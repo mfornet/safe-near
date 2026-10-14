@@ -69,6 +69,11 @@ official one and we use exactly for this purpose.
 
 There was some previous effort at: https://github.com/cajal-technologies/NEAR-lean/
 
+### Questions
+
+Is it true that after we schedule any callback that will always be triggered
+despite if the intermediate results are executed succesfully or not.
+
 ## Smart Contracts
 
 Our first goal is to formalize critical smart contracts on the NEAR blockchain,
@@ -146,3 +151,6 @@ state of the art tools in LEAN to verify the final proofs.
 Note this is only needed at the very end of the verification, during the development
 of the proof we can use fastart and "trusted" tools.
 
+## Future work
+
+Theorems that span multiple contracts simultaneously (do we really need this?)

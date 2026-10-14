@@ -2,5 +2,5 @@
 
 Formally verify NEAR smart contracts.
 
-Check [human written notes](SAFE_NEAR.md).
+Check [human written notes](human-docs/SAFE_NEAR.md).
 
