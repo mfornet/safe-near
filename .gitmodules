@@ -1,0 +1,33 @@
+[submodule "contracts/sputnik-dao-factory/src"]
+	path = contracts/sputnik-dao-factory/source
+	url = https://github.com/near-daos/sputnik-dao-contract
+[submodule "contracts/sputnikdao2-v3.2/src"]
+	path = contracts/sputnikdao2-v3.2/source
+	url = https://github.com/near-daos/sputnik-dao-contract
+[submodule "contracts/intents-defuse/src"]
+	path = contracts/intents-defuse/source
+	url = https://github.com/near/intents
+[submodule "contracts/mpc-contract/src"]
+	path = contracts/mpc-contract/source
+	url = https://github.com/near/mpc
+[submodule "contracts/omni-bridge/src"]
+	path = contracts/omni-bridge/source
+	url = https://github.com/Near-One/omni-bridge
+[submodule "contracts/eth2-client/src"]
+	path = contracts/eth2-client/source
+	url = https://github.com/Near-One/rainbow-bridge
+[submodule "contracts/w-near/src"]
+	path = contracts/w-near/source
+	url = https://github.com/near/core-contracts
+[submodule "contracts/skyward/src"]
+	path = contracts/skyward/source
+	url = https://github.com/skyward-finance/contracts
+[submodule "contracts/linkdrop/src"]
+	path = contracts/linkdrop/source
+	url = https://github.com/near/near-linkdrop
+[submodule "contracts/ref-farming/src"]
+	path = contracts/ref-farming/source
+	url = https://github.com/DevOfCredit/ref-contracts
+[submodule "contracts/aurora-engine/src"]
+	path = contracts/aurora-engine/source
+	url = https://github.com/aurora-is-near/aurora-engine

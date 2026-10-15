@@ -1,0 +1,35 @@
+name = "w-near"
+title = "Wrapped NEAR (wNEAR)"
+description = "The wNEAR fungible token (`wrap.near`), NEP-141 implementation from core-contracts."
+code_hash = "DL2f5xmZ44cQRP6vBMt94rvseH5d5KKnAGis2WkTAsh1"
+
+[source]
+repo = "https://github.com/near/core-contracts"
+commit = "54f8267436058567b66efdaba3e790394f7f1529"
+path = "w-near"
+version = "1.0.0"
+pinned_by = "wasm-in-git-history"
+wasm_in_repo = "w-near/res/w_near.wasm"
+
+[build]
+method = "docker-script"
+rust = "1.51.0"
+near_sdk = "3.1.0"
+image = "rust:1.51.0"
+workdir = "w-near"
+rustflags = "-C link-arg=-s"
+command = "cargo build --target wasm32-unknown-unknown --release"
+output_wasm_path = "w-near/target/wasm32-unknown-unknown/release/w_near.wasm"
+reproduced = "exact"
+rust_version_basis = "rust-toolchain file at commit = stable-2021-03-25 (Rust 1.51.0); commit message says 'Rebuild with contract builder'"
+reproduced_hash = "DL2f5xmZ44cQRP6vBMt94rvseH5d5KKnAGis2WkTAsh1"
+reproduced_at = "2026-10-15"
+
+[[deployments]]
+network = "mainnet"
+account_id = "wrap.near"
+verified_block_height = 220077326
+verified_block_hash = "6DzdbUYKnGunfxHq5ysk53ZMnqPdyRUZ4usdyrFswN2n"
+deploy_block_height = 35438886
+deploy_block_hash = "E1tLsA3i5sTaJcNCFttTiqCErwVTJCEzBkZLH78HnsMf"
+code_hash_before = "9kQaNiscuPh69vRs1GyzfnkEjpUPGLjJhT6RaJBQyG7p"

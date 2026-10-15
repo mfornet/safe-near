@@ -1,0 +1,36 @@
+name = "ref-farming"
+title = "Ref Finance farming v1.1.0"
+description = "Ref Finance farming contract (`v2.ref-farming.near`). The upstream repo `ref-finance/ref-contracts` was removed from GitHub; the source is pinned through a public fork whose history contains the exact release binary."
+code_hash = "dp5BqcBKtpqEUTx5jF3fQKjUZ1gghEHo54oRLJ8uXZ4"
+
+[source]
+repo = "https://github.com/DevOfCredit/ref-contracts"
+upstream_repo = "https://github.com/ref-finance/ref-contracts (404 as of 2026-10-15)"
+commit = "fc34dd82bcfbc216d1461145679b28a05e1dc56a"
+path = "ref-farming"
+version = "1.1.0"
+pinned_by = "wasm-in-git-history"
+wasm_in_repo = "releases/ref_farming_release.wasm"
+
+[build]
+method = "docker-script"
+rust = "1.56.1"
+near_sdk = "3.1.0"
+image = "rust:1.56.1"
+workdir = "."
+rustflags = "-C link-arg=-s"
+command = "cargo build -p ref_farming --target wasm32-unknown-unknown --release"
+output_wasm_path = "target/wasm32-unknown-unknown/release/ref_farming.wasm"
+reproduced = "exact"
+rust_version_basis = "Dockerfile at commit: FROM rust:1.56.1; _rust_setup.sh installs stable-2021-11-01 (= 1.56.1)"
+reproduced_hash = "dp5BqcBKtpqEUTx5jF3fQKjUZ1gghEHo54oRLJ8uXZ4"
+reproduced_at = "2026-10-15"
+
+[[deployments]]
+network = "mainnet"
+account_id = "v2.ref-farming.near"
+verified_block_height = 220075377
+verified_block_hash = "BMpFF6uiB5Aqm3yetWSZCaVMup6WQGKBkymDUKfjC6uq"
+deploy_block_height = 81183973
+deploy_block_hash = "9Q39W8SpJjbtspcmbNrGQ3LuwkLX1YCfamT2gasibMAT"
+code_hash_before = "CJ5QL4jQvPAKPrhjHBkvXs21jNQhrhcWbApVJcrnTJiP"

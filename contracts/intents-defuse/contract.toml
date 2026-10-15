@@ -1,0 +1,32 @@
+name = "intents-defuse"
+title = "NEAR Intents verifier (defuse)"
+description = "The NEAR Intents settlement contract (`intents.near`): multi-token (NEP-245) balances and signed intent execution."
+code_hash = "BtA1BEFNS619KkvXFsgcpQ21Tb5yMm32aaUkn7xNothk"
+
+[source]
+repo = "https://github.com/near/intents"
+commit = "16d04f6ec4401263f8914638710260da50bb46b0"
+path = "contracts/defuse"
+version = "0.4.5"
+pinned_by = "nep330-metadata"
+
+[build]
+method = "cargo-near-reproducible"
+rust = "1.97.1"
+near_sdk = "5.29.0"
+image = "sourcescan/cargo-near:0.22.0-rust-1.97.1"
+image_digest = "sha256:7467038bdddc86484b73b416eeadce926ff59013e128e53dec5a19e1cb4b2234"
+command = ["cargo", "near", "build", "non-reproducible-wasm", "--locked", "--features=contract", "--abi-features=abi,contract"]
+output_wasm_path = "target/near/defuse/defuse.wasm"
+reproduced = "exact"
+reproduced_hash = "BtA1BEFNS619KkvXFsgcpQ21Tb5yMm32aaUkn7xNothk"
+reproduced_at = "2026-10-15"
+
+[[deployments]]
+network = "mainnet"
+account_id = "intents.near"
+verified_block_height = 220077603
+verified_block_hash = "GWbFQCPUjLRkoBWJ99GFbBvcvPCiv6WFbLAHnCg8dMAv"
+deploy_block_height = 218982375
+deploy_block_hash = "85UzEE4Gq6EaXAc5JLZn53eeHaC1qszCga8pgBVwQ6Zg"
+code_hash_before = "EHTzkKyabhTGuKpvET5hBi7xPdKacuesMc91dDGkWvqb"

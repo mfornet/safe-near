@@ -1,0 +1,35 @@
+name = "skyward"
+title = "Skyward Finance"
+description = "Skyward Finance token sale / IDO platform contract (`skyward.near`)."
+code_hash = "G9NQfb8SpWysM29Ngbu5azci28JfobJqrtUVpQdiDkL8"
+
+[source]
+repo = "https://github.com/skyward-finance/contracts"
+commit = "a814cbd3a0fbdf7a90180c8959b1f49aea247f84"
+path = "skyward"
+version = "0.1.0"
+pinned_by = "wasm-in-git-history"
+wasm_in_repo = "release/skyward.wasm"
+
+[build]
+method = "docker-script"
+rust = "1.51.0"
+near_sdk = "3.1.0"
+image = "rust:1.51.0"
+workdir = "skyward"
+rustflags = "-C link-arg=-s"
+command = "cargo build --target wasm32-unknown-unknown --release"
+output_wasm_path = "skyward/target/wasm32-unknown-unknown/release/skyward.wasm"
+reproduced = "exact"
+rust_version_basis = "Dockerfile added to the repo shortly after this commit uses rust:1.51.0; docker_build.sh compares against release/skyward.wasm"
+reproduced_hash = "G9NQfb8SpWysM29Ngbu5azci28JfobJqrtUVpQdiDkL8"
+reproduced_at = "2026-10-15"
+
+[[deployments]]
+network = "mainnet"
+account_id = "skyward.near"
+verified_block_height = 220075572
+verified_block_hash = "9aeaQ8CLrdRBHjFiYkvQyUVpnNJUHmRqVyebF2iHPYtJ"
+deploy_block_height = 40785914
+deploy_block_hash = "DZ4Hka2GnoCkzEsvyaojypz1bchLjeUetXQHXaYFMz6D"
+code_hash_before = "11111111111111111111111111111111"

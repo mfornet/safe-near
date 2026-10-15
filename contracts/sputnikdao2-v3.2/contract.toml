@@ -1,0 +1,31 @@
+name = "sputnikdao2-v3.2"
+title = "Sputnik DAO v3.2 (sputnikdao2)"
+description = "Sputnik DAO contract, version 3.2 as stored in the factory (`get_contracts_metadata`, default code). DAO instances upgrade to it through the factory. No deployed instance with this hash was identified yet."
+code_hash = "DtHZA1mUmGYeScEaUoUZYQGGFHSMpnjMCvkr5U9hJXuF"
+deployments = []
+
+[source]
+repo = "https://github.com/near-daos/sputnik-dao-contract"
+commit = "2b0f34a3860460f285307ec2ccf36345acbe05a2"
+path = "sputnikdao2"
+version = "2.3.1"
+pinned_by = "factory-metadata"
+
+[build]
+method = "cargo-near-reproducible"
+rust = "1.86.0"
+near_sdk = "5.24"
+image = "sourcescan/cargo-near:0.19.0-rust-1.86.0"
+image_digest = "sha256:772638e343baeeea24e49062c7d424274f3441452cc06ce97fc4e5695b19fecc"
+command = ["cargo", "near", "build", "non-reproducible-wasm", "--locked"]
+output_wasm_path = "target/near/sputnikdao2/sputnikdao2.wasm"
+reproduced = "exact"
+reproduced_hash = "DtHZA1mUmGYeScEaUoUZYQGGFHSMpnjMCvkr5U9hJXuF"
+reproduced_at = "2026-10-15"
+
+[stored_in]
+account_id = "sputnik-dao.near"
+how = "factory code blob, version [3,2], commit_id from get_contracts_metadata"
+fetched_with = "get_code({\"code_hash\": ...}) view call on sputnik-dao.near"
+verified_block_height = 220077680
+verified_block_hash = "7VoEgkDVgzCP3YNLMpcuKPY2x8QUinvynsyukS7qMzRc"

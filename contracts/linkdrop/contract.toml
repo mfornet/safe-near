@@ -1,0 +1,32 @@
+name = "linkdrop"
+title = "Top-level account contract (linkdrop) on `near`"
+description = "Contract deployed on the `near` top-level account: creates `*.near` accounts and implements linkdrops. Not in the initial list but every `.near` account creation goes through it."
+code_hash = "HiyC5tB1gBDpgR4x1guEp1orBde5PXqUYGoWaZfX3JGX"
+
+[source]
+repo = "https://github.com/near/near-linkdrop"
+commit = "9a6bb316f6b7c83b504ce9c94a80c37178097655"
+path = "."
+version = "0.1.1"
+pinned_by = "nep330-metadata"
+
+[build]
+method = "cargo-near-reproducible"
+rust = "1.86.0"
+near_sdk = "5.17.0"
+image = "sourcescan/cargo-near:0.16.0-rust-1.86.0"
+image_digest = "sha256:3220302ebb7036c1942e772810f21edd9381edf9a339983da43487c77fbad488"
+command = ["cargo", "near", "build", "non-reproducible-wasm", "--locked"]
+output_wasm_path = "target/near/linkdrop.wasm"
+reproduced = "exact"
+reproduced_hash = "HiyC5tB1gBDpgR4x1guEp1orBde5PXqUYGoWaZfX3JGX"
+reproduced_at = "2026-10-15"
+
+[[deployments]]
+network = "mainnet"
+account_id = "near"
+verified_block_height = 220074325
+verified_block_hash = "5FvjfHQpKzrPpKiTZThxjRbi5pXL6ekXZe3x638hKHAr"
+deploy_block_height = 163297127
+deploy_block_hash = "7U9kAGffD1UnJ1FunvgNnqzzeHcVvPLqiZjXEP6kr1dn"
+code_hash_before = "GPByuPHcs3QNeXvBwVhXdnP8ArDYkuSjgenGhHC5UeQW"

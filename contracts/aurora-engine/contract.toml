@@ -1,0 +1,34 @@
+name = "aurora-engine"
+title = "Aurora Engine (EVM on NEAR)"
+description = "Aurora EVM engine contract (`aurora`), release 3.11.1. The on-chain binary equals the `aurora-engine.wasm` asset of the GitHub release."
+code_hash = "HrtBWvCMmVXRLG9vsYAFT7LfJ6mZtCSNTvYnXMF6fwzT"
+
+[source]
+repo = "https://github.com/aurora-is-near/aurora-engine"
+commit = "f296f06ab618468dff58cbef81732b1d0ee1782e"
+tag = "3.11.1"
+path = "engine"
+version = "3.11.1"
+pinned_by = "release-asset"
+release_asset = "https://github.com/aurora-is-near/aurora-engine/releases/tag/3.11.1 aurora-engine.wasm sha256:fa8252444e819963b6e8a3e7c01308c9ca1a2401d82c8d754cc1d055e338839c"
+
+[build]
+method = "docker-script"
+rust = "1.99.0"
+image = "nearprotocol/contract-builder:master-13430592a7be246dd5a29439791f4081e0107ff3-amd64"
+workdir = "."
+command = "./scripts/docker-entrypoint.sh (cargo make build-docker-inner, CARGO_MAKE_VERSION=0.37.24)"
+output_wasm_path = "bin/aurora-engine.wasm"
+reproduced = "exact"
+rust_version_basis = "rust-toolchain at tag 3.11.1; Makefile.toml task build-docker pins the builder image"
+reproduced_hash = "HrtBWvCMmVXRLG9vsYAFT7LfJ6mZtCSNTvYnXMF6fwzT"
+reproduced_at = "2026-10-15"
+
+[[deployments]]
+network = "mainnet"
+account_id = "aurora"
+verified_block_height = 220073289
+verified_block_hash = "EN7FrNe77M6gDLtVfy3d9ezjdqnu6uc3R5JcPiYUvqRQ"
+deploy_block_height = 218961590
+deploy_block_hash = "p2BiP2urB56y2DNLdpL5ujGyA9oA3bBAR74uBbqQvxy"
+code_hash_before = "2axCgM1hmJWemwiGH8YuhXzvzodSjfP34X4TzcLRUM76"

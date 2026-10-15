@@ -1,0 +1,32 @@
+name = "omni-bridge"
+title = "Omni Bridge (NEAR side)"
+description = "Omni Bridge locker/controller contract on NEAR (`omni.bridge.near`): token transfers between NEAR and other chains verified by provers."
+code_hash = "FpsHmvso6geZzLc3Re1skvMAvssMSgKwofk9281Uafhz"
+
+[source]
+repo = "https://github.com/Near-One/omni-bridge"
+commit = "3124f85f7b02c45ad4517b059525963d53a7aab9"
+path = "near/omni-bridge"
+version = "0.4.16"
+pinned_by = "nep330-metadata"
+
+[build]
+method = "cargo-near-reproducible"
+rust = "1.96.0"
+near_sdk = "5.28.1"
+image = "sourcescan/cargo-near:0.21.1-rust-1.96.0"
+image_digest = "sha256:ccb22bb4e677ed022d8b9d1aa1b32f0af52dd0471ef1c32e48dedbf68ee6ee17"
+command = ["cargo", "near", "build", "non-reproducible-wasm", "--locked"]
+output_wasm_path = "near/target/near/omni_bridge/omni_bridge.wasm"
+reproduced = "exact"
+reproduced_hash = "FpsHmvso6geZzLc3Re1skvMAvssMSgKwofk9281Uafhz"
+reproduced_at = "2026-10-15"
+
+[[deployments]]
+network = "mainnet"
+account_id = "omni.bridge.near"
+verified_block_height = 220075218
+verified_block_hash = "3Vc6mNgV8VsyvKotVx15EgEP6LW7r1X5mxJUw17Vb8Dp"
+deploy_block_height = 216369342
+deploy_block_hash = "AXZ1ABfv6hb5DVrBusVA9xyNu9K8vnvzZPuZWRv2ucj"
+code_hash_before = "748XDYXPBT4kMGovgRh6u8Mi7R4iNMsvUXzrSN1rFHT4"

@@ -1,0 +1,32 @@
+name = "eth2-client"
+title = "Rainbow Bridge Ethereum 2 light client"
+description = "Ethereum beacon-chain light client on NEAR used by the Rainbow Bridge after the Merge (`client-eth2.bridge.near`)."
+code_hash = "C34bk5hjnmVQRD8f5YTiwPzh8A64iKe3wkTNaaxPhUts"
+
+[source]
+repo = "https://github.com/Near-One/rainbow-bridge"
+commit = "9783ca494c2cea62512d7396274087b487af0805"
+path = "contracts/near/eth2-client"
+version = "0.7.1"
+pinned_by = "nep330-metadata"
+
+[build]
+method = "cargo-near-reproducible"
+rust = "1.86.0"
+near_sdk = "5.24.1"
+image = "sourcescan/cargo-near:0.16.0-rust-1.86.0"
+image_digest = "sha256:3220302ebb7036c1942e772810f21edd9381edf9a339983da43487c77fbad488"
+command = ["cargo", "near", "build", "non-reproducible-wasm", "--locked"]
+output_wasm_path = "contracts/near/target/near/eth2_client/eth2_client.wasm"
+reproduced = "exact"
+reproduced_hash = "C34bk5hjnmVQRD8f5YTiwPzh8A64iKe3wkTNaaxPhUts"
+reproduced_at = "2026-10-15"
+
+[[deployments]]
+network = "mainnet"
+account_id = "client-eth2.bridge.near"
+verified_block_height = 220073811
+verified_block_hash = "rEMPFhqyL3w6TJYY8VTxvBDDxcH7vRyX4wBQNUxiin9"
+deploy_block_height = 193402297
+deploy_block_hash = "BkqAJfMP2huNBq1pkBUqT173tw3yevPvT7sWeLTrkLKP"
+code_hash_before = "BXYEBPy89DUSLopYgaSwitpxBv6uPhd4bG2ADPVnsXia"

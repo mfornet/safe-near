@@ -1,0 +1,32 @@
+name = "mpc-contract"
+title = "NEAR MPC / Chain Signatures contract"
+description = "Coordinates the MPC network: signature requests, key resharing, participant and TEE attestation management (`v1.signer`)."
+code_hash = "BqN6GrovBmBD7g41p5GvXMVUJcLgipuVGXF6ps6hQgBy"
+
+[source]
+repo = "https://github.com/near/mpc"
+commit = "3499a2a44207df89699c9791e21623613a365a16"
+path = "crates/contract"
+version = "3.16.0"
+pinned_by = "nep330-metadata"
+
+[build]
+method = "cargo-near-reproducible"
+rust = "1.97.1"
+near_sdk = "5.29.0"
+image = "sourcescan/cargo-near:0.22.0-rust-1.97.1"
+image_digest = "sha256:7467038bdddc86484b73b416eeadce926ff59013e128e53dec5a19e1cb4b2234"
+command = ["cargo", "near", "build", "non-reproducible-wasm", "--locked", "--profile=release-contract", "--features", "abi"]
+output_wasm_path = "target/near/mpc_contract/mpc_contract.wasm"
+reproduced = "exact"
+reproduced_hash = "BqN6GrovBmBD7g41p5GvXMVUJcLgipuVGXF6ps6hQgBy"
+reproduced_at = "2026-10-15"
+
+[[deployments]]
+network = "mainnet"
+account_id = "v1.signer"
+verified_block_height = 220074732
+verified_block_hash = "3rVqfrPijPeyMqjTPseD1FsxCx2nBEfqqoDBrrLxT3DR"
+deploy_block_height = 217179197
+deploy_block_hash = "4sEwVdsgn9gtUAqvejxm1zMQrhS1U6wFExSSRTTpXwBG"
+code_hash_before = "8XjbgWsv7eEcNnMujyWwAbQHVXnu49qD3JTbH4TGPqBL"

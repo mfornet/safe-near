@@ -1,0 +1,8 @@
+# build outputs of contracts/*/build.sh
+contracts/*/build/
+contracts/*/build.log
+
+# documentation site
+site/
+.venv/
+__pycache__/

@@ -1,0 +1,32 @@
+name = "sputnik-dao-factory"
+title = "Sputnik DAO factory (sputnikdao-factory2)"
+description = "Factory that creates Sputnik DAO instances (`*.sputnik-dao.near`) and stores the versioned DAO code blobs used for creation and upgrades."
+code_hash = "BXd5idTXSnC7WRfxHmi7z4crw2F5WXQJ6MZUEv8DfnnY"
+
+[source]
+repo = "https://github.com/near-daos/sputnik-dao-contract"
+commit = "2b0f34a3860460f285307ec2ccf36345acbe05a2"
+path = "sputnikdao-factory2"
+version = "0.2.1"
+pinned_by = "nep330-metadata"
+
+[build]
+method = "cargo-near-reproducible"
+rust = "1.86.0"
+near_sdk = "5.24"
+image = "sourcescan/cargo-near:0.19.0-rust-1.86.0"
+image_digest = "sha256:772638e343baeeea24e49062c7d424274f3441452cc06ce97fc4e5695b19fecc"
+command = ["cargo", "near", "build", "non-reproducible-wasm", "--locked"]
+output_wasm_path = "target/near/sputnikdao_factory2/sputnikdao_factory2.wasm"
+reproduced = "exact"
+reproduced_hash = "BXd5idTXSnC7WRfxHmi7z4crw2F5WXQJ6MZUEv8DfnnY"
+reproduced_at = "2026-10-15"
+
+[[deployments]]
+network = "mainnet"
+account_id = "sputnik-dao.near"
+verified_block_height = 220075703
+verified_block_hash = "H9oHaAPQU9GUzwng7y6QkwUSw1g2kXyJ8K92gwc3W4nX"
+deploy_block_height = 187622594
+deploy_block_hash = "4RV2tbPxi6Fbk7A6fL1kE8SvxheQZ217NYV7qfTKWhWL"
+code_hash_before = "4V6tEzAf2EVXRUNgtLB45ohE2SWxS8Q5rJAGJap8v3C9"
