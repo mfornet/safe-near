@@ -1,8 +1,7 @@
 import Programs.Mergesort.Program
-import Programs.Attrs
-import Programs.WordCodec
-import Programs.ByteReassembly
 import Interpreter.Wasm.Host.Universal
+import CodeLib.UInt32
+import CodeLib.WordCodec
 import Std.Tactic.BVDecide
 
 /-!

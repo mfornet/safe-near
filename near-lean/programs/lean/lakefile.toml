@@ -3,12 +3,15 @@ version = "0.1.0"
 defaultTargets = ["Programs"]
 packagesDir = "../../.lake/packages"
 
+# CodeLib (../../iris-wasm) re-exports the interpreter (../../wasm) and adds
+# the Iris separation-logic layer, Rust std lemmas and the elaborators that
+# splice ../rust/build/<crate>/program.wat into each Program.lean.
 [[require]]
-name = "Interpreter"
-path = "../../wasm"
+name = "CodeLib"
+path = "../../iris-wasm"
 
-# Generated Wasm modules of ../rust (one `Programs.<Crate>.Program` each) plus
-# the elaborators that splice ../rust/build/<crate>/program.wat into them.
+# Generated Wasm modules of ../rust (one `Programs.<Crate>.Program` each),
+# their specifications and (sorry) correctness theorems.
 [[lean_lib]]
 name = "Programs"
 

@@ -28,11 +28,10 @@ Copied, with paths flattened so that this directory is the Lake package:
   adapted to this layout.
 - `testsuite_report.txt`: the committed spec-testsuite coverage snapshot.
 
-Left out on purpose (they are not part of the runtime; bring them in later if
-needed): `codelib/` (Iris separation logic layer, Rust std lemmas, a NEAR host
-experiment), `programs/` (Rust-to-Wasm proof projects), `verifier/`
-(scaffolder / WAT emitter), `differential/` (fuzzing against V8), and the
-agent configuration files.
+Left out of this package: `codelib/` and `programs/`, which live beside it as
+[`../iris-wasm`](../iris-wasm/README.md) and [`../programs`](../programs/README.md);
+`verifier/` (scaffolder / WAT emitter), `differential/` (fuzzing against V8),
+and the agent configuration files were not brought over.
 
 The Lake module is still called `Interpreter` to keep diffs against upstream
 small.
@@ -113,7 +112,9 @@ Talos moves quickly. To pull in newer changes, diff this directory against
 what is wanted, update the commit in this README, and regenerate
 `testsuite_report.txt`.
 
-## Programs
+## Siblings
 
-Rust stream programs compiled to Wasm and run under this interpreter live in
-[`../programs`](../programs/README.md).
+- [`../iris-wasm`](../iris-wasm/README.md): Iris separation logic over this
+  interpreter, lifting and adequacy, Rust std lemmas (Talos `codelib`).
+- [`../programs`](../programs/README.md): Rust stream programs compiled to
+  Wasm, their specs, and the smoke runner.

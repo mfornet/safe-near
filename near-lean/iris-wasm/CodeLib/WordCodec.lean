@@ -1,4 +1,3 @@
--- Copied verbatim from Talos codelib/CodeLib/WordCodec.lean.
 /-!
 # Fixed-width word codecs for packed byte streams
 

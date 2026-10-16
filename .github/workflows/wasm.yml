@@ -24,7 +24,7 @@ jobs:
       - uses: actions/cache@v5
         with:
           path: near-lean/.lake/packages
-          key: lake-pkgs-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('near-lean/wasm/lean-toolchain') }}-${{ hashFiles('near-lean/wasm/lake-manifest.json') }}
+          key: lake-pkgs-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('near-lean/wasm/lean-toolchain') }}-${{ hashFiles('near-lean/wasm/lake-manifest.json', 'near-lean/iris-wasm/lake-manifest.json') }}
           restore-keys: |
             lake-pkgs-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('near-lean/wasm/lean-toolchain') }}-
 
@@ -55,6 +55,12 @@ jobs:
             exit 1
           fi
 
+      # iris-wasm: the Iris separation-logic layer (Talos codelib). Iris is a
+      # git dependency compiled from source; it lands in the shared package cache.
+      - name: Build iris-wasm
+        working-directory: near-lean/iris-wasm
+        run: lake build --wfail
+
       # Programs: each Program.lean re-decodes rust/build/<crate>/program.wat
       # at compile time, then the smoke exe runs them under the stdio host.
       - name: Build programs and run smoke
@@ -62,6 +68,15 @@ jobs:
         run: |
           lake build
           lake exe smoke
+
+      # Every declaration may depend only on propext, Classical.choice and
+      # Quot.sound: no sorry, no native_decide. The programs package carries
+      # open proofs by design, so only sorryAx is tolerated there (and listed).
+      - name: Axiom audit (no sorry, no native_decide)
+        run: |
+          python3 tools/axiom-audit.py near-lean/wasm --report audit/wasm.json --no-build
+          python3 tools/axiom-audit.py near-lean/iris-wasm --report audit/iris-wasm.json --no-build
+          python3 tools/axiom-audit.py near-lean/programs/lean --report audit/programs.json --no-build --allow-sorry
 
   programs-rust:
     name: Check committed program wasm is reproducible

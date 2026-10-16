@@ -1,7 +1,6 @@
 import Programs.GcdStdio.Program
-import Programs.Attrs
-import Programs.WordCodec.UInt64
 import Interpreter.Wasm.Host.Universal
+import CodeLib.Examples.SelectionSort.StdIO
 
 /-!
 # Specification for the `num-integer` GCD stream
@@ -22,8 +21,10 @@ namespace Programs.GcdStdio.Spec
 
 open Wasm
 
-/-- The canonical eight-byte little-endian codec. -/
-abbrev codec : WordCodec UInt64 := Wasm.WordCodec.u64le
+/-- The canonical eight-byte little-endian codec already used by the StdIO
+examples. -/
+abbrev codec : WordCodec UInt64 :=
+  Wasm.Examples.SelectionSort.StdIO.codec
 
 /-- The mathematical input of `gcd`, independently of its byte layout. -/
 structure Input where

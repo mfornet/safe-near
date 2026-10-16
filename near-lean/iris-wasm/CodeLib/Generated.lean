@@ -1,3 +1,4 @@
+import CodeLib
 import Interpreter.Wasm.LeanSyntax
 import Interpreter.Wasm.Decoder.Wat
 import Lean.Elab.Term
@@ -6,11 +7,8 @@ import Lean.Elab.Term
 # Support for generated Wasm modules
 
 Generated `Program.lean` files import this module rather than depending on
-interpreter internals directly. It provides compact syntax that elaborates to
-ordinary Wasm AST literals, spliced from a `.wat` file at compile time.
-
-This is the elaborator half of Talos's `CodeLib.Generated`; the proof surface
-that module also re-exports (CodeLib) is not part of near-lean.
+interpreter internals directly. It re-exports CodeLib's proof surface together
+with compact syntax that elaborates to ordinary Wasm AST literals.
 -/
 
 namespace Wasm
@@ -110,6 +108,6 @@ def checkWatFidelity (path : System.FilePath) (actual : Module) : IO Unit := do
     | .error message => throw (IO.userError s!"{path} no longer decodes: {message}")
   unless toExpr actual == toExpr expected do
     throw (IO.userError
-      s!"{path} decodes to a different Wasm module; regenerate Program.lean.")
+      s!"{path} decodes to a different Wasm module; re-run `lake exe verifier emit`.")
 
 end Wasm

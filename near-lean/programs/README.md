@@ -9,8 +9,9 @@ Copied from [Talos](https://github.com/cajal-technologies/talos) `programs/`
 at commit `80644390de3ad4db3055445259a034413ae41577` (2026-10-06), **with the
 specifications but without the proofs**: each program's `Spec.lean` is ported
 and its top-level correctness theorem is stated in `Proof.lean` with a `sorry`
-body. No `*Proof.lean` machinery, `Analysis/`, or Talos `codelib` dependency
-was brought over. License AGPL-3.0, see `../wasm/LICENSE`.
+body. No `*Proof.lean` machinery or `Analysis/` was brought over. The package
+depends on `../iris-wasm` (Talos's `codelib`), exactly as upstream does.
+License AGPL-3.0, see `../wasm/LICENSE`.
 
 | Program | Export | Stream contract |
 |---|---|---|
@@ -28,23 +29,20 @@ Support crates: `talos_stdio` (bump allocator over `talos.oom`, plus
 rust/                     cargo workspace, toolchain pinned in rust-toolchain.toml
   build.sh                cargo → wasm-tools strip/print → build/<crate>/program.{wasm,wat}
   build/<crate>/          committed build outputs (what the Lean side consumes)
-lean/                     Lake package `Programs`, depends on ../../wasm
-  Programs/Generated.lean elaborators that splice a .wat into Lean at compile time
-  Programs/<Crate>/Program.lean   generated Wasm AST of each program
+lean/                     Lake package `Programs`, depends on ../../iris-wasm (and so on ../../wasm)
+  Programs/<Crate>/Program.lean   generated Wasm AST of each program (spliced from the .wat by CodeLib.Generated)
   Programs/<Crate>/Spec.lean      the specification (semantic Input/Output, host contract)
   Programs/<Crate>/Proof.lean     the correctness theorem, proof is `sorry`
-  Programs/Attrs.lean     `@[spec_of]` / `@[proves]` attributes linking specs to code and proofs
-  Programs/WordCodec.lean fixed-width packed byte codecs (`serialize`/`deserialize` round trip)
-  Programs/WordCodec/UInt64.lean  the little-endian u64 codec
-  Programs/ByteReassembly.lean    kernel-checked byte reconstruction lemmas behind the codecs
   Programs/Smoke.lean     `lake exe smoke`: runs every program on small inputs
 ```
 
 ## Specifications and open proofs
 
 Specs are `def … : Prop` tagged `@[spec_of <kind> "crate::fn"]`; the theorem
-that discharges one is tagged `@[proves <spec>]`. Everything below is stated
-and typechecks; every proof is currently `sorry`.
+that discharges one is tagged `@[proves <spec>]` (attributes from
+`CodeLib.Attrs`). Everything below is stated and typechecks; every proof is
+currently `sorry`. Upstream's proofs are separation-logic proofs over
+`CodeLib.SepLogic`, which is now available here.
 
 | Spec | Kind | Statement | Theorem (sorry) |
 |---|---|---|---|

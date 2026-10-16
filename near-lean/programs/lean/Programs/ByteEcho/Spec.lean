@@ -1,5 +1,4 @@
 import Programs.ByteEcho.Program
-import Programs.Attrs
 import Interpreter.Wasm.Host.Universal
 
 /-!
