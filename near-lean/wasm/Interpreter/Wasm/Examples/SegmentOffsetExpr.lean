@@ -1,0 +1,105 @@
+import Interpreter.Wasm.SmallStep
+import Interpreter.Wasm.Examples.Harness
+
+kernel_decoder
+
+set_option maxRecDepth 100000
+set_option maxHeartbeats 4000000
+
+/-! ## Example: const-expression data/element segment offsets
+
+    Active segment offsets may use constant expressions such as
+    `global.get`. Instantiation must evaluate those expressions before the
+    small-step machine observes memory and table contents.
+-/
+
+namespace Wasm
+open SmallStep
+namespace SegmentOffsetExpr
+
+def segmentOffsetWat : String := "
+(module
+  (global $o i32 (i32.const 4))
+  (global $t i32 (i32.const 2))
+  (memory 1)
+  (data (offset (global.get $o)) \"ABCD\")
+  (table 4 funcref)
+  (elem (offset (global.get $t)) $f42)
+  (type $ri (func (result i32)))
+  (func $f42 (type $ri) (i32.const 42))
+  (func $readByte4 (export \"readByte4\") (result i32)
+    (i32.load8_u (i32.const 4)))
+  (func $callAt2 (export \"callAt2\") (result i32)
+    (call_indirect (type $ri) (i32.const 2))))
+"
+
+private def decoded : Wasm.Module :=
+  Wasm.Examples.decodeOrDefault segmentOffsetWat
+
+theorem decoded_segments_keep_offsetExpr :
+    ((decoded.memory.bind (·.data[0]?)).map (·.offsetExpr.isEmpty)).getD true = false
+    ∧ (decoded.elements[0]?.map (·.offsetExpr.isEmpty)).getD true = false := by
+  constructor <;> cbv
+
+private def store0 : Store Unit :=
+  let module := decoded
+  module.runActiveSegments 64
+    (module.runConstGlobals 64 (module.initialStore (α := Unit)) {}) {}
+
+def segmentMachineStore : MachineStore Unit :=
+  { runtime := { instances := #[{ module := decoded, host := {} }], entry := ⟨0⟩ }
+    wasm := store0 }
+
+private def functionConfig (index : Nat) : Config Unit :=
+  { expr := .running
+      { locals := {}
+        code := decoded.funcs[index]!.body
+        resultArity := decoded.funcs[index]!.results.length
+        callerRemainder := [] }
+    store := segmentMachineStore }
+
+def readByte4Config : Config Unit := functionConfig 1
+def callAt2Config : Config Unit := functionConfig 2
+
+theorem readByte4_returns_65 :
+    (runSteps 3 readByte4Config).result.values? =
+      some [.i32 65] := by cbv
+
+theorem readByte4_terminates :
+    TerminatesWith readByte4Config (fun values store =>
+      values = [.i32 65] ∧
+      store.wasm.mem.read8 4 = 65 ∧
+      store.wasm.mem.read8 0 = 0) := by
+  apply runSteps_checked_terminates (fuel := 3)
+    (fun values store =>
+      decide (values = [.i32 65] ∧
+        store.wasm.mem.read8 4 = 65 ∧
+        store.wasm.mem.read8 0 = 0))
+  · cbv
+  · exact fun _ _ h => of_decide_eq_true h
+
+/-- Partial correctness reuses the terminating run: normal completion is
+deterministic, so the trace witnessed by `readByte4_terminates` is the only one. -/
+theorem readByte4_partial :
+    PartiallyMeets readByte4Config (fun values store =>
+      values = [.i32 65] ∧ store.wasm.mem.read8 4 = 65) :=
+  readByte4_terminates.toPartiallyMeets.mono fun _ _ post => ⟨post.1, post.2.1⟩
+
+theorem callAt2_returns_42 :
+    (runSteps 16 callAt2Config).result.values? =
+      some [.i32 42] := by cbv
+
+theorem callAt2_terminates :
+    TerminatesWith callAt2Config (fun values _ =>
+      values = [.i32 42]) :=
+  runSteps_values_terminates callAt2_returns_42
+
+theorem callAt2_partial :
+    PartiallyMeets callAt2Config (fun values _ =>
+      values = [.i32 42]) :=
+  callAt2_terminates.toPartiallyMeets
+
+theorem byte0_still_zero : store0.mem.read8 0 = 0 := by cbv
+
+end SegmentOffsetExpr
+end Wasm

@@ -1,0 +1,25 @@
+# Programs for the WASM interpreter (see README.md). Run `just` to list recipes.
+set shell := ["bash", "-euo", "pipefail", "-c"]
+
+[private]
+default:
+    @just --list --unsorted
+
+# Compile the Rust workspace to Wasm and refresh rust/build/<crate>/program.{wasm,wat}.
+rust-build:
+    rust/build.sh
+
+# Run the Rust unit tests natively.
+[working-directory("rust")]
+rust-test:
+    cargo test
+
+# Build the Lean `Programs` library (checks each Program.lean against its .wat).
+[working-directory("lean")]
+build:
+    lake build
+
+# Run every program under the stdio host on small inputs.
+[working-directory("lean")]
+smoke:
+    lake exe smoke

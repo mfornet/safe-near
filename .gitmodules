@@ -31,3 +31,6 @@
 [submodule "contracts/aurora-engine/src"]
 	path = contracts/aurora-engine/source
 	url = https://github.com/aurora-is-near/aurora-engine
+[submodule "near-lean/wasm/vendor/testsuite"]
+	path = near-lean/wasm/vendor/testsuite
+	url = https://github.com/WebAssembly/testsuite

@@ -1,0 +1,86 @@
+name: wasm
+
+on:
+  push:
+    branches: [main]
+    paths: ["near-lean/**", ".github/workflows/wasm.yml"]
+  pull_request:
+    paths: ["near-lean/**", ".github/workflows/wasm.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: wasm-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build, smoke test, and check testsuite_report.txt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      # Only the spec testsuite is needed; the contracts/*/source submodules are large.
+      - run: git submodule update --init near-lean/wasm/vendor/testsuite
+
+      - uses: actions/cache@v5
+        with:
+          path: near-lean/.lake/packages
+          key: lake-pkgs-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('near-lean/wasm/lean-toolchain') }}-${{ hashFiles('near-lean/wasm/lake-manifest.json') }}
+          restore-keys: |
+            lake-pkgs-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('near-lean/wasm/lean-toolchain') }}-
+
+      # Build the `Interpreter` library (not only the executables) so the worked
+      # examples under Interpreter/Wasm/Examples/ keep compiling.
+      - uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: near-lean/wasm
+          build-args: Interpreter runner testsuite
+          use-mathlib-cache: true
+
+      # Must match the pin in near-lean/wasm/scripts/testsuite-report.sh.
+      - name: Install wasm-tools
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-tools@1.251.0
+
+      - name: Runner smoke test
+        run: near-lean/wasm/scripts/runner-smoke.sh
+
+      - name: Regenerate testsuite_report.txt
+        run: near-lean/wasm/scripts/testsuite-report.sh
+
+      - name: Verify testsuite_report.txt is unchanged
+        run: |
+          if ! git diff --exit-code near-lean/wasm/testsuite_report.txt; then
+            echo "::error::near-lean/wasm/testsuite_report.txt is out of date. Run scripts/testsuite-report.sh and commit the result."
+            exit 1
+          fi
+
+      # Programs: each Program.lean re-decodes rust/build/<crate>/program.wat
+      # at compile time, then the smoke exe runs them under the stdio host.
+      - name: Build programs and run smoke
+        working-directory: near-lean/programs/lean
+        run: |
+          lake build
+          lake exe smoke
+
+  programs-rust:
+    name: Check committed program wasm is reproducible
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install pinned Rust toolchain
+        working-directory: near-lean/programs/rust
+        run: rustup show active-toolchain || rustup toolchain install
+      # Must match the pin in near-lean/wasm/scripts/testsuite-report.sh.
+      - name: Install wasm-tools
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-tools@1.251.0
+      - name: Rebuild
+        run: near-lean/programs/rust/build.sh
+      - name: Verify build outputs are unchanged
+        run: |
+          if ! git diff --exit-code near-lean/programs/rust/build; then
+            echo "::error::near-lean/programs/rust/build is out of date. Run build.sh and commit the result (and regenerate Program.lean if the .wat changed)."
+            exit 1
+          fi

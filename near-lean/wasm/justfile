@@ -1,0 +1,35 @@
+# WASM interpreter (copied from Talos, see README.md). Run `just` to list recipes.
+set shell := ["bash", "-euo", "pipefail", "-c"]
+
+[private]
+default:
+    @just --list --unsorted
+
+# Fetch mathlib's prebuilt oleans, then build the library and both executables.
+build:
+    lake exe cache get
+    lake build Interpreter runner testsuite
+
+# Run a .wat/.wasm module, e.g. `just run samples/factorial.wat fact 5`.
+run +args:
+    lake exe runner {{ args }}
+
+# Smoke-test the runner executable against samples/.
+runner-smoke:
+    scripts/runner-smoke.sh
+
+# Run the WebAssembly spec testsuite; optional substring filter on the .wast name.
+testsuite pattern="":
+    scripts/testsuite.sh {{ quote(pattern) }}
+
+# Regenerate testsuite_report.txt (needs the pinned wasm-tools, see the script).
+testsuite-report:
+    scripts/testsuite-report.sh
+
+# Summarise testsuite_report.txt: where the interpreter stands against the spec.
+testsuite-summary:
+    scripts/testsuite-summary.sh
+
+# Remove Lake build artefacts (this package and the shared near-lean/.lake).
+clean:
+    rm -rf .lake ../.lake

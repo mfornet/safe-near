@@ -1,0 +1,307 @@
+/-! ## Linear memory model
+
+A `Mem` is a function from byte addresses to `UInt8`, together with a
+page count (1 page = 64 KiB). The function is total: reads outside the
+"legal" range `[0, pages * 65536)` return whatever `bytes` returns there
+(typically zero, since `Mem.empty` initialises with `fun _ => 0`), but
+well-formed programs never read those addresses.
+
+This is the live memory model backing every memory instruction:
+loads/stores, `memory.size`/`grow`/`fill`/`copy`/`init`, and the
+multi-memory and data-segment machinery all read and write a `Mem`.
+
+The simplicity-of-reasoning convention applies: writes update the
+underlying `bytes` function pointwise via `fun i => if i ∈ range then …
+else m.bytes i`, which is trivially easy to `simp` through. -/
+
+namespace Wasm
+
+/-- A function-model linear memory. `pages` counts 64 KiB pages; `bytes`
+maps every byte address to its current value. -/
+structure Mem where
+  pages : Nat
+  bytes : Nat → UInt8
+deriving Inhabited
+
+/-- Custom `Repr` instance: prints only `pages`. The byte function is
+elided because functions don't have a sensible textual representation
+and `#eval` results in examples don't need byte-level dumps. -/
+instance : Repr Mem where
+  reprPrec m _ := s!"Mem(pages={m.pages})"
+
+/-- An empty memory with `pages` pages, all bytes zeroed. -/
+def Mem.empty (pages : Nat) : Mem :=
+  { pages, bytes := fun _ => 0 }
+
+/-- Read a single byte. -/
+def Mem.read8 (m : Mem) (a : UInt32) : UInt8 :=
+  m.bytes a.toNat
+
+/-- Read a little-endian 32-bit word starting at `a`. -/
+def Mem.read32 (m : Mem) (a : UInt32) : UInt32 :=
+  let b0 : UInt32 := (m.bytes a.toNat).toUInt32
+  let b1 : UInt32 := (m.bytes (a.toNat + 1)).toUInt32
+  let b2 : UInt32 := (m.bytes (a.toNat + 2)).toUInt32
+  let b3 : UInt32 := (m.bytes (a.toNat + 3)).toUInt32
+  b0 ||| (b1 <<< 8) ||| (b2 <<< 16) ||| (b3 <<< 24)
+
+/-- Write a single byte. -/
+def Mem.write8 (m : Mem) (a : UInt32) (v : UInt8) : Mem :=
+  { m with bytes := fun i => if i = a.toNat then v else m.bytes i }
+
+/-- Write a little-endian 32-bit word starting at `a`. -/
+def Mem.write32 (m : Mem) (a : UInt32) (v : UInt32) : Mem :=
+  let n := a.toNat
+  let b0 : UInt8 := (v &&& 0xFF).toUInt8
+  let b1 : UInt8 := ((v >>> 8) &&& 0xFF).toUInt8
+  let b2 : UInt8 := ((v >>> 16) &&& 0xFF).toUInt8
+  let b3 : UInt8 := ((v >>> 24) &&& 0xFF).toUInt8
+  { m with bytes := fun i =>
+      if i = n then b0
+      else if i = n + 1 then b1
+      else if i = n + 2 then b2
+      else if i = n + 3 then b3
+      else m.bytes i }
+
+/-- Read a little-endian 16-bit value starting at `a`; zero-extended to UInt32. -/
+def Mem.read16 (m : Mem) (a : UInt32) : UInt32 :=
+  let b0 : UInt32 := (m.bytes a.toNat).toUInt32
+  let b1 : UInt32 := (m.bytes (a.toNat + 1)).toUInt32
+  b0 ||| (b1 <<< 8)
+
+/-- Read a little-endian 64-bit word starting at `a`. -/
+def Mem.read64 (m : Mem) (a : UInt32) : UInt64 :=
+  let b0 : UInt64 := (m.bytes a.toNat).toUInt64
+  let b1 : UInt64 := (m.bytes (a.toNat + 1)).toUInt64
+  let b2 : UInt64 := (m.bytes (a.toNat + 2)).toUInt64
+  let b3 : UInt64 := (m.bytes (a.toNat + 3)).toUInt64
+  let b4 : UInt64 := (m.bytes (a.toNat + 4)).toUInt64
+  let b5 : UInt64 := (m.bytes (a.toNat + 5)).toUInt64
+  let b6 : UInt64 := (m.bytes (a.toNat + 6)).toUInt64
+  let b7 : UInt64 := (m.bytes (a.toNat + 7)).toUInt64
+  b0 ||| (b1 <<< 8) ||| (b2 <<< 16) ||| (b3 <<< 24) |||
+  (b4 <<< 32) ||| (b5 <<< 40) ||| (b6 <<< 48) ||| (b7 <<< 56)
+
+/-- Write the low 2 bytes of `v` in little-endian order starting at `a`. -/
+def Mem.write16 (m : Mem) (a : UInt32) (v : UInt32) : Mem :=
+  let n := a.toNat
+  let b0 : UInt8 := (v &&& 0xFF).toUInt8
+  let b1 : UInt8 := ((v >>> 8) &&& 0xFF).toUInt8
+  { m with bytes := fun i =>
+      if i = n then b0
+      else if i = n + 1 then b1
+      else m.bytes i }
+
+/-- Write a little-endian 64-bit word starting at `a`. -/
+def Mem.write64 (m : Mem) (a : UInt32) (v : UInt64) : Mem :=
+  let n := a.toNat
+  let b0 : UInt8 := (v &&& 0xFF).toUInt8
+  let b1 : UInt8 := ((v >>> 8) &&& 0xFF).toUInt8
+  let b2 : UInt8 := ((v >>> 16) &&& 0xFF).toUInt8
+  let b3 : UInt8 := ((v >>> 24) &&& 0xFF).toUInt8
+  let b4 : UInt8 := ((v >>> 32) &&& 0xFF).toUInt8
+  let b5 : UInt8 := ((v >>> 40) &&& 0xFF).toUInt8
+  let b6 : UInt8 := ((v >>> 48) &&& 0xFF).toUInt8
+  let b7 : UInt8 := ((v >>> 56) &&& 0xFF).toUInt8
+  { m with bytes := fun i =>
+      if i = n then b0
+      else if i = n + 1 then b1
+      else if i = n + 2 then b2
+      else if i = n + 3 then b3
+      else if i = n + 4 then b4
+      else if i = n + 5 then b5
+      else if i = n + 6 then b6
+      else if i = n + 7 then b7
+      else m.bytes i }
+
+/-- Fill `len` consecutive bytes starting at `offset` with `val`. The
+pointwise `if i ∈ [offset, offset+len) then val else m.bytes i` form is
+the canonical "easy to `simp` through" shape — no list allocation, no
+recursion. The caller is responsible for the bounds check (the spec
+requires a trap when `offset + len` exceeds the memory's byte size). -/
+def Mem.fill (m : Mem) (offset len : Nat) (val : UInt8) : Mem :=
+  { m with bytes := fun i =>
+      if offset ≤ i ∧ i < offset + len then val
+      else m.bytes i }
+
+theorem Mem.fill_zero (m : Mem) (offset : Nat) (val : UInt8) :
+    m.fill offset 0 val = m := by
+  cases m with
+  | mk pages bytes =>
+    simp only [Mem.fill, Nat.add_zero]
+    congr 1; funext i
+    exact ite_eq_right (by omega)
+
+theorem Mem.fill_read8_in (m : Mem) (offset len : Nat) (val : UInt8) (i : UInt32)
+    (h : offset ≤ i.toNat ∧ i.toNat < offset + len) :
+    (m.fill offset len val).read8 i = val := by simp [Mem.fill, Mem.read8, h]
+
+theorem Mem.fill_read8_out (m : Mem) (offset len : Nat) (val : UInt8) (i : UInt32)
+    (h : ¬(offset ≤ i.toNat ∧ i.toNat < offset + len)) :
+    (m.fill offset len val).read8 i = m.read8 i := by simp [Mem.fill, Mem.read8, h]
+
+theorem Mem.fill_pages (m : Mem) (offset len : Nat) (val : UInt8) :
+    (m.fill offset len val).pages = m.pages := rfl
+
+theorem Mem.write8_fill_eq (m : Mem) (addr : UInt32) (n : Nat) (val : UInt8) :
+    (m.write8 addr val).fill (addr.toNat + 1) n val = m.fill addr.toNat (n + 1) val := by
+  cases m; simp only [Mem.fill, Mem.write8]; congr 1; funext i
+  by_cases h1 : addr.toNat + 1 ≤ i ∧ i < addr.toNat + 1 + n
+  · rw [ite_eq_left h1, ite_eq_left ⟨by omega, by omega⟩]
+  · rw [ite_eq_right h1]
+    by_cases h2 : i = addr.toNat
+    · subst h2; rw [ite_eq_left rfl, ite_eq_left (by omega)]
+    · rw [ite_eq_right h2, ite_eq_right (fun ⟨h3, h4⟩ => h1 ⟨by omega, by omega⟩)]
+
+/-- Copy `len` bytes from `[src, src+len)` to `[dst, dst+len)`. The
+result is defined pointwise — for an address `i` in the destination
+range, the new byte is the *original* `m.bytes (src + (i - dst))`.
+Reading from the pre-copy bytes function gives `memmove` semantics for
+free even when the source and destination ranges overlap, while staying
+in the canonical "easy to `simp` through" shape. The caller checks
+bounds; the spec requires a trap when `dst + len` or `src + len`
+exceeds the memory's byte size. -/
+def Mem.copy (m : Mem) (dst src len : Nat) : Mem :=
+  { m with bytes := fun i =>
+      if dst ≤ i ∧ i < dst + len then m.bytes (src + (i - dst))
+      else m.bytes i }
+
+theorem Mem.copy_pages (m : Mem) (dst src len : Nat) :
+    (m.copy dst src len).pages = m.pages := rfl
+
+theorem Mem.copy_read8_in (m : Mem) (dst src len : Nat) (i : UInt32)
+    (h : dst ≤ i.toNat ∧ i.toNat < dst + len) :
+    (m.copy dst src len).read8 i = m.bytes (src + (i.toNat - dst)) := by
+  simp [Mem.copy, Mem.read8, h]
+
+theorem Mem.copy_read8_out (m : Mem) (dst src len : Nat) (i : UInt32)
+    (h : ¬(dst ≤ i.toNat ∧ i.toNat < dst + len)) :
+    (m.copy dst src len).read8 i = m.read8 i := by simp [Mem.copy, Mem.read8, h]
+
+/-- Attempt to grow `m` by `delta` pages, accepting only if the resulting
+page count stays within `cap`. On success returns the new memory paired
+with the *previous* page count (what `memory.grow` pushes); on failure
+returns `none`. -/
+def Mem.grow (m : Mem) (delta : UInt32) (cap : Nat) : Option (Mem × Nat) :=
+  let cur := m.pages
+  let newPages := cur + delta.toNat
+  if newPages ≤ cap then some ({ m with pages := newPages }, cur)
+  else none
+
+/-- Write a list of bytes starting at byte offset `offset`. The list's
+i-th element lands at address `offset + i`. -/
+def Mem.writeBytes (m : Mem) (offset : Nat) (data : List UInt8) : Mem :=
+  let len := data.length
+  { m with bytes := fun i =>
+      if h : offset ≤ i ∧ i < offset + len then
+        data[i - offset]'(by
+          have : i - offset < len := by
+            have := h.2; omega
+          exact this)
+      else m.bytes i }
+
+/-- Writing concatenated byte strings is the same as writing the first string
+and then the second one immediately after it. -/
+theorem Mem.writeBytes_append (m : Mem) (offset : Nat) (xs ys : List UInt8) :
+    m.writeBytes offset (xs ++ ys) =
+      (m.writeBytes offset xs).writeBytes (offset + xs.length) ys := by
+  cases m with
+  | mk pages bytes =>
+    simp only [Mem.writeBytes]
+    congr
+    funext i
+    simp only [List.length_append]
+    by_cases hy : offset + xs.length ≤ i ∧
+        i < offset + xs.length + ys.length
+    · rw [dite_eq_left hy]
+      have hall : offset ≤ i ∧ i < offset + (xs.length + ys.length) := by omega
+      rw [dite_eq_left hall]
+      rw [List.getElem_append_right (by omega)]
+      congr 1
+      omega
+    · rw [dite_eq_right hy]
+      by_cases hx : offset ≤ i ∧ i < offset + xs.length
+      · rw [dite_eq_left hx]
+        have hall : offset ≤ i ∧ i < offset + (xs.length + ys.length) := by omega
+        rw [dite_eq_left hall]
+        rw [List.getElem_append_left (by omega)]
+      · rw [dite_eq_right hx]
+        have hall : ¬(offset ≤ i ∧ i < offset + (xs.length + ys.length)) := by omega
+        rw [dite_eq_right hall]
+
+/-- Writing an empty byte list leaves memory unchanged. -/
+@[simp] theorem Mem.writeBytes_nil (m : Mem) (offset : Nat) :
+    m.writeBytes offset [] = m := by
+  cases m with
+  | mk pages bytes =>
+      simp only [Mem.writeBytes, List.length_nil, Nat.add_zero]
+      congr
+      funext i
+      rw [dite_eq_right (by omega)]
+
+/-- Writing a nonempty byte list is a single-byte write followed by the tail.
+The bound identifies the natural offset with its `UInt32` address. -/
+theorem Mem.writeBytes_cons (m : Mem) (offset : Nat) (b : UInt8)
+    (bs : List UInt8) (h : offset < UInt32.size) :
+    m.writeBytes offset (b :: bs) =
+      (m.write8 (UInt32.ofNat offset) b).writeBytes (offset + 1) bs := by
+  rw [show b :: bs = [b] ++ bs by rfl, Mem.writeBytes_append]
+  congr 1
+  cases m with
+  | mk pages bytes =>
+      simp only [Mem.writeBytes, Mem.write8, List.length_cons, List.length_nil]
+      congr
+      funext i
+      rw [UInt32.toNat_ofNat_of_lt' h]
+      by_cases hi : i = offset
+      · subst i
+        simp
+      · simp only [hi, ↓reduceIte]
+        rw [dite_eq_right (by omega)]
+
+/-- Read `len` bytes starting at byte offset `offset`. Used by the
+cross-memory `memory.copy`; the caller checks bounds. -/
+def Mem.readBytes (m : Mem) (offset len : Nat) : List UInt8 :=
+  (List.range len).map fun i => m.bytes (offset + i)
+
+theorem Mem.readBytes_add (m : Mem) (offset left right : Nat) :
+    m.readBytes offset (left + right) =
+      m.readBytes offset left ++ m.readBytes (offset + left) right := by
+  simp [Mem.readBytes, List.range_add, Nat.add_assoc]
+
+theorem Mem.readBytes_getElem? (m : Mem) (offset len i : Nat)
+    (hi : i < len) :
+    (m.readBytes offset len)[i]? = some (m.bytes (offset + i)) := by simp [Mem.readBytes, hi]
+
+/-- Write a slice of `src` into memory at `dst`. The byte at address
+`dst + k` (for `0 ≤ k < len`) is `src[srcOff + k]`. The caller is
+responsible for bounds — both `dst + len ≤ pages * 65536` and
+`srcOff + len ≤ src.length`. Out-of-range source reads fall back to
+the existing byte (defensive default, never observed in spec-conforming
+runs). -/
+def Mem.writeBytesFrom (m : Mem) (dst : Nat) (src : List UInt8)
+    (srcOff len : Nat) : Mem :=
+  { m with bytes := fun i =>
+      if dst ≤ i ∧ i < dst + len then
+        (src[srcOff + (i - dst)]?).getD (m.bytes i)
+      else m.bytes i }
+
+theorem Mem.writeBytesFrom_pages (m : Mem) (dst : Nat) (src : List UInt8)
+    (srcOff len : Nat) :
+    (m.writeBytesFrom dst src srcOff len).pages = m.pages := rfl
+
+theorem Mem.writeBytesFrom_read8_in (m : Mem) (dst : Nat) (src : List UInt8)
+    (srcOff len : Nat) (i : UInt32)
+    (hin : dst ≤ i.toNat ∧ i.toNat < dst + len)
+    (hbound : srcOff + (i.toNat - dst) < src.length) :
+    (m.writeBytesFrom dst src srcOff len).read8 i = src[srcOff + (i.toNat - dst)] := by
+  simp only [Mem.writeBytesFrom, Mem.read8, ite_eq_left hin,
+             List.getElem?_eq_getElem hbound, Option.getD_some]
+
+theorem Mem.writeBytesFrom_read8_out (m : Mem) (dst : Nat) (src : List UInt8)
+    (srcOff len : Nat) (i : UInt32)
+    (h : ¬(dst ≤ i.toNat ∧ i.toNat < dst + len)) :
+    (m.writeBytesFrom dst src srcOff len).read8 i = m.read8 i := by
+  simp [Mem.writeBytesFrom, Mem.read8, h]
+
+end Wasm

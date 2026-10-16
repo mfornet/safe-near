@@ -1,0 +1,81 @@
+import Interpreter.Wasm.Decoder.ProofEval
+import Interpreter.Wasm.SmallStep
+
+/-!
+# `Wasm.Examples` — shared harness for the worked examples
+
+Decoder-oriented examples use these projections to state concrete behavior.
+These compatibility projections execute only the authoritative small-step
+runner; they do not call the retained big-step semantics.
+
+* `runValues` / `runTrapMsg` / `runInvalidMsg` — initialize a small-step
+  configuration and project its success stack / structured trap / internal
+  diagnostic. `env` defaults to the empty host environment.
+* `decodeOrDefault` — decode a WAT module, falling back to `default` on error
+  (each decoder example pins the success shape with a separate decidable check,
+  so the fallback is never actually hit).
+-/
+
+namespace Wasm.Examples
+open Wasm.SmallStep
+
+/-- Legacy example fuel counted recursive big steps rather than individual
+machine transitions. Compatibility projections deliberately over-approximate
+it; no specification may depend on this scaling. -/
+private def smallStepFuel (fuel : Nat) : Nat := fuel * 16
+
+/-- Run `m`'s function `idx` and keep the returned stack, or `[]` on any
+non-`Success` outcome. Total, so proof-producing evaluation can use it without
+`DecidableEq (Store Unit)`. -/
+def runValues (fuel : Nat) (m : Module) (idx : Nat) (st : Store Unit)
+    (args : List Value) (env : HostEnv Unit := {}) : List Value :=
+  match initConfig { module := m, host := env } idx st args with
+  | .error _ => []
+  | .ok config =>
+    match (runSteps (smallStepFuel fuel) config).result with
+    | .success values _ => values
+    | _ => []
+
+/-- Project the trap message (if the run trapped) out of the `Result`. -/
+def runTrapMsg (fuel : Nat) (m : Module) (idx : Nat) (st : Store Unit)
+    (args : List Value) (env : HostEnv Unit := {}) : Option String :=
+  match initConfig { module := m, host := env } idx st args with
+  | .error _ => none
+  | .ok config =>
+    match (runSteps (smallStepFuel fuel) config).result with
+    | .trapped reason _ => some reason.message
+    | _ => none
+
+/-- Project the invalidation message (if the run was rejected as invalid) out of
+the `Result`. -/
+def runInvalidMsg (fuel : Nat) (m : Module) (idx : Nat) (st : Store Unit)
+    (args : List Value) (env : HostEnv Unit := {}) : Option String :=
+  match initConfig { module := m, host := env } idx st args with
+  | .error error => some error.message
+  | .ok config =>
+    match (runSteps (smallStepFuel fuel) config).result with
+    | .internalError error _ => some error.message
+    | _ => none
+
+/-- Decode a WAT module, falling back to `default` on a decode error. Decoder
+examples check the decoded shape with a separate decidable projection, so the
+fallback is a placeholder that is never reached on a well-formed input. -/
+def decodeOrDefault (wat : String) : Wasm.Module :=
+  match Wasm.Decoder.Wat.decode wat with
+  | .ok m => m
+  | .error _ => default
+
+/-- Use a canonical error type in the matcher's motive. `cbv` unfolds the
+decoder's `Err` alias to `String`; comparing that normalized matcher with the
+original equation can make the kernel evaluate the whole decoder again. -/
+private def moduleOrDefault (result : Except String Wasm.Module) : Wasm.Module :=
+  match result with
+  | .ok m => m
+  | .error _ => default
+
+/-- Keep decoder evaluation in the proof-producing evaluator. This equation
+is checked symbolically, before any concrete WAT input is substituted. -/
+@[cbv_eval] private theorem decodeOrDefault_eq (wat : String) :
+    decodeOrDefault wat = moduleOrDefault (Wasm.Decoder.Wat.decode wat) := by rfl
+
+end Wasm.Examples

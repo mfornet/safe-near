@@ -1,0 +1,19 @@
+name = "Programs"
+version = "0.1.0"
+defaultTargets = ["Programs"]
+packagesDir = "../../.lake/packages"
+
+[[require]]
+name = "Interpreter"
+path = "../../wasm"
+
+# Generated Wasm modules of ../rust (one `Programs.<Crate>.Program` each) plus
+# the elaborators that splice ../rust/build/<crate>/program.wat into them.
+[[lean_lib]]
+name = "Programs"
+
+# Runs every program under the interpreter's stdio host on small inputs and
+# checks the output bytes. `lake exe smoke`.
+[[lean_exe]]
+name = "smoke"
+root = "Programs.Smoke"
