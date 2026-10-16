@@ -2,13 +2,14 @@
 
 Formally verify NEAR smart contracts.
 
-Check [human written notes](notes/human/SAFE_NEAR.md).
+Check the [human written notes](notes/README.md).
 
 ## Notes
 
-`notes/human/` holds the human-written notes: the plan, the NEAR model, the
-project structure and the TODO list. It is written by humans only; see
-[notes/human/AGENTS.md](notes/human/AGENTS.md).
+`notes/` holds the human-written notes: the design of each component, the
+plan for what is being worked on, and the TODO list. Start at
+[notes/README.md](notes/README.md). The folder is written by humans only; see
+[notes/AGENTS.md](notes/AGENTS.md).
 
 ## Contracts dataset
 

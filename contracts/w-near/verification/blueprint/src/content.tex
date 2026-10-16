@@ -1,0 +1,195 @@
+% Blueprint of the wNEAR verification. Every Lean definition, specification and
+% theorem below is extracted by LeanArchitect from the `@[blueprint]`
+% annotations in ../../{Model,Spec,Proofs}; run `lake build :blueprint` first.
+\input{../../.lake/build/blueprint/library/Model}
+\input{../../.lake/build/blueprint/library/Spec}
+\input{../../.lake/build/blueprint/library/Proofs}
+
+\chapter{Introduction}
+
+\section{The contract}
+
+\texttt{wrap.near} is the wrapped NEAR fungible token (NEP-141), binary
+\texttt{contracts/w-near/contract.wasm} with code hash
+\texttt{DL2f5xmZ44cQRP6vBMt94rvseH5d5KKnAGis2WkTAsh1}, reproduced byte for
+byte from \texttt{near/core-contracts} at commit \texttt{54f8267}, built with
+Rust 1.51.0, near-sdk 3.1.0 and near-contract-standards 3.1.0. The contract
+has fifteen exported methods: initialisation (\texttt{new}), wrapping
+(\texttt{near\_deposit}, \texttt{near\_withdraw}), the NEP-141 core
+(\texttt{ft\_transfer}, \texttt{ft\_transfer\_call},
+\texttt{ft\_resolve\_transfer}, \texttt{ft\_total\_supply},
+\texttt{ft\_balance\_of}, \texttt{ft\_metadata}) and NEP-145 storage
+management (\texttt{storage\_deposit}, \texttt{storage\_withdraw},
+\texttt{storage\_unregister}, \texttt{storage\_balance\_bounds},
+\texttt{storage\_balance\_of}, plus the legacy
+\texttt{storage\_minimum\_balance}).
+
+\section{Structure of the verification}
+
+The verification is organised in three layers.
+
+\begin{enumerate}
+\item \textbf{Model} (Chapter~\ref{ch:model}). A mathematical description of
+  the contract state and of every method, written by hand from the Rust
+  source. Each method is a function from a state and a host context to either
+  a panic or an outcome (new state, promises, return value, logs). This is
+  the only part of the project that has to be audited against the source.
+\item \textbf{Specifications} (Chapter~\ref{ch:spec}). Properties of the
+  model stated as propositions, and their proofs (Chapter~\ref{ch:proofs}).
+  They never mention WebAssembly.
+\item \textbf{Refinement} (Chapter~\ref{ch:refinement}). The statement that
+  the deployed binary, executed by the NEAR runtime in Lean, behaves exactly
+  as the model. This is what transfers every proven property to the real
+  contract. It is stated against an interface the runtime must provide; the
+  runtime does not exist yet.
+\end{enumerate}
+
+Chapter~\ref{ch:chain} lists the properties that only make sense over a
+sequence of receipts (solvency, the end-to-end behaviour of
+\texttt{ft\_transfer\_call}). They are stated informally until the
+chain-level model exists.
+
+\chapter{Model}
+\label{ch:model}
+
+\section{Types and state}
+
+Amounts are natural numbers; the \texttt{u128} / \texttt{u64} ranges of the
+on-chain representation are side conditions of well-formedness rather than
+wrapping arithmetic, so every overflow check of the contract is an explicit
+branch of the model.
+
+\inputleanmodule{Model.Types}
+\inputleanmodule{Model.State}
+
+\section{Host context}
+
+\inputleanmodule{Model.Env}
+
+\section{Calls, outcomes and panics}
+
+\inputleanmodule{Model.Calls}
+
+\section{Methods}
+
+One definition per exported method, in source order of
+\texttt{contracts/w-near/source/w-near} and of the near-contract-standards
+\texttt{FungibleToken} it delegates to. \texttt{step} adds the checks the
+\texttt{\#[near\_bindgen]} wrapper generates (deposit, private,
+initialisation) and dispatches.
+
+\inputleanmodule{Model.Methods}
+
+\section{On-chain layout}
+
+\inputleanmodule{Model.Storage}
+
+\chapter{Specifications}
+\label{ch:spec}
+
+\section{Invariant}
+
+\inputleanmodule{Spec.Invariants}
+
+\section{Authorization}
+
+\inputleanmodule{Spec.Authorization}
+
+\section{Conservation}
+
+\inputleanmodule{Spec.Conservation}
+
+\section{Availability}
+
+\inputleanmodule{Spec.Availability}
+
+\section{Views and initialisation}
+
+\inputleanmodule{Spec.Views}
+
+\section{Storage}
+
+\inputleanmodule{Spec.Storage}
+
+\chapter{Proofs}
+\label{ch:proofs}
+
+\inputleanmodule{Proofs.Views}
+\inputleanmodule{Proofs.Invariants}
+\inputleanmodule{Proofs.Authorization}
+\inputleanmodule{Proofs.Conservation}
+\inputleanmodule{Proofs.Availability}
+\inputleanmodule{Proofs.Storage}
+
+\chapter{Refinement}
+\label{ch:refinement}
+
+\inputleanmodule{Spec.Refinement}
+
+\section{What the runtime must provide}
+
+Beyond the interface above, the refinement proof will need from
+\texttt{near-lean}:
+
+\begin{itemize}
+\item The deployed module decoded from \texttt{contract.wasm}, and a
+  deterministic executor of one function call (WebAssembly interpreter plus
+  the NEAR host functions the binary imports: storage read/write/remove/has
+  key, register access, predecessor and current account, attached deposit,
+  prepaid gas, storage usage, promise creation and chaining, promise results,
+  logging, value return and panic).
+\item Rollback: the storage of a failed execution is the storage before it.
+\item Storage accounting: \texttt{storage\_usage} equals the sum over
+  records of key length plus value length plus a per-record constant.
+\item The JSON argument and return value encodings of near-sdk 3.1.0
+  (\texttt{U128} as decimal strings, \texttt{Option} as absent or
+  \texttt{null}) and the Borsh layout of the state, as a shared, audited
+  library.
+\item A way to say that an execution did not run out of gas, so that gas
+  can be abstracted away everywhere else.
+\end{itemize}
+
+\chapter{Chain-level properties}
+\label{ch:chain}
+
+The following properties are about sequences of receipts and need the
+chain-level model (accounts with NEAR balances and storage locks, a receipt
+queue, refunds of failed transfers). They are stated informally; each will
+become a Lean statement once that model exists.
+
+\begin{theorem}[Solvency]
+\label{thm:solvency}
+\uses{spec:conservation, spec:inv-preserved, spec:refinement}
+\notready
+In every reachable chain state, the NEAR balance of \texttt{wrap.near} is at
+least its total supply plus one registration fee per registered account plus
+its balance at deployment. Hence every holder can unwrap in full.
+\end{theorem}
+
+\begin{theorem}[Storage lock]
+\label{thm:storage-lock}
+\uses{spec:storage-coverage, thm:solvency}
+\notready
+The storage lock of \texttt{wrap.near} never exceeds what the collected
+registration fees cover, so no execution fails for lack of balance for
+storage.
+\end{theorem}
+
+\begin{theorem}[Transfer-call resolution]
+\label{thm:transfer-call}
+\uses{spec:refinement, spec:balance-authorization}
+\notready
+After an \texttt{ft\_transfer\_call} of $a$ from $S$ to $R$ and its callback,
+if no other receipt touched $R$'s balance in between, then $S$ was debited
+and $R$ credited by the same amount $u \le a$, where $u$ is the amount
+\texttt{ft\_on\_transfer} reported as used (all of $a$ if that call failed or
+returned something unparsable).
+\end{theorem}
+
+\begin{theorem}[Upgrade]
+\label{thm:upgrade}
+\notready
+\texttt{wrap.near} has no access keys, so its code cannot change; every
+property above holds for the lifetime of the account. (To be checked against
+chain state; see docs/human/NEAR\_MODEL.md.)
+\end{theorem}

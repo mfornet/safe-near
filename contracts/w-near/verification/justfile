@@ -1,0 +1,36 @@
+# Verification of wNEAR (wrap.near). Run `just` to list recipes.
+set shell := ["bash", "-euo", "pipefail", "-c"]
+
+[private]
+default:
+    @just --list --unsorted
+
+# Build Model, Spec and Proofs (open `sorry`s are reported as warnings).
+build:
+    lake build
+
+# List the specs that are still proved by `sorry`.
+sorries:
+    lake build 2>&1 | grep "declaration uses \`sorry\`" || echo "no sorry"
+
+# Extract the blueprint from the @[blueprint] annotations into .lake/build/blueprint.
+blueprint-extract:
+    lake build :blueprint
+
+# (`leanblueprint web` expects the Lake project at the git root, so plasTeX is called directly.)
+# Build the web blueprint (blueprint/web/index.html) with the dependency graph.
+[working-directory("blueprint/src")]
+blueprint-web: blueprint-extract
+    mkdir -p ../web
+    $(dirname $(readlink -f $(which leanblueprint)))/plastex -c plastex.cfg web.tex
+
+# Build the PDF blueprint (blueprint/print/print.pdf).
+[working-directory("blueprint/src")]
+blueprint-pdf: blueprint-extract
+    mkdir -p ../print
+    latexmk -interaction=nonstopmode -output-directory=../print print.tex
+
+# Serve the web blueprint at http://localhost:8000.
+[working-directory("blueprint/web")]
+blueprint-serve:
+    python3 -m http.server 8000

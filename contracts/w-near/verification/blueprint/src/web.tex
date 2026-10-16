@@ -1,0 +1,22 @@
+% Web version of the blueprint (plasTeX). Content lives in content.tex.
+\documentclass{report}
+
+\usepackage{amssymb, amsthm, amsmath}
+\usepackage{hyperref}
+\usepackage{cleveref}
+\usepackage[showmore, dep_graph]{blueprint}
+
+\input{macros/common}
+\input{macros/web}
+
+\home{https://github.com/mfornet/safe-near}
+\github{https://github.com/mfornet/safe-near}
+\dochome{https://github.com/mfornet/safe-near}
+
+\title{Verification of wNEAR (\texttt{wrap.near})}
+\author{Safe NEAR}
+
+\begin{document}
+\maketitle
+\input{content}
+\end{document}
