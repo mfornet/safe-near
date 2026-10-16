@@ -1,10 +1,15 @@
 # TODO
 
+- Bring Talos to NEAR, not as a submodule, just as a runtime
+    - Bring the iris-lean machinery
+    - Let's have an easy way to run the whole testsuite and understand where we are right now
+    - Setup mergesort as a test to be solved by a harness
+
+- Create NEAR Runtime (requires discussion about the interfaces / boundaries)
+- Simplify Talos as much as possible, remove features that we don't need, etc...
+
 - Setup linter and formatter in CI for lean
 - Enforce that every LEAN package uses the same LEAN toolchain / version
-
-- Bring Talos to NEAR, not as a submodule, just as a runtime
-    - Let's have an easy way to run the whole testsuite and understand where we are right now
 
 - Tool to download a partial snapshot of the NEAR blockchain such that we can run
   the runtime against real smart contracts on the blockchain. This will be the basis of the
