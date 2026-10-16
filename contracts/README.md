@@ -2,7 +2,7 @@
 
 One folder per contract binary that is (or was) deployed on NEAR mainnet. Each
 folder is self-contained and pins everything needed to rebuild the exact
-on-chain binary (layout from `docs/human/PROJECT_STRUCTURE.md`):
+on-chain binary (layout from `notes/human/PROJECT_STRUCTURE.md`):
 
 ```
 contracts/<name>/
@@ -24,7 +24,7 @@ git submodule update --init contracts/<name>/source
 
 Two contracts built from the same repository at different commits get two
 submodules (two folders). This duplicates clones but keeps every entry
-independent, as described in `docs/human/SAFE_NEAR.md`.
+independent, as described in `notes/human/SAFE_NEAR.md`.
 
 ## contract.toml
 

@@ -2,7 +2,11 @@
 contracts/*/build/
 contracts/*/build.log
 
-# documentation site
-site/
-.venv/
 __pycache__/
+
+*.swp
+
+# Lean / Lake build artefacts
+near-lean/.lake/
+near-lean/**/.lake/
+near-lean/programs/rust/target/

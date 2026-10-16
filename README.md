@@ -2,21 +2,13 @@
 
 Formally verify NEAR smart contracts.
 
-Check [human written notes](docs/human/SAFE_NEAR.md).
+Check [human written notes](notes/human/SAFE_NEAR.md).
 
-## Documentation
+## Notes
 
-All documentation lives in `docs/` and is published as a static site with
-[MkDocs](https://www.mkdocs.org/) (Material theme). `docs/human/` is written by
-humans only; see [docs/human/AGENTS.md](docs/human/AGENTS.md).
-
-```
-uv run mkdocs serve            # preview at http://127.0.0.1:8000
-uv run mkdocs build --strict   # static site in site/
-```
-
-The contracts pages of the site are generated from `contracts/` at build time
-(`tools/mkdocs_hooks.py`), so there is a single source of truth.
+`notes/human/` holds the human-written notes: the plan, the NEAR model, the
+project structure and the TODO list. It is written by humans only; see
+[notes/human/AGENTS.md](notes/human/AGENTS.md).
 
 ## Contracts dataset
 
