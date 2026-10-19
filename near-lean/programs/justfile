@@ -23,3 +23,8 @@ build:
 [working-directory("lean")]
 smoke:
     lake exe smoke
+
+# Check mergesort against Lean sorting on exhaustive small and boundary inputs.
+[working-directory("lean")]
+test:
+    lake exe program-tests

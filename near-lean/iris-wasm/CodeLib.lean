@@ -62,10 +62,11 @@ import CodeLib.SepLogic.ImportChainExample
 import CodeLib.SepLogic.SharedMemoryExample
 
 /-!
-# CodeLib — umbrella import for downstream code
+# CodeLib — convenience umbrella for proof development
 
-Generated `Program.lean` files (emitted by `lake exe verifier check`) and
-hand-written `Spec.lean` siblings should `import CodeLib`, never the
-interpreter directly. Today this is mostly a thin re-export of Wasm;
-domain-specific spec helpers will live here as they accrete.
+This wide import includes the separation-logic framework, Rust library
+lemmas, and worked proof examples. Generated `Program.lean` files import
+`CodeLib.Generated`, which provides AST tooling without this proof surface.
+Specifications and proofs may import this umbrella for convenience, or name
+their required supporting modules explicitly.
 -/

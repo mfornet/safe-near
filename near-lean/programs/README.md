@@ -78,12 +78,25 @@ unnoticed; regenerating `Program.lean` needs Talos's `verifier emit`.
 cd near-lean/programs/lean
 lake build            # Programs library
 lake exe smoke        # six cases across the three programs, exit 1 on mismatch
+lake exe program-tests # exhaustive small mergesort inputs and stream boundaries
 ```
 
-`Programs.Smoke.runBytes` is the small driver: it instantiates a module under
+`Programs.Harness.run` is the reusable driver: it instantiates a module under
 `Universal.envFor` (every host the interpreter knows, resolved by import name),
-feeds it an input byte list and returns the output byte list. It is the seed
-of a harness for running these programs, and later NEAR contracts, as tests.
+feeds it an input byte list and returns the output byte list. Its error type
+distinguishes missing exports, unsupported imports, initialization errors,
+traps, fuel exhaustion, and interpreter errors. `Programs.Smoke.runBytes`
+retains the original `Option` adapter.
+
+`Programs.Regression` compares compiled mergesort against Lean's sorting on
+all lists of length 0–4 over `[0, 1, UInt32.max]`, plus sorted, reversed, and
+duplicate-heavy inputs around merge and 256-byte stream boundaries. It also
+checks malformed byte lengths, GCD boundary values, byte echo, and explicit
+harness failures. Both the six smoke cases and the regression suite run in CI.
+These are executable checks; `Mergesort.Proof.mergesort_correct` remains open.
+The stream harness requires a `() -> ()` export; exports requiring parameters
+or returning Wasm values are rejected before execution. The regression suite
+currently contains 168 cases.
 
 The interpreter's CLI `runner` cannot run these programs: it rejects any module
 with imports.

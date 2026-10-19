@@ -26,6 +26,7 @@ wasm-report:
 programs-test:
     just --justfile near-lean/programs/justfile build
     just --justfile near-lean/programs/justfile smoke
+    just --justfile near-lean/programs/justfile test
 
 # Rebuild the committed Rust test-program binaries and WAT.
 programs-build:
@@ -34,7 +35,7 @@ programs-build:
 # Audit a Lake package's transitive axioms; add --allow-sorry for open specs.
 [positional-arguments]
 audit package *args:
-    python3 tools/axiom-audit.py "$@"
+    python3 tools/axiom-audit.py --report {{quote("audit/" + replace(package, "/", "-") + ".json")}} "$@"
 
 # Download accounts at one finalized block; options include --block and --rpc.
 [positional-arguments]

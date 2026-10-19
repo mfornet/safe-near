@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: lean-quality-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
   toolchains:
     runs-on: ubuntu-latest
@@ -34,9 +38,35 @@ jobs:
       - uses: leanprover/lean-action@v1
         with:
           lake-package-directory: near-lean/wasm
-          build-args: +Mathlib.Tactic.Linter.TextBased
-          use-mathlib-cache: true
+          build: "false"
+          test: "false"
+          lint: "false"
+          use-mathlib-cache: false
+      - name: Prepare only the style checker's dependencies
+        working-directory: near-lean/wasm
+        run: |
+          lake exe cache get Mathlib.Tactic.Linter.TextBased
+          lake build +Mathlib.Tactic.Linter.TextBased
       - name: Check Lean style and formatting
         run: python3 tools/lean_style.py
       - name: Test style checker and formatter
         run: python3 tools/tests/check_lean_style.py
+
+  programs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/cache@v5
+        with:
+          path: near-lean/.lake/packages
+          key: lean-programs-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'near-lean/**/lake-manifest.json') }}
+      - uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: near-lean/programs/lean
+          build-args: program-tests smoke
+          use-mathlib-cache: false
+      - name: Smoke and program regression tests
+        working-directory: near-lean/programs/lean
+        run: |
+          ./.lake/build/bin/smoke
+          ./.lake/build/bin/program-tests

@@ -10,7 +10,7 @@ Run `just` at the repository root for the documented command list.
 | `just wasm-test [pattern]` | Run all official Wasm tests or filter their filenames |
 | `just wasm-summary` | Summarize the committed Wasm coverage report |
 | `just wasm-report` | Regenerate that report using the pinned wasm-tools |
-| `just programs-test` | Build the example programs and run the Lean interpreter smoke harness |
+| `just programs-test` | Build the example programs and run smoke and regression harnesses |
 | `just programs-build` | Rebuild Rust program Wasm and WAT |
 | `just audit near-lean/wasm` | Check a package's transitive proof axioms |
 | `just tools-test` | Run offline Python tooling regression tests |

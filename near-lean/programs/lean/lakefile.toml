@@ -20,3 +20,8 @@ name = "Programs"
 [[lean_exe]]
 name = "smoke"
 root = "Programs.Smoke"
+
+# Exhaustive small inputs, stream boundaries and explicit harness failures.
+[[lean_exe]]
+name = "program-tests"
+root = "Programs.Regression"
