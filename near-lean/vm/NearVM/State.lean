@@ -1,4 +1,4 @@
-import Interpreter.Wasm
+import Interpreter.Wasm.Host
 import NearVM.Error
 import NearVM.Gas
 

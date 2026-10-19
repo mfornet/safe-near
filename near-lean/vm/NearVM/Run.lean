@@ -1,3 +1,4 @@
+import Interpreter.Wasm.SmallStep
 import NearVM.Metered
 import NearVM.Context
 import NearVM.Outcome

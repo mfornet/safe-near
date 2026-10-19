@@ -10,6 +10,7 @@ core axiom audits, formatter integration checks and contract builds.
 | `just audit-all` | Audit all core packages and list the programs' open proofs |
 | `just check` | Run the combined repository checks |
 | `just check-toolchains` | Check every owned Lake package against the root `lean-toolchain` |
+| `just vm-dependencies` | Check Lean's actual VM import closure for legacy interpreters and proof APIs |
 | `just lean-lint` | Check all owned Lean files with pinned Mathlib text-based style linters |
 | `just lean-format [files...]` | Apply validated syntax formatting to handwritten package sources |
 | `just lean-format-check [files...]` | Check canonical syntax layout without writing files |
@@ -123,6 +124,27 @@ reported separately by `just lean-format-check`.
 The core axiom audit tolerates `sorryAx` only in the Programs package and
 prints those open declarations. Contract builds may report open proofs as
 warnings; a successful build is not a claim that those contracts are verified.
+
+## VM execution dependency boundary
+
+`Interpreter.Wasm.Operations` holds the shared numeric and GC operations.
+Both interpreter implementations use those same definitions. `SmallStep`
+imports that executable layer directly; `Semantics` retains the legacy
+big-step interpreter for regression tests and the existing proof API.
+`NearVM.State` imports only host types and `NearVM.Run` explicitly imports
+the small-step machine. Executing the VM does not need the broad Wasm proof
+umbrella.
+The local source import closure decreases from 39 project modules to 20;
+the compiler-header check confirms the resulting 20-module execution graph.
+
+`check_vm_dependencies.py` builds `NearVM`, then inspects Lean's imported-module
+header. It rejects legacy `Semantics`, `Wp`, `Spec` and CodeLib imports,
+including indirect imports, and requires the actual small-step/operation
+modules to be present. CI runs it after building the VM. Its separate Lean
+fixture test demonstrates a clean graph, a forbidden transitive dependency,
+and an incorrectly disconnected execution module.
+`just vm-dependencies` runs both the real graph check and those adversarial
+fixture cases; `just check` includes the same gate.
 
 ## Snapshots
 

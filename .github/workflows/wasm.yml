@@ -3,9 +3,9 @@ name: wasm
 on:
   push:
     branches: [main]
-    paths: ["near-lean/**", "contracts/w-near/verification/**", "contracts/w-near/contract.wasm", "tools/runtime-conformance/**", "tools/axiom-audit.py", ".github/workflows/wasm.yml"]
+    paths: ["near-lean/**", "contracts/w-near/verification/**", "contracts/w-near/contract.wasm", "tools/runtime-conformance/**", "tools/axiom-audit.py", "tools/check_vm_dependencies.py", "tools/tests/check_vm_dependencies.py", ".github/workflows/wasm.yml"]
   pull_request:
-    paths: ["near-lean/**", "contracts/w-near/verification/**", "contracts/w-near/contract.wasm", "tools/runtime-conformance/**", "tools/axiom-audit.py", ".github/workflows/wasm.yml"]
+    paths: ["near-lean/**", "contracts/w-near/verification/**", "contracts/w-near/contract.wasm", "tools/runtime-conformance/**", "tools/axiom-audit.py", "tools/check_vm_dependencies.py", "tools/tests/check_vm_dependencies.py", ".github/workflows/wasm.yml"]
   workflow_dispatch:
 
 concurrency:
@@ -95,6 +95,10 @@ jobs:
       - name: VM scenarios
         working-directory: near-lean/vm
         run: ./.lake/build/bin/vm-tests
+      - name: Check the VM execution dependency boundary
+        run: |
+          python3 tools/check_vm_dependencies.py --no-build
+          python3 tools/tests/check_vm_dependencies.py
       - name: Runtime scenarios
         working-directory: near-lean/runtime
         run: |

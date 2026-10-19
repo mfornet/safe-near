@@ -1,3 +1,4 @@
+import Interpreter.Wasm.Semantics
 import Interpreter.Wasm.SmallStep
 import Interpreter.Wasm.Examples.Harness
 

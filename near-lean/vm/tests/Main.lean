@@ -192,7 +192,7 @@ def main (args : List String) : IO UInt32 := do
     ((r1.map (·.receiverId)) == some bob && (r2.map (·.receiverId)) == some wrap &&
      (r2.map (·.dependencies)) == some [0] &&
      (r1.bind (fcOf ·.actions)).map (·.1) == some "ft_on_transfer" &&
-     (r2.bind (fcOf ·.actions)) == some ("ft_resolve_transfer", 0, 5 * 10 ^ 12)) (describe o5)
+     (r2.bind (fcOf ·.actions)) == some ("ft_resolve_transfer", 0, UInt64.ofNat (5 * 10 ^ 12))) (describe o5)
   check r "ft_transfer_call returns the callback's receipt" (o5.returnData == .receiptIndex 1)
   check r "ft_transfer_call attaches the remaining gas"
     ((r1.bind (fcOf ·.actions)).map (·.2.2) == some (UInt64.ofNat (300 * 10 ^ 12 - 30 * 10 ^ 12)))

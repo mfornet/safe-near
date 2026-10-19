@@ -2,6 +2,11 @@
 check-toolchains:
     python3 tools/check_lean_toolchains.py
 
+# Check the compiled VM import graph for legacy interpreter and proof API dependencies.
+vm-dependencies:
+    python3 tools/check_vm_dependencies.py
+    python3 tools/tests/check_vm_dependencies.py
+
 # Check Lean source style with the pinned Mathlib text-based linters.
 lean-lint:
     python3 tools/lean_style.py
@@ -74,7 +79,7 @@ audit-all:
     python3 tools/axiom-audit.py near-lean/programs/lean --report audit/programs.json --allow-sorry
 
 # Run executable suites, source checks, core axiom audits and contract builds.
-check: test-all lean-lint audit-all build-all
+check: test-all vm-dependencies lean-lint audit-all build-all
     python3 tools/lean_format.py --check near-lean/programs/lean/Programs/Harness.lean near-lean/programs/lean/Programs/Regression.lean
     python3 tools/tests/check_lean_style.py
     python3 tools/tests/check_lean_format.py

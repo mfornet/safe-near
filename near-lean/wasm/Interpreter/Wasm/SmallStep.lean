@@ -1,4 +1,4 @@
-import Interpreter.Wasm.Semantics
+import Interpreter.Wasm.Operations
 
 set_option maxHeartbeats 2000000
 
