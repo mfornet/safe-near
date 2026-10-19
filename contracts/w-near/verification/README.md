@@ -102,3 +102,16 @@ settled run but does not establish sufficient prepaid gas. The refinement
 obligation requires model issues to be absent and successful receipt projections
 to be valid. JSON and receipt projection regression tests run with
 `just runtime-adapter-test` from the repository root.
+
+The refinement input includes `ExecutionResources`: liquid balance before the
+attached deposit and total measured storage usage, including account/code
+overhead. These come from the enclosing runtime, rather than zero defaults.
+`Valid` bounds host integers and requires usage to cover the stored records;
+`Supports` requires funds for the model's outgoing deposits and room for its
+resulting storage. Proving these preconditions from chain-level solvency remains
+an obligation. Successful refinement additionally requires exact NEAR accounting,
+retained storage overhead, and bounded burnt/used gas. Every failed execution,
+including out of gas, must restore input storage, balance and usage and emit no
+receipts. Failure logs may survive. These are specification obligations, not yet
+proved properties of the deployed binary. Adapter regressions carry real resources
+through initialization, deposit, withdrawal, panic and gas exhaustion.

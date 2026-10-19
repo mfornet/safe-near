@@ -48,9 +48,10 @@ structure Input where
   method : String
   args : String
   env : Env
+  resources : ExecutionResources
 
-def mkInput (env : Env) (call : Call) : Input :=
-  { method := call.methodName, args := call.jsonArgs, env }
+def mkInput (resources : ExecutionResources) (env : Env) (call : Call) : Input :=
+  { method := call.methodName, args := call.jsonArgs, env, resources }
 
 /-- The promise results the callback sees, from the model's view of them.
 A parsed `U128` is re-serialised; an unparsable value is an empty body. -/
@@ -71,8 +72,14 @@ def toVMContext (i : Input) : VMContext :=
     promiseResults := promiseResultsOf i.env
     attachedDeposit := i.env.attachedDeposit
     prepaidGas := i.env.prepaidGas
-    accountBalance := 0
-    storageUsage := 0 }
+    accountBalance := i.resources.balance
+    storageUsage := i.resources.storageUsage }
+
+/-- The adapter passes chain resources through without inventing funding. -/
+theorem toVMContext_resources (resources : ExecutionResources) (env : Env) (call : Call) :
+    (toVMContext (mkInput resources env call)).accountBalance = resources.balance ∧
+    (toVMContext (mkInput resources env call)).storageUsage = resources.storageUsage :=
+  ⟨rfl, rfl⟩
 
 /-- JSON of a return value as near-sdk's serde emits it. -/
 def Ret.json : Ret → String
@@ -191,6 +198,10 @@ noncomputable def nearLean (cfg : RuntimeConfig) : RuntimeInterface :=
     observationsValid := observationsValid
     outOfGas := fun o => (o.aborted.map (·.isOutOfGas)).getD false
     storage := (·.storage)
+    balance := (·.balance)
+    storageUsage := (·.storageUsage)
+    burntGas := (·.burntGas)
+    usedGas := (·.usedGas)
     returnValue := returnDataOf
     logs := (·.logs)
     promises := promisesOf
