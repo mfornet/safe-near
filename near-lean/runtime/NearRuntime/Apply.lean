@@ -90,22 +90,26 @@ def canCreateAccount (cfg : RuntimeConfig) (predecessor id : AccountId) : Bool :
 def bytesOfString (s : String) : Bytes := s.toUTF8.toList
 def stringOfBytes (b : Bytes) : String := (String.fromUTF8? ⟨b.toArray⟩).getD ""
 
-/-- Promise actions created by a contract become receipt actions. -/
-def actionOfPromise (codeOf : Bytes → ContractCode) : PromiseAction → Action
-  | .createAccount => .createAccount
-  | .deployContract code => .deployContract (codeOf code)
-  | .functionCall m args amount gas => .functionCall (stringOfBytes m) args gas.toNat amount
-  | .transfer amount => .transfer amount
-  | .stake amount pk => .stake amount pk
+/-- Promise actions created by a contract become receipt actions. A missing
+external decoder is a model issue, never a deployable placeholder module. -/
+def actionOfPromise (codeOf : Bytes → ContractCode) : PromiseAction → Except RuntimeError Action
+  | .createAccount => .ok .createAccount
+  | .deployContract bytes => do
+    let code := codeOf bytes
+    if let some issue := code.decodeIssue then throw (.executionIssue issue)
+    return .deployContract code
+  | .functionCall m args amount gas => .ok (.functionCall (stringOfBytes m) args gas.toNat amount)
+  | .transfer amount => .ok (.transfer amount)
+  | .stake amount pk => .ok (.stake amount pk)
   | .addKey pk nonce perm =>
     let permission : AccessKeyPermission := match perm with
       | .fullAccess => .fullAccess
       | .functionCall allowance receiver methods =>
         .functionCall allowance (stringOfBytes receiver)
           (if methods.isEmpty then [] else (stringOfBytes methods).splitOn ",")
-    .addKey pk { nonce := nonce.toNat, permission }
-  | .deleteKey pk => .deleteKey pk
-  | .deleteAccount beneficiary => .deleteAccount (stringOfBytes beneficiary)
+    .ok (.addKey pk { nonce := nonce.toNat, permission })
+  | .deleteKey pk => .ok (.deleteKey pk)
+  | .deleteAccount beneficiary => .ok (.deleteAccount (stringOfBytes beneficiary))
 
 /-- Context of a receipt being applied. -/
 structure ReceiptCtx where
@@ -124,6 +128,7 @@ def applyFunctionCall (c : ReceiptCtx) (method : String) (args : Bytes) (gas dep
   let account ← getAccount id
   let some code := account.code
     | throw (.functionCallError (.compilationError "CodeDoesNotExist"))
+  if let some issue := code.decodeIssue then throw (.executionIssue issue)
   let st ← getState
   let ctx : VMContext := {
     currentAccountId := bytesOfString id
@@ -184,12 +189,15 @@ def applyFunctionCall (c : ReceiptCtx) (method : String) (args : Bytes) (gas dep
       modify fun e => { e with result := some (.successValue []) }
     for h : i in [0:outcome.receipts.length] do
       let spec := outcome.receipts[i]
+      let actions ← match spec.actions.mapM (actionOfPromise c.codeOf) with
+        | .ok actions => pure actions
+        | .error error => throw error
       emit { predecessorId := id, receiverId := stringOfBytes spec.receiverId, receiptId := ids[i]?.getD 0,
              receipt := .action { signerId := c.action.signerId, signerPublicKey := c.action.signerPublicKey,
                                   gasPrice := c.action.gasPrice,
                                   outputDataReceivers := outputs[i]?.getD []
                                   inputDataIds := inputs[i]?.getD []
-                                  actions := spec.actions.map (actionOfPromise c.codeOf) } }
+                                  actions := actions } }
 
 def applyAction (c : ReceiptCtx) (isLast : Bool) : Action → ExecM Unit
   | .createAccount => do
@@ -200,6 +208,7 @@ def applyAction (c : ReceiptCtx) (isLast : Bool) : Action → ExecM Unit
     putAccount id { amount := 0, storageUsage := c.cfg.fees.numBytesAccount }
     modify fun e => { e with actorId := id }
   | .deployContract code => do
+    if let some issue := code.decodeIssue then throw (.executionIssue issue)
     let id := c.receipt.receiverId
     let a ← getAccount id
     if code.size > c.cfg.wasm.limits.maxContractSize then

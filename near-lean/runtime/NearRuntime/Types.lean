@@ -30,6 +30,9 @@ structure ContractCode where
   module : Module
   size : Nat
   hash : String
+  /-- The external decoder could not supply this code. Replay adapters must
+  report that limitation rather than substituting an executable empty module. -/
+  decodeIssue : Option Wasm.Near.ExecutionIssue := none
 
 instance : Inhabited ContractCode := ⟨{ module := default, size := 0, hash := "" }⟩
 

@@ -1,4 +1,5 @@
 import NearRuntime
+import Tests.Decoder
 import Interpreter.Wasm.Decoder.Wat
 
 /-!
@@ -152,6 +153,8 @@ def main (args : List String) : IO UInt32 := do
   let configs := args[1]?.getD "../vm/configs"
   let r ← IO.mkRef ({} : Report)
   let cfg ← RuntimeConfig.load configs RuntimeConfig.latestVersion
+  let decoderChecks ← NearRuntime.Tests.Decoder.run cfg
+  r.modify fun report => { report with passed := report.passed + decoderChecks }
   let text ← IO.FS.readFile wat
   let module ← match Decoder.Wat.decode text with
     | .ok m => pure m

@@ -31,7 +31,12 @@ Signatures, consensus, initial state, block context, and receipt delivery are
 externally supplied. Contract code enters as a decoded module, an independently
 supplied size, and a hash label. Neither byte-to-module correspondence nor the
 hash label is checked by the runtime. `codeOf` is an externally supplied decoder.
-These assumptions must be carried into any theorem about deployed bytes.
+`ContractCode.decodeIssue` marks unavailable decoding explicitly. Calling or
+deploying flagged code, including conversion of a deployment promise, rejects
+the entire apply as a model issue with no committed state, outcomes or fees.
+Replay adapters must use that flag instead of substituting an empty executable
+module. Successful decoding still remains a trusted byte-to-module assumption
+that must be carried into any theorem about deployed bytes.
 
 ## Chunk boundaries
 
