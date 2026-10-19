@@ -50,6 +50,18 @@ inductive Call
 
 namespace Call
 
+/-- Numeric JSON arguments must fit the Rust `U128` wrapper. The mathematical
+methods retain natural-number arithmetic; refinement applies to decodable calls. -/
+def WF : Call → Prop
+  | .nearWithdraw amount | .ftTransfer _ amount _ | .ftTransferCall _ amount _ _
+  | .ftResolveTransfer _ _ amount => amount < u128Bound
+  | .storageWithdraw (some amount) => amount < u128Bound
+  | _ => True
+
+instance (call : Call) : Decidable call.WF := by
+  cases call <;> simp only [WF]
+  all_goals first | infer_instance | (split <;> infer_instance)
+
 def methodName : Call → String
   | new => "new"
   | nearDeposit => "near_deposit"
@@ -204,8 +216,8 @@ inductive Panic
   | arithmeticOverflow
   deriving DecidableEq, Repr
 
-/-- The text of the panic as the contract emits it. The runtime wraps it
-(`Smart contract panicked: ...`, and `assert!` adds a source location). -/
+/-- Expected diagnostic fragment. Contract panics may have a runtime prefix
+or source location; missing promise results are structured host errors. -/
 def Panic.message : Panic → String
   | depositNotAccepted m => s!"Method {m} doesn't accept deposit"
   | privateMethod m => s!"Method {m} is private"
@@ -224,7 +236,7 @@ def Panic.message : Panic → String
   | storageDepositTooSmall => "The attached deposit is less than the mimimum storage balance"
   | storageWithdrawPositive => "The amount is greater than the available storage balance"
   | unregisterWithBalance => "Can't unregister the account with the positive balance without force"
-  | noPromiseResult => "promise_result"
+  | noPromiseResult => "Accessed invalid promise result index: 0"
   | promiseNotReady => "internal error: entered unreachable code"
   | arithmeticOverflow => "attempt to"
 

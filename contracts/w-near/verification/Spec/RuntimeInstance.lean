@@ -43,25 +43,64 @@ def Call.jsonArgs : Call → String
   | .storageUnregister force =>
     "{" ++ (match force with | some b => "\"force\":" ++ toString b | none => "") ++ "}"
 
-/-- The host context of a call: `Env` plus the arguments. -/
+/-- A successful `U128` JSON string can contain only ASCII decimal digits and
+an optional plus, literally or as Unicode escapes. All other decoded characters
+would make Rust's integer parser fail. This specialized decoder is total. -/
+def decodeU128String : List Char → Option (List Char)
+  | ['"'] => some []
+  | '\\' :: 'u' :: '0' :: '0' :: '3' :: digit :: rest => do
+    if !digit.isDigit then none else
+      pure (digit :: (← decodeU128String rest))
+  | '\\' :: 'u' :: '0' :: '0' :: '2' :: hex :: rest => do
+    if hex != 'b' && hex != 'B' then none else
+      pure ('+' :: (← decodeU128String rest))
+  | c :: rest => do
+    if !c.isDigit && c != '+' then none else
+      pure (c :: (← decodeU128String rest))
+  | [] => none
+
+def jsonWhitespace (c : Char) : Bool := c == ' ' || c == '\t' || c == '\n' || c == '\r'
+
+/-- SDK 3.1.0 reads a JSON string then calls `u128::from_str_radix(_, 10)`.
+Keep the projection total and reject non-JSON whitespace and integer overflow. -/
+def parseU128Result (bytes : List UInt8) : Option Nat := do
+  let text ← String.fromUTF8? ⟨bytes.toArray⟩
+  let chars := ((text.toList.dropWhile jsonWhitespace).reverse.dropWhile jsonWhitespace).reverse
+  let '"' :: body := chars | none
+  let decoded ← decodeU128String body
+  let digits := match decoded with | '+' :: rest => rest | other => other
+  if digits.isEmpty || !digits.all Char.isDigit then none else do
+    let amount := digits.foldl (fun n c => n * 10 + (c.toNat - '0'.toNat)) 0
+    if amount < u128Bound then some amount else none
+
+/-- Every successfully projected callback amount satisfies the SDK integer bound. -/
+theorem parseU128Result_lt {bytes : List UInt8} {amount : Nat}
+    (h : parseU128Result bytes = some amount) : amount < u128Bound := by
+  unfold parseU128Result at h
+  simp only [bind, Option.bind] at h
+  repeat (split at h <;> try simp_all)
+  all_goals exact h.2.2 ▸ h.2.1
+
+/-- Only result zero is read by wNEAR. Its raw representation is never replaced
+by this projection when constructing the VM context. -/
+def callbackResultOf (results : List Wasm.PromiseResult) : Option WNear.PromiseResult :=
+  match results.head? with
+  | none => none
+  | some .notReady => some .notReady
+  | some .failed => some .failed
+  | some (.successful bytes) => some (.successful (parseU128Result bytes))
+
+/-- A typed call and exact callback inputs, alongside chain-supplied resources. -/
 structure Input where
   method : String
   args : String
   env : Env
   resources : ExecutionResources
+  promiseResults : List Wasm.PromiseResult
 
-def mkInput (resources : ExecutionResources) (env : Env) (call : Call) : Input :=
-  { method := call.methodName, args := call.jsonArgs, env, resources }
-
-/-- The promise results the callback sees, from the model's view of them.
-A parsed `U128` is re-serialised; an unparsable value is an empty body. -/
-def promiseResultsOf (env : Env) : List Wasm.PromiseResult :=
-  match env.promiseResult with
-  | none => []
-  | some .notReady => [.notReady]
-  | some .failed => [.failed]
-  | some (.successful (some u)) => [.successful (jsonString (toString u)).toUTF8.toList]
-  | some (.successful none) => [.successful []]
+def mkInput (resources : ExecutionResources) (results : List Wasm.PromiseResult)
+    (env : Env) (call : Call) : Input :=
+  { method := call.methodName, args := call.jsonArgs, env, resources, promiseResults := results }
 
 def toVMContext (i : Input) : VMContext :=
   { currentAccountId := i.env.currentAccount.val.toUTF8.toList
@@ -69,17 +108,23 @@ def toVMContext (i : Input) : VMContext :=
     signerAccountPk := []
     predecessorAccountId := i.env.predecessor.val.toUTF8.toList
     input := i.args.toUTF8.toList
-    promiseResults := promiseResultsOf i.env
+    promiseResults := i.promiseResults
     attachedDeposit := i.env.attachedDeposit
     prepaidGas := i.env.prepaidGas
     accountBalance := i.resources.balance
     storageUsage := i.resources.storageUsage }
 
 /-- The adapter passes chain resources through without inventing funding. -/
-theorem toVMContext_resources (resources : ExecutionResources) (env : Env) (call : Call) :
-    (toVMContext (mkInput resources env call)).accountBalance = resources.balance ∧
-    (toVMContext (mkInput resources env call)).storageUsage = resources.storageUsage :=
+theorem toVMContext_resources (resources : ExecutionResources) (results : List Wasm.PromiseResult)
+    (env : Env) (call : Call) :
+    (toVMContext (mkInput resources results env call)).accountBalance = resources.balance ∧
+    (toVMContext (mkInput resources results env call)).storageUsage = resources.storageUsage :=
   ⟨rfl, rfl⟩
+
+/-- Neither parse failures nor additional callback results are discarded. -/
+theorem toVMContext_promiseResults (resources : ExecutionResources) (results : List Wasm.PromiseResult)
+    (env : Env) (call : Call) :
+    (toVMContext (mkInput resources results env call)).promiseResults = results := rfl
 
 /-- JSON of a return value as near-sdk's serde emits it. -/
 def Ret.json : Ret → String
@@ -190,6 +235,8 @@ noncomputable def nearLean (cfg : RuntimeConfig) : RuntimeInterface :=
     entries := rawOf
     Code := Wasm.Module × Nat
     Input := Input
+    CallbackResults := List Wasm.PromiseResult
+    callbackResult := callbackResultOf
     mkInput := mkInput
     Result := VMOutcome
     exec := fun (code, size) raw i => run cfg code size i.method (toVMContext i) raw

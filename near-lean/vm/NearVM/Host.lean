@@ -923,7 +923,9 @@ def promiseResultFn : HostFn NearState :=
     invoke := fun st args => match args with
       | [.i64 resultIdx, .i64 regId] =>
         match getPromiseResult? st.host.promiseResults resultIdx.toNat with
-        | none => .Trap st "promise_result: invalid promise result index"
+        | none =>
+          let error := HostError.invalidPromiseResultIndex resultIdx.toNat
+          .Trap { st with host := { st.host with lastError := some error } } error.message
         | some .notReady => .Return [.i64 0] st
         | some (.successful data) =>
           writeRegisterResult "promise_result" st regId data [.i64 1]

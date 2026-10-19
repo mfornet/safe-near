@@ -35,7 +35,7 @@ These assumptions must be carried into any theorem about deployed bytes.
 | Actions | Create, deploy, call, transfer, stake, add/delete key, delete account | Reference validation; integer bounds; epoch effects; newer action variants |
 | Receipts | Input/output dependencies, postponement, failure data, refunds | Well-formedness and freshness proofs; independent reference comparisons; yield/resume lifecycle |
 | Chain | Block application, delayed queue, explicit bounded-run completion, reachability restricted to supported applies | Scheduling assumptions; indirect interaction predicates; sufficient prepaid gas specification |
-| wNEAR | Executable scenarios; model authorization proofs; refinement proposition with explicit account resources and accounting | Binary refinement proof; raw callback observations; chain-level solvency and availability proofs |
+| wNEAR | Executable scenarios; model authorization proofs; refinement proposition with explicit account resources and accounting | Binary refinement proof; callback parsing/serialization proofs; chain-level solvency and availability proofs |
 
 Known unsafe approximations still requiring implementation changes:
 
@@ -121,3 +121,14 @@ well-formed state, including unregistered zero balances and bounded integers.
 The bridge from these model theorems to runtime/chain solvency remains open.
 `just wnear-audit` checks the entire verification package without an exemption
 for unfinished proofs; the deployed refinement remains a proposition to prove.
+
+The callback adapter now forwards exact raw result lists; the model view is a
+separate total `U128` string projection with a proved output bound. Typed numeric
+arguments carry a representability condition. Independent callback fixtures
+compare malformed UTF-8, noncanonical/escaped JSON, integer overflow, missing and
+extra results. Interleaving fixtures serialize receiver spending and account
+unregistration before resolution. They test the VM seam, not scheduling or
+transaction validation. A missing promise result now uses the structured
+`invalidPromiseResultIndex` host error, matching the independent oracle.
+The full deployed refinement also still needs treatment of input/log/temporary
+storage limits and proofs connecting the projection to SDK serialization.

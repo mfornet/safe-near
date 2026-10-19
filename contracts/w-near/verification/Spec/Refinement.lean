@@ -60,9 +60,14 @@ structure RuntimeInterface where
   Code : Type
   /-- One function-call action: method name, JSON arguments and host context. -/
   Input : Type
+  /-- Exact raw callback inputs, including malformed successful return bytes. -/
+  CallbackResults : Type
+  /-- The contract-specific view of result zero; additional results are retained
+  by the executor even though this contract does not inspect them. -/
+  callbackResult : CallbackResults → Option PromiseResult
   /-- The input for a typed call under a host context, using near-sdk's JSON
   argument encoding (`U128` as decimal strings, account ids as strings). -/
-  mkInput : ExecutionResources → Env → Call → Input
+  mkInput : ExecutionResources → CallbackResults → Env → Call → Input
   /-- Result of executing one function call. -/
   Result : Type
   /-- Deterministic execution of one function call against code and storage. -/
@@ -111,11 +116,12 @@ accounting. Failures, including out of gas, roll back account resources. -/
 @[blueprint "spec:refinement"
   (statement := /-- For every storage representing an optional state (empty, or the encoding of a state satisfying \cref{def:inv}), every context and call, if executing the deployed code does not run out of gas then: when \cref{def:step} succeeds, the execution succeeds with the encoding of the new state as storage and the same return value, logs and promises; when \cref{def:step} panics, the execution fails with a message containing the panic text and the storage is unchanged. -/)]
 def Refines (R : RuntimeInterface) (code : R.Code) (cfg : Config) : Prop :=
-  ∀ (raw : R.Storage) (st : Option State) (resources : ExecutionResources) (env : Env) (call : Call),
+  ∀ (raw : R.Storage) (st : Option State) (resources : ExecutionResources) (env : Env) (call : Call) (results : R.CallbackResults),
+    call.WF → env.promiseResult = R.callbackResult results →
     Represents R cfg raw st →
     resources.Valid cfg (R.entries raw) env →
     resources.Supports cfg (R.entries raw) env (step cfg st env call) →
-    let r := R.exec code raw (R.mkInput resources env call)
+    let r := R.exec code raw (R.mkInput resources results env call)
     R.executionIssue r = none ∧
     R.burntGas r ≤ R.usedGas r ∧ R.usedGas r ≤ env.prepaidGas ∧
     (R.failure r ≠ none →

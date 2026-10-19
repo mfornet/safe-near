@@ -45,3 +45,11 @@ resolution failure. Matching functional fields alone does not establish VM
 conformance. Those observed discrepancies have been fixed for these fixtures;
 the comparison remains strict. Extend it to more contracts, boundary cases
 and protocol versions before making broader conformance claims.
+
+`wnear_callbacks.json` preserves exact raw callback bytes (including malformed
+UTF-8, escaped numbers, overflow, missing results and additional result slots).
+It caught an invalid-result-index host error that was incorrectly reported as a
+contract panic; the regression compares its exact error and gas. The
+`wnear_interleavings.json` fixture executes calls where a receiver spends or a
+sender/receiver unregisters before refund resolution. These are controlled VM
+call sequences on shared storage, not an independent receipt scheduler oracle.
