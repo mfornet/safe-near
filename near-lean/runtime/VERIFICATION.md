@@ -299,3 +299,29 @@ pending, delayed and postponed receipts. Whole-chain conservation is still open.
 refund routines from the clean pinned nearcore implementation through an appended
 adapter module. Its 72 exact comparisons cover v84/85/86 financial parameters,
 price changes and account creation. It is not a full receipt execution oracle.
+
+## Finite-map and transaction invariants
+
+`StateInvariants` defines `AccountsUnique` and `MapsUnique` for the association-list
+key domains. It proves insert/erase lookup frames, uniqueness preservation by the
+state update primitives, and exact account balance changes for insertion,
+replacement and removal. These predicates do not establish numeric bounds,
+receipt consistency or global identifier freshness.
+
+`TransactionInvariants` connects the actual successful `convertTransaction`
+execution to its validated commit. Kernel-checked theorems establish exact account
+debit, conservation of account funds plus the newly backed receipt and conversion
+gas burn, preservation of all map-key domains, unrelated-account isolation, and
+the receipt counter's exact increment. Conservation assumes unique account keys
+and excludes the reserved system signer, whose receipts use free-refund semantics.
+`AccessKeyInvariants` proves successful conversion installs the authorized key,
+sets its nonce, respects restricted receiver/method/zero-deposit constraints,
+checks the allowance and deducts exactly the transaction cost from finite
+allowances. Signatures remain trusted; these are properties of the implemented
+conversion, not a proof of equivalence with nearcore transaction admission.
+
+The transaction interface currently represents the legacy monotonic nonce mode.
+Pinned `verifier::verify_nonce` also enforces a block-height nonce ceiling, which
+conversion does not yet enforce. Strict nonce and gas-key transaction variants,
+remaining admission bounds and error ordering, gas-refund allowance restoration,
+whole-receipt state-invariant preservation and global conservation remain open.

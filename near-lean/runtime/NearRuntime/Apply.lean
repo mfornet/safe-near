@@ -476,17 +476,10 @@ decreasing_by
 
 /-! ## Transactions -/
 
-/-- `verify_and_charge_transaction`: signer, key, nonce, permission and
-balance checks; charges the cost; bumps the nonce; returns the receipt. -/
-def convertTransaction (cfg : RuntimeConfig) (ap : ApplyState) (st : ChainState) (tx : Transaction) :
-    Except RuntimeError (ChainState × Receipt × Fees.TxCost) := do
-  let some signer := st.account? tx.signerId | throw (.invalidSigner tx.signerId)
-  let some key := st.accessKey? tx.signerId tx.publicKey | throw (.invalidAccessKey "AccessKeyNotFound")
-  if tx.nonce ≤ key.nonce then throw (.invalidNonce tx.nonce key.nonce)
-  if tx.actions.length > cfg.wasm.limits.maxActionsPerReceipt then
-    throw (.tooManyActions tx.actions.length cfg.wasm.limits.maxActionsPerReceipt)
-  let cost := Fees.txCost cfg ap.gasPrice tx.signerId tx.receiverId tx.actions
-  let key' ← match key.permission with
+/-- Access-key authorization and allowance debit before a transaction commits. -/
+def validateTransactionAccessKey (tx : Transaction) (key : AccessKey) (cost : Fees.TxCost) :
+    Except RuntimeError AccessKey := do
+  match key.permission with
     | .fullAccess => pure { key with nonce := tx.nonce }
     | .functionCall allowance receiver methods =>
       match tx.actions with
@@ -500,11 +493,13 @@ def convertTransaction (cfg : RuntimeConfig) (ap : ApplyState) (st : ChainState)
           pure { nonce := tx.nonce, permission := .functionCall (some (al - cost.total)) receiver methods }
         | none => pure { key with nonce := tx.nonce }
       | _ => throw (.invalidAccessKey "RequiresFullAccess")
-  if signer.amount < cost.total then throw (.notEnoughBalance tx.signerId signer.amount cost.total)
-  let signer' := { signer with amount := signer.amount - cost.total }
-  let deficit := storageStakeDeficit cfg signer'
-  if deficit > 0 then throw (.lackBalanceForState tx.signerId deficit)
-  let st := (st.setAccount tx.signerId signer').setAccessKey tx.signerId tx.publicKey key'
+
+/-- Commit the already-validated transaction debit, key update and fresh receipt.
+Callers must establish that `signer` is the current signer account and funded. -/
+def commitTransaction (st : ChainState) (tx : Transaction) (signer : Account)
+    (newKey : AccessKey) (cost : Fees.TxCost) : ChainState × Receipt × Fees.TxCost :=
+  let st := (st.setAccount tx.signerId { signer with amount := signer.amount - cost.total }).setAccessKey
+    tx.signerId tx.publicKey newKey
   let (id, st) := st.freshId
   let action : ActionReceipt :=
     { signerId := tx.signerId
@@ -516,7 +511,24 @@ def convertTransaction (cfg : RuntimeConfig) (ap : ApplyState) (st : ChainState)
       receiverId := tx.receiverId
       receiptId := id
       receipt := .action action }
-  return (st, receipt, cost)
+  (st, receipt, cost)
+
+/-- `verify_and_charge_transaction`: signer, key, nonce, permission and
+balance checks; charges the cost; bumps the nonce; returns the receipt. -/
+def convertTransaction (cfg : RuntimeConfig) (ap : ApplyState) (st : ChainState) (tx : Transaction) :
+    Except RuntimeError (ChainState × Receipt × Fees.TxCost) := do
+  let some signer := st.account? tx.signerId | throw (.invalidSigner tx.signerId)
+  let some key := st.accessKey? tx.signerId tx.publicKey | throw (.invalidAccessKey "AccessKeyNotFound")
+  if tx.nonce ≤ key.nonce then throw (.invalidNonce tx.nonce key.nonce)
+  if tx.actions.length > cfg.wasm.limits.maxActionsPerReceipt then
+    throw (.tooManyActions tx.actions.length cfg.wasm.limits.maxActionsPerReceipt)
+  let cost := Fees.txCost cfg ap.gasPrice tx.signerId tx.receiverId tx.actions
+  let key' ← validateTransactionAccessKey tx key cost
+  if signer.amount < cost.total then throw (.notEnoughBalance tx.signerId signer.amount cost.total)
+  let signer' := { signer with amount := signer.amount - cost.total }
+  let deficit := storageStakeDeficit cfg signer'
+  if deficit > 0 then throw (.lackBalanceForState tx.signerId deficit)
+  return commitTransaction st tx signer key' cost
 
 /-- `Runtime::apply`. Transactions first (their receipts are local), then
 delayed receipts, then incoming ones; receipts beyond the gas limit are
