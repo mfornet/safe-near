@@ -87,7 +87,10 @@ should be written:
 methods, with reusable lemmas that refund callbacks preserve registration.
 `BalanceAuthorization` is also proved: a non-predecessor balance can fall
 only in refund resolution, for the receiver and by at most the transfer amount.
-`Conservation` remains open. `ProjectEncode` and `StorageCoverage` need
+`Conservation` is proved for every model method: increases in supply and
+registration liabilities are covered by the attached NEAR after outgoing promises. `StorageCoverage` is proved by bounding each encoded account record by the
+64-byte entry measured at initialization. This uses a kernel-checked byte-array
+length lemma and does not assume encoder injectivity. `ProjectEncode` still needs
 injectivity of the Borsh encoders in `Model/Borsh.lean`.
 
 `Spec/Refinement.lean` states the interface the proofs need from a runtime;

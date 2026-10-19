@@ -1,3 +1,5 @@
+import Init.Omega
+
 /-!
 # Borsh encoding (the fragment used by wNEAR)
 
@@ -31,5 +33,22 @@ def string (s : String) : Bytes := bytes s.toUTF8.toList
   induction w generalizing n with
   | zero => rfl
   | succ w ih => simp [leBytes, ih]
+
+private theorem byteArray_loop_length (b : ByteArray) (i : Nat) (acc : List UInt8) :
+    (ByteArray.toList.loop b i acc).length = acc.length + (b.size - i) := by
+  rw [ByteArray.toList.loop]
+  split
+  · rw [byteArray_loop_length b (i + 1) (b.get! i :: acc)]
+    simp only [List.length_cons]
+    omega
+  · simp only [List.length_reverse]
+    omega
+termination_by b.size - i
+
+/-- Byte extraction preserves the measured byte length; no compiler evaluation
+or UTF-8 decoding assumption is needed. -/
+@[simp] theorem byteArray_toList_length (b : ByteArray) : b.toList.length = b.size := by
+  simpa only [ByteArray.toList, List.length_nil, Nat.sub_zero, Nat.zero_add] using
+    byteArray_loop_length b 0 []
 
 end WNear.Borsh

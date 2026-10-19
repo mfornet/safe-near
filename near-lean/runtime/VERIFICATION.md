@@ -35,7 +35,7 @@ These assumptions must be carried into any theorem about deployed bytes.
 | Actions | Create, deploy, call, transfer, stake, add/delete key, delete account | Reference validation; integer bounds; epoch effects; newer action variants |
 | Receipts | Input/output dependencies, postponement, failure data, refunds | Well-formedness and freshness proofs; independent reference comparisons; yield/resume lifecycle |
 | Chain | Block application, delayed queue, explicit bounded-run completion, reachability restricted to supported applies | Scheduling assumptions; indirect interaction predicates; sufficient prepaid gas specification |
-| wNEAR | Executable scenarios and a model refinement proposition | Binary refinement proof; exact financial observations; chain-level solvency and availability proofs |
+| wNEAR | Executable scenarios; model authorization proofs; refinement proposition with explicit account resources and accounting | Binary refinement proof; raw callback observations; chain-level solvency and availability proofs |
 
 Known unsafe approximations still requiring implementation changes:
 
@@ -101,3 +101,20 @@ receipt actions, invalid accounts and graphs not representable by its model.
 The refinement proposition requires absence of model issues and valid successful
 observations; neither is an exclusion hypothesis that can hide a failed run.
 The binary-to-model refinement proof remains open.
+
+The wNEAR model now proves balance and registration authorization across every
+method. A callback can reduce only the receiver's balance, by at most the original
+transfer amount, and cannot change registration. These proofs use only the three
+standard Lean axioms. Their connection to deployed execution still requires the
+binary refinement proof. The adapter passes actual balance and storage usage from
+the enclosing action rather than inventing zero resources; the refinement states
+local funding/bounds preconditions, exact successful accounting, and failure
+rollback, including gas exhaustion. Chain solvency must establish those funding
+preconditions.
+
+The model also proves per-call conservation: the increase in total supply plus
+registration liabilities is bounded by attached NEAR minus all outgoing promise
+deposits. Refund resolution preserves registration, creates no NEAR transfers,
+and can only decrease supply. Storage coverage bounds the encoded records by the
+`STATE` record plus the measured per-account allocation. Encoder injectivity and
+the bridge from these model theorems to runtime/chain solvency remain open.
