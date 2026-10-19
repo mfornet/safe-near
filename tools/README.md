@@ -37,6 +37,13 @@ the subset Mathlib can repair; unresolved findings still fail the command.
 The text-only semicolon rule is disabled because it matches meaningful WAT
 string literals in interpreter tests.
 
+Unicode conventions apply to source notation and comments; string, raw-string
+and character literal contents are opaque contract data. A lexical scan masks
+those contents for the code-point check, preserving source line numbers and
+handling escapes and nested comments. Unicode findings outside literals remain
+errors and are never automatically replaced. This preserves multilingual ABI
+test data while retaining source-notation checks.
+
 After a fresh checkout, prepare the style dependency once:
 
 ```sh

@@ -36,4 +36,22 @@ with tempfile.TemporaryDirectory() as directory:
     source.write_bytes(literal)
     assert run(source, fix=True).returncode == 0
     assert source.read_bytes() == literal, "formatter changed a WAT string literal"
+    multilingual = '''def text : String := "日本語 🙂"
+def escaped : String := "quote: \\\"日本語"
+def raw : String := r##"quote: " 日本語 🙂 /- literal -/"##
+def character : Char := '日'
+'''.encode()
+    source.write_bytes(multilingual)
+    result = run(source, fix=True)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert source.read_bytes() == multilingual, "style fix changed Unicode literal bytes"
+    outside = '''/- A comment with "quotes" and /- a nested comment -/. -/
+def text : String := "backslash: \\\\"
+def 日本語 : Nat := 1
+'''.encode()
+    source.write_bytes(outside)
+    result = run(source)
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "ERR_UNICODE" in result.stdout, result.stdout
+    assert source.read_bytes() == outside, "check mode changed Unicode source"
 print("Lean style integration checks passed.")
