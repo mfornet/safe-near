@@ -468,15 +468,21 @@ def meteredHostFns (cfg : RuntimeConfig) : List (ImportDecl × HostFn NearState)
   (nearHostFns.map fun (decl, fn) => (decl, metered extra decl.name (swap decl fn)))
     ++ [({ «module» := "env", name := "gas", params := [.i32], results := [] }, gasFn)]
 
-/-- Resolve a module's imports against the metered table. `none` names the
+/-- Resolve imports in declaration order, retaining the first unknown-import
+error. Structural recursion exposes the environment invariant to proofs. -/
+def resolveMeteredImports (cfg : RuntimeConfig) : List ImportDecl → Except String (HostEnv NearState)
+  | [] => .ok { funcs := [] }
+  | decl :: rest =>
+    match (meteredHostFns cfg).find? (fun p => importMatches p.fst decl) with
+    | none => .error s!"{decl.module}.{decl.name}"
+    | some (_, fn) =>
+      match resolveMeteredImports cfg rest with
+      | .error message => .error message
+      | .ok env => .ok { funcs := fn :: env.funcs }
+
+/-- Resolve a module's imports against the metered table. `error` names the
 first import that is not a known NEAR host function. -/
-def resolveMetered (cfg : RuntimeConfig) (m : Module) : Except String (HostEnv NearState) := do
-  let table := meteredHostFns cfg
-  let mut funcs : Array (HostFn NearState) := #[]
-  for decl in m.imports do
-    match table.find? (fun p => importMatches p.fst decl) with
-    | some (_, fn) => funcs := funcs.push fn
-    | none => throw s!"{decl.module}.{decl.name}"
-  return { funcs := funcs.toList }
+def resolveMetered (cfg : RuntimeConfig) (m : Module) : Except String (HostEnv NearState) :=
+  resolveMeteredImports cfg m.imports
 
 end Wasm.Near

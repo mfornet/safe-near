@@ -146,5 +146,13 @@ error outcomes. A generic metering theorem lifts these proofs through gas
 charging, deposit deductions and storage-usage updates. Initialization starts
 with a well-formed empty graph; successful preserving host calls therefore
 admit conversion to a valid receipt graph. These local proofs do not yet cover
-the complete host registry or interpreter transitions, full action validity,
+interpreter transitions, full action validity,
 identifier bounds/freshness, or global token conservation.
+
+`NearVM/HostDispatch.lean` extends dependency preservation to the complete
+metered registry, including unsupported/deprecated rejection and gas imports.
+Successful `resolveMetered` environments contain only preserving host functions.
+The resolver uses structural recursion; alignment and length theorems establish
+that each output slot is the first matching registry function for its input
+import, preserving declaration order and duplicate imports. This closes host
+dispatch preservation, not whole-interpreter preservation.
