@@ -145,9 +145,8 @@ cover both call orders.
 error outcomes. A generic metering theorem lifts these proofs through gas
 charging, deposit deductions and storage-usage updates. Initialization starts
 with a well-formed empty graph; successful preserving host calls therefore
-admit conversion to a valid receipt graph. These local proofs do not yet cover
-interpreter transitions, full action validity,
-identifier bounds/freshness, or global token conservation.
+admit conversion to a valid receipt graph. These local proofs do not establish
+full action validity, identifier bounds/freshness, or global token conservation.
 
 `NearVM/HostDispatch.lean` extends dependency preservation to the complete
 metered registry, including unsupported/deprecated rejection and gas imports.
@@ -155,4 +154,14 @@ Successful `resolveMetered` environments contain only preserving host functions.
 The resolver uses structural recursion; alignment and length theorems establish
 that each output slot is the first matching registry function for its input
 import, preserving declaration order and duplicate imports. This closes host
-dispatch preservation, not whole-interpreter preservation.
+dispatch preservation; the execution lifting is described below.
+
+`NearVM/ExecutionPromises.lean` lifts dependency preservation through every
+small-step transition and finite trace, instruction/frame gas charging, and
+all exits of `runMetered`. The proof includes indirect/foreign calls,
+cross-instance calls, GC operations, exception preparation and indexed-memory
+execution. Resolved initialization establishes the callable-host invariant;
+`runResolved_promises_convertible` proves that execution from a well-formed
+initial promise list produces a convertible valid graph without assuming an
+output-validator check. This does not yet prove returned-handle selection,
+full state well-formedness, global identifier freshness or conservation.

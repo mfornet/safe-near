@@ -141,9 +141,8 @@ prove that every public VM result has backward-only dependencies, an existing
 returned receipt and no dependency cycle. Invalid raw handles or converted
 graphs become model issues with balance/storage/usage rollback; logs and burnt
 gas remain diagnostic observations. These predicates concern dependency indices,
-not full action/account validity or global identifier freshness. Preservation
-across interpreter transitions remains open; accepted outputs
-are checked regardless. Join conversion is now related to explicit ordered graph
+not full action/account validity or global identifier freshness. Accepted outputs
+are checked regardless of the preservation proof. Join conversion is now related to explicit ordered graph
 semantics by the proofs described below.
 The join oracle covers ordinary, nested, duplicate and empty joins, illegal
 joint returns/actions, nonexistent handles, view restrictions and low-gas error
@@ -173,8 +172,8 @@ charges, deposit deductions and storage-usage updates. Post-call metering was
 extracted into `finishMeteredCall` without changing its execution order or
 behavior. Initialization has an empty well-formed graph, and
 `HostPreservesPromises.convertible` connects successful host execution directly
-to the proved converter and receipt-graph validity. Full interpreter
-preservation, action validity, integer bounds, global freshness and conservation
+to the proved converter and receipt-graph validity. Full state
+well-formedness, action validity, integer bounds, global freshness and conservation
 remain separate obligations.
 
 `NearVM/HostDispatch.lean` now covers the complete metered host registry.
@@ -184,4 +183,18 @@ this invariant to every function in a successfully resolved environment.
 `resolveMeteredImports_aligned` and `resolveMetered_length` prove positional
 alignment and multiplicity for the structurally recursive import resolver.
 These are dependency-preservation guarantees, not complete host semantic
-conformance, and do not yet establish preservation through interpreter steps.
+conformance; the interpreter lifting is described below.
+
+`NearVM/ExecutionPromises.lean` now proves dependency preservation for every
+`SmallStep.Step`, finite `SmallStep.Steps` trace, and every `runMetered` exit,
+including fuel/gas exhaustion and diagnostic errors. The invariant includes
+all callable hosts in all module instances and foreign-function slots.
+Indexed-memory selection changes only memory metadata, with a proved host-table
+frame; GC execution, exception preparation and memory restoration have host-state
+frames as well. Successful resolved initialization establishes the invariant.
+`runResolved_promises_convertible` connects that initialization and actual
+metered execution to a valid converted graph without using the output checker.
+The initial promise list must be well formed (ordinary VM contexts start empty).
+These proofs do not establish complete state well-formedness, valid returned
+selection, account/action validity, bounds, global freshness or conservation,
+nor do they prove equivalence between interpreter steps and nearcore.
