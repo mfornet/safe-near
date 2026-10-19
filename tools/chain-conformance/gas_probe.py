@@ -82,6 +82,8 @@ def model_request(source, trace, config_dir):
     result = dict(formatVersion=1, protocolVersion=source["protocolVersion"], configDir=str(config_dir),
                   codes=[], initialState=state(trace["initialState"], 1), pendingReceipts=[], blocks=[])
     for header, block in zip(source["blocks"], trace["blocks"]):
+        if [row["borsh"] for row in block["inputs"]["transactions"]] != header["transactions"]:
+            raise ValueError("decoded native transactions disagree with the signed request bytes")
         value = {key: header[key] for key in ("blockHeight", "blockTimestamp", "epochHeight", "gasPrice",
                                             "gasLimit", "randomSeed", "incomingIndices")}
         transactions = []
@@ -192,7 +194,8 @@ def probe(reference, model):
                         block["gasPrice"] = str(purchase)
                     source["blocks"][2]["gasPrice"] = str(burn)
                     native_trace = execute(native, source)
-                    if native_trace["stop"] != "blocksExhausted" or native_trace["unrunBlocks"]:
+                    if (native_trace["stop"] != "blocksExhausted" or native_trace["unrunBlocks"]
+                            or len(native_trace["blocks"]) != len(source["blocks"])):
                         raise ValueError("native transfer probe did not execute every block")
                     request = model_request(source, native_trace, config_dir)
                     model_trace = execute(lean, request)

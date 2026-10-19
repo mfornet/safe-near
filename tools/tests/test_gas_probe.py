@@ -36,6 +36,11 @@ class GasObservationTests(unittest.TestCase):
         self.assertEqual(gas_probe.public_key("ed25519:" + "1" * 32), [0] * 33)
         with self.assertRaises(ValueError):
             gas_probe.public_key("ed25519:1")
+        with self.assertRaisesRegex(ValueError, "signed request bytes"):
+            gas_probe.model_request(
+                {"pendingReceipts": [], "protocolVersion": 86, "blocks": [{"transactions": [[1]]}]},
+                {"initialState": {"decodedRecords": []}, "blocks": [{"inputs": {"transactions": []}}]},
+                Path("."))
 
 
 if __name__ == "__main__":
