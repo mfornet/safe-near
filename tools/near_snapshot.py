@@ -66,6 +66,13 @@ def capture(accounts: list[str], *, url: str = ARCHIVAL_RPC,
         keys = query("view_access_key_list", account_id)["keys"]
         if len({k["public_key"] for k in keys}) != len(keys):
             raise ValueError(f"{account_id}: duplicate access key in RPC response")
+        gas_key_nonces = []
+        for key in sorted(keys, key=lambda k: k["public_key"]):
+            permission = key["access_key"]["permission"]
+            if isinstance(permission, dict) and any(
+                    kind in permission for kind in ("GasKeyFullAccess", "GasKeyFunctionCall")):
+                lanes = query("view_gas_key_nonces", account_id, public_key=key["public_key"])
+                gas_key_nonces.append({"public_key": key["public_key"], "nonces": lanes["nonces"]})
         values = {}
         for prefix in prefixes:
             state = query("view_state", account_id,
@@ -80,6 +87,7 @@ def capture(accounts: list[str], *, url: str = ARCHIVAL_RPC,
         snapshots.append({
             "account_id": account_id, "account": account, "code": code,
             "access_keys": sorted(keys, key=lambda k: k["public_key"]),
+            "gas_key_nonces": gas_key_nonces,
             "storage": {
                 "complete": prefixes == [b""],
                 "prefixes_base64": [base64.b64encode(p).decode() for p in prefixes],

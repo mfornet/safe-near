@@ -22,6 +22,7 @@ class FakeRPC:
                         "code_hash": snapshot.code_hash(self.code)}
         self.data = {b"": b"root", b"STATE": b"state", b"a\x00": b"\xff"}
         self.wrong_block = False
+        self.gas_key = False
 
     def __call__(self, method, params, **kwargs):
         self.calls.append((method, params, kwargs))
@@ -39,6 +40,11 @@ class FakeRPC:
             result["keys"] = [{"public_key": "ed25519:key", "access_key": {
                 "nonce": 8, "permission": {"FunctionCall": {
                     "allowance": None, "receiver_id": "app.near", "method_names": ["go"]}}}}]
+            if self.gas_key:
+                result["keys"][0]["access_key"]["permission"] = {
+                    "GasKeyFullAccess": {"balance": "100", "num_nonces": 2}}
+        elif kind == "view_gas_key_nonces":
+            result["nonces"] = [123000001, 123000003]
         elif kind == "view_state":
             prefix = snapshot.decode(params["prefix_base64"])
             result["values"] = [{"key": b64(k), "value": b64(v)} for k, v in self.data.items()
@@ -71,6 +77,15 @@ class SnapshotTests(unittest.TestCase):
         self.rpc.wrong_block = True
         with self.assertRaisesRegex(ValueError, "different block"):
             self.capture()
+
+    def test_gas_key_nonce_lanes_are_preserved_at_the_same_block(self):
+        self.rpc.gas_key = True
+        result = self.capture()["accounts"][0]
+        self.assertEqual(result["gas_key_nonces"], [
+            {"public_key": "ed25519:key", "nonces": [123000001, 123000003]}])
+        calls = [params for _, params, _ in self.rpc.calls
+                 if params.get("request_type") == "view_gas_key_nonces"]
+        self.assertEqual(calls[0]["block_id"], "fixed-hash")
 
     def test_tampered_code_is_rejected(self):
         self.rpc.account["code_hash"] = "wrong"

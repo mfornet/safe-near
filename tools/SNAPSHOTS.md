@@ -16,6 +16,8 @@ both the code response's hash and the account's code hash. The output includes
 the full block response and protocol configuration requested at that block.
 Account balances, nonces, permissions, and raw binary storage are preserved;
 JSON amounts remain decimal strings and storage stays base64-encoded.
+For gas keys, the separately queried parallel nonce lanes are preserved in
+`gas_key_nonces` at the same pinned block; ordinary accounts have an empty list.
 
 The file is published atomically after all reads and checks succeed. Existing
 files are never overwritten. To repeat a capture, select the saved block hash
