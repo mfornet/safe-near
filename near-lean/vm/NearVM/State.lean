@@ -223,6 +223,25 @@ def setIterator (ns : NearState) (id : Nat) (it : StorageIterator) : NearState :
     iterators := fun i => if i = id then some it else ns.iterators i
     nextIteratorId := max ns.nextIteratorId (id + 1) }
 
+/-- Return selectors share one logical slot: the last successful selection wins. -/
+def selectReturnValue (ns : NearState) (bytes : List UInt8) : NearState :=
+  { ns with returnData := some bytes, returnedPromise := none }
+
+def selectReturnPromise (ns : NearState) (index : Nat) : NearState :=
+  { ns with returnedPromise := some index, returnData := none }
+
+theorem selectReturnValue_clears_promise (ns : NearState) (bytes : List UInt8) :
+    (ns.selectReturnValue bytes).returnedPromise = none := rfl
+
+theorem selectReturnPromise_clears_value (ns : NearState) (index : Nat) :
+    (ns.selectReturnPromise index).returnData = none := rfl
+
+theorem selectReturnValue_after_promise (ns : NearState) (index : Nat) (bytes : List UInt8) :
+    (ns.selectReturnPromise index).selectReturnValue bytes = ns.selectReturnValue bytes := rfl
+
+theorem selectReturnPromise_after_value (ns : NearState) (bytes : List UInt8) (index : Nat) :
+    (ns.selectReturnValue bytes).selectReturnPromise index = ns.selectReturnPromise index := rfl
+
 end NearState
 
 /-- The NEAR `get_memory_or_register` input convention. For an input

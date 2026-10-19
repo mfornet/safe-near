@@ -45,3 +45,23 @@ resolution failure. Matching functional fields alone does not establish VM
 conformance. Those observed discrepancies have been fixed for these fixtures;
 the comparison remains strict. Extend it to more contracts, boundary cases
 and protocol versions before making broader conformance claims.
+
+`wnear_callbacks.json` preserves exact raw callback bytes (including malformed
+UTF-8, escaped numbers, overflow, missing results and additional result slots).
+It caught an invalid-result-index host error that was incorrectly reported as a
+contract panic; the regression compares its exact error and gas. The
+`wnear_interleavings.json` fixture executes calls where a receiver spends or a
+sender/receiver unregisters before refund resolution. These are controlled VM
+call sequences on shared storage, not an independent receipt scheduler oracle.
+
+`promise_graphs.json` checks exact ordered receipt dependencies and returned
+receipt identity for ordinary, nested, duplicate and empty joins. Failure cases
+cover joint return/action restrictions, nonexistent handles, view calls and
+invalid-handle errors that precede later action-fee gas exhaustion. Its WAT and
+binary are pinned together; replay still regenerates WAT from the binary.
+
+The promise-graph fixture also covers both orders of `value_return` and
+`promise_return`. It exposed a stale receipt selection after a later value
+return; the host now gives the last successful selection precedence. The same
+fixture validates the incremental converter against the reference after removal
+of the bounded join walk.

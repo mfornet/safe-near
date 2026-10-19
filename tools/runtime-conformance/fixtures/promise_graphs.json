@@ -1,0 +1,82 @@
+{
+  "code": "tools/runtime-conformance/fixtures/promise_graphs.wasm",
+  "sha256": "625250fb76eb895acc4812a772e9e7c6856119bad5386222539b5c355b380a86",
+  "protocolVersion": 86,
+  "initialBalance": "100000000000000000000000000",
+  "storage": [],
+  "calls": [
+    {
+      "name": "join",
+      "method": "join",
+      "args": {}
+    },
+    {
+      "name": "nested_join",
+      "method": "nested_join",
+      "args": {}
+    },
+    {
+      "name": "duplicate_join",
+      "method": "duplicate_join",
+      "args": {}
+    },
+    {
+      "name": "empty_join",
+      "method": "empty_join",
+      "args": {}
+    },
+    {
+      "name": "return_join",
+      "method": "return_join",
+      "args": {}
+    },
+    {
+      "name": "append_join",
+      "method": "append_join",
+      "args": {}
+    },
+    {
+      "name": "return_invalid",
+      "method": "return_invalid",
+      "args": {}
+    },
+    {
+      "name": "then_invalid",
+      "method": "then_invalid",
+      "args": {}
+    },
+    {
+      "name": "join_invalid",
+      "method": "join_invalid",
+      "args": {}
+    },
+    {
+      "name": "return invalid prohibited in view",
+      "method": "return_invalid",
+      "args": {},
+      "view": true
+    },
+    {
+      "name": "invalid append wins over later action fee exhaustion",
+      "method": "append_join",
+      "args": {},
+      "gas": 1000000000000
+    },
+    {
+      "name": "invalid callback wins over later receipt fee exhaustion",
+      "method": "then_invalid",
+      "args": {},
+      "gas": 10000000000
+    },
+    {
+      "name": "value_after_receipt",
+      "method": "value_after_receipt",
+      "args": {}
+    },
+    {
+      "name": "receipt_after_value",
+      "method": "receipt_after_value",
+      "args": {}
+    }
+  ]
+}

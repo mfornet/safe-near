@@ -1,0 +1,139 @@
+{
+  "code": "contracts/w-near/contract.wasm",
+  "sha256": "b72c26d390b23f4517d091a8aab06b0369d465356ec5fb337d5fda076da38ac0",
+  "protocolVersion": 86,
+  "initialBalance": "100000000000000000000000000",
+  "storage": [],
+  "calls": [
+    {
+      "name": "initialize",
+      "method": "new",
+      "predecessor": "wrap.near",
+      "args": {}
+    },
+    {
+      "name": "deposit",
+      "method": "near_deposit",
+      "args": {},
+      "deposit": "1000000000000000000000000"
+    },
+    {
+      "name": "register receiver",
+      "method": "storage_deposit",
+      "args": {
+        "account_id": "bob.near"
+      },
+      "deposit": "10000000000000000000000"
+    },
+    {
+      "name": "register third party",
+      "method": "storage_deposit",
+      "args": {
+        "account_id": "carol.near"
+      },
+      "deposit": "10000000000000000000000"
+    },
+    {
+      "name": "transfer before receiver spends",
+      "method": "ft_transfer_call",
+      "args": {
+        "receiver_id": "bob.near",
+        "amount": "200000000000000000000000",
+        "msg": ""
+      },
+      "deposit": "1"
+    },
+    {
+      "name": "receiver spends before callback",
+      "method": "ft_transfer",
+      "predecessor": "bob.near",
+      "args": {
+        "receiver_id": "carol.near",
+        "amount": "150000000000000000000000"
+      },
+      "deposit": "1"
+    },
+    {
+      "name": "refund limited by remaining receiver balance",
+      "method": "ft_resolve_transfer",
+      "predecessor": "wrap.near",
+      "promiseResults": [
+        null
+      ],
+      "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "200000000000000000000000"
+      }
+    },
+    {
+      "name": "transfer before sender unregisters",
+      "method": "ft_transfer_call",
+      "args": {
+        "receiver_id": "bob.near",
+        "amount": "200000000000000000000000",
+        "msg": ""
+      },
+      "deposit": "1"
+    },
+    {
+      "name": "sender unregisters before callback",
+      "method": "storage_unregister",
+      "args": {
+        "force": true
+      },
+      "deposit": "1"
+    },
+    {
+      "name": "burn refund after sender unregisters",
+      "method": "ft_resolve_transfer",
+      "predecessor": "wrap.near",
+      "promiseResults": [
+        null
+      ],
+      "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "200000000000000000000000"
+      }
+    },
+    {
+      "name": "sender registers and deposits again",
+      "method": "near_deposit",
+      "args": {},
+      "deposit": "1000000000000000000000000"
+    },
+    {
+      "name": "transfer before receiver unregisters",
+      "method": "ft_transfer_call",
+      "args": {
+        "receiver_id": "bob.near",
+        "amount": "200000000000000000000000",
+        "msg": ""
+      },
+      "deposit": "1"
+    },
+    {
+      "name": "receiver unregisters before callback",
+      "method": "storage_unregister",
+      "predecessor": "bob.near",
+      "args": {
+        "force": true
+      },
+      "deposit": "1"
+    },
+    {
+      "name": "no refund after receiver unregisters",
+      "method": "ft_resolve_transfer",
+      "predecessor": "wrap.near",
+      "promiseResults": [
+        null
+      ],
+      "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "200000000000000000000000"
+      }
+    }
+  ]
+}

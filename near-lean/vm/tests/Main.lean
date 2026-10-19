@@ -74,6 +74,50 @@ def main (args : List String) : IO UInt32 := do
     | .error e => do IO.println s!"decode error: {e}"; return 1
   let h : Harness := { cfg, code, codeSize := 200_000 }
 
+  let root : ReceiptSpec := { receiverId := alice, actions := [.transfer 1] }
+  let joined : VMOutcome := { (default : VMOutcome) with
+    receipts := [root, root, { root with dependencies := [0, 0, 1] }]
+    returnData := .receiptIndex 2 }
+  check r "backward dependencies allow joins and repeated input positions" joined.receiptsValid
+  let cycle : VMOutcome := { joined with receipts := [{ root with dependencies := [0] }] }
+  check r "self dependencies cannot be accepted as a receipt graph" (!cycle.receiptsValid)
+  check r "forward dependencies cannot be accepted as a receipt graph"
+    (!({ joined with receipts := [{ root with dependencies := [1] }, root] }.receiptsValid))
+  check r "a returned receipt must exist"
+    (!({ joined with returnData := .receiptIndex 3 }.receiptsValid))
+  let observed := cycle.checkReceipts 99 123 [(alice, [7])]
+  check r "invalid receipt graphs are explicit model issues"
+    (observed.issue? == some (.interpreterError "invalid receipt dependency graph"))
+  check r "invalid graph rejection restores funds, storage and usage"
+    (observed.balance == 99 && observed.storageUsage == 123 && observed.storage == [(alice, [7])] &&
+      observed.receipts.isEmpty)
+  let cyclicJoin : List NearPromise := [.and [0]]
+  check r "raw join cycles cannot disappear through bounded flattening"
+    ((joined.checkPromises 99 123 [] cyclicJoin).issue?.isSome)
+  check r "unsupported yielded handles cannot disappear during conversion"
+    ((joined.checkPromises 99 123 [] [.yielded [] [] 0 0 []]).issue?.isSome)
+
+  let nestedHandles : List NearPromise := [
+    .batch alice [.transfer 1], .and [0], .callback 1 bob [.transfer 2],
+    .and [0, 2, 0], .callback 3 wrap [.transfer 3]]
+  match convertPromises nestedHandles with
+  | none => check r "valid nested joins convert" false
+  | some graph =>
+    check r "conversion preserves exact nested join order and duplicate positions"
+      (graph.receipts.map (·.dependencies) == [[], [0], [0, 1, 0]])
+    check r "conversion preserves receipt actions and receivers"
+      (graph.receipts.map (·.receiverId) == [alice, bob, wrap] &&
+        graph.receipts.map (·.actions) == [[.transfer 1], [.transfer 2], [.transfer 3]])
+    check r "only receipt handles can be returned, including singleton joints"
+      (graph.returnedReceipt? 0 == some 0 && (graph.returnedReceipt? 1).isNone &&
+        graph.returnedReceipt? 2 == some 1 && graph.returnedReceipt? 4 == some 2)
+  check r "conversion rejects unresolved and forward references"
+    ((convertPromises [.and [0]]).isNone &&
+      (convertPromises [.callback 0 alice []]).isNone &&
+      (convertPromises [.and [99]]).isNone)
+  check r "conversion does not silently drop unsupported yielded promises"
+    ((convertPromises [.yielded [] [] 0 0 []]).isNone)
+
   let exhausted := run cfg code h.codeSize "new" (ctx alice "new" "{}" 0) [] 0
   check r "fuel exhaustion is explicitly incomplete"
     (exhausted.issue? == some .fuelExhausted)

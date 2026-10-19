@@ -52,19 +52,22 @@ near-sdk-core 3.1.0 and near-contract-standards 3.1.0):
 
 ## Specifications
 
+Proofs below concern the mathematical model. Applying them to deployed execution
+requires the open runtime refinement proof and explicit gas/storage assumptions.
+
 | Spec | Statement | Proof |
 |---|---|---|
 | `InvPreserved` | Bounds, `Σ balances = total_supply` and the measured storage usage are preserved by every execution | proved |
-| `BalanceAuthorization` | Only the predecessor loses balance, except the receiver of a transfer-call inside the contract's own callback, by at most the transferred amount | open |
-| `RegistrationAuthorization` | Only the predecessor can be unregistered | open |
-| `Conservation` | Minted supply plus collected fees never exceed deposit minus NEAR sent out (per execution; solvency follows at chain level) | open |
+| `BalanceAuthorization` | Only the predecessor loses balance, except the receiver of a transfer-call inside the contract's own callback, by at most the transferred amount | proved |
+| `RegistrationAuthorization` | Only the predecessor can be unregistered | proved |
+| `Conservation` | Minted supply plus collected fees never exceed deposit minus NEAR sent out (per execution; chain-level solvency remains open) | proved |
 | `WithdrawAvailable` | A holder attaching 1 yoctoNEAR can always unwrap any amount it holds, and gets `amount + 1` back | proved |
 | `DepositAvailable` | A positive deposit that fits the supply (and covers the fee if unregistered) always wraps | proved |
 | `ViewsPure`, `ViewsTotal` | View methods never panic, never change state, never schedule promises | proved |
 | `BalanceOfCorrect`, `TotalSupplyCorrect` | `ft_balance_of` and `ft_total_supply` report the model balance and the sum of balances | proved |
 | `InitOnce` | `new` cannot run twice; nothing runs before `new` | proved |
-| `ProjectEncode` | The view recovers every well-formed state from its storage | open |
-| `StorageCoverage` | Occupied storage is at most the `STATE` record plus `account_storage_usage` per registered account | open |
+| `ProjectEncode` | The view recovers every well-formed state from its storage | proved |
+| `StorageCoverage` | Occupied storage is at most the `STATE` record plus `account_storage_usage` per registered account | proved |
 | `Refines` / `RefinesNearLean` | The binary executed by the runtime behaves exactly as `step`; `Spec/RuntimeInstance.lean` instantiates the interface with `near-lean/vm` so the obligation is concrete | stated, open |
 
 ## Proof approach and lessons
@@ -83,11 +86,16 @@ should be written:
   (`ft_resolve_transfer` became `unusedAmount` + `resolveRefund`): the pieces
   get their own lemmas and the proofs stop depending on how `do` desugars.
 
-The open specs (`BalanceAuthorization`, `RegistrationAuthorization`,
-`Conservation`) are each a pass over all fifteen methods; the natural next
-step is one relational characterisation of `dispatch` from which all three
-follow by case analysis. `ProjectEncode` and `StorageCoverage` need
-injectivity of the Borsh encoders in `Model/Borsh.lean`.
+`RegistrationAuthorization` is proved by case analysis over all fifteen
+methods, with reusable lemmas that refund callbacks preserve registration.
+`BalanceAuthorization` is also proved: a non-predecessor balance can fall
+only in refund resolution, for the receiver and by at most the transfer amount.
+`Conservation` is proved for every model method: increases in supply and
+registration liabilities are covered by the attached NEAR after outgoing promises. `StorageCoverage` is proved by bounding each encoded account record by the
+64-byte entry measured at initialization. This uses a kernel-checked byte-array
+length lemma and does not assume encoder injectivity. `ProjectEncode` is proved using fixed-width integer round trips, byte/string
+encoding injectivity, disjoint storage keys, and equality of all registered
+records. Thus `project (encode s) = some s` for every well-formed state.
 
 `Spec/Refinement.lean` states the interface the proofs need from a runtime;
 `Spec/RuntimeInstance.lean` fills it with `near-lean/vm` (`NearVM.run`, the
@@ -115,3 +123,26 @@ including out of gas, must restore input storage, balance and usage and emit no
 receipts. Failure logs may survive. These are specification obligations, not yet
 proved properties of the deployed binary. Adapter regressions carry real resources
 through initialization, deposit, withdrawal, panic and gas exhaustion.
+
+All model/spec/proof declarations are now subject to a strict transitive axiom
+audit in CI (`just wnear-audit` locally). It rejects `sorryAx`, `native_decide`
+and every axiom outside `propext`, `Classical.choice` and `Quot.sound`, including
+private helpers. This audit establishes trust in the model proofs; the deployed
+binary refinement remains a separate unproved obligation. The storage projection
+still uses classical choice, not an executable Borsh decoder.
+
+Refinement quantifies over exact callback result lists. The adapter forwards every
+byte and position unchanged, including malformed successful bodies and extra
+results; `callbackResultOf` separately projects result zero into the model. Its
+specialized total `U128` JSON decoder follows the SDK 3.1.0 string/radix-10 format,
+including plus signs, leading zeros, ASCII JSON whitespace, escaped digits and
+overflow rejection. `parseU128Result_lt` proves that every projected amount fits
+`u128`. The source checked is `near-sdk` 3.1.0 `json_types/integers.rs`, using the
+crate checksum recorded in the contract's Cargo.lock. Full parser equivalence and
+argument serialization proofs remain open. `Call.WF` requires numeric arguments
+to fit Rust `U128`; the model's pure natural-number methods are unchanged.
+Adapter regressions compare storage, return values, logs, receipts and balances
+with the model from identical transfer-call snapshots. Independent nearcore
+fixtures additionally cover missing/malformed results and call sequences with
+receiver spending, sender deletion, and receiver deletion before resolution.
+These sequences do not establish fairness or receipt-scheduler correctness.

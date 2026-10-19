@@ -160,11 +160,15 @@ def appendPromiseAction? (ps : List NearPromise) (idx : Nat)
     setPromise? ps idx (.callback base accountId (actions ++ [action]))
   | _ => none
 
-def appendPromiseActionResult (name : String) (st : Store NearState)
+def appendPromiseActionResult (_name : String) (st : Store NearState)
     (idx : UInt64) (action : PromiseAction) : HostResult NearState :=
   match appendPromiseAction? st.host.promises idx.toNat action with
   | some promises => .Return [] { st with host := { st.host with promises } }
-  | none          => .Trap st s!"{name}: invalid promise index"
+  | none =>
+    let error := match getPromise? st.host.promises idx.toNat with
+      | some (.and _) => HostError.cannotAppendActionToJointPromise
+      | _ => HostError.invalidPromiseIndex idx.toNat
+    .Trap { st with host := { st.host with lastError := some error } } error.message
 
 def promiseYieldDataIdExists (dataId : List UInt8) : List NearPromise → Bool
   | [] => false
@@ -191,7 +195,8 @@ def createCallbackPromiseResult (name : String) (st : Store NearState)
       let idx := nextPromiseIdx st
       .Return [.i64 idx] (appendPromise st (.callback baseIdx.toNat accountId []))
   else
-    .Trap st s!"{name}: invalid promise index"
+    let error := HostError.invalidPromiseIndex baseIdx.toNat
+    .Trap { st with host := { st.host with lastError := some error } } error.message
 
 def readFunctionCallAction? (st : Store NearState)
     (methodNameLen methodNamePtr argsLen argsPtr amountPtr gas : UInt64) :
@@ -230,7 +235,8 @@ def promiseThenFn : HostFn NearState :=
               let idx := nextPromiseIdx st
               .Return [.i64 idx] (appendPromise st (.callback baseIdx.toNat accountId [action]))
           else
-            .Trap st "promise_then: invalid promise index"
+            let error := HostError.invalidPromiseIndex baseIdx.toNat
+            .Trap { st with host := { st.host with lastError := some error } } error.message
         | _, _ => .Trap st "promise_then: invalid input"
       | _ => .Trap st "promise_then: bad args" }
 
@@ -241,11 +247,13 @@ def promiseAndFn : HostFn NearState :=
       | [.i64 promiseIdxPtr, .i64 promiseIdxCount] =>
         match readU64Array st promiseIdxPtr promiseIdxCount.toNat with
         | some deps =>
-          if promiseDepsValid st deps then
+          match deps.find? (fun idx => !promiseIndexValid st idx) with
+          | none =>
             let idx := nextPromiseIdx st
             .Return [.i64 idx] (appendPromise st (.and deps))
-          else
-            .Trap st "promise_and: invalid promise index"
+          | some invalid =>
+            let error := HostError.invalidPromiseIndex invalid
+            .Trap { st with host := { st.host with lastError := some error } } error.message
         | none => .Trap st "promise_and: invalid memory"
       | _ => .Trap st "promise_and: bad args" }
 
@@ -514,7 +522,7 @@ def valueReturnFn : HostFn NearState :=
         | none   => .Trap st "value_return: invalid register"
         | some v =>
           checkDataLimit "value_return" "return" st.host.config.maxReturnLen v.length st <|
-            fun _ => .Return [] { st with host := { st.host with returnData := some v } }
+            fun _ => .Return [] { st with host := st.host.selectReturnValue v }
       | _ => .Trap st "value_return: bad args" }
 
 /-! ## Context and economics -/
@@ -923,7 +931,9 @@ def promiseResultFn : HostFn NearState :=
     invoke := fun st args => match args with
       | [.i64 resultIdx, .i64 regId] =>
         match getPromiseResult? st.host.promiseResults resultIdx.toNat with
-        | none => .Trap st "promise_result: invalid promise result index"
+        | none =>
+          let error := HostError.invalidPromiseResultIndex resultIdx.toNat
+          .Trap { st with host := { st.host with lastError := some error } } error.message
         | some .notReady => .Return [.i64 0] st
         | some (.successful data) =>
           writeRegisterResult "promise_result" st regId data [.i64 1]
@@ -935,10 +945,15 @@ def promiseReturnFn : HostFn NearState :=
   { params := [.i64], results := []
     invoke := fun st args => match args with
       | [.i64 promiseIdx] =>
-        if promiseIdx.toNat < st.host.promises.length then
-          .Return [] { st with host := { st.host with returnedPromise := some promiseIdx.toNat } }
-        else
-          .Trap st "promise_return: invalid promise index"
+        match getPromise? st.host.promises promiseIdx.toNat with
+        | some (.and _) =>
+          let error := HostError.cannotReturnJointPromise
+          .Trap { st with host := { st.host with lastError := some error } } error.message
+        | none =>
+          let error := HostError.invalidPromiseIndex promiseIdx.toNat
+          .Trap { st with host := { st.host with lastError := some error } } error.message
+        | some _ =>
+          .Return [] { st with host := st.host.selectReturnPromise promiseIdx.toNat }
       | _ => .Trap st "promise_return: bad args" }
 
 /-! ## The registry — single source of truth -/

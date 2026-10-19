@@ -1,0 +1,643 @@
+{
+  "code": "contracts/w-near/contract.wasm",
+  "sha256": "b72c26d390b23f4517d091a8aab06b0369d465356ec5fb337d5fda076da38ac0",
+  "protocolVersion": 86,
+  "initialBalance": "100000000000000000000000000",
+  "storage": [],
+  "calls": [
+    {
+      "name": "initialize",
+      "method": "new",
+      "predecessor": "wrap.near",
+      "args": {}
+    },
+    {
+      "name": "deposit",
+      "method": "near_deposit",
+      "args": {},
+      "deposit": "1000000000000000000000000"
+    },
+    {
+      "name": "register receiver",
+      "method": "storage_deposit",
+      "args": {
+        "account_id": "bob.near"
+      },
+      "deposit": "10000000000000000000000"
+    },
+    {
+      "name": "transfer before zero",
+      "method": "ft_transfer_call",
+      "args": {
+        "receiver_id": "bob.near",
+        "amount": "1000000000000000000000",
+        "msg": ""
+      },
+      "deposit": "1"
+    },
+    {
+      "name": "callback zero",
+      "method": "ft_resolve_transfer",
+      "predecessor": "wrap.near",
+      "promiseResults": [
+        [
+          34,
+          48,
+          34
+        ]
+      ],
+      "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "1000000000000000000000"
+      }
+    },
+    {
+      "name": "transfer before partial",
+      "method": "ft_transfer_call",
+      "args": {
+        "receiver_id": "bob.near",
+        "amount": "1000000000000000000000",
+        "msg": ""
+      },
+      "deposit": "1"
+    },
+    {
+      "name": "callback partial",
+      "method": "ft_resolve_transfer",
+      "predecessor": "wrap.near",
+      "promiseResults": [
+        [
+          34,
+          55,
+          34
+        ]
+      ],
+      "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "1000000000000000000000"
+      }
+    },
+    {
+      "name": "transfer before plus and leading zeros",
+      "method": "ft_transfer_call",
+      "args": {
+        "receiver_id": "bob.near",
+        "amount": "1000000000000000000000",
+        "msg": ""
+      },
+      "deposit": "1"
+    },
+    {
+      "name": "callback plus and leading zeros",
+      "method": "ft_resolve_transfer",
+      "predecessor": "wrap.near",
+      "promiseResults": [
+        [
+          34,
+          43,
+          48,
+          48,
+          48,
+          55,
+          34
+        ]
+      ],
+      "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "1000000000000000000000"
+      }
+    },
+    {
+      "name": "transfer before escaped digit",
+      "method": "ft_transfer_call",
+      "args": {
+        "receiver_id": "bob.near",
+        "amount": "1000000000000000000000",
+        "msg": ""
+      },
+      "deposit": "1"
+    },
+    {
+      "name": "callback escaped digit",
+      "method": "ft_resolve_transfer",
+      "predecessor": "wrap.near",
+      "promiseResults": [
+        [
+          34,
+          92,
+          117,
+          48,
+          48,
+          51,
+          55,
+          34
+        ]
+      ],
+      "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "1000000000000000000000"
+      }
+    },
+    {
+      "name": "transfer before JSON whitespace",
+      "method": "ft_transfer_call",
+      "args": {
+        "receiver_id": "bob.near",
+        "amount": "1000000000000000000000",
+        "msg": ""
+      },
+      "deposit": "1"
+    },
+    {
+      "name": "callback JSON whitespace",
+      "method": "ft_resolve_transfer",
+      "predecessor": "wrap.near",
+      "promiseResults": [
+        [
+          32,
+          10,
+          34,
+          55,
+          34,
+          9
+        ]
+      ],
+      "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "1000000000000000000000"
+      }
+    },
+    {
+      "name": "transfer before max U128",
+      "method": "ft_transfer_call",
+      "args": {
+        "receiver_id": "bob.near",
+        "amount": "1000000000000000000000",
+        "msg": ""
+      },
+      "deposit": "1"
+    },
+    {
+      "name": "callback max U128",
+      "method": "ft_resolve_transfer",
+      "predecessor": "wrap.near",
+      "promiseResults": [
+        [
+          34,
+          51,
+          52,
+          48,
+          50,
+          56,
+          50,
+          51,
+          54,
+          54,
+          57,
+          50,
+          48,
+          57,
+          51,
+          56,
+          52,
+          54,
+          51,
+          52,
+          54,
+          51,
+          51,
+          55,
+          52,
+          54,
+          48,
+          55,
+          52,
+          51,
+          49,
+          55,
+          54,
+          56,
+          50,
+          49,
+          49,
+          52,
+          53,
+          53,
+          34
+        ]
+      ],
+      "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "1000000000000000000000"
+      }
+    },
+    {
+      "name": "transfer before U128 overflow",
+      "method": "ft_transfer_call",
+      "args": {
+        "receiver_id": "bob.near",
+        "amount": "1000000000000000000000",
+        "msg": ""
+      },
+      "deposit": "1"
+    },
+    {
+      "name": "callback U128 overflow",
+      "method": "ft_resolve_transfer",
+      "predecessor": "wrap.near",
+      "promiseResults": [
+        [
+          34,
+          51,
+          52,
+          48,
+          50,
+          56,
+          50,
+          51,
+          54,
+          54,
+          57,
+          50,
+          48,
+          57,
+          51,
+          56,
+          52,
+          54,
+          51,
+          52,
+          54,
+          51,
+          51,
+          55,
+          52,
+          54,
+          48,
+          55,
+          52,
+          51,
+          49,
+          55,
+          54,
+          56,
+          50,
+          49,
+          49,
+          52,
+          53,
+          54,
+          34
+        ]
+      ],
+      "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "1000000000000000000000"
+      }
+    },
+    {
+      "name": "transfer before JSON number",
+      "method": "ft_transfer_call",
+      "args": {
+        "receiver_id": "bob.near",
+        "amount": "1000000000000000000000",
+        "msg": ""
+      },
+      "deposit": "1"
+    },
+    {
+      "name": "callback JSON number",
+      "method": "ft_resolve_transfer",
+      "predecessor": "wrap.near",
+      "promiseResults": [
+        [
+          55
+        ]
+      ],
+      "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "1000000000000000000000"
+      }
+    },
+    {
+      "name": "transfer before empty body",
+      "method": "ft_transfer_call",
+      "args": {
+        "receiver_id": "bob.near",
+        "amount": "1000000000000000000000",
+        "msg": ""
+      },
+      "deposit": "1"
+    },
+    {
+      "name": "callback empty body",
+      "method": "ft_resolve_transfer",
+      "predecessor": "wrap.near",
+      "promiseResults": [
+        []
+      ],
+      "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "1000000000000000000000"
+      }
+    },
+    {
+      "name": "transfer before invalid UTF8",
+      "method": "ft_transfer_call",
+      "args": {
+        "receiver_id": "bob.near",
+        "amount": "1000000000000000000000",
+        "msg": ""
+      },
+      "deposit": "1"
+    },
+    {
+      "name": "callback invalid UTF8",
+      "method": "ft_resolve_transfer",
+      "predecessor": "wrap.near",
+      "promiseResults": [
+        [
+          255
+        ]
+      ],
+      "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "1000000000000000000000"
+      }
+    },
+    {
+      "name": "transfer before whitespace inside number",
+      "method": "ft_transfer_call",
+      "args": {
+        "receiver_id": "bob.near",
+        "amount": "1000000000000000000000",
+        "msg": ""
+      },
+      "deposit": "1"
+    },
+    {
+      "name": "callback whitespace inside number",
+      "method": "ft_resolve_transfer",
+      "predecessor": "wrap.near",
+      "promiseResults": [
+        [
+          34,
+          32,
+          55,
+          34
+        ]
+      ],
+      "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "1000000000000000000000"
+      }
+    },
+    {
+      "name": "transfer before trailing garbage",
+      "method": "ft_transfer_call",
+      "args": {
+        "receiver_id": "bob.near",
+        "amount": "1000000000000000000000",
+        "msg": ""
+      },
+      "deposit": "1"
+    },
+    {
+      "name": "callback trailing garbage",
+      "method": "ft_resolve_transfer",
+      "predecessor": "wrap.near",
+      "promiseResults": [
+        [
+          34,
+          55,
+          34,
+          32,
+          116,
+          114,
+          97,
+          105,
+          108,
+          105,
+          110,
+          103
+        ]
+      ],
+      "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "1000000000000000000000"
+      }
+    },
+    {
+      "name": "transfer before negative zero",
+      "method": "ft_transfer_call",
+      "args": {
+        "receiver_id": "bob.near",
+        "amount": "1000000000000000000000",
+        "msg": ""
+      },
+      "deposit": "1"
+    },
+    {
+      "name": "callback negative zero",
+      "method": "ft_resolve_transfer",
+      "predecessor": "wrap.near",
+      "promiseResults": [
+        [
+          34,
+          45,
+          48,
+          34
+        ]
+      ],
+      "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "1000000000000000000000"
+      }
+    },
+    {
+      "name": "transfer before failed result",
+      "method": "ft_transfer_call",
+      "args": {
+        "receiver_id": "bob.near",
+        "amount": "1000000000000000000000",
+        "msg": ""
+      },
+      "deposit": "1"
+    },
+    {
+      "name": "callback failed result",
+      "method": "ft_resolve_transfer",
+      "predecessor": "wrap.near",
+      "promiseResults": [
+        null
+      ],
+      "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "1000000000000000000000"
+      }
+    },
+    {
+      "name": "transfer before missing result",
+      "method": "ft_transfer_call",
+      "args": {
+        "receiver_id": "bob.near",
+        "amount": "1000000000000000000000",
+        "msg": ""
+      },
+      "deposit": "1"
+    },
+    {
+      "name": "callback missing result",
+      "method": "ft_resolve_transfer",
+      "predecessor": "wrap.near",
+      "promiseResults": [],
+      "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "1000000000000000000000"
+      }
+    },
+    {
+      "name": "transfer before extra results",
+      "method": "ft_transfer_call",
+      "args": {
+        "receiver_id": "bob.near",
+        "amount": "1000000000000000000000",
+        "msg": ""
+      },
+      "deposit": "1"
+    },
+    {
+      "name": "callback extra results",
+      "method": "ft_resolve_transfer",
+      "predecessor": "wrap.near",
+      "promiseResults": [
+        [
+          34,
+          55,
+          34
+        ],
+        [
+          34,
+          57,
+          57,
+          57,
+          34
+        ],
+        null
+      ],
+      "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "1000000000000000000000"
+      }
+    },
+    {
+      "name": "transfer before escaped plus",
+      "method": "ft_transfer_call",
+      "args": {
+        "receiver_id": "bob.near",
+        "amount": "1000000000000000000000",
+        "msg": ""
+      },
+      "deposit": "1"
+    },
+    {
+      "name": "callback escaped plus",
+      "method": "ft_resolve_transfer",
+      "predecessor": "wrap.near",
+      "promiseResults": [
+        [
+          34,
+          92,
+          117,
+          48,
+          48,
+          50,
+          98,
+          48,
+          48,
+          55,
+          34
+        ]
+      ],
+      "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "1000000000000000000000"
+      }
+    },
+    {
+      "name": "transfer before non-JSON whitespace",
+      "method": "ft_transfer_call",
+      "args": {
+        "receiver_id": "bob.near",
+        "amount": "1000000000000000000000",
+        "msg": ""
+      },
+      "deposit": "1"
+    },
+    {
+      "name": "callback non-JSON whitespace",
+      "method": "ft_resolve_transfer",
+      "predecessor": "wrap.near",
+      "promiseResults": [
+        [
+          194,
+          160,
+          34,
+          55,
+          34
+        ]
+      ],
+      "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "1000000000000000000000"
+      }
+    },
+    {
+      "name": "transfer before duplicate plus",
+      "method": "ft_transfer_call",
+      "args": {
+        "receiver_id": "bob.near",
+        "amount": "1000000000000000000000",
+        "msg": ""
+      },
+      "deposit": "1"
+    },
+    {
+      "name": "callback duplicate plus",
+      "method": "ft_resolve_transfer",
+      "predecessor": "wrap.near",
+      "promiseResults": [
+        [
+          34,
+          43,
+          43,
+          55,
+          34
+        ]
+      ],
+      "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "1000000000000000000000"
+      }
+    }
+  ]
+}
