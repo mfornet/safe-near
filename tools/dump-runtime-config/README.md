@@ -73,3 +73,7 @@ scheduler) and 77 (global contracts) do not produce output files, and the
 diffs at 46, 50, 55 and 63 are empty in this crate version. If any of the
 omitted fields are needed, add a custom serializer that reads the internal
 `RuntimeConfig` directly.
+
+The generated `runtime_admission` supplement records `strict_nonce` from the
+pinned `ProtocolFeature::StrictNonce` table. It is a semantic feature gate, not a
+gas parameter; it becomes true at protocol version 85.

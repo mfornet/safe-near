@@ -320,8 +320,20 @@ checks the allowance and deducts exactly the transaction cost from finite
 allowances. Signatures remain trusted; these are properties of the implemented
 conversion, not a proof of equivalence with nearcore transaction admission.
 
-The transaction interface currently represents the legacy monotonic nonce mode.
-Pinned `verifier::verify_nonce` also enforces a block-height nonce ceiling, which
-conversion does not yet enforce. Strict nonce and gas-key transaction variants,
-remaining admission bounds and error ordering, gas-refund allowance restoration,
+The transaction interface models monotonic and strict regular-key nonces.
+`verifyNonce` follows the pinned validator's checked strict increment, saturating
+u64 height ceiling and error precedence; Apply always supplies its block height.
+The default apply context starts at height one. Explicit height zero rejects every
+nonce, matching the reference. Strict requests require the generated v85+ gate.
+`NonceInvariants` proves exact acceptance, increasing nonces and the ceiling/u64
+bounds; `convertTransaction_nonce_bounds` connects those properties to successful
+conversion while retaining the earlier conservation and authorization proofs.
+`tools/runtime-nonce-reference` compares 126 cases to the actual private validator
+and feature table. Native v1 decoding, gas-key nonce slots, pending-mempool overlays,
+remaining admission bounds/error ordering, gas-refund allowance restoration,
 whole-receipt state-invariant preservation and global conservation remain open.
+
+`NearChain.step_applyResult` exposes the exact apply result for compositional
+proofs, and `Reachable.firstStep` proves first-step reachability generically.
+The chain scenario uses this universal proof rather than elaborating a redundant
+concrete execution witness inside its IO program; runtime checks are unchanged.

@@ -34,6 +34,13 @@ def step (cfg : RuntimeConfig) (codeOf : CodeTable) (s : Snapshot) (b : Block) :
   if r.issue.isSome then (s, r)
   else ({ state := r.state, pending := r.outgoing }, r)
 
+/-- Every chain step exposes the exact apply result, including rejected attempts. -/
+theorem step_applyResult (cfg : RuntimeConfig) (codeOf : CodeTable) (s : Snapshot) (b : Block) :
+    (step cfg codeOf s b).2 = apply cfg b.ap codeOf s.state b.txs s.pending := by
+  unfold step
+  dsimp only
+  split <;> rfl
+
 theorem step_issue_unchanged (cfg : RuntimeConfig) (codeOf : CodeTable)
     (s : Snapshot) (b : Block)
     (h : (apply cfg b.ap codeOf s.state b.txs s.pending).issue.isSome = true) :
@@ -46,6 +53,14 @@ inductive Reachable (cfg : RuntimeConfig) (codeOf : CodeTable) (genesis : Snapsh
   | step {s : Snapshot} (b : Block) : (step cfg codeOf s b).2.issue = none →
       Reachable cfg codeOf genesis s →
       Reachable cfg codeOf genesis (step cfg codeOf s b).1
+
+/-- First-step reachability from the public step result. Keeping this transport
+abstract prevents proof inference from evaluating a concrete transaction batch. -/
+theorem Reachable.firstStep (cfg : RuntimeConfig) (codeOf : CodeTable) (genesis : Snapshot) (b : Block)
+    (h : (Near.step cfg codeOf genesis b).2.issue = none) :
+    Reachable cfg codeOf genesis (Near.step cfg codeOf genesis b).1 := by
+  exact Reachable.step (cfg := cfg) (codeOf := codeOf) (genesis := genesis)
+    (s := genesis) b h Reachable.refl
 
 /-- No receipt in flight, delayed, or waiting for data. -/
 def Snapshot.quiescent (s : Snapshot) : Bool :=

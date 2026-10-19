@@ -33,10 +33,17 @@ fn config_json(store: &RuntimeConfigStore, version: ProtocolVersion) -> String {
     let finance = serde_json::to_string_pretty(&finance)
         .unwrap()
         .replace('\n', "\n  ");
+    let admission = serde_json::json!({
+        "strict_nonce": near_primitives_core::version::ProtocolFeature::StrictNonce.enabled(version),
+    });
+    let admission = serde_json::to_string_pretty(&admission)
+        .unwrap()
+        .replace('\n', "\n  ");
     format!(
-        "{},\n  \"runtime_finance\": {}\n}}",
+        "{},\n  \"runtime_finance\": {},\n  \"runtime_admission\": {}\n}}",
         json.trim_end().strip_suffix('}').unwrap().trim_end(),
-        finance
+        finance,
+        admission
     )
 }
 

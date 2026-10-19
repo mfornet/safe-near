@@ -132,10 +132,8 @@ def main (args : List String) : IO UInt32 := do
   check r "a stopped chain attempt does not charge the signer"
     ((issueRun.snapshot.state.account? "wrap.near").map (·.amount) == some (10 * oneNear))
 
-  -- Reachable is inhabited by what runIsolated computes
-  have : (step cfg codeOf genesis { ap, txs := [initTx] }).2.issue = none →
-      Reachable cfg codeOf genesis (step cfg codeOf genesis { ap, txs := [initTx] }).1 :=
-    fun h => Reachable.step _ h Reachable.refl
+  -- Reachable.firstStep proves the implication for every supported block.
+  -- Keep that proof abstract rather than reducing this concrete IO fixture.
   check r "Reachable.step requires a supported execution" (rs1.all fun a => a.issue.isNone)
 
   let s ← r.get

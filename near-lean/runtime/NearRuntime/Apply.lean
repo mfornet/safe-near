@@ -1,5 +1,6 @@
 import NearRuntime.Fees
 import NearRuntime.State
+import NearRuntime.Nonce
 
 /-!
 # `apply`
@@ -517,9 +518,10 @@ def commitTransaction (st : ChainState) (tx : Transaction) (signer : Account)
 balance checks; charges the cost; bumps the nonce; returns the receipt. -/
 def convertTransaction (cfg : RuntimeConfig) (ap : ApplyState) (st : ChainState) (tx : Transaction) :
     Except RuntimeError (ChainState × Receipt × Fees.TxCost) := do
+  if tx.nonceMode = .strict ∧ cfg.strictNonceEnabled = false then throw .invalidTransactionVersion
   let some signer := st.account? tx.signerId | throw (.invalidSigner tx.signerId)
   let some key := st.accessKey? tx.signerId tx.publicKey | throw (.invalidAccessKey "AccessKeyNotFound")
-  if tx.nonce ≤ key.nonce then throw (.invalidNonce tx.nonce key.nonce)
+  verifyNonce tx.nonce key.nonce (some ap.blockHeight) tx.nonceMode
   if tx.actions.length > cfg.wasm.limits.maxActionsPerReceipt then
     throw (.tooManyActions tx.actions.length cfg.wasm.limits.maxActionsPerReceipt)
   let cost := Fees.txCost cfg ap.gasPrice tx.signerId tx.receiverId tx.actions

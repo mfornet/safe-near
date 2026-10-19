@@ -279,5 +279,8 @@
       1
     ],
     "min_gas_refund_penalty": 0
+  },
+  "runtime_admission": {
+    "strict_nonce": false
   }
 }

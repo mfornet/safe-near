@@ -1,6 +1,7 @@
 import NearRuntime.Apply
 import NearRuntime.StateInvariants
 import NearRuntime.AccessKeyInvariants
+import NearRuntime.NonceInvariants
 
 namespace Near
 open Wasm.Near
@@ -18,31 +19,40 @@ theorem convertTransaction_success_commit (cfg : RuntimeConfig) (ap : ApplyState
         (Fees.txCost cfg ap.gasPrice tx.signerId tx.receiverId tx.actions) = (st', receipt, cost) ∧
       ∃ key, st.accessKey? tx.signerId tx.publicKey = some key ∧ key.nonce < tx.nonce ∧
         validateTransactionAccessKey tx key
-          (Fees.txCost cfg ap.gasPrice tx.signerId tx.receiverId tx.actions) = .ok newKey := by
-  cases hs : st.account? tx.signerId with
-  | none => simp [convertTransaction, hs] at h
-  | some signer =>
-    cases hk : st.accessKey? tx.signerId tx.publicKey with
-    | none => simp [convertTransaction, hs, hk] at h
-    | some key =>
-      by_cases hn : tx.nonce ≤ key.nonce
-      · simp [convertTransaction, hs, hk, hn] at h
-      · by_cases ha : tx.actions.length > cfg.wasm.limits.maxActionsPerReceipt
-        · simp [convertTransaction, hs, hk, hn, ha] at h
-        · let expected := Fees.txCost cfg ap.gasPrice tx.signerId tx.receiverId tx.actions
-          have he : Fees.txCost cfg ap.gasPrice tx.signerId tx.receiverId tx.actions = expected := rfl
-          cases hv : validateTransactionAccessKey tx key expected with
-          | error err =>
-            simp [convertTransaction, hs, hk, hn, ha, he, hv] at h
-          | ok newKey =>
-            by_cases hb : signer.amount < expected.total
-            · simp [convertTransaction, hs, hk, hn, ha, he, hv, hb] at h
-            · by_cases hd : storageStakeDeficit cfg { signer with amount := signer.amount - expected.total } > 0
-              · simp [convertTransaction, hs, hk, hn, ha, he, hv, hb, hd] at h
-              · refine ⟨signer, newKey, rfl, ?_, ?_, key, rfl, by omega, hv⟩
-                · change expected.total ≤ signer.amount
-                  omega
-                · simpa [convertTransaction, hs, hk, hn, ha, he, hv, hb, hd] using h
+          (Fees.txCost cfg ap.gasPrice tx.signerId tx.receiverId tx.actions) = .ok newKey ∧
+        verifyNonce tx.nonce key.nonce (some ap.blockHeight) tx.nonceMode = .ok () ∧
+        (tx.nonceMode = .strict → cfg.strictNonceEnabled = true) := by
+  by_cases hg : tx.nonceMode = .strict ∧ cfg.strictNonceEnabled = false
+  · simp [convertTransaction, hg] at h
+  · have hgate : tx.nonceMode = .strict → cfg.strictNonceEnabled = true := by
+      intro hm
+      cases hf : cfg.strictNonceEnabled <;> simp [hf, hm] at hg ⊢
+    cases hs : st.account? tx.signerId with
+    | none => simp [convertTransaction, hg, hs] at h
+    | some signer =>
+      cases hk : st.accessKey? tx.signerId tx.publicKey with
+      | none => simp [convertTransaction, hg, hs, hk] at h
+      | some key =>
+        cases hvn : verifyNonce tx.nonce key.nonce (some ap.blockHeight) tx.nonceMode with
+        | error err => simp [convertTransaction, hg, hs, hk, hvn] at h
+        | ok accepted =>
+          cases accepted
+          have hn := verifyNonce_increases tx.nonce key.nonce (some ap.blockHeight) tx.nonceMode hvn
+          by_cases ha : tx.actions.length > cfg.wasm.limits.maxActionsPerReceipt
+          · simp [convertTransaction, hg, hs, hk, hvn, ha] at h
+          · let expected := Fees.txCost cfg ap.gasPrice tx.signerId tx.receiverId tx.actions
+            have he : Fees.txCost cfg ap.gasPrice tx.signerId tx.receiverId tx.actions = expected := rfl
+            cases hv : validateTransactionAccessKey tx key expected with
+            | error err => simp [convertTransaction, hg, hs, hk, hvn, ha, he, hv] at h
+            | ok newKey =>
+              by_cases hb : signer.amount < expected.total
+              · simp [convertTransaction, hg, hs, hk, hvn, ha, he, hv, hb] at h
+              · by_cases hd : storageStakeDeficit cfg { signer with amount := signer.amount - expected.total } > 0
+                · simp [convertTransaction, hg, hs, hk, hvn, ha, he, hv, hb, hd] at h
+                · refine ⟨signer, newKey, rfl, ?_, ?_, key, rfl, hn, hv, hvn, hgate⟩
+                  · change expected.total ≤ signer.amount
+                    omega
+                  · simpa [convertTransaction, hg, hs, hk, hvn, ha, he, hv, hb, hd] using h
 
 /-- The commit operation debits exactly its validated transaction cost, leaving
 locked funds unchanged. Unique account keys prevent hidden duplicate balances. -/
@@ -157,7 +167,7 @@ theorem convertTransaction_authorized (cfg : RuntimeConfig) (ap : ApplyState)
       st'.accessKey? tx.signerId tx.publicKey = some newKey ∧
       newKey.nonce = tx.nonce ∧ oldKey.nonce < newKey.nonce ∧ AccessKeyAuthorizes tx oldKey cost ∧
       newKey.permission = chargedPermission oldKey.permission cost := by
-  obtain ⟨signer, newKey, _, _, hc, key, hk, hn, hv⟩ :=
+  obtain ⟨signer, newKey, _, _, hc, key, hk, hn, hv, _, _⟩ :=
     convertTransaction_success_commit cfg ap st st' tx receipt cost h
   have ha := validateTransactionAccessKey_authorizes tx key newKey _ hv
   have hcost := congrArg (fun result => result.2.2) hc
@@ -171,5 +181,19 @@ theorem convertTransaction_authorized (cfg : RuntimeConfig) (ap : ApplyState)
     exact Assoc.lookup_insert_self _ _ _
   · simpa only [hcost] using ha.2.1
   · simpa only [hcost] using ha.2.2
+
+/-- Successful admission has the reference's nonce ordering and u64 ceiling;
+strict requests additionally require the protocol feature. -/
+theorem convertTransaction_nonce_bounds (cfg : RuntimeConfig) (ap : ApplyState)
+    (st st' : ChainState) (tx : Transaction) (receipt : Receipt) (cost : Fees.TxCost)
+    (h : convertTransaction cfg ap st tx = .ok (st', receipt, cost)) :
+    ∃ key, st.accessKey? tx.signerId tx.publicKey = some key ∧
+      NonceOrdered tx.nonceMode tx.nonce key.nonce ∧
+      tx.nonce < nonceUpperBound ap.blockHeight ∧ tx.nonce < 2 ^ 64 - 1 ∧
+      (tx.nonceMode = .strict → cfg.strictNonceEnabled = true) := by
+  obtain ⟨_, _, _, _, _, key, hk, _, _, hvn, hg⟩ :=
+    convertTransaction_success_commit cfg ap st st' tx receipt cost h
+  exact ⟨key, hk, ((verifyNonce_success_iff _ _ _ _).mp hvn).1,
+    verifyNonce_below_ceiling _ _ _ _ hvn, verifyNonce_u64 _ _ _ _ hvn, hg⟩
 
 end Near

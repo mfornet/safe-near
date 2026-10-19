@@ -113,11 +113,18 @@ def Receipt.actions : Receipt → List Action
 
 def Receipt.isRefund (r : Receipt) : Bool := r.predecessorId == systemAccount
 
+/-- Legacy transactions are monotonic; v1 can request strict sequential nonces. -/
+inductive NonceMode where
+  | monotonic
+  | strict
+  deriving Repr, BEq, DecidableEq, Inhabited
+
 /-- A transaction; the signature is trusted. -/
 structure Transaction where
   signerId : AccountId
   publicKey : PublicKey
   nonce : Nat
+  nonceMode : NonceMode := .monotonic
   receiverId : AccountId
   actions : List Action
   deriving Inhabited
@@ -141,7 +148,9 @@ inductive RuntimeError
   | onlyImplicitAccountCreationAllowed (id : AccountId)
   | deleteAccountWithLargeState (id : AccountId)
   | invalidSigner (id : AccountId)
+  | invalidTransactionVersion
   | invalidNonce (txNonce akNonce : Nat)
+  | nonceTooLarge (txNonce upperBound : Nat)
   | invalidAccessKey (msg : String)
   | notEnoughBalance (id : AccountId) (balance cost : Nat)
   | invalidReceiver (id : AccountId)

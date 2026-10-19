@@ -224,3 +224,9 @@ exact account debit, receipt backing plus burnt-gas conservation, unrelated-acco
 isolation, authorized access-key updates and exact nonce/counter changes.
 These results have explicit unique-map and reserved-signer premises; they do not
 yet establish full admission equivalence or receipt/chain invariant preservation.
+
+Transaction nonce validation now enforces the pinned monotonic/strict ordering,
+checked strict increment and saturating block-height ceiling. Strict mode uses
+the generated v85+ feature gate. Kernel proofs connect successful conversion to
+these bounds; 126 exact comparisons exercise nearcore's actual private validator.
+Apply defaults to block height one; explicit zero-height transactions are rejected.
