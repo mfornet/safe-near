@@ -151,8 +151,24 @@ def checkWithdrawalSchedule (r : IO.Ref Report) (cfg : RuntimeConfig) (codeOf : 
   let withdrawal :=
     runBlocks cfg codeOf s2
       [{ ap := { ap with blockHeight := 10 }, txs := [withdrawTx], receipts := .indices [] }]
-  check r "a real wNEAR withdrawal leaves asynchronous receipts to schedule"
-      (withdrawal.stop == .fuelExhausted && withdrawal.snapshot.pending.length ≥ 2)
+  check r "a cross-account withdrawal waits for delivery before touching contract storage"
+      (withdrawal.stop == .fuelExhausted && withdrawal.snapshot.pending.length == 1 &&
+        withdrawal.snapshot.state.storage == s2.state.storage &&
+        (withdrawal.applies.flatMap (·.outcomes)).map (·.2.executorId) == ["alice.near"])
+  let idle :=
+    runBlocks cfg codeOf withdrawal.snapshot
+      [{ ap := { ap with blockHeight := 11 }, txs := [], receipts := .indices [] }]
+  check r "an idle block does not execute the pending withdrawal call"
+      (idle.snapshot.state.storage == s2.state.storage &&
+        idle.snapshot.pending.map (·.receiptId) == withdrawal.snapshot.pending.map (·.receiptId))
+  let called :=
+    runBlocks cfg codeOf idle.snapshot
+      [{ ap := { ap with blockHeight := 12 }, txs := [], receipts := .indices [0] }]
+  check r "delivering the withdrawal call creates its transfer and refund receipts"
+      (called.stop == .fuelExhausted && called.snapshot.pending.length ≥ 2 &&
+        called.snapshot.state.storage != s2.state.storage &&
+        (called.applies.flatMap (·.outcomes)).any
+          (fun (_, outcome) => outcome.executorId == "wrap.near" && outcome.status.isSuccess))
   let earlier : Receipt :=
     { predecessorId := "alice.near", receiverId := "wrap.near", receiptId := 9000
       receipt :=
@@ -162,16 +178,16 @@ def checkWithdrawalSchedule (r : IO.Ref Report) (cfg : RuntimeConfig) (codeOf : 
   let retained :=
     runBlocks cfg codeOf { s2 with pending := [earlier] }
       [{ ap := { ap with blockHeight := 10 }, txs := [withdrawTx], receipts := .indices [] }]
-  check r "deferred incoming work precedes newly emitted wNEAR receipts"
+  check r "deferred incoming work precedes newly emitted transaction receipts"
       (retained.snapshot.pending.map (·.receiptId) ==
         9000 :: withdrawal.snapshot.pending.map (·.receiptId))
-  let mut custom := withdrawal
+  let mut custom := { called with applies := withdrawal.applies ++ idle.applies ++ called.applies }
   for height in List.range 20 do
     if !custom.snapshot.quiescent then
       let next :=
         runBlocks cfg codeOf custom.snapshot
-          [{ ap := { ap with blockHeight := 11 + 2 * height }, txs := [], receipts := .indices [] },
-            { ap := { ap with blockHeight := 12 + 2 * height }, txs := [],
+          [{ ap := { ap with blockHeight := 13 + 2 * height }, txs := [], receipts := .indices [] },
+            { ap := { ap with blockHeight := 14 + 2 * height }, txs := [],
               receipts := .indices [0] }]
       custom := { next with applies := custom.applies ++ next.applies }
   let balances (s : Snapshot) :=

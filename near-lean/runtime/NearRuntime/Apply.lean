@@ -500,9 +500,10 @@ def convertTransaction (cfg : RuntimeConfig) (ap : ApplyState) (st : ChainState)
       receipt := .action action }
   return (st, receipt, cost)
 
-/-- `Runtime::apply`. Transactions first (their receipts are local), then
-delayed receipts, then incoming ones; receipts beyond the gas limit are
-delayed to the next apply. -/
+/-- `Runtime::apply`. Transactions first; only signer-is-receiver receipts
+are local. Other transaction receipts are outgoing work for a later chunk.
+Local, delayed and incoming receipts execute in that order; receipts beyond
+the gas limit are delayed to the next apply. -/
 private def applyAttempt (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → ContractCode)
     (st : ChainState) (txs : List Transaction) (incoming : List Receipt) : ApplyResult := Id.run do
   let initial := st
@@ -517,7 +518,10 @@ private def applyAttempt (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes
     match convertTransaction cfg ap st tx with
     | .ok (st', r, cost) =>
       st := st'
-      localReceipts := localReceipts ++ [r]
+      if tx.signerId == tx.receiverId then
+        localReceipts := localReceipts ++ [r]
+      else
+        outgoing := outgoing ++ [r]
       tokensBurnt := tokensBurnt + cost.gasBurnt * ap.gasPrice
       let o : ExecutionOutcome :=
         { executorId := tx.signerId

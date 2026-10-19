@@ -58,8 +58,9 @@ with the SDK's messages, out-of-gas, storage usage, view calls.
 
 `Near.apply cfg applyState codeOf state txs incoming : ApplyResult`
 (`NearRuntime/Apply.lean`) is one chunk's worth of work: transactions are
-verified and charged and become local receipts; local, delayed and incoming
-receipts run in that order until the gas limit; every receipt yields an
+verified and charged. Signer-is-receiver transaction receipts are local;
+other transaction receipts become outgoing work for a later chunk. Local,
+delayed and incoming receipts run in that order until the gas limit; every receipt yields an
 `ExecutionOutcome` when it runs. Action receipts implement eight action kinds
 (`applyAction`), roll back on failure, and refund unused gas to the signer
 and deposits to the predecessor through system receipts. Function calls go

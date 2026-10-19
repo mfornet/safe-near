@@ -27,6 +27,22 @@ supplied size, and a hash label. Neither byte-to-module correspondence nor the
 hash label is checked by the runtime. `codeOf` is an externally supplied decoder.
 These assumptions must be carried into any theorem about deployed bytes.
 
+## Chunk boundaries
+
+Transaction acceptance charges the signer, updates its access-key nonce and
+produces a transaction outcome. Only signer-is-receiver action receipts run
+locally in that chunk. Other transaction receipts are outgoing work; their
+receiver state changes when those receipts are delivered in a later chunk.
+The routing follows `Runtime::process_transactions` in the pinned source.
+
+An unsupported contract host operation is discovered when the function-call
+receipt executes. A cross-account transaction can therefore be accepted in
+one chunk before delivery encounters a model issue in a later chunk. The
+issue rolls back the failing chunk; it does not erase already committed
+transaction charges or nonce updates. Likewise, an implicit account's initial
+key nonce uses the block that executes its transfer receipt, not the block
+that accepted the originating transaction.
+
 ## Current implementation and gaps
 
 | Boundary | Implemented | Remaining obligations |
