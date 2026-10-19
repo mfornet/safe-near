@@ -21,7 +21,8 @@ just blueprint-pdf    # -> blueprint/print/print.pdf
 ```
 
 Packages are shared with `near-lean` (`packagesDir = ../../../near-lean/.lake/packages`,
-toolchain `v4.34.1`, Mathlib `v4.34.1`, LeanArchitect `v4.34.0`).
+toolchain `v4.34.1`, Mathlib `v4.34.1`, LeanArchitect `v4.34.0`); the project
+depends on `near-lean/vm` for `Spec/RuntimeInstance.lean`.
 
 ## The model
 
@@ -64,7 +65,7 @@ near-sdk-core 3.1.0 and near-contract-standards 3.1.0):
 | `InitOnce` | `new` cannot run twice; nothing runs before `new` | proved |
 | `ProjectEncode` | The view recovers every well-formed state from its storage | open |
 | `StorageCoverage` | Occupied storage is at most the `STATE` record plus `account_storage_usage` per registered account | open |
-| `Refines` | The binary executed by the runtime behaves exactly as `step` (stated against `RuntimeInterface`) | needs near-lean |
+| `Refines` / `RefinesNearLean` | The binary executed by the runtime behaves exactly as `step`; `Spec/RuntimeInstance.lean` instantiates the interface with `near-lean/vm` so the obligation is concrete | stated, open |
 
 ## Proof approach and lessons
 
@@ -88,7 +89,29 @@ step is one relational characterisation of `dispatch` from which all three
 follow by case analysis. `ProjectEncode` and `StorageCoverage` need
 injectivity of the Borsh encoders in `Model/Borsh.lean`.
 
-`Spec/Refinement.lean` is also the list of what the proofs need from
-`near-lean/runtime`; the blueprint (chapter "Refinement") expands on it, and
-its chapter "Chain-level properties" states solvency, the storage lock and
-the end-to-end transfer-call property informally, pending a chain model.
+`Spec/Refinement.lean` states the interface the proofs need from a runtime;
+`Spec/RuntimeInstance.lean` fills it with `near-lean/vm` (`NearVM.run`, the
+JSON encodings of near-sdk 3.1.0, receipts read back as model promises), so
+`RefinesNearLean cfg code size modelCfg` is the exact obligation on
+`contract.wasm`. The blueprint's chapter "Chain-level properties" states
+solvency, the storage lock and the end-to-end transfer-call property
+informally; `near-lean/chain` now has the definitions (`Reachable`,
+`runIsolated`, `touches`, `upgrades`) to write them in Lean. Bounded runs now
+report whether they completed; `measureCallGasBurnt` measures a successful
+settled run but does not establish sufficient prepaid gas. The refinement
+obligation requires model issues to be absent and successful receipt projections
+to be valid. JSON and receipt projection regression tests run with
+`just runtime-adapter-test` from the repository root.
+
+The refinement input includes `ExecutionResources`: liquid balance before the
+attached deposit and total measured storage usage, including account/code
+overhead. These come from the enclosing runtime, rather than zero defaults.
+`Valid` bounds host integers and requires usage to cover the stored records;
+`Supports` requires funds for the model's outgoing deposits and room for its
+resulting storage. Proving these preconditions from chain-level solvency remains
+an obligation. Successful refinement additionally requires exact NEAR accounting,
+retained storage overhead, and bounded burnt/used gas. Every failed execution,
+including out of gas, must restore input storage, balance and usage and emit no
+receipts. Failure logs may survive. These are specification obligations, not yet
+proved properties of the deployed binary. Adapter regressions carry real resources
+through initialization, deposit, withdrawal, panic and gas exhaustion.

@@ -1,0 +1,22 @@
+# NearChain: the trustless manipulator.
+#
+# Blocks of transactions applied with NearRuntime (../runtime); reachable
+# states, receipts in flight, isolation of one transaction's receipt chain,
+# and the predicates specifications use to talk about transitions (touching
+# an account, upgrading a contract, and measured burnt gas).
+name = "NearChain"
+version = "0.1.0"
+defaultTargets = ["NearChain"]
+packagesDir = "../.lake/packages"
+
+[[require]]
+name = "NearRuntime"
+path = "../runtime"
+
+[[lean_lib]]
+name = "NearChain"
+
+# `lake exe chain-tests`: isolation, completion, reachability and measured gas.
+[[lean_exe]]
+name = "chain-tests"
+root = "Tests.Main"

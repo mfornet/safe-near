@@ -5,3 +5,4 @@ import Spec.Availability
 import Spec.Views
 import Spec.Storage
 import Spec.Refinement
+import Spec.RuntimeInstance

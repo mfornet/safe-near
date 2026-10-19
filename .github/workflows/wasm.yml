@@ -3,9 +3,9 @@ name: wasm
 on:
   push:
     branches: [main]
-    paths: ["near-lean/**", ".github/workflows/wasm.yml"]
+    paths: ["near-lean/**", "contracts/w-near/verification/**", "contracts/w-near/contract.wasm", "tools/runtime-conformance/**", "tools/axiom-audit.py", ".github/workflows/wasm.yml"]
   pull_request:
-    paths: ["near-lean/**", ".github/workflows/wasm.yml"]
+    paths: ["near-lean/**", "contracts/w-near/verification/**", "contracts/w-near/contract.wasm", "tools/runtime-conformance/**", "tools/axiom-audit.py", ".github/workflows/wasm.yml"]
   workflow_dispatch:
 
 concurrency:
@@ -77,6 +77,80 @@ jobs:
           python3 tools/axiom-audit.py near-lean/wasm --report audit/wasm.json --no-build
           python3 tools/axiom-audit.py near-lean/iris-wasm --report audit/iris-wasm.json --no-build
           python3 tools/axiom-audit.py near-lean/programs/lean --report audit/programs.json --no-build --allow-sorry
+
+  near-runtime:
+    name: VM, runtime and chain scenarios and axiom audits
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/cache@v5
+        with:
+          path: near-lean/.lake/packages
+          key: lake-runtime-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('near-lean/*/lean-toolchain', 'near-lean/*/lake-manifest.json') }}
+      - uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: near-lean/vm
+          build-args: NearVM vm-tests vm-replay
+          use-mathlib-cache: true
+      - name: VM scenarios
+        working-directory: near-lean/vm
+        run: ./.lake/build/bin/vm-tests
+      - name: Runtime scenarios
+        working-directory: near-lean/runtime
+        run: |
+          lake build NearRuntime runtime-tests --wfail
+          ./.lake/build/bin/runtime-tests
+      - name: Chain scenarios
+        working-directory: near-lean/chain
+        run: |
+          lake build NearChain chain-tests --wfail
+          ./.lake/build/bin/chain-tests
+      - name: Runtime axiom audits
+        run: |
+          python3 tools/axiom-audit.py near-lean/vm --report audit/vm.json --no-build
+          python3 tools/axiom-audit.py near-lean/runtime --report audit/runtime.json --no-build
+          python3 tools/axiom-audit.py near-lean/chain --report audit/chain.json --no-build
+      - name: wNEAR runtime observation adapter
+        working-directory: contracts/w-near/verification
+        run: |
+          lake build Spec runtime-adapter-tests --wfail
+          ./.lake/build/bin/runtime-adapter-tests
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: runtime-axiom-audits
+          path: audit/
+
+  runtime-conformance:
+    name: Exact VM comparison with pinned nearcore
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/cache@v5
+        with:
+          path: near-lean/.lake/packages
+          key: lake-conformance-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('near-lean/*/lean-toolchain', 'near-lean/*/lake-manifest.json') }}
+      - uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: near-lean/vm
+          build-args: vm-replay
+          use-mathlib-cache: true
+      - uses: dtolnay/rust-toolchain@1.93.1
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: tools/runtime-conformance
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-tools@1.251.0
+      - name: Compare all VM observations
+        run: |
+          python3 -m unittest discover -s tools/runtime-conformance
+          python3 tools/runtime-conformance/compare.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: runtime-conformance-evidence
+          path: audit/runtime-conformance.json
 
   programs-rust:
     name: Check committed program wasm is reproducible

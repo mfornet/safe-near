@@ -1,0 +1,103 @@
+# Runtime verification work
+
+This implementation is an executable prototype. Scenario success does not
+establish equivalence with nearcore or correctness of deployed contracts.
+
+## Reference and trusted inputs
+
+The configuration exporter pins `near-parameters` and `near-primitives-core`
+to crates.io version `0.37.4` in `tools/dump-runtime-config/Cargo.toml`.
+The committed tables cover parameter changes through protocol 86. This is
+a parameter-source pin. `reference.json` pins nearcore revision
+`44f7ae6cd7ef08bab604e20a473bf77e35d4c993` (release 2.13.4) for source
+comparisons. The crates report that revision with `dirty=true`; their exact
+published bytes are locked separately, and equivalence to the clean revision
+is not assumed. `tools/runtime-conformance` now runs the pinned published VM
+as an independent execution oracle. The initial gas discrepancies have been
+fixed for the checked fixtures. General VM conformance remains unproved.
+Selecting
+an older table does not select older execution semantics: the current Lean
+configuration still omits most protocol feature switches. The loading-cost
+fix is explicitly parsed and used. Historical replay is therefore
+not a supported guarantee.
+
+Signatures, consensus, initial state, block context, and receipt delivery are
+externally supplied. Contract code enters as a decoded module, an independently
+supplied size, and a hash label. Neither byte-to-module correspondence nor the
+hash label is checked by the runtime. `codeOf` is an externally supplied decoder.
+These assumptions must be carried into any theorem about deployed bytes.
+
+## Current implementation and gaps
+
+| Boundary | Implemented | Remaining obligations |
+| --- | --- | --- |
+| VM | Host context, storage, registers, logs, promises, gas counter, rollback on abort | Exact instrumentation and trie costs; host limits and error ordering; cryptographic semantics; module validation and decoding |
+| Actions | Create, deploy, call, transfer, stake, add/delete key, delete account | Reference validation; integer bounds; epoch effects; newer action variants |
+| Receipts | Input/output dependencies, postponement, failure data, refunds | Well-formedness and freshness proofs; independent reference comparisons; yield/resume lifecycle |
+| Chain | Block application, delayed queue, explicit bounded-run completion, reachability restricted to supported applies | Scheduling assumptions; indirect interaction predicates; sufficient prepaid gas specification |
+| wNEAR | Executable scenarios and a model refinement proposition | Binary refinement proof; exact financial observations; chain-level solvency and availability proofs |
+
+Known unsafe approximations still requiring implementation changes:
+
+- The functional host has injectable cryptographic defaults. The metered VM
+  rejects cryptographic and validator operations instead of invoking those
+  defaults. Concrete cryptographic and validator semantics remain to be supplied.
+- The metered VM rejects yield/resume operations. Their receipt lifecycle is
+  not implemented; the low-level promise conversion is not a yield executor.
+- Unstaking is explicitly rejected as unsupported epoch semantics.
+- Natural-number arithmetic does not by itself reproduce bounded protocol arithmetic.
+- Scenario code supplies a synthetic deployed code size.
+- Fuel exhaustion has a structured execution issue. `VMOutcome.issue?` separates
+  model limitations from protocol outcomes. An issue makes `Near.apply` atomic:
+  input state is preserved and no protocol outcomes, fees or refunds are emitted.
+- Both execution loops are total. Receipt recursion decreases the postponed map
+  length. Their surrounding well-formedness and transition properties remain open.
+
+These are limitations, not accepted conformance exceptions. Until closed or
+explicitly rejected by execution, affected runs cannot support NEAR claims.
+
+## Completion gates
+
+1. Pin a nearcore execution reference and define the supported protocol semantics.
+2. Make execution total and expose incomplete and unsupported execution explicitly.
+3. Preserve all observations needed for financial and asynchronous refinement.
+4. Establish state/receipt well-formedness and close implementation discrepancies.
+5. Compare Lean and nearcore on identical reproducible inputs, including failures,
+   interleavings, boundary values, and protocol changes.
+6. Prove reusable rollback, conservation, authorization, and dependency properties.
+7. Prove deployed wNEAR refinement and end-to-end solvency and availability under
+   explicit gas, scheduling, storage, and environment assumptions.
+8. Run scenario, conformance, and axiom checks in CI for all affected packages.
+
+## Validation commands
+
+From the repository root:
+
+```sh
+just near-test
+just runtime-adapter-test
+just near-conformance
+python3 tools/axiom-audit.py near-lean/vm --report /tmp/safe-near-vm-audit.json
+python3 tools/axiom-audit.py near-lean/runtime --report /tmp/safe-near-runtime-audit.json
+python3 tools/axiom-audit.py near-lean/chain --report /tmp/safe-near-chain-audit.json
+```
+
+The VM fuel loop is now structurally recursive. `runMetered_zero`,
+`runMetered_done`, and `runMetered_trapped` expose its terminal equations to
+kernel-checked proofs. They do not establish conformance, gas sufficiency,
+or termination before fuel exhaustion.
+
+`apply_issue_atomic` proves atomic rejection of model limitations.
+`foreign_deploy_denied` proves the actor check rejects foreign deployment;
+receipt execution tracks authority changes after account creation. This is not
+yet a general authorization-preservation theorem.
+`settle_completed_quiescent` and `runIsolated_completed_quiescent` prove that
+reported completion leaves no receipt pending, delayed, or postponed.
+`measureCallGasBurnt` returns a measurement only for successful, settled runs;
+it does not claim to compute sufficient prepaid gas.
+
+The wNEAR adapter uses real JSON escaping and parsing. It rejects unknown
+receipt actions, invalid accounts and graphs not representable by its model.
+The refinement proposition requires absence of model issues and valid successful
+observations; neither is an exclusion hypothesis that can hide a failed run.
+The binary-to-model refinement proof remains open.

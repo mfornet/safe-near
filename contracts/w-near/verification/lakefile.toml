@@ -18,6 +18,11 @@ rev = "v4.34.1"
 
 # Lean blueprint extracted from `@[blueprint]` annotations (docs/human/PROVING.md).
 # `lake build :blueprint` writes .lake/build/blueprint/, consumed by blueprint/src.
+# The NEAR runtime in Lean: instantiates `Spec/Refinement.lean`'s interface.
+[[require]]
+name = "NearVM"
+path = "../../../near-lean/vm"
+
 [[require]]
 name = "LeanArchitect"
 git = "https://github.com/hanwenzhu/LeanArchitect.git"
@@ -31,3 +36,7 @@ name = "Spec"
 
 [[lean_lib]]
 name = "Proofs"
+
+[[lean_exe]]
+name = "runtime-adapter-tests"
+root = "RuntimeTests.Main"

@@ -3,11 +3,10 @@ import Spec.Invariants
 /-!
 # Refinement: what we need from `near-lean`
 
-The NEAR runtime in Lean does not exist yet. This file states the interface
-the wNEAR proofs need from it (`RuntimeInterface`) and the theorem that links
-the deployed binary to the model (`Refines`). Once `near-lean/runtime` exists,
-it must provide an instance of `RuntimeInterface` and `Refines` becomes a
-theorem about `contracts/w-near/contract.wasm`.
+This file states the observations the wNEAR proofs need from the runtime
+(`RuntimeInterface`) and the proposition linking a deployed module to the
+model (`Refines`). `Spec.RuntimeInstance` supplies the executable VM instance;
+the refinement proof remains an obligation.
 
 The interface is deliberately minimal: a deterministic executor for a single
 function-call action, plus observation functions on its result.
@@ -24,6 +23,31 @@ inductive ReturnData
   | promise
   deriving DecidableEq
 
+/-- Resources supplied by the enclosing action/chain semantics, before adding
+this call's attached deposit. Storage usage includes code and account overhead,
+which are absent from the contract's key/value model. -/
+structure ExecutionResources where
+  balance : Nat
+  storageUsage : Nat
+  deriving DecidableEq, Repr
+
+/-- Bounded host inputs and enough measured usage to cover stored records. -/
+def ExecutionResources.Valid (r : ExecutionResources) (cfg : Config)
+    (raw : RawStorage) (env : Env) : Prop :=
+  r.balance + env.attachedDeposit < 2^128 ∧
+  r.storageUsage < 2^64 ∧ WNear.storageUsage cfg raw ≤ r.storageUsage ∧
+  env.prepaidGas < 2^64
+
+/-- Local resource obligations for a model success. Chain-level solvency must
+establish these; the mathematical model alone does not own NEAR funds.
+The retained overhead is added to the new contract records without truncation. -/
+def ExecutionResources.Supports (r : ExecutionResources) (cfg : Config)
+    (raw : RawStorage) (env : Env) (result : Except Panic Outcome) : Prop :=
+  match result with
+  | .error _ => True
+  | .ok o => o.nearOut ≤ r.balance + env.attachedDeposit ∧
+      r.storageUsage - WNear.storageUsage cfg raw + WNear.storageUsage cfg (encode o.state) < 2^64
+
 /-- The interface required from `near-lean`. -/
 @[blueprint "def:runtime-interface"
   (statement := /-- What the proofs need from \texttt{near-lean}: types for storage, code, inputs and results; a deterministic executor of one function call; observation functions on results (failure message, gas exhaustion, resulting storage, return data, logs, promises); and the JSON encoding of return values. -/)]
@@ -38,17 +62,29 @@ structure RuntimeInterface where
   Input : Type
   /-- The input for a typed call under a host context, using near-sdk's JSON
   argument encoding (`U128` as decimal strings, account ids as strings). -/
-  mkInput : Env → Call → Input
+  mkInput : ExecutionResources → Env → Call → Input
   /-- Result of executing one function call. -/
   Result : Type
   /-- Deterministic execution of one function call against code and storage. -/
   exec : Code → Storage → Input → Result
   /-- Failure message when the execution failed (panic, host error, gas). -/
   failure : Result → Option String
+  /-- A model limitation, distinct from a protocol failure. Refinement must
+  prove this absent, rather than exclude such executions by a hypothesis. -/
+  executionIssue : Result → Option String
+  /-- No information was silently discarded by contract-specific observation
+  functions (in particular the projection of the exact receipt graph). -/
+  observationsValid : Result → Bool
   /-- Whether the failure is gas exhaustion, which the model does not predict. -/
   outOfGas : Result → Bool
   /-- Storage after the execution; unchanged when the execution failed. -/
   storage : Result → Storage
+  /-- Liquid account balance at the VM boundary (before receipt-level rewards). -/
+  balance : Result → Nat
+  /-- Total measured account storage usage, including retained overhead. -/
+  storageUsage : Result → Nat
+  burntGas : Result → Nat
+  usedGas : Result → Nat
   /-- Return data of a successful execution. -/
   returnValue : Result → ReturnData
   /-- Logs emitted, in order. -/
@@ -69,21 +105,33 @@ def Represents (R : RuntimeInterface) (cfg : Config) (raw : R.Storage) : Option 
   | some s => Inv cfg s ∧ R.entries raw = encode s
 
 /-- Every execution of the deployed code that does not run out of gas is
-predicted exactly by `step`: same success or panic, same storage, return
-value, logs and promises. -/
+predicted exactly by `step` under bounded, funded resource inputs: same success
+or panic, storage, return value, logs and promises, plus balance and storage usage
+accounting. Failures, including out of gas, roll back account resources. -/
 @[blueprint "spec:refinement"
   (statement := /-- For every storage representing an optional state (empty, or the encoding of a state satisfying \cref{def:inv}), every context and call, if executing the deployed code does not run out of gas then: when \cref{def:step} succeeds, the execution succeeds with the encoding of the new state as storage and the same return value, logs and promises; when \cref{def:step} panics, the execution fails with a message containing the panic text and the storage is unchanged. -/)]
 def Refines (R : RuntimeInterface) (code : R.Code) (cfg : Config) : Prop :=
-  ∀ (raw : R.Storage) (st : Option State) (env : Env) (call : Call),
+  ∀ (raw : R.Storage) (st : Option State) (resources : ExecutionResources) (env : Env) (call : Call),
     Represents R cfg raw st →
-    let r := R.exec code raw (R.mkInput env call)
-    R.outOfGas r = false →
+    resources.Valid cfg (R.entries raw) env →
+    resources.Supports cfg (R.entries raw) env (step cfg st env call) →
+    let r := R.exec code raw (R.mkInput resources env call)
+    R.executionIssue r = none ∧
+    R.burntGas r ≤ R.usedGas r ∧ R.usedGas r ≤ env.prepaidGas ∧
+    (R.failure r ≠ none →
+      R.entries (R.storage r) = R.entries raw ∧ R.balance r = resources.balance ∧
+      R.storageUsage r = resources.storageUsage ∧ R.promises r = []) ∧
+    (R.outOfGas r = false →
     match step cfg st env call with
     | .ok o =>
+        R.observationsValid r = true ∧
         R.failure r = none ∧ R.entries (R.storage r) = encode o.state ∧
-        R.returnValue r = R.encodeRet o.ret ∧ R.logs r = o.logs ∧ R.promises r = o.promises
+        R.returnValue r = R.encodeRet o.ret ∧ R.logs r = o.logs ∧ R.promises r = o.promises ∧
+        R.balance r + o.nearOut = resources.balance + env.attachedDeposit ∧
+        R.storageUsage r = resources.storageUsage - WNear.storageUsage cfg (R.entries raw) +
+          WNear.storageUsage cfg (encode o.state)
     | .error p =>
         (∃ msg, R.failure r = some msg ∧ p.matches msg) ∧
-        R.entries (R.storage r) = R.entries raw
+        R.entries (R.storage r) = R.entries raw ∧ R.promises r = [])
 
 end WNear
