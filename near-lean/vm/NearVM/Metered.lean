@@ -91,7 +91,9 @@ def spanLen (st : Store NearState) (len ptr : UInt64) : Nat :=
 /-- Reading a `(len, ptr)` argument: memory or register costs. -/
 def readSpan (st : Store NearState) (len ptr : UInt64) : List Charge :=
   if len = u64Max then
-    [.ext "read_register_base", .ext "read_register_byte" (spanLen st len ptr)]
+    match st.host.registers ptr.toNat with
+    | none => []
+    | some bytes => [.ext "read_register_base", .ext "read_register_byte" bytes.length]
   else [.ext "read_memory_base", .ext "read_memory_byte" len.toNat]
 
 def readMem (n : Nat) : List Charge := [.ext "read_memory_base", .ext "read_memory_byte" n]
@@ -172,6 +174,68 @@ def throughNewReceipt : List Charge → List Charge
     | .newReceipt .. => [charge]
     | _ => charge :: throughNewReceipt rest
 
+structure FunctionCallInputs where
+  target : Option Nat := none
+  methodLen : UInt64
+  methodPtr : UInt64
+  argsLen : UInt64
+  argsPtr : UInt64
+  amountPtr : UInt64
+  gas : UInt64
+
+def functionCallInputs (args : List Value) (offset : Nat) (target : Option Nat := none) : FunctionCallInputs :=
+  { target, methodLen := argU64 args offset, methodPtr := argU64 args (offset + 1)
+    argsLen := argU64 args (offset + 2), argsPtr := argU64 args (offset + 3)
+    amountPtr := argU64 args (offset + 4), gas := argU64 args (offset + 5) }
+
+def functionCallInputs? (name : String) (args : List Value) : Option FunctionCallInputs :=
+  match name with
+  | "promise_create" => some (functionCallInputs args 2)
+  | "promise_then" => some (functionCallInputs args 3)
+  | "promise_batch_action_function_call" => some (functionCallInputs args 1 (some (argU64 args 0).toNat))
+  | _ => none
+
+structure FunctionCallPlan where
+  charges : List Charge
+  error : Option HostError := none
+
+def spanReadError (len ptr : UInt64) : HostError :=
+  if len == u64Max then .invalidRegisterId ptr.toNat else .memoryAccessViolation
+
+def functionCallTargetError (st : Store NearState) (index : Nat) : Option HostError :=
+  match getPromise? st.host.promises index with
+  | some (.batch ..) | some (.callback ..) => none
+  | some (.and _) => some .cannotAppendActionToJointPromise
+  | _ => some (.invalidPromiseIndex index)
+
+/-- The reference reads amount, method (rejecting empty), arguments, then the
+target handle. Fees and prepaid gas follow only after all inputs are valid. -/
+def functionCallPlan (st : Store NearState) (input : FunctionCallInputs) (sir : Bool) : FunctionCallPlan :=
+  let amountCharges := [.ext "base"] ++ readMem 16
+  match readU128Mem st input.amountPtr with
+  | none => { charges := amountCharges, error := some .memoryAccessViolation }
+  | some _ =>
+    let methodCharges := amountCharges ++ readSpan st input.methodLen input.methodPtr
+    match getMemOrReg st input.methodPtr input.methodLen with
+    | none => { charges := methodCharges, error := some (spanReadError input.methodLen input.methodPtr) }
+    | some method =>
+      if method.isEmpty then { charges := methodCharges, error := some .emptyMethodName }
+      else
+        let argCharges := methodCharges ++ readSpan st input.argsLen input.argsPtr
+        match getMemOrReg st input.argsPtr input.argsLen with
+        | none => { charges := argCharges, error := some (spanReadError input.argsLen input.argsPtr) }
+        | some arguments =>
+          let targetError := input.target.bind (functionCallTargetError st)
+          match targetError with
+          | some error => { charges := argCharges, error := some error }
+          | none => { charges := argCharges ++
+              [.actionBase (·.functionCallBase) sir,
+               .actionBytes (·.functionCallByte) (method.length + arguments.length) sir,
+               .prepay input.gas.toNat] }
+
+def functionCallInputError (name : String) (st : Store NearState) (args : List Value) : Option HostError :=
+  (functionCallInputs? name args).bind fun input => (functionCallPlan st input false).error
+
 /-- Argument-dependent charge plan before validating promise handles. -/
 private def chargesBeforeUnvalidated (name : String) (st : Store NearState) (args : List Value) : List Charge :=
   let a := argU64 args
@@ -243,21 +307,13 @@ private def chargesBeforeUnvalidated (name : String) (st : Store NearState) (arg
     [base, .ext "storage_has_key_base"] ++ readSpan st (a 0) (a 1) ++ [.ext "storage_has_key_byte" k]
   | "promise_create" =>
     let sir := sirOfSpan st (a 0) (a 1)
-    let m := spanLen st (a 2) (a 3)
-    let args := spanLen st (a 4) (a 5)
-    [base] ++ readSpan st (a 0) (a 1) ++ utf8 (spanLen st (a 0) (a 1)) ++ [.newReceipt sir [], base]
-      ++ readSpan st (a 2) (a 3) ++ readSpan st (a 4) (a 5) ++ readMem 16
-      ++ [.actionBase (·.functionCallBase) sir, .actionBytes (·.functionCallByte) (m + args) sir,
-          .prepay (a 7).toNat]
+    [base] ++ readSpan st (a 0) (a 1) ++ utf8 (spanLen st (a 0) (a 1)) ++ [.newReceipt sir []]
+      ++ (functionCallPlan st (functionCallInputs args 2) sir).charges
   | "promise_then" =>
     let sir := sirOfSpan st (a 1) (a 2)
-    let m := spanLen st (a 3) (a 4)
-    let args := spanLen st (a 5) (a 6)
     [base] ++ readSpan st (a 1) (a 2) ++ utf8 (spanLen st (a 1) (a 2))
-      ++ [.newReceipt sir (depsSir st (a 0).toNat (getMemOrReg st (a 2) (a 1))), base]
-      ++ readSpan st (a 3) (a 4) ++ readSpan st (a 5) (a 6) ++ readMem 16
-      ++ [.actionBase (·.functionCallBase) sir, .actionBytes (·.functionCallByte) (m + args) sir,
-          .prepay (a 8).toNat]
+      ++ [.newReceipt sir (depsSir st (a 0).toNat (getMemOrReg st (a 2) (a 1)))]
+      ++ (functionCallPlan st (functionCallInputs args 3) sir).charges
   | "promise_and" =>
     let n := (a 1).toNat * 8
     [base, .ext "promise_and_base", .ext "promise_and_per_promise" n] ++ readMem n
@@ -276,11 +332,7 @@ private def chargesBeforeUnvalidated (name : String) (st : Store NearState) (arg
       ++ [.actionBase (·.deployContractBase) sir, .actionBytes (·.deployContractByte) n sir]
   | "promise_batch_action_function_call" =>
     let sir := sirOf st (promiseReceiver? st (a 0).toNat)
-    let m := spanLen st (a 1) (a 2)
-    let args := spanLen st (a 3) (a 4)
-    [base] ++ readSpan st (a 1) (a 2) ++ readSpan st (a 3) (a 4) ++ readMem 16
-      ++ [.actionBase (·.functionCallBase) sir, .actionBytes (·.functionCallByte) (m + args) sir,
-          .prepay (a 6).toNat]
+    (functionCallPlan st (functionCallInputs args 1 (some (a 0).toNat)) sir).charges
   | "promise_batch_action_transfer" =>
     [base] ++ readMem 16 ++ [.actionBase (·.transfer) (sirOf st (promiseReceiver? st (a 0).toNat))]
   | "promise_batch_action_stake" =>
@@ -372,7 +424,10 @@ def invocationArgumentError (name : String) (st : Store NearState) (args : List 
 def preInvokeError (name : String) (st : Store NearState) (args : List Value) : Option HostError :=
   match invocationArgumentError name st args with
   | some error => some error
-  | none => if allocatesPromise name then promiseCapacityError st else none
+  | none =>
+    match (if allocatesPromise name then promiseCapacityError st else none) with
+    | some error => some error
+    | none => functionCallInputError name st args
 
 /-- Length of register `reg` in `st`, if set. -/
 def registerLen? (st : Store NearState) (reg : UInt64) : Option Nat :=
@@ -431,8 +486,32 @@ def updateStorageUsage (extraBytes : Nat) (name : String) (before after : Store 
     | none => after
   | _ => after
 
-/-- Deposits attached to promise actions leave the account balance when the
-action is created (`BalanceExceeded` if it cannot cover them). -/
+/-- Deduct a promise deposit or grant the protocol's one-yocto subsidy.
+Only function-call actions qualify; the counter is diagnostic until receipt commit. -/
+def deductPromiseDeposit (name : String) (ns : NearState) (d : Nat) : NearState × Option HostError :=
+  let bal := ns.context.accountBalance
+  if ns.config.oneYoctoOnPromise && d == 1 && bal == 0 &&
+      (name == "promise_create" || name == "promise_then" ||
+       name == "promise_batch_action_function_call") then
+    ({ ns with subsidizedAmount := ns.subsidizedAmount + d }, none)
+  else if d ≤ bal then
+    ({ ns with context := { ns.context with accountBalance := bal - d } }, none)
+  else (ns, some .balanceExceeded)
+
+/-- Successful deductions conserve liquid funds plus minted deposits. -/
+theorem deductPromiseDeposit_accounting (name : String) (ns : NearState) (d : Nat)
+    (h : (deductPromiseDeposit name ns d).2 = none) :
+    ns.context.accountBalance + (deductPromiseDeposit name ns d).1.subsidizedAmount =
+      (deductPromiseDeposit name ns d).1.context.accountBalance + ns.subsidizedAmount + d := by
+  by_cases hs : (ns.config.oneYoctoOnPromise && d == 1 && ns.context.accountBalance == 0 &&
+      (name == "promise_create" || name == "promise_then" ||
+       name == "promise_batch_action_function_call")) = true
+  · simp [deductPromiseDeposit, hs, Nat.add_assoc]
+  · by_cases hd : d ≤ ns.context.accountBalance
+    · simp [deductPromiseDeposit, hs, hd]
+      omega
+    · simp [deductPromiseDeposit, hs, hd] at h
+
 def deductDeposit (name : String) (before after : Store NearState) (args : List Value) :
     Store NearState × Option HostError :=
   let a := argU64 args
@@ -447,10 +526,8 @@ def deductDeposit (name : String) (before after : Store NearState) (args : List 
   match deposit with
   | some 0 => (after, none)
   | some d =>
-    let bal := after.host.context.accountBalance
-    if d ≤ bal then
-      ({ after with host := { after.host with context := { after.host.context with accountBalance := bal - d } } }, none)
-    else (after, some .balanceExceeded)
+    let (ns, err) := deductPromiseDeposit name after.host d
+    ({ after with host := ns }, err)
   | none => (after, none)
 
 /-- `panic_utf8(len, ptr)` with the message. -/

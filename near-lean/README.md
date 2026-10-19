@@ -204,3 +204,16 @@ error names. Protocol V2 receiver syntax is installed in the host configuration.
 `checked_nextPromiseIdx_fresh` proves the u64 handle is unwrapped, absent from
 the old list, and resolves to the appended promise when the limit fits u64.
 This is local handle freshness, not global receipt/data identifier freshness.
+
+Function-call action inputs now use one staged validation/charge plan: amount,
+method (including empty-method rejection), arguments, then target handle,
+followed by action fees and prepaid gas. Combined create/then operations retain
+their receiver/receipt/count prefix before this plan. Memory-or-register reads
+of missing registers incur no register-read charge, matching the reference.
+`FunctionCallValidation.lean` proves accepted inputs are readable, methods are
+nonempty, direct targets are receipts, and the functional host builds the same
+raw action. One-yocto sponsorship follows the protocol flag: eligible function
+calls at zero liquid balance receive minted deposits. VM outcomes retain attempted
+grants on failure; receipt/apply results count only committed grants separately
+from burnt tokens. `deductPromiseDeposit_accounting` proves local accounting.
+Global conservation and deployed refinement are still open.

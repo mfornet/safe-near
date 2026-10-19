@@ -468,7 +468,7 @@ theorem updateStorageUsage_promises (extra : Nat) (name : String) (before after 
 
 theorem deductDeposit_promises (name : String) (before after : Store NearState) (args : List Value) :
     (deductDeposit name before after args).1.host.promises = after.host.promises := by
-  unfold deductDeposit
+  unfold deductDeposit deductPromiseDeposit
   repeat (first | rfl | (dsimp only; split))
   all_goals first | rfl | (split <;> rfl)
 

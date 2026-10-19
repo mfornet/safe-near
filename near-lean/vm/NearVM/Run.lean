@@ -230,13 +230,13 @@ private def runAttempt (cfg : RuntimeConfig) (code : Module) (codeSize : Nat) (m
   | some e =>
     { balance := ctx.accountBalance, storageUsage := ctx.storageUsage, returnData := .none,
       burntGas := ns.gas.burnt, usedGas := ns.gas.burnt, logs := logsOf ns, storage := storage,
-      receipts := [], aborted := some e, gasProfile := ns.gasProfile }
+      receipts := [], aborted := some e, gasProfile := ns.gasProfile, subsidizedAmount := ns.subsidizedAmount }
   | none =>
     let outcome : VMOutcome := {
       balance := ns.context.accountBalance, storageUsage := ns.context.storageUsage.toNat
       returnData := .none, burntGas := ns.gas.burnt, usedGas := ns.gas.used
       logs := logsOf ns, storage := finalStorage ns, receipts := [], aborted := none
-      gasProfile := ns.gasProfile }
+      gasProfile := ns.gasProfile, subsidizedAmount := ns.subsidizedAmount }
     match convertPromises ns.promises with
     | none => outcome.graphIssue ctx.accountBalance ctx.storageUsage storage
     | some graph =>

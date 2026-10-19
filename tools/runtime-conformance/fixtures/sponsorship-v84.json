@@ -1,0 +1,27 @@
+{
+  "code": "tools/runtime-conformance/fixtures/sponsorship.wasm",
+  "sha256": "181459f6492c78d9494e52eb38824a6ce3d094592dbd8a09cd47c6855bb14544",
+  "protocolVersion": 84,
+  "initialBalance": "0",
+  "initialStorageUsage": 182,
+  "storage": [],
+  "calls": [
+    {
+      "name": "unfunded one yocto",
+      "method": "one",
+      "args": {}
+    },
+    {
+      "name": "paid one yocto",
+      "method": "one",
+      "args": {},
+      "deposit": "1"
+    },
+    {
+      "name": "paid then unfunded",
+      "method": "twice",
+      "args": {},
+      "deposit": "1"
+    }
+  ]
+}

@@ -90,6 +90,7 @@ structure RuntimeInterface where
   storageUsage : Result → Nat
   burntGas : Result → Nat
   usedGas : Result → Nat
+  subsidizedAmount : Result → Nat
   /-- Return data of a successful execution. -/
   returnValue : Result → ReturnData
   /-- Logs emitted, in order. -/
@@ -123,6 +124,7 @@ def Refines (R : RuntimeInterface) (code : R.Code) (cfg : Config) : Prop :=
     resources.Supports cfg (R.entries raw) env (step cfg st env call) →
     let r := R.exec code raw (R.mkInput resources results env call)
     R.executionIssue r = none ∧
+    R.subsidizedAmount r = 0 ∧
     R.burntGas r ≤ R.usedGas r ∧ R.usedGas r ≤ env.prepaidGas ∧
     (R.failure r ≠ none →
       R.entries (R.storage r) = R.entries raw ∧ R.balance r = resources.balance ∧

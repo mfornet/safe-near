@@ -249,6 +249,7 @@ noncomputable def nearLean (cfg : RuntimeConfig) : RuntimeInterface :=
     storageUsage := (·.storageUsage)
     burntGas := (·.burntGas)
     usedGas := (·.usedGas)
+    subsidizedAmount := (·.subsidizedAmount)
     returnValue := returnDataOf
     logs := (·.logs)
     promises := promisesOf

@@ -107,6 +107,8 @@ structure VMOutcome where
   receipts : List ReceiptSpec
   /-- `none` on success. -/
   aborted : Option FunctionCallError
+  /-- Attempted sponsored deposits, retained as diagnostics on VM failure. -/
+  subsidizedAmount : Nat := 0
   gasProfile : GasProfile := {}
   deriving Inhabited
 

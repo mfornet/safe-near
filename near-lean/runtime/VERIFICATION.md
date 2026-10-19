@@ -294,3 +294,25 @@ The additional empty-span regressions exposed two discrepancies;
 `preInvokeError_join_span_bound` now proves the entire accepted pointer/length
 span lies within guest memory, while the existing join proof bounds its u64
 length and expanded dependency vector.
+
+`functionCallPlan` now validates and charges function-call inputs in reference
+order: u128 amount, method bytes/nonemptiness, argument bytes, then target
+receipt/joint distinction. Invalid input stops the charge list before later
+reads, fees or gas prepayment. Direct batch actions and combined create/then
+calls share the plan; creation-prefix and capacity errors still precede it.
+Missing-register memory-or-register reads fail before any register-read charge.
+The new fixture exposed 15 mismatching cases, including overlapping errors and
+an empty method that must fail before action-fee gas exhaustion.
+`FunctionCallValidation` proves successful plans admit exact readable inputs,
+nonempty methods, receipt targets, and matching functional action construction;
+it also connects pre-invocation acceptance to that action result.
+One-yocto sponsorship is enabled from the pinned v85 configuration. Eligible
+function-call deposits of exactly one yocto at zero liquid balance increment
+`VMOutcome.subsidizedAmount`; transfers and larger deposits remain unfunded.
+Failed VM calls retain attempted subsidy diagnostics, matching the VM reference.
+Receipt execution commits subsidy only on success and clears it on any later
+action or storage-staking failure. Apply results aggregate committed subsidy
+separately from gas burn, and model issues commit zero subsidy (kernel proved).
+The 770-byte storage-staking exemption follows pinned nearcore's verifier.
+The local deposit accounting equation is kernel proved; a full chain conservation
+theorem incorporating minted grants and deployed wNEAR refinement remain open.
