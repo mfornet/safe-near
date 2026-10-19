@@ -42,6 +42,7 @@ programs-test:
     just --justfile near-lean/programs/justfile build
     just --justfile near-lean/programs/justfile smoke
     just --justfile near-lean/programs/justfile test
+    just --justfile near-lean/programs/justfile rust-test
 
 # Rebuild the committed Rust test-program binaries and WAT.
 programs-build:
@@ -60,6 +61,7 @@ snapshot output +accounts_and_options:
 # Run offline regression tests for repository tools.
 tools-test:
     python3 -m unittest discover -s tools/tests -v
+    python3 -m unittest discover -s tools/runtime-conformance -p 'test_*.py' -v
 
 # Run all executable suites: programs, NEAR scenarios, official Wasm tests and strict VM conformance.
 test-all: check-toolchains tools-test programs-test near-test runtime-adapter-test wasm-test near-conformance

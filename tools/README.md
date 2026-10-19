@@ -108,8 +108,9 @@ and failure when a formatter process is killed.
 
 ## Combined checks
 
-`just test-all` runs the toolchain check and Python tooling tests, program
-smoke/regression tests, VM/runtime/chain scenarios, the wNEAR adapter suite,
+`just test-all` runs the toolchain check and Python tooling/conformance-driver
+tests, native Rust unit tests, program smoke/regression tests,
+VM/runtime/chain scenarios, the wNEAR adapter suite,
 the complete official Wasm testsuite, and strict VM conformance against the
 pinned Rust oracle. It stops on the first failing command. Install the Lean,
 Rust and pinned wasm-tools prerequisites documented by those components first.
