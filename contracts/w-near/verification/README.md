@@ -83,10 +83,10 @@ should be written:
   (`ft_resolve_transfer` became `unusedAmount` + `resolveRefund`): the pieces
   get their own lemmas and the proofs stop depending on how `do` desugars.
 
-The open specs (`BalanceAuthorization`, `RegistrationAuthorization`,
-`Conservation`) are each a pass over all fifteen methods; the natural next
-step is one relational characterisation of `dispatch` from which all three
-follow by case analysis. `ProjectEncode` and `StorageCoverage` need
+`RegistrationAuthorization` is proved by case analysis over all fifteen
+methods, with reusable lemmas that refund callbacks preserve registration.
+`BalanceAuthorization` and `Conservation` remain open; a relational
+characterisation of `dispatch` can support both. `ProjectEncode` and `StorageCoverage` need
 injectivity of the Borsh encoders in `Model/Borsh.lean`.
 
 `Spec/Refinement.lean` states the interface the proofs need from a runtime;
