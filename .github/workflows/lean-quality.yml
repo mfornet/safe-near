@@ -2,6 +2,7 @@ name: Lean quality
 
 on:
   push:
+    branches: [main]
     paths: ["**/*.lean", "**/lean-toolchain", "lean-toolchain", "**/lakefile.*", "**/lake-manifest.json", "tools/**", ".github/workflows/lean-quality.yml"]
   pull_request:
     paths: ["**/*.lean", "**/lean-toolchain", "lean-toolchain", "**/lakefile.*", "**/lake-manifest.json", "tools/**", ".github/workflows/lean-quality.yml"]

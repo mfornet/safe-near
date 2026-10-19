@@ -45,3 +45,8 @@ snapshot output +accounts_and_options:
 # Run offline regression tests for repository tools.
 tools-test:
     python3 -m unittest discover -s tools/tests -v
+
+# Compare VM executors on calls seeded from a complete captured account snapshot.
+[positional-arguments]
+snapshot-vm snapshot account scenario +options:
+    python3 tools/snapshot_vm.py "$@"

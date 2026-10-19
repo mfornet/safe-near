@@ -15,6 +15,7 @@ Run `just` at the repository root for the documented command list.
 | `just audit near-lean/wasm` | Check a package's transitive proof axioms |
 | `just tools-test` | Run offline Python tooling regression tests |
 | `just snapshot /tmp/fixture.json lockup.near` | Download a block-pinned account fixture |
+| `just snapshot-vm SNAPSHOT ACCOUNT SCENARIO --report REPORT` | Compare VM calls seeded from a complete captured account |
 
 ## Lean quality
 
@@ -57,3 +58,9 @@ storage, provider size limits, and historical captures. A live full capture of
 `lockup.near`, including 522,447 bytes of deployed code, succeeded at block
 `GXdjU1zVDi5HJNh2YmnTEWiqGPZA2b4iegU28kVvXhpn` (height 220701709,
 protocol 86). Capturing that same hash again produced byte-identical JSON.
+
+[SNAPSHOT_VM.md](SNAPSHOT_VM.md) explains how to feed a complete captured
+account to compatible reference and model executables, preserving the actual
+contract identity and block context. The adapter freezes executables and
+configuration before running, allowing the components to live in separate
+worktrees while other agents continue rebuilding them.
