@@ -80,7 +80,10 @@ theorem metered_preserves_selection (extra : Nat) (name : String) (fn : HostFn N
         exact applyCharges_selection _ _ hwf
       cases herr : (applyCharges st.host (chargesBefore name st args)).2 with
       | some error => exact hwf1
-      | none => exact finishMeteredCall_selection extra name st1 args _ (hfn st1 args hwf1)
+      | none =>
+        cases hp : preInvokeError name st1 args with
+        | some error => exact hwf1
+        | none => exact finishMeteredCall_selection extra name st1 args _ (hfn st1 args hwf1)
 
 /-- Every function published by the runtime's metered registry preserves
 creation-order validity, including rejected unsupported and deprecated calls. -/

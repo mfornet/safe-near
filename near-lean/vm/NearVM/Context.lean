@@ -77,7 +77,8 @@ def toNearState (cfg : RuntimeConfig) (ctx : VMContext)
       maxLogLen := some cfg.wasm.limits.maxTotalLogLength
       maxNumberLogs := some cfg.wasm.limits.maxNumberLogs
       maxStorageKeyLen := some cfg.wasm.limits.maxLengthStorageKey
-      maxStorageValueLen := some cfg.wasm.limits.maxLengthStorageValue }
+      maxStorageValueLen := some cfg.wasm.limits.maxLengthStorageValue
+      maxInputDataDependencies := some cfg.wasm.limits.maxNumberInputDataDependencies }
     randomSeed := ctx.randomSeed
     gas := { prepaid := ctx.prepaidGas, maxBurnt := maxBurnt }
     extCosts := cfg.wasm.extCosts

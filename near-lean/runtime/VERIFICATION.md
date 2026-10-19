@@ -218,3 +218,17 @@ exact value bytes when no promise is selected. Yielded raw handles remain
 excluded by dependency well-formedness; this invariant does not implement yield.
 Bounds/freshness, complete state validity, conservation and deployed refinement
 remain open.
+
+The metered join path now loads `max_number_input_data_dependencies` from the
+protocol configuration and checks expanded prefixes before functional invocation.
+Duplicate receipt indices count repeatedly; joins of empty joints can exceed
+128 input handles while contributing zero dependencies. Earlier limit violations
+precede later invalid handles. The u64 `count * 8` overflow check occurs after
+base/promise-and-base charging and before per-element/memory charging. Memory
+bounds errors use the structured host error. Independent boundary fixtures found
+five mismatches, including overflow/error-message differences, now covered by
+regressions. `joinedDependenciesError_none_iff`,
+`joinedDependenciesError_expands` and `preInvokeError_join_bounds` prove the
+prefix condition, ordered expansion and accepted-span/dependency bounds.
+Both existing execution invariants cover the new pre-invocation error exits.
+This does not yet implement promise-creation count limits or all host limits.

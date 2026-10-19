@@ -1,6 +1,6 @@
 {
   "code": "tools/runtime-conformance/fixtures/promise_graphs.wasm",
-  "sha256": "625250fb76eb895acc4812a772e9e7c6856119bad5386222539b5c355b380a86",
+  "sha256": "3bdf51097244cd114ad6aea95b5fa39dadc300eda22a92450429a8501cf64afa",
   "protocolVersion": 86,
   "initialBalance": "100000000000000000000000000",
   "storage": [],
@@ -77,6 +77,52 @@
       "name": "receipt_after_value",
       "method": "receipt_after_value",
       "args": {}
+    },
+    {
+      "name": "join_limit",
+      "method": "join_limit",
+      "args": {}
+    },
+    {
+      "name": "join_exceeded",
+      "method": "join_exceeded",
+      "args": {}
+    },
+    {
+      "name": "nested_exceeded",
+      "method": "nested_exceeded",
+      "args": {}
+    },
+    {
+      "name": "limit_before_invalid",
+      "method": "limit_before_invalid",
+      "args": {}
+    },
+    {
+      "name": "invalid_before_limit",
+      "method": "invalid_before_limit",
+      "args": {}
+    },
+    {
+      "name": "many_empty_joins",
+      "method": "many_empty_joins",
+      "args": {}
+    },
+    {
+      "name": "join_count_overflow",
+      "method": "join_count_overflow",
+      "args": {}
+    },
+    {
+      "name": "join_memory_oob",
+      "method": "join_memory_oob",
+      "args": {}
+    },
+    {
+      "name": "overflow prohibited in view",
+      "method": "join_count_overflow",
+      "args": {},
+      "view": true
     }
   ]
 }

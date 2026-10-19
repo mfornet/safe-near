@@ -177,3 +177,12 @@ selection. The shared `InterpreterInvariant` and `MeteredInvariant` theorems now
 carry both dependency and selection proofs, with gas preservation explicit.
 These guarantees do not establish numeric bounds, identifier freshness, full
 state validity, token conservation, or deployed wNEAR refinement.
+
+Metered `promise_and` now enforces the configured limit on expanded receipt
+dependencies, checking each ordered prefix and counting duplicate dependencies.
+It also rejects overflow in the u64 count-to-byte conversion before charging
+per-element or memory-read costs. `PromiseLimits.lean` relates successful checks
+to exact ordered expansion and proves the resulting dependency-length bound.
+Independent fixtures cover the 128/129 boundary, nested joins, empty joins,
+invalid-index precedence, memory bounds, overflow and view restrictions.
+Promise-creation count limits and broader host limits remain open.

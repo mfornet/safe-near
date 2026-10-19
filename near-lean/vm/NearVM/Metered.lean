@@ -1,5 +1,6 @@
 import NearVM.Host
 import NearVM.Config
+import NearVM.PromiseGraph
 
 /-!
 # Gas-metered host functions
@@ -269,7 +270,9 @@ def chargesBefore (name : String) (st : Store NearState) (args : List Value) : L
   let a := argU64 args
   let base : Charge := .ext "base"
   let charges := chargesBeforeUnvalidated name st args
-  if (name == "promise_then" || name == "promise_batch_then") &&
+  if name == "promise_and" && (a 1).toNat * 8 ≥ 2 ^ 64 then
+    [base, .ext "promise_and_base"]
+  else if (name == "promise_then" || name == "promise_batch_then") &&
       !promiseIndexValid st (a 0).toNat then
     [base] ++ readSpan st (a 1) (a 2) ++ utf8 (spanLen st (a 1) (a 2))
   else if name.startsWith "promise_batch_action_" &&
@@ -278,6 +281,38 @@ def chargesBefore (name : String) (st : Store NearState) (args : List Value) : L
       | .actionBase .. | .actionBytes .. | .prepay .. => false
       | _ => true
   else charges
+
+/-- Check each expanded prefix, retaining duplicate receipt dependencies.
+This ordering makes an earlier limit violation precede a later invalid handle. -/
+def joinedDependenciesError (handles : List PromiseHandle) (limit : Nat) : List Nat → Nat → Option HostError
+  | [], _ => none
+  | index :: rest, count =>
+    match handles[index]? with
+    | none => some (.invalidPromiseIndex index)
+    | some handle =>
+      let count := count + handle.dependencies.length
+      if count > limit then some (.numberInputDataDependenciesExceeded count limit)
+      else joinedDependenciesError handles limit rest count
+
+/-- Validation after argument-reading charges and before functional invocation.
+An invalid internal raw graph is explicit unsupported model state. Ordinary VM
+execution preserves graph well-formedness independently of this check. -/
+def preInvokeError (name : String) (st : Store NearState) (args : List Value) : Option HostError :=
+  if name == "promise_and" then
+    match args with
+    | [.i64 ptr, .i64 count] =>
+      if count.toNat * 8 ≥ 2 ^ 64 then some .integerOverflow
+      else match readU64Array st ptr count.toNat with
+      | none => some .memoryAccessViolation
+      | some indices =>
+        match st.host.config.maxInputDataDependencies with
+        | none => none
+        | some limit =>
+          match convertPromises st.host.promises with
+          | none => some (.unsupported "promise_and: malformed raw graph")
+          | some graph => joinedDependenciesError graph.handles limit indices 0
+    | _ => none
+  else none
 
 /-- Length of register `reg` in `st`, if set. -/
 def registerLen? (st : Store NearState) (reg : UInt64) : Option Nat :=
@@ -440,7 +475,9 @@ def metered (extraBytes : Nat) (name : String) (fn : HostFn NearState) : HostFn 
       match err with
       | some e => trapWith st1 e
       | none =>
-        finishMeteredCall extraBytes name st1 args (fn.invoke st1 args) }
+        match preInvokeError name st1 args with
+        | some error => trapWith st1 error
+        | none => finishMeteredCall extraBytes name st1 args (fn.invoke st1 args) }
 
 /-- These host operations require semantics not supplied by `VMContext`.
 Reject them on invocation instead of using the functional host's placeholder

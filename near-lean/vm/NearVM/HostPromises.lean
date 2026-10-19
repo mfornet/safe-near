@@ -529,7 +529,10 @@ theorem metered_preserves_promises (extra : Nat) (name : String) (fn : HostFn Ne
         exact hwf
       cases herr : (applyCharges st.host (chargesBefore name st args)).2 with
       | some error => exact hwf1
-      | none => exact finishMeteredCall_preserves extra name st1 args _ (hfn st1 args hwf1)
+      | none =>
+        cases hp : preInvokeError name st1 args with
+        | some error => exact hwf1
+        | none => exact finishMeteredCall_preserves extra name st1 args _ (hfn st1 args hwf1)
 
 /-- A successful preserving host call leaves a graph the executable converter
 accepts, with validity proved before the output boundary check. -/

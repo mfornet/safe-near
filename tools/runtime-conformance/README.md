@@ -65,3 +65,9 @@ The promise-graph fixture also covers both orders of `value_return` and
 return; the host now gives the last successful selection precedence. The same
 fixture validates the incremental converter against the reference after removal
 of the bounded join walk.
+
+Join boundary cases check 128 versus 129 expanded dependencies, nested joint
+expansion, duplicate counting, more than 128 empty input joints, invalid-index
+ordering, u64 count-to-byte overflow, out-of-bounds index reads, and view
+precedence. They exposed five discrepancies before the metered join limit and
+overflow checks were added. Comparisons include exact error text and gas profiles.
