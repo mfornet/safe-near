@@ -1,12 +1,17 @@
 import Spec.Storage
-import Proofs.StateLemmas
+import Proofs.StorageEncoding
 
 namespace WNear
 
 @[blueprint "thm:project-encode"
   (statement := /-- \cref{spec:project-encode} holds. -/)]
 theorem project_encode : ProjectEncode := by
-  sorry
+  intro s hs
+  have hex : ∃ t : State, t.WF ∧ encode t = encode s := ⟨s, hs, rfl⟩
+  unfold project
+  rw [dif_pos hex]
+  apply congrArg some
+  exact encode_injective_of_wf (Classical.choose_spec hex).1 hs (Classical.choose_spec hex).2
 
 @[blueprint "thm:storage-coverage"
   (statement := /-- \cref{spec:storage-coverage} holds. -/)]

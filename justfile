@@ -54,6 +54,11 @@ near-test:
 runtime-adapter-test:
     cd contracts/w-near/verification && lake build runtime-adapter-tests && ./.lake/build/bin/runtime-adapter-tests
 
+# Audit every wNEAR model/spec/proof declaration, including transitive axioms.
+wnear-audit:
+    cd contracts/w-near/verification && lake build Model Spec Proofs runtime-adapter-tests
+    python3 tools/axiom-audit.py contracts/w-near/verification --no-build --report audit/wnear.json
+
 # Compare every normalized VM observation, including gas, against pinned nearcore.
 near-conformance:
     python3 tools/runtime-conformance/compare.py

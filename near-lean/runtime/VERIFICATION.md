@@ -116,5 +116,8 @@ The model also proves per-call conservation: the increase in total supply plus
 registration liabilities is bounded by attached NEAR minus all outgoing promise
 deposits. Refund resolution preserves registration, creates no NEAR transfers,
 and can only decrease supply. Storage coverage bounds the encoded records by the
-`STATE` record plus the measured per-account allocation. Encoder injectivity and
-the bridge from these model theorems to runtime/chain solvency remain open.
+`STATE` record plus the measured per-account allocation. Encoder injectivity and `project (encode s) = some s` are now proved for every
+well-formed state, including unregistered zero balances and bounded integers.
+The bridge from these model theorems to runtime/chain solvency remains open.
+`just wnear-audit` checks the entire verification package without an exemption
+for unfinished proofs; the deployed refinement remains a proposition to prove.

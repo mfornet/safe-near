@@ -90,8 +90,9 @@ only in refund resolution, for the receiver and by at most the transfer amount.
 `Conservation` is proved for every model method: increases in supply and
 registration liabilities are covered by the attached NEAR after outgoing promises. `StorageCoverage` is proved by bounding each encoded account record by the
 64-byte entry measured at initialization. This uses a kernel-checked byte-array
-length lemma and does not assume encoder injectivity. `ProjectEncode` still needs
-injectivity of the Borsh encoders in `Model/Borsh.lean`.
+length lemma and does not assume encoder injectivity. `ProjectEncode` is proved using fixed-width integer round trips, byte/string
+encoding injectivity, disjoint storage keys, and equality of all registered
+records. Thus `project (encode s) = some s` for every well-formed state.
 
 `Spec/Refinement.lean` states the interface the proofs need from a runtime;
 `Spec/RuntimeInstance.lean` fills it with `near-lean/vm` (`NearVM.run`, the
@@ -119,3 +120,10 @@ including out of gas, must restore input storage, balance and usage and emit no
 receipts. Failure logs may survive. These are specification obligations, not yet
 proved properties of the deployed binary. Adapter regressions carry real resources
 through initialization, deposit, withdrawal, panic and gas exhaustion.
+
+All model/spec/proof declarations are now subject to a strict transitive axiom
+audit in CI (`just wnear-audit` locally). It rejects `sorryAx`, `native_decide`
+and every axiom outside `propext`, `Classical.choice` and `Quot.sound`, including
+private helpers. This audit establishes trust in the model proofs; the deployed
+binary refinement remains a separate unproved obligation. The storage projection
+still uses classical choice, not an executable Borsh decoder.
