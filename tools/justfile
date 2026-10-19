@@ -73,6 +73,7 @@ test-all: check-toolchains tools-test programs-test near-test runtime-adapter-te
 
 # Audit all core Lean packages; list the program specifications whose proofs remain open.
 audit-all:
+    python3 tools/tests/check_axiom_audit.py
     @for package in wasm iris-wasm vm runtime chain; do \
         python3 tools/axiom-audit.py near-lean/"$package" --report audit/"$package".json; \
     done

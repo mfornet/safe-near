@@ -3,9 +3,9 @@ name: wasm
 on:
   push:
     branches: [main]
-    paths: ["near-lean/**", "contracts/w-near/verification/**", "contracts/w-near/contract.wasm", "tools/runtime-conformance/**", "tools/axiom-audit.py", "tools/check_vm_dependencies.py", "tools/tests/check_vm_dependencies.py", ".github/workflows/wasm.yml"]
+    paths: ["near-lean/**", "contracts/w-near/verification/**", "contracts/w-near/contract.wasm", "tools/runtime-conformance/**", "tools/axiom-audit.py", "tools/check_vm_dependencies.py", "tools/tests/check_vm_dependencies.py", "tools/tests/check_axiom_audit.py", ".github/workflows/wasm.yml"]
   pull_request:
-    paths: ["near-lean/**", "contracts/w-near/verification/**", "contracts/w-near/contract.wasm", "tools/runtime-conformance/**", "tools/axiom-audit.py", "tools/check_vm_dependencies.py", "tools/tests/check_vm_dependencies.py", ".github/workflows/wasm.yml"]
+    paths: ["near-lean/**", "contracts/w-near/verification/**", "contracts/w-near/contract.wasm", "tools/runtime-conformance/**", "tools/axiom-audit.py", "tools/check_vm_dependencies.py", "tools/tests/check_vm_dependencies.py", "tools/tests/check_axiom_audit.py", ".github/workflows/wasm.yml"]
   workflow_dispatch:
 
 concurrency:
@@ -111,6 +111,7 @@ jobs:
           ./.lake/build/bin/chain-tests
       - name: Runtime axiom audits
         run: |
+          python3 tools/tests/check_axiom_audit.py
           python3 tools/axiom-audit.py near-lean/vm --report audit/vm.json --no-build
           python3 tools/axiom-audit.py near-lean/runtime --report audit/runtime.json --no-build
           python3 tools/axiom-audit.py near-lean/chain --report audit/chain.json --no-build

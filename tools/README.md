@@ -124,8 +124,14 @@ the same two-file syntax-layout enforcement as CI. Broader layout debt is
 reported separately by `just lean-format-check`.
 
 The core axiom audit tolerates `sorryAx` only in the Programs package and
-prints those open declarations. Contract builds may report open proofs as
-warnings; a successful build is not a claim that those contracts are verified.
+prints those open declarations. It resolves every audited module from the
+selected package's own compiled artifacts before searching dependencies and
+fails if a local artifact is missing. This matters for overlapping executable
+names such as `Tests.Main`, including case aliases on macOS. A real-Lean
+regression proves that a dependency's same-named module cannot hide a local
+nonstandard axiom; `just audit-all` and CI run that regression.
+Contract builds may report open proofs as warnings; a successful build is not
+a claim that those contracts are verified.
 
 ## VM execution dependency boundary
 

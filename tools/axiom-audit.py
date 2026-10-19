@@ -26,6 +26,7 @@ dropped; near-lean has no verifier).
 
 import argparse
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -113,7 +114,19 @@ def audit_groups(package: Path, modules: list[str]) -> list[dict]:
         source = Path(temp) / "NearLeanAxiomAudit.lean"
         report = Path(temp) / "report.json"
         source.write_text(audit_source(modules, report))
-        process = subprocess.run(["lake", "env", "lean", str(source)],
+        local = package / ".lake/build/lib/lean"
+        for module in modules:
+            artifact = local.joinpath(*module.split(".")).with_suffix(".olean")
+            if not artifact.is_file():
+                raise FileNotFoundError(f"missing local audit artifact: {artifact}")
+        # Lake puts dependency libraries before this package in LEAN_PATH.
+        # Executable roots often share names (Tests.Main), and case-insensitive
+        # filesystems also alias tests.Main. Audit our own artifacts first.
+        search = subprocess.run(["lake", "env", "printenv", "LEAN_PATH"],
+                                cwd=package, text=True, capture_output=True, check=True)
+        lean_path = str(local) + os.pathsep + search.stdout.strip()
+        process = subprocess.run(["lake", "env", "env", f"LEAN_PATH={lean_path}",
+                                  "lean", str(source)],
                                  cwd=package, text=True, capture_output=True)
         if process.returncode == 0:
             return [json.loads(report.read_text())]
@@ -181,3 +194,6 @@ if __name__ == "__main__":
         sys.exit(main())
     except subprocess.CalledProcessError as error:
         sys.exit(error.returncode)
+    except OSError as error:
+        print(f"Axiom audit failed: {error}", file=sys.stderr)
+        sys.exit(2)
