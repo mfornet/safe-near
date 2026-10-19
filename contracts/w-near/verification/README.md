@@ -85,8 +85,9 @@ should be written:
 
 `RegistrationAuthorization` is proved by case analysis over all fifteen
 methods, with reusable lemmas that refund callbacks preserve registration.
-`BalanceAuthorization` and `Conservation` remain open; a relational
-characterisation of `dispatch` can support both. `ProjectEncode` and `StorageCoverage` need
+`BalanceAuthorization` is also proved: a non-predecessor balance can fall
+only in refund resolution, for the receiver and by at most the transfer amount.
+`Conservation` remains open. `ProjectEncode` and `StorageCoverage` need
 injectivity of the Borsh encoders in `Model/Borsh.lean`.
 
 `Spec/Refinement.lean` states the interface the proofs need from a runtime;
