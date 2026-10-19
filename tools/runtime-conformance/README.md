@@ -53,3 +53,9 @@ contract panic; the regression compares its exact error and gas. The
 `wnear_interleavings.json` fixture executes calls where a receiver spends or a
 sender/receiver unregisters before refund resolution. These are controlled VM
 call sequences on shared storage, not an independent receipt scheduler oracle.
+
+`promise_graphs.json` checks exact ordered receipt dependencies and returned
+receipt identity for ordinary, nested, duplicate and empty joins. Failure cases
+cover joint return/action restrictions, nonexistent handles, view calls and
+invalid-handle errors that precede later action-fee gas exhaustion. Its WAT and
+binary are pinned together; replay still regenerates WAT from the binary.

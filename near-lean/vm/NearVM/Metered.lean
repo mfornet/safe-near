@@ -113,20 +113,21 @@ def sirOf (st : Store NearState) (acct : Option (List UInt8)) : Bool :=
 def sirOfSpan (st : Store NearState) (len ptr : UInt64) : Bool :=
   sirOf st (getMemOrReg st ptr len)
 
-/-- `sir` of each data dependency of a callback on promise `idx`. -/
-def depsSir (st : Store NearState) (idx : Nat) : List Bool :=
+/-- Data routing is same-account when the dependency receiver equals the
+callback receiver, which need not be the currently executing account. -/
+def depsSir (st : Store NearState) (idx : Nat) (receiver : Option (List UInt8)) : List Bool :=
   let rec go (fuel : Nat) (i : Nat) : List Bool :=
     match fuel with
     | 0 => []
     | fuel + 1 =>
       match getPromise? st.host.promises i with
       | some (.and ds) => ds.flatMap (go fuel)
-      | some _ => [sirOf st (promiseReceiver? st i)]
+      | some _ => [promiseReceiver? st i == receiver]
       | none => []
   go st.host.promises.length idx
 
-/-- Charges before a host function runs. -/
-def chargesBefore (name : String) (st : Store NearState) (args : List Value) : List Charge :=
+/-- Argument-dependent charge plan before validating promise handles. -/
+private def chargesBeforeUnvalidated (name : String) (st : Store NearState) (args : List Value) : List Charge :=
   let a := argU64 args
   let base : Charge := .ext "base"
   match name with
@@ -207,7 +208,7 @@ def chargesBefore (name : String) (st : Store NearState) (args : List Value) : L
     let m := spanLen st (a 3) (a 4)
     let args := spanLen st (a 5) (a 6)
     [base] ++ readSpan st (a 1) (a 2) ++ utf8 (spanLen st (a 1) (a 2))
-      ++ [.newReceipt sir (depsSir st (a 0).toNat)]
+      ++ [.newReceipt sir (depsSir st (a 0).toNat (getMemOrReg st (a 2) (a 1)))]
       ++ readSpan st (a 3) (a 4) ++ readSpan st (a 5) (a 6) ++ readMem 16
       ++ [.actionBase (·.functionCallBase) sir, .actionBytes (·.functionCallByte) (m + args) sir,
           .prepay (a 8).toNat]
@@ -219,7 +220,7 @@ def chargesBefore (name : String) (st : Store NearState) (args : List Value) : L
       ++ [.newReceipt (sirOfSpan st (a 0) (a 1)) []]
   | "promise_batch_then" =>
     [base] ++ readSpan st (a 1) (a 2) ++ utf8 (spanLen st (a 1) (a 2))
-      ++ [.newReceipt (sirOfSpan st (a 1) (a 2)) (depsSir st (a 0).toNat)]
+      ++ [.newReceipt (sirOfSpan st (a 1) (a 2)) (depsSir st (a 0).toNat (getMemOrReg st (a 2) (a 1)))]
   | "promise_batch_action_create_account" =>
     [base, .actionBase (·.createAccount) (sirOf st (promiseReceiver? st (a 0).toNat))]
   | "promise_batch_action_deploy_contract" =>
@@ -261,6 +262,22 @@ def chargesBefore (name : String) (st : Store NearState) (args : List Value) : L
   | "promise_return" => [base, .ext "promise_return"]
   | "gas" => [.burn (a 0).toNat]
   | _ => [base]
+
+/-- Charges before a host function runs. Invalid handles retain input-reading
+costs, but cannot incur later receipt/action fees or prepaid function-call gas. -/
+def chargesBefore (name : String) (st : Store NearState) (args : List Value) : List Charge :=
+  let a := argU64 args
+  let base : Charge := .ext "base"
+  let charges := chargesBeforeUnvalidated name st args
+  if (name == "promise_then" || name == "promise_batch_then") &&
+      !promiseIndexValid st (a 0).toNat then
+    [base] ++ readSpan st (a 1) (a 2) ++ utf8 (spanLen st (a 1) (a 2))
+  else if name.startsWith "promise_batch_action_" &&
+      (promiseReceiver? st (a 0).toNat).isNone then
+    charges.filter fun charge => match charge with
+      | .actionBase .. | .actionBytes .. | .prepay .. => false
+      | _ => true
+  else charges
 
 /-- Length of register `reg` in `st`, if set. -/
 def registerLen? (st : Store NearState) (reg : UInt64) : Option Nat :=
@@ -396,7 +413,9 @@ def metered (extraBytes : Nat) (name : String) (fn : HostFn NearState) : HostFn 
   { fn with invoke := fun st args =>
       if deprecatedRuntimeHost name then trapWith st (.deprecated name)
       else if st.host.context.isView && viewRestrictedHost name then
-        let (ns, error) := applyCharges st.host [.ext "base"]
+        let charges := [.ext "base"] ++
+          (if name == "promise_return" then [.ext "promise_return"] else [])
+        let (ns, error) := applyCharges st.host charges
         trapWith { st with host := ns } (error.getD (.prohibitedInView name))
       else
       let (ns, err) := applyCharges st.host (chargesBefore name st args)

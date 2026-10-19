@@ -163,7 +163,7 @@ def VMOutcome.failedBefore (ctx : VMContext) (storage : List (List UInt8 × List
 
 /-- Execute `method` of `code` under `ctx` on `storage`. `codeSize` is the
 byte size of the deployed Wasm (the loading cost depends on it). -/
-def run (cfg : RuntimeConfig) (code : Module) (codeSize : Nat) (method : String)
+private def runAttempt (cfg : RuntimeConfig) (code : Module) (codeSize : Nat) (method : String)
     (ctx : VMContext) (storage : List (List UInt8 × List UInt8))
     (fuel : Nat := defaultFuel) : VMOutcome :=
   if method.isEmpty then
@@ -239,9 +239,49 @@ def run (cfg : RuntimeConfig) (code : Module) (codeSize : Nat) (method : String)
         | none => .none
       | none, some bytes => .value bytes
       | none, none => .none
+    VMOutcome.checkPromiseHandles ctx.accountBalance ctx.storageUsage storage ns.promises
     { balance := ns.context.accountBalance, storageUsage := ns.context.storageUsage.toNat,
       returnData := returnData, burntGas := ns.gas.burnt, usedGas := ns.gas.used,
       logs := logsOf ns, storage := finalStorage ns, receipts := promisesToReceipts ns.promises,
       aborted := none, gasProfile := ns.gasProfile }
+
+/-- The public VM boundary validates converted receipts on every exit. Raw
+promise handles are checked before a successful outcome can escape `runAttempt`. -/
+def run (cfg : RuntimeConfig) (code : Module) (codeSize : Nat) (method : String)
+    (ctx : VMContext) (storage : List (List UInt8 × List UInt8))
+    (fuel : Nat := defaultFuel) : VMOutcome :=
+  (runAttempt cfg code codeSize method ctx storage fuel).checkReceipts
+    ctx.accountBalance ctx.storageUsage storage
+
+/-- Every executable VM result has a checked, backward-only receipt graph and
+an existing returned receipt, including failed or incomplete attempts. -/
+theorem run_receipts_valid (cfg : RuntimeConfig) (code : Module) (codeSize : Nat) (method : String)
+    (ctx : VMContext) (storage : List (List UInt8 × List UInt8)) (fuel : Nat) :
+    (run cfg code codeSize method ctx storage fuel).receiptsValid = true := by
+  exact checkReceipts_valid _ ctx.accountBalance ctx.storageUsage storage
+
+theorem run_no_receipt_cycle (cfg : RuntimeConfig) (code : Module) (codeSize : Nat) (method : String)
+    (ctx : VMContext) (storage : List (List UInt8 × List UInt8)) (fuel index : Nat) :
+    ¬ReceiptDependencyPath (run cfg code codeSize method ctx storage fuel).receipts index index :=
+  no_receipt_dependency_cycle
+    ((run cfg code codeSize method ctx storage fuel).receiptsWellFormed
+      (run_receipts_valid cfg code codeSize method ctx storage fuel)) index
+
+theorem run_dependency_before (cfg : RuntimeConfig) (code : Module) (codeSize : Nat) (method : String)
+    (ctx : VMContext) (storage : List (List UInt8 × List UInt8)) (fuel : Nat)
+    {source target : Nat} {receipt : ReceiptSpec}
+    (hlookup : (run cfg code codeSize method ctx storage fuel).receipts[source]? = some receipt)
+    (hmember : target ∈ receipt.dependencies) : target < source :=
+  dependencyPath_decreases
+    ((run cfg code codeSize method ctx storage fuel).receiptsWellFormed
+      (run_receipts_valid cfg code codeSize method ctx storage fuel))
+    (.edge hlookup hmember)
+
+theorem run_returnedReceipt_lt (cfg : RuntimeConfig) (code : Module) (codeSize : Nat) (method : String)
+    (ctx : VMContext) (storage : List (List UInt8 × List UInt8)) (fuel : Nat) {index : Nat}
+    (hreturn : (run cfg code codeSize method ctx storage fuel).returnData = .receiptIndex index) :
+    index < (run cfg code codeSize method ctx storage fuel).receipts.length :=
+  (run cfg code codeSize method ctx storage fuel).returnedReceipt_lt
+    (run_receipts_valid cfg code codeSize method ctx storage fuel) hreturn
 
 end Wasm.Near

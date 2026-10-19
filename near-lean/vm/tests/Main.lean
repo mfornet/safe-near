@@ -74,6 +74,29 @@ def main (args : List String) : IO UInt32 := do
     | .error e => do IO.println s!"decode error: {e}"; return 1
   let h : Harness := { cfg, code, codeSize := 200_000 }
 
+  let root : ReceiptSpec := { receiverId := alice, actions := [.transfer 1] }
+  let joined : VMOutcome := { (default : VMOutcome) with
+    receipts := [root, root, { root with dependencies := [0, 0, 1] }]
+    returnData := .receiptIndex 2 }
+  check r "backward dependencies allow joins and repeated input positions" joined.receiptsValid
+  let cycle : VMOutcome := { joined with receipts := [{ root with dependencies := [0] }] }
+  check r "self dependencies cannot be accepted as a receipt graph" (!cycle.receiptsValid)
+  check r "forward dependencies cannot be accepted as a receipt graph"
+    (!({ joined with receipts := [{ root with dependencies := [1] }, root] }.receiptsValid))
+  check r "a returned receipt must exist"
+    (!({ joined with returnData := .receiptIndex 3 }.receiptsValid))
+  let observed := cycle.checkReceipts 99 123 [(alice, [7])]
+  check r "invalid receipt graphs are explicit model issues"
+    (observed.issue? == some (.interpreterError "invalid receipt dependency graph"))
+  check r "invalid graph rejection restores funds, storage and usage"
+    (observed.balance == 99 && observed.storageUsage == 123 && observed.storage == [(alice, [7])] &&
+      observed.receipts.isEmpty)
+  let cyclicJoin : List NearPromise := [.and [0]]
+  check r "raw join cycles cannot disappear through bounded flattening"
+    ((joined.checkPromises 99 123 [] cyclicJoin).issue?.isSome)
+  check r "unsupported yielded handles cannot disappear during conversion"
+    ((joined.checkPromises 99 123 [] [.yielded [] [] 0 0 []]).issue?.isSome)
+
   let exhausted := run cfg code h.codeSize "new" (ctx alice "new" "{}" 0) [] 0
   check r "fuel exhaustion is explicitly incomplete"
     (exhausted.issue? == some .fuelExhausted)

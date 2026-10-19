@@ -132,3 +132,20 @@ transaction validation. A missing promise result now uses the structured
 `invalidPromiseResultIndex` host error, matching the independent oracle.
 The full deployed refinement also still needs treatment of input/log/temporary
 storage limits and proofs connecting the projection to SDK serialization.
+
+The public VM boundary now validates raw promise handles and emitted receipt
+indices. `promisesValidFrom_iff` and `receiptsValidFrom_iff` connect executable
+checks to creation-order predicates. `run_receipts_valid`,
+`run_dependency_before`, `run_returnedReceipt_lt` and `run_no_receipt_cycle`
+prove that every public VM result has backward-only dependencies, an existing
+returned receipt and no dependency cycle. Invalid raw handles or converted
+graphs become model issues with balance/storage/usage rollback; logs and burnt
+gas remain diagnostic observations. These predicates concern dependency indices,
+not full action/account validity or global identifier freshness. Preservation of
+raw handle validity by every host operation and a proof of join conversion's
+exact graph semantics remain open; accepted outputs are checked regardless.
+The join oracle covers ordinary, nested, duplicate and empty joins, illegal
+joint returns/actions, nonexistent handles, view restrictions and low-gas error
+precedence. It exposed and fixed joint promises incorrectly returning success,
+panic-style index errors and action fees charged before invalid-handle checks.
+The `promise_return` view guard retains its own host fee, as nearcore does.

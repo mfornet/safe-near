@@ -119,3 +119,12 @@ open by design, so there `--allow-sorry` tolerates `sorryAx` alone and prints
 each sorried declaration; any other nonstandard axiom still fails. CI runs all
 three on every change under `near-lean/`. Pass `--no-build` to audit already
 built artefacts.
+
+The public VM result also carries a checked receipt DAG: dependencies refer only
+to earlier receipts, returned receipt indices exist, and dependency cycles are
+impossible (`run_receipts_valid`, `run_dependency_before`,
+`run_returnedReceipt_lt`, `run_no_receipt_cycle`). Raw promise handles are checked
+before accepting an outcome, so malformed joins cannot disappear through bounded
+flattening. Rejection is an explicit model issue with rollback, not contract
+success. Full host-invariant preservation, graph-conversion equivalence, global
+identifier freshness and scheduler correctness remain separate obligations.
