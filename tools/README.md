@@ -134,8 +134,9 @@ big-step interpreter for regression tests and the existing proof API.
 `NearVM.State` imports only host types and `NearVM.Run` explicitly imports
 the small-step machine. Executing the VM does not need the broad Wasm proof
 umbrella.
-The local source import closure decreases from 39 project modules to 20;
-the compiler-header check confirms the resulting 20-module execution graph.
+The compiler-header report records the current execution dependency graph in
+`audit/vm-dependencies.json`. New runtime modules may extend that graph while
+the legacy interpreter and proof API boundary stays enforced.
 
 `check_vm_dependencies.py` builds `NearVM`, then inspects Lean's imported-module
 header. It rejects legacy `Semantics`, `Wp`, `Spec` and CodeLib imports,
