@@ -19,8 +19,10 @@ fixed for the checked fixtures. General VM conformance remains unproved.
 `Runtime::apply`. Its source, manifest overlay, lockfile, compiler and executable
 are recorded and checked; the runtime implementation is not patched. Native
 smoke checks establish deterministic raw-state replay and the transaction/
-receipt chunk boundary. The Lean frontend and full-runtime differential
-comparison remain to be connected.
+receipt chunk boundary. The Lean JSON frontend now executes explicit blocks
+and serializes all represented state, queue and outcome fields; its wire format
+and decoder assumptions are documented in `tools/chain-conformance/REPLAY.md`.
+The cross-runtime bridge and complete observation comparison remain open.
 Selecting
 an older table does not select older execution semantics: the current Lean
 configuration still omits most protocol feature switches. The loading-cost

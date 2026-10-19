@@ -20,3 +20,11 @@ name = "NearChain"
 [[lean_exe]]
 name = "chain-tests"
 root = "Tests.Main"
+
+# Trusted JSON block replay for the independent runtime comparison bridge.
+[[lean_lib]]
+name = "ChainReplay"
+
+[[lean_exe]]
+name = "chain-replay"
+root = "ChainReplay.Main"

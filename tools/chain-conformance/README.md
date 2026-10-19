@@ -2,9 +2,10 @@
 
 This adapter executes the **regular trie-backed nearcore `Runtime::apply`**,
 not `near_vm_runner` with mocked storage. It is the reference side of the
-transaction/receipt differential harness. The Lean JSON replay adapter and
-cross-runtime comparison are still to be connected; passing this component's
-smoke checks does not establish Lean/nearcore equivalence.
+transaction/receipt differential harness. The
+[Lean JSON replay frontend](REPLAY.md) executes complete represented state and explicit block schedules. The cross-runtime bridge and comparison
+still need connecting; passing either component's checks does not establish
+Lean/nearcore equivalence.
 The `Chain reference smoke` workflow builds and exercises this source oracle
 on Linux; it uploads the raw trace and build metadata separately from the
 existing VM comparison evidence.
@@ -122,6 +123,6 @@ own protocol transaction checks. This is a trusted apply harness, without
 consensus, networking or historical chain replay.
 
 The independent full-runtime oracle now exists. Remaining work includes the
-Lean replay frontend, explicit treatment of its abstract counter ids versus
-nearcore hashes, exact observation comparison, and captured-account import.
+cross-runtime bridge, explicit treatment of abstract counter ids versus
+nearcore hashes, complete observation comparison, and captured-account import.
 The existing `just near-conformance` remains a VM-level comparison.

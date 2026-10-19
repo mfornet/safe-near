@@ -7,6 +7,7 @@ core axiom audits, formatter integration checks and contract builds.
 | Command | Purpose |
 | --- | --- |
 | `just test-all` | Run programs, NEAR scenarios, official Wasm tests and exact VM conformance |
+| `just chain-replay-test` | Exercise trusted JSON block replay and complete-state continuation |
 | `just audit-all` | Audit all core packages and list the programs' open proofs |
 | `just check` | Run the combined repository checks |
 | `just check-toolchains` | Check every owned Lake package against the root `lean-toolchain` |
@@ -175,3 +176,7 @@ account to compatible reference and model executables, preserving the actual
 contract identity and block context. The adapter freezes executables and
 configuration before running, allowing the components to live in separate
 worktrees while other agents continue rebuilding them.
+
+The Lean chain replay wire format and its external decoder assumptions are documented in
+[`chain-conformance/REPLAY.md`](chain-conformance/REPLAY.md). Its tests run in
+`just test-all` and CI; the native/Lean comparison bridge remains open.

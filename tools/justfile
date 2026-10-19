@@ -69,7 +69,7 @@ tools-test:
     python3 -m unittest discover -s tools/runtime-conformance -p 'test_*.py' -v
 
 # Run all executable suites: programs, NEAR scenarios, official Wasm tests and strict VM conformance.
-test-all: check-toolchains tools-test programs-test near-test runtime-adapter-test wasm-test near-conformance
+test-all: check-toolchains tools-test programs-test near-test chain-replay-test runtime-adapter-test wasm-test near-conformance
 
 # Audit all core Lean packages; list the program specifications whose proofs remain open.
 audit-all:
@@ -99,3 +99,8 @@ chain-reference-build *options:
 [positional-arguments]
 chain-reference-test *options:
     python3 tools/chain-conformance/probe.py "$@"
+
+# Exercise trusted JSON chain replay, complete-state continuation and rejection paths.
+chain-replay-test:
+    cd near-lean/chain && lake build chain-replay
+    python3 tools/chain-conformance/test_replay.py

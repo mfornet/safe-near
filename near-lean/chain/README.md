@@ -76,3 +76,16 @@ These tests exercise the Lean scheduler. They do not establish equivalence to
 nearcore's full transaction/receipt runtime. The independent `Runtime::apply`
 oracle and per-block differential harness remain open; the existing
 `just near-conformance` compares VM calls only.
+
+## JSON replay
+
+`lake build chain-replay` builds a stdin/stdout JSON frontend over this same
+`step`. It accepts full represented state and explicit blocks, records every
+attempt and reports unrun blocks on schedule errors or model issues. It never
+automatically drains pending work. See
+[`tools/chain-conformance/REPLAY.md`](../../tools/chain-conformance/REPLAY.md)
+for the wire format and trusted code-catalogue boundary.
+
+From the repository root, `just chain-replay-test` checks continuation from
+serialized state, all state/queue fields, action execution, decoder rejection
+and malformed input. Native/Lean differential comparison remains separate work.
