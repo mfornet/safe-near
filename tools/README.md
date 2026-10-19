@@ -6,7 +6,10 @@ Run `just` at the repository root for the documented command list.
 | --- | --- |
 | `just check-toolchains` | Check every owned Lake package against the root `lean-toolchain` |
 | `just lean-lint` | Check all owned Lean files with pinned Mathlib text-based style linters |
-| `just lean-format` | Apply Mathlib's automatic style fixes, then check remaining findings |
+| `just lean-format [files...]` | Apply validated syntax formatting to handwritten package sources |
+| `just lean-format-check [files...]` | Check canonical syntax layout without writing files |
+| `just lean-format-diff [files...]` | Preview syntax formatting as a patch |
+| `just lean-style-fix` | Apply Mathlib's automatic text-style fixes |
 | `just wasm-test [pattern]` | Run all official Wasm tests or filter their filenames |
 | `just wasm-summary` | Summarize the committed Wasm coverage report |
 | `just wasm-report` | Regenerate that report using the pinned wasm-tools |
@@ -25,12 +28,12 @@ repository-owned Lake package also carries that pin so it works independently.
 including newly added local files. Submodules and ignored build dependencies
 are outside its scope. When upgrading Lean, update all pins together.
 
-The Lean quality workflow runs the pin check, tool tests, and source-style
-checks. The style driver uses the Mathlib revision in the Wasm package's
+The Lean quality workflow runs the pin check, tool tests, source-style checks,
+and syntax-formatting checks for the two new program harness modules.
+The text-style driver uses the Mathlib revision in the Wasm package's
 committed Lake manifest. It checks line endings, trailing whitespace,
 adaptation-note conventions, and Unicode conventions. Automatic fixes cover
 the subset Mathlib can repair; unresolved findings still fail the command.
-This is source-style formatting, not a complete syntax layout formatter.
 The text-only semicolon rule is disabled because it matches meaningful WAT
 string literals in interpreter tests.
 
@@ -42,7 +45,7 @@ lake exe cache get
 lake build +Mathlib.Tactic.Linter.TextBased
 ```
 
-Then run `just lean-lint` or `just lean-format` from the repository root.
+Then run `just lean-lint` or `just lean-style-fix` from the repository root.
 To check selected files, use `python3 tools/lean_style.py path/to/File.lean`.
 The driver never formats submodule sources, ignored dependencies, or human notes.
 
@@ -50,6 +53,46 @@ The driver never formats submodule sources, ignored dependencies, or human notes
 check mode must leave a dirty fixture unchanged, formatting must be repeatable,
 and WAT string literals must remain intact. These checks run separately from
 the Python tests because they need the pinned Lean/Mathlib installation.
+
+## Syntax formatting
+
+`lean_format.py` builds [lean-fmt](https://github.com/jcreinhold/lean-fmt) from
+the immutable revision recorded in `lean_format_tool.json`, using the exact
+compiler in the root `lean-toolchain`. The pinned sources are from the
+`v4.34.0-rc2` release and are tested here with Lean `v4.34.1`; the upstream
+toolchain file is not used to choose our compiler. A future compiler or
+formatter upgrade must pass the same integration checks.
+
+The first invocation fetches and builds the tool into the ignored
+`near-lean/.lake/lean-fmt/` cache. Later invocations verify the source revision
+and reuse the build. Interrupted downloads never publish a partial checkout.
+`lean-fmt.toml` sets the shared layout margin. Candidate validation always
+runs; this wrapper exposes no validation bypass.
+
+```sh
+just lean-format-diff near-lean/programs/lean/Programs/Harness.lean
+just lean-format near-lean/programs/lean/Programs/Harness.lean
+just lean-format-check near-lean/programs/lean/Programs/Harness.lean
+```
+
+With no filenames, the command selects all handwritten sources in all owned
+Lake packages. Build a package's dependencies before formatting its files.
+Human notes, generated `Program.lean` AST files, ignored dependencies and
+submodule sources are protected from selection. Standalone tooling scripts
+outside Lake packages remain covered by `lean-lint`.
+
+CI currently enforces canonical syntax layout for `Programs/Harness.lean`
+and `Programs/Regression.lean`. Existing package sources still have layout
+debt: `just lean-format-check` reports it rather than hiding it behind a
+baseline. Expanding enforcement is a separate source-formatting change, so
+formatting the new harness does not also rewrite existing contract proofs.
+
+`python3 tools/tests/check_lean_format.py` checks the real formatter against a
+tiny independent Lake package: check mode preserves dirty bytes, formatting
+preserves comments and string literals, a second pass is stable, and the
+formatted theorem still builds with the kernel. Pure Python selection tests
+also verify nested package ownership, protected inputs, ignored dependencies,
+and failure when a formatter process is killed.
 
 ## Snapshots
 

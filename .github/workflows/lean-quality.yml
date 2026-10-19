@@ -3,9 +3,9 @@ name: Lean quality
 on:
   push:
     branches: [main]
-    paths: ["**/*.lean", "**/lean-toolchain", "lean-toolchain", "**/lakefile.*", "**/lake-manifest.json", "tools/**", ".github/workflows/lean-quality.yml"]
+    paths: ["**/*.lean", "**/lean-toolchain", "lean-toolchain", "lean-fmt.toml", "**/lakefile.*", "**/lake-manifest.json", "tools/**", ".github/workflows/lean-quality.yml"]
   pull_request:
-    paths: ["**/*.lean", "**/lean-toolchain", "lean-toolchain", "**/lakefile.*", "**/lake-manifest.json", "tools/**", ".github/workflows/lean-quality.yml"]
+    paths: ["**/*.lean", "**/lean-toolchain", "lean-toolchain", "lean-fmt.toml", "**/lakefile.*", "**/lake-manifest.json", "tools/**", ".github/workflows/lean-quality.yml"]
   workflow_dispatch:
 
 permissions:
@@ -71,3 +71,14 @@ jobs:
         run: |
           ./.lake/build/bin/smoke
           ./.lake/build/bin/program-tests
+      - uses: actions/cache@v5
+        with:
+          path: near-lean/.lake/lean-fmt
+          key: lean-fmt-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'tools/lean_format_tool.json') }}
+      - name: Check syntax formatting of the new harness modules
+        run: >-
+          python3 tools/lean_format.py --check
+          near-lean/programs/lean/Programs/Harness.lean
+          near-lean/programs/lean/Programs/Regression.lean
+      - name: Test validated syntax formatting
+        run: python3 tools/tests/check_lean_format.py

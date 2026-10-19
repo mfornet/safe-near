@@ -17,30 +17,36 @@ inductive Failure where
 
 /-- Execute a zero-argument export under the universal host. Resource limits,
 traps, and interpreter errors remain distinct from successful empty output. -/
-def run (m : Module) (op : String) (input : List UInt8)
-    (fuel : Nat := 50_000_000) : Except Failure (List UInt8) := do
+def run (m : Module) (op : String) (input : List UInt8) (fuel : Nat := 50_000_000) :
+    Except Failure (List UInt8) := do
   let some entry := m.findExport op | throw (.missingExport op)
-  unless Universal.covers m do throw .unsupportedImports
+  unless Universal.covers m do
+    throw .unsupportedImports
   let some signature := m.funcSig? entry
     | throw (.initializationError "export has no function signature")
   unless signature.params.isEmpty && signature.results.isEmpty do
     throw (.initializationError "stream programs require a () -> () export")
   let store : Store Universal.State :=
-    { (m.initialStore (α := Universal.State)) with
-        host := Universal.State.ofInput input }
-  let config ← match SmallStep.initConfig { module := m, host := Universal.envFor m }
-      entry store [] with
-    | .error error => .error (.initializationError error.message)
-    | .ok config => .ok config
+    { (m.initialStore (α := Universal.State)) with host := Universal.State.ofInput input }
+  let config ←
+    match SmallStep.initConfig { module := m, host := Universal.envFor m } entry store [] with
+    | .error error =>
+      .error (.initializationError error.message)
+    | .ok config =>
+      .ok config
   match (SmallStep.runSteps fuel config).result with
-  | .success _ final => return final.wasm.host.stdio.output
-  | .trapped reason _ => throw (.trapped reason)
-  | .outOfFuel _ => throw .outOfFuel
-  | .internalError error _ => throw (.interpreterError error.message)
+  | .success _ final =>
+    return final.wasm.host.stdio.output
+  | .trapped reason _ =>
+    throw (.trapped reason)
+  | .outOfFuel _ =>
+    throw .outOfFuel
+  | .internalError error _ =>
+    throw (.interpreterError error.message)
 
 /-- Compatibility adapter for callers that only need success or failure. -/
-def runBytes (m : Module) (op : String) (input : List UInt8)
-    (fuel : Nat := 50_000_000) : Option (List UInt8) :=
+def runBytes (m : Module) (op : String) (input : List UInt8) (fuel : Nat := 50_000_000) :
+    Option (List UInt8) :=
   (run m op input fuel).toOption
 
 def le32 (x : UInt32) : List UInt8 :=

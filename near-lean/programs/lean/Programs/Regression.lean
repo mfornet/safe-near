@@ -23,19 +23,19 @@ def listsOfLength (alphabet : List UInt32) : Nat → List (List UInt32)
 
 def sortInputs : List (List UInt32) :=
   (List.range 5).flatMap (listsOfLength [0, 1, 0xFFFFFFFF]) ++
-  [5, 8, 16, 31, 63, 64, 65].flatMap fun n =>
-    let ascending := (List.range n).map UInt32.ofNat
-    [ascending, ascending.reverse, ascending.map fun x => x % 3]
+    [5, 8, 16, 31, 63, 64, 65].flatMap fun n =>
+      let ascending := (List.range n).map UInt32.ofNat
+      [ascending, ascending.reverse, ascending.map fun x => x % 3]
 
-def checkFixture (name wat : String)
-    (accept : Except Failure (List UInt8) → Bool) : IO Bool := do
+def checkFixture (name wat : String) (accept : Except Failure (List UInt8) → Bool) : IO Bool := do
   match Wasm.Decoder.Wat.decode wat with
   | .error error =>
     IO.println s!"FAIL {name}: fixture could not decode: {error}"
     return false
   | .ok m =>
     let result := run m "test" []
-    if accept result then return true
+    if accept result then
+      return true
     IO.println s!"FAIL {name}: {repr result}"
     return false
 
@@ -55,9 +55,10 @@ def main : IO UInt32 := do
     if actual != .ok [] then
       failed := failed + 1
       IO.println s!"FAIL malformed mergesort input length {length}: {repr actual}"
-  for (a, b) in ([(0, 0), (0, 1), (1, 0), (0, 0xFFFFFFFFFFFFFFFF),
-      (0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF), (0xFFFFFFFFFFFFFFFF, 2),
-      (144, 89), (48, 18)] : List (UInt64 × UInt64)) do
+  for (a, b) in
+    ([(0, 0), (0, 1), (1, 0), (0, 0xFFFFFFFFFFFFFFFF), (0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF),
+        (0xFFFFFFFFFFFFFFFF, 2), (144, 89), (48, 18)] :
+      List (UInt64 × UInt64)) do
     total := total + 1
     let expected := le64 (UInt64.ofNat (Nat.gcd a.toNat b.toNat))
     let actual := run GcdStdio.«module» "gcd" (le64 a ++ le64 b)
@@ -78,21 +79,30 @@ def main : IO UInt32 := do
     failed := failed + 1
     IO.println "FAIL absent export must be reported as missingExport"
   total := total + 3
-  unless ← checkFixture "trap remains distinct from empty output"
-      "(module (func (export \"test\") unreachable))"
-      (· == .error (.trapped .unreachable)) do
+  unless
+    ←
+      checkFixture "trap remains distinct from empty output"
+          "(module (func (export \"test\") unreachable))" (· == .error (.trapped .unreachable)) do
     failed := failed + 1
-  unless ← checkFixture "unsupported imports are rejected"
-      "(module (import \"missing\" \"host\" (func)) (func (export \"test\")))"
-      (· == .error .unsupportedImports) do
+  unless
+    ←
+      checkFixture "unsupported imports are rejected"
+          "(module (import \"missing\" \"host\" (func)) (func (export \"test\")))"
+          (· == .error .unsupportedImports) do
     failed := failed + 1
-  unless ← checkFixture "entry-point arguments are checked"
-      "(module (func (export \"test\") (param i32)))"
-      (fun result => match result with | .error (.initializationError _) => true | _ => false) do
+  unless
+    ←
+      checkFixture "entry-point arguments are checked"
+          "(module (func (export \"test\") (param i32)))"
+          (fun result =>
+            match result with
+            | .error (.initializationError _) => true
+            | _ => false) do
     failed := failed + 1
   IO.println s!"{total - failed} passed, {failed} failed ({total} program regressions)"
   return if failed == 0 then 0 else 1
 
 end Programs.Regression
 
-def main : IO UInt32 := Programs.Regression.main
+def main : IO UInt32 :=
+  Programs.Regression.main

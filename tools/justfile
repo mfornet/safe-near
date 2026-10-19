@@ -6,8 +6,23 @@ check-toolchains:
 lean-lint:
     python3 tools/lean_style.py
 
-# Apply Mathlib's automatic source-style fixes, then check remaining findings.
-lean-format:
+# Apply validated syntax formatting to package sources (optional file selection).
+[positional-arguments]
+lean-format *files:
+    python3 tools/lean_format.py --fix "$@"
+
+# Preview syntax-formatting changes without writing source (optional file selection).
+[positional-arguments]
+lean-format-check *files:
+    python3 tools/lean_format.py --check "$@"
+
+# Show syntax-formatting changes as a patch without writing source.
+[positional-arguments]
+lean-format-diff *files:
+    python3 tools/lean_format.py --diff "$@"
+
+# Apply Mathlib's automatic text-style fixes, then check remaining findings.
+lean-style-fix:
     python3 tools/lean_style.py --fix
 
 # Run the WebAssembly spec testsuite (optional .wast name filter).
