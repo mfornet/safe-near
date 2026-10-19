@@ -61,6 +61,22 @@ snapshot output +accounts_and_options:
 tools-test:
     python3 -m unittest discover -s tools/tests -v
 
+# Run all executable suites: programs, NEAR scenarios, official Wasm tests and strict VM conformance.
+test-all: check-toolchains tools-test programs-test near-test runtime-adapter-test wasm-test near-conformance
+
+# Audit all core Lean packages; list the program specifications whose proofs remain open.
+audit-all:
+    @for package in wasm iris-wasm vm runtime chain; do \
+        python3 tools/axiom-audit.py near-lean/"$package" --report audit/"$package".json; \
+    done
+    python3 tools/axiom-audit.py near-lean/programs/lean --report audit/programs.json --allow-sorry
+
+# Run executable suites, source checks, core axiom audits and contract builds.
+check: test-all lean-lint audit-all build-all
+    python3 tools/lean_format.py --check near-lean/programs/lean/Programs/Harness.lean near-lean/programs/lean/Programs/Regression.lean
+    python3 tools/tests/check_lean_style.py
+    python3 tools/tests/check_lean_format.py
+
 # Compare VM executors on calls seeded from a complete captured account snapshot.
 [positional-arguments]
 snapshot-vm snapshot account scenario +options:

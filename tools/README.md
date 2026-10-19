@@ -1,9 +1,14 @@
 # Repository tools
 
 Run `just` at the repository root for the documented command list.
+`just test-all` runs the executable suites; `just check` adds source checks,
+core axiom audits, formatter integration checks and contract builds.
 
 | Command | Purpose |
 | --- | --- |
+| `just test-all` | Run programs, NEAR scenarios, official Wasm tests and exact VM conformance |
+| `just audit-all` | Audit all core packages and list the programs' open proofs |
+| `just check` | Run the combined repository checks |
 | `just check-toolchains` | Check every owned Lake package against the root `lean-toolchain` |
 | `just lean-lint` | Check all owned Lean files with pinned Mathlib text-based style linters |
 | `just lean-format [files...]` | Apply validated syntax formatting to handwritten package sources |
@@ -100,6 +105,23 @@ preserves comments and string literals, a second pass is stable, and the
 formatted theorem still builds with the kernel. Pure Python selection tests
 also verify nested package ownership, protected inputs, ignored dependencies,
 and failure when a formatter process is killed.
+
+## Combined checks
+
+`just test-all` runs the toolchain check and Python tooling tests, program
+smoke/regression tests, VM/runtime/chain scenarios, the wNEAR adapter suite,
+the complete official Wasm testsuite, and strict VM conformance against the
+pinned Rust oracle. It stops on the first failing command. Install the Lean,
+Rust and pinned wasm-tools prerequisites documented by those components first.
+
+`just check` adds Mathlib text-style checks, core axiom audits, builds of every
+contract verification package, and both formatter integration tests. It uses
+the same two-file syntax-layout enforcement as CI. Broader layout debt is
+reported separately by `just lean-format-check`.
+
+The core axiom audit tolerates `sorryAx` only in the Programs package and
+prints those open declarations. Contract builds may report open proofs as
+warnings; a successful build is not a claim that those contracts are verified.
 
 ## Snapshots
 
