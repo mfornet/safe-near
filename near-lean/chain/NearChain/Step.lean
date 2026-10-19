@@ -159,6 +159,11 @@ def Transaction.touches (u : AccountId) (tx : Transaction) : Bool :=
 def Snapshot.inFlight (s : Snapshot) : List Receipt :=
   s.pending ++ s.state.delayed ++ s.state.postponed.map (·.2)
 
+/-- Account and in-flight funds, including purchased gas in every receipt queue.
+Minted subsidy and burnt tokens are separate transition observations. -/
+def Snapshot.totalFunds (cfg : RuntimeConfig) (s : Snapshot) : Nat :=
+  s.state.totalBalance + (s.inFlight.map (Fees.receiptFunds cfg)).sum
+
 /-- A direct-interaction filter, not a noninterference theorem. It accounts
 for all existing receipt queues; contract calls can still emit new actions
 affecting other accounts, so indirect effects need a semantic premise. -/

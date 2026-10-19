@@ -139,3 +139,9 @@ global-contract compute costs, `global_contract_storage_amount_per_byte`,
 `bandwidth_scheduler_config`, `use_state_stored_receipt`, and the per
 host-function compute costs (only gas is emitted). See
 `tools/dump-runtime-config/README.md`.
+
+The generated `runtime_finance` supplement contains `account_cost_increase`,
+`gas_refund_penalty` and `min_gas_refund_penalty`. The RPC view omits these refund
+fields; the dumper reads them from the internal pinned configuration. Receipt
+purchase pricing also loads `min_gas_purchase_price` and `account_creation_charge`.
+These financial comparisons do not establish historical execution conformance.

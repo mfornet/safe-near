@@ -3,9 +3,9 @@ name: wasm
 on:
   push:
     branches: [main]
-    paths: ["near-lean/**", "contracts/w-near/verification/**", "contracts/w-near/contract.wasm", "tools/runtime-conformance/**", "tools/axiom-audit.py", ".github/workflows/wasm.yml"]
+    paths: ["near-lean/**", "contracts/w-near/verification/**", "contracts/w-near/contract.wasm", "tools/runtime-conformance/**", "tools/runtime-finance-reference/**", "tools/dump-runtime-config/**", "tools/axiom-audit.py", ".github/workflows/wasm.yml"]
   pull_request:
-    paths: ["near-lean/**", "contracts/w-near/verification/**", "contracts/w-near/contract.wasm", "tools/runtime-conformance/**", "tools/axiom-audit.py", ".github/workflows/wasm.yml"]
+    paths: ["near-lean/**", "contracts/w-near/verification/**", "contracts/w-near/contract.wasm", "tools/runtime-conformance/**", "tools/runtime-finance-reference/**", "tools/dump-runtime-config/**", "tools/axiom-audit.py", ".github/workflows/wasm.yml"]
   workflow_dispatch:
 
 concurrency:
@@ -98,7 +98,7 @@ jobs:
       - name: Runtime scenarios
         working-directory: near-lean/runtime
         run: |
-          lake build NearRuntime runtime-tests --wfail
+          lake build NearRuntime runtime-tests finance-replay --wfail
           ./.lake/build/bin/runtime-tests
       - name: Chain scenarios
         working-directory: near-lean/chain
@@ -176,3 +176,43 @@ jobs:
             echo "::error::near-lean/programs/rust/build is out of date. Run build.sh and commit the result (and regenerate Program.lean if the .wat changed)."
             exit 1
           fi
+
+  runtime-finance-conformance:
+    name: Financial settlement against pinned nearcore
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/checkout@v5
+        with:
+          repository: near/nearcore
+          ref: 44f7ae6cd7ef08bab604e20a473bf77e35d4c993
+          path: reference-nearcore
+      - uses: actions/cache@v5
+        with:
+          path: near-lean/.lake/packages
+          key: lake-finance-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('near-lean/*/lean-toolchain', 'near-lean/*/lake-manifest.json') }}
+      - uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: near-lean/runtime
+          build-args: finance-replay --wfail
+          use-mathlib-cache: true
+      - uses: dtolnay/rust-toolchain@1.93.0
+      - name: Install native build dependencies
+        run: sudo apt-get update && sudo apt-get install -y clang libclang-dev cmake protobuf-compiler libssl-dev pkg-config libzstd-dev
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            reference-nearcore/target
+          key: finance-nearcore-${{ runner.os }}-${{ runner.arch }}-44f7ae6-1.93.0-v1
+      - name: Build reference adapter and compare financial observations
+        run: |
+          python3 tools/runtime-finance-reference/build.py reference-nearcore
+          python3 tools/runtime-finance-reference/compare.py reference-nearcore/target/debug/safe-near-finance-reference
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: financial-conformance
+          path: audit/finance*.json

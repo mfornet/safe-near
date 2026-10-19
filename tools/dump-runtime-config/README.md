@@ -19,8 +19,11 @@ hand-copying numbers.
 `RuntimeConfig` does not implement `serde::Serialize` in this version of
 `near-parameters`, so the tool serializes
 `near_parameters::view::RuntimeConfigView::from(config.clone())` instead. That
-is the same JSON shape returned by the `EXPERIMENTAL_protocol_config` RPC
-method (`runtime_config` field). See "What the view omits" below.
+is the RPC JSON shape returned by the `EXPERIMENTAL_protocol_config` RPC
+method (`runtime_config` field), extended with `runtime_finance` for the refund
+ratio, minimum refund penalty and `AccountCostIncrease` feature flag that the RPC
+view omits. These values come directly from the pinned configuration and feature
+table. See "What the view omits" below.
 
 ## Build and run
 
@@ -49,14 +52,15 @@ The crate is intentionally outside every Cargo workspace in the repository
 
 ## What the view omits
 
-`RuntimeConfigView` (hence the JSON) does not expose the following fields of
+`RuntimeConfigView` does not expose the following fields of
 the internal `RuntimeConfig` in `near-parameters 0.37.4`:
 
 * action fees for `ActionCosts` variants 16..=25:
   `deploy_global_contract_base/byte`, `use_global_contract_base/byte`,
   `deterministic_state_init_base/byte/entry`, `gas_key_transfer_base`,
   `gas_key_byte`, `gas_key_nonce_write_base`;
-* `fees.gas_refund_penalty`, `fees.min_gas_refund_penalty` (NEP-536);
+* `fees.gas_refund_penalty`, `fees.min_gas_refund_penalty` (NEP-536), now
+  explicitly included in the supplemental `runtime_finance` object;
 * `fees.deploy_global_contract_execution_base` and its per-byte companion
   (compute costs);
 * `fees.storage_usage_config.global_contract_storage_amount_per_byte`;

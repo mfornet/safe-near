@@ -59,6 +59,8 @@ structure FeesConfig where
   actionFees : ActionFees
   /-- Fraction of burnt gas paid to the validator, as (numerator, denominator). -/
   burntGasReward : Nat × Nat
+  gasRefundPenalty : Nat × Nat := (0, 1)
+  minGasRefundPenalty : Nat := 0
   pessimisticGasPriceInflation : Nat × Nat
   numBytesAccount : Nat
   numExtraBytesRecord : Nat
@@ -70,6 +72,9 @@ structure AccountCreationConfig where
   deriving Repr, Inhabited
 
 structure RuntimeConfig where
+  accountCostIncrease : Bool := true
+  minGasPurchasePrice : Nat := 0
+  accountCreationCharge : Nat := 0
   storageAmountPerByte : Nat
   fees : FeesConfig
   wasm : WasmConfig
@@ -175,10 +180,16 @@ def ofJson (j : Json) : Except String RuntimeConfig := do
     newDataReceiptBase := ← feeAt dataReceipt "base_cost"
     newDataReceiptByte := ← feeAt dataReceipt "cost_per_byte"
     delegate := ← feeAt ac "delegate_cost" }
+  let finance ← field j "runtime_finance"
   pure {
+    accountCostIncrease := ← (← field finance "account_cost_increase").getBool?
+    minGasPurchasePrice := ← natString j "min_gas_purchase_price"
+    accountCreationCharge := ← natString j "account_creation_charge"
     storageAmountPerByte := ← natString j "storage_amount_per_byte"
     fees := {
       actionFees
+      gasRefundPenalty := ← ratio finance "gas_refund_penalty"
+      minGasRefundPenalty := ← nat finance "min_gas_refund_penalty"
       burntGasReward := ← ratio tc "burnt_gas_reward"
       pessimisticGasPriceInflation := ← ratio tc "pessimistic_gas_price_inflation_ratio"
       numBytesAccount := ← nat storageUsage "num_bytes_account"

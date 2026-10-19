@@ -38,6 +38,8 @@ structure Exec where
   actorId : AccountId := ""
   subsidizedAmount : Nat := 0
   newReceipts : List Receipt := []
+  tokensBurnt : Nat := 0
+  otherTokensBurnt : Nat := 0
   gasBurnt : Nat := 0
   /-- Gas burnt or attached onward; what is left of the receipt's gas is refunded. -/
   gasUsed : Nat := 0
@@ -336,8 +338,7 @@ def applyActionReceipt (c : ReceiptCtx) (st0 : ChainState) : Exec :=
   -- gas prepaid for this receipt: its creation and action execution fees, the execution fee
   -- and the gas attached to its function calls. Dependency data execution fees
   -- were already burnt by the producer when scheduling this callback.
-  let receiptGas := f.newActionReceipt.execution + Fees.totalExec f receiver c.action.actions
-    + Fees.totalPrepaid c.action.actions
+  let receiptGas := Fees.receiptGasBudget c.cfg receiver c.action.actions
   -- refunds (sent by the system account) burn no gas
   let isRefund := c.receipt.isRefund
   let body : ExecM Unit := do
@@ -366,8 +367,12 @@ def applyActionReceipt (c : ReceiptCtx) (st0 : ChainState) : Exec :=
     | none => exec
   let _ := failed
   -- refunds: unspent gas to the signer, the deposits to the predecessor on failure
-  let gasRefund := receiptGas - exec.gasUsed
-  let tokensRefund := gasRefund * c.action.gasPrice
+  let createdAccount := (st0.account? receiver).isNone && (exec.state.account? receiver).isSome && failed.isNone
+  let settlement := Fees.settleGas c.cfg c.action.gasPrice c.ap.gasPrice receiptGas exec.gasUsed exec.gasBurnt createdAccount
+  let exec := { exec with
+    tokensBurnt := if isRefund then 0 else settlement.tokensBurnt
+    otherTokensBurnt := if isRefund && failed.isSome then Fees.totalDeposit c.action.actions else 0 }
+  let tokensRefund := if isRefund then 0 else settlement.refund
   let depositRefund := if failed.isSome then Fees.totalDeposit c.action.actions else 0
   let exec := if depositRefund > 0 && c.receipt.predecessorId != systemAccount then
       let (r, st) := refundReceipt exec.state c.receipt.predecessorId depositRefund
@@ -381,7 +386,8 @@ def applyActionReceipt (c : ReceiptCtx) (st0 : ChainState) : Exec :=
   -- execution failed and its state changes were rolled back (nearcore lib.rs).
   let exec :=
       let (num, den) := c.cfg.fees.burntGasReward
-      let reward := exec.gasBurntForFunctionCall * num / den * c.action.gasPrice
+      let rewardPrice := if c.cfg.accountCostIncrease then settlement.burnPrice else c.action.gasPrice
+      let reward := exec.gasBurntForFunctionCall * num / den * rewardPrice
       match exec.state.account? receiver with
       | some a => { exec with state := exec.state.setAccount receiver { a with amount := a.amount + reward }
                               reward := reward }
@@ -400,13 +406,13 @@ def applyActionReceipt (c : ReceiptCtx) (st0 : ChainState) : Exec :=
   { exec with result := some (exec.result.getD (.successValue [])) }
 
 /-- Outcome of an executed receipt. -/
-def outcomeOf (r : Receipt) (gasPrice : Nat) (e : Exec) : ExecutionOutcome :=
+def outcomeOf (r : Receipt) (e : Exec) : ExecutionOutcome :=
   { executorId := r.receiverId
     status := e.result.getD (.successValue [])
     logs := e.logs
     receiptIds := e.newReceipts.map (·.receiptId)
     gasBurnt := e.gasBurnt
-    tokensBurnt := e.gasBurnt * gasPrice }
+    tokensBurnt := e.tokensBurnt }
 
 /-- Result of processing one receipt: state, new receipts, outcomes, and the
 yocto paid to contracts as gas reward (which are not burnt). -/
@@ -415,6 +421,7 @@ structure Processed where
   receipts : List Receipt := []
   outcomes : List (ReceiptId × ExecutionOutcome) := []
   subsidizedAmount : Nat := 0
+  otherTokensBurnt : Nat := 0
   rewards : Nat := 0
   issue : Option (ReceiptId × ExecutionIssue) := none
   deriving Inhabited
@@ -439,8 +446,8 @@ def processReceipt (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → C
       match issue with
       | some issue => { state := st, issue := some (r.receiptId, issue) }
       | none =>
-        { state := e.state, receipts := e.newReceipts, outcomes := [(r.receiptId, outcomeOf r a.gasPrice e)],
-          rewards := e.reward, subsidizedAmount := e.subsidizedAmount }
+        { state := e.state, receipts := e.newReceipts, outcomes := [(r.receiptId, outcomeOf r e)],
+          rewards := e.reward, otherTokensBurnt := e.otherTokensBurnt, subsidizedAmount := e.subsidizedAmount }
     else
       let st := { st with
         postponed := Assoc.insert st.postponed r.receiptId r
@@ -502,7 +509,7 @@ def convertTransaction (cfg : RuntimeConfig) (ap : ApplyState) (st : ChainState)
   let action : ActionReceipt :=
     { signerId := tx.signerId
       signerPublicKey := tx.publicKey
-      gasPrice := ap.gasPrice
+      gasPrice := cost.receiptGasPrice
       actions := tx.actions }
   let receipt : Receipt :=
     { predecessorId := tx.signerId
@@ -558,7 +565,7 @@ private def applyAttempt (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes
       for (_, o) in p.outcomes do
         gasUsed := gasUsed + o.gasBurnt
         tokensBurnt := tokensBurnt + o.tokensBurnt
-      tokensBurnt := tokensBurnt - p.rewards
+      tokensBurnt := tokensBurnt + p.otherTokensBurnt - p.rewards
       if let some limit := ap.gasLimit then
         if gasUsed ≥ limit then overLimit := true
   return { state := st, outgoing, outcomes, tokensBurnt, subsidizedAmount }

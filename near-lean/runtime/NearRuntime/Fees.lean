@@ -95,11 +95,24 @@ def totalPrepaid (actions : List Action) : Nat := (actions.map Action.attachedGa
 
 def totalDeposit (actions : List Action) : Nat := (actions.map Action.deposit).sum
 
+/-- Gas budget carried by an ordinary action receipt. -/
+def receiptGasBudget (cfg : RuntimeConfig) (receiver : AccountId) (actions : List Action) : Nat :=
+  cfg.fees.actionFees.newActionReceipt.execution + totalExec cfg.fees.actionFees receiver actions + totalPrepaid actions
+
+/-- Funds carried by a receipt: deposits plus gas purchased for future execution.
+System refunds carry only their transfer balance; data receipts carry no funds. -/
+def receiptFunds (cfg : RuntimeConfig) (r : Receipt) : Nat :=
+  match r.receipt with
+  | .action a => totalDeposit a.actions +
+      (if r.isRefund then 0 else receiptGasBudget cfg r.receiverId a.actions * a.gasPrice)
+  | .data _ => 0
+
 /-- The cost of a transaction (`tx_cost`): gas burnt now, gas prepaid for
 the receipt, and the total yoctoNEAR charged to the signer. -/
 structure TxCost where
   gasBurnt : Nat
   gasRemaining : Nat
+  receiptGasPrice : Nat
   total : Nat
 
 def txCost (cfg : RuntimeConfig) (gasPrice : Nat) (signer receiver : AccountId)
@@ -107,11 +120,85 @@ def txCost (cfg : RuntimeConfig) (gasPrice : Nat) (signer receiver : AccountId)
   let f := cfg.fees.actionFees
   let sir := signer == receiver
   let gasBurnt := f.newActionReceipt.send sir + totalSend f sir receiver actions
-  let gasRemaining := f.newActionReceipt.execution + totalExec f receiver actions + totalPrepaid actions
-  let (num, den) := cfg.fees.pessimisticGasPriceInflation
-  let inflated := gasPrice * num / den
-  { gasBurnt, gasRemaining,
-    total := gasBurnt * gasPrice + gasRemaining * inflated + totalDeposit actions }
+  let gasRemaining := receiptGasBudget cfg receiver actions
+  let receiptGasPrice := max gasPrice cfg.minGasPurchasePrice
+  { gasBurnt, gasRemaining, receiptGasPrice,
+    total := gasBurnt * gasPrice + gasRemaining * receiptGasPrice + totalDeposit actions }
+
+/-- Token settlement from pinned nearcore's `refund_unspent_gas_and_deposits`.
+Gas purchase price is carried by the receipt; burn price comes from this block. -/
+structure GasSettlement where
+  burnPrice : Nat
+  refund : Nat
+  tokensBurnt : Nat
+  priceDeficit : Nat
+  priceSurplus : Nat
+  refundPenalty : Nat
+  creationCharge : Nat
+  deriving Repr, BEq
+
+def settleGas (cfg : RuntimeConfig) (purchasePrice currentPrice prepaid used burnt : Nat)
+    (createdAccount : Bool) : GasSettlement :=
+  let burnPrice := if cfg.accountCostIncrease then min purchasePrice currentPrice else currentPrice
+  let grossRefund := prepaid - used
+  let (num, den) := cfg.fees.gasRefundPenalty
+  let penaltyGas := min grossRefund (max (grossRefund * num / den) cfg.fees.minGasRefundPenalty)
+  let penaltyPrice := if cfg.accountCostIncrease then burnPrice else purchasePrice
+  let refundPenalty := penaltyGas * penaltyPrice
+  let priceDeficit := (burnPrice - purchasePrice) * burnt
+  let priceSurplus := (purchasePrice - burnPrice) * burnt
+  let creationCharge := if cfg.accountCostIncrease && createdAccount then
+      min priceSurplus (cfg.accountCreationCharge - cfg.fees.actionFees.createAccount.execution * burnPrice)
+    else 0
+  let refund := grossRefund * purchasePrice - refundPenalty +
+    (if cfg.accountCostIncrease then priceSurplus - creationCharge else 0)
+  let tokensBurnt := burnt * burnPrice - priceDeficit +
+    (if cfg.accountCostIncrease then 0 else priceSurplus) + refundPenalty + creationCharge
+  { burnPrice, refund, tokensBurnt, priceDeficit, priceSurplus, refundPenalty, creationCharge }
+
+/-- A receipt's purchased gas partitions into its refund, burnt tokens and
+reserved gas sent onward. Charges and penalties move funds within that partition. -/
+theorem gas_settlement_partition (purchase burn prepaid used burnt penalty charge : Nat)
+    (hprice : burn ≤ purchase) (hused : used ≤ prepaid) (hburnt : burnt ≤ used)
+    (hpenalty : penalty ≤ (prepaid - used) * purchase)
+    (hcharge : charge ≤ (purchase - burn) * burnt) :
+    ((prepaid - used) * purchase - penalty + ((purchase - burn) * burnt - charge)) +
+      (burnt * burn + penalty + charge) + (used - burnt) * purchase = prepaid * purchase := by
+  have hr := Nat.sub_add_cancel hused
+  have hu := Nat.sub_add_cancel hburnt
+  have hp := Nat.sub_add_cancel hprice
+  have hgas : (prepaid - used) * purchase + (used - burnt) * purchase + burnt * purchase = prepaid * purchase := by
+    nlinarith
+  have hsurplus : (purchase - burn) * burnt + burnt * burn = burnt * purchase := by
+    nlinarith
+  omega
+
+/-- Kernel-checked gas-token conservation for the v85+ settlement algorithm. -/
+theorem settleGas_conservation (cfg : RuntimeConfig) (purchase current prepaid used burnt : Nat)
+    (created : Bool) (hnew : cfg.accountCostIncrease = true)
+    (hused : used ≤ prepaid) (hburnt : burnt ≤ used) :
+    (settleGas cfg purchase current prepaid used burnt created).refund +
+      (settleGas cfg purchase current prepaid used burnt created).tokensBurnt +
+      (used - burnt) * purchase = prepaid * purchase := by
+  let burn := min purchase current
+  let gross := prepaid - used
+  let penaltyGas := min gross (max (gross * cfg.fees.gasRefundPenalty.1 / cfg.fees.gasRefundPenalty.2)
+    cfg.fees.minGasRefundPenalty)
+  let penalty := penaltyGas * burn
+  let charge := if created then
+      min ((purchase - burn) * burnt) (cfg.accountCreationCharge - cfg.fees.actionFees.createAccount.execution * burn)
+    else 0
+  have hb : burn ≤ purchase := Nat.min_le_left _ _
+  have hp : penalty ≤ (prepaid - used) * purchase :=
+    Nat.mul_le_mul (Nat.min_le_left _ _) hb
+  have hc : charge ≤ (purchase - burn) * burnt := by
+    dsimp only [charge]
+    split
+    · exact Nat.min_le_left _ _
+    · exact Nat.zero_le _
+  have identity := gas_settlement_partition purchase burn prepaid used burnt penalty charge hb hused hburnt hp hc
+  simpa [settleGas, hnew, burn, gross, penaltyGas, penalty, charge,
+    Nat.sub_eq_zero_of_le hb] using identity
 
 end Fees
 

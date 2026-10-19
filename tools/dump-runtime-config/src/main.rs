@@ -22,7 +22,22 @@ fn config_json(store: &RuntimeConfigStore, version: ProtocolVersion) -> String {
     // `near-parameters`; `RuntimeConfigView` is the JSON-stable representation
     // used by the `EXPERIMENTAL_protocol_config` RPC.
     let view = RuntimeConfigView::from(config.clone());
-    serde_json::to_string_pretty(&view).expect("RuntimeConfigView serialization cannot fail")
+    let json =
+        serde_json::to_string_pretty(&view).expect("RuntimeConfigView serialization cannot fail");
+    // The RPC view omits the refund parameters needed for exact token accounting.
+    let finance = serde_json::json!({
+        "account_cost_increase": near_primitives_core::version::ProtocolFeature::AccountCostIncrease.enabled(version),
+        "gas_refund_penalty": [*config.fees.gas_refund_penalty.numer(), *config.fees.gas_refund_penalty.denom()],
+        "min_gas_refund_penalty": config.fees.min_gas_refund_penalty.as_gas(),
+    });
+    let finance = serde_json::to_string_pretty(&finance)
+        .unwrap()
+        .replace('\n', "\n  ");
+    format!(
+        "{},\n  \"runtime_finance\": {}\n}}",
+        json.trim_end().strip_suffix('}').unwrap().trim_end(),
+        finance
+    )
 }
 
 fn write_config(out_dir: &Path, version: ProtocolVersion, json: &str) -> std::io::Result<()> {
