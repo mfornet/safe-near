@@ -1,0 +1,27 @@
+# NearVM: the NEAR contract runtime at the `near_vm_runner::run` seam.
+#
+# One function call of one contract: the Wasm interpreter (../wasm) plus the
+# NEAR host functions, gas accounting and the `VMContext` / `VMOutcome`
+# boundary mirrored from nearcore. The runtime (../runtime) builds receipts
+# and state transitions on top of it.
+name = "NearVM"
+version = "0.1.0"
+defaultTargets = ["NearVM"]
+packagesDir = "../.lake/packages"
+
+[[require]]
+name = "Interpreter"
+path = "../wasm"
+
+[[lean_lib]]
+name = "NearVM"
+
+# Scenario tests: `lake exe vm-tests`. Runs the real wNEAR binary
+# (tests/fixtures/w_near.wat, printed from contracts/w-near/contract.wasm).
+[[lean_exe]]
+name = "vm-tests"
+root = "tests.Main"
+
+[[lean_exe]]
+name = "vm-replay"
+root = "Conformance.Main"

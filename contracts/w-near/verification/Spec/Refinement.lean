@@ -3,11 +3,10 @@ import Spec.Invariants
 /-!
 # Refinement: what we need from `near-lean`
 
-The NEAR runtime in Lean does not exist yet. This file states the interface
-the wNEAR proofs need from it (`RuntimeInterface`) and the theorem that links
-the deployed binary to the model (`Refines`). Once `near-lean/runtime` exists,
-it must provide an instance of `RuntimeInterface` and `Refines` becomes a
-theorem about `contracts/w-near/contract.wasm`.
+This file states the observations the wNEAR proofs need from the runtime
+(`RuntimeInterface`) and the proposition linking a deployed module to the
+model (`Refines`). `Spec.RuntimeInstance` supplies the executable VM instance;
+the refinement proof remains an obligation.
 
 The interface is deliberately minimal: a deterministic executor for a single
 function-call action, plus observation functions on its result.
@@ -45,6 +44,12 @@ structure RuntimeInterface where
   exec : Code → Storage → Input → Result
   /-- Failure message when the execution failed (panic, host error, gas). -/
   failure : Result → Option String
+  /-- A model limitation, distinct from a protocol failure. Refinement must
+  prove this absent, rather than exclude such executions by a hypothesis. -/
+  executionIssue : Result → Option String
+  /-- No information was silently discarded by contract-specific observation
+  functions (in particular the projection of the exact receipt graph). -/
+  observationsValid : Result → Bool
   /-- Whether the failure is gas exhaustion, which the model does not predict. -/
   outOfGas : Result → Bool
   /-- Storage after the execution; unchanged when the execution failed. -/
@@ -77,13 +82,14 @@ def Refines (R : RuntimeInterface) (code : R.Code) (cfg : Config) : Prop :=
   ∀ (raw : R.Storage) (st : Option State) (env : Env) (call : Call),
     Represents R cfg raw st →
     let r := R.exec code raw (R.mkInput env call)
-    R.outOfGas r = false →
+    R.executionIssue r = none ∧ (R.outOfGas r = false →
     match step cfg st env call with
     | .ok o =>
+        R.observationsValid r = true ∧
         R.failure r = none ∧ R.entries (R.storage r) = encode o.state ∧
         R.returnValue r = R.encodeRet o.ret ∧ R.logs r = o.logs ∧ R.promises r = o.promises
     | .error p =>
         (∃ msg, R.failure r = some msg ∧ p.matches msg) ∧
-        R.entries (R.storage r) = R.entries raw
+        R.entries (R.storage r) = R.entries raw ∧ R.promises r = [])
 
 end WNear

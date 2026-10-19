@@ -1,0 +1,21 @@
+{
+  "code": "contracts/w-near/contract.wasm",
+  "sha256": "b72c26d390b23f4517d091a8aab06b0369d465356ec5fb337d5fda076da38ac0",
+  "protocolVersion": 86,
+  "initialBalance": "100000000000000000000000000",
+  "storage": [],
+  "calls": [
+    {"name": "initialize", "method": "new", "predecessor": "wrap.near", "args": {}},
+    {"name": "initialize twice", "method": "new", "args": {}},
+    {"name": "deposit", "method": "near_deposit", "args": {}, "deposit": "1000000000000000000000000"},
+    {"name": "balance view", "method": "ft_balance_of", "args": {"account_id": "alice.near"}, "view": true},
+    {"name": "supply view", "method": "ft_total_supply", "args": {}, "view": true},
+    {"name": "withdraw", "method": "near_withdraw", "args": {"amount": "100000000000000000000000"}, "deposit": "1"},
+    {"name": "withdraw without authorization deposit", "method": "near_withdraw", "args": {"amount": "100000000000000000000000"}},
+    {"name": "register receiver", "method": "storage_deposit", "args": {"account_id": "bob.near"}, "deposit": "10000000000000000000000"},
+    {"name": "transfer call", "method": "ft_transfer_call", "args": {"receiver_id": "bob.near", "amount": "200000000000000000000000", "msg": "quoted \"message\"\n🙂"}, "deposit": "1"},
+    {"name": "failed receiver callback", "method": "ft_resolve_transfer", "predecessor": "wrap.near", "promiseResults": [null], "args": {"sender_id": "alice.near", "receiver_id": "bob.near", "amount": "200000000000000000000000"}},
+    {"name": "out of gas", "method": "near_deposit", "args": {}, "deposit": "1000000000000000000000000", "gas": 100000000000},
+    {"name": "missing method", "method": "does_not_exist", "args": {}}
+  ]
+}

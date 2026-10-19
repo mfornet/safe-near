@@ -1,0 +1,24 @@
+# NearRuntime: the NEAR transaction runtime at the `Runtime::apply` seam.
+#
+# Accounts, access keys, receipts, actions, fees and refunds on top of
+# NearVM (../vm). `apply` takes a chain state, transactions and incoming
+# receipts and returns the new state, the outgoing receipts and one
+# execution outcome per transaction and receipt, as nearcore does.
+name = "NearRuntime"
+version = "0.1.0"
+defaultTargets = ["NearRuntime"]
+packagesDir = "../.lake/packages"
+
+[[require]]
+name = "NearVM"
+path = "../vm"
+
+[[lean_lib]]
+name = "NearRuntime"
+
+# Scenario tests: `lake exe runtime-tests`. Deploys the real wNEAR binary and
+# drives it with transactions, checking balances, receipts, refunds and the
+# conservation of NEAR.
+[[lean_exe]]
+name = "runtime-tests"
+root = "Tests.Main"

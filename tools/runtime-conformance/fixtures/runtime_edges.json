@@ -1,0 +1,119 @@
+{
+  "code": "tools/runtime-conformance/fixtures/runtime_edges.wasm",
+  "sha256": "10ce3842036ae124f622df815e038faf3a1408dd1378dc63b6b735d23962f0d9",
+  "protocolVersion": 86,
+  "initialBalance": "100000000000000000000000000",
+  "storage": [],
+  "calls": [
+    {
+      "name": "memory_size",
+      "method": "memory_size",
+      "args": {}
+    },
+    {
+      "name": "memory_grow",
+      "method": "memory_grow",
+      "args": {}
+    },
+    {
+      "name": "after_grow",
+      "method": "after_grow",
+      "args": {}
+    },
+    {
+      "name": "panic",
+      "method": "panic",
+      "args": {}
+    },
+    {
+      "name": "out_of_bounds",
+      "method": "out_of_bounds",
+      "args": {}
+    },
+    {
+      "name": "divide_by_zero",
+      "method": "divide_by_zero",
+      "args": {}
+    },
+    {
+      "name": "unreachable",
+      "method": "unreachable",
+      "args": {}
+    },
+    {
+      "name": "wrong_signature",
+      "method": "wrong_signature",
+      "args": {}
+    },
+    {
+      "name": "empty",
+      "method": "empty",
+      "args": {}
+    },
+    {
+      "name": "missing",
+      "method": "missing",
+      "args": {}
+    },
+    {
+      "name": "empty method",
+      "method": "",
+      "args": {}
+    },
+    {
+      "name": "loading exhaustion",
+      "method": "memory_size",
+      "args": {},
+      "gas": 1000000
+    },
+    {
+      "name": "loop_backedge",
+      "method": "loop_backedge",
+      "args": {}
+    },
+    {
+      "name": "loop_conditional_backedge",
+      "method": "loop_conditional_backedge",
+      "args": {}
+    },
+    {
+      "name": "observe used gas",
+      "method": "used_gas",
+      "args": {}
+    },
+    {
+      "name": "used gas prohibited in view",
+      "method": "used_gas",
+      "args": {},
+      "view": true
+    },
+    {
+      "name": "write storage",
+      "method": "write",
+      "args": {}
+    },
+    {
+      "name": "storage write prohibited in view",
+      "method": "write",
+      "args": {},
+      "view": true
+    },
+    {
+      "name": "deprecated iterator",
+      "method": "iterator",
+      "args": {}
+    },
+    {
+      "name": "predecessor prohibited in view",
+      "method": "predecessor",
+      "args": {},
+      "view": true
+    },
+    {
+      "name": "promise results count prohibited in view",
+      "method": "results_count",
+      "args": {},
+      "view": true
+    }
+  ]
+}
