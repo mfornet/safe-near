@@ -522,7 +522,7 @@ def valueReturnFn : HostFn NearState :=
         | none   => .Trap st "value_return: invalid register"
         | some v =>
           checkDataLimit "value_return" "return" st.host.config.maxReturnLen v.length st <|
-            fun _ => .Return [] { st with host := { st.host with returnData := some v } }
+            fun _ => .Return [] { st with host := st.host.selectReturnValue v }
       | _ => .Trap st "value_return: bad args" }
 
 /-! ## Context and economics -/
@@ -953,7 +953,7 @@ def promiseReturnFn : HostFn NearState :=
           let error := HostError.invalidPromiseIndex promiseIdx.toNat
           .Trap { st with host := { st.host with lastError := some error } } error.message
         | some _ =>
-          .Return [] { st with host := { st.host with returnedPromise := some promiseIdx.toNat } }
+          .Return [] { st with host := st.host.selectReturnPromise promiseIdx.toNat }
       | _ => .Trap st "promise_return: bad args" }
 
 /-! ## The registry — single source of truth -/

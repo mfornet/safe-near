@@ -59,3 +59,9 @@ receipt identity for ordinary, nested, duplicate and empty joins. Failure cases
 cover joint return/action restrictions, nonexistent handles, view calls and
 invalid-handle errors that precede later action-fee gas exhaustion. Its WAT and
 binary are pinned together; replay still regenerates WAT from the binary.
+
+The promise-graph fixture also covers both orders of `value_return` and
+`promise_return`. It exposed a stale receipt selection after a later value
+return; the host now gives the last successful selection precedence. The same
+fixture validates the incremental converter against the reference after removal
+of the bounded join walk.

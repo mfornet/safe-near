@@ -1,6 +1,6 @@
 import NearVM.Metered
 import NearVM.Context
-import NearVM.Outcome
+import NearVM.PromiseGraph
 
 /-!
 # `run`: one function call
@@ -231,22 +231,23 @@ private def runAttempt (cfg : RuntimeConfig) (code : Module) (codeSize : Nat) (m
       burntGas := ns.gas.burnt, usedGas := ns.gas.burnt, logs := logsOf ns, storage := storage,
       receipts := [], aborted := some e, gasProfile := ns.gasProfile }
   | none =>
-    let returnData : ReturnData :=
-      match ns.returnedPromise, ns.returnData with
-      | some idx, _ =>
-        match returnedReceipt? ns.promises idx with
-        | some r => .receiptIndex r
-        | none => .none
-      | none, some bytes => .value bytes
-      | none, none => .none
-    VMOutcome.checkPromiseHandles ctx.accountBalance ctx.storageUsage storage ns.promises
-    { balance := ns.context.accountBalance, storageUsage := ns.context.storageUsage.toNat,
-      returnData := returnData, burntGas := ns.gas.burnt, usedGas := ns.gas.used,
-      logs := logsOf ns, storage := finalStorage ns, receipts := promisesToReceipts ns.promises,
-      aborted := none, gasProfile := ns.gasProfile }
+    let outcome : VMOutcome := {
+      balance := ns.context.accountBalance, storageUsage := ns.context.storageUsage.toNat
+      returnData := .none, burntGas := ns.gas.burnt, usedGas := ns.gas.used
+      logs := logsOf ns, storage := finalStorage ns, receipts := [], aborted := none
+      gasProfile := ns.gasProfile }
+    match convertPromises ns.promises with
+    | none => outcome.graphIssue ctx.accountBalance ctx.storageUsage storage
+    | some graph =>
+      let returned : Option ReturnData := match ns.returnedPromise with
+        | some index => (graph.returnedReceipt? index).map ReturnData.receiptIndex
+        | none => some (match ns.returnData with | some bytes => .value bytes | none => .none)
+      match returned with
+      | none => outcome.graphIssue ctx.accountBalance ctx.storageUsage storage
+      | some returnData => { outcome with returnData, receipts := graph.receipts }
 
 /-- The public VM boundary validates converted receipts on every exit. Raw
-promise handles are checked before a successful outcome can escape `runAttempt`. -/
+promise handles are resolved by the proved total converter in `runAttempt`. -/
 def run (cfg : RuntimeConfig) (code : Module) (codeSize : Nat) (method : String)
     (ctx : VMContext) (storage : List (List UInt8 × List UInt8))
     (fuel : Nat := defaultFuel) : VMOutcome :=

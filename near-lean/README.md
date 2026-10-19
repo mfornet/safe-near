@@ -124,7 +124,18 @@ The public VM result also carries a checked receipt DAG: dependencies refer only
 to earlier receipts, returned receipt indices exist, and dependency cycles are
 impossible (`run_receipts_valid`, `run_dependency_before`,
 `run_returnedReceipt_lt`, `run_no_receipt_cycle`). Raw promise handles are checked
-before accepting an outcome, so malformed joins cannot disappear through bounded
-flattening. Rejection is an explicit model issue with rollback, not contract
-success. Full host-invariant preservation, graph-conversion equivalence, global
-identifier freshness and scheduler correctness remain separate obligations.
+before accepting an outcome, so malformed joins cannot silently disappear
+during conversion. Rejection is an explicit model issue with rollback, not contract
+success. Full host-invariant preservation, correspondence with nearcore beyond the
+conformance fixtures, global identifier freshness and scheduler correctness
+remain separate obligations.
+
+`NearVM/PromiseGraph.lean` now implements total incremental conversion, replacing
+the bounded recursive join walk. It stores each handle's exact ordered receipt
+vector, preserves duplicate dependencies and rejects missing/future references
+or yielded promises. Executable conversion is proved equivalent to an explicit
+transition relation, succeeds exactly on supported well-formed raw graphs, and
+preserves receipt validity from the empty graph. Returned receipt identity comes
+from that same handle table. Successful `value_return` and `promise_return`
+selections now overwrite each other; overwrite lemmas and independent regressions
+cover both call orders.

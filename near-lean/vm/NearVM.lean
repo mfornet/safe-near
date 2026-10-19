@@ -5,5 +5,6 @@ import NearVM.State
 import NearVM.Host
 import NearVM.Context
 import NearVM.Outcome
+import NearVM.PromiseGraph
 import NearVM.Metered
 import NearVM.Run

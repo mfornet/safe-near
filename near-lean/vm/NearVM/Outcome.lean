@@ -93,7 +93,8 @@ theorem no_receipt_dependency_cycle {rs : List ReceiptSpec}
   exact Nat.lt_irrefl index (dependencyPath_decreases hwf path)
 
 structure VMOutcome where
-  /-- Account balance after the call (unchanged by the VM itself). -/
+  /-- Liquid balance after the attached deposit and outgoing promise deposits;
+  the input balance is restored on a failed VM call. -/
   balance : Nat
   /-- Storage usage after the call. -/
   storageUsage : Nat
@@ -115,9 +116,8 @@ def VMOutcome.succeeded (o : VMOutcome) : Bool := o.aborted.isNone
 def VMOutcome.issue? (o : VMOutcome) : Option ExecutionIssue :=
   o.aborted.bind FunctionCallError.issue?
 
-/-- Validate handles before expanding joins. This prevents the expansion's
-structural fuel from hiding cyclic or future join references. Yielded promises
-remain unsupported by the metered VM and cannot disappear during conversion. -/
+/-- Supported handle creation order: callbacks and joints refer only to earlier
+handles. Yielded promises remain explicitly unsupported by the metered VM. -/
 def promisesValidFrom (index : Nat) : List NearPromise → Bool
   | [] => true
   | p :: ps =>
@@ -222,42 +222,5 @@ theorem checkPromises_no_cycle (o : VMOutcome) (balance usage : Nat)
   no_receipt_dependency_cycle
     ((o.checkPromises balance usage storage promises).receiptsWellFormed
       (checkPromises_valid o balance usage storage promises)) index
-
-/-- Promise handles become receipts: `and` promises are not receipts, they
-only widen the dependencies of the callback chained on them. -/
-def promisesToReceipts (ps : List NearPromise) : List ReceiptSpec :=
-  let arr := ps.toArray
-  -- Receipt index of promise `i`: promises that are joins have no receipt.
-  let receiptIdx : Array (Option Nat) := Id.run do
-    let mut out := #[]
-    let mut next := 0
-    for p in arr do
-      match p with
-      | .and _ => out := out.push none
-      | _ => out := out.push (some next); next := next + 1
-    return out
-  let rec deps (fuel : Nat) (i : Nat) : List Nat :=
-    match fuel with
-    | 0 => []
-    | fuel + 1 =>
-      match arr[i]? with
-      | some (.and ds) => ds.flatMap (deps fuel)
-      | some _ => (receiptIdx[i]?.bind id).toList
-      | none => []
-  arr.toList.filterMap fun p =>
-    match p with
-    | .batch acct actions => some { receiverId := acct, actions := actions }
-    | .callback base acct actions =>
-      some { receiverId := acct, actions := actions, dependencies := deps arr.size base }
-    | .and _ => none
-    | .yielded _ _ _ _ _ => none
-
-/-- `promise_return` selects a promise; the result is that promise's receipt. -/
-def returnedReceipt? (ps : List NearPromise) (idx : Nat) : Option Nat :=
-  let before := ps.take idx
-  match ps[idx]? with
-  | some (.and _) => none
-  | some _ => some (before.filter (fun p => match p with | .and _ => false | _ => true)).length
-  | none => none
 
 end Wasm.Near

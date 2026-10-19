@@ -1,6 +1,6 @@
 {
   "code": "tools/runtime-conformance/fixtures/promise_graphs.wasm",
-  "sha256": "3039dd6f179fd75e9b8d700daa40b60241364df4def667ee5b541119ff4095b6",
+  "sha256": "625250fb76eb895acc4812a772e9e7c6856119bad5386222539b5c355b380a86",
   "protocolVersion": 86,
   "initialBalance": "100000000000000000000000000",
   "storage": [],
@@ -67,6 +67,16 @@
       "method": "then_invalid",
       "args": {},
       "gas": 10000000000
+    },
+    {
+      "name": "value_after_receipt",
+      "method": "value_after_receipt",
+      "args": {}
+    },
+    {
+      "name": "receipt_after_value",
+      "method": "receipt_after_value",
+      "args": {}
     }
   ]
 }

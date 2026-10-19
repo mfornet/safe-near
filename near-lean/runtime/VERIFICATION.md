@@ -32,10 +32,10 @@ These assumptions must be carried into any theorem about deployed bytes.
 | Boundary | Implemented | Remaining obligations |
 | --- | --- | --- |
 | VM | Host context, storage, registers, logs, promises, gas counter, rollback on abort | Exact instrumentation and trie costs; host limits and error ordering; cryptographic semantics; module validation and decoding |
-| Actions | Create, deploy, call, transfer, stake, add/delete key, delete account | Reference validation; integer bounds; epoch effects; newer action variants |
-| Receipts | Input/output dependencies, postponement, failure data, refunds | Well-formedness and freshness proofs; independent reference comparisons; yield/resume lifecycle |
+| Actions | Create, deploy, call, transfer, add/delete key, delete account; basic stake rejection checks | Reference validation; integer bounds; staking/epoch semantics; newer action variants |
+| Receipts | Proved per-call graph conversion and acyclicity; input/output dependencies, postponement, failure data, refunds | Global state well-formedness/freshness; receipt-layer reference oracle; yield/resume lifecycle |
 | Chain | Block application, delayed queue, explicit bounded-run completion, reachability restricted to supported applies | Scheduling assumptions; indirect interaction predicates; sufficient prepaid gas specification |
-| wNEAR | Executable scenarios; model authorization proofs; refinement proposition with explicit account resources and accounting | Binary refinement proof; callback parsing/serialization proofs; chain-level solvency and availability proofs |
+| wNEAR | Completed local model proofs; checked callback projection; refinement proposition with explicit resources and accounting | Binary refinement proof; callback parsing/serialization proofs; chain-level solvency and availability proofs |
 
 Known unsafe approximations still requiring implementation changes:
 
@@ -142,10 +142,25 @@ returned receipt and no dependency cycle. Invalid raw handles or converted
 graphs become model issues with balance/storage/usage rollback; logs and burnt
 gas remain diagnostic observations. These predicates concern dependency indices,
 not full action/account validity or global identifier freshness. Preservation of
-raw handle validity by every host operation and a proof of join conversion's
-exact graph semantics remain open; accepted outputs are checked regardless.
+raw handle validity by every host operation remains open; accepted outputs are
+checked regardless. Join conversion is now related to explicit ordered graph
+semantics by the proofs described below.
 The join oracle covers ordinary, nested, duplicate and empty joins, illegal
 joint returns/actions, nonexistent handles, view restrictions and low-gas error
 precedence. It exposed and fixed joint promises incorrectly returning success,
 panic-style index errors and action fees charged before invalid-handle checks.
 The `promise_return` view guard retains its own host fee, as nearcore does.
+
+The converter is now an incremental total `Option` computation in
+`NearVM/PromiseGraph.lean`. `convertPromises_iff` relates it in both directions to
+`ConvertsPromises`; `ExpandsDependencies` specifies ordered concatenation with
+duplicates. `convertPromises_accepts_iff` proves exact agreement with the raw
+handle well-formedness check, so no valid supported graph is rejected.
+`convertPromises_valid` and `convertPromises_receipts_valid` establish graph
+validity without invoking the output validator. Handle-count and returned-index
+lemmas connect the handle table to receipt identities. These are proofs of the
+Lean graph semantics, not a universal proof of equivalence with nearcore.
+The old fuel-based converter and its silent invalid-return fallback are removed.
+A nearcore regression also found that `value_return` after `promise_return` kept
+the old promise selected; successful selectors now clear each other's state,
+with kernel-checked overwrite lemmas and exact comparisons in both call orders.

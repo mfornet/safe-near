@@ -1,4 +1,5 @@
 (module
+  (import "env" "value_return" (func $value (param i64 i64)))
   (import "env" "promise_batch_create" (func $create (param i64 i64) (result i64)))
   (import "env" "promise_batch_then" (func $then (param i64 i64 i64) (result i64)))
   (import "env" "promise_and" (func $and (param i64 i64) (result i64)))
@@ -22,6 +23,12 @@
     local.get 0 i64.const 9 i64.const 32 call $then local.tee 1
     i64.const 48 call $transfer
     local.get 1)
+  (func (export "value_after_receipt")
+    i64.const 10 i64.const 0 call $batch call $return
+    i64.const 10 i64.const 0 call $value)
+  (func (export "receipt_after_value")
+    i64.const 10 i64.const 0 call $value
+    i64.const 10 i64.const 0 call $batch call $return)
   (func (export "join")
     call $pair call $callback call $return)
   (func (export "nested_join")
