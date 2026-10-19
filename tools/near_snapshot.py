@@ -5,6 +5,8 @@ Only reads public RPC data. No signing keys or transactions are needed.
 See tools/SNAPSHOTS.md for the fixture boundary and examples.
 """
 
+from __future__ import annotations
+
 import argparse
 import base64
 import json
