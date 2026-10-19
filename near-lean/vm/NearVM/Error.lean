@@ -59,7 +59,7 @@ inductive HostError
   deriving Repr, BEq, Inhabited
 
 def HostError.message : HostError → String
-  | .badUTF8 => "String encoding is bad UTF-8 sequence"
+  | .badUTF8 => "String encoding is bad UTF-8 sequence."
   | .badUTF16 => "String encoding is bad UTF-16 sequence"
   | .gasExceeded => "Exceeded the prepaid gas."
   | .gasLimitExceeded => "Exceeded the maximum amount of gas allowed to burn per contract."

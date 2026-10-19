@@ -185,4 +185,15 @@ per-element or memory-read costs. `PromiseLimits.lean` relates successful checks
 to exact ordered expansion and proves the resulting dependency-length bound.
 Independent fixtures cover the 128/129 boundary, nested joins, empty joins,
 invalid-index precedence, memory bounds, overflow and view restrictions.
-Promise-creation count limits and broader host limits remain open.
+Broader host limits remain open.
+
+All five supported promise allocators now enforce the configured handle-count
+limit, including empty joints. Receiver parsing and callback-handle validation
+precede the count check; receipt fees are retained when capacity is exceeded,
+while function-action reads and fees are skipped. `promise_create` and
+`promise_then` include both underlying base charges and the reference's view
+error names. Protocol V2 receiver syntax is installed in the host configuration.
+`preInvokeError_count_bound` proves accepted allocations fit the limit;
+`checked_nextPromiseIdx_fresh` proves the u64 handle is unwrapped, absent from
+the old list, and resolves to the appended promise when the limit fits u64.
+This is local handle freshness, not global receipt/data identifier freshness.

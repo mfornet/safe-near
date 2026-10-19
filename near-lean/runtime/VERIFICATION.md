@@ -231,4 +231,27 @@ regressions. `joinedDependenciesError_none_iff`,
 `joinedDependenciesError_expands` and `preInvokeError_join_bounds` prove the
 prefix condition, ordered expansion and accepted-span/dependency bounds.
 Both existing execution invariants cover the new pre-invocation error exits.
-This does not yet implement promise-creation count limits or all host limits.
+Other host limits remain separate obligations.
+
+Promise allocation now checks `max_promises_per_function_call_action` for
+`promise_create`, `promise_then`, `promise_and`, `promise_batch_create`, and
+`promise_batch_then`. Empty joints consume handles even though they emit no
+receipts. Receiver reads/UTF-8/V2 syntax and callback-handle errors precede the
+capacity error. Receipt dispatch fees are paid before that error; subsequent
+function-action argument reads, the second base fee, action fees and prepaid
+gas are omitted. Successful combined create/then calls retain both base fees.
+Their view errors name the underlying batch operation, matching the reference.
+The context installs V2 account syntax validation (legacy rules retain their
+unvalidated behavior); structured creation-prefix errors preserve gas ordering.
+The count regression fixture covers capacity, invalid receiver/handle/method
+precedence, ordinary combined calls, view restrictions and account boundaries.
+`promiseCapacityError_none_iff`, `preInvokeError_count_bound`, and
+`checked_nextPromiseIdx_fresh` establish capacity and local raw-handle freshness
+under a u64-sized limit. Global identifier freshness, complete state validity,
+remaining host limits and deployed refinement are still open.
+
+Even zero-length join spans validate their pointer before capacity checks.
+The additional empty-span regressions exposed two discrepancies;
+`preInvokeError_join_span_bound` now proves the entire accepted pointer/length
+span lies within guest memory, while the existing join proof bounds its u64
+length and expanded dependency vector.

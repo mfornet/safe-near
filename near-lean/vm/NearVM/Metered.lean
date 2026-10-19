@@ -127,6 +127,51 @@ def depsSir (st : Store NearState) (idx : Nat) (receiver : Option (List UInt8)) 
       | none => []
   go st.host.promises.length idx
 
+/-- The supported operations that allocate one raw handle on success. -/
+def allocatesPromise (name : String) : Bool :=
+  ["promise_create", "promise_then", "promise_and", "promise_batch_create", "promise_batch_then"].contains name
+
+def promiseCapacityError (st : Store NearState) : Option HostError :=
+  match st.host.config.maxPromises with
+  | none => none
+  | some limit =>
+    if st.host.promises.length + 1 > limit then
+      some (.numberPromisesExceeded (st.host.promises.length + 1) limit)
+    else none
+
+def creationAccountArgs (name : String) (args : List Value) : Option (UInt64 × UInt64) :=
+  if name == "promise_create" || name == "promise_batch_create" then some (argU64 args 0, argU64 args 1)
+  else if name == "promise_then" || name == "promise_batch_then" then some (argU64 args 1, argU64 args 2)
+  else none
+
+/-- Receiver parsing precedes receipt creation and the allocation limit. -/
+def creationAccountError (name : String) (st : Store NearState) (args : List Value) : Option HostError :=
+  match creationAccountArgs name args with
+  | none => none
+  | some (len, ptr) =>
+    match getMemOrReg st ptr len with
+    | none => some (if len == u64Max then .invalidRegisterId ptr.toNat else .memoryAccessViolation)
+    | some bytes =>
+      if (String.fromUTF8? ⟨bytes.toArray⟩).isNone then some .badUTF8
+      else if !st.host.config.validAccountId bytes then some .invalidAccountId
+      else none
+
+def creationPrefixError (name : String) (st : Store NearState) (args : List Value) : Option HostError :=
+  match creationAccountError name st args with
+  | some error => some error
+  | none =>
+    if (name == "promise_then" || name == "promise_batch_then") &&
+        !promiseIndexValid st (argU64 args 0).toNat then
+      some (.invalidPromiseIndex (argU64 args 0).toNat)
+    else none
+
+/-- Retain receipt dispatch charges, stopping before function-action processing. -/
+def throughNewReceipt : List Charge → List Charge
+  | [] => []
+  | charge :: rest => match charge with
+    | .newReceipt .. => [charge]
+    | _ => charge :: throughNewReceipt rest
+
 /-- Argument-dependent charge plan before validating promise handles. -/
 private def chargesBeforeUnvalidated (name : String) (st : Store NearState) (args : List Value) : List Charge :=
   let a := argU64 args
@@ -200,7 +245,7 @@ private def chargesBeforeUnvalidated (name : String) (st : Store NearState) (arg
     let sir := sirOfSpan st (a 0) (a 1)
     let m := spanLen st (a 2) (a 3)
     let args := spanLen st (a 4) (a 5)
-    [base] ++ readSpan st (a 0) (a 1) ++ utf8 (spanLen st (a 0) (a 1)) ++ [.newReceipt sir []]
+    [base] ++ readSpan st (a 0) (a 1) ++ utf8 (spanLen st (a 0) (a 1)) ++ [.newReceipt sir [], base]
       ++ readSpan st (a 2) (a 3) ++ readSpan st (a 4) (a 5) ++ readMem 16
       ++ [.actionBase (·.functionCallBase) sir, .actionBytes (·.functionCallByte) (m + args) sir,
           .prepay (a 7).toNat]
@@ -209,7 +254,7 @@ private def chargesBeforeUnvalidated (name : String) (st : Store NearState) (arg
     let m := spanLen st (a 3) (a 4)
     let args := spanLen st (a 5) (a 6)
     [base] ++ readSpan st (a 1) (a 2) ++ utf8 (spanLen st (a 1) (a 2))
-      ++ [.newReceipt sir (depsSir st (a 0).toNat (getMemOrReg st (a 2) (a 1)))]
+      ++ [.newReceipt sir (depsSir st (a 0).toNat (getMemOrReg st (a 2) (a 1))), base]
       ++ readSpan st (a 3) (a 4) ++ readSpan st (a 5) (a 6) ++ readMem 16
       ++ [.actionBase (·.functionCallBase) sir, .actionBytes (·.functionCallByte) (m + args) sir,
           .prepay (a 8).toNat]
@@ -272,9 +317,16 @@ def chargesBefore (name : String) (st : Store NearState) (args : List Value) : L
   let charges := chargesBeforeUnvalidated name st args
   if name == "promise_and" && (a 1).toNat * 8 ≥ 2 ^ 64 then
     [base, .ext "promise_and_base"]
-  else if (name == "promise_then" || name == "promise_batch_then") &&
-      !promiseIndexValid st (a 0).toNat then
-    [base] ++ readSpan st (a 1) (a 2) ++ utf8 (spanLen st (a 1) (a 2))
+  else if let some (len, ptr) := creationAccountArgs name args then
+    let readAccount := [base] ++ readSpan st len ptr
+    let parseAccount := readAccount ++ utf8 (spanLen st len ptr)
+    match creationAccountError name st args with
+    | some .memoryAccessViolation | some (.invalidRegisterId _) => readAccount
+    | some _ => parseAccount
+    | none =>
+      if (creationPrefixError name st args).isSome then parseAccount
+      else if (promiseCapacityError st).isSome then throughNewReceipt charges
+      else charges
   else if name.startsWith "promise_batch_action_" &&
       (promiseReceiver? st (a 0).toNat).isNone then
     charges.filter fun charge => match charge with
@@ -297,22 +349,30 @@ def joinedDependenciesError (handles : List PromiseHandle) (limit : Nat) : List 
 /-- Validation after argument-reading charges and before functional invocation.
 An invalid internal raw graph is explicit unsupported model state. Ordinary VM
 execution preserves graph well-formedness independently of this check. -/
+def promiseJoinError (st : Store NearState) (args : List Value) : Option HostError :=
+  match args with
+  | [.i64 ptr, .i64 count] =>
+    if count.toNat * 8 ≥ 2 ^ 64 then some .integerOverflow
+    else if ptr.toNat + count.toNat * 8 > memBytes st then some .memoryAccessViolation
+    else match readU64Array st ptr count.toNat with
+    | none => some .memoryAccessViolation
+    | some [] => none
+    | some indices =>
+      match st.host.config.maxInputDataDependencies with
+      | none => none
+      | some limit =>
+        match convertPromises st.host.promises with
+        | none => some (.unsupported "promise_and: malformed raw graph")
+        | some graph => joinedDependenciesError graph.handles limit indices 0
+  | _ => none
+
+def invocationArgumentError (name : String) (st : Store NearState) (args : List Value) : Option HostError :=
+  if name == "promise_and" then promiseJoinError st args else creationPrefixError name st args
+
 def preInvokeError (name : String) (st : Store NearState) (args : List Value) : Option HostError :=
-  if name == "promise_and" then
-    match args with
-    | [.i64 ptr, .i64 count] =>
-      if count.toNat * 8 ≥ 2 ^ 64 then some .integerOverflow
-      else match readU64Array st ptr count.toNat with
-      | none => some .memoryAccessViolation
-      | some indices =>
-        match st.host.config.maxInputDataDependencies with
-        | none => none
-        | some limit =>
-          match convertPromises st.host.promises with
-          | none => some (.unsupported "promise_and: malformed raw graph")
-          | some graph => joinedDependenciesError graph.handles limit indices 0
-    | _ => none
-  else none
+  match invocationArgumentError name st args with
+  | some error => some error
+  | none => if allocatesPromise name then promiseCapacityError st else none
 
 /-- Length of register `reg` in `st`, if set. -/
 def registerLen? (st : Store NearState) (reg : UInt64) : Option Nat :=
@@ -467,7 +527,8 @@ def metered (extraBytes : Nat) (name : String) (fn : HostFn NearState) : HostFn 
         let charges := [.ext "base"] ++
           (if name == "promise_return" then [.ext "promise_return"] else [])
         let (ns, error) := applyCharges st.host charges
-        trapWith { st with host := ns } (error.getD (.prohibitedInView name))
+        trapWith { st with host := ns } (error.getD (.prohibitedInView (if name == "promise_create" then "promise_batch_create"
+          else if name == "promise_then" then "promise_batch_then" else name)))
       else
       let (ns, err) := applyCharges st.host (chargesBefore name st args)
       let st1 := { st with host := { ns with context := { ns.context with

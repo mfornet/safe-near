@@ -1,5 +1,6 @@
 import NearVM.State
 import NearVM.Config
+import NearVM.AccountId
 
 /-!
 # `VMContext`: the input of one function call
@@ -78,7 +79,10 @@ def toNearState (cfg : RuntimeConfig) (ctx : VMContext)
       maxNumberLogs := some cfg.wasm.limits.maxNumberLogs
       maxStorageKeyLen := some cfg.wasm.limits.maxLengthStorageKey
       maxStorageValueLen := some cfg.wasm.limits.maxLengthStorageValue
-      maxInputDataDependencies := some cfg.wasm.limits.maxNumberInputDataDependencies }
+      maxInputDataDependencies := some cfg.wasm.limits.maxNumberInputDataDependencies
+      maxPromises := some cfg.wasm.limits.maxPromisesPerFunctionCallAction
+      validAccountId := if cfg.wasm.limits.accountIdValidityRulesVersion == 2 then validAccountIdBytes
+        else fun _ => true }
     randomSeed := ctx.randomSeed
     gas := { prepaid := ctx.prepaidGas, maxBurnt := maxBurnt }
     extCosts := cfg.wasm.extCosts
