@@ -1,6 +1,8 @@
 # Safe NEAR. Run `just` to list recipes; `just <recipe> <contract>` takes a name from contracts/.
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
+import 'tools/justfile'
+
 [private]
 default:
     @just --list --unsorted

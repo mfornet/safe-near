@@ -2,9 +2,9 @@ name: Lean quality
 
 on:
   push:
-    paths: ["**/lean-toolchain", "lean-toolchain", "**/lakefile.*", "tools/**", ".github/workflows/lean-quality.yml"]
+    paths: ["**/*.lean", "**/lean-toolchain", "lean-toolchain", "**/lakefile.*", "**/lake-manifest.json", "tools/**", ".github/workflows/lean-quality.yml"]
   pull_request:
-    paths: ["**/lean-toolchain", "lean-toolchain", "**/lakefile.*", "tools/**", ".github/workflows/lean-quality.yml"]
+    paths: ["**/*.lean", "**/lean-toolchain", "lean-toolchain", "**/lakefile.*", "**/lake-manifest.json", "tools/**", ".github/workflows/lean-quality.yml"]
   workflow_dispatch:
 
 permissions:
@@ -22,3 +22,21 @@ jobs:
         run: python3 tools/check_lean_toolchains.py
       - name: Test repository tooling
         run: python3 -m unittest discover -s tools/tests -v
+
+  style:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/cache@v5
+        with:
+          path: near-lean/.lake/packages
+          key: lean-style-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'near-lean/wasm/lake-manifest.json') }}
+      - uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: near-lean/wasm
+          build-args: +Mathlib.Tactic.Linter.TextBased
+          use-mathlib-cache: true
+      - name: Check Lean style and formatting
+        run: python3 tools/lean_style.py
+      - name: Test style checker and formatter
+        run: python3 tools/tests/check_lean_style.py

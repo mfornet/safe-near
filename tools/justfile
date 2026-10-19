@@ -1,0 +1,46 @@
+# Check every repository-owned Lake package against the root Lean version.
+check-toolchains:
+    python3 tools/check_lean_toolchains.py
+
+# Check Lean source style with the pinned Mathlib text-based linters.
+lean-lint:
+    python3 tools/lean_style.py
+
+# Apply Mathlib's automatic source-style fixes, then check remaining findings.
+lean-format:
+    python3 tools/lean_style.py --fix
+
+# Run the WebAssembly spec testsuite (optional .wast name filter).
+wasm-test pattern="":
+    just --justfile near-lean/wasm/justfile testsuite {{quote(pattern)}}
+
+# Show the committed Wasm report's totals and unsupported features.
+wasm-summary:
+    just --justfile near-lean/wasm/justfile testsuite-summary
+
+# Regenerate the committed Wasm coverage report with the pinned wasm-tools.
+wasm-report:
+    just --justfile near-lean/wasm/justfile testsuite-report
+
+# Build and smoke-test the Rust programs under the Lean interpreter.
+programs-test:
+    just --justfile near-lean/programs/justfile build
+    just --justfile near-lean/programs/justfile smoke
+
+# Rebuild the committed Rust test-program binaries and WAT.
+programs-build:
+    just --justfile near-lean/programs/justfile rust-build
+
+# Audit a Lake package's transitive axioms; add --allow-sorry for open specs.
+[positional-arguments]
+audit package *args:
+    python3 tools/axiom-audit.py "$@"
+
+# Download accounts at one finalized block; options include --block and --rpc.
+[positional-arguments]
+snapshot output +accounts_and_options:
+    python3 tools/near_snapshot.py "$@"
+
+# Run offline regression tests for repository tools.
+tools-test:
+    python3 -m unittest discover -s tools/tests -v
