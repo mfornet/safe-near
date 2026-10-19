@@ -19,8 +19,12 @@ hand-copying numbers.
 `RuntimeConfig` does not implement `serde::Serialize` in this version of
 `near-parameters`, so the tool serializes
 `near_parameters::view::RuntimeConfigView::from(config.clone())` instead. That
-is the same JSON shape returned by the `EXPERIMENTAL_protocol_config` RPC
-method (`runtime_config` field). See "What the view omits" below.
+preserves the JSON shape returned by the `EXPERIMENTAL_protocol_config` RPC
+method (`runtime_config` field), with a `safe_near` supplement for execution
+parameters the view omits. The supplement reads refund penalties directly
+from the pinned internal fees and evaluates the pinned `AccountCostIncrease`
+protocol feature for each table. No execution constants are copied by hand. The Lean parser requires this
+supplement; a bare RPC view is not a complete executable configuration.
 
 ## Build and run
 
@@ -49,14 +53,15 @@ The crate is intentionally outside every Cargo workspace in the repository
 
 ## What the view omits
 
-`RuntimeConfigView` (hence the JSON) does not expose the following fields of
+`RuntimeConfigView` does not expose the following fields of
 the internal `RuntimeConfig` in `near-parameters 0.37.4`:
 
 * action fees for `ActionCosts` variants 16..=25:
   `deploy_global_contract_base/byte`, `use_global_contract_base/byte`,
   `deterministic_state_init_base/byte/entry`, `gas_key_transfer_base`,
   `gas_key_byte`, `gas_key_nonce_write_base`;
-* `fees.gas_refund_penalty`, `fees.min_gas_refund_penalty` (NEP-536);
+* `fees.gas_refund_penalty`, `fees.min_gas_refund_penalty` (NEP-536), now
+  included in the `safe_near` supplement;
 * `fees.deploy_global_contract_execution_base` and its per-byte companion
   (compute costs);
 * `fees.storage_usage_config.global_contract_storage_amount_per_byte`;
@@ -67,5 +72,5 @@ the internal `RuntimeConfig` in `near-parameters 0.37.4`:
 As a consequence the parameter diffs at protocol versions 74 (bandwidth
 scheduler) and 77 (global contracts) do not produce output files, and the
 diffs at 46, 50, 55 and 63 are empty in this crate version. If any of the
-omitted fields are needed, add a custom serializer that reads the internal
+remaining omitted fields are needed, extend the custom serializer that reads the internal
 `RuntimeConfig` directly.

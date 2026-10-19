@@ -20,7 +20,7 @@ name = "NearRuntime"
 # package's Tests namespace. They are not part of the runtime library.
 [[lean_lib]]
 name = "RuntimeTests"
-roots = ["Tests.Decoder"]
+roots = ["Tests.Decoder", "Tests.Gas"]
 
 # Scenario tests: `lake exe runtime-tests`. Deploys the real wNEAR binary and
 # drives it with transactions, checking balances, receipts, refunds and the

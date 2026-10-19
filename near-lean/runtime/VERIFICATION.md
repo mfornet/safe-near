@@ -56,6 +56,29 @@ transaction charges or nonce updates. Likewise, an implicit account's initial
 key nonce uses the block that executes its transfer receipt, not the block
 that accepted the originating transaction.
 
+## Gas purchase and refund accounting
+
+Receipt gas is purchased at `max(block price, min_gas_purchase_price)`.
+Source-derived configuration also supplies the `AccountCostIncrease` feature,
+account-creation charge and refund penalties omitted by the RPC view. Current
+feature semantics distinguish purchase/burn prices, return price surplus,
+charge successful account creation and pay contract rewards at the burn price.
+Older feature settings retain the reference's purchase-price accounting.
+System refunds report execution gas without charging gas tokens; failed system
+refunds burn their deposit separately. Gas refunds identify the signer key and
+restore its current function-call allowance on delivery, saturating at u128.
+
+Forty targeted native/Lean cases compare all represented state, receipt and
+outcome fields for successful transfers/account creation across protocols
+83–86 and zero, increasing and decreasing prices. Creation-order renaming
+relates native receipt hashes to model counters; transaction hashes remain
+abstracted. Native metadata, compute and opaque trie/statistics fields are
+retained as explicit observation gaps. This is a restricted financial regression,
+not general runtime conformance. Runtime tests separately cover replaced/deleted
+keys, failed refunds, allowance saturation and refund chunk-capacity usage.
+The general comparison bridge, other actions/failures and bounded arithmetic
+remain separate obligations.
+
 ## Current implementation and gaps
 
 | Boundary | Implemented | Remaining obligations |
@@ -75,16 +98,6 @@ Known unsafe approximations still requiring implementation changes:
   not implemented; the low-level promise conversion is not a yield executor.
 - Unstaking is explicitly rejected as unsupported epoch semantics.
 - Natural-number arithmetic does not by itself reproduce bounded protocol arithmetic.
-- The first six-block native/Lean transfer diagnostic exposes gas-purchase and
-  refund discrepancies. Protocol 85+ buys receipt gas at least at
-  `min_gas_purchase_price` and refunds the burnt-gas price surplus later. The
-  Lean configuration/transaction conversion currently omits that minimum and
-  price-surplus refund, making intermediate balances and receipt queues differ
-  even when the eventual settled balances agree. System refunds also report
-  execution gas in nearcore while burning no tokens; the current Lean refund
-  path skips those gas charges. These are open implementation bugs, not allowed
-  comparison exceptions. The pinned source paths are `config.rs::tx_cost` and
-  `lib.rs::apply_action_receipt` / `refund_unspent_gas_and_deposits`.
 - Scenario code supplies a synthetic deployed code size.
 - Fuel exhaustion has a structured execution issue. `VMOutcome.issue?` separates
   model limitations from protocol outcomes. An issue makes `Near.apply` atomic:

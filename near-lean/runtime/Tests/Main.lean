@@ -1,5 +1,6 @@
 import NearRuntime
 import Tests.Decoder
+import Tests.Gas
 import Interpreter.Wasm.Decoder.Wat
 
 /-!
@@ -154,7 +155,8 @@ def main (args : List String) : IO UInt32 := do
   let r ← IO.mkRef ({} : Report)
   let cfg ← RuntimeConfig.load configs RuntimeConfig.latestVersion
   let decoderChecks ← NearRuntime.Tests.Decoder.run cfg
-  r.modify fun report => { report with passed := report.passed + decoderChecks }
+  let gasChecks ← NearRuntime.Tests.Gas.run cfg
+  r.modify fun report => { report with passed := report.passed + decoderChecks + gasChecks }
   let text ← IO.FS.readFile wat
   let module ← match Decoder.Wat.decode text with
     | .ok m => pure m
@@ -295,7 +297,7 @@ def main (args : List String) : IO UInt32 := do
     (aliceBefore - oneNear - (w.account "alice.near").amount < oneNear / 100 &&
      (w.account "alice.near").amount < aliceBefore - oneNear)
   check r "near_deposit: unused gas was refunded (a refund receipt ran)"
-    (w.outcomes.any fun (_, o) => o.executorId == "alice.near" && o.status.isSuccess && o.gasBurnt == 0)
+    (w.outcomes.any fun (_, o) => o.executorId == "alice.near" && o.status.isSuccess && o.tokensBurnt == 0)
   check r "near_deposit: NEAR conserved" (w.total = total0) s!"{w.total} vs {total0}"
 
   -- alice unwraps 0.3 NEAR
@@ -423,8 +425,10 @@ def main (args : List String) : IO UInt32 := do
     { signerId := "alice.near", publicKey := pkOf 1, nonce := 1, receiverId := "wrap.near", actions }
   let sponsorCall (method : String) : Action := .functionCall method [] (tgas 100) 0
   let fundedTotal := (sponsorState 770).totalBalance
-  let sponsored := Near.apply cfg World.ap (fun _ => sponsorCode) (sponsorState 770)
+  let sponsorSubmitted := Near.apply cfg World.ap (fun _ => sponsorCode) (sponsorState 770)
     [sponsorTx [sponsorCall "twice"]] []
+  let sponsored := Near.apply cfg World.ap (fun _ => sponsorCode)
+    sponsorSubmitted.state [] sponsorSubmitted.outgoing
   check r "sponsorship: two grants commit at storage exemption boundary"
     (sponsored.issue.isNone && sponsored.subsidizedAmount == 2 &&
      sponsored.outcomes.any fun (_, o) => o.executorId == "wrap.near" && o.status.isSuccess)
@@ -436,14 +440,15 @@ def main (args : List String) : IO UInt32 := do
          Fees.totalPrepaid action.actions) * action.gasPrice
     | .data _ => 0).sum
   check r "sponsorship: minted funds enter conservation accounting"
-    (sponsored.state.totalBalance + outgoingFunds + sponsored.tokensBurnt == fundedTotal + sponsored.subsidizedAmount)
+    (sponsored.state.totalBalance + outgoingFunds + sponsored.tokensBurnt + sponsorSubmitted.tokensBurnt == fundedTotal + sponsored.subsidizedAmount)
   for (name, actions, usage) in
       [("VM panic", [sponsorCall "panic"], 770),
        ("later action failure", [sponsorCall "one", .deleteKey (pkOf 99)], 770),
        ("later VM failure", [sponsorCall "one", sponsorCall "panic"], 770),
        ("storage staking failure", [sponsorCall "one"], 771)] do
-    let result := Near.apply cfg World.ap (fun _ => sponsorCode) (sponsorState usage)
+    let submitted := Near.apply cfg World.ap (fun _ => sponsorCode) (sponsorState usage)
       [sponsorTx actions] []
+    let result := Near.apply cfg World.ap (fun _ => sponsorCode) submitted.state [] submitted.outgoing
     check r s!"sponsorship: {name} rolls back committed mint and promises"
       (result.issue.isNone && result.subsidizedAmount == 0 &&
        !(result.outgoing.any fun receipt => !receipt.isRefund && Fees.totalDeposit receipt.actions > 0) &&
@@ -452,19 +457,21 @@ def main (args : List String) : IO UInt32 := do
   let twoSponsorState := (sponsorState 770).setAccount "bob.near"
     { amount := 0, storageUsage := 770, code := some sponsorCode }
   let secondSponsor := { sponsorTx [sponsorCall "one"] with nonce := 2, receiverId := "bob.near" }
-  let twoSponsored := Near.apply cfg World.ap (fun _ => sponsorCode) twoSponsorState
+  let twoSubmitted := Near.apply cfg World.ap (fun _ => sponsorCode) twoSponsorState
     [sponsorTx [sponsorCall "one"], secondSponsor] []
+  let twoSponsored := Near.apply cfg World.ap (fun _ => sponsorCode) twoSubmitted.state [] twoSubmitted.outgoing
   check r "sponsorship: apply accumulates grants from separate receipts"
     (twoSponsored.issue.isNone && twoSponsored.subsidizedAmount == 2)
   let issueState := (sponsorState 770).setAccount "bob.near"
     { amount := 0, storageUsage := 770, code := some unsupportedCode }
   let issueTx := { secondSponsor with actions := [sponsorCall "test"] }
-  let issueAfterGrant := Near.apply cfg World.ap (fun _ => sponsorCode) issueState
+  let issueSubmitted := Near.apply cfg World.ap (fun _ => sponsorCode) issueState
     [sponsorTx [sponsorCall "one"], issueTx] []
+  let issueAfterGrant := Near.apply cfg World.ap (fun _ => sponsorCode) issueSubmitted.state [] issueSubmitted.outgoing
   check r "sponsorship: later model issue discards all earlier grants"
     (issueAfterGrant.issue.isSome && issueAfterGrant.subsidizedAmount == 0 &&
      issueAfterGrant.outgoing.isEmpty && issueAfterGrant.outcomes.isEmpty &&
-     issueAfterGrant.tokensBurnt == 0 && issueAfterGrant.state.nextId == issueState.nextId)
+     issueAfterGrant.tokensBurnt == 0 && issueAfterGrant.state.nextId == issueSubmitted.state.nextId)
 
   let s ← r.get
   IO.println s!"{s.passed} passed, {s.failed} failed"

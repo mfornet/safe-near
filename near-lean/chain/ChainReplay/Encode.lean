@@ -105,6 +105,7 @@ def applyJson (s : Snapshot) (r : ApplyResult) : Json :=
       [("outcomes", toJson (r.outcomes.map outcomeJson)),
         ("outgoingReceipts", toJson (r.outgoing.map receiptJson)),
         ("tokensBurnt", toJson (toString r.tokensBurnt)),
+        ("subsidizedAmount", toJson (toString r.subsidizedAmount)),
         ("issue",
           toJson
             (r.issue.map fun (id, issue) =>

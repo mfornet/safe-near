@@ -100,6 +100,7 @@ the receipt, and the total yoctoNEAR charged to the signer. -/
 structure TxCost where
   gasBurnt : Nat
   gasRemaining : Nat
+  receiptGasPrice : Nat
   total : Nat
 
 def txCost (cfg : RuntimeConfig) (gasPrice : Nat) (signer receiver : AccountId)
@@ -108,10 +109,9 @@ def txCost (cfg : RuntimeConfig) (gasPrice : Nat) (signer receiver : AccountId)
   let sir := signer == receiver
   let gasBurnt := f.newActionReceipt.send sir + totalSend f sir receiver actions
   let gasRemaining := f.newActionReceipt.execution + totalExec f receiver actions + totalPrepaid actions
-  let (num, den) := cfg.fees.pessimisticGasPriceInflation
-  let inflated := gasPrice * num / den
-  { gasBurnt, gasRemaining,
-    total := gasBurnt * gasPrice + gasRemaining * inflated + totalDeposit actions }
+  let receiptGasPrice := max gasPrice cfg.minGasPurchasePrice
+  { gasBurnt, gasRemaining, receiptGasPrice,
+    total := gasBurnt * gasPrice + gasRemaining * receiptGasPrice + totalDeposit actions }
 
 end Fees
 
