@@ -1,0 +1,51 @@
+name: Chain reference smoke
+
+on:
+  push:
+    branches: [main]
+    paths: ["tools/chain-conformance/**", "tools/tests/test_chain_reference.py", "near-lean/runtime/reference.json", ".github/workflows/chain-reference.yml"]
+  pull_request:
+    paths: ["tools/chain-conformance/**", "tools/tests/test_chain_reference.py", "near-lean/runtime/reference.json", ".github/workflows/chain-reference.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chain-reference-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  native-reference:
+    name: Build pinned Runtime::apply and verify raw-state replay
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      CARGO_BUILD_JOBS: "2"
+      CARGO_PROFILE_DEV_DEBUG: "0"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - uses: dtolnay/rust-toolchain@1.93.0
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            tools/chain-conformance/.nearcore
+          key: chain-reference-${{ runner.os }}-${{ hashFiles('near-lean/runtime/reference.json') }}
+      - name: Check source custody and interrupted-build recovery
+        run: python3 -m unittest discover -s tools/tests -p test_chain_reference.py -v
+      - name: Build the clean source oracle
+        run: python3 tools/chain-conformance/prepare.py
+      - name: Verify native chunk boundaries and complete raw-state replay
+        run: python3 tools/chain-conformance/probe.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-chain-reference-evidence
+          path: |
+            audit/chain-reference-smoke.json
+            tools/chain-conformance/target/*.build.json

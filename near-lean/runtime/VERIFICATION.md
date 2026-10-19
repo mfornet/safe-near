@@ -15,6 +15,12 @@ published bytes are locked separately, and equivalence to the clean revision
 is not assumed. `tools/runtime-conformance` now runs the pinned published VM
 as an independent execution oracle. The initial gas discrepancies have been
 fixed for the checked fixtures. General VM conformance remains unproved.
+`tools/chain-conformance` also builds the clean source's full trie-backed
+`Runtime::apply`. Its source, manifest overlay, lockfile, compiler and executable
+are recorded and checked; the runtime implementation is not patched. Native
+smoke checks establish deterministic raw-state replay and the transaction/
+receipt chunk boundary. The Lean frontend and full-runtime differential
+comparison remain to be connected.
 Selecting
 an older table does not select older execution semantics: the current Lean
 configuration still omits most protocol feature switches. The loading-cost

@@ -88,3 +88,13 @@ check: test-all vm-dependencies lean-lint audit-all build-all
 [positional-arguments]
 snapshot-vm snapshot account scenario +options:
     python3 tools/snapshot_vm.py "$@"
+
+# Build the pinned trie-backed nearcore Runtime::apply reference (cold native build).
+[positional-arguments]
+chain-reference-build *options:
+    python3 tools/chain-conformance/prepare.py "$@"
+
+# Smoke-test the native apply reference and save raw-state evidence; no Lean comparison yet.
+[positional-arguments]
+chain-reference-test *options:
+    python3 tools/chain-conformance/probe.py "$@"

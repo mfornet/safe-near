@@ -25,6 +25,8 @@ core axiom audits, formatter integration checks and contract builds.
 | `just tools-test` | Run offline Python tooling regression tests |
 | `just snapshot /tmp/fixture.json lockup.near` | Download a block-pinned account fixture |
 | `just snapshot-vm SNAPSHOT ACCOUNT SCENARIO --report REPORT` | Compare VM calls seeded from a complete captured account |
+| `just chain-reference-build [options...]` | Build the clean pinned nearcore transaction/receipt reference |
+| `just chain-reference-test [options...]` | Exercise the native reference's chunk boundaries and complete raw-state replay |
 
 ## Lean quality
 
@@ -146,6 +148,13 @@ fixture test demonstrates a clean graph, a forbidden transitive dependency,
 and an incorrectly disconnected execution module.
 `just vm-dependencies` runs both the real graph check and those adversarial
 fixture cases; `just check` includes the same gate.
+
+## Full runtime reference
+
+The full transaction/receipt reference is documented in
+[chain-conformance/README.md](chain-conformance/README.md). It runs the actual
+trie-backed `Runtime::apply` and preserves complete raw state. Its smoke checks
+do not yet compare the Lean chain runner with nearcore.
 
 ## Snapshots
 
