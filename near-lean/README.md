@@ -86,13 +86,19 @@ never change.
 ## chain
 
 `NearChain/Step.lean`: a `Snapshot` is a chain state plus the receipts in
-flight; `step` applies a block; `Reachable` closes it under block sequences;
+flight; `step` applies a block with ordered incoming selection and deferral;
+`Reachable` closes it under those same block sequences;
 `runIsolated` runs transactions and everything they cause with nothing else
 interleaved; `Receipt.touches`, `Receipt.upgrades` and `Block.independentOf`
 inspect direct interactions in pending, delayed and postponed queues. They do
 not establish independence from indirect contract effects. `settle` and
 `runIsolated` return a `RunResult` distinguishing quiescence, exhausted block
-budget and execution issues. Their completion implies quiescence by proved
+budget, invalid delivery schedules and execution issues. `runBlocks` executes
+explicit custom blocks without automatically draining deferred work. Its
+results are proved reachable; selection preserves the receipt multiset and
+the order of deferred work. See [chain/README.md](chain/README.md) for the
+`Except`-returning step API and scheduling examples.
+Reported completion implies quiescence by proved
 lemmas. `measureCallGasBurnt` measures successful settled executions with
 maximum attached gas; it does not establish sufficient prepaid gas.
 `lake exe chain-tests` exercises these boundaries on wNEAR.
