@@ -13,7 +13,8 @@ permissions:
 
 concurrency:
   group: chain-reference-${{ github.head_ref || github.ref_name }}
-  cancel-in-progress: true
+  # Let one cold native build finish and save its cache across rapid PR pushes.
+  cancel-in-progress: false
 
 jobs:
   native-reference:
