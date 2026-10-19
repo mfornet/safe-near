@@ -408,6 +408,22 @@ def viewRestrictedHost (name : String) : Bool :=
 def deprecatedRuntimeHost (name : String) : Bool :=
   ["storage_iter_prefix", "storage_iter_range", "storage_iter_next"].contains name
 
+/-- Post-call metering is separated from host invocation so its frame
+properties can be used directly in execution proofs. -/
+def finishMeteredCall (extraBytes : Nat) (name : String) (before : Store NearState)
+    (args : List Value) : HostResult NearState → HostResult NearState
+  | .Return vals st2 =>
+    let (ns2, err2) := applyCharges st2.host (chargesAfter name before st2 args)
+    let st3 := { st2 with host := ns2 }
+    match err2 with
+    | some e => trapWith st3 e
+    | none =>
+      match deductDeposit name before st3 args with
+      | (st4, some e) => trapWith st4 e
+      | (st4, none) => .Return vals (updateStorageUsage extraBytes name before st4 args)
+  | .Trap st2 msg => .Trap st2 msg
+  | .Throw st2 tag vals => .Throw st2 tag vals
+
 /-- Wrap a functional host function with its gas and storage-usage rules. -/
 def metered (extraBytes : Nat) (name : String) (fn : HostFn NearState) : HostFn NearState :=
   { fn with invoke := fun st args =>
@@ -424,18 +440,7 @@ def metered (extraBytes : Nat) (name : String) (fn : HostFn NearState) : HostFn 
       match err with
       | some e => trapWith st1 e
       | none =>
-        match fn.invoke st1 args with
-        | .Return vals st2 =>
-          let (ns2, err2) := applyCharges st2.host (chargesAfter name st1 st2 args)
-          let st3 := { st2 with host := ns2 }
-          match err2 with
-          | some e => trapWith st3 e
-          | none =>
-            match deductDeposit name st1 st3 args with
-            | (st4, some e) => trapWith st4 e
-            | (st4, none) => .Return vals (updateStorageUsage extraBytes name st1 st4 args)
-        | .Trap st2 msg => .Trap st2 msg
-        | .Throw st2 tag vals => .Throw st2 tag vals }
+        finishMeteredCall extraBytes name st1 args (fn.invoke st1 args) }
 
 /-- These host operations require semantics not supplied by `VMContext`.
 Reject them on invocation instead of using the functional host's placeholder

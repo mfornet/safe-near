@@ -141,9 +141,9 @@ prove that every public VM result has backward-only dependencies, an existing
 returned receipt and no dependency cycle. Invalid raw handles or converted
 graphs become model issues with balance/storage/usage rollback; logs and burnt
 gas remain diagnostic observations. These predicates concern dependency indices,
-not full action/account validity or global identifier freshness. Preservation of
-raw handle validity by every host operation remains open; accepted outputs are
-checked regardless. Join conversion is now related to explicit ordered graph
+not full action/account validity or global identifier freshness. Preservation
+across the complete host registry and interpreter remains open; accepted outputs
+are checked regardless. Join conversion is now related to explicit ordered graph
 semantics by the proofs described below.
 The join oracle covers ordinary, nested, duplicate and empty joins, illegal
 joint returns/actions, nonexistent handles, view restrictions and low-gas error
@@ -164,3 +164,15 @@ The old fuel-based converter and its silent invalid-return fallback are removed.
 A nearcore regression also found that `value_return` after `promise_return` kept
 the old promise selected; successful selectors now clear each other's state,
 with kernel-checked overwrite lemmas and exact comparisons in both call orders.
+
+`NearVM/HostPromises.lean` now proves raw dependency preservation for the 14
+functional promise creation/action functions, the three promise result/return
+functions, and `value_return`. The property includes returned, trapped and thrown
+stores. `metered_preserves_promises` lifts any such host proof through pre/post
+charges, deposit deductions and storage-usage updates. Post-call metering was
+extracted into `finishMeteredCall` without changing its execution order or
+behavior. Initialization has an empty well-formed graph, and
+`HostPreservesPromises.convertible` connects successful host execution directly
+to the proved converter and receipt-graph validity. Full interpreter/registry
+preservation, action validity, integer bounds, global freshness and conservation
+remain separate obligations.

@@ -139,3 +139,12 @@ preserves receipt validity from the empty graph. Returned receipt identity comes
 from that same handle table. Successful `value_return` and `promise_return`
 selections now overwrite each other; overwrite lemmas and independent regressions
 cover both call orders.
+
+`NearVM/HostPromises.lean` proves dependency well-formedness preservation for
+18 promise and return-value host functions, including
+error outcomes. A generic metering theorem lifts these proofs through gas
+charging, deposit deductions and storage-usage updates. Initialization starts
+with a well-formed empty graph; successful preserving host calls therefore
+admit conversion to a valid receipt graph. These local proofs do not yet cover
+the complete host registry or interpreter transitions, full action validity,
+identifier bounds/freshness, or global token conservation.
