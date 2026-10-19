@@ -53,7 +53,7 @@ theorem storageWriteFn_preserves : HostPreservesPromises storageWriteFn := by
     | exact writeRegisterResult_preserves _ _ _ _ _ hwf
     | split)
   all_goals
-    simp_all only [HostResultPromisesWellFormed, NearState.setStorage,
+    simp_all only [HostResult.Satisfies, NearState.setStorage,
       NearState.invalidateIterators]
   all_goals
     rename_i hreg
@@ -78,7 +78,7 @@ theorem storageRemoveFn_preserves : HostPreservesPromises storageRemoveFn := by
     | exact writeRegisterResult_preserves _ _ _ _ _ hwf
     | split)
   all_goals
-    simp_all only [HostResultPromisesWellFormed, NearState.removeStorage,
+    simp_all only [HostResult.Satisfies, NearState.removeStorage,
       NearState.invalidateIterators]
   all_goals
     rename_i hreg

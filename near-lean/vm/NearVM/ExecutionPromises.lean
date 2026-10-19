@@ -1,6 +1,6 @@
 import NearVM.HostDispatch
-import NearVM.Run
-import NearVM.ExecutionFrames
+import NearVM.MeteredInvariant
+import NearVM.InterpreterInvariant
 
 /-!
 Dependency preservation through the authoritative small-step interpreter and
@@ -70,32 +70,7 @@ theorem step_promises {before after : SmallStep.Config NearState} {kind : SmallS
     (hhosts : RuntimePreservesPromises before.store.runtime)
     (hwf : PromisesWellFormedFrom 0 before.store.wasm.host.promises) :
     PromisesWellFormedFrom 0 after.store.wasm.host.promises := by
-  revert hhosts hwf
-  induction h <;> intro hhosts hwf <;> try exact hwf
-  all_goals first
-    | simpa only [SmallStep.prepareCatch_host, SmallStep.setMemoryAt_host] using hwf
-    | (rename_i hcall
-       first
-       | apply hostReturn_promises _ hcall hhosts hwf
-       | apply hostTrap_promises _ hcall hhosts hwf
-       | apply hostThrow_promises _ _ hcall hhosts hwf
-       solve_by_elim [Or.inl, Or.inr, List.mem_of_getElem?])
-    | (rename_i heval
-       have hp := execGcOp_fallthrough_host heval
-       simpa only [hp] using hwf)
-    | (rename_i heval
-       have hp := execGcOp_trap_host heval
-       simpa only [hp] using hwf)
-    | (rename_i heval htarget
-       have hp := execGcOp_break_host heval
-       simpa only [hp] using hwf)
-    | skip
-  case memOp =>
-    rename_i henter hstep ih
-    rw [SmallStep.resumeAfterIndexedMemory_host]
-    apply ih
-    · exact RuntimePreservesPromises.of_hosts_eq (SmallStep.enterIndexedMemory_hosts henter) hhosts
-    · simpa only [SmallStep.enterIndexedMemory_host henter] using hwf
+  exact step_hostInvariant (P := fun ns : NearState => PromisesWellFormedFrom 0 ns.promises) h hhosts hwf
 
 /-- The dependency invariant includes the callable environments needed by
 subsequent steps, including cross-instance calls. -/
@@ -120,35 +95,8 @@ exhaustion and diagnostic errors, without relying on output validation. -/
 theorem runMetered_preserves_promises (cfg : WasmConfig) (fuel : Nat)
     (config : SmallStep.Config NearState) (h : ConfigPromisesValid config) :
     ConfigPromisesValid (runMetered cfg fuel config).1 := by
-  induction fuel generalizing config with
-  | zero => cases he : config.expr <;> simpa only [runMetered, he] using h
-  | succ fuel ih =>
-    cases he : config.expr with
-    | done values => simpa only [runMetered, he] using h
-    | trapped reason => simpa only [runMetered, he] using h
-    | running thread =>
-      cases hc : chargeWasm config (nextInstructionGas cfg config) with
-      | mk paid error =>
-        have hp := chargeWasm_preserves_promises config (nextInstructionGas cfg config) h
-        rw [hc] at hp
-        cases error with
-        | some error => simpa only [runMetered, he, hc] using hp
-        | none =>
-          cases hs : SmallStep.stepChecked? paid with
-          | error error => simpa only [runMetered, he, hc, hs] using hp
-          | ok transition =>
-            cases transition with
-            | none => simpa only [runMetered, he, hc, hs] using hp
-            | some transition =>
-              obtain ⟨kind, next⟩ := transition
-              have hn := step_preserves_promises (SmallStep.stepChecked?_sound hs) hp
-              cases hf : chargeWasm next (frameTransitionGas cfg paid next) with
-              | mk final error =>
-                have hfinal := chargeWasm_preserves_promises next (frameTransitionGas cfg paid next) hn
-                rw [hf] at hfinal
-                cases error with
-                | some error => simpa only [runMetered, he, hc, hs, hf] using hfinal
-                | none => simpa only [runMetered, he, hc, hs, hf] using ih final hfinal
+  exact runMetered_hostInvariant (fun ns => PromisesWellFormedFrom 0 ns.promises)
+    (by intro config cost hwf; exact hwf) cfg fuel config h
 
 theorem steps_preserve_promises {before after : SmallStep.Config NearState} {trace : List SmallStep.StepKind}
     (hsteps : SmallStep.Steps before trace after) (h : ConfigPromisesValid before) :

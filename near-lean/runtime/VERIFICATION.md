@@ -195,6 +195,26 @@ frames as well. Successful resolved initialization establishes the invariant.
 `runResolved_promises_convertible` connects that initialization and actual
 metered execution to a valid converted graph without using the output checker.
 The initial promise list must be well formed (ordinary VM contexts start empty).
-These proofs do not establish complete state well-formedness, valid returned
-selection, account/action validity, bounds, global freshness or conservation,
+These proofs do not establish complete state well-formedness, account/action
+validity, bounds, global freshness or conservation,
 nor do they prove equivalence between interpreter steps and nearcore.
+
+Returned-promise selection is now a separate preserved invariant in
+`ReturnSelection.lean`: an optional selection names an existing non-joint raw
+handle. Creation and action append preserve earlier selected slots;
+`value_return` clears selection and `promise_return` checks existence and kind.
+`HostSelection` and `MeteredSelection` cover the complete resolved registry,
+including errors and unsupported rejection. `InterpreterInvariant` provides
+one generic step/trace/initialization proof, and `MeteredInvariant` lifts it
+through execution with an explicit gas-frame premise. Both the dependency and
+selection proofs specialize these shared results.
+`ReturnGraph` proves non-joint slots retain receipt identities through all
+subsequent conversion, and bounds their returned receipt indices.
+`runResolved_return_selection` in `ExecutionSelection.lean` combines resolved
+initialization, metered execution, graph validity and return resolution.
+`PromiseGraph.returnData?` is extracted from the existing VM return branch;
+its totality is proved for convertible graphs with valid selection, including
+exact value bytes when no promise is selected. Yielded raw handles remain
+excluded by dependency well-formedness; this invariant does not implement yield.
+Bounds/freshness, complete state validity, conservation and deployed refinement
+remain open.

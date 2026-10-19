@@ -11,3 +11,4 @@ import NearVM.HostPromises
 import NearVM.HostDispatch
 import NearVM.Run
 import NearVM.ExecutionPromises
+import NearVM.ExecutionSelection

@@ -1,6 +1,7 @@
 import NearVM.Metered
 import NearVM.Context
 import NearVM.PromiseGraph
+import NearVM.InterpreterInvariant
 
 namespace Wasm.Near
 
@@ -134,12 +135,11 @@ theorem appendJointPromise_preserves (st : Store NearState) (dependencies : List
 
 /-- The invariant is preserved in every returned host store, including traps;
 this is stronger than the condition needed by successful VM conversion. -/
-def HostResultPromisesWellFormed : HostResult NearState → Prop
-  | .Return _ st | .Trap st _ | .Throw st _ _ => PromisesWellFormedFrom 0 st.host.promises
+def HostResultPromisesWellFormed :=
+  HostResult.Satisfies (fun ns : NearState => PromisesWellFormedFrom 0 ns.promises)
 
-def HostPreservesPromises (fn : HostFn NearState) : Prop :=
-  ∀ st args, PromisesWellFormedFrom 0 st.host.promises →
-    HostResultPromisesWellFormed (fn.invoke st args)
+def HostPreservesPromises :=
+  HostFn.Preserves (fun ns : NearState => PromisesWellFormedFrom 0 ns.promises)
 
 theorem checkAccountId_preserves_promises (name : String) (st : Store NearState)
     (account : List UInt8) (next : Unit → HostResult NearState)

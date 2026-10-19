@@ -163,5 +163,17 @@ cross-instance calls, GC operations, exception preparation and indexed-memory
 execution. Resolved initialization establishes the callable-host invariant;
 `runResolved_promises_convertible` proves that execution from a well-formed
 initial promise list produces a convertible valid graph without assuming an
-output-validator check. This does not yet prove returned-handle selection,
-full state well-formedness, global identifier freshness or conservation.
+output-validator check. Full state well-formedness, global identifier freshness
+and conservation remain separate obligations.
+
+`NearVM/ExecutionSelection.lean` adds returned-handle preservation. Every
+resolved host operation and metered execution preserves the existence and
+non-joint kind of the selected handle. `ReturnGraph.lean` proves conversion
+keeps that slot's receipt identity and produces an in-bounds returned receipt.
+`runResolved_return_selection` combines both invariants from resolved
+initialization; `PromiseGraph.returnData?_total` proves the exact return helper
+used by the VM cannot reject such a selection. Ordinary contexts start with no
+selection. The shared `InterpreterInvariant` and `MeteredInvariant` theorems now
+carry both dependency and selection proofs, with gas preservation explicit.
+These guarantees do not establish numeric bounds, identifier freshness, full
+state validity, token conservation, or deployed wNEAR refinement.
