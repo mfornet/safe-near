@@ -1,0 +1,24 @@
+name: Lean quality
+
+on:
+  push:
+    paths: ["**/lean-toolchain", "lean-toolchain", "**/lakefile.*", "tools/**", ".github/workflows/lean-quality.yml"]
+  pull_request:
+    paths: ["**/lean-toolchain", "lean-toolchain", "**/lakefile.*", "tools/**", ".github/workflows/lean-quality.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  toolchains:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Check all repository-owned Lean pins
+        run: python3 tools/check_lean_toolchains.py
+      - name: Test repository tooling
+        run: python3 -m unittest discover -s tools/tests -v
