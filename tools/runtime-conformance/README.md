@@ -91,3 +91,11 @@ memory and register inputs; a low-gas case checks empty-method precedence over
 later action-fee exhaustion, and a view case checks restrictions before reads.
 The initial fixture found 15 mismatching cases. Comparisons retain exact bytes,
 error text, fee profiles and prepaid/used/burnt gas.
+
+`sponsorship*.json` checks the v84/v85 protocol boundary and v86 accounting:
+paid, zero, repeated and combined function-call deposits, ineligible transfers,
+invalid methods, view restrictions, and attempted grants retained after panic or
+later balance failure. VM subsidy is diagnostic; receipt-level rollback and
+committed minting are covered by runtime scenarios rather than this VM oracle.
+The initial sponsorship comparisons also exposed a missing period in the
+`BalanceExceeded` error text; the Lean text now matches the reference exactly.

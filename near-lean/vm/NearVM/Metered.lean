@@ -486,8 +486,32 @@ def updateStorageUsage (extraBytes : Nat) (name : String) (before after : Store 
     | none => after
   | _ => after
 
-/-- Deposits attached to promise actions leave the account balance when the
-action is created (`BalanceExceeded` if it cannot cover them). -/
+/-- Deduct a promise deposit or grant the protocol's one-yocto subsidy.
+Only function-call actions qualify; the counter is diagnostic until receipt commit. -/
+def deductPromiseDeposit (name : String) (ns : NearState) (d : Nat) : NearState × Option HostError :=
+  let bal := ns.context.accountBalance
+  if ns.config.oneYoctoOnPromise && d == 1 && bal == 0 &&
+      (name == "promise_create" || name == "promise_then" ||
+       name == "promise_batch_action_function_call") then
+    ({ ns with subsidizedAmount := ns.subsidizedAmount + d }, none)
+  else if d ≤ bal then
+    ({ ns with context := { ns.context with accountBalance := bal - d } }, none)
+  else (ns, some .balanceExceeded)
+
+/-- Successful deductions conserve liquid funds plus minted deposits. -/
+theorem deductPromiseDeposit_accounting (name : String) (ns : NearState) (d : Nat)
+    (h : (deductPromiseDeposit name ns d).2 = none) :
+    ns.context.accountBalance + (deductPromiseDeposit name ns d).1.subsidizedAmount =
+      (deductPromiseDeposit name ns d).1.context.accountBalance + ns.subsidizedAmount + d := by
+  by_cases hs : (ns.config.oneYoctoOnPromise && d == 1 && ns.context.accountBalance == 0 &&
+      (name == "promise_create" || name == "promise_then" ||
+       name == "promise_batch_action_function_call")) = true
+  · simp [deductPromiseDeposit, hs, Nat.add_assoc]
+  · by_cases hd : d ≤ ns.context.accountBalance
+    · simp [deductPromiseDeposit, hs, hd]
+      omega
+    · simp [deductPromiseDeposit, hs, hd] at h
+
 def deductDeposit (name : String) (before after : Store NearState) (args : List Value) :
     Store NearState × Option HostError :=
   let a := argU64 args
@@ -502,10 +526,8 @@ def deductDeposit (name : String) (before after : Store NearState) (args : List 
   match deposit with
   | some 0 => (after, none)
   | some d =>
-    let bal := after.host.context.accountBalance
-    if d ≤ bal then
-      ({ after with host := { after.host with context := { after.host.context with accountBalance := bal - d } } }, none)
-    else (after, some .balanceExceeded)
+    let (ns, err) := deductPromiseDeposit name after.host d
+    ({ after with host := ns }, err)
   | none => (after, none)
 
 /-- `panic_utf8(len, ptr)` with the message. -/

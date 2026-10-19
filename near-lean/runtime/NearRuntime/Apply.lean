@@ -21,6 +21,8 @@ structure ApplyResult where
   /-- Yocto burnt as gas during this apply: gas × price of every outcome,
   minus what went to contracts as `burnt_gas_reward`. -/
   tokensBurnt : Nat
+  /-- Newly minted promise deposits, separate from positive gas burn. -/
+  subsidizedAmount : Nat := 0
   /-- No state transition is committed when the model cannot execute a receipt.
   The state is the input state and the protocol observations are empty. -/
   issue : Option (ReceiptId × ExecutionIssue) := none
@@ -34,6 +36,7 @@ structure Exec where
   /-- Authority for administrative actions; creation changes it to the new
   receiver, as in nearcore's `actor_id`. -/
   actorId : AccountId := ""
+  subsidizedAmount : Nat := 0
   newReceipts : List Receipt := []
   gasBurnt : Nat := 0
   /-- Gas burnt or attached onward; what is left of the receipt's gas is refunded. -/
@@ -150,6 +153,7 @@ def applyFunctionCall (c : ReceiptCtx) (method : String) (args : Bytes) (gas dep
   match outcome.aborted with
   | some err => throw (.functionCallError err)
   | none =>
+    modify fun e => { e with subsidizedAmount := e.subsidizedAmount + outcome.subsidizedAmount }
     putAccount id { account with amount := outcome.balance, storageUsage := outcome.storageUsage }
     modifyState (·.setContractStorage id outcome.storage)
     -- receipts created by the call
@@ -259,12 +263,18 @@ def applyAction (c : ReceiptCtx) (isLast : Bool) : Action → ExecM Unit
     modify fun e => { e with actorId := c.receipt.predecessorId }
     emit r
 
-/-- `check_storage_stake`: the account must hold enough to pay for its state. -/
+/-- Pinned nearcore verifier's zero-balance account exemption (NEP-448). -/
+def zeroBalanceAccountStorageLimit : Nat := 770
+
+def storageStakeDeficit (cfg : RuntimeConfig) (a : Account) : Nat :=
+  if a.storageUsage ≤ zeroBalanceAccountStorageLimit then 0
+  else a.storageUsage * cfg.storageAmountPerByte - a.amount - a.locked
+
 def checkStorageStake (cfg : RuntimeConfig) (id : AccountId) : ExecM Unit := do
   match (← getState).account? id with
   | some a =>
-    let required := a.storageUsage * cfg.storageAmountPerByte
-    if a.amount + a.locked < required then throw (.lackBalanceForState id (required - a.amount - a.locked))
+    let deficit := storageStakeDeficit cfg a
+    if deficit > 0 then throw (.lackBalanceForState id deficit)
   | none => pure ()
 
 /-! ## Receipts -/
@@ -351,7 +361,7 @@ def applyActionReceipt (c : ReceiptCtx) (st0 : ChainState) : Exec :=
     | (.error err, e) => (e, some err)
   -- roll back on failure: keep gas, drop receipts and state changes
   let exec := match failed with
-    | some err => { exec with state := st0, newReceipts := [], gasUsed := exec.gasBurnt,
+    | some err => { exec with state := st0, newReceipts := [], subsidizedAmount := 0, gasUsed := exec.gasBurnt,
                               result := some (.failure err) }
     | none => exec
   let _ := failed
@@ -404,6 +414,7 @@ structure Processed where
   state : ChainState
   receipts : List Receipt := []
   outcomes : List (ReceiptId × ExecutionOutcome) := []
+  subsidizedAmount : Nat := 0
   rewards : Nat := 0
   issue : Option (ReceiptId × ExecutionIssue) := none
   deriving Inhabited
@@ -429,7 +440,7 @@ def processReceipt (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → C
       | some issue => { state := st, issue := some (r.receiptId, issue) }
       | none =>
         { state := e.state, receipts := e.newReceipts, outcomes := [(r.receiptId, outcomeOf r a.gasPrice e)],
-          rewards := e.reward }
+          rewards := e.reward, subsidizedAmount := e.subsidizedAmount }
     else
       let st := { st with
         postponed := Assoc.insert st.postponed r.receiptId r
@@ -484,8 +495,8 @@ def convertTransaction (cfg : RuntimeConfig) (ap : ApplyState) (st : ChainState)
       | _ => throw (.invalidAccessKey "RequiresFullAccess")
   if signer.amount < cost.total then throw (.notEnoughBalance tx.signerId signer.amount cost.total)
   let signer' := { signer with amount := signer.amount - cost.total }
-  if signer'.amount + signer'.locked < signer'.storageUsage * cfg.storageAmountPerByte then
-    throw (.lackBalanceForState tx.signerId (signer'.storageUsage * cfg.storageAmountPerByte - signer'.amount))
+  let deficit := storageStakeDeficit cfg signer'
+  if deficit > 0 then throw (.lackBalanceForState tx.signerId deficit)
   let st := (st.setAccount tx.signerId signer').setAccessKey tx.signerId tx.publicKey key'
   let (id, st) := st.freshId
   let action : ActionReceipt :=
@@ -510,6 +521,7 @@ private def applyAttempt (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes
   let mut outcomes : List (ReceiptId × ExecutionOutcome) := []
   let mut outgoing : List Receipt := []
   let mut localReceipts : List Receipt := []
+  let mut subsidizedAmount := 0
   let mut tokensBurnt := 0
   let mut txIndex := 0
   for tx in txs do
@@ -539,6 +551,7 @@ private def applyAttempt (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes
       let p := processReceipt cfg ap codeOf st r
       if let some issue := p.issue then
         return { state := initial, outgoing := [], outcomes := [], tokensBurnt := 0, issue := some issue }
+      subsidizedAmount := subsidizedAmount + p.subsidizedAmount
       st := p.state
       outgoing := outgoing ++ p.receipts
       outcomes := outcomes ++ p.outcomes
@@ -548,7 +561,7 @@ private def applyAttempt (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes
       tokensBurnt := tokensBurnt - p.rewards
       if let some limit := ap.gasLimit then
         if gasUsed ≥ limit then overLimit := true
-  return { state := st, outgoing, outcomes, tokensBurnt }
+  return { state := st, outgoing, outcomes, tokensBurnt, subsidizedAmount }
 
 /-- Commit a supported chunk. Model limitations invalidate the entire attempt:
 no fees, refunds, nonces, receipt consumption, or state changes are committed. -/
@@ -556,7 +569,7 @@ def apply (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → ContractCo
     (st : ChainState) (txs : List Transaction) (incoming : List Receipt) : ApplyResult :=
   let result := applyAttempt cfg ap codeOf st txs incoming
   if result.issue.isSome then
-    { result with state := st, outgoing := [], outcomes := [], tokensBurnt := 0 }
+    { result with state := st, outgoing := [], outcomes := [], tokensBurnt := 0, subsidizedAmount := 0 }
   else result
 
 /-- An unsupported or incomplete apply is atomic with respect to all public
@@ -568,6 +581,15 @@ theorem apply_issue_atomic (cfg : RuntimeConfig) (ap : ApplyState)
     (apply cfg ap codeOf st txs incoming).outgoing = [] ∧
     (apply cfg ap codeOf st txs incoming).outcomes = [] ∧
     (apply cfg ap codeOf st txs incoming).tokensBurnt = 0 := by
+  cases hi : (applyAttempt cfg ap codeOf st txs incoming).issue with
+  | none => simp [apply, hi] at h
+  | some issue => simp [apply, hi]
+
+/-- A model issue never commits attempted minting. -/
+theorem apply_issue_subsidized_zero (cfg : RuntimeConfig) (ap : ApplyState)
+    (codeOf : Bytes → ContractCode) (st : ChainState) (txs : List Transaction)
+    (incoming : List Receipt) (h : (apply cfg ap codeOf st txs incoming).issue ≠ none) :
+    (apply cfg ap codeOf st txs incoming).subsidizedAmount = 0 := by
   cases hi : (applyAttempt cfg ap codeOf st txs incoming).issue with
   | none => simp [apply, hi] at h
   | some issue => simp [apply, hi]

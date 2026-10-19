@@ -267,9 +267,13 @@ an empty method that must fail before action-fee gas exhaustion.
 `FunctionCallValidation` proves successful plans admit exact readable inputs,
 nonempty methods, receipt targets, and matching functional action construction;
 it also connects pre-invocation acceptance to that action result.
-One additional pinned-v86 accounting gap is identified: `one_yocto_on_promise`
-is enabled by the reference but its sponsored one-yocto branch is not modeled
-by the current deposit deduction. A separate independent probe with
-zero balance and a one-yocto function-call deposit currently disagrees on abort
-status, used gas, emitted receipts and subsidized amount. Sponsorship accounting,
-global conservation and deployed refinement remain open.
+One-yocto sponsorship is enabled from the pinned v85 configuration. Eligible
+function-call deposits of exactly one yocto at zero liquid balance increment
+`VMOutcome.subsidizedAmount`; transfers and larger deposits remain unfunded.
+Failed VM calls retain attempted subsidy diagnostics, matching the VM reference.
+Receipt execution commits subsidy only on success and clears it on any later
+action or storage-staking failure. Apply results aggregate committed subsidy
+separately from gas burn, and model issues commit zero subsidy (kernel proved).
+The 770-byte storage-staking exemption follows pinned nearcore's verifier.
+The local deposit accounting equation is kernel proved; a full chain conservation
+theorem incorporating minted grants and deployed wNEAR refinement remain open.

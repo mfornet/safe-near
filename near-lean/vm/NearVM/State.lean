@@ -77,6 +77,7 @@ deriving Inhabited
 limit unconstrained, which keeps existing concrete examples small and easy to
 compute while allowing fidelity checks to opt in to nearcore-style traps. -/
 structure NearConfig where
+  oneYoctoOnPromise : Bool := false
   maxRegisterLen     : Option Nat := none
   maxReturnLen       : Option Nat := none
   maxLogLen          : Option Nat := none
@@ -148,6 +149,8 @@ structure NearState where
   /-- Register ABI scratch buffers: `id ↦ bytes`, `none` when unset. -/
   registers  : Nat → Option (List UInt8) := fun _ => none
   context    : NearContext := {}
+  /-- Attempted one-yocto grants; retained as diagnostics on VM failure. -/
+  subsidizedAmount : Nat := 0
   /-- Value set by `value_return` (the call's result), if any. -/
   returnData : Option (List UInt8) := none
   /-- Log lines emitted during the call, newest last. -/

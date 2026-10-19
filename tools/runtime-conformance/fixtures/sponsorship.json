@@ -1,0 +1,78 @@
+{
+  "code": "tools/runtime-conformance/fixtures/sponsorship.wasm",
+  "sha256": "181459f6492c78d9494e52eb38824a6ce3d094592dbd8a09cd47c6855bb14544",
+  "protocolVersion": 86,
+  "initialBalance": "0",
+  "initialStorageUsage": 182,
+  "storage": [],
+  "calls": [
+    {
+      "name": "one grant",
+      "method": "one",
+      "args": {}
+    },
+    {
+      "name": "two grants",
+      "method": "twice",
+      "args": {}
+    },
+    {
+      "name": "zero deposit",
+      "method": "zero",
+      "args": {}
+    },
+    {
+      "name": "two yocto unfunded",
+      "method": "two",
+      "args": {}
+    },
+    {
+      "name": "transfer is ineligible",
+      "method": "transfer",
+      "args": {}
+    },
+    {
+      "name": "empty method before grant",
+      "method": "empty",
+      "args": {}
+    },
+    {
+      "name": "panic retains diagnostic grant",
+      "method": "panic",
+      "args": {}
+    },
+    {
+      "name": "later failure retains diagnostic grant",
+      "method": "late_failure",
+      "args": {}
+    },
+    {
+      "name": "paid deposit",
+      "method": "one",
+      "args": {},
+      "deposit": "1"
+    },
+    {
+      "name": "paid then sponsored",
+      "method": "twice",
+      "args": {},
+      "deposit": "1"
+    },
+    {
+      "name": "view prohibits grant",
+      "method": "one",
+      "args": {},
+      "view": true
+    },
+    {
+      "name": "combined create grants",
+      "method": "create",
+      "args": {}
+    },
+    {
+      "name": "combined then grants",
+      "method": "then",
+      "args": {}
+    }
+  ]
+}

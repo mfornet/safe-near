@@ -205,5 +205,8 @@ their receiver/receipt/count prefix before this plan. Memory-or-register reads
 of missing registers incur no register-read charge, matching the reference.
 `FunctionCallValidation.lean` proves accepted inputs are readable, methods are
 nonempty, direct targets are receipts, and the functional host builds the same
-raw action. The pinned VM's one-yocto sponsorship feature remains an accounting
-gap; global conservation and deployed refinement are still open.
+raw action. One-yocto sponsorship follows the protocol flag: eligible function
+calls at zero liquid balance receive minted deposits. VM outcomes retain attempted
+grants on failure; receipt/apply results count only committed grants separately
+from burnt tokens. `deductPromiseDeposit_accounting` proves local accounting.
+Global conservation and deployed refinement are still open.

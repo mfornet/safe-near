@@ -319,6 +319,76 @@ def main (args : List String) : IO UInt32 := do
 
   check r "supported scenarios never encounter a model issue" (w.issue.isNone && r1.issue.isNone && r2.issue.isNone)
 
+  let spendToZero : Transaction :=
+    { signerId := "alice.near", publicKey := pkOf 1, nonce := 1,
+      receiverId := "bob.near", actions := [.transfer 0] }
+  let zeroCost := Fees.txCost cfg World.ap.gasPrice "alice.near" "bob.near" spendToZero.actions
+  for (usage, accepted) in [(770, true), (771, false)] do
+    let zeroSigner := genesis.setAccount "alice.near" { amount := zeroCost.total, storageUsage := usage }
+    let result := convertTransaction cfg World.ap zeroSigner spendToZero
+    check r s!"storage exemption: signer at {usage} bytes"
+      (match result with
+       | .ok (state, _, _) => accepted && (state.account? "alice.near").map (·.amount) == some 0
+       | .error (.lackBalanceForState _ _) => !accepted
+       | _ => false)
+  check r "storage staking deficit includes locked balance"
+    (storageStakeDeficit cfg { amount := 2, locked := 3, storageUsage := 771 } ==
+      771 * cfg.storageAmountPerByte - 5)
+
+  -- Sponsorship is a committed mint only after the whole receipt succeeds.
+  let sponsorModule ← match Decoder.Wat.decode "(module\n (import \"env\" \"promise_batch_create\" (func $batch (param i64 i64) (result i64)))\n (import \"env\" \"promise_batch_action_function_call\" (func $call (param i64 i64 i64 i64 i64 i64 i64)))\n (import \"env\" \"promise_batch_action_transfer\" (func $transfer (param i64 i64)))\n (import \"env\" \"panic\" (func $panic))\n (memory 1)\n (data (i32.const 0) \"alice.near\")\n (data (i32.const 16) \"go\")\n (data (i32.const 64) \"\\01\")\n (data (i32.const 80) \"\\02\")\n (func (export \"one\") (local i64) i64.const 10 i64.const 0 call $batch i64.const 2 i64.const 16 i64.const 0 i64.const 0 i64.const 64 i64.const 0 call $call)\n (func (export \"twice\") (local i64) i64.const 10 i64.const 0 call $batch local.set 0 local.get 0 i64.const 2 i64.const 16 i64.const 0 i64.const 0 i64.const 64 i64.const 0 call $call local.get 0 i64.const 2 i64.const 16 i64.const 0 i64.const 0 i64.const 64 i64.const 0 call $call)\n (func (export \"zero\") (local i64) i64.const 10 i64.const 0 call $batch i64.const 2 i64.const 16 i64.const 0 i64.const 0 i64.const 96 i64.const 0 call $call)\n (func (export \"two\") (local i64) i64.const 10 i64.const 0 call $batch i64.const 2 i64.const 16 i64.const 0 i64.const 0 i64.const 80 i64.const 0 call $call)\n (func (export \"transfer\") (local i64) i64.const 10 i64.const 0 call $batch i64.const 64 call $transfer)\n (func (export \"empty\") (local i64) i64.const 10 i64.const 0 call $batch i64.const 0 i64.const 16 i64.const 0 i64.const 0 i64.const 64 i64.const 0 call $call)\n (func (export \"panic\") (local i64) i64.const 10 i64.const 0 call $batch i64.const 2 i64.const 16 i64.const 0 i64.const 0 i64.const 64 i64.const 0 call $call call $panic)\n (func (export \"late_failure\") (local i64) i64.const 10 i64.const 0 call $batch local.set 0 local.get 0 i64.const 2 i64.const 16 i64.const 0 i64.const 0 i64.const 64 i64.const 0 call $call local.get 0 i64.const 2 i64.const 16 i64.const 0 i64.const 0 i64.const 80 i64.const 0 call $call)\n)\n" with
+    | .ok m => pure m
+    | .error e => throw (IO.userError s!"sponsorship fixture: {e}")
+  let sponsorCode : ContractCode := { module := sponsorModule, size := 0, hash := "sponsor" }
+  let sponsorState (usage : Nat) := genesis.setAccount "wrap.near"
+    { amount := 0, storageUsage := usage, code := some sponsorCode }
+  let sponsorTx (actions : List Action) : Transaction :=
+    { signerId := "alice.near", publicKey := pkOf 1, nonce := 1, receiverId := "wrap.near", actions }
+  let sponsorCall (method : String) : Action := .functionCall method [] (tgas 100) 0
+  let fundedTotal := (sponsorState 770).totalBalance
+  let sponsored := Near.apply cfg World.ap (fun _ => sponsorCode) (sponsorState 770)
+    [sponsorTx [sponsorCall "twice"]] []
+  check r "sponsorship: two grants commit at storage exemption boundary"
+    (sponsored.issue.isNone && sponsored.subsidizedAmount == 2 &&
+     sponsored.outcomes.any fun (_, o) => o.executorId == "wrap.near" && o.status.isSuccess)
+  let outgoingFunds := (sponsored.outgoing.map fun receipt =>
+    match receipt.receipt with
+    | .action action => Fees.totalDeposit action.actions +
+        (cfg.fees.actionFees.newActionReceipt.execution +
+         Fees.totalExec cfg.fees.actionFees receipt.receiverId action.actions +
+         Fees.totalPrepaid action.actions) * action.gasPrice
+    | .data _ => 0).sum
+  check r "sponsorship: minted funds enter conservation accounting"
+    (sponsored.state.totalBalance + outgoingFunds + sponsored.tokensBurnt == fundedTotal + sponsored.subsidizedAmount)
+  for (name, actions, usage) in
+      [("VM panic", [sponsorCall "panic"], 770),
+       ("later action failure", [sponsorCall "one", .deleteKey (pkOf 99)], 770),
+       ("later VM failure", [sponsorCall "one", sponsorCall "panic"], 770),
+       ("storage staking failure", [sponsorCall "one"], 771)] do
+    let result := Near.apply cfg World.ap (fun _ => sponsorCode) (sponsorState usage)
+      [sponsorTx actions] []
+    check r s!"sponsorship: {name} rolls back committed mint and promises"
+      (result.issue.isNone && result.subsidizedAmount == 0 &&
+       !(result.outgoing.any fun receipt => !receipt.isRefund && Fees.totalDeposit receipt.actions > 0) &&
+       result.outcomes.any fun (_, o) => o.executorId == "wrap.near" && !o.status.isSuccess)
+
+  let twoSponsorState := (sponsorState 770).setAccount "bob.near"
+    { amount := 0, storageUsage := 770, code := some sponsorCode }
+  let secondSponsor := { sponsorTx [sponsorCall "one"] with nonce := 2, receiverId := "bob.near" }
+  let twoSponsored := Near.apply cfg World.ap (fun _ => sponsorCode) twoSponsorState
+    [sponsorTx [sponsorCall "one"], secondSponsor] []
+  check r "sponsorship: apply accumulates grants from separate receipts"
+    (twoSponsored.issue.isNone && twoSponsored.subsidizedAmount == 2)
+  let issueState := (sponsorState 770).setAccount "bob.near"
+    { amount := 0, storageUsage := 770, code := some unsupportedCode }
+  let issueTx := { secondSponsor with actions := [sponsorCall "test"] }
+  let issueAfterGrant := Near.apply cfg World.ap (fun _ => sponsorCode) issueState
+    [sponsorTx [sponsorCall "one"], issueTx] []
+  check r "sponsorship: later model issue discards all earlier grants"
+    (issueAfterGrant.issue.isSome && issueAfterGrant.subsidizedAmount == 0 &&
+     issueAfterGrant.outgoing.isEmpty && issueAfterGrant.outcomes.isEmpty &&
+     issueAfterGrant.tokensBurnt == 0 && issueAfterGrant.state.nextId == issueState.nextId)
+
   let s ← r.get
   IO.println s!"{s.passed} passed, {s.failed} failed"
   return (if s.failed = 0 then 0 else 1)

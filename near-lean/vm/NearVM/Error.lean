@@ -63,7 +63,7 @@ def HostError.message : HostError → String
   | .badUTF16 => "String encoding is bad UTF-16 sequence"
   | .gasExceeded => "Exceeded the prepaid gas."
   | .gasLimitExceeded => "Exceeded the maximum amount of gas allowed to burn per contract."
-  | .balanceExceeded => "Exceeded the account balance"
+  | .balanceExceeded => "Exceeded the account balance."
   | .emptyMethodName => "Tried to call an empty method name."
   | .guestPanic msg => s!"Smart contract panicked: {msg}"
   | .integerOverflow => "Integer overflow."

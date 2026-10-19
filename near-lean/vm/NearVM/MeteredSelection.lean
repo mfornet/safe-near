@@ -32,7 +32,7 @@ theorem updateStorageUsage_selection (extra : Nat) (name : String) (before after
 
 theorem deductDeposit_selection (name : String) (before after : Store NearState) (args : List Value)
     (hwf : ReturnSelectionValid after.host) : ReturnSelectionValid (deductDeposit name before after args).1.host := by
-  unfold deductDeposit
+  unfold deductDeposit deductPromiseDeposit
   repeat (first | exact hwf | (dsimp only; split))
   all_goals first | exact hwf | (split <;> exact hwf)
 

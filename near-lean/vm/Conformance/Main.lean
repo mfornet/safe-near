@@ -117,7 +117,7 @@ def outcomeJson (outcome : VMOutcome) : Json :=
     ("receipts", toJson (outcome.receipts.map receiptJson)),
     ("aborted", toJson (outcome.aborted.map (·.message))),
     ("issue", toJson (outcome.issue?.map (·.message))),
-    ("subsidizedAmount", toJson "0"),
+    ("subsidizedAmount", toJson (toString outcome.subsidizedAmount)),
     ("gasProfile", obj [
       ("ext", obj (outcome.gasProfile.ext.map fun (name, gas) => (name, toJson gas))),
       ("actionBurnt", toJson outcome.gasProfile.actionBurnt),
