@@ -1,0 +1,121 @@
+{
+  "code": "tools/runtime-conformance/fixtures/function_call_inputs.wasm",
+  "sha256": "71a7a865cdf2bef5879f4c645480e7e0f1edaec0795e2da71515f17b1c29ceed",
+  "protocolVersion": 86,
+  "initialBalance": "100000000000000000000000000",
+  "storage": [],
+  "calls": [
+    {
+      "name": "valid_batch",
+      "method": "valid_batch",
+      "args": {}
+    },
+    {
+      "name": "bad_amount",
+      "method": "bad_amount",
+      "args": {}
+    },
+    {
+      "name": "bad_method",
+      "method": "bad_method",
+      "args": {}
+    },
+    {
+      "name": "empty_method",
+      "method": "empty_method",
+      "args": {}
+    },
+    {
+      "name": "bad_args",
+      "method": "bad_args",
+      "args": {}
+    },
+    {
+      "name": "invalid_index_bad_amount",
+      "method": "invalid_index_bad_amount",
+      "args": {}
+    },
+    {
+      "name": "invalid_index_empty_method",
+      "method": "invalid_index_empty_method",
+      "args": {}
+    },
+    {
+      "name": "invalid_index_bad_args",
+      "method": "invalid_index_bad_args",
+      "args": {}
+    },
+    {
+      "name": "invalid_index_valid_args",
+      "method": "invalid_index_valid_args",
+      "args": {}
+    },
+    {
+      "name": "joint_empty_method",
+      "method": "joint_empty_method",
+      "args": {}
+    },
+    {
+      "name": "joint_valid_args",
+      "method": "joint_valid_args",
+      "args": {}
+    },
+    {
+      "name": "method_register_invalid",
+      "method": "method_register_invalid",
+      "args": {}
+    },
+    {
+      "name": "args_register_invalid",
+      "method": "args_register_invalid",
+      "args": {}
+    },
+    {
+      "name": "empty_method_register",
+      "method": "empty_method_register",
+      "args": {}
+    },
+    {
+      "name": "valid_registers",
+      "method": "valid_registers",
+      "args": {}
+    },
+    {
+      "name": "combined_create_bad_amount",
+      "method": "combined_create_bad_amount",
+      "args": {}
+    },
+    {
+      "name": "combined_create_empty_method",
+      "method": "combined_create_empty_method",
+      "args": {}
+    },
+    {
+      "name": "combined_then_bad_args",
+      "method": "combined_then_bad_args",
+      "args": {}
+    },
+    {
+      "name": "combined_invalid_receiver_bad_amount",
+      "method": "combined_invalid_receiver_bad_amount",
+      "args": {}
+    },
+    {
+      "name": "combined_invalid_base_bad_amount",
+      "method": "combined_invalid_base_bad_amount",
+      "args": {}
+    },
+    {
+      "name": "empty method before action fee exhaustion",
+      "method": "empty_method",
+      "args": {},
+      "gas": 1000000000000
+    },
+    {
+      "name": "view before malformed input",
+      "method": "direct_action",
+      "args": {},
+      "view": true
+    }
+  ]
+}

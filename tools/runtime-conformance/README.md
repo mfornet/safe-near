@@ -83,3 +83,11 @@ cover V2 syntax, UTF-8, and the 2/64-byte endpoints. The initial cases exposed
 Empty join spans with an invalid pointer are rejected before capacity, including
 at the handle limit. These cases found two further mismatches and guard against
 bypassing memory bounds when the index count is zero.
+
+`function_call_inputs.json` compares direct and combined function-call action
+validation: amount/method/argument memory failures, register failures, empty
+methods, invalid and joint handles, and overlapping errors. Success cases cover
+memory and register inputs; a low-gas case checks empty-method precedence over
+later action-fee exhaustion, and a view case checks restrictions before reads.
+The initial fixture found 15 mismatching cases. Comparisons retain exact bytes,
+error text, fee profiles and prepaid/used/burnt gas.

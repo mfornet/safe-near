@@ -255,3 +255,21 @@ The additional empty-span regressions exposed two discrepancies;
 `preInvokeError_join_span_bound` now proves the entire accepted pointer/length
 span lies within guest memory, while the existing join proof bounds its u64
 length and expanded dependency vector.
+
+`functionCallPlan` now validates and charges function-call inputs in reference
+order: u128 amount, method bytes/nonemptiness, argument bytes, then target
+receipt/joint distinction. Invalid input stops the charge list before later
+reads, fees or gas prepayment. Direct batch actions and combined create/then
+calls share the plan; creation-prefix and capacity errors still precede it.
+Missing-register memory-or-register reads fail before any register-read charge.
+The new fixture exposed 15 mismatching cases, including overlapping errors and
+an empty method that must fail before action-fee gas exhaustion.
+`FunctionCallValidation` proves successful plans admit exact readable inputs,
+nonempty methods, receipt targets, and matching functional action construction;
+it also connects pre-invocation acceptance to that action result.
+One additional pinned-v86 accounting gap is identified: `one_yocto_on_promise`
+is enabled by the reference but its sponsored one-yocto branch is not modeled
+by the current deposit deduction. A separate independent probe with
+zero balance and a one-yocto function-call deposit currently disagrees on abort
+status, used gas, emitted receipts and subsidized amount. Sponsorship accounting,
+global conservation and deployed refinement remain open.

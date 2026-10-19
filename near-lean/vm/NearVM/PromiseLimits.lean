@@ -111,9 +111,13 @@ theorem preInvokeError_count_bound {name : String} {st : Store NearState} {args 
     (hlimit : st.host.config.maxPromises = some limit) (halloc : allocatesPromise name = true)
     (h : preInvokeError name st args = none) : st.host.promises.length + 1 ≤ limit := by
   have ha := preInvokeError_arguments_valid h
-  unfold preInvokeError at h
-  simp only [ha, halloc, ite_true] at h
-  exact (promiseCapacityError_none_iff hlimit).mp h
+  have hcapacity : promiseCapacityError st = none := by
+    unfold preInvokeError at h
+    simp only [ha, halloc, ite_true] at h
+    cases hc : promiseCapacityError st with
+    | none => rfl
+    | some error => simp [hc] at h
+  exact (promiseCapacityError_none_iff hlimit).mp hcapacity
 
 theorem checked_nextPromiseIdx_fresh {st : Store NearState} {limit : Nat}
     (hlimit : st.host.config.maxPromises = some limit) (h : promiseCapacityError st = none)

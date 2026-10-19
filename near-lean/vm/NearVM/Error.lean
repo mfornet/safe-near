@@ -64,7 +64,7 @@ def HostError.message : HostError → String
   | .gasExceeded => "Exceeded the prepaid gas."
   | .gasLimitExceeded => "Exceeded the maximum amount of gas allowed to burn per contract."
   | .balanceExceeded => "Exceeded the account balance"
-  | .emptyMethodName => "Tried to call an empty method name"
+  | .emptyMethodName => "Tried to call an empty method name."
   | .guestPanic msg => s!"Smart contract panicked: {msg}"
   | .integerOverflow => "Integer overflow."
   | .invalidPromiseIndex i => s!"{i} does not correspond to existing promises"
