@@ -89,7 +89,8 @@ def World.view (w : World) (method : String) (args : String) : Option String :=
 
 /-- NEAR conservation: what was minted at genesis is still accounted for. -/
 def World.total (w : World) : Nat :=
-  w.state.totalBalance + w.burnt + (w.pending.map fun r => Fees.totalDeposit r.actions).sum
+  w.state.totalBalance + w.burnt +
+    ((w.pending ++ w.state.delayed ++ w.state.postponed.map (·.2)).map (Fees.receiptFunds w.cfg)).sum
 
 def genesisAccount (amount : Nat) : Account := { amount, storageUsage := 182 }
 
@@ -432,13 +433,7 @@ def main (args : List String) : IO UInt32 := do
   check r "sponsorship: two grants commit at storage exemption boundary"
     (sponsored.issue.isNone && sponsored.subsidizedAmount == 2 &&
      sponsored.outcomes.any fun (_, o) => o.executorId == "wrap.near" && o.status.isSuccess)
-  let outgoingFunds := (sponsored.outgoing.map fun receipt =>
-    match receipt.receipt with
-    | .action action => Fees.totalDeposit action.actions +
-        (cfg.fees.actionFees.newActionReceipt.execution +
-         Fees.totalExec cfg.fees.actionFees receipt.receiverId action.actions +
-         Fees.totalPrepaid action.actions) * action.gasPrice
-    | .data _ => 0).sum
+  let outgoingFunds := (sponsored.outgoing.map (Fees.receiptFunds cfg)).sum
   check r "sponsorship: minted funds enter conservation accounting"
     (sponsored.state.totalBalance + outgoingFunds + sponsored.tokensBurnt + sponsorSubmitted.tokensBurnt == fundedTotal + sponsored.subsidizedAmount)
   for (name, actions, usage) in
@@ -472,6 +467,35 @@ def main (args : List String) : IO UInt32 := do
     (issueAfterGrant.issue.isSome && issueAfterGrant.subsidizedAmount == 0 &&
      issueAfterGrant.outgoing.isEmpty && issueAfterGrant.outcomes.isEmpty &&
      issueAfterGrant.tokensBurnt == 0 && issueAfterGrant.state.nextId == issueSubmitted.state.nextId)
+
+  -- Preserve purchased gas while the chain price changes between blocks.
+  let (priceTx, priceWorld) := w.tx "alice.near" "wrap.near"
+    [.functionCall "near_withdraw" (bytesOf "{\"amount\":\"1\"}") (tgas 100) 1]
+  let priceStart := priceWorld.total
+  let priceSubmitted := Near.apply cfg World.ap (fun _ => code) priceWorld.state [priceTx] []
+  let firstPrice := Near.apply cfg World.ap (fun _ => code) priceSubmitted.state [] priceSubmitted.outgoing
+  let firstTokensBurnt := priceSubmitted.tokensBurnt + firstPrice.tokensBurnt
+  let funds (result : ApplyResult) := result.state.totalBalance +
+    ((result.outgoing ++ result.state.delayed ++ result.state.postponed.map (·.2)).map (Fees.receiptFunds cfg)).sum
+  check r "gas purchase: pending promises and refunds preserve all purchased funds"
+    (firstPrice.issue.isNone && firstPrice.outgoing.any (fun receipt => !receipt.isRefund) &&
+      firstPrice.outcomes.any (fun (_, outcome) => outcome.executorId == "wrap.near" && outcome.status.isSuccess) &&
+      funds firstPrice + priceWorld.burnt + firstTokensBurnt == priceStart)
+  for nextPrice in [50_000_000, 3_000_000_000] do
+    let secondPrice := Near.apply cfg { World.ap with gasPrice := nextPrice } (fun _ => code)
+      firstPrice.state [] firstPrice.outgoing
+    check r s!"gas purchase: conservation across block price {nextPrice}"
+      (secondPrice.issue.isNone && funds secondPrice + priceWorld.burnt + firstTokensBurnt +
+        secondPrice.tokensBurnt == priceStart)
+  let lostRefund : Receipt := {
+    predecessorId := systemAccount, receiverId := "deleted.near", receiptId := 999
+    receipt := .action {
+      signerId := systemAccount, signerPublicKey := [], gasPrice := 0
+      actions := [.transfer 123] } }
+  let lost := Near.apply cfg World.ap (fun _ => code) genesis [] [lostRefund]
+  check r "failed system refund burns its funds and reports execution gas without gas tokens"
+    (lost.issue.isNone && lost.tokensBurnt == 123 && lost.outgoing.isEmpty &&
+      lost.outcomes.all fun (_, outcome) => outcome.gasBurnt > 0 && outcome.tokensBurnt == 0)
 
   let s ← r.get
   IO.println s!"{s.passed} passed, {s.failed} failed"

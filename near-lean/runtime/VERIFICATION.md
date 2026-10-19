@@ -329,3 +329,25 @@ separately from gas burn, and model issues commit zero subsidy (kernel proved).
 The 770-byte storage-staking exemption follows pinned nearcore's verifier.
 The local deposit accounting equation is kernel proved; a full chain conservation
 theorem incorporating minted grants and deployed wNEAR refinement remain open.
+
+## Purchased gas and token settlement
+
+Transaction conversion now buys receipt gas at `max(block price, minimum purchase
+price)` and carries that price through promises. The pinned v85+ rule burns gas at
+`min(purchase price, block price)`, refunds the burnt-price surplus, and subtracts
+bounded refund penalties and account-creation charges. Prior configuration behavior
+retains the price surplus in burnt tokens. Function-call rewards use the correct
+burn/purchase price for each rule. Failed system refunds burn their transfer funds
+in apply statistics while their execution outcome still reports zero gas/tokens.
+
+`Fees.settleGas_conservation` proves the v85+ partition of purchased gas into
+refunds, burnt tokens and gas reserved for onward execution, including general
+bounded penalties and creation charges. It assumes `burnt ≤ used ≤ prepaid`;
+receipt/VM execution must still establish these budget premises compositionally.
+`Fees.receiptFunds` and `Snapshot.totalFunds` count deposits and purchased gas in
+pending, delayed and postponed receipts. Whole-chain conservation is still open.
+
+`tools/runtime-finance-reference` compares transaction costs and actual private
+refund routines from the clean pinned nearcore implementation through an appended
+adapter module. Its 72 exact comparisons cover v84/85/86 financial parameters,
+price changes and account creation. It is not a full receipt execution oracle.

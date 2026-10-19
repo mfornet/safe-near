@@ -59,9 +59,9 @@ structure FeesConfig where
   actionFees : ActionFees
   /-- Fraction of burnt gas paid to the contract, as (numerator, denominator). -/
   burntGasReward : Nat × Nat
-  pessimisticGasPriceInflation : Nat × Nat
   gasRefundPenalty : Nat × Nat := (0, 1)
   minGasRefundPenalty : Nat := 0
+  pessimisticGasPriceInflation : Nat × Nat
   numBytesAccount : Nat
   numExtraBytesRecord : Nat
   deriving Repr, Inhabited
@@ -72,10 +72,10 @@ structure AccountCreationConfig where
   deriving Repr, Inhabited
 
 structure RuntimeConfig where
-  storageAmountPerByte : Nat
+  accountCostIncrease : Bool := true
   minGasPurchasePrice : Nat := 0
   accountCreationCharge : Nat := 0
-  accountCostIncrease : Bool := false
+  storageAmountPerByte : Nat
   fees : FeesConfig
   wasm : WasmConfig
   accountCreation : AccountCreationConfig
@@ -154,9 +154,8 @@ private def extCosts (j : Json) : Except String ExtCosts := do
     pure { lookup := fun name => (arr.find? (·.1 == name)).map (·.2) |>.getD 0 }
   | _ => .error "ext_costs is not an object"
 
-/-- Parse the exported view plus source-derived execution parameters. -/
+/-- Parse nearcore's `RuntimeConfigView` JSON. -/
 def ofJson (j : Json) : Except String RuntimeConfig := do
-  let execution ← field j "safe_near"
   let tc ← field j "transaction_costs"
   let ac ← field tc "action_creation_config"
   let addKey ← field ac "add_key_cost"
@@ -181,17 +180,18 @@ def ofJson (j : Json) : Except String RuntimeConfig := do
     newDataReceiptBase := ← feeAt dataReceipt "base_cost"
     newDataReceiptByte := ← feeAt dataReceipt "cost_per_byte"
     delegate := ← feeAt ac "delegate_cost" }
+  let finance ← field j "runtime_finance"
   pure {
-    storageAmountPerByte := ← natString j "storage_amount_per_byte"
+    accountCostIncrease := ← (← field finance "account_cost_increase").getBool?
     minGasPurchasePrice := ← natString j "min_gas_purchase_price"
     accountCreationCharge := ← natString j "account_creation_charge"
-    accountCostIncrease := ← (← field execution "account_cost_increase").getBool?
+    storageAmountPerByte := ← natString j "storage_amount_per_byte"
     fees := {
       actionFees
+      gasRefundPenalty := ← ratio finance "gas_refund_penalty"
+      minGasRefundPenalty := ← nat finance "min_gas_refund_penalty"
       burntGasReward := ← ratio tc "burnt_gas_reward"
       pessimisticGasPriceInflation := ← ratio tc "pessimistic_gas_price_inflation_ratio"
-      gasRefundPenalty := ← ratio execution "gas_refund_penalty"
-      minGasRefundPenalty := ← nat execution "min_gas_refund_penalty"
       numBytesAccount := ← nat storageUsage "num_bytes_account"
       numExtraBytesRecord := ← nat storageUsage "num_extra_bytes_record" }
     wasm := {

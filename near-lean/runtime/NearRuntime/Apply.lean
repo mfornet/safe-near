@@ -1,4 +1,4 @@
-import NearRuntime.Gas
+import NearRuntime.Fees
 import NearRuntime.State
 
 /-!
@@ -363,8 +363,7 @@ def applyActionReceipt (c : ReceiptCtx) (st0 : ChainState) : Exec :=
   -- gas prepaid for this receipt: its creation and action execution fees, the execution fee
   -- and the gas attached to its function calls. Dependency data execution fees
   -- were already burnt by the producer when scheduling this callback.
-  let receiptGas := f.newActionReceipt.execution + Fees.totalExec f receiver c.action.actions
-    + Fees.totalPrepaid c.action.actions
+  let receiptGas := Fees.receiptGasBudget c.cfg receiver c.action.actions
   -- System refunds report execution gas but do not charge tokens for it.
   let isRefund := c.receipt.isRefund
   let body : ExecM Unit := do
@@ -394,8 +393,8 @@ def applyActionReceipt (c : ReceiptCtx) (st0 : ChainState) : Exec :=
   -- refunds: unspent gas to the signer, the deposits to the predecessor on failure
   let createdAccount := (st0.account? receiver).isNone && (exec.state.account? receiver).isSome
     && failed.isNone
-  let settlement := Gas.settle c.cfg c.ap.gasPrice c.action.gasPrice receiptGas
-    exec.gasBurnt exec.gasUsed createdAccount
+  let settlement := Fees.settleGas c.cfg c.action.gasPrice c.ap.gasPrice receiptGas
+    exec.gasUsed exec.gasBurnt createdAccount
   let tokensRefund := if isRefund then 0 else settlement.refund
   let exec := { exec with
     tokensBurnt := if isRefund then 0 else settlement.tokensBurnt
@@ -414,7 +413,8 @@ def applyActionReceipt (c : ReceiptCtx) (st0 : ChainState) : Exec :=
   -- execution failed and its state changes were rolled back (nearcore lib.rs).
   let exec :=
       let (num, den) := c.cfg.fees.burntGasReward
-      let reward := exec.gasBurntForFunctionCall * num / den * settlement.rewardPrice
+      let rewardPrice := if c.cfg.accountCostIncrease then settlement.burnPrice else c.action.gasPrice
+      let reward := exec.gasBurntForFunctionCall * num / den * rewardPrice
       match exec.state.account? receiver with
       | some a => { exec with state := exec.state.setAccount receiver { a with amount := a.amount + reward }
                               reward := reward }

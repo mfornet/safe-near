@@ -26,7 +26,7 @@ struct ConfigDump {
     view: RuntimeConfigView,
     // RuntimeConfigView omits these execution parameters. Keep their provenance
     // explicit instead of silently choosing zero or copying protocol constants.
-    safe_near: Value,
+    runtime_finance: Value,
 }
 
 fn config_json(store: &RuntimeConfigStore, version: ProtocolVersion) -> String {
@@ -37,7 +37,7 @@ fn config_json(store: &RuntimeConfigStore, version: ProtocolVersion) -> String {
     let view = RuntimeConfigView::from(config.clone());
     let dump = ConfigDump {
         view,
-        safe_near: json!({
+        runtime_finance: json!({
             "account_cost_increase": ProtocolFeature::AccountCostIncrease.enabled(version),
             "gas_refund_penalty": [config.fees.gas_refund_penalty.numer(), config.fees.gas_refund_penalty.denom()],
             "min_gas_refund_penalty": config.fees.min_gas_refund_penalty.as_gas(),

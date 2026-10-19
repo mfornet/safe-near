@@ -20,7 +20,7 @@ hand-copying numbers.
 `near-parameters`, so the tool serializes
 `near_parameters::view::RuntimeConfigView::from(config.clone())` instead. That
 preserves the JSON shape returned by the `EXPERIMENTAL_protocol_config` RPC
-method (`runtime_config` field), with a `safe_near` supplement for execution
+method (`runtime_config` field), with a `runtime_finance` supplement for execution
 parameters the view omits. The supplement reads refund penalties directly
 from the pinned internal fees and evaluates the pinned `AccountCostIncrease`
 protocol feature for each table. No execution constants are copied by hand. The Lean parser requires this
@@ -61,7 +61,7 @@ the internal `RuntimeConfig` in `near-parameters 0.37.4`:
   `deterministic_state_init_base/byte/entry`, `gas_key_transfer_base`,
   `gas_key_byte`, `gas_key_nonce_write_base`;
 * `fees.gas_refund_penalty`, `fees.min_gas_refund_penalty` (NEP-536), now
-  included in the `safe_near` supplement;
+  included in the `runtime_finance` supplement;
 * `fees.deploy_global_contract_execution_base` and its per-byte companion
   (compute costs);
 * `fees.storage_usage_config.global_contract_storage_amount_per_byte`;

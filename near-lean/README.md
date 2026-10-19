@@ -217,3 +217,10 @@ calls at zero liquid balance receive minted deposits. VM outcomes retain attempt
 grants on failure; receipt/apply results count only committed grants separately
 from burnt tokens. `deductPromiseDeposit_accounting` proves local accounting.
 Global conservation and deployed refinement are still open.
+
+Receipt backing now includes purchased gas as well as deposits. Financial
+settlement carries purchase price separately from block burn price and applies
+the pinned v85+ minimum price, surplus refunds and account-creation charge.
+`Fees.settleGas_conservation` kernel-checks the local gas-token partition;
+`tools/runtime-finance-reference` compares 72 cases to nearcore's actual routines.
+Full receipt and chain conservation remain open.

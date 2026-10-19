@@ -280,7 +280,7 @@
   },
   "min_gas_purchase_price": "0",
   "account_creation_charge": "0",
-  "safe_near": {
+  "runtime_finance": {
     "account_cost_increase": false,
     "gas_refund_penalty": [
       0,
