@@ -75,6 +75,16 @@ Known unsafe approximations still requiring implementation changes:
   not implemented; the low-level promise conversion is not a yield executor.
 - Unstaking is explicitly rejected as unsupported epoch semantics.
 - Natural-number arithmetic does not by itself reproduce bounded protocol arithmetic.
+- The first six-block native/Lean transfer diagnostic exposes gas-purchase and
+  refund discrepancies. Protocol 85+ buys receipt gas at least at
+  `min_gas_purchase_price` and refunds the burnt-gas price surplus later. The
+  Lean configuration/transaction conversion currently omits that minimum and
+  price-surplus refund, making intermediate balances and receipt queues differ
+  even when the eventual settled balances agree. System refunds also report
+  execution gas in nearcore while burning no tokens; the current Lean refund
+  path skips those gas charges. These are open implementation bugs, not allowed
+  comparison exceptions. The pinned source paths are `config.rs::tx_cost` and
+  `lib.rs::apply_action_receipt` / `refund_unspent_gas_and_deposits`.
 - Scenario code supplies a synthetic deployed code size.
 - Fuel exhaustion has a structured execution issue. `VMOutcome.issue?` separates
   model limitations from protocol outcomes. An issue makes `Near.apply` atomic:
