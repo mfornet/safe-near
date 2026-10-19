@@ -2,8 +2,8 @@
 
 `chain-replay` executes the existing `Near.step` on exactly the supplied blocks.
 It accepts complete represented state, transactions and an ordered receipt
-schedule. It records state, pending and outgoing receipts, outcomes and burnt
-tokens after every attempt. Idle blocks remain idle; it never adds settlement
+schedule. It records state, pending and outgoing receipts, outcomes, burnt tokens and committed
+promise subsidies after every attempt. Idle blocks remain idle; it never adds settlement
 blocks automatically. This is the Lean side of the full-runtime comparison
 harness, not evidence of agreement with nearcore by itself.
 
@@ -115,6 +115,7 @@ errors and model execution issues record the rejected attempt and stop before
 later blocks. Protocol action failures remain ordinary outcomes and allow
 later supplied blocks to execute.
 
+Each apply also exports `subsidizedAmount`, separately from burnt tokens.
 Every represented outcome field is exported: id, executor, status, logs,
 receipt ids, gas burnt and tokens burnt. Failures retain both the complete
 Lean error constructor representation and its readable message. Native

@@ -4,7 +4,7 @@ use borsh::{BorshDeserialize, BorshSerialize, from_slice, to_vec as borsh_bytes}
 use near_crypto::{InMemorySigner, KeyType};
 use near_parameters::RuntimeConfigStore;
 use near_primitives::account::{AccessKey, Account, AccountContract};
-use near_primitives::action::{Action, TransferAction};
+use near_primitives::action::{Action, CreateAccountAction, TransferAction};
 use near_primitives::apply::ApplyChunkReason;
 use near_primitives::bandwidth_scheduler::BlockBandwidthRequests;
 use near_primitives::congestion_info::{BlockCongestionInfo, ExtendedCongestionInfo};
@@ -433,10 +433,39 @@ fn example() -> Result<Value> {
     )
 }
 
+fn financial_examples() -> Result<Value> {
+    let transfer = example()?;
+    let mut creation = transfer.clone();
+    let alice: AccountId = "alice.near".parse()?;
+    let child: AccountId = "child.alice.near".parse()?;
+    let signer =
+        InMemorySigner::from_seed(alice.clone(), KeyType::ED25519, "safe-near-fixture-alice");
+    let tx = SignedTransaction::from_actions(
+        1,
+        alice,
+        child,
+        &signer,
+        vec![
+            Action::CreateAccount(CreateAccountAction {}),
+            Action::Transfer(TransferAction {
+                deposit: Balance::from_yoctonear(10u128.pow(24)),
+            }),
+        ],
+        CryptoHash::default(),
+    );
+    let blocks = creation["blocks"]
+        .as_array_mut()
+        .ok_or("missing example blocks")?;
+    blocks.truncate(4);
+    blocks[0]["transactions"] = json!([borsh_bytes(&tx)?]);
+    Ok(json!({"transfer":transfer, "createAccount":creation}))
+}
+
 fn main() -> Result<()> {
     match args().nth(1).as_deref() {
         Some("--metadata") => println!("{}", metadata()),
         Some("--example") => println!("{}", example()?),
+        Some("--financial-examples") => println!("{}", financial_examples()?),
         Some(_) => return Err("unknown argument".into()),
         None => {
             let mut input = String::new();

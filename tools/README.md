@@ -1,182 +1,237 @@
-# Repository tools
+#!/usr/bin/env python3
+"""Targeted transfer/account-creation gas/price differential checks, not general conformance.
 
-Run `just` at the repository root for the documented command list.
-`just test-all` runs the executable suites; `just check` adds source checks,
-core axiom audits, formatter integration checks and contract builds.
+Checks all represented state/receipt/outcome fields for a deliberately restricted
+financial corpus. Native metadata/compute/trie columns remain recorded gaps.
+"""
+from __future__ import annotations
 
-| Command | Purpose |
-| --- | --- |
-| `just test-all` | Run programs, NEAR scenarios, official Wasm tests and exact VM conformance |
-| `just chain-replay-test` | Exercise trusted JSON block replay and complete-state continuation |
-| `just audit-all` | Audit all core packages and list the programs' open proofs |
-| `just check` | Run the combined repository checks |
-| `just check-toolchains` | Check every owned Lake package against the root `lean-toolchain` |
-| `just vm-dependencies` | Check Lean's actual VM import closure for legacy interpreters and proof APIs |
-| `just lean-lint` | Check all owned Lean files with pinned Mathlib text-based style linters |
-| `just lean-format [files...]` | Apply validated syntax formatting to handwritten package sources |
-| `just lean-format-check [files...]` | Check canonical syntax layout without writing files |
-| `just lean-format-diff [files...]` | Preview syntax formatting as a patch |
-| `just lean-style-fix` | Apply Mathlib's automatic text-style fixes |
-| `just wasm-test [pattern]` | Run all official Wasm tests or filter their filenames |
-| `just wasm-summary` | Summarize the committed Wasm coverage report |
-| `just wasm-report` | Regenerate that report using the pinned wasm-tools |
-| `just programs-test` | Build the example programs and run smoke and regression harnesses |
-| `just programs-build` | Rebuild Rust program Wasm and WAT |
-| `just audit near-lean/wasm` | Check a package's transitive proof axioms |
-| `just tools-test` | Run offline Python tooling regression tests |
-| `just snapshot /tmp/fixture.json lockup.near` | Download a block-pinned account fixture |
-| `just snapshot-vm SNAPSHOT ACCOUNT SCENARIO --report REPORT` | Compare VM calls seeded from a complete captured account |
-| `just chain-reference-build [options...]` | Build the clean pinned nearcore transaction/receipt reference |
-| `just chain-reference-test [options...]` | Exercise the native reference's chunk boundaries and complete raw-state replay |
+import argparse
+import base64
+import copy
+import hashlib
+import json
+from pathlib import Path
+import shutil
+import subprocess
+import tempfile
 
-## Lean quality
+from prepare import HERE, ROOT, atomic_write, digest
+from probe import execute, frozen_reference
 
-`lean-toolchain` at the repository root is the canonical release pin. Each
-repository-owned Lake package also carries that pin so it works independently.
-`check_lean_toolchains.py` discovers Lake manifests and pins through Git,
-including newly added local files. Submodules and ignored build dependencies
-are outside its scope. When upgrading Lean, update all pins together.
+ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 
-The Lean quality workflow runs the pin check, tool tests, source-style checks,
-and syntax-formatting checks for the two new program harness modules.
-The text-style driver uses the Mathlib revision in the Wasm package's
-committed Lake manifest. It checks line endings, trailing whitespace,
-adaptation-note conventions, and Unicode conventions. Automatic fixes cover
-the subset Mathlib can repair; unresolved findings still fail the command.
-The text-only semicolon rule is disabled because it matches meaningful WAT
-string literals in interpreter tests.
 
-Unicode conventions apply to source notation and comments; string, raw-string
-and character literal contents are opaque contract data. A lexical scan masks
-those contents for the code-point check, preserving source line numbers and
-handling escapes and nested comments. Unicode findings outside literals remain
-errors and are never automatically replaced. This preserves multilingual ABI
-test data while retaining source-notation checks.
+def public_key(text):
+    kind, encoded = text.split(":")
+    n = 0
+    for char in encoded:
+        n = n * 58 + ALPHABET.index(char)
+    raw = b"\0" * (len(encoded) - len(encoded.lstrip("1"))) + n.to_bytes((n.bit_length() + 7) // 8, "big")
+    tag, size = {"ed25519": (0, 32), "secp256k1": (1, 64)}[kind]
+    if len(raw) != size:
+        raise ValueError("invalid native public key length")
+    return [tag, *raw]
 
-After a fresh checkout, prepare the style dependency once:
 
-```sh
-cd near-lean/wasm
-lake exe cache get
-lake build +Mathlib.Tactic.Linter.TextBased
-```
+def simple_action(action):
+    if action == "CreateAccount" or action == {"CreateAccount": {}}:
+        return {"kind": "createAccount"}
+    if not isinstance(action, dict) or list(action) != ["Transfer"]:
+        raise ValueError("gas probe supports only transfers and account creation; use the general bridge for other actions")
+    return {"kind": "transfer", "deposit": action["Transfer"]["deposit"]}
 
-Then run `just lean-lint` or `just lean-style-fix` from the repository root.
-To check selected files, use `python3 tools/lean_style.py path/to/File.lean`.
-The driver never formats submodule sources, ignored dependencies, or human notes.
 
-`python3 tools/tests/check_lean_style.py` exercises the real Lean checker:
-check mode must leave a dirty fixture unchanged, formatting must be repeatable,
-and WAT string literals must remain intact. These checks run separately from
-the Python tests because they need the pinned Lean/Mathlib installation.
+def state(native, next_id):
+    result = dict(accounts=[], accessKeys=[], storage=[], postponed=[], pendingDataCount=[],
+                  postponedByData=[], receivedData=[], delayed=[], nextId=next_id)
+    for row in native["decodedRecords"]:
+        if row.get("opaque"):
+            continue  # Full raw bytes remain in evidence; these are a declared observation gap.
+        record = row["record"]
+        if list(record) == ["Account"]:
+            value = record["Account"]
+            account = value["account"]
+            if account["code_hash"] != "1" * 32:
+                raise ValueError("gas probe requires accounts without code")
+            result["accounts"].append([value["account_id"], dict(amount=account["amount"],
+                locked=account["locked"], storageUsage=account["storage_usage"], codeHash=None)])
+        elif list(record) == ["AccessKey"]:
+            value = record["AccessKey"]
+            key = value["access_key"]
+            if key["permission"] != "FullAccess":
+                raise ValueError("gas probe requires full-access keys")
+            result["accessKeys"].append([[value["account_id"], public_key(value["public_key"])],
+                dict(nonce=key["nonce"], permission=dict(kind="fullAccess"))])
+        else:
+            raise ValueError(f"unsupported state record in financial probe: {list(record)}")
+    return result
 
-## Syntax formatting
 
-`lean_format.py` builds [lean-fmt](https://github.com/jcreinhold/lean-fmt) from
-the immutable revision recorded in `lean_format_tool.json`, using the exact
-compiler in the root `lean-toolchain`. The pinned sources are from the
-`v4.34.0-rc2` release and are tested here with Lean `v4.34.1`; the upstream
-toolchain file is not used to choose our compiler. A future compiler or
-formatter upgrade must pass the same integration checks.
+def canonical_state(value):
+    value = copy.deepcopy(value)
+    for name in ("accounts", "accessKeys", "storage", "postponed", "pendingDataCount",
+                 "postponedByData", "receivedData"):
+        value[name].sort(key=lambda row: json.dumps(row[0], sort_keys=True))
+    return value
 
-The first invocation fetches and builds the tool into the ignored
-`near-lean/.lake/lean-fmt/` cache. Later invocations verify the source revision
-and reuse the build. Interrupted downloads never publish a partial checkout.
-`lean-fmt.toml` sets the shared layout margin. Candidate validation always
-runs; this wrapper exposes no validation bypass.
 
-```sh
-just lean-format-diff near-lean/programs/lean/Programs/Harness.lean
-just lean-format near-lean/programs/lean/Programs/Harness.lean
-just lean-format-check near-lean/programs/lean/Programs/Harness.lean
-```
+def model_request(source, trace, config_dir):
+    if source["pendingReceipts"] or any(row.get("opaque") for row in trace["initialState"]["decodedRecords"]):
+        raise ValueError("probe requires a plain account/key genesis and empty delivery queue")
+    result = dict(formatVersion=1, protocolVersion=source["protocolVersion"], configDir=str(config_dir),
+                  codes=[], initialState=state(trace["initialState"], 1), pendingReceipts=[], blocks=[])
+    for header, block in zip(source["blocks"], trace["blocks"]):
+        value = {key: header[key] for key in ("blockHeight", "blockTimestamp", "epochHeight", "gasPrice",
+                                            "gasLimit", "randomSeed", "incomingIndices")}
+        transactions = []
+        for row in block["inputs"]["transactions"]:
+            tx = row["view"]
+            if row["version"] != 0:
+                raise ValueError("probe requires V0 transactions")
+            transactions.append(dict(signerId=tx["signer_id"], receiverId=tx["receiver_id"],
+                publicKey=public_key(tx["public_key"]), nonce=tx["nonce"], actions=list(map(simple_action, tx["actions"]))))
+        value["transactions"] = transactions
+        result["blocks"].append(value)
+    return result
 
-With no filenames, the command selects all handwritten sources in all owned
-Lake packages. Build a package's dependencies before formatting its files.
-Human notes, generated `Program.lean` AST files, ignored dependencies and
-submodule sources are protected from selection. Standalone tooling scripts
-outside Lake packages remain covered by `lean-lint`.
 
-CI currently enforces canonical syntax layout for `Programs/Harness.lean`
-and `Programs/Regression.lean`. Existing package sources still have layout
-debt: `just lean-format-check` reports it rather than hiding it behind a
-baseline. Expanding enforcement is a separate source-formatting change, so
-formatting the new harness does not also rewrite existing contract proofs.
+def projection(source, trace):
+    ids = {}
+    pending, pending_borsh, blocks = [], [], []
 
-`python3 tools/tests/check_lean_format.py` checks the real formatter against a
-tiny independent Lake package: check mode preserves dirty bytes, formatting
-preserves comments and string literals, a second pass is stable, and the
-formatted theorem still builds with the kernel. Pure Python selection tests
-also verify nested package ownership, protected inputs, ignored dependencies,
-and failure when a formatter process is killed.
+    def existing(identifier):
+        if identifier not in ids:
+            raise ValueError(f"native receipt id has no earlier creation event: {identifier}")
+        return ids[identifier]
 
-## Combined checks
+    def receipt(value):
+        payload = value["receipt"]
+        if list(payload) != ["Action"]:
+            raise ValueError("financial probe received a non-action receipt")
+        action = payload["Action"]
+        if action["input_data_ids"] or action["output_data_receivers"]:
+            raise ValueError("financial probe received data dependencies")
+        return dict(predecessorId=value["predecessor_id"], receiverId=value["receiver_id"],
+            receiptId=existing(value["receipt_id"]), receipt=dict(kind="action",
+                signerId=action["signer_id"], signerPublicKey=public_key(action["signer_public_key"]),
+                gasPrice=action["gas_price"], inputDataIds=[], outputDataReceivers=[],
+                actions=list(map(simple_action, action["actions"]))))
 
-`just test-all` runs the toolchain check and Python tooling/conformance-driver
-tests, native Rust unit tests, program smoke/regression tests,
-VM/runtime/chain scenarios, the wNEAR adapter suite,
-the complete official Wasm testsuite, and strict VM conformance against the
-pinned Rust oracle. It stops on the first failing command. Install the Lean,
-Rust and pinned wasm-tools prerequisites documented by those components first.
+    for header, block in zip(source["blocks"], trace["blocks"]):
+        tx_hashes = {row["view"]["hash"] for row in block["inputs"]["transactions"]}
+        for outcome in block["outcomes"]:
+            for identifier in outcome["outcome"]["receipt_ids"]:
+                if identifier in ids:
+                    raise ValueError("financial native runtime reused a created receipt id")
+                ids[identifier] = len(ids) + 1
+        positions = header["incomingIndices"]
+        positions = list(range(len(pending))) if positions is None else positions
+        if [pending[i] for i in positions] != block["inputs"]["incomingReceipts"]:
+            raise ValueError("native decoded inputs disagree with selected pending receipts")
+        pending = [value for i, value in enumerate(pending) if i not in positions] + block["outgoingReceipts"]
+        pending_borsh = [value for i, value in enumerate(pending_borsh) if i not in positions] + block["outgoingReceiptBorsh"]
+        if pending_borsh != block["pendingReceipts"] or block["delayedReceiptsCount"]:
+            raise ValueError("native queue representation is outside the probe's supported transfer frontier")
+        outcomes = []
+        for row in block["outcomes"]:
+            outcome = row["outcome"]
+            status = outcome["status"]
+            if list(status) == ["SuccessReceiptId"]:
+                status = dict(kind="successReceiptId", receiptId=existing(status["SuccessReceiptId"]))
+            elif list(status) == ["SuccessValue"]:
+                status = dict(kind="successValue", value=list(base64.b64decode(status["SuccessValue"], validate=True)))
+            else:
+                raise ValueError("unexpected failure in successful financial probe")
+            outcomes.append(dict(id=0 if row["id"] in tx_hashes else existing(row["id"]),
+                outcome=dict(executorId=outcome["executor_id"], status=status, logs=outcome["logs"],
+                    receiptIds=list(map(existing, outcome["receipt_ids"])), gasBurnt=outcome["gas_burnt"],
+                    tokensBurnt=outcome["tokens_burnt"])))
+        blocks.append(dict(state=canonical_state(state(block["state"], len(ids) + 1)),
+            pendingReceipts=list(map(receipt, pending)), outgoingReceipts=list(map(receipt, block["outgoingReceipts"])),
+            outcomes=outcomes, tokensBurnt=str(sum(int(row["outcome"]["tokens_burnt"]) for row in block["outcomes"])),
+            subsidizedAmount="0", issue=None))
+    return blocks
 
-`just check` adds Mathlib text-style checks, core axiom audits, builds of every
-contract verification package, and both formatter integration tests. It uses
-the same two-file syntax-layout enforcement as CI. Broader layout debt is
-reported separately by `just lean-format-check`.
 
-The core axiom audit tolerates `sorryAx` only in the Programs package and
-prints those open declarations. It resolves every audited module from the
-selected package's own compiled artifacts before searching dependencies and
-fails if a local artifact is missing. This matters for overlapping executable
-names such as `Tests.Main`, including case aliases on macOS. A real-Lean
-regression proves that a dependency's same-named module cannot hide a local
-nonstandard axiom; `just audit-all` and CI run that regression.
-Contract builds may report open proofs as warnings; a successful build is not
-a claim that those contracts are verified.
+def differences(expected, actual, path=""):
+    if type(expected) is not type(actual):
+        return [dict(path=path, native=expected, model=actual)]
+    if isinstance(expected, dict):
+        if expected.keys() != actual.keys():
+            return [dict(path=path, nativeKeys=sorted(expected), modelKeys=sorted(actual))]
+        return [diff for key in expected for diff in differences(expected[key], actual[key], f"{path}.{key}")]
+    if isinstance(expected, list):
+        if len(expected) != len(actual):
+            return [dict(path=path, nativeLength=len(expected), modelLength=len(actual))]
+        return [diff for i, (left, right) in enumerate(zip(expected, actual))
+                for diff in differences(left, right, f"{path}[{i}]")]
+    return [] if expected == actual else [dict(path=path, native=expected, model=actual)]
 
-## VM execution dependency boundary
 
-`Interpreter.Wasm.Operations` holds the shared numeric and GC operations.
-Both interpreter implementations use those same definitions. `SmallStep`
-imports that executable layer directly; `Semantics` retains the legacy
-big-step interpreter for regression tests and the existing proof API.
-`NearVM.State` imports only host types and `NearVM.Run` explicitly imports
-the small-step machine. Executing the VM does not need the broad Wasm proof
-umbrella.
-The compiler-header report records the current execution dependency graph in
-`audit/vm-dependencies.json`. New runtime modules may extend that graph while
-the legacy interpreter and proof API boundary stays enforced.
+def probe(reference, model):
+    cases = []
+    with frozen_reference(reference) as (native, build), tempfile.TemporaryDirectory(prefix="safe-near-gas-") as directory:
+        directory = Path(directory)
+        lean = directory / "chain-replay"
+        shutil.copy2(model, lean)
+        config_dir = directory / "configs"
+        config_dir.mkdir()
+        configs = {}
+        for file in sorted((ROOT / "near-lean/vm/configs").glob("*.json")):
+            raw = file.read_bytes()
+            (config_dir / file.name).write_bytes(raw)
+            configs[file.name] = digest(raw)
+        examples = json.loads(subprocess.check_output([str(native), "--financial-examples"], text=True))
+        for version in (83, 84, 85, 86):
+            for scenario, example in examples.items():
+                for purchase, burn in ((0, 0), (10**8, 10**8), (10**8, 2*10**9), (2*10**9, 10**8), (2*10**9, 3*10**9)):
+                    source = copy.deepcopy(example)
+                    source["protocolVersion"] = version
+                    for block in source["blocks"]:
+                        block["gasPrice"] = str(purchase)
+                    source["blocks"][2]["gasPrice"] = str(burn)
+                    native_trace = execute(native, source)
+                    if native_trace["stop"] != "blocksExhausted" or native_trace["unrunBlocks"]:
+                        raise ValueError("native transfer probe did not execute every block")
+                    request = model_request(source, native_trace, config_dir)
+                    model_trace = execute(lean, request)
+                    expected = dict(formatVersion=1, protocolVersion=version, model="near-lean-chain",
+                        initialState=canonical_state(request["initialState"]), initialPendingReceipts=[],
+                        blocks=projection(source, native_trace), stop="blocksExhausted", unrunBlocks=0,
+                        quiescent=not native_trace["blocks"][-1]["pendingReceipts"], codeCatalogue=[])
+                    actual = copy.deepcopy(model_trace)
+                    actual["initialState"] = canonical_state(actual["initialState"])
+                    for block in actual["blocks"]:
+                        block["state"] = canonical_state(block["state"])
+                    diffs = differences(expected, actual, "trace")
+                    cases.append(dict(scenario=scenario, protocolVersion=version, purchaseBlockPrice=str(purchase), deliveryBlockPrice=str(burn),
+                        request=source, modelRequest=request, native=native_trace, model=model_trace, differences=diffs))
+        return dict(scope="transfer/account-creation gas regression; not general runtime conformance", build=build,
+            leanBinarySha256=hashlib.sha256(lean.read_bytes()).hexdigest(), configSha256=configs,
+            unmodeledObservations=["native compute counter", "execution metadata", "account representation version",
+                                  "native statistics beyond derived transfer/creation token burn", "trie roots and opaque shard state",
+                                  "native hash generation (receipt ids compared under creation-order renaming)",
+                                  "transaction hash identity (modeled transaction outcome ids are zero)"],
+            cases=cases, differingCases=sum(bool(case["differences"]) for case in cases))
 
-`check_vm_dependencies.py` builds `NearVM`, then inspects Lean's imported-module
-header. It rejects legacy `Semantics`, `Wp`, `Spec` and CodeLib imports,
-including indirect imports, and requires the actual small-step/operation
-modules to be present. CI runs it after building the VM. Its separate Lean
-fixture test demonstrates a clean graph, a forbidden transitive dependency,
-and an incorrectly disconnected execution module.
-`just vm-dependencies` runs both the real graph check and those adversarial
-fixture cases; `just check` includes the same gate.
 
-## Full runtime reference
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--reference", type=Path, default=HERE / "target/near-apply-reference")
+    parser.add_argument("--model", type=Path, default=ROOT / "near-lean/chain/.lake/build/bin/chain-replay")
+    parser.add_argument("--report", type=Path, default=ROOT / "audit/transfer-gas-regression.json")
+    args = parser.parse_args()
+    report = probe(args.reference.resolve(), args.model.resolve())
+    atomic_write(args.report.resolve(), (json.dumps(report, indent=2) + "\n").encode())
+    print(f"Transfer gas regression: {len(report['cases'])} cases, {report['differingCases']} differing cases.")
+    print(f"Evidence: {args.report.resolve()}")
+    raise SystemExit(bool(report["differingCases"]))
 
-The full transaction/receipt reference is documented in
-[chain-conformance/README.md](chain-conformance/README.md). It runs the actual
-trie-backed `Runtime::apply` and preserves complete raw state. Its smoke checks
-do not yet compare the Lean chain runner with nearcore.
 
-## Snapshots
+if __name__ == "__main__":
+    main()
 
-See [SNAPSHOTS.md](SNAPSHOTS.md) for format, trust boundary, prefix-filtered
-storage, provider size limits, and historical captures. A live full capture of
-`lockup.near`, including 522,447 bytes of deployed code, succeeded at block
-`GXdjU1zVDi5HJNh2YmnTEWiqGPZA2b4iegU28kVvXhpn` (height 220701709,
-protocol 86). Capturing that same hash again produced byte-identical JSON.
-
-[SNAPSHOT_VM.md](SNAPSHOT_VM.md) explains how to feed a complete captured
-account to compatible reference and model executables, preserving the actual
-contract identity and block context. The adapter freezes executables and
-configuration before running, allowing the components to live in separate
-worktrees while other agents continue rebuilding them.
-
-The Lean chain replay wire format and its external decoder assumptions are documented in
-[`chain-conformance/REPLAY.md`](chain-conformance/REPLAY.md). Its tests run in
-`just test-all` and CI; the native/Lean comparison bridge remains open.
+`just chain-gas-test` runs the targeted native/Lean transfer and account-creation
+gas regression after the reference is built. It records all field differences
+and explicit observation gaps; it does not establish general runtime conformance.

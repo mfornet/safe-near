@@ -3,9 +3,9 @@ name: wasm
 on:
   push:
     branches: [main]
-    paths: ["near-lean/**", "contracts/w-near/verification/**", "contracts/w-near/contract.wasm", "tools/runtime-conformance/**", "tools/chain-conformance/**", "tools/axiom-audit.py", "tools/check_vm_dependencies.py", "tools/tests/check_vm_dependencies.py", "tools/tests/check_axiom_audit.py", ".github/workflows/wasm.yml"]
+    paths: ["near-lean/**", "contracts/w-near/verification/**", "contracts/w-near/contract.wasm", "tools/runtime-conformance/**", "tools/dump-runtime-config/**", "tools/chain-conformance/**", "tools/axiom-audit.py", "tools/check_vm_dependencies.py", "tools/tests/check_vm_dependencies.py", "tools/tests/check_axiom_audit.py", ".github/workflows/wasm.yml"]
   pull_request:
-    paths: ["near-lean/**", "contracts/w-near/verification/**", "contracts/w-near/contract.wasm", "tools/runtime-conformance/**", "tools/chain-conformance/**", "tools/axiom-audit.py", "tools/check_vm_dependencies.py", "tools/tests/check_vm_dependencies.py", "tools/tests/check_axiom_audit.py", ".github/workflows/wasm.yml"]
+    paths: ["near-lean/**", "contracts/w-near/verification/**", "contracts/w-near/contract.wasm", "tools/runtime-conformance/**", "tools/dump-runtime-config/**", "tools/chain-conformance/**", "tools/axiom-audit.py", "tools/check_vm_dependencies.py", "tools/tests/check_vm_dependencies.py", "tools/tests/check_axiom_audit.py", ".github/workflows/wasm.yml"]
   workflow_dispatch:
 
 concurrency:
@@ -152,6 +152,10 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: wasm-tools@1.251.0
+      - name: Verify all generated runtime configuration tables
+        run: |
+          cargo run --locked --release --manifest-path tools/dump-runtime-config/Cargo.toml -- /tmp/safe-near-runtime-configs
+          diff -ru --exclude=README.md near-lean/vm/configs /tmp/safe-near-runtime-configs
       - name: Verify the chain replay Wasm fixture
         run: |
           wasm-tools parse tools/chain-conformance/fixtures/replay.wat -o /tmp/safe-near-replay.wasm

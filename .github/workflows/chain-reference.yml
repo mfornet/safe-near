@@ -3,9 +3,9 @@ name: Chain reference smoke
 on:
   push:
     branches: [main]
-    paths: ["tools/chain-conformance/**", "tools/tests/test_chain_reference.py", "near-lean/runtime/reference.json", ".github/workflows/chain-reference.yml"]
+    paths: ["tools/chain-conformance/**", "tools/dump-runtime-config/**", "tools/tests/test_chain_reference.py", "near-lean/runtime/**", "near-lean/chain/**", "near-lean/vm/NearVM/Config.lean", "near-lean/vm/configs/**", ".github/workflows/chain-reference.yml"]
   pull_request:
-    paths: ["tools/chain-conformance/**", "tools/tests/test_chain_reference.py", "near-lean/runtime/reference.json", ".github/workflows/chain-reference.yml"]
+    paths: ["tools/chain-conformance/**", "tools/dump-runtime-config/**", "tools/tests/test_chain_reference.py", "near-lean/runtime/**", "near-lean/chain/**", "near-lean/vm/NearVM/Config.lean", "near-lean/vm/configs/**", ".github/workflows/chain-reference.yml"]
   workflow_dispatch:
 
 permissions:
@@ -50,3 +50,32 @@ jobs:
           path: |
             audit/chain-reference-smoke.json
             tools/chain-conformance/target/*.build.json
+            tools/chain-conformance/target/near-apply-reference
+
+  financial-regression:
+    name: Transfer and creation gas comparison
+    needs: native-reference
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/cache@v5
+        with:
+          path: near-lean/.lake/packages
+          key: chain-finance-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'near-lean/*/lake-manifest.json') }}
+      - uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: near-lean/chain
+          build-args: chain-replay
+          use-mathlib-cache: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-chain-reference-evidence
+      - name: Compare represented financial observations
+        run: |
+          chmod +x tools/chain-conformance/target/near-apply-reference
+          python3 tools/chain-conformance/gas_probe.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: transfer-creation-gas-evidence
+          path: audit/transfer-gas-regression.json

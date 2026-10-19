@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+from contextlib import contextmanager
 import hashlib
 import json
 from pathlib import Path
@@ -37,7 +38,8 @@ def account(state: dict, identifier: str) -> dict:
     raise AssertionError(f"missing account: {identifier}")
 
 
-def probe(binary: Path) -> dict:
+@contextmanager
+def frozen_reference(binary: Path):
     build = json.loads(binary.with_name(binary.name + ".build.json").read_text())
     pin = json.loads((ROOT / "near-lean/runtime/reference.json").read_text())
     expected_adapter = digest((HERE / "reference.rs").read_bytes())
@@ -52,6 +54,11 @@ def probe(binary: Path) -> dict:
         runtime = json.loads(subprocess.check_output([str(frozen), "--metadata"], text=True))
         if runtime != build["runtime"]:
             raise ValueError("runtime oracle self-identification does not match its build metadata")
+        yield frozen, build
+
+
+def probe(binary: Path) -> dict:
+    with frozen_reference(binary) as (frozen, build):
         request = json.loads(subprocess.check_output([str(frozen), "--example"], text=True))
         trace = execute(frozen, request)
         checks = []

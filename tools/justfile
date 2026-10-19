@@ -104,3 +104,9 @@ chain-reference-test *options:
 chain-replay-test:
     cd near-lean/chain && lake build chain-replay
     python3 tools/chain-conformance/test_replay.py
+
+# Compare transfer/creation gas settlement with the built native oracle; scope is not general conformance.
+[positional-arguments]
+chain-gas-test *options:
+    cd near-lean/chain && lake build chain-replay
+    python3 tools/chain-conformance/gas_probe.py "$@"

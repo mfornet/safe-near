@@ -126,3 +126,26 @@ The independent full-runtime oracle now exists. Remaining work includes the
 cross-runtime bridge, explicit treatment of abstract counter ids versus
 nearcore hashes, complete observation comparison, and captured-account import.
 The existing `just near-conformance` remains a VM-level comparison.
+
+## Targeted financial comparison
+
+After building both executables, run `just chain-gas-test`. Forty native/Lean
+cases cover successful transfers and account creation across protocols 83–86,
+zero and nonzero prices, and price increases/decreases between submission and
+delivery. Source-signed requests come from `--financial-examples`. The runner
+freezes both executables and configuration tables, checks native provenance,
+and saves raw requests/traces plus field differences in
+`audit/transfer-gas-regression.json`.
+
+It compares every represented state/receipt/outcome field for this restricted
+corpus, including ordered pending work and model counters. Native receipt
+hashes are renamed by independently observed creation order; transaction hashes
+map to the model's zero transaction outcome id. Association-list map order is
+canonicalized, while receipt order is preserved. Native metadata, compute,
+account representation versions, opaque trie columns and statistics outside
+derived token burn remain explicit observation gaps. This targeted regression
+is not a general runtime comparator or a proof of conformance. Other action
+kinds, initial contract/data state and failures are rejected rather than dropped.
+
+The CI financial job consumes the exact binary/metadata artifact produced by
+the native job, so it does not repeat the expensive source build.
