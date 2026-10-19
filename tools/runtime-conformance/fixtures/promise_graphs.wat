@@ -54,4 +54,33 @@
     i64.const 99 call $return)
   (func (export "then_invalid")
     i64.const 99 call $callback drop)
+
+  (func (export "join_limit")
+    i64.const 10 i64.const 0 call $batch drop
+    i64.const 512 i64.const 128 call $and call $callback call $return)
+  (func (export "join_exceeded")
+    i64.const 10 i64.const 0 call $batch drop
+    i64.const 512 i64.const 129 call $and drop)
+  (func $limit_pair
+    i64.const 10 i64.const 0 call $batch drop
+    i32.const 2048 i64.const 512 i64.const 128 call $and i64.store
+    i32.const 2056 i64.const 0 i64.store
+    i32.const 2064 i64.const 999 i64.store)
+  (func (export "nested_exceeded")
+    call $limit_pair
+    i64.const 2048 i64.const 2 call $and drop)
+  (func (export "limit_before_invalid")
+    call $limit_pair
+    i64.const 2048 i64.const 3 call $and drop)
+  (func (export "invalid_before_limit")
+    call $limit_pair
+    i32.const 2048 i64.const 999 i64.store
+    i64.const 2048 i64.const 3 call $and drop)
+  (func (export "many_empty_joins")
+    i64.const 512 i64.const 0 call $and drop
+    i64.const 512 i64.const 129 call $and call $callback call $return)
+  (func (export "join_count_overflow")
+    i64.const 0 i64.const -1 call $and drop)
+  (func (export "join_memory_oob")
+    i64.const 4294967295 i64.const 1 call $and drop)
 )

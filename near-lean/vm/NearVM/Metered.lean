@@ -1,5 +1,6 @@
 import NearVM.Host
 import NearVM.Config
+import NearVM.PromiseGraph
 
 /-!
 # Gas-metered host functions
@@ -126,6 +127,51 @@ def depsSir (st : Store NearState) (idx : Nat) (receiver : Option (List UInt8)) 
       | none => []
   go st.host.promises.length idx
 
+/-- The supported operations that allocate one raw handle on success. -/
+def allocatesPromise (name : String) : Bool :=
+  ["promise_create", "promise_then", "promise_and", "promise_batch_create", "promise_batch_then"].contains name
+
+def promiseCapacityError (st : Store NearState) : Option HostError :=
+  match st.host.config.maxPromises with
+  | none => none
+  | some limit =>
+    if st.host.promises.length + 1 > limit then
+      some (.numberPromisesExceeded (st.host.promises.length + 1) limit)
+    else none
+
+def creationAccountArgs (name : String) (args : List Value) : Option (UInt64 × UInt64) :=
+  if name == "promise_create" || name == "promise_batch_create" then some (argU64 args 0, argU64 args 1)
+  else if name == "promise_then" || name == "promise_batch_then" then some (argU64 args 1, argU64 args 2)
+  else none
+
+/-- Receiver parsing precedes receipt creation and the allocation limit. -/
+def creationAccountError (name : String) (st : Store NearState) (args : List Value) : Option HostError :=
+  match creationAccountArgs name args with
+  | none => none
+  | some (len, ptr) =>
+    match getMemOrReg st ptr len with
+    | none => some (if len == u64Max then .invalidRegisterId ptr.toNat else .memoryAccessViolation)
+    | some bytes =>
+      if (String.fromUTF8? ⟨bytes.toArray⟩).isNone then some .badUTF8
+      else if !st.host.config.validAccountId bytes then some .invalidAccountId
+      else none
+
+def creationPrefixError (name : String) (st : Store NearState) (args : List Value) : Option HostError :=
+  match creationAccountError name st args with
+  | some error => some error
+  | none =>
+    if (name == "promise_then" || name == "promise_batch_then") &&
+        !promiseIndexValid st (argU64 args 0).toNat then
+      some (.invalidPromiseIndex (argU64 args 0).toNat)
+    else none
+
+/-- Retain receipt dispatch charges, stopping before function-action processing. -/
+def throughNewReceipt : List Charge → List Charge
+  | [] => []
+  | charge :: rest => match charge with
+    | .newReceipt .. => [charge]
+    | _ => charge :: throughNewReceipt rest
+
 /-- Argument-dependent charge plan before validating promise handles. -/
 private def chargesBeforeUnvalidated (name : String) (st : Store NearState) (args : List Value) : List Charge :=
   let a := argU64 args
@@ -199,7 +245,7 @@ private def chargesBeforeUnvalidated (name : String) (st : Store NearState) (arg
     let sir := sirOfSpan st (a 0) (a 1)
     let m := spanLen st (a 2) (a 3)
     let args := spanLen st (a 4) (a 5)
-    [base] ++ readSpan st (a 0) (a 1) ++ utf8 (spanLen st (a 0) (a 1)) ++ [.newReceipt sir []]
+    [base] ++ readSpan st (a 0) (a 1) ++ utf8 (spanLen st (a 0) (a 1)) ++ [.newReceipt sir [], base]
       ++ readSpan st (a 2) (a 3) ++ readSpan st (a 4) (a 5) ++ readMem 16
       ++ [.actionBase (·.functionCallBase) sir, .actionBytes (·.functionCallByte) (m + args) sir,
           .prepay (a 7).toNat]
@@ -208,7 +254,7 @@ private def chargesBeforeUnvalidated (name : String) (st : Store NearState) (arg
     let m := spanLen st (a 3) (a 4)
     let args := spanLen st (a 5) (a 6)
     [base] ++ readSpan st (a 1) (a 2) ++ utf8 (spanLen st (a 1) (a 2))
-      ++ [.newReceipt sir (depsSir st (a 0).toNat (getMemOrReg st (a 2) (a 1)))]
+      ++ [.newReceipt sir (depsSir st (a 0).toNat (getMemOrReg st (a 2) (a 1))), base]
       ++ readSpan st (a 3) (a 4) ++ readSpan st (a 5) (a 6) ++ readMem 16
       ++ [.actionBase (·.functionCallBase) sir, .actionBytes (·.functionCallByte) (m + args) sir,
           .prepay (a 8).toNat]
@@ -269,15 +315,64 @@ def chargesBefore (name : String) (st : Store NearState) (args : List Value) : L
   let a := argU64 args
   let base : Charge := .ext "base"
   let charges := chargesBeforeUnvalidated name st args
-  if (name == "promise_then" || name == "promise_batch_then") &&
-      !promiseIndexValid st (a 0).toNat then
-    [base] ++ readSpan st (a 1) (a 2) ++ utf8 (spanLen st (a 1) (a 2))
+  if name == "promise_and" && (a 1).toNat * 8 ≥ 2 ^ 64 then
+    [base, .ext "promise_and_base"]
+  else if let some (len, ptr) := creationAccountArgs name args then
+    let readAccount := [base] ++ readSpan st len ptr
+    let parseAccount := readAccount ++ utf8 (spanLen st len ptr)
+    match creationAccountError name st args with
+    | some .memoryAccessViolation | some (.invalidRegisterId _) => readAccount
+    | some _ => parseAccount
+    | none =>
+      if (creationPrefixError name st args).isSome then parseAccount
+      else if (promiseCapacityError st).isSome then throughNewReceipt charges
+      else charges
   else if name.startsWith "promise_batch_action_" &&
       (promiseReceiver? st (a 0).toNat).isNone then
     charges.filter fun charge => match charge with
       | .actionBase .. | .actionBytes .. | .prepay .. => false
       | _ => true
   else charges
+
+/-- Check each expanded prefix, retaining duplicate receipt dependencies.
+This ordering makes an earlier limit violation precede a later invalid handle. -/
+def joinedDependenciesError (handles : List PromiseHandle) (limit : Nat) : List Nat → Nat → Option HostError
+  | [], _ => none
+  | index :: rest, count =>
+    match handles[index]? with
+    | none => some (.invalidPromiseIndex index)
+    | some handle =>
+      let count := count + handle.dependencies.length
+      if count > limit then some (.numberInputDataDependenciesExceeded count limit)
+      else joinedDependenciesError handles limit rest count
+
+/-- Validation after argument-reading charges and before functional invocation.
+An invalid internal raw graph is explicit unsupported model state. Ordinary VM
+execution preserves graph well-formedness independently of this check. -/
+def promiseJoinError (st : Store NearState) (args : List Value) : Option HostError :=
+  match args with
+  | [.i64 ptr, .i64 count] =>
+    if count.toNat * 8 ≥ 2 ^ 64 then some .integerOverflow
+    else if ptr.toNat + count.toNat * 8 > memBytes st then some .memoryAccessViolation
+    else match readU64Array st ptr count.toNat with
+    | none => some .memoryAccessViolation
+    | some [] => none
+    | some indices =>
+      match st.host.config.maxInputDataDependencies with
+      | none => none
+      | some limit =>
+        match convertPromises st.host.promises with
+        | none => some (.unsupported "promise_and: malformed raw graph")
+        | some graph => joinedDependenciesError graph.handles limit indices 0
+  | _ => none
+
+def invocationArgumentError (name : String) (st : Store NearState) (args : List Value) : Option HostError :=
+  if name == "promise_and" then promiseJoinError st args else creationPrefixError name st args
+
+def preInvokeError (name : String) (st : Store NearState) (args : List Value) : Option HostError :=
+  match invocationArgumentError name st args with
+  | some error => some error
+  | none => if allocatesPromise name then promiseCapacityError st else none
 
 /-- Length of register `reg` in `st`, if set. -/
 def registerLen? (st : Store NearState) (reg : UInt64) : Option Nat :=
@@ -408,6 +503,22 @@ def viewRestrictedHost (name : String) : Bool :=
 def deprecatedRuntimeHost (name : String) : Bool :=
   ["storage_iter_prefix", "storage_iter_range", "storage_iter_next"].contains name
 
+/-- Post-call metering is separated from host invocation so its frame
+properties can be used directly in execution proofs. -/
+def finishMeteredCall (extraBytes : Nat) (name : String) (before : Store NearState)
+    (args : List Value) : HostResult NearState → HostResult NearState
+  | .Return vals st2 =>
+    let (ns2, err2) := applyCharges st2.host (chargesAfter name before st2 args)
+    let st3 := { st2 with host := ns2 }
+    match err2 with
+    | some e => trapWith st3 e
+    | none =>
+      match deductDeposit name before st3 args with
+      | (st4, some e) => trapWith st4 e
+      | (st4, none) => .Return vals (updateStorageUsage extraBytes name before st4 args)
+  | .Trap st2 msg => .Trap st2 msg
+  | .Throw st2 tag vals => .Throw st2 tag vals
+
 /-- Wrap a functional host function with its gas and storage-usage rules. -/
 def metered (extraBytes : Nat) (name : String) (fn : HostFn NearState) : HostFn NearState :=
   { fn with invoke := fun st args =>
@@ -416,7 +527,8 @@ def metered (extraBytes : Nat) (name : String) (fn : HostFn NearState) : HostFn 
         let charges := [.ext "base"] ++
           (if name == "promise_return" then [.ext "promise_return"] else [])
         let (ns, error) := applyCharges st.host charges
-        trapWith { st with host := ns } (error.getD (.prohibitedInView name))
+        trapWith { st with host := ns } (error.getD (.prohibitedInView (if name == "promise_create" then "promise_batch_create"
+          else if name == "promise_then" then "promise_batch_then" else name)))
       else
       let (ns, err) := applyCharges st.host (chargesBefore name st args)
       let st1 := { st with host := { ns with context := { ns.context with
@@ -424,18 +536,9 @@ def metered (extraBytes : Nat) (name : String) (fn : HostFn NearState) : HostFn 
       match err with
       | some e => trapWith st1 e
       | none =>
-        match fn.invoke st1 args with
-        | .Return vals st2 =>
-          let (ns2, err2) := applyCharges st2.host (chargesAfter name st1 st2 args)
-          let st3 := { st2 with host := ns2 }
-          match err2 with
-          | some e => trapWith st3 e
-          | none =>
-            match deductDeposit name st1 st3 args with
-            | (st4, some e) => trapWith st4 e
-            | (st4, none) => .Return vals (updateStorageUsage extraBytes name st1 st4 args)
-        | .Trap st2 msg => .Trap st2 msg
-        | .Throw st2 tag vals => .Throw st2 tag vals }
+        match preInvokeError name st1 args with
+        | some error => trapWith st1 error
+        | none => finishMeteredCall extraBytes name st1 args (fn.invoke st1 args) }
 
 /-- These host operations require semantics not supplied by `VMContext`.
 Reject them on invocation instead of using the functional host's placeholder
@@ -463,15 +566,21 @@ def meteredHostFns (cfg : RuntimeConfig) : List (ImportDecl × HostFn NearState)
   (nearHostFns.map fun (decl, fn) => (decl, metered extra decl.name (swap decl fn)))
     ++ [({ «module» := "env", name := "gas", params := [.i32], results := [] }, gasFn)]
 
-/-- Resolve a module's imports against the metered table. `none` names the
+/-- Resolve imports in declaration order, retaining the first unknown-import
+error. Structural recursion exposes the environment invariant to proofs. -/
+def resolveMeteredImports (cfg : RuntimeConfig) : List ImportDecl → Except String (HostEnv NearState)
+  | [] => .ok { funcs := [] }
+  | decl :: rest =>
+    match (meteredHostFns cfg).find? (fun p => importMatches p.fst decl) with
+    | none => .error s!"{decl.module}.{decl.name}"
+    | some (_, fn) =>
+      match resolveMeteredImports cfg rest with
+      | .error message => .error message
+      | .ok env => .ok { funcs := fn :: env.funcs }
+
+/-- Resolve a module's imports against the metered table. `error` names the
 first import that is not a known NEAR host function. -/
-def resolveMetered (cfg : RuntimeConfig) (m : Module) : Except String (HostEnv NearState) := do
-  let table := meteredHostFns cfg
-  let mut funcs : Array (HostFn NearState) := #[]
-  for decl in m.imports do
-    match table.find? (fun p => importMatches p.fst decl) with
-    | some (_, fn) => funcs := funcs.push fn
-    | none => throw s!"{decl.module}.{decl.name}"
-  return { funcs := funcs.toList }
+def resolveMetered (cfg : RuntimeConfig) (m : Module) : Except String (HostEnv NearState) :=
+  resolveMeteredImports cfg m.imports
 
 end Wasm.Near

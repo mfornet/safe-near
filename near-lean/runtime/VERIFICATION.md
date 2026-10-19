@@ -163,9 +163,8 @@ prove that every public VM result has backward-only dependencies, an existing
 returned receipt and no dependency cycle. Invalid raw handles or converted
 graphs become model issues with balance/storage/usage rollback; logs and burnt
 gas remain diagnostic observations. These predicates concern dependency indices,
-not full action/account validity or global identifier freshness. Preservation of
-raw handle validity by every host operation remains open; accepted outputs are
-checked regardless. Join conversion is now related to explicit ordered graph
+not full action/account validity or global identifier freshness. Accepted outputs
+are checked regardless of the preservation proof. Join conversion is now related to explicit ordered graph
 semantics by the proofs described below.
 The join oracle covers ordinary, nested, duplicate and empty joins, illegal
 joint returns/actions, nonexistent handles, view restrictions and low-gas error
@@ -186,3 +185,95 @@ The old fuel-based converter and its silent invalid-return fallback are removed.
 A nearcore regression also found that `value_return` after `promise_return` kept
 the old promise selected; successful selectors now clear each other's state,
 with kernel-checked overwrite lemmas and exact comparisons in both call orders.
+
+`NearVM/HostPromises.lean` now proves raw dependency preservation for the 14
+functional promise creation/action functions, the three promise result/return
+functions, and `value_return`. The property includes returned, trapped and thrown
+stores. `metered_preserves_promises` lifts any such host proof through pre/post
+charges, deposit deductions and storage-usage updates. Post-call metering was
+extracted into `finishMeteredCall` without changing its execution order or
+behavior. Initialization has an empty well-formed graph, and
+`HostPreservesPromises.convertible` connects successful host execution directly
+to the proved converter and receipt-graph validity. Full state
+well-formedness, action validity, integer bounds, global freshness and conservation
+remain separate obligations.
+
+`NearVM/HostDispatch.lean` now covers the complete metered host registry.
+`meteredHostFns_preserves` includes deprecated and unsupported rejection paths,
+structured panic handlers and the gas import. `resolveMetered_preserves` lifts
+this invariant to every function in a successfully resolved environment.
+`resolveMeteredImports_aligned` and `resolveMetered_length` prove positional
+alignment and multiplicity for the structurally recursive import resolver.
+These are dependency-preservation guarantees, not complete host semantic
+conformance; the interpreter lifting is described below.
+
+`NearVM/ExecutionPromises.lean` now proves dependency preservation for every
+`SmallStep.Step`, finite `SmallStep.Steps` trace, and every `runMetered` exit,
+including fuel/gas exhaustion and diagnostic errors. The invariant includes
+all callable hosts in all module instances and foreign-function slots.
+Indexed-memory selection changes only memory metadata, with a proved host-table
+frame; GC execution, exception preparation and memory restoration have host-state
+frames as well. Successful resolved initialization establishes the invariant.
+`runResolved_promises_convertible` connects that initialization and actual
+metered execution to a valid converted graph without using the output checker.
+The initial promise list must be well formed (ordinary VM contexts start empty).
+These proofs do not establish complete state well-formedness, account/action
+validity, bounds, global freshness or conservation,
+nor do they prove equivalence between interpreter steps and nearcore.
+
+Returned-promise selection is now a separate preserved invariant in
+`ReturnSelection.lean`: an optional selection names an existing non-joint raw
+handle. Creation and action append preserve earlier selected slots;
+`value_return` clears selection and `promise_return` checks existence and kind.
+`HostSelection` and `MeteredSelection` cover the complete resolved registry,
+including errors and unsupported rejection. `InterpreterInvariant` provides
+one generic step/trace/initialization proof, and `MeteredInvariant` lifts it
+through execution with an explicit gas-frame premise. Both the dependency and
+selection proofs specialize these shared results.
+`ReturnGraph` proves non-joint slots retain receipt identities through all
+subsequent conversion, and bounds their returned receipt indices.
+`runResolved_return_selection` in `ExecutionSelection.lean` combines resolved
+initialization, metered execution, graph validity and return resolution.
+`PromiseGraph.returnData?` is extracted from the existing VM return branch;
+its totality is proved for convertible graphs with valid selection, including
+exact value bytes when no promise is selected. Yielded raw handles remain
+excluded by dependency well-formedness; this invariant does not implement yield.
+Bounds/freshness, complete state validity, conservation and deployed refinement
+remain open.
+
+The metered join path now loads `max_number_input_data_dependencies` from the
+protocol configuration and checks expanded prefixes before functional invocation.
+Duplicate receipt indices count repeatedly; joins of empty joints can exceed
+128 input handles while contributing zero dependencies. Earlier limit violations
+precede later invalid handles. The u64 `count * 8` overflow check occurs after
+base/promise-and-base charging and before per-element/memory charging. Memory
+bounds errors use the structured host error. Independent boundary fixtures found
+five mismatches, including overflow/error-message differences, now covered by
+regressions. `joinedDependenciesError_none_iff`,
+`joinedDependenciesError_expands` and `preInvokeError_join_bounds` prove the
+prefix condition, ordered expansion and accepted-span/dependency bounds.
+Both existing execution invariants cover the new pre-invocation error exits.
+Other host limits remain separate obligations.
+
+Promise allocation now checks `max_promises_per_function_call_action` for
+`promise_create`, `promise_then`, `promise_and`, `promise_batch_create`, and
+`promise_batch_then`. Empty joints consume handles even though they emit no
+receipts. Receiver reads/UTF-8/V2 syntax and callback-handle errors precede the
+capacity error. Receipt dispatch fees are paid before that error; subsequent
+function-action argument reads, the second base fee, action fees and prepaid
+gas are omitted. Successful combined create/then calls retain both base fees.
+Their view errors name the underlying batch operation, matching the reference.
+The context installs V2 account syntax validation (legacy rules retain their
+unvalidated behavior); structured creation-prefix errors preserve gas ordering.
+The count regression fixture covers capacity, invalid receiver/handle/method
+precedence, ordinary combined calls, view restrictions and account boundaries.
+`promiseCapacityError_none_iff`, `preInvokeError_count_bound`, and
+`checked_nextPromiseIdx_fresh` establish capacity and local raw-handle freshness
+under a u64-sized limit. Global identifier freshness, complete state validity,
+remaining host limits and deployed refinement are still open.
+
+Even zero-length join spans validate their pointer before capacity checks.
+The additional empty-span regressions exposed two discrepancies;
+`preInvokeError_join_span_bound` now proves the entire accepted pointer/length
+span lies within guest memory, while the existing join proof bounds its u64
+length and expanded dependency vector.

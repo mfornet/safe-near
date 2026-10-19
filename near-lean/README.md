@@ -146,3 +146,61 @@ preserves receipt validity from the empty graph. Returned receipt identity comes
 from that same handle table. Successful `value_return` and `promise_return`
 selections now overwrite each other; overwrite lemmas and independent regressions
 cover both call orders.
+
+`NearVM/HostPromises.lean` proves dependency well-formedness preservation for
+18 promise and return-value host functions, including
+error outcomes. A generic metering theorem lifts these proofs through gas
+charging, deposit deductions and storage-usage updates. Initialization starts
+with a well-formed empty graph; successful preserving host calls therefore
+admit conversion to a valid receipt graph. These local proofs do not establish
+full action validity, identifier bounds/freshness, or global token conservation.
+
+`NearVM/HostDispatch.lean` extends dependency preservation to the complete
+metered registry, including unsupported/deprecated rejection and gas imports.
+Successful `resolveMetered` environments contain only preserving host functions.
+The resolver uses structural recursion; alignment and length theorems establish
+that each output slot is the first matching registry function for its input
+import, preserving declaration order and duplicate imports. This closes host
+dispatch preservation; the execution lifting is described below.
+
+`NearVM/ExecutionPromises.lean` lifts dependency preservation through every
+small-step transition and finite trace, instruction/frame gas charging, and
+all exits of `runMetered`. The proof includes indirect/foreign calls,
+cross-instance calls, GC operations, exception preparation and indexed-memory
+execution. Resolved initialization establishes the callable-host invariant;
+`runResolved_promises_convertible` proves that execution from a well-formed
+initial promise list produces a convertible valid graph without assuming an
+output-validator check. Full state well-formedness, global identifier freshness
+and conservation remain separate obligations.
+
+`NearVM/ExecutionSelection.lean` adds returned-handle preservation. Every
+resolved host operation and metered execution preserves the existence and
+non-joint kind of the selected handle. `ReturnGraph.lean` proves conversion
+keeps that slot's receipt identity and produces an in-bounds returned receipt.
+`runResolved_return_selection` combines both invariants from resolved
+initialization; `PromiseGraph.returnData?_total` proves the exact return helper
+used by the VM cannot reject such a selection. Ordinary contexts start with no
+selection. The shared `InterpreterInvariant` and `MeteredInvariant` theorems now
+carry both dependency and selection proofs, with gas preservation explicit.
+These guarantees do not establish numeric bounds, identifier freshness, full
+state validity, token conservation, or deployed wNEAR refinement.
+
+Metered `promise_and` now enforces the configured limit on expanded receipt
+dependencies, checking each ordered prefix and counting duplicate dependencies.
+It also rejects overflow in the u64 count-to-byte conversion before charging
+per-element or memory-read costs. `PromiseLimits.lean` relates successful checks
+to exact ordered expansion and proves the resulting dependency-length bound.
+Independent fixtures cover the 128/129 boundary, nested joins, empty joins,
+invalid-index precedence, memory bounds, overflow and view restrictions.
+Broader host limits remain open.
+
+All five supported promise allocators now enforce the configured handle-count
+limit, including empty joints. Receiver parsing and callback-handle validation
+precede the count check; receipt fees are retained when capacity is exceeded,
+while function-action reads and fees are skipped. `promise_create` and
+`promise_then` include both underlying base charges and the reference's view
+error names. Protocol V2 receiver syntax is installed in the host configuration.
+`preInvokeError_count_bound` proves accepted allocations fit the limit;
+`checked_nextPromiseIdx_fresh` proves the u64 handle is unwrapped, absent from
+the old list, and resolves to the appended promise when the limit fits u64.
+This is local handle freshness, not global receipt/data identifier freshness.

@@ -83,6 +83,8 @@ structure NearConfig where
   maxNumberLogs      : Option Nat := none
   maxStorageKeyLen   : Option Nat := none
   maxStorageValueLen : Option Nat := none
+  maxInputDataDependencies : Option Nat := none
+  maxPromises : Option Nat := none
   validAccountId     : List UInt8 → Bool := fun _ => true
   validPublicKey     : List UInt8 → Bool := fun _ => true
 deriving Inhabited

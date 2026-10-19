@@ -7,4 +7,9 @@ import NearVM.Context
 import NearVM.Outcome
 import NearVM.PromiseGraph
 import NearVM.Metered
+import NearVM.HostPromises
+import NearVM.HostDispatch
 import NearVM.Run
+import NearVM.ExecutionPromises
+import NearVM.ExecutionSelection
+import NearVM.PromiseLimits

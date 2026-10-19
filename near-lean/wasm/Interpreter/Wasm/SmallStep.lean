@@ -6822,6 +6822,41 @@ theorem instances_preserved {config config' : Config α} {kind}
   case memoryCopyBetween => simp [setMemoryAt_runtime]
   case memOp => simp [resumeAfterIndexedMemory_runtime]
 
+/-- Exception preparation only allocates an exception reference. -/
+theorem prepareCatch_host (tag : Nat) (arguments : List Value) (clause : CatchClause)
+    (store : MachineStore α) : (prepareCatch tag arguments clause store).2.wasm.host = store.wasm.host := by
+  cases clause <;> rfl
+
+theorem setMemoryAt_host (store : MachineStore α) (index : Nat) (memory : Mem) :
+    (setMemoryAt store index memory).wasm.host = store.wasm.host := by
+  dsimp only [setMemoryAt]
+  split <;> rfl
+
+theorem enterIndexedMemory_host {store indexed : MachineStore α} {index : Nat}
+    (h : enterIndexedMemory? store index = some indexed) : indexed.wasm.host = store.wasm.host := by
+  unfold enterIndexedMemory? at h
+  split at h <;> simp only [Option.some.injEq, reduceCtorEq] at h
+  subst indexed
+  rfl
+
+/-- Selecting a memory changes module memory metadata, never callable hosts. -/
+theorem enterIndexedMemory_hosts {store indexed : MachineStore α} {index : Nat}
+    (h : enterIndexedMemory? store index = some indexed) (slot : Nat) :
+    (indexed.runtime.instances[slot]!).host = (store.runtime.instances[slot]!).host := by
+  unfold enterIndexedMemory? at h
+  split at h <;> simp only [Option.some.injEq, reduceCtorEq] at h
+  subst indexed
+  simp only [getElem!_def, Array.getElem?_modify]
+  by_cases same : store.runtime.entry.id = slot
+  · simp only [same, ite_true]
+    cases store.runtime.instances[slot]? <;> rfl
+  · simp only [same, ite_false]
+
+theorem resumeAfterIndexedMemory_host (rest : Program) (original : MachineStore α) (index : Nat)
+    (config : Config α) :
+    (resumeAfterIndexedMemory rest original index config).store.wasm.host = config.store.wasm.host := by
+  simp only [resumeAfterIndexedMemory, leaveIndexedMemory, setMemoryAt_host]
+
 theorem runtime_preserved {config config' : Config α} {kind}
     (h : Step config kind config')
     (hnot : kind ≠ .administrative .returnFromCallCrossInstance)

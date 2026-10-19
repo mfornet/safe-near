@@ -65,3 +65,21 @@ The promise-graph fixture also covers both orders of `value_return` and
 return; the host now gives the last successful selection precedence. The same
 fixture validates the incremental converter against the reference after removal
 of the bounded join walk.
+
+Join boundary cases check 128 versus 129 expanded dependencies, nested joint
+expansion, duplicate counting, more than 128 empty input joints, invalid-index
+ordering, u64 count-to-byte overflow, out-of-bounds index reads, and view
+precedence. They exposed five discrepancies before the metered join limit and
+overflow checks were added. Comparisons include exact error text and gas profiles.
+
+`promise_counts.json` exercises the 1,024-handle boundary with empty joints and
+all five supported allocating operations. It compares receipt-fee charging and
+errors when receiver parsing or callback lookup fails before capacity, and when
+function-call argument failure would occur after capacity. Ordinary combined
+create/then calls and view errors cover their nested host calls; account cases
+cover V2 syntax, UTF-8, and the 2/64-byte endpoints. The initial cases exposed
+12 discrepancies before count enforcement and charge/validation ordering fixes.
+
+Empty join spans with an invalid pointer are rejected before capacity, including
+at the handle limit. These cases found two further mismatches and guard against
+bypassing memory bounds when the index count is zero.

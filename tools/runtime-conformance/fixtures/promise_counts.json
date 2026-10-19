@@ -1,0 +1,147 @@
+{
+  "code": "tools/runtime-conformance/fixtures/promise_counts.wasm",
+  "sha256": "5f2edff2043ea77f2788e2e3637e4f2124939ac9c7761173fd42a3372afa7d54",
+  "protocolVersion": 86,
+  "initialBalance": "100000000000000000000000000",
+  "storage": [],
+  "calls": [
+    {
+      "name": "normal_create",
+      "method": "normal_create",
+      "args": {}
+    },
+    {
+      "name": "normal_then",
+      "method": "normal_then",
+      "args": {}
+    },
+    {
+      "name": "count_limit",
+      "method": "count_limit",
+      "args": {}
+    },
+    {
+      "name": "join_count_limit",
+      "method": "join_count_limit",
+      "args": {}
+    },
+    {
+      "name": "join_count_exceeded",
+      "method": "join_count_exceeded",
+      "args": {}
+    },
+    {
+      "name": "batch_count_exceeded",
+      "method": "batch_count_exceeded",
+      "args": {}
+    },
+    {
+      "name": "callback_count_exceeded",
+      "method": "callback_count_exceeded",
+      "args": {}
+    },
+    {
+      "name": "create_count_exceeded",
+      "method": "create_count_exceeded",
+      "args": {}
+    },
+    {
+      "name": "then_count_exceeded",
+      "method": "then_count_exceeded",
+      "args": {}
+    },
+    {
+      "name": "create_bad_method_at_capacity",
+      "method": "create_bad_method_at_capacity",
+      "args": {}
+    },
+    {
+      "name": "then_invalid_base_at_capacity",
+      "method": "then_invalid_base_at_capacity",
+      "args": {}
+    },
+    {
+      "name": "account_oob_at_capacity",
+      "method": "account_oob_at_capacity",
+      "args": {}
+    },
+    {
+      "name": "account_invalid_at_capacity",
+      "method": "account_invalid_at_capacity",
+      "args": {}
+    },
+    {
+      "name": "account_badutf8_at_capacity",
+      "method": "account_badutf8_at_capacity",
+      "args": {}
+    },
+    {
+      "name": "join_invalid_at_capacity",
+      "method": "join_invalid_at_capacity",
+      "args": {}
+    },
+    {
+      "name": "normal_create in view",
+      "method": "normal_create",
+      "args": {},
+      "view": true
+    },
+    {
+      "name": "normal_then in view",
+      "method": "normal_then",
+      "args": {},
+      "view": true
+    },
+    {
+      "name": "direct_then in view",
+      "method": "direct_then",
+      "args": {},
+      "view": true
+    },
+    {
+      "name": "invalid_account",
+      "method": "invalid_account",
+      "args": {}
+    },
+    {
+      "name": "short_account",
+      "method": "short_account",
+      "args": {}
+    },
+    {
+      "name": "long_account",
+      "method": "long_account",
+      "args": {}
+    },
+    {
+      "name": "double_separator",
+      "method": "double_separator",
+      "args": {}
+    },
+    {
+      "name": "utf8_account",
+      "method": "utf8_account",
+      "args": {}
+    },
+    {
+      "name": "max_account",
+      "method": "max_account",
+      "args": {}
+    },
+    {
+      "name": "min_account",
+      "method": "min_account",
+      "args": {}
+    },
+    {
+      "name": "zero_join_oob",
+      "method": "zero_join_oob",
+      "args": {}
+    },
+    {
+      "name": "zero_join_oob_at_capacity",
+      "method": "zero_join_oob_at_capacity",
+      "args": {}
+    }
+  ]
+}

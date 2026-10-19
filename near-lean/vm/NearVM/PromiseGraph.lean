@@ -341,6 +341,12 @@ def PromiseGraph.returnedReceipt? (g : PromiseGraph) (index : Nat) : Option Nat 
   | some (.receipt receipt) => some receipt
   | _ => none
 
+/-- Resolve the selected raw handle or the exact selected return bytes. -/
+def PromiseGraph.returnData? (g : PromiseGraph) (ns : NearState) : Option ReturnData :=
+  match ns.returnedPromise with
+  | some index => (g.returnedReceipt? index).map ReturnData.receiptIndex
+  | none => some (match ns.returnData with | some bytes => .value bytes | none => .none)
+
 theorem PromiseGraph.returnedReceipt_lt {g : PromiseGraph} (hwf : g.Valid)
     {index receipt : Nat} (h : g.returnedReceipt? index = some receipt) : receipt < g.receipts.length := by
   unfold returnedReceipt? at h

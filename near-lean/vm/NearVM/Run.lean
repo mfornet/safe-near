@@ -240,9 +240,7 @@ private def runAttempt (cfg : RuntimeConfig) (code : Module) (codeSize : Nat) (m
     match convertPromises ns.promises with
     | none => outcome.graphIssue ctx.accountBalance ctx.storageUsage storage
     | some graph =>
-      let returned : Option ReturnData := match ns.returnedPromise with
-        | some index => (graph.returnedReceipt? index).map ReturnData.receiptIndex
-        | none => some (match ns.returnData with | some bytes => .value bytes | none => .none)
+      let returned := graph.returnData? ns
       match returned with
       | none => outcome.graphIssue ctx.accountBalance ctx.storageUsage storage
       | some returnData => { outcome with returnData, receipts := graph.receipts }
