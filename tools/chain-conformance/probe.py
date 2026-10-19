@@ -65,6 +65,17 @@ def probe(binary: Path) -> dict:
                 trace["stop"] == "blocksExhausted" and trace["unrunBlocks"] == 0
                 and len(trace["blocks"]) == 6)
         blocks = trace["blocks"]
+        require("decoded transactions retain their canonical native bytes and versions",
+                all([item["borsh"] for item in block["inputs"]["transactions"]] == source["transactions"]
+                    for block, source in zip(blocks, request["blocks"]))
+                and blocks[0]["inputs"]["transactions"][0]["version"] == 0
+                and blocks[0]["inputs"]["transactions"][0]["view"]["signer_id"] == "alice.near"
+                and blocks[0]["inputs"]["transactions"][0]["view"]["receiver_id"] == "bob.near")
+        require("decoded incoming views preserve the selected native receipt frontier",
+                trace["initialPendingReceiptViews"] == []
+                and blocks[0]["inputs"]["incomingReceipts"] == []
+                and blocks[1]["inputs"]["incomingReceipts"] == []
+                and blocks[2]["inputs"]["incomingReceipts"] == blocks[0]["outgoingReceipts"])
         initial_bob = account(trace["initialState"], "bob.near")
         require("transaction acceptance defers the cross-account receipt",
                 len(blocks[0]["outcomes"]) == 1 and len(blocks[0]["outgoingReceipts"]) == 1
@@ -92,6 +103,7 @@ def probe(binary: Path) -> dict:
         resumed = execute(frozen, continuation)
         require("the complete raw trie and pending queue reproduce every later block",
                 resumed["initialState"] == blocks[0]["state"]
+                and resumed["initialPendingReceiptViews"] == blocks[0]["outgoingReceipts"]
                 and resumed["blocks"] == blocks[1:] and resumed["unrunBlocks"] == 0)
         rejected = []
         for positions in ([0, 0], [2], [-1]):

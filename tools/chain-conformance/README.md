@@ -95,6 +95,14 @@ Deferred receipts precede newly outgoing work. A runtime error stops the
 sequence without committing that block's trie changes. A malformed request or
 Borsh payload fails the process rather than returning an empty success trace.
 
+The trace also exposes `initialPendingReceiptViews`. Each attempted apply
+has `inputs.transactions` rows containing the native transaction `version`,
+canonical `borsh` bytes and upstream `SignedTransactionView`, plus
+`inputs.incomingReceipts` in actual delivery order. Runtime-error attempts
+retain these inputs; a rejected schedule stops before decoding transactions.
+These projections prepare the Lean bridge without introducing another Borsh
+decoder. Views are not lossless replacements for the authoritative raw bytes.
+
 Every committed block exports its complete raw trie, root, outcomes, outgoing
 and pending receipts, state changes, stats, validator proposals, congestion
 and bandwidth outputs. Protocol structs without a JSON view remain available

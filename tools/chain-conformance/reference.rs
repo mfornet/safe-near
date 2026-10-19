@@ -12,11 +12,11 @@ use near_primitives::hash::CryptoHash;
 use near_primitives::receipt::Receipt;
 use near_primitives::state_record::StateRecord;
 use near_primitives::test_utils::MockEpochInfoProvider;
-use near_primitives::transaction::SignedTransaction;
+use near_primitives::transaction::{SignedTransaction, Transaction};
 use near_primitives::trie_key::{TrieKey, col};
 use near_primitives::types::{AccountId, Balance, EpochId, EpochInfoProvider, Gas, ShardId};
 use near_primitives::version::{MIN_SUPPORTED_PROTOCOL_VERSION, PROTOCOL_VERSION};
-use near_primitives::views::ExecutionOutcomeView;
+use near_primitives::views::{ExecutionOutcomeView, SignedTransactionView};
 use near_store::test_utils::TestTriesBuilder;
 use near_store::trie::AccessOptions;
 use near_store::{ShardTries, ShardUId};
@@ -52,11 +52,15 @@ fn object<'a>(value: &'a Value, fields: &[&str]) -> Result<&'a Map<String, Value
 }
 
 fn field<'a>(object: &'a Map<String, Value>, name: &str) -> Result<&'a Value> {
-    object.get(name).ok_or_else(|| format!("missing field: {name}").into())
+    object
+        .get(name)
+        .ok_or_else(|| format!("missing field: {name}").into())
 }
 
 fn integer(object: &Map<String, Value>, name: &str) -> Result<u64> {
-    field(object, name)?.as_u64().ok_or_else(|| format!("invalid u64 field: {name}").into())
+    field(object, name)?
+        .as_u64()
+        .ok_or_else(|| format!("invalid u64 field: {name}").into())
 }
 
 fn decode<T: BorshDeserialize + BorshSerialize>(value: &Value) -> Result<T> {
@@ -70,7 +74,9 @@ fn decode<T: BorshDeserialize + BorshSerialize>(value: &Value) -> Result<T> {
 
 fn hash(value: &Value) -> Result<CryptoHash> {
     let bytes: Vec<u8> = from_value(value.clone())?;
-    Ok(CryptoHash(bytes.try_into().map_err(|_| "expected a 32-byte hash")?))
+    Ok(CryptoHash(
+        bytes.try_into().map_err(|_| "expected a 32-byte hash")?,
+    ))
 }
 
 fn congestion_info(value: &Value) -> Result<BlockCongestionInfo> {
@@ -148,7 +154,13 @@ fn select(
 fn run(request: &Value) -> Result<Value> {
     let input = object(
         request,
-        &["formatVersion", "protocolVersion", "initialEntries", "pendingReceipts", "blocks"],
+        &[
+            "formatVersion",
+            "protocolVersion",
+            "initialEntries",
+            "pendingReceipts",
+            "blocks",
+        ],
     )?;
     if integer(input, "formatVersion")? != 1 {
         return Err("unsupported formatVersion".into());
@@ -185,7 +197,10 @@ fn run(request: &Value) -> Result<Value> {
         .iter()
         .map(decode)
         .collect::<Result<_>>()?;
-    let blocks = field(input, "blocks")?.as_array().ok_or("blocks must be an array")?;
+    let initial_pending = json!(pending);
+    let blocks = field(input, "blocks")?
+        .as_array()
+        .ok_or("blocks must be an array")?;
     let runtime = Runtime::new();
     let mut trace = Vec::new();
     let mut stop = "blocksExhausted";
@@ -222,8 +237,23 @@ fn run(request: &Value) -> Result<Value> {
             .iter()
             .map(decode)
             .collect::<Result<_>>()?;
-        let gas_price_text =
-            field(header, "gasPrice")?.as_str().ok_or("gasPrice must be a decimal string")?;
+        // The bridge consumes upstream-decoded views, never a second custom
+        // Borsh parser. Preserve version and canonical bytes beside each view.
+        let transactions = txs
+            .iter()
+            .map(|tx| {
+                let version = match &tx.transaction {
+                    Transaction::V0(_) => 0,
+                    Transaction::V1(_) => 1,
+                };
+                Ok(json!({"version":version, "borsh":borsh_bytes(tx)?,
+                    "view":SignedTransactionView::from(tx.clone())}))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let resolved_inputs = json!({"transactions":transactions, "incomingReceipts":incoming});
+        let gas_price_text = field(header, "gasPrice")?
+            .as_str()
+            .ok_or("gasPrice must be a decimal string")?;
         if gas_price_text.is_empty() || !gas_price_text.bytes().all(|byte| byte.is_ascii_digit()) {
             return Err("gasPrice must contain decimal digits only".into());
         }
@@ -270,7 +300,8 @@ fn run(request: &Value) -> Result<Value> {
         let result = match attempt {
             Ok(result) => result,
             Err(error) => {
-                trace.push(json!({"runtimeError":format!("{error:?}"), "state":snapshot(&tries, shard, root)?,
+                trace.push(json!({"runtimeError":format!("{error:?}"), "inputs":resolved_inputs,
+                    "state":snapshot(&tries, shard, root)?,
                     "pendingReceipts":pending.iter().map(borsh_bytes).collect::<StdResult<Vec<_>, _>>()?}));
                 stop = "runtimeError";
                 break;
@@ -297,6 +328,7 @@ fn run(request: &Value) -> Result<Value> {
             })
             .collect::<Result<_>>()?;
         trace.push(json!({
+            "inputs":resolved_inputs,
             "state":snapshot(&tries, shard, root)?,
             "outcomes":outcomes,
             "outgoingReceipts":result.outgoing_receipts,
@@ -313,7 +345,8 @@ fn run(request: &Value) -> Result<Value> {
     }
     Ok(json!({"formatVersion":1, "reference":metadata(),
         "protocolVersion":version, "vmKind":format!("{:?}",config.wasm_config.vm_kind),
-        "epochFixture":"single-shard/no-validators", "initialState":initial, "blocks":trace, "stop":stop,
+        "epochFixture":"single-shard/no-validators", "initialState":initial,
+        "initialPendingReceiptViews":initial_pending, "blocks":trace, "stop":stop,
         "unrunBlocks":blocks.len() - trace.len()}))
 }
 
@@ -331,7 +364,10 @@ fn example() -> Result<Value> {
             AccountContract::None,
             182,
         );
-        entries.push((TrieKey::Account { account_id: id }.to_vec(), borsh_bytes(&account)?));
+        entries.push((
+            TrieKey::Account { account_id: id }.to_vec(),
+            borsh_bytes(&account)?,
+        ));
     }
     entries.push((
         TrieKey::access_key(alice.clone(), signer.public_key()).to_vec(),
@@ -342,7 +378,9 @@ fn example() -> Result<Value> {
         alice.clone(),
         bob,
         &signer,
-        vec![Action::Transfer(TransferAction { deposit: Balance::from_yoctonear(one) })],
+        vec![Action::Transfer(TransferAction {
+            deposit: Balance::from_yoctonear(one),
+        })],
         CryptoHash::default(),
     );
     let local = SignedTransaction::from_actions(
@@ -350,18 +388,27 @@ fn example() -> Result<Value> {
         alice.clone(),
         alice,
         &signer,
-        vec![Action::Transfer(TransferAction { deposit: Balance::from_yoctonear(one) })],
+        vec![Action::Transfer(TransferAction {
+            deposit: Balance::from_yoctonear(one),
+        })],
         CryptoHash::default(),
     );
     let provider = MockEpochInfoProvider::default();
     let layout = provider.shard_layout(&EpochId::default())?;
     let congestion = BlockCongestionInfo::new(
-        layout.shard_ids().map(|id| (id, ExtendedCongestionInfo::default())).collect(),
+        layout
+            .shard_ids()
+            .map(|id| (id, ExtendedCongestionInfo::default()))
+            .collect(),
     );
     let congestion_rows: Vec<_> = congestion
         .iter()
         .map(|(id, extended)| {
-            Ok(json!([id, borsh_bytes(&extended.congestion_info)?, extended.missed_chunks_count]))
+            Ok(json!([
+                id,
+                borsh_bytes(&extended.congestion_info)?,
+                extended.missed_chunks_count
+            ]))
         })
         .collect::<Result<_>>()?;
     let mut blocks = Vec::new();
@@ -380,8 +427,10 @@ fn example() -> Result<Value> {
             "bandwidthRequests":borsh_bytes(&BlockBandwidthRequests::empty().shards_bandwidth_requests)?,
             "transactions":transactions, "incomingIndices":positions}));
     }
-    Ok(json!({"formatVersion":1, "protocolVersion":PROTOCOL_VERSION, "initialEntries":entries,
-        "pendingReceipts":[], "blocks":blocks}))
+    Ok(
+        json!({"formatVersion":1, "protocolVersion":PROTOCOL_VERSION, "initialEntries":entries,
+        "pendingReceipts":[], "blocks":blocks}),
+    )
 }
 
 fn main() -> Result<()> {
