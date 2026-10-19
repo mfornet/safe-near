@@ -616,8 +616,13 @@ theorem checkedSetRegister_promises {st after : Store NearState} {register : UIn
     {bytes : List UInt8} (h : checkedSetRegister? st register bytes = some after) :
     after.host.promises = st.host.promises := by
   unfold checkedSetRegister? at h
-  split_ifs at h <;> simp only [Option.some.injEq] at h
-  all_goals subst after; rfl
+  split at h
+  · cases h
+    rfl
+  · split at h
+    · cases h
+      rfl
+    · cases h
 
 theorem writeRegisterResult_preserves (name : String) (st : Store NearState) (register : UInt64)
     (bytes : List UInt8) (vals : List Value) (hwf : PromisesWellFormedFrom 0 st.host.promises) :
