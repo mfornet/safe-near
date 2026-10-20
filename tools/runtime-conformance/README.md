@@ -125,5 +125,14 @@ methods, one/two/three names, UTF-8 names, positive and maximum allowances, and 
 tight gas budget. The initial five cases exposed zero allowance being emitted as
 finite zero and comma separators being double-counted in gas. The comparison
 checks the complete emitted access-key permission as well as burnt/used gas.
-Malformed method-list rejection and complete input-error precedence remain
-implementation/conformance gaps; these cases establish successful scheduling.
+`key_input_errors.json` adds 44 exact comparisons for malformed method lists,
+invalid receiver IDs and UTF-8, memory/register reads, promise targets, serialized
+public keys, view restrictions, and gas exhaustion at validation boundaries.
+The model follows the observed read/validation order, including charging action
+fees before reporting an invalid serialized public key. Empty method lists are
+unrestricted; empty comma-separated entries are rejected.
+
+The pinned VM oracle uses MockedExternal, which enables post-quantum keys.
+These tests do not establish historical runtime feature gating or real runtime
+external validation of invalid UTF-8 action method bytes. Those remain explicit
+conformance boundaries.

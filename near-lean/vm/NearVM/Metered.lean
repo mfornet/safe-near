@@ -252,6 +252,53 @@ def functionCallPlan (st : Store NearState) (input : FunctionCallInputs) (sir : 
 def functionCallInputError (name : String) (st : Store NearState) (args : List Value) : Option HostError :=
   (functionCallInputs? name args).bind fun input => (functionCallPlan st input false).error
 
+structure FunctionKeyInputs where
+  target : Nat
+  publicKeyLen : UInt64
+  publicKeyPtr : UInt64
+  allowancePtr : UInt64
+  receiverLen : UInt64
+  receiverPtr : UInt64
+  methodsLen : UInt64
+  methodsPtr : UInt64
+
+def functionKeyInputs (args : List Value) : FunctionKeyInputs :=
+  { target := (argU64 args 0).toNat
+    publicKeyLen := argU64 args 1, publicKeyPtr := argU64 args 2
+    allowancePtr := argU64 args 4, receiverLen := argU64 args 5, receiverPtr := argU64 args 6
+    methodsLen := argU64 args 7, methodsPtr := argU64 args 8 }
+
+/-- Native order: key read, allowance, receiver read/UTF-8/syntax, method read/
+nonempty segments, target lookup, action fees, then public-key decoding. -/
+def functionKeyPlan (st : Store NearState) (input : FunctionKeyInputs) (sir : Bool) : FunctionCallPlan :=
+  let keyCharges := [.ext "base"] ++ readSpan st input.publicKeyLen input.publicKeyPtr
+  match getMemOrReg st input.publicKeyPtr input.publicKeyLen with
+  | none => { charges := keyCharges, error := some (spanReadError input.publicKeyLen input.publicKeyPtr) }
+  | some publicKey =>
+    let allowanceCharges := keyCharges ++ readMem 16
+    match readU128Mem st input.allowancePtr with
+    | none => { charges := allowanceCharges, error := some .memoryAccessViolation }
+    | some _ =>
+      let receiverCharges := allowanceCharges ++ readSpan st input.receiverLen input.receiverPtr
+      match getMemOrReg st input.receiverPtr input.receiverLen with
+      | none => { charges := receiverCharges, error := some (spanReadError input.receiverLen input.receiverPtr) }
+      | some receiver =>
+        let parsedCharges := receiverCharges ++ utf8 receiver.length
+        if (String.fromUTF8? ⟨receiver.toArray⟩).isNone then { charges := parsedCharges, error := some .badUTF8 }
+        else if !st.host.config.validAccountId receiver then { charges := parsedCharges, error := some .invalidAccountId }
+        else
+          let methodsCharges := parsedCharges ++ readSpan st input.methodsLen input.methodsPtr
+          match getMemOrReg st input.methodsPtr input.methodsLen with
+          | none => { charges := methodsCharges, error := some (spanReadError input.methodsLen input.methodsPtr) }
+          | some methods =>
+            if !methodNamesValid methods then { charges := methodsCharges, error := some .emptyMethodName }
+            else match functionCallTargetError st input.target with
+            | some error => { charges := methodsCharges, error := some error }
+            | none =>
+              { charges := methodsCharges ++ [.actionBase (·.addFunctionCallKeyBase) sir,
+                  .actionBytes (·.addFunctionCallKeyByte) (methodNamesGasBytes methods) sir]
+                error := if serializedPublicKeyValid publicKey then none else some .invalidPublicKey }
+
 /-- Argument-dependent charge plan before validating promise handles. -/
 private def chargesBeforeUnvalidated (name : String) (st : Store NearState) (args : List Value) : List Charge :=
   let a := argU64 args
@@ -358,12 +405,7 @@ private def chargesBeforeUnvalidated (name : String) (st : Store NearState) (arg
     [base] ++ readSpan st (a 1) (a 2)
       ++ [.actionBase (·.addFullAccessKey) (sirOf st (promiseReceiver? st (a 0).toNat))]
   | "promise_batch_action_add_key_with_function_call" =>
-    let sir := sirOf st (promiseReceiver? st (a 0).toNat)
-    let methods := getMemOrReg st (a 8) (a 7) |>.getD []
-    [base] ++ readSpan st (a 1) (a 2) ++ readMem 16 ++ readSpan st (a 5) (a 6)
-      ++ utf8 (spanLen st (a 5) (a 6)) ++ readSpan st (a 7) (a 8)
-      ++ [.actionBase (·.addFunctionCallKeyBase) sir,
-          .actionBytes (·.addFunctionCallKeyByte) (methodNamesGasBytes methods) sir]
+    (functionKeyPlan st (functionKeyInputs args) (sirOf st (promiseReceiver? st (a 0).toNat))).charges
   | "promise_batch_action_delete_key" =>
     [base] ++ readSpan st (a 1) (a 2)
       ++ [.actionBase (·.deleteKey) (sirOf st (promiseReceiver? st (a 0).toNat))]
@@ -454,6 +496,7 @@ theorem transferInputError_invalidAmount (st : Store NearState) (index amountPtr
 def invocationArgumentError (name : String) (st : Store NearState) (args : List Value) : Option HostError :=
   if name == "promise_and" then promiseJoinError st args
   else if name == "promise_batch_action_transfer" then transferInputError st args
+  else if name == "promise_batch_action_add_key_with_function_call" then (functionKeyPlan st (functionKeyInputs args) false).error
   else creationPrefixError name st args
 
 def preInvokeError (name : String) (st : Store NearState) (args : List Value) : Option HostError :=

@@ -43,6 +43,7 @@ inductive HostError
   | invalidReceiptIndex (receiptIndex : Nat)
   | invalidIteratorIndex (iteratorIndex : Nat)
   | invalidAccountId
+  | invalidPublicKey
   | tooManyPromises (numberOfPromises limit : Nat)
   | tooManyInputDataDependencies (dependencies limit : Nat)
   | returnedValueLengthExceeded (length limit : Nat)
@@ -76,6 +77,7 @@ def HostError.message : HostError → String
   | .memoryAccessViolation => "Accessed memory outside the bounds."
   | .invalidReceiptIndex i => s!"VM Logic returned an invalid receipt index: {i}"
   | .invalidIteratorIndex i => s!"Iterator index {i} does not exist"
+  | .invalidPublicKey => "VM Logic provided an invalid public key"
   | .invalidAccountId => "VM Logic returned an invalid account id"
   | .tooManyPromises n l => s!"Number of promises within a FunctionCall {n} exceeds the limit {l}"
   | .tooManyInputDataDependencies n l => s!"Number of input data dependencies {n} exceeds the limit {l}"

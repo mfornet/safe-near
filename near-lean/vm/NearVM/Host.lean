@@ -344,6 +344,24 @@ def promiseBatchActionAddKeyWithFullAccessFn : HostFn NearState :=
         | none => .Trap st "promise_batch_action_add_key_with_full_access: invalid public key"
       | _ => .Trap st "promise_batch_action_add_key_with_full_access: bad args" }
 
+/-- Serialized public-key variants accepted by the reference VM external:
+Ed25519, secp256k1 and ML-DSA-65. Signature verification is a separate boundary. -/
+def serializedPublicKeyValid : List UInt8 → Bool
+  | 0 :: bytes => bytes.length == 32
+  | 1 :: bytes => bytes.length == 64
+  | 2 :: bytes => bytes.length == 1952
+  | _ => false
+
+def methodNameSegmentsValid : Bool → List UInt8 → Bool
+  | previousSeparator, [] => !previousSeparator
+  | previousSeparator, byte :: rest =>
+    if byte == 44 then !previousSeparator && methodNameSegmentsValid true rest
+    else methodNameSegmentsValid false rest
+
+/-- Empty input means unrestricted methods; every listed method must be nonempty. -/
+def methodNamesValid (methods : List UInt8) : Bool :=
+  methods.isEmpty || methodNameSegmentsValid true methods
+
 /-- Commas are replaced by terminators, so a nonempty CSV adds one byte total.
 Empty method-name entries are a separate validation obligation. -/
 def methodNamesGasBytes (methods : List UInt8) : Nat :=
@@ -369,8 +387,11 @@ def promiseBatchActionAddKeyWithFunctionCallFn : HostFn NearState :=
         | some pk, some allowance, some receiverId, some methodNames =>
           checkPublicKey "promise_batch_action_add_key_with_function_call" st pk <| fun _ =>
           checkAccountId "promise_batch_action_add_key_with_function_call" st receiverId <| fun _ =>
-            appendPromiseActionResult "promise_batch_action_add_key_with_function_call" st promiseIdx
-              (.addKey pk nonce (.functionCall (functionCallAllowance allowance) receiverId methodNames))
+            if methodNamesValid methodNames then
+              appendPromiseActionResult "promise_batch_action_add_key_with_function_call" st promiseIdx
+                (.addKey pk nonce (.functionCall (functionCallAllowance allowance) receiverId methodNames))
+            else
+              .Trap { st with host := { st.host with lastError := some .emptyMethodName } } HostError.emptyMethodName.message
         | _, _, _, _ => .Trap st "promise_batch_action_add_key_with_function_call: invalid input"
       | _ => .Trap st "promise_batch_action_add_key_with_function_call: bad args" }
 

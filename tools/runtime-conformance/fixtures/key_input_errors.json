@@ -1,0 +1,240 @@
+{
+  "code": "tools/runtime-conformance/fixtures/key_input_errors.wasm",
+  "sha256": "c335fe8c65a0bdc91b2ee8eaa1b103d4011ef309959857df673d5819c96f476f",
+  "protocolVersion": 86,
+  "initialBalance": "100",
+  "storage": [],
+  "calls": [
+    {
+      "name": "key_input_errors: leading",
+      "method": "leading",
+      "args": {}
+    },
+    {
+      "name": "key_input_errors: trailing",
+      "method": "trailing",
+      "args": {}
+    },
+    {
+      "name": "key_input_errors: repeated",
+      "method": "repeated",
+      "args": {}
+    },
+    {
+      "name": "key_input_errors: separator",
+      "method": "separator",
+      "args": {}
+    },
+    {
+      "name": "key_input_errors: separators",
+      "method": "separators",
+      "args": {}
+    },
+    {
+      "name": "key_input_errors: empty",
+      "method": "empty",
+      "args": {}
+    },
+    {
+      "name": "key_input_errors: bad_index",
+      "method": "bad_index",
+      "args": {}
+    },
+    {
+      "name": "key_input_errors: joint",
+      "method": "joint",
+      "args": {}
+    },
+    {
+      "name": "key_input_errors: bad_index_bad_methods",
+      "method": "bad_index_bad_methods",
+      "args": {}
+    },
+    {
+      "name": "key_input_errors: joint_bad_methods",
+      "method": "joint_bad_methods",
+      "args": {}
+    },
+    {
+      "name": "key_input_errors: pk_memory",
+      "method": "pk_memory",
+      "args": {}
+    },
+    {
+      "name": "key_input_errors: allowance_memory",
+      "method": "allowance_memory",
+      "args": {}
+    },
+    {
+      "name": "key_input_errors: receiver_memory",
+      "method": "receiver_memory",
+      "args": {}
+    },
+    {
+      "name": "key_input_errors: receiver_utf8",
+      "method": "receiver_utf8",
+      "args": {}
+    },
+    {
+      "name": "key_input_errors: receiver_format",
+      "method": "receiver_format",
+      "args": {}
+    },
+    {
+      "name": "key_input_errors: methods_memory",
+      "method": "methods_memory",
+      "args": {}
+    },
+    {
+      "name": "key_input_errors: pk_length",
+      "method": "pk_length",
+      "args": {}
+    },
+    {
+      "name": "key_input_errors: pk_tag",
+      "method": "pk_tag",
+      "args": {}
+    },
+    {
+      "name": "key_input_errors: pk_bad_index",
+      "method": "pk_bad_index",
+      "args": {}
+    },
+    {
+      "name": "key_input_errors: pk_bad_methods",
+      "method": "pk_bad_methods",
+      "args": {}
+    },
+    {
+      "name": "key_input_errors: pk_bad_receiver",
+      "method": "pk_bad_receiver",
+      "args": {}
+    },
+    {
+      "name": "key_input_errors: pk_memory_first",
+      "method": "pk_memory_first",
+      "args": {}
+    },
+    {
+      "name": "key_input_errors: allowance_memory_first",
+      "method": "allowance_memory_first",
+      "args": {}
+    },
+    {
+      "name": "key_input_errors: receiver_first",
+      "method": "receiver_first",
+      "args": {}
+    },
+    {
+      "name": "key_input_errors: utf8_first",
+      "method": "utf8_first",
+      "args": {}
+    },
+    {
+      "name": "key_input_errors: registers",
+      "method": "registers",
+      "args": {}
+    },
+    {
+      "name": "key_input_errors: register_methods_bad",
+      "method": "register_methods_bad",
+      "args": {}
+    },
+    {
+      "name": "key_input_errors: register_pk_missing",
+      "method": "register_pk_missing",
+      "args": {}
+    },
+    {
+      "name": "key_input_errors: register_receiver_missing",
+      "method": "register_receiver_missing",
+      "args": {}
+    },
+    {
+      "name": "key_input_errors: register_methods_missing",
+      "method": "register_methods_missing",
+      "args": {}
+    },
+    {
+      "name": "key_input_errors: secp256k1",
+      "method": "secp256k1",
+      "args": {}
+    },
+    {
+      "name": "key_input_errors: mldsa65",
+      "method": "mldsa65",
+      "args": {}
+    },
+    {
+      "name": "key_input_errors: direct",
+      "method": "direct",
+      "args": {}
+    },
+    {
+      "name": "key_input_errors: pk_tag gas 240000000000",
+      "method": "pk_tag",
+      "args": {},
+      "gas": 240000000000
+    },
+    {
+      "name": "key_input_errors: pk_tag gas 250000000000",
+      "method": "pk_tag",
+      "args": {},
+      "gas": 250000000000
+    },
+    {
+      "name": "key_input_errors: repeated gas 240000000000",
+      "method": "repeated",
+      "args": {},
+      "gas": 240000000000
+    },
+    {
+      "name": "key_input_errors: repeated gas 250000000000",
+      "method": "repeated",
+      "args": {},
+      "gas": 250000000000
+    },
+    {
+      "name": "key_input_errors: bad_index gas 240000000000",
+      "method": "bad_index",
+      "args": {},
+      "gas": 240000000000
+    },
+    {
+      "name": "key_input_errors: bad_index gas 250000000000",
+      "method": "bad_index",
+      "args": {},
+      "gas": 250000000000
+    },
+    {
+      "name": "key_input_errors: receiver_format gas 240000000000",
+      "method": "receiver_format",
+      "args": {},
+      "gas": 240000000000
+    },
+    {
+      "name": "key_input_errors: receiver_format gas 250000000000",
+      "method": "receiver_format",
+      "args": {},
+      "gas": 250000000000
+    },
+    {
+      "name": "key_input_errors: pk_memory gas 240000000000",
+      "method": "pk_memory",
+      "args": {},
+      "gas": 240000000000
+    },
+    {
+      "name": "key_input_errors: pk_memory gas 250000000000",
+      "method": "pk_memory",
+      "args": {},
+      "gas": 250000000000
+    },
+    {
+      "name": "key_input_errors: view",
+      "method": "direct",
+      "args": {},
+      "view": true
+    }
+  ]
+}
