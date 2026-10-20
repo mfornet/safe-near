@@ -344,6 +344,20 @@ def promiseBatchActionAddKeyWithFullAccessFn : HostFn NearState :=
         | none => .Trap st "promise_batch_action_add_key_with_full_access: invalid public key"
       | _ => .Trap st "promise_batch_action_add_key_with_full_access: bad args" }
 
+/-- Commas are replaced by terminators, so a nonempty CSV adds one byte total.
+Empty method-name entries are a separate validation obligation. -/
+def methodNamesGasBytes (methods : List UInt8) : Nat :=
+  if methods.isEmpty then 0 else methods.length + 1
+
+/-- A zero ABI allowance denotes unlimited access in the native host. -/
+def functionCallAllowance (amount : Nat) : Allowance := if amount == 0 then none else some amount
+
+@[simp] theorem functionCallAllowance_zero : functionCallAllowance 0 = none := rfl
+
+@[simp] theorem functionCallAllowance_positive (amount : Nat) (h : 0 < amount) :
+    functionCallAllowance amount = some amount := by
+  simp [functionCallAllowance, Nat.ne_of_gt h]
+
 def promiseBatchActionAddKeyWithFunctionCallFn : HostFn NearState :=
   disallowInView "promise_batch_action_add_key_with_function_call" <|
   { params := [.i64, .i64, .i64, .i64, .i64, .i64, .i64, .i64, .i64], results := []
@@ -356,7 +370,7 @@ def promiseBatchActionAddKeyWithFunctionCallFn : HostFn NearState :=
           checkPublicKey "promise_batch_action_add_key_with_function_call" st pk <| fun _ =>
           checkAccountId "promise_batch_action_add_key_with_function_call" st receiverId <| fun _ =>
             appendPromiseActionResult "promise_batch_action_add_key_with_function_call" st promiseIdx
-              (.addKey pk nonce (.functionCall (some allowance) receiverId methodNames))
+              (.addKey pk nonce (.functionCall (functionCallAllowance allowance) receiverId methodNames))
         | _, _, _, _ => .Trap st "promise_batch_action_add_key_with_function_call: invalid input"
       | _ => .Trap st "promise_batch_action_add_key_with_function_call: bad args" }
 

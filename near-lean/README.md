@@ -367,3 +367,34 @@ these account types requires protocol code/context that is not implemented;
 the runtime now reports an explicit model issue and rolls back the apply batch.
 Account-existence checks take the protocol flag explicitly; disabled protocols
 treat these addresses as named accounts for creation admission.
+
+`PromiseGas` defines execution/prepaid gas obligations for every raw action and
+receipt. It proves that append operations charge each receipt base once and
+that promise conversion preserves the obligation through arbitrary joins.
+`SuccessInvariant` and `ExecutionReservations` connect instruction/frame and
+entry charging, metered execution and successful outcome packing. Their host
+premise includes the fee table, protocol flag and raw promise backing; the
+concrete registry must still discharge it. The full public VM gas-to-receipt
+backing theorem and multi-action conservation remain open.
+
+`PromiseGasInvariants` connects runtime action costs to raw VM costs for simple
+actions and function calls whose method bytes decode as UTF-8. The byte-array
+and UTF-8 roundtrip proofs are shared in `Interpreter.Wasm.ByteEncoding`; wNEAR
+keeps its existing Borsh theorem names as wrappers around those generic proofs.
+Function-call-key CSV encoding and the complete host-preservation proof remain
+required for the general gas bridge.
+
+Promise deployment derives `ContractCode.size` from the actual payload through
+`ContractCode.decodeSized`. Size limits, storage accounting and outgoing gas
+budgets therefore use the byte length even when decoder metadata differs.
+Three runtime regressions cover scheduling, deployment and final refunds and
+previously failed with inconsistent decoder size metadata. The decoder remains
+trusted for module/hash correspondence; this does not establish a verified
+binary-decoding theorem.
+
+Function-call-key host actions encode zero allowance as unlimited. Nonempty
+CSV method lists cost their raw byte length plus one: comma separators become
+terminators. The independent fixture checks empty/single/multiple/UTF-8 names,
+positive and maximum allowances, and a tight gas budget.
+The successful key cases do not establish malformed-list rejection or complete
+host input-error ordering; those remain implementation/conformance gaps.

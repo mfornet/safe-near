@@ -335,6 +335,41 @@ def main (args : List String) : IO UInt32 := do
   check r "VM-created implicit transfer conserves deposits, fees and refunds"
     (implicitResult.total == implicitWorld.total && implicitResult.burnt > 0)
 
+  -- Raw deployment length must not be supplied by the external module decoder.
+  let deployWat := "(module (import \"env\" \"promise_batch_create\" (func $batch (param i64 i64) (result i64))) " ++
+    "(import \"env\" \"promise_batch_action_deploy_contract\" (func $deploy (param i64 i64 i64))) (memory 1) " ++
+    "(data (i32.const 0) \"wrap.near\") (data (i32.const 16) \"\\00asm\\01\\00\\00\\00\") " ++
+    "(func (export \"deploy\") i64.const 9 i64.const 0 call $batch i64.const 8 i64.const 16 call $deploy))"
+  let deployModule ← match Decoder.Wat.decode deployWat with
+    | .ok module => pure module
+    | .error error => throw (IO.userError s!"deployment fixture: {error}")
+  let emptyModule ← match Decoder.Wat.decode "(module)" with
+    | .ok module => pure module
+    | .error error => throw (IO.userError s!"empty deployment fixture: {error}")
+  let decodedCode : ContractCode := {
+    module := emptyModule, size := cfg.wasm.limits.maxContractSize + 1, hash := "empty-wasm" }
+  let deployingCode : ContractCode := { module := deployModule, size := 0, hash := "deploying-fixture" }
+  let deploymentState := genesis.setAccount "wrap.near" { genesisAccount (10 * oneNear) with code := some deployingCode }
+  let deployApply := Near.apply cfg World.ap (fun _ => decodedCode)
+  let deployCall : Transaction := {
+    signerId := "alice.near", publicKey := pkOf 1, nonce := 1, receiverId := "wrap.near"
+    actions := [.functionCall "deploy" [] (tgas 50) 0] }
+  let admittedDeploy := deployApply deploymentState [deployCall] []
+  let scheduledDeploy := deployApply admittedDeploy.state [] admittedDeploy.outgoing
+  check r "promise deployment uses raw byte length in outgoing gas backing"
+    (scheduledDeploy.issue.isNone && scheduledDeploy.state.totalBalance + admittedDeploy.tokensBurnt +
+      scheduledDeploy.tokensBurnt + (scheduledDeploy.outgoing.map (Fees.receiptFunds cfg)).sum == deploymentState.totalBalance)
+  let executedDeploy := deployApply scheduledDeploy.state [] scheduledDeploy.outgoing
+  check r "promise deployment stores actual byte size and storage usage despite decoder metadata"
+    (executedDeploy.issue.isNone && executedDeploy.outcomes.all (fun (_, o) => o.status.isSuccess) &&
+      ((executedDeploy.state.account? "wrap.near").bind (·.code)).map (·.size) == some 8 &&
+      (executedDeploy.state.account? "wrap.near").map (·.storageUsage) == some 190)
+  let refundedDeploy := deployApply executedDeploy.state [] executedDeploy.outgoing
+  check r "promise deployment conserves funds through execution and refunds"
+    (refundedDeploy.issue.isNone && refundedDeploy.outgoing.isEmpty &&
+      refundedDeploy.state.totalBalance + admittedDeploy.tokensBurnt + scheduledDeploy.tokensBurnt +
+        executedDeploy.tokensBurnt + refundedDeploy.tokensBurnt == deploymentState.totalBalance)
+
   -- deploy and initialise in one transaction from wrap.near
   let (txDeploy, w) := w0.tx "wrap.near" "wrap.near" [.deployContract code, .functionCall "new" (bytesOf "{}") (tgas 50) 0]
   let w := w.settle [txDeploy]

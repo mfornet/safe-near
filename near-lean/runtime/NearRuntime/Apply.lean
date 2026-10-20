@@ -93,7 +93,7 @@ def stringOfBytes (b : Bytes) : String := (String.fromUTF8? ⟨b.toArray⟩).get
 /-- Promise actions created by a contract become receipt actions. -/
 def actionOfPromise (codeOf : Bytes → ContractCode) : PromiseAction → Action
   | .createAccount => .createAccount
-  | .deployContract code => .deployContract (codeOf code)
+  | .deployContract code => .deployContract (ContractCode.decodeSized codeOf code)
   | .functionCall m args amount gas => .functionCall (stringOfBytes m) args gas.toNat amount
   | .transfer amount => .transfer amount
   | .stake amount pk => .stake amount pk

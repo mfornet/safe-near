@@ -360,11 +360,10 @@ private def chargesBeforeUnvalidated (name : String) (st : Store NearState) (arg
   | "promise_batch_action_add_key_with_function_call" =>
     let sir := sirOf st (promiseReceiver? st (a 0).toNat)
     let methods := getMemOrReg st (a 8) (a 7) |>.getD []
-    let numMethods := if methods.isEmpty then 0 else (methods.filter (· == 44)).length + 1
     [base] ++ readSpan st (a 1) (a 2) ++ readMem 16 ++ readSpan st (a 5) (a 6)
       ++ utf8 (spanLen st (a 5) (a 6)) ++ readSpan st (a 7) (a 8)
       ++ [.actionBase (·.addFunctionCallKeyBase) sir,
-          .actionBytes (·.addFunctionCallKeyByte) (methods.length + numMethods) sir]
+          .actionBytes (·.addFunctionCallKeyByte) (methodNamesGasBytes methods) sir]
   | "promise_batch_action_delete_key" =>
     [base] ++ readSpan st (a 1) (a 2)
       ++ [.actionBase (·.deleteKey) (sirOf st (promiseReceiver? st (a 0).toNat))]

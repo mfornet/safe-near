@@ -119,3 +119,11 @@ then exposed nine amount-read charging/error-precedence discrepancies. The
 strict comparison retains exact gas and error observations for every case.
 These VM fixtures schedule transfers; runtime scenario checks separately cover
 existing ETH/deterministic receivers and explicit unsupported creation rollback.
+
+`key_methods.json` covers eight function-call-key scheduling cases: unrestricted
+methods, one/two/three names, UTF-8 names, positive and maximum allowances, and a
+tight gas budget. The initial five cases exposed zero allowance being emitted as
+finite zero and comma separators being double-counted in gas. The comparison
+checks the complete emitted access-key permission as well as burnt/used gas.
+Malformed method-list rejection and complete input-error precedence remain
+implementation/conformance gaps; these cases establish successful scheduling.
