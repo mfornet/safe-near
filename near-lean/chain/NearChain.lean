@@ -1,1 +1,1 @@
-import NearChain.IdentifierBounds
+import NearChain.ReceiptIdUniqueness

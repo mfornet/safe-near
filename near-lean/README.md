@@ -605,6 +605,18 @@ or pending reference. This closes block/chain numeric-bound composition, while
 queue-wide uniqueness/ownership, dependency-edge validity and financial
 conservation across blocks still require separate proofs.
 
+`FreshReceiptIds` proves collision-free append across consecutive allocation
+intervals through raw actions and action sequences. `ProcessedFreshReceiptIds`
+includes finalization, rollback, refunds and failure data, then proves that every
+processor output envelope is distinct and allocated at or beyond its initial
+counter. `BlockFreshReceiptIds.apply_freshIds` composes these intervals across
+the actual block accumulator without validity or success premises. Thus outgoing
+envelope ids are unique and cannot reuse a reference below the old counter.
+`NearChain.ReceiptIdUniqueness` preserves uniqueness of pending envelopes across
+steps, reachable states, settlement and isolated runs from unique initial pending
+work. Dependency ids may be shared; disjoint ownership among pending, delayed and
+postponed queues, and preservation of the whole dependency graph, remain open.
+
 Reserved `system` account creation is rejected independently of the registrar
 and minimum-name-length configuration. Pinned nearcore's `action_create_account`
 uses near-account-id 2.0.0's `is_top_level`/`is_sub_account_of`; `system` is neither.
