@@ -17,3 +17,4 @@ import NearVM.FunctionCallValidation
 import NearVM.GasInvariants
 import NearVM.ExecutionGas
 import NearVM.OutcomeGas
+import NearVM.DepositRegistry

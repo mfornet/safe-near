@@ -293,3 +293,13 @@ deposits. `deductDeposit_stake` kernel-checks the no-op financial frame, and 16
 native comparison cases cover zero balances, amount bounds, repeated actions,
 rollback and mixed transfer/stake construction. Epoch-dependent stake execution
 remains explicitly unsupported by the receipt runtime.
+
+`PromiseAccounting` proves that the actual promise-to-receipt converter preserves
+arbitrary receiver/action valuations, including total attached deposits.
+`DepositRegistry.resolveMetered_funding` proves that every successfully returning
+resolved host import preserves liquid balance plus pending promise deposits,
+with subsidies accounted for explicitly. This includes the actual memory-decoded
+amounts for create, then, batch function-call, and transfer APIs. Other registered
+hosts preserve those financial fields; rejected calls have no success guarantee.
+These are host/conversion lemmas, not yet a whole-interpreter or successful
+action-receipt conservation theorem.

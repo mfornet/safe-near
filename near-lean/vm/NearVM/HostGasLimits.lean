@@ -43,7 +43,7 @@ theorem updateStorageUsage_gasLimits (extra : Nat) (name : String) (before after
 
 theorem deductDeposit_gasLimits (name : String) (before after : Store NearState) (args : List Value)
     (hwf : GasLimits prepaid maxBurnt after.host) : GasLimits prepaid maxBurnt (deductDeposit name before after args).1.host := by
-  unfold deductDeposit deductPromiseDeposit
+  unfold deductDeposit promiseDeposit? deductPromiseDeposit
   repeat (first | exact hwf | (dsimp only; split))
   all_goals first | exact hwf | (split <;> exact hwf)
 
