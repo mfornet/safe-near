@@ -149,17 +149,6 @@ theorem Exec.creditReceiptReward_systemAbsent (exec : Exec) (cfg : RuntimeConfig
     · exact (ChainState.account?_setAccount_ne _ _ _ _ hr).trans h
   · exact h
 
-theorem addCompletionData_account (exec : Exec) (receiver id : AccountId) (outputs : List DataReceiver) :
-    (exec.addCompletionData receiver outputs).state.account? id = exec.state.account? id := by
-  unfold Exec.addCompletionData
-  dsimp only
-  split
-  · rfl
-  · apply foldl_preserves (fun pair : ChainState × List Receipt => pair.1.account? id = exec.state.account? id)
-    · intro pair item h
-      exact h
-    · rfl
-
 /-- Rewards and refunds cannot install an absent system account. Even a reward
 targeting the name is skipped because no such receiver account exists. -/
 theorem finalizeReceipt_systemAbsent (c : ReceiptCtx) (st : ChainState) (raw : Exec) (failed : Option RuntimeError)

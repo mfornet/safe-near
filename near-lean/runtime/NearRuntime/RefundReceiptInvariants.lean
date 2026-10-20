@@ -165,48 +165,6 @@ theorem applyActionReceipt_refund_failed_conservation (c : ReceiptCtx) (st : Cha
   rw [hf.1, hf.2, hb, ho, hi]
   simp
 
-theorem completionDataFold_state (receiver : AccountId) (data : Option Bytes) (outputs : List DataReceiver)
-    (st : ChainState) (receipts : List Receipt) :
-    (outputs.foldl (completionDataStep receiver data) (st, receipts)).1 =
-      { st with nextId := st.nextId + outputs.length } := by
-  induction outputs generalizing st receipts with
-  | nil => rfl
-  | cons output rest ih =>
-    simp only [List.foldl_cons, completionDataStep, ChainState.freshId]
-    rw [ih]
-    simp only [List.length_cons]
-    congr 1; omega
-
-theorem completionDataFold_funds (cfg : RuntimeConfig) (receiver : AccountId) (data : Option Bytes)
-    (outputs : List DataReceiver) (st : ChainState) (receipts : List Receipt) :
-    receiptsFunds cfg (outputs.foldl (completionDataStep receiver data) (st, receipts)).2 = receiptsFunds cfg receipts := by
-  induction outputs generalizing st receipts with
-  | nil => rfl
-  | cons output rest ih =>
-    simp only [List.foldl_cons, completionDataStep, ChainState.freshId]
-    rw [ih]
-    simp [receiptsFunds, Fees.receiptFunds]
-
-@[simp] theorem addCompletionData_totalFunds (cfg : RuntimeConfig) (exec : Exec) (receiver : AccountId)
-    (outputs : List DataReceiver) : (exec.addCompletionData receiver outputs).totalFunds cfg = exec.totalFunds cfg := by
-  cases hr : exec.result with
-  | none => simp [Exec.addCompletionData, hr, Exec.totalFunds, receiptsFunds_append,
-      completionDataFold_state, completionDataFold_funds, ChainState.totalBalance]; rfl
-  | some status => cases status <;> simp [Exec.addCompletionData, hr, Exec.totalFunds, receiptsFunds_append,
-      completionDataFold_state, completionDataFold_funds, ChainState.totalBalance] <;> rfl
-
-@[simp] theorem addCompletionData_trace (exec : Exec) (receiver : AccountId) (outputs : List DataReceiver) :
-    (exec.addCompletionData receiver outputs).finalizationTrace = exec.finalizationTrace := by
-  cases hr : exec.result with
-  | none => simp [Exec.addCompletionData, hr, Exec.finalizationTrace]
-  | some status => cases status <;> simp [Exec.addCompletionData, hr, Exec.finalizationTrace]
-
-@[simp] theorem addCompletionData_reward (exec : Exec) (receiver : AccountId) (outputs : List DataReceiver) :
-    (exec.addCompletionData receiver outputs).reward = exec.reward := by
-  cases hr : exec.result with
-  | none => simp [Exec.addCompletionData, hr]
-  | some status => cases status <;> simp [Exec.addCompletionData, hr]
-
 /-- Successful system finalization adds no monetary refunds, burn or reward; completion data has zero backing. -/
 theorem finalizeReceipt_refund_success_funds (c : ReceiptCtx) (st : ChainState) (raw : Exec)
     (hwf : raw.state.AccountsUnique) (hrefund : c.receipt.isRefund = true)
@@ -230,11 +188,7 @@ theorem finalizeReceipt_refund_success_funds (c : ReceiptCtx) (st : ChainState) 
   rw [hz, Nat.add_zero] at hb
   have ht := congrArg (fun trace => trace.2.2.2.2.2)
     (creditReceiptReward_trace base c.cfg c.receipt.receiverId settlement.burnPrice c.action.gasPrice)
-  have hp : (data.tokensBurnt, data.otherTokensBurnt) = (0, 0) := by
-    have htrace := congrArg (fun trace => trace.2.2.2.2.2)
-      (addCompletionData_trace rewarded c.receipt.receiverId c.action.outputDataReceivers)
-    change (data.tokensBurnt, data.otherTokensBurnt) = (rewarded.tokensBurnt, rewarded.otherTokensBurnt) at htrace
-    exact htrace.trans ht
+  have hp : (rewarded.tokensBurnt, rewarded.otherTokensBurnt) = (0, 0) := ht
   dsimp only
   rw [hf]
   have ht' := finishReceiptResult_trace rewarded c none

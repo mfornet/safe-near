@@ -42,9 +42,10 @@ def validation_steps(root: Path, nearcore: Path) -> list[Step]:
     add("programs-build", "near-lean/programs/lean", "lake", "build", "Programs", "smoke", "program-tests", "--wfail")
     add("vm-build", "near-lean/vm", "lake", "build", "NearVM", "vm-tests", "vm-replay", "--wfail")
     add("runtime-build", "near-lean/runtime", "lake", "build", "NearRuntime", "runtime-tests",
-        "finance-replay", "nonce-replay", "allowance-replay", "staking-key-replay", "trie-replay", "--wfail")
+        "NearRuntime.TrieAccounting", "finance-replay", "nonce-replay", "allowance-replay",
+        "staking-key-replay", "trie-replay", "--wfail")
     add("chain-build", "near-lean/chain", "lake", "build", "NearChain", "chain-tests", "chain-replay",
-        "registered-replay", "state-encode", "receipt-encode", "transaction-replay", "--wfail")
+        "registered-replay", "state-encode", "receipt-encode", "transaction-replay", "receipt-replay", "--wfail")
     add("wnear-adapter-build", "contracts/w-near/verification", "lake", "build", "Spec", "runtime-adapter-tests", "--wfail")
     add("wnear-proofs-build", "contracts/w-near/verification", "lake", "build", "Model", "Proofs")
     for package, binary in [("vm", "vm-tests"), ("runtime", "runtime-tests"), ("chain", "chain-tests"),
@@ -84,6 +85,7 @@ def validation_steps(root: Path, nearcore: Path) -> list[Step]:
     add("vm-reference-build", "tools/runtime-conformance", "cargo", "build", "--locked", "--quiet")
     python("finance-reference-build", "tools/runtime-finance-reference/build.py", nearcore)
     python("nonce-reference-build", "tools/runtime-nonce-reference/build.py", nearcore)
+    python("receipt-reference-build", "tools/runtime-receipt-reference/build.py", nearcore)
     # prepare.py uses its own clean source cache; the finance/nonce checkout is
     # intentionally separate from the Runtime::apply reference's custody.
     python("chain-reference-build", "tools/chain-conformance/prepare.py")
@@ -95,6 +97,8 @@ def validation_steps(root: Path, nearcore: Path) -> list[Step]:
     python("allowance-conformance", "tools/runtime-finance-reference/compare_allowance.py", finance)
     python("nonce-conformance", "tools/runtime-nonce-reference/compare.py",
            nearcore / "target/debug/safe-near-nonce-reference")
+    python("receipt-result-conformance", "tools/runtime-receipt-reference/compare.py",
+           nearcore / "target/debug/safe-near-receipt-reference", "--scope", "receipt-results")
     python("chain-reference-smoke", "tools/chain-conformance/probe.py")
     python("chain-gas", "tools/chain-conformance/gas_probe.py")
     for name in ["snapshot_import", "contract_comparison", "chunk_storage_accounting", "transaction_versions", "action_comparison",

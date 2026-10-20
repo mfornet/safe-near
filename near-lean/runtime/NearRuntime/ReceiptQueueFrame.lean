@@ -178,7 +178,7 @@ theorem finalizeReceipt_receiptQueues (c : ReceiptCtx) (st : ChainState) (raw : 
     (hraw : raw.receiptQueues = st.receiptQueues) :
     (finalizeReceipt c st raw failed).receiptQueues = st.receiptQueues := by
   unfold finalizeReceipt
-  simp only [setResult_receiptQueues, finishReceiptResult_receiptQueues, addFailureData_receiptQueues, creditReceiptReward_receiptQueues,
+  simp only [setResult_receiptQueues, finishReceiptResult_receiptQueues, creditReceiptReward_receiptQueues,
     ite_receiptQueues, addBalanceRefund_receiptQueues, addGasRefund_receiptQueues, ite_self]
   cases failed with
   | none => exact hraw

@@ -109,7 +109,7 @@ theorem finishReceiptResult_accountsUnique (exec : Exec) (c : ReceiptCtx) (faile
   split <;> unfold Exec.deliverResult <;> dsimp only <;> split
   all_goals first
     | (simp only [Exec.addSuccessData, successDataFold_state]; rfl)
-    | (simp only [addFailureData_accountsUnique] <;> rfl)
+    | simp only [addFailureData_accountsUnique]
     | rfl
 
 /-- Refunds, rewards and failure data preserve unique account records. On

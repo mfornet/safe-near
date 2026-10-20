@@ -759,11 +759,11 @@ host input-error ordering; those remain implementation/conformance gaps.
 
 ### Asynchronous receipt results and delivery
 
-`Block.deliver` selects which in-transit pending receipts arrive in a step.
+`Block.receipts` selects an ordered list of pending receipt positions for a step.
 Unselected receipts remain pending, in order, alongside newly emitted receipts.
 This differs from the runtime's gas-delayed and data-postponed queues. The default
-selector delivers eagerly, so `settle`/`runIsolated` still exercise one schedule;
-they are not fairness or bounded-latency guarantees. Arbitrary selectors are an
+schedule delivers eagerly, so `settle`/`runIsolated` still exercise one schedule;
+they are not fairness or bounded-latency guarantees. Arbitrary delivery schedules are an
 abstraction, not an implementation of native shard routing and congestion rules.
 
 Receipt finalization emits successful or failed data only after the full action

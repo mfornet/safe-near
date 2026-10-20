@@ -148,7 +148,7 @@ counter. Only inherited callback references need a caller-supplied bound; newly
 allocated dependency references are proved bounded from the actual loops. -/
 theorem materializeFunctionCall_liveIds_below (c : ReceiptCtx) (isLast : Bool) (outcome : VMOutcome)
     (initial : ChainState)
-    (hinherited : ∀ receiver ∈ c.action.outputDataReceivers, receiver.dataId < initial.nextId) :
+    (_hinherited : ∀ receiver ∈ c.action.outputDataReceivers, receiver.dataId < initial.nextId) :
     ∀ receipt ∈ (materializeFunctionCallRaw c isLast outcome initial).receipts,
       ∀ id ∈ receipt.liveIds, id < (materializeFunctionCallRaw c isLast outcome initial).state.nextId := by
   let allocation := allocateFunctionCallIds outcome.receipts initial
@@ -172,7 +172,7 @@ theorem materializeFunctionCall_liveIds_below (c : ReceiptCtx) (isLast : Bool) (
   have hlinked : OutputDataIdsBelow linked.1.nextId linked.2.1 ∧ InputDataIdsBelow linked.1.nextId linked.2.2 :=
     linkFunctionCallDependencies_empty_bounds outcome.receipts allocation.1
   have hreceivers : ∀ receiver ∈ ([] : List DataReceiver), receiver.dataId < linked.1.nextId := by simp
-  rw [materializeFunctionCall_eq_stages]
+  rw [materializeFunctionCallRaw_eq_stages]
   cases hr : outcome.returnData with
   | receiptIndex k =>
     dsimp only

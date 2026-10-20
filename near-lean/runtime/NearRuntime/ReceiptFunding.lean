@@ -18,7 +18,7 @@ theorem finalizeReceipt_success_trace (c : ReceiptCtx) (st : ChainState) (raw : 
       (raw.gasBurnt, raw.gasUsed, raw.gasBurntForFunctionCall, raw.logs, raw.subsidizedAmount,
         if c.receipt.isRefund then 0 else (successSettlement c st raw).tokensBurnt, 0) := by
   unfold finalizeReceipt
-  simp only [setResult_trace, finishReceiptResult_trace, addFailureData_trace, creditReceiptReward_trace,
+  simp only [setResult_trace, finishReceiptResult_trace, creditReceiptReward_trace,
     ite_trace, addBalanceRefund_trace, addGasRefund_trace, ite_self]
   simp [rollbackReceipt, Exec.finalizationTrace, successSettlement]
 

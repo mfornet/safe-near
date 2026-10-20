@@ -138,7 +138,7 @@ theorem rollbackReceipt_failure (st : ChainState) (exec : Exec) (err : RuntimeEr
     (rollbackReceipt st exec (some err)).gasBurnt = exec.gasBurnt ∧
     (rollbackReceipt st exec (some err)).logs = exec.logs ∧
     (rollbackReceipt st exec (some err)).result = some (.failure err) := by
-  simp [rollbackReceipt, Exec.finishReceiptResult, Exec.deliverResult]
+  simp [rollbackReceipt]
 
 @[simp] theorem addBalanceRefund_accountsUnique (exec : Exec) (receiver : AccountId) (amount : Nat) :
     (exec.addBalanceRefund receiver amount).state.AccountsUnique ↔ exec.state.AccountsUnique := by
@@ -261,7 +261,7 @@ theorem finalizeReceipt_failure_trace (c : ReceiptCtx) (st : ChainState) (raw : 
         if c.receipt.isRefund then 0 else settlement.tokensBurnt,
         if c.receipt.isRefund then Fees.totalDeposit c.action.actions else 0) := by
   unfold finalizeReceipt
-  simp only [setResult_trace, finishReceiptResult_trace, addFailureData_trace, creditReceiptReward_trace,
+  simp only [setResult_trace, finishReceiptResult_trace, creditReceiptReward_trace,
     ite_trace, addBalanceRefund_trace, addGasRefund_trace, ite_self]
   simp [rollbackReceipt, Exec.finalizationTrace]
 
@@ -417,7 +417,7 @@ theorem finalizeReceipt_failure_reward_le (c : ReceiptCtx) (st : ChainState) (ra
       raw.receiptRewardAmount c.cfg settlement.burnPrice c.action.gasPrice := by
   unfold finalizeReceipt
   dsimp only
-  simp only [Option.isSome, ite_true, finishReceiptResult_reward, addFailureData_reward]
+  simp only [Option.isSome, ite_true, finishReceiptResult_reward]
   apply (creditReceiptReward_reward_le _ _ _ _ _).trans
   simp only [ite_rewardAmount, addGasRefund_rewardAmount, addBalanceRefund_rewardAmount, ite_self]
   rfl
@@ -527,7 +527,7 @@ from a failed action body. It may credit the receiver and allocate receipt ids. 
 theorem finalizeReceipt_failure_frame (c : ReceiptCtx) (st : ChainState) (raw : Exec) (err : RuntimeError) :
     (finalizeReceipt c st raw (some err)).state.receiptFrame = st.receiptFrame := by
   unfold finalizeReceipt
-  simp only [finishReceiptResult_frame, addFailureData_frame, creditReceiptReward_frame, ite_frame,
+  simp only [finishReceiptResult_frame, creditReceiptReward_frame, ite_frame,
     addGasRefund_frame, addBalanceRefund_frame, ite_self]
   rfl
 
@@ -561,7 +561,7 @@ theorem finalizeReceipt_failure_account_ne (c : ReceiptCtx) (st : ChainState) (r
     (err : RuntimeError) (id : AccountId) (hne : c.receipt.receiverId ≠ id) :
     (finalizeReceipt c st raw (some err)).state.account? id = st.account? id := by
   unfold finalizeReceipt
-  simp only [finishReceiptResult_account, addFailureData_account, creditReceiptReward_account_ne _ _ _ _ _ _ hne,
+  simp only [finishReceiptResult_account, creditReceiptReward_account_ne _ _ _ _ _ _ hne,
     ite_account, addGasRefund_account, addBalanceRefund_account, ite_self]
   rfl
 
