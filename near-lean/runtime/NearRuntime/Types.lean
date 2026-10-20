@@ -151,9 +151,10 @@ inductive RuntimeError
   | accountAlreadyExists (id : AccountId)
   | accountDoesNotExist (id : AccountId)
   | createAccountNotAllowed (id predecessor : AccountId)
+  | createAccountOnlyByRegistrar (id registrar predecessor : AccountId)
   | actorNoPermission (id actor : AccountId)
-  | deleteKeyDoesNotExist (id : AccountId)
-  | addKeyAlreadyExists (id : AccountId)
+  | deleteKeyDoesNotExist (id : AccountId) (publicKey : PublicKey)
+  | addKeyAlreadyExists (id : AccountId) (publicKey : PublicKey)
   | deleteAccountStaking (id : AccountId)
   | lackBalanceForState (id : AccountId) (amount : Nat)
   | triesToUnstake (id : AccountId)
@@ -196,6 +197,8 @@ def ExecutionStatus.isSuccess : ExecutionStatus → Bool
   | _ => true
 
 structure ExecutionOutcome where
+  /-- Failed receipt action, absent for transaction errors and final storage checks. -/
+  failureIndex : Option Nat := none
   executorId : AccountId
   status : ExecutionStatus
   logs : List String := []

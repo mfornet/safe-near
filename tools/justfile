@@ -143,3 +143,8 @@ chain-contract-probe *options:
 chain-version-test:
     cd near-lean/chain && lake build chain-replay
     python3 tools/chain-conformance/test_transaction_versions.py
+
+# Compare administrative actions, structured failures and rollback with native apply.
+chain-action-test:
+    cd near-lean/chain && lake build chain-replay
+    python3 tools/chain-conformance/test_action_comparison.py

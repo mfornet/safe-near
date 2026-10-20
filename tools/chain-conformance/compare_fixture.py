@@ -201,38 +201,81 @@ class Projection:
             entries[1].sort(key=lambda pair: pair[0])
         return canonical_state(result)
 
-    def status(self, value):
+    def status(self, value, executor=None):
         if list(value) == ["SuccessReceiptId"]:
             return dict(kind="successReceiptId", receiptId=self.rid(value["SuccessReceiptId"]))
         if list(value) == ["SuccessValue"]:
             return dict(kind="successValue", value=list(importer.decode(value["SuccessValue"])))
-        # Preserve structured transaction-admission parameters and the exact
-        # guest-panic message. Other failure correspondences remain rejected.
-        if list(value) == ["Failure"]:
-            error = value["Failure"]
-            if list(error) == ["InvalidTxError"]:
-                failure = error["InvalidTxError"]
-                if failure == "InvalidTransactionVersion":
-                    text = "Near.RuntimeError.invalidTransactionVersion"
-                    return dict(kind="failure", error=text, message=text)
-                for native, modeled, fields in [
-                    ("InvalidNonce", "invalidNonce", ["tx_nonce", "ak_nonce"]),
-                    ("NonceTooLarge", "nonceTooLarge", ["tx_nonce", "upper_bound"]),
-                ]:
-                    if isinstance(failure, dict) and list(failure) == [native] and set(failure[native]) == set(fields):
-                        text = "Near.RuntimeError." + modeled + " " + " ".join(str(failure[native][f]) for f in fields)
-                        return dict(kind="failure", error=text, message=text)
-            if list(error) == ["ActionError"]:
-                error = error["ActionError"]
-                if error["index"] == 0 and list(error["kind"]) == ["FunctionCallError"]:
-                    call = error["kind"]["FunctionCallError"]
-                    prefix = "Smart contract panicked: "
-                    if list(call) == ["ExecutionError"] and call["ExecutionError"].startswith(prefix):
-                        message = call["ExecutionError"]
-                        panic = json.dumps(message[len(prefix):], ensure_ascii=False)
-                        return dict(kind="failure", message=message, error="Near.RuntimeError.functionCallError "
-                            "(Wasm.Near.FunctionCallError.hostError (Wasm.Near.HostError.guestPanic " + panic + "))")
-        raise ValueError(f"unmapped native execution status: {value}")
+        if list(value) != ["Failure"] or not isinstance(value["Failure"], dict):
+            raise ValueError(f"unmapped native execution status: {value}")
+        failure = value["Failure"]
+        index, context = None, None
+        if list(failure) == ["ActionError"]:
+            error = failure["ActionError"]
+            if set(error) != {"index", "kind"}:
+                raise ValueError("unknown native action error fields")
+            index = error["index"]
+            if index is not None and (type(index) is not int or not 0 <= index < 2**64):
+                raise ValueError("invalid native failed-action index")
+            context, error = "action", error["kind"]
+        elif list(failure) == ["InvalidTxError"]:
+            context, error = "transaction", failure["InvalidTxError"]
+        else:
+            raise ValueError(f"unmapped native execution status: {value}")
+        details = None
+        if context == "transaction" and error == "InvalidTransactionVersion":
+            details = dict(kind="invalidTransactionVersion")
+        fields = {
+            "action": {
+                "AccountAlreadyExists": ("accountAlreadyExists", {"account_id": "accountId"}),
+                "AccountDoesNotExist": ("accountDoesNotExist", {"account_id": "accountId"}),
+                "CreateAccountNotAllowed": ("createAccountNotAllowed", {"account_id": "accountId", "predecessor_id": "predecessorId"}),
+                "CreateAccountOnlyByRegistrar": ("createAccountOnlyByRegistrar", {"account_id": "accountId", "registrar_account_id": "registrarId", "predecessor_id": "predecessorId"}),
+                "ActorNoPermission": ("actorNoPermission", {"account_id": "accountId", "actor_id": "actorId"}),
+                "DeleteKeyDoesNotExist": ("deleteKeyDoesNotExist", {"account_id": "accountId", "public_key": "publicKey"}),
+                "AddKeyAlreadyExists": ("addKeyAlreadyExists", {"account_id": "accountId", "public_key": "publicKey"}),
+                "DeleteAccountStaking": ("deleteAccountStaking", {"account_id": "accountId"}),
+                "LackBalanceForState": ("lackBalanceForState", {"account_id": "accountId", "amount": "amount"}),
+                "TriesToUnstake": ("triesToUnstake", {"account_id": "accountId"}),
+                "TriesToStake": ("triesToStake", {"account_id": "accountId", "stake": "stake", "locked": "locked", "balance": "balance"}),
+                "OnlyImplicitAccountCreationAllowed": ("onlyImplicitAccountCreationAllowed", {"account_id": "accountId"}),
+                "DeleteAccountWithLargeState": ("deleteAccountWithLargeState", {"account_id": "accountId"}),
+            },
+            "transaction": {
+                "InvalidNonce": ("invalidNonce", {"tx_nonce": "nonce", "ak_nonce": "currentNonce"}),
+                "NonceTooLarge": ("nonceTooLarge", {"tx_nonce": "nonce", "upper_bound": "upperBound"}),
+                "SignerDoesNotExist": ("invalidSigner", {"signer_id": "accountId"}),
+                "InvalidReceiverId": ("invalidReceiver", {"receiver_id": "accountId"}),
+                "NotEnoughBalance": ("notEnoughBalance", {"signer_id": "accountId", "balance": "balance", "cost": "cost"}),
+                "LackBalanceForState": ("lackBalanceForState", {"signer_id": "accountId", "amount": "amount"}),
+            },
+        }[context]
+        if isinstance(error, dict) and len(error) == 1:
+            native, data = next(iter(error.items()))
+            if native in fields:
+                modeled, names = fields[native]
+                if not isinstance(data, dict) or set(data) != set(names):
+                    raise ValueError(f"unrepresented native error parameters: {native}")
+                details = {"kind": modeled, **{name: self.keys[data[key]] if key == "public_key" else data[key]
+                    for key, name in names.items()}}
+            elif context == "action" and native == "FunctionCallError":
+                if not isinstance(data, dict) or len(data) != 1:
+                    raise ValueError("unknown native function-call error shape")
+                category, payload = next(iter(data.items()))
+                if category == "ExecutionError" and isinstance(payload, str):
+                    details = dict(kind="functionCallError", error=dict(kind="executionError", message=payload))
+                elif category == "MethodResolveError" and isinstance(payload, str) and payload in {"MethodNotFound", "MethodEmptyName", "MethodInvalidSignature"}:
+                    details = dict(kind="functionCallError", error=dict(kind="methodResolveError", error=payload))
+                elif category == "CompilationError" and isinstance(payload, dict) and list(payload) == ["CodeDoesNotExist"]:
+                    account = payload["CodeDoesNotExist"]
+                    if isinstance(account, dict) and set(account) == {"account_id"} and account["account_id"] == executor:
+                        details = dict(kind="functionCallError", error=dict(kind="compilationError", message="CodeDoesNotExist", accountId=executor))
+            elif context == "transaction" and native == "InvalidAccessKeyError":
+                if data in ["RequiresFullAccess", "DepositWithFunctionCall"]:
+                    details = dict(kind="invalidAccessKey", reason=data)
+        if details is None:
+            raise ValueError(f"unmapped native execution status: {value}")
+        return dict(kind="failure", error=details, actionIndex=index)
 
     def project(self, source, trace, model_request):
         if source["pendingReceipts"] or trace["initialPendingReceiptViews"] or model_request["pendingReceipts"]:
@@ -286,7 +329,7 @@ class Projection:
             for row in block["outcomes"]:
                 o = row["outcome"]
                 outcomes.append(dict(id=0 if row["id"] in tx_hashes else self.rid(row["id"]), outcome=dict(
-                    executorId=o["executor_id"], status=self.status(o["status"]), logs=o["logs"],
+                    executorId=o["executor_id"], status=self.status(o["status"], o["executor_id"]), logs=o["logs"],
                     receiptIds=[self.rid(r) for r in o["receipt_ids"]], gasBurnt=o["gas_burnt"], tokensBurnt=o["tokens_burnt"])))
             balance = block["balanceStats"]
             blocks.append(dict(state=self.state(block["state"]), pendingReceipts=[self.receipt(r) for r in pending],
@@ -299,7 +342,7 @@ class Projection:
             codeCatalogue=[dict(hash=label, size=len(blob)) for label, blob in sorted(self.codes.items())])
 
 
-def canonical_trace(value):
+def canonical_trace(value, *, model_output=False):
     value = copy.deepcopy(value)
     for state in [value["initialState"], *[b["state"] for b in value["blocks"]]]:
         for _, entries in state["storage"]:
@@ -308,6 +351,15 @@ def canonical_trace(value):
         # denote the same empty key/value function in ChainState.contractStorage.
         state["storage"] = [[account, entries] for account, entries in state["storage"] if entries]
         state.update(canonical_state(state))
+    for block in value["blocks"]:
+        for row in block.get("outcomes", []):
+            status = row["outcome"]["status"]
+            if status["kind"] == "failure" and (model_output or "details" in status):
+                if set(status) != {"kind", "error", "message", "details", "actionIndex"}:
+                    raise ValueError("model failure must include structured details and action index")
+                if not isinstance(status["error"], str) or not isinstance(status["message"], str) or not isinstance(status["details"], dict):
+                    raise ValueError("malformed model diagnostic or semantic error fields")
+                row["outcome"]["status"] = dict(kind="failure", error=status["details"], actionIndex=status["actionIndex"])
     value["codeCatalogue"].sort(key=lambda row: row["hash"])
     return value
 
@@ -352,7 +404,7 @@ def compare(directory, reference, model):
         right = importer.execute(lean, request, stage)
         try:
             expected = Projection(codes).project(source, left, request)
-            diffs = differences(canonical_trace(expected), canonical_trace(right), "trace")
+            diffs = differences(canonical_trace(expected), canonical_trace(right, model_output=True), "trace")
             error = None
         except (ValueError, KeyError, IndexError) as issue:
             expected = None
@@ -364,7 +416,7 @@ def compare(directory, reference, model):
             unmodeledObservations=["native compute and execution metadata", "account/receipt representation versions",
                 "native shard scheduler columns and delayed queue indices", "native hash generation (event-based renaming)",
                 "transaction hash identity (transaction outcome ids map to zero)",
-                "statistics beyond represented balance burn/subsidy", "native action failure index (only index-zero guest panic mapped)"])
+                "statistics beyond represented balance burn/subsidy", "model diagnostic repr/message formatting (structured semantic errors and action indices are compared)"])
 
 
 def main():

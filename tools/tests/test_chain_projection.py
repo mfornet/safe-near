@@ -66,10 +66,29 @@ class ChainProjectionTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 p.state(value)
         with self.assertRaises(ValueError):
-            p.status({"Failure": {"ActionError": {"index": 1, "kind": {"FunctionCallError": {
+            p.status({"Failure": {"ActionError": {"index": True, "kind": {"FunctionCallError": {
                 "ExecutionError": "Smart contract panicked: panic"}}}}})
         with self.assertRaises(ValueError):
             p.status({"Failure": {"InvalidTxError": "InvalidSignerId"}})
+
+    def test_action_error_parameters_and_nonzero_indices_are_preserved(self):
+        p = comparator.Projection({})
+        value = {"Failure": {"ActionError": {"index": 3, "kind": {"DeleteKeyDoesNotExist": {
+            "account_id": "bob.near", "public_key": "ed25519:" + "1" * 32}}}}}
+        projected = p.status(value)
+        self.assertEqual(projected, dict(kind="failure", actionIndex=3,
+            error=dict(kind="deleteKeyDoesNotExist", accountId="bob.near", publicKey=[0] * 33)))
+        value["Failure"]["ActionError"]["kind"]["DeleteKeyDoesNotExist"]["unknown"] = 1
+        with self.assertRaises(ValueError):
+            p.status(value)
+
+    def test_unrepresented_function_call_errors_fail_closed(self):
+        p = comparator.Projection({})
+        for error in [{"CompilationError": {"CodeDoesNotExist": 7}},
+                      {"MethodResolveError": {"unexpected": "MethodNotFound"}},
+                      {"CompilationError": {"CodeDoesNotExist": {"account_id": "other.near"}}}]:
+            with self.subTest(error=error), self.assertRaises(ValueError):
+                p.status({"Failure": {"ActionError": {"index": 0, "kind": {"FunctionCallError": error}}}}, "bob.near")
 
     def test_postponed_indices_cannot_change_the_native_receiver(self):
         p = comparator.Projection({})

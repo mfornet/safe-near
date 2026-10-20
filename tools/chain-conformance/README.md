@@ -165,3 +165,9 @@ are decoded with native types and validated by exact `TrieKey` re-encoding;
 complete raw trie/statistics bytes remain available. Delayed receipt records
 include their native `queueIndex`, so Borsh key byte ordering cannot reorder the
 logical queue.
+
+`just chain-action-test` compares 64 administrative-action scenarios across
+protocols 83–86, including registrar restrictions, multi-action rollback,
+missing methods/code, final storage failures and key nonce initialization.
+Mapped failures preserve semantic parameters and action indices; unsupported
+error variants fail closed. Raw diagnostic formatting remains in evidence.

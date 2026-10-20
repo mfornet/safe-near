@@ -43,6 +43,8 @@ jobs:
         run: python3 tools/chain-conformance/prepare.py
       - name: Verify native chunk boundaries and complete raw-state replay
         run: python3 tools/chain-conformance/probe.py
+      - name: Compare administrative actions and structured failures
+        run: python3 tools/chain-conformance/test_action_comparison.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -83,6 +85,8 @@ jobs:
         run: python3 tools/chain-conformance/test_contract_comparison.py
       - name: Compare signed V0/V1 transaction batches and protocol gates
         run: python3 tools/chain-conformance/test_transaction_versions.py
+      - name: Compare administrative actions and structured failures
+        run: python3 tools/chain-conformance/test_action_comparison.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -91,3 +95,4 @@ jobs:
             audit/transfer-gas-regression.json
             audit/contract-chain-regressions.json
             audit/transaction-version-comparison.json
+            audit/action-chain-regressions.json

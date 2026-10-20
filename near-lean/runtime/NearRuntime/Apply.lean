@@ -52,6 +52,7 @@ structure Exec where
   reward : Nat := 0
   logs : List String := []
   result : Option ExecutionStatus := none
+  failureIndex : Option Nat := none
   deriving Inhabited
 
 abbrev ExecM := ExceptT RuntimeError (StateM Exec)
@@ -199,6 +200,8 @@ def applyAction (c : ReceiptCtx) (isLast : Bool) : Action → ExecM Unit
     let id := c.receipt.receiverId
     if (← getState).account? id |>.isSome then throw (.accountAlreadyExists id)
     unless canCreateAccount c.cfg c.receipt.predecessorId id do
+      if (id.splitOn ".").length == 1 then
+        throw (.createAccountOnlyByRegistrar id c.cfg.accountCreation.registrarAccountId c.receipt.predecessorId)
       throw (.createAccountNotAllowed id c.receipt.predecessorId)
     putAccount id { amount := 0, storageUsage := c.cfg.fees.numBytesAccount }
     modify fun e => { e with actorId := id }
@@ -242,15 +245,15 @@ def applyAction (c : ReceiptCtx) (isLast : Bool) : Action → ExecM Unit
   | .addKey pk key => do
     let id := c.receipt.receiverId
     let st ← getState
-    if (st.accessKey? id pk).isSome then throw (.addKeyAlreadyExists id)
+    if (st.accessKey? id pk).isSome then throw (.addKeyAlreadyExists id pk)
     let a ← getAccount id
     putAccount id { a with storageUsage := a.storageUsage + accessKeyStorageBytes pk key
       + c.cfg.fees.numExtraBytesRecord }
-    modifyState (·.setAccessKey id pk key)
+    modifyState (·.setAccessKey id pk { key with nonce := initialNonce c.ap.blockHeight })
   | .deleteKey pk => do
     let id := c.receipt.receiverId
     let st ← getState
-    let some key := st.accessKey? id pk | throw (.deleteKeyDoesNotExist id)
+    let some key := st.accessKey? id pk | throw (.deleteKeyDoesNotExist id pk)
     let a ← getAccount id
     putAccount id { a with storageUsage := a.storageUsage - (accessKeyStorageBytes pk key
       + c.cfg.fees.numExtraBytesRecord) }
@@ -341,6 +344,7 @@ def runReceiptActions (c : ReceiptCtx) (st0 : ChainState) : Exec × Option Runti
     let n := c.action.actions.length
     for h : i in [0:n] do
       let act := c.action.actions[i]
+      modify fun e => { e with failureIndex := some i }
       burnGas (Fees.exec f receiver act)
       match checkActionAccount (← getState) c.receipt (n == 1) act with
       | .error e => throw e
@@ -349,6 +353,7 @@ def runReceiptActions (c : ReceiptCtx) (st0 : ChainState) : Exec × Option Runti
       | .error e => throw e
       | .ok () => pure ()
       applyAction c (i + 1 == n) act
+    modify fun e => { e with failureIndex := none }
     checkStorageStake c.cfg receiver
   let exec0 : Exec := { state := st0, actorId := c.receipt.predecessorId }
   match (body.run.run exec0) with
@@ -461,7 +466,8 @@ def applyActionReceipt (c : ReceiptCtx) (st0 : ChainState) : Exec :=
 
 /-- Outcome of an executed receipt. -/
 def outcomeOf (r : Receipt) (e : Exec) : ExecutionOutcome :=
-  { executorId := r.receiverId
+  { failureIndex := e.failureIndex
+    executorId := r.receiverId
     status := e.result.getD (.successValue [])
     logs := e.logs
     receiptIds := (e.newReceipts.filter fun r => match r.receipt with

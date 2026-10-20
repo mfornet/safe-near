@@ -136,3 +136,10 @@ Transaction objects now optionally carry `version` (0/1, default 0) and
 be encoded and is rejected. Ordinary-key V1 protocol/nonce admission is checked
 by the runtime, preserving rejected-transaction outcomes and later valid batch
 entries. Gas-key nonce indices remain unsupported.
+
+Failed outcomes include `details` (typed semantic error parameters) and
+`actionIndex` (zero-based, or null for transaction/final storage failures).
+The `error` repr and `message` remain presentation diagnostics. Added access
+keys receive `(deliveryBlockHeight - 1) * 1_000_000` as their initial nonce;
+the action’s supplied nonce remains visible in the input but is overwritten
+when the action executes.

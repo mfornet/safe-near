@@ -138,9 +138,16 @@ Native action V2 receipts are accepted only with `refund_to = null`. Other
 native receipt variants, gas-key nonce lanes and unmapped failure kinds are
 rejected. Ordinary-key V0 and V1 envelopes preserve their actual version and
 nonce mode through native signing and replay. Transaction admission mappings
-preserve version and nonce error parameters. The mapped receipt failure is an
-index-zero guest panic; native action error indices and other native-only
-details remain explicit observation gaps.
+preserve version and nonce error parameters. Mapped receipt failures preserve
+account, actor, registrar and public-key parameters, function-call errors and
+the failed action index (including no index for final storage checks). Unknown
+error variants or extra native parameters fail closed. Lean diagnostic repr
+and message formatting remains in raw evidence; comparison uses typed semantic
+errors instead. Native public execution-error messages are compared exactly.
+
+`just chain-action-test` checks administrative actions, successful key changes,
+late-delivery key nonces and multi-action rollback across protocols 83–86.
+Added-key nonces use the actual delivery block height, ignoring supplied nonces.
 
 Receipt ids are renamed using **native events**, independently of model output:
 new action receipts, their newly introduced dependency ids, then refunds and
