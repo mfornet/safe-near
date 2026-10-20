@@ -244,3 +244,15 @@ unchanged account funds and storage size, and exact bounded restoration. Native
 trie/constructor/Borsh comparisons cover 66 cases; restricted-key runtime scenarios
 cover delayed refunds, replacement/deletion and failure rollback. Access-key
 storage accounting distinguishes absent allowances and counts receiver UTF-8 bytes.
+
+Receipt execution is split into the action attempt, rollback and finalization.
+`ReceiptInvariants` proves that rollback discards tentative state, promises and
+subsidies while preserving logs and burnt gas. Refund constructors account for
+exact in-flight funds; failure data carries zero funds; reward credits account
+for the exact balance increase. Failed ordinary receipt finalization conserves
+incoming deposit and gas backing against refunds plus gross settlement burn,
+with receiver rewards shown separately. The theorem connects to
+`applyActionReceipt`, with explicit account-uniqueness, matching action receipt,
+non-system predecessor/signer, v85+ settlement and burnt-gas-budget premises.
+It does not yet prove the gas-budget premise from execution, bound rewards by
+burn, cover successful/system receipts, or establish chain conservation.

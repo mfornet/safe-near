@@ -331,17 +331,11 @@ theorem foreign_deploy_denied (actor receiver : AccountId) (code : ContractCode)
       .error (.actorNoPermission receiver actor) := by
   simp [checkActorPermissions, h]
 
-/-- Apply the actions of an action receipt. Rolls back to the state at the
-start on failure, then issues refunds either way. -/
-def applyActionReceipt (c : ReceiptCtx) (st0 : ChainState) : Exec :=
+/-- Run actions and the final storage-staking check, before rollback/refunds. -/
+def runReceiptActions (c : ReceiptCtx) (st0 : ChainState) : Exec × Option RuntimeError :=
   let f := c.cfg.fees.actionFees
   let receiver := c.receipt.receiverId
-  -- gas prepaid for this receipt: its creation and action execution fees, the execution fee
-  -- and the gas attached to its function calls. Dependency data execution fees
-  -- were already burnt by the producer when scheduling this callback.
-  let receiptGas := Fees.receiptGasBudget c.cfg receiver c.action.actions
-  -- System refunds report execution gas but do not charge tokens for it.
-  let isRefund := c.receipt.isRefund
+  -- System refunds report receipt execution gas but do not charge tokens.
   let body : ExecM Unit := do
     burnGas f.newActionReceipt.execution
     let n := c.action.actions.length
@@ -357,15 +351,86 @@ def applyActionReceipt (c : ReceiptCtx) (st0 : ChainState) : Exec :=
       applyAction c (i + 1 == n) act
     checkStorageStake c.cfg receiver
   let exec0 : Exec := { state := st0, actorId := c.receipt.predecessorId }
-  let (exec, failed) := match (body.run.run exec0) with
+  match (body.run.run exec0) with
     | (.ok (), e) => (e, none)
     | (.error err, e) => (e, some err)
-  -- roll back on failure: keep gas, drop receipts and state changes
-  let exec := match failed with
+
+/-- Receipt failure restores the pre-action state while retaining gas and logs. -/
+def rollbackReceipt (st0 : ChainState) (exec : Exec) (failed : Option RuntimeError) : Exec :=
+  match failed with
     | some err => { exec with state := st0, newReceipts := [], subsidizedAmount := 0, gasUsed := exec.gasBurnt,
                               result := some (.failure err) }
     | none => exec
-  let _ := failed
+
+def Exec.addBalanceRefund (exec : Exec) (receiver : AccountId) (amount : Nat) : Exec :=
+  let (r, st) := refundReceipt exec.state receiver amount
+  { exec with state := st, newReceipts := exec.newReceipts ++ [r] }
+
+def Exec.addGasRefund (exec : Exec) (receiver : AccountId) (pk : PublicKey) (amount : Nat) : Exec :=
+  let (r, st) := gasRefundReceipt exec.state receiver pk amount
+  { exec with state := st, newReceipts := exec.newReceipts ++ [r] }
+
+def Exec.receiptRewardAmount (exec : Exec) (cfg : RuntimeConfig) (burnPrice purchasePrice : Nat) : Nat :=
+  let (num, den) := cfg.fees.burntGasReward
+  let price := if cfg.accountCostIncrease then burnPrice else purchasePrice
+  exec.gasBurntForFunctionCall * num / den * price
+
+/-- Reward comes from burnt tokens and is computed after rollback. -/
+def Exec.creditReceiptReward (exec : Exec) (cfg : RuntimeConfig) (receiver : AccountId)
+    (burnPrice purchasePrice : Nat) : Exec :=
+  let reward := exec.receiptRewardAmount cfg burnPrice purchasePrice
+  match exec.state.account? receiver with
+  | some a => { exec with
+      state := exec.state.setAccount receiver { a with amount := a.amount + reward }
+      reward := reward }
+  | none => { exec with reward := 0 }
+
+/-- One failure data output allocates an id and carries no funds. -/
+def failureDataStep (receiver : AccountId) (acc : ChainState × List Receipt) (d : DataReceiver) :
+    ChainState × List Receipt :=
+  let (st, rs) := acc
+  let (id, st) := st.freshId
+  (st, rs ++ [{
+    predecessorId := receiver
+    receiverId := d.receiverId
+    receiptId := id
+    receipt := .data { dataId := d.dataId, data := none } }])
+
+/-- Failed outputs propagate `none`, with no token backing. -/
+def Exec.addFailureData (exec : Exec) (receiver : AccountId) (outputs : List DataReceiver) : Exec :=
+  let (st, rs) := outputs.foldl (failureDataStep receiver) (exec.state, [])
+  { exec with state := st, newReceipts := exec.newReceipts ++ rs }
+
+/-- Completed data follows refunds. Returning a promise delegates these
+outputs to that promise; other completions carry their value or failure. -/
+def Exec.addCompletionData (exec : Exec) (receiver : AccountId) (outputs : List DataReceiver) : Exec :=
+  let result := match exec.result with
+    | some (.successReceiptId _) => none
+    | some (.failure _) => some none
+    | some (.successValue value) => some (some value)
+    | none => some (some [])
+  match result with
+  | none => exec
+  | some data =>
+    let (st, rs) := outputs.foldl
+      (fun (acc : ChainState × List Receipt) (d : DataReceiver) =>
+        let (st, rs) := acc
+        let (id, st) := st.freshId
+        let receipt : Receipt := {
+          predecessorId := receiver
+          receiverId := d.receiverId
+          receiptId := id
+          receipt := .data { dataId := d.dataId, data } }
+        (st, rs ++ [receipt]))
+      (exec.state, [])
+    { exec with state := st, newReceipts := exec.newReceipts ++ rs }
+
+/-- Finalize a receipt attempt: rollback, settlement, refunds, reward and data. -/
+def finalizeReceipt (c : ReceiptCtx) (st0 : ChainState) (exec : Exec) (failed : Option RuntimeError) : Exec :=
+  let receiver := c.receipt.receiverId
+  let receiptGas := Fees.receiptGasBudget c.cfg receiver c.action.actions
+  let isRefund := c.receipt.isRefund
+  let exec := rollbackReceipt st0 exec failed
   -- refunds: unspent gas to the signer, the deposits to the predecessor on failure
   let createdAccount := (st0.account? receiver).isNone && (exec.state.account? receiver).isSome
     && failed.isNone
@@ -378,42 +443,21 @@ def applyActionReceipt (c : ReceiptCtx) (st0 : ChainState) : Exec :=
   }
   let depositRefund := if failed.isSome then Fees.totalDeposit c.action.actions else 0
   let exec := if depositRefund > 0 && c.receipt.predecessorId != systemAccount then
-      let (r, st) := refundReceipt exec.state c.receipt.predecessorId depositRefund
-      { exec with state := st, newReceipts := exec.newReceipts ++ [r] }
+      exec.addBalanceRefund c.receipt.predecessorId depositRefund
     else exec
   let exec := if tokensRefund > 0 && c.action.signerId != systemAccount then
-      let (r, st) := gasRefundReceipt exec.state c.action.signerId c.action.signerPublicKey tokensRefund
-      { exec with state := st, newReceipts := exec.newReceipts ++ [r] }
+      exec.addGasRefund c.action.signerId c.action.signerPublicKey tokensRefund
     else exec
-  -- The surviving receiver earns the burnt function-call reward even when
-  -- execution failed and its state changes were rolled back (nearcore lib.rs).
-  let exec :=
-      let (num, den) := c.cfg.fees.burntGasReward
-      let rewardPrice := if c.cfg.accountCostIncrease then settlement.burnPrice else c.action.gasPrice
-      let reward := exec.gasBurntForFunctionCall * num / den * rewardPrice
-      match exec.state.account? receiver with
-      | some a => { exec with state := exec.state.setAccount receiver { a with amount := a.amount + reward }
-                              reward := reward }
-      | none => exec
-  -- Native apply emits data after action receipts and refunds. Data receipts
-  -- carry the terminal value/failure and have no execution outcome of their own.
-  let dataResult := match exec.result with
-    | some (.successReceiptId _) => none
-    | some (.failure _) => some none
-    | some (.successValue value) => some (some value)
-    | none => some (some [])
-  let exec := match dataResult with
-    | none => exec
-    | some data =>
-      let (st, rs) := c.action.outputDataReceivers.foldl
-        (fun (acc : ChainState × List Receipt) (d : DataReceiver) =>
-          let (st, rs) := acc
-          let (id, st) := st.freshId
-          (st, rs ++ [({ predecessorId := receiver, receiverId := d.receiverId, receiptId := id,
-                         receipt := .data { dataId := d.dataId, data } } : Receipt)]))
-        (exec.state, [])
-      { exec with state := st, newReceipts := exec.newReceipts ++ rs }
+  let exec := exec.creditReceiptReward c.cfg receiver settlement.burnPrice c.action.gasPrice
+  let exec := if failed.isSome then exec.addFailureData receiver c.action.outputDataReceivers
+    else exec.addCompletionData receiver c.action.outputDataReceivers
   { exec with result := some (exec.result.getD (.successValue [])) }
+
+
+/-- Execute and finalize the actual action receipt. -/
+def applyActionReceipt (c : ReceiptCtx) (st0 : ChainState) : Exec :=
+  let (exec, failed) := runReceiptActions c st0
+  finalizeReceipt c st0 exec failed
 
 /-- Outcome of an executed receipt. -/
 def outcomeOf (r : Receipt) (e : Exec) : ExecutionOutcome :=
