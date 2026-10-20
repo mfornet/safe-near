@@ -180,3 +180,4 @@ chain-trie-compare request *options:
 chain-trie-test:
     cd near-lean/runtime && lake build trie-replay --wfail
     python3 tools/chain-conformance/test_trie_accounting.py
+    python3 tools/chain-conformance/test_trie_updates.py

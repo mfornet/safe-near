@@ -19,12 +19,15 @@ use near_primitives::transaction::{
 };
 use near_primitives::trie_key::trie_key_parsers::parse_account_id_from_raw_key;
 use near_primitives::trie_key::{TrieKey, col};
-use near_primitives::types::{AccountId, Balance, EpochId, EpochInfoProvider, Gas, ShardId};
+use near_primitives::types::{
+    AccountId, Balance, EpochId, EpochInfoProvider, Gas, ShardId, StateChangeCause,
+};
 use near_primitives::version::{MIN_SUPPORTED_PROTOCOL_VERSION, PROTOCOL_VERSION};
 use near_primitives::views::{ExecutionOutcomeView, SignedTransactionView};
 use near_store::test_utils::TestTriesBuilder;
 use near_store::trie::{AccessOptions, AccessTracker, KeyLookupMode};
 use near_store::{ShardTries, ShardUId};
+use near_store::{TrieUpdate, TrieUpdateValuePtr};
 use node_runtime::{ApplyState, Runtime, SignedValidPeriodTransactions};
 use serde_json::{Map, Value, from_str, from_value, json, to_value};
 use std::cell::{Cell, RefCell};
@@ -730,6 +733,160 @@ fn trie_lookups(request: &Value) -> Result<Value> {
     )
 }
 
+/// Exercise actual prospective/committed overlays and native incremental finalization.
+/// Set/remove are TrieUpdate primitives, not VM storage host calls.
+fn trie_updates(request: &Value) -> Result<Value> {
+    let input = object(
+        request,
+        &["formatVersion", "entries", "accountId", "operations"],
+    )?;
+    if integer(input, "formatVersion")? != 1 {
+        return Err("unsupported trie formatVersion".into());
+    }
+    let account: AccountId = from_value(field(input, "accountId")?.clone())?;
+    let entries: Vec<Entry> = from_value(field(input, "entries")?.clone())?;
+    let mut keys = BTreeSet::new();
+    if entries.iter().any(|(key, _)| !keys.insert(key.clone())) {
+        return Err("duplicate trie entry".into());
+    }
+    let provider = MockEpochInfoProvider::default();
+    let layout = provider.shard_layout(&EpochId::default())?;
+    let shard = layout.shard_uids().next().ok_or("missing shard")?;
+    let tries = TestTriesBuilder::new().with_shard_layout(layout).build();
+    let changes = tries
+        .get_trie_for_shard(shard, CryptoHash::default())
+        .update(
+            entries.into_iter().map(|(key, value)| (key, Some(value))),
+            AccessOptions::DEFAULT,
+        )?;
+    let mut disk = tries.store_update();
+    let initial_root = tries.apply_all(&changes, shard, &mut disk);
+    disk.commit();
+    let trie = tries.get_trie_for_shard(shard, initial_root);
+    if trie.has_memtries() || trie.has_flat_storage_chunk_view() {
+        return Err("trie diagnostic requires canonical on-disk nodes".into());
+    }
+    let mut state = TrieUpdate::new(trie);
+    let tracker = LookupTracker::default();
+    let mut steps = Vec::new();
+    for operation in field(input, "operations")?
+        .as_array()
+        .ok_or("operations must be an array")?
+    {
+        let kind = operation
+            .get("kind")
+            .and_then(Value::as_str)
+            .ok_or("missing operation kind")?;
+        let mut raw_key = None;
+        let mut lookup = None;
+        let mut present = None;
+        match kind {
+            "set" | "remove" | "get" | "has" => {
+                let names: &[&str] = match kind {
+                    "set" => &["kind", "key", "value"],
+                    "get" => &["kind", "key", "accountNodes", "dereference"],
+                    _ => &["kind", "key"],
+                };
+                let op = object(operation, names)?;
+                let key = TrieKey::ContractData {
+                    account_id: account.clone(),
+                    key: from_value(field(op, "key")?.clone())?,
+                };
+                raw_key = Some(key.to_vec());
+                match kind {
+                    "set" => state.set(key, from_value(field(op, "value")?.clone())?),
+                    "remove" => state.remove(key),
+                    "has" => {
+                        present = Some(
+                            state.contains_key(&key, AccessOptions::contract_runtime(&tracker))?,
+                        )
+                    }
+                    _ => {
+                        let boolean = |name| -> Result<bool> {
+                            field(op, name)?
+                                .as_bool()
+                                .ok_or_else(|| format!("invalid bool field: {name}").into())
+                        };
+                        tracker.phase.set("node");
+                        let mode = if boolean("accountNodes")? {
+                            KeyLookupMode::MemOrTrie
+                        } else {
+                            KeyLookupMode::MemOrFlatOrTrie
+                        };
+                        let reference =
+                            state.get_ref(&key, mode, AccessOptions::contract_runtime(&tracker))?;
+                        let view = reference.as_ref().map(|pointer| json!({
+                            "kind":if matches!(pointer, TrieUpdateValuePtr::MemoryRef(_)) {"memory"} else {"trie"},
+                            "hash":pointer.value_hash().0,"length":pointer.len()}));
+                        tracker.phase.set("value");
+                        let value = if boolean("dereference")? {
+                            reference
+                                .as_ref()
+                                .map(|pointer| {
+                                    pointer.deref_value(AccessOptions::contract_runtime(&tracker))
+                                })
+                                .transpose()?
+                        } else {
+                            None
+                        };
+                        lookup = Some(json!({"reference":view,"value":value}));
+                    }
+                }
+            }
+            "commit" | "rollback" | "checkpoint" | "resetCache" => {
+                object(operation, &["kind"])?;
+                match kind {
+                    "commit" => state.commit(StateChangeCause::InitialState),
+                    "rollback" => state.rollback(),
+                    "resetCache" => tracker.cache.borrow_mut().clear(),
+                    _ => {
+                        if state.prospective_len() != 0 {
+                            return Err("cannot checkpoint prospective changes".into());
+                        }
+                        let finalized = state.finalize()?;
+                        let mut disk = tries.store_update();
+                        let root = tries.apply_all(&finalized.trie_changes, shard, &mut disk);
+                        disk.commit();
+                        state = TrieUpdate::new(tries.get_trie_for_shard(shard, root));
+                    }
+                }
+            }
+            _ => return Err("unknown trie update operation".into()),
+        }
+        let events = take(&mut *tracker.events.borrow_mut());
+        let cached = events
+            .iter()
+            .filter(|event| event["cached"] == true)
+            .count();
+        let contract_prefix = TrieKey::ContractData {
+            account_id: account.clone(),
+            key: vec![],
+        }
+        .to_vec();
+        let mut view = Vec::new();
+        for raw_key in state.iter(&[])? {
+            let raw_key = raw_key?;
+            let value = if let Some(suffix) = raw_key.strip_prefix(contract_prefix.as_slice()) {
+                let key = TrieKey::ContractData {
+                    account_id: account.clone(),
+                    key: suffix.to_vec(),
+                };
+                state.get_from_updates(&key, |raw| state.trie.get(raw, AccessOptions::DEFAULT))?
+            } else {
+                state.trie.get(&raw_key, AccessOptions::DEFAULT)?
+            };
+            view.push((raw_key, value.ok_or("iterator returned a deleted key")?));
+        }
+        steps.push(json!({"kind":kind,"rawKey":raw_key,"lookup":lookup,"present":present,
+            "baseRoot":state.get_root().0,"viewEntries":view,"prospectiveCount":state.prospective_len(),
+            "committedCount":state.committed_len(),"events":events,"counts":{"disk":events.len()-cached,"mem":cached}}));
+    }
+    Ok(
+        json!({"formatVersion":1,"mode":"contract-data-overlays/on-disk/no-flat/no-memtrie",
+        "initialRoot":initial_root.0,"steps":steps}),
+    )
+}
+
 /// Independent native eligibility oracle; no runtime state is changed.
 fn classify_staking_keys(request: &Value) -> Result<Value> {
     let input = object(request, &["publicKeys", "seeds"])?;
@@ -898,7 +1055,8 @@ fn main() -> Result<()> {
             mode @ ("--encode-state"
             | "--sign-transactions"
             | "--classify-staking-keys"
-            | "--trie-lookups"),
+            | "--trie-lookups"
+            | "--trie-updates"),
         ) => {
             let mut input = String::new();
             stdin().read_to_string(&mut input)?;
@@ -908,7 +1066,9 @@ fn main() -> Result<()> {
                 if mode == "--encode-state" {
                     encode_state(&input)?
                 } else {
-                    if mode == "--trie-lookups" {
+                    if mode == "--trie-updates" {
+                        trie_updates(&input)?
+                    } else if mode == "--trie-lookups" {
                         trie_lookups(&input)?
                     } else if mode == "--classify-staking-keys" {
                         classify_staking_keys(&input)?

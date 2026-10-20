@@ -1,0 +1,16 @@
+{
+  "formatVersion": 1,
+  "accountId": "fixture.near",
+  "entries": [],
+  "operations": [
+    {"kind": "set", "key": [107], "value": [118]},
+    {"kind": "get", "key": [107], "accountNodes": true, "dereference": true},
+    {"kind": "commit"},
+    {"kind": "get", "key": [107], "accountNodes": true, "dereference": true},
+    {"kind": "checkpoint"},
+    {"kind": "get", "key": [107], "accountNodes": true, "dereference": true},
+    {"kind": "remove", "key": [107]},
+    {"kind": "rollback"},
+    {"kind": "get", "key": [107], "accountNodes": true, "dereference": true}
+  ]
+}

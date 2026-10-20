@@ -9,6 +9,7 @@ bytes, roots, paths, dereferences and fresh/cached counts are compared exactly.
 from __future__ import annotations
 
 import argparse
+import copy
 from contextlib import contextmanager
 import hashlib
 import json
@@ -60,7 +61,38 @@ def checked_model_request(request, native):
     return dict(formatVersion=1, root=root, witness=native["witness"], lookups=request["lookups"])
 
 
+def compare_updates(request, native, model):
+    expected = native_call(native, "--trie-updates", request)
+    if expected.get("formatVersion") != 1 or expected.get("mode") != "contract-data-overlays/on-disk/no-flat/no-memtrie":
+        raise ValueError("unsupported native trie update mode")
+    try:
+        actual = execute(model, request, ROOT)
+    except subprocess.CalledProcessError as error:
+        message = error.stderr.strip()
+        return dict(request=request, native=expected, model=None, modelExecutionError=message,
+            differences=[dict(path="execution", error=message)])
+    def projection(value, native=False):
+        result = copy.deepcopy(value)
+        if native:
+            for key in ["formatVersion", "mode"]: del result[key]
+        for step in result["steps"]:
+            rows = step["viewEntries"]
+            if any(type(byte) is not int or not 0 <= byte < 256 for key, data in rows for part in [key, data] for byte in part):
+                raise ValueError("invalid trie entry byte")
+            entries = {bytes(key).hex(): data for key, data in rows}
+            if len(entries) != len(rows): raise ValueError("duplicate trie view entry")
+            step["viewEntries"] = entries
+        return result
+    try:
+        diffs = differences(projection(expected, native=True), projection(actual))
+    except (ValueError, KeyError, TypeError) as error:
+        diffs = [dict(path="projection", error=str(error))]
+    return dict(request=request, native=expected, model=actual, modelExecutionError=None, differences=diffs)
+
+
 def compare(request, native, model):
+    if "operations" in request:
+        return compare_updates(request, native, model)
     expected = native_call(native, "--trie-lookups", request)
     checked_model_request(request, expected)
     if expected.get("witnessComplete") is not True:
@@ -103,9 +135,10 @@ def main():
         report = compare(request, native, model)
     report.update(referenceBuild=build, modelBinarySha256=checksum, runtimeIntegrated=False,
         witnessHashBinding="pure Lean SHA256, independently checked externally",
-        nodeTraversal="Lean canonical construction from raw entries, Borsh decoding and cache")
+        nodeTraversal=("Lean canonical base, prospective/committed overlays and cache" if "operations" in request
+            else "Lean canonical construction from raw entries, Borsh decoding and cache"))
     atomic_write(arguments.report.resolve(), (json.dumps(report, indent=2) + "\n").encode())
-    print(f"{len(report['native']['results'])} lookups; {len(report['differences'])} differences; {arguments.report}")
+    print(f"{len(report['native'].get('results', report['native'].get('steps', [])))} observations; {len(report['differences'])} differences; {arguments.report}")
     raise SystemExit(bool(report["differences"]))
 
 

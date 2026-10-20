@@ -242,3 +242,40 @@ runtime gas gap. Encoding modeled runtime records into raw entries, updates/pros
 receipt-wide cache lifetime, flat storage and memtries still need integration.
 The complete object set is for the trie built from the supplied entries; it does
 not establish that all state of an original blockchain was captured.
+
+## Staged ContractData updates
+
+`--trie-updates` exercises the actual native `TrieUpdate` on a canonical on-disk
+base trie. The matching Lean mode accepts only the original raw `entries`, a
+validated `accountId`, `formatVersion: 1`, and ordered `operations`. For example:
+
+```sh
+just chain-trie-compare tools/chain-conformance/fixtures/trie_updates.json
+```
+
+Operations are `set` (`key`, `value`), `remove` (`key`), `get` (`key`, Boolean
+`accountNodes` and `dereference`), `has` (`key`), `commit`, `rollback`,
+`checkpoint`, and `resetCache`. Keys are raw contract storage bytes; both sides
+independently encode native ContractData keys. Set/remove are storage-update
+primitives: they do not implicitly read the old value or charge VM host fees.
+
+Each step compares its complete visible key/value map, immutable base root,
+prospective/committed distinct-key counts, memory/trie pointer kind, read result,
+and exact ordered fresh/cached node/value accesses. Prospective writes override
+committed changes and the base, including deletion tombstones. Commit transfers
+updates to the committed overlay without rebuilding the base. Rollback clears
+only prospective changes; it does not rewind cache accesses. Memory pointers
+bypass trie accounting even after commit or cache reset.
+
+Checkpoint requires an empty prospective overlay. Native incremental
+finalization is compared with independent Lean canonical reconstruction; the
+base root changes and overlays clear. The accounting cache persists across root
+changes until explicitly reset, allowing unchanged node/value hashes to remain
+cached. The Lean rollback/commit frame properties are kernel-checked.
+
+This remains a low-level diagnostic. Commits use the `InitialState` cause;
+state-change histories, contract-code caches, proof-size accounting, host fees,
+and actual receipt cache lifetimes are outside this comparison. Snapshot reads
+use non-accounting native access and do not warm the observed query cache.
+Encoding all modeled runtime records and connecting these primitives to receipt
+execution remain open.

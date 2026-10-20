@@ -1,4 +1,5 @@
-import NearRuntime.TrieConstruction
+import NearRuntime.TrieOverlay
+import NearVM.AccountId
 
 open Lean Near.TrieAccounting
 
@@ -80,6 +81,60 @@ private def buildInput (input : Json) : Except String Json := do
     ("root", bytesJson built.root),
     ("witness", toJson (built.witness.map fun (hash, value) => toJson [bytesJson hash, bytesJson value]))])
 
+private def updateOperation (input : Json) : Except String Near.TrieOverlay.Operation := do
+  let kind ← (← field input "kind").getStr?
+  match kind with
+  | "set" =>
+    object input ["kind", "key", "value"]
+    return .set (← bytes (← field input "key")) (← bytes (← field input "value"))
+  | "remove" | "has" =>
+    object input ["kind", "key"]
+    let key ← bytes (← field input "key")
+    return if kind == "remove" then .remove key else .has key
+  | "get" =>
+    object input ["kind", "key", "accountNodes", "dereference"]
+    return .get (← bytes (← field input "key")) (← (← field input "accountNodes").getBool?)
+      (← (← field input "dereference").getBool?)
+  | "commit" | "rollback" | "checkpoint" | "resetCache" =>
+    object input ["kind"]
+    return match kind with
+      | "commit" => .commit
+      | "rollback" => .rollback
+      | "checkpoint" => .checkpoint
+      | _ => .resetCache
+  | _ => throw "unknown trie update operation"
+
+private def updateInput (input : Json) : Except String Json := do
+  object input ["formatVersion", "entries", "accountId", "operations"]
+  unless (← (← field input "formatVersion").getNat?) == 1 do throw "unsupported trie formatVersion"
+  let account := (← (← field input "accountId").getStr?).toUTF8.toList
+  unless Wasm.Near.validAccountIdBytes account do throw "invalid account id"
+  let rows ← (← field input "entries").getArr?
+  let entries ← rows.toList.mapM fun row => do
+    let pair ← row.getArr?
+    unless pair.size == 2 do throw "invalid trie entry"
+    return (← bytes pair[0]!, ← bytes pair[1]!)
+  let mut state ← Near.TrieOverlay.start entries
+  let initial := state.base.root
+  let mut steps := []
+  for row in (← (← field input "operations").getArr?) do
+    let (after, observation) ← Near.TrieOverlay.step account (← updateOperation row) state
+    state := after
+    let reference := observation.reference.map fun (kind, value) => Json.mkObj [
+      ("kind", toJson kind), ("hash", bytesJson value.hash), ("length", toJson value.length)]
+    let lookup := if observation.isLookup then Json.mkObj [
+      ("reference", reference.getD .null), ("value", (observation.value.map bytesJson).getD .null)] else .null
+    steps := steps ++ [Json.mkObj [
+      ("kind", toJson observation.kind), ("rawKey", (observation.rawKey.map bytesJson).getD .null),
+      ("lookup", lookup), ("present", toJson observation.present),
+      ("baseRoot", bytesJson state.base.root),
+      ("viewEntries", toJson (state.view.map fun (key, value) => toJson [bytesJson key, bytesJson value])),
+      ("prospectiveCount", toJson state.prospective.length), ("committedCount", toJson state.committed.length),
+      ("events", toJson (state.accounting.events.map fun event => Json.mkObj [
+        ("hash", bytesJson event.hash), ("kind", toJson event.kind), ("cached", toJson event.cached)])),
+      ("counts", Json.mkObj [("disk", toJson state.accounting.disk), ("mem", toJson state.accounting.mem)])]]
+  return Json.mkObj [("initialRoot", bytesJson initial), ("steps", toJson steps)]
+
 private def hashInput (input : Json) : Except String Json := do
   object input ["formatVersion", "hashInputs"]
   unless (← (← field input "formatVersion").getNat?) == 1 do throw "unsupported trie formatVersion"
@@ -87,7 +142,8 @@ private def hashInput (input : Json) : Except String Json := do
   return Json.mkObj [("hashes", toJson (values.map fun value => bytesJson (Near.Sha256.hash value)))]
 
 def execute (input : Json) : Except String Json :=
-  if (input.getObjVal? "hashInputs").isOk then hashInput input
+  if (input.getObjVal? "operations").isOk then updateInput input
+  else if (input.getObjVal? "hashInputs").isOk then hashInput input
   else if (input.getObjVal? "entries").isOk then buildInput input else witnessInput input
 
 end TrieReplay

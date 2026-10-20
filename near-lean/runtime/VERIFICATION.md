@@ -452,3 +452,13 @@ subtrees and cross-role node/value hash aliases. This does not inject observed
 counts into receipt execution. Encoding modeled state into raw entries, state
 updates/prospective overlays, receipt cache lifetime, flat/memory trie behavior
 and broader refinement proofs remain open before runtime trie gas is discharged.
+
+`TrieOverlay` adds prospective/committed ContractData updates, tombstones,
+memory-pointer reads, commit/rollback and canonical checkpoints. Native
+incremental `TrieUpdate::finalize` roots are compared with independent Lean
+reconstruction after every checkpoint, alongside every intermediate view and
+access event. Cache resets are explicit: commit, rollback and root publication
+do not implicitly rewind already observed hashes. Kernel frame properties
+preserve the base/cache under commit and the base/committed/cache under rollback.
+The diagnostic does not model code caches, change-history causes, proof-size
+limits or VM host charges; receipt integration still requires those boundaries.
