@@ -298,6 +298,45 @@ original shard roots remain outside this represented state. Evidence is saved
 in `audit/queue-encoding-regressions.json` and
 `audit/runtime-queue-encoding-regressions.json`.
 
+`just chain-transaction-encoding-test` checks original typed transaction bodies
+and automatic registration of admitted transaction receipts. The pure
+`NearRuntime.TransactionEncoding` serializes V0 and ordinary-key V1 envelopes,
+including the V1 nonce tag and trailing nonce mode, all eight actions, both
+ordinary public key families, actual deployment bytes and an explicit original
+32-byte `blockHash`. It checks body length against the existing size model and
+computes the transaction hash from the complete unsigned body. Signatures and
+signature verification remain external. Native signed bodies and hashes are
+comparison outputs, never inputs to the Lean encoder.
+
+The `transaction-replay` executable takes `{formatVersion: 1, codes, transactions}`;
+each row is `{transaction, blockHash}` using the existing replay transaction and
+catalogue transport. It returns each `body`, `hash` and `bodySize`. An optional
+`admission` object with `configDir`, `protocolVersion`, `blockHeight`, `gasPrice`,
+`initialState` and existing `receiptIds` bindings enables the registration
+observer. Its transport starts from a queue-free synthetic genesis. The library
+also accepts an existing typed queue context, which it validates and preserves.
+
+`NearRuntime.TransactionRegistry.observe` calls the existing
+`convertTransaction` transition sequentially, leaving rejected transactions out
+of both state and registration updates. Each admitted receipt gets its native
+hash from the independently encoded transaction hash and supplied execution
+height, and a legacy action-format entry. Logical-ID overwrites, hash aliases,
+malformed bodies and model limitations fail closed. A kernel-checked frame
+guarantees registration cannot rewrite established data ownership or delayed
+queue metadata. The output's `stateAfterTransactions` is the conversion stage,
+before any receipt execution or delayed-queue insertion. This observer does not
+replace `apply` or add a second receipt-execution implementation.
+
+The regression compares 366 original transaction bodies and hashes, then 24
+native admission batches across protocols 83–86, both key families, rejected
+transactions between admitted ones, strict/monotonic nonces, height/price
+variation and restricted or unfunded callers. Automatically registered IDs
+also encode the actual zero-budget local delayed queues without manual receipt
+bindings. General promise/data registration, action-derived VM seeds, queue
+context evolution during receipt execution and trie-backed runtime gas remain
+open. Evidence is saved in `audit/transaction-encoding-regressions.json` and
+`audit/transaction-registry-regressions.json`.
+
 `just chain-trie-test` compares native `near_store::Trie` traversal with
 `NearRuntime.TrieAccounting`. Build the source oracle first, as above. For an
 individual request:

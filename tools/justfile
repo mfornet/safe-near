@@ -196,3 +196,8 @@ chain-receipt-encoding-test:
 chain-queue-encoding-test:
     cd near-lean/chain && lake build state-encode receipt-encode chain-replay --wfail
     python3 tools/chain-conformance/test_queue_encoding.py
+
+# Check typed transaction bodies/hashes and admitted-prefix receipt registration.
+chain-transaction-encoding-test:
+    cd near-lean/chain && lake build transaction-replay state-encode chain-replay --wfail
+    python3 tools/chain-conformance/test_transaction_encoding.py

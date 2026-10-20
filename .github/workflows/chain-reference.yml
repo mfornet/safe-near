@@ -112,6 +112,10 @@ jobs:
         run: |
           cd near-lean/chain && lake build state-encode receipt-encode chain-replay --wfail
           cd ../.. && python3 tools/chain-conformance/test_queue_encoding.py
+      - name: Compare typed transaction hashes and automatic transaction receipt registration
+        run: |
+          cd near-lean/chain && lake build transaction-replay state-encode chain-replay --wfail
+          cd ../.. && python3 tools/chain-conformance/test_transaction_encoding.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -133,3 +137,5 @@ jobs:
             audit/runtime-identity-regressions.json
             audit/queue-encoding-regressions.json
             audit/runtime-queue-encoding-regressions.json
+            audit/transaction-encoding-regressions.json
+            audit/transaction-registry-regressions.json

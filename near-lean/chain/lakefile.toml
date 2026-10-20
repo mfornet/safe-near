@@ -37,3 +37,8 @@ root = "ChainReplay.StateEncoding"
 [[lean_exe]]
 name = "receipt-encode"
 root = "ChainReplay.ReceiptEncoding"
+
+# Original typed transaction bodies and automatic admitted-receipt registration.
+[[lean_exe]]
+name = "transaction-replay"
+root = "ChainReplay.Transactions"
