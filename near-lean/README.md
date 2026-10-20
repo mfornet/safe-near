@@ -539,6 +539,16 @@ and cannot overwrite a postponed slot. Promise allocation is fresh against all
 old routing references. This predicate does not assert uniqueness, preserve the
 bounds of all emitted VM receipts, or close the full queue invariant.
 
+`DataReceiptIdentifiers` proves exact consecutive data-envelope ids and exact
+callback delivery order, data ids and bytes. With bounded callback references,
+all identifiers carried by the data-emission pass remain below its new counter.
+`ActionReceiptIdentifiers.materializeFunctionCall_receiptIds` characterizes the
+complete materializer's envelope ids as disjoint data and action allocation
+ranges. Its corollaries prove uniqueness, counter bounds, freshness against old
+routing references and absence from the returned state's postponed map. These
+are envelope-identity guarantees; full bounds on linked action dependency
+references and preservation across later execution remain open.
+
 Reserved `system` account creation is rejected independently of the registrar
 and minimum-name-length configuration. Pinned nearcore's `action_create_account`
 uses near-account-id 2.0.0's `is_top_level`/`is_sub_account_of`; `system` is neither.
