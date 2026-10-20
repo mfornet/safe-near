@@ -160,6 +160,8 @@ jobs:
         run: |
           wasm-tools parse tools/chain-conformance/fixtures/replay.wat -o /tmp/safe-near-replay.wasm
           cmp tools/chain-conformance/fixtures/replay.wasm /tmp/safe-near-replay.wasm
+          wasm-tools parse tools/chain-conformance/fixtures/stateful.wat -o /tmp/safe-near-stateful.wasm
+          cmp tools/chain-conformance/fixtures/stateful.wasm /tmp/safe-near-stateful.wasm
       - name: Compare all VM observations
         run: |
           python3 -m unittest discover -s tools/runtime-conformance
