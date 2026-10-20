@@ -594,6 +594,17 @@ are unnecessary. Thus the local processor-output bound obligation is closed.
 Composition across the complete block queue, queue-wide ownership/uniqueness,
 valid dependency edges and eventual completion remain open.
 
+`BlockIdentifierBounds.apply_identifier_bounds` composes the local bounds through
+both actual block loops. Its inputs are bounded routing state and bounded incoming
+receipts; it proves bounded resulting state and all outgoing work, including
+transaction-generated receipts, gas-limit deferral and atomic issue rollback.
+`NearChain.IdentifierBounds` includes pending receipts in the snapshot invariant
+and preserves it across steps, reachable states, settlement and isolated runs for
+all stop reasons. The next allocator id is therefore absent from every live state
+or pending reference. This closes block/chain numeric-bound composition, while
+queue-wide uniqueness/ownership, dependency-edge validity and financial
+conservation across blocks still require separate proofs.
+
 Reserved `system` account creation is rejected independently of the registrar
 and minimum-name-length configuration. Pinned nearcore's `action_create_account`
 uses near-account-id 2.0.0's `is_top_level`/`is_sub_account_of`; `system` is neither.
