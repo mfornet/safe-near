@@ -46,6 +46,7 @@ fn config_json(store: &RuntimeConfigStore, version: ProtocolVersion) -> String {
         runtime_admission: json!({
             "strict_nonce": ProtocolFeature::StrictNonce.enabled(version),
             "v1_transactions": ProtocolFeature::GasKeys.enabled(version),
+            "transaction_size_includes_signature": ProtocolFeature::PostQuantumSignatures.enabled(version),
         }),
     };
     serde_json::to_string_pretty(&dump).expect("runtime configuration serialization cannot fail")

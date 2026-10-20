@@ -143,3 +143,7 @@ The `error` repr and `message` remain presentation diagnostics. Added access
 keys receive `(deliveryBlockHeight - 1) * 1_000_000` as their initial nonce;
 the action’s supplied nonce remains visible in the input but is overwritten
 when the action executes.
+
+Each executed block also exports `transactionSizes`, in transaction order, with
+`bodySize`, `wireSize` and protocol-selected `sizeForLimits`. Unknown signature
+encodings produce null optional sizes and an execution issue before charging.

@@ -157,6 +157,18 @@ class SnapshotImportTests(unittest.TestCase):
                         importer.prepare(snapshot(), target, reference=REFERENCE, model=MODEL, scenario=request)
                     self.assertFalse(target.exists())
 
+    def test_synthetic_signer_rejects_unsupported_key_schemes(self):
+        with frozen_reference(REFERENCE) as (native, _), tempfile.TemporaryDirectory() as directory:
+            for index, kind in enumerate(["rsa", None, [], 0]):
+                with self.subTest(kind=kind):
+                    value = dict(signerId="caller.near", seed="public-key-type-test", keyType=kind, transactions=[])
+                    with self.assertRaises(subprocess.CalledProcessError):
+                        importer.native_call(native, "--sign-transactions", value)
+                    request = scenario()
+                    request["caller"]["keyType"] = kind
+                    with self.assertRaises(ValueError):
+                        importer.prepare(snapshot(), Path(directory) / str(index), reference=REFERENCE, model=MODEL, scenario=request)
+
     def test_native_encoder_rejects_duplicates_and_unknown_access_key_fields(self):
         with frozen_reference(REFERENCE) as (native, _):
             rows, _, _ = importer.validate_snapshot(snapshot())

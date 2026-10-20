@@ -125,6 +125,16 @@ class ChainProjectionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             projection.status({"Failure": {"InvalidTxError": {"ActionsValidation": "unknown"}}})
 
+    def test_transaction_size_error_preserves_native_size_and_limit(self):
+        projection = comparator.Projection({})
+        fields = {"size": 1572865, "limit": 1572864}
+        status = {"Failure": {"InvalidTxError": {"TransactionSizeExceeded": fields}}}
+        self.assertEqual(projection.status(status), dict(kind="failure", actionIndex=None,
+            error=dict(kind="transactionSizeExceeded", **fields)))
+        fields["unknown"] = 1
+        with self.assertRaises(ValueError):
+            projection.status(status)
+
     def test_unrepresented_function_call_errors_fail_closed(self):
         p = comparator.Projection({})
         for error in [{"CompilationError": {"CodeDoesNotExist": 7}},

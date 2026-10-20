@@ -235,8 +235,8 @@ argument/code sizes, key receiver validation and terminated key-method totals.
 Rejections happen before signer charging, allowance updates or nonce changes;
 valid transactions around a rejection still execute. Structured native errors
 retain every mapped parameter, including the byte-truncated invalid key receiver.
-The transaction-size gate and staking-key curve eligibility remain outside this
-action-list validator.
+The separate transaction-size gate runs after envelope-feature checks and before
+stateful admission. Staking-key curve eligibility remains an open boundary.
 
 RPC `SignedTransactionView` masks deployment code as its hash. The native
 adapter therefore exports both the original RPC `view` and actual typed
@@ -249,3 +249,30 @@ Synthetic request and initial-trace JSON files use compact encoding to avoid
 inflating multi-megabyte byte arrays. Their complete contents remain covered by
 the manifest hashes. Configurations, capture/scenario records and manifest
 metadata remain readable JSON. Reports retain all raw inputs and observations.
+
+## Transaction envelope sizes
+
+`just chain-size-test` compares 48 imported native/Lean fixtures (192 signed
+transactions). It covers every modeled action encoding, finite/unlimited key
+permissions, UTF-8 method names, V0/V1 envelopes and Ed25519/secp256k1 signers.
+The optional synthetic caller `keyType` is `ed25519` (default) or `secp256k1`;
+other schemes are rejected. These keys and seeds are public local fixture data.
+
+The model computes Borsh body size from field widths and byte lengths. Ordinary
+V1 contributes three bytes beyond V0's layout: transaction tag, nonce tag and
+nonce mode. Native `SignedTransaction::get_size`, `wire_size` and
+`size_for_limits` are exported separately and compared to each model block's
+`transactionSizes`. Wire size is also checked against actual signed Borsh length.
+The source-derived `runtime_admission.transaction_size_includes_signature` flag
+starts at protocol 85; it selects body-only size before that feature and full
+wire size afterward. Ed25519 signatures occupy 65 Borsh bytes; secp256k1 occupies 66.
+
+Boundary fixtures use native empty-argument encoding to choose payload lengths,
+then independently compare the model sizes and complete execution traces.
+Exact-limit transactions execute, and one-byte overflows reject atomically.
+Version gates precede size checks; size precedes signer/key/nonce/balance checks.
+Unknown or malformed signature/key representations stop as a model issue without
+charges rather than receiving a guessed signature width.
+
+Large reports live in `audit/transaction-size-cases/`; the small regression index
+binds every per-case file by SHA-256. CI uploads the index and all full raw cases.

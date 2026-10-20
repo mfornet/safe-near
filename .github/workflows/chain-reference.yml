@@ -89,6 +89,8 @@ jobs:
         run: python3 tools/chain-conformance/test_permission_comparison.py
       - name: Compare stateless action rules and deployment-byte binding
         run: python3 tools/chain-conformance/test_action_validation.py
+      - name: Compare native transaction sizes and signature-width gates
+        run: python3 tools/chain-conformance/test_transaction_size.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -100,3 +102,5 @@ jobs:
             audit/action-chain-regressions.json
             audit/permission-chain-regressions.json
             audit/action-validation-regressions.json
+            audit/transaction-size-regressions.json
+            audit/transaction-size-cases/*.json

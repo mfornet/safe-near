@@ -158,3 +158,8 @@ chain-permission-test:
 chain-validation-test:
     cd near-lean/chain && lake build chain-replay
     python3 tools/chain-conformance/test_action_validation.py
+
+# Compare native Borsh widths, signature gates and transaction-size boundaries.
+chain-size-test:
+    cd near-lean/chain && lake build chain-replay
+    python3 tools/chain-conformance/test_transaction_size.py

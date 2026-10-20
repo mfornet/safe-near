@@ -16,7 +16,7 @@ def run (protocol : Nat) (cfg : RuntimeConfig) (codes : Catalogue) (initial : Sn
           kind "unavailableIndex", ("position", toJson position)])])
         finish s (trace ++ [rejected]) "invalidSchedule" rest.length
       | .ok (next, result) =>
-        let trace := trace ++ [applyJson next result]
+        let trace := trace ++ [applyJson cfg block.txs next result]
         if result.issue.isSome then finish next trace "executionIssue" rest.length
         else go next trace rest
   go initial [] blocks

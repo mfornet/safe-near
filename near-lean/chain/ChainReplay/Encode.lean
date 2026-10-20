@@ -135,6 +135,7 @@ def runtimeErrorJson (executor : AccountId) : RuntimeError → Json
   | .deleteAccountWithLargeState id => obj [kind "deleteAccountWithLargeState", ("accountId", toJson id)]
   | .invalidSigner id => obj [kind "invalidSigner", ("accountId", toJson id)]
   | .invalidTransactionVersion => obj [kind "invalidTransactionVersion"]
+  | .transactionSizeExceeded size limit => obj [kind "transactionSizeExceeded", ("size", toJson size), ("limit", toJson limit)]
   | .invalidNonce nonce current => obj [kind "invalidNonce", ("nonce", toJson nonce), ("currentNonce", toJson current)]
   | .nonceTooLarge nonce upper => obj [kind "nonceTooLarge", ("nonce", toJson nonce), ("upperBound", toJson upper)]
   | .invalidAccessKey message => obj [kind "invalidAccessKey", ("reason", toJson message)]
@@ -176,10 +177,16 @@ def outcomeJson (pair : ReceiptId × ExecutionOutcome) : Json :=
 def snapshotFields (s : Snapshot) : List (String × Json) :=
   [("state", stateJson s.state), ("pendingReceipts", toJson (s.pending.map receiptJson))]
 
-def applyJson (s : Snapshot) (r : ApplyResult) : Json :=
+def transactionSizeJson (cfg : Wasm.Near.RuntimeConfig) (tx : Transaction) : Json :=
+  obj [("bodySize", toJson tx.bodySize),
+    ("wireSize", toJson (tx.signatureSize?.map (tx.bodySize + ·))),
+    ("sizeForLimits", toJson (tx.sizeForLimits? cfg))]
+
+def applyJson (cfg : Wasm.Near.RuntimeConfig) (transactions : List Transaction) (s : Snapshot) (r : ApplyResult) : Json :=
   obj
     (snapshotFields s ++
-      [("outcomes", toJson (r.outcomes.map outcomeJson)),
+      [("transactionSizes", toJson (transactions.map (transactionSizeJson cfg))),
+        ("outcomes", toJson (r.outcomes.map outcomeJson)),
         ("outgoingReceipts", toJson (r.outgoing.map receiptJson)),
         ("tokensBurnt", toJson (toString r.tokensBurnt)),
         ("subsidizedAmount", toJson (toString r.subsidizedAmount)),

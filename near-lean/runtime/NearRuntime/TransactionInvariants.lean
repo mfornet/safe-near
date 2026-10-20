@@ -38,36 +38,42 @@ theorem convertTransaction_success_commit (cfg : RuntimeConfig) (ap : ApplyState
       · have hgate : tx.nonceMode = .strict → cfg.strictNonceEnabled = true := by
           intro hm
           cases hf : cfg.strictNonceEnabled <;> simp [hf, hm] at hg ⊢
-        cases hs : st.account? tx.signerId with
-        | none => simp [convertTransactionCore, hversion, hg, hs] at h
-        | some signer =>
-          cases hk : st.accessKey? tx.signerId tx.publicKey with
-          | none => simp [convertTransactionCore, hversion, hg, hs, hk] at h
-          | some key =>
-            cases hvn : verifyNonce tx.nonce key.nonce (some ap.blockHeight) tx.nonceMode with
-            | error err => simp [convertTransactionCore, hversion, hg, hs, hk, hvn] at h
-            | ok accepted =>
-              cases accepted
-              have hn := verifyNonce_increases tx.nonce key.nonce (some ap.blockHeight) tx.nonceMode hvn
-              by_cases ha : tx.actions.length > cfg.wasm.limits.maxActionsPerReceipt
-              · simp [convertTransactionCore, hversion, hg, hs, hk, hvn, ha] at h
-              · let expected := Fees.txCost cfg ap.gasPrice tx.signerId tx.receiverId tx.actions
-                have he : Fees.txCost cfg ap.gasPrice tx.signerId tx.receiverId tx.actions = expected := rfl
-                by_cases hb : signer.amount < expected.total
-                · simp [convertTransactionCore, hversion, hg, hs, hk, hvn, ha, he, hb] at h
-                · cases hal : validateTransactionAllowance tx key expected with
-                  | error err => simp [convertTransactionCore, hversion, hg, hs, hk, hvn, ha, he, hb, hal] at h
-                  | ok accepted =>
-                    cases accepted
-                    by_cases hd : storageStakeDeficit cfg { signer with amount := signer.amount - expected.total } > 0
-                    · simp [convertTransactionCore, hversion, hg, hs, hk, hvn, ha, he, hb, hal, hd] at h
-                    · cases hv : validateTransactionAccessKey tx key expected with
-                      | error err => simp [convertTransactionCore, hversion, hg, hs, hk, hvn, ha, he, hb, hal, hd, hv] at h
-                      | ok newKey =>
-                        refine ⟨signer, newKey, rfl, ?_, ?_, key, rfl, hn, hv, hvn, hgate⟩
-                        · change expected.total ≤ signer.amount
-                          omega
-                        · simpa [convertTransactionCore, hversion, hg, hs, hk, hvn, ha, he, hb, hal, hd, hv] using h
+        cases hsize : tx.sizeForLimits? cfg with
+        | none => simp [convertTransactionCore, hversion, hg, hsize] at h
+        | some size =>
+          by_cases hlarge : size > cfg.wasm.limits.maxTransactionSize
+          · simp [convertTransactionCore, hversion, hg, hsize, hlarge] at h
+          ·
+            cases hs : st.account? tx.signerId with
+            | none => simp [convertTransactionCore, hversion, hg, hsize, hlarge, hs] at h
+            | some signer =>
+              cases hk : st.accessKey? tx.signerId tx.publicKey with
+              | none => simp [convertTransactionCore, hversion, hg, hsize, hlarge, hs, hk] at h
+              | some key =>
+                cases hvn : verifyNonce tx.nonce key.nonce (some ap.blockHeight) tx.nonceMode with
+                | error err => simp [convertTransactionCore, hversion, hg, hsize, hlarge, hs, hk, hvn] at h
+                | ok accepted =>
+                  cases accepted
+                  have hn := verifyNonce_increases tx.nonce key.nonce (some ap.blockHeight) tx.nonceMode hvn
+                  by_cases ha : tx.actions.length > cfg.wasm.limits.maxActionsPerReceipt
+                  · simp [convertTransactionCore, hversion, hg, hsize, hlarge, hs, hk, hvn, ha] at h
+                  · let expected := Fees.txCost cfg ap.gasPrice tx.signerId tx.receiverId tx.actions
+                    have he : Fees.txCost cfg ap.gasPrice tx.signerId tx.receiverId tx.actions = expected := rfl
+                    by_cases hb : signer.amount < expected.total
+                    · simp [convertTransactionCore, hversion, hg, hsize, hlarge, hs, hk, hvn, ha, he, hb] at h
+                    · cases hal : validateTransactionAllowance tx key expected with
+                      | error err => simp [convertTransactionCore, hversion, hg, hsize, hlarge, hs, hk, hvn, ha, he, hb, hal] at h
+                      | ok accepted =>
+                        cases accepted
+                        by_cases hd : storageStakeDeficit cfg { signer with amount := signer.amount - expected.total } > 0
+                        · simp [convertTransactionCore, hversion, hg, hsize, hlarge, hs, hk, hvn, ha, he, hb, hal, hd] at h
+                        · cases hv : validateTransactionAccessKey tx key expected with
+                          | error err => simp [convertTransactionCore, hversion, hg, hsize, hlarge, hs, hk, hvn, ha, he, hb, hal, hd, hv] at h
+                          | ok newKey =>
+                            refine ⟨signer, newKey, rfl, ?_, ?_, key, rfl, hn, hv, hvn, hgate⟩
+                            · change expected.total ≤ signer.amount
+                              omega
+                            · simpa [convertTransactionCore, hversion, hg, hsize, hlarge, hs, hk, hvn, ha, he, hb, hal, hd, hv] using h
 
 /-- Every successful public conversion passed the stateless action rules. -/
 theorem convertTransaction_actions_valid (cfg : RuntimeConfig) (ap : ApplyState)
@@ -103,6 +109,28 @@ theorem convertTransaction_version_supported (cfg : RuntimeConfig) (ap : ApplySt
       · simp [convertTransactionCore, hg] at h
       · simp [convertTransactionCore, hg, hv] at h
     | true => rfl
+
+/-- Every accepted public transaction fits the protocol's chosen Borsh size limit. -/
+theorem convertTransaction_size_bound (cfg : RuntimeConfig) (ap : ApplyState)
+    (st st' : ChainState) (tx : Transaction) (receipt : Receipt) (cost : Fees.TxCost)
+    (h : convertTransaction cfg ap st tx = .ok (st', receipt, cost)) :
+    ∃ size, tx.sizeForLimits? cfg = some size ∧ size ≤ cfg.wasm.limits.maxTransactionSize := by
+  cases ha : validateTransactionActions cfg tx.actions with
+  | error error => simp [convertTransaction, ha] at h
+  | ok accepted =>
+    cases accepted
+    have h : convertTransactionCore cfg ap st tx = .ok (st', receipt, cost) := by
+      simpa [convertTransaction, ha] using h
+    by_cases hg : tx.nonceMode = .strict ∧ cfg.strictNonceEnabled = false
+    · simp [convertTransactionCore, hg] at h
+    · by_cases hv : tx.versionSupported cfg = false
+      · simp [convertTransactionCore, hg, hv] at h
+      · cases hs : tx.sizeForLimits? cfg with
+        | none => simp [convertTransactionCore, hg, hv, hs] at h
+        | some size =>
+          by_cases hl : size > cfg.wasm.limits.maxTransactionSize
+          · simp [convertTransactionCore, hg, hv, hs, hl] at h
+          · exact ⟨size, rfl, Nat.le_of_not_gt hl⟩
 
 /-- The commit operation debits exactly its validated transaction cost, leaving
 locked funds unchanged. Unique account keys prevent hidden duplicate balances. -/

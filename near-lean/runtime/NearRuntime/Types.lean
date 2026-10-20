@@ -182,6 +182,7 @@ inductive RuntimeError
   | deleteAccountWithLargeState (id : AccountId)
   | invalidSigner (id : AccountId)
   | invalidTransactionVersion
+  | transactionSizeExceeded (size limit : Nat)
   | invalidNonce (txNonce akNonce : Nat)
   | nonceTooLarge (txNonce upperBound : Nat)
   | invalidAccessKey (msg : String)

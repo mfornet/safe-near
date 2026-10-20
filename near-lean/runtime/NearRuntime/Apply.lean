@@ -3,6 +3,7 @@ import NearRuntime.State
 import NearRuntime.Nonce
 import NearRuntime.Refund
 import NearRuntime.ActionValidation
+import NearRuntime.TransactionSize
 
 /-!
 # `apply`
@@ -648,6 +649,10 @@ def convertTransactionCore (cfg : RuntimeConfig) (ap : ApplyState) (st : ChainSt
     Except RuntimeError (ChainState × Receipt × Fees.TxCost) := do
   if tx.nonceMode = .strict ∧ cfg.strictNonceEnabled = false then throw .invalidTransactionVersion
   if tx.versionSupported cfg = false then throw .invalidTransactionVersion
+  let some size := tx.sizeForLimits? cfg
+    | throw (.executionIssue (.unsupportedAction "transaction signature/key encoding"))
+  if size > cfg.wasm.limits.maxTransactionSize then
+    throw (.transactionSizeExceeded size cfg.wasm.limits.maxTransactionSize)
   let some signer := st.account? tx.signerId | throw (.invalidSigner tx.signerId)
   let some key := st.accessKey? tx.signerId tx.publicKey | throw (.accessKeyNotFound tx.signerId tx.publicKey)
   verifyNonce tx.nonce key.nonce (some ap.blockHeight) tx.nonceMode
@@ -701,6 +706,8 @@ private def applyAttempt (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes
           tokensBurnt := cost.gasBurnt * ap.gasPrice }
       outcomes := outcomes ++ [(0, o)]
     | .error e =>
+      if let some issue := e.issue? then
+        return { state := initial, outgoing := [], outcomes := [], tokensBurnt := 0, issue := some (0, issue) }
       outcomes := outcomes ++ [(0, { executorId := tx.signerId, status := .failure e })]
   let queue := localReceipts ++ st.delayed ++ incoming
   st := { st with delayed := [] }

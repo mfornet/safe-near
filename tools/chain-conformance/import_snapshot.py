@@ -268,7 +268,7 @@ def prepare(snapshot, destination, *, reference, model, scenario=None):
                     blockHash=byte_list(tx.get("blockHash", block["prevBlockHash"]), "transaction block hash", 32)))
         if "caller" in scenario:
             caller = scenario["caller"]
-            fields(caller, ["accountId", "seed", "amount"], ["accessKey"])
+            fields(caller, ["accountId", "seed", "amount"], ["accessKey", "keyType"])
             identifier = account_id(caller["accountId"], "synthetic caller")
             if identifier == "system":
                 raise ValueError("system is reserved for protocol receipts, not a synthetic caller")
@@ -276,7 +276,12 @@ def prepare(snapshot, destination, *, reference, model, scenario=None):
                 raise ValueError("synthetic caller overlaps a captured account")
             if not isinstance(caller["seed"], str) or not caller["seed"]:
                 raise ValueError("provide an explicit synthetic caller seed")
-            signed = native_call(native, "--sign-transactions", dict(signerId=identifier, seed=caller["seed"], transactions=specifications))
+            signing = dict(signerId=identifier, seed=caller["seed"], transactions=specifications)
+            if "keyType" in caller:
+                if not isinstance(caller["keyType"], str) or caller["keyType"] not in {"ed25519", "secp256k1"}:
+                    raise ValueError("unsupported synthetic key type")
+                signing["keyType"] = caller["keyType"]
+            signed = native_call(native, "--sign-transactions", signing)
             usage = config["transaction_costs"]["storage_usage_config"]
             caller_key = caller.get("accessKey", dict(nonce=0, permission="FullAccess"))
             if caller_key is not None:

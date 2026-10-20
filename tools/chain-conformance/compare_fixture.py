@@ -243,6 +243,7 @@ class Projection:
             },
             "transaction": {
                 "InvalidNonce": ("invalidNonce", {"tx_nonce": "nonce", "ak_nonce": "currentNonce"}),
+                "TransactionSizeExceeded": ("transactionSizeExceeded", {"size": "size", "limit": "limit"}),
                 "NonceTooLarge": ("nonceTooLarge", {"tx_nonce": "nonce", "upper_bound": "upperBound"}),
                 "SignerDoesNotExist": ("invalidSigner", {"signer_id": "accountId"}),
                 "InvalidReceiverId": ("invalidReceiver", {"receiver_id": "accountId"}),
@@ -362,7 +363,8 @@ class Projection:
                     executorId=o["executor_id"], status=self.status(o["status"], o["executor_id"]), logs=o["logs"],
                     receiptIds=[self.rid(r) for r in o["receipt_ids"]], gasBurnt=o["gas_burnt"], tokensBurnt=o["tokens_burnt"])))
             balance = block["balanceStats"]
-            blocks.append(dict(state=self.state(block["state"]), pendingReceipts=[self.receipt(r) for r in pending],
+            blocks.append(dict(transactionSizes=[{field: row[field] for field in ["bodySize", "wireSize", "sizeForLimits"]}
+                for row in block["inputs"]["transactions"]], state=self.state(block["state"]), pendingReceipts=[self.receipt(r) for r in pending],
                 outgoingReceipts=[self.receipt(r) for r in block["outgoingReceipts"]], outcomes=outcomes, issue=None,
                 tokensBurnt=str(sum(int(balance[k]) for k in ["txBurntAmount", "otherBurntAmount", "slashedBurntAmount"])),
                 subsidizedAmount=balance["subsidizedAmount"]))

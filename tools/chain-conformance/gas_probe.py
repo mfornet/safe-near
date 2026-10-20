@@ -149,7 +149,8 @@ def projection(source, trace):
                 outcome=dict(executorId=outcome["executor_id"], status=status, logs=outcome["logs"],
                     receiptIds=list(map(existing, outcome["receipt_ids"])), gasBurnt=outcome["gas_burnt"],
                     tokensBurnt=outcome["tokens_burnt"])))
-        blocks.append(dict(state=canonical_state(state(block["state"], len(ids) + 1)),
+        blocks.append(dict(transactionSizes=[{field: row[field] for field in ["bodySize", "wireSize", "sizeForLimits"]}
+            for row in block["inputs"]["transactions"]], state=canonical_state(state(block["state"], len(ids) + 1)),
             pendingReceipts=list(map(receipt, pending)), outgoingReceipts=list(map(receipt, block["outgoingReceipts"])),
             outcomes=outcomes, tokensBurnt=str(sum(int(row["outcome"]["tokens_burnt"]) for row in block["outcomes"])),
             subsidizedAmount="0", issue=None))

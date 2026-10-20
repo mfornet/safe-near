@@ -289,11 +289,13 @@ fn run(request: &Value) -> Result<Value> {
         let transactions = txs
             .iter()
             .map(|tx| {
-                let version = match &tx.transaction {
+                let envelope_version = match &tx.transaction {
                     Transaction::V0(_) => 0,
                     Transaction::V1(_) => 1,
                 };
-                Ok(json!({"version":version, "borsh":borsh_bytes(tx)?,
+                Ok(json!({"version":envelope_version, "borsh":borsh_bytes(tx)?,
+                    "bodySize":tx.get_size(), "wireSize":tx.wire_size(),
+                    "sizeForLimits":tx.size_for_limits(version),
                     "actions":to_value(tx.transaction.actions())?,
                     "view":SignedTransactionView::from(tx.clone())}))
             })
@@ -609,7 +611,7 @@ fn encode_state(request: &Value) -> Result<Value> {
 /// Deterministic synthetic signers make local transaction fixtures reproducible.
 /// The adapter never submits anything to a network.
 fn sign_transactions(request: &Value) -> Result<Value> {
-    let input = object(request, &["signerId", "seed", "transactions"])?;
+    let input = object(request, &["signerId", "seed", "keyType", "transactions"])?;
     let signer_id: AccountId = field(input, "signerId")?
         .as_str()
         .ok_or("invalid signer")?
@@ -617,7 +619,13 @@ fn sign_transactions(request: &Value) -> Result<Value> {
     let seed = field(input, "seed")?
         .as_str()
         .ok_or("invalid synthetic seed")?;
-    let signer = InMemorySigner::from_seed(signer_id.clone(), KeyType::ED25519, seed);
+    let key_type = match input.get("keyType") {
+        None => KeyType::ED25519,
+        Some(Value::String(value)) if value == "ed25519" => KeyType::ED25519,
+        Some(Value::String(value)) if value == "secp256k1" => KeyType::SECP256K1,
+        Some(_) => return Err("unsupported synthetic key type".into()),
+    };
+    let signer = InMemorySigner::from_seed(signer_id.clone(), key_type, seed);
     let requests = field(input, "transactions")?
         .as_array()
         .ok_or("expected transactions array")?;
@@ -697,6 +705,7 @@ fn sign_transactions(request: &Value) -> Result<Value> {
             _ => return Err("unsupported transaction envelope tag".into()),
         };
         result.push(json!({"version":version,"borsh":borsh_bytes(&transaction)?,
+            "bodySize":transaction.get_size(), "wireSize":transaction.wire_size(),
             "actions":to_value(transaction.transaction.actions())?,
             "view":SignedTransactionView::from(transaction)}));
     }

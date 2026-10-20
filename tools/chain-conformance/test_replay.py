@@ -194,6 +194,22 @@ class ChainReplayTests(unittest.TestCase):
             self.assertEqual(missing["blocks"][0]["tokensBurnt"], "0")
             self.assertIn("catalogue", missing["blocks"][0]["issue"]["message"])
 
+    def test_unknown_signature_encoding_is_a_model_issue_without_charging(self):
+        for earlier in [[], [tx([transfer()])]]:
+            with self.subTest(earlier=bool(earlier)):
+                value = request()
+                transaction = tx([transfer()], nonce=2 if earlier else 1)
+                transaction["publicKey"] = [2] + [0] * 32
+                value["blocks"] = [block(earlier + [transaction])]
+                result = execute(value)
+                self.assertEqual(result["stop"], "executionIssue")
+                self.assertEqual(result["blocks"][0]["state"], value["initialState"])
+                self.assertEqual(result["blocks"][0]["tokensBurnt"], "0")
+                self.assertEqual(result["blocks"][0]["outcomes"], [])
+                self.assertEqual(result["blocks"][0]["outgoingReceipts"], [])
+                self.assertIsNone(result["blocks"][0]["transactionSizes"][-1]["wireSize"])
+                self.assertIn("signature/key encoding", result["blocks"][0]["issue"]["message"])
+
     def test_malformed_inputs_fail_without_a_trace(self):
         changes = [
             lambda v: v.update(extra=True), lambda v: v.pop("blocks"),

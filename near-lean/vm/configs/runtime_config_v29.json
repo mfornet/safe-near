@@ -278,6 +278,7 @@
   },
   "runtime_admission": {
     "strict_nonce": false,
+    "transaction_size_includes_signature": false,
     "v1_transactions": false
   }
 }
