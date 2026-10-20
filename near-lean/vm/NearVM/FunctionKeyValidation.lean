@@ -59,6 +59,6 @@ theorem preInvokeError_functionKey_valid (st : Store NearState) (args : List Val
   unfold preInvokeError at h
   cases he : invocationArgumentError "promise_batch_action_add_key_with_function_call" st args with
   | some error => simp [he] at h
-  | none => simpa [invocationArgumentError] using he
+  | none => simpa [invocationArgumentError, storageMutationPlan?] using he
 
 end Wasm.Near

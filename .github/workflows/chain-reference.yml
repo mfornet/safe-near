@@ -1,0 +1,154 @@
+name: Chain reference smoke
+
+# Expensive validation is opt-in. Run `just periodic-check <nearcore>` locally.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chain-reference-${{ github.head_ref || github.ref_name }}
+  # Let one cold native build finish and save its cache across rapid PR pushes.
+  cancel-in-progress: false
+
+jobs:
+  native-reference:
+    name: Build pinned Runtime::apply and verify raw-state replay
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      CARGO_BUILD_JOBS: "2"
+      CARGO_PROFILE_DEV_DEBUG: "0"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - uses: dtolnay/rust-toolchain@1.93.0
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            tools/chain-conformance/.nearcore
+          key: chain-reference-${{ runner.os }}-${{ hashFiles('near-lean/runtime/reference.json') }}
+      - name: Check source custody and interrupted-build recovery
+        run: python3 -m unittest discover -s tools/tests -p test_chain_reference.py -v
+      - name: Build the clean source oracle
+        run: python3 tools/chain-conformance/prepare.py
+      - name: Verify native chunk boundaries and complete raw-state replay
+        run: python3 tools/chain-conformance/probe.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-chain-reference-evidence
+          path: |
+            audit/chain-reference-smoke.json
+            tools/chain-conformance/target/*.build.json
+            tools/chain-conformance/target/near-apply-reference
+
+  financial-regression:
+    name: Financial comparison and snapshot import
+    needs: native-reference
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/cache@v5
+        with:
+          path: near-lean/.lake/packages
+          key: chain-finance-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'near-lean/*/lake-manifest.json') }}
+      - uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: near-lean/chain
+          build-args: chain-replay registered-replay
+          use-mathlib-cache: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-chain-reference-evidence
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-tools@1.251.0
+      - name: Compare represented financial observations
+        run: |
+          chmod +x tools/chain-conformance/target/near-apply-reference
+          python3 tools/chain-conformance/gas_probe.py
+      - name: Check complete captured-state imports and deterministic signing
+        run: python3 tools/chain-conformance/test_snapshot_import.py
+      - name: Compare contract calls and callback delivery against native apply
+        run: python3 tools/chain-conformance/test_contract_comparison.py
+      - name: Compare signed V0/V1 transaction batches and protocol gates
+        run: python3 tools/chain-conformance/test_transaction_versions.py
+      - name: Compare administrative actions and structured failures
+        run: python3 tools/chain-conformance/test_action_comparison.py
+      - name: Compare function-call access-key admission and failure precedence
+        run: python3 tools/chain-conformance/test_permission_comparison.py
+      - name: Compare stateless action rules and deployment-byte binding
+        run: python3 tools/chain-conformance/test_action_validation.py
+      - name: Compare native transaction sizes and signature-width gates
+        run: python3 tools/chain-conformance/test_transaction_size.py
+      - name: Compare compressed staking keys and native subgroup eligibility
+        run: |
+          cd near-lean/runtime && lake build staking-key-replay
+          cd ../.. && python3 tools/chain-conformance/test_staking_key.py
+      - name: Compare canonical trie witnesses and accounting-cache access paths
+        run: |
+          cd near-lean/runtime && lake build trie-replay --wfail
+          cd ../.. && python3 tools/chain-conformance/test_trie_accounting.py
+          python3 tools/chain-conformance/test_trie_updates.py
+      - name: Compare typed model state encoding and canonical genesis roots
+        run: |
+          cd near-lean/chain && lake build state-encode --wfail
+          cd ../.. && python3 tools/chain-conformance/test_state_encoding.py
+      - name: Compare receipt encoding and independently derived runtime identities
+        run: |
+          cd near-lean/chain && lake build receipt-encode chain-replay --wfail
+          cd ../.. && python3 tools/chain-conformance/test_receipt_encoding.py
+      - name: Compare typed queue state and persisted runtime receipt wrappers
+        run: |
+          cd near-lean/chain && lake build state-encode receipt-encode chain-replay --wfail
+          cd ../.. && python3 tools/chain-conformance/test_queue_encoding.py
+      - name: Compare typed transaction hashes and automatic transaction receipt registration
+        run: |
+          cd near-lean/chain && lake build transaction-replay state-encode chain-replay --wfail
+          cd ../.. && python3 tools/chain-conformance/test_transaction_encoding.py
+      - name: Compare existing delayed FIFO with new local and incoming deferrals
+        run: python3 tools/chain-conformance/test_delayed_local_order.py
+      - name: Compare automatic runtime identity and persistent queue registration
+        run: |
+          cd near-lean/chain && lake build registered-replay chain-replay --wfail
+          cd ../.. && python3 tools/chain-conformance/test_receipt_registry.py
+      - name: Compare default registered fixtures and executor custody
+        run: python3 tools/chain-conformance/test_registered_comparison.py
+      - name: Compare native action-derived VM randomness
+        run: python3 tools/chain-conformance/test_action_randomness.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: transfer-creation-gas-evidence
+          path: |
+            audit/transfer-gas-regression.json
+            audit/contract-chain-regressions.json
+            audit/transaction-version-comparison.json
+            audit/action-chain-regressions.json
+            audit/permission-chain-regressions.json
+            audit/action-validation-regressions.json
+            audit/transaction-size-regressions.json
+            audit/transaction-size-cases/*.json
+            audit/staking-key-regressions.json
+            audit/trie-accounting-regressions.json
+            audit/trie-update-regressions.json
+            audit/state-encoding-regressions.json
+            audit/receipt-encoding-regressions.json
+            audit/runtime-identity-regressions.json
+            audit/queue-encoding-regressions.json
+            audit/runtime-queue-encoding-regressions.json
+            audit/transaction-encoding-regressions.json
+            audit/transaction-registry-regressions.json
+            audit/delayed-local-order-regressions.json
+            audit/receipt-registry-regressions.json
+            audit/receipt-registry-queues.json
+            audit/receipt-registry-fifo.json
+            audit/action-randomness-regressions.json
+            audit/default-registered-comparison.json

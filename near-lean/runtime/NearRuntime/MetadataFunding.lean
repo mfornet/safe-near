@@ -26,17 +26,23 @@ theorem ChainState.totalBalance_metadata (st : ChainState) (id : AccountId) (old
 metadata accounting instead of expanding the whole action interpreter. -/
 theorem applyDeployContract_run (c : ReceiptCtx) (isLast : Bool) (code : ContractCode) (before : Exec) :
     (applyAction c isLast (.deployContract code)).run.run before =
-      match before.state.account? c.receipt.receiverId with
-      | none => (.error (.accountDoesNotExist c.receipt.receiverId), before)
-      | some account =>
-        if code.size > c.cfg.wasm.limits.maxContractSize then
-          (.error (.contractSizeExceeded code.size c.cfg.wasm.limits.maxContractSize), before)
-        else (.ok (), { before with state := before.state.setAccount c.receipt.receiverId { account with code := some code, storageUsage := account.storageUsage + code.size - (account.code.map (·.size)).getD 0 } }) := by
-  cases ha : before.state.account? c.receipt.receiverId with
-  | none => simp [-ExceptT.run_bind, -StateT.run_bind, applyAction, getAccount, getState, ha]
-  | some account =>
-    by_cases hs : code.size > c.cfg.wasm.limits.maxContractSize <;>
-      simp [-ExceptT.run_bind, -StateT.run_bind, applyAction, getAccount, getState, putAccount, modifyState, ha, hs]
+      match code.decodeIssue with
+      | some issue => (.error (.executionIssue issue), before)
+      | none =>
+        match before.state.account? c.receipt.receiverId with
+        | none => (.error (.accountDoesNotExist c.receipt.receiverId), before)
+        | some account =>
+          if code.size > c.cfg.wasm.limits.maxContractSize then
+            (.error (.contractSizeExceeded code.size c.cfg.wasm.limits.maxContractSize), before)
+          else (.ok (), { before with state := before.state.setAccount c.receipt.receiverId { account with code := some code, storageUsage := account.storageUsage + code.size - (account.code.map (·.size)).getD 0 } }) := by
+  cases hd : code.decodeIssue with
+  | some issue => simp [-StateT.run_bind, applyAction, hd]
+  | none =>
+    cases ha : before.state.account? c.receipt.receiverId with
+    | none => simp [-StateT.run_bind, applyAction, hd, getAccount, getState, ha]
+    | some account =>
+      by_cases hs : code.size > c.cfg.wasm.limits.maxContractSize <;>
+        simp [-StateT.run_bind, applyAction, hd, getAccount, getState, putAccount, modifyState, ha, hs]
 
 /-- Deployment changes code/storage metadata, with no balance or gas side
 channel. Fees are charged separately by `runReceiptAction`. -/
@@ -44,27 +50,34 @@ theorem funded_deployContract (c : ReceiptCtx) (isLast : Bool) (code : ContractC
     (applyAction c isLast (.deployContract code)).Funded c.cfg c.action.gasPrice 0 := by
   intro before after value hwf hrun
   rw [applyDeployContract_run] at hrun
-  cases ha : before.state.account? c.receipt.receiverId with
-  | none =>
-    simp only [ha] at hrun
+  cases hd : code.decodeIssue with
+  | some issue =>
+    simp only [hd] at hrun
     have hbad := congrArg Prod.fst hrun
     cases hbad
-  | some account =>
-    simp only [ha] at hrun
-    split at hrun
-    · have hbad := congrArg Prod.fst hrun; cases hbad
-    · have he := congrArg Prod.snd hrun
-      dsimp only at he
-      subst after
-      refine ⟨hwf.setAccount _ _, Exec.FundingStep.of_fields c.cfg c.action.gasPrice before _ ?_ rfl rfl rfl⟩
-      unfold Exec.totalFunds
-      dsimp only
-      congr 1
-      apply ChainState.totalBalance_metadata _ _ account
-      · exact hwf
-      · exact ha
-      · rfl
-      · rfl
+  | none =>
+    simp only [hd] at hrun
+    cases ha : before.state.account? c.receipt.receiverId with
+    | none =>
+      simp only [ha] at hrun
+      have hbad := congrArg Prod.fst hrun
+      cases hbad
+    | some account =>
+      simp only [ha] at hrun
+      split at hrun
+      · have hbad := congrArg Prod.fst hrun; cases hbad
+      · have he := congrArg Prod.snd hrun
+        dsimp only at he
+        subst after
+        refine ⟨hwf.setAccount _ _, Exec.FundingStep.of_fields c.cfg c.action.gasPrice before _ ?_ rfl rfl rfl⟩
+        unfold Exec.totalFunds
+        dsimp only
+        congr 1
+        apply ChainState.totalBalance_metadata _ _ account
+        · exact hwf
+        · exact ha
+        · rfl
+        · rfl
 
 /-- Success-state accounting for an action that changes only chain metadata. -/
 theorem metadata_return_funded (cfg : RuntimeConfig) (price : Nat) (before after : Exec)
@@ -80,7 +93,7 @@ theorem metadata_return_funded (cfg : RuntimeConfig) (price : Nat) (before after
 
 def addKeyMetadataState (c : ReceiptCtx) (st : ChainState) (account : Account) (pk : PublicKey) (key : AccessKey) : ChainState :=
   let updated := { account with storageUsage := account.storageUsage + accessKeyStorageBytes pk key + c.cfg.fees.numExtraBytesRecord }
-  (st.setAccount c.receipt.receiverId updated).setAccessKey c.receipt.receiverId pk key
+  (st.setAccount c.receipt.receiverId updated).setAccessKey c.receipt.receiverId pk { key with nonce := initialNonce c.ap.blockHeight }
 
 def deleteKeyMetadataState (c : ReceiptCtx) (st : ChainState) (account : Account) (pk : PublicKey) (key : AccessKey) : ChainState :=
   let updated := { account with storageUsage := account.storageUsage - (accessKeyStorageBytes pk key + c.cfg.fees.numExtraBytesRecord) }
@@ -91,27 +104,27 @@ account admission checks, and preserves every execution counter. -/
 theorem applyAddKey_run (c : ReceiptCtx) (isLast : Bool) (pk : PublicKey) (key : AccessKey) (before : Exec) :
     (applyAction c isLast (.addKey pk key)).run.run before =
       if (before.state.accessKey? c.receipt.receiverId pk).isSome then
-        (.error (.addKeyAlreadyExists c.receipt.receiverId), before)
+        (.error (.addKeyAlreadyExists c.receipt.receiverId pk), before)
       else match before.state.account? c.receipt.receiverId with
         | none => (.error (.accountDoesNotExist c.receipt.receiverId), before)
         | some account => (.ok (), { before with state := addKeyMetadataState c before.state account pk key }) := by
   by_cases hk : (before.state.accessKey? c.receipt.receiverId pk).isSome = true
-  · simp [-ExceptT.run_bind, -StateT.run_bind, applyAction, getState, hk]
+  · simp [-StateT.run_bind, applyAction, getState, hk]
   · cases ha : before.state.account? c.receipt.receiverId <;>
-      simp [-ExceptT.run_bind, -StateT.run_bind, applyAction, getAccount, getState, putAccount, modifyState, hk, ha, addKeyMetadataState]
+      simp [-StateT.run_bind, applyAction, getAccount, getState, putAccount, modifyState, hk, ha, addKeyMetadataState]
 
 theorem applyDeleteKey_run (c : ReceiptCtx) (isLast : Bool) (pk : PublicKey) (before : Exec) :
     (applyAction c isLast (.deleteKey pk)).run.run before =
       match before.state.accessKey? c.receipt.receiverId pk with
-      | none => (.error (.deleteKeyDoesNotExist c.receipt.receiverId), before)
+      | none => (.error (.deleteKeyDoesNotExist c.receipt.receiverId pk), before)
       | some key => match before.state.account? c.receipt.receiverId with
         | none => (.error (.accountDoesNotExist c.receipt.receiverId), before)
         | some account => (.ok (), { before with state := deleteKeyMetadataState c before.state account pk key }) := by
   cases hk : before.state.accessKey? c.receipt.receiverId pk with
-  | none => simp [-ExceptT.run_bind, -StateT.run_bind, applyAction, getState, hk]
+  | none => simp [-StateT.run_bind, applyAction, getState, hk]
   | some key =>
     cases ha : before.state.account? c.receipt.receiverId <;>
-      simp [-ExceptT.run_bind, -StateT.run_bind, applyAction, getAccount, getState, putAccount, modifyState, hk, ha, deleteKeyMetadataState]
+      simp [-StateT.run_bind, applyAction, getAccount, getState, putAccount, modifyState, hk, ha, deleteKeyMetadataState]
 
 theorem funded_addKey (c : ReceiptCtx) (isLast : Bool) (pk : PublicKey) (key : AccessKey) :
     (applyAction c isLast (.addKey pk key)).Funded c.cfg c.action.gasPrice 0 := by

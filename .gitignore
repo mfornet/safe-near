@@ -13,3 +13,6 @@ near-lean/programs/rust/target/
 
 # axiom audit reports
 audit/
+
+# Validated syntax-formatting results (one cache per Lake package).
+.lean-fmt-cache/

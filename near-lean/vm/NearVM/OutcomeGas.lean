@@ -21,7 +21,7 @@ theorem failedBefore_gas_bounded (ctx : VMContext) (storage : List (Bytes × Byt
 theorem graphIssue_gas_bounded (outcome : VMOutcome) (balance usage : Nat) (storage : List (Bytes × Bytes))
     (prepaid maxBurnt : Nat) (h : outcome.GasBounded prepaid maxBurnt) :
     (outcome.graphIssue balance usage storage).GasBounded prepaid maxBurnt :=
-  ⟨Nat.le_refl _, h.1.trans h.2.1, h.2.2⟩
+  ⟨Nat.le_refl _, Nat.le_trans h.1 h.2.1, h.2.2⟩
 
 theorem checkReceipts_gas_bounded (outcome : VMOutcome) (balance usage : Nat) (storage : List (Bytes × Bytes))
     (prepaid maxBurnt : Nat) (h : outcome.GasBounded prepaid maxBurnt) :
@@ -40,7 +40,7 @@ theorem outcomeOfExecution_gas_bounded (ctx : VMContext) (storage : List (Bytes 
   unfold outcomeOfExecution
   dsimp only
   split
-  · exact ⟨Nat.le_refl _, h.1.trans h.2.1, h.2.2⟩
+  · exact ⟨Nat.le_refl _, Nat.le_trans h.1 h.2.1, h.2.2⟩
   · split
     · exact graphIssue_gas_bounded _ _ _ _ _ _ h
     · split
@@ -64,13 +64,13 @@ theorem runInitialized_gas_bounded (cfg : WasmConfig) (fuel : Nat) (config : Sma
       (by
         intro current n h
         have hl := chargeWasm_gas_limits current n
-        exact ⟨hl.1.trans h.1, hl.2.trans h.2⟩) config cost hlimits
+        exact ⟨Eq.trans hl.1 h.1, Eq.trans hl.2 h.2⟩) config cost hlimits
     have hb := chargeWasm_gas_bounded config cost
     rw [hc] at hp hb
     cases error with
     | some error =>
-      exact ⟨Nat.le_add_right _ _, hb.2.trans (Nat.le_of_eq hp.2.1),
-        hb.1.trans (Nat.le_of_eq hp.2.2)⟩
+      exact ⟨Nat.le_add_right _ _, Nat.le_trans hb.2 (Nat.le_of_eq hp.2.1),
+        Nat.le_trans hb.1 (Nat.le_of_eq hp.2.2)⟩
     | none =>
       have hfinal := runMetered_fixed_budget cfg fuel paid prepaid maxBurnt hp hb
       exact ⟨Nat.le_add_right _ _, hfinal.2, hfinal.1⟩
@@ -103,8 +103,8 @@ theorem runAttempt_gas_bounded (cfg : RuntimeConfig) (code : Module) (codeSize :
     | mk host loadError =>
       have hg := loading_gas_bounds cfg ctx storage codeSize host loadError hload
       have hp : host.gas.burnt ≤ ctx.prepaidGas :=
-        (Nat.le_add_right _ _).trans (hg.2.2.trans (Nat.le_of_eq hg.1.1))
-      have hm : host.gas.burnt ≤ ctx.gasBurnLimit cfg := hg.2.1.trans (Nat.le_of_eq hg.1.2)
+        Nat.le_trans (Nat.le_add_right _ _) (Nat.le_trans hg.2.2 (Nat.le_of_eq hg.1.1))
+      have hm : host.gas.burnt ≤ ctx.gasBurnLimit cfg := Nat.le_trans hg.2.1 (Nat.le_of_eq hg.1.2)
       dsimp only
       cases loadError with
       | some error => exact failedBefore_gas_bounded _ _ _ _ _ _ _ hp hm
@@ -164,6 +164,6 @@ theorem run_burntGas_le_prepaid (cfg : RuntimeConfig) (code : Module) (codeSize 
     (ctx : VMContext) (storage : List (Bytes × Bytes)) (fuel : Nat) :
     (run cfg code codeSize method ctx storage fuel).burntGas ≤ ctx.prepaidGas := by
   have h := run_gas_bounded cfg code codeSize method ctx storage fuel
-  exact h.1.trans h.2.1
+  exact Nat.le_trans h.1 h.2.1
 
 end Wasm.Near

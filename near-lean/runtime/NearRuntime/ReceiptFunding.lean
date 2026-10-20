@@ -1,4 +1,5 @@
 import NearRuntime.ActionFunding
+import NearRuntime.RefundReceiptInvariants
 
 namespace Near
 open Wasm.Near
@@ -17,7 +18,7 @@ theorem finalizeReceipt_success_trace (c : ReceiptCtx) (st : ChainState) (raw : 
       (raw.gasBurnt, raw.gasUsed, raw.gasBurntForFunctionCall, raw.logs, raw.subsidizedAmount,
         if c.receipt.isRefund then 0 else (successSettlement c st raw).tokensBurnt, 0) := by
   unfold finalizeReceipt
-  simp only [setResult_trace, addFailureData_trace, creditReceiptReward_trace,
+  simp only [setResult_trace, addFailureData_trace, addCompletionData_trace, creditReceiptReward_trace,
     ite_trace, addBalanceRefund_trace, addGasRefund_trace, ite_self]
   simp [rollbackReceipt, Exec.finalizationTrace, successSettlement]
 
@@ -47,11 +48,13 @@ theorem finalizeReceipt_success_funds (c : ReceiptCtx) (st : ChainState) (raw : 
   rw [hg] at hr
   have hrefund : c.receipt.isRefund = false := by simp [Receipt.isRefund, hpred]
   let rewarded := gas.creditReceiptReward c.cfg c.receipt.receiverId settlement.burnPrice c.action.gasPrice
+  let data := rewarded.addCompletionData c.receipt.receiverId c.action.outputDataReceivers
   have hf : finalizeReceipt c st raw none =
-      { rewarded with result := some (rewarded.result.getD (.successValue [])) } := by
-    simp [finalizeReceipt, rollbackReceipt, hrefund, hsigner, base, gas, settlement, rewarded, successSettlement]
+      { data with result := some (data.result.getD (.successValue [])) } := by
+    simp [finalizeReceipt, rollbackReceipt, hrefund, hsigner, base, gas, settlement, rewarded, data, successSettlement]
   rw [hf]
-  exact hr
+  change data.totalFunds c.cfg = raw.totalFunds c.cfg + settlement.refund + data.reward
+  simpa only [data, addCompletionData_totalFunds, addCompletionData_reward] using hr
 
 /-- Funded ordinary receipts conserve the complete incoming
 ledger, outgoing receipt backing, explicit subsidy, gross gas burn and receiver
@@ -106,7 +109,7 @@ theorem finalizeReceipt_success_reward_le (c : ReceiptCtx) (st : ChainState) (ra
       raw.receiptRewardAmount c.cfg (successSettlement c st raw).burnPrice c.action.gasPrice := by
   unfold finalizeReceipt
   dsimp only
-  simp only [Option.isSome_none, Bool.false_eq_true, ite_false]
+  simp only [Option.isSome_none, Bool.false_eq_true, ite_false, addCompletionData_reward]
   apply (creditReceiptReward_reward_le _ _ _ _ _).trans
   simp only [ite_rewardAmount, addGasRefund_rewardAmount, addBalanceRefund_rewardAmount, ite_self]
   rfl

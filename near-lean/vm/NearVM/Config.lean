@@ -23,6 +23,7 @@ structure LimitConfig where
   maxNumberLogs : Nat
   maxTotalLogLength : Nat
   maxTotalPrepaidGas : Nat
+  maxDeployActionsPerReceipt : Nat
   maxActionsPerReceipt : Nat
   maxNumberBytesMethodNames : Nat
   maxLengthMethodName : Nat
@@ -58,7 +59,7 @@ structure WasmConfig where
 /-- `near_parameters::RuntimeFeesConfig`. -/
 structure FeesConfig where
   actionFees : ActionFees
-  /-- Fraction of burnt gas paid to the validator, as (numerator, denominator). -/
+  /-- Fraction of burnt gas paid to the contract, as (numerator, denominator). -/
   burntGasReward : Nat × Nat
   gasRefundPenalty : Nat × Nat := (0, 1)
   minGasRefundPenalty : Nat := 0
@@ -74,6 +75,8 @@ structure AccountCreationConfig where
 
 structure RuntimeConfig where
   strictNonceEnabled : Bool := false
+  v1TransactionsEnabled : Bool := false
+  transactionSizeIncludesSignature : Bool := false
   accountCostIncrease : Bool := true
   minGasPurchasePrice : Nat := 0
   accountCreationCharge : Nat := 0
@@ -128,6 +131,7 @@ private def limits (j : Json) : Except String LimitConfig := do
     maxNumberLogs := ← nat j "max_number_logs"
     maxTotalLogLength := ← nat j "max_total_log_length"
     maxTotalPrepaidGas := ← nat j "max_total_prepaid_gas"
+    maxDeployActionsPerReceipt := ← nat j "max_deploy_actions_per_receipt"
     maxActionsPerReceipt := ← nat j "max_actions_per_receipt"
     maxNumberBytesMethodNames := ← nat j "max_number_bytes_method_names"
     maxLengthMethodName := ← nat j "max_length_method_name"
@@ -185,6 +189,8 @@ def ofJson (j : Json) : Except String RuntimeConfig := do
   let finance ← field j "runtime_finance"
   pure {
     strictNonceEnabled := ← (← field (← field j "runtime_admission") "strict_nonce").getBool?
+    v1TransactionsEnabled := ← (← field (← field j "runtime_admission") "v1_transactions").getBool?
+    transactionSizeIncludesSignature := ← (← field (← field j "runtime_admission") "transaction_size_includes_signature").getBool?
     accountCostIncrease := ← (← field finance "account_cost_increase").getBool?
     minGasPurchasePrice := ← natString j "min_gas_purchase_price"
     accountCreationCharge := ← natString j "account_creation_charge"

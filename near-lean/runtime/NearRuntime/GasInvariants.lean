@@ -102,9 +102,8 @@ theorem recordVMOutcome_gasDelta (before : Exec) (outcome : VMOutcome) (budget :
   constructor <;> dsimp only [Exec.recordVMOutcome] <;> omega
 
 /-- State, storage and promise materialization have no gas effects. -/
-theorem commitFunctionCall_gasDelta (before : Exec) (c : ReceiptCtx) (account : Account)
-    (outcome : VMOutcome) (isLast : Bool) :
-    GasDelta 0 before (before.commitFunctionCall c account outcome isLast) :=
+theorem commitFunctionCall_gasDelta (before : Exec) (outcome : VMOutcome) (effects : FunctionCallEffects) :
+    GasDelta 0 before (before.commitFunctionCall outcome effects) :=
   GasDelta.of_fields _ _ _ rfl rfl rfl
 
 /-- A small executable unfolding rule, keeping VM execution abstract. -/
@@ -115,22 +114,32 @@ theorem applyFunctionCall_run (c : ReceiptCtx) (method : String) (args : Bytes) 
       | none => (.error (.accountDoesNotExist c.receipt.receiverId), before)
       | some account => match account.code with
         | none => (.error (.functionCallError (.compilationError "CodeDoesNotExist")), before)
-        | some code =>
+        | some code => match code.decodeIssue with
+          | some issue => (.error (.executionIssue issue), before)
+          | none =>
           let outcome := run c.cfg code.module code.size method
             (functionCallContext c account args gas deposit isLast) (before.state.contractStorage c.receipt.receiverId)
           let charged := before.recordVMOutcome outcome
           match outcome.aborted with
           | some error => (.error (.functionCallError error), charged)
-          | none => (.ok (), charged.commitFunctionCall c account outcome isLast) := by
+          | none => match functionCallEffects c account outcome isLast before.state with
+            | .error error => (.error error, charged)
+            | .ok effects => (.ok (), charged.commitFunctionCall outcome effects) := by
   cases ha : before.state.account? c.receipt.receiverId with
-  | none => simp [-ExceptT.run_bind, -StateT.run_bind, applyFunctionCall, getAccount, getState, ha]
+  | none => simp [-StateT.run_bind, applyFunctionCall, getAccount, getState, ha]
   | some account =>
     cases hc : account.code with
-    | none => simp [-ExceptT.run_bind, -StateT.run_bind, applyFunctionCall, getAccount, getState, ha, hc]
+    | none => simp [-StateT.run_bind, applyFunctionCall, getAccount, getState, ha, hc]
     | some code =>
-      cases he : (run c.cfg code.module code.size method (functionCallContext c account args gas deposit isLast)
-        (before.state.contractStorage c.receipt.receiverId)).aborted <;>
-        simp [-ExceptT.run_bind, -StateT.run_bind, applyFunctionCall, getAccount, getState, ha, hc, he]
+      cases hi : code.decodeIssue with
+      | some issue => simp [-StateT.run_bind, applyFunctionCall, getAccount, getState, ha, hc, hi]
+      | none =>
+        cases he : (run c.cfg code.module code.size method (functionCallContext c account args gas deposit isLast)
+          (before.state.contractStorage c.receipt.receiverId)).aborted <;>
+          cases hf : functionCallEffects c account
+            (run c.cfg code.module code.size method (functionCallContext c account args gas deposit isLast)
+              (before.state.contractStorage c.receipt.receiverId)) isLast before.state <;>
+          simp [-StateT.run_bind, applyFunctionCall, getAccount, getState, ha, hc, hi, he, hf]
 
 /-- Each function-call action spends at most its own attached gas, on every exit. -/
 theorem applyFunctionCall_gasBound (c : ReceiptCtx) (method : String) (args : Bytes) (gas deposit : Nat)
@@ -143,13 +152,17 @@ theorem applyFunctionCall_gasBound (c : ReceiptCtx) (method : String) (args : By
     split
     · exact GasDelta.of_fields _ _ _ rfl rfl rfl
     · rename_i code hcode
-      have hv := run_gas_bounded c.cfg code.module code.size method
-        (functionCallContext c account args gas deposit isLast) (before.state.contractStorage c.receipt.receiverId) defaultFuel
-      have hc := recordVMOutcome_gasDelta before _ gas hv.1 hv.2.1
-      dsimp only
       split
-      · exact hc
-      · simpa only [Nat.add_zero] using hc.trans (commitFunctionCall_gasDelta _ _ _ _ _)
+      · exact GasDelta.of_fields _ _ _ rfl rfl rfl
+      · have hv := run_gas_bounded c.cfg code.module code.size method
+          (functionCallContext c account args gas deposit isLast) (before.state.contractStorage c.receipt.receiverId) defaultFuel
+        have hc := recordVMOutcome_gasDelta before _ gas hv.1 hv.2.1
+        dsimp only
+        split
+        · exact hc
+        · split
+          · exact hc
+          · simpa only [Nat.add_zero] using hc.trans (commitFunctionCall_gasDelta _ _ _)
 
 theorem gasBound_bind_zero {operation : ExecM α} {next : α → ExecM β}
     (hfirst : operation.GasBound 0) (hnext : ∀ value, (next value).GasBound 0) :
@@ -235,13 +248,9 @@ theorem gasBound_checkStorageStake (cfg : RuntimeConfig) (id : AccountId) :
     | split
     | (dsimp only; split))
 
-/-- Skipped system fees can only reduce the uniform budget. -/
+/-- Recorded execution fees fit the same uniform receipt gas budget. -/
 theorem gasBound_fee (isRefund : Bool) (fee : Nat) :
-    (chargeReceiptFee isRefund fee).GasBound fee := by
-  unfold chargeReceiptFee
-  split
-  · exact (gasBound_pure ()).mono (Nat.zero_le _)
-  · exact gasBound_burnGas _
+    (chargeReceiptFee isRefund fee).GasBound fee := gasBound_burnGas fee
 
 /-- One action is backed by its protocol execution fee and attached gas. -/
 theorem runReceiptAction_gasBound (c : ReceiptCtx) (onlyAction isLast : Bool) (action : Action) :
@@ -252,15 +261,28 @@ theorem runReceiptAction_gasBound (c : ReceiptCtx) (onlyAction isLast : Bool) (a
   exact gasBound_bind_left_zero (gasBound_checkReceiptAction c onlyAction action)
     (fun _ => applyAction_gasBound c isLast action)
 
+/-- Changing only VM randomness leaves the purchased gas bound unchanged;
+invalid exact context returns a model issue without spending gas. -/
+theorem runReceiptActionAt_gasBound (c : ReceiptCtx) (onlyAction isLast : Bool) (action : Action) (index : Nat) :
+    (runReceiptActionAt c onlyAction isLast action index).GasBound
+      (Fees.exec c.cfg.fees.actionFees c.cfg.wasm.ethImplicitAccounts c.receipt.receiverId action + action.attachedGas) := by
+  cases action <;> try exact runReceiptAction_gasBound c onlyAction isLast _
+  cases he : actionRandomSeed c index <;> simp only [runReceiptActionAt, he]
+  · exact (gasBound_throw _).mono (Nat.zero_le _)
+  · exact runReceiptAction_gasBound _ onlyAction isLast _
+
 /-- The ordered action list consumes at most the sum of its individual budgets,
 including an early error that stops the remaining actions. -/
-theorem runReceiptActionList_gasBound (c : ReceiptCtx) (onlyAction : Bool) (actions : List Action) :
-    (runReceiptActionList c onlyAction actions).GasBound
+theorem runReceiptActionList_gasBound (c : ReceiptCtx) (onlyAction : Bool) (actions : List Action) (index : Nat) :
+    (runReceiptActionList c onlyAction actions index).GasBound
       (Fees.totalExec c.cfg.fees.actionFees c.cfg.wasm.ethImplicitAccounts c.receipt.receiverId actions + Fees.totalPrepaid actions) := by
-  induction actions with
+  induction actions generalizing index with
   | nil => exact gasBound_pure _
   | cons action rest ih =>
-    have h := (runReceiptAction_gasBound c onlyAction rest.isEmpty action).bind (fun _ => ih)
+    have hm : (modify fun e : Exec => { e with failureIndex := some index } : ExecM Unit).GasBound 0 :=
+      gasBound_modify _ _ (fun _ => GasDelta.of_fields _ _ _ rfl rfl rfl)
+    have h := gasBound_bind_left_zero hm (fun _ =>
+      (runReceiptActionAt_gasBound c onlyAction rest.isEmpty action index).bind (fun _ => ih (index + 1)))
     simpa [runReceiptActionList, Fees.totalExec, Fees.totalPrepaid, Nat.add_assoc, Nat.add_left_comm, Nat.add_comm] using h
 
 /-- The complete executable action attempt fits the purchased receipt budget. -/
@@ -269,8 +291,11 @@ theorem receiptActionBody_gasBound (c : ReceiptCtx) :
   unfold receiptActionBody Fees.receiptGasBudget
   rw [Nat.add_assoc]
   refine ExecM.GasBound.bind (gasBound_fee _ _) (fun _ => ?_)
-  have h := (runReceiptActionList_gasBound c (c.action.actions.length == 1) c.action.actions).bind
-    (fun _ => gasBound_checkStorageStake c.cfg c.receipt.receiverId)
+  have h := (runReceiptActionList_gasBound c (c.action.actions.length == 1) c.action.actions 0).bind
+    (fun _ => gasBound_bind_left_zero
+      (gasBound_modify (fun e : Exec => { e with failureIndex := none }) 0
+        (fun _ => GasDelta.of_fields _ _ _ rfl rfl rfl))
+      (fun _ => gasBound_checkStorageStake c.cfg c.receipt.receiverId))
   simpa only [Nat.add_zero] using h
 
 /-- Gas premises for receipt accounting follow from execution, for every action

@@ -42,11 +42,11 @@ theorem ChainState.IdsBelowNext.freshId {st : ChainState} (h : st.IdsBelowNext) 
 references. Its emitted receipts are a separate output of this pass. -/
 theorem materializeFunctionCall_idsBelowNext (c : ReceiptCtx) (isLast : Bool) (outcome : VMOutcome)
     (initial : ChainState) (h : initial.IdsBelowNext) :
-    (materializeFunctionCall c isLast outcome initial).state.IdsBelowNext := by
+    (materializeFunctionCallRaw c isLast outcome initial).state.IdsBelowNext := by
   apply h.of_frame
-  · have hf := congrArg ChainState.liveIds (materializeFunctionCall_frame c isLast outcome initial)
+  · have hf := congrArg ChainState.liveIds (materializeFunctionCallRaw_frame c isLast outcome initial)
     exact hf
-  · rw [materializeFunctionCall_nextId]
+  · rw [materializeFunctionCallRaw_nextId]
     omega
 
 /-- Successful transaction conversion preserves every old routing reference. -/

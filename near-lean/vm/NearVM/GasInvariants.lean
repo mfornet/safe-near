@@ -15,8 +15,8 @@ theorem deduct_bounded (g : GasCounter) (burn use : Nat) : (g.deduct burn use).1
   · rename_i h
     exact h
   · constructor
-    · exact (Nat.min_le_right _ _).trans (Nat.min_le_right _ _)
-    · exact (Nat.min_le_right _ _).trans (Nat.min_le_left _ _)
+    · exact Nat.le_trans (Nat.min_le_right _ _) (Nat.min_le_right _ _)
+    · exact Nat.le_trans (Nat.min_le_right _ _) (Nat.min_le_left _ _)
 
 @[simp] theorem deduct_limits (g : GasCounter) (burn use : Nat) :
     (g.deduct burn use).1.prepaid = g.prepaid ∧ (g.deduct burn use).1.maxBurnt = g.maxBurnt := by

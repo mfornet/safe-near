@@ -14,7 +14,21 @@ use std::process::ExitCode;
 use near_parameters::view::RuntimeConfigView;
 use near_parameters::{RuntimeConfig, RuntimeConfigStore};
 use near_primitives_core::types::ProtocolVersion;
-use near_primitives_core::version::{PROD_GENESIS_PROTOCOL_VERSION, PROTOCOL_VERSION};
+use near_primitives_core::version::{
+    ProtocolFeature, PROD_GENESIS_PROTOCOL_VERSION, PROTOCOL_VERSION,
+};
+use serde::Serialize;
+use serde_json::{json, Value};
+
+#[derive(Serialize)]
+struct ConfigDump {
+    #[serde(flatten)]
+    view: RuntimeConfigView,
+    // RuntimeConfigView omits these execution parameters. Keep their provenance
+    // explicit instead of silently choosing zero or copying protocol constants.
+    runtime_finance: Value,
+    runtime_admission: Value,
+}
 
 fn config_json(store: &RuntimeConfigStore, version: ProtocolVersion) -> String {
     let config: &RuntimeConfig = store.get_config(version);
@@ -22,29 +36,20 @@ fn config_json(store: &RuntimeConfigStore, version: ProtocolVersion) -> String {
     // `near-parameters`; `RuntimeConfigView` is the JSON-stable representation
     // used by the `EXPERIMENTAL_protocol_config` RPC.
     let view = RuntimeConfigView::from(config.clone());
-    let json =
-        serde_json::to_string_pretty(&view).expect("RuntimeConfigView serialization cannot fail");
-    // The RPC view omits the refund parameters needed for exact token accounting.
-    let finance = serde_json::json!({
-        "account_cost_increase": near_primitives_core::version::ProtocolFeature::AccountCostIncrease.enabled(version),
-        "gas_refund_penalty": [*config.fees.gas_refund_penalty.numer(), *config.fees.gas_refund_penalty.denom()],
-        "min_gas_refund_penalty": config.fees.min_gas_refund_penalty.as_gas(),
-    });
-    let finance = serde_json::to_string_pretty(&finance)
-        .unwrap()
-        .replace('\n', "\n  ");
-    let admission = serde_json::json!({
-        "strict_nonce": near_primitives_core::version::ProtocolFeature::StrictNonce.enabled(version),
-    });
-    let admission = serde_json::to_string_pretty(&admission)
-        .unwrap()
-        .replace('\n', "\n  ");
-    format!(
-        "{},\n  \"runtime_finance\": {},\n  \"runtime_admission\": {}\n}}",
-        json.trim_end().strip_suffix('}').unwrap().trim_end(),
-        finance,
-        admission
-    )
+    let dump = ConfigDump {
+        view,
+        runtime_finance: json!({
+            "account_cost_increase": ProtocolFeature::AccountCostIncrease.enabled(version),
+            "gas_refund_penalty": [config.fees.gas_refund_penalty.numer(), config.fees.gas_refund_penalty.denom()],
+            "min_gas_refund_penalty": config.fees.min_gas_refund_penalty.as_gas(),
+        }),
+        runtime_admission: json!({
+            "strict_nonce": ProtocolFeature::StrictNonce.enabled(version),
+            "v1_transactions": ProtocolFeature::GasKeys.enabled(version),
+            "transaction_size_includes_signature": ProtocolFeature::PostQuantumSignatures.enabled(version),
+        }),
+    };
+    serde_json::to_string_pretty(&dump).expect("runtime configuration serialization cannot fail")
 }
 
 fn write_config(out_dir: &Path, version: ProtocolVersion, json: &str) -> std::io::Result<()> {

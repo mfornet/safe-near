@@ -1,4 +1,4 @@
-import CodeLib
+import CodeLib.Attrs
 import Interpreter.Wasm.LeanSyntax
 import Interpreter.Wasm.Decoder.Wat
 import Lean.Elab.Term
@@ -7,8 +7,10 @@ import Lean.Elab.Term
 # Support for generated Wasm modules
 
 Generated `Program.lean` files import this module rather than depending on
-interpreter internals directly. It re-exports CodeLib's proof surface together
-with compact syntax that elaborates to ordinary Wasm AST literals.
+interpreter internals directly. It provides compact syntax that elaborates to
+ordinary Wasm AST literals and the specification-link attributes. Proofs and
+specifications import their own supporting modules; decoding a test program
+does not require the Iris library or the CodeLib proof examples.
 -/
 
 namespace Wasm

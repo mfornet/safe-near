@@ -26,7 +26,16 @@ new receipts on contract failure, matching the seam exposed by `NearVM.run`.
 It preserves gas and logs. This wrapper does not execute transactions or
 schedule receipts. `MockedExternal` supplies map storage, not a real trie, so
 this is not evidence for trie costs, transaction fees, refunds, scheduling,
-epoch transitions, or historical replay.
+epoch transitions, or historical replay. It also omits the old-value byte
+charges issued by native `RuntimeExt`. `NearRuntime.functionCallContext` enables
+those charges for receipt execution; `VMContext.chargeStorageValueAccess`
+defaults to false for this mock-adapter seam.
+
+`storage_inputs_v83` through `storage_inputs_v86` add 41 exact comparisons of
+key/value read errors, length checks, discarded old-value registers and missing
+keys. They include key-limit precedence over an invalid value pointer and an
+actual 4 MiB value-limit violation. Argument validation retains only the charges
+incurred before its native failure point.
 
 ```sh
 python3 tools/runtime-conformance/compare.py

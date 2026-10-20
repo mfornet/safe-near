@@ -20,3 +20,30 @@ name = "NearChain"
 [[lean_exe]]
 name = "chain-tests"
 root = "Tests.Main"
+
+# Trusted JSON block replay for the independent runtime comparison bridge.
+[[lean_lib]]
+name = "ChainReplay"
+
+[[lean_exe]]
+name = "chain-replay"
+root = "ChainReplay.Main"
+
+# Queue-free model records to native trie bytes, root and complete object set.
+[[lean_exe]]
+name = "state-encode"
+root = "ChainReplay.StateEncoding"
+
+[[lean_exe]]
+name = "receipt-encode"
+root = "ChainReplay.ReceiptEncoding"
+
+# Original typed transaction bodies and automatic admitted-receipt registration.
+[[lean_exe]]
+name = "transaction-replay"
+root = "ChainReplay.Transactions"
+
+# Actual receipt/data births and persisted queue identities through block execution.
+[[lean_exe]]
+name = "registered-replay"
+root = "ChainReplay.Registered"

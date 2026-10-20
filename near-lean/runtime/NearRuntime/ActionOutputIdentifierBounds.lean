@@ -40,16 +40,22 @@ theorem Exec.addGasRefund_outputIds (exec : Exec) (receiver : AccountId) (pk : P
 /-- VM emission extends the already bounded output list and advances the shared
 counter. Inherited callback references are transported from the current context. -/
 theorem commitFunctionCall_outputIds (exec : Exec) (c : ReceiptCtx) (account : Account)
-    (outcome : VMOutcome) (isLast : Bool) (h : exec.OutputIdsBelowNext)
+    (outcome : VMOutcome) (isLast : Bool) (effects : FunctionCallEffects)
+    (heffects : functionCallEffects c account outcome isLast exec.state = .ok effects) (h : exec.OutputIdsBelowNext)
     (hcallbacks : c.CallbackIdsBelow exec.state.nextId) :
-    (exec.commitFunctionCall c account outcome isLast).OutputIdsBelowNext := by
+    (exec.commitFunctionCall outcome effects).OutputIdsBelowNext := by
+  have heffects' := functionCallEffects_success c account outcome isLast exec.state effects heffects
   let initial := (exec.state.setAccount c.receipt.receiverId
     { account with amount := outcome.balance, storageUsage := outcome.storageUsage }).setContractStorage
       c.receipt.receiverId outcome.storage
   have he := materializeFunctionCall_liveIds_below c isLast outcome initial hcallbacks
-  have hn := commitFunctionCall_nextId_mono exec c account outcome isLast
+  have hn := commitFunctionCall_nextId_mono exec c account outcome isLast effects heffects
+  rw [heffects'] at hn
   intro receipt hm id hid
-  change receipt ∈ exec.newReceipts ++ (materializeFunctionCall c isLast outcome initial).receipts at hm
+  change receipt ∈ exec.newReceipts ++ effects.receipts at hm
+  rw [heffects'] at hm
+  change id < effects.state.nextId
+  rw [heffects']
   rcases List.mem_append.mp hm with hold | hnew
   · exact (h receipt hold id hid).trans_le hn
   · exact he receipt hnew id hid
@@ -64,14 +70,29 @@ theorem applyAction_outputIds (c : ReceiptCtx) (isLast : Bool) (action : Action)
   | functionCall method args gas deposit =>
     rw [show applyAction c isLast (.functionCall method args gas deposit) =
       applyFunctionCall c method args gas deposit isLast from rfl, applyFunctionCall_run]
-    split
-    · exact h
-    · split
-      · exact h
-      · dsimp only
-        split
-        · exact h
-        · exact commitFunctionCall_outputIds _ _ _ _ _ h hcallbacks
+    cases ha : before.state.account? c.receipt.receiverId with
+    | none => exact h
+    | some account =>
+      dsimp only
+      cases hc : account.code with
+      | none => exact h
+      | some code =>
+        dsimp only
+        cases hi : code.decodeIssue with
+        | some issue => exact h
+        | none =>
+          dsimp only
+          generalize ho : run c.cfg code.module code.size method
+            (functionCallContext c account args gas deposit isLast)
+            (before.state.contractStorage c.receipt.receiverId) = outcome
+          cases he : outcome.aborted with
+          | some error => exact h
+          | none =>
+            dsimp only
+            cases hf : functionCallEffects c account outcome isLast before.state with
+            | error error => exact h
+            | ok effects =>
+              exact commitFunctionCall_outputIds (before.recordVMOutcome outcome) c account outcome isLast effects hf h hcallbacks
   | transfer amount =>
     rw [applyTransfer_run]
     split
@@ -83,7 +104,7 @@ theorem applyAction_outputIds (c : ReceiptCtx) (isLast : Bool) (action : Action)
       · split <;> exact h
   | stake amount pk =>
     cases ha : before.state.account? c.receipt.receiverId <;>
-      simp [-ExceptT.run_bind, -StateT.run_bind, applyAction, getAccount, getState, ha]
+      simp [-StateT.run_bind, applyAction, getAccount, getState, ha]
     repeat' (first | exact h | split)
   | addKey pk key => rw [applyAddKey_run]; repeat' (first | exact h | split)
   | deleteKey pk => rw [applyDeleteKey_run]; repeat' (first | exact h | split)
@@ -130,8 +151,8 @@ theorem outputIds_getState (c : ReceiptCtx) : getState.BoundsOutputIds c := by i
 
 theorem outputIds_fee (c : ReceiptCtx) (isRefund : Bool) (fee : Nat) : (chargeReceiptFee isRefund fee).BoundsOutputIds c := by
   intro before _ h
-  unfold chargeReceiptFee
-  split <;> exact h
+  unfold chargeReceiptFee burnGas
+  exact h
 
 theorem outputIds_checkReceiptAction (c : ReceiptCtx) (onlyAction : Bool) (action : Action) :
     (checkReceiptAction c onlyAction action).BoundsOutputIds c := by
@@ -163,18 +184,46 @@ theorem outputIds_runReceiptAction (c : ReceiptCtx) (onlyAction isLast : Bool) (
   intro before hcallbacks h
   exact applyAction_outputIds c isLast action before h hcallbacks
 
-theorem outputIds_runReceiptActionList (c : ReceiptCtx) (onlyAction : Bool) (actions : List Action) :
-    (runReceiptActionList c onlyAction actions).BoundsOutputIds c := by
-  induction actions with
+theorem outputIds_runReceiptActionAt (c : ReceiptCtx) (onlyAction isLast : Bool)
+    (action : Action) (index : Nat) : (runReceiptActionAt c onlyAction isLast action index).BoundsOutputIds c := by
+  cases action with
+  | createAccount  => exact outputIds_runReceiptAction c onlyAction isLast (.createAccount)
+  | deployContract code => exact outputIds_runReceiptAction c onlyAction isLast (.deployContract code)
+  | transfer amount => exact outputIds_runReceiptAction c onlyAction isLast (.transfer amount)
+  | stake amount pk => exact outputIds_runReceiptAction c onlyAction isLast (.stake amount pk)
+  | addKey pk key => exact outputIds_runReceiptAction c onlyAction isLast (.addKey pk key)
+  | deleteKey pk => exact outputIds_runReceiptAction c onlyAction isLast (.deleteKey pk)
+  | deleteAccount beneficiary => exact outputIds_runReceiptAction c onlyAction isLast (.deleteAccount beneficiary)
+  | functionCall method args gas deposit =>
+    intro before hcallbacks h
+    cases hs : actionRandomSeed c index with
+    | error error =>
+      simp only [runReceiptActionAt, hs]
+      exact h
+    | ok seed =>
+      simp only [runReceiptActionAt, hs]
+      exact outputIds_runReceiptAction { c with vmRandomSeed := some seed } onlyAction isLast
+        (.functionCall method args gas deposit) before hcallbacks h
+
+theorem outputIds_failureIndex (c : ReceiptCtx) (index : Option Nat) :
+    (modify fun e => { e with failureIndex := index } : ExecM Unit).BoundsOutputIds c := by
+  intro before _ h
+  exact h
+
+theorem outputIds_runReceiptActionList (c : ReceiptCtx) (onlyAction : Bool) (actions : List Action)
+    (index : Nat) : (runReceiptActionList c onlyAction actions index).BoundsOutputIds c := by
+  induction actions generalizing index with
   | nil => exact outputIds_pure _ _
   | cons action rest ih =>
-    exact ExecM.BoundsOutputIds.bind (outputIds_runReceiptAction _ _ _ _)
-      (nextId_runReceiptAction _ _ _ _) (fun _ => ih)
+    refine ExecM.BoundsOutputIds.bind (outputIds_failureIndex c (some index)) (nextId_failureIndex _) (fun _ => ?_)
+    exact ExecM.BoundsOutputIds.bind (outputIds_runReceiptActionAt c onlyAction rest.isEmpty action index)
+      (nextId_runReceiptActionAt _ _ _ _ _) (fun _ => ih (index + 1))
 
 theorem outputIds_receiptActionBody (c : ReceiptCtx) : (receiptActionBody c).BoundsOutputIds c := by
   unfold receiptActionBody
   refine ExecM.BoundsOutputIds.bind (outputIds_fee _ _ _) (nextId_fee _ _) (fun _ => ?_)
-  exact ExecM.BoundsOutputIds.bind (outputIds_runReceiptActionList _ _ _) (nextId_runReceiptActionList _ _ _)
+  refine ExecM.BoundsOutputIds.bind (outputIds_runReceiptActionList c _ _ _) (nextId_runReceiptActionList _ _ _ _) (fun _ => ?_)
+  exact ExecM.BoundsOutputIds.bind (outputIds_failureIndex c none) (nextId_failureIndex _)
     (fun _ => outputIds_checkStorageStake _ _ _)
 
 theorem runReceiptActions_outputIds (c : ReceiptCtx) (st : ChainState) (hcallbacks : c.CallbackIdsBelow st.nextId) :

@@ -1,6 +1,8 @@
 # Safe NEAR. Run `just` to list recipes; `just <recipe> <contract>` takes a name from contracts/.
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
+import 'tools/justfile'
+
 [private]
 default:
     @just --list --unsorted
@@ -65,7 +67,7 @@ near-conformance:
 
 # Regenerate near-lean/vm/configs from nearcore's parameter tables (needs cargo).
 near-configs:
-    cd tools/dump-runtime-config && cargo run --release -- ../../near-lean/vm/configs
+    cd tools/dump-runtime-config && cargo run --locked --release -- ../../near-lean/vm/configs
 
 # Rebuild one contract's wasm from its pinned source and compare with the on-chain hash.
 reproduce contract:

@@ -477,7 +477,7 @@ theorem finishMeteredCall_noThrow (extra : Nat) (name : String) (before : Store 
 theorem metered_noThrow (extra : Nat) (name : String) (fn : HostFn NearState)
     (hfn : HostNeverThrows fn) : HostNeverThrows (metered extra name fn) := by
   intro st args
-  unfold metered
+  unfold metered invokeStorageCall
   dsimp only
   repeat (first | trivial | exact finishMeteredCall_noThrow _ _ _ _ _ (hfn _ _) | split)
 

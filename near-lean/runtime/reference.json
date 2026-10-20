@@ -9,6 +9,12 @@
   },
   "execution_oracle_crate": "near-vm-runner =0.37.4",
   "execution_oracle_lockfile": "tools/runtime-conformance/Cargo.lock",
+  "runtime_apply_oracle": {
+    "builder": "tools/chain-conformance/prepare.py",
+    "adapter": "tools/chain-conformance/reference.rs",
+    "epoch_fixture": "single-shard/no-validators",
+    "model_comparison_established": false
+  },
   "configuration_provenance": "Published crates report this revision with dirty=true; crate bytes are pinned by tools/dump-runtime-config/Cargo.lock. Equivalence of published crates and the clean revision is not assumed.",
   "historical_execution_conformance": false,
   "execution_conformance_established": false

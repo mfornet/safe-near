@@ -1,0 +1,72 @@
+{
+  "code": "tools/runtime-conformance/fixtures/storage_inputs.wasm",
+  "sha256": "ad983159eb8ce2a140197cb990b4c7d76f881bbbf6e3d09cd1122a454acecaa3",
+  "protocolVersion": 83,
+  "initialBalance": "100000000000000000000000000",
+  "storage": [
+    [
+      [
+        107
+      ],
+      [
+        104,
+        101,
+        108,
+        108,
+        111
+      ]
+    ]
+  ],
+  "calls": [
+    {
+      "name": "remove_key_limit v83",
+      "method": "remove_key_limit",
+      "args": {}
+    },
+    {
+      "name": "write_key_limit_bad_value v83",
+      "method": "write_key_limit_bad_value",
+      "args": {}
+    },
+    {
+      "name": "write_missing_key_register v83",
+      "method": "write_missing_key_register",
+      "args": {}
+    },
+    {
+      "name": "write_missing_value_register v83",
+      "method": "write_missing_value_register",
+      "args": {}
+    },
+    {
+      "name": "write_bad_value_pointer v83",
+      "method": "write_bad_value_pointer",
+      "args": {}
+    },
+    {
+      "name": "remove_missing_key_register v83",
+      "method": "remove_missing_key_register",
+      "args": {}
+    },
+    {
+      "name": "remove_bad_key_pointer v83",
+      "method": "remove_bad_key_pointer",
+      "args": {}
+    },
+    {
+      "name": "write_discard_old_value v83",
+      "method": "write_discard_old_value",
+      "args": {}
+    },
+    {
+      "name": "remove_discard_old_value v83",
+      "method": "remove_discard_old_value",
+      "args": {}
+    },
+    {
+      "name": "remove_missing_key v83",
+      "method": "remove_missing_key",
+      "args": {}
+    }
+  ]
+}

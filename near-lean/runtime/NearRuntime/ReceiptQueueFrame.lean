@@ -43,9 +43,10 @@ theorem queues_getAccount (id : AccountId) : (getAccount id).PreservesReceiptQue
   · exact queues_throw _
 
 theorem commitFunctionCall_receiptQueues (exec : Exec) (c : ReceiptCtx) (account : Account)
-    (outcome : VMOutcome) (isLast : Bool) :
-    (exec.commitFunctionCall c account outcome isLast).receiptQueues = exec.receiptQueues := by
-  have hf := congrArg ChainState.receiptQueues (commitFunctionCall_frame exec c account outcome isLast)
+    (outcome : VMOutcome) (isLast : Bool) (effects : FunctionCallEffects)
+    (heffects : functionCallEffects c account outcome isLast exec.state = .ok effects) :
+    (exec.commitFunctionCall outcome effects).receiptQueues = exec.receiptQueues := by
+  have hf := congrArg ChainState.receiptQueues (commitFunctionCall_frame exec c account outcome isLast effects heffects)
   exact hf
 
 theorem refundAllowance_receiptQueues (st : ChainState) (id : AccountId) (pk : PublicKey) (amount : Nat) :
@@ -72,13 +73,13 @@ theorem queues_applyAction (c : ReceiptCtx) (isLast : Bool) (action : Action) :
   | functionCall method args gas deposit =>
     change ((applyFunctionCall c method args gas deposit isLast).run.run before).2.receiptQueues = _
     rw [applyFunctionCall_run]
-    repeat' (first | rfl | exact commitFunctionCall_receiptQueues _ _ _ _ _ | split | (dsimp only; split))
+    repeat' (first | rfl | exact commitFunctionCall_receiptQueues _ _ _ _ _ _ (by assumption) | split | (dsimp only; split))
   | transfer amount =>
     rw [applyTransfer_run]
     repeat' (first | rfl | exact transferCreditState_receiptQueues _ _ _ _ | split)
   | stake amount pk =>
     cases ha : before.state.account? c.receipt.receiverId <;>
-      simp [-ExceptT.run_bind, -StateT.run_bind, applyAction, getAccount, getState, ha]
+      simp [-StateT.run_bind, applyAction, getAccount, getState, ha]
     repeat' (first | rfl | split)
   | addKey pk key => rw [applyAddKey_run]; repeat' (first | rfl | split)
   | deleteKey pk => rw [applyDeleteKey_run]; repeat' (first | rfl | split)
@@ -87,10 +88,7 @@ theorem queues_applyAction (c : ReceiptCtx) (isLast : Bool) (action : Action) :
 theorem queues_burnGas (fee : Nat) : (burnGas fee).PreservesReceiptQueues := by intro before; rfl
 
 theorem queues_fee (isRefund : Bool) (fee : Nat) : (chargeReceiptFee isRefund fee).PreservesReceiptQueues := by
-  unfold chargeReceiptFee
-  split
-  · exact queues_pure _
-  · exact queues_burnGas _
+  exact queues_burnGas _
 
 theorem queues_checkReceiptAction (c : ReceiptCtx) (onlyAction : Bool) (action : Action) :
     (checkReceiptAction c onlyAction action).PreservesReceiptQueues := by
@@ -111,15 +109,29 @@ theorem queues_runReceiptAction (c : ReceiptCtx) (onlyAction isLast : Bool) (act
   unfold runReceiptAction
   exact (queues_fee _ _).bind (fun _ => (queues_checkReceiptAction _ _ _).bind (fun _ => queues_applyAction _ _ _))
 
-theorem queues_runReceiptActionList (c : ReceiptCtx) (onlyAction : Bool) (actions : List Action) :
-    (runReceiptActionList c onlyAction actions).PreservesReceiptQueues := by
-  induction actions with
+theorem queues_runReceiptActionAt (c : ReceiptCtx) (onlyAction isLast : Bool) (action : Action) (index : Nat) :
+    (runReceiptActionAt c onlyAction isLast action index).PreservesReceiptQueues := by
+  cases action <;> try exact queues_runReceiptAction _ _ _ _
+  case functionCall method args gas deposit =>
+    cases he : actionRandomSeed c index <;> simp only [runReceiptActionAt, he]
+    · exact queues_throw _
+    · exact queues_runReceiptAction _ _ _ _
+
+theorem queues_failureIndex (index : Option Nat) :
+    (modify fun e : Exec => { e with failureIndex := index } : ExecM Unit).PreservesReceiptQueues := by
+  intro before; rfl
+
+theorem queues_runReceiptActionList (c : ReceiptCtx) (onlyAction : Bool) (actions : List Action) (index : Nat) :
+    (runReceiptActionList c onlyAction actions index).PreservesReceiptQueues := by
+  induction actions generalizing index with
   | nil => exact queues_pure _
-  | cons action rest ih => exact (queues_runReceiptAction _ _ _ _).bind (fun _ => ih)
+  | cons action rest ih =>
+    exact (queues_failureIndex _).bind (fun _ => (queues_runReceiptActionAt _ _ _ _ _).bind (fun _ => ih _))
 
 theorem queues_receiptActionBody (c : ReceiptCtx) : (receiptActionBody c).PreservesReceiptQueues := by
   unfold receiptActionBody
-  exact (queues_fee _ _).bind (fun _ => (queues_runReceiptActionList _ _ _).bind (fun _ => queues_checkStorageStake _ _))
+  exact (queues_fee _ _).bind (fun _ => (queues_runReceiptActionList _ _ _ _).bind
+    (fun _ => (queues_failureIndex _).bind (fun _ => queues_checkStorageStake _ _)))
 
 theorem runReceiptActions_receiptQueues (c : ReceiptCtx) (st : ChainState) :
     (runReceiptActions c st).1.receiptQueues = st.receiptQueues := by
@@ -140,6 +152,11 @@ theorem runReceiptActions_receiptQueues (c : ReceiptCtx) (st : ChainState) :
   rw [failureDataFold_state]
   rfl
 
+@[simp] theorem addCompletionData_receiptQueues (exec : Exec) (receiver : AccountId) (outputs : List DataReceiver) :
+    (exec.addCompletionData receiver outputs).receiptQueues = exec.receiptQueues := by
+  unfold Exec.addCompletionData
+  split <;> first | rfl | (dsimp only; rw [completionDataFold_state]; rfl)
+
 @[simp] theorem creditReceiptReward_receiptQueues (exec : Exec) (cfg : RuntimeConfig) (receiver : AccountId)
     (burnPrice purchasePrice : Nat) :
     (exec.creditReceiptReward cfg receiver burnPrice purchasePrice).receiptQueues = exec.receiptQueues := by
@@ -157,7 +174,7 @@ theorem finalizeReceipt_receiptQueues (c : ReceiptCtx) (st : ChainState) (raw : 
     (hraw : raw.receiptQueues = st.receiptQueues) :
     (finalizeReceipt c st raw failed).receiptQueues = st.receiptQueues := by
   unfold finalizeReceipt
-  simp only [setResult_receiptQueues, addFailureData_receiptQueues, creditReceiptReward_receiptQueues,
+  simp only [setResult_receiptQueues, addCompletionData_receiptQueues, addFailureData_receiptQueues, creditReceiptReward_receiptQueues,
     ite_receiptQueues, addBalanceRefund_receiptQueues, addGasRefund_receiptQueues, ite_self]
   cases failed with
   | none => exact hraw

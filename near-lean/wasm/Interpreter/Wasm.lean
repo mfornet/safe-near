@@ -29,7 +29,9 @@ split into:
 * `Wasm.Float`             — `f32`/`f64` operations over IEEE-754 bit patterns
 * `Wasm.Locals`            — per-frame locals/value-stack state + helpers
 * `Wasm.Continuation`      — `Continuation` / `Result` outcome types
-* `Wasm.Semantics`         — `execOne` / `exec` / `run` mutual interpreter
+* `Wasm.Operations`        — shared numeric and GC operations
+* `Wasm.Semantics`         — legacy `execOne` / `exec` / `run` regression interpreter
+* `Wasm.SmallStep`         — executable machine and relational step semantics
 * `Wasm.Semantics.Lemmas`  — bridge lemmas between `exec` and `wp`
                                  (fuel monotonicity, atomic unfoldings, …)
 * `Wasm.Wp.*`              — `wp` framework: definitions, atomic

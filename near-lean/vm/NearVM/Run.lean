@@ -1,3 +1,4 @@
+import Interpreter.Wasm.SmallStep
 import NearVM.Metered
 import NearVM.Context
 import NearVM.PromiseGraph
@@ -23,6 +24,7 @@ def defaultFuel : Nat := 2_000_000_000
 
 /-- Map an interpreter trap to nearcore's error. -/
 def trapError (reason : SmallStep.TrapReason) (host : NearState) : FunctionCallError :=
+  if let some issue := host.lastExecutionIssue then .executionIssue issue else
   match host.lastError with
   | some e => .hostError e
   | none =>
@@ -158,7 +160,7 @@ def VMOutcome.failedBefore (ctx : VMContext) (storage : List (List UInt8 × List
     (burnt : Nat) (e : FunctionCallError) (profile : GasProfile := {}) : VMOutcome :=
   { balance := ctx.accountBalance, storageUsage := ctx.storageUsage, returnData := .none,
     burntGas := burnt, usedGas := burnt, logs := [], storage := storage, receipts := [],
-    aborted := some e, gasProfile := profile }
+    aborted := some e, gasProfile := profile, storageAccounting := ctx.storageAccounting }
 
 /-- Charge function entry and execute the metered loop, retaining an entry
 charge failure as a structured protocol error. -/
@@ -188,13 +190,13 @@ def outcomeOfExecution (ctx : VMContext) (storage : List (List UInt8 × List UIn
   | some e =>
     { balance := ctx.accountBalance, storageUsage := ctx.storageUsage, returnData := .none,
       burntGas := ns.gas.burnt, usedGas := ns.gas.burnt, logs := logsOf ns, storage := storage,
-      receipts := [], aborted := some e, gasProfile := ns.gasProfile, subsidizedAmount := ns.subsidizedAmount }
+      receipts := [], aborted := some e, gasProfile := ns.gasProfile, subsidizedAmount := ns.subsidizedAmount, storageAccounting := ns.storageAccounting }
   | none =>
     let outcome : VMOutcome := {
       balance := ns.context.accountBalance, storageUsage := ns.context.storageUsage.toNat
       returnData := .none, burntGas := ns.gas.burnt, usedGas := ns.gas.used
       logs := logsOf ns, storage := finalStorage ns, receipts := [], aborted := none
-      gasProfile := ns.gasProfile, subsidizedAmount := ns.subsidizedAmount }
+      gasProfile := ns.gasProfile, subsidizedAmount := ns.subsidizedAmount, storageAccounting := ns.storageAccounting }
     match convertPromises ns.promises with
     | none => outcome.graphIssue ctx.accountBalance ctx.storageUsage storage
     | some graph =>

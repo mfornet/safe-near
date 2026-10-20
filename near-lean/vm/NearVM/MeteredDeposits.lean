@@ -127,19 +127,26 @@ theorem metered_funding (extra : Nat) (name : String) (fn : HostFn NearState)
         cases herr : preInvokeError name st1 args with
         | some error => trivial
         | none =>
-          have hfinal := finishMeteredCall_funding extra name st1 args _ (hfn st1 args)
-          cases hf : finishMeteredCall extra name st1 args (fn.invoke st1 args) with
-          | Trap paid message => trivial
-          | Throw paid tag values => trivial
-          | Return values paid =>
-            rw [hf] at hfinal
-            change paid.host.liquidFunds + st1.host.subsidizedAmount = st1.host.liquidFunds + paid.host.subsidizedAmount at hfinal
-            have hfund := congrArg Prod.fst hp
-            have hsub := congrArg Prod.snd hp
-            change st1.host.liquidFunds = st.host.liquidFunds at hfund
-            change st1.host.subsidizedAmount = st.host.subsidizedAmount at hsub
-            change paid.host.liquidFunds + st.host.subsidizedAmount = st.host.liquidFunds + paid.host.subsidizedAmount
-            simpa only [hfund, hsub] using hfinal
+          unfold invokeStorageCall
+          dsimp only
+          let st2 := (prepareStorageCall name st1 args).1
+          have hp2 : fundingState st2.host = fundingState st.host := hp
+          cases hs : (prepareStorageCall name st1 args).2 with
+          | some error => cases error <;> trivial
+          | none =>
+              have hfinal := finishMeteredCall_funding extra name st2 args _ (hfn st2 args)
+              cases hf : finishMeteredCall extra name st2 args (fn.invoke st2 args) with
+              | Trap paid message => trivial
+              | Throw paid tag values => trivial
+              | Return values paid =>
+                rw [hf] at hfinal
+                change paid.host.liquidFunds + st2.host.subsidizedAmount = st2.host.liquidFunds + paid.host.subsidizedAmount at hfinal
+                have hfund := congrArg Prod.fst hp2
+                have hsub := congrArg Prod.snd hp2
+                change st2.host.liquidFunds = st.host.liquidFunds at hfund
+                change st2.host.subsidizedAmount = st.host.subsidizedAmount at hsub
+                change paid.host.liquidFunds + st.host.subsidizedAmount = st.host.liquidFunds + paid.host.subsidizedAmount
+                simpa only [hfund, hsub] using hfinal
 
 theorem meteredTransfer_funding (extra : Nat) :
     HostPreservesFunding (metered extra "promise_batch_action_transfer" promiseBatchActionTransferFn) :=

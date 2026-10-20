@@ -1,22 +1,17 @@
-import Programs.GcdStdio.Spec
+import Programs.GcdStdio.Adequacy
 
 /-!
 # Correctness of the compiled GCD stream
 
-Statements only: the proofs are not ported from Talos and are left as `sorry`.
-Upstream proves `kernel_correct` by transporting the verified `num-integer`
-Stein kernel across a body equality, and `gcd_correct` through an adequacy
-bridge from a separation-logic driver proof.
+The arithmetic kernel is proved in `KernelProof`. `Adequacy` connects the real
+allocator, codec and host calls to its call-context contract and derives the
+finite execution required by the unchanged public specification.
 -/
 
 namespace Programs.GcdStdio.Proof
 
-@[proves Programs.GcdStdio.Spec.KernelSpecification]
-theorem kernel_correct : Programs.GcdStdio.Spec.KernelSpecification := by
-  sorry
-
 @[proves Programs.GcdStdio.Spec.PublicEntrySpecification]
-theorem gcd_correct : Programs.GcdStdio.Spec.PublicEntrySpecification := by
-  sorry
+theorem gcd_correct : Programs.GcdStdio.Spec.PublicEntrySpecification :=
+  Adequacy.entry_adequacy
 
 end Programs.GcdStdio.Proof

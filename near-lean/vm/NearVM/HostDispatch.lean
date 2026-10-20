@@ -1,3 +1,4 @@
+import Batteries.Data.List.Basic
 import NearVM.HostPromises
 
 /-!
@@ -392,7 +393,12 @@ theorem resolveMeteredImports_aligned (cfg : RuntimeConfig) (imports : List Impo
         exact .cons ⟨(found, fn), hf, rfl⟩ (ih tail hr)
 
 theorem resolveMetered_length (cfg : RuntimeConfig) (m : Module) (env : HostEnv NearState)
-    (h : resolveMetered cfg m = .ok env) : env.funcs.length = m.imports.length :=
-  (resolveMeteredImports_aligned cfg m.imports env h).length_eq.symm
+    (h : resolveMetered cfg m = .ok env) : env.funcs.length = m.imports.length := by
+  have alignment := resolveMeteredImports_aligned cfg m.imports env h
+  generalize m.imports = imports at alignment ⊢
+  generalize env.funcs = funcs at alignment ⊢
+  induction alignment with
+  | nil => rfl
+  | cons _ _ ih => exact congrArg Nat.succ ih
 
 end Wasm.Near

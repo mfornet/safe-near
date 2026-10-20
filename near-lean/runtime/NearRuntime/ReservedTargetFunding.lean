@@ -13,7 +13,10 @@ theorem applyAction_system_no_success (c : ReceiptCtx) (isLast : Bool) (action :
   | createAccount =>
     rw [applyCreateAccount_system_missing c isLast before hreceiver hn]
     intro he; cases he
-  | deployContract code => rw [applyDeployContract_run]; simp [hreceiver, hn]
+  | deployContract code =>
+    rw [applyDeployContract_run]
+    simp [hreceiver, hn]
+    split <;> simp
   | functionCall method args gas deposit =>
     rw [show applyAction c isLast (.functionCall method args gas deposit) =
       applyFunctionCall c method args gas deposit isLast from rfl, applyFunctionCall_run]
@@ -23,7 +26,7 @@ theorem applyAction_system_no_success (c : ReceiptCtx) (isLast : Bool) (action :
     simp only [hreceiver, hn, implicitPublicKey_system]
     split <;> simp
   | stake amount pk =>
-    simp [-ExceptT.run_bind, -StateT.run_bind, applyAction, getAccount, getState, hreceiver, hn]
+    simp [-StateT.run_bind, applyAction, getAccount, getState, hreceiver, hn]
   | addKey pk key =>
     rw [applyAddKey_run]
     simp only [hreceiver, hn]
@@ -76,6 +79,19 @@ theorem runReceiptAction_system_no_success (c : ReceiptCtx) (onlyAction isLast :
   intro _ before hmissing
   exact applyAction_system_no_success c isLast action before hreceiver hmissing
 
+theorem runReceiptActionAt_system_no_success (c : ReceiptCtx) (onlyAction isLast : Bool)
+    (action : Action) (index : Nat) (hreceiver : c.receipt.receiverId = systemAccount) :
+    (runReceiptActionAt c onlyAction isLast action index).RejectsAbsentSystem := by
+  cases action <;> try exact runReceiptAction_system_no_success _ _ _ _ hreceiver
+  case functionCall method args gas deposit =>
+    cases hs : actionRandomSeed c index with
+    | error error =>
+      simp only [runReceiptActionAt, hs]
+      intro before _ he; cases he
+    | ok seed =>
+      simp only [runReceiptActionAt, hs]
+      exact runReceiptAction_system_no_success _ _ _ _ hreceiver
+
 theorem receiptActionBody_system_nonempty_no_success (c : ReceiptCtx)
     (hreceiver : c.receipt.receiverId = systemAccount) (hnonempty : c.action.actions ≠ []) :
     (receiptActionBody c).RejectsAbsentSystem := by
@@ -87,7 +103,9 @@ theorem receiptActionBody_system_nonempty_no_success (c : ReceiptCtx)
     intro _
     apply rejectsAbsentSystem_bind_left
     rw [ha, runReceiptActionList]
-    exact rejectsAbsentSystem_bind_left (runReceiptAction_system_no_success c _ _ action hreceiver)
+    apply rejectsAbsentSystem_bind_right (systemAbsence_failureIndex (some 0))
+    intro _
+    exact rejectsAbsentSystem_bind_left (runReceiptActionAt_system_no_success c _ _ action 0 hreceiver)
 
 /-- Nonempty receipts targeting the absent synthetic actor fail before any
 later action can execute. The failure is derived from the real action body. -/
@@ -113,7 +131,8 @@ theorem funded_receiptActionBody_empty (c : ReceiptCtx) (hempty : c.action.actio
   apply funded_bind_left_zero (funded_fee _ _ _ _)
   intro _
   rw [hempty, runReceiptActionList]
-  exact funded_bind_right_zero (funded_pure _ _ _) (fun _ => funded_checkStorageStake _ _ _)
+  exact funded_bind_right_zero (funded_pure _ _ _) (fun _ =>
+    funded_bind_left_zero (funded_failureIndex _ _ none) (fun _ => funded_checkStorageStake _ _ _))
 
 /-- Ordinary reserved-target receipts conserve funds through their actual
 failure/empty-action path, rather than being excluded by receiver scope. -/

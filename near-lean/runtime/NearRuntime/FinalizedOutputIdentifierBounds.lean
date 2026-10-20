@@ -35,6 +35,41 @@ theorem Exec.addFailureData_outputIds (exec : Exec) (receiver : AccountId) (outp
   · exact (h receipt hold id hid).trans_le hf.1
   · exact hf.2 receipt hnew id hid
 
+theorem completionDataFold_outputIds (receiver : AccountId) (data : Option Bytes) (outputs : List DataReceiver) (initial : ChainState)
+    (houtputs : ∀ output ∈ outputs, output.dataId < initial.nextId) :
+    let result := outputs.foldl (completionDataStep receiver data) (initial, [])
+    initial.nextId ≤ result.1.nextId ∧
+      ∀ receipt ∈ result.2, ∀ id ∈ receipt.liveIds, id < result.1.nextId := by
+  apply foldl_preserves_mem (fun pair : ChainState × List Receipt => initial.nextId ≤ pair.1.nextId ∧
+    ∀ receipt ∈ pair.2, ∀ id ∈ receipt.liveIds, id < pair.1.nextId)
+  · intro pair output hm hp
+    constructor
+    · exact hp.1.trans (Nat.le_succ _)
+    · intro receipt hr id hid
+      simp only [completionDataStep, ChainState.freshId, List.mem_append, List.mem_singleton] at hr
+      rcases hr with hold | rfl
+      · exact (hp.2 receipt hold id hid).trans (Nat.lt_succ_self _)
+      · simp only [Receipt.liveIds, List.mem_cons, List.not_mem_nil, or_false] at hid
+        rcases hid with rfl | rfl
+        · exact Nat.lt_succ_self _
+        · exact ((houtputs output hm).trans_le hp.1).trans (Nat.lt_succ_self _)
+  · exact ⟨Nat.le_refl _, by intro receipt hm; contradiction⟩
+
+theorem Exec.addCompletionData_outputIds (exec : Exec) (receiver : AccountId) (outputs : List DataReceiver)
+    (h : exec.OutputIdsBelowNext) (houtputs : ∀ output ∈ outputs, output.dataId < exec.state.nextId) :
+    (exec.addCompletionData receiver outputs).OutputIdsBelowNext := by
+  unfold Exec.addCompletionData
+  dsimp only
+  split
+  · exact h
+  · rename_i data he
+    have hf := completionDataFold_outputIds receiver data outputs exec.state houtputs
+    intro receipt hm id hid
+    change receipt ∈ exec.newReceipts ++ (outputs.foldl (completionDataStep receiver data) (exec.state, [])).2 at hm
+    rcases List.mem_append.mp hm with hold | hnew
+    · exact (h receipt hold id hid).trans_le hf.1
+    · exact hf.2 receipt hnew id hid
+
 theorem Exec.creditReceiptReward_outputIds (exec : Exec) (cfg : RuntimeConfig) (receiver : AccountId)
     (burnPrice purchasePrice : Nat) (h : exec.OutputIdsBelowNext) :
     (exec.creditReceiptReward cfg receiver burnPrice purchasePrice).OutputIdsBelowNext := by
@@ -64,7 +99,7 @@ theorem finalizeReceipt_outputIds (c : ReceiptCtx) (st : ChainState) (raw : Exec
   let gas := if gasRefund > 0 && c.action.signerId != systemAccount then
     balance.addGasRefund c.action.signerId c.action.signerPublicKey gasRefund else balance
   let rewarded := gas.creditReceiptReward c.cfg c.receipt.receiverId settlement.burnPrice c.action.gasPrice
-  let finished := if failed.isSome then rewarded.addFailureData c.receipt.receiverId c.action.outputDataReceivers else rewarded
+  let finished := if failed.isSome then rewarded.addFailureData c.receipt.receiverId c.action.outputDataReceivers else rewarded.addCompletionData c.receipt.receiverId c.action.outputDataReceivers
   have hbase : base.OutputIdsBelowNext := by
     cases failed with
     | none => exact hraw
@@ -102,7 +137,8 @@ theorem finalizeReceipt_outputIds (c : ReceiptCtx) (st : ChainState) (raw : Exec
     split
     · exact Exec.addFailureData_outputIds rewarded _ _ hrewarded
         (fun output hm => (hcallbacks output hm).trans_le hnrewarded)
-    · exact hrewarded
+    · exact Exec.addCompletionData_outputIds rewarded _ _ hrewarded
+        (fun output hm => (hcallbacks output hm).trans_le hnrewarded)
   exact hfinished
 
 theorem applyActionReceipt_outputIds (c : ReceiptCtx) (st : ChainState) (hcallbacks : c.CallbackIdsBelow st.nextId) :

@@ -3,74 +3,102 @@ import NearRuntime.BlockStatePreservation
 namespace Near
 open Wasm.Near
 
-/-- Exact transaction-loop accumulator used by the executable block attempt. -/
-abbrev TransactionPass := ChainState × List (ReceiptId × ExecutionOutcome) × List Receipt × Nat × Nat
+/-- Exact transaction-loop accumulator, including nonlocal output and atomic issues. -/
+abbrev TransactionPass := TransactionLoop
 
 def convertTransactions (cfg : RuntimeConfig) (ap : ApplyState) (initial : ChainState)
-    (txs : List Transaction) : TransactionPass := Id.run do
-  let mut st := initial
-  let mut outcomes : List (ReceiptId × ExecutionOutcome) := []
-  let mut localReceipts : List Receipt := []
-  let mut tokensBurnt := 0
-  let mut txIndex := 0
-  for tx in txs do
-    txIndex := txIndex + 1
-    match convertTransaction cfg ap st tx with
-    | .ok (st', r, cost) =>
-      st := st'
-      localReceipts := localReceipts ++ [r]
-      tokensBurnt := tokensBurnt + cost.gasBurnt * ap.gasPrice
-      let o : ExecutionOutcome :=
-        { executorId := tx.signerId
-          status := .successReceiptId r.receiptId
-          receiptIds := [r.receiptId]
-          gasBurnt := cost.gasBurnt
-          tokensBurnt := cost.gasBurnt * ap.gasPrice }
-      outcomes := outcomes ++ [(0, o)]
-    | .error e =>
-      outcomes := outcomes ++ [(0, { executorId := tx.signerId, status := .failure e })]
-  return (st, outcomes, localReceipts, tokensBurnt, txIndex)
+    (txs : List Transaction) : TransactionPass :=
+  Id.run <| forIn txs (none, initial, [], [], [], 0, 0) fun tx pass =>
+    match convertTransaction cfg ap pass.2.1 tx with
+    | .ok (next, receipt, cost) =>
+      let outcome : ExecutionOutcome := {
+        executorId := tx.signerId, status := .successReceiptId receipt.receiptId
+        receiptIds := [receipt.receiptId], gasBurnt := cost.gasBurnt
+        tokensBurnt := cost.gasBurnt * ap.gasPrice }
+      if tx.signerId == tx.receiverId then
+        .yield (none, next, pass.2.2.1 ++ [(0, outcome)], pass.2.2.2.1,
+          pass.2.2.2.2.1 ++ [receipt], pass.2.2.2.2.2.1 + cost.gasBurnt * ap.gasPrice, pass.2.2.2.2.2.2 + 1)
+      else
+        .yield (none, next, pass.2.2.1 ++ [(0, outcome)], pass.2.2.2.1 ++ [receipt],
+          pass.2.2.2.2.1, pass.2.2.2.2.2.1 + cost.gasBurnt * ap.gasPrice, pass.2.2.2.2.2.2 + 1)
+    | .error error =>
+      match error.issue? with
+      | some issue => .done (some { state := initial, outgoing := [], outcomes := [], tokensBurnt := 0, issue := some (0, issue) }, pass.2.1, pass.2.2.1, pass.2.2.2.1, pass.2.2.2.2.1,
+          pass.2.2.2.2.2.1, pass.2.2.2.2.2.2 + 1)
+      | none => .yield (none, pass.2.1, pass.2.2.1 ++ [(0, { executorId := tx.signerId, status := .failure error })],
+          pass.2.2.2.1, pass.2.2.2.2.1, pass.2.2.2.2.2.1, pass.2.2.2.2.2.2 + 1)
 
-/-- Exact receipt-loop stage, including the nested outcome loop, gas deferral
-and early issue rollback. This is a proof-facing decomposition, not a replacement
-execution semantics: `applyAttempt_eq_stages` connects it definitionally. -/
+/-- Exact receipt-loop stage: transaction gas already counts toward the chunk
+limit, old delayed receipts retain FIFO priority, and identity births are retained. -/
 def applyReceiptQueue (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → ContractCode)
     (initial st : ChainState) (outcomes : List (ReceiptId × ExecutionOutcome))
-    (outgoing : List Receipt) (subsidizedAmount tokensBurnt : Nat) (queue : List Receipt) : ApplyResult := Id.run do
+    (outgoing : List Receipt) (subsidizedAmount tokensBurnt : Nat) (queue : List Receipt)
+    (delayedStart delayedEnd : Nat) : ApplyResult := Id.run do
   let mut st := st
   let mut outcomes := outcomes
   let mut outgoing := outgoing
+  let mut identityBirths : List ReceiptIdentityBirth := []
   let mut subsidizedAmount := subsidizedAmount
   let mut tokensBurnt := tokensBurnt
-  let mut gasUsed := 0
-  let mut overLimit := false
-  for r in queue do
+  let mut retainedDelayed : List Receipt := []
+  let mut newlyDelayed : List Receipt := []
+  let mut gasUsed := outcomes.foldl (fun total pair => total + pair.2.gasBurnt) 0
+  let mut overLimit := ap.gasLimit.any (gasUsed ≥ ·)
+  for (receipt, position) in queue.zipIdx do
     if overLimit then
-      st := { st with delayed := st.delayed ++ [r] }
+      if delayedStart ≤ position && position < delayedEnd then
+        retainedDelayed := retainedDelayed ++ [receipt]
+      else
+        newlyDelayed := newlyDelayed ++ [receipt]
     else
-      let p := processReceipt cfg ap codeOf st r
-      if let some issue := p.issue then
+      let processed := processReceipt cfg ap codeOf st receipt
+      if let some issue := processed.issue then
         return { state := initial, outgoing := [], outcomes := [], tokensBurnt := 0, issue := some issue }
-      subsidizedAmount := subsidizedAmount + p.subsidizedAmount
-      st := p.state
-      outgoing := outgoing ++ p.receipts
-      outcomes := outcomes ++ p.outcomes
-      for (_, o) in p.outcomes do
-        gasUsed := gasUsed + o.gasBurnt
-        tokensBurnt := tokensBurnt + o.tokensBurnt
-      tokensBurnt := tokensBurnt + p.otherTokensBurnt - p.rewards
+      identityBirths := identityBirths ++ processed.identityBirths
+      subsidizedAmount := subsidizedAmount + processed.subsidizedAmount
+      st := processed.state
+      outgoing := outgoing ++ processed.receipts
+      outcomes := outcomes ++ processed.outcomes
+      for (_, outcome) in processed.outcomes do
+        gasUsed := gasUsed + outcome.gasBurnt
+        tokensBurnt := tokensBurnt + outcome.tokensBurnt
+      tokensBurnt := tokensBurnt + processed.otherTokensBurnt - processed.rewards
       if let some limit := ap.gasLimit then
         if gasUsed ≥ limit then overLimit := true
-  return { state := st, outgoing, outcomes, tokensBurnt, subsidizedAmount }
+  return {
+    state := { st with delayed := retainedDelayed ++ newlyDelayed }, outgoing, outcomes, tokensBurnt, subsidizedAmount, identityBirths
+    delayedConsumed := initial.delayed.length - retainedDelayed.length, delayedAppended := newlyDelayed.length }
 
-/-- Definitional equality with the actual public attempt implementation. -/
+/-- Every public field, including queue metadata and identity births, agrees
+with the actual executable attempt. No alternate execution semantics is used. -/
 theorem applyAttempt_eq_stages (cfg : RuntimeConfig) (ap : ApplyState) (decoder : Bytes → ContractCode)
     (st : ChainState) (txs : List Transaction) (incoming : List Receipt) :
     applyAttempt cfg ap decoder st txs incoming =
       let converted := convertTransactions cfg ap st txs
-      applyReceiptQueue cfg ap decoder st { converted.1 with delayed := [] } converted.2.1 [] 0 converted.2.2.2.1
-        (converted.2.2.1 ++ converted.1.delayed ++ incoming) := by
-  rfl
+      match converted.1 with
+      | some result => result
+      | none => applyReceiptQueue cfg ap decoder st { converted.2.1 with delayed := [] } converted.2.2.1
+          converted.2.2.2.1 0 converted.2.2.2.2.2.1
+          (converted.2.2.2.2.1 ++ converted.2.1.delayed ++ incoming)
+          converted.2.2.2.2.1.length (converted.2.2.2.2.1.length + converted.2.1.delayed.length) := by
+  unfold applyAttempt
+  dsimp only [Id.run, bind, pure]
+  generalize ht : (forIn txs _ _ : Id TransactionLoop) = converted
+  have heq : converted = convertTransactions cfg ap st txs := by
+    rw [← ht]
+    unfold convertTransactions
+    dsimp only [Id.run]
+    congr 1
+    funext tx pass
+    cases hc : convertTransaction cfg ap pass.2.1 tx with
+    | error error =>
+      dsimp only
+      cases hi : error.issue? <;> rfl
+    | ok value =>
+      obtain ⟨next, receipt, cost⟩ := value
+      split_ifs <;> rfl
+  rw [← heq]
+  cases converted.1 <;> rfl
 
 /-- Induction over the actual early-exit loop with an invariant indexed by the
 unprocessed suffix. It exposes admission facts for the next receipt without

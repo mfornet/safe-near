@@ -535,7 +535,14 @@ theorem metered_preserves_promises (extra : Nat) (name : String) (fn : HostFn Ne
       | none =>
         cases hp : preInvokeError name st1 args with
         | some error => exact hwf1
-        | none => exact finishMeteredCall_preserves extra name st1 args _ (hfn st1 args hwf1)
+        | none =>
+          unfold invokeStorageCall
+          dsimp only
+          let st2 := (prepareStorageCall name st1 args).1
+          have hwf2 : PromisesWellFormedFrom 0 st2.host.promises := hwf1
+          cases hs : (prepareStorageCall name st1 args).2 with
+          | none => exact finishMeteredCall_preserves extra name st2 args _ (hfn st2 args hwf2)
+          | some error => cases error <;> exact hwf2
 
 /-- A successful preserving host call leaves a graph the executable converter
 accepts, with validity proved before the output boundary check. -/
@@ -619,8 +626,13 @@ theorem checkedSetRegister_promises {st after : Store NearState} {register : UIn
     {bytes : List UInt8} (h : checkedSetRegister? st register bytes = some after) :
     after.host.promises = st.host.promises := by
   unfold checkedSetRegister? at h
-  split_ifs at h <;> simp only [Option.some.injEq] at h
-  all_goals subst after; rfl
+  split at h
+  · cases h
+    rfl
+  · split at h
+    · cases h
+      rfl
+    · cases h
 
 theorem writeRegisterResult_preserves (name : String) (st : Store NearState) (register : UInt64)
     (bytes : List UInt8) (vals : List Value) (hwf : PromisesWellFormedFrom 0 st.host.promises) :

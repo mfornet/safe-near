@@ -1,3 +1,4 @@
+import Mathlib.Tactic.Linarith
 import NearRuntime.State
 
 /-!

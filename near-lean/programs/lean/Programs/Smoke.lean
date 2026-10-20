@@ -1,4 +1,4 @@
-import Interpreter.Wasm.Host.Universal
+import Programs.Harness
 import Programs.ByteEcho.Program
 import Programs.GcdStdio.Program
 import Programs.Mergesort.Program
@@ -20,27 +20,11 @@ open Wasm
 
 /-- Run export `op` of `m` on `input` bytes and return what reached stdout,
 or `none` if the export is missing, the run traps, or fuel runs out. -/
-def runBytes (m : Module) (op : String) (input : List UInt8)
-    (fuel : Nat := 50_000_000) : Option (List UInt8) :=
-  match m.findExport op with
-  | none => none
-  | some entry =>
-    let store : Store Universal.State :=
-      { (m.initialStore (α := Universal.State)) with
-          host := Universal.State.ofInput input }
-    match SmallStep.initConfig { module := m, host := Universal.envFor m }
-        entry store [] with
-    | .error _ => none
-    | .ok config =>
-      match (SmallStep.runSteps fuel config).result with
-      | .success _ final => some final.wasm.host.stdio.output
-      | _ => none
+abbrev runBytes := Harness.runBytes
 
-def le32 (x : UInt32) : List UInt8 :=
-  [x.toUInt8, (x >>> 8).toUInt8, (x >>> 16).toUInt8, (x >>> 24).toUInt8]
+abbrev le32 := Harness.le32
 
-def le64 (x : UInt64) : List UInt8 :=
-  (List.range 8).map fun i => (x >>> (8 * i).toUInt64).toUInt8
+abbrev le64 := Harness.le64
 
 structure Case where
   name     : String

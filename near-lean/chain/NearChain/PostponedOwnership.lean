@@ -3,24 +3,21 @@ import NearChain.ReceiptIdUniqueness
 namespace Near
 open Wasm.Near
 
-theorem step_postponedIdsMatch (cfg : RuntimeConfig) (decoder : CodeTable) (s : Snapshot) (b : Block)
-    (h : s.state.PostponedIdsMatch) : (step cfg decoder s b).1.state.PostponedIdsMatch := by
-  unfold step
-  dsimp only
-  split
-  · exact h
-  · exact apply_postponedIdsMatch cfg b.ap decoder s.state b.txs s.pending h
+theorem step_postponedIdsMatch (cfg : RuntimeConfig) (decoder : CodeTable) (s next : Snapshot) (b : Block)
+    (result : ApplyResult) (hs : step cfg decoder s b = .ok (next, result))
+    (h : s.state.PostponedIdsMatch) : next.state.PostponedIdsMatch :=
+  step_state_invariant cfg decoder ChainState.PostponedIdsMatch
+    (fun ap st txs incoming h => apply_postponedIdsMatch cfg ap decoder st txs incoming h) s next b result hs h
 
-/-- A state-predicate induction rule over the public reachability relation. -/
+/-- State predicates propagate through every accepted public step. -/
 theorem Reachable.state_invariant (cfg : RuntimeConfig) (decoder : CodeTable) (P : ChainState → Prop)
-    (hstep : ∀ (s : Snapshot) (b : Block), P s.state → P (Near.step cfg decoder s b).1.state)
+    (hstep : ∀ s next b result, Near.step cfg decoder s b = .ok (next, result) → P s.state → P next.state)
     (genesis s : Snapshot) (hgenesis : P genesis.state) (h : Reachable cfg decoder genesis s) : P s.state := by
   induction h with
   | refl => exact hgenesis
-  | step b _ _ ih => exact hstep _ b ih
+  | step b result hs _ _ ih => exact hstep _ _ b result hs ih
 
-/-- Identity agreement is inherited from genesis, so later queue-admission
-proofs can use it without assuming it independently for every block. -/
+/-- Stored receipt/key agreement is inherited from genesis. -/
 theorem Reachable.postponedIdsMatch (cfg : RuntimeConfig) (decoder : CodeTable) (genesis s : Snapshot)
     (hgenesis : genesis.state.PostponedIdsMatch) (h : Reachable cfg decoder genesis s) :
     s.state.PostponedIdsMatch :=

@@ -1,0 +1,68 @@
+{
+  "code": "tools/chain-conformance/fixtures/stateful.wasm",
+  "sha256": "a605689516459e07e4d958462d25f0affaffaf4d1acfad5a5968d80359a7b593",
+  "protocolVersion": 86,
+  "initialBalance": "100000000000000000000000000",
+  "initialStorageUsage": 1160,
+  "storage": [
+    [
+      [
+        107
+      ],
+      [
+        104,
+        101,
+        108,
+        108,
+        111
+      ]
+    ]
+  ],
+  "calls": [
+    {
+      "name": "typed-named-parameters",
+      "method": "typed_names",
+      "args": {}
+    },
+    {
+      "name": "0-write",
+      "method": "write",
+      "args": {}
+    },
+    {
+      "name": "1-read",
+      "method": "read",
+      "args": {}
+    },
+    {
+      "name": "2-remove",
+      "method": "remove",
+      "args": {}
+    },
+    {
+      "name": "3-read",
+      "method": "read",
+      "args": {}
+    },
+    {
+      "name": "4-write",
+      "method": "write",
+      "args": {}
+    },
+    {
+      "name": "5-write",
+      "method": "write",
+      "args": {}
+    },
+    {
+      "name": "6-panic_after_write",
+      "method": "panic_after_write",
+      "args": {}
+    },
+    {
+      "name": "7-read",
+      "method": "read",
+      "args": {}
+    }
+  ]
+}
