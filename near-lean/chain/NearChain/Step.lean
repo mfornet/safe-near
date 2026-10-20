@@ -45,6 +45,15 @@ def step (cfg : RuntimeConfig) (codeOf : CodeTable) (s : Snapshot) (b : Block) :
     if r.issue.isSome then .ok (s, r)
     else .ok ({ state := r.state, pending := deferred ++ r.outgoing }, r)
 
+/-- A successful schedule exposes the exact result of applying its selected receipts. -/
+theorem step_applyResult (cfg : RuntimeConfig) (codeOf : CodeTable) (s : Snapshot) (b : Block)
+    (incoming deferred : List Receipt) (next : Snapshot) (result : ApplyResult)
+    (hs : b.receipts.resolve s.pending = .ok (incoming, deferred))
+    (hr : step cfg codeOf s b = .ok (next, result)) :
+    result = apply cfg b.ap codeOf s.state b.txs incoming := by
+  simp only [step, hs] at hr
+  split at hr <;> cases hr <;> rfl
+
 theorem step_issue_unchanged (cfg : RuntimeConfig) (codeOf : CodeTable) (s : Snapshot) (b : Block)
     (next : Snapshot) (result : ApplyResult) (h : step cfg codeOf s b = .ok (next, result))
     (hi : result.issue.isSome = true) : next = s := by
@@ -78,6 +87,14 @@ inductive Reachable (cfg : RuntimeConfig) (codeOf : CodeTable) (genesis : Snapsh
   step {s next : Snapshot} (b : Block) (result : ApplyResult) :
     step cfg codeOf s b = .ok (next, result) →
       result.issue = none → Reachable cfg codeOf genesis s → Reachable cfg codeOf genesis next
+
+/-- First-step reachability from the public step result. Keeping this transport
+abstract prevents proof inference from evaluating a concrete transaction batch. -/
+theorem Reachable.firstStep (cfg : RuntimeConfig) (codeOf : CodeTable) (genesis : Snapshot)
+    (b : Block) (next : Snapshot) (result : ApplyResult)
+    (hs : Near.step cfg codeOf genesis b = .ok (next, result)) (hi : result.issue = none) :
+    Reachable cfg codeOf genesis next := by
+  exact Reachable.step b result hs hi Reachable.refl
 
 /-- No receipt in flight, delayed, or waiting for data. -/
 def Snapshot.quiescent (s : Snapshot) : Bool :=

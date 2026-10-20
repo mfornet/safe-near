@@ -348,7 +348,7 @@ def prepare(snapshot, destination, *, reference, model, scenario=None):
         write_json(stage / "model-initial.json", model_zero)
         files = {str(path.relative_to(stage)): file_digest(path) for path in sorted(stage.rglob("*")) if path.is_file()}
         rpc_config = snapshot["protocol_config"].get("runtime_config")
-        model_view = {k: v for k, v in config.items() if k != "runtime_finance"}
+        model_view = {k: v for k, v in config.items() if k not in {"runtime_finance", "runtime_admission"}}
         manifest = dict(format="safe-near-chain-fixture-v1", genesisProjectionMatches=True,
             executionComparisonEstablished=False, historicalReplayEstablished=False,
             capturedBlock=dict(hash=snapshot["block"]["header"]["hash"], height=snapshot["block"]["header"]["height"]),

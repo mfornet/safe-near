@@ -27,6 +27,7 @@ struct ConfigDump {
     // RuntimeConfigView omits these execution parameters. Keep their provenance
     // explicit instead of silently choosing zero or copying protocol constants.
     runtime_finance: Value,
+    runtime_admission: Value,
 }
 
 fn config_json(store: &RuntimeConfigStore, version: ProtocolVersion) -> String {
@@ -42,6 +43,7 @@ fn config_json(store: &RuntimeConfigStore, version: ProtocolVersion) -> String {
             "gas_refund_penalty": [config.fees.gas_refund_penalty.numer(), config.fees.gas_refund_penalty.denom()],
             "min_gas_refund_penalty": config.fees.min_gas_refund_penalty.as_gas(),
         }),
+        runtime_admission: json!({"strict_nonce": ProtocolFeature::StrictNonce.enabled(version)}),
     };
     serde_json::to_string_pretty(&dump).expect("runtime configuration serialization cannot fail")
 }

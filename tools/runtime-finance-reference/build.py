@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Build a visibility-only adapter against the clean, pinned nearcore checkout."""
 import argparse
+import fcntl
+import tempfile
 import hashlib
 import json
 from pathlib import Path
@@ -11,6 +13,10 @@ p = argparse.ArgumentParser()
 p.add_argument("checkout", type=Path)
 a = p.parse_args()
 checkout = a.checkout.resolve()
+# Both adapters mutate this checkout briefly; serialize their overlays.
+lock_path = Path(tempfile.gettempdir()) / ("safe-near-reference-" + hashlib.sha256(str(checkout).encode()).hexdigest() + ".lock")
+checkout_lock = lock_path.open("a")
+fcntl.flock(checkout_lock, fcntl.LOCK_EX)
 assert subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=checkout, text=True).strip() == PIN
 assert not subprocess.check_output(["git", "status", "--porcelain", "--untracked-files=no"], cwd=checkout)
 root = Path(__file__).resolve().parent

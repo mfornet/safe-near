@@ -150,3 +150,12 @@ backend enum and reports selector differences, then requires exact structural
 equality for every other field and the complete file set. nearcore's own
 configuration snapshots similarly redact this selector. The original generated
 JSON remains intact; no fees, feature flags or limits are normalized.
+
+The generated `runtime_finance` supplement contains `account_cost_increase`,
+`gas_refund_penalty` and `min_gas_refund_penalty`. The RPC view omits these refund
+fields; the dumper reads them from the internal pinned configuration. Receipt
+purchase pricing also loads `min_gas_purchase_price` and `account_creation_charge`.
+These financial comparisons do not establish historical execution conformance.
+
+`runtime_admission.strict_nonce` is generated from the pinned feature table and
+controls strict sequential transaction nonces (enabled from v85).

@@ -83,3 +83,7 @@ backend enum and reports selector differences, then requires exact structural
 equality for every other field and the complete file set. nearcore's own
 configuration snapshots similarly redact this selector. The original generated
 JSON remains intact; no fees, feature flags or limits are normalized.
+
+The generated `runtime_admission` supplement records `strict_nonce` from the
+pinned `ProtocolFeature::StrictNonce` table. It is a semantic feature gate, not a
+gas parameter; it becomes true at protocol version 85.

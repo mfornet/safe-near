@@ -224,3 +224,16 @@ the pinned v85+ minimum price, surplus refunds and account-creation charge.
 `Fees.settleGas_conservation` kernel-checks the local gas-token partition;
 `tools/runtime-finance-reference` compares 72 cases to nearcore's actual routines.
 Full receipt and chain conservation remain open.
+
+The runtime also provides kernel-checked finite-map and transaction invariants.
+For successful transaction conversion it proves map-key uniqueness preservation,
+exact account debit, receipt backing plus burnt-gas conservation, unrelated-account
+isolation, authorized access-key updates and exact nonce/counter changes.
+These results have explicit unique-map and reserved-signer premises; they do not
+yet establish full admission equivalence or receipt/chain invariant preservation.
+
+Transaction nonce validation now enforces the pinned monotonic/strict ordering,
+checked strict increment and saturating block-height ceiling. Strict mode uses
+the generated v85+ feature gate. Kernel proofs connect successful conversion to
+these bounds; 126 exact comparisons exercise nearcore's actual private validator.
+Apply defaults to block height one; explicit zero-height transactions are rejected.

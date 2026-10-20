@@ -351,3 +351,41 @@ pending, delayed and postponed receipts. Whole-chain conservation is still open.
 refund routines from the clean pinned nearcore implementation through an appended
 adapter module. Its 72 exact comparisons cover v84/85/86 financial parameters,
 price changes and account creation. It is not a full receipt execution oracle.
+
+## Finite-map and transaction invariants
+
+`StateInvariants` defines `AccountsUnique` and `MapsUnique` for the association-list
+key domains. It proves insert/erase lookup frames, uniqueness preservation by the
+state update primitives, and exact account balance changes for insertion,
+replacement and removal. These predicates do not establish numeric bounds,
+receipt consistency or global identifier freshness.
+
+`TransactionInvariants` connects the actual successful `convertTransaction`
+execution to its validated commit. Kernel-checked theorems establish exact account
+debit, conservation of account funds plus the newly backed receipt and conversion
+gas burn, preservation of all map-key domains, unrelated-account isolation, and
+the receipt counter's exact increment. Conservation assumes unique account keys
+and excludes the reserved system signer, whose receipts use free-refund semantics.
+`AccessKeyInvariants` proves successful conversion installs the authorized key,
+sets its nonce, respects restricted receiver/method/zero-deposit constraints,
+checks the allowance and deducts exactly the transaction cost from finite
+allowances. Signatures remain trusted; these are properties of the implemented
+conversion, not a proof of equivalence with nearcore transaction admission.
+
+The transaction interface models monotonic and strict regular-key nonces.
+`verifyNonce` follows the pinned validator's checked strict increment, saturating
+u64 height ceiling and error precedence; Apply always supplies its block height.
+The default apply context starts at height one. Explicit height zero rejects every
+nonce, matching the reference. Strict requests require the generated v85+ gate.
+`NonceInvariants` proves exact acceptance, increasing nonces and the ceiling/u64
+bounds; `convertTransaction_nonce_bounds` connects those properties to successful
+conversion while retaining the earlier conservation and authorization proofs.
+`tools/runtime-nonce-reference` compares 126 cases to the actual private validator
+and feature table. Native v1 decoding, gas-key nonce slots, pending-mempool overlays,
+remaining admission bounds/error ordering, gas-refund allowance restoration,
+whole-receipt state-invariant preservation and global conservation remain open.
+
+`NearChain.step_applyResult` exposes the exact apply result for compositional
+proofs, and `Reachable.firstStep` proves first-step reachability generically.
+The chain scenario uses this universal proof rather than elaborating a redundant
+concrete execution witness inside its IO program; runtime checks are unchanged.

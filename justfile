@@ -49,7 +49,7 @@ near-build:
 # Run the near-lean test suites (VM, runtime and chain scenarios on the real wNEAR binary).
 near-test:
     cd near-lean/vm && lake build vm-tests && ./.lake/build/bin/vm-tests
-    cd near-lean/runtime && lake build runtime-tests finance-replay && ./.lake/build/bin/runtime-tests
+    cd near-lean/runtime && lake build runtime-tests finance-replay nonce-replay && ./.lake/build/bin/runtime-tests
     cd near-lean/chain && lake build chain-tests && ./.lake/build/bin/chain-tests
 
 # Test the wNEAR argument encoding and checked receipt-graph observations.
@@ -83,3 +83,9 @@ near-finance-conformance checkout:
     cd near-lean/runtime && lake build finance-replay --wfail
     python3 tools/runtime-finance-reference/build.py {{checkout}}
     python3 tools/runtime-finance-reference/compare.py {{checkout}}/target/debug/safe-near-finance-reference
+
+# Compare nonce admission to the pinned nearcore private validator.
+near-nonce-conformance checkout:
+    cd near-lean/runtime && lake build nonce-replay --wfail
+    python3 tools/runtime-nonce-reference/build.py {{checkout}}
+    python3 tools/runtime-nonce-reference/compare.py {{checkout}}/target/debug/safe-near-nonce-reference

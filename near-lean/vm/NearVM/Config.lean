@@ -72,6 +72,7 @@ structure AccountCreationConfig where
   deriving Repr, Inhabited
 
 structure RuntimeConfig where
+  strictNonceEnabled : Bool := false
   accountCostIncrease : Bool := true
   minGasPurchasePrice : Nat := 0
   accountCreationCharge : Nat := 0
@@ -182,6 +183,7 @@ def ofJson (j : Json) : Except String RuntimeConfig := do
     delegate := ← feeAt ac "delegate_cost" }
   let finance ← field j "runtime_finance"
   pure {
+    strictNonceEnabled := ← (← field (← field j "runtime_admission") "strict_nonce").getBool?
     accountCostIncrease := ← (← field finance "account_cost_increase").getBool?
     minGasPurchasePrice := ← natString j "min_gas_purchase_price"
     accountCreationCharge := ← natString j "account_creation_charge"

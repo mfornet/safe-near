@@ -497,6 +497,39 @@ def main (args : List String) : IO UInt32 := do
     (lost.issue.isNone && lost.tokensBurnt == 123 && lost.outgoing.isEmpty &&
       lost.outcomes.all fun (_, outcome) => outcome.gasBurnt > 0 && outcome.tokensBurnt == 0)
 
+  let nonceTx (nonce : Nat) (mode : NonceMode) : Transaction := {
+    signerId := "alice.near", publicKey := pkOf 1, nonce, nonceMode := mode,
+    receiverId := "bob.near", actions := [.transfer 1] }
+  check r "nonce: default apply context starts at height one" (World.ap.blockHeight == 1)
+  for (label, nonce, mode, height, expected) in
+      [("monotonic jump", 999_999, NonceMode.monotonic, 1, none),
+       ("ceiling equality", 1_000_000, NonceMode.monotonic, 1, some (.nonceTooLarge 1_000_000 1_000_000)),
+       ("zero height", 1, NonceMode.monotonic, 0, some (.nonceTooLarge 1 0)),
+       ("strict increment", 1, NonceMode.strict, 1, none),
+       ("strict jump", 2, NonceMode.strict, 1, some (.invalidNonce 2 0)),
+       ("stale precedes ceiling", 0, NonceMode.monotonic, 0, some (.invalidNonce 0 0))] do
+    let result := convertTransaction cfg { World.ap with blockHeight := height } genesis (nonceTx nonce mode)
+    check r s!"nonce: {label}" (match result, expected with
+      | .ok _, none => true
+      | .error error, some wanted => error == wanted
+      | _, _ => false)
+  let cfg84 ← RuntimeConfig.load configs 84
+  let earlyStrict := { nonceTx 1 .strict with signerId := "nobody.near" }
+  check r "nonce: strict version gate precedes account admission"
+    (match convertTransaction cfg84 World.ap genesis earlyStrict with
+     | .error .invalidTransactionVersion => true | _ => false)
+  let rejectedNonce := Near.apply cfg World.ap (fun _ => code) genesis [nonceTx 1_000_000 .monotonic] []
+  check r "nonce: rejected ceiling leaves balance, key, counter and fees untouched"
+    (rejectedNonce.tokensBurnt == 0 && rejectedNonce.outgoing.isEmpty &&
+      rejectedNonce.state.nextId == genesis.nextId &&
+      (rejectedNonce.state.account? "alice.near").map (·.amount) == (genesis.account? "alice.near").map (·.amount) &&
+      (rejectedNonce.state.accessKey? "alice.near" (pkOf 1)).map (·.nonce) == some 0)
+  let sequencedNonce := Near.apply cfg World.ap (fun _ => code) genesis
+    [nonceTx 1 .strict, nonceTx 3 .strict, nonceTx 2 .strict] []
+  check r "nonce: strict admission uses prior accepted transactions and ignores rejection"
+    ((sequencedNonce.state.accessKey? "alice.near" (pkOf 1)).map (·.nonce) == some 2 &&
+      (sequencedNonce.outcomes.take 3).map (fun (_, outcome) => outcome.status.isSuccess) == [true, false, true])
+
   let s ← r.get
   IO.println s!"{s.passed} passed, {s.failed} failed"
   return (if s.failed = 0 then 0 else 1)

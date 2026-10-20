@@ -93,7 +93,8 @@ end ChainState
 
 /-- Per-block context of one `apply`. -/
 structure ApplyState where
-  blockHeight : Nat := 0
+  /-- On-chain application starts at height one; height zero rejects all nonces. -/
+  blockHeight : Nat := 1
   blockTimestamp : Nat := 0
   epochHeight : Nat := 0
   gasPrice : Nat := 100_000_000

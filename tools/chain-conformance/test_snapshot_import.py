@@ -23,7 +23,7 @@ def snapshot():
     blob = (HERE / "fixtures/replay.wasm").read_bytes()
     config = json.loads((ROOT / "near-lean/vm/configs/runtime_config_v86.json").read_text())
     return dict(format="safe-near-snapshot-v1", block=dict(header=dict(hash="1" * 32, height=100)),
-        protocol_config=dict(protocol_version=86, runtime_config={k: v for k, v in config.items() if k != "runtime_finance"}),
+        protocol_config=dict(protocol_version=86, runtime_config={k: v for k, v in config.items() if k not in {"runtime_finance", "runtime_admission"}}),
         scope=dict(all_accounts=False, receipt_queues=False, state_proofs_verified=False),
         accounts=[dict(account_id="captured.near", account=dict(amount=str(10 * 10**24), locked="17",
             code_hash=importer.code_hash(blob), storage_usage=400, storage_paid_at=0),
