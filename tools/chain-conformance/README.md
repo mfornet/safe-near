@@ -176,3 +176,8 @@ error variants fail closed. Raw diagnostic formatting remains in evidence.
 and native failure precedence in 72 scenarios across protocols 83–86. Missing
 keys, receiver/method mismatches and insufficient allowances preserve every
 native semantic parameter, including the actual transaction cost.
+
+`just chain-validation-test` compares stateless action admission and binds
+actual deployment bytes to signed native transactions. Native RPC views mask
+deployment payloads as hashes, so the bridge uses separately exported typed
+actions decoded from canonical Borsh, retaining the RPC view for provenance.

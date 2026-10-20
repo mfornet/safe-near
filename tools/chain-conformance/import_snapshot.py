@@ -40,8 +40,10 @@ def permission(raw):
     allowance = None if value["allowance"] is None else amount(value["allowance"], "allowance")
     if not isinstance(value["method_names"], list) or any(not isinstance(x, str) for x in value["method_names"]):
         raise ValueError("invalid function-call method names")
+    if not isinstance(value["receiver_id"], str):
+        raise ValueError("invalid function-call key receiver")
     return dict(kind="functionCall", allowance=allowance,
-                receiverId=account_id(value["receiver_id"], "key receiver"), methodNames=value["method_names"])
+                receiverId=value["receiver_id"], methodNames=value["method_names"])
 
 
 def access_key(raw):
@@ -191,8 +193,9 @@ def initial_state(trace, keys, codes):
     return canonical_state(result)
 
 
-def write_json(path, value):
-    path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n")
+def write_json(path, value, *, compact=False):
+    options = dict(separators=(",", ":")) if compact else dict(indent=2)
+    path.write_text(json.dumps(value, sort_keys=True, **options) + "\n")
 
 
 def publish(stage, destination):
@@ -311,7 +314,7 @@ def prepare(snapshot, destination, *, reference, model, scenario=None):
             for row in transactions:
                 tx = dict(signerId=row["view"]["signer_id"], receiverId=row["view"]["receiver_id"],
                     nonce=row["view"]["nonce"], publicKey=signed["publicKeyBorsh"],
-                    actions=[action(a, keys, codes) for a in row["view"]["actions"]])
+                    actions=[action(a, keys, codes) for a in row["actions"]])
                 if row["version"] == 1:
                     if row["view"].get("nonce_index") is not None:
                         raise ValueError("gas-key nonce lanes are not represented by this importer")
@@ -361,10 +364,10 @@ def prepare(snapshot, destination, *, reference, model, scenario=None):
             raise ValueError("Lean initial state differs from the captured account projection")
         write_json(stage / "snapshot.json", snapshot)
         write_json(stage / "scenario.json", scenario)
-        write_json(stage / "native.json", native_request)
-        write_json(stage / "model.json", model_request)
-        write_json(stage / "native-initial.json", native_zero)
-        write_json(stage / "model-initial.json", model_zero)
+        write_json(stage / "native.json", native_request, compact=True)
+        write_json(stage / "model.json", model_request, compact=True)
+        write_json(stage / "native-initial.json", native_zero, compact=True)
+        write_json(stage / "model-initial.json", model_zero, compact=True)
         files = {str(path.relative_to(stage)): file_digest(path) for path in sorted(stage.rglob("*")) if path.is_file()}
         rpc_config = snapshot["protocol_config"].get("runtime_config")
         model_view = {k: v for k, v in config.items() if k not in {"runtime_finance", "runtime_admission"}}

@@ -153,3 +153,8 @@ chain-action-test:
 chain-permission-test:
     cd near-lean/chain && lake build chain-replay
     python3 tools/chain-conformance/test_permission_comparison.py
+
+# Compare stateless action admission, boundaries and actual deployment-byte binding.
+chain-validation-test:
+    cd near-lean/chain && lake build chain-replay
+    python3 tools/chain-conformance/test_action_validation.py

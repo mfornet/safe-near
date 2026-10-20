@@ -2,6 +2,7 @@ import NearRuntime.Fees
 import NearRuntime.State
 import NearRuntime.Nonce
 import NearRuntime.Refund
+import NearRuntime.ActionValidation
 
 /-!
 # `apply`
@@ -643,7 +644,7 @@ def commitTransaction (st : ChainState) (tx : Transaction) (signer : Account)
 
 /-- `verify_and_charge_transaction`: signer, key, nonce, permission and
 balance checks; charges the cost; bumps the nonce; returns the receipt. -/
-def convertTransaction (cfg : RuntimeConfig) (ap : ApplyState) (st : ChainState) (tx : Transaction) :
+def convertTransactionCore (cfg : RuntimeConfig) (ap : ApplyState) (st : ChainState) (tx : Transaction) :
     Except RuntimeError (ChainState × Receipt × Fees.TxCost) := do
   if tx.nonceMode = .strict ∧ cfg.strictNonceEnabled = false then throw .invalidTransactionVersion
   if tx.versionSupported cfg = false then throw .invalidTransactionVersion
@@ -660,6 +661,13 @@ def convertTransaction (cfg : RuntimeConfig) (ap : ApplyState) (st : ChainState)
   if deficit > 0 then throw (.lackBalanceForState tx.signerId deficit)
   let key' ← validateTransactionAccessKey tx key cost
   return commitTransaction st tx signer key' cost
+
+/-- Stateless actions are checked before envelope/key admission or any charge. -/
+def convertTransaction (cfg : RuntimeConfig) (ap : ApplyState) (st : ChainState) (tx : Transaction) :
+    Except RuntimeError (ChainState × Receipt × Fees.TxCost) := do
+  match validateTransactionActions cfg tx.actions with
+  | .error error => throw (.actionsValidation error)
+  | .ok () => convertTransactionCore cfg ap st tx
 
 /-- `Runtime::apply`. Transactions first; only signer-is-receiver receipts
 are local. Other transaction receipts are outgoing work for a later chunk.

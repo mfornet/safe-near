@@ -113,13 +113,17 @@ class SnapshotImportTests(unittest.TestCase):
                 receiverId="captured.near", nonce=1, blockHash=[0] * 32, actions=raw)])
             one = importer.native_call(native, "--sign-transactions", request)
             self.assertEqual(one, importer.native_call(native, "--sign-transactions", request))
+            self.assertEqual(one["transactions"][0]["actions"], raw)
             codes = {}
-            converted = [importer.action(value, one["actionPublicKeys"], codes) for value in one["transactions"][0]["view"]["actions"]]
+            converted = [importer.action(value, one["actionPublicKeys"], codes) for value in one["transactions"][0]["actions"]]
             self.assertEqual([value["kind"] for value in converted], ["createAccount", "deployContract", "functionCall",
                 "transfer", "stake", "addKey", "deleteKey", "deleteAccount"])
             self.assertEqual(converted[2]["args"], [0, 255])
             self.assertEqual(converted[5]["accessKey"]["nonce"], 7)
             self.assertEqual(len(codes), 1)
+            self.assertEqual(next(iter(codes.values())), b"\0asm\1\0\0\0")
+            self.assertNotEqual(one["transactions"][0]["view"]["actions"][1]["DeployContract"]["code"],
+                one["transactions"][0]["actions"][1]["DeployContract"]["code"])
             request["transactions"][0]["actions"][2]["FunctionCall"]["ignored"] = 1
             with self.assertRaises(subprocess.CalledProcessError):
                 importer.native_call(native, "--sign-transactions", request)

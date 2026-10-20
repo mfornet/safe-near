@@ -290,3 +290,11 @@ and promised-action limitations remain explicit model issues. The receipt gas
 bound also covers these exits and failed-action index tracking. Completion
 data follows refunds, and system-refund outcomes retain native execution-gas
 observations while token settlement remains exempt.
+
+`NearRuntime.ActionValidation` checks modeled ordinary-key action lists before
+stateful transaction admission. `convertTransaction_actions_valid` proves every
+successful public conversion passed these rules; `convertTransaction_actions_error`
+proves an action error bypasses stateful admission. The validator uses native
+count/check/gas ordering and UTF-8 byte lengths, with protocol-specific deploy
+limits. Cryptographic staking-key eligibility and transaction-envelope size
+checks remain separate open boundaries.

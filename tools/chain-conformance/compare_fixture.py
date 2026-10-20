@@ -270,6 +270,24 @@ class Projection:
                     account = payload["CodeDoesNotExist"]
                     if isinstance(account, dict) and set(account) == {"account_id"} and account["account_id"] == executor:
                         details = dict(kind="functionCallError", error=dict(kind="compilationError", message="CodeDoesNotExist", accountId=executor))
+            elif context == "transaction" and native == "ActionsValidation":
+                unit_errors = {"DeleteActionMustBeFinal", "FunctionCallZeroAttachedGas", "IntegerOverflow"}
+                parameters = {
+                    "TotalPrepaidGasExceeded": {"total_prepaid_gas", "limit"},
+                    "TotalNumberOfActionsExceeded": {"total_number_of_actions", "limit"},
+                    "TotalNumberOfDeployActionsExceeded": {"number_of_deploy_actions", "limit"},
+                    "AddKeyMethodNamesNumberOfBytesExceeded": {"total_number_of_bytes", "limit"},
+                    "AddKeyMethodNameLengthExceeded": {"length", "limit"},
+                    "InvalidAccountId": {"account_id"}, "ContractSizeExceeded": {"size", "limit"},
+                    "FunctionCallMethodNameLengthExceeded": {"length", "limit"},
+                    "FunctionCallArgumentsLengthExceeded": {"length", "limit"},
+                }
+                if isinstance(data, str) and data in unit_errors:
+                    details = dict(kind="actionsValidation", error=dict(kind=data))
+                elif isinstance(data, dict) and len(data) == 1:
+                    variant, fields = next(iter(data.items()))
+                    if variant in parameters and isinstance(fields, dict) and set(fields) == parameters[variant]:
+                        details = dict(kind="actionsValidation", error=dict(kind=variant, **fields))
             elif context == "transaction" and native == "InvalidAccessKeyError":
                 if data in ["RequiresFullAccess", "DepositWithFunctionCall"]:
                     details = dict(kind="invalidAccessKey", reason=data)
@@ -313,7 +331,7 @@ class Projection:
                     raise ValueError("gas-key nonce lanes are not represented by the model")
                 value = dict(signerId=tx["signer_id"], receiverId=tx["receiver_id"],
                     nonce=tx["nonce"], publicKey=self.keys[tx["public_key"]],
-                    actions=[importer.action(a, self.keys, copy.copy(self.codes)) for a in tx["actions"]])
+                    actions=[importer.action(a, self.keys, copy.copy(self.codes)) for a in row["actions"]])
                 if row["version"] == 1:
                     mode = tx.get("nonce_mode", "monotonic")
                     if mode not in {"monotonic", "strict"}:

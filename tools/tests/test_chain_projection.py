@@ -103,6 +103,28 @@ class ChainProjectionTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     p.status(value)
 
+    def test_stateless_action_errors_preserve_parameters_and_reject_extras(self):
+        projection = comparator.Projection({})
+        for variant, parameters in [
+            ("TotalPrepaidGasExceeded", {"total_prepaid_gas": 2**64 - 1, "limit": 10**15}),
+            ("TotalNumberOfDeployActionsExceeded", {"number_of_deploy_actions": 11, "limit": 10}),
+            ("FunctionCallMethodNameLengthExceeded", {"length": 257, "limit": 256}),
+            ("InvalidAccountId", {"account_id": "UPPER.near"}),
+        ]:
+            with self.subTest(variant=variant):
+                status = {"Failure": {"InvalidTxError": {"ActionsValidation": {variant: parameters}}}}
+                self.assertEqual(projection.status(status), dict(kind="failure", actionIndex=None,
+                    error=dict(kind="actionsValidation", error=dict(kind=variant, **parameters))))
+                parameters["extra"] = 1
+                with self.assertRaises(ValueError):
+                    projection.status(status)
+        for variant in ["DeleteActionMustBeFinal", "FunctionCallZeroAttachedGas", "IntegerOverflow"]:
+            status = {"Failure": {"InvalidTxError": {"ActionsValidation": variant}}}
+            self.assertEqual(projection.status(status)["error"],
+                dict(kind="actionsValidation", error=dict(kind=variant)))
+        with self.assertRaises(ValueError):
+            projection.status({"Failure": {"InvalidTxError": {"ActionsValidation": "unknown"}}})
+
     def test_unrepresented_function_call_errors_fail_closed(self):
         p = comparator.Projection({})
         for error in [{"CompilationError": {"CodeDoesNotExist": 7}},

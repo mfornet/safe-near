@@ -79,8 +79,23 @@ def stateJson (s : ChainState) : Json :=
       ("receivedData", toJson (s.receivedData.map fun (id, data) => (id, data.map bytesJson))),
       ("delayed", toJson (s.delayed.map receiptJson)), ("nextId", toJson s.nextId)]
 
+def actionValidationErrorJson : ActionsValidationError → Json
+  | .deleteActionMustBeFinal => obj [kind "DeleteActionMustBeFinal"]
+  | .functionCallZeroAttachedGas => obj [kind "FunctionCallZeroAttachedGas"]
+  | .integerOverflow => obj [kind "IntegerOverflow"]
+  | .totalPrepaidGasExceeded total limit => obj [kind "TotalPrepaidGasExceeded", ("total_prepaid_gas", toJson total), ("limit", toJson limit)]
+  | .totalNumberOfActionsExceeded count limit => obj [kind "TotalNumberOfActionsExceeded", ("total_number_of_actions", toJson count), ("limit", toJson limit)]
+  | .totalNumberOfDeployActionsExceeded count limit => obj [kind "TotalNumberOfDeployActionsExceeded", ("number_of_deploy_actions", toJson count), ("limit", toJson limit)]
+  | .addKeyMethodNamesNumberOfBytesExceeded total limit => obj [kind "AddKeyMethodNamesNumberOfBytesExceeded", ("total_number_of_bytes", toJson total), ("limit", toJson limit)]
+  | .addKeyMethodNameLengthExceeded length limit => obj [kind "AddKeyMethodNameLengthExceeded", ("length", toJson length), ("limit", toJson limit)]
+  | .invalidAccountId id => obj [kind "InvalidAccountId", ("account_id", toJson id)]
+  | .contractSizeExceeded size limit => obj [kind "ContractSizeExceeded", ("size", toJson size), ("limit", toJson limit)]
+  | .functionCallMethodNameLengthExceeded length limit => obj [kind "FunctionCallMethodNameLengthExceeded", ("length", toJson length), ("limit", toJson limit)]
+  | .functionCallArgumentsLengthExceeded length limit => obj [kind "FunctionCallArgumentsLengthExceeded", ("length", toJson length), ("limit", toJson limit)]
+
 /-- Structured semantic error fields are independent of Lean's pretty printer. -/
 def runtimeErrorJson (executor : AccountId) : RuntimeError → Json
+  | .actionsValidation error => obj [kind "actionsValidation", ("error", actionValidationErrorJson error)]
   | .accountAlreadyExists id => obj [kind "accountAlreadyExists", ("accountId", toJson id)]
   | .accountDoesNotExist id => obj [kind "accountDoesNotExist", ("accountId", toJson id)]
   | .createAccountNotAllowed id predecessor =>

@@ -285,7 +285,7 @@ fn run(request: &Value) -> Result<Value> {
             .map(decode)
             .collect::<Result<_>>()?;
         // The bridge consumes upstream-decoded views, never a second custom
-        // Borsh parser. Preserve version and canonical bytes beside each view.
+        // Borsh parser. RPC views hash deployment bytes; retain actual typed actions.
         let transactions = txs
             .iter()
             .map(|tx| {
@@ -294,6 +294,7 @@ fn run(request: &Value) -> Result<Value> {
                     Transaction::V1(_) => 1,
                 };
                 Ok(json!({"version":version, "borsh":borsh_bytes(tx)?,
+                    "actions":to_value(tx.transaction.actions())?,
                     "view":SignedTransactionView::from(tx.clone())}))
             })
             .collect::<Result<Vec<_>>>()?;
@@ -696,6 +697,7 @@ fn sign_transactions(request: &Value) -> Result<Value> {
             _ => return Err("unsupported transaction envelope tag".into()),
         };
         result.push(json!({"version":version,"borsh":borsh_bytes(&transaction)?,
+            "actions":to_value(transaction.transaction.actions())?,
             "view":SignedTransactionView::from(transaction)}));
     }
     Ok(

@@ -224,3 +224,28 @@ ceiling equality and gate/error precedence. It checks full state, charges,
 queues, outcomes and completion, retaining raw evidence in
 `audit/transaction-version-comparison.json`. This supports ordinary access keys;
 V1 gas-key nonce lanes remain unsupported and are rejected explicitly.
+
+## Stateless action admission
+
+`just chain-validation-test` checks 84 action-boundary and precedence scenarios
+across protocols 83–86, two actual 4 MiB overflow cases on protocol 86, and a
+signed deployment-byte binding regression. It exercises action/deploy counts,
+ordered delete checks, zero/total/overflowing gas, UTF-8 method byte limits,
+argument/code sizes, key receiver validation and terminated key-method totals.
+Rejections happen before signer charging, allowance updates or nonce changes;
+valid transactions around a rejection still execute. Structured native errors
+retain every mapped parameter, including the byte-truncated invalid key receiver.
+The transaction-size gate and staking-key curve eligibility remain outside this
+action-list validator.
+
+RPC `SignedTransactionView` masks deployment code as its hash. The native
+adapter therefore exports both the original RPC `view` and actual typed
+`actions` decoded from the signed Borsh input. The importer and comparator use
+those actual actions; code bytes are never reconstructed from an RPC code hash.
+A regression changes only the model deployment label and confirms that the
+signed bytes cannot be rebound to a different catalogued module.
+
+Synthetic request and initial-trace JSON files use compact encoding to avoid
+inflating multi-megabyte byte arrays. Their complete contents remain covered by
+the manifest hashes. Configurations, capture/scenario records and manifest
+metadata remain readable JSON. Reports retain all raw inputs and observations.

@@ -145,9 +145,25 @@ structure Transaction where
   actions : List Action
   deriving Inhabited
 
-/-- Why a receipt or transaction failed (`ActionErrorKind` and
-`InvalidTxError`, flattened). -/
+/-- Stateless action errors, before signer/key admission or transaction charges. -/
+inductive ActionsValidationError
+  | deleteActionMustBeFinal
+  | totalPrepaidGasExceeded (total limit : Nat)
+  | totalNumberOfActionsExceeded (count limit : Nat)
+  | totalNumberOfDeployActionsExceeded (count limit : Nat)
+  | addKeyMethodNamesNumberOfBytesExceeded (total limit : Nat)
+  | addKeyMethodNameLengthExceeded (length limit : Nat)
+  | integerOverflow
+  | invalidAccountId (id : String)
+  | contractSizeExceeded (size limit : Nat)
+  | functionCallMethodNameLengthExceeded (length limit : Nat)
+  | functionCallArgumentsLengthExceeded (length limit : Nat)
+  | functionCallZeroAttachedGas
+  deriving Repr, BEq, Inhabited
+
+/-- Receipt and transaction failures, preserving stateless action error categories. -/
 inductive RuntimeError
+  | actionsValidation (error : ActionsValidationError)
   | accountAlreadyExists (id : AccountId)
   | accountDoesNotExist (id : AccountId)
   | createAccountNotAllowed (id predecessor : AccountId)
