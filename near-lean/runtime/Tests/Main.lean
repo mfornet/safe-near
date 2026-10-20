@@ -191,7 +191,7 @@ def checkRefundScenarios (r : IO.Ref Report) (cfg : RuntimeConfig) (code : Contr
   let beforeRefund := Near.apply cfg World.ap (fun _ => code) first.state [tx 2] []
   check r "gas refund: another call is rejected before its allowance returns"
     (beforeRefund.tokensBurnt == 0 && beforeRefund.outcomes.any fun (_, outcome) => match outcome.status with
-      | .failure (.invalidAccessKey message) => message == "NotEnoughAllowance" | _ => false)
+      | .failure (.notEnoughAllowance ..) => true | _ => false)
   let restored := Near.apply cfg World.ap (fun _ => code) first.state [] first.outgoing
   check r "gas refund: restores allowance exactly without double-crediting account funds"
     (restored.issue.isNone && restored.tokensBurnt == 0 && restored.outgoing.isEmpty &&

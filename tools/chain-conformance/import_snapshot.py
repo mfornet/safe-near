@@ -265,7 +265,7 @@ def prepare(snapshot, destination, *, reference, model, scenario=None):
                     blockHash=byte_list(tx.get("blockHash", block["prevBlockHash"]), "transaction block hash", 32)))
         if "caller" in scenario:
             caller = scenario["caller"]
-            fields(caller, ["accountId", "seed", "amount"])
+            fields(caller, ["accountId", "seed", "amount"], ["accessKey"])
             identifier = account_id(caller["accountId"], "synthetic caller")
             if identifier == "system":
                 raise ValueError("system is reserved for protocol receipts, not a synthetic caller")
@@ -275,10 +275,19 @@ def prepare(snapshot, destination, *, reference, model, scenario=None):
                 raise ValueError("provide an explicit synthetic caller seed")
             signed = native_call(native, "--sign-transactions", dict(signerId=identifier, seed=caller["seed"], transactions=specifications))
             usage = config["transaction_costs"]["storage_usage_config"]
-            storage_usage = usage["num_bytes_account"] + usage["num_extra_bytes_record"] + len(signed["publicKeyBorsh"]) + len(signed["accessKeyBorsh"])
-            rows.append(dict(accountId=identifier, amount=amount(caller["amount"], "synthetic balance"), locked="0",
-                storageUsage=storage_usage, code=None, keys=[dict(publicKey=signed["publicKey"],
-                accessKey=dict(nonce=0, permission="FullAccess"))], storage=[]))
+            caller_key = caller.get("accessKey", dict(nonce=0, permission="FullAccess"))
+            if caller_key is not None:
+                access_key(caller_key)
+            caller_row = dict(accountId=identifier, amount=amount(caller["amount"], "synthetic balance"), locked="0",
+                storageUsage=usage["num_bytes_account"], code=None, keys=[] if caller_key is None else [
+                    dict(publicKey=signed["publicKey"], accessKey=caller_key)], storage=[])
+            if caller_key is not None:
+                # Measure the actual native AccessKey encoding, including variable permissions.
+                sizing = native_call(native, "--encode-state", {"accounts": [caller_row]})["initialEntries"]
+                if len(sizing) != 2 or sizing[0][0][0] != 0 or sizing[1][0][0] != 2:
+                    raise ValueError("unexpected native account/access-key sizing records")
+                caller_row["storageUsage"] += usage["num_extra_bytes_record"] + len(signed["publicKeyBorsh"]) + len(sizing[1][1])
+            rows.append(caller_row)
         elif specifications:
             raise ValueError("transactions require an explicitly funded synthetic caller")
         encoded = native_call(native, "--encode-state", {"accounts": rows})

@@ -546,15 +546,22 @@ def validateTransactionAccessKey (tx : Transaction) (key : AccessKey) (cost : Fe
     | .functionCall allowance receiver methods =>
       match tx.actions with
       | [.functionCall m _ _ deposit] =>
-        if tx.receiverId != receiver then throw (.invalidAccessKey "ReceiverMismatch")
         if deposit > 0 then throw (.invalidAccessKey "DepositWithFunctionCall")
-        if !(methods.isEmpty || methods.contains m) then throw (.invalidAccessKey "MethodNameMismatch")
+        if tx.receiverId != receiver then throw (.receiverMismatch tx.receiverId receiver)
+        if !(methods.isEmpty || methods.contains m) then throw (.methodNameMismatch m)
         match allowance with
         | some al =>
-          if al < cost.total then throw (.invalidAccessKey "NotEnoughAllowance")
+          if al < cost.total then throw (.notEnoughAllowance tx.signerId tx.publicKey al cost.total)
           pure { nonce := tx.nonce, permission := .functionCall (some (al - cost.total)) receiver methods }
         | none => pure { key with nonce := tx.nonce }
       | _ => throw (.invalidAccessKey "RequiresFullAccess")
+
+/-- Native admission checks finite allowance before storage stake and permissions. -/
+def validateTransactionAllowance (tx : Transaction) (key : AccessKey) (cost : Fees.TxCost) :
+    Except RuntimeError Unit := do
+  if let .functionCall (some allowance) _ _ := key.permission then
+    if allowance < cost.total then
+      throw (.notEnoughAllowance tx.signerId tx.publicKey allowance cost.total)
 
 /-- Commit the already-validated transaction debit, key update and fresh receipt.
 Callers must establish that `signer` is the current signer account and funded. -/
@@ -582,16 +589,17 @@ def convertTransaction (cfg : RuntimeConfig) (ap : ApplyState) (st : ChainState)
   if tx.nonceMode = .strict ∧ cfg.strictNonceEnabled = false then throw .invalidTransactionVersion
   if tx.versionSupported cfg = false then throw .invalidTransactionVersion
   let some signer := st.account? tx.signerId | throw (.invalidSigner tx.signerId)
-  let some key := st.accessKey? tx.signerId tx.publicKey | throw (.invalidAccessKey "AccessKeyNotFound")
+  let some key := st.accessKey? tx.signerId tx.publicKey | throw (.accessKeyNotFound tx.signerId tx.publicKey)
   verifyNonce tx.nonce key.nonce (some ap.blockHeight) tx.nonceMode
   if tx.actions.length > cfg.wasm.limits.maxActionsPerReceipt then
     throw (.tooManyActions tx.actions.length cfg.wasm.limits.maxActionsPerReceipt)
   let cost := Fees.txCost cfg ap.gasPrice tx.signerId tx.receiverId tx.actions
-  let key' ← validateTransactionAccessKey tx key cost
   if signer.amount < cost.total then throw (.notEnoughBalance tx.signerId signer.amount cost.total)
+  validateTransactionAllowance tx key cost
   let signer' := { signer with amount := signer.amount - cost.total }
   let deficit := storageStakeDeficit cfg signer'
   if deficit > 0 then throw (.lackBalanceForState tx.signerId deficit)
+  let key' ← validateTransactionAccessKey tx key cost
   return commitTransaction st tx signer key' cost
 
 /-- `Runtime::apply`. Transactions first; only signer-is-receiver receipts

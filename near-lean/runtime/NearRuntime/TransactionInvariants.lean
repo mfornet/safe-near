@@ -47,17 +47,21 @@ theorem convertTransaction_success_commit (cfg : RuntimeConfig) (ap : ApplyState
             · simp [convertTransaction, hversion, hg, hs, hk, hvn, ha] at h
             · let expected := Fees.txCost cfg ap.gasPrice tx.signerId tx.receiverId tx.actions
               have he : Fees.txCost cfg ap.gasPrice tx.signerId tx.receiverId tx.actions = expected := rfl
-              cases hv : validateTransactionAccessKey tx key expected with
-              | error err => simp [convertTransaction, hversion, hg, hs, hk, hvn, ha, he, hv] at h
-              | ok newKey =>
-                by_cases hb : signer.amount < expected.total
-                · simp [convertTransaction, hversion, hg, hs, hk, hvn, ha, he, hv, hb] at h
-                · by_cases hd : storageStakeDeficit cfg { signer with amount := signer.amount - expected.total } > 0
-                  · simp [convertTransaction, hversion, hg, hs, hk, hvn, ha, he, hv, hb, hd] at h
-                  · refine ⟨signer, newKey, rfl, ?_, ?_, key, rfl, hn, hv, hvn, hgate⟩
-                    · change expected.total ≤ signer.amount
-                      omega
-                    · simpa [convertTransaction, hversion, hg, hs, hk, hvn, ha, he, hv, hb, hd] using h
+              by_cases hb : signer.amount < expected.total
+              · simp [convertTransaction, hversion, hg, hs, hk, hvn, ha, he, hb] at h
+              · cases hal : validateTransactionAllowance tx key expected with
+                | error err => simp [convertTransaction, hversion, hg, hs, hk, hvn, ha, he, hb, hal] at h
+                | ok accepted =>
+                  cases accepted
+                  by_cases hd : storageStakeDeficit cfg { signer with amount := signer.amount - expected.total } > 0
+                  · simp [convertTransaction, hversion, hg, hs, hk, hvn, ha, he, hb, hal, hd] at h
+                  · cases hv : validateTransactionAccessKey tx key expected with
+                    | error err => simp [convertTransaction, hversion, hg, hs, hk, hvn, ha, he, hb, hal, hd, hv] at h
+                    | ok newKey =>
+                      refine ⟨signer, newKey, rfl, ?_, ?_, key, rfl, hn, hv, hvn, hgate⟩
+                      · change expected.total ≤ signer.amount
+                        omega
+                      · simpa [convertTransaction, hversion, hg, hs, hk, hvn, ha, he, hb, hal, hd, hv] using h
 
 /-- Successful conversion uses a supported native transaction envelope. -/
 theorem convertTransaction_version_supported (cfg : RuntimeConfig) (ap : ApplyState)

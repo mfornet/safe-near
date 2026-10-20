@@ -136,6 +136,23 @@ class SnapshotImportTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 importer.prepare(snapshot(), Path(directory) / "fixture", reference=REFERENCE, model=MODEL, scenario=request)
 
+    def test_synthetic_key_overrides_reject_unrepresented_fields_and_numeric_overflow(self):
+        invalid = [dict(nonce=2**64, permission="FullAccess"),
+            dict(nonce=0, permission="FullAccess", unknown=1),
+            dict(nonce=0, permission={"FunctionCall": {"allowance": str(2**128),
+                "receiver_id": "captured.near", "method_names": ["ping"]}}),
+            dict(nonce=0, permission={"FunctionCall": {"allowance": None,
+                "receiver_id": "captured.near", "method_names": [7]}})]
+        with tempfile.TemporaryDirectory() as directory:
+            for index, key in enumerate(invalid):
+                with self.subTest(key=key):
+                    request = scenario()
+                    request["caller"]["accessKey"] = key
+                    target = Path(directory) / str(index)
+                    with self.assertRaises(ValueError):
+                        importer.prepare(snapshot(), target, reference=REFERENCE, model=MODEL, scenario=request)
+                    self.assertFalse(target.exists())
+
     def test_native_encoder_rejects_duplicates_and_unknown_access_key_fields(self):
         with frozen_reference(REFERENCE) as (native, _):
             rows, _, _ = importer.validate_snapshot(snapshot())

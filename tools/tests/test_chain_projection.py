@@ -82,6 +82,27 @@ class ChainProjectionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             p.status(value)
 
+    def test_restricted_key_error_parameters_are_lossless(self):
+        p = comparator.Projection({})
+        key = "ed25519:" + "1" * 32
+        vectors = [
+            ("AccessKeyNotFound", {"account_id": "alice.near", "public_key": key},
+                {"accountId": "alice.near", "publicKey": [0] * 33}),
+            ("ReceiverMismatch", {"tx_receiver": "bob.near", "ak_receiver": "other.near"},
+                {"txReceiver": "bob.near", "keyReceiver": "other.near"}),
+            ("MethodNameMismatch", {"method_name": "denied"}, {"methodName": "denied"}),
+            ("NotEnoughAllowance", {"account_id": "alice.near", "public_key": key, "allowance": "2", "cost": "3"},
+                {"accountId": "alice.near", "publicKey": [0] * 33, "allowance": "2", "cost": "3"}),
+        ]
+        for reason, parameters, expected in vectors:
+            with self.subTest(reason=reason):
+                value = {"Failure": {"InvalidTxError": {"InvalidAccessKeyError": {reason: parameters}}}}
+                self.assertEqual(p.status(value), dict(kind="failure", actionIndex=None,
+                    error=dict(kind="invalidAccessKey", reason=reason, **expected)))
+                parameters["unrepresented"] = 1
+                with self.assertRaises(ValueError):
+                    p.status(value)
+
     def test_unrepresented_function_call_errors_fail_closed(self):
         p = comparator.Projection({})
         for error in [{"CompilationError": {"CodeDoesNotExist": 7}},

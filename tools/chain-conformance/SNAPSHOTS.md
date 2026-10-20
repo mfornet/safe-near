@@ -55,6 +55,20 @@ never provide a real private key. The tool does not contact or submit to a
 network. All eight modeled action kinds are encoded and signed through native
 protocol types; this does not assert that their execution is equivalent.
 
+The optional caller `accessKey` uses native JSON: for example
+`{"nonce":0,"permission":{"FunctionCall":{"allowance":"1000000000000000000000000","receiver_id":"captured.near","method_names":["read"]}}}`.
+Omitting it keeps the default nonce-zero full-access key. Setting it to `null`
+creates a funded caller without the signing key, for missing-key admission tests.
+The native serialized key determines synthetic storage usage; finite and
+unlimited permissions retain their complete fields in both executors.
+
+`just chain-permission-test` checks 72 scenarios across protocols 83–86,
+including rejected transactions between accepted ones. Admission compares the
+complete missing-key, receiver, method and allowance error parameters. Native
+failure order after envelope/key/nonce checks is balance, allowance, storage
+stake, then permission constraints;
+within a single function call, attached deposits precede receiver mismatches.
+
 A scenario has this shape:
 
 ```json

@@ -273,6 +273,18 @@ class Projection:
             elif context == "transaction" and native == "InvalidAccessKeyError":
                 if data in ["RequiresFullAccess", "DepositWithFunctionCall"]:
                     details = dict(kind="invalidAccessKey", reason=data)
+                elif isinstance(data, dict) and len(data) == 1:
+                    reason, parameters = next(iter(data.items()))
+                    names = {
+                        "AccessKeyNotFound": {"account_id": "accountId", "public_key": "publicKey"},
+                        "ReceiverMismatch": {"tx_receiver": "txReceiver", "ak_receiver": "keyReceiver"},
+                        "MethodNameMismatch": {"method_name": "methodName"},
+                        "NotEnoughAllowance": {"account_id": "accountId", "public_key": "publicKey", "allowance": "allowance", "cost": "cost"},
+                    }.get(reason)
+                    if names is not None and isinstance(parameters, dict) and set(parameters) == set(names):
+                        details = dict(kind="invalidAccessKey", reason=reason, **{name:
+                            self.keys[parameters[key]] if key == "public_key" else parameters[key]
+                            for key, name in names.items()})
         if details is None:
             raise ValueError(f"unmapped native execution status: {value}")
         return dict(kind="failure", error=details, actionIndex=index)

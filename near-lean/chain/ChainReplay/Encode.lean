@@ -123,6 +123,15 @@ def runtimeErrorJson (executor : AccountId) : RuntimeError → Json
   | .invalidNonce nonce current => obj [kind "invalidNonce", ("nonce", toJson nonce), ("currentNonce", toJson current)]
   | .nonceTooLarge nonce upper => obj [kind "nonceTooLarge", ("nonce", toJson nonce), ("upperBound", toJson upper)]
   | .invalidAccessKey message => obj [kind "invalidAccessKey", ("reason", toJson message)]
+  | .accessKeyNotFound id pk => obj [kind "invalidAccessKey", ("reason", toJson "AccessKeyNotFound"),
+      ("accountId", toJson id), ("publicKey", bytesJson pk)]
+  | .receiverMismatch txReceiver keyReceiver => obj [kind "invalidAccessKey", ("reason", toJson "ReceiverMismatch"),
+      ("txReceiver", toJson txReceiver), ("keyReceiver", toJson keyReceiver)]
+  | .methodNameMismatch method => obj [kind "invalidAccessKey", ("reason", toJson "MethodNameMismatch"),
+      ("methodName", toJson method)]
+  | .notEnoughAllowance id pk allowance cost => obj [kind "invalidAccessKey", ("reason", toJson "NotEnoughAllowance"),
+      ("accountId", toJson id), ("publicKey", bytesJson pk),
+      ("allowance", toJson (toString allowance)), ("cost", toJson (toString cost))]
   | .notEnoughBalance id balance cost =>
     obj [kind "notEnoughBalance", ("accountId", toJson id), ("balance", toJson (toString balance)), ("cost", toJson (toString cost))]
   | .invalidReceiver id => obj [kind "invalidReceiver", ("accountId", toJson id)]

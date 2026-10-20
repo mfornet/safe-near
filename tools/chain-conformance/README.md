@@ -171,3 +171,8 @@ protocols 83–86, including registrar restrictions, multi-action rollback,
 missing methods/code, final storage failures and key nonce initialization.
 Mapped failures preserve semantic parameters and action indices; unsupported
 error variants fail closed. Raw diagnostic formatting remains in evidence.
+
+`just chain-permission-test` compares restricted-key success, atomic rejection
+and native failure precedence in 72 scenarios across protocols 83–86. Missing
+keys, receiver/method mismatches and insufficient allowances preserve every
+native semantic parameter, including the actual transaction cost.
