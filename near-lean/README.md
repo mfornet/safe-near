@@ -320,3 +320,29 @@ and final receipt validation, with no assumed financial equation or host oracle.
 The stronger live-state invariant also covers caught Wasm exceptions and indexed
 memories. This closes successful VM-call funding; ordinary successful multi-action
 receipt and whole-chain conservation remain open.
+
+`MaterializeInvariants` gives a kernel-checked stage decomposition of the existing
+receipt constructor. Allocation, dependency linking and data emission preserve
+all chain fields except `nextId`, including pending, postponed and delayed work.
+The final id counter increases by the promise count, dependency count and direct
+output-data count. Promise receipt ids form a consecutive, duplicate-free range
+between the initial and post-allocation counters, in promise order.
+The constructor preserves arbitrary receiver/action valuations. Its specialized
+funds theorem covers deposits and purchased outgoing gas, using the proved
+predecessor and gas-price metadata of every emitted receipt.
+
+`FunctionCallInvariants.applyFunctionCall_success_funded` connects the public VM
+to actual successful action execution. With unique account keys, it identifies
+the account, deployed code and VM result and proves:
+
+```
+after funds + before subsidy
+  = before funds + incoming deposit + after subsidy + outgoing gas backing
+```
+
+Here funds include liquid/locked account balances and complete newly emitted
+receipt backing. Successful commit preserves account-key uniqueness and frames
+the chain outside the receiver's account/storage and id allocation. The outgoing
+gas term is explicit: linking it to VM reserved gas, composing multiple actions,
+and receipt-wide settlement remain required for full successful-receipt
+conservation.
