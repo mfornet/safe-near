@@ -33,6 +33,22 @@ official one and we use exactly for this purpose.
 
 There was some previous effort at: https://github.com/cajal-technologies/NEAR-lean/
 
+## Interface and implementation
+
+NearRuntime
+    WasmRuntime
+    NearHost
+
+NearRuntime is the main abstraction that we use to run transactions, using the
+wasm runtime, and always passing the current host state, and getting back the
+modified host state.
+
+Between txs we can modify the host state (for example to increase block height,
+    or update the state in any other way)
+
+The program orchestrating the NearRuntime is responsible for synchrounously
+executing transactions.
+
 ## Questions
 
 Is it true that after we schedule any callback that will always be triggered
