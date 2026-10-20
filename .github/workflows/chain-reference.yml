@@ -1,11 +1,7 @@
 name: Chain reference smoke
 
+# Expensive validation is opt-in. Run `just periodic-check <nearcore>` locally.
 on:
-  push:
-    branches: [main]
-    paths: ["tools/chain-conformance/**", "tools/dump-runtime-config/**", "tools/tests/test_chain_reference.py", "near-lean/runtime/**", "near-lean/chain/**", "near-lean/vm/NearVM/**", "near-lean/vm/configs/**", ".github/workflows/chain-reference.yml"]
-  pull_request:
-    paths: ["tools/chain-conformance/**", "tools/dump-runtime-config/**", "tools/tests/test_chain_reference.py", "near-lean/runtime/**", "near-lean/chain/**", "near-lean/vm/NearVM/**", "near-lean/vm/configs/**", ".github/workflows/chain-reference.yml"]
   workflow_dispatch:
 
 permissions:
@@ -56,6 +52,7 @@ jobs:
     name: Financial comparison and snapshot import
     needs: native-reference
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
       - uses: actions/cache@v5

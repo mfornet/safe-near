@@ -1,11 +1,10 @@
 name: Lean quality
 
+# Automatic CI uses Python only; Lean/native suites run locally during periodic checks.
 on:
   push:
     branches: [main]
-    paths: ["**/*.lean", "**/lean-toolchain", "lean-toolchain", "lean-fmt.toml", "**/lakefile.*", "**/lake-manifest.json", "tools/**", ".github/workflows/lean-quality.yml"]
   pull_request:
-    paths: ["**/*.lean", "**/lean-toolchain", "lean-toolchain", "lean-fmt.toml", "**/lakefile.*", "**/lake-manifest.json", "tools/**", ".github/workflows/lean-quality.yml"]
   workflow_dispatch:
 
 permissions:
@@ -16,19 +15,24 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  toolchains:
+  repository:
+    name: Repository checks (no Lean or native builds)
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - name: Check all repository-owned Lean pins
-        run: python3 tools/check_lean_toolchains.py
-      - name: Test repository tooling
-        run: python3 -m unittest discover -s tools/tests -v
+      - name: Check repository pins and offline tooling regressions
+        run: |
+          python3 tools/check_lean_toolchains.py
+          python3 -m unittest discover -s tools/tests -v
+          python3 -m unittest discover -s tools/runtime-conformance -p 'test_*.py' -v
 
   style:
+    if: github.event_name == 'workflow_dispatch'
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -54,6 +58,8 @@ jobs:
         run: python3 tools/tests/check_lean_style.py
 
   programs:
+    if: github.event_name == 'workflow_dispatch'
+    timeout-minutes: 45
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
