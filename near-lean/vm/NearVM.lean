@@ -15,3 +15,4 @@ import NearVM.ExecutionSelection
 import NearVM.PromiseLimits
 import NearVM.FunctionCallValidation
 import NearVM.GasInvariants
+import NearVM.ExecutionGas
