@@ -97,7 +97,7 @@ def validation_steps(root: Path, nearcore: Path) -> list[Step]:
            nearcore / "target/debug/safe-near-nonce-reference")
     python("chain-reference-smoke", "tools/chain-conformance/probe.py")
     python("chain-gas", "tools/chain-conformance/gas_probe.py")
-    for name in ["snapshot_import", "contract_comparison", "transaction_versions", "action_comparison",
+    for name in ["snapshot_import", "contract_comparison", "chunk_storage_accounting", "transaction_versions", "action_comparison",
                  "permission_comparison", "action_validation", "transaction_size", "staking_key",
                  "trie_accounting", "trie_updates", "state_encoding", "receipt_encoding", "queue_encoding",
                  "transaction_encoding", "delayed_local_order", "receipt_registry", "registered_comparison",
