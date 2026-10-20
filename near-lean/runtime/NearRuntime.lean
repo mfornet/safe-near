@@ -2,6 +2,7 @@ import NearRuntime.Types
 import NearRuntime.State
 import NearRuntime.Fees
 import NearRuntime.Apply
+import NearRuntime.StorageAccounting
 import NearRuntime.StateInvariants
 import NearRuntime.AccessKeyInvariants
 import NearRuntime.TransactionInvariants

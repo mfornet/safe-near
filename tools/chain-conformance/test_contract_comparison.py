@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Native contract comparisons, callback schedules and explicit storage gas gaps."""
+"""Exact native contract comparisons, including chunk trie accounting."""
 import copy
 import json
 from pathlib import Path
@@ -66,15 +66,15 @@ class ContractComparisonTests(unittest.TestCase):
             self.assertEqual(len(report["model"]["blocks"][0]["outcomes"]), 1)
             self.assertFalse(report["model"]["quiescent"])
 
-    def test_storage_mutation_gas_gaps_remain_failing_and_fully_reported(self):
+    def test_storage_mutations_match_all_fields(self):
         with tempfile.TemporaryDirectory() as directory:
             for version in [83, 84, 85, 86]:
                 for method in ["write", "remove", "panic_after_write"]:
                     with self.subTest(protocol=version, method=method):
                         report = corpus.run_case(version, method, "all", Path(directory) / f"{version}-{method}", REFERENCE, MODEL)
-                        self.evidence.append(dict(protocol=version, method=method, schedule="all", expectedToMatch=False, comparison=report))
+                        self.evidence.append(dict(protocol=version, method=method, schedule="all", expectedToMatch=True, comparison=report))
                         self.assertIsNone(report["projectionError"])
-                        self.assertTrue(report["differences"])
+                        self.assertEqual(report["differences"], [])
                         native = report["native"]["blocks"][1]["outcomes"][0]["outcome"]
                         model = report["model"]["blocks"][1]["outcomes"][0]["outcome"]
                         storage_costs = {row["cost"]: int(row["gas_used"]) for row in native["metadata"]["gas_profile"]}
@@ -83,7 +83,7 @@ class ContractComparisonTests(unittest.TestCase):
                         self.assertEqual(storage_costs.get(old_value_cost.upper(), 0), 5 * costs[old_value_cost])
                         external_cost = sum(storage_costs.get(name, 0) for name in ["TOUCHING_TRIE_NODE", "READ_CACHED_TRIE_NODE"])
                         self.assertGreater(external_cost, 0)
-                        self.assertEqual(native["gas_burnt"] - model["gasBurnt"], external_cost)
+                        self.assertEqual(native["gas_burnt"], model["gasBurnt"])
                         left, right = comparator.canonical_trace(report["expected"]), comparator.canonical_trace(report["model"])
                         for a, b in zip(left["blocks"], right["blocks"]):
                             self.assertEqual(a["state"]["storage"], b["state"]["storage"])

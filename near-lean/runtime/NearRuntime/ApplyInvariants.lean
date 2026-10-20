@@ -23,7 +23,7 @@ abbrev TransactionLoop := Option ApplyResult × ChainState × List (ReceiptId ×
   List Receipt × List Receipt × Nat × Nat
 
 abbrev ReceiptLoop := Option ApplyResult × ChainState × List (ReceiptId × ExecutionOutcome) ×
-  List Receipt × List ReceiptIdentityBirth × Nat × Nat × List Receipt × List Receipt × Nat × Bool
+  List Receipt × List ReceiptIdentityBirth × Nat × Nat × List Receipt × List Receipt × Nat × Bool × Option TrieOverlay.State
 
 /-- State predicates closed under the scheduler updates survive both real loops,
 including atomic early exits and final assembly of retained/new delayed work. -/
@@ -31,7 +31,8 @@ theorem applyAttempt_state_predicate (cfg : RuntimeConfig) (ap : ApplyState)
     (decoder : Bytes → ContractCode) (P : ChainState → Prop)
     (htx : ∀ before after tx receipt cost, P before →
       convertTransaction cfg ap before tx = .ok (after, receipt, cost) → P after)
-    (hreceipt : ∀ before receipt, P before → P (processReceipt cfg ap decoder before receipt).state)
+    (hreceipt : ∀ accounting before receipt, P before →
+      P (processReceipt cfg { ap with storageAccounting := accounting } decoder before receipt).state)
     (hclear : ∀ before, P before → P { before with delayed := [] })
     (hdelay : ∀ before receipt, P before → P { before with delayed := before.delayed ++ [receipt] })
     (st : ChainState) (txs : List Transaction) (incoming : List Receipt) (h : P st) :
@@ -80,20 +81,23 @@ theorem applyAttempt_state_predicate (cfg : RuntimeConfig) (ap : ApplyState)
         (fun s : ReceiptLoop => P s.2.1 ∧ ∀ returned, s.1 = some returned → P returned.state)
       · exact ⟨hclear _ hconverted.1, by intro returned he; contradiction⟩
       · intro entry state hs
-        by_cases hover : state.2.2.2.2.2.2.2.2.2.2 = true
+        by_cases hover : state.2.2.2.2.2.2.2.2.2.2.1 = true
         · simp only [hover, ite_true]
           split_ifs <;> exact ⟨hs.1, by intro returned he; contradiction⟩
         · simp only [hover, Bool.false_eq_true, ite_false]
-          cases hi : (processReceipt cfg ap decoder state.2.1 entry.1).issue with
+          cases hi : (processReceipt cfg { ap with storageAccounting := state.2.2.2.2.2.2.2.2.2.2.2 } decoder state.2.1 entry.1).issue with
           | some issue =>
             simp only
             exact ⟨hs.1, by intro returned he; cases he; exact h⟩
           | none =>
             simp only
-            have hp := hreceipt state.2.1 entry.1 hs.1
+            have hp := hreceipt state.2.2.2.2.2.2.2.2.2.2.2 state.2.1 entry.1 hs.1
             cases hl : ap.gasLimit with
-            | none => exact ⟨hp, by intro returned he; contradiction⟩
+            | none =>
+              simp only [hl] at hp
+              exact ⟨hp, by intro returned he; contradiction⟩
             | some limit =>
+              simp only [hl] at hp
               simp only
               split_ifs <;> exact ⟨hp, by intro returned he; contradiction⟩
     split
@@ -109,7 +113,7 @@ theorem applyAttempt_systemAbsent (cfg : RuntimeConfig) (ap : ApplyState)
     (applyAttempt cfg ap decoder st txs incoming).state.SystemAccountAbsent := by
   apply applyAttempt_state_predicate cfg ap decoder ChainState.SystemAccountAbsent
   · exact convertTransaction_systemAbsent cfg ap
-  · exact processReceipt_systemAbsent cfg ap decoder
+  · intro accounting; exact processReceipt_systemAbsent cfg { ap with storageAccounting := accounting } decoder
   · intro before hb; exact hb
   · intro before receipt hb; exact hb
   · exact h

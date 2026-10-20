@@ -34,7 +34,8 @@ def Exec.routingIssue (exec : Exec) : Option ExecutionIssue :=
   | _ => none
 
 def processedExecOutput (receipt : Receipt) (exec : Exec) : Processed :=
-  { state := exec.state
+  { storageAccounting := exec.storageAccounting
+    state := exec.state
     receipts := exec.newReceipts
     identityBirths := [{ parent := receipt.receiptId, children := exec.newReceipts.map (·.receiptId), vmActions := exec.vmIdentityBirths }]
     outcomes := [(receipt.receiptId, outcomeOf receipt exec)]

@@ -106,23 +106,23 @@ theorem commitFunctionCall_totalFunds (exec : Exec) (c : ReceiptCtx) (account : 
 
 theorem commitFunctionCall_funded (exec : Exec) (c : ReceiptCtx) (account : Account)
     (code : ContractCode) (method : String) (args : Bytes) (gas deposit : Nat) (isLast : Bool)
-    (effects : FunctionCallEffects) (hwf : exec.state.AccountsUnique)
+    (effects : FunctionCallEffects) (accounting : Option TrieOverlay.State) (hwf : exec.state.AccountsUnique)
     (haccount : exec.state.account? c.receipt.receiverId = some account)
-    (hsuccess : (run c.cfg code.module code.size method (functionCallContext c account args gas deposit isLast)
+    (hsuccess : (run c.cfg code.module code.size method (functionCallContext c account args gas deposit isLast accounting)
       (exec.state.contractStorage c.receipt.receiverId)).aborted = none)
     (heffects : functionCallEffects c account
-      (run c.cfg code.module code.size method (functionCallContext c account args gas deposit isLast)
+      (run c.cfg code.module code.size method (functionCallContext c account args gas deposit isLast accounting)
         (exec.state.contractStorage c.receipt.receiverId)) isLast exec.state = .ok effects) :
-    let outcome := run c.cfg code.module code.size method (functionCallContext c account args gas deposit isLast)
+    let outcome := run c.cfg code.module code.size method (functionCallContext c account args gas deposit isLast accounting)
       (exec.state.contractStorage c.receipt.receiverId)
     (exec.commitFunctionCall outcome effects).totalFunds c.cfg =
       exec.totalFunds c.cfg + deposit + outcome.subsidizedAmount + functionCallGasFunds c outcome := by
   dsimp only
   have hf := run_success_funding c.cfg code.module code.size method
-    (functionCallContext c account args gas deposit isLast) (exec.state.contractStorage c.receipt.receiverId)
+    (functionCallContext c account args gas deposit isLast accounting) (exec.state.contractStorage c.receipt.receiverId)
     defaultFuel hsuccess
   have hc := commitFunctionCall_totalFunds exec c account _ isLast effects heffects hwf haccount
-  change (run c.cfg code.module code.size method (functionCallContext c account args gas deposit isLast)
+  change (run c.cfg code.module code.size method (functionCallContext c account args gas deposit isLast accounting)
     (exec.state.contractStorage c.receipt.receiverId)).balance + _ = account.amount + deposit + _ at hf
   omega
 
@@ -134,7 +134,7 @@ theorem applyFunctionCall_success_funded (c : ReceiptCtx) (method : String) (arg
     (hrun : (applyFunctionCall c method args gas deposit isLast).run.run before = (.ok (), after)) :
     ∃ (account : Account) (code : ContractCode) (effects : FunctionCallEffects),
       before.state.account? c.receipt.receiverId = some account ∧ account.code = some code ∧
-      let outcome := run c.cfg code.module code.size method (functionCallContext c account args gas deposit isLast)
+      let outcome := run c.cfg code.module code.size method (functionCallContext c account args gas deposit isLast before.storageAccounting)
         (before.state.contractStorage c.receipt.receiverId)
       outcome.aborted = none ∧ functionCallEffects c account outcome isLast before.state = .ok effects ∧
       after = (before.recordVMOutcome outcome).commitFunctionCall outcome effects ∧
@@ -159,7 +159,7 @@ theorem applyFunctionCall_success_funded (c : ReceiptCtx) (method : String) (arg
         have bad := congrArg Prod.fst hrun
         cases bad
       | none =>
-        let outcome := run c.cfg code.module code.size method (functionCallContext c account args gas deposit isLast)
+        let outcome := run c.cfg code.module code.size method (functionCallContext c account args gas deposit isLast before.storageAccounting)
           (before.state.contractStorage c.receipt.receiverId)
         simp only [ha, hc, hi] at hrun
         change ((match outcome.aborted with
@@ -187,7 +187,7 @@ theorem applyFunctionCall_success_funded (c : ReceiptCtx) (method : String) (arg
             subst after
             refine ⟨account, code, effects, rfl, hc, he, hx, rfl, ?_⟩
             have hf := commitFunctionCall_funded (before.recordVMOutcome outcome) c account code method args gas deposit
-              isLast effects hwf ha he hx
+              isLast effects before.storageAccounting hwf ha he hx
             change ((before.recordVMOutcome outcome).commitFunctionCall outcome effects).totalFunds c.cfg =
               before.totalFunds c.cfg + deposit + outcome.subsidizedAmount + functionCallGasFunds c outcome at hf
             change ((before.recordVMOutcome outcome).commitFunctionCall outcome effects).totalFunds c.cfg +

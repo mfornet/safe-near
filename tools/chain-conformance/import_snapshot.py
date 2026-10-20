@@ -35,7 +35,7 @@ def represented_entries(rows):
     return [row for row in rows if row[0] and row[0][0] in REPRESENTED_COLUMNS]
 
 
-def canonical_entries(rows):
+def canonical_entries(rows, *, complete=False):
     """Compare every represented raw key/value; never hide duplicate/extra keys."""
     result, seen = [], set()
     if not isinstance(rows, list): raise ValueError("expected represented trie entry list")
@@ -45,7 +45,7 @@ def canonical_entries(rows):
         for raw in [key, value]:
             if not isinstance(raw, list) or any(type(byte) is not int or not 0 <= byte < 256 for byte in raw):
                 raise ValueError("invalid represented trie bytes")
-        if not key or key[0] not in REPRESENTED_COLUMNS: raise ValueError("unrepresented model trie column")
+        if not key or (not complete and key[0] not in REPRESENTED_COLUMNS): raise ValueError("unrepresented model trie column")
         identity = bytes(key)
         if identity in seen: raise ValueError("duplicate represented trie key")
         seen.add(identity); result.append([key, value])
@@ -399,9 +399,10 @@ def prepare(snapshot, destination, *, reference, model, scenario=None, registere
         if (canonical_state(model_zero["initialState"]) != expected or model_zero["initialPendingReceipts"]
                 or model_zero["blocks"] or not model_zero["quiescent"]):
             raise ValueError("Lean initial state differs from the captured account projection")
-        registered_request = {**model_request, "transactionBlockHashes": [
+        registered_request = {**model_request, "schedulerInputs": [
+            {key: block[key] for key in ["congestionInfo", "bandwidthRequests"]} for block in native_blocks], "transactionBlockHashes": [
             [tx.get("blockHash", block["prevBlockHash"]) for tx in block["transactions"]] for block in scenario["blocks"]]}
-        registered_zero = execute(registered, {**registered_request, "blocks": [], "transactionBlockHashes": []}, stage)
+        registered_zero = execute(registered, {**registered_request, "blocks": [], "transactionBlockHashes": [], "schedulerInputs": []}, stage)
         if (canonical_state(registered_zero["initialState"]) != expected or registered_zero["initialPendingReceipts"]
                 or registered_zero["blocks"] or not registered_zero["quiescent"] or registered_zero.get("nativeActionRandomness") is not True):
             raise ValueError("registered initial state differs from the captured account projection")

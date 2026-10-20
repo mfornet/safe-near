@@ -12,8 +12,8 @@ theorem applyAttempt_nextId_mono (cfg : RuntimeConfig) (ap : ApplyState)
   · intro before after tx receipt cost hb hc
     have hn := (convertTransaction_receipt_counter cfg ap before after tx receipt cost hc).2
     omega
-  · intro before receipt hb
-    exact hb.trans (processReceipt_nextId_mono cfg ap decoder before receipt)
+  · intro accounting before receipt hb
+    exact hb.trans (processReceipt_nextId_mono cfg { ap with storageAccounting := accounting } decoder before receipt)
   · intro before hb; exact hb
   · intro before receipt hb; exact hb
   · exact Nat.le_refl _

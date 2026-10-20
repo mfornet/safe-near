@@ -35,6 +35,7 @@ structure ReceiptIdentityBirth where
   deriving Inhabited
 
 structure ApplyResult where
+  storageAccounting : Option TrieOverlay.State := none
   state : ChainState
   outgoing : List Receipt
   identityBirths : List ReceiptIdentityBirth := []
@@ -57,6 +58,7 @@ structure ApplyResult where
 /-- State threaded through one receipt: the chain state, the receipts and
 outcomes produced so far, and the gas accounting of the receipt. -/
 structure Exec where
+  storageAccounting : Option TrieOverlay.State := none
   state : ChainState
   /-- Authority for administrative actions; creation changes it to the new
   receiver, as in nearcore's `actor_id`. -/
@@ -164,7 +166,7 @@ structure ReceiptCtx where
 
 /-- Exact VM context used by a receipt function-call action. -/
 def functionCallContext (c : ReceiptCtx) (account : Account) (args : Bytes) (gas deposit : Nat)
-    (isLast : Bool) : VMContext :=
+    (isLast : Bool) (storageAccounting : Option TrieOverlay.State := none) : VMContext :=
   let id := c.receipt.receiverId
   {
     validateActionMethodUtf8 := true
@@ -183,12 +185,14 @@ def functionCallContext (c : ReceiptCtx) (account : Account) (args : Bytes) (gas
     attachedDeposit := deposit
     prepaidGas := gas
     randomSeed := c.vmRandomSeed.getD c.ap.randomSeed
+    storageAccounting
     chargeStorageValueAccess := true
     outputDataReceivers := if isLast then c.action.outputDataReceivers.map fun d => bytesOfString d.receiverId else [] }
 
 /-- Gas/log observations from one VM call, before its success/failure branch. -/
 def Exec.recordVMOutcome (exec : Exec) (outcome : VMOutcome) : Exec :=
   { exec with
+    storageAccounting := outcome.storageAccounting
     logs := exec.logs ++ outcome.logs
     gasBurntForFunctionCall := exec.gasBurntForFunctionCall + outcome.burntGas
     gasBurnt := exec.gasBurnt + outcome.burntGas
@@ -295,7 +299,7 @@ def applyFunctionCall (c : ReceiptCtx) (method : String) (args : Bytes) (gas dep
     | throw (.functionCallError (.compilationError "CodeDoesNotExist"))
   if let some issue := code.decodeIssue then throw (.executionIssue issue)
   let st ← getState
-  let ctx := functionCallContext c account args gas deposit isLast
+  let ctx := functionCallContext c account args gas deposit isLast (← get).storageAccounting
   let outcome := run c.cfg code.module code.size method ctx (st.contractStorage c.receipt.receiverId)
   modify (·.recordVMOutcome outcome)
   match outcome.aborted with
@@ -304,6 +308,13 @@ def applyFunctionCall (c : ReceiptCtx) (method : String) (args : Bytes) (gas dep
     match functionCallEffects c account outcome isLast st with
     | .error error => throw error
     | .ok effects => modify (·.commitFunctionCall outcome effects)
+
+/-- Account deletion stages all of its ContractData tombstones in the same
+receipt overlay as VM writes; reads later in this chunk must see the deletion. -/
+def stageContractStorageRemoval (account : AccountId) (storage : List (Bytes × Bytes))
+    (accounting : Option TrieOverlay.State) : Option TrieOverlay.State :=
+  accounting.map fun trie => storage.foldl (fun trie (key, _) =>
+    trie.remove (TrieOverlay.contractKey account.toUTF8.toList key)) trie
 
 def applyAction (c : ReceiptCtx) (isLast : Bool) : Action → ExecM Unit
   | .createAccount => do
@@ -377,7 +388,9 @@ def applyAction (c : ReceiptCtx) (isLast : Bool) : Action → ExecM Unit
     if a.locked > 0 then throw (.deleteAccountStaking id)
     let st ← getState
     let (r, st) := refundReceipt st beneficiary a.amount
-    modify fun exec => { exec with state := st.removeAccount id }
+    modify fun exec => { exec with
+      state := st.removeAccount id
+      storageAccounting := stageContractStorageRemoval id (st.contractStorage id) exec.storageAccounting }
     modify fun e => { e with actorId := c.receipt.predecessorId }
     emit r
 
@@ -506,7 +519,7 @@ def receiptActionBody (c : ReceiptCtx) : ExecM Unit := do
 
 /-- Run actions and the final storage-staking check, before rollback/refunds. -/
 def runReceiptActions (c : ReceiptCtx) (st0 : ChainState) : Exec × Option RuntimeError :=
-  let exec0 : Exec := { state := st0, actorId := c.receipt.predecessorId }
+  let exec0 : Exec := { state := st0, actorId := c.receipt.predecessorId, storageAccounting := c.ap.storageAccounting }
   match ((receiptActionBody c).run.run exec0) with
     | (.ok (), e) => (e, none)
     | (.error err, e) => (e, some err)
@@ -514,7 +527,7 @@ def runReceiptActions (c : ReceiptCtx) (st0 : ChainState) : Exec × Option Runti
 /-- Receipt failure restores the pre-action state while retaining gas and logs. -/
 def rollbackReceipt (st0 : ChainState) (exec : Exec) (failed : Option RuntimeError) : Exec :=
   match failed with
-    | some err => { exec with state := st0, newReceipts := [], vmIdentityBirths := [], subsidizedAmount := 0, gasUsed := exec.gasBurnt,
+    | some err => { exec with state := st0, storageAccounting := exec.storageAccounting.map (fun trie => { trie with prospective := [] }), newReceipts := [], vmIdentityBirths := [], subsidizedAmount := 0, gasUsed := exec.gasBurnt,
                               result := some (.failure err) }
     | none => exec
 
@@ -610,10 +623,17 @@ def finalizeReceipt (c : ReceiptCtx) (st0 : ChainState) (exec : Exec) (failed : 
   { exec with result := some (exec.result.getD (.successValue [])) }
 
 
+/-- Publish successful receipt writes without rebuilding the chunk base trie.
+Failures have already cleared prospective writes; cached hashes are unchanged. -/
+def Exec.commitStorage (exec : Exec) : Exec :=
+  { exec with storageAccounting := exec.storageAccounting.map (fun trie =>
+    { trie with committed := trie.prospective.foldl (fun changes (key, value) =>
+        (key, value) :: changes.filter (·.1 != key)) trie.committed, prospective := [] }) }
+
 /-- Execute and finalize the actual action receipt. -/
 def applyActionReceipt (c : ReceiptCtx) (st0 : ChainState) : Exec :=
   let (exec, failed) := runReceiptActions c st0
-  finalizeReceipt c st0 exec failed
+  (finalizeReceipt c st0 exec failed).commitStorage
 
 /-- Outcome of an executed receipt. -/
 def outcomeOf (r : Receipt) (e : Exec) : ExecutionOutcome :=
@@ -630,6 +650,7 @@ def outcomeOf (r : Receipt) (e : Exec) : ExecutionOutcome :=
 /-- Result of processing one receipt: state, new receipts, outcomes, and the
 yocto paid to contracts as gas reward (which are not burnt). -/
 structure Processed where
+  storageAccounting : Option TrieOverlay.State := none
   state : ChainState
   receipts : List Receipt := []
   identityBirths : List ReceiptIdentityBirth := []
@@ -660,7 +681,7 @@ def processReceipt (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → C
       match issue with
       | some issue => { state := st, issue := some (r.receiptId, issue) }
       | none =>
-        { state := e.state, receipts := e.newReceipts,
+        { storageAccounting := e.storageAccounting, state := e.state, receipts := e.newReceipts,
           identityBirths := [{ parent := r.receiptId, children := e.newReceipts.map (·.receiptId), vmActions := e.vmIdentityBirths }],
           outcomes := [(r.receiptId, outcomeOf r e)],
           rewards := e.reward, otherTokensBurnt := e.otherTokensBurnt, subsidizedAmount := e.subsidizedAmount }
@@ -669,7 +690,7 @@ def processReceipt (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → C
         postponed := Assoc.insert st.postponed r.receiptId r
         pendingDataCount := Assoc.insert st.pendingDataCount r.receiptId missing.length
         postponedByData := missing.foldl (fun m d => Assoc.insert m d r.receiptId) st.postponedByData }
-      { state := st }
+      { state := st, storageAccounting := ap.storageAccounting }
   | .data d =>
     match Assoc.lookup st.postponedByData d.dataId with
     | some rid =>
@@ -683,9 +704,9 @@ def processReceipt (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → C
           let st := { st with postponed := Assoc.erase st.postponed rid
                               pendingDataCount := Assoc.erase st.pendingDataCount rid }
           processReceipt cfg ap codeOf st waiting
-        | none => { state := st }
-      else { state := { st with pendingDataCount := Assoc.insert st.pendingDataCount rid pending } }
-    | none => { state := { st with receivedData := Assoc.insert st.receivedData d.dataId d.data } }
+        | none => { state := st, storageAccounting := ap.storageAccounting }
+      else { state := { st with pendingDataCount := Assoc.insert st.pendingDataCount rid pending }, storageAccounting := ap.storageAccounting }
+    | none => { state := { st with receivedData := Assoc.insert st.receivedData d.dataId d.data }, storageAccounting := ap.storageAccounting }
 termination_by st.postponed.length
 decreasing_by
   exact Assoc.erase_length_lt_of_lookup _ _ _ _found
@@ -811,6 +832,7 @@ def applyAttempt (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → Con
   let mut newlyDelayed : List Receipt := []
   let mut gasUsed := outcomes.foldl (fun total pair => total + pair.2.gasBurnt) 0
   let mut overLimit := ap.gasLimit.any (gasUsed ≥ ·)
+  let mut storageAccounting := ap.storageAccounting
   for (r, position) in queue.zipIdx do
     if overLimit then
       -- Local execution has priority, but new deferrals append to the existing
@@ -820,7 +842,8 @@ def applyAttempt (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → Con
       else
         newlyDelayed := newlyDelayed ++ [r]
     else
-      let p := processReceipt cfg ap codeOf st r
+      let p := processReceipt cfg { ap with storageAccounting } codeOf st r
+      storageAccounting := p.storageAccounting
       if let some issue := p.issue then
         return { state := initial, outgoing := [], outcomes := [], tokensBurnt := 0, issue := some issue }
       identityBirths := identityBirths ++ p.identityBirths
@@ -836,6 +859,7 @@ def applyAttempt (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → Con
         if gasUsed ≥ limit then overLimit := true
   return {
     state := { st with delayed := retainedDelayed ++ newlyDelayed }, outgoing, outcomes, tokensBurnt, subsidizedAmount, identityBirths
+    storageAccounting
     delayedConsumed := initial.delayed.length - retainedDelayed.length, delayedAppended := newlyDelayed.length }
 
 /-- Commit a supported chunk. Model limitations invalidate the entire attempt:

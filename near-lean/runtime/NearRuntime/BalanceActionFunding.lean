@@ -151,7 +151,11 @@ theorem funded_transfer (c : ReceiptCtx) (isLast : Bool) (deposit : Nat) :
 removing the receiver's liquid balance from the account map. -/
 def deleteAccountFundedResult (c : ReceiptCtx) (before : Exec) (account : Account) (beneficiary : AccountId) : Exec :=
   let refunded := before.addBalanceRefund beneficiary account.amount
-  { refunded with state := refunded.state.removeAccount c.receipt.receiverId, actorId := c.receipt.predecessorId }
+  { refunded with
+    state := refunded.state.removeAccount c.receipt.receiverId
+    actorId := c.receipt.predecessorId
+    storageAccounting := stageContractStorageRemoval c.receipt.receiverId
+      (refunded.state.contractStorage c.receipt.receiverId) refunded.storageAccounting }
 
 theorem applyDeleteAccount_run (c : ReceiptCtx) (isLast : Bool) (beneficiary : AccountId) (before : Exec) :
     (applyAction c isLast (.deleteAccount beneficiary)).run.run before =

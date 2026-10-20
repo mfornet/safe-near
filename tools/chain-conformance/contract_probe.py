@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Exercise contract state and callbacks through the captured-account chain bridge.
 
-The complete corpus includes storage mutations, whose native trie-access gas
-is not yet represented by the model. These remain real failing comparisons;
-the report does not subtract or tolerate their differences.
+The complete corpus includes storage mutations with independently constructed
+chunk-trie accounting. Every compared field must match; no differences are
+subtracted or tolerated.
 """
 from __future__ import annotations
 

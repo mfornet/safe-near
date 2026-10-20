@@ -139,6 +139,7 @@ Captures with unsupported account fields fail instead of dropping those fields.
 ```sh
 just chain-compare /tmp/lockup-chain --report /tmp/lockup-comparison.json
 just chain-contract-test
+just chain-chunk-storage-test
 just chain-contract-probe --protocol 86 --report /tmp/contracts.json
 ```
 
@@ -183,12 +184,14 @@ received data, postponed dependencies and delayed receipts (columns 0–7 and 9)
 Queue headers, indices and stored gas/size wrappers are included. Initial bytes
 are checked before fixture publication. Duplicate keys and extra model columns
 fail closed; mismatches remain differences. This compares the represented
-synthetic state, not opaque shard columns or an original shard root.
+synthetic state. Registered replay additionally derives and compares the scheduler
+record (column 15), every complete synthetic chunk entry and the canonical trie
+root used at chunk entry. Original historical shard capture remains separate.
 
 Map order is canonicalized while receipt/delivery order stays exact. Empty and
 absent per-account storage maps denote the same storage function. No gas,
 balance, key/value or status difference is removed. Native compute, execution
-metadata, opaque scheduler/yield/buffer columns and other unrepresented
+metadata, unsupported shard/yield/buffer features and other unrepresented
 statistics remain in the raw evidence.
 
 `--legacy-event-projection` explicitly selects the former direct-seed diagnostic.
@@ -323,3 +326,14 @@ errors. Actual validator proposals, minimum stake and epoch transitions remain
 unmodeled; eligible staking that needs those services still stops as an explicit
 execution issue. `audit/staking-key-regressions.json` retains classifier build
 provenance and full native/model traces.
+
+
+Registered storage execution uses a canonical trie constructed from the model's
+complete chunk state and a cache shared across VM calls and receipts. Successful
+receipts commit tentative writes; failed receipts discard them while retaining
+burnt gas and warmed hashes. Each new chunk constructs its own fresh cache.
+Original congestion and bandwidth-request bytes are retained in
+`registered.json.schedulerInputs`; generated native scheduler records and trie
+access counts are comparison outputs only. The reference layout has one shard
+and protocols 83–86; this is not general historical replay. See
+[VM external storage accounting](README.md#vm-external-storage-accounting).

@@ -44,6 +44,7 @@ def applyReceiptQueue (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes â†
   let mut newlyDelayed : List Receipt := []
   let mut gasUsed := outcomes.foldl (fun total pair => total + pair.2.gasBurnt) 0
   let mut overLimit := ap.gasLimit.any (gasUsed â‰¥ Â·)
+  let mut storageAccounting := ap.storageAccounting
   for (receipt, position) in queue.zipIdx do
     if overLimit then
       if delayedStart â‰¤ position && position < delayedEnd then
@@ -51,7 +52,8 @@ def applyReceiptQueue (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes â†
       else
         newlyDelayed := newlyDelayed ++ [receipt]
     else
-      let processed := processReceipt cfg ap codeOf st receipt
+      let processed := processReceipt cfg { ap with storageAccounting } codeOf st receipt
+      storageAccounting := processed.storageAccounting
       if let some issue := processed.issue then
         return { state := initial, outgoing := [], outcomes := [], tokensBurnt := 0, issue := some issue }
       identityBirths := identityBirths ++ processed.identityBirths
@@ -67,6 +69,7 @@ def applyReceiptQueue (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes â†
         if gasUsed â‰¥ limit then overLimit := true
   return {
     state := { st with delayed := retainedDelayed ++ newlyDelayed }, outgoing, outcomes, tokensBurnt, subsidizedAmount, identityBirths
+    storageAccounting
     delayedConsumed := initial.delayed.length - retainedDelayed.length, delayedAppended := newlyDelayed.length }
 
 /-- Every public field, including queue metadata and identity births, agrees

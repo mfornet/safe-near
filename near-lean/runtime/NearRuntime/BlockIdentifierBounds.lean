@@ -140,7 +140,7 @@ theorem applyAttempt_identifier_bounds (cfg : RuntimeConfig) (ap : ApplyState)
           have heq := List.mem_singleton.mp he
           subst receipt
           exact h.queued entry.1 hmember
-        by_cases hover : pass.2.2.2.2.2.2.2.2.2.2 = true
+        by_cases hover : pass.2.2.2.2.2.2.2.2.2.2.1 = true
         · simp only [hover, ite_true]
           split_ifs
           · exact ⟨h.state, h.outgoing, h.queued, h.retained.append hsingle, h.appended,
@@ -148,20 +148,23 @@ theorem applyAttempt_identifier_bounds (cfg : RuntimeConfig) (ap : ApplyState)
           · exact ⟨h.state, h.outgoing, h.queued, h.retained, h.appended.append hsingle,
               by intro returned he; contradiction⟩
         · simp only [hover, Bool.false_eq_true, ite_false]
-          cases hi : (processReceipt cfg ap decoder pass.2.1 entry.1).issue with
+          cases hi : (processReceipt cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 entry.1).issue with
           | some issue =>
             dsimp only
             exact ⟨h.state, h.outgoing, h.queued, h.retained, h.appended,
               by intro returned he; cases he; exact ⟨hstate, hempty _⟩⟩
           | none =>
             dsimp only
-            have hp := processReceipt_identifier_bounds cfg ap decoder pass.2.1 entry.1 h.state (h.queued entry.1 hmember)
-            have hn := processReceipt_nextId_mono cfg ap decoder pass.2.1 entry.1
+            have hp := processReceipt_identifier_bounds cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 entry.1 h.state (h.queued entry.1 hmember)
+            have hn := processReceipt_nextId_mono cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 entry.1
             have hout := (h.outgoing.mono hn).append hp.2
             cases hl : ap.gasLimit with
-            | none => exact ⟨hp.1, hout, h.queued.mono hn, h.retained.mono hn, h.appended.mono hn,
+            | none =>
+              simp only [hl] at hp hn hout
+              exact ⟨hp.1, hout, h.queued.mono hn, h.retained.mono hn, h.appended.mono hn,
                 by intro returned he; contradiction⟩
             | some limit =>
+              simp only [hl] at hp hn hout
               dsimp only
               split_ifs <;> exact ⟨hp.1, hout, h.queued.mono hn, h.retained.mono hn, h.appended.mono hn,
                 by intro returned he; contradiction⟩

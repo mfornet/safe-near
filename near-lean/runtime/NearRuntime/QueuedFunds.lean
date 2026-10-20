@@ -30,7 +30,7 @@ theorem processReceipt_waiting (cfg : RuntimeConfig) (ap : ApplyState) (decoder 
     (st : ChainState) (receipt : Receipt) (action : ActionReceipt)
     (haction : receipt.receipt = .action action)
     (hmissing : (action.inputDataIds.filter fun id => !(Assoc.contains st.receivedData id)).isEmpty = false) :
-    processReceipt cfg ap decoder st receipt = { state := postponeActionState st receipt action } := by
+    processReceipt cfg ap decoder st receipt = { state := postponeActionState st receipt action, storageAccounting := ap.storageAccounting } := by
   rw [processReceipt]
   simp only [haction, hmissing, Bool.false_eq_true, ite_false]
   rfl

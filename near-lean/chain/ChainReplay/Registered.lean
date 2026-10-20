@@ -1,5 +1,6 @@
 import ChainReplay.Encode
 import ChainReplay.QueueContext
+import ChainReplay.ChunkTrie
 import NearRuntime.TransactionRegistry
 
 /-! Execute the existing chain transition and register identities at their
@@ -39,8 +40,17 @@ def birthsJson (births : List ReceiptIdentityBirth) : Json := toJson (births.map
   ("vmActions", toJson (birth.vmActions.map fun action => obj [
     ("actionIndex", toJson action.actionIndex), ("receipts", toJson action.receipts), ("data", toJson action.data)]))])
 
+def accountingJson (state : Option TrieOverlay.State) : Json :=
+  match state with
+  | none => .null
+  | some state => obj [
+    ("disk", toJson state.accounting.disk), ("cached", toJson state.accounting.mem),
+    ("events", toJson (state.accounting.events.map fun event => obj [
+      ("hash", bytesJson event.hash), ("kind", toJson event.kind), ("cached", toJson event.cached)]))]
+
 def run (protocol : Nat) (cfg : Wasm.Near.RuntimeConfig) (codes : Catalogue) (initial : Snapshot)
-    (context : QueueEncoding.Context) (blocks : List Block) (hashes : List (List NativeIdentity.Hash)) : Result Json := do
+    (context : QueueEncoding.Context) (blocks : List Block) (hashes : List (List NativeIdentity.Hash)) (schedulerInputs : List ChunkTrie.Input) : Result Json := do
+  unless schedulerInputs.length == blocks.length do throw "scheduler input batch count mismatch"
   unless hashes.length == blocks.length do throw "transaction block-hash batch count mismatch"
   let catalogue := codes.map fun code => (code.code.hash, code.bytes)
   let initialEntries ← QueueEncoding.encode initial.state catalogue context (some cfg)
@@ -59,6 +69,7 @@ def run (protocol : Nat) (cfg : Wasm.Near.RuntimeConfig) (codes : Catalogue) (in
   let mut snapshot := initial
   let mut context := context
   let mut trace : List Json := []
+  let mut scheduler : ChunkTrie.Scheduler := {}
   for ((block, hashes), position) in (blocks.zip hashes).zipIdx do
     unless block.txs.length == hashes.length do throw "transaction block-hash count mismatch"
     for hash in hashes do let _ ← NativeIdentity.checkedHash hash
@@ -68,8 +79,9 @@ def run (protocol : Nat) (cfg : Wasm.Near.RuntimeConfig) (codes : Catalogue) (in
     | .ok _ => pure ()
     let inputs := (block.txs.zip hashes).map fun (transaction, blockHash) =>
       ({ transaction, blockHash } : TransactionRegistry.Input)
+    let trie ← ChunkTrie.start cfg catalogue context snapshot.state scheduler
     let admitted ← TransactionRegistry.observe cfg block.ap catalogue snapshot.state inputs context
-    let block := { block with ap := { block.ap with nativeReceiptHashes := some admitted.context.receipts } }
+    let block := { block with ap := { block.ap with nativeReceiptHashes := some admitted.context.receipts, storageAccounting := some trie } }
     match step cfg (codeOf codes) snapshot block with
     | .error (.unavailableIndex index) =>
       return finish snapshot trace "invalidSchedule" (blocks.length - position - 1) [("unavailableIndex", toJson index)]
@@ -79,6 +91,7 @@ def run (protocol : Nat) (cfg : Wasm.Near.RuntimeConfig) (codes : Catalogue) (in
           ("identityBirths", birthsJson result.identityBirths),
           ("transactionIdentities", transactionIdentitiesJson admitted.attempts), ("admissionCommitted", toJson false)]]
         return finish next trace "executionIssue" (blocks.length - position - 1)
+      scheduler := scheduler.advance (schedulerInputs[position]!)
       context ← ReceiptRegistry.observeQueues cfg catalogue block.ap.blockHeight snapshot.state result admitted.context
       let outgoing ← result.outgoing.mapM (encodeReceipt catalogue context)
       let entries ← QueueEncoding.queues next.state catalogue context (some cfg)
@@ -86,23 +99,26 @@ def run (protocol : Nat) (cfg : Wasm.Near.RuntimeConfig) (codes : Catalogue) (in
       trace := trace ++ [obj [("execution", applyJson cfg block.txs next result), ("registry", contextJson context),
         ("identityBirths", birthsJson result.identityBirths), ("outgoingBytes", toJson outgoing),
         ("queueEntries", entriesJson entries), ("stateEntries", entriesJson stateEntries),
+        ("chunkEntries", entriesJson (stateEntries ++ scheduler.entries)),
+        ("chunkBaseRoot", toJson (StateEncoding.base58 trie.base.root)),
+        ("trieAccounting", accountingJson result.storageAccounting),
         ("transactionIdentities", transactionIdentitiesJson admitted.attempts), ("admissionCommitted", toJson true)]]
       snapshot := next
   return finish snapshot trace "blocksExhausted" 0
 
 def execute (request : Json) : IO Json := do
-  let (protocol, directory, catalogues, initial, pending, values, hashes, context) ← IO.ofExcept do
+  let (protocol, directory, catalogues, initial, pending, values, hashes, context, schedulerInputs) ← IO.ofExcept do
     object request ["formatVersion", "protocolVersion", "configDir", "codes", "initialState", "pendingReceipts",
-      "blocks", "transactionBlockHashes", "queueContext"]
+      "blocks", "transactionBlockHashes", "queueContext", "schedulerInputs"]
     let version : Nat ← field request "formatVersion"
     unless version == 1 do throw "unsupported formatVersion"
     let protocol : Nat ← field request "protocolVersion"
     unless 83 ≤ protocol && protocol ≤ 86 do throw "reference protocol range is 83–86"
     let context : Option Json ← fromJson? ((request.getObjVal? "queueContext").toOption.getD .null)
     pure (protocol, ← field request "configDir", ← field request "codes", ← field request "initialState",
-      ← field request "pendingReceipts", ← field request "blocks", ← field request "transactionBlockHashes", context)
+      ← field request "pendingReceipts", ← field request "blocks", ← field request "transactionBlockHashes", context, (request.getObjVal? "schedulerInputs").toOption)
   let codes ← loadCatalogue (catalogues : List Json)
-  let (snapshot, blocks, hashes, context) ← IO.ofExcept do
+  let (snapshot, blocks, hashes, context, schedulerInputs) ← IO.ofExcept do
     let snapshot : Snapshot := {
       state := ← state codes initial
       pending := ← (pending : List Json).mapM (receipt codes) }
@@ -111,9 +127,24 @@ def execute (request : Json) : IO Json := do
     let context ← match context with
       | none => pure ({} : QueueEncoding.Context)
       | some context => QueueContext.parse context
-    pure (snapshot, blocks, hashes, context)
+    let schedulerInputs ← match schedulerInputs with
+      | none => pure (blocks.map fun _ => ({} : ChunkTrie.Input))
+      | some values => do
+        let values : List Json ← fromJson? values
+        values.mapM fun value => do
+          object value ["congestionInfo", "bandwidthRequests"]
+          let congestion : List Json ← field value "congestionInfo"
+          let congestion ← congestion.mapM fun row => do
+            let fields ← row.getArr?
+            unless fields.size == 3 do throw "congestion row must contain shard, bytes and missed count"
+            let shard : Nat ← fromJson? fields[0]!
+            let raw : List Nat ← fromJson? fields[1]!
+            let missed : Nat ← fromJson? fields[2]!
+            pure (shard, ← bytes raw, missed)
+          ChunkTrie.input congestion (← byteField value "bandwidthRequests")
+    pure (snapshot, blocks, hashes, context, schedulerInputs)
   let cfg ← Wasm.Near.RuntimeConfig.load directory protocol
-  IO.ofExcept (run protocol cfg codes snapshot context blocks hashes)
+  IO.ofExcept (run protocol cfg codes snapshot context blocks hashes schedulerInputs)
 
 end ChainReplay.Registered
 

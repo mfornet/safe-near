@@ -118,7 +118,7 @@ theorem applyFunctionCall_run (c : ReceiptCtx) (method : String) (args : Bytes) 
           | some issue => (.error (.executionIssue issue), before)
           | none =>
           let outcome := run c.cfg code.module code.size method
-            (functionCallContext c account args gas deposit isLast) (before.state.contractStorage c.receipt.receiverId)
+            (functionCallContext c account args gas deposit isLast before.storageAccounting) (before.state.contractStorage c.receipt.receiverId)
           let charged := before.recordVMOutcome outcome
           match outcome.aborted with
           | some error => (.error (.functionCallError error), charged)
@@ -134,10 +134,10 @@ theorem applyFunctionCall_run (c : ReceiptCtx) (method : String) (args : Bytes) 
       cases hi : code.decodeIssue with
       | some issue => simp [-StateT.run_bind, applyFunctionCall, getAccount, getState, ha, hc, hi]
       | none =>
-        cases he : (run c.cfg code.module code.size method (functionCallContext c account args gas deposit isLast)
+        cases he : (run c.cfg code.module code.size method (functionCallContext c account args gas deposit isLast before.storageAccounting)
           (before.state.contractStorage c.receipt.receiverId)).aborted <;>
           cases hf : functionCallEffects c account
-            (run c.cfg code.module code.size method (functionCallContext c account args gas deposit isLast)
+            (run c.cfg code.module code.size method (functionCallContext c account args gas deposit isLast before.storageAccounting)
               (before.state.contractStorage c.receipt.receiverId)) isLast before.state <;>
           simp [-StateT.run_bind, applyFunctionCall, getAccount, getState, ha, hc, hi, he, hf]
 
@@ -155,7 +155,7 @@ theorem applyFunctionCall_gasBound (c : ReceiptCtx) (method : String) (args : By
       split
       · exact GasDelta.of_fields _ _ _ rfl rfl rfl
       · have hv := run_gas_bounded c.cfg code.module code.size method
-          (functionCallContext c account args gas deposit isLast) (before.state.contractStorage c.receipt.receiverId) defaultFuel
+          (functionCallContext c account args gas deposit isLast before.storageAccounting) (before.state.contractStorage c.receipt.receiverId) defaultFuel
         have hc := recordVMOutcome_gasDelta before _ gas hv.1 hv.2.1
         dsimp only
         split
@@ -304,10 +304,10 @@ theorem runReceiptActions_gas_bounds (c : ReceiptCtx) (st : ChainState) :
     let raw := (runReceiptActions c st).1
     raw.gasBurntForFunctionCall ≤ raw.gasBurnt ∧ raw.gasBurnt ≤ raw.gasUsed ∧
       raw.gasUsed ≤ Fees.receiptGasBudget c.cfg c.receipt.receiverId c.action.actions := by
-  have h := receiptActionBody_gasBound c { state := st, actorId := c.receipt.predecessorId }
+  have h := receiptActionBody_gasBound c { state := st, actorId := c.receipt.predecessorId, storageAccounting := c.ap.storageAccounting }
   unfold runReceiptActions
   dsimp only
-  cases he : (receiptActionBody c).run.run { state := st, actorId := c.receipt.predecessorId } with
+  cases he : (receiptActionBody c).run.run { state := st, actorId := c.receipt.predecessorId, storageAccounting := c.ap.storageAccounting } with
   | mk result raw =>
     rw [he] at h
     have hf : raw.gasBurntForFunctionCall ≤ raw.gasBurnt := by

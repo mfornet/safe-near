@@ -450,10 +450,14 @@ def _input_shape(request):
     return json.dumps(value, sort_keys=True, separators=(",", ":"))
 
 
-def validate_registered_request(direct, registered):
-    base = {key: value for key, value in registered.items() if key != "transactionBlockHashes"}
+def validate_registered_request(direct, registered, source=None):
+    base = {key: value for key, value in registered.items() if key not in {"transactionBlockHashes", "schedulerInputs"}}
     if _input_shape(base) != _input_shape(direct):
         raise ValueError("model transactions differ or registered request diverges from direct fixture inputs")
+    if source is not None:
+        original = [{key: block[key] for key in ["congestionInfo", "bandwidthRequests"]} for block in source["blocks"]]
+        if registered.get("schedulerInputs") != original:
+            raise ValueError("scheduler inputs differ from original block context")
     hashes = registered["transactionBlockHashes"]
     if len(hashes) != len(direct["blocks"]) or any(len(batch) != len(block["transactions"]) for batch, block in zip(hashes, direct["blocks"])):
         raise ValueError("registered transaction block-hash counts differ from original inputs")
@@ -474,18 +478,21 @@ def registered_differences(native, registered):
         if not isinstance(raw, list) or len(raw) != 32 or any(type(byte) is not int or not 0 <= byte < 256 for byte in raw):
             raise ValueError("invalid registered transaction hash")
         return b58encode(bytes(raw))
-    def records(expected, actual, path):
-        return differences(importer.canonical_entries(expected), importer.canonical_entries(actual), path)
+    def records(expected, actual, path, *, complete=False):
+        return differences(importer.canonical_entries(expected, complete=complete), importer.canonical_entries(actual, complete=complete), path)
     diffs = records(importer.represented_entries(native["initialState"]["entries"]), registered["initialEntries"], "initialEntries")
     if registered["stop"] != "blocksExhausted" or registered["unrunBlocks"] or len(registered["blocks"]) != len(native["blocks"]):
         raise ValueError("registered replay did not commit every requested block")
     for index, (left, right) in enumerate(zip(native["blocks"], registered["blocks"])):
         prefix = f"blocks[{index}]"
+        before = native["initialState"] if index == 0 else native["blocks"][index - 1]["state"]
+        diffs += differences(before["root"], right["chunkBaseRoot"], prefix + ".chunkBaseRoot")
         if right.get("admissionCommitted") is not True: raise ValueError("registered transaction admission was not committed")
         diffs += differences([row["receiptId"] for row in right["execution"]["outgoingReceipts"]],
             [row["id"] for row in right["outgoingBytes"]], prefix + ".outgoingByteIdentities")
         diffs += differences(left["outgoingReceiptBorsh"], [row["bytes"] for row in right["outgoingBytes"]], prefix + ".outgoingReceiptBorsh")
         diffs += records(importer.represented_entries(left["state"]["entries"]), right["stateEntries"], prefix + ".stateEntries")
+        diffs += records(left["state"]["entries"], right["chunkEntries"], prefix + ".chunkEntries", complete=True)
         queue = [row for row in left["state"]["entries"] if row[0][0] in [3, 4, 5, 6, 7]]
         diffs += records(queue, right["queueEntries"], prefix + ".queueEntries")
         bindings = {logical: hash_text(raw) for logical, raw in right["registry"]["receiptIds"]}
@@ -554,7 +561,7 @@ def compare(directory, reference, model, *, registered_model=None, legacy=False)
         right, expected, diffs, error = raw, None, [], None
         try:
             right = raw if legacy else registered_shape(raw)
-            if not legacy: validate_registered_request(request, registered_request)
+            if not legacy: validate_registered_request(request, registered_request, source)
             if not legacy: diffs += registered_differences(left, raw)
             registries = None if legacy else [row["registry"] for row in raw["blocks"]]
             expected = Projection(codes, registries=registries).project(source, left, request)
@@ -567,7 +574,7 @@ def compare(directory, reference, model, *, registered_model=None, legacy=False)
             directModelBinarySha256=importer.file_digest(lean), executionMode="legacy-event-projection" if legacy else "registered",
             registered=None if legacy else raw, manifest=manifest, fixtureFilesBase64=assets,
             native=left, model=right, expected=expected, projectionError=error, differences=diffs,
-            unmodeledObservations=["native compute and execution metadata", "opaque shard/scheduler/yield/buffer columns outside represented tags",
+            unmodeledObservations=["native compute and execution metadata", "unsupported shard/yield/buffer features",
                 "original shard roots and complete raw shard capture", "statistics beyond represented balance burn/subsidy",
                 "model diagnostic repr/message formatting (structured semantic errors and action indices are compared)"] +
                 (["native hash generation (event-based renaming)", "transaction hash identity", "raw state/receipt bytes and delayed queue indices"] if legacy else []))

@@ -93,6 +93,8 @@ end ChainState
 
 /-- Per-block context of one `apply`. -/
 structure ApplyState where
+  /-- Independently constructed complete chunk trie and fresh accounting cache. -/
+  storageAccounting : Option TrieOverlay.State := none
   /-- On-chain application starts at height one; height zero rejects all nonces. -/
   blockHeight : Nat := 1
   blockTimestamp : Nat := 0

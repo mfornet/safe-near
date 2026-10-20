@@ -131,8 +131,8 @@ theorem systemAbsence_receiptActionBody (c : ReceiptCtx) : (receiptActionBody c)
 
 theorem runReceiptActions_systemAbsent (c : ReceiptCtx) (st : ChainState) (h : st.SystemAccountAbsent) :
     (runReceiptActions c st).1.state.SystemAccountAbsent := by
-  have hp := systemAbsence_receiptActionBody c { state := st, actorId := c.receipt.predecessorId } h
-  cases he : (receiptActionBody c).run.run { state := st, actorId := c.receipt.predecessorId } with
+  have hp := systemAbsence_receiptActionBody c { state := st, actorId := c.receipt.predecessorId, storageAccounting := c.ap.storageAccounting } h
+  cases he : (receiptActionBody c).run.run { state := st, actorId := c.receipt.predecessorId, storageAccounting := c.ap.storageAccounting } with
   | mk result raw => cases result <;> simpa only [runReceiptActions, he] using hp
 
 theorem Exec.creditReceiptReward_systemAbsent (exec : Exec) (cfg : RuntimeConfig) (receiver : AccountId)
