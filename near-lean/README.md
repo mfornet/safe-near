@@ -272,5 +272,10 @@ bounds it by the original call budget when imported hosts preserve those limits.
 and resolver, including gas imports and unsupported/deprecated rejection paths.
 `ExecutionGas.runResolved_gas_bounds` connects it to initialization and resolved
 execution: burnt gas is at most used gas, used gas fits the original prepaid
-budget, and burnt gas fits the original per-call limit. Public VM-outcome and
-receipt gas bounds still need to be lifted from this execution result.
+budget, and burnt gas fits the original per-call limit.
+`OutcomeGas.run_gas_bounded` lifts these facts to every public VM result, without
+contract or host-behavior premises, for any interpreter fuel and view/normal call
+limits. It covers loading, method/import/init failures, entry charges, execution
+and receipt validation. `runInitialized` and `outcomeOfExecution` expose the
+executable stages for proofs. Receipt-level gas-budget preservation and its
+connection to conservation remain open.
