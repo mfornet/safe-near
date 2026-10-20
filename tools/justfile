@@ -191,3 +191,8 @@ chain-state-encoding-test:
 chain-receipt-encoding-test:
     cd near-lean/chain && lake build receipt-encode chain-replay --wfail
     python3 tools/chain-conformance/test_receipt_encoding.py
+
+# Check callback/delayed queue records, storage wrappers and real runtime queue bytes.
+chain-queue-encoding-test:
+    cd near-lean/chain && lake build state-encode receipt-encode chain-replay --wfail
+    python3 tools/chain-conformance/test_queue_encoding.py

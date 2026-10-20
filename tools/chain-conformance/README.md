@@ -207,11 +207,11 @@ Catalogue bytes must match the canonical base58 SHA256 code hash and model size;
 arbitrary replay labels cannot be used for trie encoding. Wasm byte-to-WAT
 correspondence still depends on the external decoder. Duplicate records, missing
 owners, invalid account IDs, unsupported key encodings, numeric overflow and
-nonempty receipt/data queues fail closed. Model counter IDs cannot stand in for
+nonempty receipt/data queues without explicit queue context fail closed. Model counter IDs cannot stand in for
 native receipt/data hashes. `nextId` is manipulator metadata with no trie column.
 
 The output is a selected-account synthetic genesis, not an original shard trie.
-Opaque shard records, native hash-ID generation, receipt cache lifetime and trie
+Opaque shard records, automatic runtime hash-ID registration, receipt cache lifetime and trie
 gas in runtime execution remain open. Account serialization follows the pinned
 native encoder even at the u128 maximum sentinel; serialization agreement alone
 does not establish that every such synthetic account can deserialize or execute.
@@ -251,11 +251,52 @@ receipt also checks distinct action salts and the data counter resetting per
 action. Generated native
 IDs are comparison outputs, never graph inputs. This establishes the derivation
 and serialization primitives, not an automatically maintained identity registry
-inside `Runtime::apply`. Full queue-state encoding still needs receiver ownership,
-native delayed-queue indices/wrappers and identity registration during execution.
-Those remain open alongside receipt cache lifetime and trie-backed runtime gas.
+inside `Runtime::apply`. Queue-state encoding below consumes explicit receiver
+ownership, indices and storage formats. Automatic identity/ownership/format
+registration during execution remains open alongside receipt cache lifetime and
+trie-backed runtime gas.
 Evidence is saved in `audit/receipt-encoding-regressions.json` and
 `audit/runtime-identity-regressions.json`.
+
+`just chain-queue-encoding-test` checks `NearRuntime.QueueEncoding` against native
+typed trie keys and Borsh records. `state-encode` additionally accepts
+`queueContext` with `receiptIds` pairs `[logicalId, hashBytes]`, `dataIds` objects
+`{id, hash, receiverId}`, `actionFormats` pairs `[logicalId, "legacy" | "v2"]`,
+and `delayed`. The latter is either null (absent header) or an object with
+`firstIndex` and one storage `forms` entry per delayed receipt. This preserves
+empty queues whose stored indices have advanced. It does not reset them to zero.
+
+Storage forms are `{kind: "receipt"}` for unwrapped receipts,
+`{kind: "storedV0", gas, size}` / `{kind: "storedV1", gas, size}` for existing
+metadata, and `{kind: "newStored"}` for a newly stored V1 wrapper. Existing gas
+and size fields are preserved as supplied, including values different from
+current fees and lengths. `newStored` requires the additional `runtimeConfig`
+object `{configDir, protocolVersion}`; it computes the ordinary receipt's
+prepaid execution gas and encoded length. Data receipts carry zero congestion
+gas. Named, NEAR implicit, Ethereum implicit and deterministic account charges
+are accounted for, using the loaded Ethereum feature flag. Congestion metadata
+is separate from execution gas; this does not extend runtime execution to
+unrepresented account-creation behavior or delegate actions.
+
+The encoder emits received data, postponed data-to-receipt links, u32 pending
+counts, postponed action receipts, delayed indices and delayed receipt entries.
+It checks the ownership of every referenced input/output data ID, rejects missing
+or aliased identities/formats, duplicate keys, orphan indices and overflow, and
+retains supplied pending counts rather than repairing them. Queue mode adds
+`queueEntries` to the existing state/root/witness output. Synthetic corpora compare
+all account/queue bytes, roots and complete trie objects independently.
+
+The runtime regression checks the complete represented queue columns in 24 real
+callback-first, data-first and delayed programs across protocols 83–86, including
+failed callbacks and emptied persistent queues. Its context comes from original
+signed transaction bytes, the supplied schedule and Lean's FIFO transitions;
+native generated IDs, indices, wrapper metadata and queue bytes are comparison
+outputs only. Fixtures retain full origins and executor identities. The current
+context construction is explicit for this corpus; general automatic registration
+inside receipt execution remains open. Opaque shard/yield/buffer columns and
+original shard roots remain outside this represented state. Evidence is saved
+in `audit/queue-encoding-regressions.json` and
+`audit/runtime-queue-encoding-regressions.json`.
 
 `just chain-trie-test` compares native `near_store::Trie` traversal with
 `NearRuntime.TrieAccounting`. Build the source oracle first, as above. For an

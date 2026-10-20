@@ -3,14 +3,17 @@
 use borsh::{BorshDeserialize, BorshSerialize, from_slice, to_vec as borsh_bytes};
 use near_crypto::key_conversion::is_valid_staking_key;
 use near_crypto::{InMemorySigner, KeyType, PublicKey};
-use near_parameters::RuntimeConfigStore;
+use near_parameters::{ActionCosts, RuntimeConfigStore};
 use near_primitives::account::{AccessKey, Account, AccountContract};
 use near_primitives::action::{Action, CreateAccountAction, TransferAction};
 use near_primitives::apply::ApplyChunkReason;
 use near_primitives::bandwidth_scheduler::BlockBandwidthRequests;
 use near_primitives::congestion_info::{BlockCongestionInfo, ExtendedCongestionInfo};
 use near_primitives::hash::CryptoHash;
-use near_primitives::receipt::{Receipt, ReceivedData};
+use near_primitives::receipt::{
+    DelayedReceiptIndices, Receipt, ReceivedData, StateStoredReceipt, StateStoredReceiptMetadata,
+    StateStoredReceiptV0, StateStoredReceiptV1, VersionedReceiptEnum,
+};
 use near_primitives::state::PartialState;
 use near_primitives::state_record::StateRecord;
 use near_primitives::test_utils::MockEpochInfoProvider;
@@ -32,8 +35,10 @@ use near_store::test_utils::TestTriesBuilder;
 use near_store::trie::{AccessOptions, AccessTracker, KeyLookupMode};
 use near_store::{ShardTries, ShardUId};
 use near_store::{TrieUpdate, TrieUpdateValuePtr};
+use node_runtime::config::{total_prepaid_exec_fees, total_prepaid_gas, total_prepaid_send_fees};
 use node_runtime::{ApplyState, Runtime, SignedValidPeriodTransactions};
 use serde_json::{Map, Value, from_str, from_value, json, to_value};
+use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env::args;
@@ -646,6 +651,205 @@ impl AccessTracker for LookupTracker {
     }
 }
 
+fn encode_queues(request: &Value) -> Result<Value> {
+    let input = object(
+        request,
+        &[
+            "protocolVersion",
+            "postponed",
+            "pendingDataCount",
+            "postponedByData",
+            "receivedData",
+            "delayed",
+        ],
+    )?;
+    let protocol = u32::try_from(integer(input, "protocolVersion")?)?;
+    if !(83..=86).contains(&protocol) {
+        return Err("reference protocol range is 83–86".into());
+    }
+    let configs = RuntimeConfigStore::new(None);
+    let config = configs.get_config(protocol);
+    let account_id = |value: &Value| -> Result<AccountId> {
+        Ok(value.as_str().ok_or("invalid queue receiver")?.parse()?)
+    };
+    let receipt = |value: &Value| -> Result<Receipt> {
+        let decoded: Receipt = from_value(value.clone())?;
+        if to_value(&decoded)? != *value {
+            return Err("noncanonical receipt fields".into());
+        }
+        let payload = value
+            .get("receipt")
+            .and_then(Value::as_object)
+            .ok_or("invalid receipt kind")?;
+        if !(payload.contains_key("Action")
+            || payload.contains_key("ActionV2")
+            || payload.contains_key("Data"))
+        {
+            return Err("unrepresented receipt kind".into());
+        }
+        if let Some(action) = payload.get("ActionV2") {
+            if !action.get("refund_to").is_some_and(Value::is_null) {
+                return Err("custom refund receiver is unrepresented".into());
+            }
+        }
+        Ok(decoded)
+    };
+    let rows = |name| -> Result<&Vec<Value>> {
+        field(input, name)?
+            .as_array()
+            .ok_or_else(|| "expected queue array".into())
+    };
+    let mut entries = BTreeMap::new();
+    let mut insert = |key: TrieKey, value: Vec<u8>| -> Result<()> {
+        if entries.insert(key.to_vec(), value).is_some() {
+            return Err("duplicate queue key".into());
+        }
+        Ok(())
+    };
+    for value in rows("postponed")? {
+        let receipt = receipt(value)?;
+        if !matches!(receipt.versioned_receipt(), VersionedReceiptEnum::Action(_)) {
+            return Err("postponed receipt must be an action".into());
+        }
+        insert(
+            TrieKey::PostponedReceipt {
+                receiver_id: receipt.receiver_id().clone(),
+                receipt_id: *receipt.receipt_id(),
+            },
+            borsh_bytes(&receipt)?,
+        )?;
+    }
+    for row in rows("pendingDataCount")? {
+        let row = object(row, &["receiverId", "receiptId", "count"])?;
+        let count = u32::try_from(integer(row, "count")?)?;
+        insert(
+            TrieKey::PendingDataCount {
+                receiver_id: account_id(field(row, "receiverId")?)?,
+                receipt_id: hash(field(row, "receiptId")?)?,
+            },
+            borsh_bytes(&count)?,
+        )?;
+    }
+    for row in rows("postponedByData")? {
+        let row = object(row, &["receiverId", "dataId", "receiptId"])?;
+        insert(
+            TrieKey::PostponedReceiptId {
+                receiver_id: account_id(field(row, "receiverId")?)?,
+                data_id: hash(field(row, "dataId")?)?,
+            },
+            borsh_bytes(&hash(field(row, "receiptId")?)?)?,
+        )?;
+    }
+    for row in rows("receivedData")? {
+        let row = object(row, &["receiverId", "dataId", "data"])?;
+        let data: Option<Vec<u8>> = from_value(field(row, "data")?.clone())?;
+        insert(
+            TrieKey::ReceivedData {
+                receiver_id: account_id(field(row, "receiverId")?)?,
+                data_id: hash(field(row, "dataId")?)?,
+            },
+            borsh_bytes(&ReceivedData { data })?,
+        )?;
+    }
+    let delayed = field(input, "delayed")?;
+    if !delayed.is_null() {
+        let delayed = object(delayed, &["firstIndex", "receipts"])?;
+        let first = integer(delayed, "firstIndex")?;
+        let delayed = field(delayed, "receipts")?
+            .as_array()
+            .ok_or("expected delayed receipt array")?;
+        let next = first
+            .checked_add(u64::try_from(delayed.len())?)
+            .ok_or("delayed index overflow")?;
+        insert(
+            TrieKey::DelayedReceiptIndices,
+            borsh_bytes(&DelayedReceiptIndices {
+                first_index: first,
+                next_available_index: next,
+            })?,
+        )?;
+        for (offset, row) in delayed.iter().enumerate() {
+            let row = object(row, &["receipt", "storage"])?;
+            let receipt = receipt(field(row, "receipt")?)?;
+            let form = field(row, "storage")?;
+            let kind = form
+                .get("kind")
+                .and_then(Value::as_str)
+                .ok_or("missing storage kind")?;
+            let value = if kind == "receipt" {
+                object(form, &["kind"])?;
+                borsh_bytes(&receipt)?
+            } else {
+                let (version, gas, size) = if kind == "newStored" {
+                    object(form, &["kind"])?;
+                    let gas = match receipt.versioned_receipt() {
+                        VersionedReceiptEnum::Data(_) => Gas::ZERO,
+                        VersionedReceiptEnum::Action(action) => {
+                            let actions = action.actions();
+                            let exec =
+                                total_prepaid_exec_fees(&config, actions, receipt.receiver_id())?
+                                    .gas
+                                    .as_gas();
+                            let new = config
+                                .fees
+                                .fee(ActionCosts::new_action_receipt)
+                                .exec_fee()
+                                .gas
+                                .as_gas();
+                            let send = total_prepaid_send_fees(&config, actions)?.gas.as_gas();
+                            let attached = total_prepaid_gas(actions)?.as_gas();
+                            Gas::from_gas(
+                                exec.checked_add(new)
+                                    .and_then(|x| x.checked_add(send))
+                                    .and_then(|x| x.checked_add(attached))
+                                    .ok_or("congestion gas overflow")?,
+                            )
+                        }
+                        _ => return Err("unrepresented stored receipt".into()),
+                    };
+                    (1, gas, u64::try_from(borsh_bytes(&receipt)?.len())?)
+                } else {
+                    let form = object(form, &["kind", "gas", "size"])?;
+                    let version = match kind {
+                        "storedV0" => 0,
+                        "storedV1" => 1,
+                        _ => return Err("unsupported delayed storage form".into()),
+                    };
+                    (
+                        version,
+                        Gas::from_gas(integer(form, "gas")?),
+                        integer(form, "size")?,
+                    )
+                };
+                let metadata = StateStoredReceiptMetadata {
+                    congestion_gas: gas,
+                    congestion_size: size,
+                };
+                let receipt = if version == 0 {
+                    StateStoredReceipt::V0(StateStoredReceiptV0 {
+                        receipt: Cow::Borrowed(&receipt),
+                        metadata,
+                    })
+                } else {
+                    StateStoredReceipt::V1(StateStoredReceiptV1 {
+                        receipt: Cow::Borrowed(&receipt),
+                        metadata,
+                    })
+                };
+                borsh_bytes(&receipt)?
+            };
+            insert(
+                TrieKey::DelayedReceipt {
+                    index: first + u64::try_from(offset)?,
+                },
+                value,
+            )?;
+        }
+    }
+    let entries: Vec<Entry> = entries.into_iter().collect();
+    Ok(json!({"entries":entries}))
+}
+
 fn receipt_encoding(request: &Value) -> Result<Value> {
     let input = object(
         request,
@@ -1242,6 +1446,7 @@ fn main() -> Result<()> {
             | "--sign-transactions"
             | "--classify-staking-keys"
             | "--encode-receipts"
+            | "--encode-queues"
             | "--trie-lookups"
             | "--trie-updates"),
         ) => {
@@ -1253,7 +1458,9 @@ fn main() -> Result<()> {
                 if mode == "--encode-state" {
                     encode_state(&input)?
                 } else {
-                    if mode == "--encode-receipts" {
+                    if mode == "--encode-queues" {
+                        encode_queues(&input)?
+                    } else if mode == "--encode-receipts" {
                         receipt_encoding(&input)?
                     } else if mode == "--trie-updates" {
                         trie_updates(&input)?

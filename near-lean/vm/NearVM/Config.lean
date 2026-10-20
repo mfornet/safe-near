@@ -73,6 +73,7 @@ structure AccountCreationConfig where
   deriving Repr, Inhabited
 
 structure RuntimeConfig where
+  ethImplicitAccounts : Bool := false
   strictNonceEnabled : Bool := false
   v1TransactionsEnabled : Bool := false
   transactionSizeIncludesSignature : Bool := false
@@ -187,6 +188,7 @@ def ofJson (j : Json) : Except String RuntimeConfig := do
     delegate := ← feeAt ac "delegate_cost" }
   let finance ← field j "runtime_finance"
   pure {
+    ethImplicitAccounts := ← (← field wasm "eth_implicit_accounts").getBool?
     strictNonceEnabled := ← (← field (← field j "runtime_admission") "strict_nonce").getBool?
     v1TransactionsEnabled := ← (← field (← field j "runtime_admission") "v1_transactions").getBool?
     transactionSizeIncludesSignature := ← (← field (← field j "runtime_admission") "transaction_size_includes_signature").getBool?
