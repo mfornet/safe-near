@@ -438,8 +438,15 @@ obligation. `NearVM.ReceiptPredicates` supplies the generic conversion seam:
 an actual handle update; `convertPromises_preserves_predicate` and
 `outcomeOfExecution_success_predicate` transport it into emitted receipts.
 These are kernel-checked for arbitrary decidable predicates and do not assume
-unique dependencies. Concrete host execution must still establish the initial
-and preserved encoding invariant. Full multi-action settlement/chain
+unique dependencies. `NearVM.PromiseEncoding` defines that encoding invariant and proves its
+preservation through concrete action append/update operations. All nine raw
+batch-action hosts have preservation lemmas requiring the newly parsed action's
+method witness; seven hosts also have unconditional preservation lemmas because
+their actions contain no methods. Runtime conversion and successful outcome
+packing now transport this exact invariant into `ReceiptGasEncodingValid`.
+Concrete metered execution must still supply the two method-bearing action
+witnesses, establish encoding for newly created receipts, and preserve the
+invariant through the complete interpreter. Full multi-action settlement/chain
 conservation and nearcore equivalence also remain open.
 
 Promise deployment derives `ContractCode.size` from the actual payload through

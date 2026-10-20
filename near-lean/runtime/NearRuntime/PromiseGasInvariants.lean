@@ -137,6 +137,27 @@ def ReceiptGasEncodingValid (spec : ReceiptSpec) : Prop :=
   (String.fromUTF8? ⟨spec.receiverId.toArray⟩).isSome = true ∧
     ∀ action ∈ spec.actions, PromiseActionMethodsUtf8 action
 
+/-- The VM's shared encoding invariant is exactly the decoding condition
+required by this runtime gas bridge. It makes no assertion of full action validity. -/
+theorem receiptEncoding_iff_gasEncoding (spec : ReceiptSpec) :
+    ReceiptEncoding spec.receiverId spec.actions ↔ ReceiptGasEncodingValid spec := Iff.rfl
+
+/-- Successful conversion of encoding-safe raw promises discharges the runtime
+receipt-decoding premise, including for callback and joint promise graphs. -/
+theorem convertPromises_gasEncoding (promises : List NearPromise) (graph : PromiseGraph)
+    (hconvert : convertPromises promises = some graph) (h : PromisesEncoding promises) :
+    ∀ spec ∈ graph.receipts, ReceiptGasEncodingValid spec :=
+  convertPromises_preserves_predicate ReceiptEncoding promises graph hconvert h
+
+/-- The packing seam now needs only the final raw-state encoding invariant;
+proving that invariant for complete metered execution remains separate. -/
+theorem outcomeOfExecution_success_gasEncoding (ctx : VMContext) (storage : List (Bytes × Bytes))
+    (final : Wasm.SmallStep.Config NearState) (error : Option FunctionCallError)
+    (hsuccess : (outcomeOfExecution ctx storage final error).aborted = none)
+    (h : PromisesEncoding final.store.wasm.host.promises) :
+    ∀ spec ∈ (outcomeOfExecution ctx storage final error).receipts, ReceiptGasEncodingValid spec :=
+  outcomeOfExecution_success_predicate ReceiptEncoding ctx storage final error hsuccess h
+
 def decodedReceiptGas (cfg : RuntimeConfig) (decoder : Bytes → ContractCode) (spec : ReceiptSpec) : Nat :=
   Fees.receiptGasBudget cfg (stringOfBytes spec.receiverId) (spec.actions.map (actionOfPromise decoder))
 
