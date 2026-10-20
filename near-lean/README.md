@@ -252,7 +252,7 @@ survive failure, and attempted subsidies are erased. Storage, access keys and
 scheduler state are restored, and unrelated accounts keep their full records.
 The net-conservation theorem uses returned burn minus returned reward; it derives
 the reward bound from a reward fraction at most one and function-call gas at most
-total burnt gas. Gas bounds now follow from action execution. Successful/system
+total burnt gas. Gas bounds now follow from action execution. Successful ordinary
 receipt conservation and chain conservation remain open.
 
 `GasInvariants` proves counter bounds and exact successful charge increments,
@@ -277,3 +277,13 @@ total burn ≤ gas used ≤ the purchased receipt budget.
 `applyActionReceipt_failed_net_conservation` uses these derived bounds rather than
 assuming gas accounting. VM state/promise materialization is separated from gas
 recording, and `ExecM.GasBound` provides reusable composition rules.
+
+`RefundReceiptInvariants.applyActionReceipt_refund_conservation` covers system
+balance/gas refunds containing one transfer, under account-key uniqueness and a
+matching receipt payload. Successful execution credits backing exactly once;
+current-key allowance restoration changes no account funds. Failed execution
+restores balances and reports the complete deposit as non-gas burn, without a
+recursive balance refund or gas reward. Zero gas use is derived from execution.
+Missing receivers, including implicit-account names, cannot be created by system
+refunds; storage-staking failure also follows the rollback/burn path. This does
+not yet prove ordinary successful VM-call or chain-level conservation.
