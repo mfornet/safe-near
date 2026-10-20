@@ -582,6 +582,18 @@ bounded external references therefore remain bounded as other work executes.
 This is counter progress, not queue ownership, uniqueness or complete processor-
 output bound preservation.
 
+`ActionOutputIdentifierBounds` composes bounds on emitted receipts through all
+raw actions and action sequences, transporting inherited callback bounds with
+allocator monotonicity. `FinalizedOutputIdentifierBounds` covers the committed
+outputs after rollback, refunds, rewards and failed callback data. Finally,
+`ProcessorOutputIdentifierBounds.processReceipt_identifier_bounds` proves both
+state and complete public output bounds for the actual processor, including
+recursive data-triggered execution and issue fallback. The premises are bounded
+initial routing state and a bounded incoming receipt; financial scope and success
+are unnecessary. Thus the local processor-output bound obligation is closed.
+Composition across the complete block queue, queue-wide ownership/uniqueness,
+valid dependency edges and eventual completion remain open.
+
 Reserved `system` account creation is rejected independently of the registrar
 and minimum-name-length configuration. Pinned nearcore's `action_create_account`
 uses near-account-id 2.0.0's `is_top_level`/`is_sub_account_of`; `system` is neither.
