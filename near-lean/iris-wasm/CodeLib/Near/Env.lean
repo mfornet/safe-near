@@ -14,16 +14,13 @@ of truth. Hand-built examples can use `nearImports`/`nearEnv` directly;
 real compiled modules should call `resolveEnv?` so their declared subset
 of imports is resolved by name/signature into the right positional order.
 
-## Incremental strategy
+## Scope
 
-Implemented tiers have real semantics; un-modelled crypto/promise entries
-are **trapping stubs** (`unsupported`). A contract that calls an
-un-modelled host function therefore *fails to verify loudly* (a trap the
-proof can't discharge) rather than silently misbehaving — implement a tier
-when a real contract needs it.
-
-Gas is intentionally unmodelled: functional correctness ignores it, and
-the interpreter's `fuel` already gives termination. Promises are deferred.
+This functional host models registers, storage, promises and injected operations.
+Unsupported operations trap. It has no gas metering or receipt scheduler;
+deployed runtime execution uses `near-lean/vm`, while CodeLib proofs use this
+separate host. Interpreter fuel bounds execution but does not establish that
+a target program completes successfully.
 -/
 
 namespace Wasm

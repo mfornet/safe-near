@@ -13,3 +13,6 @@ near-lean/programs/rust/target/
 
 # axiom audit reports
 audit/
+
+# Verbose periodic-check build logs; summaries live alongside the reports.
+reports/periodic/*/logs/

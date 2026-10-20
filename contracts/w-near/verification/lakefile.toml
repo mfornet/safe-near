@@ -1,6 +1,6 @@
 # Verification of the wNEAR contract (`wrap.near`, contracts/w-near/contract.wasm).
 #
-# Three libraries, following docs/human/PROJECT_STRUCTURE.md:
+# Three libraries, following notes/design/PROJECT_STRUCTURE.md:
 #   Model/   the high-level model of the contract state and of every method
 #   Spec/    the properties we want to prove, as `def ... : Prop`
 #   Proofs/  one theorem per spec
@@ -16,7 +16,7 @@ name = "mathlib"
 scope = "leanprover-community"
 rev = "v4.34.1"
 
-# Lean blueprint extracted from `@[blueprint]` annotations (docs/human/PROVING.md).
+# Lean blueprint extracted from `@[blueprint]` annotations (notes/design/PROVING.md).
 # `lake build :blueprint` writes .lake/build/blueprint/, consumed by blueprint/src.
 # The NEAR runtime in Lean: instantiates `Spec/Refinement.lean`'s interface.
 [[require]]

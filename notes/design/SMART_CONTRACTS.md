@@ -21,11 +21,19 @@ There are several tiers on what we can verify:
 Let's consider finding potential point of contacts for each of the smart contracts
 that could help us audit the formal statements that we are verifying.
 
-Define the format of the dataset: 
-One folder per problem containing:
+## Dataset layout
 
-smart-contract/
-    src/            -- Source code
-    contract.wasm   -- Binary deployed on chain
-    hash.txt        -- Hash of the binary (use the same hash used in NEAR)
-    build.sh        -- Reproducible script to re-build contract.wasm from src/
+Each contract has a directory under `contracts/` containing:
+
+```text
+source/         -- Pinned upstream source git submodule
+contract.toml   -- Provenance, build toolchain and expected code hash
+contract.wasm   -- Pinned on-chain binary
+hash.txt        -- NEAR code hash of that binary
+build.sh        -- Reproduce build/contract.wasm from source/
+verification/   -- Lean model, statements and proofs, where implemented
+```
+
+`just reproduce <name>` rebuilds the contract and checks its hash against the
+pinned binary. Source provenance and reproducibility are prerequisites for
+connecting a proof to a deployed artifact.

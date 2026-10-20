@@ -64,8 +64,9 @@ import CodeLib.SepLogic.SharedMemoryExample
 /-!
 # CodeLib — umbrella import for downstream code
 
-Generated `Program.lean` files (emitted by `lake exe verifier check`) and
-hand-written `Spec.lean` siblings should `import CodeLib`, never the
-interpreter directly. Today this is mostly a thin re-export of Wasm;
-domain-specific spec helpers will live here as they accrete.
+This umbrella re-exports interpreter semantics, Iris proof rules, Rust standard
+library lemmas, host models and worked examples. Generated `Program.lean` files
+copied from Talos import it through `CodeLib.Generated`; handwritten specs may
+import the individual proof modules they need. The upstream Talos verifier and
+extractor are not part of this repository.
 -/

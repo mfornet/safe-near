@@ -115,7 +115,7 @@ predicted exactly by `step` under bounded, funded resource inputs: same success
 or panic, storage, return value, logs and promises, plus balance and storage usage
 accounting. Failures, including out of gas, roll back account resources. -/
 @[blueprint "spec:refinement"
-  (statement := /-- For every storage representing an optional state (empty, or the encoding of a state satisfying \cref{def:inv}), every context and call, if executing the deployed code does not run out of gas then: when \cref{def:step} succeeds, the execution succeeds with the encoding of the new state as storage and the same return value, logs and promises; when \cref{def:step} panics, the execution fails with a message containing the panic text and the storage is unchanged. -/)]
+  (statement := /-- For every well-formed call, exact callback projection and storage representing an optional invariant state, under valid, bounded and funded execution resources: execution reports no model issue or subsidy, obeys the gas bounds, and rolls back storage, balance, storage usage and promises on every failure. When execution is not out of gas, a successful model step agrees on storage, encoded return value, logs and promises, with exact balance and storage-usage accounting; a model panic yields a matching failure and unchanged storage with no promises. -/)]
 def Refines (R : RuntimeInterface) (code : R.Code) (cfg : Config) : Prop :=
   ∀ (raw : R.Storage) (st : Option State) (resources : ExecutionResources) (env : Env) (call : Call) (results : R.CallbackResults),
     call.WF → env.promiseResult = R.callbackResult results →

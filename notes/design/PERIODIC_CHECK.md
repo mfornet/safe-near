@@ -27,7 +27,7 @@ Things to pay attention to:
 
 - Everything that builds today must still build, and CI must stay green.
 - No new `sorry`. The number of `sorry`s may only go down.
-- Spec statements (`spec/` in every contract) do not change meaning. Renaming
+- Spec statements (`Spec/` in each verification project) do not change meaning. Renaming
   or moving is fine; weakening or strengthening a theorem is a feature, not a
   check fix.
 - The trusted base (axioms, `native_decide`, `partial`, `unsafe`,
@@ -35,8 +35,6 @@ Things to pay attention to:
   If it has to, the reason is written down in the report.
 - Pinned versions move only on purpose. Updating a pin is a conscious decision
   recorded in the report, never a side effect of a fix.
-- Files under `notes/` are human written. The check reports what is stale
-  there; the human applies it.
 
 ## Checklist
 
@@ -111,10 +109,10 @@ Delete first, record only when deletion is not possible yet.
 
 - Every markdown file under `notes/` describes the current architecture:
   folder names, component boundaries, interfaces, commands. Report every
-  stale sentence with a proposed replacement.
+  stale sentence and update it to match the implementation.
 - Inline comments and docstrings in Lean match what the code does now.
 - The blueprint (`contracts/*/verification/blueprint`) states exactly the
-  theorems that exist in `spec/`, nothing more and nothing less, and the
+  theorems that exist in `Spec/`, nothing more and nothing less, and the
   proof status it shows matches reality.
 - `README.md` at the root and `justfile` help texts are accurate.
 - TODO files: close what is done, delete what no longer applies.
@@ -131,8 +129,7 @@ Delete first, record only when deletion is not possible yet.
 ### 7. Report
 
 Write a short dated report with: the numbers from section 2, the pins from
-section 3, every finding with its resolution (fixed / recorded / handed to
-human), and the total cost of the agent runs. Keep reports next to each other
+section 3, every finding with its resolution (fixed / recorded / requires maintainer action), and the total cost of the agent runs. Keep reports next to each other
 so the next check can diff against the previous one.
 
 ## Driving the check with agents

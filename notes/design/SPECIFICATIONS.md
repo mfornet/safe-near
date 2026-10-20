@@ -13,17 +13,25 @@ we should always have an available audit of the latest version. I imagine that a
 of common machinery like parsing json, data structures defined on near-sdk and 
 other used libraries will belong here.
 
-TODO: Discuss in more details (with example the format of the specifications)
+## Current layout and tooling
 
-Each formalization task will be a LEAN project with the following structure:
+The wNEAR formalization lives in `contracts/w-near/verification/`:
 
-smart-contract-lean/
-    task/           -- A copy (or link) to the task defined in SmartContract section
-    lakefile.toml   -- This is a LEAN Project (that can be built)
-    Specs/.lean     -- Multiple file containing all properties that we want to prove 
-    Proofs/.lean    -- A mirror of specs, for each spec the theorem that proves it.
+```text
+verification/
+    lakefile.toml
+    Model/          -- Definitions needed to state contract properties
+    Spec/           -- Properties, generally defined as def ... : Prop
+    Proofs/         -- Separate theorems proving those properties
+    blueprint/      -- Explanations and links to formal statements and proofs
+```
 
-The goal of the previous structure is to have specs in a common place which makes it
-easy for auditors and automated tools to verify the state of a project. We can have
-a tool that extract all specs automatically from this repo and shows which one have
-been proven and which ones are not prove yet.
+LeanArchitect extracts annotated statements and proof dependencies into the
+blueprint, rendered with `just blueprint w-near`. The transitive axiom audit
+(`just wnear-audit`) checks the trust dependencies of completed proofs. A
+formalized statement does not by itself mean the property has been proved;
+blueprint proof status must distinguish the two.
+
+The specification format and shared vocabulary still need refinement as more
+contracts are verified. Keep statements independently auditable and make any
+model assumptions explicit.

@@ -1,0 +1,23 @@
+[
+  {
+    "command": [
+      "just",
+      "sorries",
+      "w-near"
+    ],
+    "exit": 23,
+    "underlying_exit": 23,
+    "false_no_sorry": false
+  },
+  {
+    "command": [
+      "just",
+      "--justfile",
+      "contracts/w-near/verification/justfile",
+      "sorries"
+    ],
+    "exit": 23,
+    "underlying_exit": 23,
+    "false_no_sorry": false
+  }
+]

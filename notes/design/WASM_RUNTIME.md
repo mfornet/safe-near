@@ -1,18 +1,15 @@
 # WASM Runtime
 
-> There is partial work that we can use here: https://github.com/cajal-technologies/talos)
+`near-lean/wasm` contains the adapted Talos interpreter, and
+`near-lean/iris-wasm` contains its Iris proof machinery. The interpreter executes
+Wasm with a configurable host; the NEAR host and metered single-call executor
+live in `near-lean/vm`.
 
-WASM Runtime is responsible to running arbitrary WASM code over some custom
-defined host. 
+The official Wasm testsuite and custom tests exercise the interpreter. The
+committed `testsuite_report.txt` records the tested results and is checked in CI.
+VM conformance tests compare supported NEAR execution with a pinned reference.
 
-We can build trust in our implementation about the WASM Runtime by running
-official and custom made wasm testsuite. There is a comprehensive wasm
-testsuite, and we can extract all history of NEAR blockchain into a
-testsuite and compare that our Runtime (+Host) produce the same outcome
-as the official one.
-
-Interface: This implementation should have the same ability as any other
-wasm runtime such as wasmtime or wasmer and should allow for a plug&play
-replacement in most scenarios, even if sometime is not feasible since
-out implementation doesn't need to be as performant as others. This should
-allows us to run as many fuzz tests as possible.
+Broader fuzzing, interchangeability with other Wasm runtimes, and tests derived
+from NEAR execution history remain validation goals. Full compatibility must be
+established for each supported feature rather than inferred from passing a
+finite testsuite. Performance is secondary to an auditable execution model.

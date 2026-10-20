@@ -90,6 +90,6 @@ theorem encode_injective_of_wf {s t : State} (hs : s.WF) (ht : t.WF)
     · rw [hs.unregistered_zero a ha, ht.unregistered_zero a (by rwa [← hregistered])]
   cases s
   cases t
-  simp_all only [State.mk.injEq]
+  simp_all only
 
 end WNear

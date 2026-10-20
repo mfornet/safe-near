@@ -3,9 +3,9 @@ name: Runtime reference components
 on:
   push:
     branches: [main]
-    paths: ["near-lean/runtime/**", "near-lean/vm/**", "tools/runtime-finance-reference/**", "tools/runtime-nonce-reference/**", "tools/dump-runtime-config/**", ".github/workflows/runtime-reference.yml"]
+    paths: ["justfile", "near-lean/wasm/**", "near-lean/runtime/**", "near-lean/vm/**", "tools/runtime-finance-reference/**", "tools/runtime-nonce-reference/**", "tools/dump-runtime-config/**", ".github/workflows/runtime-reference.yml"]
   pull_request:
-    paths: ["near-lean/runtime/**", "near-lean/vm/**", "tools/runtime-finance-reference/**", "tools/runtime-nonce-reference/**", "tools/dump-runtime-config/**", ".github/workflows/runtime-reference.yml"]
+    paths: ["justfile", "near-lean/wasm/**", "near-lean/runtime/**", "near-lean/vm/**", "tools/runtime-finance-reference/**", "tools/runtime-nonce-reference/**", "tools/dump-runtime-config/**", ".github/workflows/runtime-reference.yml"]
   workflow_dispatch:
 
 # Finish cold builds so their caches survive frequent pushes. GitHub keeps the

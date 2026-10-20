@@ -18,9 +18,7 @@ rev = "04b7689c294bb1dd6401e2dd53b337871934ea47"
 name = "CodeLib"
 roots = [
   "CodeLib",
-  # Not reachable from the `CodeLib` umbrella on purpose: it declares the float
-  # bridge axioms, which should not enter every downstream module's environment.
-  # It is still a root so the codelib build keeps checking it.
+  # Standalone kernel-checked IEEE-754 facts, kept as an explicit build root.
   "CodeLib.IEEE32.Exec",
   "CodeLib.Examples.Gcd",
   "CodeLib.Examples.MergeSort.StdIO",

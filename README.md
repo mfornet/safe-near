@@ -2,14 +2,15 @@
 
 Formally verify NEAR smart contracts.
 
-Check the [human written notes](notes/README.md).
+Check the [project notes](notes/README.md).
 
 ## Notes
 
-`notes/` holds the human-written notes: the design of each component, the
+`notes/` holds the project notes: the design of each component, the
 plan for what is being worked on, and the TODO list. Start at
-[notes/README.md](notes/README.md). The folder is written by humans only; see
-[notes/AGENTS.md](notes/AGENTS.md).
+[notes/README.md](notes/README.md).
+
+Dated periodic check reports live in [reports/periodic/](reports/periodic/).
 
 ## Contracts dataset
 

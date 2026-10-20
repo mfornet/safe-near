@@ -5,10 +5,10 @@ import Lean
 
 These two attributes are the link between Lean specifications and the code
 they describe, and between proofs and the specifications they discharge.
-They carry the metadata that `verifier extract` reads off the source. The
-runtime behavior here is intentionally minimal — the attribute machinery
-only needs to *exist* so the source typechecks; semantics live in the
-extractor.
+They preserve the metadata consumed by the upstream Talos `verifier extract`.
+This repository retains the attribute machinery so imported program specs
+typecheck, but does not include that extractor. The marker implementation does
+not establish that a theorem proves a deployed binary.
 
 ## `@[spec_of <kind> "qualified::name"]`
 
@@ -40,7 +40,7 @@ is the fully qualified name of a `@[spec_of …] def`. The theorem's stated
 type is not required to be syntactically `SpecName` (a reformulation is
 fine); the attribute is the source of truth for the link.
 
-See `verifier/EXTRACT.md` (§P4, §P5, §P7) for the full discovery
+See the upstream Talos `verifier/EXTRACT.md` (§P4, §P5, §P7) for its discovery
 contract.
 -/
 

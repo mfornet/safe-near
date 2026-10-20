@@ -32,8 +32,9 @@ The verification is organised in three layers.
 \item \textbf{Model} (Chapter~\ref{ch:model}). A mathematical description of
   the contract state and of every method, written by hand from the Rust
   source. Each method is a function from a state and a host context to either
-  a panic or an outcome (new state, promises, return value, logs). This is
-  the only part of the project that has to be audited against the source.
+  a panic or an outcome (new state, promises, return value, logs). The
+  mathematical model must be audited against the source; deployed conclusions
+  also require audited runtime and adapter semantics and a refinement proof.
 \item \textbf{Specifications} (Chapter~\ref{ch:spec}). Properties of the
   model stated as propositions, and their proofs (Chapter~\ref{ch:proofs}).
   They never mention WebAssembly.
@@ -41,13 +42,14 @@ The verification is organised in three layers.
   the deployed binary, executed by the NEAR runtime in Lean, behaves exactly
   as the model. This is what transfers every proven property to the real
   contract. It is stated against an interface the runtime must provide; the
-  runtime does not exist yet.
+  executable VM instance exists in \texttt{Spec.RuntimeInstance}; the
+  deployed-binary refinement proof remains open.
 \end{enumerate}
 
-Chapter~\ref{ch:chain} lists the properties that only make sense over a
-sequence of receipts (solvency, the end-to-end behaviour of
-\texttt{ft\_transfer\_call}). They are stated informally until the
-chain-level model exists.
+A check mark on a definition records that its Lean statement exists; it does
+not prove a proposition stated by that definition. Completed property proofs
+appear as separate theorems in Chapter~\ref{ch:proofs}; deployed refinement
+remains open.
 
 \chapter{Model}
 \label{ch:model}
@@ -140,78 +142,31 @@ be proven about \texttt{contract.wasm}; its proof is the Wasm-level work
 
 \inputleanmodule{Spec.RuntimeInstance}
 
-\begin{theorem}[Refinement of contract.wasm]
-\label{thm:refinement}
-\uses{spec:refinement-near-lean}
-\notready
-For the module decoded from \texttt{contract.wasm} and every protocol
-configuration in \texttt{near-lean/vm/configs}, \cref{spec:refinement-near-lean}
-holds.
-\end{theorem}
+The proposition \cref{spec:refinement-near-lean} is the formal deployed
+refinement obligation. No theorem proving it for \texttt{contract.wasm} and
+the supported protocol configurations has been established.
 
 \section{What the runtime provides}
 
-The refinement proof needs, and \texttt{near-lean} now has:
+Executable runtime facilities are available. SDK serialization equivalence,
+sufficient gas, and deployed refinement remain proof obligations:
 
 \begin{itemize}
-\item The deployed module decoded from \texttt{contract.wasm}, and a
-  deterministic executor of one function call (WebAssembly interpreter plus
+\item The deployed module decoded from \texttt{contract.wasm}, and an
+  executor of one function call, using a trusted external Wasm-to-WAT
+  conversion and the Lean decoder (WebAssembly interpreter plus
   the NEAR host functions the binary imports: storage read/write/remove/has
   key, register access, predecessor and current account, attached deposit,
   prepaid gas, storage usage, promise creation and chaining, promise results,
   logging, value return and panic).
 \item Rollback: the storage of a failed execution is the storage before it.
-\item Storage accounting: \texttt{storage\_usage} equals the sum over
-  records of key length plus value length plus a per-record constant.
+\item Storage accounting updates the supplied total usage by the change in
+  storage records, retaining the account and code overhead supplied by the
+  enclosing runtime.
 \item The JSON argument and return value encodings of near-sdk 3.1.0
   (\texttt{U128} as decimal strings, \texttt{Option} as absent or
-  \texttt{null}) and the Borsh layout of the state, as a shared, audited
-  library.
-\item A way to say that an execution did not run out of gas, so that gas
-  can be abstracted away everywhere else.
+  \texttt{null}) and the Borsh layout of the state are implemented by the
+  adapter and model; equivalence with the SDK remains to be proved.
+\item Explicit gas and funded-resource premises in the refinement
+  proposition; gas sufficiency is not established for arbitrary calls.
 \end{itemize}
-
-\chapter{Chain-level properties}
-\label{ch:chain}
-
-The following properties are about sequences of receipts and need the
-chain-level model (accounts with NEAR balances and storage locks, a receipt
-queue, refunds of failed transfers). They are stated informally; each will
-become a Lean statement once that model exists.
-
-\begin{theorem}[Solvency]
-\label{thm:solvency}
-\uses{spec:conservation, spec:inv-preserved, thm:refinement}
-\notready
-In every reachable chain state, the NEAR balance of \texttt{wrap.near} is at
-least its total supply plus one registration fee per registered account plus
-its balance at deployment. Hence every holder can unwrap in full.
-\end{theorem}
-
-\begin{theorem}[Storage lock]
-\label{thm:storage-lock}
-\uses{spec:storage-coverage, thm:solvency}
-\notready
-The storage lock of \texttt{wrap.near} never exceeds what the collected
-registration fees cover, so no execution fails for lack of balance for
-storage.
-\end{theorem}
-
-\begin{theorem}[Transfer-call resolution]
-\label{thm:transfer-call}
-\uses{thm:refinement, spec:balance-authorization}
-\notready
-After an \texttt{ft\_transfer\_call} of $a$ from $S$ to $R$ and its callback,
-if no other receipt touched $R$'s balance in between, then $S$ was debited
-and $R$ credited by the same amount $u \le a$, where $u$ is the amount
-\texttt{ft\_on\_transfer} reported as used (all of $a$ if that call failed or
-returned something unparsable).
-\end{theorem}
-
-\begin{theorem}[Upgrade]
-\label{thm:upgrade}
-\notready
-\texttt{wrap.near} has no access keys, so its code cannot change; every
-property above holds for the lifetime of the account. (To be checked against
-chain state; see docs/human/NEAR\_MODEL.md.)
-\end{theorem}

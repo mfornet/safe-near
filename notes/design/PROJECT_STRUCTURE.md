@@ -1,25 +1,31 @@
 # Project structure
 
+```text
 safe-near/
-    docs/               -- Here is where all documentation lives. Documentation are markdown
-                        -- files that can be built somehow. There is a clear separation
-                        -- between human written vs AI written documents.
-    near-lean/          -- This is the implementation of NEAR in LEAN, for now just focused
-                        -- on the runtime and nothing more
-      wasm/             -- This is a wasm interpreter, for now let's just bring talos here,
-                        -- copy-pasted
-      runtime/          -- NEAR Runtime, host plugged into wasm for running the NEAR runtime
-      sdk/              -- Common definitions used by all contracts
-    contracts/          -- Dataset of smart contracts that we want to verify
-      name-1/
-        source/         -- Original source code
-        build.sh        -- Script to build the contract from the source code
-        contract.wasm
-        contract.toml   -- Metadata of the contract (hash, location in near blockchain,
-                        -- meaining, the account id and block height at which it exists)
-        verification/   -- This is a LEAN project 
+    notes/              -- Component design, verification policy and open tasks
+    reports/periodic/   -- Dated check findings and validation evidence
+    near-lean/
+      wasm/             -- Adapted Talos Wasm interpreter
+      iris-wasm/        -- Iris proof machinery and Wasm code library
+      programs/         -- Wasm test programs, smoke harnesses and proofs
+      vm/               -- Metered single-call execution and NEAR host functions
+      runtime/          -- Transactions, receipts, account state and routing
+      chain/            -- Block execution, settlement and reachability
+    contracts/          -- Dataset of pinned smart contracts
+      <name>/
+        source/         -- Pinned upstream source submodule
+        build.sh        -- Reproduce the contract from source
+        build/          -- Reconstructed outputs, including contract.wasm
+        contract.wasm   -- Pinned on-chain binary
+        hash.txt        -- NEAR code hash of the pinned binary
+        contract.toml   -- Provenance, build instructions and hash metadata
+        verification/   -- Lean project, where verification is implemented
           lakefile.toml
-          model/        -- Common definitions about the smart contract
-          spec/         -- Specification / Theorems that we want to prove
-          proofs/       -- The actual proofs for each spec
-          
+          Model/        -- Contract model and supporting definitions
+          Spec/         -- Property statements
+          Proofs/       -- Proofs of those properties
+          blueprint/    -- Blueprint source
+```
+
+The verification layout is currently instantiated for wNEAR. Generated blueprint
+HTML lives in its verification project's `web/` directory.

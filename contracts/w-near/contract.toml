@@ -23,7 +23,7 @@ output_wasm_path = "w-near/target/wasm32-unknown-unknown/release/w_near.wasm"
 reproduced = "exact"
 rust_version_basis = "rust-toolchain file at commit = stable-2021-03-25 (Rust 1.51.0); commit message says 'Rebuild with contract builder'"
 reproduced_hash = "DL2f5xmZ44cQRP6vBMt94rvseH5d5KKnAGis2WkTAsh1"
-reproduced_at = "2026-10-15"
+reproduced_at = "2026-10-20"
 
 [[deployments]]
 network = "mainnet"

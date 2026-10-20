@@ -14,14 +14,14 @@ open State
 theorem step_some_ok {cfg : Config} {s : State} {env : Env} {call : Call} {o : Outcome}
     (h : step cfg (some s) env call = .ok o) : dispatch s env call = .ok o := by
   unfold step at h
-  simp only [bind, bind_require, bind_ok', pure_eq_ok] at h
+  simp only [bind, bind_require, pure_eq_ok] at h
   split_ifs at h <;> cases call <;> simp_all [dispatch]
 
 /-- A successful `step` on an uninitialised contract is `new`. -/
 theorem step_none_ok {cfg : Config} {env : Env} {call : Call} {o : Outcome}
     (h : step cfg none env call = .ok o) : call = .new ∧ o = new cfg := by
   unfold step at h
-  simp only [bind, bind_require, bind_ok', pure_eq_ok] at h
+  simp only [bind, bind_require, pure_eq_ok] at h
   split_ifs at h <;> cases call <;> simp_all
 
 theorem Inv.mk' {cfg : Config} {s : State} (hwf : s.WF) (hsup : s.supply = s.totalSupply)
@@ -59,7 +59,7 @@ theorem Inv.transfer {cfg : Config} {s s' : State} {sender receiver : AccountId}
     (hs : Inv cfg s) (h : s.transfer sender receiver amount memo = .ok (s', logs)) :
     Inv cfg s' := by
   unfold State.transfer at h
-  simp only [bind, bind_require, bind_ok', pure_eq_ok] at h
+  simp only [bind, bind_require, pure_eq_ok] at h
   split_ifs at h
   obtain ⟨s1, h1, h⟩ := bind_ok_iff.mp h
   obtain ⟨s2, h2, h⟩ := bind_ok_iff.mp h
@@ -76,7 +76,7 @@ theorem Inv.new {cfg : Config} (hcfg : cfg.WF) : Inv cfg (new cfg).state := by
 theorem Inv.nearDeposit {cfg : Config} {s : State} {env : Env} {o : Outcome}
     (hs : Inv cfg s) (h : nearDeposit s env = .ok o) : Inv cfg o.state := by
   unfold WNear.nearDeposit at h
-  simp only [bind, bind_require, bind_ok', pure_eq_ok, bind_ite] at h
+  simp only [bind, bind_require, bind_ok', pure_eq_ok] at h
   split_ifs at h
   · -- already registered
     obtain ⟨s1, h1, h⟩ := bind_ok_iff.mp h
@@ -93,7 +93,7 @@ theorem Inv.nearDeposit {cfg : Config} {s : State} {env : Env} {o : Outcome}
 theorem Inv.nearWithdraw {cfg : Config} {s : State} {env : Env} {amount : Nat} {o : Outcome}
     (hs : Inv cfg s) (h : nearWithdraw s env amount = .ok o) : Inv cfg o.state := by
   unfold WNear.nearWithdraw at h
-  simp only [bind, bind_require, bind_ok', pure_eq_ok] at h
+  simp only [bind, bind_require, pure_eq_ok] at h
   split_ifs at h <;> first
     | exact (bind_const_error h).elim
     | (obtain ⟨s1, h1, h⟩ := bind_ok_iff.mp h
@@ -105,7 +105,7 @@ theorem Inv.ftTransfer {cfg : Config} {s : State} {env : Env} {receiver : Accoun
     {amount : Nat} {memo : Option String} {o : Outcome}
     (hs : Inv cfg s) (h : ftTransfer s env receiver amount memo = .ok o) : Inv cfg o.state := by
   unfold WNear.ftTransfer at h
-  simp only [bind, bind_require, bind_ok', pure_eq_ok] at h
+  simp only [bind, bind_require, pure_eq_ok] at h
   split_ifs at h
   obtain ⟨⟨s1, logs⟩, h1, h⟩ := bind_ok_iff.mp h
   simp only [Except.ok.injEq] at h
@@ -117,7 +117,7 @@ theorem Inv.ftTransferCall {cfg : Config} {s : State} {env : Env} {receiver : Ac
     (hs : Inv cfg s) (h : ftTransferCall s env receiver amount memo msg = .ok o) :
     Inv cfg o.state := by
   unfold WNear.ftTransferCall at h
-  simp only [bind, bind_require, bind_ok', pure_eq_ok] at h
+  simp only [bind, bind_require, pure_eq_ok] at h
   split_ifs at h <;> first
     | exact (bind_const_error h).elim
     | (obtain ⟨⟨s1, logs⟩, h1, h⟩ := bind_ok_iff.mp h
@@ -130,7 +130,7 @@ theorem Inv.resolveRefund {cfg : Config} {s : State} {sender receiver : AccountI
     (hs : Inv cfg s) (h : resolveRefund s sender receiver amount unused = .ok o) :
     Inv cfg o.state := by
   unfold WNear.resolveRefund at h
-  simp only [bind, bind_require, bind_ok', pure_eq_ok] at h
+  simp only [bind, bind_require, pure_eq_ok] at h
   split_ifs at h with hu hrb hsender hover hburn <;>
     simp only [Except.ok.injEq] at h <;> subst h
   · -- refund to the sender
@@ -183,7 +183,7 @@ theorem Inv.storageDeposit {cfg : Config} {s : State} {env : Env} {account : Opt
     {ro : Option Bool} {o : Outcome}
     (hs : Inv cfg s) (h : storageDeposit s env account ro = .ok o) : Inv cfg o.state := by
   unfold WNear.storageDeposit at h
-  simp only [bind, bind_require, bind_ok', pure_eq_ok] at h
+  simp only [bind, bind_require, pure_eq_ok] at h
   split_ifs at h <;> first
     | (simp only [Except.ok.injEq] at h; subst h; exact hs)
     | (obtain ⟨s1, h1, h⟩ := bind_ok_iff.mp h
@@ -195,16 +195,16 @@ theorem Inv.storageWithdraw {cfg : Config} {s : State} {env : Env} {amount : Opt
     {o : Outcome}
     (hs : Inv cfg s) (h : storageWithdraw s env amount = .ok o) : Inv cfg o.state := by
   unfold WNear.storageWithdraw at h
-  simp only [bind, bind_require, bind_ok', pure_eq_ok] at h
+  simp only [bind, bind_require, pure_eq_ok] at h
   split_ifs at h
-  cases amount <;> simp only [bind_require, bind_ok'] at h <;> (try split_ifs at h) <;>
+  cases amount <;> simp only at h <;> (try split_ifs at h) <;>
     simp only [Except.ok.injEq] at h <;> subst h <;> exact hs
 
 theorem Inv.storageUnregister {cfg : Config} {s : State} {env : Env} {force : Option Bool}
     {o : Outcome}
     (hs : Inv cfg s) (h : storageUnregister s env force = .ok o) : Inv cfg o.state := by
   unfold WNear.storageUnregister at h
-  simp only [bind, bind_require, bind_ok', pure_eq_ok] at h
+  simp only [bind, bind_require, pure_eq_ok] at h
   split_ifs at h with h1 h2 h3 h4
   · simp only [Except.ok.injEq] at h
     subst h

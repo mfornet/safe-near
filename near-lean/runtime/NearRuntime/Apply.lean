@@ -339,15 +339,6 @@ def checkStorageStake (cfg : RuntimeConfig) (id : AccountId) : ExecM Unit := do
 
 /-! ## Receipts -/
 
-/-- The receiver must exist unless the receipt starts by creating it, or is a
-transfer to an implicit account. -/
-def checkReceiver (st : ChainState) (r : Receipt) (a : ActionReceipt) (ethEnabled : Bool) : Except RuntimeError Unit :=
-  if (st.account? r.receiverId).isSome then .ok ()
-  else match a.actions with
-    | .createAccount :: _ => .ok ()
-    | [.transfer _] => if accountIsImplicit ethEnabled (bytesOfString r.receiverId) then .ok () else .error (.accountDoesNotExist r.receiverId)
-    | _ => .error (.accountDoesNotExist r.receiverId)
-
 /-- Account existence is checked before permission for each individual action.
 Implicit account creation requires a sole transfer from a non-system sender.
 Reference: `actions.rs::check_account_existence` at `runtime/reference.json`. -/

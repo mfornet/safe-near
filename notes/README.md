@@ -1,10 +1,10 @@
-# Human notes
+# Project notes
 
-Guideline on how to use the notes in this project
+Design notes and open tasks are maintained alongside the implementation by
+contributors and agents. Keep descriptions of current behavior separate from
+proposed work.
 
-notes/
-    README.md       -- Map of the notes in this directory
-    AGENTS.md       -- Agents policy, DON'T TOUCH HUMAN NOTES
-    TODO.md         -- Tasks we are not currently working on
-    design/         -- Description of each component of the system
-    plan/           -- Tasks we are currently working on
+- [Design](design/README.md): component responsibilities and verification policy.
+- [TODO](TODO.md): remaining tasks.
+- [Periodic checks](design/PERIODIC_CHECK.md): consolidation and validation workflow.
+- [Check reports](../reports/periodic/): dated findings and validation evidence.

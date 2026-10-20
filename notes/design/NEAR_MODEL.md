@@ -16,15 +16,13 @@ behind.
 
 ## Keys
 
-We can add to the NEAR Runtime model full access keys and function
-call keys, so that theorems should explicitly account for that.
-In particular if a smart contract has a full access key it means
-it can be upgraded at any time chaning its behavior in unexpected
-ways. We should be carefult about this, since we don't want to
-the hypothesis that the contract doesn't have any full access key
-potentially invalidating the whole theorem in case it has, instead
-we should capture what could happen.
+The runtime models full-access and restricted function-call access keys. Contract
+specifications must account for the permissions that can change deployed code
+or affect execution. Full-access keys can authorize upgrades, so lifetime and
+upgrade-safety properties need explicit assumptions about deployment identity,
+key permissions, and code changes. A theorem about one pinned binary must not
+silently claim correctness of later upgrades.
 
 ## Smart contract Upgrade
 
-TODO: Discuss how to deal when a smart contract is updadted.
+TODO: Discuss how to deal when a smart contract is updated.

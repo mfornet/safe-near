@@ -508,10 +508,6 @@ def preInvokeError (name : String) (st : Store NearState) (args : List Value) : 
     | some error => some error
     | none => functionCallInputError name st args
 
-/-- Length of register `reg` in `st`, if set. -/
-def registerLen? (st : Store NearState) (reg : UInt64) : Option Nat :=
-  (st.host.registers reg.toNat).map List.length
-
 /-- Charges after a host function ran, from its effect. -/
 def chargesAfter (name : String) (before after : Store NearState) (args : List Value) : List Charge :=
   let a := argU64 args

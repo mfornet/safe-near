@@ -3,9 +3,9 @@ name: wasm
 on:
   push:
     branches: [main]
-    paths: ["near-lean/**", "contracts/w-near/verification/**", "contracts/w-near/contract.wasm", "tools/runtime-conformance/**", "tools/runtime-finance-reference/**", "tools/runtime-nonce-reference/**", "tools/dump-runtime-config/**", "tools/axiom-audit.py", ".github/workflows/wasm.yml"]
+    paths: ["justfile", "near-lean/**", "contracts/w-near/verification/**", "contracts/w-near/contract.wasm", "tools/runtime-conformance/**", "tools/runtime-finance-reference/**", "tools/runtime-nonce-reference/**", "tools/dump-runtime-config/**", "tools/axiom-audit.py", ".github/workflows/wasm.yml"]
   pull_request:
-    paths: ["near-lean/**", "contracts/w-near/verification/**", "contracts/w-near/contract.wasm", "tools/runtime-conformance/**", "tools/runtime-finance-reference/**", "tools/runtime-nonce-reference/**", "tools/dump-runtime-config/**", "tools/axiom-audit.py", ".github/workflows/wasm.yml"]
+    paths: ["justfile", "near-lean/**", "contracts/w-near/verification/**", "contracts/w-near/contract.wasm", "tools/runtime-conformance/**", "tools/runtime-finance-reference/**", "tools/runtime-nonce-reference/**", "tools/dump-runtime-config/**", "tools/axiom-audit.py", ".github/workflows/wasm.yml"]
   workflow_dispatch:
 
 concurrency:
@@ -24,7 +24,7 @@ jobs:
       - uses: actions/cache@v5
         with:
           path: near-lean/.lake/packages
-          key: lake-pkgs-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('near-lean/wasm/lean-toolchain') }}-${{ hashFiles('near-lean/wasm/lake-manifest.json', 'near-lean/iris-wasm/lake-manifest.json') }}
+          key: lake-pkgs-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('near-lean/wasm/lean-toolchain') }}-${{ hashFiles('near-lean/wasm/lake-manifest.json', 'near-lean/iris-wasm/lake-manifest.json', 'near-lean/programs/lean/lake-manifest.json') }}
           restore-keys: |
             lake-pkgs-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('near-lean/wasm/lean-toolchain') }}-
 
@@ -86,7 +86,7 @@ jobs:
       - uses: actions/cache@v5
         with:
           path: near-lean/.lake/packages
-          key: lake-runtime-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('near-lean/*/lean-toolchain', 'near-lean/*/lake-manifest.json') }}
+          key: lake-runtime-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('near-lean/**/lean-toolchain', 'near-lean/**/lake-manifest.json', 'contracts/*/verification/lean-toolchain', 'contracts/*/verification/lake-manifest.json') }}
       - uses: leanprover/lean-action@v1
         with:
           lake-package-directory: near-lean/vm
@@ -132,7 +132,7 @@ jobs:
       - uses: actions/cache@v5
         with:
           path: near-lean/.lake/packages
-          key: lake-conformance-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('near-lean/*/lean-toolchain', 'near-lean/*/lake-manifest.json') }}
+          key: lake-conformance-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('near-lean/**/lean-toolchain', 'near-lean/**/lake-manifest.json', 'contracts/*/verification/lean-toolchain', 'contracts/*/verification/lake-manifest.json') }}
       - uses: leanprover/lean-action@v1
         with:
           lake-package-directory: near-lean/vm

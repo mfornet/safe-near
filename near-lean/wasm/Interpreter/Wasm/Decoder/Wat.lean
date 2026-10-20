@@ -141,9 +141,6 @@ termination_by structural cs
 private def stripCommentsAux (cs : List Char) (acc : List Char) : List Char :=
   stripCommentsLoop cs .normal acc
 
-private def stripComments (s : String) : String :=
-  String.ofList (stripCommentsAux s.toList [])
-
 private def readTokenString : List Char → List Char → String × List Char
   | [], acc => (String.ofList ('"' :: acc.reverse), [])
   | '"' :: rest, acc =>

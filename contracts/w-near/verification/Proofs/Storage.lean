@@ -9,7 +9,7 @@ theorem project_encode : ProjectEncode := by
   intro s hs
   have hex : ∃ t : State, t.WF ∧ encode t = encode s := ⟨s, hs, rfl⟩
   unfold project
-  rw [dif_pos hex]
+  rw [dite_eq_left hex]
   apply congrArg some
   exact encode_injective_of_wf (Classical.choose_spec hex).1 hs (Classical.choose_spec hex).2
 

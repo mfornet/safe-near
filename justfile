@@ -14,7 +14,7 @@ list:
 
 # Build the Lean verification project of one contract (Model, Spec, Proofs). Open `sorry`s are warnings.
 build contract: (_check contract)
-    cd contracts/{{contract}}/verification && lake build
+    cd contracts/{{ contract }}/verification && lake build
 
 # Build the verification projects of every contract that has one.
 build-all:
@@ -23,20 +23,20 @@ build-all:
         echo "== $d"; (cd "$d" && lake build); \
     done
 
-# List the specs of one contract that are still proved by `sorry`.
+# Audit transitive sorry dependencies, preserving build and audit failures.
 sorries contract: (_check contract)
-    cd contracts/{{contract}}/verification && (lake build 2>&1 | grep "declaration uses \`sorry\`" || echo "no sorry")
+    python3 tools/axiom-audit.py contracts/{{ contract }}/verification --allow-sorry --report audit/{{ contract }}-sorries.json
 
 # Build the web blueprint of one contract (contracts/<name>/verification/blueprint/web/).
 blueprint contract: (_check contract)
-    cd contracts/{{contract}}/verification && just blueprint-web
+    cd contracts/{{ contract }}/verification && just blueprint-web
 
 # (Served by the launchd agent com.safe-near.blueprint from ~/Library/Application Support/safe-near/blueprint.)
 # Build one contract's web blueprint and publish it at https://obiteum-mac-studio.tail9c65ff.ts.net:8444/<contract>/.
 publish-blueprint contract: (blueprint contract)
-    rsync -a --delete contracts/{{contract}}/verification/blueprint/web/ \
-        "$HOME/Library/Application Support/safe-near/blueprint/{{contract}}/"
-    @echo "https://obiteum-mac-studio.tail9c65ff.ts.net:8444/{{contract}}/"
+    rsync -a --delete contracts/{{ contract }}/verification/blueprint/web/ \
+        "$HOME/Library/Application Support/safe-near/blueprint/{{ contract }}/"
+    @echo "https://obiteum-mac-studio.tail9c65ff.ts.net:8444/{{ contract }}/"
 
 # Build near-lean: the Wasm interpreter, the VM, the runtime and the chain layer.
 near-build:
@@ -69,27 +69,27 @@ near-configs:
 
 # Rebuild one contract's wasm from its pinned source and compare with the on-chain hash.
 reproduce contract:
-    tools/verify_build.sh contracts/{{contract}}
+    tools/verify_build.sh contracts/{{ contract }}
 
 [private]
 _check contract:
-    @test -f contracts/{{contract}}/verification/lakefile.toml || \
-        { echo "contracts/{{contract}}/verification has no lakefile.toml (see \`just list\`)"; exit 1; }
+    @test -f contracts/{{ contract }}/verification/lakefile.toml || \
+        { echo "contracts/{{ contract }}/verification has no lakefile.toml (see \`just list\`)"; exit 1; }
 
 # Compare transaction gas purchase and refunds to the pinned nearcore runtime.
 near-finance-conformance checkout:
     cd near-lean/runtime && lake build finance-replay --wfail
-    python3 tools/runtime-finance-reference/build.py {{checkout}}
-    python3 tools/runtime-finance-reference/compare.py {{checkout}}/target/debug/safe-near-finance-reference
+    python3 tools/runtime-finance-reference/build.py {{ checkout }}
+    python3 tools/runtime-finance-reference/compare.py {{ checkout }}/target/debug/safe-near-finance-reference
 
 # Compare nonce admission to the pinned nearcore private validator.
 near-nonce-conformance checkout:
     cd near-lean/runtime && lake build nonce-replay --wfail
-    python3 tools/runtime-nonce-reference/build.py {{checkout}}
-    python3 tools/runtime-nonce-reference/compare.py {{checkout}}/target/debug/safe-near-nonce-reference
+    python3 tools/runtime-nonce-reference/build.py {{ checkout }}
+    python3 tools/runtime-nonce-reference/compare.py {{ checkout }}/target/debug/safe-near-nonce-reference
 
 # Compare best-effort key refunds and constructor metadata to native nearcore.
 near-allowance-conformance checkout:
     cd near-lean/runtime && lake build allowance-replay --wfail
-    python3 tools/runtime-finance-reference/build.py {{checkout}}
-    python3 tools/runtime-finance-reference/compare_allowance.py {{checkout}}/target/debug/safe-near-finance-reference
+    python3 tools/runtime-finance-reference/build.py {{ checkout }}
+    python3 tools/runtime-finance-reference/compare_allowance.py {{ checkout }}/target/debug/safe-near-finance-reference
