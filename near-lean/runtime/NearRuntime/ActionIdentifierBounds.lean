@@ -151,6 +151,29 @@ theorem Exec.addFailureData_idsBelowNext (exec : Exec) (receiver : AccountId) (o
     exact hp.freshId
   · exact h
 
+theorem Exec.addSuccessData_idsBelowNext (exec : Exec) (receiver : AccountId) (outputs : List DataReceiver) (bytes : Bytes)
+    (h : exec.state.IdsBelowNext) : (exec.addSuccessData receiver outputs bytes).state.IdsBelowNext := by
+  unfold Exec.addSuccessData
+  dsimp only
+  apply foldl_preserves (fun pair : ChainState × List Receipt => pair.1.IdsBelowNext)
+  · intro pair item hp
+    exact hp.freshId
+  · exact h
+
+theorem Exec.deliverResult_idsBelowNext (exec : Exec) (receiver : AccountId) (outputs : List DataReceiver)
+    (h : exec.state.IdsBelowNext) : (exec.deliverResult receiver outputs).state.IdsBelowNext := by
+  unfold Exec.deliverResult
+  split
+  · exact Exec.addSuccessData_idsBelowNext _ _ _ _ h
+  · exact Exec.addFailureData_idsBelowNext _ _ _ h
+  · exact h
+
+theorem Exec.finishReceiptResult_idsBelowNext (exec : Exec) (c : ReceiptCtx) (failed : Option RuntimeError)
+    (h : exec.state.IdsBelowNext) : (exec.finishReceiptResult c failed).state.IdsBelowNext := by
+  unfold Exec.finishReceiptResult
+  apply Exec.deliverResult_idsBelowNext
+  split <;> exact h
+
 theorem Exec.creditReceiptReward_idsBelowNext (exec : Exec) (cfg : RuntimeConfig) (receiver : AccountId)
     (burnPrice purchasePrice : Nat) (h : exec.state.IdsBelowNext) :
     (exec.creditReceiptReward cfg receiver burnPrice purchasePrice).state.IdsBelowNext := by
@@ -176,7 +199,7 @@ theorem finalizeReceipt_idsBelowNext (c : ReceiptCtx) (st : ChainState) (raw : E
   let gas := if gasRefund > 0 && c.action.signerId != systemAccount then
     balance.addGasRefund c.action.signerId c.action.signerPublicKey gasRefund else balance
   let rewarded := gas.creditReceiptReward c.cfg c.receipt.receiverId settlement.burnPrice c.action.gasPrice
-  let finished := if failed.isSome then rewarded.addFailureData c.receipt.receiverId c.action.outputDataReceivers else rewarded
+  let finished := rewarded.finishReceiptResult c failed
   have hbase : base.state.IdsBelowNext := by
     cases failed <;> first | exact hraw | exact hinitial
   have hcharged : charged.state.IdsBelowNext := hbase
@@ -193,10 +216,7 @@ theorem finalizeReceipt_idsBelowNext (c : ReceiptCtx) (st : ChainState) (raw : E
   have hrewarded : rewarded.state.IdsBelowNext :=
     Exec.creditReceiptReward_idsBelowNext gas _ _ _ _ hgas
   have hfinished : finished.state.IdsBelowNext := by
-    dsimp only [finished]
-    split
-    · exact Exec.addFailureData_idsBelowNext rewarded _ _ hrewarded
-    · exact hrewarded
+    exact Exec.finishReceiptResult_idsBelowNext rewarded c failed hrewarded
   exact hfinished
 
 theorem applyActionReceipt_idsBelowNext (c : ReceiptCtx) (st : ChainState) (h : st.IdsBelowNext) :

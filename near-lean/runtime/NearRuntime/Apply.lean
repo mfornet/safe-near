@@ -163,7 +163,7 @@ structure FunctionCallEffects where
 
 /-- Materialize the VM's ordered receipts and data dependencies without touching
 execution gas. Id allocation and outgoing order match receipt execution. -/
-def materializeFunctionCall (c : ReceiptCtx) (isLast : Bool) (outcome : VMOutcome)
+def materializeFunctionCall (c : ReceiptCtx) (_isLast : Bool) (outcome : VMOutcome)
     (initial : ChainState) : FunctionCallEffects := Id.run do
   let id := c.receipt.receiverId
   let mut st := initial
@@ -182,7 +182,9 @@ def materializeFunctionCall (c : ReceiptCtx) (isLast : Bool) (outcome : VMOutcom
       st := next
       outputs := outputs.modify dep (· ++ [{ dataId, receiverId := stringOfBytes spec.receiverId }])
       inputs := inputs.modify i (· ++ [dataId])
-  let outputReceivers := if isLast then c.action.outputDataReceivers else []
+  -- External result listeners are attached only after the entire action receipt
+  -- succeeds. Local dependencies between newly created receipts are linked above.
+  let outputReceivers : List DataReceiver := []
   let mut result := ExecutionStatus.successValue []
   match outcome.returnData with
   | .receiptIndex k =>
@@ -473,6 +475,52 @@ def Exec.addFailureData (exec : Exec) (receiver : AccountId) (outputs : List Dat
   let (st, rs) := outputs.foldl (failureDataStep receiver) (exec.state, [])
   { exec with state := st, newReceipts := exec.newReceipts ++ rs }
 
+/-- Successful result data has the same envelope/dependency identities as
+failure data; only its payload differs. -/
+def successDataStep (receiver : AccountId) (bytes : Bytes) (acc : ChainState × List Receipt)
+    (d : DataReceiver) : ChainState × List Receipt :=
+  let (st, rs) := acc
+  let (id, st) := st.freshId
+  (st, rs ++ [{
+    predecessorId := receiver
+    receiverId := d.receiverId
+    receiptId := id
+    receipt := .data { dataId := d.dataId, data := some bytes } }])
+
+def Exec.addSuccessData (exec : Exec) (receiver : AccountId) (outputs : List DataReceiver)
+    (bytes : Bytes) : Exec :=
+  let (st, rs) := outputs.foldl (successDataStep receiver bytes) (exec.state, [])
+  { exec with state := st, newReceipts := exec.newReceipts ++ rs }
+
+/-- Return forwarding changes routing metadata, not the selected receipt's
+identity, action body or funds. VM validation supplies an existing action target. -/
+def Receipt.forwardResult (receipt : Receipt) (target : ReceiptId) (outputs : List DataReceiver) : Receipt :=
+  if receipt.receiptId == target then
+    match receipt.receipt with
+    | .action action =>
+      { receipt with receipt := .action { action with outputDataReceivers := action.outputDataReceivers ++ outputs } }
+    | .data _ => receipt
+  else receipt
+
+def Exec.forwardResult (exec : Exec) (target : ReceiptId) (outputs : List DataReceiver) : Exec :=
+  { exec with newReceipts := exec.newReceipts.map (fun receipt => receipt.forwardResult target outputs) }
+
+/-- Complete the whole action receipt: values (including empty transfer results)
+emit data, failures emit failed data, and a returned receipt inherits listeners.
+This runs after storage checks, rollback, refunds and reward settlement. -/
+def Exec.deliverResult (exec : Exec) (receiver : AccountId) (outputs : List DataReceiver) : Exec :=
+  match exec.result.getD (.successValue []) with
+  | .successValue bytes => exec.addSuccessData receiver outputs bytes
+  | .failure _ => exec.addFailureData receiver outputs
+  | .successReceiptId target => exec.forwardResult target outputs
+
+/-- Select the final action's result before delivering the complete receipt.
+Non-call actions return the empty value even if an earlier call returned a promise. -/
+def Exec.finishReceiptResult (exec : Exec) (c : ReceiptCtx) (failed : Option RuntimeError) : Exec :=
+  let exec := if failed.isNone && c.action.actions.getLast?.any (fun action => !action.isFunctionCall) then
+      { exec with result := none } else exec
+  exec.deliverResult c.receipt.receiverId c.action.outputDataReceivers
+
 /-- Finalize a receipt attempt: rollback, settlement, refunds, reward and data. -/
 def finalizeReceipt (c : ReceiptCtx) (st0 : ChainState) (exec : Exec) (failed : Option RuntimeError) : Exec :=
   let receiver := c.receipt.receiverId
@@ -494,7 +542,7 @@ def finalizeReceipt (c : ReceiptCtx) (st0 : ChainState) (exec : Exec) (failed : 
       exec.addGasRefund c.action.signerId c.action.signerPublicKey tokensRefund
     else exec
   let exec := exec.creditReceiptReward c.cfg receiver settlement.burnPrice c.action.gasPrice
-  let exec := if failed.isSome then exec.addFailureData receiver c.action.outputDataReceivers else exec
+  let exec := exec.finishReceiptResult c failed
   { exec with result := some (exec.result.getD (.successValue [])) }
 
 
@@ -508,7 +556,11 @@ def outcomeOf (r : Receipt) (e : Exec) : ExecutionOutcome :=
   { executorId := r.receiverId
     status := e.result.getD (.successValue [])
     logs := e.logs
-    receiptIds := e.newReceipts.map (·.receiptId)
+    -- Native execution outcomes list action receipts, excluding data envelopes.
+    receiptIds := e.newReceipts.filterMap (fun receipt =>
+      match receipt.receipt with
+      | .action _ => some receipt.receiptId
+      | .data _ => none)
     gasBurnt := e.gasBurnt
     tokensBurnt := e.tokensBurnt }
 

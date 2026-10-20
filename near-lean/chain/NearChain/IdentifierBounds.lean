@@ -10,11 +10,25 @@ def Snapshot.IdentifierBounds (s : Snapshot) : Prop :=
 
 theorem step_identifier_bounds (cfg : RuntimeConfig) (decoder : CodeTable) (s : Snapshot) (b : Block)
     (h : s.IdentifierBounds) : (step cfg decoder s b).1.IdentifierBounds := by
+  let selected := s.pending.filter (fun receipt => b.deliver receipt.receiptId)
+  let held := s.pending.filter (fun receipt => !b.deliver receipt.receiptId)
+  have hselected : ReceiptList.IdsBelow s.state.nextId selected := by
+    intro receipt hm
+    exact h.2 receipt (List.mem_filter.mp hm).1
+  have hheld : ReceiptList.IdsBelow s.state.nextId held := by
+    intro receipt hm
+    exact h.2 receipt (List.mem_filter.mp hm).1
+  have hr := apply_identifier_bounds cfg b.ap decoder s.state b.txs selected h.1 hselected
+  have hn := apply_nextId_mono cfg b.ap decoder s.state b.txs selected
   unfold step
-  dsimp only
+  simp only [List.partition_eq_filter_filter]
   split
   · exact h
-  · exact apply_identifier_bounds cfg b.ap decoder s.state b.txs s.pending h.1 h.2
+  · refine ⟨hr.1, ?_⟩
+    intro receipt hm id hid
+    rcases List.mem_append.mp hm with hold | hnew
+    · exact (hheld receipt hold id hid).trans_le hn
+    · exact hr.2 receipt hnew id hid
 
 /-- Bounds for every referenced id survive arbitrary supported block sequences. -/
 theorem Reachable.identifier_bounds (cfg : RuntimeConfig) (decoder : CodeTable) (genesis s : Snapshot)

@@ -64,7 +64,8 @@ def main : IO Unit := do
     returnData := .receiptIndex 1 }
   check "a complete returned chain is representable" (observationsValid chained)
   check "returning the root instead of its callback is distinguished"
-    (!(observationsValid { chained with returnData := .receiptIndex 0 }))
+    (observationsValid { chained with returnData := .receiptIndex 0 } &&
+      returnDataOf { chained with returnData := .receiptIndex 0 } != returnDataOf chained)
   check "an invalid returned receipt index is rejected"
     (!(observationsValid { base with returnData := .receiptIndex 9 }))
 
@@ -97,6 +98,9 @@ def main : IO Unit := do
     { balance := deposit.balance, storageUsage := deposit.storageUsage }
     { env with attachedDeposit := 1 } (.nearWithdraw (10^22))
   check "funded withdrawal through the adapter succeeds" withdraw.succeeded
+  check "withdrawal returns its transfer receipt rather than a unit value"
+    (withdraw.returnData == .receiptIndex 0 && observationsValid withdraw &&
+      returnDataOf withdraw == encodeRet (.promise 0))
   check "withdrawal accounts for attached and transferred NEAR"
     (withdraw.balance + (10^22 + 1) == deposit.balance + 1)
   check "withdrawal retains storage usage for an existing account"
@@ -123,6 +127,12 @@ def main : IO Unit := do
   let modelCfg : WNear.Config := { extraBytesPerRecord := cfg.fees.numExtraBytesRecord }
   let modelDeposit ← modelOutcome (step modelCfg (some (WNear.new modelCfg).state)
     { env with attachedDeposit := 10^24 } .nearDeposit)
+  let modelWithdraw ← modelOutcome (step modelCfg (some modelDeposit.state)
+    { env with attachedDeposit := 1 } (.nearWithdraw (10^22)))
+  check "deployed withdrawal agrees with the model's exact returned receipt"
+    (returnDataOf withdraw == encodeRet modelWithdraw.ret &&
+      promisesOf withdraw == modelWithdraw.promises &&
+      decide (rawOf withdraw.storage = encode modelWithdraw.state))
   let bob : AccountId := ⟨"bob.near", by decide⟩
   let registerEnv := { env with attachedDeposit := 10^22 }
   let registered := execute deposit.storage

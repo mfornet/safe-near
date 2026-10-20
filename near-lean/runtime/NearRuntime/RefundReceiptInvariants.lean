@@ -76,7 +76,7 @@ theorem finalizeReceipt_refund_failure_funds (c : ReceiptCtx) (st : ChainState) 
   let data := rewarded.addFailureData c.receipt.receiverId c.action.outputDataReceivers
   have hf : finalizeReceipt c st raw (some err) =
       { data with result := some (data.result.getD (.successValue [])) } := by
-    simp [finalizeReceipt, hrefund, hpred, rollbackReceipt, base, settlement, data, rewarded]
+    simp [finalizeReceipt, hrefund, hpred, rollbackReceipt, Exec.finishReceiptResult, Exec.deliverResult, base, settlement, data, rewarded]
   have hz : rewarded.reward = 0 := creditReceiptReward_zero base c.cfg _ _ _ hfc
   have hb := creditReceiptReward_totalFunds c.cfg base c.receipt.receiverId
     settlement.burnPrice c.action.gasPrice hwf
@@ -130,9 +130,10 @@ theorem finalizeReceipt_refund_success_funds (c : ReceiptCtx) (st : ChainState) 
   let settlement := Fees.settleGas c.cfg c.action.gasPrice c.ap.gasPrice
     (Fees.receiptGasBudget c.cfg c.receipt.receiverId c.action.actions) raw.gasUsed raw.gasBurnt created
   let rewarded := base.creditReceiptReward c.cfg c.receipt.receiverId settlement.burnPrice c.action.gasPrice
+  let finished := rewarded.finishReceiptResult c none
   have hf : finalizeReceipt c st raw none =
-      { rewarded with result := some (rewarded.result.getD (.successValue [])) } := by
-    simp [finalizeReceipt, hrefund, rollbackReceipt, base, created, settlement, rewarded]
+      { finished with result := some (finished.result.getD (.successValue [])) } := by
+    simp [finalizeReceipt, hrefund, rollbackReceipt, base, created, settlement, rewarded, finished]
   have hz : rewarded.reward = 0 := creditReceiptReward_zero base c.cfg _ _ _ hfc
   have hb := creditReceiptReward_totalFunds c.cfg base c.receipt.receiverId
     settlement.burnPrice c.action.gasPrice hwf
@@ -144,7 +145,13 @@ theorem finalizeReceipt_refund_success_funds (c : ReceiptCtx) (st : ChainState) 
     simpa [Exec.finalizationTrace, base] using ht
   dsimp only
   rw [hf]
-  exact ⟨hb, congrArg Prod.fst hp, congrArg Prod.snd hp, hz⟩
+  have ht' := finishReceiptResult_trace rewarded c none
+  have hburn := congrArg (fun t => t.2.2.2.2.2) ht'
+  change (finished.tokensBurnt, finished.otherTokensBurnt) = (rewarded.tokensBurnt, rewarded.otherTokensBurnt) at hburn
+  change finished.totalFunds c.cfg = raw.totalFunds c.cfg ∧ finished.tokensBurnt = 0 ∧
+    finished.otherTokensBurnt = 0 ∧ finished.reward = 0
+  rw [finishReceiptResult_totalFunds, finishReceiptResult_reward]
+  exact ⟨hb, congrArg Prod.fst (hburn.trans hp), congrArg Prod.snd (hburn.trans hp), hz⟩
 
 @[simp] theorem refundAllowance_account (st : ChainState) (receiver id : AccountId) (pk : PublicKey) (amount : Nat) :
     (st.refundAllowance receiver pk amount).account? id = st.account? id := by

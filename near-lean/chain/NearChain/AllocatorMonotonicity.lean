@@ -7,10 +7,10 @@ open Wasm.Near
 theorem step_nextId_mono (cfg : RuntimeConfig) (decoder : CodeTable) (s : Snapshot) (b : Block) :
     s.state.nextId ≤ (step cfg decoder s b).1.state.nextId := by
   unfold step
-  dsimp only
+  simp only [List.partition_eq_filter_filter]
   split
   · exact Nat.le_refl _
-  · exact apply_nextId_mono cfg b.ap decoder s.state b.txs s.pending
+  · exact apply_nextId_mono cfg b.ap decoder s.state b.txs (s.pending.filter (fun receipt => b.deliver receipt.receiptId))
 
 theorem Reachable.nextId_mono (cfg : RuntimeConfig) (decoder : CodeTable) (genesis s : Snapshot)
     (h : Reachable cfg decoder genesis s) : genesis.state.nextId ≤ s.state.nextId := by

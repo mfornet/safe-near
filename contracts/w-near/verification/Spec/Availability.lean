@@ -10,11 +10,13 @@ a depositor can always wrap.
 namespace WNear
 
 /-- A registered account holding at least `amount` wNEAR that attaches exactly
-1 yoctoNEAR always succeeds in `near_withdraw(amount)`: its balance and the
-supply drop by `amount` and `amount + 1` yoctoNEAR are sent back to it. (The
-bound `amount + 1 < 2^128` excludes the one value whose refund would overflow.) -/
+1 yoctoNEAR succeeds in the unmetered `near_withdraw(amount)` model: its
+balance and supply drop by `amount`, a transfer of `amount + 1` yoctoNEAR is
+scheduled, and the return delegates to that payout receipt (local index 0).
+This does not assert eventual delivery or successful payout. The bound
+`amount + 1 < 2^128` excludes the one value whose refund would overflow. -/
 @[blueprint "spec:withdraw-available"
-  (statement := /-- If $s$ satisfies \cref{def:inv}, the predecessor is registered with balance at least $a$, exactly 1 yoctoNEAR is attached and $a + 1 < 2^{128}$, then \texttt{near\_withdraw}$(a)$ succeeds: the predecessor's balance and the supply drop by $a$, a single transfer of $a + 1$ yoctoNEAR goes to the predecessor, and the log is \texttt{Withdraw a NEAR from P}. -/)]
+  (statement := /-- If $s$ satisfies \cref{def:inv}, the predecessor is registered with balance at least $a$, exactly 1 yoctoNEAR is attached and $a + 1 < 2^{128}$, then \texttt{near\_withdraw}$(a)$ succeeds: the predecessor's balance and the supply drop by $a$, a single transfer of $a + 1$ yoctoNEAR is scheduled to the predecessor, the return selects that transfer (receipt index 0), and the log is \texttt{Withdraw a NEAR from P}. -/)]
 def WithdrawAvailable : Prop :=
   ∀ (cfg : Config) (s : State) (env : Env) (amount : Nat),
     Inv cfg s →
@@ -24,6 +26,7 @@ def WithdrawAvailable : Prop :=
       .ok { state := { s.setBalance env.predecessor (s.balance env.predecessor - amount) with
                        totalSupply := s.totalSupply - amount },
             promises := [.transfer env.predecessor (amount + 1)],
+            ret := .promise 0,
             logs := [s!"Withdraw {amount} NEAR from {env.predecessor}"] }
 
 /-- A positive deposit that fits the supply always succeeds in `near_deposit`

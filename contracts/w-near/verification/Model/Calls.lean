@@ -153,8 +153,10 @@ inductive Ret
   | optStorageBalance (b : Option StorageBalance)
   | storageBalanceBounds (b : StorageBalanceBounds)
   | metadata (m : Metadata)
-  /-- The receipt's result is the result of the scheduled promise (`PromiseOrValue::Promise`). -/
-  | promise
+  /-- Delegate the result to this receipt in creation order (flattening `then`
+  chains from left to right). This is a local receipt index, not returned bytes
+  and not a raw VM promise handle. -/
+  | promise (receiptIndex : Nat)
   deriving DecidableEq, Repr
 
 /-- Everything a successful execution produces. -/

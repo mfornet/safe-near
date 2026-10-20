@@ -8,7 +8,7 @@ shared allocator. -/
 theorem materializeFunctionCall_nextId_mono (c : ReceiptCtx) (isLast : Bool) (outcome : VMOutcome)
     (initial : ChainState) : initial.nextId ≤ (materializeFunctionCall c isLast outcome initial).state.nextId := by
   rw [materializeFunctionCall_nextId]
-  exact ((Nat.le_add_right _ _).trans (Nat.le_add_right _ _)).trans (Nat.le_add_right _ _)
+  exact (Nat.le_add_right _ _).trans (Nat.le_add_right _ _)
 
 theorem commitFunctionCall_nextId_mono (exec : Exec) (c : ReceiptCtx) (account : Account)
     (outcome : VMOutcome) (isLast : Bool) :
@@ -150,6 +150,15 @@ theorem Exec.addFailureData_nextId_mono (exec : Exec) (receiver : AccountId) (ou
   rw [failureDataFold_state]
   exact Nat.le_add_right _ _
 
+theorem Exec.finishReceiptResult_nextId_mono (exec : Exec) (c : ReceiptCtx) (failed : Option RuntimeError) :
+    exec.state.nextId ≤ (exec.finishReceiptResult c failed).state.nextId := by
+  unfold Exec.finishReceiptResult
+  split <;> unfold Exec.deliverResult <;> dsimp only <;> split
+  all_goals first
+    | (simp only [Exec.addSuccessData, successDataFold_state]; exact Nat.le_add_right _ _)
+    | exact Exec.addFailureData_nextId_mono _ _ _
+    | exact Nat.le_refl _
+
 theorem Exec.creditReceiptReward_nextId (exec : Exec) (cfg : RuntimeConfig) (receiver : AccountId)
     (burnPrice purchasePrice : Nat) :
     (exec.creditReceiptReward cfg receiver burnPrice purchasePrice).state.nextId = exec.state.nextId := by
@@ -175,7 +184,7 @@ theorem finalizeReceipt_nextId_mono (c : ReceiptCtx) (st : ChainState) (raw : Ex
   let gas := if gasRefund > 0 && c.action.signerId != systemAccount then
     balance.addGasRefund c.action.signerId c.action.signerPublicKey gasRefund else balance
   let rewarded := gas.creditReceiptReward c.cfg c.receipt.receiverId settlement.burnPrice c.action.gasPrice
-  let finished := if failed.isSome then rewarded.addFailureData c.receipt.receiverId c.action.outputDataReceivers else rewarded
+  let finished := rewarded.finishReceiptResult c failed
   have hbase : st.nextId ≤ base.state.nextId := by
     cases failed <;> first | exact hraw | exact Nat.le_refl _
   have hcharged : st.nextId ≤ charged.state.nextId := hbase
@@ -193,10 +202,7 @@ theorem finalizeReceipt_nextId_mono (c : ReceiptCtx) (st : ChainState) (raw : Ex
     rw [Exec.creditReceiptReward_nextId]
     exact hgas
   have hfinished : st.nextId ≤ finished.state.nextId := by
-    dsimp only [finished]
-    split
-    · exact hrewarded.trans (Exec.addFailureData_nextId_mono rewarded _ _)
-    · exact hrewarded
+    exact hrewarded.trans (Exec.finishReceiptResult_nextId_mono rewarded c failed)
   exact hfinished
 
 theorem applyActionReceipt_nextId_mono (c : ReceiptCtx) (st : ChainState) :

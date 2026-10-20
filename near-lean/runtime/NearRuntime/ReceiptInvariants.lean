@@ -56,6 +56,58 @@ theorem failureDataFold_funds (cfg : RuntimeConfig) (receiver : AccountId) (outp
   rw [receiptsFunds_append, failureDataFold_state, failureDataFold_funds]
   simp [ChainState.totalBalance, receiptsFunds]
 
+theorem successDataFold_state (receiver : AccountId) (bytes : Bytes) (outputs : List DataReceiver)
+    (st : ChainState) (receipts : List Receipt) :
+    (outputs.foldl (successDataStep receiver bytes) (st, receipts)).1 =
+      { st with nextId := st.nextId + outputs.length } := by
+  induction outputs generalizing st receipts with
+  | nil => rfl
+  | cons d rest ih =>
+    simp only [List.foldl_cons, successDataStep, ChainState.freshId]
+    rw [ih]
+    simp only [List.length_cons]
+    congr 1; omega
+
+theorem successDataFold_funds (cfg : RuntimeConfig) (receiver : AccountId) (bytes : Bytes) (outputs : List DataReceiver)
+    (st : ChainState) (receipts : List Receipt) :
+    receiptsFunds cfg (outputs.foldl (successDataStep receiver bytes) (st, receipts)).2 = receiptsFunds cfg receipts := by
+  induction outputs generalizing st receipts with
+  | nil => rfl
+  | cons d rest ih =>
+    simp only [List.foldl_cons, successDataStep, ChainState.freshId]
+    rw [ih]
+    simp [receiptsFunds, Fees.receiptFunds]
+
+@[simp] theorem addSuccessData_totalFunds (cfg : RuntimeConfig) (exec : Exec) (receiver : AccountId)
+    (outputs : List DataReceiver) (bytes : Bytes) : (exec.addSuccessData receiver outputs bytes).totalFunds cfg = exec.totalFunds cfg := by
+  unfold Exec.addSuccessData Exec.totalFunds
+  dsimp only
+  rw [receiptsFunds_append, successDataFold_state, successDataFold_funds]
+  simp [ChainState.totalBalance, receiptsFunds]
+
+@[simp] theorem forwardResult_receiptFunds (cfg : RuntimeConfig) (receipt : Receipt)
+    (target : ReceiptId) (outputs : List DataReceiver) :
+    Fees.receiptFunds cfg (receipt.forwardResult target outputs) = Fees.receiptFunds cfg receipt := by
+  unfold Receipt.forwardResult
+  split
+  · cases h : receipt.receipt <;> simp [Fees.receiptFunds, h, Receipt.isRefund, Fees.receiptGasBudget]
+  · rfl
+
+@[simp] theorem forwardResult_totalFunds (cfg : RuntimeConfig) (exec : Exec) (target : ReceiptId)
+    (outputs : List DataReceiver) : (exec.forwardResult target outputs).totalFunds cfg = exec.totalFunds cfg := by
+  simp [Exec.totalFunds, Exec.forwardResult, receiptsFunds, List.map_map, Function.comp_def]
+
+@[simp] theorem deliverResult_totalFunds (cfg : RuntimeConfig) (exec : Exec) (receiver : AccountId)
+    (outputs : List DataReceiver) : (exec.deliverResult receiver outputs).totalFunds cfg = exec.totalFunds cfg := by
+  unfold Exec.deliverResult
+  split <;> simp
+
+@[simp] theorem finishReceiptResult_totalFunds (cfg : RuntimeConfig) (exec : Exec) (c : ReceiptCtx)
+    (failed : Option RuntimeError) : (exec.finishReceiptResult c failed).totalFunds cfg = exec.totalFunds cfg := by
+  unfold Exec.finishReceiptResult
+  rw [deliverResult_totalFunds]
+  split <;> rfl
+
 /-- Reward credit moves tokens out of gross burn, independently of the action body. -/
 theorem creditReceiptReward_totalFunds (cfg : RuntimeConfig) (exec : Exec) (receiver : AccountId)
     (burnPrice purchasePrice : Nat) (hwf : exec.state.AccountsUnique) :
@@ -82,7 +134,7 @@ theorem rollbackReceipt_failure (st : ChainState) (exec : Exec) (err : RuntimeEr
     (rollbackReceipt st exec (some err)).gasBurnt = exec.gasBurnt ∧
     (rollbackReceipt st exec (some err)).logs = exec.logs ∧
     (rollbackReceipt st exec (some err)).result = some (.failure err) := by
-  simp [rollbackReceipt]
+  simp [rollbackReceipt, Exec.finishReceiptResult, Exec.deliverResult]
 
 @[simp] theorem addBalanceRefund_accountsUnique (exec : Exec) (receiver : AccountId) (amount : Nat) :
     (exec.addBalanceRefund receiver amount).state.AccountsUnique ↔ exec.state.AccountsUnique := by
@@ -137,6 +189,64 @@ def Exec.finalizationTrace (exec : Exec) : Nat × Nat × Nat × List String × N
   unfold Exec.creditReceiptReward
   split <;> rfl
 
+@[simp] theorem deliverResult_trace (exec : Exec) (receiver : AccountId) (outputs : List DataReceiver) :
+    (exec.deliverResult receiver outputs).finalizationTrace = exec.finalizationTrace := by
+  unfold Exec.deliverResult
+  split <;> rfl
+
+@[simp] theorem deliverResult_result (exec : Exec) (receiver : AccountId) (outputs : List DataReceiver) :
+    (exec.deliverResult receiver outputs).result = exec.result := by
+  unfold Exec.deliverResult
+  split <;> rfl
+
+@[simp] theorem deliverResult_reward (exec : Exec) (receiver : AccountId) (outputs : List DataReceiver) :
+    (exec.deliverResult receiver outputs).reward = exec.reward := by
+  unfold Exec.deliverResult
+  split <;> rfl
+
+@[simp] theorem finishReceiptResult_trace (exec : Exec) (c : ReceiptCtx) (failed : Option RuntimeError) :
+    (exec.finishReceiptResult c failed).finalizationTrace = exec.finalizationTrace := by
+  unfold Exec.finishReceiptResult
+  rw [deliverResult_trace]
+  split <;> rfl
+
+@[simp] theorem finishReceiptResult_reward (exec : Exec) (c : ReceiptCtx) (failed : Option RuntimeError) :
+    (exec.finishReceiptResult c failed).reward = exec.reward := by
+  unfold Exec.finishReceiptResult
+  rw [deliverResult_reward]
+  split <;> rfl
+
+@[simp] theorem finishReceiptResult_failure_result (exec : Exec) (c : ReceiptCtx) (error : RuntimeError) :
+    (exec.finishReceiptResult c (some error)).result = exec.result := by
+  simp [Exec.finishReceiptResult]
+
+@[simp] theorem deliverResult_account (exec : Exec) (receiver id : AccountId) (outputs : List DataReceiver) :
+    (exec.deliverResult receiver outputs).state.account? id = exec.state.account? id := by
+  unfold Exec.deliverResult
+  split
+  · simp only [Exec.addSuccessData, successDataFold_state]
+    rfl
+  · simp only [Exec.addFailureData, failureDataFold_state]
+    rfl
+  · rfl
+
+@[simp] theorem finishReceiptResult_account (exec : Exec) (c : ReceiptCtx) (failed : Option RuntimeError) (id : AccountId) :
+    (exec.finishReceiptResult c failed).state.account? id = exec.state.account? id := by
+  unfold Exec.finishReceiptResult
+  rw [deliverResult_account]
+  split <;> rfl
+
+@[simp] theorem finishReceiptResult_rewardAmount (exec : Exec) (c : ReceiptCtx) (failed : Option RuntimeError)
+    (cfg : RuntimeConfig) (burnPrice purchasePrice : Nat) :
+    (exec.finishReceiptResult c failed).receiptRewardAmount cfg burnPrice purchasePrice =
+      exec.receiptRewardAmount cfg burnPrice purchasePrice := by
+  unfold Exec.finishReceiptResult
+  split
+  · rfl
+  · dsimp only
+    unfold Exec.deliverResult
+    split <;> rfl
+
 /-- Logs and gas survive receipt failure; subsidy is rolled back and gross burn
 is exactly the settlement burn exposed by the executable result. -/
 theorem finalizeReceipt_failure_trace (c : ReceiptCtx) (st : ChainState) (raw : Exec) (err : RuntimeError) :
@@ -147,14 +257,14 @@ theorem finalizeReceipt_failure_trace (c : ReceiptCtx) (st : ChainState) (raw : 
         if c.receipt.isRefund then 0 else settlement.tokensBurnt,
         if c.receipt.isRefund then Fees.totalDeposit c.action.actions else 0) := by
   unfold finalizeReceipt
-  simp only [setResult_trace, addFailureData_trace, creditReceiptReward_trace,
+  simp only [setResult_trace, finishReceiptResult_trace, addFailureData_trace, creditReceiptReward_trace,
     ite_trace, addBalanceRefund_trace, addGasRefund_trace, ite_self]
   simp [rollbackReceipt, Exec.finalizationTrace]
 
 @[simp] theorem finalizeReceipt_failure_result (c : ReceiptCtx) (st : ChainState) (raw : Exec) (err : RuntimeError) :
     (finalizeReceipt c st raw (some err)).result = some (.failure err) := by
   unfold finalizeReceipt
-  simp [rollbackReceipt]
+  simp [rollbackReceipt, Exec.finishReceiptResult, Exec.deliverResult]
 
 /-- Ordinary failure finalization accounts for the entire deposit and gas refund.
 The gas-settlement equation is kept separate from this structural accounting lemma. -/
@@ -201,7 +311,7 @@ theorem finalizeReceipt_failure_funds (c : ReceiptCtx) (st : ChainState) (raw : 
   let data := rewarded.addFailureData c.receipt.receiverId c.action.outputDataReceivers
   have hf : finalizeReceipt c st raw (some err) =
       { data with result := some (data.result.getD (.successValue [])) } := by
-    simp [finalizeReceipt, hrefund, rollbackReceipt, hpred, hsigner,
+    simp [finalizeReceipt, Exec.finishReceiptResult, Exec.deliverResult, hrefund, rollbackReceipt, hpred, hsigner,
       base, deposit, gas, settlement, data, rewarded]
   dsimp only
   rw [hf]
@@ -303,7 +413,7 @@ theorem finalizeReceipt_failure_reward_le (c : ReceiptCtx) (st : ChainState) (ra
       raw.receiptRewardAmount c.cfg settlement.burnPrice c.action.gasPrice := by
   unfold finalizeReceipt
   dsimp only
-  simp only [Option.isSome, ite_true, addFailureData_reward]
+  simp only [Option.isSome, ite_true, finishReceiptResult_reward, addFailureData_reward]
   apply (creditReceiptReward_reward_le _ _ _ _ _).trans
   simp only [ite_rewardAmount, addGasRefund_rewardAmount, addBalanceRefund_rewardAmount, ite_self]
   rfl
@@ -382,6 +492,22 @@ def ChainState.receiptFrame (st : ChainState) :=
   rw [failureDataFold_state]
   rfl
 
+@[simp] theorem deliverResult_frame (exec : Exec) (receiver : AccountId) (outputs : List DataReceiver) :
+    (exec.deliverResult receiver outputs).state.receiptFrame = exec.state.receiptFrame := by
+  unfold Exec.deliverResult
+  split
+  · simp only [Exec.addSuccessData, successDataFold_state]
+    rfl
+  · simp only [Exec.addFailureData, failureDataFold_state]
+    rfl
+  · rfl
+
+@[simp] theorem finishReceiptResult_frame (exec : Exec) (c : ReceiptCtx) (failed : Option RuntimeError) :
+    (exec.finishReceiptResult c failed).state.receiptFrame = exec.state.receiptFrame := by
+  unfold Exec.finishReceiptResult
+  rw [deliverResult_frame]
+  split <;> rfl
+
 @[simp] theorem creditReceiptReward_frame (exec : Exec) (cfg : RuntimeConfig) (receiver : AccountId)
     (burnPrice purchasePrice : Nat) :
     (exec.creditReceiptReward cfg receiver burnPrice purchasePrice).state.receiptFrame = exec.state.receiptFrame := by
@@ -397,7 +523,7 @@ from a failed action body. It may credit the receiver and allocate receipt ids. 
 theorem finalizeReceipt_failure_frame (c : ReceiptCtx) (st : ChainState) (raw : Exec) (err : RuntimeError) :
     (finalizeReceipt c st raw (some err)).state.receiptFrame = st.receiptFrame := by
   unfold finalizeReceipt
-  simp only [addFailureData_frame, creditReceiptReward_frame, ite_frame,
+  simp only [finishReceiptResult_frame, addFailureData_frame, creditReceiptReward_frame, ite_frame,
     addGasRefund_frame, addBalanceRefund_frame, ite_self]
   rfl
 
@@ -431,7 +557,7 @@ theorem finalizeReceipt_failure_account_ne (c : ReceiptCtx) (st : ChainState) (r
     (err : RuntimeError) (id : AccountId) (hne : c.receipt.receiverId ≠ id) :
     (finalizeReceipt c st raw (some err)).state.account? id = st.account? id := by
   unfold finalizeReceipt
-  simp only [addFailureData_account, creditReceiptReward_account_ne _ _ _ _ _ _ hne,
+  simp only [finishReceiptResult_account, addFailureData_account, creditReceiptReward_account_ne _ _ _ _ _ _ hne,
     ite_account, addGasRefund_account, addBalanceRefund_account, ite_self]
   rfl
 

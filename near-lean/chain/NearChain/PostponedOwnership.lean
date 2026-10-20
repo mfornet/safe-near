@@ -6,10 +6,10 @@ open Wasm.Near
 theorem step_postponedIdsMatch (cfg : RuntimeConfig) (decoder : CodeTable) (s : Snapshot) (b : Block)
     (h : s.state.PostponedIdsMatch) : (step cfg decoder s b).1.state.PostponedIdsMatch := by
   unfold step
-  dsimp only
+  simp only [List.partition_eq_filter_filter]
   split
   · exact h
-  · exact apply_postponedIdsMatch cfg b.ap decoder s.state b.txs s.pending h
+  · exact apply_postponedIdsMatch cfg b.ap decoder s.state b.txs (s.pending.filter (fun receipt => b.deliver receipt.receiptId)) h
 
 /-- A state-predicate induction rule over the public reachability relation. -/
 theorem Reachable.state_invariant (cfg : RuntimeConfig) (decoder : CodeTable) (P : ChainState → Prop)

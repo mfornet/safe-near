@@ -1,0 +1,12 @@
+{
+  "wnear": {
+    "path": "contracts/w-near/contract.wasm",
+    "sha256": "b72c26d390b23f4517d091a8aab06b0369d465356ec5fb337d5fda076da38ac0"
+  },
+  "caller": {
+    "path": "tools/runtime-receipt-reference/fixtures/caller.wasm",
+    "sha256": "598dabea3f85a3b597bdfddad4ee4e8610b0d325674876a2942a9fa31b8a3545",
+    "watSha256": "fff38bc87d2cdc2e339879557aa0c3236f9b4a945b58e8dc3beb8f6e3d08e5de"
+  },
+  "compiler": "wasm-tools 1.251.0"
+}

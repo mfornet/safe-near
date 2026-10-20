@@ -95,6 +95,15 @@ theorem addFailureData_accountsUnique (exec : Exec) (receiver : AccountId) (outp
   rw [failureDataFold_state]
   rfl
 
+theorem finishReceiptResult_accountsUnique (exec : Exec) (c : ReceiptCtx) (failed : Option RuntimeError) :
+    (exec.finishReceiptResult c failed).state.AccountsUnique ↔ exec.state.AccountsUnique := by
+  unfold Exec.finishReceiptResult
+  split <;> unfold Exec.deliverResult <;> dsimp only <;> split
+  all_goals first
+    | (simp only [Exec.addSuccessData, successDataFold_state]; rfl)
+    | (simp only [addFailureData_accountsUnique] <;> rfl)
+    | rfl
+
 /-- Refunds, rewards and failure data preserve unique account records. On
 failure only the initial state needs uniqueness because rollback discards raw effects. -/
 theorem finalizeReceipt_accountsUnique (c : ReceiptCtx) (st : ChainState) (raw : Exec)
@@ -109,6 +118,7 @@ theorem finalizeReceipt_accountsUnique (c : ReceiptCtx) (st : ChainState) (raw :
     repeat' (first
       | assumption
       | apply Exec.creditReceiptReward_accountsUnique
+      | rw [finishReceiptResult_accountsUnique]
       | rw [addFailureData_accountsUnique]
       | rw [addGasRefund_accountsUnique]
       | rw [addBalanceRefund_accountsUnique]
@@ -119,6 +129,7 @@ theorem finalizeReceipt_accountsUnique (c : ReceiptCtx) (st : ChainState) (raw :
     repeat' (first
       | assumption
       | apply Exec.creditReceiptReward_accountsUnique
+      | rw [finishReceiptResult_accountsUnique]
       | rw [addFailureData_accountsUnique]
       | rw [addGasRefund_accountsUnique]
       | rw [addBalanceRefund_accountsUnique]

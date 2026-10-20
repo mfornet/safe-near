@@ -1,4 +1,5 @@
 import NearChain.Step
+import NearRuntime
 
 namespace Near
 open Wasm.Near
@@ -9,10 +10,10 @@ theorem step_systemAbsent (cfg : RuntimeConfig) (decoder : CodeTable)
     (s : Snapshot) (b : Block) (h : s.state.SystemAccountAbsent) :
     (step cfg decoder s b).1.state.SystemAccountAbsent := by
   unfold step
-  dsimp only
+  simp only [List.partition_eq_filter_filter]
   split
   · exact h
-  · exact apply_systemAbsent cfg b.ap decoder s.state b.txs s.pending h
+  · exact apply_systemAbsent cfg b.ap decoder s.state b.txs (s.pending.filter (fun receipt => b.deliver receipt.receiptId)) h
 
 /-- Any reachable chain state preserves genesis absence of the synthetic actor.
 No fairness, receipt-shape or successful-contract assumption is required. -/

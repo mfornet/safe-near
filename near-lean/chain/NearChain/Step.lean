@@ -1,4 +1,4 @@
-import NearRuntime
+import NearRuntime.Apply
 
 /-!
 # Chain steps
@@ -19,7 +19,8 @@ abbrev CodeTable := Bytes → ContractCode
 
 structure Snapshot where
   state : ChainState
-  /-- Outgoing receipts of the previous block, incoming for the next. -/
+  /-- Receipts in transit. Delivery may retain them across arbitrarily many
+  blocks; the runtime's delayed and postponed queues are separate. -/
   pending : List Receipt := []
   deriving Inhabited
 
@@ -27,25 +28,33 @@ structure Snapshot where
 structure Block where
   ap : ApplyState
   txs : List Transaction
+  /-- Which in-transit receipts arrive in this block. Selection preserves order
+  and cannot invent or duplicate receipts. This abstracts network/shard delivery;
+  protocol-specific routing and eventual progress are separate premises. The
+  default is the eager delivery schedule used by isolated-run helpers. -/
+  deliver : ReceiptId → Bool := fun _ => true
   deriving Inhabited
 
 def step (cfg : RuntimeConfig) (codeOf : CodeTable) (s : Snapshot) (b : Block) : Snapshot × ApplyResult :=
-  let r := apply cfg b.ap codeOf s.state b.txs s.pending
+  let delivery := s.pending.partition (fun receipt => b.deliver receipt.receiptId)
+  let r := apply cfg b.ap codeOf s.state b.txs delivery.1
   if r.issue.isSome then (s, r)
-  else ({ state := r.state, pending := r.outgoing }, r)
+  else ({ state := r.state, pending := delivery.2 ++ r.outgoing }, r)
 
 /-- Every chain step exposes the exact apply result, including rejected attempts. -/
 theorem step_applyResult (cfg : RuntimeConfig) (codeOf : CodeTable) (s : Snapshot) (b : Block) :
-    (step cfg codeOf s b).2 = apply cfg b.ap codeOf s.state b.txs s.pending := by
+    (step cfg codeOf s b).2 =
+      apply cfg b.ap codeOf s.state b.txs (s.pending.filter (fun receipt => b.deliver receipt.receiptId)) := by
   unfold step
-  dsimp only
+  simp only [List.partition_eq_filter_filter]
   split <;> rfl
 
 theorem step_issue_unchanged (cfg : RuntimeConfig) (codeOf : CodeTable)
     (s : Snapshot) (b : Block)
-    (h : (apply cfg b.ap codeOf s.state b.txs s.pending).issue.isSome = true) :
+    (h : (apply cfg b.ap codeOf s.state b.txs
+      (s.pending.filter (fun receipt => b.deliver receipt.receiptId))).issue.isSome = true) :
     (step cfg codeOf s b).1 = s := by
-  simp [step, h]
+  simp [step, List.partition_eq_filter_filter, h]
 
 /-- States reachable from `genesis` by applying blocks. -/
 inductive Reachable (cfg : RuntimeConfig) (codeOf : CodeTable) (genesis : Snapshot) : Snapshot → Prop

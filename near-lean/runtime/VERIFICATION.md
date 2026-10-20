@@ -360,3 +360,24 @@ Runtime scenarios exercise actual restricted wNEAR calls before/after refund,
 current-key replacement/deletion, balance/ordinary transfers and rollback on
 storage-staking failure. Full receipt/chain preservation and conservation, gas-key
 semantics, remaining integer overflow paths and deployed refinement remain open.
+
+## Receipt result delivery and delayed scheduling
+
+External result listeners are attached at complete receipt finalization, after
+storage checks and rollback. Direct values, empty transfer results and failures
+produce data receipts; returned receipt identities forward listeners to that
+new action receipt. Account uniqueness, queue frames, funds, identifier bounds
+and fresh outgoing identities are transported through this finalization. The
+chain conserves the backing of retained in-transit receipts as well as delivered
+ones; retaining old envelopes requires their identifiers to be below the
+allocator frontier when proving pending uniqueness.
+
+The [full-runtime receipt harness](../../tools/runtime-receipt-reference/README.md)
+compares real trie-backed native execution with the public Lean chain step.
+Receipt-result observations and independent causal assertions pass on the listed
+finite schedules. Full financial/gas traces are retained and still differ: trie
+access charges, storage-remove return-byte charges, and reported system-refund
+execution gas are known gaps. In particular, current zero-gas refund lemmas are
+model facts, not faithful statements about native refund execution gas. Native
+refund monetary gas burn is still zero. No general native equivalence or
+network/runtime fairness theorem follows from these checks.

@@ -93,3 +93,10 @@ near-allowance-conformance checkout:
     cd near-lean/runtime && lake build allowance-replay --wfail
     python3 tools/runtime-finance-reference/build.py {{checkout}}
     python3 tools/runtime-finance-reference/compare_allowance.py {{checkout}}/target/debug/safe-near-finance-reference
+
+# Compare delayed receipt-result delivery through native and Lean full runtimes.
+# Full gas/balance/refund differences remain explicit in the generated report.
+near-receipt-conformance checkout:
+    cd near-lean/chain && lake build receipt-replay --wfail
+    python3 tools/runtime-receipt-reference/build.py {{checkout}}
+    python3 tools/runtime-receipt-reference/compare.py {{checkout}}/target/debug/safe-near-receipt-reference --scope receipt-results

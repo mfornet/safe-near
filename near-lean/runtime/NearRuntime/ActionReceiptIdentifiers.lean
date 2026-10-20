@@ -58,12 +58,8 @@ theorem emitFunctionCallActions_allocated_nodup (c : ReceiptCtx) (specs : List R
   rw [emitFunctionCallActions_allocated_receiptIds]
   simpa using List.nodup_range' (s := initial.nextId) (n := specs.length)
 
-/-- The count of immediate return-data envelopes. A returned promise forwards
-its output receivers instead of emitting those data receipts immediately. -/
-def immediateDataCount (outcome : VMOutcome) (c : ReceiptCtx) (isLast : Bool) : Nat :=
-  match outcome.returnData with
-  | .receiptIndex _ => 0
-  | _ => if isLast then c.action.outputDataReceivers.length else 0
+/-- External result delivery is deferred until receipt finalization. -/
+def immediateDataCount (_outcome : VMOutcome) (_c : ReceiptCtx) (_isLast : Bool) : Nat := 0
 
 /-- Exact envelope ids of the complete executable materializer: immediate data
 first, then promise actions. Dependency allocation separates the two ranges. -/
@@ -105,7 +101,7 @@ theorem materializeFunctionCall_receiptId_bounds (c : ReceiptCtx) (isLast : Bool
       initial.nextId + outcome.receipts.length +
         (outcome.receipts.map fun spec => spec.dependencies.length).sum + immediateDataCount outcome c isLast := by
     have he := materializeFunctionCall_nextId c isLast outcome initial
-    cases hr : outcome.returnData <;> simpa only [hr, immediateDataCount] using he
+    simpa only [immediateDataCount, Nat.add_zero] using he
   rw [hn]
   rcases hm with hd | ha
   · obtain ⟨hl, hu⟩ := List.mem_range'_1.mp hd

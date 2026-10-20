@@ -171,11 +171,7 @@ theorem materializeFunctionCall_liveIds_below (c : ReceiptCtx) (isLast : Bool) (
     exact (allocateFunctionCallIds_bounds outcome.receipts initial _ (Array.getElem_mem_toList hi)).2.trans_le hle
   have hlinked : OutputDataIdsBelow linked.1.nextId linked.2.1 ∧ InputDataIdsBelow linked.1.nextId linked.2.2 :=
     linkFunctionCallDependencies_empty_bounds outcome.receipts allocation.1
-  have hreceivers : ∀ receiver ∈ (if isLast then c.action.outputDataReceivers else []),
-      receiver.dataId < linked.1.nextId := by
-    cases isLast with
-    | false => simp
-    | true => exact fun receiver hm => (hinherited receiver hm).trans_le hinitial
+  have hreceivers : ∀ receiver ∈ ([] : List DataReceiver), receiver.dataId < linked.1.nextId := by simp
   rw [materializeFunctionCall_eq_stages]
   cases hr : outcome.returnData with
   | receiptIndex k =>

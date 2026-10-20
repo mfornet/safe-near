@@ -105,16 +105,17 @@ def nearDeposit (s : State) (env : Env) : M Outcome := do
   let s ← s.deposit a amount
   pure { state := s, logs := [s!"Deposit {amount} NEAR to {a}"] }
 
-/-- `near_withdraw(amount)`: burn from the predecessor and send the NEAR back,
-plus the 1 yoctoNEAR that was attached. -/
+/-- `near_withdraw(amount)`: burn from the predecessor, schedule a transfer of
+that amount plus the attached yoctoNEAR, and delegate the call's result to the
+payout receipt. This local success does not assert eventual payout success. -/
 @[blueprint "def:near-withdraw"
-  (statement := /-- \texttt{near\_withdraw}$(a)$: requires exactly 1 yoctoNEAR attached and a registered predecessor with balance at least $a$; subtracts $a$ from its balance and from the total supply and transfers $a + 1$ yoctoNEAR to it. -/)]
+  (statement := /-- \texttt{near\_withdraw}$(a)$: requires exactly 1 yoctoNEAR attached and a registered predecessor with balance at least $a$; subtracts $a$ from its balance and from the total supply and schedules a transfer of $a + 1$ yoctoNEAR to it, returning that transfer receipt's result (local index 0). -/)]
 def nearWithdraw (s : State) (env : Env) (amount : Nat) : M Outcome := do
   require (env.attachedDeposit = 1) .requiresOneYocto
   let a := env.predecessor
   let s ← s.withdraw a amount
   require (amount + 1 < u128Bound) .arithmeticOverflow
-  pure { state := s, promises := [.transfer a (amount + 1)],
+  pure { state := s, promises := [.transfer a (amount + 1)], ret := .promise 0,
          logs := [s!"Withdraw {amount} NEAR from {a}"] }
 
 /-- `ft_transfer(receiver_id, amount, memo)`. -/
@@ -140,7 +141,7 @@ def ftTransferCall (s : State) (env : Env) (receiver : AccountId) (amount : Nat)
     .call receiver (.ftOnTransfer sender amount msg) 0 (env.prepaidGas - gasForFtTransferCall)
   let resolve : Promise :=
     .call env.currentAccount (.ftResolveTransfer sender receiver amount) 0 gasForResolveTransfer
-  pure { state := s, promises := [.then onTransfer resolve], ret := .promise, logs }
+  pure { state := s, promises := [.then onTransfer resolve], ret := .promise 1, logs }
 
 /-- The unused amount reported by `ft_on_transfer`: everything if the call
 failed or its return value did not parse, else the returned value capped by

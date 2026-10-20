@@ -67,7 +67,7 @@ theorem materializeFunctionCall_eq_stages (c : ReceiptCtx) (isLast : Bool) (outc
     let allocation := allocateFunctionCallIds outcome.receipts initial
     let linking := linkFunctionCallDependencies outcome.receipts allocation.1
       (Array.replicate outcome.receipts.length []) (Array.replicate outcome.receipts.length [])
-    let receivers := if isLast then c.action.outputDataReceivers else []
+    let receivers : List DataReceiver := []
     let returned := match outcome.returnData with
       | .receiptIndex k => (linking.1, [], linking.2.1.modify k (· ++ receivers),
           ExecutionStatus.successReceiptId (allocation.2[k]?.getD 0))
@@ -340,20 +340,16 @@ theorem linkFunctionCallDependencies_nextId (specs : List ReceiptSpec) (initial 
     · simp
   · rw [sum_range'_get! specs (fun spec => spec.dependencies.length)]
 
-/-- One receipt id per promise and data id per dependency, plus data receipt ids
-for direct returns. Returned promises allocate no duplicate output receipts. -/
+/-- The materializer allocates promise envelopes and dependency identities.
+External result data is allocated only when the entire receipt is finalized. -/
 theorem materializeFunctionCall_nextId (c : ReceiptCtx) (isLast : Bool) (outcome : VMOutcome)
     (initial : ChainState) :
     (materializeFunctionCall c isLast outcome initial).state.nextId = initial.nextId + outcome.receipts.length +
-      (outcome.receipts.map fun spec => spec.dependencies.length).sum +
-      (match outcome.returnData with
-        | .receiptIndex _ => 0
-        | .value _ | .none => if isLast then c.action.outputDataReceivers.length else 0) := by
+      (outcome.receipts.map fun spec => spec.dependencies.length).sum := by
   rw [materializeFunctionCall_eq_stages]
-  cases hr : outcome.returnData <;> dsimp only
-  all_goals simp [emitFunctionCallData_nextId, linkFunctionCallDependencies_nextId,
-    allocateFunctionCallIds_nextId]
-  all_goals cases isLast <;> rfl
+  cases hr : outcome.returnData <;>
+    simp [emitFunctionCallData_nextId, linkFunctionCallDependencies_nextId,
+      allocateFunctionCallIds_nextId]
 
 theorem allocateFunctionCallIds_nil (initial : ChainState) (ids : Array ReceiptId) :
     allocateFunctionCallIds [] initial ids = (initial, ids) := rfl

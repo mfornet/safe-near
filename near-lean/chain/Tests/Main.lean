@@ -132,6 +132,30 @@ def main (args : List String) : IO UInt32 := do
   check r "a stopped chain attempt does not charge the signer"
     ((issueRun.snapshot.state.account? "wrap.near").map (·.amount) == some (10 * oneNear))
 
+  -- In-transit delay is independent of the runtime's postponed/delayed queues.
+  let first := { pending with receiverId := "alice.near" }
+  let second := { pending with receiverId := "wrap.near", receiptId := 101 }
+  let inTransit : Snapshot := { state := { s1.state with nextId := 1000 }, pending := [first, second] }
+  let hold : Block := { ap, txs := [], deliver := fun _ => false }
+  let (heldOnce, heldResult) := step cfg codeOf inTransit hold
+  let (heldTwice, heldResult2) := step cfg codeOf heldOnce hold
+  check r "delivery may retain receipts across multiple empty blocks"
+    (heldTwice.pending.map (·.receiptId) == [100, 101] && heldTwice.state.nextId == 1000)
+  check r "holding receipts does not execute or regenerate them"
+    (heldResult.outcomes.isEmpty && heldResult.outgoing.isEmpty &&
+      heldResult2.outcomes.isEmpty && heldResult2.outgoing.isEmpty)
+  let (partialDelivery, delivered) := step cfg codeOf heldTwice
+    { ap, txs := [], deliver := fun id => id == first.receiptId }
+  check r "partial delivery executes the selected receipt once"
+    (delivered.outcomes.map (·.1) == [first.receiptId])
+  check r "partial delivery retains unselected receipts"
+    (partialDelivery.pending.any (fun receipt => receipt.receiptId == second.receiptId) &&
+      !(partialDelivery.pending.any (fun receipt => receipt.receiptId == first.receiptId)))
+  let (rejected, rejectedResult) := step cfg codeOf issueSnapshot
+    { ap, txs := [unsupportedTx], deliver := fun _ => false }
+  check r "rejected attempts retain receipts even when delivery was withheld"
+    (rejectedResult.issue.isSome && rejected.pending.map (·.receiptId) == [pending.receiptId])
+
   -- Reachable.firstStep proves the implication for every supported block.
   -- Keep that proof abstract rather than reducing this concrete IO fixture.
   check r "Reachable.step requires a supported execution" (rs1.all fun a => a.issue.isNone)

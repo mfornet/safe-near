@@ -140,6 +140,15 @@ theorem runReceiptActions_receiptQueues (c : ReceiptCtx) (st : ChainState) :
   rw [failureDataFold_state]
   rfl
 
+@[simp] theorem finishReceiptResult_receiptQueues (exec : Exec) (c : ReceiptCtx) (failed : Option RuntimeError) :
+    (exec.finishReceiptResult c failed).receiptQueues = exec.receiptQueues := by
+  unfold Exec.finishReceiptResult
+  split <;> unfold Exec.deliverResult <;> dsimp only <;> split
+  all_goals first
+    | (simp only [Exec.addSuccessData, successDataFold_state]; rfl)
+    | (simp only [addFailureData_receiptQueues] <;> rfl)
+    | rfl
+
 @[simp] theorem creditReceiptReward_receiptQueues (exec : Exec) (cfg : RuntimeConfig) (receiver : AccountId)
     (burnPrice purchasePrice : Nat) :
     (exec.creditReceiptReward cfg receiver burnPrice purchasePrice).receiptQueues = exec.receiptQueues := by
@@ -157,7 +166,7 @@ theorem finalizeReceipt_receiptQueues (c : ReceiptCtx) (st : ChainState) (raw : 
     (hraw : raw.receiptQueues = st.receiptQueues) :
     (finalizeReceipt c st raw failed).receiptQueues = st.receiptQueues := by
   unfold finalizeReceipt
-  simp only [setResult_receiptQueues, addFailureData_receiptQueues, creditReceiptReward_receiptQueues,
+  simp only [setResult_receiptQueues, finishReceiptResult_receiptQueues, addFailureData_receiptQueues, creditReceiptReward_receiptQueues,
     ite_receiptQueues, addBalanceRefund_receiptQueues, addGasRefund_receiptQueues, ite_self]
   cases failed with
   | none => exact hraw

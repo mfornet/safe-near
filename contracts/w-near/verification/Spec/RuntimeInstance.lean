@@ -141,17 +141,17 @@ def Ret.json : Ret → String
   | .metadata m =>
     "{\"spec\":" ++ jsonString m.spec ++ ",\"name\":" ++ jsonString m.name ++ ",\"symbol\":" ++ jsonString m.symbol
       ++ ",\"icon\":null,\"reference\":null,\"reference_hash\":null,\"decimals\":" ++ toString m.decimals ++ "}"
-  | .promise => ""
+  | .promise _ => ""
 
 def encodeRet : Ret → ReturnData
   | .unit => .value []
-  | .promise => .promise
+  | .promise index => .promise index
   | r => .value r.json.toUTF8.toList
 
 def returnDataOf (o : VMOutcome) : ReturnData :=
   match o.returnData with
   | .value b => .value b
-  | .receiptIndex _ => .promise
+  | .receiptIndex index => .promise index
   | .none => .value []
 
 /-- Invalid account bytes are a failed projection, never a substitute account. -/
@@ -217,13 +217,13 @@ def promisesOf? (o : VMOutcome) : Option (List Promise) := do
 
 def promisesOf (o : VMOutcome) : List Promise := (promisesOf? o).getD []
 
-/-- The model has no arbitrary returned-receipt selector. wNEAR's returned
-promise must be the last receipt of its sole chain. -/
+/-- Projection must preserve every receipt and the exact returned receipt
+index. Returning a root or one of several chains is representable; refinement
+compares the selected index against the model rather than guessing it. -/
 def observationsValid (o : VMOutcome) : Bool :=
   (promisesOf? o).isSome &&
     match o.returnData with
-    | .receiptIndex idx => idx + 1 == o.receipts.length &&
-        ((promisesOf? o).map (fun ps => ps.length == 1)).getD false
+    | .receiptIndex idx => idx < o.receipts.length
     | _ => true
 
 /-- The storage as the model sees it. -/

@@ -20,3 +20,8 @@ name = "NearChain"
 [[lean_exe]]
 name = "chain-tests"
 root = "Tests.Main"
+
+# Full receipt-chain differential replay, including externally delayed delivery.
+[[lean_exe]]
+name = "receipt-replay"
+root = "ChainConformance.Receipts"

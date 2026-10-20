@@ -20,7 +20,7 @@ open Borsh
 of a promise whose result becomes the call's result. -/
 inductive ReturnData
   | value (bytes : Bytes)
-  | promise
+  | promise (receiptIndex : Nat)
   deriving DecidableEq
 
 /-- Resources supplied by the enclosing action/chain semantics, before adding

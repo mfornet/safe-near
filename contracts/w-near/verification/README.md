@@ -146,3 +146,18 @@ with the model from identical transfer-call snapshots. Independent nearcore
 fixtures additionally cover missing/malformed results and call sequences with
 receiver spending, sender deletion, and receiver deletion before resolution.
 These sequences do not establish fairness or receipt-scheduler correctness.
+
+### Returned receipt selection and delayed callbacks
+
+`Ret.promise index` and `ReturnData.promise index` preserve the local receipt
+index instead of coarsening all promise returns. `nearWithdraw` and
+`WithdrawAvailable` explicitly return index 0 (the payout); `ftTransferCall`
+returns index 1 (the resolver). The adapter compares that exact selection and
+checks its range. Withdrawal regressions compare the model's return, storage and
+promises with the deployed binary's VM outcome.
+
+Whole-receipt result forwarding, transfer result data, rollback after storage
+checks and delayed callback delivery are exercised separately through the native
+and Lean full runtimes. See [receipt-result conformance](../../../tools/runtime-receipt-reference/README.md)
+for the tested schedules and the still-failing full gas/financial comparison.
+These finite tests do not prove deployed refinement or eventual chain progress.

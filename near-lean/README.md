@@ -714,3 +714,25 @@ terminators. The independent fixture checks empty/single/multiple/UTF-8 names,
 positive and maximum allowances, and a tight gas budget.
 The successful key cases do not establish malformed-list rejection or complete
 host input-error ordering; those remain implementation/conformance gaps.
+
+### Asynchronous receipt results and delivery
+
+`Block.deliver` selects which in-transit pending receipts arrive in a step.
+Unselected receipts remain pending, in order, alongside newly emitted receipts.
+This differs from the runtime's gas-delayed and data-postponed queues. The default
+selector delivers eagerly, so `settle`/`runIsolated` still exercise one schedule;
+they are not fairness or bounded-latency guarantees. Arbitrary selectors are an
+abstraction, not an implementation of native shard routing and congestion rules.
+
+Receipt finalization emits successful or failed data only after the full action
+batch and storage-stake checks settle. A returned receipt inherits result
+listeners. A successful transfer supplies empty bytes. The final non-function-call
+action clears an earlier call's return selection. Execution outcome receipt IDs
+list actions only, excluding data envelopes, as native NEAR does. A callback
+whose final data arrives can resume within that apply; no extra block delay is
+imposed. Cross-receipt effects are not rolled back together.
+
+[Native receipt-result tests](../tools/runtime-receipt-reference/README.md) cover
+actual wNEAR/caller/callback execution, finite delivery delays, both input arrival
+orders, failed payout, callback OOG and storage rollback. Full real-trie gas and
+refund equivalence remains open and is reported separately.

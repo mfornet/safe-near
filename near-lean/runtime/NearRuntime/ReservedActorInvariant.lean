@@ -135,6 +135,7 @@ theorem finalizeReceipt_systemAbsent (c : ReceiptCtx) (st : ChainState) (raw : E
   all_goals repeat' (first
     | exact hinitial | exact hraw
     | apply Exec.creditReceiptReward_systemAbsent
+    | rw [finishReceiptResult_account]
     | rw [addFailureData_account]
     | rw [addGasRefund_account]
     | rw [addBalanceRefund_account]

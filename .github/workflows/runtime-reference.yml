@@ -3,9 +3,9 @@ name: Runtime reference components
 on:
   push:
     branches: [main]
-    paths: ["near-lean/runtime/**", "near-lean/vm/**", "tools/runtime-finance-reference/**", "tools/runtime-nonce-reference/**", "tools/dump-runtime-config/**", ".github/workflows/runtime-reference.yml"]
+    paths: ["near-lean/runtime/**", "near-lean/chain/**", "contracts/w-near/contract.wasm", "near-lean/vm/**", "tools/runtime-finance-reference/**", "tools/runtime-receipt-reference/**", "tools/runtime-nonce-reference/**", "tools/dump-runtime-config/**", ".github/workflows/runtime-reference.yml"]
   pull_request:
-    paths: ["near-lean/runtime/**", "near-lean/vm/**", "tools/runtime-finance-reference/**", "tools/runtime-nonce-reference/**", "tools/dump-runtime-config/**", ".github/workflows/runtime-reference.yml"]
+    paths: ["near-lean/runtime/**", "near-lean/chain/**", "contracts/w-near/contract.wasm", "near-lean/vm/**", "tools/runtime-finance-reference/**", "tools/runtime-receipt-reference/**", "tools/runtime-nonce-reference/**", "tools/dump-runtime-config/**", ".github/workflows/runtime-reference.yml"]
   workflow_dispatch:
 
 # Finish cold builds so their caches survive frequent pushes. GitHub keeps the
@@ -17,7 +17,7 @@ concurrency:
 jobs:
 
   runtime-finance-conformance:
-    name: Financial settlement and nonce validation against pinned nearcore
+    name: Financial, nonce and receipt-result checks against pinned nearcore
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -36,6 +36,8 @@ jobs:
           lake-package-directory: near-lean/runtime
           build-args: finance-replay nonce-replay allowance-replay --wfail
           use-mathlib-cache: true
+      - name: Build receipt-chain replay
+        run: cd near-lean/chain && lake build receipt-replay --wfail
       - uses: dtolnay/rust-toolchain@1.93.0
       - name: Install native build dependencies
         run: sudo apt-get update && sudo apt-get install -y clang libclang-dev cmake protobuf-compiler libssl-dev pkg-config libzstd-dev
@@ -53,6 +55,10 @@ jobs:
           python3 tools/runtime-finance-reference/compare_allowance.py reference-nearcore/target/debug/safe-near-finance-reference
           python3 tools/runtime-nonce-reference/build.py reference-nearcore
           python3 tools/runtime-nonce-reference/compare.py reference-nearcore/target/debug/safe-near-nonce-reference
+      - name: Compare receipt-result delivery through actual native and Lean runtimes
+        run: |
+          python3 tools/runtime-receipt-reference/build.py reference-nearcore
+          python3 tools/runtime-receipt-reference/compare.py reference-nearcore/target/debug/safe-near-receipt-reference --scope receipt-results
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -61,3 +67,4 @@ jobs:
             audit/finance*.json
             audit/nonce*.json
             audit/allowance*.json
+            audit/receipt*.json
