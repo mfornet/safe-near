@@ -117,15 +117,11 @@ structure ReceiptCtx where
   /-- Decoder for code deployed by contracts (not available in Lean yet). -/
   codeOf : Bytes → ContractCode
 
-/-- Execute a function call and turn its promises into receipts. -/
-def applyFunctionCall (c : ReceiptCtx) (method : String) (args : Bytes) (gas deposit : Nat)
-    (isLast : Bool) : ExecM Unit := do
+/-- Exact VM context used by a receipt function-call action. -/
+def functionCallContext (c : ReceiptCtx) (account : Account) (args : Bytes) (gas deposit : Nat)
+    (isLast : Bool) : VMContext :=
   let id := c.receipt.receiverId
-  let account ← getAccount id
-  let some code := account.code
-    | throw (.functionCallError (.compilationError "CodeDoesNotExist"))
-  let st ← getState
-  let ctx : VMContext := {
+  {
     currentAccountId := bytesOfString id
     signerAccountId := bytesOfString c.action.signerId
     signerAccountPk := c.action.signerPublicKey
@@ -142,55 +138,108 @@ def applyFunctionCall (c : ReceiptCtx) (method : String) (args : Bytes) (gas dep
     prepaidGas := gas
     randomSeed := c.ap.randomSeed
     outputDataReceivers := if isLast then c.action.outputDataReceivers.map fun d => bytesOfString d.receiverId else [] }
-  let outcome := run c.cfg code.module code.size method ctx (st.contractStorage id)
-  modify fun e => { e with logs := e.logs ++ outcome.logs
-                           gasBurntForFunctionCall := e.gasBurntForFunctionCall + outcome.burntGas }
-  burnGas outcome.burntGas
-  useGas (outcome.usedGas - outcome.burntGas)
+
+/-- Gas/log observations from one VM call, before its success/failure branch. -/
+def Exec.recordVMOutcome (exec : Exec) (outcome : VMOutcome) : Exec :=
+  { exec with
+    logs := exec.logs ++ outcome.logs
+    gasBurntForFunctionCall := exec.gasBurntForFunctionCall + outcome.burntGas
+    gasBurnt := exec.gasBurnt + outcome.burntGas
+    gasUsed := exec.gasUsed + outcome.burntGas + (outcome.usedGas - outcome.burntGas) }
+
+structure FunctionCallEffects where
+  state : ChainState
+  receipts : List Receipt
+  result : ExecutionStatus
+
+/-- Materialize the VM's ordered receipts and data dependencies without touching
+execution gas. Id allocation and outgoing order match receipt execution. -/
+def materializeFunctionCall (c : ReceiptCtx) (isLast : Bool) (outcome : VMOutcome)
+    (initial : ChainState) : FunctionCallEffects := Id.run do
+  let id := c.receipt.receiverId
+  let mut st := initial
+  let mut receipts : List Receipt := []
+  let mut ids : Array ReceiptId := #[]
+  for _ in outcome.receipts do
+    let (rid, next) := st.freshId
+    st := next
+    ids := ids.push rid
+  let mut outputs : Array (List DataReceiver) := Array.replicate outcome.receipts.length []
+  let mut inputs : Array (List DataId) := Array.replicate outcome.receipts.length []
+  for h : i in [0:outcome.receipts.length] do
+    let spec := outcome.receipts[i]
+    for dep in spec.dependencies do
+      let (dataId, next) := st.freshId
+      st := next
+      outputs := outputs.modify dep (· ++ [{ dataId, receiverId := stringOfBytes spec.receiverId }])
+      inputs := inputs.modify i (· ++ [dataId])
+  let outputReceivers := if isLast then c.action.outputDataReceivers else []
+  let mut result := ExecutionStatus.successValue []
+  match outcome.returnData with
+  | .receiptIndex k =>
+    outputs := outputs.modify k (· ++ outputReceivers)
+    result := .successReceiptId (ids[k]?.getD 0)
+  | .value v =>
+    for d in outputReceivers do
+      let (rid, next) := st.freshId
+      st := next
+      receipts := receipts ++ [{
+        predecessorId := id
+        receiverId := d.receiverId
+        receiptId := rid
+        receipt := .data { dataId := d.dataId, data := some v } }]
+    result := .successValue v
+  | .none =>
+    for d in outputReceivers do
+      let (rid, next) := st.freshId
+      st := next
+      receipts := receipts ++ [{
+        predecessorId := id
+        receiverId := d.receiverId
+        receiptId := rid
+        receipt := .data { dataId := d.dataId, data := some [] } }]
+    result := .successValue []
+  for h : i in [0:outcome.receipts.length] do
+    let spec := outcome.receipts[i]
+    receipts := receipts ++ [{
+      predecessorId := id
+      receiverId := stringOfBytes spec.receiverId
+      receiptId := ids[i]?.getD 0
+      receipt := .action {
+        signerId := c.action.signerId
+        signerPublicKey := c.action.signerPublicKey
+        gasPrice := c.action.gasPrice
+        outputDataReceivers := outputs[i]?.getD []
+        inputDataIds := inputs[i]?.getD []
+        actions := spec.actions.map (actionOfPromise c.codeOf) } }]
+  return { state := st, receipts, result }
+
+/-- Commit successful VM effects; the gas/log record is updated separately. -/
+def Exec.commitFunctionCall (exec : Exec) (c : ReceiptCtx) (account : Account)
+    (outcome : VMOutcome) (isLast : Bool) : Exec :=
+  let id := c.receipt.receiverId
+  let st := exec.state.setAccount id { account with amount := outcome.balance, storageUsage := outcome.storageUsage }
+  let st := st.setContractStorage id outcome.storage
+  let effects := materializeFunctionCall c isLast outcome st
+  { exec with
+    state := effects.state
+    newReceipts := exec.newReceipts ++ effects.receipts
+    result := some effects.result
+    subsidizedAmount := exec.subsidizedAmount + outcome.subsidizedAmount }
+
+/-- Execute a function call and turn its promises into receipts. -/
+def applyFunctionCall (c : ReceiptCtx) (method : String) (args : Bytes) (gas deposit : Nat)
+    (isLast : Bool) : ExecM Unit := do
+  let account ← getAccount c.receipt.receiverId
+  let some code := account.code
+    | throw (.functionCallError (.compilationError "CodeDoesNotExist"))
+  let st ← getState
+  let ctx := functionCallContext c account args gas deposit isLast
+  let outcome := run c.cfg code.module code.size method ctx (st.contractStorage c.receipt.receiverId)
+  modify (·.recordVMOutcome outcome)
   match outcome.aborted with
   | some err => throw (.functionCallError err)
-  | none =>
-    modify fun e => { e with subsidizedAmount := e.subsidizedAmount + outcome.subsidizedAmount }
-    putAccount id { account with amount := outcome.balance, storageUsage := outcome.storageUsage }
-    modifyState (·.setContractStorage id outcome.storage)
-    -- receipts created by the call
-    let mut ids : Array ReceiptId := #[]
-    for _ in outcome.receipts do
-      ids := ids.push (← fresh)
-    let mut outputs : Array (List DataReceiver) := Array.replicate outcome.receipts.length []
-    let mut inputs : Array (List DataId) := Array.replicate outcome.receipts.length []
-    for h : i in [0:outcome.receipts.length] do
-      let spec := outcome.receipts[i]
-      for dep in spec.dependencies do
-        let dataId ← fresh
-        outputs := outputs.modify dep (· ++ [{ dataId, receiverId := stringOfBytes spec.receiverId }])
-        inputs := inputs.modify i (· ++ [dataId])
-    -- the return value
-    let outputReceivers := if isLast then c.action.outputDataReceivers else []
-    match outcome.returnData with
-    | .receiptIndex k =>
-      outputs := outputs.modify k (· ++ outputReceivers)
-      modify fun e => { e with result := some (.successReceiptId (ids[k]?.getD 0)) }
-    | .value v =>
-      for d in outputReceivers do
-        let rid ← fresh
-        emit { predecessorId := id, receiverId := d.receiverId, receiptId := rid,
-               receipt := .data { dataId := d.dataId, data := some v } }
-      modify fun e => { e with result := some (.successValue v) }
-    | .none =>
-      for d in outputReceivers do
-        let rid ← fresh
-        emit { predecessorId := id, receiverId := d.receiverId, receiptId := rid,
-               receipt := .data { dataId := d.dataId, data := some [] } }
-      modify fun e => { e with result := some (.successValue []) }
-    for h : i in [0:outcome.receipts.length] do
-      let spec := outcome.receipts[i]
-      emit { predecessorId := id, receiverId := stringOfBytes spec.receiverId, receiptId := ids[i]?.getD 0,
-             receipt := .action { signerId := c.action.signerId, signerPublicKey := c.action.signerPublicKey,
-                                  gasPrice := c.action.gasPrice,
-                                  outputDataReceivers := outputs[i]?.getD []
-                                  inputDataIds := inputs[i]?.getD []
-                                  actions := spec.actions.map (actionOfPromise c.codeOf) } }
+  | none => modify (·.commitFunctionCall c account outcome isLast)
 
 def applyAction (c : ReceiptCtx) (isLast : Bool) : Action → ExecM Unit
   | .createAccount => do
@@ -259,7 +308,7 @@ def applyAction (c : ReceiptCtx) (isLast : Bool) : Action → ExecM Unit
     if a.locked > 0 then throw (.deleteAccountStaking id)
     let st ← getState
     let (r, st) := refundReceipt st beneficiary a.amount
-    set { (← get) with state := st.removeAccount id }
+    modify fun exec => { exec with state := st.removeAccount id }
     modify fun e => { e with actorId := c.receipt.predecessorId }
     emit r
 
@@ -328,29 +377,42 @@ theorem foreign_deploy_denied (actor receiver : AccountId) (code : ContractCode)
       .error (.actorNoPermission receiver actor) := by
   simp [checkActorPermissions, h]
 
+/-- Admission checks are ordered per action and do not charge gas. -/
+def checkReceiptAction (c : ReceiptCtx) (onlyAction : Bool) (act : Action) : ExecM Unit := do
+  match checkActionAccount (← getState) c.receipt onlyAction act with
+  | .error e => throw e
+  | .ok () => pure ()
+  match checkActorPermissions (← get).actorId c.receipt.receiverId act with
+  | .error e => throw e
+  | .ok () => pure ()
+
+/-- System refunds do not pay protocol execution fees. -/
+def chargeReceiptFee (isRefund : Bool) (fee : Nat) : ExecM Unit :=
+  if isRefund then pure () else burnGas fee
+
+/-- One action's protocol fees, admission checks and body, in execution order. -/
+def runReceiptAction (c : ReceiptCtx) (onlyAction isLast : Bool) (act : Action) : ExecM Unit := do
+  chargeReceiptFee c.receipt.isRefund (Fees.exec c.cfg.fees.actionFees c.receipt.receiverId act)
+  checkReceiptAction c onlyAction act
+  applyAction c isLast act
+
+/-- Explicit ordered traversal, stopping at the first action error. -/
+def runReceiptActionList (c : ReceiptCtx) (onlyAction : Bool) : List Action → ExecM Unit
+  | [] => pure ()
+  | act :: rest => do
+    runReceiptAction c onlyAction rest.isEmpty act
+    runReceiptActionList c onlyAction rest
+
+/-- Complete action attempt, before receipt rollback and finalization. -/
+def receiptActionBody (c : ReceiptCtx) : ExecM Unit := do
+  chargeReceiptFee c.receipt.isRefund c.cfg.fees.actionFees.newActionReceipt.execution
+  runReceiptActionList c (c.action.actions.length == 1) c.action.actions
+  checkStorageStake c.cfg c.receipt.receiverId
+
 /-- Run actions and the final storage-staking check, before rollback/refunds. -/
 def runReceiptActions (c : ReceiptCtx) (st0 : ChainState) : Exec × Option RuntimeError :=
-  let f := c.cfg.fees.actionFees
-  let receiver := c.receipt.receiverId
-  -- refunds (sent by the system account) burn no gas
-  let isRefund := c.receipt.isRefund
-  let body : ExecM Unit := do
-    unless isRefund do
-      burnGas f.newActionReceipt.execution
-    let n := c.action.actions.length
-    for h : i in [0:n] do
-      let act := c.action.actions[i]
-      unless isRefund do burnGas (Fees.exec f receiver act)
-      match checkActionAccount (← getState) c.receipt (n == 1) act with
-      | .error e => throw e
-      | .ok () => pure ()
-      match checkActorPermissions (← get).actorId receiver act with
-      | .error e => throw e
-      | .ok () => pure ()
-      applyAction c (i + 1 == n) act
-    checkStorageStake c.cfg receiver
   let exec0 : Exec := { state := st0, actorId := c.receipt.predecessorId }
-  match (body.run.run exec0) with
+  match ((receiptActionBody c).run.run exec0) with
     | (.ok (), e) => (e, none)
     | (.error err, e) => (e, some err)
 
