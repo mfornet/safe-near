@@ -7,3 +7,5 @@ import NearRuntime.AccessKeyInvariants
 import NearRuntime.TransactionInvariants
 import NearRuntime.Nonce
 import NearRuntime.NonceInvariants
+import NearRuntime.Refund
+import NearRuntime.RefundInvariants

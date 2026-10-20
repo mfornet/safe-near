@@ -1,6 +1,7 @@
 import NearRuntime.Fees
 import NearRuntime.State
 import NearRuntime.Nonce
+import NearRuntime.Refund
 
 /-!
 # `apply`
@@ -72,13 +73,6 @@ def getAccount (id : AccountId) : ExecM Account := do
   | none => throw (.accountDoesNotExist id)
 
 def putAccount (id : AccountId) (a : Account) : ExecM Unit := modifyState (·.setAccount id a)
-
-/-- A refund receipt from the system account. -/
-def refundReceipt (st : ChainState) (receiver : AccountId) (amount : Nat) : Receipt × ChainState :=
-  let (id, st) := st.freshId
-  ({ predecessorId := systemAccount, receiverId := receiver, receiptId := id,
-     receipt := .action { signerId := systemAccount, signerPublicKey := [], gasPrice := 0,
-                          actions := [.transfer amount] } }, st)
 
 /-! ## Account id rules -/
 
@@ -217,7 +211,10 @@ def applyAction (c : ReceiptCtx) (isLast : Bool) : Action → ExecM Unit
   | .transfer deposit => do
     let id := c.receipt.receiverId
     match (← getState).account? id with
-    | some a => putAccount id { a with amount := a.amount + deposit }
+    | some a => do
+      putAccount id { a with amount := a.amount + deposit }
+      if c.receipt.isGasRefund then
+        modifyState (·.refundAllowance id c.action.signerPublicKey deposit)
     | none =>
       -- implicit account creation on transfer
       if let some pk := implicitPublicKey? id then
@@ -380,7 +377,7 @@ def applyActionReceipt (c : ReceiptCtx) (st0 : ChainState) : Exec :=
       { exec with state := st, newReceipts := exec.newReceipts ++ [r] }
     else exec
   let exec := if tokensRefund > 0 && c.action.signerId != systemAccount then
-      let (r, st) := refundReceipt exec.state c.action.signerId tokensRefund
+      let (r, st) := gasRefundReceipt exec.state c.action.signerId c.action.signerPublicKey tokensRefund
       { exec with state := st, newReceipts := exec.newReceipts ++ [r] }
     else exec
   -- The surviving receiver earns the burnt function-call reward even when

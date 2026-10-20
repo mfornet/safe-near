@@ -113,6 +113,13 @@ def Receipt.actions : Receipt → List Action
 
 def Receipt.isRefund (r : Receipt) : Bool := r.predecessorId == systemAccount
 
+/-- A system transfer refunds a key's gas allowance when its signer is its receiver.
+This is the pinned runtime's marker; balance refunds normally name `system`. -/
+def Receipt.isGasRefund (r : Receipt) : Bool :=
+  r.isRefund && match r.receipt with
+    | .action a => a.signerId == r.receiverId
+    | .data _ => false
+
 /-- Legacy transactions are monotonic; v1 can request strict sequential nonces. -/
 inductive NonceMode where
   | monotonic

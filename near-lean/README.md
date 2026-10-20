@@ -230,3 +230,10 @@ checked strict increment and saturating block-height ceiling. Strict mode uses
 the generated v85+ feature gate. Kernel proofs connect successful conversion to
 these bounds; 126 exact comparisons exercise nearcore's actual private validator.
 Apply defaults to block height one; explicit zero-height transactions are rejected.
+
+Gas refunds now preserve their signer-key marker and restore the current finite
+allowance with u128 saturation. Kernel proofs establish key/nonce isolation,
+unchanged account funds and storage size, and exact bounded restoration. Native
+trie/constructor/Borsh comparisons cover 66 cases; restricted-key runtime scenarios
+cover delayed refunds, replacement/deletion and failure rollback. Access-key
+storage accounting distinguishes absent allowances and counts receiver UTF-8 bytes.

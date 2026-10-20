@@ -30,3 +30,7 @@ root = "RuntimeConformance.Finance"
 [[lean_exe]]
 name = "nonce-replay"
 root = "RuntimeConformance.Nonce"
+
+[[lean_exe]]
+name = "allowance-replay"
+root = "RuntimeConformance.Allowance"

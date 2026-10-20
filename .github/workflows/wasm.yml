@@ -98,7 +98,7 @@ jobs:
       - name: Runtime scenarios
         working-directory: near-lean/runtime
         run: |
-          lake build NearRuntime runtime-tests finance-replay nonce-replay --wfail
+          lake build NearRuntime runtime-tests finance-replay nonce-replay allowance-replay --wfail
           ./.lake/build/bin/runtime-tests
       - name: Chain scenarios
         working-directory: near-lean/chain
