@@ -286,7 +286,7 @@ restores balances and reports the complete deposit as non-gas burn, without a
 recursive balance refund or gas reward. Zero gas use is derived from execution.
 Missing receivers, including implicit-account names, cannot be created by system
 refunds; storage-staking failure also follows the rollback/burn path. This does
-not yet prove ordinary successful VM-call or chain-level conservation.
+not yet prove ordinary successful action-receipt or chain-level conservation.
 
 Stake-promise scheduling preserves liquid balance: stake targets are not attached
 deposits. `deductDeposit_stake` kernel-checks the no-op financial frame, and 16
@@ -301,5 +301,22 @@ resolved host import preserves liquid balance plus pending promise deposits,
 with subsidies accounted for explicitly. This includes the actual memory-decoded
 amounts for create, then, batch function-call, and transfer APIs. Other registered
 hosts preserve those financial fields; rejected calls have no success guarantee.
-These are host/conversion lemmas, not yet a whole-interpreter or successful
-action-receipt conservation theorem.
+`LiveInvariant` and `MeteredLiveInvariant` lift these guarantees through actual
+interpreter transitions and the metered loop. A terminal trap discards its
+speculative financial state; catchable exceptions must preserve live invariants.
+`HostNoThrow.resolveMetered_noThrow` proves that the concrete NEAR host registry
+never raises catchable Wasm exceptions.
+
+`OutcomeFunding.run_success_funding` proves for the public executable VM, for
+arbitrary contract code, context and fuel, that success implies:
+
+```
+final balance + outgoing receipt deposits
+  = initial account balance + attached deposit + recorded subsidy
+```
+
+It covers loading/entry charging, actual resolved imports, promise conversion,
+and final receipt validation, with no assumed financial equation or host oracle.
+The stronger live-state invariant also covers caught Wasm exceptions and indexed
+memories. This closes successful VM-call funding; ordinary successful multi-action
+receipt and whole-chain conservation remain open.

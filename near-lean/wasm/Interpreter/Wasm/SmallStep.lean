@@ -233,6 +233,13 @@ structure Config (α : Type) where
   expr : Expr α
   store : MachineStore α
 
+/-- State invariant required while execution can still return successfully.
+A terminal trap carries rollback state and has no live-state obligation. -/
+def Config.LiveHost (P : α → Prop) (config : Config α) : Prop :=
+  match config.expr with
+  | .trapped _ => True
+  | .running _ | .done _ => P config.store.wasm.host
+
 structure InternalError where
   message : String
 deriving Repr, Inhabited, DecidableEq
@@ -6856,6 +6863,12 @@ theorem resumeAfterIndexedMemory_host (rest : Program) (original : MachineStore 
     (config : Config α) :
     (resumeAfterIndexedMemory rest original index config).store.wasm.host = config.store.wasm.host := by
   simp only [resumeAfterIndexedMemory, leaveIndexedMemory, setMemoryAt_host]
+
+theorem resumeAfterIndexedMemory_liveHost (P : α → Prop) (rest : Program)
+    (original : MachineStore α) (index : Nat) (config : Config α) :
+    (resumeAfterIndexedMemory rest original index config).LiveHost P = config.LiveHost P := by
+  cases he : config.expr <;>
+    simp only [Config.LiveHost, resumeAfterIndexedMemory, he, leaveIndexedMemory, setMemoryAt_host]
 
 theorem runtime_preserved {config config' : Config α} {kind}
     (h : Step config kind config')
