@@ -400,6 +400,28 @@ receipt-wide cache lifetime, flat storage and memtries still need integration.
 The complete object set is for the trie built from the supplied entries; it does
 not establish that all state of an original blockchain was captured.
 
+## VM external storage accounting
+
+`VMContext.storageAccounting` optionally supplies the full chunk trie and its
+shared hash cache. The VM's metered storage hosts use staged references to charge
+old-value bytes before fetching values, then bill disk and cached node totals.
+Read/has-key calls default to flat-storage accounting; `storageReadsFromTrie`
+selects trie traversal. Read value fetches warm the cache without trie gas,
+matching native `FreeGasCounter` dereferences. Values over 4000 bytes also incur
+the native large-read overhead, including values in prospective overlays.
+
+`VMOutcome.storageAccounting` returns cache and prospective changes on success
+and failure. A receipt executor must commit or roll back those changes and retain
+the cache across all calls in the chunk, starting a fresh cache for the next chunk.
+Inconsistent contract storage and trie
+inputs produce an explicit model execution issue. The standalone mocked VM
+adapter continues to omit trie charges when no external trie is supplied.
+
+This is an opt-in VM boundary. Registered full-chain replay still needs an
+independently constructed complete chunk trie, runtime metadata updates and shared
+receipt lifetime handling before enabling it. The existing native contract-chain
+storage-gas differences remain visible until that integration is complete.
+
 ## Staged ContractData updates
 
 `--trie-updates` exercises the actual native `TrieUpdate` on a canonical on-disk
@@ -427,8 +449,8 @@ value hash; memory-overlay references add no trie accesses on dereference.
 The Lean library exposes `TrieOverlay.getReference` and `dereference` separately.
 On-disk references retain their base root; a different checkpoint is rejected.
 This models the staging needed when RuntimeExt charges old-value bytes between
-lookup and dereference. It does not yet connect trie fees to VM execution or
-establish chunk-wide cache/overlay threading through the receipt processor.
+lookup and dereference; the optional VM external above now uses this staging.
+Chunk-wide cache/overlay threading through the receipt processor remains open.
 That backend must also derive the original complete chunk trie, including the
 bandwidth-scheduler record (column 15) created between blocks; represented
 account/receipt/storage columns alone do not specify that full trie.

@@ -59,7 +59,7 @@ theorem writeReg_reservation (fees : ActionFees) (n : Nat) :
 theorem chargesAfter_reservation (fees : ActionFees) (name : String) (before after : Store NearState)
     (args : List Value) :
     ((chargesAfter name before after args).map (fun charge => charge.reservation fees)).sum = 0 := by
-  unfold chargesAfter
+  unfold chargesAfter storageReadValueCharges
   repeat' (first | rfl | split | (dsimp only; split))
 
 theorem deductDeposit_reservationView (name : String) (before after : Store NearState) (args : List Value) :

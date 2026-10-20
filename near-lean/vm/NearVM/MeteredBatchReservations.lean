@@ -142,7 +142,9 @@ theorem metered_reservationInvariant (fees : ActionFees) (ethEnabled : Bool) (ex
     (hraw : ∀ st args, ReservationInvariant fees ethEnabled st.host →
       (applyCharges st.host (chargesBefore name st args)).2 = none →
       preInvokeError name (prechargedStore name st args) args = none →
-      HostResult.LiveSatisfies (ReservationInvariant fees ethEnabled) (fn.invoke (prechargedStore name st args) args)) :
+      (prepareStorageCall name (prechargedStore name st args) args).2 = none →
+      HostResult.LiveSatisfies (ReservationInvariant fees ethEnabled)
+        (fn.invoke (prepareStorageCall name (prechargedStore name st args) args).1 args)) :
     HostFn.PreservesLive (ReservationInvariant fees ethEnabled) (metered extra name fn) := by
   intro st args h
   unfold metered
@@ -154,15 +156,22 @@ theorem metered_reservationInvariant (fees : ActionFees) (ethEnabled : Bool) (ex
     · cases hc : (applyCharges st.host (chargesBefore name st args)).2 with
       | some error => trivial
       | none =>
+        let paid := prechargedStore name st args
         change HostResult.LiveSatisfies _
-          (match preInvokeError name (prechargedStore name st args) args with
-          | some error => trapWith (prechargedStore name st args) error
-          | none => finishMeteredCall extra name (prechargedStore name st args) args
-              (fn.invoke (prechargedStore name st args) args))
-        split
-        · trivial
-        · exact finishMeteredCall_reservationInvariant fees ethEnabled extra name _ args _
-            (hraw st args h hc (by assumption))
+          (match preInvokeError name paid args with
+          | some error => trapWith paid error
+          | none => invokeStorageCall extra name fn paid args)
+        cases hp : preInvokeError name paid args with
+        | some error => trivial
+        | none =>
+          unfold invokeStorageCall
+          dsimp only
+          let ready := (prepareStorageCall name paid args).1
+          cases hs : (prepareStorageCall name paid args).2 with
+          | some error => cases error <;> trivial
+          | none =>
+            exact finishMeteredCall_reservationInvariant fees ethEnabled extra name ready args _
+              (hraw st args h hc hp hs)
 
 theorem prechargedCreateAccount_reservationInvariant (fees : ActionFees) (ethEnabled : Bool)
     (st : Store NearState) (args : List Value)
@@ -184,7 +193,8 @@ theorem meteredCreateAccount_reservationInvariant (fees : ActionFees) (ethEnable
     HostFn.PreservesLive (ReservationInvariant fees ethEnabled)
       (metered extra "promise_batch_action_create_account" promiseBatchActionCreateAccountFn) := by
   apply metered_reservationInvariant
-  intro st args h hs _
+  intro st args h hs _ _
+  simp (disch := decide) only [prepareStorageCall_other]
   exact prechargedCreateAccount_reservationInvariant fees ethEnabled st args h hs
 
 theorem prechargedStake_reservationInvariant (fees : ActionFees) (ethEnabled : Bool)
@@ -207,7 +217,8 @@ theorem meteredStake_reservationInvariant (fees : ActionFees) (ethEnabled : Bool
     HostFn.PreservesLive (ReservationInvariant fees ethEnabled)
       (metered extra "promise_batch_action_stake" promiseBatchActionStakeFn) := by
   apply metered_reservationInvariant
-  intro st args h hs _
+  intro st args h hs _ _
+  simp (disch := decide) only [prepareStorageCall_other]
   exact prechargedStake_reservationInvariant fees ethEnabled st args h hs
 
 theorem prechargedFullAccessKey_reservationInvariant (fees : ActionFees) (ethEnabled : Bool)
@@ -230,7 +241,8 @@ theorem meteredFullAccessKey_reservationInvariant (fees : ActionFees) (ethEnable
     HostFn.PreservesLive (ReservationInvariant fees ethEnabled)
       (metered extra "promise_batch_action_add_key_with_full_access" promiseBatchActionAddKeyWithFullAccessFn) := by
   apply metered_reservationInvariant
-  intro st args h hs _
+  intro st args h hs _ _
+  simp (disch := decide) only [prepareStorageCall_other]
   exact prechargedFullAccessKey_reservationInvariant fees ethEnabled st args h hs
 
 theorem prechargedDeleteKey_reservationInvariant (fees : ActionFees) (ethEnabled : Bool)
@@ -253,7 +265,8 @@ theorem meteredDeleteKey_reservationInvariant (fees : ActionFees) (ethEnabled : 
     HostFn.PreservesLive (ReservationInvariant fees ethEnabled)
       (metered extra "promise_batch_action_delete_key" promiseBatchActionDeleteKeyFn) := by
   apply metered_reservationInvariant
-  intro st args h hs _
+  intro st args h hs _ _
+  simp (disch := decide) only [prepareStorageCall_other]
   exact prechargedDeleteKey_reservationInvariant fees ethEnabled st args h hs
 
 theorem prechargedDeleteAccount_reservationInvariant (fees : ActionFees) (ethEnabled : Bool)
@@ -276,7 +289,8 @@ theorem meteredDeleteAccount_reservationInvariant (fees : ActionFees) (ethEnable
     HostFn.PreservesLive (ReservationInvariant fees ethEnabled)
       (metered extra "promise_batch_action_delete_account" promiseBatchActionDeleteAccountFn) := by
   apply metered_reservationInvariant
-  intro st args h hs _
+  intro st args h hs _ _
+  simp (disch := decide) only [prepareStorageCall_other]
   exact prechargedDeleteAccount_reservationInvariant fees ethEnabled st args h hs
 
 theorem prechargedDeploy_reservationInvariant (fees : ActionFees) (ethEnabled : Bool)
@@ -300,7 +314,8 @@ theorem meteredDeploy_reservationInvariant (fees : ActionFees) (ethEnabled : Boo
     HostFn.PreservesLive (ReservationInvariant fees ethEnabled)
       (metered extra "promise_batch_action_deploy_contract" promiseBatchActionDeployContractFn) := by
   apply metered_reservationInvariant
-  intro st args h hs _
+  intro st args h hs _ _
+  simp (disch := decide) only [prepareStorageCall_other]
   exact prechargedDeploy_reservationInvariant fees ethEnabled st args h hs
 
 theorem prechargedTransfer_reservationInvariant (fees : ActionFees) (ethEnabled : Bool)
@@ -324,7 +339,8 @@ theorem meteredTransfer_reservationInvariant (fees : ActionFees) (ethEnabled : B
     HostFn.PreservesLive (ReservationInvariant fees ethEnabled)
       (metered extra "promise_batch_action_transfer" promiseBatchActionTransferFn) := by
   apply metered_reservationInvariant
-  intro st args h hs _
+  intro st args h hs _ _
+  simp (disch := decide) only [prepareStorageCall_other]
   exact prechargedTransfer_reservationInvariant fees ethEnabled st args h hs
 
 theorem prechargedFunctionCall_reservationInvariant (fees : ActionFees) (ethEnabled : Bool)
@@ -357,7 +373,9 @@ theorem meteredFunctionCall_reservationInvariant (fees : ActionFees) (ethEnabled
     HostFn.PreservesLive (ReservationInvariant fees ethEnabled)
       (metered extra "promise_batch_action_function_call" promiseBatchActionFunctionCallFn) := by
   apply metered_reservationInvariant
-  exact prechargedFunctionCall_reservationInvariant fees ethEnabled
+  intro st args h hs hg _
+  simp (disch := decide) only [prepareStorageCall_other]
+  exact prechargedFunctionCall_reservationInvariant fees ethEnabled st args h hs hg
 
 theorem prechargedFunctionKey_reservationInvariant (fees : ActionFees) (ethEnabled : Bool)
     (st : Store NearState) (args : List Value)
@@ -387,6 +405,8 @@ theorem meteredFunctionKey_reservationInvariant (fees : ActionFees) (ethEnabled 
     HostFn.PreservesLive (ReservationInvariant fees ethEnabled)
       (metered extra "promise_batch_action_add_key_with_function_call" promiseBatchActionAddKeyWithFunctionCallFn) := by
   apply metered_reservationInvariant
-  exact prechargedFunctionKey_reservationInvariant fees ethEnabled
+  intro st args h hs hg _
+  simp (disch := decide) only [prepareStorageCall_other]
+  exact prechargedFunctionKey_reservationInvariant fees ethEnabled st args h hs hg
 
 end Wasm.Near

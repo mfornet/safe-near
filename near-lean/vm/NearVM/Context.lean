@@ -43,6 +43,10 @@ structure VMContext where
   /-- External storage policy, beyond native VMContext: RuntimeExt charges old-value
   bytes, whereas the standalone MockedExternal oracle omits these costs. -/
   chargeStorageValueAccess : Bool := false
+  /-- Full chunk trie, including other accounts and runtime metadata. Callers retain
+  the returned cache across calls; receipt commit/rollback is their responsibility. -/
+  storageAccounting : Option _root_.Near.TrieOverlay.State := none
+  storageReadsFromTrie : Bool := false
   /-- Accounts whose pending receipts wait for this call's result. -/
   outputDataReceivers : List Bytes := []
   deriving Inhabited
@@ -77,6 +81,8 @@ def toNearState (cfg : RuntimeConfig) (ctx : VMContext)
       usedGas := 0 }
     storage := fun k => (storage.find? (·.1 == k)).map (·.2)
     storageKeys := storage.map (·.1)
+    storageAccounting := ctx.storageAccounting
+    storageReadsFromTrie := ctx.storageReadsFromTrie
     promiseResults := ctx.promiseResults
     config := {
       chargeStorageValueAccess := ctx.chargeStorageValueAccess

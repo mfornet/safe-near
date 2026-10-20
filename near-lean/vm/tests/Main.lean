@@ -1,4 +1,5 @@
 import NearVM
+import tests.TrieStorage
 import Interpreter.Wasm.Decoder.Wat
 
 /-!
@@ -348,6 +349,7 @@ def main (args : List String) : IO UInt32 := do
       | some (.hostError (.guestPanic m)) => (m.splitOn "Requires positive attached deposit").length > 1
       | _ => false) (describe o9)
 
+  TrieStorage.check cfg (fun name ok => check r name ok)
   StorageCosts.check cfg (fun name ok => check r name ok)
   let s ← r.get
   IO.println s!"{s.passed} passed, {s.failed} failed"

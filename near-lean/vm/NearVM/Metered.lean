@@ -418,7 +418,7 @@ structure StorageMutationPlan where
   error : Option HostError := none
 
 def storageValueCharges (st : Store NearState) (cost : String) (key : List UInt8) : List Charge :=
-  if st.host.config.chargeStorageValueAccess then
+  if st.host.config.chargeStorageValueAccess && st.host.storageAccounting.isNone then
     match st.host.storage key with
     | some value => [.ext cost value.length]
     | none => []
@@ -540,6 +540,13 @@ def preInvokeError (name : String) (st : Store NearState) (args : List Value) : 
 def registerLen? (st : Store NearState) (reg : UInt64) : Option Nat :=
   (st.host.registers reg.toNat).map List.length
 
+/-- The native inline-value boundary is 4000 bytes. Value-byte charges and
+large-read overhead precede dereference, including for in-memory values. -/
+def storageReadValueCharges (length : Nat) : List Charge :=
+  [.ext "storage_read_value_byte" length] ++
+    (if length > 4000 then [.ext "storage_large_read_overhead_base",
+      .ext "storage_large_read_overhead_byte" length] else [])
+
 /-- Charges after a host function ran, from its effect. -/
 def chargesAfter (name : String) (before after : Store NearState) (args : List Value) : List Charge :=
   let a := argU64 args
@@ -555,7 +562,8 @@ def chargesAfter (name : String) (before after : Store NearState) (args : List V
     match getMemOrReg before (a 1) (a 0) with
     | some key =>
       match before.host.storage key with
-      | some v => [.ext "storage_read_value_byte" v.length] ++ writeReg v.length
+      | some v => (if before.host.storageAccounting.isNone then storageReadValueCharges v.length else [])
+          ++ writeReg v.length
       | none => []
     | none => []
   | "storage_remove" =>
@@ -734,6 +742,116 @@ def finishMeteredCall (extraBytes : Nat) (name : String) (before : Store NearSta
   | .Trap st2 msg => .Trap st2 msg
   | .Throw st2 tag vals => .Throw st2 tag vals
 
+/-- RuntimeExt's external storage phase. The base trie is immutable within the
+chunk; prospective updates bypass it. Cache warming survives every gas failure.
+Reads bill lookup nodes before value bytes, then dereference with a free gas
+counter. Mutations bill old-value bytes before dereference, then disk/cache totals.
+Remove stages its update before that final charge; write stages it afterwards. -/
+private def prepareStorageCallAux (name : String) (before : Store NearState) (args : List Value) :
+    Store NearState × Option FunctionCallError := Id.run do
+  unless ["storage_read", "storage_has_key", "storage_write", "storage_remove"].contains name do
+    return (before, none)
+  let some initial := before.host.storageAccounting | return (before, none)
+  let a := argU64 args
+  let some key := getMemOrReg before (a 1) (a 0)
+    | return (before, some (.hostError (spanReadError (a 0) (a 1))))
+  if let some limit := before.host.config.maxStorageKeyLen then
+    if key.length > limit then
+      return (before, some (.hostError (.keyLengthExceeded key.length limit)))
+  let rawKey := _root_.Near.TrieOverlay.contractKey before.host.context.currentAccountId key
+  let mutation := name == "storage_write" || name == "storage_remove"
+  let result := _root_.Near.TrieOverlay.getReference initial rawKey
+    (mutation || before.host.storageReadsFromTrie)
+  let .ok (looked, pointer) := result
+    | return (before, some (.executionIssue (.storageAccounting
+        (match result with | .error message => message | .ok _ => "lookup failed"))))
+  let mut trie := looked
+  let mut st := { before with host := { before.host with storageAccounting := some trie } }
+  let bill (st : Store NearState) (charges : List Charge) :=
+    let (host, error) := applyCharges st.host charges
+    ({ st with host }, error.map FunctionCallError.hostError)
+  let totals (after : _root_.Near.TrieOverlay.State) :=
+    [.ext "touching_trie_node" (after.accounting.disk - initial.accounting.disk),
+     .ext "read_cached_trie_node" (after.accounting.mem - initial.accounting.mem)]
+  if pointer.isSome != (before.host.storage key).isSome then
+    return (st, some (.executionIssue (.storageAccounting "trie/contract storage presence mismatch")))
+  unless mutation do
+    let (paid, error) := bill st (totals trie)
+    st := paid
+    if error.isSome then return (st, error)
+  if name != "storage_has_key" then
+    if let some pointer := pointer then
+      let length := pointer.reference.2.length
+      let charges := if name == "storage_read" then storageReadValueCharges length
+        else [.ext (if name == "storage_write" then "storage_write_evicted_byte"
+          else "storage_remove_ret_value_byte") length]
+      let (paid, error) := bill st charges
+      st := paid
+      if error.isSome then return (st, error)
+      match _root_.Near.TrieOverlay.dereference trie pointer with
+      | .error message => return (st, some (.executionIssue (.storageAccounting message)))
+      | .ok (fetched, value) =>
+        trie := fetched
+        st := { st with host := { st.host with storageAccounting := some trie } }
+        if before.host.storage key != some value then
+          return (st, some (.executionIssue (.storageAccounting "trie/contract storage value mismatch")))
+  if name == "storage_remove" then
+    trie := trie.remove rawKey
+    st := { st with host := { st.host with storageAccounting := some trie } }
+  if mutation then
+    let (paid, error) := bill st (totals trie)
+    st := paid
+    if error.isSome then return (st, error)
+  if name == "storage_write" then
+    let some value := getMemOrReg before (a 3) (a 2)
+      | return (st, some (.hostError (spanReadError (a 2) (a 3))))
+    trie := trie.set rawKey value
+    st := { st with host := { st.host with storageAccounting := some trie } }
+  return (st, none)
+
+/-- Expose only the fields the external storage phase may change. On success
+its local burns cannot alter prepaid promise obligations or call gas limits. -/
+def prepareStorageCall (name : String) (before : Store NearState) (args : List Value) :
+    Store NearState × Option FunctionCallError :=
+  let (after, error) := prepareStorageCallAux name before args
+  ({ before with host := { before.host with
+      storageAccounting := after.host.storageAccounting
+      gas := { before.host.gas with
+        burnt := after.host.gas.burnt
+        promises := if error.isNone then before.host.gas.promises else after.host.gas.promises }
+      gasProfile := after.host.gasProfile } }, error)
+
+@[simp] theorem prepareStorageCall_promises (name : String) (st : Store NearState) (args : List Value) :
+    (prepareStorageCall name st args).1.host.promises = st.host.promises := rfl
+
+theorem prepareStorageCall_success_promisesGas (name : String) (st : Store NearState) (args : List Value)
+    (h : (prepareStorageCall name st args).2 = none) :
+    (prepareStorageCall name st args).1.host.gas.promises = st.host.gas.promises := by
+  change (if (prepareStorageCall name st args).2.isNone then st.host.gas.promises else _) = _
+  rw [h]
+  rfl
+
+/-- Nonstorage hosts pass straight through the external phase. -/
+@[simp] theorem prepareStorageCall_other (name : String) (st : Store NearState) (args : List Value)
+    (h : ["storage_read", "storage_has_key", "storage_write", "storage_remove"].contains name = false) :
+    prepareStorageCall name st args = (st, none) := by
+  have ha : prepareStorageCallAux name st args = (st, none) := by
+    simp only [prepareStorageCallAux, h, Bool.false_eq_true, ↓reduceIte]
+    rfl
+  simp only [prepareStorageCall, ha]
+  rfl
+
+/-- Invoke the functional host only after the external storage phase succeeds. -/
+def invokeStorageCall (extra : Nat) (name : String) (fn : HostFn NearState)
+    (before : Store NearState) (args : List Value) : HostResult NearState :=
+  let (after, error) := prepareStorageCall name before args
+  match error with
+  | some (.hostError error) => trapWith after error
+  | some (.executionIssue issue) =>
+    .Trap { after with host := { after.host with lastExecutionIssue := some issue } } issue.message
+  | some error => .Trap after error.message
+  | none => finishMeteredCall extra name after args (fn.invoke after args)
+
 /-- Wrap a functional host function with its gas and storage-usage rules. -/
 def metered (extraBytes : Nat) (name : String) (fn : HostFn NearState) : HostFn NearState :=
   { fn with invoke := fun st args =>
@@ -753,7 +871,7 @@ def metered (extraBytes : Nat) (name : String) (fn : HostFn NearState) : HostFn 
       | none =>
         match preInvokeError name st1 args with
         | some error => trapWith st1 error
-        | none => finishMeteredCall extraBytes name st1 args (fn.invoke st1 args) }
+        | none => invokeStorageCall extraBytes name fn st1 args }
 
 /-- These host operations require semantics not supplied by `VMContext`.
 Reject them on invocation instead of using the functional host's placeholder

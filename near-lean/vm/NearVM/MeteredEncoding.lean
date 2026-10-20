@@ -87,6 +87,38 @@ def HostValidatedEncoding (name : String) (fn : HostFn NearState) : Prop :=
     preInvokeError name st args = none → actionMethodEncodingError name st args = none →
     HostResult.LiveSatisfies (fun ns => PromisesEncoding ns.promises) (fn.invoke st args)
 
+@[simp] theorem prepareStorageCall_getMemOrReg (name : String) (st : Store NearState)
+    (args : List Value) (ptr len : UInt64) :
+    getMemOrReg (prepareStorageCall name st args).1 ptr len = getMemOrReg st ptr len := rfl
+
+@[simp] theorem prepareStorageCall_config (name : String) (st : Store NearState) (args : List Value) :
+    (prepareStorageCall name st args).1.host.config = st.host.config := rfl
+
+/-- External storage fees and cache state cannot change ABI validation. -/
+theorem prepareStorageCall_preInvokeError (name : String) (st : Store NearState) (args : List Value) :
+    preInvokeError name (prepareStorageCall name st args).1 args = preInvokeError name st args := by
+  by_cases hr : name = "storage_read"
+  · subst name; rfl
+  by_cases hh : name = "storage_has_key"
+  · subst name; rfl
+  by_cases hw : name = "storage_write"
+  · subst name
+    cases hk : getMemOrReg st (argU64 args 1) (argU64 args 0)
+    all_goals cases hl : st.host.config.maxStorageKeyLen
+    all_goals cases hv : getMemOrReg st (argU64 args 3) (argU64 args 2)
+    all_goals cases hvl : st.host.config.maxStorageValueLen
+    all_goals simp [preInvokeError, invocationArgumentError, storageMutationPlan?,
+      hk, hl, hv, hvl, functionCallInputError, functionCallInputs?, allocatesPromise]
+    all_goals split_ifs <;> rfl
+  by_cases hd : name = "storage_remove"
+  · subst name
+    cases hk : getMemOrReg st (argU64 args 1) (argU64 args 0)
+    all_goals cases hl : st.host.config.maxStorageKeyLen
+    all_goals simp [preInvokeError, invocationArgumentError, storageMutationPlan?,
+      hk, hl, functionCallInputError, functionCallInputs?, allocatesPromise]
+    all_goals split_ifs <;> rfl
+  rw [prepareStorageCall_other name st args (by simp [hr, hh, hw, hd])]
+
 /-- Actual successful metered returns preserve encoding from their input state.
 The concrete raw-host proof must use the validation guards, not assume a valid output. -/
 theorem metered_success_encoding (extra : Nat) (name : String) (fn : HostFn NearState)
@@ -105,21 +137,30 @@ theorem metered_success_encoding (extra : Nat) (name : String) (fn : HostFn Near
       | some error => simp [hc, trapWith] at hreturn
       | none =>
         simp only [hc] at hreturn
-        change (match preInvokeError name (prechargedStore name st args) args with
-          | some error => trapWith (prechargedStore name st args) error
-          | none => finishMeteredCall extra name (prechargedStore name st args) args
-              (fn.invoke (prechargedStore name st args) args)) = .Return values after at hreturn
-        cases hg : preInvokeError name (prechargedStore name st args) args with
+        let paid := prechargedStore name st args
+        change (match preInvokeError name paid args with
+          | some error => trapWith paid error
+          | none => invokeStorageCall extra name fn paid args) = .Return values after at hreturn
+        cases hg : preInvokeError name paid args with
         | some error => simp [hg, trapWith] at hreturn
         | none =>
           simp only [hg] at hreturn
-          apply finishMeteredCall_success_encoding_state extra name _ args _ values after ?_ hreturn
-          intro hm
-          apply hraw _ args
-          · simpa only [prechargedStore_promises] using h
-          · simpa only [prechargedStore_config] using hpolicy
-          · exact hg
-          · exact hm
+          unfold invokeStorageCall at hreturn
+          dsimp only at hreturn
+          let ready := (prepareStorageCall name paid args).1
+          cases hs : (prepareStorageCall name paid args).2 with
+          | some error => cases error <;> simp [hs, trapWith] at hreturn
+          | none =>
+            simp only [hs] at hreturn
+            apply finishMeteredCall_success_encoding_state extra name ready args _ values after ?_ hreturn
+            intro hm
+            apply hraw ready args
+            · change PromisesEncoding (prechargedStore name st args).host.promises
+              simpa only [prechargedStore_promises] using h
+            · change (prechargedStore name st args).host.config.validateActionMethodUtf8 = true
+              simpa only [prechargedStore_config] using hpolicy
+            · exact (prepareStorageCall_preInvokeError name paid args).trans hg
+            · exact hm
 
 /-- Creation host validation is supplied by the actual metered wrapper. -/
 theorem metered_creator_success_encoding (extra : Nat) (name : String) (fn : HostFn NearState)

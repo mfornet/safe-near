@@ -101,7 +101,9 @@ theorem meteredBatchCreate_reservationInvariant (fees : ActionFees) (ethEnabled 
     HostFn.PreservesLive (ReservationInvariant fees ethEnabled)
       (metered extra "promise_batch_create" promiseBatchCreateFn) := by
   apply metered_reservationInvariant
-  exact prechargedBatchCreate_reservationInvariant fees ethEnabled
+  intro st args h hs hg _
+  simp (disch := decide) only [prepareStorageCall_other]
+  exact prechargedBatchCreate_reservationInvariant fees ethEnabled st args h hs hg
 
 theorem prechargedBatchThen_reservationInvariant (fees : ActionFees) (ethEnabled : Bool)
     (st : Store NearState) (args : List Value)
@@ -125,7 +127,9 @@ theorem meteredBatchThen_reservationInvariant (fees : ActionFees) (ethEnabled : 
     HostFn.PreservesLive (ReservationInvariant fees ethEnabled)
       (metered extra "promise_batch_then" promiseBatchThenFn) := by
   apply metered_reservationInvariant
-  exact prechargedBatchThen_reservationInvariant fees ethEnabled
+  intro st args h hs hg _
+  simp (disch := decide) only [prepareStorageCall_other]
+  exact prechargedBatchThen_reservationInvariant fees ethEnabled st args h hs hg
 
 theorem prechargedJoin_reservationInvariant (fees : ActionFees) (ethEnabled : Bool)
     (st : Store NearState) (args : List Value)
@@ -147,7 +151,9 @@ theorem meteredJoin_reservationInvariant (fees : ActionFees) (ethEnabled : Bool)
     HostFn.PreservesLive (ReservationInvariant fees ethEnabled)
       (metered extra "promise_and" promiseAndFn) := by
   apply metered_reservationInvariant
-  exact prechargedJoin_reservationInvariant fees ethEnabled
+  intro st args h hs hg _
+  simp (disch := decide) only [prepareStorageCall_other]
+  exact prechargedJoin_reservationInvariant fees ethEnabled st args h hs hg
 
 theorem chargesBefore_createPromise_reservation (st : Store NearState)
     (len ptr ml mp al ap amount gas : UInt64) (account : List UInt8) (action : PromiseAction)
@@ -184,7 +190,9 @@ theorem meteredCreate_reservationInvariant (fees : ActionFees) (ethEnabled : Boo
     HostFn.PreservesLive (ReservationInvariant fees ethEnabled)
       (metered extra "promise_create" promiseCreateFn) := by
   apply metered_reservationInvariant
-  exact prechargedCreate_reservationInvariant fees ethEnabled
+  intro st args h hs hg _
+  simp (disch := decide) only [prepareStorageCall_other]
+  exact prechargedCreate_reservationInvariant fees ethEnabled st args h hs hg
 
 theorem chargesBefore_thenPromise_reservation (st : Store NearState)
     (base len ptr ml mp al ap amount gas : UInt64) (account : List UInt8) (action : PromiseAction)
@@ -221,6 +229,8 @@ theorem meteredThen_reservationInvariant (fees : ActionFees) (ethEnabled : Bool)
     HostFn.PreservesLive (ReservationInvariant fees ethEnabled)
       (metered extra "promise_then" promiseThenFn) := by
   apply metered_reservationInvariant
-  exact prechargedThen_reservationInvariant fees ethEnabled
+  intro st args h hs hg _
+  simp (disch := decide) only [prepareStorageCall_other]
+  exact prechargedThen_reservationInvariant fees ethEnabled st args h hs hg
 
 end Wasm.Near

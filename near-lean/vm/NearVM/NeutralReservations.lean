@@ -439,13 +439,17 @@ theorem meteredNeutral_reservationInvariant (fees : ActionFees) (ethEnabled : Bo
     (hfn : HostPreservesReservationView fn) :
     HostFn.PreservesLive (ReservationInvariant fees ethEnabled) (metered extra name fn) := by
   apply metered_reservationInvariant
-  intro st args h hs _
+  intro st args h hs _ hext
   have hv := applyCharges_success_zero_reservation st.host (chargesBefore name st args) hs
     (chargesBefore_neutral_reservation name st args hname)
   have hp : ReservationInvariant fees ethEnabled (prechargedStore name st args).host :=
     ReservationInvariant.of_view_eq hv h
-  have hr := hfn (prechargedStore name st args) args
-  cases he : fn.invoke (prechargedStore name st args) args <;>
+  let ready := (prepareStorageCall name (prechargedStore name st args) args).1
+  have hview : reservationView ready.host = reservationView (prechargedStore name st args).host :=
+    Prod.ext rfl (prepareStorageCall_success_promisesGas _ _ _ hext)
+  have hp : ReservationInvariant fees ethEnabled ready.host := ReservationInvariant.of_view_eq hview hp
+  have hr := hfn ready args
+  cases he : fn.invoke ready args <;>
     rw [he] at hr <;> first | trivial | exact ReservationInvariant.of_view_eq hr hp
 
 end Wasm.Near
