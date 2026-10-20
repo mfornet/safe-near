@@ -28,3 +28,4 @@ import NearVM.OutcomeReservations
 import NearVM.ActionMethodValidation
 import NearVM.ReceiptPredicates
 import NearVM.PromiseEncoding
+import NearVM.MeteredEncoding

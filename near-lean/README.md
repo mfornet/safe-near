@@ -444,9 +444,16 @@ batch-action hosts have preservation lemmas requiring the newly parsed action's
 method witness; seven hosts also have unconditional preservation lemmas because
 their actions contain no methods. Runtime conversion and successful outcome
 packing now transport this exact invariant into `ReceiptGasEncodingValid`.
-Concrete metered execution must still supply the two method-bearing action
-witnesses, establish encoding for newly created receipts, and preserve the
-invariant through the complete interpreter. Full multi-action settlement/chain
+`NearVM.CreationEncoding` derives receiver witnesses from the actual creation
+guard and method witnesses from the validated ABI bytes. `MeteredEncoding`
+proves that successful returns from all five receipt/join creators and all nine
+batch-action wrappers preserve the input encoding invariant under the strict
+runtime policy. The two method-bearing hosts now obtain their witnesses from
+the actual post-call external guard; charging and deposit error precedence are
+preserved. `finishMeteredCall_success_promises` proves postprocessing retains
+exactly the raw promise payloads. Lifting these concrete successful-return
+lemmas through the full registry/interpreter, including strict-policy
+preservation and all other hosts, remains open. Full multi-action settlement/chain
 conservation and nearcore equivalence also remain open.
 
 Promise deployment derives `ContractCode.size` from the actual payload through
