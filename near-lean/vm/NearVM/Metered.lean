@@ -300,7 +300,7 @@ def functionKeyPlan (st : Store NearState) (input : FunctionKeyInputs) (sir : Bo
                 error := if serializedPublicKeyValid publicKey then none else some .invalidPublicKey }
 
 /-- Argument-dependent charge plan before validating promise handles. -/
-private def chargesBeforeUnvalidated (name : String) (st : Store NearState) (args : List Value) : List Charge :=
+def chargesBeforeUnvalidated (name : String) (st : Store NearState) (args : List Value) : List Charge :=
   let a := argU64 args
   let base : Charge := .ext "base"
   match name with

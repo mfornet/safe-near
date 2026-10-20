@@ -360,7 +360,16 @@ public charge-plan frame.
 `ChargeReservations.applyCharges_success_reservation` proves that successful
 charge lists add exactly the sum of execution/prepaid obligations to promise
 gas. Ext/instruction burn and dependency-data charges reserve no action gas.
-Connecting this sum to the concrete emitted promise graph remains open.
+`HostGasObligations` derives the raw obligations from the actual ABI reads and
+successful append operations for all nine batch-action hosts and all five
+promise-creation/join hosts. `ActionReservations` connects the public batch-action
+charge plans to their action obligations, including deployment payload lengths,
+implicit-transfer fees, function-call prepaid gas and key-method bytes.
+`CreationReservations` proves that valid creation/callback plans reserve one
+receipt base plus their action/prepaid gas; joins reserve none. Creation checks
+are derived from the executable pre-invocation guard. Dependency-data fees remain
+local burn. These are primitive host/charge lemmas; composing them through the
+complete metered wrapper and concrete registry remains open.
 
 Existing ETH/deterministic receivers support ordinary transfers. Creation of
 these account types requires protocol code/context that is not implemented;

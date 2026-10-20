@@ -22,3 +22,4 @@ import NearVM.OutcomeFunding
 import NearVM.ChargeReservations
 import NearVM.ExecutionReservations
 import NearVM.FunctionKeyValidation
+import NearVM.CreationReservations
