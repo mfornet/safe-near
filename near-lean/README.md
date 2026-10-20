@@ -493,6 +493,17 @@ actual `issue = none` processing result. Unsupported/incomplete attempts are not
 silently treated as committed executions. `PostponedFinancialWellFormed` is a
 financial invariant, not full dependency-graph validity or fairness.
 
+`RoutingInvariants.processReceipt_postponedWellFormed` preserves this postponed
+map invariant through the actual processor, including model-issue fallback.
+`processReceipt_fundingInvariant` combines it with account uniqueness for
+supported results. `ActionAccountFrame.applyAction_account_ne` proves that each
+raw action preserves account records outside its receiver, on every outcome.
+`ReservedActorInvariant.applyActionReceipt_systemAbsent` proves that executing
+and finalizing an action receipt cannot install an initially absent `system`
+account. These are local preservation results; full block/chain composition,
+emitted receipt scope, identifier freshness and dependency-graph preservation
+remain separate obligations.
+
 Reserved `system` account creation is rejected independently of the registrar
 and minimum-name-length configuration. Pinned nearcore's `action_create_account`
 uses near-account-id 2.0.0's `is_top_level`/`is_sub_account_of`; `system` is neither.
