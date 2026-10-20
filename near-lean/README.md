@@ -126,9 +126,10 @@ impossible (`run_receipts_valid`, `run_dependency_before`,
 `run_returnedReceipt_lt`, `run_no_receipt_cycle`). Raw promise handles are checked
 before accepting an outcome, so malformed joins cannot silently disappear
 during conversion. Rejection is an explicit model issue with rollback, not contract
-success. Full host-invariant preservation, correspondence with nearcore beyond the
-conformance fixtures, global identifier freshness and scheduler correctness
-remain separate obligations.
+success. Concrete host preservation for dependency structure, returned-handle
+selection, liquid funding and raw receipt gas backing is proved below.
+Correspondence with nearcore beyond the conformance fixtures, global identifier
+freshness and scheduler correctness remain separate obligations.
 
 `NearVM/PromiseGraph.lean` now implements total incremental conversion, replacing
 the bounded recursive join walk. It stores each handle's exact ordered receipt
@@ -378,8 +379,13 @@ and the complete metered wrapper for all nine batch-action hosts. Its concrete
 preservation theorems require only the incoming invariant, not an assumed output
 accounting equation. Precharging preserves memory/register reads, protocol
 validation and target lookup, so the charge and append proofs use the same ABI
-inputs. Full wrapper preservation for receipt creation/callbacks/joins, neutral
-hosts and registry/execution composition still remain open.
+inputs. `MeteredCreationReservations` extends this to function-call creation,
+callbacks, empty batches and joins. `NeutralReservations` proves that context,
+storage, register, log and return hosts create no onward obligation and preserve
+backing. `ReservationRegistry` covers every published host, including explicit
+unsupported/deprecated rejection and legacy instruction metering.
+`ResolvedReservations` lifts this through actual import resolution and VM
+initialization; contract proofs supply no host-preservation oracle.
 
 Existing ETH/deterministic receivers support ordinary transfers. Creation of
 these account types requires protocol code/context that is not implemented;
@@ -391,17 +397,24 @@ treat these addresses as named accounts for creation admission.
 receipt. It proves that append operations charge each receipt base once and
 that promise conversion preserves the obligation through arbitrary joins.
 `SuccessInvariant` and `ExecutionReservations` connect instruction/frame and
-entry charging, metered execution and successful outcome packing. Their host
-premise includes the fee table, protocol flag and raw promise backing; the
-concrete registry must still discharge it. The full public VM gas-to-receipt
-backing theorem and multi-action conservation remain open.
+entry charging, metered execution and successful outcome packing.
+`OutcomeReservations.run_success_gas_backing` discharges the concrete host
+premise for the public executable VM: every successful call satisfies
+`usedGas = burntGas + receiptsGas fees ethEnabled receipts`. The accompanying
+budget theorem bounds burn plus all outgoing raw obligations by actual prepaid
+gas, for arbitrary code, context, storage and interpreter fuel. Rejected, trapped
+and incomplete attempts are excluded by the executable success condition.
+This closes raw VM gas backing; runtime decoding/materialization and complete
+multi-action/receipt/chain conservation remain separate obligations.
 
 `PromiseGasInvariants` connects runtime action costs to raw VM costs for simple
 actions and function calls whose method bytes decode as UTF-8. The byte-array
 and UTF-8 roundtrip proofs are shared in `Interpreter.Wasm.ByteEncoding`; wNEAR
 keeps its existing Borsh theorem names as wrappers around those generic proofs.
-Function-call-key CSV encoding and the complete host-preservation proof remain
-required for the general gas bridge.
+Function-call-key CSV encoding and runtime external validation of malformed
+UTF-8 action fields remain required for the general gas bridge. The public VM
+theorem values raw receipt bytes; it does not assume that lossy string decoding
+preserves runtime action costs or establish full nearcore equivalence.
 
 Promise deployment derives `ContractCode.size` from the actual payload through
 `ContractCode.decodeSized`. Size limits, storage accounting and outgoing gas
