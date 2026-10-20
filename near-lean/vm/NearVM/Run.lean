@@ -10,10 +10,9 @@ metered host, finds the method, charges contract loading, runs the
 interpreter one step at a time charging `regular_op_cost` per Wasm
 instruction, and packs the result as a `VMOutcome`.
 
-Per-instruction charging is currently an approximation to nearcore's
-instrumentation. Independent comparisons show discrepancies even on
-successful executions. Gas profiles expose host, action, and instruction
-contributions so these differences can be resolved against the reference.
+Instruction charging implements the supported instrumentation rules. Exact
+reference fixtures compare gas profiles, but do not establish metering
+correctness for every module or state-trie-dependent cost.
 -/
 
 namespace Wasm.Near
@@ -161,9 +160,52 @@ def VMOutcome.failedBefore (ctx : VMContext) (storage : List (List UInt8 × List
     burntGas := burnt, usedGas := burnt, logs := [], storage := storage, receipts := [],
     aborted := some e, gasProfile := profile }
 
+/-- Charge function entry and execute the metered loop, retaining an entry
+charge failure as a structured protocol error. -/
+def runInitialized (cfg : WasmConfig) (fuel : Nat) (config : SmallStep.Config NearState) :
+    SmallStep.Config NearState × Option FunctionCallError :=
+  let entryCost := match config.expr with
+    | .running thread => activationGas cfg.regularOpCost thread.locals
+    | _ => 0
+  let (paid, error) := chargeWasm config entryCost
+  match error with
+  | some error => (paid, some (.hostError error))
+  | none => runMetered cfg fuel paid
+
+/-- Build the VM result from a terminal or stopped execution. Failed calls
+retain burnt gas and logs while restoring their input financial/storage state. -/
+def outcomeOfExecution (ctx : VMContext) (storage : List (List UInt8 × List UInt8))
+    (final : SmallStep.Config NearState) (err : Option FunctionCallError) : VMOutcome :=
+  let ns := final.store.wasm.host
+  let aborted : Option FunctionCallError :=
+    match err with
+    | some e => some e
+    | none =>
+      match final.expr with
+      | .trapped reason => some (trapError reason ns)
+      | _ => none
+  match aborted with
+  | some e =>
+    { balance := ctx.accountBalance, storageUsage := ctx.storageUsage, returnData := .none,
+      burntGas := ns.gas.burnt, usedGas := ns.gas.burnt, logs := logsOf ns, storage := storage,
+      receipts := [], aborted := some e, gasProfile := ns.gasProfile, subsidizedAmount := ns.subsidizedAmount }
+  | none =>
+    let outcome : VMOutcome := {
+      balance := ns.context.accountBalance, storageUsage := ns.context.storageUsage.toNat
+      returnData := .none, burntGas := ns.gas.burnt, usedGas := ns.gas.used
+      logs := logsOf ns, storage := finalStorage ns, receipts := [], aborted := none
+      gasProfile := ns.gasProfile, subsidizedAmount := ns.subsidizedAmount }
+    match convertPromises ns.promises with
+    | none => outcome.graphIssue ctx.accountBalance ctx.storageUsage storage
+    | some graph =>
+      let returned := graph.returnData? ns
+      match returned with
+      | none => outcome.graphIssue ctx.accountBalance ctx.storageUsage storage
+      | some returnData => { outcome with returnData, receipts := graph.receipts }
+
 /-- Execute `method` of `code` under `ctx` on `storage`. `codeSize` is the
 byte size of the deployed Wasm (the loading cost depends on it). -/
-private def runAttempt (cfg : RuntimeConfig) (code : Module) (codeSize : Nat) (method : String)
+def runAttempt (cfg : RuntimeConfig) (code : Module) (codeSize : Nat) (method : String)
     (ctx : VMContext) (storage : List (List UInt8 × List UInt8))
     (fuel : Nat := defaultFuel) : VMOutcome :=
   if method.isEmpty then
@@ -205,44 +247,8 @@ private def runAttempt (cfg : RuntimeConfig) (code : Module) (codeSize : Nat) (m
   match SmallStep.initConfig { module := code, host := env } entry store [] with
   | .error e => VMOutcome.failedBefore ctx storage gas1.burnt (.internal e.message) host1.gasProfile
   | .ok config =>
-  let entryCost := match config.expr with
-    | .running thread => activationGas cfg.wasm.regularOpCost thread.locals
-    | _ => 0
-  let (entryGas, entryError) := config.store.wasm.host.gas.burn entryCost
-  let entryHost := { config.store.wasm.host with
-    gas := entryGas
-    gasProfile := { config.store.wasm.host.gasProfile with
-      wasm := config.store.wasm.host.gasProfile.wasm + (entryGas.burnt - config.store.wasm.host.gas.burnt) } }
-  let config := { config with store := { config.store with wasm := { config.store.wasm with host := entryHost } } }
-  let (final, err) : SmallStep.Config NearState × Option FunctionCallError := match entryError with
-    | some error => (config, some (.hostError error))
-    | none => runMetered cfg.wasm fuel config
-  let ns := final.store.wasm.host
-  let aborted : Option FunctionCallError :=
-    match err with
-    | some e => some e
-    | none =>
-      match final.expr with
-      | .trapped reason => some (trapError reason ns)
-      | _ => none
-  match aborted with
-  | some e =>
-    { balance := ctx.accountBalance, storageUsage := ctx.storageUsage, returnData := .none,
-      burntGas := ns.gas.burnt, usedGas := ns.gas.burnt, logs := logsOf ns, storage := storage,
-      receipts := [], aborted := some e, gasProfile := ns.gasProfile, subsidizedAmount := ns.subsidizedAmount }
-  | none =>
-    let outcome : VMOutcome := {
-      balance := ns.context.accountBalance, storageUsage := ns.context.storageUsage.toNat
-      returnData := .none, burntGas := ns.gas.burnt, usedGas := ns.gas.used
-      logs := logsOf ns, storage := finalStorage ns, receipts := [], aborted := none
-      gasProfile := ns.gasProfile, subsidizedAmount := ns.subsidizedAmount }
-    match convertPromises ns.promises with
-    | none => outcome.graphIssue ctx.accountBalance ctx.storageUsage storage
-    | some graph =>
-      let returned := graph.returnData? ns
-      match returned with
-      | none => outcome.graphIssue ctx.accountBalance ctx.storageUsage storage
-      | some returnData => { outcome with returnData, receipts := graph.receipts }
+  let (final, err) := runInitialized cfg.wasm fuel config
+  outcomeOfExecution ctx storage final err
 
 /-- The public VM boundary validates converted receipts on every exit. Raw
 promise handles are resolved by the proved total converter in `runAttempt`. -/
