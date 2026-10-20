@@ -65,23 +65,26 @@ theorem applyAttempt_freshIds (cfg : RuntimeConfig) (ap : ApplyState)
       apply forIn_id_preserves _ _ _ (ReceiptLoop.FreshInvariant st.nextId)
       · exact ⟨htx.counter, htx.outgoing, by intro returned he; contradiction⟩
       · intro entry pass h
-        by_cases hover : pass.2.2.2.2.2.2.2.2.2.2 = true
+        by_cases hover : pass.2.2.2.2.2.2.2.2.2.2.1 = true
         · simp only [hover, ite_true]
           split_ifs <;> exact ⟨h.counter, h.outgoing, by intro returned he; contradiction⟩
         · simp only [hover, Bool.false_eq_true, ite_false]
-          cases hi : (processReceipt cfg ap decoder pass.2.1 entry.1).issue with
+          cases hi : (processReceipt cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 entry.1).issue with
           | some issue =>
             dsimp only
             exact ⟨h.counter, h.outgoing,
               by intro returned he; cases he; exact ReceiptList.FreshIds.empty _ _⟩
           | none =>
             dsimp only
-            have hn := processReceipt_nextId_mono cfg ap decoder pass.2.1 entry.1
+            have hn := processReceipt_nextId_mono cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 entry.1
             have hout := h.outgoing.append
-              (processReceipt_freshIds cfg ap decoder pass.2.1 entry.1) h.counter hn
+              (processReceipt_freshIds cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 entry.1) h.counter hn
             cases hl : ap.gasLimit with
-            | none => exact ⟨h.counter.trans hn, hout, by intro returned he; contradiction⟩
+            | none =>
+              simp only [hl] at hn hout
+              exact ⟨h.counter.trans hn, hout, by intro returned he; contradiction⟩
             | some limit =>
+              simp only [hl] at hn hout
               dsimp only
               split_ifs <;> exact ⟨h.counter.trans hn, hout, by intro returned he; contradiction⟩
     split

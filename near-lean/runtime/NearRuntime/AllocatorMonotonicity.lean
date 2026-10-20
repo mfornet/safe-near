@@ -56,7 +56,7 @@ theorem applyAction_nextId_mono (c : ReceiptCtx) (isLast : Bool) (action : Actio
         | none =>
           dsimp only
           generalize ho : run c.cfg code.module code.size method
-            (functionCallContext c account args gas deposit isLast)
+            (functionCallContext c account args gas deposit isLast before.storageAccounting)
             (before.state.contractStorage c.receipt.receiverId) = outcome
           cases he : outcome.aborted with
           | some error => exact Nat.le_refl _
@@ -177,8 +177,8 @@ theorem nextId_receiptActionBody (c : ReceiptCtx) : (receiptActionBody c).NextId
 
 theorem runReceiptActions_nextId_mono (c : ReceiptCtx) (st : ChainState) :
     st.nextId ≤ (runReceiptActions c st).1.state.nextId := by
-  have hp := nextId_receiptActionBody c { state := st, actorId := c.receipt.predecessorId }
-  cases he : (receiptActionBody c).run.run { state := st, actorId := c.receipt.predecessorId } with
+  have hp := nextId_receiptActionBody c { state := st, actorId := c.receipt.predecessorId, storageAccounting := c.ap.storageAccounting }
+  cases he : (receiptActionBody c).run.run { state := st, actorId := c.receipt.predecessorId, storageAccounting := c.ap.storageAccounting } with
   | mk result raw => cases result <;> simpa only [runReceiptActions, he] using hp
 
 theorem Exec.addBalanceRefund_nextId_mono (exec : Exec) (receiver : AccountId) (amount : Nat) :

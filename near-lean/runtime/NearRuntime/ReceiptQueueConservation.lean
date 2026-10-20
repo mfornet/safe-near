@@ -90,7 +90,7 @@ theorem applyReceiptQueue_conservation (cfg : RuntimeConfig) (ap : ApplyState) (
         simpa only [List.map_cons, List.nodup_cons] using h.admission.unique
       have hscope : ∀ receipt ∈ rest.map Prod.fst, ReceiptFinancialShape receipt := by
         intro receipt hm; exact h.shapes receipt (by simp [hm])
-      by_cases hover : pass.2.2.2.2.2.2.2.2.2.2 = true
+      by_cases hover : pass.2.2.2.2.2.2.2.2.2.2.1 = true
       · simp only [hover, ite_true]
         have hadmit : ReceiptQueue.PostponedAdmission pass.2.1 (rest.map Prod.fst) := by
           refine ⟨h.admission.storedIdsMatch, hn.2, ?_⟩
@@ -107,37 +107,40 @@ theorem applyReceiptQueue_conservation (cfg : RuntimeConfig) (ap : ApplyState) (
           dsimp only [receiptsFunds] at hl
           omega
       · simp only [hover, Bool.false_eq_true, ite_false]
-        cases hi : (processReceipt cfg ap decoder pass.2.1 head.1).issue with
+        cases hi : (processReceipt cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 head.1).issue with
         | some issue => simp [ReceiptQueue.TerminalLedger, ApplyResult.ReceiptLedger]
         | none =>
           dsimp only
           have hshape := h.shapes head.1 (by simp)
           have hfresh := h.admission.disjoint head.1 (by simp)
-          have hfund := processReceipt_fundingInvariant cfg ap decoder pass.2.1 head.1
+          have hfund := processReceipt_fundingInvariant cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 head.1
             ⟨h.accounts, h.postponed⟩ hshape hi
-          have hadmit := h.admission.after_process cfg ap decoder pass.2.1 head.1 (rest.map Prod.fst)
-          have hdelay := (processReceipt_delayed cfg ap decoder pass.2.1 head.1).trans h.delayed
-          have hc := processReceipt_conservation cfg ap decoder pass.2.1 head.1 h.accounts h.postponed hfresh hshape hnew hratio hi
-          have hb := processReceipt_outcomeLoop_burn cfg ap decoder pass.2.1 head.1 pass.2.2.2.2.2.2.1 pass.2.2.2.2.2.2.2.2.2.1
+          have hadmit := h.admission.after_process cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 head.1 (rest.map Prod.fst)
+          have hdelay := (processReceipt_delayed cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 head.1).trans h.delayed
+          have hc := processReceipt_conservation cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 head.1 h.accounts h.postponed hfresh hshape hnew hratio hi
+          have hb := processReceipt_outcomeLoop_burn cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 head.1 pass.2.2.2.2.2.2.1 pass.2.2.2.2.2.2.2.2.2.1
             h.postponed hshape hnew hratio
           dsimp only [pure] at hb
-          have hledger : (processReceipt cfg ap decoder pass.2.1 head.1).state.totalFunds cfg +
-              receiptsFunds cfg (pass.2.2.2.1 ++ (processReceipt cfg ap decoder pass.2.1 head.1).receipts) +
-              ((forIn (processReceipt cfg ap decoder pass.2.1 head.1).outcomes
+          have hledger : (processReceipt cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 head.1).state.totalFunds cfg +
+              receiptsFunds cfg (pass.2.2.2.1 ++ (processReceipt cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 head.1).receipts) +
+              ((forIn (processReceipt cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 head.1).outcomes
                 (pass.2.2.2.2.2.2.1, pass.2.2.2.2.2.2.2.2.2.1)
                 (fun entry ledger => .yield (ledger.1 + entry.2.tokensBurnt, ledger.2 + entry.2.gasBurnt)) : Id (Nat × Nat)).1 +
-                (processReceipt cfg ap decoder pass.2.1 head.1).otherTokensBurnt - (processReceipt cfg ap decoder pass.2.1 head.1).rewards) +
+                (processReceipt cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 head.1).otherTokensBurnt - (processReceipt cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 head.1).rewards) +
               receiptsFunds cfg pass.2.2.2.2.2.2.2.1 + receiptsFunds cfg pass.2.2.2.2.2.2.2.2.1 +
               receiptsFunds cfg (rest.map Prod.fst) + subsidy = assets +
-                (pass.2.2.2.2.2.1 + (processReceipt cfg ap decoder pass.2.1 head.1).subsidizedAmount) := by
+                (pass.2.2.2.2.2.1 + (processReceipt cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 head.1).subsidizedAmount) := by
             rw [hb, receiptsFunds_append]
             have hl := h.ledger
             simp only [List.map_cons, receiptsFunds_cons] at hl
             dsimp only [Processed.totalFunds] at hc
             omega
           cases hlimit : ap.gasLimit with
-          | none => exact ⟨rfl, hfund.1, hfund.2, hdelay, hadmit, hscope, hledger⟩
+          | none =>
+            simp only [hlimit] at hfund hdelay hadmit hledger
+            exact ⟨rfl, hfund.1, hfund.2, hdelay, hadmit, hscope, hledger⟩
           | some limit =>
+            simp only [hlimit] at hfund hdelay hadmit hledger
             dsimp only
             split_ifs <;> exact ⟨rfl, hfund.1, hfund.2, hdelay, hadmit, hscope, hledger⟩
     · intro pass h

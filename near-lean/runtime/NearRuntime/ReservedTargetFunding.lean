@@ -113,9 +113,9 @@ theorem runReceiptActions_system_nonempty_failed (c : ReceiptCtx) (st : ChainSta
     (hreceiver : c.receipt.receiverId = systemAccount) (hmissing : st.SystemAccountAbsent)
     (hnonempty : c.action.actions ≠ []) : (runReceiptActions c st).2 ≠ none := by
   have hn := receiptActionBody_system_nonempty_no_success c hreceiver hnonempty
-    { state := st, actorId := c.receipt.predecessorId } hmissing
+    { state := st, actorId := c.receipt.predecessorId, storageAccounting := c.ap.storageAccounting } hmissing
   unfold runReceiptActions
-  cases he : (receiptActionBody c).run.run { state := st, actorId := c.receipt.predecessorId } with
+  cases he : (receiptActionBody c).run.run { state := st, actorId := c.receipt.predecessorId, storageAccounting := c.ap.storageAccounting } with
   | mk result raw =>
     rw [he] at hn
     cases result with
@@ -155,7 +155,7 @@ theorem applyActionReceipt_system_target_conservation (c : ReceiptCtx) (st : Cha
       have ht := congrArg (fun trace => trace.2.2.2.2.1)
         (finalizeReceipt_failure_trace c st (runReceiptActions c st).1 error)
       have hs : (applyActionReceipt c st).subsidizedAmount = 0 := by
-        simpa only [applyActionReceipt, he, Exec.finalizationTrace] using ht
+        simpa only [applyActionReceipt, Exec.commitStorage, he, Exec.finalizationTrace] using ht
       dsimp only at hf ⊢
       rw [hs, Nat.add_zero]
       exact hf

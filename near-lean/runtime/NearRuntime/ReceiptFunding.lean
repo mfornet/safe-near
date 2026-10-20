@@ -94,13 +94,14 @@ theorem applyActionReceipt_success_conservation_of_funded (c : ReceiptCtx) (st :
   have hi : Fees.receiptFunds c.cfg c.receipt = Fees.totalDeposit c.action.actions +
       Fees.receiptGasBudget c.cfg c.receipt.receiverId c.action.actions * c.action.gasPrice := by
     simp [Fees.receiptFunds, hreceipt, Receipt.isRefund, hpred]
-  have hfinal : applyActionReceipt c st = final := by simp [applyActionReceipt, final, raw, hsuccess]
+  have hfinal : applyActionReceipt c st = final.commitStorage := by simp [applyActionReceipt, Exec.commitStorage, final, raw, hsuccess]
   dsimp only
   rw [hfinal, hi]
   change final.totalFunds c.cfg + final.tokensBurnt = _
   change final.totalFunds c.cfg = raw.totalFunds c.cfg + (successSettlement c st raw).refund + final.reward at hfunds
   change final.tokensBurnt = _ at hburn
   change final.subsidizedAmount = _ at hsubsidy
+  dsimp only [Exec.commitStorage] at *
   omega
 
 /-- Successful finalization credits at most the recorded function-call reward. -/
@@ -147,7 +148,7 @@ theorem applyActionReceipt_success_net_conservation_of_funded (c : ReceiptCtx) (
       st.totalBalance + Fees.receiptFunds c.cfg c.receipt + final.subsidizedAmount := by
   let raw := (runReceiptActions c st).1
   have hf := applyActionReceipt_success_conservation_of_funded c st hwf hpred hsigner hreceipt hnew hbody hsuccess
-  have hfinal : applyActionReceipt c st = finalizeReceipt c st raw none := by simp [applyActionReceipt, raw, hsuccess]
+  have hfinal : applyActionReceipt c st = (finalizeReceipt c st raw none).commitStorage := by simp [applyActionReceipt, Exec.commitStorage, raw, hsuccess]
   have ht := congrArg (fun trace => trace.2.2.2.2.2.1) (finalizeReceipt_success_trace c st raw)
   have hr := finalizeReceipt_success_reward_le c st raw
   have hg := runReceiptActions_gas_bounds c st
@@ -160,7 +161,7 @@ theorem applyActionReceipt_success_net_conservation_of_funded (c : ReceiptCtx) (
     Bool.false_eq_true, ite_false] at ht
   have hreward : (applyActionReceipt c st).reward ≤ (applyActionReceipt c st).tokensBurnt := by
     rw [hfinal]
-    exact (hr.trans hbound).trans (by simpa only [ht] using hlower)
+    exact (hr.trans hbound).trans (by simpa only [ht, Exec.commitStorage] using hlower)
   dsimp only at hf ⊢
   omega
 
@@ -185,7 +186,7 @@ theorem applyActionReceipt_net_conservation_of_funded (c : ReceiptCtx) (st : Cha
     have ht := congrArg (fun trace => trace.2.2.2.2.1)
       (finalizeReceipt_failure_trace c st (runReceiptActions c st).1 error)
     have hsubsidy : (applyActionReceipt c st).subsidizedAmount = 0 := by
-      simpa only [applyActionReceipt, he, Exec.finalizationTrace] using ht
+      simpa only [applyActionReceipt, Exec.commitStorage, he, Exec.finalizationTrace] using ht
     dsimp only at hf ⊢
     rw [hsubsidy, Nat.add_zero]
     exact hf

@@ -10,6 +10,10 @@ def receiptsFunds (cfg : RuntimeConfig) (receipts : List Receipt) : Nat :=
 def Exec.totalFunds (exec : Exec) (cfg : RuntimeConfig) : Nat :=
   exec.state.totalBalance + receiptsFunds cfg exec.newReceipts
 
+@[simp] theorem Exec.totalFunds_storageAccounting (exec : Exec) (cfg : RuntimeConfig)
+    (accounting : Option TrieOverlay.State) :
+    ({ exec with storageAccounting := accounting } : Exec).totalFunds cfg = exec.totalFunds cfg := rfl
+
 @[simp] theorem receiptsFunds_append (cfg : RuntimeConfig) (xs ys : List Receipt) :
     receiptsFunds cfg (xs ++ ys) = receiptsFunds cfg xs + receiptsFunds cfg ys := by
   simp [receiptsFunds, List.map_append]
@@ -356,7 +360,7 @@ theorem applyActionReceipt_failure_conservation (c : ReceiptCtx) (st : ChainStat
       (Fees.receiptGasBudget c.cfg c.receipt.receiverId c.action.actions) raw.gasBurnt raw.gasBurnt false
     (applyActionReceipt c st).totalFunds c.cfg + settlement.tokensBurnt =
       st.totalBalance + Fees.receiptFunds c.cfg c.receipt + (applyActionReceipt c st).reward := by
-  simpa only [applyActionReceipt, hrun] using
+  simpa only [applyActionReceipt, Exec.commitStorage, hrun, Exec.totalFunds_storageAccounting] using
     finalizeReceipt_failure_conservation c st raw err hwf hpred hsigner hreceipt hnew hgas
 
 /-- A configured reward fraction at most one cannot exceed burnt function-call
@@ -472,7 +476,7 @@ theorem applyActionReceipt_failure_net_conservation (c : ReceiptCtx) (st : Chain
     let final := applyActionReceipt c st
     final.totalFunds c.cfg + (final.tokensBurnt - final.reward) =
       st.totalBalance + Fees.receiptFunds c.cfg c.receipt := by
-  simpa only [applyActionReceipt, hrun] using
+  simpa only [applyActionReceipt, Exec.commitStorage, hrun, Exec.totalFunds_storageAccounting] using
     finalizeReceipt_failure_net_conservation c st raw err hwf hpred hsigner hreceipt hnew hgas hratio hfc
 
 /-- All state components other than account records and the receipt-id counter. -/

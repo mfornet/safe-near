@@ -10,7 +10,8 @@ theorem applyAttempt_preserves_state (cfg : RuntimeConfig) (ap : ApplyState)
     (decoder : Bytes → ContractCode) (P : ChainState → Prop)
     (htx : ∀ before after tx receipt cost, P before →
       convertTransaction cfg ap before tx = .ok (after, receipt, cost) → P after)
-    (hreceipt : ∀ before receipt, P before → P (processReceipt cfg ap decoder before receipt).state)
+    (hreceipt : ∀ accounting before receipt, P before →
+      P (processReceipt cfg { ap with storageAccounting := accounting } decoder before receipt).state)
     (hclear : ∀ before, P before → P { before with delayed := [] })
     (hdelay : ∀ before receipt, P before → P { before with delayed := before.delayed ++ [receipt] })
     (st : ChainState) (txs : List Transaction) (incoming : List Receipt) (h : P st) :
@@ -21,7 +22,8 @@ theorem apply_preserves_state (cfg : RuntimeConfig) (ap : ApplyState)
     (decoder : Bytes → ContractCode) (P : ChainState → Prop)
     (htx : ∀ before after tx receipt cost, P before →
       convertTransaction cfg ap before tx = .ok (after, receipt, cost) → P after)
-    (hreceipt : ∀ before receipt, P before → P (processReceipt cfg ap decoder before receipt).state)
+    (hreceipt : ∀ accounting before receipt, P before →
+      P (processReceipt cfg { ap with storageAccounting := accounting } decoder before receipt).state)
     (hclear : ∀ before, P before → P { before with delayed := [] })
     (hdelay : ∀ before receipt, P before → P { before with delayed := before.delayed ++ [receipt] })
     (st : ChainState) (txs : List Transaction) (incoming : List Receipt) (h : P st) :
@@ -47,8 +49,8 @@ theorem apply_postponedIdsMatch (cfg : RuntimeConfig) (ap : ApplyState)
     (h : st.PostponedIdsMatch) : (apply cfg ap decoder st txs incoming).state.PostponedIdsMatch := by
   apply apply_preserves_state cfg ap decoder ChainState.PostponedIdsMatch
   · exact convertTransaction_postponedIdsMatch cfg ap
-  · intro before receipt hb
-    exact (processReceipt_postponed_ownership cfg ap decoder before receipt hb).1
+  · intro accounting before receipt hb
+    exact (processReceipt_postponed_ownership cfg { ap with storageAccounting := accounting } decoder before receipt hb).1
   · intro before hb; exact hb
   · intro before receipt hb; exact hb
   · exact h

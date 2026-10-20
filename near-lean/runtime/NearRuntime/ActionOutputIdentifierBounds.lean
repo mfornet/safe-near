@@ -83,7 +83,7 @@ theorem applyAction_outputIds (c : ReceiptCtx) (isLast : Bool) (action : Action)
         | none =>
           dsimp only
           generalize ho : run c.cfg code.module code.size method
-            (functionCallContext c account args gas deposit isLast)
+            (functionCallContext c account args gas deposit isLast before.storageAccounting)
             (before.state.contractStorage c.receipt.receiverId) = outcome
           cases he : outcome.aborted with
           | some error => exact h
@@ -228,9 +228,9 @@ theorem outputIds_receiptActionBody (c : ReceiptCtx) : (receiptActionBody c).Bou
 
 theorem runReceiptActions_outputIds (c : ReceiptCtx) (st : ChainState) (hcallbacks : c.CallbackIdsBelow st.nextId) :
     (runReceiptActions c st).1.OutputIdsBelowNext := by
-  have hp := outputIds_receiptActionBody c { state := st, actorId := c.receipt.predecessorId } hcallbacks
+  have hp := outputIds_receiptActionBody c { state := st, actorId := c.receipt.predecessorId, storageAccounting := c.ap.storageAccounting } hcallbacks
     (by intro receipt hm; contradiction)
-  cases he : (receiptActionBody c).run.run { state := st, actorId := c.receipt.predecessorId } with
+  cases he : (receiptActionBody c).run.run { state := st, actorId := c.receipt.predecessorId, storageAccounting := c.ap.storageAccounting } with
   | mk result raw => cases result <;> simpa only [runReceiptActions, he] using hp
 
 end Near

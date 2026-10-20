@@ -29,15 +29,15 @@ theorem processReceipt_data (cfg : RuntimeConfig) (ap : ApplyState) (decoder : B
     (st : ChainState) (receipt : Receipt) (data : DataReceipt) (hdata : receipt.receipt = .data data) :
     processReceipt cfg ap decoder st receipt =
       match Assoc.lookup st.postponedByData data.dataId with
-      | none => { state := { st with receivedData := Assoc.insert st.receivedData data.dataId data.data } }
+      | none => { state := { st with receivedData := Assoc.insert st.receivedData data.dataId data.data }, storageAccounting := ap.storageAccounting }
       | some id =>
         let received := receivePostponedDataState st data
         let pending := (Assoc.lookup st.pendingDataCount id).getD 1 - 1
         if pending == 0 then
           match Assoc.lookup st.postponed id with
-          | none => { state := received }
+          | none => { state := received, storageAccounting := ap.storageAccounting }
           | some waiting => processReceipt cfg ap decoder (releasePostponedState received id) waiting
-        else { state := { received with pendingDataCount := Assoc.insert received.pendingDataCount id pending } } := by
+        else { state := { received with pendingDataCount := Assoc.insert received.pendingDataCount id pending }, storageAccounting := ap.storageAccounting } := by
   rw [processReceipt]
   simp only [hdata]
   repeat' (first | rfl | contradiction | split)

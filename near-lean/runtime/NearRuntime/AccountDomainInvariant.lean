@@ -58,7 +58,7 @@ theorem apply_accountDomainInvariant (cfg : RuntimeConfig) (ap : ApplyState) (de
   · intro before after tx receipt cost hb hc
     exact ⟨convertTransaction_accountsUnique cfg ap before after tx receipt cost hb.1 hc,
       convertTransaction_systemAbsent cfg ap before after tx receipt cost hb.2 hc⟩
-  · exact processReceipt_accountDomainInvariant cfg ap decoder
+  · intro accounting; exact processReceipt_accountDomainInvariant cfg { ap with storageAccounting := accounting } decoder
   · intro before hb; exact hb
   · intro before receipt hb; exact hb
   · exact h

@@ -12,8 +12,8 @@ theorem applyActionReceipt_success_reward_backed (c : ReceiptCtx) (st : ChainSta
     (hsuccess : (runReceiptActions c st).2 = none) :
     (applyActionReceipt c st).reward ≤ (applyActionReceipt c st).tokensBurnt := by
   let raw := (runReceiptActions c st).1
-  have hfinal : applyActionReceipt c st = finalizeReceipt c st raw none := by
-    simp [applyActionReceipt, raw, hsuccess]
+  have hfinal : applyActionReceipt c st = (finalizeReceipt c st raw none).commitStorage := by
+    simp [applyActionReceipt, Exec.commitStorage, raw, hsuccess]
   have ht := congrArg (fun trace => trace.2.2.2.2.2.1) (finalizeReceipt_success_trace c st raw)
   have hr := finalizeReceipt_success_reward_le c st raw
   have hbound := receiptRewardAmount_le raw c.cfg (successSettlement c st raw).burnPrice
@@ -25,7 +25,7 @@ theorem applyActionReceipt_success_reward_backed (c : ReceiptCtx) (st : ChainSta
   simp only [Exec.finalizationTrace, Receipt.isRefund, beq_eq_false_iff_ne.mpr hpred,
     Bool.false_eq_true, ite_false] at ht
   rw [hfinal]
-  exact (hr.trans hbound).trans (by simpa only [ht] using hlower)
+  exact (hr.trans hbound).trans (by simpa only [ht, Exec.commitStorage] using hlower)
 
 theorem finalizeReceipt_reward_zero (c : ReceiptCtx) (st : ChainState) (raw : Exec)
     (failed : Option RuntimeError) (hfc : raw.gasBurntForFunctionCall = 0) :
@@ -48,14 +48,14 @@ theorem applyActionReceipt_reward_backed (c : ReceiptCtx) (st : ChainState)
     have hz := refund_runReceiptActions_functionCallGas_zero c st
       (by simp [ha, Fees.totalPrepaid, Action.attachedGas])
     have hr := finalizeReceipt_reward_zero c st (runReceiptActions c st).1 (runReceiptActions c st).2 hz
-    simpa only [applyActionReceipt, hr] using Nat.zero_le (applyActionReceipt c st).tokensBurnt
+    simpa only [applyActionReceipt, Exec.commitStorage, hr] using Nat.zero_le (applyActionReceipt c st).tokensBurnt
   · cases he : (runReceiptActions c st).2 with
     | none => exact applyActionReceipt_success_reward_backed c st hp hnew hratio he
     | some error =>
       have hb := finalizeReceipt_failure_reward_le_burn c st (runReceiptActions c st).1 error
         hnew hratio (runReceiptActions_gas_bounds c st).1
       have ht := finalizeReceipt_failure_tokensBurnt c st (runReceiptActions c st).1 error hp
-      simpa only [applyActionReceipt, he, ht] using hb
+      simpa only [applyActionReceipt, Exec.commitStorage, he, ht] using hb
 
 /-- Gross receipt burn includes any non-gas deposit destruction. -/
 def Processed.grossTokensBurnt (processed : Processed) : Nat :=

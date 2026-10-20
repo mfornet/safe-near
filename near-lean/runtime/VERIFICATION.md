@@ -3,6 +3,27 @@
 This implementation is an executable prototype. Scenario success does not
 establish equivalence with nearcore or correctness of deployed contracts.
 
+## Chunk storage accounting
+
+Registered chain replay constructs a complete synthetic trie independently from
+encoded model state, including accounts, access keys, code, storage, queues and
+the single-shard bandwidth scheduler. The runtime threads an optional external
+accounting context through VM calls and receipts. Successful receipts commit
+prospective writes; failures discard writes while preserving cache history and
+burnt gas. Chunk entry rebuilds the trie with a fresh cache. Gas is charged during
+execution, so normal settlement derives burn, refunds, rewards and balances.
+
+`NearRuntime.StorageAccounting` proves rollback preserves accounting history
+and previously committed overlays, commit preserves the base/cache, and receipt
+completion leaves no prospective writes. Existing gas, conservation and state
+preservation proofs cover the threaded context. The independent native gate is
+`just chain-contract-test`; `just chain-chunk-storage-test` extends coverage to
+cache lifetimes, action failures, exhaustion, full state shapes and scheduler
+inputs. Complete synthetic chunk bytes and entry roots are compared alongside
+all existing execution observations. These finite comparisons and local proofs
+do not establish general nearcore equivalence, memtrie behavior or original
+historical shard capture.
+
 ## Reference and trusted inputs
 
 The configuration exporter pins `near-parameters` and `near-primitives-core`

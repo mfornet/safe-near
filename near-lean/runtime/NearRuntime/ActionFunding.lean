@@ -173,13 +173,13 @@ theorem runReceiptActions_success_funded_of_body (c : ReceiptCtx) (st : ChainSta
     raw.state.AccountsUnique ∧
       raw.totalFunds c.cfg + raw.gasBurnt * c.action.gasPrice =
         st.totalBalance + Fees.totalDeposit c.action.actions + raw.subsidizedAmount + raw.gasUsed * c.action.gasPrice := by
-  cases hr : (receiptActionBody c).run.run { state := st, actorId := c.receipt.predecessorId } with
+  cases hr : (receiptActionBody c).run.run { state := st, actorId := c.receipt.predecessorId, storageAccounting := c.ap.storageAccounting } with
   | mk result raw =>
     cases result with
     | error error => simp [runReceiptActions, hr] at hsuccess
     | ok value =>
       have hf := hbody
-        { state := st, actorId := c.receipt.predecessorId } raw value hwf hr
+        { state := st, actorId := c.receipt.predecessorId, storageAccounting := c.ap.storageAccounting } raw value hwf hr
       simpa [runReceiptActions, hr, Exec.FundingStep, Exec.totalFunds, receiptsFunds] using hf
 
 /-- Concrete function-call action bodies discharge the compositional ledger premise. -/

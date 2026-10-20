@@ -27,11 +27,11 @@ theorem applyActionReceipt_ordinary_otherBurn_zero (c : ReceiptCtx) (st : ChainS
   | none =>
     have ht := congrArg (fun trace => trace.2.2.2.2.2.2)
       (finalizeReceipt_success_trace c st (runReceiptActions c st).1)
-    simpa only [applyActionReceipt, he, Exec.finalizationTrace] using ht
+    simpa only [applyActionReceipt, Exec.commitStorage, he, Exec.finalizationTrace] using ht
   | some error =>
     have ht := congrArg (fun trace => trace.2.2.2.2.2.2)
       (finalizeReceipt_failure_trace c st (runReceiptActions c st).1 error)
-    simpa [applyActionReceipt, he, Exec.finalizationTrace, Receipt.isRefund, hpred] using ht
+    simpa [applyActionReceipt, Exec.commitStorage, he, Exec.finalizationTrace, Receipt.isRefund, hpred] using ht
 
 /-- Successful system refunds have no VM subsidy; failure rolls it back. -/
 theorem applyActionReceipt_refund_subsidy_zero (c : ReceiptCtx) (st : ChainState) (amount : Nat)
@@ -43,11 +43,11 @@ theorem applyActionReceipt_refund_subsidy_zero (c : ReceiptCtx) (st : ChainState
     obtain ⟨account, _, hraw⟩ := refund_success_raw c st amount hrefund hactions he
     have ht := congrArg (fun trace => trace.2.2.2.2.1)
       (finalizeReceipt_success_trace c st (runReceiptActions c st).1)
-    simpa only [applyActionReceipt, he, Exec.finalizationTrace, hraw] using ht
+    simpa only [applyActionReceipt, Exec.commitStorage, he, Exec.finalizationTrace, hraw] using ht
   | some error =>
     have ht := congrArg (fun trace => trace.2.2.2.2.1)
       (finalizeReceipt_failure_trace c st (runReceiptActions c st).1 error)
-    simpa only [applyActionReceipt, he, Exec.finalizationTrace] using ht
+    simpa only [applyActionReceipt, Exec.commitStorage, he, Exec.finalizationTrace] using ht
 
 /-- Ordinary action receipts and protocol-shaped system refunds share one
 closed funding law. Refund delivery failures include destroyed deposits in burn. -/

@@ -139,12 +139,17 @@ chain-compare fixture *options:
     cd near-lean/chain && lake build registered-replay chain-replay
     python3 tools/chain-conformance/compare_fixture.py "$@"
 
-# Check native contract calls, callback delivery and detection of known storage gas gaps.
+# Compare native contract calls, callbacks and exact storage gas across 53 cases.
 chain-contract-test:
     cd near-lean/chain && lake build registered-replay chain-replay
     python3 tools/chain-conformance/test_contract_comparison.py
 
-# Probe the full contract corpus; known unmodeled trie gas produces a failing report.
+# Compare shared chunk cache, commit/rollback, complete state and scheduler inputs.
+chain-chunk-storage-test:
+    cd near-lean/chain && lake build registered-replay chain-replay
+    python3 tools/chain-conformance/test_chunk_storage_accounting.py
+
+# Compare every field across the full contract corpus.
 [positional-arguments]
 chain-contract-probe *options:
     cd near-lean/chain && lake build registered-replay chain-replay

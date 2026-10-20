@@ -70,7 +70,7 @@ theorem applyActionReceipt_scope_reward_backed (c : ReceiptCtx) (st : ChainState
       have hb := finalizeReceipt_failure_reward_le_burn c st (runReceiptActions c st).1 error
         hnew hratio (runReceiptActions_gas_bounds c st).1
       have ht := finalizeReceipt_failure_tokensBurnt c st (runReceiptActions c st).1 error hp
-      simpa only [applyActionReceipt, he, ht] using hb
+      simpa only [applyActionReceipt, Exec.commitStorage, he, ht] using hb
 
 theorem emitFunctionCallData_financialScope (receiver : AccountId) (bytes : Bytes) (outputs : List DataReceiver)
     (initial : ChainState) (receipts : List Receipt) (h : ∀ receipt ∈ receipts, ReceiptFinancialScope receipt) :

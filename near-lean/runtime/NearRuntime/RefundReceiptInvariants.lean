@@ -86,9 +86,9 @@ theorem receiptActionBody_functionCallBound (c : ReceiptCtx) :
 theorem refund_runReceiptActions_functionCallGas_zero (c : ReceiptCtx) (st : ChainState)
     (hprepaid : Fees.totalPrepaid c.action.actions = 0) :
     (runReceiptActions c st).1.gasBurntForFunctionCall = 0 := by
-  have h := receiptActionBody_functionCallBound c { state := st, actorId := c.receipt.predecessorId }
+  have h := receiptActionBody_functionCallBound c { state := st, actorId := c.receipt.predecessorId, storageAccounting := c.ap.storageAccounting }
   unfold runReceiptActions
-  cases he : (receiptActionBody c).run.run { state := st, actorId := c.receipt.predecessorId } with
+  cases he : (receiptActionBody c).run.run { state := st, actorId := c.receipt.predecessorId, storageAccounting := c.ap.storageAccounting } with
   | mk result raw =>
     rw [he] at h
     dsimp only at h
@@ -157,7 +157,7 @@ theorem applyActionReceipt_refund_failed_conservation (c : ReceiptCtx) (st : Cha
     simpa [Exec.finalizationTrace, hrefund] using ht
   have hi : Fees.receiptFunds c.cfg c.receipt = Fees.totalDeposit c.action.actions := by
     simp [Fees.receiptFunds, hreceipt, hrefund]
-  simp only [applyActionReceipt, hrun]
+  simp only [applyActionReceipt, Exec.commitStorage, hrun, Exec.totalFunds_storageAccounting]
   dsimp only at hf ⊢
   have hb := congrArg Prod.fst hburn
   have ho := congrArg Prod.snd hburn
@@ -325,19 +325,19 @@ theorem refund_success_raw (c : ReceiptCtx) (st : ChainState) (amount : Nat)
     (hsuccess : (runReceiptActions c st).2 = none) :
     ∃ account, st.account? c.receipt.receiverId = some account ∧
       (runReceiptActions c st).1 =
-        { state := refundTransferState c st account amount, actorId := c.receipt.predecessorId,
+        { state := refundTransferState c st account amount, actorId := c.receipt.predecessorId, storageAccounting := c.ap.storageAccounting,
           gasBurnt := refundExecutionGas c amount, gasUsed := refundExecutionGas c amount } := by
   cases ha : st.account? c.receipt.receiverId with
   | none =>
     have hb := refund_receiptActionBody_missing c
-      { state := st, actorId := c.receipt.predecessorId } amount hrefund hactions ha
+      { state := st, actorId := c.receipt.predecessorId, storageAccounting := c.ap.storageAccounting } amount hrefund hactions ha
     unfold runReceiptActions at hsuccess
     dsimp only at hsuccess
     rw [hb] at hsuccess
     contradiction
   | some account =>
     have hb := refund_receiptActionBody_run c
-      { state := st, actorId := c.receipt.predecessorId } account amount hrefund hactions ha
+      { state := st, actorId := c.receipt.predecessorId, storageAccounting := c.ap.storageAccounting } account amount hrefund hactions ha
     refine ⟨account, rfl, ?_⟩
     by_cases hd : storageStakeDeficit c.cfg { account with amount := account.amount + amount } > 0
     all_goals simp only [hd, ↓reduceIte] at hb
@@ -370,7 +370,7 @@ theorem applyActionReceipt_refund_success_conservation (c : ReceiptCtx) (st : Ch
     simpa [Exec.totalFunds, receiptsFunds] using refundTransferState_totalBalance c st account amount hwf ha
   have hi : Fees.receiptFunds c.cfg c.receipt = amount := by
     simp [Fees.receiptFunds, hreceipt, hrefund, Fees.totalDeposit, hactions, Action.deposit]
-  simp only [applyActionReceipt, hrun]
+  simp only [applyActionReceipt, Exec.commitStorage, hrun, Exec.totalFunds_storageAccounting]
   dsimp only at hf ⊢
   rw [hf.1, hf.2.1, hf.2.2.1, hf.2.2.2, hb, hi]
   simp

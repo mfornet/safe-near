@@ -30,7 +30,8 @@ core axiom audits, formatter integration checks and contract builds.
 | `just chain-import SNAPSHOT DESTINATION [--scenario SCENARIO]` | Prepare matching synthetic chain genesis from complete captured accounts |
 | `just chain-compare FIXTURE [options...]` | Compare represented per-block contract state, receipts, outcomes and fees |
 | `just chain-version-test` | Compare signed V0/V1 batches, rejected nonces and protocol gates |
-| `just chain-contract-test` | Exercise native callback delivery and explicit detection of storage gas gaps |
+| `just chain-chunk-storage-test` | Compare chunk cache, commit/rollback and scheduler boundaries |
+| `just chain-contract-test` | Compare native callback delivery and exact chunk-trie storage gas |
 | `just chain-contract-probe [options...]` | Report the full contract corpus, including known failing trie-gas comparisons |
 | `just chain-import-test` | Check native state encoding, captured-state imports and deterministic signing |
 | `just chain-reference-test [options...]` | Exercise the native reference's chunk boundaries and complete raw-state replay |

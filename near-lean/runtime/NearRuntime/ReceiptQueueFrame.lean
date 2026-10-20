@@ -135,8 +135,8 @@ theorem queues_receiptActionBody (c : ReceiptCtx) : (receiptActionBody c).Preser
 
 theorem runReceiptActions_receiptQueues (c : ReceiptCtx) (st : ChainState) :
     (runReceiptActions c st).1.receiptQueues = st.receiptQueues := by
-  have h := queues_receiptActionBody c { state := st, actorId := c.receipt.predecessorId }
-  cases he : (receiptActionBody c).run.run { state := st, actorId := c.receipt.predecessorId } with
+  have h := queues_receiptActionBody c { state := st, actorId := c.receipt.predecessorId, storageAccounting := c.ap.storageAccounting }
+  cases he : (receiptActionBody c).run.run { state := st, actorId := c.receipt.predecessorId, storageAccounting := c.ap.storageAccounting } with
   | mk result raw => cases result <;> simpa only [runReceiptActions, he, Exec.receiptQueues] using h
 
 @[simp] theorem addBalanceRefund_receiptQueues (exec : Exec) (receiver : AccountId) (amount : Nat) :

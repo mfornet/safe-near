@@ -158,12 +158,10 @@ the native job, so it does not repeat the expensive source build.
 `just chain-compare FIXTURE` compares an imported fixture against both executors.
 The contract corpus exercises actual callback data and postponed/delayed queues;
 see [SNAPSHOTS.md](SNAPSHOTS.md#compare-contract-executions) for commands,
-registered identities, byte comparisons, failure mapping and the storage-trie gas gap. Receipt VM
-calls charge `storage_write_evicted_byte` and `storage_remove_ret_value_byte`
-from the actual old value before attempting the output register. The storage
-mutation regressions retain their mismatches; their gas delta must equal only
-native `touching_trie_node` and `read_cached_trie_node` charges. No trie fees are
-inferred from observed native output or subtracted from comparison results. Native traces
+registered identities, byte comparisons and failure mapping. Registered replay
+constructs the complete synthetic chunk trie independently and charges storage
+accesses during VM execution, before settlement, refunds and rewards. No trie
+fees are inferred from native output or subtracted from comparison results. Native traces
 now include `processedReceipts`, typed `balanceStats`, and
 `nextCongestionInfo` for explicit subsequent chunk inputs. Callback index columns
 are decoded with native types and validated by exact `TrieKey` re-encoding;
@@ -334,7 +332,7 @@ transactions between admitted ones, strict/monotonic nonces, height/price
 variation and restricted or unfunded callers. Automatically registered IDs
 also encode the actual zero-budget local delayed queues without manual receipt
 bindings. The full execution registry below adds promise/data registration, queue context
-evolution and native action-derived seeds. Trie-backed runtime gas remains open. Evidence is saved in `audit/transaction-encoding-regressions.json` and
+evolution and native action-derived seeds. Registered replay also supplies independently constructed chunk trie accounting. Evidence is saved in `audit/transaction-encoding-regressions.json` and
 `audit/transaction-registry-regressions.json`.
 
 `just chain-delayed-order-test` checks local execution priority separately from
@@ -394,9 +392,9 @@ SHA256 is independently compared to hashlib on padding boundaries and multiblock
 vectors, including the million-byte standard vector; full cryptographic refinement
 and general constructor canonicality are not proved.
 
-This diagnostic does **not** supply receipt gas totals or close the remaining
-runtime gas gap. Encoding modeled runtime records into raw entries, updates/prospective overlays,
-receipt-wide cache lifetime, flat storage and memtries still need integration.
+This low-level diagnostic does **not** execute receipts. Registered replay composes
+the constructor and overlays with VM gas charging, as described below. Memtries
+and general shard-state capture remain outside this diagnostic.
 The complete object set is for the trie built from the supplied entries; it does
 not establish that all state of an original blockchain was captured.
 
@@ -417,10 +415,42 @@ Inconsistent contract storage and trie
 inputs produce an explicit model execution issue. The standalone mocked VM
 adapter continues to omit trie charges when no external trie is supplied.
 
-This is an opt-in VM boundary. Registered full-chain replay still needs an
-independently constructed complete chunk trie, runtime metadata updates and shared
-receipt lifetime handling before enabling it. The existing native contract-chain
-storage-gas differences remain visible until that integration is complete.
+Registered full-chain replay enables this boundary by default. Before each
+chunk, `ChunkTrie.start` encodes all modeled account, access-key, code, storage
+and receipt-queue records plus independently maintained scheduler state. It
+constructs the canonical trie and a fresh cache. `ApplyState.storageAccounting`
+threads that context through receipt processing and VM calls; `ApplyResult`
+returns the resulting cache and overlays. Writes stay prospective across calls
+in a receipt. A successful receipt commits them; a failed receipt discards them
+while retaining cache history and gas already burnt. Subsequent receipts in
+the chunk use that same history. No per-call trie reconstruction occurs.
+
+`registered.json.schedulerInputs` retains original `congestionInfo` and
+`bandwidthRequests` bytes for each block. Lean decodes them independently; the
+comparator binds them to the original native request. The scheduler follows the
+pinned protocols 83–86 parameters and reference single-shard layout. Its sanity
+hash chains the previous hash and Borsh shard-id vector. Unsupported layouts,
+congestion encodings and duplicate single-link requests fail closed. Omitted
+inputs in direct synthetic requests select the ordinary non-missing shard-zero,
+empty-request context. They never supply native-generated scheduler records.
+
+`just chain-contract-test` requires all 53 recorded comparisons to match,
+including write, remove and write-then-panic across protocols 83–86. The former
+12 storage failures have no expected-difference allowance. The comparison checks
+all existing observations plus complete synthetic chunk bytes (including column
+15) and independently constructed entry roots. `just chain-chunk-storage-test`
+adds multiple calls and receipts, cached reads, failures after earlier actions,
+chunk resets, missing/large values, unrelated records and scheduler requests.
+Reports include exact ordered fresh/cached hash accesses for diagnostics.
+`NearRuntime.StorageAccounting` proves cache/committed-overlay preservation on
+rollback and the absence of prospective writes after receipt completion.
+
+This covers the reference harness's synthetic shard, not original historical
+shard capture or general runtime equivalence. The explicit legacy/direct-seed
+frontend and standalone mocked VM still omit external trie accounting.
+Immediate execution of self-directed VM promises remains an existing scheduling
+limitation; the account deletion/recreation regression uses ordered local
+transactions to isolate storage overlay behavior within a supported chunk.
 
 ## Staged ContractData updates
 
@@ -450,10 +480,9 @@ The Lean library exposes `TrieOverlay.getReference` and `dereference` separately
 On-disk references retain their base root; a different checkpoint is rejected.
 This models the staging needed when RuntimeExt charges old-value bytes between
 lookup and dereference; the optional VM external above now uses this staging.
-Chunk-wide cache/overlay threading through the receipt processor remains open.
-That backend must also derive the original complete chunk trie, including the
-bandwidth-scheduler record (column 15) created between blocks; represented
-account/receipt/storage columns alone do not specify that full trie.
+Registered replay threads this overlay through the receipt processor and derives
+the bandwidth-scheduler record (column 15) between blocks. The complete chunk
+constructor includes that record alongside all encoded runtime records.
 
 Each step compares its complete visible key/value map, immutable base root,
 prospective/committed distinct-key counts, memory/trie pointer kind, read result,
@@ -578,5 +607,7 @@ executor custody, duplicate/mutated record detection, explicit legacy mode and a
 changed original block hash on a rejected transaction with no receipt outputs.
 Evidence is saved in `audit/default-registered-comparison.json`.
 
-This does not supply native trie-access gas, opaque shard/scheduler/yield/buffer
-records, original shard roots, historical replay or general runtime equivalence.
+The default path additionally compares complete synthetic chunk bytes, including
+the scheduler record, and entry roots. Original shard capture, unsupported
+shard/yield/buffer records, historical replay and general runtime equivalence
+remain outside its scope.
