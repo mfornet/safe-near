@@ -434,8 +434,25 @@ is now derived from successful execution under the strict runtime policy;
 callers no longer supply `ReceiptGasEncodingValid` for emitted receipts.
 `materialize_functionCall_run_funds` instantiates the actual runtime context,
 which sets that policy, and therefore needs no separate decoding/policy premise.
-This proves the funds of newly materialized receipts, not complete receipt
-settlement or chain conservation.
+`FunctionCallFunding` connects that result to successful commits and the actual
+function-call action path. `Exec.FundingStep` uses additive gas and subsidy
+terms so sequential steps telescope without truncated subtraction.
+`ActionFunding` supplies monadic composition and proves the law for receipt
+attempts containing arbitrary ordered function-call actions, including execution
+fees, admission checks and the final storage-staking check.
+
+`ReceiptFunding.applyActionReceipt_functionCalls_net_conservation` covers the
+actual finalized receipt on both success and failure. It equates account funds
+plus outgoing receipt backing and net burn with the initial account funds,
+incoming receipt backing and explicit subsidy. The proof accounts for gas
+refunds, reward credit and failure rollback. Its structural/configuration
+premises are unique account records, an existing ordinary receiver, non-system
+predecessor/signer, matching action-receipt metadata, the v85+ settlement branch
+(`accountCostIncrease = true`), and a reward fraction at most one. It requires
+only function-call actions; arbitrary VM-created outgoing action variants are
+covered by their proved gas/deposit backing. No VM outcome or financial equation
+is assumed. Other incoming action families and chain-level conservation remain
+open; this is not full runtime equivalence.
 
 `NearVM.ReceiptPredicates` transports arbitrary decidable receiver/action
 predicates through actual promise updates, conversion and successful outcome
@@ -452,8 +469,9 @@ host call, including legacy gas metering; unsupported operations still trap.
 for arbitrary code, context, storage and fuel when execution succeeds and the
 context selects strict runtime decoding. Mock opaque-byte execution is excluded
 by this explicit policy premise. Encoding validity is not complete action
-validity or authorization. Full multi-action settlement/chain conservation,
-verified binary decoding and full nearcore equivalence remain open.
+validity or authorization. Settlement for general incoming action mixtures,
+chain conservation, verified binary decoding and full nearcore equivalence
+remain open.
 
 Promise deployment derives `ContractCode.size` from the actual payload through
 `ContractCode.decodeSized`. Size limits, storage accounting and outgoing gas

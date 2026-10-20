@@ -1,0 +1,182 @@
+import NearRuntime.ActionFunding
+
+namespace Near
+open Wasm.Near
+
+/-- The exact successful-receipt settlement, including the native account-
+creation flag rather than assuming that it is false. -/
+def successSettlement (c : ReceiptCtx) (st : ChainState) (raw : Exec) : Fees.GasSettlement :=
+  Fees.settleGas c.cfg c.action.gasPrice c.ap.gasPrice
+    (Fees.receiptGasBudget c.cfg c.receipt.receiverId c.action.actions) raw.gasUsed raw.gasBurnt
+    ((st.account? c.receipt.receiverId).isNone && (raw.state.account? c.receipt.receiverId).isSome)
+
+/-- Successful finalization keeps execution observations and explicit subsidy;
+ordinary gas burn is precisely the settlement's gross burn. -/
+theorem finalizeReceipt_success_trace (c : ReceiptCtx) (st : ChainState) (raw : Exec) :
+    (finalizeReceipt c st raw none).finalizationTrace =
+      (raw.gasBurnt, raw.gasUsed, raw.gasBurntForFunctionCall, raw.logs, raw.subsidizedAmount,
+        if c.receipt.isRefund then 0 else (successSettlement c st raw).tokensBurnt, 0) := by
+  unfold finalizeReceipt
+  simp only [setResult_trace, addFailureData_trace, creditReceiptReward_trace,
+    ite_trace, addBalanceRefund_trace, addGasRefund_trace, ite_self]
+  simp [rollbackReceipt, Exec.finalizationTrace, successSettlement]
+
+/-- Ordinary successful finalization adds only the unused-gas refund and the
+receiver reward to the already-funded raw action ledger. -/
+theorem finalizeReceipt_success_funds (c : ReceiptCtx) (st : ChainState) (raw : Exec)
+    (hwf : raw.state.AccountsUnique) (hpred : c.receipt.predecessorId ≠ systemAccount)
+    (hsigner : c.action.signerId ≠ systemAccount) :
+    (finalizeReceipt c st raw none).totalFunds c.cfg =
+      raw.totalFunds c.cfg + (successSettlement c st raw).refund + (finalizeReceipt c st raw none).reward := by
+  let settlement := successSettlement c st raw
+  let base := { raw with tokensBurnt := settlement.tokensBurnt, otherTokensBurnt := 0 }
+  let gas := if settlement.refund > 0 then
+    base.addGasRefund c.action.signerId c.action.signerPublicKey settlement.refund else base
+  have hg : gas.totalFunds c.cfg = raw.totalFunds c.cfg + settlement.refund := by
+    dsimp only [gas]
+    split
+    · rw [addGasRefund_totalFunds]; rfl
+    · rename_i h
+      have hz : settlement.refund = 0 := by omega
+      simp [hz, base, Exec.totalFunds]
+  have hgu : gas.state.AccountsUnique := by
+    dsimp only [gas]
+    split <;> simpa [base] using hwf
+  have hr := creditReceiptReward_totalFunds c.cfg gas c.receipt.receiverId
+    settlement.burnPrice c.action.gasPrice hgu
+  rw [hg] at hr
+  have hrefund : c.receipt.isRefund = false := by simp [Receipt.isRefund, hpred]
+  let rewarded := gas.creditReceiptReward c.cfg c.receipt.receiverId settlement.burnPrice c.action.gasPrice
+  have hf : finalizeReceipt c st raw none =
+      { rewarded with result := some (rewarded.result.getD (.successValue [])) } := by
+    simp [finalizeReceipt, rollbackReceipt, hrefund, hsigner, base, gas, settlement, rewarded, successSettlement]
+  rw [hf]
+  exact hr
+
+/-- Successful ordinary function-call receipts conserve the complete incoming
+ledger, outgoing receipt backing, explicit subsidy, gross gas burn and receiver
+reward. Action execution, decoding and gas bounds are all derived from the
+executable receipt path; no ledger or VM-result equation is a premise. -/
+theorem applyActionReceipt_functionCalls_success_conservation (c : ReceiptCtx) (st : ChainState)
+    (hwf : st.AccountsUnique) (hreceiver : c.receipt.receiverId ≠ systemAccount)
+    (hpred : c.receipt.predecessorId ≠ systemAccount) (hsigner : c.action.signerId ≠ systemAccount)
+    (hreceipt : c.receipt.receipt = .action c.action) (hnew : c.cfg.accountCostIncrease = true)
+    (hactions : ∀ action ∈ c.action.actions, FunctionCallFundingAction action)
+    (hsuccess : (runReceiptActions c st).2 = none) :
+    let final := applyActionReceipt c st
+    final.totalFunds c.cfg + final.tokensBurnt =
+      st.totalBalance + Fees.receiptFunds c.cfg c.receipt + final.subsidizedAmount + final.reward := by
+  let raw := (runReceiptActions c st).1
+  let final := finalizeReceipt c st raw none
+  have hf := runReceiptActions_success_funded c st hwf hreceiver hactions hsuccess
+  change raw.state.AccountsUnique ∧ raw.totalFunds c.cfg + raw.gasBurnt * c.action.gasPrice =
+    st.totalBalance + Fees.totalDeposit c.action.actions + raw.subsidizedAmount + raw.gasUsed * c.action.gasPrice at hf
+  have hg := runReceiptActions_gas_bounds c st
+  change raw.gasBurntForFunctionCall ≤ raw.gasBurnt ∧ raw.gasBurnt ≤ raw.gasUsed ∧
+    raw.gasUsed ≤ Fees.receiptGasBudget c.cfg c.receipt.receiverId c.action.actions at hg
+  have hs := Fees.settleGas_conservation c.cfg c.action.gasPrice c.ap.gasPrice
+    (Fees.receiptGasBudget c.cfg c.receipt.receiverId c.action.actions) raw.gasUsed raw.gasBurnt
+    ((st.account? c.receipt.receiverId).isNone && (raw.state.account? c.receipt.receiverId).isSome) hnew hg.2.2 hg.2.1
+  change (successSettlement c st raw).refund + (successSettlement c st raw).tokensBurnt +
+    (raw.gasUsed - raw.gasBurnt) * c.action.gasPrice = _ at hs
+  have hfunds := finalizeReceipt_success_funds c st raw hf.1 hpred hsigner
+  have ht := finalizeReceipt_success_trace c st raw
+  have hburn := congrArg (fun trace => trace.2.2.2.2.2.1) ht
+  have hsubsidy := congrArg (fun trace => trace.2.2.2.2.1) ht
+  simp only [Exec.finalizationTrace, Receipt.isRefund, beq_eq_false_iff_ne.mpr hpred,
+    Bool.false_eq_true, ite_false] at hburn hsubsidy
+  have hpartition : raw.gasBurnt * c.action.gasPrice +
+      (raw.gasUsed - raw.gasBurnt) * c.action.gasPrice = raw.gasUsed * c.action.gasPrice := by
+    rw [← Nat.add_mul, Nat.add_sub_of_le hg.2.1]
+  have hi : Fees.receiptFunds c.cfg c.receipt = Fees.totalDeposit c.action.actions +
+      Fees.receiptGasBudget c.cfg c.receipt.receiverId c.action.actions * c.action.gasPrice := by
+    simp [Fees.receiptFunds, hreceipt, Receipt.isRefund, hpred]
+  have hfinal : applyActionReceipt c st = final := by simp [applyActionReceipt, final, raw, hsuccess]
+  dsimp only
+  rw [hfinal, hi]
+  change final.totalFunds c.cfg + final.tokensBurnt = _
+  change final.totalFunds c.cfg = raw.totalFunds c.cfg + (successSettlement c st raw).refund + final.reward at hfunds
+  change final.tokensBurnt = _ at hburn
+  change final.subsidizedAmount = _ at hsubsidy
+  omega
+
+/-- Successful finalization credits at most the recorded function-call reward. -/
+theorem finalizeReceipt_success_reward_le (c : ReceiptCtx) (st : ChainState) (raw : Exec) :
+    (finalizeReceipt c st raw none).reward ≤
+      raw.receiptRewardAmount c.cfg (successSettlement c st raw).burnPrice c.action.gasPrice := by
+  unfold finalizeReceipt
+  dsimp only
+  simp only [Option.isSome_none, Bool.false_eq_true, ite_false]
+  apply (creditReceiptReward_reward_le _ _ _ _ _).trans
+  simp only [ite_rewardAmount, addGasRefund_rewardAmount, addBalanceRefund_rewardAmount, ite_self]
+  rfl
+
+/-- An already-existing receiver cannot trigger the account-creation surcharge. -/
+theorem successSettlement_existing (c : ReceiptCtx) (st : ChainState) (raw : Exec)
+    (hexists : (st.account? c.receipt.receiverId).isSome = true) :
+    successSettlement c st raw = Fees.settleGas c.cfg c.action.gasPrice c.ap.gasPrice
+      (Fees.receiptGasBudget c.cfg c.receipt.receiverId c.action.actions) raw.gasUsed raw.gasBurnt false := by
+  cases he : st.account? c.receipt.receiverId with
+  | none => simp [he] at hexists
+  | some account => simp [successSettlement, he]
+
+/-- Receiver rewards are backed by gross burn under the configured reward
+fraction, for ordinary existing-receiver function-call receipt execution. -/
+theorem applyActionReceipt_functionCalls_success_net_conservation (c : ReceiptCtx) (st : ChainState)
+    (hwf : st.AccountsUnique) (hreceiver : c.receipt.receiverId ≠ systemAccount)
+    (hpred : c.receipt.predecessorId ≠ systemAccount) (hsigner : c.action.signerId ≠ systemAccount)
+    (hreceipt : c.receipt.receipt = .action c.action) (hnew : c.cfg.accountCostIncrease = true)
+    (hratio : c.cfg.fees.burntGasReward.1 ≤ c.cfg.fees.burntGasReward.2)
+    (hexists : (st.account? c.receipt.receiverId).isSome = true)
+    (hactions : ∀ action ∈ c.action.actions, FunctionCallFundingAction action)
+    (hsuccess : (runReceiptActions c st).2 = none) :
+    let final := applyActionReceipt c st
+    final.totalFunds c.cfg + (final.tokensBurnt - final.reward) =
+      st.totalBalance + Fees.receiptFunds c.cfg c.receipt + final.subsidizedAmount := by
+  let raw := (runReceiptActions c st).1
+  have hf := applyActionReceipt_functionCalls_success_conservation c st hwf hreceiver hpred hsigner hreceipt hnew hactions hsuccess
+  have hfinal : applyActionReceipt c st = finalizeReceipt c st raw none := by simp [applyActionReceipt, raw, hsuccess]
+  have ht := congrArg (fun trace => trace.2.2.2.2.2.1) (finalizeReceipt_success_trace c st raw)
+  have hr := finalizeReceipt_success_reward_le c st raw
+  have hg := runReceiptActions_gas_bounds c st
+  have hbound := receiptRewardAmount_le raw c.cfg (successSettlement c st raw).burnPrice c.action.gasPrice hnew hratio hg.1
+  have hlower := settlement_burn_lower_bound c.cfg c.action.gasPrice c.ap.gasPrice
+    (Fees.receiptGasBudget c.cfg c.receipt.receiverId c.action.actions) raw.gasUsed raw.gasBurnt hnew
+  rw [successSettlement_existing c st raw hexists] at hbound hr ht
+  simp only [Exec.finalizationTrace, Receipt.isRefund, beq_eq_false_iff_ne.mpr hpred,
+    Bool.false_eq_true, ite_false] at ht
+  have hreward : (applyActionReceipt c st).reward ≤ (applyActionReceipt c st).tokensBurnt := by
+    rw [hfinal]
+    exact (hr.trans hbound).trans (by simpa only [ht] using hlower)
+  dsimp only at hf ⊢
+  omega
+
+/-- Ordinary existing-receiver receipts consisting of function-call actions
+conserve net funds on both success and failure. This includes arbitrary ordered
+calls, callback-producing calls, VM failures and the final storage-staking check.
+Explicit subsidy is retained on success and rolled back on receipt failure. -/
+theorem applyActionReceipt_functionCalls_net_conservation (c : ReceiptCtx) (st : ChainState)
+    (hwf : st.AccountsUnique) (hreceiver : c.receipt.receiverId ≠ systemAccount)
+    (hpred : c.receipt.predecessorId ≠ systemAccount) (hsigner : c.action.signerId ≠ systemAccount)
+    (hreceipt : c.receipt.receipt = .action c.action) (hnew : c.cfg.accountCostIncrease = true)
+    (hratio : c.cfg.fees.burntGasReward.1 ≤ c.cfg.fees.burntGasReward.2)
+    (hexists : (st.account? c.receipt.receiverId).isSome = true)
+    (hactions : ∀ action ∈ c.action.actions, FunctionCallFundingAction action) :
+    let final := applyActionReceipt c st
+    final.totalFunds c.cfg + (final.tokensBurnt - final.reward) =
+      st.totalBalance + Fees.receiptFunds c.cfg c.receipt + final.subsidizedAmount := by
+  cases he : (runReceiptActions c st).2 with
+  | none =>
+    exact applyActionReceipt_functionCalls_success_net_conservation c st hwf hreceiver hpred hsigner
+      hreceipt hnew hratio hexists hactions he
+  | some error =>
+    have hf := applyActionReceipt_failed_net_conservation c st error he hwf hpred hsigner hreceipt hnew hratio
+    have ht := congrArg (fun trace => trace.2.2.2.2.1)
+      (finalizeReceipt_failure_trace c st (runReceiptActions c st).1 error)
+    have hsubsidy : (applyActionReceipt c st).subsidizedAmount = 0 := by
+      simpa only [applyActionReceipt, he, Exec.finalizationTrace] using ht
+    dsimp only at hf ⊢
+    rw [hsubsidy, Nat.add_zero]
+    exact hf
+
+end Near
