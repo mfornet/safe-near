@@ -493,6 +493,21 @@ actual `issue = none` processing result. Unsupported/incomplete attempts are not
 silently treated as committed executions. `PostponedFinancialWellFormed` is a
 financial invariant, not full dependency-graph validity or fairness.
 
+Reserved `system` account creation is rejected independently of the registrar
+and minimum-name-length configuration. Pinned nearcore's `action_create_account`
+uses near-account-id 2.0.0's `is_top_level`/`is_sub_account_of`; `system` is neither.
+The previous Lean split-on-dot rule incorrectly allowed creation by the
+registrar or with a zero minimum length. A kernel theorem covers every
+configuration/predecessor, and transaction regressions verify rejection and
+rollback before transfer/key/code installation. A native account-id primitive
+test in the VM oracle crate checks the classification and ordinary-name controls;
+it is not a full Runtime account-creation comparison. After building the reference
+dependencies, reproduce the primitive check with:
+
+```sh
+cargo +1.93.1 test --manifest-path tools/runtime-conformance/Cargo.toml --locked --offline reserved_system_account_classification
+```
+
 Remaining composition work includes preserving receipt scope, id freshness and
 routing invariants across generated frontiers, transactions, block scheduling
 and chain execution. Independent nearcore equivalence and end-to-end deployed

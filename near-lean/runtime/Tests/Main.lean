@@ -230,6 +230,35 @@ def main (args : List String) : IO UInt32 := do
       createResult.state.accessKey? created (pkOf 4) == some fullAccess &&
       ((createResult.state.account? created).bind (·.code)).isSome)
 
+  -- Native AccountId::is_top_level excludes the reserved system actor.
+  let relaxedCreation := { cfg with accountCreation := { cfg.accountCreation with minAllowedTopLevelAccountLength := 0 } }
+  check r "reserved system creation is denied to the registrar"
+    (!canCreateAccount cfg cfg.accountCreation.registrarAccountId systemAccount)
+  check r "reserved system creation ignores a zero top-level length limit"
+    (!canCreateAccount relaxedCreation "alice.near" systemAccount)
+  check r "reserved system rule permits an ordinary lookalike name"
+    (canCreateAccount relaxedCreation "alice.near" "systemx")
+  check r "reserved system rule permits an ordinary subaccount prefix"
+    (canCreateAccount cfg cfg.accountCreation.registrarAccountId ("system." ++ cfg.accountCreation.registrarAccountId))
+  let registrarGenesis := (genesis.setAccount cfg.accountCreation.registrarAccountId (genesisAccount (10 * oneNear))).setAccessKey
+    cfg.accountCreation.registrarAccountId (pkOf 9) fullAccess
+  for (label, creationCfg, signer, key) in
+      [("registrar", cfg, cfg.accountCreation.registrarAccountId, pkOf 9),
+       ("zero length limit", relaxedCreation, "alice.near", pkOf 1)] do
+    let tx : Transaction := {
+      signerId := signer, publicKey := key, nonce := 1, receiverId := systemAccount
+      actions := [.createAccount, .transfer (3 * oneNear), .addKey (pkOf 8) fullAccess, .deployContract code] }
+    let initial : World := { cfg := creationCfg, code, state := registrarGenesis }
+    let denied := initial.settle [tx]
+    check r s!"reserved system {label}: creation is a protocol rejection"
+      (denied.issue.isNone && denied.outcomes.any (fun (_, outcome) => match outcome.status with
+        | .failure (.createAccountNotAllowed receiver predecessor) => receiver == systemAccount && predecessor == signer
+        | _ => false))
+    check r s!"reserved system {label}: no account or authority is installed"
+      ((denied.state.account? systemAccount).isNone && (denied.state.accessKey? systemAccount (pkOf 8)).isNone)
+    check r s!"reserved system {label}: rejection conserves funds including refunds and fees"
+      (denied.pending.isEmpty && denied.total == initial.total)
+
   let multiTransfer : Transaction := {
     signerId := "alice.near", publicKey := pkOf 1, nonce := 1
     receiverId := String.ofList (List.replicate 64 'a')

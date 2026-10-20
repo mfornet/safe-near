@@ -303,3 +303,27 @@ impl External for MethodValidatingExternal {
         self.inner.post_quantum_keys_enabled()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::AccountId;
+
+    // action_create_account in the pinned runtime uses is_top_level(), then
+    // is_sub_account_of(). Neither path admits the reserved system actor.
+    #[test]
+    fn reserved_system_account_classification() {
+        let system: AccountId = "system".parse().unwrap();
+        assert!(system.is_system());
+        assert!(!system.is_top_level());
+        for parent in ["registrar", "near", "alice.near"] {
+            let parent: AccountId = parent.parse().unwrap();
+            assert!(!system.is_sub_account_of(&parent));
+        }
+        let ordinary: AccountId = "systemx".parse().unwrap();
+        assert!(ordinary.is_top_level());
+        let child: AccountId = "system.registrar".parse().unwrap();
+        let registrar: AccountId = "registrar".parse().unwrap();
+        assert!(!child.is_system());
+        assert!(child.is_sub_account_of(&registrar));
+    }
+}

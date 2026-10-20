@@ -47,6 +47,15 @@ theorem applyCreateAccount_run (c : ReceiptCtx) (isLast : Bool) (before : Exec) 
   · by_cases hc : canCreateAccount c.cfg c.receipt.predecessorId c.receipt.receiverId = true <;>
       simp [-ExceptT.run_bind, -StateT.run_bind, applyAction, getState, putAccount, modifyState, ha, hc]
 
+/-- An absent reserved actor cannot acquire an account through actual creation.
+The result is a protocol admission error and preserves the pre-action state. -/
+theorem applyCreateAccount_system_missing (c : ReceiptCtx) (isLast : Bool) (before : Exec)
+    (hreceiver : c.receipt.receiverId = systemAccount) (hmissing : before.state.account? systemAccount = none) :
+    (applyAction c isLast .createAccount).run.run before =
+      (.error (.createAccountNotAllowed systemAccount c.receipt.predecessorId), before) := by
+  rw [applyCreateAccount_run]
+  simp [hreceiver, hmissing]
+
 theorem funded_createAccount (c : ReceiptCtx) (isLast : Bool) :
     (applyAction c isLast .createAccount).Funded c.cfg c.action.gasPrice 0 := by
   intro before after value hwf hrun
