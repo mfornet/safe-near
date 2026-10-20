@@ -1,5 +1,6 @@
 import NearRuntime.FunctionCallInvariants
 import NearVM.PromiseGas
+import NearVM.OutcomeEncoding
 import Interpreter.Wasm.ByteEncoding
 
 namespace Near
@@ -137,6 +138,27 @@ def ReceiptGasEncodingValid (spec : ReceiptSpec) : Prop :=
   (String.fromUTF8? ⟨spec.receiverId.toArray⟩).isSome = true ∧
     ∀ action ∈ spec.actions, PromiseActionMethodsUtf8 action
 
+/-- The VM's shared encoding invariant is exactly the decoding condition
+required by this runtime gas bridge. It makes no assertion of full action validity. -/
+theorem receiptEncoding_iff_gasEncoding (spec : ReceiptSpec) :
+    ReceiptEncoding spec.receiverId spec.actions ↔ ReceiptGasEncodingValid spec := Iff.rfl
+
+/-- Successful conversion of encoding-safe raw promises discharges the runtime
+receipt-decoding premise, including for callback and joint promise graphs. -/
+theorem convertPromises_gasEncoding (promises : List NearPromise) (graph : PromiseGraph)
+    (hconvert : convertPromises promises = some graph) (h : PromisesEncoding promises) :
+    ∀ spec ∈ graph.receipts, ReceiptGasEncodingValid spec :=
+  convertPromises_preserves_predicate ReceiptEncoding promises graph hconvert h
+
+/-- The packing seam now needs only the final raw-state encoding invariant;
+proving that invariant for complete metered execution remains separate. -/
+theorem outcomeOfExecution_success_gasEncoding (ctx : VMContext) (storage : List (Bytes × Bytes))
+    (final : Wasm.SmallStep.Config NearState) (error : Option FunctionCallError)
+    (hsuccess : (outcomeOfExecution ctx storage final error).aborted = none)
+    (h : PromisesEncoding final.store.wasm.host.promises) :
+    ∀ spec ∈ (outcomeOfExecution ctx storage final error).receipts, ReceiptGasEncodingValid spec :=
+  outcomeOfExecution_success_predicate ReceiptEncoding ctx storage final error hsuccess h
+
 def decodedReceiptGas (cfg : RuntimeConfig) (decoder : Bytes → ContractCode) (spec : ReceiptSpec) : Nat :=
   Fees.receiptGasBudget cfg (stringOfBytes spec.receiverId) (spec.actions.map (actionOfPromiseRaw decoder))
 
@@ -167,18 +189,26 @@ theorem decodedReceiptsGas_eq_raw (cfg : RuntimeConfig) (decoder : Bytes → Con
   intro spec hm
   exact decodedReceiptGas_eq_raw cfg decoder spec (h spec hm)
 
+/-- Successful strict-policy execution discharges the entire emitted-receipt
+encoding condition, using the concrete registry and interpreter proofs. -/
+theorem run_success_gasEncoding (cfg : RuntimeConfig) (code : Module) (codeSize : Nat) (method : String)
+    (ctx : VMContext) (storage : List (Bytes × Bytes)) (fuel : Nat)
+    (hpolicy : ctx.validateActionMethodUtf8 = true)
+    (hsuccess : (Wasm.Near.run cfg code codeSize method ctx storage fuel).aborted = none) :
+    ∀ spec ∈ (Wasm.Near.run cfg code codeSize method ctx storage fuel).receipts, ReceiptGasEncodingValid spec :=
+  run_success_receipt_encoding cfg code codeSize method ctx storage fuel hpolicy hsuccess
+
 /-- Public VM gas backing transfers to decoded runtime action budgets under
-explicit byte-decoding facts. Deriving these facts for every emitted receipt
-from the concrete runtime execution remains a separate invariant obligation. -/
+the operational strict policy, with receipt decoding derived from execution. -/
 theorem run_success_decoded_receipt_gas (cfg : RuntimeConfig) (decoder : Bytes → ContractCode)
     (code : Module) (codeSize : Nat) (method : String) (ctx : VMContext)
     (storage : List (Bytes × Bytes)) (fuel : Nat)
     (hsuccess : (Wasm.Near.run cfg code codeSize method ctx storage fuel).aborted = none)
-    (hencoding : ∀ spec ∈ (Wasm.Near.run cfg code codeSize method ctx storage fuel).receipts,
-      ReceiptGasEncodingValid spec) :
+    (hpolicy : ctx.validateActionMethodUtf8 = true) :
     (Wasm.Near.run cfg code codeSize method ctx storage fuel).usedGas =
       (Wasm.Near.run cfg code codeSize method ctx storage fuel).burntGas +
         ((Wasm.Near.run cfg code codeSize method ctx storage fuel).receipts.map (decodedReceiptGas cfg decoder)).sum := by
+  have hencoding := run_success_gasEncoding cfg code codeSize method ctx storage fuel hpolicy hsuccess
   rw [decodedReceiptsGas_eq_raw cfg decoder _ hencoding]
   exact run_success_gas_backing cfg code codeSize method ctx storage fuel hsuccess
 
@@ -193,16 +223,16 @@ theorem functionCallGasFunds_eq_decoded (c : ReceiptCtx) (outcome : VMOutcome)
   | cons spec specs ih => simp_all [Nat.add_mul, decodedReceiptGas]
 
 /-- For an actual successful VM call, materialized onward gas funds are exactly
-the public counter's reservation, under the explicit encoding conditions. -/
+the public counter's reservation, with encoding proved from the strict policy. -/
 theorem run_functionCallGasFunds (c : ReceiptCtx) (code : Module) (codeSize : Nat) (method : String)
     (ctx : VMContext) (storage : List (Bytes × Bytes)) (fuel : Nat)
     (hreceiver : c.receipt.receiverId ≠ systemAccount)
     (hsuccess : (Wasm.Near.run c.cfg code codeSize method ctx storage fuel).aborted = none)
-    (hencoding : ∀ spec ∈ (Wasm.Near.run c.cfg code codeSize method ctx storage fuel).receipts,
-      ReceiptGasEncodingValid spec) :
+    (hpolicy : ctx.validateActionMethodUtf8 = true) :
     functionCallGasFunds c (Wasm.Near.run c.cfg code codeSize method ctx storage fuel) =
       ((Wasm.Near.run c.cfg code codeSize method ctx storage fuel).usedGas -
         (Wasm.Near.run c.cfg code codeSize method ctx storage fuel).burntGas) * c.action.gasPrice := by
+  have hencoding := run_success_gasEncoding c.cfg code codeSize method ctx storage fuel hpolicy hsuccess
   rw [functionCallGasFunds_eq_decoded c _ hreceiver, decodedReceiptsGas_eq_raw c.cfg c.codeOf _ hencoding]
   rw [run_success_receipts_gas_eq_reserved c.cfg code codeSize method ctx storage fuel hsuccess]
 
@@ -213,23 +243,38 @@ theorem materialize_run_funds (c : ReceiptCtx) (isLast : Bool) (initial : ChainS
     (storage : List (Bytes × Bytes)) (fuel : Nat)
     (hreceiver : c.receipt.receiverId ≠ systemAccount)
     (hsuccess : (Wasm.Near.run c.cfg code codeSize method ctx storage fuel).aborted = none)
-    (hencoding : ∀ spec ∈ (Wasm.Near.run c.cfg code codeSize method ctx storage fuel).receipts,
-      ReceiptGasEncodingValid spec) :
+    (hpolicy : ctx.validateActionMethodUtf8 = true) :
     receiptsFunds c.cfg (materializeFunctionCallRaw c isLast (Wasm.Near.run c.cfg code codeSize method ctx storage fuel) initial).receipts =
       receiptsDeposits (Wasm.Near.run c.cfg code codeSize method ctx storage fuel).receipts +
         ((Wasm.Near.run c.cfg code codeSize method ctx storage fuel).usedGas -
           (Wasm.Near.run c.cfg code codeSize method ctx storage fuel).burntGas) * c.action.gasPrice := by
-  rw [materializeFunctionCallRaw_funds_split, run_functionCallGasFunds c code codeSize method ctx storage fuel hreceiver hsuccess hencoding]
+  rw [materializeFunctionCallRaw_funds_split, run_functionCallGasFunds c code codeSize method ctx storage fuel hreceiver hsuccess hpolicy]
 
-/-- Successful checked materialization has the same gas backing; decoder/model
-issues must have been ruled out by the actual executable validation stage. -/
+/-- At the actual runtime context seam even the policy premise is discharged:
+ordinary successful calls materialize exactly their raw deposits and reserved gas funds. -/
+theorem materialize_functionCall_run_funds (c : ReceiptCtx) (account : Account)
+    (args : Bytes) (gas deposit : Nat) (isLast : Bool) (initial : ChainState)
+    (code : Module) (codeSize : Nat) (method : String) (storage : List (Bytes × Bytes)) (fuel : Nat)
+    (hreceiver : c.receipt.receiverId ≠ systemAccount)
+    (hsuccess : (Wasm.Near.run c.cfg code codeSize method
+      (functionCallContext c account args gas deposit isLast) storage fuel).aborted = none) :
+    receiptsFunds c.cfg (materializeFunctionCallRaw c isLast
+      (Wasm.Near.run c.cfg code codeSize method (functionCallContext c account args gas deposit isLast) storage fuel) initial).receipts =
+      receiptsDeposits (Wasm.Near.run c.cfg code codeSize method
+        (functionCallContext c account args gas deposit isLast) storage fuel).receipts +
+      ((Wasm.Near.run c.cfg code codeSize method (functionCallContext c account args gas deposit isLast) storage fuel).usedGas -
+        (Wasm.Near.run c.cfg code codeSize method (functionCallContext c account args gas deposit isLast) storage fuel).burntGas) * c.action.gasPrice :=
+  materialize_run_funds c isLast initial code codeSize method
+    (functionCallContext c account args gas deposit isLast) storage fuel hreceiver hsuccess rfl
+
+/-- Successful checked construction retains the concrete VM funding result.
+Decoder/model issues are excluded by the executable validation witness. -/
 theorem materialize_checked_run_funds (c : ReceiptCtx) (isLast : Bool) (initial : ChainState)
     (code : Module) (codeSize : Nat) (method : String) (ctx : VMContext)
     (storage : List (Bytes × Bytes)) (fuel : Nat) (effects : FunctionCallEffects)
     (hreceiver : c.receipt.receiverId ≠ systemAccount)
     (hsuccess : (Wasm.Near.run c.cfg code codeSize method ctx storage fuel).aborted = none)
-    (hencoding : ∀ spec ∈ (Wasm.Near.run c.cfg code codeSize method ctx storage fuel).receipts,
-      ReceiptGasEncodingValid spec)
+    (hpolicy : ctx.validateActionMethodUtf8 = true)
     (hmaterialized : materializeFunctionCall c isLast
       (Wasm.Near.run c.cfg code codeSize method ctx storage fuel) initial = .ok effects) :
     receiptsFunds c.cfg effects.receipts =
@@ -237,6 +282,6 @@ theorem materialize_checked_run_funds (c : ReceiptCtx) (isLast : Bool) (initial 
         ((Wasm.Near.run c.cfg code codeSize method ctx storage fuel).usedGas -
           (Wasm.Near.run c.cfg code codeSize method ctx storage fuel).burntGas) * c.action.gasPrice := by
   rw [materializeFunctionCall_success c isLast _ initial effects hmaterialized]
-  exact materialize_run_funds c isLast initial code codeSize method ctx storage fuel hreceiver hsuccess hencoding
+  exact materialize_run_funds c isLast initial code codeSize method ctx storage fuel hreceiver hsuccess hpolicy
 
 end Near

@@ -460,14 +460,51 @@ including empty CSV and multibyte names. The VM key guard validates each field;
 successful postprocessing supplies that decoding fact and still implies a whole
 CSV UTF-8 witness. Runtime key conversion uses the same byte fields.
 
-The gas bridge now covers action lists, receipt budgets and the actual
-materializer. `materialize_run_funds` identifies outgoing receipt funds as raw
-deposits plus `(usedGas - burntGas) * gasPrice` for ordinary contracts, under
-`ReceiptGasEncodingValid`. This predicate contains only receiver/method decoding
-facts, not an assumed gas/funds equation or full action validity. Deriving it for
-every receipt from successful runtime execution remains an open invariant
-obligation. Full multi-action settlement/chain conservation and nearcore
-equivalence also remain open.
+The gas bridge covers action lists, receipt budgets and actual materialization.
+`materialize_run_funds` identifies outgoing receipt funds as raw deposits plus
+`(usedGas - burntGas) * gasPrice` for ordinary contracts. Its decoding condition
+is now derived from successful execution under the strict runtime policy;
+callers no longer supply `ReceiptGasEncodingValid` for emitted receipts.
+`materialize_functionCall_run_funds` instantiates the actual runtime context,
+which sets that policy, and therefore needs no separate decoding/policy premise.
+`FunctionCallFunding` connects that result to successful commits and the actual
+function-call action path. `Exec.FundingStep` uses additive gas and subsidy
+terms so sequential steps telescope without truncated subtraction.
+`ActionFunding` supplies monadic composition and proves the law for receipt
+attempts containing arbitrary ordered function-call actions, including execution
+fees, admission checks and the final storage-staking check.
+
+`ReceiptFunding.applyActionReceipt_functionCalls_net_conservation` covers the
+actual finalized receipt on both success and failure. It equates account funds
+plus outgoing receipt backing and net burn with the initial account funds,
+incoming receipt backing and explicit subsidy. The proof accounts for gas
+refunds, reward credit and failure rollback. Its structural/configuration
+premises are unique account records, an existing ordinary receiver, non-system
+predecessor/signer, matching action-receipt metadata, the v85+ settlement branch
+(`accountCostIncrease = true`), and a reward fraction at most one. It requires
+only function-call actions; arbitrary VM-created outgoing action variants are
+covered by their proved gas/deposit backing. No VM outcome or financial equation
+is assumed. Other incoming action families and chain-level conservation remain
+open; this is not full runtime equivalence.
+
+`NearVM.ReceiptPredicates` transports arbitrary decidable receiver/action
+predicates through actual promise updates, conversion and successful outcome
+packing, without requiring unique dependencies. `PromiseEncoding` specializes
+this to receiver UTF-8 and byte-preserving method decoding. `CreationEncoding`
+and `MeteredEncoding` derive witnesses from the ordered receiver and external
+method guards for all five creators/joins and nine batch-action hosts.
+`NeutralEncoding`, `PolicyEncoding`, `EncodingHosts` and `EncodingRegistry`
+prove that strict policy and receipt encoding survive every published live
+host call, including legacy gas metering; unsupported operations still trap.
+`ResolvedEncoding` covers actual import resolution and initialization, and
+`ExecutionEncoding` covers checked steps and instruction/frame charges.
+`OutcomeEncoding.run_success_receipt_encoding` establishes the public VM result
+for arbitrary code, context, storage and fuel when execution succeeds and the
+context selects strict runtime decoding. Mock opaque-byte execution is excluded
+by this explicit policy premise. Encoding validity is not complete action
+validity or authorization. Settlement for general incoming action mixtures,
+chain conservation, verified binary decoding and full nearcore equivalence
+remain open.
 
 Promise deployment derives `ContractCode.size` from the actual payload through
 `ContractCode.decodeSized`. Size limits, storage accounting and outgoing gas

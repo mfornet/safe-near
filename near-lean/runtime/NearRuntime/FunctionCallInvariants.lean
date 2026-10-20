@@ -101,7 +101,9 @@ theorem commitFunctionCall_totalFunds (exec : Exec) (c : ReceiptCtx) (account : 
   rw [he] at hb
   omega
 
-/-- Public VM funding discharges deposit backing for the actual checked commit. -/
+/-- The public VM funding theorem discharges the deposit-accounting premise.
+`FunctionCallFunding` discharges outgoing gas backing using concrete execution. -/
+
 theorem commitFunctionCall_funded (exec : Exec) (c : ReceiptCtx) (account : Account)
     (code : ContractCode) (method : String) (args : Bytes) (gas deposit : Nat) (isLast : Bool)
     (effects : FunctionCallEffects) (hwf : exec.state.AccountsUnique)
