@@ -11,6 +11,7 @@ use near_primitives::bandwidth_scheduler::BlockBandwidthRequests;
 use near_primitives::congestion_info::{BlockCongestionInfo, ExtendedCongestionInfo};
 use near_primitives::hash::CryptoHash;
 use near_primitives::receipt::Receipt;
+use near_primitives::state::PartialState;
 use near_primitives::state_record::StateRecord;
 use near_primitives::test_utils::MockEpochInfoProvider;
 use near_primitives::transaction::{
@@ -22,15 +23,17 @@ use near_primitives::types::{AccountId, Balance, EpochId, EpochInfoProvider, Gas
 use near_primitives::version::{MIN_SUPPORTED_PROTOCOL_VERSION, PROTOCOL_VERSION};
 use near_primitives::views::{ExecutionOutcomeView, SignedTransactionView};
 use near_store::test_utils::TestTriesBuilder;
-use near_store::trie::AccessOptions;
+use near_store::trie::{AccessOptions, AccessTracker, KeyLookupMode};
 use near_store::{ShardTries, ShardUId};
 use node_runtime::{ApplyState, Runtime, SignedValidPeriodTransactions};
 use serde_json::{Map, Value, from_str, from_value, json, to_value};
+use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env::args;
 use std::error::Error;
 use std::io::{Read, stdin};
 use std::result::Result as StdResult;
+use std::sync::Arc;
 
 type Result<T> = StdResult<T, Box<dyn Error>>;
 type Entry = (Vec<u8>, Vec<u8>);
@@ -609,6 +612,119 @@ fn encode_state(request: &Value) -> Result<Value> {
     Ok(json!({"initialEntries":entries, "publicKeys":public_keys, "codeHashes":code_hashes}))
 }
 
+/// Observe the real canonical trie walk through its public accounting interface.
+/// The cache follows RuntimeExt's hash-keyed fresh/cached lookup policy.
+#[derive(Debug, Default)]
+struct LookupTracker {
+    cache: RefCell<BTreeMap<CryptoHash, Arc<[u8]>>>,
+    events: RefCell<Vec<Value>>,
+    phase: Cell<&'static str>,
+}
+
+impl AccessTracker for LookupTracker {
+    fn track_mem_lookup(&self, key: &CryptoHash) -> Option<Arc<[u8]>> {
+        let value = self.cache.borrow().get(key).cloned()?;
+        self.events
+            .borrow_mut()
+            .push(json!({"hash":key.0,"kind":self.phase.get(),"cached":true}));
+        Some(value)
+    }
+
+    fn track_disk_lookup(&self, key: CryptoHash, value: Arc<[u8]>) {
+        self.cache.borrow_mut().insert(key, value);
+        self.events
+            .borrow_mut()
+            .push(json!({"hash":key.0,"kind":self.phase.get(),"cached":false}));
+    }
+}
+
+fn trie_lookups(request: &Value) -> Result<Value> {
+    let input = object(request, &["formatVersion", "entries", "lookups"])?;
+    if integer(input, "formatVersion")? != 1 {
+        return Err("unsupported trie formatVersion".into());
+    }
+    let entries: Vec<Entry> = from_value(field(input, "entries")?.clone())?;
+    let mut keys = BTreeSet::new();
+    if entries.iter().any(|(key, _)| !keys.insert(key.clone())) {
+        return Err("duplicate trie entry".into());
+    }
+    let provider = MockEpochInfoProvider::default();
+    let layout = provider.shard_layout(&EpochId::default())?;
+    let shard = layout.shard_uids().next().ok_or("missing shard")?;
+    let tries = TestTriesBuilder::new().with_shard_layout(layout).build();
+    let changes = tries
+        .get_trie_for_shard(shard, CryptoHash::default())
+        .update(
+            entries.into_iter().map(|(key, value)| (key, Some(value))),
+            AccessOptions::DEFAULT,
+        )?;
+    let mut update = tries.store_update();
+    let root = tries.apply_all(&changes, shard, &mut update);
+    update.commit();
+    let trie = tries
+        .get_trie_for_shard(shard, root)
+        .recording_reads_new_recorder();
+    if trie.has_memtries() || trie.has_flat_storage_chunk_view() {
+        return Err("trie diagnostic requires canonical on-disk nodes".into());
+    }
+    let tracker = LookupTracker::default();
+    let mut results = Vec::new();
+    for query in field(input, "lookups")?
+        .as_array()
+        .ok_or("lookups must be an array")?
+    {
+        let query = object(query, &["key", "accountNodes", "dereference", "resetCache"])?;
+        let key: Vec<u8> = from_value(field(query, "key")?.clone())?;
+        let boolean = |name| -> Result<bool> {
+            field(query, name)?
+                .as_bool()
+                .ok_or_else(|| format!("invalid bool field: {name}").into())
+        };
+        if boolean("resetCache")? {
+            tracker.cache.borrow_mut().clear();
+        }
+        tracker.phase.set("node");
+        let options = AccessOptions::contract_runtime(&tracker);
+        let mode = if boolean("accountNodes")? {
+            KeyLookupMode::MemOrTrie
+        } else {
+            KeyLookupMode::MemOrFlatOrTrie
+        };
+        let reference = trie.get_optimized_ref(&key, mode, options)?;
+        let value_ref = reference
+            .as_ref()
+            .map(|value| json!({"hash":value.value_hash().0,"length":value.len()}));
+        tracker.phase.set("value");
+        let value = if boolean("dereference")? {
+            reference
+                .as_ref()
+                .map(|value| trie.deref_optimized(options, value))
+                .transpose()?
+        } else {
+            None
+        };
+        let events = std::mem::take(&mut *tracker.events.borrow_mut());
+        let cached = events
+            .iter()
+            .filter(|event| event["cached"] == true)
+            .count();
+        results.push(json!({"reference":value_ref,"value":value,"events":events,
+            "counts":{"disk":events.len()-cached,"mem":cached}}));
+    }
+    let PartialState::TrieValues(values) = trie
+        .recorded_storage()
+        .ok_or("missing trie recorder")?
+        .nodes;
+    let witness: Vec<Value> = values
+        .iter()
+        .map(|bytes| json!([CryptoHash::hash_bytes(bytes).0, bytes.as_ref()]))
+        .collect();
+    Ok(
+        json!({"formatVersion":1,"mode":"canonical-on-disk/no-flat-storage/no-memtrie",
+        "root":root.0,"witness":witness,"results":results}),
+    )
+}
+
 /// Independent native eligibility oracle; no runtime state is changed.
 fn classify_staking_keys(request: &Value) -> Result<Value> {
     let input = object(request, &["publicKeys", "seeds"])?;
@@ -773,7 +889,12 @@ fn main() -> Result<()> {
         Some("--metadata") => println!("{}", metadata()),
         Some("--example") => println!("{}", example()?),
         Some("--financial-examples") => println!("{}", financial_examples()?),
-        Some(mode @ ("--encode-state" | "--sign-transactions" | "--classify-staking-keys")) => {
+        Some(
+            mode @ ("--encode-state"
+            | "--sign-transactions"
+            | "--classify-staking-keys"
+            | "--trie-lookups"),
+        ) => {
             let mut input = String::new();
             stdin().read_to_string(&mut input)?;
             let input = from_str(&input)?;
@@ -782,7 +903,9 @@ fn main() -> Result<()> {
                 if mode == "--encode-state" {
                     encode_state(&input)?
                 } else {
-                    if mode == "--classify-staking-keys" {
+                    if mode == "--trie-lookups" {
+                        trie_lookups(&input)?
+                    } else if mode == "--classify-staking-keys" {
                         classify_staking_keys(&input)?
                     } else {
                         sign_transactions(&input)?

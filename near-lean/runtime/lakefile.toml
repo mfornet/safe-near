@@ -45,3 +45,8 @@ root = "RuntimeConformance.Allowance"
 [[lean_exe]]
 name = "staking-key-replay"
 root = "RuntimeConformance.StakingKey"
+
+# Canonical trie witness traversal and accounting-cache diagnostics.
+[[lean_exe]]
+name = "trie-replay"
+root = "RuntimeConformance.Trie"

@@ -424,3 +424,21 @@ Runtime scenarios exercise actual restricted wNEAR calls before/after refund,
 current-key replacement/deletion, balance/ordinary transfers and rollback on
 storage-staking failure. Full receipt/chain preservation and conservation, gas-key
 semantics, remaining integer overflow paths and deployed refinement remain open.
+
+## Trie witness boundary
+
+`TrieAccounting` decodes native `RawTrieNodeWithSize` Borsh and independently
+walks compact nibble paths, branch bitmaps and value references. It models the
+single hash-keyed accounting cache shared by nodes and values, including counted
+and uncounted node lookup modes, value dereferences and resets. Counter/event
+increment facts are kernel-checked. `trie-replay` rejects malformed, missing,
+trailing, cyclic and duplicate witness inputs.
+
+`tools/chain-conformance/trie_probe.py` obtains canonical witnesses and actual
+native `near_store::Trie` access traces from the clean pinned source. It freezes
+both executors and checks witness SHA256 bindings externally before comparison.
+This independently tests path selection and fresh/cached accounting, including
+complete raw states exported by `Runtime::apply`. It does not inject observed
+counts into receipt execution. Trie construction/updates from modeled state,
+receipt cache lifetimes, flat/memory trie behavior and a kernel-level hash
+refinement remain open before this can discharge the runtime trie-cost gap.

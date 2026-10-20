@@ -169,3 +169,14 @@ chain-staking-test:
     cd near-lean/runtime && lake build staking-key-replay
     cd near-lean/chain && lake build chain-replay
     python3 tools/chain-conformance/test_staking_key.py
+
+# Compare native canonical trie paths and cache counts; does not inject gas into runtime execution.
+[positional-arguments]
+chain-trie-compare request *options:
+    cd near-lean/runtime && lake build trie-replay --wfail
+    python3 tools/chain-conformance/trie_probe.py "$@"
+
+# Check trie Borsh decoding, path selection, value dereferences and cross-role cache aliases.
+chain-trie-test:
+    cd near-lean/runtime && lake build trie-replay --wfail
+    python3 tools/chain-conformance/test_trie_accounting.py

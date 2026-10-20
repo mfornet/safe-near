@@ -1,0 +1,16 @@
+{
+  "formatVersion": 1,
+  "entries": [
+    [[], [0]],
+    [[16], [97]],
+    [[16, 1], [98]],
+    [[32], [97]]
+  ],
+  "lookups": [
+    {"key": [16], "accountNodes": true, "dereference": true, "resetCache": false},
+    {"key": [16], "accountNodes": true, "dereference": true, "resetCache": false},
+    {"key": [32], "accountNodes": true, "dereference": true, "resetCache": false},
+    {"key": [16, 2], "accountNodes": true, "dereference": false, "resetCache": false},
+    {"key": [], "accountNodes": false, "dereference": true, "resetCache": true}
+  ]
+}

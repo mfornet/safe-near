@@ -190,3 +190,43 @@ actions decoded from canonical Borsh, retaining the RPC view for provenance.
 `just chain-staking-test` checks 2,355 key classifications and 68 native apply
 scenarios. Staking admission now checks Edwards decompression and prime-order
 subgroup membership; epoch-dependent staking execution remains unsupported.
+
+## Canonical trie and cache diagnostics
+
+`just chain-trie-test` compares native `near_store::Trie` traversal with
+`NearRuntime.TrieAccounting`. Build the source oracle first, as above. For an
+individual request:
+
+```sh
+just chain-trie-compare tools/chain-conformance/fixtures/trie_lookups.json
+```
+
+The native `--trie-lookups` mode builds a canonical on-disk trie from unique raw
+key/value `entries`. Each `lookups` row requires raw-byte `key`, Boolean
+`accountNodes`, `dereference`, and `resetCache`. `accountNodes` selects the native
+counted (`MemOrTrie`) or uncounted (`MemOrFlatOrTrie`, without a flat store) node
+lookup path. Value dereferences always use the accounting cache. The cache is
+shared by node and value hashes and persists until explicitly reset.
+
+The output retains the canonical root, partial Borsh witness and actual ordered
+native node/value accesses, including fresh/cached classifications. The driver
+checks every witness object's SHA256 binding, then supplies only root, bytes and
+original queries to Lean. Lean independently decodes all four node variants,
+compact paths, branch bitmaps, value references and subtree-size fields; it
+follows the paths and derives cache events/counts without reading native results.
+Missing objects, malformed/trailing node bytes, cycles, invalid byte/hash widths
+and duplicate witness hashes fail closed. The native reference, Lean executable,
+inputs, outputs and differences are retained with build identities.
+
+The regression includes prefix keys, empty values, all sixteen branch slots,
+misses, repeated reads, shared subtrees/values, cache resets, uncounted node reads,
+and a value whose bytes are also a trie node. Seven complete states exported by
+real `Runtime::apply` rebuild the same native canonical roots and match Lean's
+lookups. The counter/event increment lemmas are kernel-checked.
+
+This diagnostic does **not** supply receipt gas totals or close the remaining
+runtime gas gap. Canonical trie construction/updates from modeled state,
+receipt-wide cache lifetime, flat storage and memtries still need integration.
+Hash-to-byte binding is checked externally by the driver; it is not yet a Lean
+cryptographic refinement proof. The witness contains only objects needed by the
+requested lookups, not a claim that all chain state was captured.
