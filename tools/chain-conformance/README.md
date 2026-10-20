@@ -217,6 +217,46 @@ native encoder even at the u128 maximum sentinel; serialization agreement alone
 does not establish that every such synthetic account can deserialize or execute.
 Evidence is saved in `audit/state-encoding-regressions.json`.
 
+`just chain-receipt-encoding-test` checks native hash ancestry and V0 receipt
+envelopes with legacy or V2 action payloads, plus data receipts.
+`NearRuntime.NativeIdentity` derives child
+receipt IDs from parent hash, execution block height and output index. Action
+hashes use `u64::MAX - actionIndex` as salt; callback data IDs derive from the
+action hash, block height and a per-action data counter. The message is exactly
+32 parent bytes, eight little-endian height bytes and eight little-endian salt
+bytes. VM random seeds hash the action hash followed by the block seed. The
+native adapter invokes the actual nearcore helpers; Lean uses its pure SHA256.
+
+The `receipt-encode` executable accepts `{formatVersion: 1, codes, identities,
+receiptIds, dataIds, receipts, actionFormats, receivedData}`. Receipts/catalogues use the existing
+replay transport. Each identity graph node has a `kind`: `hash` hashes original
+`bytes`; `input` takes an explicit initial 32-byte `hash`. Derived nodes refer to
+an earlier node by zero-based `base`: `transaction` also takes `blockHeight`,
+`receipt`/`action`/`data` take `blockHeight` and `index`, and `randomSeed` takes a
+32-byte `seed`. Bindings are `[logicalId, graphPosition]` pairs. Missing,
+duplicate or aliased bindings and malformed ancestry fail closed. `actionFormats`
+contains one `legacy` or `v2` entry per receipt; data receipts require `legacy`.
+The runtime uses V2 for VM-created promises even at protocol 83; transaction and
+refund receipts use the legacy payload. V2 encodes `refund_to=None`; custom refund
+receivers are unrepresented and rejected by the native diagnostic. Output contains
+`hashes`, Borsh `receipts`, and Borsh `receivedData` values; `None` differs from
+`Some(empty)`. All eight represented action kinds and both ordinary key families
+are serialized, including actual hash-bound deployment bytes.
+
+The runtime identity regression starts from original signed Ed25519 transaction
+body bytes and the supplied schedule. It independently derives transaction,
+receipt, action and callback-data identities, then compares them with actual
+successful/failed callback execution across protocols 83–86. A two-function-call
+receipt also checks distinct action salts and the data counter resetting per
+action. Generated native
+IDs are comparison outputs, never graph inputs. This establishes the derivation
+and serialization primitives, not an automatically maintained identity registry
+inside `Runtime::apply`. Full queue-state encoding still needs receiver ownership,
+native delayed-queue indices/wrappers and identity registration during execution.
+Those remain open alongside receipt cache lifetime and trie-backed runtime gas.
+Evidence is saved in `audit/receipt-encoding-regressions.json` and
+`audit/runtime-identity-regressions.json`.
+
 `just chain-trie-test` compares native `near_store::Trie` traversal with
 `NearRuntime.TrieAccounting`. Build the source oracle first, as above. For an
 individual request:

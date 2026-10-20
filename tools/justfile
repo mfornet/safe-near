@@ -186,3 +186,8 @@ chain-trie-test:
 chain-state-encoding-test:
     cd near-lean/chain && lake build state-encode --wfail
     python3 tools/chain-conformance/test_state_encoding.py
+
+# Check native receipt ancestry, callback data IDs and typed receipt Borsh bytes.
+chain-receipt-encoding-test:
+    cd near-lean/chain && lake build receipt-encode chain-replay --wfail
+    python3 tools/chain-conformance/test_receipt_encoding.py

@@ -104,6 +104,10 @@ jobs:
         run: |
           cd near-lean/chain && lake build state-encode --wfail
           cd ../.. && python3 tools/chain-conformance/test_state_encoding.py
+      - name: Compare receipt encoding and independently derived runtime identities
+        run: |
+          cd near-lean/chain && lake build receipt-encode chain-replay --wfail
+          cd ../.. && python3 tools/chain-conformance/test_receipt_encoding.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -121,3 +125,5 @@ jobs:
             audit/trie-accounting-regressions.json
             audit/trie-update-regressions.json
             audit/state-encoding-regressions.json
+            audit/receipt-encoding-regressions.json
+            audit/runtime-identity-regressions.json

@@ -33,3 +33,7 @@ root = "ChainReplay.Main"
 [[lean_exe]]
 name = "state-encode"
 root = "ChainReplay.StateEncoding"
+
+[[lean_exe]]
+name = "receipt-encode"
+root = "ChainReplay.ReceiptEncoding"

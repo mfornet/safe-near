@@ -10,7 +10,7 @@ use near_primitives::apply::ApplyChunkReason;
 use near_primitives::bandwidth_scheduler::BlockBandwidthRequests;
 use near_primitives::congestion_info::{BlockCongestionInfo, ExtendedCongestionInfo};
 use near_primitives::hash::CryptoHash;
-use near_primitives::receipt::Receipt;
+use near_primitives::receipt::{Receipt, ReceivedData};
 use near_primitives::state::PartialState;
 use near_primitives::state_record::StateRecord;
 use near_primitives::test_utils::MockEpochInfoProvider;
@@ -21,6 +21,10 @@ use near_primitives::trie_key::trie_key_parsers::parse_account_id_from_raw_key;
 use near_primitives::trie_key::{TrieKey, col};
 use near_primitives::types::{
     AccountId, Balance, EpochId, EpochInfoProvider, Gas, ShardId, StateChangeCause,
+};
+use near_primitives::utils::{
+    create_action_hash_from_receipt_id, create_random_seed, create_receipt_id_from_action_hash,
+    create_receipt_id_from_receipt_id, create_receipt_id_from_transaction,
 };
 use near_primitives::version::{MIN_SUPPORTED_PROTOCOL_VERSION, PROTOCOL_VERSION};
 use near_primitives::views::{ExecutionOutcomeView, SignedTransactionView};
@@ -642,6 +646,188 @@ impl AccessTracker for LookupTracker {
     }
 }
 
+fn receipt_encoding(request: &Value) -> Result<Value> {
+    let input = object(
+        request,
+        &[
+            "formatVersion",
+            "identities",
+            "receiptIds",
+            "dataIds",
+            "receipts",
+            "receivedData",
+        ],
+    )?;
+    if integer(input, "formatVersion")? != 1 {
+        return Err("unsupported formatVersion".into());
+    }
+    let mut hashes: Vec<CryptoHash> = Vec::new();
+    for operation in field(input, "identities")?
+        .as_array()
+        .ok_or("expected identities array")?
+    {
+        let kind = operation
+            .get("kind")
+            .and_then(Value::as_str)
+            .ok_or("missing identity kind")?;
+        let value = match kind {
+            "input" => {
+                let operation = object(operation, &["kind", "hash"])?;
+                hash(field(operation, "hash")?)?
+            }
+            "hash" => {
+                let operation = object(operation, &["kind", "bytes"])?;
+                let bytes: Vec<u8> = from_value(field(operation, "bytes")?.clone())?;
+                CryptoHash::hash_bytes(&bytes)
+            }
+            "transaction" | "receipt" | "action" | "data" | "randomSeed" => {
+                let names: &[&str] = if kind == "transaction" {
+                    &["kind", "base", "blockHeight"]
+                } else if kind == "randomSeed" {
+                    &["kind", "base", "seed"]
+                } else {
+                    &["kind", "base", "blockHeight", "index"]
+                };
+                let operation = object(operation, names)?;
+                let base = hashes
+                    .get(usize::try_from(integer(operation, "base")?)?)
+                    .ok_or("identity base is unavailable")?;
+                if kind == "randomSeed" {
+                    let seed = hash(field(operation, "seed")?)?;
+                    CryptoHash(
+                        create_random_seed(*base, seed)
+                            .try_into()
+                            .map_err(|_| "invalid seed width")?,
+                    )
+                } else {
+                    let height = integer(operation, "blockHeight")?;
+                    if kind == "transaction" {
+                        create_receipt_id_from_transaction(base, height)
+                    } else {
+                        let index = integer(operation, "index")?;
+                        match kind {
+                            "receipt" => create_receipt_id_from_receipt_id(
+                                base,
+                                height,
+                                usize::try_from(index)?,
+                            ),
+                            "action" => create_action_hash_from_receipt_id(
+                                base,
+                                height,
+                                usize::try_from(index)?,
+                            ),
+                            _ => create_receipt_id_from_action_hash(base, height, index),
+                        }
+                    }
+                }
+            }
+            _ => return Err("unknown identity operation".into()),
+        };
+        hashes.push(value);
+    }
+    let bindings = |name| -> Result<BTreeMap<String, CryptoHash>> {
+        let values: Vec<(Value, usize)> = from_value(field(input, name)?.clone())?;
+        let mut result = BTreeMap::new();
+        let mut used = BTreeSet::new();
+        for (id, position) in values {
+            if !id.is_number()
+                || id
+                    .to_string()
+                    .chars()
+                    .any(|c| matches!(c, '-' | '.' | 'e' | 'E'))
+            {
+                return Err("invalid logical identity".into());
+            }
+            let hash = *hashes
+                .get(position)
+                .ok_or("identity binding is unavailable")?;
+            if result.insert(id.to_string(), hash).is_some() {
+                return Err("duplicate model identity".into());
+            }
+            if !used.insert(hash) {
+                return Err("aliased native identity".into());
+            }
+        }
+        Ok(result)
+    };
+    let receipt_ids = bindings("receiptIds")?;
+    let data_ids = bindings("dataIds")?;
+    let resolve = |ids: &BTreeMap<String, CryptoHash>, value: &mut Value| -> Result<()> {
+        *value = to_value(
+            ids.get(&value.to_string())
+                .ok_or("native identity is unavailable")?,
+        )?;
+        Ok(())
+    };
+    let mut encoded = Vec::new();
+    for mut value in field(input, "receipts")?
+        .as_array()
+        .ok_or("expected receipts array")?
+        .clone()
+    {
+        object(
+            &value,
+            &["predecessor_id", "receiver_id", "receipt_id", "receipt"],
+        )?;
+        resolve(&receipt_ids, &mut value["receipt_id"])?;
+        let payload = value["receipt"]
+            .as_object_mut()
+            .ok_or("expected receipt kind")?;
+        if payload.len() != 1 {
+            return Err("expected one receipt kind".into());
+        }
+        let v2 = payload.contains_key("ActionV2");
+        if let Some(action) = payload.get_mut(if v2 { "ActionV2" } else { "Action" }) {
+            let mut names = vec![
+                "signer_id",
+                "signer_public_key",
+                "gas_price",
+                "output_data_receivers",
+                "input_data_ids",
+                "actions",
+            ];
+            if v2 {
+                names.push("refund_to");
+                if !action.get("refund_to").is_some_and(Value::is_null) {
+                    return Err("custom refund receiver is unrepresented".into());
+                }
+            }
+            object(action, &names)?;
+            for output in action["output_data_receivers"]
+                .as_array_mut()
+                .ok_or("expected output data array")?
+            {
+                object(output, &["data_id", "receiver_id"])?;
+                resolve(&data_ids, &mut output["data_id"])?;
+            }
+            for id in action["input_data_ids"]
+                .as_array_mut()
+                .ok_or("expected input data array")?
+            {
+                resolve(&data_ids, id)?;
+            }
+        } else if let Some(data) = payload.get_mut("Data") {
+            object(data, &["data_id", "data"])?;
+            resolve(&data_ids, &mut data["data_id"])?;
+        } else {
+            return Err("unsupported receipt kind".into());
+        }
+        let decoded: Receipt = from_value(value.clone())?;
+        if to_value(&decoded)? != value {
+            return Err("noncanonical receipt fields".into());
+        }
+        encoded.push(borsh_bytes(&decoded)?);
+    }
+    let received: Vec<Option<Vec<u8>>> = from_value(field(input, "receivedData")?.clone())?;
+    let received = received
+        .into_iter()
+        .map(|data| borsh_bytes(&ReceivedData { data }))
+        .collect::<StdResult<Vec<_>, _>>()?;
+    Ok(
+        json!({"hashes":hashes.into_iter().map(|hash| hash.0).collect::<Vec<_>>(), "receipts":encoded, "receivedData":received}),
+    )
+}
+
 fn trie_lookups(request: &Value) -> Result<Value> {
     let input = object(request, &["formatVersion", "entries", "lookups"])?;
     if integer(input, "formatVersion")? != 1 {
@@ -1055,6 +1241,7 @@ fn main() -> Result<()> {
             mode @ ("--encode-state"
             | "--sign-transactions"
             | "--classify-staking-keys"
+            | "--encode-receipts"
             | "--trie-lookups"
             | "--trie-updates"),
         ) => {
@@ -1066,7 +1253,9 @@ fn main() -> Result<()> {
                 if mode == "--encode-state" {
                     encode_state(&input)?
                 } else {
-                    if mode == "--trie-updates" {
+                    if mode == "--encode-receipts" {
+                        receipt_encoding(&input)?
+                    } else if mode == "--trie-updates" {
                         trie_updates(&input)?
                     } else if mode == "--trie-lookups" {
                         trie_lookups(&input)?
