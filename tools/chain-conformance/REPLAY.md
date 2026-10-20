@@ -119,7 +119,7 @@ Each apply also exports `subsidizedAmount`, separately from burnt tokens.
 Every represented outcome field is exported: id, executor, status, logs,
 receipt ids, gas burnt and tokens burnt. Failures retain both the complete
 Lean error constructor representation and its readable message. Native
-compute counters, action error indices, gas metadata, trie roots and opaque
+compute counters, gas metadata, trie roots and opaque
 shard columns are not represented by this runtime output type. A comparison
 must report these gaps explicitly; agreement of a chosen projection must
 never be presented as full-runtime equivalence.

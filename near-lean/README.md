@@ -253,14 +253,14 @@ for the exact balance increase. Failed ordinary receipt finalization conserves
 incoming deposit and gas backing against refunds plus gross settlement burn,
 with receiver rewards shown separately. The theorem connects to
 `applyActionReceipt`, with explicit account-uniqueness, matching action receipt,
-non-system predecessor/signer, v85+ settlement and burnt-gas-budget premises.
+non-system predecessor/signer, v85+ settlement and reward-fraction premises.
 The finalization trace proves that returned burn matches settlement, logs and gas
 survive failure, and attempted subsidies are erased. Storage, access keys and
 scheduler state are restored, and unrelated accounts keep their full records.
 The net-conservation theorem uses returned burn minus returned reward; it derives
 the reward bound from a reward fraction at most one and function-call gas at most
-total burnt gas. It does not yet derive these gas premises from action execution,
-cover successful/system receipts, or establish chain conservation.
+total burnt gas. Gas bounds now follow from action execution. Successful/system
+receipt conservation and chain conservation remain open.
 
 `GasInvariants` proves counter bounds and exact successful charge increments,
 failure saturation/error precedence, irreversible burn, and limit preservation.
@@ -277,5 +277,16 @@ budget, and burnt gas fits the original per-call limit.
 contract or host-behavior premises, for any interpreter fuel and view/normal call
 limits. It covers loading, method/import/init failures, entry charges, execution
 and receipt validation. `runInitialized` and `outcomeOfExecution` expose the
-executable stages for proofs. Receipt-level gas-budget preservation and its
-connection to conservation remain open.
+executable stages for proofs. Runtime `GasInvariants` composes the VM bound with
+protocol fees and ordered action traversal, covering early errors and the final
+storage-staking check. `runReceiptActions_gas_bounds` derives function-call burn ≤
+total burn ≤ gas used ≤ the purchased receipt budget.
+`applyActionReceipt_failed_net_conservation` uses these derived bounds rather than
+assuming gas accounting. VM state/promise materialization is separated from gas
+recording, and `ExecM.GasBound` provides reusable composition rules.
+
+Function-call state and promise effects are validated before commit. Decoder
+and promised-action limitations remain explicit model issues. The receipt gas
+bound also covers these exits and failed-action index tracking. Completion
+data follows refunds, and system-refund outcomes retain native execution-gas
+observations while token settlement remains exempt.

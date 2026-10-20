@@ -1,4 +1,4 @@
-import NearRuntime.Apply
+import NearRuntime.GasInvariants
 import NearRuntime.StateInvariants
 
 namespace Near
@@ -434,5 +434,22 @@ theorem finalizeReceipt_failure_account_ne (c : ReceiptCtx) (st : ChainState) (r
   simp only [addFailureData_account, creditReceiptReward_account_ne _ _ _ _ _ _ hne,
     ite_account, addGasRefund_account, addBalanceRefund_account, ite_self]
   rfl
+
+/-- Failed ordinary receipt conservation with gas premises derived from the
+actual action attempt. Only state/configuration/receipt-shape premises remain. -/
+theorem applyActionReceipt_failed_net_conservation (c : ReceiptCtx) (st : ChainState)
+    (err : RuntimeError) (hfailed : (runReceiptActions c st).2 = some err)
+    (hwf : st.AccountsUnique) (hpred : c.receipt.predecessorId ≠ systemAccount)
+    (hsigner : c.action.signerId ≠ systemAccount) (hreceipt : c.receipt.receipt = .action c.action)
+    (hnew : c.cfg.accountCostIncrease = true)
+    (hratio : c.cfg.fees.burntGasReward.1 ≤ c.cfg.fees.burntGasReward.2) :
+    let final := applyActionReceipt c st
+    final.totalFunds c.cfg + (final.tokensBurnt - final.reward) =
+      st.totalBalance + Fees.receiptFunds c.cfg c.receipt := by
+  have hrun : runReceiptActions c st = ((runReceiptActions c st).1, some err) :=
+    Prod.ext rfl hfailed
+  have hg := runReceiptActions_gas_bounds c st
+  exact applyActionReceipt_failure_net_conservation c st _ err hrun hwf hpred hsigner hreceipt hnew
+    (hg.2.1.trans hg.2.2) hratio hg.1
 
 end Near
