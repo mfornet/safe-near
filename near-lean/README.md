@@ -617,6 +617,18 @@ steps, reachable states, settlement and isolated runs from unique initial pendin
 work. Dependency ids may be shared; disjoint ownership among pending, delayed and
 postponed queues, and preservation of the whole dependency graph, remain open.
 
+`PostponedOwnership.processReceipt_postponed_ownership` preserves stored key/payload
+agreement and proves that processing creates no postponed key except the incoming
+receipt's own id; data resumption can reinsert only a previously owned key.
+`ReceiptQueue.PostponedAdmission.after_process` therefore preserves empty postponed
+slots for the rest of a distinct queue, supplying local conservation's non-overwrite
+premise. The financial postponed invariant implies the required identity agreement.
+`BlockStatePreservation` exposes a generic preservation rule for actual block
+execution and uses it to preserve key/payload agreement through complete blocks.
+`NearChain.PostponedOwnership` lifts that property from genesis to every reachable
+state. These results do not yet prove disjoint ownership across all three queues,
+dependency-edge validity, or complete block-level financial conservation.
+
 Reserved `system` account creation is rejected independently of the registrar
 and minimum-name-length configuration. Pinned nearcore's `action_create_account`
 uses near-account-id 2.0.0's `is_top_level`/`is_sub_account_of`; `system` is neither.

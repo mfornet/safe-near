@@ -1,1 +1,1 @@
-import NearChain.ReceiptIdUniqueness
+import NearChain.PostponedOwnership
