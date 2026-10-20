@@ -407,10 +407,10 @@ and incomplete attempts are excluded by the executable success condition.
 This closes raw VM gas backing; runtime decoding/materialization and complete
 multi-action/receipt/chain conservation remain separate obligations.
 
-`PromiseGasInvariants` connects runtime action costs to raw VM costs for simple
-actions and function calls whose method bytes decode as UTF-8. The byte-array
-and UTF-8 roundtrip proofs are shared in `Interpreter.Wasm.ByteEncoding`; wNEAR
-keeps its existing Borsh theorem names as wrappers around those generic proofs.
+`PromiseGasInvariants` connects every modeled runtime action variant to its
+raw VM execution/prepaid cost, under explicit method-decoding facts. The
+byte-array and UTF-8 roundtrip proofs are shared in `Interpreter.Wasm.ByteEncoding`;
+wNEAR keeps its existing Borsh theorem names as wrappers around those proofs.
 Runtime calls now explicitly require UTF-8 action method names. The external
 validation policy belongs to `VMContext`, not protocol fee/limit configuration;
 `functionCallContext` always enables it. Validation runs after action fees,
@@ -421,10 +421,20 @@ logs. Opaque-byte mode is explicit for the VM mock conformance adapter only.
 charge/deposit error precedence. Existing funding and gas-backing proofs cover
 the additional rejection path.
 
-Function-call-key CSV encoding and a general successful-execution UTF-8 receipt
-invariant still need to be connected to runtime materialization costs. The public
-VM gas theorem values raw receipt bytes; it does not assume that lossy decoding
-preserves runtime costs or establish full nearcore equivalence.
+`MethodEncoding` splits raw comma-separated method bytes before decoding, as
+nearcore does. It proves exact field-byte reconstruction and terminator billing,
+including empty CSV and multibyte names. The VM key guard validates each field;
+successful postprocessing supplies that decoding fact and still implies a whole
+CSV UTF-8 witness. Runtime key conversion uses the same byte fields.
+
+The gas bridge now covers action lists, receipt budgets and the actual
+materializer. `materialize_run_funds` identifies outgoing receipt funds as raw
+deposits plus `(usedGas - burntGas) * gasPrice` for ordinary contracts, under
+`ReceiptGasEncodingValid`. This predicate contains only receiver/method decoding
+facts, not an assumed gas/funds equation or full action validity. Deriving it for
+every receipt from successful runtime execution remains an open invariant
+obligation. Full multi-action settlement/chain conservation and nearcore
+equivalence also remain open.
 
 Promise deployment derives `ContractCode.size` from the actual payload through
 `ContractCode.decodeSized`. Size limits, storage accounting and outgoing gas

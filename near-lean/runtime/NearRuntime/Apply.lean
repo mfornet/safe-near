@@ -102,7 +102,7 @@ def actionOfPromise (codeOf : Bytes → ContractCode) : PromiseAction → Action
       | .fullAccess => .fullAccess
       | .functionCall allowance receiver methods =>
         .functionCall allowance (stringOfBytes receiver)
-          (if methods.isEmpty then [] else (stringOfBytes methods).splitOn ",")
+          (decodeMethodNames methods)
     .addKey pk { nonce := nonce.toNat, permission }
   | .deleteKey pk => .deleteKey pk
   | .deleteAccount beneficiary => .deleteAccount (stringOfBytes beneficiary)

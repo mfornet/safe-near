@@ -2,6 +2,7 @@ import NearVM.AccountId
 import NearVM.Host
 import NearVM.Config
 import NearVM.PromiseGraph
+import NearVM.MethodEncoding
 
 /-!
 # Gas-metered host functions
@@ -679,7 +680,10 @@ checks. MockedExternal deliberately accepts opaque method bytes instead. -/
 def actionMethodEncodingError (name : String) (before : Store NearState) (args : List Value) : Option HostError :=
   if before.host.config.validateActionMethodUtf8 then
     match actionMethodBytes? name before args with
-    | some bytes => if (String.fromUTF8? ⟨bytes.toArray⟩).isNone then some .invalidMethodName else none
+    | some bytes =>
+      if name == "promise_batch_action_add_key_with_function_call" then
+        if methodNameFieldsUtf8 bytes then none else some .invalidMethodName
+      else if (String.fromUTF8? ⟨bytes.toArray⟩).isNone then some .invalidMethodName else none
     | none => none
   else none
 
