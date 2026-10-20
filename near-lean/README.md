@@ -119,19 +119,17 @@ fields included) and fails on anything else, in particular `sorryAx` and
 ```
 tools/axiom-audit.py near-lean/wasm --report audit/wasm.json
 tools/axiom-audit.py near-lean/iris-wasm --report audit/iris-wasm.json
-tools/axiom-audit.py near-lean/programs/lean --report audit/programs.json --allow-sorry --require-clean-module Programs.ByteEcho.Proof --require-clean-module Programs.GcdStdio.KernelProof
+tools/axiom-audit.py near-lean/programs/lean --report audit/programs.json --allow-sorry-module Programs.Mergesort.Proof
 tools/axiom-audit.py near-lean/vm --report audit/vm.json
 tools/axiom-audit.py near-lean/runtime --report audit/runtime.json
 tools/axiom-audit.py near-lean/chain --report audit/chain.json
 ```
 
-`wasm` and `iris-wasm` must be clean. The GCD stream and mergesort proofs in `programs`
-remain open, so `--allow-sorry` tolerates `sorryAx` alone and prints each sorried
-declaration. `--require-clean-module` keeps the completed ByteEcho and GCD kernel
-modules strict; a misspelled or missing required module also fails.
-Any other nonstandard axiom still fails. CI runs all
-three on every change under `near-lean/`. Pass `--no-build` to audit already
-built artefacts.
+`wasm` and `iris-wasm` must be clean. The mergesort proof in `programs`
+remains open. `--allow-sorry-module Programs.Mergesort.Proof` permits `sorryAx`
+only in that module and lists it; every other program/proof-support module
+must be clean. A misspelled or missing configured module also fails. Any other
+nonstandard axiom still fails. Pass `--no-build` to audit already built artefacts.
 
 The public VM result also carries a checked receipt DAG: dependencies refer only
 to earlier receipts, returned receipt indices exist, and dependency cycles are

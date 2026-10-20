@@ -71,13 +71,13 @@ jobs:
 
       # Every declaration may depend only on propext, Classical.choice and
       # Quot.sound: no sorry, no native_decide. The programs package carries
-      # two open proofs, so sorryAx is tolerated there (and listed), while
-      # the completed ByteEcho and GCD kernel proofs must remain strict.
+      # one open mergesort proof. Only that module may use sorryAx;
+      # completed program proofs and all supporting modules remain strict.
       - name: Axiom audit (no sorry, no native_decide)
         run: |
           python3 tools/axiom-audit.py near-lean/wasm --report audit/wasm.json --no-build
           python3 tools/axiom-audit.py near-lean/iris-wasm --report audit/iris-wasm.json --no-build
-          python3 tools/axiom-audit.py near-lean/programs/lean --report audit/programs.json --no-build --allow-sorry --require-clean-module Programs.ByteEcho.Proof --require-clean-module Programs.GcdStdio.KernelProof
+          python3 tools/axiom-audit.py near-lean/programs/lean --report audit/programs.json --no-build --allow-sorry-module Programs.Mergesort.Proof
 
   near-runtime:
     name: VM, runtime and chain scenarios and axiom audits
