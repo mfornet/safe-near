@@ -650,6 +650,18 @@ scope across arbitrary emitted work, full dependency validity, native gas fideli
 and multi-block financial invariants still need work. This is a scoped kernel
 conservation theorem, not a claim of complete native-runtime equivalence.
 
+`ReservedTargetFunding` derives failure of nonempty ordinary receipts addressed
+to an absent `system` account from the actual raw actions and action body; empty
+action lists use the fee-only funding rule. Both paths conserve funds, and account
+uniqueness is preserved. `FinancialScope` exposes the broader
+`ActionReceiptFinancialScope`/`ReceiptFinancialScope`: ordinary receivers are
+unrestricted, ordinary signers remain nonsynthetic, and system-origin receipts
+remain canonical single-transfer refunds. Local conservation under this scope
+requires `SystemAccountAbsent`, an invariant already available for reachable states.
+Reward backing and VM materialization actor-scope closure are also proved; a VM
+promise may target `system`. The block theorem still uses the older financial
+shape, so routing/queue migration and full multi-block scope closure remain open.
+
 Reserved `system` account creation is rejected independently of the registrar
 and minimum-name-length configuration. Pinned nearcore's `action_create_account`
 uses near-account-id 2.0.0's `is_top_level`/`is_sub_account_of`; `system` is neither.
