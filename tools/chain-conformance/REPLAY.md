@@ -147,3 +147,11 @@ when the action executes.
 Each executed block also exports `transactionSizes`, in transaction order, with
 `bodySize`, `wireSize` and protocol-selected `sizeForLimits`. Unknown signature
 encodings produce null optional sizes and an execution issue before charging.
+
+
+`chain-replay` treats `randomSeed` as a trusted direct VM seed. For native
+per-action randomness, use `registered-replay` with original transaction block
+hashes and the identity/queue context described in [the registration and
+randomness guide](README.md#action-derived-vm-randomness). That frontend derives
+receipt/action identities before execution and hashes the block seed separately
+for each original action position, including delayed and postponed execution.

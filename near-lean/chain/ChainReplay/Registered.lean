@@ -5,7 +5,7 @@ import NearRuntime.TransactionRegistry
 /-! Execute the existing chain transition and register identities at their
 observed births. Original transaction block hashes are explicit inputs;
 generated native receipt/data hashes and queue metadata are outputs only.
-This does not yet feed derived action randomness back into VM execution. -/
+The derived receipt bindings also supply native action randomness before VM execution. -/
 namespace ChainReplay.Registered
 open Lean Near
 
@@ -45,6 +45,15 @@ def run (protocol : Nat) (cfg : Wasm.Near.RuntimeConfig) (codes : Catalogue) (in
   for ((block, hashes), position) in (blocks.zip hashes).zipIdx do
     unless block.txs.length == hashes.length do throw "transaction block-hash count mismatch"
     for hash in hashes do let _ ← NativeIdentity.checkedHash hash
+    match block.receipts.resolve snapshot.pending with
+    | .error (.unavailableIndex index) =>
+      return obj [("blocks", toJson trace), ("stop", toJson "invalidSchedule"),
+        ("unrunBlocks", toJson (blocks.length - position - 1)), ("unavailableIndex", toJson index)]
+    | .ok _ => pure ()
+    let inputs := (block.txs.zip hashes).map fun (transaction, blockHash) =>
+      ({ transaction, blockHash } : TransactionRegistry.Input)
+    let admitted ← TransactionRegistry.observe cfg block.ap catalogue snapshot.state inputs context
+    let block := { block with ap := { block.ap with nativeReceiptHashes := some admitted.context.receipts } }
     match step cfg (codeOf codes) snapshot block with
     | .error (.unavailableIndex index) =>
       return obj [("blocks", toJson trace), ("stop", toJson "invalidSchedule"),
@@ -55,9 +64,6 @@ def run (protocol : Nat) (cfg : Wasm.Near.RuntimeConfig) (codes : Catalogue) (in
           ("identityBirths", birthsJson result.identityBirths)]]
         return obj [("blocks", toJson trace), ("stop", toJson "executionIssue"),
           ("unrunBlocks", toJson (blocks.length - position - 1))]
-      let inputs := (block.txs.zip hashes).map fun (transaction, blockHash) =>
-        ({ transaction, blockHash } : TransactionRegistry.Input)
-      let admitted ← TransactionRegistry.observe cfg block.ap catalogue snapshot.state inputs context
       context ← ReceiptRegistry.observeQueues cfg catalogue block.ap.blockHeight snapshot.state result admitted.context
       let outgoing ← result.outgoing.mapM (encodeReceipt catalogue context)
       let entries ← QueueEncoding.queues next.state catalogue context (some cfg)
@@ -66,8 +72,12 @@ def run (protocol : Nat) (cfg : Wasm.Near.RuntimeConfig) (codes : Catalogue) (in
         ("queueEntries", toJson (entries.map fun (key, value) => toJson [bytesJson key, bytesJson value]))]]
       snapshot := next
   return obj [("formatVersion", toJson (1 : Nat)), ("protocolVersion", toJson protocol),
+    ("model", toJson "near-lean-chain"), ("initialState", stateJson initial.state),
+    ("initialPendingReceipts", toJson (initial.pending.map receiptJson)),
+    ("codeCatalogue", toJson (codes.map fun entry => obj [
+      ("hash", toJson entry.code.hash), ("size", toJson entry.code.size)])),
     ("blocks", toJson trace), ("stop", toJson "blocksExhausted"), ("unrunBlocks", toJson (0 : Nat)),
-    ("quiescent", toJson snapshot.quiescent)]
+    ("quiescent", toJson snapshot.quiescent), ("nativeActionRandomness", toJson true)]
 
 def execute (request : Json) : IO Json := do
   let (protocol, directory, catalogues, initial, pending, values, hashes, context) ← IO.ofExcept do

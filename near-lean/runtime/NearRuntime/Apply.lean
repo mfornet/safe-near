@@ -4,6 +4,7 @@ import NearRuntime.Nonce
 import NearRuntime.Refund
 import NearRuntime.ActionValidation
 import NearRuntime.TransactionSize
+import NearRuntime.NativeIdentity
 
 /-!
 # `apply`
@@ -148,6 +149,8 @@ structure ReceiptCtx where
   receipt : Receipt
   action : ActionReceipt
   promiseResults : List PromiseResult
+  /-- Per-action VM seed. The block's original seed stays in `ap`. -/
+  vmRandomSeed : Option Bytes := none
   /-- Decoder for code deployed by contracts (not available in Lean yet). -/
   codeOf : Bytes → ContractCode
 
@@ -171,7 +174,7 @@ def functionCallContext (c : ReceiptCtx) (account : Account) (args : Bytes) (gas
     storageUsage := account.storageUsage
     attachedDeposit := deposit
     prepaidGas := gas
-    randomSeed := c.ap.randomSeed
+    randomSeed := c.vmRandomSeed.getD c.ap.randomSeed
     chargeStorageValueAccess := true
     outputDataReceivers := if isLast then c.action.outputDataReceivers.map fun d => bytesOfString d.receiverId else [] }
 
@@ -455,12 +458,35 @@ def runReceiptAction (c : ReceiptCtx) (onlyAction isLast : Bool) (act : Action) 
   checkReceiptAction c onlyAction act
   applyAction c isLast act
 
+/-- Native VM randomness uses this receipt's original action position and
+current execution height, including delayed and postponed receipt execution.
+Missing/malformed exact-mode inputs are errors, never direct-seed fallbacks. -/
+def actionRandomSeed (c : ReceiptCtx) (index : Nat) : Except String Bytes := do
+  match c.ap.nativeReceiptHashes with
+  | none => pure (c.vmRandomSeed.getD c.ap.randomSeed)
+  | some bindings =>
+    NativeIdentity.validate bindings
+    let parent ← NativeIdentity.resolve bindings c.receipt.receiptId
+    let action ← NativeIdentity.action parent c.ap.blockHeight index
+    NativeIdentity.randomSeed action c.ap.randomSeed
+
+/-- Derivation is local to one call: later actions still start from the block
+seed, while non-VM actions need no random context. Invalid exact-mode context
+is a model issue and rolls back the chunk rather than failing a contract. -/
+def runReceiptActionAt (c : ReceiptCtx) (onlyAction isLast : Bool) (act : Action) (index : Nat) : ExecM Unit :=
+  match act with
+  | .functionCall .. =>
+    match actionRandomSeed c index with
+    | .error error => throw (.executionIssue (.interpreterError s!"Native action randomness context: {error}"))
+    | .ok seed => runReceiptAction { c with vmRandomSeed := some seed } onlyAction isLast act
+  | _ => runReceiptAction c onlyAction isLast act
+
 /-- Explicit ordered traversal, stopping at the first action error. -/
 def runReceiptActionList (c : ReceiptCtx) (onlyAction : Bool) : List Action → Nat → ExecM Unit
   | [], _ => pure ()
   | act :: rest, index => do
     modify fun e => { e with failureIndex := some index }
-    runReceiptAction c onlyAction rest.isEmpty act
+    runReceiptActionAt c onlyAction rest.isEmpty act index
     runReceiptActionList c onlyAction rest (index + 1)
 
 /-- Complete action attempt, before receipt rollback and finalization. -/

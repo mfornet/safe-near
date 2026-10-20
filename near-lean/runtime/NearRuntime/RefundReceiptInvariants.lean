@@ -46,6 +46,14 @@ theorem runReceiptAction_functionCallBound (c : ReceiptCtx) (onlyAction isLast :
   intro _
   exact functionCallBound_of_gasBound (applyAction_gasBound c isLast action)
 
+theorem runReceiptActionAt_functionCallBound (c : ReceiptCtx) (onlyAction isLast : Bool)
+    (action : Action) (index : Nat) :
+    (runReceiptActionAt c onlyAction isLast action index).FunctionCallBound action.attachedGas := by
+  cases action <;> try exact runReceiptAction_functionCallBound c onlyAction isLast _
+  cases he : actionRandomSeed c index <;> simp only [runReceiptActionAt, he]
+  · intro before; exact Nat.le_add_right _ _
+  · exact runReceiptAction_functionCallBound _ onlyAction isLast _
+
 theorem runReceiptActionList_functionCallBound (c : ReceiptCtx) (onlyAction : Bool)
     (actions : List Action) (index : Nat) :
     (runReceiptActionList c onlyAction actions index).FunctionCallBound (Fees.totalPrepaid actions) := by
@@ -56,7 +64,7 @@ theorem runReceiptActionList_functionCallBound (c : ReceiptCtx) (onlyAction : Bo
       (gasBound_modify (fun e : Exec => { e with failureIndex := some index }) 0
         (fun _ => GasDelta.of_fields _ _ _ rfl rfl rfl))
     have h := functionCallBound_zero_left hm (fun _ =>
-      functionCallBound_bind (runReceiptAction_functionCallBound c onlyAction rest.isEmpty action)
+      functionCallBound_bind (runReceiptActionAt_functionCallBound c onlyAction rest.isEmpty action index)
         (fun _ => ih (index + 1)))
     simpa [runReceiptActionList, Fees.totalPrepaid] using h
 
@@ -291,7 +299,7 @@ theorem refund_receiptActionBody_run (c : ReceiptCtx) (before : Exec) (account :
       if deficit > 0 then (.error (.lackBalanceForState c.receipt.receiverId deficit), after) else (.ok (), after) := by
   by_cases hd : storageStakeDeficit c.cfg { account with amount := account.amount + amount } > 0
   all_goals cases hg : c.receipt.isGasRefund <;>
-    simp [hd, -StateT.run_bind, receiptActionBody, hactions, runReceiptActionList,
+    simp [hd, -StateT.run_bind, receiptActionBody, hactions, runReceiptActionList, runReceiptActionAt,
       runReceiptAction, chargeReceiptFee, hrefund, checkReceiptAction, checkActionAccount,
       checkActorPermissions, applyAction, getState, putAccount, modifyState, checkStorageStake,
       refundTransferState, refundExecutionGas, burnGas, ha, hg, ChainState.account?_setAccount_self, Nat.add_assoc]
@@ -305,7 +313,7 @@ theorem refund_receiptActionBody_missing (c : ReceiptCtx) (before : Exec) (amoun
       { before with
         gasBurnt := before.gasBurnt + refundExecutionGas c amount
         gasUsed := before.gasUsed + refundExecutionGas c amount, failureIndex := some 0 }) := by
-  simp [-StateT.run_bind, receiptActionBody, hactions, runReceiptActionList,
+  simp [-StateT.run_bind, receiptActionBody, hactions, runReceiptActionList, runReceiptActionAt,
     runReceiptAction, chargeReceiptFee, hrefund, checkReceiptAction, checkActionAccount, getState, burnGas, refundExecutionGas, ha, Nat.add_assoc]
 
 /-- Successful system transfers require an existing receiver and have exactly

@@ -267,6 +267,25 @@ def main (args : List String) : IO UInt32 := do
   check r "genesis total is 120 NEAR" (total0 = 120 * oneNear)
   checkTransactionRouting r cfg code genesis
 
+  let seedState := genesis.setAccount "wrap.near" { genesisAccount (10 * oneNear) with code := some code }
+  let seedTx : Transaction := {
+    signerId := "wrap.near", publicKey := pkOf 3, nonce := 1, receiverId := "wrap.near"
+    actions := [.functionCall "ft_metadata" [] (tgas 50) 0] }
+  let parentHash : Near.Bytes := List.replicate 32 7
+  for (label, ap, expected) in [
+      ("missing parent", { World.ap with nativeReceiptHashes := some [] }, "native identity is unavailable"),
+      ("malformed parent", { World.ap with nativeReceiptHashes := some [(1, [7])] }, "invalid identity hash width"),
+      ("duplicate parent", { World.ap with nativeReceiptHashes := some [(1, parentHash), (1, parentHash)] }, "duplicate model identity"),
+      ("malformed block seed", { World.ap with nativeReceiptHashes := some [(1, parentHash)], randomSeed := [7] }, "invalid identity hash width")] do
+    let attempted := Near.apply cfg ap (fun _ => code) seedState [seedTx] []
+    check r s!"native randomness {label} is an explicit context issue"
+      ((attempted.issue.map (·.2)) == some (.interpreterError s!"Native action randomness context: {expected}"))
+    check r s!"native randomness {label} rolls back the entire chunk"
+      (attempted.outgoing.isEmpty && attempted.outcomes.isEmpty && attempted.tokensBurnt == 0 &&
+        attempted.identityBirths.isEmpty && attempted.delayedConsumed == 0 && attempted.delayedAppended == 0 &&
+        attempted.state.totalBalance == seedState.totalBalance && attempted.state.nextId == seedState.nextId &&
+        attempted.state.accessKeys == seedState.accessKeys)
+
   for (name, action) in
       [("deploy", Action.deployContract code),
        ("add key", Action.addKey (pkOf 4) fullAccess),

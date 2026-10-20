@@ -261,6 +261,16 @@ theorem runReceiptAction_gasBound (c : ReceiptCtx) (onlyAction isLast : Bool) (a
   exact gasBound_bind_left_zero (gasBound_checkReceiptAction c onlyAction action)
     (fun _ => applyAction_gasBound c isLast action)
 
+/-- Changing only VM randomness leaves the purchased gas bound unchanged;
+invalid exact context returns a model issue without spending gas. -/
+theorem runReceiptActionAt_gasBound (c : ReceiptCtx) (onlyAction isLast : Bool) (action : Action) (index : Nat) :
+    (runReceiptActionAt c onlyAction isLast action index).GasBound
+      (Fees.exec c.cfg.fees.actionFees c.cfg.wasm.ethImplicitAccounts c.receipt.receiverId action + action.attachedGas) := by
+  cases action <;> try exact runReceiptAction_gasBound c onlyAction isLast _
+  cases he : actionRandomSeed c index <;> simp only [runReceiptActionAt, he]
+  · exact (gasBound_throw _).mono (Nat.zero_le _)
+  · exact runReceiptAction_gasBound _ onlyAction isLast _
+
 /-- The ordered action list consumes at most the sum of its individual budgets,
 including an early error that stops the remaining actions. -/
 theorem runReceiptActionList_gasBound (c : ReceiptCtx) (onlyAction : Bool) (actions : List Action) (index : Nat) :
@@ -272,7 +282,7 @@ theorem runReceiptActionList_gasBound (c : ReceiptCtx) (onlyAction : Bool) (acti
     have hm : (modify fun e : Exec => { e with failureIndex := some index } : ExecM Unit).GasBound 0 :=
       gasBound_modify _ _ (fun _ => GasDelta.of_fields _ _ _ rfl rfl rfl)
     have h := gasBound_bind_left_zero hm (fun _ =>
-      (runReceiptAction_gasBound c onlyAction rest.isEmpty action).bind (fun _ => ih (index + 1)))
+      (runReceiptActionAt_gasBound c onlyAction rest.isEmpty action index).bind (fun _ => ih (index + 1)))
     simpa [runReceiptActionList, Fees.totalExec, Fees.totalPrepaid, Nat.add_assoc, Nat.add_left_comm, Nat.add_comm] using h
 
 /-- The complete executable action attempt fits the purchased receipt budget. -/

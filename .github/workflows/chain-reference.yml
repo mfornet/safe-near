@@ -122,6 +122,8 @@ jobs:
         run: |
           cd near-lean/chain && lake build registered-replay chain-replay --wfail
           cd ../.. && python3 tools/chain-conformance/test_receipt_registry.py
+      - name: Compare native action-derived VM randomness
+        run: python3 tools/chain-conformance/test_action_randomness.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -149,3 +151,4 @@ jobs:
             audit/receipt-registry-regressions.json
             audit/receipt-registry-queues.json
             audit/receipt-registry-fifo.json
+            audit/action-randomness-regressions.json

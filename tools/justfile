@@ -211,3 +211,8 @@ chain-delayed-order-test:
 chain-receipt-registry-test:
     cd near-lean/chain && lake build registered-replay chain-replay --wfail
     python3 tools/chain-conformance/test_receipt_registry.py
+
+# Observe native action-derived randomness through contract execution.
+chain-action-randomness-test:
+    cd near-lean/chain && lake build registered-replay chain-replay --wfail
+    python3 tools/chain-conformance/test_action_randomness.py

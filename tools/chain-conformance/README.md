@@ -211,7 +211,7 @@ nonempty receipt/data queues without explicit queue context fail closed. Model c
 native receipt/data hashes. `nextId` is manipulator metadata with no trie column.
 
 The output is a selected-account synthetic genesis, not an original shard trie.
-Opaque shard records, action-derived VM seeds, receipt cache lifetime and trie
+Opaque shard records, receipt cache lifetime and trie
 gas in runtime execution remain open. Account serialization follows the pinned
 native encoder even at the u128 maximum sentinel; serialization agreement alone
 does not establish that every such synthetic account can deserialize or execute.
@@ -332,9 +332,8 @@ native admission batches across protocols 83–86, both key families, rejected
 transactions between admitted ones, strict/monotonic nonces, height/price
 variation and restricted or unfunded callers. Automatically registered IDs
 also encode the actual zero-budget local delayed queues without manual receipt
-bindings. The full execution registry below adds promise/data registration and
-queue context evolution. Action-derived VM seeds and trie-backed runtime gas
-remain open. Evidence is saved in `audit/transaction-encoding-regressions.json` and
+bindings. The full execution registry below adds promise/data registration, queue context
+evolution and native action-derived seeds. Trie-backed runtime gas remains open. Evidence is saved in `audit/transaction-encoding-regressions.json` and
 `audit/transaction-registry-regressions.json`.
 
 `just chain-delayed-order-test` checks local execution priority separately from
@@ -476,7 +475,40 @@ counts; missing, extra, reused, non-contiguous and wrong-owner bindings are
 rejected, and no gas/state/outcome field is removed. Evidence is saved in
 `audit/receipt-registry-{regressions,queues,fifo}.json`.
 
-This registers represented identities and queue state. Derived action randomness
-is not yet fed into VM execution; receipt cache/trie gas, opaque shard/yield/buffer
-records, original shard roots and general execution equivalence remain open.
+This registers represented identities and queue state and supplies native
+action-derived randomness during execution. Receipt cache/trie gas, opaque
+shard/yield/buffer records, original shard roots and general execution equivalence
+remain open.
 The four program proof obligations are also unchanged.
+
+
+## Action-derived VM randomness
+
+`just chain-action-randomness-test` observes `random_seed` through actual contract
+returns and hexadecimal logs. `registered-replay` admits original typed
+transactions before calling the existing chain step, so even a local receipt
+has its derived native hash available before executing. Each function-call action
+uses `SHA256(actionHash ++ blockSeed)`, with the pinned native action hash's
+reverse original action index and the current execution height. Each action
+starts from the original block seed; a previous call's derived seed is never
+reused as the next call's block seed. Delayed and postponed work uses its actual
+execution block, retaining its original parent receipt identity.
+
+The typed runtime API enables this mode with `ApplyState.nativeReceiptHashes :=
+some bindings`. Missing, aliased or malformed bindings, malformed block seeds
+and unrepresentable identity integers are explicit model issues. They invalidate
+the chunk atomically, including fees, nonces, births and queue operations.
+`none` preserves the trusted direct VM-seed interface used by ordinary
+`chain-replay`; that interface has no original transaction block hashes from
+which to derive native receipt identities. The registered frontend always
+supplies the exact-mode bindings. It reports the complete typed initial state,
+code catalogue, execution observations and `nativeActionRandomness: true`.
+
+The native regression checks 48 programs across protocols 83–86 and both ordinary
+key types: one/two calls, a preceding non-call action, deploy-and-call local
+execution, delayed execution and callback-first postponed execution. It compares
+all represented state, queues, statuses, logs, gas, token burn, subsidies and
+completion fields, plus complete outgoing Borsh and represented queue bytes.
+Only original transaction block hashes and block seeds enter the model; generated
+native action seeds and identity values are comparison outputs. Evidence is saved
+in `audit/action-randomness-regressions.json`.

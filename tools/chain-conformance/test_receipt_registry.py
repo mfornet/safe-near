@@ -33,7 +33,7 @@ def request_for(target, scenario):
 class ReceiptRegistryTests(unittest.TestCase):
     def test_original_transactions_actual_births_and_queue_bytes(self):
         evidence = []
-        with frozen_reference(REFERENCE) as (native, build), frozen_model(MODEL) as (model, checksum), tempfile.TemporaryDirectory() as directory:
+        with frozen_reference(REFERENCE) as (native, build), frozen_model(MODEL) as (model, checksum), frozen_model(CHAIN) as (chain, ordinary_checksum), tempfile.TemporaryDirectory() as directory:
             for protocol in [83, 84, 85, 86]:
                 for method in ["spawn", "spawn_fail", "twice", "offset", "rollback"]:
                     with self.subTest(protocol=protocol, method=method):
@@ -45,10 +45,10 @@ class ReceiptRegistryTests(unittest.TestCase):
                             for action in actions: action["FunctionCall"]["gas"] = 120 * 10**12
                             if method == "rollback": actions[-1]["FunctionCall"]["method_name"] = "fail"
                         if method == "offset": actions.insert(0, dict(Transfer=dict(deposit="0")))
-                        importer.prepare(corpus.snapshot(protocol), target, reference=REFERENCE, model=CHAIN, scenario=scenario)
+                        importer.prepare(corpus.snapshot(protocol), target, reference=REFERENCE, model=chain, scenario=scenario)
                         original = json.loads((target / "native.json").read_text())
                         expected = importer.execute(native, original, target)
-                        ordinary = importer.execute(CHAIN, json.loads((target / "model.json").read_text()), target)
+                        ordinary = importer.execute(chain, json.loads((target / "model.json").read_text()), target)
                         request = request_for(target, scenario)
                         actual = importer.execute(model, request, ROOT)
                         self.check_trace(expected, ordinary, actual)
@@ -79,8 +79,8 @@ class ReceiptRegistryTests(unittest.TestCase):
                         evidence.append(dict(protocol=protocol, method=method, originalRequest=original, native=expected,
                             request=request, model=actual))
         atomic_write(ROOT / "audit/receipt-registry-regressions.json", (json.dumps(dict(referenceBuild=build,
-            modelBinarySha256=checksum, automaticRuntimeIdentityRegistration=True, nativeGeneratedIdentitiesAsInputs=False,
-            vmActionRandomnessIntegrated=False, cases=evidence), indent=2) + "\n").encode())
+            modelBinarySha256=checksum, ordinaryModelBinarySha256=ordinary_checksum, automaticRuntimeIdentityRegistration=True, nativeGeneratedIdentitiesAsInputs=False,
+            vmActionRandomnessIntegrated=True, cases=evidence), indent=2) + "\n").encode())
 
     def check_trace(self, native, ordinary, registered):
         self.assertEqual(registered["stop"], ordinary["stop"])
@@ -93,12 +93,12 @@ class ReceiptRegistryTests(unittest.TestCase):
 
     def test_callback_delivery_and_persistent_queue_lifetimes(self):
         evidence = []
-        with frozen_model(MODEL) as (model, checksum), tempfile.TemporaryDirectory() as directory:
+        with frozen_model(MODEL) as (model, checksum), frozen_model(CHAIN) as (chain, ordinary_checksum), tempfile.TemporaryDirectory() as directory:
             for protocol in [83, 84, 85, 86]:
                 for schedule in ["callback-first", "data-first", "delayed"]:
                     with self.subTest(protocol=protocol, schedule=schedule):
                         target = Path(directory) / f"{protocol}-{schedule}"
-                        origin = corpus.run_case(protocol, "spawn", schedule, target, REFERENCE, CHAIN)
+                        origin = corpus.run_case(protocol, "spawn", schedule, target, REFERENCE, chain)
                         self.assertEqual(origin["differences"], [])
                         scenario = corpus.scenario("spawn", schedule)
                         request = request_for(target, scenario)
@@ -111,7 +111,7 @@ class ReceiptRegistryTests(unittest.TestCase):
                             self.assertTrue(all(form["kind"] == "storedV1" for form in delayed[2]["forms"]))
                             self.assertEqual(delayed[-1], dict(firstIndex=len(delayed[2]["forms"]), forms=[]))
                         evidence.append(dict(protocol=protocol, schedule=schedule, request=request, model=actual, origin=origin))
-        atomic_write(ROOT / "audit/receipt-registry-queues.json", (json.dumps(dict(modelBinarySha256=checksum,
+        atomic_write(ROOT / "audit/receipt-registry-queues.json", (json.dumps(dict(modelBinarySha256=checksum, ordinaryModelBinarySha256=ordinary_checksum,
             nativeGeneratedIdentitiesAsInputs=False, cases=evidence), indent=2) + "\n").encode())
 
     def test_missing_original_hashes_and_missing_parent_bindings_fail_closed(self):
@@ -138,7 +138,7 @@ class ReceiptRegistryTests(unittest.TestCase):
     def test_old_backlog_new_local_and_incoming_queue_context(self):
         from test_delayed_local_order import CALLER, transaction
         evidence = []
-        with frozen_reference(REFERENCE) as (native, build), frozen_model(MODEL) as (model, checksum), tempfile.TemporaryDirectory() as directory:
+        with frozen_reference(REFERENCE) as (native, build), frozen_model(MODEL) as (model, checksum), frozen_model(CHAIN) as (chain, ordinary_checksum), tempfile.TemporaryDirectory() as directory:
             for protocol in [83, 84, 85, 86]:
                 for key in ["ed25519", "secp256k1"]:
                     with self.subTest(protocol=protocol, key=key):
@@ -149,7 +149,7 @@ class ReceiptRegistryTests(unittest.TestCase):
                         scenario = dict(caller=dict(accountId=CALLER, seed="automatic-registry-FIFO", keyType=key,
                             amount=str(100 * 10**24)), blocks=blocks)
                         planning = Path(directory) / f"plan-{protocol}-{key}"
-                        importer.prepare(corpus.snapshot(protocol), planning, reference=REFERENCE, model=CHAIN, scenario=scenario)
+                        importer.prepare(corpus.snapshot(protocol), planning, reference=REFERENCE, model=chain, scenario=scenario)
                         original = json.loads((planning / "native.json").read_text())
                         source = {**original, "blocks": []}
                         previous = None
@@ -160,8 +160,8 @@ class ReceiptRegistryTests(unittest.TestCase):
                             source["blocks"].append(block)
                             previous = importer.execute(native, source, planning)["blocks"][-1]["nextCongestionInfo"]
                         target = Path(directory) / f"run-{protocol}-{key}"
-                        importer.prepare(corpus.snapshot(protocol), target, reference=REFERENCE, model=CHAIN, scenario=scenario)
-                        origin = comparator.compare(target, REFERENCE, CHAIN)
+                        importer.prepare(corpus.snapshot(protocol), target, reference=REFERENCE, model=chain, scenario=scenario)
+                        origin = comparator.compare(target, REFERENCE, chain)
                         self.assertEqual(origin["differences"], [])
                         request = request_for(target, scenario)
                         actual = importer.execute(model, request, ROOT)
@@ -173,7 +173,7 @@ class ReceiptRegistryTests(unittest.TestCase):
                         evidence.append(dict(protocol=protocol, keyType=key, scenario=scenario, origin=origin,
                             request=request, model=actual))
         atomic_write(ROOT / "audit/receipt-registry-fifo.json", (json.dumps(dict(referenceBuild=build,
-            modelBinarySha256=checksum, nativeGeneratedIdentitiesAsInputs=False, cases=evidence), indent=2) + "\n").encode())
+            modelBinarySha256=checksum, ordinaryModelBinarySha256=ordinary_checksum, nativeGeneratedIdentitiesAsInputs=False, cases=evidence), indent=2) + "\n").encode())
 
 
 if __name__ == "__main__":

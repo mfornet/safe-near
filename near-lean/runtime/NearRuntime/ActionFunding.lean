@@ -118,6 +118,18 @@ theorem funded_runReceiptAction_functionCall (c : ReceiptCtx) (onlyAction isLast
   intro _
   exact funded_functionCall c method args gas deposit isLast hreceiver
 
+/-- Native action randomness changes no ledger parameters. A missing exact
+context cannot produce a successful step and therefore publishes no funding result. -/
+theorem funded_runReceiptActionAt_functionCall (c : ReceiptCtx) (onlyAction isLast : Bool)
+    (method : String) (args : Bytes) (gas deposit index : Nat) (hreceiver : c.receipt.receiverId ≠ systemAccount) :
+    (runReceiptActionAt c onlyAction isLast (.functionCall method args gas deposit) index).Funded
+      c.cfg c.action.gasPrice deposit := by
+  cases he : actionRandomSeed c index <;> simp only [runReceiptActionAt, he]
+  · intro before after value _ hrun
+    have hbad := congrArg Prod.fst hrun
+    cases hbad
+  · exact funded_runReceiptAction_functionCall _ onlyAction isLast method args gas deposit hreceiver
+
 /-- Failure-index bookkeeping changes no account, gas or receipt funds. -/
 theorem funded_failureIndex (cfg : RuntimeConfig) (price : Nat) (index : Option Nat) :
     (modify fun e : Exec => { e with failureIndex := index } : ExecM Unit).Funded cfg price 0 := by
@@ -140,7 +152,7 @@ theorem funded_runReceiptActionList (c : ReceiptCtx) (onlyAction : Bool) (action
     case functionCall method args gas deposit =>
       simpa only [runReceiptActionList, Fees.totalDeposit, List.map_cons, List.sum_cons, Action.deposit] using
         funded_bind_left_zero (funded_failureIndex _ _ (some index)) (fun _ =>
-          (funded_runReceiptAction_functionCall c onlyAction rest.isEmpty method args gas deposit hreceiver).bind (fun _ => hr))
+          (funded_runReceiptActionAt_functionCall c onlyAction rest.isEmpty method args gas deposit index hreceiver).bind (fun _ => hr))
 
 theorem funded_receiptActionBody (c : ReceiptCtx) (hreceiver : c.receipt.receiverId ≠ systemAccount)
     (h : ∀ action ∈ c.action.actions, FunctionCallFundingAction action) :

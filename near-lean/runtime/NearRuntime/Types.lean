@@ -4,9 +4,9 @@ import NearVM
 # Runtime types
 
 Accounts, access keys, actions, receipts, transactions and execution
-outcomes, mirroring `near_primitives`. Hashes and signatures are not
-modelled: ids are counters handed out by the state, and transactions are
-trusted to be correctly signed (the chain layer is the "trustless
+outcomes, mirroring `near_primitives`. Logical IDs are counters handed out
+by the state; execution identity context can bind their native hashes.
+Transaction signatures are trusted to be correct (the chain layer is the "trustless
 manipulator" of `notes/design/NEAR_RUNTIME.md`).
 -/
 
