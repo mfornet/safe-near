@@ -254,5 +254,18 @@ incoming deposit and gas backing against refunds plus gross settlement burn,
 with receiver rewards shown separately. The theorem connects to
 `applyActionReceipt`, with explicit account-uniqueness, matching action receipt,
 non-system predecessor/signer, v85+ settlement and burnt-gas-budget premises.
-It does not yet prove the gas-budget premise from execution, bound rewards by
-burn, cover successful/system receipts, or establish chain conservation.
+The finalization trace proves that returned burn matches settlement, logs and gas
+survive failure, and attempted subsidies are erased. Storage, access keys and
+scheduler state are restored, and unrelated accounts keep their full records.
+The net-conservation theorem uses returned burn minus returned reward; it derives
+the reward bound from a reward fraction at most one and function-call gas at most
+total burnt gas. It does not yet derive these gas premises from action execution,
+cover successful/system receipts, or establish chain conservation.
+
+`GasInvariants` proves counter bounds and exact successful charge increments,
+failure saturation/error precedence, irreversible burn, and limit preservation.
+These proofs cover every host charge variant, charge lists and Wasm charging.
+The executable `runMetered` loop returns a counter bounded by its final limits on
+all exits, including fuel exhaustion and stepper errors. A compositional theorem
+bounds it by the original call budget when imported hosts preserve those limits;
+that host invariant and the public VM-outcome/receipt gas bounds remain open.
