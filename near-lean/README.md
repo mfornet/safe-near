@@ -529,6 +529,16 @@ local conservation law without natural-number subtraction consuming earlier
 charges. This closes the local counter-composition obligation; preserving scope
 and freshness across the complete block queue remains open.
 
+`IdentifierBounds.ChainState.IdsBelowNext` bounds every routing-owned receipt
+identity and data reference by the allocator counter, including postponed map
+keys and payloads, pending counts, data routes, received data and delayed receipts.
+External incoming queues require their own bounds. Transaction conversion and VM
+materialization preserve this bound for pre-existing routing state; converted
+transaction receipts are bounded by the new counter, fresh against old references,
+and cannot overwrite a postponed slot. Promise allocation is fresh against all
+old routing references. This predicate does not assert uniqueness, preserve the
+bounds of all emitted VM receipts, or close the full queue invariant.
+
 Reserved `system` account creation is rejected independently of the registrar
 and minimum-name-length configuration. Pinned nearcore's `action_create_account`
 uses near-account-id 2.0.0's `is_top_level`/`is_sub_account_of`; `system` is neither.
