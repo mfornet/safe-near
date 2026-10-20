@@ -208,25 +208,37 @@ counted (`MemOrTrie`) or uncounted (`MemOrFlatOrTrie`, without a flat store) nod
 lookup path. Value dereferences always use the accounting cache. The cache is
 shared by node and value hashes and persists until explicitly reset.
 
-The output retains the canonical root, partial Borsh witness and actual ordered
-native node/value accesses, including fresh/cached classifications. The driver
-checks every witness object's SHA256 binding, then supplies only root, bytes and
-original queries to Lean. Lean independently decodes all four node variants,
-compact paths, branch bitmaps, value references and subtree-size fields; it
-follows the paths and derives cache events/counts without reading native results.
-Missing objects, malformed/trailing node bytes, cycles, invalid byte/hash widths
-and duplicate witness hashes fail closed. The native reference, Lean executable,
-inputs, outputs and differences are retained with build identities.
+The output retains the canonical root, complete Borsh object set and actual
+ordered native node/value accesses, including fresh/cached classifications.
+After recording the requested accesses, the oracle enumerates the remaining
+objects without changing the query cache. The driver independently checks
+witness SHA256 bindings. Lean receives only the original raw entries and queries:
+it constructs the canonical compressed hexary trie, Borsh node encodings,
+subtree-size fields and pure SHA256 identities, then interprets its own nodes
+and derives the cache events/counts. Root hashes, every node/value object's
+bytes and all observations must match. Object-set order is immaterial; access
+order is preserved. Native roots, witnesses, paths and counts never enter the
+constructor.
+
+The separate witness-input mode also checks object bindings with pure Lean
+SHA256 before decoding all four node variants and following compact paths and
+branch bitmaps. Missing objects, malformed/trailing node bytes, cycles, invalid
+byte/hash widths, inconsistent value lengths and duplicate hashes fail closed.
+The native reference, Lean executable, inputs, outputs and differences are
+retained with build identities; execution errors remain mismatches with native
+evidence retained.
 
 The regression includes prefix keys, empty values, all sixteen branch slots,
 misses, repeated reads, shared subtrees/values, cache resets, uncounted node reads,
 and a value whose bytes are also a trie node. Seven complete states exported by
 real `Runtime::apply` rebuild the same native canonical roots and match Lean's
-lookups. The counter/event increment lemmas are kernel-checked.
+lookups. The counter/event increment lemmas and SHA256 output width are kernel-checked.
+SHA256 is independently compared to hashlib on padding boundaries and multiblock
+vectors, including the million-byte standard vector; full cryptographic refinement
+and general constructor canonicality are not proved.
 
 This diagnostic does **not** supply receipt gas totals or close the remaining
-runtime gas gap. Canonical trie construction/updates from modeled state,
+runtime gas gap. Encoding modeled runtime records into raw entries, updates/prospective overlays,
 receipt-wide cache lifetime, flat storage and memtries still need integration.
-Hash-to-byte binding is checked externally by the driver; it is not yet a Lean
-cryptographic refinement proof. The witness contains only objects needed by the
-requested lookups, not a claim that all chain state was captured.
+The complete object set is for the trie built from the supplied entries; it does
+not establish that all state of an original blockchain was captured.

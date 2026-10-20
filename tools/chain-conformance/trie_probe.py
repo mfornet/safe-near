@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Compare canonical native trie walks with Lean's Borsh-witness interpreter.
+"""Compare canonical trie construction, object bytes, lookups and cache accounting.
 
 This is a trie diagnostic, not receipt gas injection or full runtime equivalence.
-The driver checks SHA256 witness bindings externally; Lean independently decodes
-node bytes, selects paths, dereferences values and computes fresh/cached counts.
+Lean constructs the canonical trie from raw entries using pure SHA256; no native
+root, witness, path or count is supplied to its constructor. Complete object
+bytes, roots, paths, dereferences and fresh/cached counts are compared exactly.
 """
 from __future__ import annotations
 
@@ -61,15 +62,33 @@ def checked_model_request(request, native):
 
 def compare(request, native, model):
     expected = native_call(native, "--trie-lookups", request)
-    modeled = checked_model_request(request, expected)
+    checked_model_request(request, expected)
+    if expected.get("witnessComplete") is not True:
+        raise ValueError("native trie witness is incomplete")
     try:
-        actual = execute(model, modeled, ROOT)
+        actual = execute(model, request, ROOT)
     except subprocess.CalledProcessError as error:
         message = error.stderr.strip()
         return dict(request=request, native=expected, model=None, modelExecutionError=message,
             differences=[dict(path="execution", error=message)])
-    return dict(request=request, native=expected, model=actual, modelExecutionError=None,
-        differences=differences(dict(results=expected["results"]), actual))
+    def projection(value, native=False):
+        for identifier, payload in value["witness"]:
+            if len(identifier) != 32 or any(type(byte) is not int or not 0 <= byte < 256
+                    for data in [identifier, payload] for byte in data):
+                raise ValueError("invalid trie witness object")
+        witness = {bytes(identifier).hex(): payload for identifier, payload in value["witness"]}
+        if len(witness) != len(value["witness"]):
+            raise ValueError("duplicate trie witness object")
+        result = {**value, "witness": witness}
+        if native:
+            for key in ["formatVersion", "mode", "witnessComplete"]:
+                del result[key]
+        return result
+    try:
+        diffs = differences(projection(expected, native=True), projection(actual))
+    except (ValueError, KeyError, TypeError) as error:
+        diffs = [dict(path="projection", error=str(error))]
+    return dict(request=request, native=expected, model=actual, modelExecutionError=None, differences=diffs)
 
 
 def main():
@@ -83,7 +102,8 @@ def main():
     with frozen_reference(arguments.reference) as (native, build), frozen_model(arguments.model) as (model, checksum):
         report = compare(request, native, model)
     report.update(referenceBuild=build, modelBinarySha256=checksum, runtimeIntegrated=False,
-        witnessHashBinding="external SHA256 check", nodeTraversal="independent Lean Borsh decoder and cache")
+        witnessHashBinding="pure Lean SHA256, independently checked externally",
+        nodeTraversal="Lean canonical construction from raw entries, Borsh decoding and cache")
     atomic_write(arguments.report.resolve(), (json.dumps(report, indent=2) + "\n").encode())
     print(f"{len(report['native']['results'])} lookups; {len(report['differences'])} differences; {arguments.report}")
     raise SystemExit(bool(report["differences"]))

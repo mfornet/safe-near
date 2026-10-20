@@ -4,8 +4,9 @@ import Lean.Elab.Tactic.Omega
 /-!
 Canonical on-disk NEAR trie lookup and hash-keyed accounting-cache semantics.
 This consumes a Borsh witness, not native gas counts or native lookup paths.
-Hash-to-byte binding remains an external input check; trie construction, updates,
-flat storage, memtries and receipt-wide cache integration are separate work.
+Callers establish hash-to-byte bindings; trie-replay checks them with pure SHA256
+or constructs objects directly. Updates, flat storage, memtries and receipt-wide
+cache integration are separate work.
 -/
 namespace Near.TrieAccounting
 

@@ -32,6 +32,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::env::args;
 use std::error::Error;
 use std::io::{Read, stdin};
+use std::mem::take;
 use std::result::Result as StdResult;
 use std::sync::Arc;
 
@@ -703,13 +704,17 @@ fn trie_lookups(request: &Value) -> Result<Value> {
         } else {
             None
         };
-        let events = std::mem::take(&mut *tracker.events.borrow_mut());
+        let events = take(&mut *tracker.events.borrow_mut());
         let cached = events
             .iter()
             .filter(|event| event["cached"] == true)
             .count();
         results.push(json!({"reference":value_ref,"value":value,"events":events,
             "counts":{"disk":events.len()-cached,"mem":cached}}));
+    }
+    // Record every canonical object without changing the observed query cache.
+    for key in &keys {
+        trie.get(key, AccessOptions::DEFAULT)?;
     }
     let PartialState::TrieValues(values) = trie
         .recorded_storage()
@@ -720,7 +725,7 @@ fn trie_lookups(request: &Value) -> Result<Value> {
         .map(|bytes| json!([CryptoHash::hash_bytes(bytes).0, bytes.as_ref()]))
         .collect();
     Ok(
-        json!({"formatVersion":1,"mode":"canonical-on-disk/no-flat-storage/no-memtrie",
+        json!({"formatVersion":1,"mode":"canonical-on-disk/no-flat-storage/no-memtrie","witnessComplete":true,
         "root":root.0,"witness":witness,"results":results}),
     )
 }

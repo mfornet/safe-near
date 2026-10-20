@@ -434,11 +434,21 @@ and uncounted node lookup modes, value dereferences and resets. Counter/event
 increment facts are kernel-checked. `trie-replay` rejects malformed, missing,
 trailing, cyclic and duplicate witness inputs.
 
-`tools/chain-conformance/trie_probe.py` obtains canonical witnesses and actual
-native `near_store::Trie` access traces from the clean pinned source. It freezes
-both executors and checks witness SHA256 bindings externally before comparison.
-This independently tests path selection and fresh/cached accounting, including
-complete raw states exported by `Runtime::apply`. It does not inject observed
-counts into receipt execution. Trie construction/updates from modeled state,
-receipt cache lifetimes, flat/memory trie behavior and a kernel-level hash
-refinement remain open before this can discharge the runtime trie-cost gap.
+`TrieConstruction` now builds the canonical compressed hexary trie directly
+from unique raw key/value entries, including Borsh discriminants, compact paths,
+branch bitmaps, value references and subtree memory usage. Pure `Sha256.hash`
+computes object identities and validates witness-input mode; its output width is
+kernel-checked. General constructor canonicality and a FIPS/native cryptographic
+refinement are not proved.
+
+`tools/chain-conformance/trie_probe.py` compares independent native and Lean
+construction from the same raw entries. Native roots, witnesses, paths and counts
+are not supplied to Lean's constructor. Every node/value object's bytes and hash,
+the root and all query observations must agree. The native complete witness is
+recorded without warming the observed query cache, and the driver independently
+checks SHA256 bindings. Both executors and full runtime origins remain retained.
+The corpus includes complete raw states exported by `Runtime::apply`, shared
+subtrees and cross-role node/value hash aliases. This does not inject observed
+counts into receipt execution. Encoding modeled state into raw entries, state
+updates/prospective overlays, receipt cache lifetime, flat/memory trie behavior
+and broader refinement proofs remain open before runtime trie gas is discharged.

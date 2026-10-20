@@ -1,4 +1,4 @@
-import NearRuntime.TrieAccounting
+import NearRuntime.TrieConstruction
 
 open Lean Near.TrieAccounting
 
@@ -35,17 +35,7 @@ private def resultJson (result : Result) : Json := Json.mkObj [
   ("events", toJson (result.state.events.map fun event => Json.mkObj [
     ("hash", bytesJson event.hash), ("kind", toJson event.kind), ("cached", toJson event.cached)]))]
 
-def execute (input : Json) : Except String Json := do
-  object input ["formatVersion", "root", "witness", "lookups"]
-  unless (← (← field input "formatVersion").getNat?) == 1 do throw "unsupported trie formatVersion"
-  let root ← hash (← field input "root")
-  let rows ← (← field input "witness").getArr?
-  let witness ← rows.toList.mapM fun row => do
-    let pair ← row.getArr?
-    unless pair.size == 2 do throw "invalid witness entry"
-    return (← hash pair[0]!, ← bytes pair[1]!)
-  let ids := witness.map Prod.fst
-  unless ids.eraseDups.length == ids.length do throw "duplicate witness hash"
+private def runQueries (input : Json) (witness : Witness) (root : Hash) : Except String Json := do
   let mut state : Accounting := {}
   let mut results := []
   for row in (← (← field input "lookups").getArr?) do
@@ -59,6 +49,46 @@ def execute (input : Json) : Except String Json := do
     state := result.state
     results := results ++ [resultJson result]
   return Json.mkObj [("results", toJson results)]
+
+private def witnessInput (input : Json) : Except String Json := do
+  object input ["formatVersion", "root", "witness", "lookups"]
+  unless (← (← field input "formatVersion").getNat?) == 1 do throw "unsupported trie formatVersion"
+  let root ← hash (← field input "root")
+  let rows ← (← field input "witness").getArr?
+  let witness ← rows.toList.mapM fun row => do
+    let pair ← row.getArr?
+    unless pair.size == 2 do throw "invalid witness entry"
+    return (← hash pair[0]!, ← bytes pair[1]!)
+  let ids := witness.map Prod.fst
+  unless ids.eraseDups.length == ids.length do throw "duplicate witness hash"
+  for (id, payload) in witness do
+    unless Near.Sha256.hash payload == id do throw "trie witness hash mismatch"
+  runQueries input witness root
+
+private def buildInput (input : Json) : Except String Json := do
+  object input ["formatVersion", "entries", "lookups"]
+  unless (← (← field input "formatVersion").getNat?) == 1 do throw "unsupported trie formatVersion"
+  let rows ← (← field input "entries").getArr?
+  let entries ← rows.toList.mapM fun row => do
+    let pair ← row.getArr?
+    unless pair.size == 2 do throw "invalid trie entry"
+    return (← bytes pair[0]!, ← bytes pair[1]!)
+  let built ← Near.TrieConstruction.build entries
+  let result ← runQueries input built.witness built.root
+  let fields ← result.getObj?
+  return Json.mkObj (fields.toArray.toList ++ [
+    ("root", bytesJson built.root),
+    ("witness", toJson (built.witness.map fun (hash, value) => toJson [bytesJson hash, bytesJson value]))])
+
+private def hashInput (input : Json) : Except String Json := do
+  object input ["formatVersion", "hashInputs"]
+  unless (← (← field input "formatVersion").getNat?) == 1 do throw "unsupported trie formatVersion"
+  let values ← (← (← field input "hashInputs").getArr?).toList.mapM bytes
+  return Json.mkObj [("hashes", toJson (values.map fun value => bytesJson (Near.Sha256.hash value)))]
+
+def execute (input : Json) : Except String Json :=
+  if (input.getObjVal? "hashInputs").isOk then hashInput input
+  else if (input.getObjVal? "entries").isOk then buildInput input else witnessInput input
 
 end TrieReplay
 

@@ -52,6 +52,7 @@ class TrieAccountingTests(unittest.TestCase):
         cls.model, cls.checksum = cls.model_context.__enter__()
         cls.evidence = []
         cls.runtime_origin = None
+        cls.sha_evidence = None
 
     @classmethod
     def tearDownClass(cls):
@@ -59,7 +60,7 @@ class TrieAccountingTests(unittest.TestCase):
         cls.native_context.__exit__(None, None, None)
         atomic_write(ROOT / "audit/trie-accounting-regressions.json", (json.dumps(dict(
             referenceBuild=cls.build, modelBinarySha256=cls.checksum, runtimeIntegrated=False,
-            witnessHashBinding="external SHA256 check", runtimeOrigin=cls.runtime_origin, cases=cls.evidence), indent=2) + "\n").encode())
+            witnessHashBinding="pure Lean SHA256 and independent external check", runtimeOrigin=cls.runtime_origin, sha256=cls.sha_evidence, cases=cls.evidence), indent=2) + "\n").encode())
 
     def test_native_trie_paths_and_cache_counts(self):
         kinds, flags = set(), set()
@@ -69,6 +70,9 @@ class TrieAccountingTests(unittest.TestCase):
                 report = compare(source, self.native, self.model)
                 self.evidence.append(dict(scenario=name, **report))
                 self.assertEqual(report["differences"], [])
+                reordered = execute(self.model, {**source, "entries": list(reversed(source["entries"]))}, ROOT)
+                self.assertEqual(reordered["root"], report["native"]["root"])
+                self.assertEqual(reordered["results"], report["native"]["results"])
                 lookups += len(report["native"]["results"])
                 witness = {tuple(key): value for key, value in report["native"]["witness"]}
                 for result in report["native"]["results"]:
@@ -79,6 +83,17 @@ class TrieAccountingTests(unittest.TestCase):
         self.assertGreater(lookups, 1000)
         self.assertEqual(kinds, {0, 1, 2, 3})
         self.assertEqual(flags, {("node", False), ("node", True), ("value", False), ("value", True)})
+
+    def test_sha256_known_vectors_padding_boundaries_and_multiblock_inputs(self):
+        rng = random.Random(5291)
+        values = [b"", b"abc", b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"]
+        values += [rng.randbytes(length) for length in range(256)]
+        values += [rng.randbytes(rng.randrange(0, 8193)) for _ in range(128)]
+        values += [b"a" * 1000000]
+        result = execute(self.model, dict(formatVersion=1, hashInputs=[list(value) for value in values]), ROOT)
+        self.assertEqual(result["hashes"], [list(hashlib.sha256(value).digest()) for value in values])
+        type(self).sha_evidence = dict(vectors=len(values), byteLengths=[len(value) for value in values],
+            hashes=result["hashes"], inputsHex=[value.hex() for value in values], reference="Python hashlib SHA256")
 
     def test_actual_runtime_states_rebuild_the_same_canonical_roots(self):
         source = json.loads(subprocess.check_output([str(self.native), "--example"], text=True))
@@ -130,6 +145,11 @@ class TrieAccountingTests(unittest.TestCase):
         self.assertEqual(result["results"], expected["results"])
         reordered = {**modeled, "witness": list(reversed(modeled["witness"]))}
         self.assertEqual(execute(self.model, reordered, ROOT), result)
+        unbound = copy.deepcopy(modeled)
+        unbound["witness"][0][1].append(0)
+        rejected = subprocess.run([str(self.model)], input=json.dumps(unbound), text=True, capture_output=True)
+        self.assertNotEqual(rejected.returncode, 0)
+        self.assertIn("hash mismatch", rejected.stderr)
         for field in ["counts", "events", "reference", "value"]:
             altered = copy.deepcopy(result)
             altered["results"][0][field] = "changed"
@@ -138,12 +158,21 @@ class TrieAccountingTests(unittest.TestCase):
     def test_model_execution_failure_retains_native_witness_and_is_not_a_match(self):
         source = request([(b"a", b"hello")], [b"a"])
         failure = subprocess.CalledProcessError(1, "trie-replay", stderr="missing trie witness object")
-        with mock.patch("trie_probe.execute", side_effect=failure):
+        with mock.patch("trie_probe.execute", side_effect=failure) as run_model:
             report = compare(source, self.native, self.model)
+        run_model.assert_called_once_with(self.model, source, ROOT)
         self.assertEqual(report["request"], source)
         self.assertTrue(report["native"]["witness"])
         self.assertIsNone(report["model"])
         self.assertEqual(report["modelExecutionError"], failure.stderr)
+        self.assertTrue(report["differences"])
+
+    def test_constructor_comparison_retains_unexpected_model_fields(self):
+        source = request([(b"a", b"hello")], [b"a"])
+        result = execute(self.model, source, ROOT)
+        result["unexpectedIssue"] = True
+        with mock.patch("trie_probe.execute", return_value=result):
+            report = compare(source, self.native, self.model)
         self.assertTrue(report["differences"])
 
     def test_malformed_witnesses_and_wire_input_fail_closed(self):
@@ -190,6 +219,13 @@ class TrieAccountingTests(unittest.TestCase):
                 result = subprocess.run([str(self.model)], input=json.dumps(value), text=True, capture_output=True)
                 self.assertNotEqual(result.returncode, 0)
                 self.assertTrue(result.stderr)
+        invalid_entries = [dict(entries=[[[1], [2]], [[1], [3]]]), dict(entries=[[[256], [2]]]),
+            dict(entries=[[[1], [True]]]), dict(root=[0] * 32), dict(witness=[]), dict(formatVersion=2)]
+        for patch in invalid_entries:
+            value = {**source, **patch}
+            result = subprocess.run([str(self.model)], input=json.dumps(value), text=True, capture_output=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertTrue(result.stderr)
         for patch in [dict(formatVersion=2), dict(entries=[[[1], [2]], [[1], [3]]]), dict(extra=True)]:
             with self.assertRaises(subprocess.CalledProcessError):
                 native_call(self.native, "--trie-lookups", {**source, **patch})
