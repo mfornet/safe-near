@@ -6,10 +6,10 @@ zero-argument export that reads bytes from the `stdio` host, computes, and
 writes bytes back.
 
 Copied from [Talos](https://github.com/cajal-technologies/talos) `programs/`
-at commit `80644390de3ad4db3055445259a034413ae41577` (2026-10-06), **with the
-specifications but without the proofs**: each program's `Spec.lean` is ported
-and its top-level correctness theorem is stated in `Proof.lean` with a `sorry`
-body. No `*Proof.lean` machinery or `Analysis/` was brought over. The package
+at commit `80644390de3ad4db3055445259a034413ae41577` (2026-10-06), with the
+specifications. `ByteEcho` now has a kernel-checked correctness proof of its
+compiled export. The two GCD theorems and mergesort theorem remain open in
+`Proof.lean` files. No `*Proof.lean` machinery or `Analysis/` was brought over. The package
 depends on `../iris-wasm` (Talos's `codelib`), exactly as upstream does.
 License AGPL-3.0, see `../wasm/LICENSE`.
 
@@ -32,7 +32,7 @@ rust/                     cargo workspace, toolchain pinned in rust-toolchain.to
 lean/                     Lake package `Programs`, depends on ../../iris-wasm (and so on ../../wasm)
   Programs/<Crate>/Program.lean   generated Wasm AST of each program (spliced from the .wat by CodeLib.Generated)
   Programs/<Crate>/Spec.lean      the specification (semantic Input/Output, host contract)
-  Programs/<Crate>/Proof.lean     the correctness theorem, proof is `sorry`
+  Programs/<Crate>/Proof.lean     the correctness theorem (ByteEcho proved; GCD/mergesort open)
   Programs/Smoke.lean     `lake exe smoke`: runs every program on small inputs
 ```
 
@@ -40,16 +40,30 @@ lean/                     Lake package `Programs`, depends on ../../iris-wasm (a
 
 Specs are `def … : Prop` tagged `@[spec_of <kind> "crate::fn"]`; the theorem
 that discharges one is tagged `@[proves <spec>]` (attributes from
-`CodeLib.Attrs`). Everything below is stated and typechecks; every proof is
-currently `sorry`. Upstream's proofs are separation-logic proofs over
+`CodeLib.Attrs`). Everything below is stated and typechecks. The ByteEcho proof is complete;
+the other three proofs remain `sorry`. Upstream's proofs are separation-logic proofs over
 `CodeLib.SepLogic`, which is now available here.
 
-| Spec | Kind | Statement | Theorem (sorry) |
+| Spec | Kind | Statement | Theorem / status |
 |---|---|---|---|
-| `ByteEcho.Spec.ByteEchoSpec` | total | For every input byte, `byte_echo` terminates and writes exactly that byte. | `ByteEcho.Proof.byte_echo_correct` |
+| `ByteEcho.Spec.ByteEchoSpec` | total | For every input byte, `byte_echo` terminates and writes exactly that byte. | `ByteEcho.Proof.byte_echo_correct` (proved) |
 | `GcdStdio.Spec.KernelSpecification` | total, internal | The out-of-line `gcd_u64` kernel (`func1`), run on two `i64`s, returns `Nat.gcd`. | `GcdStdio.Proof.kernel_correct` |
 | `GcdStdio.Spec.PublicEntrySpecification` | total | For every pair of `u64`, `gcd` terminates and writes their `Nat.gcd`. | `GcdStdio.Proof.gcd_correct` |
 | `Mergesort.Spec.PublicEntrySpecification` | partial | Every finite run of `mergesort` on packed `u32`s either traps with the allocator's `talos.oom` or returns a sorted permutation of the input. Termination is not claimed. | `Mergesort.Proof.mergesort_correct` |
+
+`ByteEcho.Proof.byte_echo_correct` symbolically evaluates the actual generated
+module for an arbitrary input byte, including its allocator and universal-host
+calls. Its 85-step witness is transported through `runSteps_result_terminates`
+to the existing fuel-free total-correctness specification. It neither enumerates
+sample inputs nor assumes a VM execution equation. No generated program or
+specification was changed.
+
+`Programs.ProofSupport.Cbv.program_cbv` fixes the pinned Lean 4.34.1 evaluator's
+literal-conditional proof construction, supplying its missing `Decidable`
+argument. The change is scoped to each tactic invocation. Kernel checking and
+the axiom audit remain in force. The program audit permits the three open
+proofs but requires `Programs.ByteEcho.Proof` to remain completely free of
+nonstandard axioms, including `sorryAx`.
 
 Upstream Talos proves all four. The GCD kernel spec there is tied to the
 separately verified `num_integer_opt3` program, which is not in near-lean, so

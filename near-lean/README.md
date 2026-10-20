@@ -119,15 +119,17 @@ fields included) and fails on anything else, in particular `sorryAx` and
 ```
 tools/axiom-audit.py near-lean/wasm --report audit/wasm.json
 tools/axiom-audit.py near-lean/iris-wasm --report audit/iris-wasm.json
-tools/axiom-audit.py near-lean/programs/lean --report audit/programs.json --allow-sorry
+tools/axiom-audit.py near-lean/programs/lean --report audit/programs.json --allow-sorry --require-clean-module Programs.ByteEcho.Proof
 tools/axiom-audit.py near-lean/vm --report audit/vm.json
 tools/axiom-audit.py near-lean/runtime --report audit/runtime.json
 tools/axiom-audit.py near-lean/chain --report audit/chain.json
 ```
 
-`wasm` and `iris-wasm` must be clean. `programs` holds specs whose proofs are
-open by design, so there `--allow-sorry` tolerates `sorryAx` alone and prints
-each sorried declaration; any other nonstandard axiom still fails. CI runs all
+`wasm` and `iris-wasm` must be clean. Three GCD/mergesort proofs in `programs`
+remain open, so `--allow-sorry` tolerates `sorryAx` alone and prints each sorried
+declaration. `--require-clean-module Programs.ByteEcho.Proof` keeps the completed
+ByteEcho proof strict; a misspelled or missing required module also fails.
+Any other nonstandard axiom still fails. CI runs all
 three on every change under `near-lean/`. Pass `--no-build` to audit already
 built artefacts.
 

@@ -14,6 +14,17 @@ SPEC.loader.exec_module(AUDIT)
 
 
 class AxiomAuditArtifactTests(unittest.TestCase):
+    def test_completed_modules_cannot_use_the_open_proof_exception(self):
+        complete = dict(module="Finished", declaration="finished", axioms=["sorryAx"])
+        open_proof = dict(module="Open", declaration="unfinished", axioms=["sorryAx"])
+        compiler = dict(module="Open", declaration="native", axioms=["Lean.ofReduceBool"])
+        mixed = dict(module="Open", declaration="mixed", axioms=["sorryAx", "custom"])
+        violations = [complete, open_proof, compiler, mixed]
+        self.assertEqual(AUDIT.failing_violations(violations, True, ["Finished"]),
+                         [complete, compiler, mixed])
+        self.assertEqual(AUDIT.failing_violations(violations, False, []), violations)
+        self.assertEqual(AUDIT.failing_violations(violations, True, []), [compiler, mixed])
+
     def test_audit_uses_local_module_and_rejects_missing_local_artifact(self):
         with tempfile.TemporaryDirectory(prefix="safe-near-axiom-fixture-") as directory:
             root = Path(directory)

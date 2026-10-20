@@ -77,7 +77,7 @@ audit-all:
     @for package in wasm iris-wasm vm runtime chain; do \
         python3 tools/axiom-audit.py near-lean/"$package" --report audit/"$package".json; \
     done
-    python3 tools/axiom-audit.py near-lean/programs/lean --report audit/programs.json --allow-sorry
+    python3 tools/axiom-audit.py near-lean/programs/lean --report audit/programs.json --allow-sorry --require-clean-module Programs.ByteEcho.Proof
 
 # Run executable suites, source checks, core axiom audits and contract builds.
 check: test-all vm-dependencies lean-lint audit-all build-all
