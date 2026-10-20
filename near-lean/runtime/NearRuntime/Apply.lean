@@ -632,7 +632,7 @@ def convertTransaction (cfg : RuntimeConfig) (ap : ApplyState) (st : ChainState)
 /-- `Runtime::apply`. Transactions first (their receipts are local), then
 delayed receipts, then incoming ones; receipts beyond the gas limit are
 delayed to the next apply. -/
-private def applyAttempt (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → ContractCode)
+def applyAttempt (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → ContractCode)
     (st : ChainState) (txs : List Transaction) (incoming : List Receipt) : ApplyResult := Id.run do
   let initial := st
   let mut st := st

@@ -509,6 +509,15 @@ preservation results; full block/chain composition,
 emitted receipt scope, identifier freshness and dependency-graph preservation
 remain separate obligations.
 
+`ApplyInvariants.apply_systemAbsent` carries reserved-actor absence through the
+actual transaction and receipt loops, including gas-limit deferral and atomic
+model-issue rollback. The attempt function is public for proof-facing unfolding;
+the public commit boundary remains `apply`. `NearChain.ReservedActorInvariant`
+lifts absence to block steps, all reachable states, bounded settlement and
+isolated transaction runs. These guarantees require absence in the initial state
+and hold for every stop reason; they do not establish financial conservation
+across blocks or eventual completion.
+
 Reserved `system` account creation is rejected independently of the registrar
 and minimum-name-length configuration. Pinned nearcore's `action_create_account`
 uses near-account-id 2.0.0's `is_top_level`/`is_sub_account_of`; `system` is neither.

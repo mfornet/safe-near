@@ -18,4 +18,4 @@ import NearRuntime.PromiseGasInvariants
 import NearRuntime.ReceiptFunding
 import NearRuntime.MixedFunding
 import NearRuntime.AllActionFunding
-import NearRuntime.ReservedActorInvariant
+import NearRuntime.ApplyInvariants
