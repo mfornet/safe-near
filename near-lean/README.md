@@ -547,7 +547,17 @@ complete materializer's envelope ids as disjoint data and action allocation
 ranges. Its corollaries prove uniqueness, counter bounds, freshness against old
 routing references and absence from the returned state's postponed map. These
 are envelope-identity guarantees; full bounds on linked action dependency
-references and preservation across later execution remain open.
+references and preservation across later execution are separate obligations.
+
+`DependencyIdentifierBounds.materializeFunctionCall_liveIds_below` closes the
+materializer reference-bound obligation: all emitted envelope, input-data and
+output-data ids are below the resulting counter. Newly linked dependencies are
+proved bounded from the actual allocation/modification loops. Inherited callback
+references must be below the initial counter; the incoming receipt bound and
+context/payload agreement suffice to discharge this premise. Direct returns and
+returned-promise forwarding are both covered. This does not establish valid edge
+indices, matching input/output edges, fairness, or preservation through subsequent
+receipt execution.
 
 Reserved `system` account creation is rejected independently of the registrar
 and minimum-name-length configuration. Pinned nearcore's `action_create_account`
