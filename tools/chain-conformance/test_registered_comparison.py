@@ -78,6 +78,23 @@ class RegisteredComparisonTests(unittest.TestCase):
             self.assertEqual(report["model"], baseline["model"])
             self.assertTrue(any("transactionIdentities" in row["path"] for row in report["differences"]))
 
+    def test_unsupported_execution_keeps_its_issue_and_cannot_be_a_pass(self):
+        from near_rpc import b58encode
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "unsupported"
+            request = scenario(86, "ed25519", "single")
+            transaction = request["blocks"][0]["transactions"][0]
+            transaction["receiverId"] = request["caller"]["accountId"]
+            transaction["actions"] = [dict(Stake=dict(stake=str(10**24),
+                public_key="ed25519:" + b58encode(bytes([0x58] + [0x66] * 31))))]
+            importer.prepare(snapshot(86), target, reference=REFERENCE, model=CHAIN, scenario=request)
+            report = comparator.compare(target, REFERENCE, CHAIN)
+            self.assertEqual(report["model"]["stop"], "executionIssue")
+            self.assertIsNotNone(report["model"]["blocks"][0]["issue"])
+            self.assertFalse(report["registered"]["blocks"][0]["admissionCommitted"])
+            self.assertTrue(report["differences"])
+            self.assertIn("did not commit", report["projectionError"])
+
     def test_relocation_strict_custody_and_explicit_legacy_mode(self):
         with tempfile.TemporaryDirectory() as directory:
             target = Path(directory) / "original"
