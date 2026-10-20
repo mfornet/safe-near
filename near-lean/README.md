@@ -433,8 +433,14 @@ deposits plus `(usedGas - burntGas) * gasPrice` for ordinary contracts, under
 `ReceiptGasEncodingValid`. This predicate contains only receiver/method decoding
 facts, not an assumed gas/funds equation or full action validity. Deriving it for
 every receipt from successful runtime execution remains an open invariant
-obligation. Full multi-action settlement/chain conservation and nearcore
-equivalence also remain open.
+obligation. `NearVM.ReceiptPredicates` supplies the generic conversion seam:
+`setPromise_preserves_predicate` preserves a receiver/action invariant through
+an actual handle update; `convertPromises_preserves_predicate` and
+`outcomeOfExecution_success_predicate` transport it into emitted receipts.
+These are kernel-checked for arbitrary decidable predicates and do not assume
+unique dependencies. Concrete host execution must still establish the initial
+and preserved encoding invariant. Full multi-action settlement/chain
+conservation and nearcore equivalence also remain open.
 
 Promise deployment derives `ContractCode.size` from the actual payload through
 `ContractCode.decodeSized`. Size limits, storage accounting and outgoing gas

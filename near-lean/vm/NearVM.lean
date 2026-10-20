@@ -26,3 +26,4 @@ import NearVM.CreationReservations
 import NearVM.MeteredBatchReservations
 import NearVM.OutcomeReservations
 import NearVM.ActionMethodValidation
+import NearVM.ReceiptPredicates
