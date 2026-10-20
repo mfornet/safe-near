@@ -5,8 +5,9 @@ import NearVM.AccountId
 /-!
 # `VMContext`: the input of one function call
 
-Mirrors `near_vm_runner::logic::VMContext`. The runtime fills it from the
-receipt and the account; the Rust shim fills it from nearcore's own struct.
+Mirrors `near_vm_runner::logic::VMContext`, with an explicit external method
+validation policy. The runtime fills it from the receipt and account; the
+conformance shim selects the policy used by its native external adapter.
 `toNearState` is where it becomes the host state the interpreter threads.
 -/
 
@@ -20,6 +21,8 @@ structure ViewConfig where
   deriving Repr, Inhabited
 
 structure VMContext where
+  /-- External validation policy, not a protocol parameter. False matches nearcore VM mocks. -/
+  validateActionMethodUtf8 : Bool := true
   currentAccountId : Bytes
   signerAccountId : Bytes
   signerAccountPk : Bytes
@@ -73,6 +76,7 @@ def toNearState (cfg : RuntimeConfig) (ctx : VMContext)
     storageKeys := storage.map (·.1)
     promiseResults := ctx.promiseResults
     config := {
+      validateActionMethodUtf8 := ctx.validateActionMethodUtf8
       maxRegisterLen := some cfg.wasm.limits.maxRegisterSize
       maxReturnLen := some cfg.wasm.limits.maxLengthReturnedData
       maxLogLen := some cfg.wasm.limits.maxTotalLogLength

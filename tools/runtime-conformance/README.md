@@ -133,6 +133,23 @@ fees before reporting an invalid serialized public key. Empty method lists are
 unrestricted; empty comma-separated entries are rejected.
 
 The pinned VM oracle uses MockedExternal, which enables post-quantum keys.
-These tests do not establish historical runtime feature gating or real runtime
-external validation of invalid UTF-8 action method bytes. Those remain explicit
-conformance boundaries.
+These tests do not establish historical runtime feature gating. The method-encoding
+fixtures below separately exercise runtime-style UTF-8 external validation.
+
+
+`method_encoding.json` adds 38 method-encoding cases; the initial probe exposed
+11 discrepancies. `method_encoding_zero.json` adds five zero-balance cases,
+including one-yocto subsidy/error ordering. These fixtures compare invalid UTF-8,
+Unicode/NUL methods, register inputs, function-call creation/callbacks, access-key
+CSV methods, earlier failures and exact logs/gas/rollback.
+
+The request field `validateActionMethodUtf8` defaults to false in both replay
+adapters, matching nearcore's `MockedExternal`. Strict cases use a native
+`MethodValidatingExternal` adapter which delegates the entire external interface
+to that mock, except for the ordinary function-call and function-call-key UTF-8
+checks from the pinned `runtime/runtime/src/receipt_manager.rs`. Native VMLogic
+still controls fees, prepayment, balance deductions and error precedence. This
+adapter tests that external seam; it is not a trie-backed/full Runtime oracle.
+Actual Lean receipt execution always uses strict validation, as does a default
+public `VMContext`. Opaque VM outputs must not be treated as validated runtime
+actions.

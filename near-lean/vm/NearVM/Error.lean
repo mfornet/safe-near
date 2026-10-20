@@ -31,6 +31,7 @@ inductive HostError
   | gasLimitExceeded
   | balanceExceeded
   | emptyMethodName
+  | invalidMethodName
   | guestPanic (panicMsg : String)
   | integerOverflow
   | invalidPromiseIndex (promiseIdx : Nat)
@@ -66,6 +67,7 @@ def HostError.message : HostError → String
   | .gasLimitExceeded => "Exceeded the maximum amount of gas allowed to burn per contract."
   | .balanceExceeded => "Exceeded the account balance."
   | .emptyMethodName => "Tried to call an empty method name."
+  | .invalidMethodName => "VM Logic returned an invalid method name"
   | .guestPanic msg => s!"Smart contract panicked: {msg}"
   | .integerOverflow => "Integer overflow."
   | .invalidPromiseIndex i => s!"{i} does not correspond to existing promises"

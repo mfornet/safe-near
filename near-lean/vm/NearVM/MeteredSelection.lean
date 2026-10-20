@@ -60,7 +60,10 @@ theorem finishMeteredCall_selection (extra : Nat) (name : String) (before : Stor
           rw [hd] at hfinal
           cases error with
           | some error => exact hfinal
-          | none => exact updateStorageUsage_selection extra name before final args hfinal
+          | none =>
+            cases he : actionMethodEncodingError name before args with
+            | some error => exact hfinal
+            | none => exact updateStorageUsage_selection extra name before final args hfinal
 
 theorem metered_preserves_selection (extra : Nat) (name : String) (fn : HostFn NearState)
     (hfn : HostPreservesSelection fn) : HostPreservesSelection (metered extra name fn) := by

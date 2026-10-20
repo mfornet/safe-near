@@ -1,0 +1,36 @@
+{
+  "code": "tools/runtime-conformance/fixtures/method_encoding.wasm",
+  "sha256": "795b445a3f790ceba04dc08447757fb941efeb1aa14ea65d778462c2b55dd5b3",
+  "protocolVersion": 86,
+  "validateActionMethodUtf8": true,
+  "initialBalance": "0",
+  "storage": [],
+  "calls": [
+    {
+      "name": "method_encoding_zero: batch_bad_deposit",
+      "method": "batch_bad_deposit",
+      "args": {}
+    },
+    {
+      "name": "method_encoding_zero: batch_bad_deposit opaque",
+      "method": "batch_bad_deposit",
+      "args": {},
+      "validateActionMethodUtf8": false
+    },
+    {
+      "name": "method_encoding_zero: batch_bad_balance",
+      "method": "batch_bad_balance",
+      "args": {}
+    },
+    {
+      "name": "method_encoding_zero: key_bad",
+      "method": "key_bad",
+      "args": {}
+    },
+    {
+      "name": "method_encoding_zero: batch_valid",
+      "method": "batch_valid",
+      "args": {}
+    }
+  ]
+}

@@ -122,6 +122,7 @@ def functionCallContext (c : ReceiptCtx) (account : Account) (args : Bytes) (gas
     (isLast : Bool) : VMContext :=
   let id := c.receipt.receiverId
   {
+    validateActionMethodUtf8 := true
     currentAccountId := bytesOfString id
     signerAccountId := bytesOfString c.action.signerId
     signerAccountPk := c.action.signerPublicKey

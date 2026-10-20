@@ -1,5 +1,8 @@
 //! Independent VM oracle using the published, pinned nearcore executor.
 //! Input and output are JSON; storage and receipt actions are byte-exact.
+mod external;
+use external::MethodValidatingExternal;
+
 use anyhow::{Context, Result, bail};
 use near_parameters::RuntimeConfigStore;
 use near_primitives_core::{
@@ -49,6 +52,8 @@ struct Request {
     view: bool,
     output_data_receivers: Vec<String>,
     storage: Vec<(Vec<u8>, Vec<u8>)>,
+    #[serde(default)]
+    validate_action_method_utf8: bool,
 }
 
 fn balance(value: &str) -> Result<Balance> {
@@ -187,9 +192,17 @@ fn execute(request: Request) -> Result<Value> {
     }
     let bytes = std::fs::read(&request.code_path).context("reading deployed Wasm")?;
     let code = ContractCode::new(bytes, None);
-    let mut ext = MockedExternal::with_code(code);
+    let mut ext = MethodValidatingExternal {
+        inner: MockedExternal::with_code(code),
+        validate_action_method_utf8: request.validate_action_method_utf8,
+    };
     for (key, value) in &request.storage {
-        if ext.fake_trie.insert(key.clone(), value.clone()).is_some() {
+        if ext
+            .inner
+            .fake_trie
+            .insert(key.clone(), value.clone())
+            .is_some()
+        {
             bail!("duplicate storage key")
         }
     }
@@ -217,7 +230,7 @@ fn execute(request: Request) -> Result<Value> {
         account_balance: balance(&request.account_balance)?,
         account_locked_balance: balance(&request.account_locked_balance)?,
         storage_usage: request.storage_usage,
-        account_contract: AccountContract::Local(ext.code_hash),
+        account_contract: AccountContract::Local(ext.inner.code_hash),
         attached_deposit: balance(&request.attached_deposit)?,
         prepaid_gas: Gas::from_gas(request.prepaid_gas),
         random_seed: request.random_seed,
@@ -233,7 +246,7 @@ fn execute(request: Request) -> Result<Value> {
             .collect::<std::result::Result<_, _>>()?,
     };
     let prepared = near_vm_runner::prepare(
-        &ext,
+        &ext.inner,
         config.wasm_config.clone(),
         None,
         context.make_gas_counter(&config.wasm_config),
@@ -246,7 +259,7 @@ fn execute(request: Request) -> Result<Value> {
     let (receipts, indices) = if failed {
         (vec![], HashMap::new())
     } else {
-        normalize_receipts(&ext.action_log)?
+        normalize_receipts(&ext.inner.action_log)?
     };
     let return_data = if failed {
         json!({"kind":"none"})
@@ -262,7 +275,7 @@ fn execute(request: Request) -> Result<Value> {
     let mut storage: Vec<_> = if failed {
         request.storage
     } else {
-        ext.fake_trie.into_iter().collect()
+        ext.inner.fake_trie.into_iter().collect()
     };
     storage.sort_by(|a, b| a.0.cmp(&b.0));
     let ext_profile: serde_json::Map<String, Value> = outcome

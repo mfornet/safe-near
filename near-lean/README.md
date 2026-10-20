@@ -411,10 +411,20 @@ multi-action/receipt/chain conservation remain separate obligations.
 actions and function calls whose method bytes decode as UTF-8. The byte-array
 and UTF-8 roundtrip proofs are shared in `Interpreter.Wasm.ByteEncoding`; wNEAR
 keeps its existing Borsh theorem names as wrappers around those generic proofs.
-Function-call-key CSV encoding and runtime external validation of malformed
-UTF-8 action fields remain required for the general gas bridge. The public VM
-theorem values raw receipt bytes; it does not assume that lossy string decoding
-preserves runtime action costs or establish full nearcore equivalence.
+Runtime calls now explicitly require UTF-8 action method names. The external
+validation policy belongs to `VMContext`, not protocol fee/limit configuration;
+`functionCallContext` always enables it. Validation runs after action fees,
+prepaid gas and deposit deduction, matching the pinned receipt manager. Invalid
+bytes produce structured `invalidMethodName` and rollback while retaining prior
+logs. Opaque-byte mode is explicit for the VM mock conformance adapter only.
+`ActionMethodValidation` proves rejection, successful decoding witnesses and
+charge/deposit error precedence. Existing funding and gas-backing proofs cover
+the additional rejection path.
+
+Function-call-key CSV encoding and a general successful-execution UTF-8 receipt
+invariant still need to be connected to runtime materialization costs. The public
+VM gas theorem values raw receipt bytes; it does not assume that lossy decoding
+preserves runtime costs or establish full nearcore equivalence.
 
 Promise deployment derives `ContractCode.size` from the actual payload through
 `ContractCode.decodeSized`. Size limits, storage accounting and outgoing gas

@@ -9,6 +9,7 @@ publish = false
 [dependencies]
 anyhow = "1"
 borsh = "1"
+near-crypto = { version = "=0.37.4", default-features = false }
 near-parameters = "=0.37.4"
 near-primitives-core = "=0.37.4"
 near-vm-runner = "=0.37.4"

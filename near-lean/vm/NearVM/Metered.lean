@@ -667,6 +667,22 @@ def viewRestrictedHost (name : String) : Bool :=
 def deprecatedRuntimeHost (name : String) : Bool :=
   ["storage_iter_prefix", "storage_iter_range", "storage_iter_next"].contains name
 
+/-- Method bytes passed to the external receipt builder. The key ABI supplies
+CSV bytes: ASCII separators cannot split a UTF-8 multibyte sequence. -/
+def actionMethodBytes? (name : String) (before : Store NearState) (args : List Value) : Option (List UInt8) :=
+  if name == "promise_batch_action_add_key_with_function_call" then
+    getMemOrReg before (argU64 args 8) (argU64 args 7)
+  else (functionCallInputs? name args).bind fun input => getMemOrReg before input.methodPtr input.methodLen
+
+/-- Runtime externals decode method names after fees/prepayment and balance
+checks. MockedExternal deliberately accepts opaque method bytes instead. -/
+def actionMethodEncodingError (name : String) (before : Store NearState) (args : List Value) : Option HostError :=
+  if before.host.config.validateActionMethodUtf8 then
+    match actionMethodBytes? name before args with
+    | some bytes => if (String.fromUTF8? ⟨bytes.toArray⟩).isNone then some .invalidMethodName else none
+    | none => none
+  else none
+
 /-- Post-call metering is separated from host invocation so its frame
 properties can be used directly in execution proofs. -/
 def finishMeteredCall (extraBytes : Nat) (name : String) (before : Store NearState)
@@ -679,7 +695,10 @@ def finishMeteredCall (extraBytes : Nat) (name : String) (before : Store NearSta
     | none =>
       match deductDeposit name before st3 args with
       | (st4, some e) => trapWith st4 e
-      | (st4, none) => .Return vals (updateStorageUsage extraBytes name before st4 args)
+      | (st4, none) =>
+        match actionMethodEncodingError name before args with
+        | some error => trapWith st4 error
+        | none => .Return vals (updateStorageUsage extraBytes name before st4 args)
   | .Trap st2 msg => .Trap st2 msg
   | .Throw st2 tag vals => .Throw st2 tag vals
 

@@ -90,19 +90,22 @@ theorem finishMeteredCall_funding (extra : Nat) (name : String) (before : Store 
           cases error with
           | some error => trivial
           | none =>
-            have hpay := deductDeposit_funding name before { st with host := ns } args (by rw [hd])
-            rw [hd] at hpay
-            dsimp only at hpay
-            have hf := updateStorageUsage_fundingState extra name before paid args
-            have hfinal := congrArg Prod.fst hf
-            have hsfinal := congrArg Prod.snd hf
-            change (updateStorageUsage extra name before paid args).host.liquidFunds = paid.host.liquidFunds at hfinal
-            change (updateStorageUsage extra name before paid args).host.subsidizedAmount = paid.host.subsidizedAmount at hsfinal
-            change (updateStorageUsage extra name before paid args).host.liquidFunds + before.host.subsidizedAmount =
-              before.host.liquidFunds + (updateStorageUsage extra name before paid args).host.subsidizedAmount
-            rw [hfinal, hsfinal]
-            have hs := hraw.2.1
-            omega
+            cases he : actionMethodEncodingError name before args with
+            | some error => trivial
+            | none =>
+              have hpay := deductDeposit_funding name before { st with host := ns } args (by rw [hd])
+              rw [hd] at hpay
+              dsimp only at hpay
+              have hf := updateStorageUsage_fundingState extra name before paid args
+              have hfinal := congrArg Prod.fst hf
+              have hsfinal := congrArg Prod.snd hf
+              change (updateStorageUsage extra name before paid args).host.liquidFunds = paid.host.liquidFunds at hfinal
+              change (updateStorageUsage extra name before paid args).host.subsidizedAmount = paid.host.subsidizedAmount at hsfinal
+              change (updateStorageUsage extra name before paid args).host.liquidFunds + before.host.subsidizedAmount =
+                before.host.liquidFunds + (updateStorageUsage extra name before paid args).host.subsidizedAmount
+              rw [hfinal, hsfinal]
+              have hs := hraw.2.1
+              omega
 
 /-- The real metered wrapper preserves funded promise obligations on every
 successful host return, not just the standalone deposit arithmetic helper. -/

@@ -77,6 +77,8 @@ deriving Inhabited
 limit unconstrained, which keeps existing concrete examples small and easy to
 compute while allowing fidelity checks to opt in to nearcore-style traps. -/
 structure NearConfig where
+  /-- Runtime external action methods are UTF-8; VM mocks may keep opaque bytes. -/
+  validateActionMethodUtf8 : Bool := true
   oneYoctoOnPromise : Bool := false
   ethImplicitAccounts : Bool := false
   maxRegisterLen     : Option Nat := none

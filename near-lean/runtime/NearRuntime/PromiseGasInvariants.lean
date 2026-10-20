@@ -3,6 +3,11 @@ import NearVM.PromiseGas
 import Interpreter.Wasm.ByteEncoding
 
 namespace Near
+
+/-- Receipt execution always uses the real runtime external's UTF-8 policy. -/
+theorem functionCallContext_validates_method_utf8 (c : ReceiptCtx) (account : Account)
+    (args : Bytes) (gas deposit : Nat) (isLast : Bool) :
+    (functionCallContext c account args gas deposit isLast).validateActionMethodUtf8 = true := rfl
 open Wasm Wasm.Near Wasm.ByteEncoding
 
 @[simp] theorem bytesOfString_length (s : String) : (bytesOfString s).length = s.utf8ByteSize :=

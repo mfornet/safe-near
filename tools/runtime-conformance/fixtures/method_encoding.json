@@ -1,0 +1,214 @@
+{
+  "code": "tools/runtime-conformance/fixtures/method_encoding.wasm",
+  "sha256": "795b445a3f790ceba04dc08447757fb941efeb1aa14ea65d778462c2b55dd5b3",
+  "protocolVersion": 86,
+  "validateActionMethodUtf8": true,
+  "initialBalance": "100",
+  "storage": [],
+  "calls": [
+    {
+      "name": "method_encoding: batch_bad",
+      "method": "batch_bad",
+      "args": {}
+    },
+    {
+      "name": "method_encoding: batch_overlong",
+      "method": "batch_overlong",
+      "args": {}
+    },
+    {
+      "name": "method_encoding: batch_surrogate",
+      "method": "batch_surrogate",
+      "args": {}
+    },
+    {
+      "name": "method_encoding: batch_continuation",
+      "method": "batch_continuation",
+      "args": {}
+    },
+    {
+      "name": "method_encoding: batch_bad_deposit",
+      "method": "batch_bad_deposit",
+      "args": {}
+    },
+    {
+      "name": "method_encoding: batch_bad_balance",
+      "method": "batch_bad_balance",
+      "args": {}
+    },
+    {
+      "name": "method_encoding: batch_bad_memory",
+      "method": "batch_bad_memory",
+      "args": {}
+    },
+    {
+      "name": "method_encoding: batch_bad_register",
+      "method": "batch_bad_register",
+      "args": {}
+    },
+    {
+      "name": "method_encoding: batch_valid",
+      "method": "batch_valid",
+      "args": {}
+    },
+    {
+      "name": "method_encoding: batch_nul",
+      "method": "batch_nul",
+      "args": {}
+    },
+    {
+      "name": "method_encoding: create_bad",
+      "method": "create_bad",
+      "args": {}
+    },
+    {
+      "name": "method_encoding: create_bad_balance",
+      "method": "create_bad_balance",
+      "args": {}
+    },
+    {
+      "name": "method_encoding: create_bad_receiver",
+      "method": "create_bad_receiver",
+      "args": {}
+    },
+    {
+      "name": "method_encoding: create_valid",
+      "method": "create_valid",
+      "args": {}
+    },
+    {
+      "name": "method_encoding: key_bad",
+      "method": "key_bad",
+      "args": {}
+    },
+    {
+      "name": "method_encoding: key_bad_register",
+      "method": "key_bad_register",
+      "args": {}
+    },
+    {
+      "name": "method_encoding: key_bad_public_key",
+      "method": "key_bad_public_key",
+      "args": {}
+    },
+    {
+      "name": "method_encoding: key_overlong",
+      "method": "key_overlong",
+      "args": {}
+    },
+    {
+      "name": "method_encoding: key_empty_segment",
+      "method": "key_empty_segment",
+      "args": {}
+    },
+    {
+      "name": "method_encoding: key_valid",
+      "method": "key_valid",
+      "args": {}
+    },
+    {
+      "name": "method_encoding: key_empty",
+      "method": "key_empty",
+      "args": {}
+    },
+    {
+      "name": "method_encoding: then_bad",
+      "method": "then_bad",
+      "args": {}
+    },
+    {
+      "name": "method_encoding: then_bad_balance",
+      "method": "then_bad_balance",
+      "args": {}
+    },
+    {
+      "name": "method_encoding: then_valid",
+      "method": "then_valid",
+      "args": {}
+    },
+    {
+      "name": "method_encoding: opaque batch_bad",
+      "method": "batch_bad",
+      "args": {},
+      "validateActionMethodUtf8": false
+    },
+    {
+      "name": "method_encoding: opaque create_bad",
+      "method": "create_bad",
+      "args": {},
+      "validateActionMethodUtf8": false
+    },
+    {
+      "name": "method_encoding: opaque then_bad",
+      "method": "then_bad",
+      "args": {},
+      "validateActionMethodUtf8": false
+    },
+    {
+      "name": "method_encoding: opaque key_bad",
+      "method": "key_bad",
+      "args": {},
+      "validateActionMethodUtf8": false
+    },
+    {
+      "name": "method_encoding: batch_bad gas 1000",
+      "method": "batch_bad",
+      "args": {},
+      "gas": 1000
+    },
+    {
+      "name": "method_encoding: batch_bad gas 260000000000",
+      "method": "batch_bad",
+      "args": {},
+      "gas": 260000000000
+    },
+    {
+      "name": "method_encoding: batch_bad gas 450000000000",
+      "method": "batch_bad",
+      "args": {},
+      "gas": 450000000000
+    },
+    {
+      "name": "method_encoding: create_bad gas 1000",
+      "method": "create_bad",
+      "args": {},
+      "gas": 1000
+    },
+    {
+      "name": "method_encoding: create_bad gas 260000000000",
+      "method": "create_bad",
+      "args": {},
+      "gas": 260000000000
+    },
+    {
+      "name": "method_encoding: create_bad gas 450000000000",
+      "method": "create_bad",
+      "args": {},
+      "gas": 450000000000
+    },
+    {
+      "name": "method_encoding: key_bad gas 1000",
+      "method": "key_bad",
+      "args": {},
+      "gas": 1000
+    },
+    {
+      "name": "method_encoding: key_bad gas 260000000000",
+      "method": "key_bad",
+      "args": {},
+      "gas": 260000000000
+    },
+    {
+      "name": "method_encoding: key_bad gas 450000000000",
+      "method": "key_bad",
+      "args": {},
+      "gas": 450000000000
+    },
+    {
+      "name": "method_encoding: view",
+      "method": "batch_bad",
+      "args": {},
+      "view": true
+    }
+  ]
+}

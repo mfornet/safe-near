@@ -99,9 +99,12 @@ theorem finishMeteredCall_reservationInvariant (fees : ActionFees) (ethEnabled :
           cases error with
           | some error => trivial
           | none =>
-            have hvd := deductDeposit_reservationView name before { st with host := paid } args
-            rw [hd] at hvd
-            exact ReservationInvariant.of_view_eq (updateStorageUsage_reservationView extra name before final args)
-              (ReservationInvariant.of_view_eq hvd hp)
+            cases he : actionMethodEncodingError name before args with
+            | some error => trivial
+            | none =>
+              have hvd := deductDeposit_reservationView name before { st with host := paid } args
+              rw [hd] at hvd
+              exact ReservationInvariant.of_view_eq (updateStorageUsage_reservationView extra name before final args)
+                (ReservationInvariant.of_view_eq hvd hp)
 
 end Wasm.Near

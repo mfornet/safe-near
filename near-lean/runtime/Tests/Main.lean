@@ -370,6 +370,36 @@ def main (args : List String) : IO UInt32 := do
       refundedDeploy.state.totalBalance + admittedDeploy.tokensBurnt + scheduledDeploy.tokensBurnt +
         executedDeploy.tokensBurnt + refundedDeploy.tokensBurnt == deploymentState.totalBalance)
 
+  -- Runtime externals reject method bytes before materializing typed actions.
+  let methodWat ← IO.FS.readFile "../../tools/runtime-conformance/fixtures/method_encoding.wat"
+  let methodBytes ← IO.FS.readBinFile "../../tools/runtime-conformance/fixtures/method_encoding.wasm"
+  let methodModule ← match Decoder.Wat.decode methodWat with
+    | .ok module => pure module
+    | .error error => throw (IO.userError s!"method encoding fixture: {error}")
+  let methodCode : ContractCode := { module := methodModule, size := methodBytes.size, hash := "method-encoding-fixture" }
+  let methodState := genesis.setAccount "wrap.near" {
+    genesisAccount (10 * oneNear) with code := some methodCode, storageUsage := 182 + methodCode.size }
+  let methodWorld : World := { cfg, code := methodCode, state := methodState }
+  for method in ["batch_bad", "create_bad", "then_bad", "key_bad"] do
+    let failed := methodWorld.call "alice.near" method "{}" 0
+    let outcome := latestOutcome failed fun o => o.executorId == "wrap.near"
+    check r s!"runtime {method}: invalid UTF-8 rejects with native error and preserves earlier logs"
+      (failed.issue.isNone && isFailure outcome (· == .functionCallError (.hostError .invalidMethodName)) &&
+        outcome.map (·.logs) == some ["before"])
+    check r s!"runtime {method}: rejection conserves funds and creates no access key"
+      (failed.total == methodWorld.total && failed.pending.isEmpty && failed.state.postponed.isEmpty &&
+        (failed.state.accessKey? "wrap.near" (pkOf 0)).isNone)
+  let validMethod := methodWorld.call "alice.near" "batch_valid" "{}" 0
+  check r "runtime method encoding: valid Unicode passes external validation"
+    (validMethod.outcomes.any (fun (_, o) => o.executorId == "wrap.near" && o.status.isSuccess &&
+      o.logs == ["before", "after"]) && validMethod.issue.isNone)
+  let validKey := methodWorld.call "alice.near" "key_valid" "{}" 0
+  check r "runtime method encoding: Unicode key permissions retain exact names"
+    ((validKey.state.accessKey? "wrap.near" (pkOf 0)).map (·.permission) ==
+      some (.functionCall none "alice.near" ["λ", "ok"]))
+  check r "runtime method encoding: successful key scheduling conserves gas backing"
+    (validKey.issue.isNone && validKey.total == methodWorld.total && validKey.pending.isEmpty)
+
   -- deploy and initialise in one transaction from wrap.near
   let (txDeploy, w) := w0.tx "wrap.near" "wrap.near" [.deployContract code, .functionCall "new" (bytesOf "{}") (tgas 50) 0]
   let w := w.settle [txDeploy]
