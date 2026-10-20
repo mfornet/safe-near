@@ -11,3 +11,6 @@ import NearRuntime.Refund
 import NearRuntime.RefundInvariants
 import NearRuntime.GasInvariants
 import NearRuntime.ReceiptInvariants
+import NearRuntime.RefundReceiptInvariants
+import NearRuntime.MaterializeInvariants
+import NearRuntime.FunctionCallInvariants

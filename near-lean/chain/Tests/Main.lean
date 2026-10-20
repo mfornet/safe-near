@@ -320,7 +320,7 @@ def main (args : List String) : IO UInt32 := do
   let issueSnapshot : Snapshot := { state := issueState, pending := [pending] }
   let unsupportedTx : Transaction :=
     { signerId := "wrap.near", publicKey := pkOf 3, nonce := 2, receiverId := "wrap.near"
-      actions := [.stake 0 (pkOf 3)] }
+      actions := [.stake 0 (0 :: 0x58 :: List.replicate 31 0x66)] }
   let issueRun := runIsolated cfg codeOf ap issueSnapshot [unsupportedTx]
   check r "model issues stop isolated execution immediately"
       (issueRun.applies.length == 1 &&

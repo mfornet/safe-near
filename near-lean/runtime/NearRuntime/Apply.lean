@@ -95,26 +95,30 @@ def canCreateAccount (cfg : RuntimeConfig) (predecessor id : AccountId) : Bool :
 def bytesOfString (s : String) : Bytes := s.toUTF8.toList
 def stringOfBytes (b : Bytes) : String := (String.fromUTF8? ⟨b.toArray⟩).getD ""
 
-/-- Promise actions created by a contract become receipt actions. A missing
-external decoder is a model issue, never a deployable placeholder module. -/
-def actionOfPromise (codeOf : Bytes → ContractCode) : PromiseAction → Except RuntimeError Action
-  | .createAccount => .ok .createAccount
-  | .deployContract bytes => do
-    let code := codeOf bytes
-    if let some issue := code.decodeIssue then throw (.executionIssue issue)
-    return .deployContract code
-  | .functionCall m args amount gas => .ok (.functionCall (stringOfBytes m) args gas.toNat amount)
-  | .transfer amount => .ok (.transfer amount)
-  | .stake amount pk => .ok (.stake amount pk)
+/-- Total structural conversion retains decoder issues in the code value.
+The checked wrapper below rejects these issues before any receipts are committed. -/
+def actionOfPromiseRaw (codeOf : Bytes → ContractCode) : PromiseAction → Action
+  | .createAccount => .createAccount
+  | .deployContract bytes => .deployContract (codeOf bytes)
+  | .functionCall m args amount gas => .functionCall (stringOfBytes m) args gas.toNat amount
+  | .transfer amount => .transfer amount
+  | .stake amount pk => .stake amount pk
   | .addKey pk nonce perm =>
     let permission : AccessKeyPermission := match perm with
       | .fullAccess => .fullAccess
       | .functionCall allowance receiver methods =>
         .functionCall allowance (stringOfBytes receiver)
           (if methods.isEmpty then [] else (stringOfBytes methods).splitOn ",")
-    .ok (.addKey pk { nonce := nonce.toNat, permission })
-  | .deleteKey pk => .ok (.deleteKey pk)
-  | .deleteAccount beneficiary => .ok (.deleteAccount (stringOfBytes beneficiary))
+    .addKey pk { nonce := nonce.toNat, permission }
+  | .deleteKey pk => .deleteKey pk
+  | .deleteAccount beneficiary => .deleteAccount (stringOfBytes beneficiary)
+
+/-- Missing external decoders are model issues, never silently deployable code. -/
+def actionOfPromise (codeOf : Bytes → ContractCode) (action : PromiseAction) : Except RuntimeError Action := do
+  let converted := actionOfPromiseRaw codeOf action
+  if let .deployContract code := converted then
+    if let some issue := code.decodeIssue then throw (.executionIssue issue)
+  return converted
 
 /-- Context of a receipt being applied. -/
 structure ReceiptCtx where
@@ -163,8 +167,8 @@ structure FunctionCallEffects where
 
 /-- Materialize the VM's ordered receipts and data dependencies without touching
 execution gas. Id allocation and outgoing order match receipt execution. -/
-def materializeFunctionCall (c : ReceiptCtx) (isLast : Bool) (outcome : VMOutcome)
-    (initial : ChainState) : Except RuntimeError FunctionCallEffects := do
+def materializeFunctionCallRaw (c : ReceiptCtx) (isLast : Bool) (outcome : VMOutcome)
+    (initial : ChainState) : FunctionCallEffects := Id.run do
   let id := c.receipt.receiverId
   let mut st := initial
   let mut receipts : List Receipt := []
@@ -192,7 +196,7 @@ def materializeFunctionCall (c : ReceiptCtx) (isLast : Bool) (outcome : VMOutcom
   | .none => result := .successValue []
   for h : i in [0:outcome.receipts.length] do
     let spec := outcome.receipts[i]
-    let actions ← spec.actions.mapM (actionOfPromise c.codeOf)
+    let actions := spec.actions.map (actionOfPromiseRaw c.codeOf)
     receipts := receipts ++ [{
       predecessorId := id
       receiverId := stringOfBytes spec.receiverId
@@ -205,6 +209,27 @@ def materializeFunctionCall (c : ReceiptCtx) (isLast : Bool) (outcome : VMOutcom
         inputDataIds := inputs[i]?.getD []
         actions := actions } }]
   return { state := st, receipts, result }
+
+/-- The entire promise set is checked before pure construction/commit. -/
+def validateFunctionCallActions (c : ReceiptCtx) (outcome : VMOutcome) : Except RuntimeError Unit := do
+  for spec in outcome.receipts do
+    let _ ← spec.actions.mapM (actionOfPromise c.codeOf)
+  pure ()
+
+def materializeFunctionCall (c : ReceiptCtx) (isLast : Bool) (outcome : VMOutcome)
+    (initial : ChainState) : Except RuntimeError FunctionCallEffects := do
+  validateFunctionCallActions c outcome
+  return materializeFunctionCallRaw c isLast outcome initial
+
+/-- A successful checked construction is exactly the pure stage, with no fallback actions. -/
+theorem materializeFunctionCall_success (c : ReceiptCtx) (isLast : Bool) (outcome : VMOutcome)
+    (initial : ChainState) (effects : FunctionCallEffects)
+    (h : materializeFunctionCall c isLast outcome initial = .ok effects) :
+    effects = materializeFunctionCallRaw c isLast outcome initial := by
+  unfold materializeFunctionCall at h
+  cases hv : validateFunctionCallActions c outcome with
+  | error error => simp [hv, bind, Except.bind] at h
+  | ok accepted => cases accepted; simpa [hv, bind, pure, Except.bind, Except.pure] using h.symm
 
 /-- Commit successful VM effects; the gas/log record is updated separately. -/
 def Exec.commitFunctionCall (exec : Exec) (outcome : VMOutcome) (effects : FunctionCallEffects) : Exec :=
@@ -469,6 +494,16 @@ def Exec.addFailureData (exec : Exec) (receiver : AccountId) (outputs : List Dat
 
 /-- Completed data follows refunds. Returning a promise delegates these
 outputs to that promise; other completions carry their value or failure. -/
+def completionDataStep (receiver : AccountId) (data : Option Bytes)
+    (acc : ChainState × List Receipt) (d : DataReceiver) : ChainState × List Receipt :=
+  let (st, rs) := acc
+  let (id, st) := st.freshId
+  (st, rs ++ [{
+    predecessorId := receiver
+    receiverId := d.receiverId
+    receiptId := id
+    receipt := .data { dataId := d.dataId, data := data } }])
+
 def Exec.addCompletionData (exec : Exec) (receiver : AccountId) (outputs : List DataReceiver) : Exec :=
   let result := match exec.result with
     | some (.successReceiptId _) => none
@@ -478,17 +513,7 @@ def Exec.addCompletionData (exec : Exec) (receiver : AccountId) (outputs : List 
   match result with
   | none => exec
   | some data =>
-    let (st, rs) := outputs.foldl
-      (fun (acc : ChainState × List Receipt) (d : DataReceiver) =>
-        let (st, rs) := acc
-        let (id, st) := st.freshId
-        let receipt : Receipt := {
-          predecessorId := receiver
-          receiverId := d.receiverId
-          receiptId := id
-          receipt := .data { dataId := d.dataId, data } }
-        (st, rs ++ [receipt]))
-      (exec.state, [])
+    let (st, rs) := outputs.foldl (completionDataStep receiver data) (exec.state, [])
     { exec with state := st, newReceipts := exec.newReceipts ++ rs }
 
 /-- Finalize a receipt attempt: rollback, settlement, refunds, reward and data. -/

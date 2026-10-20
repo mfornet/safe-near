@@ -512,23 +512,32 @@ theorem deductPromiseDeposit_accounting (name : String) (ns : NearState) (d : Na
       omega
     · simp [deductPromiseDeposit, hs, hd] at h
 
-def deductDeposit (name : String) (before after : Store NearState) (args : List Value) :
-    Store NearState × Option HostError :=
+/-- Deposit carried by each financial host ABI. Non-financial actions, including
+stake targets, carry no outgoing deposit. -/
+def promiseDeposit? (name : String) (before : Store NearState) (args : List Value) : Option Nat :=
   let a := argU64 args
   let amountAt (ptr : UInt64) : Option Nat := readU128Mem before ptr
-  let deposit : Option Nat := match name with
-    | "promise_create" => amountAt (a 6)
-    | "promise_then" => amountAt (a 7)
-    | "promise_batch_action_function_call" => amountAt (a 5)
-    | "promise_batch_action_transfer" => amountAt (a 1)
-    | "promise_batch_action_stake" => amountAt (a 1)
-    | _ => some 0
+  match name with
+  | "promise_create" => amountAt (a 6)
+  | "promise_then" => amountAt (a 7)
+  | "promise_batch_action_function_call" => amountAt (a 5)
+  | "promise_batch_action_transfer" => amountAt (a 1)
+  | _ => some 0
+
+def deductDeposit (name : String) (before after : Store NearState) (args : List Value) :
+    Store NearState × Option HostError :=
+  let deposit := promiseDeposit? name before args
   match deposit with
   | some 0 => (after, none)
   | some d =>
     let (ns, err) := deductPromiseDeposit name after.host d
     ({ after with host := ns }, err)
   | none => (after, none)
+
+/-- Stake actions carry a target stake, not an outgoing deposit. Scheduling
+one leaves liquid funds untouched; execution uses the receiver's own balance. -/
+theorem deductDeposit_stake (before after : Store NearState) (args : List Value) :
+    deductDeposit "promise_batch_action_stake" before after args = (after, none) := rfl
 
 /-- `panic_utf8(len, ptr)` with the message. -/
 def panicUtf8Metered : HostFn NearState :=

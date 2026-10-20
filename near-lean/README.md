@@ -259,7 +259,7 @@ survive failure, and attempted subsidies are erased. Storage, access keys and
 scheduler state are restored, and unrelated accounts keep their full records.
 The net-conservation theorem uses returned burn minus returned reward; it derives
 the reward bound from a reward fraction at most one and function-call gas at most
-total burnt gas. Gas bounds now follow from action execution. Successful/system
+total burnt gas. Gas bounds now follow from action execution. Successful ordinary
 receipt conservation and chain conservation remain open.
 
 `GasInvariants` proves counter bounds and exact successful charge increments,
@@ -305,3 +305,73 @@ Epoch-dependent staking execution remains an explicit model limitation.
 transactions. A source-derived flag includes signature bytes from protocol 85.
 `convertTransaction_size_bound` proves every successful public conversion fits
 the selected limit. Unknown key encodings fail as explicit model issues.
+
+`RefundReceiptInvariants.applyActionReceipt_refund_conservation` covers system
+balance/gas refunds containing one transfer, under account-key uniqueness and a
+matching receipt payload. Successful execution credits backing exactly once;
+current-key allowance restoration changes no account funds. Failed execution
+restores balances and reports the complete deposit as non-gas burn, without a
+recursive balance refund or gas reward. Execution gas remains observable; zero
+function-call burn is derived for transfers and implies zero receiver reward.
+Missing receivers, including implicit-account names, cannot be created by system
+refunds; storage-staking failure also follows the rollback/burn path. This does
+not yet prove ordinary successful action-receipt or chain-level conservation.
+
+Stake-promise scheduling preserves liquid balance: stake targets are not attached
+deposits. `deductDeposit_stake` kernel-checks the no-op financial frame, and 16
+native comparison cases cover zero balances, amount bounds, repeated actions,
+rollback and mixed transfer/stake construction. Epoch-dependent stake execution
+remains explicitly unsupported by the receipt runtime.
+
+`PromiseAccounting` proves that the actual promise-to-receipt converter preserves
+arbitrary receiver/action valuations, including total attached deposits.
+`DepositRegistry.resolveMetered_funding` proves that every successfully returning
+resolved host import preserves liquid balance plus pending promise deposits,
+with subsidies accounted for explicitly. This includes the actual memory-decoded
+amounts for create, then, batch function-call, and transfer APIs. Other registered
+hosts preserve those financial fields; rejected calls have no success guarantee.
+`LiveInvariant` and `MeteredLiveInvariant` lift these guarantees through actual
+interpreter transitions and the metered loop. A terminal trap discards its
+speculative financial state; catchable exceptions must preserve live invariants.
+`HostNoThrow.resolveMetered_noThrow` proves that the concrete NEAR host registry
+never raises catchable Wasm exceptions.
+
+`OutcomeFunding.run_success_funding` proves for the public executable VM, for
+arbitrary contract code, context and fuel, that success implies:
+
+```
+final balance + outgoing receipt deposits
+  = initial account balance + attached deposit + recorded subsidy
+```
+
+It covers loading/entry charging, actual resolved imports, promise conversion,
+and final receipt validation, with no assumed financial equation or host oracle.
+The stronger live-state invariant also covers caught Wasm exceptions and indexed
+memories. This closes successful VM-call funding; ordinary successful multi-action
+receipt and whole-chain conservation remain open.
+
+`MaterializeInvariants` gives a kernel-checked stage decomposition of the existing
+receipt constructor after promised-action validation. Allocation and dependency
+linking preserve all chain fields except `nextId`, including pending, postponed
+and delayed work. Its id counter increases by the promise count and dependency
+count. Completion data is allocated separately during finalization after refunds. Promise receipt ids form a consecutive, duplicate-free range
+between the initial and post-allocation counters, in promise order.
+The constructor preserves arbitrary receiver/action valuations. Its specialized
+funds theorem covers deposits and purchased outgoing gas, using the proved
+predecessor and gas-price metadata of every emitted receipt.
+
+`FunctionCallInvariants.applyFunctionCall_success_funded` connects the public VM
+to actual successful action execution. With unique account keys, it identifies
+the account, deployed code and VM result and proves:
+
+```
+after funds + before subsidy
+  = before funds + incoming deposit + after subsidy + outgoing gas backing
+```
+
+Here funds include liquid/locked account balances and complete newly emitted
+receipt backing. Successful commit preserves account-key uniqueness and frames
+the chain outside the receiver's account/storage and id allocation. The outgoing
+gas term is explicit: linking it to VM reserved gas, composing multiple actions,
+and receipt-wide settlement remain required for full successful-receipt
+conservation.
