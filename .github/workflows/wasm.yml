@@ -66,18 +66,17 @@ jobs:
       - name: Build programs and run smoke
         working-directory: near-lean/programs/lean
         run: |
-          lake build
+          lake build --wfail
           lake exe smoke
 
       # Every declaration may depend only on propext, Classical.choice and
-      # Quot.sound: no sorry, no native_decide. The programs package carries
-      # one open mergesort proof. Only that module may use sorryAx;
-      # completed program proofs and all supporting modules remain strict.
+      # Quot.sound: no sorry, no native_decide. Program proofs and all
+      # supporting modules use the same strict gate as the core packages.
       - name: Axiom audit (no sorry, no native_decide)
         run: |
           python3 tools/axiom-audit.py near-lean/wasm --report audit/wasm.json --no-build
           python3 tools/axiom-audit.py near-lean/iris-wasm --report audit/iris-wasm.json --no-build
-          python3 tools/axiom-audit.py near-lean/programs/lean --report audit/programs.json --no-build --allow-sorry-module Programs.Mergesort.Proof
+          python3 tools/axiom-audit.py near-lean/programs/lean --report audit/programs.json --no-build
 
   near-runtime:
     name: VM, runtime and chain scenarios and axiom audits

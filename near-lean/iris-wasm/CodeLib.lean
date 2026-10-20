@@ -45,6 +45,7 @@ import CodeLib.SepLogic.SmallStepState
 import CodeLib.SepLogic.SmallStepLifting
 import CodeLib.SepLogic.SmallStepTotalLifting
 import CodeLib.SepLogic.SmallStepOutcomeLanguage
+import CodeLib.SepLogic.SmallStepOutcomeLifting
 import CodeLib.SepLogic.SmallStepOutcomeExample
 import CodeLib.SepLogic.SmallStepAdequacy
 import CodeLib.SepLogic.SmallStepAdequacyExamples

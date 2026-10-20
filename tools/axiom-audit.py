@@ -8,7 +8,7 @@ which trusts the compiler rather than the kernel).
 
 Usage:
   tools/axiom-audit.py near-lean/wasm --report audit/wasm.json
-  tools/axiom-audit.py near-lean/programs/lean --report audit/programs.json --allow-sorry
+  tools/axiom-audit.py near-lean/programs/lean --report audit/programs.json
 
 Unlike an umbrella import or a source grep, this checks the transitive axiom
 dependencies of every declaration, including private helpers and proof fields
@@ -17,7 +17,7 @@ packages must be audited separately. A missing module or failed build is an
 audit failure, never an exemption.
 
 `--allow-sorry` tolerates `sorryAx` alone, for packages whose proofs are
-still open by design (the specs in near-lean/programs); the sorried
+intentionally left open in an unfinished proof package; the sorried
 declarations are listed, and every other nonstandard axiom still fails.
 Repeat --require-clean-module to keep completed modules strict within such a
 package; a missing required module is an audit error.

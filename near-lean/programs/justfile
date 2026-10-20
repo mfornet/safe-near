@@ -17,7 +17,7 @@ rust-test:
 # Build the Lean `Programs` library (checks each Program.lean against its .wat).
 [working-directory("lean")]
 build:
-    lake build
+    lake build --wfail
 
 # Run every program under the stdio host on small inputs.
 [working-directory("lean")]

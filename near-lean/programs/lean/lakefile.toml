@@ -11,7 +11,7 @@ name = "CodeLib"
 path = "../../iris-wasm"
 
 # Generated Wasm modules of ../rust (one `Programs.<Crate>.Program` each),
-# their specifications and correctness theorems (only mergesort remains open).
+# their specifications and completed correctness theorems.
 [[lean_lib]]
 name = "Programs"
 

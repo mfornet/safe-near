@@ -8,11 +8,10 @@ writes bytes back.
 Copied from [Talos](https://github.com/cajal-technologies/talos) `programs/`
 at commit `80644390de3ad4db3055445259a034413ae41577` (2026-10-06), with the
 specifications. `ByteEcho` now has a kernel-checked correctness proof of its
-compiled export. Both the GCD kernel and exported stream driver are proved
-through Iris and small-step termination. The mergesort theorem remains open
-in its `Proof.lean` file. The port includes proof support for the completed theorems.
-The package
-depends on `../iris-wasm` (Talos's `codelib`), exactly as upstream does.
+compiled export. The GCD kernel and exported stream driver are proved
+through Iris and small-step termination. The mergesort export has an
+outcome-sensitive partial-correctness proof. All four specifications are proved.
+The port includes proof support for these theorems. The package depends on `../iris-wasm` (Talos's `codelib`), exactly as upstream does.
 License AGPL-3.0, see `../wasm/LICENSE`.
 
 | Program | Export | Stream contract |
@@ -34,25 +33,24 @@ rust/                     cargo workspace, toolchain pinned in rust-toolchain.to
 lean/                     Lake package `Programs`, depends on ../../iris-wasm (and so on ../../wasm)
   Programs/<Crate>/Program.lean   generated Wasm AST of each program (spliced from the .wat by CodeLib.Generated)
   Programs/<Crate>/Spec.lean      the specification (semantic Input/Output, host contract)
-  Programs/<Crate>/Proof.lean     the correctness theorem (only mergesort remains open)
+  Programs/<Crate>/Proof.lean     completed correctness theorem
   Programs/GcdStdio/KernelProof.lean  compiled Stein kernel partial correctness and termination
   Programs/Smoke.lean     `lake exe smoke`: runs every program on small inputs
 ```
 
-## Specifications and open proofs
+## Specifications and proofs
 
 Specs are `def … : Prop` tagged `@[spec_of <kind> "crate::fn"]`; the theorem
 that discharges one is tagged `@[proves <spec>]` (attributes from
-`CodeLib.Attrs`). Everything below is stated and typechecks. The ByteEcho, GCD kernel and GCD stream proofs are complete;
-only mergesort remains `sorry`. Upstream's proofs are separation-logic proofs over
-`CodeLib.SepLogic`, which is now available here.
+`CodeLib.Attrs`). All four statements below have completed proofs. The GCD and
+mergesort proofs use the ported `CodeLib.SepLogic` framework.
 
 | Spec | Kind | Statement | Theorem / status |
 |---|---|---|---|
 | `ByteEcho.Spec.ByteEchoSpec` | total | For every input byte, `byte_echo` terminates and writes exactly that byte. | `ByteEcho.Proof.byte_echo_correct` (proved) |
 | `GcdStdio.Spec.KernelSpecification` | total, internal | The out-of-line `gcd_u64` kernel (`func1`), run on two `i64`s, returns `Nat.gcd`. | `GcdStdio.Proof.kernel_correct` (proved) |
 | `GcdStdio.Spec.PublicEntrySpecification` | total | For every pair of `u64`, `gcd` terminates and writes their `Nat.gcd`. | `GcdStdio.Proof.gcd_correct` (proved) |
-| `Mergesort.Spec.PublicEntrySpecification` | partial | Every finite run of `mergesort` on packed `u32`s either traps with the allocator's `talos.oom` or returns a sorted permutation of the input. Termination is not claimed. | `Mergesort.Proof.mergesort_correct` |
+| `Mergesort.Spec.PublicEntrySpecification` | partial | Every finite run of `mergesort` on packed `u32`s either traps with the allocator's `talos.oom` or returns a sorted permutation of the input. Termination is not claimed. | `Mergesort.Proof.mergesort_correct` (proved) |
 
 `ByteEcho.Proof.byte_echo_correct` symbolically evaluates the actual generated
 module for an arbitrary input byte, including its allocator and universal-host
@@ -64,9 +62,8 @@ specification was changed.
 `Programs.ProofSupport.Cbv.program_cbv` fixes the pinned Lean 4.34.1 evaluator's
 literal-conditional proof construction, supplying its missing `Decidable`
 argument. The change is scoped to each tactic invocation. Kernel checking and
-the axiom audit remain in force. The program audit permits `sorryAx` only
-in `Programs.Mergesort.Proof`. Every other program and proof-support module
-must remain completely free of nonstandard axioms.
+the axiom audit remain in force. The program audit uses the same strict
+standard-axiom policy as the core libraries, with no `sorryAx` exception.
 
 `GcdStdio/KernelProof.lean` adapts the [pinned Talos optimized Stein proof](https://github.com/cajal-technologies/talos/blob/80644390de3ad4db3055445259a034413ae41577/programs/lean/Project/NumIntegerOpt3/Spec.lean)
 to the existing generated `GcdStdio.func1` and `Spec.kernelConfig`. The Iris
@@ -84,11 +81,19 @@ finite execution required by the unchanged public specification. Shared
 `ProofSupport.StreamMemory`/`StreamHost` modules contain only byte ownership,
 call framing and stdio transfers; no unrelated mergesort proof is imported.
 
-Upstream Talos proves all four. The GCD kernel spec there is tied to the
-separately verified `num_integer_opt3` program, which is not in near-lean, so
-`kernelConfig` here uses this module's own (irrelevant) store and the
-body-equality theorem is omitted. `lake build` reports the open `sorry`s as
-warnings.
+The mergesort proof ports the [pinned Talos reachable-function proof chain](https://github.com/cajal-technologies/talos/tree/80644390de3ad4db3055445259a034413ae41577/programs/lean/Project/Mergesort).
+`Representations` ties byte/word ownership, allocator freshness, vector capacity
+and codec invariants to the physical state. `SortProof`, the local-function
+contracts and the driver proof compose the actual generated functions. The
+outcome adapter accounts for the precise `talos.oom` trap and host marker.
+Partial adequacy proves the unchanged public statement for every finite
+terminal execution. This does not claim termination or exclude the specified
+OOM outcome. Generated code and public specifications remain unchanged.
+
+All program modules build with `--wfail` and pass the strict package-wide axiom
+audit. GCD uses its own generated register-only body and store, without adding
+the standalone `num_integer_opt3` program. Terminal outcome-WP rules live in
+`CodeLib.SepLogic.SmallStepOutcomeLifting`; compile-time examples reuse them.
 
 ## Build the Wasm
 
@@ -109,7 +114,7 @@ unnoticed; regenerating `Program.lean` needs Talos's `verifier emit`.
 
 ```
 cd near-lean/programs/lean
-lake build            # Programs library
+lake build --wfail    # proved Programs library, warnings treated as errors
 lake exe smoke        # six cases across the three programs, exit 1 on mismatch
 lake exe program-tests # exhaustive small mergesort inputs and stream boundaries
 ```
@@ -126,7 +131,7 @@ all lists of length 0–4 over `[0, 1, UInt32.max]`, plus sorted, reversed, and
 duplicate-heavy inputs around merge and 256-byte stream boundaries. It also
 checks malformed byte lengths, GCD boundary values, byte echo, and explicit
 harness failures. Both the six smoke cases and the regression suite run in CI.
-These are executable checks; `Mergesort.Proof.mergesort_correct` remains open.
+These executable checks complement the compiled program correctness proofs.
 The stream harness requires a `() -> ()` export; exports requiring parameters
 or returning Wasm values are rejected before execution. The regression suite
 currently contains 168 cases.
