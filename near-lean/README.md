@@ -500,7 +500,12 @@ supported results. `ActionAccountFrame.applyAction_account_ne` proves that each
 raw action preserves account records outside its receiver, on every outcome.
 `ReservedActorInvariant.applyActionReceipt_systemAbsent` proves that executing
 and finalizing an action receipt cannot install an initially absent `system`
-account. These are local preservation results; full block/chain composition,
+account. `processReceipt_systemAbsent` extends this guarantee to the entire
+processor, including recursive data delivery, without input-shape or postponed-map
+assumptions. `convertTransaction_systemAbsent` proves the same for successful
+transaction conversion. `processReceipt_runtimeFundingInvariant` combines
+reserved-actor absence with the financial state invariant. These are local
+preservation results; full block/chain composition,
 emitted receipt scope, identifier freshness and dependency-graph preservation
 remain separate obligations.
 

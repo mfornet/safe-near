@@ -1,4 +1,5 @@
 import NearRuntime.ActionAccountFrame
+import NearRuntime.TransactionInvariants
 
 namespace Near
 open Wasm.Near
@@ -142,5 +143,68 @@ theorem finalizeReceipt_systemAbsent (c : ReceiptCtx) (st : ChainState) (raw : E
 theorem applyActionReceipt_systemAbsent (c : ReceiptCtx) (st : ChainState) (h : st.SystemAccountAbsent) :
     (applyActionReceipt c st).state.SystemAccountAbsent :=
   finalizeReceipt_systemAbsent c st _ _ h (runReceiptActions_systemAbsent c st h)
+
+/-- Processing any receipt preserves absence of the synthetic actor, even when
+malformed stored data receipts recursively release further postponed work. -/
+theorem processReceipt_systemAbsent (cfg : RuntimeConfig) (ap : ApplyState) (decoder : Bytes → ContractCode)
+    (st : ChainState) (receipt : Receipt) (h : st.SystemAccountAbsent) :
+    (processReceipt cfg ap decoder st receipt).state.SystemAccountAbsent := by
+  cases hr : receipt.receipt with
+  | action action =>
+    cases he : (action.inputDataIds.filter fun id => !(Assoc.contains st.receivedData id)).isEmpty with
+    | false =>
+      rw [processReceipt_waiting cfg ap decoder st receipt action hr he]
+      exact h
+    | true =>
+      rw [processReceipt_ready cfg ap decoder st receipt action hr he]
+      unfold processedOfExec
+      split
+      · exact h
+      · exact applyActionReceipt_systemAbsent _ _ h
+  | data data =>
+    rw [processReceipt_data cfg ap decoder st receipt data hr]
+    cases hroute : Assoc.lookup st.postponedByData data.dataId with
+    | none => exact h
+    | some id =>
+      simp only
+      cases hpending : ((Assoc.lookup st.pendingDataCount id).getD 1 - 1 == 0) with
+      | false => simp only [Bool.false_eq_true, ite_false]; exact h
+      | true =>
+        simp only [ite_true]
+        cases hwaiting : Assoc.lookup st.postponed id with
+        | none => exact h
+        | some waiting =>
+          exact processReceipt_systemAbsent cfg ap decoder
+            (releasePostponedState (receivePostponedDataState st data) id) waiting h
+termination_by st.postponed.length
+decreasing_by
+  exact Assoc.erase_length_lt_of_lookup _ _ _ hwaiting
+
+/-- An absent synthetic actor cannot authenticate a transaction; successful
+conversion can therefore update only an ordinary signer account. -/
+theorem convertTransaction_systemAbsent (cfg : RuntimeConfig) (ap : ApplyState)
+    (st st' : ChainState) (tx : Transaction) (receipt : Receipt) (cost : Fees.TxCost)
+    (h : st.SystemAccountAbsent)
+    (hconvert : convertTransaction cfg ap st tx = .ok (st', receipt, cost)) :
+    st'.SystemAccountAbsent := by
+  obtain ⟨signer, _, hsigner, _⟩ := convertTransaction_success_commit cfg ap st st' tx receipt cost hconvert
+  have hne : tx.signerId ≠ systemAccount := by
+    intro he
+    rw [he, h] at hsigner
+    contradiction
+  exact (convertTransaction_account_frame cfg ap st st' tx receipt cost systemAccount hne hconvert).trans h
+
+/-- The local financial state invariant also excludes a stored synthetic actor.
+Input scope and successful support remain explicit accounting premises. -/
+def ChainState.RuntimeFundingInvariant (st : ChainState) : Prop :=
+  st.ReceiptFundingInvariant ∧ st.SystemAccountAbsent
+
+theorem processReceipt_runtimeFundingInvariant (cfg : RuntimeConfig) (ap : ApplyState)
+    (decoder : Bytes → ContractCode) (st : ChainState) (receipt : Receipt)
+    (h : st.RuntimeFundingInvariant) (hshape : ReceiptFinancialShape receipt)
+    (hsupported : (processReceipt cfg ap decoder st receipt).issue = none) :
+    (processReceipt cfg ap decoder st receipt).state.RuntimeFundingInvariant :=
+  ⟨processReceipt_fundingInvariant cfg ap decoder st receipt h.1 hshape hsupported,
+    processReceipt_systemAbsent cfg ap decoder st receipt h.2⟩
 
 end Near
