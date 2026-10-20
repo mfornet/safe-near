@@ -442,25 +442,33 @@ attempts containing arbitrary ordered function-call actions, including execution
 fees, admission checks and the final storage-staking check.
 
 `ReceiptFunding` factors settlement into a reusable action-body funding rule.
-`MetadataFunding` proves deployment and key insertion/deletion preserve liquid
-and locked balances while updating code, permissions and storage usage. Its
-executable unfolding lemmas retain the actual account/key admission witnesses.
-`MixedFunding.applyActionReceipt_mixed_net_conservation` covers arbitrary
-ordered mixtures of these actions and function calls, on success and failure.
-It equates account funds plus outgoing receipt backing and net burn with the
+`MetadataFunding` covers deployment and key insertion/deletion, retaining their
+actual account/key admission witnesses. `BalanceActionFunding` covers account
+creation, transfers to existing or supported implicit accounts, best-effort gas
+refund allowance restoration, and final account deletion. Deletion's beneficiary
+refund is backed by the removed unlocked balance; positive locked balances are
+rejected by the actual guard. Creation adds no balance, and implicit creation
+credits the deposit exactly once.
+
+`AllActionFunding.applyActionReceipt_net_conservation` has no incoming action-
+family restriction. For ordinary modeled action receipts, on success and failure,
+it equates account funds plus outgoing receipt backing and net burn with the
 initial account funds, incoming receipt backing and explicit subsidy. Gas
 refunds, rewards, admission errors and final storage-staking rollback are part
-of the actual receipt path.
+of the actual executable path. Stake/unstake still reject epoch-dependent
+semantics; their successful funding rule is vacuous and does not add support.
+`applyActionReceipt_accountsUnique` also preserves the unique-account premise
+needed by subsequent receipt proofs.
 
-The concrete theorem requires unique account records, an ordinary receiver,
-non-system predecessor/signer, matching action-receipt metadata, the v85+
-settlement branch (`accountCostIncrease = true`), and a reward fraction at most
-one. The previous existing-receiver premise is removed: a new lower-bound proof
-shows account-creation charges add to gross burn and cannot underfund rewards.
-No VM outcome or financial equation is assumed by the concrete theorem.
-Arbitrary VM-created outgoing action variants have their gas/deposit backing
-covered independently. Incoming creation, transfer and account-deletion funding
-rules, chain-level conservation and full runtime equivalence remain open.
+The concrete conservation theorem requires unique account records, an ordinary
+receiver, non-system predecessor/signer, matching action-receipt metadata, the
+v85+ settlement branch (`accountCostIncrease = true`), and a reward fraction at
+most one. No existing-receiver, VM-output or financial-equation premise is
+assumed. Account-creation charges add to gross burn and cannot underfund rewards.
+`MixedFunding` and function-call-only results remain available as narrower
+consequences. Ordinary receipt settlement is now covered; composing it with
+system refunds, scheduling, transactions and chain execution remains open.
+This is a theorem of the modeled runtime, not full nearcore equivalence.
 
 `NearVM.ReceiptPredicates` transports arbitrary decidable receiver/action
 predicates through actual promise updates, conversion and successful outcome
@@ -477,8 +485,7 @@ host call, including legacy gas metering; unsupported operations still trap.
 for arbitrary code, context, storage and fuel when execution succeeds and the
 context selects strict runtime decoding. Mock opaque-byte execution is excluded
 by this explicit policy premise. Encoding validity is not complete action
-validity or authorization. Settlement for general incoming action mixtures,
-chain conservation, verified binary decoding and full nearcore equivalence
+validity or authorization. Chain conservation, verified binary decoding and full nearcore equivalence
 remain open.
 
 Promise deployment derives `ContractCode.size` from the actual payload through
