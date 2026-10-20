@@ -18,3 +18,4 @@ import NearRuntime.PromiseGasInvariants
 import NearRuntime.ReceiptFunding
 import NearRuntime.MixedFunding
 import NearRuntime.AllActionFunding
+import NearRuntime.RoutingFunding

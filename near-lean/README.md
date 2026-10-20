@@ -466,9 +466,37 @@ v85+ settlement branch (`accountCostIncrease = true`), and a reward fraction at
 most one. No existing-receiver, VM-output or financial-equation premise is
 assumed. Account-creation charges add to gross burn and cannot underfund rewards.
 `MixedFunding` and function-call-only results remain available as narrower
-consequences. Ordinary receipt settlement is now covered; composing it with
-system refunds, scheduling, transactions and chain execution remains open.
-This is a theorem of the modeled runtime, not full nearcore equivalence.
+consequences. This is a theorem of the modeled runtime, not full nearcore equivalence.
+
+`UnifiedReceiptFunding` combines ordinary receipts with protocol-shaped system
+refunds, including destroyed deposits when refunds cannot be delivered. Its
+`ReceiptFinancialShape` states the actor/action scope explicitly: system-origin
+receipts are single transfers; ordinary receipts have non-system receiver and
+signer. This is not a proof that every emitted receipt satisfies that scope.
+
+`QueuedFunds` defines `ChainState.totalFunds` as liquid/locked account value plus
+postponed and delayed receipt backing. The real waiting-action branch moves the
+incoming asset into the postponed map. Its freshness premise prevents an
+existing receipt id from being overwritten. Queue insertion, release and delayed
+append/pop laws account for the full deposit and purchased-gas value.
+`ReceiptQueueFrame` proves that action execution and finalization leave these
+routing-owned queues unchanged, including on contract failure.
+
+`RoutingFunding.processReceipt_conservation` covers the entire supported
+processor: ready actions, waiting actions, data-only updates and data-triggered
+resumption. `Processed.totalFunds` also counts newly emitted receipts, and its
+net burn includes non-gas deposit destruction minus receiver rewards. Account
+uniqueness is preserved. The theorem assumes unique, correctly identified,
+financially scoped action receipts in the postponed map, a fresh incoming id,
+receipt financial scope, the settlement configuration/reward bounds, and an
+actual `issue = none` processing result. Unsupported/incomplete attempts are not
+silently treated as committed executions. `PostponedFinancialWellFormed` is a
+financial invariant, not full dependency-graph validity or fairness.
+
+Remaining composition work includes preserving receipt scope, id freshness and
+routing invariants across generated frontiers, transactions, block scheduling
+and chain execution. Independent nearcore equivalence and end-to-end deployed
+wNEAR refinement remain separate open requirements.
 
 `NearVM.ReceiptPredicates` transports arbitrary decidable receiver/action
 predicates through actual promise updates, conversion and successful outcome
