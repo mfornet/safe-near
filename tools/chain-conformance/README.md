@@ -193,6 +193,30 @@ subgroup membership; epoch-dependent staking execution remains unsupported.
 
 ## Canonical trie and cache diagnostics
 
+`just chain-state-encoding-test` compares `NearRuntime.StateEncoding.encode` on
+actual typed `ChainState` records with native `--encode-state`. It checks account
+V1 Borsh bytes, ordinary Ed25519/secp256k1 access keys, finite/unlimited
+function-call permissions, raw contract code and binary contract storage. Native
+permission receivers are strings; they may contain values invalid as account IDs.
+The Lean `state-encode` executable accepts `{formatVersion: 1, codes, initialState}`
+using the same catalogue and state transport as `chain-replay`. It returns
+`initialEntries`, `root` and the complete `witness`, constructed independently.
+Native encoded state, roots and objects never enter the Lean request.
+
+Catalogue bytes must match the canonical base58 SHA256 code hash and model size;
+arbitrary replay labels cannot be used for trie encoding. Wasm byte-to-WAT
+correspondence still depends on the external decoder. Duplicate records, missing
+owners, invalid account IDs, unsupported key encodings, numeric overflow and
+nonempty receipt/data queues fail closed. Model counter IDs cannot stand in for
+native receipt/data hashes. `nextId` is manipulator metadata with no trie column.
+
+The output is a selected-account synthetic genesis, not an original shard trie.
+Opaque shard records, native hash-ID generation, receipt cache lifetime and trie
+gas in runtime execution remain open. Account serialization follows the pinned
+native encoder even at the u128 maximum sentinel; serialization agreement alone
+does not establish that every such synthetic account can deserialize or execute.
+Evidence is saved in `audit/state-encoding-regressions.json`.
+
 `just chain-trie-test` compares native `near_store::Trie` traversal with
 `NearRuntime.TrieAccounting`. Build the source oracle first, as above. For an
 individual request:

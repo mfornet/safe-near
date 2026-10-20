@@ -28,3 +28,8 @@ name = "ChainReplay"
 [[lean_exe]]
 name = "chain-replay"
 root = "ChainReplay.Main"
+
+# Queue-free model records to native trie bytes, root and complete object set.
+[[lean_exe]]
+name = "state-encode"
+root = "ChainReplay.StateEncoding"

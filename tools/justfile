@@ -181,3 +181,8 @@ chain-trie-test:
     cd near-lean/runtime && lake build trie-replay --wfail
     python3 tools/chain-conformance/test_trie_accounting.py
     python3 tools/chain-conformance/test_trie_updates.py
+
+# Compare typed model accounts/keys/code/storage to native Borsh and canonical trie objects.
+chain-state-encoding-test:
+    cd near-lean/chain && lake build state-encode --wfail
+    python3 tools/chain-conformance/test_state_encoding.py
