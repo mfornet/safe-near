@@ -427,34 +427,33 @@ including empty CSV and multibyte names. The VM key guard validates each field;
 successful postprocessing supplies that decoding fact and still implies a whole
 CSV UTF-8 witness. Runtime key conversion uses the same byte fields.
 
-The gas bridge now covers action lists, receipt budgets and the actual
-materializer. `materialize_run_funds` identifies outgoing receipt funds as raw
-deposits plus `(usedGas - burntGas) * gasPrice` for ordinary contracts, under
-`ReceiptGasEncodingValid`. This predicate contains only receiver/method decoding
-facts, not an assumed gas/funds equation or full action validity. Deriving it for
-every receipt from successful runtime execution remains an open invariant
-obligation. `NearVM.ReceiptPredicates` supplies the generic conversion seam:
-`setPromise_preserves_predicate` preserves a receiver/action invariant through
-an actual handle update; `convertPromises_preserves_predicate` and
-`outcomeOfExecution_success_predicate` transport it into emitted receipts.
-These are kernel-checked for arbitrary decidable predicates and do not assume
-unique dependencies. `NearVM.PromiseEncoding` defines that encoding invariant and proves its
-preservation through concrete action append/update operations. All nine raw
-batch-action hosts have preservation lemmas requiring the newly parsed action's
-method witness; seven hosts also have unconditional preservation lemmas because
-their actions contain no methods. Runtime conversion and successful outcome
-packing now transport this exact invariant into `ReceiptGasEncodingValid`.
-`NearVM.CreationEncoding` derives receiver witnesses from the actual creation
-guard and method witnesses from the validated ABI bytes. `MeteredEncoding`
-proves that successful returns from all five receipt/join creators and all nine
-batch-action wrappers preserve the input encoding invariant under the strict
-runtime policy. The two method-bearing hosts now obtain their witnesses from
-the actual post-call external guard; charging and deposit error precedence are
-preserved. `finishMeteredCall_success_promises` proves postprocessing retains
-exactly the raw promise payloads. Lifting these concrete successful-return
-lemmas through the full registry/interpreter, including strict-policy
-preservation and all other hosts, remains open. Full multi-action settlement/chain
-conservation and nearcore equivalence also remain open.
+The gas bridge covers action lists, receipt budgets and actual materialization.
+`materialize_run_funds` identifies outgoing receipt funds as raw deposits plus
+`(usedGas - burntGas) * gasPrice` for ordinary contracts. Its decoding condition
+is now derived from successful execution under the strict runtime policy;
+callers no longer supply `ReceiptGasEncodingValid` for emitted receipts.
+`materialize_functionCall_run_funds` instantiates the actual runtime context,
+which sets that policy, and therefore needs no separate decoding/policy premise.
+This proves the funds of newly materialized receipts, not complete receipt
+settlement or chain conservation.
+
+`NearVM.ReceiptPredicates` transports arbitrary decidable receiver/action
+predicates through actual promise updates, conversion and successful outcome
+packing, without requiring unique dependencies. `PromiseEncoding` specializes
+this to receiver UTF-8 and byte-preserving method decoding. `CreationEncoding`
+and `MeteredEncoding` derive witnesses from the ordered receiver and external
+method guards for all five creators/joins and nine batch-action hosts.
+`NeutralEncoding`, `PolicyEncoding`, `EncodingHosts` and `EncodingRegistry`
+prove that strict policy and receipt encoding survive every published live
+host call, including legacy gas metering; unsupported operations still trap.
+`ResolvedEncoding` covers actual import resolution and initialization, and
+`ExecutionEncoding` covers checked steps and instruction/frame charges.
+`OutcomeEncoding.run_success_receipt_encoding` establishes the public VM result
+for arbitrary code, context, storage and fuel when execution succeeds and the
+context selects strict runtime decoding. Mock opaque-byte execution is excluded
+by this explicit policy premise. Encoding validity is not complete action
+validity or authorization. Full multi-action settlement/chain conservation,
+verified binary decoding and full nearcore equivalence remain open.
 
 Promise deployment derives `ContractCode.size` from the actual payload through
 `ContractCode.decodeSized`. Size limits, storage accounting and outgoing gas

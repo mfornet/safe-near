@@ -1,5 +1,6 @@
 import NearRuntime.FunctionCallInvariants
 import NearVM.PromiseGas
+import NearVM.OutcomeEncoding
 import Interpreter.Wasm.ByteEncoding
 
 namespace Near
@@ -188,18 +189,26 @@ theorem decodedReceiptsGas_eq_raw (cfg : RuntimeConfig) (decoder : Bytes → Con
   intro spec hm
   exact decodedReceiptGas_eq_raw cfg decoder spec (h spec hm)
 
+/-- Successful strict-policy execution discharges the entire emitted-receipt
+encoding condition, using the concrete registry and interpreter proofs. -/
+theorem run_success_gasEncoding (cfg : RuntimeConfig) (code : Module) (codeSize : Nat) (method : String)
+    (ctx : VMContext) (storage : List (Bytes × Bytes)) (fuel : Nat)
+    (hpolicy : ctx.validateActionMethodUtf8 = true)
+    (hsuccess : (Wasm.Near.run cfg code codeSize method ctx storage fuel).aborted = none) :
+    ∀ spec ∈ (Wasm.Near.run cfg code codeSize method ctx storage fuel).receipts, ReceiptGasEncodingValid spec :=
+  run_success_receipt_encoding cfg code codeSize method ctx storage fuel hpolicy hsuccess
+
 /-- Public VM gas backing transfers to decoded runtime action budgets under
-explicit byte-decoding facts. Deriving these facts for every emitted receipt
-from the concrete runtime execution remains a separate invariant obligation. -/
+the operational strict policy, with receipt decoding derived from execution. -/
 theorem run_success_decoded_receipt_gas (cfg : RuntimeConfig) (decoder : Bytes → ContractCode)
     (code : Module) (codeSize : Nat) (method : String) (ctx : VMContext)
     (storage : List (Bytes × Bytes)) (fuel : Nat)
     (hsuccess : (Wasm.Near.run cfg code codeSize method ctx storage fuel).aborted = none)
-    (hencoding : ∀ spec ∈ (Wasm.Near.run cfg code codeSize method ctx storage fuel).receipts,
-      ReceiptGasEncodingValid spec) :
+    (hpolicy : ctx.validateActionMethodUtf8 = true) :
     (Wasm.Near.run cfg code codeSize method ctx storage fuel).usedGas =
       (Wasm.Near.run cfg code codeSize method ctx storage fuel).burntGas +
         ((Wasm.Near.run cfg code codeSize method ctx storage fuel).receipts.map (decodedReceiptGas cfg decoder)).sum := by
+  have hencoding := run_success_gasEncoding cfg code codeSize method ctx storage fuel hpolicy hsuccess
   rw [decodedReceiptsGas_eq_raw cfg decoder _ hencoding]
   exact run_success_gas_backing cfg code codeSize method ctx storage fuel hsuccess
 
@@ -212,16 +221,16 @@ theorem functionCallGasFunds_eq_decoded (c : ReceiptCtx) (outcome : VMOutcome)
   exact List.sum_map_mul_right (l := outcome.receipts) (f := decodedReceiptGas c.cfg c.codeOf) (r := c.action.gasPrice)
 
 /-- For an actual successful VM call, materialized onward gas funds are exactly
-the public counter's reservation, under the explicit encoding conditions. -/
+the public counter's reservation, with encoding proved from the strict policy. -/
 theorem run_functionCallGasFunds (c : ReceiptCtx) (code : Module) (codeSize : Nat) (method : String)
     (ctx : VMContext) (storage : List (Bytes × Bytes)) (fuel : Nat)
     (hreceiver : c.receipt.receiverId ≠ systemAccount)
     (hsuccess : (Wasm.Near.run c.cfg code codeSize method ctx storage fuel).aborted = none)
-    (hencoding : ∀ spec ∈ (Wasm.Near.run c.cfg code codeSize method ctx storage fuel).receipts,
-      ReceiptGasEncodingValid spec) :
+    (hpolicy : ctx.validateActionMethodUtf8 = true) :
     functionCallGasFunds c (Wasm.Near.run c.cfg code codeSize method ctx storage fuel) =
       ((Wasm.Near.run c.cfg code codeSize method ctx storage fuel).usedGas -
         (Wasm.Near.run c.cfg code codeSize method ctx storage fuel).burntGas) * c.action.gasPrice := by
+  have hencoding := run_success_gasEncoding c.cfg code codeSize method ctx storage fuel hpolicy hsuccess
   rw [functionCallGasFunds_eq_decoded c _ hreceiver, decodedReceiptsGas_eq_raw c.cfg c.codeOf _ hencoding]
   rw [run_success_receipts_gas_eq_reserved c.cfg code codeSize method ctx storage fuel hsuccess]
 
@@ -232,12 +241,28 @@ theorem materialize_run_funds (c : ReceiptCtx) (isLast : Bool) (initial : ChainS
     (storage : List (Bytes × Bytes)) (fuel : Nat)
     (hreceiver : c.receipt.receiverId ≠ systemAccount)
     (hsuccess : (Wasm.Near.run c.cfg code codeSize method ctx storage fuel).aborted = none)
-    (hencoding : ∀ spec ∈ (Wasm.Near.run c.cfg code codeSize method ctx storage fuel).receipts,
-      ReceiptGasEncodingValid spec) :
+    (hpolicy : ctx.validateActionMethodUtf8 = true) :
     receiptsFunds c.cfg (materializeFunctionCall c isLast (Wasm.Near.run c.cfg code codeSize method ctx storage fuel) initial).receipts =
       receiptsDeposits (Wasm.Near.run c.cfg code codeSize method ctx storage fuel).receipts +
         ((Wasm.Near.run c.cfg code codeSize method ctx storage fuel).usedGas -
           (Wasm.Near.run c.cfg code codeSize method ctx storage fuel).burntGas) * c.action.gasPrice := by
-  rw [materializeFunctionCall_funds_split, run_functionCallGasFunds c code codeSize method ctx storage fuel hreceiver hsuccess hencoding]
+  rw [materializeFunctionCall_funds_split, run_functionCallGasFunds c code codeSize method ctx storage fuel hreceiver hsuccess hpolicy]
+
+/-- At the actual runtime context seam even the policy premise is discharged:
+ordinary successful calls materialize exactly their raw deposits and reserved gas funds. -/
+theorem materialize_functionCall_run_funds (c : ReceiptCtx) (account : Account)
+    (args : Bytes) (gas deposit : Nat) (isLast : Bool) (initial : ChainState)
+    (code : Module) (codeSize : Nat) (method : String) (storage : List (Bytes × Bytes)) (fuel : Nat)
+    (hreceiver : c.receipt.receiverId ≠ systemAccount)
+    (hsuccess : (Wasm.Near.run c.cfg code codeSize method
+      (functionCallContext c account args gas deposit isLast) storage fuel).aborted = none) :
+    receiptsFunds c.cfg (materializeFunctionCall c isLast
+      (Wasm.Near.run c.cfg code codeSize method (functionCallContext c account args gas deposit isLast) storage fuel) initial).receipts =
+      receiptsDeposits (Wasm.Near.run c.cfg code codeSize method
+        (functionCallContext c account args gas deposit isLast) storage fuel).receipts +
+      ((Wasm.Near.run c.cfg code codeSize method (functionCallContext c account args gas deposit isLast) storage fuel).usedGas -
+        (Wasm.Near.run c.cfg code codeSize method (functionCallContext c account args gas deposit isLast) storage fuel).burntGas) * c.action.gasPrice :=
+  materialize_run_funds c isLast initial code codeSize method
+    (functionCallContext c account args gas deposit isLast) storage fuel hreceiver hsuccess rfl
 
 end Near
