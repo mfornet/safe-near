@@ -118,6 +118,10 @@ jobs:
           cd ../.. && python3 tools/chain-conformance/test_transaction_encoding.py
       - name: Compare existing delayed FIFO with new local and incoming deferrals
         run: python3 tools/chain-conformance/test_delayed_local_order.py
+      - name: Compare automatic runtime identity and persistent queue registration
+        run: |
+          cd near-lean/chain && lake build registered-replay chain-replay --wfail
+          cd ../.. && python3 tools/chain-conformance/test_receipt_registry.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -142,3 +146,6 @@ jobs:
             audit/transaction-encoding-regressions.json
             audit/transaction-registry-regressions.json
             audit/delayed-local-order-regressions.json
+            audit/receipt-registry-regressions.json
+            audit/receipt-registry-queues.json
+            audit/receipt-registry-fifo.json

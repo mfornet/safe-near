@@ -206,3 +206,8 @@ chain-transaction-encoding-test:
 chain-delayed-order-test:
     cd near-lean/chain && lake build chain-replay --wfail
     python3 tools/chain-conformance/test_delayed_local_order.py
+
+# Register actual VM births and persistent queue context during trusted block replay.
+chain-receipt-registry-test:
+    cd near-lean/chain && lake build registered-replay chain-replay --wfail
+    python3 tools/chain-conformance/test_receipt_registry.py

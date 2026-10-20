@@ -15,3 +15,4 @@ import NearRuntime.RefundReceiptInvariants
 import NearRuntime.MaterializeInvariants
 import NearRuntime.FunctionCallInvariants
 import NearRuntime.PromiseGasInvariants
+import NearRuntime.ReceiptRegistry

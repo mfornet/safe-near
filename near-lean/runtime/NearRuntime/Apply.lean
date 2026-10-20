@@ -17,9 +17,29 @@ namespace Near
 
 open Wasm Wasm.Near
 
+/-- IDs allocated by one successful VM action, in external creation order.
+The action index is the original receipt action position, not a VM-call count. -/
+structure VMIdentityBirth where
+  actionIndex : Nat
+  receipts : List ReceiptId
+  data : List (DataId × AccountId)
+  deriving Inhabited
+
+/-- Final child order includes refunds and completion data. VM origins only
+survive successful receipt execution; rollback discards their allocations. -/
+structure ReceiptIdentityBirth where
+  parent : ReceiptId
+  children : List ReceiptId
+  vmActions : List VMIdentityBirth
+  deriving Inhabited
+
 structure ApplyResult where
   state : ChainState
   outgoing : List Receipt
+  identityBirths : List ReceiptIdentityBirth := []
+  /-- Persistent FIFO pops/appends, measured at the actual queue traversal. -/
+  delayedConsumed : Nat := 0
+  delayedAppended : Nat := 0
   /-- One outcome per transaction and per processed receipt, in order. -/
   outcomes : List (ReceiptId × ExecutionOutcome)
   /-- Outcome token burn plus failed system-refund deposits, minus what went
@@ -42,6 +62,7 @@ structure Exec where
   actorId : AccountId := ""
   subsidizedAmount : Nat := 0
   newReceipts : List Receipt := []
+  vmIdentityBirths : List VMIdentityBirth := []
   gasBurnt : Nat := 0
   /-- Gas burnt or attached onward; what is left of the receipt's gas is refunded. -/
   gasUsed : Nat := 0
@@ -238,6 +259,12 @@ def Exec.commitFunctionCall (exec : Exec) (outcome : VMOutcome) (effects : Funct
   { exec with
     state := effects.state
     newReceipts := exec.newReceipts ++ effects.receipts
+    vmIdentityBirths := exec.vmIdentityBirths ++ [{
+      actionIndex := exec.failureIndex.getD 0
+      receipts := effects.receipts.map (·.receiptId)
+      data := effects.receipts.flatMap fun receipt => match receipt.receipt with
+        | .data _ => []
+        | .action action => action.inputDataIds.map (·, receipt.receiverId) }]
     result := some effects.result
     subsidizedAmount := exec.subsidizedAmount + outcome.subsidizedAmount }
 
@@ -453,7 +480,7 @@ def runReceiptActions (c : ReceiptCtx) (st0 : ChainState) : Exec × Option Runti
 /-- Receipt failure restores the pre-action state while retaining gas and logs. -/
 def rollbackReceipt (st0 : ChainState) (exec : Exec) (failed : Option RuntimeError) : Exec :=
   match failed with
-    | some err => { exec with state := st0, newReceipts := [], subsidizedAmount := 0, gasUsed := exec.gasBurnt,
+    | some err => { exec with state := st0, newReceipts := [], vmIdentityBirths := [], subsidizedAmount := 0, gasUsed := exec.gasBurnt,
                               result := some (.failure err) }
     | none => exec
 
@@ -571,6 +598,7 @@ yocto paid to contracts as gas reward (which are not burnt). -/
 structure Processed where
   state : ChainState
   receipts : List Receipt := []
+  identityBirths : List ReceiptIdentityBirth := []
   outcomes : List (ReceiptId × ExecutionOutcome) := []
   subsidizedAmount : Nat := 0
   rewards : Nat := 0
@@ -598,7 +626,9 @@ def processReceipt (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → C
       match issue with
       | some issue => { state := st, issue := some (r.receiptId, issue) }
       | none =>
-        { state := e.state, receipts := e.newReceipts, outcomes := [(r.receiptId, outcomeOf r e)],
+        { state := e.state, receipts := e.newReceipts,
+          identityBirths := [{ parent := r.receiptId, children := e.newReceipts.map (·.receiptId), vmActions := e.vmIdentityBirths }],
+          outcomes := [(r.receiptId, outcomeOf r e)],
           rewards := e.reward, otherTokensBurnt := e.otherTokensBurnt, subsidizedAmount := e.subsidizedAmount }
     else
       let st := { st with
@@ -714,6 +744,7 @@ private def applyAttempt (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes
   let mut outcomes : List (ReceiptId × ExecutionOutcome) := []
   let mut outgoing : List Receipt := []
   let mut localReceipts : List Receipt := []
+  let mut identityBirths : List ReceiptIdentityBirth := []
   let mut subsidizedAmount := 0
   let mut tokensBurnt := 0
   let mut txIndex := 0
@@ -758,6 +789,7 @@ private def applyAttempt (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes
       let p := processReceipt cfg ap codeOf st r
       if let some issue := p.issue then
         return { state := initial, outgoing := [], outcomes := [], tokensBurnt := 0, issue := some issue }
+      identityBirths := identityBirths ++ p.identityBirths
       subsidizedAmount := subsidizedAmount + p.subsidizedAmount
       st := p.state
       outgoing := outgoing ++ p.receipts
@@ -768,7 +800,9 @@ private def applyAttempt (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes
       tokensBurnt := tokensBurnt + p.otherTokensBurnt - p.rewards
       if let some limit := ap.gasLimit then
         if gasUsed ≥ limit then overLimit := true
-  return { state := { st with delayed := retainedDelayed ++ newlyDelayed }, outgoing, outcomes, tokensBurnt, subsidizedAmount }
+  return {
+    state := { st with delayed := retainedDelayed ++ newlyDelayed }, outgoing, outcomes, tokensBurnt, subsidizedAmount, identityBirths
+    delayedConsumed := initial.delayed.length - retainedDelayed.length, delayedAppended := newlyDelayed.length }
 
 /-- Commit a supported chunk. Model limitations invalidate the entire attempt:
 no fees, refunds, nonces, receipt consumption, or state changes are committed. -/
@@ -776,7 +810,7 @@ def apply (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → ContractCo
     (st : ChainState) (txs : List Transaction) (incoming : List Receipt) : ApplyResult :=
   let result := applyAttempt cfg ap codeOf st txs incoming
   if result.issue.isSome then
-    { result with state := st, outgoing := [], outcomes := [], tokensBurnt := 0, subsidizedAmount := 0 }
+    { result with state := st, outgoing := [], outcomes := [], tokensBurnt := 0, subsidizedAmount := 0, identityBirths := [], delayedConsumed := 0, delayedAppended := 0 }
   else result
 
 /-- An unsupported or incomplete apply is atomic with respect to all public

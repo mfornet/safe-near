@@ -42,3 +42,8 @@ root = "ChainReplay.ReceiptEncoding"
 [[lean_exe]]
 name = "transaction-replay"
 root = "ChainReplay.Transactions"
+
+# Actual receipt/data births and persisted queue identities through block execution.
+[[lean_exe]]
+name = "registered-replay"
+root = "ChainReplay.Registered"

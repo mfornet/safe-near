@@ -211,7 +211,7 @@ nonempty receipt/data queues without explicit queue context fail closed. Model c
 native receipt/data hashes. `nextId` is manipulator metadata with no trie column.
 
 The output is a selected-account synthetic genesis, not an original shard trie.
-Opaque shard records, automatic runtime hash-ID registration, receipt cache lifetime and trie
+Opaque shard records, action-derived VM seeds, receipt cache lifetime and trie
 gas in runtime execution remain open. Account serialization follows the pinned
 native encoder even at the u128 maximum sentinel; serialization agreement alone
 does not establish that every such synthetic account can deserialize or execute.
@@ -252,9 +252,9 @@ action. Generated native
 IDs are comparison outputs, never graph inputs. This establishes the derivation
 and serialization primitives, not an automatically maintained identity registry
 inside `Runtime::apply`. Queue-state encoding below consumes explicit receiver
-ownership, indices and storage formats. Automatic identity/ownership/format
-registration during execution remains open alongside receipt cache lifetime and
-trie-backed runtime gas.
+ownership, indices and storage formats. The automatically maintained execution
+registry is described below; receipt cache lifetime and trie-backed runtime gas
+remain open.
 Evidence is saved in `audit/receipt-encoding-regressions.json` and
 `audit/runtime-identity-regressions.json`.
 
@@ -292,8 +292,8 @@ failed callbacks and emptied persistent queues. Its context comes from original
 signed transaction bytes, the supplied schedule and Lean's FIFO transitions;
 native generated IDs, indices, wrapper metadata and queue bytes are comparison
 outputs only. Fixtures retain full origins and executor identities. The current
-context construction is explicit for this corpus; general automatic registration
-inside receipt execution remains open. Opaque shard/yield/buffer columns and
+context construction is explicit for this primitive corpus; the execution
+registry below constructs it from actual receipt births and FIFO operations. Opaque shard/yield/buffer columns and
 original shard roots remain outside this represented state. Evidence is saved
 in `audit/queue-encoding-regressions.json` and
 `audit/runtime-queue-encoding-regressions.json`.
@@ -332,9 +332,9 @@ native admission batches across protocols 83–86, both key families, rejected
 transactions between admitted ones, strict/monotonic nonces, height/price
 variation and restricted or unfunded callers. Automatically registered IDs
 also encode the actual zero-budget local delayed queues without manual receipt
-bindings. General promise/data registration, action-derived VM seeds, queue
-context evolution during receipt execution and trie-backed runtime gas remain
-open. Evidence is saved in `audit/transaction-encoding-regressions.json` and
+bindings. The full execution registry below adds promise/data registration and
+queue context evolution. Action-derived VM seeds and trie-backed runtime gas
+remain open. Evidence is saved in `audit/transaction-encoding-regressions.json` and
 `audit/transaction-registry-regressions.json`.
 
 `just chain-delayed-order-test` checks local execution priority separately from
@@ -436,3 +436,47 @@ and actual receipt cache lifetimes are outside this comparison. Snapshot reads
 use non-accounting native access and do not warm the observed query cache.
 Encoding all modeled runtime records and connecting these primitives to receipt
 execution remain open.
+
+
+## Automatic runtime identity and queue registration
+
+`just chain-receipt-registry-test` exercises `registered-replay`. It uses the
+same typed state, code catalogue, blocks and receipt schedule as `chain-replay`,
+plus `transactionBlockHashes`: one batch per block, containing each original
+transaction's 32-byte block hash in transaction order. An optional `queueContext`
+uses the `state-encode` schema for preexisting receipt/data identities, owners,
+formats and persisted queue metadata. A queue-free synthetic genesis needs no
+initial bindings. Missing identities, malformed hashes and inconsistent queue
+contexts fail closed.
+
+`Near.apply` records actual successful VM action positions and the IDs allocated
+for their promises and data dependencies. Receipt rollback discards these VM
+origins, while finalized child order retains refunds and completion data. Data
+receipts which wake postponed work retain the waiting action receipt's parent
+identity. Model issues publish no births or queue operations. The registry
+combines these observations with original typed transaction bodies and supplied
+block heights; newly generated native IDs and queue metadata never enter the model.
+
+The runtime also records actual persistent queue pops and appends. The registry
+preserves old wrapper metadata, advances the queue's first index, and freezes
+new V1 gas/size wrappers at enqueue time. Empty advanced queue headers survive
+later blocks. Encoding checks the entire old and new represented queue state
+before publishing the updated context.
+
+Each block reports ordinary execution, the identity/queue registry, creation
+origins, complete outgoing receipt Borsh bytes and represented queue-column
+bytes. The regression compares full ordinary execution and these bytes with
+native apply across protocols 83–86: successful/failed callbacks, two calls in
+one receipt, a non-call action before a VM call, rollback after promise creation,
+callback-first/data-first delivery, delayed receipt execution and mixed old/new
+FIFO pressure with both ordinary key families. Full-trace comparison uses the
+independently derived registry to name native objects when multiple VM calls
+interleave receipt/data allocations. Native creation events still determine
+counts; missing, extra, reused, non-contiguous and wrong-owner bindings are
+rejected, and no gas/state/outcome field is removed. Evidence is saved in
+`audit/receipt-registry-{regressions,queues,fifo}.json`.
+
+This registers represented identities and queue state. Derived action randomness
+is not yet fed into VM execution; receipt cache/trie gas, opaque shard/yield/buffer
+records, original shard roots and general execution equivalence remain open.
+The four program proof obligations are also unchanged.

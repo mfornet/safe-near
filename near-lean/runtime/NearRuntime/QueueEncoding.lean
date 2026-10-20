@@ -48,7 +48,8 @@ private def dataIdentity (context : Context) (id : DataId) : Except String DataI
 private def checkOwner (context : Context) (id : DataId) (receiver : AccountId) : Except String Unit := do
   unless (← dataIdentity context id).receiver == receiver do throw "data identity receiver mismatch"
 
-private def receiptBytes (context : Context) (codes : List (String × Bytes)) (value : Receipt) : Except String Bytes := do
+/-- Encode one receipt with the same identity, format and data-owner checks as queue records. -/
+def receiptBytes (context : Context) (codes : List (String × Bytes)) (value : Receipt) : Except String Bytes := do
   let some format := Assoc.lookup context.formats value.receiptId | throw "receipt action format is unavailable"
   match value.receipt with
   | .data payload => checkOwner context payload.dataId value.receiverId

@@ -2,7 +2,9 @@
 """Compare imported synthetic chains against pinned trie-backed Runtime::apply.
 
 No mismatching fields are removed. Unsupported projections fail closed. Native
-hashes are renamed from native creation events, independently of the Lean trace.
+hashes are renamed from native creation events. Optional independently derived
+registries bind logical names while native events still determine allocation
+counts; missing, extra, reused and non-contiguous bindings fail closed.
 Raw traces, inputs, assets and projection differences remain in the report.
 """
 from __future__ import annotations
@@ -43,7 +45,9 @@ def action_payload(receipt):
 
 
 class Projection:
-    def __init__(self, codes):
+    def __init__(self, codes, registries=None):
+        self.registries = registries
+        self.bound_receipts = self.bound_data = self.bound_owners = None
         self.codes = codes
         self.keys = PublicKeys()
         self.receipts = {}
@@ -55,9 +59,45 @@ class Projection:
     def fresh(self, table, identifier):
         if identifier in table:
             raise ValueError(f"duplicate native creation event: {identifier}")
-        table[identifier] = self.next_id
+        bound = self.bound_receipts if table is self.receipt_ids else self.bound_data
+        if bound is not None and identifier not in bound:
+            raise ValueError("native creation has no independently derived identity binding")
+        table[identifier] = self.next_id if bound is None else bound[identifier]
         self.next_id += 1
         return table[identifier]
+
+    def bind_registry(self, registry):
+        from near_rpc import b58encode
+        def bindings(rows):
+            result = {}
+            for identifier, raw in rows:
+                if type(identifier) is not int or identifier <= 0:
+                    raise ValueError("invalid registered logical identity")
+                if len(raw) != 32 or any(type(byte) is not int or not 0 <= byte < 256 for byte in raw):
+                    raise ValueError("invalid registered native identity")
+                text = b58encode(bytes(raw))
+                if text in result: raise ValueError("duplicate registered native identity")
+                result[text] = identifier
+            return result
+        receipts = bindings(registry["receiptIds"])
+        data = bindings([(row["id"], row["hash"]) for row in registry["dataIds"]])
+        owners = {b58encode(bytes(row["hash"])): row["receiverId"] for row in registry["dataIds"]}
+        values = list(receipts.values()) + list(data.values())
+        if len(values) != len(set(values)): raise ValueError("aliased registered logical identity")
+        for old, new in [(self.receipt_ids, receipts), (self.data_ids, data), (self.data_owners, owners)]:
+            if any(new.get(key) != value for key, value in old.items()):
+                raise ValueError("registration rewrote an established native identity")
+        self.bound_receipts, self.bound_data, self.bound_owners = receipts, data, owners
+
+    def check_registry(self):
+        if (self.receipt_ids != self.bound_receipts or self.data_ids != self.bound_data
+                or self.data_owners != self.bound_owners):
+            raise ValueError("registered identities differ from actual native creation events")
+        # Native creation events determine the count independently of logical
+        # names. Two VM calls may interleave receipt/data allocations.
+        values = list(self.receipt_ids.values()) + list(self.data_ids.values())
+        if sorted(values) != list(range(1, self.next_id)):
+            raise ValueError("registered allocation is not contiguous with native creation count")
 
     def rid(self, identifier):
         if identifier not in self.receipt_ids:
@@ -319,6 +359,8 @@ class Projection:
             raise ValueError("native execution did not commit every requested block")
         if source["protocolVersion"] != model_request["protocolVersion"] or len(source["blocks"]) != len(model_request["blocks"]):
             raise ValueError("native/model protocol or block count differs")
+        if self.registries is not None and len(self.registries) != len(trace["blocks"]):
+            raise ValueError("identity registry block count mismatch")
         for header, block, modeled in zip(source["blocks"], trace["blocks"], model_request["blocks"]):
             for field in ["blockHeight", "blockTimestamp", "epochHeight", "gasPrice", "gasLimit", "randomSeed", "incomingIndices"]:
                 if differences(header[field], modeled[field]):
@@ -348,7 +390,9 @@ class Projection:
             if differences([explicit_envelope(tx) for tx in converted],
                            [explicit_envelope(tx) for tx in modeled["transactions"]]):
                 raise ValueError("model transactions differ from native signed input views")
+            if self.registries is not None: self.bind_registry(self.registries[len(blocks)])
             self.creations(block)
+            if self.registries is not None: self.check_registry()
             positions = header["incomingIndices"]
             positions = list(range(len(pending))) if positions is None else positions
             if [pending[i] for i in positions] != block["inputs"]["incomingReceipts"]:
