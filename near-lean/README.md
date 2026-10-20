@@ -267,5 +267,10 @@ failure saturation/error precedence, irreversible burn, and limit preservation.
 These proofs cover every host charge variant, charge lists and Wasm charging.
 The executable `runMetered` loop returns a counter bounded by its final limits on
 all exits, including fuel exhaustion and stepper errors. A compositional theorem
-bounds it by the original call budget when imported hosts preserve those limits;
-that host invariant and the public VM-outcome/receipt gas bounds remain open.
+bounds it by the original call budget when imported hosts preserve those limits.
+`HostGas` and `HostGasLimits` derive that invariant for the actual metered registry
+and resolver, including gas imports and unsupported/deprecated rejection paths.
+`ExecutionGas.runResolved_gas_bounds` connects it to initialization and resolved
+execution: burnt gas is at most used gas, used gas fits the original prepaid
+budget, and burnt gas fits the original per-call limit. Public VM-outcome and
+receipt gas bounds still need to be lifted from this execution result.
