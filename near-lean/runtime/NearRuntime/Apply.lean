@@ -1,6 +1,7 @@
 import NearRuntime.Fees
 import NearRuntime.State
 import NearRuntime.Nonce
+import NearRuntime.Refund
 
 /-!
 # `apply`
@@ -74,21 +75,6 @@ def getAccount (id : AccountId) : ExecM Account := do
   | none => throw (.accountDoesNotExist id)
 
 def putAccount (id : AccountId) (a : Account) : ExecM Unit := modifyState (·.setAccount id a)
-
-/-- A refund receipt from the system account. -/
-def refundReceipt (st : ChainState) (receiver : AccountId) (amount : Nat) : Receipt × ChainState :=
-  let (id, st) := st.freshId
-  ({ predecessorId := systemAccount, receiverId := receiver, receiptId := id,
-     receipt := .action { signerId := systemAccount, signerPublicKey := 0 :: List.replicate 32 0, gasPrice := 0,
-                          actions := [.transfer amount] } }, st)
-
-/-- Gas refunds additionally identify the key whose allowance may be restored. -/
-def gasRefundReceipt (st : ChainState) (receiver : AccountId) (pk : PublicKey) (amount : Nat) :
-    Receipt × ChainState :=
-  let (id, st) := st.freshId
-  ({ predecessorId := systemAccount, receiverId := receiver, receiptId := id,
-     receipt := .action { signerId := receiver, signerPublicKey := pk, gasPrice := 0,
-                          actions := [.transfer amount] } }, st)
 
 /-! ## Account id rules -/
 
@@ -228,13 +214,10 @@ def applyAction (c : ReceiptCtx) (isLast : Bool) : Action → ExecM Unit
   | .transfer deposit => do
     let id := c.receipt.receiverId
     match (← getState).account? id with
-    | some a =>
+    | some a => do
       putAccount id { a with amount := a.amount + deposit }
-      if c.receipt.isRefund && c.action.signerId == id then
-        if let some key := (← getState).accessKey? id c.action.signerPublicKey then
-          if let .functionCall (some allowance) target methods := key.permission then
-            modifyState (·.setAccessKey id c.action.signerPublicKey
-              { key with permission := .functionCall (some (min (2 ^ 128 - 1) (allowance + deposit))) target methods })
+      if c.receipt.isGasRefund then
+        modifyState (·.refundAllowance id c.action.signerPublicKey deposit)
     | none =>
       -- implicit account creation on transfer
       if let some pk := implicitPublicKey? id then

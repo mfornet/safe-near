@@ -17,7 +17,9 @@ open Wasm.Near
 def accessKeyStorageBytes (pk : PublicKey) (k : AccessKey) : Nat :=
   pk.length + 8 + (match k.permission with
     | .fullAccess => 1
-    | .functionCall _ receiver methods => 1 + 17 + 4 + receiver.length + 4 + (methods.map (·.utf8ByteSize + 4)).sum)
+    | .functionCall allowance receiver methods =>
+      1 + (match allowance with | none => 1 | some _ => 17) + 4 + receiver.utf8ByteSize + 4
+        + (methods.map (·.utf8ByteSize + 4)).sum)
 
 /-- 64 lowercase hex characters: an implicit (NEAR) account. -/
 def isImplicitAccount (id : AccountId) : Bool :=

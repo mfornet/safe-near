@@ -156,6 +156,90 @@ def checkTransactionRouting (r : IO.Ref Report) (cfg : RuntimeConfig) (code : Co
       && (mixed.state.account? "bob.near").map (·.amount) == some (10 * oneNear + 7)
       && (mixed.outgoing.head?.map (·.receiverId)) == some "bob.near")
 
+/-- Restricted-key availability across real VM execution and delayed refunds. -/
+def checkRefundScenarios (r : IO.Ref Report) (cfg : RuntimeConfig) (code : ContractCode)
+    (base : ChainState) : IO Unit := do
+  let accountId := "alice.near"
+  let pk := pkOf 42
+  let args := bytesOf "{\"account_id\":\"alice.near\"}"
+  let actions := [Action.functionCall "ft_balance_of" args (tgas 50) 0]
+  let cost := Fees.txCost cfg World.ap.gasPrice accountId "wrap.near" actions
+  let reserve := cost.total / 2
+  let install (state : ChainState) (pk : PublicKey) (key : AccessKey) : ChainState :=
+    let account := (state.account? accountId).getD (genesisAccount 0)
+    let oldBytes := ((state.accessKey? accountId pk).map fun old =>
+      accessKeyStorageBytes pk old + cfg.fees.numExtraBytesRecord).getD 0
+    let bytes := accessKeyStorageBytes pk key + cfg.fees.numExtraBytesRecord
+    (state.setAccount accountId { account with storageUsage := account.storageUsage + bytes - oldBytes }).setAccessKey accountId pk key
+  let allowanceOf (state : ChainState) (pk : PublicKey) : Option Nat :=
+    (state.accessKey? accountId pk).bind fun key => match key.permission with
+      | .functionCall allowance _ _ => allowance | _ => none
+  let initial := install base pk {
+    nonce := 0
+    permission := .functionCall (some (cost.total + reserve)) "wrap.near" ["ft_balance_of"] }
+  let tx (nonce : Nat) : Transaction := {
+    signerId := accountId, publicKey := pk, nonce, receiverId := "wrap.near", actions }
+  let submitted := Near.apply cfg World.ap (fun _ => code) initial [tx 1] []
+  let first := Near.apply cfg World.ap (fun _ => code) submitted.state [] submitted.outgoing
+  let refunds := first.outgoing.filter Receipt.isGasRefund
+  let amount := (refunds.map fun receipt => Fees.totalDeposit receipt.actions).sum
+  check r "gas refund: restricted call consumes its purchased allowance and emits the key marker"
+    (first.issue.isNone && first.outgoing.length == 1 && refunds.length == 1 && amount > 0 &&
+      allowanceOf first.state pk == some reserve && refunds.all fun receipt => match receipt.receipt with
+        | .action action => action.signerId == accountId && action.signerPublicKey == pk
+        | _ => false)
+  let beforeRefund := Near.apply cfg World.ap (fun _ => code) first.state [tx 2] []
+  check r "gas refund: another call is rejected before its allowance returns"
+    (beforeRefund.tokensBurnt == 0 && beforeRefund.outcomes.any fun (_, outcome) => match outcome.status with
+      | .failure (.invalidAccessKey message) => message == "NotEnoughAllowance" | _ => false)
+  let restored := Near.apply cfg World.ap (fun _ => code) first.state [] first.outgoing
+  check r "gas refund: restores allowance exactly without double-crediting account funds"
+    (restored.issue.isNone && restored.tokensBurnt == 0 && restored.outgoing.isEmpty &&
+      allowanceOf restored.state pk == some (reserve + amount) &&
+      restored.state.totalBalance == first.state.totalBalance + amount)
+  let submittedAgain := Near.apply cfg World.ap (fun _ => code) restored.state [tx 2] []
+  let second := Near.apply cfg World.ap (fun _ => code) submittedAgain.state [] submittedAgain.outgoing
+  check r "gas refund: restored allowance permits the next restricted call"
+    (second.issue.isNone && second.outcomes.any fun (_, outcome) =>
+      outcome.executorId == "wrap.near" && outcome.status.isSuccess)
+  let old := (first.state.accessKey? accountId pk).getD { nonce := 0, permission := .fullAccess }
+  let oldAccount := (first.state.account? accountId).getD (genesisAccount 0)
+  let removed := (first.state.setAccount accountId { oldAccount with
+    storageUsage := oldAccount.storageUsage - accessKeyStorageBytes pk old - cfg.fees.numExtraBytesRecord }).removeAccessKey accountId pk
+  let deleted := Near.apply cfg World.ap (fun _ => code) removed [] first.outgoing
+  check r "gas refund: deleted key stays deleted while its account receives the refund"
+    ((deleted.state.accessKey? accountId pk).isNone && deleted.state.totalBalance == removed.totalBalance + amount)
+  for (name, replacement, expected) in
+      [("finite", ({ nonce := 17, permission := .functionCall (some 5) "other.near" ["other"] } : AccessKey),
+         ({ nonce := 17, permission := .functionCall (some (5 + amount)) "other.near" ["other"] } : AccessKey)),
+       ("unlimited", { nonce := 18, permission := .functionCall none "other.near" ["other"] },
+         { nonce := 18, permission := .functionCall none "other.near" ["other"] }),
+       ("full access", { nonce := 19, permission := .fullAccess }, { nonce := 19, permission := .fullAccess })] do
+    let state := install first.state pk replacement
+    let result := Near.apply cfg World.ap (fun _ => code) state [] first.outgoing
+    check r s!"gas refund: follows the current {name} replacement key"
+      (result.issue.isNone && result.state.accessKey? accountId pk == some expected &&
+        result.state.totalBalance == state.totalBalance + amount)
+  let emptyKey : AccessKey := { nonce := 2, permission := .functionCall (some 7) "wrap.near" [] }
+  let balanceState := install first.state emptyPublicKey emptyKey
+  let balance := (refundReceipt balanceState accountId 23).1
+  let balanceResult := Near.apply cfg World.ap (fun _ => code) balanceState [] [balance]
+  check r "balance refund: matching empty public key does not restore its allowance"
+    (!balance.isGasRefund && balanceResult.state.accessKey? accountId emptyPublicKey == some emptyKey &&
+      balanceResult.state.totalBalance == balanceState.totalBalance + 23)
+  let ordinary : Receipt := {
+    predecessorId := "wrap.near", receiverId := accountId, receiptId := 999
+    receipt := .action { signerId := accountId, signerPublicKey := pk, gasPrice := 0, actions := [.transfer 3] } }
+  let ordinaryResult := Near.apply cfg World.ap (fun _ => code) first.state [] [ordinary]
+  check r "ordinary transfer: signer metadata never restores an allowance"
+    (ordinaryResult.state.accessKey? accountId pk == first.state.accessKey? accountId pk)
+  let underfunded := first.state.setAccount accountId { amount := 0, storageUsage := 1_000_000_000 }
+  let rolledBack := Near.apply cfg World.ap (fun _ => code) underfunded [] first.outgoing
+  check r "failed gas refund: storage-staking rollback discards the allowance update"
+    (rolledBack.issue.isNone && rolledBack.tokensBurnt == amount &&
+      rolledBack.state.accessKey? accountId pk == underfunded.accessKey? accountId pk &&
+      (rolledBack.state.account? accountId).map (·.amount) == some 0)
+
 def main (args : List String) : IO UInt32 := do
   let wat := args[0]?.getD "../vm/tests/fixtures/w_near.wat"
   let configs := args[1]?.getD "../vm/configs"
@@ -535,6 +619,8 @@ def main (args : List String) : IO UInt32 := do
   check r "nonce: strict admission uses prior accepted transactions and ignores rejection"
     ((sequencedNonce.state.accessKey? "alice.near" (pkOf 1)).map (·.nonce) == some 2 &&
       (sequencedNonce.outcomes.take 3).map (fun (_, outcome) => outcome.status.isSuccess) == [true, false, true])
+
+  checkRefundScenarios r cfg code w.state
 
   let s ← r.get
   IO.println s!"{s.passed} passed, {s.failed} failed"

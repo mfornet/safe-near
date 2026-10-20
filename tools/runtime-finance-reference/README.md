@@ -29,3 +29,26 @@ transactions, process receipt dependencies, or establish chain-level equivalence
 The pinned production refund penalty is zero; the generic Lean implementation
 also models bounded relative/minimum penalties and proves the v85+ partition
 identity for them. Complete receipt execution still needs its own reference seam.
+
+## Allowance restoration and refund metadata
+
+```sh
+just near-allowance-conformance /absolute/path/to/nearcore
+```
+
+The same binary also calls the actual trie-backed `try_refund_allowance`, native
+`Receipt::new_gas_refund`/`new_balance_refund` constructors, and Borsh serialization.
+Sixty-six cases cover finite/unlimited/full/missing keys, a mismatching target key,
+zero and repeated refunds, u128 saturation, preserved nonce/restrictions, native
+signer/public-key markers, and key storage bytes. Unicode and empty receiver/method
+strings are tested as representable stored permissions, including legacy invalid
+receiver strings; this is not a claim they authorize valid transactions.
+These cases exposed 12 storage-size mismatches before correcting the optional
+allowance tag/value size and receiver UTF-8 byte length.
+
+Reports are saved in `audit/allowance.json`. Inputs are bounded to u64 nonces and
+u128 allowances/refunds. This routine-level oracle does not execute the account
+transfer, account-existence/storage-staking checks, or multi-action rollback.
+Runtime scenarios separately cover restricted-key availability, delayed key
+replacement/deletion, balance-versus-gas refund routing, and failed-refund rollback.
+Gas-key balances and complete receipt-level equivalence remain outside this seam.

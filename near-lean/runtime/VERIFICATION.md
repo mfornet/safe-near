@@ -382,10 +382,33 @@ bounds; `convertTransaction_nonce_bounds` connects those properties to successfu
 conversion while retaining the earlier conservation and authorization proofs.
 `tools/runtime-nonce-reference` compares 126 cases to the actual private validator
 and feature table. Native v1 decoding, gas-key nonce slots, pending-mempool overlays,
-remaining admission bounds/error ordering, gas-refund allowance restoration,
+remaining admission bounds/error ordering, gas-key refund balances,
 whole-receipt state-invariant preservation and global conservation remain open.
 
 `NearChain.step_applyResult` exposes the exact apply result for compositional
 proofs, and `Reachable.firstStep` proves first-step reachability generically.
 The chain scenario uses this universal proof rather than elaborating a redundant
 concrete execution witness inside its IO program; runtime checks are unchanged.
+
+## Gas refund allowances
+
+Gas refunds now carry the original signer public key and name the receiver as
+signer, matching native receipt constructors. Balance refunds use `system` and the
+33-byte empty Ed25519 key. System transfers restore allowances only when the
+signer equals the receiver. They target the current key: deleted keys stay absent,
+finite allowances saturate at u128::MAX, and full/unlimited keys stay unchanged.
+Refund failure rolls back the allowance change along with the account credit.
+
+`RefundInvariants` proves the exact finite-key refund, unchanged key nonce and
+receiver/method restrictions, no-op zero refunds, key isolation, map uniqueness,
+unchanged account funds/storage/receipt queues, and unchanged serialized key size.
+The caller credits the account once; allowance restoration is metadata, not a
+second token credit. Finite-key bounds are explicit premises where required.
+
+The native financial adapter compares 66 cases against the actual trie-backed
+routine, refund constructors and Borsh sizes. It exposed and fixed the storage-size
+difference between absent and finite allowances and UTF-8 receiver byte accounting.
+Runtime scenarios exercise actual restricted wNEAR calls before/after refund,
+current-key replacement/deletion, balance/ordinary transfers and rollback on
+storage-staking failure. Full receipt/chain preservation and conservation, gas-key
+semantics, remaining integer overflow paths and deployed refinement remain open.
