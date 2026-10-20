@@ -32,7 +32,7 @@ theorem ftResolveTransfer_accounting {s : State} {env : Env}
 
 private theorem conditional_transfer_sum (receiver : AccountId) (amount : Nat) :
     ((if 0 < amount then [Promise.transfer receiver amount] else []).map Promise.transferred).sum = amount := by
-  by_cases h : 0 < amount <;> simp [h, Promise.transferred] <;> omega
+  by_cases h : 0 < amount <;> simp [h, Promise.transferred]; omega
 
 private theorem retained_fee (deposit fee : Nat) (h : fee ≤ deposit) :
     (fee : Int) ≤ (deposit : Int) - ((deposit - fee : Nat) : Int) := by omega
@@ -53,10 +53,10 @@ private theorem storageDeposit_conservation {s : State} {env : Env}
     omega
   · simp only [bind, bind_require, pure_eq_ok] at h
     by_cases hfee : s.storageMin ≤ env.attachedDeposit
-    · simp only [if_pos hfee] at h
+    · simp only [ite_eq_left hfee] at h
       obtain ⟨s1, hreg, h⟩ := bind_ok_iff.mp h
       obtain ⟨ha, rfl⟩ := State.registerAccount_ok.mp hreg
-      simp only [pure_eq_ok, Except.ok.injEq] at h
+      simp only [Except.ok.injEq] at h
       subst o
       have hmin : (s.register (account.getD env.predecessor)).storageMin = s.storageMin := rfl
       simp only [State.register_registered, State.register_totalSupply, hmin,
@@ -91,18 +91,17 @@ theorem conservation : Conservation := by
         simp only [State.storageMin] at *
         generalize hprice : storagePricePerByte = price at *
         clear hprice
-        aesop (add norm simp [State.setBalance, State.register, State.unregister,
-          Outcome.nearOut, Promise.transferred, Function.update_apply,
-          Finset.card_insert_of_notMem, Finset.card_erase_of_mem, Nat.cast_add,
-          Nat.cast_sub]) (add safe (by omega))
-  all_goals
-    try
-      have hc : 1 ≤ s.registered.card := by
-        have : 0 < s.registered.card := Finset.card_pos.mpr ⟨env.predecessor, by assumption⟩
-        omega
-    try split_ifs
-    all_goals
-      simp_all [Nat.cast_sub]
+        first
+        | solve
+          | aesop (add norm simp [State.setBalance, State.register, State.unregister,
+              Outcome.nearOut, Promise.transferred, Function.update_apply,
+              Finset.card_insert_of_notMem, Finset.card_erase_of_mem, Nat.cast_add,
+              Nat.cast_sub]) (add safe (by omega))
+        | subst o
+          have hc : 1 ≤ s.registered.card := by
+            have : 0 < s.registered.card := Finset.card_pos.mpr ⟨env.predecessor, by assumption⟩
+            omega
+          simp_all [State.unregister, Outcome.nearOut, Promise.transferred, Nat.cast_sub]
 
 
 end WNear

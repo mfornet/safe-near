@@ -58,7 +58,9 @@ theorem metered_raw_encodingInvariant (extra : Nat) (name : String) (fn : HostFn
     (hraw : ∀ st args, EncodingInvariant st.host →
       (applyCharges st.host (chargesBefore name st args)).2 = none →
       preInvokeError name (prechargedStore name st args) args = none →
-      HostResult.LiveSatisfies EncodingInvariant (fn.invoke (prechargedStore name st args) args)) :
+      (prepareStorageCall name (prechargedStore name st args) args).2 = none →
+      HostResult.LiveSatisfies EncodingInvariant
+        (fn.invoke (prepareStorageCall name (prechargedStore name st args) args).1 args)) :
     HostFn.PreservesLive EncodingInvariant (metered extra name fn) := by
   intro st args h
   unfold metered
@@ -70,25 +72,33 @@ theorem metered_raw_encodingInvariant (extra : Nat) (name : String) (fn : HostFn
     · cases hc : (applyCharges st.host (chargesBefore name st args)).2 with
       | some error => trivial
       | none =>
+        let paid := prechargedStore name st args
         change HostResult.LiveSatisfies _
-          (match preInvokeError name (prechargedStore name st args) args with
-          | some error => trapWith (prechargedStore name st args) error
-          | none => finishMeteredCall extra name (prechargedStore name st args) args
-              (fn.invoke (prechargedStore name st args) args))
-        split
-        · trivial
-        · exact finishMeteredCall_encodingInvariant extra name _ args _ (hraw st args h hc (by assumption))
+          (match preInvokeError name paid args with
+          | some error => trapWith paid error
+          | none => invokeStorageCall extra name fn paid args)
+        cases hp : preInvokeError name paid args with
+        | some error => trivial
+        | none =>
+          unfold invokeStorageCall
+          dsimp only
+          let ready := (prepareStorageCall name paid args).1
+          cases hs : (prepareStorageCall name paid args).2 with
+          | some error => cases error <;> trivial
+          | none => exact finishMeteredCall_encodingInvariant extra name ready args _ (hraw st args h hc hp hs)
 
 /-- Local host frame proofs preserve the invariant for arbitrary metering plans. -/
 theorem meteredNeutral_encodingInvariant (extra : Nat) (name : String) (fn : HostFn NearState)
     (hfn : HostPreservesEncodingFrame fn) : HostFn.PreservesLive EncodingInvariant (metered extra name fn) := by
   apply metered_raw_encodingInvariant
-  intro st args h _ _
+  intro st args h _ _ _
   have hf : encodingFrame (prechargedStore name st args).host = encodingFrame st.host :=
     applyCharges_encodingFrame st.host (chargesBefore name st args)
   have hp := EncodingInvariant.of_frame_eq hf h
-  have hr := hfn (prechargedStore name st args) args
-  cases he : fn.invoke (prechargedStore name st args) args <;> rw [he] at hr <;>
+  let ready := (prepareStorageCall name (prechargedStore name st args) args).1
+  have hp : EncodingInvariant ready.host := hp
+  have hr := hfn ready args
+  cases he : fn.invoke ready args <;> rw [he] at hr <;>
     first | trivial | exact EncodingInvariant.of_frame_eq hr hp
 
 /-- Combine policy preservation, concrete successful-return encoding, and the

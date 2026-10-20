@@ -1,55 +1,36 @@
 # NEAR Runtime
 
-The former WASM Runtime is generic over hosts, and in particular we will
-need to have a detailed model of the NEAR Runtime such that we can replay
-all NEAR history and validate that we get to the same state.
+The generic Wasm interpreter is connected to NEAR through three layers:
 
-In particular this will require modeling all host functions that are
-exposed to the smart contracts, the internal state representation in a way
-that is as rich as the NEAR blockchain, it doesn't need to be as efficient
-and details of the implementations doesn't really matter as long as we can
-replicate to the bit granularity all actions in our runtime vs NEAR runtime.
+- `near-lean/vm`: `NearVM.run` executes a single contract function call with
+  metering and NEAR host functions.
+- `near-lean/runtime`: `NearRuntime.apply` validates transactions, executes and
+  routes receipts, and updates account state.
+- `near-lean/chain`: block application and settlement orchestrate queued work
+  and report completion explicitly.
 
-We will need to model receipts, to deal with promises and callbacks, contract
-and account state, gas accounting, Runtime upgrades (such that the behavior
-of the runtime can change over time).
+Receipts, promises and callbacks, contract storage, account state, access keys,
+and gas accounting are modeled across these layers. Full protocol coverage and
+an equivalence proof against nearcore remain open. Independent conformance
+harnesses compare supported VM and runtime behavior with pinned nearcore
+reference adapters.
 
-Not covered in the NEAR Runtime is all cryptographic verification (check signer,
-predecessor_account_id, etc...), this is a trusted runtime that needs to be
-orchestrated by a trustless manipulator, so nothing about consensus, and most
-parts of the chain are not modeled here, all data is externally provided and
-trusted.
+Consensus and cryptographic verification remain outside these execution layers.
+Execution relies on supplied block context and validation assumptions; proofs
+must state which inputs are trusted. Block orchestration does not establish
+consensus correctness.
 
-This opens the door to test it by creating rust shims over our implementation
-and try to plug this runtime inside nearcore, and replay all the history verified
-using a patched version of nearcore that uses our runtime. This could be also
-an step towards building nearcore in LEAN.
+## Future validation
 
-Interface: Runtime implementation that can be plugged inside the NEAR runtime
-replacing it by whatever there is there (requires some investigation to see
-how decoupled is the runtime inside nearcore). Even if it is not decoupled
-we can have a parallel implementation of nearcore that we can run next to the
-official one and we use exactly for this purpose.
+We aim to model runtime upgrades and replay NEAR history with bit-for-bit
+agreement. Broader real-chain snapshot tests, a nearcore integration or parallel
+replay implementation, and fuzzing can increase confidence in the model. These
+are goals, not guarantees supplied by current conformance tests.
 
-There was some previous effort at: https://github.com/cajal-technologies/NEAR-lean/
+An earlier implementation effort is recorded in the project history.
 
-## Interface and implementation
+## Open questions
 
-NearRuntime
-    WasmRuntime
-    NearHost
-
-NearRuntime is the main abstraction that we use to run transactions, using the
-wasm runtime, and always passing the current host state, and getting back the
-modified host state.
-
-Between txs we can modify the host state (for example to increase block height,
-    or update the state in any other way)
-
-The program orchestrating the NearRuntime is responsible for synchrounously
-executing transactions.
-
-## Questions
-
-Is it true that after we schedule any callback that will always be triggered
-despite if the intermediate results are executed succesfully or not.
+Specify callback execution and delivery guarantees under failed dependencies,
+resource limits, and scheduling assumptions, and connect those guarantees to
+contract lifetime properties.

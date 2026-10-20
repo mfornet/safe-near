@@ -73,7 +73,7 @@ network oracle. It deliberately explores callback/data ordering and arbitrary
 finite delays. Per-shard routing, FIFO constraints, congestion/bandwidth scheduling,
 and eventual network/runtime progress require separate modeling and review.
 There is no fixed block bound, and eventual processing does not imply success.
-`NearChain.Schedule` defines histories, supported execution and `DeliveryFair`
+`NearChain.History` defines histories, supported execution and `DeliveryFair`
 explicitly. Fair delivery guarantees arrival only; progress through gas-delayed
 work and dependency resolution needs separate premises. An indefinitely
 delegating contract can keep a logical result pending even under fair delivery.

@@ -157,9 +157,12 @@ def main : IO Unit := do
             | _ => false)
         | _ => false
     let incoming := pending.filter (fun r => deliver r.receiptId)
-    let (next, result) := step cfg decoder { snapshot with pending }
+    let positions := (pending.zipIdx.filter (fun (r, _) => deliver r.receiptId)).map Prod.snd
+    let (next, result) ← match step cfg decoder { snapshot with pending }
       { ap := { blockHeight := index + 1, blockTimestamp := (index + 1) * 1_000_000_000,
-                gasPrice := 100_000_000, gasLimit := block.gasLimit }, txs := [], deliver }
+                gasPrice := 100_000_000, gasLimit := block.gasLimit }, txs := [], receipts := .indices positions } with
+      | .ok value => pure value
+      | .error error => throw (IO.userError s!"schedule error: {reprStr error}")
     if let some (_, issue) := result.issue then throw (IO.userError s!"model issue: {reprStr issue}")
     snapshot := next
     let accounts := Json.mkObj (request.accounts.map fun a =>

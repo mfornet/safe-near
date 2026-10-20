@@ -1,0 +1,74 @@
+[
+  {
+    "name": "build-all",
+    "command": "just build-all",
+    "exit": 0,
+    "seconds": 379.19
+  },
+  {
+    "name": "near-build",
+    "command": "just near-build",
+    "exit": 0,
+    "seconds": 698.04
+  },
+  {
+    "name": "near-test",
+    "command": "just near-test",
+    "exit": 0,
+    "seconds": 268.45
+  },
+  {
+    "name": "runtime-adapter-test",
+    "command": "just runtime-adapter-test",
+    "exit": 0,
+    "seconds": 20.35
+  },
+  {
+    "name": "near-conformance",
+    "command": "just near-conformance",
+    "exit": 0,
+    "seconds": 123.45
+  },
+  {
+    "name": "finance",
+    "command": "just near-finance-conformance /tmp/safe-near-nearcore-44f7ae6",
+    "exit": 0,
+    "seconds": 15.64
+  },
+  {
+    "name": "nonce",
+    "command": "just near-nonce-conformance /tmp/safe-near-nearcore-44f7ae6",
+    "exit": 0,
+    "seconds": 10.56
+  },
+  {
+    "name": "allowance",
+    "command": "just near-allowance-conformance /tmp/safe-near-nearcore-44f7ae6",
+    "exit": 0,
+    "seconds": 8.58
+  },
+  {
+    "name": "wnear-audit",
+    "command": "just wnear-audit",
+    "exit": 0,
+    "seconds": 49.53
+  },
+  {
+    "name": "blueprint",
+    "command": "just blueprint w-near",
+    "exit": 0,
+    "seconds": 24.55
+  },
+  {
+    "name": "reproduce",
+    "command": "just reproduce w-near",
+    "exit": 0,
+    "seconds": 97.84
+  },
+  {
+    "name": "wasm-report",
+    "command": "near-lean/wasm/scripts/testsuite-report.sh",
+    "exit": 0,
+    "seconds": 140.81
+  }
+]

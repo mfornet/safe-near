@@ -1,12 +1,11 @@
 name: Runtime reference components
 
+# Expensive validation is opt-in. Run `just periodic-check <nearcore>` locally.
 on:
-  push:
-    branches: [main]
-    paths: ["near-lean/runtime/**", "near-lean/chain/**", "contracts/w-near/contract.wasm", "near-lean/vm/**", "tools/runtime-finance-reference/**", "tools/runtime-receipt-reference/**", "tools/runtime-nonce-reference/**", "tools/dump-runtime-config/**", ".github/workflows/runtime-reference.yml"]
-  pull_request:
-    paths: ["near-lean/runtime/**", "near-lean/chain/**", "contracts/w-near/contract.wasm", "near-lean/vm/**", "tools/runtime-finance-reference/**", "tools/runtime-receipt-reference/**", "tools/runtime-nonce-reference/**", "tools/dump-runtime-config/**", ".github/workflows/runtime-reference.yml"]
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 # Finish cold builds so their caches survive frequent pushes. GitHub keeps the
 # latest pending run while allowing the current run to complete.
@@ -20,6 +19,9 @@ jobs:
     name: Financial, nonce and receipt-result checks against pinned nearcore
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    env:
+      CARGO_BUILD_JOBS: "2"
+      CARGO_PROFILE_DEV_DEBUG: "0"
     steps:
       - uses: actions/checkout@v5
       - uses: actions/checkout@v5
@@ -27,6 +29,10 @@ jobs:
           repository: near/nearcore
           ref: 44f7ae6cd7ef08bab604e20a473bf77e35d4c993
           path: reference-nearcore
+      - name: Reclaim unused SDK space before Lean and nearcore builds
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
+          df -h /
       - uses: actions/cache@v5
         with:
           path: near-lean/.lake/packages
@@ -47,7 +53,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             reference-nearcore/target
-          key: finance-nearcore-${{ runner.os }}-${{ runner.arch }}-44f7ae6-1.93.0-v1
+          key: finance-nearcore-${{ runner.os }}-${{ runner.arch }}-44f7ae6-1.93.0-debug0-v2
       - name: Build reference adapter and compare financial observations
         run: |
           python3 tools/runtime-finance-reference/build.py reference-nearcore

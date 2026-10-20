@@ -32,16 +32,24 @@ theorem funded_runReceiptAction_mixed (c : ReceiptCtx) (onlyAction isLast : Bool
   intro _
   exact funded_mixed_action c isLast action hreceiver h
 
-theorem funded_runReceiptActionList_mixed (c : ReceiptCtx) (onlyAction : Bool) (actions : List Action)
+theorem funded_runReceiptActionAt_mixed (c : ReceiptCtx) (onlyAction isLast : Bool) (action : Action)
+    (index : Nat) (hreceiver : c.receipt.receiverId ≠ systemAccount) (h : MixedFundingAction action) :
+    (runReceiptActionAt c onlyAction isLast action index).Funded c.cfg c.action.gasPrice action.deposit := by
+  cases action <;> try exact funded_runReceiptAction_mixed c onlyAction isLast _ hreceiver h
+  case functionCall method args gas deposit =>
+    exact funded_runReceiptActionAt_functionCall c onlyAction isLast method args gas deposit index hreceiver
+
+theorem funded_runReceiptActionList_mixed (c : ReceiptCtx) (onlyAction : Bool) (actions : List Action) (index : Nat)
     (hreceiver : c.receipt.receiverId ≠ systemAccount) (h : ∀ action ∈ actions, MixedFundingAction action) :
-    (runReceiptActionList c onlyAction actions).Funded c.cfg c.action.gasPrice (Fees.totalDeposit actions) := by
-  induction actions with
+    (runReceiptActionList c onlyAction actions index).Funded c.cfg c.action.gasPrice (Fees.totalDeposit actions) := by
+  induction actions generalizing index with
   | nil => exact funded_pure _ _ _
   | cons action rest ih =>
     have ha := h action (by simp)
-    have hr := ih (by intro a hm; exact h a (by simp [hm]))
+    have hr := ih (index + 1) (by intro a hm; exact h a (by simp [hm]))
     simpa only [runReceiptActionList, Fees.totalDeposit, List.map_cons, List.sum_cons] using
-      (funded_runReceiptAction_mixed c onlyAction rest.isEmpty action hreceiver ha).bind (fun _ => hr)
+      funded_bind_left_zero (funded_failureIndex _ _ (some index)) (fun _ =>
+        (funded_runReceiptActionAt_mixed c onlyAction rest.isEmpty action index hreceiver ha).bind (fun _ => hr))
 
 /-- This follows the actual action order and state changes. Calls following a
 deployment use the newly installed code; key updates and storage checks are
@@ -52,8 +60,8 @@ theorem funded_receiptActionBody_mixed (c : ReceiptCtx) (hreceiver : c.receipt.r
   unfold receiptActionBody
   apply funded_bind_left_zero (funded_fee _ _ _ _)
   intro _
-  exact funded_bind_right_zero (funded_runReceiptActionList_mixed c _ _ hreceiver h)
-    (fun _ => funded_checkStorageStake _ _ _)
+  exact funded_bind_right_zero (funded_runReceiptActionList_mixed c _ _ 0 hreceiver h)
+    (fun _ => funded_bind_zero (funded_failureIndex _ _ none) (fun _ => funded_checkStorageStake _ _ _))
 
 /-- Complete net settlement conservation for arbitrary ordered mixtures of
 calls, deployment and key changes, on success and failure. Structural and

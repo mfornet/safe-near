@@ -61,24 +61,23 @@ theorem emitFunctionCallActions_allocated_nodup (c : ReceiptCtx) (specs : List R
 /-- External result delivery is deferred until receipt finalization. -/
 def immediateDataCount (_outcome : VMOutcome) (_c : ReceiptCtx) (_isLast : Bool) : Nat := 0
 
-/-- Exact envelope ids of the complete executable materializer: immediate data
-first, then promise actions. Dependency allocation separates the two ranges. -/
+/-- Exact envelope ids of the raw materializer. It emits promise actions;
+completion-data envelopes are allocated later by receipt finalization. -/
 theorem materializeFunctionCall_receiptIds (c : ReceiptCtx) (isLast : Bool) (outcome : VMOutcome)
     (initial : ChainState) :
-    ((materializeFunctionCall c isLast outcome initial).receipts.map (·.receiptId)) =
+    ((materializeFunctionCallRaw c isLast outcome initial).receipts.map (·.receiptId)) =
       List.range' (initial.nextId + outcome.receipts.length +
         (outcome.receipts.map fun spec => spec.dependencies.length).sum) (immediateDataCount outcome c isLast) ++
       List.range' initial.nextId outcome.receipts.length := by
-  rw [materializeFunctionCall_eq_stages]
-  cases hr : outcome.returnData <;> cases isLast <;>
-    simp [hr, emitFunctionCallActions_allocated_receiptIds, emitFunctionCallData_receiptIds,
-      linkFunctionCallDependencies_nextId, allocateFunctionCallIds_nextId, immediateDataCount]
+  rw [materializeFunctionCallRaw_eq_stages]
+  cases hr : outcome.returnData <;>
+    simp [emitFunctionCallActions_allocated_receiptIds, immediateDataCount]
 
-/-- Every emitted envelope has a unique identity, including simultaneous data
-and action emission. No VM-provided id freshness premise is needed. -/
+/-- Every promise-action envelope emitted by the raw materializer has a unique
+identity. No VM-provided id freshness premise is needed. -/
 theorem materializeFunctionCall_receiptIds_nodup (c : ReceiptCtx) (isLast : Bool) (outcome : VMOutcome)
     (initial : ChainState) :
-    ((materializeFunctionCall c isLast outcome initial).receipts.map (·.receiptId)).Nodup := by
+    ((materializeFunctionCallRaw c isLast outcome initial).receipts.map (·.receiptId)).Nodup := by
   rw [materializeFunctionCall_receiptIds, List.nodup_append]
   refine ⟨List.nodup_range', List.nodup_range', ?_⟩
   intro dataId hdata actionId haction he
@@ -91,16 +90,16 @@ theorem materializeFunctionCall_receiptIds_nodup (c : ReceiptCtx) (isLast : Bool
 its own counter interval, despite emitting data before actions. -/
 theorem materializeFunctionCall_receiptId_bounds (c : ReceiptCtx) (isLast : Bool) (outcome : VMOutcome)
     (initial : ChainState) (receipt : Receipt)
-    (hmem : receipt ∈ (materializeFunctionCall c isLast outcome initial).receipts) :
+    (hmem : receipt ∈ (materializeFunctionCallRaw c isLast outcome initial).receipts) :
     initial.nextId ≤ receipt.receiptId ∧
-      receipt.receiptId < (materializeFunctionCall c isLast outcome initial).state.nextId := by
-  have hm : receipt.receiptId ∈ ((materializeFunctionCall c isLast outcome initial).receipts.map (·.receiptId)) :=
+      receipt.receiptId < (materializeFunctionCallRaw c isLast outcome initial).state.nextId := by
+  have hm : receipt.receiptId ∈ ((materializeFunctionCallRaw c isLast outcome initial).receipts.map (·.receiptId)) :=
     List.mem_map.mpr ⟨receipt, hmem, rfl⟩
   rw [materializeFunctionCall_receiptIds, List.mem_append] at hm
-  have hn : (materializeFunctionCall c isLast outcome initial).state.nextId =
+  have hn : (materializeFunctionCallRaw c isLast outcome initial).state.nextId =
       initial.nextId + outcome.receipts.length +
         (outcome.receipts.map fun spec => spec.dependencies.length).sum + immediateDataCount outcome c isLast := by
-    have he := materializeFunctionCall_nextId c isLast outcome initial
+    have he := materializeFunctionCallRaw_nextId c isLast outcome initial
     simpa only [immediateDataCount, Nat.add_zero] using he
   rw [hn]
   rcases hm with hd | ha
@@ -117,7 +116,7 @@ theorem materializeFunctionCall_receiptId_bounds (c : ReceiptCtx) (isLast : Bool
 /-- Every materialized envelope is fresh against all old routing references. -/
 theorem materializeFunctionCall_receiptId_fresh (c : ReceiptCtx) (isLast : Bool) (outcome : VMOutcome)
     (initial : ChainState) (h : initial.IdsBelowNext) (receipt : Receipt)
-    (hmem : receipt ∈ (materializeFunctionCall c isLast outcome initial).receipts) :
+    (hmem : receipt ∈ (materializeFunctionCallRaw c isLast outcome initial).receipts) :
     receipt.receiptId ∉ initial.liveIds := by
   have hb := (materializeFunctionCall_receiptId_bounds c isLast outcome initial receipt hmem).1
   intro hold
@@ -128,11 +127,11 @@ theorem materializeFunctionCall_receiptId_fresh (c : ReceiptCtx) (isLast : Bool)
 state, so local conservation's non-overwrite premise follows from the frontier. -/
 theorem materializeFunctionCall_postponed_fresh (c : ReceiptCtx) (isLast : Bool) (outcome : VMOutcome)
     (initial : ChainState) (h : initial.IdsBelowNext) (receipt : Receipt)
-    (hmem : receipt ∈ (materializeFunctionCall c isLast outcome initial).receipts) :
-    Assoc.lookup (materializeFunctionCall c isLast outcome initial).state.postponed receipt.receiptId = none := by
+    (hmem : receipt ∈ (materializeFunctionCallRaw c isLast outcome initial).receipts) :
+    Assoc.lookup (materializeFunctionCallRaw c isLast outcome initial).state.postponed receipt.receiptId = none := by
   have hf := congrArg (fun st => Assoc.lookup st.postponed receipt.receiptId)
-    (materializeFunctionCall_frame c isLast outcome initial)
-  change Assoc.lookup (materializeFunctionCall c isLast outcome initial).state.postponed receipt.receiptId =
+    (materializeFunctionCallRaw_frame c isLast outcome initial)
+  change Assoc.lookup (materializeFunctionCallRaw c isLast outcome initial).state.postponed receipt.receiptId =
     Assoc.lookup initial.postponed receipt.receiptId at hf
   rw [hf]
   exact h.postponed_lookup_none receipt.receiptId

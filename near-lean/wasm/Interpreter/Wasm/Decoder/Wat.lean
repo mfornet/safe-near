@@ -141,9 +141,6 @@ termination_by structural cs
 private def stripCommentsAux (cs : List Char) (acc : List Char) : List Char :=
   stripCommentsLoop cs .normal acc
 
-private def stripComments (s : String) : String :=
-  String.ofList (stripCommentsAux s.toList [])
-
 private def readTokenString : List Char → List Char → String × List Char
   | [], acc => (String.ofList ('"' :: acc.reverse), [])
   | '"' :: rest, acc =>
@@ -2222,6 +2219,7 @@ private def parseFunc (funcIds : NameMap)
   let mut inlineExports : List String := []
   let mut localIds : NameMap := {}
   let mut typeApplied : Bool := false
+  let mut explicitParamIndex : Nat := 0
   -- Declared `(type N)` index, recorded on the function so the runtime
   -- nominal type checks (`(return_)call_indirect`, `ref.test`/`ref.cast`
   -- against a concrete function type) can consult the `rec`/`sub`
@@ -2263,6 +2261,17 @@ private def parseFunc (funcIds : NameMap)
                 | some vt => paramTypes := paramTypes ++ [vt]
                 | none    => throw s!"unsupported param type: {a}"
               | .list l => paramTypes := paramTypes ++ [listToValueType l]
+        else
+          -- The type use already supplied the parameter types, but inline
+          -- annotations can still introduce names used by the body.
+          for t in tail do
+            match t with
+            | .atom name =>
+              if startsWith name "$" then
+                localIds := localIds.insert (name.drop 1).toString explicitParamIndex
+              else
+                explicitParamIndex := explicitParamIndex + 1
+            | .list _ => explicitParamIndex := explicitParamIndex + 1
         rest := r
       | "local" =>
         let named := tail.any fun

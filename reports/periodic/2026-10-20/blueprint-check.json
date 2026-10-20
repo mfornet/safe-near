@@ -1,0 +1,18 @@
+{
+  "specifications": 15,
+  "proof_endpoints": 13,
+  "exact_label_match": true,
+  "open_refinement_propositions": [
+    "spec:refinement",
+    "spec:refinement-near-lean"
+  ],
+  "extra_theorem_nodes": [],
+  "renderer_warnings": [
+    "makeatletter",
+    "providecommand",
+    "makeatother",
+    "gdef"
+  ],
+  "proof_markers_verified": true,
+  "obsolete_generated_page_removed": true
+}

@@ -9,9 +9,9 @@ default:
 build:
     lake build
 
-# List the specs that are still proved by `sorry`.
+# Audit transitive sorry dependencies, including after cached builds.
 sorries:
-    lake build 2>&1 | grep "declaration uses \`sorry\`" || echo "no sorry"
+    python3 ../../../tools/axiom-audit.py . --allow-sorry --report ../../../audit/w-near-sorries.json
 
 # Extract the blueprint from the @[blueprint] annotations into .lake/build/blueprint.
 blueprint-extract:
@@ -21,6 +21,7 @@ blueprint-extract:
 # Build the web blueprint (blueprint/web/index.html) with the dependency graph.
 [working-directory("blueprint/src")]
 blueprint-web: blueprint-extract
+    rm -rf ../web
     mkdir -p ../web
     $(dirname $(readlink -f $(which leanblueprint)))/plastex -c plastex.cfg web.tex
 

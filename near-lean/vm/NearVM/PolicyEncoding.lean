@@ -66,16 +66,25 @@ theorem metered_encodingPolicy (extra : Nat) (name : String) (fn : HostFn NearSt
     · cases hc : (applyCharges st.host (chargesBefore name st args)).2 with
       | some error => trivial
       | none =>
+        let paid := prechargedStore name st args
         change HostResult.LiveSatisfies _
-          (match preInvokeError name (prechargedStore name st args) args with
-          | some error => trapWith (prechargedStore name st args) error
-          | none => finishMeteredCall extra name (prechargedStore name st args) args
-              (fn.invoke (prechargedStore name st args) args))
-        split
-        · trivial
-        · have hp := finishMeteredCall_encodingPolicy extra name (prechargedStore name st args) args _
-            (hraw (prechargedStore name st args) args)
-          simpa only [prechargedStore_config] using hp
+          (match preInvokeError name paid args with
+          | some error => trapWith paid error
+          | none => invokeStorageCall extra name fn paid args)
+        cases hp : preInvokeError name paid args with
+        | some error => trivial
+        | none =>
+          unfold invokeStorageCall
+          dsimp only
+          let ready := (prepareStorageCall name paid args).1
+          cases hs : (prepareStorageCall name paid args).2 with
+          | some error => cases error <;> trivial
+          | none =>
+            have hr := finishMeteredCall_encodingPolicy extra name ready args _ (hraw ready args)
+            change HostResult.LiveSatisfies
+              (fun (ns : NearState) => ns.config.validateActionMethodUtf8 =
+                (prechargedStore name st args).host.config.validateActionMethodUtf8) _ at hr
+            simpa only [prechargedStore_config] using hr
 
 theorem promiseCreateFn_encodingPolicy : HostPreservesEncodingPolicy promiseCreateFn := by
   intro st args

@@ -1,0 +1,50 @@
+[
+  {
+    "package": "near-lean/wasm",
+    "command": "lake build --wfail",
+    "exit": 0,
+    "seconds": 2.54
+  },
+  {
+    "package": "near-lean/vm",
+    "command": "lake build --wfail",
+    "exit": 0,
+    "seconds": 2.51
+  },
+  {
+    "package": "near-lean/runtime",
+    "command": "lake build --wfail",
+    "exit": 0,
+    "seconds": 2.62
+  },
+  {
+    "package": "near-lean/chain",
+    "command": "lake build --wfail",
+    "exit": 0,
+    "seconds": 2.61
+  },
+  {
+    "package": "near-lean/iris-wasm",
+    "command": "lake build --wfail",
+    "exit": 0,
+    "seconds": 2.31
+  },
+  {
+    "package": "near-lean/programs/lean",
+    "command": "lake build",
+    "exit": 0,
+    "seconds": 2.31
+  },
+  {
+    "package": "contracts/w-near/verification",
+    "command": "lake build --wfail",
+    "exit": 0,
+    "seconds": 2.83
+  },
+  {
+    "package": "all contracts",
+    "command": "just build-all",
+    "exit": 0,
+    "seconds": 2.82
+  }
+]

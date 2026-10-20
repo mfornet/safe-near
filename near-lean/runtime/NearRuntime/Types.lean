@@ -4,9 +4,9 @@ import NearVM
 # Runtime types
 
 Accounts, access keys, actions, receipts, transactions and execution
-outcomes, mirroring `near_primitives`. Hashes and signatures are not
-modelled: ids are counters handed out by the state, and transactions are
-trusted to be correctly signed (the chain layer is the "trustless
+outcomes, mirroring `near_primitives`. Logical IDs are counters handed out
+by the state; execution identity context can bind their native hashes.
+Transaction signatures are trusted to be correct (the chain layer is the "trustless
 manipulator" of `notes/design/NEAR_RUNTIME.md`).
 -/
 
@@ -30,6 +30,9 @@ structure ContractCode where
   module : Module
   size : Nat
   hash : String
+  /-- The external decoder could not supply this code. Replay adapters must
+  report that limitation rather than substituting an executable empty module. -/
+  decodeIssue : Option Wasm.Near.ExecutionIssue := none
 
 instance : Inhabited ContractCode := ⟨{ module := default, size := 0, hash := "" }⟩
 
@@ -137,8 +140,14 @@ inductive NonceMode where
   | strict
   deriving Repr, BEq, DecidableEq, Inhabited
 
+instance : LawfulBEq NonceMode where
+  rfl := by intro mode; cases mode <;> rfl
+  eq_of_beq := by intro a b h; cases a <;> cases b <;> cases h <;> rfl
+
 /-- A transaction; the signature is trusted. -/
 structure Transaction where
+  /-- Native transaction envelope tag. V1 is enabled by the GasKeys feature. -/
+  version : Nat := 0
   signerId : AccountId
   publicKey : PublicKey
   nonce : Nat
@@ -147,15 +156,33 @@ structure Transaction where
   actions : List Action
   deriving Inhabited
 
-/-- Why a receipt or transaction failed (`ActionErrorKind` and
-`InvalidTxError`, flattened). -/
+/-- Stateless action errors, before signer/key admission or transaction charges. -/
+inductive ActionsValidationError
+  | deleteActionMustBeFinal
+  | totalPrepaidGasExceeded (total limit : Nat)
+  | totalNumberOfActionsExceeded (count limit : Nat)
+  | totalNumberOfDeployActionsExceeded (count limit : Nat)
+  | addKeyMethodNamesNumberOfBytesExceeded (total limit : Nat)
+  | addKeyMethodNameLengthExceeded (length limit : Nat)
+  | integerOverflow
+  | invalidAccountId (id : String)
+  | contractSizeExceeded (size limit : Nat)
+  | functionCallMethodNameLengthExceeded (length limit : Nat)
+  | functionCallArgumentsLengthExceeded (length limit : Nat)
+  | functionCallZeroAttachedGas
+  | unsuitableStakingKey (key : PublicKey)
+  deriving Repr, BEq, Inhabited
+
+/-- Receipt and transaction failures, preserving stateless action error categories. -/
 inductive RuntimeError
+  | actionsValidation (error : ActionsValidationError)
   | accountAlreadyExists (id : AccountId)
   | accountDoesNotExist (id : AccountId)
   | createAccountNotAllowed (id predecessor : AccountId)
+  | createAccountOnlyByRegistrar (id registrar predecessor : AccountId)
   | actorNoPermission (id actor : AccountId)
-  | deleteKeyDoesNotExist (id : AccountId)
-  | addKeyAlreadyExists (id : AccountId)
+  | deleteKeyDoesNotExist (id : AccountId) (publicKey : PublicKey)
+  | addKeyAlreadyExists (id : AccountId) (publicKey : PublicKey)
   | deleteAccountStaking (id : AccountId)
   | lackBalanceForState (id : AccountId) (amount : Nat)
   | triesToUnstake (id : AccountId)
@@ -167,9 +194,14 @@ inductive RuntimeError
   | deleteAccountWithLargeState (id : AccountId)
   | invalidSigner (id : AccountId)
   | invalidTransactionVersion
+  | transactionSizeExceeded (size limit : Nat)
   | invalidNonce (txNonce akNonce : Nat)
   | nonceTooLarge (txNonce upperBound : Nat)
   | invalidAccessKey (msg : String)
+  | accessKeyNotFound (id : AccountId) (publicKey : PublicKey)
+  | receiverMismatch (txReceiver keyReceiver : AccountId)
+  | methodNameMismatch (methodName : String)
+  | notEnoughAllowance (id : AccountId) (publicKey : PublicKey) (allowance cost : Nat)
   | notEnoughBalance (id : AccountId) (balance cost : Nat)
   | invalidReceiver (id : AccountId)
   | contractSizeExceeded (size limit : Nat)
@@ -198,6 +230,8 @@ def ExecutionStatus.isSuccess : ExecutionStatus → Bool
   | _ => true
 
 structure ExecutionOutcome where
+  /-- Failed receipt action, absent for transaction errors and final storage checks. -/
+  failureIndex : Option Nat := none
   executorId : AccountId
   status : ExecutionStatus
   logs : List String := []

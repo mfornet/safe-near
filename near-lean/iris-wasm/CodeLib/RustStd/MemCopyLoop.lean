@@ -76,15 +76,6 @@ def copyWordsOuterFrame : Wasm.SmallStep.ControlFrame :=
     continuation := []
     belowStack := [] }
 
-def copyWordsInnerFrame : Wasm.SmallStep.ControlFrame :=
-  { kind := .block
-    paramArity := 0
-    resultArity := 0
-    body := CopyWordsInnerGuard
-    continuation :=
-      CopyWordsLoadStoreIteration ++ CopyWordsIncrementBackedge
-    belowStack := [] }
-
 theorem CopyWords_eq_structured :
     CopyWords = [.const 0, .localSet 3,
       .loop 0 0 CopyWordsLoopBody] := by rfl

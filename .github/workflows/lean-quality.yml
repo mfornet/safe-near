@@ -1,0 +1,90 @@
+name: Lean quality
+
+# Automatic CI uses Python only; Lean/native suites run locally during periodic checks.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lean-quality-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  repository:
+    name: Repository checks (no Lean or native builds)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Check repository pins and offline tooling regressions
+        run: |
+          python3 tools/check_lean_toolchains.py
+          python3 -m unittest discover -s tools/tests -v
+          python3 -m unittest discover -s tools/runtime-conformance -p 'test_*.py' -v
+
+  style:
+    if: github.event_name == 'workflow_dispatch'
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/cache@v5
+        with:
+          path: near-lean/.lake/packages
+          key: lean-style-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'near-lean/wasm/lake-manifest.json') }}
+      - uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: near-lean/wasm
+          build: "false"
+          test: "false"
+          lint: "false"
+          use-mathlib-cache: false
+      - name: Prepare only the style checker's dependencies
+        working-directory: near-lean/wasm
+        run: |
+          lake exe cache get Mathlib.Tactic.Linter.TextBased
+          lake build +Mathlib.Tactic.Linter.TextBased
+      - name: Check Lean style and formatting
+        run: python3 tools/lean_style.py
+      - name: Test style checker and formatter
+        run: python3 tools/tests/check_lean_style.py
+
+  programs:
+    if: github.event_name == 'workflow_dispatch'
+    timeout-minutes: 45
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/cache@v5
+        with:
+          path: near-lean/.lake/packages
+          key: lean-programs-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'near-lean/**/lake-manifest.json') }}
+      - uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: near-lean/programs/lean
+          build-args: program-tests smoke
+          use-mathlib-cache: false
+      - name: Smoke and program regression tests
+        working-directory: near-lean/programs/lean
+        run: |
+          ./.lake/build/bin/smoke
+          ./.lake/build/bin/program-tests
+      - uses: actions/cache@v5
+        with:
+          path: near-lean/.lake/lean-fmt
+          key: lean-fmt-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'tools/lean_format_tool.json') }}
+      - name: Check syntax formatting of the new harness modules
+        run: >-
+          python3 tools/lean_format.py --check
+          near-lean/programs/lean/Programs/Harness.lean
+          near-lean/programs/lean/Programs/Regression.lean
+      - name: Test validated syntax formatting
+        run: python3 tools/tests/check_lean_format.py

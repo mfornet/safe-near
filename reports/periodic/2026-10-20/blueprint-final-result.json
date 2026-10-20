@@ -1,0 +1,24 @@
+{
+  "attempts": [
+    {
+      "command": "just blueprint w-near",
+      "exit": 0,
+      "seconds": 11.79
+    },
+    {
+      "command": "just blueprint w-near",
+      "exit": 0,
+      "seconds": 11.89
+    },
+    {
+      "command": "just blueprint w-near",
+      "exit": 0,
+      "seconds": 11.64
+    },
+    {
+      "command": "just blueprint w-near",
+      "exit": 0,
+      "seconds": 9.84
+    }
+  ]
+}

@@ -1,0 +1,80 @@
+[
+  {
+    "name": "sorries",
+    "command": "just sorries w-near",
+    "exit": 0,
+    "seconds": 43.95
+  },
+  {
+    "name": "wasm-ci",
+    "command": "cd near-lean/wasm && lake build Interpreter runner testsuite --wfail",
+    "exit": 0,
+    "seconds": 209.98
+  },
+  {
+    "name": "wasm-smoke",
+    "command": "near-lean/wasm/scripts/runner-smoke.sh",
+    "exit": 0,
+    "seconds": 2.54
+  },
+  {
+    "name": "iris-build",
+    "command": "cd near-lean/iris-wasm && lake build --wfail",
+    "exit": 0,
+    "seconds": 223.31
+  },
+  {
+    "name": "programs-build",
+    "command": "cd near-lean/programs/lean && lake build && lake exe smoke",
+    "exit": 0,
+    "seconds": 310.47
+  },
+  {
+    "name": "wasm-audit",
+    "command": "python3 tools/axiom-audit.py near-lean/wasm --report audit/wasm.json --no-build",
+    "exit": 0,
+    "seconds": 273.22
+  },
+  {
+    "name": "iris-audit",
+    "command": "python3 tools/axiom-audit.py near-lean/iris-wasm --report audit/iris-wasm.json --no-build",
+    "exit": 0,
+    "seconds": 57.44
+  },
+  {
+    "name": "programs-audit",
+    "command": "python3 tools/axiom-audit.py near-lean/programs/lean --report audit/programs.json --allow-sorry",
+    "exit": 0,
+    "seconds": 87.82
+  },
+  {
+    "name": "vm-audit",
+    "command": "python3 tools/axiom-audit.py near-lean/vm --report audit/vm.json --no-build",
+    "exit": 0,
+    "seconds": 79.43
+  },
+  {
+    "name": "runtime-audit",
+    "command": "python3 tools/axiom-audit.py near-lean/runtime --report audit/runtime.json --no-build",
+    "exit": 0,
+    "seconds": 311.32
+  },
+  {
+    "name": "chain-audit",
+    "command": "python3 tools/axiom-audit.py near-lean/chain --report audit/chain.json --no-build",
+    "exit": 0,
+    "seconds": 34.81
+  },
+  {
+    "name": "programs-reproduce",
+    "command": "near-lean/programs/rust/build.sh",
+    "exit": 0,
+    "seconds": 1.48
+  },
+  {
+    "name": "config-regenerate",
+    "command": "just near-configs",
+    "exit": 0,
+    "seconds": 7.37
+  }
+]

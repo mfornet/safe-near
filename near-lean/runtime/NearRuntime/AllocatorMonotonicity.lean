@@ -6,14 +6,17 @@ open Wasm.Near
 /-- Materialization reserves receipt and dependency ids without rewinding the
 shared allocator. -/
 theorem materializeFunctionCall_nextId_mono (c : ReceiptCtx) (isLast : Bool) (outcome : VMOutcome)
-    (initial : ChainState) : initial.nextId ≤ (materializeFunctionCall c isLast outcome initial).state.nextId := by
-  rw [materializeFunctionCall_nextId]
+    (initial : ChainState) : initial.nextId ≤ (materializeFunctionCallRaw c isLast outcome initial).state.nextId := by
+  rw [materializeFunctionCallRaw_nextId]
   exact (Nat.le_add_right _ _).trans (Nat.le_add_right _ _)
 
 theorem commitFunctionCall_nextId_mono (exec : Exec) (c : ReceiptCtx) (account : Account)
-    (outcome : VMOutcome) (isLast : Bool) :
-    exec.state.nextId ≤ (exec.commitFunctionCall c account outcome isLast).state.nextId :=
-  materializeFunctionCall_nextId_mono c isLast outcome
+    (outcome : VMOutcome) (isLast : Bool) (effects : FunctionCallEffects)
+    (heffects : functionCallEffects c account outcome isLast exec.state = .ok effects) :
+    exec.state.nextId ≤ (exec.commitFunctionCall outcome effects).state.nextId := by
+  change exec.state.nextId ≤ effects.state.nextId
+  rw [functionCallEffects_success c account outcome isLast exec.state effects heffects]
+  exact materializeFunctionCall_nextId_mono c isLast outcome
     ((exec.state.setAccount c.receipt.receiverId
       { account with amount := outcome.balance, storageUsage := outcome.storageUsage }).setContractStorage
         c.receipt.receiverId outcome.storage)
@@ -40,14 +43,29 @@ theorem applyAction_nextId_mono (c : ReceiptCtx) (isLast : Bool) (action : Actio
   | functionCall method args gas deposit =>
     rw [show applyAction c isLast (.functionCall method args gas deposit) =
       applyFunctionCall c method args gas deposit isLast from rfl, applyFunctionCall_run]
-    split
-    · exact Nat.le_refl _
-    · split
-      · exact Nat.le_refl _
-      · dsimp only
-        split
-        · exact Nat.le_refl _
-        · exact commitFunctionCall_nextId_mono _ _ _ _ _
+    cases ha : before.state.account? c.receipt.receiverId with
+    | none => exact Nat.le_refl _
+    | some account =>
+      dsimp only
+      cases hc : account.code with
+      | none => exact Nat.le_refl _
+      | some code =>
+        dsimp only
+        cases hi : code.decodeIssue with
+        | some issue => exact Nat.le_refl _
+        | none =>
+          dsimp only
+          generalize ho : run c.cfg code.module code.size method
+            (functionCallContext c account args gas deposit isLast)
+            (before.state.contractStorage c.receipt.receiverId) = outcome
+          cases he : outcome.aborted with
+          | some error => exact Nat.le_refl _
+          | none =>
+            dsimp only
+            cases hf : functionCallEffects c account outcome isLast before.state with
+            | error error => exact Nat.le_refl _
+            | ok effects =>
+              exact commitFunctionCall_nextId_mono (before.recordVMOutcome outcome) c account outcome isLast effects hf
   | transfer amount =>
     rw [applyTransfer_run]
     split
@@ -57,7 +75,7 @@ theorem applyAction_nextId_mono (c : ReceiptCtx) (isLast : Bool) (action : Actio
       · split <;> exact Nat.le_refl _
   | stake amount pk =>
     cases ha : before.state.account? c.receipt.receiverId <;>
-      simp [-ExceptT.run_bind, -StateT.run_bind, applyAction, getAccount, getState, ha]
+      simp [-StateT.run_bind, applyAction, getAccount, getState, ha]
     repeat' (first | exact Nat.le_refl _ | split)
   | addKey pk key => rw [applyAddKey_run]; repeat' (first | exact Nat.le_refl _ | split)
   | deleteKey pk => rw [applyDeleteKey_run]; repeat' (first | exact Nat.le_refl _ | split)
@@ -89,8 +107,8 @@ theorem nextId_getState : getState.NextIdMonotone := by intro before; exact Nat.
 
 theorem nextId_fee (isRefund : Bool) (fee : Nat) : (chargeReceiptFee isRefund fee).NextIdMonotone := by
   intro before
-  unfold chargeReceiptFee
-  split <;> exact Nat.le_refl _
+  unfold chargeReceiptFee burnGas
+  exact Nat.le_refl _
 
 theorem nextId_checkReceiptAction (c : ReceiptCtx) (onlyAction : Bool) (action : Action) :
     (checkReceiptAction c onlyAction action).NextIdMonotone := by
@@ -120,16 +138,42 @@ theorem nextId_runReceiptAction (c : ReceiptCtx) (onlyAction isLast : Bool) (act
   exact (nextId_fee _ _).bind (fun _ => (nextId_checkReceiptAction _ _ _).bind
     (fun _ => applyAction_nextId_mono _ _ _))
 
-theorem nextId_runReceiptActionList (c : ReceiptCtx) (onlyAction : Bool) (actions : List Action) :
-    (runReceiptActionList c onlyAction actions).NextIdMonotone := by
-  induction actions with
+theorem nextId_runReceiptActionAt (c : ReceiptCtx) (onlyAction isLast : Bool)
+    (action : Action) (index : Nat) : (runReceiptActionAt c onlyAction isLast action index).NextIdMonotone := by
+  cases action with
+  | createAccount  => exact nextId_runReceiptAction c onlyAction isLast (.createAccount)
+  | deployContract code => exact nextId_runReceiptAction c onlyAction isLast (.deployContract code)
+  | transfer amount => exact nextId_runReceiptAction c onlyAction isLast (.transfer amount)
+  | stake amount pk => exact nextId_runReceiptAction c onlyAction isLast (.stake amount pk)
+  | addKey pk key => exact nextId_runReceiptAction c onlyAction isLast (.addKey pk key)
+  | deleteKey pk => exact nextId_runReceiptAction c onlyAction isLast (.deleteKey pk)
+  | deleteAccount beneficiary => exact nextId_runReceiptAction c onlyAction isLast (.deleteAccount beneficiary)
+  | functionCall method args gas deposit =>
+    cases hs : actionRandomSeed c index with
+    | error error =>
+      simp only [runReceiptActionAt, hs]
+      exact nextId_throw _
+    | ok seed =>
+      simp only [runReceiptActionAt, hs]
+      exact nextId_runReceiptAction _ _ _ _
+
+theorem nextId_failureIndex (index : Option Nat) :
+    (modify fun e => { e with failureIndex := index } : ExecM Unit).NextIdMonotone := by
+  intro before
+  exact Nat.le_refl _
+
+theorem nextId_runReceiptActionList (c : ReceiptCtx) (onlyAction : Bool) (actions : List Action)
+    (index : Nat) : (runReceiptActionList c onlyAction actions index).NextIdMonotone := by
+  induction actions generalizing index with
   | nil => exact nextId_pure _
-  | cons action rest ih => exact (nextId_runReceiptAction _ _ _ _).bind (fun _ => ih)
+  | cons action rest ih =>
+    exact (nextId_failureIndex (some index)).bind (fun _ =>
+      (nextId_runReceiptActionAt c onlyAction rest.isEmpty action index).bind (fun _ => ih (index + 1)))
 
 theorem nextId_receiptActionBody (c : ReceiptCtx) : (receiptActionBody c).NextIdMonotone := by
   unfold receiptActionBody
-  exact (nextId_fee _ _).bind (fun _ => (nextId_runReceiptActionList _ _ _).bind
-    (fun _ => nextId_checkStorageStake _ _))
+  exact (nextId_fee _ _).bind (fun _ => (nextId_runReceiptActionList _ _ _ _).bind
+    (fun _ => (nextId_failureIndex none).bind (fun _ => nextId_checkStorageStake _ _)))
 
 theorem runReceiptActions_nextId_mono (c : ReceiptCtx) (st : ChainState) :
     st.nextId ≤ (runReceiptActions c st).1.state.nextId := by

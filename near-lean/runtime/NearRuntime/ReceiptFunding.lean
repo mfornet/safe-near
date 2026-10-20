@@ -1,4 +1,5 @@
 import NearRuntime.ActionFunding
+import NearRuntime.RefundReceiptInvariants
 
 namespace Near
 open Wasm.Near

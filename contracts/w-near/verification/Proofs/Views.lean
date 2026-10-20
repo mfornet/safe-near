@@ -49,6 +49,6 @@ theorem init_once : InitOnce := by
     step_simp
     simp [hdep]
   · intro cfg env call hcall
-    cases call <;> simp at hcall <;> step_simp <;> (repeat' split) <;> (try simp)
+    cases call <;> simp at hcall <;> (step_simp; repeat' split) <;> simp
 
 end WNear

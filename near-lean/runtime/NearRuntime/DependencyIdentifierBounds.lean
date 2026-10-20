@@ -149,8 +149,8 @@ allocated dependency references are proved bounded from the actual loops. -/
 theorem materializeFunctionCall_liveIds_below (c : ReceiptCtx) (isLast : Bool) (outcome : VMOutcome)
     (initial : ChainState)
     (hinherited : ∀ receiver ∈ c.action.outputDataReceivers, receiver.dataId < initial.nextId) :
-    ∀ receipt ∈ (materializeFunctionCall c isLast outcome initial).receipts,
-      ∀ id ∈ receipt.liveIds, id < (materializeFunctionCall c isLast outcome initial).state.nextId := by
+    ∀ receipt ∈ (materializeFunctionCallRaw c isLast outcome initial).receipts,
+      ∀ id ∈ receipt.liveIds, id < (materializeFunctionCallRaw c isLast outcome initial).state.nextId := by
   let allocation := allocateFunctionCallIds outcome.receipts initial
   let linked := linkFunctionCallDependencies outcome.receipts allocation.1
     (Array.replicate outcome.receipts.length []) (Array.replicate outcome.receipts.length [])
@@ -189,20 +189,18 @@ theorem materializeFunctionCall_liveIds_below (c : ReceiptCtx) (isLast : Bool) (
     · simp
   | value bytes =>
     dsimp only
-    exact emitFunctionCall_directReturn_liveIds_below c outcome.receipts allocation.2 linked.2.1 linked.2.2
-      linked.1 bytes _ hsize hids hlinked.1 hlinked.2 hreceivers
+    exact emitFunctionCallActions_liveIds_below _ _ _ _ _ _ _ hsize hids hlinked.1 hlinked.2 (by simp)
   | none =>
     dsimp only
-    exact emitFunctionCall_directReturn_liveIds_below c outcome.receipts allocation.2 linked.2.1 linked.2.2
-      linked.1 [] _ hsize hids hlinked.1 hlinked.2 hreceivers
+    exact emitFunctionCallActions_liveIds_below _ _ _ _ _ _ _ hsize hids hlinked.1 hlinked.2 (by simp)
 
 /-- The inherited-reference premise follows from the ordinary incoming receipt
 bound and the context's agreement with that receipt's action payload. -/
 theorem materializeFunctionCall_liveIds_below_of_receipt (c : ReceiptCtx) (isLast : Bool) (outcome : VMOutcome)
     (initial : ChainState) (hreceipt : c.receipt.receipt = .action c.action)
     (hbound : ∀ id ∈ c.receipt.liveIds, id < initial.nextId) :
-    ∀ receipt ∈ (materializeFunctionCall c isLast outcome initial).receipts,
-      ∀ id ∈ receipt.liveIds, id < (materializeFunctionCall c isLast outcome initial).state.nextId := by
+    ∀ receipt ∈ (materializeFunctionCallRaw c isLast outcome initial).receipts,
+      ∀ id ∈ receipt.liveIds, id < (materializeFunctionCallRaw c isLast outcome initial).state.nextId := by
   apply materializeFunctionCall_liveIds_below
   intro receiver hm
   apply hbound

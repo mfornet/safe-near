@@ -11,11 +11,11 @@ theorem funded_stake_rejection (c : ReceiptCtx) (isLast : Bool) (stake : Nat) (p
   intro before after value _ hrun
   cases ha : before.state.account? c.receipt.receiverId with
   | none =>
-    simp [-ExceptT.run_bind, -StateT.run_bind, applyAction, getAccount, getState, ha] at hrun
+    simp [-StateT.run_bind, applyAction, getAccount, getState, ha] at hrun
     have hbad := congrArg Prod.fst hrun
     cases hbad
   | some account =>
-    simp [-ExceptT.run_bind, -StateT.run_bind, applyAction, getAccount, getState, ha] at hrun
+    simp [-StateT.run_bind, applyAction, getAccount, getState, ha] at hrun
     repeat' (first
       | contradiction
       | (have hbad := congrArg Prod.fst hrun; cases hbad)
@@ -46,14 +46,22 @@ theorem funded_runReceiptAction (c : ReceiptCtx) (onlyAction isLast : Bool) (act
   intro _
   exact funded_applyAction c isLast action hreceiver
 
-theorem funded_runReceiptActionList_all (c : ReceiptCtx) (onlyAction : Bool) (actions : List Action)
+theorem funded_runReceiptActionAt_all (c : ReceiptCtx) (onlyAction isLast : Bool) (action : Action)
+    (index : Nat) (hreceiver : c.receipt.receiverId ≠ systemAccount) :
+    (runReceiptActionAt c onlyAction isLast action index).Funded c.cfg c.action.gasPrice action.deposit := by
+  cases action <;> try exact funded_runReceiptAction c onlyAction isLast _ hreceiver
+  case functionCall method args gas deposit =>
+    exact funded_runReceiptActionAt_functionCall c onlyAction isLast method args gas deposit index hreceiver
+
+theorem funded_runReceiptActionList_all (c : ReceiptCtx) (onlyAction : Bool) (actions : List Action) (index : Nat)
     (hreceiver : c.receipt.receiverId ≠ systemAccount) :
-    (runReceiptActionList c onlyAction actions).Funded c.cfg c.action.gasPrice (Fees.totalDeposit actions) := by
-  induction actions with
+    (runReceiptActionList c onlyAction actions index).Funded c.cfg c.action.gasPrice (Fees.totalDeposit actions) := by
+  induction actions generalizing index with
   | nil => exact funded_pure _ _ _
   | cons action rest ih =>
     simpa only [runReceiptActionList, Fees.totalDeposit, List.map_cons, List.sum_cons] using
-      (funded_runReceiptAction c onlyAction rest.isEmpty action hreceiver).bind (fun _ => ih)
+      funded_bind_left_zero (funded_failureIndex _ _ (some index)) (fun _ =>
+        (funded_runReceiptActionAt_all c onlyAction rest.isEmpty action index hreceiver).bind (fun _ => ih (index + 1)))
 
 /-- Arbitrary action lists follow their real order, including creation followed
 by deployment/calls, implicit creation, key changes, and final deletion. -/
@@ -62,8 +70,8 @@ theorem funded_receiptActionBody_all (c : ReceiptCtx) (hreceiver : c.receipt.rec
   unfold receiptActionBody
   apply funded_bind_left_zero (funded_fee _ _ _ _)
   intro _
-  exact funded_bind_right_zero (funded_runReceiptActionList_all c _ _ hreceiver)
-    (fun _ => funded_checkStorageStake _ _ _)
+  exact funded_bind_right_zero (funded_runReceiptActionList_all c _ _ 0 hreceiver)
+    (fun _ => funded_bind_zero (funded_failureIndex _ _ none) (fun _ => funded_checkStorageStake _ _ _))
 
 /-- Ordinary modeled action receipts conserve funds on success and failure,
 without an action-family restriction or assumed VM/ledger equations. Liquid and

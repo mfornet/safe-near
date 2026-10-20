@@ -45,8 +45,8 @@ theorem applyActionReceipt_reward_backed (c : ReceiptCtx) (st : ChainState)
   by_cases hp : c.receipt.predecessorId = systemAccount
   · obtain ⟨amount, ha⟩ := (by simpa only [ActionReceiptFinancialShape, hp, ite_true] using hshape :
       ∃ amount, c.action.actions = [.transfer amount])
-    have hrefund : c.receipt.isRefund = true := by simp [Receipt.isRefund, hp]
-    have hz := (refund_runReceiptActions_gas_zero c st hrefund (by simp [ha, Fees.totalPrepaid, Action.attachedGas])).1
+    have hz := refund_runReceiptActions_functionCallGas_zero c st
+      (by simp [ha, Fees.totalPrepaid, Action.attachedGas])
     have hr := finalizeReceipt_reward_zero c st (runReceiptActions c st).1 (runReceiptActions c st).2 hz
     simpa only [applyActionReceipt, hr] using Nat.zero_le (applyActionReceipt c st).tokensBurnt
   · cases he : (runReceiptActions c st).2 with

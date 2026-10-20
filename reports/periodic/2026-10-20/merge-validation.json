@@ -1,0 +1,134 @@
+{
+  "base": "dbf9d11",
+  "merged_main": "fc34915",
+  "results": [
+    {
+      "name": "ci-check",
+      "command": [
+        "just",
+        "ci-check"
+      ],
+      "cwd": ".",
+      "exit_code": 0,
+      "seconds": 2.19,
+      "log": "logs/merge-ci-check.log"
+    },
+    {
+      "name": "wasm-build",
+      "command": [
+        "lake",
+        "build",
+        "--wfail"
+      ],
+      "cwd": "near-lean/wasm",
+      "exit_code": 0,
+      "seconds": 290.11,
+      "log": "logs/merge-wasm-build.log"
+    },
+    {
+      "name": "iris-build",
+      "command": [
+        "lake",
+        "build",
+        "--wfail"
+      ],
+      "cwd": "near-lean/iris-wasm",
+      "exit_code": 0,
+      "seconds": 133.48,
+      "log": "logs/merge-iris-build.log"
+    },
+    {
+      "name": "programs-build",
+      "command": [
+        "lake",
+        "build",
+        "--wfail"
+      ],
+      "cwd": "near-lean/programs/lean",
+      "exit_code": 0,
+      "seconds": 81.83,
+      "log": "logs/merge-programs-build.log"
+    },
+    {
+      "name": "vm-build",
+      "command": [
+        "lake",
+        "build",
+        "--wfail"
+      ],
+      "cwd": "near-lean/vm",
+      "exit_code": 0,
+      "seconds": 115.83,
+      "log": "logs/merge-vm-build.log"
+    },
+    {
+      "name": "runtime-build",
+      "command": [
+        "lake",
+        "build",
+        "--wfail"
+      ],
+      "cwd": "near-lean/runtime",
+      "exit_code": 0,
+      "seconds": 147.58,
+      "log": "logs/merge-runtime-build.log"
+    },
+    {
+      "name": "chain-build",
+      "command": [
+        "lake",
+        "build",
+        "--wfail"
+      ],
+      "cwd": "near-lean/chain",
+      "exit_code": 0,
+      "seconds": 21.61,
+      "log": "logs/merge-chain-build.log"
+    },
+    {
+      "name": "wnear-build",
+      "command": [
+        "lake",
+        "build",
+        "--wfail"
+      ],
+      "cwd": "contracts/w-near/verification",
+      "exit_code": 0,
+      "seconds": 7.01,
+      "log": "logs/merge-wnear-build.log"
+    },
+    {
+      "name": "near-test",
+      "command": [
+        "just",
+        "near-test"
+      ],
+      "cwd": ".",
+      "exit_code": 0,
+      "seconds": 45.83,
+      "log": "logs/merge-near-test.log"
+    },
+    {
+      "name": "runtime-adapter-test",
+      "command": [
+        "just",
+        "runtime-adapter-test"
+      ],
+      "cwd": ".",
+      "exit_code": 0,
+      "seconds": 7.77,
+      "log": "logs/merge-runtime-adapter-test.log"
+    },
+    {
+      "name": "wnear-audit",
+      "command": [
+        "just",
+        "wnear-audit"
+      ],
+      "cwd": ".",
+      "exit_code": 0,
+      "seconds": 15.99,
+      "log": "logs/merge-wnear-audit.log"
+    }
+  ]
+}

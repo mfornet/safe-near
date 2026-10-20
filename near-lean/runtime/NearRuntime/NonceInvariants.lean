@@ -1,6 +1,16 @@
+import Mathlib.Tactic.SplitIfs
 import NearRuntime.Nonce
 
 namespace Near
+
+open Wasm.Near
+
+/-- Supported ordinary-key envelopes preserve the native version/feature split. -/
+theorem transactionVersionSupported_iff (tx : Transaction) (cfg : RuntimeConfig) :
+    tx.versionSupported cfg = true ↔
+      (tx.version = 0 ∧ tx.nonceMode = .monotonic) ∨
+      (tx.version = 1 ∧ cfg.v1TransactionsEnabled = true) := by
+  cases hm : tx.nonceMode <;> simp [Transaction.versionSupported, hm]
 
 attribute [local simp] bind pure throw Except.bind Except.pure Except.map
 
@@ -31,6 +41,6 @@ theorem verifyNonce_u64 (nonce current height : Nat) (mode : NonceMode)
     (h : verifyNonce nonce current (some height) mode = .ok ()) : nonce < 2 ^ 64 - 1 := by
   have hb := verifyNonce_below_ceiling nonce current height mode h
   have hm := Nat.min_le_right (height * 1_000_000) (2 ^ 64 - 1)
-  exact lt_of_lt_of_le hb hm
+  exact Nat.lt_of_lt_of_le hb hm
 
 end Near

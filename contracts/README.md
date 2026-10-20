@@ -2,7 +2,7 @@
 
 One folder per contract binary that is (or was) deployed on NEAR mainnet. Each
 folder is self-contained and pins everything needed to rebuild the exact
-on-chain binary (layout from `notes/PROJECT_STRUCTURE.md`):
+on-chain binary (layout from `notes/design/PROJECT_STRUCTURE.md`):
 
 ```
 contracts/<name>/
@@ -12,7 +12,7 @@ contracts/<name>/
     hash.txt         base58(sha256(contract.wasm)) == NEAR `code_hash` of the account
     build.sh         Rebuilds contract.wasm from source/ into build/contract.wasm
     source/          git submodule: the upstream repository pinned at the exact commit
-    verification/    (later) LEAN project with model/, spec/ and proofs/
+    verification/    Optional Lean project with Model/, Spec/ and Proofs/ (w-near)
 ```
 
 `source/` is a git submodule so that the commit is pinned by git itself and the

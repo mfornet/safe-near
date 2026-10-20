@@ -4,19 +4,19 @@ Formal model and specifications of `wrap.near`
 (`../contract.wasm`, code hash `DL2f5xmZ44cQRP6vBMt94rvseH5d5KKnAGis2WkTAsh1`,
 source `../source/w-near` at core-contracts commit `54f8267`, near-sdk 3.1.0).
 
-The layout follows `docs/human/PROJECT_STRUCTURE.md`:
+The layout follows `notes/design/PROJECT_STRUCTURE.md`:
 
 | Directory | Lake library | Content |
 |---|---|---|
 | `Model/` | `Model` | The model: state, host context, every method as a Lean function, on-chain layout |
 | `Spec/` | `Spec` | Properties to prove, one `def ... : Prop` each |
-| `Proofs/` | `Proofs` | One theorem per spec (`sorry` where still open) |
-| `blueprint/` | | Lean blueprint (`docs/human/PROVING.md`), fed by `@[blueprint]` annotations via LeanArchitect |
+| `Proofs/` | `Proofs` | Completed model proofs; deployed refinement remains open |
+| `blueprint/` | | Lean blueprint (`notes/design/PROVING.md`), fed by `@[blueprint]` annotations via LeanArchitect |
 
 ```
 just build            # lake build
-just sorries          # which specs are still open
-just blueprint-web    # lake build :blueprint && leanblueprint web  -> blueprint/web/
+just sorries          # transitive sorry audit (open statements need no sorry)
+just blueprint-web    # extract annotations and run plasTeX -> blueprint/web/
 just blueprint-pdf    # -> blueprint/print/print.pdf
 ```
 
@@ -33,7 +33,7 @@ balance function, the total supply and the measured per-account storage usage.
 `step cfg state env call : Except Panic Outcome`, which also implements the
 checks the `#[near_bindgen]` wrapper generates. Every `require` is one panic
 site in the Rust source, in source order. `Model/Storage.lean` is the exact
-Borsh layout (`encode`) and its inverse, the view of `docs/human/NEAR_MODEL.md`.
+Borsh layout (`encode`) and its inverse, the view of `notes/design/NEAR_MODEL.md`.
 
 Facts about the source the model relies on (verified against near-sdk 3.1.0,
 near-sdk-core 3.1.0 and near-contract-standards 3.1.0):
@@ -101,9 +101,9 @@ records. Thus `project (encode s) = some s` for every well-formed state.
 `Spec/RuntimeInstance.lean` fills it with `near-lean/vm` (`NearVM.run`, the
 JSON encodings of near-sdk 3.1.0, receipts read back as model promises), so
 `RefinesNearLean cfg code size modelCfg` is the exact obligation on
-`contract.wasm`. The blueprint's chapter "Chain-level properties" states
-solvency, the storage lock and the end-to-end transfer-call property
-informally; `near-lean/chain` now has the definitions (`Reachable`,
+`contract.wasm`. Solvency, storage-lock coverage and end-to-end transfer-call
+behavior remain future chain-level specifications; `near-lean/chain` now has
+the definitions (`Reachable`,
 `runIsolated`, `touches`, `upgrades`) to write them in Lean. Bounded runs now
 report whether they completed; `measureCallGasBurnt` measures a successful
 settled run but does not establish sufficient prepaid gas. The refinement

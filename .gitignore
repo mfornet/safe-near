@@ -13,3 +13,9 @@ near-lean/programs/rust/target/
 
 # axiom audit reports
 audit/
+
+# Verbose periodic-check build logs; summaries live alongside the reports.
+reports/periodic/*/logs/
+
+# Validated syntax-formatting results (one cache per Lake package).
+.lean-fmt-cache/

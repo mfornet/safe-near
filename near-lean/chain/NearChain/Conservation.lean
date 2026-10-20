@@ -11,56 +11,46 @@ theorem Snapshot.totalFunds_eq_runtime (cfg : RuntimeConfig) (s : Snapshot) :
     ChainState.postponedFunds, Assoc.mass, receiptsFunds, List.map_append, List.sum_append, List.map_map, Function.comp_def]
   omega
 
-/-- Selecting incoming receipts preserves structural financial premises. -/
-theorem BlockFinancialPremises.filterIncoming (cfg : RuntimeConfig) (st : ChainState)
-    (txs : List Transaction) (incoming : List Receipt) (select : Receipt → Bool)
-    (h : BlockFinancialPremises cfg st txs incoming) :
-    BlockFinancialPremises cfg st txs (incoming.filter select) := by
-  have hs : List.Sublist (st.delayed ++ incoming.filter select) (st.delayed ++ incoming) :=
-    List.Sublist.append_left List.filter_sublist _
-  refine { h with incomingIds := ?_, queueUnique := ?_, queueDisjoint := ?_, queueShapes := ?_ }
-  · intro receipt hm
-    exact h.incomingIds receipt (List.mem_filter.mp hm).1
-  · exact List.Nodup.sublist (hs.map _) h.queueUnique
-  · intro receipt hm
-    exact h.queueDisjoint receipt (hs.subset hm)
-  · intro receipt hm
-    exact h.queueShapes receipt (hs.subset hm)
-
-/-- Retained and delivered receipts partition the same financial backing. -/
-theorem receiptsFunds_filter_partition (cfg : RuntimeConfig) (receipts : List Receipt) (select : Receipt → Bool) :
-    receiptsFunds cfg (receipts.filter select) + receiptsFunds cfg (receipts.filter (fun r => !select r)) =
-      receiptsFunds cfg receipts := by
-  induction receipts with
-  | nil => rfl
-  | cons receipt rest ih =>
-    cases he : select receipt <;> simp [List.filter_cons, he, receiptsFunds] at * <;> omega
-
-/-- One supported chain step conserves the account/in-flight ledger, including
-receipts whose delivery is deferred, modulo net burn and explicit subsidy. -/
-theorem step_conservation (cfg : RuntimeConfig) (decoder : CodeTable) (s : Snapshot) (b : Block)
-    (h : BlockFinancialPremises cfg s.state b.txs s.pending)
-    (hsupported : (step cfg decoder s b).2.issue = none) :
-    (step cfg decoder s b).1.totalFunds cfg + (step cfg decoder s b).2.tokensBurnt =
-      s.totalFunds cfg + (step cfg decoder s b).2.subsidizedAmount := by
-  let select := fun receipt : Receipt => b.deliver receipt.receiptId
-  let selected := s.pending.filter select
-  let held := s.pending.filter (fun receipt => !select receipt)
-  have ha : (apply cfg b.ap decoder s.state b.txs selected).issue = none := by
-    simpa only [step_applyResult] using hsupported
-  have hc := apply_conservation cfg b.ap decoder s.state b.txs selected
-    (BlockFinancialPremises.filterIncoming cfg s.state b.txs s.pending select h) ha
-  have hp := receiptsFunds_filter_partition cfg s.pending select
-  have hs : (step cfg decoder s b).1.totalFunds cfg =
-      (apply cfg b.ap decoder s.state b.txs selected).state.totalFunds cfg +
-        receiptsFunds cfg held + receiptsFunds cfg (apply cfg b.ap decoder s.state b.txs selected).outgoing := by
-    have ha' := ha
-    dsimp only [selected, select] at ha'
-    simp only [step, List.partition_eq_filter_filter, ha', Option.isSome_none, Bool.false_eq_true,
-      ite_false, Snapshot.totalFunds_eq_runtime, receiptsFunds_append, selected, held, select, Function.comp_def]
-    omega
-  rw [hs, step_applyResult, Snapshot.totalFunds_eq_runtime]
-  dsimp only [selected, held, select] at hc hp ⊢
-  omega
+/-- One supported step conserves accounts and all in-flight work, including
+receipts deferred by its delivery schedule. Structural scope is inherited from
+the complete initial pending queue; no ledger equation is assumed. -/
+theorem step_conservation (cfg : RuntimeConfig) (decoder : CodeTable) (s next : Snapshot) (b : Block)
+    (result : ApplyResult) (hr : step cfg decoder s b = .ok (next, result))
+    (h : BlockFinancialPremises cfg s.state b.txs s.pending) (hsupported : result.issue = none) :
+    next.totalFunds cfg + result.tokensBurnt = s.totalFunds cfg + result.subsidizedAmount := by
+  cases hs : b.receipts.resolve s.pending with
+  | error error => simp [step, hs] at hr
+  | ok pair =>
+    obtain ⟨incoming, deferred⟩ := pair
+    have hp := ReceiptSchedule.resolve_perm s.pending b.receipts incoming deferred hs
+    have hmem : ∀ receipt ∈ s.state.delayed ++ incoming, receipt ∈ s.state.delayed ++ s.pending := by
+      intro receipt hm
+      rcases List.mem_append.mp hm with hd | hi
+      · exact List.mem_append_left _ hd
+      · exact List.mem_append_right _ (hp.mem_iff.mp (List.mem_append_left _ hi))
+    have hselected : BlockFinancialPremises cfg s.state b.txs incoming := by
+      refine ⟨h.accounts, h.postponed, h.identifiers, ?_, ?_, ?_, ?_, h.transactionActors,
+        h.accountCostIncrease, h.rewardRatio⟩
+      · intro receipt hm
+        exact h.incomingIds receipt (hp.mem_iff.mp (List.mem_append_left _ hm))
+      · have hn := ((List.Perm.append_left s.state.delayed hp).map (fun receipt : Receipt => receipt.receiptId)).nodup_iff.mpr h.queueUnique
+        have hn' : (((s.state.delayed ++ incoming) ++ deferred).map (·.receiptId)).Nodup := by
+          simpa only [List.append_assoc] using hn
+        exact (List.nodup_append.mp (by simpa only [List.map_append] using hn')).1
+      · intro receipt hm; exact h.queueDisjoint receipt (hmem receipt hm)
+      · intro receipt hm; exact h.queueShapes receipt (hmem receipt hm)
+    have hfunds : receiptsFunds cfg incoming + receiptsFunds cfg deferred = receiptsFunds cfg s.pending := by
+      rw [← receiptsFunds_append]
+      exact (hp.map (Fees.receiptFunds cfg)).sum_eq
+    simp only [step, hs] at hr
+    split at hr
+    · cases hr
+      simp_all
+    · cases hr
+      have hc := apply_conservation cfg b.ap decoder s.state b.txs incoming hselected hsupported
+      rw [Snapshot.totalFunds_eq_runtime, Snapshot.totalFunds_eq_runtime]
+      dsimp only
+      rw [receiptsFunds_append]
+      omega
 
 end Near

@@ -29,11 +29,11 @@ theorem applyAttempt_conservation (cfg : RuntimeConfig) (ap : ApplyState) (decod
     result.state.totalFunds cfg + receiptsFunds cfg result.outgoing + result.tokensBurnt =
       st.totalFunds cfg + receiptsFunds cfg incoming + result.subsidizedAmount := by
   let converted := convertTransactions cfg ap st txs
-  let ready : ChainState := { converted.1 with delayed := [] }
-  let queue := converted.2.2.1 ++ converted.1.delayed ++ incoming
+  let ready : ChainState := { converted.2.1 with delayed := [] }
+  let queue := converted.2.2.2.2.1 ++ converted.2.1.delayed ++ incoming
   have hf : TransactionPass.FinancialInvariant cfg st converted :=
     convertTransactions_financial cfg ap st txs h.accounts h.postponed h.transactionActors
-  have hqueue : queue = converted.2.2.1 ++ (st.delayed ++ incoming) := by
+  have hqueue : queue = converted.2.2.2.2.1 ++ (st.delayed ++ incoming) := by
     dsimp only [queue]
     rw [hf.delayedFrame, List.append_assoc]
   have hold : ReceiptList.IdsBelow st.nextId (st.delayed ++ incoming) := by
@@ -45,7 +45,7 @@ theorem applyAttempt_conservation (cfg : RuntimeConfig) (ap : ApplyState) (decod
     intro receipt hm
     exact hold receipt hm _ (by simp [Receipt.liveIds])
   have hreadyPost : ready.PostponedFinancialWellFormed :=
-    hf.postponed.of_postponed_eq (before := converted.1) rfl
+    hf.postponed.of_postponed_eq (before := converted.2.1) rfl
   have hadmission : ReceiptQueue.PostponedAdmission ready queue := by
     refine ⟨hreadyPost.idsMatch, ?_, ?_⟩
     · rw [hqueue, List.map_append, List.nodup_append]
@@ -60,7 +60,7 @@ theorem applyAttempt_conservation (cfg : RuntimeConfig) (ap : ApplyState) (decod
       exact Nat.not_le_of_lt hupp hlow
     · intro receipt hm
       rw [hqueue] at hm
-      change Assoc.lookup converted.1.postponed receipt.receiptId = none
+      change Assoc.lookup converted.2.1.postponed receipt.receiptId = none
       rw [hf.postponedFrame]
       rcases List.mem_append.mp hm with hl | ho
       · exact h.identifiers.postponed_lookup_none receipt.receiptId (hf.localIds.bounds receipt hl).1
@@ -71,24 +71,33 @@ theorem applyAttempt_conservation (cfg : RuntimeConfig) (ap : ApplyState) (decod
     rcases List.mem_append.mp hm with hl | ho
     · exact hf.shapes receipt hl
     · exact h.queueShapes receipt ho
-  have hclear : ready.totalFunds cfg + receiptsFunds cfg converted.1.delayed = converted.1.totalFunds cfg := by
-    change (converted.1.totalBalance + (converted.1.postponedFunds cfg + 0)) + receiptsFunds cfg converted.1.delayed =
-      converted.1.totalBalance + (converted.1.postponedFunds cfg + receiptsFunds cfg converted.1.delayed)
+  have hclear : ready.totalFunds cfg + receiptsFunds cfg converted.2.1.delayed = converted.2.1.totalFunds cfg := by
+    change (converted.2.1.totalBalance + (converted.2.1.postponedFunds cfg + 0)) + receiptsFunds cfg converted.2.1.delayed =
+      converted.2.1.totalBalance + (converted.2.1.postponedFunds cfg + receiptsFunds cfg converted.2.1.delayed)
     omega
-  have hbudget : ready.totalFunds cfg + receiptsFunds cfg [] + converted.2.2.2.1 + receiptsFunds cfg queue =
+  have hbudget : ready.totalFunds cfg + receiptsFunds cfg converted.2.2.2.1 + converted.2.2.2.2.2.1 + receiptsFunds cfg queue =
       st.totalFunds cfg + receiptsFunds cfg incoming := by
     dsimp only [queue]
     rw [receiptsFunds_append, receiptsFunds_append]
-    change ready.totalFunds cfg + 0 + converted.2.2.2.1 +
-      (receiptsFunds cfg converted.2.2.1 + receiptsFunds cfg converted.1.delayed + receiptsFunds cfg incoming) = _
     have ht := hf.ledger
     omega
+  have hcontinue : converted.1 = none := by
+    cases he : converted.1 with
+    | none => rfl
+    | some result =>
+      have hi := hf.returnedIssue result he
+      have hs : result.issue = none := by
+        simpa only [applyAttempt_eq_stages, show convertTransactions cfg ap st txs = converted from rfl, he] using hsupported
+      exact False.elim (hi hs)
   have hstage : applyAttempt cfg ap decoder st txs incoming =
-      applyReceiptQueue cfg ap decoder st ready converted.2.1 [] 0 converted.2.2.2.1 queue :=
-    applyAttempt_eq_stages cfg ap decoder st txs incoming
+      applyReceiptQueue cfg ap decoder st ready converted.2.2.1 converted.2.2.2.1 0 converted.2.2.2.2.2.1 queue
+        converted.2.2.2.2.1.length (converted.2.2.2.2.1.length + converted.2.1.delayed.length) := by
+    simpa only [show convertTransactions cfg ap st txs = converted from rfl, hcontinue] using
+      applyAttempt_eq_stages cfg ap decoder st txs incoming
   rw [hstage] at hsupported ⊢
-  have hc := applyReceiptQueue_conservation cfg ap decoder st ready converted.2.1 [] 0 converted.2.2.2.1 queue
-    hf.accounts hreadyPost hadmission hshapes h.accountCostIncrease h.rewardRatio hsupported
+  have hc := applyReceiptQueue_conservation cfg ap decoder st ready converted.2.2.1 converted.2.2.2.1 0 converted.2.2.2.2.2.1 queue
+    converted.2.2.2.2.1.length (converted.2.2.2.2.1.length + converted.2.1.delayed.length)
+    hf.accounts hreadyPost rfl hadmission hshapes h.accountCostIncrease h.rewardRatio hsupported
   rw [hbudget] at hc
   simpa only [Nat.add_zero] using hc
 

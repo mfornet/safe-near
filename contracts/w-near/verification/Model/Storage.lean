@@ -9,7 +9,7 @@ import Model.Env
 The contract stores borsh(`Contract`) under the key `STATE` and one entry per
 registered account under `b"a" ++ borsh(account_id)`. `encode` is the exact
 layout; `project` is its (partial) inverse, the "view" of
-docs/human/NEAR_MODEL.md. An executable decoder is future work; for proofs the
+notes/design/NEAR_MODEL.md. An executable decoder is future work; for proofs the
 injectivity of `encode` is what matters.
 -/
 

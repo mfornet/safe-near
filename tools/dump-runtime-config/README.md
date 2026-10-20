@@ -19,11 +19,12 @@ hand-copying numbers.
 `RuntimeConfig` does not implement `serde::Serialize` in this version of
 `near-parameters`, so the tool serializes
 `near_parameters::view::RuntimeConfigView::from(config.clone())` instead. That
-is the RPC JSON shape returned by the `EXPERIMENTAL_protocol_config` RPC
-method (`runtime_config` field), extended with `runtime_finance` for the refund
-ratio, minimum refund penalty and `AccountCostIncrease` feature flag that the RPC
-view omits. These values come directly from the pinned configuration and feature
-table. See "What the view omits" below.
+preserves the JSON shape returned by the `EXPERIMENTAL_protocol_config` RPC
+method (`runtime_config` field), with a `runtime_finance` supplement for execution
+parameters the view omits. The supplement reads refund penalties directly
+from the pinned internal fees and evaluates the pinned `AccountCostIncrease`
+protocol feature for each table. No execution constants are copied by hand. The Lean parser requires this
+supplement; a bare RPC view is not a complete executable configuration.
 
 ## Build and run
 
@@ -60,7 +61,7 @@ the internal `RuntimeConfig` in `near-parameters 0.37.4`:
   `deterministic_state_init_base/byte/entry`, `gas_key_transfer_base`,
   `gas_key_byte`, `gas_key_nonce_write_base`;
 * `fees.gas_refund_penalty`, `fees.min_gas_refund_penalty` (NEP-536), now
-  explicitly included in the supplemental `runtime_finance` object;
+  included in the `runtime_finance` supplement;
 * `fees.deploy_global_contract_execution_base` and its per-byte companion
   (compute costs);
 * `fees.storage_usage_config.global_contract_storage_amount_per_byte`;
@@ -71,9 +72,24 @@ the internal `RuntimeConfig` in `near-parameters 0.37.4`:
 As a consequence the parameter diffs at protocol versions 74 (bandwidth
 scheduler) and 77 (global contracts) do not produce output files, and the
 diffs at 46, 50, 55 and 63 are empty in this crate version. If any of the
-omitted fields are needed, add a custom serializer that reads the internal
+remaining omitted fields are needed, extend the custom serializer that reads the internal
 `RuntimeConfig` directly.
+
+The native `wasm_config.vm_kind` selector depends on the generator's host
+architecture (these committed tables were generated on ARM with Wasmtime).
+The Lean configuration loader does not consume this field. CI runs
+`tools/check_runtime_configs.py` against regenerated tables: it validates the
+backend enum and reports selector differences, then requires exact structural
+equality for every other field and the complete file set. nearcore's own
+configuration snapshots similarly redact this selector. The original generated
+JSON remains intact; no fees, feature flags or limits are normalized.
 
 The generated `runtime_admission` supplement records `strict_nonce` from the
 pinned `ProtocolFeature::StrictNonce` table. It is a semantic feature gate, not a
 gas parameter; it becomes true at protocol version 85.
+
+`runtime_admission.v1_transactions` is generated from the pinned
+`ProtocolFeature::GasKeys` gate for the V1 transaction envelope. This is
+independent of `runtime_admission.strict_nonce` (`StrictNonce`), even though
+both become enabled at protocol 85 in this source revision. Ordinary-key V1
+transactions are supported; this flag does not assert modeled gas-key lanes.

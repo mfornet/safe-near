@@ -35,7 +35,7 @@ theorem deposit_available : DepositAvailable := by
   intro cfg s env hs hpos hbound hcond
   rw [step_nearDeposit]
   unfold WNear.nearDeposit
-  simp only [bind, bind_require, bind_ok', pure_eq_ok, bind_ite, hpos, ite_true]
+  simp only [bind, bind_require, bind_ok', pure_eq_ok, hpos, ite_true]
   have hd : env.attachedDeposit < u128Bound := by omega
   by_cases hreg : env.predecessor ∈ s.registered
   · have hb : s.balance env.predecessor + env.attachedDeposit < u128Bound :=

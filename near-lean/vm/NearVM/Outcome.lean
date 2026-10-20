@@ -104,6 +104,9 @@ structure VMOutcome where
   logs : List String
   /-- Contract storage after the call (the input storage when the call failed). -/
   storage : List (List UInt8 × List UInt8)
+  /-- External trie state after the attempt, retaining cache warming on failure.
+  Failed-call prospective writes must be rolled back by the receipt executor. -/
+  storageAccounting : Option _root_.Near.TrieOverlay.State := none
   receipts : List ReceiptSpec
   /-- `none` on success. -/
   aborted : Option FunctionCallError

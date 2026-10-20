@@ -43,7 +43,11 @@ FunctionCallError` with nearcore's error taxonomy (`NearVM/Error.lean`).
   Nothing is hand-copied.
 
 Known gaps against nearcore: trie-dependent costs (`touching_trie_node`,
-`read_cached_trie_node`) are not charged. The independent fixtures check exact
+`read_cached_trie_node`) are not charged. Runtime calls do charge evicted and
+removed value bytes, as native `RuntimeExt` does; standalone VM calls default to
+`MockedExternal` accounting, which omits those adapter charges. The explicit
+`VMContext.chargeStorageValueAccess` policy records this external boundary.
+The independent fixtures check exact
 instruction and host gas, but do not prove metering correct for all programs.
 Contract code enters as WAT text
 because there is no binary Wasm decoder in Lean yet; the cryptographic host
@@ -58,8 +62,9 @@ with the SDK's messages, out-of-gas, storage usage, view calls.
 
 `Near.apply cfg applyState codeOf state txs incoming : ApplyResult`
 (`NearRuntime/Apply.lean`) is one chunk's worth of work: transactions are
-verified and charged and become local receipts; local, delayed and incoming
-receipts run in that order until the gas limit; every receipt yields an
+verified and charged. Signer-is-receiver transaction receipts are local;
+other transaction receipts become outgoing work for a later chunk. Local,
+delayed and incoming receipts run in that order until the gas limit; every receipt yields an
 `ExecutionOutcome` when it runs. Action receipts implement eight action kinds
 (`applyAction`), roll back on failure, and refund unused gas to the signer
 and deposits to the predecessor through system receipts. Function calls go
@@ -86,13 +91,19 @@ never change.
 ## chain
 
 `NearChain/Step.lean`: a `Snapshot` is a chain state plus the receipts in
-flight; `step` applies a block; `Reachable` closes it under block sequences;
+flight; `step` applies a block with ordered incoming selection and deferral;
+`Reachable` closes it under those same block sequences;
 `runIsolated` runs transactions and everything they cause with nothing else
 interleaved; `Receipt.touches`, `Receipt.upgrades` and `Block.independentOf`
 inspect direct interactions in pending, delayed and postponed queues. They do
 not establish independence from indirect contract effects. `settle` and
 `runIsolated` return a `RunResult` distinguishing quiescence, exhausted block
-budget and execution issues. Their completion implies quiescence by proved
+budget, invalid delivery schedules and execution issues. `runBlocks` executes
+explicit custom blocks without automatically draining deferred work. Its
+results are proved reachable; selection preserves the receipt multiset and
+the order of deferred work. See [chain/README.md](chain/README.md) for the
+`Except`-returning step API and scheduling examples.
+Reported completion implies quiescence by proved
 lemmas. `measureCallGasBurnt` measures successful settled executions with
 maximum attached gas; it does not establish sufficient prepaid gas.
 `lake exe chain-tests` exercises these boundaries on wNEAR.
@@ -108,17 +119,16 @@ fields included) and fails on anything else, in particular `sorryAx` and
 ```
 tools/axiom-audit.py near-lean/wasm --report audit/wasm.json
 tools/axiom-audit.py near-lean/iris-wasm --report audit/iris-wasm.json
-tools/axiom-audit.py near-lean/programs/lean --report audit/programs.json --allow-sorry
+tools/axiom-audit.py near-lean/programs/lean --report audit/programs.json
 tools/axiom-audit.py near-lean/vm --report audit/vm.json
 tools/axiom-audit.py near-lean/runtime --report audit/runtime.json
 tools/axiom-audit.py near-lean/chain --report audit/chain.json
 ```
 
-`wasm` and `iris-wasm` must be clean. `programs` holds specs whose proofs are
-open by design, so there `--allow-sorry` tolerates `sorryAx` alone and prints
-each sorried declaration; any other nonstandard axiom still fails. CI runs all
-three on every change under `near-lean/`. Pass `--no-build` to audit already
-built artefacts.
+All core packages and `programs` must be clean. The compiled ByteEcho, GCD
+kernel, GCD stream and mergesort specifications are proved. Every declaration
+is checked against the same three standard axioms; no program proof exception
+is enabled. Pass `--no-build` to audit already built artefacts.
 
 The public VM result also carries a checked receipt DAG: dependencies refer only
 to earlier receipts, returned receipt indices exist, and dependency cycles are
@@ -279,12 +289,34 @@ total burn ≤ gas used ≤ the purchased receipt budget.
 assuming gas accounting. VM state/promise materialization is separated from gas
 recording, and `ExecM.GasBound` provides reusable composition rules.
 
+Function-call state and promise effects are validated before commit. Decoder
+and promised-action limitations remain explicit model issues. The receipt gas
+bound also covers these exits and failed-action index tracking. Completion
+data follows refunds, and system-refund outcomes retain native execution-gas
+observations while token settlement remains exempt.
+
+`NearRuntime.ActionValidation` checks modeled ordinary-key action lists before
+stateful transaction admission. `convertTransaction_actions_valid` proves every
+successful public conversion passed these rules; `convertTransaction_actions_error`
+proves an action error bypasses stateful admission. The validator uses native
+count/check/gas ordering and UTF-8 byte lengths, with protocol-specific deploy
+limits. `NearRuntime.StakingKey` checks compressed Edwards25519 decoding and prime-order
+subgroup membership for staking keys, including native noncanonical encodings.
+The curve constants have kernel-checked identities; native differential corpora
+check the implementation, with full cryptographic refinement still unproved.
+Epoch-dependent staking execution remains an explicit model limitation.
+`NearRuntime.TransactionSize` computes body/wire widths for ordinary-key V0/V1
+transactions. A source-derived flag includes signature bytes from protocol 85.
+`convertTransaction_size_bound` proves every successful public conversion fits
+the selected limit. Unknown key encodings fail as explicit model issues.
+
 `RefundReceiptInvariants.applyActionReceipt_refund_conservation` covers system
 balance/gas refunds containing one transfer, under account-key uniqueness and a
 matching receipt payload. Successful execution credits backing exactly once;
 current-key allowance restoration changes no account funds. Failed execution
 restores balances and reports the complete deposit as non-gas burn, without a
-recursive balance refund or gas reward. Zero gas use is derived from execution.
+recursive balance refund or gas reward. Execution gas remains observable; zero
+function-call burn is derived for transfers and implies zero receiver reward.
 Missing receivers, including implicit-account names, cannot be created by system
 refunds; storage-staking failure also follows the rollback/burn path. This does
 not yet prove ordinary successful action-receipt or chain-level conservation.
@@ -323,10 +355,10 @@ memories. This closes successful VM-call funding; ordinary successful multi-acti
 receipt and whole-chain conservation remain open.
 
 `MaterializeInvariants` gives a kernel-checked stage decomposition of the existing
-receipt constructor. Allocation, dependency linking and data emission preserve
-all chain fields except `nextId`, including pending, postponed and delayed work.
-The final id counter increases by the promise count, dependency count and direct
-output-data count. Promise receipt ids form a consecutive, duplicate-free range
+receipt constructor after promised-action validation. Allocation and dependency
+linking preserve all chain fields except `nextId`, including pending, postponed
+and delayed work. Its id counter increases by the promise count and dependency
+count. Completion data is allocated separately during finalization after refunds. Promise receipt ids form a consecutive, duplicate-free range
 between the initial and post-allocation counters, in promise order.
 The constructor preserves arbitrary receiver/action valuations. Its specialized
 funds theorem covers deposits and purchased outgoing gas, using the proved
@@ -443,7 +475,8 @@ fees, admission checks and the final storage-staking check.
 
 `ReceiptFunding` factors settlement into a reusable action-body funding rule.
 `MetadataFunding` covers deployment and key insertion/deletion, retaining their
-actual account/key admission witnesses. `BalanceActionFunding` covers account
+actual account/key admission witnesses, deployment decode failures and the
+execution-height nonce installed by key insertion. `BalanceActionFunding` covers account
 creation, transfers to existing or supported implicit accounts, best-effort gas
 refund allowance restoration, and final account deletion. Deletion's beneficiary
 refund is backed by the removed unlocked balance; positive locked balances are
@@ -455,7 +488,10 @@ family restriction. For ordinary modeled action receipts, on success and failure
 it equates account funds plus outgoing receipt backing and net burn with the
 initial account funds, incoming receipt backing and explicit subsidy. Gas
 refunds, rewards, admission errors and final storage-staking rollback are part
-of the actual executable path. Stake/unstake still reject epoch-dependent
+of the actual executable path. The indexed action loop retains failure-index
+bookkeeping and native action randomness; checked VM commits, completion-data
+outputs and receipt identity births remain in the executable state.
+Stake/unstake still reject epoch-dependent
 semantics; their successful funding rule is vacuous and does not add support.
 `applyActionReceipt_accountsUnique` also preserves the unique-account premise
 needed by subsequent receipt proofs.
@@ -614,7 +650,9 @@ the actual block accumulator without validity or success premises. Thus outgoing
 envelope ids are unique and cannot reuse a reference below the old counter.
 `NearChain.ReceiptIdUniqueness` preserves uniqueness of pending envelopes across
 steps, reachable states, settlement and isolated runs from unique initial pending
-work. Dependency ids may be shared; disjoint ownership among pending, delayed and
+work satisfying the snapshot identifier bounds. Accepted delivery schedules may
+retain old pending receipts; their ids stay below the allocation frontier while
+new outgoing ids start at that frontier. Dependency ids may be shared; disjoint ownership among pending, delayed and
 postponed queues, and preservation of the whole dependency graph, remain open.
 
 `PostponedOwnership.processReceipt_postponed_ownership` preserves stored key/payload
@@ -629,16 +667,18 @@ execution and uses it to preserve key/payload agreement through complete blocks.
 state. These results do not yet prove disjoint ownership across all three queues,
 dependency-edge validity, or complete block-level financial conservation.
 
-`BlockStages.applyAttempt_eq_stages` is definitional equality between the real
-block executor and its proof-facing transaction/receipt passes. The suffix-indexed
+`BlockStages.applyAttempt_eq_stages` proves equality of every public result field
+between the real block executor and its proof-facing transaction/receipt passes. The suffix-indexed
 loop rule carries the unprocessed queue's admission facts through execution.
 `ReceiptQueueConservation` proves the complete receipt-loop ledger law, including
-gas deferral and the actual reward deduction. `TransactionPassConservation` backs
-local transaction receipts and conversion burn. `BlockConservation.apply_conservation`
+both retained and newly delayed receipt buffers and the actual reward deduction.
+`TransactionPassConservation` backs local and outgoing transaction receipts and
+conversion burn. `BlockConservation.apply_conservation`
 then proves, for supported results, that resulting runtime funds plus outgoing
 backing and net burn equal initial runtime funds plus incoming backing and explicit
 subsidy. `NearChain.Conservation.step_conservation` lifts that law to the full
-snapshot ledger, including all pending, delayed and postponed receipts.
+snapshot ledger, including scheduled deliveries, deferred pending receipts, and
+all delayed and postponed receipts. Invalid schedules return an error before apply.
 
 The theorem's `BlockFinancialPremises` are explicit: unique accounts; financially
 well-formed postponed entries; identifier bounds; distinct queued envelopes with
@@ -670,7 +710,9 @@ registrar or with a zero minimum length. A kernel theorem covers every
 configuration/predecessor, and transaction regressions verify rejection and
 rollback before transfer/key/code installation. A native account-id primitive
 test in the VM oracle crate checks the classification and ordinary-name controls;
-it is not a full Runtime account-creation comparison. After building the reference
+the full Runtime comparator additionally checks registrar and ordinary attempts
+to create `system`, rollback before installing an access key, and valid `systemx`
+and `system.` controls across protocols 83–86. After building the reference
 dependencies, reproduce the primitive check with:
 
 ```sh

@@ -1,12 +1,11 @@
 name: wasm
 
+# Expensive validation is opt-in. Run `just periodic-check <nearcore>` locally.
 on:
-  push:
-    branches: [main]
-    paths: ["near-lean/**", "contracts/w-near/verification/**", "contracts/w-near/contract.wasm", "tools/runtime-conformance/**", "tools/runtime-finance-reference/**", "tools/runtime-nonce-reference/**", "tools/dump-runtime-config/**", "tools/axiom-audit.py", ".github/workflows/wasm.yml"]
-  pull_request:
-    paths: ["near-lean/**", "contracts/w-near/verification/**", "contracts/w-near/contract.wasm", "tools/runtime-conformance/**", "tools/runtime-finance-reference/**", "tools/runtime-nonce-reference/**", "tools/dump-runtime-config/**", "tools/axiom-audit.py", ".github/workflows/wasm.yml"]
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
   group: wasm-${{ github.ref }}
@@ -16,6 +15,7 @@ jobs:
   build:
     name: Build, smoke test, and check testsuite_report.txt
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
       # Only the spec testsuite is needed; the contracts/*/source submodules are large.
@@ -24,7 +24,7 @@ jobs:
       - uses: actions/cache@v5
         with:
           path: near-lean/.lake/packages
-          key: lake-pkgs-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('near-lean/wasm/lean-toolchain') }}-${{ hashFiles('near-lean/wasm/lake-manifest.json', 'near-lean/iris-wasm/lake-manifest.json') }}
+          key: lake-pkgs-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('near-lean/wasm/lean-toolchain') }}-${{ hashFiles('near-lean/wasm/lake-manifest.json', 'near-lean/iris-wasm/lake-manifest.json', 'near-lean/programs/lean/lake-manifest.json') }}
           restore-keys: |
             lake-pkgs-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('near-lean/wasm/lean-toolchain') }}-
 
@@ -66,27 +66,28 @@ jobs:
       - name: Build programs and run smoke
         working-directory: near-lean/programs/lean
         run: |
-          lake build
+          lake build --wfail
           lake exe smoke
 
       # Every declaration may depend only on propext, Classical.choice and
-      # Quot.sound: no sorry, no native_decide. The programs package carries
-      # open proofs by design, so only sorryAx is tolerated there (and listed).
+      # Quot.sound: no sorry, no native_decide. Program proofs and all
+      # supporting modules use the same strict gate as the core packages.
       - name: Axiom audit (no sorry, no native_decide)
         run: |
           python3 tools/axiom-audit.py near-lean/wasm --report audit/wasm.json --no-build
           python3 tools/axiom-audit.py near-lean/iris-wasm --report audit/iris-wasm.json --no-build
-          python3 tools/axiom-audit.py near-lean/programs/lean --report audit/programs.json --no-build --allow-sorry
+          python3 tools/axiom-audit.py near-lean/programs/lean --report audit/programs.json --no-build
 
   near-runtime:
     name: VM, runtime and chain scenarios and axiom audits
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
       - uses: actions/cache@v5
         with:
           path: near-lean/.lake/packages
-          key: lake-runtime-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('near-lean/*/lean-toolchain', 'near-lean/*/lake-manifest.json') }}
+          key: lake-runtime-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('near-lean/**/lean-toolchain', 'near-lean/**/lake-manifest.json', 'contracts/*/verification/lean-toolchain', 'contracts/*/verification/lake-manifest.json') }}
       - uses: leanprover/lean-action@v1
         with:
           lake-package-directory: near-lean/vm
@@ -95,18 +96,25 @@ jobs:
       - name: VM scenarios
         working-directory: near-lean/vm
         run: ./.lake/build/bin/vm-tests
+      - name: Check the VM execution dependency boundary
+        run: |
+          python3 tools/check_vm_dependencies.py --no-build
+          python3 tools/tests/check_vm_dependencies.py
       - name: Runtime scenarios
         working-directory: near-lean/runtime
         run: |
-          lake build NearRuntime runtime-tests finance-replay nonce-replay allowance-replay --wfail
+          lake build NearRuntime runtime-tests finance-replay nonce-replay allowance-replay staking-key-replay trie-replay --wfail
           ./.lake/build/bin/runtime-tests
       - name: Chain scenarios
         working-directory: near-lean/chain
         run: |
-          lake build NearChain chain-tests --wfail
+          lake build NearChain chain-tests chain-replay --wfail
           ./.lake/build/bin/chain-tests
+      - name: Chain JSON replay
+        run: python3 tools/chain-conformance/test_replay.py
       - name: Runtime axiom audits
         run: |
+          python3 tools/tests/check_axiom_audit.py
           python3 tools/axiom-audit.py near-lean/vm --report audit/vm.json --no-build
           python3 tools/axiom-audit.py near-lean/runtime --report audit/runtime.json --no-build
           python3 tools/axiom-audit.py near-lean/chain --report audit/chain.json --no-build
@@ -127,12 +135,13 @@ jobs:
   runtime-conformance:
     name: Exact VM comparison with pinned nearcore
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5
       - uses: actions/cache@v5
         with:
           path: near-lean/.lake/packages
-          key: lake-conformance-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('near-lean/*/lean-toolchain', 'near-lean/*/lake-manifest.json') }}
+          key: lake-conformance-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('near-lean/**/lean-toolchain', 'near-lean/**/lake-manifest.json', 'contracts/*/verification/lean-toolchain', 'contracts/*/verification/lake-manifest.json') }}
       - uses: leanprover/lean-action@v1
         with:
           lake-package-directory: near-lean/vm
@@ -145,6 +154,18 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: wasm-tools@1.251.0
+      - name: Verify all generated runtime configuration tables
+        run: |
+          cargo run --locked --release --manifest-path tools/dump-runtime-config/Cargo.toml -- /tmp/safe-near-runtime-configs
+          python3 tools/check_runtime_configs.py /tmp/safe-near-runtime-configs
+      - name: Verify chain replay and storage input Wasm fixtures
+        run: |
+          wasm-tools parse tools/chain-conformance/fixtures/replay.wat -o /tmp/safe-near-replay.wasm
+          cmp tools/chain-conformance/fixtures/replay.wasm /tmp/safe-near-replay.wasm
+          wasm-tools parse tools/chain-conformance/fixtures/stateful.wat -o /tmp/safe-near-stateful.wasm
+          cmp tools/chain-conformance/fixtures/stateful.wasm /tmp/safe-near-stateful.wasm
+          wasm-tools parse tools/runtime-conformance/fixtures/storage_inputs.wat -o /tmp/safe-near-storage-inputs.wasm
+          cmp tools/runtime-conformance/fixtures/storage_inputs.wasm /tmp/safe-near-storage-inputs.wasm
       - name: Compare all VM observations
         run: |
           python3 -m unittest discover -s tools/runtime-conformance
@@ -158,6 +179,7 @@ jobs:
   programs-rust:
     name: Check committed program wasm is reproducible
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
       - name: Install pinned Rust toolchain

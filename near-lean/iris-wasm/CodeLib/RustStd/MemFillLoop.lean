@@ -80,15 +80,6 @@ def fillWordsOuterFrame : Wasm.SmallStep.ControlFrame :=
     continuation := []
     belowStack := [] }
 
-def fillWordsInnerFrame : Wasm.SmallStep.ControlFrame :=
-  { kind := .block
-    paramArity := 0
-    resultArity := 0
-    body := FillWordsInnerGuard
-    continuation :=
-      FillWordsStoreIteration ++ FillWordsIncrementBackedge
-    belowStack := [] }
-
 theorem FillWords_eq_structured :
     FillWords = [.const 0, .localSet 3,
       .loop 0 0 FillWordsLoopBody] := by rfl

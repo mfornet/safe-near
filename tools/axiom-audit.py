@@ -8,7 +8,7 @@ which trusts the compiler rather than the kernel).
 
 Usage:
   tools/axiom-audit.py near-lean/wasm --report audit/wasm.json
-  tools/axiom-audit.py near-lean/programs/lean --report audit/programs.json --allow-sorry
+  tools/axiom-audit.py near-lean/programs/lean --report audit/programs.json
 
 Unlike an umbrella import or a source grep, this checks the transitive axiom
 dependencies of every declaration, including private helpers and proof fields
@@ -17,15 +17,21 @@ packages must be audited separately. A missing module or failed build is an
 audit failure, never an exemption.
 
 `--allow-sorry` tolerates `sorryAx` alone, for packages whose proofs are
-still open by design (the specs in near-lean/programs); the sorried
+intentionally left open in an unfinished proof package; the sorried
 declarations are listed, and every other nonstandard axiom still fails.
+Repeat --require-clean-module to keep completed modules strict within such a
+package; a missing required module is an audit error.
+Use --allow-sorry-module instead of --allow-sorry to limit open proofs to named
+modules while keeping every other module strict.
 
 Adapted from Talos `scripts/axiom-audit.py` (the verifier-template audit was
 dropped; near-lean has no verifier).
 """
 
 import argparse
+from collections.abc import Sequence
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -113,7 +119,19 @@ def audit_groups(package: Path, modules: list[str]) -> list[dict]:
         source = Path(temp) / "NearLeanAxiomAudit.lean"
         report = Path(temp) / "report.json"
         source.write_text(audit_source(modules, report))
-        process = subprocess.run(["lake", "env", "lean", str(source)],
+        local = package / ".lake/build/lib/lean"
+        for module in modules:
+            artifact = local.joinpath(*module.split(".")).with_suffix(".olean")
+            if not artifact.is_file():
+                raise FileNotFoundError(f"missing local audit artifact: {artifact}")
+        # Lake puts dependency libraries before this package in LEAN_PATH.
+        # Executable roots often share names (Tests.Main), and case-insensitive
+        # filesystems also alias tests.Main. Audit our own artifacts first.
+        search = subprocess.run(["lake", "env", "printenv", "LEAN_PATH"],
+                                cwd=package, text=True, capture_output=True, check=True)
+        lean_path = str(local) + os.pathsep + search.stdout.strip()
+        process = subprocess.run(["lake", "env", "env", f"LEAN_PATH={lean_path}",
+                                  "lean", str(source)],
                                  cwd=package, text=True, capture_output=True)
         if process.returncode == 0:
             return [json.loads(report.read_text())]
@@ -126,6 +144,15 @@ def audit_groups(package: Path, modules: list[str]) -> list[dict]:
         raise subprocess.CalledProcessError(process.returncode, process.args)
 
 
+def failing_violations(violations: list[dict], allow_sorry: bool,
+                       require_clean_modules: list[str],
+                       allow_sorry_modules: Sequence[str] = ()) -> list[dict]:
+    """Completed modules stay strict even inside a package with open proofs."""
+    return [v for v in violations if not (
+        (allow_sorry or v["module"] in allow_sorry_modules) and v["axioms"] == ["sorryAx"]
+        and v["module"] not in require_clean_modules)]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -135,7 +162,13 @@ def main() -> int:
                         help="Use existing package artifacts; missing modules still fail")
     parser.add_argument("--allow-sorry", action="store_true",
                         help="Tolerate sorryAx (open proofs); still fail on any other axiom")
+    parser.add_argument("--allow-sorry-module", action="append", default=[],
+                        help="Tolerate sorryAx only in this module; repeatable, missing modules fail")
+    parser.add_argument("--require-clean-module", action="append", default=[],
+                        help="Keep this module strict even with --allow-sorry; repeatable")
     args = parser.parse_args()
+    if args.allow_sorry and args.allow_sorry_module:
+        parser.error("--allow-sorry cannot be combined with --allow-sorry-module")
     root = Path(__file__).resolve().parent.parent
     package = args.package.resolve()
     report = args.report.resolve()
@@ -147,6 +180,12 @@ def main() -> int:
     modules = source_modules(root, package)
     if not modules:
         parser.error("package has no Lean source modules")
+    missing = set(args.require_clean_module) - set(modules)
+    if missing:
+        parser.error("required clean module is absent: " + ", ".join(sorted(missing)))
+    missing = set(args.allow_sorry_module) - set(modules)
+    if missing:
+        parser.error("allowed sorry module is absent: " + ", ".join(sorted(missing)))
     report.parent.mkdir(parents=True, exist_ok=True)
     report.unlink(missing_ok=True)
     if not args.no_build:
@@ -154,13 +193,16 @@ def main() -> int:
     groups = audit_groups(package, modules)
     declarations = [d for group in groups for d in group["declarations"]]
     violations = [v for group in groups for v in group["violations"]]
-    sorried = [v for v in violations if v["axioms"] == ["sorryAx"]]
-    failing = [v for v in violations if not (args.allow_sorry and v["axioms"] == ["sorryAx"])]
+    failing = failing_violations(violations, args.allow_sorry, args.require_clean_module,
+                                 args.allow_sorry_module)
+    tolerated = [v for v in violations if v not in failing]
     result = {
         "modules": modules,
         "declarations_checked": len(declarations),
         "theorems_checked": sum(d["theorem"] for d in declarations),
         "allow_sorry": args.allow_sorry,
+        "allow_sorry_modules": args.allow_sorry_module,
+        "require_clean_modules": args.require_clean_module,
         "violations": violations,
     }
     report.write_text(json.dumps(result, indent=2) + "\n")
@@ -168,9 +210,9 @@ def main() -> int:
           f"{result['declarations_checked']} declarations, "
           f"{result['theorems_checked']} theorems, "
           f"{len(violations)} violations"
-          + (f" ({len(sorried)} sorry, tolerated)" if args.allow_sorry else ""))
+          + (f" ({len(tolerated)} sorry, tolerated)" if args.allow_sorry or args.allow_sorry_module else ""))
     for v in violations:
-        tag = "sorry" if v in sorried and args.allow_sorry else "FAIL"
+        tag = "sorry" if v in tolerated else "FAIL"
         print(f"  {tag}: {v['declaration']}  [{', '.join(v['axioms'])}]")
     print(f"Full report: {report}")
     return int(bool(failing))
@@ -181,3 +223,6 @@ if __name__ == "__main__":
         sys.exit(main())
     except subprocess.CalledProcessError as error:
         sys.exit(error.returncode)
+    except OSError as error:
+        print(f"Axiom audit failed: {error}", file=sys.stderr)
+        sys.exit(2)

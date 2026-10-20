@@ -4,53 +4,100 @@ import NearRuntime.RefundInvariants
 namespace Near
 open Wasm.Near
 
-theorem refund_runReceiptAction_gasBound (c : ReceiptCtx) (onlyAction isLast : Bool) (action : Action)
-    (hrefund : c.receipt.isRefund = true) :
-    (runReceiptAction c onlyAction isLast action).GasBound action.attachedGas := by
-  unfold runReceiptAction
-  simp only [chargeReceiptFee, hrefund, ite_true, pure_bind]
-  exact gasBound_bind_left_zero (gasBound_checkReceiptAction c onlyAction action)
-    (fun _ => applyAction_gasBound c isLast action)
+/-- Only attached call gas can increase function-call burn; protocol fees cannot. -/
+def ExecM.FunctionCallBound (operation : ExecM α) (budget : Nat) : Prop :=
+  ∀ before, (operation.run.run before).2.gasBurntForFunctionCall ≤ before.gasBurntForFunctionCall + budget
 
-theorem refund_runReceiptActionList_gasBound (c : ReceiptCtx) (onlyAction : Bool) (actions : List Action)
-    (hrefund : c.receipt.isRefund = true) :
-    (runReceiptActionList c onlyAction actions).GasBound (Fees.totalPrepaid actions) := by
-  induction actions with
-  | nil => exact gasBound_pure _
+theorem functionCallBound_of_gasBound {operation : ExecM α} {budget : Nat}
+    (h : operation.GasBound budget) : operation.FunctionCallBound budget := by
+  intro before
+  have h := h before
+  rcases h with ⟨_, _, _, hfc, hb, hu⟩
+  omega
+
+theorem functionCallBound_bind {operation : ExecM α} {next : α → ExecM β} {first second : Nat}
+    (hfirst : operation.FunctionCallBound first) (hsecond : ∀ value, (next value).FunctionCallBound second) :
+    (operation >>= next).FunctionCallBound (first + second) := by
+  intro before
+  rw [execM_run_bind]
+  have h := hfirst before
+  cases he : operation.run.run before with
+  | mk result middle =>
+    rw [he] at h
+    dsimp only at h
+    cases result with
+    | error error => dsimp only; omega
+    | ok value => have hn := hsecond value middle; dsimp only; omega
+
+theorem functionCallBound_zero_left {operation : ExecM α} {next : α → ExecM β} {budget : Nat}
+    (hfirst : operation.FunctionCallBound 0) (hsecond : ∀ value, (next value).FunctionCallBound budget) :
+    (operation >>= next).FunctionCallBound budget := by
+  simpa only [Nat.zero_add] using functionCallBound_bind hfirst hsecond
+
+theorem functionCallBound_fee (isRefund : Bool) (fee : Nat) :
+    (chargeReceiptFee isRefund fee).FunctionCallBound 0 := by intro before; exact Nat.le_refl _
+
+theorem runReceiptAction_functionCallBound (c : ReceiptCtx) (onlyAction isLast : Bool) (action : Action) :
+    (runReceiptAction c onlyAction isLast action).FunctionCallBound action.attachedGas := by
+  unfold runReceiptAction
+  apply functionCallBound_zero_left (functionCallBound_fee _ _)
+  intro _
+  apply functionCallBound_zero_left (functionCallBound_of_gasBound (gasBound_checkReceiptAction c onlyAction action))
+  intro _
+  exact functionCallBound_of_gasBound (applyAction_gasBound c isLast action)
+
+theorem runReceiptActionAt_functionCallBound (c : ReceiptCtx) (onlyAction isLast : Bool)
+    (action : Action) (index : Nat) :
+    (runReceiptActionAt c onlyAction isLast action index).FunctionCallBound action.attachedGas := by
+  cases action <;> try exact runReceiptAction_functionCallBound c onlyAction isLast _
+  cases he : actionRandomSeed c index <;> simp only [runReceiptActionAt, he]
+  · intro before; exact Nat.le_add_right _ _
+  · exact runReceiptAction_functionCallBound _ onlyAction isLast _
+
+theorem runReceiptActionList_functionCallBound (c : ReceiptCtx) (onlyAction : Bool)
+    (actions : List Action) (index : Nat) :
+    (runReceiptActionList c onlyAction actions index).FunctionCallBound (Fees.totalPrepaid actions) := by
+  induction actions generalizing index with
+  | nil => intro before; exact Nat.le_refl _
   | cons action rest ih =>
-    have h := (refund_runReceiptAction_gasBound c onlyAction rest.isEmpty action hrefund).bind (fun _ => ih)
+    have hm := functionCallBound_of_gasBound
+      (gasBound_modify (fun e : Exec => { e with failureIndex := some index }) 0
+        (fun _ => GasDelta.of_fields _ _ _ rfl rfl rfl))
+    have h := functionCallBound_zero_left hm (fun _ =>
+      functionCallBound_bind (runReceiptActionAt_functionCallBound c onlyAction rest.isEmpty action index)
+        (fun _ => ih (index + 1)))
     simpa [runReceiptActionList, Fees.totalPrepaid] using h
 
-/-- System receipts pay no protocol execution fees. With no prepaid function
-calls, the complete attempt spends zero gas, including failure paths. -/
-theorem refund_receiptActionBody_gasBound_zero (c : ReceiptCtx)
-    (hrefund : c.receipt.isRefund = true) (hprepaid : Fees.totalPrepaid c.action.actions = 0) :
-    (receiptActionBody c).GasBound 0 := by
+theorem receiptActionBody_functionCallBound (c : ReceiptCtx) :
+    (receiptActionBody c).FunctionCallBound (Fees.totalPrepaid c.action.actions) := by
   unfold receiptActionBody
-  simp only [chargeReceiptFee, hrefund, ite_true, pure_bind]
-  have h := (refund_runReceiptActionList_gasBound c (c.action.actions.length == 1) c.action.actions hrefund).bind
-    (fun _ => gasBound_checkStorageStake c.cfg c.receipt.receiverId)
-  simpa only [hprepaid, Nat.add_zero] using h
+  apply functionCallBound_zero_left (functionCallBound_fee _ _)
+  intro _
+  have hm := functionCallBound_of_gasBound
+    (gasBound_modify (fun e : Exec => { e with failureIndex := none }) 0
+      (fun _ => GasDelta.of_fields _ _ _ rfl rfl rfl))
+  have h := functionCallBound_bind
+    (runReceiptActionList_functionCallBound c (c.action.actions.length == 1) c.action.actions 0)
+    (fun _ => functionCallBound_zero_left hm (fun _ =>
+      functionCallBound_of_gasBound (gasBound_checkStorageStake c.cfg c.receipt.receiverId)))
+  simpa only [Nat.add_zero] using h
 
-theorem refund_runReceiptActions_gas_zero (c : ReceiptCtx) (st : ChainState)
-    (hrefund : c.receipt.isRefund = true) (hprepaid : Fees.totalPrepaid c.action.actions = 0) :
-    let raw := (runReceiptActions c st).1
-    raw.gasBurntForFunctionCall = 0 ∧ raw.gasBurnt = 0 ∧ raw.gasUsed = 0 := by
-  have h := refund_receiptActionBody_gasBound_zero c hrefund hprepaid
-    { state := st, actorId := c.receipt.predecessorId }
+/-- Zero prepaid gas implies zero function-call burn, while receipt gas remains observable. -/
+theorem refund_runReceiptActions_functionCallGas_zero (c : ReceiptCtx) (st : ChainState)
+    (hprepaid : Fees.totalPrepaid c.action.actions = 0) :
+    (runReceiptActions c st).1.gasBurntForFunctionCall = 0 := by
+  have h := receiptActionBody_functionCallBound c { state := st, actorId := c.receipt.predecessorId }
   unfold runReceiptActions
-  dsimp only
   cases he : (receiptActionBody c).run.run { state := st, actorId := c.receipt.predecessorId } with
   | mk result raw =>
     rw [he] at h
-    have hf := h.functionCall_le_burnt
-    have hb := h.burnt_le_used
-    have hu := h.budget_bound
-    dsimp only at hf hb hu
-    have hz : raw.gasBurntForFunctionCall = 0 ∧ raw.gasBurnt = 0 ∧ raw.gasUsed = 0 := by omega
+    dsimp only at h
+    rw [hprepaid] at h
+    dsimp only
+    rw [he]
     cases result with
-    | error error => exact hz
-    | ok value => cases value; exact hz
+    | error error => dsimp only; omega
+    | ok value => cases value; dsimp only; omega
 
 /-- With no function-call gas there is no receiver gas reward. -/
 theorem creditReceiptReward_zero (exec : Exec) (cfg : RuntimeConfig) (receiver : AccountId)
@@ -90,7 +137,7 @@ theorem finalizeReceipt_refund_failure_funds (c : ReceiptCtx) (st : ChainState) 
   change data.totalFunds c.cfg = st.totalBalance ∧ rewarded.reward = 0
   exact ⟨by simpa only [data, addFailureData_totalFunds] using hb, hz⟩
 
-/-- Failed refund backing is burnt exactly once, with no gas charge or reward. -/
+/-- Failed refund backing is burnt exactly once, with no token fee or reward. -/
 theorem applyActionReceipt_refund_failed_conservation (c : ReceiptCtx) (st : ChainState)
     (err : RuntimeError) (hfailed : (runReceiptActions c st).2 = some err)
     (hwf : st.AccountsUnique) (hpred : c.receipt.predecessorId = systemAccount)
@@ -102,8 +149,8 @@ theorem applyActionReceipt_refund_failed_conservation (c : ReceiptCtx) (st : Cha
   let raw := (runReceiptActions c st).1
   have hrun : runReceiptActions c st = (raw, some err) := Prod.ext rfl hfailed
   have hrefund : c.receipt.isRefund = true := by simp [Receipt.isRefund, hpred]
-  have hz := refund_runReceiptActions_gas_zero c st hrefund hprepaid
-  have hf := finalizeReceipt_refund_failure_funds c st raw err hwf hpred hz.1
+  have hz := refund_runReceiptActions_functionCallGas_zero c st hprepaid
+  have hf := finalizeReceipt_refund_failure_funds c st raw err hwf hpred hz
   have ht := congrArg (fun trace => trace.2.2.2.2.2) (finalizeReceipt_failure_trace c st raw err)
   have hburn : ((finalizeReceipt c st raw (some err)).tokensBurnt,
       (finalizeReceipt c st raw (some err)).otherTokensBurnt) = (0, Fees.totalDeposit c.action.actions) := by
@@ -118,7 +165,49 @@ theorem applyActionReceipt_refund_failed_conservation (c : ReceiptCtx) (st : Cha
   rw [hf.1, hf.2, hb, ho, hi]
   simp
 
-/-- Successful zero-gas system finalization adds no refunds, burn or reward. -/
+theorem completionDataFold_state (receiver : AccountId) (data : Option Bytes) (outputs : List DataReceiver)
+    (st : ChainState) (receipts : List Receipt) :
+    (outputs.foldl (completionDataStep receiver data) (st, receipts)).1 =
+      { st with nextId := st.nextId + outputs.length } := by
+  induction outputs generalizing st receipts with
+  | nil => rfl
+  | cons output rest ih =>
+    simp only [List.foldl_cons, completionDataStep, ChainState.freshId]
+    rw [ih]
+    simp only [List.length_cons]
+    congr 1; omega
+
+theorem completionDataFold_funds (cfg : RuntimeConfig) (receiver : AccountId) (data : Option Bytes)
+    (outputs : List DataReceiver) (st : ChainState) (receipts : List Receipt) :
+    receiptsFunds cfg (outputs.foldl (completionDataStep receiver data) (st, receipts)).2 = receiptsFunds cfg receipts := by
+  induction outputs generalizing st receipts with
+  | nil => rfl
+  | cons output rest ih =>
+    simp only [List.foldl_cons, completionDataStep, ChainState.freshId]
+    rw [ih]
+    simp [receiptsFunds, Fees.receiptFunds]
+
+@[simp] theorem addCompletionData_totalFunds (cfg : RuntimeConfig) (exec : Exec) (receiver : AccountId)
+    (outputs : List DataReceiver) : (exec.addCompletionData receiver outputs).totalFunds cfg = exec.totalFunds cfg := by
+  cases hr : exec.result with
+  | none => simp [Exec.addCompletionData, hr, Exec.totalFunds, receiptsFunds_append,
+      completionDataFold_state, completionDataFold_funds, ChainState.totalBalance]; rfl
+  | some status => cases status <;> simp [Exec.addCompletionData, hr, Exec.totalFunds, receiptsFunds_append,
+      completionDataFold_state, completionDataFold_funds, ChainState.totalBalance] <;> rfl
+
+@[simp] theorem addCompletionData_trace (exec : Exec) (receiver : AccountId) (outputs : List DataReceiver) :
+    (exec.addCompletionData receiver outputs).finalizationTrace = exec.finalizationTrace := by
+  cases hr : exec.result with
+  | none => simp [Exec.addCompletionData, hr, Exec.finalizationTrace]
+  | some status => cases status <;> simp [Exec.addCompletionData, hr, Exec.finalizationTrace]
+
+@[simp] theorem addCompletionData_reward (exec : Exec) (receiver : AccountId) (outputs : List DataReceiver) :
+    (exec.addCompletionData receiver outputs).reward = exec.reward := by
+  cases hr : exec.result with
+  | none => simp [Exec.addCompletionData, hr]
+  | some status => cases status <;> simp [Exec.addCompletionData, hr]
+
+/-- Successful system finalization adds no monetary refunds, burn or reward; completion data has zero backing. -/
 theorem finalizeReceipt_refund_success_funds (c : ReceiptCtx) (st : ChainState) (raw : Exec)
     (hwf : raw.state.AccountsUnique) (hrefund : c.receipt.isRefund = true)
     (hfc : raw.gasBurntForFunctionCall = 0) :
@@ -141,8 +230,11 @@ theorem finalizeReceipt_refund_success_funds (c : ReceiptCtx) (st : ChainState) 
   rw [hz, Nat.add_zero] at hb
   have ht := congrArg (fun trace => trace.2.2.2.2.2)
     (creditReceiptReward_trace base c.cfg c.receipt.receiverId settlement.burnPrice c.action.gasPrice)
-  have hp : (rewarded.tokensBurnt, rewarded.otherTokensBurnt) = (0, 0) := by
-    simpa [Exec.finalizationTrace, base] using ht
+  have hp : (data.tokensBurnt, data.otherTokensBurnt) = (0, 0) := by
+    have htrace := congrArg (fun trace => trace.2.2.2.2.2)
+      (addCompletionData_trace rewarded c.receipt.receiverId c.action.outputDataReceivers)
+    change (data.tokensBurnt, data.otherTokensBurnt) = (rewarded.tokensBurnt, rewarded.otherTokensBurnt) at htrace
+    exact htrace.trans ht
   dsimp only
   rw [hf]
   have ht' := finishReceiptResult_trace rewarded c none
@@ -192,29 +284,39 @@ theorem refundTransferState_totalBalance (c : ReceiptCtx) (st : ChainState) (acc
     omega
   · omega
 
+/-- Refunds report execution gas even though settlement charges no token fees. -/
+def refundExecutionGas (c : ReceiptCtx) (amount : Nat) : Nat :=
+  c.cfg.fees.actionFees.newActionReceipt.execution + Fees.exec c.cfg.fees.actionFees c.cfg.wasm.ethImplicitAccounts c.receipt.receiverId (.transfer amount)
+
 /-- Exact single-refund evaluation before finalization, for an existing receiver. -/
 theorem refund_receiptActionBody_run (c : ReceiptCtx) (before : Exec) (account : Account) (amount : Nat)
     (hrefund : c.receipt.isRefund = true) (hactions : c.action.actions = [.transfer amount])
     (ha : before.state.account? c.receipt.receiverId = some account) :
     (receiptActionBody c).run.run before =
-      let after := { before with state := refundTransferState c before.state account amount }
+      let after := { before with
+        state := refundTransferState c before.state account amount
+        gasBurnt := before.gasBurnt + refundExecutionGas c amount,
+        gasUsed := before.gasUsed + refundExecutionGas c amount, failureIndex := none }
       let deficit := storageStakeDeficit c.cfg { account with amount := account.amount + amount }
       if deficit > 0 then (.error (.lackBalanceForState c.receipt.receiverId deficit), after) else (.ok (), after) := by
   by_cases hd : storageStakeDeficit c.cfg { account with amount := account.amount + amount } > 0
   all_goals cases hg : c.receipt.isGasRefund <;>
-    simp [hd, -ExceptT.run_bind, -StateT.run_bind, receiptActionBody, hactions, runReceiptActionList,
+    simp [hd, -StateT.run_bind, receiptActionBody, hactions, runReceiptActionList, runReceiptActionAt,
       runReceiptAction, chargeReceiptFee, hrefund, checkReceiptAction, checkActionAccount,
       checkActorPermissions, applyAction, getState, putAccount, modifyState, checkStorageStake,
-      refundTransferState, ha, hg, ChainState.account?_setAccount_self]
+      refundTransferState, refundExecutionGas, burnGas, ha, hg, ChainState.account?_setAccount_self, Nat.add_assoc]
 
 /-- A missing receiver fails before executing a system transfer, even for an
 implicit-account name: refunds cannot create implicit accounts. -/
 theorem refund_receiptActionBody_missing (c : ReceiptCtx) (before : Exec) (amount : Nat)
     (hrefund : c.receipt.isRefund = true) (hactions : c.action.actions = [.transfer amount])
     (ha : before.state.account? c.receipt.receiverId = none) :
-    (receiptActionBody c).run.run before = (.error (.accountDoesNotExist c.receipt.receiverId), before) := by
-  simp [-ExceptT.run_bind, -StateT.run_bind, receiptActionBody, hactions, runReceiptActionList,
-    runReceiptAction, chargeReceiptFee, hrefund, checkReceiptAction, checkActionAccount, getState, ha]
+    (receiptActionBody c).run.run before = (.error (.accountDoesNotExist c.receipt.receiverId),
+      { before with
+        gasBurnt := before.gasBurnt + refundExecutionGas c amount
+        gasUsed := before.gasUsed + refundExecutionGas c amount, failureIndex := some 0 }) := by
+  simp [-StateT.run_bind, receiptActionBody, hactions, runReceiptActionList, runReceiptActionAt,
+    runReceiptAction, chargeReceiptFee, hrefund, checkReceiptAction, checkActionAccount, getState, burnGas, refundExecutionGas, ha, Nat.add_assoc]
 
 /-- Successful system transfers require an existing receiver and have exactly
 the credited transfer state; storage-staking failure is handled by rollback. -/
@@ -223,7 +325,8 @@ theorem refund_success_raw (c : ReceiptCtx) (st : ChainState) (amount : Nat)
     (hsuccess : (runReceiptActions c st).2 = none) :
     ∃ account, st.account? c.receipt.receiverId = some account ∧
       (runReceiptActions c st).1 =
-        { state := refundTransferState c st account amount, actorId := c.receipt.predecessorId } := by
+        { state := refundTransferState c st account amount, actorId := c.receipt.predecessorId,
+          gasBurnt := refundExecutionGas c amount, gasUsed := refundExecutionGas c amount } := by
   cases ha : st.account? c.receipt.receiverId with
   | none =>
     have hb := refund_receiptActionBody_missing c
@@ -236,14 +339,12 @@ theorem refund_success_raw (c : ReceiptCtx) (st : ChainState) (amount : Nat)
     have hb := refund_receiptActionBody_run c
       { state := st, actorId := c.receipt.predecessorId } account amount hrefund hactions ha
     refine ⟨account, rfl, ?_⟩
-    unfold runReceiptActions
-    dsimp only
-    rw [hb]
-    dsimp only
-    split_ifs <;> rfl
+    by_cases hd : storageStakeDeficit c.cfg { account with amount := account.amount + amount } > 0
+    all_goals simp only [hd, ↓reduceIte] at hb
+    all_goals simp [runReceiptActions, hb]
 
 /-- Successful system refunds credit their backing exactly once, including
-current-key allowance restoration, without gas burn or new backed receipts. -/
+current-key allowance restoration, without token burn or new backed receipts. -/
 theorem applyActionReceipt_refund_success_conservation (c : ReceiptCtx) (st : ChainState) (amount : Nat)
     (hsuccess : (runReceiptActions c st).2 = none) (hwf : st.AccountsUnique)
     (hpred : c.receipt.predecessorId = systemAccount) (hreceipt : c.receipt.receipt = .action c.action)

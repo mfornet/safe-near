@@ -10,10 +10,11 @@ theorem ChainState.account?_removeAccount_ne (st : ChainState) (receiver id : Ac
 /-- A successful VM commit changes only its own account record. Promise effects
 are emitted as receipts; they do not directly mutate other receiver accounts. -/
 theorem commitFunctionCall_account_ne (exec : Exec) (c : ReceiptCtx) (account : Account)
-    (outcome : Wasm.Near.VMOutcome) (isLast : Bool) (id : AccountId) (hne : c.receipt.receiverId ≠ id) :
-    (exec.commitFunctionCall c account outcome isLast).state.account? id = exec.state.account? id := by
-  have hf := congrArg (fun state : ChainState => state.account? id) (commitFunctionCall_frame exec c account outcome isLast)
-  change (exec.commitFunctionCall c account outcome isLast).state.account? id =
+    (outcome : Wasm.Near.VMOutcome) (isLast : Bool) (effects : FunctionCallEffects)
+    (heffects : functionCallEffects c account outcome isLast exec.state = .ok effects) (id : AccountId) (hne : c.receipt.receiverId ≠ id) :
+    (exec.commitFunctionCall outcome effects).state.account? id = exec.state.account? id := by
+  have hf := congrArg (fun state : ChainState => state.account? id) (commitFunctionCall_frame exec c account outcome isLast effects heffects)
+  change (exec.commitFunctionCall outcome effects).state.account? id =
     (exec.state.setAccount c.receipt.receiverId _).account? id at hf
   rw [ChainState.account?_setAccount_ne _ _ _ _ hne] at hf
   exact hf
@@ -43,14 +44,14 @@ theorem applyAction_account_ne (c : ReceiptCtx) (isLast : Bool) (action : Action
   | functionCall method args gas deposit =>
     change ((applyFunctionCall c method args gas deposit isLast).run.run before).2.state.account? id = _
     rw [applyFunctionCall_run]
-    repeat' (first | rfl | exact commitFunctionCall_account_ne _ _ _ _ _ _ hne | split | (dsimp only; split))
+    repeat' (first | rfl | exact commitFunctionCall_account_ne _ _ _ _ _ _ (by assumption) _ hne | split | (dsimp only; split))
   | transfer amount =>
     rw [applyTransfer_run]
     repeat' (first | rfl | exact transferCreditState_account_ne _ _ _ _ _ hne |
       exact ChainState.account?_setAccount_ne _ _ _ _ hne | split)
   | stake amount pk =>
     cases ha : before.state.account? c.receipt.receiverId <;>
-      simp [-ExceptT.run_bind, -StateT.run_bind, applyAction, getAccount, getState, ha]
+      simp [-StateT.run_bind, applyAction, getAccount, getState, ha]
     repeat' (first | rfl | split)
   | addKey pk key =>
     rw [applyAddKey_run]

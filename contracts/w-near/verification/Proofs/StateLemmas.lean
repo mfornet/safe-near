@@ -153,18 +153,13 @@ theorem WF.withTotalSupply {s : State} (hs : s.WF) {t : Nat} (ht : t < u128Bound
   totalSupply_lt := ht
   usage_lt := hs.usage_lt
 
-/-- Characterisation of a successful `unwrapBalance`. -/
-theorem unwrapBalance_ok {s : State} {a : AccountId} {b : Nat} :
-    s.unwrapBalance a = .ok b ↔ a ∈ s.registered ∧ b = s.balance a := by
-  unfold unwrapBalance; split <;> simp_all [eq_comm]
-
 /-- Characterisation of a successful `deposit`. -/
 theorem deposit_ok {s : State} {a : AccountId} {amount : Nat} {s' : State} :
     s.deposit a amount = .ok s' ↔
       a ∈ s.registered ∧ s.balance a + amount < u128Bound ∧ s.totalSupply + amount < u128Bound ∧
       s' = { s.setBalance a (s.balance a + amount) with totalSupply := s.totalSupply + amount } := by
   unfold deposit unwrapBalance
-  simp only [bind, bind_ok', bind_require, pure_eq_ok]
+  simp only [bind, bind_require, pure_eq_ok]
   by_cases h0 : a ∈ s.registered <;>
     by_cases h1 : s.balance a + amount < u128Bound <;>
     by_cases h2 : s.totalSupply + amount < u128Bound <;>
@@ -176,7 +171,7 @@ theorem withdraw_ok {s : State} {a : AccountId} {amount : Nat} {s' : State} :
       a ∈ s.registered ∧ amount ≤ s.balance a ∧ amount ≤ s.totalSupply ∧
       s' = { s.setBalance a (s.balance a - amount) with totalSupply := s.totalSupply - amount } := by
   unfold withdraw unwrapBalance
-  simp only [bind, bind_ok', bind_require, pure_eq_ok]
+  simp only [bind, bind_require, pure_eq_ok]
   by_cases h0 : a ∈ s.registered <;>
     by_cases h1 : amount ≤ s.balance a <;>
     by_cases h2 : amount ≤ s.totalSupply <;>
@@ -187,7 +182,7 @@ theorem registerAccount_ok {s : State} {a : AccountId} {s' : State} :
     s.registerAccount a = .ok s' ↔ a ∉ s.registered ∧ s' = s.register a := by
   unfold registerAccount
   simp only [bind, bind_require, pure_eq_ok]
-  split_ifs <;> (try split_ifs) <;> simp_all [eq_comm]
+  split_ifs <;> simp_all [eq_comm]
 
 end State
 

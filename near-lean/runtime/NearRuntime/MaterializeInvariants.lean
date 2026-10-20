@@ -57,13 +57,13 @@ def emitFunctionCallActions (c : ReceiptCtx) (specs : List ReceiptSpec) (ids : A
         gasPrice := c.action.gasPrice
         outputDataReceivers := outputs[i]?.getD []
         inputDataIds := inputs[i]?.getD []
-        actions := spec.actions.map (actionOfPromise c.codeOf) } }]
+        actions := spec.actions.map (actionOfPromiseRaw c.codeOf) } }]
   return receipts
 
 /-- This is definitional equality with the executable implementation, not an
 assumed relation to a second receipt constructor. -/
-theorem materializeFunctionCall_eq_stages (c : ReceiptCtx) (isLast : Bool) (outcome : VMOutcome)
-    (initial : ChainState) : materializeFunctionCall c isLast outcome initial =
+theorem materializeFunctionCallRaw_eq_stages (c : ReceiptCtx) (isLast : Bool) (outcome : VMOutcome)
+    (initial : ChainState) : materializeFunctionCallRaw c isLast outcome initial =
     let allocation := allocateFunctionCallIds outcome.receipts initial
     let linking := linkFunctionCallDependencies outcome.receipts allocation.1
       (Array.replicate outcome.receipts.length []) (Array.replicate outcome.receipts.length [])
@@ -71,17 +71,13 @@ theorem materializeFunctionCall_eq_stages (c : ReceiptCtx) (isLast : Bool) (outc
     let returned := match outcome.returnData with
       | .receiptIndex k => (linking.1, [], linking.2.1.modify k (· ++ receivers),
           ExecutionStatus.successReceiptId (allocation.2[k]?.getD 0))
-      | .value value =>
-        let emitted := emitFunctionCallData c.receipt.receiverId value receivers linking.1
-        (emitted.1, emitted.2, linking.2.1, ExecutionStatus.successValue value)
-      | .none =>
-        let emitted := emitFunctionCallData c.receipt.receiverId [] receivers linking.1
-        (emitted.1, emitted.2, linking.2.1, ExecutionStatus.successValue [])
+      | .value value => (linking.1, [], linking.2.1, ExecutionStatus.successValue value)
+      | .none => (linking.1, [], linking.2.1, ExecutionStatus.successValue [])
     { state := returned.1, receipts := emitFunctionCallActions c outcome.receipts allocation.2
         returned.2.2.1 linking.2.2 returned.2.1, result := returned.2.2.2 } := by
   cases hr : outcome.returnData <;>
-    simp only [materializeFunctionCall, allocateFunctionCallIds, linkFunctionCallDependencies,
-      emitFunctionCallData, emitFunctionCallActions, hr] <;> rfl
+    simp only [materializeFunctionCallRaw, allocateFunctionCallIds, linkFunctionCallDependencies,
+      emitFunctionCallActions, hr] <;> rfl
 
 /-- A projection untouched by every loop body is untouched by the full pass. -/
 theorem foldl_frame (view : β → γ) (step : β → α → β)
@@ -164,13 +160,13 @@ theorem emitFunctionCallActions_value (value : AccountId → List Action → Nat
     (inputs : Array (List DataId)) (receipts : List Receipt) :
     chainReceiptsValue value (emitFunctionCallActions c specs ids outputs inputs receipts) =
       chainReceiptsValue value receipts +
-        (specs.map fun spec => value (stringOfBytes spec.receiverId) (spec.actions.map (actionOfPromise c.codeOf))).sum := by
+        (specs.map fun spec => value (stringOfBytes spec.receiverId) (spec.actions.map (actionOfPromiseRaw c.codeOf))).sum := by
   simp only [emitFunctionCallActions, Std.Legacy.Range.forIn'_eq_forIn'_range',
     List.forIn'_pure_yield_eq_foldl, Std.Legacy.Range.size, Nat.sub_zero, Nat.add_sub_cancel,
     Nat.div_one]
   trans chainReceiptsValue value receipts +
     ((List.range' 0 specs.length).attach.map fun i => value (stringOfBytes specs[i.val]!.receiverId)
-      (specs[i.val]!.actions.map (actionOfPromise c.codeOf))).sum
+      (specs[i.val]!.actions.map (actionOfPromiseRaw c.codeOf))).sum
   · apply foldl_additive
     intro acc item
     have hb : item.val < specs.length := by
@@ -178,44 +174,43 @@ theorem emitFunctionCallActions_value (value : AccountId → List Action → Nat
       omega
     simp [chainReceiptsValue, chainReceiptValue, List.map_append, getElem!_pos specs item.val hb]
   · rw [List.attach_map_val (f := fun (i : Nat) => value (stringOfBytes specs[i]!.receiverId)
-        (specs[i]!.actions.map (actionOfPromise c.codeOf)))]
+        (specs[i]!.actions.map (actionOfPromiseRaw c.codeOf)))]
     have hm := congrArg (fun xs : List ReceiptSpec =>
         (xs.map fun spec => value (stringOfBytes spec.receiverId)
-          (spec.actions.map (actionOfPromise c.codeOf))).sum) (map_range'_get! specs)
+          (spec.actions.map (actionOfPromiseRaw c.codeOf))).sum) (map_range'_get! specs)
     simpa only [List.map_map, Function.comp_def] using
       congrArg (fun n => chainReceiptsValue value receipts + n) hm
 
 /-- Receipt construction changes no ledger, storage, key or scheduler field. -/
-theorem materializeFunctionCall_frame (c : ReceiptCtx) (isLast : Bool) (outcome : VMOutcome)
+theorem materializeFunctionCallRaw_frame (c : ReceiptCtx) (isLast : Bool) (outcome : VMOutcome)
     (initial : ChainState) :
-    (materializeFunctionCall c isLast outcome initial).state.withoutIds = initial.withoutIds := by
-  rw [materializeFunctionCall_eq_stages]
+    (materializeFunctionCallRaw c isLast outcome initial).state.withoutIds = initial.withoutIds := by
+  rw [materializeFunctionCallRaw_eq_stages]
   cases hr : outcome.returnData <;> dsimp only
-  all_goals simp only [emitFunctionCallData_frame, linkFunctionCallDependencies_frame, allocateFunctionCallIds_frame]
+  all_goals simp only [linkFunctionCallDependencies_frame, allocateFunctionCallIds_frame]
 
 /-- The actual chain receipt constructor preserves every receiver/action
 valuation, independently of ids, dependency shapes and returned receipt choice. -/
-theorem materializeFunctionCall_value (value : AccountId → List Action → Nat)
+theorem materializeFunctionCallRaw_value (value : AccountId → List Action → Nat)
     (c : ReceiptCtx) (isLast : Bool) (outcome : VMOutcome) (initial : ChainState) :
-    chainReceiptsValue value (materializeFunctionCall c isLast outcome initial).receipts =
+    chainReceiptsValue value (materializeFunctionCallRaw c isLast outcome initial).receipts =
       (outcome.receipts.map fun spec =>
-        value (stringOfBytes spec.receiverId) (spec.actions.map (actionOfPromise c.codeOf))).sum := by
-  rw [materializeFunctionCall_eq_stages]
+        value (stringOfBytes spec.receiverId) (spec.actions.map (actionOfPromiseRaw c.codeOf))).sum := by
+  rw [materializeFunctionCallRaw_eq_stages]
   cases hr : outcome.returnData <;> dsimp only
   all_goals rw [emitFunctionCallActions_value]
-  all_goals try rw [emitFunctionCallData_value]
   all_goals exact Nat.zero_add _
 
-@[simp] theorem actionOfPromise_deposit (codeOf : Bytes → ContractCode) (action : PromiseAction) :
-    (actionOfPromise codeOf action).deposit = action.deposit := by
+@[simp] theorem actionOfPromiseRaw_deposit (codeOf : Bytes → ContractCode) (action : PromiseAction) :
+    (actionOfPromiseRaw codeOf action).deposit = action.deposit := by
   cases action <;> rfl
 
 /-- Memory-decoded VM deposits survive conversion into runtime actions. -/
-theorem materializeFunctionCall_deposits (c : ReceiptCtx) (isLast : Bool) (outcome : VMOutcome)
+theorem materializeFunctionCallRaw_deposits (c : ReceiptCtx) (isLast : Bool) (outcome : VMOutcome)
     (initial : ChainState) :
     chainReceiptsValue (fun _ actions => Fees.totalDeposit actions)
-      (materializeFunctionCall c isLast outcome initial).receipts = receiptsDeposits outcome.receipts := by
-  rw [materializeFunctionCall_value]
+      (materializeFunctionCallRaw c isLast outcome initial).receipts = receiptsDeposits outcome.receipts := by
+  rw [materializeFunctionCallRaw_value]
   simp [Fees.totalDeposit, List.map_map, Function.comp_def, receiptsDeposits, receiptsValue, depositValue]
 
 theorem foldl_preserves (P : β → Prop) (step : β → α → β)
@@ -256,15 +251,13 @@ theorem emitFunctionCallActions_origin (c : ReceiptCtx) (specs : List ReceiptSpe
   · exact hacc r hr
   · exact ⟨rfl, rfl⟩
 
-theorem materializeFunctionCall_origin (c : ReceiptCtx) (isLast : Bool) (outcome : VMOutcome)
+theorem materializeFunctionCallRaw_origin (c : ReceiptCtx) (isLast : Bool) (outcome : VMOutcome)
     (initial : ChainState) :
-    ∀ r ∈ (materializeFunctionCall c isLast outcome initial).receipts, r.FromVM c := by
-  rw [materializeFunctionCall_eq_stages]
+    ∀ r ∈ (materializeFunctionCallRaw c isLast outcome initial).receipts, r.FromVM c := by
+  rw [materializeFunctionCallRaw_eq_stages]
   cases hr : outcome.returnData <;> dsimp only
   all_goals apply emitFunctionCallActions_origin
-  all_goals first
-    | (apply emitFunctionCallData_origin; simp)
-    | simp
+  all_goals simp
 
 /-- Financial valuation includes the exact gas purchase price. The system
 predecessor case is retained explicitly rather than assumed impossible. -/
@@ -283,18 +276,18 @@ theorem receiptFunds_fromVM (c : ReceiptCtx) (receipt : Receipt) (h : receipt.Fr
 
 /-- Full outgoing funds, including prepaid execution gas, are retained by the
 actual constructor. Data receipts contribute no backing. -/
-theorem materializeFunctionCall_funds (c : ReceiptCtx) (isLast : Bool) (outcome : VMOutcome)
+theorem materializeFunctionCallRaw_funds (c : ReceiptCtx) (isLast : Bool) (outcome : VMOutcome)
     (initial : ChainState) :
-    receiptsFunds c.cfg (materializeFunctionCall c isLast outcome initial).receipts =
+    receiptsFunds c.cfg (materializeFunctionCallRaw c isLast outcome initial).receipts =
       (outcome.receipts.map fun spec => functionCallReceiptValue c (stringOfBytes spec.receiverId)
-        (spec.actions.map (actionOfPromise c.codeOf))).sum := by
-  have hv := materializeFunctionCall_value (functionCallReceiptValue c) c isLast outcome initial
+        (spec.actions.map (actionOfPromiseRaw c.codeOf))).sum := by
+  have hv := materializeFunctionCallRaw_value (functionCallReceiptValue c) c isLast outcome initial
   rw [← hv]
   unfold receiptsFunds chainReceiptsValue
   congr 1
   apply List.map_congr_left
   intro receipt hmem
-  exact receiptFunds_fromVM c receipt (materializeFunctionCall_origin c isLast outcome initial receipt hmem)
+  exact receiptFunds_fromVM c receipt (materializeFunctionCallRaw_origin c isLast outcome initial receipt hmem)
 
 theorem allocateFunctionCallIds_nextId (specs : List ReceiptSpec) (initial : ChainState)
     (ids : Array ReceiptId) :
@@ -340,16 +333,16 @@ theorem linkFunctionCallDependencies_nextId (specs : List ReceiptSpec) (initial 
     · simp
   · rw [sum_range'_get! specs (fun spec => spec.dependencies.length)]
 
-/-- The materializer allocates promise envelopes and dependency identities.
-External result data is allocated only when the entire receipt is finalized. -/
-theorem materializeFunctionCall_nextId (c : ReceiptCtx) (isLast : Bool) (outcome : VMOutcome)
+/-- One receipt id per promise and data id per dependency, plus data receipt ids
+for direct returns. Returned promises allocate no duplicate output receipts. -/
+theorem materializeFunctionCallRaw_nextId (c : ReceiptCtx) (isLast : Bool) (outcome : VMOutcome)
     (initial : ChainState) :
-    (materializeFunctionCall c isLast outcome initial).state.nextId = initial.nextId + outcome.receipts.length +
+    (materializeFunctionCallRaw c isLast outcome initial).state.nextId = initial.nextId + outcome.receipts.length +
       (outcome.receipts.map fun spec => spec.dependencies.length).sum := by
-  rw [materializeFunctionCall_eq_stages]
-  cases hr : outcome.returnData <;>
-    simp [emitFunctionCallData_nextId, linkFunctionCallDependencies_nextId,
-      allocateFunctionCallIds_nextId]
+  rw [materializeFunctionCallRaw_eq_stages]
+  cases hr : outcome.returnData <;> dsimp only
+  all_goals simp [linkFunctionCallDependencies_nextId,
+    allocateFunctionCallIds_nextId]
 
 theorem allocateFunctionCallIds_nil (initial : ChainState) (ids : Array ReceiptId) :
     allocateFunctionCallIds [] initial ids = (initial, ids) := rfl

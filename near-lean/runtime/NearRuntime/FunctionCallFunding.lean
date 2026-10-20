@@ -6,17 +6,20 @@ open Wasm Wasm.Near
 /-- Commit funding with the outgoing gas obligation derived from concrete
 strict-policy execution, rather than supplied as an outcome equation. -/
 theorem commitFunctionCall_funded_gas (exec : Exec) (c : ReceiptCtx) (account : Account)
-    (code : ContractCode) (method : String) (args : Bytes) (gas deposit : Nat) (isLast : Bool)
+    (code : ContractCode) (method : String) (args : Bytes) (gas deposit : Nat) (isLast : Bool) (effects : FunctionCallEffects)
     (hwf : exec.state.AccountsUnique) (haccount : exec.state.account? c.receipt.receiverId = some account)
     (hreceiver : c.receipt.receiverId ≠ systemAccount)
     (hsuccess : (run c.cfg code.module code.size method (functionCallContext c account args gas deposit isLast)
-      (exec.state.contractStorage c.receipt.receiverId)).aborted = none) :
+      (exec.state.contractStorage c.receipt.receiverId)).aborted = none)
+    (heffects : functionCallEffects c account
+      (run c.cfg code.module code.size method (functionCallContext c account args gas deposit isLast)
+        (exec.state.contractStorage c.receipt.receiverId)) isLast exec.state = .ok effects) :
     let outcome := run c.cfg code.module code.size method (functionCallContext c account args gas deposit isLast)
       (exec.state.contractStorage c.receipt.receiverId)
-    (exec.commitFunctionCall c account outcome isLast).totalFunds c.cfg =
+    (exec.commitFunctionCall outcome effects).totalFunds c.cfg =
       exec.totalFunds c.cfg + deposit + outcome.subsidizedAmount +
         (outcome.usedGas - outcome.burntGas) * c.action.gasPrice := by
-  have hf := commitFunctionCall_funded exec c account code method args gas deposit isLast hwf haccount hsuccess
+  have hf := commitFunctionCall_funded exec c account code method args gas deposit isLast effects hwf haccount hsuccess heffects
   have hg := run_functionCallGasFunds c code.module code.size method
     (functionCallContext c account args gas deposit isLast) (exec.state.contractStorage c.receipt.receiverId)
     defaultFuel hreceiver hsuccess rfl
@@ -50,7 +53,7 @@ theorem applyFunctionCall_success_funding_step (c : ReceiptCtx) (method : String
     (hwf : before.state.AccountsUnique) (hreceiver : c.receipt.receiverId ≠ systemAccount)
     (hrun : (applyFunctionCall c method args gas deposit isLast).run.run before = (.ok (), after)) :
     Exec.FundingStep c.cfg c.action.gasPrice deposit before after := by
-  obtain ⟨account, code, _, _, hsuccess, heq, hf⟩ :=
+  obtain ⟨account, code, effects, _, _, hsuccess, _, heq, hf⟩ :=
     applyFunctionCall_success_funded c method args gas deposit isLast before after hwf hrun
   let outcome := run c.cfg code.module code.size method (functionCallContext c account args gas deposit isLast)
     (before.state.contractStorage c.receipt.receiverId)

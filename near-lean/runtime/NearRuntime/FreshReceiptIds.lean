@@ -73,13 +73,19 @@ theorem Exec.addGasRefund_freshIds (exec : Exec) (receiver : AccountId) (pk : Pu
     exact ⟨Nat.le_refl _, Nat.lt_succ_self _⟩
 
 theorem commitFunctionCall_freshIds (exec : Exec) (c : ReceiptCtx) (account : Account)
-    (outcome : VMOutcome) (isLast : Bool) (lower : Nat)
+    (outcome : VMOutcome) (isLast : Bool) (effects : FunctionCallEffects)
+    (heffects : functionCallEffects c account outcome isLast exec.state = .ok effects) (lower : Nat)
     (h : exec.FreshReceiptIds lower) (hfloor : lower ≤ exec.state.nextId) :
-    (exec.commitFunctionCall c account outcome isLast).FreshReceiptIds lower := by
+    (exec.commitFunctionCall outcome effects).FreshReceiptIds lower := by
+  have heffects' := functionCallEffects_success c account outcome isLast exec.state effects heffects
   let initial := (exec.state.setAccount c.receipt.receiverId
     { account with amount := outcome.balance, storageUsage := outcome.storageUsage }).setContractStorage
       c.receipt.receiverId outcome.storage
-  apply ReceiptList.FreshIds.append h _ hfloor (commitFunctionCall_nextId_mono exec c account outcome isLast)
+  change ReceiptList.FreshIds lower effects.state.nextId (exec.newReceipts ++ effects.receipts)
+  rw [heffects']
+  have hn := commitFunctionCall_nextId_mono exec c account outcome isLast effects heffects
+  rw [heffects'] at hn
+  apply ReceiptList.FreshIds.append h _ hfloor hn
   exact ⟨materializeFunctionCall_receiptIds_nodup c isLast outcome initial,
     materializeFunctionCall_receiptId_bounds c isLast outcome initial⟩
 
@@ -94,14 +100,29 @@ theorem applyAction_freshIds (c : ReceiptCtx) (isLast : Bool) (action : Action) 
   | functionCall method args gas deposit =>
     rw [show applyAction c isLast (.functionCall method args gas deposit) =
       applyFunctionCall c method args gas deposit isLast from rfl, applyFunctionCall_run]
-    split
-    · exact h
-    · split
-      · exact h
-      · dsimp only
-        split
-        · exact h
-        · exact commitFunctionCall_freshIds _ _ _ _ _ _ h hfloor
+    cases ha : before.state.account? c.receipt.receiverId with
+    | none => exact h
+    | some account =>
+      dsimp only
+      cases hc : account.code with
+      | none => exact h
+      | some code =>
+        dsimp only
+        cases hi : code.decodeIssue with
+        | some issue => exact h
+        | none =>
+          dsimp only
+          generalize ho : run c.cfg code.module code.size method
+            (functionCallContext c account args gas deposit isLast)
+            (before.state.contractStorage c.receipt.receiverId) = outcome
+          cases he : outcome.aborted with
+          | some error => exact h
+          | none =>
+            dsimp only
+            cases hf : functionCallEffects c account outcome isLast before.state with
+            | error error => exact h
+            | ok effects =>
+              exact commitFunctionCall_freshIds (before.recordVMOutcome outcome) c account outcome isLast effects hf lower h hfloor
   | transfer amount =>
     rw [applyTransfer_run]
     split
@@ -113,7 +134,7 @@ theorem applyAction_freshIds (c : ReceiptCtx) (isLast : Bool) (action : Action) 
       · split <;> exact h
   | stake amount pk =>
     cases ha : before.state.account? c.receipt.receiverId <;>
-      simp [-ExceptT.run_bind, -StateT.run_bind, applyAction, getAccount, getState, ha]
+      simp [-StateT.run_bind, applyAction, getAccount, getState, ha]
     repeat' (first | exact h | split)
   | addKey pk key => rw [applyAddKey_run]; repeat' (first | exact h | split)
   | deleteKey pk => rw [applyDeleteKey_run]; repeat' (first | exact h | split)
@@ -158,8 +179,8 @@ theorem freshIds_getState (lower : Nat) : getState.PreservesFreshIds lower := by
 
 theorem freshIds_fee (lower : Nat) (isRefund : Bool) (fee : Nat) : (chargeReceiptFee isRefund fee).PreservesFreshIds lower := by
   intro before _ h
-  unfold chargeReceiptFee
-  split <;> exact h
+  unfold chargeReceiptFee burnGas
+  exact h
 
 theorem freshIds_checkReceiptAction (lower : Nat) (c : ReceiptCtx) (onlyAction : Bool) (action : Action) :
     (checkReceiptAction c onlyAction action).PreservesFreshIds lower := by
@@ -191,18 +212,44 @@ theorem freshIds_runReceiptAction (lower : Nat) (c : ReceiptCtx) (onlyAction isL
   intro before hfloor h
   exact applyAction_freshIds c isLast action before lower h hfloor
 
-theorem freshIds_runReceiptActionList (lower : Nat) (c : ReceiptCtx) (onlyAction : Bool) (actions : List Action) :
-    (runReceiptActionList c onlyAction actions).PreservesFreshIds lower := by
-  induction actions with
+theorem freshIds_runReceiptActionAt (lower : Nat) (c : ReceiptCtx) (onlyAction isLast : Bool)
+    (action : Action) (index : Nat) : (runReceiptActionAt c onlyAction isLast action index).PreservesFreshIds lower := by
+  cases action with
+  | createAccount  => exact freshIds_runReceiptAction lower c onlyAction isLast (.createAccount)
+  | deployContract code => exact freshIds_runReceiptAction lower c onlyAction isLast (.deployContract code)
+  | transfer amount => exact freshIds_runReceiptAction lower c onlyAction isLast (.transfer amount)
+  | stake amount pk => exact freshIds_runReceiptAction lower c onlyAction isLast (.stake amount pk)
+  | addKey pk key => exact freshIds_runReceiptAction lower c onlyAction isLast (.addKey pk key)
+  | deleteKey pk => exact freshIds_runReceiptAction lower c onlyAction isLast (.deleteKey pk)
+  | deleteAccount beneficiary => exact freshIds_runReceiptAction lower c onlyAction isLast (.deleteAccount beneficiary)
+  | functionCall method args gas deposit =>
+    cases hs : actionRandomSeed c index with
+    | error error =>
+      simp only [runReceiptActionAt, hs]
+      exact freshIds_throw _ _
+    | ok seed =>
+      simp only [runReceiptActionAt, hs]
+      exact freshIds_runReceiptAction lower _ _ _ _
+
+theorem freshIds_failureIndex (lower : Nat) (_c : ReceiptCtx) (index : Option Nat) :
+    (modify fun e => { e with failureIndex := index } : ExecM Unit).PreservesFreshIds lower := by
+  intro before _ h
+  exact h
+
+theorem freshIds_runReceiptActionList (lower : Nat) (c : ReceiptCtx) (onlyAction : Bool) (actions : List Action)
+    (index : Nat) : (runReceiptActionList c onlyAction actions index).PreservesFreshIds lower := by
+  induction actions generalizing index with
   | nil => exact freshIds_pure _ _
   | cons action rest ih =>
-    exact ExecM.PreservesFreshIds.bind (freshIds_runReceiptAction _ _ _ _ _)
-      (nextId_runReceiptAction _ _ _ _) (fun _ => ih)
+    refine ExecM.PreservesFreshIds.bind (freshIds_failureIndex lower c (some index)) (nextId_failureIndex _) (fun _ => ?_)
+    exact ExecM.PreservesFreshIds.bind (freshIds_runReceiptActionAt lower c onlyAction rest.isEmpty action index)
+      (nextId_runReceiptActionAt _ _ _ _ _) (fun _ => ih (index + 1))
 
 theorem freshIds_receiptActionBody (lower : Nat) (c : ReceiptCtx) : (receiptActionBody c).PreservesFreshIds lower := by
   unfold receiptActionBody
   refine ExecM.PreservesFreshIds.bind (freshIds_fee _ _ _) (nextId_fee _ _) (fun _ => ?_)
-  exact ExecM.PreservesFreshIds.bind (freshIds_runReceiptActionList _ _ _ _) (nextId_runReceiptActionList _ _ _)
+  refine ExecM.PreservesFreshIds.bind (freshIds_runReceiptActionList lower c _ _ _) (nextId_runReceiptActionList _ _ _ _) (fun _ => ?_)
+  exact ExecM.PreservesFreshIds.bind (freshIds_failureIndex lower c none) (nextId_failureIndex _)
     (fun _ => freshIds_checkStorageStake _ _ _)
 
 theorem runReceiptActions_freshIds (c : ReceiptCtx) (st : ChainState) :

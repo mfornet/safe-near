@@ -99,6 +99,9 @@ structure ApplyState where
   epochHeight : Nat := 0
   gasPrice : Nat := 100_000_000
   randomSeed : Bytes := List.replicate 32 0
+  /-- Some selects native action-derived randomness and requires a valid parent
+  binding for every VM call. None retains the trusted direct-seed interface. -/
+  nativeReceiptHashes : Option (List (ReceiptId × Bytes)) := none
   /-- Gas burnt in one apply before the remaining receipts are delayed. -/
   gasLimit : Option Nat := none
   deriving Inhabited

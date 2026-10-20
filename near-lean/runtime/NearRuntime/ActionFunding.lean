@@ -78,10 +78,7 @@ theorem funded_burnGas (cfg : RuntimeConfig) (price fee : Nat) : (burnGas fee).F
 
 theorem funded_fee (cfg : RuntimeConfig) (price : Nat) (isRefund : Bool) (fee : Nat) :
     (chargeReceiptFee isRefund fee).Funded cfg price 0 := by
-  unfold chargeReceiptFee
-  split
-  · exact funded_pure cfg price ()
-  · exact funded_burnGas cfg price fee
+  exact funded_burnGas cfg price fee
 
 theorem funded_checkReceiptAction (c : ReceiptCtx) (onlyAction : Bool) (action : Action) :
     (checkReceiptAction c onlyAction action).Funded c.cfg c.action.gasPrice 0 := by
@@ -121,19 +118,41 @@ theorem funded_runReceiptAction_functionCall (c : ReceiptCtx) (onlyAction isLast
   intro _
   exact funded_functionCall c method args gas deposit isLast hreceiver
 
-theorem funded_runReceiptActionList (c : ReceiptCtx) (onlyAction : Bool) (actions : List Action)
+/-- Native action randomness changes no ledger parameters. A missing exact
+context cannot produce a successful step and therefore publishes no funding result. -/
+theorem funded_runReceiptActionAt_functionCall (c : ReceiptCtx) (onlyAction isLast : Bool)
+    (method : String) (args : Bytes) (gas deposit index : Nat) (hreceiver : c.receipt.receiverId ≠ systemAccount) :
+    (runReceiptActionAt c onlyAction isLast (.functionCall method args gas deposit) index).Funded
+      c.cfg c.action.gasPrice deposit := by
+  cases he : actionRandomSeed c index <;> simp only [runReceiptActionAt, he]
+  · intro before after value _ hrun
+    have hbad := congrArg Prod.fst hrun
+    cases hbad
+  · exact funded_runReceiptAction_functionCall _ onlyAction isLast method args gas deposit hreceiver
+
+/-- Failure-index bookkeeping changes no account, gas or receipt funds. -/
+theorem funded_failureIndex (cfg : RuntimeConfig) (price : Nat) (index : Option Nat) :
+    (modify fun e : Exec => { e with failureIndex := index } : ExecM Unit).Funded cfg price 0 := by
+  intro before after value hwf hrun
+  have he := congrArg Prod.snd hrun
+  change { before with failureIndex := index } = after at he
+  subst after
+  exact ⟨hwf, by simp [Exec.FundingStep, Exec.totalFunds]⟩
+
+theorem funded_runReceiptActionList (c : ReceiptCtx) (onlyAction : Bool) (actions : List Action) (index : Nat)
     (hreceiver : c.receipt.receiverId ≠ systemAccount)
     (h : ∀ action ∈ actions, FunctionCallFundingAction action) :
-    (runReceiptActionList c onlyAction actions).Funded c.cfg c.action.gasPrice (Fees.totalDeposit actions) := by
-  induction actions with
+    (runReceiptActionList c onlyAction actions index).Funded c.cfg c.action.gasPrice (Fees.totalDeposit actions) := by
+  induction actions generalizing index with
   | nil => exact funded_pure _ _ _
   | cons action rest ih =>
     have ha := h action (by simp)
-    have hr := ih (by intro a hm; exact h a (by simp [hm]))
+    have hr := ih (index + 1) (by intro a hm; exact h a (by simp [hm]))
     cases action <;> try contradiction
     case functionCall method args gas deposit =>
       simpa only [runReceiptActionList, Fees.totalDeposit, List.map_cons, List.sum_cons, Action.deposit] using
-        (funded_runReceiptAction_functionCall c onlyAction rest.isEmpty method args gas deposit hreceiver).bind (fun _ => hr)
+        funded_bind_left_zero (funded_failureIndex _ _ (some index)) (fun _ =>
+          (funded_runReceiptActionAt_functionCall c onlyAction rest.isEmpty method args gas deposit index hreceiver).bind (fun _ => hr))
 
 theorem funded_receiptActionBody (c : ReceiptCtx) (hreceiver : c.receipt.receiverId ≠ systemAccount)
     (h : ∀ action ∈ c.action.actions, FunctionCallFundingAction action) :
@@ -141,8 +160,8 @@ theorem funded_receiptActionBody (c : ReceiptCtx) (hreceiver : c.receipt.receive
   unfold receiptActionBody
   apply funded_bind_left_zero (funded_fee _ _ _ _)
   intro _
-  exact funded_bind_right_zero (funded_runReceiptActionList c _ _ hreceiver h)
-    (fun _ => funded_checkStorageStake _ _ _)
+  exact funded_bind_right_zero (funded_runReceiptActionList c _ _ 0 hreceiver h)
+    (fun _ => funded_bind_zero (funded_failureIndex _ _ none) (fun _ => funded_checkStorageStake _ _ _))
 
 /-- The actual successful action attempt, including all receipt/action fees and
 storage-staking checks, obeys any established action-body funding rule. -/
