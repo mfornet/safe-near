@@ -529,6 +529,179 @@ actual `issue = none` processing result. Unsupported/incomplete attempts are not
 silently treated as committed executions. `PostponedFinancialWellFormed` is a
 financial invariant, not full dependency-graph validity or fairness.
 
+`RoutingInvariants.processReceipt_postponedWellFormed` preserves this postponed
+map invariant through the actual processor, including model-issue fallback.
+`processReceipt_fundingInvariant` combines it with account uniqueness for
+supported results. `ActionAccountFrame.applyAction_account_ne` proves that each
+raw action preserves account records outside its receiver, on every outcome.
+`ReservedActorInvariant.applyActionReceipt_systemAbsent` proves that executing
+and finalizing an action receipt cannot install an initially absent `system`
+account. `processReceipt_systemAbsent` extends this guarantee to the entire
+processor, including recursive data delivery, without input-shape or postponed-map
+assumptions. `convertTransaction_systemAbsent` proves the same for successful
+transaction conversion. `processReceipt_runtimeFundingInvariant` combines
+reserved-actor absence with the financial state invariant. These are local
+preservation results; full block/chain composition,
+emitted receipt scope, identifier freshness and dependency-graph preservation
+remain separate obligations.
+
+`ApplyInvariants.apply_systemAbsent` carries reserved-actor absence through the
+actual transaction and receipt loops, including gas-limit deferral and atomic
+model-issue rollback. The attempt function is public for proof-facing unfolding;
+the public commit boundary remains `apply`. `NearChain.ReservedActorInvariant`
+lifts absence to block steps, all reachable states, bounded settlement and
+isolated transaction runs. These guarantees require absence in the initial state
+and hold for every stop reason; they do not establish financial conservation
+across blocks or eventual completion.
+
+`RewardBacking.processReceipt_reward_backed` proves that each scoped receipt's
+public reward is bounded by its own gross burn, including data-triggered execution,
+canonical refunds and model-issue fallback. It assumes the settlement configuration
+bounds and financially scoped postponed entries, but no monetary equation.
+`processReceipt_outcomeLoop_burn` connects the executor's actual inner outcome loop
+and reward deduction to addition of that receipt's net burn. Consequently,
+`processReceipt_ledger_conservation` carries arbitrary prior burn through the
+local conservation law without natural-number subtraction consuming earlier
+charges. This closes the local counter-composition obligation; preserving scope
+and freshness across the complete block queue remains open.
+
+`IdentifierBounds.ChainState.IdsBelowNext` bounds every routing-owned receipt
+identity and data reference by the allocator counter, including postponed map
+keys and payloads, pending counts, data routes, received data and delayed receipts.
+External incoming queues require their own bounds. Transaction conversion and VM
+materialization preserve this bound for pre-existing routing state; converted
+transaction receipts are bounded by the new counter, fresh against old references,
+and cannot overwrite a postponed slot. Promise allocation is fresh against all
+old routing references. This predicate does not assert uniqueness, preserve the
+bounds of all emitted VM receipts, or close the full queue invariant.
+
+`DataReceiptIdentifiers` proves exact consecutive data-envelope ids and exact
+callback delivery order, data ids and bytes. With bounded callback references,
+all identifiers carried by the data-emission pass remain below its new counter.
+`ActionReceiptIdentifiers.materializeFunctionCall_receiptIds` characterizes the
+complete materializer's envelope ids as disjoint data and action allocation
+ranges. Its corollaries prove uniqueness, counter bounds, freshness against old
+routing references and absence from the returned state's postponed map. These
+are envelope-identity guarantees; full bounds on linked action dependency
+references and preservation across later execution are separate obligations.
+
+`DependencyIdentifierBounds.materializeFunctionCall_liveIds_below` closes the
+materializer reference-bound obligation: all emitted envelope, input-data and
+output-data ids are below the resulting counter. Newly linked dependencies are
+proved bounded from the actual allocation/modification loops. Inherited callback
+references must be below the initial counter; the incoming receipt bound and
+context/payload agreement suffice to discharge this premise. Direct returns and
+returned-promise forwarding are both covered. This does not establish valid edge
+indices, matching input/output edges, fairness, or preservation through subsequent
+receipt execution.
+
+`RoutingIdentifierBounds` provides a component form of the allocator bound and
+preserves it through postponement, data arrival and release. `ActionIdentifierBounds`
+proves preservation for every raw action, action sequence, receipt rollback and
+finalization, including refund and failure-data allocation. Finally,
+`ProcessorIdentifierBounds.processReceipt_idsBelowNext` preserves the state bound
+through the entire executable processor, including recursive release of stored
+receipts and issue fallback. Its premises are bounded initial routing state and
+bounded ids in the incoming receipt; no financial-scope or success premise is
+needed. This is state-bound preservation. Bounding the complete processor's newly
+emitted outputs, preserving queue-wide uniqueness and proving valid dependency
+edges remain separate obligations.
+
+`AllocatorMonotonicity` proves allocator progress through all raw actions,
+receipt finalization and recursive processing without validity or success
+premises. Finalization is compared with the receipt's initial counter because
+rollback discards speculative allocations. `BlockAllocatorMonotonicity` carries
+progress through the actual transaction, receipt and gas-deferral loops and the
+public atomic apply boundary. `NearChain.AllocatorMonotonicity` lifts it to steps,
+reachable states, settlement and isolated runs for every stop reason. Previously
+bounded external references therefore remain bounded as other work executes.
+This is counter progress, not queue ownership, uniqueness or complete processor-
+output bound preservation.
+
+`ActionOutputIdentifierBounds` composes bounds on emitted receipts through all
+raw actions and action sequences, transporting inherited callback bounds with
+allocator monotonicity. `FinalizedOutputIdentifierBounds` covers the committed
+outputs after rollback, refunds, rewards and failed callback data. Finally,
+`ProcessorOutputIdentifierBounds.processReceipt_identifier_bounds` proves both
+state and complete public output bounds for the actual processor, including
+recursive data-triggered execution and issue fallback. The premises are bounded
+initial routing state and a bounded incoming receipt; financial scope and success
+are unnecessary. Thus the local processor-output bound obligation is closed.
+Composition across the complete block queue, queue-wide ownership/uniqueness,
+valid dependency edges and eventual completion remain open.
+
+`BlockIdentifierBounds.apply_identifier_bounds` composes the local bounds through
+both actual block loops. Its inputs are bounded routing state and bounded incoming
+receipts; it proves bounded resulting state and all outgoing work, including
+transaction-generated receipts, gas-limit deferral and atomic issue rollback.
+`NearChain.IdentifierBounds` includes pending receipts in the snapshot invariant
+and preserves it across steps, reachable states, settlement and isolated runs for
+all stop reasons. The next allocator id is therefore absent from every live state
+or pending reference. This closes block/chain numeric-bound composition, while
+queue-wide uniqueness/ownership, dependency-edge validity and financial
+conservation across blocks still require separate proofs.
+
+`FreshReceiptIds` proves collision-free append across consecutive allocation
+intervals through raw actions and action sequences. `ProcessedFreshReceiptIds`
+includes finalization, rollback, refunds and failure data, then proves that every
+processor output envelope is distinct and allocated at or beyond its initial
+counter. `BlockFreshReceiptIds.apply_freshIds` composes these intervals across
+the actual block accumulator without validity or success premises. Thus outgoing
+envelope ids are unique and cannot reuse a reference below the old counter.
+`NearChain.ReceiptIdUniqueness` preserves uniqueness of pending envelopes across
+steps, reachable states, settlement and isolated runs from unique initial pending
+work satisfying the snapshot identifier bounds. Accepted delivery schedules may
+retain old pending receipts; their ids stay below the allocation frontier while
+new outgoing ids start at that frontier. Dependency ids may be shared; disjoint ownership among pending, delayed and
+postponed queues, and preservation of the whole dependency graph, remain open.
+
+`PostponedOwnership.processReceipt_postponed_ownership` preserves stored key/payload
+agreement and proves that processing creates no postponed key except the incoming
+receipt's own id; data resumption can reinsert only a previously owned key.
+`ReceiptQueue.PostponedAdmission.after_process` therefore preserves empty postponed
+slots for the rest of a distinct queue, supplying local conservation's non-overwrite
+premise. The financial postponed invariant implies the required identity agreement.
+`BlockStatePreservation` exposes a generic preservation rule for actual block
+execution and uses it to preserve key/payload agreement through complete blocks.
+`NearChain.PostponedOwnership` lifts that property from genesis to every reachable
+state. These results do not yet prove disjoint ownership across all three queues,
+dependency-edge validity, or complete block-level financial conservation.
+
+`BlockStages.applyAttempt_eq_stages` proves equality of every public result field
+between the real block executor and its proof-facing transaction/receipt passes. The suffix-indexed
+loop rule carries the unprocessed queue's admission facts through execution.
+`ReceiptQueueConservation` proves the complete receipt-loop ledger law, including
+both retained and newly delayed receipt buffers and the actual reward deduction.
+`TransactionPassConservation` backs local and outgoing transaction receipts and
+conversion burn. `BlockConservation.apply_conservation`
+then proves, for supported results, that resulting runtime funds plus outgoing
+backing and net burn equal initial runtime funds plus incoming backing and explicit
+subsidy. `NearChain.Conservation.step_conservation` lifts that law to the full
+snapshot ledger, including scheduled deliveries, deferred pending receipts, and
+all delayed and postponed receipts. Invalid schedules return an error before apply.
+
+The theorem's `BlockFinancialPremises` are explicit: unique accounts; financially
+well-formed postponed entries; identifier bounds; distinct queued envelopes with
+no postponed-slot collision; financial scope for queued receipts; nonreserved
+signer/receiver transaction actors; and the settlement configuration/reward bounds.
+There is no assumed monetary equation or supplied VM outcome. Reserved-target
+transactions remain outside this actor scope, and closure of financial receipt
+scope across arbitrary emitted work, full dependency validity, native gas fidelity,
+and multi-block financial invariants still need work. This is a scoped kernel
+conservation theorem, not a claim of complete native-runtime equivalence.
+
+`ReservedTargetFunding` derives failure of nonempty ordinary receipts addressed
+to an absent `system` account from the actual raw actions and action body; empty
+action lists use the fee-only funding rule. Both paths conserve funds, and account
+uniqueness is preserved. `FinancialScope` exposes the broader
+`ActionReceiptFinancialScope`/`ReceiptFinancialScope`: ordinary receivers are
+unrestricted, ordinary signers remain nonsynthetic, and system-origin receipts
+remain canonical single-transfer refunds. Local conservation under this scope
+requires `SystemAccountAbsent`, an invariant already available for reachable states.
+Reward backing and VM materialization actor-scope closure are also proved; a VM
+promise may target `system`. The block theorem still uses the older financial
+shape, so routing/queue migration and full multi-block scope closure remain open.
+
 Reserved `system` account creation is rejected independently of the registrar
 and minimum-name-length configuration. Pinned nearcore's `action_create_account`
 uses near-account-id 2.0.0's `is_top_level`/`is_sub_account_of`; `system` is neither.

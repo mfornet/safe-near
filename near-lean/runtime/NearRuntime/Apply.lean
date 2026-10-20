@@ -771,7 +771,7 @@ def convertTransaction (cfg : RuntimeConfig) (ap : ApplyState) (st : ChainState)
 are local. Other transaction receipts are outgoing work for a later chunk.
 Local, delayed and incoming receipts execute in that order; receipts beyond
 the gas limit are delayed to the next apply. -/
-private def applyAttempt (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → ContractCode)
+def applyAttempt (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → ContractCode)
     (st : ChainState) (txs : List Transaction) (incoming : List Receipt) : ApplyResult := Id.run do
   let initial := st
   let mut st := st
