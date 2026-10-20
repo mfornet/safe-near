@@ -1,4 +1,5 @@
 import NearRuntime.Fees
+import NearRuntime.StakingKey
 
 namespace Near
 
@@ -25,8 +26,8 @@ def validateActionPermission (limits : LimitConfig) : AccessKeyPermission → Ex
     if total > limits.maxNumberBytesMethodNames then
       throw (.addKeyMethodNamesNumberOfBytesExceeded total limits.maxNumberBytesMethodNames)
 
-/-- The modeled action transport trusts public-key decoding/curve validity externally.
-Staking execution remains an explicit epoch-machinery limitation. -/
+/-- Public keys use native decoded encodings. Staking eligibility is checked
+mathematically; staking execution still requires unmodeled epoch machinery. -/
 def validateAction (limits : LimitConfig) : Action → Except ActionsValidationError Unit
   | .functionCall method args gas _ => do
     if gas == 0 then throw .functionCallZeroAttachedGas
@@ -37,6 +38,8 @@ def validateAction (limits : LimitConfig) : Action → Except ActionsValidationE
   | .deployContract code => do
     if code.size > limits.maxContractSize then
       throw (.contractSizeExceeded code.size limits.maxContractSize)
+  | .stake _ key => do
+    unless StakingKey.suitable key do throw (.unsuitableStakingKey key)
   | .addKey _ key => validateActionPermission limits key.permission
   | .deleteAccount beneficiary => do
     if !validAccountIdBytes beneficiary.toUTF8.toList then throw (.invalidAccountId beneficiary)

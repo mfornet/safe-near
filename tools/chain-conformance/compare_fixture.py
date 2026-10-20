@@ -279,6 +279,7 @@ class Projection:
                     "TotalNumberOfDeployActionsExceeded": {"number_of_deploy_actions", "limit"},
                     "AddKeyMethodNamesNumberOfBytesExceeded": {"total_number_of_bytes", "limit"},
                     "AddKeyMethodNameLengthExceeded": {"length", "limit"},
+                    "UnsuitableStakingKey": {"public_key"},
                     "InvalidAccountId": {"account_id"}, "ContractSizeExceeded": {"size", "limit"},
                     "FunctionCallMethodNameLengthExceeded": {"length", "limit"},
                     "FunctionCallArgumentsLengthExceeded": {"length", "limit"},
@@ -288,7 +289,8 @@ class Projection:
                 elif isinstance(data, dict) and len(data) == 1:
                     variant, fields = next(iter(data.items()))
                     if variant in parameters and isinstance(fields, dict) and set(fields) == parameters[variant]:
-                        details = dict(kind="actionsValidation", error=dict(kind=variant, **fields))
+                        details = dict(kind="actionsValidation", error=dict(kind=variant, **{
+                            key: self.keys[value] if key == "public_key" else value for key, value in fields.items()}))
             elif context == "transaction" and native == "InvalidAccessKeyError":
                 if data in ["RequiresFullAccess", "DepositWithFunctionCall"]:
                     details = dict(kind="invalidAccessKey", reason=data)

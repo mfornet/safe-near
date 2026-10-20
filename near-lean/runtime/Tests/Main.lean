@@ -19,6 +19,9 @@ def tgas (n : Nat) : Nat := n * 10 ^ 12
 def registrationFee : Nat := 125 * 10 ^ 19
 
 def pkOf (seed : UInt8) : PublicKey := 0 :: List.replicate 32 seed
+
+/-- Standard compressed Edwards25519 basepoint, suitable for staking. -/
+def stakingPk : PublicKey := 0 :: 0x58 :: List.replicate 31 0x66
 def bytesOf (s : String) : List UInt8 := s.toUTF8.toList
 def strOf (b : List UInt8) : String := (String.fromUTF8? ⟨b.toArray⟩).getD "<bad utf8>"
 
@@ -269,7 +272,7 @@ def main (args : List String) : IO UInt32 := do
        ("add key", Action.addKey (pkOf 4) fullAccess),
        ("delete key", Action.deleteKey (pkOf 3)),
        ("delete account", Action.deleteAccount "alice.near"),
-       ("stake", Action.stake oneNear (pkOf 4))] do
+       ("stake", Action.stake oneNear stakingPk)] do
     let tx : Transaction := {
       signerId := "alice.near", publicKey := pkOf 1, nonce := 1, receiverId := "wrap.near"
       actions := [.transfer oneNear, action] }
@@ -354,7 +357,7 @@ def main (args : List String) : IO UInt32 := do
     { genesisAccount (10 * oneNear) with locked := oneNear }
   let unstakeTx : Transaction := {
     signerId := "wrap.near", publicKey := pkOf 3, nonce := 1, receiverId := "wrap.near"
-    actions := [.stake 0 (pkOf 3)] }
+    actions := [.stake 0 stakingPk] }
   let unstake := Near.apply cfg World.ap (fun _ => code) stakedState [unstakeTx] []
   check r "unstaking explicitly requires unmodelled epoch semantics"
     ((unstake.issue.map (·.2)) == some (.unsupportedAction "unstake (epoch machinery)"))

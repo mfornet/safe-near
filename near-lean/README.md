@@ -296,7 +296,11 @@ stateful transaction admission. `convertTransaction_actions_valid` proves every
 successful public conversion passed these rules; `convertTransaction_actions_error`
 proves an action error bypasses stateful admission. The validator uses native
 count/check/gas ordering and UTF-8 byte lengths, with protocol-specific deploy
-limits. Cryptographic staking-key eligibility remains a separate open boundary.
+limits. `NearRuntime.StakingKey` checks compressed Edwards25519 decoding and prime-order
+subgroup membership for staking keys, including native noncanonical encodings.
+The curve constants have kernel-checked identities; native differential corpora
+check the implementation, with full cryptographic refinement still unproved.
+Epoch-dependent staking execution remains an explicit model limitation.
 `NearRuntime.TransactionSize` computes body/wire widths for ordinary-key V0/V1
 transactions. A source-derived flag includes signature bytes from protocol 85.
 `convertTransaction_size_bound` proves every successful public conversion fits

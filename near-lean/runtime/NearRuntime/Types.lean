@@ -159,6 +159,7 @@ inductive ActionsValidationError
   | functionCallMethodNameLengthExceeded (length limit : Nat)
   | functionCallArgumentsLengthExceeded (length limit : Nat)
   | functionCallZeroAttachedGas
+  | unsuitableStakingKey (key : PublicKey)
   deriving Repr, BEq, Inhabited
 
 /-- Receipt and transaction failures, preserving stateless action error categories. -/

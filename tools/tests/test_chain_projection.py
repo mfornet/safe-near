@@ -125,6 +125,16 @@ class ChainProjectionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             projection.status({"Failure": {"InvalidTxError": {"ActionsValidation": "unknown"}}})
 
+    def test_unsuitable_staking_key_preserves_the_complete_public_key(self):
+        projection = comparator.Projection({})
+        fields = {"public_key": "ed25519:" + "1" * 32}
+        status = {"Failure": {"InvalidTxError": {"ActionsValidation": {"UnsuitableStakingKey": fields}}}}
+        self.assertEqual(projection.status(status), dict(kind="failure", actionIndex=None,
+            error=dict(kind="actionsValidation", error=dict(kind="UnsuitableStakingKey", public_key=[0] * 33))))
+        fields["unknown"] = 1
+        with self.assertRaises(ValueError):
+            projection.status(status)
+
     def test_transaction_size_error_preserves_native_size_and_limit(self):
         projection = comparator.Projection({})
         fields = {"size": 1572865, "limit": 1572864}

@@ -1,6 +1,7 @@
 //! Lossless JSON/Borsh adapter around the pinned, trie-backed Runtime::apply.
 //! The build overlay adds this binary target without changing runtime code.
 use borsh::{BorshDeserialize, BorshSerialize, from_slice, to_vec as borsh_bytes};
+use near_crypto::key_conversion::is_valid_staking_key;
 use near_crypto::{InMemorySigner, KeyType, PublicKey};
 use near_parameters::RuntimeConfigStore;
 use near_primitives::account::{AccessKey, Account, AccountContract};
@@ -608,6 +609,28 @@ fn encode_state(request: &Value) -> Result<Value> {
     Ok(json!({"initialEntries":entries, "publicKeys":public_keys, "codeHashes":code_hashes}))
 }
 
+/// Independent native eligibility oracle; no runtime state is changed.
+fn classify_staking_keys(request: &Value) -> Result<Value> {
+    let input = object(request, &["publicKeys", "seeds"])?;
+    let mut keys: Vec<PublicKey> = from_value(field(input, "publicKeys")?.clone())?;
+    if let Some(seeds) = input.get("seeds") {
+        let seeds: Vec<String> = from_value(seeds.clone())?;
+        let id: AccountId = "staking-key-fixture.near".parse()?;
+        for seed in seeds {
+            keys.push(InMemorySigner::from_seed(id.clone(), KeyType::ED25519, &seed).public_key());
+        }
+    }
+    let results = keys
+        .iter()
+        .map(|key| {
+            Ok(json!({
+                "publicKey":key, "borsh":borsh_bytes(key)?, "suitable":is_valid_staking_key(key)
+            }))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    Ok(json!({"results":results}))
+}
+
 /// Deterministic synthetic signers make local transaction fixtures reproducible.
 /// The adapter never submits anything to a network.
 fn sign_transactions(request: &Value) -> Result<Value> {
@@ -750,7 +773,7 @@ fn main() -> Result<()> {
         Some("--metadata") => println!("{}", metadata()),
         Some("--example") => println!("{}", example()?),
         Some("--financial-examples") => println!("{}", financial_examples()?),
-        Some(mode @ ("--encode-state" | "--sign-transactions")) => {
+        Some(mode @ ("--encode-state" | "--sign-transactions" | "--classify-staking-keys")) => {
             let mut input = String::new();
             stdin().read_to_string(&mut input)?;
             let input = from_str(&input)?;
@@ -759,7 +782,11 @@ fn main() -> Result<()> {
                 if mode == "--encode-state" {
                     encode_state(&input)?
                 } else {
-                    sign_transactions(&input)?
+                    if mode == "--classify-staking-keys" {
+                        classify_staking_keys(&input)?
+                    } else {
+                        sign_transactions(&input)?
+                    }
                 }
             );
         }

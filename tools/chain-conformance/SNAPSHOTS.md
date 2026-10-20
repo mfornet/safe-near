@@ -236,7 +236,7 @@ Rejections happen before signer charging, allowance updates or nonce changes;
 valid transactions around a rejection still execute. Structured native errors
 retain every mapped parameter, including the byte-truncated invalid key receiver.
 The separate transaction-size gate runs after envelope-feature checks and before
-stateful admission. Staking-key curve eligibility remains an open boundary.
+stateful admission. Staking-key curve/subgroup eligibility is checked separately, as described below.
 
 RPC `SignedTransactionView` masks deployment code as its hash. The native
 adapter therefore exports both the original RPC `view` and actual typed
@@ -276,3 +276,27 @@ charges rather than receiving a guessed signature width.
 
 Large reports live in `audit/transaction-size-cases/`; the small regression index
 binds every per-case file by SHA-256. CI uploads the index and all full raw cases.
+
+## Staking-key eligibility
+
+`just chain-staking-test` compares the pure key predicate with pinned
+`near_crypto::key_conversion::is_valid_staking_key`, then compares 68 full
+native/Lean admission cases across protocols 83–86. The classifier corpus has
+2,355 keys: deterministic random encodings, generated Ed25519 keys, field
+boundaries, sign variants, identity aliases, torsion and mixed-torsion points,
+and an ineligible secp256k1 key.
+
+The Lean implementation uses compressed Edwards25519 decoding and multiplication
+by the prime-order subgroup order. It reduces masked y values as dalek does;
+it deliberately accepts the identity and noncanonical encodings that the pinned
+native implementation accepts. On-curve membership alone is insufficient.
+Curve-parameter and square-root constants have kernel-checked identities.
+Differential agreement is not a formal proof of equivalence to dalek's backend.
+
+Unsuitable keys produce the complete `UnsuitableStakingKey` action-validation
+error before nonce/balance checks or charges. Tests also check count/per-action
+precedence, rejected transactions between accepted ones and eligible-key receipt
+errors. Actual validator proposals, minimum stake and epoch transitions remain
+unmodeled; eligible staking that needs those services still stops as an explicit
+execution issue. `audit/staking-key-regressions.json` retains classifier build
+provenance and full native/model traces.

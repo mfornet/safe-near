@@ -82,6 +82,7 @@ def stateJson (s : ChainState) : Json :=
 def actionValidationErrorJson : ActionsValidationError → Json
   | .deleteActionMustBeFinal => obj [kind "DeleteActionMustBeFinal"]
   | .functionCallZeroAttachedGas => obj [kind "FunctionCallZeroAttachedGas"]
+  | .unsuitableStakingKey key => obj [kind "UnsuitableStakingKey", ("public_key", bytesJson key)]
   | .integerOverflow => obj [kind "IntegerOverflow"]
   | .totalPrepaidGasExceeded total limit => obj [kind "TotalPrepaidGasExceeded", ("total_prepaid_gas", toJson total), ("limit", toJson limit)]
   | .totalNumberOfActionsExceeded count limit => obj [kind "TotalNumberOfActionsExceeded", ("total_number_of_actions", toJson count), ("limit", toJson limit)]

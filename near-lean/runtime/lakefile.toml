@@ -40,3 +40,8 @@ root = "RuntimeConformance.Nonce"
 [[lean_exe]]
 name = "allowance-replay"
 root = "RuntimeConformance.Allowance"
+
+# Pure compressed Edwards/subgroup classification at the native staking boundary.
+[[lean_exe]]
+name = "staking-key-replay"
+root = "RuntimeConformance.StakingKey"

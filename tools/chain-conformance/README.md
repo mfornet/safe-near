@@ -181,3 +181,7 @@ native semantic parameter, including the actual transaction cost.
 actual deployment bytes to signed native transactions. Native RPC views mask
 deployment payloads as hashes, so the bridge uses separately exported typed
 actions decoded from canonical Borsh, retaining the RPC view for provenance.
+
+`just chain-staking-test` checks 2,355 key classifications and 68 native apply
+scenarios. Staking admission now checks Edwards decompression and prime-order
+subgroup membership; epoch-dependent staking execution remains unsupported.

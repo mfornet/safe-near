@@ -163,3 +163,9 @@ chain-validation-test:
 chain-size-test:
     cd near-lean/chain && lake build chain-replay
     python3 tools/chain-conformance/test_transaction_size.py
+
+# Compare pure staking-key eligibility and native admission/rollback behavior.
+chain-staking-test:
+    cd near-lean/runtime && lake build staking-key-replay
+    cd near-lean/chain && lake build chain-replay
+    python3 tools/chain-conformance/test_staking_key.py
