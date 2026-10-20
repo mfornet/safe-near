@@ -518,6 +518,17 @@ isolated transaction runs. These guarantees require absence in the initial state
 and hold for every stop reason; they do not establish financial conservation
 across blocks or eventual completion.
 
+`RewardBacking.processReceipt_reward_backed` proves that each scoped receipt's
+public reward is bounded by its own gross burn, including data-triggered execution,
+canonical refunds and model-issue fallback. It assumes the settlement configuration
+bounds and financially scoped postponed entries, but no monetary equation.
+`processReceipt_outcomeLoop_burn` connects the executor's actual inner outcome loop
+and reward deduction to addition of that receipt's net burn. Consequently,
+`processReceipt_ledger_conservation` carries arbitrary prior burn through the
+local conservation law without natural-number subtraction consuming earlier
+charges. This closes the local counter-composition obligation; preserving scope
+and freshness across the complete block queue remains open.
+
 Reserved `system` account creation is rejected independently of the registrar
 and minimum-name-length configuration. Pinned nearcore's `action_create_account`
 uses near-account-id 2.0.0's `is_top_level`/`is_sub_account_of`; `system` is neither.
