@@ -735,13 +735,22 @@ private def applyAttempt (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes
       if let some issue := e.issue? then
         return { state := initial, outgoing := [], outcomes := [], tokensBurnt := 0, issue := some (0, issue) }
       outcomes := outcomes ++ [(0, { executorId := tx.signerId, status := .failure e })]
+  let delayedStart := localReceipts.length
+  let delayedEnd := delayedStart + st.delayed.length
   let queue := localReceipts ++ st.delayed ++ incoming
   st := { st with delayed := [] }
+  let mut retainedDelayed : List Receipt := []
+  let mut newlyDelayed : List Receipt := []
   let mut gasUsed := outcomes.foldl (fun total pair => total + pair.2.gasBurnt) 0
   let mut overLimit := ap.gasLimit.any (gasUsed ≥ ·)
-  for r in queue do
+  for (r, position) in queue.zipIdx do
     if overLimit then
-      st := { st with delayed := st.delayed ++ [r] }
+      -- Local execution has priority, but new deferrals append to the existing
+      -- persistent queue. Untouched old entries retain their FIFO positions.
+      if delayedStart ≤ position && position < delayedEnd then
+        retainedDelayed := retainedDelayed ++ [r]
+      else
+        newlyDelayed := newlyDelayed ++ [r]
     else
       let p := processReceipt cfg ap codeOf st r
       if let some issue := p.issue then
@@ -756,7 +765,7 @@ private def applyAttempt (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes
       tokensBurnt := tokensBurnt + p.otherTokensBurnt - p.rewards
       if let some limit := ap.gasLimit then
         if gasUsed ≥ limit then overLimit := true
-  return { state := st, outgoing, outcomes, tokensBurnt, subsidizedAmount }
+  return { state := { st with delayed := retainedDelayed ++ newlyDelayed }, outgoing, outcomes, tokensBurnt, subsidizedAmount }
 
 /-- Commit a supported chunk. Model limitations invalidate the entire attempt:
 no fees, refunds, nonces, receipt consumption, or state changes are committed. -/

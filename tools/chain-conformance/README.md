@@ -337,6 +337,19 @@ context evolution during receipt execution and trie-backed runtime gas remain
 open. Evidence is saved in `audit/transaction-encoding-regressions.json` and
 `audit/transaction-registry-regressions.json`.
 
+`just chain-delayed-order-test` checks local execution priority separately from
+persistent queue order. Local receipts execute before the old backlog when the
+chunk has capacity. When capacity is exhausted, old unprocessed delayed entries
+retain their FIFO positions ahead of newly deferred local and incoming receipts.
+For example, an old deferred transfer of 1 followed by a new deferred local
+transfer of 2 must leave `[1, 2]`. Eight five-block native programs across protocols
+83–86 and both ordinary key types compare every modeled observation, including a
+mixed `[1, 2, 4, 3]` backlog and its eventual execution order. A new local receipt
+still executes ahead of that backlog in the resumed chunk. The regression retains
+explicit carried chunk congestion inputs and complete origins in
+`audit/delayed-local-order-regressions.json`. Compute/proof limits remain outside
+the represented runtime.
+
 `just chain-trie-test` compares native `near_store::Trie` traversal with
 `NearRuntime.TrieAccounting`. Build the source oracle first, as above. For an
 individual request:

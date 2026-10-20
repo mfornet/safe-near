@@ -116,6 +116,8 @@ jobs:
         run: |
           cd near-lean/chain && lake build transaction-replay state-encode chain-replay --wfail
           cd ../.. && python3 tools/chain-conformance/test_transaction_encoding.py
+      - name: Compare existing delayed FIFO with new local and incoming deferrals
+        run: python3 tools/chain-conformance/test_delayed_local_order.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -139,3 +141,4 @@ jobs:
             audit/runtime-queue-encoding-regressions.json
             audit/transaction-encoding-regressions.json
             audit/transaction-registry-regressions.json
+            audit/delayed-local-order-regressions.json

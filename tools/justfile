@@ -201,3 +201,8 @@ chain-queue-encoding-test:
 chain-transaction-encoding-test:
     cd near-lean/chain && lake build transaction-replay state-encode chain-replay --wfail
     python3 tools/chain-conformance/test_transaction_encoding.py
+
+# Preserve persistent FIFO when new local and incoming work is deferred.
+chain-delayed-order-test:
+    cd near-lean/chain && lake build chain-replay --wfail
+    python3 tools/chain-conformance/test_delayed_local_order.py
