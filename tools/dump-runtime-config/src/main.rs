@@ -43,7 +43,10 @@ fn config_json(store: &RuntimeConfigStore, version: ProtocolVersion) -> String {
             "gas_refund_penalty": [config.fees.gas_refund_penalty.numer(), config.fees.gas_refund_penalty.denom()],
             "min_gas_refund_penalty": config.fees.min_gas_refund_penalty.as_gas(),
         }),
-        runtime_admission: json!({"strict_nonce": ProtocolFeature::StrictNonce.enabled(version)}),
+        runtime_admission: json!({
+            "strict_nonce": ProtocolFeature::StrictNonce.enabled(version),
+            "v1_transactions": ProtocolFeature::GasKeys.enabled(version),
+        }),
     };
     serde_json::to_string_pretty(&dump).expect("runtime configuration serialization cannot fail")
 }

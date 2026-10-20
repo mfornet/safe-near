@@ -588,6 +588,7 @@ def main (args : List String) : IO UInt32 := do
       lost.outcomes.all fun (_, outcome) => outcome.gasBurnt > 0 && outcome.tokensBurnt == 0)
 
   let nonceTx (nonce : Nat) (mode : NonceMode) : Transaction := {
+    version := if mode == .strict then 1 else 0,
     signerId := "alice.near", publicKey := pkOf 1, nonce, nonceMode := mode,
     receiverId := "bob.near", actions := [.transfer 1] }
   check r "nonce: default apply context starts at height one" (World.ap.blockHeight == 1)
@@ -604,6 +605,22 @@ def main (args : List String) : IO UInt32 := do
       | .error error, some wanted => error == wanted
       | _, _ => false)
   let cfg84 ← RuntimeConfig.load configs 84
+  let monoV1 := { nonceTx 1 .monotonic with version := 1 }
+  check r "version: monotonic V1 still requires the envelope feature"
+    (match convertTransaction cfg84 World.ap genesis monoV1 with
+      | .error .invalidTransactionVersion => true | _ => false)
+  check r "version: V0 cannot request strict nonces"
+    (match convertTransaction cfg World.ap genesis { nonceTx 1 .strict with version := 0 } with
+      | .error .invalidTransactionVersion => true | _ => false)
+  check r "version: envelope gate is independent of the strict nonce flag"
+    (match convertTransaction { cfg with v1TransactionsEnabled := false } World.ap genesis monoV1 with
+      | .error .invalidTransactionVersion => true | _ => false)
+  check r "version: monotonic V1 does not require strict nonce activation"
+    (match convertTransaction { cfg with strictNonceEnabled := false } World.ap genesis monoV1 with
+      | .ok _ => true | _ => false)
+  check r "version: unknown envelope tag cannot commit"
+    (match convertTransaction cfg World.ap genesis { monoV1 with version := 2 } with
+      | .error .invalidTransactionVersion => true | _ => false)
   let earlyStrict := { nonceTx 1 .strict with signerId := "nobody.near" }
   check r "nonce: strict version gate precedes account admission"
     (match convertTransaction cfg84 World.ap genesis earlyStrict with

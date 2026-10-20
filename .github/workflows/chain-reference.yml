@@ -81,6 +81,8 @@ jobs:
         run: python3 tools/chain-conformance/test_snapshot_import.py
       - name: Compare contract calls and callback delivery against native apply
         run: python3 tools/chain-conformance/test_contract_comparison.py
+      - name: Compare signed V0/V1 transaction batches and protocol gates
+        run: python3 tools/chain-conformance/test_transaction_versions.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -88,3 +90,4 @@ jobs:
           path: |
             audit/transfer-gas-regression.json
             audit/contract-chain-regressions.json
+            audit/transaction-version-comparison.json

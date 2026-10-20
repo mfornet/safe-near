@@ -22,37 +22,54 @@ theorem convertTransaction_success_commit (cfg : RuntimeConfig) (ap : ApplyState
           (Fees.txCost cfg ap.gasPrice tx.signerId tx.receiverId tx.actions) = .ok newKey ∧
         verifyNonce tx.nonce key.nonce (some ap.blockHeight) tx.nonceMode = .ok () ∧
         (tx.nonceMode = .strict → cfg.strictNonceEnabled = true) := by
-  by_cases hg : tx.nonceMode = .strict ∧ cfg.strictNonceEnabled = false
-  · simp [convertTransaction, hg] at h
-  · have hgate : tx.nonceMode = .strict → cfg.strictNonceEnabled = true := by
-      intro hm
-      cases hf : cfg.strictNonceEnabled <;> simp [hf, hm] at hg ⊢
-    cases hs : st.account? tx.signerId with
-    | none => simp [convertTransaction, hg, hs] at h
-    | some signer =>
-      cases hk : st.accessKey? tx.signerId tx.publicKey with
-      | none => simp [convertTransaction, hg, hs, hk] at h
-      | some key =>
-        cases hvn : verifyNonce tx.nonce key.nonce (some ap.blockHeight) tx.nonceMode with
-        | error err => simp [convertTransaction, hg, hs, hk, hvn] at h
-        | ok accepted =>
-          cases accepted
-          have hn := verifyNonce_increases tx.nonce key.nonce (some ap.blockHeight) tx.nonceMode hvn
-          by_cases ha : tx.actions.length > cfg.wasm.limits.maxActionsPerReceipt
-          · simp [convertTransaction, hg, hs, hk, hvn, ha] at h
-          · let expected := Fees.txCost cfg ap.gasPrice tx.signerId tx.receiverId tx.actions
-            have he : Fees.txCost cfg ap.gasPrice tx.signerId tx.receiverId tx.actions = expected := rfl
-            cases hv : validateTransactionAccessKey tx key expected with
-            | error err => simp [convertTransaction, hg, hs, hk, hvn, ha, he, hv] at h
-            | ok newKey =>
-              by_cases hb : signer.amount < expected.total
-              · simp [convertTransaction, hg, hs, hk, hvn, ha, he, hv, hb] at h
-              · by_cases hd : storageStakeDeficit cfg { signer with amount := signer.amount - expected.total } > 0
-                · simp [convertTransaction, hg, hs, hk, hvn, ha, he, hv, hb, hd] at h
-                · refine ⟨signer, newKey, rfl, ?_, ?_, key, rfl, hn, hv, hvn, hgate⟩
-                  · change expected.total ≤ signer.amount
-                    omega
-                  · simpa [convertTransaction, hg, hs, hk, hvn, ha, he, hv, hb, hd] using h
+  by_cases hversion : tx.versionSupported cfg = false
+  · by_cases hg : tx.nonceMode = .strict ∧ cfg.strictNonceEnabled = false
+    · simp [convertTransaction, hg] at h
+    · simp [convertTransaction, hg, hversion] at h
+  ·
+    by_cases hg : tx.nonceMode = .strict ∧ cfg.strictNonceEnabled = false
+    · simp [convertTransaction, hg] at h
+    · have hgate : tx.nonceMode = .strict → cfg.strictNonceEnabled = true := by
+        intro hm
+        cases hf : cfg.strictNonceEnabled <;> simp [hf, hm] at hg ⊢
+      cases hs : st.account? tx.signerId with
+      | none => simp [convertTransaction, hversion, hg, hs] at h
+      | some signer =>
+        cases hk : st.accessKey? tx.signerId tx.publicKey with
+        | none => simp [convertTransaction, hversion, hg, hs, hk] at h
+        | some key =>
+          cases hvn : verifyNonce tx.nonce key.nonce (some ap.blockHeight) tx.nonceMode with
+          | error err => simp [convertTransaction, hversion, hg, hs, hk, hvn] at h
+          | ok accepted =>
+            cases accepted
+            have hn := verifyNonce_increases tx.nonce key.nonce (some ap.blockHeight) tx.nonceMode hvn
+            by_cases ha : tx.actions.length > cfg.wasm.limits.maxActionsPerReceipt
+            · simp [convertTransaction, hversion, hg, hs, hk, hvn, ha] at h
+            · let expected := Fees.txCost cfg ap.gasPrice tx.signerId tx.receiverId tx.actions
+              have he : Fees.txCost cfg ap.gasPrice tx.signerId tx.receiverId tx.actions = expected := rfl
+              cases hv : validateTransactionAccessKey tx key expected with
+              | error err => simp [convertTransaction, hversion, hg, hs, hk, hvn, ha, he, hv] at h
+              | ok newKey =>
+                by_cases hb : signer.amount < expected.total
+                · simp [convertTransaction, hversion, hg, hs, hk, hvn, ha, he, hv, hb] at h
+                · by_cases hd : storageStakeDeficit cfg { signer with amount := signer.amount - expected.total } > 0
+                  · simp [convertTransaction, hversion, hg, hs, hk, hvn, ha, he, hv, hb, hd] at h
+                  · refine ⟨signer, newKey, rfl, ?_, ?_, key, rfl, hn, hv, hvn, hgate⟩
+                    · change expected.total ≤ signer.amount
+                      omega
+                    · simpa [convertTransaction, hversion, hg, hs, hk, hvn, ha, he, hv, hb, hd] using h
+
+/-- Successful conversion uses a supported native transaction envelope. -/
+theorem convertTransaction_version_supported (cfg : RuntimeConfig) (ap : ApplyState)
+    (st st' : ChainState) (tx : Transaction) (receipt : Receipt) (cost : Fees.TxCost)
+    (h : convertTransaction cfg ap st tx = .ok (st', receipt, cost)) :
+    tx.versionSupported cfg = true := by
+  cases hv : tx.versionSupported cfg with
+  | false =>
+    by_cases hg : tx.nonceMode = .strict ∧ cfg.strictNonceEnabled = false
+    · simp [convertTransaction, hg] at h
+    · simp [convertTransaction, hg, hv] at h
+  | true => rfl
 
 /-- The commit operation debits exactly its validated transaction cost, leaving
 locked funds unchanged. Unique account keys prevent hidden duplicate balances. -/

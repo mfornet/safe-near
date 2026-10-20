@@ -87,3 +87,9 @@ JSON remains intact; no fees, feature flags or limits are normalized.
 The generated `runtime_admission` supplement records `strict_nonce` from the
 pinned `ProtocolFeature::StrictNonce` table. It is a semantic feature gate, not a
 gas parameter; it becomes true at protocol version 85.
+
+`runtime_admission.v1_transactions` is generated from the pinned
+`ProtocolFeature::GasKeys` gate for the V1 transaction envelope. This is
+independent of `runtime_admission.strict_nonce` (`StrictNonce`), even though
+both become enabled at protocol 85 in this source revision. Ordinary-key V1
+transactions are supported; this flag does not assert modeled gas-key lanes.

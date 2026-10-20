@@ -206,10 +206,22 @@ class Projection:
             return dict(kind="successReceiptId", receiptId=self.rid(value["SuccessReceiptId"]))
         if list(value) == ["SuccessValue"]:
             return dict(kind="successValue", value=list(importer.decode(value["SuccessValue"])))
-        # A first explicit error correspondence: the native execution error
-        # retains the exact guest-panic message. Other failures remain rejected.
+        # Preserve structured transaction-admission parameters and the exact
+        # guest-panic message. Other failure correspondences remain rejected.
         if list(value) == ["Failure"]:
             error = value["Failure"]
+            if list(error) == ["InvalidTxError"]:
+                failure = error["InvalidTxError"]
+                if failure == "InvalidTransactionVersion":
+                    text = "Near.RuntimeError.invalidTransactionVersion"
+                    return dict(kind="failure", error=text, message=text)
+                for native, modeled, fields in [
+                    ("InvalidNonce", "invalidNonce", ["tx_nonce", "ak_nonce"]),
+                    ("NonceTooLarge", "nonceTooLarge", ["tx_nonce", "upper_bound"]),
+                ]:
+                    if isinstance(failure, dict) and list(failure) == [native] and set(failure[native]) == set(fields):
+                        text = "Near.RuntimeError." + modeled + " " + " ".join(str(failure[native][f]) for f in fields)
+                        return dict(kind="failure", error=text, message=text)
             if list(error) == ["ActionError"]:
                 error = error["ActionError"]
                 if error["index"] == 0 and list(error["kind"]) == ["FunctionCallError"]:
@@ -239,13 +251,26 @@ class Projection:
                 raise ValueError("decoded native transactions do not bind the signed request")
             converted = []
             for row in block["inputs"]["transactions"]:
-                if row["version"] != 0:
-                    raise ValueError("strict V1 transaction conversion is not supported yet")
+                if row["version"] not in {0, 1}:
+                    raise ValueError("unsupported native transaction envelope tag")
                 tx = row["view"]
-                converted.append(dict(signerId=tx["signer_id"], receiverId=tx["receiver_id"],
+                if tx.get("nonce_index") is not None:
+                    raise ValueError("gas-key nonce lanes are not represented by the model")
+                value = dict(signerId=tx["signer_id"], receiverId=tx["receiver_id"],
                     nonce=tx["nonce"], publicKey=self.keys[tx["public_key"]],
-                    actions=[importer.action(a, self.keys, copy.copy(self.codes)) for a in tx["actions"]]))
-            if differences(converted, modeled["transactions"]):
+                    actions=[importer.action(a, self.keys, copy.copy(self.codes)) for a in tx["actions"]])
+                if row["version"] == 1:
+                    mode = tx.get("nonce_mode", "monotonic")
+                    if mode not in {"monotonic", "strict"}:
+                        raise ValueError("unknown native nonce mode")
+                    value.update(version=1, nonceMode=mode)
+                elif "nonce_mode" in tx:
+                    raise ValueError("V0 transactions have no explicit nonce mode")
+                converted.append(value)
+            def explicit_envelope(tx):
+                return {**tx, "version": tx.get("version", 0), "nonceMode": tx.get("nonceMode", "monotonic")}
+            if differences([explicit_envelope(tx) for tx in converted],
+                           [explicit_envelope(tx) for tx in modeled["transactions"]]):
                 raise ValueError("model transactions differ from native signed input views")
             self.creations(block)
             positions = header["incomingIndices"]

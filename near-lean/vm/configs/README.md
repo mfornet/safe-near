@@ -159,3 +159,9 @@ These financial comparisons do not establish historical execution conformance.
 
 `runtime_admission.strict_nonce` is generated from the pinned feature table and
 controls strict sequential transaction nonces (enabled from v85).
+
+`runtime_admission.v1_transactions` is generated from the pinned
+`ProtocolFeature::GasKeys` gate for the V1 transaction envelope. This is
+independent of `runtime_admission.strict_nonce` (`StrictNonce`), even though
+both become enabled at protocol 85 in this source revision. Ordinary-key V1
+transactions are supported; this flag does not assert modeled gas-key lanes.

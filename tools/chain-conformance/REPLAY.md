@@ -130,3 +130,9 @@ fields, all eight action encodings, an executed account create/deploy/call/key/
 delete lifecycle, known/unknown deployment promises, rejected schedules and
 malformed requests. CI also rebuilds the committed Wasm fixture with the
 pinned `wasm-tools` version and checks its bytes.
+
+Transaction objects now optionally carry `version` (0/1, default 0) and
+`nonceMode` (`monotonic`/`strict`, default `monotonic`). V0 strict mode cannot
+be encoded and is rejected. Ordinary-key V1 protocol/nonce admission is checked
+by the runtime, preserving rejected-transaction outcomes and later valid batch
+entries. Gas-key nonce indices remain unsupported.

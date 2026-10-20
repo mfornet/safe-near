@@ -138,3 +138,8 @@ chain-contract-test:
 chain-contract-probe *options:
     cd near-lean/chain && lake build chain-replay
     python3 tools/chain-conformance/contract_probe.py "$@"
+
+# Compare signed V0/V1 nonce modes, protocol gates and rejected transaction batches.
+chain-version-test:
+    cd near-lean/chain && lake build chain-replay
+    python3 tools/chain-conformance/test_transaction_versions.py

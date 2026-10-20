@@ -135,9 +135,12 @@ The current projection handles account/key/code/storage state, action and data
 receipts, postponed dependency indices, received data, ordered delayed work,
 ordered outgoing/pending queues, outcomes, gas, token burn and subsidies.
 Native action V2 receipts are accepted only with `refund_to = null`. Other
-native receipt variants, V1 transaction conversion and unmapped failure kinds
-are rejected. The mapped failure is an index-zero guest panic; native action
-error indices and other native-only details remain explicit observation gaps.
+native receipt variants, gas-key nonce lanes and unmapped failure kinds are
+rejected. Ordinary-key V0 and V1 envelopes preserve their actual version and
+nonce mode through native signing and replay. Transaction admission mappings
+preserve version and nonce error parameters. The mapped receipt failure is an
+index-zero guest panic; native action error indices and other native-only
+details remain explicit observation gaps.
 
 Receipt ids are renamed using **native events**, independently of model output:
 new action receipts, their newly introduced dependency ids, then refunds and
@@ -174,3 +177,27 @@ tests separately assert that the comparator catches these known gaps, saving
 raw evidence with `expectedToMatch = false` in
 `audit/contract-chain-regressions.json`. A passing regression test is not a
 claim that those native/model executions match.
+
+## V0/V1 transaction envelopes
+
+Scenario transactions optionally supply `version` (`0` or `1`) and `nonceMode`
+(`monotonic` or `strict`). Defaults preserve V0 monotonic behavior. V0 cannot
+encode strict mode, and the importer and JSON replay parser reject that shape.
+Use `{"version": 1, "nonceMode": "strict", ...}` for sequential V1 nonces.
+The native adapter constructs `TransactionV1` and signs its actual hash; signed
+bytes and native envelope tags/views remain in the evidence.
+
+The model and native runtime apply the pinned `GasKeys` **envelope** gate to all
+V1 transactions, even when their nonce mode is monotonic. The separate
+`StrictNonce` gate applies to strict mode. Both currently activate at v85, but
+the configuration records each source feature independently. Pre-v85 V1 requests
+are valid replay inputs that produce `InvalidTransactionVersion` outcomes; they
+are not misclassified as malformed JSON or accepted as V0. Invalid nonce and
+nonce-ceiling outcomes are mapped with both numeric parameters preserved.
+
+`just chain-version-test` compares mixed V0/V1 batches at protocols 83–86,
+including accepted transactions around rejected ones, strict gaps, stale nonces,
+ceiling equality and gate/error precedence. It checks full state, charges,
+queues, outcomes and completion, retaining raw evidence in
+`audit/transaction-version-comparison.json`. This supports ordinary access keys;
+V1 gas-key nonce lanes remain unsupported and are rejected explicitly.

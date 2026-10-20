@@ -81,6 +81,19 @@ class ChainReplayTests(unittest.TestCase):
         empty_wat.write_text("(module)")
         value["codes"].append({"hash": "empty", "codePath": str(empty_wasm), "watPath": str(empty_wat)})
 
+    def test_transaction_envelope_rejects_bad_tags_modes_and_gas_key_lanes(self):
+        for patch in [{"version": 2}, {"version": True}, {"version": None},
+                      {"version": 1, "nonceMode": "Strict"}, {"version": 0, "nonceMode": "strict"},
+                      {"version": 1, "nonceMode": None}, {"version": 1, "nonceIndex": 0}]:
+            with self.subTest(patch=patch):
+                value = request()
+                transaction = tx([transfer()])
+                transaction.update(patch)
+                value["blocks"] = [block([transaction])]
+                result = subprocess.run([str(BINARY)], input=json.dumps(value), text=True, capture_output=True)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertTrue(result.stderr)
+
     def test_transfer_frontiers_idle_blocks_and_complete_state_continuation(self):
         value = request()
         value["blocks"] = [block([tx([transfer()])]), block(incoming=[], height=8),

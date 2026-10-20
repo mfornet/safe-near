@@ -3,6 +3,15 @@ import NearRuntime.Nonce
 
 namespace Near
 
+open Wasm.Near
+
+/-- Supported ordinary-key envelopes preserve the native version/feature split. -/
+theorem transactionVersionSupported_iff (tx : Transaction) (cfg : RuntimeConfig) :
+    tx.versionSupported cfg = true ↔
+      (tx.version = 0 ∧ tx.nonceMode = .monotonic) ∨
+      (tx.version = 1 ∧ cfg.v1TransactionsEnabled = true) := by
+  cases hm : tx.nonceMode <;> simp [Transaction.versionSupported, hm]
+
 attribute [local simp] bind pure throw Except.bind Except.pure Except.map
 
 def NonceOrdered (mode : NonceMode) (nonce current : Nat) : Prop :=

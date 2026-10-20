@@ -12,7 +12,9 @@ use near_primitives::hash::CryptoHash;
 use near_primitives::receipt::Receipt;
 use near_primitives::state_record::StateRecord;
 use near_primitives::test_utils::MockEpochInfoProvider;
-use near_primitives::transaction::{SignedTransaction, Transaction};
+use near_primitives::transaction::{
+    NonceMode, SignedTransaction, Transaction, TransactionNonce, TransactionV1,
+};
 use near_primitives::trie_key::trie_key_parsers::parse_account_id_from_raw_key;
 use near_primitives::trie_key::{TrieKey, col};
 use near_primitives::types::{AccountId, Balance, EpochId, EpochInfoProvider, Gas, ShardId};
@@ -621,7 +623,17 @@ fn sign_transactions(request: &Value) -> Result<Value> {
     let mut result = Vec::new();
     let mut action_keys = BTreeMap::new();
     for row in requests {
-        let row = object(row, &["receiverId", "nonce", "blockHash", "actions"])?;
+        let row = object(
+            row,
+            &[
+                "version",
+                "receiverId",
+                "nonce",
+                "nonceMode",
+                "blockHash",
+                "actions",
+            ],
+        )?;
         let receiver: AccountId = field(row, "receiverId")?
             .as_str()
             .ok_or("invalid receiver")?
@@ -644,15 +656,46 @@ fn sign_transactions(request: &Value) -> Result<Value> {
                 _ => {}
             }
         }
-        let transaction = SignedTransaction::from_actions(
-            integer(row, "nonce")?,
-            signer_id.clone(),
-            receiver,
-            &signer,
-            actions,
-            hash(field(row, "blockHash")?)?,
-        );
-        result.push(json!({"borsh":borsh_bytes(&transaction)?,
+        let version = row
+            .get("version")
+            .map(|v| v.as_u64().ok_or("invalid transaction version"))
+            .transpose()?
+            .unwrap_or(0);
+        let nonce_mode: NonceMode = row
+            .get("nonceMode")
+            .map(|v| from_value(v.clone()))
+            .transpose()?
+            .unwrap_or_default();
+        let transaction = match version {
+            0 => {
+                if nonce_mode != NonceMode::Monotonic {
+                    return Err("v0 transactions have no nonce mode".into());
+                }
+                SignedTransaction::from_actions(
+                    integer(row, "nonce")?,
+                    signer_id.clone(),
+                    receiver,
+                    &signer,
+                    actions,
+                    hash(field(row, "blockHash")?)?,
+                )
+            }
+            1 => {
+                let transaction = Transaction::V1(TransactionV1 {
+                    signer_id: signer_id.clone(),
+                    public_key: signer.public_key(),
+                    nonce: TransactionNonce::from_nonce(integer(row, "nonce")?),
+                    receiver_id: receiver,
+                    block_hash: hash(field(row, "blockHash")?)?,
+                    actions,
+                    nonce_mode,
+                });
+                let signature = signer.sign(transaction.get_hash_and_size().0.as_ref());
+                SignedTransaction::new(signature, transaction)
+            }
+            _ => return Err("unsupported transaction envelope tag".into()),
+        };
+        result.push(json!({"version":version,"borsh":borsh_bytes(&transaction)?,
             "view":SignedTransactionView::from(transaction)}));
     }
     Ok(

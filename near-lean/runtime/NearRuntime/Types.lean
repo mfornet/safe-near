@@ -129,8 +129,14 @@ inductive NonceMode where
   | strict
   deriving Repr, BEq, DecidableEq, Inhabited
 
+instance : LawfulBEq NonceMode where
+  rfl := by intro mode; cases mode <;> rfl
+  eq_of_beq := by intro a b h; cases a <;> cases b <;> cases h <;> rfl
+
 /-- A transaction; the signature is trusted. -/
 structure Transaction where
+  /-- Native transaction envelope tag. V1 is enabled by the GasKeys feature. -/
+  version : Nat := 0
   signerId : AccountId
   publicKey : PublicKey
   nonce : Nat

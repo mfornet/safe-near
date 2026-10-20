@@ -574,6 +574,7 @@ balance checks; charges the cost; bumps the nonce; returns the receipt. -/
 def convertTransaction (cfg : RuntimeConfig) (ap : ApplyState) (st : ChainState) (tx : Transaction) :
     Except RuntimeError (ChainState × Receipt × Fees.TxCost) := do
   if tx.nonceMode = .strict ∧ cfg.strictNonceEnabled = false then throw .invalidTransactionVersion
+  if tx.versionSupported cfg = false then throw .invalidTransactionVersion
   let some signer := st.account? tx.signerId | throw (.invalidSigner tx.signerId)
   let some key := st.accessKey? tx.signerId tx.publicKey | throw (.invalidAccessKey "AccessKeyNotFound")
   verifyNonce tx.nonce key.nonce (some ap.blockHeight) tx.nonceMode

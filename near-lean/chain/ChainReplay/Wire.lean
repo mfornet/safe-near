@@ -122,9 +122,24 @@ def action (codes : Catalogue) (j : Json) : Result Action := do
     throw s!"unknown action: {kind}"
 
 def transaction (codes : Catalogue) (j : Json) : Result Transaction := do
-  object j ["signerId", "publicKey", "nonce", "receiverId", "actions"]
+  object j ["version", "signerId", "publicKey", "nonce", "nonceMode", "receiverId", "actions"]
+  let version : Nat ← match j.getObjVal? "version" with
+    | .error _ => pure 0
+    | .ok value => fromJson? value
+  unless version ≤ 1 do throw "unsupported transaction envelope tag"
+  let mode : String ← match j.getObjVal? "nonceMode" with
+    | .error _ => pure "monotonic"
+    | .ok value => fromJson? value
+  let nonceMode ← match mode with
+    | "monotonic" => pure NonceMode.monotonic
+    | "strict" => pure NonceMode.strict
+    | _ => throw "unknown transaction nonce mode"
+  unless version == 1 || nonceMode == .monotonic do
+    throw "V0 transactions have no strict nonce mode"
   let actions : List Json ← field j "actions"
   pure {
+        version
+        nonceMode
         signerId := ← field j "signerId"
         publicKey := ← byteField j "publicKey"
         nonce := ← u64 j "nonce"

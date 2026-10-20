@@ -256,8 +256,11 @@ def prepare(snapshot, destination, *, reference, model, scenario=None):
                 raise ValueError("transactions must be an array")
             counts.append(len(block["transactions"]))
             for tx in block["transactions"]:
-                fields(tx, ["receiverId", "nonce", "actions"], ["blockHash"])
-                specifications.append(dict(receiverId=account_id(tx["receiverId"], "transaction receiver"),
+                fields(tx, ["receiverId", "nonce", "actions"], ["blockHash", "version", "nonceMode"])
+                version_tag = uint(tx.get("version", 0), 8, "transaction version")
+                if version_tag > 1 or tx.get("nonceMode", "monotonic") not in {"monotonic", "strict"}:
+                    raise ValueError("unsupported transaction envelope or nonce mode")
+                specifications.append(dict(version=version_tag, nonceMode=tx.get("nonceMode", "monotonic"), receiverId=account_id(tx["receiverId"], "transaction receiver"),
                     nonce=uint(tx["nonce"], 64, "transaction nonce"), actions=tx["actions"],
                     blockHash=byte_list(tx.get("blockHash", block["prevBlockHash"]), "transaction block hash", 32)))
         if "caller" in scenario:
@@ -295,9 +298,16 @@ def prepare(snapshot, destination, *, reference, model, scenario=None):
             native_block["transactions"] = [row["borsh"] for row in transactions]
             native_blocks.append(native_block)
             model_block = {k: block[k] for k in ("blockHeight", "blockTimestamp", "epochHeight", "gasPrice", "gasLimit", "randomSeed", "incomingIndices")}
-            model_block["transactions"] = [dict(signerId=row["view"]["signer_id"], receiverId=row["view"]["receiver_id"],
-                nonce=row["view"]["nonce"], publicKey=signed["publicKeyBorsh"],
-                actions=[action(a, keys, codes) for a in row["view"]["actions"]]) for row in transactions]
+            model_block["transactions"] = []
+            for row in transactions:
+                tx = dict(signerId=row["view"]["signer_id"], receiverId=row["view"]["receiver_id"],
+                    nonce=row["view"]["nonce"], publicKey=signed["publicKeyBorsh"],
+                    actions=[action(a, keys, codes) for a in row["view"]["actions"]])
+                if row["version"] == 1:
+                    if row["view"].get("nonce_index") is not None:
+                        raise ValueError("gas-key nonce lanes are not represented by this importer")
+                    tx.update(version=1, nonceMode=row["view"].get("nonce_mode", "monotonic"))
+                model_block["transactions"].append(tx)
             model_blocks.append(model_block)
         catalogue, wasm_tools = [], None
         (stage / "codes").mkdir()
