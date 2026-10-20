@@ -171,8 +171,9 @@ complete raw trie/statistics bytes remain available. Delayed receipt records
 include their native `queueIndex`, so Borsh key byte ordering cannot reorder the
 logical queue.
 
-`just chain-action-test` compares 64 administrative-action scenarios across
-protocols 83–86, including registrar restrictions, multi-action rollback,
+`just chain-action-test` compares 84 administrative-action scenarios across
+protocols 83–86, including registrar restrictions, reserved `system` rejection
+(including registrar attempts), valid `systemx` and `system.` names, multi-action rollback,
 missing methods/code, final storage failures and key nonce initialization.
 Mapped failures preserve semantic parameters and action indices; unsupported
 error variants fail closed. Raw diagnostic formatting remains in evidence.

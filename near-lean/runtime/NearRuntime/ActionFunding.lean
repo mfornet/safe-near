@@ -164,10 +164,10 @@ theorem funded_receiptActionBody (c : ReceiptCtx) (hreceiver : c.receipt.receive
     (fun _ => funded_bind_zero (funded_failureIndex _ _ none) (fun _ => funded_checkStorageStake _ _ _))
 
 /-- The actual successful action attempt, including all receipt/action fees and
-storage-staking checks, obeys the funding law for function-call action lists. -/
-theorem runReceiptActions_success_funded (c : ReceiptCtx) (st : ChainState)
-    (hwf : st.AccountsUnique) (hreceiver : c.receipt.receiverId ≠ systemAccount)
-    (hactions : ∀ action ∈ c.action.actions, FunctionCallFundingAction action)
+storage-staking checks, obeys any established action-body funding rule. -/
+theorem runReceiptActions_success_funded_of_body (c : ReceiptCtx) (st : ChainState)
+    (hwf : st.AccountsUnique)
+    (hbody : (receiptActionBody c).Funded c.cfg c.action.gasPrice (Fees.totalDeposit c.action.actions))
     (hsuccess : (runReceiptActions c st).2 = none) :
     let raw := (runReceiptActions c st).1
     raw.state.AccountsUnique ∧
@@ -178,8 +178,19 @@ theorem runReceiptActions_success_funded (c : ReceiptCtx) (st : ChainState)
     cases result with
     | error error => simp [runReceiptActions, hr] at hsuccess
     | ok value =>
-      have hf := funded_receiptActionBody c hreceiver hactions
+      have hf := hbody
         { state := st, actorId := c.receipt.predecessorId } raw value hwf hr
       simpa [runReceiptActions, hr, Exec.FundingStep, Exec.totalFunds, receiptsFunds] using hf
+
+/-- Concrete function-call action bodies discharge the compositional ledger premise. -/
+theorem runReceiptActions_success_funded (c : ReceiptCtx) (st : ChainState)
+    (hwf : st.AccountsUnique) (hreceiver : c.receipt.receiverId ≠ systemAccount)
+    (hactions : ∀ action ∈ c.action.actions, FunctionCallFundingAction action)
+    (hsuccess : (runReceiptActions c st).2 = none) :
+    let raw := (runReceiptActions c st).1
+    raw.state.AccountsUnique ∧
+      raw.totalFunds c.cfg + raw.gasBurnt * c.action.gasPrice =
+        st.totalBalance + Fees.totalDeposit c.action.actions + raw.subsidizedAmount + raw.gasUsed * c.action.gasPrice :=
+  runReceiptActions_success_funded_of_body c st hwf (funded_receiptActionBody c hreceiver hactions) hsuccess
 
 end Near

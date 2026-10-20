@@ -103,14 +103,22 @@ def putAccount (id : AccountId) (a : Account) : ExecM Unit := modifyState (·.se
 
 /-! ## Account id rules -/
 
-/-- Can `predecessor` create `id`? Top-level names need the minimum length
-(or the registrar), sub-accounts need their parent as predecessor. -/
+/-- Can `predecessor` create `id`? The reserved system actor is neither top-level
+nor a sub-account in near-account-id. Ordinary top-level names need the minimum
+length (or registrar), and sub-accounts need their parent as predecessor. -/
 def canCreateAccount (cfg : RuntimeConfig) (predecessor id : AccountId) : Bool :=
-  if accountIsImplicit cfg.wasm.ethImplicitAccounts id.toUTF8.toList then false
+  if id == systemAccount then false
+  else if accountIsImplicit cfg.wasm.ethImplicitAccounts id.toUTF8.toList then false
   else match id.splitOn "." with
     | [_] => id.length ≥ cfg.accountCreation.minAllowedTopLevelAccountLength
              || predecessor == cfg.accountCreation.registrarAccountId
     | parts => ".".intercalate (parts.drop 1) == predecessor
+
+/-- The native reserved-actor rule cannot be bypassed by the registrar or by
+changing the minimum top-level name length. -/
+@[simp] theorem canCreateAccount_system (cfg : RuntimeConfig) (predecessor : AccountId) :
+    canCreateAccount cfg predecessor systemAccount = false := by
+  simp [canCreateAccount]
 
 /-! ## Actions -/
 
@@ -302,7 +310,7 @@ def applyAction (c : ReceiptCtx) (isLast : Bool) : Action → ExecM Unit
     let id := c.receipt.receiverId
     if (← getState).account? id |>.isSome then throw (.accountAlreadyExists id)
     unless canCreateAccount c.cfg c.receipt.predecessorId id do
-      if (id.splitOn ".").length == 1 then
+      if id != systemAccount && (id.splitOn ".").length == 1 then
         throw (.createAccountOnlyByRegistrar id c.cfg.accountCreation.registrarAccountId c.receipt.predecessorId)
       throw (.createAccountNotAllowed id c.receipt.predecessorId)
     putAccount id { amount := 0, storageUsage := c.cfg.fees.numBytesAccount }

@@ -23,6 +23,11 @@ def call(method):
     return {"FunctionCall": {"method_name": method, "args": "", "gas": 50 * 10**12, "deposit": "0"}}
 
 CASES = {
+    "reserved-system": ("system", [CREATE], 0),
+    "reserved-system-registrar": ("system", [CREATE, TRANSFER, ADD_KEY], 0),
+    "system-lookalike-registrar": ("systemx", [CREATE, {"Transfer": {"deposit": str(10**24)}}, ADD_KEY], "success"),
+    "reserved-system-authority": ("system", [CREATE, TRANSFER, ADD_KEY], 0),
+    "system-subaccount": ("system." + CALLER, [CREATE, {"Transfer": {"deposit": str(10**24)}}, ADD_KEY], "success"),
     "existing-create": ("captured.near", [CREATE], 0),
     "missing-transfer": ("missing.near", [TRANSFER], 0),
     "foreign-key": ("captured.near", [DELETE_KEY], 0),
@@ -55,15 +60,17 @@ def prepare_case(version, name):
     transaction = dict(receiverId=receiver, nonce=1, actions=copy.deepcopy(actions))
     scenario = dict(caller=dict(accountId=CALLER, seed="safe-near-action-corpus", amount=str(100 * 10**24)),
         blocks=[block(101, [transaction])] + [block(i) for i in range(102, 106)])
+    if name in {"reserved-system-registrar", "system-lookalike-registrar"}:
+        scenario["caller"]["accountId"] = "registrar"
     if name == "add-key-late":
         scenario["blocks"] = [block(101, [transaction]), block(110), block(111), block(112)]
     return capture, scenario, expected_index
 
 
-def run_case(version, name, target, reference, model):
+def run_case(version, name, target, reference, model, registered_model=None):
     capture, scenario, _ = prepare_case(version, name)
-    importer.prepare(capture, target, reference=reference, model=model, scenario=scenario)
-    return compare(target, reference, model)
+    importer.prepare(capture, target, reference=reference, model=model, registered_model=registered_model, scenario=scenario)
+    return compare(target, reference, model, registered_model=registered_model)
 
 
 def main():

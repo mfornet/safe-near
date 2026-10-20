@@ -474,18 +474,83 @@ terms so sequential steps telescope without truncated subtraction.
 attempts containing arbitrary ordered function-call actions, including execution
 fees, admission checks and the final storage-staking check.
 
-`ReceiptFunding.applyActionReceipt_functionCalls_net_conservation` covers the
-actual finalized receipt on both success and failure. It equates account funds
-plus outgoing receipt backing and net burn with the initial account funds,
-incoming receipt backing and explicit subsidy. The proof accounts for gas
-refunds, reward credit and failure rollback. Its structural/configuration
-premises are unique account records, an existing ordinary receiver, non-system
-predecessor/signer, matching action-receipt metadata, the v85+ settlement branch
-(`accountCostIncrease = true`), and a reward fraction at most one. It requires
-only function-call actions; arbitrary VM-created outgoing action variants are
-covered by their proved gas/deposit backing. No VM outcome or financial equation
-is assumed. Other incoming action families and chain-level conservation remain
-open; this is not full runtime equivalence.
+`ReceiptFunding` factors settlement into a reusable action-body funding rule.
+`MetadataFunding` covers deployment and key insertion/deletion, retaining their
+actual account/key admission witnesses, deployment decode failures and the
+execution-height nonce installed by key insertion. `BalanceActionFunding` covers account
+creation, transfers to existing or supported implicit accounts, best-effort gas
+refund allowance restoration, and final account deletion. Deletion's beneficiary
+refund is backed by the removed unlocked balance; positive locked balances are
+rejected by the actual guard. Creation adds no balance, and implicit creation
+credits the deposit exactly once.
+
+`AllActionFunding.applyActionReceipt_net_conservation` has no incoming action-
+family restriction. For ordinary modeled action receipts, on success and failure,
+it equates account funds plus outgoing receipt backing and net burn with the
+initial account funds, incoming receipt backing and explicit subsidy. Gas
+refunds, rewards, admission errors and final storage-staking rollback are part
+of the actual executable path. The indexed action loop retains failure-index
+bookkeeping and native action randomness; checked VM commits, completion-data
+outputs and receipt identity births remain in the executable state.
+Stake/unstake still reject epoch-dependent
+semantics; their successful funding rule is vacuous and does not add support.
+`applyActionReceipt_accountsUnique` also preserves the unique-account premise
+needed by subsequent receipt proofs.
+
+The concrete conservation theorem requires unique account records, an ordinary
+receiver, non-system predecessor/signer, matching action-receipt metadata, the
+v85+ settlement branch (`accountCostIncrease = true`), and a reward fraction at
+most one. No existing-receiver, VM-output or financial-equation premise is
+assumed. Account-creation charges add to gross burn and cannot underfund rewards.
+`MixedFunding` and function-call-only results remain available as narrower
+consequences. This is a theorem of the modeled runtime, not full nearcore equivalence.
+
+`UnifiedReceiptFunding` combines ordinary receipts with protocol-shaped system
+refunds, including destroyed deposits when refunds cannot be delivered. Its
+`ReceiptFinancialShape` states the actor/action scope explicitly: system-origin
+receipts are single transfers; ordinary receipts have non-system receiver and
+signer. This is not a proof that every emitted receipt satisfies that scope.
+
+`QueuedFunds` defines `ChainState.totalFunds` as liquid/locked account value plus
+postponed and delayed receipt backing. The real waiting-action branch moves the
+incoming asset into the postponed map. Its freshness premise prevents an
+existing receipt id from being overwritten. Queue insertion, release and delayed
+append/pop laws account for the full deposit and purchased-gas value.
+`ReceiptQueueFrame` proves that action execution and finalization leave these
+routing-owned queues unchanged, including on contract failure.
+
+`RoutingFunding.processReceipt_conservation` covers the entire supported
+processor: ready actions, waiting actions, data-only updates and data-triggered
+resumption. `Processed.totalFunds` also counts newly emitted receipts, and its
+net burn includes non-gas deposit destruction minus receiver rewards. Account
+uniqueness is preserved. The theorem assumes unique, correctly identified,
+financially scoped action receipts in the postponed map, a fresh incoming id,
+receipt financial scope, the settlement configuration/reward bounds, and an
+actual `issue = none` processing result. Unsupported/incomplete attempts are not
+silently treated as committed executions. `PostponedFinancialWellFormed` is a
+financial invariant, not full dependency-graph validity or fairness.
+
+Reserved `system` account creation is rejected independently of the registrar
+and minimum-name-length configuration. Pinned nearcore's `action_create_account`
+uses near-account-id 2.0.0's `is_top_level`/`is_sub_account_of`; `system` is neither.
+The previous Lean split-on-dot rule incorrectly allowed creation by the
+registrar or with a zero minimum length. A kernel theorem covers every
+configuration/predecessor, and transaction regressions verify rejection and
+rollback before transfer/key/code installation. A native account-id primitive
+test in the VM oracle crate checks the classification and ordinary-name controls;
+the full Runtime comparator additionally checks registrar and ordinary attempts
+to create `system`, rollback before installing an access key, and valid `systemx`
+and `system.` controls across protocols 83–86. After building the reference
+dependencies, reproduce the primitive check with:
+
+```sh
+cargo +1.93.1 test --manifest-path tools/runtime-conformance/Cargo.toml --locked --offline reserved_system_account_classification
+```
+
+Remaining composition work includes preserving receipt scope, id freshness and
+routing invariants across generated frontiers, transactions, block scheduling
+and chain execution. Independent nearcore equivalence and end-to-end deployed
+wNEAR refinement remain separate open requirements.
 
 `NearVM.ReceiptPredicates` transports arbitrary decidable receiver/action
 predicates through actual promise updates, conversion and successful outcome
@@ -502,8 +567,7 @@ host call, including legacy gas metering; unsupported operations still trap.
 for arbitrary code, context, storage and fuel when execution succeeds and the
 context selects strict runtime decoding. Mock opaque-byte execution is excluded
 by this explicit policy premise. Encoding validity is not complete action
-validity or authorization. Settlement for general incoming action mixtures,
-chain conservation, verified binary decoding and full nearcore equivalence
+validity or authorization. Chain conservation, verified binary decoding and full nearcore equivalence
 remain open.
 
 Promise deployment derives `ContractCode.size` from the actual payload through
