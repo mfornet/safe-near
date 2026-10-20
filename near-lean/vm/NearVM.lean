@@ -14,3 +14,4 @@ import NearVM.ExecutionPromises
 import NearVM.ExecutionSelection
 import NearVM.PromiseLimits
 import NearVM.FunctionCallValidation
+import NearVM.GasInvariants

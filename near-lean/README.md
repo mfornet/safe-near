@@ -254,3 +254,11 @@ The net-conservation theorem uses returned burn minus returned reward; it derive
 the reward bound from a reward fraction at most one and function-call gas at most
 total burnt gas. It does not yet derive these gas premises from action execution,
 cover successful/system receipts, or establish chain conservation.
+
+`GasInvariants` proves counter bounds and exact successful charge increments,
+failure saturation/error precedence, irreversible burn, and limit preservation.
+These proofs cover every host charge variant, charge lists and Wasm charging.
+The executable `runMetered` loop returns a counter bounded by its final limits on
+all exits, including fuel exhaustion and stepper errors. A compositional theorem
+bounds it by the original call budget when imported hosts preserve those limits;
+that host invariant and the public VM-outcome/receipt gas bounds remain open.
