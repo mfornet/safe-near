@@ -368,8 +368,18 @@ implicit-transfer fees, function-call prepaid gas and key-method bytes.
 `CreationReservations` proves that valid creation/callback plans reserve one
 receipt base plus their action/prepaid gas; joins reserve none. Creation checks
 are derived from the executable pre-invocation guard. Dependency-data fees remain
-local burn. These are primitive host/charge lemmas; composing them through the
-complete metered wrapper and concrete registry remains open.
+local burn. `MeteredReservations.finishMeteredCall_reservationInvariant` proves
+that successful post-call charging, deposit deductions/subsidies and storage
+usage updates preserve the fee table, protocol flag and raw gas backing. Terminal
+traps are excluded; catchable exceptions must preserve the invariant.
+
+`MeteredBatchReservations` connects successful precharging to raw action append
+and the complete metered wrapper for all nine batch-action hosts. Its concrete
+preservation theorems require only the incoming invariant, not an assumed output
+accounting equation. Precharging preserves memory/register reads, protocol
+validation and target lookup, so the charge and append proofs use the same ABI
+inputs. Full wrapper preservation for receipt creation/callbacks/joins, neutral
+hosts and registry/execution composition still remain open.
 
 Existing ETH/deterministic receivers support ordinary transfers. Creation of
 these account types requires protocol code/context that is not implemented;
