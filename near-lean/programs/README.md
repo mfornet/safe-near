@@ -8,8 +8,10 @@ writes bytes back.
 Copied from [Talos](https://github.com/cajal-technologies/talos) `programs/`
 at commit `80644390de3ad4db3055445259a034413ae41577` (2026-10-06), with the
 specifications. `ByteEcho` now has a kernel-checked correctness proof of its
-compiled export. The two GCD theorems and mergesort theorem remain open in
-`Proof.lean` files. No `*Proof.lean` machinery or `Analysis/` was brought over. The package
+compiled export, and the compiled GCD kernel is proved through Iris and
+small-step termination. The GCD stream and mergesort theorems remain open in
+`Proof.lean` files. The port includes proof support for the completed theorems.
+The package
 depends on `../iris-wasm` (Talos's `codelib`), exactly as upstream does.
 License AGPL-3.0, see `../wasm/LICENSE`.
 
@@ -32,7 +34,8 @@ rust/                     cargo workspace, toolchain pinned in rust-toolchain.to
 lean/                     Lake package `Programs`, depends on ../../iris-wasm (and so on ../../wasm)
   Programs/<Crate>/Program.lean   generated Wasm AST of each program (spliced from the .wat by CodeLib.Generated)
   Programs/<Crate>/Spec.lean      the specification (semantic Input/Output, host contract)
-  Programs/<Crate>/Proof.lean     the correctness theorem (ByteEcho proved; GCD/mergesort open)
+  Programs/<Crate>/Proof.lean     the correctness theorem (GCD stream/mergesort remain open)
+  Programs/GcdStdio/KernelProof.lean  compiled Stein kernel partial correctness and termination
   Programs/Smoke.lean     `lake exe smoke`: runs every program on small inputs
 ```
 
@@ -40,14 +43,14 @@ lean/                     Lake package `Programs`, depends on ../../iris-wasm (a
 
 Specs are `def … : Prop` tagged `@[spec_of <kind> "crate::fn"]`; the theorem
 that discharges one is tagged `@[proves <spec>]` (attributes from
-`CodeLib.Attrs`). Everything below is stated and typechecks. The ByteEcho proof is complete;
-the other three proofs remain `sorry`. Upstream's proofs are separation-logic proofs over
+`CodeLib.Attrs`). Everything below is stated and typechecks. The ByteEcho and GCD kernel proofs are complete;
+the other two proofs remain `sorry`. Upstream's proofs are separation-logic proofs over
 `CodeLib.SepLogic`, which is now available here.
 
 | Spec | Kind | Statement | Theorem / status |
 |---|---|---|---|
 | `ByteEcho.Spec.ByteEchoSpec` | total | For every input byte, `byte_echo` terminates and writes exactly that byte. | `ByteEcho.Proof.byte_echo_correct` (proved) |
-| `GcdStdio.Spec.KernelSpecification` | total, internal | The out-of-line `gcd_u64` kernel (`func1`), run on two `i64`s, returns `Nat.gcd`. | `GcdStdio.Proof.kernel_correct` |
+| `GcdStdio.Spec.KernelSpecification` | total, internal | The out-of-line `gcd_u64` kernel (`func1`), run on two `i64`s, returns `Nat.gcd`. | `GcdStdio.Proof.kernel_correct` (proved) |
 | `GcdStdio.Spec.PublicEntrySpecification` | total | For every pair of `u64`, `gcd` terminates and writes their `Nat.gcd`. | `GcdStdio.Proof.gcd_correct` |
 | `Mergesort.Spec.PublicEntrySpecification` | partial | Every finite run of `mergesort` on packed `u32`s either traps with the allocator's `talos.oom` or returns a sorted permutation of the input. Termination is not claimed. | `Mergesort.Proof.mergesort_correct` |
 
@@ -61,9 +64,18 @@ specification was changed.
 `Programs.ProofSupport.Cbv.program_cbv` fixes the pinned Lean 4.34.1 evaluator's
 literal-conditional proof construction, supplying its missing `Decidable`
 argument. The change is scoped to each tactic invocation. Kernel checking and
-the axiom audit remain in force. The program audit permits the three open
-proofs but requires `Programs.ByteEcho.Proof` to remain completely free of
-nonstandard axioms, including `sorryAx`.
+the axiom audit remain in force. The program audit permits the two open
+proofs but requires `Programs.ByteEcho.Proof` and `Programs.GcdStdio.KernelProof`
+to remain completely free of nonstandard axioms, including `sorryAx`.
+
+`GcdStdio/KernelProof.lean` adapts the [pinned Talos optimized Stein proof](https://github.com/cajal-technologies/talos/blob/80644390de3ad4db3055445259a034413ae41577/programs/lean/Project/NumIntegerOpt3/Spec.lean)
+to the existing generated `GcdStdio.func1` and `Spec.kernelConfig`. The Iris
+partial-correctness invariant tracks the GCD of the positive odd parts and
+recombines their common power of two. A separate finite-trace proof decreases
+the sum of the two odd operands. Combining them proves the existing total
+kernel specification, including both zero-input exits. No standalone Talos
+program, alternate store or assumed execution equation is needed. The exported
+stream theorem still needs its allocator/codec/host-call bridge.
 
 Upstream Talos proves all four. The GCD kernel spec there is tied to the
 separately verified `num_integer_opt3` program, which is not in near-lean, so
