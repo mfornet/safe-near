@@ -364,6 +364,131 @@ def main (args : List String) : IO UInt32 := do
   check r "unsupported unstaking leaves locked funds untouched"
     ((unstake.state.account? "wrap.near").map (·.locked) == some oneNear)
 
+  -- Fee classification and explicit unsupported implicit-creation semantics.
+  let cfg69 ← RuntimeConfig.load configs 69
+  let cfg70 ← RuntimeConfig.load configs 70
+  check r "ETH implicit account flag follows the protocol configuration"
+    (!cfg69.wasm.ethImplicitAccounts && cfg70.wasm.ethImplicitAccounts && cfg.wasm.ethImplicitAccounts)
+  for (label, receiver) in [("ETH", "0x" ++ String.ofList (List.replicate 40 'a')),
+      ("deterministic", "0s" ++ String.ofList (List.replicate 40 'a'))] do
+    let tx : Transaction := {
+      signerId := "alice.near", publicKey := pkOf 1, nonce := 1
+      receiverId := receiver, actions := [.transfer oneNear] }
+    let submitted := Near.apply cfg World.ap (fun _ => code) genesis [tx] []
+    check r s!"{label} implicit transfer submits an outgoing receipt before receiver execution"
+      (submitted.issue.isNone && submitted.outgoing.length == 1 &&
+        (submitted.state.accessKey? "alice.near" (pkOf 1)).map (·.nonce) == some 1)
+    let missing := Near.apply cfg World.ap (fun _ => code) submitted.state [] submitted.outgoing
+    check r s!"{label} implicit creation reports a model issue"
+      ((missing.issue.map (·.2)) == some (.unsupportedAction "implicit account creation (ETH/deterministic contracts)"))
+    check r s!"{label} implicit delivery issue rolls back receiver execution and preserves committed submission"
+      (missing.state.totalBalance == submitted.state.totalBalance &&
+        (missing.state.account? receiver).isNone && missing.state.storage == submitted.state.storage &&
+        missing.state.accessKeys == submitted.state.accessKeys && missing.state.nextId == submitted.state.nextId &&
+        missing.outcomes.isEmpty && missing.outgoing.isEmpty && missing.tokensBurnt == 0)
+    let present := genesis.setAccount receiver (genesisAccount oneNear)
+    let sent := Near.apply cfg World.ap (fun _ => code) present [tx] []
+    let applied := Near.apply cfg World.ap (fun _ => code) sent.state [] sent.outgoing
+    check r s!"{label} existing receiver accepts a transfer"
+      (sent.issue.isNone && applied.issue.isNone &&
+        (applied.state.account? receiver).map (·.amount) == some (2 * oneNear))
+    let total := applied.state.totalBalance + (applied.outgoing.map (Fees.receiptFunds cfg)).sum +
+      sent.tokensBurnt + applied.tokensBurnt
+    check r s!"{label} existing receiver transfer conserves funds and gas backing" (total == present.totalBalance)
+    check r s!"{label} explicit create is rejected as implicit creation"
+      (match checkActionAccount genesis { predecessorId := "alice.near", receiverId := receiver, receiptId := 0, receipt := .data { dataId := 0, data := none } } true .createAccount true with
+        | .error (.onlyImplicitAccountCreationAllowed id) => id == receiver
+        | _ => false)
+  let disabledReceipt : Receipt := {
+    predecessorId := "alice.near", receiverId := "0x" ++ String.ofList (List.replicate 40 'a')
+    receiptId := 0, receipt := .data { dataId := 0, data := none } }
+  check r "disabled ETH implicit receiver is treated as a missing named account"
+    (match checkActionAccount genesis disabledReceipt true (.transfer 1) false with
+      | .error (.accountDoesNotExist _) => true | _ => false)
+
+  let implicitTarget := String.ofList (List.replicate 64 'a')
+  let implicitWat := "(module (import \"env\" \"promise_batch_create\" (func $batch (param i64 i64) (result i64))) " ++
+    "(import \"env\" \"promise_batch_action_transfer\" (func $transfer (param i64 i64))) (memory 1) " ++
+    "(data (i32.const 0) \"" ++ implicitTarget ++ "\") (data (i32.const 80) \"\\01\") " ++
+    "(func (export \"send\") i64.const 64 i64.const 0 call $batch i64.const 80 call $transfer))"
+  let implicitModule ← match Decoder.Wat.decode implicitWat with
+    | .ok m => pure m
+    | .error error => throw (IO.userError s!"implicit transfer fixture: {error}")
+  let implicitCode : ContractCode := { module := implicitModule, size := 0, hash := "implicit-transfer-fixture" }
+  let implicitState := genesis.setAccount "wrap.near" { genesisAccount (10 * oneNear) with code := some implicitCode }
+  let implicitWorld : World := { cfg, code := implicitCode, state := implicitState }
+  let implicitResult := implicitWorld.call "alice.near" "send" "{}" 0
+  check r "VM-created implicit transfer settles and creates the NEAR receiver"
+    (implicitResult.issue.isNone && implicitResult.pending.isEmpty && implicitResult.state.delayed.isEmpty &&
+      implicitResult.state.postponed.isEmpty && (implicitResult.state.account? implicitTarget).map (·.amount) == some 1)
+  check r "VM-created implicit transfer conserves deposits, fees and refunds"
+    (implicitResult.total == implicitWorld.total && implicitResult.burnt > 0)
+
+  -- Raw deployment length must not be supplied by the external module decoder.
+  let deployWat := "(module (import \"env\" \"promise_batch_create\" (func $batch (param i64 i64) (result i64))) " ++
+    "(import \"env\" \"promise_batch_action_deploy_contract\" (func $deploy (param i64 i64 i64))) (memory 1) " ++
+    "(data (i32.const 0) \"wrap.near\") (data (i32.const 16) \"\\00asm\\01\\00\\00\\00\") " ++
+    "(func (export \"deploy\") i64.const 9 i64.const 0 call $batch i64.const 8 i64.const 16 call $deploy))"
+  let deployModule ← match Decoder.Wat.decode deployWat with
+    | .ok module => pure module
+    | .error error => throw (IO.userError s!"deployment fixture: {error}")
+  let emptyModule ← match Decoder.Wat.decode "(module)" with
+    | .ok module => pure module
+    | .error error => throw (IO.userError s!"empty deployment fixture: {error}")
+  let decodedCode : ContractCode := {
+    module := emptyModule, size := cfg.wasm.limits.maxContractSize + 1, hash := "empty-wasm" }
+  let deployingCode : ContractCode := { module := deployModule, size := 0, hash := "deploying-fixture" }
+  let deploymentState := genesis.setAccount "wrap.near" { genesisAccount (10 * oneNear) with code := some deployingCode }
+  let deployApply := Near.apply cfg World.ap (fun _ => decodedCode)
+  let deployCall : Transaction := {
+    signerId := "alice.near", publicKey := pkOf 1, nonce := 1, receiverId := "wrap.near"
+    actions := [.functionCall "deploy" [] (tgas 50) 0] }
+  let admittedDeploy := deployApply deploymentState [deployCall] []
+  let scheduledDeploy := deployApply admittedDeploy.state [] admittedDeploy.outgoing
+  check r "promise deployment uses raw byte length in outgoing gas backing"
+    (scheduledDeploy.issue.isNone && scheduledDeploy.state.totalBalance + admittedDeploy.tokensBurnt +
+      scheduledDeploy.tokensBurnt + (scheduledDeploy.outgoing.map (Fees.receiptFunds cfg)).sum == deploymentState.totalBalance)
+  let executedDeploy := deployApply scheduledDeploy.state [] scheduledDeploy.outgoing
+  check r "promise deployment stores actual byte size and storage usage despite decoder metadata"
+    (executedDeploy.issue.isNone && executedDeploy.outcomes.all (fun (_, o) => o.status.isSuccess) &&
+      ((executedDeploy.state.account? "wrap.near").bind (·.code)).map (·.size) == some 8 &&
+      (executedDeploy.state.account? "wrap.near").map (·.storageUsage) == some 190)
+  let refundedDeploy := deployApply executedDeploy.state [] executedDeploy.outgoing
+  check r "promise deployment conserves funds through execution and refunds"
+    (refundedDeploy.issue.isNone && refundedDeploy.outgoing.isEmpty &&
+      refundedDeploy.state.totalBalance + admittedDeploy.tokensBurnt + scheduledDeploy.tokensBurnt +
+        executedDeploy.tokensBurnt + refundedDeploy.tokensBurnt == deploymentState.totalBalance)
+
+  -- Runtime externals reject method bytes before materializing typed actions.
+  let methodWat ← IO.FS.readFile "../../tools/runtime-conformance/fixtures/method_encoding.wat"
+  let methodBytes ← IO.FS.readBinFile "../../tools/runtime-conformance/fixtures/method_encoding.wasm"
+  let methodModule ← match Decoder.Wat.decode methodWat with
+    | .ok module => pure module
+    | .error error => throw (IO.userError s!"method encoding fixture: {error}")
+  let methodCode : ContractCode := { module := methodModule, size := methodBytes.size, hash := "method-encoding-fixture" }
+  let methodState := genesis.setAccount "wrap.near" {
+    genesisAccount (10 * oneNear) with code := some methodCode, storageUsage := 182 + methodCode.size }
+  let methodWorld : World := { cfg, code := methodCode, state := methodState }
+  for method in ["batch_bad", "create_bad", "then_bad", "key_bad"] do
+    let failed := methodWorld.call "alice.near" method "{}" 0
+    let outcome := latestOutcome failed fun o => o.executorId == "wrap.near"
+    check r s!"runtime {method}: invalid UTF-8 rejects with native error and preserves earlier logs"
+      (failed.issue.isNone && isFailure outcome (· == .functionCallError (.hostError .invalidMethodName)) &&
+        outcome.map (·.logs) == some ["before"])
+    check r s!"runtime {method}: rejection conserves funds and creates no access key"
+      (failed.total == methodWorld.total && failed.pending.isEmpty && failed.state.postponed.isEmpty &&
+        (failed.state.accessKey? "wrap.near" (pkOf 0)).isNone)
+  let validMethod := methodWorld.call "alice.near" "batch_valid" "{}" 0
+  check r "runtime method encoding: valid Unicode passes external validation"
+    (validMethod.outcomes.any (fun (_, o) => o.executorId == "wrap.near" && o.status.isSuccess &&
+      o.logs == ["before", "after"]) && validMethod.issue.isNone)
+  let validKey := methodWorld.call "alice.near" "key_valid" "{}" 0
+  check r "runtime method encoding: Unicode key permissions retain exact names"
+    ((validKey.state.accessKey? "wrap.near" (pkOf 0)).map (·.permission) ==
+      some (.functionCall none "alice.near" ["λ", "ok"]))
+  check r "runtime method encoding: successful key scheduling conserves gas backing"
+    (validKey.issue.isNone && validKey.total == methodWorld.total && validKey.pending.isEmpty)
+
   -- deploy and initialise in one transaction from wrap.near
   let (txDeploy, w) := w0.tx "wrap.near" "wrap.near" [.deployContract code, .functionCall "new" (bytesOf "{}") (tgas 50) 0]
   let w := w.settle [txDeploy]

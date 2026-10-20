@@ -38,6 +38,12 @@ structure Fee where
 
 def Fee.send (f : Fee) (sir : Bool) : Nat := if sir then f.sendSir else f.sendNotSir
 
+/-- Accumulate fees before charging, preserving native exhaustion precedence. -/
+def Fee.add (left right : Fee) : Fee :=
+  { sendSir := left.sendSir + right.sendSir
+    sendNotSir := left.sendNotSir + right.sendNotSir
+    execution := left.execution + right.execution }
+
 /-- `near_parameters::ActionCosts`. -/
 structure ActionFees where
   createAccount : Fee := {}

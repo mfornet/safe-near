@@ -36,6 +36,17 @@ structure ContractCode where
 
 instance : Inhabited ContractCode := ⟨{ module := default, size := 0, hash := "" }⟩
 
+/-- The decoder remains trusted for module/hash correspondence. Byte size is
+known from the supplied bytes and must not be delegated to decoder metadata. -/
+def ContractCode.decodeSized (decoder : Bytes → ContractCode) (bytes : Bytes) : ContractCode :=
+  { decoder bytes with size := bytes.length }
+
+@[simp] theorem ContractCode.decodeSized_size (decoder : Bytes → ContractCode) (bytes : Bytes) :
+    (ContractCode.decodeSized decoder bytes).size = bytes.length := rfl
+
+theorem ContractCode.decodeSized_module (decoder : Bytes → ContractCode) (bytes : Bytes) :
+    (ContractCode.decodeSized decoder bytes).module = (decoder bytes).module := rfl
+
 inductive AccessKeyPermission
   | fullAccess
   /-- `allowance = none` means unlimited. `methodNames = []` allows every method. -/

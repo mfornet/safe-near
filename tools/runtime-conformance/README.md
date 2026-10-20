@@ -117,3 +117,48 @@ stake target as an outgoing deposit and could fabricate balance-exceeded errors.
 Scheduling now preserves liquid balance while retaining the exact gas charges.
 This verifies VM promise construction; runtime staking execution still requires
 unsupported epoch machinery and reports an explicit model issue.
+
+`implicit_transfers_v69.json`, `implicit_transfers_v70.json` and
+`implicit_transfers_v86.json` cover 60 transfer-scheduling cases across the ETH
+implicit-account feature boundary. They compare named, NEAR implicit, ETH and
+deterministic addresses, hexadecimal lookalikes, zero/repeated transfers, panic
+rollback, invalid handles, amount-pointer failures, one-Tgas budgets and views.
+The first 30 cases exposed 17 implicit-address fee discrepancies. Expanded cases
+then exposed nine amount-read charging/error-precedence discrepancies. The
+strict comparison retains exact gas and error observations for every case.
+These VM fixtures schedule transfers; runtime scenario checks separately cover
+existing ETH/deterministic receivers and explicit unsupported creation rollback.
+
+`key_methods.json` covers eight function-call-key scheduling cases: unrestricted
+methods, one/two/three names, UTF-8 names, positive and maximum allowances, and a
+tight gas budget. The initial five cases exposed zero allowance being emitted as
+finite zero and comma separators being double-counted in gas. The comparison
+checks the complete emitted access-key permission as well as burnt/used gas.
+`key_input_errors.json` adds 44 exact comparisons for malformed method lists,
+invalid receiver IDs and UTF-8, memory/register reads, promise targets, serialized
+public keys, view restrictions, and gas exhaustion at validation boundaries.
+The model follows the observed read/validation order, including charging action
+fees before reporting an invalid serialized public key. Empty method lists are
+unrestricted; empty comma-separated entries are rejected.
+
+The pinned VM oracle uses MockedExternal, which enables post-quantum keys.
+These tests do not establish historical runtime feature gating. The method-encoding
+fixtures below separately exercise runtime-style UTF-8 external validation.
+
+
+`method_encoding.json` adds 38 method-encoding cases; the initial probe exposed
+11 discrepancies. `method_encoding_zero.json` adds five zero-balance cases,
+including one-yocto subsidy/error ordering. These fixtures compare invalid UTF-8,
+Unicode/NUL methods, register inputs, function-call creation/callbacks, access-key
+CSV methods, earlier failures and exact logs/gas/rollback.
+
+The request field `validateActionMethodUtf8` defaults to false in both replay
+adapters, matching nearcore's `MockedExternal`. Strict cases use a native
+`MethodValidatingExternal` adapter which delegates the entire external interface
+to that mock, except for the ordinary function-call and function-call-key UTF-8
+checks from the pinned `runtime/runtime/src/receipt_manager.rs`. Native VMLogic
+still controls fees, prepayment, balance deductions and error precedence. This
+adapter tests that external seam; it is not a trie-backed/full Runtime oracle.
+Actual Lean receipt execution always uses strict validation, as does a default
+public `VMContext`. Opaque VM outputs must not be treated as validated runtime
+actions.

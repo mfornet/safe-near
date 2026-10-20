@@ -63,6 +63,7 @@ def compare_fixture(fixture_path, version):
             predecessor = case.get("predecessor", "alice.near")
             request = {
                 "codePath": str(code), "watPath": str(wat),
+                "validateActionMethodUtf8": case.get("validateActionMethodUtf8", fixture.get("validateActionMethodUtf8", False)),
                 "configDir": str(ROOT / "near-lean/vm/configs"),
                 "protocolVersion": fixture["protocolVersion"], "method": case["method"],
                 "currentAccountId": "wrap.near", "signerAccountId": case.get("signer", predecessor),

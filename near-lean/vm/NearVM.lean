@@ -19,3 +19,10 @@ import NearVM.ExecutionGas
 import NearVM.OutcomeGas
 import NearVM.DepositRegistry
 import NearVM.OutcomeFunding
+import NearVM.ChargeReservations
+import NearVM.ExecutionReservations
+import NearVM.FunctionKeyValidation
+import NearVM.CreationReservations
+import NearVM.MeteredBatchReservations
+import NearVM.OutcomeReservations
+import NearVM.ActionMethodValidation

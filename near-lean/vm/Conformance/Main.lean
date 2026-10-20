@@ -8,6 +8,7 @@ namespace Replay
 /-- Shared wire format with tools/runtime-conformance. Numeric byte arrays
 are checked before conversion; large balances use decimal strings. -/
 structure Request where
+  validateActionMethodUtf8 : Bool := false
   codePath : String
   watPath : String
   configDir : String
@@ -53,6 +54,7 @@ def inputOf (cfg : RuntimeConfig) (r : Request) :
     | none => pure PromiseResult.failed
     | some bytes => pure (PromiseResult.successful (← checkedBytes bytes))
   let ctx : VMContext := {
+    validateActionMethodUtf8 := r.validateActionMethodUtf8
     currentAccountId := r.currentAccountId.toUTF8.toList
     signerAccountId := r.signerAccountId.toUTF8.toList
     signerAccountPk := ← checkedBytes r.signerAccountPk

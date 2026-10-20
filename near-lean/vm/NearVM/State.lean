@@ -79,7 +79,10 @@ compute while allowing fidelity checks to opt in to nearcore-style traps. -/
 structure NearConfig where
   /-- RuntimeExt charges old-value bytes; MockedExternal does not. Trie-node costs are separate. -/
   chargeStorageValueAccess : Bool := false
+  /-- Runtime external action methods are UTF-8; VM mocks may keep opaque bytes. -/
+  validateActionMethodUtf8 : Bool := true
   oneYoctoOnPromise : Bool := false
+  ethImplicitAccounts : Bool := false
   maxRegisterLen     : Option Nat := none
   maxReturnLen       : Option Nat := none
   maxLogLen          : Option Nat := none

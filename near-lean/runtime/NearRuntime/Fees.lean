@@ -51,14 +51,13 @@ def initialNonce (blockHeight : Nat) : Nat := (blockHeight - 1) * 1_000_000
 namespace Fees
 
 /-- Send fee of one action (`total_send_fees` summand). -/
-def send (f : ActionFees) (sir : Bool) (receiver : AccountId) : Action → Nat
+def send (f : ActionFees) (ethEnabled : Bool) (sir : Bool) (receiver : AccountId) : Action → Nat
   | .createAccount => f.createAccount.send sir
   | .deployContract code => f.deployContractBase.send sir + f.deployContractByte.send sir * code.size
   | .functionCall m args _ _ =>
     f.functionCallBase.send sir + f.functionCallByte.send sir * (m.utf8ByteSize + args.length)
   | .transfer _ =>
-    f.transfer.send sir + (if isImplicitAccount receiver then
-      f.createAccount.send sir + f.addFullAccessKey.send sir else 0)
+    (transferFees f ethEnabled receiver.toUTF8.toList).send sir
   | .stake _ _ => f.stake.send sir
   | .addKey _ k =>
     match k.permission with
@@ -70,14 +69,13 @@ def send (f : ActionFees) (sir : Bool) (receiver : AccountId) : Action → Nat
   | .deleteAccount _ => f.deleteAccount.send sir
 
 /-- Execution fee of one action (`exec_fee`). -/
-def exec (f : ActionFees) (receiver : AccountId) : Action → Nat
+def exec (f : ActionFees) (ethEnabled : Bool) (receiver : AccountId) : Action → Nat
   | .createAccount => f.createAccount.execution
   | .deployContract code => f.deployContractBase.execution + f.deployContractByte.execution * code.size
   | .functionCall m args _ _ =>
     f.functionCallBase.execution + f.functionCallByte.execution * (m.utf8ByteSize + args.length)
   | .transfer _ =>
-    f.transfer.execution + (if isImplicitAccount receiver then
-      f.createAccount.execution + f.addFullAccessKey.execution else 0)
+    (transferFees f ethEnabled receiver.toUTF8.toList).execution
   | .stake _ _ => f.stake.execution
   | .addKey _ k =>
     match k.permission with
@@ -88,11 +86,11 @@ def exec (f : ActionFees) (receiver : AccountId) : Action → Nat
   | .deleteKey _ => f.deleteKey.execution
   | .deleteAccount _ => f.deleteAccount.execution
 
-def totalSend (f : ActionFees) (sir : Bool) (receiver : AccountId) (actions : List Action) : Nat :=
-  (actions.map (send f sir receiver)).sum
+def totalSend (f : ActionFees) (ethEnabled : Bool) (sir : Bool) (receiver : AccountId) (actions : List Action) : Nat :=
+  (actions.map (send f ethEnabled sir receiver)).sum
 
-def totalExec (f : ActionFees) (receiver : AccountId) (actions : List Action) : Nat :=
-  (actions.map (exec f receiver)).sum
+def totalExec (f : ActionFees) (ethEnabled : Bool) (receiver : AccountId) (actions : List Action) : Nat :=
+  (actions.map (exec f ethEnabled receiver)).sum
 
 def totalPrepaid (actions : List Action) : Nat := (actions.map Action.attachedGas).sum
 
@@ -100,7 +98,7 @@ def totalDeposit (actions : List Action) : Nat := (actions.map Action.deposit).s
 
 /-- Gas budget carried by an ordinary action receipt. -/
 def receiptGasBudget (cfg : RuntimeConfig) (receiver : AccountId) (actions : List Action) : Nat :=
-  cfg.fees.actionFees.newActionReceipt.execution + totalExec cfg.fees.actionFees receiver actions + totalPrepaid actions
+  cfg.fees.actionFees.newActionReceipt.execution + totalExec cfg.fees.actionFees cfg.wasm.ethImplicitAccounts receiver actions + totalPrepaid actions
 
 /-- Funds carried by a receipt: deposits plus gas purchased for future execution.
 System refunds carry only their transfer balance; data receipts carry no funds. -/
@@ -122,7 +120,7 @@ def txCost (cfg : RuntimeConfig) (gasPrice : Nat) (signer receiver : AccountId)
     (actions : List Action) : TxCost :=
   let f := cfg.fees.actionFees
   let sir := signer == receiver
-  let gasBurnt := f.newActionReceipt.send sir + totalSend f sir receiver actions
+  let gasBurnt := f.newActionReceipt.send sir + totalSend f cfg.wasm.ethImplicitAccounts sir receiver actions
   let gasRemaining := receiptGasBudget cfg receiver actions
   let receiptGasPrice := max gasPrice cfg.minGasPurchasePrice
   { gasBurnt, gasRemaining, receiptGasPrice,

@@ -1,6 +1,8 @@
+import NearVM.AccountId
 import NearVM.Host
 import NearVM.Config
 import NearVM.PromiseGraph
+import NearVM.MethodEncoding
 
 /-!
 # Gas-metered host functions
@@ -115,6 +117,21 @@ def sirOf (st : Store NearState) (acct : Option (List UInt8)) : Bool :=
 
 def sirOfSpan (st : Store NearState) (len ptr : UInt64) : Bool :=
   sirOf st (getMemOrReg st ptr len)
+
+/-- Native transfer reads the u128 before looking up the promise or charging
+accumulated action fees. A failed read retains only the argument-reading cost. -/
+def transferCharges (st : Store NearState) (index amountPtr : UInt64) : List Charge :=
+  let initialCharges := [.ext "base"] ++ readMem 16
+  match readU128Mem st amountPtr with
+  | none => initialCharges
+  | some _ => initialCharges ++ [.actionBase
+      (fun fees => transferFees fees st.host.config.ethImplicitAccounts
+        ((promiseReceiver? st index.toNat).getD [])) (sirOf st (promiseReceiver? st index.toNat))]
+
+theorem transferCharges_invalidAmount (st : Store NearState) (index amountPtr : UInt64)
+    (h : readU128Mem st amountPtr = none) :
+    transferCharges st index amountPtr = [.ext "base"] ++ readMem 16 := by
+  simp only [transferCharges, h]
 
 /-- Data routing is same-account when the dependency receiver equals the
 callback receiver, which need not be the currently executing account. -/
@@ -236,8 +253,55 @@ def functionCallPlan (st : Store NearState) (input : FunctionCallInputs) (sir : 
 def functionCallInputError (name : String) (st : Store NearState) (args : List Value) : Option HostError :=
   (functionCallInputs? name args).bind fun input => (functionCallPlan st input false).error
 
+structure FunctionKeyInputs where
+  target : Nat
+  publicKeyLen : UInt64
+  publicKeyPtr : UInt64
+  allowancePtr : UInt64
+  receiverLen : UInt64
+  receiverPtr : UInt64
+  methodsLen : UInt64
+  methodsPtr : UInt64
+
+def functionKeyInputs (args : List Value) : FunctionKeyInputs :=
+  { target := (argU64 args 0).toNat
+    publicKeyLen := argU64 args 1, publicKeyPtr := argU64 args 2
+    allowancePtr := argU64 args 4, receiverLen := argU64 args 5, receiverPtr := argU64 args 6
+    methodsLen := argU64 args 7, methodsPtr := argU64 args 8 }
+
+/-- Native order: key read, allowance, receiver read/UTF-8/syntax, method read/
+nonempty segments, target lookup, action fees, then public-key decoding. -/
+def functionKeyPlan (st : Store NearState) (input : FunctionKeyInputs) (sir : Bool) : FunctionCallPlan :=
+  let keyCharges := [.ext "base"] ++ readSpan st input.publicKeyLen input.publicKeyPtr
+  match getMemOrReg st input.publicKeyPtr input.publicKeyLen with
+  | none => { charges := keyCharges, error := some (spanReadError input.publicKeyLen input.publicKeyPtr) }
+  | some publicKey =>
+    let allowanceCharges := keyCharges ++ readMem 16
+    match readU128Mem st input.allowancePtr with
+    | none => { charges := allowanceCharges, error := some .memoryAccessViolation }
+    | some _ =>
+      let receiverCharges := allowanceCharges ++ readSpan st input.receiverLen input.receiverPtr
+      match getMemOrReg st input.receiverPtr input.receiverLen with
+      | none => { charges := receiverCharges, error := some (spanReadError input.receiverLen input.receiverPtr) }
+      | some receiver =>
+        let parsedCharges := receiverCharges ++ utf8 receiver.length
+        if (String.fromUTF8? ⟨receiver.toArray⟩).isNone then { charges := parsedCharges, error := some .badUTF8 }
+        else if !st.host.config.validAccountId receiver then { charges := parsedCharges, error := some .invalidAccountId }
+        else
+          let methodsCharges := parsedCharges ++ readSpan st input.methodsLen input.methodsPtr
+          match getMemOrReg st input.methodsPtr input.methodsLen with
+          | none => { charges := methodsCharges, error := some (spanReadError input.methodsLen input.methodsPtr) }
+          | some methods =>
+            if !methodNamesValid methods then { charges := methodsCharges, error := some .emptyMethodName }
+            else match functionCallTargetError st input.target with
+            | some error => { charges := methodsCharges, error := some error }
+            | none =>
+              { charges := methodsCharges ++ [.actionBase (·.addFunctionCallKeyBase) sir,
+                  .actionBytes (·.addFunctionCallKeyByte) (methodNamesGasBytes methods) sir]
+                error := if serializedPublicKeyValid publicKey then none else some .invalidPublicKey }
+
 /-- Argument-dependent charge plan before validating promise handles. -/
-private def chargesBeforeUnvalidated (name : String) (st : Store NearState) (args : List Value) : List Charge :=
+def chargesBeforeUnvalidated (name : String) (st : Store NearState) (args : List Value) : List Charge :=
   let a := argU64 args
   let base : Charge := .ext "base"
   match name with
@@ -326,7 +390,7 @@ private def chargesBeforeUnvalidated (name : String) (st : Store NearState) (arg
     let sir := sirOf st (promiseReceiver? st (a 0).toNat)
     (functionCallPlan st (functionCallInputs args 1 (some (a 0).toNat)) sir).charges
   | "promise_batch_action_transfer" =>
-    [base] ++ readMem 16 ++ [.actionBase (·.transfer) (sirOf st (promiseReceiver? st (a 0).toNat))]
+    transferCharges st (a 0) (a 1)
   | "promise_batch_action_stake" =>
     [base] ++ readMem 16 ++ readSpan st (a 2) (a 3)
       ++ [.actionBase (·.stake) (sirOf st (promiseReceiver? st (a 0).toNat))]
@@ -334,13 +398,7 @@ private def chargesBeforeUnvalidated (name : String) (st : Store NearState) (arg
     [base] ++ readSpan st (a 1) (a 2)
       ++ [.actionBase (·.addFullAccessKey) (sirOf st (promiseReceiver? st (a 0).toNat))]
   | "promise_batch_action_add_key_with_function_call" =>
-    let sir := sirOf st (promiseReceiver? st (a 0).toNat)
-    let methods := getMemOrReg st (a 8) (a 7) |>.getD []
-    let numMethods := if methods.isEmpty then 0 else (methods.filter (· == 44)).length + 1
-    [base] ++ readSpan st (a 1) (a 2) ++ readMem 16 ++ readSpan st (a 5) (a 6)
-      ++ utf8 (spanLen st (a 5) (a 6)) ++ readSpan st (a 7) (a 8)
-      ++ [.actionBase (·.addFunctionCallKeyBase) sir,
-          .actionBytes (·.addFunctionCallKeyByte) (methods.length + numMethods) sir]
+    (functionKeyPlan st (functionKeyInputs args) (sirOf st (promiseReceiver? st (a 0).toNat))).charges
   | "promise_batch_action_delete_key" =>
     [base] ++ readSpan st (a 1) (a 2)
       ++ [.actionBase (·.deleteKey) (sirOf st (promiseReceiver? st (a 0).toNat))]
@@ -413,6 +471,14 @@ def chargesBefore (name : String) (st : Store NearState) (args : List Value) : L
       | _ => true
   else charges
 
+/-- The public pre-call plan cannot charge transfer fees for an unread amount,
+including an invalid target handle. -/
+theorem chargesBefore_transfer_invalidAmount (st : Store NearState) (index amountPtr : UInt64)
+    (h : readU128Mem st amountPtr = none) :
+    chargesBefore "promise_batch_action_transfer" st [.i64 index, .i64 amountPtr] =
+      [.ext "base"] ++ readMem 16 := by
+  simp [chargesBefore, chargesBeforeUnvalidated, storageMutationPlan?, creationAccountArgs, argU64, transferCharges, h, readMem]
+
 /-- Check each expanded prefix, retaining duplicate receipt dependencies.
 This ordering makes an earlier limit violation precede a later invalid handle. -/
 def joinedDependenciesError (handles : List PromiseHandle) (limit : Nat) : List Nat → Nat → Option HostError
@@ -445,9 +511,22 @@ def promiseJoinError (st : Store NearState) (args : List Value) : Option HostErr
         | some graph => joinedDependenciesError graph.handles limit indices 0
   | _ => none
 
+def transferInputError (st : Store NearState) (args : List Value) : Option HostError :=
+  match args with
+  | [.i64 _, .i64 amountPtr] => if (readU128Mem st amountPtr).isNone then some .memoryAccessViolation else none
+  | _ => none
+
+theorem transferInputError_invalidAmount (st : Store NearState) (index amountPtr : UInt64)
+    (h : readU128Mem st amountPtr = none) :
+    transferInputError st [.i64 index, .i64 amountPtr] = some .memoryAccessViolation := by
+  simp only [transferInputError, h, Option.isNone_none, ite_true]
+
 def invocationArgumentError (name : String) (st : Store NearState) (args : List Value) : Option HostError :=
   if let some plan := storageMutationPlan? name st args then plan.error
-  else if name == "promise_and" then promiseJoinError st args else creationPrefixError name st args
+  else if name == "promise_and" then promiseJoinError st args
+  else if name == "promise_batch_action_transfer" then transferInputError st args
+  else if name == "promise_batch_action_add_key_with_function_call" then (functionKeyPlan st (functionKeyInputs args) false).error
+  else creationPrefixError name st args
 
 def preInvokeError (name : String) (st : Store NearState) (args : List Value) : Option HostError :=
   match invocationArgumentError name st args with
@@ -617,6 +696,25 @@ def viewRestrictedHost (name : String) : Bool :=
 def deprecatedRuntimeHost (name : String) : Bool :=
   ["storage_iter_prefix", "storage_iter_range", "storage_iter_next"].contains name
 
+/-- Method bytes passed to the external receipt builder. The key ABI supplies
+CSV bytes: ASCII separators cannot split a UTF-8 multibyte sequence. -/
+def actionMethodBytes? (name : String) (before : Store NearState) (args : List Value) : Option (List UInt8) :=
+  if name == "promise_batch_action_add_key_with_function_call" then
+    getMemOrReg before (argU64 args 8) (argU64 args 7)
+  else (functionCallInputs? name args).bind fun input => getMemOrReg before input.methodPtr input.methodLen
+
+/-- Runtime externals decode method names after fees/prepayment and balance
+checks. MockedExternal deliberately accepts opaque method bytes instead. -/
+def actionMethodEncodingError (name : String) (before : Store NearState) (args : List Value) : Option HostError :=
+  if before.host.config.validateActionMethodUtf8 then
+    match actionMethodBytes? name before args with
+    | some bytes =>
+      if name == "promise_batch_action_add_key_with_function_call" then
+        if methodNameFieldsUtf8 bytes then none else some .invalidMethodName
+      else if (String.fromUTF8? ⟨bytes.toArray⟩).isNone then some .invalidMethodName else none
+    | none => none
+  else none
+
 /-- Post-call metering is separated from host invocation so its frame
 properties can be used directly in execution proofs. -/
 def finishMeteredCall (extraBytes : Nat) (name : String) (before : Store NearState)
@@ -629,7 +727,10 @@ def finishMeteredCall (extraBytes : Nat) (name : String) (before : Store NearSta
     | none =>
       match deductDeposit name before st3 args with
       | (st4, some e) => trapWith st4 e
-      | (st4, none) => .Return vals (updateStorageUsage extraBytes name before st4 args)
+      | (st4, none) =>
+        match actionMethodEncodingError name before args with
+        | some error => trapWith st4 error
+        | none => .Return vals (updateStorageUsage extraBytes name before st4 args)
   | .Trap st2 msg => .Trap st2 msg
   | .Throw st2 tag vals => .Throw st2 tag vals
 

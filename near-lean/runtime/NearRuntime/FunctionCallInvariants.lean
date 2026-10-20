@@ -20,7 +20,7 @@ theorem materializeFunctionCallRaw_funds_split (c : ReceiptCtx) (isLast : Bool) 
     receiptsFunds c.cfg (materializeFunctionCallRaw c isLast outcome initial).receipts =
       receiptsDeposits outcome.receipts + functionCallGasFunds c outcome := by
   rw [materializeFunctionCallRaw_funds]
-  simp [functionCallReceiptValue, functionCallGasFunds, sum_map_add_nat,
+  simp [functionCallReceiptValue, functionCallGasFunds,
     Fees.totalDeposit, List.map_map, Function.comp_def, receiptsDeposits, receiptsValue, depositValue]
 
 theorem materializeFunctionCallRaw_totalBalance (c : ReceiptCtx) (isLast : Bool) (outcome : VMOutcome)

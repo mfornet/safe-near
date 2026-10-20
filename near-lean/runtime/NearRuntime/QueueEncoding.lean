@@ -64,22 +64,7 @@ def congestionGas (cfg : Wasm.Near.RuntimeConfig) (receipt : Receipt) : Nat :=
   match receipt.receipt with
   | .data _ => 0
   | .action payload =>
-    let receiver := receipt.receiverId
-    let hex40 := receiver.length == 42 &&
-      (receiver.toList.drop 2).all (fun c => c.isDigit || ('a' ≤ c && c ≤ 'f'))
-    let fees := cfg.fees.actionFees
-    -- Source transfer_exec_fee has four account classes. Compute its complete
-    -- transfer fee here, so later extensions to Fees.exec cannot double-charge
-    -- the implicit creation fee in congestion metadata.
-    let creation := if isImplicitAccount receiver then
-        fees.createAccount.execution + fees.addFullAccessKey.execution
-      else if hex40 && (receiver.startsWith "0s" || (cfg.ethImplicitAccounts && receiver.startsWith "0x")) then
-        fees.createAccount.execution
-      else 0
-    let execution := (payload.actions.map fun action => match action with
-      | .transfer _ => fees.transfer.execution + creation
-      | _ => Fees.exec fees receiver action).sum
-    fees.newActionReceipt.execution + execution + Fees.totalPrepaid payload.actions
+    Fees.receiptGasBudget cfg receipt.receiverId payload.actions
 
 private def storedBytes (cfg : Option Wasm.Near.RuntimeConfig) (form : StorageForm)
     (receipt : Receipt) (bytes : Bytes) : Except String Bytes := do

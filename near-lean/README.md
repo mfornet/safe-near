@@ -137,9 +137,10 @@ impossible (`run_receipts_valid`, `run_dependency_before`,
 `run_returnedReceipt_lt`, `run_no_receipt_cycle`). Raw promise handles are checked
 before accepting an outcome, so malformed joins cannot silently disappear
 during conversion. Rejection is an explicit model issue with rollback, not contract
-success. Full host-invariant preservation, correspondence with nearcore beyond the
-conformance fixtures, global identifier freshness and scheduler correctness
-remain separate obligations.
+success. Concrete host preservation for dependency structure, returned-handle
+selection, liquid funding and raw receipt gas backing is proved below.
+Correspondence with nearcore beyond the conformance fixtures, global identifier
+freshness and scheduler correctness remain separate obligations.
 
 `NearVM/PromiseGraph.lean` now implements total incremental conversion, replacing
 the bounded recursive join walk. It stores each handle's exact ordered receipt
@@ -379,3 +380,106 @@ the chain outside the receiver's account/storage and id allocation. The outgoing
 gas term is explicit: linking it to VM reserved gas, composing multiple actions,
 and receipt-wide settlement remain required for full successful-receipt
 conservation.
+
+Transfer fees use the pinned account classification in both VM scheduling and
+runtime transaction/receipt budgets: 64 lowercase hex bytes reserve creation and
+full-access-key execution, `0x` plus 40 lowercase hex bytes add creation when
+`eth_implicit_accounts` is enabled, and `0s` deterministic addresses carry their
+creation fee. The protocol flag is loaded from the configuration and propagated
+into host metering. Fees are accumulated into one charge, preserving exhaustion
+precedence. Invalid amount pointers retain only reading costs, before handle
+lookup and transfer fees; `chargesBefore_transfer_invalidAmount` proves that
+public charge-plan frame.
+
+`ChargeReservations.applyCharges_success_reservation` proves that successful
+charge lists add exactly the sum of execution/prepaid obligations to promise
+gas. Ext/instruction burn and dependency-data charges reserve no action gas.
+`HostGasObligations` derives the raw obligations from the actual ABI reads and
+successful append operations for all nine batch-action hosts and all five
+promise-creation/join hosts. `ActionReservations` connects the public batch-action
+charge plans to their action obligations, including deployment payload lengths,
+implicit-transfer fees, function-call prepaid gas and key-method bytes.
+`CreationReservations` proves that valid creation/callback plans reserve one
+receipt base plus their action/prepaid gas; joins reserve none. Creation checks
+are derived from the executable pre-invocation guard. Dependency-data fees remain
+local burn. `MeteredReservations.finishMeteredCall_reservationInvariant` proves
+that successful post-call charging, deposit deductions/subsidies and storage
+usage updates preserve the fee table, protocol flag and raw gas backing. Terminal
+traps are excluded; catchable exceptions must preserve the invariant.
+
+`MeteredBatchReservations` connects successful precharging to raw action append
+and the complete metered wrapper for all nine batch-action hosts. Its concrete
+preservation theorems require only the incoming invariant, not an assumed output
+accounting equation. Precharging preserves memory/register reads, protocol
+validation and target lookup, so the charge and append proofs use the same ABI
+inputs. `MeteredCreationReservations` extends this to function-call creation,
+callbacks, empty batches and joins. `NeutralReservations` proves that context,
+storage, register, log and return hosts create no onward obligation and preserve
+backing. `ReservationRegistry` covers every published host, including explicit
+unsupported/deprecated rejection and legacy instruction metering.
+`ResolvedReservations` lifts this through actual import resolution and VM
+initialization; contract proofs supply no host-preservation oracle.
+
+Existing ETH/deterministic receivers support ordinary transfers. Creation of
+these account types requires protocol code/context that is not implemented;
+the runtime now reports an explicit model issue and rolls back the apply batch.
+Account-existence checks take the protocol flag explicitly; disabled protocols
+treat these addresses as named accounts for creation admission.
+
+`PromiseGas` defines execution/prepaid gas obligations for every raw action and
+receipt. It proves that append operations charge each receipt base once and
+that promise conversion preserves the obligation through arbitrary joins.
+`SuccessInvariant` and `ExecutionReservations` connect instruction/frame and
+entry charging, metered execution and successful outcome packing.
+`OutcomeReservations.run_success_gas_backing` discharges the concrete host
+premise for the public executable VM: every successful call satisfies
+`usedGas = burntGas + receiptsGas fees ethEnabled receipts`. The accompanying
+budget theorem bounds burn plus all outgoing raw obligations by actual prepaid
+gas, for arbitrary code, context, storage and interpreter fuel. Rejected, trapped
+and incomplete attempts are excluded by the executable success condition.
+This closes raw VM gas backing; runtime decoding/materialization and complete
+multi-action/receipt/chain conservation remain separate obligations.
+
+`PromiseGasInvariants` connects every modeled runtime action variant to its
+raw VM execution/prepaid cost, under explicit method-decoding facts. The
+byte-array and UTF-8 roundtrip proofs are shared in `Interpreter.Wasm.ByteEncoding`;
+wNEAR keeps its existing Borsh theorem names as wrappers around those proofs.
+Runtime calls now explicitly require UTF-8 action method names. The external
+validation policy belongs to `VMContext`, not protocol fee/limit configuration;
+`functionCallContext` always enables it. Validation runs after action fees,
+prepaid gas and deposit deduction, matching the pinned receipt manager. Invalid
+bytes produce structured `invalidMethodName` and rollback while retaining prior
+logs. Opaque-byte mode is explicit for the VM mock conformance adapter only.
+`ActionMethodValidation` proves rejection, successful decoding witnesses and
+charge/deposit error precedence. Existing funding and gas-backing proofs cover
+the additional rejection path.
+
+`MethodEncoding` splits raw comma-separated method bytes before decoding, as
+nearcore does. It proves exact field-byte reconstruction and terminator billing,
+including empty CSV and multibyte names. The VM key guard validates each field;
+successful postprocessing supplies that decoding fact and still implies a whole
+CSV UTF-8 witness. Runtime key conversion uses the same byte fields.
+
+The gas bridge now covers action lists, receipt budgets and the actual
+materializer. `materialize_run_funds` identifies outgoing receipt funds as raw
+deposits plus `(usedGas - burntGas) * gasPrice` for ordinary contracts, under
+`ReceiptGasEncodingValid`. This predicate contains only receiver/method decoding
+facts, not an assumed gas/funds equation or full action validity. Deriving it for
+every receipt from successful runtime execution remains an open invariant
+obligation. Full multi-action settlement/chain conservation and nearcore
+equivalence also remain open.
+
+Promise deployment derives `ContractCode.size` from the actual payload through
+`ContractCode.decodeSized`. Size limits, storage accounting and outgoing gas
+budgets therefore use the byte length even when decoder metadata differs.
+Three runtime regressions cover scheduling, deployment and final refunds and
+previously failed with inconsistent decoder size metadata. The decoder remains
+trusted for module/hash correspondence; this does not establish a verified
+binary-decoding theorem.
+
+Function-call-key host actions encode zero allowance as unlimited. Nonempty
+CSV method lists cost their raw byte length plus one: comma separators become
+terminators. The independent fixture checks empty/single/multiple/UTF-8 names,
+positive and maximum allowances, and a tight gas budget.
+The successful key cases do not establish malformed-list rejection or complete
+host input-error ordering; those remain implementation/conformance gaps.

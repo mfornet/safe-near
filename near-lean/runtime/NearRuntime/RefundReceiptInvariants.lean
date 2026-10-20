@@ -276,7 +276,7 @@ theorem refundTransferState_totalBalance (c : ReceiptCtx) (st : ChainState) (acc
 
 /-- Refunds report execution gas even though settlement charges no token fees. -/
 def refundExecutionGas (c : ReceiptCtx) (amount : Nat) : Nat :=
-  c.cfg.fees.actionFees.newActionReceipt.execution + Fees.exec c.cfg.fees.actionFees c.receipt.receiverId (.transfer amount)
+  c.cfg.fees.actionFees.newActionReceipt.execution + Fees.exec c.cfg.fees.actionFees c.cfg.wasm.ethImplicitAccounts c.receipt.receiverId (.transfer amount)
 
 /-- Exact single-refund evaluation before finalization, for an existing receiver. -/
 theorem refund_receiptActionBody_run (c : ReceiptCtx) (before : Exec) (account : Account) (amount : Nat)

@@ -503,9 +503,12 @@ theorem finishMeteredCall_preserves (extra : Nat) (name : String) (before : Stor
           cases error with
           | some error => exact hfinal
           | none =>
-            change PromisesWellFormedFrom 0 (updateStorageUsage extra name before final args).host.promises
-            rw [updateStorageUsage_promises]
-            exact hfinal
+            cases he : actionMethodEncodingError name before args with
+            | some error => exact hfinal
+            | none =>
+              change PromisesWellFormedFrom 0 (updateStorageUsage extra name before final args).host.promises
+              rw [updateStorageUsage_promises]
+              exact hfinal
 
 /-- Metering preserves the host invariant even if charging, deposit deduction
 or storage accounting turns a successful host call into a trap. -/

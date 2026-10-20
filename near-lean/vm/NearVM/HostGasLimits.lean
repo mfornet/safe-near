@@ -71,7 +71,10 @@ theorem finishMeteredCall_gasLimits (extra : Nat) (name : String) (before : Stor
           rw [hd] at hfinal
           cases error with
           | some error => exact hfinal
-          | none => exact updateStorageUsage_gasLimits extra name before final args hfinal
+          | none =>
+            cases he : actionMethodEncodingError name before args with
+            | some error => exact hfinal
+            | none => exact updateStorageUsage_gasLimits extra name before final args hfinal
 
 theorem metered_preserves_gasLimits (extra : Nat) (name : String) (fn : HostFn NearState)
     (hfn : HostPreservesGasLimits fn) : HostPreservesGasLimits (metered extra name fn) := by

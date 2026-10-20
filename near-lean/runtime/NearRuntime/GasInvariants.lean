@@ -255,7 +255,7 @@ theorem gasBound_fee (isRefund : Bool) (fee : Nat) :
 /-- One action is backed by its protocol execution fee and attached gas. -/
 theorem runReceiptAction_gasBound (c : ReceiptCtx) (onlyAction isLast : Bool) (action : Action) :
     (runReceiptAction c onlyAction isLast action).GasBound
-      (Fees.exec c.cfg.fees.actionFees c.receipt.receiverId action + action.attachedGas) := by
+      (Fees.exec c.cfg.fees.actionFees c.cfg.wasm.ethImplicitAccounts c.receipt.receiverId action + action.attachedGas) := by
   unfold runReceiptAction
   refine ExecM.GasBound.bind (gasBound_fee _ _) (fun _ => ?_)
   exact gasBound_bind_left_zero (gasBound_checkReceiptAction c onlyAction action)
@@ -265,7 +265,7 @@ theorem runReceiptAction_gasBound (c : ReceiptCtx) (onlyAction isLast : Bool) (a
 including an early error that stops the remaining actions. -/
 theorem runReceiptActionList_gasBound (c : ReceiptCtx) (onlyAction : Bool) (actions : List Action) (index : Nat) :
     (runReceiptActionList c onlyAction actions index).GasBound
-      (Fees.totalExec c.cfg.fees.actionFees c.receipt.receiverId actions + Fees.totalPrepaid actions) := by
+      (Fees.totalExec c.cfg.fees.actionFees c.cfg.wasm.ethImplicitAccounts c.receipt.receiverId actions + Fees.totalPrepaid actions) := by
   induction actions generalizing index with
   | nil => exact gasBound_pure _
   | cons action rest ih =>

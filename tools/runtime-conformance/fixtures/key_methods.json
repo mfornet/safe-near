@@ -1,0 +1,50 @@
+{
+  "code": "tools/runtime-conformance/fixtures/key_methods.wasm",
+  "sha256": "d29d3281d8a1d567991afba3c7f3e24c6a58006fd63d3d818080e5a1576070cc",
+  "protocolVersion": 86,
+  "initialBalance": "100",
+  "storage": [],
+  "calls": [
+    {
+      "name": "key_methods: empty",
+      "method": "empty",
+      "args": {}
+    },
+    {
+      "name": "key_methods: single",
+      "method": "single",
+      "args": {}
+    },
+    {
+      "name": "key_methods: two",
+      "method": "two",
+      "args": {}
+    },
+    {
+      "name": "key_methods: three",
+      "method": "three",
+      "args": {}
+    },
+    {
+      "name": "key_methods: unicode",
+      "method": "unicode",
+      "args": {}
+    },
+    {
+      "name": "key_methods: two_finite",
+      "method": "two_finite",
+      "args": {}
+    },
+    {
+      "name": "key_methods: single_max",
+      "method": "single_max",
+      "args": {}
+    },
+    {
+      "name": "key_methods: two tight gas",
+      "method": "two",
+      "args": {},
+      "gas": 446801204887
+    }
+  ]
+}
