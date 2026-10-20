@@ -74,3 +74,12 @@ scheduler) and 77 (global contracts) do not produce output files, and the
 diffs at 46, 50, 55 and 63 are empty in this crate version. If any of the
 remaining omitted fields are needed, extend the custom serializer that reads the internal
 `RuntimeConfig` directly.
+
+The native `wasm_config.vm_kind` selector depends on the generator's host
+architecture (these committed tables were generated on ARM with Wasmtime).
+The Lean configuration loader does not consume this field. CI runs
+`tools/check_runtime_configs.py` against regenerated tables: it validates the
+backend enum and reports selector differences, then requires exact structural
+equality for every other field and the complete file set. nearcore's own
+configuration snapshots similarly redact this selector. The original generated
+JSON remains intact; no fees, feature flags or limits are normalized.

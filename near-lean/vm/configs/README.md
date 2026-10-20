@@ -141,3 +141,12 @@ global-contract compute costs, `global_contract_storage_amount_per_byte`,
 `bandwidth_scheduler_config`, `use_state_stored_receipt`, and the per
 host-function compute costs (only gas is emitted). See
 `tools/dump-runtime-config/README.md`.
+
+The native `wasm_config.vm_kind` selector depends on the generator's host
+architecture (these committed tables were generated on ARM with Wasmtime).
+The Lean configuration loader does not consume this field. CI runs
+`tools/check_runtime_configs.py` against regenerated tables: it validates the
+backend enum and reports selector differences, then requires exact structural
+equality for every other field and the complete file set. nearcore's own
+configuration snapshots similarly redact this selector. The original generated
+JSON remains intact; no fees, feature flags or limits are normalized.
