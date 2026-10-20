@@ -1,14 +1,8 @@
 # Proving
 
-Once we have the contracts and the statements, we just need to scale theorem proving,
-This might be the most expensive part of the system, so we need to make it as cheap 
-as possible. 
+To follow and control the progress on what is being proven we are going to use
+lean blueprint through lean architect.
 
-This part requires little trust, once the proof is finalized, for that we should use
-state of the art tools in LEAN to verify the final proofs. 
+https://github.com/PatrickMassot/leanblueprint
+https://github.com/hanwenzhu/LeanArchitect
 
-- Lean Kernel using accepted three axioms (no sorry and no native decide)
-- Comparator in strict mode
-
-Note this is only needed at the very end of the verification, during the development
-of the proof we can use fastart and "trusted" tools.

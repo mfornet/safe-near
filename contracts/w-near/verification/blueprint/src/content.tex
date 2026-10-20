@@ -126,10 +126,32 @@ initialisation) and dispatches.
 
 \inputleanmodule{Spec.Refinement}
 
-\section{What the runtime must provide}
+\section{The near-lean instance}
 
-Beyond the interface above, the refinement proof will need from
-\texttt{near-lean}:
+\texttt{near-lean/vm} provides the runtime: \texttt{NearVM.run} executes one
+function call of a decoded module under a \texttt{VMContext} and returns a
+\texttt{VMOutcome} with nearcore's error taxonomy, gas, logs and receipts.
+\texttt{Spec/RuntimeInstance.lean} instantiates the interface with it, encoding
+arguments and return values as near-sdk 3.1.0 does and reading the created
+receipts back as the model's promises. The obligation below is what remains to
+be proven about \texttt{contract.wasm}; its proof is the Wasm-level work
+(interpreter semantics plus the Iris separation logic of
+\texttt{near-lean/iris-wasm}).
+
+\inputleanmodule{Spec.RuntimeInstance}
+
+\begin{theorem}[Refinement of contract.wasm]
+\label{thm:refinement}
+\uses{spec:refinement-near-lean}
+\notready
+For the module decoded from \texttt{contract.wasm} and every protocol
+configuration in \texttt{near-lean/vm/configs}, \cref{spec:refinement-near-lean}
+holds.
+\end{theorem}
+
+\section{What the runtime provides}
+
+The refinement proof needs, and \texttt{near-lean} now has:
 
 \begin{itemize}
 \item The deployed module decoded from \texttt{contract.wasm}, and a
@@ -159,7 +181,7 @@ become a Lean statement once that model exists.
 
 \begin{theorem}[Solvency]
 \label{thm:solvency}
-\uses{spec:conservation, spec:inv-preserved, spec:refinement}
+\uses{spec:conservation, spec:inv-preserved, thm:refinement}
 \notready
 In every reachable chain state, the NEAR balance of \texttt{wrap.near} is at
 least its total supply plus one registration fee per registered account plus
@@ -177,7 +199,7 @@ storage.
 
 \begin{theorem}[Transfer-call resolution]
 \label{thm:transfer-call}
-\uses{spec:refinement, spec:balance-authorization}
+\uses{thm:refinement, spec:balance-authorization}
 \notready
 After an \texttt{ft\_transfer\_call} of $a$ from $S$ to $R$ and its callback,
 if no other receipt touched $R$'s balance in between, then $S$ was debited
