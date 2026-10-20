@@ -41,6 +41,10 @@ upstream small; only the interpreter dependency was repointed from
   design.
 - `CodeLib/Generated.lean`: the `watFunctionBody%` / `watModuleMetadata%`
   elaborators and `checkWatFidelity` used by every generated `Program.lean`.
+  It imports AST tooling and link attributes directly, so executing generated
+  programs does not pull in Iris or the CodeLib proof examples. The program
+  regression harness's local import closure contains 25 modules rather than
+  119; only `CodeLib.Generated` and `CodeLib.Attrs` are from CodeLib.
 - `CodeLib/Attrs.lean`: `@[spec_of]` and `@[proves]`.
 - `CodeLib/IEEE32/Exec.lean`: declares the float bridge axioms; a build root
   but deliberately not reachable from the `CodeLib` umbrella.

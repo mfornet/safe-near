@@ -384,13 +384,51 @@ theorem abortMetered_reservationView : HostPreservesReservationView abortMetered
 def reservationNeutralNames : List String :=
   ["input", "read_register", "register_len", "write_register", "value_return", "storage_write", "storage_read", "storage_remove", "storage_has_key", "current_account_id", "predecessor_account_id", "signer_account_id", "attached_deposit", "log_utf8", "signer_account_pk", "block_index", "block_height", "block_timestamp", "epoch_height", "storage_usage", "account_balance", "account_locked_balance", "prepaid_gas", "used_gas", "log_utf16", "random_seed", "promise_results_count", "promise_result", "promise_return", "panic", "panic_utf8", "abort"]
 
+@[simp] theorem storageValueCharges_reservation (st : Store NearState) (cost : String)
+    (key : List UInt8) (fees : ActionFees) :
+    ((storageValueCharges st cost key).map (fun charge => charge.reservation fees)).sum = 0 := by
+  unfold storageValueCharges
+  split
+  · cases st.host.storage key <;> rfl
+  · rfl
+
+/-- Storage plans contain only local ext-cost burns, including old-value reads. -/
+theorem storageMutationPlan_reservation (name : String) (st : Store NearState) (args : List Value)
+    (plan : StorageMutationPlan) (fees : ActionFees) (h : storageMutationPlan? name st args = some plan) :
+    ((plan.charges.map (fun charge => charge.reservation fees)).sum) = 0 := by
+  have hext (cost : String) (count : Nat) : (Charge.ext cost count).reservation fees = 0 := rfl
+  cases hk : getMemOrReg st (argU64 args 1) (argU64 args 0) <;>
+    cases hkl : st.host.config.maxStorageKeyLen <;>
+    cases hv : getMemOrReg st (argU64 args 3) (argU64 args 2) <;>
+    cases hvl : st.host.config.maxStorageValueLen
+  all_goals simp only [storageMutationPlan?, hk, hkl, hv, hvl, pure] at h
+  all_goals repeat' (first | contradiction | split at h)
+  all_goals have hp := Option.some.inj h
+  all_goals cases hp
+  all_goals simp only [List.map_append, List.sum_append, List.map_cons, List.map_nil, List.sum_cons,
+    List.sum_nil, readSpan_reservation, storageValueCharges_reservation, hext, Nat.add_zero]
+
+theorem chargesBefore_storage_reservation (name : String) (st : Store NearState) (args : List Value)
+    (hname : name = "storage_write" ∨ name = "storage_remove") :
+    ((chargesBefore name st args).map (fun charge => charge.reservation st.host.fees)).sum = 0 := by
+  unfold chargesBefore
+  split
+  · rename_i plan he
+    exact storageMutationPlan_reservation name st args plan st.host.fees he
+  · rcases hname with h | h <;> subst name <;>
+      simp [chargesBeforeUnvalidated, creationAccountArgs, Charge.reservation]
+
 theorem chargesBefore_neutral_reservation (name : String) (st : Store NearState) (args : List Value)
     (hname : name ∈ reservationNeutralNames) :
     ((chargesBefore name st args).map (fun charge => charge.reservation st.host.fees)).sum = 0 := by
   simp only [reservationNeutralNames, List.mem_cons, List.not_mem_nil, or_false] at hname
   rcases hname with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
   all_goals subst name
-  all_goals dsimp only [chargesBefore, chargesBeforeUnvalidated, creationAccountArgs, argU64,
+  all_goals first
+    | exact chargesBefore_storage_reservation _ _ _ (Or.inl rfl)
+    | exact chargesBefore_storage_reservation _ _ _ (Or.inr rfl)
+    | skip
+  all_goals dsimp only [chargesBefore, chargesBeforeUnvalidated, storageMutationPlan?, creationAccountArgs, argU64,
     readMem, writeMem, writeReg, readSpan, utf8, utf16, Charge.reservation]
   all_goals simp
   all_goals repeat' (first | rfl | contradiction | constructor | split)
@@ -401,13 +439,17 @@ theorem meteredNeutral_reservationInvariant (fees : ActionFees) (ethEnabled : Bo
     (hfn : HostPreservesReservationView fn) :
     HostFn.PreservesLive (ReservationInvariant fees ethEnabled) (metered extra name fn) := by
   apply metered_reservationInvariant
-  intro st args h hs _
+  intro st args h hs _ hext
   have hv := applyCharges_success_zero_reservation st.host (chargesBefore name st args) hs
     (chargesBefore_neutral_reservation name st args hname)
   have hp : ReservationInvariant fees ethEnabled (prechargedStore name st args).host :=
     ReservationInvariant.of_view_eq hv h
-  have hr := hfn (prechargedStore name st args) args
-  cases he : fn.invoke (prechargedStore name st args) args <;>
+  let ready := (prepareStorageCall name (prechargedStore name st args) args).1
+  have hview : reservationView ready.host = reservationView (prechargedStore name st args).host :=
+    Prod.ext rfl (prepareStorageCall_success_promisesGas _ _ _ hext)
+  have hp : ReservationInvariant fees ethEnabled ready.host := ReservationInvariant.of_view_eq hview hp
+  have hr := hfn ready args
+  cases he : fn.invoke ready args <;>
     rw [he] at hr <;> first | trivial | exact ReservationInvariant.of_view_eq hr hp
 
 end Wasm.Near

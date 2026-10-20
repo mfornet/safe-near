@@ -21,28 +21,28 @@ open Wasm Wasm.Near Wasm.ByteEncoding
 
 /-- Size is fixed by the actual promise payload, independent of decoder metadata. -/
 theorem actionOfPromise_deploy_size (decoder : Bytes → ContractCode) (bytes : Bytes) :
-    actionOfPromise decoder (.deployContract bytes) =
+    actionOfPromiseRaw decoder (.deployContract bytes) =
       .deployContract { decoder bytes with size := bytes.length } := rfl
 
 theorem deployPromise_executionGas (cfg : RuntimeConfig) (decoder : Bytes → ContractCode)
     (receiver : AccountId) (bytes : Bytes) :
-    Fees.exec cfg.fees.actionFees cfg.wasm.ethImplicitAccounts receiver (actionOfPromise decoder (.deployContract bytes)) =
+    Fees.exec cfg.fees.actionFees cfg.wasm.ethImplicitAccounts receiver (actionOfPromiseRaw decoder (.deployContract bytes)) =
       actionExecutionGas cfg.fees.actionFees cfg.wasm.ethImplicitAccounts (bytesOfString receiver) (.deployContract bytes) := rfl
 
 /-- Byte-preserving UTF-8 method encoding supplies the exact runtime billing
 length. No gas or financial equation is assumed. -/
 theorem functionCallPromise_executionGas (cfg : RuntimeConfig) (decoder : Bytes → ContractCode)
     (receiver method : String) (args : Bytes) (deposit : Nat) (gas : UInt64) :
-    let action := actionOfPromise decoder (.functionCall (bytesOfString method) args deposit gas)
+    let action := actionOfPromiseRaw decoder (.functionCall (bytesOfString method) args deposit gas)
     Fees.exec cfg.fees.actionFees cfg.wasm.ethImplicitAccounts receiver action + action.attachedGas =
       actionExecutionGas cfg.fees.actionFees cfg.wasm.ethImplicitAccounts (bytesOfString receiver)
         (.functionCall (bytesOfString method) args deposit gas) := by
-  simp [actionOfPromise, Fees.exec, Action.attachedGas, actionExecutionGas]
+  simp [actionOfPromiseRaw, Fees.exec, Action.attachedGas, actionExecutionGas]
 
 theorem functionCallPromise_executionGas_of_utf8 (cfg : RuntimeConfig) (decoder : Bytes → ContractCode)
     (receiver : AccountId) (method args : Bytes) (decoded : String) (deposit : Nat) (gas : UInt64)
     (hutf8 : String.fromUTF8? (ByteArray.mk method.toArray) = some decoded) :
-    let action := actionOfPromise decoder (.functionCall method args deposit gas)
+    let action := actionOfPromiseRaw decoder (.functionCall method args deposit gas)
     Fees.exec cfg.fees.actionFees cfg.wasm.ethImplicitAccounts receiver action + action.attachedGas =
       actionExecutionGas cfg.fees.actionFees cfg.wasm.ethImplicitAccounts (bytesOfString receiver)
         (.functionCall method args deposit gas) := by
@@ -56,11 +56,11 @@ theorem functionCallPromise_executionGas_of_utf8 (cfg : RuntimeConfig) (decoder 
 theorem functionKeyPromise_executionGas (cfg : RuntimeConfig) (decoder : Bytes → ContractCode)
     (receiver : AccountId) (pk : Bytes) (nonce : UInt64) (allowance : Option Nat)
     (keyReceiver methods : Bytes) (hutf8 : methodNameFieldsUtf8 methods = true) :
-    let action := actionOfPromise decoder (.addKey pk nonce (.functionCall allowance keyReceiver methods))
+    let action := actionOfPromiseRaw decoder (.addKey pk nonce (.functionCall allowance keyReceiver methods))
     Fees.exec cfg.fees.actionFees cfg.wasm.ethImplicitAccounts receiver action + action.attachedGas =
       actionExecutionGas cfg.fees.actionFees cfg.wasm.ethImplicitAccounts (bytesOfString receiver)
         (.addKey pk nonce (.functionCall allowance keyReceiver methods)) := by
-  simp only [actionOfPromise, Fees.exec, Action.attachedGas, actionExecutionGas, Nat.add_zero]
+  simp only [actionOfPromiseRaw, Fees.exec, Action.attachedGas, actionExecutionGas, Nat.add_zero]
   rw [decodeMethodNames_billed_length methods hutf8]
   rfl
 
@@ -74,8 +74,8 @@ def PromiseActionMethodsUtf8 : PromiseAction → Prop
 actual decoding, rather than assuming a financial/gas equation. -/
 theorem promiseAction_executionGas (cfg : RuntimeConfig) (decoder : Bytes → ContractCode)
     (receiver : AccountId) (action : PromiseAction) (h : PromiseActionMethodsUtf8 action) :
-    Fees.exec cfg.fees.actionFees cfg.wasm.ethImplicitAccounts receiver (actionOfPromise decoder action) +
-      (actionOfPromise decoder action).attachedGas =
+    Fees.exec cfg.fees.actionFees cfg.wasm.ethImplicitAccounts receiver (actionOfPromiseRaw decoder action) +
+      (actionOfPromiseRaw decoder action).attachedGas =
         actionExecutionGas cfg.fees.actionFees cfg.wasm.ethImplicitAccounts (bytesOfString receiver) action := by
   cases action with
   | functionCall method args deposit gas =>
@@ -98,8 +98,8 @@ def SimpleGasAction : PromiseAction → Prop
 
 theorem simplePromise_executionGas (cfg : RuntimeConfig) (decoder : Bytes → ContractCode)
     (receiver : AccountId) (action : PromiseAction) (h : SimpleGasAction action) :
-    Fees.exec cfg.fees.actionFees cfg.wasm.ethImplicitAccounts receiver (actionOfPromise decoder action) +
-      (actionOfPromise decoder action).attachedGas =
+    Fees.exec cfg.fees.actionFees cfg.wasm.ethImplicitAccounts receiver (actionOfPromiseRaw decoder action) +
+      (actionOfPromiseRaw decoder action).attachedGas =
         actionExecutionGas cfg.fees.actionFees cfg.wasm.ethImplicitAccounts (bytesOfString receiver) action := by
   cases action <;> try contradiction
   case addKey pk nonce permission =>
@@ -110,8 +110,8 @@ theorem simplePromise_executionGas (cfg : RuntimeConfig) (decoder : Bytes → Co
 theorem promiseActions_executionGas (cfg : RuntimeConfig) (decoder : Bytes → ContractCode)
     (receiver : AccountId) (actions : List PromiseAction)
     (h : ∀ action ∈ actions, PromiseActionMethodsUtf8 action) :
-    Fees.totalExec cfg.fees.actionFees cfg.wasm.ethImplicitAccounts receiver (actions.map (actionOfPromise decoder)) +
-      Fees.totalPrepaid (actions.map (actionOfPromise decoder)) =
+    Fees.totalExec cfg.fees.actionFees cfg.wasm.ethImplicitAccounts receiver (actions.map (actionOfPromiseRaw decoder)) +
+      Fees.totalPrepaid (actions.map (actionOfPromiseRaw decoder)) =
         (actions.map (actionExecutionGas cfg.fees.actionFees cfg.wasm.ethImplicitAccounts (bytesOfString receiver))).sum := by
   induction actions with
   | nil => rfl
@@ -127,7 +127,7 @@ receipt base, once actual action-method decoding is established. -/
 theorem promiseReceipt_gasBudget (cfg : RuntimeConfig) (decoder : Bytes → ContractCode)
     (receiver : AccountId) (actions : List PromiseAction)
     (h : ∀ action ∈ actions, PromiseActionMethodsUtf8 action) :
-    Fees.receiptGasBudget cfg receiver (actions.map (actionOfPromise decoder)) =
+    Fees.receiptGasBudget cfg receiver (actions.map (actionOfPromiseRaw decoder)) =
       receiptGasValue cfg.fees.actionFees cfg.wasm.ethImplicitAccounts (bytesOfString receiver) actions := by
   have he := promiseActions_executionGas cfg decoder receiver actions h
   unfold Fees.receiptGasBudget receiptGasValue
@@ -160,7 +160,7 @@ theorem outcomeOfExecution_success_gasEncoding (ctx : VMContext) (storage : List
   outcomeOfExecution_success_predicate ReceiptEncoding ctx storage final error hsuccess h
 
 def decodedReceiptGas (cfg : RuntimeConfig) (decoder : Bytes → ContractCode) (spec : ReceiptSpec) : Nat :=
-  Fees.receiptGasBudget cfg (stringOfBytes spec.receiverId) (spec.actions.map (actionOfPromise decoder))
+  Fees.receiptGasBudget cfg (stringOfBytes spec.receiverId) (spec.actions.map (actionOfPromiseRaw decoder))
 
 /-- Runtime materialization's actual string conversion has the same receipt
 budget; the premises are decoding facts, never assumed gas/fund equations. -/
@@ -218,7 +218,9 @@ theorem functionCallGasFunds_eq_decoded (c : ReceiptCtx) (outcome : VMOutcome)
     functionCallGasFunds c outcome =
       (outcome.receipts.map (decodedReceiptGas c.cfg c.codeOf)).sum * c.action.gasPrice := by
   simp only [functionCallGasFunds, beq_eq_false_iff_ne.mpr hreceiver, Bool.false_eq_true, ite_false]
-  exact List.sum_map_mul_right (l := outcome.receipts) (f := decodedReceiptGas c.cfg c.codeOf) (r := c.action.gasPrice)
+  induction outcome.receipts with
+  | nil => simp
+  | cons spec specs ih => simp_all [Nat.add_mul, decodedReceiptGas]
 
 /-- For an actual successful VM call, materialized onward gas funds are exactly
 the public counter's reservation, with encoding proved from the strict policy. -/
@@ -234,7 +236,7 @@ theorem run_functionCallGasFunds (c : ReceiptCtx) (code : Module) (codeSize : Na
   rw [functionCallGasFunds_eq_decoded c _ hreceiver, decodedReceiptsGas_eq_raw c.cfg c.codeOf _ hencoding]
   rw [run_success_receipts_gas_eq_reserved c.cfg code codeSize method ctx storage fuel hsuccess]
 
-/-- The real materializer's complete new-receipt funds split into outgoing
+/-- The pure materialization stage's complete new-receipt funds split into outgoing
 deposits and gas reservation purchased at the inherited price. -/
 theorem materialize_run_funds (c : ReceiptCtx) (isLast : Bool) (initial : ChainState)
     (code : Module) (codeSize : Nat) (method : String) (ctx : VMContext)
@@ -242,11 +244,11 @@ theorem materialize_run_funds (c : ReceiptCtx) (isLast : Bool) (initial : ChainS
     (hreceiver : c.receipt.receiverId ≠ systemAccount)
     (hsuccess : (Wasm.Near.run c.cfg code codeSize method ctx storage fuel).aborted = none)
     (hpolicy : ctx.validateActionMethodUtf8 = true) :
-    receiptsFunds c.cfg (materializeFunctionCall c isLast (Wasm.Near.run c.cfg code codeSize method ctx storage fuel) initial).receipts =
+    receiptsFunds c.cfg (materializeFunctionCallRaw c isLast (Wasm.Near.run c.cfg code codeSize method ctx storage fuel) initial).receipts =
       receiptsDeposits (Wasm.Near.run c.cfg code codeSize method ctx storage fuel).receipts +
         ((Wasm.Near.run c.cfg code codeSize method ctx storage fuel).usedGas -
           (Wasm.Near.run c.cfg code codeSize method ctx storage fuel).burntGas) * c.action.gasPrice := by
-  rw [materializeFunctionCall_funds_split, run_functionCallGasFunds c code codeSize method ctx storage fuel hreceiver hsuccess hpolicy]
+  rw [materializeFunctionCallRaw_funds_split, run_functionCallGasFunds c code codeSize method ctx storage fuel hreceiver hsuccess hpolicy]
 
 /-- At the actual runtime context seam even the policy premise is discharged:
 ordinary successful calls materialize exactly their raw deposits and reserved gas funds. -/
@@ -256,7 +258,7 @@ theorem materialize_functionCall_run_funds (c : ReceiptCtx) (account : Account)
     (hreceiver : c.receipt.receiverId ≠ systemAccount)
     (hsuccess : (Wasm.Near.run c.cfg code codeSize method
       (functionCallContext c account args gas deposit isLast) storage fuel).aborted = none) :
-    receiptsFunds c.cfg (materializeFunctionCall c isLast
+    receiptsFunds c.cfg (materializeFunctionCallRaw c isLast
       (Wasm.Near.run c.cfg code codeSize method (functionCallContext c account args gas deposit isLast) storage fuel) initial).receipts =
       receiptsDeposits (Wasm.Near.run c.cfg code codeSize method
         (functionCallContext c account args gas deposit isLast) storage fuel).receipts +
@@ -264,5 +266,22 @@ theorem materialize_functionCall_run_funds (c : ReceiptCtx) (account : Account)
         (Wasm.Near.run c.cfg code codeSize method (functionCallContext c account args gas deposit isLast) storage fuel).burntGas) * c.action.gasPrice :=
   materialize_run_funds c isLast initial code codeSize method
     (functionCallContext c account args gas deposit isLast) storage fuel hreceiver hsuccess rfl
+
+/-- Successful checked construction retains the concrete VM funding result.
+Decoder/model issues are excluded by the executable validation witness. -/
+theorem materialize_checked_run_funds (c : ReceiptCtx) (isLast : Bool) (initial : ChainState)
+    (code : Module) (codeSize : Nat) (method : String) (ctx : VMContext)
+    (storage : List (Bytes × Bytes)) (fuel : Nat) (effects : FunctionCallEffects)
+    (hreceiver : c.receipt.receiverId ≠ systemAccount)
+    (hsuccess : (Wasm.Near.run c.cfg code codeSize method ctx storage fuel).aborted = none)
+    (hpolicy : ctx.validateActionMethodUtf8 = true)
+    (hmaterialized : materializeFunctionCall c isLast
+      (Wasm.Near.run c.cfg code codeSize method ctx storage fuel) initial = .ok effects) :
+    receiptsFunds c.cfg effects.receipts =
+      receiptsDeposits (Wasm.Near.run c.cfg code codeSize method ctx storage fuel).receipts +
+        ((Wasm.Near.run c.cfg code codeSize method ctx storage fuel).usedGas -
+          (Wasm.Near.run c.cfg code codeSize method ctx storage fuel).burntGas) * c.action.gasPrice := by
+  rw [materializeFunctionCall_success c isLast _ initial effects hmaterialized]
+  exact materialize_run_funds c isLast initial code codeSize method ctx storage fuel hreceiver hsuccess hpolicy
 
 end Near

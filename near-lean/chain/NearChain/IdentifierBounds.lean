@@ -3,53 +3,50 @@ import NearChain.AllocatorMonotonicity
 namespace Near
 open Wasm.Near
 
-/-- The routing state and all inter-block pending receipts use allocated ids.
+/-- Routing state and all inter-block pending receipts use allocated ids.
 This numeric bound does not assert ownership, uniqueness or graph validity. -/
 def Snapshot.IdentifierBounds (s : Snapshot) : Prop :=
   s.state.IdsBelowNext ∧ ReceiptList.IdsBelow s.state.nextId s.pending
 
-theorem step_identifier_bounds (cfg : RuntimeConfig) (decoder : CodeTable) (s : Snapshot) (b : Block)
-    (h : s.IdentifierBounds) : (step cfg decoder s b).1.IdentifierBounds := by
-  unfold step
-  dsimp only
-  split
-  · exact h
-  · exact apply_identifier_bounds cfg b.ap decoder s.state b.txs s.pending h.1 h.2
+theorem step_identifier_bounds (cfg : RuntimeConfig) (decoder : CodeTable) (s next : Snapshot) (b : Block)
+    (result : ApplyResult) (hs : step cfg decoder s b = .ok (next, result))
+    (h : s.IdentifierBounds) : next.IdentifierBounds := by
+  cases hr : b.receipts.resolve s.pending with
+  | error error => simp [step, hr] at hs
+  | ok pair =>
+    obtain ⟨incoming, deferred⟩ := pair
+    have hp := ReceiptSchedule.resolve_perm s.pending b.receipts incoming deferred hr
+    have hin : ReceiptList.IdsBelow s.state.nextId incoming := by
+      intro receipt hm
+      exact h.2 receipt (hp.mem_iff.mp (List.mem_append_left _ hm))
+    have hdefer : ReceiptList.IdsBelow s.state.nextId deferred := by
+      intro receipt hm
+      exact h.2 receipt (hp.mem_iff.mp (List.mem_append_right _ hm))
+    simp only [step, hr] at hs
+    split at hs
+    · cases hs; exact h
+    · cases hs
+      have ha := apply_identifier_bounds cfg b.ap decoder s.state b.txs incoming h.1 hin
+      exact ⟨ha.1, (hdefer.mono (apply_nextId_mono cfg b.ap decoder s.state b.txs incoming)).append ha.2⟩
 
-/-- Bounds for every referenced id survive arbitrary supported block sequences. -/
+/-- Every reference stays allocated under arbitrary accepted schedules. -/
 theorem Reachable.identifier_bounds (cfg : RuntimeConfig) (decoder : CodeTable) (genesis s : Snapshot)
     (hgenesis : genesis.IdentifierBounds) (h : Reachable cfg decoder genesis s) : s.IdentifierBounds := by
   induction h with
   | refl => exact hgenesis
-  | step b _ _ ih => exact step_identifier_bounds cfg decoder _ b ih
+  | step b result hs _ _ ih => exact step_identifier_bounds cfg decoder _ _ b result hs ih
 
 theorem settle_identifier_bounds (cfg : RuntimeConfig) (decoder : CodeTable) (ap : ApplyState)
     (s : Snapshot) (fuel : Nat) (h : s.IdentifierBounds) :
-    (settle cfg decoder ap s fuel).snapshot.IdentifierBounds := by
-  induction fuel generalizing s with
-  | zero => exact h
-  | succ fuel ih =>
-    unfold settle
-    split
-    · exact h
-    · dsimp only
-      have hs := step_identifier_bounds cfg decoder s { ap, txs := [] } h
-      split
-      · exact hs
-      · exact ih _ hs
+    (settle cfg decoder ap s fuel).snapshot.IdentifierBounds :=
+  settle_snapshot_invariant cfg decoder Snapshot.IdentifierBounds (step_identifier_bounds cfg decoder) ap s fuel h
 
 theorem runIsolated_identifier_bounds (cfg : RuntimeConfig) (decoder : CodeTable) (ap : ApplyState)
     (s : Snapshot) (txs : List Transaction) (fuel : Nat) (h : s.IdentifierBounds) :
-    (runIsolated cfg decoder ap s txs fuel).snapshot.IdentifierBounds := by
-  unfold runIsolated
-  dsimp only
-  have hs := step_identifier_bounds cfg decoder s { ap, txs } h
-  split
-  · exact hs
-  · exact settle_identifier_bounds cfg decoder ap _ fuel hs
+    (runIsolated cfg decoder ap s txs fuel).snapshot.IdentifierBounds :=
+  runIsolated_snapshot_invariant cfg decoder Snapshot.IdentifierBounds (step_identifier_bounds cfg decoder) ap s txs fuel h
 
-/-- The allocator frontier cannot coincide with any currently live routing or
-pending reference. Duplicate ids already below that frontier are not excluded. -/
+/-- The allocator frontier cannot coincide with any live routing or pending id. -/
 theorem Snapshot.IdentifierBounds.nextId_fresh (s : Snapshot) (h : s.IdentifierBounds) :
     s.state.nextId ∉ s.state.liveIds ∧ ∀ receipt ∈ s.pending, s.state.nextId ∉ receipt.liveIds := by
   refine ⟨h.1.fresh, ?_⟩

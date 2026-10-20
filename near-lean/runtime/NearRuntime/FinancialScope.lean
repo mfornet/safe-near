@@ -102,12 +102,10 @@ theorem emitFunctionCallActions_financialScope (c : ReceiptCtx) (specs : List Re
 scope. A real successful call's sender is ordinary when the system actor is absent. -/
 theorem materializeFunctionCall_financialScope (c : ReceiptCtx) (isLast : Bool) (outcome : VMOutcome)
     (initial : ChainState) (hsender : c.receipt.receiverId ≠ systemAccount) (hsigner : c.action.signerId ≠ systemAccount) :
-    ∀ receipt ∈ (materializeFunctionCall c isLast outcome initial).receipts, ReceiptFinancialScope receipt := by
-  rw [materializeFunctionCall_eq_stages]
+    ∀ receipt ∈ (materializeFunctionCallRaw c isLast outcome initial).receipts, ReceiptFinancialScope receipt := by
+  rw [materializeFunctionCallRaw_eq_stages]
   cases hr : outcome.returnData <;> dsimp only
   all_goals apply emitFunctionCallActions_financialScope _ _ _ _ _ _ hsender hsigner
-  · exact emitFunctionCallData_financialScope _ _ _ _ [] (by simp)
-  · simp
-  · exact emitFunctionCallData_financialScope _ _ _ _ [] (by simp)
+  all_goals simp
 
 end Near

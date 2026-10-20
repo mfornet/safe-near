@@ -11,14 +11,19 @@ theorem preInvokeError_creation_checks (name : String) (st : Store NearState) (a
     (halloc : allocatesPromise name = true)
     (h : preInvokeError name st args = none) :
     creationAccountError name st args = none ∧ creationPrefixError name st args = none ∧ promiseCapacityError st = none := by
+  have hw : name ≠ "storage_write" := by
+    intro he; subst name; simp [allocatesPromise] at halloc
+  have hr : name ≠ "storage_remove" := by
+    intro he; subst name; simp [allocatesPromise] at halloc
+  have hs : storageMutationPlan? name st args = none := by simp [storageMutationPlan?, hw, hr]
   have hp : creationPrefixError name st args = none := by
     cases he : creationPrefixError name st args with
     | none => rfl
-    | some error => simp [preInvokeError, invocationArgumentError, hjoin, htransfer, hkey, he] at h
+    | some error => simp [preInvokeError, invocationArgumentError, hs, hjoin, htransfer, hkey, he] at h
   have hc : promiseCapacityError st = none := by
     cases he : promiseCapacityError st with
     | none => rfl
-    | some error => simp [preInvokeError, invocationArgumentError, hjoin, htransfer, hkey, hp, halloc, he] at h
+    | some error => simp [preInvokeError, invocationArgumentError, hs, hjoin, htransfer, hkey, hp, halloc, he] at h
   refine ⟨?_, hp, hc⟩
   cases he : creationAccountError name st args with
   | none => rfl
@@ -33,8 +38,13 @@ theorem chargesBefore_valid_creation (name : String) (st : Store NearState) (arg
     (hargs : creationAccountArgs name args = some (len, ptr))
     (h : preInvokeError name st args = none) :
     chargesBefore name st args = chargesBeforeUnvalidated name st args := by
+  have hw : name ≠ "storage_write" := by
+    intro he; subst name; simp [allocatesPromise] at halloc
+  have hr : name ≠ "storage_remove" := by
+    intro he; subst name; simp [allocatesPromise] at halloc
+  have hs : storageMutationPlan? name st args = none := by simp [storageMutationPlan?, hw, hr]
   obtain ⟨ha, hp, hc⟩ := preInvokeError_creation_checks name st args hjoin htransfer hkey halloc h
-  simp only [chargesBefore, hjoin, Bool.false_and, Bool.false_eq_true, ite_false, hargs, ha, hp, hc,
+  simp only [chargesBefore, hs, hjoin, Bool.false_and, Bool.false_eq_true, ite_false, hargs, ha, hp, hc,
     Option.isSome_none, Bool.false_eq_true, ite_false]
 
 /-- Empty action batches reserve only their one action-receipt execution fee. -/
@@ -59,7 +69,7 @@ covers the overflowing-count early charge prefix, which cannot reserve gas. -/
 theorem chargesBefore_join_reservation (st : Store NearState) (ptr count : UInt64) :
     ((chargesBefore "promise_and" st [.i64 ptr, .i64 count]).map
       (fun charge => charge.reservation st.host.fees)).sum = 0 := by
-  simp [chargesBefore, chargesBeforeUnvalidated, creationAccountArgs, argU64, readMem]
+  simp [chargesBefore, chargesBeforeUnvalidated, storageMutationPlan?, creationAccountArgs, argU64, readMem]
   split <;> simp [Charge.reservation]
 
 /-- A new function-call receipt reserves one dispatch fee plus its action and

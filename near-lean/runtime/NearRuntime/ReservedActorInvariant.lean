@@ -19,7 +19,10 @@ theorem applyAction_systemAbsent (c : ReceiptCtx) (isLast : Bool) (action : Acti
   by_cases hreceiver : c.receipt.receiverId = systemAccount
   · cases action with
     | createAccount => rw [applyCreateAccount_run]; simp [hreceiver, hmissing]
-    | deployContract code => rw [applyDeployContract_run]; simp [hreceiver, hmissing]
+    | deployContract code =>
+      rw [applyDeployContract_run]
+      simp [hreceiver, hmissing]
+      split <;> exact hmissing
     | functionCall method args gas deposit =>
       change ((applyFunctionCall c method args gas deposit isLast).run.run before).2.state.account? systemAccount = none
       rw [applyFunctionCall_run]
@@ -29,7 +32,7 @@ theorem applyAction_systemAbsent (c : ReceiptCtx) (isLast : Bool) (action : Acti
       simp only [hreceiver, hmissing, implicitPublicKey_system]
       split <;> exact hmissing
     | stake amount pk =>
-      simp [-ExceptT.run_bind, -StateT.run_bind, applyAction, getAccount, getState, hreceiver, hmissing]
+      simp [-StateT.run_bind, applyAction, getAccount, getState, hreceiver, hmissing]
     | addKey pk key =>
       rw [applyAddKey_run]
       simp only [hreceiver, hmissing]
@@ -72,8 +75,8 @@ theorem systemAbsence_getState : getState.PreservesSystemAbsence := by intro bef
 
 theorem systemAbsence_fee (isRefund : Bool) (fee : Nat) : (chargeReceiptFee isRefund fee).PreservesSystemAbsence := by
   intro before h
-  unfold chargeReceiptFee
-  split <;> exact h
+  unfold chargeReceiptFee burnGas
+  exact h
 
 theorem systemAbsence_checkReceiptAction (c : ReceiptCtx) (onlyAction : Bool) (action : Action) :
     (checkReceiptAction c onlyAction action).PreservesSystemAbsence := by
@@ -95,16 +98,36 @@ theorem systemAbsence_runReceiptAction (c : ReceiptCtx) (onlyAction isLast : Boo
   exact (systemAbsence_fee _ _).bind (fun _ => (systemAbsence_checkReceiptAction _ _ _).bind
     (fun _ => applyAction_systemAbsent _ _ _))
 
-theorem systemAbsence_runReceiptActionList (c : ReceiptCtx) (onlyAction : Bool) (actions : List Action) :
-    (runReceiptActionList c onlyAction actions).PreservesSystemAbsence := by
-  induction actions with
+theorem systemAbsence_runReceiptActionAt (c : ReceiptCtx) (onlyAction isLast : Bool)
+    (action : Action) (index : Nat) :
+    (runReceiptActionAt c onlyAction isLast action index).PreservesSystemAbsence := by
+  cases action <;> try exact systemAbsence_runReceiptAction _ _ _ _
+  case functionCall method args gas deposit =>
+    cases hs : actionRandomSeed c index with
+    | error error =>
+      simp only [runReceiptActionAt, hs]
+      exact systemAbsence_throw _
+    | ok seed =>
+      simp only [runReceiptActionAt, hs]
+      exact systemAbsence_runReceiptAction _ _ _ _
+
+theorem systemAbsence_failureIndex (index : Option Nat) :
+    (modify fun e => { e with failureIndex := index } : ExecM Unit).PreservesSystemAbsence := by
+  intro before h
+  exact h
+
+theorem systemAbsence_runReceiptActionList (c : ReceiptCtx) (onlyAction : Bool) (actions : List Action)
+    (index : Nat) : (runReceiptActionList c onlyAction actions index).PreservesSystemAbsence := by
+  induction actions generalizing index with
   | nil => exact systemAbsence_pure _
-  | cons action rest ih => exact (systemAbsence_runReceiptAction _ _ _ _).bind (fun _ => ih)
+  | cons action rest ih =>
+    exact (systemAbsence_failureIndex (some index)).bind (fun _ =>
+      (systemAbsence_runReceiptActionAt c onlyAction rest.isEmpty action index).bind (fun _ => ih (index + 1)))
 
 theorem systemAbsence_receiptActionBody (c : ReceiptCtx) : (receiptActionBody c).PreservesSystemAbsence := by
   unfold receiptActionBody
-  exact (systemAbsence_fee _ _).bind (fun _ => (systemAbsence_runReceiptActionList _ _ _).bind
-    (fun _ => systemAbsence_checkStorageStake _ _))
+  exact (systemAbsence_fee _ _).bind (fun _ => (systemAbsence_runReceiptActionList _ _ _ _).bind
+    (fun _ => (systemAbsence_failureIndex none).bind (fun _ => systemAbsence_checkStorageStake _ _)))
 
 theorem runReceiptActions_systemAbsent (c : ReceiptCtx) (st : ChainState) (h : st.SystemAccountAbsent) :
     (runReceiptActions c st).1.state.SystemAccountAbsent := by
@@ -126,6 +149,17 @@ theorem Exec.creditReceiptReward_systemAbsent (exec : Exec) (cfg : RuntimeConfig
     · exact (ChainState.account?_setAccount_ne _ _ _ _ hr).trans h
   · exact h
 
+theorem addCompletionData_account (exec : Exec) (receiver id : AccountId) (outputs : List DataReceiver) :
+    (exec.addCompletionData receiver outputs).state.account? id = exec.state.account? id := by
+  unfold Exec.addCompletionData
+  dsimp only
+  split
+  · rfl
+  · apply foldl_preserves (fun pair : ChainState × List Receipt => pair.1.account? id = exec.state.account? id)
+    · intro pair item h
+      exact h
+    · rfl
+
 /-- Rewards and refunds cannot install an absent system account. Even a reward
 targeting the name is skipped because no such receiver account exists. -/
 theorem finalizeReceipt_systemAbsent (c : ReceiptCtx) (st : ChainState) (raw : Exec) (failed : Option RuntimeError)
@@ -135,6 +169,7 @@ theorem finalizeReceipt_systemAbsent (c : ReceiptCtx) (st : ChainState) (raw : E
   all_goals repeat' (first
     | exact hinitial | exact hraw
     | apply Exec.creditReceiptReward_systemAbsent
+    | rw [addCompletionData_account]
     | rw [addFailureData_account]
     | rw [addGasRefund_account]
     | rw [addBalanceRefund_account]

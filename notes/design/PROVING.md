@@ -9,8 +9,9 @@ Theorem proving can use automation and exploratory tools during development,
 but completed proofs must be checked by the Lean kernel. The accepted logical
 axioms are `propext`, `Classical.choice`, and `Quot.sound`; completed verification
 must not depend on `sorryAx` or `native_decide`. The transitive axiom audit
-(`just wnear-audit`) checks proof dependencies. The programs package has known
-open proofs recorded in periodic reports; these are not completed verification.
+(`just wnear-audit`) checks proof dependencies. All four program specifications are now proved; the mergesort statement is
+partial correctness and allows the specified OOM outcome. Older periodic reports
+record the open proofs present at their checked revisions.
 
 Strict Comparator checking remains a proposed additional final check until a
 pinned integration and repository command exist. It is not currently enforced.

@@ -2,7 +2,12 @@
 
 Checked starting commit `dbf9d11` on macOS/Apple Silicon. Initial tree was clean.
 All required commands and additional CI checks passed locally. Remaining findings
-are documented below; hosted CI is blocked externally.
+are documented below; hosted CI for that starting revision was blocked externally.
+
+After this check, merged remote `main` at `fc34915`. The counts and expensive
+conformance results below describe the checked starting revision plus its check
+fixes. They are historical evidence, not measurements of the newer merged main.
+See [merge follow-up](merge-follow-up.md) for conflict resolutions and validation.
 
 ## 1. Build and tests — passed, with recorded tool warnings
 

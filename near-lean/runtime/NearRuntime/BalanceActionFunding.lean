@@ -41,11 +41,14 @@ theorem applyCreateAccount_run (c : ReceiptCtx) (isLast : Bool) (before : Exec) 
         (.error (.accountAlreadyExists c.receipt.receiverId), before)
       else if canCreateAccount c.cfg c.receipt.predecessorId c.receipt.receiverId then
         (.ok (), { before with state := before.state.setAccount c.receipt.receiverId { amount := 0, storageUsage := c.cfg.fees.numBytesAccount }, actorId := c.receipt.receiverId })
+      else if c.receipt.receiverId != systemAccount && (c.receipt.receiverId.splitOn ".").length == 1 then
+        (.error (.createAccountOnlyByRegistrar c.receipt.receiverId c.cfg.accountCreation.registrarAccountId c.receipt.predecessorId), before)
       else (.error (.createAccountNotAllowed c.receipt.receiverId c.receipt.predecessorId), before) := by
   by_cases ha : (before.state.account? c.receipt.receiverId).isSome = true
-  · simp [-ExceptT.run_bind, -StateT.run_bind, applyAction, getState, ha]
+  · simp [-StateT.run_bind, applyAction, getState, ha]
   · by_cases hc : canCreateAccount c.cfg c.receipt.predecessorId c.receipt.receiverId = true <;>
-      simp [-ExceptT.run_bind, -StateT.run_bind, applyAction, getState, putAccount, modifyState, ha, hc]
+      simp [-StateT.run_bind, applyAction, getState, putAccount, modifyState, ha, hc]
+    split <;> rfl
 
 /-- An absent reserved actor cannot acquire an account through actual creation.
 The result is a protocol admission error and preserves the pre-action state. -/
@@ -73,7 +76,7 @@ theorem funded_createAccount (c : ReceiptCtx) (isLast : Bool) :
           { amount := 0, storageUsage := c.cfg.fees.numBytesAccount } hwf ha
         simpa only [Exec.totalFunds, Nat.add_zero] using congrArg (fun n => n + receiptsFunds c.cfg before.newReceipts) hb
       all_goals rfl
-    · have hbad := congrArg Prod.fst hrun; cases hbad
+    · split at hrun <;> (have hbad := congrArg Prod.fst hrun; cases hbad)
 
 /-- The real existing-account transfer includes any gas-refund allowance update. -/
 def transferCreditState (c : ReceiptCtx) (st : ChainState) (account : Account) (deposit : Nat) : ChainState :=
@@ -99,12 +102,12 @@ theorem applyTransfer_run (c : ReceiptCtx) (isLast : Bool) (deposit : Nat) (befo
   cases ha : before.state.account? c.receipt.receiverId with
   | some account =>
     by_cases hr : c.receipt.isGasRefund = true <;>
-      simp [-ExceptT.run_bind, -StateT.run_bind, applyAction, getState, putAccount, modifyState, ha, transferCreditState, hr]
+      simp [-StateT.run_bind, applyAction, getState, putAccount, modifyState, ha, transferCreditState, hr]
   | none =>
     by_cases hu : unsupportedImplicitCreation c.cfg.wasm.ethImplicitAccounts (bytesOfString c.receipt.receiverId) = true
-    · simp [-ExceptT.run_bind, -StateT.run_bind, applyAction, getState, ha, hu]
+    · simp [-StateT.run_bind, applyAction, getState, ha, hu]
     · cases hp : implicitPublicKey? c.receipt.receiverId <;>
-        simp [-ExceptT.run_bind, -StateT.run_bind, applyAction, getState, putAccount, modifyState, ha, hu, hp, implicitTransferState]
+        simp [-StateT.run_bind, applyAction, getState, putAccount, modifyState, ha, hu, hp, implicitTransferState]
 
 /-- Ordinary transfer and best-effort refund-allowance restoration preserve
 exact deposit funding; implicit creation adds the same deposit exactly once. -/
@@ -159,13 +162,13 @@ theorem applyDeleteAccount_run (c : ReceiptCtx) (isLast : Bool) (beneficiary : A
           if account.locked > 0 then (.error (.deleteAccountStaking c.receipt.receiverId), before)
           else (.ok (), deleteAccountFundedResult c before account beneficiary) := by
   cases isLast with
-  | false => simp [-ExceptT.run_bind, -StateT.run_bind, applyAction]
+  | false => simp [-StateT.run_bind, applyAction]
   | true =>
     cases ha : before.state.account? c.receipt.receiverId with
-    | none => simp [-ExceptT.run_bind, -StateT.run_bind, applyAction, getAccount, getState, ha]
+    | none => simp [-StateT.run_bind, applyAction, getAccount, getState, ha]
     | some account =>
       by_cases hl : account.locked > 0 <;>
-        simp [-ExceptT.run_bind, -StateT.run_bind, applyAction, getAccount, getState, emit, ha, hl,
+        simp [-StateT.run_bind, applyAction, getAccount, getState, emit, ha, hl,
           deleteAccountFundedResult, Exec.addBalanceRefund]
 
 /-- Deletion funds the beneficiary refund by removing precisely the unlocked

@@ -1,4 +1,6 @@
 import NearRuntime
+import Tests.Decoder
+import Tests.Gas
 import Interpreter.Wasm.Decoder.Wat
 
 /-!
@@ -17,6 +19,9 @@ def tgas (n : Nat) : Nat := n * 10 ^ 12
 def registrationFee : Nat := 125 * 10 ^ 19
 
 def pkOf (seed : UInt8) : PublicKey := 0 :: List.replicate 32 seed
+
+/-- Standard compressed Edwards25519 basepoint, suitable for staking. -/
+def stakingPk : PublicKey := 0 :: 0x58 :: List.replicate 31 0x66
 def bytesOf (s : String) : List UInt8 := s.toUTF8.toList
 def strOf (b : List UInt8) : String := (String.fromUTF8? ⟨b.toArray⟩).getD "<bad utf8>"
 
@@ -100,6 +105,60 @@ def isFailure (o : Option ExecutionOutcome) (p : RuntimeError → Bool) : Bool :
   | some { status := .failure e, .. } => p e
   | _ => false
 
+/-- Transaction acceptance and receipt execution occupy different chunks
+unless the signer is also the receiver. These checks observe each frontier. -/
+def checkTransactionRouting (r : IO.Ref Report) (cfg : RuntimeConfig) (code : ContractCode)
+    (genesis : ChainState) : IO Unit := do
+  let tx : Transaction := {
+    signerId := "alice.near", publicKey := pkOf 1, nonce := 1, receiverId := "bob.near"
+    actions := [.transfer oneNear] }
+  let sent := Near.apply cfg World.ap (fun _ => code) genesis [tx] []
+  check r "cross-account transaction emits an outgoing action receipt"
+    (sent.issue.isNone && sent.outgoing.length == 1 && sent.state.delayed.isEmpty
+      && sent.outgoing.all fun receipt =>
+        receipt.predecessorId == "alice.near" && receipt.receiverId == "bob.near"
+          && Fees.totalDeposit receipt.actions == oneNear)
+  check r "cross-account acceptance has only a transaction outcome"
+    (sent.outcomes.length == 1 && sent.outcomes.all fun (_, outcome) =>
+      outcome.executorId == "alice.near" && match outcome.status with
+        | .successReceiptId id => sent.outgoing.any (·.receiptId == id)
+        | _ => false)
+  check r "cross-account acceptance charges the signer without crediting the receiver"
+    ((sent.state.account? "alice.near").map (fun account => decide (account.amount < 100 * oneNear)) == some true
+      && (sent.state.account? "bob.near").map (·.amount) == some (10 * oneNear)
+      && (sent.state.accessKey? "alice.near" (pkOf 1)).map (·.nonce) == some 1)
+  let delivered := Near.apply cfg World.ap (fun _ => code) sent.state [] sent.outgoing
+  check r "the receiver is credited only when the transaction receipt is delivered"
+    (delivered.issue.isNone && (delivered.state.account? "bob.near").map (·.amount) == some (11 * oneNear)
+      && delivered.outcomes.any fun (_, outcome) => outcome.executorId == "bob.near" && outcome.status.isSuccess)
+  let localResult := Near.apply cfg World.ap (fun _ => code) genesis [{ tx with receiverId := "alice.near" }] []
+  check r "signer-is-receiver actions execute in the transaction chunk"
+    (localResult.issue.isNone && localResult.outcomes.length == 2
+      && localResult.outcomes.all (fun (_, outcome) => outcome.status.isSuccess)
+      && localResult.outgoing.all Receipt.isRefund)
+  let limited := Near.apply cfg { World.ap with gasLimit := some 0 } (fun _ => code) genesis [tx] []
+  check r "outgoing transaction receipts do not enter the local gas-delay queue"
+    (limited.state.delayed.isEmpty && limited.outgoing.length == 1
+      && (limited.state.account? "bob.near").map (·.amount) == some (10 * oneNear))
+  let limitedLocal := Near.apply cfg { World.ap with gasLimit := some 0 } (fun _ => code)
+    genesis [{ tx with receiverId := "alice.near" }] []
+  check r "zero chunk budget defers local receipts before any execution"
+    (limitedLocal.outcomes.length == 1 && limitedLocal.state.delayed.length == 1 &&
+      limitedLocal.outgoing.isEmpty && limitedLocal.outcomes.all fun (_, o) =>
+        match o.status with | .successReceiptId _ => true | _ => false)
+  let incoming : Receipt := {
+    predecessorId := "carol.near", receiverId := "bob.near", receiptId := 100
+    receipt := .action {
+      signerId := "carol.near", signerPublicKey := pkOf 4
+      gasPrice := 0, actions := [.transfer 7] } }
+  let mixed := Near.apply cfg World.ap (fun _ => code) genesis
+    [tx, { tx with receiverId := "alice.near", nonce := 2 }] [incoming]
+  check r "mixed blocks execute local receipts before incoming receipts"
+    (mixed.issue.isNone && mixed.outcomes.map (·.2.executorId) ==
+      ["alice.near", "alice.near", "alice.near", "bob.near"]
+      && (mixed.state.account? "bob.near").map (·.amount) == some (10 * oneNear + 7)
+      && (mixed.outgoing.head?.map (·.receiverId)) == some "bob.near")
+
 /-- Restricted-key availability across real VM execution and delayed refunds. -/
 def checkRefundScenarios (r : IO.Ref Report) (cfg : RuntimeConfig) (code : ContractCode)
     (base : ChainState) : IO Unit := do
@@ -123,7 +182,8 @@ def checkRefundScenarios (r : IO.Ref Report) (cfg : RuntimeConfig) (code : Contr
     permission := .functionCall (some (cost.total + reserve)) "wrap.near" ["ft_balance_of"] }
   let tx (nonce : Nat) : Transaction := {
     signerId := accountId, publicKey := pk, nonce, receiverId := "wrap.near", actions }
-  let first := Near.apply cfg World.ap (fun _ => code) initial [tx 1] []
+  let submitted := Near.apply cfg World.ap (fun _ => code) initial [tx 1] []
+  let first := Near.apply cfg World.ap (fun _ => code) submitted.state [] submitted.outgoing
   let refunds := first.outgoing.filter Receipt.isGasRefund
   let amount := (refunds.map fun receipt => Fees.totalDeposit receipt.actions).sum
   check r "gas refund: restricted call consumes its purchased allowance and emits the key marker"
@@ -134,13 +194,14 @@ def checkRefundScenarios (r : IO.Ref Report) (cfg : RuntimeConfig) (code : Contr
   let beforeRefund := Near.apply cfg World.ap (fun _ => code) first.state [tx 2] []
   check r "gas refund: another call is rejected before its allowance returns"
     (beforeRefund.tokensBurnt == 0 && beforeRefund.outcomes.any fun (_, outcome) => match outcome.status with
-      | .failure (.invalidAccessKey message) => message == "NotEnoughAllowance" | _ => false)
+      | .failure (.notEnoughAllowance ..) => true | _ => false)
   let restored := Near.apply cfg World.ap (fun _ => code) first.state [] first.outgoing
   check r "gas refund: restores allowance exactly without double-crediting account funds"
     (restored.issue.isNone && restored.tokensBurnt == 0 && restored.outgoing.isEmpty &&
       allowanceOf restored.state pk == some (reserve + amount) &&
       restored.state.totalBalance == first.state.totalBalance + amount)
-  let second := Near.apply cfg World.ap (fun _ => code) restored.state [tx 2] []
+  let submittedAgain := Near.apply cfg World.ap (fun _ => code) restored.state [tx 2] []
+  let second := Near.apply cfg World.ap (fun _ => code) submittedAgain.state [] submittedAgain.outgoing
   check r "gas refund: restored allowance permits the next restricted call"
     (second.issue.isNone && second.outcomes.any fun (_, outcome) =>
       outcome.executorId == "wrap.near" && outcome.status.isSuccess)
@@ -187,6 +248,9 @@ def main (args : List String) : IO UInt32 := do
   let configs := args[1]?.getD "../vm/configs"
   let r ← IO.mkRef ({} : Report)
   let cfg ← RuntimeConfig.load configs RuntimeConfig.latestVersion
+  let decoderChecks ← NearRuntime.Tests.Decoder.run cfg
+  let gasChecks ← NearRuntime.Tests.Gas.run cfg
+  r.modify fun report => { report with passed := report.passed + decoderChecks + gasChecks }
   let text ← IO.FS.readFile wat
   let module ← match Decoder.Wat.decode text with
     | .ok m => pure m
@@ -201,17 +265,38 @@ def main (args : List String) : IO UInt32 := do
   let w0 : World := { cfg, code, state := genesis }
   let total0 := w0.total
   check r "genesis total is 120 NEAR" (total0 = 120 * oneNear)
+  checkTransactionRouting r cfg code genesis
+
+  let seedState := genesis.setAccount "wrap.near" { genesisAccount (10 * oneNear) with code := some code }
+  let seedTx : Transaction := {
+    signerId := "wrap.near", publicKey := pkOf 3, nonce := 1, receiverId := "wrap.near"
+    actions := [.functionCall "ft_metadata" [] (tgas 50) 0] }
+  let parentHash : Near.Bytes := List.replicate 32 7
+  for (label, ap, expected) in [
+      ("missing parent", { World.ap with nativeReceiptHashes := some [] }, "native identity is unavailable"),
+      ("malformed parent", { World.ap with nativeReceiptHashes := some [(1, [7])] }, "invalid identity hash width"),
+      ("duplicate parent", { World.ap with nativeReceiptHashes := some [(1, parentHash), (1, parentHash)] }, "duplicate model identity"),
+      ("malformed block seed", { World.ap with nativeReceiptHashes := some [(1, parentHash)], randomSeed := [7] }, "invalid identity hash width")] do
+    let attempted := Near.apply cfg ap (fun _ => code) seedState [seedTx] []
+    check r s!"native randomness {label} is an explicit context issue"
+      ((attempted.issue.map (·.2)) == some (.interpreterError s!"Native action randomness context: {expected}"))
+    check r s!"native randomness {label} rolls back the entire chunk"
+      (attempted.outgoing.isEmpty && attempted.outcomes.isEmpty && attempted.tokensBurnt == 0 &&
+        attempted.identityBirths.isEmpty && attempted.delayedConsumed == 0 && attempted.delayedAppended == 0 &&
+        attempted.state.totalBalance == seedState.totalBalance && attempted.state.nextId == seedState.nextId &&
+        attempted.state.accessKeys == seedState.accessKeys)
 
   for (name, action) in
       [("deploy", Action.deployContract code),
        ("add key", Action.addKey (pkOf 4) fullAccess),
        ("delete key", Action.deleteKey (pkOf 3)),
        ("delete account", Action.deleteAccount "alice.near"),
-       ("stake", Action.stake oneNear (pkOf 4))] do
+       ("stake", Action.stake oneNear stakingPk)] do
     let tx : Transaction := {
       signerId := "alice.near", publicKey := pkOf 1, nonce := 1, receiverId := "wrap.near"
       actions := [.transfer oneNear, action] }
-    let attempt := Near.apply cfg World.ap (fun _ => code) genesis [tx] []
+    let submitted := Near.apply cfg World.ap (fun _ => code) genesis [tx] []
+    let attempt := Near.apply cfg World.ap (fun _ => code) submitted.state [] submitted.outgoing
     check r s!"foreign actor cannot {name} on wrap.near"
       (attempt.outcomes.any fun (_, o) => match o.status with
         | .failure (.actorNoPermission "wrap.near" "alice.near") => true
@@ -224,7 +309,8 @@ def main (args : List String) : IO UInt32 := do
   let createTx : Transaction := {
     signerId := "alice.near", publicKey := pkOf 1, nonce := 1, receiverId := created
     actions := [.createAccount, .transfer (3 * oneNear), .addKey (pkOf 4) fullAccess, .deployContract code] }
-  let createResult := Near.apply cfg World.ap (fun _ => code) genesis [createTx] []
+  let createSubmitted := Near.apply cfg World.ap (fun _ => code) genesis [createTx] []
+  let createResult := Near.apply cfg World.ap (fun _ => code) createSubmitted.state [] createSubmitted.outgoing
   check r "account creation grants authority for subsequent key and code actions"
     (createResult.issue.isNone && createResult.outcomes.all (fun (_, o) => o.status.isSuccess) &&
       createResult.state.accessKey? created (pkOf 4) == some fullAccess &&
@@ -263,13 +349,15 @@ def main (args : List String) : IO UInt32 := do
     signerId := "alice.near", publicKey := pkOf 1, nonce := 1
     receiverId := String.ofList (List.replicate 64 'a')
     actions := [.transfer oneNear, .addKey (pkOf 4) fullAccess] }
-  let invalidImplicit := Near.apply cfg World.ap (fun _ => code) genesis [multiTransfer] []
+  let implicitSubmitted := Near.apply cfg World.ap (fun _ => code) genesis [multiTransfer] []
+  let invalidImplicit := Near.apply cfg World.ap (fun _ => code) implicitSubmitted.state [] implicitSubmitted.outgoing
   check r "implicit creation cannot be followed by an attacker-controlled key"
     ((invalidImplicit.state.account? multiTransfer.receiverId).isNone &&
       invalidImplicit.outcomes.any fun (_, o) => !o.status.isSuccess)
 
   -- An unsupported operation invalidates the model attempt, not the contract.
-  -- A preceding successful transfer in the same apply must not be committed.
+  -- Neither charged transactions, queued outgoing receipts nor a preceding
+  -- successfully executed local receipt in the same apply may be committed.
   let unsupportedModule ← match Decoder.Wat.decode
       "(module (import \"env\" \"sha256\" (func $hash (param i64 i64 i64)))
        (memory 1) (func (export \"test\") i64.const 0 i64.const 0 i64.const 0 call $hash))" with
@@ -282,10 +370,13 @@ def main (args : List String) : IO UInt32 := do
     signerId := "alice.near", publicKey := pkOf 1, nonce := 1, receiverId := "bob.near"
     actions := [.transfer oneNear] }
   let unsupportedTx : Transaction := {
-    signerId := "alice.near", publicKey := pkOf 1, nonce := 2, receiverId := "wrap.near"
+    signerId := "wrap.near", publicKey := pkOf 3, nonce := 1, receiverId := "wrap.near"
     actions := [.functionCall "test" [] (tgas 50) oneNear] }
+  let localTransferTx : Transaction := {
+    signerId := "bob.near", publicKey := pkOf 2, nonce := 1, receiverId := "bob.near"
+    actions := [.transfer oneNear] }
   let stopped := Near.apply cfg World.ap (fun _ => unsupportedCode) unsupportedState
-    [transferTx, unsupportedTx] []
+    [transferTx, localTransferTx, unsupportedTx] []
   check r "unsupported host is an apply issue, not a receipt failure"
     ((stopped.issue.map (·.2)) == some (.unsupportedHost "sha256"))
   check r "unsupported apply publishes no outcomes, refunds or burnt tokens"
@@ -297,12 +388,24 @@ def main (args : List String) : IO UInt32 := do
   check r "unsupported apply rolls back nonces and receipt identifiers"
     (stopped.state.accessKey? "alice.near" (pkOf 1) == some fullAccess &&
      stopped.state.nextId == unsupportedState.nextId)
+  let crossUnsupported := { unsupportedTx with signerId := "alice.near", publicKey := pkOf 1, nonce := 2 }
+  let accepted := Near.apply cfg World.ap (fun _ => unsupportedCode) unsupportedState
+    [transferTx, crossUnsupported] []
+  let rejectedDelivery := Near.apply cfg World.ap (fun _ => unsupportedCode) accepted.state [] accepted.outgoing
+  check r "unsupported contract execution is discovered at delivery, not transaction acceptance"
+    (accepted.issue.isNone && accepted.outgoing.length == 2 && accepted.outcomes.length == 2
+      && rejectedDelivery.issue.map (·.2) == some (.unsupportedHost "sha256"))
+  check r "a delivery issue retains already committed transaction charges and nonces"
+    (rejectedDelivery.state.totalBalance == accepted.state.totalBalance
+      && rejectedDelivery.state.accessKey? "alice.near" (pkOf 1) == accepted.state.accessKey? "alice.near" (pkOf 1)
+      && rejectedDelivery.state.nextId == accepted.state.nextId
+      && rejectedDelivery.state.totalBalance < unsupportedState.totalBalance)
 
   let stakedState := genesis.setAccount "wrap.near"
     { genesisAccount (10 * oneNear) with locked := oneNear }
   let unstakeTx : Transaction := {
     signerId := "wrap.near", publicKey := pkOf 3, nonce := 1, receiverId := "wrap.near"
-    actions := [.stake 0 (pkOf 3)] }
+    actions := [.stake 0 stakingPk] }
   let unstake := Near.apply cfg World.ap (fun _ => code) stakedState [unstakeTx] []
   check r "unstaking explicitly requires unmodelled epoch semantics"
     ((unstake.issue.map (·.2)) == some (.unsupportedAction "unstake (epoch machinery)"))
@@ -319,13 +422,18 @@ def main (args : List String) : IO UInt32 := do
     let tx : Transaction := {
       signerId := "alice.near", publicKey := pkOf 1, nonce := 1
       receiverId := receiver, actions := [.transfer oneNear] }
-    let missing := Near.apply cfg World.ap (fun _ => code) genesis [tx] []
+    let submitted := Near.apply cfg World.ap (fun _ => code) genesis [tx] []
+    check r s!"{label} implicit transfer submits an outgoing receipt before receiver execution"
+      (submitted.issue.isNone && submitted.outgoing.length == 1 &&
+        (submitted.state.accessKey? "alice.near" (pkOf 1)).map (·.nonce) == some 1)
+    let missing := Near.apply cfg World.ap (fun _ => code) submitted.state [] submitted.outgoing
     check r s!"{label} implicit creation reports a model issue"
       ((missing.issue.map (·.2)) == some (.unsupportedAction "implicit account creation (ETH/deterministic contracts)"))
-    check r s!"{label} implicit issue rolls back funds, nonce, ids and observations"
-      (missing.state.totalBalance == genesis.totalBalance && missing.outcomes.isEmpty && missing.outgoing.isEmpty &&
-        missing.tokensBurnt == 0 && missing.state.nextId == genesis.nextId &&
-        missing.state.accessKey? "alice.near" (pkOf 1) == some fullAccess)
+    check r s!"{label} implicit delivery issue rolls back receiver execution and preserves committed submission"
+      (missing.state.totalBalance == submitted.state.totalBalance &&
+        (missing.state.account? receiver).isNone && missing.state.storage == submitted.state.storage &&
+        missing.state.accessKeys == submitted.state.accessKeys && missing.state.nextId == submitted.state.nextId &&
+        missing.outcomes.isEmpty && missing.outgoing.isEmpty && missing.tokensBurnt == 0)
     let present := genesis.setAccount receiver (genesisAccount oneNear)
     let sent := Near.apply cfg World.ap (fun _ => code) present [tx] []
     let applied := Near.apply cfg World.ap (fun _ => code) sent.state [] sent.outgoing
@@ -456,7 +564,7 @@ def main (args : List String) : IO UInt32 := do
     (aliceBefore - oneNear - (w.account "alice.near").amount < oneNear / 100 &&
      (w.account "alice.near").amount < aliceBefore - oneNear)
   check r "near_deposit: unused gas was refunded (a refund receipt ran)"
-    (w.outcomes.any fun (_, o) => o.executorId == "alice.near" && o.status.isSuccess && o.gasBurnt == 0)
+    (w.outcomes.any fun (_, o) => o.executorId == "alice.near" && o.status.isSuccess && o.tokensBurnt == 0)
   check r "near_deposit: NEAR conserved" (w.total = total0) s!"{w.total} vs {total0}"
 
   -- alice unwraps 0.3 NEAR
@@ -528,9 +636,13 @@ def main (args : List String) : IO UInt32 := do
   let implicitTx : Transaction := {
     signerId := "alice.near", publicKey := pkOf 1, nonce := 1, receiverId := implicit
     actions := [.transfer oneNear] }
-  let implicitAtHeight := Near.apply cfg { World.ap with blockHeight := 7 } (fun _ => code) genesis [implicitTx] []
+  let implicitSent := Near.apply cfg { World.ap with blockHeight := 7 } (fun _ => code) genesis [implicitTx] []
+  check r "implicit accounts do not exist before their transfer receipt arrives"
+    ((implicitSent.state.account? implicit).isNone)
+  let implicitAtHeight := Near.apply cfg { World.ap with blockHeight := 9 } (fun _ => code)
+    implicitSent.state [] implicitSent.outgoing
   check r "implicit key nonce begins in the creation block's nonce range"
-    ((implicitAtHeight.state.accessKey? implicit implicitPk).map (·.nonce) == some 6_000_000)
+    ((implicitAtHeight.state.accessKey? implicit implicitPk).map (·.nonce) == some 8_000_000)
   let aliceBefore := (w.account "alice.near").amount
   let bobAmount := (w.account "bob.near").amount
   let (txD, w) := w.tx "bob.near" "bob.near" [.deleteAccount "alice.near"]
@@ -543,7 +655,9 @@ def main (args : List String) : IO UInt32 := do
   -- gas limit: receipts beyond the limit are delayed, then run
   let (tx1, w') := w.tx "alice.near" "wrap.near" [.functionCall "near_deposit" (bytesOf "{}") (tgas 50) oneNear]
   let (tx2, w') := w'.tx "alice.near" "wrap.near" [.functionCall "near_deposit" (bytesOf "{}") (tgas 50) oneNear]
-  let r1 := Near.apply w'.cfg { World.ap with gasLimit := some 1 } (fun _ => w'.code) w'.state [tx1, tx2] w'.pending
+  let submitted := Near.apply w'.cfg World.ap (fun _ => w'.code) w'.state [tx1, tx2] w'.pending
+  let r1 := Near.apply w'.cfg { World.ap with gasLimit := some 1 } (fun _ => w'.code)
+    submitted.state [] submitted.outgoing
   check r "gas limit: second receipt is delayed" (r1.state.delayed.length = 1) s!"{r1.state.delayed.length}"
   let r2 := Near.apply w'.cfg World.ap (fun _ => w'.code) r1.state [] r1.outgoing
   check r "gas limit: delayed receipt runs in the next apply"
@@ -578,21 +692,24 @@ def main (args : List String) : IO UInt32 := do
     { signerId := "alice.near", publicKey := pkOf 1, nonce := 1, receiverId := "wrap.near", actions }
   let sponsorCall (method : String) : Action := .functionCall method [] (tgas 100) 0
   let fundedTotal := (sponsorState 770).totalBalance
-  let sponsored := Near.apply cfg World.ap (fun _ => sponsorCode) (sponsorState 770)
+  let sponsorSubmitted := Near.apply cfg World.ap (fun _ => sponsorCode) (sponsorState 770)
     [sponsorTx [sponsorCall "twice"]] []
+  let sponsored := Near.apply cfg World.ap (fun _ => sponsorCode)
+    sponsorSubmitted.state [] sponsorSubmitted.outgoing
   check r "sponsorship: two grants commit at storage exemption boundary"
     (sponsored.issue.isNone && sponsored.subsidizedAmount == 2 &&
      sponsored.outcomes.any fun (_, o) => o.executorId == "wrap.near" && o.status.isSuccess)
   let outgoingFunds := (sponsored.outgoing.map (Fees.receiptFunds cfg)).sum
   check r "sponsorship: minted funds enter conservation accounting"
-    (sponsored.state.totalBalance + outgoingFunds + sponsored.tokensBurnt == fundedTotal + sponsored.subsidizedAmount)
+    (sponsored.state.totalBalance + outgoingFunds + sponsored.tokensBurnt + sponsorSubmitted.tokensBurnt == fundedTotal + sponsored.subsidizedAmount)
   for (name, actions, usage) in
       [("VM panic", [sponsorCall "panic"], 770),
        ("later action failure", [sponsorCall "one", .deleteKey (pkOf 99)], 770),
        ("later VM failure", [sponsorCall "one", sponsorCall "panic"], 770),
        ("storage staking failure", [sponsorCall "one"], 771)] do
-    let result := Near.apply cfg World.ap (fun _ => sponsorCode) (sponsorState usage)
+    let submitted := Near.apply cfg World.ap (fun _ => sponsorCode) (sponsorState usage)
       [sponsorTx actions] []
+    let result := Near.apply cfg World.ap (fun _ => sponsorCode) submitted.state [] submitted.outgoing
     check r s!"sponsorship: {name} rolls back committed mint and promises"
       (result.issue.isNone && result.subsidizedAmount == 0 &&
        !(result.outgoing.any fun receipt => !receipt.isRefund && Fees.totalDeposit receipt.actions > 0) &&
@@ -601,36 +718,40 @@ def main (args : List String) : IO UInt32 := do
   let twoSponsorState := (sponsorState 770).setAccount "bob.near"
     { amount := 0, storageUsage := 770, code := some sponsorCode }
   let secondSponsor := { sponsorTx [sponsorCall "one"] with nonce := 2, receiverId := "bob.near" }
-  let twoSponsored := Near.apply cfg World.ap (fun _ => sponsorCode) twoSponsorState
+  let twoSubmitted := Near.apply cfg World.ap (fun _ => sponsorCode) twoSponsorState
     [sponsorTx [sponsorCall "one"], secondSponsor] []
+  let twoSponsored := Near.apply cfg World.ap (fun _ => sponsorCode) twoSubmitted.state [] twoSubmitted.outgoing
   check r "sponsorship: apply accumulates grants from separate receipts"
     (twoSponsored.issue.isNone && twoSponsored.subsidizedAmount == 2)
   let issueState := (sponsorState 770).setAccount "bob.near"
     { amount := 0, storageUsage := 770, code := some unsupportedCode }
   let issueTx := { secondSponsor with actions := [sponsorCall "test"] }
-  let issueAfterGrant := Near.apply cfg World.ap (fun _ => sponsorCode) issueState
+  let issueSubmitted := Near.apply cfg World.ap (fun _ => sponsorCode) issueState
     [sponsorTx [sponsorCall "one"], issueTx] []
+  let issueAfterGrant := Near.apply cfg World.ap (fun _ => sponsorCode) issueSubmitted.state [] issueSubmitted.outgoing
   check r "sponsorship: later model issue discards all earlier grants"
     (issueAfterGrant.issue.isSome && issueAfterGrant.subsidizedAmount == 0 &&
      issueAfterGrant.outgoing.isEmpty && issueAfterGrant.outcomes.isEmpty &&
-     issueAfterGrant.tokensBurnt == 0 && issueAfterGrant.state.nextId == issueState.nextId)
+     issueAfterGrant.tokensBurnt == 0 && issueAfterGrant.state.nextId == issueSubmitted.state.nextId)
 
   -- Preserve purchased gas while the chain price changes between blocks.
   let (priceTx, priceWorld) := w.tx "alice.near" "wrap.near"
     [.functionCall "near_withdraw" (bytesOf "{\"amount\":\"1\"}") (tgas 100) 1]
   let priceStart := priceWorld.total
-  let firstPrice := Near.apply cfg World.ap (fun _ => code) priceWorld.state [priceTx] []
+  let priceSubmitted := Near.apply cfg World.ap (fun _ => code) priceWorld.state [priceTx] []
+  let firstPrice := Near.apply cfg World.ap (fun _ => code) priceSubmitted.state [] priceSubmitted.outgoing
+  let firstTokensBurnt := priceSubmitted.tokensBurnt + firstPrice.tokensBurnt
   let funds (result : ApplyResult) := result.state.totalBalance +
     ((result.outgoing ++ result.state.delayed ++ result.state.postponed.map (·.2)).map (Fees.receiptFunds cfg)).sum
   check r "gas purchase: pending promises and refunds preserve all purchased funds"
     (firstPrice.issue.isNone && firstPrice.outgoing.any (fun receipt => !receipt.isRefund) &&
       firstPrice.outcomes.any (fun (_, outcome) => outcome.executorId == "wrap.near" && outcome.status.isSuccess) &&
-      funds firstPrice + priceWorld.burnt + firstPrice.tokensBurnt == priceStart)
+      funds firstPrice + priceWorld.burnt + firstTokensBurnt == priceStart)
   for nextPrice in [50_000_000, 3_000_000_000] do
     let secondPrice := Near.apply cfg { World.ap with gasPrice := nextPrice } (fun _ => code)
       firstPrice.state [] firstPrice.outgoing
     check r s!"gas purchase: conservation across block price {nextPrice}"
-      (secondPrice.issue.isNone && funds secondPrice + priceWorld.burnt + firstPrice.tokensBurnt +
+      (secondPrice.issue.isNone && funds secondPrice + priceWorld.burnt + firstTokensBurnt +
         secondPrice.tokensBurnt == priceStart)
   let lostRefund : Receipt := {
     predecessorId := systemAccount, receiverId := "deleted.near", receiptId := 999
@@ -638,11 +759,12 @@ def main (args : List String) : IO UInt32 := do
       signerId := systemAccount, signerPublicKey := [], gasPrice := 0
       actions := [.transfer 123] } }
   let lost := Near.apply cfg World.ap (fun _ => code) genesis [] [lostRefund]
-  check r "failed system refund burns its funds without charging execution gas"
+  check r "failed system refund burns its funds and reports execution gas without gas tokens"
     (lost.issue.isNone && lost.tokensBurnt == 123 && lost.outgoing.isEmpty &&
-      lost.outcomes.all fun (_, outcome) => outcome.gasBurnt == 0 && outcome.tokensBurnt == 0)
+      lost.outcomes.all fun (_, outcome) => outcome.gasBurnt > 0 && outcome.tokensBurnt == 0)
 
   let nonceTx (nonce : Nat) (mode : NonceMode) : Transaction := {
+    version := if mode == .strict then 1 else 0,
     signerId := "alice.near", publicKey := pkOf 1, nonce, nonceMode := mode,
     receiverId := "bob.near", actions := [.transfer 1] }
   check r "nonce: default apply context starts at height one" (World.ap.blockHeight == 1)
@@ -659,6 +781,22 @@ def main (args : List String) : IO UInt32 := do
       | .error error, some wanted => error == wanted
       | _, _ => false)
   let cfg84 ← RuntimeConfig.load configs 84
+  let monoV1 := { nonceTx 1 .monotonic with version := 1 }
+  check r "version: monotonic V1 still requires the envelope feature"
+    (match convertTransaction cfg84 World.ap genesis monoV1 with
+      | .error .invalidTransactionVersion => true | _ => false)
+  check r "version: V0 cannot request strict nonces"
+    (match convertTransaction cfg World.ap genesis { nonceTx 1 .strict with version := 0 } with
+      | .error .invalidTransactionVersion => true | _ => false)
+  check r "version: envelope gate is independent of the strict nonce flag"
+    (match convertTransaction { cfg with v1TransactionsEnabled := false } World.ap genesis monoV1 with
+      | .error .invalidTransactionVersion => true | _ => false)
+  check r "version: monotonic V1 does not require strict nonce activation"
+    (match convertTransaction { cfg with strictNonceEnabled := false } World.ap genesis monoV1 with
+      | .ok _ => true | _ => false)
+  check r "version: unknown envelope tag cannot commit"
+    (match convertTransaction cfg World.ap genesis { monoV1 with version := 2 } with
+      | .error .invalidTransactionVersion => true | _ => false)
   let earlyStrict := { nonceTx 1 .strict with signerId := "nobody.near" }
   check r "nonce: strict version gate precedes account admission"
     (match convertTransaction cfg84 World.ap genesis earlyStrict with

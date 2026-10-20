@@ -27,8 +27,8 @@ Things to pay attention to:
 
 - Everything that builds today must still build, and CI must stay green.
 - No new `sorry`. The number of `sorry`s may only go down.
-- Spec statements (`Spec/` in each verification project) do not change meaning. Renaming
-  or moving is fine; weakening or strengthening a theorem is a feature, not a
+- Spec statements (`Spec/` in each verification project) do not change meaning.
+  Renaming or moving is fine; weakening or strengthening a theorem is a feature, not a
   check fix.
 - The trusted base (axioms, `native_decide`, `partial`, `unsafe`,
   `implemented_by`, the Wasm interpreter, the runtime adapter) does not grow.
@@ -44,8 +44,14 @@ or recorded in the report with a reason for leaving it.
 
 ### 1. Build and tests
 
+Run `just periodic-check-plan` to inspect the local heavy-check runner, then
+`just periodic-check <checkout>` to execute it with logs and timings. Automatic CI
+runs the inexpensive repository checks; heavy workflows are opt-in. The manual
+checklist below also covers documentation and report requirements.
+
 Baseline, must be clean (no warnings, no `sorry` outside the known list):
 
+    just ci-check
     just build-all
     just near-build
     just near-test
@@ -129,8 +135,9 @@ Delete first, record only when deletion is not possible yet.
 ### 7. Report
 
 Write a short dated report with: the numbers from section 2, the pins from
-section 3, every finding with its resolution (fixed / recorded / requires maintainer action), and the total cost of the agent runs. Keep reports next to each other
-so the next check can diff against the previous one.
+section 3, every finding with its resolution (fixed / recorded / requires
+maintainer action), and the total cost of the agent runs. Keep reports next to
+each other so the next check can diff against the previous one.
 
 ## Driving the check with agents
 

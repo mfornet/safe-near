@@ -15,6 +15,7 @@ inductive ExecutionIssue
   | unsupportedHost (name : String)
   | unsupportedAction (name : String)
   | interpreterError (message : String)
+  | storageAccounting (message : String)
   deriving Repr, BEq, Inhabited
 
 def ExecutionIssue.message : ExecutionIssue → String
@@ -22,6 +23,7 @@ def ExecutionIssue.message : ExecutionIssue → String
   | .unsupportedHost name => s!"Unsupported host semantics: {name}"
   | .unsupportedAction name => s!"Unsupported action semantics: {name}"
   | .interpreterError message => s!"Interpreter error: {message}"
+  | .storageAccounting message => s!"Storage accounting error: {message}"
 
 /-- `near_vm_runner::logic::HostError`. -/
 inductive HostError

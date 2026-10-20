@@ -9,8 +9,11 @@ def HostPreservesGas (fn : HostFn NearState) : Prop :=
 theorem checkedSetRegister_gas {st after : Store NearState} {register : UInt64} {bytes : List UInt8}
     (h : checkedSetRegister? st register bytes = some after) : after.host.gas = st.host.gas := by
   unfold checkedSetRegister? at h
-  split_ifs at h <;> simp only [Option.some.injEq] at h
-  all_goals subst after; rfl
+  split at h
+  · cases h; rfl
+  · split at h
+    · cases h; rfl
+    · cases h
 
 theorem writeRegisterResult_gas (name : String) (st : Store NearState) (register : UInt64)
     (bytes : List UInt8) (vals : List Value) :

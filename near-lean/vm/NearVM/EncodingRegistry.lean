@@ -77,11 +77,13 @@ theorem meteredHostFns_encodingInvariant
       · exact logUtf8Fn_encodingFrame
     · cases h
       apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard
+      intro st args hwf hs hguard _
+      simp (disch := decide) only [prepareStorageCall_other]
       trivial
     · cases h
       apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard
+      intro st args hwf hs hguard _
+      simp (disch := decide) only [prepareStorageCall_other]
       trivial
     · cases h
       apply meteredNeutral_encodingInvariant
@@ -115,11 +117,13 @@ theorem meteredHostFns_encodingInvariant
       · exact usedGasFn_encodingFrame
     · cases h
       apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard
+      intro st args hwf hs hguard _
+      simp (disch := decide) only [prepareStorageCall_other]
       trivial
     · cases h
       apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard
+      intro st args hwf hs hguard _
+      simp (disch := decide) only [prepareStorageCall_other]
       trivial
     · cases h
       apply meteredNeutral_encodingInvariant
@@ -138,70 +142,86 @@ theorem meteredHostFns_encodingInvariant
       trivial
     · cases h
       apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard
+      intro st args hwf hs hguard _
+      simp (disch := decide) only [prepareStorageCall_other]
       trivial
     · cases h
       apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard
+      intro st args hwf hs hguard _
+      simp (disch := decide) only [prepareStorageCall_other]
       trivial
     · cases h
       apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard
+      intro st args hwf hs hguard _
+      simp (disch := decide) only [prepareStorageCall_other]
       trivial
     · cases h
       apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard
+      intro st args hwf hs hguard _
+      simp (disch := decide) only [prepareStorageCall_other]
       trivial
     · cases h
       apply meteredNeutral_encodingInvariant
       · exact randomSeedFn_encodingFrame
     · cases h
       apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard
+      intro st args hwf hs hguard _
+      simp (disch := decide) only [prepareStorageCall_other]
       trivial
     · cases h
       apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard
+      intro st args hwf hs hguard _
+      simp (disch := decide) only [prepareStorageCall_other]
       trivial
     · cases h
       apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard
+      intro st args hwf hs hguard _
+      simp (disch := decide) only [prepareStorageCall_other]
       trivial
     · cases h
       apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard
+      intro st args hwf hs hguard _
+      simp (disch := decide) only [prepareStorageCall_other]
       trivial
     · cases h
       apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard
+      intro st args hwf hs hguard _
+      simp (disch := decide) only [prepareStorageCall_other]
       trivial
     · cases h
       apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard
+      intro st args hwf hs hguard _
+      simp (disch := decide) only [prepareStorageCall_other]
       trivial
     · cases h
       apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard
+      intro st args hwf hs hguard _
+      simp (disch := decide) only [prepareStorageCall_other]
       trivial
     · cases h
       apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard
+      intro st args hwf hs hguard _
+      simp (disch := decide) only [prepareStorageCall_other]
       trivial
     · cases h
       apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard
+      intro st args hwf hs hguard _
+      simp (disch := decide) only [prepareStorageCall_other]
       trivial
     · cases h
       apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard
+      intro st args hwf hs hguard _
+      simp (disch := decide) only [prepareStorageCall_other]
       trivial
     · cases h
       apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard
+      intro st args hwf hs hguard _
+      simp (disch := decide) only [prepareStorageCall_other]
       trivial
     · cases h
       apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard
+      intro st args hwf hs hguard _
+      simp (disch := decide) only [prepareStorageCall_other]
       trivial
     · cases h
       exact meteredCreate_encodingInvariant _
@@ -233,11 +253,13 @@ theorem meteredHostFns_encodingInvariant
       exact meteredActionDeleteAccount_encodingInvariant _
     · cases h
       apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard
+      intro st args hwf hs hguard _
+      simp (disch := decide) only [prepareStorageCall_other]
       trivial
     · cases h
       apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard
+      intro st args hwf hs hguard _
+      simp (disch := decide) only [prepareStorageCall_other]
       trivial
     · cases h
       apply meteredNeutral_encodingInvariant

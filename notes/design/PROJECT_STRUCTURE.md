@@ -3,11 +3,13 @@
 ```text
 safe-near/
     notes/              -- Component design, verification policy and open tasks
+    tools/              -- Conformance, snapshots, audits and Lean quality tools
+    lean-toolchain      -- Canonical Lean version, checked across packages
     reports/periodic/   -- Dated check findings and validation evidence
     near-lean/
       wasm/             -- Adapted Talos Wasm interpreter
       iris-wasm/        -- Iris proof machinery and Wasm code library
-      programs/         -- Wasm test programs, smoke harnesses and proofs
+      programs/         -- Wasm test programs, regression harnesses and proofs
       vm/               -- Metered single-call execution and NEAR host functions
       runtime/          -- Transactions, receipts, account state and routing
       chain/            -- Block execution, settlement and reachability
@@ -28,4 +30,4 @@ safe-near/
 ```
 
 The verification layout is currently instantiated for wNEAR. Generated blueprint
-HTML lives in its verification project's `web/` directory.
+HTML lives in its verification project's `blueprint/web/` directory.

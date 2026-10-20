@@ -106,7 +106,7 @@ def discoverFiles (pattern? : Option String) : IO (Array String) := do
     let name := e.fileName
     if name.endsWith ".wast" then
       let keep : Bool := match pattern? with
-        | some p => decide ((name.splitOn p).length > 1)
+        | some p => p.isEmpty || decide ((name.splitOn p).length > 1)
         | none   => true
       if keep then
         out := out.push s!"{testsuiteDir}/{name}"

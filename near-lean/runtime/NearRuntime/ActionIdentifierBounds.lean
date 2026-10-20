@@ -5,9 +5,13 @@ open Wasm.Near
 
 
 theorem commitFunctionCall_idsBelowNext (exec : Exec) (c : ReceiptCtx) (account : Account)
-    (outcome : VMOutcome) (isLast : Bool) (h : exec.state.IdsBelowNext) :
-    (exec.commitFunctionCall c account outcome isLast).state.IdsBelowNext :=
-  materializeFunctionCall_idsBelowNext c isLast outcome _ h
+    (outcome : VMOutcome) (isLast : Bool) (effects : FunctionCallEffects)
+    (heffects : functionCallEffects c account outcome isLast exec.state = .ok effects)
+    (h : exec.state.IdsBelowNext) :
+    (exec.commitFunctionCall outcome effects).state.IdsBelowNext := by
+  change effects.state.IdsBelowNext
+  rw [functionCallEffects_success c account outcome isLast exec.state effects heffects]
+  exact materializeFunctionCall_idsBelowNext c isLast outcome _ h
 
 theorem refundAllowance_idsBelowNext (st : ChainState) (receiver : AccountId) (pk : PublicKey) (amount : Nat)
     (h : st.IdsBelowNext) : (st.refundAllowance receiver pk amount).IdsBelowNext := by
@@ -32,16 +36,30 @@ theorem applyAction_idsBelowNext (c : ReceiptCtx) (isLast : Bool) (action : Acti
   | deployContract code => rw [applyDeployContract_run]; repeat' (first | exact h | split)
   | functionCall method args gas deposit =>
     rw [show applyAction c isLast (.functionCall method args gas deposit) =
-      applyFunctionCall c method args gas deposit isLast from rfl]
-    rw [applyFunctionCall_run]
-    split
-    · exact h
-    · split
-      · exact h
-      · dsimp only
-        split
-        · exact h
-        · exact commitFunctionCall_idsBelowNext _ _ _ _ _ h
+      applyFunctionCall c method args gas deposit isLast from rfl, applyFunctionCall_run]
+    cases ha : before.state.account? c.receipt.receiverId with
+    | none => exact h
+    | some account =>
+      dsimp only
+      cases hc : account.code with
+      | none => exact h
+      | some code =>
+        dsimp only
+        cases hi : code.decodeIssue with
+        | some issue => exact h
+        | none =>
+          dsimp only
+          generalize ho : run c.cfg code.module code.size method
+            (functionCallContext c account args gas deposit isLast)
+            (before.state.contractStorage c.receipt.receiverId) = outcome
+          cases he : outcome.aborted with
+          | some error => exact h
+          | none =>
+            dsimp only
+            cases hf : functionCallEffects c account outcome isLast before.state with
+            | error error => exact h
+            | ok effects =>
+              exact commitFunctionCall_idsBelowNext (before.recordVMOutcome outcome) c account outcome isLast effects hf h
   | transfer amount =>
     rw [applyTransfer_run]
     split
@@ -51,7 +69,7 @@ theorem applyAction_idsBelowNext (c : ReceiptCtx) (isLast : Bool) (action : Acti
       · split <;> exact h
   | stake amount pk =>
     cases ha : before.state.account? c.receipt.receiverId <;>
-      simp [-ExceptT.run_bind, -StateT.run_bind, applyAction, getAccount, getState, ha]
+      simp [-StateT.run_bind, applyAction, getAccount, getState, ha]
     repeat' (first | exact h | split)
   | addKey pk key => rw [applyAddKey_run]; repeat' (first | exact h | split)
   | deleteKey pk => rw [applyDeleteKey_run]; repeat' (first | exact h | split)
@@ -87,8 +105,8 @@ theorem idBounds_getState : getState.PreservesIdBounds := by intro before h; exa
 
 theorem idBounds_fee (isRefund : Bool) (fee : Nat) : (chargeReceiptFee isRefund fee).PreservesIdBounds := by
   intro before h
-  unfold chargeReceiptFee
-  split <;> exact h
+  unfold chargeReceiptFee burnGas
+  exact h
 
 theorem idBounds_checkReceiptAction (c : ReceiptCtx) (onlyAction : Bool) (action : Action) :
     (checkReceiptAction c onlyAction action).PreservesIdBounds := by
@@ -118,16 +136,42 @@ theorem idBounds_runReceiptAction (c : ReceiptCtx) (onlyAction isLast : Bool) (a
   exact (idBounds_fee _ _).bind (fun _ => (idBounds_checkReceiptAction _ _ _).bind
     (fun _ => applyAction_idsBelowNext _ _ _))
 
-theorem idBounds_runReceiptActionList (c : ReceiptCtx) (onlyAction : Bool) (actions : List Action) :
-    (runReceiptActionList c onlyAction actions).PreservesIdBounds := by
-  induction actions with
+theorem idBounds_runReceiptActionAt (c : ReceiptCtx) (onlyAction isLast : Bool)
+    (action : Action) (index : Nat) : (runReceiptActionAt c onlyAction isLast action index).PreservesIdBounds := by
+  cases action with
+  | createAccount  => exact idBounds_runReceiptAction c onlyAction isLast (.createAccount)
+  | deployContract code => exact idBounds_runReceiptAction c onlyAction isLast (.deployContract code)
+  | transfer amount => exact idBounds_runReceiptAction c onlyAction isLast (.transfer amount)
+  | stake amount pk => exact idBounds_runReceiptAction c onlyAction isLast (.stake amount pk)
+  | addKey pk key => exact idBounds_runReceiptAction c onlyAction isLast (.addKey pk key)
+  | deleteKey pk => exact idBounds_runReceiptAction c onlyAction isLast (.deleteKey pk)
+  | deleteAccount beneficiary => exact idBounds_runReceiptAction c onlyAction isLast (.deleteAccount beneficiary)
+  | functionCall method args gas deposit =>
+    cases hs : actionRandomSeed c index with
+    | error error =>
+      simp only [runReceiptActionAt, hs]
+      exact idBounds_throw _
+    | ok seed =>
+      simp only [runReceiptActionAt, hs]
+      exact idBounds_runReceiptAction _ _ _ _
+
+theorem idBounds_failureIndex (index : Option Nat) :
+    (modify fun e => { e with failureIndex := index } : ExecM Unit).PreservesIdBounds := by
+  intro before h
+  exact h
+
+theorem idBounds_runReceiptActionList (c : ReceiptCtx) (onlyAction : Bool) (actions : List Action)
+    (index : Nat) : (runReceiptActionList c onlyAction actions index).PreservesIdBounds := by
+  induction actions generalizing index with
   | nil => exact idBounds_pure _
-  | cons action rest ih => exact (idBounds_runReceiptAction _ _ _ _).bind (fun _ => ih)
+  | cons action rest ih =>
+    exact (idBounds_failureIndex (some index)).bind (fun _ =>
+      (idBounds_runReceiptActionAt c onlyAction rest.isEmpty action index).bind (fun _ => ih (index + 1)))
 
 theorem idBounds_receiptActionBody (c : ReceiptCtx) : (receiptActionBody c).PreservesIdBounds := by
   unfold receiptActionBody
-  exact (idBounds_fee _ _).bind (fun _ => (idBounds_runReceiptActionList _ _ _).bind
-    (fun _ => idBounds_checkStorageStake _ _))
+  exact (idBounds_fee _ _).bind (fun _ => (idBounds_runReceiptActionList _ _ _ _).bind
+    (fun _ => (idBounds_failureIndex none).bind (fun _ => idBounds_checkStorageStake _ _)))
 
 theorem runReceiptActions_idsBelowNext (c : ReceiptCtx) (st : ChainState) (h : st.IdsBelowNext) :
     (runReceiptActions c st).1.state.IdsBelowNext := by
@@ -150,6 +194,17 @@ theorem Exec.addFailureData_idsBelowNext (exec : Exec) (receiver : AccountId) (o
   · intro pair item hp
     exact hp.freshId
   · exact h
+
+theorem Exec.addCompletionData_idsBelowNext (exec : Exec) (receiver : AccountId) (outputs : List DataReceiver)
+    (h : exec.state.IdsBelowNext) : (exec.addCompletionData receiver outputs).state.IdsBelowNext := by
+  unfold Exec.addCompletionData
+  dsimp only
+  split
+  · exact h
+  · apply foldl_preserves (fun pair : ChainState × List Receipt => pair.1.IdsBelowNext)
+    · intro pair item hp
+      exact hp.freshId
+    · exact h
 
 theorem Exec.creditReceiptReward_idsBelowNext (exec : Exec) (cfg : RuntimeConfig) (receiver : AccountId)
     (burnPrice purchasePrice : Nat) (h : exec.state.IdsBelowNext) :
@@ -176,7 +231,7 @@ theorem finalizeReceipt_idsBelowNext (c : ReceiptCtx) (st : ChainState) (raw : E
   let gas := if gasRefund > 0 && c.action.signerId != systemAccount then
     balance.addGasRefund c.action.signerId c.action.signerPublicKey gasRefund else balance
   let rewarded := gas.creditReceiptReward c.cfg c.receipt.receiverId settlement.burnPrice c.action.gasPrice
-  let finished := if failed.isSome then rewarded.addFailureData c.receipt.receiverId c.action.outputDataReceivers else rewarded
+  let finished := if failed.isSome then rewarded.addFailureData c.receipt.receiverId c.action.outputDataReceivers else rewarded.addCompletionData c.receipt.receiverId c.action.outputDataReceivers
   have hbase : base.state.IdsBelowNext := by
     cases failed <;> first | exact hraw | exact hinitial
   have hcharged : charged.state.IdsBelowNext := hbase
@@ -196,7 +251,7 @@ theorem finalizeReceipt_idsBelowNext (c : ReceiptCtx) (st : ChainState) (raw : E
     dsimp only [finished]
     split
     · exact Exec.addFailureData_idsBelowNext rewarded _ _ hrewarded
-    · exact hrewarded
+    · exact Exec.addCompletionData_idsBelowNext rewarded _ _ hrewarded
   exact hfinished
 
 theorem applyActionReceipt_idsBelowNext (c : ReceiptCtx) (st : ChainState) (h : st.IdsBelowNext) :

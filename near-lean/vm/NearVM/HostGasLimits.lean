@@ -97,7 +97,14 @@ theorem metered_preserves_gasLimits (extra : Nat) (name : String) (fn : HostFn N
       | none =>
         cases hp : preInvokeError name st1 args with
         | some error => exact hwf1
-        | none => exact finishMeteredCall_gasLimits extra name st1 args _ (hfn prepaid maxBurnt st1 args hwf1)
+        | none =>
+          unfold invokeStorageCall
+          dsimp only
+          let st2 := (prepareStorageCall name st1 args).1
+          have hwf2 : GasLimits prepaid maxBurnt st2.host := hwf1
+          cases hs : (prepareStorageCall name st1 args).2 with
+          | none => exact finishMeteredCall_gasLimits extra name st2 args _ (hfn prepaid maxBurnt st2 args hwf2)
+          | some error => cases error <;> exact hwf2
 
 /-- Every published metered host preserves call gas limits, including
 unsupported/deprecated rejection paths and the explicit gas import. -/

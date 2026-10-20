@@ -6,11 +6,13 @@ namespace Wasm.Near
 theorem chargesBefore_valid_batch_target (name : String) (st : Store NearState) (args : List Value)
     (hjoin : (name == "promise_and") = false)
     (hcreation : creationAccountArgs name args = none)
-    (htarget : (promiseReceiver? st (argU64 args 0).toNat).isSome = true) :
+    (htarget : (promiseReceiver? st (argU64 args 0).toNat).isSome = true)
+    (hwrite : name ≠ "storage_write") (hremove : name ≠ "storage_remove") :
     chargesBefore name st args = chargesBeforeUnvalidated name st args := by
+  have hs : storageMutationPlan? name st args = none := by simp [storageMutationPlan?, hwrite, hremove]
   have hn : (promiseReceiver? st (argU64 args 0).toNat).isNone = false := by
     cases he : promiseReceiver? st (argU64 args 0).toNat <;> simp_all
-  simp only [chargesBefore, hjoin, Bool.false_and, Bool.false_eq_true, ite_false, hcreation, hn, Bool.and_false]
+  simp only [chargesBefore, hs, hjoin, Bool.false_and, Bool.false_eq_true, ite_false, hcreation, hn, Bool.and_false]
 
 /-- The length billed by a successful ABI span is the bytes actually read. -/
 theorem spanLen_of_read {st : Store NearState} {len ptr : UInt64} {bytes : List UInt8}
@@ -35,7 +37,7 @@ theorem chargesBefore_createAccount_reservation (st : Store NearState) (index : 
       (fun charge => charge.reservation st.host.fees)).sum =
       actionExecutionGas st.host.fees st.host.config.ethImplicitAccounts
         ((promiseReceiver? st index.toNat).getD []) .createAccount := by
-  rw [chargesBefore_valid_batch_target _ _ _ (by decide) (by rfl) (by simpa [argU64] using htarget)]
+  rw [chargesBefore_valid_batch_target _ _ _ (by decide) (by rfl) (by simpa [argU64] using htarget) (by decide) (by decide)]
   simp [chargesBeforeUnvalidated, Charge.reservation, actionExecutionGas]
 
 theorem chargesBefore_deploy_reservation (st : Store NearState) (index len ptr : UInt64) (bytes : List UInt8)
@@ -45,7 +47,7 @@ theorem chargesBefore_deploy_reservation (st : Store NearState) (index len ptr :
       (fun charge => charge.reservation st.host.fees)).sum =
       actionExecutionGas st.host.fees st.host.config.ethImplicitAccounts
         ((promiseReceiver? st index.toNat).getD []) (.deployContract bytes) := by
-  rw [chargesBefore_valid_batch_target _ _ _ (by decide) (by rfl) (by simpa [argU64] using htarget)]
+  rw [chargesBefore_valid_batch_target _ _ _ (by decide) (by rfl) (by simpa [argU64] using htarget) (by decide) (by decide)]
   simp [chargesBeforeUnvalidated, argU64, List.map_append, readSpan_reservation, spanLen_of_read hread]
   simp [Charge.reservation, actionExecutionGas]
 
@@ -56,7 +58,7 @@ theorem chargesBefore_stake_reservation (st : Store NearState) (index amountPtr 
       (fun charge => charge.reservation st.host.fees)).sum =
       actionExecutionGas st.host.fees st.host.config.ethImplicitAccounts
         ((promiseReceiver? st index.toNat).getD []) (.stake amount pk) := by
-  rw [chargesBefore_valid_batch_target _ _ _ (by decide) (by rfl) (by simpa [argU64] using htarget)]
+  rw [chargesBefore_valid_batch_target _ _ _ (by decide) (by rfl) (by simpa [argU64] using htarget) (by decide) (by decide)]
   simp [chargesBeforeUnvalidated, argU64, List.map_append, readSpan_reservation, readMem]
   simp [Charge.reservation, actionExecutionGas]
 
@@ -67,7 +69,7 @@ theorem chargesBefore_fullAccessKey_reservation (st : Store NearState) (index le
       (fun charge => charge.reservation st.host.fees)).sum =
       actionExecutionGas st.host.fees st.host.config.ethImplicitAccounts
         ((promiseReceiver? st index.toNat).getD []) (.addKey pk nonce .fullAccess) := by
-  rw [chargesBefore_valid_batch_target _ _ _ (by decide) (by rfl) (by simpa [argU64] using htarget)]
+  rw [chargesBefore_valid_batch_target _ _ _ (by decide) (by rfl) (by simpa [argU64] using htarget) (by decide) (by decide)]
   simp [chargesBeforeUnvalidated, argU64, List.map_append, readSpan_reservation]
   simp [Charge.reservation, actionExecutionGas]
 
@@ -78,7 +80,7 @@ theorem chargesBefore_deleteKey_reservation (st : Store NearState) (index len pt
       (fun charge => charge.reservation st.host.fees)).sum =
       actionExecutionGas st.host.fees st.host.config.ethImplicitAccounts
         ((promiseReceiver? st index.toNat).getD []) (.deleteKey pk) := by
-  rw [chargesBefore_valid_batch_target _ _ _ (by decide) (by rfl) (by simpa [argU64] using htarget)]
+  rw [chargesBefore_valid_batch_target _ _ _ (by decide) (by rfl) (by simpa [argU64] using htarget) (by decide) (by decide)]
   simp [chargesBeforeUnvalidated, argU64, List.map_append, readSpan_reservation]
   simp [Charge.reservation, actionExecutionGas]
 
@@ -89,7 +91,7 @@ theorem chargesBefore_deleteAccount_reservation (st : Store NearState) (index le
       (fun charge => charge.reservation st.host.fees)).sum =
       actionExecutionGas st.host.fees st.host.config.ethImplicitAccounts
         ((promiseReceiver? st index.toNat).getD []) (.deleteAccount beneficiary) := by
-  rw [chargesBefore_valid_batch_target _ _ _ (by decide) (by rfl) (by simpa [argU64] using htarget)]
+  rw [chargesBefore_valid_batch_target _ _ _ (by decide) (by rfl) (by simpa [argU64] using htarget) (by decide) (by decide)]
   simp [chargesBeforeUnvalidated, argU64, List.map_append, readSpan_reservation, utf8]
   simp [Charge.reservation, actionExecutionGas]
 
@@ -100,7 +102,7 @@ theorem chargesBefore_transfer_reservation (st : Store NearState) (index amountP
       (fun charge => charge.reservation st.host.fees)).sum =
       actionExecutionGas st.host.fees st.host.config.ethImplicitAccounts
         ((promiseReceiver? st index.toNat).getD []) (.transfer amount) := by
-  rw [chargesBefore_valid_batch_target _ _ _ (by decide) (by rfl) (by simpa [argU64] using htarget)]
+  rw [chargesBefore_valid_batch_target _ _ _ (by decide) (by rfl) (by simpa [argU64] using htarget) (by decide) (by decide)]
   simp [chargesBeforeUnvalidated, argU64, transferCharges, hread, readMem]
   simp [Charge.reservation, actionExecutionGas]
 
@@ -148,7 +150,7 @@ theorem chargesBefore_functionCall_reservation (st : Store NearState) (args : Li
         actionExecutionGas st.host.fees st.host.config.ethImplicitAccounts
           ((promiseReceiver? st (argU64 args 0).toNat).getD []) action := by
   have ht := functionCallPlan_valid_target h rfl
-  rw [chargesBefore_valid_batch_target _ _ _ (by decide) (by rfl) ht]
+  rw [chargesBefore_valid_batch_target _ _ _ (by decide) (by rfl) ht (by decide) (by decide)]
   exact functionCallPlan_reservation h _
 
 theorem chargesBefore_functionKey_reservation (st : Store NearState) (args : List Value)
@@ -165,7 +167,7 @@ theorem chargesBefore_functionKey_reservation (st : Store NearState) (args : Lis
           ((promiseReceiver? st (argU64 args 0).toNat).getD [])
           (.addKey publicKey (argU64 args 3) (.functionCall (functionCallAllowance allowance) receiver methods)) := by
   have ht := functionKeyPlan_valid_target h
-  rw [chargesBefore_valid_batch_target _ _ _ (by decide) (by rfl) ht]
+  rw [chargesBefore_valid_batch_target _ _ _ (by decide) (by rfl) ht (by decide) (by decide)]
   exact functionKeyPlan_reservation h
 
 end Wasm.Near

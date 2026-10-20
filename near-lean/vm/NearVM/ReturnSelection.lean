@@ -120,8 +120,13 @@ theorem checkedSetRegister_selection {st after : Store NearState} {register : UI
     (h : checkedSetRegister? st register bytes = some after) (hwf : ReturnSelectionValid st.host) :
     ReturnSelectionValid after.host := by
   unfold checkedSetRegister? at h
-  split_ifs at h <;> simp only [Option.some.injEq] at h
-  all_goals subst after; exact hwf
+  split at h
+  · cases h
+    exact hwf
+  · split at h
+    · cases h
+      exact hwf
+    · cases h
 
 theorem writeRegisterResult_selection (name : String) (st : Store NearState) (register : UInt64)
     (bytes : List UInt8) (vals : List Value) (hwf : ReturnSelectionValid st.host) :

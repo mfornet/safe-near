@@ -2,6 +2,14 @@ import NearRuntime.Types
 
 namespace Near
 
+open Wasm.Near
+
+/-- V0 has no nonce-mode field; V1 ordinary-key transactions use the native
+GasKeys envelope gate even when they request monotonic nonces. -/
+def Transaction.versionSupported (tx : Transaction) (cfg : RuntimeConfig) : Bool :=
+  (tx.version == 0 && tx.nonceMode == .monotonic) ||
+    (tx.version == 1 && cfg.v1TransactionsEnabled)
+
 /-- Saturating u64 nonce ceiling from pinned `verifier::verify_nonce`. -/
 def nonceUpperBound (height : Nat) : Nat := min (height * 1_000_000) (2 ^ 64 - 1)
 

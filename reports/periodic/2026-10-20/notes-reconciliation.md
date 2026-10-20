@@ -7,7 +7,9 @@ Applied after the user removed the human-only editing restriction:
 - Replaced nonexistent `docs/`, `plan/`, `sdk/`, `task/`, and `Specs/` layout
   descriptions with the current package and contract verification structure.
 - Closed initial Talos/Iris, testsuite, mergesort harness, and runtime setup tasks;
-  retained open proof, coverage, snapshot, and CI tooling work.
+  then reconciled them with newer main: all four program proofs, snapshot tools,
+  CI style tooling, and shared toolchain enforcement are now implemented.
+  Retained open coverage and broader validation work.
 - Documented the VM/runtime/chain boundaries, modeled access keys, and current
   conformance tests. Kept history replay, upgrade safety, fuzzing, and full
   scheduling equivalence as goals requiring further work.
@@ -16,5 +18,6 @@ Applied after the user removed the human-only editing restriction:
   Preserved kernel/axiom policy and identified strict Comparator as proposed,
   rather than claiming it is already enforced.
 
-These follow-up changes affect documentation only. The recorded build, proof,
-conformance, and reproduction results apply to the unchanged checked code.
+The initial check results remain tied to their checked revision. The subsequent
+merge brings newer code from main; its validation is recorded separately in
+[merge follow-up](merge-follow-up.md).

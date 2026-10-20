@@ -1,6 +1,7 @@
-import Interpreter.Wasm
+import Interpreter.Wasm.Host
 import NearVM.Error
 import NearVM.Gas
+import NearVM.TrieOverlay
 
 /-!
 # NEAR host state (`α := NearState`)
@@ -77,6 +78,8 @@ deriving Inhabited
 limit unconstrained, which keeps existing concrete examples small and easy to
 compute while allowing fidelity checks to opt in to nearcore-style traps. -/
 structure NearConfig where
+  /-- RuntimeExt charges old-value bytes; MockedExternal does not. Trie-node costs are separate. -/
+  chargeStorageValueAccess : Bool := false
   /-- Runtime external action methods are UTF-8; VM mocks may keep opaque bytes. -/
   validateActionMethodUtf8 : Bool := true
   oneYoctoOnPromise : Bool := false
@@ -145,6 +148,11 @@ deriving Inhabited, BEq
 structure NearState where
   /-- Storage trie projection: `key ↦ value`, `none` when absent. -/
   storage    : List UInt8 → Option (List UInt8) := fun _ => none
+  /-- Optional full chunk trie and shared accounting cache. Contract storage remains
+  the functional projection; disagreement is an explicit model execution issue. -/
+  storageAccounting : Option _root_.Near.TrieOverlay.State := none
+  /-- Reads/has-key use flat storage by default; writes/removes always traverse the trie. -/
+  storageReadsFromTrie : Bool := false
   /-- Finite key support for deprecated storage iterator APIs. -/
   storageKeys : List (List UInt8) := []
   iterators  : Nat → Option StorageIterator := fun _ => none
@@ -185,6 +193,7 @@ structure NearState where
   outputDataReceivers : List (List UInt8) := []
   /-- The structured error behind the last host trap, read by the runner. -/
   lastError  : Option Near.HostError := none
+  lastExecutionIssue : Option Near.ExecutionIssue := none
   ecrecover  : List UInt8 → List UInt8 → UInt64 → Bool → Option (List UInt8) :=
     fun _ _ _ _ => none
   ed25519Verify : List UInt8 → List UInt8 → List UInt8 → Bool :=

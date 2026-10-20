@@ -8,8 +8,11 @@ def HostCreatesNoDeposits (fn : HostFn NearState) : Prop :=
 theorem checkedSetRegister_deposits {st after : Store NearState} {register : UInt64} {bytes : List UInt8}
     (h : checkedSetRegister? st register bytes = some after) : DepositEffect st.host after.host 0 := by
   unfold checkedSetRegister? at h
-  split_ifs at h <;> simp only [Option.some.injEq] at h
-  all_goals subst after; exact ⟨rfl, rfl, rfl⟩
+  split at h
+  · cases h; exact ⟨rfl, rfl, rfl⟩
+  · split at h
+    · cases h; exact ⟨rfl, rfl, rfl⟩
+    · cases h
 
 theorem writeRegisterResult_deposits (name : String) (st : Store NearState) (register : UInt64)
     (bytes : List UInt8) (values : List Value) :

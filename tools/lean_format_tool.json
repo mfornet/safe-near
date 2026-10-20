@@ -1,0 +1,7 @@
+{
+  "repository": "https://github.com/jcreinhold/lean-fmt.git",
+  "revision": "9e8704afb1ed88a935cbdbf10d735e826b0034b8",
+  "source_release": "v4.34.0-rc2",
+  "compiler": "repository root lean-toolchain",
+  "generated": ["near-lean/programs/lean/Programs/*/Program.lean"]
+}

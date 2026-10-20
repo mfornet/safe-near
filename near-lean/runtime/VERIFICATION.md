@@ -15,6 +15,14 @@ published bytes are locked separately, and equivalence to the clean revision
 is not assumed. `tools/runtime-conformance` now runs the pinned published VM
 as an independent execution oracle. The initial gas discrepancies have been
 fixed for the checked fixtures. General VM conformance remains unproved.
+`tools/chain-conformance` also builds the clean source's full trie-backed
+`Runtime::apply`. Its source, manifest overlay, lockfile, compiler and executable
+are recorded and checked; the runtime implementation is not patched. Native
+smoke checks establish deterministic raw-state replay and the transaction/
+receipt chunk boundary. The Lean JSON frontend now executes explicit blocks
+and serializes all represented state, queue and outcome fields; its wire format
+and decoder assumptions are documented in `tools/chain-conformance/REPLAY.md`.
+The cross-runtime bridge and complete observation comparison remain open.
 Selecting
 an older table does not select older execution semantics: the current Lean
 configuration still omits most protocol feature switches. The loading-cost
@@ -25,7 +33,63 @@ Signatures, consensus, initial state, block context, and receipt delivery are
 externally supplied. Contract code enters as a decoded module, an independently
 supplied size, and a hash label. Neither byte-to-module correspondence nor the
 hash label is checked by the runtime. `codeOf` is an externally supplied decoder.
-These assumptions must be carried into any theorem about deployed bytes.
+`ContractCode.decodeIssue` marks unavailable decoding explicitly. Calling or
+deploying flagged code, including conversion of a deployment promise, rejects
+the entire apply as a model issue with no committed state, outcomes or fees.
+Replay adapters must use that flag instead of substituting an empty executable
+module. Successful decoding still remains a trusted byte-to-module assumption
+that must be carried into any theorem about deployed bytes.
+
+## Chunk boundaries
+
+Transaction acceptance charges the signer, updates its access-key nonce and
+produces a transaction outcome. Only signer-is-receiver action receipts run
+locally in that chunk. Other transaction receipts are outgoing work; their
+receiver state changes when those receipts are delivered in a later chunk.
+The routing follows `Runtime::process_transactions` in the pinned source.
+
+An unsupported contract host operation is discovered when the function-call
+receipt executes. A cross-account transaction can therefore be accepted in
+one chunk before delivery encounters a model issue in a later chunk. The
+issue rolls back the failing chunk; it does not erase already committed
+transaction charges or nonce updates. Likewise, an implicit account's initial
+key nonce uses the block that executes its transfer receipt, not the block
+that accepted the originating transaction.
+
+## Gas purchase and refund accounting
+
+Receipt gas is purchased at `max(block price, min_gas_purchase_price)`.
+Source-derived configuration also supplies the `AccountCostIncrease` feature,
+account-creation charge and refund penalties omitted by the RPC view. Current
+feature semantics distinguish purchase/burn prices, return price surplus,
+charge successful account creation and pay contract rewards at the burn price.
+Older feature settings retain the reference's purchase-price accounting.
+System refunds report execution gas without charging gas tokens; failed system
+refunds burn their deposit separately. Gas refunds identify the signer key and
+restore its current function-call allowance on delivery, saturating at u128.
+
+Forty targeted native/Lean cases compare all represented state, receipt and
+outcome fields for successful transfers/account creation across protocols
+83–86 and zero, increasing and decreasing prices. Creation-order renaming
+relates native receipt hashes to model counters; transaction hashes remain
+abstracted. Native metadata, compute and opaque trie/statistics fields are
+retained as explicit observation gaps. This is a restricted financial regression,
+not general runtime conformance. Runtime tests separately cover replaced/deleted
+keys, failed refunds, allowance saturation and refund chunk-capacity usage.
+The general comparison bridge, other actions/failures and bounded arithmetic
+remain separate obligations.
+
+## Storage adapter accounting
+
+Native `RuntimeExt` charges evicted/removed value bytes independently of trie-node
+access; the VM oracle's `MockedExternal` omits both. Receipt function-call contexts
+therefore enable `chargeStorageValueAccess`, while standalone contexts default to
+the mock policy. These charges use the actual pre-operation storage value and
+precede register writes, including discarded registers, traps and gas exhaustion.
+Storage mutation input plans preserve key/read/value-limit precedence and stop
+charging at the failing input. This does not model trie structure or cached-node
+access. Full native mutation comparisons continue to expose those remaining gas
+differences rather than treating storage-heavy execution as equivalent.
 
 ## Current implementation and gaps
 
@@ -360,3 +424,41 @@ Runtime scenarios exercise actual restricted wNEAR calls before/after refund,
 current-key replacement/deletion, balance/ordinary transfers and rollback on
 storage-staking failure. Full receipt/chain preservation and conservation, gas-key
 semantics, remaining integer overflow paths and deployed refinement remain open.
+
+## Trie witness boundary
+
+`TrieAccounting` decodes native `RawTrieNodeWithSize` Borsh and independently
+walks compact nibble paths, branch bitmaps and value references. It models the
+single hash-keyed accounting cache shared by nodes and values, including counted
+and uncounted node lookup modes, value dereferences and resets. Counter/event
+increment facts are kernel-checked. `trie-replay` rejects malformed, missing,
+trailing, cyclic and duplicate witness inputs.
+
+`TrieConstruction` now builds the canonical compressed hexary trie directly
+from unique raw key/value entries, including Borsh discriminants, compact paths,
+branch bitmaps, value references and subtree memory usage. Pure `Sha256.hash`
+computes object identities and validates witness-input mode; its output width is
+kernel-checked. General constructor canonicality and a FIPS/native cryptographic
+refinement are not proved.
+
+`tools/chain-conformance/trie_probe.py` compares independent native and Lean
+construction from the same raw entries. Native roots, witnesses, paths and counts
+are not supplied to Lean's constructor. Every node/value object's bytes and hash,
+the root and all query observations must agree. The native complete witness is
+recorded without warming the observed query cache, and the driver independently
+checks SHA256 bindings. Both executors and full runtime origins remain retained.
+The corpus includes complete raw states exported by `Runtime::apply`, shared
+subtrees and cross-role node/value hash aliases. This does not inject observed
+counts into receipt execution. Encoding modeled state into raw entries, state
+updates/prospective overlays, receipt cache lifetime, flat/memory trie behavior
+and broader refinement proofs remain open before runtime trie gas is discharged.
+
+`TrieOverlay` adds prospective/committed ContractData updates, tombstones,
+memory-pointer reads, commit/rollback and canonical checkpoints. Native
+incremental `TrieUpdate::finalize` roots are compared with independent Lean
+reconstruction after every checkpoint, alongside every intermediate view and
+access event. Cache resets are explicit: commit, rollback and root publication
+do not implicitly rewind already observed hashes. Kernel frame properties
+preserve the base/cache under commit and the base/committed/cache under rollback.
+The diagnostic does not model code caches, change-history causes, proof-size
+limits or VM host charges; receipt integration still requires those boundaries.

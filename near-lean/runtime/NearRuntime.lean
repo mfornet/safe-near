@@ -15,6 +15,7 @@ import NearRuntime.RefundReceiptInvariants
 import NearRuntime.MaterializeInvariants
 import NearRuntime.FunctionCallInvariants
 import NearRuntime.PromiseGasInvariants
+import NearRuntime.ReceiptRegistry
 import NearRuntime.ReceiptFunding
 import NearRuntime.MixedFunding
 import NearRuntime.AllActionFunding

@@ -1,4 +1,4 @@
-import Interpreter.Wasm.Semantics
+import Interpreter.Wasm.Operations
 
 namespace Wasm
 
