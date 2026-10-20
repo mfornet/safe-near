@@ -441,18 +441,26 @@ terms so sequential steps telescope without truncated subtraction.
 attempts containing arbitrary ordered function-call actions, including execution
 fees, admission checks and the final storage-staking check.
 
-`ReceiptFunding.applyActionReceipt_functionCalls_net_conservation` covers the
-actual finalized receipt on both success and failure. It equates account funds
-plus outgoing receipt backing and net burn with the initial account funds,
-incoming receipt backing and explicit subsidy. The proof accounts for gas
-refunds, reward credit and failure rollback. Its structural/configuration
-premises are unique account records, an existing ordinary receiver, non-system
-predecessor/signer, matching action-receipt metadata, the v85+ settlement branch
-(`accountCostIncrease = true`), and a reward fraction at most one. It requires
-only function-call actions; arbitrary VM-created outgoing action variants are
-covered by their proved gas/deposit backing. No VM outcome or financial equation
-is assumed. Other incoming action families and chain-level conservation remain
-open; this is not full runtime equivalence.
+`ReceiptFunding` factors settlement into a reusable action-body funding rule.
+`MetadataFunding` proves deployment and key insertion/deletion preserve liquid
+and locked balances while updating code, permissions and storage usage. Its
+executable unfolding lemmas retain the actual account/key admission witnesses.
+`MixedFunding.applyActionReceipt_mixed_net_conservation` covers arbitrary
+ordered mixtures of these actions and function calls, on success and failure.
+It equates account funds plus outgoing receipt backing and net burn with the
+initial account funds, incoming receipt backing and explicit subsidy. Gas
+refunds, rewards, admission errors and final storage-staking rollback are part
+of the actual receipt path.
+
+The concrete theorem requires unique account records, an ordinary receiver,
+non-system predecessor/signer, matching action-receipt metadata, the v85+
+settlement branch (`accountCostIncrease = true`), and a reward fraction at most
+one. The previous existing-receiver premise is removed: a new lower-bound proof
+shows account-creation charges add to gross burn and cannot underfund rewards.
+No VM outcome or financial equation is assumed by the concrete theorem.
+Arbitrary VM-created outgoing action variants have their gas/deposit backing
+covered independently. Incoming creation, transfer and account-deletion funding
+rules, chain-level conservation and full runtime equivalence remain open.
 
 `NearVM.ReceiptPredicates` transports arbitrary decidable receiver/action
 predicates through actual promise updates, conversion and successful outcome

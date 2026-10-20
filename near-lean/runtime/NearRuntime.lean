@@ -16,3 +16,4 @@ import NearRuntime.MaterializeInvariants
 import NearRuntime.FunctionCallInvariants
 import NearRuntime.PromiseGasInvariants
 import NearRuntime.ReceiptFunding
+import NearRuntime.MixedFunding
