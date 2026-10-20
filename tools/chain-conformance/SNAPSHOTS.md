@@ -144,7 +144,9 @@ details remain explicit observation gaps.
 
 Receipt ids are renamed using **native events**, independently of model output:
 new action receipts, their newly introduced dependency ids, then refunds and
-final data receipts. Native outcome `receipt_ids` excludes data receipts. Map
+final data receipts. Native outcome `receipt_ids` excludes data receipts. Transaction outcome hashes
+map to the model's zero id; the full native hash identity remains in raw evidence.
+Map
 entry order is canonicalized; receipt/delivery order is preserved. An absent
 per-account storage map and an explicitly empty one both denote an empty
 storage function and compare equally. No key/value, gas or balance difference

@@ -363,6 +363,7 @@ def compare(directory, reference, model):
             native=left, model=right, expected=expected, projectionError=error, differences=diffs,
             unmodeledObservations=["native compute and execution metadata", "account/receipt representation versions",
                 "native shard scheduler columns and delayed queue indices", "native hash generation (event-based renaming)",
+                "transaction hash identity (transaction outcome ids map to zero)",
                 "statistics beyond represented balance burn/subsidy", "native action failure index (only index-zero guest panic mapped)"])
 
 
