@@ -117,8 +117,34 @@ private def updateInput (input : Json) : Except String Json := do
   let mut state ← Near.TrieOverlay.start entries
   let initial := state.base.root
   let mut steps := []
+  let mut pending : Option (Option Near.TrieOverlay.ValuePointer) := none
   for row in (← (← field input "operations").getArr?) do
-    let (after, observation) ← Near.TrieOverlay.step account (← updateOperation row) state
+    let kind ← (← field row "kind").getStr?
+    if pending.isSome && kind != "dereference" && kind != "dropRef" then
+      throw "consume or drop the pending trie reference before another operation"
+    let fresh := { state with accounting := { seen := state.accounting.seen } }
+    let (after, observation) ← match kind with
+      | "getRef" => do
+        object row ["kind", "key", "accountNodes"]
+        let key := Near.TrieOverlay.contractKey account (← bytes (← field row "key"))
+        let (after, pointer) ← Near.TrieOverlay.getReference fresh key (← (← field row "accountNodes").getBool?)
+        pending := some pointer
+        pure (after, { kind, rawKey := some key, reference := pointer.map (·.reference), isLookup := true })
+      | "dereference" => do
+        object row ["kind"]
+        let some pointer := pending | throw "no pending trie reference"
+        pending := none
+        match pointer with
+        | none => pure (fresh, { kind, isLookup := true })
+        | some pointer => do
+          let (after, value) ← Near.TrieOverlay.dereference fresh pointer
+          pure (after, { kind, reference := some pointer.reference, value := some value, isLookup := true })
+      | "dropRef" => do
+        object row ["kind"]
+        unless pending.isSome do throw "no pending trie reference"
+        pending := none
+        pure (fresh, { kind })
+      | _ => Near.TrieOverlay.step account (← updateOperation row) state
     state := after
     let reference := observation.reference.map fun (kind, value) => Json.mkObj [
       ("kind", toJson kind), ("hash", bytesJson value.hash), ("length", toJson value.length)]
@@ -133,6 +159,7 @@ private def updateInput (input : Json) : Except String Json := do
       ("events", toJson (state.accounting.events.map fun event => Json.mkObj [
         ("hash", bytesJson event.hash), ("kind", toJson event.kind), ("cached", toJson event.cached)])),
       ("counts", Json.mkObj [("disk", toJson state.accounting.disk), ("mem", toJson state.accounting.mem)])]]
+  if pending.isSome then throw "unconsumed trie value reference"
   return Json.mkObj [("initialRoot", bytesJson initial), ("steps", toJson steps)]
 
 private def hashInput (input : Json) : Except String Json := do

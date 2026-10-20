@@ -161,6 +161,29 @@ structure Result where
   state : Accounting
   deriving Repr
 
+/-- Value dereference is a separate accounted phase. RuntimeExt can exhaust
+gas on the old-value byte charge after finding a reference, before this read. -/
+def dereference (witness : Witness) (reference : ValueRef) (state : Accounting) :
+    Except String (Bytes × Accounting) := do
+  let bytes ← fetch witness reference.hash
+  if bytes.length != reference.length then throw "trie value length mismatch"
+  return (bytes, state.touch reference.hash "value")
+
+/-- One successful on-disk dereference records exactly one access, whether its
+hash is fresh or already cached (including aliases with previously read nodes). -/
+theorem dereference_success_total (witness : Witness) (reference : ValueRef)
+    (before after : Accounting) (bytes : Bytes)
+    (h : dereference witness reference before = .ok (bytes, after)) :
+    after.disk + after.mem = before.disk + before.mem + 1 := by
+  cases hf : fetch witness reference.hash with
+  | error error => simp [dereference, hf, bind, Except.bind] at h
+  | ok payload =>
+    by_cases hl : payload.length = reference.length
+    · simp [dereference, hf, hl, bind, Except.bind] at h
+      rcases h with ⟨rfl, rfl⟩
+      exact Accounting.touch_total before reference.hash "value"
+    · simp [dereference, hf, hl, bind, Except.bind] at h
+
 /-- Lookups retain the cache across queries but report per-query counters/events. -/
 def lookup (witness : Witness) (root : Hash) (previous : Accounting) (query : Query) : Except String Result := do
   let state : Accounting := { seen := if query.resetCache then [] else previous.seen }
@@ -168,9 +191,8 @@ def lookup (witness : Witness) (root : Hash) (previous : Accounting) (query : Qu
   match reference with
   | some reference =>
     if query.dereference then
-      let bytes ← fetch witness reference.hash
-      if bytes.length != reference.length then throw "trie value length mismatch"
-      return { reference := some reference, value := some bytes, state := state.touch reference.hash "value" }
+      let (bytes, state) ← dereference witness reference state
+      return { reference := some reference, value := some bytes, state }
     else return { reference := some reference, value := none, state }
   | none => return { reference := none, value := none, state }
 

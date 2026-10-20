@@ -32,7 +32,7 @@ use near_primitives::utils::{
 use near_primitives::version::{MIN_SUPPORTED_PROTOCOL_VERSION, PROTOCOL_VERSION};
 use near_primitives::views::{ExecutionOutcomeView, SignedTransactionView};
 use near_store::test_utils::TestTriesBuilder;
-use near_store::trie::{AccessOptions, AccessTracker, KeyLookupMode};
+use near_store::trie::{AccessOptions, AccessTracker, KeyLookupMode, OptimizedValueRef};
 use near_store::{ShardTries, ShardUId};
 use near_store::{TrieUpdate, TrieUpdateValuePtr};
 use node_runtime::config::{total_prepaid_exec_fees, total_prepaid_gas, total_prepaid_send_fees};
@@ -1159,6 +1159,19 @@ fn trie_updates(request: &Value) -> Result<Value> {
     let mut state = TrieUpdate::new(trie);
     let tracker = LookupTracker::default();
     let mut steps = Vec::new();
+    enum SavedPointer {
+        Memory(Vec<u8>),
+        Trie(OptimizedValueRef),
+    }
+    let pointer_view = |pointer: &SavedPointer| match pointer {
+        SavedPointer::Memory(bytes) => {
+            json!({"kind":"memory", "hash":near_primitives::hash::hash(bytes).0,"length":bytes.len()})
+        }
+        SavedPointer::Trie(reference) => {
+            json!({"kind":"trie", "hash":reference.value_hash().0,"length":reference.len()})
+        }
+    };
+    let mut pending: Option<Option<SavedPointer>> = None;
     for operation in field(input, "operations")?
         .as_array()
         .ok_or("operations must be an array")?
@@ -1170,7 +1183,59 @@ fn trie_updates(request: &Value) -> Result<Value> {
         let mut raw_key = None;
         let mut lookup = None;
         let mut present = None;
+        if pending.is_some() && kind != "dereference" && kind != "dropRef" {
+            return Err(
+                "consume or drop the pending trie reference before another operation".into(),
+            );
+        }
         match kind {
+            "getRef" => {
+                let op = object(operation, &["kind", "key", "accountNodes"])?;
+                let key = TrieKey::ContractData {
+                    account_id: account.clone(),
+                    key: from_value(field(op, "key")?.clone())?,
+                };
+                raw_key = Some(key.to_vec());
+                let mode = match field(op, "accountNodes")?
+                    .as_bool()
+                    .ok_or("invalid bool field: accountNodes")?
+                {
+                    true => KeyLookupMode::MemOrTrie,
+                    false => KeyLookupMode::MemOrFlatOrTrie,
+                };
+                tracker.phase.set("node");
+                let pointer = state
+                    .get_ref(&key, mode, AccessOptions::contract_runtime(&tracker))?
+                    .map(|pointer| match pointer {
+                        TrieUpdateValuePtr::MemoryRef(bytes) => {
+                            SavedPointer::Memory(bytes.to_vec())
+                        }
+                        TrieUpdateValuePtr::Ref(_, reference) => SavedPointer::Trie(reference),
+                    });
+                lookup =
+                    Some(json!({"reference":pointer.as_ref().map(&pointer_view),"value":null}));
+                pending = Some(pointer);
+            }
+            "dereference" => {
+                object(operation, &["kind"])?;
+                let pointer = pending.take().ok_or("no pending trie reference")?;
+                let view = pointer.as_ref().map(&pointer_view);
+                tracker.phase.set("value");
+                let value =
+                    match pointer {
+                        None => None,
+                        Some(SavedPointer::Memory(bytes)) => Some(bytes),
+                        Some(SavedPointer::Trie(reference)) => Some(state.trie().deref_optimized(
+                            AccessOptions::contract_runtime(&tracker),
+                            &reference,
+                        )?),
+                    };
+                lookup = Some(json!({"reference":view,"value":value}));
+            }
+            "dropRef" => {
+                object(operation, &["kind"])?;
+                pending.take().ok_or("no pending trie reference")?;
+            }
             "set" | "remove" | "get" | "has" => {
                 let names: &[&str] = match kind {
                     "set" => &["kind", "key", "value"],
@@ -1270,6 +1335,9 @@ fn trie_updates(request: &Value) -> Result<Value> {
         steps.push(json!({"kind":kind,"rawKey":raw_key,"lookup":lookup,"present":present,
             "baseRoot":state.get_root().0,"viewEntries":view,"prospectiveCount":state.prospective_len(),
             "committedCount":state.committed_len(),"events":events,"counts":{"disk":events.len()-cached,"mem":cached}}));
+    }
+    if pending.is_some() {
+        return Err("unconsumed trie value reference".into());
     }
     Ok(
         json!({"formatVersion":1,"mode":"contract-data-overlays/on-disk/no-flat/no-memtrie",

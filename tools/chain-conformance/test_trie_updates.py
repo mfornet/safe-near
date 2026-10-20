@@ -24,6 +24,10 @@ def put(key=b"a", value=b"new"):
     return dict(kind="set", key=list(key), value=list(value))
 
 
+def reference(key=b"a", account=True):
+    return dict(kind="getRef", key=list(key), accountNodes=account)
+
+
 def op(kind, key=None):
     return dict(kind=kind, **({} if key is None else dict(key=list(key))))
 
@@ -36,6 +40,15 @@ def source(account="fixture.near", entries=None, operations=()):
 
 
 def cases():
+    yield "staged-disk-cache", source(operations=[reference(), op("dropRef"), reference(), op("dereference"),
+        reference(), op("dereference")])
+    yield "staged-no-node-accounting", source(operations=[reference(account=False), op("dereference"),
+        reference(account=False), op("dereference")])
+    yield "staged-memory", source(operations=[put(), reference(), op("dereference"), op("commit"),
+        reference(), op("dereference"), op("remove", b"a"), reference(), op("dereference")])
+    yield "staged-missing", source(operations=[reference(b"missing"), op("dereference"), reference(b"missing"), op("dropRef")])
+    yield "staged-shared-value", source(entries=[(b"a", b"shared"), (b"b", b"shared")],
+        operations=[reference(), op("dereference"), reference(b"b"), op("dereference")])
     yield "visibility", source(operations=[get(), op("has", b"a"), put(), get(), op("commit"), get(),
         put(value=b"second"), get(), op("rollback"), get(), op("remove", b"b"), op("has", b"b"), get(b"b"),
         op("rollback"), get(b"b"), op("checkpoint"), get(), op("resetCache"), op("has", b"a"), get()])
@@ -97,6 +110,23 @@ class TrieUpdateTests(unittest.TestCase):
                     if name in roots:
                         self.assertEqual(b58encode(bytes(report["native"]["initialRoot"])), roots[name])
                     steps = report["native"]["steps"]
+                    if name == "staged-disk-cache":
+                        self.assertTrue(steps[0]["events"])
+                        self.assertTrue(all(event["kind"] == "node" for event in steps[0]["events"]))
+                        self.assertEqual(steps[1]["events"], [])
+                        self.assertTrue(all(event["cached"] for event in steps[2]["events"]))
+                        self.assertEqual([event["kind"] for event in steps[3]["events"]], ["value"])
+                        self.assertFalse(steps[3]["events"][0]["cached"])
+                        self.assertTrue(steps[5]["events"][0]["cached"])
+                    if name == "staged-memory":
+                        self.assertTrue(all(not row["events"] for row in steps))
+                        self.assertEqual(steps[2]["lookup"]["value"], list(b"new"))
+                        self.assertIsNone(steps[-1]["lookup"]["value"])
+                    if name == "staged-missing":
+                        self.assertEqual(steps[1]["events"], [])
+                        self.assertIsNone(steps[1]["lookup"]["reference"])
+                    if name == "staged-shared-value":
+                        self.assertTrue(steps[3]["events"][0]["cached"])
                     if name == "visibility":
                         self.assertEqual([steps[i]["lookup"]["reference"]["kind"] for i in [0, 3, 5, 7, 9, 16]],
                             ["trie", "memory", "memory", "memory", "memory", "trie"])
@@ -129,7 +159,12 @@ class TrieUpdateTests(unittest.TestCase):
         variants = [source(operations=[put(), op("checkpoint")]), source(operations=[op("unknown")]),
             source(account="A.near"), source(operations=[{**get(), "dereference": 1}]),
             source(operations=[{**put(), "value": [256]}]), source(operations=[{**op("commit"), "key": []}]),
-            source(operations=[{**op("has", b"a"), "accountNodes": True}])]
+            source(operations=[{**op("has", b"a"), "accountNodes": True}]),
+            source(operations=[reference()]), source(operations=[op("dereference")]),
+            source(operations=[op("dropRef")]), source(operations=[reference(), put()]),
+            source(operations=[reference(), op("checkpoint")]), source(operations=[reference(), reference()]),
+            source(operations=[{**reference(), "accountNodes": 1}, op("dropRef")]),
+            source(operations=[reference(), {**op("dereference"), "key": []}])]
         with frozen_reference(REFERENCE) as (native, _), frozen_model(MODEL) as (model, _):
             for request in variants:
                 with self.subTest(request=request):

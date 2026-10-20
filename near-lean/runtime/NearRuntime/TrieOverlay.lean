@@ -54,17 +54,57 @@ private def overlay (state : State) (key : Bytes) : Option (Option Bytes) :=
 def start (entries : List (Bytes × Bytes)) : Except String State := do
   return { entries, base := ← build entries }
 
-private def read (state : State) (key : Bytes) (accountNodes dereference : Bool) :
-    Except String (State × Option (String × ValueRef) × Option Bytes) := do
+/-- A reference keeps its origin: overlay bytes need no trie dereference, while
+on-disk values retain their canonical reference and originating base root. -/
+inductive ValuePointer where
+  | memory (bytes : Bytes)
+  | trie (root : Hash) (reference : ValueRef)
+  deriving Repr
+
+def ValuePointer.reference : ValuePointer → String × ValueRef
+  | .memory bytes => ("memory", { hash := Sha256.hash bytes, length := bytes.length })
+  | .trie _ reference => ("trie", reference)
+
+/-- Find the old value without dereferencing it. In particular, this phase
+does not warm the value hash when the subsequent byte charge would fail. -/
+def getReference (state : State) (key : Bytes) (accountNodes : Bool) :
+    Except String (State × Option ValuePointer) := do
   match overlay state key with
-  | some none => return (state, none, none)
-  | some (some value) =>
-    return (state, some ("memory", { hash := Sha256.hash value, length := value.length }),
-      if dereference then some value else none)
+  | some none => return (state, none)
+  | some (some value) => return (state, some (.memory value))
   | none =>
     let result ← lookup state.base.witness state.base.root state.accounting {
-      key, accountNodes, dereference, resetCache := false }
-    return ({ state with accounting := result.state }, result.reference.map ("trie", ·), result.value)
+      key, accountNodes, dereference := false, resetCache := false }
+    return ({ state with accounting := result.state }, result.reference.map (.trie state.base.root))
+
+/-- Consume a reference after any intervening gas charge. A mismatched base is
+rejected instead of dereferencing against an unrelated checkpoint. -/
+def dereference (state : State) : ValuePointer → Except String (State × Bytes)
+  | .memory bytes => .ok (state, bytes)
+  | .trie root reference => do
+    unless root == state.base.root do throw "trie reference belongs to a different base"
+    let (bytes, accounting) ← TrieAccounting.dereference state.base.witness reference state.accounting
+    return ({ state with accounting }, bytes)
+
+theorem dereference_memory (state : State) (bytes : Bytes) :
+    dereference state (.memory bytes) = .ok (state, bytes) := rfl
+
+theorem dereference_wrong_root (state : State) (root : Hash) (reference : ValueRef)
+    (h : root ≠ state.base.root) :
+    dereference state (.trie root reference) = .error "trie reference belongs to a different base" := by
+  simp [dereference, h, bind, Except.bind]
+  rfl
+
+private def read (state : State) (key : Bytes) (accountNodes readValue : Bool) :
+    Except String (State × Option (String × ValueRef) × Option Bytes) := do
+  let (state, pointer) ← getReference state key accountNodes
+  match pointer with
+  | none => return (state, none, none)
+  | some pointer =>
+    if readValue then
+      let (state, bytes) ← dereference state pointer
+      return (state, some pointer.reference, some bytes)
+    else return (state, some pointer.reference, none)
 
 /-- Each operation reports fresh counters/events while retaining the hash cache.
 A checkpoint publishes only committed updates and preserves the cache explicitly. -/

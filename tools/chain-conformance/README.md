@@ -416,6 +416,23 @@ Operations are `set` (`key`, `value`), `remove` (`key`), `get` (`key`, Boolean
 independently encode native ContractData keys. Set/remove are storage-update
 primitives: they do not implicitly read the old value or charge VM host fees.
 
+For the external-storage charge boundary, `getRef` (`key`, Boolean
+`accountNodes`) obtains a typed reference without reading the value. The next
+operation must consume it with `dereference` or abandon it with `dropRef`.
+Other operations, nested references, duplicate consumption and an unconsumed
+final reference fail closed. Missing keys also require explicit consumption or
+dropping. A dropped reference retains node-cache accesses without warming the
+value hash; memory-overlay references add no trie accesses on dereference.
+
+The Lean library exposes `TrieOverlay.getReference` and `dereference` separately.
+On-disk references retain their base root; a different checkpoint is rejected.
+This models the staging needed when RuntimeExt charges old-value bytes between
+lookup and dereference. It does not yet connect trie fees to VM execution or
+establish chunk-wide cache/overlay threading through the receipt processor.
+That backend must also derive the original complete chunk trie, including the
+bandwidth-scheduler record (column 15) created between blocks; represented
+account/receipt/storage columns alone do not specify that full trie.
+
 Each step compares its complete visible key/value map, immutable base root,
 prospective/committed distinct-key counts, memory/trie pointer kind, read result,
 and exact ordered fresh/cached node/value accesses. Prospective writes override
