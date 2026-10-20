@@ -1,0 +1,49 @@
+{
+  "code": "tools/runtime-conformance/fixtures/stake_promises.wasm",
+  "sha256": "ba0559095243e079aaf1e5e7ad2079aa0031e8f80092e8ec3e43ea33acc7bb34",
+  "protocolVersion": 86,
+  "initialBalance": "0",
+  "storage": [],
+  "calls": [
+    {
+      "name": "stake_promises_zero: stake_zero",
+      "method": "stake_zero",
+      "args": {}
+    },
+    {
+      "name": "stake_promises_zero: stake_one",
+      "method": "stake_one",
+      "args": {}
+    },
+    {
+      "name": "stake_promises_zero: stake_over_balance",
+      "method": "stake_over_balance",
+      "args": {}
+    },
+    {
+      "name": "stake_promises_zero: stake_max",
+      "method": "stake_max",
+      "args": {}
+    },
+    {
+      "name": "stake_promises_zero: stake_other",
+      "method": "stake_other",
+      "args": {}
+    },
+    {
+      "name": "stake_promises_zero: stake_twice",
+      "method": "stake_twice",
+      "args": {}
+    },
+    {
+      "name": "stake_promises_zero: stake_then_panic",
+      "method": "stake_then_panic",
+      "args": {}
+    },
+    {
+      "name": "stake_promises_zero: transfer_then_stake",
+      "method": "transfer_then_stake",
+      "args": {}
+    }
+  ]
+}

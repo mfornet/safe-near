@@ -521,7 +521,6 @@ def deductDeposit (name : String) (before after : Store NearState) (args : List 
     | "promise_then" => amountAt (a 7)
     | "promise_batch_action_function_call" => amountAt (a 5)
     | "promise_batch_action_transfer" => amountAt (a 1)
-    | "promise_batch_action_stake" => amountAt (a 1)
     | _ => some 0
   match deposit with
   | some 0 => (after, none)
@@ -529,6 +528,11 @@ def deductDeposit (name : String) (before after : Store NearState) (args : List 
     let (ns, err) := deductPromiseDeposit name after.host d
     ({ after with host := ns }, err)
   | none => (after, none)
+
+/-- Stake actions carry a target stake, not an outgoing deposit. Scheduling
+one leaves liquid funds untouched; execution uses the receiver's own balance. -/
+theorem deductDeposit_stake (before after : Store NearState) (args : List Value) :
+    deductDeposit "promise_batch_action_stake" before after args = (after, none) := rfl
 
 /-- `panic_utf8(len, ptr)` with the message. -/
 def panicUtf8Metered : HostFn NearState :=

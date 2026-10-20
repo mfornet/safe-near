@@ -287,3 +287,9 @@ recursive balance refund or gas reward. Zero gas use is derived from execution.
 Missing receivers, including implicit-account names, cannot be created by system
 refunds; storage-staking failure also follows the rollback/burn path. This does
 not yet prove ordinary successful VM-call or chain-level conservation.
+
+Stake-promise scheduling preserves liquid balance: stake targets are not attached
+deposits. `deductDeposit_stake` kernel-checks the no-op financial frame, and 16
+native comparison cases cover zero balances, amount bounds, repeated actions,
+rollback and mixed transfer/stake construction. Epoch-dependent stake execution
+remains explicitly unsupported by the receipt runtime.

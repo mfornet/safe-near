@@ -99,3 +99,12 @@ later balance failure. VM subsidy is diagnostic; receipt-level rollback and
 committed minting are covered by runtime scenarios rather than this VM oracle.
 The initial sponsorship comparisons also exposed a missing period in the
 `BalanceExceeded` error text; the Lean text now matches the reference exactly.
+
+`stake_promises.json` and `stake_promises_zero.json` compare stake-action scheduling
+at positive and zero liquid balance. They cover zero/one/over-balance/max-u128
+amounts, another receiver, repeated stakes, panic rollback and a preceding
+transfer. These 16 cases exposed 12 differences: Lean incorrectly deducted the
+stake target as an outgoing deposit and could fabricate balance-exceeded errors.
+Scheduling now preserves liquid balance while retaining the exact gas charges.
+This verifies VM promise construction; runtime staking execution still requires
+unsupported epoch machinery and reports an explicit model issue.
