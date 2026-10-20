@@ -1,7 +1,7 @@
 //! Lossless JSON/Borsh adapter around the pinned, trie-backed Runtime::apply.
 //! The build overlay adds this binary target without changing runtime code.
 use borsh::{BorshDeserialize, BorshSerialize, from_slice, to_vec as borsh_bytes};
-use near_crypto::{InMemorySigner, KeyType};
+use near_crypto::{InMemorySigner, KeyType, PublicKey};
 use near_parameters::RuntimeConfigStore;
 use near_primitives::account::{AccessKey, Account, AccountContract};
 use near_primitives::action::{Action, CreateAccountAction, TransferAction};
@@ -21,7 +21,7 @@ use near_store::test_utils::TestTriesBuilder;
 use near_store::trie::AccessOptions;
 use near_store::{ShardTries, ShardUId};
 use node_runtime::{ApplyState, Runtime, SignedValidPeriodTransactions};
-use serde_json::{Map, Value, from_str, from_value, json};
+use serde_json::{Map, Value, from_str, from_value, json, to_value};
 use std::collections::{BTreeMap, BTreeSet};
 use std::env::args;
 use std::error::Error;
@@ -433,6 +433,179 @@ fn example() -> Result<Value> {
     )
 }
 
+fn decimal(value: &Value) -> Result<u128> {
+    let text = value.as_str().ok_or("expected a decimal string")?;
+    if text.is_empty() || !text.bytes().all(|byte| byte.is_ascii_digit()) {
+        return Err("invalid decimal string".into());
+    }
+    Ok(text.parse()?)
+}
+
+/// Encode a queue-free synthetic genesis through the pinned protocol types.
+/// This is a projection of captured account fields, not the original shard trie.
+fn encode_state(request: &Value) -> Result<Value> {
+    let input = object(request, &["accounts"])?;
+    let accounts = field(input, "accounts")?
+        .as_array()
+        .ok_or("expected accounts array")?;
+    let mut entries = BTreeMap::new();
+    let mut public_keys = BTreeMap::new();
+    let mut code_hashes = BTreeMap::new();
+    for row in accounts {
+        let row = object(
+            row,
+            &[
+                "accountId",
+                "amount",
+                "locked",
+                "storageUsage",
+                "code",
+                "keys",
+                "storage",
+            ],
+        )?;
+        let id: AccountId = field(row, "accountId")?
+            .as_str()
+            .ok_or("invalid account id")?
+            .parse()?;
+        let code: Option<Vec<u8>> = from_value(field(row, "code")?.clone())?;
+        let hash = code
+            .as_ref()
+            .map(|code| CryptoHash::hash_bytes(code))
+            .unwrap_or_default();
+        if code_hashes.insert(id.clone(), hash).is_some() {
+            return Err("duplicate account".into());
+        }
+        let account = Account::new(
+            Balance::from_yoctonear(decimal(field(row, "amount")?)?),
+            Balance::from_yoctonear(decimal(field(row, "locked")?)?),
+            if code.is_some() {
+                AccountContract::Local(hash)
+            } else {
+                AccountContract::None
+            },
+            integer(row, "storageUsage")?,
+        );
+        entries.insert(
+            TrieKey::Account {
+                account_id: id.clone(),
+            }
+            .to_vec(),
+            borsh_bytes(&account)?,
+        );
+        if let Some(code) = code {
+            entries.insert(
+                TrieKey::ContractCode {
+                    account_id: id.clone(),
+                }
+                .to_vec(),
+                code,
+            );
+        }
+        let mut insert = |key, value| -> Result<()> {
+            if entries.insert(key, value).is_some() {
+                return Err("duplicate state key".into());
+            }
+            Ok(())
+        };
+        for key in field(row, "keys")?
+            .as_array()
+            .ok_or("expected keys array")?
+        {
+            let key = object(key, &["publicKey", "accessKey"])?;
+            let text = field(key, "publicKey")?
+                .as_str()
+                .ok_or("invalid public key")?;
+            let public_key: PublicKey = text.parse()?;
+            if public_key.to_string() != text {
+                return Err("noncanonical public key".into());
+            }
+            let access_key: AccessKey = from_value(field(key, "accessKey")?.clone())?;
+            if to_value(&access_key)? != *field(key, "accessKey")? {
+                return Err("noncanonical access key fields".into());
+            }
+            public_keys.insert(text.to_owned(), borsh_bytes(&public_key)?);
+            insert(
+                TrieKey::access_key(id.clone(), public_key).to_vec(),
+                borsh_bytes(&access_key)?,
+            )?;
+        }
+        let storage: Vec<Entry> = from_value(field(row, "storage")?.clone())?;
+        for (key, value) in storage {
+            insert(
+                TrieKey::ContractData {
+                    account_id: id.clone(),
+                    key,
+                }
+                .to_vec(),
+                value,
+            )?;
+        }
+    }
+    let entries: Vec<Entry> = entries.into_iter().collect();
+    Ok(json!({"initialEntries":entries, "publicKeys":public_keys, "codeHashes":code_hashes}))
+}
+
+/// Deterministic synthetic signers make local transaction fixtures reproducible.
+/// The adapter never submits anything to a network.
+fn sign_transactions(request: &Value) -> Result<Value> {
+    let input = object(request, &["signerId", "seed", "transactions"])?;
+    let signer_id: AccountId = field(input, "signerId")?
+        .as_str()
+        .ok_or("invalid signer")?
+        .parse()?;
+    let seed = field(input, "seed")?
+        .as_str()
+        .ok_or("invalid synthetic seed")?;
+    let signer = InMemorySigner::from_seed(signer_id.clone(), KeyType::ED25519, seed);
+    let requests = field(input, "transactions")?
+        .as_array()
+        .ok_or("expected transactions array")?;
+    let mut result = Vec::new();
+    let mut action_keys = BTreeMap::new();
+    for row in requests {
+        let row = object(row, &["receiverId", "nonce", "blockHash", "actions"])?;
+        let receiver: AccountId = field(row, "receiverId")?
+            .as_str()
+            .ok_or("invalid receiver")?
+            .parse()?;
+        let actions: Vec<Action> = from_value(field(row, "actions")?.clone())?;
+        if to_value(&actions)? != *field(row, "actions")? {
+            return Err("noncanonical action fields".into());
+        }
+        for action in &actions {
+            match action {
+                Action::Stake(a) => {
+                    action_keys.insert(a.public_key.to_string(), borsh_bytes(&a.public_key)?);
+                }
+                Action::AddKey(a) => {
+                    action_keys.insert(a.public_key.to_string(), borsh_bytes(&a.public_key)?);
+                }
+                Action::DeleteKey(a) => {
+                    action_keys.insert(a.public_key.to_string(), borsh_bytes(&a.public_key)?);
+                }
+                _ => {}
+            }
+        }
+        let transaction = SignedTransaction::from_actions(
+            integer(row, "nonce")?,
+            signer_id.clone(),
+            receiver,
+            &signer,
+            actions,
+            hash(field(row, "blockHash")?)?,
+        );
+        result.push(json!({"borsh":borsh_bytes(&transaction)?,
+            "view":SignedTransactionView::from(transaction)}));
+    }
+    Ok(
+        json!({"signerId":signer_id, "publicKey":signer.public_key(),
+        "publicKeyBorsh":borsh_bytes(&signer.public_key())?,
+        "accessKeyBorsh":borsh_bytes(&AccessKey::full_access())?,
+        "actionPublicKeys":action_keys, "transactions":result}),
+    )
+}
+
 fn financial_examples() -> Result<Value> {
     let transfer = example()?;
     let mut creation = transfer.clone();
@@ -466,6 +639,19 @@ fn main() -> Result<()> {
         Some("--metadata") => println!("{}", metadata()),
         Some("--example") => println!("{}", example()?),
         Some("--financial-examples") => println!("{}", financial_examples()?),
+        Some(mode @ ("--encode-state" | "--sign-transactions")) => {
+            let mut input = String::new();
+            stdin().read_to_string(&mut input)?;
+            let input = from_str(&input)?;
+            println!(
+                "{}",
+                if mode == "--encode-state" {
+                    encode_state(&input)?
+                } else {
+                    sign_transactions(&input)?
+                }
+            );
+        }
         Some(_) => return Err("unknown argument".into()),
         None => {
             let mut input = String::new();

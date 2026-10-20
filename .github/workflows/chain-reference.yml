@@ -53,7 +53,7 @@ jobs:
             tools/chain-conformance/target/near-apply-reference
 
   financial-regression:
-    name: Transfer and creation gas comparison
+    name: Financial comparison and snapshot import
     needs: native-reference
     runs-on: ubuntu-latest
     steps:
@@ -70,10 +70,15 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: native-chain-reference-evidence
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-tools@1.251.0
       - name: Compare represented financial observations
         run: |
           chmod +x tools/chain-conformance/target/near-apply-reference
           python3 tools/chain-conformance/gas_probe.py
+      - name: Check complete captured-state imports and deterministic signing
+        run: python3 tools/chain-conformance/test_snapshot_import.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:

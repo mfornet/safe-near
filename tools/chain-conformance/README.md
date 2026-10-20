@@ -125,7 +125,9 @@ consensus, networking or historical chain replay.
 
 The independent full-runtime oracle now exists. Remaining work includes the
 cross-runtime bridge, explicit treatment of abstract counter ids versus
-nearcore hashes, complete observation comparison, and captured-account import.
+nearcore hashes, complete observation comparison, and broader action/failure coverage.
+[Captured-account import](SNAPSHOTS.md) now prepares matching queue-free initial
+state for both executors; it does not establish general execution equivalence.
 The existing `just near-conformance` remains a VM-level comparison.
 
 ## Targeted financial comparison

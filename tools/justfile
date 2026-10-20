@@ -110,3 +110,14 @@ chain-replay-test:
 chain-gas-test *options:
     cd near-lean/chain && lake build chain-replay
     python3 tools/chain-conformance/gas_probe.py "$@"
+
+# Prepare a synthetic native/Lean chain genesis from complete captured accounts.
+[positional-arguments]
+chain-import snapshot destination *options:
+    cd near-lean/chain && lake build chain-replay
+    python3 tools/chain-conformance/import_snapshot.py "$@"
+
+# Check captured-state imports and native transaction signing (built native oracle required).
+chain-import-test:
+    cd near-lean/chain && lake build chain-replay
+    python3 tools/chain-conformance/test_snapshot_import.py

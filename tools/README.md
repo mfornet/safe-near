@@ -27,6 +27,8 @@ core axiom audits, formatter integration checks and contract builds.
 | `just snapshot /tmp/fixture.json lockup.near` | Download a block-pinned account fixture |
 | `just snapshot-vm SNAPSHOT ACCOUNT SCENARIO --report REPORT` | Compare VM calls seeded from a complete captured account |
 | `just chain-reference-build [options...]` | Build the clean pinned nearcore transaction/receipt reference |
+| `just chain-import SNAPSHOT DESTINATION [--scenario SCENARIO]` | Prepare matching synthetic chain genesis from complete captured accounts |
+| `just chain-import-test` | Check native state encoding, captured-state imports and deterministic signing |
 | `just chain-reference-test [options...]` | Exercise the native reference's chunk boundaries and complete raw-state replay |
 
 ## Lean quality
@@ -184,3 +186,7 @@ The Lean chain replay wire format and its external decoder assumptions are docum
 `just chain-gas-test` runs the targeted native/Lean transfer and account-creation
 gas regression after the reference is built. It records all field differences
 and explicit observation gaps; it does not establish general runtime conformance.
+
+Complete captured accounts can now seed both chain executors with `just chain-import`.
+See [chain-conformance/SNAPSHOTS.md](chain-conformance/SNAPSHOTS.md) for explicit
+synthetic callers, signed actions, fixture evidence and supported scope.
