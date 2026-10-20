@@ -157,8 +157,8 @@ the native job, so it does not repeat the expensive source build.
 
 `just chain-compare FIXTURE` compares an imported fixture against both executors.
 The contract corpus exercises actual callback data and postponed/delayed queues;
-see [SNAPSHOTS.md](SNAPSHOTS.md#compare-contract-executions) for commands, id
-renaming, failure mapping and the remaining storage-trie gas gap. Receipt VM
+see [SNAPSHOTS.md](SNAPSHOTS.md#compare-contract-executions) for commands,
+registered identities, byte comparisons, failure mapping and the storage-trie gas gap. Receipt VM
 calls charge `storage_write_evicted_byte` and `storage_remove_ret_value_byte`
 from the actual old value before attempting the output register. The storage
 mutation regressions retain their mismatches; their gas delta must equal only
@@ -512,3 +512,31 @@ completion fields, plus complete outgoing Borsh and represented queue bytes.
 Only original transaction block hashes and block seeds enter the model; generated
 native action seeds and identity values are comparison outputs. Evidence is saved
 in `audit/action-randomness-regressions.json`.
+
+
+## Default registered fixture comparison
+
+`chain-import` publishes `registered.json` beside the direct `model.json` and
+records both Lean executor digests. Its transaction block-hash batches come
+from original scenario inputs, never generated native identities. It validates
+the typed genesis through both frontends and compares registered initial bytes
+with every represented native record before publishing the manifest.
+
+`just chain-compare FIXTURE` now executes `registered-replay` by default. It
+compares transaction hashes/body sizes for accepted and rejected inputs, complete
+outgoing Borsh receipts, delayed wrapper metadata and all represented state bytes
+(columns 0–7 and 9), as well as the complete typed execution trace. Registered
+observations and source assets remain in the report. The ordinary frontend is
+retained as the pinned direct-seed diagnostic; `--legacy-event-projection` selects
+it explicitly. There is no fallback when registered custody or input binding
+fails. Older fixtures must be re-imported for the default path.
+
+`just chain-registered-comparison-test` checks this production path on seed-observing
+contracts, two calls in one receipt, local deployment, delayed/postponed work,
+both ordinary key types and protocols 83–86. It also checks relocation, immutable
+executor custody, duplicate/mutated record detection, explicit legacy mode and a
+changed original block hash on a rejected transaction with no receipt outputs.
+Evidence is saved in `audit/default-registered-comparison.json`.
+
+This does not supply native trie-access gas, opaque shard/scheduler/yield/buffer
+records, original shard roots, historical replay or general runtime equivalence.

@@ -86,7 +86,7 @@ class ChainSnapshotTests(unittest.TestCase):
             stage.mkdir()
             (stage / "codes").mkdir()
             (stage / "codes/code.wasm").write_bytes(b"code")
-            for name in ("native.json", "model.json", "manifest.json"):
+            for name in ("native.json", "model.json", "registered.json", "manifest.json"):
                 (stage / name).write_text("{}")
             output = root / "output"
             importer.publish(stage, output)
@@ -95,6 +95,21 @@ class ChainSnapshotTests(unittest.TestCase):
             with self.assertRaises(FileExistsError):
                 importer.publish(stage, output)
             self.assertEqual((output / "native.json").read_text(), "{}")
+
+
+    def test_incomplete_registered_stage_is_not_published(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); stage = root / "stage"; stage.mkdir()
+            for name in ["native.json", "model.json", "manifest.json"]: (stage / name).write_text("{}")
+            output = root / "output"
+            with self.assertRaisesRegex(ValueError, "incomplete fixture"):
+                importer.publish(stage, output)
+            self.assertFalse(output.exists())
+
+    def test_represented_entry_comparison_rejects_duplicates_extras_and_invalid_bytes(self):
+        self.assertEqual(importer.canonical_entries([[[9, 1], []], [[0, 2], [255]]]), [[[0, 2], [255]], [[9, 1], []]])
+        for rows in [[[[0], []], [[0], [1]]], [[[8], []]], [[[0], [True]]], [[[0], [256]]], [[[], []]]]:
+            with self.subTest(rows=rows), self.assertRaises(ValueError): importer.canonical_entries(rows)
 
 
 if __name__ == "__main__":

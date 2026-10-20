@@ -65,7 +65,7 @@ jobs:
       - uses: leanprover/lean-action@v1
         with:
           lake-package-directory: near-lean/chain
-          build-args: chain-replay
+          build-args: chain-replay registered-replay
           use-mathlib-cache: true
       - uses: actions/download-artifact@v4
         with:
@@ -122,6 +122,8 @@ jobs:
         run: |
           cd near-lean/chain && lake build registered-replay chain-replay --wfail
           cd ../.. && python3 tools/chain-conformance/test_receipt_registry.py
+      - name: Compare default registered fixtures and executor custody
+        run: python3 tools/chain-conformance/test_registered_comparison.py
       - name: Compare native action-derived VM randomness
         run: python3 tools/chain-conformance/test_action_randomness.py
       - uses: actions/upload-artifact@v4
@@ -152,3 +154,4 @@ jobs:
             audit/receipt-registry-queues.json
             audit/receipt-registry-fifo.json
             audit/action-randomness-regressions.json
+            audit/default-registered-comparison.json

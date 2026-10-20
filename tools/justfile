@@ -102,72 +102,72 @@ chain-reference-test *options:
 
 # Exercise trusted JSON chain replay, complete-state continuation and rejection paths.
 chain-replay-test:
-    cd near-lean/chain && lake build chain-replay
+    cd near-lean/chain && lake build registered-replay chain-replay
     python3 tools/chain-conformance/test_replay.py
 
 # Compare transfer/creation gas settlement with the built native oracle; scope is not general conformance.
 [positional-arguments]
 chain-gas-test *options:
-    cd near-lean/chain && lake build chain-replay
+    cd near-lean/chain && lake build registered-replay chain-replay
     python3 tools/chain-conformance/gas_probe.py "$@"
 
 # Prepare a synthetic native/Lean chain genesis from complete captured accounts.
 [positional-arguments]
 chain-import snapshot destination *options:
-    cd near-lean/chain && lake build chain-replay
+    cd near-lean/chain && lake build registered-replay chain-replay
     python3 tools/chain-conformance/import_snapshot.py "$@"
 
 # Check captured-state imports and native transaction signing (built native oracle required).
 chain-import-test:
-    cd near-lean/chain && lake build chain-replay
+    cd near-lean/chain && lake build registered-replay chain-replay
     python3 tools/chain-conformance/test_snapshot_import.py
 
 # Compare every represented field in one imported native/Lean chain fixture.
 [positional-arguments]
 chain-compare fixture *options:
-    cd near-lean/chain && lake build chain-replay
+    cd near-lean/chain && lake build registered-replay chain-replay
     python3 tools/chain-conformance/compare_fixture.py "$@"
 
 # Check native contract calls, callback delivery and detection of known storage gas gaps.
 chain-contract-test:
-    cd near-lean/chain && lake build chain-replay
+    cd near-lean/chain && lake build registered-replay chain-replay
     python3 tools/chain-conformance/test_contract_comparison.py
 
 # Probe the full contract corpus; known unmodeled trie gas produces a failing report.
 [positional-arguments]
 chain-contract-probe *options:
-    cd near-lean/chain && lake build chain-replay
+    cd near-lean/chain && lake build registered-replay chain-replay
     python3 tools/chain-conformance/contract_probe.py "$@"
 
 # Compare signed V0/V1 nonce modes, protocol gates and rejected transaction batches.
 chain-version-test:
-    cd near-lean/chain && lake build chain-replay
+    cd near-lean/chain && lake build registered-replay chain-replay
     python3 tools/chain-conformance/test_transaction_versions.py
 
 # Compare administrative actions, structured failures and rollback with native apply.
 chain-action-test:
-    cd near-lean/chain && lake build chain-replay
+    cd near-lean/chain && lake build registered-replay chain-replay
     python3 tools/chain-conformance/test_action_comparison.py
 
 # Compare restricted-key authorization, detailed errors and failure precedence.
 chain-permission-test:
-    cd near-lean/chain && lake build chain-replay
+    cd near-lean/chain && lake build registered-replay chain-replay
     python3 tools/chain-conformance/test_permission_comparison.py
 
 # Compare stateless action admission, boundaries and actual deployment-byte binding.
 chain-validation-test:
-    cd near-lean/chain && lake build chain-replay
+    cd near-lean/chain && lake build registered-replay chain-replay
     python3 tools/chain-conformance/test_action_validation.py
 
 # Compare native Borsh widths, signature gates and transaction-size boundaries.
 chain-size-test:
-    cd near-lean/chain && lake build chain-replay
+    cd near-lean/chain && lake build registered-replay chain-replay
     python3 tools/chain-conformance/test_transaction_size.py
 
 # Compare pure staking-key eligibility and native admission/rollback behavior.
 chain-staking-test:
     cd near-lean/runtime && lake build staking-key-replay
-    cd near-lean/chain && lake build chain-replay
+    cd near-lean/chain && lake build registered-replay chain-replay
     python3 tools/chain-conformance/test_staking_key.py
 
 # Compare native canonical trie paths and cache counts; does not inject gas into runtime execution.
@@ -184,27 +184,27 @@ chain-trie-test:
 
 # Compare typed model accounts/keys/code/storage to native Borsh and canonical trie objects.
 chain-state-encoding-test:
-    cd near-lean/chain && lake build state-encode --wfail
+    cd near-lean/chain && lake build registered-replay state-encode --wfail
     python3 tools/chain-conformance/test_state_encoding.py
 
 # Check native receipt ancestry, callback data IDs and typed receipt Borsh bytes.
 chain-receipt-encoding-test:
-    cd near-lean/chain && lake build receipt-encode chain-replay --wfail
+    cd near-lean/chain && lake build registered-replay receipt-encode chain-replay --wfail
     python3 tools/chain-conformance/test_receipt_encoding.py
 
 # Check callback/delayed queue records, storage wrappers and real runtime queue bytes.
 chain-queue-encoding-test:
-    cd near-lean/chain && lake build state-encode receipt-encode chain-replay --wfail
+    cd near-lean/chain && lake build registered-replay state-encode receipt-encode chain-replay --wfail
     python3 tools/chain-conformance/test_queue_encoding.py
 
 # Check typed transaction bodies/hashes and admitted-prefix receipt registration.
 chain-transaction-encoding-test:
-    cd near-lean/chain && lake build transaction-replay state-encode chain-replay --wfail
+    cd near-lean/chain && lake build registered-replay transaction-replay state-encode chain-replay --wfail
     python3 tools/chain-conformance/test_transaction_encoding.py
 
 # Preserve persistent FIFO when new local and incoming work is deferred.
 chain-delayed-order-test:
-    cd near-lean/chain && lake build chain-replay --wfail
+    cd near-lean/chain && lake build registered-replay chain-replay --wfail
     python3 tools/chain-conformance/test_delayed_local_order.py
 
 # Register actual VM births and persistent queue context during trusted block replay.
@@ -216,3 +216,8 @@ chain-receipt-registry-test:
 chain-action-randomness-test:
     cd near-lean/chain && lake build registered-replay chain-replay --wfail
     python3 tools/chain-conformance/test_action_randomness.py
+
+# Exercise the default imported-fixture identity, seed and raw-byte comparison path.
+chain-registered-comparison-test:
+    cd near-lean/chain && lake build chain-replay registered-replay --wfail
+    python3 tools/chain-conformance/test_registered_comparison.py

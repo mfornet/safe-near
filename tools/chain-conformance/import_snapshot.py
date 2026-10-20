@@ -26,6 +26,32 @@ from near_snapshot import EMPTY_CODE_HASH, code_hash, decode
 from snapshot_vm import account_id, amount, byte_list, storage_pairs, uint
 
 
+
+REGISTERED_MODEL = ROOT / "near-lean/chain/.lake/build/bin/registered-replay"
+REPRESENTED_COLUMNS = frozenset([0, 1, 2, 3, 4, 5, 6, 7, 9])
+
+
+def represented_entries(rows):
+    return [row for row in rows if row[0] and row[0][0] in REPRESENTED_COLUMNS]
+
+
+def canonical_entries(rows):
+    """Compare every represented raw key/value; never hide duplicate/extra keys."""
+    result, seen = [], set()
+    if not isinstance(rows, list): raise ValueError("expected represented trie entry list")
+    for row in rows:
+        if not isinstance(row, list) or len(row) != 2: raise ValueError("invalid represented trie entry")
+        key, value = row
+        for raw in [key, value]:
+            if not isinstance(raw, list) or any(type(byte) is not int or not 0 <= byte < 256 for byte in raw):
+                raise ValueError("invalid represented trie bytes")
+        if not key or key[0] not in REPRESENTED_COLUMNS: raise ValueError("unrepresented model trie column")
+        identity = bytes(key)
+        if identity in seen: raise ValueError("duplicate represented trie key")
+        seen.add(identity); result.append([key, value])
+    return sorted(result, key=lambda row: bytes(row[0]))
+
+
 def fields(value, required, optional=()):
     if not isinstance(value, dict) or set(value) - set(required) - set(optional) or set(required) - set(value):
         raise ValueError(f"expected fields {list(required)}, optional {list(optional)}")
@@ -204,18 +230,22 @@ def publish(stage, destination):
     A directory without manifest.json is incomplete. Exclusive mkdir and hard
     links reject concurrent filenames rather than replacing somebody's files.
     """
+    required = ["native.json", "model.json", "registered.json", "manifest.json"]
+    if any(not (stage / name).is_file() for name in required):
+        raise ValueError("incomplete fixture publication stage")
     destination.mkdir()
     for folder in sorted(path for path in stage.rglob("*") if path.is_dir()):
         (destination / folder.relative_to(stage)).mkdir()
     names = sorted(path.relative_to(stage) for path in stage.rglob("*") if path.is_file())
-    ordered = [name for name in names if name.as_posix() not in {"native.json", "model.json", "manifest.json"}]
-    ordered += [Path("native.json"), Path("model.json"), Path("manifest.json")]
+    ordered = [name for name in names if name.as_posix() not in {"native.json", "model.json", "registered.json", "manifest.json"}]
+    ordered += [Path("native.json"), Path("model.json"), Path("registered.json"), Path("manifest.json")]
     for name in ordered:
         os.link(stage / name, destination / name)
 
 
-def prepare(snapshot, destination, *, reference, model, scenario=None):
+def prepare(snapshot, destination, *, reference, model, scenario=None, registered_model=None):
     rows, codes, version = validate_snapshot(snapshot)
+    registered_model = REGISTERED_MODEL if registered_model is None else Path(registered_model)
     destination = destination.resolve()
     if destination.exists():
         raise FileExistsError(f"destination already exists: {destination}")
@@ -233,6 +263,8 @@ def prepare(snapshot, destination, *, reference, model, scenario=None):
         stage.mkdir()
         lean = temporary / "chain-replay"
         shutil.copy2(model, lean)
+        registered = temporary / "registered-replay"
+        shutil.copy2(registered_model, registered)
         prototype = json.loads(subprocess.check_output([str(native), "--example"], text=True))["blocks"][0]
         config_dir = stage / "configs"
         config_dir.mkdir()
@@ -367,16 +399,26 @@ def prepare(snapshot, destination, *, reference, model, scenario=None):
         if (canonical_state(model_zero["initialState"]) != expected or model_zero["initialPendingReceipts"]
                 or model_zero["blocks"] or not model_zero["quiescent"]):
             raise ValueError("Lean initial state differs from the captured account projection")
+        registered_request = {**model_request, "transactionBlockHashes": [
+            [tx.get("blockHash", block["prevBlockHash"]) for tx in block["transactions"]] for block in scenario["blocks"]]}
+        registered_zero = execute(registered, {**registered_request, "blocks": [], "transactionBlockHashes": []}, stage)
+        if (canonical_state(registered_zero["initialState"]) != expected or registered_zero["initialPendingReceipts"]
+                or registered_zero["blocks"] or not registered_zero["quiescent"] or registered_zero.get("nativeActionRandomness") is not True):
+            raise ValueError("registered initial state differs from the captured account projection")
+        if canonical_entries(registered_zero["initialEntries"]) != canonical_entries(represented_entries(native_zero["initialState"]["entries"])):
+            raise ValueError("registered initial trie bytes differ from native represented records")
         write_json(stage / "snapshot.json", snapshot)
         write_json(stage / "scenario.json", scenario)
         write_json(stage / "native.json", native_request, compact=True)
         write_json(stage / "model.json", model_request, compact=True)
+        write_json(stage / "registered.json", registered_request, compact=True)
         write_json(stage / "native-initial.json", native_zero, compact=True)
         write_json(stage / "model-initial.json", model_zero, compact=True)
+        write_json(stage / "registered-initial.json", registered_zero, compact=True)
         files = {str(path.relative_to(stage)): file_digest(path) for path in sorted(stage.rglob("*")) if path.is_file()}
         rpc_config = snapshot["protocol_config"].get("runtime_config")
         model_view = {k: v for k, v in config.items() if k not in {"runtime_finance", "runtime_admission"}}
-        manifest = dict(format="safe-near-chain-fixture-v1", genesisProjectionMatches=True,
+        manifest = dict(format="safe-near-chain-fixture-v1", genesisProjectionMatches=True, representedGenesisBytesMatch=True,
             executionComparisonEstablished=False, historicalReplayEstablished=False,
             capturedBlock=dict(hash=snapshot["block"]["header"]["hash"], height=snapshot["block"]["header"]["height"]),
             capturedAccounts=sorted(entry["account_id"] for entry in snapshot["accounts"]), syntheticCaller=scenario.get("caller"),
@@ -384,7 +426,8 @@ def prepare(snapshot, destination, *, reference, model, scenario=None):
                 queuesExplicitlyEmpty=True, stateProofsVerified=False, originalRawTrieCaptured=False),
             capturedRpcConfigMatchesPinnedView=rpc_config == model_view,
             capturedRpcConfigSha256=digest(json.dumps(rpc_config, sort_keys=True).encode()),
-            referenceBuild=build, modelBinarySha256=file_digest(lean), wasmTools=wasm_tools, files=files)
+            referenceBuild=build, modelBinarySha256=file_digest(lean), registeredModelBinarySha256=file_digest(registered),
+            defaultExecutionMode="registered", wasmTools=wasm_tools, files=files)
         write_json(stage / "manifest.json", manifest)
         publish(stage, destination)
         return manifest
@@ -396,11 +439,12 @@ def main():
     parser.add_argument("destination", type=Path)
     parser.add_argument("--scenario", type=Path)
     parser.add_argument("--reference", type=Path, default=HERE / "target/near-apply-reference")
-    parser.add_argument("--model", type=Path, default=ROOT / "near-lean/chain/.lake/build/bin/chain-replay")
+    parser.add_argument("--model", type=Path, default=ROOT / "near-lean/chain/.lake/build/bin/chain-replay", help="direct frontend for typed genesis validation")
+    parser.add_argument("--registered-model", type=Path, default=REGISTERED_MODEL)
     args = parser.parse_args()
     snapshot = json.loads(args.snapshot.read_text())
     scenario = None if args.scenario is None else json.loads(args.scenario.read_text())
-    result = prepare(snapshot, args.destination, reference=args.reference.resolve(), model=args.model.resolve(), scenario=scenario)
+    result = prepare(snapshot, args.destination, reference=args.reference.resolve(), model=args.model.resolve(), scenario=scenario, registered_model=args.registered_model.resolve())
     print(f"Prepared {len(result['capturedAccounts'])} captured accounts; initial native/Lean projections match.")
     print(f"Fixture: {args.destination.resolve()}")
     print("Synthetic genesis; no historical replay or execution equivalence claimed.")

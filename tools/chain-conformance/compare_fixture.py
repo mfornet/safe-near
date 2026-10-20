@@ -442,8 +442,70 @@ def canonical_trace(value, *, model_output=False):
     return value
 
 
-def compare(directory, reference, model):
+def _input_shape(request):
+    value = copy.deepcopy(request)
+    for block in value["blocks"]:
+        for tx in block["transactions"]:
+            tx.setdefault("version", 0); tx.setdefault("nonceMode", "monotonic")
+    return json.dumps(value, sort_keys=True, separators=(",", ":"))
+
+
+def validate_registered_request(direct, registered):
+    base = {key: value for key, value in registered.items() if key != "transactionBlockHashes"}
+    if _input_shape(base) != _input_shape(direct):
+        raise ValueError("model transactions differ or registered request diverges from direct fixture inputs")
+    hashes = registered["transactionBlockHashes"]
+    if len(hashes) != len(direct["blocks"]) or any(len(batch) != len(block["transactions"]) for batch, block in zip(hashes, direct["blocks"])):
+        raise ValueError("registered transaction block-hash counts differ from original inputs")
+
+
+def registered_shape(trace):
+    if trace.get("nativeActionRandomness") is not True:
+        raise ValueError("registered executor did not enable native action randomness")
+    fields = ["formatVersion", "protocolVersion", "model", "initialState", "initialPendingReceipts", "codeCatalogue", "stop", "unrunBlocks", "quiescent"]
+    result = {name: trace[name] for name in fields}
+    result["blocks"] = [row["execution"] for row in trace["blocks"]]
+    return result
+
+
+def registered_differences(native, registered):
+    from near_rpc import b58encode
+    def hash_text(raw):
+        if not isinstance(raw, list) or len(raw) != 32 or any(type(byte) is not int or not 0 <= byte < 256 for byte in raw):
+            raise ValueError("invalid registered transaction hash")
+        return b58encode(bytes(raw))
+    def records(expected, actual, path):
+        return differences(importer.canonical_entries(expected), importer.canonical_entries(actual), path)
+    diffs = records(importer.represented_entries(native["initialState"]["entries"]), registered["initialEntries"], "initialEntries")
+    if registered["stop"] != "blocksExhausted" or registered["unrunBlocks"] or len(registered["blocks"]) != len(native["blocks"]):
+        raise ValueError("registered replay did not commit every requested block")
+    for index, (left, right) in enumerate(zip(native["blocks"], registered["blocks"])):
+        prefix = f"blocks[{index}]"
+        if right.get("admissionCommitted") is not True: raise ValueError("registered transaction admission was not committed")
+        diffs += differences([row["receiptId"] for row in right["execution"]["outgoingReceipts"]],
+            [row["id"] for row in right["outgoingBytes"]], prefix + ".outgoingByteIdentities")
+        diffs += differences(left["outgoingReceiptBorsh"], [row["bytes"] for row in right["outgoingBytes"]], prefix + ".outgoingReceiptBorsh")
+        diffs += records(importer.represented_entries(left["state"]["entries"]), right["stateEntries"], prefix + ".stateEntries")
+        queue = [row for row in left["state"]["entries"] if row[0][0] in [3, 4, 5, 6, 7]]
+        diffs += records(queue, right["queueEntries"], prefix + ".queueEntries")
+        bindings = {logical: hash_text(raw) for logical, raw in right["registry"]["receiptIds"]}
+        attempts = right["transactionIdentities"]
+        if len(attempts) != len(left["inputs"]["transactions"]): raise ValueError("registered transaction identity count mismatch")
+        for position, (original, attempt) in enumerate(zip(left["inputs"]["transactions"], attempts)):
+            success = left["outcomes"][position]["outcome"]["status"].get("SuccessReceiptId")
+            expected = dict(index=position, bodySize=original["bodySize"], hash=original["view"]["hash"],
+                receiptPresent=success is not None, receiptHash=success, receiptBinding=success)
+            actual = dict(index=attempt["index"], bodySize=attempt["bodySize"], hash=hash_text(attempt["hash"]),
+                receiptPresent=attempt["receiptId"] is not None,
+                receiptHash=None if attempt["receiptHash"] is None else hash_text(attempt["receiptHash"]),
+                receiptBinding=None if attempt["receiptId"] is None else bindings.get(attempt["receiptId"]))
+            diffs += differences(expected, actual, prefix + f".transactionIdentities[{position}]")
+    return diffs
+
+
+def compare(directory, reference, model, *, registered_model=None, legacy=False):
     manifest = json.loads((directory / "manifest.json").read_text())
+    registered_model = importer.REGISTERED_MODEL if registered_model is None else Path(registered_model)
     if manifest["format"] != "safe-near-chain-fixture-v1" or not manifest["genesisProjectionMatches"]:
         raise ValueError("expected a validated captured-account chain fixture")
     with frozen_reference(reference) as (native, build), tempfile.TemporaryDirectory(prefix="safe-near-chain-compare-") as temporary:
@@ -465,6 +527,14 @@ def compare(directory, reference, model):
         shutil.copy2(model, lean)
         if importer.file_digest(lean) != manifest["modelBinarySha256"] or build != manifest["referenceBuild"]:
             raise ValueError("executor provenance changed since fixture import; re-import with these executors")
+        registered = None
+        if not legacy:
+            if not manifest.get("representedGenesisBytesMatch") or "registeredModelBinarySha256" not in manifest:
+                raise ValueError("fixture lacks registered executor provenance; re-import it")
+            registered = Path(temporary) / "registered-replay"
+            shutil.copy2(registered_model, registered)
+            if importer.file_digest(registered) != manifest["registeredModelBinarySha256"]:
+                raise ValueError("registered executor provenance changed since fixture import; re-import it")
         source = json.loads((stage / "native.json").read_text())
         request = json.loads((stage / "model.json").read_text())
         if request["configDir"] != "configs":
@@ -478,33 +548,42 @@ def compare(directory, reference, model):
             if importer.code_hash(blob) != code["hash"]:
                 raise ValueError("frozen code label does not match bytes")
             codes[code["hash"]] = blob
+        registered_request = None if legacy else json.loads((stage / "registered.json").read_text())
         left = importer.execute(native, source, stage)
-        right = importer.execute(lean, request, stage)
+        raw = importer.execute(lean if legacy else registered, request if legacy else registered_request, stage)
+        right, expected, diffs, error = raw, None, [], None
         try:
-            expected = Projection(codes).project(source, left, request)
-            diffs = differences(canonical_trace(expected), canonical_trace(right, model_output=True), "trace")
-            error = None
+            right = raw if legacy else registered_shape(raw)
+            if not legacy: validate_registered_request(request, registered_request)
+            if not legacy: diffs += registered_differences(left, raw)
+            registries = None if legacy else [row["registry"] for row in raw["blocks"]]
+            expected = Projection(codes, registries=registries).project(source, left, request)
+            diffs += differences(canonical_trace(expected), canonical_trace(right, model_output=True), "trace")
         except (ValueError, KeyError, IndexError) as issue:
-            expected = None
             error = str(issue)
-            diffs = [dict(path="projection", error=error)]
+            diffs.append(dict(path="projection", error=error))
         return dict(scope="synthetic captured-account chain execution; not historical replay or general conformance",
-            referenceBuild=build, modelBinarySha256=importer.file_digest(lean), manifest=manifest, fixtureFilesBase64=assets,
+            referenceBuild=build, modelBinarySha256=importer.file_digest(lean if legacy else registered),
+            directModelBinarySha256=importer.file_digest(lean), executionMode="legacy-event-projection" if legacy else "registered",
+            registered=None if legacy else raw, manifest=manifest, fixtureFilesBase64=assets,
             native=left, model=right, expected=expected, projectionError=error, differences=diffs,
-            unmodeledObservations=["native compute and execution metadata", "account/receipt representation versions",
-                "native shard scheduler columns and delayed queue indices", "native hash generation (event-based renaming)",
-                "transaction hash identity (transaction outcome ids map to zero)",
-                "statistics beyond represented balance burn/subsidy", "model diagnostic repr/message formatting (structured semantic errors and action indices are compared)"])
+            unmodeledObservations=["native compute and execution metadata", "opaque shard/scheduler/yield/buffer columns outside represented tags",
+                "original shard roots and complete raw shard capture", "statistics beyond represented balance burn/subsidy",
+                "model diagnostic repr/message formatting (structured semantic errors and action indices are compared)"] +
+                (["native hash generation (event-based renaming)", "transaction hash identity", "raw state/receipt bytes and delayed queue indices"] if legacy else []))
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("fixture", type=Path)
     parser.add_argument("--reference", type=Path, default=HERE / "target/near-apply-reference")
-    parser.add_argument("--model", type=Path, default=ROOT / "near-lean/chain/.lake/build/bin/chain-replay")
+    parser.add_argument("--model", type=Path, default=ROOT / "near-lean/chain/.lake/build/bin/chain-replay", help="direct frontend pinned at import; registered execution is the default")
+    parser.add_argument("--registered-model", type=Path, default=importer.REGISTERED_MODEL)
+    parser.add_argument("--legacy-event-projection", action="store_true", help="explicit direct-seed diagnostic; no automatic fallback")
     parser.add_argument("--report", type=Path, default=ROOT / "audit/chain-fixture-comparison.json")
     args = parser.parse_args()
-    report = compare(args.fixture.resolve(), args.reference.resolve(), args.model.resolve())
+    report = compare(args.fixture.resolve(), args.reference.resolve(), args.model.resolve(),
+        registered_model=args.registered_model.resolve(), legacy=args.legacy_event_projection)
     atomic_write(args.report.resolve(), (json.dumps(report, indent=2) + "\n").encode())
     print(f"Chain comparison: {len(report['differences'])} differences; evidence: {args.report.resolve()}")
     if report["projectionError"]:

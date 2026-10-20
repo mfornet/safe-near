@@ -28,6 +28,12 @@ def encodeReceipt (codes : List (String × Bytes)) (context : QueueEncoding.Cont
   let bytes ← QueueEncoding.receiptBytes context codes receipt
   pure (obj [("id", toJson receipt.receiptId), ("bytes", bytesJson bytes)])
 
+def transactionIdentitiesJson (attempts : List TransactionRegistry.Attempt) : Json :=
+  toJson (attempts.map fun attempt => obj [
+    ("index", toJson attempt.index), ("bodySize", toJson attempt.body.length), ("hash", bytesJson attempt.hash),
+    ("receiptId", toJson (attempt.receipt.map (·.receiptId))),
+    ("receiptHash", toJson (attempt.receiptHash.map bytesJson))])
+
 def birthsJson (births : List ReceiptIdentityBirth) : Json := toJson (births.map fun birth => obj [
   ("parent", toJson birth.parent), ("children", toJson birth.children),
   ("vmActions", toJson (birth.vmActions.map fun action => obj [
@@ -37,8 +43,19 @@ def run (protocol : Nat) (cfg : Wasm.Near.RuntimeConfig) (codes : Catalogue) (in
     (context : QueueEncoding.Context) (blocks : List Block) (hashes : List (List NativeIdentity.Hash)) : Result Json := do
   unless hashes.length == blocks.length do throw "transaction block-hash batch count mismatch"
   let catalogue := codes.map fun code => (code.code.hash, code.bytes)
-  let _ ← QueueEncoding.encode initial.state catalogue context (some cfg)
+  let initialEntries ← QueueEncoding.encode initial.state catalogue context (some cfg)
   let _ ← initial.pending.mapM (encodeReceipt catalogue context)
+  let entriesJson (entries : List (Bytes × Bytes)) :=
+    toJson (entries.map fun (key, value) => toJson [bytesJson key, bytesJson value])
+  let finish (snapshot : Snapshot) (trace : List Json) (stop : String) (unrun : Nat) (extra : List (String × Json) := []) :=
+    obj ([("formatVersion", toJson (1 : Nat)), ("protocolVersion", toJson protocol),
+      ("model", toJson "near-lean-chain"), ("initialState", stateJson initial.state),
+      ("initialPendingReceipts", toJson (initial.pending.map receiptJson)),
+      ("initialEntries", entriesJson initialEntries),
+      ("codeCatalogue", toJson (codes.map fun entry => obj [
+        ("hash", toJson entry.code.hash), ("size", toJson entry.code.size)])),
+      ("blocks", toJson trace), ("stop", toJson stop), ("unrunBlocks", toJson unrun),
+      ("quiescent", toJson snapshot.quiescent), ("nativeActionRandomness", toJson true)] ++ extra)
   let mut snapshot := initial
   let mut context := context
   let mut trace : List Json := []
@@ -47,8 +64,7 @@ def run (protocol : Nat) (cfg : Wasm.Near.RuntimeConfig) (codes : Catalogue) (in
     for hash in hashes do let _ ← NativeIdentity.checkedHash hash
     match block.receipts.resolve snapshot.pending with
     | .error (.unavailableIndex index) =>
-      return obj [("blocks", toJson trace), ("stop", toJson "invalidSchedule"),
-        ("unrunBlocks", toJson (blocks.length - position - 1)), ("unavailableIndex", toJson index)]
+      return finish snapshot trace "invalidSchedule" (blocks.length - position - 1) [("unavailableIndex", toJson index)]
     | .ok _ => pure ()
     let inputs := (block.txs.zip hashes).map fun (transaction, blockHash) =>
       ({ transaction, blockHash } : TransactionRegistry.Input)
@@ -56,28 +72,23 @@ def run (protocol : Nat) (cfg : Wasm.Near.RuntimeConfig) (codes : Catalogue) (in
     let block := { block with ap := { block.ap with nativeReceiptHashes := some admitted.context.receipts } }
     match step cfg (codeOf codes) snapshot block with
     | .error (.unavailableIndex index) =>
-      return obj [("blocks", toJson trace), ("stop", toJson "invalidSchedule"),
-        ("unrunBlocks", toJson (blocks.length - position - 1)), ("unavailableIndex", toJson index)]
+      return finish snapshot trace "invalidSchedule" (blocks.length - position - 1) [("unavailableIndex", toJson index)]
     | .ok (next, result) =>
       if result.issue.isSome then
         trace := trace ++ [obj [("execution", applyJson cfg block.txs next result), ("registry", contextJson context),
-          ("identityBirths", birthsJson result.identityBirths)]]
-        return obj [("blocks", toJson trace), ("stop", toJson "executionIssue"),
-          ("unrunBlocks", toJson (blocks.length - position - 1))]
+          ("identityBirths", birthsJson result.identityBirths),
+          ("transactionIdentities", transactionIdentitiesJson admitted.attempts), ("admissionCommitted", toJson false)]]
+        return finish next trace "executionIssue" (blocks.length - position - 1)
       context ← ReceiptRegistry.observeQueues cfg catalogue block.ap.blockHeight snapshot.state result admitted.context
       let outgoing ← result.outgoing.mapM (encodeReceipt catalogue context)
       let entries ← QueueEncoding.queues next.state catalogue context (some cfg)
+      let stateEntries ← QueueEncoding.encode next.state catalogue context (some cfg)
       trace := trace ++ [obj [("execution", applyJson cfg block.txs next result), ("registry", contextJson context),
         ("identityBirths", birthsJson result.identityBirths), ("outgoingBytes", toJson outgoing),
-        ("queueEntries", toJson (entries.map fun (key, value) => toJson [bytesJson key, bytesJson value]))]]
+        ("queueEntries", entriesJson entries), ("stateEntries", entriesJson stateEntries),
+        ("transactionIdentities", transactionIdentitiesJson admitted.attempts), ("admissionCommitted", toJson true)]]
       snapshot := next
-  return obj [("formatVersion", toJson (1 : Nat)), ("protocolVersion", toJson protocol),
-    ("model", toJson "near-lean-chain"), ("initialState", stateJson initial.state),
-    ("initialPendingReceipts", toJson (initial.pending.map receiptJson)),
-    ("codeCatalogue", toJson (codes.map fun entry => obj [
-      ("hash", toJson entry.code.hash), ("size", toJson entry.code.size)])),
-    ("blocks", toJson trace), ("stop", toJson "blocksExhausted"), ("unrunBlocks", toJson (0 : Nat)),
-    ("quiescent", toJson snapshot.quiescent), ("nativeActionRandomness", toJson true)]
+  return finish snapshot trace "blocksExhausted" 0
 
 def execute (request : Json) : IO Json := do
   let (protocol, directory, catalogues, initial, pending, values, hashes, context) ← IO.ofExcept do

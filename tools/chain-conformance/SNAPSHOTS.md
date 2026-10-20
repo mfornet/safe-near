@@ -23,10 +23,12 @@ this byte-to-WAT/decoder connection remains an external assumption.
 ## Evidence and execution
 
 The destination must not exist. It contains the original snapshot and scenario,
-portable `native.json` and `model.json` requests, relative configuration/code
-assets, and both zero-block traces. `manifest.json` records hashes of every
+portable `native.json`, direct `model.json` and native-identity `registered.json`
+requests, relative configuration/code assets, and all three zero-block traces. `manifest.json` records hashes of every
 input/asset, native build provenance, model/wasm-tools executable hashes and
-whether the captured RPC configuration matches the pinned table. The manifest
+whether the captured RPC configuration matches the pinned table. Both Lean
+frontends must match the typed initial state; registered execution must also
+match every represented native trie-record byte. The manifest
 is published last; a directory without it is incomplete. Existing paths are
 never overwritten. Runtime executables are frozen for validation but are not
 included in the portable directory.
@@ -37,7 +39,9 @@ whose hashes are recorded in the manifest:
 ```sh
 cd /tmp/lockup-chain
 /path/to/near-apply-reference < native.json > native-run.json
-/path/to/chain-replay < model.json > model-run.json
+/path/to/registered-replay < registered.json > model-run.json
+# Optional direct-seed diagnostic:
+/path/to/chain-replay < model.json > direct-run.json
 ```
 
 The importer validates **initial state**, not execution equivalence. Its manifest
@@ -141,7 +145,9 @@ just chain-contract-probe --protocol 86 --report /tmp/contracts.json
 `chain-compare` verifies the manifest's file hashes and exact executor build
 identities, copies assets and executors into a temporary frozen run, binds the
 model transactions to native-decoded signed inputs, and checks common block
-contexts. Re-import a fixture when either executor changes. It retains both raw
+contexts. Registered execution is the default; it derives identities from
+original typed transactions and original transaction block hashes saved at
+import. Re-import a fixture when the native or either Lean executor changes. It retains both raw
 traces, the complete fixture files and field differences in its report. An
 unsupported projection also fails and is recorded; it never becomes a pass.
 
@@ -163,16 +169,33 @@ errors instead. Native public execution-error messages are compared exactly.
 late-delivery key nonces and multi-action rollback across protocols 83–86.
 Added-key nonces use the actual delivery block height, ignoring supplied nonces.
 
-Receipt ids are renamed using **native events**, independently of model output:
-new action receipts, their newly introduced dependency ids, then refunds and
-final data receipts. Native outcome `receipt_ids` excludes data receipts. Transaction outcome hashes
-map to the model's zero id; the full native hash identity remains in raw evidence.
-Map
-entry order is canonicalized; receipt/delivery order is preserved. An absent
-per-account storage map and an explicitly empty one both denote an empty
-storage function and compare equally. No key/value, gas or balance difference
-is removed. Native account/receipt representation versions, compute/metadata,
-shard scheduler columns and other unmodeled observations remain in raw evidence.
+Native receipt/data identities, formats, receiver ownership and delayed queue
+indices are independently maintained by registered execution. Native events
+still determine allocation counts; the comparator rejects missing, extra,
+reused or non-contiguous logical bindings. Every original transaction hash and
+body size is checked, including rejected transactions which create no receipts.
+Transaction outcome hashes map to the model's zero outcome id only in the typed
+trace; the separate identity observations compare their actual hash values.
+
+The default also compares complete outgoing receipt Borsh and every represented
+raw state record: account, ordinary access key, contract code, contract data,
+received data, postponed dependencies and delayed receipts (columns 0–7 and 9).
+Queue headers, indices and stored gas/size wrappers are included. Initial bytes
+are checked before fixture publication. Duplicate keys and extra model columns
+fail closed; mismatches remain differences. This compares the represented
+synthetic state, not opaque shard columns or an original shard root.
+
+Map order is canonicalized while receipt/delivery order stays exact. Empty and
+absent per-account storage maps denote the same storage function. No gas,
+balance, key/value or status difference is removed. Native compute, execution
+metadata, opaque scheduler/yield/buffer columns and other unrepresented
+statistics remain in the raw evidence.
+
+`--legacy-event-projection` explicitly selects the former direct-seed diagnostic.
+It does not check native identity hashes or raw bytes and can differ for contracts
+which observe randomness. Missing registered requests, stale executors or
+inconsistent inputs never trigger an automatic fallback. The report records its
+execution mode, both executor hashes and complete registered observations.
 
 The offline contract fixture has binary storage, named typed parameters, a
 read, write, delete, panic-after-write, successful callback and failed callback.
