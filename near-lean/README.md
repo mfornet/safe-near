@@ -571,6 +571,17 @@ needed. This is state-bound preservation. Bounding the complete processor's newl
 emitted outputs, preserving queue-wide uniqueness and proving valid dependency
 edges remain separate obligations.
 
+`AllocatorMonotonicity` proves allocator progress through all raw actions,
+receipt finalization and recursive processing without validity or success
+premises. Finalization is compared with the receipt's initial counter because
+rollback discards speculative allocations. `BlockAllocatorMonotonicity` carries
+progress through the actual transaction, receipt and gas-deferral loops and the
+public atomic apply boundary. `NearChain.AllocatorMonotonicity` lifts it to steps,
+reachable states, settlement and isolated runs for every stop reason. Previously
+bounded external references therefore remain bounded as other work executes.
+This is counter progress, not queue ownership, uniqueness or complete processor-
+output bound preservation.
+
 Reserved `system` account creation is rejected independently of the registrar
 and minimum-name-length configuration. Pinned nearcore's `action_create_account`
 uses near-account-id 2.0.0's `is_top_level`/`is_sub_account_of`; `system` is neither.
