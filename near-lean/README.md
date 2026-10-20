@@ -559,6 +559,18 @@ returned-promise forwarding are both covered. This does not establish valid edge
 indices, matching input/output edges, fairness, or preservation through subsequent
 receipt execution.
 
+`RoutingIdentifierBounds` provides a component form of the allocator bound and
+preserves it through postponement, data arrival and release. `ActionIdentifierBounds`
+proves preservation for every raw action, action sequence, receipt rollback and
+finalization, including refund and failure-data allocation. Finally,
+`ProcessorIdentifierBounds.processReceipt_idsBelowNext` preserves the state bound
+through the entire executable processor, including recursive release of stored
+receipts and issue fallback. Its premises are bounded initial routing state and
+bounded ids in the incoming receipt; no financial-scope or success premise is
+needed. This is state-bound preservation. Bounding the complete processor's newly
+emitted outputs, preserving queue-wide uniqueness and proving valid dependency
+edges remain separate obligations.
+
 Reserved `system` account creation is rejected independently of the registrar
 and minimum-name-length configuration. Pinned nearcore's `action_create_account`
 uses near-account-id 2.0.0's `is_top_level`/`is_sub_account_of`; `system` is neither.
