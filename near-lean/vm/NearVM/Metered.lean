@@ -291,17 +291,9 @@ private def chargesBeforeUnvalidated (name : String) (st : Store NearState) (arg
       let sir := r == st.host.context.currentAccountId
       byte.send sir * n + byte.execution * n).sum
     [base] ++ readSpan st (a 0) (a 1) ++ [.burn dataGas]
-  | "storage_write" =>
-    let k := spanLen st (a 0) (a 1)
-    let v := spanLen st (a 2) (a 3)
-    [base, .ext "storage_write_base"] ++ readSpan st (a 0) (a 1) ++ readSpan st (a 2) (a 3)
-      ++ [.ext "storage_write_key_byte" k, .ext "storage_write_value_byte" v]
   | "storage_read" =>
     let k := spanLen st (a 0) (a 1)
     [base, .ext "storage_read_base"] ++ readSpan st (a 0) (a 1) ++ [.ext "storage_read_key_byte" k]
-  | "storage_remove" =>
-    let k := spanLen st (a 0) (a 1)
-    [base, .ext "storage_remove_base"] ++ readSpan st (a 0) (a 1) ++ [.ext "storage_remove_key_byte" k]
   | "storage_has_key" =>
     let k := spanLen st (a 0) (a 1)
     [base, .ext "storage_has_key_base"] ++ readSpan st (a 0) (a 1) ++ [.ext "storage_has_key_byte" k]
@@ -361,13 +353,48 @@ private def chargesBeforeUnvalidated (name : String) (st : Store NearState) (arg
   | "gas" => [.burn (a 0).toNat]
   | _ => [base]
 
+/-- The storage adapter is reached only after input reads and length checks.
+Its old-value charge precedes the output-register operation, even if that traps. -/
+structure StorageMutationPlan where
+  charges : List Charge
+  error : Option HostError := none
+
+def storageValueCharges (st : Store NearState) (cost : String) (key : List UInt8) : List Charge :=
+  if st.host.config.chargeStorageValueAccess then
+    match st.host.storage key with
+    | some value => [.ext cost value.length]
+    | none => []
+  else []
+
+def storageMutationPlan? (name : String) (st : Store NearState) (args : List Value) :
+    Option StorageMutationPlan := do
+  if name != "storage_write" && name != "storage_remove" then none else
+  let a := argU64 args
+  let charges := [.ext "base", .ext (name ++ "_base")] ++ readSpan st (a 0) (a 1)
+  let some key := getMemOrReg st (a 1) (a 0)
+    | return { charges, error := some (spanReadError (a 0) (a 1)) }
+  if let some limit := st.host.config.maxStorageKeyLen then
+    if key.length > limit then return { charges, error := some (.keyLengthExceeded key.length limit) }
+  if name == "storage_write" then
+    let charges := charges ++ readSpan st (a 2) (a 3)
+    let some value := getMemOrReg st (a 3) (a 2)
+      | return { charges, error := some (spanReadError (a 2) (a 3)) }
+    if let some limit := st.host.config.maxStorageValueLen then
+      if value.length > limit then return { charges, error := some (.valueLengthExceeded value.length limit) }
+    return { charges := charges ++ [.ext "storage_write_key_byte" key.length,
+      .ext "storage_write_value_byte" value.length] ++ storageValueCharges st "storage_write_evicted_byte" key }
+  else
+    return { charges := charges ++ [.ext "storage_remove_key_byte" key.length] ++
+      storageValueCharges st "storage_remove_ret_value_byte" key }
+
 /-- Charges before a host function runs. Invalid handles retain input-reading
 costs, but cannot incur later receipt/action fees or prepaid function-call gas. -/
 def chargesBefore (name : String) (st : Store NearState) (args : List Value) : List Charge :=
   let a := argU64 args
   let base : Charge := .ext "base"
   let charges := chargesBeforeUnvalidated name st args
-  if name == "promise_and" && (a 1).toNat * 8 ≥ 2 ^ 64 then
+  if let some plan := storageMutationPlan? name st args then plan.charges
+  else if name == "promise_and" && (a 1).toNat * 8 ≥ 2 ^ 64 then
     [base, .ext "promise_and_base"]
   else if let some (len, ptr) := creationAccountArgs name args then
     let readAccount := [base] ++ readSpan st len ptr
@@ -419,7 +446,8 @@ def promiseJoinError (st : Store NearState) (args : List Value) : Option HostErr
   | _ => none
 
 def invocationArgumentError (name : String) (st : Store NearState) (args : List Value) : Option HostError :=
-  if name == "promise_and" then promiseJoinError st args else creationPrefixError name st args
+  if let some plan := storageMutationPlan? name st args then plan.error
+  else if name == "promise_and" then promiseJoinError st args else creationPrefixError name st args
 
 def preInvokeError (name : String) (st : Store NearState) (args : List Value) : Option HostError :=
   match invocationArgumentError name st args with

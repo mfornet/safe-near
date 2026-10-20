@@ -63,6 +63,85 @@ def returnString (o : VMOutcome) : Option String :=
   | .value b => some (strOf b)
   | _ => none
 
+namespace StorageCosts
+
+private def code (keyLen valueLen valuePtr register : Nat) : IO Module := do
+  let text := "(module\n" ++
+    "(import \"env\" \"storage_write\" (func $write (param i64 i64 i64 i64 i64) (result i64)))\n" ++
+    "(import \"env\" \"storage_remove\" (func $remove (param i64 i64 i64) (result i64)))\n" ++
+    "(memory 1) (data (i32.const 0) \"k\") (data (i32.const 8) \"v\")\n" ++
+    s!"(func (export \"write\") i64.const {keyLen} i64.const 0 i64.const {valueLen} " ++
+    s!"i64.const {valuePtr} i64.const {register} call $write drop)\n" ++
+    s!"(func (export \"remove\") i64.const {keyLen} i64.const 0 i64.const {register} call $remove drop))"
+  match Decoder.Wat.decode text with
+  | .ok module => pure module
+  | .error error => throw (IO.userError s!"storage-cost fixture: {error}")
+
+private def context (runtime : Bool) : VMContext :=
+  { currentAccountId := "storage.near".toUTF8.toList
+    signerAccountId := "alice.near".toUTF8.toList
+    signerAccountPk := 0 :: List.replicate 32 1
+    predecessorAccountId := "alice.near".toUTF8.toList
+    input := [], prepaidGas := 100 * 10 ^ 12, storageUsage := 10000
+    chargeStorageValueAccess := runtime }
+
+private def cost (outcome : VMOutcome) (name : String) : Nat :=
+  ((outcome.gasProfile.ext.find? (·.1 == name)).map (·.2)).getD 0
+
+/-- Execute Wasm, rather than testing a copy of the charge-list implementation.
+The standalone oracle and real runtime intentionally use different adapters. -/
+def check (cfg : RuntimeConfig) (check : String → Bool → IO Unit) : IO Unit := do
+  let module ← code 1 1 8 0
+  for old in ([none, some [], some [42], some (List.replicate 5 42), some (List.replicate 17 42)] :
+      List (Option (List UInt8))) do
+    let storage := old.toList.map fun value => ([107], value)
+    for (method, charge) in [("write", "storage_write_evicted_byte"), ("remove", "storage_remove_ret_value_byte")] do
+      let mock := run cfg module 0 method (context false) storage
+      let runtime := run cfg module 0 method (context true) storage
+      let expected := (old.map List.length).getD 0 * cfg.wasm.extCosts.cost charge
+      check s!"{method}: runtime old-value bytes {repr old}"
+        (mock.succeeded && runtime.succeeded && runtime.storage == mock.storage &&
+          runtime.burntGas == mock.burntGas + expected && cost runtime charge == expected && cost mock charge == 0)
+  let storage : List (List UInt8 × List UInt8) := [([107], List.replicate 5 42)]
+  let restricted := { cfg with wasm := { cfg.wasm with limits := { cfg.wasm.limits with maxRegisterSize := 2 } } }
+  for (method, charge) in [("write", "storage_write_evicted_byte"), ("remove", "storage_remove_ret_value_byte")] do
+    let failed := run restricted module 0 method (context true) storage
+    check s!"{method}: old-value access precedes output-register failure"
+      (failed.aborted.isSome && failed.storage == storage && cost failed charge == 5 * cfg.wasm.extCosts.cost charge)
+    let costly := { cfg with wasm := { cfg.wasm with extCosts := {
+      lookup := fun name => if name == charge then 10 ^ 12 else cfg.wasm.extCosts.cost name } } }
+    let full := run costly module 0 method (context true) storage
+    let prepaid := full.burntGas - cost full charge / 2
+    let exhausted := run costly module 0 method { context true with prepaidGas := prepaid } storage
+    check s!"{method}: exhaustion at old-value charge rolls back storage"
+      (exhausted.aborted == some (.hostError .gasExceeded) && exhausted.storage == storage &&
+        exhausted.burntGas == prepaid && cost exhausted charge > 0 && cost exhausted charge < cost full charge)
+    let view := run cfg module 0 method { context true with viewConfig := some { maxGasBurnt := 10 ^ 14 } } storage
+    check s!"{method}: view rejection precedes storage access"
+      (view.aborted == some (.hostError (.prohibitedInView ("storage_" ++ method))) && cost view charge == 0)
+  let badValue ← code 1 1 (2 ^ 32) 0
+  let noKeys := { cfg with wasm := { cfg.wasm with limits := { cfg.wasm.limits with maxLengthStorageKey := 0 } } }
+  let rejected := run noKeys badValue 0 "write" (context true) storage
+  check "storage key limit precedes inaccessible value and byte fees"
+    (rejected.aborted == some (.hostError (.keyLengthExceeded 1 0)) &&
+      cost rejected "storage_write_key_byte" == 0 && cost rejected "storage_write_value_byte" == 0 &&
+      cost rejected "storage_write_evicted_byte" == 0)
+  let noValues := { cfg with wasm := { cfg.wasm with limits := { cfg.wasm.limits with maxLengthStorageValue := 0 } } }
+  let rejected := run noValues module 0 "write" (context true) storage
+  check "storage value limit precedes byte fees and old-value access"
+    (rejected.aborted == some (.hostError (.valueLengthExceeded 1 0)) &&
+      cost rejected "storage_write_value_byte" == 0 && cost rejected "storage_write_evicted_byte" == 0)
+  let missingRegister ← code 1 (2 ^ 64 - 1) 99 0
+  let rejected := run cfg missingRegister 0 "write" (context true) storage
+  check "missing value register retains its id before storage access"
+    (rejected.aborted == some (.hostError (.invalidRegisterId 99)) && cost rejected "storage_write_evicted_byte" == 0)
+  let discarded ← code 1 1 8 (2 ^ 64 - 1)
+  let outcome := run cfg discarded 0 "write" (context true) storage
+  check "discarding the old-value register still charges storage access"
+    (outcome.succeeded && cost outcome "storage_write_evicted_byte" == 5 * cfg.wasm.extCosts.cost "storage_write_evicted_byte")
+
+end StorageCosts
+
 def main (args : List String) : IO UInt32 := do
   let wat := args[0]?.getD "tests/fixtures/w_near.wat"
   let configs := args[1]?.getD "configs"
@@ -269,6 +348,7 @@ def main (args : List String) : IO UInt32 := do
       | some (.hostError (.guestPanic m)) => (m.splitOn "Requires positive attached deposit").length > 1
       | _ => false) (describe o9)
 
+  StorageCosts.check cfg (fun name ok => check r name ok)
   let s ← r.get
   IO.println s!"{s.passed} passed, {s.failed} failed"
   return (if s.failed = 0 then 0 else 1)

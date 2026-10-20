@@ -158,7 +158,12 @@ the native job, so it does not repeat the expensive source build.
 `just chain-compare FIXTURE` compares an imported fixture against both executors.
 The contract corpus exercises actual callback data and postponed/delayed queues;
 see [SNAPSHOTS.md](SNAPSHOTS.md#compare-contract-executions) for commands, id
-renaming, failure mapping and the remaining storage-trie gas gap. Native traces
+renaming, failure mapping and the remaining storage-trie gas gap. Receipt VM
+calls charge `storage_write_evicted_byte` and `storage_remove_ret_value_byte`
+from the actual old value before attempting the output register. The storage
+mutation regressions retain their mismatches; their gas delta must equal only
+native `touching_trie_node` and `read_cached_trie_node` charges. No trie fees are
+inferred from observed native output or subtracted from comparison results. Native traces
 now include `processedReceipts`, typed `balanceStats`, and
 `nextCongestionInfo` for explicit subsequent chunk inputs. Callback index columns
 are decoded with native types and validated by exact `TrieKey` re-encoding;

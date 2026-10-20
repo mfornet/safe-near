@@ -37,6 +37,9 @@ structure VMContext where
   prepaidGas : Nat := 0
   randomSeed : Bytes := []
   viewConfig : Option ViewConfig := none
+  /-- External storage policy, beyond native VMContext: RuntimeExt charges old-value
+  bytes, whereas the standalone MockedExternal oracle omits these costs. -/
+  chargeStorageValueAccess : Bool := false
   /-- Accounts whose pending receipts wait for this call's result. -/
   outputDataReceivers : List Bytes := []
   deriving Inhabited
@@ -73,6 +76,7 @@ def toNearState (cfg : RuntimeConfig) (ctx : VMContext)
     storageKeys := storage.map (·.1)
     promiseResults := ctx.promiseResults
     config := {
+      chargeStorageValueAccess := ctx.chargeStorageValueAccess
       maxRegisterLen := some cfg.wasm.limits.maxRegisterSize
       maxReturnLen := some cfg.wasm.limits.maxLengthReturnedData
       maxLogLen := some cfg.wasm.limits.maxTotalLogLength

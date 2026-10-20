@@ -77,6 +77,8 @@ deriving Inhabited
 limit unconstrained, which keeps existing concrete examples small and easy to
 compute while allowing fidelity checks to opt in to nearcore-style traps. -/
 structure NearConfig where
+  /-- RuntimeExt charges old-value bytes; MockedExternal does not. Trie-node costs are separate. -/
+  chargeStorageValueAccess : Bool := false
   oneYoctoOnPromise : Bool := false
   maxRegisterLen     : Option Nat := none
   maxReturnLen       : Option Nat := none

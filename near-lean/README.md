@@ -43,7 +43,11 @@ FunctionCallError` with nearcore's error taxonomy (`NearVM/Error.lean`).
   Nothing is hand-copied.
 
 Known gaps against nearcore: trie-dependent costs (`touching_trie_node`,
-`read_cached_trie_node`) are not charged. The independent fixtures check exact
+`read_cached_trie_node`) are not charged. Runtime calls do charge evicted and
+removed value bytes, as native `RuntimeExt` does; standalone VM calls default to
+`MockedExternal` accounting, which omits those adapter charges. The explicit
+`VMContext.chargeStorageValueAccess` policy records this external boundary.
+The independent fixtures check exact
 instruction and host gas, but do not prove metering correct for all programs.
 Contract code enters as WAT text
 because there is no binary Wasm decoder in Lean yet; the cryptographic host

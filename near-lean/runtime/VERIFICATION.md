@@ -79,6 +79,18 @@ keys, failed refunds, allowance saturation and refund chunk-capacity usage.
 The general comparison bridge, other actions/failures and bounded arithmetic
 remain separate obligations.
 
+## Storage adapter accounting
+
+Native `RuntimeExt` charges evicted/removed value bytes independently of trie-node
+access; the VM oracle's `MockedExternal` omits both. Receipt function-call contexts
+therefore enable `chargeStorageValueAccess`, while standalone contexts default to
+the mock policy. These charges use the actual pre-operation storage value and
+precede register writes, including discarded registers, traps and gas exhaustion.
+Storage mutation input plans preserve key/read/value-limit precedence and stop
+charging at the failing input. This does not model trie structure or cached-node
+access. Full native mutation comparisons continue to expose those remaining gas
+differences rather than treating storage-heavy execution as equivalent.
+
 ## Current implementation and gaps
 
 | Boundary | Implemented | Remaining obligations |

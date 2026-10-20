@@ -84,14 +84,14 @@ theorem preInvokeError_join_bounds {st : Store NearState} {ptr count : UInt64} {
       expandDependencies graph.handles indices = some dependencies ∧ dependencies.length ≤ limit := by
   apply promiseJoinError_bounds hlimit hgraph
   have ha := preInvokeError_arguments_valid h
-  simpa only [invocationArgumentError, beq_self_eq_true, ite_true] using ha
+  simpa [invocationArgumentError, storageMutationPlan?] using ha
 
 theorem preInvokeError_join_span_bound {st : Store NearState} {ptr count : UInt64}
     (h : preInvokeError "promise_and" st [.i64 ptr, .i64 count] = none) :
     ptr.toNat + count.toNat * 8 ≤ memBytes st := by
   have ha := preInvokeError_arguments_valid h
   have hj : promiseJoinError st [.i64 ptr, .i64 count] = none := by
-    simpa only [invocationArgumentError, beq_self_eq_true, ite_true] using ha
+    simpa [invocationArgumentError, storageMutationPlan?] using ha
   unfold promiseJoinError at hj
   dsimp only at hj
   split at hj

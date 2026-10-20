@@ -156,12 +156,14 @@ jobs:
         run: |
           cargo run --locked --release --manifest-path tools/dump-runtime-config/Cargo.toml -- /tmp/safe-near-runtime-configs
           python3 tools/check_runtime_configs.py /tmp/safe-near-runtime-configs
-      - name: Verify the chain replay Wasm fixture
+      - name: Verify chain replay and storage input Wasm fixtures
         run: |
           wasm-tools parse tools/chain-conformance/fixtures/replay.wat -o /tmp/safe-near-replay.wasm
           cmp tools/chain-conformance/fixtures/replay.wasm /tmp/safe-near-replay.wasm
           wasm-tools parse tools/chain-conformance/fixtures/stateful.wat -o /tmp/safe-near-stateful.wasm
           cmp tools/chain-conformance/fixtures/stateful.wasm /tmp/safe-near-stateful.wasm
+          wasm-tools parse tools/runtime-conformance/fixtures/storage_inputs.wat -o /tmp/safe-near-storage-inputs.wasm
+          cmp tools/runtime-conformance/fixtures/storage_inputs.wasm /tmp/safe-near-storage-inputs.wasm
       - name: Compare all VM observations
         run: |
           python3 -m unittest discover -s tools/runtime-conformance

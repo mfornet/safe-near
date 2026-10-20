@@ -68,30 +68,33 @@ class ContractComparisonTests(unittest.TestCase):
 
     def test_storage_mutation_gas_gaps_remain_failing_and_fully_reported(self):
         with tempfile.TemporaryDirectory() as directory:
-            for method in ["write", "remove", "panic_after_write"]:
-                with self.subTest(method=method):
-                    report = corpus.run_case(86, method, "all", Path(directory) / method, REFERENCE, MODEL)
-                    self.evidence.append(dict(protocol=86, method=method, schedule="all", expectedToMatch=False, comparison=report))
-                    self.assertIsNone(report["projectionError"])
-                    self.assertTrue(report["differences"])
-                    native = report["native"]["blocks"][1]["outcomes"][0]["outcome"]
-                    model = report["model"]["blocks"][1]["outcomes"][0]["outcome"]
-                    storage_costs = {row["cost"]: int(row["gas_used"]) for row in native["metadata"]["gas_profile"]}
-                    external_cost = sum(storage_costs.get(name, 0) for name in ["TOUCHING_TRIE_NODE", "READ_CACHED_TRIE_NODE",
-                        "STORAGE_WRITE_EVICTED_BYTE", "STORAGE_REMOVE_RET_VALUE_BYTE"])
-                    self.assertGreater(external_cost, 0)
-                    self.assertEqual(native["gas_burnt"] - model["gasBurnt"], external_cost)
-                    left, right = comparator.canonical_trace(report["expected"]), comparator.canonical_trace(report["model"])
-                    for a, b in zip(left["blocks"], right["blocks"]):
-                        self.assertEqual(a["state"]["storage"], b["state"]["storage"])
-                        self.assertEqual(a["state"]["accessKeys"], b["state"]["accessKeys"])
-                    final_storage = dict(right["blocks"][-1]["state"]["storage"])
-                    if method == "write":
-                        self.assertEqual(final_storage["captured.near"], [[[107], [118, 255]]])
-                    elif method == "remove":
-                        self.assertNotIn("captured.near", final_storage)
-                    else:
-                        self.assertEqual(final_storage["captured.near"], [[[107], list(b"hello")]])
+            for version in [83, 84, 85, 86]:
+                for method in ["write", "remove", "panic_after_write"]:
+                    with self.subTest(protocol=version, method=method):
+                        report = corpus.run_case(version, method, "all", Path(directory) / f"{version}-{method}", REFERENCE, MODEL)
+                        self.evidence.append(dict(protocol=version, method=method, schedule="all", expectedToMatch=False, comparison=report))
+                        self.assertIsNone(report["projectionError"])
+                        self.assertTrue(report["differences"])
+                        native = report["native"]["blocks"][1]["outcomes"][0]["outcome"]
+                        model = report["model"]["blocks"][1]["outcomes"][0]["outcome"]
+                        storage_costs = {row["cost"]: int(row["gas_used"]) for row in native["metadata"]["gas_profile"]}
+                        costs = json.loads((ROOT / f"near-lean/vm/configs/runtime_config_v{version}.json").read_text())["wasm_config"]["ext_costs"]
+                        old_value_cost = "storage_remove_ret_value_byte" if method == "remove" else "storage_write_evicted_byte"
+                        self.assertEqual(storage_costs.get(old_value_cost.upper(), 0), 5 * costs[old_value_cost])
+                        external_cost = sum(storage_costs.get(name, 0) for name in ["TOUCHING_TRIE_NODE", "READ_CACHED_TRIE_NODE"])
+                        self.assertGreater(external_cost, 0)
+                        self.assertEqual(native["gas_burnt"] - model["gasBurnt"], external_cost)
+                        left, right = comparator.canonical_trace(report["expected"]), comparator.canonical_trace(report["model"])
+                        for a, b in zip(left["blocks"], right["blocks"]):
+                            self.assertEqual(a["state"]["storage"], b["state"]["storage"])
+                            self.assertEqual(a["state"]["accessKeys"], b["state"]["accessKeys"])
+                        final_storage = dict(right["blocks"][-1]["state"]["storage"])
+                        if method == "write":
+                            self.assertEqual(final_storage["captured.near"], [[[107], [118, 255]]])
+                        elif method == "remove":
+                            self.assertNotIn("captured.near", final_storage)
+                        else:
+                            self.assertEqual(final_storage["captured.near"], [[[107], list(b"hello")]])
 
     def test_comparison_rejects_asset_and_context_drift_and_detects_field_changes(self):
         with tempfile.TemporaryDirectory() as directory:

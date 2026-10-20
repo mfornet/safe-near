@@ -150,6 +150,7 @@ def functionCallContext (c : ReceiptCtx) (account : Account) (args : Bytes) (gas
     attachedDeposit := deposit
     prepaidGas := gas
     randomSeed := c.ap.randomSeed
+    chargeStorageValueAccess := true
     outputDataReceivers := if isLast then c.action.outputDataReceivers.map fun d => bytesOfString d.receiverId else [] }
 
 /-- Gas/log observations from one VM call, before its success/failure branch. -/
