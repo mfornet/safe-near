@@ -121,3 +121,20 @@ chain-import snapshot destination *options:
 chain-import-test:
     cd near-lean/chain && lake build chain-replay
     python3 tools/chain-conformance/test_snapshot_import.py
+
+# Compare every represented field in one imported native/Lean chain fixture.
+[positional-arguments]
+chain-compare fixture *options:
+    cd near-lean/chain && lake build chain-replay
+    python3 tools/chain-conformance/compare_fixture.py "$@"
+
+# Check native contract calls, callback delivery and detection of known storage gas gaps.
+chain-contract-test:
+    cd near-lean/chain && lake build chain-replay
+    python3 tools/chain-conformance/test_contract_comparison.py
+
+# Probe the full contract corpus; known unmodeled trie gas produces a failing report.
+[positional-arguments]
+chain-contract-probe *options:
+    cd near-lean/chain && lake build chain-replay
+    python3 tools/chain-conformance/contract_probe.py "$@"

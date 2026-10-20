@@ -13,6 +13,7 @@ use near_primitives::receipt::Receipt;
 use near_primitives::state_record::StateRecord;
 use near_primitives::test_utils::MockEpochInfoProvider;
 use near_primitives::transaction::{SignedTransaction, Transaction};
+use near_primitives::trie_key::trie_key_parsers::parse_account_id_from_raw_key;
 use near_primitives::trie_key::{TrieKey, col};
 use near_primitives::types::{AccountId, Balance, EpochId, EpochInfoProvider, Gas, ShardId};
 use near_primitives::version::{MIN_SUPPORTED_PROTOCOL_VERSION, PROTOCOL_VERSION};
@@ -97,6 +98,43 @@ fn snapshot(tries: &ShardTries, shard: ShardUId, root: CryptoHash) -> Result<Val
     let entries: Vec<Entry> = locked.iter()?.collect::<StdResult<_, _>>()?;
     let mut records = Vec::new();
     for (key, value) in &entries {
+        // Upstream's StateRecord omits these two callback indices. Decode their
+        // values with native Borsh types and require exact native key re-encoding.
+        if matches!(
+            key.first(),
+            Some(&col::PENDING_DATA_COUNT | &col::POSTPONED_RECEIPT_ID)
+        ) {
+            let receiver_id =
+                parse_account_id_from_raw_key(key)?.ok_or("missing queue receiver")?;
+            let suffix = key
+                .get(key.len().saturating_sub(32)..)
+                .ok_or("short queue key")?;
+            let identifier: CryptoHash = from_slice(suffix)?;
+            let (typed_key, record) = if key[0] == col::PENDING_DATA_COUNT {
+                let count: u32 = from_slice(value)?;
+                (
+                    TrieKey::PendingDataCount {
+                        receiver_id: receiver_id.clone(),
+                        receipt_id: identifier,
+                    },
+                    json!({"PendingDataCount":{"account_id":receiver_id,"receipt_id":identifier,"count":count}}),
+                )
+            } else {
+                let receipt_id: CryptoHash = from_slice(value)?;
+                (
+                    TrieKey::PostponedReceiptId {
+                        receiver_id: receiver_id.clone(),
+                        data_id: identifier,
+                    },
+                    json!({"PostponedReceiptId":{"account_id":receiver_id,"data_id":identifier,"receipt_id":receipt_id}}),
+                )
+            };
+            if typed_key.to_vec() != *key {
+                return Err("noncanonical queue key".into());
+            }
+            records.push(json!({"key":key,"record":record}));
+            continue;
+        }
         // The upstream state-dump decoder prints diagnostics for newer shard
         // columns. Only use it for the columns it understands. All columns,
         // including opaque shard state, remain in the complete raw entries.
@@ -118,7 +156,14 @@ fn snapshot(tries: &ShardTries, shard: ShardUId, root: CryptoHash) -> Result<Val
             continue;
         }
         match StateRecord::from_raw_key_value_impl(key, value.clone()) {
-            Ok(Some(record)) => records.push(json!({"key": key, "record": record})),
+            Ok(Some(record)) => {
+                let mut row = json!({"key":key,"record":record});
+                if let StateRecord::DelayedReceipt(receipt) = &record {
+                    row["queueIndex"] =
+                        json!(receipt.index.ok_or("missing delayed receipt index")?);
+                }
+                records.push(row);
+            }
             Ok(None) => records.push(json!({"key":key, "opaque":true})),
             Err(error) => records.push(json!({"key": key, "decodeError": error.to_string()})),
         }
@@ -331,13 +376,25 @@ fn run(request: &Value) -> Result<Value> {
             "inputs":resolved_inputs,
             "state":snapshot(&tries, shard, root)?,
             "outcomes":outcomes,
+            "processedReceipts":result.processed_receipts.iter().map(|entry| &entry.receipt).collect::<Vec<_>>(),
             "outgoingReceipts":result.outgoing_receipts,
             "outgoingReceiptBorsh":result.outgoing_receipts.iter().map(borsh_bytes).collect::<StdResult<Vec<_>, _>>()?,
             "pendingReceipts":pending.iter().map(borsh_bytes).collect::<StdResult<Vec<_>, _>>()?,
             "stateChanges":borsh_bytes(&result.state_changes)?,
             "stats":borsh_bytes(&result.stats)?,
+            "balanceStats":{
+                "txBurntAmount":result.stats.balance.tx_burnt_amount,
+                "slashedBurntAmount":result.stats.balance.slashed_burnt_amount,
+                "otherBurntAmount":result.stats.balance.other_burnt_amount,
+                "gasDeficitAmount":result.stats.balance.gas_deficit_amount,
+                "subsidizedAmount":result.stats.balance.subsidized_amount,
+            },
             "validatorProposals":borsh_bytes(&result.validator_proposals)?,
             "congestionInfo":borsh_bytes(&result.congestion_info)?,
+            "nextCongestionInfo":match &result.congestion_info {
+                Some(info) => json!([[shard.shard_id(),borsh_bytes(info)?,0]]),
+                None => json!([]),
+            },
             "bandwidthRequests":borsh_bytes(&result.bandwidth_requests)?,
             "delayedReceiptsCount":result.delayed_receipts_count,
             "bandwidthSchedulerStateHash":result.bandwidth_scheduler_state_hash,

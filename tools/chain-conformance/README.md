@@ -152,3 +152,16 @@ kinds, initial contract/data state and failures are rejected rather than dropped
 
 The CI financial job consumes the exact binary/metadata artifact produced by
 the native job, so it does not repeat the expensive source build.
+
+## Contract/data comparison
+
+`just chain-compare FIXTURE` compares an imported fixture against both executors.
+The contract corpus exercises actual callback data and postponed/delayed queues;
+see [SNAPSHOTS.md](SNAPSHOTS.md#compare-contract-executions) for commands, id
+renaming, failure mapping and the remaining storage-trie gas gap. Native traces
+now include `processedReceipts`, typed `balanceStats`, and
+`nextCongestionInfo` for explicit subsequent chunk inputs. Callback index columns
+are decoded with native types and validated by exact `TrieKey` re-encoding;
+complete raw trie/statistics bytes remain available. Delayed receipt records
+include their native `queueIndex`, so Borsh key byte ordering cannot reorder the
+logical queue.

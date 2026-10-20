@@ -137,6 +137,12 @@ def checkTransactionRouting (r : IO.Ref Report) (cfg : RuntimeConfig) (code : Co
   check r "outgoing transaction receipts do not enter the local gas-delay queue"
     (limited.state.delayed.isEmpty && limited.outgoing.length == 1
       && (limited.state.account? "bob.near").map (·.amount) == some (10 * oneNear))
+  let limitedLocal := Near.apply cfg { World.ap with gasLimit := some 0 } (fun _ => code)
+    genesis [{ tx with receiverId := "alice.near" }] []
+  check r "zero chunk budget defers local receipts before any execution"
+    (limitedLocal.outcomes.length == 1 && limitedLocal.state.delayed.length == 1 &&
+      limitedLocal.outgoing.isEmpty && limitedLocal.outcomes.all fun (_, o) =>
+        match o.status with | .successReceiptId _ => true | _ => false)
   let incoming : Receipt := {
     predecessorId := "carol.near", receiverId := "bob.near", receiptId := 100
     receipt := .action {

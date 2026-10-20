@@ -28,6 +28,9 @@ core axiom audits, formatter integration checks and contract builds.
 | `just snapshot-vm SNAPSHOT ACCOUNT SCENARIO --report REPORT` | Compare VM calls seeded from a complete captured account |
 | `just chain-reference-build [options...]` | Build the clean pinned nearcore transaction/receipt reference |
 | `just chain-import SNAPSHOT DESTINATION [--scenario SCENARIO]` | Prepare matching synthetic chain genesis from complete captured accounts |
+| `just chain-compare FIXTURE [options...]` | Compare represented per-block contract state, receipts, outcomes and fees |
+| `just chain-contract-test` | Exercise native callback delivery and explicit detection of storage gas gaps |
+| `just chain-contract-probe [options...]` | Report the full contract corpus, including known failing trie-gas comparisons |
 | `just chain-import-test` | Check native state encoding, captured-state imports and deterministic signing |
 | `just chain-reference-test [options...]` | Exercise the native reference's chunk boundaries and complete raw-state replay |
 

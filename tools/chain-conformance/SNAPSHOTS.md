@@ -115,3 +115,62 @@ code, duplicate accounts/keys/storage, global contract references, gas-key lanes
 unsupported key permissions and out-of-range values are rejected. Ordinary
 Ed25519 and secp256k1 access keys retain native Borsh bytes and permissions.
 Captures with unsupported account fields fail instead of dropping those fields.
+
+## Compare contract executions
+
+```sh
+just chain-compare /tmp/lockup-chain --report /tmp/lockup-comparison.json
+just chain-contract-test
+just chain-contract-probe --protocol 86 --report /tmp/contracts.json
+```
+
+`chain-compare` verifies the manifest's file hashes and exact executor build
+identities, copies assets and executors into a temporary frozen run, binds the
+model transactions to native-decoded signed inputs, and checks common block
+contexts. Re-import a fixture when either executor changes. It retains both raw
+traces, the complete fixture files and field differences in its report. An
+unsupported projection also fails and is recorded; it never becomes a pass.
+
+The current projection handles account/key/code/storage state, action and data
+receipts, postponed dependency indices, received data, ordered delayed work,
+ordered outgoing/pending queues, outcomes, gas, token burn and subsidies.
+Native action V2 receipts are accepted only with `refund_to = null`. Other
+native receipt variants, V1 transaction conversion and unmapped failure kinds
+are rejected. The mapped failure is an index-zero guest panic; native action
+error indices and other native-only details remain explicit observation gaps.
+
+Receipt ids are renamed using **native events**, independently of model output:
+new action receipts, their newly introduced dependency ids, then refunds and
+final data receipts. Native outcome `receipt_ids` excludes data receipts. Map
+entry order is canonicalized; receipt/delivery order is preserved. An absent
+per-account storage map and an explicitly empty one both denote an empty
+storage function and compare equally. No key/value, gas or balance difference
+is removed. Native account/receipt representation versions, compute/metadata,
+shard scheduler columns and other unmodeled observations remain in raw evidence.
+
+The offline contract fixture has binary storage, named typed parameters, a
+read, write, delete, panic-after-write, successful callback and failed callback.
+Its tests compare successful and failing calls across protocols 83–86, including
+callback-before-data, data-before-callback, reversed delivery, explicit idle
+blocks, delayed work and a deliberately unfinished block script. This fixture
+is synthetic test data and has no claimed RPC origin.
+
+For delayed receipt continuation, `congestionInfo` must reflect the preceding
+native output. The corpus planner materializes this explicit input using the
+adapter's `nextCongestionInfo`; resetting it to empty while delayed work exists
+causes native queue-gas underflow. The final requests and all inputs remain in
+the report. Bandwidth/epoch contexts remain the one-shard fixture environment.
+Native uses compute/proof limits; the model's positive chunk budget is still a
+gas approximation. Zero-budget deferral is compared directly.
+
+**Storage mutation gas remains incomplete.** Native trie-backed writes/removals
+charge trie-node access and old-value bytes through the external storage
+adapter. The VM mock does not charge these costs, and the model currently
+represents that mock storage environment. Storage values, usage and rollback
+are compared, but full-runtime gas differences propagate into refunds, rewards
+and balances. The full `chain-contract-probe` corpus includes these mutations
+and exits nonzero; it does not subtract or tolerate the differences. Integration
+tests separately assert that the comparator catches these known gaps, saving
+raw evidence with `expectedToMatch = false` in
+`audit/contract-chain-regressions.json`. A passing regression test is not a
+claim that those native/model executions match.

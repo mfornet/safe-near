@@ -112,8 +112,8 @@ def checkSchedules (r : IO.Ref Report) (cfg : RuntimeConfig) (codeOf : CodeTable
     runBlocks cfg codeOf queued
       [{ ap := { ap with gasLimit := some 0 }, txs := [], receipts := .indices [2, 0] }]
   check r "runtime gas delays and scheduler deferrals stay in distinct queues"
-      (ids limited.snapshot == [102] && limited.snapshot.state.delayed.map (·.receiptId) == [101] &&
-        bobAmount limited.snapshot == some (oneNear + 100))
+      (ids limited.snapshot == [102] && limited.snapshot.state.delayed.map (·.receiptId) == [103, 101] &&
+        bobAmount limited.snapshot == some oneNear)
   let drainedDelayed := scheduled limited.snapshot []
   check r "empty incoming delivery still processes runtime-delayed receipts"
       (ids drainedDelayed.snapshot == [102] && drainedDelayed.snapshot.state.delayed.isEmpty &&

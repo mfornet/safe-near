@@ -193,16 +193,8 @@ def applyFunctionCall (c : ReceiptCtx) (method : String) (args : Bytes) (gas dep
       outputs := outputs.modify k (· ++ outputReceivers)
       modify fun e => { e with result := some (.successReceiptId (ids[k]?.getD 0)) }
     | .value v =>
-      for d in outputReceivers do
-        let rid ← fresh
-        emit { predecessorId := id, receiverId := d.receiverId, receiptId := rid,
-               receipt := .data { dataId := d.dataId, data := some v } }
       modify fun e => { e with result := some (.successValue v) }
     | .none =>
-      for d in outputReceivers do
-        let rid ← fresh
-        emit { predecessorId := id, receiverId := d.receiverId, receiptId := rid,
-               receipt := .data { dataId := d.dataId, data := some [] } }
       modify fun e => { e with result := some (.successValue []) }
     for h : i in [0:outcome.receipts.length] do
       let spec := outcome.receipts[i]
@@ -420,17 +412,24 @@ def applyActionReceipt (c : ReceiptCtx) (st0 : ChainState) : Exec :=
       | some a => { exec with state := exec.state.setAccount receiver { a with amount := a.amount + reward }
                               reward := reward }
       | none => exec
-  -- data receipts for failed executions: receivers learn the failure
-  let exec := if failed.isSome then
+  -- Native apply emits data after action receipts and refunds. Data receipts
+  -- carry the terminal value/failure and have no execution outcome of their own.
+  let dataResult := match exec.result with
+    | some (.successReceiptId _) => none
+    | some (.failure _) => some none
+    | some (.successValue value) => some (some value)
+    | none => some (some [])
+  let exec := match dataResult with
+    | none => exec
+    | some data =>
       let (st, rs) := c.action.outputDataReceivers.foldl
         (fun (acc : ChainState × List Receipt) (d : DataReceiver) =>
           let (st, rs) := acc
           let (id, st) := st.freshId
           (st, rs ++ [({ predecessorId := receiver, receiverId := d.receiverId, receiptId := id,
-                         receipt := .data { dataId := d.dataId, data := none } } : Receipt)]))
+                         receipt := .data { dataId := d.dataId, data } } : Receipt)]))
         (exec.state, [])
       { exec with state := st, newReceipts := exec.newReceipts ++ rs }
-    else exec
   { exec with result := some (exec.result.getD (.successValue [])) }
 
 /-- Outcome of an executed receipt. -/
@@ -438,7 +437,9 @@ def outcomeOf (r : Receipt) (e : Exec) : ExecutionOutcome :=
   { executorId := r.receiverId
     status := e.result.getD (.successValue [])
     logs := e.logs
-    receiptIds := e.newReceipts.map (·.receiptId)
+    receiptIds := (e.newReceipts.filter fun r => match r.receipt with
+      | .action _ => true
+      | .data _ => false).map (·.receiptId)
     gasBurnt := e.gasBurnt
     tokensBurnt := e.tokensBurnt }
 
@@ -594,8 +595,8 @@ private def applyAttempt (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes
       outcomes := outcomes ++ [(0, { executorId := tx.signerId, status := .failure e })]
   let queue := localReceipts ++ st.delayed ++ incoming
   st := { st with delayed := [] }
-  let mut gasUsed := 0
-  let mut overLimit := false
+  let mut gasUsed := outcomes.foldl (fun total pair => total + pair.2.gasBurnt) 0
+  let mut overLimit := ap.gasLimit.any (gasUsed ≥ ·)
   for r in queue do
     if overLimit then
       st := { st with delayed := st.delayed ++ [r] }
