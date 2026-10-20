@@ -629,6 +629,27 @@ execution and uses it to preserve key/payload agreement through complete blocks.
 state. These results do not yet prove disjoint ownership across all three queues,
 dependency-edge validity, or complete block-level financial conservation.
 
+`BlockStages.applyAttempt_eq_stages` is definitional equality between the real
+block executor and its proof-facing transaction/receipt passes. The suffix-indexed
+loop rule carries the unprocessed queue's admission facts through execution.
+`ReceiptQueueConservation` proves the complete receipt-loop ledger law, including
+gas deferral and the actual reward deduction. `TransactionPassConservation` backs
+local transaction receipts and conversion burn. `BlockConservation.apply_conservation`
+then proves, for supported results, that resulting runtime funds plus outgoing
+backing and net burn equal initial runtime funds plus incoming backing and explicit
+subsidy. `NearChain.Conservation.step_conservation` lifts that law to the full
+snapshot ledger, including all pending, delayed and postponed receipts.
+
+The theorem's `BlockFinancialPremises` are explicit: unique accounts; financially
+well-formed postponed entries; identifier bounds; distinct queued envelopes with
+no postponed-slot collision; financial scope for queued receipts; nonreserved
+signer/receiver transaction actors; and the settlement configuration/reward bounds.
+There is no assumed monetary equation or supplied VM outcome. Reserved-target
+transactions remain outside this actor scope, and closure of financial receipt
+scope across arbitrary emitted work, full dependency validity, native gas fidelity,
+and multi-block financial invariants still need work. This is a scoped kernel
+conservation theorem, not a claim of complete native-runtime equivalence.
+
 Reserved `system` account creation is rejected independently of the registrar
 and minimum-name-length configuration. Pinned nearcore's `action_create_account`
 uses near-account-id 2.0.0's `is_top_level`/`is_sub_account_of`; `system` is neither.
