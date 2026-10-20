@@ -78,6 +78,7 @@ limit unconstrained, which keeps existing concrete examples small and easy to
 compute while allowing fidelity checks to opt in to nearcore-style traps. -/
 structure NearConfig where
   oneYoctoOnPromise : Bool := false
+  ethImplicitAccounts : Bool := false
   maxRegisterLen     : Option Nat := none
   maxReturnLen       : Option Nat := none
   maxLogLen          : Option Nat := none

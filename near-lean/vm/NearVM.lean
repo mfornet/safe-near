@@ -19,3 +19,4 @@ import NearVM.ExecutionGas
 import NearVM.OutcomeGas
 import NearVM.DepositRegistry
 import NearVM.OutcomeFunding
+import NearVM.ChargeReservations

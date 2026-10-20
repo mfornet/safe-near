@@ -49,6 +49,7 @@ structure WasmConfig where
   linearOpUnitCost : Nat := 0
   /-- Grant a one-yocto function-call deposit when liquid balance is zero. -/
   oneYoctoOnPromise : Bool := false
+  ethImplicitAccounts : Bool := false
   /-- Whether method-resolution failures retain the contract-loading charge. -/
   fixContractLoadingCost : Bool := false
   limits : LimitConfig
@@ -202,6 +203,7 @@ def ofJson (j : Json) : Except String RuntimeConfig := do
       regularOpCost := ← nat wasm "regular_op_cost"
       linearOpBaseCost := ← nat wasm "linear_op_base_cost"
       linearOpUnitCost := ← nat wasm "linear_op_unit_cost"
+      ethImplicitAccounts := ← (← field wasm "eth_implicit_accounts").getBool?
       oneYoctoOnPromise := ← (← field wasm "one_yocto_on_promise").getBool?
       fixContractLoadingCost := ← (← field wasm "fix_contract_loading_cost").getBool?
       limits := ← limits (← field wasm "limit_config") }

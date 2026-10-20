@@ -108,3 +108,14 @@ stake target as an outgoing deposit and could fabricate balance-exceeded errors.
 Scheduling now preserves liquid balance while retaining the exact gas charges.
 This verifies VM promise construction; runtime staking execution still requires
 unsupported epoch machinery and reports an explicit model issue.
+
+`implicit_transfers_v69.json`, `implicit_transfers_v70.json` and
+`implicit_transfers_v86.json` cover 60 transfer-scheduling cases across the ETH
+implicit-account feature boundary. They compare named, NEAR implicit, ETH and
+deterministic addresses, hexadecimal lookalikes, zero/repeated transfers, panic
+rollback, invalid handles, amount-pointer failures, one-Tgas budgets and views.
+The first 30 cases exposed 17 implicit-address fee discrepancies. Expanded cases
+then exposed nine amount-read charging/error-precedence discrepancies. The
+strict comparison retains exact gas and error observations for every case.
+These VM fixtures schedule transfers; runtime scenario checks separately cover
+existing ETH/deterministic receivers and explicit unsupported creation rollback.

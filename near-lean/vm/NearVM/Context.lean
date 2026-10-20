@@ -81,6 +81,7 @@ def toNearState (cfg : RuntimeConfig) (ctx : VMContext)
       maxStorageValueLen := some cfg.wasm.limits.maxLengthStorageValue
       maxInputDataDependencies := some cfg.wasm.limits.maxNumberInputDataDependencies
       oneYoctoOnPromise := cfg.wasm.oneYoctoOnPromise
+      ethImplicitAccounts := cfg.wasm.ethImplicitAccounts
       maxPromises := some cfg.wasm.limits.maxPromisesPerFunctionCallAction
       validAccountId := if cfg.wasm.limits.accountIdValidityRulesVersion == 2 then validAccountIdBytes
         else fun _ => true }

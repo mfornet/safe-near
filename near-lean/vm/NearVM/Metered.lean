@@ -1,3 +1,4 @@
+import NearVM.AccountId
 import NearVM.Host
 import NearVM.Config
 import NearVM.PromiseGraph
@@ -115,6 +116,21 @@ def sirOf (st : Store NearState) (acct : Option (List UInt8)) : Bool :=
 
 def sirOfSpan (st : Store NearState) (len ptr : UInt64) : Bool :=
   sirOf st (getMemOrReg st ptr len)
+
+/-- Native transfer reads the u128 before looking up the promise or charging
+accumulated action fees. A failed read retains only the argument-reading cost. -/
+def transferCharges (st : Store NearState) (index amountPtr : UInt64) : List Charge :=
+  let initialCharges := [.ext "base"] ++ readMem 16
+  match readU128Mem st amountPtr with
+  | none => initialCharges
+  | some _ => initialCharges ++ [.actionBase
+      (fun fees => transferFees fees st.host.config.ethImplicitAccounts
+        ((promiseReceiver? st index.toNat).getD [])) (sirOf st (promiseReceiver? st index.toNat))]
+
+theorem transferCharges_invalidAmount (st : Store NearState) (index amountPtr : UInt64)
+    (h : readU128Mem st amountPtr = none) :
+    transferCharges st index amountPtr = [.ext "base"] ++ readMem 16 := by
+  simp only [transferCharges, h]
 
 /-- Data routing is same-account when the dependency receiver equals the
 callback receiver, which need not be the currently executing account. -/
@@ -334,7 +350,7 @@ private def chargesBeforeUnvalidated (name : String) (st : Store NearState) (arg
     let sir := sirOf st (promiseReceiver? st (a 0).toNat)
     (functionCallPlan st (functionCallInputs args 1 (some (a 0).toNat)) sir).charges
   | "promise_batch_action_transfer" =>
-    [base] ++ readMem 16 ++ [.actionBase (·.transfer) (sirOf st (promiseReceiver? st (a 0).toNat))]
+    transferCharges st (a 0) (a 1)
   | "promise_batch_action_stake" =>
     [base] ++ readMem 16 ++ readSpan st (a 2) (a 3)
       ++ [.actionBase (·.stake) (sirOf st (promiseReceiver? st (a 0).toNat))]
@@ -386,6 +402,14 @@ def chargesBefore (name : String) (st : Store NearState) (args : List Value) : L
       | _ => true
   else charges
 
+/-- The public pre-call plan cannot charge transfer fees for an unread amount,
+including an invalid target handle. -/
+theorem chargesBefore_transfer_invalidAmount (st : Store NearState) (index amountPtr : UInt64)
+    (h : readU128Mem st amountPtr = none) :
+    chargesBefore "promise_batch_action_transfer" st [.i64 index, .i64 amountPtr] =
+      [.ext "base"] ++ readMem 16 := by
+  simp [chargesBefore, chargesBeforeUnvalidated, creationAccountArgs, argU64, transferCharges, h, readMem]
+
 /-- Check each expanded prefix, retaining duplicate receipt dependencies.
 This ordering makes an earlier limit violation precede a later invalid handle. -/
 def joinedDependenciesError (handles : List PromiseHandle) (limit : Nat) : List Nat → Nat → Option HostError
@@ -418,8 +442,20 @@ def promiseJoinError (st : Store NearState) (args : List Value) : Option HostErr
         | some graph => joinedDependenciesError graph.handles limit indices 0
   | _ => none
 
+def transferInputError (st : Store NearState) (args : List Value) : Option HostError :=
+  match args with
+  | [.i64 _, .i64 amountPtr] => if (readU128Mem st amountPtr).isNone then some .memoryAccessViolation else none
+  | _ => none
+
+theorem transferInputError_invalidAmount (st : Store NearState) (index amountPtr : UInt64)
+    (h : readU128Mem st amountPtr = none) :
+    transferInputError st [.i64 index, .i64 amountPtr] = some .memoryAccessViolation := by
+  simp only [transferInputError, h, Option.isNone_none, ite_true]
+
 def invocationArgumentError (name : String) (st : Store NearState) (args : List Value) : Option HostError :=
-  if name == "promise_and" then promiseJoinError st args else creationPrefixError name st args
+  if name == "promise_and" then promiseJoinError st args
+  else if name == "promise_batch_action_transfer" then transferInputError st args
+  else creationPrefixError name st args
 
 def preInvokeError (name : String) (st : Store NearState) (args : List Value) : Option HostError :=
   match invocationArgumentError name st args with

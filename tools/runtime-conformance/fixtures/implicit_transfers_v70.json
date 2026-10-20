@@ -1,0 +1,116 @@
+{
+  "code": "tools/runtime-conformance/fixtures/implicit_transfers.wasm",
+  "sha256": "8dac11c6d62c6849433b46023a2556c0032647b97aa064417cf0092806966cce",
+  "protocolVersion": 70,
+  "initialBalance": "100",
+  "storage": [],
+  "calls": [
+    {
+      "name": "implicit_transfers_v70: named",
+      "method": "named",
+      "args": {}
+    },
+    {
+      "name": "implicit_transfers_v70: near",
+      "method": "near",
+      "args": {}
+    },
+    {
+      "name": "implicit_transfers_v70: eth",
+      "method": "eth",
+      "args": {}
+    },
+    {
+      "name": "implicit_transfers_v70: deterministic",
+      "method": "deterministic",
+      "args": {}
+    },
+    {
+      "name": "implicit_transfers_v70: near_lookalike",
+      "method": "near_lookalike",
+      "args": {}
+    },
+    {
+      "name": "implicit_transfers_v70: eth_lookalike",
+      "method": "eth_lookalike",
+      "args": {}
+    },
+    {
+      "name": "implicit_transfers_v70: deterministic_lookalike",
+      "method": "deterministic_lookalike",
+      "args": {}
+    },
+    {
+      "name": "implicit_transfers_v70: near_twice",
+      "method": "near_twice",
+      "args": {}
+    },
+    {
+      "name": "implicit_transfers_v70: near_zero",
+      "method": "near_zero",
+      "args": {}
+    },
+    {
+      "name": "implicit_transfers_v70: near_panic",
+      "method": "near_panic",
+      "args": {}
+    },
+    {
+      "name": "implicit_transfers_v70: near_bad_index",
+      "method": "near_bad_index",
+      "args": {}
+    },
+    {
+      "name": "implicit_transfers_v70: near_bad_amount",
+      "method": "near_bad_amount",
+      "args": {}
+    },
+    {
+      "name": "implicit_transfers_v70: named_bad_amount",
+      "method": "named_bad_amount",
+      "args": {}
+    },
+    {
+      "name": "implicit_transfers_v70: named one Tgas",
+      "method": "named",
+      "args": {},
+      "gas": 1000000000000
+    },
+    {
+      "name": "implicit_transfers_v70: near one Tgas",
+      "method": "near",
+      "args": {},
+      "gas": 1000000000000
+    },
+    {
+      "name": "implicit_transfers_v70: eth one Tgas",
+      "method": "eth",
+      "args": {},
+      "gas": 1000000000000
+    },
+    {
+      "name": "implicit_transfers_v70: deterministic one Tgas",
+      "method": "deterministic",
+      "args": {},
+      "gas": 1000000000000
+    },
+    {
+      "name": "implicit_transfers_v70: near_bad_index one Tgas",
+      "method": "near_bad_index",
+      "args": {},
+      "gas": 1000000000000
+    },
+    {
+      "name": "implicit_transfers_v70: near_bad_amount one Tgas",
+      "method": "near_bad_amount",
+      "args": {},
+      "gas": 1000000000000
+    },
+    {
+      "name": "implicit_transfers_v70: view",
+      "method": "near",
+      "args": {},
+      "view": true
+    }
+  ]
+}

@@ -346,3 +346,24 @@ the chain outside the receiver's account/storage and id allocation. The outgoing
 gas term is explicit: linking it to VM reserved gas, composing multiple actions,
 and receipt-wide settlement remain required for full successful-receipt
 conservation.
+
+Transfer fees use the pinned account classification in both VM scheduling and
+runtime transaction/receipt budgets: 64 lowercase hex bytes reserve creation and
+full-access-key execution, `0x` plus 40 lowercase hex bytes add creation when
+`eth_implicit_accounts` is enabled, and `0s` deterministic addresses carry their
+creation fee. The protocol flag is loaded from the configuration and propagated
+into host metering. Fees are accumulated into one charge, preserving exhaustion
+precedence. Invalid amount pointers retain only reading costs, before handle
+lookup and transfer fees; `chargesBefore_transfer_invalidAmount` proves that
+public charge-plan frame.
+
+`ChargeReservations.applyCharges_success_reservation` proves that successful
+charge lists add exactly the sum of execution/prepaid obligations to promise
+gas. Ext/instruction burn and dependency-data charges reserve no action gas.
+Connecting this sum to the concrete emitted promise graph remains open.
+
+Existing ETH/deterministic receivers support ordinary transfers. Creation of
+these account types requires protocol code/context that is not implemented;
+the runtime now reports an explicit model issue and rolls back the apply batch.
+Account-existence checks take the protocol flag explicitly; disabled protocols
+treat these addresses as named accounts for creation admission.

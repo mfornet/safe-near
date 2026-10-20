@@ -280,6 +280,61 @@ def main (args : List String) : IO UInt32 := do
   check r "unsupported unstaking leaves locked funds untouched"
     ((unstake.state.account? "wrap.near").map (·.locked) == some oneNear)
 
+  -- Fee classification and explicit unsupported implicit-creation semantics.
+  let cfg69 ← RuntimeConfig.load configs 69
+  let cfg70 ← RuntimeConfig.load configs 70
+  check r "ETH implicit account flag follows the protocol configuration"
+    (!cfg69.wasm.ethImplicitAccounts && cfg70.wasm.ethImplicitAccounts && cfg.wasm.ethImplicitAccounts)
+  for (label, receiver) in [("ETH", "0x" ++ String.ofList (List.replicate 40 'a')),
+      ("deterministic", "0s" ++ String.ofList (List.replicate 40 'a'))] do
+    let tx : Transaction := {
+      signerId := "alice.near", publicKey := pkOf 1, nonce := 1
+      receiverId := receiver, actions := [.transfer oneNear] }
+    let missing := Near.apply cfg World.ap (fun _ => code) genesis [tx] []
+    check r s!"{label} implicit creation reports a model issue"
+      ((missing.issue.map (·.2)) == some (.unsupportedAction "implicit account creation (ETH/deterministic contracts)"))
+    check r s!"{label} implicit issue rolls back funds, nonce, ids and observations"
+      (missing.state.totalBalance == genesis.totalBalance && missing.outcomes.isEmpty && missing.outgoing.isEmpty &&
+        missing.tokensBurnt == 0 && missing.state.nextId == genesis.nextId &&
+        missing.state.accessKey? "alice.near" (pkOf 1) == some fullAccess)
+    let present := genesis.setAccount receiver (genesisAccount oneNear)
+    let sent := Near.apply cfg World.ap (fun _ => code) present [tx] []
+    let applied := Near.apply cfg World.ap (fun _ => code) sent.state [] sent.outgoing
+    check r s!"{label} existing receiver accepts a transfer"
+      (sent.issue.isNone && applied.issue.isNone &&
+        (applied.state.account? receiver).map (·.amount) == some (2 * oneNear))
+    let total := applied.state.totalBalance + (applied.outgoing.map (Fees.receiptFunds cfg)).sum +
+      sent.tokensBurnt + applied.tokensBurnt
+    check r s!"{label} existing receiver transfer conserves funds and gas backing" (total == present.totalBalance)
+    check r s!"{label} explicit create is rejected as implicit creation"
+      (match checkActionAccount genesis { predecessorId := "alice.near", receiverId := receiver, receiptId := 0, receipt := .data { dataId := 0, data := none } } true .createAccount true with
+        | .error (.onlyImplicitAccountCreationAllowed id) => id == receiver
+        | _ => false)
+  let disabledReceipt : Receipt := {
+    predecessorId := "alice.near", receiverId := "0x" ++ String.ofList (List.replicate 40 'a')
+    receiptId := 0, receipt := .data { dataId := 0, data := none } }
+  check r "disabled ETH implicit receiver is treated as a missing named account"
+    (match checkActionAccount genesis disabledReceipt true (.transfer 1) false with
+      | .error (.accountDoesNotExist _) => true | _ => false)
+
+  let implicitTarget := String.ofList (List.replicate 64 'a')
+  let implicitWat := "(module (import \"env\" \"promise_batch_create\" (func $batch (param i64 i64) (result i64))) " ++
+    "(import \"env\" \"promise_batch_action_transfer\" (func $transfer (param i64 i64))) (memory 1) " ++
+    "(data (i32.const 0) \"" ++ implicitTarget ++ "\") (data (i32.const 80) \"\\01\") " ++
+    "(func (export \"send\") i64.const 64 i64.const 0 call $batch i64.const 80 call $transfer))"
+  let implicitModule ← match Decoder.Wat.decode implicitWat with
+    | .ok m => pure m
+    | .error error => throw (IO.userError s!"implicit transfer fixture: {error}")
+  let implicitCode : ContractCode := { module := implicitModule, size := 0, hash := "implicit-transfer-fixture" }
+  let implicitState := genesis.setAccount "wrap.near" { genesisAccount (10 * oneNear) with code := some implicitCode }
+  let implicitWorld : World := { cfg, code := implicitCode, state := implicitState }
+  let implicitResult := implicitWorld.call "alice.near" "send" "{}" 0
+  check r "VM-created implicit transfer settles and creates the NEAR receiver"
+    (implicitResult.issue.isNone && implicitResult.pending.isEmpty && implicitResult.state.delayed.isEmpty &&
+      implicitResult.state.postponed.isEmpty && (implicitResult.state.account? implicitTarget).map (·.amount) == some 1)
+  check r "VM-created implicit transfer conserves deposits, fees and refunds"
+    (implicitResult.total == implicitWorld.total && implicitResult.burnt > 0)
+
   -- deploy and initialise in one transaction from wrap.near
   let (txDeploy, w) := w0.tx "wrap.near" "wrap.near" [.deployContract code, .functionCall "new" (bytesOf "{}") (tgas 50) 0]
   let w := w.settle [txDeploy]

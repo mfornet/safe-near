@@ -79,7 +79,7 @@ def putAccount (id : AccountId) (a : Account) : ExecM Unit := modifyState (·.se
 /-- Can `predecessor` create `id`? Top-level names need the minimum length
 (or the registrar), sub-accounts need their parent as predecessor. -/
 def canCreateAccount (cfg : RuntimeConfig) (predecessor id : AccountId) : Bool :=
-  if isImplicitAccount id then false
+  if accountIsImplicit cfg.wasm.ethImplicitAccounts id.toUTF8.toList then false
   else match id.splitOn "." with
     | [_] => id.length ≥ cfg.accountCreation.minAllowedTopLevelAccountLength
              || predecessor == cfg.accountCreation.registrarAccountId
@@ -265,6 +265,8 @@ def applyAction (c : ReceiptCtx) (isLast : Bool) : Action → ExecM Unit
       if c.receipt.isGasRefund then
         modifyState (·.refundAllowance id c.action.signerPublicKey deposit)
     | none =>
+      if unsupportedImplicitCreation c.cfg.wasm.ethImplicitAccounts (bytesOfString id) then
+        throw (.executionIssue (.unsupportedAction "implicit account creation (ETH/deterministic contracts)"))
       -- implicit account creation on transfer
       if let some pk := implicitPublicKey? id then
         let key : AccessKey := { nonce := initialNonce c.ap.blockHeight, permission := .fullAccess }
@@ -330,26 +332,26 @@ def checkStorageStake (cfg : RuntimeConfig) (id : AccountId) : ExecM Unit := do
 
 /-- The receiver must exist unless the receipt starts by creating it, or is a
 transfer to an implicit account. -/
-def checkReceiver (st : ChainState) (r : Receipt) (a : ActionReceipt) : Except RuntimeError Unit :=
+def checkReceiver (st : ChainState) (r : Receipt) (a : ActionReceipt) (ethEnabled : Bool) : Except RuntimeError Unit :=
   if (st.account? r.receiverId).isSome then .ok ()
   else match a.actions with
     | .createAccount :: _ => .ok ()
-    | [.transfer _] => if isImplicitAccount r.receiverId then .ok () else .error (.accountDoesNotExist r.receiverId)
+    | [.transfer _] => if accountIsImplicit ethEnabled (bytesOfString r.receiverId) then .ok () else .error (.accountDoesNotExist r.receiverId)
     | _ => .error (.accountDoesNotExist r.receiverId)
 
 /-- Account existence is checked before permission for each individual action.
 Implicit account creation requires a sole transfer from a non-system sender.
 Reference: `actions.rs::check_account_existence` at `runtime/reference.json`. -/
 def checkActionAccount (st : ChainState) (r : Receipt) (onlyAction : Bool)
-    (action : Action) : Except RuntimeError Unit :=
+    (action : Action) (ethEnabled : Bool) : Except RuntimeError Unit :=
   let accountExists := (st.account? r.receiverId).isSome
   match action with
   | .createAccount =>
     if accountExists then .error (.accountAlreadyExists r.receiverId)
-    else if isImplicitAccount r.receiverId then .error (.onlyImplicitAccountCreationAllowed r.receiverId)
+    else if accountIsImplicit ethEnabled (bytesOfString r.receiverId) then .error (.onlyImplicitAccountCreationAllowed r.receiverId)
     else .ok ()
   | .transfer _ =>
-    if accountExists || (onlyAction && !r.isRefund && isImplicitAccount r.receiverId) then .ok ()
+    if accountExists || (onlyAction && !r.isRefund && accountIsImplicit ethEnabled (bytesOfString r.receiverId)) then .ok ()
     else .error (.accountDoesNotExist r.receiverId)
   | _ => if accountExists then .ok () else .error (.accountDoesNotExist r.receiverId)
 
@@ -379,7 +381,7 @@ theorem foreign_deploy_denied (actor receiver : AccountId) (code : ContractCode)
 
 /-- Admission checks are ordered per action and do not charge gas. -/
 def checkReceiptAction (c : ReceiptCtx) (onlyAction : Bool) (act : Action) : ExecM Unit := do
-  match checkActionAccount (← getState) c.receipt onlyAction act with
+  match checkActionAccount (← getState) c.receipt onlyAction act c.cfg.wasm.ethImplicitAccounts with
   | .error e => throw e
   | .ok () => pure ()
   match checkActorPermissions (← get).actorId c.receipt.receiverId act with
@@ -392,7 +394,7 @@ def chargeReceiptFee (isRefund : Bool) (fee : Nat) : ExecM Unit :=
 
 /-- One action's protocol fees, admission checks and body, in execution order. -/
 def runReceiptAction (c : ReceiptCtx) (onlyAction isLast : Bool) (act : Action) : ExecM Unit := do
-  chargeReceiptFee c.receipt.isRefund (Fees.exec c.cfg.fees.actionFees c.receipt.receiverId act)
+  chargeReceiptFee c.receipt.isRefund (Fees.exec c.cfg.fees.actionFees c.cfg.wasm.ethImplicitAccounts c.receipt.receiverId act)
   checkReceiptAction c onlyAction act
   applyAction c isLast act
 
