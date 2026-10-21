@@ -1,15 +1,13 @@
-# WASM Runtime
+# Wasm runtime
 
-`near-lean/wasm` contains the adapted Talos interpreter, and
-`near-lean/iris-wasm` contains its Iris proof machinery. The interpreter executes
-Wasm with a configurable host; the NEAR host and metered single-call executor
-live in `near-lean/vm`.
+- `near-lean/wasm`: the Wasm interpreter, adapted from Talos. It runs with a
+  configurable host.
+- `near-lean/iris-wasm`: Iris proof machinery for reasoning about Wasm code.
+- The NEAR host lives in `near-lean/vm` (see [NEAR runtime](NEAR_RUNTIME.md)).
 
-The official Wasm testsuite and custom tests exercise the interpreter. The
-committed `testsuite_report.txt` records the tested results and is checked in CI.
-VM conformance tests compare supported NEAR execution with a pinned reference.
+The interpreter is tested with the official Wasm testsuite and custom tests.
+`testsuite_report.txt` records the results and CI checks it is up to date.
 
-Broader fuzzing, interchangeability with other Wasm runtimes, and tests derived
-from NEAR execution history remain validation goals. Full compatibility must be
-established for each supported feature rather than inferred from passing a
-finite testsuite. Performance is secondary to an auditable execution model.
+Passing a finite testsuite does not prove compatibility; each supported feature
+must be validated. Fuzzing and tests from NEAR history are future work.
+Auditability matters more than performance.

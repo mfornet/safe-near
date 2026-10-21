@@ -1,39 +1,32 @@
-# Smart Contracts
+# Smart contracts
 
-Our first goal is to formalize critical smart contracts on the NEAR blockchain,
-and the first step is to identify and collect those smart contracts, including
-source code (github repository), with the pinned version that was used to generate
-the binary that is deployed on chain. I imagine that we will have multiple 
-versions for some smart contracts (say multisig or dao) if there are different
-versions deployed and in use. We should treat each of them independently even
-if we later can reuse part of the formalization effort between them.
+The first goal is to formalize critical NEAR contracts. That starts with a
+dataset: for each deployed binary, its source at the exact commit and a
+reproducible build. A proof only applies to a deployed contract if we can
+rebuild that binary from source.
 
-Interface: This is just a dataset, where we have source code, and how to build
-the exact binary from the source code in a reproducible way, the actual binary
-and its hash (useful to check exactly which version we are verifying).
+Different deployed versions of the same contract (e.g. multisig, DAO) are
+separate entries, even if their proofs end up sharing work.
 
-There are several tiers on what we can verify:
-
-1. Manually identified contracts that are considered critical in the NEAR ecosystem
-2. Contracts that have had "significant" usage in the last month (year)
-3. All smart contracts ever deployed
-
-Let's consider finding potential point of contacts for each of the smart contracts
-that could help us audit the formal statements that we are verifying.
-
-## Dataset layout
-
-Each contract has a directory under `contracts/` containing:
+## Layout
 
 ```text
-source/         -- Pinned upstream source git submodule
-contract.toml   -- Provenance, build toolchain and expected code hash
-contract.wasm   -- Pinned on-chain binary
-hash.txt        -- NEAR code hash of that binary
-build.sh        -- Reproduce build/contract.wasm from source/
-verification/   -- Lean model, statements and proofs, where implemented
+contracts/<name>/
+    source/         -- Upstream source, pinned as a git submodule
+    contract.toml   -- Provenance, toolchain and expected code hash
+    contract.wasm   -- On-chain binary
+    hash.txt        -- NEAR code hash of that binary
+    build.sh        -- Rebuilds build/contract.wasm from source/
+    verification/   -- Lean model, specs and proofs, where they exist
 ```
 
-`just reproduce <name>` rebuilds the contract and checks its hash against the
-pinned binary. Source provenance and reproducibility are prerequisites for
-connecting a proof to a deployed artifact.
+`just reproduce <name>` rebuilds and compares hashes. The list of contracts is
+in [contracts/CATALOG.md](../../contracts/CATALOG.md).
+
+## Scope
+
+1. Critical contracts in the NEAR ecosystem, picked by hand.
+2. Contracts with significant recent usage.
+3. Every contract ever deployed.
+
+For each contract, try to find a contact who can review the formal statements.

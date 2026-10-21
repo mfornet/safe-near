@@ -1,28 +1,25 @@
-# NEAR Model and specifications
+# NEAR model
 
-Discussion on how the NEAR model should work and how to write
-specifications for particular smart contracts.
+How contract state and the environment are presented to specifications.
 
-## View
+## State view
 
-Per contract let's have a method that converts the state of the 
-contract from the low level representation in the host to a higher
-level view in Lean, this method needs to be audited once per
-contract but provide a very clean way to talk about the internals
-of the smart contract. Ideally this representation is bijective,
-i.e it capture everything that can be capture from the state, so
-it can be reconstructed later, and we are not leaving anything
-behind.
+Each contract has a function from its raw storage (key/value bytes in the host)
+to a high-level Lean view of its state. Specifications talk about the view, so
+the function is audited once per contract.
 
-## Keys
+The view should be bijective: it captures everything in storage, so the raw
+state can be reconstructed and nothing is left out. For wNEAR this is
+`encode`/`project` in `Model/Storage.lean`, with `project (encode s) = some s`
+proved.
 
-The runtime models full-access and restricted function-call access keys. Contract
-specifications must account for the permissions that can change deployed code
-or affect execution. Full-access keys can authorize upgrades, so lifetime and
-upgrade-safety properties need explicit assumptions about deployment identity,
-key permissions, and code changes. A theorem about one pinned binary must not
-silently claim correctness of later upgrades.
+## Access keys
 
-## Smart contract Upgrade
+The runtime models full-access and function-call access keys. Full-access keys
+can deploy new code, so lifetime properties must state assumptions about keys
+and deployment. A theorem about one pinned binary says nothing about later
+upgrades.
 
-TODO: Discuss how to deal when a smart contract is updated.
+## Upgrades
+
+Open: how to state and prove properties across a contract upgrade.

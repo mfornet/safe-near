@@ -2,32 +2,21 @@
 
 ```text
 safe-near/
-    notes/              -- Component design, verification policy and open tasks
+    notes/              -- Design notes and TODO
     tools/              -- Conformance, snapshots, audits and Lean quality tools
-    lean-toolchain      -- Canonical Lean version, checked across packages
-    reports/periodic/   -- Dated check findings and validation evidence
+    reports/periodic/   -- Dated periodic check reports
+    lean-toolchain      -- Lean version shared by every package
     near-lean/
-      wasm/             -- Adapted Talos Wasm interpreter
+      wasm/             -- Wasm interpreter (adapted from Talos)
       iris-wasm/        -- Iris proof machinery and Wasm code library
-      programs/         -- Wasm test programs, regression harnesses and proofs
-      vm/               -- Metered single-call execution and NEAR host functions
-      runtime/          -- Transactions, receipts, account state and routing
-      chain/            -- Block execution, settlement and reachability
-    contracts/          -- Dataset of pinned smart contracts
-      <name>/
-        source/         -- Pinned upstream source submodule
-        build.sh        -- Reproduce the contract from source
-        build/          -- Reconstructed outputs, including contract.wasm
-        contract.wasm   -- Pinned on-chain binary
-        hash.txt        -- NEAR code hash of the pinned binary
-        contract.toml   -- Provenance, build instructions and hash metadata
-        verification/   -- Lean project, where verification is implemented
-          lakefile.toml
-          Model/        -- Contract model and supporting definitions
-          Spec/         -- Property statements
-          Proofs/       -- Proofs of those properties
-          blueprint/    -- Blueprint source
+      programs/         -- Wasm test programs and their proofs
+      vm/               -- Single contract call: metering and host functions
+      runtime/          -- Transactions, receipts and account state
+      chain/            -- Block execution and settlement
+    contracts/
+      CATALOG.md        -- List of contracts
+      <name>/           -- One deployed binary (see SMART_CONTRACTS.md)
+        verification/   -- Lean project: Model/, Spec/, Proofs/, blueprint/
 ```
 
-The verification layout is currently instantiated for wNEAR. Generated blueprint
-HTML lives in its verification project's `blueprint/web/` directory.
+Generated blueprint HTML goes to `verification/blueprint/web/`.

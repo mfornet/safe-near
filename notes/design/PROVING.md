@@ -1,25 +1,23 @@
 # Proving
 
-Verification uses LeanArchitect `@[blueprint]` annotations and leanblueprint to
-connect explanations, formal statements, and proofs. Build the wNEAR blueprint
-with `just blueprint w-near`. The blueprint must show open obligations as open;
-a definition of a property is not a proof of it.
+## Blueprint
 
-Theorem proving can use automation and exploratory tools during development,
-but completed proofs must be checked by the Lean kernel. The accepted logical
-axioms are `propext`, `Classical.choice`, and `Quot.sound`; completed verification
-must not depend on `sorryAx` or `native_decide`. The transitive axiom audit
-(`just wnear-audit`) checks proof dependencies. All four program specifications are now proved; the mergesort statement is
-partial correctness and allows the specified OOM outcome. Older periodic reports
-record the open proofs present at their checked revisions.
+`@[blueprint]` annotations ([LeanArchitect](https://github.com/hanwenzhu/LeanArchitect))
+and [leanblueprint](https://github.com/PatrickMassot/leanblueprint) link prose,
+statements and proofs. Build with `just blueprint w-near`. The blueprint must
+show open obligations as open: stating a property is not proving it.
 
-Strict Comparator checking remains a proposed additional final check until a
-pinned integration and repository command exist. It is not currently enforced.
+## What counts as proved
 
-Scaling proof development should reduce cost while keeping statements, model
-assumptions, and trusted dependencies auditable.
+- Checked by the Lean kernel.
+- Only the axioms `propext`, `Classical.choice` and `Quot.sound`.
+- No `sorryAx` and no `native_decide`.
 
-Tooling references:
+`just wnear-audit` checks this transitively for every wNEAR declaration, and
+`just sorries <contract>` lists what is still open. Automation and exploratory
+tools are fine during development, as long as the result passes these checks.
 
-- [leanblueprint](https://github.com/PatrickMassot/leanblueprint)
-- [LeanArchitect](https://github.com/hanwenzhu/LeanArchitect)
+## Open
+
+- A stricter final check with Comparator is proposed but not set up yet.
+- Making proofs cheaper to write without making statements harder to audit.

@@ -33,10 +33,9 @@ def source_groups(root, requested, pin):
     for path in sorted(set(requested) if requested else owned):
         if path not in owned or path.is_absolute() or ".." in path.parts:
             raise ValueError(f"not a repository-owned Lean source: {path}")
-        if path.parts[0] == "notes" or any(fnmatchcase(path.as_posix(), pattern)
-                                          for pattern in pin["generated"]):
+        if any(fnmatchcase(path.as_posix(), pattern) for pattern in pin["generated"]):
             if requested:
-                raise ValueError(f"protected human note or generated source: {path}")
+                raise ValueError(f"protected generated source: {path}")
             skipped.append(path)
             continue
         package = next((parent for parent in path.parents if parent in packages), None)

@@ -1,54 +1,54 @@
 # Safe NEAR
 
-Formally verify NEAR smart contracts.
+Formalizing NEAR smart contracts at the binary level using Lean.
 
-Check the [project notes](notes/README.md).
+## How it works
 
-## Notes
+We verify the Wasm binary that is actually deployed on chain, not the Rust
+source. To do that, everything the binary runs on is implemented in Lean:
 
-`notes/` holds the project notes: the design of each component, the
-plan for what is being worked on, and the TODO list. Start at
-[notes/README.md](notes/README.md).
+- **Wasm** (`near-lean/wasm`, `near-lean/iris-wasm`): a Wasm interpreter and
+  proof machinery for reasoning about Wasm code.
+- **NEAR runtime** (`near-lean/vm`, `near-lean/runtime`, `near-lean/chain`):
+  host functions, gas, transactions, receipts and block execution on top of the
+  interpreter.
 
-Dated periodic check reports live in [reports/periodic/](reports/periodic/).
+Per contract, we write a high-level model of its state and methods, state the
+properties we care about (for example "balances always sum to the total
+supply"), prove them in Lean, and connect the model to the binary running on
+the Lean runtime. The Lean implementation is tested against the official Wasm
+testsuite and against nearcore.
 
-## Checks
+See [notes/](notes/README.md) for the design and open work.
 
-Pushes and pull requests run one Python-only job: Lean pin consistency and offline
-tooling regressions, with a five-minute limit. Run the same checks with `just ci-check`.
-This fast gate does not certify Lean proofs or native equivalence.
-
-Run the expensive validation locally during the weekly periodic review:
+## Usage
 
 ```sh
-just periodic-check-plan
-just periodic-check /path/to/clean/pinned/nearcore
+just                      # list all recipes
+just list                 # contracts, and which have a verification project
+just build w-near         # build a contract's model, specs and proofs
+just blueprint w-near     # render the blueprint linking statements to proofs
+just wnear-audit          # check proofs have no sorry or extra axioms
+just near-build           # build the Wasm interpreter and NEAR runtime
+just near-test            # run the runtime test suites
+just ci-check             # the fast checks CI runs on every push
 ```
 
-The checkout must be at `44f7ae6cd7ef08bab604e20a473bf77e35d4c993` for the
-finance/nonce adapters. Install the pinned Lean/Rust toolchains and
-`wasm-tools 1.251.0`, initialize the Wasm testsuite submodule, and allow time and
-disk space for cold nearcore builds. The full-chain oracle uses its own clean
-source cache. The runner builds packages sequentially, checks the Wasm report and
-program reproducibility, runs all scenarios and native suites, and audits every
-core/wNEAR declaration. It stops on the first failure and saves commands, source
-revision, working-tree status, logs, and timings under `audit/periodic/`.
-
-The existing large GitHub workflows remain available through **Run workflow**
-when explicitly needed; they do not run on pushes, pull requests, or a schedule.
-The local command covers their executable checks. The broader
-[periodic review](notes/design/PERIODIC_CHECK.md) also includes architecture,
-documentation, blueprint and contract-reproduction review. Human-only notes are
-maintained separately.
+Heavy validation (conformance against a pinned nearcore checkout, full builds)
+runs locally with `just periodic-check <nearcore-checkout>`; see
+[periodic checks](notes/design/PERIODIC_CHECK.md).
 
 ## Contracts dataset
 
-`contracts/` holds one folder per on-chain binary: the binary, its NEAR code
-hash, a reproducible `build.sh`, and the upstream source pinned as a git
-submodule. See [contracts/README.md](contracts/README.md) for the format and
-[contracts/CATALOG.md](contracts/CATALOG.md) for the list of contracts.
+`contracts/` has one folder per on-chain binary: the binary, its code hash, the
+upstream source pinned as a git submodule, and a script that rebuilds the binary
+byte-for-byte. A proof is only meaningful for a binary we can trace back to its
+source. [CATALOG.md](contracts/CATALOG.md) lists the contracts, and
+[contracts/README.md](contracts/README.md) describes the format.
 
-```
+```sh
 git submodule update --init contracts/<name>/source   # fetch the pinned source
-tools/verify_build.sh contracts/<name>              # rebuild and compare hashes
+just reproduce <name>                                 # rebuild and compare hashes
 ```
+
+`w-near` is the first contract with a verification project.

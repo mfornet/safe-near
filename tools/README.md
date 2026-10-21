@@ -70,7 +70,7 @@ lake build +Mathlib.Tactic.Linter.TextBased
 
 Then run `just lean-lint` or `just lean-style-fix` from the repository root.
 To check selected files, use `python3 tools/lean_style.py path/to/File.lean`.
-The driver never formats submodule sources, ignored dependencies, or human notes.
+The driver never formats submodule sources or ignored dependencies.
 
 `python3 tools/tests/check_lean_style.py` exercises the real Lean checker:
 check mode must leave a dirty fixture unchanged, formatting must be repeatable,
@@ -100,8 +100,8 @@ just lean-format-check near-lean/programs/lean/Programs/Harness.lean
 
 With no filenames, the command selects all handwritten sources in all owned
 Lake packages. Build a package's dependencies before formatting its files.
-Human notes, generated `Program.lean` AST files, ignored dependencies and
-submodule sources are protected from selection. Standalone tooling scripts
+Generated `Program.lean` AST files, ignored dependencies and submodule
+sources are protected from selection. Standalone tooling scripts
 outside Lake packages remain covered by `lean-lint`.
 
 CI currently enforces canonical syntax layout for `Programs/Harness.lean`

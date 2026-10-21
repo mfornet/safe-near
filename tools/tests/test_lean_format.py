@@ -33,12 +33,11 @@ class FormatSelectionTests(unittest.TestCase):
         self.assertEqual(groups[Path("pkg")], [Path("Source.lean")])
         self.assertIn(Path("Inner.lean"), groups[Path("pkg/nested")])
 
-    def test_generated_sources_and_human_notes_are_protected(self):
+    def test_generated_sources_are_protected(self):
         self.write("pkg/Generated/Program.lean", "def generated := 1\n")
-        self.write("notes/Example.lean", "-- Human note\n")
         groups, skipped = lean_format.source_groups(self.root, [], self.pin)
         self.assertEqual(groups, {Path("pkg"): [Path("Source.lean")]})
-        self.assertEqual(len(skipped), 2)
+        self.assertEqual(len(skipped), 1)
         for path in skipped:
             with self.assertRaisesRegex(ValueError, "protected"):
                 lean_format.source_groups(self.root, [path], self.pin)

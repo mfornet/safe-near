@@ -1,55 +1,40 @@
 # Periodic checks
 
-At least once a week we should make a large check of the project. The main idea
-is to check that everything is up to date, including comments, markdown files,
-tests and code. We should avoid maintaining legacy code: if decisions taken
-along the way made part of the code unused or suboptimal we should acknowledge
-it and either record it or, preferably, fix it.
+Once a week, review the whole project for consolidation and simplification.
+Features land during the week; this check keeps the code cohesive instead of
+growing in every direction. A large refactor is a fine outcome if it simplifies.
+Don't add new features or concepts as part of the check.
 
-We should run the large and expensive tests that we don't run often, and make
-sure they pass and are clean. If not, fix them.
+Look for:
+- Outdated dependencies and toolchains.
+- Unused or unmaintained code. Prefer deleting it to documenting it.
+- Stale comments and notes.
+- Growth of the trusted base without a written reason.
 
-The main goal of this periodic check is consolidation and simplification. We
-work on large features during the week, and we need to make sure the code is
-kept cohesive and consistent, not a big Frankenstein growing in multiple
-directions. It is ok if the result of this check is a large refactor, as long
-as the overall direction is simplification. We should avoid introducing new
-concepts or features during check fixes.
+## Rules for fixes
 
-Things to pay attention to:
-- Dependencies / toolchains that need to be updated
-- Code that we no longer use or maintain
-- Obsolete comments, either inline in code or in markdown files documenting
-  old decisions
-- Growth of the trusted base without a written reason
-
-## Constraints on the fixes
-
-- Everything that builds today must still build, and CI must stay green.
-- No new `sorry`. The number of `sorry`s may only go down.
-- Spec statements (`Spec/` in each verification project) do not change meaning.
-  Renaming or moving is fine; weakening or strengthening a theorem is a feature, not a
-  check fix.
+- Everything that builds today still builds, and CI stays green.
+- No new `sorry`.
+- `Spec/` statements keep their meaning. Renaming or moving is fine; weakening
+  or strengthening a theorem is a feature, not a fix.
 - The trusted base (axioms, `native_decide`, `partial`, `unsafe`,
-  `implemented_by`, the Wasm interpreter, the runtime adapter) does not grow.
-  If it has to, the reason is written down in the report.
-- Pinned versions move only on purpose. Updating a pin is a conscious decision
-  recorded in the report, never a side effect of a fix.
+  `implemented_by`, the Wasm interpreter, the runtime adapter) does not grow
+  unless the report says why.
+- Pins change only on purpose, recorded in the report.
 
 ## Checklist
 
-Every check runs through all sections. Each section ends either with "clean"
-or with a list of findings, and each finding is either fixed in the same check
-or recorded in the report with a reason for leaving it.
+Each section ends with "clean" or a list of findings. Each finding is fixed in
+the same check or recorded in the report with a reason.
 
 ### 1. Build and tests
 
-Run `just periodic-check-plan` to inspect the local heavy-check runner, then
-`just periodic-check <checkout>` to execute it with logs and timings. Automatic CI
-runs the inexpensive repository checks; heavy workflows are opt-in. The manual
-checklist below also covers documentation and report requirements.
+`just periodic-check-plan` shows what the runner will do; `just periodic-check
+<nearcore-checkout>` runs it and saves logs and timings under `audit/periodic/`.
+The checkout must be at the nearcore commit pinned in
+`.github/workflows/runtime-reference.yml`.
 
-Baseline, must be clean (no warnings, no `sorry` outside the known list):
+Baseline, no warnings and no `sorry` outside the known list:
 
     just ci-check
     just build-all
@@ -57,115 +42,79 @@ Baseline, must be clean (no warnings, no `sorry` outside the known list):
     just near-test
     just runtime-adapter-test
 
-Expensive tests that are not run daily. They need a pinned nearcore checkout
-(same commit as in `.github/workflows/runtime-reference.yml`):
+Expensive, not run daily:
 
     just near-conformance
     just near-finance-conformance <checkout>
     just near-nonce-conformance <checkout>
     just near-allowance-conformance <checkout>
+    just near-receipt-conformance <checkout>
     just wnear-audit
     just blueprint w-near
     just reproduce w-near
 
-The Wasm testsuite report (`testsuite_report.txt`) must match what CI checks.
-Any failure here is fixed before anything else in the check.
+`testsuite_report.txt` must match what CI checks. Fix failures here first.
 
 ### 2. Trusted base
 
-Produce the numbers and compare them with the previous report:
-- `sorry` count per package and per contract (`just sorries <contract>`)
-- Axioms used transitively beyond `propext`, `Classical.choice`, `Quot.sound`
-  (`audit/wnear.json` from `just wnear-audit`)
-- Occurrences of `native_decide`, `partial`, `unsafe`, `implemented_by`,
-  `opaque` with no definition, and `set_option maxHeartbeats`
-- Anything trusted by convention: the Wasm interpreter, the runtime adapter,
-  the conformance comparison scripts, the config dump
-
-Every number that went up needs a sentence explaining why.
+Compare with the previous report and explain every number that went up:
+- `sorry` count per package and contract (`just sorries <contract>`).
+- Axioms beyond `propext`, `Classical.choice`, `Quot.sound` (`audit/wnear.json`).
+- `native_decide`, `partial`, `unsafe`, `implemented_by`, bodiless `opaque`,
+  `set_option maxHeartbeats`.
+- Code trusted by convention: the interpreter, the runtime adapter, the
+  conformance scripts, the config dump.
 
 ### 3. Pinned versions
 
-List the pins and decide for each one: keep or update.
-- Lean toolchain in every `lean-toolchain` of `near-lean/*` and
-  `contracts/*/verification`. They must all be identical.
-- Mathlib / other lake dependencies (`lake-manifest.json`)
-- nearcore commit: in both CI workflows and in `tools/runtime-*-reference`
-- Rust toolchain used to build the reference adapters
-- GitHub Actions versions in `.github/workflows`
-- On-chain contract hashes in `contracts/*/contract.toml`
-
-If a pin is updated, the whole of section 1 is rerun afterwards.
+Keep or update each, and rerun section 1 after any update:
+- `lean-toolchain` in every package (all identical).
+- Lake dependencies (`lake-manifest.json`).
+- nearcore commit in CI workflows and `tools/runtime-*-reference`.
+- Rust toolchain for the reference adapters.
+- GitHub Actions versions.
+- Contract hashes in `contracts/*/contract.toml`.
 
 ### 4. Dead and duplicated code
 
-- Lean declarations not referenced anywhere (search by name across the
-  workspace; declarations only used by their own tests count as suspicious)
-- Modules not imported by anything
-- justfile recipes nobody runs, scripts in `tools/` nobody calls, CI steps
-  that test nothing anymore
-- Duplicated helpers between `near-lean/*` packages and between contracts
-- Untracked or stray files in the tree (`git status`), leftover copies such
-  as `FILE 2.md`, generated outputs that should be regenerated instead of
-  committed
+- Unreferenced Lean declarations (only used by their own tests is suspicious).
+- Modules nobody imports.
+- Unused justfile recipes, `tools/` scripts and CI steps.
+- Helpers duplicated across packages or contracts.
+- Stray files (`git status`, copies like `FILE 2.md`, committed generated output).
 
-Delete first, record only when deletion is not possible yet.
+### 5. Documentation
 
-### 5. Documentation and comments
-
-- Every markdown file under `notes/` describes the current architecture:
-  folder names, component boundaries, interfaces, commands. Report every
-  stale sentence and update it to match the implementation.
-- Inline comments and docstrings in Lean match what the code does now.
-- The blueprint (`contracts/*/verification/blueprint`) states exactly the
-  theorems that exist in `Spec/`, nothing more and nothing less, and the
-  proof status it shows matches reality.
-- `README.md` at the root and `justfile` help texts are accurate.
-- TODO files: close what is done, delete what no longer applies.
+- `notes/` matches the current code: folders, boundaries, commands.
+- Lean comments and docstrings match the code.
+- Each blueprint states exactly the theorems in `Spec/`, with correct status.
+- The root `README.md` and justfile help texts are accurate.
+- `TODO.md`: remove what is done or no longer applies.
 
 ### 6. CI health
 
-- Path filters in the workflows cover every directory that exists today
-- Cache keys still key on the right files
-- Timeouts and build times: note the wall time of each job and of each
-  `lake build`. A step that doubled since the last check is a finding.
-- Slow proofs: anything with raised `maxHeartbeats` or visibly slow to
-  elaborate is a candidate for simplification
+- Workflow path filters cover every current directory.
+- Cache keys depend on the right files.
+- Job and `lake build` times; anything that doubled is a finding.
+- Slow proofs or raised `maxHeartbeats` are candidates for simplification.
 
 ### 7. Report
 
-Write a short dated report with: the numbers from section 2, the pins from
-section 3, every finding with its resolution (fixed / recorded / requires
-maintainer action), and the total cost of the agent runs. Keep reports next to
-each other so the next check can diff against the previous one.
+Write a dated report in `reports/periodic/` with the numbers from section 2,
+the pins from section 3, every finding and its resolution (fixed, recorded, or
+needs maintainer action), and the cost of the agent runs.
 
-## Driving the check with agents
+## Running the check with agents
 
-The check is mostly reading and comparing, which is a good fit for agents, but
-it touches the whole repository and can burn a lot of tokens if done naively.
-Rules of thumb:
-
-- One coordinator runs the checklist and owns the report. It does not read
-  the whole codebase itself; it delegates sections and merges results.
-- Fan out by section, not by file. Sections 2, 3, 4, 5 and 6 are independent
-  and can run in parallel. Section 1 runs first because its failures change
-  what the others should look at.
-- Each delegated agent gets a narrow brief: the section, the commands to run,
-  the files to look at, and the exact shape of the answer expected (a list of
-  findings with file and line). Agents that are told "look for anything
-  wrong" read everything and report noise.
-- Prefer deterministic tooling over agent reading whenever it exists:
-  `grep` for `sorry` and the trusted-base keywords, the axiom audit, `git
-  status`, `lake build` warnings. Agents interpret the output; they do not
-  reproduce it by hand.
-- Use cheaper and faster models for mechanical sections (3, 4, 6) and the
-  strongest model only where judgement is needed: deciding whether a refactor
-  simplifies, and reviewing proposed changes to proofs.
-- Fixes are applied by one agent at a time per package. Parallel edits to the
-  same Lean package produce conflicts and broken builds that cost more than
-  the time saved.
-- Every proposed deletion or refactor is verified by a full rebuild before it
-  is accepted. A delegated agent reports "builds" only when it ran the build.
-- Record the token or dollar cost of the check in the report. If a check
-  costs noticeably more than the previous one, the checklist or the briefs
-  need tightening, not the budget.
+- One coordinator owns the report and delegates sections; it does not read the
+  whole codebase.
+- Run section 1 first, then sections 2 to 6 in parallel.
+- Give each agent a narrow brief: commands, files, and the expected answer
+  format (findings with file and line). "Look for anything wrong" produces noise.
+- Prefer tools (`grep`, the axiom audit, `git status`, build warnings) to
+  reading by hand.
+- Use cheaper models for mechanical sections (3, 4, 6) and the strongest model
+  for judgement calls and proof changes.
+- One agent edits a given Lean package at a time.
+- Accept a change only after a full rebuild that the agent actually ran.
+- If a check costs noticeably more than the last one, tighten the briefs.
