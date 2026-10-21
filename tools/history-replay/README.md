@@ -56,6 +56,21 @@ are signed or submitted. Limits cover the node run; initialization/build have
 separate network and disk costs. Disk checks occur between polling iterations,
 so the cap can be exceeded by writes during an iteration.
 
+`--download-concurrency N` controls concurrent part requests (default 2, maximum
+16). Progress, including header/state-sync stages, is saved in the node directory
+and printed every 30 seconds. Interrupting the command stops its child node;
+creating `bootstrap-stop` in the node directory also requests a stop. Remove
+that file before resuming.
+
+If general boot peers do not track the desired shard, `--boot-peers peers.json`
+accepts an explicit JSON array of `peer-id@host:port` strings and restricts
+outbound connections to those peers. A running node's local
+`/debug/api/snapshot_hosts` and `/debug/api/peer_store` endpoints can identify
+advertised snapshot hosts and known addresses. Match the snapshot's shard and
+sync hash (the state-sync block's previous-previous hash), rather than assuming
+that every block producer serves that state. Endpoint metadata is discovery;
+nearcore still validates received data.
+
 The optional build overlay sends upstream state-header/part requests over
 existing outbound Tier2 connections, allowing acquisition behind NAT without
 inbound Tier3 callbacks. It is enabled only by the bootstrap's explicit flag;

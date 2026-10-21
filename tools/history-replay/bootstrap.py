@@ -12,7 +12,9 @@ import json
 import os
 from pathlib import Path
 import socket
+import signal
 import subprocess
+import sys
 import time
 import urllib.request
 
@@ -109,12 +111,16 @@ def run_locked(args):
         raise ValueError('loopback bootstrap requires --direct-state-sync; build with the same flag')
     if args.max_seconds <= 0 or args.max_gib <= 0:
         raise ValueError('time and disk limits must be positive')
+    if not 1 <= args.download_concurrency <= 16:
+        raise ValueError('download concurrency must be between 1 and 16')
     protocol = rpc(args.rpc, 'EXPERIMENTAL_protocol_config', {'finality': 'final'})
     if protocol.get('chain_id') != 'mainnet':
         raise ValueError('bootstrap RPC must serve mainnet')
     if not 83 <= protocol['protocol_version'] <= 86:
         raise ValueError('live mainnet protocol is outside this capture runtime\'s supported range')
-    peers = boot_peers(rpc(args.rpc, 'network_info', []))
+    peers = read(args.boot_peers) if args.boot_peers else boot_peers(rpc(args.rpc, 'network_info', []))
+    if not isinstance(peers, list) or any(not isinstance(p, str) or '@' not in p for p in peers):
+        raise ValueError('boot peers must be a JSON array of peer-id@address strings')
     if not peers:
         raise ValueError('RPC returned no usable boot peers')
     home = args.near_home.resolve()
@@ -138,6 +144,11 @@ def run_locked(args):
     if (home / 'validator_key.json').exists():
         raise ValueError('bootstrap must not have a validator signing key')
     config = read(home / 'config.json')
+    config['network'].setdefault('experimental', {})['connect_only_to_boot_nodes'] = bool(args.boot_peers)
+    config['network']['connect_to_reliable_peers_on_startup'] = not bool(args.boot_peers)
+    config['state_sync']['concurrency'].update(peer_downloads=args.download_concurrency,
+                                              per_shard=args.download_concurrency)
+    (home / 'config.json').write_text(json.dumps(config, indent=2) + '\n')
     url = 'http://' + config['rpc']['addr']
     genesis_height = read(home / 'genesis.json')['genesis_height']
     env = os.environ.copy()
@@ -149,10 +160,20 @@ def run_locked(args):
     synced_at = None
     reason = 'timeLimit'
     selected = None
+    last_report = -30
     with (home / 'bootstrap.log').open('a') as log:
         node = subprocess.Popen([str(neard), '--home', str(home), 'run'], env=env, stdout=log, stderr=log)
+        stopping = False
+        def request_stop(*_):
+            nonlocal stopping
+            stopping = True
+        previous_handlers = {sig: signal.signal(sig, request_stop)
+                             for sig in (signal.SIGINT, signal.SIGTERM)}
         try:
             while time.monotonic() - start < args.max_seconds:
+                if stopping or (home / 'bootstrap-stop').exists():
+                    reason = 'stopRequested'
+                    break
                 if node.poll() is not None:
                     raise ValueError(f'node exited {node.returncode}; inspect {home / "bootstrap.log"}')
                 size = directory_bytes(home)
@@ -163,7 +184,15 @@ def run_locked(args):
                     status = rpc(url, 'status', {}, timeout=2)
                     progress = dict(elapsedSeconds=round(time.monotonic() - start), bytes=size,
                                     sync=status['sync_info'])
+                    try:
+                        with urllib.request.urlopen(url + '/debug/api/sync_status', timeout=2) as response:
+                            progress['stage'] = json.load(response)
+                    except (OSError, ValueError):
+                        pass
                     (home / 'bootstrap-progress.json').write_text(json.dumps(progress, indent=2) + '\n')
+                    if progress['elapsedSeconds'] - last_report >= 30:
+                        print(json.dumps(progress), file=sys.stderr, flush=True)
+                        last_report = progress['elapsedSeconds']
                     if initialized_and_synced(status, genesis_height):
                         height = status['sync_info']['latest_block_height']
                         if synced_at is None: synced_at = height
@@ -184,6 +213,8 @@ def run_locked(args):
             except subprocess.TimeoutExpired:
                 node.kill()
                 node.wait()
+            for sig, handler in previous_handlers.items():
+                signal.signal(sig, handler)
     result = dict(reason=reason, elapsedSeconds=round(time.monotonic() - start),
                   bytes=directory_bytes(home), publicHistoricalReplayEstablished=False)
     if selected:
@@ -203,8 +234,10 @@ def main():
     parser.add_argument('--build', type=Path, default=HERE / 'target/build.json')
     parser.add_argument('--account', default='a.near')
     parser.add_argument('--rpc', default='https://rpc.mainnet.fastnear.com')
+    parser.add_argument('--boot-peers', type=Path, help='JSON array of explicit peers; connects only to these')
     parser.add_argument('--max-seconds', type=int, default=1800)
     parser.add_argument('--max-gib', type=float, default=10)
+    parser.add_argument('--download-concurrency', type=int, default=2)
     parser.add_argument('--resume', action='store_true')
     parser.add_argument('--direct-state-sync', action='store_true')
     print(json.dumps(run(parser.parse_args()), indent=2))
