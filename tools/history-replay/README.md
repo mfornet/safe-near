@@ -9,8 +9,10 @@ the following chunk's state, outcome and receipt commitments.
 The first real historical fixture has **not yet been captured**. Public RPC
 discovery is available under ignored `audit/history-discovery/`; those headers
 and configuration responses are not replay fixtures. Capture requires an
-archival database retaining the selected pre-state, or an export made on a host
-with such a database. No archive database was found in the current environment.
+database retaining the selected pre-state, or an export made on a host with
+such a database. An archival database supports older selections; a recent shard
+sync may provide a smaller retained window. Public peer acquisition is currently
+being tested; it has not yet produced a verified public fixture.
 
 ## Build
 
@@ -30,6 +32,36 @@ oracle. `target/build.json` records every overlay hash and executable digest.
 1.93.0. The first `neard` build is substantially larger than the runtime-only
 replay build. `--smoke` additionally builds the test-only capture driver; its
 inputs and outputs must not be mistaken for history.
+
+## Acquire recent shard state
+
+Public snapshots may require provider access. An alternative is a bounded,
+non-validator mainnet node tracking the shard containing a selected account:
+
+```sh
+just history-build --neard --direct-state-sync
+just history-bootstrap --near-home /path/to/new-node \
+  --neard /path/to/target/debug/neard --account a.near \
+  --direct-state-sync --max-seconds 1800 --max-gib 10
+```
+
+The parent directory must exist. The command binds local listeners to loopback,
+uses fresh boot peers from the configured mainnet RPC, and stops after syncing
+and observing additional blocks. It leaves a candidate finalized block and a
+retained database for capture. The account selects a **whole shard**; this does
+not download only that account's state. A shard can exceed the default budget.
+Time or disk limits stop the node and leave a resumable owned directory; repeat
+with `--resume` to continue. No validator key is accepted, and no transactions
+are signed or submitted. Limits cover the node run; initialization/build have
+separate network and disk costs. Disk checks occur between polling iterations,
+so the cap can be exceeded by writes during an iteration.
+
+The optional build overlay sends upstream state-header/part requests over
+existing outbound Tier2 connections, allowing acquisition behind NAT without
+inbound Tier3 callbacks. It is enabled only by the bootstrap's explicit flag;
+upstream response handling and state validation are unchanged. Its source hash
+is recorded in build provenance. Successful sync alone does not establish replay:
+the selected chunk must still pass capture and offline archive verification.
 
 ## Capture one chunk
 

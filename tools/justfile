@@ -116,7 +116,12 @@ chain-reference-test *options:
 history-build *options:
     python3 tools/history-replay/prepare.py "$@"
 
-# Capture one complete historical shard apply from an archival nearcore home.
+# Acquire a recent mainnet shard with explicit disk and time budgets.
+[positional-arguments]
+history-bootstrap *options:
+    python3 tools/history-replay/bootstrap.py "$@"
+
+# Capture a historical chunk from retained native state.
 [positional-arguments]
 history-capture *options:
     python3 tools/history-replay/history.py capture "$@"

@@ -17,6 +17,7 @@ TRIE = 'core/store/src/trie/mod.rs'
 CHAIN = 'chain/chain/src/runtime/mod.rs'
 MANIFEST = 'runtime/runtime/Cargo.toml'
 VIEWER = 'tools/state-viewer/src/apply_chain_range.rs'
+NETWORK = 'chain/network/src/peer_manager/peer_manager_actor.rs'
 
 
 def replace_once(source, old, new):
@@ -25,7 +26,42 @@ def replace_once(source, old, new):
     return source.replace(old, new, 1)
 
 
-def overlays(source):
+def direct_state_sync_overlay(source):
+    """Use upstream's direct state messages on an existing outbound connection.
+
+    This changes transport selection only. Header/part validation stays upstream.
+    It is opt-in because the ordinary sync transport expects inbound Tier3 TCP.
+    """
+    selector = '''
+                if std::env::var_os("SAFE_NEAR_HISTORY_DIRECT_STATE_SYNC").is_some() {
+                    let peers = self.state.peers.tier2();
+                    let Some((peer_id, _)) = peers.iter()
+                        .filter(|(_, peer)| peer.tracked_shards.contains(&shard_id))
+                        .choose(&mut thread_rng()) else {
+                            return NetworkResponses::NoDestinationsAvailable;
+                        };
+                    let peer_id = peer_id.clone();
+                    if self.transport.send_message(tcp::Tier::T2, peer_id.clone(),
+                        Arc::new(DIRECT_MESSAGE)) {
+                        return NetworkResponses::SelectedDestination(peer_id);
+                    }
+                    return NetworkResponses::RouteNotFound;
+                }
+'''
+    header = '            NetworkRequests::StateRequestHeader { shard_id, sync_hash, sync_prev_prev_hash } => {'
+    source = replace_once(source, header, header + selector.replace(
+        'DIRECT_MESSAGE', 'PeerMessage::StateRequestHeader(shard_id, sync_hash)'))
+    part = '''            NetworkRequests::StateRequestPart {
+                shard_id,
+                sync_hash,
+                sync_prev_prev_hash,
+                part_id,
+            } => {'''
+    return replace_once(source, part, part + selector.replace(
+        'DIRECT_MESSAGE', 'PeerMessage::StateRequestPart(shard_id, sync_hash, part_id)'))
+
+
+def overlays(source, direct_state_sync=False):
     """Every replacement is guarded against the exact upstream content."""
     read = lambda p: (source / p).read_text()
     lib = read(LIB) + '\n#[path = "safe_near_history.rs"]\npub mod historical_capture;\n'
@@ -47,17 +83,20 @@ def overlays(source):
         '\n[[bin]]\nname = "safe-near-history-smoke"\npath = "safe_near_history_smoke.rs"\n'
         'required-features = ["test_features", "estimator"]\n')
     runtime = (HERE / 'runtime.rs').read_text().replace('use node_runtime::{', 'use crate::{')
-    return {LIB: lib, TRIE: trie, CHAIN: chain, MANIFEST: manifest, VIEWER: viewer,
+    result = {LIB: lib, TRIE: trie, CHAIN: chain, MANIFEST: manifest, VIEWER: viewer,
             'runtime/runtime/src/safe_near_history.rs': runtime,
             'runtime/runtime/safe_near_history_replay.rs': (HERE / 'replay.rs').read_text(),
             'runtime/runtime/safe_near_history_smoke.rs': (HERE / 'smoke.rs').read_text()}
+    if direct_state_sync:
+        result[NETWORK] = direct_state_sync_overlay(read(NETWORK))
+    return result
 
 
 def git(source, *args):
     return subprocess.check_output(['git', '-C', str(source), *args], text=True).strip()
 
 
-def prepare(destination, source=None):
+def prepare(destination, source=None, *, direct_state_sync=False):
     if source and source.resolve() == destination.resolve():
         raise ValueError('instrumentation checkout must be separate from the supplied source')
     if not destination.exists():
@@ -92,7 +131,7 @@ def prepare(destination, source=None):
             else: p.unlink()
     elif git(destination, 'status', '--porcelain'):
         raise ValueError('unrecognized instrumentation checkout modifications')
-    overlay = overlays(destination)
+    overlay = overlays(destination, direct_state_sync)
     hashes = {}
     for name, value in overlay.items():
         (destination / name).write_text(value)
@@ -109,12 +148,15 @@ def main():
     p.add_argument('--neard', action='store_true', help='also build the archive capture tool')
     p.add_argument('--smoke', action='store_true', help='also build the synthetic witness regression tool')
     p.add_argument('--check', action='store_true')
+    p.add_argument('--direct-state-sync', action='store_true',
+                   help='add opt-in outbound state-sync transport for capture behind NAT')
     args = p.parse_args()
     checkout = args.checkout.resolve()
     checkout.parent.mkdir(parents=True, exist_ok=True)
     lock = (checkout.parent / (checkout.name + '.history-build.lock')).open('a')
     fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    hashes = prepare(checkout, args.source.resolve() if args.source else None)
+    hashes = prepare(checkout, args.source.resolve() if args.source else None,
+                     direct_state_sync=args.direct_state_sync)
     adapter = hashlib.sha256(json.dumps(hashes, sort_keys=True).encode()).hexdigest()
     target = (args.target_dir or checkout / 'target').resolve()
     env = os.environ.copy()
