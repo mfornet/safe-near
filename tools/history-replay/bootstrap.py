@@ -113,6 +113,8 @@ def run_locked(args):
         raise ValueError('time and disk limits must be positive')
     if not 1 <= args.download_concurrency <= 16:
         raise ValueError('download concurrency must be between 1 and 16')
+    if not 1 <= args.apply_concurrency <= 16:
+        raise ValueError('apply concurrency must be between 1 and 16')
     protocol = rpc(args.rpc, 'EXPERIMENTAL_protocol_config', {'finality': 'final'})
     if protocol.get('chain_id') != 'mainnet':
         raise ValueError('bootstrap RPC must serve mainnet')
@@ -147,7 +149,8 @@ def run_locked(args):
     config['network'].setdefault('experimental', {})['connect_only_to_boot_nodes'] = bool(args.boot_peers)
     config['network']['connect_to_reliable_peers_on_startup'] = not bool(args.boot_peers)
     config['state_sync']['concurrency'].update(peer_downloads=args.download_concurrency,
-                                              per_shard=args.download_concurrency)
+                                              per_shard=max(args.download_concurrency, args.apply_concurrency),
+                                              apply=args.apply_concurrency)
     (home / 'config.json').write_text(json.dumps(config, indent=2) + '\n')
     url = 'http://' + config['rpc']['addr']
     genesis_height = read(home / 'genesis.json')['genesis_height']
@@ -238,6 +241,7 @@ def main():
     parser.add_argument('--max-seconds', type=int, default=1800)
     parser.add_argument('--max-gib', type=float, default=10)
     parser.add_argument('--download-concurrency', type=int, default=2)
+    parser.add_argument('--apply-concurrency', type=int, default=2)
     parser.add_argument('--resume', action='store_true')
     parser.add_argument('--direct-state-sync', action='store_true')
     print(json.dumps(run(parser.parse_args()), indent=2))

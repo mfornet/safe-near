@@ -45,7 +45,7 @@ class BootstrapBoundaries(unittest.TestCase):
                 neardBinarySha256=bootstrap.sha(binary),
                 overlaySha256={bootstrap.NETWORK_OVERLAY: 'test'}))
             args = argparse.Namespace(near_home=root / 'node', neard=binary, build=build,
-                direct_state_sync=True, max_seconds=1, max_gib=1, download_concurrency=2,
+                direct_state_sync=True, max_seconds=1, max_gib=1, download_concurrency=2, apply_concurrency=2,
                 rpc='https://unused.test')
             with patch.object(bootstrap, 'rpc', return_value={'chain_id': 'testnet',
                     'protocol_version': 86}), patch.object(bootstrap, 'initialize') as init:

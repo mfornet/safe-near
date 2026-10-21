@@ -57,7 +57,9 @@ separate network and disk costs. Disk checks occur between polling iterations,
 so the cap can be exceeded by writes during an iteration.
 
 `--download-concurrency N` controls concurrent part requests (default 2, maximum
-16). Progress, including header/state-sync stages, is saved in the node directory
+16); `--apply-concurrency N` separately controls local part application (same
+bounds). Start conservatively because application can create disk contention.
+Progress, including header/state-sync stages, is saved in the node directory
 and printed every 30 seconds. Interrupting the command stops its child node;
 creating `bootstrap-stop` in the node directory also requests a stop. Remove
 that file before resuming.
