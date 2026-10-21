@@ -23,13 +23,27 @@ def capture():
                    context=dict(blockHeight=100, shardId=3, isNewChunk=True),
                    preStateRoot='00', flatStorageCosts=True, validatorAccountsUpdate=None,
                    transactions='00', transactionValidity=[], incomingReceipts='00',
-                   epochQueries=dict(chain_id='mainnet'), witness='00', nativeExpected=expected)
+                   epochQueries=dict(chain_id='mainnet'), witness='00', nativeExpected=expected,
+                   captureTelemetry=dict(originalStats='00', bandwidthSchedulerTimeToRunMs='1'))
     archive = dict(format='safe-near-archive-anchor-v1', archiveComparisonEstablished=True,
                    chainId='mainnet', blockHeight=100, shardId=3, blockHash='block', **expected)
     return request, archive
 
 
 class HistoricalBundleTests(unittest.TestCase):
+    def test_checked_in_public_fixture_custody_and_archive_binding(self):
+        directory = HERE / 'fixtures/mainnet-220938800-shard11'
+        manifest = history.read(directory / 'manifest.json')
+        self.assertEqual(set(manifest['files']), set(history.FILES))
+        for name, digest in manifest['files'].items():
+            self.assertEqual(history.sha(directory / name), digest)
+        request = history.read(directory / 'request.json')
+        archive = history.read(directory / 'archive.json')
+        history.validate_capture(request, archive)
+        self.assertEqual(manifest['comparisonScope'], history.COMPARISON_SCOPE)
+        self.assertEqual(manifest['blockHash'], archive['blockHash'])
+        self.assertFalse(manifest['leanExecutionEstablished'])
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
@@ -59,6 +73,7 @@ class HistoricalBundleTests(unittest.TestCase):
             result = history.verify(moved, self.binary, model)
         self.assertTrue(result['leanExecutionEstablished'])
         self.assertNotIn('nativeExpected', run.call_args.args[1])
+        self.assertNotIn('captureTelemetry', run.call_args.args[1])
         self.assertFalse(history.read(moved / 'manifest.json')['leanExecutionEstablished'])
 
     def test_mutated_asset_is_rejected_before_execution(self):
@@ -68,6 +83,15 @@ class HistoricalBundleTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'hash mismatch'):
                 history.verify(self.destination, self.binary)
             run.assert_not_called()
+
+    def test_comparison_scope_cannot_silently_exclude_another_output(self):
+        self.package()
+        path = self.destination / 'manifest.json'
+        manifest = history.read(path)
+        manifest['comparisonScope']['excludedTelemetry'].append('outcomes')
+        path.write_text(json.dumps(manifest))
+        with self.assertRaisesRegex(ValueError, 'comparison scope'):
+            history.verify(self.destination, self.binary)
 
     def test_incomplete_manifest_and_path_injection_are_rejected(self):
         self.package()

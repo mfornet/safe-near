@@ -131,6 +131,11 @@ history-capture *options:
 history-verify bundle *options:
     python3 tools/history-replay/history.py verify "$@"
 
+# Replay the frozen mainnet fixture and reject corrupted historical inputs offline.
+[positional-arguments]
+history-fixture-test *options:
+    python3 tools/history-replay/fixture_probe.py "$@"
+
 # Exercise the capture transport with synthetic native inputs; no historical claim.
 [positional-arguments]
 history-witness-test *options:

@@ -147,7 +147,9 @@ def run_locked(args):
         raise ValueError('bootstrap must not have a validator signing key')
     config = read(home / 'config.json')
     config['network'].setdefault('experimental', {})['connect_only_to_boot_nodes'] = bool(args.boot_peers)
-    config['network']['connect_to_reliable_peers_on_startup'] = not bool(args.boot_peers)
+    config['network'].setdefault('experimental', {}).setdefault('network_config_overrides', {})[
+        'connect_to_reliable_peers_on_startup'] = not bool(args.boot_peers)
+    config['network'].pop('connect_to_reliable_peers_on_startup', None)
     config['state_sync']['concurrency'].update(peer_downloads=args.download_concurrency,
                                               per_shard=max(args.download_concurrency, args.apply_concurrency),
                                               apply=args.apply_concurrency)

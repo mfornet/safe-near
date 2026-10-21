@@ -2,8 +2,8 @@
 
 The goal is an offline integration test that executes real NEAR history through
 Lean and pinned nearcore, comparing protocol outputs byte for byte. The existing
-tools provide substantial synthetic differential coverage, but do not yet capture
-or replay historical shard execution. Downloading several account states and
+tools provide synthetic differential coverage and one verified native historical
+shard fixture; Lean historical replay remains unimplemented. Downloading several account states and
 filtering transactions is useful for a separate synthetic regression; it does
 not generally preserve historical execution results.
 
@@ -13,8 +13,12 @@ The initial capture and offline native replay tooling now lives in
 [tools/history-replay](../../tools/history-replay/README.md). It instruments the
 pinned runtime, retains original trie/code reads and checks archived chunk
 outputs and successor commitments. Native synthetic witness regressions cover
-the transport. Capturing and validating the first real historical bundle still
-requires an archival data source; this milestone is not yet established.
+the transport. The first native historical milestone is established by
+[mainnet block 220938800, shard 11](../../tools/history-replay/fixtures/mainnet-220938800-shard11/README.md):
+an oracle contract call captured from peer-synced retained state, matching archived
+protocol outputs and successor commitments. Its roughly 2 MB bundle passes
+relocated offline replay and corruption tests, including with OS networking denied.
+The remaining gate is Lean execution from the original witness and environment.
 
 | Component | Available behavior | Remaining boundary |
 | --- | --- | --- |
@@ -78,7 +82,7 @@ Both modes are useful. Only the second satisfies historical byte equality.
 ## Proposed capture and fixture format
 
 Add a versioned historical bundle alongside the existing synthetic format.
-Capture once using an archival nearcore store, then run offline without RPC.
+Capture once using retained historical nearcore state, then run offline without RPC.
 Ordinary account RPC remains a discovery/debugging tool. Its account queries
 are block-pinned, but do not provide a complete runtime invocation. See the
 [account RPC](https://docs.near.org/api/rpc/contracts) and
@@ -144,13 +148,13 @@ chunk from a captured pre-state establishes per-chunk equality only.
 
 | Priority | Work | Completion criterion |
 | --- | --- | --- |
-| 1 | Historical exporter and lossless input loader | Native round-trip preserves original transaction/receipt bytes, ordered inputs, roots, validity and context; no signing or synthetic caller |
-| 1 | Native historical environment | Real shard layout/epoch context, initial scheduler/queues, validator update inputs and apply flags replace fixture defaults; native replay matches archive |
+| 2 | Extend the implemented historical exporter | First supported scope works; expand beyond new chunks within an epoch, including validator updates and VM-upgrade prewarming |
+| 1 | Lean historical environment | Consume captured shard layout/epoch context, scheduler/queues and apply flags; the native environment already reproduces the first archive anchor |
 | 1 | Lean witness-backed storage | Verify original pre-root, exact access/cache accounting, absence and writes; derive post-root without rebuilding a selected-account trie |
 | 1 | Historical receipt delivery | Accept newly arriving external receipts for each chunk, initialize in-flight/delayed/postponed/data state, preserve actual order and processed/deferred work |
 | 2 | Complete protocol output encoding | Independently encode execution outcomes/errors/metadata and state-change records; represent compute, limits, proposals and congestion/bandwidth outputs |
 | 2 | Feature inventory and support | Preflight checks every action, key, receipt and trie column; implement or explicitly reject global contracts, gas keys, delegation, yield/resume, buffers and epoch-dependent behavior |
-| 2 | Portable offline runner | Immutable inputs and expected outputs, explicit candidate executable selection, full diffs and reproducible evidence |
+| 2 | Lean offline adapter and diagnostics | Native portable runner and candidate selection exist; add a witness-capable Lean adapter and useful field/byte diffs |
 | 3 | Continuous and multi-shard history | Carry state across chunks, model missing chunks and protocol/epoch boundaries, then extend routing/resharding support |
 
 The current `pendingReceipts` plus `incomingIndices` API only selects from work
@@ -174,6 +178,10 @@ return bytes, logs and gas/token charges; raw changed trie keys/values and
 deletions; persistent queue records; and original post-state root. Add native
 state-change causes/order, validator proposals, scheduler/congestion/bandwidth
 outputs and runtime statistics to the declared complete output surface.
+Exclude measured wall-clock durations explicitly: the pinned scheduler's
+`time_to_run_ms` is nondeterministic diagnostic telemetry. Preserve its original
+stats bytes separately and compare every remaining stats field exactly; do not
+drop the entire stats object to work around timing differences.
 
 Use typed checks to explain byte differences, not to erase them. JSON map
 formatting and diagnostic `Debug` strings are not canonical protocol bytes.
@@ -183,6 +191,9 @@ the present comparator's typed failure mapping does not establish complete
 native outcome serialization equality.
 
 ## Proposed milestones and acceptance
+
+The native capture/replay gate below is complete for the checked-in first
+fixture. Lean replay and broader historical coverage remain open.
 
 1. Choose a short historical interval whose actual protocol is supported by
    the pin. Start with one shard chunk in a stable epoch, ordinary accounts and
@@ -215,7 +226,8 @@ The existing Lean registered frontend cannot yet consume historical witnesses.
 The tool accepts a future historical adapter through `--model`, passing only
 captured inputs and withholding expected native observations.
 
-Capture needs archive access; normal tests need only the downloaded bundle and
+Capture needs retained historical state (recent peer sync or archival access);
+normal tests need only the downloaded bundle and
 executables. Keep the capture-time Lean digest as provenance, while allowing
 the test runner to select a newly built candidate and record its digest. The
 existing synthetic comparator requires exact manifest executor hashes and

@@ -1,0 +1,24 @@
+{
+  "sourceRevision": "44f7ae6cd7ef08bab604e20a473bf77e35d4c993",
+  "overlaySha256": {
+    "runtime/runtime/src/lib.rs": "dcf34d6dcdc4eec085bf1fb481668f92ea6f1ab8a87633b371a1569543bfb465",
+    "core/store/src/trie/mod.rs": "861603ed75dfdd5b363eb73b63e2d5e8a5f46845311da262b041961d98b2f053",
+    "chain/chain/src/runtime/mod.rs": "ae00ae0e589f0f3196e620b5e56e2ee5dfe603c43ccd53ef023ed2145ac320ba",
+    "runtime/runtime/Cargo.toml": "5e870d9cc02cacfef0cedd2031c1cd93c19cb9a18f35c6bfaafaca2fdca54590",
+    "tools/state-viewer/src/apply_chain_range.rs": "9a321dff7a6c70a92d3c152eb2bd2a5a575481ba204d22040e9d99622e0eba9e",
+    "runtime/runtime/src/safe_near_history.rs": "f3f12417ee2c5ac79b082b4e080d91213e3e63b492311928cb7574f265877a2c",
+    "runtime/runtime/safe_near_history_replay.rs": "40fb5455f85c003e089702a01185d8ce4398e7772b84bcc8d4e7452ea76e7ebb",
+    "runtime/runtime/safe_near_history_smoke.rs": "55249d0751f1ee147f4b489c5f5e72ed4a8fa7607b7699663639ef43a0e42da2",
+    "chain/network/src/peer_manager/peer_manager_actor.rs": "8ea7b0182ce40ffecdcaefd26b873044d3bc13e22ea20898b30557747bfc766b"
+  },
+  "adapterSha256": "c1ed1323771b2ce70174d4b16e19b827159ea836ea23b3760ab373ddb273eb92",
+  "checkout": "/Users/marcelo/.codex/worktrees/8766/safe-near/tools/history-replay/.nearcore/44f7ae6cd7ef08bab604e20a473bf77e35d4c993",
+  "replay": "/private/tmp/safe-near-nearcore-44f7ae6/target/debug/safe-near-history-replay",
+  "neard": "/private/tmp/safe-near-nearcore-44f7ae6/target/debug/neard",
+  "checkOnly": false,
+  "cargoLockSha256": "6cc67ca2874d67ca122c9664beca331814ee97aafba1d3beb6bc593d881bc4f7",
+  "smoke": "/private/tmp/safe-near-nearcore-44f7ae6/target/debug/safe-near-history-smoke",
+  "replayBinarySha256": "c7ffa724317c286b92d3f971bbba48d1e8f4deb6b61eb58d37982dc236b478d2",
+  "neardBinarySha256": "4ef3fa9f9f94aa7ffd7e747d6a632cee2bc0e41f8fd432a903753cdef9ffbfa7",
+  "smokeBinarySha256": "b0945ea61e2b128924ad90160075471d70b400aae0d6ad569ed67dea15183448"
+}

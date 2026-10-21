@@ -13,6 +13,9 @@ import tempfile
 HERE = Path(__file__).resolve().parent
 REVISION = '44f7ae6cd7ef08bab604e20a473bf77e35d4c993'
 FILES = ('request.json', 'archive.json', 'capture-build.json')
+COMPARISON_SCOPE = {'statsEncoding': 'ChunkApplyStatsV1 Borsh with time_to_run_ms zeroed',
+                    'excludedTelemetry': ['stats.bandwidth_scheduler.time_to_run_ms'],
+                    'originalStats': 'request.captureTelemetry.originalStats'}
 
 
 def unique_object(pairs):
@@ -62,7 +65,7 @@ def validate_capture(request, archive):
         raise ValueError('unknown runtime capture format or revision')
     required = {'format', 'sourceRevision', 'context', 'preStateRoot', 'flatStorageCosts',
                 'validatorAccountsUpdate', 'transactions', 'transactionValidity', 'incomingReceipts',
-                'epochQueries', 'witness', 'nativeExpected'}
+                'epochQueries', 'witness', 'nativeExpected', 'captureTelemetry'}
     if set(request) != required:
         raise ValueError('missing or unknown runtime capture fields')
     if (archive.get('format') != 'safe-near-archive-anchor-v1'
@@ -115,7 +118,8 @@ def package(request_path, archive_path, build_path, destination, binary):
                         blockHeight=archive['blockHeight'], shardId=archive['shardId'],
                         files={name: sha(destination / name) for name in FILES},
                         verification=evidence,
-                        trustBoundary='trusted archival nearcore store; consensus signatures are not reverified',
+                        comparisonScope=COMPARISON_SCOPE,
+                        trustBoundary='trusted retained nearcore store; consensus signatures are not reverified',
                         leanExecutionEstablished=False)
         write(destination / 'manifest.json', manifest)
     except BaseException:
@@ -130,6 +134,8 @@ def verify(directory, binary, model=None):
         raise ValueError('unknown historical bundle format or revision')
     if set(manifest.get('files', {})) != set(FILES):
         raise ValueError('historical bundle assets are incomplete or unknown')
+    if manifest.get('comparisonScope') != COMPARISON_SCOPE:
+        raise ValueError('unknown deterministic output comparison scope')
     for name, expected in manifest['files'].items():
         path = directory / name
         read(path)  # Includes symlink and duplicate-key rejection.
@@ -144,7 +150,7 @@ def verify(directory, binary, model=None):
     if model:
         # The candidate consumes the witness request, never nativeExpected. Its
         # protocol output must use the same canonical observation encoding.
-        model_request = {k: v for k, v in request.items() if k != 'nativeExpected'}
+        model_request = {k: v for k, v in request.items() if k not in ('nativeExpected', 'captureTelemetry')}
         observed = execute(model, model_request)
         if observed != request['nativeExpected']:
             raise ValueError('candidate output differs from historical native observations')

@@ -6,13 +6,26 @@ or network connection. A separate archive anchor compares the result with the
 exact block/shard's persisted outcomes, outgoing receipts and chunk extra, plus
 the following chunk's state, outcome and receipt commitments.
 
-The first real historical fixture has **not yet been captured**. Public RPC
-discovery is available under ignored `audit/history-discovery/`; those headers
-and configuration responses are not replay fixtures. Capture requires an
-database retaining the selected pre-state, or an export made on a host with
-such a database. An archival database supports older selections; a recent shard
-sync may provide a smaller retained window. Public peer acquisition is currently
-being tested; it has not yet produced a verified public fixture.
+The first real historical fixture is checked in at
+[mainnet-220938800-shard11](fixtures/mainnet-220938800-shard11/README.md).
+Pinned nearcore reproduces its archived protocol outputs offline. The bundle is
+about 2 MB and includes an `aggregate-oracle.near` contract call. Lean historical
+execution is still unimplemented.
+
+Capture requires a database retaining the selected pre-state. This fixture was
+acquired through public peer sync of one recent shard, without an archival
+provider. Older selections require archival storage. Acquisition used about
+43 GiB on disk; ordinary tests need only the checked-in bundle and executable.
+
+```sh
+just history-build
+just history-fixture-test
+```
+
+The test relocates the bundle, runs fresh native/archive verification, rejects
+eight corrupted input/commitment variants and verifies the explicit wall-clock
+telemetry exclusion. No capture home or RPC is used. The recorded fixture also
+passed this test with operating-system networking denied.
 
 ## Build
 
@@ -87,14 +100,14 @@ Use the executable paths from `target/build.json`:
 ```sh
 just history-capture \
   --near-home /path/to/archive \
-  --height 220940000 --shard-id 11 --temperature cold \
+  --height 220938800 --shard-id 11 --temperature cold \
   --neard /path/to/target/debug/neard \
   --replay /path/to/target/debug/safe-near-history-replay \
   --out /path/to/new-bundle
 ```
 
-The height/shard above is a discovery candidate, not an established successful
-capture. Select an interval supported by the archive and pinned runtime.
+The height/shard above identifies the checked-in fixture. For a new capture,
+select an interval retained by the database and supported by the pinned runtime.
 `cold` selects nearcore's split store; use `hot` for a database whose required
 data resides in hot storage. The command runs state-viewer in read-only mode
 with trie-free access to reproduce flat-storage gas costs. It does not enable
@@ -113,7 +126,7 @@ The portable directory contains:
 
 | File | Contents |
 | --- | --- |
-| `request.json` | Complete runtime context, original transaction/receipt Borsh, validity flags, captured epoch queries, pre-root, witness and native expected observations |
+| `request.json` | Complete runtime context, original transaction/receipt Borsh, validity flags, captured epoch queries, pre-root, witness, native expected observations and original diagnostic stats |
 | `archive.json` | Original and successor block/chunk headers, archived chunk extra, exact archived outcomes/outgoing receipts and network/genesis context |
 | `capture-build.json` | Capture compiler/source-overlay/executable provenance |
 | `manifest.json` | Asset hashes, transition identity, verification evidence and trust boundary; published last |
@@ -147,6 +160,15 @@ congestion/bandwidth state and contract updates. Persisted outcome Borsh omits
 compute in upstream nearcore: its historical comparison covers the persisted
 encoding, while compute is checked between capture and offline execution.
 
+The only excluded statistics field is
+`bandwidth_scheduler.time_to_run_ms`, a measured wall-clock duration. The stats
+comparison zeros that field in `ChunkApplyStatsV1` before Borsh encoding; all
+other statistics bytes remain exact. `captureTelemetry.originalStats` preserves
+the unmodified original encoding and its measured duration, and native replay
+checks that it differs from deterministic stats only in that field. The manifest
+declares this comparison scope explicitly. Wall-clock timing is not a protocol
+output and cannot be reproduced bit for bit.
+
 ## Lean boundary
 
 The bundle is intended to become the input to Lean historical replay. The
@@ -158,7 +180,8 @@ just history-verify /path/to/bundle --replay /path/to/native-replay \
   --model /path/to/candidate-historical-lean-adapter
 ```
 
-The candidate receives the runtime request **without** `nativeExpected`, and
+The candidate receives the runtime request **without** `nativeExpected` or
+`captureTelemetry`, and
 must return the same canonical observation object. Its executable digest is
 recorded independently of capture provenance, allowing a frozen bundle to
 test future implementations. Current Lean executables cannot be substituted
@@ -169,6 +192,7 @@ matches; native verification alone never sets it true.
 
 ```sh
 python3 -m unittest discover -s tools/tests -p 'test_history_replay.py'
+just history-fixture-test
 just history-witness-test --reference /path/to/near-apply-reference
 just history-localnet-test
 ```
@@ -181,6 +205,7 @@ The local-node integration test also exercises state-viewer extraction, the
 archive sidecar and offline commitment verification against a real local
 database, and rejects corrupt archive fields. It explicitly verifies that this
 synthetic chain cannot be published as a mainnet/testnet historical bundle.
-These tests do not establish public historical replay. See the
+The synthetic/local-node tests do not establish public historical replay; the
+separate frozen-fixture test does establish native replay for its one chunk. See the
 [design](../../notes/todo/replay_near_history.md) for the milestone and
 remaining Lean/storage work.

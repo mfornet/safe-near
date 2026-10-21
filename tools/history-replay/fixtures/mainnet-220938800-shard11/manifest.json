@@ -1,0 +1,32 @@
+{
+  "format": "safe-near-historical-chunk-v1",
+  "sourceRevision": "44f7ae6cd7ef08bab604e20a473bf77e35d4c993",
+  "chainId": "mainnet",
+  "blockHash": "FpX49fvNFJArdkZNDKrg9yqDrXyHf9wUwBsxQFo8mSv9",
+  "blockHeight": 220938800,
+  "shardId": 11,
+  "files": {
+    "request.json": "7db7fa55b70c033e6928cf90199527b094f547a70c2ca4862e0808113f0a7cea",
+    "archive.json": "452761b2e50d2e45e2c706e042152ebed22b10af4764a188820ff5b43507fc9f",
+    "capture-build.json": "b3adede6fec15a5a4e374834769ed2cb4cd48f663ddcf0446eff828c71063d9c"
+  },
+  "verification": {
+    "binarySha256": "c7ffa724317c286b92d3f971bbba48d1e8f4deb6b61eb58d37982dc236b478d2",
+    "metadata": {
+      "adapterSha256": "c1ed1323771b2ce70174d4b16e19b827159ea836ea23b3760ab373ddb273eb92",
+      "format": "safe-near-runtime-witness-v1",
+      "sourceRevision": "44f7ae6cd7ef08bab604e20a473bf77e35d4c993"
+    },
+    "archiveVerified": true,
+    "offlineReplayVerified": true
+  },
+  "comparisonScope": {
+    "statsEncoding": "ChunkApplyStatsV1 Borsh with time_to_run_ms zeroed",
+    "excludedTelemetry": [
+      "stats.bandwidth_scheduler.time_to_run_ms"
+    ],
+    "originalStats": "request.captureTelemetry.originalStats"
+  },
+  "trustBoundary": "trusted retained nearcore store; consensus signatures are not reverified",
+  "leanExecutionEstablished": false
+}

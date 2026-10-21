@@ -14,6 +14,34 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 
 
+def scheduler_time_offset(stats):
+    """Locate the one excluded field in the pinned ChunkApplyStatsV1 encoding.
+
+    Decode only its Borsh prefix, including variable-sized maps. Mutations below
+    prove that duration can vary while adjacent deterministic stats remain bound.
+    """
+    offset = 33  # height, shard, is_new_chunk, transaction/receipt counts
+    def count():
+        nonlocal offset
+        value = int.from_bytes(stats[offset:offset + 4], 'little')
+        offset += 4
+        return value
+    for entry_size in (24, 40, 40, 40, 9):
+        entries = count()
+        offset += entries * entry_size
+    offset += 1  # all_outgoing_metadatas_ready
+    present = stats[offset]
+    assert present in (0, 1)
+    offset += 1 + 40 * present  # optional scheduler parameters
+    for _ in range(count()):
+        offset += 16  # source/destination shards
+        entries = count()
+        offset += entries * 8
+    offset += 8  # previous request count
+    assert offset + 16 <= len(stats)
+    return offset
+
+
 def run(binary, request, env=None, success=True):
     p = subprocess.run([str(binary)], input=json.dumps(request), text=True,
                        capture_output=True, env=env)
@@ -56,6 +84,16 @@ def main():
                     assert run(replay, witness) == expected
                     assert witness['transactionValidity'] == ([False] if kind == 'expired' else [True])
                     assert witness['flatStorageCosts'] == flat
+                    telemetry_variant = copy.deepcopy(witness)
+                    stats = bytearray.fromhex(witness['captureTelemetry']['originalStats'])
+                    offset = scheduler_time_offset(stats)
+                    stats[offset:offset + 16] = (1234567890123).to_bytes(16, 'little')
+                    telemetry_variant['captureTelemetry'].update(
+                        originalStats=stats.hex(), bandwidthSchedulerTimeToRunMs='1234567890123')
+                    assert run(replay, telemetry_variant) == expected
+                    stats[offset - 8] ^= 1  # adjacent deterministic scheduler counter
+                    telemetry_variant['captureTelemetry']['originalStats'] = stats.hex()
+                    run(replay, telemetry_variant, success=False)
                     for mutation in ('missing-nodes', 'expected-root', 'config', 'validity', 'missing-epoch'):
                         changed = copy.deepcopy(witness)
                         if mutation == 'missing-nodes':
@@ -70,7 +108,8 @@ def main():
                             changed['epochQueries'] = {}
                         run(replay, changed, success=False)
                     cases.append(dict(protocol=protocol, kind=kind, flatStorageCosts=flat,
-                                      mutationsRejected=5, witnessBytes=len(bytes.fromhex(witness['witness']))))
+                                      mutationsRejected=6, telemetryVariantsMatched=1,
+                                      witnessBytes=len(bytes.fromhex(witness['witness']))))
     report = dict(historicalReplayEstablished=False, syntheticWitnessRoundTrips=len(cases), cases=cases)
     destination = ROOT / 'audit/history-witness-smoke.json'
     destination.parent.mkdir(parents=True, exist_ok=True)

@@ -133,6 +133,11 @@ impl EpochInfoProvider for ReplayEpoch {
 }
 
 pub fn observations(result: &ApplyResult) -> Value {
+    // Wall-clock scheduler duration is diagnostic telemetry, not a protocol result.
+    // Preserve its original bytes separately in captureTelemetry; compare every
+    // other statistics field, including scheduler grants and accounting.
+    let mut stats = result.stats.clone();
+    stats.bandwidth_scheduler.time_to_run_ms = 0;
     let hashes: Vec<_> = result.outcomes.iter().map(|o| o.to_hashes()).collect();
     let outcome_root = merklize(&hashes).0;
     let mut accesses: Vec<_> = result
@@ -150,7 +155,7 @@ pub fn observations(result: &ApplyResult) -> Value {
         "outgoingReceipts": encoded(&result.outgoing_receipts),
         "stateChanges": encoded(&result.state_changes),
         "validatorProposals": encoded(&result.validator_proposals),
-        "stats": encoded(&result.stats),
+        "stats": encoded(&stats),
         "processedReceipts": result.processed_receipts.iter().map(|p| json!({"receipt":encoded(&p.receipt),"source":encoded(&p.source)})).collect::<Vec<_>>(),
         "processedYieldTimeouts": encoded(&result.processed_yield_timeouts),
         "delayedReceiptsCount": result.delayed_receipts_count,
@@ -286,7 +291,15 @@ pub fn replay(input: &Value) -> Value {
             Default::default(),
         )
         .expect("offline Runtime::apply failed");
-    observations(&result)
+    let observed = observations(&result);
+    let telemetry = &input["captureTelemetry"];
+    let mut original: near_primitives::chunk_apply_stats::ChunkApplyStatsV1 =
+        decoded(&telemetry["originalStats"]);
+    assert_eq!(telemetry["bandwidthSchedulerTimeToRunMs"],
+        original.bandwidth_scheduler.time_to_run_ms.to_string());
+    original.bandwidth_scheduler.time_to_run_ms = 0;
+    assert_eq!(encoded(&original), observed["stats"], "deterministic capture statistics differ");
+    observed
 }
 
 pub fn verify_archive(input: &Value, archive: &Value, result: &Value) {
@@ -566,7 +579,9 @@ impl Runtime {
             "preStateRoot":encoded(&pre_root),"flatStorageCosts":flat_costs,
             "validatorAccountsUpdate":null,"transactions":transactions,"transactionValidity":flags,
             "incomingReceipts":encoded(receipts),"epochQueries":recording.entries.into_inner().unwrap(),
-            "witness":encoded(&witness),"nativeExpected":expected});
+            "witness":encoded(&witness),"nativeExpected":expected,
+            "captureTelemetry":{"originalStats":encoded(&result.stats),
+                "bandwidthSchedulerTimeToRunMs":result.stats.bandwidth_scheduler.time_to_run_ms.to_string()}});
         // A capture is published only after an independent offline execution reproduces every observation.
         let replayed = replay(&input);
         if replayed != expected {
