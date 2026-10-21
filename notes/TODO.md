@@ -11,6 +11,8 @@ as partial correctness, allowing its OOM outcome).
 - Prove compositional runtime/chain invariants.
 - Extend scenario and conformance harnesses to real-chain snapshots and full
   scheduling equivalence, towards a near-workspaces-style test environment.
+  The [historical replay plan](todo/replay_near_history.md) tracks archive capture,
+  original-trie witnesses and byte-exact chunk comparison.
 - Extend the snapshot downloader to more account features and deployed contracts.
 
 ## Contracts

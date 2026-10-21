@@ -111,6 +111,31 @@ chain-reference-build *options:
 chain-reference-test *options:
     python3 tools/chain-conformance/probe.py "$@"
 
+# Build the isolated historical capture instrumentation and offline witness replay.
+[positional-arguments]
+history-build *options:
+    python3 tools/history-replay/prepare.py "$@"
+
+# Capture one complete historical shard apply from an archival nearcore home.
+[positional-arguments]
+history-capture *options:
+    python3 tools/history-replay/history.py capture "$@"
+
+# Verify bundle hashes, native witness replay and archived header commitments offline.
+[positional-arguments]
+history-verify bundle *options:
+    python3 tools/history-replay/history.py verify "$@"
+
+# Exercise the capture transport with synthetic native inputs; no historical claim.
+[positional-arguments]
+history-witness-test *options:
+    python3 tools/history-replay/probe.py "$@"
+
+# Test archive extraction and header binding on an isolated local node; no public history claim.
+[positional-arguments]
+history-localnet-test *options:
+    python3 tools/history-replay/localnet_probe.py "$@"
+
 # Exercise trusted JSON chain replay, complete-state continuation and rejection paths.
 chain-replay-test:
     cd near-lean/chain && lake build registered-replay chain-replay
