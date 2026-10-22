@@ -1,0 +1,198 @@
+{
+  "date": "2026-10-21",
+  "sourceCommit": "2b0f34a3860460f285307ec2ccf36345acbe05a2",
+  "codeHash": "BXd5idTXSnC7WRfxHmi7z4crw2F5WXQJ6MZUEv8DfnnY",
+  "sha256": "9c6d17411c2d0f634a27a7d5046272cffdc3aef1977f263c26bc71d64e14e675",
+  "imports": [
+    {
+      "module": "env",
+      "name": "promise_then"
+    },
+    {
+      "module": "env",
+      "name": "sha256"
+    },
+    {
+      "module": "env",
+      "name": "read_register"
+    },
+    {
+      "module": "env",
+      "name": "value_return"
+    },
+    {
+      "module": "env",
+      "name": "current_account_id"
+    },
+    {
+      "module": "env",
+      "name": "promise_results_count"
+    },
+    {
+      "module": "env",
+      "name": "predecessor_account_id"
+    },
+    {
+      "module": "env",
+      "name": "attached_deposit"
+    },
+    {
+      "module": "env",
+      "name": "register_len"
+    },
+    {
+      "module": "env",
+      "name": "input"
+    },
+    {
+      "module": "env",
+      "name": "storage_usage"
+    },
+    {
+      "module": "env",
+      "name": "promise_and"
+    },
+    {
+      "module": "env",
+      "name": "promise_batch_create"
+    },
+    {
+      "module": "env",
+      "name": "promise_batch_then"
+    },
+    {
+      "module": "env",
+      "name": "promise_batch_action_create_account"
+    },
+    {
+      "module": "env",
+      "name": "promise_batch_action_deploy_contract"
+    },
+    {
+      "module": "env",
+      "name": "promise_batch_action_function_call"
+    },
+    {
+      "module": "env",
+      "name": "promise_batch_action_function_call_weight"
+    },
+    {
+      "module": "env",
+      "name": "promise_batch_action_transfer"
+    },
+    {
+      "module": "env",
+      "name": "promise_batch_action_stake"
+    },
+    {
+      "module": "env",
+      "name": "promise_batch_action_add_key_with_full_access"
+    },
+    {
+      "module": "env",
+      "name": "promise_batch_action_add_key_with_function_call"
+    },
+    {
+      "module": "env",
+      "name": "promise_batch_action_delete_key"
+    },
+    {
+      "module": "env",
+      "name": "promise_batch_action_delete_account"
+    },
+    {
+      "module": "env",
+      "name": "promise_batch_action_deploy_global_contract"
+    },
+    {
+      "module": "env",
+      "name": "promise_batch_action_deploy_global_contract_by_account_id"
+    },
+    {
+      "module": "env",
+      "name": "promise_batch_action_use_global_contract"
+    },
+    {
+      "module": "env",
+      "name": "promise_batch_action_use_global_contract_by_account_id"
+    },
+    {
+      "module": "env",
+      "name": "promise_result"
+    },
+    {
+      "module": "env",
+      "name": "promise_return"
+    },
+    {
+      "module": "env",
+      "name": "panic_utf8"
+    },
+    {
+      "module": "env",
+      "name": "storage_write"
+    },
+    {
+      "module": "env",
+      "name": "storage_read"
+    },
+    {
+      "module": "env",
+      "name": "storage_remove"
+    },
+    {
+      "module": "env",
+      "name": "storage_has_key"
+    }
+  ],
+  "functionExports": [
+    "__contract_abi",
+    "contract_source_metadata",
+    "new",
+    "set_owner",
+    "set_default_code_hash",
+    "delete_contract",
+    "create",
+    "on_create",
+    "update",
+    "get_dao_list",
+    "get_number_daos",
+    "get_daos",
+    "get_owner",
+    "get_default_code_hash",
+    "get_default_version",
+    "store",
+    "get_code",
+    "store_contract_metadata",
+    "delete_contract_metadata",
+    "get_contracts_metadata"
+  ],
+  "explicitSourceMethods": [
+    "new",
+    "set_owner",
+    "set_default_code_hash",
+    "delete_contract",
+    "create",
+    "on_create",
+    "update",
+    "get_dao_list",
+    "get_number_daos",
+    "get_daos",
+    "get_owner",
+    "get_default_code_hash",
+    "get_default_version",
+    "store",
+    "get_code",
+    "store_contract_metadata",
+    "delete_contract_metadata",
+    "get_contracts_metadata"
+  ],
+  "missingNearVMImportNames": [
+    "env.promise_batch_action_function_call_weight",
+    "env.promise_batch_action_deploy_global_contract",
+    "env.promise_batch_action_deploy_global_contract_by_account_id",
+    "env.promise_batch_action_use_global_contract",
+    "env.promise_batch_action_use_global_contract_by_account_id"
+  ],
+  "checkScope": "Static binary/source surface and VM import-name inventory. Does not execute Wasm or prove method equivalence."
+}

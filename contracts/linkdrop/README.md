@@ -19,3 +19,10 @@ Deploy block heights and the block at which `contract.wasm` was fetched are in `
 ```
 tools/verify_build.sh contracts/linkdrop
 ```
+
+## Formalization
+
+[verification/](verification/README.md) contains the source-level Lean model,
+completed safety/liability proofs, callback interleaving witnesses, and explicit
+open storage/runtime refinement obligations. Run `just build linkdrop` and
+`just audit contracts/linkdrop/verification` from the repository root.

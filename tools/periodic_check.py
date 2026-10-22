@@ -48,6 +48,15 @@ def validation_steps(root: Path, nearcore: Path) -> list[Step]:
         "registered-replay", "state-encode", "receipt-encode", "transaction-replay", "receipt-replay", "--wfail")
     add("wnear-adapter-build", "contracts/w-near/verification", "lake", "build", "Spec", "runtime-adapter-tests", "--wfail")
     add("wnear-proofs-build", "contracts/w-near/verification", "lake", "build", "Model", "Proofs")
+    # New contract projects join the sequential build/audit gate automatically.
+    # wNEAR retains its specialized adapter executable checks above.
+    contract_projects = sorted({manifest.parent for pattern in ("*/verification/lakefile.toml",
+                                                               "*/verification/lakefile.lean")
+                                for manifest in (root / "contracts").glob(pattern)
+                                if manifest.parent.parent.name != "w-near"})
+    for project in contract_projects:
+        name = project.parent.name
+        add(f"contract-{name}-build", project.relative_to(root), "lake", "build", "--wfail")
     for package, binary in [("vm", "vm-tests"), ("runtime", "runtime-tests"), ("chain", "chain-tests"),
                             ("programs/lean", "smoke"), ("programs/lean", "program-tests")]:
         add(binary, f"near-lean/{package}", f"./.lake/build/bin/{binary}")
@@ -69,6 +78,10 @@ def validation_steps(root: Path, nearcore: Path) -> list[Step]:
                             ("near-lean/runtime", "runtime"), ("near-lean/chain", "chain"),
                             ("contracts/w-near/verification", "wnear")]:
         python(f"audit-{report}", "tools/axiom-audit.py", package, "--no-build", "--report", f"audit/{report}.json")
+    for project in contract_projects:
+        name = project.parent.name
+        python(f"audit-contract-{name}", "tools/axiom-audit.py", project.relative_to(root),
+               "--no-build", "--report", f"audit/{name}.json")
     add("program-wasm-rebuild", "", "near-lean/programs/rust/build.sh")
     add("program-wasm-clean", "", "git", "diff", "--exit-code", "--", "near-lean/programs/rust/build")
     add("program-rust-tests", "near-lean/programs/rust", "cargo", "test", "--locked")

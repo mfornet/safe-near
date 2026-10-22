@@ -20,3 +20,10 @@ Deploy block heights and the block at which `contract.wasm` was fetched are in `
 ```
 tools/verify_build.sh contracts/sputnikdao2-v3.2
 ```
+
+## Formalization in progress
+
+[verification/](verification/README.md) contains checked source models for
+policy, authorization, proposal and bounty paths, delegation, migration,
+upgrade and blob storage, with a source-specific proof plan. A full
+entry-point model and concrete runtime refinement remain open.

@@ -19,3 +19,9 @@ Deploy block heights and the block at which `contract.wasm` was fetched are in `
 ```
 tools/verify_build.sh contracts/sputnik-dao-factory
 ```
+
+## Formalization in progress
+
+[verification/](verification/README.md) contains the 18-method source model,
+checked raw-storage and storage-projection proofs, and explicit remaining
+runtime obligations. Concrete deployed refinement remains open.

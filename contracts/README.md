@@ -12,7 +12,7 @@ contracts/<name>/
     hash.txt         base58(sha256(contract.wasm)) == NEAR `code_hash` of the account
     build.sh         Rebuilds contract.wasm from source/ into build/contract.wasm
     source/          git submodule: the upstream repository pinned at the exact commit
-    verification/    Optional Lean project with Model/, Spec/ and Proofs/ (w-near)
+    verification/    Optional Lean project with Model/, Spec/ and Proofs/
 ```
 
 `source/` is a git submodule so that the commit is pinned by git itself and the

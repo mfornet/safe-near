@@ -51,4 +51,7 @@ git submodule update --init contracts/<name>/source   # fetch the pinned source
 just reproduce <name>                                 # rebuild and compare hashes
 ```
 
-`w-near` is the first contract with a verification project.
+`w-near` is the first contract with a verification project. The sequential
+expansion is tracked in [contracts/VERIFICATION.md](contracts/VERIFICATION.md);
+`linkdrop` now has source-model safety and liability proofs, with deployed
+refinement still open.

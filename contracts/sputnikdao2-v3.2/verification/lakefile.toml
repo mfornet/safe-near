@@ -1,0 +1,9 @@
+name = "SputnikDAO2Verification"
+version = "0.1.0"
+defaultTargets = ["Model", "Proofs"]
+
+[[lean_lib]]
+name = "Model"
+
+[[lean_lib]]
+name = "Proofs"
