@@ -142,6 +142,10 @@ structure NearState where
   promiseResults : List PromiseResult := []
   /-- Promises created during this execution. -/
   promises   : List NearPromise := []
+  /-- Weighted function-call actions, in call order: (promise index, action
+  index, weight), recorded only for a positive weight. After a successful call
+  the unused prepaid gas is split among them (nearcore's `distribute_gas`). -/
+  gasWeights : List (Nat × Nat × Nat) := []
   /-- Promise selected as this call's return value by `promise_return`. -/
   returnedPromise : Option Nat := none
   /-- Successful `promise_yield_resume` payloads, newest last. -/

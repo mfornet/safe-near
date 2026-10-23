@@ -695,7 +695,10 @@ def viewRestrictedHost (name : String) : Bool :=
    "promise_batch_action_add_key_with_full_access", "promise_batch_action_add_key_with_function_call",
    "promise_batch_action_delete_key", "promise_batch_action_delete_account",
    "promise_yield_create", "promise_yield_resume", "promise_results_count", "promise_result",
-   "promise_return"].contains name
+   "promise_return", "promise_batch_action_deploy_global_contract",
+   "promise_batch_action_deploy_global_contract_by_account_id",
+   "promise_batch_action_use_global_contract",
+   "promise_batch_action_use_global_contract_by_account_id"].contains name
 
 def deprecatedRuntimeHost (name : String) : Bool :=
   ["storage_iter_prefix", "storage_iter_range", "storage_iter_next"].contains name
@@ -974,7 +977,17 @@ def unsupportedRuntimeHost (name : String) : Bool :=
    "alt_bn128_g1_multiexp", "alt_bn128_g1_sum", "alt_bn128_pairing_check",
    "bls12381_g1_multiexp", "bls12381_g2_multiexp", "bls12381_map_fp_to_g1",
    "bls12381_map_fp2_to_g2", "bls12381_p1_decompress", "bls12381_p2_decompress",
-   "bls12381_p1_sum", "bls12381_p2_sum", "bls12381_pairing_check"].contains name
+   "bls12381_p1_sum", "bls12381_p2_sum", "bls12381_pairing_check",
+   "promise_batch_action_deploy_global_contract",
+   "promise_batch_action_deploy_global_contract_by_account_id",
+   "promise_batch_action_use_global_contract",
+   "promise_batch_action_use_global_contract_by_account_id"].contains name
+
+/-- The name a host is metered under. nearcore's weighted function call is the
+plain one plus a weight: same charges, checks and errors. -/
+def meteringName (name : String) : String :=
+  if name == "promise_batch_action_function_call_weight" then "promise_batch_action_function_call"
+  else name
 
 /-- The metered host table: `nearHostFns` with gas, plus the structured
 panics and the `gas` import. -/
@@ -988,7 +1001,7 @@ def meteredHostFns (cfg : RuntimeConfig) : List (ImportDecl × NearHostFn NearSt
     | "panic_utf8" => panicUtf8Metered
     | "abort" => abortMetered
     | _ => fn
-  (nearHostFns.map fun (decl, fn) => (decl, metered extra decl.name (swap decl fn)))
+  (nearHostFns.map fun (decl, fn) => (decl, metered extra (meteringName decl.name) (swap decl fn)))
     ++ [({ «module» := "env", name := "gas", params := [.i32], results := [] }, gasFn)]
 
 /-- Resolve imports in declaration order, retaining the first unknown-import

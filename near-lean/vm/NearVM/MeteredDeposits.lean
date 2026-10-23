@@ -154,6 +154,10 @@ theorem meteredBatchCall_funding (extra : Nat) :
     HostPreservesFunding (metered extra "promise_batch_action_function_call" promiseBatchActionFunctionCallFn) :=
   metered_funding _ _ _ promiseBatchActionFunctionCallFn_deposits
 
+theorem meteredBatchCallWeight_funding (extra : Nat) :
+    HostPreservesFunding (metered extra "promise_batch_action_function_call" promiseBatchActionFunctionCallWeightFn) :=
+  metered_funding _ _ _ promiseBatchActionFunctionCallWeightFn_deposits
+
 theorem meteredCreate_funding (extra : Nat) : HostPreservesFunding (metered extra "promise_create" promiseCreateFn) :=
   metered_funding _ _ _ promiseCreateFn_deposits
 

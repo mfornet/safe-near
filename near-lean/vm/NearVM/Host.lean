@@ -160,10 +160,27 @@ def appendPromiseAction? (ps : List NearPromise) (idx : Nat)
     setPromise? ps idx (.callback base accountId (actions ++ [action]))
   | _ => none
 
+/-- Number of actions already in promise `idx`: the index of the next one. -/
+def nextActionIndex (ps : List NearPromise) (idx : Nat) : Nat :=
+  match getPromise? ps idx with
+  | some (.batch _ actions) | some (.callback _ _ actions) => actions.length
+  | _ => 0
+
+/-- nearcore's receipt manager records a gas weight only when it is positive. -/
+def addGasWeight (weights : List (Nat × Nat × Nat)) (idx action : Nat) (weight : UInt64) :
+    List (Nat × Nat × Nat) :=
+  if weight = 0 then weights else weights ++ [(idx, action, weight.toNat)]
+
+@[simp] theorem addGasWeight_zero (weights : List (Nat × Nat × Nat)) (idx action : Nat) :
+    addGasWeight weights idx action 0 = weights := rfl
+
 def appendPromiseActionResult (_name : String) (st : HostStore NearState)
-    (idx : UInt64) (action : PromiseAction) : HostResult NearState :=
+    (idx : UInt64) (action : PromiseAction) (weight : UInt64 := 0) : HostResult NearState :=
   match appendPromiseAction? st.host.promises idx.toNat action with
-  | some promises => .Return [] { st with host := { st.host with promises } }
+  | some promises => .Return [] { st with host := { st.host with
+      promises := promises
+      gasWeights := addGasWeight st.host.gasWeights idx.toNat
+        (nextActionIndex st.host.promises idx.toNat) weight } }
   | none =>
     let error := match getPromise? st.host.promises idx.toNat with
       | some (.and _) => HostError.cannotAppendActionToJointPromise
@@ -305,6 +322,21 @@ def promiseBatchActionFunctionCallFn : NearHostFn NearState :=
         match readFunctionCallAction? st methodNameLen methodNamePtr argsLen argsPtr amountPtr gas with
         | some action =>
           appendPromiseActionResult "promise_batch_action_function_call" st promiseIdx action
+        | none => .Trap st "promise_batch_action_function_call: invalid input"
+      | _ => .Trap st "promise_batch_action_function_call: bad args" }
+
+/-- `promise_batch_action_function_call_weight`. nearcore's
+`promise_batch_action_function_call` is this with weight `0`: same charges,
+checks and view error (named `promise_batch_action_function_call`). -/
+def promiseBatchActionFunctionCallWeightFn : NearHostFn NearState :=
+  disallowInView "promise_batch_action_function_call" <|
+  { params := [.i64, .i64, .i64, .i64, .i64, .i64, .i64, .i64], results := []
+    invoke := fun st args => match args with
+      | [.i64 promiseIdx, .i64 methodNameLen, .i64 methodNamePtr, .i64 argsLen,
+          .i64 argsPtr, .i64 amountPtr, .i64 gas, .i64 weight] =>
+        match readFunctionCallAction? st methodNameLen methodNamePtr argsLen argsPtr amountPtr gas with
+        | some action =>
+          appendPromiseActionResult "promise_batch_action_function_call" st promiseIdx action weight
         | none => .Trap st "promise_batch_action_function_call: invalid input"
       | _ => .Trap st "promise_batch_action_function_call: bad args" }
 
@@ -1065,6 +1097,8 @@ def nearHostFns : List (ImportDecl × NearHostFn NearState) :=
       promiseBatchActionDeployContractFn)
   , (imp "promise_batch_action_function_call" [.i64, .i64, .i64, .i64, .i64, .i64, .i64] [],
       promiseBatchActionFunctionCallFn)
+  , (imp "promise_batch_action_function_call_weight"
+      [.i64, .i64, .i64, .i64, .i64, .i64, .i64, .i64] [], promiseBatchActionFunctionCallWeightFn)
   , (imp "promise_batch_action_transfer" [.i64, .i64] [], promiseBatchActionTransferFn)
   , (imp "promise_batch_action_stake" [.i64, .i64, .i64, .i64] [], promiseBatchActionStakeFn)
   , (imp "promise_batch_action_add_key_with_full_access" [.i64, .i64, .i64, .i64] [],
@@ -1076,6 +1110,14 @@ def nearHostFns : List (ImportDecl × NearHostFn NearState) :=
       promiseBatchActionDeleteKeyFn)
   , (imp "promise_batch_action_delete_account" [.i64, .i64, .i64] [],
       promiseBatchActionDeleteAccountFn)
+  , (imp "promise_batch_action_deploy_global_contract" [.i64, .i64, .i64] [],
+      unsupported "promise_batch_action_deploy_global_contract" [.i64, .i64, .i64] [])
+  , (imp "promise_batch_action_deploy_global_contract_by_account_id" [.i64, .i64, .i64] [],
+      unsupported "promise_batch_action_deploy_global_contract_by_account_id" [.i64, .i64, .i64] [])
+  , (imp "promise_batch_action_use_global_contract" [.i64, .i64, .i64] [],
+      unsupported "promise_batch_action_use_global_contract" [.i64, .i64, .i64] [])
+  , (imp "promise_batch_action_use_global_contract_by_account_id" [.i64, .i64, .i64] [],
+      unsupported "promise_batch_action_use_global_contract_by_account_id" [.i64, .i64, .i64] [])
   , (imp "promise_yield_create" [.i64, .i64, .i64, .i64, .i64, .i64, .i64] [.i64],
       promiseYieldCreateFn)
   , (imp "promise_yield_resume" [.i64, .i64, .i64, .i64] [.i64],

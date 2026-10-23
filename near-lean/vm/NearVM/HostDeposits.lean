@@ -19,9 +19,9 @@ theorem appendPromise_return_deposits (st : HostStore NearState) (promise : Near
     HostResultCreatesDeposits st.host (promiseValue depositValue promise) (.Return values (appendPromise st promise)) :=
   ⟨rfl, rfl, appendPromise_deposits st promise⟩
 
-theorem appendPromiseActionResult_deposits (name : String) (st : HostStore NearState) (index : UInt64)
+theorem appendPromiseActionResult_deposits {weight : UInt64} (name : String) (st : HostStore NearState) (index : UInt64)
     (action : PromiseAction) :
-    HostResultCreatesDeposits st.host action.deposit (appendPromiseActionResult name st index action) := by
+    HostResultCreatesDeposits st.host action.deposit (appendPromiseActionResult name st index action weight) := by
   unfold appendPromiseActionResult
   split
   · exact ⟨rfl, rfl, appendPromiseAction_deposits _ _ _ _ (by assumption)⟩
@@ -46,6 +46,11 @@ theorem promiseDeposit_transfer (st : HostStore NearState) (index ptr : UInt64) 
 theorem promiseDeposit_batchCall (st : HostStore NearState) (index ml mp al ap amount gas : UInt64) :
     promiseDeposit? "promise_batch_action_function_call" st
       [.i64 index, .i64 ml, .i64 mp, .i64 al, .i64 ap, .i64 amount, .i64 gas] = readU128Mem st amount := rfl
+
+theorem promiseDeposit_batchCallWeight (st : HostStore NearState) (index ml mp al ap amount gas weight : UInt64) :
+    promiseDeposit? "promise_batch_action_function_call" st
+      [.i64 index, .i64 ml, .i64 mp, .i64 al, .i64 ap, .i64 amount, .i64 gas, .i64 weight] =
+      readU128Mem st amount := rfl
 
 theorem promiseDeposit_create (st : HostStore NearState) (nl np ml mp al ap amount gas : UInt64) :
     promiseDeposit? "promise_create" st [.i64 nl, .i64 np, .i64 ml, .i64 mp, .i64 al, .i64 ap, .i64 amount, .i64 gas] =
@@ -83,6 +88,24 @@ theorem promiseBatchActionFunctionCallFn_deposits :
   · split
     · rename_i index methodLen methodPtr argsLen argsPtr amountPtr gas
       rw [promiseDeposit_batchCall]
+      split
+      · rename_i action hread
+        have hd := readFunctionCallAction_deposit st methodLen methodPtr argsLen argsPtr amountPtr gas action hread
+        rw [← hd]
+        exact appendPromiseActionResult_deposits _ _ _ _
+      · trivial
+    · trivial
+
+theorem promiseBatchActionFunctionCallWeightFn_deposits :
+    HostCreatesDeposits "promise_batch_action_function_call" promiseBatchActionFunctionCallWeightFn := by
+  intro st args
+  unfold promiseBatchActionFunctionCallWeightFn
+  dsimp only [disallowInView]
+  split
+  · trivial
+  · split
+    · rename_i index methodLen methodPtr argsLen argsPtr amountPtr gas weight
+      rw [promiseDeposit_batchCallWeight]
       split
       · rename_i action hread
         have hd := readFunctionCallAction_deposit st methodLen methodPtr argsLen argsPtr amountPtr gas action hread

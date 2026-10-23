@@ -120,7 +120,7 @@ theorem meteredHostFns_gasFloor (cfg : RuntimeConfig) (entry : ImportDecl × Nea
   rcases h with ⟨⟨decl, fn⟩, hin, heq⟩ | heq
   · subst entry
     simp only [nearHostFns, List.mem_cons, List.not_mem_nil, or_false] at hin
-    rcases hin with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
+    rcases hin with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
     all_goals cases h
     all_goals first
       | (intro b prepaid maxBurnt st args hwf; exact hwf)
@@ -162,6 +162,7 @@ theorem meteredHostFns_gasFloor (cfg : RuntimeConfig) (entry : ImportDecl × Nea
       | exact HostPreservesGas.floor promiseBatchActionCreateAccountFn_gas
       | exact HostPreservesGas.floor promiseBatchActionDeployContractFn_gas
       | exact HostPreservesGas.floor promiseBatchActionFunctionCallFn_gas
+      | exact HostPreservesGas.floor promiseBatchActionFunctionCallWeightFn_gas
       | exact HostPreservesGas.floor promiseBatchActionTransferFn_gas
       | exact HostPreservesGas.floor promiseBatchActionStakeFn_gas
       | exact HostPreservesGas.floor promiseBatchActionAddKeyWithFullAccessFn_gas

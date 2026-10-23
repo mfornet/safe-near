@@ -2,6 +2,7 @@ import NearVM.Interp
 import NearVM.Metered
 import NearVM.Context
 import NearVM.PromiseGraph
+import NearVM.GasDistribution
 import Wasm.Fuel
 
 /-!
@@ -228,7 +229,13 @@ def outcomeOfExecution (ctx : VMContext) (storage : List (List UInt8 × List UIn
       let returned := graph.returnData? ns
       match returned with
       | none => outcome.graphIssue ctx.accountBalance ctx.storageUsage storage
-      | some returnData => { outcome with returnData, receipts := graph.receipts }
+      | some returnData =>
+        let distributed := distributeGas (ctx.prepaidGas - ns.gas.used) graph.handles ns.gasWeights
+          graph.receipts
+        { outcome with
+          returnData := returnData
+          receipts := distributed.1
+          usedGas := ns.gas.used + distributed.2 }
 
 /-- nearcore replaces the contract's memory declaration during preparation. -/
 def prepareMemory (cfg : RuntimeConfig) (code : Module) : Module :=

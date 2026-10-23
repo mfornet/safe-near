@@ -170,9 +170,9 @@ theorem disallowInView_preserves_promises (name : String) (fn : NearHostFn NearS
   · exact hwf
   · exact hfn st args hwf
 
-theorem appendPromiseActionResult_preserves (name : String) (st : HostStore NearState)
+theorem appendPromiseActionResult_preserves {weight : UInt64} (name : String) (st : HostStore NearState)
     (index : UInt64) (action : PromiseAction) (hwf : PromisesWellFormedFrom 0 st.host.promises) :
-    HostResultPromisesWellFormed (appendPromiseActionResult name st index action) := by
+    HostResultPromisesWellFormed (appendPromiseActionResult name st index action weight) := by
   unfold appendPromiseActionResult
   cases h : appendPromiseAction? st.host.promises index.toNat action with
   | none =>
@@ -325,6 +325,23 @@ theorem promiseBatchActionDeployContractFn_preserves : HostPreservesPromises pro
 
 theorem promiseBatchActionFunctionCallFn_preserves : HostPreservesPromises promiseBatchActionFunctionCallFn := by
   unfold promiseBatchActionFunctionCallFn
+  apply disallowInView_preserves_promises
+  intro st args hwf
+  dsimp only
+  repeat (first
+    | exact hwf
+    | exact appendBatchPromise_preserves _ _ _ hwf
+    | exact appendCallbackPromise_preserves _ _ _ _ hwf (by assumption)
+    | exact appendJointPromise_find_preserves _ _ hwf (by assumption)
+    | exact appendPromiseActionResult_preserves _ _ _ _ hwf
+    | exact createBatchPromiseResult_preserves _ _ _ hwf
+    | exact createCallbackPromiseResult_preserves _ _ _ _ hwf
+    | apply checkAccountId_preserves_promises _ _ _ _ hwf
+    | apply checkPublicKey_preserves_promises _ _ _ _ hwf
+    | split)
+
+theorem promiseBatchActionFunctionCallWeightFn_preserves : HostPreservesPromises promiseBatchActionFunctionCallWeightFn := by
+  unfold promiseBatchActionFunctionCallWeightFn
   apply disallowInView_preserves_promises
   intro st args hwf
   dsimp only
@@ -586,6 +603,10 @@ theorem metered_promiseBatchActionDeployContractFn_preserves (extra : Nat) (name
 theorem metered_promiseBatchActionFunctionCallFn_preserves (extra : Nat) (name : String) :
     HostPreservesPromises (metered extra name promiseBatchActionFunctionCallFn) :=
   metered_preserves_promises extra name promiseBatchActionFunctionCallFn promiseBatchActionFunctionCallFn_preserves
+
+theorem metered_promiseBatchActionFunctionCallWeightFn_preserves (extra : Nat) (name : String) :
+    HostPreservesPromises (metered extra name promiseBatchActionFunctionCallWeightFn) :=
+  metered_preserves_promises extra name promiseBatchActionFunctionCallWeightFn promiseBatchActionFunctionCallWeightFn_preserves
 
 theorem metered_promiseBatchActionTransferFn_preserves (extra : Nat) (name : String) :
     HostPreservesPromises (metered extra name promiseBatchActionTransferFn) :=

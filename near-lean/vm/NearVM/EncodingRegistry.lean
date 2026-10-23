@@ -26,7 +26,7 @@ theorem meteredHostFns_encodingInvariant
   rcases h with ⟨⟨decl, fn⟩, hin, heq⟩ | heq
   · subst entry
     simp only [nearHostFns, List.mem_cons, List.not_mem_nil, or_false] at hin
-    rcases hin with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
+    rcases hin with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
     · cases h
       apply meteredNeutral_encodingInvariant
       · exact inputFn_encodingFrame
@@ -240,6 +240,8 @@ theorem meteredHostFns_encodingInvariant
     · cases h
       exact meteredActionFunctionCall_encodingInvariant _
     · cases h
+      exact meteredActionFunctionCallWeight_encodingInvariant _
+    · cases h
       exact meteredActionTransfer_encodingInvariant _
     · cases h
       exact meteredActionStake_encodingInvariant _
@@ -251,6 +253,26 @@ theorem meteredHostFns_encodingInvariant
       exact meteredActionDeleteKey_encodingInvariant _
     · cases h
       exact meteredActionDeleteAccount_encodingInvariant _
+    · cases h
+      apply metered_raw_encodingInvariant
+      intro st args hwf hs hguard _
+      simp (disch := decide) only [prepareStorageCall_other]
+      trivial
+    · cases h
+      apply metered_raw_encodingInvariant
+      intro st args hwf hs hguard _
+      simp (disch := decide) only [prepareStorageCall_other]
+      trivial
+    · cases h
+      apply metered_raw_encodingInvariant
+      intro st args hwf hs hguard _
+      simp (disch := decide) only [prepareStorageCall_other]
+      trivial
+    · cases h
+      apply metered_raw_encodingInvariant
+      intro st args hwf hs hguard _
+      simp (disch := decide) only [prepareStorageCall_other]
+      trivial
     · cases h
       apply metered_raw_encodingInvariant
       intro st args hwf hs hguard _

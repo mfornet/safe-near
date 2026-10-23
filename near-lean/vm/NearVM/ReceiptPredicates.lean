@@ -84,17 +84,29 @@ theorem convertPromises_preserves_predicate (property : ReceiptPredicate) [Decid
   apply receiptsValue_zero property
   rw [convertPromises_value promises graph hconvert, promisesValue_zero property promises h]
 
+/-- A predicate that ignores the prepaid gas of function calls. -/
+def PredicateGasInsensitive (property : ReceiptPredicate) : Prop :=
+  ∀ (g : Nat) (receiver : List UInt8) (actions : List PromiseAction) (i : Nat) (a a' : PromiseAction),
+    actions[i]? = some a → a.addGas? g = some a' → (property receiver (actions.set i a') ↔ property receiver actions)
+
+private theorem violationValue_gasInsensitive (property : ReceiptPredicate) [DecidableRel property]
+    (h : PredicateGasInsensitive property) : GasInsensitive (violationValue property) := by
+  intro g receiver actions i a a' ha hadd
+  simp only [violationValue, h g receiver actions i a a' ha hadd]
+
 /-- Outcome packing preserves a final raw-promise invariant. Establishing that
 invariant from concrete execution remains a separate proof obligation. -/
 theorem outcomeOfExecution_success_predicate (property : ReceiptPredicate) [DecidableRel property]
     (ctx : VMContext) (storage : List (Bytes × Bytes)) (final : Machine)
     (error : Option FunctionCallError)
     (hsuccess : (outcomeOfExecution ctx storage final error).aborted = none)
+    (hgas : PredicateGasInsensitive property)
     (h : ∀ promise ∈ final.host.promises, PromiseSatisfies property promise) :
     ∀ receipt ∈ (outcomeOfExecution ctx storage final error).receipts,
       property receipt.receiverId receipt.actions := by
   apply receiptsValue_zero property
-  rw [outcomeOfExecution_success_value ctx storage final error hsuccess,
+  rw [outcomeOfExecution_success_value ctx storage final error hsuccess _
+      (violationValue_gasInsensitive property hgas),
     promisesValue_zero property _ h]
 
 end Wasm.Near

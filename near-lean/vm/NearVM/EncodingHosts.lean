@@ -156,6 +156,11 @@ theorem meteredActionFunctionCall_encodingInvariant (extra : Nat) :
   meteredPromise_encodingInvariant extra "promise_batch_action_function_call" promiseBatchActionFunctionCallFn
     promiseBatchActionFunctionCallFn_encodingPolicy (meteredActionFunctionCall_success_encoding extra)
 
+theorem meteredActionFunctionCallWeight_encodingInvariant (extra : Nat) :
+    NearHostFn.PreservesLive EncodingInvariant (metered extra "promise_batch_action_function_call" promiseBatchActionFunctionCallWeightFn) :=
+  meteredPromise_encodingInvariant extra "promise_batch_action_function_call" promiseBatchActionFunctionCallWeightFn
+    promiseBatchActionFunctionCallWeightFn_encodingPolicy (meteredActionFunctionCallWeight_success_encoding extra)
+
 theorem meteredActionTransfer_encodingInvariant (extra : Nat) :
     NearHostFn.PreservesLive EncodingInvariant (metered extra "promise_batch_action_transfer" promiseBatchActionTransferFn) :=
   meteredPromise_encodingInvariant extra "promise_batch_action_transfer" promiseBatchActionTransferFn

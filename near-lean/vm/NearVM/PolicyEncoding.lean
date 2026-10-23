@@ -141,6 +141,13 @@ theorem promiseBatchActionFunctionCallFn_encodingPolicy : HostPreservesEncodingP
     appendPromiseActionResult, createBatchPromiseResult, createCallbackPromiseResult]
   repeat' (first | trivial | rfl | split)
 
+theorem promiseBatchActionFunctionCallWeightFn_encodingPolicy : HostPreservesEncodingPolicy promiseBatchActionFunctionCallWeightFn := by
+  intro st args
+  unfold promiseBatchActionFunctionCallWeightFn
+  dsimp only [disallowInView, checkAccountId, checkPublicKey, appendPromise,
+    appendPromiseActionResult, createBatchPromiseResult, createCallbackPromiseResult]
+  repeat' (first | trivial | rfl | split)
+
 theorem promiseBatchActionTransferFn_encodingPolicy : HostPreservesEncodingPolicy promiseBatchActionTransferFn := by
   intro st args
   unfold promiseBatchActionTransferFn

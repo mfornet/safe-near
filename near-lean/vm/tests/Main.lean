@@ -218,7 +218,15 @@ def main (args : List String) : IO UInt32 := do
       [("sha256", "i64 i64 i64", "i64.const 0 i64.const 0 i64.const 0", ""),
        ("validator_total_stake", "i64", "i64.const 0", ""),
        ("promise_yield_resume", "i64 i64 i64 i64",
-        "i64.const 0 i64.const 0 i64.const 0 i64.const 0", "(result i64)")] do
+        "i64.const 0 i64.const 0 i64.const 0 i64.const 0", "(result i64)"),
+       ("promise_batch_action_deploy_global_contract", "i64 i64 i64",
+        "i64.const 0 i64.const 0 i64.const 0", ""),
+       ("promise_batch_action_deploy_global_contract_by_account_id", "i64 i64 i64",
+        "i64.const 0 i64.const 0 i64.const 0", ""),
+       ("promise_batch_action_use_global_contract", "i64 i64 i64",
+        "i64.const 0 i64.const 0 i64.const 0", ""),
+       ("promise_batch_action_use_global_contract_by_account_id", "i64 i64 i64",
+        "i64.const 0 i64.const 0 i64.const 0", "")] do
     let wat := s!"(module (import \"env\" \"{name}\" (func $unsupported (param {params}) {results}))
       (memory 1) (func (export \"test\") {arguments} call $unsupported {if results.isEmpty then "" else "drop"})
       (func (export \"unused\")))"
@@ -231,6 +239,46 @@ def main (args : List String) : IO UInt32 := do
     check r s!"{name}: unsupported semantics never emit receipts" outcome.receipts.isEmpty
     let unused := run cfg testCode 0 "unused" (ctx alice "unused" "{}" 0) []
     check r s!"{name}: importing an unused operation is allowed" unused.succeeded
+
+  -- Weighted function calls (nearcore `distribute_gas`): the unused prepaid gas
+  -- goes to weights 1 and 2 in proportion, the remainder to the last weighted
+  -- call; an unweighted call keeps its static gas.
+  let weightedCode ← match ← Wat.compile "(module
+      (import \"env\" \"promise_batch_create\" (func $batch (param i64 i64) (result i64)))
+      (import \"env\" \"promise_batch_action_function_call_weight\"
+        (func $weighted (param i64 i64 i64 i64 i64 i64 i64 i64)))
+      (import \"env\" \"promise_batch_action_function_call\"
+        (func $call (param i64 i64 i64 i64 i64 i64 i64)))
+      (memory 1) (data (i32.const 0) \"alice.near\") (data (i32.const 16) \"m\")
+      (func (export \"test\") (local i64)
+        i64.const 10 i64.const 0 call $batch local.set 0
+        local.get 0 i64.const 1 i64.const 16 i64.const 0 i64.const 0 i64.const 64 i64.const 1000 i64.const 1
+        call $weighted
+        local.get 0 i64.const 1 i64.const 16 i64.const 0 i64.const 0 i64.const 64 i64.const 0 i64.const 2
+        call $weighted
+        local.get 0 i64.const 1 i64.const 16 i64.const 0 i64.const 0 i64.const 64 i64.const 5
+        call $call)
+      (func (export \"zero\") (local i64)
+        i64.const 10 i64.const 0 call $batch local.set 0
+        local.get 0 i64.const 1 i64.const 16 i64.const 0 i64.const 0 i64.const 64 i64.const 7 i64.const 0
+        call $weighted))" with
+    | .ok m => pure m
+    | .error e => throw (IO.userError s!"weighted fixture: {e}")
+  let weighted := run cfg weightedCode 0 "test" (ctx alice "test" "{}" 0) []
+  match (weighted.receipts.map (·.actions) : List (List PromiseAction)) with
+  | [[.functionCall _ _ _ g1, .functionCall _ _ _ g2, .functionCall _ _ _ g3]] =>
+    let unused := (g1.toNat - 1000) + g2.toNat
+    check r "weighted calls share the unused gas by weight"
+      (g1.toNat ≥ 1000 && unused > 0 && g1.toNat - 1000 == unused * 1 / 3 &&
+        g2.toNat == unused * 2 / 3 + (unused - unused * 1 / 3 - unused * 2 / 3) && g3 == 5)
+      (describe weighted)
+    check r "weighted distribution uses all prepaid gas" (weighted.usedGas == 300 * 10 ^ 12)
+      (describe weighted)
+  | _ => check r "weighted calls share the unused gas by weight" false (describe weighted)
+  let zeroWeight := run cfg weightedCode 0 "zero" (ctx alice "zero" "{}" 0) []
+  check r "weight zero is a plain function call"
+    (zeroWeight.receipts.map (·.actions) == [[.functionCall (bytesOf "m") [] 0 7]] &&
+      zeroWeight.usedGas < 300 * 10 ^ 12) (describe zeroWeight)
 
   -- config sanity
   check r "config: regular_op_cost loaded" (cfg.wasm.regularOpCost = 822756)

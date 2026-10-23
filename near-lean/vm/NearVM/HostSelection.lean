@@ -386,6 +386,21 @@ theorem promiseBatchActionFunctionCallFn_selection : HostPreservesSelection prom
     | apply checkPublicKey_selection _ _ _ _ hwf
     | split)
 
+theorem promiseBatchActionFunctionCallWeightFn_selection : HostPreservesSelection promiseBatchActionFunctionCallWeightFn := by
+  unfold promiseBatchActionFunctionCallWeightFn
+  apply disallowInView_selection
+  intro st args hwf
+  dsimp only
+  repeat (first
+    | exact hwf
+    | exact appendPromise_selection _ _ hwf
+    | exact appendPromiseActionResult_selection _ _ _ _ hwf
+    | exact createBatchPromiseResult_selection _ _ _ hwf
+    | exact createCallbackPromiseResult_selection _ _ _ _ hwf
+    | apply checkAccountId_selection _ _ _ _ hwf
+    | apply checkPublicKey_selection _ _ _ _ hwf
+    | split)
+
 theorem promiseBatchActionTransferFn_selection : HostPreservesSelection promiseBatchActionTransferFn := by
   unfold promiseBatchActionTransferFn
   apply disallowInView_selection

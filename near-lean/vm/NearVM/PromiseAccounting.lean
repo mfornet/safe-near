@@ -63,11 +63,104 @@ theorem convertPromises_deposits (promises : List NearPromise) (graph : PromiseG
     receiptsDeposits graph.receipts = promisesDeposits promises :=
   convertPromises_value promises graph h depositValue
 
+/-- Replacing one element changes a mapped sum by the difference. -/
+theorem map_sum_set {α : Type} (f : α → Nat) (l : List α) (i : Nat) (x y : α) (h : l[i]? = some x) :
+    ((l.set i y).map f).sum + f x = (l.map f).sum + f y := by
+  induction l generalizing i with
+  | nil => simp at h
+  | cons head tail ih =>
+    cases i with
+    | zero =>
+      simp only [List.getElem?_cons_zero, Option.some.injEq] at h
+      subst h
+      simp only [List.set_cons_zero, List.map_cons, List.sum_cons]
+      omega
+    | succ i =>
+      simp only [List.getElem?_cons_succ] at h
+      have := ih i h
+      simp only [List.set_cons_succ, List.map_cons, List.sum_cons]
+      omega
+
+/-- A valuation that ignores the prepaid gas of function calls. -/
+def GasInsensitive (value : ReceiptValuation) : Prop :=
+  ∀ (g : Nat) (receiver : List UInt8) (actions : List PromiseAction) (i : Nat) (a a' : PromiseAction),
+    actions[i]? = some a → a.addGas? g = some a' → value receiver (actions.set i a') = value receiver actions
+
+theorem applyGasShare_value (value : ReceiptValuation) (hv : GasInsensitive value)
+    (receipts : List ReceiptSpec) (receipt action g : Nat) :
+    receiptsValue value (applyGasShare receipts receipt action g).1 = receiptsValue value receipts := by
+  unfold applyGasShare
+  split
+  · rename_i spec hspec
+    split
+    · rename_i a ha
+      split
+      · rename_i a' hadd
+        have := map_sum_set (fun r : ReceiptSpec => value r.receiverId r.actions) receipts receipt spec
+          { spec with actions := spec.actions.set action a' } hspec
+        have he := hv g spec.receiverId spec.actions action a a' ha hadd
+        simp only [receiptsValue] at this ⊢
+        rw [he] at this
+        omega
+      · rfl
+    · rfl
+  · rfl
+
+theorem distributeStep_value (value : ReceiptValuation) (hv : GasInsensitive value)
+    (unused total : Nat) (weights : List (Nat × Nat × Nat)) (handles : List PromiseHandle)
+    (acc : List ReceiptSpec × Nat) (entry : (Nat × Nat × Nat) × Nat) :
+    receiptsValue value (distributeStep unused total weights handles acc entry).1 = receiptsValue value acc.1 := by
+  unfold distributeStep
+  split
+  · exact applyGasShare_value value hv _ _ _ _
+  · rfl
+
+theorem foldl_distributeStep_value (value : ReceiptValuation) (hv : GasInsensitive value)
+    (unused total : Nat) (weights : List (Nat × Nat × Nat)) (handles : List PromiseHandle)
+    (entries : List ((Nat × Nat × Nat) × Nat)) (acc : List ReceiptSpec × Nat) :
+    receiptsValue value (entries.foldl (distributeStep unused total weights handles) acc).1 =
+      receiptsValue value acc.1 := by
+  induction entries generalizing acc with
+  | nil => rfl
+  | cons entry rest ih =>
+    rw [List.foldl_cons, ih, distributeStep_value value hv]
+
+/-- Distribution changes only function-call gas. -/
+theorem distributeGas_value (value : ReceiptValuation) (hv : GasInsensitive value)
+    (unused : Nat) (handles : List PromiseHandle) (weights : List (Nat × Nat × Nat))
+    (receipts : List ReceiptSpec) :
+    receiptsValue value (distributeGas unused handles weights receipts).1 = receiptsValue value receipts := by
+  unfold distributeGas
+  dsimp only
+  split
+  · rfl
+  · exact foldl_distributeStep_value value hv _ _ _ _ _ _
+
+theorem depositValue_gasInsensitive : GasInsensitive depositValue := by
+  intro g receiver actions i a a' ha hadd
+  have hd : a'.deposit = a.deposit := by
+    cases a with
+    | functionCall method args amount gas =>
+      simp only [PromiseAction.addGas?] at hadd
+      split at hadd
+      · cases hadd; rfl
+      · cases hadd
+    | _ => simp [PromiseAction.addGas?] at hadd
+  have := map_sum_set PromiseAction.deposit actions i a a' ha
+  simp only [depositValue]
+  omega
+
+theorem distributeGas_deposits (unused : Nat) (handles : List PromiseHandle)
+    (weights : List (Nat × Nat × Nat)) (receipts : List ReceiptSpec) :
+    receiptsDeposits (distributeGas unused handles weights receipts).1 = receiptsDeposits receipts :=
+  distributeGas_value depositValue depositValue_gasInsensitive unused handles weights receipts
+
 /-- A successful executable VM result contains exactly the converted receipt
 valuation. Graph errors cannot silently discard or manufacture backing. -/
 theorem outcomeOfExecution_success_value (ctx : VMContext) (storage : List (Bytes × Bytes))
     (final : Machine) (error : Option FunctionCallError)
-    (hsuccess : (outcomeOfExecution ctx storage final error).aborted = none) (value : ReceiptValuation) :
+    (hsuccess : (outcomeOfExecution ctx storage final error).aborted = none) (value : ReceiptValuation)
+    (hv : GasInsensitive value) :
     receiptsValue value (outcomeOfExecution ctx storage final error).receipts =
       promisesValue value final.host.promises := by
   unfold outcomeOfExecution at hsuccess ⊢
@@ -80,7 +173,8 @@ theorem outcomeOfExecution_success_value (ctx : VMContext) (storage : List (Byte
       simp only [hc] at hsuccess ⊢
       split at hsuccess
       · simp [VMOutcome.graphIssue] at hsuccess
-      · exact convertPromises_value _ graph hc value
+      · rw [distributeGas_value value hv]
+        exact convertPromises_value _ graph hc value
 
 /-- Replacing one raw handle changes only that handle's valuation. -/
 theorem setPromise_value (value : ReceiptValuation) (promises result : List NearPromise)

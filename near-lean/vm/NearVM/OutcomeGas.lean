@@ -34,6 +34,7 @@ theorem checkReceipts_gas_bounded (outcome : VMOutcome) (balance usage : Nat) (s
 /-- Packing a failed, successful or invalid-graph result retains the gas bounds. -/
 theorem outcomeOfExecution_gas_bounded (ctx : VMContext) (storage : List (Bytes × Bytes))
     (final : Machine) (error : Option FunctionCallError) (prepaid maxBurnt : Nat)
+    (hctx : ctx.prepaidGas ≤ prepaid)
     (h : final.host.gas.burnt ≤ final.host.gas.used ∧
       final.host.gas.used ≤ prepaid ∧ final.host.gas.burnt ≤ maxBurnt) :
     (outcomeOfExecution ctx storage final error).GasBounded prepaid maxBurnt := by
@@ -45,7 +46,10 @@ theorem outcomeOfExecution_gas_bounded (ctx : VMContext) (storage : List (Bytes 
     · exact graphIssue_gas_bounded _ _ _ _ _ _ h
     · split
       · exact graphIssue_gas_bounded _ _ _ _ _ _ h
-      · exact h
+      · rename_i graph _ _ _ _
+        have := distributeGas_le (ctx.prepaidGas - final.host.gas.used) graph.handles final.host.gasWeights
+          graph.receipts
+        refine ⟨?_, ?_, h.2.2⟩ <;> dsimp only <;> omega
 
 /-- Entry charging establishes counter bounds before either its error exit or
 metered execution. Concrete imported hosts preserve the supplied limits. -/
@@ -101,7 +105,7 @@ theorem runAttempt_gas_bounded (cfg : RuntimeConfig) (code : Module) (codeSize :
       rw [← hg.1.1, ← hg.1.2]
       exact hl
     have hf := runInitialized_gas_bounded cfg.wasm fuel (.next c) _ _ hlim
-    exact outcomeOfExecution_gas_bounded _ _ _ _ _ _ hf
+    exact outcomeOfExecution_gas_bounded _ _ _ _ _ _ (Nat.le_refl _) hf
 
 /-- The public VM result exposes bounded burnt/used gas on success, protocol
 failure and explicit model issues, including the graph-validation boundary. -/

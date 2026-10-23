@@ -103,7 +103,7 @@ theorem meteredHostFns_selection (cfg : RuntimeConfig) (entry : ImportDecl × Ne
   rcases h with ⟨⟨decl, fn⟩, hin, heq⟩ | heq
   · subst entry
     simp only [nearHostFns, List.mem_cons, List.not_mem_nil, or_false] at hin
-    rcases hin with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
+    rcases hin with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
     all_goals cases h
     all_goals first
       | (intro st args hwf; exact hwf)
@@ -145,6 +145,7 @@ theorem meteredHostFns_selection (cfg : RuntimeConfig) (entry : ImportDecl × Ne
       | exact promiseBatchActionCreateAccountFn_selection
       | exact promiseBatchActionDeployContractFn_selection
       | exact promiseBatchActionFunctionCallFn_selection
+      | exact promiseBatchActionFunctionCallWeightFn_selection
       | exact promiseBatchActionTransferFn_selection
       | exact promiseBatchActionStakeFn_selection
       | exact promiseBatchActionAddKeyWithFullAccessFn_selection

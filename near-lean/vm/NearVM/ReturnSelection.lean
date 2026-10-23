@@ -71,9 +71,9 @@ theorem appendPromiseAction_selection {ps result : List NearPromise} {index sele
     | and dependencies => simp [hget] at h
     | yielded => simp [hget] at h
 
-theorem appendPromiseActionResult_selection (name : String) (st : HostStore NearState)
+theorem appendPromiseActionResult_selection {weight : UInt64} (name : String) (st : HostStore NearState)
     (index : UInt64) (action : PromiseAction) (hwf : ReturnSelectionValid st.host) :
-    HostResultSelectionValid (appendPromiseActionResult name st index action) := by
+    HostResultSelectionValid (appendPromiseActionResult name st index action weight) := by
   unfold appendPromiseActionResult
   split
   · intro selected hreturn

@@ -6,6 +6,7 @@ import NearVM.Host
 import NearVM.Context
 import NearVM.Outcome
 import NearVM.PromiseGraph
+import NearVM.GasDistribution
 import NearVM.Metered
 import NearVM.HostPromises
 import NearVM.HostDispatch

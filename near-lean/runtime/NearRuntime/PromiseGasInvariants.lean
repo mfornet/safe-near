@@ -157,7 +157,8 @@ theorem outcomeOfExecution_success_gasEncoding (ctx : VMContext) (storage : List
     (hsuccess : (outcomeOfExecution ctx storage final error).aborted = none)
     (h : PromisesEncoding final.host.promises) :
     ∀ spec ∈ (outcomeOfExecution ctx storage final error).receipts, ReceiptGasEncodingValid spec :=
-  outcomeOfExecution_success_predicate ReceiptEncoding ctx storage final error hsuccess h
+  outcomeOfExecution_success_predicate ReceiptEncoding ctx storage final error hsuccess
+    receiptEncoding_gasInsensitive h
 
 def decodedReceiptGas (cfg : RuntimeConfig) (decoder : Bytes → ContractCode) (spec : ReceiptSpec) : Nat :=
   Fees.receiptGasBudget cfg (stringOfBytes spec.receiverId) (spec.actions.map (actionOfPromiseRaw decoder))

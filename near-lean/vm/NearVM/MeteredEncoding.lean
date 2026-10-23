@@ -226,6 +226,20 @@ theorem promiseBatchActionFunctionCallFn_validated_encoding :
        simp [actionMethodBytes?, functionCallInputs?, functionCallInputs, argU64])
     | split)
 
+/-- The batch function-call host obtains its new method witness from the
+actual external guard applied after fees and deposit deduction. -/
+theorem promiseBatchActionFunctionCallWeightFn_validated_encoding :
+    HostValidatedEncoding "promise_batch_action_function_call" promiseBatchActionFunctionCallWeightFn := by
+  intro st args h hpolicy _ hmethod
+  unfold promiseBatchActionFunctionCallWeightFn
+  dsimp only [disallowInView]
+  repeat' (first
+    | trivial
+    | (apply appendPromiseActionResult_encoding _ _ _ _ h
+       apply readFunctionCallAction_encoding _ _ _ _ _ _ _ _ _ _ hpolicy hmethod ?_ (by assumption)
+       simp [actionMethodBytes?, functionCallInputs?, functionCallInputs, argU64])
+    | split)
+
 /-- The access-key host obtains per-field CSV witnesses from the actual
 external guard, retaining multibyte names and the empty unrestricted CSV case. -/
 theorem promiseBatchActionAddKeyWithFunctionCallFn_validated_encoding :
@@ -274,6 +288,14 @@ theorem meteredActionFunctionCall_success_encoding (extra : Nat) (st : HostStore
     PromisesEncoding after.host.promises :=
   metered_success_encoding extra "promise_batch_action_function_call" promiseBatchActionFunctionCallFn
     promiseBatchActionFunctionCallFn_validated_encoding st args values after h hpolicy hreturn
+
+theorem meteredActionFunctionCallWeight_success_encoding (extra : Nat) (st : HostStore NearState) (args values : List Value)
+    (after : HostStore NearState) (h : PromisesEncoding st.host.promises)
+    (hpolicy : st.host.config.validateActionMethodUtf8 = true)
+    (hreturn : (metered extra "promise_batch_action_function_call" promiseBatchActionFunctionCallWeightFn).invoke st args = .Return values after) :
+    PromisesEncoding after.host.promises :=
+  metered_success_encoding extra "promise_batch_action_function_call" promiseBatchActionFunctionCallWeightFn
+    promiseBatchActionFunctionCallWeightFn_validated_encoding st args values after h hpolicy hreturn
 
 theorem promiseBatchActionTransferFn_validated_encoding :
     HostValidatedEncoding "promise_batch_action_transfer" promiseBatchActionTransferFn := by
