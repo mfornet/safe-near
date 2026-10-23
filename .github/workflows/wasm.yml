@@ -130,7 +130,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.93.1
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: tools/runtime-conformance
+          workspaces: |
+            tools/runtime-conformance
+            tools/dump-runtime-config
       - uses: taiki-e/install-action@v2
         with:
           tool: wasm-tools@1.251.0
