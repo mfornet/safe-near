@@ -68,7 +68,8 @@ def Stats.add (t : Stats) : Verdict → Stats
 
 def Stats.plus (a b : Stats) : Stats :=
   { ok := a.ok + b.ok, bugs := a.bugs + b.bugs, outOfScope := a.outOfScope + b.outOfScope,
-    unavailable := a.unavailable + b.unavailable, unimplemented := a.unimplemented + b.unimplemented }
+    unavailable := a.unavailable + b.unavailable,
+    unimplemented := a.unimplemented + b.unimplemented }
 
 def ScriptRun.stats (r : ScriptRun) : Stats := r.rows.foldl (fun t row => t.add row.verdict) {}
 
@@ -83,7 +84,8 @@ def describe (r : ScriptRun) : List String :=
   | some why => [s!"{column r.name 34} broken: {why}"]
   | none =>
     let t := r.stats
-    let head := s!"{column r.name 34} {column (toString t.ok) 6} ok   {column (toString t.bugs) 4} bugs   " ++
+    let head := s!"{column r.name 34} {column (toString t.ok) 6} ok   " ++
+      s!"{column (toString t.bugs) 4} bugs   " ++
       s!"{column (toString t.outOfScope) 5} out of scope   {t.unavailable} unavailable"
     let bugs := r.rows.toList.filterMap fun row =>
       if row.verdict.isBug then
@@ -101,7 +103,8 @@ def main (argv : List String) : IO UInt32 := do
   let opts ← match options argv with
     | .ok o => pure o
     | .error why => IO.eprintln s!"{why}\n{help}"; return 2
-  let dir : System.FilePath := opts.dir.getD ((← IO.getEnv "WASM_TESTSUITE").getD "vendor/testsuite")
+  let env ← IO.getEnv "WASM_TESTSUITE"
+  let dir : System.FilePath := opts.dir.getD (env.getD "vendor/testsuite")
   if !(← dir.isDir) then IO.eprintln s!"no testsuite directory at {dir}"; return 2
   let files ← scripts dir opts.filter
   if files.isEmpty then IO.eprintln "no scripts match"; return 2
@@ -121,7 +124,8 @@ def main (argv : List String) : IO UInt32 := do
     return 0
   let total : Stats := runs.foldl (fun t r => t.plus r.stats) {}
   IO.println (s!"\n{files.length} scripts: {total.ok} ok, {total.bugs} bugs, " ++
-    s!"{total.outOfScope} out of scope, {total.unimplemented} unimplemented, {total.unavailable} unavailable")
+    s!"{total.outOfScope} out of scope, {total.unimplemented} unimplemented, " ++
+    s!"{total.unavailable} unavailable")
   return if runs.any (fun r => r.broken.isSome || r.stats.bugs > 0) then 1 else 0
 
 end Wasm.Testsuite

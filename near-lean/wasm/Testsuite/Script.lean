@@ -259,7 +259,8 @@ def perform (s : Session) (cmd : Json) : IO (Verdict × Session) := do
         match instantiated s vm with
         | .inl (.ok (store, inst)) => return (.ok, { s with store }.remember name (some inst))
         | .inl (.error v) => return (v, s.remember name none)
-        | .inr (t, _) => return (.wrong s!"instantiation trapped: {t.message}", s.remember name none)
+        | .inr (t, _) =>
+          return (.wrong s!"instantiation trapped: {t.message}", s.remember name none)
   | "register" =>
     let some alias := field? cmd "as" | return (.wrong "register without a name", s)
     match s.module? (field? cmd "name") with
@@ -296,7 +297,8 @@ def perform (s : Session) (cmd : Json) : IO (Verdict × Session) := do
           | .inl (.ok _) => (.wrong s!"linked a module expected not to link ({text})", s)
           | .inl (.error .unavailable) => (.unavailable, s)
           | .inl (.error _) => (.ok, s)
-          | .inr (t, store) => (.wrong s!"trapped ({t.message}) instead of failing to link", { s with store })
+          | .inr (t, store) =>
+            (.wrong s!"trapped ({t.message}) instead of failing to link", { s with store })
   | "assert_uninstantiable" =>
     match binaryOf cmd with
     | .error v => return (v, s)
@@ -321,7 +323,8 @@ def perform (s : Session) (cmd : Json) : IO (Verdict × Session) := do
       | .error why => return (.wrong why, s)
       | .ok (.ok values, s) =>
         if kind == "action" then return (.ok, s)
-        if kind != "assert_return" then return (.wrong s!"ran to completion, expected a trap ({text})", s)
+        if kind != "assert_return" then
+          return (.wrong s!"ran to completion, expected a trap ({text})", s)
         match (items cmd "expected").mapM expectation with
         | .error why => return (.wrong why, s)
         | .ok expected =>
@@ -332,7 +335,8 @@ def perform (s : Session) (cmd : Json) : IO (Verdict × Session) := do
       | .ok (.error t, s) =>
         if kind == "assert_return" || kind == "action" then
           return (.wrong s!"trapped: {t.message}", s)
-        return (if trapMatches text t then .ok else .wrong s!"trapped with {t.message}, expected {text}", s)
+        if trapMatches text t then return (.ok, s)
+        return (.wrong s!"trapped with {t.message}, expected {text}", s)
   | "assert_exception" => return (.outOfScope "exceptions", s)
   | "module_definition" | "module_instance" => return (.outOfScope "module-instances", s)
   | other => return (.unimplemented other, s)
