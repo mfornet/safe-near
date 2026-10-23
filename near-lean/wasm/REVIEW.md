@@ -8,7 +8,9 @@ one `scripts/suite.sh` with thin wrappers; the testsuite driver was rewritten
 with its own data types and loop (`Testsuite/Script.lean`, `Testsuite/Main.lean`,
 same report format, same committed report); and `Wasm/Bytes.lean` now states
 its provenance (the project's own module, not Talos). The review text follows
-unchanged, so its findings can be checked against that history.
+unchanged, so its findings can be checked against that history. A second
+independent review of the rewritten files at commit `7af472c` follows it and
+finds the whole package free of Talos-derived text and structure.
 
 ---
 
@@ -264,3 +266,154 @@ design; if a zero-tolerance reading is wanted, rewriting `field?` as
 `(j.getObjVal? key >>= Json.getStr?).toOption` removes it.
 
 The `field?` accessor was rewritten as suggested after this section was written.
+
+
+---
+
+# Clean-room review 2: `near-lean/wasm` at 7af472c vs Talos copy at 99435f7
+
+Method. All 23 `.lean`/`.sh` files under `near-lean/wasm` at HEAD (taken from `git show HEAD:`)
+against all 217 `.lean`/`.sh` files at 99435f7 under `near-lean/wasm`, `near-lean/iris-wasm`,
+`near-lean/programs`. Three passes: (a) identical lines of >= 40 chars after whitespace
+normalisation; (b) 6-token windows (identifiers, numbers, single punctuation) with every maximal
+shared token run per pair; (c) identical comment sentences of >= 7 words (220 new sentences vs
+4293 old). Every hit was read by hand next to its source. `vendor/testsuite` is a submodule
+(gitlink 9233a0a, the upstream spec testsuite), so its `extract-parts.sh` is not part of the
+package and was not scored beyond confirming no overlap (longest run 7, `> /dev/null ; then`).
+
+Note on the record: `REVIEW.md`'s follow-up section is headed "HEAD 5713333" but describes
+`Testsuite/Main.lean` only and says `Script.lean` was outside its brief. At 5713333 the package
+still contained the paraphrased `Testsuite/Exec.lean` (363 lines); `git diff --stat 5713333 HEAD`
+shows that file deleted and `Script.lean` added in 1ebb4ea. So this is the first review of the
+driver as it now stands. `Wasm/*` and `Cli/*` are byte-identical to the first review's 9e1219f
+except `Wasm/Bytes.lean` (+5 lines of provenance comment).
+
+## 1. Rewritten files: `scripts/` and `Testsuite/`
+
+| File (lines) | Counterpart at 99435f7 | (a) lines / (b) 6-tok share, longest run / (c) sentences | Verdict |
+|---|---|---|---|
+| scripts/suite.sh (58) | scripts/{ensure-testsuite,testsuite,testsuite-report,testsuite-summary,runner-smoke}.sh | 0 / 12.4%, 14 tok `="${WASM_TOOLS_VERSION:-1.251.0}"` / 0 | clean |
+| scripts/ensure-testsuite.sh, testsuite.sh, testsuite-report.sh, testsuite-summary.sh (2 each) | same names | 0 / 5 of 18-22 windows (shebang + `"$(dirname "$0"`), run 9 / 0 | clean: `exec "$(dirname "$0")/suite.sh" <cmd>` wrappers |
+| Testsuite/Script.lean (383) | Interpreter/Testsuite/Exec.lean (1460), Testsuite.lean, Runner.lean | 0 / 8.6%, 25 tok (JSON accessor, below) / 0 | clean, with two idiom echoes quoted below |
+| Testsuite/Main.lean (133) | Interpreter/Testsuite.lean (371) | 1 (`def main (argv : List String) : IO UInt32 := do`) / 5.2%, 14 tok / 0 | clean |
+
+All maximal shared runs >= 9 tokens for Script.lean vs old Exec.lean, read by hand:
+
+1. L76-87 `field?`/`number?`/`items` vs old L87-106 `jstr?`/`jnat?`/`jarr?` (runs 15, 25, 13).
+   ```
+   new L79: def number? (j : Json) (key : String) : Option Nat :=
+              match j.getObjVal? key with
+              | .ok v => v.getNat?.toOption
+              | .error _ => none
+   old L92: private def jnat? (j : Json) (key : String) : Option Nat :=
+              match j.getObjVal? key with
+              | .ok v => match v.getNat? with | .ok n => some n | _ => none
+              | _ => none
+   ```
+   Same signature shape and same `match getObjVal? ... | .ok v` skeleton. This is what Lean's
+   `Lean.Json` API (`getObjVal?` returning `Except`) forces on any key accessor; names, the `>>=`
+   form of `field?`, and `.toOption`/`getD #[]` bodies differ. Dictated by the library, not Talos.
+2. L330-331 vs old L1036-1037 (run 11):
+   ```
+   new: let agree := expected.length == values.length &&
+          (List.zip expected values).all fun (e, v) => e.accepts v
+   old: let ok := actual.length = expected.length &&
+          (List.zip expected actual).all fun (e, v) => e.matches v
+   ```
+   The closest non-dictated echo in the package: same two-line idiom including the `(e, v)` lambda
+   names. It is the standard way to compare a result list against patterns; two lines, no
+   surrounding structure shared (new is inside `perform`'s `assert_return` arm, old inside a
+   separate `runAssertReturn` that reverses argument order for Talos's calling convention).
+3. L229-231 `match field? cmd "filename" with | some f => .ok f | none => .error ...` vs old L1111
+   (run 16): Option-to-Except lifting idiom, different key (`filename` vs `field`).
+4. L358 `(System.FilePath.mk path).fileName.getD path` (also Main L76) vs old L161 `basename` (run 9):
+   the one-expression API idiom; the `private def basename` wrapper flagged last time is gone.
+5. L362-364 `IO.Process.output { cmd := "wasm-tools", args := #["json-from-wast", path,
+   "--wasm-dir", dir, "-o", manifest] }` vs old L414/L1435 and Runner L80 (runs 12, 18): the tool's
+   CLI and Lean's process record; old wraps it in `runWasmTools` with `toBaseIO` and a
+   missing-binary message, new inlines it and reports `split.stderr`.
+6. L94 `.toNat | none => .error s!"` (run 11): new reduces with Lean's non-negative `Int.emod`
+   (`i % 2^n`); old does `((n % m + m) % m)`. Different arithmetic, shared only the error-arm shape.
+7. L153, L352: `| _, _ => false`, `| _ => none /--` (runs 9-12): pattern-match boilerplate.
+
+Design comparison, driver (new vs old):
+- Outcome type: `Verdict {ok, wrong, undecodable, invalid, outOfScope, unimplemented, unavailable}`
+  vs `Outcome {pass, fail, skipped, decodeError, interpreterError, outOfFuel, moduleUnavailable}`.
+  No constructor name shared. Tag strings `pass`/`fail`/`decode_error`/`module_unavailable`/
+  `skipped:*` are shared by design (committed `testsuite_report.txt` format); `invalid_error`,
+  `out_of_scope:*` are new; `interpreter_error`, `out_of_fuel` dropped.
+- Row types: `Row {line, kind, verdict}` / `ScriptRun {script, rows, broken}` vs
+  `CmdResult {line, kind, outcome}` / `FileResult {path, results, fileError}`. The shape (a
+  per-command line+kind+tag, a per-file optional error) is forced by the `name:line kind tag` and
+  `name:0 file error` report lines; `line` and `kind` are the only shared field names.
+- State: `Session {binaries, store, names : Link.Registry, missingNames, latest, byName}` with
+  `Loaded := Option ModuleInst` vs `ScriptState {definitions, modules : Array ModuleSlot, named,
+  registered, sharedGlobals, sharedTags, sharedFunctions, sharedMemories, sharedTables}`. New
+  links through the runtime's store and registry; old copied resources into fresh stores and
+  tracked six shared arrays. Remembering a failed module so later actions say "unavailable" is
+  common to both, and is what the `module_unavailable` tag requires.
+- Loop: both do split -> parse manifest -> `for cmd in commands` -> fold state -> push row, which
+  is the `wasm-tools json-from-wast` workflow. New returns `(Verdict x Session)` from `perform` and
+  builds rows in `runScript`; old returned `(ScriptState x CmdResult)` with an `mk` closure and a
+  try/catch per command. New adds `testsuite_out_of_scope.txt` exclusion; no fuel parameter.
+- Command semantics differ: new runs `assert_malformed/invalid/unlinkable/uninstantiable` and
+  `get` actions and checks trap text by prefix; old skipped unlinkable/uninstantiable and treated
+  module_definition/instance as the component-model script. Dispatch on the JSON `type` string is
+  forced by the schema.
+- Main: `Options {filter, report, dir}` + recursive `options` vs `FlagState`/`Args` + `splitFlags`/
+  `parseArgs`; `scripts` filters with `replace`-based `mentions` vs `splitOn`; `Stats` (5 fields,
+  `add` per verdict, `plus` pairwise) vs `Counts` (7 fields, `tallyOne`, `Counts.add` + `Add`
+  instance). The counters-struct + increment + sum + fold pattern is generic; nothing textual
+  shared. Human output: both print a padded name column then counts then per-bug detail lines, but
+  every string differs (`ok/bugs/out of scope/unavailable` vs `pass/fail/skip/cascade/...`,
+  `line N, kind: tag why` vs `LN  kind  Summary`). Exit codes 1/2 vs 1/3; `createTempDir` vs a
+  hand-rolled `makeTempDir`; report lines printed after the loop in both (sorted names, line order).
+
+Design comparison, scripts: `suite.sh` is one file with `ensure/run/report/summary` functions and a
+`case` dispatch; old was four files calling each other. Shared tokens are bash boilerplate
+(`here="$(cd "$(dirname "$0")/.." && pwd)"`, old used `${BASH_SOURCE[0]}`), the pin variable, the
+git and cargo commands, the report filename, and two small echoes: the message `echo "wrote
+$here/testsuite_report.txt"` (old L30, same wording) and the summary ordering (outcome counts
+`| sort -rn`, then per-file list `| sort -k2`; new via `cut|sort|uniq -c` and `grep|sed|cut`, old
+via two awk pipelines, and new lists only bug outcomes). Emptiness test `find -print -quit` vs
+`compgen -G`; version check compares the whole `--version` string vs `awk 'NR==1{print $2}'`;
+`lake build` + `exec` binary vs `lake exe`. No comment text shared.
+
+## 2. Runtime re-run at 7af472c (`Wasm/`, `Wasm/Host/`, `Cli/`)
+
+| File | Counterpart | (a) / (b) share, longest run / (c) | Verdict |
+|---|---|---|---|
+| Wasm.lean | - | 0 / 0%, - / 0 | clean |
+| Wasm/Syntax.lean | Interpreter/Wasm/Syntax.lean, Simd.lean | 0 / 6.6%, 19 `where \| eq \| ne \| lt \| gt \| le \| ge deriving Repr, DecidableEq, Inhabited` / 0 | clean (spec's six comparison ops) |
+| Wasm/Binary.lean | Decoder/Wat.lean | 0 / 2.4%, 12 `.toUInt32 <<< 8) \|\|\| (b` / 0 | clean |
+| Wasm/Validate.lean | Interpreter/Wasm/Validate.lean | 0 / 3.0%, 11 `params := [], results := []` / 0 | clean |
+| Wasm/Exec.lean | SmallStep.lean, Near/Env.lean | 0 / 4.9%, 11 `{ params := [], results := [` / 0 | clean |
+| Wasm/Memory.lean | Interpreter/Wasm/Mem.lean | 0 / 8.2%, 19 `len : Nat) : List UInt8 := (List.range len).map fun i =>` / 0 | clean (byte-slice idiom) |
+| Wasm/Numeric.lean | Wp/Atomic.lean, Semantics.lean | 0 / 8.6%, 16 `(a <<< k) \|\|\| (a >>> (` / 0 | clean (textbook rotate) |
+| Wasm/Value.lean | SmallStep.lean, Validate.lean | 5 (trap texts) / 28.3%, 34 `.i32 _ => .i32 \| .i64 _ => .i64 \| ...` / 0 | clean: testsuite `assert_trap` strings and the forced `Value.type` case split |
+| Wasm/Store.lean | Interpreter/Wasm/Syntax.lean | 0 / 3.8%, 9 / 0 | clean |
+| Wasm/Link.lean | Decoder/Wat.lean, Testsuite/Exec.lean | 0 / 6.2%, 12 `:= Id.run do let mut store := store let mut` / 0 | clean |
+| Wasm/HostInvariant.lean | - | 0 / 2.0%, 9 / 0 | clean |
+| Wasm/LinkInvariant.lean | - | 0 / 3.6%, 13 `] at h obtain ⟨rfl, rfl⟩ := h exact` / 0 | clean (tactic idiom) |
+| Wasm/Bytes.lean | Interpreter/Wasm/ByteEncoding.lean | 4 (theorem statements, one `simp only` line) / 18.7%, 23 / 0 | port of the project's own module (commit 432616f, 2026-10-20, post-import); provenance now stated in the file header. Not Talos. |
+| Wasm/Host/Spectest.lean | Testsuite/Exec.lean L504-508 | 0 / 7.1%, 12 `.f64 (666.6 : Float).toBits)` / 0 | clean (reference interpreter's spectest values) |
+| Wasm/Wat.lean | Runner.lean L80 | 0 / 13.0%, 18 `← IO.Process.output { cmd := "wasm-tools", args := #["` / 0 | clean (process boilerplate; `parse` vs `print`) |
+| Cli/Main.lean | Runner.lean, Testsuite.lean | 0 / 8.4%, 11 `def usage : String := "Usage: lake exe` / 0 | clean |
+
+Numbers match the first review for every file except Bytes.lean (20.8% -> 18.7%, the added
+comment); the only identical lines in the runtime remain the five spec trap strings in Value.lean
+and the four Bytes.lean statements. Shared comment sentences across the whole package: 0.
+
+## 3. Overall verdict
+
+At 7af472c the package contains no text derived from the Talos copy. The three qualifications of
+the first review are resolved: the scripts are a new single-file design sharing only bash
+boilerplate and tool invocations; the testsuite driver has its own types (`Verdict`, `Row`,
+`ScriptRun`, `Session`, `Options`, `Stats`), its own loop and its own strings, with zero identical
+substantive lines; `Bytes.lean` states its (non-Talos) provenance. What remains in common with the
+Talos harness is dictated by the task (the `json-from-wast` schema, the committed report format and
+its tag strings, Lean's `Json`/`FilePath`/`IO.Process` APIs) plus two small idiom echoes a reader
+should know about and need not act on: the two-line zip-and-compare in `Script.lean` L330-331 and
+the `wrote <report>` message plus `sort -rn`/`sort -k2` ordering in `suite.sh`. The one identical
+>= 40-char line in the driver is the `main` signature. The clean-room claim holds for the whole
+package at this commit.
