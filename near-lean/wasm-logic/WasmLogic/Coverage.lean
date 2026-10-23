@@ -1,4 +1,5 @@
 import WasmLogic.Adequacy
+import WasmLogic.Rules.Table
 import Lean
 
 /-!
@@ -13,9 +14,11 @@ check fails the build if
 - a named rule does not exist, or
 - a named rule's statement does not mention `wpi` and the constructor.
 
-Out of scope is what nearcore keeps behind `reftypes_bulk_memory`, which is
-off in every protocol version the project models: table instructions and
-bulk memory. `ref.null`, `ref.is_null` and `ref.func` have rules anyway.
+Every constructor is in scope: nearcore enables reference types and bulk
+memory (`NearVM` validates with `Features.nearcore true`), so table and
+bulk-memory instructions have rules too; Iris-Wasm, a Wasm 1.0 logic, has no
+counterpart for them. The out-of-scope list stays, empty, for instructions a
+future runtime adds before their rules exist.
 
 The structural rules are checked to exist too.
 -/
@@ -72,22 +75,22 @@ def rules : List (Name × List Name × String) := [
   (``Wasm.Instr.f32_relop, [``wpi_f32_relop], "wp_relop"),
   (``Wasm.Instr.f64_relop, [``wpi_f64_relop], "wp_relop"),
   (``Wasm.Instr.cvt, [``wpi_cvt, ``wpi_cvt_trap],
-    "wp_cvtop_convert, wp_cvtop_convert_failure, wp_cvtop_reinterpret")]
+    "wp_cvtop_convert, wp_cvtop_convert_failure, wp_cvtop_reinterpret"),
+  (``Wasm.Instr.table_get, [``wpi_table_get], "none (reference types)"),
+  (``Wasm.Instr.table_set, [``wpi_table_set], "none (reference types)"),
+  (``Wasm.Instr.table_size, [``wpi_table_size], "none (reference types)"),
+  (``Wasm.Instr.table_grow, [``wpi_table_grow, ``wpi_table_grow_fail], "none (reference types)"),
+  (``Wasm.Instr.table_fill, [``wpi_table_fill], "none (reference types)"),
+  (``Wasm.Instr.table_copy, [``wpi_table_copy], "none (bulk memory)"),
+  (``Wasm.Instr.table_init, [``wpi_table_init], "none (bulk memory)"),
+  (``Wasm.Instr.elem_drop, [``wpi_elem_drop], "none (bulk memory)"),
+  (``Wasm.Instr.memory_fill, [``wpi_memory_fill], "none (bulk memory)"),
+  (``Wasm.Instr.memory_copy, [``wpi_memory_copy], "none (bulk memory)"),
+  (``Wasm.Instr.memory_init, [``wpi_memory_init], "none (bulk memory)"),
+  (``Wasm.Instr.data_drop, [``wpi_data_drop], "none (bulk memory)")]
 
 /-- Constructors without rules, and why. -/
-def outOfScope : List (Name × String) := [
-  (``Wasm.Instr.table_get, "reference types, off in nearcore"),
-  (``Wasm.Instr.table_set, "reference types, off in nearcore"),
-  (``Wasm.Instr.table_size, "reference types, off in nearcore"),
-  (``Wasm.Instr.table_grow, "reference types, off in nearcore"),
-  (``Wasm.Instr.table_fill, "reference types, off in nearcore"),
-  (``Wasm.Instr.table_copy, "bulk memory, off in nearcore"),
-  (``Wasm.Instr.table_init, "bulk memory, off in nearcore"),
-  (``Wasm.Instr.elem_drop, "bulk memory, off in nearcore"),
-  (``Wasm.Instr.memory_fill, "bulk memory, off in nearcore"),
-  (``Wasm.Instr.memory_copy, "bulk memory, off in nearcore"),
-  (``Wasm.Instr.memory_init, "bulk memory, off in nearcore"),
-  (``Wasm.Instr.data_drop, "bulk memory, off in nearcore")]
+def outOfScope : List (Name × String) := []
 
 /-- Structural rules, with Iris-Wasm's counterpart. -/
 def structural : List (Name × String) := [

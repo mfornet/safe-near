@@ -15,9 +15,13 @@ from a table over it.
 - `Specs.lean` and `Map.lean` state and prove every function's
   specification, instruction by instruction with the rules, for every stack
   and every argument. Nothing runs the machine on an input.
-- [`../Client`](../Client) links a client against the module with the
-  runtime's linker and proves its `main` end to end from these
-  specifications.
+- [`../Client`](../Client) is Iris-Wasm's client: it imports the stack's
+  functions and table, installs `square` with an element segment and runs
+  `main` as its start function, which maps `square` over a stack and stores
+  36 - 16 = 20 in the global `answer`. `client_adequate` proves, for any
+  fuel, what the whole pipeline (validation, the runtime's linker,
+  `Link.instantiate` running the start function) does: it never traps, and
+  `answer` ends 20, or -1 when no page is left.
 
 ## Lemma by lemma
 
@@ -34,7 +38,8 @@ from a table over it.
 | `stack_common.v`: `stackAll`, `stackAll2` | same names (`Map.lean`) |
 | `stack_map.v`: `spec_map_loop_body_terminate`, `spec_map_loop_body_continue`, `spec_map_loop_j` | `spec_map_loop`, by induction on `j`, its two cases being the two loop-body lemmas |
 | `stack_map.v`: `spec_map_op`, `spec_stack_map` | same names |
-| `stack_instantiation.v`, `stack_client.v` | `Client/Main.lean`: `linked_instantiates`, `main_spec`, `main_adequate` |
+| `stack_client.v`: `main`, `square`, `client_module` | `Client/Code.lean`: `main`, `square`, `clientModule` (decoded from `client.wasm`) |
+| `stack_client.v`, `stack_instantiation.v`: the client's and the stack's instantiation, `main`'s spec | `Client/Main.lean`: `client_links`, `square_spec`, `main_spec`, `start_adequate`, `client_adequate` |
 
 Not ported, as the criteria note scopes it: `stack_map_trap.v` (the variant
 where the callee may trap), the logical relation and robust safety
@@ -81,7 +86,7 @@ asks for at most 1.5×):
 
 `scripts/mutation-test.py` changes one instruction at a time in the decoded
 stack and client modules and checks that a proof fails; the decode theorems
-are stubbed while it runs, so only the specifications can notice. All 19
+are stubbed while it runs, so only the specifications can notice. All 21
 mutants are killed:
 
 | # | Mutant | Killed in |
@@ -104,4 +109,6 @@ mutants are killed:
 | 16 | `stack_map` starts at the top | `Map.lean` |
 | 17 | the client pushes 7 | `Client/Main.lean` |
 | 18 | the client adds the popped values | `Client/Main.lean` |
-| 19 | the client returns 0 when `new_stack` fails | `Client/Main.lean` |
+| 19 | the client stores 0 when `new_stack` fails | `Client/Main.lean` |
+| 20 | the client maps with table entry 1 | `Client/Main.lean` |
+| 21 | `square` doubles | `Client/Main.lean` |

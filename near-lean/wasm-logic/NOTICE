@@ -1,9 +1,10 @@
 WasmLogic contains material ported from Iris-Wasm
 (https://github.com/logsem/iriswasm, commit
-e37f8387a1171d104d78a2f77f9e637e090cf3d4): the stack module of
-theories/iris/examples/stack/ (WasmLogic/Examples/Stack/stack.wat and the
-fragments of Code.lean), the statements of its specifications and the loop
-invariant of stack_map (Specs.lean, Map.lean), and the names of the
+e37f8387a1171d104d78a2f77f9e637e090cf3d4): the stack module and its client
+from theories/iris/examples/stack/ (WasmLogic/Examples/Stack/stack.wat,
+WasmLogic/Examples/Client/client.wat and the fragments of their Code.lean),
+the statements of their specifications and the loop invariant of stack_map
+(Stack/Specs.lean, Stack/Map.lean, Client/Main.lean), and the names of the
 instruction rules (Coverage.lean). The proofs are written anew in Lean. Its
 licence:
 

@@ -8,9 +8,11 @@ import WasmLogic.Rules.Pure
 import WasmLogic.Rules.Memory
 import WasmLogic.Rules.Control
 import WasmLogic.Rules.Call
+import WasmLogic.Rules.Table
 import WasmLogic.Adequacy
 import WasmLogic.Coverage
 import WasmLogic.Examples.Sum
+import WasmLogic.Examples.Bulk
 import WasmLogic.Examples.Stack.Code
 import WasmLogic.Examples.Stack.Specs
 import WasmLogic.Examples.Stack.Map

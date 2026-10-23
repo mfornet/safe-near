@@ -23,17 +23,18 @@ package is written from iris-lean, the runtime and Iris-Wasm (MIT, see
 | `Resources.lean` | The state interpretation (`ghost_map_auth` over `heapOf σ`), the points-to assertions and their Iris-Wasm notations (`↦[wm]`, `↦[wms]`, `↦[i32]`, `↦[wmlength]`, `↪[wmlimit]`, `↦[wg]`, `↦[wt]`, `↪[wf]`, `↪[inst]`, `↦[host]`), and the lifting lemmas over `Exec.step` with small footprints. |
 | `Frag.lean` | The weakest precondition of a fragment, `wpi lim d f vs es Φ`: instructions `es` in frame `f` (locals, module instance) at call depth `d`, ending normally, by a branch, by a return or by a trap as `Φ : Post` says. Bind (`wpi_seq`), framing (`wpi_wand`) and the generic instruction rule. |
 | `Tactic.lean` | `wp_step k rule` and friends for stepping through code; `kernel_rfl` for equations the kernel evaluates (decoding, validation, linking). |
-| `Rules/Pure.lean`, `Rules/Memory.lean`, `Rules/Control.lean`, `Rules/Call.lean` | One rule per instruction (table below), with the footprint the instruction touches: the bytes, the global, the table entry, the frame. `wpInvoke` is the specification of a function invocation; `call` to a host function is against a contract (`HostContract`), not an implementation. |
+| `Rules/Pure.lean`, `Rules/Memory.lean`, `Rules/Control.lean`, `Rules/Call.lean`, `Rules/Table.lean` | One rule per instruction (table below), with the footprint the instruction touches: the bytes, the global, the table entries, the segment, the frame. `wpInvoke` is the specification of a function invocation; `call` to a host function is against a contract (`HostContract`), not an implementation. `Rules/Table.lean` adds the assertions for table sizes and segments (`tableInfoPt`, `↦[wts]`, `↦[welem]`, `↦[wdata]`). |
 | `Adequacy.lean` | The closed resource family and the adequacy theorems back to `Exec.run`. |
-| `Coverage.lean` | `#check_rule_coverage`: fails the build unless every `Wasm.Instr` constructor has its rules, or is listed out of scope. |
+| `Coverage.lean` | `#check_rule_coverage`: fails the build unless every `Wasm.Instr` constructor has its rules (all 56 do). |
 | `Examples/Sum.lean` | A counting loop proved for every input by induction, and its adequacy corollary. |
+| `Examples/Bulk.lean` | Fragments using the table and bulk-memory rules. |
 | `Examples/Stack/` | Iris-Wasm's stack module, from bytes, and every function's specification. |
-| `Examples/Client/` | A client module linked against the stack by the runtime's linker, proved from the stack's specifications, end to end. |
+| `Examples/Client/` | Iris-Wasm's client of the stack, linked by the runtime's linker and run as its start function, proved from the stack's specifications, end to end (`client_adequate`). |
 
 ## What to trust
 
-The end-to-end theorems (`sum_adequate`, `main_adequate`, and the
-`*_decodes`/`*_instantiates` theorems they rest on) are statements about
+The end-to-end theorems (`sum_adequate`, `client_adequate`, and the
+`*_decodes`/`*_instantiates`/`client_links` theorems they rest on) are statements about
 `Wasm.Exec.run`, `Wasm.Binary.decode`, `Wasm.Module.validate` and
 `Wasm.Link`: nothing in this package needs to be trusted to read them.
 
@@ -42,8 +43,8 @@ means what adequacy makes it mean. Reading one trusts:
 
 - `Language.lean`: the `Language` instance (step = `Exec.step`);
 - `Heap.lean`: `lookup`, what each location holds;
-- `Resources.lean`: the state interpretation and the definitions of the
-  points-to assertions;
+- `Resources.lean` and the assertion definitions at the top of
+  `Rules/Table.lean`: the state interpretation and the points-to assertions;
 - `Frag.lean` and `Rules/Call.lean`: `wpi`, `Post`, `Kont` and `wpInvoke`;
 - `Adequacy.lean`: the statements of `wp_adequacy_cells` (the root),
   `adequacy_cells` and `adequacy`.
@@ -54,9 +55,12 @@ Everything else is a lemma. Proofs use only the standard axioms:
 ## Rules
 
 Every rule names its Iris-Wasm counterpart; `Coverage.lean` holds this table
-and checks it against `Wasm.Instr` on every build. Out of scope is what
-nearcore keeps behind `reftypes_bulk_memory`, off in every protocol version
-the project models.
+and checks it against `Wasm.Instr` on every build. Every instruction has a
+rule: nearcore enables reference types and bulk memory (`NearVM` validates
+with `Features.nearcore true`), so the table and bulk-memory instructions,
+which Iris-Wasm (a Wasm 1.0 logic) does not have, get rules in the same
+style (`Rules/Table.lean`). Their bulk forms are for non-empty ranges, and
+`table.copy` / `memory.copy` for ranges that do not overlap.
 
 | Instruction | Lean rules | Iris-Wasm |
 |---|---|---|
@@ -104,8 +108,18 @@ the project models.
 | `f32_relop` | `wpi_f32_relop` | wp_relop |
 | `f64_relop` | `wpi_f64_relop` | wp_relop |
 | `cvt` | `wpi_cvt`, `wpi_cvt_trap` | wp_cvtop_convert, wp_cvtop_convert_failure, wp_cvtop_reinterpret |
-
-Out of scope: `table_get`, `table_set`, `table_size`, `table_grow`, `table_fill`, `table_copy`, `table_init`, `elem_drop`, `memory_fill`, `memory_copy`, `memory_init`, `data_drop`.
+| `table_get` | `wpi_table_get` | none (reference types) |
+| `table_set` | `wpi_table_set` | none (reference types) |
+| `table_size` | `wpi_table_size` | none (reference types) |
+| `table_grow` | `wpi_table_grow`, `wpi_table_grow_fail` | none (reference types) |
+| `table_fill` | `wpi_table_fill` | none (reference types) |
+| `table_copy` | `wpi_table_copy` | none (bulk memory) |
+| `table_init` | `wpi_table_init` | none (bulk memory) |
+| `elem_drop` | `wpi_elem_drop` | none (bulk memory) |
+| `memory_fill` | `wpi_memory_fill` | none (bulk memory) |
+| `memory_copy` | `wpi_memory_copy` | none (bulk memory) |
+| `memory_init` | `wpi_memory_init` | none (bulk memory) |
+| `data_drop` | `wpi_data_drop` | none (bulk memory) |
 
 | Structural | Iris-Wasm |
 |---|---|
@@ -119,7 +133,6 @@ Out of scope: `table_get`, `table_set`, `table_size`, `table_grow`, `table_fill`
 | `adequacy_cells` | wp_adequacy, instantiated to Exec.run: values, traps and final cells |
 | `adequacy` | wp_adequacy, instantiated to Exec.run, pure postconditions |
 
-
 ## Checks
 
 | Check | What it catches | Where |
@@ -127,8 +140,8 @@ Out of scope: `table_get`, `table_set`, `table_size`, `table_grow`, `table_fill`
 | `lake build --wfail` | every proof, the rule coverage table, the decode/validate/link theorems of the examples | CI (`wasm-logic` workflow), periodic check |
 | axiom audit | `sorry`, `native_decide`, non-standard axioms | CI, periodic check |
 | `scripts/check-wasm-bytes.sh` | a committed `.wasm` or byte literal out of date with its `.wat` (pinned wasm-tools) | CI, periodic check |
-| `scripts/smoke-client.sh` | the linked client, run by the runtime's testsuite runner, returns what `main_adequate` says | CI, periodic check |
-| `scripts/mutation-test.py` | specifications too weak to notice a changed instruction: 19 mutants, all must break a proof | periodic check (a few minutes) |
+| `scripts/smoke-client.sh` | the linked client, run by the runtime's testsuite runner, leaves in `answer` what `client_adequate` says | CI, periodic check |
+| `scripts/mutation-test.py` | specifications too weak to notice a changed instruction: 21 mutants, all must break a proof | periodic check (a few minutes) |
 | `tools/tests/test_wasm_logic.py` | stale byte literals, unbuilt modules, escape hatches, a coverage table or mutation suite out of date, a non-Wasm dependency | every push and PR, in seconds |
 | `scripts/proof-lines.py <iriswasm>` | proof size against Iris-Wasm's | by hand; result in the stack README |
 

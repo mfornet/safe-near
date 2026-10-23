@@ -232,6 +232,21 @@ theorem lookup_of_mem {xs : List (Loc × Cell H)} (hnd : (xs.map (·.1)).Nodup) 
     · have hne : p.1 ≠ k := fun h => hq (h ▸ List.mem_map_of_mem (f := (·.1)) hp)
       simp [hne, ih hnd hp]
 
+theorem mem_of_lookup {xs : List (Loc × Cell H)} {k : Loc} {c : Cell H} (h : xs.lookup k = some c) :
+    (k, c) ∈ xs := by
+  induction xs with
+  | nil => simp at h
+  | cons p xs ih =>
+    obtain ⟨k', c'⟩ := p
+    simp only [List.lookup_cons] at h
+    split at h
+    · rename_i hk
+      cases h
+      simp only [beq_iff_eq] at hk
+      subst hk
+      exact List.mem_cons_self
+    · exact List.mem_cons_of_mem _ (ih h)
+
 theorem lookup_eq_none_of_not_mem {xs : List (Loc × Cell H)} {l : Loc}
     (h : l ∉ xs.map (·.1)) : xs.lookup l = none := by
   induction xs with
