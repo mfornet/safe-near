@@ -314,51 +314,94 @@ statement, the instance, the model extensions, re-proved specs and tests.
 
 ## 10. Progress and decisions taken while implementing
 
-### Step 1 — done
+### Status
 
-`near-lean/interface` (`NearInterface`) holds the raw types, config, errors,
-trie overlay, `Context` (plus `outputDataReceivers`, which the VM needs),
-`Context.WF`, `Failure`, `Observation`, `RuntimeInterface`, `ContractModel`,
-`Refines` and the four generic lemmas. Departures from sections 3–6:
+| Step | State |
+|---|---|
+| 1. `near-lean/interface` | done |
+| 2. near-lean boundary and instance | done, except the proofs listed below |
+| 3. wNEAR | done: model extensions, instance, statement, re-proved specs, tests |
+| 4. linkdrop | old statement removed; instance blocked on near-lean (below) |
+| 5. Tests | wNEAR adapter tests on the boundary (205 checks) |
+| 6. Docs | wNEAR README and blueprint, linkdrop README, `SPECIFICATIONS.md` |
 
-- `Refines` has a second hypothesis, `ctx.WF raw`: the guarantees the
-  runtime gives every context it builds (integer widths, usage counting the
-  records, the trie holding `raw`). It does not depend on the call or the
+### Departures from sections 3–6
+
+- `Refines` has a second hypothesis, `ctx.WF raw`: what the runtime guarantees
+  for every context it builds (integer widths, usage counting the records, a
+  canonical trie holding `raw`). It does not depend on the call or the
   contract, so it does not reintroduce `Supports`-style exclusions.
 - The gas clause compares against `ctx.gasLimit = min prepaidGas
-  maxGasBurnt`, not `prepaidGas`: above the burn limit, more prepaid gas does
-  not help.
-- `step` returns `Failed` with logs, so the third open item (logs up to the
-  failing point) is answered by `Matches` comparing `f.logs` exactly.
+  maxGasBurnt`: above the burn limit more prepaid gas does not help.
+- `Context` also carries `outputDataReceivers` (the VM reads them).
+- `ContractModel.panicMessage : Panic → String` became
+  `panicFailure : Panic → Failure`. A contract can deterministically trigger a
+  host error that is not a guest panic: wNEAR's `ft_resolve_transfer` without
+  a promise result fails with `InvalidPromiseResultIndex`.
+- `step` returns `Failed` with logs: a failure keeps the logs emitted before
+  it. So the third open item is settled: `Matches` compares failure logs
+  exactly. In wNEAR two panic sites follow a log (`near_withdraw` logs before
+  its `amount + 1` overflow, `ft_transfer_call` logs the transfer before its
+  gas subtraction); `Panic.logs` gives them from the panic's own data.
+- `applyFunctionCall` is not refactored to call the boundary. About a dozen
+  runtime invariants pattern-match its body. The boundary uses the same `run`
+  call and fuel, and the seam is a theorem,
+  `functionCallContext_eq_toVMContext`. `storageStakeDeficit` in `Apply.lean`
+  is `NearInterface.stakeDeficit`, so there is one formula.
 
-### Step 2 — in progress (`near-lean/runtime/NearRuntime/Boundary.lean`)
+### Open items of section 9
 
-- **Seam by theorem, not by refactoring `applyFunctionCall`.** About a dozen
-  runtime invariants (`GasInvariants`, `FunctionCallInvariants`,
-  `PromiseGasInvariants`, ...) pattern-match the body of `applyFunctionCall`.
-  Instead of routing it through a new function, the boundary uses the same
-  `run` call and fuel, and the seam is stated as
-  `functionCallContext_eq_toVMContext` (the receipt executor's VM context is
-  `toVMContext` of the matching boundary context). `storageStakeDeficit` in
-  `Apply.lean` is now defined as `NearInterface.stakeDeficit`, so there is
-  one formula.
-- Still to prove: for a receipt whose only action is a function call,
-  `runReceiptActions` agrees with `execOn` on everything `Observation` holds
-  (the receipt's action fees aside).
-- **Storage listing.** The VM reads storage from a list; `RawStorage` is a
-  `Finset`, so `nearRuntime` uses `raw.toList` (noncomputable). Obligation:
-  `execOn` depends on the listing only through its `toFinset` (keys are
-  unique, so lookups agree; `storageKeys` order must not leak into gas or
-  outputs). The adapter tests use the computable `execOn`.
-- **Fuel.** The naive bound `prepaidGas / regularOpCost + c` is false for
-  this interpreter: `block` entry and falling off the end of a block or frame
-  cost no gas (`nextInstructionGas`). Between two charged steps, the free
-  steps are bounded by the nesting depth of labels times the call depth
-  (≤ `execLimits.maxCallDepth`), so a sound fuel is
-  `(gasLimit / regularOpCost + 1) * (2 * codeSize + 2) * (maxCallDepth + 1)`,
-  given `regularOpCost > 0` in the config. Not proved yet. The instance keeps
-  `defaultFuel`, like `applyFunctionCall`, until it is.
-- Error mapping (`failureOf`): `guestPanic` → `panic`, `gasExceeded` /
-  `gasLimitExceeded` → `outOfGas`, `balanceExceeded`, `methodNotFound`;
-  anything with `FunctionCallError.issue?`, plus action-conversion failures,
-  → `executionIssue`; everything else → `other`, using nearcore's message.
+- **JSON.** `NearInterface.Json` is a byte-level parser written to accept
+  exactly what `serde_json::from_slice` (1.0.60) accepts, plus serde's derived
+  struct `Deserialize` (object with each known field at most once and unknown
+  fields ignored, or an array of exactly one element per field) and near-sdk's
+  `U128` and `ValidAccountId`. Agreement was tested by running
+  `contract.wasm`: array-form arguments, duplicate fields, escaped keys, lone
+  surrogates, leading zeros, huge exponents and 129-deep nesting in ignored
+  values, trailing data. Methods without parameters never read their input,
+  so every byte string is a call to them. `Parses` is the graph of a decoding
+  function, so it is functional by construction.
+- **Worst-case storage cost.** A cold lookup touches at most one node per
+  nibble of `contractKey account key`, plus the root. wNEAR's bound pays that
+  for each distinct key a call touches (`STATE` and at most two accounts) and
+  the cached price for each access. No bound on `ctx.trie` was needed. The
+  bound is not proved; the adapter tests check it on an adversarial state
+  whose registered accounts share ever longer key prefixes with the accounts a
+  transfer touches. Consequence worth knowing: `ft_transfer_call` reserves
+  25 Tgas for itself (`GAS_FOR_FT_TRANSFER_CALL - GAS_FOR_RESOLVE_TRANSFER`),
+  and the worst-case bound must stay under it for the positive clause to apply
+  to `ft_transfer_call`; with the current constants it does for arguments up to
+  roughly 15 KB.
+
+### Proof obligations still open
+
+- **Fuel.** The naive `prepaidGas / regularOpCost + c` is false for this
+  interpreter: `block` entry and falling off the end of a block or frame cost
+  no gas (`nextInstructionGas`). Between two charged steps the free steps are
+  bounded by label nesting times call depth (≤ `execLimits.maxCallDepth`), so
+  `(gasLimit / regularOpCost + 1) * (2 * codeSize + 2) * (maxCallDepth + 1)`
+  fuel suffices given `regularOpCost > 0`. Not proved; the instance keeps
+  `defaultFuel`, like `applyFunctionCall`.
+- **Storage listing.** The VM reads storage from a list and `RawStorage` is a
+  set, so `nearRuntime` uses `raw.toList`. That `execOn` depends on the listing
+  only through its set is not proved. The adapter tests use the computable
+  `execOn`.
+- **Whole receipt.** For a receipt whose only action is a function call,
+  `runReceiptActions` agrees with `execOn` on what `Observation` holds (action
+  fees aside). Not proved.
+- **wNEAR.** `refines_wnear` itself, including the soundness of `gasBound`.
+
+### linkdrop
+
+near-lean cannot run linkdrop's binary: it imports five host functions NearVM
+does not provide (weighted function calls and global contracts). Exact panic
+texts, receipt bytes and a gas bound all come from running the binary, so the
+instance is not stated with guessed parts; `contracts/linkdrop/verification/README.md`
+lists what it needs. The old divergent statement is removed.
+
+### Environment notes
+
+- `near-lean/.lake` was tracked as a symlink into one machine's home
+  directory; it is no longer tracked.
+- `just near-test`'s runtime tests need the external `wasm-tools` binary for a
+  decoder fixture.
