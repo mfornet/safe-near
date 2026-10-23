@@ -318,7 +318,7 @@ theorem spec_is_full_op (f : Frame) (n v : Nat) (s : List UInt32) :
   have hmod : UInt32.ofNat (v + s.length * 4) % 65536 = UInt32.ofNat (s.length * 4) := by
     apply UInt32.toNat_inj.mp
     simp only [two16, two14] at hdiv hlen
-    simp [UInt32.toNat_mod, ofNat_toNat_of_lt hp, ofNat_toNat_of_lt (show s.length * 4 < 2 ^ 32 by omega)]
+    simp [UInt32.toNat_mod]
     omega
   have heq : (UInt32.ofNat (s.length * 4) == 65532) = decide (s.length = two14 - 1) := by
     have := ofNat_beq (a := s.length * 4) (b := 65532) (by simp only [two14] at hlen; omega) (by omega)

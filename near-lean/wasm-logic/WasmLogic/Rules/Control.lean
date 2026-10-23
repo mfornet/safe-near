@@ -204,7 +204,7 @@ theorem next_br_if (σ : Store H) (lim : ExecLimits) (C : Ctx) (f : Frame) (vs :
     next σ lim (C.thread f (vs ++ [.i32 c]) L (.br_if n :: R)) =
       next σ lim (C.thread f vs L [.br n]) := by
   simp only [next, Code.config, Exec.step, Exec.instr, Exec.i32, Exec.branch, Ctx.thread,
-    Ctx.threadA, List.append_assoc]
+    Ctx.threadA]
   simp only [List.pop_toArray, List.back?_toArray, ← List.append_assoc, List.dropLast_concat,
     List.getLast?_concat, Option.getD_some, bne_iff_ne, ne_eq, hc, not_false_eq_true, ite_true]
   rcases hL : L[n]? with _ | label
@@ -216,7 +216,7 @@ theorem next_br_table (σ : Store H) (lim : ExecLimits) (C : Ctx) (f : Frame) (v
     next σ lim (C.thread f (vs ++ [.i32 c]) L (.br_table ls dflt :: R)) =
       next σ lim (C.thread f vs L [.br (ls[c.toNat]?.getD dflt)]) := by
   simp only [next, Code.config, Exec.step, Exec.instr, Exec.i32, Exec.branch, Ctx.thread,
-    Ctx.threadA, List.append_assoc]
+    Ctx.threadA]
   simp only [List.pop_toArray, List.back?_toArray, ← List.append_assoc, List.dropLast_concat,
     List.getLast?_concat, Option.getD_some]
   rcases hL : L[ls[c.toNat]?.getD dflt]? with _ | label
@@ -519,12 +519,16 @@ theorem wpi_loop0 (bt : BlockType) (body : List Instr) (vs₀ : List Value)
   have := wpi_loop (Φ := Φ) (lim := lim) (d := d) (f := f) bt body vs₀ [] (by simp [hp])
   simpa [hp] using this
 
+omit [WasmGS H GF] in
 @[simp] theorem Post.block_normal (r : Nat) (vs₀ : List Value) (Φ : Post H GF) (vs : List Value)
     (g : Frame) : (Post.block r vs₀ Φ).normal vs g = Φ.normal (vs₀ ++ vs) g := rfl
+omit [WasmGS H GF] in
 @[simp] theorem Post.block_br_succ (r : Nat) (vs₀ : List Value) (Φ : Post H GF) (n : Nat)
     (X : List Value) (g : Frame) : (Post.block r vs₀ Φ).br (n + 1) X g = Φ.br n (vs₀ ++ X) g := rfl
+omit [WasmGS H GF] in
 @[simp] theorem Post.block_ret (r : Nat) (vs₀ : List Value) (Φ : Post H GF) (X : List Value)
     (g : Frame) : (Post.block r vs₀ Φ).ret X g = Φ.ret (vs₀ ++ X) g := rfl
+omit [WasmGS H GF] in
 @[simp] theorem Post.block_trap (r : Nat) (vs₀ : List Value) (Φ : Post H GF) :
     (Post.block r vs₀ Φ).trap = Φ.trap := rfl
 

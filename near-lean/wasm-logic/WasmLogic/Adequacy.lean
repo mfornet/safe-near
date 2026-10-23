@@ -89,6 +89,33 @@ theorem pointsTo_persist {GF' : BundledGFunctors} [ι : WasmGS H GF'] (l : Loc) 
   iintro H
   iapply ghost_map_elem_persist $$ H
 
+theorem mem_of_lookup {xs : List (Loc × Cell H)} {k : Loc} {c : Cell H} (h : xs.lookup k = some c) :
+    (k, c) ∈ xs := by
+  induction xs with
+  | nil => simp at h
+  | cons p xs ih =>
+    obtain ⟨k', c'⟩ := p
+    simp only [List.lookup_cons] at h
+    split at h
+    · rename_i hk
+      cases h
+      simp only [beq_iff_eq] at hk
+      subst hk
+      exact List.mem_cons_self
+    · exact List.mem_cons_of_mem _ (ih h)
+
+/-- Take a list of cells out of the ownership of a heap, dropping the rest:
+how a proof picks the cells of the initial store it needs. -/
+theorem ownCells_take {GF' : BundledGFunctors} [WasmGS H GF'] (m : HeapF (Cell H))
+    (xs : List (Loc × Cell H)) (hnd : (xs.map (·.1)).Nodup)
+    (h : ∀ p ∈ xs, get? m p.1 = some p.2) :
+    ownCells (GF := GF') m ⊢ [∗list] p ∈ xs, p.1 ↦ₛ p.2 := by
+  refine (BigSepM.bigSepM_subseteq (Φ := fun l c => iprop(l ↦ₛ c)) ?_).trans
+    (ownCells_cellsOf xs hnd).1
+  intro k c hk
+  rw [get?_cellsOf] at hk
+  exact h _ (mem_of_lookup hk)
+
 theorem startWasm_eq {σ : Store H} {lim : ExecLimits} {a : Nat} {args : List Value} {c : Config H}
     (hc : Exec.startWasm σ lim a args = some c) :
     ∃ type inst code, σ.funcs[a]? = some (.wasm type inst code) ∧

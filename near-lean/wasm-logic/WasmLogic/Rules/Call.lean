@@ -79,7 +79,7 @@ theorem popN_snd (A X : List Value) (r : Nat) (hr : r ≤ X.length) :
   apply List.ext_getElem
   · simp; omega
   · intro k h1 h2
-    simp [Array.getElem_extract, List.getElem_append_right (show A.length ≤ A.length + X.length - r + k by omega)]
+    simp [List.getElem_append_right (show A.length ≤ A.length + X.length - r + k by omega)]
     congr 1; omega
 
 /-- The context of a function body: its operands `bs` and frames `fs` below. -/
@@ -147,7 +147,7 @@ theorem next_call_wasm (σ : Store H) (lim : ExecLimits) (C : Ctx) (f : Frame)
   rw [hlen] at hp
   simp only [List.append_assoc] at hp
   simp [Exec.enter, hfn, show ¬(lim.maxCallDepth ≤ C.below.length + 1) by omega, hp, calleeThread,
-    entryLocals, hlen]
+    entryLocals]
 
 /-- A step of an instruction that calls. -/
 theorem next_instr_call (σ : Store H) (lim : ExecLimits) (C : Ctx) (f : Frame) (vs : List Value)
@@ -419,7 +419,7 @@ theorem lookup_setHostMem (σ : Store H) (h' : H) (n : Nat) (mem' : Memory) (hn 
   by_cases h9 : k = 9 ∧ a = 0 ∧ i = 0
   · obtain ⟨rfl, rfl, rfl⟩ := h9
     simp [lookup]
-  · rw [if_neg h9]
+  · rw [ite_eq_right h9]
     split
     · rfl
     · by_cases hk : k = 9
@@ -451,22 +451,22 @@ theorem wpi_call_host (i a n : Nat) (fn : HostFn H) (h h' : H) (mx : Option Nat)
       · simp [Loc.host, Loc.memLength] at h1
       · have := lookup_byteCells (H := H) n 0 bs p.1
         rw [lookup_of_mem (byteCells_nodup _ _ _) hp, hp1] at this
-        simp [Loc.host] at this
+        simp [] at this
     · rintro ⟨p, hp, hp1⟩
       have := lookup_byteCells (H := H) n 0 bs p.1
       rw [lookup_of_mem (byteCells_nodup _ _ _) hp, hp1] at this
-      simp [Loc.memLength] at this
+      simp [] at this
   · simp only [List.map_cons, List.nodup_cons, List.mem_cons, List.mem_map]
     refine ⟨?_, ?_, byteCells_nodup _ _ _⟩
     · rintro (h1 | ⟨p, hp, hp1⟩)
       · simp [Loc.host, Loc.memLength] at h1
       · have := lookup_byteCells (H := H) n 0 bs' p.1
         rw [lookup_of_mem (byteCells_nodup _ _ _) hp, hp1] at this
-        simp [Loc.host] at this
+        simp [] at this
     · rintro ⟨p, hp, hp1⟩
       have := lookup_byteCells (H := H) n 0 bs' p.1
       rw [lookup_of_mem (byteCells_nodup _ _ _) hp, hp1] at this
-      simp [Loc.memLength] at this
+      simp [] at this
   · intro σ hRd hP
     have hmi := hmi_of_see hRd
     have hfn : σ.funcs[a]? = some (.host fn) := by
@@ -498,7 +498,7 @@ theorem wpi_call_host (i a n : Nat) (fn : HostFn H) (h h' : H) (mx : Option Nat)
           { σ with host := h', mems := σ.mems.set! n mem' }) := by
       simp only [next, Code.config, Exec.step, Ctx.thread, Ctx.threadA]
       simp [Exec.instr, modules_get! hmi, ha, Exec.enter, hfn, hp, hmi, Store.memOf, hn, hmem, hhost,
-        hcall, Exec.commitHost, Store.setMemOf, hlen]
+        hcall, Exec.commitHost, Store.setMemOf]
     rw [hnext]
     refine ⟨rfl, ?_⟩
     intro ⟨k, b, j⟩
@@ -507,10 +507,10 @@ theorem wpi_call_host (i a n : Nat) (fn : HostFn H) (h h' : H) (mx : Option Nat)
     simp only [Loc.host, Loc.memLength, Prod.mk.injEq, Nat.zero_add]
     by_cases h9 : k = 9 ∧ b = 0 ∧ j = 0
     · obtain ⟨rfl, rfl, rfl⟩ := h9; simp
-    · rw [if_neg h9, if_neg h9]
-      simp only [show ¬(k = 9 ∧ b = 0 ∧ j = 0) from h9, if_false]
+    · rw [ite_eq_right h9, ite_eq_right h9]
+      simp only [show ¬(k = 9 ∧ b = 0 ∧ j = 0) from h9, ite_false]
       by_cases hk : (k = 0 ∨ k = 1) ∧ b = n
-      · rw [if_pos hk]
+      · rw [ite_eq_left hk]
         obtain ⟨hk, rfl⟩ := hk
         rw [lookup_mem _ _ _ _ hk, hmem, Option.bind_some]
         rcases hk with rfl | rfl
@@ -519,8 +519,8 @@ theorem wpi_call_host (i a n : Nat) (fn : HostFn H) (h h' : H) (mx : Option Nat)
           · by_cases hj : j < bs.length
             · simp [memCell, hwf', hsz', hj', hj]
             · simp [memCell, hwf, hwf', hsz', hlenm, hj', hj]
-        · rcases j with _ | _ | j <;> simp [memCell, hwf, hwf', hsz', hlenm, hmax, hmax']
-      · rw [if_neg hk]
+        · rcases j with _ | _ | j <;> simp [memCell, hwf, hwf', hsz', hmax, hmax']
+      · rw [ite_eq_right hk]
         have h1 : ¬(k = 1 ∧ b = n ∧ j = 0) := fun e => hk ⟨.inr e.1, e.2.1⟩
         have h2 : ∀ len, ¬(k = 0 ∧ b = n ∧ j < len) := fun _ e => hk ⟨.inl e.1, e.2.1⟩
         simp [h1, h2]
@@ -528,13 +528,13 @@ theorem wpi_call_host (i a n : Nat) (fn : HostFn H) (h h' : H) (mx : Option Nat)
     obtain ⟨mem, hmem, hwf, hlenm⟩ := memLength_facts (hP _ (List.mem_cons_of_mem _ List.mem_cons_self))
     obtain ⟨k, b, j⟩ := l
     rw [lookup_cons_pair, lookup_cons_pair, lookup_byteCells] at hq hp
-    simp only [Loc.host, Loc.memLength, Prod.mk.injEq, Nat.zero_add, List.lookup_nil] at hq hp
+    simp only [Loc.host, Loc.memLength, Prod.mk.injEq, Nat.zero_add] at hq hp
     split at hq
-    · rename_i e; rw [if_pos e] at hp; cases hp
-    · rename_i e9; rw [if_neg e9] at hp
+    · rename_i e; rw [ite_eq_left e] at hp; cases hp
+    · rename_i e9; rw [ite_eq_right e9] at hp
       split at hq
-      · rename_i e; rw [if_pos e] at hp; cases hp
-      · rename_i e1; rw [if_neg e1] at hp
+      · rename_i e; rw [ite_eq_left e] at hp; cases hp
+      · rename_i e1; rw [ite_eq_right e1] at hp
         split at hq
         · rename_i e
           obtain ⟨rfl, rfl, _, hj⟩ := e

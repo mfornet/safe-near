@@ -84,7 +84,7 @@ theorem read8_write8 {m : Memory} (hwf : m.wf) {a : Nat} (ha : a < m.byteSize) (
   unfold read8 write8
   simp only [Array.getElem?_modify]
   by_cases hpage : a / pageSize = j / pageSize
-  · rw [if_pos hpage, ← hpage, hp]
+  · rw [ite_eq_left hpage, ← hpage, hp]
     simp only [Option.map_some, ByteArray.size_set!, hpsz, hpos, ite_false]
     by_cases hja : j = a
     · subst hja
@@ -93,10 +93,10 @@ theorem read8_write8 {m : Memory} (hwf : m.wf) {a : Nat} (ha : a < m.byteSize) (
         intro h
         apply hja
         rw [← Nat.div_add_mod j pageSize, ← Nat.div_add_mod a pageSize, hpage, h]
-      rw [ByteArray.getElem!_set!_ne _ _ _ _ hne, if_neg hja,
+      rw [ByteArray.getElem!_set!_ne _ _ _ _ hne, ite_eq_right hja,
         materialise_get! (Nat.mod_lt _ pageSize_pos)]
   · have hja : j ≠ a := fun h => hpage (h ▸ rfl)
-    rw [if_neg hpage, if_neg hja]
+    rw [ite_eq_right hpage, ite_eq_right hja]
 
 /-! ## Writing a run of bytes -/
 
@@ -123,7 +123,7 @@ theorem writeRun_spec {m : Memory} (hwf : m.wf) {addr len : Nat} (hb : addr + le
     rw [read8_write8 hwf' (by omega), hrd]
     by_cases hj : j = addr + n
     · subst hj; simp
-    · simp only [hj, if_false]
+    · simp only [hj, ite_false]
       by_cases h1 : addr ≤ j ∧ j < addr + n
       · simp [h1, show addr ≤ j ∧ j < addr + (n + 1) from ⟨h1.1, by omega⟩]
       · have : ¬(addr ≤ j ∧ j < addr + (n + 1)) := by omega
@@ -166,9 +166,9 @@ theorem grow_spec {m : Memory} (hwf : m.wf) {delta : Nat} {m' : Memory}
     · left; simp
   · simp [byteSize, Nat.add_mul]
   · by_cases hj : j < m.byteSize
-    · simp only [hj, if_true, read8]
+    · simp only [hj, ite_true, read8]
       rw [Array.getElem?_append_left (page_lt hj)]
-    · simp only [hj, if_false, read8]
+    · simp only [hj, ite_false, read8]
       rw [Array.getElem?_append_right (by rw [byteSize_eq] at hj; exact
         (Nat.le_div_iff_mul_le pageSize_pos).mpr (by omega))]
       cases h : (Array.replicate delta ByteArray.empty)[j / pageSize - m.pages.size]? with

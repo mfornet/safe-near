@@ -40,12 +40,12 @@ theorem lookup_byteCells (n i : Nat) (bs : List UInt8) (l : Loc) :
     by_cases hj : k = 0 ∧ a = n ∧ j = i
     · obtain ⟨rfl, rfl, rfl⟩ := hj
       simp
-    · rw [if_neg hj]
+    · rw [ite_eq_right hj]
       by_cases hr : k = 0 ∧ a = n ∧ i + 1 ≤ j ∧ j < i + 1 + bs.length
       · have h1 : j - i = (j - (i + 1)) + 1 := by omega
-        rw [if_pos hr, if_pos (by omega), h1]
+        rw [ite_eq_left hr, ite_eq_left (by omega), h1]
         simp
-      · rw [if_neg hr, if_neg (by omega)]
+      · rw [ite_eq_right hr, ite_eq_right (by omega)]
 
 theorem byteCells_nodup (n i : Nat) (bs : List UInt8) :
     ((byteCells (H := H) n i bs).map (·.1)).Nodup := by
@@ -162,7 +162,7 @@ theorem replaces_write {σ : Store H} {n addr : Nat} {mem : Memory}
   rw [lookup_setMem _ _ _ hn, lookup_byteCells, lookup_byteCells]
   simp only [List.length_map, List.length_range]
   by_cases hk : (k = 0 ∨ k = 1) ∧ a = n
-  · rw [if_pos hk]
+  · rw [ite_eq_left hk]
     obtain ⟨hk, rfl⟩ := hk
     rw [lookup_mem _ _ _ _ hk, hmem, Option.bind_some]
     rcases hk with rfl | rfl
@@ -174,7 +174,7 @@ theorem replaces_write {σ : Store H} {n addr : Nat} {mem : Memory}
       · have hi' : ¬(addr ≤ i ∧ i < addr + old.length) := hi
         simp [memCell, hwf, hwf', hsz, hrd', hi']
     · rcases i with _ | _ | i <;> simp [memCell, hwf, hwf', hsz, hmax]
-  · rw [if_neg hk]
+  · rw [ite_eq_right hk]
     have : ¬(k = 0 ∧ a = n ∧ addr ≤ i ∧ i < addr + old.length) := fun h => hk ⟨.inl h.1, h.2.1⟩
     simp [this]
 
@@ -375,7 +375,7 @@ theorem grow_eq {mem : Memory} {k : Nat} (h : GrowOk mem.byteSize mem.max k) :
   rw [← size_eq_div] at h1 h2
   unfold Memory.grow
   dsimp only
-  rw [if_neg (by omega)]
+  rw [ite_eq_right (by omega)]
   cases hm : mem.max with
   | none => simp
   | some m => have := h2 m hm; simp; omega
@@ -408,7 +408,7 @@ theorem growCells_nodup (n len k : Nat) : ((growCells (H := H) n len k).map (·.
   have := lookup_byteCells (H := H) n len (List.replicate (k * pageSize) 0) p.1
   rw [lookup_of_mem (byteCells_nodup _ _ _) hp] at this
   split at this
-  · rename_i hc; rw [hp1] at hc; simp [Loc.memLength] at hc
+  · rename_i hc; rw [hp1] at hc; simp [] at hc
   · cases this
 
 /-- `memory.grow` succeeding, as a step of the store. -/
@@ -429,20 +429,20 @@ theorem grow_step_ok {σ : Store H} {n len : Nat} {mem : Memory} {mi : ModuleIns
     rw [lookup_setMem _ _ _ hn', growCells, lookup_cons_pair, lookup_byteCells, lookup_cons_pair]
     simp only [List.length_replicate, Loc.memLength, Prod.mk.injEq, List.lookup_nil]
     by_cases hc : (c = 0 ∨ c = 1) ∧ a = n
-    · rw [if_pos hc]
+    · rw [ite_eq_left hc]
       obtain ⟨hc, rfl⟩ := hc
       rw [lookup_mem _ _ _ _ hc, hmem, Option.bind_some]
       rcases hc with rfl | rfl
       · by_cases hi : i < len
         · have : ¬(len ≤ i ∧ i < len + k.toNat * pageSize) := by omega
-          simp [memCell, hwf, hwf', hsz', hrd', hi, hlen, this, mem',
+          simp [memCell, hwf, hwf', hsz', hrd', hi, hlen, mem',
             show i < len + k.toNat * pageSize by omega, show ¬len ≤ i by omega]
         · by_cases hi2 : i < len + k.toNat * pageSize
           · simp [memCell, hwf', hsz', hrd', hlen, hi, hi2, show len ≤ i by omega, mem',
-              List.getElem?_replicate, show i - len < k.toNat * pageSize by omega]
-          · simp [memCell, hwf, hwf', hsz', hrd', hlen, hi, hi2, mem']
-      · rcases i with _ | _ | i <;> simp [memCell, hwf, hwf', hsz', hlen, hmax', mem']
-    · rw [if_neg hc]
+              show i - len < k.toNat * pageSize by omega]
+          · simp [memCell, hwf, hwf', hsz', hlen, hi, hi2, mem']
+      · rcases i with _ | _ | i <;> simp [memCell, hwf, hwf', hsz', hlen, mem']
+    · rw [ite_eq_right hc]
       have h1 : ¬(c = 1 ∧ a = n ∧ i = 0) := fun h => hc ⟨.inr h.1, h.2.1⟩
       have h2 : ¬(c = 0 ∧ a = n ∧ len ≤ i ∧ i < len + k.toNat * pageSize) :=
         fun h => hc ⟨.inl h.1, h.2.1⟩
@@ -459,7 +459,7 @@ theorem grow_fresh {σ : Store H} {n len k : Nat}
   rw [lookup_cons_pair] at hp
   simp only [Loc.memLength, Prod.mk.injEq, List.length_replicate, List.lookup_nil] at hq hp
   split at hq
-  · rename_i h; rw [if_pos h] at hp; cases hp
+  · rename_i h; rw [ite_eq_left h] at hp; cases hp
   · split at hq
     · rename_i _ h
       obtain ⟨rfl, rfl, h3, _⟩ := h
