@@ -6,7 +6,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = ROOT / "near-lean/node/fixtures/types"
 HEX = re.compile(r"^(?:[0-9a-f]{2})*$")
-LIMIT = 5 * 1024 * 1024
+LIMIT = 12 * 1024 * 1024
 
 
 class NodeFixtureTests(unittest.TestCase):

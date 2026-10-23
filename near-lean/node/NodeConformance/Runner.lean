@@ -7,8 +7,9 @@ import NearNode.Borsh
 One fixture line is `{"type", "name", "borsh", "hash", ...}` or, for inputs both
 decoders must reject, `{"type", "name", "borsh", "reject": true}`. A line may
 carry `"canonical"`: the bytes the value re-encodes to, when the input was
-accepted but is not the canonical encoding. Derived hashes are further hex
-fields (`"hash"`, `"hashes"`).
+accepted but is not the canonical encoding. Derived values are further hex
+fields (`"hash"`, `"hashes"`, `"sigData"`, `"root"`, ...); the test computes each
+one and fails on a field it does not compute, or that the line lacks.
 -/
 
 namespace Near.Node.Conformance
@@ -107,10 +108,16 @@ def check (α : Type) [c : Codec α] (hashes : Hashes α := fun _ => []) : Check
           else
             if Codec.encode w != expected then some "Impl encode of the Spec decoding differs"
             else
-              (hashes v).findSome? fun (k, h) =>
-                match line.hashes.lookup k with
-                | some (some x) =>
-                  if x == toHex h then none else some s!"{k} differs: {toHex h} vs {x}"
-                | _ => some s!"fixture has no {k}"
+              let derived := hashes v
+              (derived.findSome? fun (k, h) =>
+                    match line.hashes.lookup k with
+                    | some (some x) =>
+                      if x == toHex h then none else some s!"{k} differs: {toHex h} vs {x}"
+                    | _ => some s!"fixture has no {k}").orElse
+                fun _ =>
+                line.hashes.findSome? fun (k, x) =>
+                  if x.isSome && !derived.any (·.1 == k) then
+                    some s!"fixture has {k}, which the test does not compute"
+                  else none
 
 end Near.Node.Conformance

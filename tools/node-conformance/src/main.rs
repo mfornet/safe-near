@@ -2,6 +2,8 @@
 //! crates. `node-conformance-fixtures <out dir>` writes one `<Type>.jsonl` per type and a
 //! `manifest.json`; the output is a pure function of the code and the locked dependencies.
 
+mod chain;
+mod chain_fam;
 mod fam;
 mod rng;
 mod values;
@@ -20,7 +22,7 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 use values::*;
 
-const SEED: u64 = 0x4e45_4152_0000_0001;
+pub const SEED: u64 = 0x4e45_4152_0000_0001;
 const REFERENCE: &str = include_str!("../../../near-lean/runtime/reference.json");
 
 fn main() {
@@ -39,6 +41,7 @@ fn main() {
     receipts(&mut m, &out_dir);
     errors(&mut m, &out_dir);
     outcomes(&mut m, &out_dir);
+    chain_fam::chain(&mut m, &out_dir);
 
     m.write(&out_dir);
 }

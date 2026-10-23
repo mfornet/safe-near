@@ -50,6 +50,7 @@ pub struct Fam<T> {
     hasher: Option<Hasher<T>>,
     accept: usize,
     reject: usize,
+    max_mutated_len: usize,
 }
 
 impl<T: BorshSerialize + BorshDeserialize> Fam<T> {
@@ -62,7 +63,13 @@ impl<T: BorshSerialize + BorshDeserialize> Fam<T> {
             hasher: None,
             accept: 0,
             reject: 0,
+            max_mutated_len: 6000,
         }
+    }
+
+    /// Values longer than this are emitted without mutations.
+    pub fn mutate_up_to(&mut self, len: usize) {
+        self.max_mutated_len = len;
     }
 
     /// The derived hashes of a value, as `(field, hex)` pairs.
@@ -77,10 +84,15 @@ impl<T: BorshSerialize + BorshDeserialize> Fam<T> {
 
     /// `n` seeded random values; the first few also get mutations.
     pub fn rand(&mut self, n: usize, f: impl Fn(&mut G) -> T) {
+        self.rand_with(n, 12, f);
+    }
+
+    /// `n` seeded random values; the first `mutated` also get mutations.
+    pub fn rand_with(&mut self, n: usize, mutated: usize, f: impl Fn(&mut G) -> T) {
         let mut g = G::new(0x5eed, &format!("{}/values", self.ty));
         for i in 0..n {
             let v = f(&mut g);
-            self.positive(&format!("rand-{i}"), &v, i < 12);
+            self.positive(&format!("rand-{i}"), &v, i < mutated);
         }
     }
 
@@ -114,7 +126,7 @@ impl<T: BorshSerialize + BorshDeserialize> Fam<T> {
             return;
         }
         self.emit(name, &bytes, &d, None);
-        if mutate && bytes.len() <= 6000 {
+        if mutate && bytes.len() <= self.max_mutated_len {
             self.mutations(name, &bytes);
         }
     }

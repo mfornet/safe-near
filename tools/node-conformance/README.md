@@ -47,6 +47,23 @@ seed and the number of accepted and rejected lines per type. Each type has one
   action is signed under (`get_nep461_hash`).
   `ExecutionOutcomeWithId`: the hash of the Borsh `Vec<CryptoHash>` returned by
   `to_hashes()`; its `hashes` field is the concatenation of those hashes.
+- M1b derived values, one hex field each (the Lean test computes every field present on a line and
+  fails on one it does not know): `innerHash` (block header: `compute_inner_hash`; chunk header:
+  hash of the Borsh inner part), `hash` (block hash; chunk hash; `BlockBody::compute_hash`;
+  `Challenge` and `OptimisticBlock` hash; `ChunkExecutionResult` hash; `ShardChunk` and
+  `PartialEncodedChunk` chunk hash; `ReceiptProof`: hash of the `ReceiptList`; `HashList` and
+  `BytesList`: `merklize` root; `ValidatorStakes`: `compute_bp_hash_from_validator_stakes` with the
+  versioned format, `hashV1` without), `paths` (Borsh `Vec<MerklePath>` of `merklize`), `root`
+  (`ReceiptProof`: root its proof reaches from the hash of `hash`; `EncodedShardChunkBody`: merklize
+  root of the parts, present only when every part is), `sigData` (`Approval::get_data_for_sig`,
+  and the spice endorsement signing data), and on `Block`: `bodyHash` (V3 and V4), `stateRoot`,
+  `receiptsRoot`, `chunkHeadersRoot`, `chunkHeadersPaths`, `txRoot`, `outcomeRoot` and `validity`
+  (one byte: 0 for `check_validity` Ok, then `InvalidStateRoot`, `InvalidReceiptRoot`,
+  `InvalidChunkHeaderRoot`, `InvalidTransactionRoot`, `InvalidChunkMask`). `PartialMerkleTree`:
+  `hash` (root), `wellFormed` and `inserted` (Borsh tree after inserting `sha256([7])`).
+  Chunk and block hashes are not on the wire; decoding recomputes them, so every line also checks
+  that. The oracle is built in release mode: `prev_state_root` of a spice (V6) chunk is the zero
+  hash there, a debug assertion otherwise.
 - `canonical`: present when the input is accepted but re-encodes to other bytes (the profile
   data decoders pad or truncate their arrays, and a `BTreeMap` decodes unsorted input).
 
