@@ -159,7 +159,7 @@ Measured on the branch that implements this note.
 |---|---|---|
 | S1.1 | Met | `Exec`, `Store`, `Syntax`, `Numeric`, `Memory` unchanged; the only runtime change is the decoder's structural recursion (§3), with `testsuite_report.txt` identical. |
 | S1.2 | Met | `wp_adequacy_cells` (root: values, traps, final cells), `adequacy_cells` over `Exec.run`, `adequacy` as a corollary; `sum_adequate` and `client_adequate` derive from them. |
-| S1.3 | Met | Axiom audit: 24 modules, 1771 declarations, 0 violations; in the `wasm-logic` workflow. |
+| S1.3 | Met | Axiom audit: 28 modules, 1827 declarations, 0 violations; in the `wasm-logic` workflow. |
 | S1.4 | Met | "What to trust" in `near-lean/wasm-logic/README.md`. |
 | S1.5 | Met | `lakefile.toml` requires `Wasm` and `iris` only; checked by `test_wasm_logic.py`. |
 | S2.1 | Met | `#check_rule_coverage`: 56 instructions with rules, 0 out of scope; each rule's footprint is the cells the instruction touches. |
@@ -172,9 +172,9 @@ Measured on the branch that implements this note.
 | S3.4 | Met | `scripts/proof-lines.py`: Lean/Rocq = 0.34 overall, at most 0.84 per file (`stack_length.v`). |
 | S3.5 | Met | `stack_decodes`, `client_decodes` (kernel); `.wasm` and byte literals committed and checked against the pinned wasm-tools. |
 | S3.6 | Met | `client_adequate`: for any fuel, validation, the runtime's linker and `Link.instantiate` (running `main` as start function) never fail or trap, and `answer` ends 20 with one page of memory, or -1 with none. |
-| S4.1 | Partly | The client reaches `new_stack`, `push`, `pop`, `stack_map` and `square` from instantiation; `is_empty`, `is_full` and `stack_length` are proved but no end-to-end corollary reaches them (Iris-Wasm's client does not call them either). |
-| S4.2 | Met | `scripts/mutation-test.py`: 21 mutants of the stack and client, all killed; in the periodic check. |
-| S4.3 | Met | `scripts/smoke-client.sh` runs the linked client on the runtime and checks `answer` = 20; in CI. |
+| S4.1 | Met | From instantiation, the client reaches `new_stack`, `push`, `pop`, `stack_map` and `square`, and a second client (`Examples/Probe`, `probe_adequate`) reaches `is_empty`, `is_full` and `stack_length`, which Iris-Wasm's client does not call. |
+| S4.2 | Met | `scripts/mutation-test.py`: 23 mutants of the stack, client and probe, all killed; in the periodic check. |
+| S4.3 | Met | `scripts/smoke-client.sh` runs the linked client and probe on the runtime and checks `answer` (20, 1001); in CI. |
 | S5.1 | Met | Clean build of the package with dependencies cached: about 65 s; slowest file `Examples/Stack/Code.lean`, 18 s (kernel decoding). |
 | S5.2 | Partly | `NOTICE` with Iris-Wasm's MIT licence. The independent clean-room review is still to be done and recorded in `near-lean/wasm/REVIEW.md`. |
 | S5.3 | Met | Package and example READMEs, `notes/design/WASM_RUNTIME.md`, `notes/TODO.md`. |

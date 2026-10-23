@@ -22,6 +22,9 @@ from a table over it.
   fuel, what the whole pipeline (validation, the runtime's linker,
   `Link.instantiate` running the start function) does: it never traps, and
   `answer` ends 20, or -1 when no page is left.
+- [`../Probe`](../Probe) is a second client for the functions Iris-Wasm's
+  client does not call: `is_empty`, `is_full` and `stack_length` are
+  reached from instantiation too (`probe_adequate`, `answer` = 1001).
 
 ## Lemma by lemma
 
@@ -85,8 +88,8 @@ asks for at most 1.5×):
 ## Mutation test
 
 `scripts/mutation-test.py` changes one instruction at a time in the decoded
-stack and client modules and checks that a proof fails; the decode theorems
-are stubbed while it runs, so only the specifications can notice. All 21
+stack, client and probe modules and checks that a proof fails; the decode theorems
+are stubbed while it runs, so only the specifications can notice. All 23
 mutants are killed:
 
 | # | Mutant | Killed in |
@@ -112,3 +115,5 @@ mutants are killed:
 | 19 | the client stores 0 when `new_stack` fails | `Client/Main.lean` |
 | 20 | the client maps with table entry 1 | `Client/Main.lean` |
 | 21 | `square` doubles | `Client/Main.lean` |
+| 22 | the probe never pushes | `Probe/Main.lean` |
+| 23 | the probe weighs the length by 100 | `Probe/Main.lean` |

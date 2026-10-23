@@ -37,6 +37,7 @@ check() {  # <dir> <base> <Lean namespace> <def name>
 if [ "${1:-}" = "--write" ]; then WRITE=1; fi
 check WasmLogic/Examples/Stack stack WasmLogic.Examples.Stack stackBytes
 check WasmLogic/Examples/Client client WasmLogic.Examples.Client clientBytes
+check WasmLogic/Examples/Probe probe WasmLogic.Examples.Probe probeBytes
 
 if [ "${WRITE:-0}" = 1 ]; then exit 0; fi
 exit "$status"

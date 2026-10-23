@@ -21,7 +21,7 @@ package is written from iris-lean, the runtime and Iris-Wasm (MIT, see
 | `Heap.lean` | The store seen as a heap: locations (`Loc`) for every byte, memory length and limit, global, table entry, function, module instance and the host state, and `lookup`/`heapOf`, what each holds. Memory cells exist only for well-formed memories. |
 | `MemoryLemmas.lean` | Lemmas about the runtime's `Memory` (reads after writes, `grow`); no runtime change. |
 | `Resources.lean` | The state interpretation (`ghost_map_auth` over `heapOf σ`), the points-to assertions and their Iris-Wasm notations (`↦[wm]`, `↦[wms]`, `↦[i32]`, `↦[wmlength]`, `↪[wmlimit]`, `↦[wg]`, `↦[wt]`, `↪[wf]`, `↪[inst]`, `↦[host]`), and the lifting lemmas over `Exec.step` with small footprints. |
-| `Frag.lean` | The weakest precondition of a fragment, `wpi lim d f vs es Φ`: instructions `es` in frame `f` (locals, module instance) at call depth `d`, ending normally, by a branch, by a return or by a trap as `Φ : Post` says. Bind (`wpi_seq`), framing (`wpi_wand`) and the generic instruction rule. |
+| `Frag.lean` | The weakest precondition of a fragment, `wpi lim d f vs es Φ`: instructions `es` in frame `f` (locals, module instance) at call depth `d`, ending normally, by a branch, by a return or by a trap as `Φ : Post` says. Bind (`wpi_seq`), framing (`wpi_wand`, `wpi_frame`) and the generic instruction rule. |
 | `Tactic.lean` | `wp_step k rule` and friends for stepping through code; `kernel_rfl` for equations the kernel evaluates (decoding, validation, linking). |
 | `Rules/Pure.lean`, `Rules/Memory.lean`, `Rules/Control.lean`, `Rules/Call.lean`, `Rules/Table.lean` | One rule per instruction (table below), with the footprint the instruction touches: the bytes, the global, the table entries, the segment, the frame. `wpInvoke` is the specification of a function invocation; `call` to a host function is against a contract (`HostContract`), not an implementation. `Rules/Table.lean` adds the assertions for table sizes and segments (`tableInfoPt`, `↦[wts]`, `↦[welem]`, `↦[wdata]`). |
 | `Adequacy.lean` | The closed resource family and the adequacy theorems back to `Exec.run`. |
@@ -29,15 +29,17 @@ package is written from iris-lean, the runtime and Iris-Wasm (MIT, see
 | `Examples/Sum.lean` | A counting loop proved for every input by induction, and its adequacy corollary. |
 | `Examples/Bulk.lean` | Fragments using the table and bulk-memory rules. |
 | `Examples/Control.lean` | Fragments using the structural rules the larger examples do not: `br_table`, `memory.size`, traps, the call-depth limit, a host call against its contract, the frame rule. |
-| `Examples/Stack/` | Iris-Wasm's stack module, from bytes, and every function's specification. |
+| `Examples/Stack/` | Iris-Wasm's stack module, from bytes, every function's specification, and (`Instance.lean`) the module's instance with a `wpInvoke` specification per exported function. |
 | `Examples/Client/` | Iris-Wasm's client of the stack, linked by the runtime's linker and run as its start function, proved from the stack's specifications, end to end (`client_adequate`). |
+| `Examples/Probe/` | A second client, for the stack functions Iris-Wasm's client does not call (`is_empty`, `is_full`, `stack_length`), end to end (`probe_adequate`). |
 
 ## What to trust
 
-The end-to-end theorems (`sum_adequate`, `client_adequate`, and the
-`*_decodes`/`*_instantiates`/`client_links` theorems they rest on) are statements about
-`Wasm.Exec.run`, `Wasm.Binary.decode`, `Wasm.Module.validate` and
-`Wasm.Link`: nothing in this package needs to be trusted to read them.
+The end-to-end theorems (`sum_adequate`, `client_adequate`,
+`probe_adequate`, and the `*_decodes`/`*_instantiates`/`*_links` theorems
+they rest on) are statements about `Wasm.Exec.run`, `Wasm.Binary.decode`,
+`Wasm.Module.validate` and `Wasm.Link`: nothing in this package needs to be
+trusted to read them.
 
 An intermediate specification (a `Triple`, `wpi` or `wpInvoke` statement)
 means what adequacy makes it mean. Reading one trusts:
@@ -142,8 +144,8 @@ style (`Rules/Table.lean`). Their bulk forms are for non-empty ranges, and
 | `lake build --wfail` | every proof, the rule coverage table, the decode/validate/link theorems of the examples | CI (`wasm-logic` workflow), periodic check |
 | axiom audit | `sorry`, `native_decide`, non-standard axioms | CI, periodic check |
 | `scripts/check-wasm-bytes.sh` | a committed `.wasm` or byte literal out of date with its `.wat` (pinned wasm-tools) | CI, periodic check |
-| `scripts/smoke-client.sh` | the linked client, run by the runtime's testsuite runner, leaves in `answer` what `client_adequate` says | CI, periodic check |
-| `scripts/mutation-test.py` | specifications too weak to notice a changed instruction: 21 mutants, all must break a proof | periodic check (a few minutes) |
+| `scripts/smoke-client.sh` | the linked client and probe, run by the runtime's testsuite runner, leave in `answer` what `client_adequate` and `probe_adequate` say | CI, periodic check |
+| `scripts/mutation-test.py` | specifications too weak to notice a changed instruction: 23 mutants, all must break a proof | periodic check (about half an hour) |
 | `tools/tests/test_wasm_logic.py` | stale byte literals, unbuilt modules, escape hatches, a coverage table or mutation suite out of date, a non-Wasm dependency | every push and PR, in seconds |
 | `scripts/proof-lines.py <iriswasm>` | proof size against Iris-Wasm's | by hand; result in the stack README |
 

@@ -23,6 +23,7 @@ SRC = PKG / "WasmLogic"
 EXAMPLES = [
     ("Examples/Stack", "stack", "WasmLogic.Examples.Stack", "stackBytes"),
     ("Examples/Client", "client", "WasmLogic.Examples.Client", "clientBytes"),
+    ("Examples/Probe", "probe", "WasmLogic.Examples.Probe", "probeBytes"),
 ]
 
 

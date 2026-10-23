@@ -17,5 +17,8 @@ import WasmLogic.Examples.Control
 import WasmLogic.Examples.Stack.Code
 import WasmLogic.Examples.Stack.Specs
 import WasmLogic.Examples.Stack.Map
+import WasmLogic.Examples.Stack.Instance
 import WasmLogic.Examples.Client.Code
 import WasmLogic.Examples.Client.Main
+import WasmLogic.Examples.Probe.Code
+import WasmLogic.Examples.Probe.Main

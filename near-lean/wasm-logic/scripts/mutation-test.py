@@ -12,8 +12,8 @@ the stubs must pass).
     scripts/mutation-test.py [--only N]
 
 Every mutant here changes what the code does; none is equivalent to the
-original. The files are restored afterwards, also on failure. Takes a few
-minutes: each mutant rebuilds the specification modules.
+original. The files are restored afterwards, also on failure. Takes about half
+an hour: each mutant rebuilds the specification modules.
 """
 
 import argparse
@@ -24,10 +24,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 STACK = ROOT / "WasmLogic/Examples/Stack/Code.lean"
 CLIENT = ROOT / "WasmLogic/Examples/Client/Code.lean"
+PROBE = ROOT / "WasmLogic/Examples/Probe/Code.lean"
 TARGETS = ["WasmLogic.Examples.Stack.Specs", "WasmLogic.Examples.Stack.Map",
-           "WasmLogic.Examples.Client.Main"]
+           "WasmLogic.Examples.Client.Main", "WasmLogic.Examples.Probe.Main"]
 PROOF_FILES = ["WasmLogic/Examples/Stack/Specs.lean", "WasmLogic/Examples/Stack/Map.lean",
-               "WasmLogic/Examples/Client/Main.lean"]
+               "WasmLogic/Examples/Stack/Instance.lean", "WasmLogic/Examples/Client/Main.lean",
+               "WasmLogic/Examples/Probe/Main.lean"]
 
 # Each stub replaces a decode theorem's proof.
 STUBS = [
@@ -35,6 +37,8 @@ STUBS = [
      "theorem stack_decodes : Binary.decode stackBytes = .ok stackModule := by\n  sorry"),
     (CLIENT, "theorem client_decodes : Binary.decode clientBytes = .ok clientModule := by\n  kernel_rfl",
      "theorem client_decodes : Binary.decode clientBytes = .ok clientModule := by\n  sorry"),
+    (PROBE, "theorem probe_decodes : Binary.decode probeBytes = .ok probeModule := by\n  kernel_rfl",
+     "theorem probe_decodes : Binary.decode probeBytes = .ok probeModule := by\n  sorry"),
 ]
 
 # (description, file, old, new): `old` occurs exactly once in `file`.
@@ -77,6 +81,8 @@ MUTANTS = [
      ".local_get 0, .i32_const 0, .call 5", ".local_get 0, .i32_const 1, .call 5"),
     ("square doubles", CLIENT, "[.local_get 0, .local_get 0, .i32_binop .mul]",
      "[.local_get 0, .local_get 0, .i32_binop .add]"),
+    ("probe never pushes", PROBE, "    .local_get 0, .i32_const 4, .call 3,\n", ""),
+    ("probe weighs the length by 100", PROBE, ".i32_const 1000, .i32_binop .mul", ".i32_const 100, .i32_binop .mul"),
 ]
 
 
@@ -102,7 +108,7 @@ def main() -> int:
     ap.add_argument("--only", type=int, help="run only mutant N (1-based)")
     args = ap.parse_args()
 
-    originals = {p: p.read_text() for p in (STACK, CLIENT)}
+    originals = {p: p.read_text() for p in (STACK, CLIENT, PROBE)}
     for desc, path, old, _ in MUTANTS:
         if originals[path].count(old) != 1:
             raise SystemExit(f"mutant {desc!r}: {old!r} occurs {originals[path].count(old)} times in {path.name}")
@@ -110,7 +116,7 @@ def main() -> int:
     try:
         for path, old, new in STUBS:
             replace_once(path, old, new)
-        stubbed = {p: p.read_text() for p in (STACK, CLIENT)}
+        stubbed = {p: p.read_text() for p in (STACK, CLIENT, PROBE)}
         ok, log = build()
         if not ok:
             print(log)

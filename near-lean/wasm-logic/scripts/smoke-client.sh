@@ -3,7 +3,8 @@
 # says (criterion S4.3): the stack module is registered as "stack", the client
 # is instantiated against it, which runs `main` as its start function, and
 # the client's global `answer` then holds 20. A second client instance gets a
-# fresh stack on a new page and answers 20 too.
+# fresh stack on a new page and answers 20 too; the probe (`probe_adequate`)
+# answers 1001.
 #
 # The script is built from the committed .wat files and run by the runtime's
 # testsuite runner, so it needs ../wasm built (`lake build testsuite` there).
@@ -25,5 +26,7 @@ trap 'rm -rf "$dir"' EXIT
     echo '(assert_return (get "answer") (i32.const 20))'
     grep -v '^;;' WasmLogic/Examples/Client/client.wat
     echo '(assert_return (get "answer") (i32.const 20))'
+    grep -v '^;;' WasmLogic/Examples/Probe/probe.wat
+    echo '(assert_return (get "answer") (i32.const 1001))'
 } > "$dir/client.wast"
 "$runner" --dir "$dir"
