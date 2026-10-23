@@ -17,10 +17,19 @@
   {
    "type": "path",
    "scope": "",
-   "name": "NearVM",
+   "name": "NearRuntime",
    "manifestFile": "lake-manifest.json",
    "inherited": false,
-   "dir": "../../../near-lean/vm",
+   "dir": "../../../near-lean/runtime",
+   "configFile": "lakefile.toml"
+  },
+  {
+   "type": "path",
+   "scope": "",
+   "name": "NearVM",
+   "manifestFile": "lake-manifest.json",
+   "inherited": true,
+   "dir": "../../../near-lean/runtime/../vm",
    "configFile": "lakefile.toml"
   },
   {
@@ -29,7 +38,7 @@
    "name": "NearInterface",
    "manifestFile": "lake-manifest.json",
    "inherited": true,
-   "dir": "../../../near-lean/vm/../interface",
+   "dir": "../../../near-lean/runtime/../vm/../interface",
    "configFile": "lakefile.toml"
   },
   {

@@ -7,3 +7,4 @@ import Model.Methods
 import Model.Storage
 import Model.Interface
 import Model.Args
+import Model.Contract
