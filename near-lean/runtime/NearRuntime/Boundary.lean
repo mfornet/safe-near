@@ -69,16 +69,18 @@ theorem functionCallContext_eq_toVMContext (c : ReceiptCtx) (account : Account) 
     (houtputs : ctx.outputDataReceivers.map Subtype.val =
       if isLast then c.action.outputDataReceivers.map (·.receiverId) else []) :
     functionCallContext c account args gas deposit isLast (some trie) = toVMContext ctx := by
-  have houtputs' : ctx.outputDataReceivers.map NearInterface.AccountId.bytes =
-      if isLast then c.action.outputDataReceivers.map fun d => bytesOfString d.receiverId else [] := by
-    have := congrArg (List.map bytesOfString) houtputs
-    split at this <;> simpa [List.map_map, Function.comp_def, NearInterface.AccountId.bytes,
-      bytesOfString] using this
-  simp only [functionCallContext, toVMContext, NearInterface.AccountId.bytes, bytesOfString,
-    hcurrent, hsigner, hpk, hpredecessor, hargs, hresults, hheight, htime, hepoch, hbalance,
-    hlocked, husage, hdeposit, hgas, hseed, htrie]
-  rw [← houtputs']
-  rfl
+  have houtputs' : (if isLast then c.action.outputDataReceivers.map fun d => bytesOfString d.receiverId
+      else []) = ctx.outputDataReceivers.map NearInterface.AccountId.bytes := by
+    have hbytes : ctx.outputDataReceivers.map NearInterface.AccountId.bytes =
+        (ctx.outputDataReceivers.map Subtype.val).map bytesOfString := by
+      simp [NearInterface.AccountId.bytes, bytesOfString]
+    rw [hbytes, houtputs]
+    split <;> simp [List.map_map, Function.comp_def]
+  unfold functionCallContext
+  rw [houtputs']
+  simp only [toVMContext, NearInterface.AccountId.bytes, bytesOfString, hcurrent, hsigner, hpk,
+    hpredecessor, hargs, hresults, hheight, htime, hepoch, hbalance, hlocked, husage, hdeposit, hgas,
+    hseed, htrie]
 
 /-- What the boundary runs: the deployed code, and the decoder the runtime
 uses for code that the call's promises deploy. -/
@@ -161,28 +163,23 @@ theorem observe_rolledBack (ctx : Context) (storage : List (Bytes × Bytes)) (ou
     (issue : Option ExecutionIssue) {failure : Failure}
     (h : (observe ctx storage outcome issue).outcome = .error failure) :
     NearInterface.RolledBack ctx storage.toFinset (observe ctx storage outcome issue) := by
-  unfold observe at h ⊢
+  revert h
+  unfold observe
   split
-  · exact ⟨⟨_, rfl⟩, rfl, rfl, rfl, rfl⟩
+  · intro _; exact ⟨⟨_, rfl⟩, rfl, rfl, rfl, rfl⟩
   · split
-    · exact ⟨⟨_, rfl⟩, rfl, rfl, rfl, rfl⟩
-    · split
-      · exact ⟨⟨_, rfl⟩, rfl, rfl, rfl, rfl⟩
-      · rename_i hab _ _
-        simp only [hab] at h
-        split at h <;> simp_all
+    · intro _; exact ⟨⟨_, rfl⟩, rfl, rfl, rfl, rfl⟩
+    · dsimp only
+      split
+      · intro _; exact ⟨⟨_, rfl⟩, rfl, rfl, rfl, rfl⟩
+      · intro h; cases h
 
 theorem execOn_rolledBack (code : Code) (storage : List (Bytes × Bytes)) (ctx : Context)
     {failure : Failure} (h : (execOn code storage ctx).outcome = .error failure) :
     NearInterface.RolledBack ctx storage.toFinset (execOn code storage ctx) := by
-  unfold execOn at h ⊢
-  split
-  · rename_i hissue
-    simp only [hissue] at h
-    exact observe_rolledBack _ _ _ _ h
-  · rename_i hissue
-    simp only [hissue] at h
-    exact observe_rolledBack _ _ _ _ h
+  revert h
+  unfold execOn
+  cases code.code.decodeIssue <;> dsimp only <;> exact observe_rolledBack _ _ _ _
 
 /-- Every failed execution of the instance leaves the account as it was. -/
 theorem nearRuntime_failure_rolledBack (code : Code) (raw : RawStorage) (ctx : Context)

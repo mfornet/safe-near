@@ -5,6 +5,7 @@ import NearRuntime.Refund
 import NearRuntime.ActionValidation
 import NearRuntime.TransactionSize
 import NearRuntime.NativeIdentity
+import NearInterface.Boundary
 
 /-!
 # `apply`
