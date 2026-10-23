@@ -7,6 +7,7 @@ one toolchain (`lean-toolchain`) and one `packagesDir` (`.lake/packages`).
 |---|---|---|
 | `wasm/` | wasmer / wasmtime | The Wasm runtime, written from the spec, and the official test suite |
 | `wasm-logic/` | | A separation logic over the runtime's step (iris-lean), for proofs about Wasm code |
+| `interface/` | | The shared vocabulary of a function call and the generic refinement statement (`NearInterface`) |
 | `vm/` | `near_vm_runner::run` | One function call: host functions, gas, `VMContext` → `VMOutcome` |
 | `runtime/` | `Runtime::apply` | Accounts, access keys, receipts, actions, fees, refunds |
 | `chain/` | the "trustless manipulator" | Blocks, reachable states, explicit run completion, measured burnt gas |
@@ -48,8 +49,8 @@ removed value bytes, as native `RuntimeExt` does; standalone VM calls default to
 `VMContext.chargeStorageValueAccess` policy records this external boundary.
 The independent fixtures check exact
 instruction and host gas, but do not prove metering correct for all programs.
-Contract code enters as WAT text
-because there is no binary Wasm decoder in Lean yet; the cryptographic host
+Contract code enters as decoded `.wasm` modules (`Wasm.Binary.decode`; test
+fixtures are compiled from WAT with the pinned `wasm-tools`); the cryptographic host
 functions are rejected by the metered VM until concrete semantics are supplied.
 
 `lake exe vm-tests` runs the real wNEAR binary (`tests/fixtures/w_near.wat`,

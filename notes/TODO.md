@@ -10,6 +10,7 @@ and chain layers run on it with nearcore conformance harnesses.
 - Extend scenario and conformance harnesses to real-chain snapshots and full
   scheduling equivalence, towards a near-workspaces-style test environment.
 - Extend the snapshot downloader to more account features and deployed contracts.
+- Exact historical replay from complete archived chunks ([replay_near_history.md](todo/replay_near_history.md)).
 
 ## Contracts
 

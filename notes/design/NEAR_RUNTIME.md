@@ -5,7 +5,7 @@ The Wasm interpreter is connected to NEAR through three layers:
 | Package | Entry point | Responsibility |
 |---|---|---|
 | `near-lean/vm` | `NearVM.run` | One contract call: metering and host functions |
-| `near-lean/runtime` | `NearRuntime.apply` | Transactions, receipts, account state |
+| `near-lean/runtime` | `Near.apply` | Transactions, receipts, account state |
 | `near-lean/chain` | block application | Ordering queued work across blocks |
 
 Together they model receipts, promises and callbacks, storage, accounts, access

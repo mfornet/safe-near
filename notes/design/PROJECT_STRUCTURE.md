@@ -9,6 +9,7 @@ safe-near/
     near-lean/
       wasm/             -- Wasm runtime, written from the spec, tested on the official testsuite
       wasm-logic/       -- separation logic over the runtime's step (iris-lean)
+      interface/        -- Shared vocabulary and the refinement statement (NearInterface)
       vm/               -- Single contract call: metering and host functions
       runtime/          -- Transactions, receipts and account state
       chain/            -- Block execution and settlement
