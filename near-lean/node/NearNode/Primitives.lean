@@ -5,3 +5,13 @@ import NearNode.Primitives.Transaction
 import NearNode.Primitives.Receipt
 import NearNode.Primitives.Errors
 import NearNode.Primitives.Outcome
+import NearNode.Primitives.Validator
+import NearNode.Primitives.Congestion
+import NearNode.Primitives.ChunkExtra
+import NearNode.Primitives.Merkle
+import NearNode.Primitives.Approval
+import NearNode.Primitives.Sharding
+import NearNode.Primitives.BlockHeader
+import NearNode.Primitives.Spice
+import NearNode.Primitives.Challenge
+import NearNode.Primitives.Block
