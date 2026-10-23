@@ -45,6 +45,7 @@ def validation_steps(root: Path, nearcore: Path) -> list[Step]:
         "staking-key-replay", "trie-replay", "--wfail")
     add("chain-build", "near-lean/chain", "lake", "build", "NearChain", "chain-tests", "chain-replay",
         "registered-replay", "state-encode", "receipt-encode", "transaction-replay", "receipt-replay", "--wfail")
+    add("node-build", "near-lean/node", "lake", "build", "NearNode", "near-lean-node", "node-bench", "--wfail")
     add("wnear-adapter-build", "contracts/w-near/verification", "lake", "build", "Spec", "runtime-adapter-tests", "--wfail")
     add("wnear-proofs-build", "contracts/w-near/verification", "lake", "build", "Model", "Proofs")
     # New contract projects join the sequential build/audit gate automatically.
@@ -75,6 +76,8 @@ def validation_steps(root: Path, nearcore: Path) -> list[Step]:
     python("formatter-regressions", "tools/tests/check_lean_format.py")
     python("vm-dependencies", "tools/check_vm_dependencies.py", "--no-build")
     python("dependency-regressions", "tools/tests/check_vm_dependencies.py")
+    python("node-isolation", "tools/check_node_isolation.py")
+    python("verification-buildtime", "tools/verification_buildtime.py")
     python("audit-regressions", "tools/tests/check_axiom_audit.py")
     for package, report in [("near-lean/wasm", "wasm"), ("near-lean/wasm-logic", "wasm-logic"),
                             ("near-lean/vm", "vm"),

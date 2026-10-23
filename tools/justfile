@@ -7,6 +7,28 @@ vm-dependencies:
     python3 tools/check_vm_dependencies.py
     python3 tools/tests/check_vm_dependencies.py
 
+# Check that contract verification never reaches the node and our Lean has no native code.
+node-isolation:
+    python3 tools/check_node_isolation.py
+    python3 -m unittest tools/tests/test_node_isolation.py
+
+# Time a clean wNEAR verification build against this machine's baseline (--record sets it).
+[positional-arguments]
+verification-buildtime *options:
+    python3 tools/verification_buildtime.py "$@"
+
+# The node's M0 gates: source isolation, compiled VM closure and verification build time.
+node-guardrails: node-isolation vm-dependencies verification-buildtime
+
+# Build the NEAR node (notes/design/NEAR_NODE.md) and its executables.
+node-build:
+    cd near-lean/node && lake build NearNode near-lean-node node-bench --wfail
+
+# Run the node benchmarks; options are --filter SUBSTRING and --out FILE.
+[positional-arguments]
+node-bench *options: node-build
+    near-lean/node/.lake/build/bin/node-bench "$@"
+
 # Check Lean source style with the pinned Mathlib text-based linters.
 lean-lint:
     python3 tools/lean_style.py
@@ -60,7 +82,7 @@ tools-test:
     python3 -m unittest discover -s tools/runtime-conformance -p 'test_*.py' -v
 
 # The inexpensive automatic CI gate: no Lean downloads or native builds.
-ci-check: check-toolchains tools-test
+ci-check: check-toolchains node-isolation tools-test
 
 # Preview every expensive periodic check without running or downloading anything.
 periodic-check-plan:

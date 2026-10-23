@@ -10,9 +10,10 @@ one toolchain (`lean-toolchain`) and one `packagesDir` (`.lake/packages`).
 | `vm/` | `near_vm_runner::run` | One function call: host functions, gas, `VMContext` → `VMOutcome` |
 | `runtime/` | `Runtime::apply` | Accounts, access keys, receipts, actions, fees, refunds |
 | `chain/` | the "trustless manipulator" | Blocks, reachable states, explicit run completion, measured burnt gas |
+| `node/` | `neard` | A full validator node, in progress ([NEAR_NODE.md](../notes/design/NEAR_NODE.md)) |
 
 ```
-just near-build     # from the repository root: build wasm, vm, runtime, chain
+just near-build     # from the repository root: build wasm, vm, runtime, chain, node
 just near-test      # run the three scenario suites on the real wNEAR binary
 just near-configs   # regenerate vm/configs from nearcore (needs cargo)
 ```
