@@ -5,7 +5,7 @@
 # verification never builds it (`just node-isolation`).
 name = "NearNode"
 version = "0.1.0"
-defaultTargets = ["NearNode", "near-lean-node"]
+defaultTargets = ["NearNode", "near-lean-node", "node-conformance-types"]
 packagesDir = "../.lake/packages"
 
 [[require]]
@@ -26,3 +26,11 @@ name = "NodeBench"
 [[lean_exe]]
 name = "node-bench"
 root = "NodeBench.Main"
+
+# `lake exe node-conformance-types`: Borsh codecs against the nearcore oracle fixtures.
+[[lean_lib]]
+name = "NodeConformance"
+
+[[lean_exe]]
+name = "node-conformance-types"
+root = "NodeConformance.Types"

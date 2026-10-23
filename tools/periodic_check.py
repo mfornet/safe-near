@@ -65,7 +65,9 @@ def validation_steps(root: Path, nearcore: Path) -> list[Step]:
         "staking-key-replay", "trie-replay", "--wfail")
     add("chain-build", "near-lean/chain", "lake", "build", "NearChain", "chain-tests", "chain-replay",
         "registered-replay", "state-encode", "receipt-encode", "transaction-replay", "receipt-replay", "--wfail")
-    add("node-build", "near-lean/node", "lake", "build", "NearNode", "near-lean-node", "node-bench", "--wfail")
+    add("node-build", "near-lean/node", "lake", "build", "NearNode", "near-lean-node", "node-bench",
+        "node-conformance-types", "--wfail")
+    add("node-conformance-types", "near-lean/node", "./.lake/build/bin/node-conformance-types", "fixtures/types")
     # Contracts with a ContractModel instance: the adapter executable compares the
     # binary with the model; `refines_<name>` in Proofs.Refinement is the open proof.
     adapter_contracts = [("w-near", "wnear")]

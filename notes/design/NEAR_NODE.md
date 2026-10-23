@@ -89,8 +89,31 @@ The detailed acceptance criteria live in each Linear issue.
 
 `just node-bench [--filter S] [--out FILE]` runs the benchmarks and prints a
 JSON report. The first benchmarks time the existing `Near.Sha256.hash`, which
-is the starting point for M2. The Rust oracle `tools/node-conformance` is
-created in M1, when there are types to compare.
+is the starting point for M2. The Rust oracle `tools/node-conformance`
+arrives with M1 (below).
+
+### M1 types
+
+`just node-conformance-types` checks every Borsh type against fixtures from
+the pinned nearcore crates.
+
+- **Borsh.** `NearNode.Borsh` has a reference semantics over `List UInt8`
+  (`Spec`) and a fast path over `ByteArray` (`Impl`). A type defines its codec
+  once, from shared combinators (struct as tuple, tagged enum, `Vec`, `Option`,
+  `BTreeMap`), and gets both. The decoders reject truncation, bad tags, bad
+  `bool`, invalid UTF-8 and, in `decodeAll`, trailing bytes. Until the
+  per-combinator equivalence theorems exist, the test decodes and encodes
+  every fixture with both.
+- **Oracle.** `tools/node-conformance` links `near-primitives`, `near-crypto`
+  and `near-primitives-core` `=0.37.4` and refuses to run unless the protocol
+  is 86. It writes `near-lean/node/fixtures/types/<Type>.jsonl` and
+  `manifest.json` (one line: type, name, hex Borsh, derived hash, or `reject`).
+  The files are committed; CI never builds the crate.
+- **Covered (M1a).** Scalars, `CryptoHash`, `AccountId`, keys and signatures,
+  accounts and access keys, every action and the delegate actions,
+  transactions V0 and V1, receipts and their state-stored forms, execution
+  outcomes with metadata and profiles, proofs, and the error trees reachable
+  from `ExecutionStatus`. Blocks, chunks and epoch types are M1b and M1c.
 
 ## Open points
 
