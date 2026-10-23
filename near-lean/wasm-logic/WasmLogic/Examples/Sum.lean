@@ -157,10 +157,10 @@ def sumInst : ModuleInst :=
 def sumStore : Store Unit :=
   { funcs := #[.wasm sumType 0 sumFunc], modules := #[sumInst], host := () }
 
-/-- `sumTo` validates under nearcore's features and instantiates to
+/-- `sumTo` validates under the features `NearVM` validates with and instantiates to
 `sumStore`: the kernel runs the validator and the linker. -/
 theorem sumTo_instantiates :
-    (do let vm ← (sumTo.validate (.nearcore false)).toOption
+    (do let vm ← (sumTo.validate (.nearcore true)).toOption
         (Link.instantiateModule (Store.empty ()) vm []).toOption) = some (sumStore, sumInst) := by
   kernel_rfl
 

@@ -68,10 +68,15 @@ MUTANTS = [
      ".local_get 1, .call_indirect 1 0", ".local_get 0, .call_indirect 1 0"),
     ("stack_map starts at the top", STACK,
      ".local_set 3, .local_get 0, .local_set 2", ".local_set 3, .local_get 3, .local_set 2"),
-    ("client pushes 7", CLIENT, ".i32_const 6", ".i32_const 7"),
-    ("client adds the popped values", CLIENT, ".call 2, .i32_binop .sub", ".call 2, .i32_binop .add"),
-    ("client returns 0 when new_stack fails", CLIENT,
-     "[.i32_const 0xFFFFFFFF]\n", "[.i32_const 0]\n"),
+    ("client pushes 7", CLIENT, ".i32_const 6, .call 4", ".i32_const 7, .call 4"),
+    ("client adds the popped values", CLIENT,
+     ".i32_binop .sub, .global_set 0]", ".i32_binop .add, .global_set 0]"),
+    ("client stores 0 when new_stack fails", CLIENT,
+     "[.i32_const 0xFFFFFFFF, .global_set 0, .return]", "[.i32_const 0, .global_set 0, .return]"),
+    ("client maps with table entry 1", CLIENT,
+     ".local_get 0, .i32_const 0, .call 5", ".local_get 0, .i32_const 1, .call 5"),
+    ("square doubles", CLIENT, "[.local_get 0, .local_get 0, .i32_binop .mul]",
+     "[.local_get 0, .local_get 0, .i32_binop .add]"),
 ]
 
 
