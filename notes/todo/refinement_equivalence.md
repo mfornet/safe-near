@@ -319,7 +319,7 @@ statement, the instance, the model extensions, re-proved specs and tests.
 | Step | State |
 |---|---|
 | 1. `near-lean/interface` | done |
-| 2. near-lean boundary and instance | done; fuel sufficiency and storage listing proved; whole-receipt seam open |
+| 2. near-lean boundary and instance | done; fuel sufficiency, storage listing and whole-receipt seam proved |
 | 3. wNEAR | done: model extensions, instance, statement, re-proved specs, tests |
 | 4. linkdrop | old statement removed; instance blocked on near-lean (below) |
 | 5. Tests | wNEAR adapter tests on the boundary (205 checks) |
@@ -396,9 +396,17 @@ statement, the instance, the model extensions, re-proved specs and tests.
   observation is the same (`execOn_perm`). `nearRuntime_exec_listing`:
   the instance computes on any listing what `execOn` computes. One value per
   key is a new `Context.WF` field.
-- **Whole receipt.** For a receipt whose only action is a function call,
-  `runReceiptActions` agrees with `execOn` on what `Observation` holds (action
-  fees aside). Not proved.
+- **Whole receipt — proved.** `functionCallReceipt_seam`
+  (`NearRuntime/BoundarySeam.lean`): for a receipt whose only action is a
+  function call to deployed code, given a `Corresponds` between the receipt
+  and the boundary `Context`, `runReceiptActions` agrees with `execOn` on
+  logs and burnt gas (plus the action fees) always; on success on usage gas,
+  the receiver's storage, balance and storage usage, and the trie; on
+  failure on the error (through `runtimeFailure`) and, after
+  `rollbackReceipt`, on the state (unchanged) and the trie. It covers VM
+  aborts, promised actions the runtime rejects (`actionsIssue?` is the
+  runtime's `validateFunctionCallActions`), and the storage-stake check
+  (both use `stakeDeficit`).
 - **wNEAR.** `refines_wnear` itself, including the soundness of `gasBound`.
 
 ### linkdrop

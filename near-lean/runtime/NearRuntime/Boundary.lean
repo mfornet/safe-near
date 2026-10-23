@@ -90,15 +90,18 @@ structure Code where
   code : ContractCode
   codeOf : Bytes → ContractCode
 
+/-- Why the runtime cannot convert a promised action, if it cannot. -/
+def actionIssue? (codeOf : Bytes → ContractCode) (action : PromiseAction) : Option ExecutionIssue :=
+  match actionOfPromise codeOf action with
+  | .error (.executionIssue issue) => some issue
+  | .error error => some (.interpreterError (repr error).pretty)
+  | .ok _ => none
+
 /-- The first promised action the runtime cannot convert
 (`validateFunctionCallActions`). -/
 def actionsIssue? (codeOf : Bytes → ContractCode) (receipts : List ReceiptSpec) :
     Option ExecutionIssue :=
-  receipts.findSome? fun spec => spec.actions.findSome? fun action =>
-    match actionOfPromise codeOf action with
-    | .error (.executionIssue issue) => some issue
-    | .error error => some (.interpreterError (repr error).pretty)
-    | .ok _ => none
+  receipts.findSome? fun spec => spec.actions.findSome? (actionIssue? codeOf)
 
 /-- The failure a VM error reports at the boundary. -/
 def failureOf (error : FunctionCallError) : Failure :=

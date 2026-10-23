@@ -22,3 +22,4 @@ import NearRuntime.MixedFunding
 import NearRuntime.AllActionFunding
 import NearRuntime.ScopedRoutingFunding
 import NearRuntime.Boundary
+import NearRuntime.BoundarySeam
