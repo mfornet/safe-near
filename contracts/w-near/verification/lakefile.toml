@@ -18,10 +18,11 @@ rev = "v4.34.1"
 
 # Lean blueprint extracted from `@[blueprint]` annotations (notes/design/PROVING.md).
 # `lake build :blueprint` writes .lake/build/blueprint/, consumed by blueprint/src.
-# The NEAR runtime in Lean: instantiates `Spec/Refinement.lean`'s interface.
+# The NEAR runtime in Lean: `Near.Boundary.nearRuntime` is the
+# `NearInterface.RuntimeInterface` the refinement obligation is stated against.
 [[require]]
-name = "NearVM"
-path = "../../../near-lean/vm"
+name = "NearRuntime"
+path = "../../../near-lean/runtime"
 
 [[require]]
 name = "LeanArchitect"

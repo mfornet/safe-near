@@ -141,6 +141,13 @@ theorem promiseBatchActionFunctionCallFn_encodingPolicy : HostPreservesEncodingP
     appendPromiseActionResult, createBatchPromiseResult, createCallbackPromiseResult]
   repeat' (first | trivial | rfl | split)
 
+theorem promiseBatchActionFunctionCallWeightFn_encodingPolicy : HostPreservesEncodingPolicy promiseBatchActionFunctionCallWeightFn := by
+  intro st args
+  unfold promiseBatchActionFunctionCallWeightFn
+  dsimp only [disallowInView, checkAccountId, checkPublicKey, appendPromise,
+    appendPromiseActionResult, createBatchPromiseResult, createCallbackPromiseResult]
+  repeat' (first | trivial | rfl | split)
+
 theorem promiseBatchActionTransferFn_encodingPolicy : HostPreservesEncodingPolicy promiseBatchActionTransferFn := by
   intro st args
   unfold promiseBatchActionTransferFn
@@ -179,6 +186,20 @@ theorem promiseBatchActionDeleteKeyFn_encodingPolicy : HostPreservesEncodingPoli
 theorem promiseBatchActionDeleteAccountFn_encodingPolicy : HostPreservesEncodingPolicy promiseBatchActionDeleteAccountFn := by
   intro st args
   unfold promiseBatchActionDeleteAccountFn
+  dsimp only [disallowInView, checkAccountId, checkPublicKey, appendPromise,
+    appendPromiseActionResult, createBatchPromiseResult, createCallbackPromiseResult]
+  repeat' (first | trivial | rfl | split)
+
+theorem promiseBatchActionUseGlobalContractFn_encodingPolicy : HostPreservesEncodingPolicy promiseBatchActionUseGlobalContractFn := by
+  intro st args
+  unfold promiseBatchActionUseGlobalContractFn useGlobalContractFn
+  dsimp only [disallowInView, checkAccountId, checkPublicKey, appendPromise,
+    appendPromiseActionResult, createBatchPromiseResult, createCallbackPromiseResult]
+  repeat' (first | trivial | rfl | split)
+
+theorem promiseBatchActionUseGlobalContractByAccountIdFn_encodingPolicy : HostPreservesEncodingPolicy promiseBatchActionUseGlobalContractByAccountIdFn := by
+  intro st args
+  unfold promiseBatchActionUseGlobalContractByAccountIdFn useGlobalContractFn
   dsimp only [disallowInView, checkAccountId, checkPublicKey, appendPromise,
     appendPromiseActionResult, createBatchPromiseResult, createCallbackPromiseResult]
   repeat' (first | trivial | rfl | split)

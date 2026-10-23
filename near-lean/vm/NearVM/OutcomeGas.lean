@@ -34,6 +34,7 @@ theorem checkReceipts_gas_bounded (outcome : VMOutcome) (balance usage : Nat) (s
 /-- Packing a failed, successful or invalid-graph result retains the gas bounds. -/
 theorem outcomeOfExecution_gas_bounded (ctx : VMContext) (storage : List (Bytes × Bytes))
     (final : Machine) (error : Option FunctionCallError) (prepaid maxBurnt : Nat)
+    (hctx : ctx.prepaidGas ≤ prepaid)
     (h : final.host.gas.burnt ≤ final.host.gas.used ∧
       final.host.gas.used ≤ prepaid ∧ final.host.gas.burnt ≤ maxBurnt) :
     (outcomeOfExecution ctx storage final error).GasBounded prepaid maxBurnt := by
@@ -45,7 +46,10 @@ theorem outcomeOfExecution_gas_bounded (ctx : VMContext) (storage : List (Bytes 
     · exact graphIssue_gas_bounded _ _ _ _ _ _ h
     · split
       · exact graphIssue_gas_bounded _ _ _ _ _ _ h
-      · exact h
+      · rename_i graph _ _ _ _
+        have := distributeGas_le (ctx.prepaidGas - final.host.gas.used) graph.handles final.host.gasWeights
+          graph.receipts
+        refine ⟨?_, ?_, h.2.2⟩ <;> dsimp only <;> omega
 
 /-- Entry charging establishes counter bounds before either its error exit or
 metered execution. Concrete imported hosts preserve the supplied limits. -/
@@ -101,7 +105,7 @@ theorem runAttempt_gas_bounded (cfg : RuntimeConfig) (code : Module) (codeSize :
       rw [← hg.1.1, ← hg.1.2]
       exact hl
     have hf := runInitialized_gas_bounded cfg.wasm fuel (.next c) _ _ hlim
-    exact outcomeOfExecution_gas_bounded _ _ _ _ _ _ hf
+    exact outcomeOfExecution_gas_bounded _ _ _ _ _ _ (Nat.le_refl _) hf
 
 /-- The public VM result exposes bounded burnt/used gas on success, protocol
 failure and explicit model issues, including the graph-validation boundary. -/
@@ -127,5 +131,64 @@ theorem run_burntGas_le_prepaid (cfg : RuntimeConfig) (code : Module) (codeSize 
     (run cfg code codeSize method ctx storage fuel).burntGas ≤ ctx.prepaidGas := by
   have h := run_gas_bounded cfg code codeSize method ctx storage fuel
   exact Nat.le_trans h.1 h.2.1
+
+/-! ## Distributed gas
+
+The gas a call itself uses, `usedGas - distributedGas`, is at least its burnt
+gas: distribution only adds unused prepaid gas on top. -/
+
+def VMOutcome.DistributionBounded (o : VMOutcome) : Prop :=
+  o.burntGas + o.distributedGas ≤ o.usedGas
+
+theorem graphIssue_distributionBounded (outcome : VMOutcome) (balance usage : Nat)
+    (storage : List (Bytes × Bytes)) : (outcome.graphIssue balance usage storage).DistributionBounded := by
+  simp [VMOutcome.DistributionBounded, VMOutcome.graphIssue]
+
+theorem checkReceipts_distributionBounded (outcome : VMOutcome) (balance usage : Nat)
+    (storage : List (Bytes × Bytes)) (h : outcome.DistributionBounded) :
+    (outcome.checkReceipts balance usage storage).DistributionBounded := by
+  unfold VMOutcome.checkReceipts
+  split
+  · exact h
+  · exact graphIssue_distributionBounded _ _ _ _
+
+theorem outcomeOfExecution_distributionBounded (ctx : VMContext) (storage : List (Bytes × Bytes))
+    (final : Machine) (error : Option FunctionCallError)
+    (h : final.host.gas.burnt ≤ final.host.gas.used) :
+    (outcomeOfExecution ctx storage final error).DistributionBounded := by
+  unfold outcomeOfExecution
+  dsimp only
+  split
+  · simp [VMOutcome.DistributionBounded]
+  · split
+    · exact graphIssue_distributionBounded _ _ _ _
+    · split
+      · exact graphIssue_distributionBounded _ _ _ _
+      · simp only [VMOutcome.DistributionBounded]
+        omega
+
+theorem runAttempt_distributionBounded (cfg : RuntimeConfig) (code : Module) (codeSize : Nat)
+    (method : String) (ctx : VMContext) (storage : List (Bytes × Bytes)) (fuel : Nat) :
+    (runAttempt cfg code codeSize method ctx storage fuel).DistributionBounded := by
+  rcases runAttempt_cases cfg code codeSize method ctx storage fuel with
+    ⟨host1, loadErr, burnt, e, profile, hload, hburnt, heq⟩ |
+    ⟨host1, env, store, imports, valid, store', inst, entry, c, hload, hresolve, halloc, hinst,
+      hstart, heq⟩
+  · rw [heq]
+    simp [VMOutcome.DistributionBounded, VMOutcome.failedBefore]
+  · rw [heq]
+    have hg := loading_gas_bounds cfg ctx storage codeSize host1 none hload
+    have hl := resolvedStart_gasLimits hresolve halloc hinst hstart
+    have hlim : MachineHostInvariant (GasLimits ctx.prepaidGas (ctx.gasBurnLimit cfg)) (.next c) := by
+      show ConfigHostInvariant _ c
+      rw [← hg.1.1, ← hg.1.2]
+      exact hl
+    have hf := runInitialized_gas_bounded cfg.wasm fuel (.next c) _ _ hlim
+    exact outcomeOfExecution_distributionBounded _ _ _ _ hf.1
+
+theorem run_distributionBounded (cfg : RuntimeConfig) (code : Module) (codeSize : Nat) (method : String)
+    (ctx : VMContext) (storage : List (Bytes × Bytes)) (fuel : Nat) :
+    (run cfg code codeSize method ctx storage fuel).DistributionBounded :=
+  checkReceipts_distributionBounded _ _ _ _ (runAttempt_distributionBounded cfg code codeSize method ctx storage fuel)
 
 end Wasm.Near

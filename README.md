@@ -56,5 +56,4 @@ just reproduce <name>                                 # rebuild and compare hash
 
 `w-near` is the first contract with a verification project. The sequential
 expansion is tracked in [contracts/VERIFICATION.md](contracts/VERIFICATION.md);
-`linkdrop` now has source-model safety and liability proofs, with deployed
-refinement still open.
+`linkdrop` is next; near-lean already runs its binary.

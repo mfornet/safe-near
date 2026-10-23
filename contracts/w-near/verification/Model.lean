@@ -5,3 +5,6 @@ import Model.Env
 import Model.Calls
 import Model.Methods
 import Model.Storage
+import Model.Interface
+import Model.Args
+import Model.Contract

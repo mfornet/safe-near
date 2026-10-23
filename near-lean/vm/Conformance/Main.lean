@@ -96,6 +96,8 @@ def actionJson : PromiseAction → Json
       ("nonce", toJson nonce.toNat), ("permission", permissionJson permission)]
   | .deleteKey pk => obj [kind "deleteKey", ("publicKey", bytesJson pk)]
   | .deleteAccount beneficiary => obj [kind "deleteAccount", ("beneficiaryId", bytesJson beneficiary)]
+  | .useGlobalContract (.codeHash hash) => obj [kind "useGlobalContract", ("codeHash", bytesJson hash)]
+  | .useGlobalContract (.accountId id) => obj [kind "useGlobalContract", ("accountId", bytesJson id)]
 
 def receiptJson (receipt : ReceiptSpec) : Json := obj [
   ("receiverId", bytesJson receipt.receiverId),

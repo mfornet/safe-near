@@ -12,7 +12,7 @@ Model proof completion and deployed refinement must remain separate statuses.
 | Entry | State |
 |---|---|
 | w-near | Existing completed model proofs; concrete runtime refinement stated and open |
-| [linkdrop](linkdrop/verification/README.md) | Source model and safety/liability proofs checked; storage layout, sizes and mathematical projection round trip proved; concrete adapter and deployed refinement open |
+| linkdrop | Queued again (verification removed). near-lean runs its binary: weighted callbacks and global-contract use are modelled |
 | [sputnik-dao-factory](sputnik-dao-factory/verification/README.md) | In progress: all 18 methods modeled on one raw trie; namespace alias witness, conditional DAO/metadata layouts, raw-key uniqueness, owner gate, receipt, store/delete rollback paths proved in the model; source and deployed refinement open |
 | [sputnikdao2-v3.2](sputnikdao2-v3.2/verification/README.md) | In progress: all 34 named exports have checked projections; policy/status/authorization, proposal/bounty/delegation/blob storage effects, views, upgrade and migration are modeled, with selected governance vote/finalize traces and raw-key refinements. Several action branches, a whole-contract dispatcher, and concrete Wasm/runtime refinement remain open. |
 | ref-farming | Queued: reward-per-share arithmetic/rounding, seed custody, claim/withdraw callbacks and storage liabilities |
@@ -28,13 +28,9 @@ the larger protocol engines. It is a queue, not a claim that queued contracts ha
 been analyzed or proved. The dataset scope is the ten pinned, reproduced entries
 besides w-near; pending catalog entries are outside the current pass.
 
-The current linkdrop package is smaller than w-near's verification: all ten
-explicit methods are modeled and model proofs are audited, but it has no concrete
-VM adapter yet. The mathematical storage projection round trip is now proved.
-The shared runtime lacks five imports used by this binary; this concrete gap
-remains part of the overall goal and must not be presented as deployed coverage.
-The next contract can undergo source/storage analysis while this shared runtime
-work remains explicitly open; no contract is marked fully verified on that basis.
+The earlier linkdrop package was removed; the shared runtime now supports the
+imports its binary uses, so a new package can start from a `ContractModel`
+instance checked against the binary.
 
 ## Checks
 

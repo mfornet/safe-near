@@ -1,0 +1,20 @@
+# NearInterface: what a contract specification may say about the runtime.
+#
+# The raw values of one function call (storage, receipts, return data,
+# callback results), the protocol configuration, the chunk trie overlay, and
+# the generic refinement statement between a runtime and a contract model.
+# Definitions only: no interpreter and no Wasm, so contract `Spec/` libraries
+# can import it without building NearVM. NearVM (../vm) re-exports the moved
+# modules under their old names.
+name = "NearInterface"
+version = "0.1.0"
+defaultTargets = ["NearInterface"]
+packagesDir = "../.lake/packages"
+
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
+rev = "v4.34.1"
+
+[[lean_lib]]
+name = "NearInterface"

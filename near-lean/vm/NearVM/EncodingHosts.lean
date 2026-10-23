@@ -156,6 +156,11 @@ theorem meteredActionFunctionCall_encodingInvariant (extra : Nat) :
   meteredPromise_encodingInvariant extra "promise_batch_action_function_call" promiseBatchActionFunctionCallFn
     promiseBatchActionFunctionCallFn_encodingPolicy (meteredActionFunctionCall_success_encoding extra)
 
+theorem meteredActionFunctionCallWeight_encodingInvariant (extra : Nat) :
+    NearHostFn.PreservesLive EncodingInvariant (metered extra "promise_batch_action_function_call" promiseBatchActionFunctionCallWeightFn) :=
+  meteredPromise_encodingInvariant extra "promise_batch_action_function_call" promiseBatchActionFunctionCallWeightFn
+    promiseBatchActionFunctionCallWeightFn_encodingPolicy (meteredActionFunctionCallWeight_success_encoding extra)
+
 theorem meteredActionTransfer_encodingInvariant (extra : Nat) :
     NearHostFn.PreservesLive EncodingInvariant (metered extra "promise_batch_action_transfer" promiseBatchActionTransferFn) :=
   meteredPromise_encodingInvariant extra "promise_batch_action_transfer" promiseBatchActionTransferFn
@@ -185,5 +190,15 @@ theorem meteredActionDeleteAccount_encodingInvariant (extra : Nat) :
     NearHostFn.PreservesLive EncodingInvariant (metered extra "promise_batch_action_delete_account" promiseBatchActionDeleteAccountFn) :=
   meteredPromise_encodingInvariant extra "promise_batch_action_delete_account" promiseBatchActionDeleteAccountFn
     promiseBatchActionDeleteAccountFn_encodingPolicy (meteredActionDeleteAccount_success_encoding extra)
+
+theorem meteredActionUseGlobalContract_encodingInvariant (extra : Nat) :
+    NearHostFn.PreservesLive EncodingInvariant (metered extra "promise_batch_action_use_global_contract" promiseBatchActionUseGlobalContractFn) :=
+  meteredPromise_encodingInvariant extra "promise_batch_action_use_global_contract" promiseBatchActionUseGlobalContractFn
+    promiseBatchActionUseGlobalContractFn_encodingPolicy (meteredActionUseGlobalContract_success_encoding extra)
+
+theorem meteredActionUseGlobalContractByAccountId_encodingInvariant (extra : Nat) :
+    NearHostFn.PreservesLive EncodingInvariant (metered extra "promise_batch_action_use_global_contract_by_account_id" promiseBatchActionUseGlobalContractByAccountIdFn) :=
+  meteredPromise_encodingInvariant extra "promise_batch_action_use_global_contract_by_account_id" promiseBatchActionUseGlobalContractByAccountIdFn
+    promiseBatchActionUseGlobalContractByAccountIdFn_encodingPolicy (meteredActionUseGlobalContractByAccountId_success_encoding extra)
 
 end Wasm.Near

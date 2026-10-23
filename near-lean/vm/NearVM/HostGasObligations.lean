@@ -17,6 +17,10 @@ def batchActionInput? (name : String) (st : HostStore NearState) : List Value �
     if name == "promise_batch_action_deploy_contract" then some (index, .deployContract bytes)
     else if name == "promise_batch_action_delete_key" then some (index, .deleteKey bytes)
     else if name == "promise_batch_action_delete_account" then some (index, .deleteAccount bytes)
+    else if name == "promise_batch_action_use_global_contract" then
+      some (index, .useGlobalContract (.codeHash bytes))
+    else if name == "promise_batch_action_use_global_contract_by_account_id" then
+      some (index, .useGlobalContract (.accountId bytes))
     else none
   | [.i64 index, .i64 a, .i64 b, .i64 c] =>
     if name == "promise_batch_action_stake" then do
@@ -28,6 +32,10 @@ def batchActionInput? (name : String) (st : HostStore NearState) : List Value �
       some (index, .addKey pk c .fullAccess)
     else none
   | [.i64 index, .i64 ml, .i64 mp, .i64 al, .i64 ap, .i64 amount, .i64 gas] => do
+    if name != "promise_batch_action_function_call" then none else
+      let action ← readFunctionCallAction? st ml mp al ap amount gas
+      some (index, action)
+  | [.i64 index, .i64 ml, .i64 mp, .i64 al, .i64 ap, .i64 amount, .i64 gas, .i64 _weight] => do
     if name != "promise_batch_action_function_call" then none else
       let action ← readFunctionCallAction? st ml mp al ap amount gas
       some (index, action)
@@ -54,10 +62,10 @@ def HostResultAppendsGas (fees : ActionFees) (ethEnabled : Bool) (name : String)
 def HostAppendsGas (name : String) (fn : NearHostFn NearState) : Prop :=
   ∀ fees ethEnabled st args, HostResultAppendsGas fees ethEnabled name st args (fn.invoke st args)
 
-theorem appendPromiseActionResult_gas_input (fees : ActionFees) (ethEnabled : Bool)
+theorem appendPromiseActionResult_gas_input {weight : UInt64} (fees : ActionFees) (ethEnabled : Bool)
     (name : String) (st : HostStore NearState) (args : List Value) (index : UInt64) (action : PromiseAction)
     (hinput : batchActionInput? name st args = some (index, action)) :
-    HostResultAppendsGas fees ethEnabled name st args (appendPromiseActionResult name st index action) := by
+    HostResultAppendsGas fees ethEnabled name st args (appendPromiseActionResult name st index action weight) := by
   unfold appendPromiseActionResult
   split
   · exact ⟨index, action, hinput, appendPromiseAction_gas fees ethEnabled st _ _ _ (by assumption)⟩
@@ -84,6 +92,15 @@ theorem promiseBatchActionDeployContractFn_gasObligation : HostAppendsGas "promi
 theorem promiseBatchActionFunctionCallFn_gasObligation : HostAppendsGas "promise_batch_action_function_call" promiseBatchActionFunctionCallFn := by
   intro fees ethEnabled st args
   unfold promiseBatchActionFunctionCallFn
+  dsimp only [disallowInView, checkAccountId, checkPublicKey]
+  repeat (first
+    | trivial
+    | (apply appendPromiseActionResult_gas_input; simp_all [batchActionInput?])
+    | split)
+
+theorem promiseBatchActionFunctionCallWeightFn_gasObligation : HostAppendsGas "promise_batch_action_function_call" promiseBatchActionFunctionCallWeightFn := by
+  intro fees ethEnabled st args
+  unfold promiseBatchActionFunctionCallWeightFn
   dsimp only [disallowInView, checkAccountId, checkPublicKey]
   repeat (first
     | trivial
@@ -138,6 +155,24 @@ theorem promiseBatchActionDeleteKeyFn_gasObligation : HostAppendsGas "promise_ba
 theorem promiseBatchActionDeleteAccountFn_gasObligation : HostAppendsGas "promise_batch_action_delete_account" promiseBatchActionDeleteAccountFn := by
   intro fees ethEnabled st args
   unfold promiseBatchActionDeleteAccountFn
+  dsimp only [disallowInView, checkAccountId, checkPublicKey]
+  repeat (first
+    | trivial
+    | (apply appendPromiseActionResult_gas_input; simp_all [batchActionInput?])
+    | split)
+
+theorem promiseBatchActionUseGlobalContractFn_gasObligation : HostAppendsGas "promise_batch_action_use_global_contract" promiseBatchActionUseGlobalContractFn := by
+  intro fees ethEnabled st args
+  unfold promiseBatchActionUseGlobalContractFn useGlobalContractFn
+  dsimp only [disallowInView, checkAccountId, checkPublicKey]
+  repeat (first
+    | trivial
+    | (apply appendPromiseActionResult_gas_input; simp_all [batchActionInput?])
+    | split)
+
+theorem promiseBatchActionUseGlobalContractByAccountIdFn_gasObligation : HostAppendsGas "promise_batch_action_use_global_contract_by_account_id" promiseBatchActionUseGlobalContractByAccountIdFn := by
+  intro fees ethEnabled st args
+  unfold promiseBatchActionUseGlobalContractByAccountIdFn useGlobalContractFn
   dsimp only [disallowInView, checkAccountId, checkPublicKey]
   repeat (first
     | trivial

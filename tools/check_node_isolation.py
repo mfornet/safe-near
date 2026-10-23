@@ -4,9 +4,10 @@
 Three source-level rules from notes/design/NEAR_NODE.md, checked without
 building anything:
 
-1. No contract verification package reaches the node, chain or runtime packages
-   through `[[require]] path = ...`, and no package other than the node itself
-   requires the node.
+1. No contract verification package reaches the node or chain packages through
+   `[[require]] path = ...`, and no package other than the node itself requires
+   the node. Contracts may require the runtime: their adapters run the binary
+   through it.
 2. No repository Lean source uses `@[extern]` or `@[implemented_by]`, and no
    lakefile links native code.
 3. The node's protocol pin matches near-lean/runtime/reference.json.
@@ -25,7 +26,7 @@ from check_lean_toolchains import repository_files  # noqa: E402
 
 NODE = Path("near-lean/node")
 # Packages the node builds on. Contract verification must not pay for them.
-NODE_ONLY = {NODE, Path("near-lean/chain"), Path("near-lean/runtime")}
+NODE_ONLY = {NODE, Path("near-lean/chain")}
 NATIVE_ATTRIBUTE = re.compile(r"(@\[|attribute\s*\[)[^\]]*\b(extern|implemented_by)\b")
 NATIVE_LAKE = re.compile(r"\b(extern_lib|moreLinkArgs|moreLeancArgs)\b")
 

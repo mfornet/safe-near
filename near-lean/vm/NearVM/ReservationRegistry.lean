@@ -39,7 +39,7 @@ theorem meteredHostFns_reservationInvariant (fees : ActionFees) (ethEnabled : Bo
   rcases h with ⟨⟨decl, fn⟩, hin, heq⟩ | heq
   · subst entry
     simp only [nearHostFns, List.mem_cons, List.not_mem_nil, or_false] at hin
-    rcases hin with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
+    rcases hin with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
     · cases h
       apply meteredNeutral_reservationInvariant
       · decide
@@ -282,6 +282,8 @@ theorem meteredHostFns_reservationInvariant (fees : ActionFees) (ethEnabled : Bo
     · cases h
       exact meteredFunctionCall_reservationInvariant fees ethEnabled _
     · cases h
+      exact meteredFunctionCallWeight_reservationInvariant fees ethEnabled _
+    · cases h
       exact meteredTransfer_reservationInvariant fees ethEnabled _
     · cases h
       exact meteredStake_reservationInvariant fees ethEnabled _
@@ -293,6 +295,20 @@ theorem meteredHostFns_reservationInvariant (fees : ActionFees) (ethEnabled : Bo
       exact meteredDeleteKey_reservationInvariant fees ethEnabled _
     · cases h
       exact meteredDeleteAccount_reservationInvariant fees ethEnabled _
+    · cases h
+      apply metered_reservationInvariant
+      intro st args hwf hs hguard _
+      simp (disch := decide) only [prepareStorageCall_other]
+      trivial
+    · cases h
+      apply metered_reservationInvariant
+      intro st args hwf hs hguard _
+      simp (disch := decide) only [prepareStorageCall_other]
+      trivial
+    · cases h
+      exact meteredUseGlobalContract_reservationInvariant fees ethEnabled _
+    · cases h
+      exact meteredUseGlobalContractByAccountId_reservationInvariant fees ethEnabled _
     · cases h
       apply metered_reservationInvariant
       intro st args hwf hs hguard _

@@ -300,6 +300,39 @@ def functionKeyPlan (st : HostStore NearState) (input : FunctionKeyInputs) (sir 
                   .actionBytes (·.addFunctionCallKeyByte) (methodNamesGasBytes methods) sir]
                 error := if serializedPublicKeyValid publicKey then none else some .invalidPublicKey }
 
+/-- The `use_global_contract` hosts' arguments: by account id or code hash. -/
+def globalContractInputs? (name : String) : Option Bool :=
+  if name == "promise_batch_action_use_global_contract" then some false
+  else if name == "promise_batch_action_use_global_contract_by_account_id" then some true
+  else none
+
+/-- nearcore's `promise_batch_action_use_global_contract_impl`: read the
+identifier (an account id is UTF-8 decoded, charged, and validated; a code hash
+must have 32 bytes), look up the target, then charge the action fees on the
+identifier's length. -/
+def globalContractPlan (st : HostStore NearState) (byAccount : Bool) (target : Nat) (len ptr : UInt64)
+    (sir : Bool) : FunctionCallPlan :=
+  let readCharges := [.ext "base"] ++ readSpan st len ptr
+  match getMemOrReg st ptr len with
+  | none => { charges := readCharges, error := some (spanReadError len ptr) }
+  | some bytes =>
+    let idCharges := if byAccount then readCharges ++ utf8 bytes.length else readCharges
+    let idError : Option HostError :=
+      if byAccount then
+        if (String.fromUTF8? ⟨bytes.toArray⟩).isNone then some .badUTF8
+        else if !st.host.config.validAccountId bytes then some .invalidAccountId
+        else none
+      else if bytes.length != 32 then some .contractCodeHashMalformed else none
+    match idError with
+    | some error => { charges := idCharges, error := some error }
+    | none =>
+      match functionCallTargetError st target with
+      | some error => { charges := idCharges, error := some error }
+      | none =>
+        let id : GlobalContractId := if byAccount then .accountId bytes else .codeHash bytes
+        { charges := idCharges ++ [.actionBase (·.useGlobalContractBase) sir,
+            .actionBytes (·.useGlobalContractByte) id.length sir] }
+
 /-- Argument-dependent charge plan before validating promise handles. -/
 def chargesBeforeUnvalidated (name : String) (st : HostStore NearState) (args : List Value) : List Charge :=
   let a := argU64 args
@@ -405,6 +438,10 @@ def chargesBeforeUnvalidated (name : String) (st : HostStore NearState) (args : 
   | "promise_batch_action_delete_account" =>
     [base] ++ readSpan st (a 1) (a 2) ++ utf8 (spanLen st (a 1) (a 2))
       ++ [.actionBase (·.deleteAccount) (sirOf st (promiseReceiver? st (a 0).toNat))]
+  | "promise_batch_action_use_global_contract" =>
+    (globalContractPlan st false (a 0).toNat (a 1) (a 2) (sirOf st (promiseReceiver? st (a 0).toNat))).charges
+  | "promise_batch_action_use_global_contract_by_account_id" =>
+    (globalContractPlan st true (a 0).toNat (a 1) (a 2) (sirOf st (promiseReceiver? st (a 0).toNat))).charges
   | "promise_results_count" => [base]
   | "promise_result" => [base]
   | "promise_return" => [base, .ext "promise_return"]
@@ -526,6 +563,8 @@ def invocationArgumentError (name : String) (st : HostStore NearState) (args : L
   else if name == "promise_and" then promiseJoinError st args
   else if name == "promise_batch_action_transfer" then transferInputError st args
   else if name == "promise_batch_action_add_key_with_function_call" then (functionKeyPlan st (functionKeyInputs args) false).error
+  else if let some byAccount := globalContractInputs? name then
+    (globalContractPlan st byAccount (argU64 args 0).toNat (argU64 args 1) (argU64 args 2) false).error
   else creationPrefixError name st args
 
 def preInvokeError (name : String) (st : HostStore NearState) (args : List Value) : Option HostError :=
@@ -695,7 +734,10 @@ def viewRestrictedHost (name : String) : Bool :=
    "promise_batch_action_add_key_with_full_access", "promise_batch_action_add_key_with_function_call",
    "promise_batch_action_delete_key", "promise_batch_action_delete_account",
    "promise_yield_create", "promise_yield_resume", "promise_results_count", "promise_result",
-   "promise_return"].contains name
+   "promise_return", "promise_batch_action_deploy_global_contract",
+   "promise_batch_action_deploy_global_contract_by_account_id",
+   "promise_batch_action_use_global_contract",
+   "promise_batch_action_use_global_contract_by_account_id"].contains name
 
 def deprecatedRuntimeHost (name : String) : Bool :=
   ["storage_iter_prefix", "storage_iter_range", "storage_iter_next"].contains name
@@ -804,6 +846,94 @@ private def prepareStorageCallAux (name : String) (before : HostStore NearState)
     st := { st with host := { st.host with storageAccounting := some trie } }
   return (st, none)
 
+/-- Burnt gas is at least `b` and within fixed limits: what a charge preserves.
+Unlike `Bounded`, it says nothing of promise gas, so it survives the storage
+phase's splice of burnt gas into the caller's counter. -/
+def GasCounter.Floor (b prepaid maxBurnt : Nat) (g : GasCounter) : Prop :=
+  b ≤ g.burnt ∧ g.burnt ≤ maxBurnt ∧ g.burnt ≤ prepaid ∧ g.prepaid = prepaid ∧ g.maxBurnt = maxBurnt
+
+theorem GasCounter.deduct_floor {b prepaid maxBurnt : Nat} {g : GasCounter} (burn use : Nat)
+    (h : g.Floor b prepaid maxBurnt) : (g.deduct burn use).1.Floor b prepaid maxBurnt := by
+  obtain ⟨hb, hm, hp, hpp, hmb⟩ := h
+  unfold deduct
+  dsimp only
+  split
+  · rename_i hok
+    simp only [Floor]
+    rw [hpp, hmb] at hok
+    omega
+  · simp only [Floor]
+    rw [hpp, hmb]
+    refine ⟨?_, ?_, ?_, rfl, rfl⟩
+    · exact Nat.le_min.mpr ⟨by omega, Nat.le_min.mpr ⟨by omega, by omega⟩⟩
+    · exact Nat.le_trans (Nat.min_le_right _ _) (Nat.min_le_right _ _)
+    · exact Nat.le_trans (Nat.min_le_right _ _) (Nat.min_le_left _ _)
+
+theorem applyCharge_floor {b prepaid maxBurnt : Nat} (ns : NearState) (charge : Charge)
+    (h : ns.gas.Floor b prepaid maxBurnt) : (applyCharge ns charge).1.gas.Floor b prepaid maxBurnt := by
+  cases charge <;> exact GasCounter.deduct_floor _ _ h
+
+theorem applyCharges_floor {b prepaid maxBurnt : Nat} (ns : NearState) (charges : List Charge)
+    (h : ns.gas.Floor b prepaid maxBurnt) : (applyCharges ns charges).1.gas.Floor b prepaid maxBurnt := by
+  induction charges generalizing ns with
+  | nil => exact h
+  | cons charge charges ih =>
+    have hp := applyCharge_floor ns charge h
+    unfold applyCharges
+    cases hc : applyCharge ns charge with
+    | mk paid error =>
+      rw [hc] at hp
+      cases error with
+      | none => exact ih paid hp
+      | some error => exact hp
+
+theorem gas_ite {P : GasCounter → Prop} {c : Prop} [Decidable c]
+    {a b : HostStore NearState × Option FunctionCallError}
+    (ha : c → P a.1.host.gas) (hb : ¬c → P b.1.host.gas) : P (if c then a else b).1.host.gas := by
+  by_cases h : c
+  · simp only [h, ↓reduceIte]; exact ha h
+  · simp only [h, ↓reduceIte]; exact hb h
+
+set_option maxHeartbeats 0 in
+/-- The storage phase changes gas only by billing charges, so any property of
+the counter that billing preserves holds after it. -/
+theorem prepareStorageCallAux_gas (P : GasCounter → Prop) (name : String)
+    (before : HostStore NearState) (args : List Value) (hP : P before.host.gas)
+    (hbill : ∀ (ns : NearState) (charges : List Charge), P ns.gas → P (applyCharges ns charges).1.gas) :
+    P (prepareStorageCallAux name before args).1.host.gas := by
+  unfold prepareStorageCallAux
+  simp only [Id.run, pure]
+  by_cases hname : ["storage_read", "storage_has_key", "storage_write", "storage_remove"].contains name = true
+  · simp only [hname, ↓reduceIte]
+    cases hacc : before.host.storageAccounting with
+    | none => exact hP
+    | some initial =>
+      dsimp only
+      rcases hk : getMemOrReg before (argU64 args 1) (argU64 args 0) with _ | key
+      · exact hP
+      · dsimp only
+        rcases hr : Near.TrieOverlay.getReference initial
+            (Near.TrieOverlay.contractKey before.host.context.currentAccountId key)
+            (name == "storage_write" || name == "storage_remove" || before.host.storageReadsFromTrie)
+          with msg | ⟨looked, pointer⟩
+        · dsimp only
+          rcases before.host.config.maxStorageKeyLen with _ | limit
+          all_goals dsimp only
+          all_goals repeat' (first | exact hP | (refine gas_ite ?_ ?_ <;> intro _))
+        · dsimp only
+          rcases before.host.config.maxStorageKeyLen with _ | limit
+          all_goals dsimp only
+          all_goals rcases pointer with _ | ptr
+          all_goals (try dsimp only)
+          all_goals repeat' (first | exact hP | (refine gas_ite ?_ ?_ <;> intro _) | apply hbill)
+          all_goals (try (rcases getMemOrReg before (argU64 args 3) (argU64 args 2) with _ | value))
+          all_goals (try dsimp only)
+          all_goals repeat' (first | exact hP | apply hbill)
+          all_goals rcases Near.TrieOverlay.dereference looked ptr with msg | ⟨fetched, stored⟩
+          all_goals (try dsimp only)
+          all_goals repeat' (first | exact hP | (refine gas_ite ?_ ?_ <;> intro _) | apply hbill)
+  · simp only [hname, Bool.false_eq_true, ↓reduceIte]; exact hP
+
 /-- Expose only the fields the external storage phase may change. On success
 its local burns cannot alter prepaid promise obligations or call gas limits. -/
 def prepareStorageCall (name : String) (before : HostStore NearState) (args : List Value) :
@@ -815,6 +945,15 @@ def prepareStorageCall (name : String) (before : HostStore NearState) (args : Li
         burnt := after.host.gas.burnt
         promises := if error.isNone then before.host.gas.promises else after.host.gas.promises }
       gasProfile := after.host.gasProfile } }, error)
+
+/-- The storage phase only raises burnt gas, within the call's limits. -/
+theorem prepareStorageCall_floor {b prepaid maxBurnt : Nat} (name : String) (st : HostStore NearState)
+    (args : List Value) (h : st.host.gas.Floor b prepaid maxBurnt) :
+    (prepareStorageCall name st args).1.host.gas.Floor b prepaid maxBurnt := by
+  have ha := prepareStorageCallAux_gas (GasCounter.Floor b prepaid maxBurnt) name st args h
+    (fun ns charges hns => applyCharges_floor ns charges hns)
+  obtain ⟨hb, hm, hp, _, _⟩ := ha
+  exact ⟨hb, hm, hp, h.2.2.2.1, h.2.2.2.2⟩
 
 @[simp] theorem prepareStorageCall_promises (name : String) (st : HostStore NearState) (args : List Value) :
     (prepareStorageCall name st args).1.host.promises = st.host.promises := rfl
@@ -877,7 +1016,15 @@ def unsupportedRuntimeHost (name : String) : Bool :=
    "alt_bn128_g1_multiexp", "alt_bn128_g1_sum", "alt_bn128_pairing_check",
    "bls12381_g1_multiexp", "bls12381_g2_multiexp", "bls12381_map_fp_to_g1",
    "bls12381_map_fp2_to_g2", "bls12381_p1_decompress", "bls12381_p2_decompress",
-   "bls12381_p1_sum", "bls12381_p2_sum", "bls12381_pairing_check"].contains name
+   "bls12381_p1_sum", "bls12381_p2_sum", "bls12381_pairing_check",
+   "promise_batch_action_deploy_global_contract",
+   "promise_batch_action_deploy_global_contract_by_account_id"].contains name
+
+/-- The name a host is metered under. nearcore's weighted function call is the
+plain one plus a weight: same charges, checks and errors. -/
+def meteringName (name : String) : String :=
+  if name == "promise_batch_action_function_call_weight" then "promise_batch_action_function_call"
+  else name
 
 /-- The metered host table: `nearHostFns` with gas, plus the structured
 panics and the `gas` import. -/
@@ -891,7 +1038,7 @@ def meteredHostFns (cfg : RuntimeConfig) : List (ImportDecl × NearHostFn NearSt
     | "panic_utf8" => panicUtf8Metered
     | "abort" => abortMetered
     | _ => fn
-  (nearHostFns.map fun (decl, fn) => (decl, metered extra decl.name (swap decl fn)))
+  (nearHostFns.map fun (decl, fn) => (decl, metered extra (meteringName decl.name) (swap decl fn)))
     ++ [({ «module» := "env", name := "gas", params := [.i32], results := [] }, gasFn)]
 
 /-- Resolve imports in declaration order, retaining the first unknown-import

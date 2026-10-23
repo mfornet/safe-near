@@ -67,6 +67,7 @@ def send (f : ActionFees) (ethEnabled : Bool) (sir : Bool) (receiver : AccountId
         + f.addFunctionCallKeyByte.send sir * (methods.map fun m => m.utf8ByteSize + 1).sum
   | .deleteKey _ => f.deleteKey.send sir
   | .deleteAccount _ => f.deleteAccount.send sir
+  | .useGlobalContract id => f.useGlobalContractBase.send sir + f.useGlobalContractByte.send sir * id.length
 
 /-- Execution fee of one action (`exec_fee`). -/
 def exec (f : ActionFees) (ethEnabled : Bool) (receiver : AccountId) : Action â†’ Nat
@@ -85,6 +86,7 @@ def exec (f : ActionFees) (ethEnabled : Bool) (receiver : AccountId) : Action â†
         + f.addFunctionCallKeyByte.execution * (methods.map fun m => m.utf8ByteSize + 1).sum
   | .deleteKey _ => f.deleteKey.execution
   | .deleteAccount _ => f.deleteAccount.execution
+  | .useGlobalContract id => f.useGlobalContractBase.execution + f.useGlobalContractByte.execution * id.length
 
 def totalSend (f : ActionFees) (ethEnabled : Bool) (sir : Bool) (receiver : AccountId) (actions : List Action) : Nat :=
   (actions.map (send f ethEnabled sir receiver)).sum

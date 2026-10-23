@@ -677,6 +677,40 @@ theorem promiseBatchActionDeleteAccountFn_noDeposits : HostCreatesNoDeposits pro
     | exact createCallbackPromiseResult_deposits _ _ _ _
     | split)
 
+theorem promiseBatchActionUseGlobalContractFn_noDeposits : HostCreatesNoDeposits promiseBatchActionUseGlobalContractFn := by
+  intro st args
+  unfold promiseBatchActionUseGlobalContractFn useGlobalContractFn
+  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
+    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
+    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
+    NearState.selectReturnValue, NearState.selectReturnPromise]
+  repeat (first
+    | trivial
+    | exact ⟨rfl, rfl, rfl⟩
+    | exact writeRegisterResult_deposits _ _ _ _ _
+    | exact appendPromise_return_deposits _ _ _
+    | exact appendPromiseActionResult_deposits _ _ _ _
+    | exact createBatchPromiseResult_deposits _ _ _
+    | exact createCallbackPromiseResult_deposits _ _ _ _
+    | split)
+
+theorem promiseBatchActionUseGlobalContractByAccountIdFn_noDeposits : HostCreatesNoDeposits promiseBatchActionUseGlobalContractByAccountIdFn := by
+  intro st args
+  unfold promiseBatchActionUseGlobalContractByAccountIdFn useGlobalContractFn
+  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
+    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
+    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
+    NearState.selectReturnValue, NearState.selectReturnPromise]
+  repeat (first
+    | trivial
+    | exact ⟨rfl, rfl, rfl⟩
+    | exact writeRegisterResult_deposits _ _ _ _ _
+    | exact appendPromise_return_deposits _ _ _
+    | exact appendPromiseActionResult_deposits _ _ _ _
+    | exact createBatchPromiseResult_deposits _ _ _
+    | exact createCallbackPromiseResult_deposits _ _ _ _
+    | split)
+
 theorem valueReturnFn_noDeposits : HostCreatesNoDeposits valueReturnFn := by
   intro st args
   unfold valueReturnFn

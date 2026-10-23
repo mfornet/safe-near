@@ -27,6 +27,36 @@ def ReceiptEncoding (receiver : List UInt8) (actions : List PromiseAction) : Pro
 
 instance : DecidableRel ReceiptEncoding := fun _ _ => inferInstanceAs (Decidable (_ ∧ ∀ a ∈ _, ActionMethodsUtf8 a))
 
+/-- Adding prepaid gas to a function call keeps its method bytes. -/
+theorem actionMethodsUtf8_addGas {g : Nat} {a a' : PromiseAction} (h : a.addGas? g = some a') :
+    ActionMethodsUtf8 a' ↔ ActionMethodsUtf8 a := by
+  cases a with
+  | functionCall method args amount gas =>
+    simp only [PromiseAction.addGas?] at h
+    split at h
+    · cases h; rfl
+    · cases h
+  | _ => simp [PromiseAction.addGas?] at h
+
+theorem forall_mem_set_iff {α : Type} (P : α → Prop) (l : List α) (i : Nat) (x y : α)
+    (hx : l[i]? = some x) (hxy : P y ↔ P x) : (∀ z ∈ l.set i y, P z) ↔ ∀ z ∈ l, P z := by
+  induction l generalizing i with
+  | nil => simp at hx
+  | cons head tail ih =>
+    cases i with
+    | zero =>
+      simp only [List.getElem?_cons_zero, Option.some.injEq] at hx
+      subst hx
+      simp only [List.set_cons_zero, List.forall_mem_cons, hxy]
+    | succ i =>
+      simp only [List.getElem?_cons_succ] at hx
+      simp only [List.set_cons_succ, List.forall_mem_cons, ih i hx]
+
+theorem receiptEncoding_gasInsensitive : PredicateGasInsensitive ReceiptEncoding := by
+  intro g receiver actions i a a' ha hadd
+  simp only [ReceiptEncoding]
+  rw [forall_mem_set_iff ActionMethodsUtf8 actions i a a' ha (actionMethodsUtf8_addGas hadd)]
+
 /-- All raw receipt payloads have byte-preserving runtime decoding. -/
 def PromisesEncoding (promises : List NearPromise) : Prop :=
   ∀ promise ∈ promises, PromiseSatisfies ReceiptEncoding promise
@@ -61,10 +91,10 @@ theorem appendPromiseAction_encoding (promises result : List NearPromise) (index
 
 /-- The raw append host preserves receipt encoding once the appended payload
 has passed method validation. Terminal traps have no committed receipt output. -/
-theorem appendPromiseActionResult_encoding (name : String) (st : HostStore NearState) (index : UInt64)
+theorem appendPromiseActionResult_encoding {weight : UInt64} (name : String) (st : HostStore NearState) (index : UInt64)
     (action : PromiseAction) (h : PromisesEncoding st.host.promises) (ha : ActionMethodsUtf8 action) :
     HostResult.LiveSatisfies (fun ns => PromisesEncoding ns.promises)
-      (appendPromiseActionResult name st index action) := by
+      (appendPromiseActionResult name st index action weight) := by
   unfold appendPromiseActionResult
   split
   · exact appendPromiseAction_encoding _ _ _ _ h ha (by assumption)
@@ -101,6 +131,16 @@ theorem promiseBatchActionFunctionCallFn_encoding :
     HostPreservesEncoding "promise_batch_action_function_call" promiseBatchActionFunctionCallFn := by
   intro st args h hnew
   unfold promiseBatchActionFunctionCallFn
+  dsimp only [disallowInView, checkAccountId, checkPublicKey]
+  repeat (first
+    | trivial
+    | (apply appendPromiseActionResult_encoding _ _ _ _ h; apply hnew; simp_all [batchActionInput?])
+    | split)
+
+theorem promiseBatchActionFunctionCallWeightFn_encoding :
+    HostPreservesEncoding "promise_batch_action_function_call" promiseBatchActionFunctionCallWeightFn := by
+  intro st args h hnew
+  unfold promiseBatchActionFunctionCallWeightFn
   dsimp only [disallowInView, checkAccountId, checkPublicKey]
   repeat (first
     | trivial
@@ -161,6 +201,26 @@ theorem promiseBatchActionDeleteAccountFn_encoding :
     HostPreservesEncoding "promise_batch_action_delete_account" promiseBatchActionDeleteAccountFn := by
   intro st args h hnew
   unfold promiseBatchActionDeleteAccountFn
+  dsimp only [disallowInView, checkAccountId, checkPublicKey]
+  repeat (first
+    | trivial
+    | (apply appendPromiseActionResult_encoding _ _ _ _ h; apply hnew; simp_all [batchActionInput?])
+    | split)
+
+theorem promiseBatchActionUseGlobalContractFn_encoding :
+    HostPreservesEncoding "promise_batch_action_use_global_contract" promiseBatchActionUseGlobalContractFn := by
+  intro st args h hnew
+  unfold promiseBatchActionUseGlobalContractFn useGlobalContractFn
+  dsimp only [disallowInView, checkAccountId, checkPublicKey]
+  repeat (first
+    | trivial
+    | (apply appendPromiseActionResult_encoding _ _ _ _ h; apply hnew; simp_all [batchActionInput?])
+    | split)
+
+theorem promiseBatchActionUseGlobalContractByAccountIdFn_encoding :
+    HostPreservesEncoding "promise_batch_action_use_global_contract_by_account_id" promiseBatchActionUseGlobalContractByAccountIdFn := by
+  intro st args h hnew
+  unfold promiseBatchActionUseGlobalContractByAccountIdFn useGlobalContractFn
   dsimp only [disallowInView, checkAccountId, checkPublicKey]
   repeat (first
     | trivial
@@ -245,6 +305,30 @@ theorem promiseBatchActionDeleteAccountFn_preserves_encoding (st : HostStore Nea
     HostResult.LiveSatisfies (fun ns => PromisesEncoding ns.promises)
       (promiseBatchActionDeleteAccountFn.invoke st args) := by
   unfold promiseBatchActionDeleteAccountFn
+  dsimp only [disallowInView, checkAccountId, checkPublicKey]
+  repeat (first
+    | trivial
+    | (apply appendPromiseActionResult_encoding _ _ _ _ h; trivial)
+    | split)
+
+/-- This action introduces no method-decoding obligation. -/
+theorem promiseBatchActionUseGlobalContractFn_preserves_encoding (st : HostStore NearState) (args : List Value)
+    (h : PromisesEncoding st.host.promises) :
+    HostResult.LiveSatisfies (fun ns => PromisesEncoding ns.promises)
+      (promiseBatchActionUseGlobalContractFn.invoke st args) := by
+  unfold promiseBatchActionUseGlobalContractFn useGlobalContractFn
+  dsimp only [disallowInView, checkAccountId, checkPublicKey]
+  repeat (first
+    | trivial
+    | (apply appendPromiseActionResult_encoding _ _ _ _ h; trivial)
+    | split)
+
+/-- This action introduces no method-decoding obligation. -/
+theorem promiseBatchActionUseGlobalContractByAccountIdFn_preserves_encoding (st : HostStore NearState) (args : List Value)
+    (h : PromisesEncoding st.host.promises) :
+    HostResult.LiveSatisfies (fun ns => PromisesEncoding ns.promises)
+      (promiseBatchActionUseGlobalContractByAccountIdFn.invoke st args) := by
+  unfold promiseBatchActionUseGlobalContractByAccountIdFn useGlobalContractFn
   dsimp only [disallowInView, checkAccountId, checkPublicKey]
   repeat (first
     | trivial

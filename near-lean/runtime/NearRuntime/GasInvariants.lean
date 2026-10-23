@@ -155,7 +155,8 @@ theorem applyFunctionCall_gasBound (c : ReceiptCtx) (method : String) (args : By
       split
       · exact GasDelta.of_fields _ _ _ rfl rfl rfl
       · have hv := run_gas_bounded c.cfg code.module code.size method
-          (functionCallContext c account args gas deposit isLast before.storageAccounting) (before.state.contractStorage c.receipt.receiverId) defaultFuel
+          (functionCallContext c account args gas deposit isLast before.storageAccounting) (before.state.contractStorage c.receipt.receiverId)
+          (fuelFor c.cfg code.module (functionCallContext c account args gas deposit isLast before.storageAccounting))
         have hc := recordVMOutcome_gasDelta before _ gas hv.1 hv.2.1
         dsimp only
         split

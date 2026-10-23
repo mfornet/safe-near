@@ -84,6 +84,7 @@ theorem queues_applyAction (c : ReceiptCtx) (isLast : Bool) (action : Action) :
   | addKey pk key => rw [applyAddKey_run]; repeat' (first | rfl | split)
   | deleteKey pk => rw [applyDeleteKey_run]; repeat' (first | rfl | split)
   | deleteAccount beneficiary => rw [applyDeleteAccount_run]; repeat' (first | rfl | split)
+  | useGlobalContract _ => rfl
 
 theorem queues_burnGas (fee : Nat) : (burnGas fee).PreservesReceiptQueues := by intro before; rfl
 

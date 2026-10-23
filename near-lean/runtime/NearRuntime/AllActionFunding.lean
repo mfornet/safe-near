@@ -21,6 +21,13 @@ theorem funded_stake_rejection (c : ReceiptCtx) (isLast : Bool) (stake : Nat) (p
       | (have hbad := congrArg Prod.fst hrun; cases hbad)
       | split at hrun)
 
+/-- Using a global contract is outside the model and never succeeds. -/
+theorem funded_useGlobalContract_rejection (c : ReceiptCtx) (isLast : Bool) (contract : Wasm.GlobalContractId) :
+    (applyAction c isLast (.useGlobalContract contract)).Funded c.cfg c.action.gasPrice 0 := by
+  intro before after value _ hrun
+  have hbad := congrArg Prod.fst hrun
+  cases hbad
+
 /-- Every modeled action has a concrete funding rule. Unsupported staking
 cannot succeed; supported actions preserve account uniqueness and exact funding. -/
 theorem funded_applyAction (c : ReceiptCtx) (isLast : Bool) (action : Action)
@@ -35,6 +42,7 @@ theorem funded_applyAction (c : ReceiptCtx) (isLast : Bool) (action : Action)
   | addKey pk key => exact funded_addKey c isLast pk key
   | deleteKey pk => exact funded_deleteKey c isLast pk
   | deleteAccount beneficiary => exact funded_deleteAccount c isLast beneficiary
+  | useGlobalContract contract => exact funded_useGlobalContract_rejection c isLast contract
 
 theorem funded_runReceiptAction (c : ReceiptCtx) (onlyAction isLast : Bool) (action : Action)
     (hreceiver : c.receipt.receiverId ≠ systemAccount) :

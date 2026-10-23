@@ -79,6 +79,7 @@ theorem applyAction_nextId_mono (c : ReceiptCtx) (isLast : Bool) (action : Actio
     repeat' (first | exact Nat.le_refl _ | split)
   | addKey pk key => rw [applyAddKey_run]; repeat' (first | exact Nat.le_refl _ | split)
   | deleteKey pk => rw [applyDeleteKey_run]; repeat' (first | exact Nat.le_refl _ | split)
+  | useGlobalContract _ => exact Nat.le_refl _
   | deleteAccount beneficiary =>
     rw [applyDeleteAccount_run]
     repeat' (first | exact Nat.le_refl _ | exact Nat.le_succ _ | split)
@@ -147,6 +148,7 @@ theorem nextId_runReceiptActionAt (c : ReceiptCtx) (onlyAction isLast : Bool)
   | stake amount pk => exact nextId_runReceiptAction c onlyAction isLast (.stake amount pk)
   | addKey pk key => exact nextId_runReceiptAction c onlyAction isLast (.addKey pk key)
   | deleteKey pk => exact nextId_runReceiptAction c onlyAction isLast (.deleteKey pk)
+  | useGlobalContract contract => exact nextId_runReceiptAction c onlyAction isLast (.useGlobalContract contract)
   | deleteAccount beneficiary => exact nextId_runReceiptAction c onlyAction isLast (.deleteAccount beneficiary)
   | functionCall method args gas deposit =>
     cases hs : actionRandomSeed c index with

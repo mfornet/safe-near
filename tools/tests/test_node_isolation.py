@@ -27,7 +27,7 @@ class NodeIsolationTests(unittest.TestCase):
         self.package("near-lean/chain", ["../runtime"])
         self.package("near-lean/node", ["../chain"])
         self.write("near-lean/node/NearNode/Protocol.lean", PROTOCOL)
-        self.package("contracts/c/verification", ["../../../near-lean/vm"])
+        self.package("contracts/c/verification", ["../../../near-lean/runtime"])
 
     def write(self, name, value):
         path = self.root / name
@@ -42,10 +42,10 @@ class NodeIsolationTests(unittest.TestCase):
     def test_current_layout_passes(self):
         self.assertEqual(isolation.check(self.root), [])
 
-    def test_contract_reaching_runtime_transitively_fails(self):
-        self.package("near-lean/vm", ["../runtime"])
+    def test_contract_reaching_chain_transitively_fails(self):
+        self.package("near-lean/vm", ["../chain"])
         errors = isolation.check(self.root)
-        self.assertIn("contracts/c/verification: contract verification depends on near-lean/runtime", errors)
+        self.assertIn("contracts/c/verification: contract verification depends on near-lean/chain", errors)
 
     def test_only_node_may_require_node(self):
         self.package("near-lean/tool", ["../node"])

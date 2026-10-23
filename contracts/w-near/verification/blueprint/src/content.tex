@@ -40,10 +40,11 @@ The verification is organised in three layers.
   They never mention WebAssembly.
 \item \textbf{Refinement} (Chapter~\ref{ch:refinement}). The statement that
   the deployed binary, executed by the NEAR runtime in Lean, behaves exactly
-  as the model. This is what transfers every proven property to the real
-  contract. It is stated against an interface the runtime must provide; the
-  executable VM instance exists in \texttt{Spec.RuntimeInstance}; the
-  deployed-binary refinement proof remains open.
+  as the model, for every input, every amount of attached gas and every
+  resource state. This is what transfers every proven property to the real
+  contract. It is the generic \texttt{NearInterface.Refines}, instantiated
+  with the near-lean runtime and the wNEAR contract model; its proof for
+  \texttt{contract.wasm} remains open.
 \end{enumerate}
 
 A check mark on a definition records that its Lean statement exists; it does
@@ -126,47 +127,42 @@ initialisation) and dispatches.
 \chapter{Refinement}
 \label{ch:refinement}
 
-\inputleanmodule{Spec.Refinement}
+The refinement statement is generic and lives in \texttt{near-lean/interface}
+(\texttt{NearInterface.Refines}). Its only hypotheses are that the storage
+represents a model state and that the context is one the runtime builds. It
+says that the execution never reports an interpreter limitation; that with at
+least the model's gas bound attached it agrees with the model exactly (return
+value, storage, balance, storage usage, logs, receipts, failure) and uses at
+most that much gas; that with less it agrees or fails for gas with no effects;
+and that input that is no call fails with no effects.
 
-\section{The near-lean instance}
+\section{The contract model}
 
-\texttt{near-lean/vm} provides the runtime: \texttt{NearVM.run} executes one
-function call of a decoded module under a \texttt{VMContext} and returns a
-\texttt{VMOutcome} with nearcore's error taxonomy, gas, logs and receipts.
-\texttt{Spec/RuntimeInstance.lean} instantiates the interface with it, encoding
-arguments and return values as near-sdk 3.1.0 does and reading the created
-receipts back as the model's promises. The obligation below is what remains to
-be proven about \texttt{contract.wasm}; its proof is the Wasm-level work
-(the runtime semantics of \texttt{near-lean/wasm} plus a separation logic over
-its step relation, still to be built).
+The model reads the context as near-sdk 3.1.0 does: account ids carry over
+(nearcore's and the SDK's account-id rules are proved to agree), arguments
+are decoded from JSON as serde\_json and the derived \texttt{Deserialize}
+accept them, and the callback result is parsed as a JSON \texttt{U128}. A
+successful \cref{def:step} is followed by the runtime's checks: promise
+deposits against the liquid balance, and the storage stake of the new state.
+Return values and receipts are compared as bytes, panics by their exact
+messages. The gas bound pays the longest possible trie path for every storage
+key a call touches; that it holds is part of the obligation, and the adapter
+tests check it on adversarial tries.
 
-\inputleanmodule{Spec.RuntimeInstance}
+\inputleanmodule{Spec.Contract}
 
-The proposition \cref{spec:refinement-near-lean} is the formal deployed
-refinement obligation. No theorem proving it for \texttt{contract.wasm} and
-the supported protocol configurations has been established.
+\section{The obligation}
 
-\section{What the runtime provides}
+\texttt{NearRuntime.Boundary} instantiates the runtime: one function-call
+action of near-lean's VM followed by the receipt's storage-stake check, with
+every failure rolling back storage, balance, usage and receipts. The theorem
+below, with the binary embedded, is the formal deployed refinement
+obligation. It is not proved.
 
-Executable runtime facilities are available. SDK serialization equivalence,
-sufficient gas, and deployed refinement remain proof obligations:
+\inputleanmodule{Proofs.Refinement}
 
-\begin{itemize}
-\item The deployed module decoded from \texttt{contract.wasm}, and an
-  executor of one function call, using a trusted external Wasm-to-WAT
-  conversion and the Lean decoder (WebAssembly interpreter plus
-  the NEAR host functions the binary imports: storage read/write/remove/has
-  key, register access, predecessor and current account, attached deposit,
-  prepaid gas, storage usage, promise creation and chaining, promise results,
-  logging, value return and panic).
-\item Rollback: the storage of a failed execution is the storage before it.
-\item Storage accounting updates the supplied total usage by the change in
-  storage records, retaining the account and code overhead supplied by the
-  enclosing runtime.
-\item The JSON argument and return value encodings of near-sdk 3.1.0
-  (\texttt{U128} as decimal strings, \texttt{Option} as absent or
-  \texttt{null}) and the Borsh layout of the state are implemented by the
-  adapter and model; equivalence with the SDK remains to be proved.
-\item Explicit gas and funded-resource premises in the refinement
-  proposition; gas sufficiency is not established for arbitrary calls.
-\end{itemize}
+\section{What the statement buys}
+
+\cref{thm:withdraw-available-binary} shows the use: under the refinement,
+\cref{spec:withdraw-available-boundary} becomes a statement about the
+execution of the binary itself.

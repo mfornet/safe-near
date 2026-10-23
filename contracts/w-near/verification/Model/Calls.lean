@@ -171,8 +171,15 @@ structure Outcome where
 /-- yoctoNEAR the execution sends out of the contract. -/
 def Outcome.nearOut (o : Outcome) : Nat := (o.promises.map Promise.transferred).sum
 
+/-- The logs of `internal_transfer`. -/
+def transferLogs (sender receiver : AccountId) (amount : Nat) (memo : Option String) : List String :=
+  s!"Transfer {amount} from {sender} to {receiver}" :: match memo with
+    | some m => [s!"Memo: {m}"]
+    | none => []
+
 /-- Every way an execution can fail. Each constructor is one panic site in the
-Rust source (contract, near-contract-standards 3.1.0, or near-sdk 3.1.0). -/
+Rust source (contract, near-contract-standards 3.1.0, or near-sdk 3.1.0), with
+the data its runtime message and preceding logs depend on. -/
 @[blueprint "def:panic"
   (statement := /-- The ways an execution can fail; one constructor per panic site in the contract, in near-contract-standards 3.1.0 and in the near-sdk 3.1.0 wrapper. -/)]
 inductive Panic
@@ -184,24 +191,27 @@ inductive Panic
   | alreadyInitialized
   /-- `PanicOnDefault`: `The contract is not initialized`. -/
   | notInitialized
-  /-- `assert_one_yocto`: `Requires attached deposit of exactly 1 yoctoNEAR`. -/
-  | requiresOneYocto
+  /-- `assert_one_yocto` (an `assert_eq!` on the attached deposit). -/
+  | requiresOneYocto (attached : Nat)
   /-- `near_deposit`: `Requires positive attached deposit`. -/
   | requiresPositiveDeposit
   /-- `near_deposit`: `ERR_DEPOSIT_TOO_SMALL`. -/
   | depositTooSmall
   /-- `internal_unwrap_balance_of` / `storage_withdraw`: `The account {a} is not registered`. -/
   | notRegistered (account : AccountId)
-  /-- `internal_register_account`: `The account is already registered`. -/
+  /-- `internal_register_account`: `The account is already registered`. Unreachable:
+  every caller checks registration first. -/
   | alreadyRegistered
   /-- `internal_withdraw`: `The account doesn't have enough balance`. -/
   | notEnoughBalance
-  /-- `internal_deposit`: `Nat overflow`. -/
+  /-- `internal_deposit`: `Balance overflow`. -/
   | balanceOverflow
-  /-- `internal_deposit` / `internal_withdraw`: `Total supply overflow`. -/
+  /-- `internal_deposit`: `Total supply overflow` (`expect` on the addition). -/
   | totalSupplyOverflow
-  /-- `internal_transfer`: `Sender and receiver should be different`. -/
-  | sameSenderReceiver
+  /-- `internal_withdraw`: `Total supply overflow` (`expect` on the subtraction). -/
+  | totalSupplyUnderflow
+  /-- `internal_transfer`: `assert_ne!` of sender and receiver. -/
+  | sameSenderReceiver (account : AccountId)
   /-- `internal_transfer`: `The amount should be a positive number`. -/
   | amountNotPositive
   /-- `storage_deposit`: `The attached deposit is less than the mimimum storage balance` (sic). -/
@@ -210,36 +220,72 @@ inductive Panic
   | storageWithdrawPositive
   /-- `storage_unregister`: `Can't unregister the account with the positive balance without force`. -/
   | unregisterWithBalance
-  /-- `ft_resolve_transfer`: `promise_result(0)` requested outside a callback (host error). -/
+  /-- `ft_resolve_transfer`: `promise_result(0)` outside a callback (a host error). -/
   | noPromiseResult
   /-- `ft_resolve_transfer`: `PromiseResult::NotReady => unreachable!()`. -/
   | promiseNotReady
-  /-- An unchecked integer operation overflowed (`overflow-checks = true` in the release profile). -/
-  | arithmeticOverflow
+  /-- `near_withdraw`: `amount + 1` overflows, after the withdrawal log. -/
+  | withdrawOverflow (account : AccountId) (amount : Nat)
+  /-- `ft_transfer_call`: `prepaid_gas - GAS_FOR_FT_TRANSFER_CALL` underflows, after the transfer logs. -/
+  | transferCallGas (sender receiver : AccountId) (amount : Nat) (memo : Option String)
+  /-- `ft_resolve_transfer`: the refund overflows the sender's balance. -/
+  | refundOverflow
+  /-- `ft_resolve_transfer`: burning the refund underflows the total supply. -/
+  | burnUnderflow
+  /-- `storage_unregister`: burning the balance underflows the total supply. -/
+  | unregisterUnderflow
   deriving DecidableEq, Repr
 
-/-- Expected diagnostic fragment. Contract panics may have a runtime prefix
-or source location; missing promise results are structured host errors. -/
+/-- `std::panic` text through near-sdk 3.1.0's panic hook. -/
+def rustPanic (msg location : String) : String := s!"panicked at '{msg}', {location}"
+
+def cargoSource (path : String) : String :=
+  "/usr/local/cargo/registry/src/github.com-1ecc6299db9ec823/" ++ path
+
+def coreImpl (line col : Nat) : String :=
+  cargoSource s!"near-contract-standards-3.1.0/src/fungible_token/core_impl.rs:{line}:{col}"
+
+/-- The exact text the contract passes to `panic_utf8`, as observed on
+`contract.wasm` (`env::panic` messages are bare; `assert!`, `expect`,
+`unreachable!` and arithmetic overflow go through the panic hook with their
+source location). -/
 def Panic.message : Panic → String
   | depositNotAccepted m => s!"Method {m} doesn't accept deposit"
   | privateMethod m => s!"Method {m} is private"
   | alreadyInitialized => "The contract has already been initialized"
   | notInitialized => "The contract is not initialized"
-  | requiresOneYocto => "Requires attached deposit of exactly 1 yoctoNEAR"
-  | requiresPositiveDeposit => "Requires positive attached deposit"
-  | depositTooSmall => "ERR_DEPOSIT_TOO_SMALL"
+  | requiresOneYocto d =>
+    rustPanic s!"assertion failed: `(left == right)`\n  left: `{d}`,\n right: `1`: Requires attached deposit of exactly 1 yoctoNEAR"
+      (cargoSource "near-sdk-3.1.0/src/utils/mod.rs:22:5")
+  | requiresPositiveDeposit => rustPanic "Requires positive attached deposit" "src/w_near.rs:15:9"
+  | depositTooSmall => rustPanic "ERR_DEPOSIT_TOO_SMALL" "src/w_near.rs:20:13"
   | notRegistered a => s!"The account {a} is not registered"
   | alreadyRegistered => "The account is already registered"
   | notEnoughBalance => "The account doesn't have enough balance"
-  | balanceOverflow => "Nat overflow"
-  | totalSupplyOverflow => "Total supply overflow"
-  | sameSenderReceiver => "Sender and receiver should be different"
-  | amountNotPositive => "The amount should be a positive number"
+  | balanceOverflow => "Balance overflow"
+  | totalSupplyOverflow => rustPanic "Total supply overflow" (coreImpl 108 55)
+  | totalSupplyUnderflow => rustPanic "Total supply overflow" (coreImpl 119 55)
+  | sameSenderReceiver a =>
+    rustPanic s!"assertion failed: `(left != right)`\n  left: `\"{a}\"`,\n right: `\"{a}\"`: Sender and receiver should be different"
+      (coreImpl 132 9)
+  | amountNotPositive => rustPanic "The amount should be a positive number" (coreImpl 133 9)
   | storageDepositTooSmall => "The attached deposit is less than the mimimum storage balance"
   | storageWithdrawPositive => "The amount is greater than the available storage balance"
   | unregisterWithBalance => "Can't unregister the account with the positive balance without force"
   | noPromiseResult => "Accessed invalid promise result index: 0"
-  | promiseNotReady => "internal error: entered unreachable code"
-  | arithmeticOverflow => "attempt to"
+  | promiseNotReady => rustPanic "internal error: entered unreachable code" (coreImpl 212 40)
+  | withdrawOverflow .. => rustPanic "attempt to add with overflow" "src/w_near.rs:45:43"
+  | transferCallGas .. => rustPanic "attempt to subtract with overflow" (coreImpl 175 13)
+  | refundOverflow => rustPanic "attempt to add with overflow" (coreImpl 230 55)
+  | burnUnderflow => rustPanic "attempt to subtract with overflow" (coreImpl 235 21)
+  | unregisterUnderflow =>
+    rustPanic "attempt to subtract with overflow"
+      (cargoSource "near-contract-standards-3.1.0/src/fungible_token/storage_impl.rs:19:17")
+
+/-- Logs emitted before the panic site. -/
+def Panic.logs : Panic → List String
+  | withdrawOverflow a amount => [s!"Withdraw {amount} NEAR from {a}"]
+  | transferCallGas sender receiver amount memo => transferLogs sender receiver amount memo
+  | _ => []
 
 end WNear

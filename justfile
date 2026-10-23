@@ -40,9 +40,9 @@ publish-blueprint contract: (blueprint contract)
         "$HOME/Library/Application Support/safe-near/blueprint/{{ contract }}/"
     @echo "https://obiteum-mac-studio.tail9c65ff.ts.net:8444/{{ contract }}/"
 
-# Build near-lean: the Wasm interpreter, the VM, the runtime, the chain layer and the node.
+# Build near-lean: the Wasm interpreter, the boundary interface, the VM, the runtime, the chain layer and the node.
 near-build:
-    @for d in near-lean/wasm near-lean/vm near-lean/runtime near-lean/chain near-lean/node; do \
+    @for d in near-lean/wasm near-lean/interface near-lean/vm near-lean/runtime near-lean/chain near-lean/node; do \
         echo "== $d"; (cd "$d" && lake build); \
     done
 

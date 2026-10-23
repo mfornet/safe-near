@@ -170,4 +170,87 @@ theorem chargesBefore_functionKey_reservation (st : HostStore NearState) (args :
   rw [chargesBefore_valid_batch_target _ _ _ (by decide) (by rfl) ht (by decide) (by decide)]
   exact functionKeyPlan_reservation h
 
+/-- A valid `use_global_contract` plan read the identifier, found the target
+and reserves exactly the action's execution gas. -/
+theorem globalContractPlan_valid {st : HostStore NearState} {byAccount : Bool} {target : Nat}
+    {len ptr : UInt64} {sir : Bool} (h : (globalContractPlan st byAccount target len ptr sir).error = none)
+    (receiver : List UInt8) :
+    ∃ bytes, getMemOrReg st ptr len = some bytes ∧ functionCallTargetError st target = none ∧
+      ((globalContractPlan st byAccount target len ptr sir).charges.map
+        (fun charge => charge.reservation st.host.fees)).sum =
+        actionExecutionGas st.host.fees st.host.config.ethImplicitAccounts receiver
+          (.useGlobalContract (if byAccount then .accountId bytes else .codeHash bytes)) := by
+  unfold globalContractPlan at h ⊢
+  cases hm : getMemOrReg st ptr len with
+  | none => simp [hm] at h
+  | some bytes =>
+    simp only [hm] at h ⊢
+    split at h
+    · simp at h
+    · rename_i hid
+      split at h
+      · simp at h
+      · rename_i ht
+        refine ⟨bytes, rfl, ht, ?_⟩
+        cases byAccount <;>
+          simp only [Bool.false_eq_true, ite_true, ite_false, List.map_append, List.sum_append,
+            readSpan_reservation] <;>
+          simp [utf8, Charge.reservation, actionExecutionGas, GlobalContractId.length]
+
+theorem globalContractPlan_valid_target {st : HostStore NearState} {byAccount : Bool} {target : Nat}
+    {len ptr : UInt64} {sir : Bool} (h : (globalContractPlan st byAccount target len ptr sir).error = none) :
+    (promiseReceiver? st target).isSome = true := by
+  obtain ⟨_, _, ht, _⟩ := globalContractPlan_valid h []
+  exact (functionCallTargetError_none_iff st target).mp ht
+
+theorem chargesBefore_useGlobalContract_reservation (st : HostStore NearState) (args : List Value)
+    (h : (globalContractPlan st false (argU64 args 0).toNat (argU64 args 1) (argU64 args 2)
+      (sirOf st (promiseReceiver? st (argU64 args 0).toNat))).error = none) :
+    ∃ bytes, getMemOrReg st (argU64 args 2) (argU64 args 1) = some bytes ∧
+      ((chargesBefore "promise_batch_action_use_global_contract" st args).map
+        (fun charge => charge.reservation st.host.fees)).sum =
+        actionExecutionGas st.host.fees st.host.config.ethImplicitAccounts
+          ((promiseReceiver? st (argU64 args 0).toNat).getD []) (.useGlobalContract (.codeHash bytes)) := by
+  have ht := globalContractPlan_valid_target h
+  rw [chargesBefore_valid_batch_target _ _ _ (by decide) (by rfl) ht (by decide) (by decide)]
+  obtain ⟨bytes, hm, _, hr⟩ := globalContractPlan_valid h ((promiseReceiver? st (argU64 args 0).toNat).getD [])
+  exact ⟨bytes, hm, hr⟩
+
+theorem chargesBefore_useGlobalContractByAccountId_reservation (st : HostStore NearState) (args : List Value)
+    (h : (globalContractPlan st true (argU64 args 0).toNat (argU64 args 1) (argU64 args 2)
+      (sirOf st (promiseReceiver? st (argU64 args 0).toNat))).error = none) :
+    ∃ bytes, getMemOrReg st (argU64 args 2) (argU64 args 1) = some bytes ∧
+      ((chargesBefore "promise_batch_action_use_global_contract_by_account_id" st args).map
+        (fun charge => charge.reservation st.host.fees)).sum =
+        actionExecutionGas st.host.fees st.host.config.ethImplicitAccounts
+          ((promiseReceiver? st (argU64 args 0).toNat).getD []) (.useGlobalContract (.accountId bytes)) := by
+  have ht := globalContractPlan_valid_target h
+  rw [chargesBefore_valid_batch_target _ _ _ (by decide) (by rfl) ht (by decide) (by decide)]
+  obtain ⟨bytes, hm, _, hr⟩ := globalContractPlan_valid h ((promiseReceiver? st (argU64 args 0).toNat).getD [])
+  exact ⟨bytes, hm, hr⟩
+
+/-- Same-receiver status affects sending fees, never identifier validation. -/
+theorem globalContractPlan_error_sir (st : HostStore NearState) (byAccount : Bool) (target : Nat)
+    (len ptr : UInt64) (a b : Bool) :
+    (globalContractPlan st byAccount target len ptr a).error =
+      (globalContractPlan st byAccount target len ptr b).error := by
+  unfold globalContractPlan
+  repeat' (first | rfl | split)
+
+/-- The concrete metered pre-invocation guard supplies plan validity. -/
+theorem preInvokeError_useGlobalContract_valid (name : String) (byAccount : Bool)
+    (hname : globalContractInputs? name = some byAccount) (st : HostStore NearState) (args : List Value)
+    (hstorage : storageMutationPlan? name st args = none) (hjoin : (name == "promise_and") = false)
+    (htransfer : (name == "promise_batch_action_transfer") = false)
+    (hkey : (name == "promise_batch_action_add_key_with_function_call") = false)
+    (h : preInvokeError name st args = none) :
+    (globalContractPlan st byAccount (argU64 args 0).toNat (argU64 args 1) (argU64 args 2) false).error = none := by
+  unfold preInvokeError at h
+  cases he : invocationArgumentError name st args with
+  | some error => simp [he] at h
+  | none =>
+    simp only [invocationArgumentError, hstorage, hjoin, htransfer, hkey, hname, Bool.false_eq_true,
+      ite_false] at he
+    exact he
+
 end Wasm.Near

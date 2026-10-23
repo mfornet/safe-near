@@ -12,3 +12,5 @@ import Wasm.Wat
 import Wasm.Bytes
 import Wasm.HostInvariant
 import Wasm.LinkInvariant
+import Wasm.Fuel
+import Wasm.LinkFuncs

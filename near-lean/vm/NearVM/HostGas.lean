@@ -379,6 +379,16 @@ theorem promiseBatchActionFunctionCallFn_gas : HostPreservesGas promiseBatchActi
     NearState.selectReturnValue, NearState.selectReturnPromise]
   repeat (first | rfl | exact writeRegisterResult_gas _ _ _ _ _ | split)
 
+theorem promiseBatchActionFunctionCallWeightFn_gas : HostPreservesGas promiseBatchActionFunctionCallWeightFn := by
+  intro st args
+  unfold promiseBatchActionFunctionCallWeightFn
+  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
+    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
+    checkAccountId, checkPublicKey, NearState.setRegister, trapWith, appendPromise,
+    appendPromiseActionResult, createBatchPromiseResult, createCallbackPromiseResult,
+    NearState.selectReturnValue, NearState.selectReturnPromise]
+  repeat (first | rfl | exact writeRegisterResult_gas _ _ _ _ _ | split)
+
 theorem promiseBatchActionTransferFn_gas : HostPreservesGas promiseBatchActionTransferFn := by
   intro st args
   unfold promiseBatchActionTransferFn
@@ -432,6 +442,26 @@ theorem promiseBatchActionDeleteKeyFn_gas : HostPreservesGas promiseBatchActionD
 theorem promiseBatchActionDeleteAccountFn_gas : HostPreservesGas promiseBatchActionDeleteAccountFn := by
   intro st args
   unfold promiseBatchActionDeleteAccountFn
+  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
+    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
+    checkAccountId, checkPublicKey, NearState.setRegister, trapWith, appendPromise,
+    appendPromiseActionResult, createBatchPromiseResult, createCallbackPromiseResult,
+    NearState.selectReturnValue, NearState.selectReturnPromise]
+  repeat (first | rfl | exact writeRegisterResult_gas _ _ _ _ _ | split)
+
+theorem promiseBatchActionUseGlobalContractFn_gas : HostPreservesGas promiseBatchActionUseGlobalContractFn := by
+  intro st args
+  unfold promiseBatchActionUseGlobalContractFn useGlobalContractFn
+  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
+    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
+    checkAccountId, checkPublicKey, NearState.setRegister, trapWith, appendPromise,
+    appendPromiseActionResult, createBatchPromiseResult, createCallbackPromiseResult,
+    NearState.selectReturnValue, NearState.selectReturnPromise]
+  repeat (first | rfl | exact writeRegisterResult_gas _ _ _ _ _ | split)
+
+theorem promiseBatchActionUseGlobalContractByAccountIdFn_gas : HostPreservesGas promiseBatchActionUseGlobalContractByAccountIdFn := by
+  intro st args
+  unfold promiseBatchActionUseGlobalContractByAccountIdFn useGlobalContractFn
   dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
     contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
     checkAccountId, checkPublicKey, NearState.setRegister, trapWith, appendPromise,

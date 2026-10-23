@@ -72,8 +72,9 @@ The detailed acceptance criteria live in each Linear issue.
 `just node-guardrails` runs all three:
 
 - `just node-isolation` (Python only, in automatic CI): no contract
-  verification package requires the node, chain or runtime packages, even
-  transitively; only the node requires the node; no `@[extern]` /
+  verification package requires the node or chain packages, even
+  transitively (the runtime is allowed: contract adapters run the binary
+  through it); only the node requires the node; no `@[extern]` /
   `@[implemented_by]` in our Lean and no native link settings in lakefiles;
   `NearNode.Protocol` matches `reference.json`.
 - `just vm-dependencies`: the compiled NearVM import closure contains no

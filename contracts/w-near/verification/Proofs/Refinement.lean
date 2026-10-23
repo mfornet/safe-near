@@ -1,21 +1,21 @@
-import Spec.RuntimeInstance
-import Interpreter.Wasm.Decoder.Wat
+import Spec.Contract
+import Spec.Exports
+import NearRuntime.BoundaryResolution
 import Lean
 
 /-!
 # The refinement obligation (open)
 
-`Spec/Refinement.lean` defines `Refines` for an abstract runtime and
-`Spec/RuntimeInstance.lean` instantiates it with `near-lean/vm`. This file
-pins the remaining inputs, the deployed module and its byte size, so that
-`refines_near_lean` below is a closed statement about `contract.wasm`.
+`Spec/Contract.lean` gives the wNEAR `ContractModel`; `NearRuntime.Boundary`
+gives near-lean's `RuntimeInterface`, a function-call action followed by the
+receipt's storage-stake check. This file pins the deployed binary, so that
+`refines_wnear` below is a closed statement about `contract.wasm`.
 
-The module is `contract.wasm` printed as text (`wasm2wat`, kept at
-`near-lean/vm/tests/fixtures/w_near.wat`) because `near-lean` only has a text
-decoder. The text file is read at elaboration time; trusting the theorem means
-trusting that the text is a faithful print of the binary, which
-`just reproduce w-near` and the runtime conformance tests check but Lean does
-not. The byte size is that of the binary itself, as the VM charges for it.
+The binary is embedded as a hex string, read when this file is elaborated.
+Decoding it in the kernel exceeds the available memory, so the decoded module
+and two facts about it (no start function; the exported functions) are
+hypotheses, which the adapter tests (`just runtime-adapter-test`) check on the
+binary.
 
 The theorem is the only open proof in the project. `just wnear-audit`
 tolerates `sorryAx` in this module alone.
@@ -23,41 +23,93 @@ tolerates `sorryAx` in this module alone.
 
 namespace WNear
 
-open Wasm.Near
+open NearInterface
 
 open Lean Elab Term in
-/-- The contents of a file, as a string literal, read when this file is elaborated.
-Paths are relative to the package root (`contracts/w-near/verification`). -/
-elab "file_contents%" path:str : term => do
-  return mkStrLit (← IO.FS.readFile path.getString)
+/-- The bytes of a file, as a hex string literal, read when this file is
+elaborated. Paths are relative to the package root. -/
+elab "file_hex%" path:str : term => do
+  let bytes ← IO.FS.readBinFile path.getString
+  let hex := String.join (bytes.toList.map fun b =>
+    String.ofList [Nat.digitChar (b.toNat / 16), Nat.digitChar (b.toNat % 16)])
+  return mkStrLit hex
 
-open Lean Elab Term in
-/-- The size in bytes of a file, as a literal, read when this file is elaborated. -/
-elab "file_size%" path:str : term => do
-  return mkNatLit (← IO.FS.readBinFile path.getString).size
+/-- Bytes from a lowercase hex string. -/
+def bytesOfHex (s : String) : ByteArray :=
+  let digit (c : Char) : Nat := if c.isDigit then c.toNat - '0'.toNat else c.toNat - 'a'.toNat + 10
+  let rec go : List Char → List UInt8
+    | a :: b :: rest => UInt8.ofNat (digit a * 16 + digit b) :: go rest
+    | _ => []
+  ⟨(go s.toList).toArray⟩
 
-/-- `contract.wasm` in text form. -/
-def wNearWat : String := file_contents% "../../../near-lean/vm/tests/fixtures/w_near.wat"
+/-- `contract.wasm`, as deployed. -/
+def wNearHex : String := file_hex% "../contract.wasm"
 
-/-- Byte size of `contract.wasm`. -/
-def wNearCodeSize : Nat := file_size% "../contract.wasm"
+def wNearBytes : ByteArray := bytesOfHex wNearHex
 
-/-- The model's runtime parameters induced by the protocol parameters. -/
-def Config.ofRuntime (cfg : RuntimeConfig) : Config :=
-  { extraBytesPerRecord := cfg.fees.numExtraBytesRecord }
+theorem exportFunc_none {m : Wasm.Module} {name : String} (h : name ∉ funcExportNames m) :
+    m.exportFunc? name = none := by
+  unfold Wasm.Module.exportFunc?
+  rw [← Array.findSome?_toList, List.findSome?_eq_none_iff]
+  intro e he
+  split
+  · rename_i i hd
+    split
+    · rename_i hn
+      exact absurd (List.mem_filterMap.mpr ⟨e, he, by simp [hd, beq_iff_eq.mp hn]⟩) h
+    · rfl
+  · rfl
 
-/-- **Open.** The deployed wNEAR binary refines the model under every protocol
-configuration whose measured account entry fits a `u64`: whenever the text
-form decodes to a module `code`, `RefinesNearLean cfg code wNearCodeSize
-(Config.ofRuntime cfg)` holds.
+/-- Methods the binary does not export are no calls. -/
+theorem decode_not_exported {method : String} (h : method ∉ exportedMethods) (args : List UInt8) :
+    Call.decode method args = none := by
+  simp only [exportedMethods, List.mem_cons, List.not_mem_nil, or_false, not_or] at h
+  unfold Call.decode
+  split <;> simp_all
 
-Decoding is a hypothesis rather than evaluated here, so the statement does
-not depend on running the decoder inside the kernel; the runtime tests
-(`just runtime-adapter-test`) check that it succeeds. -/
-theorem refines_near_lean (cfg : RuntimeConfig) (code : Wasm.Module)
-    (hcfg : (Config.ofRuntime cfg).WF)
-    (hcode : Wasm.Decoder.Wat.decode wNearWat = .ok code) :
-    RefinesNearLean cfg code wNearCodeSize (Config.ofRuntime cfg) := by
+/-- **Open.** The exported methods: on a call to one of them, near-lean's
+execution of `contract.wasm` is the model's as `Refines` states it. -/
+theorem refines_wnear_exported (cfg : Config) (code : Wasm.Module) (codeOf : List UInt8 → Near.ContractCode)
+    (hcfg : cfg.WF) (hcode : Wasm.Binary.decode wNearBytes = .ok code)
+    (raw : RawStorage) (st : Option State) (ctx : Context) (hrep : (wnear cfg).Represents raw st)
+    (hwf : ctx.WF raw) (hmethod : ctx.method ∈ exportedMethods) :
+    let r := Near.Boundary.nearRuntime.exec
+      { code := { module := code, size := wNearBytes.size, hash := "" }, codeOf } raw ctx
+    (∀ msg, r.outcome ≠ .error (.executionIssue msg)) ∧
+    (∀ c, (wnear cfg).Parses ctx.method ctx.args c →
+      let res := (wnear cfg).step ctx st c
+      ((wnear cfg).gas ctx st c ≤ ctx.gasLimit →
+        Matches (wnear cfg) ctx raw r res ∧ r.usedGas ≤ (wnear cfg).gas ctx st c) ∧
+      (Matches (wnear cfg) ctx raw r res ∨
+        (r.outcome = .error .outOfGas ∧ RolledBack ctx raw r ∧ r.logs <+: res.logs))) ∧
+    ((¬ ∃ c, (wnear cfg).Parses ctx.method ctx.args c) → RolledBack ctx raw r) := by
   sorry
+
+/-- The deployed wNEAR binary refines the model: for every configuration whose
+measured account entry fits a `u64`, every context and every resource state,
+near-lean's execution of `contract.wasm` is the model's as `Refines` states
+it. `codeOf` decodes code that the call's promises deploy; wNEAR deploys none.
+Proved for every method the binary does not export; open for the exported
+ones (`refines_wnear_exported`). -/
+@[blueprint "spec:refinement"
+  (statement := /-- The deployed binary refines \cref{def:contract-model}: for every storage representing a model state and every context the runtime can build, the execution reports no interpreter limitation; with at least the model's gas bound attached, it agrees with the model on return value, storage, balance, storage usage, logs, receipts and failure, and uses at most that much gas; with less, it agrees or fails for gas with no effects; and input that is no call fails with no effects. -/)]
+theorem refines_wnear (cfg : Config) (code : Wasm.Module) (codeOf : List UInt8 → Near.ContractCode)
+    (hcfg : cfg.WF) (hcode : Wasm.Binary.decode wNearBytes = .ok code)
+    (hstart : code.start = none) (hexports : funcExportNames code = exportedMethods) :
+    Refines Near.Boundary.nearRuntime
+      { code := { module := code, size := wNearBytes.size, hash := "" }, codeOf } (wnear cfg) := by
+  intro raw st ctx hrep hwf
+  by_cases hmethod : ctx.method ∈ exportedMethods
+  · exact refines_wnear_exported cfg code codeOf hcfg hcode raw st ctx hrep hwf hmethod
+  · have hexport : code.exportFunc? ctx.method = none := exportFunc_none (by rw [hexports]; exact hmethod)
+    obtain ⟨hrb, hni⟩ := Near.Boundary.nearRuntime_not_exported
+      { code := { module := code, size := wNearBytes.size, hash := "" }, codeOf } raw ctx rfl
+      hstart hexport
+    have hnone : ∀ c, ¬ (wnear cfg).Parses ctx.method ctx.args c := by
+      intro c hc
+      change Call.decode ctx.method ctx.args = some c at hc
+      rw [decode_not_exported hmethod] at hc
+      cases hc
+    exact ⟨hni, fun c hc => absurd hc (hnone c), fun _ => hrb⟩
 
 end WNear
