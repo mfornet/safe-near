@@ -1,235 +1,313 @@
-# Restructure refinement as exact equivalence
+# Restructure refinement as a generic, complete statement
 
-Follow-up task. Goal: replace the per-contract refinement statements
+Follow-up task, blocked on the current large rewrite. Goal: replace the
+per-contract refinement statements
 (`contracts/w-near/verification/Spec/Refinement.lean`,
 `contracts/linkdrop/verification/Spec/Refinement.lean`) by one generic
-definition, and strengthen it from "the binary refines the model when gas and
-funds suffice" to "the binary and the model have exactly the same observable
-behaviour", gas and resources included.
+definition that characterises every execution of the binary: no input, gas
+amount or resource state is excluded by a hypothesis.
 
 This document fixes the design. The agent implements it; it does not re-open
 the decisions marked **Decided** without discussing first. Items marked
 **Open** are for the agent to settle and document.
 
-## 1. Why the current statements are not equivalence
+## 1. Why the current statements are not enough
 
-`Refines` today (wNEAR, line 350 of `Spec/Refinement.lean`) is a one-directional
-simulation:
+`Refines` today (wNEAR, `Spec/Refinement.lean`) is a one-directional
+simulation with escape hatches:
 
-- Gas is not in the model. The clause `R.outOfGas r = false → ...` drops every
-  execution the binary aborts for gas. Burnt and used gas are only bounded.
-- Funds are not in the model. `ExecutionResources.Supports` is a hypothesis
-  that excludes executions where the model schedules a transfer the account
-  cannot pay or grows storage the account cannot cover.
+- Gas: the clause `R.outOfGas r = false → ...` drops every execution the
+  binary aborts for gas, and nothing says how much gas is enough.
+- Funds: `ExecutionResources.Supports` is a hypothesis that excludes executions
+  where the model schedules a transfer the account cannot pay or grows storage
+  the account cannot cover.
+- Input: `call.WF` and a typed `Call` exclude malformed arguments; nothing is
+  said about them.
 - The `RuntimeInterface` is not runtime-generic: `mkInput`, `promises`,
   `encodeRet` and `callbackResult` mention wNEAR types.
 - Receipts are compared after a lossy projection (`promisesOf?`), guarded by
-  `observationsValid`.
+  `observationsValid`; panics are matched by substring (`Panic.matches`).
 - linkdrop has a divergent copy (empty logs required, no panic-text match,
   receipts instead of promise chains).
 
-The new statement must have none of these escape hatches. Whatever the binary
-does on a given input, the model does the same, and vice versa.
+## 2. Principles — **Decided**
 
-## 2. Shape of the new definition
+- **The low-level model is exact; statements may be bounds.** near-lean's VM
+  and runtime stay an exact model of nearcore, including gas. The contract
+  model does not track gas; refinement states a gas **upper bound** per call.
+  Statements have the form "if the attached gas is at least `B`, then ...",
+  never "there exists some gas such that ...".
+- **Worst case over the environment.** Gas for storage access depends on the
+  whole chunk's trie and its node cache (`prepareStorageCallAux` in
+  `near-lean/vm/NearVM/Metered.lean` charges `touching_trie_node` /
+  `read_cached_trie_node` from trie-overlay counters). The contract model never
+  models the trie. `Refines` quantifies over every context, trie included, so
+  the gas bound must hold in the worst case (every node cold, longest path the
+  key allows).
+- **Typed calls.** Statements are written against a typed `Call`. Inputs that
+  are not a serialisation of any call are covered by the refinement, not by the
+  model: they fail with no effects.
+- **Everything else exact.** Storage, balance, storage usage, return data,
+  logs, receipts and failure kind (panic message, balance exceeded, lack of
+  balance for state) are compared exactly, in the raw space.
 
-Three parameters, as agreed:
+## 3. Interface library — **Decided**
 
-```
-Refines (R : RuntimeInterface) (code : R.Code) (M : ContractModel) : Prop
-```
+New package `near-lean/interface` (`NearInterface`). Definitions only: no
+interpreter, no Wasm, so `Spec/` libraries can import it without building
+`NearVM`.
 
-### 2.1 `RuntimeInterface` (generic, no contract types) — **Decided**
+Contents (moved, not duplicated):
 
-Lives in a new lightweight Lean library that does not depend on the Wasm
-interpreter, so that `Spec/` libraries can import it without building
-`NearVM`. Suggested location: `near-lean/interface` (lake package name for the
-agent to pick; it must contain only types and no interpreter code). The raw
-types it needs (`Bytes`, raw storage as a finite map of byte strings, raw
-receipt specs, a raw promise-result type, return data) are moved or duplicated
-there; `near-lean/vm` then imports it, or proves its own types coincide.
+- Raw types: `Bytes := List UInt8` (the VM's representation, so no
+  conversion), `RawStorage`, `ReturnData`, `ReceiptSpec` / `RawReceipt` with
+  dependencies, `PromiseResult`, `TrieOverlay` (needed by `Context`).
+- `Context`, `Failure`, `Observation`, `RuntimeInterface`, `ContractModel`,
+  `Refines` and the generic lemmas (section 7).
 
-Fields, all over raw types:
+`NearVM` imports these and keeps `abbrev`s under `Wasm.Near` so existing code
+compiles unchanged. There is a single copy of each type, so no coincidence
+proofs are needed.
 
-- `Storage`, `Code`, `Result`.
-- `exec : Code → Storage → Context → Result`, where `Context` is the
-  contract-independent host input: method name, argument bytes, current and
-  predecessor account ids, attached deposit, prepaid gas, raw promise results,
-  account balance, locked balance, account storage usage, protocol config.
-- Observations on `Result`: `storage`, `balance`, `storageUsage`, `burntGas`,
-  `usedGas`, `returnData` (bytes or receipt index), `logs`, `receipts` (raw
-  receipt specs with dependencies), `failure : Option Failure`.
-- `Failure` is a small inductive owned by the interface: `panic (msg)`,
-  `outOfGas`, `balanceExceeded`, `lackBalanceForState (deficit)`, `other
-  (msg)`, plus `executionIssue (msg)` for interpreter limitations.
+### 3.1 `Context`
 
-The instance for near-lean wraps `NearVM.run` (see 2.4 for the boundary).
+The contract-independent input of one function-call action: what varies
+between real calls.
 
-### 2.2 `ContractModel` (per contract) — **Decided**
-
-A structure with a typed state, as agreed. Required fields:
-
-- Types: `State`, `Call`, `Outcome`, `Panic`. `Env` is **not** contract-specific
-  any more: the model consumes the interface's `Context` directly (raw promise
-  results included; the contract parses them itself, so wNEAR's
-  `parseU128Result` moves from the adapter into the model).
-- `step : Config → Option State → Context → Call → Except Failure Outcome`
-  where the failure type is the interface's `Failure` with `panic` carrying the
-  contract's `Panic` (so `Panic.message` is part of the model). `Outcome`
-  carries, in addition to today's state, promises, return and logs, the gas
-  use `{burnt, used}`. A `Failure` result also carries burnt gas and logs,
-  since the binary retains both on failure.
-- Encoders to raw: `encodeState : State → RawStorage` with its inverse
-  `project`, `encodeArgs : Call → Bytes`, `encodeRet : Ret → ReturnData`,
-  `encodeReceipts : List Promise → List RawReceiptSpec`,
-  `methodName : Call → String`.
-- `Call.WF : Call → Prop`, the decodable-argument condition. Argument-decoding
-  failures stay outside the model for now (see Open items).
-- `Inv : Config → State → Prop`, the reachable-state invariant, and
-  `Represents : RawStorage → Option State → Prop` defined from `encodeState`
-  and `Inv` as today.
-
-Comparison happens in the raw space: the model encodes, the binary's raw
-observations must equal the encoding. No projection of receipts back into the
-model, no `observationsValid`.
-
-### 2.3 `Refines` as equality of observations — **Decided**
-
-```
-∀ raw st ctx call,
-  M.Call.WF call → ctx.method = M.methodName call → ctx.args = M.encodeArgs call →
-  M.Represents raw st →
-  observe (R.exec code raw ctx) = M.observe (M.step cfg st ctx call)
+```lean
+structure Context where
+  method         : String
+  args           : Bytes
+  current        : AccountId
+  predecessor    : AccountId
+  signer         : AccountId
+  signerPk       : Bytes
+  attached       : Balance
+  prepaidGas     : Gas
+  promiseResults : List PromiseResult
+  balance        : Balance   -- account.amount, before the deposit (see 3.2)
+  locked         : Balance
+  storageUsage   : Nat       -- whole account, incl. account and code overhead
+  blockHeight    : Nat
+  timestamp      : Nat
+  epochHeight    : Nat
+  randomSeed     : Bytes
+  trie           : TrieOverlay.State   -- full chunk trie and node cache
+  protocol       : RuntimeConfig       -- fees, ext costs, limits, storage price
 ```
 
-where both sides produce the same record
-`{failure, storage, balance, storageUsage, burntGas, usedGas, returnData, logs, receipts}`.
-On model failure the record is: the failure, the input storage, input balance
-and usage, the burnt gas the model predicts, used = burnt, no return data, the
-retained logs, no receipts. There is no `outOfGas → ...` guard and no
-`Supports` hypothesis. The remaining hypotheses are representation only.
+`Context` is not `VMContext`. `VMContext`'s policy fields
+(`validateActionMethodUtf8`, `chargeStorageValueAccess`,
+`storageReadsFromTrie`, `viewConfig`) are fixed by the near-lean instance to
+the values `functionCallContext` in `near-lean/runtime/NearRuntime/Apply.lean`
+uses; the instance builds the `VMContext` from `Context`.
 
-Because this is an equality, the generic transfer lemma is immediate and should
-be proved once in the interface library: every property of `M.step` is a
-property of the observed execution of `code`. Also prove the converse
-direction's useful corollaries (e.g. the binary never produces an execution
-issue when `Refines` holds).
+### 3.2 Balance convention — **Decided: exactly as NEAR**
 
-### 2.4 Which boundary — **Decided: the function-call action boundary**
+The runtime passes `account.amount` from before the deposit
+(`functionCallContext`, `accountBalance := account.amount`) and the deposit
+separately; the VM credits it when building its state
+(`toNearState`: `accountBalance := ctx.accountBalance + ctx.attachedDeposit`).
+`Context.balance` is that pre-deposit amount. Anything the model says about
+balance follows the same steps, including the `u128` bound. `locked` and
+`storageUsage` are the account's raw fields.
+
+### 3.3 `Failure` and `Observation`
+
+```lean
+inductive Failure
+  | panic (msg : String)          -- exact text as the runtime reports it
+  | outOfGas
+  | balanceExceeded
+  | lackBalanceForState (deficit : Balance)
+  | methodNotFound
+  | other (msg : String)
+  | executionIssue (msg : String) -- interpreter limitation
+
+structure Observation where
+  outcome      : Except Failure ReturnData
+  storage      : RawStorage
+  balance      : Balance
+  storageUsage : Nat
+  burntGas     : Gas
+  usedGas      : Gas
+  logs         : List String
+  receipts     : List RawReceipt
+  trie         : TrieOverlay.State  -- cache warming survives every failure
+```
+
+### 3.4 `RuntimeInterface`
+
+```lean
+structure RuntimeInterface where
+  Code : Type
+  exec : Code → RawStorage → Context → Observation
+```
+
+All projection from `VMOutcome` happens inside the instance, so the interface
+has no `observationsValid` and no `getD []` fallbacks.
+
+## 4. The function-call action boundary — **Decided**
 
 The storage-rent check (`LackBalanceForState`) is not performed by the VM. It
-runs in the receipt executor after the call
-(`near-lean/runtime/NearRuntime/Apply.lean`, `checkStorageStake`, formula
+runs in the receipt executor after the call (`checkStorageStake` in
+`near-lean/runtime/NearRuntime/Apply.lean`, formula
 `usage * storageAmountPerByte - amount - locked`, with the 770-byte
 zero-balance exemption). Outgoing deposits, by contrast, are checked inside the
 VM at promise creation (`HostError.balanceExceeded`).
 
-To make "insufficient funds to grow storage" a model failure, the near-lean
-instance of `exec` is the VM run **followed by** the storage-stake check,
-packaged in near-lean as one function (e.g. `applyFunctionCall`) that the
-runtime's action executor also uses, so the boundary is a real seam and not a
-test-only wrapper. On a rent failure the observations are those of a failed
-call: storage, balance and usage rolled back, receipts dropped, gas as burnt by
-the VM.
+The near-lean `exec` is the VM run **followed by** the storage-stake check,
+packaged as one function next to `applyFunctionCall` in `near-lean/runtime`.
+`applyFunctionCall` is refactored to call it, so the boundary is a real seam
+and not a test-only wrapper. On a rent failure the observation is that of a
+failed call: storage, balance and usage rolled back, receipts dropped, gas as
+burnt by the VM.
 
-Consequence for the model: `step` ends with the same rent check on the
-post-state's measured usage, and `Context` must carry `locked` and the
-account's total storage usage (including account and code overhead, which the
-contract's key/value storage does not see). The model tracks usage as
-`ctx.storageUsage - usage(raw) + usage(encodeState newState)` exactly as the
-VM does, including the `u64` bound.
+**Fuel.** Every Wasm instruction costs at least `regularOpCost > 0`, so
+`prepaidGas / regularOpCost + c` fuel always suffices. The instance fixes that
+amount and proves it sufficient, so `executionIssue` only means "construct
+unsupported by the interpreter", and `Refines` rules it out.
 
-## 3. Gas in the model — **Decided approach, details Open**
+## 5. `ContractModel` (per contract) — **Decided**
 
-Exact equivalence requires the model to predict `burntGas` and `usedGas`
-exactly, on success and on failure. The VM's gas is the sum of:
+```lean
+inductive ModelFailure (P : Type)
+  | panic (p : P)
+  | balanceExceeded
+  | lackBalanceForState (deficit : Balance)
 
-1. Host-side fees: per host call, per byte of storage read/written/removed, per
-   log byte, per promise and per action, contract loading by code size. These
-   are protocol parameters (`RuntimeConfig.fees`, `wasm.extCosts`) applied to
-   quantities the typed model already knows (key and value lengths, number of
-   promises, log lengths, argument sizes).
-2. Wasm instruction gas: `regularOpCost` times the number of instructions
-   executed on the path the binary takes, which depends on the compiled code
-   and on input sizes (string lengths, JSON parsing loops, Borsh encoding).
+structure ContractModel where
+  State Call Ret Panic Promise : Type
+  -- representation
+  encodeState    : State → RawStorage
+  Inv            : State → Prop
+  -- input
+  Parses         : (method : String) → (args : Bytes) → Call → Prop
+  -- output
+  encodeRet      : Ret → ReturnData
+  encodeReceipts : (leftoverGas : Gas) → List Promise → List RawReceipt
+  panicMessage   : Panic → String
+  -- semantics
+  step : Context → Option State → Call → Except (ModelFailure Panic) (Outcome State Ret Promise)
+  gas  : Context → Option State → Call → Gas
+```
 
-Approach:
+- `Outcome` carries the new state, return value, logs and promises.
+- `step` consumes the interface's `Context` directly, raw promise results
+  included; the contract parses them itself (wNEAR's `parseU128Result` moves
+  from the adapter into the model).
+- `step` is exact for failures that do not depend on gas: panics, promise
+  deposits the liquid balance cannot pay (`balanceExceeded`, at the promise
+  that fails), and the rent check on the post-state (`lackBalanceForState`).
+  The model tracks storage usage as
+  `ctx.storageUsage - usage(raw) + usage(encodeState newState)`, exactly as the
+  VM does, including the `u64` bound.
+- `gas` is a bound on `usedGas` (burnt gas plus static gas attached to
+  promises), written as a readable formula with named constants. Its soundness
+  is a proof obligation of `Refines`, for every `ctx.trie`.
+- `encodeReceipts` takes the leftover gas because a promise with
+  `with_unused_gas_weight` receives its static gas plus a share of
+  `prepaid - used`. The leftover is read from the binary's own observation, so
+  this is not an existential.
+- `panicMessage` gives the exact runtime text (SDK prefix, any location
+  suffix), replacing the substring match.
+- `Represents raw none := raw = ∅`, and
+  `Represents raw (some s) := Inv s ∧ raw = encodeState s`.
 
-- Add `Model/Gas.lean` per contract defining `gasOf : Config → Option State →
-  Context → Call → GasUse` as an explicit cost expression. Part (1) is written
-  directly from the typed trace of each method. Part (2) is a per-method,
-  per-branch function of the input sizes, with named coefficients
-  (`opsNearDeposit_base`, `opsPerArgByte`, ...). The coefficients are
-  constants of the deployed binary; their values are obtained by measurement
-  (`measureCallGasBurnt`, the gas profile in `VMOutcome.gasProfile`) and then
-  **proved** equal to the binary's instruction counts as part of the refinement
-  proof. Until proved, they are definitions, not axioms, and the audit must
-  show them as such.
-- `step` consumes gas in source order: each `require` and each host operation
-  charges before it runs, so that on `outOfGas` the model's burnt gas and
-  retained logs are the ones at the point of exhaustion. This is what makes
-  failure observations exact. The agent must check in `NearVM/HostGas.lean`
-  and `Run.lean` how burnt gas is finalised on `gasExceeded` and mirror it.
-- `usedGas` on success = burnt + gas attached to created promises, as the VM
-  computes it.
+### 5.1 `Parses`
 
-Open for the agent: whether the Wasm instruction counts are expressed per
-method as a flat formula or via a small cost-annotated trace type shared by all
-contracts. Pick the one that keeps `Proofs/` readable; document the choice.
+`Parses` is a relation, not `encodeArgs`: near-sdk/serde accepts many byte
+strings for the same call (whitespace, field order, ignored unknown fields), so
+"not equal to `encodeArgs c`" does not imply failure. For JSON contracts it is
+stated at the JSON-value level, e.g. "`args` parses to a JSON object whose
+fields `amount`, `receiver_id`, ... decode to `c`". The two clauses of
+`Refines` pin it down from both sides: too narrow makes the invalid-input
+clause false, too wide makes the valid-call clause false. Error messages and
+parse gas are not modelled.
 
-What this does **not** do: it does not replace the gas model by a VM run inside
-the model. The model stays a readable typed function; gas is an explicit
-function alongside it whose correctness is a proof obligation of `Refines`.
+Each model proves `Parses` functional (at most one call per input) as a lemma.
 
-## 4. Resources in the model — **Decided**
+## 6. `Refines` — **Decided**
 
-`Context` carries `balance`, `locked`, `storageUsage`, all from the enclosing
-runtime state. The model:
+```lean
+/-- Agreement on everything except gas and trie: outcome, storage, balance,
+usage, logs, receipts (encoded with `prepaid - r.usedGas` as leftover). On a
+model failure: the failure, input storage/balance/usage, the model's logs, no
+receipts. -/
+def Matches (M) (ctx raw) (r : Observation) (res : Except _ _) : Prop
 
-- Deducts each promise's deposit from the liquid balance at creation, in order,
-  and fails with `balanceExceeded` when it cannot, at that point (gas burnt so
-  far is retained).
-- Checks `balance + deposit < 2^128` and the `u64` storage bound as the VM
-  does.
-- Applies the storage-stake check after computing the post-state (section 2.4).
+/-- A failed call with no effects. -/
+def RolledBack (ctx raw) (r : Observation) : Prop :=
+  r.outcome.isError ∧ r.storage = raw ∧ r.balance = ctx.balance ∧
+  r.storageUsage = ctx.storageUsage ∧ r.receipts = []
 
-Existing specs that assumed unlimited resources (`WithdrawAvailable`,
-`DepositAvailable`) gain explicit gas and balance hypotheses. Keep them proved.
+def Refines (R : RuntimeInterface) (code : R.Code) (M : ContractModel) : Prop :=
+  ∀ raw st ctx, M.Represents raw st →
+    let r := R.exec code raw ctx
+    (∀ msg, r.outcome ≠ .error (.executionIssue msg)) ∧
+    -- valid calls
+    (∀ c, M.Parses ctx.method ctx.args c →
+      let res := M.step ctx st c
+      (M.gas ctx st c ≤ ctx.prepaidGas →
+        Matches M ctx raw r res ∧ r.usedGas ≤ M.gas ctx st c) ∧
+      (Matches M ctx raw r res ∨
+        (r.outcome = .error .outOfGas ∧ RolledBack ctx raw r ∧ r.logs <+: res.logs))) ∧
+    -- everything that is not a call fails with no effects
+    ((¬ ∃ c, M.Parses ctx.method ctx.args c) → RolledBack ctx raw r)
+```
 
-## 5. Work plan
+- The only hypothesis is representation. No `WF`, no `Supports`, no
+  `outOfGas` guard.
+- With enough gas, the execution is the model's and the bound holds. Below the
+  bound, it is still fully characterised: the model's behaviour or an
+  out-of-gas failure with rollback. Specs use the first clause ("with at least
+  150 Tgas attached, ...").
+- `r.logs <+: res.logs` (logs on out-of-gas are a prefix of the model's) is
+  optional; drop it if it gets in the way.
 
-1. Create the interface library with raw types, `RuntimeInterface`,
-   `ContractModel`, `Refines`, and the transfer lemmas. No dependency on the
-   interpreter.
-2. In near-lean: add the function-call-action boundary function and
-   instantiate `RuntimeInterface` with it in a library that imports `NearVM`.
-   Prove the instance's observations are total (no `getD []` fallbacks).
-3. wNEAR: extend `Model/` (context, gas, resource checks, failure type,
-   promise-result parsing), add `Model/Gas.lean`, provide the `ContractModel`
-   instance, delete `Spec/Refinement.lean` and most of
-   `Spec/RuntimeInstance.lean` in favour of the instance. Re-prove every
-   existing spec against the extended `step`. `just wnear-audit` must pass.
-4. linkdrop: retarget `Spec/Refinement.lean` to the shared definition.
-5. Tests: the adapter regressions (`just runtime-adapter-test`) become equality
-   checks of the full observation record, including gas, against the model on
-   every fixture. Add fixtures for out-of-gas at several points, balance
-   exceeded, and lack-balance-for-state.
+## 7. Generic lemmas (in the interface library)
+
+- `Refines.transfer`: a property of `M.step` under `M.gas ≤ prepaidGas` is a
+  property of the observed execution of `code`.
+- `Refines.invalid_input`: unparsable input never changes storage, balance or
+  receipts.
+- `Refines.no_execution_issue`.
+- `Refines.failure_rollback`: every failed execution rolls back storage,
+  balance, usage and receipts.
+
+## 8. Work plan
+
+1. Create `near-lean/interface`: move the raw types and `TrieOverlay`, define
+   `Context`, `Failure`, `Observation`, `RuntimeInterface`, `ContractModel`,
+   `Refines` and the generic lemmas. `NearVM` re-exports via `abbrev`.
+2. In near-lean/runtime: add the function-call boundary function (VM run then
+   storage-stake check), make `applyFunctionCall` use it, instantiate
+   `RuntimeInterface`, prove fuel sufficiency and total observations.
+3. wNEAR: extend `Model/` (context, balance and rent failures, promise-result
+   parsing, `Parses`, `gas`, `encodeReceipts` with leftover gas), provide the
+   `ContractModel` instance, delete `Spec/Refinement.lean` and most of
+   `Spec/RuntimeInstance.lean`. Re-prove existing specs; specs that assumed
+   unlimited resources (`WithdrawAvailable`, `DepositAvailable`) gain explicit
+   gas and balance hypotheses. `just wnear-audit` must pass.
+4. linkdrop: retarget to the shared definition.
+5. Tests: the adapter regressions (`just runtime-adapter-test`) check
+   `Matches` and the gas bound on every fixture. Add fixtures for out-of-gas
+   below the bound, balance exceeded, lack of balance for state, malformed and
+   non-canonical JSON arguments, unknown methods, and worst-case trie states
+   for the gas bound.
 6. Update `contracts/w-near/verification/README.md`, the blueprint, and
    `notes/design/SPECIFICATIONS.md`.
 
 Non-goal: proving `Refines` for `contract.wasm`. The task delivers the
 statement, the instance, the model extensions, re-proved specs and tests.
 
-## 6. Open items the agent must settle and write down
+## 9. Open items the agent must settle and write down
 
-- Fuel: `NearVM.run` takes a fuel argument and can return an interpreter
-  error. Decide whether `Refines` fixes default fuel and asserts no execution
-  issue, or quantifies over all sufficient fuel.
-- Argument decoding: malformed JSON arguments are still outside the model
-  (`Call.WF` plus typed `Call`). Document this as the remaining gap, or add a
-  `malformed` call case whose model behaviour is the SDK's deserialisation
-  panic.
-- Exact burnt gas on failure: required by this document; confirm it is
-  determinable from the VM's accounting without replaying the interpreter.
-- Where the shared raw types live, and whether `near-lean/vm` imports them or
-  proves coincidence.
+- The worst-case storage-access cost formula: the maximum trie path length for
+  a contract key of length `n` under `contractKey`, and whether `Refines`
+  needs a bound on `ctx.trie` (e.g. well-formedness) to make it finite.
+- How `Parses` is specified for JSON (a shared JSON-value parser in the
+  interface library, plus per-contract field decoding), and how its agreement
+  with serde's acceptance is tested.
+- Whether `Matches` needs anything beyond `RolledBack` for the logs on
+  `balanceExceeded` / `lackBalanceForState` (logs up to the failing point).
