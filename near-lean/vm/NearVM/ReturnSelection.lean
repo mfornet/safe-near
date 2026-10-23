@@ -14,8 +14,8 @@ def ReturnSelectionValid (ns : NearState) : Prop :=
   ∀ index, ns.returnedPromise = some index →
     ∃ p, getPromise? ns.promises index = some p ∧ p.NonJoint
 
-def HostPreservesSelection (fn : HostFn NearState) : Prop :=
-  HostFn.Preserves ReturnSelectionValid fn
+def HostPreservesSelection (fn : NearHostFn NearState) : Prop :=
+  NearHostFn.Preserves ReturnSelectionValid fn
 
 def HostResultSelectionValid := HostResult.Satisfies ReturnSelectionValid
 
@@ -30,7 +30,7 @@ theorem getPromise_append {ps tail : List NearPromise} {index : Nat} {p : NearPr
   rw [List.getElem?_append_left (List.getElem?_eq_some_iff.mp h).1]
   exact h
 
-theorem appendPromise_selection (st : Store NearState) (p : NearPromise)
+theorem appendPromise_selection (st : HostStore NearState) (p : NearPromise)
     (h : ReturnSelectionValid st.host) : ReturnSelectionValid (appendPromise st p).host := by
   intro index hreturn
   obtain ⟨old, hget, hsingle⟩ := h index hreturn
@@ -71,7 +71,7 @@ theorem appendPromiseAction_selection {ps result : List NearPromise} {index sele
     | and dependencies => simp [hget] at h
     | yielded => simp [hget] at h
 
-theorem appendPromiseActionResult_selection (name : String) (st : Store NearState)
+theorem appendPromiseActionResult_selection (name : String) (st : HostStore NearState)
     (index : UInt64) (action : PromiseAction) (hwf : ReturnSelectionValid st.host) :
     HostResultSelectionValid (appendPromiseActionResult name st index action) := by
   unfold appendPromiseActionResult
@@ -80,7 +80,7 @@ theorem appendPromiseActionResult_selection (name : String) (st : Store NearStat
     exact appendPromiseAction_selection (by assumption) (hwf selected hreturn)
   · exact hwf
 
-theorem checkAccountId_selection (name : String) (st : Store NearState) (account : List UInt8)
+theorem checkAccountId_selection (name : String) (st : HostStore NearState) (account : List UInt8)
     (next : Unit → HostResult NearState) (hwf : ReturnSelectionValid st.host)
     (hnext : HostResultSelectionValid (next ())) :
     HostResultSelectionValid (checkAccountId name st account next) := by
@@ -89,7 +89,7 @@ theorem checkAccountId_selection (name : String) (st : Store NearState) (account
   · exact hnext
   · exact hwf
 
-theorem checkPublicKey_selection (name : String) (st : Store NearState) (key : List UInt8)
+theorem checkPublicKey_selection (name : String) (st : HostStore NearState) (key : List UInt8)
     (next : Unit → HostResult NearState) (hwf : ReturnSelectionValid st.host)
     (hnext : HostResultSelectionValid (next ())) :
     HostResultSelectionValid (checkPublicKey name st key next) := by
@@ -99,7 +99,7 @@ theorem checkPublicKey_selection (name : String) (st : Store NearState) (key : L
   · exact hwf
 
 theorem checkDataLimit_selection (name label : String) (limit : Option Nat) (size : Nat)
-    (st : Store NearState) (next : Unit → HostResult NearState) (hwf : ReturnSelectionValid st.host)
+    (st : HostStore NearState) (next : Unit → HostResult NearState) (hwf : ReturnSelectionValid st.host)
     (hnext : HostResultSelectionValid (next ())) :
     HostResultSelectionValid (checkDataLimit name label limit size st next) := by
   unfold checkDataLimit
@@ -107,7 +107,7 @@ theorem checkDataLimit_selection (name label : String) (limit : Option Nat) (siz
   · exact hnext
   · exact hwf
 
-theorem disallowInView_selection (name : String) (fn : HostFn NearState)
+theorem disallowInView_selection (name : String) (fn : NearHostFn NearState)
     (hfn : HostPreservesSelection fn) : HostPreservesSelection (disallowInView name fn) := by
   intro st args hwf
   unfold disallowInView
@@ -116,7 +116,7 @@ theorem disallowInView_selection (name : String) (fn : HostFn NearState)
   · exact hwf
   · exact hfn st args hwf
 
-theorem checkedSetRegister_selection {st after : Store NearState} {register : UInt64} {bytes : List UInt8}
+theorem checkedSetRegister_selection {st after : HostStore NearState} {register : UInt64} {bytes : List UInt8}
     (h : checkedSetRegister? st register bytes = some after) (hwf : ReturnSelectionValid st.host) :
     ReturnSelectionValid after.host := by
   unfold checkedSetRegister? at h
@@ -128,7 +128,7 @@ theorem checkedSetRegister_selection {st after : Store NearState} {register : UI
       exact hwf
     · cases h
 
-theorem writeRegisterResult_selection (name : String) (st : Store NearState) (register : UInt64)
+theorem writeRegisterResult_selection (name : String) (st : HostStore NearState) (register : UInt64)
     (bytes : List UInt8) (vals : List Value) (hwf : ReturnSelectionValid st.host) :
     HostResultSelectionValid (writeRegisterResult name st register bytes vals) := by
   unfold writeRegisterResult
@@ -136,13 +136,13 @@ theorem writeRegisterResult_selection (name : String) (st : Store NearState) (re
   · exact checkedSetRegister_selection (by assumption) hwf
   · exact hwf
 
-theorem createBatchPromiseResult_selection (name : String) (st : Store NearState) (account : List UInt8)
+theorem createBatchPromiseResult_selection (name : String) (st : HostStore NearState) (account : List UInt8)
     (hwf : ReturnSelectionValid st.host) : HostResultSelectionValid (createBatchPromiseResult name st account) := by
   unfold createBatchPromiseResult
   apply checkAccountId_selection _ _ _ _ hwf
   exact appendPromise_selection _ _ hwf
 
-theorem createCallbackPromiseResult_selection (name : String) (st : Store NearState) (base : UInt64)
+theorem createCallbackPromiseResult_selection (name : String) (st : HostStore NearState) (base : UInt64)
     (account : List UInt8) (hwf : ReturnSelectionValid st.host) :
     HostResultSelectionValid (createCallbackPromiseResult name st base account) := by
   unfold createCallbackPromiseResult

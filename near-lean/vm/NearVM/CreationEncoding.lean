@@ -6,7 +6,7 @@ namespace Wasm.Near
 
 /-- Receiver decoding is established by the actual creation guard, before
 receipt allocation or function-call action validation. -/
-theorem creationAccountError_none_utf8 (name : String) (st : Store NearState) (args : List Value)
+theorem creationAccountError_none_utf8 (name : String) (st : HostStore NearState) (args : List Value)
     (len ptr : UInt64) (receiver : List UInt8)
     (hargs : creationAccountArgs name args = some (len, ptr))
     (hread : getMemOrReg st ptr len = some receiver)
@@ -18,7 +18,7 @@ theorem creationAccountError_none_utf8 (name : String) (st : Store NearState) (a
 
 /-- The action decoder preserves the exact method witness accepted by the
 metered runtime external. No assumption about the decoded action's gas is used. -/
-theorem readFunctionCallAction_encoding (name : String) (st : Store NearState) (args : List Value)
+theorem readFunctionCallAction_encoding (name : String) (st : HostStore NearState) (args : List Value)
     (ml mp al ap amount gas : UInt64) (action : PromiseAction)
     (hpolicy : st.host.config.validateActionMethodUtf8 = true)
     (hguard : actionMethodEncodingError name st args = none)
@@ -34,7 +34,7 @@ theorem readFunctionCallAction_encoding (name : String) (st : Store NearState) (
   simp [ActionMethodsUtf8, hd]
 
 /-- Appending a newly validated receipt retains every previous encoding witness. -/
-theorem appendPromise_encoding (st : Store NearState) (promise : NearPromise)
+theorem appendPromise_encoding (st : HostStore NearState) (promise : NearPromise)
     (h : PromisesEncoding st.host.promises) (hp : PromiseSatisfies ReceiptEncoding promise) :
     PromisesEncoding (appendPromise st promise).host.promises := by
   intro p hm
@@ -46,7 +46,7 @@ theorem appendPromise_encoding (st : Store NearState) (promise : NearPromise)
 
 /-- Raw creators consume the actual pre-call receiver and post-call method
 validation facts. These conditions are supplied by successful metered calls. -/
-def HostCreatesEncoding (name : String) (fn : HostFn NearState) : Prop :=
+def HostCreatesEncoding (name : String) (fn : NearHostFn NearState) : Prop :=
   ∀ st args, PromisesEncoding st.host.promises →
     st.host.config.validateActionMethodUtf8 = true →
     creationAccountError name st args = none →

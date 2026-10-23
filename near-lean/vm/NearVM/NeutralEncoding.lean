@@ -1,5 +1,4 @@
 import NearVM.MeteredEncoding
-import NearVM.HostNoThrow
 import NearVM.NeutralReservations
 
 namespace Wasm.Near
@@ -25,16 +24,16 @@ theorem EncodingInvariant.of_frame_eq {before after : NearState}
 
 /-- Raw local-observation hosts preserve strict policy and receipt payloads.
 Terminal traps may discard speculative state; catchable throws may not. -/
-def HostPreservesEncodingFrame (fn : HostFn NearState) : Prop :=
+def HostPreservesEncodingFrame (fn : NearHostFn NearState) : Prop :=
   ∀ st args, HostResult.LiveSatisfies (fun ns => encodingFrame ns = encodingFrame st.host) (fn.invoke st args)
 
-theorem checkedSetRegister_encodingFrame {st after : Store NearState} {register : UInt64} {bytes : List UInt8}
+theorem checkedSetRegister_encodingFrame {st after : HostStore NearState} {register : UInt64} {bytes : List UInt8}
     (h : checkedSetRegister? st register bytes = some after) : encodingFrame after.host = encodingFrame st.host := by
   unfold checkedSetRegister? at h
   split_ifs at h <;> simp only [Option.some.injEq] at h
   all_goals subst after; rfl
 
-theorem writeRegisterResult_encodingFrame (name : String) (st : Store NearState) (register : UInt64)
+theorem writeRegisterResult_encodingFrame (name : String) (st : HostStore NearState) (register : UInt64)
     (bytes : List UInt8) (values : List Value) :
     HostResult.LiveSatisfies (fun ns => encodingFrame ns = encodingFrame st.host)
       (writeRegisterResult name st register bytes values) := by

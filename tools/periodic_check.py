@@ -37,9 +37,7 @@ def validation_steps(root: Path, nearcore: Path) -> list[Step]:
     # comparisons freeze and attest their binaries.
     python("toolchains", "tools/check_lean_toolchains.py")
     add("tooling-tests", "", sys.executable, "-m", "unittest", "discover", "-s", "tools/tests", "-v")
-    add("wasm-build", "near-lean/wasm", "lake", "build", "Interpreter", "runner", "testsuite")
-    add("iris-build", "near-lean/iris-wasm", "lake", "build", "--wfail")
-    add("programs-build", "near-lean/programs/lean", "lake", "build", "Programs", "smoke", "program-tests", "--wfail")
+    add("wasm-build", "near-lean/wasm", "lake", "build", "Wasm", "testsuite", "wasm", "--wfail")
     add("vm-build", "near-lean/vm", "lake", "build", "NearVM", "vm-tests", "vm-replay", "--wfail")
     add("runtime-build", "near-lean/runtime", "lake", "build", "NearRuntime", "runtime-tests",
         "NearRuntime.TrieAccounting", "finance-replay", "nonce-replay", "allowance-replay",
@@ -57,24 +55,21 @@ def validation_steps(root: Path, nearcore: Path) -> list[Step]:
     for project in contract_projects:
         name = project.parent.name
         add(f"contract-{name}-build", project.relative_to(root), "lake", "build", "--wfail")
-    for package, binary in [("vm", "vm-tests"), ("runtime", "runtime-tests"), ("chain", "chain-tests"),
-                            ("programs/lean", "smoke"), ("programs/lean", "program-tests")]:
+    for package, binary in [("vm", "vm-tests"), ("runtime", "runtime-tests"), ("chain", "chain-tests")]:
         add(binary, f"near-lean/{package}", f"./.lake/build/bin/{binary}")
     add("wnear-adapter-tests", "contracts/w-near/verification", "./.lake/build/bin/runtime-adapter-tests")
     python("chain-json-replay", "tools/chain-conformance/test_replay.py")
-    add("wasm-runner-smoke", "", "near-lean/wasm/scripts/runner-smoke.sh")
+    add("wasm-validate-smoke", "near-lean/wasm", "./.lake/build/bin/wasm", "validate",
+        "../../contracts/w-near/contract.wasm")
     add("wasm-spec-report", "", "near-lean/wasm/scripts/testsuite-report.sh")
     add("wasm-spec-report-clean", "", "git", "diff", "--exit-code", "--", "near-lean/wasm/testsuite_report.txt")
     python("lean-style", "tools/lean_style.py")
     python("style-regressions", "tools/tests/check_lean_style.py")
-    python("syntax-format", "tools/lean_format.py", "--check",
-           "near-lean/programs/lean/Programs/Harness.lean", "near-lean/programs/lean/Programs/Regression.lean")
     python("formatter-regressions", "tools/tests/check_lean_format.py")
     python("vm-dependencies", "tools/check_vm_dependencies.py", "--no-build")
     python("dependency-regressions", "tools/tests/check_vm_dependencies.py")
     python("audit-regressions", "tools/tests/check_axiom_audit.py")
-    for package, report in [("near-lean/wasm", "wasm"), ("near-lean/iris-wasm", "iris-wasm"),
-                            ("near-lean/programs/lean", "programs"), ("near-lean/vm", "vm"),
+    for package, report in [("near-lean/wasm", "wasm"), ("near-lean/vm", "vm"),
                             ("near-lean/runtime", "runtime"), ("near-lean/chain", "chain"),
                             ("contracts/w-near/verification", "wnear")]:
         python(f"audit-{report}", "tools/axiom-audit.py", package, "--no-build", "--report", f"audit/{report}.json")
@@ -82,9 +77,6 @@ def validation_steps(root: Path, nearcore: Path) -> list[Step]:
         name = project.parent.name
         python(f"audit-contract-{name}", "tools/axiom-audit.py", project.relative_to(root),
                "--no-build", "--report", f"audit/{name}.json")
-    add("program-wasm-rebuild", "", "near-lean/programs/rust/build.sh")
-    add("program-wasm-clean", "", "git", "diff", "--exit-code", "--", "near-lean/programs/rust/build")
-    add("program-rust-tests", "near-lean/programs/rust", "cargo", "test", "--locked")
     generated = root / "audit/periodic-runtime-configs"
     add("runtime-config-generation", "", "cargo", "run", "--locked", "--release", "--manifest-path",
         "tools/dump-runtime-config/Cargo.toml", "--", generated)

@@ -23,25 +23,24 @@ theorem applyCharges_selection (ns : NearState) (charges : List Charge)
     (hwf : ReturnSelectionValid ns) : ReturnSelectionValid (applyCharges ns charges).1 :=
   ReturnSelectionValid.of_fields (applyCharges_promises ns charges) (applyCharges_returnedPromise ns charges) hwf
 
-theorem updateStorageUsage_selection (extra : Nat) (name : String) (before after : Store NearState)
+theorem updateStorageUsage_selection (extra : Nat) (name : String) (before after : HostStore NearState)
     (args : List Value) (hwf : ReturnSelectionValid after.host) :
     ReturnSelectionValid (updateStorageUsage extra name before after args).host := by
   unfold updateStorageUsage
   repeat (first | exact hwf | (dsimp only; split))
   all_goals first | exact hwf | (split <;> exact hwf)
 
-theorem deductDeposit_selection (name : String) (before after : Store NearState) (args : List Value)
+theorem deductDeposit_selection (name : String) (before after : HostStore NearState) (args : List Value)
     (hwf : ReturnSelectionValid after.host) : ReturnSelectionValid (deductDeposit name before after args).1.host := by
   unfold deductDeposit promiseDeposit? deductPromiseDeposit
   repeat (first | exact hwf | (dsimp only; split))
   all_goals first | exact hwf | (split <;> exact hwf)
 
-theorem finishMeteredCall_selection (extra : Nat) (name : String) (before : Store NearState)
+theorem finishMeteredCall_selection (extra : Nat) (name : String) (before : HostStore NearState)
     (args : List Value) (result : HostResult NearState) (hwf : HostResultSelectionValid result) :
     HostResultSelectionValid (finishMeteredCall extra name before args result) := by
   cases result with
   | Trap st msg => exact hwf
-  | Throw st tag vals => exact hwf
   | Return vals st =>
     unfold finishMeteredCall
     dsimp only
@@ -65,7 +64,7 @@ theorem finishMeteredCall_selection (extra : Nat) (name : String) (before : Stor
             | some error => exact hfinal
             | none => exact updateStorageUsage_selection extra name before final args hfinal
 
-theorem metered_preserves_selection (extra : Nat) (name : String) (fn : HostFn NearState)
+theorem metered_preserves_selection (extra : Nat) (name : String) (fn : NearHostFn NearState)
     (hfn : HostPreservesSelection fn) : HostPreservesSelection (metered extra name fn) := by
   intro st args hwf
   unfold metered
@@ -76,7 +75,7 @@ theorem metered_preserves_selection (extra : Nat) (name : String) (fn : HostFn N
     · change ReturnSelectionValid (applyCharges st.host _).1
       exact applyCharges_selection _ _ hwf
     · let ns := (applyCharges st.host (chargesBefore name st args)).1
-      let st1 : Store NearState := { st with
+      let st1 : HostStore NearState := { st with
         host := { ns with context := { ns.context with usedGas := UInt64.ofNat ns.gas.used } } }
       have hwf1 : ReturnSelectionValid st1.host := by
         change ReturnSelectionValid (applyCharges st.host _).1
@@ -95,9 +94,10 @@ theorem metered_preserves_selection (extra : Nat) (name : String) (fn : HostFn N
           | none => exact finishMeteredCall_selection extra name st2 args _ (hfn st2 args hwf2)
           | some error => cases error <;> exact hwf2
 
+set_option maxRecDepth 16384 in
 /-- Every function published by the runtime's metered registry preserves
 creation-order validity, including rejected unsupported and deprecated calls. -/
-theorem meteredHostFns_selection (cfg : RuntimeConfig) (entry : ImportDecl × HostFn NearState)
+theorem meteredHostFns_selection (cfg : RuntimeConfig) (entry : ImportDecl × NearHostFn NearState)
     (h : entry ∈ meteredHostFns cfg) : HostPreservesSelection entry.2 := by
   simp only [meteredHostFns, List.mem_append, List.mem_map, List.mem_singleton] at h
   rcases h with ⟨⟨decl, fn⟩, hin, heq⟩ | heq
@@ -186,6 +186,6 @@ theorem resolveMeteredImports_selection (cfg : RuntimeConfig) (imports : List Im
 theorem resolveMetered_selection (cfg : RuntimeConfig) (m : Module) (env : HostEnv NearState)
     (h : resolveMetered cfg m = .ok env) :
     ∀ fn ∈ env.funcs, HostPreservesSelection fn :=
-  resolveMeteredImports_selection cfg m.imports env h
+  resolveMeteredImports_selection cfg m.importDecls env h
 
 end Wasm.Near

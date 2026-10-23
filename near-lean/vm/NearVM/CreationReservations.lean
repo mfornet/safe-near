@@ -4,7 +4,7 @@ namespace Wasm.Near
 
 /-- Successful creation dispatch passes receiver/index validation and the
 allocation limit. These facts are derived from the actual pre-invocation guard. -/
-theorem preInvokeError_creation_checks (name : String) (st : Store NearState) (args : List Value)
+theorem preInvokeError_creation_checks (name : String) (st : HostStore NearState) (args : List Value)
     (hjoin : (name == "promise_and") = false)
     (htransfer : (name == "promise_batch_action_transfer") = false)
     (hkey : (name == "promise_batch_action_add_key_with_function_call") = false)
@@ -29,7 +29,7 @@ theorem preInvokeError_creation_checks (name : String) (st : Store NearState) (a
   | none => rfl
   | some error => simp [creationPrefixError, he] at hp
 
-theorem chargesBefore_valid_creation (name : String) (st : Store NearState) (args : List Value)
+theorem chargesBefore_valid_creation (name : String) (st : HostStore NearState) (args : List Value)
     (len ptr : UInt64)
     (hjoin : (name == "promise_and") = false)
     (htransfer : (name == "promise_batch_action_transfer") = false)
@@ -48,7 +48,7 @@ theorem chargesBefore_valid_creation (name : String) (st : Store NearState) (arg
     Option.isSome_none, Bool.false_eq_true, ite_false]
 
 /-- Empty action batches reserve only their one action-receipt execution fee. -/
-theorem chargesBefore_batchCreate_reservation (st : Store NearState) (len ptr : UInt64)
+theorem chargesBefore_batchCreate_reservation (st : HostStore NearState) (len ptr : UInt64)
     (h : preInvokeError "promise_batch_create" st [.i64 len, .i64 ptr] = none) :
     ((chargesBefore "promise_batch_create" st [.i64 len, .i64 ptr]).map
       (fun charge => charge.reservation st.host.fees)).sum = st.host.fees.newActionReceipt.execution := by
@@ -56,7 +56,7 @@ theorem chargesBefore_batchCreate_reservation (st : Store NearState) (len ptr : 
   simp [chargesBeforeUnvalidated, argU64, List.map_append, readSpan_reservation, utf8]
   simp [Charge.reservation]
 
-theorem chargesBefore_batchThen_reservation (st : Store NearState) (base len ptr : UInt64)
+theorem chargesBefore_batchThen_reservation (st : HostStore NearState) (base len ptr : UInt64)
     (h : preInvokeError "promise_batch_then" st [.i64 base, .i64 len, .i64 ptr] = none) :
     ((chargesBefore "promise_batch_then" st [.i64 base, .i64 len, .i64 ptr]).map
       (fun charge => charge.reservation st.host.fees)).sum = st.host.fees.newActionReceipt.execution := by
@@ -66,7 +66,7 @@ theorem chargesBefore_batchThen_reservation (st : Store NearState) (base len ptr
 
 /-- A join creates a handle, with no extra action-receipt obligation. This also
 covers the overflowing-count early charge prefix, which cannot reserve gas. -/
-theorem chargesBefore_join_reservation (st : Store NearState) (ptr count : UInt64) :
+theorem chargesBefore_join_reservation (st : HostStore NearState) (ptr count : UInt64) :
     ((chargesBefore "promise_and" st [.i64 ptr, .i64 count]).map
       (fun charge => charge.reservation st.host.fees)).sum = 0 := by
   simp [chargesBefore, chargesBeforeUnvalidated, storageMutationPlan?, creationAccountArgs, argU64, readMem]
@@ -74,7 +74,7 @@ theorem chargesBefore_join_reservation (st : Store NearState) (ptr count : UInt6
 
 /-- A new function-call receipt reserves one dispatch fee plus its action and
 prepaid gas. Callback dependency fees are local burn, not duplicated backing. -/
-theorem chargesBefore_create_reservation (st : Store NearState)
+theorem chargesBefore_create_reservation (st : HostStore NearState)
     (len ptr ml mp al ap amount gas : UInt64)
     (h : preInvokeError "promise_create" st [.i64 len, .i64 ptr, .i64 ml, .i64 mp, .i64 al, .i64 ap, .i64 amount, .i64 gas] = none) :
     ∃ action, readFunctionCallAction? st ml mp al ap amount gas = some action ∧
@@ -96,7 +96,7 @@ theorem chargesBefore_create_reservation (st : Store NearState)
 
 /-- A new function-call receipt reserves one dispatch fee plus its action and
 prepaid gas. Callback dependency fees are local burn, not duplicated backing. -/
-theorem chargesBefore_then_reservation (st : Store NearState)
+theorem chargesBefore_then_reservation (st : HostStore NearState)
     (base len ptr ml mp al ap amount gas : UInt64)
     (h : preInvokeError "promise_then" st [.i64 base, .i64 len, .i64 ptr, .i64 ml, .i64 mp, .i64 al, .i64 ap, .i64 amount, .i64 gas] = none) :
     ∃ action, readFunctionCallAction? st ml mp al ap amount gas = some action ∧

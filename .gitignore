@@ -9,7 +9,6 @@ __pycache__/
 # Lean / Lake build artefacts
 near-lean/.lake/
 near-lean/**/.lake/
-near-lean/programs/rust/target/
 
 # axiom audit reports
 audit/

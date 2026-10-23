@@ -26,7 +26,7 @@ def main() -> int:
     if args.fix:
         command.append("--fix")
     command.extend(str(root / file) for file in files)
-    return subprocess.run(command, cwd=root / "near-lean/wasm").returncode
+    return subprocess.run(command, cwd=root / "near-lean/vm").returncode
 
 
 if __name__ == "__main__":

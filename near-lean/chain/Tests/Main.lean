@@ -1,5 +1,5 @@
 import NearChain
-import Interpreter.Wasm.Decoder.Wat
+import Wasm.Wat
 
 /-!
 # Chain tests: isolation, completion, reachability, and measured gas on wNEAR.
@@ -209,7 +209,7 @@ def main (args : List String) : IO UInt32 := do
   let cfg ← RuntimeConfig.load configs RuntimeConfig.latestVersion
   let text ← IO.FS.readFile wat
   let module ←
-    match Decoder.Wat.decode text with
+    match ← Wat.compile text with
     | .ok m =>
       pure m
     | .error e =>

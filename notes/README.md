@@ -13,7 +13,7 @@ and remove it from the TODO.
 ## Design
 
 - [Project structure](design/PROJECT_STRUCTURE.md): repository layout.
-- [Wasm runtime](design/WASM_RUNTIME.md): the Lean Wasm interpreter.
+- [Wasm runtime](design/WASM_RUNTIME.md): the Lean Wasm runtime.
 - [NEAR runtime](design/NEAR_RUNTIME.md): VM, runtime and chain layers.
 - [Smart contracts](design/SMART_CONTRACTS.md): the contracts dataset.
 - [NEAR model](design/NEAR_MODEL.md): state views, access keys, upgrades.

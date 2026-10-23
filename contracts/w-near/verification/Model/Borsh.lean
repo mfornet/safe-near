@@ -1,4 +1,4 @@
-import Interpreter.Wasm.ByteEncoding
+import Wasm.Bytes
 import Init.Omega
 import Init.Data.Array.Lemmas
 import Init.Data.List.TakeDrop

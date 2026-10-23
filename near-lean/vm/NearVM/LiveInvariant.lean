@@ -1,123 +1,132 @@
 import NearVM.InterpreterInvariant
 
+/-!
+# Live invariants: broken only by traps
+
+Terminal traps need not preserve a predicate, because the caller rolls back
+their speculative state; returning host calls must.
+-/
+
 namespace Wasm
 
-/-- Catchable host exceptions must preserve the invariant; terminal traps need
-not, because the caller rolls back their speculative state. -/
 def HostResult.LiveSatisfies (P : α → Prop) : HostResult α → Prop
-  | .Return _ st | .Throw st _ _ => P st.host
+  | .Return _ st => P st.host
   | .Trap _ _ => True
 
-def HostFn.PreservesLive (P : α → Prop) (fn : HostFn α) : Prop :=
+def NearHostFn.PreservesLive (P : α → Prop) (fn : NearHostFn α) : Prop :=
   ∀ st args, P st.host → HostResult.LiveSatisfies P (fn.invoke st args)
 
-def RuntimePreservesLive (P : α → Prop) (runtime : SmallStep.RuntimeEnv α) : Prop :=
-  ∀ (index : Nat) (fn : HostFn α), (fn ∈ (runtime.instances[index]!).host.funcs ∨
-    fn ∈ (runtime.instances[index]!).host.foreignFuncs) → HostFn.PreservesLive P fn
+theorem NearHostFn.PreservesLive.toHostFn {P : α → Prop} {fn : NearHostFn α}
+    (h : fn.PreservesLive P) : Exec.HostFn.PreservesLive P fn.toHostFn := by
+  intro host mem args values host' mem' hp hcall
+  have := h { mem := mem.getD (Memory.new 0 none), host } args hp
+  unfold NearHostFn.toHostFn at hcall
+  dsimp only at hcall
+  split at hcall
+  · rename_i heq
+    rw [heq] at this
+    cases hcall
+    exact this
+  · cases hcall
 
-variable {α : Type} {P : α → Prop}
+/-- Every host function in the store preserves `P` on return, and `P` holds. -/
+def StoreLiveInvariant (P : α → Prop) (store : Store α) : Prop :=
+  Exec.StoreHosts (Exec.HostFn.PreservesLive P) store ∧ P store.host
 
-theorem RuntimePreservesLive.of_hosts_eq {before after : SmallStep.RuntimeEnv α}
-    (h : ∀ (slot : Nat), (after.instances[slot]!).host = (before.instances[slot]!).host)
-    (hhosts : RuntimePreservesLive P before) : RuntimePreservesLive P after := by
-  intro slot fn hmember
-  apply hhosts slot fn
-  simpa only [h slot] using hmember
+abbrev ConfigLiveInvariant (P : α → Prop) (c : Config α) : Prop := Exec.ConfigLiveInvariant P c
 
-theorem hostReturn_liveInvariant {runtime : SmallStep.RuntimeEnv α}
-    {fn : HostFn α} {st after : Store α} {args : List Value}
-    (values : List Value) (hcall : fn.invoke st args = .Return values after)
-    (hhosts : RuntimePreservesLive P runtime) (hwf : P st.host)
-    (hmember : fn ∈ runtime.currentHost.funcs ∨ fn ∈ runtime.currentHost.foreignFuncs) : P after.host := by
-  have hp := hhosts runtime.entry.id fn hmember st args hwf
-  rw [hcall] at hp
-  exact hp
+/-- The live invariant on a machine state: after a trap only the host
+functions are constrained. -/
+def MachineLiveInvariant (P : α → Prop) : StepResult α → Prop
+  | .next c => Exec.ConfigLiveInvariant P c
+  | .done _ s => StoreLiveInvariant P s
+  | .trap _ s => Exec.StoreHosts (Exec.HostFn.PreservesLive P) s
 
-theorem hostThrow_liveInvariant {runtime : SmallStep.RuntimeEnv α}
-    {fn : HostFn α} {st after : Store α} {args : List Value}
-    (tag : Nat) (values : List Value) (hcall : fn.invoke st args = .Throw after tag values)
-    (hhosts : RuntimePreservesLive P runtime) (hwf : P st.host)
-    (hmember : fn ∈ runtime.currentHost.funcs ∨ fn ∈ runtime.currentHost.foreignFuncs) : P after.host := by
-  have hp := hhosts runtime.entry.id fn hmember st args hwf
-  rw [hcall] at hp
-  exact hp
+theorem MachineLiveInvariant.live {P : α → Prop} {m : StepResult α}
+    (h : MachineLiveInvariant P m) : m.LiveHost P := by
+  cases m with
+  | next c => exact h.2
+  | done _ s => exact h.2
+  | trap _ _ => trivial
 
-set_option maxHeartbeats 2000000 in
-theorem step_liveInvariant {before after : SmallStep.Config α} {kind : SmallStep.StepKind}
-    (h : SmallStep.Step before kind after)
-    (hhosts : RuntimePreservesLive P before.store.runtime)
-    (hwf : P before.store.wasm.host) : after.LiveHost P := by
-  revert hhosts hwf
-  induction h <;> intro hhosts hwf <;> try exact hwf <;> try trivial
-  all_goals try (solve | simp only [SmallStep.Config.LiveHost])
-  all_goals first
-    | simpa only [SmallStep.Config.LiveHost, SmallStep.prepareCatch_host, SmallStep.setMemoryAt_host] using hwf
-    | (rename_i hcall
-       first
-       | apply hostReturn_liveInvariant _ hcall hhosts hwf
-       | apply hostThrow_liveInvariant _ _ hcall hhosts hwf
-       solve_by_elim [Or.inl, Or.inr, List.mem_of_getElem?])
-    | (rename_i heval
-       have hp := execGcOp_fallthrough_host heval
-       simpa only [SmallStep.Config.LiveHost, hp] using hwf)
-    | (rename_i heval
-       have hp := execGcOp_trap_host heval
-       simpa only [SmallStep.Config.LiveHost, hp] using hwf)
-    | (rename_i heval htarget
-       have hp := execGcOp_break_host heval
-       simpa only [SmallStep.Config.LiveHost, hp] using hwf)
-    | skip
-  case memOp =>
-    rename_i henter hstep ih
-    rw [SmallStep.resumeAfterIndexedMemory_liveHost]
-    apply ih
-    · exact RuntimePreservesLive.of_hosts_eq (SmallStep.enterIndexedMemory_hosts henter) hhosts
-    · simpa only [SmallStep.enterIndexedMemory_host henter] using hwf
+theorem MachineLiveInvariant.hosts {P : α → Prop} {m : StepResult α}
+    (h : MachineLiveInvariant P m) : Exec.StoreHosts (Exec.HostFn.PreservesLive P) m.store := by
+  cases m with
+  | next c => exact h.1
+  | done _ s => exact h.1
+  | trap _ _ => exact h
 
-/-- A terminal trap cannot step back into a live execution. -/
-theorem step_source_running {before after : SmallStep.Config α} {kind : SmallStep.StepKind}
-    (h : SmallStep.Step before kind after) : ∃ thread, before.expr = .running thread := by
-  cases h <;> exact ⟨_, rfl⟩
+theorem MachineLiveInvariant.of_parts {P : α → Prop} {m : StepResult α}
+    (hhosts : Exec.StoreHosts (Exec.HostFn.PreservesLive P) m.store) (hp : m.LiveHost P) :
+    MachineLiveInvariant P m := by
+  cases m with
+  | next c => exact ⟨hhosts, hp⟩
+  | done _ s => exact ⟨hhosts, hp⟩
+  | trap _ _ => exact hhosts
 
-def ConfigLiveInvariant (P : α → Prop) (config : SmallStep.Config α) : Prop :=
-  RuntimePreservesLive P config.store.runtime ∧ config.LiveHost P
+theorem step_liveInvariant {P : α → Prop} {c : Config α} (h : Exec.ConfigLiveInvariant P c) :
+    MachineLiveInvariant P (Exec.step c) := by
+  have hf := Exec.step_funcs c
+  have hp := Exec.step_liveInvariant c h
+  exact .of_parts (fun fn hm => h.1 fn (hf ▸ hm)) hp
 
-theorem step_preserves_liveInvariant {before after : SmallStep.Config α} {kind : SmallStep.StepKind}
-    (hstep : SmallStep.Step before kind after) (h : ConfigLiveInvariant P before) :
-    ConfigLiveInvariant P after := by
-  obtain ⟨thread, he⟩ := step_source_running hstep
-  have hp : P before.store.wasm.host := by simpa only [SmallStep.Config.LiveHost, he] using h.2
-  refine ⟨?_, step_liveInvariant hstep h.1 hp⟩
-  apply RuntimePreservesLive.of_hosts_eq _ h.1
-  intro slot
-  rw [SmallStep.instances_preserved hstep]
+theorem step_preserves_liveInvariant {P : α → Prop} {c c' : Config α}
+    (h : Exec.ConfigLiveInvariant P c) (hs : Exec.step c = .next c') :
+    Exec.ConfigLiveInvariant P c' :=
+  Exec.step_preserves_liveInvariant h hs
 
-theorem steps_preserve_liveInvariant {before after : SmallStep.Config α} {trace : List SmallStep.StepKind}
-    (hsteps : SmallStep.Steps before trace after) (h : ConfigLiveInvariant P before) :
-    ConfigLiveInvariant P after := by
-  induction hsteps with
-  | refl => exact h
-  | cons head tail ih => exact ih (step_preserves_liveInvariant head h)
+theorem start_liveInvariant {P : α → Prop} {store : Store α} (h : StoreLiveInvariant P store)
+    (limits : ExecLimits) (addr : Nat) (args : List Value) :
+    MachineLiveInvariant P (Exec.start store limits addr args) := by
+  unfold Exec.start
+  have hf := Exec.enter_funcs ⟨store, ⟨#[], []⟩, limits⟩ args.toArray [] addr
+  have hp := Exec.enter_liveInvariant (P := P) ⟨store, ⟨#[], []⟩, limits⟩ args.toArray [] addr h
+  exact .of_parts (fun fn hm => h.1 fn (hf ▸ hm)) hp
 
-theorem singleton_runtime_liveInvariant (instance_ : SmallStep.ModuleInstance α)
-    (hhosts : ∀ fn, (fn ∈ instance_.host.funcs ∨ fn ∈ instance_.host.foreignFuncs) →
-      HostFn.PreservesLive P fn) :
-    RuntimePreservesLive P { instances := #[instance_], entry := ⟨0⟩ } := by
-  intro index fn hmember
-  cases index with
-  | zero => exact hhosts fn (by simpa using hmember)
-  | succ index =>
-    simp only [getElem!_def, Array.getElem?_singleton, Nat.succ_ne_zero, ite_false] at hmember
-    change fn ∈ ([] : List (HostFn α)) ∨ fn ∈ [] at hmember
-    simp at hmember
+theorem allocate_liveInvariant {P : α → Prop} {store : Store α} {env : HostEnv α}
+    (hstore : Exec.StoreHosts (Exec.HostFn.PreservesLive P) store)
+    (henv : ∀ fn ∈ env.funcs, fn.PreservesLive P) :
+    Exec.StoreHosts (Exec.HostFn.PreservesLive P) (env.allocate store).1 := by
+  intro fn hm
+  rcases HostEnv.allocate_funcs store env fn hm with hin | ⟨nfn, hmem, rfl⟩
+  · exact hstore fn hin
+  · exact (henv nfn hmem).toHostFn
 
-theorem initConfig_liveInvariant {instance_ : SmallStep.ModuleInstance α} {entry : Nat}
-    {st : Store α} {args : List Value} {config : SmallStep.Config α}
-    (hinit : SmallStep.initConfig instance_ entry st args = .ok config)
-    (hhosts : ∀ fn, (fn ∈ instance_.host.funcs ∨ fn ∈ instance_.host.foreignFuncs) →
-      HostFn.PreservesLive P fn) (hwf : P st.host) : ConfigLiveInvariant P config := by
-  unfold SmallStep.initConfig at hinit
-  split at hinit <;> split at hinit <;> simp only [Except.ok.injEq, reduceCtorEq] at hinit
-  all_goals subst config; exact ⟨singleton_runtime_liveInvariant instance_ hhosts, hwf⟩
+theorem empty_storeHostsLive' {P : α → Prop} (host : α) :
+    Exec.StoreHosts (Exec.HostFn.PreservesLive P) (Store.empty host) := by
+  intro fn hm
+  simp [Store.empty] at hm
+
+theorem instantiateModule_liveInvariant {P : α → Prop} {store store' : Store α} {vm : ValidModule}
+    {imports : List ExternVal} {inst : ModuleInst} (h : StoreLiveInvariant P store)
+    (hi : Link.instantiateModule store vm imports = .ok (store', inst)) :
+    StoreLiveInvariant P store' :=
+  let same := Link.instantiateModule_same store vm imports hi
+  ⟨fun fn hm => h.1 fn (same.2 fn hm), same.1 ▸ h.2⟩
+
+theorem resolvedStart_liveInvariant {P : α → Prop} {env : HostEnv α} {host : α}
+    {store store' : Store α} {imports : List ExternVal} {vm : ValidModule} {inst : ModuleInst}
+    {limits : ExecLimits} {addr : Nat} {args : List Value} {c : Config α}
+    (henv : ∀ fn ∈ env.funcs, fn.PreservesLive P)
+    (halloc : env.allocate (Store.empty host) = (store, imports))
+    (hinst : Link.instantiateModule store vm imports = .ok (store', inst))
+    (hstart : Exec.startWasm store' limits addr args = some c) (hp : P host) :
+    ConfigLiveInvariant P c := by
+  have h0 : StoreLiveInvariant P store := by
+    have := allocate_liveInvariant (P := P) (empty_storeHostsLive' host) henv
+    rw [halloc] at this
+    refine ⟨this, ?_⟩
+    have hh := HostEnv.allocate_host (Store.empty host) env
+    rw [halloc] at hh
+    exact hh ▸ hp
+  have h1 := instantiateModule_liveInvariant h0 hinst
+  show Exec.StoreHosts _ c.store ∧ P c.store.host
+  rw [Exec.startWasm_store hstart]
+  exact h1
+
+theorem empty_storeHostsLive {P : α → Prop} (host : α) :
+    Exec.StoreHosts (Exec.HostFn.PreservesLive P) (Store.empty host) := by
+  intro fn hm
+  simp [Store.empty] at hm
 
 end Wasm

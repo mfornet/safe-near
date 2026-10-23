@@ -261,9 +261,9 @@ class ChainReplayTests(unittest.TestCase):
                 self.assertNotEqual(process.returncode, 0)
                 self.assertIn("duplicate catalogue", process.stderr)
                 self.assertEqual(process.stdout.strip(), "")
-            bad = Path(directory) / "invalid.wat"
-            bad.write_text("(module")
-            value["codes"][0]["watPath"] = str(bad)
+            bad = Path(directory) / "invalid.wasm"
+            bad.write_bytes(b"\x00asm\x01\x00\x00\x00\x01")
+            value["codes"][0]["codePath"] = str(bad)
             process = subprocess.run([str(BINARY)], input=json.dumps(value), text=True, capture_output=True)
             self.assertNotEqual(process.returncode, 0)
             self.assertEqual(process.stdout.strip(), "")

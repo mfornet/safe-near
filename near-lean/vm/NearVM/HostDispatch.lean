@@ -275,9 +275,10 @@ theorem gasFn_preserves : HostPreservesPromises gasFn := by
     | exact writeRegisterResult_preserves _ _ _ _ _ hwf
     | split)
 
+set_option maxRecDepth 16384 in
 /-- Every function published by the runtime's metered registry preserves
 creation-order validity, including rejected unsupported and deprecated calls. -/
-theorem meteredHostFns_preserves (cfg : RuntimeConfig) (entry : ImportDecl × HostFn NearState)
+theorem meteredHostFns_preserves (cfg : RuntimeConfig) (entry : ImportDecl × NearHostFn NearState)
     (h : entry ∈ meteredHostFns cfg) : HostPreservesPromises entry.2 := by
   simp only [meteredHostFns, List.mem_append, List.mem_map, List.mem_singleton] at h
   rcases h with ⟨⟨decl, fn⟩, hin, heq⟩ | heq
@@ -366,7 +367,7 @@ theorem resolveMeteredImports_preserves (cfg : RuntimeConfig) (imports : List Im
 theorem resolveMetered_preserves (cfg : RuntimeConfig) (m : Module) (env : HostEnv NearState)
     (h : resolveMetered cfg m = .ok env) :
     ∀ fn ∈ env.funcs, HostPreservesPromises fn :=
-  resolveMeteredImports_preserves cfg m.imports env h
+  resolveMeteredImports_preserves cfg m.importDecls env h
 
 /-- Each output slot is the exact first table match for the corresponding
 input declaration; resolution preserves import order and multiplicity. -/
@@ -393,9 +394,9 @@ theorem resolveMeteredImports_aligned (cfg : RuntimeConfig) (imports : List Impo
         exact .cons ⟨(found, fn), hf, rfl⟩ (ih tail hr)
 
 theorem resolveMetered_length (cfg : RuntimeConfig) (m : Module) (env : HostEnv NearState)
-    (h : resolveMetered cfg m = .ok env) : env.funcs.length = m.imports.length := by
-  have alignment := resolveMeteredImports_aligned cfg m.imports env h
-  generalize m.imports = imports at alignment ⊢
+    (h : resolveMetered cfg m = .ok env) : env.funcs.length = m.importDecls.length := by
+  have alignment := resolveMeteredImports_aligned cfg m.importDecls env h
+  generalize m.importDecls = imports at alignment ⊢
   generalize env.funcs = funcs at alignment ⊢
   induction alignment with
   | nil => rfl

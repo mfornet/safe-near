@@ -1,5 +1,5 @@
 import NearRuntime
-import Interpreter.Wasm.Decoder.Wat
+import Wasm.Wat
 
 /-! Decoder failures at the external code boundary must never become ordinary
 contract failures or deployable empty modules. These checks exercise `apply`,
@@ -9,8 +9,8 @@ namespace NearRuntime.Tests.Decoder
 
 open Wasm Wasm.Near Near
 
-private def decode (wat : String) : IO Module :=
-  match Decoder.Wat.decode wat with
+private def decode (wat : String) : IO Module := do
+  match ← Wat.compile wat with
   | .ok m => pure m
   | .error e => throw (IO.userError s!"decoder test fixture: {e}")
 

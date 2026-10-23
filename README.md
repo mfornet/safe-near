@@ -7,11 +7,11 @@ Formalizing NEAR smart contracts at the binary level using Lean.
 We verify the Wasm binary that is actually deployed on chain, not the Rust
 source. To do that, everything the binary runs on is implemented in Lean:
 
-- **Wasm** (`near-lean/wasm`, `near-lean/iris-wasm`): a Wasm interpreter and
-  proof machinery for reasoning about Wasm code.
+- **Wasm** (`near-lean/wasm`): a Wasm runtime written from the specification,
+  whose single executable step function is also what proofs reason about.
 - **NEAR runtime** (`near-lean/vm`, `near-lean/runtime`, `near-lean/chain`):
   host functions, gas, transactions, receipts and block execution on top of the
-  interpreter.
+  runtime.
 
 Per contract, we write a high-level model of its state and methods, state the
 properties we care about (for example "balances always sum to the total

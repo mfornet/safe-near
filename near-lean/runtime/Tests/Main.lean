@@ -1,7 +1,7 @@
 import NearRuntime
 import Tests.Decoder
 import Tests.Gas
-import Interpreter.Wasm.Decoder.Wat
+import Wasm.Wat
 
 /-!
 # Runtime scenario tests
@@ -252,7 +252,7 @@ def main (args : List String) : IO UInt32 := do
   let gasChecks ← NearRuntime.Tests.Gas.run cfg
   r.modify fun report => { report with passed := report.passed + decoderChecks + gasChecks }
   let text ← IO.FS.readFile wat
-  let module ← match Decoder.Wat.decode text with
+  let module ← match ← Wat.compile text with
     | .ok m => pure m
     | .error e => do IO.println s!"decode error: {e}"; return 1
   let code : ContractCode := { module, size := 200_000, hash := "w_near" }
@@ -358,7 +358,7 @@ def main (args : List String) : IO UInt32 := do
   -- An unsupported operation invalidates the model attempt, not the contract.
   -- Neither charged transactions, queued outgoing receipts nor a preceding
   -- successfully executed local receipt in the same apply may be committed.
-  let unsupportedModule ← match Decoder.Wat.decode
+  let unsupportedModule ← match ← Wat.compile
       "(module (import \"env\" \"sha256\" (func $hash (param i64 i64 i64)))
        (memory 1) (func (export \"test\") i64.const 0 i64.const 0 i64.const 0 call $hash))" with
     | .ok m => pure m
@@ -459,7 +459,7 @@ def main (args : List String) : IO UInt32 := do
     "(import \"env\" \"promise_batch_action_transfer\" (func $transfer (param i64 i64))) (memory 1) " ++
     "(data (i32.const 0) \"" ++ implicitTarget ++ "\") (data (i32.const 80) \"\\01\") " ++
     "(func (export \"send\") i64.const 64 i64.const 0 call $batch i64.const 80 call $transfer))"
-  let implicitModule ← match Decoder.Wat.decode implicitWat with
+  let implicitModule ← match ← Wat.compile implicitWat with
     | .ok m => pure m
     | .error error => throw (IO.userError s!"implicit transfer fixture: {error}")
   let implicitCode : ContractCode := { module := implicitModule, size := 0, hash := "implicit-transfer-fixture" }
@@ -477,10 +477,10 @@ def main (args : List String) : IO UInt32 := do
     "(import \"env\" \"promise_batch_action_deploy_contract\" (func $deploy (param i64 i64 i64))) (memory 1) " ++
     "(data (i32.const 0) \"wrap.near\") (data (i32.const 16) \"\\00asm\\01\\00\\00\\00\") " ++
     "(func (export \"deploy\") i64.const 9 i64.const 0 call $batch i64.const 8 i64.const 16 call $deploy))"
-  let deployModule ← match Decoder.Wat.decode deployWat with
+  let deployModule ← match ← Wat.compile deployWat with
     | .ok module => pure module
     | .error error => throw (IO.userError s!"deployment fixture: {error}")
-  let emptyModule ← match Decoder.Wat.decode "(module)" with
+  let emptyModule ← match ← Wat.compile "(module)" with
     | .ok module => pure module
     | .error error => throw (IO.userError s!"empty deployment fixture: {error}")
   let decodedCode : ContractCode := {
@@ -510,7 +510,7 @@ def main (args : List String) : IO UInt32 := do
   -- Runtime externals reject method bytes before materializing typed actions.
   let methodWat ← IO.FS.readFile "../../tools/runtime-conformance/fixtures/method_encoding.wat"
   let methodBytes ← IO.FS.readBinFile "../../tools/runtime-conformance/fixtures/method_encoding.wasm"
-  let methodModule ← match Decoder.Wat.decode methodWat with
+  let methodModule ← match ← Wat.compile methodWat with
     | .ok module => pure module
     | .error error => throw (IO.userError s!"method encoding fixture: {error}")
   let methodCode : ContractCode := { module := methodModule, size := methodBytes.size, hash := "method-encoding-fixture" }
@@ -682,7 +682,7 @@ def main (args : List String) : IO UInt32 := do
       771 * cfg.storageAmountPerByte - 5)
 
   -- Sponsorship is a committed mint only after the whole receipt succeeds.
-  let sponsorModule ← match Decoder.Wat.decode "(module\n (import \"env\" \"promise_batch_create\" (func $batch (param i64 i64) (result i64)))\n (import \"env\" \"promise_batch_action_function_call\" (func $call (param i64 i64 i64 i64 i64 i64 i64)))\n (import \"env\" \"promise_batch_action_transfer\" (func $transfer (param i64 i64)))\n (import \"env\" \"panic\" (func $panic))\n (memory 1)\n (data (i32.const 0) \"alice.near\")\n (data (i32.const 16) \"go\")\n (data (i32.const 64) \"\\01\")\n (data (i32.const 80) \"\\02\")\n (func (export \"one\") (local i64) i64.const 10 i64.const 0 call $batch i64.const 2 i64.const 16 i64.const 0 i64.const 0 i64.const 64 i64.const 0 call $call)\n (func (export \"twice\") (local i64) i64.const 10 i64.const 0 call $batch local.set 0 local.get 0 i64.const 2 i64.const 16 i64.const 0 i64.const 0 i64.const 64 i64.const 0 call $call local.get 0 i64.const 2 i64.const 16 i64.const 0 i64.const 0 i64.const 64 i64.const 0 call $call)\n (func (export \"zero\") (local i64) i64.const 10 i64.const 0 call $batch i64.const 2 i64.const 16 i64.const 0 i64.const 0 i64.const 96 i64.const 0 call $call)\n (func (export \"two\") (local i64) i64.const 10 i64.const 0 call $batch i64.const 2 i64.const 16 i64.const 0 i64.const 0 i64.const 80 i64.const 0 call $call)\n (func (export \"transfer\") (local i64) i64.const 10 i64.const 0 call $batch i64.const 64 call $transfer)\n (func (export \"empty\") (local i64) i64.const 10 i64.const 0 call $batch i64.const 0 i64.const 16 i64.const 0 i64.const 0 i64.const 64 i64.const 0 call $call)\n (func (export \"panic\") (local i64) i64.const 10 i64.const 0 call $batch i64.const 2 i64.const 16 i64.const 0 i64.const 0 i64.const 64 i64.const 0 call $call call $panic)\n (func (export \"late_failure\") (local i64) i64.const 10 i64.const 0 call $batch local.set 0 local.get 0 i64.const 2 i64.const 16 i64.const 0 i64.const 0 i64.const 64 i64.const 0 call $call local.get 0 i64.const 2 i64.const 16 i64.const 0 i64.const 0 i64.const 80 i64.const 0 call $call)\n)\n" with
+  let sponsorModule ← match ← Wat.compile "(module\n (import \"env\" \"promise_batch_create\" (func $batch (param i64 i64) (result i64)))\n (import \"env\" \"promise_batch_action_function_call\" (func $call (param i64 i64 i64 i64 i64 i64 i64)))\n (import \"env\" \"promise_batch_action_transfer\" (func $transfer (param i64 i64)))\n (import \"env\" \"panic\" (func $panic))\n (memory 1)\n (data (i32.const 0) \"alice.near\")\n (data (i32.const 16) \"go\")\n (data (i32.const 64) \"\\01\")\n (data (i32.const 80) \"\\02\")\n (func (export \"one\") (local i64) i64.const 10 i64.const 0 call $batch i64.const 2 i64.const 16 i64.const 0 i64.const 0 i64.const 64 i64.const 0 call $call)\n (func (export \"twice\") (local i64) i64.const 10 i64.const 0 call $batch local.set 0 local.get 0 i64.const 2 i64.const 16 i64.const 0 i64.const 0 i64.const 64 i64.const 0 call $call local.get 0 i64.const 2 i64.const 16 i64.const 0 i64.const 0 i64.const 64 i64.const 0 call $call)\n (func (export \"zero\") (local i64) i64.const 10 i64.const 0 call $batch i64.const 2 i64.const 16 i64.const 0 i64.const 0 i64.const 96 i64.const 0 call $call)\n (func (export \"two\") (local i64) i64.const 10 i64.const 0 call $batch i64.const 2 i64.const 16 i64.const 0 i64.const 0 i64.const 80 i64.const 0 call $call)\n (func (export \"transfer\") (local i64) i64.const 10 i64.const 0 call $batch i64.const 64 call $transfer)\n (func (export \"empty\") (local i64) i64.const 10 i64.const 0 call $batch i64.const 0 i64.const 16 i64.const 0 i64.const 0 i64.const 64 i64.const 0 call $call)\n (func (export \"panic\") (local i64) i64.const 10 i64.const 0 call $batch i64.const 2 i64.const 16 i64.const 0 i64.const 0 i64.const 64 i64.const 0 call $call call $panic)\n (func (export \"late_failure\") (local i64) i64.const 10 i64.const 0 call $batch local.set 0 local.get 0 i64.const 2 i64.const 16 i64.const 0 i64.const 0 i64.const 64 i64.const 0 call $call local.get 0 i64.const 2 i64.const 16 i64.const 0 i64.const 0 i64.const 80 i64.const 0 call $call)\n)\n" with
     | .ok m => pure m
     | .error e => throw (IO.userError s!"sponsorship fixture: {e}")
   let sponsorCode : ContractCode := { module := sponsorModule, size := 0, hash := "sponsor" }

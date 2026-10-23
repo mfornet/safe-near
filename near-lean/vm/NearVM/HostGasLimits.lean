@@ -7,10 +7,10 @@ namespace Wasm.Near
 def GasLimits (prepaid maxBurnt : Nat) (ns : NearState) : Prop :=
   ns.gas.prepaid = prepaid ∧ ns.gas.maxBurnt = maxBurnt
 
-def HostPreservesGasLimits (fn : HostFn NearState) : Prop :=
-  ∀ prepaid maxBurnt, HostFn.Preserves (GasLimits prepaid maxBurnt) fn
+def HostPreservesGasLimits (fn : NearHostFn NearState) : Prop :=
+  ∀ prepaid maxBurnt, NearHostFn.Preserves (GasLimits prepaid maxBurnt) fn
 
-theorem HostPreservesGas.limits {fn : HostFn NearState} (h : HostPreservesGas fn) :
+theorem HostPreservesGas.limits {fn : NearHostFn NearState} (h : HostPreservesGas fn) :
     HostPreservesGasLimits fn := by
   intro prepaid maxBurnt st args hwf
   have hg := h st args
@@ -34,25 +34,24 @@ theorem gasFn_gasLimits : HostPreservesGasLimits gasFn := by
     split <;> exact ⟨hl.1.trans hwf.1, hl.2.trans hwf.2⟩
   · exact hwf
 
-theorem updateStorageUsage_gasLimits (extra : Nat) (name : String) (before after : Store NearState)
+theorem updateStorageUsage_gasLimits (extra : Nat) (name : String) (before after : HostStore NearState)
     (args : List Value) (hwf : GasLimits prepaid maxBurnt after.host) :
     GasLimits prepaid maxBurnt (updateStorageUsage extra name before after args).host := by
   unfold updateStorageUsage
   repeat (first | exact hwf | (dsimp only; split))
   all_goals first | exact hwf | (split <;> exact hwf)
 
-theorem deductDeposit_gasLimits (name : String) (before after : Store NearState) (args : List Value)
+theorem deductDeposit_gasLimits (name : String) (before after : HostStore NearState) (args : List Value)
     (hwf : GasLimits prepaid maxBurnt after.host) : GasLimits prepaid maxBurnt (deductDeposit name before after args).1.host := by
   unfold deductDeposit promiseDeposit? deductPromiseDeposit
   repeat (first | exact hwf | (dsimp only; split))
   all_goals first | exact hwf | (split <;> exact hwf)
 
-theorem finishMeteredCall_gasLimits (extra : Nat) (name : String) (before : Store NearState)
+theorem finishMeteredCall_gasLimits (extra : Nat) (name : String) (before : HostStore NearState)
     (args : List Value) (result : HostResult NearState) (hwf : HostResult.Satisfies (GasLimits prepaid maxBurnt) result) :
     HostResult.Satisfies (GasLimits prepaid maxBurnt) (finishMeteredCall extra name before args result) := by
   cases result with
   | Trap st msg => exact hwf
-  | Throw st tag vals => exact hwf
   | Return vals st =>
     unfold finishMeteredCall
     dsimp only
@@ -76,7 +75,7 @@ theorem finishMeteredCall_gasLimits (extra : Nat) (name : String) (before : Stor
             | some error => exact hfinal
             | none => exact updateStorageUsage_gasLimits extra name before final args hfinal
 
-theorem metered_preserves_gasLimits (extra : Nat) (name : String) (fn : HostFn NearState)
+theorem metered_preserves_gasLimits (extra : Nat) (name : String) (fn : NearHostFn NearState)
     (hfn : HostPreservesGasLimits fn) : HostPreservesGasLimits (metered extra name fn) := by
   intro prepaid maxBurnt st args hwf
   unfold metered
@@ -87,7 +86,7 @@ theorem metered_preserves_gasLimits (extra : Nat) (name : String) (fn : HostFn N
     · change GasLimits prepaid maxBurnt (applyCharges st.host _).1
       exact applyCharges_gasLimits _ _ hwf
     · let ns := (applyCharges st.host (chargesBefore name st args)).1
-      let st1 : Store NearState := { st with
+      let st1 : HostStore NearState := { st with
         host := { ns with context := { ns.context with usedGas := UInt64.ofNat ns.gas.used } } }
       have hwf1 : GasLimits prepaid maxBurnt st1.host := by
         change GasLimits prepaid maxBurnt (applyCharges st.host _).1
@@ -106,9 +105,10 @@ theorem metered_preserves_gasLimits (extra : Nat) (name : String) (fn : HostFn N
           | none => exact finishMeteredCall_gasLimits extra name st2 args _ (hfn prepaid maxBurnt st2 args hwf2)
           | some error => cases error <;> exact hwf2
 
+set_option maxRecDepth 16384 in
 /-- Every published metered host preserves call gas limits, including
 unsupported/deprecated rejection paths and the explicit gas import. -/
-theorem meteredHostFns_gasLimits (cfg : RuntimeConfig) (entry : ImportDecl × HostFn NearState)
+theorem meteredHostFns_gasLimits (cfg : RuntimeConfig) (entry : ImportDecl × NearHostFn NearState)
     (h : entry ∈ meteredHostFns cfg) : HostPreservesGasLimits entry.2 := by
   simp only [meteredHostFns, List.mem_append, List.mem_map, List.mem_singleton] at h
   rcases h with ⟨⟨decl, fn⟩, hin, heq⟩ | heq
@@ -197,6 +197,6 @@ theorem resolveMeteredImports_gasLimits (cfg : RuntimeConfig) (imports : List Im
 theorem resolveMetered_gasLimits (cfg : RuntimeConfig) (m : Module) (env : HostEnv NearState)
     (h : resolveMetered cfg m = .ok env) :
     ∀ fn ∈ env.funcs, HostPreservesGasLimits fn :=
-  resolveMeteredImports_gasLimits cfg m.imports env h
+  resolveMeteredImports_gasLimits cfg m.importDecls env h
 
 end Wasm.Near

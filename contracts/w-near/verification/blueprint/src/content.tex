@@ -137,8 +137,8 @@ function call of a decoded module under a \texttt{VMContext} and returns a
 arguments and return values as near-sdk 3.1.0 does and reading the created
 receipts back as the model's promises. The obligation below is what remains to
 be proven about \texttt{contract.wasm}; its proof is the Wasm-level work
-(interpreter semantics plus the Iris separation logic of
-\texttt{near-lean/iris-wasm}).
+(the runtime semantics of \texttt{near-lean/wasm} plus a separation logic over
+its step relation, still to be built).
 
 \inputleanmodule{Spec.RuntimeInstance}
 

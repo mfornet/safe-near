@@ -5,12 +5,10 @@ one toolchain (`lean-toolchain`) and one `packagesDir` (`.lake/packages`).
 
 | Package | Seam in nearcore | What it is |
 |---|---|---|
-| `wasm/` | wasmer / wasmtime | The Wasm interpreter (Talos), WAT decoder, official test suite |
+| `wasm/` | wasmer / wasmtime | The Wasm runtime, written from the spec, and the official test suite |
 | `vm/` | `near_vm_runner::run` | One function call: host functions, gas, `VMContext` → `VMOutcome` |
 | `runtime/` | `Runtime::apply` | Accounts, access keys, receipts, actions, fees, refunds |
 | `chain/` | the "trustless manipulator" | Blocks, reachable states, explicit run completion, measured burnt gas |
-| `iris-wasm/` | | Separation logic over the interpreter (Talos codelib), for proofs about Wasm code |
-| `programs/` | | Small Rust programs used as interpreter tests |
 
 ```
 just near-build     # from the repository root: build wasm, vm, runtime, chain
@@ -28,8 +26,8 @@ gas, logs, the receipts the call created, and `aborted : Option
 FunctionCallError` with nearcore's error taxonomy (`NearVM/Error.lean`).
 
 - `NearVM/Host.lean` and `NearVM/State.lean` are the NEAR host functions
-  over the interpreter's store (copied from `iris-wasm/CodeLib/Near`, which
-  will be repointed here).
+  over the runtime's memory and host state (`NearVM/Interp.lean` is the
+  bridge to `Wasm.HostFn`).
 - `NearVM/Metered.lean` wraps every host function with the gas it costs in
   nearcore's `logic.rs`: charges computed from the arguments before the call
   and from its effect after it, action fees and prepaid gas for promises,
@@ -118,17 +116,13 @@ fields included) and fails on anything else, in particular `sorryAx` and
 
 ```
 tools/axiom-audit.py near-lean/wasm --report audit/wasm.json
-tools/axiom-audit.py near-lean/iris-wasm --report audit/iris-wasm.json
-tools/axiom-audit.py near-lean/programs/lean --report audit/programs.json
 tools/axiom-audit.py near-lean/vm --report audit/vm.json
 tools/axiom-audit.py near-lean/runtime --report audit/runtime.json
 tools/axiom-audit.py near-lean/chain --report audit/chain.json
 ```
 
-All core packages and `programs` must be clean. The compiled ByteEcho, GCD
-kernel, GCD stream and mergesort specifications are proved. Every declaration
-is checked against the same three standard axioms; no program proof exception
-is enabled. Pass `--no-build` to audit already built artefacts.
+All core packages must be clean. Every declaration is checked against the
+same three standard axioms. Pass `--no-build` to audit already built artefacts.
 
 The public VM result also carries a checked receipt DAG: dependencies refer only
 to earlier receipts, returned receipt indices exist, and dependency cycles are
@@ -441,7 +435,7 @@ multi-action/receipt/chain conservation remain separate obligations.
 
 `PromiseGasInvariants` connects every modeled runtime action variant to its
 raw VM execution/prepaid cost, under explicit method-decoding facts. The
-byte-array and UTF-8 roundtrip proofs are shared in `Interpreter.Wasm.ByteEncoding`;
+byte-array and UTF-8 roundtrip proofs are shared in `Wasm.ByteEncoding` (`wasm/Wasm/Bytes.lean`);
 wNEAR keeps its existing Borsh theorem names as wrappers around those proofs.
 Runtime calls now explicitly require UTF-8 action method names. The external
 validation policy belongs to `VMContext`, not protocol fee/limit configuration;

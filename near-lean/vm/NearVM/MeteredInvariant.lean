@@ -3,45 +3,44 @@ import NearVM.InterpreterInvariant
 
 namespace Wasm.Near
 
+theorem chargeConfig_hostInvariant {P : NearState → Prop}
+    (hcharge : ∀ (ns : NearState) (cost : Nat), P ns → P (chargeHost ns cost).1)
+    (c : Config NearState) (cost : Nat) (h : ConfigHostInvariant P c) :
+    ConfigHostInvariant P (chargeConfig c cost).1 :=
+  ⟨h.1, hcharge c.store.host cost h.2⟩
+
 theorem chargeWasm_hostInvariant {P : NearState → Prop}
-    (hcharge : ∀ (config : SmallStep.Config NearState) (cost : Nat), P config.store.wasm.host → P (chargeWasm config cost).1.store.wasm.host)
-    (config : SmallStep.Config NearState) (cost : Nat) (h : ConfigHostInvariant P config) :
-    ConfigHostInvariant P (chargeWasm config cost).1 :=
-  ⟨h.1, hcharge config cost h.2⟩
+    (hcharge : ∀ (ns : NearState) (cost : Nat), P ns → P (chargeHost ns cost).1)
+    (m : Machine) (cost : Nat) (h : MachineHostInvariant P m) :
+    MachineHostInvariant P (chargeWasm m cost).1 := by
+  cases m with
+  | next c => exact chargeConfig_hostInvariant hcharge c cost h
+  | done values store => exact ⟨h.1, hcharge store.host cost h.2⟩
+  | trap reason store => exact ⟨h.1, hcharge store.host cost h.2⟩
 
 theorem runMetered_hostInvariant (P : NearState → Prop)
-    (hcharge : ∀ (config : SmallStep.Config NearState) (cost : Nat), P config.store.wasm.host → P (chargeWasm config cost).1.store.wasm.host)
-    (cfg : WasmConfig) (fuel : Nat)
-    (config : SmallStep.Config NearState) (h : ConfigHostInvariant P config) :
-    ConfigHostInvariant P (runMetered cfg fuel config).1 := by
-  induction fuel generalizing config with
-  | zero => cases he : config.expr <;> simpa only [runMetered, he] using h
+    (hcharge : ∀ (ns : NearState) (cost : Nat), P ns → P (chargeHost ns cost).1)
+    (cfg : WasmConfig) (fuel : Nat) (m : Machine) (h : MachineHostInvariant P m) :
+    MachineHostInvariant P (runMetered cfg fuel m).1 := by
+  induction fuel generalizing m with
+  | zero => cases m <;> simpa only [runMetered] using h
   | succ fuel ih =>
-    cases he : config.expr with
-    | done values => simpa only [runMetered, he] using h
-    | trapped reason => simpa only [runMetered, he] using h
-    | running thread =>
-      cases hc : chargeWasm config (nextInstructionGas cfg config) with
-      | mk paid error =>
-        have hp := chargeWasm_hostInvariant hcharge config (nextInstructionGas cfg config) h
-        rw [hc] at hp
-        cases error with
-        | some error => simpa only [runMetered, he, hc] using hp
-        | none =>
-          cases hs : SmallStep.stepChecked? paid with
-          | error error => simpa only [runMetered, he, hc, hs] using hp
-          | ok transition =>
-            cases transition with
-            | none => simpa only [runMetered, he, hc, hs] using hp
-            | some transition =>
-              obtain ⟨kind, next⟩ := transition
-              have hn := step_preserves_hostInvariant (SmallStep.stepChecked?_sound hs) hp
-              cases hf : chargeWasm next (frameTransitionGas cfg paid next) with
-              | mk final error =>
-                have hfinal := chargeWasm_hostInvariant hcharge next (frameTransitionGas cfg paid next) hn
-                rw [hf] at hfinal
-                cases error with
-                | some error => simpa only [runMetered, he, hc, hs, hf] using hfinal
-                | none => simpa only [runMetered, he, hc, hs, hf] using ih final hfinal
+    cases m with
+    | done values store => simpa only [runMetered] using h
+    | trap reason store => simpa only [runMetered] using h
+    | next c =>
+      have hp := chargeConfig_hostInvariant hcharge c (nextInstructionGas cfg c) h
+      simp only [runMetered]
+      split
+      · exact hp
+      · rename_i hnone
+        have hn := step_hostInvariant hp
+        have hfinal := chargeWasm_hostInvariant hcharge
+          (Exec.step (chargeConfig c (nextInstructionGas cfg c)).1)
+          (frameTransitionGas cfg (chargeConfig c (nextInstructionGas cfg c)).1
+            (Exec.step (chargeConfig c (nextInstructionGas cfg c)).1)) hn
+        split
+        · exact hfinal
+        · exact ih _ hfinal
 
 end Wasm.Near

@@ -8,7 +8,7 @@ registry preservation proof. -/
 theorem resolveMeteredImports_reservationInvariant (fees : ActionFees) (ethEnabled : Bool)
     (cfg : RuntimeConfig) (imports : List ImportDecl) (env : HostEnv NearState)
     (h : resolveMeteredImports cfg imports = .ok env) :
-    ∀ fn ∈ env.funcs, HostFn.PreservesLive (ReservationInvariant fees ethEnabled) fn := by
+    ∀ fn ∈ env.funcs, NearHostFn.PreservesLive (ReservationInvariant fees ethEnabled) fn := by
   induction imports generalizing env with
   | nil =>
     simp only [resolveMeteredImports, Except.ok.injEq] at h
@@ -34,25 +34,24 @@ theorem resolveMeteredImports_reservationInvariant (fees : ActionFees) (ethEnabl
 theorem resolveMetered_reservationInvariant (fees : ActionFees) (ethEnabled : Bool)
     (cfg : RuntimeConfig) (code : Module) (env : HostEnv NearState)
     (h : resolveMetered cfg code = .ok env) :
-    ∀ fn ∈ env.funcs, HostFn.PreservesLive (ReservationInvariant fees ethEnabled) fn :=
-  resolveMeteredImports_reservationInvariant fees ethEnabled cfg code.imports env h
+    ∀ fn ∈ env.funcs, NearHostFn.PreservesLive (ReservationInvariant fees ethEnabled) fn :=
+  resolveMeteredImports_reservationInvariant fees ethEnabled cfg code.importDecls env h
 
-/-- The concrete registry discharges the live-host premise at initialization.
-No host gas-accounting equation is supplied by a contract proof. -/
-theorem initResolvedConfig_reservationInvariant {fees : ActionFees} {ethEnabled : Bool}
-    {cfg : RuntimeConfig} {resolvedCode code : Module} {entry : Nat}
-    {env : HostEnv NearState} {st : Store NearState} {args : List Value}
-    {config : SmallStep.Config NearState}
-    (hresolve : resolveMetered cfg resolvedCode = .ok env)
-    (hinit : SmallStep.initConfig { module := code, host := env } entry st args = .ok config)
-    (hbefore : ReservationInvariant fees ethEnabled st.host) :
-    ConfigLiveInvariant (ReservationInvariant fees ethEnabled) config := by
-  apply initConfig_liveInvariant hinit _ hbefore
-  intro fn hmember
-  rcases hmember with hmember | hmember
-  · exact resolveMetered_reservationInvariant fees ethEnabled cfg resolvedCode env hresolve fn hmember
-  · have hempty := resolveMeteredImports_noForeign cfg resolvedCode.imports env hresolve
-    simp only [hempty, List.not_mem_nil] at hmember
+/-- The concrete registry discharges the live-host premise at the first
+configuration. No host gas-accounting equation is supplied by a contract proof. -/
+theorem resolvedStart_reservationInvariant {fees : ActionFees} {ethEnabled : Bool}
+    {cfg : RuntimeConfig} {code : Module} {env : HostEnv NearState} {host : NearState}
+    {store store' : Store NearState} {imports : List ExternVal} {vm : ValidModule}
+    {inst : ModuleInst} {addr : Nat} {c : Config NearState}
+    (hresolve : resolveMetered cfg code = .ok env)
+    (halloc : env.allocate (Store.empty host) = (store, imports))
+    (hinst : Link.instantiateModule store vm imports = .ok (store', inst))
+    (hstart : Exec.startWasm store' execLimits addr [] = some c)
+    (hbefore : ReservationInvariant fees ethEnabled host) :
+    ConfigLiveInvariant (ReservationInvariant fees ethEnabled) c :=
+  resolvedStart_liveInvariant
+    (resolveMetered_reservationInvariant fees ethEnabled cfg code env hresolve) halloc hinst hstart
+    hbefore
 
 /-- Fresh calls begin with no raw promise obligations or reserved gas. -/
 theorem VMContext.toNearState_reservationInvariant (ctx : VMContext) (cfg : RuntimeConfig)

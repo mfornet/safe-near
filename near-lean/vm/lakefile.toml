@@ -1,6 +1,6 @@
 # NearVM: the NEAR contract runtime at the `near_vm_runner::run` seam.
 #
-# One function call of one contract: the Wasm interpreter (../wasm) plus the
+# One function call of one contract: the Wasm runtime (../wasm) plus the
 # NEAR host functions, gas accounting and the `VMContext` / `VMOutcome`
 # boundary mirrored from nearcore. The runtime (../runtime) builds receipts
 # and state transitions on top of it.
@@ -10,8 +10,13 @@ defaultTargets = ["NearVM"]
 packagesDir = "../.lake/packages"
 
 [[require]]
-name = "Interpreter"
+name = "Wasm"
 path = "../wasm"
+
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
+rev = "v4.34.1"
 
 [[lean_lib]]
 name = "NearVM"

@@ -5,7 +5,7 @@ namespace Wasm.Near
 
 /-- Decode the action carried by a batch-action ABI invocation. Validation and
 charging remain in the host; this parser records the exact bytes and amounts. -/
-def batchActionInput? (name : String) (st : Store NearState) : List Value → Option (UInt64 × PromiseAction)
+def batchActionInput? (name : String) (st : HostStore NearState) : List Value → Option (UInt64 × PromiseAction)
   | [.i64 index] =>
     if name == "promise_batch_action_create_account" then some (index, .createAccount) else none
   | [.i64 index, .i64 ptr] => do
@@ -44,18 +44,18 @@ def batchActionInput? (name : String) (st : Store NearState) : List Value → Op
 /-- The successful raw host creates exactly the action decoded from its ABI.
 The gas counter is deliberately absent: the metered wrapper pays this obligation. -/
 def HostResultAppendsGas (fees : ActionFees) (ethEnabled : Bool) (name : String)
-    (st : Store NearState) (args : List Value) : HostResult NearState → Prop
+    (st : HostStore NearState) (args : List Value) : HostResult NearState → Prop
   | .Return _ after => ∃ index action,
       batchActionInput? name st args = some (index, action) ∧
       promisesGas fees ethEnabled after.host.promises = promisesGas fees ethEnabled st.host.promises +
         actionExecutionGas fees ethEnabled ((promiseReceiver? st index.toNat).getD []) action
-  | .Trap .. | .Throw .. => True
+  | .Trap .. => True
 
-def HostAppendsGas (name : String) (fn : HostFn NearState) : Prop :=
+def HostAppendsGas (name : String) (fn : NearHostFn NearState) : Prop :=
   ∀ fees ethEnabled st args, HostResultAppendsGas fees ethEnabled name st args (fn.invoke st args)
 
 theorem appendPromiseActionResult_gas_input (fees : ActionFees) (ethEnabled : Bool)
-    (name : String) (st : Store NearState) (args : List Value) (index : UInt64) (action : PromiseAction)
+    (name : String) (st : HostStore NearState) (args : List Value) (index : UInt64) (action : PromiseAction)
     (hinput : batchActionInput? name st args = some (index, action)) :
     HostResultAppendsGas fees ethEnabled name st args (appendPromiseActionResult name st index action) := by
   unfold appendPromiseActionResult
@@ -145,7 +145,7 @@ theorem promiseBatchActionDeleteAccountFn_gasObligation : HostAppendsGas "promis
     | split)
 
 /-- Receipt-producing ABIs, including joins which create no action receipt. -/
-def promiseInput? (name : String) (st : Store NearState) : List Value → Option NearPromise
+def promiseInput? (name : String) (st : HostStore NearState) : List Value → Option NearPromise
   | [.i64 len, .i64 ptr] =>
     if name == "promise_batch_create" then do
       let account ← getMemOrReg st ptr len
@@ -171,18 +171,18 @@ def promiseInput? (name : String) (st : Store NearState) : List Value → Option
   | _ => none
 
 def HostResultCreatesGas (fees : ActionFees) (ethEnabled : Bool) (name : String)
-    (st : Store NearState) (args : List Value) : HostResult NearState → Prop
+    (st : HostStore NearState) (args : List Value) : HostResult NearState → Prop
   | .Return _ after => ∃ promise,
       promiseInput? name st args = some promise ∧
       promisesGas fees ethEnabled after.host.promises = promisesGas fees ethEnabled st.host.promises +
         promiseValue (receiptGasValue fees ethEnabled) promise
-  | .Trap .. | .Throw .. => True
+  | .Trap .. => True
 
-def HostCreatesGas (name : String) (fn : HostFn NearState) : Prop :=
+def HostCreatesGas (name : String) (fn : NearHostFn NearState) : Prop :=
   ∀ fees ethEnabled st args, HostResultCreatesGas fees ethEnabled name st args (fn.invoke st args)
 
 theorem appendPromise_gas_input (fees : ActionFees) (ethEnabled : Bool)
-    (name : String) (st : Store NearState) (args values : List Value) (promise : NearPromise)
+    (name : String) (st : HostStore NearState) (args values : List Value) (promise : NearPromise)
     (hinput : promiseInput? name st args = some promise) :
     HostResultCreatesGas fees ethEnabled name st args (.Return values (appendPromise st promise)) :=
   ⟨promise, hinput, appendPromise_gas fees ethEnabled st promise⟩

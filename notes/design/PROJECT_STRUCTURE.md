@@ -7,9 +7,7 @@ safe-near/
     reports/periodic/   -- Dated periodic check reports
     lean-toolchain      -- Lean version shared by every package
     near-lean/
-      wasm/             -- Wasm interpreter (adapted from Talos)
-      iris-wasm/        -- Iris proof machinery and Wasm code library
-      programs/         -- Wasm test programs and their proofs
+      wasm/             -- Wasm runtime, written from the spec, tested on the official testsuite
       vm/               -- Single contract call: metering and host functions
       runtime/          -- Transactions, receipts and account state
       chain/            -- Block execution and settlement

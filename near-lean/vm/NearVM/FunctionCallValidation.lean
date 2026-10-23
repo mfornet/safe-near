@@ -4,7 +4,7 @@ namespace Wasm.Near
 
 /-- Validation accepts only successful amount/method/argument reads and a
 nonempty method. The bytes remain opaque, including register-backed input. -/
-theorem functionCallPlan_valid_inputs {st : Store NearState} {input : FunctionCallInputs} {sir : Bool}
+theorem functionCallPlan_valid_inputs {st : HostStore NearState} {input : FunctionCallInputs} {sir : Bool}
     (h : (functionCallPlan st input sir).error = none) :
     ∃ amount method arguments,
       readU128Mem st input.amountPtr = some amount ∧
@@ -26,14 +26,14 @@ theorem functionCallPlan_valid_inputs {st : Store NearState} {input : FunctionCa
           subst method
           simp at hempty
 
-theorem functionCallTargetError_none_iff (st : Store NearState) (index : Nat) :
+theorem functionCallTargetError_none_iff (st : HostStore NearState) (index : Nat) :
     functionCallTargetError st index = none ↔ (promiseReceiver? st index).isSome = true := by
   unfold functionCallTargetError promiseReceiver?
   cases hget : getPromise? st.host.promises index with
   | none => simp
   | some p => cases p <;> simp
 
-theorem functionCallPlan_valid_target {st : Store NearState} {input : FunctionCallInputs} {sir : Bool}
+theorem functionCallPlan_valid_target {st : HostStore NearState} {input : FunctionCallInputs} {sir : Bool}
     (h : (functionCallPlan st input sir).error = none) {index : Nat} (htarget : input.target = some index) :
     (promiseReceiver? st index).isSome = true := by
   obtain ⟨amount, method, arguments, ha, hm, hnonempty, hargs⟩ := functionCallPlan_valid_inputs h
@@ -46,7 +46,7 @@ theorem functionCallPlan_valid_target {st : Store NearState} {input : FunctionCa
 
 /-- The functional host builds the same action from the validated raw bytes,
 amount and gas; validation introduces no contract-specific encoding. -/
-theorem functionCallPlan_valid_action {st : Store NearState} {input : FunctionCallInputs} {sir : Bool}
+theorem functionCallPlan_valid_action {st : HostStore NearState} {input : FunctionCallInputs} {sir : Bool}
     (h : (functionCallPlan st input sir).error = none) :
     ∃ amount method arguments,
       readFunctionCallAction? st input.methodLen input.methodPtr input.argsLen input.argsPtr input.amountPtr input.gas =
@@ -54,7 +54,7 @@ theorem functionCallPlan_valid_action {st : Store NearState} {input : FunctionCa
   obtain ⟨amount, method, arguments, ha, hm, hnonempty, hargs⟩ := functionCallPlan_valid_inputs h
   exact ⟨amount, method, arguments, by simp [readFunctionCallAction?, ha, hm, hargs], hnonempty⟩
 
-theorem preInvokeError_functionCall_valid {name : String} {st : Store NearState} {args : List Value}
+theorem preInvokeError_functionCall_valid {name : String} {st : HostStore NearState} {args : List Value}
     (h : preInvokeError name st args = none) : functionCallInputError name st args = none := by
   unfold preInvokeError at h
   cases ha : invocationArgumentError name st args with
@@ -65,7 +65,7 @@ theorem preInvokeError_functionCall_valid {name : String} {st : Store NearState}
     | some error => simp [hc] at h
     | none => simpa only [hc] using h
 
-theorem preInvokeError_functionCall_action {name : String} {st : Store NearState} {args : List Value}
+theorem preInvokeError_functionCall_action {name : String} {st : HostStore NearState} {args : List Value}
     {input : FunctionCallInputs} (hinputs : functionCallInputs? name args = some input)
     (h : preInvokeError name st args = none) :
     ∃ amount method arguments,

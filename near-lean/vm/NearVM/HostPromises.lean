@@ -12,11 +12,11 @@ theorem getPromise_eq_getElem? (ps : List NearPromise) (index : Nat) :
   | nil => rfl
   | cons p ps ih => cases index <;> simp [getPromise?, ih]
 
-theorem promiseIndexValid_iff (st : Store NearState) (index : Nat) :
+theorem promiseIndexValid_iff (st : HostStore NearState) (index : Nat) :
     promiseIndexValid st index = true ↔ index < st.host.promises.length := by
   simp [promiseIndexValid, getPromise_eq_getElem?]
 
-theorem promiseDepsValid_iff (st : Store NearState) (dependencies : List Nat) :
+theorem promiseDepsValid_iff (st : HostStore NearState) (dependencies : List Nat) :
     promiseDepsValid st dependencies = true ↔
       ∀ index ∈ dependencies, index < st.host.promises.length := by
   simp [promiseDepsValid, List.all_eq_true, promiseIndexValid_iff]
@@ -109,25 +109,25 @@ theorem appendPromiseAction_preserves {ps result : List NearPromise} {index star
     | and dependencies => simp [lookup] at h
     | yielded => simp [lookup] at h
 
-theorem appendPromise_preserves (st : Store NearState) (p : NearPromise)
+theorem appendPromise_preserves (st : HostStore NearState) (p : NearPromise)
     (hwf : PromisesWellFormedFrom 0 st.host.promises)
     (hp : PromiseWellFormedAt st.host.promises.length p) :
     PromisesWellFormedFrom 0 (appendPromise st p).host.promises := by
   apply promisesWellFormed_snoc _ _ _ hwf
   simpa only [Nat.zero_add] using hp
 
-theorem appendBatchPromise_preserves (st : Store NearState) (account : List UInt8)
+theorem appendBatchPromise_preserves (st : HostStore NearState) (account : List UInt8)
     (actions : List PromiseAction) (hwf : PromisesWellFormedFrom 0 st.host.promises) :
     PromisesWellFormedFrom 0 (appendPromise st (.batch account actions)).host.promises :=
   appendPromise_preserves st _ hwf trivial
 
-theorem appendCallbackPromise_preserves (st : Store NearState) (base : Nat) (account : List UInt8)
+theorem appendCallbackPromise_preserves (st : HostStore NearState) (base : Nat) (account : List UInt8)
     (actions : List PromiseAction) (hwf : PromisesWellFormedFrom 0 st.host.promises)
     (hbase : promiseIndexValid st base = true) :
     PromisesWellFormedFrom 0 (appendPromise st (.callback base account actions)).host.promises :=
   appendPromise_preserves st _ hwf ((promiseIndexValid_iff st base).mp hbase)
 
-theorem appendJointPromise_preserves (st : Store NearState) (dependencies : List Nat)
+theorem appendJointPromise_preserves (st : HostStore NearState) (dependencies : List Nat)
     (hwf : PromisesWellFormedFrom 0 st.host.promises)
     (hdeps : promiseDepsValid st dependencies = true) :
     PromisesWellFormedFrom 0 (appendPromise st (.and dependencies)).host.promises :=
@@ -139,9 +139,9 @@ def HostResultPromisesWellFormed :=
   HostResult.Satisfies (fun ns : NearState => PromisesWellFormedFrom 0 ns.promises)
 
 def HostPreservesPromises :=
-  HostFn.Preserves (fun ns : NearState => PromisesWellFormedFrom 0 ns.promises)
+  NearHostFn.Preserves (fun ns : NearState => PromisesWellFormedFrom 0 ns.promises)
 
-theorem checkAccountId_preserves_promises (name : String) (st : Store NearState)
+theorem checkAccountId_preserves_promises (name : String) (st : HostStore NearState)
     (account : List UInt8) (next : Unit → HostResult NearState)
     (hwf : PromisesWellFormedFrom 0 st.host.promises)
     (hnext : HostResultPromisesWellFormed (next ())) :
@@ -151,7 +151,7 @@ theorem checkAccountId_preserves_promises (name : String) (st : Store NearState)
   · exact hnext
   · exact hwf
 
-theorem checkPublicKey_preserves_promises (name : String) (st : Store NearState)
+theorem checkPublicKey_preserves_promises (name : String) (st : HostStore NearState)
     (key : List UInt8) (next : Unit → HostResult NearState)
     (hwf : PromisesWellFormedFrom 0 st.host.promises)
     (hnext : HostResultPromisesWellFormed (next ())) :
@@ -161,7 +161,7 @@ theorem checkPublicKey_preserves_promises (name : String) (st : Store NearState)
   · exact hnext
   · exact hwf
 
-theorem disallowInView_preserves_promises (name : String) (fn : HostFn NearState)
+theorem disallowInView_preserves_promises (name : String) (fn : NearHostFn NearState)
     (hfn : HostPreservesPromises fn) : HostPreservesPromises (disallowInView name fn) := by
   intro st args hwf
   unfold disallowInView
@@ -170,7 +170,7 @@ theorem disallowInView_preserves_promises (name : String) (fn : HostFn NearState
   · exact hwf
   · exact hfn st args hwf
 
-theorem appendPromiseActionResult_preserves (name : String) (st : Store NearState)
+theorem appendPromiseActionResult_preserves (name : String) (st : HostStore NearState)
     (index : UInt64) (action : PromiseAction) (hwf : PromisesWellFormedFrom 0 st.host.promises) :
     HostResultPromisesWellFormed (appendPromiseActionResult name st index action) := by
   unfold appendPromiseActionResult
@@ -180,14 +180,14 @@ theorem appendPromiseActionResult_preserves (name : String) (st : Store NearStat
   | some result =>
     exact (appendPromiseAction_preserves hwf h).1
 
-theorem createBatchPromiseResult_preserves (name : String) (st : Store NearState)
+theorem createBatchPromiseResult_preserves (name : String) (st : HostStore NearState)
     (account : List UInt8) (hwf : PromisesWellFormedFrom 0 st.host.promises) :
     HostResultPromisesWellFormed (createBatchPromiseResult name st account) := by
   unfold createBatchPromiseResult
   apply checkAccountId_preserves_promises _ _ _ _ hwf
   exact appendBatchPromise_preserves st account [] hwf
 
-theorem createCallbackPromiseResult_preserves (name : String) (st : Store NearState)
+theorem createCallbackPromiseResult_preserves (name : String) (st : HostStore NearState)
     (base : UInt64) (account : List UInt8) (hwf : PromisesWellFormedFrom 0 st.host.promises) :
     HostResultPromisesWellFormed (createCallbackPromiseResult name st base account) := by
   unfold createCallbackPromiseResult
@@ -197,7 +197,7 @@ theorem createCallbackPromiseResult_preserves (name : String) (st : Store NearSt
     exact appendCallbackPromise_preserves st base.toNat account [] hwf hbase
   · exact hwf
 
-theorem appendJointPromise_find_preserves (st : Store NearState) (dependencies : List Nat)
+theorem appendJointPromise_find_preserves (st : HostStore NearState) (dependencies : List Nat)
     (hwf : PromisesWellFormedFrom 0 st.host.promises)
     (hfind : dependencies.find? (fun index => !promiseIndexValid st index) = none) :
     PromisesWellFormedFrom 0 (appendPromise st (.and dependencies)).host.promises := by
@@ -460,24 +460,23 @@ theorem applyCharges_promises (ns : NearState) (charges : List Charge) :
       | none => simpa only [applyCharges, hc] using (ih next).trans hp
       | some error => simpa only [applyCharges, hc] using hp
 
-theorem updateStorageUsage_promises (extra : Nat) (name : String) (before after : Store NearState)
+theorem updateStorageUsage_promises (extra : Nat) (name : String) (before after : HostStore NearState)
     (args : List Value) : (updateStorageUsage extra name before after args).host.promises = after.host.promises := by
   unfold updateStorageUsage
   repeat (first | rfl | (dsimp only; split))
   all_goals first | rfl | (split <;> rfl)
 
-theorem deductDeposit_promises (name : String) (before after : Store NearState) (args : List Value) :
+theorem deductDeposit_promises (name : String) (before after : HostStore NearState) (args : List Value) :
     (deductDeposit name before after args).1.host.promises = after.host.promises := by
   unfold deductDeposit promiseDeposit? deductPromiseDeposit
   repeat (first | rfl | (dsimp only; split))
   all_goals first | rfl | (split <;> rfl)
 
-theorem finishMeteredCall_preserves (extra : Nat) (name : String) (before : Store NearState)
+theorem finishMeteredCall_preserves (extra : Nat) (name : String) (before : HostStore NearState)
     (args : List Value) (result : HostResult NearState) (hwf : HostResultPromisesWellFormed result) :
     HostResultPromisesWellFormed (finishMeteredCall extra name before args result) := by
   cases result with
   | Trap st msg => exact hwf
-  | Throw st tag vals => exact hwf
   | Return vals st =>
     unfold finishMeteredCall
     dsimp only
@@ -512,7 +511,7 @@ theorem finishMeteredCall_preserves (extra : Nat) (name : String) (before : Stor
 
 /-- Metering preserves the host invariant even if charging, deposit deduction
 or storage accounting turns a successful host call into a trap. -/
-theorem metered_preserves_promises (extra : Nat) (name : String) (fn : HostFn NearState)
+theorem metered_preserves_promises (extra : Nat) (name : String) (fn : NearHostFn NearState)
     (hfn : HostPreservesPromises fn) : HostPreservesPromises (metered extra name fn) := by
   intro st args hwf
   unfold metered
@@ -524,7 +523,7 @@ theorem metered_preserves_promises (extra : Nat) (name : String) (fn : HostFn Ne
       rw [applyCharges_promises]
       exact hwf
     · let ns := (applyCharges st.host (chargesBefore name st args)).1
-      let st1 : Store NearState := { st with
+      let st1 : HostStore NearState := { st with
         host := { ns with context := { ns.context with usedGas := UInt64.ofNat ns.gas.used } } }
       have hwf1 : PromisesWellFormedFrom 0 st1.host.promises := by
         change PromisesWellFormedFrom 0 (applyCharges st.host _).1.promises
@@ -546,8 +545,8 @@ theorem metered_preserves_promises (extra : Nat) (name : String) (fn : HostFn Ne
 
 /-- A successful preserving host call leaves a graph the executable converter
 accepts, with validity proved before the output boundary check. -/
-theorem HostPreservesPromises.convertible {fn : HostFn NearState}
-    (hfn : HostPreservesPromises fn) (st after : Store NearState) (args vals : List Value)
+theorem HostPreservesPromises.convertible {fn : NearHostFn NearState}
+    (hfn : HostPreservesPromises fn) (st after : HostStore NearState) (args vals : List Value)
     (hwf : PromisesWellFormedFrom 0 st.host.promises)
     (hreturn : fn.invoke st args = .Return vals after) :
     ∃ graph, convertPromises after.host.promises = some graph ∧ graph.Valid := by
@@ -613,7 +612,7 @@ theorem metered_promiseBatchActionDeleteAccountFn_preserves (extra : Nat) (name 
   metered_preserves_promises extra name promiseBatchActionDeleteAccountFn promiseBatchActionDeleteAccountFn_preserves
 
 theorem checkDataLimit_preserves_promises (name label : String) (limit : Option Nat) (size : Nat)
-    (st : Store NearState) (next : Unit → HostResult NearState)
+    (st : HostStore NearState) (next : Unit → HostResult NearState)
     (hwf : PromisesWellFormedFrom 0 st.host.promises)
     (hnext : HostResultPromisesWellFormed (next ())) :
     HostResultPromisesWellFormed (checkDataLimit name label limit size st next) := by
@@ -622,7 +621,7 @@ theorem checkDataLimit_preserves_promises (name label : String) (limit : Option 
   · exact hnext
   · exact hwf
 
-theorem checkedSetRegister_promises {st after : Store NearState} {register : UInt64}
+theorem checkedSetRegister_promises {st after : HostStore NearState} {register : UInt64}
     {bytes : List UInt8} (h : checkedSetRegister? st register bytes = some after) :
     after.host.promises = st.host.promises := by
   unfold checkedSetRegister? at h
@@ -634,7 +633,7 @@ theorem checkedSetRegister_promises {st after : Store NearState} {register : UIn
       rfl
     · cases h
 
-theorem writeRegisterResult_preserves (name : String) (st : Store NearState) (register : UInt64)
+theorem writeRegisterResult_preserves (name : String) (st : HostStore NearState) (register : UInt64)
     (bytes : List UInt8) (vals : List Value) (hwf : PromisesWellFormedFrom 0 st.host.promises) :
     HostResultPromisesWellFormed (writeRegisterResult name st register bytes vals) := by
   unfold writeRegisterResult

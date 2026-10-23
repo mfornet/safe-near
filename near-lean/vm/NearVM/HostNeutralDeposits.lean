@@ -2,10 +2,10 @@ import NearVM.MeteredDeposits
 
 namespace Wasm.Near
 
-def HostCreatesNoDeposits (fn : HostFn NearState) : Prop :=
+def HostCreatesNoDeposits (fn : NearHostFn NearState) : Prop :=
   ∀ st args, HostResultCreatesDeposits st.host 0 (fn.invoke st args)
 
-theorem checkedSetRegister_deposits {st after : Store NearState} {register : UInt64} {bytes : List UInt8}
+theorem checkedSetRegister_deposits {st after : HostStore NearState} {register : UInt64} {bytes : List UInt8}
     (h : checkedSetRegister? st register bytes = some after) : DepositEffect st.host after.host 0 := by
   unfold checkedSetRegister? at h
   split at h
@@ -14,7 +14,7 @@ theorem checkedSetRegister_deposits {st after : Store NearState} {register : UIn
     · cases h; exact ⟨rfl, rfl, rfl⟩
     · cases h
 
-theorem writeRegisterResult_deposits (name : String) (st : Store NearState) (register : UInt64)
+theorem writeRegisterResult_deposits (name : String) (st : HostStore NearState) (register : UInt64)
     (bytes : List UInt8) (values : List Value) :
     HostResultCreatesDeposits st.host 0 (writeRegisterResult name st register bytes values) := by
   unfold writeRegisterResult
@@ -22,14 +22,14 @@ theorem writeRegisterResult_deposits (name : String) (st : Store NearState) (reg
   · exact checkedSetRegister_deposits (by assumption)
   · trivial
 
-theorem createBatchPromiseResult_deposits (name : String) (st : Store NearState) (account : List UInt8) :
+theorem createBatchPromiseResult_deposits (name : String) (st : HostStore NearState) (account : List UInt8) :
     HostResultCreatesDeposits st.host 0 (createBatchPromiseResult name st account) := by
   unfold createBatchPromiseResult checkAccountId
   split
   · exact appendPromise_return_deposits _ _ _
   · trivial
 
-theorem createCallbackPromiseResult_deposits (name : String) (st : Store NearState) (base : UInt64)
+theorem createCallbackPromiseResult_deposits (name : String) (st : HostStore NearState) (base : UInt64)
     (account : List UInt8) : HostResultCreatesDeposits st.host 0 (createCallbackPromiseResult name st base account) := by
   unfold createCallbackPromiseResult checkAccountId
   split
@@ -755,13 +755,12 @@ theorem gasFn_noDeposits : HostCreatesNoDeposits gasFn := by
     · trivial
   · trivial
 
-theorem HostCreatesNoDeposits.funding {fn : HostFn NearState} (h : HostCreatesNoDeposits fn) :
+theorem HostCreatesNoDeposits.funding {fn : NearHostFn NearState} (h : HostCreatesNoDeposits fn) :
     HostPreservesFunding fn := by
   intro st args
   have hp := h st args
   cases hr : fn.invoke st args with
   | Trap paid message => trivial
-  | Throw paid tag values => trivial
   | Return values paid =>
     rw [hr] at hp
     change DepositEffect st.host paid.host 0 at hp

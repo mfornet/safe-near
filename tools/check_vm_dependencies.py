@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check Lean's actual NearVM import closure for legacy interpreters and proof APIs."""
+"""Check NearVM's import closure: the Wasm runtime, and no Talos interpreter or proof API."""
 
 import argparse
 import json
@@ -20,14 +20,13 @@ open Lean Elab Command
 
 run_cmd do
   let names := (← getEnv).header.moduleNames.map Name.toString
-  let required := #["NearVM", "Interpreter.Wasm.SmallStep", "Interpreter.Wasm.Operations"]
+  let required := #["NearVM", "Wasm.Exec", "Wasm.Link", "Wasm.Validate"]
   let missing := required.filter (!names.contains ·)
   let forbidden := names.filter fun name =>
-    name == "Interpreter.Wasm" || name.startsWith "Interpreter.Wasm.Semantics" ||
-    name.startsWith "Interpreter.Wasm.Wp" || name.startsWith "Interpreter.Wasm.Spec" ||
+    name == "Interpreter" || name.startsWith "Interpreter." ||
     name == "CodeLib" || name.startsWith "CodeLib."
   let relevant := names.filter fun name =>
-    name == "NearVM" || name.startsWith "NearVM." || name.startsWith "Interpreter."
+    name == "NearVM" || name.startsWith "NearVM." || name.startsWith "Wasm."
   let report := Json.mkObj [
     ("modules", toJson relevant), ("missing", toJson missing),
     ("forbidden", toJson forbidden)]

@@ -61,7 +61,7 @@ theorem appendPromiseAction_encoding (promises result : List NearPromise) (index
 
 /-- The raw append host preserves receipt encoding once the appended payload
 has passed method validation. Terminal traps have no committed receipt output. -/
-theorem appendPromiseActionResult_encoding (name : String) (st : Store NearState) (index : UInt64)
+theorem appendPromiseActionResult_encoding (name : String) (st : HostStore NearState) (index : UInt64)
     (action : PromiseAction) (h : PromisesEncoding st.host.promises) (ha : ActionMethodsUtf8 action) :
     HostResult.LiveSatisfies (fun ns => PromisesEncoding ns.promises)
       (appendPromiseActionResult name st index action) := by
@@ -72,7 +72,7 @@ theorem appendPromiseActionResult_encoding (name : String) (st : Store NearState
 
 /-- The new action is read from the actual ABI. Method-bearing hosts must
 supply its decoding witness from successful metered external validation. -/
-def HostPreservesEncoding (name : String) (fn : HostFn NearState) : Prop :=
+def HostPreservesEncoding (name : String) (fn : NearHostFn NearState) : Prop :=
   ∀ st args, PromisesEncoding st.host.promises →
     (∀ index action, batchActionInput? name st args = some (index, action) → ActionMethodsUtf8 action) →
     HostResult.LiveSatisfies (fun ns => PromisesEncoding ns.promises) (fn.invoke st args)
@@ -168,7 +168,7 @@ theorem promiseBatchActionDeleteAccountFn_encoding :
     | split)
 
 /-- This action introduces no method-decoding obligation. -/
-theorem promiseBatchActionCreateAccountFn_preserves_encoding (st : Store NearState) (args : List Value)
+theorem promiseBatchActionCreateAccountFn_preserves_encoding (st : HostStore NearState) (args : List Value)
     (h : PromisesEncoding st.host.promises) :
     HostResult.LiveSatisfies (fun ns => PromisesEncoding ns.promises)
       (promiseBatchActionCreateAccountFn.invoke st args) := by
@@ -180,7 +180,7 @@ theorem promiseBatchActionCreateAccountFn_preserves_encoding (st : Store NearSta
     | split)
 
 /-- This action introduces no method-decoding obligation. -/
-theorem promiseBatchActionDeployContractFn_preserves_encoding (st : Store NearState) (args : List Value)
+theorem promiseBatchActionDeployContractFn_preserves_encoding (st : HostStore NearState) (args : List Value)
     (h : PromisesEncoding st.host.promises) :
     HostResult.LiveSatisfies (fun ns => PromisesEncoding ns.promises)
       (promiseBatchActionDeployContractFn.invoke st args) := by
@@ -192,7 +192,7 @@ theorem promiseBatchActionDeployContractFn_preserves_encoding (st : Store NearSt
     | split)
 
 /-- This action introduces no method-decoding obligation. -/
-theorem promiseBatchActionTransferFn_preserves_encoding (st : Store NearState) (args : List Value)
+theorem promiseBatchActionTransferFn_preserves_encoding (st : HostStore NearState) (args : List Value)
     (h : PromisesEncoding st.host.promises) :
     HostResult.LiveSatisfies (fun ns => PromisesEncoding ns.promises)
       (promiseBatchActionTransferFn.invoke st args) := by
@@ -204,7 +204,7 @@ theorem promiseBatchActionTransferFn_preserves_encoding (st : Store NearState) (
     | split)
 
 /-- This action introduces no method-decoding obligation. -/
-theorem promiseBatchActionStakeFn_preserves_encoding (st : Store NearState) (args : List Value)
+theorem promiseBatchActionStakeFn_preserves_encoding (st : HostStore NearState) (args : List Value)
     (h : PromisesEncoding st.host.promises) :
     HostResult.LiveSatisfies (fun ns => PromisesEncoding ns.promises)
       (promiseBatchActionStakeFn.invoke st args) := by
@@ -216,7 +216,7 @@ theorem promiseBatchActionStakeFn_preserves_encoding (st : Store NearState) (arg
     | split)
 
 /-- This action introduces no method-decoding obligation. -/
-theorem promiseBatchActionAddKeyWithFullAccessFn_preserves_encoding (st : Store NearState) (args : List Value)
+theorem promiseBatchActionAddKeyWithFullAccessFn_preserves_encoding (st : HostStore NearState) (args : List Value)
     (h : PromisesEncoding st.host.promises) :
     HostResult.LiveSatisfies (fun ns => PromisesEncoding ns.promises)
       (promiseBatchActionAddKeyWithFullAccessFn.invoke st args) := by
@@ -228,7 +228,7 @@ theorem promiseBatchActionAddKeyWithFullAccessFn_preserves_encoding (st : Store 
     | split)
 
 /-- This action introduces no method-decoding obligation. -/
-theorem promiseBatchActionDeleteKeyFn_preserves_encoding (st : Store NearState) (args : List Value)
+theorem promiseBatchActionDeleteKeyFn_preserves_encoding (st : HostStore NearState) (args : List Value)
     (h : PromisesEncoding st.host.promises) :
     HostResult.LiveSatisfies (fun ns => PromisesEncoding ns.promises)
       (promiseBatchActionDeleteKeyFn.invoke st args) := by
@@ -240,7 +240,7 @@ theorem promiseBatchActionDeleteKeyFn_preserves_encoding (st : Store NearState) 
     | split)
 
 /-- This action introduces no method-decoding obligation. -/
-theorem promiseBatchActionDeleteAccountFn_preserves_encoding (st : Store NearState) (args : List Value)
+theorem promiseBatchActionDeleteAccountFn_preserves_encoding (st : HostStore NearState) (args : List Value)
     (h : PromisesEncoding st.host.promises) :
     HostResult.LiveSatisfies (fun ns => PromisesEncoding ns.promises)
       (promiseBatchActionDeleteAccountFn.invoke st args) := by

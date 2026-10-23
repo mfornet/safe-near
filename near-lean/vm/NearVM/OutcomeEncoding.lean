@@ -10,43 +10,19 @@ theorem runAttempt_success_encoding (cfg : RuntimeConfig) (code : Module) (codeS
     (runAttempt cfg code codeSize method ctx storage fuel).aborted = none →
     ∀ spec ∈ (runAttempt cfg code codeSize method ctx storage fuel).receipts,
       ReceiptEncoding spec.receiverId spec.actions := by
-  unfold runAttempt
-  dsimp only
-  split
-  · intro hs; cases hs
-  · cases hload : applyCharges (ctx.toNearState cfg storage)
-      [.ext "contract_loading_bytes" codeSize, .ext "contract_loading_base"] with
-    | mk host loadError =>
-      dsimp only
-      cases loadError with
-      | some error => intro hs; cases hs
-      | none =>
-        have hv := applyCharges_encodingFrame (ctx.toNearState cfg storage)
-          [.ext "contract_loading_bytes" codeSize, .ext "contract_loading_base"]
-        rw [hload] at hv
-        have hhost : EncodingInvariant host :=
-          EncodingInvariant.of_frame_eq hv (ctx.toNearState_encodingInvariant cfg storage hpolicy)
-        dsimp only
-        cases hexport : code.findExport method with
-        | none => intro hs; cases hs
-        | some entry =>
-          dsimp only
-          cases hsig : code.funcSig? entry with
-          | none => intro hs; cases hs
-          | some signature =>
-            dsimp only
-            split
-            · intro hs; cases hs
-            · cases hresolve : resolveMetered cfg code with
-              | error message => intro hs; cases hs
-              | ok env =>
-                dsimp only
-                split
-                · intro hs; cases hs
-                · rename_i config hinit
-                  have hi := initResolvedConfig_encodingInvariant hresolve hinit hhost
-                  intro hs
-                  exact runInitialized_outcome_encoding cfg.wasm fuel config ctx storage hi hs
+  rcases runAttempt_cases cfg code codeSize method ctx storage fuel with
+    ⟨host1, loadErr, burnt, e, profile, hload, hburnt, heq⟩ |
+    ⟨host1, env, store, imports, valid, store', inst, entry, c, hload, hresolve, halloc, hinst,
+      hstart, heq⟩
+  · rw [heq]; intro hs; cases hs
+  · rw [heq]
+    have hv := applyCharges_encodingFrame (ctx.toNearState cfg storage) (loadingCharges codeSize)
+    rw [hload] at hv
+    have hhost : EncodingInvariant host1 :=
+      EncodingInvariant.of_frame_eq hv (ctx.toNearState_encodingInvariant cfg storage hpolicy)
+    have hi := resolvedStart_encodingInvariant hresolve halloc hinst hstart hhost
+    intro hs
+    exact runInitialized_outcome_encoding cfg.wasm fuel (.next c) ctx storage hi hs
 
 /-- The public VM receipt check retains encoding witnesses derived from the
 actual strict-policy execution, for arbitrary code, storage and interpreter fuel. -/

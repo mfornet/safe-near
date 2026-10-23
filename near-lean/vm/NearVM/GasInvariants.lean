@@ -110,68 +110,61 @@ theorem VMContext.toNearState_gas_bounded (ctx : VMContext) (cfg : RuntimeConfig
   simp [VMContext.toNearState, GasCounter.Bounded, GasCounter.used]
 
 /-- Wasm instruction/frame charging enforces the same counter bounds. -/
-theorem chargeWasm_gas_bounded (config : SmallStep.Config NearState) (cost : Nat) :
-    (chargeWasm config cost).1.store.wasm.host.gas.Bounded :=
+theorem chargeHost_gas_bounded (ns : NearState) (cost : Nat) :
+    (chargeHost ns cost).1.gas.Bounded :=
   GasCounter.deduct_bounded _ _ _
 
-theorem chargeWasm_gas_limits (config : SmallStep.Config NearState) (cost : Nat) :
-    (chargeWasm config cost).1.store.wasm.host.gas.prepaid = config.store.wasm.host.gas.prepaid ∧
-    (chargeWasm config cost).1.store.wasm.host.gas.maxBurnt = config.store.wasm.host.gas.maxBurnt :=
+theorem chargeHost_gas_limits (ns : NearState) (cost : Nat) :
+    (chargeHost ns cost).1.gas.prepaid = ns.gas.prepaid ∧
+    (chargeHost ns cost).1.gas.maxBurnt = ns.gas.maxBurnt :=
   GasCounter.deduct_limits _ _ _
 
-/-- Every executable metered-loop exit has bounded gas. The theorem covers
-terminal states, fuel exhaustion, stepper errors and gas exhaustion. It bounds
-the final counter against its own limits; fixed input-budget preservation is a
-separate host-state invariant. -/
-theorem runMetered_gas_bounded (cfg : WasmConfig) (fuel : Nat) (config : SmallStep.Config NearState)
-    (h : config.store.wasm.host.gas.Bounded) :
-    (runMetered cfg fuel config).1.store.wasm.host.gas.Bounded := by
-  induction fuel generalizing config with
-  | zero => cases he : config.expr <;> simpa only [runMetered, he] using h
-  | succ fuel ih =>
-    cases he : config.expr with
-    | done values => simpa only [runMetered, he] using h
-    | trapped reason => simpa only [runMetered, he] using h
-    | running thread =>
-      cases hc : chargeWasm config (nextInstructionGas cfg config) with
-      | mk paid error =>
-        have hp := chargeWasm_gas_bounded config (nextInstructionGas cfg config)
-        rw [hc] at hp
-        cases error with
-        | some error => simpa only [runMetered, he, hc] using hp
-        | none =>
-          cases hs : SmallStep.stepChecked? paid with
-          | error error => simpa only [runMetered, he, hc, hs] using hp
-          | ok transition =>
-            cases transition with
-            | none => simpa only [runMetered, he, hc, hs] using hp
-            | some transition =>
-              obtain ⟨kind, next⟩ := transition
-              cases hf : chargeWasm next (frameTransitionGas cfg paid next) with
-              | mk final error =>
-                have hfinal := chargeWasm_gas_bounded next (frameTransitionGas cfg paid next)
-                rw [hf] at hfinal
-                cases error with
-                | some error => simpa only [runMetered, he, hc, hs, hf] using hfinal
-                | none => simpa only [runMetered, he, hc, hs, hf] using ih final hfinal
+theorem chargeWasm_gas_bounded (m : Machine) (cost : Nat) :
+    (chargeWasm m cost).1.host.gas.Bounded := by
+  cases m <;> exact chargeHost_gas_bounded _ _
 
-/-- Fixed call-budget bounds compose with the interpreter's host invariant.
+theorem chargeWasm_gas_limits (m : Machine) (cost : Nat) :
+    (chargeWasm m cost).1.host.gas.prepaid = m.host.gas.prepaid ∧
+    (chargeWasm m cost).1.host.gas.maxBurnt = m.host.gas.maxBurnt := by
+  cases m <;> exact chargeHost_gas_limits _ _
+
+/-- Every executable metered-loop exit has bounded gas. The theorem covers
+terminal states, fuel exhaustion and gas exhaustion. It bounds the final
+counter against its own limits; fixed input-budget preservation is a separate
+host-state invariant. -/
+theorem runMetered_gas_bounded (cfg : WasmConfig) (fuel : Nat) (m : Machine)
+    (h : m.host.gas.Bounded) : (runMetered cfg fuel m).1.host.gas.Bounded := by
+  induction fuel generalizing m with
+  | zero => cases m <;> simpa only [runMetered] using h
+  | succ fuel ih =>
+    cases m with
+    | done values store => simpa only [runMetered] using h
+    | trap reason store => simpa only [runMetered] using h
+    | next c =>
+      simp only [runMetered]
+      split
+      · exact chargeHost_gas_bounded _ _
+      · split
+        · exact chargeWasm_gas_bounded _ _
+        · exact ih _ (chargeWasm_gas_bounded _ _)
+
+/-- Fixed call-budget bounds compose with the runtime's host invariant.
 The host-invariant premise requires imported functions to preserve the limits;
 this does not assume that they already preserve the desired gas bounds. -/
-theorem runMetered_fixed_budget (cfg : WasmConfig) (fuel : Nat) (config : SmallStep.Config NearState)
+theorem runMetered_fixed_budget (cfg : WasmConfig) (fuel : Nat) (m : Machine)
     (prepaid maxBurnt : Nat)
-    (hlimits : ConfigHostInvariant
-      (fun ns : NearState => ns.gas.prepaid = prepaid ∧ ns.gas.maxBurnt = maxBurnt) config)
-    (hbound : config.store.wasm.host.gas.Bounded) :
-    let gas := (runMetered cfg fuel config).1.store.wasm.host.gas
+    (hlimits : MachineHostInvariant
+      (fun ns : NearState => ns.gas.prepaid = prepaid ∧ ns.gas.maxBurnt = maxBurnt) m)
+    (hbound : m.host.gas.Bounded) :
+    let gas := (runMetered cfg fuel m).1.host.gas
     gas.burnt ≤ maxBurnt ∧ gas.used ≤ prepaid := by
   have hl := runMetered_hostInvariant
     (fun ns : NearState => ns.gas.prepaid = prepaid ∧ ns.gas.maxBurnt = maxBurnt)
     (by
       intro current cost h
-      have hp := chargeWasm_gas_limits current cost
-      exact ⟨hp.1.trans h.1, hp.2.trans h.2⟩) cfg fuel config hlimits
-  have hb := runMetered_gas_bounded cfg fuel config hbound
-  exact ⟨by simpa only [hl.2.2] using hb.1, by simpa only [hl.2.1] using hb.2⟩
+      have hp := chargeHost_gas_limits current cost
+      exact ⟨hp.1.trans h.1, hp.2.trans h.2⟩) cfg fuel m hlimits
+  have hb := runMetered_gas_bounded cfg fuel m hbound
+  exact ⟨by simpa only [hl.host.2] using hb.1, by simpa only [hl.host.1] using hb.2⟩
 
 end Wasm.Near

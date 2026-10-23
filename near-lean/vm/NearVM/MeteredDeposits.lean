@@ -12,9 +12,9 @@ def fundingState (ns : NearState) : Nat × Nat := (ns.liquidFunds, ns.subsidized
 
 def HostResultFunded (before : NearState) : HostResult NearState → Prop
   | .Return _ after => after.host.liquidFunds + before.subsidizedAmount = before.liquidFunds + after.host.subsidizedAmount
-  | .Trap .. | .Throw .. => True
+  | .Trap .. => True
 
-def HostPreservesFunding (fn : HostFn NearState) : Prop := ∀ st args, HostResultFunded st.host (fn.invoke st args)
+def HostPreservesFunding (fn : NearHostFn NearState) : Prop := ∀ st args, HostResultFunded st.host (fn.invoke st args)
 
 theorem applyCharge_fundingState (ns : NearState) (charge : Charge) :
     fundingState (applyCharge ns charge).1 = fundingState ns := by
@@ -33,13 +33,13 @@ theorem applyCharges_fundingState (ns : NearState) (charges : List Charge) :
       | none => simpa only [applyCharges, hc] using (ih paid).trans hp
       | some error => simpa only [applyCharges, hc] using hp
 
-theorem updateStorageUsage_fundingState (extra : Nat) (name : String) (before after : Store NearState)
+theorem updateStorageUsage_fundingState (extra : Nat) (name : String) (before after : HostStore NearState)
     (args : List Value) : fundingState (updateStorageUsage extra name before after args).host = fundingState after.host := by
   unfold updateStorageUsage
   repeat (first | rfl | (dsimp only; split))
   all_goals first | rfl | (split <;> rfl)
 
-@[simp] theorem deductDeposit_promises (name : String) (before after : Store NearState) (args : List Value) :
+@[simp] theorem deductDeposit_promises (name : String) (before after : HostStore NearState) (args : List Value) :
     (deductDeposit name before after args).1.host.promises = after.host.promises := by
   unfold deductDeposit
   dsimp only
@@ -48,7 +48,7 @@ theorem updateStorageUsage_fundingState (extra : Nat) (name : String) (before af
   · exact deductPromiseDeposit_promises _ _ _
   · rfl
 
-theorem deductDeposit_funding (name : String) (before after : Store NearState) (args : List Value)
+theorem deductDeposit_funding (name : String) (before after : HostStore NearState) (args : List Value)
     (hpaid : (deductDeposit name before after args).2 = none) :
     let paid := (deductDeposit name before after args).1.host
     paid.liquidFunds + after.host.subsidizedAmount + (promiseDeposit? name before args).getD 0 =
@@ -61,13 +61,12 @@ theorem deductDeposit_funding (name : String) (before after : Store NearState) (
 
 /-- Post-call metering, successful deposit charging and storage usage preserve
 liquid funds plus promise deposits, with minted subsidies explicit. -/
-theorem finishMeteredCall_funding (extra : Nat) (name : String) (before : Store NearState)
+theorem finishMeteredCall_funding (extra : Nat) (name : String) (before : HostStore NearState)
     (args : List Value) (result : HostResult NearState)
     (hraw : HostResultCreatesDeposits before.host ((promiseDeposit? name before args).getD 0) result) :
     HostResultFunded before.host (finishMeteredCall extra name before args result) := by
   cases result with
   | Trap st message => trivial
-  | Throw st tag values => trivial
   | Return values st =>
     change DepositEffect before.host st.host _ at hraw
     have hr : st.host.liquidFunds = before.host.liquidFunds + (promiseDeposit? name before args).getD 0 := by
@@ -109,7 +108,7 @@ theorem finishMeteredCall_funding (extra : Nat) (name : String) (before : Store 
 
 /-- The real metered wrapper preserves funded promise obligations on every
 successful host return, not just the standalone deposit arithmetic helper. -/
-theorem metered_funding (extra : Nat) (name : String) (fn : HostFn NearState)
+theorem metered_funding (extra : Nat) (name : String) (fn : NearHostFn NearState)
     (hfn : HostCreatesDeposits name fn) : HostPreservesFunding (metered extra name fn) := by
   intro st args
   unfold metered
@@ -119,7 +118,7 @@ theorem metered_funding (extra : Nat) (name : String) (fn : HostFn NearState)
   · split
     · trivial
     · let ns := (applyCharges st.host (chargesBefore name st args)).1
-      let st1 : Store NearState := { st with host := { ns with context := { ns.context with usedGas := UInt64.ofNat ns.gas.used } } }
+      let st1 : HostStore NearState := { st with host := { ns with context := { ns.context with usedGas := UInt64.ofNat ns.gas.used } } }
       have hp : fundingState st1.host = fundingState st.host := applyCharges_fundingState _ _
       cases he : (applyCharges st.host (chargesBefore name st args)).2 with
       | some error => trivial
@@ -137,7 +136,6 @@ theorem metered_funding (extra : Nat) (name : String) (fn : HostFn NearState)
               have hfinal := finishMeteredCall_funding extra name st2 args _ (hfn st2 args)
               cases hf : finishMeteredCall extra name st2 args (fn.invoke st2 args) with
               | Trap paid message => trivial
-              | Throw paid tag values => trivial
               | Return values paid =>
                 rw [hf] at hfinal
                 change paid.host.liquidFunds + st2.host.subsidizedAmount = st2.host.liquidFunds + paid.host.subsidizedAmount at hfinal

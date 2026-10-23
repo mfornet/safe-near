@@ -1,4 +1,4 @@
-import Interpreter.Wasm.SmallStep
+import NearVM.Interp
 import NearVM.Metered
 import NearVM.Context
 import NearVM.PromiseGraph
@@ -7,9 +7,9 @@ import NearVM.PromiseGraph
 # `run`: one function call
 
 The `near_vm_runner::run` seam. Resolves the module's imports against the
-metered host, finds the method, charges contract loading, runs the
-interpreter one step at a time charging `regular_op_cost` per Wasm
-instruction, and packs the result as a `VMOutcome`.
+metered host, validates and instantiates the module, finds the method,
+charges contract loading, runs the machine one step at a time charging
+`regular_op_cost` per Wasm instruction, and packs the result as a `VMOutcome`.
 
 Instruction charging implements the supported instrumentation rules. Exact
 reference fixtures compare gas profiles, but do not establish metering
@@ -22,132 +22,133 @@ namespace Wasm.Near
 this constant is not a proved bound for every protocol-valid execution. -/
 def defaultFuel : Nat := 2_000_000_000
 
-/-- Map an interpreter trap to nearcore's error. -/
-def trapError (reason : SmallStep.TrapReason) (host : NearState) : FunctionCallError :=
+/-- A running configuration, or a finished execution with its final store. -/
+abbrev Machine := StepResult NearState
+
+/-- nearcore's stack limiter is not modelled; recursion deeper than this
+traps with `stackOverflow`. -/
+def execLimits : ExecLimits := { maxCallDepth := 10000 }
+
+/-- Map a runtime trap to nearcore's error. -/
+def trapError (reason : Trap) (host : NearState) : FunctionCallError :=
   if let some issue := host.lastExecutionIssue then .executionIssue issue else
   match host.lastError with
   | some e => .hostError e
   | none =>
     match reason with
     | .unreachable => .wasmTrap .unreachable
-    | .integerDivideByZero | .integerOverflow | .invalidConversionToInteger => .wasmTrap .illegalArithmetic
-    | .outOfBoundsMemory => .wasmTrap .memoryOutOfBounds
-    | .outOfBoundsTable | .undefinedElement | .uninitializedElement _ => .wasmTrap .callIndirectOOB
+    | .integerDivideByZero | .integerOverflow | .invalidConversionToInteger =>
+      .wasmTrap .illegalArithmetic
+    | .outOfBoundsMemoryAccess => .wasmTrap .memoryOutOfBounds
+    | .outOfBoundsTableAccess | .undefinedElement => .wasmTrap .callIndirectOOB
+    | .uninitializedElement => .wasmTrap .indirectCallToNull
     | .indirectCallTypeMismatch => .wasmTrap .incorrectCallIndirectSignature
-    | .nullFunctionReference => .wasmTrap .indirectCallToNull
+    | .callStackExhausted => .wasmTrap .stackOverflow
     | .host msg => .hostError (.guestPanic msg)
-    | _ => .wasmTrap .genericTrap
 
 /-- nearcore's function activation estimate: 64 fixed bytes plus the parameter
 and local value sizes, charged in rounded-up eight-byte units. -/
-def activationGas (opCost : Nat) (locals : Locals) : Nat :=
+def activationGas (opCost : Nat) (locals : Array Value) : Nat :=
   let size : Value → Nat
     | .i32 _ | .f32 _ => 4
-    | .v128 _ => 16
     | _ => 8
-  ((64 + ((locals.params ++ locals.locals).map size).sum + 7) / 8) * opCost
+  ((64 + (locals.toList.map size).sum + 7) / 8) * opCost
 
-def linearInstruction : Instruction → Bool
-  | .memoryGrow | .memoryFill | .memoryCopy | .memoryInit _
-  | .tableGrow _ | .tableFill _ | .tableCopy .. | .tableInit .. => true
+def linearInstruction : Instr → Bool
+  | .memory_grow | .memory_fill | .memory_copy | .memory_init _
+  | .table_grow _ | .table_fill _ | .table_copy .. | .table_init .. => true
   | _ => false
 
 /-- The stepper resumes a loop's body directly on a back-edge. nearcore's
 instrumentation charges the `loop` operator again on every such iteration
 (`finite-wasm::gas::visit_loop`), so that implicit re-entry needs a charge. -/
-def loopBackedge (thread : SmallStep.ThreadState NearState) (instr : Instruction) : Bool :=
-  let targetsLoop (depth : Nat) := match thread.control[depth]? with
-    | some frame => match frame.kind with | .loop => true | _ => false
-    | none => false
+def loopBackedge (c : Config NearState) (instr : Instr) : Bool :=
   match instr with
-  | .br depth => targetsLoop depth
+  | .br depth => c.labelIsLoop depth
   | .br_if depth =>
-    match thread.locals.values.head? with
-    | some (.i32 n) => n != 0 && targetsLoop depth
+    match c.stackTop? with
+    | some (.i32 n) => n != 0 && c.labelIsLoop depth
     | _ => false
-  | .brTable targets fallback =>
-    match thread.locals.values.head? with
-    | some (.i32 index) => targetsLoop (targets[index.toNat]?.getD fallback)
+  | .br_table targets fallback =>
+    match c.stackTop? with
+    | some (.i32 index) => c.labelIsLoop (targets[index.toNat]?.getD fallback)
     | _ => false
   | _ => false
 
 /-- Operator costs are paid before executing the instruction, so `used_gas`
 and observable host side effects see the charge. Fall-through has no opcode. -/
-def nextInstructionGas (cfg : WasmConfig) (config : SmallStep.Config NearState) : Nat :=
-  match config.expr with
-  | .running thread =>
-    match thread.code.head? with
-      | none | some (.block ..) => 0
-      | some instr =>
-        if linearInstruction instr then
-          let amount := match thread.locals.values.head? with
-            | some (.i32 n) => n.toNat
-            | _ => 0
-          cfg.linearOpBaseCost + cfg.linearOpUnitCost * amount
-        else cfg.regularOpCost + (if loopBackedge thread instr then cfg.regularOpCost else 0)
+def nextInstructionGas (cfg : WasmConfig) (c : Config NearState) : Nat :=
+  match c.nextInstr? with
+  | none | some (.block ..) => 0
+  | some instr =>
+    if linearInstruction instr then
+      let amount := match c.stackTop? with
+        | some (.i32 n) => n.toNat
+        | _ => 0
+      cfg.linearOpBaseCost + cfg.linearOpUnitCost * amount
+    else cfg.regularOpCost + (if loopBackedge c instr then cfg.regularOpCost else 0)
+
+/-- Entering a new frame costs its activation. -/
+def frameTransitionGas (cfg : WasmConfig) (before : Config NearState) (after : Machine) : Nat :=
+  match after with
+  | .next next =>
+    if next.callDepth > before.callDepth then activationGas cfg.regularOpCost next.locals else 0
   | _ => 0
 
-def frameTransitionGas (cfg : WasmConfig) (before after : SmallStep.Config NearState) : Nat :=
-  match before.expr, after.expr with
-  | .running thread, .running next =>
-    if next.calls.length > thread.calls.length then activationGas cfg.regularOpCost next.locals else 0
-  | _, _ => 0
+/-- Burn Wasm gas on the host state. -/
+def chargeHost (host : NearState) (cost : Nat) : NearState × Option HostError :=
+  let r := host.gas.burn cost
+  ({ host with gas := r.1, gasProfile := { host.gasProfile with
+    wasm := host.gasProfile.wasm + (r.1.burnt - host.gas.burnt) } }, r.2)
 
-def chargeWasm (config : SmallStep.Config NearState) (cost : Nat) :
-    SmallStep.Config NearState × Option HostError :=
-  let host := config.store.wasm.host
-  let (gas, error) := host.gas.burn cost
-  let host := { host with gas, gasProfile := { host.gasProfile with
-    wasm := host.gasProfile.wasm + (gas.burnt - host.gas.burnt) } }
-  ({ config with store := { config.store with wasm := { config.store.wasm with host } } }, error)
+def chargeConfig (c : Config NearState) (cost : Nat) : Config NearState × Option HostError :=
+  let r := chargeHost c.store.host cost
+  ({ c with store := { c.store with host := r.1 } }, r.2)
+
+def chargeWasm (m : Machine) (cost : Nat) : Machine × Option HostError :=
+  match m with
+  | .next c =>
+    let r := chargeConfig c cost
+    (.next r.1, r.2)
+  | .done values store =>
+    let r := chargeHost store.host cost
+    (.done values { store with host := r.1 }, r.2)
+  | .trap reason store =>
+    let r := chargeHost store.host cost
+    (.trap reason { store with host := r.1 }, r.2)
 
 /-- Run the stepper, charging instruction and frame costs, until the call ends
-or gas runs out. Returns the final configuration and, on gas exhaustion, the
-error. -/
-def runMetered (cfg : WasmConfig) : Nat → SmallStep.Config NearState →
-    SmallStep.Config NearState × Option FunctionCallError
-  | 0, config =>
-    match config.expr with
-    | .done _ | .trapped _ => (config, none)
-    | .running _ => (config, some (.executionIssue .fuelExhausted))
-  | fuel + 1, config =>
-    match config.expr with
-    | .done _ => (config, none)
-    | .trapped _ => (config, none)
-    | .running _ =>
-      let (paid, error) := chargeWasm config (nextInstructionGas cfg config)
-      match error with
-      | some error => (paid, some (.hostError error))
-      | none =>
-        match SmallStep.stepChecked? paid with
-        | .error e => (paid, some (.internal e.message))
-        | .ok none => (paid, some (.internal "stepper stopped in a running configuration"))
-        | .ok (some (_, next)) =>
-          let (next, error) := chargeWasm next (frameTransitionGas cfg paid next)
-          match error with
-          | some error => (next, some (.hostError error))
-          | none => runMetered cfg fuel next
+or gas runs out. Returns the final machine state and, on gas exhaustion, the
+error. Written with projections rather than pattern bindings so that proofs
+can split on the two charge outcomes directly. -/
+def runMetered (cfg : WasmConfig) : Nat → Machine → Machine × Option FunctionCallError
+  | 0, .next c => (.next c, some (.executionIssue .fuelExhausted))
+  | 0, m => (m, none)
+  | fuel + 1, .next c =>
+    let charged := chargeConfig c (nextInstructionGas cfg c)
+    match charged.2 with
+    | some error => (.next charged.1, some (.hostError error))
+    | none =>
+      let next := Exec.step charged.1
+      let charged' := chargeWasm next (frameTransitionGas cfg charged.1 next)
+      match charged'.2 with
+      | some error => (charged'.1, some (.hostError error))
+      | none => runMetered cfg fuel charged'.1
+  | _ + 1, m => (m, none)
 
 /-- Fuel exhaustion is an interpreter limit, not protocol gas exhaustion. -/
-@[simp] theorem runMetered_zero (cfg : WasmConfig) (config : SmallStep.Config NearState)
-    (h : ∃ thread, config.expr = .running thread) :
-    runMetered cfg 0 config = (config, some (.executionIssue .fuelExhausted)) := by
-  obtain ⟨thread, h⟩ := h
-  simp [runMetered, h]
+@[simp] theorem runMetered_zero (cfg : WasmConfig) (c : Config NearState) :
+    runMetered cfg 0 (.next c) = (.next c, some (.executionIssue .fuelExhausted)) := rfl
 
 /-- A completed execution needs no further interpreter steps. -/
-theorem runMetered_done (cfg : WasmConfig) (fuel : Nat) (config : SmallStep.Config NearState)
-    (h : ∃ values, config.expr = .done values) :
-    runMetered cfg fuel config = (config, none) := by
-  obtain ⟨values, h⟩ := h
-  cases fuel <;> simp [runMetered, h]
+theorem runMetered_done (cfg : WasmConfig) (fuel : Nat) (values : List Value)
+    (store : Store NearState) : runMetered cfg fuel (.done values store) = (.done values store, none) := by
+  cases fuel <;> rfl
 
 /-- The stepper preserves a terminal trap for the caller to classify. -/
-theorem runMetered_trapped (cfg : WasmConfig) (fuel : Nat) (config : SmallStep.Config NearState)
-    (h : ∃ reason, config.expr = .trapped reason) :
-    runMetered cfg fuel config = (config, none) := by
-  obtain ⟨reason, h⟩ := h
-  cases fuel <;> simp [runMetered, h]
+theorem runMetered_trapped (cfg : WasmConfig) (fuel : Nat) (reason : Trap)
+    (store : Store NearState) : runMetered cfg fuel (.trap reason store) = (.trap reason store, none) := by
+  cases fuel <;> rfl
 
 def finalStorage (ns : NearState) : List (List UInt8 × List UInt8) :=
   ns.storageKeys.filterMap fun k => (ns.storage k).map fun v => (k, v)
@@ -162,41 +163,45 @@ def VMOutcome.failedBefore (ctx : VMContext) (storage : List (List UInt8 × List
     burntGas := burnt, usedGas := burnt, logs := [], storage := storage, receipts := [],
     aborted := some e, gasProfile := profile, storageAccounting := ctx.storageAccounting }
 
+/-- The activation charge of the entry frame. -/
+def entryCost (cfg : WasmConfig) : Machine → Nat
+  | .next c => activationGas cfg.regularOpCost c.locals
+  | _ => 0
+
 /-- Charge function entry and execute the metered loop, retaining an entry
 charge failure as a structured protocol error. -/
-def runInitialized (cfg : WasmConfig) (fuel : Nat) (config : SmallStep.Config NearState) :
-    SmallStep.Config NearState × Option FunctionCallError :=
-  let entryCost := match config.expr with
-    | .running thread => activationGas cfg.regularOpCost thread.locals
-    | _ => 0
-  let (paid, error) := chargeWasm config entryCost
-  match error with
-  | some error => (paid, some (.hostError error))
-  | none => runMetered cfg fuel paid
+def runInitialized (cfg : WasmConfig) (fuel : Nat) (m : Machine) :
+    Machine × Option FunctionCallError :=
+  let charged := chargeWasm m (entryCost cfg m)
+  match charged.2 with
+  | some error => (charged.1, some (.hostError error))
+  | none => runMetered cfg fuel charged.1
 
 /-- Build the VM result from a terminal or stopped execution. Failed calls
 retain burnt gas and logs while restoring their input financial/storage state. -/
 def outcomeOfExecution (ctx : VMContext) (storage : List (List UInt8 × List UInt8))
-    (final : SmallStep.Config NearState) (err : Option FunctionCallError) : VMOutcome :=
-  let ns := final.store.wasm.host
+    (final : Machine) (err : Option FunctionCallError) : VMOutcome :=
+  let ns := final.host
   let aborted : Option FunctionCallError :=
     match err with
     | some e => some e
     | none =>
-      match final.expr with
-      | .trapped reason => some (trapError reason ns)
+      match final with
+      | .trap reason _ => some (trapError reason ns)
       | _ => none
   match aborted with
   | some e =>
     { balance := ctx.accountBalance, storageUsage := ctx.storageUsage, returnData := .none,
       burntGas := ns.gas.burnt, usedGas := ns.gas.burnt, logs := logsOf ns, storage := storage,
-      receipts := [], aborted := some e, gasProfile := ns.gasProfile, subsidizedAmount := ns.subsidizedAmount, storageAccounting := ns.storageAccounting }
+      receipts := [], aborted := some e, gasProfile := ns.gasProfile,
+      subsidizedAmount := ns.subsidizedAmount, storageAccounting := ns.storageAccounting }
   | none =>
     let outcome : VMOutcome := {
       balance := ns.context.accountBalance, storageUsage := ns.context.storageUsage.toNat
       returnData := .none, burntGas := ns.gas.burnt, usedGas := ns.gas.used
       logs := logsOf ns, storage := finalStorage ns, receipts := [], aborted := none
-      gasProfile := ns.gasProfile, subsidizedAmount := ns.subsidizedAmount, storageAccounting := ns.storageAccounting }
+      gasProfile := ns.gasProfile, subsidizedAmount := ns.subsidizedAmount,
+      storageAccounting := ns.storageAccounting }
     match convertPromises ns.promises with
     | none => outcome.graphIssue ctx.accountBalance ctx.storageUsage storage
     | some graph =>
@@ -204,6 +209,16 @@ def outcomeOfExecution (ctx : VMContext) (storage : List (List UInt8 × List UIn
       match returned with
       | none => outcome.graphIssue ctx.accountBalance ctx.storageUsage storage
       | some returnData => { outcome with returnData, receipts := graph.receipts }
+
+/-- nearcore replaces the contract's memory declaration during preparation. -/
+def prepareMemory (cfg : RuntimeConfig) (code : Module) : Module :=
+  { code with mems := code.mems.map fun _ => { type := { limits := {
+      min := cfg.wasm.limits.initialMemoryPages,
+      max := some cfg.wasm.limits.maxMemoryPages } } } }
+
+/-- The charges for loading a contract of `codeSize` bytes. -/
+def loadingCharges (codeSize : Nat) : List Charge :=
+  [.ext "contract_loading_bytes" codeSize, .ext "contract_loading_base"]
 
 /-- Execute `method` of `code` under `ctx` on `storage`. `codeSize` is the
 byte size of the deployed Wasm (the loading cost depends on it). -/
@@ -215,24 +230,39 @@ def runAttempt (cfg : RuntimeConfig) (code : Module) (codeSize : Nat) (method : 
   else
   let host0 := ctx.toNearState cfg storage
   -- contract loading
-  let (host1, loadErr) := applyCharges host0 [
-    .ext "contract_loading_bytes" codeSize, .ext "contract_loading_base"]
+  let (host1, loadErr) := applyCharges host0 (loadingCharges codeSize)
   let gas1 := host1.gas
   match loadErr with
   | some e => VMOutcome.failedBefore ctx storage gas1.burnt (.hostError e) host1.gasProfile
   | none =>
+  let code := prepareMemory cfg code
+  match code.validate (Features.nearcore true) with
+  | .error e =>
+    VMOutcome.failedBefore ctx storage gas1.burnt (.compilationError e.message) host1.gasProfile
+  | .ok valid =>
+  -- nearcore runs a start function as a metered export before the method;
+  -- no contract in the dataset has one, and the model does not support it.
+  if code.start.isSome then
+    VMOutcome.failedBefore ctx storage gas1.burnt
+      (.executionIssue (.interpreterError "start function")) host1.gasProfile
+  else
   -- Legacy protocols discard the loading charge on method-resolution failure,
   -- but loading exhaustion still takes precedence over an absent export.
   let methodErrorGas := if cfg.wasm.fixContractLoadingCost then gas1.burnt else 0
   let methodProfile := if cfg.wasm.fixContractLoadingCost then host1.gasProfile else {}
-  match code.findExport method with
-  | none => VMOutcome.failedBefore ctx storage methodErrorGas (.methodResolveError .methodNotFound) methodProfile
+  match code.exportFunc? method with
+  | none =>
+    VMOutcome.failedBefore ctx storage methodErrorGas (.methodResolveError .methodNotFound)
+      methodProfile
   | some entry =>
-  match code.funcSig? entry with
-  | none => VMOutcome.failedBefore ctx storage methodErrorGas (.methodResolveError .methodNotFound) methodProfile
+  match code.funcType? entry with
+  | none =>
+    VMOutcome.failedBefore ctx storage methodErrorGas (.methodResolveError .methodNotFound)
+      methodProfile
   | some sig =>
   if !(sig.params.isEmpty && sig.results.isEmpty) then
-    VMOutcome.failedBefore ctx storage methodErrorGas (.methodResolveError .methodInvalidSignature) methodProfile
+    VMOutcome.failedBefore ctx storage methodErrorGas (.methodResolveError .methodInvalidSignature)
+      methodProfile
   else
   match resolveMetered cfg code with
   | .error imp =>
@@ -241,15 +271,18 @@ def runAttempt (cfg : RuntimeConfig) (code : Module) (codeSize : Nat) (method : 
     VMOutcome.failedBefore ctx storage gas1.burnt
       (.executionIssue (.unsupportedHost imp)) host1.gasProfile
   | .ok env =>
-  -- nearcore replaces the contract's memory declaration during preparation.
-  let code := { code with memory := code.memory.map fun decl => { decl with
-    pagesMin := UInt32.ofNat cfg.wasm.limits.initialMemoryPages
-    pagesMax := some (UInt32.ofNat cfg.wasm.limits.maxMemoryPages) } }
-  let store : Store NearState := { (code.initialStore : Store NearState) with host := host1 }
-  match SmallStep.initConfig { module := code, host := env } entry store [] with
-  | .error e => VMOutcome.failedBefore ctx storage gas1.burnt (.internal e.message) host1.gasProfile
-  | .ok config =>
-  let (final, err) := runInitialized cfg.wasm fuel config
+  let (store, imports) := env.allocate (Store.empty host1)
+  match Link.instantiateModule store valid imports with
+  | .error e => VMOutcome.failedBefore ctx storage gas1.burnt (.linkError e.message) host1.gasProfile
+  | .ok (store, inst) =>
+  -- A method is a Wasm function; exporting an import under a method name is a
+  -- model gap, not a protocol error.
+  match Exec.startWasm store execLimits inst.funcAddrs[entry]! [] with
+  | none =>
+    VMOutcome.failedBefore ctx storage gas1.burnt
+      (.executionIssue (.interpreterError "method is an imported function")) host1.gasProfile
+  | some c =>
+  let (final, err) := runInitialized cfg.wasm fuel (.next c)
   outcomeOfExecution ctx storage final err
 
 /-- The public VM boundary validates converted receipts on every exit. Raw
@@ -290,5 +323,72 @@ theorem run_returnedReceipt_lt (cfg : RuntimeConfig) (code : Module) (codeSize :
     index < (run cfg code codeSize method ctx storage fuel).receipts.length :=
   (run cfg code codeSize method ctx storage fuel).returnedReceipt_lt
     (run_receipts_valid cfg code codeSize method ctx storage fuel) hreturn
+
+/-! ## How an attempt's outcome arises
+
+Every consumer of `runAttempt` needs the same case analysis: either the call
+failed before running, burning at most the loading charge, or the machine ran
+from a Wasm entry of the instantiated module. -/
+
+theorem runAttempt_cases (cfg : RuntimeConfig) (code : Module) (codeSize : Nat) (method : String)
+    (ctx : VMContext) (storage : List (List UInt8 × List UInt8)) (fuel : Nat) :
+    (∃ host1 loadErr burnt e profile,
+      applyCharges (ctx.toNearState cfg storage) (loadingCharges codeSize) = (host1, loadErr) ∧
+      burnt ≤ host1.gas.burnt ∧
+      runAttempt cfg code codeSize method ctx storage fuel =
+        VMOutcome.failedBefore ctx storage burnt e profile) ∨
+    (∃ (host1 : NearState) (env : HostEnv NearState) (store : Store NearState)
+      (imports : List ExternVal) (valid : ValidModule) (store' : Store NearState)
+      (inst : ModuleInst) (entry : Nat) (c : Config NearState),
+      applyCharges (ctx.toNearState cfg storage) (loadingCharges codeSize) = (host1, none) ∧
+      resolveMetered cfg (prepareMemory cfg code) = .ok env ∧
+      env.allocate (Store.empty host1) = (store, imports) ∧
+      Link.instantiateModule store valid imports = .ok (store', inst) ∧
+      Exec.startWasm store' execLimits inst.funcAddrs[entry]! [] = some c ∧
+      runAttempt cfg code codeSize method ctx storage fuel =
+        outcomeOfExecution ctx storage (runInitialized cfg.wasm fuel (.next c)).1
+          (runInitialized cfg.wasm fuel (.next c)).2) := by
+  unfold runAttempt
+  dsimp only
+  split
+  · left
+    exact ⟨_, _, 0, _, _, rfl, Nat.zero_le _, rfl⟩
+  · cases hload : applyCharges (ctx.toNearState cfg storage) (loadingCharges codeSize) with
+    | mk host1 loadErr =>
+      dsimp only
+      cases loadErr with
+      | some e => left; exact ⟨host1, some e, _, _, _, rfl, Nat.le_refl _, rfl⟩
+      | none =>
+        dsimp only
+        have hle : (if cfg.wasm.fixContractLoadingCost then host1.gas.burnt else 0) ≤
+            host1.gas.burnt := by
+          split
+          · exact Nat.le_refl _
+          · exact Nat.zero_le _
+        split
+        · left; exact ⟨host1, none, _, _, _, rfl, Nat.le_refl _, rfl⟩
+        · split
+          · left; exact ⟨host1, none, _, _, _, rfl, Nat.le_refl _, rfl⟩
+          · split
+            · left; exact ⟨host1, none, _, _, _, rfl, hle, rfl⟩
+            · split
+              · left; exact ⟨host1, none, _, _, _, rfl, hle, rfl⟩
+              · split
+                · left; exact ⟨host1, none, _, _, _, rfl, hle, rfl⟩
+                · split
+                  · left; exact ⟨host1, none, _, _, _, rfl, Nat.le_refl _, rfl⟩
+                  · rename_i env hresolve
+                    cases halloc : env.allocate (Store.empty host1) with
+                    | mk store imports =>
+                      dsimp only
+                      split
+                      · left; exact ⟨host1, none, _, _, _, rfl, Nat.le_refl _, rfl⟩
+                      · rename_i result store' inst hinst
+                        split
+                        · left; exact ⟨host1, none, _, _, _, rfl, Nat.le_refl _, rfl⟩
+                        · rename_i c hstart
+                          right
+                          exact ⟨host1, env, store, imports, _, store', inst, _, c, rfl, hresolve,
+                            halloc, hinst, hstart, rfl⟩
 
 end Wasm.Near

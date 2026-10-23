@@ -13,7 +13,7 @@ def run(path, fix=False):
     return subprocess.run(
         ["lake", "env", "lean", "--run", str(driver),
          *(["--fix"] if fix else []), str(path)],
-        cwd=root / "near-lean/wasm", text=True, capture_output=True,
+        cwd=root / "near-lean/vm", text=True, capture_output=True,
     )
 
 

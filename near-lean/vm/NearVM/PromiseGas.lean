@@ -38,7 +38,7 @@ def GasBacked (fees : ActionFees) (ethEnabled : Bool) (ns : NearState) : Prop :=
 
 /-- Extending a receipt adds its action obligation without duplicating the
 receipt base fee; callback dependency handles do not change its gas backing. -/
-theorem appendPromiseAction_gas (fees : ActionFees) (ethEnabled : Bool) (st : Store NearState)
+theorem appendPromiseAction_gas (fees : ActionFees) (ethEnabled : Bool) (st : HostStore NearState)
     (result : List NearPromise) (index : Nat) (action : PromiseAction)
     (h : appendPromiseAction? st.host.promises index action = some result) :
     promisesGas fees ethEnabled result = promisesGas fees ethEnabled st.host.promises +
@@ -67,7 +67,7 @@ theorem appendPromiseAction_gas (fees : ActionFees) (ethEnabled : Bool) (st : St
     | and dependencies => simp [hg] at h
     | yielded => simp [hg] at h
 
-theorem appendPromise_gas (fees : ActionFees) (ethEnabled : Bool) (st : Store NearState) (promise : NearPromise) :
+theorem appendPromise_gas (fees : ActionFees) (ethEnabled : Bool) (st : HostStore NearState) (promise : NearPromise) :
     promisesGas fees ethEnabled (appendPromise st promise).host.promises =
       promisesGas fees ethEnabled st.host.promises + promiseValue (receiptGasValue fees ethEnabled) promise := by
   simp [appendPromise, promisesGas, promisesValue]
@@ -81,10 +81,10 @@ theorem convertPromises_gas (fees : ActionFees) (ethEnabled : Bool) (promises : 
 /-- Packing a successful executable result exposes its exact onward gas budget.
 Establishing GasBacked from concrete host execution remains a separate obligation. -/
 theorem outcomeOfExecution_success_gas_backing (fees : ActionFees) (ethEnabled : Bool)
-    (ctx : VMContext) (storage : List (Bytes × Bytes)) (final : SmallStep.Config NearState)
+    (ctx : VMContext) (storage : List (Bytes × Bytes)) (final : Machine)
     (error : Option FunctionCallError)
     (hsuccess : (outcomeOfExecution ctx storage final error).aborted = none)
-    (hbacked : GasBacked fees ethEnabled final.store.wasm.host) :
+    (hbacked : GasBacked fees ethEnabled final.host) :
     (outcomeOfExecution ctx storage final error).usedGas =
       (outcomeOfExecution ctx storage final error).burntGas +
         receiptsGas fees ethEnabled (outcomeOfExecution ctx storage final error).receipts := by
@@ -92,13 +92,13 @@ theorem outcomeOfExecution_success_gas_backing (fees : ActionFees) (ethEnabled :
   dsimp only at hsuccess ⊢
   split at hsuccess
   · contradiction
-  · cases hc : convertPromises final.store.wasm.host.promises with
+  · cases hc : convertPromises final.host.promises with
     | none => simp [hc, VMOutcome.graphIssue] at hsuccess
     | some graph =>
       simp only [hc] at hsuccess ⊢
       split at hsuccess
       · simp [VMOutcome.graphIssue] at hsuccess
       · rw [convertPromises_gas fees ethEnabled _ graph hc]
-        exact congrArg (final.store.wasm.host.gas.burnt + ·) hbacked
+        exact congrArg (final.host.gas.burnt + ·) hbacked
 
 end Wasm.Near

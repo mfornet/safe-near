@@ -5,7 +5,7 @@ namespace Wasm.Near
 /-- Legacy instruction metering reserves no additional promise gas on success.
 Gas exhaustion traps and discards the speculative counter instead. -/
 theorem gasFn_reservationInvariant (fees : ActionFees) (ethEnabled : Bool) :
-    HostFn.PreservesLive (ReservationInvariant fees ethEnabled) gasFn := by
+    NearHostFn.PreservesLive (ReservationInvariant fees ethEnabled) gasFn := by
   intro st args h
   unfold gasFn
   dsimp only
@@ -29,11 +29,12 @@ theorem gasFn_reservationInvariant (fees : ActionFees) (ethEnabled : Bool) :
   · trivial
 
 set_option maxHeartbeats 2000000 in
+set_option maxRecDepth 16384 in
 /-- Every published metered host preserves exact raw receipt gas backing on
 live returns. Terminal model/contract/gas errors carry no speculative guarantee. -/
 theorem meteredHostFns_reservationInvariant (fees : ActionFees) (ethEnabled : Bool)
-    (cfg : RuntimeConfig) (entry : ImportDecl × HostFn NearState)
-    (h : entry ∈ meteredHostFns cfg) : HostFn.PreservesLive (ReservationInvariant fees ethEnabled) entry.2 := by
+    (cfg : RuntimeConfig) (entry : ImportDecl × NearHostFn NearState)
+    (h : entry ∈ meteredHostFns cfg) : NearHostFn.PreservesLive (ReservationInvariant fees ethEnabled) entry.2 := by
   simp only [meteredHostFns, List.mem_append, List.mem_map, List.mem_singleton] at h
   rcases h with ⟨⟨decl, fn⟩, hin, heq⟩ | heq
   · subst entry

@@ -4,16 +4,16 @@ namespace Wasm.Near
 
 /-- Raw local-observation hosts preserve all fields used by gas backing.
 Terminal traps may discard speculative state; catchable throws may not. -/
-def HostPreservesReservationView (fn : HostFn NearState) : Prop :=
+def HostPreservesReservationView (fn : NearHostFn NearState) : Prop :=
   ∀ st args, HostResult.LiveSatisfies (fun ns => reservationView ns = reservationView st.host) (fn.invoke st args)
 
-theorem checkedSetRegister_reservationView {st after : Store NearState} {register : UInt64} {bytes : List UInt8}
+theorem checkedSetRegister_reservationView {st after : HostStore NearState} {register : UInt64} {bytes : List UInt8}
     (h : checkedSetRegister? st register bytes = some after) : reservationView after.host = reservationView st.host := by
   unfold checkedSetRegister? at h
   split_ifs at h <;> simp only [Option.some.injEq] at h
   all_goals subst after; rfl
 
-theorem writeRegisterResult_reservationView (name : String) (st : Store NearState) (register : UInt64)
+theorem writeRegisterResult_reservationView (name : String) (st : HostStore NearState) (register : UInt64)
     (bytes : List UInt8) (values : List Value) :
     HostResult.LiveSatisfies (fun ns => reservationView ns = reservationView st.host)
       (writeRegisterResult name st register bytes values) := by
@@ -384,7 +384,7 @@ theorem abortMetered_reservationView : HostPreservesReservationView abortMetered
 def reservationNeutralNames : List String :=
   ["input", "read_register", "register_len", "write_register", "value_return", "storage_write", "storage_read", "storage_remove", "storage_has_key", "current_account_id", "predecessor_account_id", "signer_account_id", "attached_deposit", "log_utf8", "signer_account_pk", "block_index", "block_height", "block_timestamp", "epoch_height", "storage_usage", "account_balance", "account_locked_balance", "prepaid_gas", "used_gas", "log_utf16", "random_seed", "promise_results_count", "promise_result", "promise_return", "panic", "panic_utf8", "abort"]
 
-@[simp] theorem storageValueCharges_reservation (st : Store NearState) (cost : String)
+@[simp] theorem storageValueCharges_reservation (st : HostStore NearState) (cost : String)
     (key : List UInt8) (fees : ActionFees) :
     ((storageValueCharges st cost key).map (fun charge => charge.reservation fees)).sum = 0 := by
   unfold storageValueCharges
@@ -393,7 +393,7 @@ def reservationNeutralNames : List String :=
   · rfl
 
 /-- Storage plans contain only local ext-cost burns, including old-value reads. -/
-theorem storageMutationPlan_reservation (name : String) (st : Store NearState) (args : List Value)
+theorem storageMutationPlan_reservation (name : String) (st : HostStore NearState) (args : List Value)
     (plan : StorageMutationPlan) (fees : ActionFees) (h : storageMutationPlan? name st args = some plan) :
     ((plan.charges.map (fun charge => charge.reservation fees)).sum) = 0 := by
   have hext (cost : String) (count : Nat) : (Charge.ext cost count).reservation fees = 0 := rfl
@@ -408,7 +408,7 @@ theorem storageMutationPlan_reservation (name : String) (st : Store NearState) (
   all_goals simp only [List.map_append, List.sum_append, List.map_cons, List.map_nil, List.sum_cons,
     List.sum_nil, readSpan_reservation, storageValueCharges_reservation, hext, Nat.add_zero]
 
-theorem chargesBefore_storage_reservation (name : String) (st : Store NearState) (args : List Value)
+theorem chargesBefore_storage_reservation (name : String) (st : HostStore NearState) (args : List Value)
     (hname : name = "storage_write" ∨ name = "storage_remove") :
     ((chargesBefore name st args).map (fun charge => charge.reservation st.host.fees)).sum = 0 := by
   unfold chargesBefore
@@ -418,7 +418,7 @@ theorem chargesBefore_storage_reservation (name : String) (st : Store NearState)
   · rcases hname with h | h <;> subst name <;>
       simp [chargesBeforeUnvalidated, creationAccountArgs, Charge.reservation]
 
-theorem chargesBefore_neutral_reservation (name : String) (st : Store NearState) (args : List Value)
+theorem chargesBefore_neutral_reservation (name : String) (st : HostStore NearState) (args : List Value)
     (hname : name ∈ reservationNeutralNames) :
     ((chargesBefore name st args).map (fun charge => charge.reservation st.host.fees)).sum = 0 := by
   simp only [reservationNeutralNames, List.mem_cons, List.not_mem_nil, or_false] at hname
@@ -435,9 +435,9 @@ theorem chargesBefore_neutral_reservation (name : String) (st : Store NearState)
 
 /-- Local precharges and raw local hosts compose with the post-call theorem. -/
 theorem meteredNeutral_reservationInvariant (fees : ActionFees) (ethEnabled : Bool) (extra : Nat)
-    (name : String) (fn : HostFn NearState) (hname : name ∈ reservationNeutralNames)
+    (name : String) (fn : NearHostFn NearState) (hname : name ∈ reservationNeutralNames)
     (hfn : HostPreservesReservationView fn) :
-    HostFn.PreservesLive (ReservationInvariant fees ethEnabled) (metered extra name fn) := by
+    NearHostFn.PreservesLive (ReservationInvariant fees ethEnabled) (metered extra name fn) := by
   apply metered_reservationInvariant
   intro st args h hs _ hext
   have hv := applyCharges_success_zero_reservation st.host (chargesBefore name st args) hs
