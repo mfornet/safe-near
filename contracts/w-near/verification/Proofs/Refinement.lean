@@ -1,5 +1,6 @@
 import Spec.Contract
 import Spec.Exports
+import Proofs.Availability
 import NearRuntime.BoundaryResolution
 import Lean
 
@@ -111,5 +112,34 @@ theorem refines_wnear (cfg : Config) (code : Wasm.Module) (codeOf : List UInt8 �
       rw [decode_not_exported hmethod] at hc
       cases hc
     exact ⟨hni, fun c hc => absurd hc (hnone c), fun _ => hrb⟩
+
+/-- `withdraw_available_binary` for `contract.wasm` on near-lean: a withdrawal
+attached with at least the model's gas bound succeeds on the deployed binary.
+It depends on `refines_wnear`, which a withdrawal reaches through the open
+`refines_wnear_exported`, so the audit lists it as open too. -/
+theorem withdraw_available_wasm (cfg : Config) (code : Wasm.Module)
+    (codeOf : List UInt8 → Near.ContractCode)
+    (hcfg : cfg.WF) (hcode : Wasm.Binary.decode wNearBytes = .ok code)
+    (hstart : code.start = none) (hexports : funcExportNames code = exportedMethods)
+    {s : State} {ctx : Context} {amount : Nat}
+    (hs : Inv cfg s) (hwf : ctx.WF (encode s))
+    (hparse : Parses ctx.method ctx.args (.nearWithdraw amount))
+    (hreg : AccountId.ofNear ctx.predecessor ∈ s.registered)
+    (hamt : amount ≤ s.balance (AccountId.ofNear ctx.predecessor)) (hdep : ctx.attached = 1)
+    (hbound : amount + 1 < u128Bound) (hbal : amount ≤ ctx.balance)
+    (hrent : stakeDeficit ctx.protocol (usageAfter ctx (some s)
+      { s.setBalance (AccountId.ofNear ctx.predecessor)
+          (s.balance (AccountId.ofNear ctx.predecessor) - amount) with
+        totalSupply := s.totalSupply - amount }) (ctx.balance - amount) ctx.locked = 0)
+    (hgas : gasBound ctx (.nearWithdraw amount) ≤ ctx.gasLimit) :
+    let r := Near.Boundary.nearRuntime.exec
+      { code := { module := code, size := wNearBytes.size, hash := "" }, codeOf } (encode s) ctx
+    r.outcome = .ok (.receiptIndex 0) ∧
+      r.storage =
+        encode { s.setBalance (AccountId.ofNear ctx.predecessor)
+            (s.balance (AccountId.ofNear ctx.predecessor) - amount) with
+          totalSupply := s.totalSupply - amount } :=
+  withdraw_available_binary (refines_wnear cfg code codeOf hcfg hcode hstart hexports)
+    hs hwf hparse hreg hamt hdep hbound hbal hrent hgas
 
 end WNear
