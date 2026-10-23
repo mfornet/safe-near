@@ -1,5 +1,6 @@
 import Spec.Contract
-import NearRuntime.Boundary
+import Spec.Exports
+import NearRuntime.BoundaryResolution
 import Lean
 
 /-!
@@ -10,9 +11,11 @@ gives near-lean's `RuntimeInterface`, a function-call action followed by the
 receipt's storage-stake check. This file pins the deployed binary, so that
 `refines_wnear` below is a closed statement about `contract.wasm`.
 
-The binary is embedded as a hex string, read when this file is elaborated;
-decoding it is a hypothesis rather than evaluated in the kernel, and the
-adapter tests (`just runtime-adapter-test`) check that it succeeds.
+The binary is embedded as a hex string, read when this file is elaborated.
+Decoding it in the kernel exceeds the available memory, so the decoded module
+and two facts about it (no start function; the exported functions) are
+hypotheses, which the adapter tests (`just runtime-adapter-test`) check on the
+binary.
 
 The theorem is the only open proof in the project. `just wnear-audit`
 tolerates `sorryAx` in this module alone.
@@ -44,17 +47,69 @@ def wNearHex : String := file_hex% "../contract.wasm"
 
 def wNearBytes : ByteArray := bytesOfHex wNearHex
 
-/-- **Open.** The deployed wNEAR binary refines the model: for every
-configuration whose measured account entry fits a `u64`, every context and
-every resource state, near-lean's execution of `contract.wasm` is the model's
-as `Refines` states it. `codeOf` decodes code that the call's promises deploy;
-wNEAR deploys none. -/
+theorem exportFunc_none {m : Wasm.Module} {name : String} (h : name ∉ funcExportNames m) :
+    m.exportFunc? name = none := by
+  unfold Wasm.Module.exportFunc?
+  rw [← Array.findSome?_toList, List.findSome?_eq_none_iff]
+  intro e he
+  split
+  · rename_i i hd
+    split
+    · rename_i hn
+      exact absurd (List.mem_filterMap.mpr ⟨e, he, by simp [hd, beq_iff_eq.mp hn]⟩) h
+    · rfl
+  · rfl
+
+/-- Methods the binary does not export are no calls. -/
+theorem decode_not_exported {method : String} (h : method ∉ exportedMethods) (args : List UInt8) :
+    Call.decode method args = none := by
+  simp only [exportedMethods, List.mem_cons, List.not_mem_nil, or_false, not_or] at h
+  unfold Call.decode
+  split <;> simp_all
+
+/-- **Open.** The exported methods: on a call to one of them, near-lean's
+execution of `contract.wasm` is the model's as `Refines` states it. -/
+theorem refines_wnear_exported (cfg : Config) (code : Wasm.Module) (codeOf : List UInt8 → Near.ContractCode)
+    (hcfg : cfg.WF) (hcode : Wasm.Binary.decode wNearBytes = .ok code)
+    (raw : RawStorage) (st : Option State) (ctx : Context) (hrep : (wnear cfg).Represents raw st)
+    (hwf : ctx.WF raw) (hmethod : ctx.method ∈ exportedMethods) :
+    let r := Near.Boundary.nearRuntime.exec
+      { code := { module := code, size := wNearBytes.size, hash := "" }, codeOf } raw ctx
+    (∀ msg, r.outcome ≠ .error (.executionIssue msg)) ∧
+    (∀ c, (wnear cfg).Parses ctx.method ctx.args c →
+      let res := (wnear cfg).step ctx st c
+      ((wnear cfg).gas ctx st c ≤ ctx.gasLimit →
+        Matches (wnear cfg) ctx raw r res ∧ r.usedGas ≤ (wnear cfg).gas ctx st c) ∧
+      (Matches (wnear cfg) ctx raw r res ∨
+        (r.outcome = .error .outOfGas ∧ RolledBack ctx raw r ∧ r.logs <+: res.logs))) ∧
+    ((¬ ∃ c, (wnear cfg).Parses ctx.method ctx.args c) → RolledBack ctx raw r) := by
+  sorry
+
+/-- The deployed wNEAR binary refines the model: for every configuration whose
+measured account entry fits a `u64`, every context and every resource state,
+near-lean's execution of `contract.wasm` is the model's as `Refines` states
+it. `codeOf` decodes code that the call's promises deploy; wNEAR deploys none.
+Proved for every method the binary does not export; open for the exported
+ones (`refines_wnear_exported`). -/
 @[blueprint "spec:refinement"
   (statement := /-- The deployed binary refines \cref{def:contract-model}: for every storage representing a model state and every context the runtime can build, the execution reports no interpreter limitation; with at least the model's gas bound attached, it agrees with the model on return value, storage, balance, storage usage, logs, receipts and failure, and uses at most that much gas; with less, it agrees or fails for gas with no effects; and input that is no call fails with no effects. -/)]
 theorem refines_wnear (cfg : Config) (code : Wasm.Module) (codeOf : List UInt8 → Near.ContractCode)
-    (hcfg : cfg.WF) (hcode : Wasm.Binary.decode wNearBytes = .ok code) :
+    (hcfg : cfg.WF) (hcode : Wasm.Binary.decode wNearBytes = .ok code)
+    (hstart : code.start = none) (hexports : funcExportNames code = exportedMethods) :
     Refines Near.Boundary.nearRuntime
       { code := { module := code, size := wNearBytes.size, hash := "" }, codeOf } (wnear cfg) := by
-  sorry
+  intro raw st ctx hrep hwf
+  by_cases hmethod : ctx.method ∈ exportedMethods
+  · exact refines_wnear_exported cfg code codeOf hcfg hcode raw st ctx hrep hwf hmethod
+  · have hexport : code.exportFunc? ctx.method = none := exportFunc_none (by rw [hexports]; exact hmethod)
+    obtain ⟨hrb, hni⟩ := Near.Boundary.nearRuntime_not_exported
+      { code := { module := code, size := wNearBytes.size, hash := "" }, codeOf } raw ctx rfl
+      hstart hexport
+    have hnone : ∀ c, ¬ (wnear cfg).Parses ctx.method ctx.args c := by
+      intro c hc
+      change Call.decode ctx.method ctx.args = some c at hc
+      rw [decode_not_exported hmethod] at hc
+      cases hc
+    exact ⟨hni, fun c hc => absurd hc (hnone c), fun _ => hrb⟩
 
 end WNear

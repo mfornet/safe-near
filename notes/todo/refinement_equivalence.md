@@ -407,7 +407,13 @@ statement, the instance, the model extensions, re-proved specs and tests.
   aborts, promised actions the runtime rejects (`actionsIssue?` is the
   runtime's `validateFunctionCallActions`), and the storage-stake check
   (both use `stakeDeficit`).
-- **wNEAR.** `refines_wnear` itself, including the soundness of `gasBound`.
+- **wNEAR.** `refines_wnear` is proved from `refines_wnear_exported`, the
+  same statement for the 15 exported methods, which is open (including the
+  soundness of `gasBound`). Calls to any other method are proved: the binary
+  fails before running code, with no effects and no execution issue
+  (`nearRuntime_not_exported`). The module's lack of a start function and its
+  exported functions are hypotheses the adapter tests check, like decoding
+  itself: the kernel cannot decode the 185 KB binary within 15 GB.
 
 ### linkdrop
 
