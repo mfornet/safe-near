@@ -1,33 +1,34 @@
-import WasmLogic.Language
-import Iris.ProgramLogic.OwnP
+import WasmLogic.Rules.Call
+import Iris.ProgramLogic.Adequacy
 
 /-!
-# Adequacy: from a weakest precondition to the executable semantics
+# Adequacy: from the logic to `Wasm.Exec.run`
 
-A closed resource family `GF` with the invariant and later-credit slots that
-`iris-lean` needs plus one slot owning the store. With it, a proof that
-`ownP σ` entails a weakest precondition with a pure postcondition turns into
-a statement about `Wasm.Exec.run`: whenever the machine finishes, the outcome
-satisfies the postcondition.
+The one statement that makes proofs in the logic about the runtime:
+`adequacy` says that if, from ownership of every cell of the initial store,
+a function invocation satisfies `wpInvoke` with pure postconditions, then
+every run of `Wasm.Exec.run` from `Exec.startWasm` that finishes returns
+values satisfying the return postcondition, or traps only if the trap
+postcondition holds. `Exec.run` is the function the spec testsuite runs.
 
-The first four slots of `GF` and their `GpreS` instances are taken from
-iris-lean's own `Iris/Examples/ClosedProofs.lean` (Apache-2.0); only the
-`ownPRF` slot is ours.
+A closed resource family `GF` provides the ghost state. Its first four slots
+and their `GpreS` instances are taken from iris-lean's own
+`Iris/Examples/ClosedProofs.lean` (Apache-2.0); the heap slot is ours.
 -/
 
 namespace WasmLogic
 
-open Wasm Iris Iris.BI Iris.ProgramLogic Iris.ProgramLogic.Language.Notation FromMathlib COFE
-  HeapView Auth Std.LawfulSet
+open Wasm Iris Iris.BI Iris.Std Iris.ProgramLogic Iris.ProgramLogic.Language.Notation FromMathlib
+  COFE HeapView Auth Std.LawfulSet
 
-/-- The resource functors: iris-lean's four bookkeeping slots, then store ownership. -/
+/-- The resource functors: iris-lean's four bookkeeping slots, then the heap. -/
 noncomputable def GF (H : Type) : BundledGFunctors := fun n =>
   match n with
   | 0 => ⟨InvMapF, by infer_instance⟩
   | 1 => ⟨constOF CoPsetDisjL, by infer_instance⟩
   | 2 => ⟨constOF (DisjointLeibnizSet PosSet), by infer_instance⟩
   | 3 => ⟨AuthURF (constOF Credit), by infer_instance⟩
-  | 4 => ⟨ownPRF (Store H), by infer_instance⟩
+  | 4 => ⟨constOF (HeapView Loc (Agree (DiscreteO (Cell H))) HeapF), by infer_instance⟩
   | _ => ⟨constOF Unit, by infer_instance⟩
 
 instance (H : Type) : WsatGpreS (GF H) where
@@ -42,8 +43,26 @@ instance (H : Type) : InvGpreS (GF H) where
   toWsatGpreS := inferInstance
   toLcGpreS := inferInstance
 
-instance (H : Type) : OwnPGpreS (Store H) (GF H) where
-  inG := { τ := 4, transp := by unfold GF; rfl }
+instance (H : Type) : WasmGpreS H (GF H) where
+  heap := ⟨{ τ := 4, transp := by unfold GF; rfl }⟩
+
+/-- Adequacy of `WP` for the heap state interpretation: a `WP` proved from
+ownership of every cell of the initial store holds of every finished run. -/
+theorem wp_adequacy_heap {GF' : BundledGFunctors} [WasmGpreS H GF'] (e : Code H) (σ : Store H)
+    (φ : Outcome → Prop)
+    (hwp : ∀ [WasmGS H GF'], ownCells (GF := GF') (heapOf σ) ⊢
+      WP e @ Stuckness.MaybeStuck; ⊤ {{ v, ⌜φ v⌝ }}) :
+    adequate .MaybeStuck e σ (fun v _ => φ v) := by
+  refine wp_adequacy (GF := GF') .MaybeStuck e σ φ ?_
+  intro inst κs
+  imod ghost_map_alloc (GF := GF') (heapOf σ) with ⟨%γ, Hauth, Hcells⟩
+  letI wgs : WasmGS H GF' := { invGS := inst, heap := WasmGpreS.heap, name := γ }
+  imodintro
+  iexists (fun σ _ => ghost_map_auth γ (.own 1) (heapOf σ)), (fun _ => iprop(True))
+  isplitl [Hauth]
+  · iexact Hauth
+  · iapply (@hwp wgs)
+    iexact Hcells
 
 /-- What a run of the machine can end in, as the language sees it. -/
 theorem run_outcome (fuel : Nat) (σ : Store H) (limits : ExecLimits) (thread : Thread)
@@ -63,17 +82,62 @@ theorem run_outcome (fuel : Nat) (σ : Store H) (limits : ExecLimits) (thread : 
     exact had.adequate_result [] s (.trap r) steps
   | outOfFuel _ => trivial
 
-/-- Adequacy for the Wasm machine: a weakest precondition proved from store
-ownership holds of every finished run. -/
-theorem adequacy (σ : Store H) (limits : ExecLimits) (thread : Thread) (φ : Outcome → Prop)
-    (hwp : ∀ [OwnPGS (Store H) (GF H)],
-      ownP (GF := GF H) σ ⊢
-        WP (Code.running (H := H) limits thread) @ Stuckness.MaybeStuck; ⊤ {{ o, ⌜φ o⌝ }})
-    (fuel : Nat) :
-    match Exec.run fuel (Code.config σ limits thread) with
-    | .done vs _ => φ (.values vs)
-    | .trap r _ => φ (.trap r)
-    | .outOfFuel _ => True :=
-  run_outcome fuel σ limits thread φ (ownP_adequacy (GF := GF H) _ _ _ _ hwp)
+/-- Make an owned cell persistent: functions, instances and limits never
+change, so the initial store's cells for them can be shared. -/
+theorem pointsTo_persist {GF' : BundledGFunctors} [ι : WasmGS H GF'] (l : Loc) (c : Cell H) :
+    pointsTo (GF := GF') l (.own 1) c ==∗ pointsTo (GF := GF') l .discard c := by
+  iintro H
+  iapply ghost_map_elem_persist $$ H
+
+theorem startWasm_eq {σ : Store H} {lim : ExecLimits} {a : Nat} {args : List Value} {c : Config H}
+    (hc : Exec.startWasm σ lim a args = some c) :
+    ∃ type inst code, σ.funcs[a]? = some (.wasm type inst code) ∧
+      c = Code.config σ lim (calleeThread [] [] type inst code args) := by
+  unfold Exec.startWasm at hc
+  split at hc
+  · rename_i type inst code hfn
+    cases hc
+    exact ⟨type, inst, code, hfn, rfl⟩
+  · cases hc
+
+/-- **Adequacy.** If, from ownership of every cell of the store, the
+invocation of the Wasm function at `a` with `args` satisfies `wpInvoke` with
+pure postconditions, then every run of `Exec.run` from `Exec.startWasm`
+that finishes returns values satisfying `φ`, and traps only if `φtrap`. -/
+theorem adequacy (σ : Store H) (lim : ExecLimits) (a : Nat) (args : List Value)
+    (type : FuncType) (inst : Nat) (mi : ModuleInst) (code : Func)
+    (hfn : σ.funcs[a]? = some (.wasm type inst code))
+    (φ : List Value → Prop) (φtrap : Prop)
+    (hwp : ∀ [WasmGS H (GF H)], ownCells (GF := GF H) (heapOf σ) ⊢ |==>
+      (instPt inst mi ∗ wpInvoke lim 0 type inst mi code args
+        { ret := fun rs => iprop(⌜φ rs⌝), trap := iprop(⌜φtrap⌝) }))
+    (c : Config H) (hc : Exec.startWasm σ lim a args = some c) (fuel : Nat) :
+    match Exec.run fuel c with
+    | .done vs _ => φ vs
+    | .trap _ _ => φtrap
+    | .outOfFuel _ => True := by
+  obtain ⟨type', inst', code', hfn', rfl⟩ := startWasm_eq hc
+  rw [hfn] at hfn'
+  cases hfn'
+  have had := wp_adequacy_heap (GF' := GF H) (Code.running lim (calleeThread [] [] type inst code args))
+    σ (fun o => match o with | .values vs => φ vs | .trap _ => φtrap) (by
+      intro _
+      iintro Hcells
+      imod hwp $$ Hcells with ⟨#Hi, Hwp⟩
+      unfold wpInvoke
+      iapply Hwp $$ %(fun o => iprop(⌜match o with | .values vs => φ vs | .trap _ => φtrap⌝))
+        %([] : List Value) %([] : List CallFrame) %rfl Hi
+      isplit
+      · iintro %rs %hrs
+        simp only [retCode]
+        iapply wp_finished
+        ipureintro
+        exact hrs
+      · iintro %ht %r
+        ipureintro
+        exact ht)
+  have := run_outcome fuel σ lim _ _ had
+  revert this
+  cases Exec.run fuel (Code.config σ lim (calleeThread [] [] type inst code args)) <;> simp
 
 end WasmLogic

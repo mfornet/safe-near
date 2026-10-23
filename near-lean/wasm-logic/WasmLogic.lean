@@ -1,4 +1,13 @@
+import WasmLogic.Heap
+import WasmLogic.MemoryLemmas
 import WasmLogic.Language
-import WasmLogic.Rules
+import WasmLogic.Resources
+import WasmLogic.Frag
+import WasmLogic.Tactic
+import WasmLogic.Rules.Pure
+import WasmLogic.Rules.Memory
+import WasmLogic.Rules.Control
+import WasmLogic.Rules.Call
 import WasmLogic.Adequacy
+import WasmLogic.Coverage
 import WasmLogic.Examples.Sum
