@@ -1,5 +1,6 @@
 """The local replacement for expensive CI must never report partial work as green."""
 
+from datetime import date, timedelta
 import json
 from pathlib import Path
 import subprocess
@@ -8,7 +9,8 @@ import tempfile
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from periodic_check import ROOT, Step, run_steps, validation_steps
+from periodic_check import (PINS_MAX_AGE_DAYS, ROOT, SECTIONS, Step, due_sections, read_ledger,
+                            record_sections, run_steps, validation_steps)
 
 
 class PeriodicCheckTests(unittest.TestCase):
@@ -86,6 +88,70 @@ class PeriodicCheckTests(unittest.TestCase):
         refused = subprocess.run(command, text=True, capture_output=True)
         self.assertEqual(refused.returncode, 2)
         self.assertIn("--nearcore", refused.stderr)
+
+
+def git(root: Path, *args: str) -> str:
+    return subprocess.check_output(["git", "-c", "user.name=t", "-c", "user.email=t@t", *args],
+                                   cwd=root, text=True).strip()
+
+
+def commit_file(root: Path, name: str) -> None:
+    path = root / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(name + "\n")
+    git(root, "add", "-A")
+    git(root, "commit", "-q", "-m", name)
+
+
+class LedgerTests(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.root = Path(self.directory.name)
+        git(self.root, "init", "-q")
+        commit_file(self.root, "README.md")
+        self.ledger = self.root / "reports/periodic/LEDGER.json"
+        self.ledger.parent.mkdir(parents=True)
+
+    def tearDown(self):
+        self.directory.cleanup()
+
+    def record_all(self):
+        record_sections(self.root, self.ledger, list(SECTIONS), "reports/periodic/today/README.md", ["SAF-1"])
+
+    def test_unrecorded_sections_are_due_and_recorded_ones_are_not(self):
+        self.assertEqual([name for name, _ in due_sections(self.root, {})], list(SECTIONS))
+        self.record_all()
+        ledger = read_ledger(self.ledger)
+        self.assertEqual(ledger["divergence"]["issues"], ["SAF-1"])
+        self.assertEqual(due_sections(self.root, ledger), [])
+
+    def test_only_sections_watching_changed_paths_become_due(self):
+        self.record_all()
+        commit_file(self.root, "notes/design/X.md")
+        self.assertEqual([name for name, _ in due_sections(self.root, read_ledger(self.ledger))],
+                         ["docs", "features"])
+        commit_file(self.root, "near-lean/runtime/A.lean")
+        due = dict(due_sections(self.root, read_ledger(self.ledger)))
+        self.assertIn("divergence", due)
+        self.assertEqual(due["divergence"], f"1 files changed since {git(self.root, 'rev-parse', 'HEAD~2')[:7]}")
+
+    def test_committing_the_check_output_does_not_make_it_due_again(self):
+        self.record_all()
+        commit_file(self.root, "reports/periodic/today/README.md")
+        self.assertEqual(due_sections(self.root, read_ledger(self.ledger)), [])
+
+    def test_pins_are_due_by_age_and_unknown_commits_are_due(self):
+        self.record_all()
+        ledger = read_ledger(self.ledger)
+        later = date.fromisoformat(ledger["pins"]["date"]) + timedelta(days=PINS_MAX_AGE_DAYS)
+        self.assertEqual([name for name, _ in due_sections(self.root, ledger, later)], ["pins"])
+        ledger["build"]["commit"] = "0" * 40
+        self.assertIn("not in this repository", dict(due_sections(self.root, ledger))["build"])
+
+    def test_unknown_sections_are_refused(self):
+        with self.assertRaises(ValueError):
+            record_sections(self.root, self.ledger, ["bulid"], "report", [])
+        self.assertFalse(self.ledger.exists())
 
 
 if __name__ == "__main__":

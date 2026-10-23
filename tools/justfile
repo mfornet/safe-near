@@ -62,6 +62,10 @@ tools-test:
 # The inexpensive automatic CI gate: no Lean downloads or native builds.
 ci-check: check-toolchains tools-test
 
+# List the periodic-check sections with changes since their last check (see reports/periodic/LEDGER.json).
+periodic-due:
+    python3 tools/periodic_check.py --due
+
 # Preview every expensive periodic check without running or downloading anything.
 periodic-check-plan:
     python3 tools/periodic_check.py --plan

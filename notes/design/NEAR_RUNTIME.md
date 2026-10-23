@@ -19,6 +19,16 @@ keys and gas.
   nearcore adapters (`tools/runtime-*-reference`). They are tests, not an
   equivalence proof.
 
+## Divergences from nearcore
+
+Where the Lean code simplifies or omits nearcore behavior, it says so with a
+comment starting `nearcore divergence:` (what differs and why), and the place
+is listed here. The periodic check ([section 6](PERIODIC_CHECK.md#6-nearcore-divergence-divergence))
+looks for simplifications that are neither marked nor listed.
+
+| Where | What differs from nearcore | Why |
+|---|---|---|
+
 ## Goals
 
 - Replay NEAR history with bit-for-bit agreement, including runtime upgrades.

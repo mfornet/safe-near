@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 import fcntl
 import json
 from pathlib import Path
@@ -15,6 +15,25 @@ import sys
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
+LEDGER = ROOT / "reports/periodic/LEDGER.json"
+
+# Checklist sections of notes/design/PERIODIC_CHECK.md and the git pathspecs
+# whose changes make each one due again. Pins and upgrades (None) follow
+# upstream releases rather than our commits, so they are due by age instead.
+PINS_MAX_AGE_DAYS = 7
+# The check's own output must not make the next check due.
+IGNORED = (":(exclude)reports/periodic",)
+SECTIONS: dict[str, tuple[str, ...] | None] = {
+    "build": ("near-lean", "contracts", "tools", "justfile"),
+    "trusted-base": ("near-lean", ":(glob)contracts/*/verification/**"),
+    "pins": None,
+    "dead-code": ("near-lean", "contracts", "tools", "justfile", ".github"),
+    "simplification": ("near-lean", ":(glob)contracts/*/verification/**"),
+    "divergence": ("near-lean/vm", "near-lean/runtime", "near-lean/chain"),
+    "docs": (".",),
+    "tests-ci": ("near-lean", "tools", ".github", "justfile"),
+    "features": (".",),
+}
 
 
 @dataclass(frozen=True)
@@ -153,12 +172,73 @@ def run_steps(steps: list[Step], output: Path, revision: str, dirty: bool = Fals
     return 0
 
 
+def read_ledger(path: Path) -> dict:
+    return json.loads(path.read_text())["sections"] if path.exists() else {}
+
+
+def due_sections(root: Path, ledger: dict, today: date | None = None) -> list[tuple[str, str]]:
+    """Sections to run, each with the reason it is due."""
+    today = today or datetime.now(timezone.utc).date()
+    due = []
+    for name, paths in SECTIONS.items():
+        entry = ledger.get(name, {})
+        commit = entry.get("commit")
+        if not commit:
+            due.append((name, "never checked"))
+            continue
+        if paths is None:
+            age = (today - date.fromisoformat(entry["date"])).days
+            if age >= PINS_MAX_AGE_DAYS:
+                due.append((name, f"last checked {age} days ago"))
+            continue
+        diff = subprocess.run(["git", "diff", "--name-only", commit, "HEAD", "--", *paths, *IGNORED],
+                              cwd=root, text=True, capture_output=True)
+        if diff.returncode:
+            due.append((name, f"last checked commit {commit[:7]} is not in this repository"))
+        elif changed := diff.stdout.splitlines():
+            due.append((name, f"{len(changed)} files changed since {commit[:7]}"))
+    return due
+
+
+def record_sections(root: Path, path: Path, sections: list[str], report: str, issues: list[str]) -> None:
+    """Mark sections as checked at HEAD by the given report."""
+    if unknown := set(sections) - SECTIONS.keys():
+        raise ValueError(f"unknown sections: {', '.join(sorted(unknown))}")
+    ledger = read_ledger(path)
+    commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
+    today = datetime.now(timezone.utc).date().isoformat()
+    for name in sections:
+        ledger[name] = {"commit": commit, "date": today, "report": report, "issues": issues}
+    ordered = {name: ledger[name] for name in SECTIONS if name in ledger}
+    path.write_text(json.dumps({"sections": ordered}, indent=2) + "\n")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--nearcore", type=Path, help="clean checkout at the finance/nonce source pin")
     parser.add_argument("--plan", action="store_true", help="print the complete command plan without running it")
     parser.add_argument("--output", type=Path, help="new evidence directory (default: audit/periodic/<UTC timestamp>)")
+    parser.add_argument("--due", action="store_true", help="list the checklist sections with changes since their last check")
+    parser.add_argument("--record", nargs="+", metavar="SECTION", help="mark sections as checked at HEAD")
+    parser.add_argument("--report", help="with --record: the report that covers the sections")
+    parser.add_argument("--issue", action="append", default=[], help="with --record: a Linear issue the check filed")
+    parser.add_argument("--ledger", type=Path, default=LEDGER, help=argparse.SUPPRESS)
     args = parser.parse_args()
+    if args.due:
+        due = due_sections(ROOT, read_ledger(args.ledger))
+        for name, reason in due:
+            print(f"{name}: {reason}")
+        if not due:
+            print("Nothing is due.")
+        return 0
+    if args.record:
+        if not args.report:
+            parser.error("--record needs --report")
+        try:
+            record_sections(ROOT, args.ledger, args.record, args.report, args.issue)
+        except ValueError as error:
+            parser.error(str(error))
+        return 0
     nearcore = (args.nearcore or ROOT / "reference-nearcore").resolve()
     steps = validation_steps(ROOT, nearcore)
     if args.plan:
