@@ -396,12 +396,10 @@ def applyAction (c : ReceiptCtx) (isLast : Bool) : Action → ExecM Unit
     modify fun e => { e with actorId := c.receipt.predecessorId }
     emit r
 
-/-- Pinned nearcore verifier's zero-balance account exemption (NEP-448). -/
-def zeroBalanceAccountStorageLimit : Nat := 770
-
+/-- `check_storage_stake` on one account. The formula, with the NEP-448
+zero-balance exemption, is the boundary's `NearInterface.stakeDeficit`. -/
 def storageStakeDeficit (cfg : RuntimeConfig) (a : Account) : Nat :=
-  if a.storageUsage ≤ zeroBalanceAccountStorageLimit then 0
-  else a.storageUsage * cfg.storageAmountPerByte - a.amount - a.locked
+  NearInterface.stakeDeficit cfg a.storageUsage a.amount a.locked
 
 def checkStorageStake (cfg : RuntimeConfig) (id : AccountId) : ExecM Unit := do
   match (← getState).account? id with

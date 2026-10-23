@@ -311,3 +311,54 @@ statement, the instance, the model extensions, re-proved specs and tests.
   with serde's acceptance is tested.
 - Whether `Matches` needs anything beyond `RolledBack` for the logs on
   `balanceExceeded` / `lackBalanceForState` (logs up to the failing point).
+
+## 10. Progress and decisions taken while implementing
+
+### Step 1 — done
+
+`near-lean/interface` (`NearInterface`) holds the raw types, config, errors,
+trie overlay, `Context` (plus `outputDataReceivers`, which the VM needs),
+`Context.WF`, `Failure`, `Observation`, `RuntimeInterface`, `ContractModel`,
+`Refines` and the four generic lemmas. Departures from sections 3–6:
+
+- `Refines` has a second hypothesis, `ctx.WF raw`: the guarantees the
+  runtime gives every context it builds (integer widths, usage counting the
+  records, the trie holding `raw`). It does not depend on the call or the
+  contract, so it does not reintroduce `Supports`-style exclusions.
+- The gas clause compares against `ctx.gasLimit = min prepaidGas
+  maxGasBurnt`, not `prepaidGas`: above the burn limit, more prepaid gas does
+  not help.
+- `step` returns `Failed` with logs, so the third open item (logs up to the
+  failing point) is answered by `Matches` comparing `f.logs` exactly.
+
+### Step 2 — in progress (`near-lean/runtime/NearRuntime/Boundary.lean`)
+
+- **Seam by theorem, not by refactoring `applyFunctionCall`.** About a dozen
+  runtime invariants (`GasInvariants`, `FunctionCallInvariants`,
+  `PromiseGasInvariants`, ...) pattern-match the body of `applyFunctionCall`.
+  Instead of routing it through a new function, the boundary uses the same
+  `run` call and fuel, and the seam is stated as
+  `functionCallContext_eq_toVMContext` (the receipt executor's VM context is
+  `toVMContext` of the matching boundary context). `storageStakeDeficit` in
+  `Apply.lean` is now defined as `NearInterface.stakeDeficit`, so there is
+  one formula.
+- Still to prove: for a receipt whose only action is a function call,
+  `runReceiptActions` agrees with `execOn` on everything `Observation` holds
+  (the receipt's action fees aside).
+- **Storage listing.** The VM reads storage from a list; `RawStorage` is a
+  `Finset`, so `nearRuntime` uses `raw.toList` (noncomputable). Obligation:
+  `execOn` depends on the listing only through its `toFinset` (keys are
+  unique, so lookups agree; `storageKeys` order must not leak into gas or
+  outputs). The adapter tests use the computable `execOn`.
+- **Fuel.** The naive bound `prepaidGas / regularOpCost + c` is false for
+  this interpreter: `block` entry and falling off the end of a block or frame
+  cost no gas (`nextInstructionGas`). Between two charged steps, the free
+  steps are bounded by the nesting depth of labels times the call depth
+  (≤ `execLimits.maxCallDepth`), so a sound fuel is
+  `(gasLimit / regularOpCost + 1) * (2 * codeSize + 2) * (maxCallDepth + 1)`,
+  given `regularOpCost > 0` in the config. Not proved yet. The instance keeps
+  `defaultFuel`, like `applyFunctionCall`, until it is.
+- Error mapping (`failureOf`): `guestPanic` → `panic`, `gasExceeded` /
+  `gasLimitExceeded` → `outOfGas`, `balanceExceeded`, `methodNotFound`;
+  anything with `FunctionCallError.issue?`, plus action-conversion failures,
+  → `executionIssue`; everything else → `other`, using nearcore's message.
