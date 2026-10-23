@@ -6,10 +6,13 @@ cd "$(dirname "$0")/.."
 
 pinned_tools="1.251.0"
 version="$(wasm-tools --version 2>/dev/null || true)"
-if [ "$version" != "wasm-tools $pinned_tools" ]; then
-    echo "need wasm-tools $pinned_tools (cargo install wasm-tools@$pinned_tools); found: ${version:-none}" >&2
-    exit 1
-fi
+case "$version" in
+    "wasm-tools $pinned_tools" | "wasm-tools $pinned_tools "*) ;;
+    *)
+        echo "need wasm-tools $pinned_tools (cargo install wasm-tools@$pinned_tools); found: ${version:-none}" >&2
+        exit 1
+        ;;
+esac
 
 status=0
 check() {  # <dir> <base> <Lean namespace> <def name>
