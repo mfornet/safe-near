@@ -163,6 +163,42 @@ theorem wpi_wand {Φ Φ' : Post H GF} : wpi lim d f vs es Φ ∗ Post.wand Φ Φ
     iapply HK
     iapply Hw $$ HΦ
 
+/-- `R` added to every way a fragment can end. -/
+def Post.frame (R : IProp GF) (Φ : Post H GF) : Post H GF where
+  normal vs f := iprop(R ∗ Φ.normal vs f)
+  br n vs f := iprop(R ∗ Φ.br n vs f)
+  ret vs f := iprop(R ∗ Φ.ret vs f)
+  trap := iprop(R ∗ Φ.trap)
+
+/-- The frame rule: a resource the fragment does not use is still there
+however it ends. -/
+theorem wpi_frame {R : IProp GF} {Φ : Post H GF} :
+    R ∗ wpi lim d f vs es Φ ⊢ wpi lim d f vs es (Post.frame R Φ) := by
+  iintro ⟨HR, Hwp⟩
+  iapply wpi_wand
+  isplitl [Hwp]
+  · iexact Hwp
+  unfold Post.wand Post.frame
+  isplit
+  · iintro %vs' %f' HΦ
+    isplitl [HR]
+    · iexact HR
+    · iexact HΦ
+  isplit
+  · iintro %n %vs' %f' HΦ
+    isplitl [HR]
+    · iexact HR
+    · iexact HΦ
+  isplit
+  · iintro %vs' %f' HΦ
+    isplitl [HR]
+    · iexact HR
+    · iexact HΦ
+  · iintro HΦ
+    isplitl [HR]
+    · iexact HR
+    · iexact HΦ
+
 /-- The empty fragment falls through at once. -/
 theorem wpi_nil {Φ : Post H GF} : Φ.normal vs f ⊢ wpi lim d f vs [] Φ := by
   unfold wpi Kont

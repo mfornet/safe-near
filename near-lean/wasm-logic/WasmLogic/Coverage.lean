@@ -96,7 +96,8 @@ def outOfScope : List (Name × String) := []
 def structural : List (Name × String) := [
   (``wpi_seq, "wp_seq"),
   (``wpi_nil, "wp_nil"),
-  (``wpi_wand, "wp_wand_ctx; framing is part of it"),
+  (``wpi_wand, "wp_wand_ctx"),
+  (``wpi_frame, "wp_frame_l (Iris's generic frame rule)"),
   (``wpInvoke_intro, "wp_invoke_native"),
   (``wpi_instr, "none: the generic rule every instruction rule is derived from"),
   (``wp_lift, "none: the one lifting lemma, over `Exec.step`"),

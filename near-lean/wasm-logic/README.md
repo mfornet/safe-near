@@ -28,6 +28,7 @@ package is written from iris-lean, the runtime and Iris-Wasm (MIT, see
 | `Coverage.lean` | `#check_rule_coverage`: fails the build unless every `Wasm.Instr` constructor has its rules (all 56 do). |
 | `Examples/Sum.lean` | A counting loop proved for every input by induction, and its adequacy corollary. |
 | `Examples/Bulk.lean` | Fragments using the table and bulk-memory rules. |
+| `Examples/Control.lean` | Fragments using the structural rules the larger examples do not: `br_table`, `memory.size`, traps, the call-depth limit, a host call against its contract, the frame rule. |
 | `Examples/Stack/` | Iris-Wasm's stack module, from bytes, and every function's specification. |
 | `Examples/Client/` | Iris-Wasm's client of the stack, linked by the runtime's linker and run as its start function, proved from the stack's specifications, end to end (`client_adequate`). |
 
@@ -125,7 +126,8 @@ style (`Rules/Table.lean`). Their bulk forms are for non-empty ranges, and
 |---|---|
 | `wpi_seq` | wp_seq |
 | `wpi_nil` | wp_nil |
-| `wpi_wand` | wp_wand_ctx; framing is part of it |
+| `wpi_wand` | wp_wand_ctx |
+| `wpi_frame` | wp_frame_l (Iris's generic frame rule) |
 | `wpInvoke_intro` | wp_invoke_native |
 | `wpi_instr` | none: the generic rule every instruction rule is derived from |
 | `wp_lift` | none: the one lifting lemma, over Exec.step |
