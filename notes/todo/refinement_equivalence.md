@@ -319,7 +319,7 @@ statement, the instance, the model extensions, re-proved specs and tests.
 | Step | State |
 |---|---|
 | 1. `near-lean/interface` | done |
-| 2. near-lean boundary and instance | done, except the proofs listed below |
+| 2. near-lean boundary and instance | done, fuel sufficiency proved; storage listing and whole-receipt seam open |
 | 3. wNEAR | done: model extensions, instance, statement, re-proved specs, tests |
 | 4. linkdrop | old statement removed; instance blocked on near-lean (below) |
 | 5. Tests | wNEAR adapter tests on the boundary (205 checks) |
@@ -375,13 +375,19 @@ statement, the instance, the model extensions, re-proved specs and tests.
 
 ### Proof obligations still open
 
-- **Fuel.** The naive `prepaidGas / regularOpCost + c` is false for this
-  interpreter: `block` entry and falling off the end of a block or frame cost
-  no gas (`nextInstructionGas`). Between two charged steps the free steps are
-  bounded by label nesting times call depth (≤ `execLimits.maxCallDepth`), so
-  `(gasLimit / regularOpCost + 1) * (2 * codeSize + 2) * (maxCallDepth + 1)`
-  fuel suffices given `regularOpCost > 0`. Not proved; the instance keeps
-  `defaultFuel`, like `applyFunctionCall`.
+- **Fuel — proved.** The naive `prepaidGas / regularOpCost + c` is false for
+  this interpreter: entering a `block` and falling off the end of a block or
+  frame cost no gas. `run` now defaults to `fuelFor cfg code ctx` (burn
+  limit in cheapest instructions, times call depth times the module's
+  largest body), used by both `applyFunctionCall` and the boundary, and
+  `runAttempt_fuel_independent` proves that more fuel never changes the
+  outcome. The premise, positive regular and linear base op costs, is a
+  `Context.WF` field that every pinned protocol config satisfies. Pieces:
+  `Wasm/Fuel.lean` (free steps decrease a measure bounded by depth times
+  largest body), `Wasm/LinkFuncs.lean` (an instantiated store only holds
+  the module's code), `HostGasFloor.lean` (no host function lowers burnt
+  gas), `NearVM/Fuel.lean` (a potential that every metered iteration
+  strictly decreases).
 - **Storage listing.** The VM reads storage from a list and `RawStorage` is a
   set, so `nearRuntime` uses `raw.toList`. That `execOn` depends on the listing
   only through its set is not proved. The adapter tests use the computable
@@ -403,5 +409,6 @@ lists what it needs. The old divergent statement is removed.
 
 - `near-lean/.lake` was tracked as a symlink into one machine's home
   directory; it is no longer tracked.
-- `just near-test`'s runtime tests need the external `wasm-tools` binary for a
-  decoder fixture.
+- `just near-test` needs the external `wasm-tools` binary (1.251.0, as pinned
+  in `contracts/linkdrop/verification/binary-boundary.json`) for decoder
+  fixtures; with it, VM (103) and runtime (179) tests pass.
