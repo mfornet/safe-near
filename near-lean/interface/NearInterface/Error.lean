@@ -60,6 +60,7 @@ inductive HostError
   | prohibitedInView (methodName : String)
   | deprecated (methodName : String)
   | unsupported (methodName : String)
+  | contractCodeHashMalformed
   deriving Repr, BEq, Inhabited
 
 def HostError.message : HostError → String
@@ -96,6 +97,7 @@ def HostError.message : HostError → String
   | .prohibitedInView m => s!"{m} is not allowed in view calls"
   | .deprecated m => s!"Attempted to call deprecated host function {m}"
   | .unsupported m => s!"Attempted to call unsupported host function {m}"
+  | .contractCodeHashMalformed => "contract code hash is malformed"
 
 /-- Why a Wasm execution trapped (`near_vm_runner::logic::errors::WasmTrap`). -/
 inductive WasmTrap

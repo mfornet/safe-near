@@ -152,6 +152,8 @@ theorem meteredHostFns_selection (cfg : RuntimeConfig) (entry : ImportDecl × Ne
       | exact promiseBatchActionAddKeyWithFunctionCallFn_selection
       | exact promiseBatchActionDeleteKeyFn_selection
       | exact promiseBatchActionDeleteAccountFn_selection
+      | exact promiseBatchActionUseGlobalContractFn_selection
+      | exact promiseBatchActionUseGlobalContractByAccountIdFn_selection
       | exact valueReturnFn_selection
       | exact promiseReturnFn_selection
       | exact promiseResultsCountFn_selection

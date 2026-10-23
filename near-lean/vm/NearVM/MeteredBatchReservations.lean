@@ -443,4 +443,76 @@ theorem meteredFunctionKey_reservationInvariant (fees : ActionFees) (ethEnabled 
   simp (disch := decide) only [prepareStorageCall_other]
   exact prechargedFunctionKey_reservationInvariant fees ethEnabled st args h hs hg
 
+@[simp] theorem prechargedStore_globalContractPlan_error (name : String) (st : HostStore NearState)
+    (args : List Value) (byAccount : Bool) (target : Nat) (len ptr : UInt64) (sir : Bool) :
+    (globalContractPlan (prechargedStore name st args) byAccount target len ptr sir).error =
+      (globalContractPlan st byAccount target len ptr sir).error := by
+  unfold globalContractPlan
+  simp only [prechargedStore_getMemOrReg, prechargedStore_targetError, prechargedStore_config]
+  repeat' (first | rfl | split)
+
+theorem prechargedUseGlobalContract_reservationInvariant (fees : ActionFees) (ethEnabled : Bool)
+    (st : HostStore NearState) (args : List Value)
+    (h : ReservationInvariant fees ethEnabled st.host)
+    (hsuccess : (applyCharges st.host (chargesBefore "promise_batch_action_use_global_contract" st args)).2 = none)
+    (hguard : preInvokeError "promise_batch_action_use_global_contract" (prechargedStore "promise_batch_action_use_global_contract" st args) args = none) :
+    HostResult.LiveSatisfies (ReservationInvariant fees ethEnabled)
+      (promiseBatchActionUseGlobalContractFn.invoke (prechargedStore "promise_batch_action_use_global_contract" st args) args) := by
+  have he := preInvokeError_useGlobalContract_valid "promise_batch_action_use_global_contract" false rfl _ args
+    (by simp [storageMutationPlan?]) (by decide) (by decide) (by decide) hguard
+  rw [prechargedStore_globalContractPlan_error] at he
+  have he' : (globalContractPlan st false (argU64 args 0).toNat (argU64 args 1) (argU64 args 2)
+      (sirOf st (promiseReceiver? st (argU64 args 0).toNat))).error = none := by
+    rw [globalContractPlan_error_sir st _ _ _ _ _ false]
+    exact he
+  obtain ⟨bytes, hm, hreserved⟩ := chargesBefore_useGlobalContract_reservation st args he'
+  unfold promiseBatchActionUseGlobalContractFn useGlobalContractFn
+  dsimp only [disallowInView]
+  repeat' (first
+    | trivial
+    | (apply appendPrechargedAction_reservationInvariant fees ethEnabled _ st _ _ _ h hsuccess
+       intro _
+       simp_all [argU64])
+    | split)
+
+theorem meteredUseGlobalContract_reservationInvariant (fees : ActionFees) (ethEnabled : Bool) (extra : Nat) :
+    NearHostFn.PreservesLive (ReservationInvariant fees ethEnabled)
+      (metered extra "promise_batch_action_use_global_contract" promiseBatchActionUseGlobalContractFn) := by
+  apply metered_reservationInvariant
+  intro st args h hs hg _
+  simp (disch := decide) only [prepareStorageCall_other]
+  exact prechargedUseGlobalContract_reservationInvariant fees ethEnabled st args h hs hg
+
+theorem prechargedUseGlobalContractByAccountId_reservationInvariant (fees : ActionFees) (ethEnabled : Bool)
+    (st : HostStore NearState) (args : List Value)
+    (h : ReservationInvariant fees ethEnabled st.host)
+    (hsuccess : (applyCharges st.host (chargesBefore "promise_batch_action_use_global_contract_by_account_id" st args)).2 = none)
+    (hguard : preInvokeError "promise_batch_action_use_global_contract_by_account_id" (prechargedStore "promise_batch_action_use_global_contract_by_account_id" st args) args = none) :
+    HostResult.LiveSatisfies (ReservationInvariant fees ethEnabled)
+      (promiseBatchActionUseGlobalContractByAccountIdFn.invoke (prechargedStore "promise_batch_action_use_global_contract_by_account_id" st args) args) := by
+  have he := preInvokeError_useGlobalContract_valid "promise_batch_action_use_global_contract_by_account_id" true rfl _ args
+    (by simp [storageMutationPlan?]) (by decide) (by decide) (by decide) hguard
+  rw [prechargedStore_globalContractPlan_error] at he
+  have he' : (globalContractPlan st true (argU64 args 0).toNat (argU64 args 1) (argU64 args 2)
+      (sirOf st (promiseReceiver? st (argU64 args 0).toNat))).error = none := by
+    rw [globalContractPlan_error_sir st _ _ _ _ _ false]
+    exact he
+  obtain ⟨bytes, hm, hreserved⟩ := chargesBefore_useGlobalContractByAccountId_reservation st args he'
+  unfold promiseBatchActionUseGlobalContractByAccountIdFn useGlobalContractFn
+  dsimp only [disallowInView]
+  repeat' (first
+    | trivial
+    | (apply appendPrechargedAction_reservationInvariant fees ethEnabled _ st _ _ _ h hsuccess
+       intro _
+       simp_all [argU64])
+    | split)
+
+theorem meteredUseGlobalContractByAccountId_reservationInvariant (fees : ActionFees) (ethEnabled : Bool) (extra : Nat) :
+    NearHostFn.PreservesLive (ReservationInvariant fees ethEnabled)
+      (metered extra "promise_batch_action_use_global_contract_by_account_id" promiseBatchActionUseGlobalContractByAccountIdFn) := by
+  apply metered_reservationInvariant
+  intro st args h hs hg _
+  simp (disch := decide) only [prepareStorageCall_other]
+  exact prechargedUseGlobalContractByAccountId_reservationInvariant fees ethEnabled st args h hs hg
+
 end Wasm.Near

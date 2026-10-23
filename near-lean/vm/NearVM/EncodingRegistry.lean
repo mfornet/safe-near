@@ -264,15 +264,9 @@ theorem meteredHostFns_encodingInvariant
       simp (disch := decide) only [prepareStorageCall_other]
       trivial
     · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      exact meteredActionUseGlobalContract_encodingInvariant _
     · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      exact meteredActionUseGlobalContractByAccountId_encodingInvariant _
     · cases h
       apply metered_raw_encodingInvariant
       intro st args hwf hs hguard _

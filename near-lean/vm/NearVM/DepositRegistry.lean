@@ -63,6 +63,8 @@ theorem meteredHostFns_funding (cfg : RuntimeConfig) (entry : ImportDecl × Near
       | exact promiseBatchActionAddKeyWithFunctionCallFn_noDeposits
       | exact promiseBatchActionDeleteKeyFn_noDeposits
       | exact promiseBatchActionDeleteAccountFn_noDeposits
+      | exact promiseBatchActionUseGlobalContractFn_noDeposits
+      | exact promiseBatchActionUseGlobalContractByAccountIdFn_noDeposits
       | exact valueReturnFn_noDeposits
       | exact promiseReturnFn_noDeposits
       | exact promiseResultsCountFn_noDeposits

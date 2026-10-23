@@ -163,6 +163,8 @@ theorem meteredHostFns_gasLimits (cfg : RuntimeConfig) (entry : ImportDecl × Ne
       | exact HostPreservesGas.limits promiseBatchActionAddKeyWithFunctionCallFn_gas
       | exact HostPreservesGas.limits promiseBatchActionDeleteKeyFn_gas
       | exact HostPreservesGas.limits promiseBatchActionDeleteAccountFn_gas
+      | exact HostPreservesGas.limits promiseBatchActionUseGlobalContractFn_gas
+      | exact HostPreservesGas.limits promiseBatchActionUseGlobalContractByAccountIdFn_gas
       | exact HostPreservesGas.limits valueReturnFn_gas
       | exact HostPreservesGas.limits promiseReturnFn_gas
       | exact HostPreservesGas.limits promiseResultsCountFn_gas

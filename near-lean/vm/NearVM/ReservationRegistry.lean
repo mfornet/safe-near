@@ -306,15 +306,9 @@ theorem meteredHostFns_reservationInvariant (fees : ActionFees) (ethEnabled : Bo
       simp (disch := decide) only [prepareStorageCall_other]
       trivial
     · cases h
-      apply metered_reservationInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      exact meteredUseGlobalContract_reservationInvariant fees ethEnabled _
     · cases h
-      apply metered_reservationInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      exact meteredUseGlobalContractByAccountId_reservationInvariant fees ethEnabled _
     · cases h
       apply metered_reservationInvariant
       intro st args hwf hs hguard _

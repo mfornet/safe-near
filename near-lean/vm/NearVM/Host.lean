@@ -340,6 +340,26 @@ def promiseBatchActionFunctionCallWeightFn : NearHostFn NearState :=
         | none => .Trap st "promise_batch_action_function_call: invalid input"
       | _ => .Trap st "promise_batch_action_function_call: bad args" }
 
+/-- `promise_batch_action_use_global_contract{,_by_account_id}(promise_idx,
+len, ptr)`: append `UseGlobalContract` with the code hash or account id read
+from guest memory. Identifier checks, the target lookup and the fees precede
+the call in the metered layer (`globalContractPlan`). -/
+def useGlobalContractFn (name : String) (mk : List UInt8 → GlobalContractId) : NearHostFn NearState :=
+  disallowInView name <|
+  { params := [.i64, .i64, .i64], results := []
+    invoke := fun st args => match args with
+      | [.i64 promiseIdx, .i64 len, .i64 ptr] =>
+        match getMemOrReg st ptr len with
+        | some bytes => appendPromiseActionResult name st promiseIdx (.useGlobalContract (mk bytes))
+        | none => .Trap st s!"{name}: invalid input"
+      | _ => .Trap st s!"{name}: bad args" }
+
+def promiseBatchActionUseGlobalContractFn : NearHostFn NearState :=
+  useGlobalContractFn "promise_batch_action_use_global_contract" .codeHash
+
+def promiseBatchActionUseGlobalContractByAccountIdFn : NearHostFn NearState :=
+  useGlobalContractFn "promise_batch_action_use_global_contract_by_account_id" .accountId
+
 def promiseBatchActionTransferFn : NearHostFn NearState :=
   disallowInView "promise_batch_action_transfer" <|
   { params := [.i64, .i64], results := []
@@ -1115,9 +1135,9 @@ def nearHostFns : List (ImportDecl × NearHostFn NearState) :=
   , (imp "promise_batch_action_deploy_global_contract_by_account_id" [.i64, .i64, .i64] [],
       unsupported "promise_batch_action_deploy_global_contract_by_account_id" [.i64, .i64, .i64] [])
   , (imp "promise_batch_action_use_global_contract" [.i64, .i64, .i64] [],
-      unsupported "promise_batch_action_use_global_contract" [.i64, .i64, .i64] [])
+      promiseBatchActionUseGlobalContractFn)
   , (imp "promise_batch_action_use_global_contract_by_account_id" [.i64, .i64, .i64] [],
-      unsupported "promise_batch_action_use_global_contract_by_account_id" [.i64, .i64, .i64] [])
+      promiseBatchActionUseGlobalContractByAccountIdFn)
   , (imp "promise_yield_create" [.i64, .i64, .i64, .i64, .i64, .i64, .i64] [.i64],
       promiseYieldCreateFn)
   , (imp "promise_yield_resume" [.i64, .i64, .i64, .i64] [.i64],

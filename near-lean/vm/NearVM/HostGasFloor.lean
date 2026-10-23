@@ -169,6 +169,8 @@ theorem meteredHostFns_gasFloor (cfg : RuntimeConfig) (entry : ImportDecl × Nea
       | exact HostPreservesGas.floor promiseBatchActionAddKeyWithFunctionCallFn_gas
       | exact HostPreservesGas.floor promiseBatchActionDeleteKeyFn_gas
       | exact HostPreservesGas.floor promiseBatchActionDeleteAccountFn_gas
+      | exact HostPreservesGas.floor promiseBatchActionUseGlobalContractFn_gas
+      | exact HostPreservesGas.floor promiseBatchActionUseGlobalContractByAccountIdFn_gas
       | exact HostPreservesGas.floor valueReturnFn_gas
       | exact HostPreservesGas.floor promiseReturnFn_gas
       | exact HostPreservesGas.floor promiseResultsCountFn_gas

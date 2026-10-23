@@ -300,6 +300,39 @@ def functionKeyPlan (st : HostStore NearState) (input : FunctionKeyInputs) (sir 
                   .actionBytes (·.addFunctionCallKeyByte) (methodNamesGasBytes methods) sir]
                 error := if serializedPublicKeyValid publicKey then none else some .invalidPublicKey }
 
+/-- The `use_global_contract` hosts' arguments: by account id or code hash. -/
+def globalContractInputs? (name : String) : Option Bool :=
+  if name == "promise_batch_action_use_global_contract" then some false
+  else if name == "promise_batch_action_use_global_contract_by_account_id" then some true
+  else none
+
+/-- nearcore's `promise_batch_action_use_global_contract_impl`: read the
+identifier (an account id is UTF-8 decoded, charged, and validated; a code hash
+must have 32 bytes), look up the target, then charge the action fees on the
+identifier's length. -/
+def globalContractPlan (st : HostStore NearState) (byAccount : Bool) (target : Nat) (len ptr : UInt64)
+    (sir : Bool) : FunctionCallPlan :=
+  let readCharges := [.ext "base"] ++ readSpan st len ptr
+  match getMemOrReg st ptr len with
+  | none => { charges := readCharges, error := some (spanReadError len ptr) }
+  | some bytes =>
+    let idCharges := if byAccount then readCharges ++ utf8 bytes.length else readCharges
+    let idError : Option HostError :=
+      if byAccount then
+        if (String.fromUTF8? ⟨bytes.toArray⟩).isNone then some .badUTF8
+        else if !st.host.config.validAccountId bytes then some .invalidAccountId
+        else none
+      else if bytes.length != 32 then some .contractCodeHashMalformed else none
+    match idError with
+    | some error => { charges := idCharges, error := some error }
+    | none =>
+      match functionCallTargetError st target with
+      | some error => { charges := idCharges, error := some error }
+      | none =>
+        let id : GlobalContractId := if byAccount then .accountId bytes else .codeHash bytes
+        { charges := idCharges ++ [.actionBase (·.useGlobalContractBase) sir,
+            .actionBytes (·.useGlobalContractByte) id.length sir] }
+
 /-- Argument-dependent charge plan before validating promise handles. -/
 def chargesBeforeUnvalidated (name : String) (st : HostStore NearState) (args : List Value) : List Charge :=
   let a := argU64 args
@@ -405,6 +438,10 @@ def chargesBeforeUnvalidated (name : String) (st : HostStore NearState) (args : 
   | "promise_batch_action_delete_account" =>
     [base] ++ readSpan st (a 1) (a 2) ++ utf8 (spanLen st (a 1) (a 2))
       ++ [.actionBase (·.deleteAccount) (sirOf st (promiseReceiver? st (a 0).toNat))]
+  | "promise_batch_action_use_global_contract" =>
+    (globalContractPlan st false (a 0).toNat (a 1) (a 2) (sirOf st (promiseReceiver? st (a 0).toNat))).charges
+  | "promise_batch_action_use_global_contract_by_account_id" =>
+    (globalContractPlan st true (a 0).toNat (a 1) (a 2) (sirOf st (promiseReceiver? st (a 0).toNat))).charges
   | "promise_results_count" => [base]
   | "promise_result" => [base]
   | "promise_return" => [base, .ext "promise_return"]
@@ -526,6 +563,8 @@ def invocationArgumentError (name : String) (st : HostStore NearState) (args : L
   else if name == "promise_and" then promiseJoinError st args
   else if name == "promise_batch_action_transfer" then transferInputError st args
   else if name == "promise_batch_action_add_key_with_function_call" then (functionKeyPlan st (functionKeyInputs args) false).error
+  else if let some byAccount := globalContractInputs? name then
+    (globalContractPlan st byAccount (argU64 args 0).toNat (argU64 args 1) (argU64 args 2) false).error
   else creationPrefixError name st args
 
 def preInvokeError (name : String) (st : HostStore NearState) (args : List Value) : Option HostError :=
@@ -979,9 +1018,7 @@ def unsupportedRuntimeHost (name : String) : Bool :=
    "bls12381_map_fp2_to_g2", "bls12381_p1_decompress", "bls12381_p2_decompress",
    "bls12381_p1_sum", "bls12381_p2_sum", "bls12381_pairing_check",
    "promise_batch_action_deploy_global_contract",
-   "promise_batch_action_deploy_global_contract_by_account_id",
-   "promise_batch_action_use_global_contract",
-   "promise_batch_action_use_global_contract_by_account_id"].contains name
+   "promise_batch_action_deploy_global_contract_by_account_id"].contains name
 
 /-- The name a host is metered under. nearcore's weighted function call is the
 plain one plus a weight: same charges, checks and errors. -/

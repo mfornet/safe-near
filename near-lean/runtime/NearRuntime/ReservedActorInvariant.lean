@@ -41,6 +41,7 @@ theorem applyAction_systemAbsent (c : ReceiptCtx) (isLast : Bool) (action : Acti
       rw [applyDeleteKey_run]
       simp only [hreceiver, hmissing]
       split <;> exact hmissing
+    | useGlobalContract _ => exact hmissing
     | deleteAccount beneficiary =>
       rw [applyDeleteAccount_run]
       simp only [hreceiver, hmissing]

@@ -491,6 +491,36 @@ theorem promiseBatchActionDeleteAccountFn_selection : HostPreservesSelection pro
     | apply checkPublicKey_selection _ _ _ _ hwf
     | split)
 
+theorem promiseBatchActionUseGlobalContractFn_selection : HostPreservesSelection promiseBatchActionUseGlobalContractFn := by
+  unfold promiseBatchActionUseGlobalContractFn useGlobalContractFn
+  apply disallowInView_selection
+  intro st args hwf
+  dsimp only
+  repeat (first
+    | exact hwf
+    | exact appendPromise_selection _ _ hwf
+    | exact appendPromiseActionResult_selection _ _ _ _ hwf
+    | exact createBatchPromiseResult_selection _ _ _ hwf
+    | exact createCallbackPromiseResult_selection _ _ _ _ hwf
+    | apply checkAccountId_selection _ _ _ _ hwf
+    | apply checkPublicKey_selection _ _ _ _ hwf
+    | split)
+
+theorem promiseBatchActionUseGlobalContractByAccountIdFn_selection : HostPreservesSelection promiseBatchActionUseGlobalContractByAccountIdFn := by
+  unfold promiseBatchActionUseGlobalContractByAccountIdFn useGlobalContractFn
+  apply disallowInView_selection
+  intro st args hwf
+  dsimp only
+  repeat (first
+    | exact hwf
+    | exact appendPromise_selection _ _ hwf
+    | exact appendPromiseActionResult_selection _ _ _ _ hwf
+    | exact createBatchPromiseResult_selection _ _ _ hwf
+    | exact createCallbackPromiseResult_selection _ _ _ _ hwf
+    | apply checkAccountId_selection _ _ _ _ hwf
+    | apply checkPublicKey_selection _ _ _ _ hwf
+    | split)
+
 theorem valueReturnFn_selection : HostPreservesSelection valueReturnFn := by
   intro st args hwf
   unfold valueReturnFn

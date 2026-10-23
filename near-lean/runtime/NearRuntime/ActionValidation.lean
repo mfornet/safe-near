@@ -41,6 +41,8 @@ def validateAction (limits : LimitConfig) : Action → Except ActionsValidationE
   | .stake _ key => do
     unless StakingKey.suitable key do throw (.unsuitableStakingKey key)
   | .addKey _ key => validateActionPermission limits key.permission
+  | .useGlobalContract (.accountId id) => do
+    if !validAccountIdBytes id then throw (.invalidAccountId ((String.fromUTF8? ⟨id.toArray⟩).getD ""))
   | .deleteAccount beneficiary => do
     if !validAccountIdBytes beneficiary.toUTF8.toList then throw (.invalidAccountId beneficiary)
   | _ => pure ()

@@ -26,6 +26,18 @@ inductive AccessKeyPermission where
   | functionCall (allowance : Allowance) (receiverId methodNames : List UInt8)
 deriving Inhabited, BEq
 
+/-- `GlobalContractIdentifier`: a 32-byte code hash, or the account that
+deployed the contract. -/
+inductive GlobalContractId where
+  | codeHash (hash : List UInt8)
+  | accountId (accountId : List UInt8)
+deriving Inhabited, BEq
+
+/-- `GlobalContractIdentifier::len`, the byte count the per-byte fee charges. -/
+def GlobalContractId.length : GlobalContractId → Nat
+  | .codeHash _ => 32
+  | .accountId id => id.length
+
 /-- Receipt actions emitted by promise batch action host functions. -/
 inductive PromiseAction where
   | createAccount
@@ -36,6 +48,7 @@ inductive PromiseAction where
   | addKey (publicKey : List UInt8) (nonce : UInt64) (permission : AccessKeyPermission)
   | deleteKey (publicKey : List UInt8)
   | deleteAccount (beneficiaryId : List UInt8)
+  | useGlobalContract (contract : GlobalContractId)
 deriving Inhabited, BEq
 
 end Wasm

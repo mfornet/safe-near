@@ -207,6 +207,26 @@ theorem promiseBatchActionDeleteAccountFn_encoding :
     | (apply appendPromiseActionResult_encoding _ _ _ _ h; apply hnew; simp_all [batchActionInput?])
     | split)
 
+theorem promiseBatchActionUseGlobalContractFn_encoding :
+    HostPreservesEncoding "promise_batch_action_use_global_contract" promiseBatchActionUseGlobalContractFn := by
+  intro st args h hnew
+  unfold promiseBatchActionUseGlobalContractFn useGlobalContractFn
+  dsimp only [disallowInView, checkAccountId, checkPublicKey]
+  repeat (first
+    | trivial
+    | (apply appendPromiseActionResult_encoding _ _ _ _ h; apply hnew; simp_all [batchActionInput?])
+    | split)
+
+theorem promiseBatchActionUseGlobalContractByAccountIdFn_encoding :
+    HostPreservesEncoding "promise_batch_action_use_global_contract_by_account_id" promiseBatchActionUseGlobalContractByAccountIdFn := by
+  intro st args h hnew
+  unfold promiseBatchActionUseGlobalContractByAccountIdFn useGlobalContractFn
+  dsimp only [disallowInView, checkAccountId, checkPublicKey]
+  repeat (first
+    | trivial
+    | (apply appendPromiseActionResult_encoding _ _ _ _ h; apply hnew; simp_all [batchActionInput?])
+    | split)
+
 /-- This action introduces no method-decoding obligation. -/
 theorem promiseBatchActionCreateAccountFn_preserves_encoding (st : HostStore NearState) (args : List Value)
     (h : PromisesEncoding st.host.promises) :
@@ -285,6 +305,30 @@ theorem promiseBatchActionDeleteAccountFn_preserves_encoding (st : HostStore Nea
     HostResult.LiveSatisfies (fun ns => PromisesEncoding ns.promises)
       (promiseBatchActionDeleteAccountFn.invoke st args) := by
   unfold promiseBatchActionDeleteAccountFn
+  dsimp only [disallowInView, checkAccountId, checkPublicKey]
+  repeat (first
+    | trivial
+    | (apply appendPromiseActionResult_encoding _ _ _ _ h; trivial)
+    | split)
+
+/-- This action introduces no method-decoding obligation. -/
+theorem promiseBatchActionUseGlobalContractFn_preserves_encoding (st : HostStore NearState) (args : List Value)
+    (h : PromisesEncoding st.host.promises) :
+    HostResult.LiveSatisfies (fun ns => PromisesEncoding ns.promises)
+      (promiseBatchActionUseGlobalContractFn.invoke st args) := by
+  unfold promiseBatchActionUseGlobalContractFn useGlobalContractFn
+  dsimp only [disallowInView, checkAccountId, checkPublicKey]
+  repeat (first
+    | trivial
+    | (apply appendPromiseActionResult_encoding _ _ _ _ h; trivial)
+    | split)
+
+/-- This action introduces no method-decoding obligation. -/
+theorem promiseBatchActionUseGlobalContractByAccountIdFn_preserves_encoding (st : HostStore NearState) (args : List Value)
+    (h : PromisesEncoding st.host.promises) :
+    HostResult.LiveSatisfies (fun ns => PromisesEncoding ns.promises)
+      (promiseBatchActionUseGlobalContractByAccountIdFn.invoke st args) := by
+  unfold promiseBatchActionUseGlobalContractByAccountIdFn useGlobalContractFn
   dsimp only [disallowInView, checkAccountId, checkPublicKey]
   repeat (first
     | trivial

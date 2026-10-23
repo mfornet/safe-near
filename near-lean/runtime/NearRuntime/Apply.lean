@@ -145,6 +145,7 @@ def actionOfPromiseRaw (codeOf : Bytes → ContractCode) : PromiseAction → Act
     .addKey pk { nonce := nonce.toNat, permission }
   | .deleteKey pk => .deleteKey pk
   | .deleteAccount beneficiary => .deleteAccount (stringOfBytes beneficiary)
+  | .useGlobalContract contract => .useGlobalContract contract
 
 /-- Missing external decoders are model issues, never silently deployable code. -/
 def actionOfPromise (codeOf : Bytes → ContractCode) (action : PromiseAction) : Except RuntimeError Action := do
@@ -396,6 +397,10 @@ def applyAction (c : ReceiptCtx) (isLast : Bool) : Action → ExecM Unit
       storageAccounting := stageContractStorageRemoval id (st.contractStorage id) exec.storageAccounting }
     modify fun e => { e with actorId := c.receipt.predecessorId }
     emit r
+  | .useGlobalContract _ =>
+    -- Resolving the identifier needs the global contract registry and its
+    -- distribution, which the model does not have.
+    throw (.executionIssue (.unsupportedAction "use global contract"))
 
 /-- `check_storage_stake` on one account. The formula, with the NEP-448
 zero-balance exemption, is the boundary's `NearInterface.stakeDeficit`. -/
@@ -431,12 +436,12 @@ def checkActionAccount (st : ChainState) (r : Receipt) (onlyAction : Bool)
 transfer never grants the predecessor authority over an existing account. -/
 def checkActorPermissions (actor receiver : AccountId) (action : Action) : Except RuntimeError Unit :=
   match action with
-  | .deployContract _ | .stake .. | .addKey .. | .deleteKey _ | .deleteAccount _ =>
+  | .deployContract _ | .stake .. | .addKey .. | .deleteKey _ | .deleteAccount _ | .useGlobalContract _ =>
     if actor == receiver then .ok () else .error (.actorNoPermission receiver actor)
   | _ => .ok ()
 
 def Action.requiresActor : Action → Bool
-  | .deployContract _ | .stake .. | .addKey .. | .deleteKey _ | .deleteAccount _ => true
+  | .deployContract _ | .stake .. | .addKey .. | .deleteKey _ | .deleteAccount _ | .useGlobalContract _ => true
   | _ => false
 
 theorem administrative_action_authorized (actor receiver : AccountId) (action : Action)

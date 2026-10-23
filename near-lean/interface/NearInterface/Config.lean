@@ -169,6 +169,17 @@ def ofJson (j : Json) : Except String RuntimeConfig := do
   let storageUsage ← field tc "storage_usage_config"
   let wasm ← field j "wasm_config"
   let acc ← field j "account_creation_config"
+  -- `RuntimeConfigView` omits the global-contract action fees. nearcore sets
+  -- them in `runtime_configs/77.yaml`; the host functions that charge them are
+  -- enabled from 78 (`global_contract_host_fns`) and no later version changes them.
+  let hostFns := ((field wasm "global_contract_host_fns").toOption.bind (·.getBool?.toOption)).getD false
+  let disabled : Fee :=
+    { sendSir := 999_999_999_999_999, sendNotSir := 999_999_999_999_999, execution := 999_999_999_999_999 }
+  let useGlobalBase : Fee := if hostFns then
+    { sendSir := 184_765_750_000, sendNotSir := 184_765_750_000, execution := 184_765_750_000 }
+    else disabled
+  let useGlobalByte : Fee := if hostFns then
+    { sendSir := 6_812_999, sendNotSir := 47_683_715, execution := 64_572_944 } else disabled
   let actionFees : ActionFees := {
     createAccount := ← feeAt ac "create_account_cost"
     deleteAccount := ← feeAt ac "delete_account_cost"
@@ -185,7 +196,10 @@ def ofJson (j : Json) : Except String RuntimeConfig := do
     newActionReceipt := ← feeAt tc "action_receipt_creation_config"
     newDataReceiptBase := ← feeAt dataReceipt "base_cost"
     newDataReceiptByte := ← feeAt dataReceipt "cost_per_byte"
-    delegate := ← feeAt ac "delegate_cost" }
+    delegate := ← feeAt ac "delegate_cost"
+    useGlobalContractBase := (feeAt ac "use_global_contract_cost").toOption.getD useGlobalBase
+    useGlobalContractByte :=
+      (feeAt ac "use_global_contract_cost_per_identifier_byte").toOption.getD useGlobalByte }
   let finance ← field j "runtime_finance"
   pure {
     strictNonceEnabled := ← (← field (← field j "runtime_admission") "strict_nonce").getBool?

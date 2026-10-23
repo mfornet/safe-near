@@ -138,7 +138,8 @@ def observe (ctx : Context) (storage : List (Bytes × Bytes)) (outcome : VMOutco
       else
         { outcome := .ok outcome.returnData, storage := outcome.storage.toFinset,
           balance := outcome.balance, storageUsage := outcome.storageUsage,
-          burntGas := outcome.burntGas, usedGas := outcome.usedGas, logs := outcome.logs,
+          burntGas := outcome.burntGas, usedGas := outcome.usedGas - outcome.distributedGas,
+          logs := outcome.logs,
           receipts := outcome.receipts, trie }
 
 /-- The boundary on one listing of the contract storage. Same VM call and
@@ -228,8 +229,9 @@ theorem observe_echo (ctx : Context) {s₁ s₂ : List (Bytes × Bytes)} (hs : s
   have hbal : o₁.balance = o₂.balance := field VMOutcome.balance fun _ => rfl
   have husage : o₁.storageUsage = o₂.storageUsage := field VMOutcome.storageUsage fun _ => rfl
   have hrec : o₁.receipts = o₂.receipts := field VMOutcome.receipts fun _ => rfl
+  have hd : o₁.distributedGas = o₂.distributedGas := field VMOutcome.distributedGas fun _ => rfl
   unfold observe
-  rw [hs, ha, hacc, hb, hu, hl, hr, hbal, husage, hrec]
+  rw [hs, ha, hacc, hb, hu, hl, hr, hbal, husage, hrec, hd]
   cases hab : o₂.aborted with
   | some e => rfl
   | none => rw [hst (ha.trans hab)]

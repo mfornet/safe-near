@@ -16,6 +16,8 @@ def actionExecutionGas (fees : ActionFees) (ethEnabled : Bool) (receiver : List 
     fees.addFunctionCallKeyBase.execution + fees.addFunctionCallKeyByte.execution * methodNamesGasBytes methods
   | .deleteKey _ => fees.deleteKey.execution
   | .deleteAccount _ => fees.deleteAccount.execution
+  | .useGlobalContract id =>
+    fees.useGlobalContractBase.execution + fees.useGlobalContractByte.execution * id.length
 
 def receiptGasValue (fees : ActionFees) (ethEnabled : Bool) : ReceiptValuation := fun receiver actions =>
   fees.newActionReceipt.execution + (actions.map (actionExecutionGas fees ethEnabled receiver)).sum

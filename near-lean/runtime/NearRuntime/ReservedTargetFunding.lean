@@ -35,6 +35,7 @@ theorem applyAction_system_no_success (c : ReceiptCtx) (isLast : Bool) (action :
     rw [applyDeleteKey_run]
     simp only [hreceiver, hn]
     split <;> simp
+  | useGlobalContract _ => simp [applyAction]
   | deleteAccount beneficiary =>
     rw [applyDeleteAccount_run]
     simp only [hreceiver, hn]

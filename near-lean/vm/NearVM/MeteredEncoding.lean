@@ -73,8 +73,14 @@ theorem preInvokeError_creationAccount_valid (name : String) (st : HostStore Nea
   · simp [ht, creationAccountError, creationAccountArgs]
   by_cases hk : name = "promise_batch_action_add_key_with_function_call"
   · simp [hk, creationAccountError, creationAccountArgs]
+  by_cases hg : name = "promise_batch_action_use_global_contract"
+  · simp [hg, creationAccountError, creationAccountArgs]
+  by_cases hga : name = "promise_batch_action_use_global_contract_by_account_id"
+  · simp [hga, creationAccountError, creationAccountArgs]
+  have hgi : globalContractInputs? name = none := by
+    simp [globalContractInputs?, beq_eq_false_iff_ne.mpr hg, beq_eq_false_iff_ne.mpr hga]
   simp only [invocationArgumentError, hs, beq_eq_false_iff_ne.mpr hj,
-    beq_eq_false_iff_ne.mpr ht, beq_eq_false_iff_ne.mpr hk, Bool.false_eq_true, ite_false] at hi
+    beq_eq_false_iff_ne.mpr ht, beq_eq_false_iff_ne.mpr hk, Bool.false_eq_true, ite_false, hgi] at hi
   cases he : creationAccountError name st args with
   | none => rfl
   | some error => simp [creationPrefixError, he] at hi
@@ -362,6 +368,16 @@ theorem promiseBatchActionDeleteAccountFn_validated_encoding :
   intro st args h _ _ _
   exact promiseBatchActionDeleteAccountFn_preserves_encoding st args h
 
+theorem promiseBatchActionUseGlobalContractFn_validated_encoding :
+    HostValidatedEncoding "promise_batch_action_use_global_contract" promiseBatchActionUseGlobalContractFn := by
+  intro st args h _ _ _
+  exact promiseBatchActionUseGlobalContractFn_preserves_encoding st args h
+
+theorem promiseBatchActionUseGlobalContractByAccountIdFn_validated_encoding :
+    HostValidatedEncoding "promise_batch_action_use_global_contract_by_account_id" promiseBatchActionUseGlobalContractByAccountIdFn := by
+  intro st args h _ _ _
+  exact promiseBatchActionUseGlobalContractByAccountIdFn_preserves_encoding st args h
+
 theorem meteredActionDeleteAccount_success_encoding (extra : Nat) (st : HostStore NearState) (args values : List Value)
     (after : HostStore NearState) (h : PromisesEncoding st.host.promises)
     (hpolicy : st.host.config.validateActionMethodUtf8 = true)
@@ -369,5 +385,21 @@ theorem meteredActionDeleteAccount_success_encoding (extra : Nat) (st : HostStor
     PromisesEncoding after.host.promises :=
   metered_success_encoding extra "promise_batch_action_delete_account" promiseBatchActionDeleteAccountFn
     promiseBatchActionDeleteAccountFn_validated_encoding st args values after h hpolicy hreturn
+
+theorem meteredActionUseGlobalContract_success_encoding (extra : Nat) (st : HostStore NearState) (args values : List Value)
+    (after : HostStore NearState) (h : PromisesEncoding st.host.promises)
+    (hpolicy : st.host.config.validateActionMethodUtf8 = true)
+    (hreturn : (metered extra "promise_batch_action_use_global_contract" promiseBatchActionUseGlobalContractFn).invoke st args = .Return values after) :
+    PromisesEncoding after.host.promises :=
+  metered_success_encoding extra "promise_batch_action_use_global_contract" promiseBatchActionUseGlobalContractFn
+    promiseBatchActionUseGlobalContractFn_validated_encoding st args values after h hpolicy hreturn
+
+theorem meteredActionUseGlobalContractByAccountId_success_encoding (extra : Nat) (st : HostStore NearState) (args values : List Value)
+    (after : HostStore NearState) (h : PromisesEncoding st.host.promises)
+    (hpolicy : st.host.config.validateActionMethodUtf8 = true)
+    (hreturn : (metered extra "promise_batch_action_use_global_contract_by_account_id" promiseBatchActionUseGlobalContractByAccountIdFn).invoke st args = .Return values after) :
+    PromisesEncoding after.host.promises :=
+  metered_success_encoding extra "promise_batch_action_use_global_contract_by_account_id" promiseBatchActionUseGlobalContractByAccountIdFn
+    promiseBatchActionUseGlobalContractByAccountIdFn_validated_encoding st args values after h hpolicy hreturn
 
 end Wasm.Near

@@ -333,6 +333,8 @@ theorem meteredHostFns_preserves (cfg : RuntimeConfig) (entry : ImportDecl × Ne
       | exact promiseBatchActionAddKeyWithFunctionCallFn_preserves
       | exact promiseBatchActionDeleteKeyFn_preserves
       | exact promiseBatchActionDeleteAccountFn_preserves
+      | exact promiseBatchActionUseGlobalContractFn_preserves
+      | exact promiseBatchActionUseGlobalContractByAccountIdFn_preserves
       | exact valueReturnFn_preserves
       | exact promiseReturnFn_preserves
       | exact promiseResultsCountFn_preserves

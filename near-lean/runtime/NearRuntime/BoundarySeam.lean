@@ -252,7 +252,9 @@ theorem functionCallReceipt_seam (c : ReceiptCtx) (method : String) (args : Byte
     let res := runReceiptActions c st0
     res.1.logs = r.logs ∧ res.1.gasBurnt = fees + r.burntGas ∧
     ((∃ d, r.outcome = .ok d) →
-      res.2 = none ∧ res.1.gasUsed = fees + r.usedGas ∧
+      res.2 = none ∧
+      res.1.gasUsed = fees + r.usedGas + (run c.cfg code.module code.size method (toVMContext ctx)
+        (st0.contractStorage c.receipt.receiverId)).distributedGas ∧
       (res.1.state.contractStorage c.receipt.receiverId).toFinset = r.storage ∧
       (res.1.state.account? c.receipt.receiverId).map (·.amount) = some r.balance ∧
       (res.1.state.account? c.receipt.receiverId).map (·.storageUsage) = some r.storageUsage ∧
@@ -286,8 +288,10 @@ theorem functionCallReceipt_seam (c : ReceiptCtx) (method : String) (args : Byte
   rw [htrie, hb] at hres
   have hgas := run_burntGas_le_usedGas c.cfg code.module code.size method (toVMContext ctx)
     (st0.contractStorage c.receipt.receiverId) (fuelFor c.cfg code.module (toVMContext ctx))
+  have hdist := run_distributionBounded c.cfg code.module code.size method (toVMContext ctx)
+    (st0.contractStorage c.receipt.receiverId) (fuelFor c.cfg code.module (toVMContext ctx))
   generalize run c.cfg code.module code.size method (toVMContext ctx)
-    (st0.contractStorage c.receipt.receiverId) = o at hr hres hgas
+    (st0.contractStorage c.receipt.receiverId) = o at hr hres hgas hdist ⊢
   rw [hr]
   cases ha : o.aborted with
   | some fe =>
@@ -359,6 +363,7 @@ theorem functionCallReceipt_seam (c : ReceiptCtx) (method : String) (args : Byte
       · simp only [hd, ↓reduceIte, Exec.commitFunctionCall, Exec.recordVMOutcome]
         refine ⟨by simp, by simp [fees], ?_, ?_⟩
         · intro _
+          simp only [VMOutcome.DistributionBounded] at hdist
           refine ⟨trivial, by simp only [fees]; omega, by rw [hsto], by simp [hacc'],
             by simp [hacc'], trivial⟩
         · intro f hf; cases hf

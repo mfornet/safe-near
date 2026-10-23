@@ -235,7 +235,8 @@ def outcomeOfExecution (ctx : VMContext) (storage : List (List UInt8 × List UIn
         { outcome with
           returnData := returnData
           receipts := distributed.1
-          usedGas := ns.gas.used + distributed.2 }
+          usedGas := ns.gas.used + distributed.2
+          distributedGas := distributed.2 }
 
 /-- nearcore replaces the contract's memory declaration during preparation. -/
 def prepareMemory (cfg : RuntimeConfig) (code : Module) : Module :=

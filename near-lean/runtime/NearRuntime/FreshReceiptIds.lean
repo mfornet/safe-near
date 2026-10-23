@@ -138,6 +138,7 @@ theorem applyAction_freshIds (c : ReceiptCtx) (isLast : Bool) (action : Action) 
     repeat' (first | exact h | split)
   | addKey pk key => rw [applyAddKey_run]; repeat' (first | exact h | split)
   | deleteKey pk => rw [applyDeleteKey_run]; repeat' (first | exact h | split)
+  | useGlobalContract _ => exact h
   | deleteAccount beneficiary =>
     rw [applyDeleteAccount_run]
     split
@@ -221,6 +222,7 @@ theorem freshIds_runReceiptActionAt (lower : Nat) (c : ReceiptCtx) (onlyAction i
   | stake amount pk => exact freshIds_runReceiptAction lower c onlyAction isLast (.stake amount pk)
   | addKey pk key => exact freshIds_runReceiptAction lower c onlyAction isLast (.addKey pk key)
   | deleteKey pk => exact freshIds_runReceiptAction lower c onlyAction isLast (.deleteKey pk)
+  | useGlobalContract contract => exact freshIds_runReceiptAction lower c onlyAction isLast (.useGlobalContract contract)
   | deleteAccount beneficiary => exact freshIds_runReceiptAction lower c onlyAction isLast (.deleteAccount beneficiary)
   | functionCall method args gas deposit =>
     cases hs : actionRandomSeed c index with

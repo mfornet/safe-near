@@ -41,6 +41,12 @@ def action (codes : List (String × Bytes)) : Action → Except String Bytes
   | .addKey key access => do return [5] ++ (← StateEncoding.publicKey key) ++ (← StateEncoding.accessKey access)
   | .deleteKey key => do return [6] ++ (← StateEncoding.publicKey key)
   | .deleteAccount beneficiary => do return [7] ++ (← account beneficiary)
+  | .useGlobalContract (.codeHash hash) => do
+    unless hash.length == 32 do throw "code hash is not 32 bytes"
+    return [10, 0] ++ hash
+  | .useGlobalContract (.accountId id) => do
+    unless Wasm.Near.validAccountIdBytes id do throw "invalid account id"
+    return [10, 1] ++ (← vector id)
 
 /-- Borsh `ReceivedData` wraps only Option<Vec<u8>>. None and Some(empty)
 remain distinct native state values. -/

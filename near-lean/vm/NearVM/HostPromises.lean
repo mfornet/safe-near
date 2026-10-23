@@ -459,6 +459,40 @@ theorem promiseBatchActionDeleteAccountFn_preserves : HostPreservesPromises prom
     | apply checkPublicKey_preserves_promises _ _ _ _ hwf
     | split)
 
+theorem promiseBatchActionUseGlobalContractFn_preserves : HostPreservesPromises promiseBatchActionUseGlobalContractFn := by
+  unfold promiseBatchActionUseGlobalContractFn useGlobalContractFn
+  apply disallowInView_preserves_promises
+  intro st args hwf
+  dsimp only
+  repeat (first
+    | exact hwf
+    | exact appendBatchPromise_preserves _ _ _ hwf
+    | exact appendCallbackPromise_preserves _ _ _ _ hwf (by assumption)
+    | exact appendJointPromise_find_preserves _ _ hwf (by assumption)
+    | exact appendPromiseActionResult_preserves _ _ _ _ hwf
+    | exact createBatchPromiseResult_preserves _ _ _ hwf
+    | exact createCallbackPromiseResult_preserves _ _ _ _ hwf
+    | apply checkAccountId_preserves_promises _ _ _ _ hwf
+    | apply checkPublicKey_preserves_promises _ _ _ _ hwf
+    | split)
+
+theorem promiseBatchActionUseGlobalContractByAccountIdFn_preserves : HostPreservesPromises promiseBatchActionUseGlobalContractByAccountIdFn := by
+  unfold promiseBatchActionUseGlobalContractByAccountIdFn useGlobalContractFn
+  apply disallowInView_preserves_promises
+  intro st args hwf
+  dsimp only
+  repeat (first
+    | exact hwf
+    | exact appendBatchPromise_preserves _ _ _ hwf
+    | exact appendCallbackPromise_preserves _ _ _ _ hwf (by assumption)
+    | exact appendJointPromise_find_preserves _ _ hwf (by assumption)
+    | exact appendPromiseActionResult_preserves _ _ _ _ hwf
+    | exact createBatchPromiseResult_preserves _ _ _ hwf
+    | exact createCallbackPromiseResult_preserves _ _ _ _ hwf
+    | apply checkAccountId_preserves_promises _ _ _ _ hwf
+    | apply checkPublicKey_preserves_promises _ _ _ _ hwf
+    | split)
+
 /-- Gas accounting, including exhaustion, does not mutate promise handles. -/
 theorem applyCharge_promises (ns : NearState) (charge : Charge) :
     (applyCharge ns charge).1.promises = ns.promises := by
@@ -631,6 +665,14 @@ theorem metered_promiseBatchActionDeleteKeyFn_preserves (extra : Nat) (name : St
 theorem metered_promiseBatchActionDeleteAccountFn_preserves (extra : Nat) (name : String) :
     HostPreservesPromises (metered extra name promiseBatchActionDeleteAccountFn) :=
   metered_preserves_promises extra name promiseBatchActionDeleteAccountFn promiseBatchActionDeleteAccountFn_preserves
+
+theorem metered_promiseBatchActionUseGlobalContractFn_preserves (extra : Nat) (name : String) :
+    HostPreservesPromises (metered extra name promiseBatchActionUseGlobalContractFn) :=
+  metered_preserves_promises extra name promiseBatchActionUseGlobalContractFn promiseBatchActionUseGlobalContractFn_preserves
+
+theorem metered_promiseBatchActionUseGlobalContractByAccountIdFn_preserves (extra : Nat) (name : String) :
+    HostPreservesPromises (metered extra name promiseBatchActionUseGlobalContractByAccountIdFn) :=
+  metered_preserves_promises extra name promiseBatchActionUseGlobalContractByAccountIdFn promiseBatchActionUseGlobalContractByAccountIdFn_preserves
 
 theorem checkDataLimit_preserves_promises (name label : String) (limit : Option Nat) (size : Nat)
     (st : HostStore NearState) (next : Unit → HostResult NearState)

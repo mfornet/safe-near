@@ -67,6 +67,9 @@ inductive Action
   | addKey (publicKey : PublicKey) (accessKey : AccessKey)
   | deleteKey (publicKey : PublicKey)
   | deleteAccount (beneficiaryId : AccountId)
+  /-- Use a global contract. Created by contracts; executing it is outside the
+  model (an explicit `unsupportedAction` issue). -/
+  | useGlobalContract (contract : Wasm.GlobalContractId)
   deriving Inhabited
 
 def Action.deposit : Action → Nat

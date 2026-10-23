@@ -28,6 +28,10 @@ structure VMOutcome where
   receipts : List ReceiptSpec
   /-- `none` on success. -/
   aborted : Option FunctionCallError
+  /-- Unused prepaid gas added to weighted function calls after the call
+  (`distribute_gas`); included in `usedGas`. The VM runner's own `used_gas`
+  is `usedGas - distributedGas`. -/
+  distributedGas : Nat := 0
   /-- Attempted sponsored deposits, retained as diagnostics on VM failure. -/
   subsidizedAmount : Nat := 0
   gasProfile : GasProfile := {}
@@ -81,7 +85,7 @@ def VMOutcome.graphIssue (balance usage : Nat) (storage : List (List UInt8 × Li
     (o : VMOutcome) : VMOutcome :=
   { o with
     balance := balance, storageUsage := usage, storage := storage, receipts := [], returnData := .none
-    usedGas := o.burntGas
+    usedGas := o.burntGas, distributedGas := 0
     aborted := some (.executionIssue (.interpreterError "invalid receipt dependency graph")) }
 
 def VMOutcome.checkReceipts (balance usage : Nat) (storage : List (List UInt8 × List UInt8))

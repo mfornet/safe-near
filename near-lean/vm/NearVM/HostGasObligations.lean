@@ -17,6 +17,10 @@ def batchActionInput? (name : String) (st : HostStore NearState) : List Value â†
     if name == "promise_batch_action_deploy_contract" then some (index, .deployContract bytes)
     else if name == "promise_batch_action_delete_key" then some (index, .deleteKey bytes)
     else if name == "promise_batch_action_delete_account" then some (index, .deleteAccount bytes)
+    else if name == "promise_batch_action_use_global_contract" then
+      some (index, .useGlobalContract (.codeHash bytes))
+    else if name == "promise_batch_action_use_global_contract_by_account_id" then
+      some (index, .useGlobalContract (.accountId bytes))
     else none
   | [.i64 index, .i64 a, .i64 b, .i64 c] =>
     if name == "promise_batch_action_stake" then do
@@ -151,6 +155,24 @@ theorem promiseBatchActionDeleteKeyFn_gasObligation : HostAppendsGas "promise_ba
 theorem promiseBatchActionDeleteAccountFn_gasObligation : HostAppendsGas "promise_batch_action_delete_account" promiseBatchActionDeleteAccountFn := by
   intro fees ethEnabled st args
   unfold promiseBatchActionDeleteAccountFn
+  dsimp only [disallowInView, checkAccountId, checkPublicKey]
+  repeat (first
+    | trivial
+    | (apply appendPromiseActionResult_gas_input; simp_all [batchActionInput?])
+    | split)
+
+theorem promiseBatchActionUseGlobalContractFn_gasObligation : HostAppendsGas "promise_batch_action_use_global_contract" promiseBatchActionUseGlobalContractFn := by
+  intro fees ethEnabled st args
+  unfold promiseBatchActionUseGlobalContractFn useGlobalContractFn
+  dsimp only [disallowInView, checkAccountId, checkPublicKey]
+  repeat (first
+    | trivial
+    | (apply appendPromiseActionResult_gas_input; simp_all [batchActionInput?])
+    | split)
+
+theorem promiseBatchActionUseGlobalContractByAccountIdFn_gasObligation : HostAppendsGas "promise_batch_action_use_global_contract_by_account_id" promiseBatchActionUseGlobalContractByAccountIdFn := by
+  intro fees ethEnabled st args
+  unfold promiseBatchActionUseGlobalContractByAccountIdFn useGlobalContractFn
   dsimp only [disallowInView, checkAccountId, checkPublicKey]
   repeat (first
     | trivial

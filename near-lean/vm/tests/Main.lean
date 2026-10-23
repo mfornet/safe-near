@@ -222,10 +222,6 @@ def main (args : List String) : IO UInt32 := do
        ("promise_batch_action_deploy_global_contract", "i64 i64 i64",
         "i64.const 0 i64.const 0 i64.const 0", ""),
        ("promise_batch_action_deploy_global_contract_by_account_id", "i64 i64 i64",
-        "i64.const 0 i64.const 0 i64.const 0", ""),
-       ("promise_batch_action_use_global_contract", "i64 i64 i64",
-        "i64.const 0 i64.const 0 i64.const 0", ""),
-       ("promise_batch_action_use_global_contract_by_account_id", "i64 i64 i64",
         "i64.const 0 i64.const 0 i64.const 0", "")] do
     let wat := s!"(module (import \"env\" \"{name}\" (func $unsupported (param {params}) {results}))
       (memory 1) (func (export \"test\") {arguments} call $unsupported {if results.isEmpty then "" else "drop"})
@@ -279,6 +275,41 @@ def main (args : List String) : IO UInt32 := do
   check r "weight zero is a plain function call"
     (zeroWeight.receipts.map (·.actions) == [[.functionCall (bytesOf "m") [] 0 7]] &&
       zeroWeight.usedGas < 300 * 10 ^ 12) (describe zeroWeight)
+
+  -- `use_global_contract`: a 32-byte code hash or a valid account id, on a batch
+  -- target; nearcore's errors otherwise.
+  let globalCode ← match ← Wat.compile "(module
+      (import \"env\" \"promise_batch_create\" (func $batch (param i64 i64) (result i64)))
+      (import \"env\" \"promise_batch_action_use_global_contract\" (func $hash (param i64 i64 i64)))
+      (import \"env\" \"promise_batch_action_use_global_contract_by_account_id\"
+        (func $account (param i64 i64 i64)))
+      (memory 1) (data (i32.const 0) \"alice.near\")
+      (data (i32.const 32) \"0123456789abcdef0123456789abcdef\") (data (i32.const 80) \"A!\")
+      (func (export \"hash\") i64.const 10 i64.const 0 call $batch i64.const 32 i64.const 32 call $hash)
+      (func (export \"short\") i64.const 10 i64.const 0 call $batch i64.const 31 i64.const 32 call $hash)
+      (func (export \"account\") i64.const 10 i64.const 0 call $batch i64.const 10 i64.const 0 call $account)
+      (func (export \"invalid\") i64.const 10 i64.const 0 call $batch i64.const 2 i64.const 80 call $account)
+      (func (export \"target\") i64.const 7 i64.const 32 i64.const 32 call $hash))" with
+    | .ok m => pure m
+    | .error e => throw (IO.userError s!"global-contract fixture: {e}")
+  let globalRun (method : String) := run cfg globalCode 0 method (ctx alice method "{}" 0) []
+  let hash := (List.range 32).map fun i => (bytesOf "0123456789abcdef")[i % 16]!
+  let byHash := globalRun "hash"
+  check r "use_global_contract appends the code hash"
+    (byHash.receipts.map (·.actions) == [[.useGlobalContract (.codeHash hash)]]) (describe byHash)
+  check r "use_global_contract reserves its execution fees"
+    (byHash.usedGas - byHash.burntGas == cfg.fees.actionFees.newActionReceipt.execution +
+      cfg.fees.actionFees.useGlobalContractBase.execution + 32 * cfg.fees.actionFees.useGlobalContractByte.execution)
+    (describe byHash)
+  check r "a code hash must have 32 bytes"
+    ((globalRun "short").aborted == some (.hostError .contractCodeHashMalformed))
+  let byAccount := globalRun "account"
+  check r "use_global_contract_by_account_id appends the account id"
+    (byAccount.receipts.map (·.actions) == [[.useGlobalContract (.accountId alice)]]) (describe byAccount)
+  check r "use_global_contract_by_account_id rejects invalid account ids"
+    ((globalRun "invalid").aborted == some (.hostError .invalidAccountId))
+  check r "use_global_contract needs an existing promise"
+    ((globalRun "target").aborted == some (.hostError (.invalidPromiseIndex 7)))
 
   -- config sanity
   check r "config: regular_op_cost loaded" (cfg.wasm.regularOpCost = 822756)

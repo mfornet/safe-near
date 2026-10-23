@@ -33,7 +33,8 @@ theorem prechargedStore_creation_guard (name : String) (st : HostStore NearState
   have hs (store : HostStore NearState) : storageMutationPlan? name store args = none := by
     simp [storageMutationPlan?, hwrite, hremove]
   simp only [preInvokeError, invocationArgumentError, hs, hjoin, htransfer, hkey, Bool.false_eq_true, ite_false,
-    prechargedStore_creationPrefixError, prechargedStore_promiseCapacityError, prechargedStore_functionCallInputError]
+    prechargedStore_creationPrefixError, prechargedStore_promiseCapacityError, prechargedStore_functionCallInputError,
+    prechargedStore_globalContractPlan_error]
 
 /-- A new raw promise consumes the gas reserved by its public charge plan.
 The concrete creator proofs below discharge the plan equality from ABI reads. -/

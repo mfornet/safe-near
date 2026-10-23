@@ -62,6 +62,8 @@ structure ActionFees where
   newDataReceiptBase : Fee := {}
   newDataReceiptByte : Fee := {}
   delegate : Fee := {}
+  useGlobalContractBase : Fee := {}
+  useGlobalContractByte : Fee := {}
   deriving Repr, Inhabited
 
 /-- `ExtCosts` as a lookup by nearcore's snake_case name; missing names cost
