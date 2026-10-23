@@ -105,7 +105,7 @@ theorem invPreserved : Spec.InvPreserved := by
   all_goals try simp only [Except.ok.injEq] at hb
   all_goals subst out
   all_goals simp_all
-  all_goals apply set_wf hs hi <;> intros <;> simp_all
+  all_goals (apply set_wf hs hi; intros; simp_all)
   all_goals omega
 
 end Linkdrop

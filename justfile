@@ -56,6 +56,15 @@ near-test:
 runtime-adapter-test:
     cd contracts/w-near/verification && lake build runtime-adapter-tests && ./.lake/build/bin/runtime-adapter-tests
 
+# Compare linkdrop's binary with its contract model through the near-lean boundary.
+linkdrop-adapter-test:
+    cd contracts/linkdrop/verification && lake build runtime-adapter-tests && ./.lake/build/bin/runtime-adapter-tests
+
+# Audit every linkdrop model/spec/proof declaration, including transitive axioms.
+linkdrop-audit:
+    cd contracts/linkdrop/verification && lake build Model Spec Proofs runtime-adapter-tests
+    python3 tools/axiom-audit.py contracts/linkdrop/verification --no-build --allow-sorry-module Proofs.Refinement --report audit/linkdrop.json
+
 # Audit every wNEAR model/spec/proof declaration, including transitive axioms.
 wnear-audit:
     cd contracts/w-near/verification && lake build Model Spec Proofs runtime-adapter-tests

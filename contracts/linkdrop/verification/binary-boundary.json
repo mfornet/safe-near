@@ -169,12 +169,6 @@
     "__contract_abi",
     "contract_source_metadata"
   ],
-  "missingNearVMImportNames": [
-    "env.promise_batch_action_function_call_weight",
-    "env.promise_batch_action_deploy_global_contract",
-    "env.promise_batch_action_deploy_global_contract_by_account_id",
-    "env.promise_batch_action_use_global_contract",
-    "env.promise_batch_action_use_global_contract_by_account_id"
-  ],
-  "checkScope": "Static import-name inventory against nearHostFns plus the metered gas import. Does not validate signatures or execute Wasm. Missing names prevent NearVM import resolution; this is a model gap, not a contract failure."
+  "missingNearVMImportNames": [],
+  "checkScope": "Static import-name inventory against nearHostFns plus the metered gas import. Every import resolves. Deploying a global contract is an explicit unsupportedHost issue when invoked; linkdrop never invokes it. The adapter tests (RuntimeTests/Main.lean) execute the binary."
 }

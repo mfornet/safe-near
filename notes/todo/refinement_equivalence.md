@@ -321,8 +321,8 @@ statement, the instance, the model extensions, re-proved specs and tests.
 | 1. `near-lean/interface` | done |
 | 2. near-lean boundary and instance | done; fuel sufficiency, storage listing and whole-receipt seam proved |
 | 3. wNEAR | done: model extensions, instance, statement, re-proved specs, tests |
-| 4. linkdrop | old statement removed; instance blocked on near-lean (below) |
-| 5. Tests | wNEAR adapter tests on the boundary (205 checks) |
+| 4. linkdrop | done: instance on the boundary model, statement (`refines_linkdrop`, open), adapter tests |
+| 5. Tests | adapter tests on the boundary: wNEAR (210 checks), linkdrop (225 checks) |
 | 6. Docs | wNEAR README and blueprint, linkdrop README, `SPECIFICATIONS.md` |
 
 ### Departures from sections 3–6
@@ -407,15 +407,36 @@ statement, the instance, the model extensions, re-proved specs and tests.
   aborts, promised actions the runtime rejects (`actionsIssue?` is the
   runtime's `validateFunctionCallActions`), and the storage-stake check
   (both use `stakeDeficit`).
-- **wNEAR.** `refines_wnear` itself, including the soundness of `gasBound`.
+- **wNEAR, linkdrop.** `refines_wnear` and `refines_linkdrop` themselves,
+  including the soundness of the gas bounds.
 
 ### linkdrop
 
-near-lean cannot run linkdrop's binary: it imports five host functions NearVM
-does not provide (weighted function calls and global contracts). Exact panic
-texts, receipt bytes and a gas bound all come from running the binary, so the
-instance is not stated with guessed parts; `contracts/linkdrop/verification/README.md`
-lists what it needs. The old divergent statement is removed.
+near-lean could not run linkdrop's binary: it imports five host functions
+NearVM lacked. They are now modelled after the pinned nearcore:
+
+- `promise_batch_action_function_call_weight`: the function call with a gas
+  weight; after a successful call the unused prepaid gas goes to the weighted
+  calls (`ReceiptManager::distribute_gas`: shares by weight, remainder to the
+  last). The VM outcome records the distributed gas; the boundary observes the
+  VM runner's used gas before distribution, which is what `Matches`' leftover
+  gas means, and the whole-receipt seam adds the distributed gas.
+- `promise_batch_action_use_global_contract{,_by_account_id}`: identifier read
+  and checks, target lookup, `use_global_contract` fees (from nearcore's
+  `77.yaml`; the config view omits them), the `UseGlobalContract` action. The
+  runtime prices, encodes and validates it; executing it on the receiver is an
+  explicit `unsupportedAction` issue (no global contract registry).
+- The deployment hosts resolve and report an explicit `unsupportedHost` issue
+  when invoked; linkdrop never invokes them.
+
+The instance (`contracts/linkdrop/verification/Model/Boundary`) was then
+written from the source and checked against the binary: storage layout,
+receipt order, panic texts with their source locations, guard order, JSON
+decoding (serde_json 1.0.143), the `cargo near` metadata exports. Two
+departures from wNEAR's shape: the state is an optional map, since the metadata
+exports succeed on empty storage and `Outcome.state` must encode it; and
+`refines_linkdrop` assumes a code decoder with no limitation, since
+`create_account_advanced` deploys the bytes it is given.
 
 ### Environment notes
 

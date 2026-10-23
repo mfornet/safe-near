@@ -1,6 +1,27 @@
+# Verification of the linkdrop contract (`near`, contracts/linkdrop/contract.wasm).
+#
+#   Model/           the source-level model of every method (abstract keys)
+#   Model/Boundary/  the same contract at the function-call boundary: concrete
+#                    keys, the storage layout, argument decoding, receipts
+#   Spec/            the properties, as `def ... : Prop`, and the ContractModel
+#   Proofs/          one theorem per spec
+#
+# Packages are shared with near-lean (same toolchain, same mathlib checkout).
 name = "LinkdropVerification"
 version = "0.1.0"
 defaultTargets = ["Model", "Spec", "Proofs"]
+packagesDir = "../../../near-lean/.lake/packages"
+
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
+rev = "v4.34.1"
+
+# `Near.Boundary.nearRuntime` is the `NearInterface.RuntimeInterface` the
+# refinement obligation is stated against.
+[[require]]
+name = "NearRuntime"
+path = "../../../near-lean/runtime"
 
 [[lean_lib]]
 name = "Model"
@@ -10,3 +31,7 @@ name = "Spec"
 
 [[lean_lib]]
 name = "Proofs"
+
+[[lean_exe]]
+name = "runtime-adapter-tests"
+root = "RuntimeTests.Main"

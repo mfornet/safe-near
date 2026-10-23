@@ -8,38 +8,30 @@ The manifest requests near-sdk 5.17.0, but the pinned Cargo.lock resolves
 The SDK and macro sources at that version were inspected locally.
 
 This is the first contract after w-near in the sequential dataset effort.
-The model proofs are complete for the properties listed below. **Deployed Wasm
-refinement, the concrete VM adapter, and compatibility with actual SDK storage writes are open.**
+The model proofs are complete for the properties listed below. The binary is
+connected to a `ContractModel` instance (`Model/Boundary`, `Spec/Contract.lean`);
+**the refinement theorem `refines_linkdrop` is open**, like wNEAR's.
 The mathematical storage projection round trip is proved.
-The project is intentionally self-contained, using Lean 4.34.1 and Std only;
-it passes the same strict transitive axiom audit as w-near.
+The project uses Lean 4.34.1, Mathlib and near-lean's `NearRuntime`.
 
 From the repository root:
 
 ```sh
 just build linkdrop
-just audit contracts/linkdrop/verification
+just linkdrop-adapter-test
+just linkdrop-audit
 ```
 
 [binary-boundary.json](binary-boundary.json) records the binary hash, all imports,
-and all function exports. A static check against the current NearVM host table
-finds five missing import names:
+and all function exports. Every import resolves in NearVM. The weighted
+callbacks (`promise_batch_action_function_call_weight`) receive the unused gas
+as nearcore's `distribute_gas` assigns it, and `create_account_advanced` can
+use a global contract (`promise_batch_action_use_global_contract{,_by_account_id}`).
+The binary also imports the global-contract deployment hosts, which it never
+calls; near-lean reports invoking one as an execution issue.
 
-- `env.promise_batch_action_function_call_weight`
-- `env.promise_batch_action_deploy_global_contract`
-- `env.promise_batch_action_deploy_global_contract_by_account_id`
-- `env.promise_batch_action_use_global_contract`
-- `env.promise_batch_action_use_global_contract_by_account_id`
-
-NearVM resolves all imports before running a method, so these names prevent even
-initialization through the current runner. This is a concrete runtime capability
-gap. The inventory is a name check, not a native conformance run or signature
-verification. Weighted callbacks also require unused-gas distribution semantics;
-replacing them with ordinary fixed-gas calls would misstate this binary.
-
-The periodic checker automatically builds new verification projects with
-`--wfail` and audits all declarations without allowing sorry. Its full native
-conformance run is separate from these model checks.
+The periodic checker and CI build the adapter tests with `--wfail`, run them,
+and audit every declaration, tolerating `sorryAx` in `Proofs.Refinement` only.
 
 ## Model and proven properties
 
@@ -138,25 +130,33 @@ unique remain open.
 
 Deployed refinement is stated once for every contract, as
 `NearInterface.Refines` (`near-lean/interface`; design in
-`notes/todo/refinement_equivalence.md`). wNEAR instantiates it. linkdrop's
-earlier, divergent `RefinesTypedExecution` has been removed rather than
-retargeted with guessed parts: a `ContractModel` instance needs facts that
-come from running the binary, and near-lean cannot run it yet (the five
-missing host functions above). Once it can, the instance needs:
+`notes/todo/refinement_equivalence.md`). `Proofs/Refinement.lean` states it
+for the deployed binary: `refines_linkdrop` (open). The instance,
+`Linkdrop.Boundary.linkdrop`, is the contract as `contract.wasm` behaves:
 
-- `Parses`: the SDK 5.17.1 argument decoding of every entry point, on the
-  shared JSON layer (`NearInterface.Json`), including `PublicKey` strings
-  and the `Key`/`keyData` interpretation;
-- `encodeState`/`Inv`: `Storage.encode` with its order witness folded into the
-  state (the raw storage is a set, the vector order a physical choice);
-- `step` from the context: privacy, deposit and initialisation guards as now,
-  then the runtime's balance and storage-stake checks;
-- `encodeReceipts` with the leftover gas, which the weighted callbacks share;
-- the exact panic texts and the logs before each panic, observed on
-  `contract.wasm`;
-- a gas bound, calibrated on the binary and valid for every trie;
-- adapter tests comparing every entry point with the model through
-  `Near.Boundary.execOn`.
+- `State`: empty storage or the map, kept in the vector order of the legacy
+  `UnorderedMap` (insertions push, removals swap the last entry in); `encode`
+  is the exact trie layout (`STATE` header, `ai`/`ak`/`av` records);
+- `Parses`: near-sdk 5.17.1's argument decoding of every method on the shared
+  JSON layer, with `PublicKey` (curve prefix, base58, 32 or 64 bytes),
+  `Base58CryptoHash`, `Base64VecU8` (canonical padding) and `Vec<u8>`;
+- `step`: the metadata exports (`contract_source_metadata`, `__contract_abi`:
+  constants, any input or state), then the SDK guards in the binary's order
+  (private, deposit, arguments, state), then the method; the runtime's
+  balance and storage-stake checks on success;
+- the exact panic texts (with source locations where the SDK adds them); an
+  unparsable signer key or a not-ready callback result traps;
+- receipts in the order the SDK schedules them, the callbacks' 13 Tgas plus
+  the leftover gas;
+- a gas bound: the receipts' fees and static gas, measured compute and
+  argument decoding, and the deepest trie paths.
+
+`RuntimeTests/Main.lean` compares the binary with the model through
+`Near.Boundary.execOn` on every method and guard, the decoders' edge cases,
+swap removals, long arguments and an adversarial trie (225 checks).
+
+The abstract model of the rest of this README (`Model/Methods.lean`, keys as
+`Nat`) is the same contract; relating it to the boundary model is not done.
 
 Beyond single calls, chain-level obligations remain: callback provenance,
 pending liabilities, gas allowance costs, runtime refunds, sufficient backing
