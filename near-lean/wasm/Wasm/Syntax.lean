@@ -310,10 +310,6 @@ def exportFunc? (m : Module) (name : String) : Option Nat :=
     | .func i => if e.name == name then some i else none
     | _ => none
 
-/-- Number of imported functions, which come first in the function index space. -/
-def importedFuncs (m : Module) : Nat :=
-  m.imports.foldl (fun n imp => match imp.desc with | .func _ => n + 1 | _ => n) 0
-
 /-- The type of the function at index `i`, imported functions first. -/
 def funcType? (m : Module) (i : Nat) : Option FuncType :=
   let imported := m.imports.filterMap fun imp => match imp.desc with
