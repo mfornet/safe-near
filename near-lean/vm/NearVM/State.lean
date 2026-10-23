@@ -2,6 +2,7 @@ import NearVM.Interp
 import NearVM.Error
 import NearVM.Gas
 import NearVM.TrieOverlay
+import NearInterface.Raw
 
 /-!
 # NEAR host state (`α := NearState`)
@@ -95,35 +96,6 @@ structure NearConfig where
   validAccountId     : List UInt8 → Bool := fun _ => true
   validPublicKey     : List UInt8 → Bool := fun _ => true
 deriving Inhabited
-
-/-- Result of a promise dependency visible to a callback. NEAR returns
-`0` for incomplete, `1` for successful, and `2` for failed results. -/
-inductive PromiseResult where
-  | notReady
-  | successful (data : List UInt8)
-  | failed
-deriving Inhabited, BEq
-
-/-- Function-call access-key allowance. `none` represents no allowance. -/
-abbrev Allowance := Option Nat
-
-/-- Access-key permission carried by promise batch add-key actions. -/
-inductive AccessKeyPermission where
-  | fullAccess
-  | functionCall (allowance : Allowance) (receiverId methodNames : List UInt8)
-deriving Inhabited, BEq
-
-/-- Receipt actions emitted by promise batch action host functions. -/
-inductive PromiseAction where
-  | createAccount
-  | deployContract (code : List UInt8)
-  | functionCall (methodName args : List UInt8) (amount : Nat) (gas : UInt64)
-  | transfer (amount : Nat)
-  | stake (amount : Nat) (publicKey : List UInt8)
-  | addKey (publicKey : List UInt8) (nonce : UInt64) (permission : AccessKeyPermission)
-  | deleteKey (publicKey : List UInt8)
-  | deleteAccount (beneficiaryId : List UInt8)
-deriving Inhabited, BEq
 
 /-- Promise handle allocated during the current execution. A batch promise
 emits actions toward an account; a callback batch depends on an earlier

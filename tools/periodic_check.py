@@ -39,6 +39,7 @@ def validation_steps(root: Path, nearcore: Path) -> list[Step]:
     add("tooling-tests", "", sys.executable, "-m", "unittest", "discover", "-s", "tools/tests", "-v")
     add("wasm-build", "near-lean/wasm", "lake", "build", "Wasm", "testsuite", "wasm", "--wfail")
     add("wasm-logic-build", "near-lean/wasm-logic", "lake", "build", "--wfail")
+    add("interface-build", "near-lean/interface", "lake", "build", "NearInterface", "--wfail")
     add("vm-build", "near-lean/vm", "lake", "build", "NearVM", "vm-tests", "vm-replay", "--wfail")
     add("runtime-build", "near-lean/runtime", "lake", "build", "NearRuntime", "runtime-tests",
         "NearRuntime.TrieAccounting", "finance-replay", "nonce-replay", "allowance-replay",
@@ -71,7 +72,7 @@ def validation_steps(root: Path, nearcore: Path) -> list[Step]:
     python("dependency-regressions", "tools/tests/check_vm_dependencies.py")
     python("audit-regressions", "tools/tests/check_axiom_audit.py")
     for package, report in [("near-lean/wasm", "wasm"), ("near-lean/wasm-logic", "wasm-logic"),
-                            ("near-lean/vm", "vm"),
+                            ("near-lean/interface", "interface"), ("near-lean/vm", "vm"),
                             ("near-lean/runtime", "runtime"), ("near-lean/chain", "chain"),
                             ("contracts/w-near/verification", "wnear")]:
         python(f"audit-{report}", "tools/axiom-audit.py", package, "--no-build", "--report", f"audit/{report}.json")

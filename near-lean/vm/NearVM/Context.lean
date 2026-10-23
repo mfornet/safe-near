@@ -13,8 +13,6 @@ conformance shim selects the policy used by its native external adapter.
 
 namespace Wasm.Near
 
-abbrev Bytes := List UInt8
-
 /-- A view call's configuration: only the gas limit matters. -/
 structure ViewConfig where
   maxGasBurnt : Nat

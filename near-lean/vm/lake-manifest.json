@@ -13,6 +13,16 @@
    "configFile": "lakefile.toml"
   },
   {
+   "type": "path",
+   "subDir": null,
+   "scope": "",
+   "dir": "../interface",
+   "name": "NearInterface",
+   "manifestFile": "lake-manifest.json",
+   "inherited": false,
+   "configFile": "lakefile.toml"
+  },
+  {
    "url": "https://github.com/leanprover-community/mathlib4",
    "type": "git",
    "subDir": null,
