@@ -48,7 +48,7 @@ def validation_steps(root: Path, nearcore: Path) -> list[Step]:
         "registered-replay", "state-encode", "receipt-encode", "transaction-replay", "receipt-replay", "--wfail")
     # Contracts with a ContractModel instance: the adapter executable compares the
     # binary with the model; `refines_<name>` in Proofs.Refinement is the open proof.
-    adapter_contracts = [("w-near", "wnear"), ("linkdrop", "linkdrop")]
+    adapter_contracts = [("w-near", "wnear")]
     for contract, report in adapter_contracts:
         add(f"{report}-adapter-build", f"contracts/{contract}/verification", "lake", "build", "Spec",
             "runtime-adapter-tests", "--wfail")

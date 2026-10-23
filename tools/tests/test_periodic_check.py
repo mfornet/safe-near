@@ -52,8 +52,7 @@ class PeriodicCheckTests(unittest.TestCase):
     def test_new_contracts_are_built_before_strict_audits_without_duplicate_adapters(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            for name, manifest in [("linkdrop", "lakefile.toml"),
-                                   ("next-contract", "lakefile.lean"),
+            for name, manifest in [("next-contract", "lakefile.lean"),
                                    ("other", "lakefile.toml"),
                                    ("w-near", "lakefile.toml")]:
                 project = root / "contracts" / name / "verification"
@@ -75,7 +74,7 @@ class PeriodicCheckTests(unittest.TestCase):
                 self.assertIn("--no-build", audit.command)
                 self.assertNotIn("--allow-sorry", audit.command)
             # Contracts with a model instance keep one audit, tolerating only the open refinement.
-            for report, contract in [("wnear", "w-near"), ("linkdrop", "linkdrop")]:
+            for report, contract in [("wnear", "w-near")]:
                 self.assertEqual(names.count(f"audit-{report}"), 1)
                 self.assertNotIn(f"audit-contract-{contract}", names)
                 audit = steps[names.index(f"audit-{report}")]

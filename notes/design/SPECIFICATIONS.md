@@ -13,7 +13,7 @@ contracts/<name>/verification/
     blueprint/   -- Prose explanations linked to statements and proofs
 ```
 
-wNEAR and linkdrop have verification projects.
+wNEAR has a verification project.
 
 ## Shared vocabulary
 
@@ -41,9 +41,8 @@ representing a model state and the context being one the runtime builds:
 - input that is no call fails with no effects;
 - no execution reports an interpreter limitation.
 
-wNEAR (`refines_wnear`) and linkdrop (`refines_linkdrop`) state it for their
-deployed binaries, each with adapter tests that run the binary against the
-model; both proofs are open.
+wNEAR (`refines_wnear`) states it for its deployed binary, with adapter tests
+that run the binary against the model.
 
 Specifications about the model become facts about the binary through
 `Refines.transfer`. Specifications that need resources (a withdrawal needs

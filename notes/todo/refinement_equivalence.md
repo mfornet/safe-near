@@ -321,9 +321,9 @@ statement, the instance, the model extensions, re-proved specs and tests.
 | 1. `near-lean/interface` | done |
 | 2. near-lean boundary and instance | done; fuel sufficiency, storage listing and whole-receipt seam proved |
 | 3. wNEAR | done: model extensions, instance, statement, re-proved specs, tests |
-| 4. linkdrop | done: instance on the boundary model, statement (`refines_linkdrop`, open), adapter tests |
-| 5. Tests | adapter tests on the boundary: wNEAR (210 checks), linkdrop (225 checks) |
-| 6. Docs | wNEAR README and blueprint, linkdrop README, `SPECIFICATIONS.md` |
+| 4. linkdrop | verification removed (owner decision); near-lean runs its binary |
+| 5. Tests | wNEAR adapter tests on the boundary (210 checks) |
+| 6. Docs | wNEAR README and blueprint, `SPECIFICATIONS.md` |
 
 ### Departures from sections 3–6
 
@@ -407,8 +407,7 @@ statement, the instance, the model extensions, re-proved specs and tests.
   aborts, promised actions the runtime rejects (`actionsIssue?` is the
   runtime's `validateFunctionCallActions`), and the storage-stake check
   (both use `stakeDeficit`).
-- **wNEAR, linkdrop.** `refines_wnear` and `refines_linkdrop` themselves,
-  including the soundness of the gas bounds.
+- **wNEAR.** `refines_wnear` itself, including the soundness of `gasBound`.
 
 ### linkdrop
 
@@ -429,17 +428,9 @@ NearVM lacked. They are now modelled after the pinned nearcore:
 - The deployment hosts resolve and report an explicit `unsupportedHost` issue
   when invoked; linkdrop never invokes them.
 
-The instance (`contracts/linkdrop/verification/Model/Boundary`) was then
-written from the source and checked against the binary: storage layout,
-receipt order, panic texts with their source locations, guard order, JSON
-decoding (serde_json 1.0.143), the `cargo near` metadata exports. Two
-departures from wNEAR's shape: the state is an optional map, since the metadata
-exports succeed on empty storage and `Outcome.state` must encode it; and
-`refines_linkdrop` assumes a code decoder with no limitation, since
-`create_account_advanced` deploys the bytes it is given.
-`Proofs/BoundaryProjection.lean` relates the boundary model to the earlier
-abstract model (`body_project`), so the abstract safety and economics proofs
-carry over.
+A linkdrop `ContractModel` instance was built and checked against the binary,
+then removed with the rest of linkdrop's verification at the owner's request;
+it is in this branch's history. The near-lean support above stays.
 
 ### Environment notes
 
