@@ -352,30 +352,43 @@ deriving DecidableEq
 
 mutual
 /-- Decode one instruction whose opcode `op` has been read. `fuel` bounds the
-nesting of structured instructions; each level consumes at least one byte. -/
+nesting of structured instructions: each level spends one unit, and reads at
+least one byte (its block type), so fuel that covers the remaining bytes never
+runs out first. Spending it here makes `instr` and `seq` structurally
+recursive, so the kernel can evaluate the decoder (proofs about modules as
+decoded from their bytes rely on that). -/
 def instr (fuel : Nat) (op : UInt8) : Parser Instr := do
   match op with
   | 0x00 => return .unreachable
   | 0x01 => return .nop
   | 0x02 =>
     let bt ← blockType
-    let (body, t) ← seq fuel #[]
-    if t != .end then fail "END opcode expected"
-    return .block bt body.toList
+    match fuel with
+    | 0 => fail "unexpected end"
+    | fuel + 1 =>
+      let (body, t) ← seq fuel #[]
+      if t != .end then fail "END opcode expected"
+      return .block bt body.toList
   | 0x03 =>
     let bt ← blockType
-    let (body, t) ← seq fuel #[]
-    if t != .end then fail "END opcode expected"
-    return .loop bt body.toList
+    match fuel with
+    | 0 => fail "unexpected end"
+    | fuel + 1 =>
+      let (body, t) ← seq fuel #[]
+      if t != .end then fail "END opcode expected"
+      return .loop bt body.toList
   | 0x04 =>
     let bt ← blockType
-    let (thenBody, t) ← seq fuel #[]
-    match t with
-    | .end => return .«if» bt thenBody.toList []
-    | .else =>
-      let (elseBody, t) ← seq fuel #[]
-      if t != .end then fail "END opcode expected"
-      return .«if» bt thenBody.toList elseBody.toList
+    match fuel with
+    | 0 => fail "unexpected end"
+    | fuel + 1 =>
+      let (thenBody, t) ← seq fuel #[]
+      match t with
+      | .end => return .«if» bt thenBody.toList []
+      | .else =>
+        let (elseBody, t) ← seq fuel #[]
+        if t != .end then fail "END opcode expected"
+        return .«if» bt thenBody.toList elseBody.toList
   | 0x0C => return .br (← u32)
   | 0x0D => return .br_if (← u32)
   | 0x0E =>

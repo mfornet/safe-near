@@ -70,6 +70,12 @@ def validation_steps(root: Path, nearcore: Path) -> list[Step]:
         "../../contracts/w-near/contract.wasm")
     add("wasm-spec-report", "", "near-lean/wasm/scripts/testsuite-report.sh")
     add("wasm-spec-report-clean", "", "git", "diff", "--exit-code", "--", "near-lean/wasm/testsuite_report.txt")
+    # The separation logic's examples: committed binaries match their .wat,
+    # the linked client runs as proved, and every mutant of the proved code
+    # breaks a proof.
+    add("wasm-logic-bytes", "near-lean/wasm-logic", "scripts/check-wasm-bytes.sh")
+    add("wasm-logic-smoke", "near-lean/wasm-logic", "scripts/smoke-client.sh")
+    add("wasm-logic-mutants", "near-lean/wasm-logic", sys.executable, "scripts/mutation-test.py")
     python("lean-style", "tools/lean_style.py")
     python("style-regressions", "tools/tests/check_lean_style.py")
     python("formatter-regressions", "tools/tests/check_lean_format.py")

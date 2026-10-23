@@ -37,6 +37,9 @@ just ci-check             # the fast checks CI runs on every push
 Heavy validation (conformance against a pinned nearcore checkout, full builds)
 runs locally with `just periodic-check <nearcore-checkout>`; see
 [periodic checks](notes/design/PERIODIC_CHECK.md).
+The separation logic over the Wasm runtime (`near-lean/wasm-logic`) is the
+exception: the `wasm-logic` workflow builds and checks it whenever it or the
+runtime changes, which takes a few minutes with iris-lean cached.
 
 ## Contracts dataset
 
