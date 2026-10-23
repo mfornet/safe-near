@@ -147,16 +147,20 @@ theorem seeList_lookup (σ : Store H) (Rd : List (Loc × Cell H)) :
     · exact h2 q hq
 
 /-- The one lifting lemma. A running thread whose next step, from any store
-containing the read-only cells `Rd` and the owned cells `P`, reaches `e'` and
-replaces `P` by `Q` in the heap. -/
+`σ` containing the read-only cells `Rd` and the owned cells `P`, reaches
+`e' σ` and replaces `P` by `Q σ` in the heap. What the step does may depend
+on the store beyond the owned cells (as `memory.grow` depends on the
+memory's limit); the continuation is given the store's facts. -/
 theorem wp_lift_heap (lim : ExecLimits) (t : Thread) (Rd : List (Loc × Cell H))
-    (P Q : HeapF (Cell H)) (e' : Code H)
+    (P : HeapF (Cell H)) (Q : Store H → HeapF (Cell H)) (e' : Store H → Code H)
     (hstep : ∀ σ : Store H, (∀ p ∈ Rd, lookup σ p.1 = some p.2) → P ⊆ heapOf σ →
-      (next σ lim t).1 = e' ∧
-        heapOf (next σ lim t).2 = PartialMap.union Q (PartialMap.difference (heapOf σ) P))
+      (next σ lim t).1 = e' σ ∧
+        heapOf (next σ lim t).2 = PartialMap.union (Q σ) (PartialMap.difference (heapOf σ) P))
     (hdisj : ∀ σ : Store H, (∀ p ∈ Rd, lookup σ p.1 = some p.2) → P ⊆ heapOf σ →
-      Q ##ₘ PartialMap.difference (heapOf σ) P) :
-    seeList Rd ∗ ownCells P ∗ ▷ (ownCells Q -∗ WP e' @ s; E {{ Φ }})
+      Q σ ##ₘ PartialMap.difference (heapOf σ) P) :
+    seeList Rd ∗ ownCells P ∗
+      ▷ (∀ σ : Store H, ⌜(∀ p ∈ Rd, lookup σ p.1 = some p.2) ∧ P ⊆ heapOf σ⌝ -∗
+        ownCells (Q σ) -∗ WP (e' σ) @ s; E {{ Φ }})
       ⊢ WP (Code.running (H := H) lim t) @ s; E {{ Φ }} := by
   iintro ⟨HRd, HP, Hwp⟩
   iapply wp_lift_step rfl
@@ -175,18 +179,18 @@ theorem wp_lift_heap (lim : ExecLimits) (t : Thread) (Rd : List (Loc × Cell H))
   iintro !> %e₂ %σ₂ %eₜ %Hstep _
   obtain ⟨-, rfl, rfl, rfl⟩ := step_det Hstep
   imod ghost_map_delete_big (γ := ι.name) P $$ Hσ HP with Hσ
-  ihave Hins := ghost_map_insert_big (γ := ι.name) (m := PartialMap.difference (heapOf σ) P) Q hQ
+  ihave Hins := ghost_map_insert_big (γ := ι.name) (m := PartialMap.difference (heapOf σ) P) (Q σ) hQ
   imod Hins $$ Hσ with ⟨Hσ, HQ⟩
   imod Hclose
   imodintro
   rw [he]
-  have key : (ghost_map_auth ι.name (.own 1) (PartialMap.union Q (PartialMap.difference
+  have key : (ghost_map_auth ι.name (.own 1) (PartialMap.union (Q σ) (PartialMap.difference
       (heapOf σ) P)) : IProp GF) ⊢ stateInterp (next σ lim t).2 (ns + 1) obs' (nt + 0) := by
     rw [← hheap]; exact .rfl
   isplitl [Hσ]
   · iapply key $$ Hσ
   isplitl [Hwp HQ]
-  · iapply Hwp $$ HQ
+  · iapply Hwp $$ %σ %⟨hRd, hP⟩ HQ
   · iapply BigSepL.bigSepL_nil.2
     itrivial
 
@@ -255,35 +259,38 @@ theorem ownCells_cellsOf (xs : List (Loc × Cell H)) (hnd : (xs.map (·.1)).Nodu
     refine ⟨hins.1.trans (sep_mono .rfl (ih hnd).1), (sep_mono .rfl (ih hnd).2).trans hins.2⟩
 
 /-- The lifting lemma over lists of cells: `Rd` read persistently, `P` owned
-before the step and replaced by `Q` after it. -/
-theorem wp_lift (lim : ExecLimits) (t : Thread) (Rd P Q : List (Loc × Cell H)) (e' : Code H)
-    (hP : (P.map (·.1)).Nodup) (hQ : (Q.map (·.1)).Nodup)
+before the step and replaced by `Q σ` after it, the step reaching `e' σ`. -/
+theorem wp_lift_dep (lim : ExecLimits) (t : Thread) (Rd P : List (Loc × Cell H))
+    (Q : Store H → List (Loc × Cell H)) (e' : Store H → Code H)
+    (hP : (P.map (·.1)).Nodup) (hQ : ∀ σ, ((Q σ).map (·.1)).Nodup)
     (hstep : ∀ σ : Store H, (∀ p ∈ Rd, lookup σ p.1 = some p.2) →
       (∀ p ∈ P, lookup σ p.1 = some p.2) →
-      (next σ lim t).1 = e' ∧ ∀ l, lookup (next σ lim t).2 l =
-        (Q.lookup l).or (if (P.lookup l).isSome then none else lookup σ l))
+      (next σ lim t).1 = e' σ ∧ ∀ l, lookup (next σ lim t).2 l =
+        ((Q σ).lookup l).or (if (P.lookup l).isSome then none else lookup σ l))
     (hfresh : ∀ σ : Store H, (∀ p ∈ Rd, lookup σ p.1 = some p.2) →
       (∀ p ∈ P, lookup σ p.1 = some p.2) →
-      ∀ l, (Q.lookup l).isSome → P.lookup l = none → lookup σ l = none) :
-    seeList Rd ∗ ([∗list] p ∈ P, p.1 ↦ₛ p.2) ∗ ▷ (([∗list] p ∈ Q, p.1 ↦ₛ p.2) -∗ WP e' @ s; E {{ Φ }})
+      ∀ l, ((Q σ).lookup l).isSome → P.lookup l = none → lookup σ l = none) :
+    seeList Rd ∗ ([∗list] p ∈ P, p.1 ↦ₛ p.2) ∗
+      ▷ (∀ σ : Store H, ⌜(∀ p ∈ Rd, lookup σ p.1 = some p.2) ∧ (∀ p ∈ P, lookup σ p.1 = some p.2)⌝ -∗
+        ([∗list] p ∈ Q σ, p.1 ↦ₛ p.2) -∗ WP (e' σ) @ s; E {{ Φ }})
       ⊢ WP (Code.running (H := H) lim t) @ s; E {{ Φ }} := by
   have hsub : ∀ σ : Store H, cellsOf P ⊆ heapOf σ → ∀ p ∈ P, lookup σ p.1 = some p.2 := by
     intro σ h p hp
     have := h p.1 p.2 (by rw [get?_cellsOf]; exact lookup_of_mem hP hp)
     simpa using this
   iintro ⟨HRd, HP, Hwp⟩
-  iapply wp_lift_heap lim t Rd (cellsOf P) (cellsOf Q) e'
+  iapply wp_lift_heap lim t Rd (cellsOf P) (fun σ => cellsOf (Q σ)) e'
   · intro σ hRd hPs
     obtain ⟨he, hl⟩ := hstep σ hRd (hsub σ hPs)
     refine ⟨he, LawfulPartialMap.equiv_iff_eq.mp fun l => ?_⟩
     simp only [get?_heapOf, PartialMap.union, LawfulPartialMap.get?_merge, PartialMap.difference,
       LawfulPartialMap.get?_differenceWith, get?_cellsOf, hl]
-    cases Q.lookup l <;> cases hp : P.lookup l <;> cases lookup σ l <;> simp [Option.merge]
+    cases (Q σ).lookup l <;> cases hp : P.lookup l <;> cases lookup σ l <;> simp [Option.merge]
   · intro σ hRd hPs
     refine (PartialMap.disjoint_iff _ _).mpr fun l => ?_
     simp only [get?_heapOf, PartialMap.difference, LawfulPartialMap.get?_differenceWith,
       get?_cellsOf]
-    cases hq : Q.lookup l with
+    cases hq : (Q σ).lookup l with
     | none => exact .inl rfl
     | some c =>
       right
@@ -295,9 +302,32 @@ theorem wp_lift (lim : ExecLimits) (t : Thread) (Rd P Q : List (Loc × Cell H)) 
   isplitl [HP]
   · iapply (ownCells_cellsOf P hP).2 $$ HP
   · inext
-    iintro HQ
-    iapply Hwp
-    iapply (ownCells_cellsOf Q hQ).1 $$ HQ
+    iintro %σ %⟨hRd, hPs⟩ HQ
+    iapply Hwp $$ %σ %⟨hRd, hsub σ hPs⟩
+    iapply (ownCells_cellsOf (Q σ) (hQ σ)).1 $$ HQ
+
+/-- The lifting lemma over lists of cells, when the step's outcome does not
+depend on the store beyond the cells. -/
+theorem wp_lift (lim : ExecLimits) (t : Thread) (Rd P Q : List (Loc × Cell H)) (e' : Code H)
+    (hP : (P.map (·.1)).Nodup) (hQ : (Q.map (·.1)).Nodup)
+    (hstep : ∀ σ : Store H, (∀ p ∈ Rd, lookup σ p.1 = some p.2) →
+      (∀ p ∈ P, lookup σ p.1 = some p.2) →
+      (next σ lim t).1 = e' ∧ ∀ l, lookup (next σ lim t).2 l =
+        (Q.lookup l).or (if (P.lookup l).isSome then none else lookup σ l))
+    (hfresh : ∀ σ : Store H, (∀ p ∈ Rd, lookup σ p.1 = some p.2) →
+      (∀ p ∈ P, lookup σ p.1 = some p.2) →
+      ∀ l, (Q.lookup l).isSome → P.lookup l = none → lookup σ l = none) :
+    seeList Rd ∗ ([∗list] p ∈ P, p.1 ↦ₛ p.2) ∗ ▷ (([∗list] p ∈ Q, p.1 ↦ₛ p.2) -∗ WP e' @ s; E {{ Φ }})
+      ⊢ WP (Code.running (H := H) lim t) @ s; E {{ Φ }} := by
+  iintro ⟨HRd, HP, Hwp⟩
+  iapply wp_lift_dep lim t Rd P (fun _ => Q) (fun _ => e') hP (fun _ => hQ) hstep hfresh
+  isplitl [HRd]
+  · iexact HRd
+  isplitl [HP]
+  · iexact HP
+  · inext
+    iintro %σ %_ HQ
+    iapply Hwp $$ HQ
 
 /-- A finished thread has its postcondition. -/
 theorem wp_finished (o : Outcome) : Φ o ⊢ WP (Code.finished (H := H) o) @ s; E {{ Φ }} :=

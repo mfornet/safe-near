@@ -313,6 +313,55 @@ theorem wpi_instr (i : Instr) (vs' : List Value) (loc' : Array Value)
   iapply HK
   iapply HΦ $$ HQ
 
+/-- The generic rule for an instruction that falls through, when its result
+depends on the store beyond the owned cells: the continuation is given the
+store's facts and chooses accordingly. -/
+theorem wpi_instr_dep (i : Instr) (vs' : Store H → List Value) (loc' : Array Value)
+    (Rd P : List (Loc × Cell H)) (Q : Store H → List (Loc × Cell H))
+    (hP : (P.map (·.1)).Nodup) (hQ : ∀ σ, ((Q σ).map (·.1)).Nodup) {Φ : Post H GF}
+    (h : ∀ σ : Store H, σ.modules[f.inst]? = some f.mi → (∀ p ∈ Rd, lookup σ p.1 = some p.2) →
+      (∀ p ∈ P, lookup σ p.1 = some p.2) → ∀ base L R, ∃ σ',
+        Exec.instr σ f.mi f.locals (base ++ vs).toArray L i R =
+          ⟨σ', .continue (base ++ vs' σ).toArray L R loc'⟩ ∧ Replaces σ σ' P (Q σ))
+    (hfresh : ∀ σ : Store H, σ.modules[f.inst]? = some f.mi → (∀ p ∈ Rd, lookup σ p.1 = some p.2) →
+      (∀ p ∈ P, lookup σ p.1 = some p.2) →
+      ∀ l, ((Q σ).lookup l).isSome → P.lookup l = none → lookup σ l = none) :
+    seeList Rd ∗ ([∗list] p ∈ P, p.1 ↦ₛ p.2) ∗
+      ▷ (∀ σ : Store H, ⌜(∀ p ∈ Rd, lookup σ p.1 = some p.2) ∧ (∀ p ∈ P, lookup σ p.1 = some p.2)⌝ -∗
+        ([∗list] p ∈ Q σ, p.1 ↦ₛ p.2) -∗ Φ.normal (vs' σ) (f.withLocals loc'))
+      ⊢ wpi lim d f vs [i] Φ := by
+  unfold wpi Kont
+  iintro ⟨HRd, HP, HΦ⟩ %Ψ %C %hC #Hi HK
+  have hmi : ∀ σ : Store H, (∀ p ∈ (Loc.inst f.inst, Cell.inst f.mi) :: Rd,
+      lookup σ p.1 = some p.2) → σ.modules[f.inst]? = some f.mi := by
+    intro σ hσ
+    have := hσ _ List.mem_cons_self
+    simp only [lookup_inst, Option.map_eq_some_iff] at this
+    obtain ⟨m, hm, he⟩ := this
+    cases he; exact hm
+  iapply wp_lift_dep lim _ ((Loc.inst f.inst, .inst f.mi) :: Rd) P Q
+    (fun σ => .running lim (C.thread (f.withLocals loc') (vs' σ) C.labels C.rest)) hP hQ
+  · intro σ hRd hPs
+    obtain ⟨σ', hi, hrep⟩ := h σ (hmi σ hRd) (fun p hp => hRd p (List.mem_cons_of_mem _ hp)) hPs
+      C.base C.labels C.rest
+    rw [List.singleton_append, next_instr_continue σ lim C f vs C.labels i C.rest (hmi σ hRd) hi]
+    exact ⟨rfl, hrep⟩
+  · intro σ hRd hPs
+    exact hfresh σ (hmi σ hRd) (fun p hp => hRd p (List.mem_cons_of_mem _ hp)) hPs
+  isplitl [HRd]
+  · iapply (seeList_cons _ _).2
+    iunfold instPt at Hi
+    isplitr
+    · iexact Hi
+    · iexact HRd
+  isplitl [HP]
+  · iexact HP
+  inext
+  iintro %σ %⟨hRd, hPs⟩ HQ
+  icases HK with ⟨HK, -⟩
+  iapply HK
+  iapply HΦ $$ %σ %⟨fun p hp => hRd p (List.mem_cons_of_mem _ hp), hPs⟩ HQ
+
 /-- An instruction that traps with reason `r` after reading `Rd` and owning
 `P`, leaving `Q`. -/
 theorem wpi_instr_trap (i : Instr) (r : Trap) (Rd P Q : List (Loc × Cell H))

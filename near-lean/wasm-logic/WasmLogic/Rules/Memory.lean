@@ -396,7 +396,149 @@ theorem grow_eq_none {mem : Memory} {k : Nat} (h : ¬GrowOk mem.byteSize mem.max
       exact h ⟨h1, fun m' hm' => by rw [hm] at hm'; cases hm'; omega⟩
     · left; omega
 
-/-- Iris-Wasm's `wp_grow_memory`, success case: `k` new pages of zeros. -/
+/-- The cells `memory.grow` by `k` pages leaves: the new length and the new
+bytes, all zero. -/
+def growCells (n len k : Nat) : List (Loc × Cell H) :=
+  (Loc.memLength n, .memLength (len + k * pageSize)) :: byteCells n len (List.replicate (k * pageSize) 0)
+
+theorem growCells_nodup (n len k : Nat) : ((growCells (H := H) n len k).map (·.1)).Nodup := by
+  simp only [growCells, List.map_cons, List.nodup_cons]
+  refine ⟨fun hmem => ?_, byteCells_nodup _ _ _⟩
+  obtain ⟨p, hp, hp1⟩ := List.mem_map.mp hmem
+  have := lookup_byteCells (H := H) n len (List.replicate (k * pageSize) 0) p.1
+  rw [lookup_of_mem (byteCells_nodup _ _ _) hp] at this
+  split at this
+  · rename_i hc; rw [hp1] at hc; simp [Loc.memLength] at hc
+  · cases this
+
+/-- `memory.grow` succeeding, as a step of the store. -/
+theorem grow_step_ok {σ : Store H} {n len : Nat} {mem : Memory} {mi : ModuleInst}
+    (hn : mi.memAddrs[0]? = some n) (hmem : σ.mems[n]? = some mem) (hwf : mem.wf)
+    (hlen : mem.byteSize = len) (k : UInt32) (hok : GrowOk len mem.max k.toNat)
+    (loc : Array Value) (base : List Value) (L : List Label) (R : List Instr) : ∃ σ',
+    Exec.instr σ mi loc (base ++ [Value.i32 k]).toArray L .memory_grow R =
+      ⟨σ', .continue (base ++ [Value.i32 (UInt32.ofNat (len / pageSize))]).toArray L R loc⟩ ∧
+    Replaces σ σ' [(Loc.memLength n, .memLength len)] (growCells n len k.toNat) := by
+  have hn' : n < σ.mems.size := (Array.getElem?_eq_some_iff.mp hmem).1
+  have hgrow := grow_eq (k := k.toNat) (by rw [hlen]; exact hok)
+  obtain ⟨hwf', hsz', hmax', _, hrd'⟩ := Memory.grow_spec hwf hgrow
+  let mem' : Memory := { mem with pages := mem.pages ++ Array.replicate k.toNat ByteArray.empty }
+  refine ⟨{ σ with mems := σ.mems.set! n mem' }, ?_, ?_⟩
+  · simp [Exec.instr, Exec.i32, memOf_eq hn hmem, hgrow, Store.setMemOf, hn, size_eq_div, hlen, mem']
+  · intro ⟨c, a, i⟩
+    rw [lookup_setMem _ _ _ hn', growCells, lookup_cons_pair, lookup_byteCells, lookup_cons_pair]
+    simp only [List.length_replicate, Loc.memLength, Prod.mk.injEq, List.lookup_nil]
+    by_cases hc : (c = 0 ∨ c = 1) ∧ a = n
+    · rw [if_pos hc]
+      obtain ⟨hc, rfl⟩ := hc
+      rw [lookup_mem _ _ _ _ hc, hmem, Option.bind_some]
+      rcases hc with rfl | rfl
+      · by_cases hi : i < len
+        · have : ¬(len ≤ i ∧ i < len + k.toNat * pageSize) := by omega
+          simp [memCell, hwf, hwf', hsz', hrd', hi, hlen, this, mem',
+            show i < len + k.toNat * pageSize by omega, show ¬len ≤ i by omega]
+        · by_cases hi2 : i < len + k.toNat * pageSize
+          · simp [memCell, hwf', hsz', hrd', hlen, hi, hi2, show len ≤ i by omega, mem',
+              List.getElem?_replicate, show i - len < k.toNat * pageSize by omega]
+          · simp [memCell, hwf, hwf', hsz', hrd', hlen, hi, hi2, mem']
+      · rcases i with _ | _ | i <;> simp [memCell, hwf, hwf', hsz', hlen, hmax', mem']
+    · rw [if_neg hc]
+      have h1 : ¬(c = 1 ∧ a = n ∧ i = 0) := fun h => hc ⟨.inr h.1, h.2.1⟩
+      have h2 : ¬(c = 0 ∧ a = n ∧ len ≤ i ∧ i < len + k.toNat * pageSize) :=
+        fun h => hc ⟨.inl h.1, h.2.1⟩
+      simp [h1, h2]
+
+/-- The new bytes `memory.grow` adds are not cells of the store before it. -/
+theorem grow_fresh {σ : Store H} {n len k : Nat}
+    (hP : lookup σ (Loc.memLength n) = some (.memLength len)) (l : Loc)
+    (hq : ((growCells (H := H) n len k).lookup l).isSome)
+    (hp : [(Loc.memLength n, (Cell.memLength len : Cell H))].lookup l = none) : lookup σ l = none := by
+  obtain ⟨mem, hmem, hwf, hlen⟩ := memLength_facts hP
+  obtain ⟨c, a, i⟩ := l
+  rw [growCells, lookup_cons_pair, lookup_byteCells] at hq
+  rw [lookup_cons_pair] at hp
+  simp only [Loc.memLength, Prod.mk.injEq, List.length_replicate, List.lookup_nil] at hq hp
+  split at hq
+  · rename_i h; rw [if_pos h] at hp; cases hp
+  · split at hq
+    · rename_i _ h
+      obtain ⟨rfl, rfl, h3, _⟩ := h
+      simp [lookup_byte, hmem, hwf, hlen, show ¬ i < len by omega]
+    · cases hq
+
+/-- `memory.grow` failing, as a step of the store. -/
+theorem grow_step_fail {σ : Store H} {n len : Nat} {mem : Memory} {mi : ModuleInst}
+    (hn : mi.memAddrs[0]? = some n) (hmem : σ.mems[n]? = some mem)
+    (hlen : mem.byteSize = len) (k : UInt32) (hfail : ¬GrowOk len mem.max k.toNat)
+    (loc : Array Value) (base : List Value) (L : List Label) (R : List Instr) :
+    Exec.instr σ mi loc (base ++ [Value.i32 k]).toArray L .memory_grow R =
+      ⟨σ, .continue (base ++ [Value.i32 0xFFFFFFFF]).toArray L R loc⟩ := by
+  have hgrow := grow_eq_none (mem := mem) (k := k.toNat) (by rw [hlen]; exact hfail)
+  simp [Exec.instr, Exec.i32, memOf_eq hn hmem, hgrow]
+
+open Classical in
+/-- Iris-Wasm's `wp_grow_memory`: `memory.grow` either adds `k` pages of
+zeros and returns the old size in pages, or fails and returns `-1`. Which
+one depends on the memory's limit, which this rule does not need to know. -/
+theorem wpi_memory_grow_either (n len : Nat) (k : UInt32) (hn : f.mi.memAddrs[0]? = some n) :
+    n ↦[wmlength] len ∗
+      ▷ ((n ↦[wmlength] (len + k.toNat * pageSize) ∗
+            n ↦[wms][ len ] List.replicate (k.toNat * pageSize) 0 -∗
+          Φ.normal (vs ++ [.i32 (UInt32.ofNat (len / pageSize))]) f) ∧
+        (n ↦[wmlength] len -∗ Φ.normal (vs ++ [.i32 0xFFFFFFFF]) f))
+      ⊢ wpi lim d f (vs ++ [.i32 k]) [.memory_grow] Φ := by
+  let ok : Store H → Prop := fun σ =>
+    ∃ mem, σ.mems[n]? = some mem ∧ GrowOk len mem.max k.toNat
+  have key := wpi_instr_dep (Φ := Φ) (lim := lim) (d := d) (f := f) (vs := vs ++ [.i32 k])
+    .memory_grow (fun σ => if ok σ then vs ++ [.i32 (UInt32.ofNat (len / pageSize))]
+      else vs ++ [.i32 0xFFFFFFFF]) f.locals [] [(Loc.memLength n, .memLength len)]
+    (fun σ => if ok σ then growCells n len k.toNat else [(Loc.memLength n, .memLength len)])
+    (by simp) (fun σ => by split <;> simp [growCells_nodup])
+    (by
+      intro σ _ _ hP base L R
+      obtain ⟨mem, hmem, hwf, hlen⟩ := memLength_facts (hP _ List.mem_cons_self)
+      by_cases hok : GrowOk len mem.max k.toNat
+      · have hσ : ok σ := ⟨mem, hmem, hok⟩
+        simp only [hσ, ite_true]
+        have := grow_step_ok hn hmem hwf hlen k hok f.locals (base ++ vs) L R
+        simpa only [List.append_assoc] using this
+      · have hσ : ¬ok σ := fun ⟨m, hm, h⟩ => by rw [hmem] at hm; cases hm; exact hok h
+        simp only [hσ, ite_false]
+        refine ⟨σ, ?_, replaces_same hP⟩
+        have := grow_step_fail hn hmem hlen k hok f.locals (base ++ vs) L R
+        simpa only [List.append_assoc] using this)
+    (by
+      intro σ _ _ hP l hq hp
+      split at hq
+      · exact grow_fresh (hP _ List.mem_cons_self) l hq hp
+      · simp_all)
+  simp only [Frame.withLocals_self] at key
+  unfold memLength memBytes
+  iintro ⟨Hl, HΦ⟩
+  iapply key
+  isplitr
+  · iapply BigSepL.bigSepL_nil.2; iempintro
+  isplitl [Hl]
+  · iapply BigSepL.bigSepL_cons.2
+    isplitl [Hl]
+    · iexact Hl
+    · iapply BigSepL.bigSepL_nil.2; iempintro
+  · inext
+    iintro %σ %_ HQ
+    by_cases hσ : ok σ
+    · simp only [hσ, ite_true, growCells]
+      icases HΦ with ⟨HΦ, -⟩
+      icases BigSepL.bigSepL_cons.1 $$ HQ with ⟨HQ1, HQ2⟩
+      iapply HΦ
+      isplitl [HQ1]
+      · iexact HQ1
+      · iexact HQ2
+    · simp only [hσ, ite_false]
+      icases HΦ with ⟨-, HΦ⟩
+      icases BigSepL.bigSepL_cons.1 $$ HQ with ⟨HQ, -⟩
+      iapply HΦ $$ HQ
+
+/-- `memory.grow` when the limit allows it: `k` new pages of zeros. -/
 theorem wpi_memory_grow (n len : Nat) (mx : Option Nat) (k : UInt32)
     (hn : f.mi.memAddrs[0]? = some n) (hok : GrowOk len mx k.toNat) :
     n ↦[wmlength] len ∗ n ↪[wmlimit] mx ∗
@@ -407,66 +549,15 @@ theorem wpi_memory_grow (n len : Nat) (mx : Option Nat) (k : UInt32)
   have key := wpi_instr (Φ := Φ) (lim := lim) (d := d) (f := f) (vs := vs ++ [.i32 k])
     .memory_grow (vs ++ [.i32 (UInt32.ofNat (len / pageSize))]) f.locals
     [(Loc.memLimit n, .memLimit mx)] [(Loc.memLength n, .memLength len)]
-    ((Loc.memLength n, .memLength (len + k.toNat * pageSize)) ::
-      byteCells n len (List.replicate (k.toNat * pageSize) 0))
-    (by simp)
-    (by
-      simp only [List.map_cons, List.nodup_cons]
-      refine ⟨fun hmem => ?_, byteCells_nodup _ _ _⟩
-      obtain ⟨p, hp, hp1⟩ := List.mem_map.mp hmem
-      have := lookup_byteCells (H := H) n len (List.replicate (k.toNat * pageSize) 0) p.1
-      rw [lookup_of_mem (byteCells_nodup _ _ _) hp] at this
-      split at this
-      · rename_i hc; rw [hp1] at hc; simp [Loc.memLength] at hc
-      · cases this)
+    (growCells n len k.toNat) (by simp) (growCells_nodup _ _ _)
     (by
       intro σ _ hRd hP base L R
       obtain ⟨mem, hmem, hwf, hlen⟩ := memLength_facts (hP _ List.mem_cons_self)
       obtain ⟨mem', hmem', hmax⟩ := memLimit_facts (hRd _ List.mem_cons_self)
       rw [hmem] at hmem'; cases hmem'
-      have hn' : n < σ.mems.size := (Array.getElem?_eq_some_iff.mp hmem).1
-      have hgrow := grow_eq (k := k.toNat) (by rw [hlen, hmax]; exact hok)
-      obtain ⟨hwf', hsz', hmax', _, hrd'⟩ := Memory.grow_spec hwf hgrow
-      let mem' : Memory := { mem with pages := mem.pages ++ Array.replicate k.toNat ByteArray.empty }
-      refine ⟨{ σ with mems := σ.mems.set! n mem' }, ?_, ?_⟩
-      · simp [Exec.instr, Exec.i32, memOf_eq hn hmem, hgrow, Store.setMemOf, hn, size_eq_div, hlen,
-          mem']
-      · intro ⟨c, a, i⟩
-        rw [lookup_setMem _ _ _ hn', lookup_cons_pair, lookup_byteCells, lookup_cons_pair]
-        simp only [List.length_replicate, Loc.memLength, Prod.mk.injEq, List.lookup_nil]
-        by_cases hc : (c = 0 ∨ c = 1) ∧ a = n
-        · rw [if_pos hc]
-          obtain ⟨hc, rfl⟩ := hc
-          rw [lookup_mem _ _ _ _ hc, hmem, Option.bind_some]
-          rcases hc with rfl | rfl
-          · by_cases hi : i < len
-            · have : ¬(len ≤ i ∧ i < len + k.toNat * pageSize) := by omega
-              simp [memCell, hwf, hwf', hsz', hrd', hi, hlen, this, mem',
-                show i < len + k.toNat * pageSize by omega, show ¬len ≤ i by omega]
-            · by_cases hi2 : i < len + k.toNat * pageSize
-              · simp [memCell, hwf', hsz', hrd', hlen, hi, hi2, show len ≤ i by omega, mem',
-                  List.getElem?_replicate, show i - len < k.toNat * pageSize by omega]
-              · simp [memCell, hwf, hwf', hsz', hrd', hlen, hi, hi2, mem']
-          · rcases i with _ | _ | i <;> simp [memCell, hwf, hwf', hsz', hlen, hmax', mem']
-        · rw [if_neg hc]
-          have h1 : ¬(c = 1 ∧ a = n ∧ i = 0) := fun h => hc ⟨.inr h.1, h.2.1⟩
-          have h2 : ¬(c = 0 ∧ a = n ∧ len ≤ i ∧ i < len + k.toNat * pageSize) :=
-            fun h => hc ⟨.inl h.1, h.2.1⟩
-          simp [h1, h2])
-    (by
-      intro σ _ _ hP l hq hp
-      obtain ⟨mem, hmem, hwf, hlen⟩ := memLength_facts (hP _ List.mem_cons_self)
-      obtain ⟨c, a, i⟩ := l
-      rw [lookup_cons_pair, lookup_byteCells] at hq
-      rw [lookup_cons_pair] at hp
-      simp only [Loc.memLength, Prod.mk.injEq, List.length_replicate, List.lookup_nil] at hq hp
-      split at hq
-      · rename_i h; rw [if_pos h] at hp; cases hp
-      · split at hq
-        · rename_i _ h
-          obtain ⟨rfl, rfl, h3, _⟩ := h
-          simp [lookup_byte, hmem, hwf, hlen, show ¬ i < len by omega]
-        · cases hq)
+      have := grow_step_ok hn hmem hwf hlen k (by rw [hmax]; exact hok) f.locals (base ++ vs) L R
+      simpa only [List.append_assoc] using this)
+    (fun σ _ _ hP l hq hp => grow_fresh (hP _ List.mem_cons_self) l hq hp)
   simp only [Frame.withLocals_self] at key
   unfold memLength memLimit memBytes
   iintro ⟨Hl, #Hm, HΦ⟩
@@ -483,13 +574,14 @@ theorem wpi_memory_grow (n len : Nat) (mx : Option Nat) (k : UInt32)
     · iapply BigSepL.bigSepL_nil.2; iempintro
   · inext
     iintro HQ
+    simp only [growCells]
     icases BigSepL.bigSepL_cons.1 $$ HQ with ⟨HQ1, HQ2⟩
     iapply HΦ
     isplitl [HQ1]
     · iexact HQ1
     · iexact HQ2
 
-/-- `memory.grow` when the limits forbid it: `-1`, nothing changes. -/
+/-- `memory.grow` when the limit forbids it: `-1`, nothing changes. -/
 theorem wpi_memory_grow_fail (n len : Nat) (mx : Option Nat) (k : UInt32)
     (hn : f.mi.memAddrs[0]? = some n) (hfail : ¬GrowOk len mx k.toNat) :
     n ↦[wmlength] len ∗ n ↪[wmlimit] mx ∗
@@ -504,9 +596,9 @@ theorem wpi_memory_grow_fail (n len : Nat) (mx : Option Nat) (k : UInt32)
       obtain ⟨mem, hmem, _, hlen⟩ := memLength_facts (hP _ List.mem_cons_self)
       obtain ⟨mem', hmem', hmax⟩ := memLimit_facts (hRd _ List.mem_cons_self)
       rw [hmem] at hmem'; cases hmem'
-      have hgrow := grow_eq_none (mem := mem) (k := k.toNat) (by rw [hlen, hmax]; exact hfail)
       refine ⟨σ, ?_, replaces_same hP⟩
-      simp [Exec.instr, Exec.i32, memOf_eq hn hmem, hgrow])
+      have := grow_step_fail hn hmem hlen k (by rw [hmax]; exact hfail) f.locals (base ++ vs) L R
+      simpa only [List.append_assoc] using this)
     (by intro σ _ _ _ l hq hp; simp_all)
   simp only [Frame.withLocals_self] at key
   unfold memLength memLimit
@@ -617,6 +709,57 @@ theorem wpi_global_set (g a : Nat) (gi : GlobalInst) (v : Value)
     iapply HΦ
     icases BigSepL.bigSepL_cons.1 $$ HQ with ⟨HQ, -⟩
     iexact HQ
+
+/-! ## Runs of bytes and 32-bit words -/
+
+theorem byteCells_append (n i : Nat) (bs₁ bs₂ : List UInt8) :
+    byteCells (H := H) n i (bs₁ ++ bs₂) = byteCells n i bs₁ ++ byteCells n (i + bs₁.length) bs₂ := by
+  induction bs₁ generalizing i with
+  | nil => simp [byteCells]
+  | cons b bs ih => simp [byteCells, ih, Nat.add_assoc, Nat.add_comm 1]
+
+/-- Iris-Wasm's splitting of `↦[wms]` at a point. -/
+theorem memBytes_append (n i : Nat) (bs₁ bs₂ : List UInt8) :
+    memBytes (GF := GF) n i (bs₁ ++ bs₂) ⊣⊢ memBytes n i bs₁ ∗ memBytes n (i + bs₁.length) bs₂ := by
+  unfold memBytes
+  rw [byteCells_append]
+  exact BigSepL.bigSepL_append (PROP := IProp GF)
+    (Φ := fun (_ : Nat) (p : Loc × Cell H) => iprop(p.1 ↦ₛ p.2))
+    (l₁ := byteCells n i bs₁) (l₂ := byteCells n (i + bs₁.length) bs₂)
+
+theorem memBytes_congr {n i j : Nat} {bs : List UInt8} (h : i = j) :
+    memBytes (GF := GF) n i bs ⊣⊢ memBytes n j bs := by subst h; exact .rfl
+
+@[simp] theorem bytes32_length (v : UInt32) : (bytes32 v).length = 4 := by simp [bytes32]
+
+theorem decodeLE_bytes32 (v : UInt32) : Memory.decodeLE (bytes32 v) = v.toNat := by
+  have hv := v.toNat_lt
+  simp [bytes32, Memory.decodeLE, List.range, List.range.loop, Nat.shiftRight_eq_div_pow]
+  omega
+
+theorem storeBytes_i32 (w : UInt32) : storeBytes (.i32 w) 4 = bytes32 w := rfl
+
+/-- Iris-Wasm's `wp_load` at `i32`: read an owned word. -/
+theorem wpi_load_i32 (arg : MemArg) (a : UInt32) (n k : Nat) (w : UInt32)
+    (hn : f.mi.memAddrs[0]? = some n) (hk : a.toNat + arg.offset = k) :
+    n ↦[i32][ k ] w ∗ ▷ (n ↦[i32][ k ] w -∗ Φ.normal (vs ++ [.i32 w]) f)
+      ⊢ wpi lim d f (vs ++ [.i32 a]) [.load .i32 none arg] Φ := by
+  subst hk
+  have h := wpi_load (Φ := Φ) (lim := lim) (d := d) (f := f) (vs := vs) .i32 none arg a n (bytes32 w) hn
+    (by simp [loadWidth, NumType.byteWidth]) (by simp [bytes32])
+  simp only [loadValue, decodeLE_bytes32, UInt32.ofNat_toNat] at h
+  exact h
+
+/-- Iris-Wasm's `wp_store` at `i32`: overwrite four owned bytes with a word. -/
+theorem wpi_store_i32 (arg : MemArg) (a : UInt32) (n k : Nat) (w : UInt32) (old : List UInt8)
+    (hn : f.mi.memAddrs[0]? = some n) (hk : a.toNat + arg.offset = k) (hold : old.length = 4) :
+    n ↦[wms][ k ] old ∗ ▷ (n ↦[i32][ k ] w -∗ Φ.normal vs f)
+      ⊢ wpi lim d f (vs ++ [.i32 a, .i32 w]) [.store .i32 none arg] Φ := by
+  subst hk
+  have h := wpi_store (Φ := Φ) (lim := lim) (d := d) (f := f) (vs := vs) .i32 none arg a (.i32 w) n old hn
+    (by simp [storeWidth, NumType.byteWidth, hold]) (by intro h; simp [h] at hold)
+  rw [hold, storeBytes_i32] at h
+  exact h
 
 end Rules
 

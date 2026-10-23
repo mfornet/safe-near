@@ -486,6 +486,48 @@ theorem wpi_loop (bt : BlockType) (body : List Instr) (vs₀ args : List Value)
   · icases HK with ⟨-, -, -, HK⟩
     iexact HK
 
+/-! ## Blocks without parameters
+
+The usual case: block types `[] → []` or `[] → [t]`. The rules take the
+operands below the block as they are. -/
+
+theorem wpi_block0 (bt : BlockType) (body : List Instr) (vs₀ : List Value)
+    (hp : (Exec.blockType f.mi bt).params = []) :
+    ▷ wpi lim d f [] body (Post.block (Exec.blockType f.mi bt).results.length vs₀ Φ)
+      ⊢ wpi lim d f vs₀ [.block bt body] Φ := by
+  have := wpi_block (Φ := Φ) (lim := lim) (d := d) (f := f) bt body vs₀ [] (by simp [hp])
+  simpa using this
+
+theorem wpi_if0_true (bt : BlockType) (th el : List Instr) (vs₀ : List Value) (c : UInt32)
+    (hc : c ≠ 0) (hp : (Exec.blockType f.mi bt).params = []) :
+    ▷ wpi lim d f [] th (Post.block (Exec.blockType f.mi bt).results.length vs₀ Φ)
+      ⊢ wpi lim d f (vs₀ ++ [.i32 c]) [.«if» bt th el] Φ := by
+  have := wpi_if_true (Φ := Φ) (lim := lim) (d := d) (f := f) bt th el vs₀ [] c hc (by simp [hp])
+  simpa using this
+
+theorem wpi_if0_false (bt : BlockType) (th el : List Instr) (vs₀ : List Value)
+    (hp : (Exec.blockType f.mi bt).params = []) :
+    ▷ wpi lim d f [] el (Post.block (Exec.blockType f.mi bt).results.length vs₀ Φ)
+      ⊢ wpi lim d f (vs₀ ++ [.i32 0]) [.«if» bt th el] Φ := by
+  have := wpi_if_false (Φ := Φ) (lim := lim) (d := d) (f := f) bt th el vs₀ [] (by simp [hp])
+  simpa using this
+
+theorem wpi_loop0 (bt : BlockType) (body : List Instr) (vs₀ : List Value)
+    (hp : (Exec.blockType f.mi bt).params = []) :
+    ▷ wpi lim d f [] body (Post.loop lim d bt body 0 vs₀ Φ)
+      ⊢ wpi lim d f vs₀ [.loop bt body] Φ := by
+  have := wpi_loop (Φ := Φ) (lim := lim) (d := d) (f := f) bt body vs₀ [] (by simp [hp])
+  simpa [hp] using this
+
+@[simp] theorem Post.block_normal (r : Nat) (vs₀ : List Value) (Φ : Post H GF) (vs : List Value)
+    (g : Frame) : (Post.block r vs₀ Φ).normal vs g = Φ.normal (vs₀ ++ vs) g := rfl
+@[simp] theorem Post.block_br_succ (r : Nat) (vs₀ : List Value) (Φ : Post H GF) (n : Nat)
+    (X : List Value) (g : Frame) : (Post.block r vs₀ Φ).br (n + 1) X g = Φ.br n (vs₀ ++ X) g := rfl
+@[simp] theorem Post.block_ret (r : Nat) (vs₀ : List Value) (Φ : Post H GF) (X : List Value)
+    (g : Frame) : (Post.block r vs₀ Φ).ret X g = Φ.ret (vs₀ ++ X) g := rfl
+@[simp] theorem Post.block_trap (r : Nat) (vs₀ : List Value) (Φ : Post H GF) :
+    (Post.block r vs₀ Φ).trap = Φ.trap := rfl
+
 end Rules
 
 end WasmLogic
