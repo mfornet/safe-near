@@ -70,7 +70,7 @@ requires the open runtime refinement proof and explicit gas/storage assumptions.
 | `InitOnce` | `new` cannot run twice; nothing runs before `new` | proved |
 | `ProjectEncode` | The view recovers every well-formed state from its storage | proved |
 | `StorageCoverage` | Occupied storage is at most the `STATE` record plus `account_storage_usage` per registered account | proved |
-| `refines_wnear` | `NearInterface.Refines` for `contract.wasm` on near-lean's function-call boundary and the `wnear` contract model: every input, every amount of gas, every resource state | stated, open |
+| `refines_wnear` | `NearInterface.Refines` for `contract.wasm` on near-lean's function-call boundary and the `wnear` contract model, under the pinned protocol configuration (version 86): every input, every amount of gas, every resource state | stated, open |
 
 ## Proof approach and lessons
 
@@ -106,9 +106,14 @@ The refinement statement is the generic `NearInterface.Refines`
 `Spec/Contract.lean` makes wNEAR a `ContractModel`; `NearRuntime.Boundary`
 makes near-lean a `RuntimeInterface` (one function-call action, then the
 receipt's storage-stake check); `Proofs/Refinement.lean` states
-`refines_wnear` for the embedded `contract.wasm`. Its only hypotheses are that
-the storage represents a model state and that the context is one the runtime
-builds. With at least the model's gas bound attached, the execution agrees with
+`refines_wnear` for the embedded `contract.wasm` and the embedded protocol
+configuration (`runtime_config_v86.json`, the latest in `near-lean/vm/configs`
+and the one the adapter tests run on). Its only hypotheses are that the
+storage represents a model state, that the context is one the runtime builds,
+and that it carries that configuration. Gas costs and limits are protocol
+parameters: `gasBound` is measured under the pinned configuration, and under a
+configuration with, say, a much larger `regular_op_cost` or no room for logs
+the binary would not behave as the model. With at least the model's gas bound attached, the execution agrees with
 the model exactly (return value bytes, storage, balance, storage usage, logs,
 receipt bytes, failure with its exact message) and uses at most that much gas;
 with less, it agrees or fails for gas with no effects; input that is no call

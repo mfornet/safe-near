@@ -11,8 +11,9 @@ the invariant: the measured per-account storage usage a state records. The
 semantics reads the protocol configuration from each context, as the binary
 does.
 
-`Refines R code (wnear cfg)` is then the complete statement about the binary:
-every input, every amount of gas, every resource state.
+`Refines R protocol code (wnear cfg)` is then the complete statement about the
+binary under the protocol configuration `protocol`: every input, every amount
+of gas, every resource state.
 -/
 
 namespace WNear
