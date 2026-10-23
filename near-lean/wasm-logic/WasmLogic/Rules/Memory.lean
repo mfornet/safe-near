@@ -482,7 +482,7 @@ zeros and returns the old size in pages, or fails and returns `-1`. Which
 one depends on the memory's limit, which this rule does not need to know. -/
 theorem wpi_memory_grow_either (n len : Nat) (k : UInt32) (hn : f.mi.memAddrs[0]? = some n) :
     n ↦[wmlength] len ∗
-      ▷ ((n ↦[wmlength] (len + k.toNat * pageSize) ∗
+      ▷ ((⌜len / pageSize + k.toNat ≤ maxPages⌝ -∗ n ↦[wmlength] (len + k.toNat * pageSize) ∗
             n ↦[wms][ len ] List.replicate (k.toNat * pageSize) 0 -∗
           Φ.normal (vs ++ [.i32 (UInt32.ofNat (len / pageSize))]) f) ∧
         (n ↦[wmlength] len -∗ Φ.normal (vs ++ [.i32 0xFFFFFFFF]) f))
@@ -526,9 +526,12 @@ theorem wpi_memory_grow_either (n len : Nat) (k : UInt32) (hn : f.mi.memAddrs[0]
   · inext
     iintro %σ %_ HQ
     by_cases hσ : ok σ
-    · simp only [hσ, ite_true, growCells]
+    · obtain ⟨_, _, hok⟩ := hσ
+      have hσ' : ok σ := ⟨_, by assumption, hok⟩
+      simp only [hσ', ite_true, growCells]
       icases HΦ with ⟨HΦ, -⟩
       icases BigSepL.bigSepL_cons.1 $$ HQ with ⟨HQ1, HQ2⟩
+      ispecialize HΦ $$ %hok.1
       iapply HΦ
       isplitl [HQ1]
       · iexact HQ1
