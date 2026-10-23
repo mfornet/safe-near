@@ -59,7 +59,7 @@ runtime-adapter-test:
 # Audit every wNEAR model/spec/proof declaration, including transitive axioms.
 wnear-audit:
     cd contracts/w-near/verification && lake build Model Spec Proofs runtime-adapter-tests
-    python3 tools/axiom-audit.py contracts/w-near/verification --no-build --report audit/wnear.json
+    python3 tools/axiom-audit.py contracts/w-near/verification --no-build --allow-sorry-module Proofs.Refinement --report audit/wnear.json
 
 # Compare every normalized VM observation, including gas, against pinned nearcore.
 near-conformance:

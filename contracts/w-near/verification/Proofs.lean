@@ -4,3 +4,4 @@ import Proofs.Authorization
 import Proofs.Conservation
 import Proofs.Availability
 import Proofs.Storage
+import Proofs.Refinement
