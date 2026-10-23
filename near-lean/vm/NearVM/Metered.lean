@@ -804,6 +804,94 @@ private def prepareStorageCallAux (name : String) (before : HostStore NearState)
     st := { st with host := { st.host with storageAccounting := some trie } }
   return (st, none)
 
+/-- Burnt gas is at least `b` and within fixed limits: what a charge preserves.
+Unlike `Bounded`, it says nothing of promise gas, so it survives the storage
+phase's splice of burnt gas into the caller's counter. -/
+def GasCounter.Floor (b prepaid maxBurnt : Nat) (g : GasCounter) : Prop :=
+  b ≤ g.burnt ∧ g.burnt ≤ maxBurnt ∧ g.burnt ≤ prepaid ∧ g.prepaid = prepaid ∧ g.maxBurnt = maxBurnt
+
+theorem GasCounter.deduct_floor {b prepaid maxBurnt : Nat} {g : GasCounter} (burn use : Nat)
+    (h : g.Floor b prepaid maxBurnt) : (g.deduct burn use).1.Floor b prepaid maxBurnt := by
+  obtain ⟨hb, hm, hp, hpp, hmb⟩ := h
+  unfold deduct
+  dsimp only
+  split
+  · rename_i hok
+    simp only [Floor]
+    rw [hpp, hmb] at hok
+    omega
+  · simp only [Floor]
+    rw [hpp, hmb]
+    refine ⟨?_, ?_, ?_, rfl, rfl⟩
+    · exact Nat.le_min.mpr ⟨by omega, Nat.le_min.mpr ⟨by omega, by omega⟩⟩
+    · exact Nat.le_trans (Nat.min_le_right _ _) (Nat.min_le_right _ _)
+    · exact Nat.le_trans (Nat.min_le_right _ _) (Nat.min_le_left _ _)
+
+theorem applyCharge_floor {b prepaid maxBurnt : Nat} (ns : NearState) (charge : Charge)
+    (h : ns.gas.Floor b prepaid maxBurnt) : (applyCharge ns charge).1.gas.Floor b prepaid maxBurnt := by
+  cases charge <;> exact GasCounter.deduct_floor _ _ h
+
+theorem applyCharges_floor {b prepaid maxBurnt : Nat} (ns : NearState) (charges : List Charge)
+    (h : ns.gas.Floor b prepaid maxBurnt) : (applyCharges ns charges).1.gas.Floor b prepaid maxBurnt := by
+  induction charges generalizing ns with
+  | nil => exact h
+  | cons charge charges ih =>
+    have hp := applyCharge_floor ns charge h
+    unfold applyCharges
+    cases hc : applyCharge ns charge with
+    | mk paid error =>
+      rw [hc] at hp
+      cases error with
+      | none => exact ih paid hp
+      | some error => exact hp
+
+theorem gas_ite {P : GasCounter → Prop} {c : Prop} [Decidable c]
+    {a b : HostStore NearState × Option FunctionCallError}
+    (ha : c → P a.1.host.gas) (hb : ¬c → P b.1.host.gas) : P (if c then a else b).1.host.gas := by
+  by_cases h : c
+  · simp only [h, ↓reduceIte]; exact ha h
+  · simp only [h, ↓reduceIte]; exact hb h
+
+set_option maxHeartbeats 0 in
+/-- The storage phase changes gas only by billing charges, so any property of
+the counter that billing preserves holds after it. -/
+theorem prepareStorageCallAux_gas (P : GasCounter → Prop) (name : String)
+    (before : HostStore NearState) (args : List Value) (hP : P before.host.gas)
+    (hbill : ∀ (ns : NearState) (charges : List Charge), P ns.gas → P (applyCharges ns charges).1.gas) :
+    P (prepareStorageCallAux name before args).1.host.gas := by
+  unfold prepareStorageCallAux
+  simp only [Id.run, pure]
+  by_cases hname : ["storage_read", "storage_has_key", "storage_write", "storage_remove"].contains name = true
+  · simp only [hname, ↓reduceIte]
+    cases hacc : before.host.storageAccounting with
+    | none => exact hP
+    | some initial =>
+      dsimp only
+      rcases hk : getMemOrReg before (argU64 args 1) (argU64 args 0) with _ | key
+      · exact hP
+      · dsimp only
+        rcases hr : Near.TrieOverlay.getReference initial
+            (Near.TrieOverlay.contractKey before.host.context.currentAccountId key)
+            (name == "storage_write" || name == "storage_remove" || before.host.storageReadsFromTrie)
+          with msg | ⟨looked, pointer⟩
+        · dsimp only
+          rcases before.host.config.maxStorageKeyLen with _ | limit
+          all_goals dsimp only
+          all_goals repeat' (first | exact hP | (refine gas_ite ?_ ?_ <;> intro _))
+        · dsimp only
+          rcases before.host.config.maxStorageKeyLen with _ | limit
+          all_goals dsimp only
+          all_goals rcases pointer with _ | ptr
+          all_goals (try dsimp only)
+          all_goals repeat' (first | exact hP | (refine gas_ite ?_ ?_ <;> intro _) | apply hbill)
+          all_goals (try (rcases getMemOrReg before (argU64 args 3) (argU64 args 2) with _ | value))
+          all_goals (try dsimp only)
+          all_goals repeat' (first | exact hP | apply hbill)
+          all_goals rcases Near.TrieOverlay.dereference looked ptr with msg | ⟨fetched, stored⟩
+          all_goals (try dsimp only)
+          all_goals repeat' (first | exact hP | (refine gas_ite ?_ ?_ <;> intro _) | apply hbill)
+  · simp only [hname, Bool.false_eq_true, ↓reduceIte]; exact hP
+
 /-- Expose only the fields the external storage phase may change. On success
 its local burns cannot alter prepaid promise obligations or call gas limits. -/
 def prepareStorageCall (name : String) (before : HostStore NearState) (args : List Value) :
@@ -815,6 +903,15 @@ def prepareStorageCall (name : String) (before : HostStore NearState) (args : Li
         burnt := after.host.gas.burnt
         promises := if error.isNone then before.host.gas.promises else after.host.gas.promises }
       gasProfile := after.host.gasProfile } }, error)
+
+/-- The storage phase only raises burnt gas, within the call's limits. -/
+theorem prepareStorageCall_floor {b prepaid maxBurnt : Nat} (name : String) (st : HostStore NearState)
+    (args : List Value) (h : st.host.gas.Floor b prepaid maxBurnt) :
+    (prepareStorageCall name st args).1.host.gas.Floor b prepaid maxBurnt := by
+  have ha := prepareStorageCallAux_gas (GasCounter.Floor b prepaid maxBurnt) name st args h
+    (fun ns charges hns => applyCharges_floor ns charges hns)
+  obtain ⟨hb, hm, hp, _, _⟩ := ha
+  exact ⟨hb, hm, hp, h.2.2.2.1, h.2.2.2.2⟩
 
 @[simp] theorem prepareStorageCall_promises (name : String) (st : HostStore NearState) (args : List Value) :
     (prepareStorageCall name st args).1.host.promises = st.host.promises := rfl

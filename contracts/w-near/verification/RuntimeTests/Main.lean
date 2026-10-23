@@ -153,6 +153,10 @@ def main : IO Unit := do
 
   let protocol ← RuntimeConfig.load "../../../near-lean/vm/configs" RuntimeConfig.latestVersion
   let cfg := WNear.Config.ofRuntime protocol
+  for version in [29, 48, 49, 84, RuntimeConfig.latestVersion] do
+    let pinned ← RuntimeConfig.load "../../../near-lean/vm/configs" version
+    check s!"protocol {version}: every instruction costs gas (fuel sufficiency premise)"
+      (0 < pinned.wasm.regularOpCost && 0 < pinned.wasm.linearOpBaseCost)
   let contractBytes ← IO.FS.readBinFile "../contract.wasm"
   let module ← match Wasm.Binary.decode contractBytes with
     | .ok m => pure m

@@ -30,3 +30,4 @@ import NearVM.ReceiptPredicates
 import NearVM.PromiseEncoding
 import NearVM.MeteredEncoding
 import NearVM.OutcomeEncoding
+import NearVM.Fuel

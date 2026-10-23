@@ -117,6 +117,8 @@ structure Context.WF (ctx : Context) (raw : RawStorage) : Prop where
   usage_ge : storageUsageOf ctx.protocol raw ≤ ctx.storageUsage
   /-- Each stored byte burns gas, so one call cannot overflow the `u64` counter. -/
   usage_room : ctx.storageUsage + ctx.protocol.wasm.limits.maxGasBurnt < 2 ^ 64
+  /-- Every instruction costs gas: the per-operation and linear base costs are positive. -/
+  opCost_pos : 0 < ctx.protocol.wasm.regularOpCost ∧ 0 < ctx.protocol.wasm.linearOpBaseCost
   trie_canonical : Near.TrieConstruction.build ctx.trie.entries = .ok ctx.trie.base
   trie_storage : contractData ctx.trie ctx.current.bytes = raw
 

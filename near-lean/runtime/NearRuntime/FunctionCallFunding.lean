@@ -22,7 +22,7 @@ theorem commitFunctionCall_funded_gas (exec : Exec) (c : ReceiptCtx) (account : 
   have hf := commitFunctionCall_funded exec c account code method args gas deposit isLast effects exec.storageAccounting hwf haccount hsuccess heffects
   have hg := run_functionCallGasFunds c code.module code.size method
     (functionCallContext c account args gas deposit isLast exec.storageAccounting) (exec.state.contractStorage c.receipt.receiverId)
-    defaultFuel hreceiver hsuccess rfl
+    _ hreceiver hsuccess rfl
   dsimp only at hf ⊢
   rw [hg] at hf
   exact hf
@@ -59,7 +59,7 @@ theorem applyFunctionCall_success_funding_step (c : ReceiptCtx) (method : String
     (before.state.contractStorage c.receipt.receiverId)
   have hg := run_functionCallGasFunds c code.module code.size method
     (functionCallContext c account args gas deposit isLast before.storageAccounting) (before.state.contractStorage c.receipt.receiverId)
-    defaultFuel hreceiver hsuccess rfl
+    _ hreceiver hsuccess rfl
   change functionCallGasFunds c outcome = (outcome.usedGas - outcome.burntGas) * c.action.gasPrice at hg
   change after.totalFunds c.cfg + before.subsidizedAmount = before.totalFunds c.cfg + deposit +
     after.subsidizedAmount + functionCallGasFunds c outcome at hf

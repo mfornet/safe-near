@@ -1,5 +1,6 @@
 import NearRuntime.Apply
 import NearInterface.Refines
+import NearVM.Fuel
 
 /-!
 # near-lean as a `RuntimeInterface`
@@ -187,5 +188,18 @@ theorem nearRuntime_failure_rolledBack (code : Code) (raw : RawStorage) (ctx : C
     NearInterface.RolledBack ctx raw (nearRuntime.exec code raw ctx) := by
   have := execOn_rolledBack code raw.toList ctx h
   simpa [nearRuntime, Finset.toList_toFinset] using this
+
+/-! ## Fuel
+
+The VM call uses `run`'s default fuel, `fuelFor`, as `applyFunctionCall` does.
+Under the runtime's guarantees it is enough: more fuel never changes the
+outcome, so no execution stops for want of interpreter steps. -/
+
+theorem execOn_fuel_independent (code : Code) (storage : List (Bytes × Bytes)) {ctx : Context}
+    {raw : RawStorage} (hwf : ctx.WF raw) (n : Nat) :
+    run ctx.protocol code.code.module code.code.size ctx.method (toVMContext ctx) storage
+        (fuelFor ctx.protocol code.code.module (toVMContext ctx) + n) =
+      run ctx.protocol code.code.module code.code.size ctx.method (toVMContext ctx) storage :=
+  run_fuel_independent _ _ _ _ _ _ (Nat.lt_min.mpr hwf.opCost_pos) n
 
 end Near.Boundary
