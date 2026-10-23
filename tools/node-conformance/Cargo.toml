@@ -9,7 +9,7 @@ publish = false
 [dependencies]
 borsh = "1"
 near-crypto = "=0.37.4"
-near-primitives = "=0.37.4"
+near-primitives = { version = "=0.37.4", features = ["rand"] }
 near-primitives-core = "=0.37.4"
 ordered-float = "4"
 rand = "0.8"

@@ -216,6 +216,18 @@
       "accept": 39,
       "reject": 29
     },
+    "ChunkContractAccesses": {
+      "accept": 29,
+      "reject": 52
+    },
+    "ChunkContractDeploys": {
+      "accept": 9,
+      "reject": 21
+    },
+    "ChunkEndorsement": {
+      "accept": 35,
+      "reject": 52
+    },
     "ChunkEndorsementsBitmap": {
       "accept": 13,
       "reject": 39
@@ -240,6 +252,10 @@
       "accept": 29,
       "reject": 30
     },
+    "ChunkProductionKey": {
+      "accept": 41,
+      "reject": 39
+    },
     "ChunkProofs": {
       "accept": 23,
       "reject": 12
@@ -247,6 +263,30 @@
     "ChunkState": {
       "accept": 22,
       "reject": 13
+    },
+    "ChunkStateTransition": {
+      "accept": 39,
+      "reject": 42
+    },
+    "ChunkStateWitness": {
+      "accept": 20,
+      "reject": 19
+    },
+    "ChunkStateWitnessAck": {
+      "accept": 30,
+      "reject": 30
+    },
+    "CodeBytes": {
+      "accept": 16,
+      "reject": 38
+    },
+    "CodeHash": {
+      "accept": 24,
+      "reject": 24
+    },
+    "CodeHashes": {
+      "accept": 18,
+      "reject": 29
     },
     "CompilationError": {
       "accept": 11,
@@ -259,6 +299,22 @@
     "CongestionInfoV1": {
       "accept": 47,
       "reject": 42
+    },
+    "ContractCodeRequest": {
+      "accept": 26,
+      "reject": 49
+    },
+    "ContractCodeResponse": {
+      "accept": 30,
+      "reject": 50
+    },
+    "ContractCodeResponseV1": {
+      "accept": 31,
+      "reject": 34
+    },
+    "ContractCodeResponseV2": {
+      "accept": 26,
+      "reject": 34
     },
     "CryptoHash": {
       "accept": 56,
@@ -275,6 +331,10 @@
     "DeterministicAccountStateInit": {
       "accept": 45,
       "reject": 54
+    },
+    "EncodedChunkStateWitness": {
+      "accept": 16,
+      "reject": 38
     },
     "EncodedShardChunk": {
       "accept": 44,
@@ -356,6 +416,10 @@
       "accept": 30,
       "reject": 30
     },
+    "MainTransitionKey": {
+      "accept": 24,
+      "reject": 24
+    },
     "MaybeEncodedShardChunk": {
       "accept": 33,
       "reject": 18
@@ -403,6 +467,22 @@
     "PartialEncodedChunkV2": {
       "accept": 34,
       "reject": 51
+    },
+    "PartialEncodedContractDeploys": {
+      "accept": 23,
+      "reject": 52
+    },
+    "PartialEncodedContractDeploysPart": {
+      "accept": 28,
+      "reject": 32
+    },
+    "PartialEncodedStateWitness": {
+      "accept": 37,
+      "reject": 38
+    },
+    "PartialEncodedStateWitnessV2": {
+      "accept": 38,
+      "reject": 37
     },
     "PartialExecutionOutcome": {
       "accept": 46,
@@ -540,6 +620,10 @@
       "accept": 29,
       "reject": 16
     },
+    "SpiceChunkContractAccesses": {
+      "accept": 35,
+      "reject": 40
+    },
     "SpiceChunkEndorsement": {
       "accept": 40,
       "reject": 51
@@ -552,6 +636,18 @@
       "accept": 30,
       "reject": 30
     },
+    "SpiceChunkStateWitness": {
+      "accept": 18,
+      "reject": 12
+    },
+    "SpiceContractCodeRequest": {
+      "accept": 25,
+      "reject": 50
+    },
+    "SpiceContractCodeResponse": {
+      "accept": 20,
+      "reject": 40
+    },
     "SpiceCoreStatement": {
       "accept": 52,
       "reject": 49
@@ -559,6 +655,18 @@
     "SpiceCoreStatements": {
       "accept": 18,
       "reject": 35
+    },
+    "SpiceDataCommitment": {
+      "accept": 24,
+      "reject": 24
+    },
+    "SpiceDataIdentifier": {
+      "accept": 24,
+      "reject": 47
+    },
+    "SpiceDataPart": {
+      "accept": 24,
+      "reject": 34
     },
     "SpiceEndorsementCoreStatement": {
       "accept": 39,
@@ -568,12 +676,20 @@
       "accept": 44,
       "reject": 36
     },
+    "SpicePartialData": {
+      "accept": 25,
+      "reject": 50
+    },
     "SpiceStoredVerifiedEndorsement": {
       "accept": 39,
       "reject": 36
     },
     "SpiceUncertifiedChunkInfo": {
       "accept": 40,
+      "reject": 40
+    },
+    "SpiceVerifiedPartialData": {
+      "accept": 20,
       "reject": 40
     },
     "StateStoredReceipt": {
@@ -595,6 +711,10 @@
     "StorageError": {
       "accept": 24,
       "reject": 59
+    },
+    "StoredChunkStateTransitionData": {
+      "accept": 24,
+      "reject": 51
     },
     "String": {
       "accept": 38,
@@ -651,6 +771,10 @@
     "ValidatorStakes": {
       "accept": 28,
       "reject": 43
+    },
+    "VersionedPartialEncodedStateWitness": {
+      "accept": 42,
+      "reject": 48
     },
     "VersionedSignedDelegateAction": {
       "accept": 69,

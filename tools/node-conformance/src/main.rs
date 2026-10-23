@@ -6,6 +6,7 @@ mod chain;
 mod chain_fam;
 mod fam;
 mod rng;
+mod stateless_fam;
 mod values;
 
 use borsh::BorshDeserialize;
@@ -42,6 +43,7 @@ fn main() {
     errors(&mut m, &out_dir);
     outcomes(&mut m, &out_dir);
     chain_fam::chain(&mut m, &out_dir);
+    stateless_fam::stateless(&mut m, &out_dir);
 
     m.write(&out_dir);
 }
