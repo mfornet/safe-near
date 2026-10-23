@@ -74,9 +74,7 @@ structure ScriptRun where
 /-! ## Reading the JSON -/
 
 def field? (j : Json) (key : String) : Option String :=
-  match j.getObjVal? key with
-  | .ok v => v.getStr?.toOption
-  | .error _ => none
+  (j.getObjVal? key >>= Json.getStr?).toOption
 
 def number? (j : Json) (key : String) : Option Nat :=
   match j.getObjVal? key with

@@ -228,3 +228,39 @@ says so.
 Conclusion: with 5713333 the three qualifications of the original verdict are resolved for the
 scripts and the testsuite driver; the clean-room claim now holds for every file in the original
 table except as already noted for `Wasm/Bytes.lean` (own code, provenance now stated).
+
+## Follow-up: Testsuite/Script.lean (2026-10-23, HEAD 9dc5e93)
+
+Compared against `Interpreter/Testsuite/Exec.lean` and `Interpreter/Testsuite.lean` at 99435f7
+(and, as before, every other old file) with the same measures.
+
+Measures: 385 lines, 168 lines of 40+ chars, **0 identical**; 4202 6-token windows, 373 shared
+(8.9%, mostly from Testsuite/Exec.lean: 252); longest shared runs 27, 25, 18, 16 tokens.
+
+Hand inspection of every run of 10+ tokens:
+- 27 tok, new L76-79 vs old Exec.lean L87-90: `field? (j : Json) (key : String) : Option String :=
+  match j.getObjVal? key with | .ok v => v.getStr?.toOption | ...` — the old `jstr?` with a new name
+  and `| .error _ => none` for `| _ => none`. The same four-line Lean JSON accessor. 25 tok, L81-84 vs
+  old L92-98: `number?` has the same signature as old `jnat?`; the body differs (`v.getNat?.toOption`
+  vs the old nested match). 13 tok, L86: `items` shares only the signature prefix.
+- 18 tok, L364-366: `IO.Process.output { cmd := "wasm-tools", args := #["json-from-wast", path,
+  "--wasm-dir", ...` — the tool's command line (old Runner.lean L80 / Exec.lean L1435); the
+  manifest is now `commands.json` (old `script.json`).
+- 16 tok, L231: `with | some f => .ok f | none => .error` and the rest (10-13 tok) are Lean
+  match/`Except` idioms (`| _, _ => false`, `.all fun (e, v) =>`, `(j : Json) : Except String Value := do`).
+
+Everything the earlier review flagged in `Testsuite/Exec.lean` is replaced: `Outcome` is now `Verdict`
+(`ok/wrong/undecodable/invalid/outOfScope/unimplemented/unavailable`), `CmdResult`/`FileResult` are
+`Row`/`ScriptRun{script,rows,broken}`, `ScriptState` is `Session{binaries,store,names,missingNames,
+latest,byName}`, `runCommand`/`runFile`/`runAction`/`parseValue`/`parseExpected`/`matchesExpected`
+are `perform`/`runScript`/`act`/`constant`+`argument`/`expectation`/`Expectation.accepts`, with
+`binaryOf`/`instantiated`/`trapMatches` factored out. No comment, docstring, message or error text
+matches the old harness; the report tags (`pass`, `fail`, `module_unavailable`, ...) are fixed by the
+committed `testsuite_report.txt`, and the `json-from-wast` invocation is the tool's interface.
+
+Verdict: meets the clean-room standard. The one carried-over fragment, the four-line `getObjVal?`
+accessor, is the only idiomatic way to write that helper against `Lean.Data.Json` and carries no
+design; if a zero-tolerance reading is wanted, rewriting `field?` as
+`(j.getObjVal? key >>= Json.getStr?).toOption` removes it.
+
+The `field?` accessor was rewritten as suggested after this section was written.
