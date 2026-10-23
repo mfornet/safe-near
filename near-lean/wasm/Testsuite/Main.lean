@@ -1,139 +1,128 @@
-import Testsuite.Exec
+import Testsuite.Script
 
 /-!
 # `testsuite`: run the WebAssembly spec testsuite
 
-    lake exe testsuite [--report] [--dir DIR] [PATTERN]
+    lake exe testsuite [--report] [--dir DIR] [NAME]
 
-Runs the top-level `.wast` files of the testsuite directory (`vendor/testsuite`
-unless `--dir` or `$WASM_TESTSUITE` says otherwise), or only those whose name
-contains `PATTERN`. The default output is one summary line per file followed
-by every bug; `--report` instead prints the coverage report CI diffs: one
-`file:line kind outcome` line per command, sorted by file and line.
+Runs every `.wast` script at the top of the testsuite directory (default
+`vendor/testsuite`, or `$WASM_TESTSUITE`), or only those whose file name
+contains `NAME`. By default it prints one line per script and one per bug;
+with `--report` it prints the coverage report instead, one
+`script:line kind tag` line per command in file and line order, which CI
+compares with the committed `testsuite_report.txt`.
 
-Exit status: 1 when any command is a bug, 3 when the run could not start,
-0 otherwise; `--report` is always 0, since the diff of the report is the gate.
+Exit status: 1 when any command is a bug, 2 on a setup problem, else 0. The
+report form always exits 0: the diff is the gate there.
 -/
 
 namespace Wasm.Testsuite
 
 structure Options where
-  pattern : Option String := none
+  filter : Option String := none
   report : Bool := false
   dir : Option String := none
-  help : Bool := false
 
 def help : String :=
-"Usage: lake exe testsuite [--report] [--dir DIR] [PATTERN]
-  PATTERN   run only the .wast files whose name contains it
-  --report  print the coverage report instead of the summary
-  --dir DIR the testsuite directory (default vendor/testsuite or $WASM_TESTSUITE)
-  --help    this text"
+"usage: lake exe testsuite [--report] [--dir DIR] [NAME]
+  NAME       run only the scripts whose file name contains NAME
+  --report   print the coverage report (one line per command)
+  --dir DIR  the testsuite directory (default vendor/testsuite, or $WASM_TESTSUITE)"
 
-/-- Parse the command line; `none` on a bad flag or a second pattern. -/
-def options (argv : List String) : Except String Options := go argv {}
-where
-  go : List String → Options → Except String Options
-    | [], o => .ok o
-    | "--report" :: rest, o => go rest { o with report := true }
-    | "--dir" :: d :: rest, o => go rest { o with dir := some d }
-    | ["--dir"], _ => .error "--dir needs a directory"
-    | "--help" :: _, o | "-h" :: _, o => .ok { o with help := true }
-    | arg :: rest, o =>
-      if arg.startsWith "-" then .error s!"unknown option {arg}"
-      else match o.pattern with
-        | some _ => .error "only one PATTERN is allowed"
-        | none => go rest { o with pattern := some arg }
+def options : List String → Except String Options
+  | [] => .ok {}
+  | "--report" :: rest => (options rest).map fun o => { o with report := true }
+  | "--dir" :: dir :: rest => (options rest).map fun o => { o with dir := some dir }
+  | ["--dir"] => .error "--dir needs a directory"
+  | arg :: rest =>
+    if arg.startsWith "-" then .error s!"unknown option {arg}"
+    else (options rest).bind fun o =>
+      if o.filter.isSome then .error "at most one NAME" else .ok { o with filter := some arg }
 
-/-- The `.wast` files to run, sorted. -/
-def selectFiles (dir : System.FilePath) (pattern : Option String) : IO (Array String) := do
-  let entries ← dir.readDir
-  let wanted := entries.filterMap fun entry =>
-    let name : String := entry.fileName
-    let chosen := name.endsWith ".wast" &&
-      (match pattern with
-        | some p => !(name.splitOn p).length.ble 1
-        | none => true)
-    if chosen then some (dir / name).toString else none
-  return wanted.qsort (· < ·)
+/-- Whether `needle` occurs in `hay`. -/
+def mentions (hay needle : String) : Bool :=
+  needle.isEmpty || (hay.replace needle "").length < hay.length
 
-/-- Counts of each outcome kind in one file. -/
-structure Summary where
-  pass : Nat := 0
+def scripts (dir : System.FilePath) (filter : Option String) : IO (List String) := do
+  let mut found := #[]
+  for entry in ← dir.readDir do
+    let file := entry.fileName
+    if file.endsWith ".wast" && mentions file (filter.getD "") then
+      found := found.push (dir / file).toString
+  return (found.qsort (· < ·)).toList
+
+/-- Totals of one script. -/
+structure Stats where
+  ok : Nat := 0
   bugs : Nat := 0
-  skipped : Nat := 0
   outOfScope : Nat := 0
   unavailable : Nat := 0
+  unimplemented : Nat := 0
 
-def Summary.add (s : Summary) : Outcome → Summary
-  | .pass => { s with pass := s.pass + 1 }
-  | .fail _ | .decodeError _ | .invalidError _ => { s with bugs := s.bugs + 1 }
-  | .skipped _ => { s with skipped := s.skipped + 1 }
-  | .outOfScope _ => { s with outOfScope := s.outOfScope + 1 }
-  | .moduleUnavailable => { s with unavailable := s.unavailable + 1 }
+def Stats.add (t : Stats) : Verdict → Stats
+  | .ok => { t with ok := t.ok + 1 }
+  | .outOfScope _ => { t with outOfScope := t.outOfScope + 1 }
+  | .unavailable => { t with unavailable := t.unavailable + 1 }
+  | .unimplemented _ => { t with unimplemented := t.unimplemented + 1 }
+  | _ => { t with bugs := t.bugs + 1 }
 
-def Summary.merge (a b : Summary) : Summary :=
-  { pass := a.pass + b.pass, bugs := a.bugs + b.bugs, skipped := a.skipped + b.skipped,
-    outOfScope := a.outOfScope + b.outOfScope, unavailable := a.unavailable + b.unavailable }
+def Stats.plus (a b : Stats) : Stats :=
+  { ok := a.ok + b.ok, bugs := a.bugs + b.bugs, outOfScope := a.outOfScope + b.outOfScope,
+    unavailable := a.unavailable + b.unavailable, unimplemented := a.unimplemented + b.unimplemented }
 
-def Summary.of (results : Array CmdResult) : Summary :=
-  results.foldl (fun s r => s.add r.outcome) {}
+def ScriptRun.stats (r : ScriptRun) : Stats := r.rows.foldl (fun t row => t.add row.verdict) {}
 
-def Summary.line (s : Summary) : String :=
-  s!"{s.pass} pass, {s.bugs} bugs, {s.skipped} skipped, {s.outOfScope} out of scope, " ++
-  s!"{s.unavailable} unavailable"
+def ScriptRun.name (r : ScriptRun) : String := (System.FilePath.mk r.script).fileName.getD r.script
 
-def fileName (path : String) : String :=
-  (System.FilePath.mk path).fileName.getD path
+def column (s : String) (width : Nat) : String :=
+  s ++ String.ofList (List.replicate (width - s.length) ' ')
 
-/-- The human-readable account of one file: its summary and each bug. -/
-def account (file : FileResult) : String :=
-  let name := fileName file.path
-  match file.fileError with
-  | some error => s!"{name}: could not run: {error}\n"
+/-- The human-readable lines for one script. -/
+def describe (r : ScriptRun) : List String :=
+  match r.broken with
+  | some why => [s!"{column r.name 34} broken: {why}"]
   | none =>
-    let bugs := file.results.filter (·.outcome.isFailure)
-    let lines := bugs.map fun r =>
-      let detail := r.outcome.detail.getD ""
-      s!"    line {r.line} {r.kind}: {r.outcome.tag} {detail}\n"
-    s!"{name}: {(Summary.of file.results).line}\n" ++ String.join lines.toList
+    let t := r.stats
+    let head := s!"{column r.name 34} {column (toString t.ok) 6} ok   {column (toString t.bugs) 4} bugs   " ++
+      s!"{column (toString t.outOfScope) 5} out of scope   {t.unavailable} unavailable"
+    let bugs := r.rows.toList.filterMap fun row =>
+      if row.verdict.isBug then
+        some s!"    line {row.line}, {row.kind}: {row.verdict.tag}  {row.verdict.explanation}"
+      else none
+    head :: bugs
 
-/-- The coverage report lines, sorted by file name then line number. -/
-def coverage (files : Array FileResult) : List String :=
-  let rows := files.toList.flatMap fun file =>
-    let name := fileName file.path
-    match file.fileError with
-    | some error => [(name, 0, s!"{name}:0 file error {error}")]
-    | none => file.results.toList.map fun r =>
-      (name, r.line, s!"{name}:{r.line} {r.kind} {r.outcome.tag}")
-  let ordered := rows.toArray.qsort fun (n, l, _) (n', l', _) => n < n' || (n == n' && l < l')
-  ordered.toList.map (·.2.2)
+/-- The report lines of one script, in line order (the rows already are). -/
+def reportLines (r : ScriptRun) : List String :=
+  match r.broken with
+  | some why => [s!"{r.name}:0 file error {why}"]
+  | none => r.rows.toList.map fun row => s!"{r.name}:{row.line} {row.kind} {row.verdict.tag}"
 
 def main (argv : List String) : IO UInt32 := do
   let opts ← match options argv with
     | .ok o => pure o
-    | .error e => IO.eprintln s!"{e}\n{help}"; return 3
-  if opts.help then IO.println help; return 0
-  let fallback := (← IO.getEnv "WASM_TESTSUITE").getD "vendor/testsuite"
-  let dir : System.FilePath := opts.dir.getD fallback
-  unless ← dir.isDir do IO.eprintln s!"not a directory: {dir}"; return 3
-  let files ← selectFiles dir opts.pattern
-  if files.isEmpty then IO.eprintln "no .wast file matched"; return 3
+    | .error why => IO.eprintln s!"{why}\n{help}"; return 2
+  let dir : System.FilePath := opts.dir.getD ((← IO.getEnv "WASM_TESTSUITE").getD "vendor/testsuite")
+  if !(← dir.isDir) then IO.eprintln s!"no testsuite directory at {dir}"; return 2
+  let files ← scripts dir opts.filter
+  if files.isEmpty then IO.eprintln "no scripts match"; return 2
+  let excluded ← outOfScopeScripts
   let scratch ← IO.FS.createTempDir
-  let skipList ← outOfScopeFiles
-  let mut done : Array FileResult := #[]
-  for path in files do
-    let result ← runFile scratch skipList path
-    unless opts.report do IO.print (account result)
-    done := done.push result
+  let mut runs : List ScriptRun := []
+  for file in files do
+    let run ← runScript scratch excluded file
+    if !opts.report then
+      for line in describe run do IO.println line
+    runs := runs ++ [run]
   IO.FS.removeDirAll scratch
   if opts.report then
-    for line in coverage done do IO.println line
+    -- Scripts come sorted by name; rows come in line order.
+    for run in runs do
+      for line in reportLines run do IO.println line
     return 0
-  let total : Summary := done.foldl (fun s f => s.merge (Summary.of f.results)) {}
-  IO.println s!"\n{files.size} files: {total.line}"
-  let broken := done.any fun f => f.fileError.isSome || f.results.any (·.outcome.isFailure)
-  return if broken then 1 else 0
+  let total : Stats := runs.foldl (fun t r => t.plus r.stats) {}
+  IO.println (s!"\n{files.length} scripts: {total.ok} ok, {total.bugs} bugs, " ++
+    s!"{total.outOfScope} out of scope, {total.unimplemented} unimplemented, {total.unavailable} unavailable")
+  return if runs.any (fun r => r.broken.isSome || r.stats.bugs > 0) then 1 else 0
 
 end Wasm.Testsuite
 

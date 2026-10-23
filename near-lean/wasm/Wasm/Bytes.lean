@@ -4,6 +4,11 @@
 Small facts about `ByteArray.toList` and `String.fromUTF8?` that the NEAR
 runtime's encoding proofs use. In Lean 4.34 a `String` is its UTF-8 byte
 array with a validity proof, so the round trips are by construction.
+
+Provenance: these statements continue the project's own `ByteEncoding`
+module (added to the repository on 2026-10-20, after the Talos import, and
+never part of Talos), which lived next to the Talos interpreter; the proofs
+were redone against the current `String` representation.
 -/
 
 namespace Wasm.ByteEncoding

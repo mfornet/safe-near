@@ -1,192 +1,199 @@
-# Clean-room review of the initial runtime
+# Clean-room review record
 
-An independent reviewer compared the new package, at the commit that deleted
-the Talos copy, against every Lean and shell file of the Talos packages kept in
-git history at `99435f7`, and spot-checked the semantics against the
-specification. The report follows verbatim.
+An independent review of the initial runtime against the Talos copy in git
+history, run on 2026-10-23 by a reviewer with no part in writing the code.
+The three qualifications it raised were acted on the same day, before the
+migration was pushed: the four shell scripts were rewritten from scratch as
+one `scripts/suite.sh` with thin wrappers; the testsuite driver was rewritten
+with its own data types and loop (`Testsuite/Script.lean`, `Testsuite/Main.lean`,
+same report format, same committed report); and `Wasm/Bytes.lean` now states
+its provenance (the project's own module, not Talos). The review text follows
+unchanged, so its findings can be checked against that history.
 
-## Remediation after the review
+---
 
-- The four `scripts/*.sh` and `Testsuite/Main.lean`, which the review found to
-  be condensed from the Talos harness, were re-authored from scratch with a
-  different structure. The coverage report they produce is byte-identical.
-- `Testsuite/Exec.lean` keeps the vocabulary of `wasm-tools json-from-wast`
-  (command kinds, module files) and the report's outcome tags, which are the
-  CI contract; its execution logic is new, as the review states.
-- `Wasm/Bytes.lean` carries over lemmas this project wrote on 2026-10-20 inside
-  the Talos directory; they are our own, not Talos's.
+# Clean-room review: `near-lean/wasm` (HEAD 9e1219f) vs Talos copy (99435f7)
 
-## Report
-
-# Clean-room review: `near-lean/wasm` (commit 9e1219f) vs the Talos copy (commit 99435f7)
-
-Method. Every `.lean`/`.sh` under the new `near-lean/wasm` (22 files, 4486 lines) was compared
-against every `.lean`/`.sh` of the old `near-lean/wasm`, `near-lean/iris-wasm` and
-`near-lean/programs` trees at 99435f7 (211 files) with two measures: (a) identical
-whitespace-normalised lines of 40+ characters, (b) shared 6-token windows, plus the longest
-shared token run per file. Every line hit and every run of 14+ tokens was inspected by hand;
-the modules were then read side by side with their Talos counterparts.
+Method. Both trees were extracted to a scratch directory. Two automated passes over every new
+`.lean`/`.sh` against *all* 211 old `.lean`/`.sh` files (Interpreter, iris-wasm, programs):
+(1) identical lines of >= 40 chars after whitespace normalisation; (2) shared 6-token windows,
+with the longest shared token run per pair; plus (3) identical comment sentences of >= 7 words.
+Every hit was read by hand, and each new module was read in full next to its counterpart.
+Provenance of old files was checked with `git log` (Talos import = 1a6ceb2, 2026-10-16; upstream
+commit 8064439 of 2026-10-06).
 
 ## (a) Per-module table
 
-"6-tok" = share of the new file's 6-token windows that occur anywhere in the old trees
-(a Lean baseline of 2–5% is unavoidable: `deriving Repr, DecidableEq, Inhabited`, `match ... with`,
-`IO.Process.output { cmd := ...`). "lines" = identical 40+-char lines.
+"6-tok" = share of 6-token windows of the new file that occur anywhere in the old tree (a loose
+measure: Lean keywords and spec names inflate it; the useful signal is the longest run).
 
-| New module | Talos counterpart | lines / 6-tok | Verdict |
+| New module | Talos counterpart | Overlap (6-tok, longest run, identical lines) | Verdict |
 |---|---|---|---|
-| Wasm/Syntax.lean | Interpreter/Wasm/Syntax.lean, Simd.lean | 0 / 6.6% | clean. Spec section-2 layout (NumType/RefType/ValType, FuncType, Limits, Instr grouped as in the spec, Module with spec field names). Talos has a flat 300-constructor `Instruction`, `Function/MemDecl/GlobalDecl/TableDecl/ImportDecl`. Shared runs are `\| eq \| ne \| lt \| gt \| le \| ge deriving ...` (spec operator names) and `(m : Module) (name : String) : Option Nat` signatures. |
-| Wasm/Binary.lean | none (Talos had no binary decoder; Decoder/Wat.lean parses text, Decoder/ProofEval.lean evaluates it) | 0 / 2.4% | clean. Error strings are the testsuite's `assert_malformed` messages. |
-| Wasm/Validate.lean | Interpreter/Wasm/Validate.lean | 0 / 3.0% | clean. New = spec Appendix A.3 verbatim in structure (`OpType.known/unknown`, `Frame{kind,startTypes,endTypes,height,unreachable}`, `pushVal/popVal/pushCtrl/popCtrl/labelTypes`). Talos is a partial GC-oriented checker (`CheckState`, `CheckedType := Option ValueType`, `straightSig`). Shared text: spec diagnostics `unknown memory/table/global/function/type`. |
-| Wasm/Value.lean | SmallStep.lean (TrapReason), Validate.lean (`Value.toValueType`) | 5 / 28.3% | shared only spec-dictated names. The 5 lines are `\| .integerOverflow => "integer overflow"` etc.: the trap strings the testsuite asserts, constructor names are their camelCase. The 34-token run is the `.i32 _ => .i32 \| .i64 _ => .i64 ...` type-of-value match, the only way to write it. Talos has 6 extra GC/exception traps and `uninitializedElement (index : Nat)`; new has none. |
-| Wasm/Numeric.lean | Operations.lean, Float.lean, IEEE754.lean, Semantics.lean | 0 / 8.6% | clean. Talos implements a pure soft-float (`IEEE754.Format`, `encodeRatio`, `roundRatio`); new uses Lean `Float32`/`Float` with canonical-NaN replacement. Shared runs are `(a <<< k) \|\|\| (a >>> (` — the textbook rotate, and Talos guards `k = 0` where new uses `% 32`. Canonical NaN constants are IEEE values. |
-| Wasm/Memory.lean | Mem.lean | 0 / 8.2% | clean. Talos `Mem` = `pages × (Nat → UInt8)`; new = `Array ByteArray` with lazily materialised pages. Shared 19-token run is `(List.range len).map fun i => m.read8 (addr + i)`, the obvious idiom (`readList` vs `Mem.readBytes`). |
-| Wasm/Store.lean | Syntax.lean (`Store`), Host.lean | 0 / 3.8% | clean. Spec 4.2 store (funcs/tables/mems/globals/elems/datas, `ModuleInst` with `*Addrs`). Talos has one shared store with per-instance metadata and `HostEnv` positional resolvers. |
-| Wasm/Exec.lean | SmallStep.lean, Semantics.lean, Continuation.lean | 0 / 4.9% | clean. New: one `Array Value` stack, `Label{arity,height,rest,loop}`, `CallFrame{locals,inst,arity,height,labels,code}`, `Step c c' := step c = .next c'`. Talos: `ControlFrame{kind,paramArity,resultArity,body,continuation,belowStack}`, `CallFrame{...,callerRemainder,control,returningInstance}`, a 3000-line inductive `Step` with separate soundness/completeness. No shared comment, proof or constant. |
-| Wasm/Link.lean | Syntax.lean `Module.initialStore`, Testsuite/Exec.lean `instantiateModule`, Host/Registry.lean | 0 / 6.2% | clean. Spec 4.5 allocation as folds; `Registry` is a name→instance list. Talos had no spec instantiation (shared store, `assignResourceIds`, `hydrateStore`). Shared windows are generic `match ... with \| .error e => .error e`. |
-| Wasm/HostInvariant.lean | none (Talos `Host.lean` `HostContract`/`HostSpec` are a different idea) | 0 / 2.0% | clean. |
-| Wasm/LinkInvariant.lean | none | 0 / 3.6% | clean. |
-| Wasm/Bytes.lean | Interpreter/Wasm/ByteEncoding.lean | 4 / 20.8% | derived from the old file, but that file is NOT Talos: see (b). |
-| Wasm/Host/Spectest.lean | Testsuite/Exec.lean `spectestGlobal?`, `spectestPrintNames` | 0 / 7.1% | clean. Contents (666, 666.6, table 10/20, memory 1/2, print names) are the reference interpreter's `spectest`. |
-| Wasm/Wat.lean | Runner.lean `wasmToolsPrint`, Decoder/Wat.lean | 0 / 13.0% | clean. 18-token run is `IO.Process.output { cmd := "wasm-tools", args := #["` (Lean API + tool name). Talos ran `wasm-tools print` and parsed WAT; new runs `wasm-tools parse` and decodes binary. |
-| Wasm.lean | Interpreter.lean | 0 / 0% | clean (import list). |
-| Testsuite/Exec.lean | Interpreter/Testsuite/Exec.lean | 2 / 10.6% | suspect-light: same harness design and names, no copied bodies. See (b). |
-| Testsuite/Main.lean | Interpreter/Testsuite.lean | 7 / 20.3% | suspect: rewritten, but several helpers reproduced near-verbatim. See (b). |
-| Cli/Main.lean | Runner.lean | 0 / 8.4% | clean (decode/validate commands only; Talos runner executed modules). |
-| scripts/ensure-testsuite.sh | scripts/ensure-testsuite.sh | 1 / 52.1% | suspect: edited copy. See (b). |
-| scripts/testsuite.sh | scripts/testsuite.sh | 1 / 50.4% | suspect: edited copy. |
-| scripts/testsuite-report.sh | scripts/testsuite-report.sh | 2 / 61.4% | suspect: edited copy. |
-| scripts/testsuite-summary.sh | scripts/testsuite-summary.sh | 2 / 58.3% | suspect: edited copy. |
+| Wasm/Syntax.lean | Interpreter/Wasm/Syntax.lean, Simd.lean | 6.6%, 19 tok (`eq\|ne\|lt\|gt\|le\|ge deriving Repr, DecidableEq, Inhabited`), 0 lines | clean: spec section 2 layout (NumType/RefType/ValType/Limits/..., `Module` fields in spec order); Talos uses a flat `ValueType`, a ~300-constructor `Instruction`, `Function/MemDecl/GlobalDecl/TableDecl/ImportDecl/ElementSegment` |
+| Wasm/Binary.lean | none (Talos had no binary decoder; `Decoder/Wat.lean` parses text, no LEB128 anywhere in the old tree) | 2.4%, no run >= 14 tok, 0 lines | clean |
+| Wasm/Validate.lean | Interpreter/Wasm/Validate.lean | 3.0%, no run >= 14, 0 lines | clean: literal Appendix A.3 (`OpType.unknown`, `Frame{kind,startTypes,endTypes,height,unreachable}`, `pushVal/popVal/pushCtrl/popCtrl/labelTypes`). Talos: partial GC-oriented checker (`CheckState`, `CheckedType := Option ValueType`, `straightSig`), different design. Shared strings `unknown memory/table/global/local/function/type` are the spec's |
+| Wasm/Exec.lean | SmallStep.lean, Semantics.lean | 4.9%, no run >= 14, 0 lines | clean: `Label{arity,height,rest,loop}`, `CallFrame{locals,inst,arity,height,labels,code}`, one `Array Value` stack, `Step c c' := step c = .next c'`. Talos: `ControlFrame{kind,paramArity,resultArity,body,continuation,belowStack}`, `CallFrame{locals,continuation,resultArity,callerRemainder,control,returningInstance}`, `Expr/MachineStore/RuntimeEnv`, inductive `Step` + sound/complete proofs |
+| Wasm/Memory.lean | Interpreter/Wasm/Mem.lean | 8.2%, 19 tok (`(List.range len).map fun i => m.read8 (addr + i)`), 0 lines | clean: page-array-of-`ByteArray` vs Talos `pages × (Nat -> UInt8)` function; the shared idiom is the obvious one. Lemma names differ |
+| Wasm/Numeric.lean | Operations.lean, Float.lean, IEEE754.lean, Semantics.lean | 8.6%, 16 tok (rotl/rotr formula `(a <<< k) ||| (a >>> (32 - k))`), 0 lines | clean: Lean `Float32/Float` + canonical NaN vs Talos soft-float `IEEE754.Format`; textbook rotate formula; Talos guards `k = 0`, new uses `% 32` |
+| Wasm/Value.lean | SmallStep.lean L21-68 (`TrapReason`), Validate.lean L933 | 28.3%, 34 tok (`.i32 _ => .i32 \| .i64 _ => .i64 ...`), 5 lines (trap messages) | shared only spec-dictated names: trap texts are the testsuite's `assert_trap` strings; constructor names are their camelCase; `Value.type` case split is forced |
+| Wasm/Store.lean | Syntax.lean `Store`, Host.lean, SmallStep `ModuleInstance` | 3.8%, none, 0 | clean: spec 4.2 (`funcAddrs/tableAddrs/memAddrs/globalAddrs/elemAddrs/dataAddrs/exports`); Talos has a shared single store with instance metadata |
+| Wasm/Link.lean | SmallStep `initConfig`, Syntax `Module.initialStore`, Testsuite/Exec `instantiateModule` | 6.2%, none, 0 | clean: spec 4.5 allocation/instantiation; Talos had no import matching, copied imported entities into a fresh store |
+| Wasm/HostInvariant.lean | none in Talos; nearest is near-lean/vm (local) | 2.0%, none, 0 | clean w.r.t. Talos. `LiveHost`, `HostFn.PreservesLive` reuse names from the project's own commits 7e1a0cd/432616f (2026-10-20), not from upstream |
+| Wasm/LinkInvariant.lean | none | 3.6%, none, 0 | clean |
+| Wasm/Bytes.lean | Interpreter/Wasm/ByteEncoding.lean | 20.8%, 23 tok, 4 identical lines (theorem statements) | **derived, but not from Talos**: see (b)1. ByteEncoding.lean was added to the Talos directory by local commit 432616f (2026-10-20), four days after the upstream import; it is not in the Talos snapshot |
+| Wasm/Host/Spectest.lean | Testsuite/Exec.lean L454-512 | 7.1%, none, 0 | clean: names, `666`, `666.6`, table 10/20, memory 1/2 are the reference interpreter's |
+| Wasm/Wat.lean | Runner.lean L75-99 (`wasmToolsPrint`) | 13%, 18 tok (`IO.Process.output { cmd := "wasm-tools", args := #[`) | clean: different tool verb (`parse` vs `print`); boilerplate |
+| Cli/Main.lean | Runner.lean | 8.4%, none, 0 | clean |
+| Testsuite/Exec.lean | Interpreter/Testsuite/Exec.lean | 10.6%, 23 tok, 2 lines | **suspect (structure)**: see (b)2 |
+| Testsuite/Main.lean | Interpreter/Testsuite.lean | 20.3%, 31 tok, 7 lines | **suspect (structure)**: see (b)2 |
+| scripts/ensure-testsuite.sh | scripts/ensure-testsuite.sh | 52%, 33 tok, 1 line | **edited copy**: see (b)3 |
+| scripts/testsuite.sh | scripts/testsuite.sh | 50%, 50 tok, 1 line | **edited copy** |
+| scripts/testsuite-report.sh | scripts/testsuite-report.sh | 61%, 40 tok, 2 lines | **edited copy** |
+| scripts/testsuite-summary.sh | scripts/testsuite-summary.sh | 58%, 47 tok, 2 lines | **edited copy** |
 
-## (b) Suspect hits, quoted
+Shared comment sentences (>= 7 words) between any new and any old file: 0.
 
-1. Shell scripts (all four). The old scripts were imported in 1a6ceb2 "from the Talos root, with
-   paths adapted" (old README). The new ones are `diff`-small edits of them: header comments
-   shortened, variable `required_version` renamed `required`, `lake exe testsuite` replaced by
-   `lake build testsuite; exec ./.lake/build/bin/testsuite`. Retained verbatim (new:old lines):
-   - every script: `ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"` (boilerplate, but identical).
-   - ensure-testsuite.sh 8-10 : 9-11: `if ! compgen -G "$SUITE/*.wast" >/dev/null; then` /
-     `git -C "$ROOT" submodule update --init -- "$SUITE"` (old: `"$ROOT/vendor/testsuite"`).
-   - testsuite-report.sh 7-13 : 12-19: `"${WASM_TOOLS_VERSION:-1.251.0}"`, `if ! command -v wasm-tools
-     >/dev/null 2>&1; then`, `$(wasm-tools --version | awk 'NR == 1 { print $2 }')`.
-   - testsuite-summary.sh 7,10,13-14 : 14,27,30-31: `report="${1:-$ROOT/testsuite_report.txt}"`;
-     `awk '{ n[$3]++ } END { for (k in n) printf "%7d  %s\n", n[k], k }' "$report" | sort -rn`
-     (old: `awk '{c[$3]++} END {for (k in c) printf "%7d  %s\n", c[k], k}' "$report" | sort -rn`);
-     `split($1, a, ":"); n[a[1] "  " $3]++ } END { for (k in n) printf "%5d  %s\n", n[k], k }' "$report" | sort -k2`
-     (old identical with `c` for `n`).
-   These are ~50 lines total and trivial, but they are modified Talos files, not clean-room.
+## (b) Suspect hits
 
-2. Testsuite/Main.lean vs Interpreter/Testsuite.lean. Same namespace `Wasm.Testsuite`, same
-   `Args`/`Counts`/`tally`/`renderFile`/`basename`/`usage`/`parseArgs`/`discover` decomposition,
-   same exit-code contract (1 fail / 3 setup / `--report` always 0) and report line format
-   `{name}:{line} {kind} {tag}`. Reproduced lines (new : old):
-   - 56-57 : 160-161 `private def basename (path : String) : String :=` /
-     `(System.FilePath.mk path).fileName.getD path`
-   - 62-65 : 117-120 `structure Counts where pass : Nat := 0 fail : Nat := 0 skipped : Nat := 0`
-   - 69-73 : 139-149 `def tally (rs : Array CmdResult) : Counts :=` ... `| .pass => { c with pass := c.pass + 1 }`
-     `| .skipped _ => { c with skipped := c.skipped + 1 }`
-   - 77 : 177 `def renderFile (fr : FileResult) : String := Id.run do`
-   - 103 : 362 `def main (argv : List String) : IO UInt32 := do`
-   - 48-54 : 104-113 the `.wast` discovery loop (`name.endsWith ".wast"`, `(name.splitOn p).length > 1`,
-     `out.qsort (· < ·)`).
-   The file is not a copy (old 371 lines with JSON output, fuel, Windows temp dirs; new 137), but
-   the author plainly had the old harness in view: this is a condensation, not an independent
-   rewrite.
+### 1. Wasm/Bytes.lean vs Interpreter/Wasm/ByteEncoding.lean (own code, not Talos)
+Same namespace `Wasm.ByteEncoding`; the same eight theorem names in nearly the same order
+(`byteArray_toList_length`, `byteArray_toList_eq`, `byteArray_toList_injective`,
+`byteArray_of_toList`, `byteArray_toList_ofArray`, `string_utf8_length`,
+`string_fromUTF8_toUTF8`, `string_fromUTF8_some_bytes`); identical statements, and one identical
+proof:
+```
+new L71-73: theorem string_utf8_length (s : String) : s.toUTF8.toList.length = s.utf8ByteSize := by
+              rw [byteArray_toList_length]
+              rfl
+old L63-65: @[simp] theorem string_utf8_length (s : String) : s.toUTF8.toList.length = s.utf8ByteSize := by
+              rw [byteArray_toList_length]
+              rfl
+```
+The loop lemma is restated (`r.reverse ++ bs.data.toList.drop i`, new L13, vs
+`acc.reverse ++ b.data.toList.drop i`, old L26) and shares the line
+`simp only [List.reverse_cons, List.append_assoc, List.singleton_append]` (new L29, old L33); the
+other proofs are rewritten (induction on `n` vs well-founded recursion, `cases s with | ofByteArray`
+vs `String.toUTF8_eq_toByteArray`). This is a port. However `git log --diff-filter=A` shows
+ByteEncoding.lean first appeared in 432616f ("Strengthen promise gas accounting ...", Marcelo
+Fornet, 2026-10-20), after the Talos import, so it is the project's own file that happened to live
+in the AGPL directory. Not a Talos derivation; the README/commit message should not call it
+"written from the spec" either.
 
-3. Testsuite/Exec.lean vs Interpreter/Testsuite/Exec.lean. Shared skeleton: `Outcome`
-   (`pass/fail/skipped/decodeError/moduleUnavailable`), `CmdResult{line,kind,outcome}`,
-   `FileResult{path,results,fileError}`, `ScriptState`, `runCommand`, `runFile`, the
-   `json-from-wast ... --wasm-dir ... -o script.json` flow, `(j : Json) (key : String) : Option String`
-   helpers (`str?` vs `jstr?`), `let named := match name? with | some n => (n, ...) :: s.named`,
-   `let mut results : Array CmdResult := #[]`, `.moduleUnavailable => "module_unavailable"`.
-   The command execution itself is new (Talos had `ModuleSlot`, shared-resource hydration,
-   SIMD lane parsing, no spec instantiation). Verdict: derived harness structure, new logic.
+### 2. Testsuite/Main.lean and Testsuite/Exec.lean vs Interpreter/Testsuite.lean, Testsuite/Exec.lean
+These are Talos files (imported in 1a6ceb2). The new driver is a rewrite against the new API (new
+`ScriptState`, real linking instead of Talos's store copying, no JSON output, no fuel flag), but it
+keeps the old harness's skeleton and vocabulary beyond what the task dictates:
+```
+new Main.lean L56-57:  private def basename (path : String) : String :=
+                         (System.FilePath.mk path).fileName.getD path
+old Testsuite.lean L160-161: identical, including `private`.
+new Main.lean L69-75:  def tally (rs : Array CmdResult) : Counts := rs.foldl (init := {}) fun c r => match r.outcome with
+                         | .pass => { c with pass := c.pass + 1 }  ... | .skipped _ => { c with skipped := c.skipped + 1 }
+old Testsuite.lean L139-149: def tallyOne ... | .pass => { c with pass := c.pass + 1 } ... def tally (rs : Array CmdResult) : Counts := rs.foldl (fun c r => tallyOne c r.outcome) {}
+new Main.lean L77 / old L177:  def renderFile (fr : FileResult) : String := Id.run do
+new Exec.lean L59-70 / old L69-82: structure CmdResult where line/kind/outcome; structure FileResult where path/results/fileError
+new Exec.lean L48 / old L259:  | .moduleUnavailable => "module_unavailable"
+new Exec.lean L74-78 / old L87-99: str?/nat? (j : Json) (key : String) : Option ... (old: jstr?/jnat?)
+new Exec.lean L339-341 / old L1435: args #["json-from-wast", path, "--wasm-dir", dir, "-o", json]
+```
+Also shared: namespace `Wasm.Testsuite`, `Outcome` with `pass/fail/skipped/decodeError/moduleUnavailable`,
+report line format `name:line kind tag` and `name:0 file error`, exit codes 1/3 with `--report`
+always 0, `padRight`/`padR`, the `usage` string shape, `discover`/`discoverFiles` with
+`(name.splitOn p).length > 1`. No line of substance beyond the ones above is identical, and the
+command semantics (assert_unlinkable/uninstantiable, out-of-scope classes) are new. Judgement:
+test harness paraphrased from the Talos harness with the same architecture, not a clean-room
+rewrite. It is a driver, not the runtime, and it is ~500 lines.
 
-4. Wasm/Bytes.lean vs Interpreter/Wasm/ByteEncoding.lean. Same namespace `Wasm.ByteEncoding`,
-   same eight theorem names in near-identical order (`byteArray_toList_length`,
-   `byteArray_toList_eq`, `byteArray_toList_injective`, `byteArray_of_toList`,
-   `byteArray_toList_ofArray`, `string_utf8_length`, `string_fromUTF8_toUTF8`,
-   `string_fromUTF8_some_bytes`), identical statements, one identical proof
-   (`string_utf8_length`: `rw [byteArray_toList_length]; rfl`), identical simp line
-   `simp only [List.reverse_cons, List.append_assoc, List.singleton_append]`, loop lemma with the
-   same shape `acc.reverse ++ b.data.toList.drop i`. Other proofs are restructured (induction on
-   `n` vs `termination_by`). However `git log` shows ByteEncoding.lean was added by Marcelo
-   Fornet in 432616f (2026-10-20), after the Talos import (1a6ceb2, snapshot of Talos
-   8064439 dated 2026-10-06), and `git log --all --diff-filter=A` finds no earlier copy. It is
-   the project's own code that happened to live inside the AGPL directory. Not a Talos
-   derivation; the lineage should simply be acknowledged.
+### 3. scripts/*.sh vs Talos scripts
+The old README states the scripts came "from the Talos root, with paths adapted". The new ones are
+`diff`-level edits of them: header comments shortened, variables renamed, same control flow.
+```
+new testsuite-report.sh L7-15 / old L12-22:
+  required="${WASM_TOOLS_VERSION:-1.251.0}"  /  required_version="${WASM_TOOLS_VERSION:-1.251.0}"
+  if ! command -v wasm-tools >/dev/null 2>&1; then  (identical)
+  found="$(wasm-tools --version | awk 'NR == 1 { print $2 }')"  /  got=$(wasm-tools --version | awk 'NR==1 {print $2}')
+new testsuite-summary.sh L10 / old L27:
+  awk '{ n[$3]++ } END { for (k in n) printf "%7d  %s\n", n[k], k }' "$report" | sort -rn
+  awk '{c[$3]++} END {for (k in c) printf "%7d  %s\n", c[k], k}' "$report" | sort -rn
+new testsuite-summary.sh L13-14 / old L30-31:
+  awk '$3 == "fail" || $3 == "decode_error" { split($1, a, ":"); n[a[1] "  " $3]++ } END { for (k in n) printf "%5d  %s\n", n[k], k }' "$report" | sort -k2
+  awk '$3 != "pass" {split($1, a, ":"); c[a[1] "  " $3]++} END {for (k in c) printf "%5d  %s\n", c[k], k}' "$report" | sort -k2
+new ensure-testsuite.sh L8-10 / old L9-11: compgen -G "$SUITE/*.wast" ...; git -C "$ROOT" submodule update --init -- "$SUITE"
+```
+`testsuite.sh` keeps the same three lines plus `lake build` instead of `lake exe`. These four
+files (57 lines total) are derived works of the Talos scripts.
 
-No comment or doc string of any runtime module (Syntax, Binary, Validate, Value, Numeric,
-Memory, Store, Exec, Link, invariants) matches Talos text; no proof script, tactic sequence,
-unusual constant or error message is shared beyond spec/testsuite-mandated strings.
+## (c) Spec spot-checks (WebAssembly core spec; checked against my knowledge of 2.0/3.0 and the
+testsuite's `assert_malformed` texts; no web access used)
 
-## (c) Spec spot-checks
-
-- LEB128 (Binary.lean 100-145). `uleb bits` allows ceil(bits/7) bytes; a continuation bit on the
-  last allowed byte gives "integer representation too long", unused high payload bits on the last
-  byte give "integer too large" (`payload >>> (bits - shift) != 0`). `sleb` requires the bits
-  above the value width to all equal the sign bit (`top` must be 0 or all-ones for `8 - avail`
-  bits); checked for 32 (avail 4), 33 (avail 5) and 64 (avail 1: payload must be 0x00 or 0x7F).
-  Sign extension `value - (1 <<< (shift+7))` when bit 6 of the last byte is set. All match
-  spec 5.2.2 and the `binary.wast`/`binary-leb128.wast` expectations. Block types read `sleb 33`
-  and reject negatives: correct. Note: memarg offset and limits are read as `uleb 64` (memory64
-  grammar); the validator restricts the offset to `< 2^32` and limits to 65536 / 2^32-1, so the
-  observable behaviour is the 2.0/3.0 spec's for 32-bit memories.
-- Validation (Validate.lean 110-166, 253-476) is Appendix A.3 line for line: `popVal` returns
-  `unknown` only at frame height with `unreachable` set; `popCtrl` pops `endTypes` then checks
-  height; `if` without else requires `startTypes == endTypes`; `br_table` checks arity per label
-  and re-pushes what it popped (so `unknown` survives); untyped `select` requires numeric
-  operands and `t1 == t2 || unknown`; `markUnreachable` truncates to height. Constant expressions
-  (489-511) accept `global.get` of immutable globals, imported-only unless `constGlobalGet`.
-  Divergence: `.i32_binop .add/.sub/.mul` in a const expr is reported `unsupported "extended-const"`
-  rather than invalid, which is intentional feature gating.
-- Numeric (Numeric.lean). `div_s` traps on divisor 0 and on `INT_MIN / -1`; `rem_s` uses
-  `Int.tmod` (sign of dividend, `INT_MIN rem -1 = 0`, no trap); shifts mask by width; `shr_s`
-  is arithmetic via `Int`. Trapping truncation bounds (250-294) are exclusive and are the exact
-  float neighbours of the integer range: `i32_trunc_f32_s` in (-2147483904, 2147483648),
-  `i32_trunc_f64_s` in (-2147483649, 2147483648), unsigned in (-1, 2^32), `i64_trunc_f32_s` in
-  (-9223373136366403584, 2^63), `i64_trunc_f64_s` in (-9223372036854777856, 2^63), unsigned in
-  (-1, 2^64); NaN gives `invalidConversionToInteger`, otherwise `integerOverflow`. Correct.
-  NaN: arithmetic results are canonicalised (`canon32/64`), which is one of the spec-permitted
-  nondeterministic outcomes and satisfies `nan:canonical`/`nan:arithmetic` assertions; `abs`,
-  `neg`, `copysign`, reinterpret and loads/stores are bitwise and preserve payloads. `fmin/fmax`
-  follow the -0/+0 and NaN rules; `nearest` is ties-to-even with sign of zero preserved.
-  Divergence worth noting: `f32_demote_f64`/`f64_promote_f32` of a NaN return the canonical NaN
-  (spec allows any arithmetic NaN; fine), and `Float32` arithmetic depends on the C library,
-  which the module docstring states.
-- Instantiation (Link.lean 269-324). Order: import count and type check (`limitsMatch` per spec
-  2.3.8 with current table/memory size as `min`); allocate module slot, funcs, tables, mems;
-  globals evaluated in order seeing imports and earlier globals; element refs evaluated;
-  datas allocated; exports built; active/declarative element segments applied in order (each
-  bounds-checked before writing, dropped after); then active data segments; then the start
-  function (`instantiate`/`runStart`). This is spec 4.5.4 (elems before datas, start last, a
-  trap keeping the effects of earlier segments). The validator's `Features.nearcore` rejects
-  start functions as a model gap, documented in notes/design/WASM_RUNTIME.md.
+- LEB128 (Binary.lean L100-135). `uleb bits` reads at most ceil(bits/7) bytes; a continuation bit on
+  the last permitted byte gives "integer representation too long", unused high bits of the last byte
+  give "integer too large" (payload >>> (bits - shift) != 0): correct for u32 (5 bytes, top 4 bits)
+  and u64. `sleb`: last-byte check requires bits beyond the width to all equal the sign bit
+  (`top` is 0 or all-ones over 8-avail bits); sign extension via `b &&& 0x40`. Verified by hand for
+  s32 (avail 4), s33 (avail 5) and s64 (avail 1: payload must be 0x00 or 0x7F). Correct. Block
+  types: value-type bytes are peeked first, other negative s33 are "malformed block type" (spec:
+  only `0x40`/valtype or non-negative type index). Correct. Section order (L532-557), data-count
+  requirement (L603-607), func/code length consistency, magic/version strings all match.
+  Divergence (benign): limits are read as u64 (L211-218) and memarg offsets as u64 (L253); the
+  validator caps offset < 2^32 and memory at 65536 pages, so the observable behaviour is the 2.0 one.
+- Validator operand stack (Validate.lean L110-166, 251-476). Faithful transcription of Appendix
+  A.3: `pop_val` returns Unknown at the frame height when unreachable, `pop_ctrl` checks the
+  height after popping end types, `unreachable` truncates to the height, `br_table` pops against
+  each label and pushes back what it popped (L295-306, handles Unknown as the appendix does),
+  `if` without `else` requires start = end types (L280-281), untyped `select` requires numeric
+  operands and equal-or-Unknown (L336-342). Loop labels use start types. Correct.
+- Numerics (Numeric.lean). `div_s`: zero -> "integer divide by zero"; INT_MIN / -1 -> "integer
+  overflow" (L73-76, L95-98); `rem_s` uses truncated modulus and does not trap on INT_MIN % -1
+  (L77-79). Shifts mask by width; `shr_s` is an arithmetic shift on `Int`. Trapping truncations
+  (L250-317): NaN -> "invalid conversion to integer", then exclusive bounds
+  (-2147483904, 2^31) for i32<-f32 signed, (-2147483649, 2^31) for i32<-f64, (-1, 2^32) unsigned,
+  (-(2^63+2^39), 2^63) for i64<-f32, (-(2^63+2^11), 2^63) for i64<-f64, (-1, 2^64) unsigned: these
+  are exactly the nearest representable values outside the range, so the open intervals are the
+  spec's trap condition. Saturating variants rely on Lean's saturating casts. NaN: any NaN result of
+  an arithmetic op is replaced by the canonical NaN (L143-144); `abs/neg/copysign` are bitwise
+  (L174-175, 219), as the spec requires; `min/max` return canonical NaN on NaN input and order
+  -0 < +0 (L192-210); `nearest` is ties-to-even with sign-preserving zero (L154-168). All within the
+  spec's nondeterminism. Comparisons go through Lean float `==`/`<`, i.e. IEEE semantics.
+- Instantiation order (Link.lean L269-324). Import count and type check (`limitsMatch` is the
+  spec's limits-matching rule) -> allocate module slot, functions, tables, memories -> globals
+  evaluated in order, each seeing imports and earlier globals (gated by
+  `Features.constGlobalGet`, so 2.0 behaviour is selectable) -> element segment expressions ->
+  data -> exports -> active/declarative element segments in order (bounds check before any write,
+  then drop) -> active data segments in order -> start function. Matches section 4.5.4 of the
+  3.0 spec (and 2.0 modulo global.get in constants). A trap keeps the store with earlier segments
+  applied (L219, L248), as the spec requires since bulk memory. One divergence from the spec,
+  documented in notes/design/WASM_RUNTIME.md L45: NearVM rejects modules with a start function
+  (the core runtime itself runs it).
+- Execution (Exec.lean), spot checks: `call_indirect` null -> "uninitialized element", out of
+  range -> "undefined element", type mismatch by structural `FuncType` equality (L224-238);
+  `memory.grow`/`table.grow` return -1 on failure (L287-288, L370); `select` operand order (L246-248);
+  packed loads sign-extend (L337-345). Correct.
+- Testsuite report: 33595 pass, 0 fail/decode_error/invalid_error; 27382 `module_unavailable` are all
+  cascades inside SIMD files (e.g. simd_f64x2_pmin_pmax.wast 3872), consistent with "out of scope".
 
 ## (d) Overall verdict
 
-The runtime proper — Syntax, Binary, Validate, Value, Numeric, Memory, Store, Exec, Link,
-HostInvariant, LinkInvariant, Host/Spectest, Wat, Cli — is a genuine clean-room implementation
-written from the specification. Its data structures track the spec's own sections (2, 3/A.3,
-4.2, 4.4, 4.5, 5), its designs differ from Talos at every level (binary decoder where Talos had
-a WAT parser; A.3 operand stack where Talos had a partial checker; native floats where Talos had
-soft-float; a single-stack machine with `Step := step c = .next c'` where Talos had a 6000-line
-inductive relation; a spec store where Talos shared one store across instances), and the only
-shared text is spec/testsuite-mandated strings and standard Lean idioms.
+The runtime proper (Syntax, Binary, Validate, Exec, Memory, Numeric, Value, Store, Link,
+Host/Spectest, Wat, Cli, HostInvariant, LinkInvariant: ~3,700 lines) shows no evidence of copying,
+translation or paraphrase from Talos. The designs differ at every level (AST shape, no text parser
+vs a binary decoder, A.3 validator vs a partial GC checker, one array-stack machine with
+`Step := step c = .next c'` vs Talos's frame lists and inductive `Step`, Lean floats vs soft-float,
+spec-style store vs shared store), no non-trivial line or comment sentence is shared, and the names
+in common are the specification's or the testsuite's. For these files the clean-room claim holds.
 
-The claim does not hold without qualification for three peripheral pieces:
-1. `scripts/*.sh` are lightly edited copies of the scripts the old README attributes to the Talos
-   root. They should be rewritten from scratch or their provenance acknowledged (they are
-   ~50 lines of bash and carry no runtime semantics, but AGPL applies to them as written).
-2. `Testsuite/Main.lean` and, to a lesser degree, `Testsuite/Exec.lean` are condensations of the
-   Talos testsuite harness: same decomposition, type names, outcome tags, report format and
-   several helper definitions character-for-character (`basename`, `Counts`, `tally`, the `.wast`
-   discovery loop). The execution logic is new, but "nothing paraphrased" is not true of these files.
-3. `Wasm/Bytes.lean` is derived from `Interpreter/Wasm/ByteEncoding.lean`, which is the
-   project's own 2026-10-20 code, not Talos code; it is clean with respect to Talos but the
-   commit message's "written from the spec" framing does not describe it.
+Three qualifications, which the commit message ("written from the core specification and the spec
+testsuite ... nothing copied") does not make:
+1. `scripts/*.sh` are lightly edited copies of the Talos root scripts (57 lines). Either rewrite
+   them or state that they derive from Talos; as-is they are AGPL-derived text in the new package.
+2. `Testsuite/Main.lean` and `Testsuite/Exec.lean` reuse the architecture and most of the
+   identifiers of the Talos testsuite harness, with two verbatim small definitions
+   (`basename`, the `tally` cases). This is paraphrase of Talos code, even though the logic was
+   substantially rewritten. It does not touch the runtime, but it undercuts "nothing paraphrased".
+3. `Wasm/Bytes.lean` is a port of `ByteEncoding.lean`, which was the project's own file
+   (commit 432616f) placed in the Talos directory; no licence problem, but it was not written from
+   the spec.
 
-Recommended wording: "the runtime is clean-room; the testsuite driver and scripts were rewritten
-with the previous harness as a reference, and Bytes.lean carries over our own earlier lemmas."
-If a strict no-derivation standard is required, re-author the four scripts and Testsuite/Main.lean
-(an hour's work) and keep the rest as is.
+Recommendation: rewrite the four scripts from scratch (they are trivial), and either rewrite the
+testsuite driver's data types/driver loop independently or amend the commit/README to say the
+harness was adapted from Talos. With those two changes, or that disclosure, the claim is accurate.

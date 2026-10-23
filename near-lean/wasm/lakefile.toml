@@ -19,7 +19,7 @@ root = "Testsuite.Main"
 # Library half of the driver, kept out of `Wasm`'s import closure.
 [[lean_lib]]
 name = "Testsuite"
-roots = ["Testsuite.Exec"]
+roots = ["Testsuite.Script"]
 
 # Command-line front end: `lake exe wasm decode FILE.wasm`.
 [[lean_exe]]

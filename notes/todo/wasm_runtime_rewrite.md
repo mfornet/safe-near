@@ -340,6 +340,10 @@ Wasm code rather than refinement at the `NearVM.run` boundary.
 - Speed: the VM, runtime and chain scenario suites take 0.45 s, 0.50 s and
   0.25 s of CPU on the new runtime against 0.65 s, 0.72 s and 0.40 s on the
   Talos build of the same commit, same fixtures.
+- An independent clean-room review (`near-lean/wasm/REVIEW.md`) found the
+  runtime free of Talos text and design, and flagged the shell scripts and the
+  testsuite driver as derived; both were rewritten from scratch before the
+  push, with the committed report unchanged.
 - Model gaps kept explicit (`notes/design/WASM_RUNTIME.md`): start functions,
   exported imports, nearcore's stack limiter.
 
