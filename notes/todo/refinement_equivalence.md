@@ -370,8 +370,8 @@ statement, the instance, the model extensions, re-proved specs and tests.
   transfer touches. Consequence worth knowing: `ft_transfer_call` reserves
   25 Tgas for itself (`GAS_FOR_FT_TRANSFER_CALL - GAS_FOR_RESOLVE_TRANSFER`),
   and the worst-case bound must stay under it for the positive clause to apply
-  to `ft_transfer_call`; with the current constants it does for arguments up to
-  roughly 15 KB.
+  to `ft_transfer_call`; with the current constants (about 12 Tgas of fixed
+  bound, 400 Mgas per argument byte) it does for arguments up to roughly 30 KB.
 
 ### Proof obligations still open
 
