@@ -197,3 +197,34 @@ testsuite ... nothing copied") does not make:
 Recommendation: rewrite the four scripts from scratch (they are trivial), and either rewrite the
 testsuite driver's data types/driver loop independently or amend the commit/README to say the
 harness was adapted from Talos. With those two changes, or that disclosure, the claim is accurate.
+
+## Follow-up (2026-10-23, HEAD 5713333)
+
+Re-authored files re-measured against the Talos trees at 99435f7 with the same script (identical
+40+-char lines, shared 6-token windows, longest shared run), then read by hand against
+`scripts/*.sh` and `Interpreter/Testsuite.lean`.
+
+| File | lines / 6-tok / longest run | Finding | Clean-room? |
+|---|---|---|---|
+| scripts/suite.sh (58 lines, new) | 0 / 12.4% / 14 tok | Longest run is `="${WASM_TOOLS_VERSION:-1.251.0}"` (the pinned version, a configuration value, old testsuite-report.sh L12). Other hits: `$(cd "$(dirname "$0")/.." && pwd)` (bash boilerplate), `submodule update --init --` (the git command). Logic is different throughout: `find -print -quit` for the emptiness test (old: `compgen -G`), version check by comparing the whole `wasm-tools --version` string (old: `awk 'NR==1{print $2}'`), summary via `cut \| sort \| uniq -c` (old: two awk associative-array pipelines), subcommand dispatch in one file. No awk pipeline, variable name or message from the old scripts survives. | yes |
+| scripts/ensure-testsuite.sh, testsuite.sh, testsuite-report.sh, testsuite-summary.sh | 0 / 22–28% of 18–22 windows / no run ≥ 10 | Each is a 2-line `exec "$(dirname "$0")/suite.sh" <cmd>` wrapper; the only shared windows are `#!/usr/bin/env bash` + `"$(dirname "$0"`. | yes |
+| Testsuite/Main.lean (128 lines) | 1 / 5.2% / 14 tok | The one identical line is `def main (argv : List String) : IO UInt32 := do` (Lean entry-point convention; also in old Runner.lean). Longest runs: that signature; `(s : String) (width : Nat) : String :=` (a pad function's natural signature; body now `String.mk (List.replicate ...)` vs old `"".pushn`); `\| "--report" :: rest =>` (the flag). The previously flagged items are gone: `basename`/`padRight`/`Counts`/`tally`/`renderFile`/`discover`/`Args`/`usage` are replaced by `ScriptRun.name`, `column`, `Stats`/`Stats.add`/`Stats.plus`, `describe`, `scripts`+`mentions` (substring test via `replace`, not `splitOn`), `Options`, `help`; outcomes are a `Verdict` with `ok/bugs/outOfScope/unavailable/unimplemented` tallies; exit codes are 1/2 (old 1/3); the summary line and per-bug lines are new. Namespace `Wasm.Testsuite` and the `name:line kind tag` report line remain, both dictated by the committed report format. 6-tok share fell from 20.3% to 5.2%, i.e. the Lean baseline. | yes |
+
+Not re-reviewed: `Testsuite/Script.lean` (new file replacing `Testsuite/Exec.lean`) was outside the
+brief for this follow-up.
+
+`near-lean/wasm/REVIEW.md` (199 lines): it does NOT reproduce the report text verbatim. Its preamble
+(L1-11) is new and says the three qualifications were acted on; its body (L13-199) is a differently
+worded write-up of the same review — same method, same 211-file comparison, same per-module
+numbers (6.6%, 2.4%, 3.0%, 28.3%, 20.8%, 52–61% ...), same three suspect findings with the same
+quoted lines, same spec spot-check conclusions and the same verdict and recommendation — plus one
+measure the report file does not mention (identical comment sentences ≥ 7 words: 0) and an
+execution/report spot-check paragraph. Every finding and number in REVIEW.md agrees with the
+report; nothing is omitted or softened. Its line "The review text follows unchanged" is accurate
+with respect to findings but not to wording. It still describes the pre-rewrite `Testsuite/Exec.lean`
+and `scripts/*.sh`, which is correct as a historical record of what was reviewed, and the preamble
+says so.
+
+Conclusion: with 5713333 the three qualifications of the original verdict are resolved for the
+scripts and the testsuite driver; the clean-room claim now holds for every file in the original
+table except as already noted for `Wasm/Bytes.lean` (own code, provenance now stated).
