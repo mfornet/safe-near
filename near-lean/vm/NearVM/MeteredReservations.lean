@@ -56,18 +56,18 @@ theorem writeReg_reservation (fees : ActionFees) (n : Nat) :
   simp [writeReg, Charge.reservation]
 
 /-- Every post-call charge is local burn; it cannot create an unbacked receipt. -/
-theorem chargesAfter_reservation (fees : ActionFees) (name : String) (before after : Store NearState)
+theorem chargesAfter_reservation (fees : ActionFees) (name : String) (before after : HostStore NearState)
     (args : List Value) :
     ((chargesAfter name before after args).map (fun charge => charge.reservation fees)).sum = 0 := by
   unfold chargesAfter storageReadValueCharges
   repeat' (first | rfl | split | (dsimp only; split))
 
-theorem deductDeposit_reservationView (name : String) (before after : Store NearState) (args : List Value) :
+theorem deductDeposit_reservationView (name : String) (before after : HostStore NearState) (args : List Value) :
     reservationView (deductDeposit name before after args).1.host = reservationView after.host := by
   unfold deductDeposit deductPromiseDeposit
   repeat' (first | rfl | split | (dsimp only; split))
 
-theorem updateStorageUsage_reservationView (extra : Nat) (name : String) (before after : Store NearState)
+theorem updateStorageUsage_reservationView (extra : Nat) (name : String) (before after : HostStore NearState)
     (args : List Value) :
     reservationView (updateStorageUsage extra name before after args).host = reservationView after.host := by
   unfold updateStorageUsage
@@ -76,12 +76,11 @@ theorem updateStorageUsage_reservationView (extra : Nat) (name : String) (before
 /-- Post-call metering, deposit deductions (including the one-yocto subsidy),
 and storage usage preserve backing on every nonterminal result. -/
 theorem finishMeteredCall_reservationInvariant (fees : ActionFees) (ethEnabled : Bool)
-    (extra : Nat) (name : String) (before : Store NearState) (args : List Value) (result : HostResult NearState)
+    (extra : Nat) (name : String) (before : HostStore NearState) (args : List Value) (result : HostResult NearState)
     (hraw : HostResult.LiveSatisfies (ReservationInvariant fees ethEnabled) result) :
     HostResult.LiveSatisfies (ReservationInvariant fees ethEnabled) (finishMeteredCall extra name before args result) := by
   cases result with
   | Trap st message => trivial
-  | Throw st tag values => exact hraw
   | Return values st =>
     unfold finishMeteredCall
     dsimp only

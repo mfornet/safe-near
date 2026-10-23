@@ -3,7 +3,7 @@ import NearVM.EncodingHosts
 namespace Wasm.Near
 
 /-- Legacy gas metering changes no encoding field on a live return. -/
-theorem gasFn_encodingInvariant : HostFn.PreservesLive EncodingInvariant gasFn := by
+theorem gasFn_encodingInvariant : NearHostFn.PreservesLive EncodingInvariant gasFn := by
   intro st args h
   unfold gasFn
   dsimp only
@@ -20,8 +20,8 @@ set_option maxHeartbeats 2000000 in
 /-- Every published metered host preserves strict policy and raw receipt encoding on
 live returns. Terminal model/contract/gas errors carry no speculative guarantee. -/
 theorem meteredHostFns_encodingInvariant
-    (cfg : RuntimeConfig) (entry : ImportDecl × HostFn NearState)
-    (h : entry ∈ meteredHostFns cfg) : HostFn.PreservesLive EncodingInvariant entry.2 := by
+    (cfg : RuntimeConfig) (entry : ImportDecl × NearHostFn NearState)
+    (h : entry ∈ meteredHostFns cfg) : NearHostFn.PreservesLive EncodingInvariant entry.2 := by
   simp only [meteredHostFns, List.mem_append, List.mem_map, List.mem_singleton] at h
   rcases h with ⟨⟨decl, fn⟩, hin, heq⟩ | heq
   · subst entry

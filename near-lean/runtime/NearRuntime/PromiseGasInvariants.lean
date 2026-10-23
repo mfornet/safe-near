@@ -1,7 +1,7 @@
 import NearRuntime.FunctionCallInvariants
 import NearVM.PromiseGas
 import NearVM.OutcomeEncoding
-import Interpreter.Wasm.ByteEncoding
+import Wasm.Bytes
 
 namespace Near
 
@@ -153,9 +153,9 @@ theorem convertPromises_gasEncoding (promises : List NearPromise) (graph : Promi
 /-- The packing seam now needs only the final raw-state encoding invariant;
 proving that invariant for complete metered execution remains separate. -/
 theorem outcomeOfExecution_success_gasEncoding (ctx : VMContext) (storage : List (Bytes × Bytes))
-    (final : Wasm.SmallStep.Config NearState) (error : Option FunctionCallError)
+    (final : Machine) (error : Option FunctionCallError)
     (hsuccess : (outcomeOfExecution ctx storage final error).aborted = none)
-    (h : PromisesEncoding final.store.wasm.host.promises) :
+    (h : PromisesEncoding final.host.promises) :
     ∀ spec ∈ (outcomeOfExecution ctx storage final error).receipts, ReceiptGasEncodingValid spec :=
   outcomeOfExecution_success_predicate ReceiptEncoding ctx storage final error hsuccess h
 

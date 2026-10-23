@@ -1,6 +1,6 @@
 import NearVM
 import tests.TrieStorage
-import Interpreter.Wasm.Decoder.Wat
+import Wasm.Wat
 
 /-!
 # VM scenario tests: the real wNEAR binary under `NearVM.run`
@@ -74,7 +74,7 @@ private def code (keyLen valueLen valuePtr register : Nat) : IO Module := do
     s!"(func (export \"write\") i64.const {keyLen} i64.const 0 i64.const {valueLen} " ++
     s!"i64.const {valuePtr} i64.const {register} call $write drop)\n" ++
     s!"(func (export \"remove\") i64.const {keyLen} i64.const 0 i64.const {register} call $remove drop))"
-  match Decoder.Wat.decode text with
+  match ← Wat.compile text with
   | .ok module => pure module
   | .error error => throw (IO.userError s!"storage-cost fixture: {error}")
 
@@ -149,7 +149,7 @@ def main (args : List String) : IO UInt32 := do
   let r ← IO.mkRef ({} : Report)
   let cfg ← RuntimeConfig.load configs RuntimeConfig.latestVersion
   let text ← IO.FS.readFile wat
-  let code ← match Decoder.Wat.decode text with
+  let code ← match ← Wat.compile text with
     | .ok m => pure m
     | .error e => do IO.println s!"decode error: {e}"; return 1
   let h : Harness := { cfg, code, codeSize := 200_000 }
@@ -206,7 +206,7 @@ def main (args : List String) : IO UInt32 := do
   check r "incomplete execution preserves input storage and emits no receipts"
     (exhausted.storage.isEmpty && exhausted.receipts.isEmpty && !exhausted.succeeded)
 
-  let emptyCode ← match Decoder.Wat.decode "(module (func (export \"empty\")))" with
+  let emptyCode ← match ← Wat.compile "(module (func (export \"empty\")))" with
     | .ok m => pure m
     | .error e => throw (IO.userError e)
   let exactBudget := run cfg emptyCode 0 "empty" (ctx alice "empty" "{}" 0) [] 1
@@ -222,7 +222,7 @@ def main (args : List String) : IO UInt32 := do
     let wat := s!"(module (import \"env\" \"{name}\" (func $unsupported (param {params}) {results}))
       (memory 1) (func (export \"test\") {arguments} call $unsupported {if results.isEmpty then "" else "drop"})
       (func (export \"unused\")))"
-    let testCode ← match Decoder.Wat.decode wat with
+    let testCode ← match ← Wat.compile wat with
       | .ok m => pure m
       | .error e => throw (IO.userError s!"unsupported-host fixture: {e}")
     let outcome := run cfg testCode 0 "test" (ctx alice "test" "{}" 0) []

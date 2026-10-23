@@ -5,7 +5,7 @@ namespace Wasm.Near
 
 /-- A successful key plan establishes the actual ABI reads, receiver syntax,
 method-list shape, target and serialized key, with no caller-supplied oracle. -/
-theorem functionKeyPlan_valid_inputs {st : Store NearState} {input : FunctionKeyInputs} {sir : Bool}
+theorem functionKeyPlan_valid_inputs {st : HostStore NearState} {input : FunctionKeyInputs} {sir : Bool}
     (h : (functionKeyPlan st input sir).error = none) :
     ∃ publicKey allowance receiver methods,
       getMemOrReg st input.publicKeyPtr input.publicKeyLen = some publicKey ∧
@@ -22,21 +22,21 @@ theorem functionKeyPlan_valid_inputs {st : Store NearState} {input : FunctionKey
   repeat (first | contradiction | (dsimp only at h; split at h))
   all_goals aesop (add safe option_not_none)
 
-theorem functionKeyPlan_valid_target {st : Store NearState} {input : FunctionKeyInputs} {sir : Bool}
+theorem functionKeyPlan_valid_target {st : HostStore NearState} {input : FunctionKeyInputs} {sir : Bool}
     (h : (functionKeyPlan st input sir).error = none) :
     (promiseReceiver? st input.target).isSome = true := by
   obtain ⟨_, _, _, _, _, _, _, _, _, _, _, ht, _⟩ := functionKeyPlan_valid_inputs h
   exact (functionCallTargetError_none_iff st input.target).mp ht
 
 /-- Reading/UTF-8 charges reserve no onward gas. -/
-theorem readSpan_reservation (fees : ActionFees) (st : Store NearState) (len ptr : UInt64) :
+theorem readSpan_reservation (fees : ActionFees) (st : HostStore NearState) (len ptr : UInt64) :
     ((readSpan st len ptr).map (fun charge => charge.reservation fees)).sum = 0 := by
   unfold readSpan
   repeat (first | rfl | split)
 
 /-- Once inputs are valid, the plan reserves exactly the encoded key action's
 execution gas. Sending fees and all reads remain local burn. -/
-theorem functionKeyPlan_reservation {st : Store NearState} {input : FunctionKeyInputs} {sir : Bool}
+theorem functionKeyPlan_reservation {st : HostStore NearState} {input : FunctionKeyInputs} {sir : Bool}
     (h : (functionKeyPlan st input sir).error = none) :
     ∃ publicKey allowance receiver methods,
       getMemOrReg st input.publicKeyPtr input.publicKeyLen = some publicKey ∧
@@ -53,7 +53,7 @@ theorem functionKeyPlan_reservation {st : Store NearState} {input : FunctionKeyI
   simp [Charge.reservation]
 
 /-- The concrete metered pre-invocation guard supplies plan validity. -/
-theorem preInvokeError_functionKey_valid (st : Store NearState) (args : List Value)
+theorem preInvokeError_functionKey_valid (st : HostStore NearState) (args : List Value)
     (h : preInvokeError "promise_batch_action_add_key_with_function_call" st args = none) :
     (functionKeyPlan st (functionKeyInputs args) false).error = none := by
   unfold preInvokeError at h

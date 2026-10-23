@@ -1,4 +1,4 @@
-import Interpreter.Wasm.Host
+import NearVM.Interp
 import NearVM.Error
 import NearVM.Gas
 import NearVM.TrieOverlay
@@ -6,7 +6,7 @@ import NearVM.TrieOverlay
 /-!
 # NEAR host state (`α := NearState`)
 
-The interpreter threads an opaque `host : α` slot through `Store α`; host
+The interpreter threads an opaque `host : α` slot through `HostStore α`; host
 imports are the only code that inspects it. This module instantiates that
 slot for the **NEAR Protocol** smart-contract host environment.
 
@@ -34,7 +34,7 @@ Promise creation/action modelling is deliberately incremental: callback
 result access and returned-promise selection are concrete; emitted receipt
 actions are added in `Env.lean` as the host API grows.
 
-The host-function semantics live in `CodeLib/Near/Env.lean`; this file is
+The host-function semantics live in `NearVM/Host.lean`; this file is
 just the state shape plus the pure helpers those functions are built from.
 -/
 
@@ -144,7 +144,7 @@ structure StorageIterator where
   pos     : Nat := 0
 deriving Inhabited, BEq
 
-/-- The NEAR host state threaded as `Store.host`. -/
+/-- The NEAR host state threaded as `HostStore.host`. -/
 structure NearState where
   /-- Storage trie projection: `key ↦ value`, `none` when absent. -/
   storage    : List UInt8 → Option (List UInt8) := fun _ => none
@@ -267,9 +267,9 @@ bytes are taken from that register (`none` if the register is unset, which
 the caller turns into a trap); otherwise it reads `len` bytes of linear
 memory starting at `ptr`, returning `none` when the range exceeds guest
 memory. Used uniformly by `storage_*` (keys/values) and `value_return`. -/
-def getMemOrReg (st : Store NearState) (ptr len : UInt64) : Option (List UInt8) :=
+def getMemOrReg (st : HostStore NearState) (ptr len : UInt64) : Option (List UInt8) :=
   if len = u64Max then st.host.registers ptr.toNat
-  else if ptr.toNat + len.toNat > st.mem.pages * 65536 then none
-  else some (st.mem.readBytes ptr.toNat len.toNat)
+  else if ptr.toNat + len.toNat > st.mem.size * 65536 then none
+  else some (st.mem.readList ptr.toNat len.toNat)
 
 end Wasm

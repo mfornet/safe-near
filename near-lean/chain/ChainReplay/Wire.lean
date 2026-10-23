@@ -1,5 +1,5 @@
 import NearChain
-import Interpreter.Wasm.Decoder.Wat
+import Wasm
 
 /-! JSON transport for the trusted chain manipulator. This preserves every
 represented state/receipt field. Code hashes name an externally verified code
@@ -274,8 +274,8 @@ def loadCatalogue (values : List Json) : IO Catalogue := do
     if (hash : String).isEmpty then
       throw (IO.userError "empty catalogue hash")
     let raw ← IO.FS.readBinFile (codePath : String)
-    let text ← IO.FS.readFile (watPath : String)
-    let module ← IO.ofExcept (Wasm.Decoder.Wat.decode text)
+    let _ : String := watPath
+    let module ← IO.ofExcept ((Wasm.Binary.decode raw).mapError (·.message))
     if codes.any (fun entry => entry.code.hash == hash || entry.bytes == raw.toList) then
       throw (IO.userError "duplicate catalogue hash or bytes")
     codes := codes ++ [{ bytes := raw.toList, code := { module, size := raw.size, hash } }]

@@ -1,5 +1,5 @@
 import Spec.RuntimeInstance
-import Interpreter.Wasm.Decoder.Wat
+import Wasm.Wat
 
 open WNear Wasm Wasm.Near
 
@@ -71,11 +71,11 @@ def main : IO Unit := do
 
   -- Carry the real VM resources across calls to the deployed wNEAR module.
   let cfg ← RuntimeConfig.load "../../../near-lean/vm/configs" RuntimeConfig.latestVersion
-  let wat ← IO.FS.readFile "../../../near-lean/vm/tests/fixtures/w_near.wat"
-  let code ← match Decoder.Wat.decode wat with
+  let contractBytes ← IO.FS.readBinFile "../contract.wasm"
+  let code ← match Wasm.Binary.decode contractBytes with
     | .ok code => pure code
-    | .error error => throw (IO.userError error)
-  let codeSize := (← IO.FS.readBinFile "../contract.wasm").size
+    | .error error => throw (IO.userError error.message)
+  let codeSize := contractBytes.size
   let wrap : AccountId := ⟨"wrap.near", by decide⟩
   let alice : AccountId := ⟨"alice.near", by decide⟩
   let env : Env := {

@@ -87,10 +87,10 @@ theorem convertPromises_preserves_predicate (property : ReceiptPredicate) [Decid
 /-- Outcome packing preserves a final raw-promise invariant. Establishing that
 invariant from concrete execution remains a separate proof obligation. -/
 theorem outcomeOfExecution_success_predicate (property : ReceiptPredicate) [DecidableRel property]
-    (ctx : VMContext) (storage : List (Bytes × Bytes)) (final : SmallStep.Config NearState)
+    (ctx : VMContext) (storage : List (Bytes × Bytes)) (final : Machine)
     (error : Option FunctionCallError)
     (hsuccess : (outcomeOfExecution ctx storage final error).aborted = none)
-    (h : ∀ promise ∈ final.store.wasm.host.promises, PromiseSatisfies property promise) :
+    (h : ∀ promise ∈ final.host.promises, PromiseSatisfies property promise) :
     ∀ receipt ∈ (outcomeOfExecution ctx storage final error).receipts,
       property receipt.receiverId receipt.actions := by
   apply receiptsValue_zero property

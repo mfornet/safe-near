@@ -12,45 +12,21 @@ theorem runAttempt_success_gas_backing (cfg : RuntimeConfig) (code : Module) (co
       (runAttempt cfg code codeSize method ctx storage fuel).burntGas +
         receiptsGas cfg.fees.actionFees cfg.wasm.ethImplicitAccounts
           (runAttempt cfg code codeSize method ctx storage fuel).receipts := by
-  unfold runAttempt
-  dsimp only
-  split
-  · intro hs; cases hs
-  · cases hload : applyCharges (ctx.toNearState cfg storage)
-      [.ext "contract_loading_bytes" codeSize, .ext "contract_loading_base"] with
-    | mk host loadError =>
-      dsimp only
-      cases loadError with
-      | some error => intro hs; cases hs
-      | none =>
-        have hv := applyCharges_success_zero_reservation (ctx.toNearState cfg storage)
-          [.ext "contract_loading_bytes" codeSize, .ext "contract_loading_base"]
-          (by rw [hload]) (by simp [Charge.reservation])
-        rw [hload] at hv
-        have hhost : ReservationInvariant cfg.fees.actionFees cfg.wasm.ethImplicitAccounts host :=
-          ReservationInvariant.of_view_eq hv (ctx.toNearState_reservationInvariant cfg storage)
-        dsimp only
-        cases hexport : code.findExport method with
-        | none => intro hs; cases hs
-        | some entry =>
-          dsimp only
-          cases hsig : code.funcSig? entry with
-          | none => intro hs; cases hs
-          | some signature =>
-            dsimp only
-            split
-            · intro hs; cases hs
-            · cases hresolve : resolveMetered cfg code with
-              | error message => intro hs; cases hs
-              | ok env =>
-                dsimp only
-                split
-                · intro hs; cases hs
-                · rename_i config hinit
-                  have hi := initResolvedConfig_reservationInvariant hresolve hinit hhost
-                  intro hs
-                  exact runInitialized_outcome_gas_backing cfg.fees.actionFees cfg.wasm.ethImplicitAccounts
-                    cfg.wasm fuel config ctx storage hi hs
+  rcases runAttempt_cases cfg code codeSize method ctx storage fuel with
+    ⟨host1, loadErr, burnt, e, profile, hload, hburnt, heq⟩ |
+    ⟨host1, env, store, imports, valid, store', inst, entry, c, hload, hresolve, halloc, hinst,
+      hstart, heq⟩
+  · rw [heq]; intro hs; cases hs
+  · rw [heq]
+    have hv := applyCharges_success_zero_reservation (ctx.toNearState cfg storage)
+      (loadingCharges codeSize) (by rw [hload]) (by simp [loadingCharges, Charge.reservation])
+    rw [hload] at hv
+    have hhost : ReservationInvariant cfg.fees.actionFees cfg.wasm.ethImplicitAccounts host1 :=
+      ReservationInvariant.of_view_eq hv (ctx.toNearState_reservationInvariant cfg storage)
+    have hi := resolvedStart_reservationInvariant hresolve halloc hinst hstart hhost
+    intro hs
+    exact runInitialized_outcome_gas_backing cfg.fees.actionFees cfg.wasm.ethImplicitAccounts
+      cfg.wasm fuel (.next c) ctx storage hi hs
 
 /-- Public receipt validation preserves the exact successful gas-backing law.
 The statement covers arbitrary contract code, context, storage and fuel; success

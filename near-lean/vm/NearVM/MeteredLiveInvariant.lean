@@ -3,51 +3,43 @@ import NearVM.LiveInvariant
 
 namespace Wasm.Near
 
+theorem chargeConfig_liveInvariant {P : NearState → Prop}
+    (hcharge : ∀ (ns : NearState) (cost : Nat), P ns → P (chargeHost ns cost).1)
+    (c : Config NearState) (cost : Nat) (h : ConfigLiveInvariant P c) :
+    ConfigLiveInvariant P (chargeConfig c cost).1 :=
+  ⟨h.1, hcharge c.store.host cost h.2⟩
+
 theorem chargeWasm_liveInvariant {P : NearState → Prop}
-    (hcharge : ∀ (config : SmallStep.Config NearState) (cost : Nat), P config.store.wasm.host → P (chargeWasm config cost).1.store.wasm.host)
-    (config : SmallStep.Config NearState) (cost : Nat) (h : ConfigLiveInvariant P config) :
-    ConfigLiveInvariant P (chargeWasm config cost).1 :=
-by
-  refine ⟨h.1, ?_⟩
-  have hl := h.2
-  cases he : config.expr <;>
-    simp only [SmallStep.Config.LiveHost, chargeWasm, he] at hl ⊢
-  · exact hcharge config cost hl
-  · exact hcharge config cost hl
+    (hcharge : ∀ (ns : NearState) (cost : Nat), P ns → P (chargeHost ns cost).1)
+    (m : Machine) (cost : Nat) (h : MachineLiveInvariant P m) :
+    MachineLiveInvariant P (chargeWasm m cost).1 := by
+  cases m with
+  | next c => exact chargeConfig_liveInvariant hcharge c cost h
+  | done values store => exact ⟨h.1, hcharge store.host cost h.2⟩
+  | trap reason store => exact h
 
 theorem runMetered_liveInvariant (P : NearState → Prop)
-    (hcharge : ∀ (config : SmallStep.Config NearState) (cost : Nat), P config.store.wasm.host → P (chargeWasm config cost).1.store.wasm.host)
-    (cfg : WasmConfig) (fuel : Nat)
-    (config : SmallStep.Config NearState) (h : ConfigLiveInvariant P config) :
-    ConfigLiveInvariant P (runMetered cfg fuel config).1 := by
-  induction fuel generalizing config with
-  | zero => cases he : config.expr <;> simpa only [runMetered, he] using h
+    (hcharge : ∀ (ns : NearState) (cost : Nat), P ns → P (chargeHost ns cost).1)
+    (cfg : WasmConfig) (fuel : Nat) (m : Machine) (h : MachineLiveInvariant P m) :
+    MachineLiveInvariant P (runMetered cfg fuel m).1 := by
+  induction fuel generalizing m with
+  | zero => cases m <;> simpa only [runMetered] using h
   | succ fuel ih =>
-    cases he : config.expr with
-    | done values => simpa only [runMetered, he] using h
-    | trapped reason => simpa only [runMetered, he] using h
-    | running thread =>
-      cases hc : chargeWasm config (nextInstructionGas cfg config) with
-      | mk paid error =>
-        have hp := chargeWasm_liveInvariant hcharge config (nextInstructionGas cfg config) h
-        rw [hc] at hp
-        cases error with
-        | some error => simpa only [runMetered, he, hc] using hp
-        | none =>
-          cases hs : SmallStep.stepChecked? paid with
-          | error error => simpa only [runMetered, he, hc, hs] using hp
-          | ok transition =>
-            cases transition with
-            | none => simpa only [runMetered, he, hc, hs] using hp
-            | some transition =>
-              obtain ⟨kind, next⟩ := transition
-              have hn := step_preserves_liveInvariant (SmallStep.stepChecked?_sound hs) hp
-              cases hf : chargeWasm next (frameTransitionGas cfg paid next) with
-              | mk final error =>
-                have hfinal := chargeWasm_liveInvariant hcharge next (frameTransitionGas cfg paid next) hn
-                rw [hf] at hfinal
-                cases error with
-                | some error => simpa only [runMetered, he, hc, hs, hf] using hfinal
-                | none => simpa only [runMetered, he, hc, hs, hf] using ih final hfinal
+    cases m with
+    | done values store => simpa only [runMetered] using h
+    | trap reason store => simpa only [runMetered] using h
+    | next c =>
+      have hp := chargeConfig_liveInvariant hcharge c (nextInstructionGas cfg c) h
+      simp only [runMetered]
+      split
+      · exact hp
+      · have hn := step_liveInvariant hp
+        have hfinal := chargeWasm_liveInvariant hcharge
+          (Exec.step (chargeConfig c (nextInstructionGas cfg c)).1)
+          (frameTransitionGas cfg (chargeConfig c (nextInstructionGas cfg c)).1
+            (Exec.step (chargeConfig c (nextInstructionGas cfg c)).1)) hn
+        split
+        · exact hfinal
+        · exact ih _ hfinal
 
 end Wasm.Near

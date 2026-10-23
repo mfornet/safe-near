@@ -6,9 +6,9 @@ core axiom audits, formatter integration checks and contract builds.
 
 | Command | Purpose |
 | --- | --- |
-| `just test-all` | Run programs, NEAR scenarios, official Wasm tests and exact VM conformance |
+| `just test-all` | Run NEAR scenarios, official Wasm tests and exact VM conformance |
 | `just chain-replay-test` | Exercise trusted JSON block replay and complete-state continuation |
-| `just audit-all` | Audit all core packages and list the programs' open proofs |
+| `just audit-all` | Audit all core packages |
 | `just check` | Run the combined repository checks |
 | `just check-toolchains` | Check every owned Lake package against the root `lean-toolchain` |
 | `just vm-dependencies` | Check Lean's actual VM import closure for legacy interpreters and proof APIs |
@@ -20,8 +20,6 @@ core axiom audits, formatter integration checks and contract builds.
 | `just wasm-test [pattern]` | Run all official Wasm tests or filter their filenames |
 | `just wasm-summary` | Summarize the committed Wasm coverage report |
 | `just wasm-report` | Regenerate that report using the pinned wasm-tools |
-| `just programs-test` | Build the example programs and run smoke and regression harnesses |
-| `just programs-build` | Rebuild Rust program Wasm and WAT |
 | `just audit near-lean/wasm` | Check a package's transitive proof axioms |
 | `just tools-test` | Run offline Python tooling regression tests |
 | `just snapshot /tmp/fixture.json lockup.near` | Download a block-pinned account fixture |
@@ -93,9 +91,9 @@ and reuse the build. Interrupted downloads never publish a partial checkout.
 runs; this wrapper exposes no validation bypass.
 
 ```sh
-just lean-format-diff near-lean/programs/lean/Programs/Harness.lean
-just lean-format near-lean/programs/lean/Programs/Harness.lean
-just lean-format-check near-lean/programs/lean/Programs/Harness.lean
+just lean-format-diff near-lean/wasm/Wasm/Syntax.lean
+just lean-format near-lean/wasm/Wasm/Syntax.lean
+just lean-format-check near-lean/wasm/Wasm/Syntax.lean
 ```
 
 With no filenames, the command selects all handwritten sources in all owned
@@ -143,25 +141,21 @@ a claim that those contracts are verified.
 
 ## VM execution dependency boundary
 
-`Interpreter.Wasm.Operations` holds the shared numeric and GC operations.
-Both interpreter implementations use those same definitions. `SmallStep`
-imports that executable layer directly; `Semantics` retains the legacy
-big-step interpreter for regression tests and the existing proof API.
-`NearVM.State` imports only host types and `NearVM.Run` explicitly imports
-the small-step machine. Executing the VM does not need the broad Wasm proof
-umbrella.
+`NearVM` executes on the Wasm runtime in `near-lean/wasm`: `NearVM.Run`
+imports `Wasm.Exec` (the step machine), `Wasm.Link` (instantiation) and
+`Wasm.Validate`; `NearVM.Interp` is the only bridge between NEAR host
+functions and the runtime's `HostFn`. Nothing from the former Talos
+interpreter (`Interpreter.*`) or its proof library (`CodeLib`) may be reachable.
 The compiler-header report records the current execution dependency graph in
-`audit/vm-dependencies.json`. New runtime modules may extend that graph while
-the legacy interpreter and proof API boundary stays enforced.
+`audit/vm-dependencies.json`.
 
 `check_vm_dependencies.py` builds `NearVM`, then inspects Lean's imported-module
-header. It rejects legacy `Semantics`, `Wp`, `Spec` and CodeLib imports,
-including indirect imports, and requires the actual small-step/operation
-modules to be present. CI runs it after building the VM. Its separate Lean
-fixture test demonstrates a clean graph, a forbidden transitive dependency,
-and an incorrectly disconnected execution module.
-`just vm-dependencies` runs both the real graph check and those adversarial
-fixture cases; `just check` includes the same gate.
+header. It rejects `Interpreter` and `CodeLib` imports, including indirect
+imports, and requires the runtime's execution modules to be present. CI runs it
+after building the VM. Its separate Lean fixture test demonstrates a clean
+graph, a forbidden transitive dependency, and an incorrectly disconnected
+execution module. `just vm-dependencies` runs both the real graph check and
+those adversarial fixture cases; `just check` includes the same gate.
 
 ## Full runtime reference
 

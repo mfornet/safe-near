@@ -3,23 +3,23 @@ import NearVM.NeutralEncoding
 namespace Wasm.Near
 
 /-- Host calls cannot silently disable the runtime external's decoding policy. -/
-def HostPreservesEncodingPolicy (fn : HostFn NearState) : Prop :=
+def HostPreservesEncodingPolicy (fn : NearHostFn NearState) : Prop :=
   ∀ st args, HostResult.LiveSatisfies
     (fun ns => ns.config.validateActionMethodUtf8 = st.host.config.validateActionMethodUtf8) (fn.invoke st args)
 
-theorem deductDeposit_encodingPolicy (name : String) (before after : Store NearState) (args : List Value) :
+theorem deductDeposit_encodingPolicy (name : String) (before after : HostStore NearState) (args : List Value) :
     (deductDeposit name before after args).1.host.config.validateActionMethodUtf8 = after.host.config.validateActionMethodUtf8 := by
   unfold deductDeposit deductPromiseDeposit
   repeat' (first | rfl | split | (dsimp only; split))
 
-theorem updateStorageUsage_encodingPolicy (extra : Nat) (name : String) (before after : Store NearState)
+theorem updateStorageUsage_encodingPolicy (extra : Nat) (name : String) (before after : HostStore NearState)
     (args : List Value) :
     (updateStorageUsage extra name before after args).host.config.validateActionMethodUtf8 = after.host.config.validateActionMethodUtf8 := by
   unfold updateStorageUsage
   repeat' (first | rfl | split | (dsimp only; split))
 
 /-- Post-call fees, deposit charging and local storage usage keep the policy. -/
-theorem finishMeteredCall_encodingPolicy (extra : Nat) (name : String) (before : Store NearState)
+theorem finishMeteredCall_encodingPolicy (extra : Nat) (name : String) (before : HostStore NearState)
     (args : List Value) (result : HostResult NearState)
     (hraw : HostResult.LiveSatisfies
       (fun ns => ns.config.validateActionMethodUtf8 = before.host.config.validateActionMethodUtf8) result) :
@@ -27,7 +27,6 @@ theorem finishMeteredCall_encodingPolicy (extra : Nat) (name : String) (before :
       (finishMeteredCall extra name before args result) := by
   cases result with
   | Trap st message => trivial
-  | Throw st tag values => exact hraw
   | Return values st =>
     unfold finishMeteredCall
     dsimp only
@@ -54,7 +53,7 @@ theorem finishMeteredCall_encodingPolicy (extra : Nat) (name : String) (before :
 
 /-- Precharging also preserves the policy, so arbitrary sequences of metered
 calls cannot opt out of method decoding. -/
-theorem metered_encodingPolicy (extra : Nat) (name : String) (fn : HostFn NearState)
+theorem metered_encodingPolicy (extra : Nat) (name : String) (fn : NearHostFn NearState)
     (hraw : HostPreservesEncodingPolicy fn) : HostPreservesEncodingPolicy (metered extra name fn) := by
   intro st args
   unfold metered

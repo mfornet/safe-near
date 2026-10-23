@@ -1,5 +1,5 @@
 import NearRuntime
-import Interpreter.Wasm.Decoder.Wat
+import Wasm.Wat
 
 namespace NearRuntime.Tests.Gas
 
@@ -26,7 +26,7 @@ private def allowance (s : ChainState) : Option Nat := do
 chunk capacity without charging gas tokens. Tests use actual runtime transitions. -/
 def run (cfg : RuntimeConfig) : IO Nat := do
   let checks ← IO.mkRef 0
-  let module ← IO.ofExcept (Decoder.Wat.decode "(module (func (export \"ping\")))")
+  let module ← Wat.compile! "(module (func (export \"ping\")))"
   let code : ContractCode := { module, size := 0, hash := "refund-fixture" }
   let initialAllowance := 5 * 10 ^ 24
   let access : AccessKey :=

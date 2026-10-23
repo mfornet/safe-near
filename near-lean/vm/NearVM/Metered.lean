@@ -76,7 +76,7 @@ def applyCharges (ns : NearState) : List Charge → NearState × Option HostErro
     | (ns', some e) => (ns', some e)
 
 /-- Trap with a structured error recorded in the host state. -/
-def trapWith (st : Store NearState) (e : HostError) : HostResult NearState :=
+def trapWith (st : HostStore NearState) (e : HostError) : HostResult NearState :=
   .Trap { st with host := { st.host with lastError := some e } } e.message
 
 /-! ## Cost rules -/
@@ -87,11 +87,11 @@ def argU64 (args : List Value) (i : Nat) : UInt64 :=
   | _ => 0
 
 /-- Bytes of a `(len, ptr)` argument following `get_memory_or_register`. -/
-def spanLen (st : Store NearState) (len ptr : UInt64) : Nat :=
+def spanLen (st : HostStore NearState) (len ptr : UInt64) : Nat :=
   if len = u64Max then ((st.host.registers ptr.toNat).map List.length).getD 0 else len.toNat
 
 /-- Reading a `(len, ptr)` argument: memory or register costs. -/
-def readSpan (st : Store NearState) (len ptr : UInt64) : List Charge :=
+def readSpan (st : HostStore NearState) (len ptr : UInt64) : List Charge :=
   if len = u64Max then
     match st.host.registers ptr.toNat with
     | none => []
@@ -105,22 +105,22 @@ def utf8 (n : Nat) : List Charge := [.ext "utf8_decoding_base", .ext "utf8_decod
 def utf16 (n : Nat) : List Charge := [.ext "utf16_decoding_base", .ext "utf16_decoding_byte" n]
 
 /-- Receiver of promise `idx`, if it is a receipt. -/
-def promiseReceiver? (st : Store NearState) (idx : Nat) : Option (List UInt8) :=
+def promiseReceiver? (st : HostStore NearState) (idx : Nat) : Option (List UInt8) :=
   match getPromise? st.host.promises idx with
   | some (.batch acct _) => some acct
   | some (.callback _ acct _) => some acct
   | _ => none
 
 /-- Same-shard ("sir") test: the receiver is the current account. -/
-def sirOf (st : Store NearState) (acct : Option (List UInt8)) : Bool :=
+def sirOf (st : HostStore NearState) (acct : Option (List UInt8)) : Bool :=
   acct == some st.host.context.currentAccountId
 
-def sirOfSpan (st : Store NearState) (len ptr : UInt64) : Bool :=
+def sirOfSpan (st : HostStore NearState) (len ptr : UInt64) : Bool :=
   sirOf st (getMemOrReg st ptr len)
 
 /-- Native transfer reads the u128 before looking up the promise or charging
 accumulated action fees. A failed read retains only the argument-reading cost. -/
-def transferCharges (st : Store NearState) (index amountPtr : UInt64) : List Charge :=
+def transferCharges (st : HostStore NearState) (index amountPtr : UInt64) : List Charge :=
   let initialCharges := [.ext "base"] ++ readMem 16
   match readU128Mem st amountPtr with
   | none => initialCharges
@@ -128,14 +128,14 @@ def transferCharges (st : Store NearState) (index amountPtr : UInt64) : List Cha
       (fun fees => transferFees fees st.host.config.ethImplicitAccounts
         ((promiseReceiver? st index.toNat).getD [])) (sirOf st (promiseReceiver? st index.toNat))]
 
-theorem transferCharges_invalidAmount (st : Store NearState) (index amountPtr : UInt64)
+theorem transferCharges_invalidAmount (st : HostStore NearState) (index amountPtr : UInt64)
     (h : readU128Mem st amountPtr = none) :
     transferCharges st index amountPtr = [.ext "base"] ++ readMem 16 := by
   simp only [transferCharges, h]
 
 /-- Data routing is same-account when the dependency receiver equals the
 callback receiver, which need not be the currently executing account. -/
-def depsSir (st : Store NearState) (idx : Nat) (receiver : Option (List UInt8)) : List Bool :=
+def depsSir (st : HostStore NearState) (idx : Nat) (receiver : Option (List UInt8)) : List Bool :=
   let rec go (fuel : Nat) (i : Nat) : List Bool :=
     match fuel with
     | 0 => []
@@ -150,7 +150,7 @@ def depsSir (st : Store NearState) (idx : Nat) (receiver : Option (List UInt8)) 
 def allocatesPromise (name : String) : Bool :=
   ["promise_create", "promise_then", "promise_and", "promise_batch_create", "promise_batch_then"].contains name
 
-def promiseCapacityError (st : Store NearState) : Option HostError :=
+def promiseCapacityError (st : HostStore NearState) : Option HostError :=
   match st.host.config.maxPromises with
   | none => none
   | some limit =>
@@ -164,7 +164,7 @@ def creationAccountArgs (name : String) (args : List Value) : Option (UInt64 × 
   else none
 
 /-- Receiver parsing precedes receipt creation and the allocation limit. -/
-def creationAccountError (name : String) (st : Store NearState) (args : List Value) : Option HostError :=
+def creationAccountError (name : String) (st : HostStore NearState) (args : List Value) : Option HostError :=
   match creationAccountArgs name args with
   | none => none
   | some (len, ptr) =>
@@ -175,7 +175,7 @@ def creationAccountError (name : String) (st : Store NearState) (args : List Val
       else if !st.host.config.validAccountId bytes then some .invalidAccountId
       else none
 
-def creationPrefixError (name : String) (st : Store NearState) (args : List Value) : Option HostError :=
+def creationPrefixError (name : String) (st : HostStore NearState) (args : List Value) : Option HostError :=
   match creationAccountError name st args with
   | some error => some error
   | none =>
@@ -219,7 +219,7 @@ structure FunctionCallPlan where
 def spanReadError (len ptr : UInt64) : HostError :=
   if len == u64Max then .invalidRegisterId ptr.toNat else .memoryAccessViolation
 
-def functionCallTargetError (st : Store NearState) (index : Nat) : Option HostError :=
+def functionCallTargetError (st : HostStore NearState) (index : Nat) : Option HostError :=
   match getPromise? st.host.promises index with
   | some (.batch ..) | some (.callback ..) => none
   | some (.and _) => some .cannotAppendActionToJointPromise
@@ -227,7 +227,7 @@ def functionCallTargetError (st : Store NearState) (index : Nat) : Option HostEr
 
 /-- The reference reads amount, method (rejecting empty), arguments, then the
 target handle. Fees and prepaid gas follow only after all inputs are valid. -/
-def functionCallPlan (st : Store NearState) (input : FunctionCallInputs) (sir : Bool) : FunctionCallPlan :=
+def functionCallPlan (st : HostStore NearState) (input : FunctionCallInputs) (sir : Bool) : FunctionCallPlan :=
   let amountCharges := [.ext "base"] ++ readMem 16
   match readU128Mem st input.amountPtr with
   | none => { charges := amountCharges, error := some .memoryAccessViolation }
@@ -250,7 +250,7 @@ def functionCallPlan (st : Store NearState) (input : FunctionCallInputs) (sir : 
                .actionBytes (·.functionCallByte) (method.length + arguments.length) sir,
                .prepay input.gas.toNat] }
 
-def functionCallInputError (name : String) (st : Store NearState) (args : List Value) : Option HostError :=
+def functionCallInputError (name : String) (st : HostStore NearState) (args : List Value) : Option HostError :=
   (functionCallInputs? name args).bind fun input => (functionCallPlan st input false).error
 
 structure FunctionKeyInputs where
@@ -271,7 +271,7 @@ def functionKeyInputs (args : List Value) : FunctionKeyInputs :=
 
 /-- Native order: key read, allowance, receiver read/UTF-8/syntax, method read/
 nonempty segments, target lookup, action fees, then public-key decoding. -/
-def functionKeyPlan (st : Store NearState) (input : FunctionKeyInputs) (sir : Bool) : FunctionCallPlan :=
+def functionKeyPlan (st : HostStore NearState) (input : FunctionKeyInputs) (sir : Bool) : FunctionCallPlan :=
   let keyCharges := [.ext "base"] ++ readSpan st input.publicKeyLen input.publicKeyPtr
   match getMemOrReg st input.publicKeyPtr input.publicKeyLen with
   | none => { charges := keyCharges, error := some (spanReadError input.publicKeyLen input.publicKeyPtr) }
@@ -301,7 +301,7 @@ def functionKeyPlan (st : Store NearState) (input : FunctionKeyInputs) (sir : Bo
                 error := if serializedPublicKeyValid publicKey then none else some .invalidPublicKey }
 
 /-- Argument-dependent charge plan before validating promise handles. -/
-def chargesBeforeUnvalidated (name : String) (st : Store NearState) (args : List Value) : List Charge :=
+def chargesBeforeUnvalidated (name : String) (st : HostStore NearState) (args : List Value) : List Charge :=
   let a := argU64 args
   let base : Charge := .ext "base"
   match name with
@@ -417,14 +417,14 @@ structure StorageMutationPlan where
   charges : List Charge
   error : Option HostError := none
 
-def storageValueCharges (st : Store NearState) (cost : String) (key : List UInt8) : List Charge :=
+def storageValueCharges (st : HostStore NearState) (cost : String) (key : List UInt8) : List Charge :=
   if st.host.config.chargeStorageValueAccess && st.host.storageAccounting.isNone then
     match st.host.storage key with
     | some value => [.ext cost value.length]
     | none => []
   else []
 
-def storageMutationPlan? (name : String) (st : Store NearState) (args : List Value) :
+def storageMutationPlan? (name : String) (st : HostStore NearState) (args : List Value) :
     Option StorageMutationPlan := do
   if name != "storage_write" && name != "storage_remove" then none else
   let a := argU64 args
@@ -447,7 +447,7 @@ def storageMutationPlan? (name : String) (st : Store NearState) (args : List Val
 
 /-- Charges before a host function runs. Invalid handles retain input-reading
 costs, but cannot incur later receipt/action fees or prepaid function-call gas. -/
-def chargesBefore (name : String) (st : Store NearState) (args : List Value) : List Charge :=
+def chargesBefore (name : String) (st : HostStore NearState) (args : List Value) : List Charge :=
   let a := argU64 args
   let base : Charge := .ext "base"
   let charges := chargesBeforeUnvalidated name st args
@@ -473,7 +473,7 @@ def chargesBefore (name : String) (st : Store NearState) (args : List Value) : L
 
 /-- The public pre-call plan cannot charge transfer fees for an unread amount,
 including an invalid target handle. -/
-theorem chargesBefore_transfer_invalidAmount (st : Store NearState) (index amountPtr : UInt64)
+theorem chargesBefore_transfer_invalidAmount (st : HostStore NearState) (index amountPtr : UInt64)
     (h : readU128Mem st amountPtr = none) :
     chargesBefore "promise_batch_action_transfer" st [.i64 index, .i64 amountPtr] =
       [.ext "base"] ++ readMem 16 := by
@@ -494,7 +494,7 @@ def joinedDependenciesError (handles : List PromiseHandle) (limit : Nat) : List 
 /-- Validation after argument-reading charges and before functional invocation.
 An invalid internal raw graph is explicit unsupported model state. Ordinary VM
 execution preserves graph well-formedness independently of this check. -/
-def promiseJoinError (st : Store NearState) (args : List Value) : Option HostError :=
+def promiseJoinError (st : HostStore NearState) (args : List Value) : Option HostError :=
   match args with
   | [.i64 ptr, .i64 count] =>
     if count.toNat * 8 ≥ 2 ^ 64 then some .integerOverflow
@@ -511,24 +511,24 @@ def promiseJoinError (st : Store NearState) (args : List Value) : Option HostErr
         | some graph => joinedDependenciesError graph.handles limit indices 0
   | _ => none
 
-def transferInputError (st : Store NearState) (args : List Value) : Option HostError :=
+def transferInputError (st : HostStore NearState) (args : List Value) : Option HostError :=
   match args with
   | [.i64 _, .i64 amountPtr] => if (readU128Mem st amountPtr).isNone then some .memoryAccessViolation else none
   | _ => none
 
-theorem transferInputError_invalidAmount (st : Store NearState) (index amountPtr : UInt64)
+theorem transferInputError_invalidAmount (st : HostStore NearState) (index amountPtr : UInt64)
     (h : readU128Mem st amountPtr = none) :
     transferInputError st [.i64 index, .i64 amountPtr] = some .memoryAccessViolation := by
   simp only [transferInputError, h, Option.isNone_none, ite_true]
 
-def invocationArgumentError (name : String) (st : Store NearState) (args : List Value) : Option HostError :=
+def invocationArgumentError (name : String) (st : HostStore NearState) (args : List Value) : Option HostError :=
   if let some plan := storageMutationPlan? name st args then plan.error
   else if name == "promise_and" then promiseJoinError st args
   else if name == "promise_batch_action_transfer" then transferInputError st args
   else if name == "promise_batch_action_add_key_with_function_call" then (functionKeyPlan st (functionKeyInputs args) false).error
   else creationPrefixError name st args
 
-def preInvokeError (name : String) (st : Store NearState) (args : List Value) : Option HostError :=
+def preInvokeError (name : String) (st : HostStore NearState) (args : List Value) : Option HostError :=
   match invocationArgumentError name st args with
   | some error => some error
   | none =>
@@ -544,7 +544,7 @@ def storageReadValueCharges (length : Nat) : List Charge :=
       .ext "storage_large_read_overhead_byte" length] else [])
 
 /-- Charges after a host function ran, from its effect. -/
-def chargesAfter (name : String) (before after : Store NearState) (args : List Value) : List Charge :=
+def chargesAfter (name : String) (before after : HostStore NearState) (args : List Value) : List Charge :=
   let a := argU64 args
   match name with
   | "storage_write" =>
@@ -577,10 +577,10 @@ def chargesAfter (name : String) (before after : Store NearState) (args : List V
 
 /-- `storage_usage` after a storage host function: new records cost
 key + value + `num_extra_bytes_record`, overwrites the value difference. -/
-def updateStorageUsage (extraBytes : Nat) (name : String) (before after : Store NearState)
-    (args : List Value) : Store NearState :=
+def updateStorageUsage (extraBytes : Nat) (name : String) (before after : HostStore NearState)
+    (args : List Value) : HostStore NearState :=
   let a := argU64 args
-  let adjust (key : List UInt8) : Store NearState :=
+  let adjust (key : List UInt8) : HostStore NearState :=
     let old := (before.host.storage key).map List.length
     let new := (after.host.storage key).map List.length
     let usage := after.host.context.storageUsage.toNat
@@ -625,7 +625,7 @@ theorem deductPromiseDeposit_accounting (name : String) (ns : NearState) (d : Na
 
 /-- Deposit carried by each financial host ABI. Non-financial actions, including
 stake targets, carry no outgoing deposit. -/
-def promiseDeposit? (name : String) (before : Store NearState) (args : List Value) : Option Nat :=
+def promiseDeposit? (name : String) (before : HostStore NearState) (args : List Value) : Option Nat :=
   let a := argU64 args
   let amountAt (ptr : UInt64) : Option Nat := readU128Mem before ptr
   match name with
@@ -635,8 +635,8 @@ def promiseDeposit? (name : String) (before : Store NearState) (args : List Valu
   | "promise_batch_action_transfer" => amountAt (a 1)
   | _ => some 0
 
-def deductDeposit (name : String) (before after : Store NearState) (args : List Value) :
-    Store NearState × Option HostError :=
+def deductDeposit (name : String) (before after : HostStore NearState) (args : List Value) :
+    HostStore NearState × Option HostError :=
   let deposit := promiseDeposit? name before args
   match deposit with
   | some 0 => (after, none)
@@ -647,11 +647,11 @@ def deductDeposit (name : String) (before after : Store NearState) (args : List 
 
 /-- Stake actions carry a target stake, not an outgoing deposit. Scheduling
 one leaves liquid funds untouched; execution uses the receiver's own balance. -/
-theorem deductDeposit_stake (before after : Store NearState) (args : List Value) :
+theorem deductDeposit_stake (before after : HostStore NearState) (args : List Value) :
     deductDeposit "promise_batch_action_stake" before after args = (after, none) := rfl
 
 /-- `panic_utf8(len, ptr)` with the message. -/
-def panicUtf8Metered : HostFn NearState :=
+def panicUtf8Metered : NearHostFn NearState :=
   { params := [.i64, .i64], results := []
     invoke := fun st args =>
       match args with
@@ -664,15 +664,15 @@ def panicUtf8Metered : HostFn NearState :=
         | none => trapWith st .memoryAccessViolation
       | _ => trapWith st .memoryAccessViolation }
 
-def panicMetered : HostFn NearState :=
+def panicMetered : NearHostFn NearState :=
   { invoke := fun st _ => trapWith st (.guestPanic "explicit guest panic") }
 
-def abortMetered : HostFn NearState :=
+def abortMetered : NearHostFn NearState :=
   { params := [.i32, .i32, .i32, .i32], results := []
     invoke := fun st _ => trapWith st (.guestPanic "abort") }
 
 /-- The `gas(n)` import used by older metering schemes. -/
-def gasFn : HostFn NearState :=
+def gasFn : NearHostFn NearState :=
   { params := [.i32], results := []
     invoke := fun st args =>
       match args with
@@ -702,14 +702,14 @@ def deprecatedRuntimeHost (name : String) : Bool :=
 
 /-- Method bytes passed to the external receipt builder. The key ABI supplies
 CSV bytes: ASCII separators cannot split a UTF-8 multibyte sequence. -/
-def actionMethodBytes? (name : String) (before : Store NearState) (args : List Value) : Option (List UInt8) :=
+def actionMethodBytes? (name : String) (before : HostStore NearState) (args : List Value) : Option (List UInt8) :=
   if name == "promise_batch_action_add_key_with_function_call" then
     getMemOrReg before (argU64 args 8) (argU64 args 7)
   else (functionCallInputs? name args).bind fun input => getMemOrReg before input.methodPtr input.methodLen
 
 /-- Runtime externals decode method names after fees/prepayment and balance
 checks. MockedExternal deliberately accepts opaque method bytes instead. -/
-def actionMethodEncodingError (name : String) (before : Store NearState) (args : List Value) : Option HostError :=
+def actionMethodEncodingError (name : String) (before : HostStore NearState) (args : List Value) : Option HostError :=
   if before.host.config.validateActionMethodUtf8 then
     match actionMethodBytes? name before args with
     | some bytes =>
@@ -721,7 +721,7 @@ def actionMethodEncodingError (name : String) (before : Store NearState) (args :
 
 /-- Post-call metering is separated from host invocation so its frame
 properties can be used directly in execution proofs. -/
-def finishMeteredCall (extraBytes : Nat) (name : String) (before : Store NearState)
+def finishMeteredCall (extraBytes : Nat) (name : String) (before : HostStore NearState)
     (args : List Value) : HostResult NearState → HostResult NearState
   | .Return vals st2 =>
     let (ns2, err2) := applyCharges st2.host (chargesAfter name before st2 args)
@@ -736,15 +736,14 @@ def finishMeteredCall (extraBytes : Nat) (name : String) (before : Store NearSta
         | some error => trapWith st4 error
         | none => .Return vals (updateStorageUsage extraBytes name before st4 args)
   | .Trap st2 msg => .Trap st2 msg
-  | .Throw st2 tag vals => .Throw st2 tag vals
 
 /-- RuntimeExt's external storage phase. The base trie is immutable within the
 chunk; prospective updates bypass it. Cache warming survives every gas failure.
 Reads bill lookup nodes before value bytes, then dereference with a free gas
 counter. Mutations bill old-value bytes before dereference, then disk/cache totals.
 Remove stages its update before that final charge; write stages it afterwards. -/
-private def prepareStorageCallAux (name : String) (before : Store NearState) (args : List Value) :
-    Store NearState × Option FunctionCallError := Id.run do
+private def prepareStorageCallAux (name : String) (before : HostStore NearState) (args : List Value) :
+    HostStore NearState × Option FunctionCallError := Id.run do
   unless ["storage_read", "storage_has_key", "storage_write", "storage_remove"].contains name do
     return (before, none)
   let some initial := before.host.storageAccounting | return (before, none)
@@ -763,7 +762,7 @@ private def prepareStorageCallAux (name : String) (before : Store NearState) (ar
         (match result with | .error message => message | .ok _ => "lookup failed"))))
   let mut trie := looked
   let mut st := { before with host := { before.host with storageAccounting := some trie } }
-  let bill (st : Store NearState) (charges : List Charge) :=
+  let bill (st : HostStore NearState) (charges : List Charge) :=
     let (host, error) := applyCharges st.host charges
     ({ st with host }, error.map FunctionCallError.hostError)
   let totals (after : _root_.Near.TrieOverlay.State) :=
@@ -807,8 +806,8 @@ private def prepareStorageCallAux (name : String) (before : Store NearState) (ar
 
 /-- Expose only the fields the external storage phase may change. On success
 its local burns cannot alter prepaid promise obligations or call gas limits. -/
-def prepareStorageCall (name : String) (before : Store NearState) (args : List Value) :
-    Store NearState × Option FunctionCallError :=
+def prepareStorageCall (name : String) (before : HostStore NearState) (args : List Value) :
+    HostStore NearState × Option FunctionCallError :=
   let (after, error) := prepareStorageCallAux name before args
   ({ before with host := { before.host with
       storageAccounting := after.host.storageAccounting
@@ -817,10 +816,10 @@ def prepareStorageCall (name : String) (before : Store NearState) (args : List V
         promises := if error.isNone then before.host.gas.promises else after.host.gas.promises }
       gasProfile := after.host.gasProfile } }, error)
 
-@[simp] theorem prepareStorageCall_promises (name : String) (st : Store NearState) (args : List Value) :
+@[simp] theorem prepareStorageCall_promises (name : String) (st : HostStore NearState) (args : List Value) :
     (prepareStorageCall name st args).1.host.promises = st.host.promises := rfl
 
-theorem prepareStorageCall_success_promisesGas (name : String) (st : Store NearState) (args : List Value)
+theorem prepareStorageCall_success_promisesGas (name : String) (st : HostStore NearState) (args : List Value)
     (h : (prepareStorageCall name st args).2 = none) :
     (prepareStorageCall name st args).1.host.gas.promises = st.host.gas.promises := by
   change (if (prepareStorageCall name st args).2.isNone then st.host.gas.promises else _) = _
@@ -828,7 +827,7 @@ theorem prepareStorageCall_success_promisesGas (name : String) (st : Store NearS
   rfl
 
 /-- Nonstorage hosts pass straight through the external phase. -/
-@[simp] theorem prepareStorageCall_other (name : String) (st : Store NearState) (args : List Value)
+@[simp] theorem prepareStorageCall_other (name : String) (st : HostStore NearState) (args : List Value)
     (h : ["storage_read", "storage_has_key", "storage_write", "storage_remove"].contains name = false) :
     prepareStorageCall name st args = (st, none) := by
   have ha : prepareStorageCallAux name st args = (st, none) := by
@@ -838,8 +837,8 @@ theorem prepareStorageCall_success_promisesGas (name : String) (st : Store NearS
   rfl
 
 /-- Invoke the functional host only after the external storage phase succeeds. -/
-def invokeStorageCall (extra : Nat) (name : String) (fn : HostFn NearState)
-    (before : Store NearState) (args : List Value) : HostResult NearState :=
+def invokeStorageCall (extra : Nat) (name : String) (fn : NearHostFn NearState)
+    (before : HostStore NearState) (args : List Value) : HostResult NearState :=
   let (after, error) := prepareStorageCall name before args
   match error with
   | some (.hostError error) => trapWith after error
@@ -849,7 +848,7 @@ def invokeStorageCall (extra : Nat) (name : String) (fn : HostFn NearState)
   | none => finishMeteredCall extra name after args (fn.invoke after args)
 
 /-- Wrap a functional host function with its gas and storage-usage rules. -/
-def metered (extraBytes : Nat) (name : String) (fn : HostFn NearState) : HostFn NearState :=
+def metered (extraBytes : Nat) (name : String) (fn : NearHostFn NearState) : NearHostFn NearState :=
   { fn with invoke := fun st args =>
       if deprecatedRuntimeHost name then trapWith st (.deprecated name)
       else if st.host.context.isView && viewRestrictedHost name then
@@ -882,9 +881,9 @@ def unsupportedRuntimeHost (name : String) : Bool :=
 
 /-- The metered host table: `nearHostFns` with gas, plus the structured
 panics and the `gas` import. -/
-def meteredHostFns (cfg : RuntimeConfig) : List (ImportDecl × HostFn NearState) :=
+def meteredHostFns (cfg : RuntimeConfig) : List (ImportDecl × NearHostFn NearState) :=
   let extra := cfg.fees.numExtraBytesRecord
-  let swap (decl : ImportDecl) (fn : HostFn NearState) : HostFn NearState :=
+  let swap (decl : ImportDecl) (fn : NearHostFn NearState) : NearHostFn NearState :=
     if unsupportedRuntimeHost decl.name then
       { fn with invoke := fun st _ => trapWith st (.unsupported decl.name) }
     else match decl.name with
@@ -910,6 +909,6 @@ def resolveMeteredImports (cfg : RuntimeConfig) : List ImportDecl → Except Str
 /-- Resolve a module's imports against the metered table. `error` names the
 first import that is not a known NEAR host function. -/
 def resolveMetered (cfg : RuntimeConfig) (m : Module) : Except String (HostEnv NearState) :=
-  resolveMeteredImports cfg m.imports
+  resolveMeteredImports cfg m.importDecls
 
 end Wasm.Near

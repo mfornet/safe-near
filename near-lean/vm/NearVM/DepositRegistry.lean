@@ -4,10 +4,11 @@ import NearVM.HostGasLimits
 namespace Wasm.Near
 
 set_option maxHeartbeats 2000000 in
+set_option maxRecDepth 16384 in
 /-- Every successful published host call preserves liquid funds plus pending
 promise deposits, accounting explicitly for permitted subsidies. Rejected calls
 carry no success guarantee. -/
-theorem meteredHostFns_funding (cfg : RuntimeConfig) (entry : ImportDecl × HostFn NearState)
+theorem meteredHostFns_funding (cfg : RuntimeConfig) (entry : ImportDecl × NearHostFn NearState)
     (h : entry ∈ meteredHostFns cfg) : HostPreservesFunding entry.2 := by
   simp only [meteredHostFns, List.mem_append, List.mem_map, List.mem_singleton] at h
   rcases h with ⟨⟨decl, fn⟩, hin, heq⟩ | heq
@@ -96,6 +97,6 @@ theorem resolveMeteredImports_funding (cfg : RuntimeConfig) (imports : List Impo
 theorem resolveMetered_funding (cfg : RuntimeConfig) (m : Module) (env : HostEnv NearState)
     (h : resolveMetered cfg m = .ok env) :
     ∀ fn ∈ env.funcs, HostPreservesFunding fn :=
-  resolveMeteredImports_funding cfg m.imports env h
+  resolveMeteredImports_funding cfg m.importDecls env h
 
 end Wasm.Near

@@ -7,7 +7,7 @@ namespace Wasm.Near
 registry preservation proof. -/
 theorem resolveMeteredImports_encodingInvariant (cfg : RuntimeConfig) (imports : List ImportDecl) (env : HostEnv NearState)
     (h : resolveMeteredImports cfg imports = .ok env) :
-    ∀ fn ∈ env.funcs, HostFn.PreservesLive EncodingInvariant fn := by
+    ∀ fn ∈ env.funcs, NearHostFn.PreservesLive EncodingInvariant fn := by
   induction imports generalizing env with
   | nil =>
     simp only [resolveMeteredImports, Except.ok.injEq] at h
@@ -32,24 +32,23 @@ theorem resolveMeteredImports_encodingInvariant (cfg : RuntimeConfig) (imports :
 
 theorem resolveMetered_encodingInvariant (cfg : RuntimeConfig) (code : Module) (env : HostEnv NearState)
     (h : resolveMetered cfg code = .ok env) :
-    ∀ fn ∈ env.funcs, HostFn.PreservesLive EncodingInvariant fn :=
-  resolveMeteredImports_encodingInvariant cfg code.imports env h
+    ∀ fn ∈ env.funcs, NearHostFn.PreservesLive EncodingInvariant fn :=
+  resolveMeteredImports_encodingInvariant cfg code.importDecls env h
 
-/-- The concrete registry discharges the live-host premise at initialization.
-No host preservation or receipt-decoding premise is supplied by a contract proof. -/
-theorem initResolvedConfig_encodingInvariant {cfg : RuntimeConfig} {resolvedCode code : Module} {entry : Nat}
-    {env : HostEnv NearState} {st : Store NearState} {args : List Value}
-    {config : SmallStep.Config NearState}
-    (hresolve : resolveMetered cfg resolvedCode = .ok env)
-    (hinit : SmallStep.initConfig { module := code, host := env } entry st args = .ok config)
-    (hbefore : EncodingInvariant st.host) :
-    ConfigLiveInvariant EncodingInvariant config := by
-  apply initConfig_liveInvariant hinit _ hbefore
-  intro fn hmember
-  rcases hmember with hmember | hmember
-  · exact resolveMetered_encodingInvariant cfg resolvedCode env hresolve fn hmember
-  · have hempty := resolveMeteredImports_noForeign cfg resolvedCode.imports env hresolve
-    simp only [hempty, List.not_mem_nil] at hmember
+/-- The concrete registry discharges the live-host premise at the first
+configuration. No host preservation or receipt-decoding premise is supplied by
+a contract proof. -/
+theorem resolvedStart_encodingInvariant {cfg : RuntimeConfig} {code : Module}
+    {env : HostEnv NearState} {host : NearState} {store store' : Store NearState}
+    {imports : List ExternVal} {vm : ValidModule} {inst : ModuleInst} {addr : Nat}
+    {c : Config NearState}
+    (hresolve : resolveMetered cfg code = .ok env)
+    (halloc : env.allocate (Store.empty host) = (store, imports))
+    (hinst : Link.instantiateModule store vm imports = .ok (store', inst))
+    (hstart : Exec.startWasm store' execLimits addr [] = some c)
+    (hbefore : EncodingInvariant host) : ConfigLiveInvariant EncodingInvariant c :=
+  resolvedStart_liveInvariant (resolveMetered_encodingInvariant cfg code env hresolve) halloc hinst
+    hstart hbefore
 
 /-- A strict runtime call starts with an empty, encoding-safe promise list. -/
 theorem VMContext.toNearState_encodingInvariant (ctx : VMContext) (cfg : RuntimeConfig)

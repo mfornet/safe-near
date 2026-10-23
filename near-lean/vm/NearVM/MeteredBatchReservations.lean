@@ -3,15 +3,15 @@ import NearVM.MeteredReservations
 namespace Wasm.Near
 
 /-- The actual store prepared by the metered wrapper before raw invocation. -/
-def prechargedStore (name : String) (st : Store NearState) (args : List Value) : Store NearState :=
+def prechargedStore (name : String) (st : HostStore NearState) (args : List Value) : HostStore NearState :=
   let ns := (applyCharges st.host (chargesBefore name st args)).1
   { st with host := { ns with context := { ns.context with usedGas := UInt64.ofNat ns.gas.used } } }
 
-theorem prechargedStore_frame (name : String) (st : Store NearState) (args : List Value) :
+theorem prechargedStore_frame (name : String) (st : HostStore NearState) (args : List Value) :
     reservationFrame (prechargedStore name st args).host = reservationFrame st.host :=
   applyCharges_reservationFrame st.host (chargesBefore name st args)
 
-theorem prechargedStore_reservation (name : String) (st : Store NearState) (args : List Value)
+theorem prechargedStore_reservation (name : String) (st : HostStore NearState) (args : List Value)
     (hsuccess : (applyCharges st.host (chargesBefore name st args)).2 = none) :
     (prechargedStore name st args).host.gas.promises = st.host.gas.promises +
       ((chargesBefore name st args).map (fun charge => charge.reservation st.host.fees)).sum :=
@@ -34,35 +34,35 @@ theorem applyCharges_abiFrame (ns : NearState) (charges : List Charge) :
       | some error => simpa only [applyCharges, hc] using hp
       | none => simpa only [applyCharges, hc] using (ih paid).trans hp
 
-@[simp] theorem prechargedStore_getMemOrReg (name : String) (st : Store NearState) (args : List Value)
+@[simp] theorem prechargedStore_getMemOrReg (name : String) (st : HostStore NearState) (args : List Value)
     (ptr len : UInt64) : getMemOrReg (prechargedStore name st args) ptr len = getMemOrReg st ptr len := by
   have hr := congrArg Prod.fst (applyCharges_abiFrame st.host (chargesBefore name st args))
   change (prechargedStore name st args).host.registers = st.host.registers at hr
   have hm : (prechargedStore name st args).mem = st.mem := rfl
   simp only [getMemOrReg, hr, hm]
 
-@[simp] theorem prechargedStore_readU128Mem (name : String) (st : Store NearState) (args : List Value)
+@[simp] theorem prechargedStore_readU128Mem (name : String) (st : HostStore NearState) (args : List Value)
     (ptr : UInt64) : readU128Mem (prechargedStore name st args) ptr = readU128Mem st ptr := rfl
 
-@[simp] theorem prechargedStore_readFunctionCallAction (name : String) (st : Store NearState) (args : List Value)
+@[simp] theorem prechargedStore_readFunctionCallAction (name : String) (st : HostStore NearState) (args : List Value)
     (ml mp al ap amount gas : UInt64) :
     readFunctionCallAction? (prechargedStore name st args) ml mp al ap amount gas =
       readFunctionCallAction? st ml mp al ap amount gas := by
   simp only [readFunctionCallAction?, prechargedStore_getMemOrReg, prechargedStore_readU128Mem]
 
-@[simp] theorem prechargedStore_config (name : String) (st : Store NearState) (args : List Value) :
+@[simp] theorem prechargedStore_config (name : String) (st : HostStore NearState) (args : List Value) :
     (prechargedStore name st args).host.config = st.host.config :=
   congrArg (fun frame => frame.2.1) (applyCharges_abiFrame st.host (chargesBefore name st args))
 
-@[simp] theorem prechargedStore_promises (name : String) (st : Store NearState) (args : List Value) :
+@[simp] theorem prechargedStore_promises (name : String) (st : HostStore NearState) (args : List Value) :
     (prechargedStore name st args).host.promises = st.host.promises :=
   congrArg (fun frame => frame.2.2) (applyCharges_abiFrame st.host (chargesBefore name st args))
 
-@[simp] theorem prechargedStore_targetError (name : String) (st : Store NearState) (args : List Value) (index : Nat) :
+@[simp] theorem prechargedStore_targetError (name : String) (st : HostStore NearState) (args : List Value) (index : Nat) :
     functionCallTargetError (prechargedStore name st args) index = functionCallTargetError st index := by
   simp only [functionCallTargetError, prechargedStore_promises]
 
-@[simp] theorem prechargedStore_functionCallPlan_error (name : String) (st : Store NearState)
+@[simp] theorem prechargedStore_functionCallPlan_error (name : String) (st : HostStore NearState)
     (args : List Value) (input : FunctionCallInputs) (sir : Bool) :
     (functionCallPlan (prechargedStore name st args) input sir).error = (functionCallPlan st input sir).error := by
   have ht : functionCallTargetError (prechargedStore name st args) = functionCallTargetError st := by
@@ -72,7 +72,7 @@ theorem applyCharges_abiFrame (ns : NearState) (charges : List Charge) :
   simp only [prechargedStore_readU128Mem, prechargedStore_getMemOrReg, ht]
   repeat' (first | rfl | split)
 
-@[simp] theorem prechargedStore_functionKeyPlan_error (name : String) (st : Store NearState)
+@[simp] theorem prechargedStore_functionKeyPlan_error (name : String) (st : HostStore NearState)
     (args : List Value) (input : FunctionKeyInputs) (sir : Bool) :
     (functionKeyPlan (prechargedStore name st args) input sir).error = (functionKeyPlan st input sir).error := by
   unfold functionKeyPlan
@@ -80,13 +80,13 @@ theorem applyCharges_abiFrame (ns : NearState) (charges : List Charge) :
   repeat' (first | rfl | split)
 
 /-- Same-receiver status affects sending fees, never key validation. -/
-theorem functionKeyPlan_error_sir (st : Store NearState) (input : FunctionKeyInputs) (a b : Bool) :
+theorem functionKeyPlan_error_sir (st : HostStore NearState) (input : FunctionKeyInputs) (a b : Bool) :
     (functionKeyPlan st input a).error = (functionKeyPlan st input b).error := by
   unfold functionKeyPlan
   repeat' (first | rfl | split)
 
 /-- A successful append must target a batch/callback, never a join or missing handle. -/
-theorem appendPromiseAction_valid_target (st : Store NearState) (index : Nat) (action : PromiseAction)
+theorem appendPromiseAction_valid_target (st : HostStore NearState) (index : Nat) (action : PromiseAction)
     (promises : List NearPromise) (h : appendPromiseAction? st.host.promises index action = some promises) :
     (promiseReceiver? st index).isSome = true := by
   unfold appendPromiseAction? at h
@@ -98,7 +98,7 @@ theorem appendPromiseAction_valid_target (st : Store NearState) (index : Nat) (a
 /-- Compose a concrete public charge plan with the actual raw append. The plan
 premise is discharged by per-ABI reservation lemmas, never by an outcome equation. -/
 theorem appendPrechargedAction_reservationInvariant (fees : ActionFees) (ethEnabled : Bool)
-    (name : String) (st : Store NearState) (args : List Value) (index : UInt64) (action : PromiseAction)
+    (name : String) (st : HostStore NearState) (args : List Value) (index : UInt64) (action : PromiseAction)
     (h : ReservationInvariant fees ethEnabled st.host)
     (hsuccess : (applyCharges st.host (chargesBefore name st args)).2 = none)
     (hreservation : (promiseReceiver? st index.toNat).isSome = true →
@@ -138,14 +138,14 @@ theorem appendPrechargedAction_reservationInvariant (fees : ActionFees) (ethEnab
 /-- Compose precharging, raw execution and all postprocessing. Concrete host
 instances discharge the precharged raw-call premise below. -/
 theorem metered_reservationInvariant (fees : ActionFees) (ethEnabled : Bool) (extra : Nat)
-    (name : String) (fn : HostFn NearState)
+    (name : String) (fn : NearHostFn NearState)
     (hraw : ∀ st args, ReservationInvariant fees ethEnabled st.host →
       (applyCharges st.host (chargesBefore name st args)).2 = none →
       preInvokeError name (prechargedStore name st args) args = none →
       (prepareStorageCall name (prechargedStore name st args) args).2 = none →
       HostResult.LiveSatisfies (ReservationInvariant fees ethEnabled)
         (fn.invoke (prepareStorageCall name (prechargedStore name st args) args).1 args)) :
-    HostFn.PreservesLive (ReservationInvariant fees ethEnabled) (metered extra name fn) := by
+    NearHostFn.PreservesLive (ReservationInvariant fees ethEnabled) (metered extra name fn) := by
   intro st args h
   unfold metered
   dsimp only
@@ -174,7 +174,7 @@ theorem metered_reservationInvariant (fees : ActionFees) (ethEnabled : Bool) (ex
               (hraw st args h hc hp hs)
 
 theorem prechargedCreateAccount_reservationInvariant (fees : ActionFees) (ethEnabled : Bool)
-    (st : Store NearState) (args : List Value)
+    (st : HostStore NearState) (args : List Value)
     (h : ReservationInvariant fees ethEnabled st.host)
     (hsuccess : (applyCharges st.host (chargesBefore "promise_batch_action_create_account" st args)).2 = none) :
     HostResult.LiveSatisfies (ReservationInvariant fees ethEnabled)
@@ -190,7 +190,7 @@ theorem prechargedCreateAccount_reservationInvariant (fees : ActionFees) (ethEna
     | split)
 
 theorem meteredCreateAccount_reservationInvariant (fees : ActionFees) (ethEnabled : Bool) (extra : Nat) :
-    HostFn.PreservesLive (ReservationInvariant fees ethEnabled)
+    NearHostFn.PreservesLive (ReservationInvariant fees ethEnabled)
       (metered extra "promise_batch_action_create_account" promiseBatchActionCreateAccountFn) := by
   apply metered_reservationInvariant
   intro st args h hs _ _
@@ -198,7 +198,7 @@ theorem meteredCreateAccount_reservationInvariant (fees : ActionFees) (ethEnable
   exact prechargedCreateAccount_reservationInvariant fees ethEnabled st args h hs
 
 theorem prechargedStake_reservationInvariant (fees : ActionFees) (ethEnabled : Bool)
-    (st : Store NearState) (args : List Value)
+    (st : HostStore NearState) (args : List Value)
     (h : ReservationInvariant fees ethEnabled st.host)
     (hsuccess : (applyCharges st.host (chargesBefore "promise_batch_action_stake" st args)).2 = none) :
     HostResult.LiveSatisfies (ReservationInvariant fees ethEnabled)
@@ -214,7 +214,7 @@ theorem prechargedStake_reservationInvariant (fees : ActionFees) (ethEnabled : B
     | split)
 
 theorem meteredStake_reservationInvariant (fees : ActionFees) (ethEnabled : Bool) (extra : Nat) :
-    HostFn.PreservesLive (ReservationInvariant fees ethEnabled)
+    NearHostFn.PreservesLive (ReservationInvariant fees ethEnabled)
       (metered extra "promise_batch_action_stake" promiseBatchActionStakeFn) := by
   apply metered_reservationInvariant
   intro st args h hs _ _
@@ -222,7 +222,7 @@ theorem meteredStake_reservationInvariant (fees : ActionFees) (ethEnabled : Bool
   exact prechargedStake_reservationInvariant fees ethEnabled st args h hs
 
 theorem prechargedFullAccessKey_reservationInvariant (fees : ActionFees) (ethEnabled : Bool)
-    (st : Store NearState) (args : List Value)
+    (st : HostStore NearState) (args : List Value)
     (h : ReservationInvariant fees ethEnabled st.host)
     (hsuccess : (applyCharges st.host (chargesBefore "promise_batch_action_add_key_with_full_access" st args)).2 = none) :
     HostResult.LiveSatisfies (ReservationInvariant fees ethEnabled)
@@ -238,7 +238,7 @@ theorem prechargedFullAccessKey_reservationInvariant (fees : ActionFees) (ethEna
     | split)
 
 theorem meteredFullAccessKey_reservationInvariant (fees : ActionFees) (ethEnabled : Bool) (extra : Nat) :
-    HostFn.PreservesLive (ReservationInvariant fees ethEnabled)
+    NearHostFn.PreservesLive (ReservationInvariant fees ethEnabled)
       (metered extra "promise_batch_action_add_key_with_full_access" promiseBatchActionAddKeyWithFullAccessFn) := by
   apply metered_reservationInvariant
   intro st args h hs _ _
@@ -246,7 +246,7 @@ theorem meteredFullAccessKey_reservationInvariant (fees : ActionFees) (ethEnable
   exact prechargedFullAccessKey_reservationInvariant fees ethEnabled st args h hs
 
 theorem prechargedDeleteKey_reservationInvariant (fees : ActionFees) (ethEnabled : Bool)
-    (st : Store NearState) (args : List Value)
+    (st : HostStore NearState) (args : List Value)
     (h : ReservationInvariant fees ethEnabled st.host)
     (hsuccess : (applyCharges st.host (chargesBefore "promise_batch_action_delete_key" st args)).2 = none) :
     HostResult.LiveSatisfies (ReservationInvariant fees ethEnabled)
@@ -262,7 +262,7 @@ theorem prechargedDeleteKey_reservationInvariant (fees : ActionFees) (ethEnabled
     | split)
 
 theorem meteredDeleteKey_reservationInvariant (fees : ActionFees) (ethEnabled : Bool) (extra : Nat) :
-    HostFn.PreservesLive (ReservationInvariant fees ethEnabled)
+    NearHostFn.PreservesLive (ReservationInvariant fees ethEnabled)
       (metered extra "promise_batch_action_delete_key" promiseBatchActionDeleteKeyFn) := by
   apply metered_reservationInvariant
   intro st args h hs _ _
@@ -270,7 +270,7 @@ theorem meteredDeleteKey_reservationInvariant (fees : ActionFees) (ethEnabled : 
   exact prechargedDeleteKey_reservationInvariant fees ethEnabled st args h hs
 
 theorem prechargedDeleteAccount_reservationInvariant (fees : ActionFees) (ethEnabled : Bool)
-    (st : Store NearState) (args : List Value)
+    (st : HostStore NearState) (args : List Value)
     (h : ReservationInvariant fees ethEnabled st.host)
     (hsuccess : (applyCharges st.host (chargesBefore "promise_batch_action_delete_account" st args)).2 = none) :
     HostResult.LiveSatisfies (ReservationInvariant fees ethEnabled)
@@ -286,7 +286,7 @@ theorem prechargedDeleteAccount_reservationInvariant (fees : ActionFees) (ethEna
     | split)
 
 theorem meteredDeleteAccount_reservationInvariant (fees : ActionFees) (ethEnabled : Bool) (extra : Nat) :
-    HostFn.PreservesLive (ReservationInvariant fees ethEnabled)
+    NearHostFn.PreservesLive (ReservationInvariant fees ethEnabled)
       (metered extra "promise_batch_action_delete_account" promiseBatchActionDeleteAccountFn) := by
   apply metered_reservationInvariant
   intro st args h hs _ _
@@ -294,7 +294,7 @@ theorem meteredDeleteAccount_reservationInvariant (fees : ActionFees) (ethEnable
   exact prechargedDeleteAccount_reservationInvariant fees ethEnabled st args h hs
 
 theorem prechargedDeploy_reservationInvariant (fees : ActionFees) (ethEnabled : Bool)
-    (st : Store NearState) (args : List Value)
+    (st : HostStore NearState) (args : List Value)
     (h : ReservationInvariant fees ethEnabled st.host)
     (hsuccess : (applyCharges st.host (chargesBefore "promise_batch_action_deploy_contract" st args)).2 = none) :
     HostResult.LiveSatisfies (ReservationInvariant fees ethEnabled)
@@ -311,7 +311,7 @@ theorem prechargedDeploy_reservationInvariant (fees : ActionFees) (ethEnabled : 
     | split)
 
 theorem meteredDeploy_reservationInvariant (fees : ActionFees) (ethEnabled : Bool) (extra : Nat) :
-    HostFn.PreservesLive (ReservationInvariant fees ethEnabled)
+    NearHostFn.PreservesLive (ReservationInvariant fees ethEnabled)
       (metered extra "promise_batch_action_deploy_contract" promiseBatchActionDeployContractFn) := by
   apply metered_reservationInvariant
   intro st args h hs _ _
@@ -319,7 +319,7 @@ theorem meteredDeploy_reservationInvariant (fees : ActionFees) (ethEnabled : Boo
   exact prechargedDeploy_reservationInvariant fees ethEnabled st args h hs
 
 theorem prechargedTransfer_reservationInvariant (fees : ActionFees) (ethEnabled : Bool)
-    (st : Store NearState) (args : List Value)
+    (st : HostStore NearState) (args : List Value)
     (h : ReservationInvariant fees ethEnabled st.host)
     (hsuccess : (applyCharges st.host (chargesBefore "promise_batch_action_transfer" st args)).2 = none) :
     HostResult.LiveSatisfies (ReservationInvariant fees ethEnabled)
@@ -336,7 +336,7 @@ theorem prechargedTransfer_reservationInvariant (fees : ActionFees) (ethEnabled 
     | split)
 
 theorem meteredTransfer_reservationInvariant (fees : ActionFees) (ethEnabled : Bool) (extra : Nat) :
-    HostFn.PreservesLive (ReservationInvariant fees ethEnabled)
+    NearHostFn.PreservesLive (ReservationInvariant fees ethEnabled)
       (metered extra "promise_batch_action_transfer" promiseBatchActionTransferFn) := by
   apply metered_reservationInvariant
   intro st args h hs _ _
@@ -344,7 +344,7 @@ theorem meteredTransfer_reservationInvariant (fees : ActionFees) (ethEnabled : B
   exact prechargedTransfer_reservationInvariant fees ethEnabled st args h hs
 
 theorem prechargedFunctionCall_reservationInvariant (fees : ActionFees) (ethEnabled : Bool)
-    (st : Store NearState) (args : List Value)
+    (st : HostStore NearState) (args : List Value)
     (h : ReservationInvariant fees ethEnabled st.host)
     (hsuccess : (applyCharges st.host (chargesBefore "promise_batch_action_function_call" st args)).2 = none)
     (hguard : preInvokeError "promise_batch_action_function_call"
@@ -370,7 +370,7 @@ theorem prechargedFunctionCall_reservationInvariant (fees : ActionFees) (ethEnab
     | split)
 
 theorem meteredFunctionCall_reservationInvariant (fees : ActionFees) (ethEnabled : Bool) (extra : Nat) :
-    HostFn.PreservesLive (ReservationInvariant fees ethEnabled)
+    NearHostFn.PreservesLive (ReservationInvariant fees ethEnabled)
       (metered extra "promise_batch_action_function_call" promiseBatchActionFunctionCallFn) := by
   apply metered_reservationInvariant
   intro st args h hs hg _
@@ -378,7 +378,7 @@ theorem meteredFunctionCall_reservationInvariant (fees : ActionFees) (ethEnabled
   exact prechargedFunctionCall_reservationInvariant fees ethEnabled st args h hs hg
 
 theorem prechargedFunctionKey_reservationInvariant (fees : ActionFees) (ethEnabled : Bool)
-    (st : Store NearState) (args : List Value)
+    (st : HostStore NearState) (args : List Value)
     (h : ReservationInvariant fees ethEnabled st.host)
     (hsuccess : (applyCharges st.host (chargesBefore "promise_batch_action_add_key_with_function_call" st args)).2 = none)
     (hguard : preInvokeError "promise_batch_action_add_key_with_function_call"
@@ -402,7 +402,7 @@ theorem prechargedFunctionKey_reservationInvariant (fees : ActionFees) (ethEnabl
     | split)
 
 theorem meteredFunctionKey_reservationInvariant (fees : ActionFees) (ethEnabled : Bool) (extra : Nat) :
-    HostFn.PreservesLive (ReservationInvariant fees ethEnabled)
+    NearHostFn.PreservesLive (ReservationInvariant fees ethEnabled)
       (metered extra "promise_batch_action_add_key_with_function_call" promiseBatchActionAddKeyWithFunctionCallFn) := by
   apply metered_reservationInvariant
   intro st args h hs hg _

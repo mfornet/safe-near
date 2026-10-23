@@ -1,20 +1,27 @@
-name = "Interpreter"
+# Wasm: the Wasm runtime of near-lean, written from the WebAssembly spec.
+#
+# Scope is the feature set nearcore enables (notes/todo/wasm_runtime_rewrite.md):
+# MVP, mutable globals, sign extension, saturating truncation, floats,
+# reference types and bulk memory. No dependency beyond core Lean.
+name = "Wasm"
 version = "0.1.0"
-defaultTargets = ["Interpreter"]
+defaultTargets = ["Wasm"]
 packagesDir = "../.lake/packages"
 
-[[require]]
-name = "mathlib"
-scope = "leanprover-community"
-rev = "v4.34.1"
-
 [[lean_lib]]
-name = "Interpreter"
+name = "Wasm"
 
-[[lean_exe]]
-name = "runner"
-root = "Interpreter.Runner"
-
+# Spec testsuite driver: `lake exe testsuite [PATTERN]`.
 [[lean_exe]]
 name = "testsuite"
-root = "Interpreter.Testsuite"
+root = "Testsuite.Main"
+
+# Library half of the driver, kept out of `Wasm`'s import closure.
+[[lean_lib]]
+name = "Testsuite"
+roots = ["Testsuite.Script"]
+
+# Command-line front end: `lake exe wasm decode FILE.wasm`.
+[[lean_exe]]
+name = "wasm"
+root = "Cli.Main"

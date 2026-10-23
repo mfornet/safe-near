@@ -4,13 +4,12 @@ namespace Wasm.Near
 
 /-- Successful postprocessing retains exactly the raw host's promise payloads.
 Charges, deposit deductions and storage accounting cannot change their encoding. -/
-theorem finishMeteredCall_success_promises (extra : Nat) (name : String) (before : Store NearState)
-    (args : List Value) (result : HostResult NearState) (values : List Value) (after : Store NearState)
+theorem finishMeteredCall_success_promises (extra : Nat) (name : String) (before : HostStore NearState)
+    (args : List Value) (result : HostResult NearState) (values : List Value) (after : HostStore NearState)
     (hreturn : finishMeteredCall extra name before args result = .Return values after) :
     ∃ rawValues rawAfter, result = .Return rawValues rawAfter ∧ after.host.promises = rawAfter.host.promises := by
   cases result with
   | Trap st message => simp [finishMeteredCall] at hreturn
-  | Throw st tag vals => simp [finishMeteredCall] at hreturn
   | Return vals st =>
     unfold finishMeteredCall at hreturn
     cases hc : applyCharges st.host (chargesAfter name before st args) with
@@ -40,8 +39,8 @@ theorem finishMeteredCall_success_promises (extra : Nat) (name : String) (before
 
 /-- A successful post-call result can use the actual method validation fact to
 establish the raw encoding invariant; speculative invalid methods need not satisfy it. -/
-theorem finishMeteredCall_success_encoding_state (extra : Nat) (name : String) (before : Store NearState)
-    (args : List Value) (result : HostResult NearState) (values : List Value) (after : Store NearState)
+theorem finishMeteredCall_success_encoding_state (extra : Nat) (name : String) (before : HostStore NearState)
+    (args : List Value) (result : HostResult NearState) (values : List Value) (after : HostStore NearState)
     (hraw : actionMethodEncodingError name before args = none →
       HostResult.LiveSatisfies (fun ns => PromisesEncoding ns.promises) result)
     (hreturn : finishMeteredCall extra name before args result = .Return values after) :
@@ -53,14 +52,14 @@ theorem finishMeteredCall_success_encoding_state (extra : Nat) (name : String) (
   exact hv
 
 /-- Successful invocation has passed its ordered pre-call argument guard. -/
-theorem preInvokeError_invocation_valid (name : String) (st : Store NearState) (args : List Value)
+theorem preInvokeError_invocation_valid (name : String) (st : HostStore NearState) (args : List Value)
     (h : preInvokeError name st args = none) : invocationArgumentError name st args = none := by
   cases he : invocationArgumentError name st args with
   | none => rfl
   | some error => simp [preInvokeError, he] at h
 
 /-- The receiver guard is part of successful creation argument validation. -/
-theorem preInvokeError_creationAccount_valid (name : String) (st : Store NearState) (args : List Value)
+theorem preInvokeError_creationAccount_valid (name : String) (st : HostStore NearState) (args : List Value)
     (h : preInvokeError name st args = none) : creationAccountError name st args = none := by
   have hi := preInvokeError_invocation_valid name st args h
   by_cases hw : name = "storage_write"
@@ -82,20 +81,20 @@ theorem preInvokeError_creationAccount_valid (name : String) (st : Store NearSta
 
 /-- A raw host may establish encoding using both ordered validation seams.
 Invalid speculative method payloads need no witness because postprocessing traps. -/
-def HostValidatedEncoding (name : String) (fn : HostFn NearState) : Prop :=
+def HostValidatedEncoding (name : String) (fn : NearHostFn NearState) : Prop :=
   ∀ st args, PromisesEncoding st.host.promises → st.host.config.validateActionMethodUtf8 = true →
     preInvokeError name st args = none → actionMethodEncodingError name st args = none →
     HostResult.LiveSatisfies (fun ns => PromisesEncoding ns.promises) (fn.invoke st args)
 
-@[simp] theorem prepareStorageCall_getMemOrReg (name : String) (st : Store NearState)
+@[simp] theorem prepareStorageCall_getMemOrReg (name : String) (st : HostStore NearState)
     (args : List Value) (ptr len : UInt64) :
     getMemOrReg (prepareStorageCall name st args).1 ptr len = getMemOrReg st ptr len := rfl
 
-@[simp] theorem prepareStorageCall_config (name : String) (st : Store NearState) (args : List Value) :
+@[simp] theorem prepareStorageCall_config (name : String) (st : HostStore NearState) (args : List Value) :
     (prepareStorageCall name st args).1.host.config = st.host.config := rfl
 
 /-- External storage fees and cache state cannot change ABI validation. -/
-theorem prepareStorageCall_preInvokeError (name : String) (st : Store NearState) (args : List Value) :
+theorem prepareStorageCall_preInvokeError (name : String) (st : HostStore NearState) (args : List Value) :
     preInvokeError name (prepareStorageCall name st args).1 args = preInvokeError name st args := by
   by_cases hr : name = "storage_read"
   · subst name; rfl
@@ -121,9 +120,9 @@ theorem prepareStorageCall_preInvokeError (name : String) (st : Store NearState)
 
 /-- Actual successful metered returns preserve encoding from their input state.
 The concrete raw-host proof must use the validation guards, not assume a valid output. -/
-theorem metered_success_encoding (extra : Nat) (name : String) (fn : HostFn NearState)
-    (hraw : HostValidatedEncoding name fn) (st : Store NearState) (args values : List Value)
-    (after : Store NearState) (h : PromisesEncoding st.host.promises)
+theorem metered_success_encoding (extra : Nat) (name : String) (fn : NearHostFn NearState)
+    (hraw : HostValidatedEncoding name fn) (st : HostStore NearState) (args values : List Value)
+    (after : HostStore NearState) (h : PromisesEncoding st.host.promises)
     (hpolicy : st.host.config.validateActionMethodUtf8 = true)
     (hreturn : (metered extra name fn).invoke st args = .Return values after) :
     PromisesEncoding after.host.promises := by
@@ -163,9 +162,9 @@ theorem metered_success_encoding (extra : Nat) (name : String) (fn : HostFn Near
             · exact hm
 
 /-- Creation host validation is supplied by the actual metered wrapper. -/
-theorem metered_creator_success_encoding (extra : Nat) (name : String) (fn : HostFn NearState)
-    (hraw : HostCreatesEncoding name fn) (st : Store NearState) (args values : List Value)
-    (after : Store NearState) (h : PromisesEncoding st.host.promises)
+theorem metered_creator_success_encoding (extra : Nat) (name : String) (fn : NearHostFn NearState)
+    (hraw : HostCreatesEncoding name fn) (st : HostStore NearState) (args values : List Value)
+    (after : HostStore NearState) (h : PromisesEncoding st.host.promises)
     (hpolicy : st.host.config.validateActionMethodUtf8 = true)
     (hreturn : (metered extra name fn).invoke st args = .Return values after) :
     PromisesEncoding after.host.promises := by
@@ -173,40 +172,40 @@ theorem metered_creator_success_encoding (extra : Nat) (name : String) (fn : Hos
   intro before input hb hp hg hm
   exact hraw before input hb hp (preInvokeError_creationAccount_valid name before input hg) hm
 
-theorem meteredCreate_success_encoding (extra : Nat) (st : Store NearState) (args values : List Value)
-    (after : Store NearState) (h : PromisesEncoding st.host.promises)
+theorem meteredCreate_success_encoding (extra : Nat) (st : HostStore NearState) (args values : List Value)
+    (after : HostStore NearState) (h : PromisesEncoding st.host.promises)
     (hpolicy : st.host.config.validateActionMethodUtf8 = true)
     (hreturn : (metered extra "promise_create" promiseCreateFn).invoke st args = .Return values after) :
     PromisesEncoding after.host.promises :=
   metered_creator_success_encoding extra "promise_create" promiseCreateFn
     promiseCreateFn_encoding st args values after h hpolicy hreturn
 
-theorem meteredThen_success_encoding (extra : Nat) (st : Store NearState) (args values : List Value)
-    (after : Store NearState) (h : PromisesEncoding st.host.promises)
+theorem meteredThen_success_encoding (extra : Nat) (st : HostStore NearState) (args values : List Value)
+    (after : HostStore NearState) (h : PromisesEncoding st.host.promises)
     (hpolicy : st.host.config.validateActionMethodUtf8 = true)
     (hreturn : (metered extra "promise_then" promiseThenFn).invoke st args = .Return values after) :
     PromisesEncoding after.host.promises :=
   metered_creator_success_encoding extra "promise_then" promiseThenFn
     promiseThenFn_encoding st args values after h hpolicy hreturn
 
-theorem meteredBatchCreate_success_encoding (extra : Nat) (st : Store NearState) (args values : List Value)
-    (after : Store NearState) (h : PromisesEncoding st.host.promises)
+theorem meteredBatchCreate_success_encoding (extra : Nat) (st : HostStore NearState) (args values : List Value)
+    (after : HostStore NearState) (h : PromisesEncoding st.host.promises)
     (hpolicy : st.host.config.validateActionMethodUtf8 = true)
     (hreturn : (metered extra "promise_batch_create" promiseBatchCreateFn).invoke st args = .Return values after) :
     PromisesEncoding after.host.promises :=
   metered_creator_success_encoding extra "promise_batch_create" promiseBatchCreateFn
     promiseBatchCreateFn_encoding st args values after h hpolicy hreturn
 
-theorem meteredBatchThen_success_encoding (extra : Nat) (st : Store NearState) (args values : List Value)
-    (after : Store NearState) (h : PromisesEncoding st.host.promises)
+theorem meteredBatchThen_success_encoding (extra : Nat) (st : HostStore NearState) (args values : List Value)
+    (after : HostStore NearState) (h : PromisesEncoding st.host.promises)
     (hpolicy : st.host.config.validateActionMethodUtf8 = true)
     (hreturn : (metered extra "promise_batch_then" promiseBatchThenFn).invoke st args = .Return values after) :
     PromisesEncoding after.host.promises :=
   metered_creator_success_encoding extra "promise_batch_then" promiseBatchThenFn
     promiseBatchThenFn_encoding st args values after h hpolicy hreturn
 
-theorem meteredAnd_success_encoding (extra : Nat) (st : Store NearState) (args values : List Value)
-    (after : Store NearState) (h : PromisesEncoding st.host.promises)
+theorem meteredAnd_success_encoding (extra : Nat) (st : HostStore NearState) (args values : List Value)
+    (after : HostStore NearState) (h : PromisesEncoding st.host.promises)
     (hpolicy : st.host.config.validateActionMethodUtf8 = true)
     (hreturn : (metered extra "promise_and" promiseAndFn).invoke st args = .Return values after) :
     PromisesEncoding after.host.promises :=
@@ -247,8 +246,8 @@ theorem promiseBatchActionCreateAccountFn_validated_encoding :
   intro st args h _ _ _
   exact promiseBatchActionCreateAccountFn_preserves_encoding st args h
 
-theorem meteredActionCreateAccount_success_encoding (extra : Nat) (st : Store NearState) (args values : List Value)
-    (after : Store NearState) (h : PromisesEncoding st.host.promises)
+theorem meteredActionCreateAccount_success_encoding (extra : Nat) (st : HostStore NearState) (args values : List Value)
+    (after : HostStore NearState) (h : PromisesEncoding st.host.promises)
     (hpolicy : st.host.config.validateActionMethodUtf8 = true)
     (hreturn : (metered extra "promise_batch_action_create_account" promiseBatchActionCreateAccountFn).invoke st args = .Return values after) :
     PromisesEncoding after.host.promises :=
@@ -260,16 +259,16 @@ theorem promiseBatchActionDeployContractFn_validated_encoding :
   intro st args h _ _ _
   exact promiseBatchActionDeployContractFn_preserves_encoding st args h
 
-theorem meteredActionDeployContract_success_encoding (extra : Nat) (st : Store NearState) (args values : List Value)
-    (after : Store NearState) (h : PromisesEncoding st.host.promises)
+theorem meteredActionDeployContract_success_encoding (extra : Nat) (st : HostStore NearState) (args values : List Value)
+    (after : HostStore NearState) (h : PromisesEncoding st.host.promises)
     (hpolicy : st.host.config.validateActionMethodUtf8 = true)
     (hreturn : (metered extra "promise_batch_action_deploy_contract" promiseBatchActionDeployContractFn).invoke st args = .Return values after) :
     PromisesEncoding after.host.promises :=
   metered_success_encoding extra "promise_batch_action_deploy_contract" promiseBatchActionDeployContractFn
     promiseBatchActionDeployContractFn_validated_encoding st args values after h hpolicy hreturn
 
-theorem meteredActionFunctionCall_success_encoding (extra : Nat) (st : Store NearState) (args values : List Value)
-    (after : Store NearState) (h : PromisesEncoding st.host.promises)
+theorem meteredActionFunctionCall_success_encoding (extra : Nat) (st : HostStore NearState) (args values : List Value)
+    (after : HostStore NearState) (h : PromisesEncoding st.host.promises)
     (hpolicy : st.host.config.validateActionMethodUtf8 = true)
     (hreturn : (metered extra "promise_batch_action_function_call" promiseBatchActionFunctionCallFn).invoke st args = .Return values after) :
     PromisesEncoding after.host.promises :=
@@ -281,8 +280,8 @@ theorem promiseBatchActionTransferFn_validated_encoding :
   intro st args h _ _ _
   exact promiseBatchActionTransferFn_preserves_encoding st args h
 
-theorem meteredActionTransfer_success_encoding (extra : Nat) (st : Store NearState) (args values : List Value)
-    (after : Store NearState) (h : PromisesEncoding st.host.promises)
+theorem meteredActionTransfer_success_encoding (extra : Nat) (st : HostStore NearState) (args values : List Value)
+    (after : HostStore NearState) (h : PromisesEncoding st.host.promises)
     (hpolicy : st.host.config.validateActionMethodUtf8 = true)
     (hreturn : (metered extra "promise_batch_action_transfer" promiseBatchActionTransferFn).invoke st args = .Return values after) :
     PromisesEncoding after.host.promises :=
@@ -294,8 +293,8 @@ theorem promiseBatchActionStakeFn_validated_encoding :
   intro st args h _ _ _
   exact promiseBatchActionStakeFn_preserves_encoding st args h
 
-theorem meteredActionStake_success_encoding (extra : Nat) (st : Store NearState) (args values : List Value)
-    (after : Store NearState) (h : PromisesEncoding st.host.promises)
+theorem meteredActionStake_success_encoding (extra : Nat) (st : HostStore NearState) (args values : List Value)
+    (after : HostStore NearState) (h : PromisesEncoding st.host.promises)
     (hpolicy : st.host.config.validateActionMethodUtf8 = true)
     (hreturn : (metered extra "promise_batch_action_stake" promiseBatchActionStakeFn).invoke st args = .Return values after) :
     PromisesEncoding after.host.promises :=
@@ -307,16 +306,16 @@ theorem promiseBatchActionAddKeyWithFullAccessFn_validated_encoding :
   intro st args h _ _ _
   exact promiseBatchActionAddKeyWithFullAccessFn_preserves_encoding st args h
 
-theorem meteredActionAddKeyWithFullAccess_success_encoding (extra : Nat) (st : Store NearState) (args values : List Value)
-    (after : Store NearState) (h : PromisesEncoding st.host.promises)
+theorem meteredActionAddKeyWithFullAccess_success_encoding (extra : Nat) (st : HostStore NearState) (args values : List Value)
+    (after : HostStore NearState) (h : PromisesEncoding st.host.promises)
     (hpolicy : st.host.config.validateActionMethodUtf8 = true)
     (hreturn : (metered extra "promise_batch_action_add_key_with_full_access" promiseBatchActionAddKeyWithFullAccessFn).invoke st args = .Return values after) :
     PromisesEncoding after.host.promises :=
   metered_success_encoding extra "promise_batch_action_add_key_with_full_access" promiseBatchActionAddKeyWithFullAccessFn
     promiseBatchActionAddKeyWithFullAccessFn_validated_encoding st args values after h hpolicy hreturn
 
-theorem meteredActionAddKeyWithFunctionCall_success_encoding (extra : Nat) (st : Store NearState) (args values : List Value)
-    (after : Store NearState) (h : PromisesEncoding st.host.promises)
+theorem meteredActionAddKeyWithFunctionCall_success_encoding (extra : Nat) (st : HostStore NearState) (args values : List Value)
+    (after : HostStore NearState) (h : PromisesEncoding st.host.promises)
     (hpolicy : st.host.config.validateActionMethodUtf8 = true)
     (hreturn : (metered extra "promise_batch_action_add_key_with_function_call" promiseBatchActionAddKeyWithFunctionCallFn).invoke st args = .Return values after) :
     PromisesEncoding after.host.promises :=
@@ -328,8 +327,8 @@ theorem promiseBatchActionDeleteKeyFn_validated_encoding :
   intro st args h _ _ _
   exact promiseBatchActionDeleteKeyFn_preserves_encoding st args h
 
-theorem meteredActionDeleteKey_success_encoding (extra : Nat) (st : Store NearState) (args values : List Value)
-    (after : Store NearState) (h : PromisesEncoding st.host.promises)
+theorem meteredActionDeleteKey_success_encoding (extra : Nat) (st : HostStore NearState) (args values : List Value)
+    (after : HostStore NearState) (h : PromisesEncoding st.host.promises)
     (hpolicy : st.host.config.validateActionMethodUtf8 = true)
     (hreturn : (metered extra "promise_batch_action_delete_key" promiseBatchActionDeleteKeyFn).invoke st args = .Return values after) :
     PromisesEncoding after.host.promises :=
@@ -341,8 +340,8 @@ theorem promiseBatchActionDeleteAccountFn_validated_encoding :
   intro st args h _ _ _
   exact promiseBatchActionDeleteAccountFn_preserves_encoding st args h
 
-theorem meteredActionDeleteAccount_success_encoding (extra : Nat) (st : Store NearState) (args values : List Value)
-    (after : Store NearState) (h : PromisesEncoding st.host.promises)
+theorem meteredActionDeleteAccount_success_encoding (extra : Nat) (st : HostStore NearState) (args values : List Value)
+    (after : HostStore NearState) (h : PromisesEncoding st.host.promises)
     (hpolicy : st.host.config.validateActionMethodUtf8 = true)
     (hreturn : (metered extra "promise_batch_action_delete_account" promiseBatchActionDeleteAccountFn).invoke st args = .Return values after) :
     PromisesEncoding after.host.promises :=

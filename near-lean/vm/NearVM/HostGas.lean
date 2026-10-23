@@ -3,10 +3,10 @@ import NearVM.GasInvariants
 namespace Wasm.Near
 
 /-- Functional hosts leave gas charging to the metered wrapper. -/
-def HostPreservesGas (fn : HostFn NearState) : Prop :=
+def HostPreservesGas (fn : NearHostFn NearState) : Prop :=
   ∀ st args, HostResult.Satisfies (fun ns => ns.gas = st.host.gas) (fn.invoke st args)
 
-theorem checkedSetRegister_gas {st after : Store NearState} {register : UInt64} {bytes : List UInt8}
+theorem checkedSetRegister_gas {st after : HostStore NearState} {register : UInt64} {bytes : List UInt8}
     (h : checkedSetRegister? st register bytes = some after) : after.host.gas = st.host.gas := by
   unfold checkedSetRegister? at h
   split at h
@@ -15,7 +15,7 @@ theorem checkedSetRegister_gas {st after : Store NearState} {register : UInt64} 
     · cases h; rfl
     · cases h
 
-theorem writeRegisterResult_gas (name : String) (st : Store NearState) (register : UInt64)
+theorem writeRegisterResult_gas (name : String) (st : HostStore NearState) (register : UInt64)
     (bytes : List UInt8) (vals : List Value) :
     HostResult.Satisfies (fun ns => ns.gas = st.host.gas) (writeRegisterResult name st register bytes vals) := by
   unfold writeRegisterResult

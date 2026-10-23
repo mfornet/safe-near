@@ -16,12 +16,13 @@ class VMDependencyFixtureTests(unittest.TestCase):
             (root / "lean-toolchain").write_text((dependencies.ROOT / "lean-toolchain").read_text())
             (root / "lakefile.toml").write_text(
                 'name = "VMDependencyFixture"\n[[lean_lib]]\nname = "NearVM"\n'
-                '[[lean_lib]]\nname = "Interpreter"\n')
-            wasm = root / "Interpreter/Wasm"
+                '[[lean_lib]]\nname = "Wasm"\n[[lean_lib]]\nname = "Interpreter"\n')
+            wasm = root / "Wasm"
             wasm.mkdir(parents=True)
-            (wasm / "Operations.lean").write_text('def operationValue : Nat := 1\n')
-            (wasm / "SmallStep.lean").write_text('import Interpreter.Wasm.Operations\n')
-            (root / "NearVM.lean").write_text('import Interpreter.Wasm.SmallStep\n')
+            (wasm / "Validate.lean").write_text('def validateValue : Nat := 1\n')
+            (wasm / "Link.lean").write_text('def linkValue : Nat := 1\n')
+            (wasm / "Exec.lean").write_text('import Wasm.Validate\nimport Wasm.Link\n')
+            (root / "NearVM.lean").write_text('import Wasm.Exec\n')
             subprocess.run(["lake", "build", "NearVM"], cwd=root, check=True, capture_output=True)
             report = root / "dependencies.json"
             result = dependencies.audit(root, report)
@@ -30,10 +31,12 @@ class VMDependencyFixtureTests(unittest.TestCase):
 
             # The root source never mentions the forbidden module. Only the
             # compiler's transitive header exposes this indirect dependency.
-            (wasm / "Semantics.lean").write_text('def legacyValue : Nat := 2\n')
+            legacy = root / "Interpreter/Wasm"
+            legacy.mkdir(parents=True)
+            (legacy / "Semantics.lean").write_text('def legacyValue : Nat := 2\n')
             (wasm / "Bridge.lean").write_text('import Interpreter.Wasm.Semantics\n')
-            (wasm / "SmallStep.lean").write_text(
-                'import Interpreter.Wasm.Operations\nimport Interpreter.Wasm.Bridge\n')
+            (wasm / "Exec.lean").write_text(
+                'import Wasm.Validate\nimport Wasm.Link\nimport Wasm.Bridge\n')
             subprocess.run(["lake", "build", "NearVM"], cwd=root, check=True, capture_output=True)
             result = dependencies.audit(root, report)
             self.assertNotEqual(result.returncode, 0)
@@ -44,7 +47,7 @@ class VMDependencyFixtureTests(unittest.TestCase):
             subprocess.run(["lake", "build", "NearVM"], cwd=root, check=True, capture_output=True)
             result = dependencies.audit(root, report)
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("Interpreter.Wasm.SmallStep", json.loads(report.read_text())["missing"])
+            self.assertIn("Wasm.Exec", json.loads(report.read_text())["missing"])
 
 
 if __name__ == "__main__":

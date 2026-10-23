@@ -39,16 +39,16 @@ jobs:
       - uses: actions/cache@v5
         with:
           path: near-lean/.lake/packages
-          key: lean-style-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'near-lean/wasm/lake-manifest.json') }}
+          key: lean-style-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'near-lean/vm/lake-manifest.json') }}
       - uses: leanprover/lean-action@v1
         with:
-          lake-package-directory: near-lean/wasm
+          lake-package-directory: near-lean/vm
           build: "false"
           test: "false"
           lint: "false"
           use-mathlib-cache: false
       - name: Prepare only the style checker's dependencies
-        working-directory: near-lean/wasm
+        working-directory: near-lean/vm
         run: |
           lake exe cache get Mathlib.Tactic.Linter.TextBased
           lake build +Mathlib.Tactic.Linter.TextBased
@@ -57,34 +57,15 @@ jobs:
       - name: Test style checker and formatter
         run: python3 tools/tests/check_lean_style.py
 
-  programs:
+  formatter:
     if: github.event_name == 'workflow_dispatch'
-    timeout-minutes: 45
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - uses: actions/cache@v5
         with:
-          path: near-lean/.lake/packages
-          key: lean-programs-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'near-lean/**/lake-manifest.json') }}
-      - uses: leanprover/lean-action@v1
-        with:
-          lake-package-directory: near-lean/programs/lean
-          build-args: program-tests smoke
-          use-mathlib-cache: false
-      - name: Smoke and program regression tests
-        working-directory: near-lean/programs/lean
-        run: |
-          ./.lake/build/bin/smoke
-          ./.lake/build/bin/program-tests
-      - uses: actions/cache@v5
-        with:
           path: near-lean/.lake/lean-fmt
           key: lean-fmt-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'tools/lean_format_tool.json') }}
-      - name: Check syntax formatting of the new harness modules
-        run: >-
-          python3 tools/lean_format.py --check
-          near-lean/programs/lean/Programs/Harness.lean
-          near-lean/programs/lean/Programs/Regression.lean
       - name: Test validated syntax formatting
         run: python3 tools/tests/check_lean_format.py

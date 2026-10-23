@@ -1,5 +1,5 @@
 import NearVM
-import Interpreter.Wasm.Decoder.Wat
+import Wasm.Wat
 
 open Lean Wasm Wasm.Near
 
@@ -131,11 +131,10 @@ def execute (request : Request) : IO Json := do
   let (ctx, storage) ← match inputOf cfg request with
     | .ok input => pure input
     | .error error => throw (IO.userError error)
-  let text ← IO.FS.readFile request.watPath
-  let code ← match Decoder.Wat.decode text with
-    | .ok code => pure code
-    | .error error => throw (IO.userError s!"WAT decode failed: {error}")
   let bytes ← IO.FS.readBinFile request.codePath
+  let code ← match Binary.decode bytes with
+    | .ok code => pure code
+    | .error error => throw (IO.userError s!"Wasm decode failed: {error.message}")
   pure (outcomeJson (run cfg code bytes.size request.method ctx storage))
 
 end Replay

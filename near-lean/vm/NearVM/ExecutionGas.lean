@@ -2,61 +2,69 @@ import NearVM.HostGasLimits
 
 namespace Wasm.Near
 
-/-- Interpreter initialization carries the supplied counter without changes. -/
-theorem initConfig_gas {instance_ : SmallStep.ModuleInstance NearState} {entry : Nat}
-    {st : Store NearState} {args : List Value} {config : SmallStep.Config NearState}
-    (hinit : SmallStep.initConfig instance_ entry st args = .ok config) :
-    config.store.wasm.host.gas = st.host.gas := by
-  unfold SmallStep.initConfig at hinit
-  split at hinit <;> split at hinit <;> simp only [Except.ok.injEq, reduceCtorEq] at hinit
-  all_goals subst config; rfl
+/-- The first configuration of a resolved call keeps the supplied limits. -/
+theorem resolvedStart_gasLimits {cfg : RuntimeConfig} {code : Module} {env : HostEnv NearState}
+    {host : NearState} {store store' : Store NearState} {imports : List ExternVal}
+    {vm : ValidModule} {inst : ModuleInst} {addr : Nat} {c : Config NearState}
+    (hresolve : resolveMetered cfg code = .ok env)
+    (halloc : env.allocate (Store.empty host) = (store, imports))
+    (hinst : Link.instantiateModule store vm imports = .ok (store', inst))
+    (hstart : Exec.startWasm store' execLimits addr [] = some c) :
+    ConfigHostInvariant (GasLimits host.gas.prepaid host.gas.maxBurnt) c :=
+  resolvedStart_hostInvariant
+    (fun fn hm => resolveMetered_gasLimits cfg code env hresolve fn hm _ _) halloc hinst hstart
+    ⟨rfl, rfl⟩
 
-/-- A resolved registry supplies the host invariant required by the interpreter.
-The module used at initialization may have adjusted memory declarations. -/
-theorem initResolvedConfig_gasLimits {cfg : RuntimeConfig} {resolvedCode code : Module} {entry : Nat}
-    {env : HostEnv NearState} {st : Store NearState} {args : List Value}
-    {config : SmallStep.Config NearState}
-    (hresolve : resolveMetered cfg resolvedCode = .ok env)
-    (hinit : SmallStep.initConfig { module := code, host := env } entry st args = .ok config) :
-    ConfigHostInvariant (GasLimits st.host.gas.prepaid st.host.gas.maxBurnt) config := by
-  apply initConfig_hostInvariant hinit _ ⟨rfl, rfl⟩
-  intro fn hmember
-  rcases hmember with hmember | hmember
-  · exact resolveMetered_gasLimits cfg resolvedCode env hresolve fn hmember _ _
-  · have hempty := resolveMeteredImports_noForeign cfg resolvedCode.imports env hresolve
-    simp only [hempty, List.not_mem_nil] at hmember
+/-- Starting a call changes no gas: the host state is the instantiated store's. -/
+theorem resolvedStart_gas {env : HostEnv NearState} {host : NearState}
+    {store store' : Store NearState} {imports : List ExternVal} {vm : ValidModule}
+    {inst : ModuleInst} {addr : Nat} {c : Config NearState}
+    (halloc : env.allocate (Store.empty host) = (store, imports))
+    (hinst : Link.instantiateModule store vm imports = .ok (store', inst))
+    (hstart : Exec.startWasm store' execLimits addr [] = some c) :
+    c.store.host = host := by
+  rw [Exec.startWasm_store hstart, (Link.instantiateModule_same store vm imports hinst).1]
+  have hh := HostEnv.allocate_host (Store.empty host) env
+  rw [halloc] at hh
+  exact hh
 
 /-- Executable resolved calls preserve the original call's gas limits without
 an assumed host-invariant oracle. -/
-theorem runResolved_gas_limits {cfg : RuntimeConfig} {resolvedCode code : Module} {entry : Nat}
-    {env : HostEnv NearState} {st : Store NearState} {args : List Value}
-    {config : SmallStep.Config NearState} (fuel : Nat)
-    (hresolve : resolveMetered cfg resolvedCode = .ok env)
-    (hinit : SmallStep.initConfig { module := code, host := env } entry st args = .ok config) :
-    let gas := (runMetered cfg.wasm fuel config).1.store.wasm.host.gas
-    gas.prepaid = st.host.gas.prepaid ∧ gas.maxBurnt = st.host.gas.maxBurnt := by
-  have hfinal := runMetered_hostInvariant
-    (GasLimits st.host.gas.prepaid st.host.gas.maxBurnt)
+theorem runResolved_gas_limits {cfg : RuntimeConfig} {code : Module} {env : HostEnv NearState}
+    {host : NearState} {store store' : Store NearState} {imports : List ExternVal}
+    {vm : ValidModule} {inst : ModuleInst} {addr : Nat} {c : Config NearState} (fuel : Nat)
+    (hresolve : resolveMetered cfg code = .ok env)
+    (halloc : env.allocate (Store.empty host) = (store, imports))
+    (hinst : Link.instantiateModule store vm imports = .ok (store', inst))
+    (hstart : Exec.startWasm store' execLimits addr [] = some c) :
+    let gas := (runMetered cfg.wasm fuel (.next c)).1.host.gas
+    gas.prepaid = host.gas.prepaid ∧ gas.maxBurnt = host.gas.maxBurnt := by
+  have hfinal := runMetered_hostInvariant (GasLimits host.gas.prepaid host.gas.maxBurnt)
     (by
       intro current cost h
-      have hp := chargeWasm_gas_limits current cost
-      exact ⟨hp.1.trans h.1, hp.2.trans h.2⟩) cfg.wasm fuel config
-    (initResolvedConfig_gasLimits hresolve hinit)
-  exact hfinal.2
+      have hp := chargeHost_gas_limits current cost
+      exact ⟨hp.1.trans h.1, hp.2.trans h.2⟩) cfg.wasm fuel (.next c)
+    (resolvedStart_gasLimits hresolve halloc hinst hstart)
+  exact hfinal.host
 
 /-- Actual resolved execution respects the supplied prepaid/per-call budgets
 on every exit. The only gas premise is that the supplied initial counter fits
 its limits; imported-host preservation is derived from the concrete registry. -/
-theorem runResolved_gas_bounds {cfg : RuntimeConfig} {resolvedCode code : Module} {entry : Nat}
-    {env : HostEnv NearState} {st : Store NearState} {args : List Value}
-    {config : SmallStep.Config NearState} (fuel : Nat)
-    (hresolve : resolveMetered cfg resolvedCode = .ok env)
-    (hinit : SmallStep.initConfig { module := code, host := env } entry st args = .ok config)
-    (hbound : st.host.gas.Bounded) :
-    let gas := (runMetered cfg.wasm fuel config).1.store.wasm.host.gas
-    gas.burnt ≤ gas.used ∧ gas.used ≤ st.host.gas.prepaid ∧ gas.burnt ≤ st.host.gas.maxBurnt := by
-  have hb := runMetered_fixed_budget cfg.wasm fuel config st.host.gas.prepaid st.host.gas.maxBurnt
-    (initResolvedConfig_gasLimits hresolve hinit) (by rw [initConfig_gas hinit]; exact hbound)
+theorem runResolved_gas_bounds {cfg : RuntimeConfig} {code : Module} {env : HostEnv NearState}
+    {host : NearState} {store store' : Store NearState} {imports : List ExternVal}
+    {vm : ValidModule} {inst : ModuleInst} {addr : Nat} {c : Config NearState} (fuel : Nat)
+    (hresolve : resolveMetered cfg code = .ok env)
+    (halloc : env.allocate (Store.empty host) = (store, imports))
+    (hinst : Link.instantiateModule store vm imports = .ok (store', inst))
+    (hstart : Exec.startWasm store' execLimits addr [] = some c)
+    (hbound : host.gas.Bounded) :
+    let gas := (runMetered cfg.wasm fuel (.next c)).1.host.gas
+    gas.burnt ≤ gas.used ∧ gas.used ≤ host.gas.prepaid ∧ gas.burnt ≤ host.gas.maxBurnt := by
+  have hb := runMetered_fixed_budget cfg.wasm fuel (.next c) host.gas.prepaid host.gas.maxBurnt
+    (resolvedStart_gasLimits hresolve halloc hinst hstart)
+    (by
+      show c.store.host.gas.Bounded
+      rw [resolvedStart_gas halloc hinst hstart]; exact hbound)
   exact ⟨Nat.le_add_right _ _, hb.2, hb.1⟩
 
 end Wasm.Near

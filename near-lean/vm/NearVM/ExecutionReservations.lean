@@ -9,42 +9,42 @@ def ReservationInvariant (fees : ActionFees) (ethEnabled : Bool) (ns : NearState
   ns.fees = fees ∧ ns.config.ethImplicitAccounts = ethEnabled ∧ GasBacked fees ethEnabled ns
 
 /-- Successful instruction/frame charging cannot discard reserved promise gas. -/
-theorem chargeWasm_success_gasBacked (fees : ActionFees) (ethEnabled : Bool)
-    (config : SmallStep.Config NearState) (cost : Nat)
-    (hsuccess : (chargeWasm config cost).2 = none) (h : GasBacked fees ethEnabled config.store.wasm.host) :
-    GasBacked fees ethEnabled (chargeWasm config cost).1.store.wasm.host := by
-  have hg := GasCounter.deduct_success config.store.wasm.host.gas cost cost (Nat.le_refl _) hsuccess
-  have hp : (chargeWasm config cost).1.store.wasm.host.gas.promises = config.store.wasm.host.gas.promises := by
-    simpa only [chargeWasm, GasCounter.burn, Nat.sub_self, Nat.add_zero] using hg.2.1
+theorem chargeHost_success_gasBacked (fees : ActionFees) (ethEnabled : Bool)
+    (ns : NearState) (cost : Nat)
+    (hsuccess : (chargeHost ns cost).2 = none) (h : GasBacked fees ethEnabled ns) :
+    GasBacked fees ethEnabled (chargeHost ns cost).1 := by
+  have hg := GasCounter.deduct_success ns.gas cost cost (Nat.le_refl _) hsuccess
+  have hp : (chargeHost ns cost).1.gas.promises = ns.gas.promises := by
+    simpa only [chargeHost, GasCounter.burn, Nat.sub_self, Nat.add_zero] using hg.2.1
   unfold GasBacked at h ⊢
   rw [hp]
   exact h
 
-theorem chargeWasm_success_reservationInvariant (fees : ActionFees) (ethEnabled : Bool)
-    (config : SmallStep.Config NearState) (cost : Nat)
-    (hsuccess : (chargeWasm config cost).2 = none)
-    (h : ReservationInvariant fees ethEnabled config.store.wasm.host) :
-    ReservationInvariant fees ethEnabled (chargeWasm config cost).1.store.wasm.host :=
-  ⟨h.1, h.2.1, chargeWasm_success_gasBacked fees ethEnabled config cost hsuccess h.2.2⟩
+theorem chargeHost_success_reservationInvariant (fees : ActionFees) (ethEnabled : Bool)
+    (ns : NearState) (cost : Nat)
+    (hsuccess : (chargeHost ns cost).2 = none)
+    (h : ReservationInvariant fees ethEnabled ns) :
+    ReservationInvariant fees ethEnabled (chargeHost ns cost).1 :=
+  ⟨h.1, h.2.1, chargeHost_success_gasBacked fees ethEnabled ns cost hsuccess h.2.2⟩
 
 /-- This compositional theorem requires the live host invariant explicitly.
 The concrete registry proof must supply it; successful gas charging is derived
 from the executable run, rather than required on failed/saturated states. -/
 theorem runInitialized_success_reservationInvariant (fees : ActionFees) (ethEnabled : Bool)
-    (cfg : WasmConfig) (fuel : Nat) (config : SmallStep.Config NearState)
-    (h : ConfigLiveInvariant (ReservationInvariant fees ethEnabled) config)
+    (cfg : WasmConfig) (fuel : Nat) (config : Machine)
+    (h : MachineLiveInvariant (ReservationInvariant fees ethEnabled) config)
     (hsuccess : (runInitialized cfg fuel config).2 = none) :
     (runInitialized cfg fuel config).1.LiveHost (ReservationInvariant fees ethEnabled) := by
-  exact (runInitialized_success_liveInvariant _ (chargeWasm_success_reservationInvariant fees ethEnabled)
-    cfg fuel config h hsuccess).2
+  exact (runInitialized_success_liveInvariant _ (chargeHost_success_reservationInvariant fees ethEnabled)
+    cfg fuel config h hsuccess).live
 
 /-- Actual metered execution and outcome conversion compose without assuming a
 financial equation at the outcome. The remaining premise is host preservation
 of fee/config identity and raw promise gas backing. -/
 theorem runInitialized_outcome_gas_backing (fees : ActionFees) (ethEnabled : Bool)
-    (cfg : WasmConfig) (fuel : Nat) (config : SmallStep.Config NearState)
+    (cfg : WasmConfig) (fuel : Nat) (config : Machine)
     (ctx : VMContext) (storage : List (Bytes × Bytes))
-    (h : ConfigLiveInvariant (ReservationInvariant fees ethEnabled) config)
+    (h : MachineLiveInvariant (ReservationInvariant fees ethEnabled) config)
     (hsuccess : (outcomeOfExecution ctx storage (runInitialized cfg fuel config).1
       (runInitialized cfg fuel config).2).aborted = none) :
     let outcome := outcomeOfExecution ctx storage (runInitialized cfg fuel config).1 (runInitialized cfg fuel config).2

@@ -1,5 +1,5 @@
 import NearChain.Step
-import Interpreter.Wasm.Decoder.Wat
+import Wasm
 
 /-! Replay the shared full-receipt scenarios through the public chain step.
 The delivery selector is a test input; it is not a shard-network implementation. -/
@@ -101,11 +101,11 @@ def main : IO Unit := do
   let cfg ← RuntimeConfig.load request.configDir request.protocolVersion
   let mut registry : List (String × List UInt8 × ContractCode) := []
   for c in request.contracts do
-    let text ← IO.FS.readFile c.watPath
-    let module ← match Decoder.Wat.decode text with
+    let raw ← IO.FS.readBinFile c.codePath
+    let module ← match Binary.decode raw with
       | .ok m => pure m
-      | .error error => throw (IO.userError error)
-    let bytes := (← IO.FS.readBinFile c.codePath).data.toList
+      | .error error => throw (IO.userError error.message)
+    let bytes := raw.data.toList
     registry := registry ++ [(c.account, bytes, { module, size := bytes.length, hash := c.codePath })]
   let decoder : CodeTable := fun bytes =>
     ((registry.find? (fun entry => entry.2.1 == bytes)).map (·.2.2)).getD default

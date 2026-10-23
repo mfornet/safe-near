@@ -18,10 +18,10 @@ class AxiomAuditArtifactTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="safe-near-audit-policy-") as directory:
             report = Path(directory) / "report.json"
             base = ["python3", str(ROOT / "tools/axiom-audit.py"),
-                    str(ROOT / "near-lean/programs/lean"), "--report", str(report), "--no-build"]
+                    str(ROOT / "near-lean/wasm"), "--report", str(report), "--no-build"]
             for options, message in [
-                (["--allow-sorry-module", "Programs.DoesNotExist"], "allowed sorry module is absent"),
-                (["--allow-sorry", "--allow-sorry-module", "Programs.Mergesort.Proof"], "cannot be combined"),
+                (["--allow-sorry-module", "Wasm.DoesNotExist"], "allowed sorry module is absent"),
+                (["--allow-sorry", "--allow-sorry-module", "Wasm.Exec"], "cannot be combined"),
             ]:
                 with self.subTest(options=options):
                     result = subprocess.run(base + options, cwd=ROOT, text=True, capture_output=True)

@@ -1,5 +1,5 @@
 import NearVM
-import Interpreter.Wasm.Decoder.Wat
+import Wasm.Wat
 
 /-! Execute actual Wasm storage hosts against a canonical one-leaf trie. These
 checks cover the external-call ordering, including failures that final contract
@@ -42,7 +42,7 @@ private def code : IO Module := do
     "(func (export \"remove\") i64.const 1 i64.const 0 i64.const 0 call $d drop)\n" ++
     "(func (export \"read\") i64.const 1 i64.const 0 i64.const 0 call $r drop)\n" ++
     "(func (export \"has\") i64.const 1 i64.const 0 call $h drop))"
-  match Decoder.Wat.decode text with
+  match ← Wat.compile text with
   | .ok code => pure code
   | .error error => throw (IO.userError s!"trie storage fixture: {error}")
 

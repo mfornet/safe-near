@@ -42,16 +42,7 @@ wasm-summary:
 wasm-report:
     just --justfile near-lean/wasm/justfile testsuite-report
 
-# Build and smoke-test the Rust programs under the Lean interpreter.
-programs-test:
-    just --justfile near-lean/programs/justfile build
-    just --justfile near-lean/programs/justfile smoke
-    just --justfile near-lean/programs/justfile test
-    just --justfile near-lean/programs/justfile rust-test
 
-# Rebuild the committed Rust test-program binaries and WAT.
-programs-build:
-    just --justfile near-lean/programs/justfile rust-build
 
 # Audit a Lake package's transitive axioms; add --allow-sorry for open specs.
 [positional-arguments]
@@ -79,20 +70,18 @@ periodic-check-plan:
 periodic-check nearcore:
     python3 tools/periodic_check.py --nearcore {{quote(nearcore)}}
 
-# Run all executable suites: programs, NEAR scenarios, official Wasm tests and strict VM conformance.
-test-all: check-toolchains tools-test programs-test near-test chain-replay-test runtime-adapter-test wasm-test near-conformance
+# Run all executable suites: NEAR scenarios, official Wasm tests and strict VM conformance.
+test-all: check-toolchains tools-test near-test chain-replay-test runtime-adapter-test wasm-test near-conformance
 
-# Audit all core Lean packages and the completed program specifications.
+# Audit all core Lean packages.
 audit-all:
     python3 tools/tests/check_axiom_audit.py
-    @for package in wasm iris-wasm vm runtime chain; do \
+    @for package in wasm wasm-logic vm runtime chain; do \
         python3 tools/axiom-audit.py near-lean/"$package" --report audit/"$package".json; \
     done
-    python3 tools/axiom-audit.py near-lean/programs/lean --report audit/programs.json
 
 # Run executable suites, source checks, core axiom audits and contract builds.
 check: test-all vm-dependencies lean-lint audit-all build-all
-    python3 tools/lean_format.py --check near-lean/programs/lean/Programs/Harness.lean near-lean/programs/lean/Programs/Regression.lean
     python3 tools/tests/check_lean_style.py
     python3 tools/tests/check_lean_format.py
 

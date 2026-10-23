@@ -10,16 +10,16 @@ def DepositEffect (before after : NearState) (amount : Nat) : Prop :=
 
 def HostResultCreatesDeposits (before : NearState) (amount : Nat) : HostResult NearState → Prop
   | .Return _ after => DepositEffect before after.host amount
-  | .Trap .. | .Throw .. => True
+  | .Trap .. => True
 
-def HostCreatesDeposits (name : String) (fn : HostFn NearState) : Prop :=
+def HostCreatesDeposits (name : String) (fn : NearHostFn NearState) : Prop :=
   ∀ st args, HostResultCreatesDeposits st.host ((promiseDeposit? name st args).getD 0) (fn.invoke st args)
 
-theorem appendPromise_return_deposits (st : Store NearState) (promise : NearPromise) (values : List Value) :
+theorem appendPromise_return_deposits (st : HostStore NearState) (promise : NearPromise) (values : List Value) :
     HostResultCreatesDeposits st.host (promiseValue depositValue promise) (.Return values (appendPromise st promise)) :=
   ⟨rfl, rfl, appendPromise_deposits st promise⟩
 
-theorem appendPromiseActionResult_deposits (name : String) (st : Store NearState) (index : UInt64)
+theorem appendPromiseActionResult_deposits (name : String) (st : HostStore NearState) (index : UInt64)
     (action : PromiseAction) :
     HostResultCreatesDeposits st.host action.deposit (appendPromiseActionResult name st index action) := by
   unfold appendPromiseActionResult
@@ -28,7 +28,7 @@ theorem appendPromiseActionResult_deposits (name : String) (st : Store NearState
   · trivial
 
 /-- Successful parsing records the exact u128 amount read from guest memory. -/
-theorem readFunctionCallAction_deposit (st : Store NearState)
+theorem readFunctionCallAction_deposit (st : HostStore NearState)
     (methodLen methodPtr argsLen argsPtr amountPtr gas : UInt64) (action : PromiseAction)
     (h : readFunctionCallAction? st methodLen methodPtr argsLen argsPtr amountPtr gas = some action) :
     action.deposit = (readU128Mem st amountPtr).getD 0 := by
@@ -40,18 +40,18 @@ theorem readFunctionCallAction_deposit (st : Store NearState)
   subst action
   simp [PromiseAction.deposit, hd]
 
-theorem promiseDeposit_transfer (st : Store NearState) (index ptr : UInt64) :
+theorem promiseDeposit_transfer (st : HostStore NearState) (index ptr : UInt64) :
     promiseDeposit? "promise_batch_action_transfer" st [.i64 index, .i64 ptr] = readU128Mem st ptr := rfl
 
-theorem promiseDeposit_batchCall (st : Store NearState) (index ml mp al ap amount gas : UInt64) :
+theorem promiseDeposit_batchCall (st : HostStore NearState) (index ml mp al ap amount gas : UInt64) :
     promiseDeposit? "promise_batch_action_function_call" st
       [.i64 index, .i64 ml, .i64 mp, .i64 al, .i64 ap, .i64 amount, .i64 gas] = readU128Mem st amount := rfl
 
-theorem promiseDeposit_create (st : Store NearState) (nl np ml mp al ap amount gas : UInt64) :
+theorem promiseDeposit_create (st : HostStore NearState) (nl np ml mp al ap amount gas : UInt64) :
     promiseDeposit? "promise_create" st [.i64 nl, .i64 np, .i64 ml, .i64 mp, .i64 al, .i64 ap, .i64 amount, .i64 gas] =
       readU128Mem st amount := rfl
 
-theorem promiseDeposit_then (st : Store NearState) (base nl np ml mp al ap amount gas : UInt64) :
+theorem promiseDeposit_then (st : HostStore NearState) (base nl np ml mp al ap amount gas : UInt64) :
     promiseDeposit? "promise_then" st
       [.i64 base, .i64 nl, .i64 np, .i64 ml, .i64 mp, .i64 al, .i64 ap, .i64 amount, .i64 gas] =
       readU128Mem st amount := rfl

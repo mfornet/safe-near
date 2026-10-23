@@ -66,15 +66,15 @@ theorem convertPromises_deposits (promises : List NearPromise) (graph : PromiseG
 /-- A successful executable VM result contains exactly the converted receipt
 valuation. Graph errors cannot silently discard or manufacture backing. -/
 theorem outcomeOfExecution_success_value (ctx : VMContext) (storage : List (Bytes × Bytes))
-    (final : SmallStep.Config NearState) (error : Option FunctionCallError)
+    (final : Machine) (error : Option FunctionCallError)
     (hsuccess : (outcomeOfExecution ctx storage final error).aborted = none) (value : ReceiptValuation) :
     receiptsValue value (outcomeOfExecution ctx storage final error).receipts =
-      promisesValue value final.store.wasm.host.promises := by
+      promisesValue value final.host.promises := by
   unfold outcomeOfExecution at hsuccess ⊢
   dsimp only at hsuccess ⊢
   split at hsuccess
   · contradiction
-  · cases hc : convertPromises final.store.wasm.host.promises with
+  · cases hc : convertPromises final.host.promises with
     | none => simp [hc, VMOutcome.graphIssue] at hsuccess
     | some graph =>
       simp only [hc] at hsuccess ⊢
@@ -144,7 +144,7 @@ theorem appendPromiseAction_deposits (promises result : List NearPromise) (index
 
 /-- Creating a raw receipt funds it once; empty batches and joints add zero
 attached deposits. -/
-theorem appendPromise_deposits (st : Store NearState) (promise : NearPromise) :
+theorem appendPromise_deposits (st : HostStore NearState) (promise : NearPromise) :
     promisesDeposits (appendPromise st promise).host.promises =
       promisesDeposits st.host.promises + promiseValue depositValue promise := by
   simp [appendPromise, promisesDeposits, promisesValue]
@@ -160,7 +160,7 @@ theorem appendPromise_deposits (st : Store NearState) (promise : NearPromise) :
 
 /-- The financial charge at the actual host ABI seam accounts for the exact
 memory-decoded deposit and any one-yocto subsidy, on every successful exit. -/
-theorem deductDeposit_accounting (name : String) (before after : Store NearState) (args : List Value)
+theorem deductDeposit_accounting (name : String) (before after : HostStore NearState) (args : List Value)
     (hsuccess : (deductDeposit name before after args).2 = none) :
     let paid := (deductDeposit name before after args).1.host
     after.host.context.accountBalance + paid.subsidizedAmount =

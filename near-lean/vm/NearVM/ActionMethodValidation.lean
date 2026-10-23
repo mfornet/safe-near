@@ -3,13 +3,13 @@ import NearVM.Metered
 namespace Wasm.Near
 
 /-- The VM mock's opaque-byte external policy is an explicit context choice. -/
-theorem actionMethodEncodingError_opaque (name : String) (before : Store NearState) (args : List Value)
+theorem actionMethodEncodingError_opaque (name : String) (before : HostStore NearState) (args : List Value)
     (hpolicy : before.host.config.validateActionMethodUtf8 = false) :
     actionMethodEncodingError name before args = none := by
   simp [actionMethodEncodingError, hpolicy]
 
 /-- Runtime external rejection retains the native structured error. -/
-theorem actionMethodEncodingError_invalid (name : String) (before : Store NearState) (args : List Value)
+theorem actionMethodEncodingError_invalid (name : String) (before : HostStore NearState) (args : List Value)
     (bytes : List UInt8) (hpolicy : before.host.config.validateActionMethodUtf8 = true)
     (hinput : actionMethodBytes? name before args = some bytes)
     (hutf8 : String.fromUTF8? ⟨bytes.toArray⟩ = none) :
@@ -27,7 +27,7 @@ theorem actionMethodEncodingError_invalid (name : String) (before : Store NearSt
 
 /-- Successful external validation supplies an actual decoded string; lossy
 fallback decoding is not an assumption of this theorem. -/
-theorem actionMethodEncodingError_none_utf8 (name : String) (before : Store NearState) (args : List Value)
+theorem actionMethodEncodingError_none_utf8 (name : String) (before : HostStore NearState) (args : List Value)
     (bytes : List UInt8) (hpolicy : before.host.config.validateActionMethodUtf8 = true)
     (hinput : actionMethodBytes? name before args = some bytes)
     (h : actionMethodEncodingError name before args = none) :
@@ -43,7 +43,7 @@ theorem actionMethodEncodingError_none_utf8 (name : String) (before : Store Near
     | some decoded => exact ⟨decoded, rfl⟩
 
 /-- Successful key validation establishes UTF-8 for every raw CSV field. -/
-theorem actionMethodEncodingError_none_key_fields (before : Store NearState) (args : List Value)
+theorem actionMethodEncodingError_none_key_fields (before : HostStore NearState) (args : List Value)
     (bytes : List UInt8) (hpolicy : before.host.config.validateActionMethodUtf8 = true)
     (hinput : actionMethodBytes? "promise_batch_action_add_key_with_function_call" before args = some bytes)
     (h : actionMethodEncodingError "promise_batch_action_add_key_with_function_call" before args = none) :
@@ -53,7 +53,7 @@ theorem actionMethodEncodingError_none_key_fields (before : Store NearState) (ar
   | true => rfl
 
 /-- Fees and prepaid gas are checked before runtime external decoding. -/
-theorem finishMeteredCall_charge_error (extra : Nat) (name : String) (before after : Store NearState)
+theorem finishMeteredCall_charge_error (extra : Nat) (name : String) (before after : HostStore NearState)
     (args values : List Value) (paid : NearState) (error : HostError)
     (hcharge : applyCharges after.host (chargesAfter name before after args) = (paid, some error)) :
     finishMeteredCall extra name before args (.Return values after) = trapWith { after with host := paid } error := by
@@ -61,29 +61,28 @@ theorem finishMeteredCall_charge_error (extra : Nat) (name : String) (before aft
 
 /-- A balance failure wins over an invalid method encoding, for every policy
 and byte sequence. This follows from the executable post-call order. -/
-theorem finishMeteredCall_deposit_error (extra : Nat) (name : String) (before after : Store NearState)
-    (args values : List Value) (paid : NearState) (final : Store NearState) (error : HostError)
+theorem finishMeteredCall_deposit_error (extra : Nat) (name : String) (before after : HostStore NearState)
+    (args values : List Value) (paid : NearState) (final : HostStore NearState) (error : HostError)
     (hcharge : applyCharges after.host (chargesAfter name before after args) = (paid, none))
     (hdeposit : deductDeposit name before { after with host := paid } args = (final, some error)) :
     finishMeteredCall extra name before args (.Return values after) = trapWith final error := by
   simp only [finishMeteredCall, hcharge, hdeposit]
 
 /-- A successful actual post-call return has passed external validation. -/
-theorem finishMeteredCall_success_encoding (extra : Nat) (name : String) (before : Store NearState)
-    (args : List Value) (result : HostResult NearState) (values : List Value) (after : Store NearState)
+theorem finishMeteredCall_success_encoding (extra : Nat) (name : String) (before : HostStore NearState)
+    (args : List Value) (result : HostResult NearState) (values : List Value) (after : HostStore NearState)
     (hreturn : finishMeteredCall extra name before args result = .Return values after) :
     actionMethodEncodingError name before args = none := by
   cases result with
   | Trap st message => simp [finishMeteredCall] at hreturn
-  | Throw st tag vals => simp [finishMeteredCall] at hreturn
   | Return vals st =>
     unfold finishMeteredCall at hreturn
     repeat' (first | assumption | contradiction | (split at hreturn) | (dsimp only at hreturn; split at hreturn))
 
 /-- A concrete successful return under the runtime policy has UTF-8 method
 bytes. The earlier charging/deposit checks need no additional assumptions. -/
-theorem finishMeteredCall_success_method_utf8 (extra : Nat) (name : String) (before : Store NearState)
-    (args : List Value) (result : HostResult NearState) (values : List Value) (after : Store NearState)
+theorem finishMeteredCall_success_method_utf8 (extra : Nat) (name : String) (before : HostStore NearState)
+    (args : List Value) (result : HostResult NearState) (values : List Value) (after : HostStore NearState)
     (bytes : List UInt8) (hpolicy : before.host.config.validateActionMethodUtf8 = true)
     (hinput : actionMethodBytes? name before args = some bytes)
     (hreturn : finishMeteredCall extra name before args result = .Return values after) :
@@ -93,8 +92,8 @@ theorem finishMeteredCall_success_method_utf8 (extra : Nat) (name : String) (bef
 
 /-- Actual successful key-host postprocessing supplies the decoding premise
 used by the runtime key-action gas bridge. -/
-theorem finishMeteredCall_success_key_fields_utf8 (extra : Nat) (before : Store NearState)
-    (args : List Value) (result : HostResult NearState) (values : List Value) (after : Store NearState)
+theorem finishMeteredCall_success_key_fields_utf8 (extra : Nat) (before : HostStore NearState)
+    (args : List Value) (result : HostResult NearState) (values : List Value) (after : HostStore NearState)
     (bytes : List UInt8) (hpolicy : before.host.config.validateActionMethodUtf8 = true)
     (hinput : actionMethodBytes? "promise_batch_action_add_key_with_function_call" before args = some bytes)
     (hreturn : finishMeteredCall extra "promise_batch_action_add_key_with_function_call" before args result = .Return values after) :

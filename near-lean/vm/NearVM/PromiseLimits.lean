@@ -43,7 +43,7 @@ theorem joinedDependenciesError_expands {handles : List PromiseHandle} {limit co
 
 /-- A successful metered join has a non-overflowing input span and a bounded
 expanded dependency vector; no output validator is assumed. -/
-theorem promiseJoinError_bounds {st : Store NearState} {ptr count : UInt64} {limit : Nat}
+theorem promiseJoinError_bounds {st : HostStore NearState} {ptr count : UInt64} {limit : Nat}
     {graph : PromiseGraph} (hlimit : st.host.config.maxInputDataDependencies = some limit)
     (hgraph : convertPromises st.host.promises = some graph)
     (h : promiseJoinError st [.i64 ptr, .i64 count] = none) :
@@ -68,14 +68,14 @@ theorem promiseJoinError_bounds {st : Store NearState} {ptr count : UInt64} {lim
           obtain ⟨dependencies, hexpand, hbound⟩ := joinedDependenciesError_expands h (Nat.zero_le limit)
           exact ⟨first :: rest, dependencies, rfl, hexpand, by simpa using hbound⟩
 
-theorem preInvokeError_arguments_valid {name : String} {st : Store NearState} {args : List Value}
+theorem preInvokeError_arguments_valid {name : String} {st : HostStore NearState} {args : List Value}
     (h : preInvokeError name st args = none) : invocationArgumentError name st args = none := by
   unfold preInvokeError at h
   cases ha : invocationArgumentError name st args with
   | none => rfl
   | some error => simp [ha] at h
 
-theorem preInvokeError_join_bounds {st : Store NearState} {ptr count : UInt64} {limit : Nat}
+theorem preInvokeError_join_bounds {st : HostStore NearState} {ptr count : UInt64} {limit : Nat}
     {graph : PromiseGraph} (hlimit : st.host.config.maxInputDataDependencies = some limit)
     (hgraph : convertPromises st.host.promises = some graph)
     (h : preInvokeError "promise_and" st [.i64 ptr, .i64 count] = none) :
@@ -86,7 +86,7 @@ theorem preInvokeError_join_bounds {st : Store NearState} {ptr count : UInt64} {
   have ha := preInvokeError_arguments_valid h
   simpa [invocationArgumentError, storageMutationPlan?] using ha
 
-theorem preInvokeError_join_span_bound {st : Store NearState} {ptr count : UInt64}
+theorem preInvokeError_join_span_bound {st : HostStore NearState} {ptr count : UInt64}
     (h : preInvokeError "promise_and" st [.i64 ptr, .i64 count] = none) :
     ptr.toNat + count.toNat * 8 ≤ memBytes st := by
   have ha := preInvokeError_arguments_valid h
@@ -100,14 +100,14 @@ theorem preInvokeError_join_span_bound {st : Store NearState} {ptr count : UInt6
     · simp at hj
     · omega
 
-theorem promiseCapacityError_none_iff {st : Store NearState} {limit : Nat}
+theorem promiseCapacityError_none_iff {st : HostStore NearState} {limit : Nat}
     (hlimit : st.host.config.maxPromises = some limit) :
     promiseCapacityError st = none ↔ st.host.promises.length + 1 ≤ limit := by
   unfold promiseCapacityError
   rw [hlimit]
   split <;> simp_all
 
-theorem preInvokeError_count_bound {name : String} {st : Store NearState} {args : List Value} {limit : Nat}
+theorem preInvokeError_count_bound {name : String} {st : HostStore NearState} {args : List Value} {limit : Nat}
     (hlimit : st.host.config.maxPromises = some limit) (halloc : allocatesPromise name = true)
     (h : preInvokeError name st args = none) : st.host.promises.length + 1 ≤ limit := by
   have ha := preInvokeError_arguments_valid h
@@ -119,7 +119,7 @@ theorem preInvokeError_count_bound {name : String} {st : Store NearState} {args 
     | some error => simp [hc] at h
   exact (promiseCapacityError_none_iff hlimit).mp hcapacity
 
-theorem checked_nextPromiseIdx_fresh {st : Store NearState} {limit : Nat}
+theorem checked_nextPromiseIdx_fresh {st : HostStore NearState} {limit : Nat}
     (hlimit : st.host.config.maxPromises = some limit) (h : promiseCapacityError st = none)
     (h64 : limit < 2 ^ 64) (p : NearPromise) :
     (nextPromiseIdx st).toNat = st.host.promises.length ∧

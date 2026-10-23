@@ -1,4 +1,4 @@
-import Interpreter.Wasm.ByteEncoding
+import Wasm.Bytes
 import Init.Data.List.SplitOn.Lemmas
 import Init.Data.String.Lemmas.Intercalate
 import Init.Data.ByteArray.Lemmas
