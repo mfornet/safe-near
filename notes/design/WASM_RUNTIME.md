@@ -42,11 +42,18 @@ Auditability matters more than performance.
 
 ## Proofs about Wasm code
 
-`near-lean/wasm-logic` is an iris-lean separation logic over `Wasm.Exec.step`:
-the machine as a `Language`, weakest-precondition rules from store ownership
-(one step, or a whole finishing run), adequacy back to `Exec.run`, and a
-worked example. Its resource is the whole store; points-to assertions over
-memory, locals and globals are future work.
+`near-lean/wasm-logic` is an iris-lean separation logic over `Wasm.Exec.step`,
+at the Wasm level. The store is seen as a heap of cells (bytes, memory
+lengths, globals, table entries, functions, instances, segments, host
+state) owned through points-to assertions in Iris-Wasm's notation; a
+weakest precondition for instruction fragments (`wpi`) has one rule per
+instruction, each owning only what the instruction touches; and
+`wp_adequacy_cells` turns a proof into a statement about every run of
+`Exec.run`, values, traps and final cells. Iris-Wasm's stack case study and
+its client are ported on top, from their compiled bytes through validation
+and the runtime's linker. The package README lists what to trust; the
+success criteria and how the result measures against them are in
+[wasm_logic_iris.md](../todo/wasm_logic_iris.md).
 
 ## Known model gaps
 

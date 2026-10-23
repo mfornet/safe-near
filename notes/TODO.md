@@ -18,11 +18,11 @@ and chain layers run on it with nearcore conformance harnesses.
 
 ## Wasm runtime
 
-- Points-to assertions in `near-lean/wasm-logic` that split memory, locals
-  and globals into separately owned pieces, and per-instruction rules over
-  them; today the logic owns the whole store. Success criteria and the
-  Iris-Wasm port that measures them:
-  [wasm_logic_iris.md](todo/wasm_logic_iris.md).
+- `near-lean/wasm-logic`, next milestone: Iris-Wasm's `stack_map_trap.v`,
+  its logical relation and robust safety, host reentrancy; rules for
+  overlapping `memory.copy`/`table.copy`, zero-length bulk operations and
+  out-of-bounds traps; the independent clean-room review of the logic
+  ([wasm_logic_iris.md](todo/wasm_logic_iris.md) §5).
 - Close the model gaps listed in [Wasm runtime](design/WASM_RUNTIME.md): start
   functions, exported imports, nearcore's stack limiter.
 

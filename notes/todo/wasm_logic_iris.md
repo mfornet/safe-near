@@ -1,11 +1,12 @@
 # WasmLogic: a usable iris-lean program logic for the Wasm runtime
 
 Follow-up to Phase 4 of [wasm_runtime_rewrite.md](wasm_runtime_rewrite.md).
-Today `near-lean/wasm-logic` has the iris-lean `Language` instance, rules that
-own the **whole store** (`ownP`), adequacy back to `Exec.run`, and one example
-proved by letting the kernel run the machine on a fixed input. That proves
-nothing about a function for *all* inputs and can't host a proof written
-elsewhere.
+When this note was written, `near-lean/wasm-logic` had the iris-lean
+`Language` instance, rules that owned the **whole store** (`ownP`), adequacy
+back to `Exec.run`, and one example proved by letting the kernel run the
+machine on a fixed input. That proved nothing about a function for *all*
+inputs and couldn't host a proof written elsewhere. §3 records the design
+decisions and §5 how the result measures against the criteria.
 
 Goal: a separation logic at the **Wasm level** (not NEAR) good enough that
 an existing Iris proof about Wasm code can be ported with its statements
@@ -94,34 +95,49 @@ The work is done when every row holds. Each one has a mechanical check;
 | S5.2 | Clean room and licence: `NOTICE` with Iris-Wasm's MIT text; independent review recorded in `near-lean/wasm/REVIEW.md`, as for Phase 4. | Review entry present. |
 | S5.3 | Docs: package README (modules, trusted definitions, rule table), `notes/design/WASM_RUNTIME.md` and `notes/TODO.md` updated. | Review. |
 
-## 3. Design questions — **Open**
+## 3. Design questions — **Decided**
 
-These block the points-to work and are decided first, recorded here.
+1. **Compositional WP over a flat machine: option (a).** `Frag.lean`
+   defines `wpi lim d f vs es Φ`: running `es` in frame `f` with operands
+   `vs`, under *every* context (operands below, labels around, code after,
+   frames below) and every continuation `Kont` that knows how to carry on
+   from each way the fragment can end (fall through, branch, return, trap),
+   reaches `WP` of the whole thread. Bind (`wpi_seq`), framing (`wpi_wand`,
+   `wpi_frame`) and the label rules are derived; the `Language` instance and
+   the runtime are unchanged and adequacy is reused.
+2. **Where locals and the frame live: in the index of `wpi`.** Neither a
+   `Store × frame` language state nor ghost tracking: a `Frame` (locals,
+   instance address, module instance) is a parameter of `wpi`, and
+   postconditions say what the final frame keeps. The module instance is a
+   persistent cell (`↪[inst]`), assumed by `wpi`. Iris-Wasm's `↪[frame]`
+   becomes this index; the stack README lists it as a representation
+   deviation.
+3. **Memory granularity: bytes**, as in Iris-Wasm (`↦[wm]`, `↦[wms]`), with
+   `↦[i32]` derived. The heap view (`Heap.lean`) shows a memory's cells only
+   while it is well formed (every page empty or full size), which every
+   runtime operation preserves (`MemoryLemmas.lean`).
+4. **Partial correctness, `MaybeStuck`.** `Exec.step` is total, so stuckness
+   rules nothing out; `outOfFuel` is "no claim". Total WP stays for later.
 
-1. **Compositional WP over a flat machine.** Iris-Wasm's expressions are
-   administrative instruction sequences with label/frame evaluation
-   contexts, so `bind` and `wp_seq` come from the context structure. Our
-   machine runs a whole `Thread` (value stack, labels, call frames) with no
-   syntactic contexts. Options:
-   (a) keep `Language` as is and define a derived fragment WP, "running `es`
-   in this frame under any continuation `K` reaches `K` with `Φ`",
-   quantifying over continuations, then derive bind, sequencing and the label
-   rules. The runtime stays untouched and the existing adequacy is reused.
-   (b) restate the language over fragment and context (an `EctxLanguage`),
-   with a proved correspondence to `Exec.step`.
-   Leaning (a). Either way, S1.1 holds.
-2. **Where locals and the frame live.** Locals are in `Thread.frames`, not
-   in the store, but the state interpretation sees only the language state.
-   `↪[frame]` needs the current frame in the state, either by making the
-   language state `Store × frame` (a language-level split, the runtime
-   unchanged) or by ghost tracking.
-3. **Memory granularity.** Byte-level `↦[wm]` as in Iris-Wasm, with word
-   points-to derived, versus word-level primitives. Byte-level matches the
-   port; check that the `Memory` page representation still gives a clean
-   `gen_heap` view.
-4. **Partial correctness.** Iris-Wasm is partial (WP, not total WP);
-   `Exec.run` reports `outOfFuel` as "no claim". Match that. Total WP (which
-   iris-lean has) is a later milestone, relevant to gas bounds.
+Decisions taken while implementing:
+
+- **Instruction set.** nearcore enables reference types and bulk memory
+  (`NearVM` validates with `Features.nearcore true`), so every `Wasm.Instr`
+  constructor is in scope; the table and bulk-memory instructions, which
+  Iris-Wasm does not have, get rules in its style (`Rules/Table.lean`).
+- **Adequacy shape.** The root theorem, `wp_adequacy_cells`, takes a
+  postcondition that owns cells chosen existentially (`cellsSat`), so a
+  result that is not a return value (the client's `answer` global) can be
+  stated about the final store.
+- **Decoding in the kernel.** The binary decoder recursed by well-founded
+  recursion, which the kernel cannot evaluate; it now spends one unit of
+  fuel per nesting level and recurses structurally. Same results
+  (`testsuite_report.txt` unchanged), and `Binary.decode bytes = .ok m` is
+  provable by `kernel_rfl`.
+- **CI.** Fast checks that need no Lean (`tools/tests/test_wasm_logic.py`)
+  run on every push and PR; the Lean build, axiom audit, byte check and
+  smoke run are the `wasm-logic` workflow, triggered by changes to the logic
+  or the runtime; the mutation test runs in the periodic check.
 
 ## 4. Order of work
 
@@ -134,3 +150,36 @@ These block the points-to work and are decided first, recorded here.
 5. Stack functions (S3.1–S3.4), then `.wat`/binary (S3.5), instantiation and
    client (S3.6).
 6. Mutation test and smoke run (S4), timings, review, docs (S5).
+
+## 5. Outcome
+
+Measured on the branch that implements this note.
+
+| # | Status | Evidence |
+|---|---|---|
+| S1.1 | Met | `Exec`, `Store`, `Syntax`, `Numeric`, `Memory` unchanged; the only runtime change is the decoder's structural recursion (§3), with `testsuite_report.txt` identical. |
+| S1.2 | Met | `wp_adequacy_cells` (root: values, traps, final cells), `adequacy_cells` over `Exec.run`, `adequacy` as a corollary; `sum_adequate` and `client_adequate` derive from them. |
+| S1.3 | Met | Axiom audit: 24 modules, 1771 declarations, 0 violations; in the `wasm-logic` workflow. |
+| S1.4 | Met | "What to trust" in `near-lean/wasm-logic/README.md`. |
+| S1.5 | Met | `lakefile.toml` requires `Wasm` and `iris` only; checked by `test_wasm_logic.py`. |
+| S2.1 | Met | `#check_rule_coverage`: 56 instructions with rules, 0 out of scope; each rule's footprint is the cells the instruction touches. |
+| S2.2 | Met | Each structural rule is used in an example: sequencing, `block`, `loop`, `if`, `br`, `br_if`, `return`, `call`, `call_indirect`, `memory.grow` in `Sum`/`Stack`/`Client`; `br_table`, `memory.size`, traps, the call-depth limit, the host call and the frame rule in `Examples/Control.lean`. |
+| S2.3 | Met | Iris-Wasm names in `Coverage.lean` and the README rule table. |
+| S2.4 | Met, with two differences | All of Iris-Wasm's vocabulary and the separation lemmas (`memBytes_append`, word ↔ bytes); `↪[frame]` is the `wpi` index (§3.2); `↦[i64]` is not defined, as no proof needed it. |
+| S3.1 | Met for every function | `spec_new_stack`, `spec_is_empty`, `spec_is_full`, `spec_push`, `spec_pop`, `spec_stack_length`, `spec_stack_map` (with their `_op` lemmas). `stack_map_trap.v`, the variant where the callee may trap, is not ported. |
+| S3.2 | Met, two forced hypotheses | Deviations table in `Examples/Stack/README.md`. All rows are representation except: `stack_map`'s callee must be a Wasm function, and calls need `d + 1 < maxCallDepth` (the runtime traps past a call depth, Iris-Wasm's semantics does not). |
+| S3.3 | Met | Specs step through the rules for all stacks and arguments; `test_wasm_logic.py` checks that `Specs.lean`/`Map.lean` use no `Exec.run`, `Exec.step`, `kernel_rfl` or `native_decide`. `decide` appears only on closed arithmetic facts, so the check is on machine execution rather than the word `decide`. |
+| S3.4 | Met | `scripts/proof-lines.py`: Lean/Rocq = 0.34 overall, at most 0.84 per file (`stack_length.v`). |
+| S3.5 | Met | `stack_decodes`, `client_decodes` (kernel); `.wasm` and byte literals committed and checked against the pinned wasm-tools. |
+| S3.6 | Met | `client_adequate`: for any fuel, validation, the runtime's linker and `Link.instantiate` (running `main` as start function) never fail or trap, and `answer` ends 20 with one page of memory, or -1 with none. |
+| S4.1 | Partly | The client reaches `new_stack`, `push`, `pop`, `stack_map` and `square` from instantiation; `is_empty`, `is_full` and `stack_length` are proved but no end-to-end corollary reaches them (Iris-Wasm's client does not call them either). |
+| S4.2 | Met | `scripts/mutation-test.py`: 21 mutants of the stack and client, all killed; in the periodic check. |
+| S4.3 | Met | `scripts/smoke-client.sh` runs the linked client on the runtime and checks `answer` = 20; in CI. |
+| S5.1 | Met | Clean build of the package with dependencies cached: about 65 s; slowest file `Examples/Stack/Code.lean`, 18 s (kernel decoding). |
+| S5.2 | Partly | `NOTICE` with Iris-Wasm's MIT licence. The independent clean-room review is still to be done and recorded in `near-lean/wasm/REVIEW.md`. |
+| S5.3 | Met | Package and example READMEs, `notes/design/WASM_RUNTIME.md`, `notes/TODO.md`. |
+
+Next milestone, as §1 scopes it: `stack_map_trap.v`, the logical relation
+and robust safety, host reentrancy; and in the rules, `memory.copy` /
+`table.copy` over overlapping ranges, zero-length bulk operations, and
+out-of-bounds trap rules for tables and bulk memory.
