@@ -1,6 +1,5 @@
 import WasmLogic.Language
 import Iris.ProgramLogic.OwnP
-import Iris.Examples.ClosedProofs
 
 /-!
 # Adequacy: from a weakest precondition to the executable semantics
@@ -10,6 +9,10 @@ A closed resource family `GF` with the invariant and later-credit slots that
 `ownP σ` entails a weakest precondition with a pure postcondition turns into
 a statement about `Wasm.Exec.run`: whenever the machine finishes, the outcome
 satisfies the postcondition.
+
+The first four slots of `GF` and their `GpreS` instances are taken from
+iris-lean's own `Iris/Examples/ClosedProofs.lean` (Apache-2.0); only the
+`ownPRF` slot is ours.
 -/
 
 namespace WasmLogic

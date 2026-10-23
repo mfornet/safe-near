@@ -10,7 +10,8 @@ same report format, same committed report); and `Wasm/Bytes.lean` now states
 its provenance (the project's own module, not Talos). The review text follows
 unchanged, so its findings can be checked against that history. A second
 independent review of the rewritten files at commit `7af472c` follows it and
-finds the whole package free of Talos-derived text and structure.
+finds the whole package free of Talos-derived text and structure. A third
+review covers the Iris layer `near-lean/wasm-logic` at `7a2e12b`.
 
 ---
 
@@ -417,3 +418,227 @@ should know about and need not act on: the two-line zip-and-compare in `Script.l
 the `wrote <report>` message plus `sort -rn`/`sort -k2` ordering in `suite.sh`. The one identical
 >= 40-char line in the driver is the `main` signature. The clean-room claim holds for the whole
 package at this commit.
+
+---
+
+# Clean-room review: `near-lean/wasm-logic` (HEAD 7a2e12b) vs Talos copy (99435f7)
+
+Reviewer: independent, no part in writing the code. Date: 2026-10-23.
+
+## Method
+
+Both trees were extracted to a scratch directory: the five new `.lean` files plus
+`README.md` and `lakefile.toml` of `near-lean/wasm-logic` at `7a2e12b`, and all 211
+`.lean` files (plus README/lakefile/scripts) that `git ls-tree -r 99435f7` lists under
+`near-lean/iris-wasm`, `near-lean/programs` and `near-lean/wasm` (the Talos interpreter,
+CodeLib and programs). Three automated passes, new vs *all* old files: (1) identical lines
+of >= 40 chars after whitespace normalisation; (2) shared 6-token windows, with the longest
+shared token run per file pair; (3) identical comment sentences of >= 7 words. Every hit was
+read by hand. Each new file was then read in full next to its nearest old counterpart
+(`CodeLib/SepLogic/SmallStepLanguage.lean`, `SmallStepOutcomeLanguage.lean`,
+`SmallStepOutcomeAdequacy.lean`, `SmallStepAdequacy.lean`, `SmallStepLifting.lean`,
+`WasmHeap.lean`, `SmallStepAdequacyExamples.lean`, `Interpreter/Wasm/SmallStep.lean`,
+`Interpreter/Wasm/Examples/{SimpleLoop,Factorial}.lean`) and next to the iris-lean
+dependency at `near-lean/.lake/packages/iris` (revision `04b7689c`, the same revision the old
+`iris-wasm/lakefile.toml` pinned): `Iris/Examples/ClosedProofs.lean`,
+`Iris/ProgramLogic/OwnP.lean`, `Iris/HeapLang/Syntax.lean`, `IrisTest/Language.lean`.
+The files named in the brief as "most relevant" (`CodeLib/Basic`, `Entry`, `Equivalence`,
+`Attrs`, `Near/SmallStep`, `Near/Proof`, `Near/State`) were read as outlines; none of them is
+a counterpart of anything in `wasm-logic` (they are big-step `TerminatesWith` bridges,
+observational equivalence, `@[spec_of]` attributes and the NEAR host model), and the
+automated passes found nothing against them. Provenance of the old files was checked with
+`git log --diff-filter=A`: every `CodeLib/SepLogic/*` file compared against was added by the
+Talos import `c6beacd` (2026-10-16), so all of them are upstream Talos text. The new package
+has one commit, `7a2e12b` (2026-10-23). The scratch directory holds the extracted trees
+(`old/`, `new/`), the comparison script (`scripts/cmp.py`) and its output (`cmp_talos.txt`).
+
+## Per-file table
+
+"6-tok" = share of the new file's 6-token windows that occur anywhere in the old tree (a loose
+measure; Lean keywords, iris-lean API names and Wasm spec names inflate it). "Run" = longest
+shared token run with any old file. "Lines" = identical normalised lines of >= 40 chars.
+
+| New file | Nearest Talos counterpart | 6-tok / run / lines | Verdict |
+|---|---|---|---|
+| `WasmLogic.lean` (4 import lines) | `CodeLib.lean` | 0% / 0 / 0 | clean |
+| `WasmLogic/Language.lean` (125 l.) | `SepLogic/SmallStepLanguage.lean` (287 l.), `SmallStepOutcomeLanguage.lean` (73 l.) | 3.4% / 11 tok (`h cases e <;> simp_all toVal_coe := by`) / 0 | clean. The 11-token run is the `ToVal` instance idiom, which is iris-lean's own (`HeapLang/Syntax.lean` L423-430: `coe_of_toVal_eq_some … := by cases e <;> simp_all`). See Suspect hits 1 and 2. |
+| `WasmLogic/Rules.lean` (104 l.) | `SepLogic/SmallStepLifting.lean` (5015 l.), `SmallStepOutcomeLifting.lean` | 8.1% / 14 tok (`) @ s; E {{ Φ }} := by have`) / 0 | clean. The run is WP notation. The proof of `wp_step` follows iris-lean's `ownP_lift_atomic_step` (OwnP.lean L190-206), which is library reuse; Talos's lifting goes through `wp_lift_step` + `stateInterp` macros (`wasm_wp_begin`, `wasm_wp_step_frame`) and never uses `ownP`. See Suspect hit 3. |
+| `WasmLogic/Adequacy.lean` (76 l.) | `SepLogic/WasmHeap.lean` L284-319 (`WasmHeapGF`), `SmallStepAdequacy.lean` L152-247 | 8.6% / 23 tok / 2 lines (`\| 2 => ⟨constOF (DisjointLeibnizSet PosSet), by infer_instance⟩`, `\| _ => ⟨constOF Unit, by infer_instance⟩`) | clean. Both identical lines and the 23-token run are the first four slots of the resource family, which are copied verbatim from iris-lean's `Iris/Examples/ClosedProofs.lean` L39-57 (same `constOF CoPsetDisjL`, same `{ τ := n, transp := by unfold GF; rfl }` instances). Talos's `WasmHeapGF` differs on slot 1 (`DisjointLeibnizSet CoPset`) and builds its `GpreS` with `by constructor; exists 0 …`. See Suspect hit 4. |
+| `WasmLogic/Examples/Sum.lean` (99 l.) | `Interpreter/Wasm/Examples/Factorial.lean`, `SimpleLoop.lean`; `SepLogic/SmallStepAdequacyExamples.lean` | 10.5% / 19 tok (`[ { params := [.i32], results := [.i32] } ]`) / 0 | clean with a note. The run is the structure-literal for a function type, dictated by both runtimes' syntax. The loop body is the textbook countdown shape also used by Talos's `Factorial`; see Suspect hit 5. The proof method (kernel evaluation of `Exec.run`, `wp_run`, `adequacy`) has no Talos counterpart. |
+| `README.md` | `iris-wasm/README.md` | 8.0% / 16 tok (the iris-lean GitHub URL in Markdown link syntax) / 0 | clean |
+| `lakefile.toml` | `iris-wasm/lakefile.toml` | 44.7% / 21 tok (`packagesDir = "../.lake/packages" [[require]] name =`) / 1 line (`rev = "04b7689c…"`) | clean: Lake boilerplate plus the same iris-lean revision pin; the project's own `wasm/lakefile.toml` shares the same 21-token run. |
+
+Shared comment sentences (>= 7 words) between any new and any old file: 0.
+Occurrences of `ownP` anywhere in the Talos tree: 0.
+
+## Suspect hits
+
+Every hit from the automated passes, plus everything that looked structurally close on
+reading, is listed here with the conclusion.
+
+### 1. `Language.lean` `instToVal` (L40-48) vs `SmallStepLanguage.lean` L22-30 and `SmallStepOutcomeLanguage.lean` L18-31
+
+Shared: the `ToVal` instance shape (`toVal` by pattern match, `ofVal := <constructor>`,
+`coe_of_toVal_eq_some := by intro e v h; cases e <;> simp_all`). This is the shape iris-lean
+itself uses for HeapLang (`HeapLang/Syntax.lean` L423-430) and is forced by the `ToVal` class;
+the intro-cases-simp_all script is the library's. Differences from Talos: the new `Code` type
+has two constructors (`running limits thread`, `finished outcome`) where Talos's `Expr` has
+three (`running`, `done`, `trapped`); the new value type `Outcome` (`values`/`trap`) is a
+separate inductive and the only value view, where Talos keeps `List Value` as the primary
+view and bolts on `ObservableOutcome` through a `TerminalView` class with scoped instances.
+Conclusion: library pattern, not Talos. Clean.
+
+### 2. `Language.lean` `instPrimStep`/`instLanguage`/`step_iff`/`step_det`/`run_steps` (L50-123) vs `SmallStepLanguage.lean` L32-48, L256-283 and `SmallStep.lean` L6784-6793
+
+The primitive step: Talos's is relational (`∃ kind, observation = [] ∧ Step ⟨…⟩ kind ⟨…⟩`
+over an inductive `Step` with labels); the new one is functional
+(`(target.1, target.2.1) = next source.2 limits thread` where `next` wraps
+`Wasm.Exec.step`). `val_stuck` is proved by `subst; rfl` in the new file, by `done_terminal`/
+`trapped_terminal` case analysis in Talos. The name `step_iff` exists in Talos
+(`SmallStep.lean` L6784) but states something else (`stepChecked? = ok ↔ Step`); the new
+`step_iff` unfolds the `PrimStep` instance. `step_det` has no Talos analogue in this shape
+(Talos's `step_deterministic` is two-`Step`-hypotheses determinism). `run_steps` (induction on
+fuel over `Exec.run`, `ReflTransGen.head` with `Language.Step.atomic`) corresponds in purpose
+to Talos's `Steps.to_languageNSteps`/`to_languageErasedSteps` (induction on an inductive
+`Steps` trace, `NSteps.cons`), but the statement, the induction object and the script are
+different, and the `-·->ₜₚ*` notation is iris-lean's. Conclusion: clean.
+
+### 3. `Rules.lean` `wp_step` (L28-50), `wp_done`/`wp_trap` (L53-70), `wp_run` (L73-102) vs `SmallStepLifting.lean` L27-45, L140-150 and the `wasm_wp_*` macros in `SmallStepLanguage.lean` L65-196
+
+The `wp_step` script (`iintro ⟨Hσ, H⟩; iapply ownP_lift_step; iapply fupd_mask_intro
+empty_subset; iintro Hclose; iexists σ; iframe Hσ %Hsafe; iintro !> %obs %e₂ %σ₂ %eₜ %Hstep
+Hσ₂; … imod Hclose; imodintro`) is iris-lean's own proof of `ownP_lift_atomic_step`
+(`OwnP.lean` L196-206) with the determinism step (`step_det`) spliced in; `wp_done`/`wp_trap`
+are direct applications of the library's `ownP_lift_atomic_det_step_no_fork`. Talos's
+`wasm_wp_offer_step`/`wasm_wp_frame` macros also contain `iapply fupd_mask_intro
+Std.LawfulSet.empty_subset; iintro Hclose; … imod Hclose; imodintro; isplitl [Hσ]`, but
+that is the same library idiom seen from the `wp_lift_step` side; Talos threads
+`stateInterp`, a later-credit hypothesis `Hcredit` and the `wp_lift_stuck` trap path, none
+of which appear in the new file. The rule statements differ in kind: Talos's are
+per-instruction `▷ WP next ⊢ WP current` rules generated by `wasm_wp_pure_rule`; the new file
+has three generic step rules keyed on `Exec.step = .next/.done/.trap` and one whole-run rule
+`wp_run` keyed on `Exec.run = .done`, with `ownP` pre/post. `wp_run` has no Talos counterpart.
+Conclusion: library reuse; clean.
+
+### 4. `Adequacy.lean` `GF` and `GpreS` instances (L21-43) vs `WasmHeap.lean` L284-319, L321-331 and `SmallStepAdequacy.lean` L152-162
+
+The two identical lines and the 23-token run. The new `GF` is `ClosedProofs.GF` from
+iris-lean (slots 0-3 byte-for-byte, including `constOF CoPsetDisjL` and the `| _ => ⟨constOF
+Unit, by infer_instance⟩` default) with one added slot `4 => ownPRF (Store H)`; the three
+`GpreS` instances are `ClosedProofs.lean` L47-57 verbatim, plus an `OwnPGpreS` instance in the
+same `{ τ := 4, transp := … }` style. Talos's `WasmHeapGF` uses `DisjointLeibnizSet CoPset`
+for slot 1 (so the identical lines are the two the library and Talos happen to share) and
+twenty-one slots of `HeapView`/`Auth`/`MonoNat` ghost state, and its `GpreS` instances are
+built with `by constructor; exists n`. Conclusion: copied from the Apache-2.0 library example,
+which the clean-room rule allows; not from Talos. The file even imports
+`Iris.Examples.ClosedProofs` (L3), which it does not otherwise use (it defines its own `GF`);
+that import is harmless but worth dropping or justifying.
+
+The adequacy theorems: `run_outcome` (L46-61) uses `adequate_result` on `run_steps`, like
+Talos's `adequate_to_partiallyMeets` (`SmallStepAdequacy.lean` L169-178) uses
+`adequate_result` on `to_languageErasedSteps`; both are the one-line way to use the library's
+`adequate` record, and the statements differ (match on `Exec.run` vs a `PartiallyMeets`
+predicate over traces). `adequacy` (L65-74) is `ownP_adequacy` applied; Talos's
+`wasm_smallStep_adequacy` (L184-233) is a 50-line ghost-allocation script over `wp_adequacy`.
+Conclusion: clean.
+
+### 5. `Examples/Sum.lean` `sumBody` (L20-27) vs `Interpreter/Wasm/Examples/Factorial.lean` and `SimpleLoop.lean`
+
+The loop body (`local_get 0, i32_eqz, br_if <exit>; local_get 1, local_get 0, add, local_set 1;
+local_get 0, i32_const 1, sub, local_set 0; br <loop>`) has the same instruction sequence as
+Talos's `Factorial` with `mul` replaced by `add` and the operands of the accumulate step swapped
+(`localGet 0, localGet 1, mul` vs `local_get 1, local_get 0, add`). This is the canonical
+countdown-accumulate loop that any Wasm tutorial produces for "sum 1..n"; the control nesting
+is different (new: `block [loop […]]` with `br_if 1`/`br 0`; Talos: `loop [block […]]` with
+`br_if 0`/`br 1`), the accumulator is a declared local initialised by the runtime rather than by
+an explicit `const 0, localSet 1` prologue, and the instruction names are the new runtime's
+spec-style ones. Everything after the program is unrelated: Talos's loop examples prove
+relational invariants over 13-transition traces with Mathlib; the new file defines `entry`
+through `validate`/`instantiateModule`/`startWasm`, proves `result 10 200 = some [.i32 55]` by
+`decide +kernel`, lifts that to a WP via `wp_run`, and closes with `adequacy`. The `decide
++kernel` idiom also appears in `SmallStepAdequacyExamples.lean`, but as side-condition
+discharge, not as the proof of the specification. Conclusion: shared textbook program shape,
+not a copy; clean. If the author wants zero resemblance, a different example (e.g. gcd or a
+memory loop) would remove even this.
+
+### 6. `RunResult.code` (Language.lean L93-96) vs `RunnerResult.finalConfig?` (SmallStep.lean L7297-7301)
+
+Both map a run result (`done`/`trap`/`outOfFuel`) to an expression-and-store pair. The run
+result type is the new runtime's `Wasm.Exec.RunResult` (already reviewed clean in REVIEW.md),
+the function is three one-line cases forced by that type, and Talos's version returns an
+`Option (Config α)` with an `internalError` case. Conclusion: forced by the types; clean.
+
+### 7. `lakefile.toml` identical line `rev = "04b7689c…"`
+
+Same iris-lean revision pin as the old `iris-wasm/lakefile.toml`. A dependency revision is not
+Talos text. Clean.
+
+## README and doc comments: provenance statements
+
+- `README.md` L3-6 says the package is "built on iris-lean … Phase 4 of
+  notes/todo/wasm_runtime_rewrite.md". It makes no clean-room claim and does not mention Talos
+  or the removed `iris-wasm` layer. The notes file (L5-6, L317-321) describes Phase 4 as
+  "Iris `Language` instance over `Step`, `WasmHeap` points-to, instruction rules, adequacy back
+  to `Terminates`"; the README correctly says points-to assertions "are not here yet" (L15-17),
+  so the README is the accurate one and the notes' Phase 4 paragraph is slightly ahead of what
+  exists. Nothing overstates provenance; but since `near-lean/wasm/README.md` states the
+  clean-room rule for `near-lean/wasm` only, `wasm-logic/README.md` should state that the same
+  rule applies to this package and point at this review, otherwise the rule's scope is
+  ambiguous for the logic layer.
+- `README.md` L23-24 says proofs "count only with the standard axioms" and names the audit
+  command; `audit/wasm-logic.json` exists with 65 theorems checked and no violations, so that
+  claim is backed.
+- `Adequacy.lean` L8-9 says "a closed resource family `GF` with the invariant and later-credit
+  slots that `iris-lean` needs plus one slot owning the store". Accurate, but it does not say
+  the slots and instances are taken from `Iris.Examples.ClosedProofs`; given that this is the
+  one place where whole lines are verbatim from elsewhere, a one-line attribution ("slots 0-3
+  and their instances follow `Iris.Examples.ClosedProofs`") would make the provenance of the
+  identical lines self-evident to the next reviewer.
+- `Examples/Sum.lean` L11-12 ("The proof touches no step by hand: the machine computes, the
+  kernel checks") is accurate.
+- `lakefile.toml` L1-3 and `Language.lean` L4-12, `Rules.lean` L4-10: accurate descriptions, no
+  provenance claims.
+
+## Overall verdict
+
+**Clean, with qualifications** (none of them a Talos derivation).
+
+Numbers: zero identical comment sentences; zero identical lines against any Talos-authored
+text (the two identical lines in `Adequacy.lean` and the one in `lakefile.toml` are iris-lean
+example text and a dependency pin); longest token run against a Talos `.lean` file is 23
+tokens, inside those same library lines; the next longest are 19 (a function-type structure
+literal), 14 (WP notation) and 11 (the library's `ToVal` proof idiom). Reading: the language
+instance (functional `next` over `Exec.step`, two-constructor `Code`, `Outcome` as the only
+value type), the rules (`ownP`-based, three step rules plus `wp_run`), the adequacy
+(`ownP_adequacy` over a five-slot family) and the example (kernel evaluation) are all designed
+differently from Talos's relational `Step`, `TerminalView`, `genHeap`/`stateInterp` ghost
+state, per-instruction macro-generated rules and invariant-trace examples. Talos never used
+`ownP` at all.
+
+Qualifications, actionable:
+
+1. `WasmLogic/Adequacy.lean` L21-43 copies `Iris/Examples/ClosedProofs.lean` L39-57
+   (Apache-2.0). Permitted by the clean-room rule ("the iris-lean library"), but add a
+   one-line attribution in the doc comment so the verbatim lines are explained in place, and
+   either use or drop the otherwise unused `import Iris.Examples.ClosedProofs` (L3).
+2. `near-lean/wasm-logic/README.md` does not state that the clean-room rule of
+   `near-lean/wasm/README.md` covers this package, and `near-lean/wasm/REVIEW.md` does not
+   cover it either. Add a sentence to the README pointing at the rule and record this review
+   (e.g. append it to `near-lean/wasm/REVIEW.md` or add `near-lean/wasm-logic/REVIEW.md`).
+3. `WasmLogic/Examples/Sum.lean` L20-27 is the same textbook countdown loop as Talos's
+   `Interpreter/Wasm/Examples/Factorial.lean`/`SimpleLoop.lean` (with `add` for `mul`,
+   different nesting and operand order). Not a copy and not actionable under the rule, but if
+   the author prefers the package to share no program shape with the Talos corpus, swap the
+   example for one Talos did not have.
+4. `notes/todo/wasm_runtime_rewrite.md` L5-6 and L317-321 describe Phase 4 as including
+   `WasmHeap` points-to and instruction rules; the README correctly says those are not
+   present. Align the notes with what landed.
+
+## Action taken (2026-10-23)
+
+Qualifications 1, 2 and 4 were applied the same day: `Adequacy.lean` names
+`Iris/Examples/ClosedProofs.lean` as the source of its first four slots and
+drops the unused import; `wasm-logic/README.md` states that the clean-room
+rule covers the package and points here; the notes describe Phase 4 as it
+landed. Qualification 3 (the textbook countdown loop in the example) is
+recorded and left as is: the reviewer found it not a copy.

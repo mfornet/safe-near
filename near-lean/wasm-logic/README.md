@@ -4,6 +4,10 @@ A separation logic over the Wasm runtime in [`../wasm`](../wasm/README.md),
 built on [iris-lean](https://github.com/leanprover-community/iris-lean)
 (pinned by revision in `lakefile.toml`). Phase 4 of
 [notes/todo/wasm_runtime_rewrite.md](../../notes/todo/wasm_runtime_rewrite.md).
+The clean-room rule of [`../wasm/README.md`](../wasm/README.md) applies to this
+package too: it is written from iris-lean and the runtime, never from the
+removed Talos layer `iris-wasm`; the independent review is recorded in
+[`../wasm/REVIEW.md`](../wasm/REVIEW.md).
 
 | Module | What it is |
 |---|---|
