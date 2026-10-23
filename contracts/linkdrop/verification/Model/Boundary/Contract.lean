@@ -213,6 +213,9 @@ def Panic.failure : Panic → NearInterface.Failure
 
 /-! ## Receipts -/
 
+/-- A `u128`/`NearToken` as serde_json writes it: a JSON string. -/
+def jsonU128 (n : Nat) : String := quote (toString n)
+
 /-- Gas the callbacks attach (`ON_CREATE_ACCOUNT_CALLBACK_GAS`). -/
 def callbackGas : Nat := 13 * 10 ^ 12
 
@@ -231,8 +234,10 @@ inductive Action where
   | deploy (code : Bytes)
   | globalHash (hash : Bytes)
   | globalAccount (account : AccountId)
-  /-- A function call with static gas and gas weight 1. -/
-  | callback (method args : String) (gas : Nat)
+  /-- `on_account_created(predecessor, amount)`: 13 Tgas, weight 1. -/
+  | onCreated (predecessor : AccountId) (amount : Nat)
+  /-- `on_account_created_and_claimed(amount)`: 13 Tgas, weight 1. -/
+  | onClaimed (amount : Nat)
 
 structure Receipt where
   receiver : AccountId
@@ -240,12 +245,17 @@ structure Receipt where
   /-- Scheduled with `.then` on the previous receipt. -/
   afterPrevious : Bool := false
 
-/-- A `u128`/`NearToken` as serde_json writes it: a JSON string. -/
-def jsonU128 (n : Nat) : String := quote (toString n)
-
 def Action.weighted : Action → Bool
-  | .callback .. => true
+  | .onCreated .. | .onClaimed _ => true
   | _ => false
+
+/-- The method and JSON arguments of a callback. -/
+def callbackCall : Action → String × String
+  | .onCreated predecessor amount =>
+    ("on_account_created",
+      "{\"predecessor_account_id\":" ++ quote predecessor.val ++ ",\"amount\":" ++ jsonU128 amount ++ "}")
+  | .onClaimed amount => ("on_account_created_and_claimed", "{\"amount\":" ++ jsonU128 amount ++ "}")
+  | _ => ("", "")
 
 /-- The share of the leftover gas the `i`-th of `n` weighted calls receives
 (`distribute_gas`, every weight 1). -/
@@ -262,8 +272,9 @@ def Action.encode (leftover n : Nat) (i : Nat) : Action → Wasm.PromiseAction
   | .deploy code => .deployContract code
   | .globalHash hash => .useGlobalContract (.codeHash hash)
   | .globalAccount account => .useGlobalContract (.accountId account.bytes)
-  | .callback method args gas =>
-    .functionCall method.toUTF8.toList args.toUTF8.toList 0 (UInt64.ofNat (gas + share leftover n i))
+  | a@(.onCreated ..) | a@(.onClaimed _) =>
+    let (method, args) := callbackCall a
+    .functionCall method.toUTF8.toList args.toUTF8.toList 0 (UInt64.ofNat (callbackGas + share leftover n i))
 
 /-- Encode actions, numbering the weighted ones from `i`. -/
 def encodeActions (leftover n : Nat) : Nat → List Action → List Wasm.PromiseAction
@@ -320,14 +331,6 @@ def Options.actions (o : Options) : List Action :=
   o.bytes.toList.map .deploy ++ o.base64Bytes.toList.map .deploy ++
   o.globalHash.toList.map .globalHash ++ o.globalAccount.toList.map .globalAccount
 
-def createdCallback (e : Env) (amount : Nat) : Action :=
-  .callback "on_account_created"
-    ("{\"predecessor_account_id\":" ++ quote e.predecessor.val ++ ",\"amount\":" ++ jsonU128 amount ++ "}")
-    callbackGas
-
-def claimedCallback (amount : Nat) : Action :=
-  .callback "on_account_created_and_claimed" ("{\"amount\":" ++ jsonU128 amount ++ "}") callbackGas
-
 /-- `is_promise_success()`: exactly one result, which must be ready. -/
 def promiseSuccess (e : Env) : Except Panic Bool :=
   match e.results with
@@ -342,7 +345,7 @@ def signer (e : Env) : Except Panic PublicKey :=
   | none => .error .trap
 
 def body (s : Map) (e : Env) : Call → Result
-  | .new => .ok (s, .unit, [])
+  | .new => .ok (⟨[]⟩, .unit, [])
   | .send key =>
     if e.deposit = 0 then .error .zeroDeposit else
     .ok (s.insert key (min ((s.get key).getD 0 + e.deposit) maxAmount), .promise 0,
@@ -358,17 +361,17 @@ def body (s : Map) (e : Env) : Call → Result
     let some amount := s.get k | .error .createAndClaimMissing
     pure (s.remove k, .promise 1,
       [{ receiver := account, actions := [.create, .fullKey key, .transfer amount] },
-       { receiver := e.current, actions := [claimedCallback amount], afterPrevious := true }])
+       { receiver := e.current, actions := [.onClaimed amount], afterPrevious := true }])
   | .createAccount account key =>
     .ok (s, .promise 1,
       [{ receiver := account, actions := [.create, .fullKey key, .transfer e.deposit] },
-       { receiver := e.current, actions := [createdCallback e e.deposit], afterPrevious := true }])
+       { receiver := e.current, actions := [.onCreated e.predecessor e.deposit], afterPrevious := true }])
   | .createAdvanced account o =>
     if !o.present then .error .noOptions else
     if o.deployments > 1 then .error .conflictingOptions else
     .ok (s, .promise 1,
       [{ receiver := account, actions := [.create, .transfer e.deposit] ++ o.actions },
-       { receiver := e.current, actions := [createdCallback e e.deposit], afterPrevious := true }])
+       { receiver := e.current, actions := [.onCreated e.predecessor e.deposit], afterPrevious := true }])
   | .onCreated predecessor amount => do
     let success ← promiseSuccess e
     pure (s, .bool success,

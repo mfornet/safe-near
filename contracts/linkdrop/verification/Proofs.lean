@@ -6,3 +6,4 @@ import Proofs.Storage
 import Proofs.Liability
 import Proofs.Projection
 import Proofs.Refinement
+import Proofs.BoundaryProjection

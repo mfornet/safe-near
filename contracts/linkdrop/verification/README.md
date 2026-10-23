@@ -156,7 +156,12 @@ for the deployed binary: `refines_linkdrop` (open). The instance,
 swap removals, long arguments and an adversarial trie (225 checks).
 
 The abstract model of the rest of this README (`Model/Methods.lean`, keys as
-`Nat`) is the same contract; relating it to the boundary model is not done.
+`Nat`) is the same contract: `Proofs/BoundaryProjection.lean` proves that,
+under any injective numbering of public keys, every boundary method projects
+onto the abstract method (`body_project`: same failure, map, receipts and
+return value), for distinct stored keys and a parsable signer key. The
+abstract model's properties are therefore properties of the model the binary
+is tested against.
 
 Beyond single calls, chain-level obligations remain: callback provenance,
 pending liabilities, gas allowance costs, runtime refunds, sufficient backing

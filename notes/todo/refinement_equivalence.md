@@ -437,6 +437,9 @@ departures from wNEAR's shape: the state is an optional map, since the metadata
 exports succeed on empty storage and `Outcome.state` must encode it; and
 `refines_linkdrop` assumes a code decoder with no limitation, since
 `create_account_advanced` deploys the bytes it is given.
+`Proofs/BoundaryProjection.lean` relates the boundary model to the earlier
+abstract model (`body_project`), so the abstract safety and economics proofs
+carry over.
 
 ### Environment notes
 
