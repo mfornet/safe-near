@@ -1,0 +1,264 @@
+{
+  "crates": "near-primitives =0.37.4, near-crypto =0.37.4, near-primitives-core =0.37.4",
+  "nearcore_release": "2.13.4",
+  "protocol_version": 86,
+  "seed": "0x4e45415200000001",
+  "types": {
+    "AccessKey": {
+      "accept": 156,
+      "reject": 45
+    },
+    "AccessKeyPermission": {
+      "accept": 33,
+      "reject": 49
+    },
+    "Account": {
+      "accept": 181,
+      "reject": 51
+    },
+    "AccountContract": {
+      "accept": 32,
+      "reject": 50
+    },
+    "AccountId": {
+      "accept": 50,
+      "reject": 117
+    },
+    "Action": {
+      "accept": 295,
+      "reject": 111
+    },
+    "ActionError": {
+      "accept": 107,
+      "reject": 51
+    },
+    "ActionErrorKind": {
+      "accept": 132,
+      "reject": 150
+    },
+    "ActionReceipt": {
+      "accept": 70,
+      "reject": 50
+    },
+    "ActionReceiptV2": {
+      "accept": 67,
+      "reject": 53
+    },
+    "ActionsValidationError": {
+      "accept": 86,
+      "reject": 106
+    },
+    "Bool": {
+      "accept": 2,
+      "reject": 7
+    },
+    "BufferedReceiptIndices": {
+      "accept": 37,
+      "reject": 50
+    },
+    "Bytes": {
+      "accept": 32,
+      "reject": 58
+    },
+    "BytesMap": {
+      "accept": 28,
+      "reject": 66
+    },
+    "CompilationError": {
+      "accept": 11,
+      "reject": 44
+    },
+    "CryptoHash": {
+      "accept": 56,
+      "reject": 39
+    },
+    "DataReceipt": {
+      "accept": 65,
+      "reject": 40
+    },
+    "DataReceiver": {
+      "accept": 39,
+      "reject": 41
+    },
+    "DeterministicAccountStateInit": {
+      "accept": 45,
+      "reject": 54
+    },
+    "ExecutionMetadata": {
+      "accept": 32,
+      "reject": 60
+    },
+    "ExecutionOutcome": {
+      "accept": 162,
+      "reject": 48
+    },
+    "ExecutionOutcomeWithId": {
+      "accept": 176,
+      "reject": 40
+    },
+    "ExecutionOutcomeWithIdAndProof": {
+      "accept": 51,
+      "reject": 49
+    },
+    "ExecutionOutcomeWithProof": {
+      "accept": 41,
+      "reject": 49
+    },
+    "ExecutionStatus": {
+      "accept": 48,
+      "reject": 46
+    },
+    "FunctionCallError": {
+      "accept": 29,
+      "reject": 54
+    },
+    "FunctionCallPermission": {
+      "accept": 34,
+      "reject": 62
+    },
+    "GlobalContractDistributionReceipt": {
+      "accept": 52,
+      "reject": 60
+    },
+    "GlobalContractIdentifier": {
+      "accept": 32,
+      "reject": 60
+    },
+    "HostError": {
+      "accept": 91,
+      "reject": 130
+    },
+    "InvalidAccessKeyError": {
+      "accept": 27,
+      "reject": 53
+    },
+    "InvalidTxError": {
+      "accept": 111,
+      "reject": 116
+    },
+    "MerklePathItem": {
+      "accept": 18,
+      "reject": 19
+    },
+    "MethodResolveError": {
+      "accept": 3,
+      "reject": 8
+    },
+    "MissingTrieValue": {
+      "accept": 20,
+      "reject": 40
+    },
+    "NonDelegateAction": {
+      "accept": 84,
+      "reject": 102
+    },
+    "OptionU64": {
+      "accept": 12,
+      "reject": 31
+    },
+    "PartialExecutionOutcome": {
+      "accept": 46,
+      "reject": 54
+    },
+    "PrepareError": {
+      "accept": 19,
+      "reject": 37
+    },
+    "ProfileDataV2": {
+      "accept": 36,
+      "reject": 56
+    },
+    "ProfileDataV3": {
+      "accept": 37,
+      "reject": 56
+    },
+    "PromiseYieldTimeout": {
+      "accept": 27,
+      "reject": 53
+    },
+    "PublicKey": {
+      "accept": 53,
+      "reject": 75
+    },
+    "Receipt": {
+      "accept": 206,
+      "reject": 54
+    },
+    "ReceiptEnum": {
+      "accept": 83,
+      "reject": 76
+    },
+    "ReceiptOrStateStoredReceipt": {
+      "accept": 94,
+      "reject": 53
+    },
+    "ReceiptValidationError": {
+      "accept": 46,
+      "reject": 89
+    },
+    "ReceivedData": {
+      "accept": 6,
+      "reject": 23
+    },
+    "Signature": {
+      "accept": 52,
+      "reject": 75
+    },
+    "SignedDelegateAction": {
+      "accept": 68,
+      "reject": 52
+    },
+    "SignedTransaction": {
+      "accept": 216,
+      "reject": 62
+    },
+    "StateStoredReceipt": {
+      "accept": 70,
+      "reject": 50
+    },
+    "StorageError": {
+      "accept": 24,
+      "reject": 59
+    },
+    "String": {
+      "accept": 38,
+      "reject": 92
+    },
+    "Transaction": {
+      "accept": 219,
+      "reject": 71
+    },
+    "TransactionNonce": {
+      "accept": 22,
+      "reject": 50
+    },
+    "TransactionV0": {
+      "accept": 51,
+      "reject": 49
+    },
+    "TransactionV1": {
+      "accept": 48,
+      "reject": 52
+    },
+    "TrieQueueIndices": {
+      "accept": 30,
+      "reject": 31
+    },
+    "TxExecutionError": {
+      "accept": 276,
+      "reject": 60
+    },
+    "U128": {
+      "accept": 45,
+      "reject": 34
+    },
+    "VersionedSignedDelegateAction": {
+      "accept": 69,
+      "reject": 51
+    },
+    "WasmTrap": {
+      "accept": 9,
+      "reject": 19
+    }
+  }
+}
