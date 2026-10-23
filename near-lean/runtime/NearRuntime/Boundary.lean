@@ -1,6 +1,7 @@
 import NearRuntime.Apply
 import NearInterface.Refines
 import NearVM.Fuel
+import NearVM.StorageListing
 
 /-!
 # near-lean as a `RuntimeInterface`
@@ -201,5 +202,61 @@ theorem execOn_fuel_independent (code : Code) (storage : List (Bytes × Bytes)) 
         (fuelFor ctx.protocol code.code.module (toVMContext ctx) + n) =
       run ctx.protocol code.code.module code.code.size ctx.method (toVMContext ctx) storage :=
   run_fuel_independent _ _ _ _ _ _ (Nat.lt_min.mpr hwf.opCost_pos) n
+
+/-! ## Storage listing
+
+The VM reads storage from a list; `RawStorage` is a set. Two listings of the
+same records give the same observation, so `nearRuntime` depends on the
+storage only as a set. -/
+
+theorem observe_echo (ctx : Context) {s₁ s₂ : List (Bytes × Bytes)} (hs : s₁.toFinset = s₂.toFinset)
+    {o₁ o₂ : VMOutcome} (h : EchoRel o₁ o₂) (issue : Option ExecutionIssue) :
+    observe ctx s₁ o₁ issue = observe ctx s₂ o₂ issue := by
+  obtain ⟨hf, hst⟩ := h
+  have field {β : Type} (f : VMOutcome → β) (hf' : ∀ o : VMOutcome, f { o with storage := [] } = f o) :
+      f o₁ = f o₂ := by
+    rw [← hf' o₁, ← hf' o₂, hf]
+  have ha : o₁.aborted = o₂.aborted := field VMOutcome.aborted fun _ => rfl
+  have hacc : o₁.storageAccounting = o₂.storageAccounting := field VMOutcome.storageAccounting fun _ => rfl
+  have hb : o₁.burntGas = o₂.burntGas := field VMOutcome.burntGas fun _ => rfl
+  have hu : o₁.usedGas = o₂.usedGas := field VMOutcome.usedGas fun _ => rfl
+  have hl : o₁.logs = o₂.logs := field VMOutcome.logs fun _ => rfl
+  have hr : o₁.returnData = o₂.returnData := field VMOutcome.returnData fun _ => rfl
+  have hbal : o₁.balance = o₂.balance := field VMOutcome.balance fun _ => rfl
+  have husage : o₁.storageUsage = o₂.storageUsage := field VMOutcome.storageUsage fun _ => rfl
+  have hrec : o₁.receipts = o₂.receipts := field VMOutcome.receipts fun _ => rfl
+  unfold observe
+  rw [hs, ha, hacc, hb, hu, hl, hr, hbal, husage, hrec]
+  cases hab : o₂.aborted with
+  | some e => rfl
+  | none => rw [hst (ha.trans hab)]
+
+/-- The boundary does not depend on how the storage is listed. -/
+theorem execOn_perm (code : Code) {s₁ s₂ : List (Bytes × Bytes)} (h : s₁.Perm s₂)
+    (hu : KeysUnique s₁) (ctx : Context) : execOn code s₁ ctx = execOn code s₂ ctx := by
+  have hs : s₁.toFinset = s₂.toFinset := List.toFinset_eq_of_perm _ _ h
+  unfold execOn
+  split
+  · exact observe_echo ctx hs (failedBefore_echo _ _ _ _ _ _) none
+  · have hrun := run_perm ctx.protocol code.code.module code.code.size ctx.method (toVMContext ctx) h hu
+      (fuelFor ctx.protocol code.code.module (toVMContext ctx))
+    have hrec : (run ctx.protocol code.code.module code.code.size ctx.method (toVMContext ctx) s₁).receipts =
+        (run ctx.protocol code.code.module code.code.size ctx.method (toVMContext ctx) s₂).receipts := by
+      have := congrArg VMOutcome.receipts hrun.1
+      simpa using this
+    dsimp only
+    rw [hrec]
+    exact observe_echo ctx hs hrun _
+
+/-- `nearRuntime` computes, on any listing of the storage, what the boundary
+computes on that listing. -/
+theorem nearRuntime_exec_listing (code : Code) {raw : RawStorage} {ctx : Context}
+    (hwf : ctx.WF raw) {l : List (Bytes × Bytes)} (hl : l.toFinset = raw) (hnd : l.Nodup) :
+    nearRuntime.exec code raw ctx = execOn code l ctx := by
+  show execOn code raw.toList ctx = execOn code l ctx
+  apply execOn_perm code _ _ ctx
+  · rw [← hl]; exact List.toFinset_toList hnd
+  · intro k v v' hv hv'
+    exact hwf.raw_keys_unique k v v' (Finset.mem_toList.mp hv) (Finset.mem_toList.mp hv')
 
 end Near.Boundary

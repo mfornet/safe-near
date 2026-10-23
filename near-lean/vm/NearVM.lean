@@ -31,3 +31,4 @@ import NearVM.PromiseEncoding
 import NearVM.MeteredEncoding
 import NearVM.OutcomeEncoding
 import NearVM.Fuel
+import NearVM.StorageListing

@@ -319,7 +319,7 @@ statement, the instance, the model extensions, re-proved specs and tests.
 | Step | State |
 |---|---|
 | 1. `near-lean/interface` | done |
-| 2. near-lean boundary and instance | done, fuel sufficiency proved; storage listing and whole-receipt seam open |
+| 2. near-lean boundary and instance | done; fuel sufficiency and storage listing proved; whole-receipt seam open |
 | 3. wNEAR | done: model extensions, instance, statement, re-proved specs, tests |
 | 4. linkdrop | old statement removed; instance blocked on near-lean (below) |
 | 5. Tests | wNEAR adapter tests on the boundary (205 checks) |
@@ -388,10 +388,14 @@ statement, the instance, the model extensions, re-proved specs and tests.
   the module's code), `HostGasFloor.lean` (no host function lowers burnt
   gas), `NearVM/Fuel.lean` (a potential that every metered iteration
   strictly decreases).
-- **Storage listing.** The VM reads storage from a list and `RawStorage` is a
-  set, so `nearRuntime` uses `raw.toList`. That `execOn` depends on the listing
-  only through its set is not proved. The adapter tests use the computable
-  `execOn`.
+- **Storage listing — proved.** The VM reads storage from a list and
+  `RawStorage` is a set. `toNearState` now sorts the keys (the trie's
+  iteration order); two listings of the same records with one value per key
+  give the same initial host state, so `run` differs only in the input a
+  failure echoes back (`NearVM/StorageListing.lean`), and the boundary's
+  observation is the same (`execOn_perm`). `nearRuntime_exec_listing`:
+  the instance computes on any listing what `execOn` computes. One value per
+  key is a new `Context.WF` field.
 - **Whole receipt.** For a receipt whose only action is a function call,
   `runReceiptActions` agrees with `execOn` on what `Observation` holds (action
   fees aside). Not proved.
