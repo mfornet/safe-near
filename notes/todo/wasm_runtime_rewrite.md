@@ -2,7 +2,8 @@
 
 Status: phases 1 to 3 done on 2026-10-23: the runtime lives in `near-lean/wasm`,
 `NearVM` runs on it with its proofs intact, and the Talos packages are gone.
-Phase 4 (the Iris layer) is open.
+Phase 4 (the Iris layer) is in `near-lean/wasm-logic`: language instance,
+step and run rules, adequacy and an example; points-to assertions remain.
 
 ## Why
 

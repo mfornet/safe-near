@@ -76,7 +76,7 @@ test-all: check-toolchains tools-test near-test chain-replay-test runtime-adapte
 # Audit all core Lean packages.
 audit-all:
     python3 tools/tests/check_axiom_audit.py
-    @for package in wasm vm runtime chain; do \
+    @for package in wasm wasm-logic vm runtime chain; do \
         python3 tools/axiom-audit.py near-lean/"$package" --report audit/"$package".json; \
     done
 

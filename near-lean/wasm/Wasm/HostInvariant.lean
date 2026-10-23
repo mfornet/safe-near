@@ -179,6 +179,29 @@ theorem enter_liveInvariant {P : H → Prop} (c : Config H) (stack : Array Value
     · trivial
     · exact h.2
 
+/-- A running step keeps the execution limits. -/
+theorem step_limits (c : Config H) {c' : Config H} (h : step c = .next c') : c'.limits = c.limits := by
+  unfold step at h
+  split at h
+  · cases h
+  · rename_i frame frames hframes
+    split at h
+    · unfold leave at h; dsimp only at h; (repeat' split at h) <;> cases h <;> rfl
+    · cases h; rfl
+    · dsimp only at h
+      split at h
+      · cases h; rfl
+      · unfold enter at h
+        split at h
+        · cases h
+        · dsimp only at h
+          (repeat' split at h) <;> (try cases h) <;> rfl
+        · split at h
+          · cases h
+          · cases h; rfl
+      · unfold leave at h; dsimp only at h; (repeat' split at h) <;> cases h <;> rfl
+      · cases h
+
 theorem step_funcs (c : Config H) : (step c).store.funcs = c.store.funcs := by
   unfold step
   split

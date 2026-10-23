@@ -1,0 +1,20 @@
+# WasmLogic: a separation logic over the Wasm runtime (../wasm), built on
+# iris-lean. Proofs about Wasm code by weakest preconditions, with adequacy
+# back to the executable semantics.
+name = "WasmLogic"
+version = "0.1.0"
+defaultTargets = ["WasmLogic"]
+packagesDir = "../.lake/packages"
+
+[[require]]
+name = "Wasm"
+path = "../wasm"
+
+[[require]]
+name = "iris"
+git = "https://github.com/leanprover-community/iris-lean.git"
+subDir = "Iris"
+rev = "04b7689c294bb1dd6401e2dd53b337871934ea47"
+
+[[lean_lib]]
+name = "WasmLogic"

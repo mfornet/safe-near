@@ -6,6 +6,7 @@ one toolchain (`lean-toolchain`) and one `packagesDir` (`.lake/packages`).
 | Package | Seam in nearcore | What it is |
 |---|---|---|
 | `wasm/` | wasmer / wasmtime | The Wasm runtime, written from the spec, and the official test suite |
+| `wasm-logic/` | | A separation logic over the runtime's step (iris-lean), for proofs about Wasm code |
 | `vm/` | `near_vm_runner::run` | One function call: host functions, gas, `VMContext` → `VMOutcome` |
 | `runtime/` | `Runtime::apply` | Accounts, access keys, receipts, actions, fees, refunds |
 | `chain/` | the "trustless manipulator" | Blocks, reachable states, explicit run completion, measured burnt gas |

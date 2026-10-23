@@ -40,6 +40,14 @@ Passing a finite testsuite does not prove compatibility; each supported feature
 must be validated. Fuzzing and tests from NEAR history are future work.
 Auditability matters more than performance.
 
+## Proofs about Wasm code
+
+`near-lean/wasm-logic` is an iris-lean separation logic over `Wasm.Exec.step`:
+the machine as a `Language`, weakest-precondition rules from store ownership
+(one step, or a whole finishing run), adequacy back to `Exec.run`, and a
+worked example. Its resource is the whole store; points-to assertions over
+memory, locals and globals are future work.
+
 ## Known model gaps
 
 - A start function is rejected as unsupported; nearcore runs it as a metered

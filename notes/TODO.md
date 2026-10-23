@@ -18,9 +18,9 @@ and chain layers run on it with nearcore conformance harnesses.
 
 ## Wasm runtime
 
-- A separation-logic layer (Iris) over `Wasm.Exec.step`, for proofs about Wasm
-  code rather than refinement at the `NearVM.run` boundary
-  ([plan](todo/wasm_runtime_rewrite.md), phase 4).
+- Points-to assertions in `near-lean/wasm-logic` that split memory, locals
+  and globals into separately owned pieces, and per-instruction rules over
+  them; today the logic owns the whole store.
 - Close the model gaps listed in [Wasm runtime](design/WASM_RUNTIME.md): start
   functions, exported imports, nearcore's stack limiter.
 
