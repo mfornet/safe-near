@@ -40,7 +40,7 @@ def deposit (s : State) (a : AccountId) (amount : Nat) : M State := do
 def withdraw (s : State) (a : AccountId) (amount : Nat) : M State := do
   let b ← s.unwrapBalance a
   require (amount ≤ b) .notEnoughBalance
-  require (amount ≤ s.totalSupply) .totalSupplyOverflow
+  require (amount ≤ s.totalSupply) .totalSupplyUnderflow
   pure { s.setBalance a (b - amount) with totalSupply := s.totalSupply - amount }
 
 /-- `internal_register_account`. -/
@@ -51,14 +51,11 @@ def registerAccount (s : State) (a : AccountId) : M State := do
 /-- `internal_transfer`. Returns the new state and the logs. -/
 def transfer (s : State) (sender receiver : AccountId) (amount : Nat) (memo : Option String) :
     M (State × List String) := do
-  require (sender ≠ receiver) .sameSenderReceiver
+  require (sender ≠ receiver) (.sameSenderReceiver sender)
   require (0 < amount) .amountNotPositive
   let s ← s.withdraw sender amount
   let s ← s.deposit receiver amount
-  let memoLog := match memo with
-    | some m => [s!"Memo: {m}"]
-    | none => []
-  pure (s, s!"Transfer {amount} from {sender} to {receiver}" :: memoLog)
+  pure (s, transferLogs sender receiver amount memo)
 
 /-- `storage_balance_bounds()`. -/
 def storageBalanceBounds (s : State) : StorageBalanceBounds :=
@@ -111,10 +108,10 @@ payout receipt. This local success does not assert eventual payout success. -/
 @[blueprint "def:near-withdraw"
   (statement := /-- \texttt{near\_withdraw}$(a)$: requires exactly 1 yoctoNEAR attached and a registered predecessor with balance at least $a$; subtracts $a$ from its balance and from the total supply and schedules a transfer of $a + 1$ yoctoNEAR to it, returning that transfer receipt's result (local index 0). -/)]
 def nearWithdraw (s : State) (env : Env) (amount : Nat) : M Outcome := do
-  require (env.attachedDeposit = 1) .requiresOneYocto
+  require (env.attachedDeposit = 1) (.requiresOneYocto env.attachedDeposit)
   let a := env.predecessor
   let s ← s.withdraw a amount
-  require (amount + 1 < u128Bound) .arithmeticOverflow
+  require (amount + 1 < u128Bound) (.withdrawOverflow a amount)
   pure { state := s, promises := [.transfer a (amount + 1)], ret := .promise 0,
          logs := [s!"Withdraw {amount} NEAR from {a}"] }
 
@@ -123,7 +120,7 @@ def nearWithdraw (s : State) (env : Env) (amount : Nat) : M Outcome := do
   (statement := /-- \texttt{ft\_transfer}$(r, a, \mathit{memo})$: requires 1 yoctoNEAR, $r \ne$ predecessor and $a > 0$; moves $a$ from the predecessor to $r$, both of which must be registered. -/)]
 def ftTransfer (s : State) (env : Env) (receiver : AccountId) (amount : Nat)
     (memo : Option String) : M Outcome := do
-  require (env.attachedDeposit = 1) .requiresOneYocto
+  require (env.attachedDeposit = 1) (.requiresOneYocto env.attachedDeposit)
   let (s, logs) ← s.transfer env.predecessor receiver amount memo
   pure { state := s, logs }
 
@@ -133,10 +130,10 @@ def ftTransfer (s : State) (env : Env) (receiver : AccountId) (amount : Nat)
   (statement := /-- \texttt{ft\_transfer\_call}$(r, a, \mathit{memo}, \mathit{msg})$: as \cref{def:ft-transfer}, then creates the promise \texttt{ft\_on\_transfer} on $r$ with all the prepaid gas but 30 TGas (panicking if there is less), followed by the callback \texttt{ft\_resolve\_transfer} on the contract itself with 5 TGas; the call's result is that of the callback. -/)]
 def ftTransferCall (s : State) (env : Env) (receiver : AccountId) (amount : Nat)
     (memo : Option String) (msg : String) : M Outcome := do
-  require (env.attachedDeposit = 1) .requiresOneYocto
+  require (env.attachedDeposit = 1) (.requiresOneYocto env.attachedDeposit)
   let sender := env.predecessor
   let (s, logs) ← s.transfer sender receiver amount memo
-  require (gasForFtTransferCall ≤ env.prepaidGas) .arithmeticOverflow
+  require (gasForFtTransferCall ≤ env.prepaidGas) (.transferCallGas sender receiver amount memo)
   let onTransfer : Promise :=
     .call receiver (.ftOnTransfer sender amount msg) 0 (env.prepaidGas - gasForFtTransferCall)
   let resolve : Promise :=
@@ -162,12 +159,12 @@ def resolveRefund (s : State) (sender receiver : AccountId) (amount unused : Nat
       let refund := min receiverBalance unused
       let s := s.setBalance receiver (receiverBalance - refund)
       if sender ∈ s.registered then do
-        require (s.balance sender + refund < u128Bound) .arithmeticOverflow
+        require (s.balance sender + refund < u128Bound) .refundOverflow
         pure { state := s.setBalance sender (s.balance sender + refund),
                ret := .u128 (amount - refund),
                logs := [s!"Refund {refund} from {receiver} to {sender}"] }
       else do
-        require (refund ≤ s.totalSupply) .arithmeticOverflow
+        require (refund ≤ s.totalSupply) .burnUnderflow
         pure { state := { s with totalSupply := s.totalSupply - refund }, ret := .u128 amount,
                logs := ["The account of the sender was deleted"] }
     else pure { state := s, ret := .u128 amount }
@@ -213,7 +210,7 @@ or no amount succeeds. -/
 @[blueprint "def:storage-withdraw"
   (statement := /-- \texttt{storage\_withdraw}$(a)$: requires 1 yoctoNEAR and a registered predecessor; panics if $a > 0$ (nothing is ever withdrawable); changes nothing. -/)]
 def storageWithdraw (s : State) (env : Env) (amount : Option Nat) : M Outcome := do
-  require (env.attachedDeposit = 1) .requiresOneYocto
+  require (env.attachedDeposit = 1) (.requiresOneYocto env.attachedDeposit)
   let a := env.predecessor
   require (a ∈ s.registered) (.notRegistered a)
   match amount with
@@ -226,13 +223,13 @@ def storageWithdraw (s : State) (env : Env) (amount : Option Nat) : M Outcome :=
 @[blueprint "def:storage-unregister"
   (statement := /-- \texttt{storage\_unregister}$(\mathit{force})$: requires 1 yoctoNEAR. If the predecessor is registered, requires its balance to be $0$ or $\mathit{force}$; removes it, subtracts its balance from the total supply and transfers $\mathrm{storageMin} + 1$ yoctoNEAR back to it. Otherwise returns \texttt{false}. -/)]
 def storageUnregister (s : State) (env : Env) (force : Option Bool) : M Outcome := do
-  require (env.attachedDeposit = 1) .requiresOneYocto
+  require (env.attachedDeposit = 1) (.requiresOneYocto env.attachedDeposit)
   let a := env.predecessor
   let force := force.getD false
   if a ∈ s.registered then
     let b := s.balance a
     require (b = 0 ∨ force = true) .unregisterWithBalance
-    require (b ≤ s.totalSupply) .arithmeticOverflow
+    require (b ≤ s.totalSupply) .unregisterUnderflow
     pure { state := { s.unregister a with totalSupply := s.totalSupply - b },
            promises := [.transfer a (s.storageMin + 1)], ret := .bool true }
   else
