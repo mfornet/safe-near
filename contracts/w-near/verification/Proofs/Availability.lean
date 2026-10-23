@@ -68,4 +68,67 @@ theorem deposit_available : DepositAvailable := by
     simp [hreg, hz]
     omega
 
+@[blueprint "thm:withdraw-available-boundary"
+  (statement := /-- \cref{spec:withdraw-available-boundary} holds. -/)]
+theorem withdraw_available_at_boundary : WithdrawAvailableAtBoundary := by
+  intro cfg s ctx amount a s' hs hreg hamt hdep hbound hbal hrent
+  have h := withdraw_available cfg s (Env.ofContext ctx) amount hs hreg hamt hdep hbound
+  rw [step_nearWithdraw] at h
+  unfold contractStep
+  rw [step_nearWithdraw, h]
+  dsimp only
+  split
+  · rename_i hlt
+    change ctx.balance + ctx.attached < amount + 1 at hlt
+    rw [hdep] at hlt
+    exact absurd hlt (Nat.not_lt.mpr (Nat.add_le_add_right hbal 1))
+  · split
+    · rename_i hpos
+      change 0 < NearInterface.stakeDeficit ctx.protocol (usageAfter ctx (some s) s')
+        (ctx.balance + ctx.attached - (amount + 1)) ctx.locked at hpos
+      rw [hdep, Nat.add_sub_add_right, hrent] at hpos
+      exact absurd hpos (Nat.lt_irrefl 0)
+    · rfl
+
+@[blueprint "thm:deposit-available-boundary"
+  (statement := /-- \cref{spec:deposit-available-boundary} holds. -/)]
+theorem deposit_available_at_boundary : DepositAvailableAtBoundary := by
+  intro cfg s ctx env hs hpos hbound hcond
+  obtain ⟨o, h, hmem, hbal, hprom⟩ := deposit_available cfg s env hs hpos hbound hcond
+  rw [step_nearDeposit] at h
+  refine ⟨o, by rw [step_nearDeposit]; exact h, hmem, hbal, hprom, ?_⟩
+  unfold contractStep
+  rw [step_nearDeposit, h]
+  have hout : Outcome.nearOut o = 0 := by simp [Outcome.nearOut, hprom]
+  simp only [hout, Nat.not_lt_zero, ↓reduceIte, Nat.sub_zero, hprom]
+
+open NearInterface in
+/-- What `Refines` buys: on a runtime the binary refines the model in, a
+withdrawal attached with at least the model's gas bound succeeds on the binary,
+returns the payout receipt and stores the model's new state. -/
+@[blueprint "thm:withdraw-available-binary"
+  (statement := /-- If a binary refines \cref{def:contract-model}, then under the hypotheses of \cref{spec:withdraw-available-boundary}, for arguments that are the call \texttt{near\_withdraw}$(a)$ and at least the model's gas bound attached, the binary's execution returns receipt index 0 and its storage encodes the resulting state. -/)]
+theorem withdraw_available_binary {R : RuntimeInterface} {code : R.Code} {cfg : Config}
+    (href : Refines R code (wnear cfg)) {s : State} {ctx : Context} {amount : Nat}
+    (hs : Inv cfg s) (hwf : ctx.WF (encode s))
+    (hparse : Parses ctx.method ctx.args (.nearWithdraw amount))
+    (hreg : AccountId.ofNear ctx.predecessor ∈ s.registered)
+    (hamt : amount ≤ s.balance (AccountId.ofNear ctx.predecessor)) (hdep : ctx.attached = 1)
+    (hbound : amount + 1 < u128Bound) (hbal : amount ≤ ctx.balance)
+    (hrent : stakeDeficit ctx.protocol (usageAfter ctx (some s)
+      { s.setBalance (AccountId.ofNear ctx.predecessor)
+          (s.balance (AccountId.ofNear ctx.predecessor) - amount) with
+        totalSupply := s.totalSupply - amount }) (ctx.balance - amount) ctx.locked = 0)
+    (hgas : gasBound ctx (.nearWithdraw amount) ≤ ctx.gasLimit) :
+    (R.exec code (encode s) ctx).outcome = .ok (.receiptIndex 0) ∧
+      (R.exec code (encode s) ctx).storage =
+        encode { s.setBalance (AccountId.ofNear ctx.predecessor)
+            (s.balance (AccountId.ofNear ctx.predecessor) - amount) with
+          totalSupply := s.totalSupply - amount } := by
+  have hrep : (wnear cfg).Represents (encode s) (some s) := ⟨hs, rfl⟩
+  have hm := href.transfer (c := (Call.nearWithdraw amount : Call)) hrep hwf hparse hgas
+  change Matches (wnear cfg) ctx (encode s) _ (contractStep ctx (some s) (.nearWithdraw amount)) at hm
+  rw [withdraw_available_at_boundary cfg s ctx amount hs hreg hamt hdep hbound hbal hrent] at hm
+  exact ⟨hm.1, hm.2.1⟩
+
 end WNear

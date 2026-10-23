@@ -101,6 +101,12 @@ def storageOf : Option State → RawStorage
   | none => ∅
   | some s => encode s
 
+/-- The account's storage usage after a call leaves `s'`: the records change,
+the account and code overhead stays. -/
+def usageAfter (ctx : Context) (st : Option State) (s' : State) : Nat :=
+  ctx.storageUsage - storageUsageOf ctx.protocol (storageOf st) +
+    storageUsageOf ctx.protocol (encode s')
+
 /-- A failed call: the failure and the logs emitted before it. -/
 abbrev Result := NearInterface.StepResult Panic State Ret Promise
 
@@ -114,9 +120,8 @@ def contractStep (ctx : Context) (st : Option State) (c : Call) : Result :=
     let available := ctx.balance + ctx.attached
     if available < o.nearOut then .error { failure := .balanceExceeded, logs := o.logs }
     else
-      let usage := ctx.storageUsage - storageUsageOf ctx.protocol (storageOf st) +
-        storageUsageOf ctx.protocol (encode o.state)
-      let deficit := stakeDeficit ctx.protocol usage (available - o.nearOut) ctx.locked
+      let deficit := stakeDeficit ctx.protocol (usageAfter ctx st o.state) (available - o.nearOut)
+        ctx.locked
       if 0 < deficit then .error { failure := .lackBalanceForState deficit, logs := o.logs }
       else .ok { state := o.state, ret := o.ret, logs := o.logs, promises := o.promises }
 
