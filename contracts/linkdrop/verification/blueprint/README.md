@@ -19,10 +19,10 @@ claimed. This index records checked theorem names and unproved boundaries.
 | Header/record byte sizes | `Proofs/Storage.lean` | proved for specified encoding |
 | Logical state uniqueness / projection round trip | `represents_unique`, `project_encode`, `Proofs/Projection.lean` | proved under LayoutValid |
 | Physical layout compatible with SDK execution | `Storage.Represents` relation | open |
-| Concrete Wasm behavior equals model | `Spec.RefinesTypedExecution`, `Spec/Refinement.lean` | stated; no runtime instance |
+| Concrete Wasm behavior equals model | `NearInterface.Refines` (shared); linkdrop `ContractModel` instance | not yet stated: needs near-lean support for the binary's host functions |
 | Whole-chain solvency and progress | constraints in verification README | open, not formalized |
 
 Dependency order: Types → State → Methods → Safety lemmas; Safety → Economics
 and reachability; Economics → liability lemmas and interleaving witnesses.
 Storage sizing depends only on State and the source-derived layout encoder.
-The runtime obligation consumes these interfaces but is not assumed by any proof.
+No proof assumes deployed refinement.

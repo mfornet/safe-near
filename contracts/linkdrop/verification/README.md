@@ -134,19 +134,35 @@ Size and projection theorems concern this encoding; compatibility with actual
 SDK storage writes and a standalone proof that all encoded trie keys are
 unique remain open.
 
-`Spec/Refinement.lean` states a typed execution obligation with explicit storage,
-receipts, return selection, gas, balance, retained storage overhead and rollback.
-It has no instance or proof. Before claiming deployed refinement we still need:
+## Refinement
 
-- concrete JSON/Borsh/key encodings and lossless receipt projection for this SDK;
-- a pinned `contract.wasm` NearVM instance, including global-contract host actions;
-- physical vector order transitions, trie-key uniqueness and executable decoding;
-- model/binary comparisons for every entry point, guards, callbacks and action lists;
-- resource assumptions sufficient for gas, storage, action count and host bounds;
-- chain-level callback provenance, pending liabilities, gas allowance costs,
-  runtime refunds, and sufficient backing throughout interleavings;
-- conditional liveness: funded valid creation/transfer, successful action execution,
-  and eventual delivery. None follows merely from scheduling a promise.
+Deployed refinement is stated once for every contract, as
+`NearInterface.Refines` (`near-lean/interface`; design in
+`notes/todo/refinement_equivalence.md`). wNEAR instantiates it. linkdrop's
+earlier, divergent `RefinesTypedExecution` has been removed rather than
+retargeted with guessed parts: a `ContractModel` instance needs facts that
+come from running the binary, and near-lean cannot run it yet (the five
+missing host functions above). Once it can, the instance needs:
+
+- `Parses`: the SDK 5.17.1 argument decoding of every entry point, on the
+  shared JSON layer (`NearInterface.Json`), including `PublicKey` strings
+  and the `Key`/`keyData` interpretation;
+- `encodeState`/`Inv`: `Storage.encode` with its order witness folded into the
+  state (the raw storage is a set, the vector order a physical choice);
+- `step` from the context: privacy, deposit and initialisation guards as now,
+  then the runtime's balance and storage-stake checks;
+- `encodeReceipts` with the leftover gas, which the weighted callbacks share;
+- the exact panic texts and the logs before each panic, observed on
+  `contract.wasm`;
+- a gas bound, calibrated on the binary and valid for every trie;
+- adapter tests comparing every entry point with the model through
+  `Near.Boundary.execOn`.
+
+Beyond single calls, chain-level obligations remain: callback provenance,
+pending liabilities, gas allowance costs, runtime refunds, sufficient backing
+throughout interleavings, and conditional liveness (funded valid creation and
+transfer, successful action execution, eventual delivery). None follows merely
+from scheduling a promise.
 
 The blueprint proof index is [blueprint/README.md](blueprint/README.md).
 It is a source document; LeanArchitect annotations and generated web/PDF views
