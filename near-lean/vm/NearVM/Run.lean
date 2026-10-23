@@ -27,6 +27,8 @@ def defaultFuel : Nat := 2_000_000_000
 /-- A running configuration, or a finished execution with its final store. -/
 abbrev Machine := StepResult NearState
 
+-- nearcore divergence: no `max_stack_height` stack-limiter instrumentation; recursion instead
+-- traps at call depth 10000, so stack-overflow points differ from nearcore.
 /-- nearcore's stack limiter is not modelled; recursion deeper than this
 traps with `stackOverflow`. -/
 def execLimits : ExecLimits := { maxCallDepth := 10000 }
@@ -268,6 +270,7 @@ def runAttempt (cfg : RuntimeConfig) (code : Module) (codeSize : Nat) (method : 
   | .error e =>
     VMOutcome.failedBefore ctx storage gas1.burnt (.compilationError e.message) host1.gasProfile
   | .ok valid =>
+  -- nearcore divergence: a module with a start function is an execution issue, never run.
   -- nearcore runs a start function as a metered export before the method;
   -- no contract in the dataset has one, and the model does not support it.
   if code.start.isSome then
@@ -294,6 +297,8 @@ def runAttempt (cfg : RuntimeConfig) (code : Module) (codeSize : Nat) (method : 
   else
   match resolveMetered cfg code with
   | .error imp =>
+    -- nearcore divergence: v86 imports `promise_set_refund_to`, `promise_batch_action_state_init*`,
+    -- `set_state_init_data_entry`, `current_contract_code` and `refund_to_account_id` are missing.
     -- The registry is not yet a complete protocol host inventory. Failure to
     -- resolve an import cannot establish that nearcore would reject it.
     VMOutcome.failedBefore ctx storage gas1.burnt
