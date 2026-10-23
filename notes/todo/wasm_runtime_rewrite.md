@@ -316,10 +316,11 @@ Talos's proofs of Talos's programs.
 
 **Phase 4, later and separate.** `near-lean/wasm-logic`: Iris `Language`
 instance over `Exec.step`, step and run rules from store ownership, adequacy
-back to `Exec.run`, and an example. As landed it owns the whole store;
-points-to assertions over memory, locals and globals, per-instruction rules
-and sample programs under a host are the next step. Only needed when a contract proof needs symbolic execution of
-Wasm code rather than refinement at the `NearVM.run` boundary.
+back to `Exec.run`, and an example. As landed it owns the whole store; points-
+to assertions over memory, locals and globals, per-instruction rules and
+sample programs under a host are the next step. Only needed when a contract
+proof needs symbolic execution of Wasm code rather than refinement at the
+`NearVM.run` boundary.
 
 ## Outcome (2026-10-23)
 
