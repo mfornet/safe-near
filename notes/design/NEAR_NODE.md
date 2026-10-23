@@ -113,7 +113,24 @@ the pinned nearcore crates.
   accounts and access keys, every action and the delegate actions,
   transactions V0 and V1, receipts and their state-stored forms, execution
   outcomes with metadata and profiles, proofs, and the error trees reachable
-  from `ExecutionStatus`. Blocks, chunks and epoch types are M1b and M1c.
+  from `ExecutionStatus`.
+- **Covered (M1b).** `ValidatorStake` (V1 is the only version) and
+  `ValidatorStakeV1`; `Approval`, `ApprovalInner`, `ApprovalMessage` with
+  `get_data_for_sig`; `BlockHeader` V1 to V7 over `BlockHeaderInnerLite` and
+  `BlockHeaderInnerRest` V1 to V7; `Block` V1 to V4 and `BlockBody` V1 to V3
+  (V3 is the spice body); `ShardChunkHeader` V1 to V3 over inner V1 to V6;
+  `ShardChunk`, `EncodedShardChunk`, `PartialEncodedChunk` (V1, V2),
+  `ReceiptProof`, `ShardProof`; `CongestionInfo`, `BandwidthRequests`,
+  scheduler state; `ChunkExtra` V1 to V5; challenges and the spice
+  endorsement and execution-result types; `Tip`, `OptimisticBlock`,
+  `PartialMerkleTree`, `StateSyncInfo`. Derived values are checked against the
+  oracle: block hash and inner hash for every header version, chunk hash per
+  header version, approval and spice signing bytes, `merklize` roots and
+  proofs, the block's chunk roots, block body hash, `check_validity`, the
+  block-producer-set hash, receipt proof roots and the encoded chunk merkle
+  root. The block producer signs the block hash, so there are no other signing
+  bytes. Not covered: stateless validation witnesses and chunk endorsements
+  (network, M-later), epoch and state types (M1c).
 
 ## Open points
 
