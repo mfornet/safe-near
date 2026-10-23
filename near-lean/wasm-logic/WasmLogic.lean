@@ -13,5 +13,6 @@ import WasmLogic.Coverage
 import WasmLogic.Examples.Sum
 import WasmLogic.Examples.Stack.Code
 import WasmLogic.Examples.Stack.Specs
+import WasmLogic.Examples.Stack.Map
 import WasmLogic.Examples.Client.Code
 import WasmLogic.Examples.Client.Main

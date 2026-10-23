@@ -24,8 +24,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 STACK = ROOT / "WasmLogic/Examples/Stack/Code.lean"
 CLIENT = ROOT / "WasmLogic/Examples/Client/Code.lean"
-TARGETS = ["WasmLogic.Examples.Stack.Specs", "WasmLogic.Examples.Client.Main"]
-PROOF_FILES = ["WasmLogic/Examples/Stack/Specs.lean", "WasmLogic/Examples/Client/Main.lean"]
+TARGETS = ["WasmLogic.Examples.Stack.Specs", "WasmLogic.Examples.Stack.Map",
+           "WasmLogic.Examples.Client.Main"]
+PROOF_FILES = ["WasmLogic/Examples/Stack/Specs.lean", "WasmLogic/Examples/Stack/Map.lean",
+               "WasmLogic/Examples/Client/Main.lean"]
 
 # Each stub replaces a decode theorem's proof.
 STUBS = [
@@ -58,6 +60,14 @@ MUTANTS = [
      "[.i32_const 0xFFFFFFFF]\n", "[.i32_const 0]\n"),
     ("validate_stack traps on valid stacks", STACK,
      ".«if» .empty [.unreachable] []]", ".«if» .empty [] [.unreachable]]"),
+    ("stack_map stops at once", STACK,
+     ".local_get 2, .local_get 3, .i32_relop .eq, .br_if 1", ".local_get 2, .local_get 3, .i32_relop .ne, .br_if 1"),
+    ("stack_map steps by 8", STACK,
+     ".local_get 2, .i32_const 4, .i32_binop .add", ".local_get 2, .i32_const 8, .i32_binop .add"),
+    ("stack_map calls the table entry named by the stack", STACK,
+     ".local_get 1, .call_indirect 1 0", ".local_get 0, .call_indirect 1 0"),
+    ("stack_map starts at the top", STACK,
+     ".local_set 3, .local_get 0, .local_set 2", ".local_set 3, .local_get 3, .local_set 2"),
     ("client pushes 7", CLIENT, ".i32_const 6", ".i32_const 7"),
     ("client adds the popped values", CLIENT, ".call 2, .i32_binop .sub", ".call 2, .i32_binop .add"),
     ("client returns 0 when new_stack fails", CLIENT,
