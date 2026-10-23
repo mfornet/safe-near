@@ -59,8 +59,10 @@ structure ContractModel where
   /-- The receipts a call's promises become. `leftoverGas` is `prepaid - used`,
   shared among promises that ask for unused gas. -/
   encodeReceipts : (leftoverGas : Gas) → List Promise → List RawReceipt
-  /-- The exact text the contract passes to `panic_utf8`. -/
-  panicMessage : Panic → String
+  /-- The exact failure a panic site produces: usually `.panic msg` with the
+  text the contract passes to `panic_utf8`; a host error the contract triggers
+  deterministically (reading a missing promise result) is `.other msg`. -/
+  panicFailure : Panic → Failure
   /-- One call, exact on every failure that does not depend on gas. -/
   step : Context → Option State → Call → StepResult Panic State Ret Promise
   /-- An upper bound on `usedGas`: burnt gas plus gas attached to promises. -/
@@ -80,7 +82,7 @@ def ParsesFunctional : Prop :=
   ∀ method args c c', M.Parses method args c → M.Parses method args c' → c = c'
 
 def ModelFailure.toFailure : ModelFailure M.Panic → Failure
-  | .panic p => .panic (M.panicMessage p)
+  | .panic p => M.panicFailure p
   | .balanceExceeded => .balanceExceeded
   | .lackBalanceForState deficit => .lackBalanceForState deficit
 
