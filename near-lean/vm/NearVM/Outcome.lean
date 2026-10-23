@@ -10,88 +10,6 @@ created (nearcore hands those to the `External`; here they are returned).
 
 namespace Wasm.Near
 
-/-- `ReturnData`. -/
-inductive ReturnData
-  | value (bytes : List UInt8)
-  /-- The call's result is the result of the receipt created at this index. -/
-  | receiptIndex (idx : Nat)
-  | none
-  deriving Repr, BEq, Inhabited
-
-/-- One receipt to create, in the order of `promise_batch_create` /
-`promise_then` calls. `dependencies` are indices into the same list: the
-receipt runs once each of them has produced its data. -/
-structure ReceiptSpec where
-  receiverId : List UInt8
-  actions : List PromiseAction
-  dependencies : List Nat := []
-  deriving BEq, Inhabited
-
-/-- Each dependency refers to a receipt created earlier in this call. Repeated
-edges are allowed: they represent separate data dependencies. -/
-def ReceiptSpec.ValidAt (index : Nat) (r : ReceiptSpec) : Prop :=
-  ∀ dependency ∈ r.dependencies, dependency < index
-
-def receiptsValidFrom (index : Nat) : List ReceiptSpec → Bool
-  | [] => true
-  | r :: rs => r.dependencies.all (· < index) && receiptsValidFrom (index + 1) rs
-
-def ReceiptsWellFormedFrom (index : Nat) : List ReceiptSpec → Prop
-  | [] => True
-  | r :: rs => r.ValidAt index ∧ ReceiptsWellFormedFrom (index + 1) rs
-
-/-- The executable graph check proves backward-only dependencies, rather than
-assuming host-created handles were valid. -/
-theorem receiptsValidFrom_iff (rs : List ReceiptSpec) (index : Nat) :
-    receiptsValidFrom index rs = true ↔ ReceiptsWellFormedFrom index rs := by
-  induction rs generalizing index with
-  | nil => simp [receiptsValidFrom, ReceiptsWellFormedFrom]
-  | cons r rs ih =>
-    simp [receiptsValidFrom, ReceiptsWellFormedFrom, ReceiptSpec.ValidAt, List.all_eq_true, ih]
-
-/-- Looking up a receipt in a valid suffix preserves its creation-order bound. -/
-theorem dependency_before_index {rs : List ReceiptSpec} {start index dependency : Nat}
-    {r : ReceiptSpec} (hwf : ReceiptsWellFormedFrom start rs)
-    (hget : rs[index]? = some r) (hdep : dependency ∈ r.dependencies) :
-    dependency < start + index := by
-  induction rs generalizing start index with
-  | nil => simp at hget
-  | cons head tail ih =>
-    cases index with
-    | zero =>
-      simp only [List.getElem?_cons_zero, Option.some.injEq] at hget
-      subst r
-      exact hwf.1 _ hdep
-    | succ index =>
-      have htail : tail[index]? = some r := hget
-      have hlt := ih hwf.2 htail
-      omega
-
-/-- Nonempty dependency paths in the exact emitted receipt list. -/
-inductive ReceiptDependencyPath (rs : List ReceiptSpec) : Nat → Nat → Prop
-  | edge {source target : Nat} {r : ReceiptSpec}
-      (lookup : rs[source]? = some r) (member : target ∈ r.dependencies) :
-      ReceiptDependencyPath rs source target
-  | trans {source middle target : Nat}
-      (first : ReceiptDependencyPath rs source middle)
-      (rest : ReceiptDependencyPath rs middle target) : ReceiptDependencyPath rs source target
-
-/-- Every dependency path strictly decreases creation indices, so callbacks
-cannot indirectly depend on themselves. -/
-theorem dependencyPath_decreases {rs : List ReceiptSpec}
-    (hwf : ReceiptsWellFormedFrom 0 rs) {source target : Nat}
-    (path : ReceiptDependencyPath rs source target) : target < source := by
-  induction path with
-  | edge lookup member =>
-    simpa only [Nat.zero_add] using dependency_before_index hwf lookup member
-  | trans _ _ ihFirst ihRest => exact Nat.lt_trans ihRest ihFirst
-
-theorem no_receipt_dependency_cycle {rs : List ReceiptSpec}
-    (hwf : ReceiptsWellFormedFrom 0 rs) (index : Nat) :
-    ¬ReceiptDependencyPath rs index index := by
-  intro path
-  exact Nat.lt_irrefl index (dependencyPath_decreases hwf path)
-
 structure VMOutcome where
   /-- Liquid balance after the attached deposit and outgoing promise deposits;
   the input balance is restored on a failed VM call. -/
@@ -110,6 +28,10 @@ structure VMOutcome where
   receipts : List ReceiptSpec
   /-- `none` on success. -/
   aborted : Option FunctionCallError
+  /-- Unused prepaid gas added to weighted function calls after the call
+  (`distribute_gas`); included in `usedGas`. The VM runner's own `used_gas`
+  is `usedGas - distributedGas`. -/
+  distributedGas : Nat := 0
   /-- Attempted sponsored deposits, retained as diagnostics on VM failure. -/
   subsidizedAmount : Nat := 0
   gasProfile : GasProfile := {}
@@ -163,7 +85,7 @@ def VMOutcome.graphIssue (balance usage : Nat) (storage : List (List UInt8 × Li
     (o : VMOutcome) : VMOutcome :=
   { o with
     balance := balance, storageUsage := usage, storage := storage, receipts := [], returnData := .none
-    usedGas := o.burntGas
+    usedGas := o.burntGas, distributedGas := 0
     aborted := some (.executionIssue (.interpreterError "invalid receipt dependency graph")) }
 
 def VMOutcome.checkReceipts (balance usage : Nat) (storage : List (List UInt8 × List UInt8))

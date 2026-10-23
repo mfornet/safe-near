@@ -13,6 +13,15 @@
   },
   {
    "type": "path",
+   "scope": "",
+   "name": "NearInterface",
+   "manifestFile": "lake-manifest.json",
+   "inherited": true,
+   "dir": "../vm/../interface",
+   "configFile": "lakefile.toml"
+  },
+  {
+   "type": "path",
    "subDir": null,
    "scope": "",
    "dir": "../wasm",

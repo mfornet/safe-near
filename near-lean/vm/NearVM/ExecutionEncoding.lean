@@ -20,6 +20,7 @@ theorem runInitialized_outcome_encoding (cfg : WasmConfig) (fuel : Nat)
   have hl := runInitialized_success_liveInvariant EncodingInvariant
     (fun ns cost _ h => chargeHost_encodingInvariant ns cost h) cfg fuel config h herr
   have hf := outcomeOfExecution_success_live ctx storage _ _ hsuccess hl.live
-  exact outcomeOfExecution_success_predicate ReceiptEncoding ctx storage _ _ hsuccess hf.2
+  exact outcomeOfExecution_success_predicate ReceiptEncoding ctx storage _ _ hsuccess
+    receiptEncoding_gasInsensitive hf.2
 
 end Wasm.Near

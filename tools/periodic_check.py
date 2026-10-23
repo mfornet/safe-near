@@ -39,26 +39,32 @@ def validation_steps(root: Path, nearcore: Path) -> list[Step]:
     add("tooling-tests", "", sys.executable, "-m", "unittest", "discover", "-s", "tools/tests", "-v")
     add("wasm-build", "near-lean/wasm", "lake", "build", "Wasm", "testsuite", "wasm", "--wfail")
     add("wasm-logic-build", "near-lean/wasm-logic", "lake", "build", "--wfail")
+    add("interface-build", "near-lean/interface", "lake", "build", "NearInterface", "--wfail")
     add("vm-build", "near-lean/vm", "lake", "build", "NearVM", "vm-tests", "vm-replay", "--wfail")
     add("runtime-build", "near-lean/runtime", "lake", "build", "NearRuntime", "runtime-tests",
         "NearRuntime.TrieAccounting", "finance-replay", "nonce-replay", "allowance-replay",
         "staking-key-replay", "trie-replay", "--wfail")
     add("chain-build", "near-lean/chain", "lake", "build", "NearChain", "chain-tests", "chain-replay",
         "registered-replay", "state-encode", "receipt-encode", "transaction-replay", "receipt-replay", "--wfail")
-    add("wnear-adapter-build", "contracts/w-near/verification", "lake", "build", "Spec", "runtime-adapter-tests", "--wfail")
-    add("wnear-proofs-build", "contracts/w-near/verification", "lake", "build", "Model", "Proofs")
+    # Contracts with a ContractModel instance: the adapter executable compares the
+    # binary with the model; `refines_<name>` in Proofs.Refinement is the open proof.
+    adapter_contracts = [("w-near", "wnear")]
+    for contract, report in adapter_contracts:
+        add(f"{report}-adapter-build", f"contracts/{contract}/verification", "lake", "build", "Spec",
+            "runtime-adapter-tests", "--wfail")
+        add(f"{report}-proofs-build", f"contracts/{contract}/verification", "lake", "build", "Model", "Proofs")
     # New contract projects join the sequential build/audit gate automatically.
-    # wNEAR retains its specialized adapter executable checks above.
     contract_projects = sorted({manifest.parent for pattern in ("*/verification/lakefile.toml",
                                                                "*/verification/lakefile.lean")
                                 for manifest in (root / "contracts").glob(pattern)
-                                if manifest.parent.parent.name != "w-near"})
+                                if manifest.parent.parent.name not in dict(adapter_contracts)})
     for project in contract_projects:
         name = project.parent.name
         add(f"contract-{name}-build", project.relative_to(root), "lake", "build", "--wfail")
     for package, binary in [("vm", "vm-tests"), ("runtime", "runtime-tests"), ("chain", "chain-tests")]:
         add(binary, f"near-lean/{package}", f"./.lake/build/bin/{binary}")
-    add("wnear-adapter-tests", "contracts/w-near/verification", "./.lake/build/bin/runtime-adapter-tests")
+    for contract, report in adapter_contracts:
+        add(f"{report}-adapter-tests", f"contracts/{contract}/verification", "./.lake/build/bin/runtime-adapter-tests")
     python("chain-json-replay", "tools/chain-conformance/test_replay.py")
     add("wasm-validate-smoke", "near-lean/wasm", "./.lake/build/bin/wasm", "validate",
         "../../contracts/w-near/contract.wasm")
@@ -77,10 +83,12 @@ def validation_steps(root: Path, nearcore: Path) -> list[Step]:
     python("dependency-regressions", "tools/tests/check_vm_dependencies.py")
     python("audit-regressions", "tools/tests/check_axiom_audit.py")
     for package, report in [("near-lean/wasm", "wasm"), ("near-lean/wasm-logic", "wasm-logic"),
-                            ("near-lean/vm", "vm"),
-                            ("near-lean/runtime", "runtime"), ("near-lean/chain", "chain"),
-                            ("contracts/w-near/verification", "wnear")]:
+                            ("near-lean/interface", "interface"), ("near-lean/vm", "vm"),
+                            ("near-lean/runtime", "runtime"), ("near-lean/chain", "chain")]:
         python(f"audit-{report}", "tools/axiom-audit.py", package, "--no-build", "--report", f"audit/{report}.json")
+    for contract, report in adapter_contracts:
+        python(f"audit-{report}", "tools/axiom-audit.py", f"contracts/{contract}/verification", "--no-build",
+               "--allow-sorry-module", "Proofs.Refinement", "--report", f"audit/{report}.json")
     for project in contract_projects:
         name = project.parent.name
         python(f"audit-contract-{name}", "tools/axiom-audit.py", project.relative_to(root),

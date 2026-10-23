@@ -2,6 +2,8 @@ import NearVM.Interp
 import NearVM.Metered
 import NearVM.Context
 import NearVM.PromiseGraph
+import NearVM.GasDistribution
+import Wasm.Fuel
 
 /-!
 # `run`: one function call
@@ -18,8 +20,8 @@ correctness for every module or state-trie-dependent cost.
 
 namespace Wasm.Near
 
-/-- Interpreter step budget. Exhaustion is explicitly incomplete execution;
-this constant is not a proved bound for every protocol-valid execution. -/
+/-- A fixed interpreter step budget, for callers that run without a context.
+Calls default to `fuelFor`, which `NearVM.Fuel` proves enough. -/
 def defaultFuel : Nat := 2_000_000_000
 
 /-- A running configuration, or a finished execution with its final store. -/
@@ -28,6 +30,25 @@ abbrev Machine := StepResult NearState
 /-- nearcore's stack limiter is not modelled; recursion deeper than this
 traps with `stackOverflow`. -/
 def execLimits : ExecLimits := { maxCallDepth := 10000 }
+
+/-- The largest function body of a module. -/
+def moduleBody (m : Module) : Nat := m.funcs.foldl (fun acc f => max acc (Exec.codeSize f.body)) 0
+
+/-- The least gas any charged instruction costs. -/
+def minOpCost (cfg : WasmConfig) : Nat := min cfg.regularOpCost cfg.linearOpBaseCost
+
+/-- The per-call burn limit of a context: `max_gas_burnt`, or a view's own. -/
+def VMContext.maxBurnt (cfg : RuntimeConfig) (ctx : VMContext) : Nat :=
+  match ctx.viewConfig with
+  | some v => v.maxGasBurnt
+  | none => cfg.wasm.limits.maxGasBurnt
+
+/-- Enough fuel for any call of `code` under `ctx`: one more than the
+cheapest-instruction count the burn limit allows, times one more than call
+depth times the largest function body. -/
+def fuelFor (cfg : RuntimeConfig) (code : Module) (ctx : VMContext) : Nat :=
+  (ctx.maxBurnt cfg / minOpCost cfg.wasm + 1) *
+    (max 1 execLimits.maxCallDepth * (moduleBody code + 1) + 1)
 
 /-- Map a runtime trap to nearcore's error. -/
 def trapError (reason : Trap) (host : NearState) : FunctionCallError :=
@@ -208,7 +229,14 @@ def outcomeOfExecution (ctx : VMContext) (storage : List (List UInt8 × List UIn
       let returned := graph.returnData? ns
       match returned with
       | none => outcome.graphIssue ctx.accountBalance ctx.storageUsage storage
-      | some returnData => { outcome with returnData, receipts := graph.receipts }
+      | some returnData =>
+        let distributed := distributeGas (ctx.prepaidGas - ns.gas.used) graph.handles ns.gasWeights
+          graph.receipts
+        { outcome with
+          returnData := returnData
+          receipts := distributed.1
+          usedGas := ns.gas.used + distributed.2
+          distributedGas := distributed.2 }
 
 /-- nearcore replaces the contract's memory declaration during preparation. -/
 def prepareMemory (cfg : RuntimeConfig) (code : Module) : Module :=
@@ -224,7 +252,7 @@ def loadingCharges (codeSize : Nat) : List Charge :=
 byte size of the deployed Wasm (the loading cost depends on it). -/
 def runAttempt (cfg : RuntimeConfig) (code : Module) (codeSize : Nat) (method : String)
     (ctx : VMContext) (storage : List (List UInt8 × List UInt8))
-    (fuel : Nat := defaultFuel) : VMOutcome :=
+    (fuel : Nat := fuelFor cfg code ctx) : VMOutcome :=
   if method.isEmpty then
     VMOutcome.failedBefore ctx storage 0 (.methodResolveError .methodEmptyName)
   else
@@ -289,7 +317,7 @@ def runAttempt (cfg : RuntimeConfig) (code : Module) (codeSize : Nat) (method : 
 promise handles are resolved by the proved total converter in `runAttempt`. -/
 def run (cfg : RuntimeConfig) (code : Module) (codeSize : Nat) (method : String)
     (ctx : VMContext) (storage : List (List UInt8 × List UInt8))
-    (fuel : Nat := defaultFuel) : VMOutcome :=
+    (fuel : Nat := fuelFor cfg code ctx) : VMOutcome :=
   (runAttempt cfg code codeSize method ctx storage fuel).checkReceipts
     ctx.accountBalance ctx.storageUsage storage
 

@@ -49,11 +49,11 @@ class PeriodicCheckTests(unittest.TestCase):
             with self.assertRaises(FileExistsError):
                 run_steps(steps, output, "new-rev")
 
-    def test_new_contracts_are_built_before_strict_audits_without_duplicate_wnear(self):
+    def test_new_contracts_are_built_before_strict_audits_without_duplicate_adapters(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            for name, manifest in [("linkdrop", "lakefile.toml"),
-                                   ("next-contract", "lakefile.lean"),
+            for name, manifest in [("next-contract", "lakefile.lean"),
+                                   ("other", "lakefile.toml"),
                                    ("w-near", "lakefile.toml")]:
                 project = root / "contracts" / name / "verification"
                 project.mkdir(parents=True)
@@ -64,7 +64,7 @@ class PeriodicCheckTests(unittest.TestCase):
             names = [step.name for step in steps]
             builds = [step for step in steps if step.name.startswith("contract-")]
             self.assertEqual([step.name for step in builds],
-                             ["contract-linkdrop-build", "contract-next-contract-build"])
+                             ["contract-next-contract-build", "contract-other-build"])
             for step in builds:
                 name = step.directory.parent.name
                 audit_name = f"audit-contract-{name}"
@@ -73,8 +73,13 @@ class PeriodicCheckTests(unittest.TestCase):
                 self.assertIn("--wfail", step.command)
                 self.assertIn("--no-build", audit.command)
                 self.assertNotIn("--allow-sorry", audit.command)
-            self.assertEqual(names.count("audit-wnear"), 1)
-            self.assertNotIn("audit-contract-w-near", names)
+            # Contracts with a model instance keep one audit, tolerating only the open refinement.
+            for report, contract in [("wnear", "w-near")]:
+                self.assertEqual(names.count(f"audit-{report}"), 1)
+                self.assertNotIn(f"audit-contract-{contract}", names)
+                audit = steps[names.index(f"audit-{report}")]
+                self.assertIn("--allow-sorry-module", audit.command)
+                self.assertLess(names.index(f"{report}-adapter-build"), names.index(f"audit-{report}"))
 
     def test_plan_needs_no_native_checkout_and_execution_requires_one(self):
         command = [sys.executable, str(ROOT / "tools/periodic_check.py")]

@@ -14,7 +14,7 @@ use near_vm_runner::{
     logic::{
         VMContext,
         mocks::mock_external::{MockAction, MockedExternal},
-        types::{PromiseResult, ReturnData},
+        types::{GlobalContractIdentifier, PromiseResult, ReturnData},
     },
 };
 use serde::Deserialize;
@@ -110,6 +110,20 @@ fn action_json(action: &MockAction) -> Result<(u64, Value)> {
         } => (
             *receipt_index,
             json!({"kind":"deleteKey", "publicKey":borsh::to_vec(public_key)?}),
+        ),
+        MockAction::UseGlobalContract {
+            receipt_index,
+            contract_id,
+        } => (
+            *receipt_index,
+            match contract_id {
+                GlobalContractIdentifier::CodeHash(hash) => {
+                    json!({"kind":"useGlobalContract", "codeHash":hash.0.to_vec()})
+                }
+                GlobalContractIdentifier::AccountId(account_id) => {
+                    json!({"kind":"useGlobalContract", "accountId":account_id.as_bytes()})
+                }
+            },
         ),
         MockAction::DeleteAccount {
             receipt_index,

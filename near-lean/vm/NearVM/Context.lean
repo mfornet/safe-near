@@ -13,8 +13,6 @@ conformance shim selects the policy used by its native external adapter.
 
 namespace Wasm.Near
 
-abbrev Bytes := List UInt8
-
 /-- A view call's configuration: only the gas limit matters. -/
 structure ViewConfig where
   maxGasBurnt : Nat
@@ -51,6 +49,11 @@ structure VMContext where
   outputDataReceivers : List Bytes := []
   deriving Inhabited
 
+/-- Storage keys in byte order: the order the trie iterates them in, and one
+that does not depend on how the caller listed the storage. -/
+def sortedKeys (storage : List (Bytes × Bytes)) : List Bytes :=
+  (storage.map (·.1)).mergeSort fun a b => decide (a ≤ b)
+
 namespace VMContext
 
 def isView (ctx : VMContext) : Bool := ctx.viewConfig.isSome
@@ -80,7 +83,7 @@ def toNearState (cfg : RuntimeConfig) (ctx : VMContext)
       prepaidGas := UInt64.ofNat ctx.prepaidGas
       usedGas := 0 }
     storage := fun k => (storage.find? (·.1 == k)).map (·.2)
-    storageKeys := storage.map (·.1)
+    storageKeys := sortedKeys storage
     storageAccounting := ctx.storageAccounting
     storageReadsFromTrie := ctx.storageReadsFromTrie
     promiseResults := ctx.promiseResults

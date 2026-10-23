@@ -2,7 +2,7 @@ import NearRuntime.Fees
 
 namespace Near
 
-/-- Size of the eight modeled native Borsh action encodings, including enum tags. -/
+/-- Size of the modeled native Borsh action encodings, including enum tags. -/
 def Action.borshSize : Action → Nat
   | .createAccount => 1
   | .deployContract code => 1 + 4 + code.size
@@ -12,6 +12,8 @@ def Action.borshSize : Action → Nat
   | .addKey key access => 1 + accessKeyStorageBytes key access
   | .deleteKey key => 1 + key.length
   | .deleteAccount beneficiary => 1 + 4 + beneficiary.utf8ByteSize
+  | .useGlobalContract (.codeHash _) => 1 + 1 + 32
+  | .useGlobalContract (.accountId id) => 1 + 1 + 4 + id.length
 
 /-- V0 has no transaction tag. Ordinary-key V1 adds transaction/nonce tags and nonce mode.
 Block hashes have fixed 32-byte encoding and nonce values have fixed 8-byte encoding. -/

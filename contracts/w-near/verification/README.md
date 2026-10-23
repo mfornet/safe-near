@@ -22,7 +22,8 @@ just blueprint-pdf    # -> blueprint/print/print.pdf
 
 Packages are shared with `near-lean` (`packagesDir = ../../../near-lean/.lake/packages`,
 toolchain `v4.34.1`, Mathlib `v4.34.1`, LeanArchitect `v4.34.0`); the project
-depends on `near-lean/vm` for `Spec/RuntimeInstance.lean`.
+depends on `near-lean/runtime` (and through it `near-lean/interface`) for the
+refinement statement and its runtime instance.
 
 ## The model
 
@@ -63,12 +64,13 @@ requires the open runtime refinement proof and explicit gas/storage assumptions.
 | `Conservation` | Minted supply plus collected fees never exceed deposit minus NEAR sent out (per execution; chain-level solvency remains open) | proved |
 | `WithdrawAvailable` | A holder attaching 1 yoctoNEAR can always unwrap any amount it holds, and gets `amount + 1` back | proved |
 | `DepositAvailable` | A positive deposit that fits the supply (and covers the fee if unregistered) always wraps | proved |
+| `WithdrawAvailableAtBoundary`, `DepositAvailableAtBoundary` | The same for a real call: with the balance covering the payout and the storage stake paid, a withdrawal succeeds at the function-call boundary; a deposit succeeds there unless the account cannot pay the stake of its new storage | proved |
 | `ViewsPure`, `ViewsTotal` | View methods never panic, never change state, never schedule promises | proved |
 | `BalanceOfCorrect`, `TotalSupplyCorrect` | `ft_balance_of` and `ft_total_supply` report the model balance and the sum of balances | proved |
 | `InitOnce` | `new` cannot run twice; nothing runs before `new` | proved |
 | `ProjectEncode` | The view recovers every well-formed state from its storage | proved |
 | `StorageCoverage` | Occupied storage is at most the `STATE` record plus `account_storage_usage` per registered account | proved |
-| `Refines` / `RefinesNearLean` | The binary executed by the runtime behaves exactly as `step`; `Spec/RuntimeInstance.lean` instantiates the interface with `near-lean/vm` so the obligation is concrete | stated, open |
+| `refines_wnear` | `NearInterface.Refines` for `contract.wasm` on near-lean's function-call boundary and the `wnear` contract model: every input, every amount of gas, every resource state | stated, open |
 
 ## Proof approach and lessons
 
@@ -97,64 +99,72 @@ length lemma and does not assume encoder injectivity. `ProjectEncode` is proved 
 encoding injectivity, disjoint storage keys, and equality of all registered
 records. Thus `project (encode s) = some s` for every well-formed state.
 
-`Spec/Refinement.lean` states the interface the proofs need from a runtime;
-`Spec/RuntimeInstance.lean` fills it with `near-lean/vm` (`NearVM.run`, the
-JSON encodings of near-sdk 3.1.0, receipts read back as model promises), so
-`RefinesNearLean cfg code size modelCfg` is the exact obligation on
-`contract.wasm`. Solvency, storage-lock coverage and end-to-end transfer-call
-behavior remain future chain-level specifications; `near-lean/chain` now has
-the definitions (`Reachable`,
-`runIsolated`, `touches`, `upgrades`) to write them in Lean. Bounded runs now
-report whether they completed; `measureCallGasBurnt` measures a successful
-settled run but does not establish sufficient prepaid gas. The refinement
-obligation requires model issues to be absent and successful receipt projections
-to be valid. JSON and receipt projection regression tests run with
-`just runtime-adapter-test` from the repository root.
+## Refinement
 
-The refinement input includes `ExecutionResources`: liquid balance before the
-attached deposit and total measured storage usage, including account/code
-overhead. These come from the enclosing runtime, rather than zero defaults.
-`Valid` bounds host integers and requires usage to cover the stored records;
-`Supports` requires funds for the model's outgoing deposits and room for its
-resulting storage. Proving these preconditions from chain-level solvency remains
-an obligation. Successful refinement additionally requires exact NEAR accounting,
-retained storage overhead, and bounded burnt/used gas. Every failed execution,
-including out of gas, must restore input storage, balance and usage and emit no
-receipts. Failure logs may survive. These are specification obligations, not yet
-proved properties of the deployed binary. Adapter regressions carry real resources
-through initialization, deposit, withdrawal, panic and gas exhaustion.
+The refinement statement is the generic `NearInterface.Refines`
+(`near-lean/interface`, design in `notes/todo/refinement_equivalence.md`).
+`Spec/Contract.lean` makes wNEAR a `ContractModel`; `NearRuntime.Boundary`
+makes near-lean a `RuntimeInterface` (one function-call action, then the
+receipt's storage-stake check); `Proofs/Refinement.lean` states
+`refines_wnear` for the embedded `contract.wasm`. Its only hypotheses are that
+the storage represents a model state and that the context is one the runtime
+builds. With at least the model's gas bound attached, the execution agrees with
+the model exactly (return value bytes, storage, balance, storage usage, logs,
+receipt bytes, failure with its exact message) and uses at most that much gas;
+with less, it agrees or fails for gas with no effects; input that is no call
+fails with no effects; no execution reports an interpreter limitation.
 
-All model/spec/proof declarations are now subject to a strict transitive axiom
-audit in CI (`just wnear-audit` locally). It rejects `sorryAx`, `native_decide`
-and every axiom outside `propext`, `Classical.choice` and `Quot.sound`, including
-private helpers. This audit establishes trust in the model proofs; the deployed
-binary refinement remains a separate unproved obligation. The storage projection
-still uses classical choice, not an executable Borsh decoder.
+What the model adds to `step` for this (`Model/Interface.lean`,
+`Model/Args.lean`, `Model/Contract.lean`):
 
-Refinement quantifies over exact callback result lists. The adapter forwards every
-byte and position unchanged, including malformed successful bodies and extra
-results; `callbackResultOf` separately projects result zero into the model. Its
-specialized total `U128` JSON decoder follows the SDK 3.1.0 string/radix-10 format,
-including plus signs, leading zeros, ASCII JSON whitespace, escaped digits and
-overflow rejection. `parseU128Result_lt` proves that every projected amount fits
-`u128`. The source checked is `near-sdk` 3.1.0 `json_types/integers.rs`, using the
-crate checksum recorded in the contract's Cargo.lock. Full parser equivalence and
-argument serialization proofs remain open. `Call.WF` requires numeric arguments
-to fit Rust `U128`; the model's pure natural-number methods are unchanged.
-Adapter regressions compare storage, return values, logs, receipts and balances
-with the model from identical transfer-call snapshots. Independent nearcore
-fixtures additionally cover missing/malformed results and call sequences with
-receiver spending, sender deletion, and receiver deletion before resolution.
-These sequences do not establish fairness or receipt-scheduler correctness.
+- **Context.** Account ids carry over: nearcore's byte-level account-id rules
+  and near-sdk 3.1.0's are proved to accept the same strings
+  (`validAccountIdBytes_toUTF8`). The callback result is parsed as
+  `serde_json::from_slice::<U128>`.
+- **Arguments.** `Call.decode` reads JSON as serde_json 1.0.60 and the derived
+  `Deserialize` accept it (`NearInterface.Json`): object or exact-length array
+  form, duplicate known fields rejected, unknown fields ignored, escapes and
+  surrogates as serde handles them. Methods without parameters never read
+  their input. `Parses` is the graph of `Call.decode`, hence functional.
+- **Failures.** Every panic site carries the data its message depends on, and
+  `Panic.message` is the exact text the binary reports, source location
+  included; `Panic.logs` are the logs emitted before it. A successful `step` is
+  followed by the runtime's checks: promise deposits against the liquid balance
+  (`balanceExceeded`) and the storage stake of the new state
+  (`lackBalanceForState`).
+- **Outputs.** Return values and receipts are compared as bytes, in the field
+  order and escaping serde_json and near-sdk's `ext_contract` produce.
+- **Gas.** `gasBound` is measured compute and per-argument-byte constants with
+  margin, the gas a call attaches to its receipts and the fees they reserve,
+  and a worst-case trie term: every node of the longest possible key path,
+  cold, for each distinct key a call touches. That the bound holds is part of
+  the obligation; it is not proved.
+
+`just runtime-adapter-test` runs `contract.wasm` through the boundary and
+compares every execution with the model as `Refines` does: a life cycle, every
+callback result shape, every panic, malformed and non-canonical arguments,
+unknown methods, balance exceeded, lack of balance for state, out of gas below
+the bound, and an adversarial state whose registered accounts share ever
+longer key prefixes with the accounts a transfer touches.
+`withdraw_available_binary` shows what the statement buys: under it,
+`WithdrawAvailableAtBoundary` is a fact about the binary's execution.
+
+All model/spec/proof declarations are subject to a strict transitive axiom
+audit (`just wnear-audit`). It rejects `sorryAx`, `native_decide` and every
+axiom outside `propext`, `Classical.choice` and `Quot.sound`, except the one
+open obligation `refines_wnear`. The storage projection still uses classical
+choice, not an executable Borsh decoder.
+
+Solvency, storage-lock coverage and end-to-end transfer-call behaviour remain
+future chain-level specifications; `near-lean/chain` has the definitions
+(`Reachable`, `runIsolated`, `touches`, `upgrades`) to write them in Lean.
 
 ### Returned receipt selection and delayed callbacks
 
-`Ret.promise index` and `ReturnData.promise index` preserve the local receipt
+`Ret.promise index` and `ReturnData.receiptIndex index` preserve the local receipt
 index instead of coarsening all promise returns. `nearWithdraw` and
 `WithdrawAvailable` explicitly return index 0 (the payout); `ftTransferCall`
-returns index 1 (the resolver). The adapter compares that exact selection and
-checks its range. Withdrawal regressions compare the model's return, storage and
-promises with the deployed binary's VM outcome.
+returns index 1 (the resolver). The adapter tests compare that exact selection.
 
 Whole-receipt result forwarding, transfer result data, rollback after storage
 checks and delayed callback delivery are exercised separately through the native

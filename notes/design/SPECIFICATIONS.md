@@ -13,13 +13,43 @@ contracts/<name>/verification/
     blueprint/   -- Prose explanations linked to statements and proofs
 ```
 
-Only wNEAR has a verification project so far.
+wNEAR has a verification project.
 
 ## Shared vocabulary
 
-Common definitions (JSON, near-sdk data structures, runtime concepts) should
-live in a shared library. It is part of the trusted base, so it should grow
-slowly and always have an up-to-date audit.
+Common definitions live in `near-lean/interface` (`NearInterface`): the raw
+values of a function call (bytes, storage, receipts, return data, promise
+results), the protocol configuration, JSON as serde_json accepts and writes
+it, and the refinement statement. It is part of the trusted base: it should
+grow slowly, stay definitions-only (no interpreter, so `Spec/` libraries can
+import it cheaply), and always have an up-to-date audit.
+
+## Refinement
+
+There is one refinement statement for every contract,
+`NearInterface.Refines R code M` (design: `notes/todo/refinement_equivalence.md`).
+A contract provides a `ContractModel`: its state encoding and invariant,
+`Parses` (which inputs are calls), a `step` from the boundary `Context`, exact
+encodings of return values, receipts and failures, and a gas bound. The
+runtime provides a `RuntimeInterface`; near-lean's is
+`Near.Boundary.nearRuntime`. The statement has no hypotheses beyond storage
+representing a model state and the context being one the runtime builds:
+
+- with at least the model's gas bound attached, the execution is the model's
+  and uses at most that much gas;
+- with less, it is the model's or an out-of-gas failure with no effects;
+- input that is no call fails with no effects;
+- no execution reports an interpreter limitation.
+
+wNEAR (`refines_wnear`) states it for its deployed binary, with adapter tests
+that run the binary against the model.
+
+Specifications about the model become facts about the binary through
+`Refines.transfer`. Specifications that need resources (a withdrawal needs
+the balance for its payout and the storage stake of its new state) state them
+as explicit hypotheses on the context, and are stated on the contract's
+boundary step so they can transfer (see wNEAR's
+`WithdrawAvailableAtBoundary` and `withdraw_available_binary`).
 
 The format will be refined as more contracts are verified. Keep statements
 self-contained and model assumptions explicit.

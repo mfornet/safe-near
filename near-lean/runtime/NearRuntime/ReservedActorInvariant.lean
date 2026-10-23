@@ -41,6 +41,7 @@ theorem applyAction_systemAbsent (c : ReceiptCtx) (isLast : Bool) (action : Acti
       rw [applyDeleteKey_run]
       simp only [hreceiver, hmissing]
       split <;> exact hmissing
+    | useGlobalContract _ => exact hmissing
     | deleteAccount beneficiary =>
       rw [applyDeleteAccount_run]
       simp only [hreceiver, hmissing]
@@ -88,9 +89,14 @@ theorem systemAbsence_checkReceiptAction (c : ReceiptCtx) (onlyAction : Bool) (a
 theorem systemAbsence_checkStorageStake (cfg : RuntimeConfig) (id : AccountId) :
     (checkStorageStake cfg id).PreservesSystemAbsence := by
   unfold checkStorageStake
-  repeat (first
-    | exact systemAbsence_pure _ | exact systemAbsence_throw _ | exact systemAbsence_getState
-    | (refine ExecM.PreservesSystemAbsence.bind ?_ (fun _ => ?_)) | split | (dsimp only; split))
+  refine ExecM.PreservesSystemAbsence.bind systemAbsence_getState (fun st => ?_)
+  cases st.account? id with
+  | none => exact systemAbsence_pure _
+  | some a =>
+    dsimp only
+    by_cases hd : storageStakeDeficit cfg a > 0
+    · simp only [hd, ↓reduceIte]; exact systemAbsence_throw _
+    · simp only [hd, ↓reduceIte]; exact systemAbsence_pure _
 
 theorem systemAbsence_runReceiptAction (c : ReceiptCtx) (onlyAction isLast : Bool) (action : Action) :
     (runReceiptAction c onlyAction isLast action).PreservesSystemAbsence := by

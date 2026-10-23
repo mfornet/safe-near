@@ -26,7 +26,7 @@ theorem outcomeOfExecution_success_funding (ctx : VMContext) (storage : List (By
       · simp [VMOutcome.graphIssue] at hsuccess
       · unfold VMOutcome.Funded
         dsimp only
-        rw [convertPromises_deposits _ graph hc]
+        rw [distributeGas_deposits, convertPromises_deposits _ graph hc]
         simpa only [Funding, NearState.liquidFunds, Nat.add_zero] using hf
 
 /-- No contract-specific assumptions: actual successful VM attempts conserve

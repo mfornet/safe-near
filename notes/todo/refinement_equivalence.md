@@ -311,3 +311,137 @@ statement, the instance, the model extensions, re-proved specs and tests.
   with serde's acceptance is tested.
 - Whether `Matches` needs anything beyond `RolledBack` for the logs on
   `balanceExceeded` / `lackBalanceForState` (logs up to the failing point).
+
+## 10. Progress and decisions taken while implementing
+
+### Status
+
+| Step | State |
+|---|---|
+| 1. `near-lean/interface` | done |
+| 2. near-lean boundary and instance | done; fuel sufficiency, storage listing and whole-receipt seam proved |
+| 3. wNEAR | done: model extensions, instance, statement, re-proved specs, tests |
+| 4. linkdrop | verification removed (owner decision); near-lean runs its binary |
+| 5. Tests | wNEAR adapter tests on the boundary (210 checks) |
+| 6. Docs | wNEAR README and blueprint, `SPECIFICATIONS.md` |
+
+### Departures from sections 3–6
+
+- `Refines` has a second hypothesis, `ctx.WF raw`: what the runtime guarantees
+  for every context it builds (integer widths, usage counting the records, a
+  canonical trie holding `raw`). It does not depend on the call or the
+  contract, so it does not reintroduce `Supports`-style exclusions.
+- The gas clause compares against `ctx.gasLimit = min prepaidGas
+  maxGasBurnt`: above the burn limit more prepaid gas does not help.
+- `Context` also carries `outputDataReceivers` (the VM reads them).
+- `ContractModel.panicMessage : Panic → String` became
+  `panicFailure : Panic → Failure`. A contract can deterministically trigger a
+  host error that is not a guest panic: wNEAR's `ft_resolve_transfer` without
+  a promise result fails with `InvalidPromiseResultIndex`.
+- `step` returns `Failed` with logs: a failure keeps the logs emitted before
+  it. So the third open item is settled: `Matches` compares failure logs
+  exactly. In wNEAR two panic sites follow a log (`near_withdraw` logs before
+  its `amount + 1` overflow, `ft_transfer_call` logs the transfer before its
+  gas subtraction); `Panic.logs` gives them from the panic's own data.
+- `applyFunctionCall` is not refactored to call the boundary. About a dozen
+  runtime invariants pattern-match its body. The boundary uses the same `run`
+  call and fuel, and the seam is a theorem,
+  `functionCallContext_eq_toVMContext`. `storageStakeDeficit` in `Apply.lean`
+  is `NearInterface.stakeDeficit`, so there is one formula.
+
+### Open items of section 9
+
+- **JSON.** `NearInterface.Json` is a byte-level parser written to accept
+  exactly what `serde_json::from_slice` (1.0.60) accepts, plus serde's derived
+  struct `Deserialize` (object with each known field at most once and unknown
+  fields ignored, or an array of exactly one element per field) and near-sdk's
+  `U128` and `ValidAccountId`. Agreement was tested by running
+  `contract.wasm`: array-form arguments, duplicate fields, escaped keys, lone
+  surrogates, leading zeros, huge exponents and 129-deep nesting in ignored
+  values, trailing data. Methods without parameters never read their input,
+  so every byte string is a call to them. `Parses` is the graph of a decoding
+  function, so it is functional by construction.
+- **Worst-case storage cost.** A cold lookup touches at most one node per
+  nibble of `contractKey account key`, plus the root. wNEAR's bound pays that
+  for each distinct key a call touches (`STATE` and at most two accounts) and
+  the cached price for each access. No bound on `ctx.trie` was needed. The
+  bound is not proved; the adapter tests check it on an adversarial state
+  whose registered accounts share ever longer key prefixes with the accounts a
+  transfer touches. Consequence worth knowing: `ft_transfer_call` reserves
+  25 Tgas for itself (`GAS_FOR_FT_TRANSFER_CALL - GAS_FOR_RESOLVE_TRANSFER`),
+  and the worst-case bound must stay under it for the positive clause to apply
+  to `ft_transfer_call`; with the current constants (about 12 Tgas of fixed
+  bound, 400 Mgas per argument byte) it does for arguments up to roughly 30 KB.
+
+### Proof obligations still open
+
+- **Fuel — proved.** The naive `prepaidGas / regularOpCost + c` is false for
+  this interpreter: entering a `block` and falling off the end of a block or
+  frame cost no gas. `run` now defaults to `fuelFor cfg code ctx` (burn
+  limit in cheapest instructions, times call depth times the module's
+  largest body), used by both `applyFunctionCall` and the boundary, and
+  `runAttempt_fuel_independent` proves that more fuel never changes the
+  outcome. The premise, positive regular and linear base op costs, is a
+  `Context.WF` field that every pinned protocol config satisfies. Pieces:
+  `Wasm/Fuel.lean` (free steps decrease a measure bounded by depth times
+  largest body), `Wasm/LinkFuncs.lean` (an instantiated store only holds
+  the module's code), `HostGasFloor.lean` (no host function lowers burnt
+  gas), `NearVM/Fuel.lean` (a potential that every metered iteration
+  strictly decreases).
+- **Storage listing — proved.** The VM reads storage from a list and
+  `RawStorage` is a set. `toNearState` now sorts the keys (the trie's
+  iteration order); two listings of the same records with one value per key
+  give the same initial host state, so `run` differs only in the input a
+  failure echoes back (`NearVM/StorageListing.lean`), and the boundary's
+  observation is the same (`execOn_perm`). `nearRuntime_exec_listing`:
+  the instance computes on any listing what `execOn` computes. One value per
+  key is a new `Context.WF` field.
+- **Whole receipt — proved.** `functionCallReceipt_seam`
+  (`NearRuntime/BoundarySeam.lean`): for a receipt whose only action is a
+  function call to deployed code, given a `Corresponds` between the receipt
+  and the boundary `Context`, `runReceiptActions` agrees with `execOn` on
+  logs and burnt gas (plus the action fees) always; on success on usage gas,
+  the receiver's storage, balance and storage usage, and the trie; on
+  failure on the error (through `runtimeFailure`) and, after
+  `rollbackReceipt`, on the state (unchanged) and the trie. It covers VM
+  aborts, promised actions the runtime rejects (`actionsIssue?` is the
+  runtime's `validateFunctionCallActions`), and the storage-stake check
+  (both use `stakeDeficit`).
+- **wNEAR.** `refines_wnear` is proved from `refines_wnear_exported`, the
+  same statement for the 15 exported methods, which is open (including the
+  soundness of `gasBound`). Calls to any other method are proved: the binary
+  fails before running code, with no effects and no execution issue
+  (`nearRuntime_not_exported`). The module's lack of a start function and its
+  exported functions are hypotheses the adapter tests check, like decoding
+  itself: the kernel cannot decode the 185 KB binary within 15 GB.
+
+### linkdrop
+
+near-lean could not run linkdrop's binary: it imports five host functions
+NearVM lacked. They are now modelled after the pinned nearcore:
+
+- `promise_batch_action_function_call_weight`: the function call with a gas
+  weight; after a successful call the unused prepaid gas goes to the weighted
+  calls (`ReceiptManager::distribute_gas`: shares by weight, remainder to the
+  last). The VM outcome records the distributed gas; the boundary observes the
+  VM runner's used gas before distribution, which is what `Matches`' leftover
+  gas means, and the whole-receipt seam adds the distributed gas.
+- `promise_batch_action_use_global_contract{,_by_account_id}`: identifier read
+  and checks, target lookup, `use_global_contract` fees (from nearcore's
+  `77.yaml`; the config view omits them), the `UseGlobalContract` action. The
+  runtime prices, encodes and validates it; executing it on the receiver is an
+  explicit `unsupportedAction` issue (no global contract registry).
+- The deployment hosts resolve and report an explicit `unsupportedHost` issue
+  when invoked; linkdrop never invokes them.
+
+A linkdrop `ContractModel` instance was built and checked against the binary,
+then removed with the rest of linkdrop's verification at the owner's request;
+it is in this branch's history. The near-lean support above stays.
+
+### Environment notes
+
+- `near-lean/.lake` was tracked as a symlink into one machine's home
+  directory; it is no longer tracked.
+- `just near-test` needs the external `wasm-tools` binary (1.251.0, as pinned
+  in `contracts/linkdrop/verification/binary-boundary.json`) for decoder
+  fixtures; with it, VM (103) and runtime (179) tests pass.

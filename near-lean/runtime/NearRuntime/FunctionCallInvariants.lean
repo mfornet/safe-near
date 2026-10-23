@@ -120,7 +120,7 @@ theorem commitFunctionCall_funded (exec : Exec) (c : ReceiptCtx) (account : Acco
   dsimp only
   have hf := run_success_funding c.cfg code.module code.size method
     (functionCallContext c account args gas deposit isLast accounting) (exec.state.contractStorage c.receipt.receiverId)
-    defaultFuel hsuccess
+    _ hsuccess
   have hc := commitFunctionCall_totalFunds exec c account _ isLast effects heffects hwf haccount
   change (run c.cfg code.module code.size method (functionCallContext c account args gas deposit isLast accounting)
     (exec.state.contractStorage c.receipt.receiverId)).balance + _ = account.amount + deposit + _ at hf
