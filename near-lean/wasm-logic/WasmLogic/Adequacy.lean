@@ -46,31 +46,77 @@ instance (H : Type) : InvGpreS (GF H) where
 instance (H : Type) : WasmGpreS H (GF H) where
   heap := ⟨{ τ := 4, transp := by unfold GF; rfl }⟩
 
-/-- Adequacy of `WP` for the heap state interpretation: a `WP` proved from
-ownership of every cell of the initial store holds of every finished run. -/
+/-- Adequacy with cells: if from ownership of every cell of the initial
+store the program satisfies `WP` with a postcondition owning the cells
+`Q o`, then every finished run ends in an outcome `o` with `φ o` and a store
+holding those cells. This is the root statement; `wp_adequacy_heap` and
+`adequacy` are corollaries. -/
+theorem wp_adequacy_cells {GF' : BundledGFunctors} [WasmGpreS H GF'] (e : Code H) (σ : Store H)
+    (φ : Outcome → Prop) (Q : Outcome → List (Loc × Cell H)) (hQ : ∀ o, ((Q o).map (·.1)).Nodup)
+    (hwp : ∀ [WasmGS H GF'], ownCells (GF := GF') (heapOf σ) ⊢
+      WP e @ Stuckness.MaybeStuck; ⊤ {{ o, ⌜φ o⌝ ∗ [∗list] p ∈ Q o, p.1 ↦ₛ p.2 }}) :
+    adequate .MaybeStuck e σ (fun o σ' => φ o ∧ ∀ p ∈ Q o, lookup σ' p.1 = some p.2) := by
+  refine (adequate_alt _ _ _ _).mpr ?_
+  intro t2 σ2 hreach
+  refine ⟨fun v2 t2' heq => ?_, fun _ h => by cases h⟩
+  subst heq
+  obtain ⟨n, κs, hsteps⟩ := (Language.erasedStep_nSteps _ _).mp hreach
+  apply wp_strong_adequacy_gen (GF := GF') (hlc := .hasLC) .MaybeStuck (Hsteps := hsteps)
+    (numLaters := fun _ => 0)
+  iintro %Hinv
+  imod ghost_map_alloc (GF := GF') (heapOf σ) with ⟨%γ, Hauth, Hcells⟩
+  letI wgs : WasmGS H GF' := { invGS := Hinv, heap := WasmGpreS.heap, name := γ }
+  ihave Hwp := (@hwp wgs) $$ Hcells
+  iexists (fun σ _ _ _ => ghost_map_auth γ (.own 1) (heapOf σ)),
+    [fun o => iprop(⌜φ o⌝ ∗ [∗list] p ∈ Q o, p.1 ↦ₛ p.2)], (fun _ => iprop(True)),
+    (fun _ _ _ _ => fupd_intro)
+  dsimp only
+  imodintro
+  iframe
+  isplitl
+  · iapply BigSepL2.bigSepL2_nil; itrivial
+  iintro %es' %_ %Heq %hlen %_ Hst Hpost _
+  icases BigSepL2.bigSepL2_cons_inv_right $$ Hpost with ⟨%e', %es'', %Heq', Hpost, H⟩
+  subst Heq'
+  icases BigSepL2.bigSepL2_nil_inv_right $$ H with %Heq''
+  subst Heq''
+  simp only [List.cons_append, List.nil_append, List.cons.injEq] at Heq
+  obtain ⟨rfl, -⟩ := Heq
+  simp only [ToVal.toVal_coe, Option.elim_some]
+  icases Hpost with ⟨%hφ, Hc⟩
+  ihave Hc := (ownCells_cellsOf (GF := GF') (Q v2) (hQ v2)).2 $$ Hc
+  ihave %hsub := ghost_map_lookup_big (cellsOf (Q v2)) $$ Hst Hc
+  iapply fupd_mask_intro_discard empty_subset
+  ipureintro
+  refine ⟨hφ, fun p hp => ?_⟩
+  have := hsub p.1 p.2 (by rw [get?_cellsOf]; exact lookup_of_mem (hQ v2) hp)
+  simpa [get?_heapOf] using this
+
+/-- Adequacy of `WP` for the heap state interpretation with a pure
+postcondition: a `WP` proved from ownership of every cell of the initial
+store holds of every finished run. -/
 theorem wp_adequacy_heap {GF' : BundledGFunctors} [WasmGpreS H GF'] (e : Code H) (σ : Store H)
     (φ : Outcome → Prop)
     (hwp : ∀ [WasmGS H GF'], ownCells (GF := GF') (heapOf σ) ⊢
       WP e @ Stuckness.MaybeStuck; ⊤ {{ v, ⌜φ v⌝ }}) :
     adequate .MaybeStuck e σ (fun v _ => φ v) := by
-  refine wp_adequacy (GF := GF') .MaybeStuck e σ φ ?_
-  intro inst κs
-  imod ghost_map_alloc (GF := GF') (heapOf σ) with ⟨%γ, Hauth, Hcells⟩
-  letI wgs : WasmGS H GF' := { invGS := inst, heap := WasmGpreS.heap, name := γ }
-  imodintro
-  iexists (fun σ _ => ghost_map_auth γ (.own 1) (heapOf σ)), (fun _ => iprop(True))
-  isplitl [Hauth]
-  · iexact Hauth
-  · iapply (@hwp wgs)
-    iexact Hcells
+  have h := wp_adequacy_cells (GF' := GF') e σ φ (fun _ => []) (fun _ => List.nodup_nil) (by
+    intro _
+    refine hwp.trans (wp_mono fun _ => ?_)
+    iintro H
+    isplitl [H]
+    · iexact H
+    · iapply BigSepL.bigSepL_nil.2; iempintro)
+  exact ⟨fun t2 σ2 v2 hr => (h.adequate_result t2 σ2 v2 hr).1,
+    fun t2 σ2 e2 hs hr hm => h.adequate_not_stuck t2 σ2 e2 hs hr hm⟩
 
 /-- What a run of the machine can end in, as the language sees it. -/
 theorem run_outcome (fuel : Nat) (σ : Store H) (limits : ExecLimits) (thread : Thread)
-    (φ : Outcome → Prop)
-    (had : adequate (Expr := Code H) .MaybeStuck (.running limits thread) σ (fun o _ => φ o)) :
+    (φ : Outcome → Store H → Prop)
+    (had : adequate (Expr := Code H) .MaybeStuck (.running limits thread) σ φ) :
     match Exec.run fuel (Code.config σ limits thread) with
-    | .done vs _ => φ (.values vs)
-    | .trap r _ => φ (.trap r)
+    | .done vs σ' => φ (.values vs) σ'
+    | .trap r σ' => φ (.trap r) σ'
     | .outOfFuel _ => True := by
   have steps := run_steps fuel σ limits thread
   cases h : Exec.run fuel (Code.config σ limits thread) with
@@ -127,10 +173,76 @@ theorem startWasm_eq {σ : Store H} {lim : ExecLimits} {a : Nat} {args : List Va
     exact ⟨type, inst, code, hfn, rfl⟩
   · cases hc
 
+/-- Weaken a function's postcondition. -/
+theorem wpInvoke_mono {GF' : BundledGFunctors} [WasmGS H GF'] {lim : ExecLimits} {d : Nat}
+    {type : FuncType} {inst : Nat} {mi : ModuleInst} {code : Func} {args : List Value}
+    {Φf Φf' : FunPost GF'} (hret : ∀ rs, Φf.ret rs ⊢ Φf'.ret rs) (htrap : Φf.trap ⊢ Φf'.trap) :
+    wpInvoke (H := H) lim d type inst mi code args Φf ⊢ wpInvoke lim d type inst mi code args Φf' := by
+  unfold wpInvoke
+  iintro Hwp %Ψ %bs %fs %hfs #Hi HK
+  iapply Hwp $$ %Ψ %bs %fs %hfs Hi
+  isplit
+  · iintro %rs Hr
+    icases HK with ⟨HK, -⟩
+    iapply HK
+    iapply hret $$ Hr
+  · iintro Ht
+    icases HK with ⟨-, HK⟩
+    iapply HK
+    iapply htrap $$ Ht
+
 /-- **Adequacy.** If, from ownership of every cell of the store, the
-invocation of the Wasm function at `a` with `args` satisfies `wpInvoke` with
-pure postconditions, then every run of `Exec.run` from `Exec.startWasm`
-that finishes returns values satisfying `φ`, and traps only if `φtrap`. -/
+invocation of the Wasm function at `a` with `args` satisfies `wpInvoke`,
+returning `rs` with `φ rs` and the cells `Q rs`, and trapping only with
+`φtrap`, then every run of `Exec.run` from `Exec.startWasm` that finishes
+returns values `vs` with `φ vs` in a store holding the cells `Q vs`, and
+traps only if `φtrap`. -/
+theorem adequacy_cells (σ : Store H) (lim : ExecLimits) (a : Nat) (args : List Value)
+    (type : FuncType) (inst : Nat) (mi : ModuleInst) (code : Func)
+    (hfn : σ.funcs[a]? = some (.wasm type inst code))
+    (φ : List Value → Prop) (φtrap : Prop) (Q : List Value → List (Loc × Cell H))
+    (hQ : ∀ vs, ((Q vs).map (·.1)).Nodup)
+    (hwp : ∀ [WasmGS H (GF H)], ownCells (GF := GF H) (heapOf σ) ⊢ |==>
+      (instPt inst mi ∗ wpInvoke lim 0 type inst mi code args
+        { ret := fun rs => iprop(⌜φ rs⌝ ∗ [∗list] p ∈ Q rs, p.1 ↦ₛ p.2), trap := iprop(⌜φtrap⌝) }))
+    (c : Config H) (hc : Exec.startWasm σ lim a args = some c) (fuel : Nat) :
+    match Exec.run fuel c with
+    | .done vs σ' => φ vs ∧ ∀ p ∈ Q vs, lookup σ' p.1 = some p.2
+    | .trap _ _ => φtrap
+    | .outOfFuel _ => True := by
+  obtain ⟨type', inst', code', hfn', rfl⟩ := startWasm_eq hc
+  rw [hfn] at hfn'
+  cases hfn'
+  let φ' : Outcome → Prop := fun o => match o with | .values vs => φ vs | .trap _ => φtrap
+  let Q' : Outcome → List (Loc × Cell H) := fun o => match o with | .values vs => Q vs | .trap _ => []
+  have had := wp_adequacy_cells (GF' := GF H) (Code.running lim (calleeThread [] [] type inst code args))
+    σ φ' Q' (fun o => by cases o <;> simp [Q', hQ]) (by
+      intro _
+      let Ψ : Outcome → IProp (GF H) := fun o => iprop(⌜φ' o⌝ ∗ [∗list] p ∈ Q' o, p.1 ↦ₛ p.2)
+      show _ ⊢ WP _ @ _; _ {{ Ψ }}
+      iintro Hcells
+      imod hwp $$ Hcells with ⟨#Hi, Hwp⟩
+      unfold wpInvoke
+      iapply Hwp $$ %Ψ %([] : List Value) %([] : List CallFrame) %rfl Hi
+      isplit
+      · iintro %rs ⟨%hrs, Hc⟩
+        simp only [retCode]
+        iapply wp_finished
+        isplitr
+        · ipureintro; exact hrs
+        · iexact Hc
+      · iintro %ht %r
+        isplitr
+        · ipureintro; exact ht
+        · iapply BigSepL.bigSepL_nil.2; iempintro)
+  have := run_outcome fuel σ lim _ _ had
+  revert this
+  cases Exec.run fuel (Code.config σ lim (calleeThread [] [] type inst code args)) <;>
+    simp [φ', Q']
+
+/-- Adequacy with pure postconditions: every run of `Exec.run` from
+`Exec.startWasm` that finishes returns values satisfying `φ`, and traps
+only if `φtrap`. -/
 theorem adequacy (σ : Store H) (lim : ExecLimits) (a : Nat) (args : List Value)
     (type : FuncType) (inst : Nat) (mi : ModuleInst) (code : Func)
     (hfn : σ.funcs[a]? = some (.wasm type inst code))
@@ -143,28 +255,24 @@ theorem adequacy (σ : Store H) (lim : ExecLimits) (a : Nat) (args : List Value)
     | .done vs _ => φ vs
     | .trap _ _ => φtrap
     | .outOfFuel _ => True := by
-  obtain ⟨type', inst', code', hfn', rfl⟩ := startWasm_eq hc
-  rw [hfn] at hfn'
-  cases hfn'
-  have had := wp_adequacy_heap (GF' := GF H) (Code.running lim (calleeThread [] [] type inst code args))
-    σ (fun o => match o with | .values vs => φ vs | .trap _ => φtrap) (by
+  have h := adequacy_cells σ lim a args type inst mi code hfn φ φtrap (fun _ => [])
+    (fun _ => List.nodup_nil) (by
       intro _
       iintro Hcells
-      imod hwp $$ Hcells with ⟨#Hi, Hwp⟩
-      unfold wpInvoke
-      iapply Hwp $$ %(fun o => iprop(⌜match o with | .values vs => φ vs | .trap _ => φtrap⌝))
-        %([] : List Value) %([] : List CallFrame) %rfl Hi
-      isplit
-      · iintro %rs %hrs
-        simp only [retCode]
-        iapply wp_finished
-        ipureintro
-        exact hrs
-      · iintro %ht %r
-        ipureintro
-        exact ht)
-  have := run_outcome fuel σ lim _ _ had
-  revert this
-  cases Exec.run fuel (Code.config σ lim (calleeThread [] [] type inst code args)) <;> simp
+      imod hwp $$ Hcells with ⟨Hi, Hwp⟩
+      imodintro
+      isplitl [Hi]
+      · iexact Hi
+      have hm : ∀ rs, (iprop(⌜φ rs⌝) : IProp (GF H)) ⊢
+          iprop(⌜φ rs⌝ ∗ [∗list] p ∈ ([] : List (Loc × Cell H)), p.1 ↦ₛ p.2) := fun _ => by
+        iintro H
+        isplitl [H]
+        · iexact H
+        · iapply BigSepL.bigSepL_nil.2; iempintro
+      iapply (wpInvoke_mono (Φf := { ret := fun rs => iprop(⌜φ rs⌝), trap := iprop(⌜φtrap⌝) })
+        (Φf' := { ret := fun rs => iprop(⌜φ rs⌝ ∗ [∗list] p ∈ ([] : List (Loc × Cell H)), p.1 ↦ₛ p.2),
+                  trap := iprop(⌜φtrap⌝) }) hm .rfl) $$ Hwp) c hc fuel
+  revert h
+  cases Exec.run fuel c <;> simp
 
 end WasmLogic

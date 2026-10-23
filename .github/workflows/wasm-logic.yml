@@ -1,0 +1,81 @@
+name: wasm-logic
+
+# The separation logic over the Wasm runtime (near-lean/wasm-logic). Unlike
+# the other Lean suites, which run in the periodic check, this runs on every
+# change to the logic or to the runtime it is about: with iris-lean cached it
+# takes a few minutes. The mutation test (scripts/mutation-test.py) is slower
+# and runs in the periodic check only.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "near-lean/wasm-logic/**"
+      - "near-lean/wasm/Wasm/**"
+      - "near-lean/wasm/Wasm.lean"
+      - "near-lean/wasm/Testsuite/**"
+      - "near-lean/wasm/lakefile.toml"
+      - "near-lean/wasm/lean-toolchain"
+      - "tools/axiom-audit.py"
+      - ".github/workflows/wasm-logic.yml"
+  pull_request:
+    paths:
+      - "near-lean/wasm-logic/**"
+      - "near-lean/wasm/Wasm/**"
+      - "near-lean/wasm/Wasm.lean"
+      - "near-lean/wasm/Testsuite/**"
+      - "near-lean/wasm/lakefile.toml"
+      - "near-lean/wasm/lean-toolchain"
+      - "tools/axiom-audit.py"
+      - ".github/workflows/wasm-logic.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wasm-logic-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  logic:
+    name: Build and check the logic, examples and client
+    runs-on: ubuntu-latest
+    # iris-lean compiles from source on a cold cache.
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+
+      # iris-lean is a git dependency compiled from source; cache it with its build.
+      - uses: actions/cache@v5
+        with:
+          path: near-lean/.lake/packages/iris
+          key: lake-iris-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('near-lean/wasm-logic/lake-manifest.json', 'near-lean/wasm-logic/lean-toolchain') }}
+
+      # Builds every module, which also runs the rule coverage check
+      # (Coverage.lean) and the kernel checks that the examples' bytes decode,
+      # validate and link to the modules the proofs are about.
+      - uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: near-lean/wasm-logic
+          build-args: --wfail
+          use-mathlib-cache: false
+
+      # Every declaration may depend only on propext, Classical.choice and
+      # Quot.sound: no sorry, no native_decide.
+      - name: Axiom audit
+        run: python3 tools/axiom-audit.py near-lean/wasm-logic --report audit/wasm-logic.json --no-build
+
+      # Must match the pin in near-lean/wasm-logic/scripts/check-wasm-bytes.sh.
+      - name: Install wasm-tools
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-tools@1.251.0
+
+      - name: Committed binaries match their .wat
+        working-directory: near-lean/wasm-logic
+        run: scripts/check-wasm-bytes.sh
+
+      - name: Run the linked client on the runtime
+        run: |
+          (cd near-lean/wasm && lake build testsuite --wfail)
+          near-lean/wasm-logic/scripts/smoke-client.sh

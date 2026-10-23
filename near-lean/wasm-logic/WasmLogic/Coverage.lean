@@ -51,7 +51,8 @@ def rules : List (Name × List Name × String) := [
   (``Wasm.Instr.load, [``wpi_load], "wp_load, wp_load_packed (one rule over widths)"),
   (``Wasm.Instr.store, [``wpi_store], "wp_store, wp_store_packed (one rule over widths)"),
   (``Wasm.Instr.memory_size, [``wpi_memory_size], "wp_current_memory"),
-  (``Wasm.Instr.memory_grow, [``wpi_memory_grow, ``wpi_memory_grow_fail], "wp_grow_memory"),
+  (``Wasm.Instr.memory_grow, [``wpi_memory_grow, ``wpi_memory_grow_fail, ``wpi_memory_grow_either],
+    "wp_grow_memory (its either-outcome shape is wpi_memory_grow_either)"),
   (``Wasm.Instr.i32_const, [``wpi_i32_const], "wp_val (constants are values there)"),
   (``Wasm.Instr.i64_const, [``wpi_i64_const], "wp_val"),
   (``Wasm.Instr.f32_const, [``wpi_f32_const], "wp_val"),
@@ -96,7 +97,9 @@ def structural : List (Name × String) := [
   (``wpInvoke_intro, "wp_invoke_native"),
   (``wpi_instr, "none: the generic rule every instruction rule is derived from"),
   (``wp_lift, "none: the one lifting lemma, over `Exec.step`"),
-  (``adequacy, "wp_adequacy, instantiated to `Exec.run`")]
+  (``wp_adequacy_cells, "wp_adequacy, with final-store facts from owned cells (wp_strong_adequacy)"),
+  (``adequacy_cells, "wp_adequacy, instantiated to `Exec.run`: values, traps and final cells"),
+  (``adequacy, "wp_adequacy, instantiated to `Exec.run`, pure postconditions")]
 
 /-- Fails the build unless every instruction in scope has its rules. -/
 elab "#check_rule_coverage" : command => do

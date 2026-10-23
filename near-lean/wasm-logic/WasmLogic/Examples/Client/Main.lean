@@ -168,15 +168,17 @@ theorem invoke_pop (d v : Nat) (a : UInt32) (s : List UInt32) (Φf : FunPost GF)
   · ipureintro; exact Nat.le_refl _
   iapply HΦ $$ Hs
 
-/-- `main`, from the stack's specifications: it returns `2`, or `-1` when
-`new_stack` fails. Its resources are the stack's functions and instance
-and the stack's memory length; it never sees the stack's memory. -/
+/-- `main`, from the stack's specifications: it returns `2` and memory has
+grown by a page, or `-1` and memory is as it was, when `new_stack` fails.
+Its resources are the stack's functions and instance and the stack's memory
+length; it never sees the stack's memory. -/
 theorem main_spec (hlim : 1 < lim.maxCallDepth) (Φf : FunPost GF) :
     (0 : Nat) ↪[wf] FuncInst.wasm (H := H) stackTypes[0]! 0 newStackFn ∗
       (3 : Nat) ↪[wf] FuncInst.wasm (H := H) stackTypes[1]! 0 popFn ∗
       (4 : Nat) ↪[wf] FuncInst.wasm (H := H) stackTypes[2]! 0 pushFn ∗
       (0 : Nat) ↪[inst] stackInst ∗ (0 : Nat) ↦[wmlength] 0 ∗
-      (∀ k : UInt32, ⌜k = 2 ∨ k = 0xFFFFFFFF⌝ -∗ Φf.ret [.i32 k])
+      (∀ k : UInt32, ((⌜k = 2⌝ ∗ (0 : Nat) ↦[wmlength] pageSize) ∨
+          (⌜k = 0xFFFFFFFF⌝ ∗ (0 : Nat) ↦[wmlength] 0)) -∗ Φf.ret [.i32 k])
       ⊢ wpInvoke (H := H) lim 0 clientTypes[0]! 1 clientInst mainFunc [] Φf := by
   iintro ⟨#H0, #H3, #H4, #Hsi, Hlen, HΦ⟩
   iapply wpInvoke_intro
@@ -193,7 +195,7 @@ theorem main_spec (hlim : 1 < lim.maxCallDepth) (Φf : FunPost GF) :
   isplitl [Hlen]
   · iexact Hlen
   iintro %vs Hd
-  icases Hd with (⟨%hvs, -⟩ | ⟨%hvs, Hs, -⟩)
+  icases Hd with (⟨%hvs, Hl⟩ | ⟨%hvs, Hs, Hl⟩)
   · -- `new_stack` failed: return -1.
     subst hvs
     simp only [Post.seq_normal, List.nil_append]
@@ -215,7 +217,10 @@ theorem main_spec (hlim : 1 < lim.maxCallDepth) (Φf : FunPost GF) :
     isplitr
     · ipureintro; exact Nat.le_refl _
     iapply HΦ
-    ipureintro; exact .inr rfl
+    iright
+    isplitr
+    · ipureintro; rfl
+    · iexact Hl
   · -- A stack at address 0: push 4 and 6, pop twice, subtract.
     subst hvs
     simp only [Post.seq_normal, List.nil_append]
@@ -293,7 +298,10 @@ theorem main_spec (hlim : 1 < lim.maxCallDepth) (Φf : FunPost GF) :
     isplitr
     · ipureintro; exact Nat.le_refl _
     iapply HΦ
-    ipureintro; exact .inl rfl
+    ileft
+    isplitr
+    · ipureintro; rfl
+    · simp only [Nat.zero_add]; iexact Hl
 
 end Proof
 
@@ -311,17 +319,33 @@ theorem mainCells_get : ∀ p ∈ mainCells, Iris.Std.get? (heapOf linkedStore) 
   rcases hp with rfl | rfl | rfl | rfl | rfl | rfl <;> rw [get?_heapOf]
   all_goals first | rfl | simp [linkedStore, Memory.wf, Memory.byteSize]
 
-/-- Every run of the linked client's `main` that finishes returns `2`, or
-`-1` if the stack could not get a page; none traps. -/
+/-- What `main` leaves in memory 0: one page if it returned 2, else nothing. -/
+def mainFinal (vs : List Value) : List (Loc × Cell Unit) :=
+  [(Loc.memLength 0, .memLength (if vs = [.i32 2] then pageSize else 0))]
+
+/-- Every run of the linked client's `main` that finishes returns `2`, with
+the stack's memory grown to one page, or returns `-1` with memory still
+empty; none traps. -/
 theorem main_adequate (c : Config Unit) (hc : Exec.startWasm linkedStore {} 7 [] = some c) (fuel : Nat) :
     match Exec.run fuel c with
-    | .done vs _ => vs = [.i32 2] ∨ vs = [.i32 0xFFFFFFFF]
+    | .done vs σ' =>
+      (vs = [.i32 2] ∧ ∃ mem, σ'.mems[0]? = some mem ∧ mem.byteSize = pageSize) ∨
+        (vs = [.i32 0xFFFFFFFF] ∧ ∃ mem, σ'.mems[0]? = some mem ∧ mem.byteSize = 0)
     | .trap _ _ => False
     | .outOfFuel _ => True := by
-  have h := adequacy linkedStore {} 7 [] clientTypes[0]! 1 clientInst mainFunc rfl
-    (fun vs => vs = [.i32 2] ∨ vs = [.i32 0xFFFFFFFF]) False ?_ c hc fuel
+  have h := adequacy_cells linkedStore {} 7 [] clientTypes[0]! 1 clientInst mainFunc rfl
+    (fun vs => vs = [.i32 2] ∨ vs = [.i32 0xFFFFFFFF]) False mainFinal (fun _ => by simp [mainFinal])
+    ?_ c hc fuel
   · revert h
-    cases Exec.run fuel c <;> exact id
+    cases Exec.run fuel c with
+    | done vs σ' =>
+      intro ⟨hvs, hcells⟩
+      obtain ⟨mem, hmem, -, hlen⟩ := memLength_facts (hcells _ List.mem_cons_self)
+      rcases hvs with rfl | rfl
+      · exact .inl ⟨rfl, mem, hmem, by simpa [mainFinal] using hlen⟩
+      · exact .inr ⟨rfl, mem, hmem, by simpa [mainFinal] using hlen⟩
+    | trap => exact id
+    | outOfFuel => exact id
   intro _
   iintro Hcells
   icases ownCells_take _ mainCells (by decide) mainCells_get $$ Hcells with Hl
@@ -351,10 +375,22 @@ theorem main_adequate (c : Config Unit) (hc : Exec.startWasm linkedStore {} 7 []
   · iunfold instPt; iexact Hi0
   isplitl [Hlen]
   · iunfold memLength; iexact Hlen
-  iintro %k %hk
-  ipureintro
-  rcases hk with rfl | rfl
-  · exact .inl rfl
-  · exact .inr rfl
+  iintro %k Hk
+  icases Hk with (⟨%hk, Hl⟩ | ⟨%hk, Hl⟩)
+  · subst hk
+    isplitr
+    · ipureintro; exact .inl rfl
+    · simp only [mainFinal, ite_eq_left]
+      iapply BigSepL.bigSepL_singleton.2
+      iunfold memLength at Hl
+      iexact Hl
+  · subst hk
+    isplitr
+    · ipureintro; exact .inr rfl
+    · simp only [mainFinal]
+      rw [ite_eq_right (by decide)]
+      iapply BigSepL.bigSepL_singleton.2
+      iunfold memLength at Hl
+      iexact Hl
 
 end WasmLogic.Examples.Client
