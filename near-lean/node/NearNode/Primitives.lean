@@ -15,3 +15,4 @@ import NearNode.Primitives.BlockHeader
 import NearNode.Primitives.Spice
 import NearNode.Primitives.Challenge
 import NearNode.Primitives.Block
+import NearNode.Primitives.Stateless
