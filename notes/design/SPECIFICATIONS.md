@@ -41,6 +41,10 @@ representing a model state and the context being one the runtime builds:
 - input that is no call fails with no effects;
 - no execution reports an interpreter limitation.
 
+wNEAR (`refines_wnear`) and linkdrop (`refines_linkdrop`) state it for their
+deployed binaries, each with adapter tests that run the binary against the
+model; both proofs are open.
+
 Specifications about the model become facts about the binary through
 `Refines.transfer`. Specifications that need resources (a withdrawal needs
 the balance for its payout and the storage stake of its new state) state them
