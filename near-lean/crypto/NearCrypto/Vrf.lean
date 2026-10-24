@@ -122,8 +122,10 @@ def hashS (parts : List ByteArray) : Nat :=
 
 /-- A canonical scalar (`Scalar::from_canonical_bytes`) at byte offset `off` of `b`. -/
 def canonical (b : ByteArray) (off : Nat) : Option Nat :=
-  let s := Scalar.ofBytes b off 4
-  if off + 32 ≤ b.size && s < ell then some s else none
+  if off + 32 ≤ b.size then
+    let s := Scalar.ofBytes b off 4
+    if s < ell then some s else none
+  else none
 
 /-- The encoding of `s · B`. -/
 def basemul (s : Nat) : ByteArray :=
@@ -140,7 +142,7 @@ structure SecretKey where
 
 /-- `SecretKey::try_from(&[u8; 32])`: a canonical scalar. -/
 def SecretKey.ofBytes (b : ByteArray) : Option SecretKey :=
-  (canonical b 0).map fun s => ⟨s, basemul s⟩
+  if b.size == 32 then (canonical b 0).map fun s => ⟨s, basemul s⟩ else none
 
 /-- The scalar. -/
 def SecretKey.toBytes (k : SecretKey) : ByteArray :=

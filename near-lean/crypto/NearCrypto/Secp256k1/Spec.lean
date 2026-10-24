@@ -179,7 +179,7 @@ def validSecret (b : ByteArray) : Bool :=
 
 /-- `secp256k1_eckey_pubkey_parse`. -/
 def parsePublicKey (b : ByteArray) : Option (Nat × Nat) :=
-  let tag := b.get! 0
+  let tag := b.data.getD 0 0
   if b.size == 33 && (tag == 2 || tag == 3) then
     let x := toNat (b.extract 1 33)
     if x < p then
