@@ -49,7 +49,8 @@ def accountingJson (state : Option TrieOverlay.State) : Json :=
       ("hash", bytesJson event.hash), ("kind", toJson event.kind), ("cached", toJson event.cached)]))]
 
 def run (protocol : Nat) (cfg : Wasm.Near.RuntimeConfig) (codes : Catalogue) (initial : Snapshot)
-    (context : QueueEncoding.Context) (blocks : List Block) (hashes : List (List NativeIdentity.Hash)) (schedulerInputs : List ChunkTrie.Input) : Result Json := do
+    (context : QueueEncoding.Context) (blocks : List Block) (hashes : List (List NativeIdentity.Hash)) (schedulerInputs : List ChunkTrie.Input)
+    (initialScheduler : ChunkTrie.Scheduler := {}) : Result Json := do
   unless schedulerInputs.length == blocks.length do throw "scheduler input batch count mismatch"
   unless hashes.length == blocks.length do throw "transaction block-hash batch count mismatch"
   let catalogue := codes.map fun code => (code.code.hash, code.bytes)
@@ -65,11 +66,12 @@ def run (protocol : Nat) (cfg : Wasm.Near.RuntimeConfig) (codes : Catalogue) (in
       ("codeCatalogue", toJson (codes.map fun entry => obj [
         ("hash", toJson entry.code.hash), ("size", toJson entry.code.size)])),
       ("blocks", toJson trace), ("stop", toJson stop), ("unrunBlocks", toJson unrun),
+      ("initialSchedulerEntries", entriesJson initialScheduler.entries),
       ("quiescent", toJson snapshot.quiescent), ("nativeActionRandomness", toJson true)] ++ extra)
   let mut snapshot := initial
   let mut context := context
   let mut trace : List Json := []
-  let mut scheduler : ChunkTrie.Scheduler := {}
+  let mut scheduler : ChunkTrie.Scheduler := initialScheduler
   for ((block, hashes), position) in (blocks.zip hashes).zipIdx do
     unless block.txs.length == hashes.length do throw "transaction block-hash count mismatch"
     for hash in hashes do let _ ← NativeIdentity.checkedHash hash
@@ -107,16 +109,25 @@ def run (protocol : Nat) (cfg : Wasm.Near.RuntimeConfig) (codes : Catalogue) (in
   return finish snapshot trace "blocksExhausted" 0
 
 def execute (request : Json) : IO Json := do
-  let (protocol, directory, catalogues, initial, pending, values, hashes, context, schedulerInputs) ← IO.ofExcept do
+  let (protocol, directory, catalogues, initial, pending, values, hashes, context, schedulerInputs, scheduler) ← IO.ofExcept do
     object request ["formatVersion", "protocolVersion", "configDir", "codes", "initialState", "pendingReceipts",
-      "blocks", "transactionBlockHashes", "queueContext", "schedulerInputs"]
+      "blocks", "transactionBlockHashes", "queueContext", "schedulerInputs", "initialScheduler"]
     let version : Nat ← field request "formatVersion"
     unless version == 1 do throw "unsupported formatVersion"
     let protocol : Nat ← field request "protocolVersion"
     unless 83 ≤ protocol && protocol ≤ 86 do throw "reference protocol range is 83–86"
     let context : Option Json ← fromJson? ((request.getObjVal? "queueContext").toOption.getD .null)
+    -- Optional: the bandwidth scheduler state at the start of the chunk, when it does not start from genesis.
+    let scheduler : Option Json := match request.getObjVal? "initialScheduler" with
+      | .ok .null | .error _ => none
+      | .ok value => some value
+    let scheduler ← scheduler.mapM fun value => do
+      object value ["sanity", "allowance"]
+      let sanity ← byteField value "sanity"
+      unless sanity.length == 32 do throw "scheduler sanity hash must contain 32 bytes"
+      pure ({ sanity, allowance := ← u64 value "allowance", present := true } : ChunkTrie.Scheduler)
     pure (protocol, ← field request "configDir", ← field request "codes", ← field request "initialState",
-      ← field request "pendingReceipts", ← field request "blocks", ← field request "transactionBlockHashes", context, (request.getObjVal? "schedulerInputs").toOption)
+      ← field request "pendingReceipts", ← field request "blocks", ← field request "transactionBlockHashes", context, (request.getObjVal? "schedulerInputs").toOption, scheduler)
   let codes ← loadCatalogue (catalogues : List Json)
   let (snapshot, blocks, hashes, context, schedulerInputs) ← IO.ofExcept do
     let snapshot : Snapshot := {
@@ -144,7 +155,7 @@ def execute (request : Json) : IO Json := do
           ChunkTrie.input congestion (← byteField value "bandwidthRequests")
     pure (snapshot, blocks, hashes, context, schedulerInputs)
   let cfg ← Wasm.Near.RuntimeConfig.load directory protocol
-  IO.ofExcept (run protocol cfg codes snapshot context blocks hashes schedulerInputs)
+  IO.ofExcept (run protocol cfg codes snapshot context blocks hashes schedulerInputs (scheduler.getD {}))
 
 end ChainReplay.Registered
 

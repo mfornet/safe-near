@@ -118,6 +118,12 @@ def action (codes : Catalogue) (j : Json) : Result Action := do
   | "deleteAccount" =>
     object j ["kind", "beneficiaryId"]
     pure (.deleteAccount (← field j "beneficiaryId"))
+  | "useGlobalContract" =>
+    object j ["kind", "codeHash", "accountId"]
+    match j.getObjVal? "codeHash", j.getObjVal? "accountId" with
+    | .ok _, .error _ => pure (.useGlobalContract (.codeHash (← byteField j "codeHash")))
+    | .error _, .ok _ => pure (.useGlobalContract (.accountId (← byteField j "accountId")))
+    | _, _ => throw "useGlobalContract needs exactly one of codeHash and accountId"
   | _ =>
     throw s!"unknown action: {kind}"
 
