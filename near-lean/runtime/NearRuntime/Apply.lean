@@ -1343,8 +1343,8 @@ def convertTransaction (cfg : RuntimeConfig) (ap : ApplyState) (st : ChainState)
   | .ok () => convertTransactionCore cfg ap st tx
 
 -- nearcore divergence: one shard; no congestion-control buffering, bandwidth scheduler,
--- instant receipts, yield timeouts, epoch validator-account updates or incoming-receipt
--- validation (`Runtime::apply`, `process_receipts`).
+-- epoch validator-account updates or incoming-receipt validation (`Runtime::apply`,
+-- `process_receipts`). Instant receipts and yield timeouts are modelled.
 /-- `Runtime::apply`. Transactions first; only signer-is-receiver receipts
 are local. Other transaction receipts are outgoing work for a later chunk.
 Local, delayed and incoming receipts execute in that order; receipts beyond

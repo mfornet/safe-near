@@ -566,23 +566,23 @@ reports. Rebuild steps and formats: [`tools/localnet/CORPUS.md`](../../tools/loc
   complete post-state with the record, never the reverse. Result per chunk: `pass`, `fail: <first field>` or
   `unsupported: <reason>`. The recipe exits 0 only if all pass; `just chain-replay-corpus-report` prints the table
   and always exits 0. Python tests check codec, format, manifest and converter in CI without neard.
-- **Current report (M3a): 70 pass, 18 fail, 348 unsupported of 436**; this is the work list, by first reason:
+- **Current report (M3b): 129 pass, 6 fail, 301 unsupported of 436** (M3a: 70, 18, 348). The work list, by first
+  reason:
 
-  | Chunks | First reason |
-  |---:|---|
-  | 288 | multi-shard layout (chunk model: single-shard scheduler and congestion) |
-  | 26 | pre-state yield queues |
-  | 24 + 1 | pre-state global contract code and nonces |
-  | 13 | fail: VM host `promise_batch_action_transfer_to_gas_key` unsupported (every call into `test_contract_rs`) |
-  | 3 | epoch boundary: validator accounts update (rewards, stake return) |
-  | 3 | pre-state callback or delayed-queue records |
-  | 3 | fail: `Stake`/`Unstake` need the epoch machinery |
-  | 2 + 2 | host `validator_stake` needs the validator set; fail: host `ecrecover` unsupported |
-  | 1 | `DeployGlobalContract` |
+  | Chunks | First reason | Stage |
+  |---:|---|---|
+  | 288 | multi-shard layout (chunk model: single-shard scheduler and congestion) | M3c |
+  | 5 + 3 | pre-state postponed receipts and delayed-queue records (converter does not decode them yet) | converter |
+  | 3 | epoch boundary: validator accounts update (rewards, stake return) | M3d |
+  | 2 + 2 | host `validator_stake`; fail: `Stake`/`Unstake` need the epoch machinery | M3d |
+  | 2 | fail: host `ecrecover` unsupported | M3e |
 
-  Behind the first reasons stand `Delegate`, `UseGlobalContract`, gas-key actions, global contract distribution
-  receipts and the buffered-receipt (congestion) columns. Not exercised by the workload: `DelegateV2`,
-  `DeterministicStateInit`, secp256k1 and ML-DSA signers, chunks invalid at application, missing chunks, resharding.
+  M3b closed global contracts (deploy, use, distribution receipts, Account V2), promise yield and resume with
+  timeouts, gas keys (actions and host functions), delegate actions V1 and V2 (signature through a verifier the
+  chain package injects from `NearCrypto`), and the pre-state columns behind them. Behind the remaining first
+  reasons stand the buffered-receipt (congestion) columns. Not exercised by the workload: `DeterministicStateInit`,
+  secp256k1 and ML-DSA signers, chunks invalid at application, missing chunks, resharding. Transactions signed by
+  a gas key are reported as a model issue (see the divergence table in [`NEAR_RUNTIME.md`](NEAR_RUNTIME.md)).
 
 ## Open points
 

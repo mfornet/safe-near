@@ -232,29 +232,39 @@ just chain-replay-corpus-report
 python3 -m unittest discover -s tools/tests -p 'test_corpus.py' -v      # format checks, no neard needed
 ```
 
-## 10. Current result (M3a)
+## 10. Current result (M3b)
 
-`just chain-replay-corpus-report`, 436 chunks, about 2 minutes:
+`just chain-replay-corpus-report`, 436 chunks, a few minutes:
 
 ```
-  pass         70
-  fail         18
-  unsupported  348
+  pass         129
+  fail         6
+  unsupported  301
 by first reason (unsupported / fail):
     288  multi-shard layout (the chunk model assumes the single-shard reference layout)
-     26  pre-state column promise-yield-indices
-     24  pre-state column global-contract-code
-     13  model execution issue: Unsupported host semantics: env.promise_batch_action_transfer_to_gas_key
+      5  pre-state callback or delayed-queue record PostponedReceiptId
       3  epoch boundary: validator accounts update (rewards, stake return)
-      3  pre-state callback or delayed-queue record PostponedReceiptId
+      3  pre-state callback or delayed-queue record DelayedReceipt
       2  host function validator_stake (needs the epoch's validator set)
+      2  model execution issue: Unsupported action semantics: stake (epoch machinery)
       2  model execution issue: Unsupported action semantics: unstake (epoch machinery)
       2  model execution issue: Unsupported host semantics: env.ecrecover
-      1  action DeployGlobalContract
-      1  model execution issue: Unsupported action semantics: stake (epoch machinery)
-      1  pre-state column global-contract-nonce
 ```
 
-The 70 passing chunks include account creation, transfers, key changes, deployments, contract calls with storage
-reads, writes and removals (so trie-node gas), logs, callbacks and system refunds. The failures are all runtime
-limitations the model reports itself: an unsupported host function, or the epoch machinery behind `Stake`.
+M3a measured 70 pass, 18 fail, 348 unsupported. M3b closed the pre-state yield queues, the global contract
+tables and nonces, `DeployGlobalContract`, `UseGlobalContract`, distribution receipts, delegate actions,
+gas-key actions and host functions, and yield timeouts, which accounts for the 59 chunks that now pass.
+
+What remains, by stage:
+
+* M3c (multi-shard, congestion, bandwidth): the 288 sharded chunks and the buffered-receipt columns.
+* M3d (stake, validators, epochs): epoch boundary updates, `Stake`/`Unstake`, `validator_stake`.
+* M3e (crypto hosts): `ecrecover`.
+* Converter gap, not a runtime gap (8 chunks): `lean_input.py` does not yet decode pre-state
+  `PostponedReceipt`, `PostponedReceiptId`, `PendingDataCount`, `ReceivedData` or `DelayedReceipt` records into
+  the model's callback columns and delayed queue. The Lean state and its encoder already carry them.
+
+The passing chunks include account creation, transfers, key changes, deployments, contract calls with storage
+reads, writes and removals (so trie-node gas), logs, callbacks, system refunds, yields and resumes, global
+contracts, delegation and gas keys. The six failures are all limitations the model reports itself: the epoch
+machinery behind `Stake` and an unlinked crypto host.
