@@ -140,6 +140,8 @@ theorem meteredHostFns_gasLimits (cfg : RuntimeConfig) (entry : ImportDecl × Ne
       | exact HostPreservesGas.limits storageUsageFn_gas
       | exact HostPreservesGas.limits accountBalanceFn_gas
       | exact HostPreservesGas.limits accountLockedBalanceFn_gas
+      | exact HostPreservesGas.limits validatorStakeFn_gas
+      | exact HostPreservesGas.limits validatorTotalStakeFn_gas
       | exact HostPreservesGas.limits prepaidGasFn_gas
       | exact HostPreservesGas.limits usedGasFn_gas
       | exact HostPreservesGas.limits randomSeedFn_gas

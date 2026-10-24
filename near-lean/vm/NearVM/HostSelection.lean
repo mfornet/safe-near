@@ -185,6 +185,24 @@ theorem accountLockedBalanceFn_selection : HostPreservesSelection accountLockedB
     | exact writeRegisterResult_selection _ _ _ _ _ hwf
     | split)
 
+theorem validatorStakeFn_selection : HostPreservesSelection validatorStakeFn := by
+  intro st args hwf
+  unfold validatorStakeFn
+  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
+  repeat (first
+    | exact hwf
+    | exact writeRegisterResult_selection _ _ _ _ _ hwf
+    | split)
+
+theorem validatorTotalStakeFn_selection : HostPreservesSelection validatorTotalStakeFn := by
+  intro st args hwf
+  unfold validatorTotalStakeFn
+  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
+  repeat (first
+    | exact hwf
+    | exact writeRegisterResult_selection _ _ _ _ _ hwf
+    | split)
+
 theorem prepaidGasFn_selection : HostPreservesSelection prepaidGasFn := by
   intro st args hwf
   unfold prepaidGasFn

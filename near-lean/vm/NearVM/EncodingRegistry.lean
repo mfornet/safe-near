@@ -117,15 +117,11 @@ theorem meteredHostFns_encodingInvariant
       apply meteredNeutral_encodingInvariant
       · exact usedGasFn_encodingFrame
     · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      apply meteredNeutral_encodingInvariant
+      · exact validatorStakeFn_encodingFrame
     · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      apply meteredNeutral_encodingInvariant
+      · exact validatorTotalStakeFn_encodingFrame
     · cases h
       apply meteredNeutral_encodingInvariant
       · exact logUtf16Fn_encodingFrame

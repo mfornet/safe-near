@@ -54,6 +54,10 @@ structure VMContext where
   existingYields : List Bytes := []
   /-- `chain_id` of the epoch provider. -/
   chainId : Bytes := []
+  /-- `validator_stake`: the stake of an account in the current epoch (0 for a non-validator). -/
+  validatorStake : Bytes → Nat := fun _ => 0
+  /-- `validator_total_stake`: the sum of the current epoch's validator stakes. -/
+  validatorTotalStake : Nat := 0
   deriving Inhabited
 
 /-- Storage keys in byte order: the order the trie iterates them in, and one
@@ -89,7 +93,9 @@ def toNearState (cfg : RuntimeConfig) (ctx : VMContext)
       attachedDeposit := ctx.attachedDeposit
       prepaidGas := UInt64.ofNat ctx.prepaidGas
       usedGas := 0
-      chainId := ctx.chainId }
+      chainId := ctx.chainId
+      validatorStake := ctx.validatorStake
+      validatorTotalStake := ctx.validatorTotalStake }
     actionHash := ctx.actionHash
     existingYields := ctx.existingYields
     storage := fun k => (storage.find? (·.1 == k)).map (·.2)

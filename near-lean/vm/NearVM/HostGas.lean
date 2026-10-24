@@ -133,6 +133,16 @@ theorem accountLockedBalanceFn_gas : HostPreservesGas accountLockedBalanceFn := 
   unfold accountLockedBalanceFn
   host_gas_tac
 
+theorem validatorStakeFn_gas : HostPreservesGas validatorStakeFn := by
+  intro st args
+  unfold validatorStakeFn
+  host_gas_tac
+
+theorem validatorTotalStakeFn_gas : HostPreservesGas validatorTotalStakeFn := by
+  intro st args
+  unfold validatorTotalStakeFn
+  host_gas_tac
+
 theorem prepaidGasFn_gas : HostPreservesGas prepaidGasFn := by
   intro st args
   unfold prepaidGasFn

@@ -155,15 +155,13 @@ theorem meteredHostFns_reservationInvariant (fees : ActionFees) (ethEnabled : Bo
       · decide
       · exact usedGasFn_reservationView
     · cases h
-      apply metered_reservationInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      apply meteredNeutral_reservationInvariant
+      · decide
+      · exact validatorStakeFn_reservationView
     · cases h
-      apply metered_reservationInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      apply meteredNeutral_reservationInvariant
+      · decide
+      · exact validatorTotalStakeFn_reservationView
     · cases h
       apply meteredNeutral_reservationInvariant
       · decide

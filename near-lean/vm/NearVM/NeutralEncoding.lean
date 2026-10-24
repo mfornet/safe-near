@@ -296,6 +296,30 @@ theorem accountLockedBalanceFn_encodingFrame : HostPreservesEncodingFrame accoun
     | trivial | rfl | exact writeRegisterResult_encodingFrame _ _ _ _ _
     | split)
 
+theorem validatorStakeFn_encodingFrame : HostPreservesEncodingFrame validatorStakeFn := by
+  intro st args
+  unfold validatorStakeFn
+  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
+    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
+    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
+    NearState.selectReturnValue, NearState.selectReturnPromise,
+    NearState.setStorage, NearState.removeStorage, NearState.invalidateIterators]
+  repeat' (first
+    | trivial | rfl | exact writeRegisterResult_encodingFrame _ _ _ _ _
+    | split)
+
+theorem validatorTotalStakeFn_encodingFrame : HostPreservesEncodingFrame validatorTotalStakeFn := by
+  intro st args
+  unfold validatorTotalStakeFn
+  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
+    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
+    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
+    NearState.selectReturnValue, NearState.selectReturnPromise,
+    NearState.setStorage, NearState.removeStorage, NearState.invalidateIterators]
+  repeat' (first
+    | trivial | rfl | exact writeRegisterResult_encodingFrame _ _ _ _ _
+    | split)
+
 theorem prepaidGasFn_encodingFrame : HostPreservesEncodingFrame prepaidGasFn := by
   intro st args
   unfold prepaidGasFn

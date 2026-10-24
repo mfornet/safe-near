@@ -159,6 +159,16 @@ theorem accountLockedBalanceFn_noDeposits : HostCreatesNoDeposits accountLockedB
   unfold accountLockedBalanceFn
   no_deposits_tac
 
+theorem validatorStakeFn_noDeposits : HostCreatesNoDeposits validatorStakeFn := by
+  intro st args
+  unfold validatorStakeFn
+  no_deposits_tac
+
+theorem validatorTotalStakeFn_noDeposits : HostCreatesNoDeposits validatorTotalStakeFn := by
+  intro st args
+  unfold validatorTotalStakeFn
+  no_deposits_tac
+
 theorem prepaidGasFn_noDeposits : HostCreatesNoDeposits prepaidGasFn := by
   intro st args
   unfold prepaidGasFn

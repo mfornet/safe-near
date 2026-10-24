@@ -544,7 +544,7 @@ def chargesBeforeUnvalidated (name : String) (st : HostStore NearState) (args : 
   | "random_seed" => [base] ++ writeReg st.host.randomSeed.length
   | "account_balance" | "account_locked_balance" | "attached_deposit" => [base] ++ writeMem 16
   | "validator_stake" =>
-    [base, .ext "validator_stake_base"] ++ readSpan st (a 0) (a 1) ++ utf8 (spanLen st (a 0) (a 1)) ++ writeMem 16
+    [base] ++ readSpan st (a 0) (a 1) ++ utf8 (spanLen st (a 0) (a 1)) ++ [.ext "validator_stake_base"] ++ writeMem 16
   | "validator_total_stake" => [base, .ext "validator_total_stake_base"] ++ writeMem 16
   | "sha256" =>
     let n := spanLen st (a 0) (a 1)
@@ -1228,18 +1228,17 @@ def metered (extraBytes : Nat) (name : String) (fn : NearHostFn NearState) : Nea
         | some error => trapWith st1 error
         | none => invokeStorageCall extraBytes name fn st1 args }
 
--- nearcore divergence: hashing, signature, curve and validator host functions are rejected as
+-- nearcore divergence: hashing, signature and curve host functions are rejected as
 -- execution issues instead of being executed.
 /-- These host operations require semantics not supplied by `VMContext`.
 Reject them on invocation instead of using the functional host's placeholder
-crypto or validator implementations. Merely importing one is allowed.
+crypto implementations. Merely importing one is allowed.
 nearcore divergence: `promise_yield_create_with_id`, `promise_yield_resume_with_yield_id`,
 `promise_set_refund_to` and `promise_batch_action_state_init_by_account_id` are linked but trap
 when called, because the receipt forms they need (a refund target, deterministic state init)
 are outside the modelled receipts. -/
 def unsupportedRuntimeHost (name : String) : Bool :=
   ["sha256", "keccak256", "keccak512", "ripemd160", "ecrecover", "ed25519_verify",
-   "validator_stake", "validator_total_stake",
    "promise_yield_create_with_id", "promise_yield_resume_with_yield_id", "promise_set_refund_to",
    "promise_batch_action_state_init_by_account_id", "alt_bn128_g1_multiexp", "alt_bn128_g1_sum", "alt_bn128_pairing_check",
    "bls12381_g1_multiexp", "bls12381_g2_multiexp", "bls12381_map_fp_to_g1",

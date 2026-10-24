@@ -146,6 +146,8 @@ theorem meteredHostFns_gasFloor (cfg : RuntimeConfig) (entry : ImportDecl × Nea
       | exact HostPreservesGas.floor storageUsageFn_gas
       | exact HostPreservesGas.floor accountBalanceFn_gas
       | exact HostPreservesGas.floor accountLockedBalanceFn_gas
+      | exact HostPreservesGas.floor validatorStakeFn_gas
+      | exact HostPreservesGas.floor validatorTotalStakeFn_gas
       | exact HostPreservesGas.floor prepaidGasFn_gas
       | exact HostPreservesGas.floor usedGasFn_gas
       | exact HostPreservesGas.floor randomSeedFn_gas

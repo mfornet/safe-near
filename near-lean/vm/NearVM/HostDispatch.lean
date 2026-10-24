@@ -185,6 +185,24 @@ theorem accountBalanceFn_preserves : HostPreservesPromises accountBalanceFn := b
     | exact writeRegisterResult_preserves _ _ _ _ _ hwf
     | split)
 
+theorem validatorStakeFn_preserves : HostPreservesPromises validatorStakeFn := by
+  intro st args hwf
+  unfold validatorStakeFn
+  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
+  repeat (first
+    | exact hwf
+    | exact writeRegisterResult_preserves _ _ _ _ _ hwf
+    | split)
+
+theorem validatorTotalStakeFn_preserves : HostPreservesPromises validatorTotalStakeFn := by
+  intro st args hwf
+  unfold validatorTotalStakeFn
+  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
+  repeat (first
+    | exact hwf
+    | exact writeRegisterResult_preserves _ _ _ _ _ hwf
+    | split)
+
 theorem accountLockedBalanceFn_preserves : HostPreservesPromises accountLockedBalanceFn := by
   intro st args hwf
   unfold accountLockedBalanceFn
@@ -309,6 +327,8 @@ theorem meteredHostFns_preserves (cfg : RuntimeConfig) (entry : ImportDecl × Ne
       | exact storageUsageFn_preserves
       | exact accountBalanceFn_preserves
       | exact accountLockedBalanceFn_preserves
+      | exact validatorStakeFn_preserves
+      | exact validatorTotalStakeFn_preserves
       | exact prepaidGasFn_preserves
       | exact usedGasFn_preserves
       | exact randomSeedFn_preserves

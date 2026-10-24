@@ -218,7 +218,6 @@ def main (args : List String) : IO UInt32 := do
   -- Imports alone must remain usable for contracts with unreachable crypto code.
   for (name, params, arguments, results) in
       [("sha256", "i64 i64 i64", "i64.const 0 i64.const 0 i64.const 0", ""),
-       ("validator_total_stake", "i64", "i64.const 0", ""),
        ("promise_yield_resume", "i64 i64 i64 i64",
         "i64.const 0 i64.const 0 i64.const 0 i64.const 0", "(result i64)"),
        ("promise_batch_action_deploy_global_contract", "i64 i64 i64",
@@ -237,6 +236,35 @@ def main (args : List String) : IO UInt32 := do
     check r s!"{name}: unsupported semantics never emit receipts" outcome.receipts.isEmpty
     let unused := run cfg testCode 0 "unused" (ctx alice "unused" "{}" 0) []
     check r s!"{name}: importing an unused operation is allowed" unused.succeeded
+
+  -- `validator_stake` and `validator_total_stake` read the epoch's validator set from the context.
+  let validators : List (List UInt8 × Nat) := [(alice, 7 * oneNear), (bob, 3 * oneNear)]
+  let validatorCode ← match ← Wat.compile
+      "(module (import \"env\" \"validator_total_stake\" (func $total (param i64)))
+        (import \"env\" \"validator_stake\" (func $stake (param i64 i64 i64)))
+        (import \"env\" \"value_return\" (func $ret (param i64 i64)))
+        (memory 1) (data (i32.const 64) \"alice.near\")
+        (func (export \"test\") i64.const 0 call $total
+          i64.const 10 i64.const 64 i64.const 16 call $stake
+          i64.const 32 i64.const 0 call $ret)
+        (func (export \"other\") i64.const 0 call $total
+          i64.const 3 i64.const 64 i64.const 16 call $stake
+          i64.const 32 i64.const 0 call $ret))" with
+    | .ok m => pure m
+    | .error e => throw (IO.userError s!"validator fixture: {e}")
+  let validatorCtx (method : String) : VMContext :=
+    { ctx alice method "{}" 0 with
+      validatorStake := fun id => ((validators.find? (·.1 == id)).map (·.2)).getD 0
+      validatorTotalStake := 10 * oneNear }
+  let le128 (n : Nat) : List UInt8 := (List.range 16).map fun i => UInt8.ofNat ((n / 256 ^ i) % 256)
+  let known := run cfg validatorCode 0 "test" (validatorCtx "test") []
+  check r "validator_stake and validator_total_stake read the context's validator set"
+    (known.succeeded && known.returnData == .value (le128 (10 * oneNear) ++ le128 (7 * oneNear)))
+    (describe known)
+  let unknown := run cfg validatorCode 0 "other" (validatorCtx "other") []
+  check r "validator_stake of a non-validator is zero"
+    (unknown.succeeded && unknown.returnData == .value (le128 (10 * oneNear) ++ le128 0))
+    (describe unknown)
 
   -- Weighted function calls (nearcore `distribute_gas`): the unused prepaid gas
   -- goes to weights 1 and 2 in proportion, the remainder to the last weighted

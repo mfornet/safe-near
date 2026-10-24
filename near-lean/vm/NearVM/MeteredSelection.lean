@@ -128,6 +128,8 @@ theorem meteredHostFns_selection (cfg : RuntimeConfig) (entry : ImportDecl × Ne
       | exact storageUsageFn_selection
       | exact accountBalanceFn_selection
       | exact accountLockedBalanceFn_selection
+      | exact validatorStakeFn_selection
+      | exact validatorTotalStakeFn_selection
       | exact prepaidGasFn_selection
       | exact usedGasFn_selection
       | exact randomSeedFn_selection

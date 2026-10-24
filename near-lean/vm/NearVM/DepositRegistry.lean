@@ -39,6 +39,8 @@ theorem meteredHostFns_funding (cfg : RuntimeConfig) (entry : ImportDecl × Near
       | exact storageUsageFn_noDeposits
       | exact accountBalanceFn_noDeposits
       | exact accountLockedBalanceFn_noDeposits
+      | exact validatorStakeFn_noDeposits
+      | exact validatorTotalStakeFn_noDeposits
       | exact prepaidGasFn_noDeposits
       | exact usedGasFn_noDeposits
       | exact randomSeedFn_noDeposits
