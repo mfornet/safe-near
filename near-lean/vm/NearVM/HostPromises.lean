@@ -204,294 +204,122 @@ theorem appendJointPromise_find_preserves (st : HostStore NearState) (dependenci
   apply appendJointPromise_preserves _ _ hwf
   simpa [promiseDepsValid, List.all_eq_true] using hfind
 
+/-- Close each branch of a promise host from `hwf`. -/
+local macro "promise_preserves_tac" hwf:ident : tactic => `(tactic| (
+    dsimp only
+    repeat (first
+      | exact $hwf
+      | exact appendBatchPromise_preserves _ _ _ $hwf
+      | exact appendCallbackPromise_preserves _ _ _ _ $hwf (by assumption)
+      | exact appendJointPromise_find_preserves _ _ $hwf (by assumption)
+      | exact appendPromiseActionResult_preserves _ _ _ _ $hwf
+      | exact createBatchPromiseResult_preserves _ _ _ $hwf
+      | exact createCallbackPromiseResult_preserves _ _ _ _ $hwf
+      | apply checkAccountId_preserves_promises _ _ _ _ $hwf
+      | apply checkPublicKey_preserves_promises _ _ _ _ $hwf
+      | split)))
+
 theorem promiseCreateFn_preserves : HostPreservesPromises promiseCreateFn := by
   unfold promiseCreateFn
   apply disallowInView_preserves_promises
   intro st args hwf
-  dsimp only
-  repeat (first
-    | exact hwf
-    | exact appendBatchPromise_preserves _ _ _ hwf
-    | exact appendCallbackPromise_preserves _ _ _ _ hwf (by assumption)
-    | exact appendJointPromise_find_preserves _ _ hwf (by assumption)
-    | exact appendPromiseActionResult_preserves _ _ _ _ hwf
-    | exact createBatchPromiseResult_preserves _ _ _ hwf
-    | exact createCallbackPromiseResult_preserves _ _ _ _ hwf
-    | apply checkAccountId_preserves_promises _ _ _ _ hwf
-    | apply checkPublicKey_preserves_promises _ _ _ _ hwf
-    | split)
+  promise_preserves_tac hwf
 
 theorem promiseThenFn_preserves : HostPreservesPromises promiseThenFn := by
   unfold promiseThenFn
   apply disallowInView_preserves_promises
   intro st args hwf
-  dsimp only
-  repeat (first
-    | exact hwf
-    | exact appendBatchPromise_preserves _ _ _ hwf
-    | exact appendCallbackPromise_preserves _ _ _ _ hwf (by assumption)
-    | exact appendJointPromise_find_preserves _ _ hwf (by assumption)
-    | exact appendPromiseActionResult_preserves _ _ _ _ hwf
-    | exact createBatchPromiseResult_preserves _ _ _ hwf
-    | exact createCallbackPromiseResult_preserves _ _ _ _ hwf
-    | apply checkAccountId_preserves_promises _ _ _ _ hwf
-    | apply checkPublicKey_preserves_promises _ _ _ _ hwf
-    | split)
+  promise_preserves_tac hwf
 
 theorem promiseAndFn_preserves : HostPreservesPromises promiseAndFn := by
   unfold promiseAndFn
   apply disallowInView_preserves_promises
   intro st args hwf
-  dsimp only
-  repeat (first
-    | exact hwf
-    | exact appendBatchPromise_preserves _ _ _ hwf
-    | exact appendCallbackPromise_preserves _ _ _ _ hwf (by assumption)
-    | exact appendJointPromise_find_preserves _ _ hwf (by assumption)
-    | exact appendPromiseActionResult_preserves _ _ _ _ hwf
-    | exact createBatchPromiseResult_preserves _ _ _ hwf
-    | exact createCallbackPromiseResult_preserves _ _ _ _ hwf
-    | apply checkAccountId_preserves_promises _ _ _ _ hwf
-    | apply checkPublicKey_preserves_promises _ _ _ _ hwf
-    | split)
+  promise_preserves_tac hwf
 
 theorem promiseBatchCreateFn_preserves : HostPreservesPromises promiseBatchCreateFn := by
   unfold promiseBatchCreateFn
   apply disallowInView_preserves_promises
   intro st args hwf
-  dsimp only
-  repeat (first
-    | exact hwf
-    | exact appendBatchPromise_preserves _ _ _ hwf
-    | exact appendCallbackPromise_preserves _ _ _ _ hwf (by assumption)
-    | exact appendJointPromise_find_preserves _ _ hwf (by assumption)
-    | exact appendPromiseActionResult_preserves _ _ _ _ hwf
-    | exact createBatchPromiseResult_preserves _ _ _ hwf
-    | exact createCallbackPromiseResult_preserves _ _ _ _ hwf
-    | apply checkAccountId_preserves_promises _ _ _ _ hwf
-    | apply checkPublicKey_preserves_promises _ _ _ _ hwf
-    | split)
+  promise_preserves_tac hwf
 
 theorem promiseBatchThenFn_preserves : HostPreservesPromises promiseBatchThenFn := by
   unfold promiseBatchThenFn
   apply disallowInView_preserves_promises
   intro st args hwf
-  dsimp only
-  repeat (first
-    | exact hwf
-    | exact appendBatchPromise_preserves _ _ _ hwf
-    | exact appendCallbackPromise_preserves _ _ _ _ hwf (by assumption)
-    | exact appendJointPromise_find_preserves _ _ hwf (by assumption)
-    | exact appendPromiseActionResult_preserves _ _ _ _ hwf
-    | exact createBatchPromiseResult_preserves _ _ _ hwf
-    | exact createCallbackPromiseResult_preserves _ _ _ _ hwf
-    | apply checkAccountId_preserves_promises _ _ _ _ hwf
-    | apply checkPublicKey_preserves_promises _ _ _ _ hwf
-    | split)
+  promise_preserves_tac hwf
 
 theorem promiseBatchActionCreateAccountFn_preserves : HostPreservesPromises promiseBatchActionCreateAccountFn := by
   unfold promiseBatchActionCreateAccountFn
   apply disallowInView_preserves_promises
   intro st args hwf
-  dsimp only
-  repeat (first
-    | exact hwf
-    | exact appendBatchPromise_preserves _ _ _ hwf
-    | exact appendCallbackPromise_preserves _ _ _ _ hwf (by assumption)
-    | exact appendJointPromise_find_preserves _ _ hwf (by assumption)
-    | exact appendPromiseActionResult_preserves _ _ _ _ hwf
-    | exact createBatchPromiseResult_preserves _ _ _ hwf
-    | exact createCallbackPromiseResult_preserves _ _ _ _ hwf
-    | apply checkAccountId_preserves_promises _ _ _ _ hwf
-    | apply checkPublicKey_preserves_promises _ _ _ _ hwf
-    | split)
+  promise_preserves_tac hwf
 
 theorem promiseBatchActionDeployContractFn_preserves : HostPreservesPromises promiseBatchActionDeployContractFn := by
   unfold promiseBatchActionDeployContractFn
   apply disallowInView_preserves_promises
   intro st args hwf
-  dsimp only
-  repeat (first
-    | exact hwf
-    | exact appendBatchPromise_preserves _ _ _ hwf
-    | exact appendCallbackPromise_preserves _ _ _ _ hwf (by assumption)
-    | exact appendJointPromise_find_preserves _ _ hwf (by assumption)
-    | exact appendPromiseActionResult_preserves _ _ _ _ hwf
-    | exact createBatchPromiseResult_preserves _ _ _ hwf
-    | exact createCallbackPromiseResult_preserves _ _ _ _ hwf
-    | apply checkAccountId_preserves_promises _ _ _ _ hwf
-    | apply checkPublicKey_preserves_promises _ _ _ _ hwf
-    | split)
+  promise_preserves_tac hwf
 
 theorem promiseBatchActionFunctionCallFn_preserves : HostPreservesPromises promiseBatchActionFunctionCallFn := by
   unfold promiseBatchActionFunctionCallFn
   apply disallowInView_preserves_promises
   intro st args hwf
-  dsimp only
-  repeat (first
-    | exact hwf
-    | exact appendBatchPromise_preserves _ _ _ hwf
-    | exact appendCallbackPromise_preserves _ _ _ _ hwf (by assumption)
-    | exact appendJointPromise_find_preserves _ _ hwf (by assumption)
-    | exact appendPromiseActionResult_preserves _ _ _ _ hwf
-    | exact createBatchPromiseResult_preserves _ _ _ hwf
-    | exact createCallbackPromiseResult_preserves _ _ _ _ hwf
-    | apply checkAccountId_preserves_promises _ _ _ _ hwf
-    | apply checkPublicKey_preserves_promises _ _ _ _ hwf
-    | split)
+  promise_preserves_tac hwf
 
 theorem promiseBatchActionFunctionCallWeightFn_preserves : HostPreservesPromises promiseBatchActionFunctionCallWeightFn := by
   unfold promiseBatchActionFunctionCallWeightFn
   apply disallowInView_preserves_promises
   intro st args hwf
-  dsimp only
-  repeat (first
-    | exact hwf
-    | exact appendBatchPromise_preserves _ _ _ hwf
-    | exact appendCallbackPromise_preserves _ _ _ _ hwf (by assumption)
-    | exact appendJointPromise_find_preserves _ _ hwf (by assumption)
-    | exact appendPromiseActionResult_preserves _ _ _ _ hwf
-    | exact createBatchPromiseResult_preserves _ _ _ hwf
-    | exact createCallbackPromiseResult_preserves _ _ _ _ hwf
-    | apply checkAccountId_preserves_promises _ _ _ _ hwf
-    | apply checkPublicKey_preserves_promises _ _ _ _ hwf
-    | split)
+  promise_preserves_tac hwf
 
 theorem promiseBatchActionTransferFn_preserves : HostPreservesPromises promiseBatchActionTransferFn := by
   unfold promiseBatchActionTransferFn
   apply disallowInView_preserves_promises
   intro st args hwf
-  dsimp only
-  repeat (first
-    | exact hwf
-    | exact appendBatchPromise_preserves _ _ _ hwf
-    | exact appendCallbackPromise_preserves _ _ _ _ hwf (by assumption)
-    | exact appendJointPromise_find_preserves _ _ hwf (by assumption)
-    | exact appendPromiseActionResult_preserves _ _ _ _ hwf
-    | exact createBatchPromiseResult_preserves _ _ _ hwf
-    | exact createCallbackPromiseResult_preserves _ _ _ _ hwf
-    | apply checkAccountId_preserves_promises _ _ _ _ hwf
-    | apply checkPublicKey_preserves_promises _ _ _ _ hwf
-    | split)
+  promise_preserves_tac hwf
 
 theorem promiseBatchActionStakeFn_preserves : HostPreservesPromises promiseBatchActionStakeFn := by
   unfold promiseBatchActionStakeFn
   apply disallowInView_preserves_promises
   intro st args hwf
-  dsimp only
-  repeat (first
-    | exact hwf
-    | exact appendBatchPromise_preserves _ _ _ hwf
-    | exact appendCallbackPromise_preserves _ _ _ _ hwf (by assumption)
-    | exact appendJointPromise_find_preserves _ _ hwf (by assumption)
-    | exact appendPromiseActionResult_preserves _ _ _ _ hwf
-    | exact createBatchPromiseResult_preserves _ _ _ hwf
-    | exact createCallbackPromiseResult_preserves _ _ _ _ hwf
-    | apply checkAccountId_preserves_promises _ _ _ _ hwf
-    | apply checkPublicKey_preserves_promises _ _ _ _ hwf
-    | split)
+  promise_preserves_tac hwf
 
 theorem promiseBatchActionAddKeyWithFullAccessFn_preserves : HostPreservesPromises promiseBatchActionAddKeyWithFullAccessFn := by
   unfold promiseBatchActionAddKeyWithFullAccessFn
   apply disallowInView_preserves_promises
   intro st args hwf
-  dsimp only
-  repeat (first
-    | exact hwf
-    | exact appendBatchPromise_preserves _ _ _ hwf
-    | exact appendCallbackPromise_preserves _ _ _ _ hwf (by assumption)
-    | exact appendJointPromise_find_preserves _ _ hwf (by assumption)
-    | exact appendPromiseActionResult_preserves _ _ _ _ hwf
-    | exact createBatchPromiseResult_preserves _ _ _ hwf
-    | exact createCallbackPromiseResult_preserves _ _ _ _ hwf
-    | apply checkAccountId_preserves_promises _ _ _ _ hwf
-    | apply checkPublicKey_preserves_promises _ _ _ _ hwf
-    | split)
+  promise_preserves_tac hwf
 
 theorem promiseBatchActionAddKeyWithFunctionCallFn_preserves : HostPreservesPromises promiseBatchActionAddKeyWithFunctionCallFn := by
   unfold promiseBatchActionAddKeyWithFunctionCallFn
   apply disallowInView_preserves_promises
   intro st args hwf
-  dsimp only
-  repeat (first
-    | exact hwf
-    | exact appendBatchPromise_preserves _ _ _ hwf
-    | exact appendCallbackPromise_preserves _ _ _ _ hwf (by assumption)
-    | exact appendJointPromise_find_preserves _ _ hwf (by assumption)
-    | exact appendPromiseActionResult_preserves _ _ _ _ hwf
-    | exact createBatchPromiseResult_preserves _ _ _ hwf
-    | exact createCallbackPromiseResult_preserves _ _ _ _ hwf
-    | apply checkAccountId_preserves_promises _ _ _ _ hwf
-    | apply checkPublicKey_preserves_promises _ _ _ _ hwf
-    | split)
+  promise_preserves_tac hwf
 
 theorem promiseBatchActionDeleteKeyFn_preserves : HostPreservesPromises promiseBatchActionDeleteKeyFn := by
   unfold promiseBatchActionDeleteKeyFn
   apply disallowInView_preserves_promises
   intro st args hwf
-  dsimp only
-  repeat (first
-    | exact hwf
-    | exact appendBatchPromise_preserves _ _ _ hwf
-    | exact appendCallbackPromise_preserves _ _ _ _ hwf (by assumption)
-    | exact appendJointPromise_find_preserves _ _ hwf (by assumption)
-    | exact appendPromiseActionResult_preserves _ _ _ _ hwf
-    | exact createBatchPromiseResult_preserves _ _ _ hwf
-    | exact createCallbackPromiseResult_preserves _ _ _ _ hwf
-    | apply checkAccountId_preserves_promises _ _ _ _ hwf
-    | apply checkPublicKey_preserves_promises _ _ _ _ hwf
-    | split)
+  promise_preserves_tac hwf
 
 theorem promiseBatchActionDeleteAccountFn_preserves : HostPreservesPromises promiseBatchActionDeleteAccountFn := by
   unfold promiseBatchActionDeleteAccountFn
   apply disallowInView_preserves_promises
   intro st args hwf
-  dsimp only
-  repeat (first
-    | exact hwf
-    | exact appendBatchPromise_preserves _ _ _ hwf
-    | exact appendCallbackPromise_preserves _ _ _ _ hwf (by assumption)
-    | exact appendJointPromise_find_preserves _ _ hwf (by assumption)
-    | exact appendPromiseActionResult_preserves _ _ _ _ hwf
-    | exact createBatchPromiseResult_preserves _ _ _ hwf
-    | exact createCallbackPromiseResult_preserves _ _ _ _ hwf
-    | apply checkAccountId_preserves_promises _ _ _ _ hwf
-    | apply checkPublicKey_preserves_promises _ _ _ _ hwf
-    | split)
+  promise_preserves_tac hwf
 
 theorem promiseBatchActionUseGlobalContractFn_preserves : HostPreservesPromises promiseBatchActionUseGlobalContractFn := by
   unfold promiseBatchActionUseGlobalContractFn useGlobalContractFn
   apply disallowInView_preserves_promises
   intro st args hwf
-  dsimp only
-  repeat (first
-    | exact hwf
-    | exact appendBatchPromise_preserves _ _ _ hwf
-    | exact appendCallbackPromise_preserves _ _ _ _ hwf (by assumption)
-    | exact appendJointPromise_find_preserves _ _ hwf (by assumption)
-    | exact appendPromiseActionResult_preserves _ _ _ _ hwf
-    | exact createBatchPromiseResult_preserves _ _ _ hwf
-    | exact createCallbackPromiseResult_preserves _ _ _ _ hwf
-    | apply checkAccountId_preserves_promises _ _ _ _ hwf
-    | apply checkPublicKey_preserves_promises _ _ _ _ hwf
-    | split)
+  promise_preserves_tac hwf
 
 theorem promiseBatchActionUseGlobalContractByAccountIdFn_preserves : HostPreservesPromises promiseBatchActionUseGlobalContractByAccountIdFn := by
   unfold promiseBatchActionUseGlobalContractByAccountIdFn useGlobalContractFn
   apply disallowInView_preserves_promises
   intro st args hwf
-  dsimp only
-  repeat (first
-    | exact hwf
-    | exact appendBatchPromise_preserves _ _ _ hwf
-    | exact appendCallbackPromise_preserves _ _ _ _ hwf (by assumption)
-    | exact appendJointPromise_find_preserves _ _ hwf (by assumption)
-    | exact appendPromiseActionResult_preserves _ _ _ _ hwf
-    | exact createBatchPromiseResult_preserves _ _ _ hwf
-    | exact createCallbackPromiseResult_preserves _ _ _ _ hwf
-    | apply checkAccountId_preserves_promises _ _ _ _ hwf
-    | apply checkPublicKey_preserves_promises _ _ _ _ hwf
-    | split)
+  promise_preserves_tac hwf
 
 /-- Gas accounting, including exhaustion, does not mutate promise handles. -/
 theorem applyCharge_promises (ns : NearState) (charge : Charge) :

@@ -42,343 +42,158 @@ theorem writeRegisterResult_encodingFrame (name : String) (st : HostStore NearSt
   · exact checkedSetRegister_encodingFrame (by assumption)
   · trivial
 
+/-- Unfold a register/context host and close each branch: frames are unchanged. -/
+local macro "neutral_encoding_tac" : tactic => `(tactic| (
+    dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
+      contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
+      checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
+      NearState.selectReturnValue, NearState.selectReturnPromise,
+      NearState.setStorage, NearState.removeStorage, NearState.invalidateIterators]
+    repeat' (first
+      | trivial | rfl | exact writeRegisterResult_encodingFrame _ _ _ _ _
+      | split)))
+
 theorem inputFn_encodingFrame : HostPreservesEncodingFrame inputFn := by
   intro st args
   unfold inputFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise,
-    NearState.setStorage, NearState.removeStorage, NearState.invalidateIterators]
-  repeat' (first
-    | trivial | rfl | exact writeRegisterResult_encodingFrame _ _ _ _ _
-    | split)
+  neutral_encoding_tac
 
 theorem readRegisterFn_encodingFrame : HostPreservesEncodingFrame readRegisterFn := by
   intro st args
   unfold readRegisterFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise,
-    NearState.setStorage, NearState.removeStorage, NearState.invalidateIterators]
-  repeat' (first
-    | trivial | rfl | exact writeRegisterResult_encodingFrame _ _ _ _ _
-    | split)
+  neutral_encoding_tac
 
 theorem registerLenFn_encodingFrame : HostPreservesEncodingFrame registerLenFn := by
   intro st args
   unfold registerLenFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise,
-    NearState.setStorage, NearState.removeStorage, NearState.invalidateIterators]
-  repeat' (first
-    | trivial | rfl | exact writeRegisterResult_encodingFrame _ _ _ _ _
-    | split)
+  neutral_encoding_tac
 
 theorem writeRegisterFn_encodingFrame : HostPreservesEncodingFrame writeRegisterFn := by
   intro st args
   unfold writeRegisterFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise,
-    NearState.setStorage, NearState.removeStorage, NearState.invalidateIterators]
-  repeat' (first
-    | trivial | rfl | exact writeRegisterResult_encodingFrame _ _ _ _ _
-    | split)
+  neutral_encoding_tac
 
 theorem valueReturnFn_encodingFrame : HostPreservesEncodingFrame valueReturnFn := by
   intro st args
   unfold valueReturnFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise,
-    NearState.setStorage, NearState.removeStorage, NearState.invalidateIterators]
-  repeat' (first
-    | trivial | rfl | exact writeRegisterResult_encodingFrame _ _ _ _ _
-    | split)
+  neutral_encoding_tac
 
 theorem storageWriteFn_encodingFrame : HostPreservesEncodingFrame storageWriteFn := by
   intro st args
   unfold storageWriteFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise,
-    NearState.setStorage, NearState.removeStorage, NearState.invalidateIterators]
-  repeat' (first
-    | trivial | rfl | exact writeRegisterResult_encodingFrame _ _ _ _ _
-    | split)
+  neutral_encoding_tac
   all_goals aesop (add safe forward checkedSetRegister_encodingFrame)
 
 theorem storageReadFn_encodingFrame : HostPreservesEncodingFrame storageReadFn := by
   intro st args
   unfold storageReadFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise,
-    NearState.setStorage, NearState.removeStorage, NearState.invalidateIterators]
-  repeat' (first
-    | trivial | rfl | exact writeRegisterResult_encodingFrame _ _ _ _ _
-    | split)
+  neutral_encoding_tac
 
 theorem storageRemoveFn_encodingFrame : HostPreservesEncodingFrame storageRemoveFn := by
   intro st args
   unfold storageRemoveFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise,
-    NearState.setStorage, NearState.removeStorage, NearState.invalidateIterators]
-  repeat' (first
-    | trivial | rfl | exact writeRegisterResult_encodingFrame _ _ _ _ _
-    | split)
+  neutral_encoding_tac
   all_goals aesop (add safe forward checkedSetRegister_encodingFrame)
 
 theorem storageHasKeyFn_encodingFrame : HostPreservesEncodingFrame storageHasKeyFn := by
   intro st args
   unfold storageHasKeyFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise,
-    NearState.setStorage, NearState.removeStorage, NearState.invalidateIterators]
-  repeat' (first
-    | trivial | rfl | exact writeRegisterResult_encodingFrame _ _ _ _ _
-    | split)
+  neutral_encoding_tac
 
 theorem currentAccountIdFn_encodingFrame : HostPreservesEncodingFrame currentAccountIdFn := by
   intro st args
   unfold currentAccountIdFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise,
-    NearState.setStorage, NearState.removeStorage, NearState.invalidateIterators]
-  repeat' (first
-    | trivial | rfl | exact writeRegisterResult_encodingFrame _ _ _ _ _
-    | split)
+  neutral_encoding_tac
 
 theorem predecessorAccountIdFn_encodingFrame : HostPreservesEncodingFrame predecessorAccountIdFn := by
   intro st args
   unfold predecessorAccountIdFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise,
-    NearState.setStorage, NearState.removeStorage, NearState.invalidateIterators]
-  repeat' (first
-    | trivial | rfl | exact writeRegisterResult_encodingFrame _ _ _ _ _
-    | split)
+  neutral_encoding_tac
 
 theorem signerAccountIdFn_encodingFrame : HostPreservesEncodingFrame signerAccountIdFn := by
   intro st args
   unfold signerAccountIdFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise,
-    NearState.setStorage, NearState.removeStorage, NearState.invalidateIterators]
-  repeat' (first
-    | trivial | rfl | exact writeRegisterResult_encodingFrame _ _ _ _ _
-    | split)
+  neutral_encoding_tac
 
 theorem attachedDepositFn_encodingFrame : HostPreservesEncodingFrame attachedDepositFn := by
   intro st args
   unfold attachedDepositFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise,
-    NearState.setStorage, NearState.removeStorage, NearState.invalidateIterators]
-  repeat' (first
-    | trivial | rfl | exact writeRegisterResult_encodingFrame _ _ _ _ _
-    | split)
+  neutral_encoding_tac
 
 theorem logUtf8Fn_encodingFrame : HostPreservesEncodingFrame logUtf8Fn := by
   intro st args
   unfold logUtf8Fn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise,
-    NearState.setStorage, NearState.removeStorage, NearState.invalidateIterators]
-  repeat' (first
-    | trivial | rfl | exact writeRegisterResult_encodingFrame _ _ _ _ _
-    | split)
+  neutral_encoding_tac
 
 theorem signerAccountPkFn_encodingFrame : HostPreservesEncodingFrame signerAccountPkFn := by
   intro st args
   unfold signerAccountPkFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise,
-    NearState.setStorage, NearState.removeStorage, NearState.invalidateIterators]
-  repeat' (first
-    | trivial | rfl | exact writeRegisterResult_encodingFrame _ _ _ _ _
-    | split)
+  neutral_encoding_tac
 
 theorem blockIndexFn_encodingFrame : HostPreservesEncodingFrame blockIndexFn := by
   intro st args
   unfold blockIndexFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise,
-    NearState.setStorage, NearState.removeStorage, NearState.invalidateIterators]
-  repeat' (first
-    | trivial | rfl | exact writeRegisterResult_encodingFrame _ _ _ _ _
-    | split)
+  neutral_encoding_tac
 
 theorem blockTimestampFn_encodingFrame : HostPreservesEncodingFrame blockTimestampFn := by
   intro st args
   unfold blockTimestampFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise,
-    NearState.setStorage, NearState.removeStorage, NearState.invalidateIterators]
-  repeat' (first
-    | trivial | rfl | exact writeRegisterResult_encodingFrame _ _ _ _ _
-    | split)
+  neutral_encoding_tac
 
 theorem epochHeightFn_encodingFrame : HostPreservesEncodingFrame epochHeightFn := by
   intro st args
   unfold epochHeightFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise,
-    NearState.setStorage, NearState.removeStorage, NearState.invalidateIterators]
-  repeat' (first
-    | trivial | rfl | exact writeRegisterResult_encodingFrame _ _ _ _ _
-    | split)
+  neutral_encoding_tac
 
 theorem storageUsageFn_encodingFrame : HostPreservesEncodingFrame storageUsageFn := by
   intro st args
   unfold storageUsageFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise,
-    NearState.setStorage, NearState.removeStorage, NearState.invalidateIterators]
-  repeat' (first
-    | trivial | rfl | exact writeRegisterResult_encodingFrame _ _ _ _ _
-    | split)
+  neutral_encoding_tac
 
 theorem accountBalanceFn_encodingFrame : HostPreservesEncodingFrame accountBalanceFn := by
   intro st args
   unfold accountBalanceFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise,
-    NearState.setStorage, NearState.removeStorage, NearState.invalidateIterators]
-  repeat' (first
-    | trivial | rfl | exact writeRegisterResult_encodingFrame _ _ _ _ _
-    | split)
+  neutral_encoding_tac
 
 theorem accountLockedBalanceFn_encodingFrame : HostPreservesEncodingFrame accountLockedBalanceFn := by
   intro st args
   unfold accountLockedBalanceFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise,
-    NearState.setStorage, NearState.removeStorage, NearState.invalidateIterators]
-  repeat' (first
-    | trivial | rfl | exact writeRegisterResult_encodingFrame _ _ _ _ _
-    | split)
+  neutral_encoding_tac
 
 theorem prepaidGasFn_encodingFrame : HostPreservesEncodingFrame prepaidGasFn := by
   intro st args
   unfold prepaidGasFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise,
-    NearState.setStorage, NearState.removeStorage, NearState.invalidateIterators]
-  repeat' (first
-    | trivial | rfl | exact writeRegisterResult_encodingFrame _ _ _ _ _
-    | split)
+  neutral_encoding_tac
 
 theorem usedGasFn_encodingFrame : HostPreservesEncodingFrame usedGasFn := by
   intro st args
   unfold usedGasFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise,
-    NearState.setStorage, NearState.removeStorage, NearState.invalidateIterators]
-  repeat' (first
-    | trivial | rfl | exact writeRegisterResult_encodingFrame _ _ _ _ _
-    | split)
+  neutral_encoding_tac
 
 theorem logUtf16Fn_encodingFrame : HostPreservesEncodingFrame logUtf16Fn := by
   intro st args
   unfold logUtf16Fn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise,
-    NearState.setStorage, NearState.removeStorage, NearState.invalidateIterators]
-  repeat' (first
-    | trivial | rfl | exact writeRegisterResult_encodingFrame _ _ _ _ _
-    | split)
+  neutral_encoding_tac
 
 theorem randomSeedFn_encodingFrame : HostPreservesEncodingFrame randomSeedFn := by
   intro st args
   unfold randomSeedFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise,
-    NearState.setStorage, NearState.removeStorage, NearState.invalidateIterators]
-  repeat' (first
-    | trivial | rfl | exact writeRegisterResult_encodingFrame _ _ _ _ _
-    | split)
+  neutral_encoding_tac
 
 theorem promiseResultsCountFn_encodingFrame : HostPreservesEncodingFrame promiseResultsCountFn := by
   intro st args
   unfold promiseResultsCountFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise,
-    NearState.setStorage, NearState.removeStorage, NearState.invalidateIterators]
-  repeat' (first
-    | trivial | rfl | exact writeRegisterResult_encodingFrame _ _ _ _ _
-    | split)
+  neutral_encoding_tac
 
 theorem promiseResultFn_encodingFrame : HostPreservesEncodingFrame promiseResultFn := by
   intro st args
   unfold promiseResultFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise,
-    NearState.setStorage, NearState.removeStorage, NearState.invalidateIterators]
-  repeat' (first
-    | trivial | rfl | exact writeRegisterResult_encodingFrame _ _ _ _ _
-    | split)
+  neutral_encoding_tac
 
 theorem promiseReturnFn_encodingFrame : HostPreservesEncodingFrame promiseReturnFn := by
   intro st args
   unfold promiseReturnFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise,
-    NearState.setStorage, NearState.removeStorage, NearState.invalidateIterators]
-  repeat' (first
-    | trivial | rfl | exact writeRegisterResult_encodingFrame _ _ _ _ _
-    | split)
+  neutral_encoding_tac
 
 theorem panicMetered_encodingFrame : HostPreservesEncodingFrame panicMetered := by
   intro st args
@@ -387,14 +202,7 @@ theorem panicMetered_encodingFrame : HostPreservesEncodingFrame panicMetered := 
 theorem panicUtf8Metered_encodingFrame : HostPreservesEncodingFrame panicUtf8Metered := by
   intro st args
   unfold panicUtf8Metered
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise,
-    NearState.setStorage, NearState.removeStorage, NearState.invalidateIterators]
-  repeat' (first
-    | trivial | rfl | exact writeRegisterResult_encodingFrame _ _ _ _ _
-    | split)
+  neutral_encoding_tac
 
 theorem abortMetered_encodingFrame : HostPreservesEncodingFrame abortMetered := by
   intro st args
