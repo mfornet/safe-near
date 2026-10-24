@@ -412,6 +412,50 @@ def main (args : List String) : IO UInt32 := do
   check r "unsupported unstaking leaves locked funds untouched"
     ((unstake.state.account? "wrap.near").map (·.locked) == some oneNear)
 
+  -- `UseGlobalContract`: priced, permission-checked and encoded like nearcore;
+  -- executing it needs the global contract registry, which the model does not have.
+  let globalHash := (List.range 32).map fun i => UInt8.ofNat (i + 1)
+  let fees := cfg.fees.actionFees
+  for (label, id) in [("code hash", GlobalContractId.codeHash globalHash),
+      ("account id", GlobalContractId.accountId (bytesOf "alice.near"))] do
+    let width := match id with | .codeHash hash => hash.length | .accountId bytes => bytes.length
+    let tx : Transaction := {
+      signerId := "alice.near", publicKey := pkOf 1, nonce := 1, receiverId := "bob.near"
+      actions := [.useGlobalContract id] }
+    let sent := Near.apply cfg World.ap (fun _ => code) genesis [tx] []
+    check r s!"use global contract by {label}: the transaction burns its send fees"
+      (sent.issue.isNone && sent.outgoing.length == 1 &&
+        sent.outcomes.map (·.2.gasBurnt) == [fees.newActionReceipt.sendNotSir +
+          fees.useGlobalContractBase.sendNotSir + width * fees.useGlobalContractByte.sendNotSir])
+      s!"{sent.outcomes.map (·.2.gasBurnt)}"
+    let delivered := Near.apply cfg World.ap (fun _ => code) sent.state [] sent.outgoing
+    check r s!"use global contract by {label}: only the account itself may use one"
+      (delivered.issue.isNone && delivered.outcomes.map (·.2.status) ==
+        [.failure (.actorNoPermission "bob.near" "alice.near")])
+    let own := Near.apply cfg World.ap (fun _ => code) genesis [{ tx with receiverId := "alice.near" }] []
+    check r s!"use global contract by {label}: execution is an explicit model issue"
+      ((own.issue.map (·.2)) == some (.unsupportedAction "use global contract"))
+    check r s!"use global contract by {label}: the issue rolls back the chunk"
+      (own.state.totalBalance == genesis.totalBalance && own.outcomes.isEmpty &&
+        own.outgoing.isEmpty && own.tokensBurnt == 0 &&
+        own.state.accessKey? "alice.near" (pkOf 1) == some fullAccess)
+  -- Borsh: `Action::UseGlobalContract` is variant 10; the identifier is
+  -- `CodeHash(CryptoHash)` (0) or `AccountId(String)` (1).
+  check r "use global contract encodes a code hash as Borsh"
+    (match ReceiptEncoding.action [] (.useGlobalContract (.codeHash globalHash)) with
+      | .ok bytes => bytes == [10, 0] ++ globalHash | .error _ => false)
+  check r "use global contract encodes an account id as Borsh"
+    (match ReceiptEncoding.action [] (.useGlobalContract (.accountId (bytesOf "alice.near"))) with
+      | .ok bytes => bytes == [10, 1, 10, 0, 0, 0] ++ bytesOf "alice.near" | .error _ => false)
+  check r "use global contract rejects a short code hash and an invalid account id"
+    ((match ReceiptEncoding.action [] (.useGlobalContract (.codeHash (globalHash.take 31))) with
+      | .ok _ => false | .error _ => true) &&
+     (match ReceiptEncoding.action [] (.useGlobalContract (.accountId (bytesOf "A!"))) with
+      | .ok _ => false | .error _ => true))
+  check r "use global contract by an invalid account id fails action validation"
+    (match validateAction cfg.wasm.limits (.useGlobalContract (.accountId (bytesOf "A!"))) with
+      | .error (.invalidAccountId _) => true | _ => false)
+
   -- Fee classification and explicit unsupported implicit-creation semantics.
   let cfg69 ← RuntimeConfig.load configs 69
   let cfg70 ← RuntimeConfig.load configs 70

@@ -63,6 +63,16 @@ contract panic; the regression compares its exact error and gas. The
 sender/receiver unregisters before refund resolution. These are controlled VM
 call sequences on shared storage, not an independent receipt scheduler oracle.
 
+`global_contract.json` (v86) and `global_contract_v78.json` (the first version
+with `global_contract_host_fns`) compare `promise_batch_action_use_global_contract`
+and its `_by_account_id` variant: both identifiers, malformed hashes,
+out-of-bounds reads, invalid, over-long and non-UTF-8 account ids (accepted at
+v78, rejected by v86's account id rules), invalid promise indices, view calls,
+rollback on panic and fee exhaustion. The fees come from nearcore's `77.yaml`
+(the config view omits them); these comparisons confirm them exactly. Earlier
+protocol versions are not compared: nearcore rejects the import there, while
+the model's host table is not gated by protocol version.
+
 `promise_graphs.json` checks exact ordered receipt dependencies and returned
 receipt identity for ordinary, nested, duplicate and empty joins. Failure cases
 cover joint return/action restrictions, nonexistent handles, view calls and
