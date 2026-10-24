@@ -97,6 +97,8 @@ structure Context where
   protocol : RuntimeConfig
   /-- The current epoch's validators and their stakes. -/
   validators : List (String × Nat) := []
+  /-- The cryptographic oracles the call may use. -/
+  crypto : HostCrypto := {}
 
 /-- Records stored under `account` in a trie view (`TrieKey::ContractData`). -/
 def contractData (trie : Near.TrieOverlay.State) (account : Bytes) : RawStorage :=

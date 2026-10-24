@@ -180,6 +180,16 @@ theorem randomSeedFn_encodingFrame : HostPreservesEncodingFrame randomSeedFn := 
   unfold randomSeedFn
   neutral_encoding_tac
 
+theorem ecrecoverFn_encodingFrame : HostPreservesEncodingFrame ecrecoverFn := by
+  intro st args
+  unfold ecrecoverFn missingOracle
+  neutral_encoding_tac
+
+theorem ed25519VerifyFn_encodingFrame : HostPreservesEncodingFrame ed25519VerifyFn := by
+  intro st args
+  unfold ed25519VerifyFn missingOracle
+  neutral_encoding_tac
+
 theorem validatorStakeFn_encodingFrame : HostPreservesEncodingFrame validatorStakeFn := by
   intro st args
   unfold validatorStakeFn

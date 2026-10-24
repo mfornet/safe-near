@@ -173,7 +173,8 @@ Ed25519, secp256k1 and ML-DSA-65 signatures in Lean. M2a is the hashes and Ed255
 
 - **Package.** `NearCrypto` requires nothing from this repository and no Mathlib, so contract builds
   are unaffected and `NearVM` can adopt it later without pulling the node in; `just node-isolation`
-  enforces it. The VM keeps taking its digests, `ed25519Verify` and `ecrecover` as host parameters. The node
+  enforces it. The VM takes its digests, `ed25519Verify` and `ecrecover` as oracles (`HostCrypto`,
+  absent ones are unsupported-host issues); the VM conformance replay supplies `NearCrypto`. The node
   requires it by path: `CryptoHash.hash` (so every block, chunk and outcome hash and the sampler
   seeds) is the `NearCrypto` SHA-256 `Impl`. Pure Lean throughout, no `@[extern]`.
 - **Spec and Impl.** Each primitive has a `Spec`, simple and close to the standard (lists, `Nat`,
@@ -527,4 +528,5 @@ reports. Rebuild steps and formats: [`tools/localnet/CORPUS.md`](../../tools/loc
 - Numeric performance targets for M4 and M10, measured against nearcore (M2's are proposed above).
 - Whether crypto host functions in `NearVM` slow contract verification. If they
   do, `NearVM` takes host crypto as a parameter and the node supplies it. Today the VM takes its
-  digests, `ed25519Verify` and `ecrecover` as parameters; `NearCrypto` is a separate package it can import later.
+  digests, `ed25519Verify` and `ecrecover` as oracles (`HostCrypto`); only its conformance replay
+  imports `NearCrypto` to supply them.

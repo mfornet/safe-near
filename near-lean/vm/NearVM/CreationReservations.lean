@@ -39,15 +39,25 @@ theorem preInvokeError_creation_checks (name : String) (st : HostStore NearState
     · split
       · rename_i he; simp only [beq_iff_eq] at he; subst name; simp at halloc
       · rfl
+  have hcp : cryptoPlan? name st args = none := by
+    have hec : (name == "ecrecover") = false := by
+      cases he : name == "ecrecover"
+      · rfl
+      · simp only [beq_iff_eq] at he; subst name; simp [allocatesPromise] at halloc
+    have hed : (name == "ed25519_verify") = false := by
+      cases he : name == "ed25519_verify"
+      · rfl
+      · simp only [beq_iff_eq] at he; subst name; simp [allocatesPromise] at halloc
+    simp [cryptoPlan?, hec, hed]
   have hp : creationPrefixError name st args = none := by
     cases he : creationPrefixError name st args with
     | none => rfl
-    | some error => simp [preInvokeError, invocationArgumentError, hs, hjoin, htransfer, hkey, hg, hlog, hvs, hv, he] at h
+    | some error => simp [preInvokeError, invocationArgumentError, hs, hjoin, htransfer, hkey, hg, hlog, hvs, hcp, hv, he] at h
   have hc : promiseCapacityError st = none := by
     cases he : promiseCapacityError st with
     | none => rfl
     | some error =>
-      simp [preInvokeError, invocationArgumentError, hs, hjoin, htransfer, hkey, hg, hlog, hvs, hv, hp, halloc, he] at h
+      simp [preInvokeError, invocationArgumentError, hs, hjoin, htransfer, hkey, hg, hlog, hvs, hcp, hv, hp, halloc, he] at h
   refine ⟨?_, hp, hc⟩
   cases he : creationAccountError name st args with
   | none => rfl

@@ -61,6 +61,8 @@ inductive HostError
   | deprecated (methodName : String)
   | unsupported (methodName : String)
   | contractCodeHashMalformed
+  | ecRecoverError (msg : String)
+  | ed25519VerifyInvalidInput (msg : String)
   deriving Repr, BEq, Inhabited
 
 def HostError.message : HostError → String
@@ -97,6 +99,8 @@ def HostError.message : HostError → String
   | .prohibitedInView m => s!"{m} is not allowed in view calls"
   | .deprecated m => s!"Attempted to call deprecated host function {m}"
   | .unsupported m => s!"Attempted to call unsupported host function {m}"
+  | .ecRecoverError msg => s!"ECDSA recover error: {msg}"
+  | .ed25519VerifyInvalidInput msg => s!"ED25519 signature verification error: {msg}"
   | .contractCodeHashMalformed => "contract code hash is malformed"
 
 /-- Why a Wasm execution trapped (`near_vm_runner::logic::errors::WasmTrap`). -/

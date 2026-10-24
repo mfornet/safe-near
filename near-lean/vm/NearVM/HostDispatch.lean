@@ -141,6 +141,16 @@ theorem randomSeedFn_preserves : HostPreservesPromises randomSeedFn := by
   unfold randomSeedFn
   host_dispatch_tac hwf
 
+theorem ecrecoverFn_preserves : HostPreservesPromises ecrecoverFn := by
+  intro st args hwf
+  unfold ecrecoverFn missingOracle
+  host_dispatch_tac hwf
+
+theorem ed25519VerifyFn_preserves : HostPreservesPromises ed25519VerifyFn := by
+  intro st args hwf
+  unfold ed25519VerifyFn missingOracle
+  host_dispatch_tac hwf
+
 theorem validatorStakeFn_preserves : HostPreservesPromises validatorStakeFn := by
   intro st args hwf
   unfold validatorStakeFn
@@ -244,6 +254,8 @@ theorem meteredHostFns_preserves (cfg : RuntimeConfig) (entry : ImportDecl × Ne
       | exact ripemd160Fn_preserves
       | exact validatorStakeFn_preserves
       | exact validatorTotalStakeFn_preserves
+      | exact ecrecoverFn_preserves
+      | exact ed25519VerifyFn_preserves
       | exact logUtf8Fn_preserves
       | exact logUtf16Fn_preserves
       | exact panicMetered_preserves

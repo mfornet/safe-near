@@ -160,6 +160,16 @@ theorem randomSeedFn_reservationView : HostPreservesReservationView randomSeedFn
   unfold randomSeedFn
   neutral_reservation_tac
 
+theorem ecrecoverFn_reservationView : HostPreservesReservationView ecrecoverFn := by
+  intro st args
+  unfold ecrecoverFn missingOracle
+  neutral_reservation_tac
+
+theorem ed25519VerifyFn_reservationView : HostPreservesReservationView ed25519VerifyFn := by
+  intro st args
+  unfold ed25519VerifyFn missingOracle
+  neutral_reservation_tac
+
 theorem validatorStakeFn_reservationView : HostPreservesReservationView validatorStakeFn := by
   intro st args
   unfold validatorStakeFn
@@ -220,7 +230,7 @@ theorem abortMetered_reservationView : HostPreservesReservationView abortMetered
 
 /-- These published host names create no onward execution/prepaid obligation. -/
 def reservationNeutralNames : List String :=
-  ["input", "read_register", "register_len", "write_register", "value_return", "storage_write", "storage_read", "storage_remove", "storage_has_key", "current_account_id", "predecessor_account_id", "signer_account_id", "attached_deposit", "log_utf8", "signer_account_pk", "block_index", "block_height", "block_timestamp", "epoch_height", "storage_usage", "account_balance", "account_locked_balance", "prepaid_gas", "used_gas", "log_utf16", "random_seed", "validator_stake", "validator_total_stake", "sha256", "keccak256", "keccak512", "ripemd160", "promise_results_count", "promise_result", "promise_return", "panic", "panic_utf8", "abort"]
+  ["input", "read_register", "register_len", "write_register", "value_return", "storage_write", "storage_read", "storage_remove", "storage_has_key", "current_account_id", "predecessor_account_id", "signer_account_id", "attached_deposit", "log_utf8", "signer_account_pk", "block_index", "block_height", "block_timestamp", "epoch_height", "storage_usage", "account_balance", "account_locked_balance", "prepaid_gas", "used_gas", "log_utf16", "random_seed", "ecrecover", "ed25519_verify", "validator_stake", "validator_total_stake", "sha256", "keccak256", "keccak512", "ripemd160", "promise_results_count", "promise_result", "promise_return", "panic", "panic_utf8", "abort"]
 
 @[simp] theorem storageValueCharges_reservation (st : HostStore NearState) (cost : String)
     (key : List UInt8) (fees : ActionFees) :
@@ -272,17 +282,37 @@ theorem chargesBefore_log_reservation (name : String) (st : HostStore NearState)
     simpa [chargesBefore, chargesBeforeUnvalidated, storageMutationPlan?, creationAccountArgs] using
       logPlan_reservation _ st args st.host.fees
 
+/-- Signature host plans contain only local ext-cost burns. -/
+theorem cryptoPlan_reservation (name : String) (st : HostStore NearState) (args : List Value)
+    (fees : ActionFees) :
+    ((((cryptoPlan? name st args).map (·.charges)).getD []).map (fun charge => charge.reservation fees)).sum = 0 := by
+  unfold cryptoPlan?
+  dsimp only [Id.run]
+  repeat' split
+  all_goals simp only [pure, Option.map, Option.getD, List.map_append, List.sum_append,
+    readSpan_reservation, Nat.add_zero]
+  all_goals simp [Charge.reservation, writeReg]
+
+theorem chargesBefore_crypto_reservation (name : String) (st : HostStore NearState) (args : List Value)
+    (hname : name = "ecrecover" ∨ name = "ed25519_verify") :
+    ((chargesBefore name st args).map (fun charge => charge.reservation st.host.fees)).sum = 0 := by
+  rcases hname with h | h <;> subst name <;>
+    simpa [chargesBefore, chargesBeforeUnvalidated, storageMutationPlan?, creationAccountArgs] using
+      cryptoPlan_reservation _ st args st.host.fees
+
 theorem chargesBefore_neutral_reservation (name : String) (st : HostStore NearState) (args : List Value)
     (hname : name ∈ reservationNeutralNames) :
     ((chargesBefore name st args).map (fun charge => charge.reservation st.host.fees)).sum = 0 := by
   simp only [reservationNeutralNames, List.mem_cons, List.not_mem_nil, or_false] at hname
-  rcases hname with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
+  rcases hname with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
   all_goals subst name
   all_goals first
     | exact chargesBefore_storage_reservation _ _ _ (Or.inl rfl)
     | exact chargesBefore_storage_reservation _ _ _ (Or.inr rfl)
     | exact chargesBefore_log_reservation _ _ _ (Or.inl rfl)
     | exact chargesBefore_log_reservation _ _ _ (Or.inr rfl)
+    | exact chargesBefore_crypto_reservation _ _ _ (Or.inl rfl)
+    | exact chargesBefore_crypto_reservation _ _ _ (Or.inr rfl)
     | skip
   all_goals dsimp only [chargesBefore, chargesBeforeUnvalidated, storageMutationPlan?, creationAccountArgs, argU64,
     readMem, writeMem, writeReg, readSpan, utf8, utf16, Charge.reservation]

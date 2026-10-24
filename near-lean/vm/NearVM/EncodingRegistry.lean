@@ -108,8 +108,10 @@ theorem meteredHostFns_encodingInvariant
     · exact keccak512Fn_encodingFrame
   · apply meteredNeutral_encodingInvariant
     · exact ripemd160Fn_encodingFrame
-  · unsupported_encoding
-  · unsupported_encoding
+  · apply meteredNeutral_encodingInvariant
+    · exact ecrecoverFn_encodingFrame
+  · apply meteredNeutral_encodingInvariant
+    · exact ed25519VerifyFn_encodingFrame
   · apply meteredNeutral_encodingInvariant
     · exact randomSeedFn_encodingFrame
   · unsupported_encoding

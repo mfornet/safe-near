@@ -148,6 +148,16 @@ theorem randomSeedFn_gas : HostPreservesGas randomSeedFn := by
   unfold randomSeedFn
   host_gas_tac
 
+theorem ecrecoverFn_gas : HostPreservesGas ecrecoverFn := by
+  intro st args
+  unfold ecrecoverFn missingOracle
+  host_gas_tac
+
+theorem ed25519VerifyFn_gas : HostPreservesGas ed25519VerifyFn := by
+  intro st args
+  unfold ed25519VerifyFn missingOracle
+  host_gas_tac
+
 theorem validatorStakeFn_gas : HostPreservesGas validatorStakeFn := by
   intro st args
   unfold validatorStakeFn

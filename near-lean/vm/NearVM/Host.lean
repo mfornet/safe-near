@@ -673,16 +673,22 @@ def validatorStakeFn : NearHostFn NearState :=
 def validatorTotalStakeFn : NearHostFn NearState :=
   contextU128MemFn "validator_total_stake" (·.validatorTotalStake)
 
-/-! ## Crypto and math, modelled as pure host-state hooks -/
+/-! ## Crypto, through the supplied oracles (`HostCrypto`) -/
 
-def digestFn (name : String) (hash : NearState → List UInt8 → List UInt8) : NearHostFn NearState :=
+/-- A crypto host called without its oracle: an explicit unsupported-host issue. -/
+def missingOracle (name : String) (st : HostStore NearState) : HostResult NearState :=
+  .Trap { st with host := { st.host with lastError := some (.unsupported name) } } s!"{name}: no oracle"
+
+def digestFn (name : String) (oracle : HostCrypto → Option (List UInt8 → List UInt8)) : NearHostFn NearState :=
   { params := [.i64, .i64, .i64], results := []
     invoke := fun st args => match args with
       | [.i64 valueLen, .i64 valuePtr, .i64 regId] =>
-        match getMemOrReg st valuePtr valueLen with
-        | none => .Trap st s!"{name}: invalid input"
-        | some value =>
-          writeRegisterResult name st regId (hash st.host value)
+        match oracle st.host.crypto with
+        | none => missingOracle name st
+        | some hash =>
+          match getMemOrReg st valuePtr valueLen with
+          | none => .Trap st s!"{name}: invalid input"
+          | some value => writeRegisterResult name st regId (hash value)
       | _ => .Trap st s!"{name}: bad args" }
 
 def sha256Fn : NearHostFn NearState :=
@@ -704,29 +710,42 @@ def randomSeedFn : NearHostFn NearState :=
         writeRegisterResult "random_seed" st regId st.host.randomSeed
       | _ => .Trap st "random_seed: bad args" }
 
+/-- `ecrecover(hash_len, hash_ptr, sig_len, sig_ptr, v, malleability_flag,
+register_id)`. The input checks (lengths, `v`, the flag) are the metered
+plan's errors; here the inputs are valid and the oracle decides. -/
 def ecrecoverFn : NearHostFn NearState :=
-  { params := [.i64, .i64, .i64, .i64, .i64, .i64], results := [.i64]
+  { params := [.i64, .i64, .i64, .i64, .i64, .i64, .i64], results := [.i64]
     invoke := fun st args => match args with
-      | [.i64 hashLen, .i64 hashPtr, .i64 sigLen, .i64 sigPtr, .i64 v, .i64 malleabilityFlag] =>
-        match getMemOrReg st hashPtr hashLen, getMemOrReg st sigPtr sigLen with
-        | some hash, some sig =>
-          match st.host.ecrecover hash sig v (malleabilityFlag != 0) with
-          | some pk =>
-            checkPublicKey "ecrecover" st pk <| fun _ =>
-              writeRegisterResult "ecrecover" st 0 pk [.i64 1]
-          | none => .Return [.i64 0] st
-        | _, _ => .Trap st "ecrecover: invalid input"
+      | [.i64 hashLen, .i64 hashPtr, .i64 sigLen, .i64 sigPtr, .i64 v, .i64 malleabilityFlag, .i64 regId] =>
+        match st.host.crypto.ecrecover with
+        | none => missingOracle "ecrecover" st
+        | some recover =>
+          match getMemOrReg st hashPtr hashLen, getMemOrReg st sigPtr sigLen with
+          | some hash, some sig =>
+            match recover hash sig v.toNat (malleabilityFlag != 0) with
+            | some pk => writeRegisterResult "ecrecover" st regId pk [.i64 1]
+            | none => .Return [.i64 0] st
+          | _, _ => .Trap st "ecrecover: invalid input"
       | _ => .Trap st "ecrecover: bad args" }
 
+/-- `ed25519_verify(sig_len, sig_ptr, msg_len, msg_ptr, pk_len, pk_ptr)`. As in
+nearcore, a signature whose last byte has any of its top three bits set is
+false before the message is read; lengths are the metered plan's errors. -/
 def ed25519VerifyFn : NearHostFn NearState :=
   { params := [.i64, .i64, .i64, .i64, .i64, .i64], results := [.i64]
     invoke := fun st args => match args with
       | [.i64 sigLen, .i64 sigPtr, .i64 msgLen, .i64 msgPtr, .i64 pkLen, .i64 pkPtr] =>
-        match getMemOrReg st sigPtr sigLen, getMemOrReg st msgPtr msgLen, getMemOrReg st pkPtr pkLen with
-        | some sig, some msg, some pk =>
-          checkPublicKey "ed25519_verify" st pk <| fun _ =>
-            .Return [.i64 (if st.host.ed25519Verify sig msg pk then 1 else 0)] st
-        | _, _, _ => .Trap st "ed25519_verify: invalid input"
+        match st.host.crypto.ed25519Verify with
+        | none => missingOracle "ed25519_verify" st
+        | some verify =>
+          match getMemOrReg st sigPtr sigLen with
+          | none => .Trap st "ed25519_verify: invalid input"
+          | some sig =>
+            if (sig.getLast?.getD 0) &&& 0xE0 != 0 then .Return [.i64 0] st
+            else
+              match getMemOrReg st msgPtr msgLen, getMemOrReg st pkPtr pkLen with
+              | some msg, some pk => .Return [.i64 (if verify pk msg sig then 1 else 0)] st
+              | _, _ => .Trap st "ed25519_verify: invalid input"
       | _ => .Trap st "ed25519_verify: bad args" }
 
 def mathRegisterFn (name : String) (op : NearState → List UInt8 → List UInt8) : NearHostFn NearState :=
@@ -1115,7 +1134,7 @@ def nearHostFns : List (ImportDecl × NearHostFn NearState) :=
   , (imp "storage_iter_next"      [.i64, .i64, .i64] [.i64], storageIterNextFn)
   , (imp "keccak512"        [.i64, .i64, .i64] [], keccak512Fn)
   , (imp "ripemd160"        [.i64, .i64, .i64] [], ripemd160Fn)
-  , (imp "ecrecover"        [.i64, .i64, .i64, .i64, .i64, .i64] [.i64], ecrecoverFn)
+  , (imp "ecrecover"        [.i64, .i64, .i64, .i64, .i64, .i64, .i64] [.i64], ecrecoverFn)
   , (imp "ed25519_verify"   [.i64, .i64, .i64, .i64, .i64, .i64] [.i64], ed25519VerifyFn)
   , (imp "random_seed"      [.i64] [], randomSeedFn)
   , (imp "alt_bn128_g1_multiexp" [.i64, .i64, .i64] [], altBn128G1MultiexpFn)

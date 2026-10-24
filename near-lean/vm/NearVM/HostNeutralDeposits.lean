@@ -174,6 +174,16 @@ theorem randomSeedFn_noDeposits : HostCreatesNoDeposits randomSeedFn := by
   unfold randomSeedFn
   no_deposits_tac
 
+theorem ecrecoverFn_noDeposits : HostCreatesNoDeposits ecrecoverFn := by
+  intro st args
+  unfold ecrecoverFn missingOracle
+  no_deposits_tac
+
+theorem ed25519VerifyFn_noDeposits : HostCreatesNoDeposits ed25519VerifyFn := by
+  intro st args
+  unfold ed25519VerifyFn missingOracle
+  no_deposits_tac
+
 theorem validatorStakeFn_noDeposits : HostCreatesNoDeposits validatorStakeFn := by
   intro st args
   unfold validatorStakeFn

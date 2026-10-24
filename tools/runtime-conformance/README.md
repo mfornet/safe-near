@@ -91,10 +91,13 @@ body size, tables, table elements, locals) and the rejected imports (another
 module, globals, tables, memory): a no-op outcome with `PrepareError` and no
 gas. A module at the locals limit is left out: Wasmtime fails to compile it.
 
-`hashes.json` runs `sha256`, `keccak256`, `keccak512` and `ripemd160` (pure
-Lean in `near-lean/interface`) on empty, short and multi-block inputs, a chain
-of digests read from registers, an out-of-bounds read, an invalid register and
-gas exhaustion: digests, charges and errors match exactly.
+The Lean replay supplies `NearCrypto` as the VM's crypto oracles (`HostCrypto`).
+`hashes.json` runs `sha256`, `keccak256`, `keccak512` and `ripemd160` on empty,
+short and multi-block inputs, a chain of digests read from registers, an
+out-of-bounds read, an invalid register and gas exhaustion. `signatures.json`
+runs `ed25519_verify` and `ecrecover` on valid and tampered signatures,
+nearcore's early false results, every length, `v` and flag error, out-of-bounds
+inputs and the recovered key. Digests, results, charges and errors match exactly.
 
 `validators.json` sets the epoch's validators (a request may set
 `validators`) and reads `validator_stake` for known and unknown accounts,

@@ -50,6 +50,8 @@ structure VMContext where
   /-- The current epoch's validators and their stakes, a block context input
   (`validator_stake`, `validator_total_stake`). -/
   validators : List (Bytes × Nat) := []
+  /-- The cryptographic oracles the call may use. -/
+  crypto : HostCrypto := {}
   deriving Inhabited
 
 /-- Storage keys in byte order: the order the trie iterates them in, and one
@@ -111,7 +113,8 @@ def toNearState (cfg : RuntimeConfig) (ctx : VMContext)
     gas := { prepaid := ctx.prepaidGas, maxBurnt := maxBurnt }
     extCosts := cfg.wasm.extCosts
     fees := cfg.fees.actionFees
-    outputDataReceivers := ctx.outputDataReceivers }
+    outputDataReceivers := ctx.outputDataReceivers
+    crypto := ctx.crypto }
 
 end VMContext
 

@@ -109,6 +109,9 @@ structure ApplyState where
   /-- The current epoch's validators and their stakes, read by
   `validator_stake` and `validator_total_stake`. -/
   validators : List (AccountId × Nat) := []
+  /-- The cryptographic oracles VM calls may use (`HostCrypto`); a crypto host
+  whose oracle is absent is an explicit unsupported-host issue. -/
+  crypto : Wasm.HostCrypto := {}
   deriving Inhabited
 
 end Near

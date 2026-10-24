@@ -215,10 +215,10 @@ def main (args : List String) : IO UInt32 := do
   -- Execute unsupported operations, rather than checking the host registry.
   -- Imports alone must remain usable for contracts with unreachable crypto code.
   for (name, params, arguments, results) in
-      [("ed25519_verify", "i64 i64 i64 i64 i64 i64",
-        "i64.const 0 i64.const 0 i64.const 0 i64.const 0 i64.const 0 i64.const 0", "(result i64)"),
-       ("ecrecover", "i64 i64 i64 i64 i64 i64",
-        "i64.const 0 i64.const 0 i64.const 0 i64.const 0 i64.const 0 i64.const 0", "(result i64)"),
+      [-- A crypto host runs only with its oracle (`HostCrypto`); these tests supply none.
+       ("sha256", "i64 i64 i64", "i64.const 0 i64.const 0 i64.const 0", ""),
+       ("alt_bn128_g1_sum", "i64 i64 i64", "i64.const 0 i64.const 0 i64.const 0", ""),
+       ("bls12381_p1_sum", "i64 i64 i64", "i64.const 0 i64.const 0 i64.const 0", "(result i64)"),
        ("promise_yield_resume", "i64 i64 i64 i64",
         "i64.const 0 i64.const 0 i64.const 0 i64.const 0", "(result i64)"),
        ("promise_batch_action_deploy_global_contract", "i64 i64 i64",

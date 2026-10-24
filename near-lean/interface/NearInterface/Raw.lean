@@ -17,6 +17,23 @@ inductive PromiseResult where
   | failed
 deriving Inhabited, BEq
 
+/-- Cryptographic oracles for the VM's crypto host functions. Each is a named
+assumption: a host whose oracle is absent is an explicit unsupported-host
+issue, never a guessed result. The node and the conformance harness supply
+`NearCrypto`; contract verification states which oracles it trusts. -/
+structure HostCrypto where
+  sha256 : Option (List UInt8 → List UInt8) := none
+  keccak256 : Option (List UInt8 → List UInt8) := none
+  keccak512 : Option (List UInt8 → List UInt8) := none
+  ripemd160 : Option (List UInt8 → List UInt8) := none
+  /-- `ed25519Verify publicKey message signature` for a 32-byte key and a
+  64-byte signature; false when the key does not decompress. -/
+  ed25519Verify : Option (List UInt8 → List UInt8 → List UInt8 → Bool) := none
+  /-- `ecrecover hash signature v malleability`: the 64-byte raw public key, or
+  none when the signature values are invalid or recovery fails. -/
+  ecrecover : Option (List UInt8 → List UInt8 → Nat → Bool → Option (List UInt8)) := none
+deriving Inhabited
+
 /-- Function-call access-key allowance. `none` represents no allowance. -/
 abbrev Allowance := Option Nat
 

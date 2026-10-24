@@ -132,6 +132,16 @@ theorem randomSeedFn_selection : HostPreservesSelection randomSeedFn := by
   unfold randomSeedFn
   host_selection_tac hwf
 
+theorem ecrecoverFn_selection : HostPreservesSelection ecrecoverFn := by
+  intro st args hwf
+  unfold ecrecoverFn missingOracle
+  host_selection_tac hwf
+
+theorem ed25519VerifyFn_selection : HostPreservesSelection ed25519VerifyFn := by
+  intro st args hwf
+  unfold ed25519VerifyFn missingOracle
+  host_selection_tac hwf
+
 theorem validatorStakeFn_selection : HostPreservesSelection validatorStakeFn := by
   intro st args hwf
   unfold validatorStakeFn

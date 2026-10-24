@@ -82,6 +82,27 @@ theorem applyCharges_logs (ns : NearState) (charges : List Charge) :
     (len ptr : UInt64) : accountIdError (prechargedStore name st args) len ptr = accountIdError st len ptr := by
   simp only [accountIdError, prechargedStore_getMemOrReg, prechargedStore_config]
 
+/-- Charging leaves the cryptographic oracles fixed. -/
+theorem applyCharges_crypto (ns : NearState) (charges : List Charge) :
+    (applyCharges ns charges).1.crypto = ns.crypto := by
+  induction charges generalizing ns with
+  | nil => rfl
+  | cons charge rest ih =>
+    have hp : (applyCharge ns charge).1.crypto = ns.crypto := by cases charge <;> rfl
+    cases hc : applyCharge ns charge with
+    | mk paid error =>
+      rw [hc] at hp
+      cases error with
+      | some error => simpa only [applyCharges, hc] using hp
+      | none => simpa only [applyCharges, hc] using (ih paid).trans hp
+
+/-- The signature hosts' plans read only memory, registers and the oracles. -/
+@[simp] theorem prechargedStore_cryptoPlan (name : String) (st : HostStore NearState) (args : List Value)
+    (host : String) : cryptoPlan? host (prechargedStore name st args) args = cryptoPlan? host st args := by
+  have hc : (prechargedStore name st args).host.crypto = st.host.crypto :=
+    applyCharges_crypto st.host (chargesBefore name st args)
+  simp only [cryptoPlan?, hc, prechargedStore_getMemOrReg, prechargedStore_readSpan]
+
 /-- A log host's plan reads only logs, configuration, memory and registers. -/
 @[simp] theorem prechargedStore_logPlan (name : String) (st : HostStore NearState) (args : List Value)
     (host : String) : logPlan host (prechargedStore name st args) args = logPlan host st args := by

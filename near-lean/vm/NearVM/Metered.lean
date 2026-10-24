@@ -389,6 +389,50 @@ def logPlan (name : String) (st : HostStore NearState) (args : List Value) : Log
       return { charges, error := some (.totalLogLengthExceeded (total + 2 * msg.length) limit) }
     return { charges }
 
+/-- `ecrecover` and `ed25519_verify` in nearcore's order (`logic.rs`): each
+pays its own base (not `base`), reads and checks its inputs one by one, and
+stops at the first invalid one; `ed25519_verify` returns false, unread, after
+a signature whose last byte has a top bit set. The register write follows a
+recovered key. -/
+def cryptoPlan? (name : String) (st : HostStore NearState) (args : List Value) : Option LogPlan := do
+  let a := argU64 args
+  if name == "ecrecover" then
+    some <| Id.run do
+      let charges := [.ext "ecrecover_base"] ++ readSpan st (a 2) (a 3)
+      let some sig := getMemOrReg st (a 3) (a 2) | return { charges, error := some (spanReadError (a 2) (a 3)) }
+      if sig.length != 64 then
+        return { charges, error := some (.ecRecoverError
+          s!"The length of the signature: {sig.length}, exceeds the limit of 64 bytes") }
+      if (a 4).toNat ≥ 4 then
+        return { charges, error := some (.ecRecoverError
+          s!"V recovery byte 0 through 3 are valid but was provided {(a 4).toNat}") }
+      let charges := charges ++ readSpan st (a 0) (a 1)
+      let some hash := getMemOrReg st (a 1) (a 0) | return { charges, error := some (spanReadError (a 0) (a 1)) }
+      if hash.length != 32 then
+        return { charges, error := some (.ecRecoverError
+          s!"The length of the hash: {hash.length}, exceeds the limit of 32 bytes") }
+      if (a 5).toNat > 1 then
+        return { charges, error := some (.ecRecoverError
+          s!"Malleability flag needs to be 0 or 1, but is instead {(a 5).toNat}") }
+      match st.host.crypto.ecrecover.bind fun recover => recover hash sig (a 4).toNat ((a 5).toNat == 1) with
+      | some key => return { charges := charges ++ writeReg key.length }
+      | none => return { charges }
+  else if name == "ed25519_verify" then
+    some <| Id.run do
+      let charges := [.ext "ed25519_verify_base"] ++ readSpan st (a 0) (a 1)
+      let some sig := getMemOrReg st (a 1) (a 0) | return { charges, error := some (spanReadError (a 0) (a 1)) }
+      if sig.length != 64 then
+        return { charges, error := some (.ed25519VerifyInvalidInput "invalid signature length") }
+      if (sig.getLast?.getD 0) &&& 0xE0 != 0 then return { charges }
+      let charges := charges ++ readSpan st (a 2) (a 3)
+      let some message := getMemOrReg st (a 3) (a 2) | return { charges, error := some (spanReadError (a 2) (a 3)) }
+      let charges := charges ++ [.ext "ed25519_verify_byte" message.length] ++ readSpan st (a 4) (a 5)
+      let some key := getMemOrReg st (a 5) (a 4) | return { charges, error := some (spanReadError (a 4) (a 5)) }
+      if key.length != 32 then
+        return { charges, error := some (.ed25519VerifyInvalidInput "invalid public key length") }
+      return { charges }
+  else none
+
 /-- Argument-dependent charge plan before validating promise handles. -/
 def chargesBeforeUnvalidated (name : String) (st : HostStore NearState) (args : List Value) : List Charge :=
   let a := argU64 args
@@ -428,12 +472,7 @@ def chargesBeforeUnvalidated (name : String) (st : HostStore NearState) (args : 
       (match getMemOrReg st (a 1) (a 0) with
        | some value => [perInput value.length] ++ writeReg digest
        | none => [])
-  | "ecrecover" =>
-    [base, .ext "ecrecover_base"] ++ readSpan st (a 0) (a 1) ++ readSpan st (a 2) (a 3) ++ writeReg 64
-  | "ed25519_verify" =>
-    let n := spanLen st (a 2) (a 3)
-    [base, .ext "ed25519_verify_base", .ext "ed25519_verify_byte" n] ++ readSpan st (a 0) (a 1)
-      ++ readSpan st (a 2) (a 3) ++ readSpan st (a 4) (a 5)
+  | "ecrecover" | "ed25519_verify" => ((cryptoPlan? name st args).map (·.charges)).getD []
   | "log_utf8" | "log_utf16" => (logPlan name st args).charges
   | "panic" => [base]
   | "panic_utf8" => [base] ++ readSpan st (a 0) (a 1) ++ utf8 (spanLen st (a 0) (a 1))
@@ -634,6 +673,7 @@ def invocationArgumentError (name : String) (st : HostStore NearState) (args : L
     (globalContractPlan st byAccount (argU64 args 0).toNat (argU64 args 1) (argU64 args 2) false).error
   else if name == "log_utf8" || name == "log_utf16" then (logPlan name st args).error
   else if name == "validator_stake" then accountIdError st (argU64 args 0) (argU64 args 1)
+  else if let some plan := cryptoPlan? name st args then plan.error
   else if spanInputHost name then
     if (getMemOrReg st (argU64 args 1) (argU64 args 0)).isNone then
       some (spanReadError (argU64 args 0) (argU64 args 1))
@@ -1081,13 +1121,13 @@ def metered (extraBytes : Nat) (name : String) (fn : NearHostFn NearState) : Nea
         | some error => trapWith st1 error
         | none => invokeStorageCall extraBytes name fn st1 args }
 
--- nearcore divergence: signature, curve, yield and global-deploy host
+-- nearcore divergence: curve, yield and global-deploy host
 -- functions are rejected as execution issues instead of being executed.
 /-- These host operations require semantics not supplied by `VMContext`.
 Reject them on invocation instead of using the functional host's placeholder
 crypto, validator, or yield implementations. Merely importing one is allowed. -/
 def unsupportedRuntimeHost (name : String) : Bool :=
-  ["ecrecover", "ed25519_verify", "promise_yield_create", "promise_yield_resume",
+  ["promise_yield_create", "promise_yield_resume",
    "alt_bn128_g1_multiexp", "alt_bn128_g1_sum", "alt_bn128_pairing_check",
    "bls12381_g1_multiexp", "bls12381_g2_multiexp", "bls12381_map_fp_to_g1",
    "bls12381_map_fp2_to_g2", "bls12381_p1_decompress", "bls12381_p2_decompress",

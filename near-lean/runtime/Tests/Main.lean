@@ -390,9 +390,8 @@ def main (args : List String) : IO UInt32 := do
   -- Neither charged transactions, queued outgoing receipts nor a preceding
   -- successfully executed local receipt in the same apply may be committed.
   let unsupportedModule ← match ← Wat.compile
-      "(module (import \"env\" \"ed25519_verify\" (func $verify (param i64 i64 i64 i64 i64 i64) (result i64)))
-       (memory 1) (func (export \"test\") i64.const 0 i64.const 0 i64.const 0 i64.const 0 i64.const 0
-         i64.const 0 call $verify drop))" with
+      "(module (import \"env\" \"alt_bn128_g1_sum\" (func $sum (param i64 i64 i64)))
+       (memory 1) (func (export \"test\") i64.const 0 i64.const 0 i64.const 0 call $sum))" with
     | .ok m => pure m
     | .error e => throw (IO.userError s!"unsupported runtime fixture: {e}")
   let unsupportedCode : ContractCode := { module := unsupportedModule, size := 0, hash := "unsupported-fixture" }
@@ -410,7 +409,7 @@ def main (args : List String) : IO UInt32 := do
   let stopped := Near.apply cfg World.ap (fun _ => unsupportedCode) unsupportedState
     [transferTx, localTransferTx, unsupportedTx] []
   check r "unsupported host is an apply issue, not a receipt failure"
-    ((stopped.issue.map (·.2)) == some (.unsupportedHost "ed25519_verify"))
+    ((stopped.issue.map (·.2)) == some (.unsupportedHost "alt_bn128_g1_sum"))
   check r "unsupported apply publishes no outcomes, refunds or burnt tokens"
     (stopped.outcomes.isEmpty && stopped.outgoing.isEmpty && stopped.tokensBurnt == 0)
   check r "unsupported apply rolls back prior transfers and charged transaction balances"
@@ -426,7 +425,7 @@ def main (args : List String) : IO UInt32 := do
   let rejectedDelivery := Near.apply cfg World.ap (fun _ => unsupportedCode) accepted.state [] accepted.outgoing
   check r "unsupported contract execution is discovered at delivery, not transaction acceptance"
     (accepted.issue.isNone && accepted.outgoing.length == 2 && accepted.outcomes.length == 2
-      && rejectedDelivery.issue.map (·.2) == some (.unsupportedHost "ed25519_verify"))
+      && rejectedDelivery.issue.map (·.2) == some (.unsupportedHost "alt_bn128_g1_sum"))
   check r "a delivery issue retains already committed transaction charges and nonces"
     (rejectedDelivery.state.totalBalance == accepted.state.totalBalance
       && rejectedDelivery.state.accessKey? "alice.near" (pkOf 1) == accepted.state.accessKey? "alice.near" (pkOf 1)
@@ -656,6 +655,29 @@ def main (args : List String) : IO UInt32 := do
         failureOf exact == none)
       s!"sizes {linkedSizes}"
   | _ => check r "the receipt size check agrees with the materialized receipt's Borsh size" false s!"{linkedSizes}"
+
+  -- Crypto hosts run on the oracles the caller supplies (`ApplyState.crypto`).
+  let digestWat := "(module (import \"env\" \"sha256\" (func $sha (param i64 i64 i64))) " ++
+    "(import \"env\" \"value_return\" (func $return (param i64 i64))) (memory 1) (data (i32.const 0) \"abc\") " ++
+    "(func (export \"digest\") i64.const 3 i64.const 0 i64.const 0 call $sha i64.const -1 i64.const 0 call $return))"
+  let digestModule ← match ← Wat.compile digestWat with
+    | .ok module => pure module
+    | .error error => throw (IO.userError s!"digest fixture: {error}")
+  let digestCode : ContractCode := { module := digestModule, size := 0, hash := "digest-fixture" }
+  let digestState := genesis.setAccount "wrap.near" { genesisAccount (10 * oneNear) with code := some digestCode }
+  let digestCall : Transaction := {
+    signerId := "alice.near", publicKey := pkOf 1, nonce := 1, receiverId := "wrap.near"
+    actions := [.functionCall "digest" [] (tgas 50) 0] }
+  let callDigest (ap : ApplyState) :=
+    let admitted := Near.apply cfg ap (fun _ => digestCode) digestState [digestCall] []
+    Near.apply cfg ap (fun _ => digestCode) admitted.state [] admitted.outgoing
+  let oracle : List UInt8 → List UInt8 := fun input => input.reverse ++ List.replicate 29 0
+  let withOracle := callDigest { World.ap with crypto := { sha256 := some oracle } }
+  check r "a crypto host returns what the supplied oracle computes"
+    (withOracle.issue.isNone && withOracle.outcomes.any fun (_, o) => o.status == .successValue (oracle (bytesOf "abc")))
+  let withoutOracle := callDigest World.ap
+  check r "without its oracle a crypto host is an explicit model issue"
+    ((withoutOracle.issue.map (·.2)) == some (.unsupportedHost "sha256"))
 
   -- Validator stakes are a block context input (`ApplyState.validators`).
   let stakeWat := "(module (import \"env\" \"validator_stake\" (func $stake (param i64 i64 i64))) " ++

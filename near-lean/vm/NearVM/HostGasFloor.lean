@@ -157,8 +157,8 @@ theorem meteredHostFns_gasFloor (cfg : RuntimeConfig) (entry : ImportDecl × Nea
   · intro b prepaid maxBurnt st args hwf; exact hwf -- storage_iter_next
   · apply metered_preserves_gasFloor; exact HostPreservesGas.floor keccak512Fn_gas
   · apply metered_preserves_gasFloor; exact HostPreservesGas.floor ripemd160Fn_gas
-  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- ecrecover
-  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- ed25519_verify
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor ecrecoverFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor ed25519VerifyFn_gas
   · apply metered_preserves_gasFloor; exact HostPreservesGas.floor randomSeedFn_gas
   · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- alt_bn128_g1_multiexp
   · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- alt_bn128_g1_sum

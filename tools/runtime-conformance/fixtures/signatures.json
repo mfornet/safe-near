@@ -1,0 +1,100 @@
+{
+  "code": "tools/runtime-conformance/fixtures/signatures.wasm",
+  "sha256": "390db641a3a2ba774de60bba0e5d24a6eb1517187801948c0c81aaad92a95411",
+  "protocolVersion": 86,
+  "initialBalance": "100000000000000000000000000",
+  "storage": [],
+  "calls": [
+    {
+      "name": "signatures: ed_valid",
+      "method": "ed_valid",
+      "args": {}
+    },
+    {
+      "name": "signatures: ed_tampered",
+      "method": "ed_tampered",
+      "args": {}
+    },
+    {
+      "name": "signatures: ed_high_bit",
+      "method": "ed_high_bit",
+      "args": {}
+    },
+    {
+      "name": "signatures: ed_short_sig",
+      "method": "ed_short_sig",
+      "args": {}
+    },
+    {
+      "name": "signatures: ed_short_key",
+      "method": "ed_short_key",
+      "args": {}
+    },
+    {
+      "name": "signatures: ed_bad_key",
+      "method": "ed_bad_key",
+      "args": {}
+    },
+    {
+      "name": "signatures: ed_sig_oob",
+      "method": "ed_sig_oob",
+      "args": {}
+    },
+    {
+      "name": "signatures: ed_msg_oob",
+      "method": "ed_msg_oob",
+      "args": {}
+    },
+    {
+      "name": "signatures: ec_valid",
+      "method": "ec_valid",
+      "args": {}
+    },
+    {
+      "name": "signatures: ec_tampered",
+      "method": "ec_tampered",
+      "args": {}
+    },
+    {
+      "name": "signatures: ec_bad_v",
+      "method": "ec_bad_v",
+      "args": {}
+    },
+    {
+      "name": "signatures: ec_short_sig",
+      "method": "ec_short_sig",
+      "args": {}
+    },
+    {
+      "name": "signatures: ec_short_hash",
+      "method": "ec_short_hash",
+      "args": {}
+    },
+    {
+      "name": "signatures: ec_bad_flag",
+      "method": "ec_bad_flag",
+      "args": {}
+    },
+    {
+      "name": "signatures: ec_malleability",
+      "method": "ec_malleability",
+      "args": {}
+    },
+    {
+      "name": "signatures: ec_sig_oob",
+      "method": "ec_sig_oob",
+      "args": {}
+    },
+    {
+      "name": "signatures: ec_valid_key",
+      "method": "ec_valid_key",
+      "args": {}
+    },
+    {
+      "name": "signatures: ed_valid runs out of gas",
+      "method": "ed_valid",
+      "args": {},
+      "gas": 3000000000
+    }
+  ]
+}

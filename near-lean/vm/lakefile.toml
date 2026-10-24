@@ -17,6 +17,12 @@ path = "../wasm"
 name = "NearInterface"
 path = "../interface"
 
+# Only the conformance replay imports it, to supply the crypto oracles; the
+# NearVM library stays free of it (`just vm-dependencies`).
+[[require]]
+name = "NearCrypto"
+path = "../crypto"
+
 [[require]]
 name = "mathlib"
 scope = "leanprover-community"

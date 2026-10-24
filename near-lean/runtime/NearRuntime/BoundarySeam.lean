@@ -210,6 +210,7 @@ structure Corresponds (c : ReceiptCtx) (seed : Bytes) (account : Account) (metho
   protocol : ctx.protocol = c.cfg
   method : ctx.method = method
   validators : ctx.validators = c.ap.validators
+  crypto : ctx.crypto = c.ap.crypto
 
 theorem Corresponds.vmContext {c : ReceiptCtx} {seed : Bytes} {account : Account} {method : String}
     {args : Bytes} {gas deposit : Nat} {trie : TrieOverlay.State} {ctx : Context}
@@ -218,7 +219,7 @@ theorem Corresponds.vmContext {c : ReceiptCtx} {seed : Bytes} {account : Account
       toVMContext ctx :=
   functionCallContext_eq_toVMContext _ account args gas deposit true trie ctx h.current h.signer
     h.signerPk h.predecessor h.args h.results h.height h.timestamp h.epoch h.balance h.locked h.usage
-    h.deposit h.gas h.seed h.trie (by simpa using h.outputs) h.validators
+    h.deposit h.gas h.seed h.trie (by simpa using h.outputs) h.validators h.crypto
 
 /-- The boundary's reading of a receipt failure. -/
 def runtimeFailure : RuntimeError → Failure

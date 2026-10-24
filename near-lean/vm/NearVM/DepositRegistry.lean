@@ -50,8 +50,8 @@ theorem meteredHostFns_funding (cfg : RuntimeConfig) (entry : ImportDecl × Near
   · intro st args; trivial -- storage_iter_next
   · apply metered_funding; exact keccak512Fn_noDeposits
   · apply metered_funding; exact ripemd160Fn_noDeposits
-  · apply metered_funding; intro st args; trivial -- ecrecover
-  · apply metered_funding; intro st args; trivial -- ed25519_verify
+  · apply metered_funding; exact ecrecoverFn_noDeposits
+  · apply metered_funding; exact ed25519VerifyFn_noDeposits
   · apply metered_funding; exact randomSeedFn_noDeposits
   · apply metered_funding; intro st args; trivial -- alt_bn128_g1_multiexp
   · apply metered_funding; intro st args; trivial -- alt_bn128_g1_sum

@@ -1,5 +1,6 @@
 import NearVM
 import Wasm.Wat
+import NearCrypto
 
 open Lean Wasm Wasm.Near
 
@@ -35,6 +36,18 @@ structure Request where
   /-- The current epoch's validators and their stakes (decimal yoctoNEAR). -/
   validators : List (String × String) := []
   deriving FromJson
+
+/-- The crypto oracles the replay supplies: `NearCrypto`, the pure-Lean
+primitives the node uses, so the comparison checks them through the VM. -/
+def nearCrypto : HostCrypto :=
+  let lift (f : ByteArray → ByteArray) (bytes : List UInt8) : List UInt8 := (f ⟨bytes.toArray⟩).toList
+  { sha256 := some (lift NearCrypto.sha256)
+    keccak256 := some (lift NearCrypto.keccak256)
+    keccak512 := some (lift NearCrypto.keccak512)
+    ripemd160 := some (lift NearCrypto.ripemd160)
+    ed25519Verify := some fun pk msg sig => NearCrypto.ed25519Verify ⟨pk.toArray⟩ ⟨msg.toArray⟩ ⟨sig.toArray⟩
+    ecrecover := some fun hash sig v malleability =>
+      (NearCrypto.ecrecover ⟨hash.toArray⟩ ⟨sig.toArray⟩ v malleability).map (·.toList) }
 
 def checkedBytes (values : List Nat) : Except String (List UInt8) :=
   values.mapM fun value =>
@@ -74,7 +87,8 @@ def inputOf (cfg : RuntimeConfig) (r : Request) :
     randomSeed := ← checkedBytes r.randomSeed
     viewConfig := if r.view then some { maxGasBurnt := cfg.wasm.limits.maxGasBurnt } else none
     outputDataReceivers := r.outputDataReceivers.map (·.toUTF8.toList)
-    validators := ← r.validators.mapM fun (id, stake) => do return (id.toUTF8.toList, ← checkedBalance stake) }
+    validators := ← r.validators.mapM fun (id, stake) => do return (id.toUTF8.toList, ← checkedBalance stake)
+    crypto := nearCrypto }
   pure (ctx, storage)
 
 def bytesJson (bytes : List UInt8) : Json := toJson (bytes.map UInt8.toNat)

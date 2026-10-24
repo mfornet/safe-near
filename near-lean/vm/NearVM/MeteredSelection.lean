@@ -137,6 +137,8 @@ theorem meteredHostFns_selection (cfg : RuntimeConfig) (entry : ImportDecl × Ne
       | exact ripemd160Fn_selection
       | exact validatorStakeFn_selection
       | exact validatorTotalStakeFn_selection
+      | exact ecrecoverFn_selection
+      | exact ed25519VerifyFn_selection
       | exact logUtf8Fn_selection
       | exact logUtf16Fn_selection
       | exact panicMetered_selection
