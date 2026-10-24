@@ -174,6 +174,16 @@ theorem randomSeedFn_noDeposits : HostCreatesNoDeposits randomSeedFn := by
   unfold randomSeedFn
   no_deposits_tac
 
+theorem validatorStakeFn_noDeposits : HostCreatesNoDeposits validatorStakeFn := by
+  intro st args
+  unfold validatorStakeFn
+  no_deposits_tac
+
+theorem validatorTotalStakeFn_noDeposits : HostCreatesNoDeposits validatorTotalStakeFn := by
+  intro st args
+  unfold validatorTotalStakeFn
+  no_deposits_tac
+
 theorem sha256Fn_noDeposits : HostCreatesNoDeposits sha256Fn := by
   intro st args
   unfold sha256Fn digestFn

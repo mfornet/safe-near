@@ -96,6 +96,11 @@ Lean in `near-lean/interface`) on empty, short and multi-block inputs, a chain
 of digests read from registers, an out-of-bounds read, an invalid register and
 gas exhaustion: digests, charges and errors match exactly.
 
+`validators.json` sets the epoch's validators (a request may set
+`validators`) and reads `validator_stake` for known and unknown accounts,
+`validator_total_stake`, and their bad UTF-8, invalid-id, out-of-bounds and
+invalid-register errors.
+
 `promise_graphs.json` checks exact ordered receipt dependencies and returned
 receipt identity for ordinary, nested, duplicate and empty joins. Failure cases
 cover joint return/action restrictions, nonexistent handles, view calls and

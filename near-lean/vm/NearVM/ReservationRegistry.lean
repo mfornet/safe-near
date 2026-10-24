@@ -130,8 +130,12 @@ theorem meteredHostFns_reservationInvariant (fees : ActionFees) (ethEnabled : Bo
   · apply meteredNeutral_reservationInvariant
     · decide
     · exact usedGasFn_reservationView
-  · unsupported_reservation
-  · unsupported_reservation
+  · apply meteredNeutral_reservationInvariant
+    · decide
+    · exact validatorStakeFn_reservationView
+  · apply meteredNeutral_reservationInvariant
+    · decide
+    · exact validatorTotalStakeFn_reservationView
   · apply meteredNeutral_reservationInvariant
     · decide
     · exact logUtf16Fn_reservationView

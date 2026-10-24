@@ -217,7 +217,8 @@ def main (args : List String) : IO UInt32 := do
   for (name, params, arguments, results) in
       [("ed25519_verify", "i64 i64 i64 i64 i64 i64",
         "i64.const 0 i64.const 0 i64.const 0 i64.const 0 i64.const 0 i64.const 0", "(result i64)"),
-       ("validator_total_stake", "i64", "i64.const 0", ""),
+       ("ecrecover", "i64 i64 i64 i64 i64 i64",
+        "i64.const 0 i64.const 0 i64.const 0 i64.const 0 i64.const 0 i64.const 0", "(result i64)"),
        ("promise_yield_resume", "i64 i64 i64 i64",
         "i64.const 0 i64.const 0 i64.const 0 i64.const 0", "(result i64)"),
        ("promise_batch_action_deploy_global_contract", "i64 i64 i64",

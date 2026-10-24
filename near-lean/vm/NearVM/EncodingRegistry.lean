@@ -90,8 +90,10 @@ theorem meteredHostFns_encodingInvariant
     · exact prepaidGasFn_encodingFrame
   · apply meteredNeutral_encodingInvariant
     · exact usedGasFn_encodingFrame
-  · unsupported_encoding
-  · unsupported_encoding
+  · apply meteredNeutral_encodingInvariant
+    · exact validatorStakeFn_encodingFrame
+  · apply meteredNeutral_encodingInvariant
+    · exact validatorTotalStakeFn_encodingFrame
   · apply meteredNeutral_encodingInvariant
     · exact logUtf16Fn_encodingFrame
   · apply meteredNeutral_encodingInvariant

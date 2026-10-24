@@ -78,6 +78,10 @@ theorem applyCharges_logs (ns : NearState) (charges : List Charge) :
     (prechargedStore name st args).host.promises = st.host.promises :=
   congrArg (fun frame => frame.2.2) (applyCharges_abiFrame st.host (chargesBefore name st args))
 
+@[simp] theorem prechargedStore_accountIdError (name : String) (st : HostStore NearState) (args : List Value)
+    (len ptr : UInt64) : accountIdError (prechargedStore name st args) len ptr = accountIdError st len ptr := by
+  simp only [accountIdError, prechargedStore_getMemOrReg, prechargedStore_config]
+
 /-- A log host's plan reads only logs, configuration, memory and registers. -/
 @[simp] theorem prechargedStore_logPlan (name : String) (st : HostStore NearState) (args : List Value)
     (host : String) : logPlan host (prechargedStore name st args) args = logPlan host st args := by

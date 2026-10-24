@@ -55,7 +55,7 @@ def readU128Mem (st : HostStore NearState) (ptr : UInt64) : Option Nat :=
 def writeMemBytes (name : String) (st : HostStore NearState) (ptr : UInt64)
     (data : List UInt8) : HostResult NearState :=
   if ptr.toNat + data.length > memBytes st then
-    .Trap st s!"{name}: out of bounds"
+    .Trap { st with host := { st.host with lastError := some .memoryAccessViolation } } s!"{name}: out of bounds"
   else
     .Return [] { st with mem := st.mem.writeList ptr.toNat data }
 

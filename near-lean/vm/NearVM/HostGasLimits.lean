@@ -146,6 +146,8 @@ theorem meteredHostFns_gasLimits (cfg : RuntimeConfig) (entry : ImportDecl × Ne
       | exact HostPreservesGas.limits keccak256Fn_gas
       | exact HostPreservesGas.limits keccak512Fn_gas
       | exact HostPreservesGas.limits ripemd160Fn_gas
+      | exact HostPreservesGas.limits validatorStakeFn_gas
+      | exact HostPreservesGas.limits validatorTotalStakeFn_gas
       | exact HostPreservesGas.limits logUtf8Fn_gas
       | exact HostPreservesGas.limits logUtf16Fn_gas
       | exact HostPreservesGas.limits panicMetered_gas

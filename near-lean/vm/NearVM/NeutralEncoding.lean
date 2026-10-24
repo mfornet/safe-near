@@ -180,6 +180,16 @@ theorem randomSeedFn_encodingFrame : HostPreservesEncodingFrame randomSeedFn := 
   unfold randomSeedFn
   neutral_encoding_tac
 
+theorem validatorStakeFn_encodingFrame : HostPreservesEncodingFrame validatorStakeFn := by
+  intro st args
+  unfold validatorStakeFn
+  neutral_encoding_tac
+
+theorem validatorTotalStakeFn_encodingFrame : HostPreservesEncodingFrame validatorTotalStakeFn := by
+  intro st args
+  unfold validatorTotalStakeFn
+  neutral_encoding_tac
+
 theorem sha256Fn_encodingFrame : HostPreservesEncodingFrame sha256Fn := by
   intro st args
   unfold sha256Fn digestFn

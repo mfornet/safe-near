@@ -148,8 +148,8 @@ theorem meteredHostFns_gasFloor (cfg : RuntimeConfig) (entry : ImportDecl × Nea
   · apply metered_preserves_gasFloor; exact HostPreservesGas.floor accountLockedBalanceFn_gas
   · apply metered_preserves_gasFloor; exact HostPreservesGas.floor prepaidGasFn_gas
   · apply metered_preserves_gasFloor; exact HostPreservesGas.floor usedGasFn_gas
-  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- validator_stake
-  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- validator_total_stake
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor validatorStakeFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor validatorTotalStakeFn_gas
   · apply metered_preserves_gasFloor; exact HostPreservesGas.floor logUtf16Fn_gas
   · apply metered_preserves_gasFloor; exact HostPreservesGas.floor abortMetered_gas
   · intro b prepaid maxBurnt st args hwf; exact hwf -- storage_iter_prefix

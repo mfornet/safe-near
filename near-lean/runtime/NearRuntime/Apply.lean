@@ -189,7 +189,8 @@ def functionCallContext (c : ReceiptCtx) (account : Account) (args : Bytes) (gas
     randomSeed := c.vmRandomSeed.getD c.ap.randomSeed
     storageAccounting
     chargeStorageValueAccess := true
-    outputDataReceivers := if isLast then c.action.outputDataReceivers.map fun d => bytesOfString d.receiverId else [] }
+    outputDataReceivers := if isLast then c.action.outputDataReceivers.map fun d => bytesOfString d.receiverId else []
+    validators := c.ap.validators.map fun (id, stake) => (bytesOfString id, stake) }
 
 /-- Gas/log observations from one VM call, before its success/failure branch. -/
 def Exec.recordVMOutcome (exec : Exec) (outcome : VMOutcome) : Exec :=

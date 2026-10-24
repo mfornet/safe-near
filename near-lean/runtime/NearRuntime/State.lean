@@ -106,6 +106,9 @@ structure ApplyState where
   nativeReceiptHashes : Option (List (ReceiptId × Bytes)) := none
   /-- Gas burnt in one apply before the remaining receipts are delayed. -/
   gasLimit : Option Nat := none
+  /-- The current epoch's validators and their stakes, read by
+  `validator_stake` and `validator_total_stake`. -/
+  validators : List (AccountId × Nat) := []
   deriving Inhabited
 
 end Near

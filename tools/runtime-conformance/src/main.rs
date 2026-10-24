@@ -54,6 +54,9 @@ struct Request {
     storage: Vec<(Vec<u8>, Vec<u8>)>,
     #[serde(default)]
     validate_action_method_utf8: bool,
+    /// The current epoch's validators and their stakes (decimal yoctoNEAR).
+    #[serde(default)]
+    validators: Vec<(String, String)>,
 }
 
 fn balance(value: &str) -> Result<Balance> {
@@ -210,6 +213,9 @@ fn execute(request: Request) -> Result<Value> {
         inner: MockedExternal::with_code(code),
         validate_action_method_utf8: request.validate_action_method_utf8,
     };
+    for (account_id, stake) in &request.validators {
+        ext.inner.validators.insert(account_id.parse().context("validator account id")?, balance(stake)?);
+    }
     for (key, value) in &request.storage {
         if ext
             .inner

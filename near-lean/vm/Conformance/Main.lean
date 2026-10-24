@@ -32,6 +32,8 @@ structure Request where
   view : Bool
   outputDataReceivers : List String
   storage : List (List Nat × List Nat)
+  /-- The current epoch's validators and their stakes (decimal yoctoNEAR). -/
+  validators : List (String × String) := []
   deriving FromJson
 
 def checkedBytes (values : List Nat) : Except String (List UInt8) :=
@@ -71,7 +73,8 @@ def inputOf (cfg : RuntimeConfig) (r : Request) :
     prepaidGas := r.prepaidGas
     randomSeed := ← checkedBytes r.randomSeed
     viewConfig := if r.view then some { maxGasBurnt := cfg.wasm.limits.maxGasBurnt } else none
-    outputDataReceivers := r.outputDataReceivers.map (·.toUTF8.toList) }
+    outputDataReceivers := r.outputDataReceivers.map (·.toUTF8.toList)
+    validators := ← r.validators.mapM fun (id, stake) => do return (id.toUTF8.toList, ← checkedBalance stake) }
   pure (ctx, storage)
 
 def bytesJson (bytes : List UInt8) : Json := toJson (bytes.map UInt8.toNat)

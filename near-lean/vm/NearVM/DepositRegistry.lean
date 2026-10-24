@@ -41,8 +41,8 @@ theorem meteredHostFns_funding (cfg : RuntimeConfig) (entry : ImportDecl × Near
   · apply metered_funding; exact accountLockedBalanceFn_noDeposits
   · apply metered_funding; exact prepaidGasFn_noDeposits
   · apply metered_funding; exact usedGasFn_noDeposits
-  · apply metered_funding; intro st args; trivial -- validator_stake
-  · apply metered_funding; intro st args; trivial -- validator_total_stake
+  · apply metered_funding; exact validatorStakeFn_noDeposits
+  · apply metered_funding; exact validatorTotalStakeFn_noDeposits
   · apply metered_funding; exact logUtf16Fn_noDeposits
   · apply metered_funding; exact abortMetered_noDeposits
   · intro st args; trivial -- storage_iter_prefix

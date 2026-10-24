@@ -165,6 +165,15 @@ def creationAccountArgs (name : String) (args : List Value) : Option (UInt64 × 
   else if name == "promise_then" || name == "promise_batch_then" then some (argU64 args 1, argU64 args 2)
   else none
 
+/-- `read_and_parse_account_id`: the read, UTF-8 and account id rule errors. -/
+def accountIdError (st : HostStore NearState) (len ptr : UInt64) : Option HostError :=
+  match getMemOrReg st ptr len with
+  | none => some (if len == u64Max then .invalidRegisterId ptr.toNat else .memoryAccessViolation)
+  | some bytes =>
+    if (String.fromUTF8? ⟨bytes.toArray⟩).isNone then some .badUTF8
+    else if !st.host.config.validAccountId bytes then some .invalidAccountId
+    else none
+
 /-- Receiver parsing precedes receipt creation and the allocation limit. -/
 def creationAccountError (name : String) (st : HostStore NearState) (args : List Value) : Option HostError :=
   match creationAccountArgs name args with
@@ -398,8 +407,14 @@ def chargesBeforeUnvalidated (name : String) (st : HostStore NearState) (args : 
   | "input" => [base, .ext "write_register_base"]
   | "random_seed" => [base] ++ writeReg st.host.randomSeed.length
   | "account_balance" | "account_locked_balance" | "attached_deposit" => [base] ++ writeMem 16
+  -- nearcore reads and parses the account id before `validator_stake_base`.
   | "validator_stake" =>
-    [base, .ext "validator_stake_base"] ++ readSpan st (a 0) (a 1) ++ utf8 (spanLen st (a 0) (a 1)) ++ writeMem 16
+    let read := [base] ++ readSpan st (a 0) (a 1)
+    match getMemOrReg st (a 1) (a 0) with
+    | none => read
+    | some bytes =>
+      if (accountIdError st (a 0) (a 1)).isSome then read ++ utf8 bytes.length
+      else read ++ utf8 bytes.length ++ [.ext "validator_stake_base"] ++ writeMem 16
   | "validator_total_stake" => [base, .ext "validator_total_stake_base"] ++ writeMem 16
   -- Hashes pay their own base (not `base`), read the input, then pay per byte
   -- (per block for RIPEMD-160) and write the digest register (`logic.rs`).
@@ -618,6 +633,7 @@ def invocationArgumentError (name : String) (st : HostStore NearState) (args : L
   else if let some byAccount := globalContractInputs? name then
     (globalContractPlan st byAccount (argU64 args 0).toNat (argU64 args 1) (argU64 args 2) false).error
   else if name == "log_utf8" || name == "log_utf16" then (logPlan name st args).error
+  else if name == "validator_stake" then accountIdError st (argU64 args 0) (argU64 args 1)
   else if spanInputHost name then
     if (getMemOrReg st (argU64 args 1) (argU64 args 0)).isNone then
       some (spanReadError (argU64 args 0) (argU64 args 1))
@@ -1065,14 +1081,13 @@ def metered (extraBytes : Nat) (name : String) (fn : NearHostFn NearState) : Nea
         | some error => trapWith st1 error
         | none => invokeStorageCall extraBytes name fn st1 args }
 
--- nearcore divergence: signature, curve, validator, yield and global-deploy host
+-- nearcore divergence: signature, curve, yield and global-deploy host
 -- functions are rejected as execution issues instead of being executed.
 /-- These host operations require semantics not supplied by `VMContext`.
 Reject them on invocation instead of using the functional host's placeholder
 crypto, validator, or yield implementations. Merely importing one is allowed. -/
 def unsupportedRuntimeHost (name : String) : Bool :=
-  ["ecrecover", "ed25519_verify",
-   "validator_stake", "validator_total_stake", "promise_yield_create", "promise_yield_resume",
+  ["ecrecover", "ed25519_verify", "promise_yield_create", "promise_yield_resume",
    "alt_bn128_g1_multiexp", "alt_bn128_g1_sum", "alt_bn128_pairing_check",
    "bls12381_g1_multiexp", "bls12381_g2_multiexp", "bls12381_map_fp_to_g1",
    "bls12381_map_fp2_to_g2", "bls12381_p1_decompress", "bls12381_p2_decompress",

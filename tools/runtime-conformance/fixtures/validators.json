@@ -1,0 +1,81 @@
+{
+  "code": "tools/runtime-conformance/fixtures/validators.wasm",
+  "sha256": "a00ac07de96657ce7930de18f1572a1bd54966d65e13dad703c8024c3abcbdf5",
+  "protocolVersion": 86,
+  "initialBalance": "100000000000000000000000000",
+  "storage": [],
+  "validators": [
+    [
+      "alice.near",
+      "1000"
+    ],
+    [
+      "bob.near",
+      "2000000000000000000000000000000"
+    ]
+  ],
+  "calls": [
+    {
+      "name": "validators: alice",
+      "method": "alice",
+      "args": {}
+    },
+    {
+      "name": "validators: bob",
+      "method": "bob",
+      "args": {}
+    },
+    {
+      "name": "validators: carol",
+      "method": "carol",
+      "args": {}
+    },
+    {
+      "name": "validators: total",
+      "method": "total",
+      "args": {}
+    },
+    {
+      "name": "validators: bad_utf8",
+      "method": "bad_utf8",
+      "args": {}
+    },
+    {
+      "name": "validators: invalid",
+      "method": "invalid",
+      "args": {}
+    },
+    {
+      "name": "validators: read_oob",
+      "method": "read_oob",
+      "args": {}
+    },
+    {
+      "name": "validators: bad_register",
+      "method": "bad_register",
+      "args": {}
+    },
+    {
+      "name": "validators: write_oob",
+      "method": "write_oob",
+      "args": {}
+    },
+    {
+      "name": "validators: total_write_oob",
+      "method": "total_write_oob",
+      "args": {}
+    },
+    {
+      "name": "validators: alice in a view",
+      "method": "alice",
+      "args": {},
+      "view": true
+    },
+    {
+      "name": "validators: total without validators",
+      "method": "total",
+      "args": {},
+      "validators": []
+    }
+  ]
+}

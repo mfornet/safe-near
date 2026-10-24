@@ -132,6 +132,16 @@ theorem randomSeedFn_selection : HostPreservesSelection randomSeedFn := by
   unfold randomSeedFn
   host_selection_tac hwf
 
+theorem validatorStakeFn_selection : HostPreservesSelection validatorStakeFn := by
+  intro st args hwf
+  unfold validatorStakeFn
+  host_selection_tac hwf
+
+theorem validatorTotalStakeFn_selection : HostPreservesSelection validatorTotalStakeFn := by
+  intro st args hwf
+  unfold validatorTotalStakeFn
+  host_selection_tac hwf
+
 theorem sha256Fn_selection : HostPreservesSelection sha256Fn := by
   intro st args hwf
   unfold sha256Fn digestFn

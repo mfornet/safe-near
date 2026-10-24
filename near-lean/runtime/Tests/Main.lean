@@ -657,6 +657,29 @@ def main (args : List String) : IO UInt32 := do
       s!"sizes {linkedSizes}"
   | _ => check r "the receipt size check agrees with the materialized receipt's Borsh size" false s!"{linkedSizes}"
 
+  -- Validator stakes are a block context input (`ApplyState.validators`).
+  let stakeWat := "(module (import \"env\" \"validator_stake\" (func $stake (param i64 i64 i64))) " ++
+    "(import \"env\" \"validator_total_stake\" (func $total (param i64))) " ++
+    "(import \"env\" \"value_return\" (func $return (param i64 i64))) (memory 1) " ++
+    "(data (i32.const 0) \"bob.near\") " ++
+    "(func (export \"bob\") i64.const 8 i64.const 0 i64.const 64 call $stake i64.const 16 i64.const 64 call $return) " ++
+    "(func (export \"total\") i64.const 64 call $total i64.const 16 i64.const 64 call $return))"
+  let stakeModule ← match ← Wat.compile stakeWat with
+    | .ok module => pure module
+    | .error error => throw (IO.userError s!"validator fixture: {error}")
+  let stakeCode : ContractCode := { module := stakeModule, size := 0, hash := "validator-fixture" }
+  let stakeState := genesis.setAccount "wrap.near" { genesisAccount (10 * oneNear) with code := some stakeCode }
+  let withValidators : ApplyState := { World.ap with validators := [("bob.near", 7 * oneNear), ("carol.near", 5)] }
+  let le128 (n : Nat) : List UInt8 := (List.range 16).map fun i => UInt8.ofNat (n / 2 ^ (8 * i) % 256)
+  for (method, expected) in [("bob", 7 * oneNear), ("total", 7 * oneNear + 5)] do
+    let call : Transaction := {
+      signerId := "alice.near", publicKey := pkOf 1, nonce := 1, receiverId := "wrap.near"
+      actions := [.functionCall method [] (tgas 50) 0] }
+    let admitted := Near.apply cfg withValidators (fun _ => stakeCode) stakeState [call] []
+    let executed := Near.apply cfg withValidators (fun _ => stakeCode) admitted.state [] admitted.outgoing
+    check r s!"validator_{if method == "bob" then "stake" else "total_stake"} reads the epoch's validators"
+      (executed.issue.isNone && executed.outcomes.any fun (_, o) => o.status == .successValue (le128 expected))
+
   -- Raw deployment length must not be supplied by the external module decoder.
   let deployWat := "(module (import \"env\" \"promise_batch_create\" (func $batch (param i64 i64) (result i64))) " ++
     "(import \"env\" \"promise_batch_action_deploy_contract\" (func $deploy (param i64 i64 i64))) (memory 1) " ++

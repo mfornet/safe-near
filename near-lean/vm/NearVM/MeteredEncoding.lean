@@ -77,6 +77,8 @@ theorem preInvokeError_creationAccount_valid (name : String) (st : HostStore Nea
   · simp [hg, creationAccountError, creationAccountArgs]
   by_cases hga : name = "promise_batch_action_use_global_contract_by_account_id"
   · simp [hga, creationAccountError, creationAccountArgs]
+  by_cases hvs : name = "validator_stake"
+  · simp [hvs, creationAccountError, creationAccountArgs]
   by_cases hv : spanInputHost name = true
   · simp only [spanInputHost, List.contains_cons, List.contains_nil, Bool.or_false, Bool.or_eq_true,
       beq_iff_eq] at hv
@@ -88,7 +90,7 @@ theorem preInvokeError_creationAccount_valid (name : String) (st : HostStore Nea
   have hgi : globalContractInputs? name = none := by
     simp [globalContractInputs?, beq_eq_false_iff_ne.mpr hg, beq_eq_false_iff_ne.mpr hga]
   simp only [invocationArgumentError, hs, beq_eq_false_iff_ne.mpr hj,
-    beq_eq_false_iff_ne.mpr ht, beq_eq_false_iff_ne.mpr hk, Bool.not_eq_true _ ▸ hv,
+    beq_eq_false_iff_ne.mpr ht, beq_eq_false_iff_ne.mpr hk, beq_eq_false_iff_ne.mpr hvs, Bool.not_eq_true _ ▸ hv,
     beq_eq_false_iff_ne.mpr hl8, beq_eq_false_iff_ne.mpr hl16, Bool.or_false,
     Bool.false_eq_true, ite_false, hgi] at hi
   cases he : creationAccountError name st args with

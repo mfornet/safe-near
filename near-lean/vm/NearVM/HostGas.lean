@@ -148,6 +148,16 @@ theorem randomSeedFn_gas : HostPreservesGas randomSeedFn := by
   unfold randomSeedFn
   host_gas_tac
 
+theorem validatorStakeFn_gas : HostPreservesGas validatorStakeFn := by
+  intro st args
+  unfold validatorStakeFn
+  host_gas_tac
+
+theorem validatorTotalStakeFn_gas : HostPreservesGas validatorTotalStakeFn := by
+  intro st args
+  unfold validatorTotalStakeFn
+  host_gas_tac
+
 theorem sha256Fn_gas : HostPreservesGas sha256Fn := by
   intro st args
   unfold sha256Fn digestFn

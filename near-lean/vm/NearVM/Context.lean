@@ -47,6 +47,9 @@ structure VMContext where
   storageReadsFromTrie : Bool := false
   /-- Accounts whose pending receipts wait for this call's result. -/
   outputDataReceivers : List Bytes := []
+  /-- The current epoch's validators and their stakes, a block context input
+  (`validator_stake`, `validator_total_stake`). -/
+  validators : List (Bytes × Nat) := []
   deriving Inhabited
 
 /-- Storage keys in byte order: the order the trie iterates them in, and one
@@ -81,7 +84,9 @@ def toNearState (cfg : RuntimeConfig) (ctx : VMContext)
       accountLockedBalance := ctx.accountLockedBalance
       attachedDeposit := ctx.attachedDeposit
       prepaidGas := UInt64.ofNat ctx.prepaidGas
-      usedGas := 0 }
+      usedGas := 0
+      validatorStake := fun id => ((ctx.validators.find? (·.1 == id)).map (·.2)).getD 0
+      validatorTotalStake := (ctx.validators.map (·.2)).sum }
     storage := fun k => (storage.find? (·.1 == k)).map (·.2)
     storageKeys := sortedKeys storage
     storageAccounting := ctx.storageAccounting
