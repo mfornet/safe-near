@@ -2,7 +2,11 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import sys
 import unittest
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from secp_reference import G, N, P, ec_add, ec_mul  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = ROOT / "near-lean/crypto/fixtures"
@@ -10,36 +14,6 @@ HEX = re.compile(r"^(?:[0-9a-f]{2})*$")
 LIMIT = 5 * 1024 * 1024
 DIGEST_BYTES = {"sha256": 32, "sha512": 64, "keccak256": 32, "keccak512": 64, "ripemd160": 20,
                 "blake2b256": 32, "blake2b512": 64}
-P = 2**256 - 2**32 - 977
-N = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141
-G = (0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798,
-     0x483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8)
-
-
-def ec_add(a, b):
-    """Affine addition on secp256k1; None is infinity."""
-    if a is None:
-        return b
-    if b is None:
-        return a
-    if a[0] == b[0] and (a[1] + b[1]) % P == 0:
-        return None
-    if a == b:
-        m = 3 * a[0] * a[0] * pow(2 * a[1], -1, P) % P
-    else:
-        m = (b[1] - a[1]) * pow(b[0] - a[0], -1, P) % P
-    x = (m * m - a[0] - b[0]) % P
-    return x, (m * (a[0] - x) - a[1]) % P
-
-
-def ec_mul(k, point):
-    result = None
-    while k:
-        if k & 1:
-            result = ec_add(result, point)
-        point = ec_add(point, point)
-        k >>= 1
-    return result
 FIELD_BYTES = {"seed": 32, "public": 32, "keypair": 64, "sig": 64}
 KINDS = {"keypair", "keypair-check", "sign", "verify", "pubkey"}
 

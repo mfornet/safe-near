@@ -1,7 +1,11 @@
 import json
 from pathlib import Path
 import re
+import sys
 import unittest
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import secp_reference  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = ROOT / "near-lean/node/fixtures/types"
@@ -47,7 +51,8 @@ class NodeFixtureTests(unittest.TestCase):
 
 
 class SignatureRecordTests(unittest.TestCase):
-    """`signatures.jsonl` records the keys of the oracle's ED25519 signatures per fixture line."""
+    """`signatures.jsonl` records the keys of the oracle's ED25519 and SECP256K1 signatures per
+    fixture line."""
 
     @classmethod
     def setUpClass(cls):
@@ -78,13 +83,27 @@ class SignatureRecordTests(unittest.TestCase):
             for signature in record["sigs"]:
                 self.assertEqual(set(signature), {"sig", "public", "msg"}, where)
                 self.assertRegex(signature["sig"], HEX, where)
-                self.assertEqual(len(signature["sig"]), 128, where)
-                self.assertEqual(len(signature["public"]), 64, where)
+                # ED25519: a 64-byte signature and a 32-byte key; SECP256K1: 65 and 64 bytes
+                self.assertIn((len(signature["sig"]), len(signature["public"])), {(128, 64), (130, 128)}, where)
                 self.assertRegex(signature["public"], HEX, where)
                 self.assertRegex(signature["msg"], HEX, where)
             for signer in record["signers"]:
                 self.assertRegex(signer, HEX, where)
                 self.assertEqual(len(signer), 64, where)
+
+    def test_secp256k1_signatures_verify_in_python(self):
+        checked = set()
+        for record in self.records:
+            for signature in record["sigs"]:
+                if len(signature["sig"]) != 130 or signature["sig"] in checked:
+                    continue
+                checked.add(signature["sig"])
+                sig, key = bytes.fromhex(signature["sig"]), bytes.fromhex(signature["public"])
+                public = (int.from_bytes(key[:32], "big"), int.from_bytes(key[32:], "big"))
+                self.assertTrue(secp_reference.verify(
+                    public, bytes.fromhex(signature["msg"]),
+                    int.from_bytes(sig[:32], "big"), int.from_bytes(sig[32:64], "big")), record["name"])
+        self.assertGreater(len(checked), 100)
 
     def test_records_cover_the_signed_types(self):
         signed = {r["type"] for r in self.records if r["sigs"] or r["signers"]}
