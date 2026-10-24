@@ -1,6 +1,6 @@
 # WasmLogic: a usable iris-lean program logic for the Wasm runtime
 
-Follow-up to Phase 4 of [wasm_runtime_rewrite.md](wasm_runtime_rewrite.md).
+Follow-up to Phase 4 of [wasm_runtime_rewrite.md](../history/wasm_runtime_rewrite.md).
 When this note was written, `near-lean/wasm-logic` had the iris-lean
 `Language` instance, rules that owned the **whole store** (`ownP`), adequacy
 back to `Exec.run`, and one example proved by letting the kernel run the

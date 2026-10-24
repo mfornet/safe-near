@@ -1,6 +1,6 @@
 # Wasm: the Wasm runtime of near-lean, written from the WebAssembly spec.
 #
-# Scope is the feature set nearcore enables (notes/todo/wasm_runtime_rewrite.md):
+# Scope is the feature set nearcore enables (notes/design/WASM_RUNTIME.md):
 # MVP, mutable globals, sign extension, saturating truncation, floats,
 # reference types and bulk memory. No dependency beyond core Lean.
 name = "Wasm"
