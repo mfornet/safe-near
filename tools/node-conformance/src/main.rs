@@ -7,6 +7,7 @@ mod chain_fam;
 mod epoch_fam;
 mod fam;
 mod rng;
+mod sync_fam;
 mod stateless_fam;
 mod values;
 
@@ -46,6 +47,7 @@ fn main() {
     chain_fam::chain(&mut m, &out_dir);
     stateless_fam::stateless(&mut m, &out_dir);
     epoch_fam::epoch(&mut m, &out_dir);
+    sync_fam::sync(&mut m, &out_dir);
 
     m.write(&out_dir);
 }

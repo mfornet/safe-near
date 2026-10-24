@@ -48,6 +48,10 @@
       "accept": 86,
       "reject": 106
     },
+    "AnnounceAccount": {
+      "accept": 26,
+      "reject": 54
+    },
     "Approval": {
       "accept": 75,
       "reject": 57
@@ -87,6 +91,10 @@
     "BandwidthSchedulerStateV1": {
       "accept": 27,
       "reject": 48
+    },
+    "BitArray": {
+      "accept": 12,
+      "reject": 30
     },
     "Block": {
       "accept": 95,
@@ -215,6 +223,10 @@
     "BytesMap": {
       "accept": 28,
       "reject": 66
+    },
+    "CachedParts": {
+      "accept": 8,
+      "reject": 24
     },
     "Challenge": {
       "accept": 33,
@@ -428,6 +440,10 @@
       "accept": 34,
       "reject": 62
     },
+    "GenesisId": {
+      "accept": 17,
+      "reject": 49
+    },
     "GlobalContractDistributionReceipt": {
       "accept": 52,
       "reject": 60
@@ -496,6 +512,10 @@
       "accept": 12,
       "reject": 31
     },
+    "PartIdOrHeader": {
+      "accept": 4,
+      "reject": 14
+    },
     "PartialEncodedChunk": {
       "accept": 48,
       "reject": 24
@@ -540,6 +560,10 @@
       "accept": 12,
       "reject": 23
     },
+    "PeerId": {
+      "accept": 27,
+      "reject": 48
+    },
     "PrepareError": {
       "accept": 19,
       "reject": 37
@@ -576,6 +600,10 @@
       "accept": 51,
       "reject": 55
     },
+    "ReceiptProofResponse": {
+      "accept": 29,
+      "reject": 31
+    },
     "ReceiptValidationError": {
       "accept": 46,
       "reject": 89
@@ -587,6 +615,10 @@
     "RngCase": {
       "accept": 26,
       "reject": 2
+    },
+    "RootProof": {
+      "accept": 28,
+      "reject": 32
     },
     "ShardChunk": {
       "accept": 48,
@@ -651,6 +683,38 @@
     "ShardProof": {
       "accept": 36,
       "reject": 38
+    },
+    "ShardStateSyncResponse": {
+      "accept": 45,
+      "reject": 39
+    },
+    "ShardStateSyncResponseHeader": {
+      "accept": 23,
+      "reject": 17
+    },
+    "ShardStateSyncResponseHeaderV1": {
+      "accept": 16,
+      "reject": 9
+    },
+    "ShardStateSyncResponseHeaderV2": {
+      "accept": 17,
+      "reject": 12
+    },
+    "ShardStateSyncResponseV1": {
+      "accept": 11,
+      "reject": 8
+    },
+    "ShardStateSyncResponseV2": {
+      "accept": 11,
+      "reject": 8
+    },
+    "ShardStateSyncResponseV3": {
+      "accept": 14,
+      "reject": 8
+    },
+    "ShardStateSyncResponseV4": {
+      "accept": 9,
+      "reject": 8
     },
     "ShardUId": {
       "accept": 29,
@@ -760,9 +824,37 @@
       "accept": 52,
       "reject": 2
     },
+    "StateHeaderKey": {
+      "accept": 30,
+      "reject": 30
+    },
+    "StatePart": {
+      "accept": 24,
+      "reject": 38
+    },
+    "StatePartKey": {
+      "accept": 30,
+      "reject": 30
+    },
+    "StateRequestAck": {
+      "accept": 38,
+      "reject": 36
+    },
+    "StateRequestAckBody": {
+      "accept": 3,
+      "reject": 8
+    },
+    "StateRootNode": {
+      "accept": 35,
+      "reject": 72
+    },
     "StateStoredReceipt": {
       "accept": 70,
       "reject": 50
+    },
+    "StateSyncDumpProgress": {
+      "accept": 32,
+      "reject": 49
     },
     "StateSyncInfo": {
       "accept": 31,
