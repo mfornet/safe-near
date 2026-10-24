@@ -28,11 +28,12 @@ theorem applyAttempt_conservation (cfg : RuntimeConfig) (ap : ApplyState) (decod
     let result := applyAttempt cfg ap decoder st txs incoming
     result.state.totalFunds cfg + receiptsFunds cfg result.outgoing + result.tokensBurnt =
       st.totalFunds cfg + receiptsFunds cfg incoming + result.subsidizedAmount := by
-  let converted := convertTransactions cfg ap st txs
+  let converted := convertTransactions cfg ap st (chunkTransactions cfg txs)
   let ready : ChainState := { converted.2.1 with delayed := [] }
   let queue := converted.2.2.2.2.1 ++ converted.2.1.delayed ++ incoming
   have hf : TransactionPass.FinancialInvariant cfg st converted :=
-    convertTransactions_financial cfg ap st txs h.accounts h.postponed h.transactionActors
+    convertTransactions_financial cfg ap st (chunkTransactions cfg txs) h.accounts h.postponed
+      (fun tx hm => h.transactionActors tx (mem_chunkTransactions hm))
   have hqueue : queue = converted.2.2.2.2.1 ++ (st.delayed ++ incoming) := by
     dsimp only [queue]
     rw [hf.delayedFrame, List.append_assoc]
@@ -87,12 +88,12 @@ theorem applyAttempt_conservation (cfg : RuntimeConfig) (ap : ApplyState) (decod
     | some result =>
       have hi := hf.returnedIssue result he
       have hs : result.issue = none := by
-        simpa only [applyAttempt_eq_stages, show convertTransactions cfg ap st txs = converted from rfl, he] using hsupported
+        simpa only [applyAttempt_eq_stages, show convertTransactions cfg ap st (chunkTransactions cfg txs) = converted from rfl, he] using hsupported
       exact False.elim (hi hs)
   have hstage : applyAttempt cfg ap decoder st txs incoming =
       applyReceiptQueue cfg ap decoder st ready converted.2.2.1 converted.2.2.2.1 0 converted.2.2.2.2.2.1 queue
         converted.2.2.2.2.1.length (converted.2.2.2.2.1.length + converted.2.1.delayed.length) := by
-    simpa only [show convertTransactions cfg ap st txs = converted from rfl, hcontinue] using
+    simpa only [show convertTransactions cfg ap st (chunkTransactions cfg txs) = converted from rfl, hcontinue] using
       applyAttempt_eq_stages cfg ap decoder st txs incoming
   rw [hstage] at hsupported ⊢
   have hc := applyReceiptQueue_conservation cfg ap decoder st ready converted.2.2.1 converted.2.2.2.1 0 converted.2.2.2.2.2.1 queue

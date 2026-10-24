@@ -23,7 +23,7 @@ theorem applyAttempt_freshIds (cfg : RuntimeConfig) (ap : ApplyState)
     (applyAttempt cfg ap decoder st txs incoming).FreshReceiptIds st.nextId := by
   unfold applyAttempt
   dsimp only [Id.run, bind, pure]
-  generalize ht : (forIn txs _ _ : Id TransactionLoop) = txResult
+  generalize ht : (forIn (chunkTransactions cfg txs) _ _ : Id TransactionLoop) = txResult
   have htx : TransactionLoop.FreshInvariant st.nextId txResult := by
     rw [← ht]
     apply forIn_id_preserves _ _ _ (TransactionLoop.FreshInvariant st.nextId)

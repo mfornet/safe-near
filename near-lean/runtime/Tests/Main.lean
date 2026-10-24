@@ -908,6 +908,23 @@ def main (args : List String) : IO UInt32 := do
       | .error error, some wanted => error == wanted
       | _, _ => false)
   let cfg84 ← RuntimeConfig.load configs 84
+  -- UniqueChunkTransactions (v85+): a repeated transaction is skipped with no outcome.
+  let repeated : Transaction := {
+    signerId := "alice.near", publicKey := pkOf 1, nonce := 1, receiverId := "bob.near"
+    actions := [.transfer oneNear] }
+  let deduplicated := Near.apply cfg World.ap (fun _ => code) genesis [repeated, repeated] []
+  check r "a repeated transaction in a chunk is skipped without an outcome"
+    (cfg.uniqueChunkTransactions && deduplicated.issue.isNone && deduplicated.outcomes.length == 1 &&
+      deduplicated.outgoing.length == 1)
+  let legacy := Near.apply cfg84 World.ap (fun _ => code) genesis [repeated, repeated] []
+  check r "before v85 the repeat fails nonce validation instead"
+    (!cfg84.uniqueChunkTransactions && legacy.outcomes.length == 2 &&
+      (legacy.outcomes.getLast?.map fun (_, o) => !o.status.isSuccess) == some true)
+  let distinct := Near.apply cfg World.ap (fun _ => code) genesis
+    [repeated, { repeated with nonce := 2 }] []
+  check r "transactions differing only in their nonce are both processed"
+    (distinct.outcomes.length == 2 && distinct.outcomes.all fun (_, o) => o.status.isSuccess)
+
   let monoV1 := { nonceTx 1 .monotonic with version := 1 }
   check r "version: monotonic V1 still requires the envelope feature"
     (match convertTransaction cfg84 World.ap genesis monoV1 with

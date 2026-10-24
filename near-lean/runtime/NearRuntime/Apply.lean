@@ -828,6 +828,62 @@ def convertTransaction (cfg : RuntimeConfig) (ap : ApplyState) (st : ChainState)
   | .error error => throw (.actionsValidation error)
   | .ok () => convertTransactionCore cfg ap st tx
 
+/-- Same transaction, hence the same hash: the model's transactions carry no
+signature, and a deployment's code is identified by its hash and size. -/
+def Action.identical : Action → Action → Bool
+  | .createAccount, .createAccount => true
+  | .deployContract a, .deployContract b => a.hash == b.hash && a.size == b.size
+  | .functionCall m a g d, .functionCall m' a' g' d' => m == m' && a == a' && g == g' && d == d'
+  | .transfer d, .transfer d' => d == d'
+  | .stake s k, .stake s' k' => s == s' && k == k'
+  | .addKey k a, .addKey k' a' => k == k' && a == a'
+  | .deleteKey k, .deleteKey k' => k == k'
+  | .deleteAccount b, .deleteAccount b' => b == b'
+  | .useGlobalContract c, .useGlobalContract c' => c == c'
+  | _, _ => false
+
+def Transaction.identical (a b : Transaction) : Bool :=
+  a.version == b.version && a.signerId == b.signerId && a.publicKey == b.publicKey &&
+    a.nonce == b.nonce && a.nonceMode == b.nonceMode && a.receiverId == b.receiverId &&
+    a.actions.length == b.actions.length && (a.actions.zip b.actions).all fun (x, y) => x.identical y
+
+/-- `UniqueChunkTransactions`: every repeat of an earlier transaction is skipped,
+with no outcome. -/
+def uniqueTransactions (txs : List Transaction) : List Transaction :=
+  txs.foldl (fun kept tx => if kept.any (·.identical tx) then kept else kept ++ [tx]) []
+
+/-- The transactions a chunk processes, in order. -/
+def chunkTransactions (cfg : RuntimeConfig) (txs : List Transaction) : List Transaction :=
+  if cfg.uniqueChunkTransactions then uniqueTransactions txs else txs
+
+theorem mem_uniqueTransactions {tx : Transaction} {txs : List Transaction}
+    (h : tx ∈ uniqueTransactions txs) : tx ∈ txs := by
+  suffices ∀ (kept : List Transaction),
+      tx ∈ txs.foldl (fun kept tx => if kept.any (·.identical tx) then kept else kept ++ [tx]) kept →
+      tx ∈ kept ∨ tx ∈ txs by
+    simpa using this [] h
+  clear h
+  induction txs with
+  | nil => intro kept h; exact .inl h
+  | cons head rest ih =>
+    intro kept h
+    rcases ih _ h with hk | hr
+    · dsimp only at hk
+      split at hk
+      · exact .inl hk
+      · rcases List.mem_append.mp hk with hk | hk
+        · exact .inl hk
+        · exact .inr (List.mem_cons.mpr (.inl (List.mem_singleton.mp hk)))
+    · exact .inr (List.mem_cons_of_mem _ hr)
+
+/-- Every transaction a chunk processes is one it was given. -/
+theorem mem_chunkTransactions {cfg : RuntimeConfig} {tx : Transaction} {txs : List Transaction}
+    (h : tx ∈ chunkTransactions cfg txs) : tx ∈ txs := by
+  unfold chunkTransactions at h
+  split at h
+  · exact mem_uniqueTransactions h
+  · exact h
+
 -- nearcore divergence: one shard; no congestion-control buffering, bandwidth scheduler,
 -- instant receipts, yield timeouts, epoch validator-account updates or incoming-receipt
 -- validation (`Runtime::apply`, `process_receipts`).
@@ -846,7 +902,7 @@ def applyAttempt (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → Con
   let mut subsidizedAmount := 0
   let mut tokensBurnt := 0
   let mut txIndex := 0
-  for tx in txs do
+  for tx in chunkTransactions cfg txs do
     txIndex := txIndex + 1
     match convertTransaction cfg ap st tx with
     | .ok (st', r, cost) =>

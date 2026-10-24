@@ -84,6 +84,8 @@ structure RuntimeConfig where
   strictNonceEnabled : Bool := false
   v1TransactionsEnabled : Bool := false
   transactionSizeIncludesSignature : Bool := false
+  /-- `UniqueChunkTransactions`: a repeated transaction in a chunk is skipped. -/
+  uniqueChunkTransactions : Bool := false
   accountCostIncrease : Bool := true
   minGasPurchasePrice : Nat := 0
   accountCreationCharge : Nat := 0
@@ -227,6 +229,7 @@ def ofJson (j : Json) : Except String RuntimeConfig := do
     strictNonceEnabled := ← (← field (← field j "runtime_admission") "strict_nonce").getBool?
     v1TransactionsEnabled := ← (← field (← field j "runtime_admission") "v1_transactions").getBool?
     transactionSizeIncludesSignature := ← (← field (← field j "runtime_admission") "transaction_size_includes_signature").getBool?
+    uniqueChunkTransactions := ← (← field (← field j "runtime_admission") "unique_chunk_transactions").getBool?
     accountCostIncrease := ← (← field finance "account_cost_increase").getBool?
     minGasPurchasePrice := ← natString j "min_gas_purchase_price"
     accountCreationCharge := ← natString j "account_creation_charge"
