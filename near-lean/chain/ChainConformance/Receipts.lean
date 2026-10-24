@@ -1,3 +1,4 @@
+import ChainReplay.HostCrypto
 import NearChain.Step
 import Wasm
 
@@ -99,7 +100,7 @@ def main : IO Unit := do
     | .ok r => pure r
     | .error error => throw (IO.userError error)
   unless request.protocolVersion == 86 do throw (IO.userError "receipt replay pins protocol 86")
-  let cfg ← RuntimeConfig.load request.configDir request.protocolVersion
+  let cfg ← ChainReplay.HostCrypto.loadConfig request.configDir request.protocolVersion
   let mut registry : List (String × List UInt8 × ContractCode) := []
   for c in request.contracts do
     let raw ← IO.FS.readBinFile c.codePath

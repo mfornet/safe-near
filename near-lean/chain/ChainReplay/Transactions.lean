@@ -1,3 +1,4 @@
+import ChainReplay.HostCrypto
 import ChainReplay.Encode
 import NearRuntime.TransactionRegistry
 
@@ -32,7 +33,7 @@ def execute (request : Json) : IO Json := do
       let ids : List (Nat × List Nat) ← field admission "receiptIds"
       let ids ← ids.mapM fun (id, hash) => do pure (id, ← bytes hash)
       pure (← field admission "configDir", protocol, ← u64 admission "blockHeight", ← amount admission "gasPrice", initial, ids)
-    let cfg ← Wasm.Near.RuntimeConfig.load directory protocol
+    let cfg ← ChainReplay.HostCrypto.loadConfig directory protocol
     IO.ofExcept do
       let context : QueueEncoding.Context := { receipts := bindings, formats := bindings.map fun (id, _) => (id, .legacy) }
       -- This transport starts at a queue-free synthetic genesis. General typed

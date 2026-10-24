@@ -115,7 +115,7 @@ theorem meteredHostFns_gasLimits (cfg : RuntimeConfig) (entry : ImportDecl × Ne
   rcases h with ⟨⟨decl, fn⟩, hin, heq⟩ | heq
   · subst entry
     simp only [nearHostFns, List.mem_cons, List.not_mem_nil, or_false] at hin
-    rcases hin with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
+    rcases hin with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
     all_goals cases h
     all_goals first
       | (intro prepaid maxBurnt st args hwf; exact hwf)
@@ -145,6 +145,25 @@ theorem meteredHostFns_gasLimits (cfg : RuntimeConfig) (entry : ImportDecl × Ne
       | exact HostPreservesGas.limits prepaidGasFn_gas
       | exact HostPreservesGas.limits usedGasFn_gas
       | exact HostPreservesGas.limits randomSeedFn_gas
+      | exact HostPreservesGas.limits sha256Fn_gas
+      | exact HostPreservesGas.limits keccak256Fn_gas
+      | exact HostPreservesGas.limits keccak512Fn_gas
+      | exact HostPreservesGas.limits ripemd160Fn_gas
+      | exact HostPreservesGas.limits ecrecoverFn_gas
+      | exact HostPreservesGas.limits ed25519VerifyFn_gas
+      | exact HostPreservesGas.limits p256VerifyFn_gas
+      | exact HostPreservesGas.limits altBn128G1MultiexpFn_gas
+      | exact HostPreservesGas.limits altBn128G1SumFn_gas
+      | exact HostPreservesGas.limits altBn128PairingCheckFn_gas
+      | exact HostPreservesGas.limits bls12381P1SumFn_gas
+      | exact HostPreservesGas.limits bls12381P2SumFn_gas
+      | exact HostPreservesGas.limits bls12381G1MultiexpFn_gas
+      | exact HostPreservesGas.limits bls12381G2MultiexpFn_gas
+      | exact HostPreservesGas.limits bls12381MapFpToG1Fn_gas
+      | exact HostPreservesGas.limits bls12381MapFp2ToG2Fn_gas
+      | exact HostPreservesGas.limits bls12381P1DecompressFn_gas
+      | exact HostPreservesGas.limits bls12381P2DecompressFn_gas
+      | exact HostPreservesGas.limits bls12381PairingCheckFn_gas
       | exact HostPreservesGas.limits logUtf8Fn_gas
       | exact HostPreservesGas.limits logUtf16Fn_gas
       | exact HostPreservesGas.limits panicMetered_gas

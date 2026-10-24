@@ -1,3 +1,4 @@
+import ChainReplay.HostCrypto
 import ChainReplay.Encode
 import ChainReplay.DelegateSignature
 import ChainReplay.QueueContext
@@ -326,7 +327,7 @@ def execute (request : Json) : IO Json := do
               let values : List Json ← fromJson? values
               values.mapM parseSchedulerInput
         pure (snapshot, blocks, updates, hashes, context, schedulerInputs)
-  let cfg ← Wasm.Near.RuntimeConfig.load directory protocol
+  let cfg ← HostCrypto.loadConfig directory protocol
   let congestion ← Congestion.Config.load directory protocol
   IO.ofExcept
       (run protocol cfg congestion codes snapshot context blocks hashes schedulerInputs

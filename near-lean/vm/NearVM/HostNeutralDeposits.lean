@@ -184,6 +184,49 @@ theorem randomSeedFn_noDeposits : HostCreatesNoDeposits randomSeedFn := by
   unfold randomSeedFn
   no_deposits_tac
 
+theorem cryptoHostFn_noDeposits (name : String) (params results : List ValType) : HostCreatesNoDeposits (cryptoHostFn name params results) := by
+  intro st args
+  unfold cryptoHostFn
+  no_deposits_tac
+
+theorem sha256Fn_noDeposits : HostCreatesNoDeposits sha256Fn := cryptoHostFn_noDeposits _ _ _
+
+theorem keccak256Fn_noDeposits : HostCreatesNoDeposits keccak256Fn := cryptoHostFn_noDeposits _ _ _
+
+theorem keccak512Fn_noDeposits : HostCreatesNoDeposits keccak512Fn := cryptoHostFn_noDeposits _ _ _
+
+theorem ripemd160Fn_noDeposits : HostCreatesNoDeposits ripemd160Fn := cryptoHostFn_noDeposits _ _ _
+
+theorem ecrecoverFn_noDeposits : HostCreatesNoDeposits ecrecoverFn := cryptoHostFn_noDeposits _ _ _
+
+theorem ed25519VerifyFn_noDeposits : HostCreatesNoDeposits ed25519VerifyFn := cryptoHostFn_noDeposits _ _ _
+
+theorem p256VerifyFn_noDeposits : HostCreatesNoDeposits p256VerifyFn := cryptoHostFn_noDeposits _ _ _
+
+theorem altBn128G1MultiexpFn_noDeposits : HostCreatesNoDeposits altBn128G1MultiexpFn := cryptoHostFn_noDeposits _ _ _
+
+theorem altBn128G1SumFn_noDeposits : HostCreatesNoDeposits altBn128G1SumFn := cryptoHostFn_noDeposits _ _ _
+
+theorem altBn128PairingCheckFn_noDeposits : HostCreatesNoDeposits altBn128PairingCheckFn := cryptoHostFn_noDeposits _ _ _
+
+theorem bls12381P1SumFn_noDeposits : HostCreatesNoDeposits bls12381P1SumFn := cryptoHostFn_noDeposits _ _ _
+
+theorem bls12381P2SumFn_noDeposits : HostCreatesNoDeposits bls12381P2SumFn := cryptoHostFn_noDeposits _ _ _
+
+theorem bls12381G1MultiexpFn_noDeposits : HostCreatesNoDeposits bls12381G1MultiexpFn := cryptoHostFn_noDeposits _ _ _
+
+theorem bls12381G2MultiexpFn_noDeposits : HostCreatesNoDeposits bls12381G2MultiexpFn := cryptoHostFn_noDeposits _ _ _
+
+theorem bls12381MapFpToG1Fn_noDeposits : HostCreatesNoDeposits bls12381MapFpToG1Fn := cryptoHostFn_noDeposits _ _ _
+
+theorem bls12381MapFp2ToG2Fn_noDeposits : HostCreatesNoDeposits bls12381MapFp2ToG2Fn := cryptoHostFn_noDeposits _ _ _
+
+theorem bls12381P1DecompressFn_noDeposits : HostCreatesNoDeposits bls12381P1DecompressFn := cryptoHostFn_noDeposits _ _ _
+
+theorem bls12381P2DecompressFn_noDeposits : HostCreatesNoDeposits bls12381P2DecompressFn := cryptoHostFn_noDeposits _ _ _
+
+theorem bls12381PairingCheckFn_noDeposits : HostCreatesNoDeposits bls12381PairingCheckFn := cryptoHostFn_noDeposits _ _ _
+
 theorem chainIdFn_noDeposits : HostCreatesNoDeposits chainIdFn := by
   intro st args
   unfold chainIdFn contextRegisterFn

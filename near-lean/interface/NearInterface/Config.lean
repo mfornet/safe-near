@@ -1,5 +1,6 @@
 import Lean.Data.Json
 import NearInterface.Gas
+import NearInterface.HostCrypto
 
 /-!
 # Runtime configuration
@@ -59,6 +60,9 @@ structure WasmConfig where
   fixContractLoadingCost : Bool := false
   /-- `eth_implicit_global_contract`: ETH-implicit accounts use the global wallet contract. -/
   ethImplicitGlobalContract : Bool := false
+  /-- `bls12381_not_in_group_fix` (NEP-488): `bls12381_p1_sum` and `bls12381_p1_decompress` accept
+  the points of order 3 with abscissa zero. -/
+  bls12381NotInGroupFix : Bool := false
   limits : LimitConfig
   deriving Inhabited
 
@@ -103,6 +107,8 @@ structure RuntimeConfig where
   fees : FeesConfig
   wasm : WasmConfig
   accountCreation : AccountCreationConfig
+  /-- The cryptography of the host functions, supplied by the node; not a protocol parameter. -/
+  hostCrypto : Option HostCrypto := none
   deriving Inhabited
 
 namespace RuntimeConfig
@@ -285,6 +291,8 @@ def ofJson (j : Json) : Except String RuntimeConfig := do
       oneYoctoOnPromise := ← (← field wasm "one_yocto_on_promise").getBool?
       fixContractLoadingCost := ← (← field wasm "fix_contract_loading_cost").getBool?
       ethImplicitGlobalContract := ((field wasm "eth_implicit_global_contract").toOption.bind (·.getBool?.toOption)).getD false
+      bls12381NotInGroupFix :=
+        ((field wasm "bls12381_not_in_group_fix").toOption.bind (·.getBool?.toOption)).getD false
       limits := ← limits (← field wasm "limit_config") }
     accountCreation := {
       minAllowedTopLevelAccountLength := ← nat acc "min_allowed_top_level_account_length"

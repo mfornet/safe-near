@@ -3,6 +3,7 @@ import NearVM.Error
 import NearVM.Gas
 import NearVM.TrieOverlay
 import NearInterface.Raw
+import NearInterface.HostCrypto
 
 /-!
 # NEAR host state (`α := NearState`)
@@ -99,6 +100,8 @@ structure NearConfig where
   maxContractSize : Option Nat := none
   /-- `max_yield_payload_size`, checked by `promise_yield_resume`. -/
   maxYieldPayloadSize : Option Nat := none
+  /-- The behaviour version of the `bls12381_*` host functions (`1` with NEP-488). -/
+  blsVersion : Nat := 0
   validAccountId     : List UInt8 → Bool := fun _ => true
   validPublicKey     : List UInt8 → Bool := fun _ => true
 deriving Inhabited
@@ -175,10 +178,6 @@ structure NearState where
   /-- Data ids of the current account's yields that have a stored receipt or status. -/
   existingYields : List (List UInt8) := []
   config     : NearConfig := {}
-  sha256     : List UInt8 → List UInt8 := fun _ => []
-  keccak256  : List UInt8 → List UInt8 := fun _ => []
-  keccak512  : List UInt8 → List UInt8 := fun _ => []
-  ripemd160  : List UInt8 → List UInt8 := fun _ => []
   randomSeed : List UInt8 := []
   /-- Gas counter of this execution; charged by the metered host functions
   (`NearVM.Metered`) and by the step loop (`NearVM.Run`). -/
@@ -194,24 +193,14 @@ structure NearState where
   /-- The structured error behind the last host trap, read by the runner. -/
   lastError  : Option Near.HostError := none
   lastExecutionIssue : Option Near.ExecutionIssue := none
-  ecrecover  : List UInt8 → List UInt8 → UInt64 → Bool → Option (List UInt8) :=
-    fun _ _ _ _ => none
-  ed25519Verify : List UInt8 → List UInt8 → List UInt8 → Bool :=
-    fun _ _ _ => false
   yieldCreateToken : List UInt8 → List UInt8 → UInt64 → UInt64 → List UInt8 :=
     fun _ _ _ _ => []
-  altBn128G1Multiexp : List UInt8 → List UInt8 := fun _ => []
-  altBn128G1Sum : List UInt8 → List UInt8 := fun _ => []
-  altBn128PairingCheck : List UInt8 → UInt64 := fun _ => 0
-  bls12381G1Multiexp : List UInt8 → UInt64 × List UInt8 := fun _ => (1, [])
-  bls12381G2Multiexp : List UInt8 → UInt64 × List UInt8 := fun _ => (1, [])
-  bls12381MapFpToG1 : List UInt8 → UInt64 × List UInt8 := fun _ => (1, [])
-  bls12381MapFp2ToG2 : List UInt8 → UInt64 × List UInt8 := fun _ => (1, [])
-  bls12381P1Decompress : List UInt8 → UInt64 × List UInt8 := fun _ => (1, [])
-  bls12381P2Decompress : List UInt8 → UInt64 × List UInt8 := fun _ => (1, [])
-  bls12381P1Sum : List UInt8 → UInt64 × List UInt8 := fun _ => (1, [])
-  bls12381P2Sum : List UInt8 → UInt64 × List UInt8 := fun _ => (1, [])
-  bls12381PairingCheck : List UInt8 → UInt64 := fun _ => 0
+  /-- The cryptography of the hashing and signature host functions; without it they are
+  reported as unsupported (`HostCrypto`). -/
+  crypto : Option Near.HostCrypto := none
+  /-- The bytes the cryptographic host function that just ran wrote to a register, if any: its
+  write-register gas is charged afterwards, once it is known whether it wrote. -/
+  registerWrite : Option Nat := none
 deriving Inhabited
 
 namespace NearState

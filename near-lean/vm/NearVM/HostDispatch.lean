@@ -239,6 +239,53 @@ theorem randomSeedFn_preserves : HostPreservesPromises randomSeedFn := by
     | exact writeRegisterResult_preserves _ _ _ _ _ hwf
     | split)
 
+theorem cryptoHostFn_preserves (name : String) (params results : List ValType) : HostPreservesPromises (cryptoHostFn name params results) := by
+  intro st args hwf
+  unfold cryptoHostFn
+  try dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
+  repeat (first
+    | exact hwf
+    | exact writeRegisterResult_preserves _ _ _ _ _ hwf
+    | split)
+
+theorem sha256Fn_preserves : HostPreservesPromises sha256Fn := cryptoHostFn_preserves _ _ _
+
+theorem keccak256Fn_preserves : HostPreservesPromises keccak256Fn := cryptoHostFn_preserves _ _ _
+
+theorem keccak512Fn_preserves : HostPreservesPromises keccak512Fn := cryptoHostFn_preserves _ _ _
+
+theorem ripemd160Fn_preserves : HostPreservesPromises ripemd160Fn := cryptoHostFn_preserves _ _ _
+
+theorem ecrecoverFn_preserves : HostPreservesPromises ecrecoverFn := cryptoHostFn_preserves _ _ _
+
+theorem ed25519VerifyFn_preserves : HostPreservesPromises ed25519VerifyFn := cryptoHostFn_preserves _ _ _
+
+theorem p256VerifyFn_preserves : HostPreservesPromises p256VerifyFn := cryptoHostFn_preserves _ _ _
+
+theorem altBn128G1MultiexpFn_preserves : HostPreservesPromises altBn128G1MultiexpFn := cryptoHostFn_preserves _ _ _
+
+theorem altBn128G1SumFn_preserves : HostPreservesPromises altBn128G1SumFn := cryptoHostFn_preserves _ _ _
+
+theorem altBn128PairingCheckFn_preserves : HostPreservesPromises altBn128PairingCheckFn := cryptoHostFn_preserves _ _ _
+
+theorem bls12381P1SumFn_preserves : HostPreservesPromises bls12381P1SumFn := cryptoHostFn_preserves _ _ _
+
+theorem bls12381P2SumFn_preserves : HostPreservesPromises bls12381P2SumFn := cryptoHostFn_preserves _ _ _
+
+theorem bls12381G1MultiexpFn_preserves : HostPreservesPromises bls12381G1MultiexpFn := cryptoHostFn_preserves _ _ _
+
+theorem bls12381G2MultiexpFn_preserves : HostPreservesPromises bls12381G2MultiexpFn := cryptoHostFn_preserves _ _ _
+
+theorem bls12381MapFpToG1Fn_preserves : HostPreservesPromises bls12381MapFpToG1Fn := cryptoHostFn_preserves _ _ _
+
+theorem bls12381MapFp2ToG2Fn_preserves : HostPreservesPromises bls12381MapFp2ToG2Fn := cryptoHostFn_preserves _ _ _
+
+theorem bls12381P1DecompressFn_preserves : HostPreservesPromises bls12381P1DecompressFn := cryptoHostFn_preserves _ _ _
+
+theorem bls12381P2DecompressFn_preserves : HostPreservesPromises bls12381P2DecompressFn := cryptoHostFn_preserves _ _ _
+
+theorem bls12381PairingCheckFn_preserves : HostPreservesPromises bls12381PairingCheckFn := cryptoHostFn_preserves _ _ _
+
 theorem logUtf8Fn_preserves : HostPreservesPromises logUtf8Fn := by
   intro st args hwf
   unfold logUtf8Fn
@@ -294,6 +341,7 @@ theorem gasFn_preserves (opCost : Nat) : HostPreservesPromises (gasFn opCost) :=
     | split)
 
 set_option maxRecDepth 16384 in
+set_option maxHeartbeats 1600000 in
 /-- Every function published by the runtime's metered registry preserves
 creation-order validity, including rejected unsupported and deprecated calls. -/
 theorem meteredHostFns_preserves (cfg : RuntimeConfig) (entry : ImportDecl × NearHostFn NearState)
@@ -302,7 +350,7 @@ theorem meteredHostFns_preserves (cfg : RuntimeConfig) (entry : ImportDecl × Ne
   rcases h with ⟨⟨decl, fn⟩, hin, heq⟩ | heq
   · subst entry
     simp only [nearHostFns, List.mem_cons, List.not_mem_nil, or_false] at hin
-    rcases hin with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
+    rcases hin with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
     all_goals cases h
     all_goals first
       | (intro st args hwf; exact hwf)
@@ -332,6 +380,25 @@ theorem meteredHostFns_preserves (cfg : RuntimeConfig) (entry : ImportDecl × Ne
       | exact prepaidGasFn_preserves
       | exact usedGasFn_preserves
       | exact randomSeedFn_preserves
+      | exact sha256Fn_preserves
+      | exact keccak256Fn_preserves
+      | exact keccak512Fn_preserves
+      | exact ripemd160Fn_preserves
+      | exact ecrecoverFn_preserves
+      | exact ed25519VerifyFn_preserves
+      | exact p256VerifyFn_preserves
+      | exact altBn128G1MultiexpFn_preserves
+      | exact altBn128G1SumFn_preserves
+      | exact altBn128PairingCheckFn_preserves
+      | exact bls12381P1SumFn_preserves
+      | exact bls12381P2SumFn_preserves
+      | exact bls12381G1MultiexpFn_preserves
+      | exact bls12381G2MultiexpFn_preserves
+      | exact bls12381MapFpToG1Fn_preserves
+      | exact bls12381MapFp2ToG2Fn_preserves
+      | exact bls12381P1DecompressFn_preserves
+      | exact bls12381P2DecompressFn_preserves
+      | exact bls12381PairingCheckFn_preserves
       | exact logUtf8Fn_preserves
       | exact logUtf16Fn_preserves
       | exact panicMetered_preserves

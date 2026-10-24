@@ -124,7 +124,7 @@ differences rather than treating storage-heavy execution as equivalent.
 
 | Boundary | Implemented | Remaining obligations |
 | --- | --- | --- |
-| VM | Host context, storage, registers, logs, promises, gas counter, rollback on abort | Exact instrumentation and trie costs; host limits and error ordering; cryptographic semantics; module validation and decoding |
+| VM | Host context, storage, registers, logs, promises, gas counter, rollback on abort | Exact instrumentation and trie costs; host limits and error ordering; module validation and decoding |
 | Actions | Create, deploy, call, transfer, add/delete key, delete account, delegate (V1/V2, signature through an injected verifier), global contract deploy/use with distribution receipts, gas-key transfer and withdrawal; `Stake`/unstake against the epoch's minimum stake with validator proposals (`funded_stake`); the epoch-start validator accounts update (`Epoch.lean`) | Reference validation; integer bounds; the epoch manager itself (the epoch's validators and update are inputs); `DeterministicStateInit` and refund targets |
 | Receipts | Proved per-call graph conversion and acyclicity; input/output dependencies, postponement, failure data, refunds | Receipt-layer reference oracle for the yield/resume lifecycle (timeouts, resume receipts) beyond the corpus chunks; global state well-formedness |
 | Chain | Block application, delayed queue, explicit bounded-run completion, reachability restricted to supported applies | Scheduling assumptions; indirect interaction predicates; sufficient prepaid gas specification |
@@ -132,10 +132,13 @@ differences rather than treating storage-heavy execution as equivalent.
 
 Known unsafe approximations still requiring implementation changes:
 
-- The functional host has injectable cryptographic defaults. The metered VM
-  rejects cryptographic operations instead of invoking those defaults. Concrete
-  cryptographic semantics remain to be supplied. `validator_stake` and
-  `validator_total_stake` read the epoch's validator set that `ApplyState.epochInfo` supplies.
+- The cryptographic host functions (`sha256` ... `bls12381_*`) read their arguments, pay gas and
+  raise errors in the VM (`NearVM/CryptoHost.lean`), and call primitives injected through
+  `RuntimeConfig.hostCrypto`; the proofs about the metered registry treat them through one generic
+  lemma per invariant (`cryptoHostFn_*`) and say nothing about the primitives. Without an injected
+  implementation they are rejected as unsupported.
+- `validator_stake` and `validator_total_stake` read the epoch's validator set that
+  `ApplyState.epochInfo` supplies.
 - Promise yield and resume are executed: yielded receipts, resume data receipts and timeouts
   (`resolveYieldTimeouts`) are modelled and replayed against the corpus. Only the host functions
   that name a yield id or refund target (`promise_yield_create_with_id` and friends) trap; see

@@ -14,7 +14,7 @@ theorem meteredHostFns_funding (cfg : RuntimeConfig) (entry : ImportDecl × Near
   rcases h with ⟨⟨decl, fn⟩, hin, heq⟩ | heq
   · subst entry
     simp only [nearHostFns, List.mem_cons, List.not_mem_nil, or_false] at hin
-    rcases hin with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
+    rcases hin with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
     all_goals cases h
     all_goals first
       | (intro st args; trivial)
@@ -44,6 +44,25 @@ theorem meteredHostFns_funding (cfg : RuntimeConfig) (entry : ImportDecl × Near
       | exact prepaidGasFn_noDeposits
       | exact usedGasFn_noDeposits
       | exact randomSeedFn_noDeposits
+      | exact sha256Fn_noDeposits
+      | exact keccak256Fn_noDeposits
+      | exact keccak512Fn_noDeposits
+      | exact ripemd160Fn_noDeposits
+      | exact ecrecoverFn_noDeposits
+      | exact ed25519VerifyFn_noDeposits
+      | exact p256VerifyFn_noDeposits
+      | exact altBn128G1MultiexpFn_noDeposits
+      | exact altBn128G1SumFn_noDeposits
+      | exact altBn128PairingCheckFn_noDeposits
+      | exact bls12381P1SumFn_noDeposits
+      | exact bls12381P2SumFn_noDeposits
+      | exact bls12381G1MultiexpFn_noDeposits
+      | exact bls12381G2MultiexpFn_noDeposits
+      | exact bls12381MapFpToG1Fn_noDeposits
+      | exact bls12381MapFp2ToG2Fn_noDeposits
+      | exact bls12381P1DecompressFn_noDeposits
+      | exact bls12381P2DecompressFn_noDeposits
+      | exact bls12381PairingCheckFn_noDeposits
       | exact logUtf8Fn_noDeposits
       | exact logUtf16Fn_noDeposits
       | exact panicMetered_noDeposits

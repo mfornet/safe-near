@@ -119,7 +119,9 @@ def toNearState (cfg : RuntimeConfig) (ctx : VMContext)
       maxContractSize := some cfg.wasm.limits.maxContractSize
       maxYieldPayloadSize := some cfg.wasm.limits.maxYieldPayloadSize
       validAccountId := if cfg.wasm.limits.accountIdValidityRulesVersion == 2 then validAccountIdBytes
-        else fun _ => true }
+        else fun _ => true
+      blsVersion := if cfg.wasm.bls12381NotInGroupFix then 1 else 0 }
+    crypto := cfg.hostCrypto
     randomSeed := ctx.randomSeed
     gas := { prepaid := ctx.prepaidGas, maxBurnt := maxBurnt }
     extCosts := cfg.wasm.extCosts

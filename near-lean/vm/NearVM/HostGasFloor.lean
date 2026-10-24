@@ -121,7 +121,7 @@ theorem meteredHostFns_gasFloor (cfg : RuntimeConfig) (entry : ImportDecl × Nea
   rcases h with ⟨⟨decl, fn⟩, hin, heq⟩ | heq
   · subst entry
     simp only [nearHostFns, List.mem_cons, List.not_mem_nil, or_false] at hin
-    rcases hin with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
+    rcases hin with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
     all_goals cases h
     all_goals first
       | (intro b prepaid maxBurnt st args hwf; exact hwf)
@@ -151,6 +151,25 @@ theorem meteredHostFns_gasFloor (cfg : RuntimeConfig) (entry : ImportDecl × Nea
       | exact HostPreservesGas.floor prepaidGasFn_gas
       | exact HostPreservesGas.floor usedGasFn_gas
       | exact HostPreservesGas.floor randomSeedFn_gas
+      | exact HostPreservesGas.floor sha256Fn_gas
+      | exact HostPreservesGas.floor keccak256Fn_gas
+      | exact HostPreservesGas.floor keccak512Fn_gas
+      | exact HostPreservesGas.floor ripemd160Fn_gas
+      | exact HostPreservesGas.floor ecrecoverFn_gas
+      | exact HostPreservesGas.floor ed25519VerifyFn_gas
+      | exact HostPreservesGas.floor p256VerifyFn_gas
+      | exact HostPreservesGas.floor altBn128G1MultiexpFn_gas
+      | exact HostPreservesGas.floor altBn128G1SumFn_gas
+      | exact HostPreservesGas.floor altBn128PairingCheckFn_gas
+      | exact HostPreservesGas.floor bls12381P1SumFn_gas
+      | exact HostPreservesGas.floor bls12381P2SumFn_gas
+      | exact HostPreservesGas.floor bls12381G1MultiexpFn_gas
+      | exact HostPreservesGas.floor bls12381G2MultiexpFn_gas
+      | exact HostPreservesGas.floor bls12381MapFpToG1Fn_gas
+      | exact HostPreservesGas.floor bls12381MapFp2ToG2Fn_gas
+      | exact HostPreservesGas.floor bls12381P1DecompressFn_gas
+      | exact HostPreservesGas.floor bls12381P2DecompressFn_gas
+      | exact HostPreservesGas.floor bls12381PairingCheckFn_gas
       | exact HostPreservesGas.floor logUtf8Fn_gas
       | exact HostPreservesGas.floor logUtf16Fn_gas
       | exact HostPreservesGas.floor panicMetered_gas
