@@ -19,4 +19,6 @@ safe-near/
         verification/   -- Lean project: Model/, Spec/, Proofs/, blueprint/
 ```
 
-Generated blueprint HTML goes to `verification/blueprint/web/`.
+Generated blueprint HTML goes to `verification/blueprint/web/`. Contracts
+without a leanblueprint yet keep a hand-written proof index in
+`verification/blueprint/README.md` instead (see PROVING.md).
