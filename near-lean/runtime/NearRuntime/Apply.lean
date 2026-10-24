@@ -258,10 +258,41 @@ def validateFunctionCallActions (c : ReceiptCtx) (outcome : VMOutcome) : Except 
     let _ ← spec.actions.mapM (actionOfPromise c.codeOf)
   pure ()
 
+/-- The receivers of the data receipt `k` produces: each later receipt that
+depends on it, once per dependency edge, in creation order (as
+`materializeFunctionCallRaw` links them). -/
+def vmReceiptOutputs (specs : List ReceiptSpec) (k : Nat) : List AccountId :=
+  specs.flatMap fun spec => (spec.dependencies.filter (· == k)).map fun _ => stringOfBytes spec.receiverId
+
+/-- The Borsh size of the action receipt a promise becomes (`Receipt.newBorshSize`
+of the materialized receipt; ids and the gas price have fixed widths). -/
+def vmReceiptSize (predecessor signer : AccountId) (signerKey : PublicKey) (outputs : List AccountId)
+    (spec : ReceiptSpec) (actions : List Action) : Nat :=
+  4 + predecessor.utf8ByteSize + 4 + (stringOfBytes spec.receiverId).utf8ByteSize + 32 + 1 + 4 +
+    signer.utf8ByteSize + 1 + signerKey.length + 16 + 4 + (outputs.map fun o => 32 + 4 + o.utf8ByteSize).sum +
+    4 + 32 * spec.dependencies.length + 4 + (actions.map Action.borshSize).sum
+
+/-- `validate_receipt(NewReceipt)` on each receipt a function call creates, in
+order: its Borsh size, then its actions as `validate_actions` checks them.
+The VM already validates the account ids, dependency counts and returned data. -/
+def checkVMReceipts (cfg : RuntimeConfig) (codeOf : Bytes → ContractCode) (predecessor signer : AccountId)
+    (signerKey : PublicKey) (specs : List ReceiptSpec) : Except ReceiptValidationError Unit := do
+  for (spec, k) in specs.zipIdx do
+    let actions := spec.actions.map (actionOfPromiseRaw codeOf)
+    let size := vmReceiptSize predecessor signer signerKey (vmReceiptOutputs specs k) spec actions
+    if size > cfg.wasm.limits.maxReceiptSize then
+      throw (.receiptSizeExceeded size cfg.wasm.limits.maxReceiptSize)
+    match validateTransactionActions cfg actions with
+    | .error e => throw (.actionsValidation e)
+    | .ok () => pure ()
+
 def materializeFunctionCall (c : ReceiptCtx) (isLast : Bool) (outcome : VMOutcome)
     (initial : ChainState) : Except RuntimeError FunctionCallEffects := do
   validateFunctionCallActions c outcome
-  return materializeFunctionCallRaw c isLast outcome initial
+  match checkVMReceipts c.cfg c.codeOf c.receipt.receiverId c.action.signerId c.action.signerPublicKey
+      outcome.receipts with
+  | .error error => throw (.newReceiptValidationError error)
+  | .ok () => return materializeFunctionCallRaw c isLast outcome initial
 
 /-- A successful checked construction is exactly the pure stage, with no fallback actions. -/
 theorem materializeFunctionCall_success (c : ReceiptCtx) (isLast : Bool) (outcome : VMOutcome)
@@ -271,7 +302,11 @@ theorem materializeFunctionCall_success (c : ReceiptCtx) (isLast : Bool) (outcom
   unfold materializeFunctionCall at h
   cases hv : validateFunctionCallActions c outcome with
   | error error => simp [hv, bind, Except.bind] at h
-  | ok accepted => cases accepted; simpa [hv, bind, pure, Except.bind, Except.pure] using h.symm
+  | ok accepted =>
+    cases hn : checkVMReceipts c.cfg c.codeOf c.receipt.receiverId c.action.signerId c.action.signerPublicKey
+        outcome.receipts with
+    | error error => simp [hv, hn, bind, Except.bind, throw, throwThe, MonadExceptOf.throw] at h
+    | ok checked => cases accepted; cases checked; simpa [hv, hn, bind, pure, Except.bind, Except.pure] using h.symm
 
 /-- Commit successful VM effects; the gas/log record is updated separately. -/
 def Exec.commitFunctionCall (exec : Exec) (outcome : VMOutcome) (effects : FunctionCallEffects) : Exec :=

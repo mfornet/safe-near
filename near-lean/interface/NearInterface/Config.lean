@@ -46,6 +46,8 @@ structure LimitConfig where
   maxTablesPerContract : Option Nat := none
   maxElementsPerContractTable : Option Nat := none
   maxTypesPerContract : Option Nat := none
+  /-- `max_receipt_size`, checked on the receipts a function call creates. -/
+  maxReceiptSize : Nat := 2 ^ 32 - 1
   deriving Repr, Inhabited
 
 /-- `near_parameters::vm::Config`. -/
@@ -170,7 +172,8 @@ private def limits (j : Json) : Except String LimitConfig := do
     maxFunctionBodySize := ← optNat j "max_function_body_size"
     maxTablesPerContract := ← optNat j "max_tables_per_contract"
     maxElementsPerContractTable := ← optNat j "max_elements_per_contract_table"
-    maxTypesPerContract := ← optNat j "max_types_per_contract" }
+    maxTypesPerContract := ← optNat j "max_types_per_contract"
+    maxReceiptSize := ← nat j "max_receipt_size" }
 
 private def extCosts (j : Json) : Except String ExtCosts := do
   match j with

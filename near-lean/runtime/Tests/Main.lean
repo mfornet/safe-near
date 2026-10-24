@@ -549,15 +549,16 @@ def main (args : List String) : IO UInt32 := do
 
   -- Weighted function calls (`distribute_gas`): the receipt's gas used includes
   -- the gas distributed to the new receipt. `w1` and `w0` differ only in the
-  -- weight, so they burn the same gas.
+  -- weight, so they burn the same gas. Both attach 1 gas: nearcore rejects a
+  -- created function call with none.
   let weightedWat := "(module (import \"env\" \"promise_batch_create\" (func $batch (param i64 i64) (result i64))) " ++
     "(import \"env\" \"promise_batch_action_function_call_weight\" " ++
     "(func $weighted (param i64 i64 i64 i64 i64 i64 i64 i64))) (memory 1) " ++
     "(data (i32.const 0) \"bob.near\") (data (i32.const 16) \"m\") " ++
     "(func (export \"w1\") i64.const 8 i64.const 0 call $batch " ++
-    "i64.const 1 i64.const 16 i64.const 0 i64.const 0 i64.const 64 i64.const 0 i64.const 1 call $weighted) " ++
+    "i64.const 1 i64.const 16 i64.const 0 i64.const 0 i64.const 64 i64.const 1 i64.const 1 call $weighted) " ++
     "(func (export \"w0\") i64.const 8 i64.const 0 call $batch " ++
-    "i64.const 1 i64.const 16 i64.const 0 i64.const 0 i64.const 64 i64.const 0 i64.const 0 call $weighted))"
+    "i64.const 1 i64.const 16 i64.const 0 i64.const 0 i64.const 64 i64.const 1 i64.const 0 call $weighted))"
   let weightedModule ← match ← Wat.compile weightedWat with
     | .ok module => pure module
     | .error error => throw (IO.userError s!"weighted call fixture: {error}")
@@ -585,8 +586,8 @@ def main (args : List String) : IO UInt32 := do
       executed.outcomes.map (·.2.gasBurnt), (weightedWorld.settle [call]))
   let (weightedOk, weightedChild, weightedRefund, weightedPrice, weightedBurnt, weightedSettled) := weightedRun "w1"
   let (plainOk, plainChild, plainRefund, plainPrice, plainBurnt, plainSettled) := weightedRun "w0"
-  check r "weighted call: the child receipt gets the distributed gas, a plain one none"
-    (weightedOk && plainOk && plainChild == [0] && weightedChild.length == 1 && weightedChild.all (· > 0))
+  check r "weighted call: the child receipt gets the distributed gas, a plain one only its static gas"
+    (weightedOk && plainOk && plainChild == [1] && weightedChild.length == 1 && weightedChild.all (· > 1))
     s!"weighted {weightedChild}, plain {plainChild}"
   -- With all prepaid gas used, only the price surplus on burnt gas comes back
   -- (`settleGas`: no gross refund, so no refund penalty either).
@@ -598,6 +599,62 @@ def main (args : List String) : IO UInt32 := do
   check r "weighted and plain calls conserve funds and gas backing through the child receipt"
     (weightedSettled.issue.isNone && plainSettled.issue.isNone &&
       weightedSettled.total == weightedWorld.total && plainSettled.total == weightedWorld.total)
+
+  -- Receipts a function call creates pass `validate_receipt(NewReceipt)` or
+  -- fail the call: here a zero-gas call, a receipt over max_receipt_size, and
+  -- the size boundary measured on the materialized receipt.
+  let createdWat := "(module (import \"env\" \"promise_batch_create\" (func $batch (param i64 i64) (result i64))) " ++
+    "(import \"env\" \"promise_batch_then\" (func $then (param i64 i64 i64) (result i64))) " ++
+    "(import \"env\" \"promise_batch_action_function_call\" " ++
+    "(func $call (param i64 i64 i64 i64 i64 i64 i64))) (memory 1) " ++
+    "(data (i32.const 0) \"bob.near\") (data (i32.const 16) \"carol.near\") (data (i32.const 32) \"mn\") " ++
+    "(func (export \"zero\") i64.const 8 i64.const 0 call $batch " ++
+    "i64.const 1 i64.const 32 i64.const 0 i64.const 0 i64.const 48 i64.const 0 call $call) " ++
+    "(func (export \"linked\") (local i64) i64.const 8 i64.const 0 call $batch local.set 0 " ++
+    "local.get 0 i64.const 1 i64.const 32 i64.const 100 i64.const 64 i64.const 48 i64.const 1000 call $call " ++
+    "local.get 0 i64.const 10 i64.const 16 call $then i64.const 1 i64.const 33 i64.const 0 i64.const 0 " ++
+    "i64.const 48 i64.const 1000 call $call) " ++
+    "(func (export \"huge\") i32.const 64 memory.grow drop i64.const 8 i64.const 0 call $batch " ++
+    "i64.const 1 i64.const 32 i64.const 4194304 i64.const 0 i64.const 48 i64.const 1000 call $call))"
+  let createdModule ← match ← Wat.compile createdWat with
+    | .ok module => pure module
+    | .error error => throw (IO.userError s!"created receipts fixture: {error}")
+  let createdCode : ContractCode := { module := createdModule, size := 0, hash := "created-receipts-fixture" }
+  let createdState := genesis.setAccount "wrap.near" { genesisAccount (10 * oneNear) with code := some createdCode }
+  let callCreated (config : RuntimeConfig) (method : String) (gas : Nat := tgas 200) :=
+    let call : Transaction := {
+      signerId := "alice.near", publicKey := pkOf 1, nonce := 1, receiverId := "wrap.near"
+      actions := [.functionCall method [] gas 0] }
+    let admitted := Near.apply config World.ap (fun _ => createdCode) createdState [call] []
+    Near.apply config World.ap (fun _ => createdCode) admitted.state [] admitted.outgoing
+  let failureOf (result : ApplyResult) : Option RuntimeError := result.outcomes.findSome? fun (_, o) =>
+    match o.status with | .failure e => some e | _ => none
+  let zero := callCreated cfg "zero"
+  check r "a created function call with no gas fails the call that created it"
+    (zero.issue.isNone && failureOf zero ==
+      some (.newReceiptValidationError (.actionsValidation .functionCallZeroAttachedGas)) &&
+      zero.outgoing.all (·.isRefund))
+  let huge := callCreated cfg "huge" (tgas 300)
+  check r "a created receipt with max_arguments_length arguments exceeds max_receipt_size"
+    (huge.issue.isNone && match failureOf huge with
+      | some (.newReceiptValidationError (.receiptSizeExceeded size limit)) =>
+        limit == cfg.wasm.limits.maxReceiptSize && size > cfg.wasm.limits.maxArgumentsLength
+      | _ => false)
+    s!"{repr (failureOf huge)} {repr huge.issue}"
+  let linked := callCreated cfg "linked"
+  let linkedSizes := (linked.outgoing.filter fun receipt => !receipt.isRefund).map (·.newBorshSize)
+  match linkedSizes with
+  | [first, second] =>
+    let withLimit (limit : Nat) : RuntimeConfig :=
+      { cfg with wasm := { cfg.wasm with limits := { cfg.wasm.limits with maxReceiptSize := limit } } }
+    let tight := callCreated (withLimit (first - 1)) "linked"
+    let exact := callCreated (withLimit first) "linked"
+    check r "the receipt size check agrees with the materialized receipt's Borsh size"
+      (linked.issue.isNone && first > second &&
+        failureOf tight == some (.newReceiptValidationError (.receiptSizeExceeded first (first - 1))) &&
+        failureOf exact == none)
+      s!"sizes {linkedSizes}"
+  | _ => check r "the receipt size check agrees with the materialized receipt's Borsh size" false s!"{linkedSizes}"
 
   -- Raw deployment length must not be supplied by the external module decoder.
   let deployWat := "(module (import \"env\" \"promise_batch_create\" (func $batch (param i64 i64) (result i64))) " ++
@@ -809,7 +866,7 @@ def main (args : List String) : IO UInt32 := do
       771 * cfg.storageAmountPerByte - 5)
 
   -- Sponsorship is a committed mint only after the whole receipt succeeds.
-  let sponsorModule ← match ← Wat.compile "(module\n (import \"env\" \"promise_batch_create\" (func $batch (param i64 i64) (result i64)))\n (import \"env\" \"promise_batch_action_function_call\" (func $call (param i64 i64 i64 i64 i64 i64 i64)))\n (import \"env\" \"promise_batch_action_transfer\" (func $transfer (param i64 i64)))\n (import \"env\" \"panic\" (func $panic))\n (memory 1)\n (data (i32.const 0) \"alice.near\")\n (data (i32.const 16) \"go\")\n (data (i32.const 64) \"\\01\")\n (data (i32.const 80) \"\\02\")\n (func (export \"one\") (local i64) i64.const 10 i64.const 0 call $batch i64.const 2 i64.const 16 i64.const 0 i64.const 0 i64.const 64 i64.const 0 call $call)\n (func (export \"twice\") (local i64) i64.const 10 i64.const 0 call $batch local.set 0 local.get 0 i64.const 2 i64.const 16 i64.const 0 i64.const 0 i64.const 64 i64.const 0 call $call local.get 0 i64.const 2 i64.const 16 i64.const 0 i64.const 0 i64.const 64 i64.const 0 call $call)\n (func (export \"zero\") (local i64) i64.const 10 i64.const 0 call $batch i64.const 2 i64.const 16 i64.const 0 i64.const 0 i64.const 96 i64.const 0 call $call)\n (func (export \"two\") (local i64) i64.const 10 i64.const 0 call $batch i64.const 2 i64.const 16 i64.const 0 i64.const 0 i64.const 80 i64.const 0 call $call)\n (func (export \"transfer\") (local i64) i64.const 10 i64.const 0 call $batch i64.const 64 call $transfer)\n (func (export \"empty\") (local i64) i64.const 10 i64.const 0 call $batch i64.const 0 i64.const 16 i64.const 0 i64.const 0 i64.const 64 i64.const 0 call $call)\n (func (export \"panic\") (local i64) i64.const 10 i64.const 0 call $batch i64.const 2 i64.const 16 i64.const 0 i64.const 0 i64.const 64 i64.const 0 call $call call $panic)\n (func (export \"late_failure\") (local i64) i64.const 10 i64.const 0 call $batch local.set 0 local.get 0 i64.const 2 i64.const 16 i64.const 0 i64.const 0 i64.const 64 i64.const 0 call $call local.get 0 i64.const 2 i64.const 16 i64.const 0 i64.const 0 i64.const 80 i64.const 0 call $call)\n)\n" with
+  let sponsorModule ← match ← Wat.compile "(module\n (import \"env\" \"promise_batch_create\" (func $batch (param i64 i64) (result i64)))\n (import \"env\" \"promise_batch_action_function_call\" (func $call (param i64 i64 i64 i64 i64 i64 i64)))\n (import \"env\" \"promise_batch_action_transfer\" (func $transfer (param i64 i64)))\n (import \"env\" \"panic\" (func $panic))\n (memory 1)\n (data (i32.const 0) \"alice.near\")\n (data (i32.const 16) \"go\")\n (data (i32.const 64) \"\\01\")\n (data (i32.const 80) \"\\02\")\n (func (export \"one\") (local i64) i64.const 10 i64.const 0 call $batch i64.const 2 i64.const 16 i64.const 0 i64.const 0 i64.const 64 i64.const 1 call $call)\n (func (export \"twice\") (local i64) i64.const 10 i64.const 0 call $batch local.set 0 local.get 0 i64.const 2 i64.const 16 i64.const 0 i64.const 0 i64.const 64 i64.const 1 call $call local.get 0 i64.const 2 i64.const 16 i64.const 0 i64.const 0 i64.const 64 i64.const 1 call $call)\n (func (export \"zero\") (local i64) i64.const 10 i64.const 0 call $batch i64.const 2 i64.const 16 i64.const 0 i64.const 0 i64.const 96 i64.const 1 call $call)\n (func (export \"two\") (local i64) i64.const 10 i64.const 0 call $batch i64.const 2 i64.const 16 i64.const 0 i64.const 0 i64.const 80 i64.const 1 call $call)\n (func (export \"transfer\") (local i64) i64.const 10 i64.const 0 call $batch i64.const 64 call $transfer)\n (func (export \"empty\") (local i64) i64.const 10 i64.const 0 call $batch i64.const 0 i64.const 16 i64.const 0 i64.const 0 i64.const 64 i64.const 1 call $call)\n (func (export \"panic\") (local i64) i64.const 10 i64.const 0 call $batch i64.const 2 i64.const 16 i64.const 0 i64.const 0 i64.const 64 i64.const 1 call $call call $panic)\n (func (export \"late_failure\") (local i64) i64.const 10 i64.const 0 call $batch local.set 0 local.get 0 i64.const 2 i64.const 16 i64.const 0 i64.const 0 i64.const 64 i64.const 1 call $call local.get 0 i64.const 2 i64.const 16 i64.const 0 i64.const 0 i64.const 80 i64.const 1 call $call)\n)\n" with
     | .ok m => pure m
     | .error e => throw (IO.userError s!"sponsorship fixture: {e}")
   let sponsorCode : ContractCode := { module := sponsorModule, size := 0, hash := "sponsor" }

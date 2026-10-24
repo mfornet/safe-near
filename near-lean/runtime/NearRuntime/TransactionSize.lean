@@ -15,6 +15,17 @@ def Action.borshSize : Action → Nat
   | .useGlobalContract (.codeHash _) => 1 + 1 + 32
   | .useGlobalContract (.accountId id) => 1 + 1 + 4 + id.length
 
+/-- Borsh size of a receipt a function call creates: V0 receipt header, the
+ActionV2 tag with `refund_to = None`, as `ReceiptEncoding` writes VM receipts. -/
+def Receipt.newBorshSize (receipt : Receipt) : Nat :=
+  let header := 4 + receipt.predecessorId.utf8ByteSize + 4 + receipt.receiverId.utf8ByteSize + 32
+  match receipt.receipt with
+  | .data payload => header + 1 + 32 + (match payload.data with | none => 1 | some bytes => 1 + 4 + bytes.length)
+  | .action action =>
+    header + 1 + 4 + action.signerId.utf8ByteSize + 1 + action.signerPublicKey.length + 16 +
+      4 + (action.outputDataReceivers.map fun r => 32 + 4 + r.receiverId.utf8ByteSize).sum +
+      4 + 32 * action.inputDataIds.length + 4 + (action.actions.map Action.borshSize).sum
+
 /-- V0 has no transaction tag. Ordinary-key V1 adds transaction/nonce tags and nonce mode.
 Block hashes have fixed 32-byte encoding and nonce values have fixed 8-byte encoding. -/
 def Transaction.bodySize (tx : Transaction) : Nat :=

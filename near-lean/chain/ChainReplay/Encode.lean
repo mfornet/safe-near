@@ -99,6 +99,11 @@ def actionValidationErrorJson : ActionsValidationError → Json
 /-- Structured semantic error fields are independent of Lean's pretty printer. -/
 def runtimeErrorJson (executor : AccountId) : RuntimeError → Json
   | .actionsValidation error => obj [kind "actionsValidation", ("error", actionValidationErrorJson error)]
+  | .newReceiptValidationError (.actionsValidation error) =>
+    obj [kind "newReceiptValidationError", ("error", obj [kind "actionsValidation", ("error", actionValidationErrorJson error)])]
+  | .newReceiptValidationError (.receiptSizeExceeded size limit) =>
+    obj [kind "newReceiptValidationError", ("error", obj [kind "receiptSizeExceeded",
+      ("size", toJson size), ("limit", toJson limit)])]
   | .accountAlreadyExists id => obj [kind "accountAlreadyExists", ("accountId", toJson id)]
   | .accountDoesNotExist id => obj [kind "accountDoesNotExist", ("accountId", toJson id)]
   | .createAccountNotAllowed id predecessor =>
