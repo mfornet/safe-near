@@ -197,19 +197,27 @@ theorem processReceipt_freshIds (cfg : RuntimeConfig) (ap : ApplyState) (decoder
               (releasePostponedState (receivePostponedDataState st data) id) waiting
     | some dataId =>
       rw [processReceipt_resume cfg ap decoder st receipt data dataId hr hres]
-      split
-      · exact ReceiptList.FreshIds.empty _ _
-      · split
-        · rename_i y _
-          split
-          · rename_i a _
+      by_cases hmoot : (data.data.isNone &&
+          Assoc.lookup st.yieldStatus (receipt.receiverId, dataId) == some YieldStatus.resumeInitiated) = true
+      · simp only [hmoot, ite_true]; exact ReceiptList.FreshIds.empty _ _
+      · simp only [hmoot, Bool.false_eq_true, ite_false]
+        cases hy : Assoc.lookup st.yieldReceipts (receipt.receiverId, dataId) with
+        | none => exact ReceiptList.FreshIds.empty _ _
+        | some y =>
+          dsimp only
+          cases hyr : y.receipt with
+          | action a =>
+            dsimp only
             rw [runActionReceipt_eq]
             unfold processedOfExec
             split
             · exact ReceiptList.FreshIds.empty _ _
-            · exact applyActionReceipt_freshIds _ _
-          · exact ReceiptList.FreshIds.empty _ _
-        · exact ReceiptList.FreshIds.empty _ _
+            · exact applyActionReceipt_freshIds
+                { cfg, ap, receipt := y, action := a, promiseResults := [data.promiseResult], codeOf := decoder
+                  vmYields := yieldsOf (resumeYieldState st (receipt.receiverId, dataId)) y.receiverId }
+                (resumeYieldState st (receipt.receiverId, dataId))
+          | data _ => dsimp only; exact ReceiptList.FreshIds.empty _ _
+          | globalDistribution _ => dsimp only; exact ReceiptList.FreshIds.empty _ _
   | globalDistribution g =>
     rw [processReceipt_distribution cfg ap decoder st receipt g hr]
     exact processDistribution_freshIds cfg ap st receipt g
@@ -219,7 +227,8 @@ decreasing_by exact Assoc.erase_length_lt_of_lookup _ _ _ hwaiting
 theorem ReceiptList.FreshIds.subperm {lower upper : Nat} {E l : List Receipt}
     (h : ReceiptList.FreshIds lower upper E) (hl : l.Subperm E) : ReceiptList.FreshIds lower upper l := by
   constructor
-  · exact (hl.map _).nodup_of_subperm h.unique
+  · obtain ⟨l', hp, hs⟩ := hl
+    exact (hp.map (·.receiptId)).nodup_iff.mp ((hs.map (·.receiptId)).nodup h.unique)
   · intro receipt hm
     exact h.bounds receipt (hl.subset hm)
 
@@ -267,12 +276,12 @@ theorem processWithInstants_freshIds (cfg : RuntimeConfig) (ap : ApplyState) (de
       · exact (List.filter_append_perm _ _).subperm)
     (by
       rintro st' r' rfl hne
-      exact processReceipt_freshIds cfg ap decoder st r')
+      exact processReceipt_freshIds cfg ap decoder st' r')
     (by
       rintro st' r' rfl hi
-      have hn := processReceipt_nextId_mono cfg ap decoder st r'
-      have hf := processReceipt_freshIds cfg ap decoder st r'
-      refine ⟨hn, (processReceipt cfg ap decoder st r').receipts, hf, ?_⟩
+      have hn := processReceipt_nextId_mono cfg ap decoder st' r'
+      have hf := processReceipt_freshIds cfg ap decoder st' r'
+      refine ⟨hn, (processReceipt cfg ap decoder st' r').receipts, hf, ?_⟩
       exact (List.perm_append_comm.trans (List.filter_append_perm Receipt.isInstant _)).subperm)
   exact key st receipt rfl
 
