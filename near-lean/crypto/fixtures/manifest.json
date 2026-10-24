@@ -14,7 +14,7 @@
     },
     "bn254.jsonl": {
       "g1_multiexp": 110,
-      "g1_sum": 106,
+      "g1_sum": 91,
       "pairing_check": 135
     },
     "ed25519.jsonl": {

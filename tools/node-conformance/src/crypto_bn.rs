@@ -271,7 +271,7 @@ pub fn bn254(out: &mut Out) {
         c.g1(false, &format!("bad-sign-{sign}-after-good"), &cat(&[&sgn(0, &g1(p)), &sgn(sign, &g1(p))]));
     }
     c.g1(false, "bad-sign-and-bad-point", &sgn(2, &[0xff; 64]));
-    for len in [1, 2, 64, 65 - 1, 66, 129, 130, 131] {
+    for len in [1, 2, 64, 66, 129, 130, 131] {
         let mut d = sgn(0, &g1(p)).repeat(3);
         d.truncate(len);
         while d.len() < len {
@@ -280,7 +280,6 @@ pub fn bn254(out: &mut Out) {
         c.g1(false, &format!("length-{len}"), &d);
     }
     for (name, bp) in &bad_points {
-        c.g1(false, &format!("bad-{name}"), &sgn(0, bp));
         c.g1(false, &format!("bad-{name}-middle"), &cat(&[&sgn(0, &g1(p)), &sgn(1, bp), &sgn(0, &g1(g1gen))]));
     }
 

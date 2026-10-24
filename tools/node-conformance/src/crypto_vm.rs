@@ -11,9 +11,7 @@ use near_vm_runner::logic::{
 use std::borrow::Cow;
 use std::sync::Arc;
 
-const MEMORY: usize = 1 << 21;
 const INPUT: u64 = 1 << 12;
-const OUTPUT: u64 = 1 << 20;
 
 struct Memory(Vec<u8>);
 
@@ -71,6 +69,8 @@ fn context() -> VMContext {
 pub struct Vm {
     config: Arc<Config>,
     fees: Arc<RuntimeFeesConfig>,
+    /// Bytes of memory; the register is copied to its middle.
+    memory: usize,
 }
 
 /// What a call returned: the value the host function returns and the bytes it left in register 0.
@@ -80,11 +80,17 @@ pub struct Reply {
 }
 
 impl Vm {
+    #[allow(dead_code)]
     pub fn new(not_in_group_fix: bool) -> Vm {
+        Vm::with_memory(not_in_group_fix, 1 << 21)
+    }
+
+    /// A VM whose memory has `memory` bytes (the inputs must fit in the first half after 4 KiB).
+    pub fn with_memory(not_in_group_fix: bool, memory: usize) -> Vm {
         let free = RuntimeConfig::free();
         let mut config = Config::clone(&free.wasm_config);
         config.bls12381_not_in_group_fix = not_in_group_fix;
-        Vm { config: Arc::new(config), fees: free.fees.clone() }
+        Vm { config: Arc::new(config), fees: free.fees.clone(), memory }
     }
 
     /// Run `f` on a fresh `VMLogic` whose memory holds `data` at `INPUT`; the register 0 content is
@@ -94,7 +100,8 @@ impl Vm {
         data: &[&[u8]],
         f: impl FnOnce(&mut VMLogic, &[u64]) -> Result<u64, VMLogicError>,
     ) -> Option<Reply> {
-        let mut memory = Memory(vec![0; MEMORY]);
+        let mut memory = Memory(vec![0; self.memory]);
+        let output = (self.memory / 2) as u64;
         let mut ptrs = vec![];
         let mut at = INPUT;
         for d in data {
@@ -111,9 +118,9 @@ impl Vm {
         let len = logic.register_len(0).unwrap();
         let mut out = vec![];
         if len != u64::MAX {
-            logic.read_register(0, OUTPUT).unwrap();
+            logic.read_register(0, output).unwrap();
             drop(logic);
-            out = memory.0[OUTPUT as usize..OUTPUT as usize + len as usize].to_vec();
+            out = memory.0[output as usize..output as usize + len as usize].to_vec();
         }
         Some(Reply { ret, out })
     }
