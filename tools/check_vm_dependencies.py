@@ -23,9 +23,12 @@ run_cmd do
   let required := #["NearVM", "Wasm.Exec", "Wasm.Link", "Wasm.Validate"]
   let missing := required.filter (!names.contains ·)
   -- The legacy interpreter and proof API, and the node-side packages that
-  -- contract verification must never build (notes/design/NEAR_NODE.md).
+  -- contract verification must never build (notes/design/NEAR_NODE.md). NearCrypto is
+  -- self-contained but the VM takes its digests as host parameters, so it stays out until the
+  -- design's open point on crypto host functions is settled.
   let forbidden := names.filter fun name =>
-    ["Interpreter", "CodeLib", "NearRuntime", "NearChain", "ChainReplay", "NearNode", "NodeBench"].any
+    ["Interpreter", "CodeLib", "NearRuntime", "NearChain", "ChainReplay", "NearNode", "NodeBench",
+     "NearCrypto"].any
       fun root => name == root || name.startsWith (root ++ ".")
   let relevant := names.filter fun name =>
     name == "NearVM" || name.startsWith "NearVM." || name.startsWith "Wasm."

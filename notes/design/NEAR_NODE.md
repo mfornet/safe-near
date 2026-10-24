@@ -75,11 +75,13 @@ The detailed acceptance criteria live in each Linear issue.
 - `just node-isolation` (Python only, in automatic CI): no contract
   verification package requires the node or chain packages, even
   transitively (the runtime is allowed: contract adapters run the binary
-  through it); only the node requires the node; no `@[extern]` /
+  through it); only the node requires the node; the crypto package requires no
+  repository package; no `@[extern]` /
   `@[implemented_by]` in our Lean and no native link settings in lakefiles;
   `NearNode.Protocol` matches `reference.json`.
 - `just vm-dependencies`: the compiled NearVM import closure contains no
-  `NearRuntime`, `NearChain`, `ChainReplay`, `NearNode` or `NodeBench` module.
+  `NearRuntime`, `NearChain`, `ChainReplay`, `NearNode`, `NodeBench` or (until the open point
+  below is settled) `NearCrypto` module.
 - `just verification-buildtime`: copies `contracts/w-near/verification` and its
   local packages to a fresh directory (sharing built mathlib), builds it, and
   fails if it is more than 5% slower than this machine's entry in
