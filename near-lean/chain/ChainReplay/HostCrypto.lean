@@ -16,13 +16,16 @@ these are the `NearCrypto` primitives on arguments it has checked. The fast (`Im
 `bls12381_not_in_group_fix` is protocol configuration: the VM passes the version.
 nearcore divergence: the messages of `alt_bn128` errors for an invalid point are those of
 `NearCrypto` and omit the offending bytes nearcore prints. -/
+
 namespace ChainReplay.HostCrypto
 
 open Wasm.Near
 
-private def toBytes (bytes : List UInt8) : ByteArray := ⟨bytes.toArray⟩
+private def toBytes (bytes : List UInt8) : ByteArray :=
+  ⟨bytes.toArray⟩
 
-private def ofBytes (bytes : ByteArray) : List UInt8 := bytes.toList
+private def ofBytes (bytes : ByteArray) : List UInt8 :=
+  bytes.toList
 
 /-- The host functions' primitives, from `NearCrypto`. -/
 def hostCrypto : HostCrypto where
@@ -32,8 +35,7 @@ def hostCrypto : HostCrypto where
   ripemd160 m := ofBytes (NearCrypto.ripemd160 (toBytes m))
   ecrecover hash sig v malleability :=
     (NearCrypto.ecrecover (toBytes hash) (toBytes sig) v malleability).map ofBytes
-  ed25519Verify sig msg key :=
-    NearCrypto.ed25519Verify (toBytes key) (toBytes msg) (toBytes sig)
+  ed25519Verify sig msg key := NearCrypto.ed25519Verify (toBytes key) (toBytes msg) (toBytes sig)
   p256Verify sig msg key :=
     match NearCrypto.P256.Impl.verify (toBytes sig) (toBytes msg) (toBytes key) with
     | .ok verified => verified
@@ -45,9 +47,11 @@ def hostCrypto : HostCrypto where
   altBn128PairingCheck data :=
     NearCrypto.Bn254.pairingCheck NearCrypto.Bn254.Impl.ops (toBytes data)
   bls12381P1Sum version data :=
-    (NearCrypto.Bls12381.p1Sum NearCrypto.Bls12381.Impl.ops version (toBytes data)).map (·.map ofBytes)
+    (NearCrypto.Bls12381.p1Sum NearCrypto.Bls12381.Impl.ops version (toBytes data)).map
+      (·.map ofBytes)
   bls12381P2Sum version data :=
-    (NearCrypto.Bls12381.p2Sum NearCrypto.Bls12381.Impl.ops version (toBytes data)).map (·.map ofBytes)
+    (NearCrypto.Bls12381.p2Sum NearCrypto.Bls12381.Impl.ops version (toBytes data)).map
+      (·.map ofBytes)
   bls12381G1Multiexp version data :=
     (NearCrypto.Bls12381.g1Multiexp NearCrypto.Bls12381.Impl.ops version (toBytes data)).map
       (·.map ofBytes)

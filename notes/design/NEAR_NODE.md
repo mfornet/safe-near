@@ -573,7 +573,7 @@ reports. Rebuild steps and formats: [`tools/localnet/CORPUS.md`](../../tools/loc
   |---:|---|---|
   | 12 | epoch boundary: validator accounts update (rewards, stake return) | M3d |
   | 5 + 4 + 1 | host `validator_stake` / `validator_total_stake`; fail: `Stake`/`Unstake` need the epoch machinery (4 + 4) | M3d |
-  | 5 + 1 | fail: crypto host functions `ecrecover` and `sha256` unsupported in the VM | M3e |
+  | 5 + 1 | fail: crypto host functions `ecrecover` and `sha256` unsupported in the VM | M3e (done, below) |
 
   M3c closed the 288 four-shard chunks and the 8 converter chunks: the `ShardLayout` (V2, ids 3, 1, 0, 2 over the
   boundaries `test1`..`test3`; routing as `account_id_to_shard_id`, shard order as `shard_ids()`), the bandwidth
@@ -594,9 +594,31 @@ reports. Rebuild steps and formats: [`tools/localnet/CORPUS.md`](../../tools/loc
   minutes on four cores (`replay_corpus.py --jobs`): the burst chunks `single-h214`, `sharded-h214` and `single-h215`
   each spend 14 minutes executing 300 Tgas of contract code in the Lean interpreter.
 
+  **M3e (crypto host functions).** The 19 cryptographic host functions of protocol 86 (`sha256`, `keccak256`,
+  `keccak512`, `ripemd160`, `ecrecover`, `ed25519_verify`, `p256_verify`, `alt_bn128_g1_multiexp`/`g1_sum`/
+  `pairing_check`, the nine `bls12381_*`) now run in the metered VM. `vm/NearVM/CryptoHost.lean` follows
+  `near-vm-runner` 0.37.4 `logic.rs` call by call: arguments from memory or a register (a failed read keeps its
+  read charges), the function's own base cost (none of them pays the generic `base`), per-byte, per-block
+  (`ripemd160`) or per-element costs where `logic.rs` pays them, `IntegerOverflow` before any burn when
+  `cost * count` overflows `u64` (the `bls12381_*` element count comes from the declared length, so a register input
+  overflows), the `ecrecover` order (signature, then `v`, then hash, then flag, with the `ECRecoverError` texts),
+  `ed25519_verify`/`p256_verify` early exits (a signature with its top three bits set, or a `p256` signature outside
+  `[1, n-1]`, returns 0 before the message is read or paid), the length errors (`Ed25519VerifyInvalidInput`,
+  `P256VerifyInvalidInput`, `AltBn128InvalidInput`, `BLS12381InvalidInput` with nearcore's messages), the register
+  write and its gas only when the call writes one, and the protocol-86 `bls12381_not_in_group_fix = false` (version 0).
+  The primitives are `HostCrypto` (`interface/NearInterface/HostCrypto.lean`), carried by `RuntimeConfig.hostCrypto`;
+  `chain/ChainReplay/HostCrypto.lean` builds it from `NearCrypto` (`Impl`) for the replay executables, and the VM
+  never imports `NearCrypto` (`check_vm_dependencies.py`). Without one the functions stay `unsupportedHost`.
+  `ecrecover` is declared with its seven arguments (the old table had six), and `p256_verify` is a new import.
+  `vm-tests` runs every function on a recording stub. The proofs over the metered registry gained one generic lemma
+  per invariant for `cryptoHostFn` (13 files, none of them restated); `applyCharge` and the other proved definitions
+  are unchanged. The six chunks pass: `sharded-h48-s1`, `sharded-h193-s2/s3`, `sharded-h199-s3`, `single-h193-s0`,
+  `single-h199-s0`.
+
 ## Open points
 
 - Numeric performance targets for M4 and M10, measured against nearcore (M2's are proposed above).
 - Whether crypto host functions in `NearVM` slow contract verification. If they
   do, `NearVM` takes host crypto as a parameter and the node supplies it. Today the VM takes its
   digests, `ed25519Verify` and `ecrecover` as parameters; `NearCrypto` is a separate package it can import later.
+  Resolved in M3e: the VM takes a `HostCrypto` through the runtime configuration and the chain package supplies it.
