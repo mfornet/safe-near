@@ -566,23 +566,33 @@ reports. Rebuild steps and formats: [`tools/localnet/CORPUS.md`](../../tools/loc
   complete post-state with the record, never the reverse. Result per chunk: `pass`, `fail: <first field>` or
   `unsupported: <reason>`. The recipe exits 0 only if all pass; `just chain-replay-corpus-report` prints the table
   and always exits 0. Python tests check codec, format, manifest and converter in CI without neard.
-- **Current report (M3b): 129 pass, 6 fail, 301 unsupported of 436** (M3a: 70, 18, 348). The work list, by first
-  reason:
+- **Current report (M3c): 405 pass, 14 fail, 17 unsupported of 436** (M3b: 129, 6, 301; M3a: 70, 18, 348). The work
+  list, by first reason:
 
   | Chunks | First reason | Stage |
   |---:|---|---|
-  | 288 | multi-shard layout (chunk model: single-shard scheduler and congestion) | M3c |
-  | 5 + 3 | pre-state postponed receipts and delayed-queue records (converter does not decode them yet) | converter |
-  | 3 | epoch boundary: validator accounts update (rewards, stake return) | M3d |
-  | 2 + 2 | host `validator_stake`; fail: `Stake`/`Unstake` need the epoch machinery | M3d |
-  | 2 | fail: host `ecrecover` unsupported | M3e |
+  | 12 | epoch boundary: validator accounts update (rewards, stake return) | M3d |
+  | 5 + 4 + 1 | host `validator_stake` / `validator_total_stake`; fail: `Stake`/`Unstake` need the epoch machinery (4 + 4) | M3d |
+  | 5 + 1 | fail: crypto host functions `ecrecover` and `sha256` unsupported in the VM | M3e |
 
-  M3b closed global contracts (deploy, use, distribution receipts, Account V2), promise yield and resume with
-  timeouts, gas keys (actions and host functions), delegate actions V1 and V2 (signature through a verifier the
-  chain package injects from `NearCrypto`), and the pre-state columns behind them. Behind the remaining first
-  reasons stand the buffered-receipt (congestion) columns. Not exercised by the workload: `DeterministicStateInit`,
-  secp256k1 and ML-DSA signers, chunks invalid at application, missing chunks, resharding. Transactions signed by
-  a gas key are reported as a model issue (see the divergence table in [`NEAR_RUNTIME.md`](NEAR_RUNTIME.md)).
+  M3c closed the 288 four-shard chunks and the 8 converter chunks: the `ShardLayout` (V2, ids 3, 1, 0, 2 over the
+  boundaries `test1`..`test3`; routing as `account_id_to_shard_id`, shard order as `shard_ids()`), the bandwidth
+  scheduler for any layout (`Bandwidth.lean`: parameters, request bitmaps, the persistent link allowances and sanity
+  hash, tie breaks by `rand_chacha 0.3.1`/`rand 0.8.5` shuffling seeded with the previous block hash, the
+  remaining-bandwidth distribution), congestion control (`Congestion.lean`: levels in IEEE doubles, outgoing gas
+  limits, the allowed shard, `shardAcceptsTransactions` for chunk producers) and the receipt sink (`ShardSink.lean`:
+  per-target limits from congestion and granted bandwidth, forwarding from the outgoing buffers, buffering with
+  `StateStoredReceipt` metadata, receipt groups, bandwidth requests). `ChainReplay/ShardChunk.lean` runs them around
+  `Near.apply` in the order of `Runtime::apply` and reports the outgoing receipts, own `CongestionInfo`, bandwidth
+  requests and scheduler hash; the harness compares all of them and the `buffered-receipt*` columns of the
+  post-state (bundles with a buffered receipt: 10 chunks, 2 of which change the buffers). No existing runtime
+  theorem or definition changed; the proved `apply` still returns every outgoing receipt and the layer around it
+  is new. The converter now decodes pre-state postponed receipts, pending counts, received data and delayed
+  receipts (with their stored gas and size). Not exercised by the workload: bandwidth requests (every request in
+  the corpus is empty, so the tie-break shuffle and request grants are checked by unit tests against the Rust
+  crates, not by chunks), a fully congested shard, missing chunks, resharding. A full replay takes about 15
+  minutes on four cores (`replay_corpus.py --jobs`): the burst chunks `single-h214`, `sharded-h214` and `single-h215`
+  each spend 14 minutes executing 300 Tgas of contract code in the Lean interpreter.
 
 ## Open points
 

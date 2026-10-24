@@ -7,7 +7,7 @@ establish equivalence with nearcore or correctness of deployed contracts.
 
 Registered chain replay constructs a complete synthetic trie independently from
 encoded model state, including accounts, access keys, code, storage, queues and
-the single-shard bandwidth scheduler. The runtime threads an optional external
+the bandwidth scheduler state and the outgoing receipt buffers of the shard. The runtime threads an optional external
 accounting context through VM calls and receipts. Successful receipts commit
 prospective writes; failures discard writes while preserving cache history and
 burnt gas. Chunk entry rebuilds the trie with a fresh cache. Gas is charged during
@@ -23,6 +23,14 @@ inputs. Complete synthetic chunk bytes and entry roots are compared alongside
 all existing execution observations. These finite comparisons and local proofs
 do not establish general nearcore equivalence, memtrie behavior or original
 historical shard capture.
+
+## Shard machinery
+
+`ShardLayout`, `Congestion`, `Bandwidth`, `ChaCha` and `ShardSink` are executable ports of nearcore's congestion
+control and bandwidth scheduler with unit tests (`Tests/Shard.lean`: values produced by `rand 0.8.5`,
+`rand_chacha 0.3.1` and nearcore's own scheduler tests) and replay against 288 four-shard chunks. No theorem
+mentions them and no theorem of the existing modules changed: they sit around `Near.apply`, which still returns
+every outgoing receipt, and the chain layer decides which are sent or buffered.
 
 ## Reference and trusted inputs
 
