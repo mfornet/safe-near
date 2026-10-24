@@ -246,8 +246,26 @@ all of it in Lean; CI never builds this crate.
     domain prefix, HashML-DSA with SHA-256, ExternalMu) that `near-crypto` must reject, with one that it
     accepts (ExternalMu of the pure `μ`).
 
+- `bn254.jsonl`, `bls12381.jsonl`, `p256.jsonl` (`src/crypto_bn.rs`, `src/crypto_bls.rs`,
+  `src/crypto_p256.rs`; `src/crypto_vm.rs` is the harness): the verdicts are those of `near-vm-runner`
+  0.37.4's own `VMLogic` host functions (`alt_bn128_g1_multiexp`, `alt_bn128_g1_sum`,
+  `alt_bn128_pairing_check`, the nine `bls12381_*`, `p256_verify`), run over a flat memory under
+  the free configuration of the current protocol; `zeropool-bn` 0.5.11, `blst` 0.3.11 and `p256` 0.13.2 only build
+  the valid points and signatures. A line is `{"kind", "name", "input", "ok", "output" | "result"}` for BN254
+  (`ok = false` is a trap of the host function, `output` the 64 bytes written, `result` the pairing check's
+  boolean), `{"kind", "name", "input", "v0", "v1"}` for BLS12-381 (`v0`: `bls12381_not_in_group_fix` off, as at
+  protocol 86; `v1`: on, NEP-488; each is `{"trap": true}`, `{"ret": 1}` or `{"ret": 0 | 2, "output"?}`) and
+  `{"kind", "name", "sig", "msg", "pk", "ok", "result"}` for P-256. Inputs: valid points, sums and
+  products (up to 64 points), infinity in every position, repeated and opposite points, non-canonical
+  field elements, off-curve points, points of `E'` outside `G2`, points outside `G1` (accepted by the
+  sums, rejected by multiexp and pairing), the order-3 points `(0, ±2)`, flag combinations, wrong lengths,
+  pairing checks that hold and that do not, field elements where the SSWU denominator vanishes, and
+  signatures with every edge of `ecdsa` 0.16.9's parsing and `p256_verify`'s order of checks.
+
 `crypto-bench` times the same primitives natively (release mode, `std::time`, at least 0.3 s each)
-and prints one JSON line per benchmark; the names match `node-bench`:
+and prints one JSON line per benchmark; the names match `node-bench`. The pairing-friendly curves and
+P-256 run the host functions themselves, on inputs taken from the committed fixtures, and
+`crypto-bench curves` runs only those:
 
 ```sh
 cargo run --release --locked --bin crypto-bench

@@ -470,14 +470,76 @@ Ed25519, secp256k1 and ML-DSA-65 signatures in Lean. M2a is the hashes and Ed255
   | HMAC-SHA256, SHA-512 | RFC 6979 nonces, Ed25519 | yes |
   | `Merkle` (`merklize`, paths) | chunk, block and outcome roots | not crypto: the node (M1) |
 
-  **Not in this package, needed by the VM's host functions for M3** (listed, not implemented): the BN254
-  curve of `alt_bn128_g1_multiexp`, `alt_bn128_g1_sum` and `alt_bn128_pairing_check`; and the BLS12-381 curves
-  of `bls12381_p1_sum`, `bls12381_p2_sum`, `bls12381_g1_multiexp`, `bls12381_g2_multiexp`,
-  `bls12381_map_fp_to_g1`, `bls12381_map_fp2_to_g2`, `bls12381_pairing_check`, `bls12381_p1_decompress`
-  and `bls12381_p2_decompress` (field towers, pairings, hash-to-curve and subgroup checks). The VM keeps taking its
-  digests, `ed25519Verify` and `ecrecover` as parameters until M3 chooses to import `NearCrypto`. Reed-Solomon
-  erasure coding (chunk parts) is not cryptography and is not here either; M6 confirms the network
-  handshake needs nothing more than Ed25519.
+  **Not in this package:** the VM keeps taking its digests, `ed25519Verify` and `ecrecover` as parameters until M3
+  chooses to import `NearCrypto`. Reed-Solomon erasure coding (chunk parts) is not cryptography and is not here
+  either; M6 confirms the network handshake needs nothing more than Ed25519. The pairing-friendly curves and P-256
+  of the VM's host functions are M2d, below.
+
+- **M2d: pairing-friendly curves and P-256.** `NearCrypto.Bn254` (`alt_bn128_g1_multiexp`, `alt_bn128_g1_sum`,
+  `alt_bn128_pairing_check`), `NearCrypto.Bls12381` (the nine `bls12381_*` functions) and `NearCrypto.P256`
+  (`p256_verify`), each a function from the host's input bytes to what the host writes or returns (`Except` for
+  its traps, `none` for the BLS functions' return value 1), with a `Spec` and an `Impl`. The oracle is
+  `near-vm-runner` 0.37.4's own `VMLogic` (`crypto_vm.rs`: a flat memory, the free configuration), not a
+  reimplementation of its wrapping; `zeropool-bn` 0.5.11, `blst` 0.3.11 and `p256` 0.13.2 only build the inputs.
+  The sources matched: `logic/alt_bn128.rs` (little-endian words; `Fq` below `q`, `Fr` below `r`; `G1` on the
+  curve, `(0, 0)` infinity; `G2` on the twist **and** `[r] Q = O`), `logic/bls12381.rs` (ZCash flags; the flag `0x80`
+  rejected on uncompressed input; sums need only curve points, multiexp and pairing the prime-order group;
+  returns 0, 1 or 2), `blst` `e1.c`/`e2.c`/`map_to_g1.c`/`map_to_g2.c`/`pairing.c`, and `logic/logic.rs:1900`
+  (`p256_verify`) with `ecdsa` 0.16.9 `verify_prehash` (the message is the digest: under 16 bytes false, cut to 32;
+  no low-`s` rule; a signature outside `[1, n-1]` answers false **before** the key length can trap).
+  - **Structure.** `Pairing.Group` is one Jacobian implementation over a record of field operations (`Fp`, `Fp2`,
+    any `a`); `Pairing.Spec` is the optimal ate pairing for both families as an `Fp12` of twelve coefficients, a
+    Miller loop on the twist in affine coordinates with each line untwisted and multiplied as an ordinary element,
+    and the final exponentiation as one power; `Pairing.Tower`/`Pairing.Impl` are the Karatsuba tower, one Miller
+    loop for all pairs with Jacobian steps and thirteen-product sparse lines (D- and M-type twists), cyclotomic
+    squaring, and the hard part from its expansion in `x` (BN: `λ₀ + λ₁p + λ₂p² + p³`; BLS:
+    `((x-1)²/3)(x+p)(x²+p²-1) + 1`). The fast pairing equals the reference exactly, so the differential test
+    compares reduced values, not only verdicts. Field elements stay `Nat`: a 381-bit product and `%` costs 0.4 µs, a
+    Montgomery product on 26-bit limbs would cost about as much (225 + 225 limb products), and inversion is the
+    extended Euclidean algorithm (4 µs; Fermat's 250 µs).
+  - **Subgroup tests.** `G2` of BN254 by `ψ(Q) = [6x²] Q`: `deg([6x²] - ψ) = 36x⁴ + p - 6x²t = r`, so the kernel is
+    exactly `G2` (the check the crate makes is `[r] Q = O`, which the reference does). BLS12-381 uses `blst`'s own
+    tests (`σ²(P) = -[z²] P`, whose endomorphism has degree `r`, and `ψ(P) = [z] P` of Scott 2021) and the reference
+    `[r] P = O`; the differential tests compare them on members, non-members and sums of both. `ψ`-based clearing of the
+    `G2` cofactor, as `blst` does, equals `[h_eff]` on random curve points (also a differential test).
+  - **NEP-488.** With `bls12381_not_in_group_fix` off (protocol 86) `p1_sum` and `p1_decompress` reject the order-3
+    points `(0, ±2)`; on (protocol 155) they accept them. Both are fixtures (`v0`, `v1`) and a `version` argument.
+  - **Hash to curve.** The isogeny constants are read out of `blst`'s sources by `scripts/gen_bls_isogeny.py`
+    (`tools/tests/test_crypto_generated.py` regenerates them when the sources are in the cargo registry;
+    `test_bls_isogeny.py` checks they define isogenies). The fast `G1` map takes one exponentiation
+    (`sqrt(-g)` for the non-square case) and one inversion.
+  - **Fixtures** (`bn254.jsonl` 336 lines: 110 multiexp, 91 sum, 135 pairing; `bls12381.jsonl` 883: 112 + 120
+    multiexp, 109 + 113 sum, 88 + 88 decompress, 50 + 99 map, 104 pairing; `p256.jsonl` 215; 1.3 MB, the older
+    files unchanged). Valid and invalid: wrong lengths, non-canonical and over-range field elements and scalars,
+    off-curve points, points outside the groups, infinities, flags, opposite and repeated points, up to 64 points,
+    pairings that hold and fail, the exceptional SSWU input, every `p256_verify` edge. `crypto-conformance` runs
+    all of them on `Impl` and, within a size bound (and on one version unless the two differ), on `Spec`;
+    `tools/tests/test_pairing_fixtures.py` recomputes a sample of every function in plain Python integers with
+    `pairing_reference.py` and an RFC 9380 SSWU written again.
+  - **Performance** (same machine as above, best of three; the native column is `crypto-bench curves`, the host
+    functions themselves with `blst` built `portable` as `near-vm-runner` builds it; 2 pairs, 8 points):
+
+    | | Lean | native | Lean / native |
+    |---|---|---|---|
+    | BN254 pairing check, 1 / 2 pairs | 19.2 / 28.1 ms | 2.95 / 4.24 ms | 6.5 / 6.6 |
+    | BN254 `g1_multiexp` 1 / 8 points | 1.65 / 4.93 ms | 195 / 774 µs | 8.5 / 6.4 |
+    | BN254 `g1_sum` 8 points | 145 µs | 13 µs | 11 |
+    | BLS12-381 pairing check, 1 / 2 pairs | 17.0 / 22.2 ms | 0.89 / 1.32 ms | 19 / 17 |
+    | BLS12-381 `p1_sum` / `p2_sum`, 8 points | 218 / 353 µs | 16 / 31 µs | 13 / 11 |
+    | BLS12-381 `g1_multiexp` 1 / 8 points | 2.5 / 12.4 ms | 203 µs / 1.40 ms | 12 / 8.9 |
+    | BLS12-381 `g2_multiexp` 1 / 8 points | 6.5 / 30.2 ms | 279 µs / 3.16 ms | 23 / 9.5 |
+    | BLS12-381 `map_fp_to_g1` / `map_fp2_to_g2` | 1.40 / 3.64 ms | 61 / 185 µs | 23 / 20 |
+    | BLS12-381 `p1_decompress` / `p2_decompress` | 258 / 656 µs | 21 / 39 µs | 12 / 17 |
+    | P-256 `p256_verify` (32-byte digest) | 2.94 ms | 319 µs | 9.2 |
+
+    The native BN254 crate is slow (`zeropool-bn`), so BN254 is the closest. Proposed targets (the code meets
+    them): BN254 pairing checks within 8x, BLS12-381 pairing checks within 20x (about 25 ms for two pairs), sums,
+    multiexp, decompression and `p256_verify` within 25x, the maps within 25x. Levers, none changing a `Spec`: the
+    subgroup tests dominate multiexp (an eighth of a `G2` multiexp is its tests), a GLV/GLS split of the
+    scalars, mixed additions from affine tables, lazy reduction in the tower, and an unboxed limb field once
+    there is a 128-bit product.
+  - **Open.** Nothing here is constant time (all inputs are public). The host functions' gas is the VM's
+    (M3). `p256_verify` and the BLS functions take the arguments after the VM's own length and memory checks.
 
 ### M3 runtime
 
