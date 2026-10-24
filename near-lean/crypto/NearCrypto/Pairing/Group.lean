@@ -25,11 +25,13 @@ structure Fld (α : Type) where
   a : α
 
 /-- The field `Fp` as a record. -/
+@[inline]
 def fpFld (p : Nat) : Fld Nat :=
   { zero := 0, one := 1, add := Fp2.addMod p, sub := Fp2.subMod p, mul := fun a b => a * b % p,
     neg := Fp2.subMod p 0, inv := invMod p, isZero := (· == 0), eq := (· == ·), a := 0 }
 
 /-- The field `Fp2` as a record. -/
+@[inline]
 def fp2Fld (p : Nat) : Fld Fp2 :=
   { zero := Fp2.zero, one := Fp2.one, add := Fp2.add p, sub := Fp2.sub p, mul := Fp2.mul p,
     neg := Fp2.neg p, inv := Fp2.inv p, isZero := Fp2.isZero, eq := (· == ·), a := Fp2.zero }
@@ -57,6 +59,7 @@ def ofAffine (F : Fld α) : Option (α × α) → Jac α
   | some (x, y) => ⟨x, y, F.one⟩
 
 /-- The affine form: one inversion. -/
+@[specialize]
 def toAffine (F : Fld α) (P : Jac α) : Option (α × α) :=
   if F.isZero P.z then none
   else
@@ -68,6 +71,7 @@ def neg (F : Fld α) (P : Jac α) : Jac α :=
   ⟨P.x, F.neg P.y, P.z⟩
 
 /-- Doubling (`dbl-2009-l`; with `a ≠ 0` the slope numerator gains `a Z⁴`, as in `dbl-2007-bl`). -/
+@[specialize]
 def dbl (F : Fld α) (P : Jac α) : Jac α :=
   if F.isZero P.z || F.isZero P.y then inf F
   else
@@ -93,6 +97,7 @@ def dbl (F : Fld α) (P : Jac α) : Jac α :=
     ⟨x3, y3, z3⟩
 
 /-- Addition (`add-2007-bl`) with the special cases. -/
+@[specialize]
 def add (F : Fld α) (P Q : Jac α) : Jac α :=
   if F.isZero P.z then Q
   else
@@ -121,6 +126,7 @@ def add (F : Fld α) (P Q : Jac α) : Jac α :=
         ⟨x3, y3, z3⟩
 
 /-- `k P` by double and add from the top bit. -/
+@[specialize]
 def mul (F : Fld α) (P : Jac α) (k : Nat) : Jac α :=
   Id.run do
     let mut r := inf F
@@ -131,6 +137,7 @@ def mul (F : Fld α) (P : Jac α) (k : Nat) : Jac α :=
     return r
 
 /-- Whether the Jacobian `P` is the affine point `(x, y)`. -/
+@[specialize]
 def eqAffine (F : Fld α) (P : Jac α) (x y : α) : Bool :=
   if F.isZero P.z then false
   else
@@ -159,6 +166,7 @@ def wnaf (k : Nat) (w : Nat) : Array Int :=
 
 /-- `∑ kᵢ Pᵢ` by one chain of doublings shared by all terms, each term added from a table of its
 odd multiples `P, 3 P, …` (window `w`). -/
+@[specialize]
 def multiScalar (F : Fld α) (terms : Array (Jac α × Nat)) (w : Nat := 4) : Jac α :=
   Id.run do
     let n := 1 <<< (w - 2)

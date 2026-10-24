@@ -25,7 +25,8 @@ def ofParams (p a : Nat) : Ctx :=
 
 /-- `ξ x`. -/
 def mulXi (c : Ctx) (x : Fp2) : Fp2 :=
-  ⟨(c.a * x.c0 + (c.p - x.c1)) % c.p, (x.c0 + c.a * x.c1) % c.p⟩
+  if c.a == 1 then ⟨Fp2.subMod c.p x.c0 x.c1, Fp2.addMod c.p x.c0 x.c1⟩
+  else ⟨(c.a * x.c0 + (c.p - x.c1)) % c.p, (x.c0 + c.a * x.c1) % c.p⟩
 
 end Ctx
 
@@ -65,9 +66,9 @@ def mul (c : Ctx) (a b : Fp6) : Fp6 :=
   let v0 := Fp2.mul p a.c0 b.c0
   let v1 := Fp2.mul p a.c1 b.c1
   let v2 := Fp2.mul p a.c2 b.c2
-  let t0 := Fp2.sub p (Fp2.sub p (Fp2.mul p (Fp2.add p a.c1 a.c2) (Fp2.add p b.c1 b.c2)) v1) v2
-  let t1 := Fp2.sub p (Fp2.sub p (Fp2.mul p (Fp2.add p a.c0 a.c1) (Fp2.add p b.c0 b.c1)) v0) v1
-  let t2 := Fp2.sub p (Fp2.sub p (Fp2.mul p (Fp2.add p a.c0 a.c2) (Fp2.add p b.c0 b.c2)) v0) v2
+  let t0 := Fp2.sub p (Fp2.sub p (Fp2.mul p (Fp2.addU a.c1 a.c2) (Fp2.addU b.c1 b.c2)) v1) v2
+  let t1 := Fp2.sub p (Fp2.sub p (Fp2.mul p (Fp2.addU a.c0 a.c1) (Fp2.addU b.c0 b.c1)) v0) v1
+  let t2 := Fp2.sub p (Fp2.sub p (Fp2.mul p (Fp2.addU a.c0 a.c2) (Fp2.addU b.c0 b.c2)) v0) v2
   ⟨Fp2.add p v0 (c.mulXi t0), Fp2.add p t1 (c.mulXi v2), Fp2.add p t2 v1⟩
 
 /-- Square (Chung-Hasan). -/
@@ -91,20 +92,19 @@ def mulV (c : Ctx) (a : Fp6) : Fp6 :=
 def scale (c : Ctx) (a : Fp6) (k : Fp2) : Fp6 :=
   ⟨Fp2.mul c.p a.c0 k, Fp2.mul c.p a.c1 k, Fp2.mul c.p a.c2 k⟩
 
-/-- Product with the coefficients of `b` that are zero skipped (schoolbook). -/
-def mulSparse (c : Ctx) (a b : Fp6) : Fp6 :=
+/-- Product by `b0 + b1 v`: five `Fp2` products. -/
+def mulBy01 (c : Ctx) (a : Fp6) (b0 b1 : Fp2) : Fp6 :=
   let p := c.p
-  let bs := #[b.c0, b.c1, b.c2]
-  let as := #[a.c0, a.c1, a.c2]
-  let r :=
-    Id.run do
-      let mut r : Array Fp2 := Array.replicate 5 Fp2.zero
-      for j in [0:3] do
-        if !(bs[j]!).isZero then
-          for i in [0:3] do
-            r := r.modify (i + j) fun x => Fp2.add p x (Fp2.mul p as[i]! bs[j]!)
-      return r
-  ⟨Fp2.add p r[0]! (c.mulXi r[3]!), Fp2.add p r[1]! (c.mulXi r[4]!), r[2]!⟩
+  let v0 := Fp2.mul p a.c0 b0
+  let v1 := Fp2.mul p a.c1 b1
+  let w := Fp2.mul p a.c2 b1
+  let u := Fp2.mul p a.c2 b0
+  let cross := Fp2.sub p (Fp2.sub p (Fp2.mul p (Fp2.addU a.c0 a.c1) (Fp2.addU b0 b1)) v0) v1
+  ⟨Fp2.add p v0 (c.mulXi w), cross, Fp2.add p v1 u⟩
+
+/-- Product by `b1 v`: three `Fp2` products. -/
+def mulBy1 (c : Ctx) (a : Fp6) (b1 : Fp2) : Fp6 :=
+  ⟨c.mulXi (Fp2.mul c.p a.c2 b1), Fp2.mul c.p a.c0 b1, Fp2.mul c.p a.c1 b1⟩
 
 /-- The inverse. -/
 def inv (c : Ctx) (a : Fp6) : Fp6 :=
@@ -161,6 +161,51 @@ def pow (c : Ctx) (a : Fp12) (e : Nat) : Fp12 :=
       r := sqr c r
       if e.testBit (e.log2 - i) then
         r := mul c r a
+    return r
+
+/-- Squaring in the cyclotomic subgroup (Granger-Scott): the six `Fp2` coefficients of `f` are
+three pairs, each squared in `Fp4 = Fp2[w³] / (w⁶ - ξ)`; nine `Fp2` squarings in place of the
+generic squaring's twelve `Fp2` products. Valid when `f ^ (p⁴ - p² + 1) = 1`, that is after the
+easy part of the final exponentiation. -/
+def cycSqr (c : Ctx) (f : Fp12) : Fp12 :=
+  let p := c.p
+  let fp4 := fun (a b : Fp2) =>
+    let t0 := Fp2.sqr p a
+    let t1 := Fp2.sqr p b
+    (Fp2.add p (c.mulXi t1) t0, Fp2.sub p (Fp2.sub p (Fp2.sqr p (Fp2.add p a b)) t0) t1)
+  -- `3 t - 2 z` and `3 t + 2 z`
+  let minus := fun (t z : Fp2) =>
+    let d := Fp2.sub p t z
+    Fp2.add p (Fp2.add p d d) t
+  let plus := fun (t z : Fp2) =>
+    let d := Fp2.add p t z
+    Fp2.add p (Fp2.add p d d) t
+  let (t0, t1) := fp4 f.c0.c0 f.c1.c1
+  let z0 := minus t0 f.c0.c0
+  let z1 := plus t1 f.c1.c1
+  let (u0, u1) := fp4 f.c1.c0 f.c0.c2
+  let (v0, v1) := fp4 f.c0.c1 f.c1.c2
+  let z4 := minus u0 f.c0.c1
+  let z5 := plus u1 f.c1.c2
+  let w := c.mulXi v1
+  let z2 := plus w f.c1.c0
+  let z3 := minus v0 f.c0.c2
+  ⟨⟨z0, z4, z3⟩, ⟨z2, z1, z5⟩⟩
+
+/-- `f ^ e` for `f` in the cyclotomic subgroup: its squaring, and the non-adjacent form of `e`
+(the inverse is the conjugate). -/
+def powCyc (c : Ctx) (a : Fp12) (e : Nat) : Fp12 :=
+  Id.run do
+    let forms := Jac.wnaf e 2
+    let inv := conj c a
+    let mut r := one
+    for i in [0:forms.size] do
+      r := cycSqr c r
+      let d := forms.getD (forms.size - 1 - i) 0
+      if d > 0 then
+        r := mul c r a
+      else if d < 0 then
+        r := mul c r inv
     return r
 
 end Fp12

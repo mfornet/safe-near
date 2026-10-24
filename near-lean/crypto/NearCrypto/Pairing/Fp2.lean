@@ -41,6 +41,10 @@ def subMod (p a b : Nat) : Nat :=
 def add (p : Nat) (a b : Fp2) : Fp2 :=
   ⟨addMod p a.c0 b.c0, addMod p a.c1 b.c1⟩
 
+/-- The sum without reduction, for an operand of a product (`mul` accepts any size). -/
+def addU (a b : Fp2) : Fp2 :=
+  ⟨a.c0 + b.c0, a.c1 + b.c1⟩
+
 def sub (p : Nat) (a b : Fp2) : Fp2 :=
   ⟨subMod p a.c0 b.c0, subMod p a.c1 b.c1⟩
 
@@ -85,7 +89,8 @@ def pow (p : Nat) (a : Fp2) (e : Nat) : Fp2 :=
 def isSquare (p : Nat) (a : Fp2) : Bool :=
   isSquareMod p ((a.c0 * a.c0 + a.c1 * a.c1) % p)
 
-/-- A square root of `a`, when there is one (any of the two). -/
+/-- A square root of `a`, when there is one (any of the two): for `a₁ ≠ 0` the root `x₀ + x₁ u`
+has `x₀² = (a₀ ± s) / 2` with `s² = a₀² + a₁²` the norm's root, `x₁ = a₁ / (2 x₀)`. -/
 def sqrt (p : Nat) (a : Fp2) : Option Fp2 :=
   let root : Option Fp2 :=
     if a.c1 == 0 then
@@ -98,8 +103,9 @@ def sqrt (p : Nat) (a : Fp2) : Option Fp2 :=
       | some s =>
         let half := (p + 1) / 2
         let t := (a.c0 + s) * half % p
-        let t := if isSquareMod p t then t else (a.c0 + (p - s)) * half % p
-        (sqrtMod p t).map fun x => ⟨x, a.c1 * invMod p (2 * x % p) % p⟩
+        let x := powMod p t ((p + 1) / 4)
+        let x := if x * x % p == t then x else powMod p ((a.c0 + (p - s)) * half % p) ((p + 1) / 4)
+        some ⟨x, a.c1 * invMod p (2 * x % p) % p⟩
   root.filter fun r => sqr p r == a
 
 /-- The sign of an element for hash-to-curve (`sgn0`, RFC 9380 section 4.1, `m = 2`). -/

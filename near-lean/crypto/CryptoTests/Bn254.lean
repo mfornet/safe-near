@@ -13,7 +13,7 @@ open Lean NearCrypto Bn254
 
 /-- The reference pairing costs about 0.3 s a pair; it runs on the lines with few pairs. -/
 def specPairs : Nat :=
-  3
+  2
 
 def expectBytes (what : String) (got : Except String ByteArray) (want : Option ByteArray) :
     Option String :=

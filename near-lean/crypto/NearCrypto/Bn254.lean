@@ -48,6 +48,18 @@ abbrev G1 :=
 abbrev G2 :=
   Option (Fp2 × Fp2)
 
+/-- The generator of `G1`. -/
+def g1Gen : G1 :=
+  some (1, 2)
+
+/-- The generator of `G2`. -/
+def g2Gen : G2 :=
+  some
+    (⟨10857046999023057135944570762232829481370756359578518086990519993285655852781,
+        11559732032986387107991004021392285783925812861821192530917403151452391805634⟩,
+      ⟨8495653923123431417604973247489272438418190587263600148770280649306958101930,
+        4082367875863433681332203403145435568316851327593401208105741076214120093531⟩)
+
 /-- The operations the host functions are built from. -/
 structure Ops where
   /-- `∑ ± Pᵢ` (the flag is the sign: true negates). -/
@@ -97,6 +109,11 @@ def decodeG2 (ops : Ops) (b : ByteArray) (off : Nat) : Option G2 := do
 def encodeG1 : G1 → ByteArray
   | none => zeros 64
   | some (x, y) => toLe x 32 ++ toLe y 32
+
+/-- `G2` as `x ‖ y`, 128 little-endian bytes, zeros for infinity. -/
+def encodeG2 : G2 → ByteArray
+  | none => zeros 128
+  | some (x, y) => toLe x.c0 32 ++ toLe x.c1 32 ++ toLe y.c0 32 ++ toLe y.c1 32
 
 /-- `decode_bool`: 0 or 1. -/
 def decodeBool (b : ByteArray) (off : Nat) : Option Bool :=
@@ -211,7 +228,8 @@ Frobenius `ψ` of the twist: `ψ² - t ψ + p = 0` with the trace `t = 6 x² + 1
 the subgroup. -/
 def inG2 (q : Fp2 × Fp2) : Bool :=
   let psi := (Fp2.mul p (Fp2.conj p q.1) params.twX, Fp2.mul p (Fp2.conj p q.2) params.twY)
-  Jac.eqAffine f2 (Jac.mul f2 (Jac.ofAffine f2 (some q)) (6 * 4965661367192848881 ^ 2)) psi.1 psi.2
+  Jac.eqAffine f2 (Jac.multiScalar f2 #[(Jac.ofAffine f2 (some q), 6 * 4965661367192848881 ^ 2)])
+    psi.1 psi.2
 
 /-- The fast operations. -/
 def ops : Ops :=

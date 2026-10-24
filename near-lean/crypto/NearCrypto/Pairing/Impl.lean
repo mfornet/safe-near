@@ -55,20 +55,22 @@ namespace Impl
 abbrev T3 :=
   Fp2 × Fp2 × Fp2
 
-/-- The sparse `Fp12` element of a line: ordinate, abscissa and constant terms. -/
-def lineElem (P : Params) (cy cx k : Fp2) : Fp12 :=
-  if P.curve.dTwist then ⟨⟨cy, Fp2.zero, Fp2.zero⟩, ⟨cx, k, Fp2.zero⟩⟩
-  else ⟨⟨k, cx, Fp2.zero⟩, ⟨Fp2.zero, cy, Fp2.zero⟩⟩
-
-/-- `f · l` for a line `l`: Karatsuba over `Fp6` with the zero coefficients skipped. -/
-def mulLine (c : Ctx) (f l : Fp12) : Fp12 :=
-  let v0 := Fp6.mulSparse c f.c0 l.c0
-  let v1 := Fp6.mulSparse c f.c1 l.c1
-  ⟨Fp6.add c v0 (Fp6.mulV c v1),
-    Fp6.sub c (Fp6.sub c (Fp6.mulSparse c (Fp6.add c f.c0 f.c1) (Fp6.add c l.c0 l.c1)) v0) v1⟩
+/-- `f · l` for the line with ordinate, abscissa and constant terms `cy`, `cx`, `k`: thirteen
+`Fp2` products. A D-type twist puts them at `1`, `w`, `w³`, so `l = (cy, 0, 0) + (cx, k, 0) w`; an
+M-type twist at `1`, `v`, `w³`, so `l = (k, cx, 0) + (0, cy, 0) w`. -/
+def mulLine (P : Params) (f : Fp12) (cy cx k : Fp2) : Fp12 :=
+  let c := P.ctx
+  let (v0, v1, cross) :=
+    if P.curve.dTwist then
+      (Fp6.scale c f.c0 cy, Fp6.mulBy01 c f.c1 cx k,
+        Fp6.mulBy01 c (Fp6.add c f.c0 f.c1) (Fp2.add c.p cy cx) k)
+    else
+      (Fp6.mulBy01 c f.c0 k cx, Fp6.mulBy1 c f.c1 cy,
+        Fp6.mulBy01 c (Fp6.add c f.c0 f.c1) k (Fp2.add c.p cx cy))
+  ⟨Fp6.add c v0 (Fp6.mulV c v1), Fp6.sub c (Fp6.sub c cross v0) v1⟩
 
 /-- Double `T` and return the line (tangent) at `P = (xP, yP)`. -/
-def dblStep (P : Params) (T : T3) (xP yP : Nat) : T3 × Fp12 :=
+def dblStep (P : Params) (T : T3) (xP yP : Nat) : T3 × (Fp2 × Fp2 × Fp2) :=
   let p := P.ctx.p
   let (X, Y, Z) := T
   let A := Fp2.sqr p X
@@ -89,10 +91,10 @@ def dblStep (P : Params) (T : T3) (xP yP : Nat) : T3 × Fp12 :=
   let cy := Fp2.scale p (Fp2.mul p Z3 Z2) yP
   let cx := Fp2.scale p (Fp2.neg p (Fp2.mul p E Z2)) xP
   let k := Fp2.sub p (Fp2.mul p E X) (Fp2.add p B B)
-  ((X3, Y3, Z3), lineElem P cy cx k)
+  ((X3, Y3, Z3), (cy, cx, k))
 
 /-- Add the affine `Q` to `T` and return the line through them at `P`. -/
-def addStep (P : Params) (T : T3) (Q : Fp2 × Fp2) (xP yP : Nat) : T3 × Fp12 :=
+def addStep (P : Params) (T : T3) (Q : Fp2 × Fp2) (xP yP : Nat) : T3 × (Fp2 × Fp2 × Fp2) :=
   let p := P.ctx.p
   let (X, Y, Z) := T
   let Z2 := Fp2.sqr p Z
@@ -114,7 +116,7 @@ def addStep (P : Params) (T : T3) (Q : Fp2 × Fp2) (xP yP : Nat) : T3 × Fp12 :=
   let cy := Fp2.scale p ZH yP
   let cx := Fp2.scale p (Fp2.neg p R) xP
   let k := Fp2.sub p (Fp2.mul p R Q.1) (Fp2.mul p ZH Q.2)
-  ((X3, Y3, Z3), lineElem P cy cx k)
+  ((X3, Y3, Z3), (cy, cx, k))
 
 /-- The product of the Miller values of the pairs `((xP, yP), Q)`, `P` and `Q` finite. -/
 def millerLoop (P : Params) (pairs : Array ((Nat × Nat) × (Fp2 × Fp2))) : Fp12 :=
@@ -130,13 +132,13 @@ def millerLoop (P : Params) (pairs : Array ((Nat × Nat) × (Fp2 × Fp2))) : Fp1
         let ((xP, yP), _) := pairs[j]!
         let (t, l) := dblStep P ts[j]! xP yP
         ts := ts.set! j t
-        f := mulLine ctx f l
+        f := mulLine P f l.1 l.2.1 l.2.2
       if c.loop.testBit (c.loop.log2 - 1 - i) then
         for j in [0:pairs.size] do
           let ((xP, yP), q) := pairs[j]!
           let (t, l) := addStep P ts[j]! q xP yP
           ts := ts.set! j t
-          f := mulLine ctx f l
+          f := mulLine P f l.1 l.2.1 l.2.2
     if c.bn then
       for j in [0:pairs.size] do
         let ((xP, yP), q) := pairs[j]!
@@ -146,15 +148,15 @@ def millerLoop (P : Params) (pairs : Array ((Nat × Nat) × (Fp2 × Fp2))) : Fp1
         let q2 := frobQ q1
         let q2 := (q2.1, Fp2.neg c.p q2.2)
         let (t, l) := addStep P ts[j]! q1 xP yP
-        f := mulLine ctx f l
+        f := mulLine P f l.1 l.2.1 l.2.2
         let (_, l) := addStep P t q2 xP yP
-        f := mulLine ctx f l
+        f := mulLine P f l.1 l.2.1 l.2.2
     return f
 
 /-- The hard part `f ^ ((p⁴ - p² + 1) / r)` of an element of the cyclotomic subgroup. -/
 def hardPart (P : Params) (t : Fp12) : Fp12 :=
   let c := P.ctx
-  let pow := Fp12.pow c
+  let pow := Fp12.powCyc c
   let mul := Fp12.mul c
   if P.curve.bn then
     let fx := pow t P.x
@@ -168,7 +170,7 @@ def hardPart (P : Params) (t : Fp12) : Fp12 :=
   else
     -- x = -|x|: `a ^ x` is the conjugate of `a ^ |x|`
     let powX := fun a => Fp12.conj c (pow a P.x)
-    let a := pow t ((P.x + 1) ^ 2 / 3)
+    let a := pow (pow t (P.x + 1)) ((P.x + 1) / 3)
     let b := mul (powX a) (Fp12.frob c a)
     let d := mul (mul (powX (powX b)) (Fp12.frob2 c b)) (Fp12.conj c b)
     mul d t

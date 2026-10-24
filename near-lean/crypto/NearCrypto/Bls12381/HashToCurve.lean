@@ -80,6 +80,42 @@ def mapToE2 (u : Fp2) : G2 :=
   isogeny f2 (fp2s Isogeny.xNum2) (fp2s Isogeny.xDen2) (fp2s Isogeny.yNum2) (fp2s Isogeny.yDen2)
     (sswu sfp2 a b ⟨p - 2, p - 1⟩ u)
 
+/-- `-B / A` of the isogenous curve of `E1`. -/
+def negBOverA : Nat :=
+  (p - Isogeny.b1[0]! * invMod p Isogeny.a1[0]! % p) % p
+
+/-- `B / (Z A)`, the abscissa when the denominator of the map vanishes. -/
+def bOverZA : Nat :=
+  Isogeny.b1[0]! * invMod p (11 * Isogeny.a1[0]! % p) % p
+
+/-- `sqrt (-Z³)` for `Z = 11` (`-Z` is a square as `-1` and `Z` are not). -/
+def sqrtMinusZ3 : Nat :=
+  (sqrtMod p (p - 11 ^ 3)).getD 0
+
+/-- The fast version of `mapToE1` (the same map): when `g(x₁)` is not a square then `-g(x₁)` is, with
+root `g(x₁)^((p+1)/4)`, and the ordinate for `x₂ = Z u² x₁` is that root times `sqrt (-Z³) u³`
+(`g(x₂) = Z³ u⁶ g(x₁)`); one inversion in the isogeny. -/
+def mapToE1Fast (u : Nat) : G1 :=
+  let u := u % p
+  let u2 := u * u % p
+  let zu2 := 11 * u2 % p
+  let den := (zu2 * zu2 + zu2) % p
+  let x1 := if den == 0 then bOverZA else negBOverA * (1 + invMod p den) % p
+  let g1 := ((x1 * x1 + Isogeny.a1[0]!) % p * x1 + Isogeny.b1[0]!) % p
+  let t := powMod p g1 ((p + 1) / 4)
+  let (x, y) :=
+    if t * t % p == g1 then (x1, t) else (zu2 * x1 % p, sqrtMinusZ3 * t % p * (u2 * u % p) % p)
+  let y := if (u % 2 == 1) == (y % 2 == 1) then y else (p - y) % p
+  let horner := fun (cs : Array Nat) (monic : Bool) => horner f1 cs monic x
+  let xd := horner Isogeny.xDen1 true
+  let yd := horner Isogeny.yDen1 true
+  if xd == 0 || yd == 0 then none
+  else
+    let i := invMod p (xd * yd % p)
+    some
+      (horner Isogeny.xNum1 false * yd % p * i % p,
+        y * horner Isogeny.yNum1 false % p * xd % p * i % p)
+
 /-- The clearing of the cofactor of `G1`: `[1 - z] P = [|z| + 1] P`. -/
 def clear1 (P : G1) : G1 :=
   Jac.toAffine f1 (Jac.mul f1 (Jac.ofAffine f1 P) (z + 1))

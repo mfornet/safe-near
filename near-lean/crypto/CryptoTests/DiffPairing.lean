@@ -93,6 +93,10 @@ def tests (K : Kit) (t : Tally) (r : Rng) : Tally × Rng :=
       t :=
         chk t s!"{n} tower sqr {i}"
           (toFlat c (Fp12.sqr ctx a) == Spec.mul c (toFlat c a) (toFlat c a))
+      -- squaring in the cyclotomic subgroup, on the image of the easy part of the final exponent
+      let e := Fp12.mul ctx (Fp12.conj ctx a) (Fp12.inv ctx a)
+      let e := Fp12.mul ctx (Fp12.frob2 ctx e) e
+      t := chk t s!"{n} cyclotomic square {i}" (Fp12.cycSqr ctx e == Fp12.sqr ctx e)
       t := chk t s!"{n} tower inv {i}" (Fp12.mul ctx a (Fp12.inv ctx a) == Fp12.one)
       t := chk t s!"{n} tower frob {i}" (toFlat c (Fp12.frob ctx a) == Spec.pow c (toFlat c a) c.p)
       t :=
@@ -131,23 +135,12 @@ def tests (K : Kit) (t : Tally) (r : Rng) : Tally × Rng :=
     return (t, r)
 
 def bn254Kit : Kit :=
-  { name := "bn254", curve := Bn254.curve, params := Bn254.Impl.params, g1 := (1, 2),
-    g2 :=
-      (⟨10857046999023057135944570762232829481370756359578518086990519993285655852781,
-          11559732032986387107991004021392285783925812861821192530917403151452391805634⟩,
-        ⟨8495653923123431417604973247489272438418190587263600148770280649306958101930,
-          4082367875863433681332203403145435568316851327593401208105741076214120093531⟩) }
+  { name := "bn254", curve := Bn254.curve, params := Bn254.Impl.params,
+    g1 := Bn254.g1Gen.getD (0, 0), g2 := Bn254.g2Gen.getD (default, default) }
 
 def blsKit : Kit :=
   { name := "bls12381", curve := Bls12381.curve, params := Bls12381.params,
-    g1 :=
-      (0x17f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac586c55e83ff97a1aeffb3af00adb22c6bb,
-        0x08b3f481e3aaa0f1a09e30ed741d8ae4fcf5e095d5d00af600db18cb2c04b3edd03cc744a2888ae40caa232946c5e7e1),
-    g2 :=
-      (⟨0x024aa2b2f08f0a91260805272dc51051c6e47ad4fa403b02b4510b647ae3d1770bac0326a805bbefd48056c8c121bdb8,
-          0x13e02b6052719f607dacd3a088274f65596bd0d09920b61ab5da61bbdc7f5049334cf11213945d57e5ac7d055d042b7e⟩,
-        ⟨0x0ce5d527727d6e118cc9cdc6da2e351aadfd9baa8cbdd3a76d429a695160d12c923ac9cc3baca289e193548608b82801,
-          0x0606c4a02ea734cc32acd2b02bc28b99cb3e287e85a763af267492ab572e99ab3f370d275cec1da1aaa9075ff05f79be⟩) }
+    g1 := Bls12381.g1Gen.getD (0, 0), g2 := Bls12381.g2Gen.getD (default, default) }
 
 /-- A point of `E(Fp)` by abscissa: on the curve, outside `G1` in general. -/
 def randE1 (r : Rng) : Option (Nat × Nat) × Rng :=
@@ -162,6 +155,10 @@ def randE1 (r : Rng) : Option (Nat × Nat) × Rng :=
       | none =>
         pure ()
     return (none, r)
+
+/-- A field element with `11 u² = -1`, where the denominator of the SSWU map vanishes. -/
+def exceptionalU : Nat :=
+  0x01f7462c8b6cbf74db38f4a9a3d71bda12f01df4948d09ff046edbdd403fc31088b69520ee5c57fb7cc51062bde821b8
 
 /-- BLS12-381 host-level operations: the fast ones against the reference ones. -/
 def blsOpsTests (t : Tally) (r : Rng) : Tally × Rng :=
@@ -205,6 +202,9 @@ def blsOpsTests (t : Tally) (r : Rng) : Tally × Rng :=
       let (u, r4) := below r c.p
       let (v, r5) := below r4 c.p
       r := r5
+      t :=
+        chk t s!"bls map g1 fast = reference {i}"
+          (Bls12381.HashToCurve.mapToE1Fast u == Bls12381.HashToCurve.mapToE1 u)
       let m1 := Bls12381.HashToCurve.clear1 (Bls12381.HashToCurve.mapToE1 u)
       t :=
         chk t s!"bls map g1 {i}"
@@ -213,6 +213,30 @@ def blsOpsTests (t : Tally) (r : Rng) : Tally × Rng :=
       t :=
         chk t s!"bls map g2 {i}"
           (Bls12381.Impl.inG2 m2 && Bls12381.Spec.inGroup F2 m2 && m2 != none)
+    -- compression and decompression are inverse on the groups
+    for i in [0:4] do
+      let (k, r1) := below r c.r
+      r := r1
+      let p1 := mulG1 K k
+      let p2 := mulG2 K k
+      t :=
+        chk t s!"bls compress g1 {i}"
+          ((Bls12381.pDecompress Bls12381.Impl.g1 0 (Bls12381.compressG1 p1)).toOption ==
+            some (some (Bls12381.serializeG1 p1)))
+      t :=
+        chk t s!"bls compress g2 {i}"
+          ((Bls12381.pDecompress Bls12381.Impl.g2 0 (Bls12381.compressG2 p2)).toOption ==
+            some (some (Bls12381.serializeG2 p2)))
+      let n1 := Jac.toAffine F1 (Jac.neg F1 (Jac.ofAffine F1 p1))
+      t :=
+        chk t s!"bls compress g1 negated {i}"
+          ((Bls12381.pDecompress Bls12381.Impl.g1 0 (Bls12381.compressG1 n1)).toOption ==
+            some (some (Bls12381.serializeG1 n1)))
+    -- the exceptional abscissa (11 u² = -1) and zero
+    for u in [0, 1, Bls12381.p - 1, exceptionalU] do
+      t :=
+        chk t s!"bls map g1 fast = reference at {u}"
+          (Bls12381.HashToCurve.mapToE1Fast u == Bls12381.HashToCurve.mapToE1 u)
     -- the order-3 points (0, ±2) are outside G1 for both tests
     t :=
       chk t "bls order 3"

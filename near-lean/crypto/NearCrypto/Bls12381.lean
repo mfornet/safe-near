@@ -98,6 +98,20 @@ def largeFp (y : Nat) : Bool :=
 def largeFp2 (y : Fp2) : Bool :=
   if y.c1 != 0 then largeFp y.c1 else largeFp y.c0
 
+/-- The compressed form of a point of `G1`: the abscissa with the flags `0x80` and, for the larger
+ordinate, `0x20` (infinity: `0xc0` and zeros). -/
+def compressG1 : G1 → ByteArray
+  | none => (zeros 48).set! 0 0xc0
+  | some (x, y) =>
+    let b := toBe x 48
+    b.set! 0 (b.get! 0 ||| 0x80 ||| if largeFp y then 0x20 else 0)
+
+def compressG2 : G2 → ByteArray
+  | none => (zeros 96).set! 0 0xc0
+  | some (x, y) =>
+    let b := toBe x.c1 48 ++ toBe x.c0 48
+    b.set! 0 (b.get! 0 ||| 0x80 ||| if largeFp2 y then 0x20 else 0)
+
 /-- `blst_p1_deserialize` for a 96-byte item without the compressed flag, `parse_p1`: `version = 0`
 also rejects `(0, ±2)`. The infinity is `some none`. -/
 def parseG1 (version : Nat) (b : ByteArray) (off : Nat) : Option G1 :=
