@@ -240,6 +240,14 @@ def outcomeOfExecution (ctx : VMContext) (storage : List (List UInt8 × List UIn
           usedGas := ns.gas.used + distributed.2
           distributedGas := distributed.2 }
 
+/-- A host function nearcore does not link at this protocol version
+(`imports.rs`: `#[global_contract_host_fns]`). The other gated imports are
+not in the host table, so they are unsupported-host issues. -/
+def disabledHost (cfg : RuntimeConfig) (name : String) : Bool :=
+  !cfg.wasm.globalContractHostFns &&
+    ["promise_batch_action_deploy_global_contract", "promise_batch_action_deploy_global_contract_by_account_id",
+     "promise_batch_action_use_global_contract", "promise_batch_action_use_global_contract_by_account_id"].contains name
+
 /-- nearcore's `prepare_v3` limits, checked in its section order: types,
 imports (`env` functions only, counted as functions), tables and their
 initial size, defined functions, then each body's size and locals.
@@ -309,6 +317,11 @@ def runAttempt (cfg : RuntimeConfig) (code : Module) (codeSize : Nat) (method : 
   if code.start.isSome then
     VMOutcome.failedBefore ctx storage gas1.burnt
       (.executionIssue (.interpreterError "start function")) host1.gasProfile
+  else
+  -- nearcore links a gated host only when its protocol feature is on, and links
+  -- before it looks the method up.
+  if code.importDecls.any (fun decl => decl.module == "env" && disabledHost cfg decl.name) then
+    VMOutcome.failedBefore ctx storage gas1.burnt (.linkError "unknown or invalid import") host1.gasProfile
   else
   -- Legacy protocols discard the loading charge on method-resolution failure,
   -- but loading exhaustion still takes precedence over an absent export.
@@ -439,25 +452,27 @@ theorem runAttempt_cases (cfg : RuntimeConfig) (code : Module) (codeSize : Nat) 
           · split
             · left; exact ⟨host1, none, _, _, _, rfl, Nat.le_refl _, rfl⟩
             · split
-              · left; exact ⟨host1, none, _, _, _, rfl, hle, rfl⟩
+              · left; exact ⟨host1, none, _, _, _, rfl, Nat.le_refl _, rfl⟩
               · split
                 · left; exact ⟨host1, none, _, _, _, rfl, hle, rfl⟩
                 · split
                   · left; exact ⟨host1, none, _, _, _, rfl, hle, rfl⟩
                   · split
-                    · left; exact ⟨host1, none, _, _, _, rfl, Nat.le_refl _, rfl⟩
-                    · rename_i env hresolve
-                      cases halloc : env.allocate (Store.empty host1) with
-                      | mk store imports =>
-                        dsimp only
-                        split
-                        · left; exact ⟨host1, none, _, _, _, rfl, Nat.le_refl _, rfl⟩
-                        · rename_i result store' inst hinst
+                    · left; exact ⟨host1, none, _, _, _, rfl, hle, rfl⟩
+                    · split
+                      · left; exact ⟨host1, none, _, _, _, rfl, Nat.le_refl _, rfl⟩
+                      · rename_i env hresolve
+                        cases halloc : env.allocate (Store.empty host1) with
+                        | mk store imports =>
+                          dsimp only
                           split
                           · left; exact ⟨host1, none, _, _, _, rfl, Nat.le_refl _, rfl⟩
-                          · rename_i c hstart
-                            right
-                            exact ⟨host1, env, store, imports, _, store', inst, _, c, rfl, hresolve,
-                              halloc, hinst, hstart, rfl⟩
+                          · rename_i result store' inst hinst
+                            split
+                            · left; exact ⟨host1, none, _, _, _, rfl, Nat.le_refl _, rfl⟩
+                            · rename_i c hstart
+                              right
+                              exact ⟨host1, env, store, imports, _, store', inst, _, c, rfl, hresolve,
+                                halloc, hinst, hstart, rfl⟩
 
 end Wasm.Near

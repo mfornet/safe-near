@@ -69,9 +69,10 @@ and its `_by_account_id` variant: both identifiers, malformed hashes,
 out-of-bounds reads, invalid, over-long and non-UTF-8 account ids (accepted at
 v78, rejected by v86's account id rules), invalid promise indices, view calls,
 rollback on panic and fee exhaustion. The fees come from nearcore's `77.yaml`
-(the config view omits them); these comparisons confirm them exactly. Earlier
-protocol versions are not compared: nearcore rejects the import there, while
-the model's host table is not gated by protocol version.
+(the config view omits them); these comparisons confirm them exactly.
+`global_contract_v73.json` checks that before v78 nearcore does not link these
+hosts: importing one fails with "unknown or invalid import" after the loading
+charge, even when the method does not exist.
 
 `value_return.json` returns values below, at and one byte over
 `max_length_returned_data`, and from out-of-bounds memory, with and without

@@ -187,7 +187,7 @@ inductive FunctionCallError
 
 def FunctionCallError.message : FunctionCallError → String
   | .compilationError m => s!"CompilationError({m})"
-  | .linkError m => s!"LinkError({m})"
+  | .linkError m => m
   | .methodResolveError .methodEmptyName => "MethodEmptyName"
   | .methodResolveError .methodNotFound => "MethodNotFound"
   | .methodResolveError .methodInvalidSignature => "MethodInvalidSignature"

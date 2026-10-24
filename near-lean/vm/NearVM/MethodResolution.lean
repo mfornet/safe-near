@@ -75,7 +75,9 @@ theorem runAttempt_not_exported (cfg : RuntimeConfig) (code : Module) (codeSize 
         · exact ⟨_, _, _, rfl, rfl⟩
         · simp only [prepareMemory_start, hstart, Option.isSome_none, Bool.false_eq_true, ite_false,
             prepareMemory_exportFunc, hexport]
-          exact ⟨_, _, _, rfl, rfl⟩
+          split
+          · exact ⟨_, _, _, rfl, rfl⟩
+          · exact ⟨_, _, _, rfl, rfl⟩
 
 /-- The same at the public VM boundary. -/
 theorem run_not_exported (cfg : RuntimeConfig) (code : Module) (codeSize : Nat)

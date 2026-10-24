@@ -62,6 +62,9 @@ structure WasmConfig where
   ethImplicitAccounts : Bool := false
   /-- Whether method-resolution failures retain the contract-loading charge. -/
   fixContractLoadingCost : Bool := false
+  /-- `global_contract_host_fns`: the global-contract host functions are
+  linked (protocol 78 on); before, importing one fails to link. -/
+  globalContractHostFns : Bool := false
   limits : LimitConfig
   deriving Inhabited
 
@@ -254,6 +257,7 @@ def ofJson (j : Json) : Except String RuntimeConfig := do
       ethImplicitAccounts := ← (← field wasm "eth_implicit_accounts").getBool?
       oneYoctoOnPromise := ← (← field wasm "one_yocto_on_promise").getBool?
       fixContractLoadingCost := ← (← field wasm "fix_contract_loading_cost").getBool?
+      globalContractHostFns := hostFns
       limits := ← limits (← field wasm "limit_config") }
     accountCreation := {
       minAllowedTopLevelAccountLength := ← nat acc "min_allowed_top_level_account_length"
