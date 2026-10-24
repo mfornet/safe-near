@@ -236,6 +236,211 @@ def signTests (t : Tally) (r : Rng) : Tally × Rng :=
             !Spec.verify sk.publicKey msg (sig.push 0))
     return (t, r)
 
+/-! ### secp256k1 -/
+
+/-- Field values that stress the limb boundaries. -/
+def secpFieldEdges : List Nat :=
+  [0, 1, 2, 977, 2 ^ 32, 2 ^ 32 + 977, Secp256k1.p - 1, Secp256k1.p, Secp256k1.p + 1,
+    Secp256k1.p - 2 ^ 32, 2 ^ 256 - 1, 2 ^ 255, 2 ^ 234, 2 ^ 234 - 1, 2 ^ 26, 2 ^ 26 - 1, 2 ^ 52,
+    2 ^ 208 - 1, 2 ^ 128, 2 ^ 129 + 12345, Secp256k1.n, Secp256k1.n - 1]
+
+def secpFieldTests (t : Tally) (r : Rng) : Tally × Rng :=
+  Id.run do
+    let mut t := t
+    let mut r := r
+    let p := Secp256k1.p
+    t := check t "secp prime" (Secp256k1.p == Secp256k1.Spec.p)
+    t := check t "secp order" (Secp256k1.n == Secp256k1.Spec.n)
+    let mut values := secpFieldEdges
+    for _ in [0:60] do
+      let (a, r') := r.nat 32
+      r := r'
+      values := values ++ [a]
+    for a in values do
+      let fa := Secp256k1.Fp.ofNat a
+      t := check t s!"secp toNat {a}" (fa.toNat == a % p)
+      t := check t s!"secp isZero {a}" (fa.isZero == (a % p == 0))
+      t := check t s!"secp sq {a}" ((Secp256k1.Fp.sq fa).toNat == a * a % p)
+      t := check t s!"secp neg {a}" ((Secp256k1.Fp.neg fa).toNat == (p - a % p) % p)
+      t := check t s!"secp inv {a}" ((Secp256k1.Fp.inv fa).toNat == Secp256k1.Spec.inv p a)
+      t := check t s!"secp mulInt {a}" ((Secp256k1.Fp.mulInt fa 15632).toNat == a * 15632 % p)
+      t := check t s!"secp toBytes {a}" (fa.toBytes == Secp256k1.Spec.ofNat 32 (a % p))
+      let root := Secp256k1.Fp.sqrt fa
+      let want := Secp256k1.Spec.sqrt a
+      t :=
+        check t s!"secp sqrt {a}"
+          (root.isSome == want.isSome && (root.all fun x => x.toNat * x.toNat % p == a % p))
+    for (a, b) in values.zip (values.drop 7 ++ values.take 7) do
+      let (fa, fb) := (Secp256k1.Fp.ofNat a, Secp256k1.Fp.ofNat b)
+      t := check t s!"secp mul {a} {b}" ((Secp256k1.Fp.mul fa fb).toNat == a * b % p)
+      t := check t s!"secp add {a} {b}" ((Secp256k1.Fp.add fa fb).toNat == (a + b) % p)
+      t := check t s!"secp sub {a} {b}" ((Secp256k1.Fp.sub fa fb).toNat == (a % p + p - b % p) % p)
+      t := check t s!"secp eq {a} {b}" (Secp256k1.Fp.eq fa fb == (a % p == b % p))
+      -- long chains keep every limb in range
+      let chain :=
+        (List.range 20).foldl
+          (fun x _ => Secp256k1.Fp.sub (Secp256k1.Fp.mul x fb) (Secp256k1.Fp.add x fa)) fa
+      let chainNat := (List.range 20).foldl (fun x _ => ((x * b) % p + p - (x + a) % p) % p) (a % p)
+      t := check t s!"secp chain {a} {b}" (chain.toNat == chainNat)
+    return (t, r)
+
+def secpScalarTests (t : Tally) (r : Rng) : Tally × Rng :=
+  Id.run do
+    let mut t := t
+    let mut r := r
+    let n := Secp256k1.n
+    for a in [1, 2, 3, n - 1, n - 2, n / 2, n / 2 + 1, 2 ^ 128, 2 ^ 255 % n] do
+      t := check t s!"scalar inv {a}" (Secp256k1.Scalar.inv a n == Secp256k1.Spec.inv n a)
+    for i in [0:30] do
+      let (a, r') := r.nat 32
+      r := r'
+      let a := a % (n - 1) + 1
+      t := check t s!"scalar inv random {i}" (a * Secp256k1.Scalar.inv a n % n == 1)
+      let (b, r') := r.nat 32
+      r := r'
+      t :=
+        check t s!"scalar bytes {i}"
+          (Secp256k1.Scalar.ofBytes (Secp256k1.Scalar.toBytes b) == b &&
+            Secp256k1.Scalar.toBytes b == Secp256k1.Spec.ofNat 32 b)
+    return (t, r)
+
+/-- An affine point of the fast code as the `Spec` one. -/
+def secpSpec (P : Option Secp256k1.Aff) : Secp256k1.Spec.Point :=
+  P.map fun Q => (Q.x.toNat, Q.y.toNat)
+
+def secpPointTests (t : Tally) (r : Rng) : Tally × Rng :=
+  Id.run do
+    let mut t := t
+    let mut r := r
+    let n := Secp256k1.n
+    let G := Secp256k1.Aff.base
+    let specG := Secp256k1.Spec.basePoint
+    t := check t "secp base point" (secpSpec (some G) == specG)
+    t := check t "secp base on curve" G.onCurve
+    t :=
+      check t "secp base table"
+        (Secp256k1.baseTable.size == 128 && secpSpec (some Secp256k1.baseTable[0]!) == specG &&
+          secpSpec (some Secp256k1.baseTable[127]!) == Secp256k1.Spec.ecmult 0 none 255)
+    -- scalars that exercise the recoding and the exceptional additions
+    let edgeScalars :=
+      [0, 1, 2, 3, 15, 16, 255, 256, 2 ^ 128, n - 1, n, n + 1, 2 ^ 255, 2 ^ 256 - 1]
+    for k in edgeScalars do
+      t :=
+        check t s!"secp mulBase {k}"
+          (secpSpec (Secp256k1.Jac.mulBase k).toAff == Secp256k1.Spec.ecmult 0 none k)
+    for k in edgeScalars do
+      for l in [0, 1, 2, n - 1, n, 12345, 2 ^ 200] do
+        t :=
+          check t s!"secp ecmult {k} {l}"
+            (secpSpec (Secp256k1.Jac.ecmult k G l).toAff == Secp256k1.Spec.ecmult k specG l)
+    -- a·G + b·G with a + b ≡ 0 or a = b (the doubling and the opposite cases)
+    for (a, b) in [(5, n - 5), (5, 5), (n - 1, 1), (7, 7), (2 ^ 200, n - 2 ^ 200)] do
+      t :=
+        check t s!"secp ecmult same point {a} {b}"
+          (secpSpec (Secp256k1.Jac.ecmult a G b).toAff == Secp256k1.Spec.ecmult a specG b)
+    for i in [0:25] do
+      let (a, r') := r.nat 32
+      let (b, r') := r'.nat 32
+      let (c, r') := r'.nat 32
+      r := r'
+      let some P := (Secp256k1.Jac.mulBase (c % n)).toAff | t := check t s!"secp point {i}" false
+      let specP := secpSpec (some P)
+      t :=
+        check t s!"secp ecmult random {i}"
+          (secpSpec (Secp256k1.Jac.ecmult a P b).toAff == Secp256k1.Spec.ecmult a specP b)
+      t :=
+        check t s!"secp ecmult random 2 {i}"
+          (secpSpec (Secp256k1.Jac.ecmult (a % n) P (b % 2 ^ 128)).toAff ==
+            Secp256k1.Spec.ecmult (a % n) specP (b % 2 ^ 128))
+    return (t, r)
+
+def secpKeyTests (t : Tally) (r : Rng) : Tally × Rng :=
+  Id.run do
+    let mut t := t
+    let mut r := r
+    let n := Secp256k1.n
+    for i in [0:60] do
+      let (sk, r') := r.bytes 32
+      let (junk, r') := r'.bytes 65
+      let (msg, r') := r'.bytes 32
+      let (flip, r') := r'.below 520
+      let (small, r') := r'.below 130
+      r := r'
+      -- the secret key is valid for most `i`; the others cover 0, n and 2^256 - 1
+      let sk :=
+        match i % 20 with
+        | 7 => zeros 32
+        | 11 => Secp256k1.Spec.ofNat 32 n
+        | 13 => ByteArray.mk (Array.replicate 32 0xff)
+        | _ => sk
+      t :=
+        check t s!"secp validSecret {i}"
+          (Secp256k1.Impl.validSecret sk == Secp256k1.Spec.validSecret sk)
+      t :=
+        check t s!"secp publicKey {i}"
+          (Secp256k1.Impl.publicKey sk ==
+            (Secp256k1.Spec.publicKey sk).map fun (x, y) => Secp256k1.Spec.serializeRaw x y)
+      let sig := Secp256k1.Impl.signRecoverable sk msg
+      t := check t s!"secp sign {i}" (sig == Secp256k1.Spec.signRecoverable sk msg)
+      if let some sig := sig then
+        let some pk := Secp256k1.Impl.publicKey sk | t := check t s!"secp key {i}" false
+        t :=
+          check t s!"secp verify {i}"
+            (Secp256k1.Impl.verify pk msg sig && Secp256k1.Spec.verify pk msg sig)
+        t :=
+          check t s!"secp recover {i}"
+            (Secp256k1.Impl.recoverKey msg sig == some pk &&
+              Secp256k1.Spec.recoverKey msg sig == some pk)
+        -- one flipped bit of the signature or of the key
+        let flipBit (b : ByteArray) (k : Nat) : ByteArray :=
+          b.set! (k / 8) (b.get! (k / 8) ^^^ (1 <<< (k % 8).toUInt8))
+        let bad := flipBit sig (flip % 520)
+        t :=
+          check t s!"secp verify edited {i}"
+            (Secp256k1.Impl.verify pk msg bad == Secp256k1.Spec.verify pk msg bad)
+        t :=
+          check t s!"secp recover edited {i}"
+            (Secp256k1.Impl.recoverKey msg bad == Secp256k1.Spec.recoverKey msg bad)
+        let badKey := flipBit pk (flip % 512)
+        t :=
+          check t s!"secp verify edited key {i}"
+            (Secp256k1.Impl.verify badKey msg sig == Secp256k1.Spec.verify badKey msg sig)
+        -- the high-s twin: recovers the same key with the other parity, never verifies
+        let s := Secp256k1.Scalar.ofBytes sig 32
+        let high :=
+          sig.extract 0 32 ++ Secp256k1.Scalar.toBytes (n - s) ++
+            (ByteArray.empty.push (sig.get! 64 ^^^ 1))
+        t :=
+          check t s!"secp high-s {i}"
+            (!Secp256k1.Impl.verify pk msg high && !Secp256k1.Spec.verify pk msg high &&
+              Secp256k1.Impl.recoverKey msg high == some pk)
+      -- random signatures: small `r` gives the recovery ids 2 and 3
+      let rSmall := Secp256k1.Spec.toNat (junk.extract 0 (small / 8 + 1)) % 2 ^ (small + 1)
+      for v in ([0, 1, 2, 3] : List Nat) do
+        let rs := Secp256k1.Spec.ofNat 32 rSmall ++ junk.extract 32 64
+        let s65 := rs.push v.toUInt8
+        let implKey := Secp256k1.Impl.recoverKey msg s65
+        t := check t s!"secp recover small r {i} {v}" (implKey == Secp256k1.Spec.recoverKey msg s65)
+        t :=
+          check t s!"secp ecrecover {i} {v}"
+            (Secp256k1.Impl.ecrecover msg rs v false == Secp256k1.Spec.ecrecover msg rs v false &&
+              Secp256k1.Impl.ecrecover msg rs v true == Secp256k1.Spec.ecrecover msg rs v true)
+        let rs2 := junk.extract 0 64
+        t :=
+          check t s!"secp recover random {i} {v}"
+            (Secp256k1.Impl.recoverKey msg (rs2.push v.toUInt8) ==
+              Secp256k1.Spec.recoverKey msg (rs2.push v.toUInt8))
+      -- public key parsing of random 33 and 65 byte strings, with the tags that parse
+      let tag : UInt8 := [2, 3, 4, 6, 7, 0, 5][i % 7]!
+      let candidate :=
+        (ByteArray.empty.push tag) ++ junk.extract 0 (if tag == 2 || tag == 3 then 32 else 64)
+      t :=
+        check t s!"secp parse random {i}"
+          ((Secp256k1.Impl.parsePublicKey candidate).map Secp256k1.Impl.serializeRaw ==
+            (Secp256k1.Spec.parsePublicKey candidate).map fun (x, y) =>
+              Secp256k1.Spec.serializeRaw x y)
+    return (t, r)
+
 def main : IO UInt32 := do
   let mut t : Tally := {}
   let mut r : Rng := ⟨0x4e45415243525950⟩
@@ -246,4 +451,8 @@ def main : IO UInt32 := do
   (t, r) := pointTests t r
   (t, r) := decodeTests t r
   (t, r) := signTests t r
+  (t, r) := secpFieldTests t r
+  (t, r) := secpScalarTests t r
+  (t, r) := secpPointTests t r
+  (t, r) := secpKeyTests t r
   finish "crypto-differential" t

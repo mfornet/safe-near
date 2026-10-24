@@ -24,6 +24,10 @@ class GeneratedSourceTests(unittest.TestCase):
         committed = (CRYPTO / "NearCrypto/Ed25519/FeMul.lean").read_text()
         self.assertEqual(tokens(generated("gen_fe.py")), tokens(committed))
 
+    def test_fp_mul_is_up_to_date(self):
+        committed = (CRYPTO / "NearCrypto/Secp256k1/FpMul.lean").read_text()
+        self.assertEqual(tokens(generated("gen_fp.py")), tokens(committed))
+
     def test_sha2_rounds_are_up_to_date(self):
         committed = (CRYPTO / "NearCrypto/Sha2Rounds.lean").read_text()
         self.assertEqual(tokens(generated("gen_sha.py")), tokens(committed))

@@ -5,3 +5,5 @@ import NearCrypto.Ripemd160
 import NearCrypto.Ed25519
 import NearCrypto.Blake2b
 import NearCrypto.Hmac
+import NearCrypto.Secp256k1
+import NearCrypto.Secp256k1.Spec
