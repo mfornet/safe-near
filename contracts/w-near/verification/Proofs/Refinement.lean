@@ -26,7 +26,8 @@ are protocol parameters: `gasBound` is a sum of constants measured under this
 configuration, and the binary's logs and register reads succeed only under
 its limits, so the statement does not hold for every configuration.
 
-The theorem is the only open proof in the project. `just wnear-audit`
+`refines_wnear_exported` (the 15 exported methods) is the only open proof in
+this project; `refines_wnear` and its corollaries depend on it. `just wnear-audit`
 tolerates `sorryAx` in this module alone.
 -/
 

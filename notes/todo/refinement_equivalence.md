@@ -1,10 +1,9 @@
 # Restructure refinement as a generic, complete statement
 
-Follow-up task, blocked on the current large rewrite. Goal: replace the
-per-contract refinement statements
-(`contracts/w-near/verification/Spec/Refinement.lean`,
-`contracts/linkdrop/verification/Spec/Refinement.lean`) by one generic
-definition that characterises every execution of the binary: no input, gas
+Implemented (see section 10 for the status); sections 1 to 9 are the design
+that was followed. The task was to replace the per-contract refinement
+statements (formerly `Spec/Refinement.lean` of wNEAR and linkdrop) by one
+generic definition that characterises every execution of the binary: no input, gas
 amount or resource state is excluded by a hypothesis.
 
 This document fixes the design. The agent implements it; it does not re-open
@@ -449,5 +448,4 @@ it is in this branch's history. The near-lean support above stays.
 - `near-lean/.lake` was tracked as a symlink into one machine's home
   directory; it is no longer tracked.
 - `just near-test` needs the external `wasm-tools` binary (1.251.0, as pinned
-  in `contracts/linkdrop/verification/binary-boundary.json`) for decoder
-  fixtures; with it, VM (103) and runtime (179) tests pass.
+  in `.github/workflows/wasm.yml`) for decoder fixtures; with it, VM (103) and runtime (179) tests pass.

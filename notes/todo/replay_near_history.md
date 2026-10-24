@@ -1,6 +1,6 @@
-We have much of the differential-testing infrastructure, but **exact historical replay is not implemented yet**.
+# Replay NEAR history
 
-I saved a detailed [design and gap analysis](/Users/marcelo/.codex/worktrees/8766/safe-near/notes/design/HISTORICAL_RUNTIME_REPLAY.md) and linked it from the project notes/TODO.
+We have much of the differential-testing infrastructure, but **exact historical replay is not implemented yet**.
 
 What already exists:
 
@@ -24,5 +24,3 @@ Nearcore already has a useful extraction seam in its [historical apply-range and
 The main missing pieces are the historical exporter, faithful epoch/shard context, external receipt ingestion, witness-backed Lean storage, and complete outcome/metadata serialization comparison.
 
 **Recommended first milestone:** one downloadable, offline historical chunk fixture, independently checked against the archive. Establish that before building a large corpus.
-
-Validation: 30 offline chain-tooling tests passed; execution comparisons were not rerun because the binaries are not built in this worktree.

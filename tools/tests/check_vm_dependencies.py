@@ -43,6 +43,17 @@ class VMDependencyFixtureTests(unittest.TestCase):
             self.assertEqual(json.loads(report.read_text())["forbidden"], ["Interpreter.Wasm.Semantics"])
             self.assertIn("legacy interpreter", result.stdout)
 
+            # Node-side packages are forbidden the same way.
+            (root / "lakefile.toml").write_text(
+                (root / "lakefile.toml").read_text() + '[[lean_lib]]\nname = "NearChain"\n')
+            (root / "NearChain.lean").write_text('def chainValue : Nat := 4\n')
+            (wasm / "Bridge.lean").write_text('import NearChain\n')
+            subprocess.run(["lake", "build", "NearVM"], cwd=root, check=True, capture_output=True)
+            result = dependencies.audit(root, report)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(json.loads(report.read_text())["forbidden"], ["NearChain"])
+            self.assertIn("node packages", result.stdout)
+
             (root / "NearVM.lean").write_text('def disconnected : Nat := 3\n')
             subprocess.run(["lake", "build", "NearVM"], cwd=root, check=True, capture_output=True)
             result = dependencies.audit(root, report)

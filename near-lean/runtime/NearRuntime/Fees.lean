@@ -118,6 +118,8 @@ structure TxCost where
   receiptGasPrice : Nat
   total : Nat
 
+-- nearcore divergence: no `signature_verification_cost`. It is zero for Ed25519/secp256k1 and
+-- the model rejects other key types (`Transaction.signatureSize?`), so the cost is always 0.
 def txCost (cfg : RuntimeConfig) (gasPrice : Nat) (signer receiver : AccountId)
     (actions : List Action) : TxCost :=
   let f := cfg.fees.actionFees

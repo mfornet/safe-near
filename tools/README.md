@@ -42,10 +42,10 @@ repository-owned Lake package also carries that pin so it works independently.
 including newly added local files. Submodules and ignored build dependencies
 are outside its scope. When upgrading Lean, update all pins together.
 
-The Lean quality workflow runs the pin check, tool tests, source-style checks,
-and syntax-formatting checks for the two new program harness modules.
-The text-style driver uses the Mathlib revision in the Wasm package's
-committed Lake manifest. It checks line endings, trailing whitespace,
+The Lean quality workflow runs the pin check and the offline tool tests on
+every push; the source-style and formatter integration checks run only when
+the workflow is dispatched by hand. The text-style driver uses the Mathlib
+revision in the VM package's committed Lake manifest. It checks line endings, trailing whitespace,
 adaptation-note conventions, and Unicode conventions. Automatic fixes cover
 the subset Mathlib can repair; unresolved findings still fail the command.
 The text-only semicolon rule is disabled because it matches meaningful WAT
@@ -61,7 +61,7 @@ test data while retaining source-notation checks.
 After a fresh checkout, prepare the style dependency once:
 
 ```sh
-cd near-lean/wasm
+cd near-lean/vm
 lake exe cache get
 lake build +Mathlib.Tactic.Linter.TextBased
 ```
@@ -102,11 +102,10 @@ Generated `Program.lean` AST files, ignored dependencies and submodule
 sources are protected from selection. Standalone tooling scripts
 outside Lake packages remain covered by `lean-lint`.
 
-CI currently enforces canonical syntax layout for `Programs/Harness.lean`
-and `Programs/Regression.lean`. Existing package sources still have layout
-debt: `just lean-format-check` reports it rather than hiding it behind a
-baseline. Expanding enforcement is a separate source-formatting change, so
-formatting the new harness does not also rewrite existing contract proofs.
+No package source is enforced against the canonical layout yet. Existing
+sources have layout debt: `just lean-format-check` reports it rather than
+hiding it behind a baseline. Expanding enforcement is a separate
+source-formatting change, so it does not also rewrite existing contract proofs.
 
 `python3 tools/tests/check_lean_format.py` checks the real formatter against a
 tiny independent Lake package: check mode preserves dirty bytes, formatting
@@ -118,24 +117,24 @@ and failure when a formatter process is killed.
 ## Combined checks
 
 `just test-all` runs the toolchain check and Python tooling/conformance-driver
-tests, native Rust unit tests, program smoke/regression tests,
-VM/runtime/chain scenarios, the wNEAR adapter suite,
+tests, the trusted chain-replay tests, VM/runtime/chain scenarios, the wNEAR
+adapter suite,
 the complete official Wasm testsuite, and strict VM conformance against the
 pinned Rust oracle. It stops on the first failing command. Install the Lean,
 Rust and pinned wasm-tools prerequisites documented by those components first.
 
 `just check` adds Mathlib text-style checks, core axiom audits, builds of every
-contract verification package, and both formatter integration tests. It uses
-the same two-file syntax-layout enforcement as CI. Broader layout debt is
-reported separately by `just lean-format-check`.
+contract verification package, and both formatter integration tests. Layout
+debt in existing sources is reported separately by `just lean-format-check`.
 
-The core axiom audit tolerates `sorryAx` only in the Programs package and
-prints those open declarations. It resolves every audited module from the
+The core axiom audit is strict: any `sorryAx` or non-standard axiom fails it.
+(Contract projects with open specs are audited with `--allow-sorry`, or
+`--allow-sorry-module` for a single module.) It resolves every audited module from the
 selected package's own compiled artifacts before searching dependencies and
 fails if a local artifact is missing. This matters for overlapping executable
 names such as `Tests.Main`, including case aliases on macOS. A real-Lean
 regression proves that a dependency's same-named module cannot hide a local
-nonstandard axiom; `just audit-all` and CI run that regression.
+nonstandard axiom; `just audit-all` runs that regression.
 Contract builds may report open proofs as warnings; a successful build is not
 a claim that those contracts are verified.
 
@@ -151,8 +150,7 @@ The compiler-header report records the current execution dependency graph in
 
 `check_vm_dependencies.py` builds `NearVM`, then inspects Lean's imported-module
 header. It rejects `Interpreter` and `CodeLib` imports, including indirect
-imports, and requires the runtime's execution modules to be present. CI runs it
-after building the VM. Its separate Lean fixture test demonstrates a clean
+imports, and requires the runtime's execution modules to be present. Its separate Lean fixture test demonstrates a clean
 graph, a forbidden transitive dependency, and an incorrectly disconnected
 execution module. `just vm-dependencies` runs both the real graph check and
 those adversarial fixture cases; `just check` includes the same gate.
@@ -163,6 +161,12 @@ The full transaction/receipt reference is documented in
 [chain-conformance/README.md](chain-conformance/README.md). It runs the actual
 trie-backed `Runtime::apply` and preserves complete raw state. Its smoke checks
 do not yet compare the Lean chain runner with nearcore.
+
+## Real-chunk corpus
+
+[`localnet/CORPUS.md`](localnet/CORPUS.md) describes the neard localnet corpus that the Lean runtime is
+replayed against (`just chain-replay-corpus`): how neard is built from the pinned source, the localnets and the
+deterministic workload, the exported bundles, the oracle self-check and the Lean harness.
 
 ## Snapshots
 
@@ -180,7 +184,7 @@ worktrees while other agents continue rebuilding them.
 
 The Lean chain replay wire format and its external decoder assumptions are documented in
 [`chain-conformance/REPLAY.md`](chain-conformance/REPLAY.md). Its tests run in
-`just test-all` and CI; the native/Lean comparison bridge remains open.
+`just test-all`; the native/Lean comparison bridge remains open.
 
 `just chain-gas-test` runs the targeted native/Lean transfer and account-creation
 gas regression after the reference is built. It records all field differences

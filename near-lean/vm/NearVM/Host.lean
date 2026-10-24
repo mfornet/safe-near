@@ -504,13 +504,6 @@ def promiseYieldResumeFn : NearHostFn NearState :=
         | _, _ => .Trap st "promise_yield_resume: invalid input"
       | _ => .Trap st "promise_yield_resume: bad args" }
 
-def contextRegisterFn (name : String) (select : NearContext → List UInt8) : NearHostFn NearState :=
-  { params := [.i64], results := []
-    invoke := fun st args => match args with
-      | [.i64 regId] =>
-        writeRegisterResult name st regId (select st.host.context)
-      | _ => .Trap st s!"{name}: bad args" }
-
 def accountIdRegisterFn (name : String) (select : NearContext → List UInt8) : NearHostFn NearState :=
   { params := [.i64], results := []
     invoke := fun st args => match args with

@@ -4,11 +4,12 @@
 safe-near/
     notes/              -- Design notes and TODO
     tools/              -- Conformance, snapshots, audits and Lean quality tools
-    reports/periodic/   -- Dated periodic check reports
+    reports/periodic/   -- Periodic check ledger (reports are in Linear)
     lean-toolchain      -- Lean version shared by every package
     near-lean/
       wasm/             -- Wasm runtime, written from the spec, tested on the official testsuite
       wasm-logic/       -- separation logic over the runtime's step (iris-lean)
+      interface/        -- Shared vocabulary and the refinement statement (NearInterface)
       vm/               -- Single contract call: metering and host functions
       runtime/          -- Transactions, receipts and account state
       chain/            -- Block execution and settlement

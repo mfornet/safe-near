@@ -7,12 +7,15 @@ one toolchain (`lean-toolchain`) and one `packagesDir` (`.lake/packages`).
 |---|---|---|
 | `wasm/` | wasmer / wasmtime | The Wasm runtime, written from the spec, and the official test suite |
 | `wasm-logic/` | | A separation logic over the runtime's step (iris-lean), for proofs about Wasm code |
+| `interface/` | | The shared vocabulary of a function call and the generic refinement statement (`NearInterface`) |
 | `vm/` | `near_vm_runner::run` | One function call: host functions, gas, `VMContext` → `VMOutcome` |
 | `runtime/` | `Runtime::apply` | Accounts, access keys, receipts, actions, fees, refunds |
 | `chain/` | the "trustless manipulator" | Blocks, reachable states, explicit run completion, measured burnt gas |
+| `crypto/` | `near-crypto`, `sha2`, `sha3`, `ripemd` | Hashes, edwards25519 and Ed25519 in pure Lean, each with a `Spec` and a fast `Impl` ([NEAR_NODE.md](../notes/design/NEAR_NODE.md)) |
+| `node/` | `neard` | A full validator node, in progress ([NEAR_NODE.md](../notes/design/NEAR_NODE.md)) |
 
 ```
-just near-build     # from the repository root: build wasm, vm, runtime, chain
+just near-build     # from the repository root: build wasm, vm, runtime, chain, crypto, node
 just near-test      # run the three scenario suites on the real wNEAR binary
 just near-configs   # regenerate vm/configs from nearcore (needs cargo)
 ```
@@ -48,8 +51,8 @@ removed value bytes, as native `RuntimeExt` does; standalone VM calls default to
 `VMContext.chargeStorageValueAccess` policy records this external boundary.
 The independent fixtures check exact
 instruction and host gas, but do not prove metering correct for all programs.
-Contract code enters as WAT text
-because there is no binary Wasm decoder in Lean yet; the cryptographic host
+Contract code enters as decoded `.wasm` modules (`Wasm.Binary.decode`; test
+fixtures are compiled from WAT with the pinned `wasm-tools`); the cryptographic host
 functions are rejected by the metered VM until concrete semantics are supplied.
 
 `lake exe vm-tests` runs the real wNEAR binary (`tests/fixtures/w_near.wat`,
@@ -120,6 +123,7 @@ tools/axiom-audit.py near-lean/wasm --report audit/wasm.json
 tools/axiom-audit.py near-lean/vm --report audit/vm.json
 tools/axiom-audit.py near-lean/runtime --report audit/runtime.json
 tools/axiom-audit.py near-lean/chain --report audit/chain.json
+tools/axiom-audit.py near-lean/crypto --report audit/crypto.json
 ```
 
 All core packages must be clean. Every declaration is checked against the

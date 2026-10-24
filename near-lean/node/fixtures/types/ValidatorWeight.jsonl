@@ -1,0 +1,12 @@
+{"type":"ValidatorWeight","name":"rand-0","borsh":"01000000000000008100000000000000","hash":null}
+{"type":"ValidatorWeight","name":"rand-0/trunc","borsh":"010000000000000081000000000000","reject":true}
+{"type":"ValidatorWeight","name":"rand-0/flip11","borsh":"01000000000000008100009f00000000","hash":null}
+{"type":"ValidatorWeight","name":"rand-0/tag255","borsh":"ff000000000000008100000000000000","hash":null}
+{"type":"ValidatorWeight","name":"rand-0/half","borsh":"0100000000000000","reject":true}
+{"type":"ValidatorWeight","name":"rand-0/trailing","borsh":"0100000000000000810000000000000000","reject":true}
+{"type":"ValidatorWeight","name":"rand-1","borsh":"00000000000000000000000000000000","hash":null}
+{"type":"ValidatorWeight","name":"rand-1/trunc","borsh":"000000000000000000000000000000","reject":true}
+{"type":"ValidatorWeight","name":"rand-1/flip0","borsh":"48000000000000000000000000000000","hash":null}
+{"type":"ValidatorWeight","name":"rand-1/tag255","borsh":"ff000000000000000000000000000000","hash":null}
+{"type":"ValidatorWeight","name":"rand-1/half","borsh":"0000000000000000","reject":true}
+{"type":"ValidatorWeight","name":"rand-1/trailing","borsh":"0000000000000000000000000000000000","reject":true}

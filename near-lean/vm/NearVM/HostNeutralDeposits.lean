@@ -38,90 +38,46 @@ theorem createCallbackPromiseResult_deposits (name : String) (st : HostStore Nea
     · trivial
   · trivial
 
+/-- Unfolds the shared host helpers and closes the deposit-neutral cases. -/
+local macro "no_deposits_tac" : tactic => `(tactic| (
+    dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
+      contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
+      checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
+      NearState.selectReturnValue, NearState.selectReturnPromise]
+    repeat (first
+      | trivial
+      | exact ⟨rfl, rfl, rfl⟩
+      | exact writeRegisterResult_deposits _ _ _ _ _
+      | exact appendPromise_return_deposits _ _ _
+      | exact appendPromiseActionResult_deposits _ _ _ _
+      | exact createBatchPromiseResult_deposits _ _ _
+      | exact createCallbackPromiseResult_deposits _ _ _ _
+      | split)))
+
 theorem inputFn_noDeposits : HostCreatesNoDeposits inputFn := by
   intro st args
   unfold inputFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise]
-  repeat (first
-    | trivial
-    | exact ⟨rfl, rfl, rfl⟩
-    | exact writeRegisterResult_deposits _ _ _ _ _
-    | exact appendPromise_return_deposits _ _ _
-    | exact appendPromiseActionResult_deposits _ _ _ _
-    | exact createBatchPromiseResult_deposits _ _ _
-    | exact createCallbackPromiseResult_deposits _ _ _ _
-    | split)
+  no_deposits_tac
 
 theorem readRegisterFn_noDeposits : HostCreatesNoDeposits readRegisterFn := by
   intro st args
   unfold readRegisterFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise]
-  repeat (first
-    | trivial
-    | exact ⟨rfl, rfl, rfl⟩
-    | exact writeRegisterResult_deposits _ _ _ _ _
-    | exact appendPromise_return_deposits _ _ _
-    | exact appendPromiseActionResult_deposits _ _ _ _
-    | exact createBatchPromiseResult_deposits _ _ _
-    | exact createCallbackPromiseResult_deposits _ _ _ _
-    | split)
+  no_deposits_tac
 
 theorem registerLenFn_noDeposits : HostCreatesNoDeposits registerLenFn := by
   intro st args
   unfold registerLenFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise]
-  repeat (first
-    | trivial
-    | exact ⟨rfl, rfl, rfl⟩
-    | exact writeRegisterResult_deposits _ _ _ _ _
-    | exact appendPromise_return_deposits _ _ _
-    | exact appendPromiseActionResult_deposits _ _ _ _
-    | exact createBatchPromiseResult_deposits _ _ _
-    | exact createCallbackPromiseResult_deposits _ _ _ _
-    | split)
+  no_deposits_tac
 
 theorem writeRegisterFn_noDeposits : HostCreatesNoDeposits writeRegisterFn := by
   intro st args
   unfold writeRegisterFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise]
-  repeat (first
-    | trivial
-    | exact ⟨rfl, rfl, rfl⟩
-    | exact writeRegisterResult_deposits _ _ _ _ _
-    | exact appendPromise_return_deposits _ _ _
-    | exact appendPromiseActionResult_deposits _ _ _ _
-    | exact createBatchPromiseResult_deposits _ _ _
-    | exact createCallbackPromiseResult_deposits _ _ _ _
-    | split)
+  no_deposits_tac
 
 theorem storageWriteFn_noDeposits : HostCreatesNoDeposits storageWriteFn := by
   intro st args
   unfold storageWriteFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise]
-  repeat (first
-    | trivial
-    | exact ⟨rfl, rfl, rfl⟩
-    | exact writeRegisterResult_deposits _ _ _ _ _
-    | exact appendPromise_return_deposits _ _ _
-    | exact appendPromiseActionResult_deposits _ _ _ _
-    | exact createBatchPromiseResult_deposits _ _ _
-    | exact createCallbackPromiseResult_deposits _ _ _ _
-    | split)
+  no_deposits_tac
   all_goals simp_all only [HostResultCreatesDeposits, DepositEffect, NearState.setStorage, NearState.invalidateIterators]
   all_goals first
     | trivial
@@ -131,36 +87,12 @@ theorem storageWriteFn_noDeposits : HostCreatesNoDeposits storageWriteFn := by
 theorem storageReadFn_noDeposits : HostCreatesNoDeposits storageReadFn := by
   intro st args
   unfold storageReadFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise]
-  repeat (first
-    | trivial
-    | exact ⟨rfl, rfl, rfl⟩
-    | exact writeRegisterResult_deposits _ _ _ _ _
-    | exact appendPromise_return_deposits _ _ _
-    | exact appendPromiseActionResult_deposits _ _ _ _
-    | exact createBatchPromiseResult_deposits _ _ _
-    | exact createCallbackPromiseResult_deposits _ _ _ _
-    | split)
+  no_deposits_tac
 
 theorem storageRemoveFn_noDeposits : HostCreatesNoDeposits storageRemoveFn := by
   intro st args
   unfold storageRemoveFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise]
-  repeat (first
-    | trivial
-    | exact ⟨rfl, rfl, rfl⟩
-    | exact writeRegisterResult_deposits _ _ _ _ _
-    | exact appendPromise_return_deposits _ _ _
-    | exact appendPromiseActionResult_deposits _ _ _ _
-    | exact createBatchPromiseResult_deposits _ _ _
-    | exact createCallbackPromiseResult_deposits _ _ _ _
-    | split)
+  no_deposits_tac
   all_goals simp_all only [HostResultCreatesDeposits, DepositEffect, NearState.removeStorage, NearState.invalidateIterators]
   all_goals first
     | trivial
@@ -170,614 +102,182 @@ theorem storageRemoveFn_noDeposits : HostCreatesNoDeposits storageRemoveFn := by
 theorem storageHasKeyFn_noDeposits : HostCreatesNoDeposits storageHasKeyFn := by
   intro st args
   unfold storageHasKeyFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise]
-  repeat (first
-    | trivial
-    | exact ⟨rfl, rfl, rfl⟩
-    | exact writeRegisterResult_deposits _ _ _ _ _
-    | exact appendPromise_return_deposits _ _ _
-    | exact appendPromiseActionResult_deposits _ _ _ _
-    | exact createBatchPromiseResult_deposits _ _ _
-    | exact createCallbackPromiseResult_deposits _ _ _ _
-    | split)
+  no_deposits_tac
 
 theorem currentAccountIdFn_noDeposits : HostCreatesNoDeposits currentAccountIdFn := by
   intro st args
   unfold currentAccountIdFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise]
-  repeat (first
-    | trivial
-    | exact ⟨rfl, rfl, rfl⟩
-    | exact writeRegisterResult_deposits _ _ _ _ _
-    | exact appendPromise_return_deposits _ _ _
-    | exact appendPromiseActionResult_deposits _ _ _ _
-    | exact createBatchPromiseResult_deposits _ _ _
-    | exact createCallbackPromiseResult_deposits _ _ _ _
-    | split)
+  no_deposits_tac
 
 theorem predecessorAccountIdFn_noDeposits : HostCreatesNoDeposits predecessorAccountIdFn := by
   intro st args
   unfold predecessorAccountIdFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise]
-  repeat (first
-    | trivial
-    | exact ⟨rfl, rfl, rfl⟩
-    | exact writeRegisterResult_deposits _ _ _ _ _
-    | exact appendPromise_return_deposits _ _ _
-    | exact appendPromiseActionResult_deposits _ _ _ _
-    | exact createBatchPromiseResult_deposits _ _ _
-    | exact createCallbackPromiseResult_deposits _ _ _ _
-    | split)
+  no_deposits_tac
 
 theorem signerAccountIdFn_noDeposits : HostCreatesNoDeposits signerAccountIdFn := by
   intro st args
   unfold signerAccountIdFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise]
-  repeat (first
-    | trivial
-    | exact ⟨rfl, rfl, rfl⟩
-    | exact writeRegisterResult_deposits _ _ _ _ _
-    | exact appendPromise_return_deposits _ _ _
-    | exact appendPromiseActionResult_deposits _ _ _ _
-    | exact createBatchPromiseResult_deposits _ _ _
-    | exact createCallbackPromiseResult_deposits _ _ _ _
-    | split)
+  no_deposits_tac
 
 theorem signerAccountPkFn_noDeposits : HostCreatesNoDeposits signerAccountPkFn := by
   intro st args
   unfold signerAccountPkFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise]
-  repeat (first
-    | trivial
-    | exact ⟨rfl, rfl, rfl⟩
-    | exact writeRegisterResult_deposits _ _ _ _ _
-    | exact appendPromise_return_deposits _ _ _
-    | exact appendPromiseActionResult_deposits _ _ _ _
-    | exact createBatchPromiseResult_deposits _ _ _
-    | exact createCallbackPromiseResult_deposits _ _ _ _
-    | split)
+  no_deposits_tac
 
 theorem attachedDepositFn_noDeposits : HostCreatesNoDeposits attachedDepositFn := by
   intro st args
   unfold attachedDepositFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise]
-  repeat (first
-    | trivial
-    | exact ⟨rfl, rfl, rfl⟩
-    | exact writeRegisterResult_deposits _ _ _ _ _
-    | exact appendPromise_return_deposits _ _ _
-    | exact appendPromiseActionResult_deposits _ _ _ _
-    | exact createBatchPromiseResult_deposits _ _ _
-    | exact createCallbackPromiseResult_deposits _ _ _ _
-    | split)
+  no_deposits_tac
 
 theorem blockIndexFn_noDeposits : HostCreatesNoDeposits blockIndexFn := by
   intro st args
   unfold blockIndexFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise]
-  repeat (first
-    | trivial
-    | exact ⟨rfl, rfl, rfl⟩
-    | exact writeRegisterResult_deposits _ _ _ _ _
-    | exact appendPromise_return_deposits _ _ _
-    | exact appendPromiseActionResult_deposits _ _ _ _
-    | exact createBatchPromiseResult_deposits _ _ _
-    | exact createCallbackPromiseResult_deposits _ _ _ _
-    | split)
+  no_deposits_tac
 
 theorem blockTimestampFn_noDeposits : HostCreatesNoDeposits blockTimestampFn := by
   intro st args
   unfold blockTimestampFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise]
-  repeat (first
-    | trivial
-    | exact ⟨rfl, rfl, rfl⟩
-    | exact writeRegisterResult_deposits _ _ _ _ _
-    | exact appendPromise_return_deposits _ _ _
-    | exact appendPromiseActionResult_deposits _ _ _ _
-    | exact createBatchPromiseResult_deposits _ _ _
-    | exact createCallbackPromiseResult_deposits _ _ _ _
-    | split)
+  no_deposits_tac
 
 theorem epochHeightFn_noDeposits : HostCreatesNoDeposits epochHeightFn := by
   intro st args
   unfold epochHeightFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise]
-  repeat (first
-    | trivial
-    | exact ⟨rfl, rfl, rfl⟩
-    | exact writeRegisterResult_deposits _ _ _ _ _
-    | exact appendPromise_return_deposits _ _ _
-    | exact appendPromiseActionResult_deposits _ _ _ _
-    | exact createBatchPromiseResult_deposits _ _ _
-    | exact createCallbackPromiseResult_deposits _ _ _ _
-    | split)
+  no_deposits_tac
 
 theorem storageUsageFn_noDeposits : HostCreatesNoDeposits storageUsageFn := by
   intro st args
   unfold storageUsageFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise]
-  repeat (first
-    | trivial
-    | exact ⟨rfl, rfl, rfl⟩
-    | exact writeRegisterResult_deposits _ _ _ _ _
-    | exact appendPromise_return_deposits _ _ _
-    | exact appendPromiseActionResult_deposits _ _ _ _
-    | exact createBatchPromiseResult_deposits _ _ _
-    | exact createCallbackPromiseResult_deposits _ _ _ _
-    | split)
+  no_deposits_tac
 
 theorem accountBalanceFn_noDeposits : HostCreatesNoDeposits accountBalanceFn := by
   intro st args
   unfold accountBalanceFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise]
-  repeat (first
-    | trivial
-    | exact ⟨rfl, rfl, rfl⟩
-    | exact writeRegisterResult_deposits _ _ _ _ _
-    | exact appendPromise_return_deposits _ _ _
-    | exact appendPromiseActionResult_deposits _ _ _ _
-    | exact createBatchPromiseResult_deposits _ _ _
-    | exact createCallbackPromiseResult_deposits _ _ _ _
-    | split)
+  no_deposits_tac
 
 theorem accountLockedBalanceFn_noDeposits : HostCreatesNoDeposits accountLockedBalanceFn := by
   intro st args
   unfold accountLockedBalanceFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise]
-  repeat (first
-    | trivial
-    | exact ⟨rfl, rfl, rfl⟩
-    | exact writeRegisterResult_deposits _ _ _ _ _
-    | exact appendPromise_return_deposits _ _ _
-    | exact appendPromiseActionResult_deposits _ _ _ _
-    | exact createBatchPromiseResult_deposits _ _ _
-    | exact createCallbackPromiseResult_deposits _ _ _ _
-    | split)
+  no_deposits_tac
 
 theorem prepaidGasFn_noDeposits : HostCreatesNoDeposits prepaidGasFn := by
   intro st args
   unfold prepaidGasFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise]
-  repeat (first
-    | trivial
-    | exact ⟨rfl, rfl, rfl⟩
-    | exact writeRegisterResult_deposits _ _ _ _ _
-    | exact appendPromise_return_deposits _ _ _
-    | exact appendPromiseActionResult_deposits _ _ _ _
-    | exact createBatchPromiseResult_deposits _ _ _
-    | exact createCallbackPromiseResult_deposits _ _ _ _
-    | split)
+  no_deposits_tac
 
 theorem usedGasFn_noDeposits : HostCreatesNoDeposits usedGasFn := by
   intro st args
   unfold usedGasFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise]
-  repeat (first
-    | trivial
-    | exact ⟨rfl, rfl, rfl⟩
-    | exact writeRegisterResult_deposits _ _ _ _ _
-    | exact appendPromise_return_deposits _ _ _
-    | exact appendPromiseActionResult_deposits _ _ _ _
-    | exact createBatchPromiseResult_deposits _ _ _
-    | exact createCallbackPromiseResult_deposits _ _ _ _
-    | split)
+  no_deposits_tac
 
 theorem randomSeedFn_noDeposits : HostCreatesNoDeposits randomSeedFn := by
   intro st args
   unfold randomSeedFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise]
-  repeat (first
-    | trivial
-    | exact ⟨rfl, rfl, rfl⟩
-    | exact writeRegisterResult_deposits _ _ _ _ _
-    | exact appendPromise_return_deposits _ _ _
-    | exact appendPromiseActionResult_deposits _ _ _ _
-    | exact createBatchPromiseResult_deposits _ _ _
-    | exact createCallbackPromiseResult_deposits _ _ _ _
-    | split)
+  no_deposits_tac
 
 theorem logUtf8Fn_noDeposits : HostCreatesNoDeposits logUtf8Fn := by
   intro st args
   unfold logUtf8Fn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise]
-  repeat (first
-    | trivial
-    | exact ⟨rfl, rfl, rfl⟩
-    | exact writeRegisterResult_deposits _ _ _ _ _
-    | exact appendPromise_return_deposits _ _ _
-    | exact appendPromiseActionResult_deposits _ _ _ _
-    | exact createBatchPromiseResult_deposits _ _ _
-    | exact createCallbackPromiseResult_deposits _ _ _ _
-    | split)
+  no_deposits_tac
 
 theorem logUtf16Fn_noDeposits : HostCreatesNoDeposits logUtf16Fn := by
   intro st args
   unfold logUtf16Fn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise]
-  repeat (first
-    | trivial
-    | exact ⟨rfl, rfl, rfl⟩
-    | exact writeRegisterResult_deposits _ _ _ _ _
-    | exact appendPromise_return_deposits _ _ _
-    | exact appendPromiseActionResult_deposits _ _ _ _
-    | exact createBatchPromiseResult_deposits _ _ _
-    | exact createCallbackPromiseResult_deposits _ _ _ _
-    | split)
+  no_deposits_tac
 
 theorem panicMetered_noDeposits : HostCreatesNoDeposits panicMetered := by
   intro st args
   unfold panicMetered
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise]
-  repeat (first
-    | trivial
-    | exact ⟨rfl, rfl, rfl⟩
-    | exact writeRegisterResult_deposits _ _ _ _ _
-    | exact appendPromise_return_deposits _ _ _
-    | exact appendPromiseActionResult_deposits _ _ _ _
-    | exact createBatchPromiseResult_deposits _ _ _
-    | exact createCallbackPromiseResult_deposits _ _ _ _
-    | split)
+  no_deposits_tac
 
 theorem panicUtf8Metered_noDeposits : HostCreatesNoDeposits panicUtf8Metered := by
   intro st args
   unfold panicUtf8Metered
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise]
-  repeat (first
-    | trivial
-    | exact ⟨rfl, rfl, rfl⟩
-    | exact writeRegisterResult_deposits _ _ _ _ _
-    | exact appendPromise_return_deposits _ _ _
-    | exact appendPromiseActionResult_deposits _ _ _ _
-    | exact createBatchPromiseResult_deposits _ _ _
-    | exact createCallbackPromiseResult_deposits _ _ _ _
-    | split)
+  no_deposits_tac
 
 theorem abortMetered_noDeposits : HostCreatesNoDeposits abortMetered := by
   intro st args
   unfold abortMetered
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise]
-  repeat (first
-    | trivial
-    | exact ⟨rfl, rfl, rfl⟩
-    | exact writeRegisterResult_deposits _ _ _ _ _
-    | exact appendPromise_return_deposits _ _ _
-    | exact appendPromiseActionResult_deposits _ _ _ _
-    | exact createBatchPromiseResult_deposits _ _ _
-    | exact createCallbackPromiseResult_deposits _ _ _ _
-    | split)
+  no_deposits_tac
 
 theorem promiseAndFn_noDeposits : HostCreatesNoDeposits promiseAndFn := by
   intro st args
   unfold promiseAndFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise]
-  repeat (first
-    | trivial
-    | exact ⟨rfl, rfl, rfl⟩
-    | exact writeRegisterResult_deposits _ _ _ _ _
-    | exact appendPromise_return_deposits _ _ _
-    | exact appendPromiseActionResult_deposits _ _ _ _
-    | exact createBatchPromiseResult_deposits _ _ _
-    | exact createCallbackPromiseResult_deposits _ _ _ _
-    | split)
+  no_deposits_tac
 
 theorem promiseBatchCreateFn_noDeposits : HostCreatesNoDeposits promiseBatchCreateFn := by
   intro st args
   unfold promiseBatchCreateFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise]
-  repeat (first
-    | trivial
-    | exact ⟨rfl, rfl, rfl⟩
-    | exact writeRegisterResult_deposits _ _ _ _ _
-    | exact appendPromise_return_deposits _ _ _
-    | exact appendPromiseActionResult_deposits _ _ _ _
-    | exact createBatchPromiseResult_deposits _ _ _
-    | exact createCallbackPromiseResult_deposits _ _ _ _
-    | split)
+  no_deposits_tac
 
 theorem promiseBatchThenFn_noDeposits : HostCreatesNoDeposits promiseBatchThenFn := by
   intro st args
   unfold promiseBatchThenFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise]
-  repeat (first
-    | trivial
-    | exact ⟨rfl, rfl, rfl⟩
-    | exact writeRegisterResult_deposits _ _ _ _ _
-    | exact appendPromise_return_deposits _ _ _
-    | exact appendPromiseActionResult_deposits _ _ _ _
-    | exact createBatchPromiseResult_deposits _ _ _
-    | exact createCallbackPromiseResult_deposits _ _ _ _
-    | split)
+  no_deposits_tac
 
 theorem promiseBatchActionCreateAccountFn_noDeposits : HostCreatesNoDeposits promiseBatchActionCreateAccountFn := by
   intro st args
   unfold promiseBatchActionCreateAccountFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise]
-  repeat (first
-    | trivial
-    | exact ⟨rfl, rfl, rfl⟩
-    | exact writeRegisterResult_deposits _ _ _ _ _
-    | exact appendPromise_return_deposits _ _ _
-    | exact appendPromiseActionResult_deposits _ _ _ _
-    | exact createBatchPromiseResult_deposits _ _ _
-    | exact createCallbackPromiseResult_deposits _ _ _ _
-    | split)
+  no_deposits_tac
 
 theorem promiseBatchActionDeployContractFn_noDeposits : HostCreatesNoDeposits promiseBatchActionDeployContractFn := by
   intro st args
   unfold promiseBatchActionDeployContractFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise]
-  repeat (first
-    | trivial
-    | exact ⟨rfl, rfl, rfl⟩
-    | exact writeRegisterResult_deposits _ _ _ _ _
-    | exact appendPromise_return_deposits _ _ _
-    | exact appendPromiseActionResult_deposits _ _ _ _
-    | exact createBatchPromiseResult_deposits _ _ _
-    | exact createCallbackPromiseResult_deposits _ _ _ _
-    | split)
+  no_deposits_tac
 
 theorem promiseBatchActionStakeFn_noDeposits : HostCreatesNoDeposits promiseBatchActionStakeFn := by
   intro st args
   unfold promiseBatchActionStakeFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise]
-  repeat (first
-    | trivial
-    | exact ⟨rfl, rfl, rfl⟩
-    | exact writeRegisterResult_deposits _ _ _ _ _
-    | exact appendPromise_return_deposits _ _ _
-    | exact appendPromiseActionResult_deposits _ _ _ _
-    | exact createBatchPromiseResult_deposits _ _ _
-    | exact createCallbackPromiseResult_deposits _ _ _ _
-    | split)
+  no_deposits_tac
 
 theorem promiseBatchActionAddKeyWithFullAccessFn_noDeposits : HostCreatesNoDeposits promiseBatchActionAddKeyWithFullAccessFn := by
   intro st args
   unfold promiseBatchActionAddKeyWithFullAccessFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise]
-  repeat (first
-    | trivial
-    | exact ⟨rfl, rfl, rfl⟩
-    | exact writeRegisterResult_deposits _ _ _ _ _
-    | exact appendPromise_return_deposits _ _ _
-    | exact appendPromiseActionResult_deposits _ _ _ _
-    | exact createBatchPromiseResult_deposits _ _ _
-    | exact createCallbackPromiseResult_deposits _ _ _ _
-    | split)
+  no_deposits_tac
 
 theorem promiseBatchActionAddKeyWithFunctionCallFn_noDeposits : HostCreatesNoDeposits promiseBatchActionAddKeyWithFunctionCallFn := by
   intro st args
   unfold promiseBatchActionAddKeyWithFunctionCallFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise]
-  repeat (first
-    | trivial
-    | exact ⟨rfl, rfl, rfl⟩
-    | exact writeRegisterResult_deposits _ _ _ _ _
-    | exact appendPromise_return_deposits _ _ _
-    | exact appendPromiseActionResult_deposits _ _ _ _
-    | exact createBatchPromiseResult_deposits _ _ _
-    | exact createCallbackPromiseResult_deposits _ _ _ _
-    | split)
+  no_deposits_tac
 
 theorem promiseBatchActionDeleteKeyFn_noDeposits : HostCreatesNoDeposits promiseBatchActionDeleteKeyFn := by
   intro st args
   unfold promiseBatchActionDeleteKeyFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise]
-  repeat (first
-    | trivial
-    | exact ⟨rfl, rfl, rfl⟩
-    | exact writeRegisterResult_deposits _ _ _ _ _
-    | exact appendPromise_return_deposits _ _ _
-    | exact appendPromiseActionResult_deposits _ _ _ _
-    | exact createBatchPromiseResult_deposits _ _ _
-    | exact createCallbackPromiseResult_deposits _ _ _ _
-    | split)
+  no_deposits_tac
 
 theorem promiseBatchActionDeleteAccountFn_noDeposits : HostCreatesNoDeposits promiseBatchActionDeleteAccountFn := by
   intro st args
   unfold promiseBatchActionDeleteAccountFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise]
-  repeat (first
-    | trivial
-    | exact ⟨rfl, rfl, rfl⟩
-    | exact writeRegisterResult_deposits _ _ _ _ _
-    | exact appendPromise_return_deposits _ _ _
-    | exact appendPromiseActionResult_deposits _ _ _ _
-    | exact createBatchPromiseResult_deposits _ _ _
-    | exact createCallbackPromiseResult_deposits _ _ _ _
-    | split)
+  no_deposits_tac
 
 theorem promiseBatchActionUseGlobalContractFn_noDeposits : HostCreatesNoDeposits promiseBatchActionUseGlobalContractFn := by
   intro st args
   unfold promiseBatchActionUseGlobalContractFn useGlobalContractFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise]
-  repeat (first
-    | trivial
-    | exact ⟨rfl, rfl, rfl⟩
-    | exact writeRegisterResult_deposits _ _ _ _ _
-    | exact appendPromise_return_deposits _ _ _
-    | exact appendPromiseActionResult_deposits _ _ _ _
-    | exact createBatchPromiseResult_deposits _ _ _
-    | exact createCallbackPromiseResult_deposits _ _ _ _
-    | split)
+  no_deposits_tac
 
 theorem promiseBatchActionUseGlobalContractByAccountIdFn_noDeposits : HostCreatesNoDeposits promiseBatchActionUseGlobalContractByAccountIdFn := by
   intro st args
   unfold promiseBatchActionUseGlobalContractByAccountIdFn useGlobalContractFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise]
-  repeat (first
-    | trivial
-    | exact ⟨rfl, rfl, rfl⟩
-    | exact writeRegisterResult_deposits _ _ _ _ _
-    | exact appendPromise_return_deposits _ _ _
-    | exact appendPromiseActionResult_deposits _ _ _ _
-    | exact createBatchPromiseResult_deposits _ _ _
-    | exact createCallbackPromiseResult_deposits _ _ _ _
-    | split)
+  no_deposits_tac
 
 theorem valueReturnFn_noDeposits : HostCreatesNoDeposits valueReturnFn := by
   intro st args
   unfold valueReturnFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise]
-  repeat (first
-    | trivial
-    | exact ⟨rfl, rfl, rfl⟩
-    | exact writeRegisterResult_deposits _ _ _ _ _
-    | exact appendPromise_return_deposits _ _ _
-    | exact appendPromiseActionResult_deposits _ _ _ _
-    | exact createBatchPromiseResult_deposits _ _ _
-    | exact createCallbackPromiseResult_deposits _ _ _ _
-    | split)
+  no_deposits_tac
 
 theorem promiseReturnFn_noDeposits : HostCreatesNoDeposits promiseReturnFn := by
   intro st args
   unfold promiseReturnFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise]
-  repeat (first
-    | trivial
-    | exact ⟨rfl, rfl, rfl⟩
-    | exact writeRegisterResult_deposits _ _ _ _ _
-    | exact appendPromise_return_deposits _ _ _
-    | exact appendPromiseActionResult_deposits _ _ _ _
-    | exact createBatchPromiseResult_deposits _ _ _
-    | exact createCallbackPromiseResult_deposits _ _ _ _
-    | split)
+  no_deposits_tac
 
 theorem promiseResultsCountFn_noDeposits : HostCreatesNoDeposits promiseResultsCountFn := by
   intro st args
   unfold promiseResultsCountFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise]
-  repeat (first
-    | trivial
-    | exact ⟨rfl, rfl, rfl⟩
-    | exact writeRegisterResult_deposits _ _ _ _ _
-    | exact appendPromise_return_deposits _ _ _
-    | exact appendPromiseActionResult_deposits _ _ _ _
-    | exact createBatchPromiseResult_deposits _ _ _
-    | exact createCallbackPromiseResult_deposits _ _ _ _
-    | split)
+  no_deposits_tac
 
 theorem promiseResultFn_noDeposits : HostCreatesNoDeposits promiseResultFn := by
   intro st args
   unfold promiseResultFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
-    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
-    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
-    NearState.selectReturnValue, NearState.selectReturnPromise]
-  repeat (first
-    | trivial
-    | exact ⟨rfl, rfl, rfl⟩
-    | exact writeRegisterResult_deposits _ _ _ _ _
-    | exact appendPromise_return_deposits _ _ _
-    | exact appendPromiseActionResult_deposits _ _ _ _
-    | exact createBatchPromiseResult_deposits _ _ _
-    | exact createCallbackPromiseResult_deposits _ _ _ _
-    | split)
+  no_deposits_tac
 
 theorem gasFn_noDeposits : HostCreatesNoDeposits gasFn := by
   intro st args

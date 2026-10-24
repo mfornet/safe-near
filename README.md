@@ -54,6 +54,8 @@ git submodule update --init contracts/<name>/source   # fetch the pinned source
 just reproduce <name>                                 # rebuild and compare hashes
 ```
 
-`w-near` is the first contract with a verification project. The sequential
-expansion is tracked in [contracts/VERIFICATION.md](contracts/VERIFICATION.md);
-`linkdrop` is next; near-lean already runs its binary.
+Verification projects exist for `w-near` (model proofs complete, deployed
+refinement open), `sputnik-dao-factory` and `sputnikdao2-v3.2` (both in
+progress). The sequential expansion is tracked in
+[contracts/VERIFICATION.md](contracts/VERIFICATION.md); `linkdrop` is queued
+again, and near-lean already runs its binary.

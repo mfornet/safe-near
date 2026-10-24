@@ -1,0 +1,19 @@
+{
+ "blockHash": "6395cb26fcb53b6986f9719e021cc1747ab72dd0c52a8886ea8fa708a21ed181",
+ "chainId": "safe-near-localnet-4s",
+ "chunkHash": "2f8bab02e03ccc85248894bd7d21b43009950736db27f9c00c36fde3def56359",
+ "firstBlockOfVersion": false,
+ "format": "safe-near-corpus-v1",
+ "height": 283,
+ "nextEpochProtocolVersion": null,
+ "prevBlockHash": "520459278227ea9fdd65c7bd9e7ceb7f7d51cf148498dd2f0a7315d1d2c44fe0",
+ "prevEpochProtocolVersion": 86,
+ "protocolTreasury": "near",
+ "protocolVersion": 86,
+ "shardId": 3,
+ "shardUId": {
+  "shardId": 3,
+  "version": 0
+ },
+ "topology": "sharded"
+}

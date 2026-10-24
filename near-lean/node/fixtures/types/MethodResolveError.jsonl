@@ -1,0 +1,11 @@
+{"type":"MethodResolveError","name":"variant-0","borsh":"00","hash":null}
+{"type":"MethodResolveError","name":"variant-0/trunc","borsh":"","reject":true}
+{"type":"MethodResolveError","name":"variant-0/flip0","borsh":"29","reject":true}
+{"type":"MethodResolveError","name":"variant-0/tag255","borsh":"ff","reject":true}
+{"type":"MethodResolveError","name":"variant-0/trailing","borsh":"0000","reject":true}
+{"type":"MethodResolveError","name":"variant-1","borsh":"01","hash":null}
+{"type":"MethodResolveError","name":"variant-1/flip0","borsh":"4f","reject":true}
+{"type":"MethodResolveError","name":"variant-1/trailing","borsh":"0100","reject":true}
+{"type":"MethodResolveError","name":"variant-2","borsh":"02","hash":null}
+{"type":"MethodResolveError","name":"variant-2/flip0","borsh":"c8","reject":true}
+{"type":"MethodResolveError","name":"variant-2/trailing","borsh":"0200","reject":true}

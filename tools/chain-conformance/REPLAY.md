@@ -87,6 +87,10 @@ Supported action objects:
 - `{kind: "deleteKey", publicKey}`
 - `{kind: "deleteAccount", beneficiaryId}`
 
+The encoder also writes `{kind: "useGlobalContract", codeHash}` or
+`{kind: "useGlobalContract", accountId}` (both byte arrays) for receipts the VM
+creates; the decoder does not accept them, as the runtime does not execute them.
+
 Recognizing an action is not a claim that every execution is supported.
 For example, runtime epoch limitations still stop staking/unstaking attempts
 as documented in `near-lean/runtime/VERIFICATION.md`.
