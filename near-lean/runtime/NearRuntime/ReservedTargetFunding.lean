@@ -24,7 +24,7 @@ theorem applyAction_system_no_success (c : ReceiptCtx) (isLast : Bool) (action :
   | transfer amount =>
     rw [applyTransfer_run]
     simp only [hreceiver, hn, specialImplicitAccount_system, implicitPublicKey_system]
-    split <;> simp
+    intro he; cases he
   | stake amount pk =>
     simp [-StateT.run_bind, applyAction, getAccount, getState, hreceiver, hn]
   | addKey pk key =>
