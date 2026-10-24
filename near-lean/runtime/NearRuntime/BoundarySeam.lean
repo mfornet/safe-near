@@ -209,6 +209,8 @@ structure Corresponds (c : ReceiptCtx) (seed : Bytes) (account : Account) (metho
   actionHash : ctx.actionHash = (actionHashOf c 0).getD []
   yields : ctx.existingYields = c.vmYields
   chain : ctx.chainId = bytesOfString c.ap.chainId
+  validatorStake : ctx.validatorStake = c.ap.epochInfo.stake
+  validatorTotalStake : ctx.validatorTotalStake = c.ap.epochInfo.totalStake
 
 theorem Corresponds.vmContext {c : ReceiptCtx} {seed : Bytes} {account : Account} {method : String}
     {args : Bytes} {gas deposit : Nat} {trie : TrieOverlay.State} {ctx : Context}
@@ -217,7 +219,7 @@ theorem Corresponds.vmContext {c : ReceiptCtx} {seed : Bytes} {account : Account
       toVMContext ctx :=
   functionCallContext_eq_toVMContext _ account args gas deposit true trie ctx h.current h.signer
     h.signerPk h.predecessor h.args h.results h.height h.timestamp h.epoch h.balance h.locked h.usage
-    h.deposit h.gas h.seed h.trie (by simpa using h.outputs) h.actionHash h.yields h.chain
+    h.deposit h.gas h.seed h.trie (by simpa using h.outputs) h.actionHash h.yields h.chain h.validatorStake h.validatorTotalStake
 
 /-- The boundary's reading of a receipt failure. -/
 def runtimeFailure : RuntimeError → Failure

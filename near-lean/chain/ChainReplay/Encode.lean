@@ -199,7 +199,9 @@ def runtimeErrorJson (executor : AccountId) : RuntimeError → Json
     obj
       [kind "triesToStake", ("accountId", toJson id), ("stake", toJson (toString stake)),
         ("locked", toJson (toString locked)), ("balance", toJson (toString balance))]
-  | .insufficientStake id => obj [kind "insufficientStake", ("accountId", toJson id)]
+  | .insufficientStake id stake minimum =>
+    obj [kind "insufficientStake", ("accountId", toJson id), ("stake", toJson stake),
+      ("minimumStake", toJson minimum)]
   | .functionCallError error =>
     let inner :=
       match error with

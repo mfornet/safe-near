@@ -157,6 +157,22 @@ def totalBalance (st : ChainState) : Nat :=
 
 end ChainState
 
+/-- The epoch's validator set as `EpochInfoProvider` answers for the chunk: the stake of each
+validator, their total, and the minimum stake of `Stake` actions. -/
+structure EpochInfo where
+  /-- `minimum_stake(prev_block_hash)`: a `Stake` action below it is an `InsufficientStake`. -/
+  minimumStake : Nat := 0
+  /-- `validator_total_stake(epoch_id)`. -/
+  totalStake : Nat := 0
+  /-- `validator_stake(epoch_id, account)` for each validator. -/
+  validators : List (AccountId × Nat) := []
+  deriving Inhabited, Repr
+
+/-- The stake of an account in the epoch, as the `validator_stake` host function reads it
+(`bytes` is the account id's UTF-8); zero for an account that is not a validator. -/
+def EpochInfo.stake (info : EpochInfo) (bytes : Bytes) : Nat :=
+  ((info.validators.find? fun v => v.1.toUTF8.toList == bytes).map (·.2)).getD 0
+
 /-- Per-block context of one `apply`. -/
 structure ApplyState where
   /-- Independently constructed complete chunk trie and fresh accounting cache. -/
@@ -174,6 +190,8 @@ structure ApplyState where
   gasLimit : Option Nat := none
   /-- The chain's name, which selects the ETH wallet global contract and answers `chain_id`. -/
   chainId : String := ""
+  /-- The epoch's validators and minimum stake (`EpochInfoProvider`). -/
+  epochInfo : EpochInfo := {}
   /-- The shard being applied and the shards of its layout, for global contract distribution. -/
   shardId : Nat := 0
   shardIds : List Nat := [0]

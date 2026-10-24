@@ -83,10 +83,23 @@ def accountingJson (state : Option TrieOverlay.State) : Json :=
                 [("hash", bytesJson event.hash), ("kind", toJson event.kind),
                   ("cached", toJson event.cached)]))]
 
+/-- Borsh of `Vec<ValidatorStake>` (`ApplyResult::validator_proposals`): each proposal is the
+`V1` variant, its account id, public key and stake. -/
+def proposalsBorsh (proposals : List ValidatorProposal) : Result Bytes := do
+  let unsigned (width value : Nat) : Bytes :=
+    (List.range width).map fun i => UInt8.ofNat (value / 2 ^ (8 * i) % 256)
+  unless proposals.all (·.stake < 2 ^ 128) do throw "validator stake exceeds u128"
+  let encoded ← proposals.mapM fun p => do
+    let name := p.account.toUTF8.toList
+    pure ([0] ++ unsigned 4 name.length ++ name ++ (← StateEncoding.publicKey p.publicKey)
+      ++ unsigned 16 p.stake)
+  pure (unsigned 4 proposals.length ++ encoded.flatten)
+
 def run (protocol : Nat) (cfg : Wasm.Near.RuntimeConfig) (congestion : Congestion.Config)
     (codes : Catalogue) (initial : Snapshot) (context : QueueEncoding.Context) (blocks : List Block)
     (hashes : List (List NativeIdentity.Hash)) (schedulerInputs : List ShardChunk.Input)
-    (initialShard : ShardChunk.State := {}) : Result Json := do
+    (initialShard : ShardChunk.State := {})
+    (updates : List (Option ValidatorAccountsUpdate) := []) : Result Json := do
   unless schedulerInputs.length == blocks.length do
     throw "scheduler input batch count mismatch"
   unless hashes.length == blocks.length do
@@ -130,6 +143,10 @@ def run (protocol : Nat) (cfg : Wasm.Near.RuntimeConfig) (congestion : Congestio
     let inputs :=
       (block.txs.zip hashes).map fun (transaction, blockHash) =>
         ({ transaction, blockHash } : TransactionRegistry.Input)
+    -- Step 1 of `Runtime::apply`: the epoch's first chunk pays rewards and returns stake before
+    -- anything else runs, so the chunk trie below already holds the updated accounts.
+    if let some (some update) := updates[position]? then
+      snapshot := { snapshot with state := ← update.apply snapshot.state }
     let trie ← ShardChunk.start cfg catalogue context snapshot.state shard
     let admitted ← TransactionRegistry.observe cfg block.ap catalogue snapshot.state inputs context
     let block :=
@@ -201,6 +218,7 @@ def run (protocol : Nat) (cfg : Wasm.Near.RuntimeConfig) (congestion : Congestio
                 ("bandwidthRequests", bytesJson (Bandwidth.requestsToBorsh outcome.requests)),
                 ("schedulerStateHash", bytesJson outcome.schedulerHash),
                 ("delayedReceiptsCount", toJson next.state.delayed.length),
+                ("validatorProposals", bytesJson (← proposalsBorsh (uniqueProposals result.proposals))),
                 ("grantedBandwidth",
                   toJson (outcome.granted.map fun (s, r, b) => toJson [s, r, b])),
                 ("chunkBaseRoot", toJson (StateEncoding.base58 trie.base.root)),
@@ -285,12 +303,13 @@ def execute (request : Json) : IO Json := do
               ← field request "blocks", ← field request "transactionBlockHashes", context,
               (request.getObjVal? "schedulerInputs").toOption, scheduler, buffers)
   let codes ← loadCatalogue (catalogues : List Json)
-  let (snapshot, blocks, hashes, context, schedulerInputs) ←
+  let (snapshot, blocks, updates, hashes, context, schedulerInputs) ←
     IO.ofExcept do
         let snapshot : Snapshot :=
           { state := ← state codes initial
             pending := ← (pending : List Json).mapM (receipt codes) }
         let blocks ← (values : List Json).mapM (block codes)
+        let updates ← (values : List Json).mapM blockValidatorUpdate
         let hashes ← (hashes : List (List (List Nat))).mapM (List.mapM bytes)
         let context ←
           match context with
@@ -306,12 +325,12 @@ def execute (request : Json) : IO Json := do
             do
               let values : List Json ← fromJson? values
               values.mapM parseSchedulerInput
-        pure (snapshot, blocks, hashes, context, schedulerInputs)
+        pure (snapshot, blocks, updates, hashes, context, schedulerInputs)
   let cfg ← Wasm.Near.RuntimeConfig.load directory protocol
   let congestion ← Congestion.Config.load directory protocol
   IO.ofExcept
       (run protocol cfg congestion codes snapshot context blocks hashes schedulerInputs
-        { scheduler, buffers })
+        { scheduler, buffers } updates)
 
 end ChainReplay.Registered
 

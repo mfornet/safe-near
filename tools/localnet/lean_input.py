@@ -40,8 +40,6 @@ UNREPRESENTED_ACTIONS = {
 # the action views that are spelled differently in the RPC view and in the typed receipt
 ACTION_ALIASES = {"DeployGlobalContractByAccountId": "DeployGlobalContract",
                   "UseGlobalContractByAccountId": "UseGlobalContract"}
-HOSTS_NEEDING_EPOCH = {"validator_stake": "host function validator_stake (needs the epoch's validator set)",
-                       "validator_total_stake": "host function validator_total_stake (needs the epoch's validator set)"}
 
 
 class Unsupported(Exception):
@@ -125,13 +123,6 @@ def blockers(bundle: dict) -> list[str]:
     for kind in dict.fromkeys(kinds):
         if kind in UNREPRESENTED_ACTIONS:
             found.append(UNREPRESENTED_ACTIONS[kind])
-    if context["validatorAccountsUpdate"] is not None:
-        found.append("epoch boundary: validator accounts update (rewards, stake return)")
-    for outcome in expected["outcomes"]:
-        for entry in (outcome["view"].get("metadata") or {}).get("gas_profile") or []:
-            host = corpus.host_function(entry["cost"]) if entry.get("cost_category") == "WASM_HOST_COST" else None
-            if host in HOSTS_NEEDING_EPOCH:
-                found.append(HOSTS_NEEDING_EPOCH[host])
     return list(dict.fromkeys(found))
 
 
@@ -650,7 +641,9 @@ class Converter:
                         "gasLimit": context["gasLimit"], "randomSeed": list(bytes.fromhex(context["randomSeed"])),
                         "transactions": transactions, "incomingIndices": None,
                         "chainId": bundle["meta"]["chainId"], "shardId": bundle["meta"]["shardId"],
-                        "shardIds": layout_shard_ids(context["shardLayout"])}],
+                        "shardIds": layout_shard_ids(context["shardLayout"]),
+                        "epochInfo": epoch_info(context["epochInfo"]),
+                        "validatorAccountsUpdate": validator_update(context["validatorAccountsUpdate"])}],
             "transactionBlockHashes": [hashes], "queueContext": registry,
             "schedulerInputs": [{"congestionInfo": [[shard, list(bytes.fromhex(info)), missed]
                                                     for shard, info, missed in context["congestionInfo"]],
@@ -665,6 +658,21 @@ class Converter:
         if buffers:
             request["initialBuffers"] = buffers
         return request
+
+
+def epoch_info(info: dict) -> dict:
+    """What `EpochInfoProvider` answers: minimum stake, total stake and each validator's stake."""
+    return {"minimumStake": info["minimumStake"], "totalStake": info["totalStake"],
+            "validators": {name: stake for name, stake in info["validators"]}}
+
+
+def validator_update(update: dict | None) -> dict | None:
+    """The epoch-start `ValidatorAccountsUpdate` of the shard (None outside an epoch's first chunk)."""
+    if update is None:
+        return None
+    return {"stakeInfo": update["stakeInfo"], "validatorRewards": update["validatorRewards"],
+            "lastProposals": update["lastProposals"],
+            "protocolTreasuryAccountId": update["protocolTreasuryAccountId"]}
 
 
 def run_lean(binary: Path, request: dict, workdir: Path) -> dict:
@@ -776,7 +784,8 @@ def compare(bundle: dict, request: dict, answer: dict, extra: list[str]) -> None
         raise Mismatch("balanceStats.burnt", extra)
     if int(trace["execution"]["subsidizedAmount"]) != int(stats["subsidized"]):
         raise Mismatch("balanceStats.subsidized", extra)
-    published = {"congestionInfo": bytes(trace["congestionInfo"]).hex(),
+    published = {"validatorProposals": bytes(trace["validatorProposals"]).hex(),
+                 "congestionInfo": bytes(trace["congestionInfo"]).hex(),
                  "bandwidthRequests": bytes(trace["bandwidthRequests"]).hex(),
                  "bandwidthSchedulerStateHash": bytes(trace["schedulerStateHash"]).hex(),
                  "delayedReceiptsCount": trace["delayedReceiptsCount"]}

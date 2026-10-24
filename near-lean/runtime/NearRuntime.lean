@@ -32,3 +32,4 @@ import NearRuntime.ShardLayout
 import NearRuntime.ChaCha
 import NearRuntime.Congestion
 import NearRuntime.Bandwidth
+import NearRuntime.Epoch

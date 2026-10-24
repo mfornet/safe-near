@@ -75,8 +75,8 @@ theorem applyAction_account_ne (c : ReceiptCtx) (isLast : Bool) (action : Action
       exact ChainState.account?_setAccount_ne _ _ _ _ hne | split)
   | stake amount pk =>
     cases ha : before.state.account? c.receipt.receiverId <;>
-      simp [-StateT.run_bind, applyAction, getAccount, getState, ha]
-    repeat' (first | rfl | split)
+      simp [-StateT.run_bind, applyAction, getAccount, getState, putAccount, modifyState, ha]
+    repeat' (first | rfl | exact ChainState.account?_setAccount_ne _ _ _ _ hne | split)
   | addKey pk key =>
     rw [applyAddKey_run]
     repeat' (first | rfl | exact addKeyMetadataState_account_ne _ _ _ _ _ _ hne | split)

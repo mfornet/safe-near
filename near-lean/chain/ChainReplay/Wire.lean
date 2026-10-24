@@ -1,4 +1,5 @@
 import NearChain
+import NearRuntime.Epoch
 import Wasm
 
 /-! JSON transport for the trusted chain manipulator. This preserves every
@@ -358,10 +359,40 @@ def state (codes : Catalogue) (j : Json) : Result ChainState := do
                   | _ => throw s!"unknown yield status: {status}")
         nextId := ← field j "nextId" }
 
+/-- An object of decimal balances by account id. -/
+def stakeTable (j : Json) : Result (List (String × Nat)) := do
+  (← j.getObj?).toList.mapM fun (name, value) => do
+    let text : String ← fromJson? value
+    pure (name, ← balance text)
+
+/-- `EpochInfoProvider`'s answers for the chunk. -/
+def epochInfo (j : Json) : Result Near.EpochInfo := do
+  object j ["minimumStake", "totalStake", "validators"]
+  pure { minimumStake := ← amount j "minimumStake", totalStake := ← amount j "totalStake"
+         validators := ← stakeTable (← field j "validators") }
+
+/-- The `ValidatorAccountsUpdate` of an epoch's first chunk. -/
+def validatorUpdate (j : Json) : Result Near.ValidatorAccountsUpdate := do
+  object j ["stakeInfo", "validatorRewards", "lastProposals", "protocolTreasuryAccountId"]
+  pure { stakeInfo := ← stakeTable (← field j "stakeInfo")
+         validatorRewards := ← stakeTable (← field j "validatorRewards")
+         lastProposals := ← stakeTable (← field j "lastProposals")
+         protocolTreasury := ← optionalField j "protocolTreasuryAccountId" }
+
+/-- The epoch-boundary update a block's JSON carries, if any. -/
+def blockValidatorUpdate (j : Json) : Result (Option Near.ValidatorAccountsUpdate) :=
+  match j.getObjVal? "validatorAccountsUpdate" with
+  | .error _ | .ok .null => pure none
+  | .ok value => do pure (some (← validatorUpdate value))
+
 def block (codes : Catalogue) (j : Json) : Result Block := do
   object j
       ["blockHeight", "blockTimestamp", "epochHeight", "gasPrice", "gasLimit", "randomSeed",
-        "transactions", "incomingIndices", "chainId", "shardId", "shardIds"]
+        "transactions", "incomingIndices", "chainId", "shardId", "shardIds", "epochInfo",
+        "validatorAccountsUpdate"]
+  let epoch : Near.EpochInfo ← match j.getObjVal? "epochInfo" with
+    | .error _ | .ok .null => pure {}
+    | .ok value => epochInfo value
   let gasLimit : Option Nat ← field j "gasLimit"
   let seed ← byteField j "randomSeed"
   unless seed.length == 32 do
@@ -378,7 +409,8 @@ def block (codes : Catalogue) (j : Json) : Result Block := do
             randomSeed := seed
             chainId := (← optionalField j "chainId").getD ""
             shardId := (← optionalField j "shardId").getD 0
-            shardIds := (← optionalField j "shardIds").getD [0] }
+            shardIds := (← optionalField j "shardIds").getD [0]
+            epochInfo := epoch }
         txs := ← transactions.mapM (transaction codes)
         receipts := positions.elim .all .indices }
 

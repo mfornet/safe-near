@@ -77,6 +77,7 @@ def applyReceiptQueue (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes â†
   return {
     state := { st with delayed := retainedDelayed ++ newlyDelayed }, outgoing, outcomes, tokensBurnt, subsidizedAmount, identityBirths
     storageAccounting
+    proposals := outcomes.flatMap (Â·.2.proposals)
     delayedConsumed := initial.delayed.length - retainedDelayed.length, delayedAppended := newlyDelayed.length }
 
 /-- Every public field, including queue metadata and identity births, agrees

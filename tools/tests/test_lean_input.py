@@ -30,6 +30,8 @@ def tx_bundle(actions=None, receipts=(), entries=None, shards=1):
     return {
         "formatVersion": 1, "meta": {"height": 9, "shardId": 0, "chainId": "safe-near-localnet-1s"},
         "context": {"currentProtocolVersion": 86, "validatorAccountsUpdate": None, "blockHeight": 9,
+                    "epochInfo": {"chainId": "safe-near-localnet-1s", "minimumStake": "50", "totalStake": "300",
+                                  "validators": [["alice.near", "100"], ["v.near", "200"]]},
                     "blockTimestamp": 5, "epochHeight": 1, "gasPrice": "100", "gasLimit": 10**15,
                     "randomSeed": "ab" * 32, "bandwidthRequests": "00000000", "prevBlockHash": "cd" * 32,
                     "shardLayout": SINGLE_LAYOUT,
@@ -84,11 +86,10 @@ class Blockers(unittest.TestCase):
     def test_each_unrepresented_feature_is_named(self):
         bundle = tx_bundle(actions=[{"DeterministicStateInit": {}}, "CreateAccount"], shards=4)
         bundle["preState"]["entries"] = [["0a", "00"], ["0f", "00"], ["0d", "00"], ["16", "00"]]
-        bundle["context"]["validatorAccountsUpdate"] = {}
         bundle["inputs"]["transactions"][0]["valid"] = False
         found = li.blockers(bundle)
         for text in ["pre-state column yield-id-to-data-id",
-                     "action DeterministicStateInit", "epoch boundary", "transaction rejected"]:
+                     "action DeterministicStateInit", "transaction rejected"]:
             self.assertTrue(any(text in reason for reason in found), (text, found))
         self.assertFalse(any("bandwidth" in reason or "buffered" in reason for reason in found))   # modelled columns
         self.assertEqual(found, list(dict.fromkeys(found)))
@@ -99,11 +100,13 @@ class Blockers(unittest.TestCase):
         self.assertEqual(li.model_action_blockers(["Transfer", "DeterministicStateInit"]),
                          ["action DeterministicStateInit"])
 
-    def test_host_functions_that_need_the_epoch(self):
+    def test_the_epoch_is_modelled(self):
         bundle = tx_bundle()
+        bundle["context"]["validatorAccountsUpdate"] = {"stakeInfo": {}, "validatorRewards": {}, "lastProposals": {},
+                                                        "protocolTreasuryAccountId": "near"}
         bundle["expected"]["outcomes"] = [{"view": {"metadata": {"gas_profile": [
             {"cost_category": "WASM_HOST_COST", "cost": "VALIDATOR_STAKE_BASE", "gas_used": "1"}]}}}]
-        self.assertTrue(any("validator_stake" in reason for reason in li.blockers(bundle)))
+        self.assertEqual(li.blockers(bundle), [])
 
 
 class Conversion(unittest.TestCase):
@@ -123,6 +126,15 @@ class Conversion(unittest.TestCase):
         self.assertEqual(tx["actions"], [{"kind": "transfer", "deposit": "7"}])
         self.assertEqual(request["transactionBlockHashes"], [[list(range(32))]])
         self.assertEqual(request["blocks"][0]["randomSeed"], [0xAB] * 32)
+        self.assertEqual(request["blocks"][0]["epochInfo"], {"minimumStake": "50", "totalStake": "300",
+                         "validators": {"alice.near": "100", "v.near": "200"}})
+        self.assertIsNone(request["blocks"][0]["validatorAccountsUpdate"])
+        bundle["context"]["validatorAccountsUpdate"] = {
+            "stakeInfo": {"v.near": "9"}, "validatorRewards": {"v.near": "2", "near": "1"},
+            "lastProposals": {}, "protocolTreasuryAccountId": "near"}
+        update = self.convert(bundle)["blocks"][0]["validatorAccountsUpdate"]
+        self.assertEqual(update, {"stakeInfo": {"v.near": "9"}, "validatorRewards": {"v.near": "2", "near": "1"},
+                                  "lastProposals": {}, "protocolTreasuryAccountId": "near"})
         self.assertIsNone(request["blocks"][0]["incomingIndices"])
         self.assertNotIn("initialScheduler", request)
 

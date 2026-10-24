@@ -277,7 +277,7 @@ inductive RuntimeError
   | lackBalanceForState (id : AccountId) (amount : Nat)
   | triesToUnstake (id : AccountId)
   | triesToStake (id : AccountId) (stake locked balance : Nat)
-  | insufficientStake (id : AccountId)
+  | insufficientStake (id : AccountId) (stake minimum : Nat)
   | functionCallError (e : Wasm.Near.FunctionCallError)
   | deleteActionMustBeFinal
   | onlyImplicitAccountCreationAllowed (id : AccountId)
@@ -332,6 +332,13 @@ def ExecutionStatus.isSuccess : ExecutionStatus → Bool
   | .failure _ => false
   | _ => true
 
+/-- A validator proposal a `Stake` action makes (`ValidatorStake::new`). -/
+structure ValidatorProposal where
+  account : AccountId
+  publicKey : Bytes
+  stake : Nat
+  deriving Inhabited, Repr, BEq
+
 structure ExecutionOutcome where
   /-- Failed receipt action, absent for transaction errors and final storage checks. -/
   failureIndex : Option Nat := none
@@ -341,6 +348,8 @@ structure ExecutionOutcome where
   receiptIds : List ReceiptId := []
   gasBurnt : Nat := 0
   tokensBurnt : Nat := 0
+  /-- The validator proposals of the receipt's successful `Stake` actions. -/
+  proposals : List ValidatorProposal := []
   deriving Inhabited
 
 end Near

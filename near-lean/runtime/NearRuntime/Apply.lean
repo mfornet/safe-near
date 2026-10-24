@@ -60,6 +60,8 @@ structure ApplyResult where
   tokensBurnt : Nat
   /-- Newly minted promise deposits, separate from positive gas burn. -/
   subsidizedAmount : Nat := 0
+  /-- Validator proposals of the successful `Stake` actions, in the order the receipts ran. -/
+  proposals : List ValidatorProposal := []
   /-- No state transition is committed when the model cannot execute a receipt.
   The state is the input state and the protocol observations are empty. -/
   issue : Option (ReceiptId × ExecutionIssue) := none
@@ -91,6 +93,8 @@ structure Exec where
   /-- Yocto credited to the contract out of its burnt gas (`burnt_gas_reward`). -/
   reward : Nat := 0
   logs : List String := []
+  /-- Validator proposals of the receipt's `Stake` actions, in order; a failed receipt has none. -/
+  proposals : List ValidatorProposal := []
   result : Option ExecutionStatus := none
   failureIndex : Option Nat := none
   deriving Inhabited
@@ -222,7 +226,9 @@ def functionCallContext (c : ReceiptCtx) (account : Account) (args : Bytes) (gas
     outputDataReceivers := if isLast then c.action.outputDataReceivers.map fun d => bytesOfString d.receiverId else []
     actionHash := c.vmActionHash.getD []
     existingYields := c.vmYields
-    chainId := bytesOfString c.ap.chainId }
+    chainId := bytesOfString c.ap.chainId
+    validatorStake := c.ap.epochInfo.stake
+    validatorTotalStake := c.ap.epochInfo.totalStake }
 
 /-- Gas/log observations from one VM call, before its success/failure branch. -/
 def Exec.recordVMOutcome (exec : Exec) (outcome : VMOutcome) : Exec :=
@@ -676,18 +682,17 @@ def applyAction (c : ReceiptCtx) (isLast : Bool) : Action → ExecM Unit
           modify fun e => { e with actorId := id }
         else throw (.accountDoesNotExist id)
   | .stake stake pk => do
+    -- `action_stake`: the locked balance grows out of the liquid one, a proposal goes to the epoch.
     let id := c.receipt.receiverId
     let a ← getAccount id
-    let _ := pk
-    if stake == 0 && a.locked == 0 then throw (.triesToUnstake id)
-    if stake > a.amount + a.locked then throw (.triesToStake id stake a.locked a.amount)
-    -- nearcore divergence: staking (validator proposals, minimum stake from the epoch provider)
-    -- is not modeled; any stake that passes the balance checks is an `unsupportedAction` issue.
-    if stake < a.locked then
-      throw (.executionIssue (.unsupportedAction "unstake (epoch machinery)"))
-    -- Staking also emits validator proposals and depends on epoch-provider
-    -- eligibility checks. A local balance update would fabricate success.
-    throw (.executionIssue (.unsupportedAction "stake (epoch machinery)"))
+    let increment := stake - a.locked
+    if a.amount < increment then throw (.triesToStake id stake a.locked a.amount)
+    if a.locked == 0 && stake == 0 then throw (.triesToUnstake id)
+    let minimum := c.ap.epochInfo.minimumStake
+    if stake > 0 && stake < minimum then throw (.insufficientStake id stake minimum)
+    modify fun e => { e with proposals := e.proposals ++ [{ account := id, publicKey := pk, stake }] }
+    if stake > a.locked then
+      putAccount id { a with amount := a.amount - increment, locked := stake }
   | .addKey pk key => do
     let id := c.receipt.receiverId
     let st ← getState
@@ -894,7 +899,7 @@ def runReceiptActions (c : ReceiptCtx) (st0 : ChainState) : Exec × Option Runti
 /-- Receipt failure restores the pre-action state while retaining gas and logs. -/
 def rollbackReceipt (st0 : ChainState) (exec : Exec) (failed : Option RuntimeError) : Exec :=
   match failed with
-    | some err => { exec with state := st0, storageAccounting := exec.storageAccounting.map (fun trie => { trie with prospective := [] }), newReceipts := [], vmIdentityBirths := [], subsidizedAmount := 0, actionTokensBurnt := 0, gasUsed := exec.gasBurnt,
+    | some err => { exec with state := st0, storageAccounting := exec.storageAccounting.map (fun trie => { trie with prospective := [] }), newReceipts := [], proposals := [], vmIdentityBirths := [], subsidizedAmount := 0, actionTokensBurnt := 0, gasUsed := exec.gasBurnt,
                               result := some (.failure err) }
     | none => exec
 
@@ -1035,7 +1040,8 @@ def outcomeOf (r : Receipt) (e : Exec) : ExecutionOutcome :=
       | .action _ => some receipt.receiptId
       | .data _ | .globalDistribution _ => none)
     gasBurnt := e.gasBurnt
-    tokensBurnt := e.tokensBurnt }
+    tokensBurnt := e.tokensBurnt
+    proposals := e.proposals }
 
 /-- Result of processing one receipt: state, new receipts, outcomes, and the
 yocto paid to contracts as gas reward (which are not burnt). -/
@@ -1424,6 +1430,7 @@ def applyAttempt (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → Con
   return {
     state := { st with delayed := retainedDelayed ++ newlyDelayed }, outgoing, outcomes, tokensBurnt, subsidizedAmount, identityBirths
     storageAccounting
+    proposals := outcomes.flatMap (·.2.proposals)
     delayedConsumed := initial.delayed.length - retainedDelayed.length, delayedAppended := newlyDelayed.length }
 
 /-- Commit a supported chunk. Model limitations invalidate the entire attempt:
@@ -1432,8 +1439,15 @@ def apply (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → ContractCo
     (st : ChainState) (txs : List Transaction) (incoming : List Receipt) : ApplyResult :=
   let result := applyAttempt cfg ap codeOf st txs incoming
   if result.issue.isSome then
-    { result with state := st, outgoing := [], outcomes := [], tokensBurnt := 0, subsidizedAmount := 0, identityBirths := [], delayedConsumed := 0, delayedAppended := 0 }
+    { result with state := st, outgoing := [], outcomes := [], tokensBurnt := 0, subsidizedAmount := 0, proposals := [], identityBirths := [], delayedConsumed := 0, delayedAppended := 0 }
   else result
+
+/-- The proposals `ApplyResult::validator_proposals` carries: one per account, the last one the
+chunk made, in the reverse of the order they were made in (`Runtime::apply` walks the proposals
+backwards and keeps the first it meets of each account). -/
+def uniqueProposals (proposals : List ValidatorProposal) : List ValidatorProposal :=
+  proposals.reverse.foldl (fun kept p =>
+    if kept.any (·.account == p.account) then kept else kept ++ [p]) []
 
 /-- An unsupported or incomplete apply is atomic with respect to all public
 protocol observations, including work that preceded the problematic receipt. -/

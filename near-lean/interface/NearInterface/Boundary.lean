@@ -102,6 +102,11 @@ structure Context where
   existingYields : List Bytes := []
   /-- The chain's name, for `chain_id`. -/
   chainId : Bytes := []
+  /-- `validator_stake`: the stake of the account with these id bytes in the current epoch,
+  zero when it is not a validator. -/
+  validatorStake : Bytes → Nat := fun _ => 0
+  /-- `validator_total_stake`: the current epoch's total validator stake. -/
+  validatorTotalStake : Nat := 0
 
 /-- Records stored under `account` in a trie view (`TrieKey::ContractData`). -/
 def contractData (trie : Near.TrieOverlay.State) (account : Bytes) : RawStorage :=

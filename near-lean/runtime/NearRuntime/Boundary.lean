@@ -55,6 +55,8 @@ def toVMContext (ctx : Context) : VMContext where
   actionHash := ctx.actionHash
   existingYields := ctx.existingYields
   chainId := ctx.chainId
+  validatorStake := ctx.validatorStake
+  validatorTotalStake := ctx.validatorTotalStake
 
 /-- The receipt executor builds exactly `toVMContext` from a context that
 agrees with the receipt, the account and the action. -/
@@ -75,7 +77,9 @@ theorem functionCallContext_eq_toVMContext (c : ReceiptCtx) (account : Account) 
       if isLast then c.action.outputDataReceivers.map (·.receiverId) else [])
     (hactionHash : ctx.actionHash = c.vmActionHash.getD [])
     (hyields : ctx.existingYields = c.vmYields)
-    (hchain : ctx.chainId = bytesOfString c.ap.chainId) :
+    (hchain : ctx.chainId = bytesOfString c.ap.chainId)
+    (hstake : ctx.validatorStake = c.ap.epochInfo.stake)
+    (htotal : ctx.validatorTotalStake = c.ap.epochInfo.totalStake) :
     functionCallContext c account args gas deposit isLast (some trie) = toVMContext ctx := by
   have houtputs' : (if isLast then c.action.outputDataReceivers.map fun d => bytesOfString d.receiverId
       else []) = ctx.outputDataReceivers.map NearInterface.AccountId.bytes := by
@@ -88,7 +92,7 @@ theorem functionCallContext_eq_toVMContext (c : ReceiptCtx) (account : Account) 
   rw [houtputs']
   simp only [toVMContext, NearInterface.AccountId.bytes, bytesOfString, hcurrent, hsigner, hpk,
     hpredecessor, hargs, hresults, hheight, htime, hepoch, hbalance, hlocked, husage, hdeposit, hgas,
-    hseed, htrie, hactionHash, hyields, hchain]
+    hseed, htrie, hactionHash, hyields, hchain, hstake, htotal]
 
 /-- What the boundary runs: the deployed code, and the decoder the runtime
 uses for code that the call's promises deploy. -/
