@@ -34,6 +34,15 @@ core axiom audits, formatter integration checks and contract builds.
 | `just chain-import-test` | Check native state encoding, captured-state imports and deterministic signing |
 | `just chain-reference-test [options...]` | Exercise the native reference's chunk boundaries and complete raw-state replay |
 
+## Tool tests
+
+`tools/tests/test_*.py` are offline: `just tools-test` and CI's repository job
+run them with `unittest discover`, which only picks up `test_*` files.
+`tools/tests/check_*.py` build Lean fixtures or need the Mathlib cache, so CI
+skips them on purpose. They run in the periodic plan and through `just
+vm-dependencies`, `just audit-all` and `just check`. Keep a test that needs no
+Lean in a `test_*` file.
+
 ## Lean quality
 
 `lean-toolchain` at the repository root is the canonical release pin. Each
