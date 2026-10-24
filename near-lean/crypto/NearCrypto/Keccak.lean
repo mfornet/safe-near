@@ -219,12 +219,13 @@ private def round (s : State) (rc : UInt64) : State :=
     b20 ^^^ (~~~b21 &&& b22), b21 ^^^ (~~~b22 &&& b23), b22 ^^^ (~~~b23 &&& b24),
     b23 ^^^ (~~~b24 &&& b20), b24 ^^^ (~~~b20 &&& b21)⟩
 
-private def permute (s : State) : Nat → State
+/-- Keccak-f[1600]: `n` rounds from the last round constant down (`n = 24` is all of them). -/
+def permute (s : State) : Nat → State
   | 0 => s
   | n + 1 => permute (round s RC[23 - n]!) n
 
 /-- XOR the block at `off` (`lanes` lanes of it) into the state. -/
-private def absorb (s : State) (data : ByteArray) (off lanes : Nat) : State :=
+def absorb (s : State) (data : ByteArray) (off lanes : Nat) : State :=
   let lane (i : Nat) : UInt64 := if i < lanes then le64 data (off + 8 * i) else 0
   ⟨s.a0 ^^^ lane 0, s.a1 ^^^ lane 1, s.a2 ^^^ lane 2, s.a3 ^^^ lane 3, s.a4 ^^^ lane 4,
     s.a5 ^^^ lane 5, s.a6 ^^^ lane 6, s.a7 ^^^ lane 7, s.a8 ^^^ lane 8, s.a9 ^^^ lane 9,
@@ -232,7 +233,8 @@ private def absorb (s : State) (data : ByteArray) (off lanes : Nat) : State :=
     s.a15 ^^^ lane 15, s.a16 ^^^ lane 16, s.a17 ^^^ lane 17, s.a18 ^^^ lane 18, s.a19 ^^^ lane 19,
     s.a20 ^^^ lane 20, s.a21 ^^^ lane 21, s.a22 ^^^ lane 22, s.a23 ^^^ lane 23, s.a24 ^^^ lane 24⟩
 
-private def run (rate : Nat) (data : ByteArray) (off : Nat) (s : State) : Nat → State
+/-- Absorb `n` blocks of `rate` bytes of `data` from `off`, permuting after each. -/
+def run (rate : Nat) (data : ByteArray) (off : Nat) (s : State) : Nat → State
   | 0 => s
   | n + 1 => run rate data (off + rate) (permute (absorb s data off (rate / 8)) 24) n
 

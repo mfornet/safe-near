@@ -10,3 +10,4 @@ import NearCrypto.Secp256k1.Spec
 import NearCrypto.Ristretto
 import NearCrypto.Vrf
 import NearCrypto.ModInv
+import NearCrypto.Shake

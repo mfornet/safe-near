@@ -74,6 +74,25 @@ def hashTests (t : Tally) (r : Rng) : Tally × Rng :=
         t := check t s!"{name} length {n}" (spec m == impl m) s!"digests differ on {toHex m}"
     return (t, r)
 
+/-- SHAKE agrees for every message length around the rates and for output lengths up to several blocks. -/
+def shakeTests (t : Tally) (r : Rng) : Tally × Rng :=
+  Id.run do
+    let mut t := t
+    let mut r := r
+    for (name, spec, impl) in
+      [("shake128", Shake.Spec.shake128, Shake.Impl.shake128),
+        ("shake256", Shake.Spec.shake256, Shake.Impl.shake256)] do
+      let mut cases : List (Nat × Nat) := []
+      for n in List.range 400 do
+        let (k, r') := r.below 700
+        r := r'
+        cases := cases ++ [(n, k)]
+      for (n, k) in cases do
+        let (m, r') := r.bytes n
+        r := r'
+        t := check t s!"{name} length {n} output {k}" (spec m k == impl m k) s!"differ on {toHex m}"
+    return (t, r)
+
 /-- HMAC-SHA256 agrees for keys shorter than, equal to and longer than a block. -/
 def hmacTests (t : Tally) (r : Rng) : Tally × Rng :=
   Id.run do
@@ -683,4 +702,5 @@ def main : IO UInt32 := do
   (t, r) := secpFormulaTests t r
   (t, r) := ristrettoTests t r
   (t, r) := vrfTests t r
+  (t, r) := shakeTests t r
   finish "crypto-differential" t

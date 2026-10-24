@@ -11,16 +11,6 @@ primitive. A failure names the file, line and vector. The exit code is nonzero o
 
 open Lean NearCrypto CryptoTests
 
-/-- Message of a hash vector: literal bytes, or a unit repeated `count` times. -/
-def message (j : Json) : Except String ByteArray := do
-  match bytes j "msg" with
-  | .ok m =>
-    pure m
-  | .error _ =>
-    let unit ← bytes j "unit"
-    let count ← j.getObjValAs? Nat "count"
-    pure (ByteArray.mk ((List.replicate count unit.toList).flatten.toArray))
-
 /-- `(Spec, Impl)` of each hash by the oracle's name. -/
 def hashes : List (String × ((ByteArray → ByteArray) × (ByteArray → ByteArray))) :=
   [("sha256", (Sha256.Spec.hash, Sha256.Impl.hash)),
@@ -49,6 +39,26 @@ def checkHash (j : Json) : Except String (Option String) := do
     throw s!"unknown algorithm {alg}"
   | some (spec, impl) =>
     pure (firstError [expect s!"{alg} Impl" (impl msg) want, expect s!"{alg} Spec" (spec msg) want])
+
+/-- A SHAKE vector: `outLen` bytes of the named function. -/
+def checkShake (j : Json) : Except String (Option String) := do
+  let alg ← str j "alg"
+  let msg ← message j
+  let n ← j.getObjValAs? Nat "outLen"
+  let want ← bytes j "digest"
+  match alg with
+  | "shake128" =>
+    pure <|
+        firstError
+          [expect "shake128 Impl" (Shake.Impl.shake128 msg n) want,
+            expect "shake128 Spec" (Shake.Spec.shake128 msg n) want]
+  | "shake256" =>
+    pure <|
+        firstError
+          [expect "shake256 Impl" (Shake.Impl.shake256 msg n) want,
+            expect "shake256 Spec" (Shake.Spec.shake256 msg n) want]
+  | _ =>
+    throw s!"unknown algorithm {alg}"
 
 def checkEd25519 (j : Json) : Except String (Option String) := do
   let kind ← str j "kind"
@@ -120,6 +130,7 @@ def main (args : List String) : IO UInt32 := do
   let dir : System.FilePath := args.headD "fixtures"
   let mut t : Tally := {}
   t ← runFile t (dir / "hash.jsonl") checkHash
+  t ← runFile t (dir / "shake.jsonl") checkShake
   t ← runFile t (dir / "ed25519.jsonl") checkEd25519
   t ← runFile t (dir / "secp256k1.jsonl") Secp.check
   t ← runFile t (dir / "vrf.jsonl") Vrf.check

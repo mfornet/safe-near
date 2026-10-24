@@ -1059,8 +1059,10 @@ dependencies = [
 name = "node-conformance"
 version = "0.1.0"
 dependencies = [
+ "aws-lc-rs",
  "blake2",
  "borsh",
+ "bs58 0.4.0",
  "curve25519-dalek",
  "ed25519-dalek",
  "near-crypto",

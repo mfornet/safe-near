@@ -57,6 +57,16 @@ def int (j : Json) (k : String) : Except String Int :=
 def bool (j : Json) (k : String) : Except String Bool :=
   j.getObjValAs? Bool k
 
+/-- The message of a vector: literal bytes, or a unit repeated `count` times. -/
+def message (j : Json) : Except String ByteArray := do
+  match bytes j "msg" with
+  | .ok m =>
+    pure m
+  | .error _ =>
+    let unit ← bytes j "unit"
+    let count ← j.getObjValAs? Nat "count"
+    pure (ByteArray.mk ((List.replicate count unit.toList).flatten.toArray))
+
 /-- Print the outcome and return the exit code. -/
 def finish (name : String) (t : Tally) : IO UInt32 := do
   for f in t.failures do

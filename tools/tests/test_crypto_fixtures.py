@@ -11,7 +11,7 @@ from secp_reference import G, N, P, ec_add, ec_mul  # noqa: E402
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = ROOT / "near-lean/crypto/fixtures"
 HEX = re.compile(r"^(?:[0-9a-f]{2})*$")
-LIMIT = 5 * 1024 * 1024
+LIMIT = 8 * 1024 * 1024
 DIGEST_BYTES = {"sha256": 32, "sha512": 64, "keccak256": 32, "keccak512": 64, "ripemd160": 20,
                 "blake2b256": 32, "blake2b512": 64}
 FIELD_BYTES = {"seed": 32, "public": 32, "keypair": 64, "sig": 64}
@@ -32,20 +32,24 @@ class CryptoFixtureTests(unittest.TestCase):
         cls.ed25519 = lines("ed25519.jsonl")
         cls.secp = lines("secp256k1.jsonl")
         cls.vrf = lines("vrf.jsonl")
+        cls.shake = lines("shake.jsonl")
+        cls.mldsa = lines("mldsa.jsonl")
 
     def test_size(self):
         self.assertLess(sum(p.stat().st_size for p in FIXTURES.iterdir()), LIMIT)
 
     def test_counts_match_manifest(self):
         for name, records in (("hash.jsonl", self.hashes), ("ed25519.jsonl", self.ed25519),
-                              ("secp256k1.jsonl", self.secp), ("vrf.jsonl", self.vrf)):
+                              ("secp256k1.jsonl", self.secp), ("vrf.jsonl", self.vrf),
+                              ("shake.jsonl", self.shake), ("mldsa.jsonl", self.mldsa)):
             counts = {}
             for record in records:
                 kind = record.get("kind", "hash")
                 counts[kind] = counts.get(kind, 0) + 1
             self.assertEqual(counts, self.manifest["files"][name], name)
         self.assertEqual(set(self.manifest["files"]),
-                         {"hash.jsonl", "ed25519.jsonl", "secp256k1.jsonl", "vrf.jsonl"})
+                         {"hash.jsonl", "ed25519.jsonl", "secp256k1.jsonl", "vrf.jsonl", "shake.jsonl",
+                          "mldsa.jsonl"})
 
     def test_hash_lines(self):
         seen = set()
@@ -81,6 +85,27 @@ class CryptoFixtureTests(unittest.TestCase):
             else:
                 digest = hashlib.new(record["alg"], message).hexdigest()
             self.assertEqual(digest, record["digest"], record["name"])
+
+    def test_shake_against_hashlib(self):
+        names = set()
+        for record in self.shake:
+            self.assertNotIn((record["alg"], record["name"]), names, record["name"])
+            names.add((record["alg"], record["name"]))
+            if "msg" in record:
+                message = bytes.fromhex(record["msg"])
+            else:
+                message = bytes.fromhex(record["unit"]) * record["count"]
+            digest = hashlib.new(record["alg"], message).hexdigest(record["outLen"])
+            self.assertEqual(digest, record["digest"], record["name"])
+        for alg, rate in (("shake128", 168), ("shake256", 136)):
+            lengths = {len(r["msg"]) // 2 for r in self.shake if r["alg"] == alg and "msg" in r}
+            for length in (0, rate - 1, rate, rate + 1, 2 * rate, 3 * rate + 1):
+                self.assertIn(length, lengths, alg)
+            outs = {r["outLen"] for r in self.shake if r["alg"] == alg}
+            for length in (1, rate - 1, rate, rate + 1, 2 * rate):
+                self.assertIn(length, outs, alg)
+            self.assertIn((alg, "million-a"), names)
+            self.assertTrue(any(r["alg"] == alg and r["outLen"] > 3 * rate for r in self.shake))
 
     def test_ed25519_lines(self):
         verdicts = {"verify": set(), "pubkey": set(), "keypair-check": set()}

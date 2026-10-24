@@ -26,6 +26,7 @@ use sha3::{Keccak256, Keccak512};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
+mod crypto_mldsa;
 mod crypto_secp;
 mod crypto_vrf;
 
@@ -572,6 +573,9 @@ fn main() {
     let mut h = Out::default();
     hashes(&mut h);
     h.write(dir.join("hash.jsonl"));
+    let mut x = Out::default();
+    crypto_mldsa::shake_fixtures(&mut x);
+    x.write(dir.join("shake.jsonl"));
     let mut e = Out::default();
     ed25519(&mut e);
     e.write(dir.join("ed25519.jsonl"));
@@ -581,14 +585,19 @@ fn main() {
     let mut v = Out::default();
     crypto_vrf::vrf(&mut v);
     v.write(dir.join("vrf.jsonl"));
+    let mut m = Out::default();
+    crypto_mldsa::mldsa_fixtures(&mut m);
+    m.write(dir.join("mldsa.jsonl"));
     let mut counts = BTreeMap::new();
     counts.insert("hash.jsonl", &h.counts);
     counts.insert("ed25519.jsonl", &e.counts);
     counts.insert("secp256k1.jsonl", &s.counts);
     counts.insert("vrf.jsonl", &v.counts);
+    counts.insert("shake.jsonl", &x.counts);
+    counts.insert("mldsa.jsonl", &m.counts);
     let manifest = json!({
-        "crates": "near-crypto =0.37.4, secp256k1 =0.27.0 (libsecp256k1 of secp256k1-sys 0.8.2), ed25519-dalek =2.2.0, curve25519-dalek =4.1.3, sha2 =0.10.9, sha3 =0.10.9, ripemd 0.1, blake2 0.10",
-        "verifier": "near_crypto::Signature::verify -> ed25519_dalek::VerifyingKey::from_bytes + Verifier::verify (non-strict, no legacy_compatibility); SECP256K1: recovery id and r, s parsed by secp256k1::RecoverableSignature::from_compact, then secp256k1_ecdsa_verify (low s only); VM ecrecover: Secp256K1Signature::check_signature_values then recover; VRF: near_crypto::vrf",
+        "crates": "near-crypto =0.37.4, secp256k1 =0.27.0 (libsecp256k1 of secp256k1-sys 0.8.2), ed25519-dalek =2.2.0, curve25519-dalek =4.1.3, sha2 =0.10.9, sha3 =0.10.9, ripemd 0.1, blake2 0.10, aws-lc-rs =1.16.2 (aws-lc-sys 0.39.1, ML-DSA-65)",
+        "verifier": "near_crypto::Signature::verify -> ed25519_dalek::VerifyingKey::from_bytes + Verifier::verify (non-strict, no legacy_compatibility); SECP256K1: recovery id and r, s parsed by secp256k1::RecoverableSignature::from_compact, then secp256k1_ecdsa_verify (low s only); VM ecrecover: Secp256K1Signature::check_signature_values then recover; VRF: near_crypto::vrf; ML-DSA-65: near_crypto::Signature::verify -> aws_lc_rs UnparsedPublicKey(ML_DSA_65).verify (pure mode, empty context); keys: PqdsaKeyPair::from_seed / from_raw_private_key; signatures: ml_dsa_65_sign_internal with chosen randomness",
         "seed": format!("{SEED:#018x}"),
         "files": counts,
     });
