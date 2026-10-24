@@ -6,6 +6,7 @@ import sys
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import mldsa_reference  # noqa: E402
 from secp_reference import G, N, P, ec_add, ec_mul  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -106,6 +107,79 @@ class CryptoFixtureTests(unittest.TestCase):
                 self.assertIn(length, outs, alg)
             self.assertIn((alg, "million-a"), names)
             self.assertTrue(any(r["alg"] == alg and r["outLen"] > 3 * rate for r in self.shake))
+
+    def mldsa_inputs(self, record, keys):
+        message = bytes.fromhex(record["msg"]) if "msg" in record else bytes.fromhex(record["unit"]) * record["count"]
+        public = keys[record["key"]][0] if "key" in record else bytes.fromhex(record["public"])
+        return public, message
+
+    def test_mldsa_structure(self):
+        keys = {r["name"]: (bytes.fromhex(r["public"]), bytes.fromhex(r["secret"]))
+                for r in self.mldsa if r["kind"] == "keygen"}
+        self.assertEqual(len(keys), 12)
+        seen = set()
+        for number, record in enumerate(self.mldsa, 1):
+            where = f"mldsa.jsonl:{number}"
+            self.assertIn(record["kind"], {"keygen", "secret", "sign", "verify"}, where)
+            key = (record["kind"], record["name"], record.get("sig"), record.get("secret"), record.get("public"))
+            self.assertNotIn(key, seen, where)
+            seen.add(key)
+            fixed = {"keygen": {"seed": 32, "public": 1952, "secret": 4032}, "sign": {"rnd": 32, "sig": 3309}}
+            for field, value in record.items():
+                if field in ("seed", "public", "secret", "rnd", "sig", "msg", "unit"):
+                    self.assertRegex(value, HEX, f"{where} {field}")
+                if field in fixed.get(record["kind"], {}):
+                    self.assertEqual(len(value), 2 * fixed[record["kind"]][field], f"{where} {field}")
+            if "key" in record:
+                self.assertIn(record["key"], keys, where)
+            if record["kind"] in ("secret", "verify"):
+                self.assertIsInstance(record["valid"], bool, where)
+        for kind in ("secret", "verify"):
+            self.assertEqual({r["valid"] for r in self.mldsa if r["kind"] == kind}, {True, False}, kind)
+        names = {r["name"] for r in self.mldsa if r["kind"] == "verify"}
+        for fragment in ("hint-unsorted/0", "hint-count-56/0", "hint-padding-nonzero/0", "z-at-bound",
+                         "pk-truncated", "mode/pure-context-255", "mode/hash-ml-dsa-sha256", "mode/external-mu-as-msg",
+                         "mode/internal-no-prefix", "sig-zeros", "wrong-key"):
+            self.assertTrue(any(fragment in n for n in names), fragment)
+        self.assertTrue(any(r["kind"] == "sign" and r["rnd"] == "00" * 32 for r in self.mldsa))
+        self.assertTrue(any(r["kind"] == "sign" and r["rnd"] != "00" * 32 for r in self.mldsa))
+
+    def test_mldsa_keys_against_plain_python(self):
+        for record in self.mldsa:
+            if record["kind"] == "keygen":
+                pk, sk = mldsa_reference.key_gen(bytes.fromhex(record["seed"]))
+                self.assertEqual((pk.hex(), sk.hex()), (record["public"], record["secret"]), record["name"])
+            elif record["kind"] == "secret":
+                pk = mldsa_reference.public_key_of_secret(bytes.fromhex(record["secret"]))
+                self.assertEqual(pk is not None, record["valid"], record["name"])
+                if record["valid"]:
+                    self.assertEqual(pk.hex(), record["public"], record["name"])
+
+    def test_mldsa_signatures_against_plain_python(self):
+        keys = {r["name"]: (bytes.fromhex(r["public"]), bytes.fromhex(r["secret"]))
+                for r in self.mldsa if r["kind"] == "keygen"}
+        checked = 0
+        for record in self.mldsa:
+            if record["kind"] != "sign" or "unit" in record:
+                continue
+            public, message = self.mldsa_inputs(record, keys)
+            sig = mldsa_reference.sign(keys[record["key"]][1], message, bytes.fromhex(record["rnd"]))
+            self.assertEqual(sig.hex(), record["sig"], record["name"])
+            checked += 1
+        self.assertGreater(checked, 40)
+
+    def test_mldsa_verdicts_against_plain_python(self):
+        keys = {r["name"]: (bytes.fromhex(r["public"]), bytes.fromhex(r["secret"]))
+                for r in self.mldsa if r["kind"] == "keygen"}
+        accepted = 0
+        for record in self.mldsa:
+            if record["kind"] != "verify":
+                continue
+            public, message = self.mldsa_inputs(record, keys)
+            verdict = mldsa_reference.verify(public, message, bytes.fromhex(record["sig"]))
+            self.assertEqual(verdict, record["valid"], record["name"])
+            accepted += verdict
+        self.assertGreaterEqual(accepted, 10)
 
     def test_ed25519_lines(self):
         verdicts = {"verify": set(), "pubkey": set(), "keypair-check": set()}

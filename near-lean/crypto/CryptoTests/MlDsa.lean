@@ -52,7 +52,11 @@ def check (keys : Keys) (j : Json) : Except String (Option String) := do
     let pk ← bytes j "public"
     let sk ← bytes j "secret"
     let (spk, ssk) := Spec.keyGen seed
-    pure <| firstError [expect "Spec public key" spk pk, expect "Spec secret key" ssk sk]
+    let (ipk, isk) := Impl.keyGen seed
+    pure <|
+        firstError
+          [expect "Impl public key" ipk pk, expect "Impl secret key" isk sk,
+            expect "Spec public key" spk pk, expect "Spec secret key" ssk sk]
   | "secret" =>
     let sk ← bytes j "secret"
     let valid ← bool j "valid"
@@ -61,7 +65,10 @@ def check (keys : Keys) (j : Json) : Except String (Option String) := do
         some <$> bytes j "public"
       else
         pure none
-    pure <| firstError [expectOpt "Spec publicKeyOfSecret" (Spec.publicKeyOfSecret sk) pk]
+    pure <|
+        firstError
+          [expectOpt "Impl publicKeyOfSecret" (Impl.publicKeyOfSecret sk) pk,
+            expectOpt "Spec publicKeyOfSecret" (Spec.publicKeyOfSecret sk) pk]
   | "sign" =>
     let (pk, sk) ← keyOf keys j
     let msg ← message j
@@ -78,7 +85,10 @@ def check (keys : Keys) (j : Json) : Except String (Option String) := do
     let msg ← message j
     let sig ← bytes j "sig"
     let valid ← bool j "valid"
-    pure <| firstError [expectBool "Spec verify" (Spec.verify pk msg sig) valid]
+    pure <|
+        firstError
+          [expectBool "Impl verify" (Impl.verify pk msg sig) valid,
+            expectBool "Spec verify" (Spec.verify pk msg sig) valid]
   | k =>
     throw s!"unknown kind {k}"
 
