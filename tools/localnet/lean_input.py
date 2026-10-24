@@ -12,6 +12,7 @@ Nothing here edits an expected value to agree with Lean; ``replay`` only reads `
 from __future__ import annotations
 
 import base64
+import copy
 import hashlib
 import json
 from pathlib import Path
@@ -450,6 +451,32 @@ class Converter:
         return {"nonce": nonce, "permission": {"kind": "gasKeyFunctionCall", "balance": balance, "numNonces": nonces,
                                                **call()}}
 
+    def add_outgoing_codes(self) -> None:
+        """Code a contract deploys from its own memory appears in no input, only in the expected outgoing
+        receipts. The catalogue maps code hashes to bytes for the encoders, keyed by those exact bytes, so Lean
+        must still produce them itself (the outgoing receipt bytes are compared)."""
+        scratch = copy.deepcopy(self)       # decoding actions may register keys and ids; keep only the codes
+        for raw_hex in self.bundle["expected"]["outgoingReceipts"]:
+            reader = Reader(bytes.fromhex(raw_hex))
+            reader.string(), reader.string(), reader.take(32)
+            tag = reader.take(1)[0]
+            if tag not in (0, 5):           # Action and ActionV2 carry actions; the rest carry no code to deploy
+                continue
+            reader.string()
+            if tag == 5 and reader.take(1)[0] == 1:
+                reader.string()
+            reader.public_key(), reader.uint(16)
+            for _ in range(reader.uint(4)):
+                reader.take(32), reader.string()
+            for _ in range(reader.uint(4)):
+                reader.take(32)
+            try:
+                for _ in range(reader.uint(4)):
+                    scratch.raw_action(reader)
+            except Unsupported:             # an action the model does not encode carries no catalogue code
+                continue
+        self.codes.update(scratch.codes)
+
     def raw_receipt(self, raw: bytes) -> dict:
         """A stored ``PromiseYield`` receipt, as the model's receipt JSON."""
         reader = Reader(raw)
@@ -627,6 +654,7 @@ class Converter:
                     "dataIds": [{"id": identifier, "hash": list(b58(name)), "receiverId": self.data_receivers[name]}
                                 for name, identifier in self.data_ids.items()],
                     "actionFormats": formats + self.yield_formats, "delayed": delayed}
+        self.add_outgoing_codes()
         catalogue = []
         (self.workdir / "codes").mkdir(parents=True, exist_ok=True)
         for label, blob in sorted(self.codes.items()):

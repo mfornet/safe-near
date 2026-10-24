@@ -97,14 +97,20 @@ def codeByHash (codes : Catalogue) (hash : String) : Result ContractCode :=
   | some entry => pure entry.code
   | none => throw s!"code hash absent from catalogue: {hash}"
 
+/-- The code for deployed bytes. Bytes a contract deploys from its own memory appear in no input, so
+bytes outside the catalogue are decoded here exactly as `loadCatalogue` decodes its entries. -/
 def codeOf (codes : Catalogue) (blob : Near.Bytes) : ContractCode :=
   match codes.find? (·.bytes == blob) with
   | some entry => entry.code
   | none =>
-    { module := default
-      size := blob.length
-      hash := ""
-      decodeIssue := some (.interpreterError "deployed bytes absent from replay code catalogue") }
+    let hash := Near.StateEncoding.base58 (Near.Sha256.hash blob)
+    match Wasm.Binary.decode (ByteArray.mk blob.toArray) with
+    | .ok module => { module, size := blob.length, hash }
+    | .error e =>
+      { module := default
+        size := blob.length
+        hash
+        decodeIssue := some (.interpreterError s!"deployed bytes do not decode: {e.message}") }
 
 /-- A global contract identifier: exactly one of the hash and the deploying account. -/
 def globalIdentifier (j : Json) : Result Wasm.GlobalContractId := do
