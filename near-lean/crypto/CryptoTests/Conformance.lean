@@ -1,6 +1,7 @@
 import NearCrypto
 import CryptoTests.Fixtures
 import CryptoTests.Secp256k1
+import CryptoTests.Vrf
 
 /-!
 `crypto-conformance [FIXTURES_DIR]`: every hash vector and Ed25519 vector of the oracle
@@ -121,4 +122,5 @@ def main (args : List String) : IO UInt32 := do
   t ← runFile t (dir / "hash.jsonl") checkHash
   t ← runFile t (dir / "ed25519.jsonl") checkEd25519
   t ← runFile t (dir / "secp256k1.jsonl") Secp.check
+  t ← runFile t (dir / "vrf.jsonl") Vrf.check
   finish "crypto-conformance" t

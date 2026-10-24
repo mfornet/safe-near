@@ -194,22 +194,35 @@ def addDigit (R : Ext) (table : Array Cached) (digit : Int) : Ext :=
 def baseTable : Array Cached :=
   oddMultiples basePoint 32
 
-/-- Shamir's trick from digit `i - 1` down: `R = 2 R + a_j A + b_j B`. -/
-private def shamir (nafA nafB : Array Int) (tableA : Array Cached) : Nat → Ext → Ext
+/-- Shamir's trick from digit `i - 1` down: `R = 2 R + a_j A + b_j B`, with the tables of the odd
+multiples of `A` and `B`. -/
+private def shamir (nafA nafB : Array Int) (tableA tableB : Array Cached) : Nat → Ext → Ext
   | 0, R => R
   | i + 1, R =>
     let da := nafA[i]!
     let db := nafB[i]!
     let R := dbl R (i == 0 || da != 0 || db != 0)
     let R := addDigit R tableA da
-    shamir nafA nafB tableA i (addDigit R baseTable db)
+    shamir nafA nafB tableA tableB i (addDigit R tableB db)
 
 /-- `a · A + b · B` for the base point `B` (`a`, `b < 2²⁵⁵`), in variable time. -/
 def doubleMulBase (a : Nat) (A : Ext) (b : Nat) : Ext :=
   let nafA := naf 5 a
   let nafB := naf 7 b
   let top := ((List.range 256).reverse.find? fun i => nafA[i]! != 0 || nafB[i]! != 0).getD 0
-  shamir nafA nafB (oddMultiples A 8) (top + 1) identity
+  shamir nafA nafB (oddMultiples A 8) baseTable (top + 1) identity
+
+/-- `a · A + b · B` for any two points (`a`, `b < 2²⁵⁵`), in variable time (`curve25519-dalek`'s
+`vartime_multiscalar_mul` for two terms). -/
+def doubleMul (a : Nat) (A : Ext) (b : Nat) (B : Ext) : Ext :=
+  let nafA := naf 5 a
+  let nafB := naf 5 b
+  let top := ((List.range 256).reverse.find? fun i => nafA[i]! != 0 || nafB[i]! != 0).getD 0
+  shamir nafA nafB (oddMultiples A 8) (oddMultiples B 8) (top + 1) identity
+
+/-- Whether the point is the identity. -/
+def isIdentity (P : Ext) : Bool :=
+  (P.x.toNat == 0) && P.y.eq P.z
 
 /-- `b · B` (`b < 2²⁵⁵`). -/
 def mulBase (b : Nat) : Ext :=

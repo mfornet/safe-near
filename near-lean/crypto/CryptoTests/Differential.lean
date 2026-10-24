@@ -441,6 +441,113 @@ def secpKeyTests (t : Tally) (r : Rng) : Tally × Rng :=
               Secp256k1.Spec.serializeRaw x y)
     return (t, r)
 
+/-! ### ristretto255 and the VRF -/
+
+def ristrettoTests (t : Tally) (r : Rng) : Tally × Rng :=
+  Id.run do
+    let mut t := t
+    let mut r := r
+    t :=
+      check t "invSqrtAMinusD"
+        (Ristretto.Impl.invSqrtAMinusD.toNat == Ristretto.Spec.invSqrtAMinusD)
+    -- random 32-byte strings decode alike, and re-encode to themselves
+    for i in [0:120] do
+      let (b, r') := r.bytes 32
+      r := r'
+      let b := if i % 2 == 0 then (b.set! 31 (b.get! 31 &&& 0x7f)).set! 0 (b.get! 0 &&& 0xfe) else b
+      let impl := Ristretto.Impl.decompress b
+      let spec := Ristretto.Spec.decompress b
+      t := check t s!"ristretto decode {i}" (impl.isSome == spec.isSome)
+      t :=
+        check t s!"ristretto re-encode {i}"
+          ((impl.map Ristretto.Impl.compress) == (spec.map Ristretto.Spec.compress) &&
+            (impl.all fun P => Ristretto.Impl.compress P == b))
+    -- encodings of random multiples of the base point, their sums and doubles
+    for i in [0:25] do
+      let (a, r') := r.nat 32
+      let (b, r') := r'.nat 32
+      r := r'
+      let a := a % Ed25519.ell
+      let b := b % Ed25519.ell
+      let specA := Ed25519.Spec.mul a Ed25519.Spec.basePoint
+      let implA := Ed25519.Ext.mulBase a
+      t :=
+        check t s!"ristretto basemul {i}"
+          (Ristretto.Impl.compress implA == Ristretto.Spec.compress specA)
+      let implB := Ed25519.Ext.mulBase b
+      t :=
+        check t s!"ristretto doubleMul {i}"
+          (Ristretto.Impl.compress (Ed25519.Ext.doubleMul a implB b implA) ==
+            Ristretto.Spec.compress
+              (Ed25519.Spec.add (Ed25519.Spec.mul a (Ed25519.Spec.mul b Ed25519.Spec.basePoint))
+                (Ed25519.Spec.mul b specA)))
+      -- the encoding is the same for the whole coset: add the point (i, 0) of order 4
+      let torsion : Ed25519.Spec.Point := (Ed25519.Spec.sqrtM1, 0, 1)
+      t :=
+        check t s!"ristretto coset spec {i}"
+          (Ristretto.Spec.compress (Ed25519.Spec.add specA torsion) ==
+            Ristretto.Spec.compress specA)
+      let implTorsion := Ed25519.Ext.ofAffine Ed25519.Fe.sqrtM1 Ed25519.Fe.zero
+      t :=
+        check t s!"ristretto coset impl {i}"
+          (Ristretto.Impl.compress (Ed25519.Ext.add implA implTorsion) ==
+            Ristretto.Spec.compress specA)
+    return (t, r)
+
+def vrfTests (t : Tally) (r : Rng) : Tally × Rng :=
+  Id.run do
+    let mut t := t
+    let mut r := r
+    for i in [0:12] do
+      let (seed, r') := r.bytes 32
+      let (len, r') := r'.below 100
+      let (input, r') := r'.bytes len
+      let (flip, r') := r'.below 640
+      let (other, r') := r'.bytes 32
+      r := r'
+      let some key := Vrf.Impl.SecretKey.ofSeed seed | t := check t s!"vrf key {i}" false
+      let sk := Vrf.Spec.convertSecretKey seed
+      t := check t s!"vrf secret {i}" (key.scalar == sk && key.publicKey == Vrf.Spec.publicKey sk)
+      let (value, proof) := key.computeWithProof input
+      t :=
+        check t s!"vrf compute {i}"
+          (Vrf.Spec.computeWithProof sk input == (value, proof) && key.compute input == value)
+      t :=
+        check t s!"vrf valid {i}"
+          (Vrf.Impl.isValid key.publicKey input value proof &&
+            Vrf.Spec.isValid key.publicKey input value proof)
+      -- the ed25519 key of the seed converts to the VRF key
+      let ed := (Ed25519.Impl.SigningKey.ofSeed seed).map (·.publicKey)
+      t :=
+        check t s!"vrf convert {i}"
+          (ed.bind Vrf.Impl.convertPublicKey == some key.publicKey &&
+            ed.bind Vrf.Spec.convertPublicKey == some key.publicKey)
+      -- an edited value, proof or input, and another key
+      let flipBit (b : ByteArray) (k : Nat) : ByteArray :=
+        b.set! (k / 8) (b.get! (k / 8) ^^^ (1 <<< (k % 8).toUInt8))
+      let badValue := flipBit value (flip % 256)
+      let badProof := flipBit proof (flip % 512)
+      t :=
+        check t s!"vrf edited value {i}"
+          (Vrf.Impl.isValid key.publicKey input badValue proof ==
+            Vrf.Spec.isValid key.publicKey input badValue proof)
+      t :=
+        check t s!"vrf edited proof {i}"
+          (Vrf.Impl.isValid key.publicKey input value badProof ==
+            Vrf.Spec.isValid key.publicKey input value badProof)
+      t :=
+        check t s!"vrf edited input {i}"
+          (Vrf.Impl.isValid key.publicKey (input.push 1) value proof == false &&
+            Vrf.Spec.isValid key.publicKey (input.push 1) value proof == false)
+      t :=
+        check t s!"vrf other key {i}"
+          (Vrf.Impl.isValid other input value proof == Vrf.Spec.isValid other input value proof)
+      -- a random conversion input
+      t :=
+        check t s!"vrf convert random {i}"
+          (Vrf.Impl.convertPublicKey other == Vrf.Spec.convertPublicKey other)
+    return (t, r)
+
 def main : IO UInt32 := do
   let mut t : Tally := {}
   let mut r : Rng := ⟨0x4e45415243525950⟩
@@ -455,4 +562,6 @@ def main : IO UInt32 := do
   (t, r) := secpScalarTests t r
   (t, r) := secpPointTests t r
   (t, r) := secpKeyTests t r
+  (t, r) := ristrettoTests t r
+  (t, r) := vrfTests t r
   finish "crypto-differential" t
