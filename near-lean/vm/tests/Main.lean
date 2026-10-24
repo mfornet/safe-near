@@ -216,15 +216,15 @@ def main (args : List String) : IO UInt32 := do
   check r "completion on the last interpreter step is not fuel exhaustion" exactBudget.succeeded
 
   -- Execute unsupported operations, rather than checking the host registry.
-  -- Imports alone must remain usable for contracts with unreachable crypto code.
+  -- Imports alone must remain usable for contracts with unreachable code: `sha256` without
+  -- injected cryptography, and the hosts whose receipt forms are not modelled.
   for (name, params, arguments, results) in
       [("sha256", "i64 i64 i64", "i64.const 0 i64.const 0 i64.const 0", ""),
-       ("promise_yield_resume", "i64 i64 i64 i64",
-        "i64.const 0 i64.const 0 i64.const 0 i64.const 0", "(result i64)"),
-       ("promise_batch_action_deploy_global_contract", "i64 i64 i64",
-        "i64.const 0 i64.const 0 i64.const 0", ""),
-       ("promise_batch_action_deploy_global_contract_by_account_id", "i64 i64 i64",
-        "i64.const 0 i64.const 0 i64.const 0", "")] do
+       ("promise_yield_resume_with_yield_id", "i64 i64 i64 i64",
+        "i64.const 0 i64.const 0 i64.const 0 i64.const 0", "(result i32)"),
+       ("promise_set_refund_to", "i64 i64 i64", "i64.const 0 i64.const 0 i64.const 0", ""),
+       ("promise_batch_action_state_init_by_account_id", "i64 i64 i64 i64",
+        "i64.const 0 i64.const 0 i64.const 0 i64.const 0", "(result i64)")] do
     let wat := s!"(module (import \"env\" \"{name}\" (func $unsupported (param {params}) {results}))
       (memory 1) (func (export \"test\") {arguments} call $unsupported {if results.isEmpty then "" else "drop"})
       (func (export \"unused\")))"
