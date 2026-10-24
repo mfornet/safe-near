@@ -7,8 +7,7 @@ original action positions and final child order determine the new identities.
 Queue pops/appends preserve persistent indices and freeze newly stored metadata. -/
 namespace Near.ReceiptRegistry
 
-private def unique [BEq α] (name : String) (values : List α) : Except String Unit := do
-  unless values.eraseDups.length == values.length do throw s!"duplicate {name}"
+open EncodingPrimitives
 
 private def register (height : Nat) (context : QueueEncoding.Context)
     (birth : ReceiptIdentityBirth) : Except String QueueEncoding.Context := do

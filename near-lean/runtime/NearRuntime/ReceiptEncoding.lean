@@ -6,26 +6,16 @@ inputs or derived by NativeIdentity; no model counter is serialized as a hash.
 This does not encode delayed-queue wrappers, gas keys or yielded receipts. -/
 namespace Near.ReceiptEncoding
 
+open EncodingPrimitives
+
 inductive ActionFormat
   | legacy
   | v2
   deriving BEq
 
-private def unsigned (width value : Nat) : Except String Bytes := do
-  unless value < 2 ^ (8 * width) do throw s!"integer exceeds u{8 * width}"
-  return (List.range width).map fun i => UInt8.ofNat (value / 2 ^ (8 * i) % 256)
-
-private def vector (bytes : Bytes) : Except String Bytes := do
-  return (← unsigned 4 bytes.length) ++ bytes
-
-private def string (text : String) : Except String Bytes := vector text.toUTF8.toList
-
 private def account (id : AccountId) : Except String Bytes := do
   unless Wasm.Near.validAccountIdBytes id.toUTF8.toList do throw "invalid account id"
   string id
-
-private def sequence (encode : α → Except String Bytes) (values : List α) : Except String Bytes := do
-  return (← unsigned 4 values.length) ++ (← values.mapM encode).flatten
 
 def action (codes : List (String × Bytes)) : Action → Except String Bytes
   | .createAccount => pure [0]

@@ -1,6 +1,7 @@
 import NearRuntime.State
 import NearRuntime.Sha256
 import NearVM.AccountId
+import NearRuntime.EncodingPrimitives
 
 /-! Queue-free selected-account state at the pinned native Borsh boundary.
 This constructs a synthetic genesis, not an original shard state. Receipt/data
@@ -8,17 +9,7 @@ IDs are model counters rather than native hashes, so nonempty queues fail closed
 The external Wasm decoder remains responsible for bytes-to-module correspondence. -/
 namespace Near.StateEncoding
 
-private def little (width value : Nat) : Bytes :=
-  (List.range width).map fun i => UInt8.ofNat (value / 2 ^ (8 * i) % 256)
-
-private def unsigned (width value : Nat) : Except String Bytes :=
-  if value < 2 ^ (8 * width) then pure (little width value)
-  else throw s!"integer exceeds u{8 * width}"
-
-private def vector (bytes : Bytes) : Except String Bytes := do
-  return (← unsigned 4 bytes.length) ++ bytes
-
-private def string (text : String) : Except String Bytes := vector text.toUTF8.toList
+open EncodingPrimitives
 
 private def digits : Nat → Nat → List Char
   | 0, _ => []
@@ -57,9 +48,6 @@ def accessKey (key : AccessKey) : Except String Bytes := do
     let names ← methods.mapM string
     -- Native FunctionCallPermission.receiver_id is String, not AccountId.
     return nonce ++ [0] ++ allowance ++ (← string receiver) ++ count ++ names.flatten
-
-private def unique [BEq α] (name : String) (values : List α) : Except String Unit := do
-  unless values.eraseDups.length == values.length do throw s!"duplicate {name}"
 
 /-- Encode actual runtime records. Code payloads must be present, size-matched,
 and SHA256-bound to the model's canonical hash name. No native output is input.

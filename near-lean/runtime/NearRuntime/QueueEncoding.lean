@@ -7,6 +7,8 @@ indices. The context supplies those facts; missing facts fail closed. Native
 output-derived context is not a substitute for execution identity registration. -/
 namespace Near.QueueEncoding
 
+open EncodingPrimitives
+
 structure DataIdentity where
   id : DataId
   hash : NativeIdentity.Hash
@@ -29,13 +31,6 @@ structure Context where
   formats : List (ReceiptId × ReceiptEncoding.ActionFormat) := []
   /-- None is an absent queue header; Some also preserves empty advanced queues. -/
   delayed : Option Delayed := none
-
-private def unsigned (width value : Nat) : Except String Bytes := do
-  unless value < 2 ^ (8 * width) do throw s!"integer exceeds u{8 * width}"
-  return (List.range width).map fun i => UInt8.ofNat (value / 2 ^ (8 * i) % 256)
-
-private def unique [BEq α] (name : String) (values : List α) : Except String Unit := do
-  unless values.eraseDups.length == values.length do throw s!"duplicate {name}"
 
 private def ownedKey (tag : UInt8) (owner : AccountId) (hash : NativeIdentity.Hash) : Except String Bytes := do
   unless Wasm.Near.validAccountIdBytes owner.toUTF8.toList do throw "invalid queue receiver"
