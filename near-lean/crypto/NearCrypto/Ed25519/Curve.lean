@@ -1,4 +1,5 @@
 import NearCrypto.Ed25519.FeMul
+import NearCrypto.Wnaf
 
 /-!
 # edwards25519 in extended coordinates
@@ -179,30 +180,9 @@ def oddMultiples (P : Ext) (n : Nat) : Array Cached :=
       go k next (t.push next.toCached)
   go (n - 1) P #[P.toCached]
 
-/-- The width-`w` non-adjacent form of `k < 2²⁵⁵`: 256 digits, least significant first, each zero
-or odd with absolute value below `2 ^ (w - 1)`. -/
+/-- The width-`w` non-adjacent form of `k < 2²⁵⁵`: 256 digits, least significant first. -/
 def naf (w : Nat) (k : Nat) : Array Int :=
-  let words : Array UInt64 :=
-    #[k.toUInt64, (k >>> 64).toUInt64, (k >>> 128).toUInt64, (k >>> 192).toUInt64, 0]
-  let width : UInt64 := 1 <<< w.toUInt64
-  let mask := width - 1
-  let rec go : Nat → Nat → UInt64 → Array Int → Array Int
-    | 0, _, _, digits => digits
-    | fuel + 1, pos, carry, digits =>
-      if pos ≥ 256 then digits
-      else
-        let idx := pos / 64
-        let bit := (pos % 64).toUInt64
-        let buf :=
-          if pos % 64 < 64 - w then words[idx]! >>> bit
-          else words[idx]! >>> bit ||| words[idx + 1]! <<< (64 - bit)
-        let window := carry + (buf &&& mask)
-        if window &&& 1 == 0 then go fuel (pos + 1) carry digits
-        else
-          if window < width / 2 then go fuel (pos + w) 0 (digits.set! pos (Int.ofNat window.toNat))
-          else
-            go fuel (pos + w) 1 (digits.set! pos (Int.ofNat window.toNat - Int.ofNat width.toNat))
-  go 256 0 0 (Array.replicate 256 0)
+  Wnaf.naf 255 w k
 
 /-- Add `digit · P` for the odd `digit` using the table of odd multiples. -/
 @[inline]

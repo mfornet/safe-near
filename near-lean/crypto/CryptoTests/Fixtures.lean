@@ -49,6 +49,10 @@ def bytes (j : Json) (k : String) : Except String ByteArray := do
   | none =>
     throw s!"{k} is not hex"
 
+/-- An integer field. -/
+def int (j : Json) (k : String) : Except String Int :=
+  j.getObjValAs? Int k
+
 /-- A boolean field. -/
 def bool (j : Json) (k : String) : Except String Bool :=
   j.getObjValAs? Bool k

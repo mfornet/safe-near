@@ -54,7 +54,9 @@ def hashes : List (String × ((ByteArray → ByteArray) × (ByteArray → ByteAr
     ("sha512", (Sha512.Spec.hash, Sha512.Impl.hash)),
     ("keccak256", (Keccak.Spec.keccak256, Keccak.Impl.keccak256)),
     ("keccak512", (Keccak.Spec.keccak512, Keccak.Impl.keccak512)),
-    ("ripemd160", (Ripemd160.Spec.hash, Ripemd160.Impl.hash))]
+    ("ripemd160", (Ripemd160.Spec.hash, Ripemd160.Impl.hash)),
+    ("blake2b256", (Blake2b.Spec.hash 32, Blake2b.Impl.hash 32)),
+    ("blake2b512", (Blake2b.Spec.hash 64, Blake2b.Impl.hash 64))]
 
 def hashTests (t : Tally) (r : Rng) : Tally × Rng :=
   Id.run do
@@ -70,6 +72,19 @@ def hashTests (t : Tally) (r : Rng) : Tally × Rng :=
         let (m, r') := r.bytes n
         r := r'
         t := check t s!"{name} length {n}" (spec m == impl m) s!"digests differ on {toHex m}"
+    return (t, r)
+
+/-- HMAC-SHA256 agrees for keys shorter than, equal to and longer than a block. -/
+def hmacTests (t : Tally) (r : Rng) : Tally × Rng :=
+  Id.run do
+    let mut t := t
+    let mut r := r
+    for keyLen in [0, 1, 31, 32, 63, 64, 65, 100, 200] do
+      let (key, r') := r.bytes keyLen
+      let (msg, r') := r'.bytes (keyLen * 3 % 150)
+      r := r'
+      t :=
+        check t s!"hmac key length {keyLen}" (Hmac.Spec.sha256 key msg == Hmac.Impl.sha256 key msg)
     return (t, r)
 
 /-- Field elements that stress the limb boundaries. -/
@@ -225,6 +240,7 @@ def main : IO UInt32 := do
   let mut t : Tally := {}
   let mut r : Rng := ⟨0x4e45415243525950⟩
   (t, r) := hashTests t r
+  (t, r) := hmacTests t r
   (t, r) := fieldTests t r
   (t, r) := scalarTests t r
   (t, r) := pointTests t r

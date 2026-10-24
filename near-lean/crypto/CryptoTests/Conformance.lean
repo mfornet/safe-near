@@ -25,7 +25,9 @@ def hashes : List (String × ((ByteArray → ByteArray) × (ByteArray → ByteAr
     ("sha512", (Sha512.Spec.hash, Sha512.Impl.hash)),
     ("keccak256", (Keccak.Spec.keccak256, Keccak.Impl.keccak256)),
     ("keccak512", (Keccak.Spec.keccak512, Keccak.Impl.keccak512)),
-    ("ripemd160", (Ripemd160.Spec.hash, Ripemd160.Impl.hash))]
+    ("ripemd160", (Ripemd160.Spec.hash, Ripemd160.Impl.hash)),
+    ("blake2b256", (Blake2b.Spec.hash 32, Blake2b.Impl.hash 32)),
+    ("blake2b512", (Blake2b.Spec.hash 64, Blake2b.Impl.hash 64))]
 
 def expect (what : String) (got want : ByteArray) : Option String :=
   if got == want then none else some s!"{what}: got {toHex got}, want {toHex want}"

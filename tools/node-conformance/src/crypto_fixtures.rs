@@ -18,12 +18,16 @@ use near_crypto::{ED25519PublicKey, ED25519SecretKey, KeyType, PublicKey, Secret
 use near_primitives::hash::CryptoHash;
 use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha8Rng;
+use blake2::{Blake2b512, Blake2bVar};
 use ripemd::Ripemd160;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha512};
 use sha3::{Keccak256, Keccak512};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
+
+mod crypto_secp;
+mod crypto_vrf;
 
 const SEED: u64 = 0x4e45_4152_0000_0002;
 
@@ -83,17 +87,29 @@ fn digest(alg: &str, msg: &[u8]) -> Vec<u8> {
         "keccak256" => Keccak256::digest(msg).to_vec(),
         "keccak512" => Keccak512::digest(msg).to_vec(),
         "ripemd160" => Ripemd160::digest(msg).to_vec(),
+        // `near_crypto::vrf` hashes with BLAKE2b of 32 and of 64 bytes.
+        "blake2b256" => {
+            use blake2::digest::{Update, VariableOutput};
+            let mut h = Blake2bVar::new(32).unwrap();
+            h.update(msg);
+            let mut out = vec![0u8; 32];
+            h.finalize_variable(&mut out).unwrap();
+            out
+        }
+        "blake2b512" => Blake2b512::digest(msg).to_vec(),
         _ => unreachable!(),
     }
 }
 
-const ALGS: [&str; 5] = ["sha256", "sha512", "keccak256", "keccak512", "ripemd160"];
+const ALGS: [&str; 7] = ["sha256", "sha512", "keccak256", "keccak512", "ripemd160", "blake2b256", "blake2b512"];
 
 fn hashes(out: &mut Out) {
     // Sanity check against the published values, so a wrong crate cannot silently pass.
     assert_eq!(hex(&digest("sha256", b"abc")), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
     assert_eq!(hex(&digest("keccak256", b"")), "c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470");
     assert_eq!(hex(&digest("ripemd160", b"abc")), "8eb208f7e05d987a9b044a8e98c6b087f15a0bfc");
+    assert_eq!(hex(&digest("blake2b256", b"abc")), "bddd813c634239723171ef3fee98579b94964e3bb1cb3e427262c8c068d52319");
+    assert_eq!(hex(&digest("blake2b512", b"abc")), "ba80a53f981c4d0d6a2797b69f12f6e94c212f14685ac4b74b12bb6fdbffa2d17d87c5392aab792dc252d5de4533cc9518d38aa8dbf1925ab92386edd4009923");
 
     let lengths = [
         0usize, 1, 2, 3, 4, 5, 7, 8, 9, 15, 16, 17, 31, 32, 33, 55, 56, 57, 63, 64, 65, 71, 72, 73, 111,
@@ -559,12 +575,20 @@ fn main() {
     let mut e = Out::default();
     ed25519(&mut e);
     e.write(dir.join("ed25519.jsonl"));
+    let mut s = Out::default();
+    crypto_secp::secp256k1(&mut s);
+    s.write(dir.join("secp256k1.jsonl"));
+    let mut v = Out::default();
+    crypto_vrf::vrf(&mut v);
+    v.write(dir.join("vrf.jsonl"));
     let mut counts = BTreeMap::new();
     counts.insert("hash.jsonl", &h.counts);
     counts.insert("ed25519.jsonl", &e.counts);
+    counts.insert("secp256k1.jsonl", &s.counts);
+    counts.insert("vrf.jsonl", &v.counts);
     let manifest = json!({
-        "crates": "near-crypto =0.37.4, ed25519-dalek =2.2.0, curve25519-dalek =4.1.3, sha2 =0.10.9, sha3 =0.10.9, ripemd 0.1",
-        "verifier": "near_crypto::Signature::verify -> ed25519_dalek::VerifyingKey::from_bytes + Verifier::verify (non-strict, no legacy_compatibility)",
+        "crates": "near-crypto =0.37.4, secp256k1 =0.27.0 (libsecp256k1 of secp256k1-sys 0.8.2), ed25519-dalek =2.2.0, curve25519-dalek =4.1.3, sha2 =0.10.9, sha3 =0.10.9, ripemd 0.1, blake2 0.10",
+        "verifier": "near_crypto::Signature::verify -> ed25519_dalek::VerifyingKey::from_bytes + Verifier::verify (non-strict, no legacy_compatibility); SECP256K1: recovery id and r, s parsed by secp256k1::RecoverableSignature::from_compact, then secp256k1_ecdsa_verify (low s only); VM ecrecover: Secp256K1Signature::check_signature_values then recover; VRF: near_crypto::vrf",
         "seed": format!("{SEED:#018x}"),
         "files": counts,
     });

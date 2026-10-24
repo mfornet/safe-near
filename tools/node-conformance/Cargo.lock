@@ -1059,6 +1059,7 @@ dependencies = [
 name = "node-conformance"
 version = "0.1.0"
 dependencies = [
+ "blake2",
  "borsh",
  "curve25519-dalek",
  "ed25519-dalek",
@@ -1069,6 +1070,7 @@ dependencies = [
  "rand",
  "rand_chacha",
  "ripemd",
+ "secp256k1",
  "serde_json",
  "sha2",
  "sha3",
