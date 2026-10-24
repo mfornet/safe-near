@@ -472,6 +472,58 @@ def main (args : List String) : IO UInt32 := do
   check r "VM-created implicit transfer conserves deposits, fees and refunds"
     (implicitResult.total == implicitWorld.total && implicitResult.burnt > 0)
 
+  -- Weighted function calls (`distribute_gas`): the receipt's gas used includes
+  -- the gas distributed to the new receipt. `w1` and `w0` differ only in the
+  -- weight, so they burn the same gas.
+  let weightedWat := "(module (import \"env\" \"promise_batch_create\" (func $batch (param i64 i64) (result i64))) " ++
+    "(import \"env\" \"promise_batch_action_function_call_weight\" " ++
+    "(func $weighted (param i64 i64 i64 i64 i64 i64 i64 i64))) (memory 1) " ++
+    "(data (i32.const 0) \"bob.near\") (data (i32.const 16) \"m\") " ++
+    "(func (export \"w1\") i64.const 8 i64.const 0 call $batch " ++
+    "i64.const 1 i64.const 16 i64.const 0 i64.const 0 i64.const 64 i64.const 0 i64.const 1 call $weighted) " ++
+    "(func (export \"w0\") i64.const 8 i64.const 0 call $batch " ++
+    "i64.const 1 i64.const 16 i64.const 0 i64.const 0 i64.const 64 i64.const 0 i64.const 0 call $weighted))"
+  let weightedModule ← match ← Wat.compile weightedWat with
+    | .ok module => pure module
+    | .error error => throw (IO.userError s!"weighted call fixture: {error}")
+  let weightedCode : ContractCode := { module := weightedModule, size := 0, hash := "weighted-call-fixture" }
+  let weightedState := genesis.setAccount "wrap.near" { genesisAccount (10 * oneNear) with code := some weightedCode }
+  let weightedWorld : World := { cfg, code := weightedCode, state := weightedState }
+  -- (child receipt gas, gas refund to the signer, receipt gas price, burnt gas) of one call.
+  let weightedRun := fun (method : String) =>
+    let call : Transaction := {
+      signerId := "alice.near", publicKey := pkOf 1, nonce := 1, receiverId := "wrap.near"
+      actions := [.functionCall method [] (tgas 50) 0] }
+    let admitted := Near.apply cfg World.ap (fun _ => weightedCode) weightedWorld.state [call] []
+    let executed := Near.apply cfg World.ap (fun _ => weightedCode) admitted.state [] admitted.outgoing
+    let childGas := executed.outgoing.filterMap fun receipt =>
+      match receipt.receiverId, receipt.actions with
+      | "bob.near", [.functionCall "m" [] gas 0] => some gas
+      | _, _ => none
+    let refund := (executed.outgoing.filterMap fun receipt =>
+      match receipt.isRefund, receipt.receiverId, receipt.actions with
+      | true, "alice.near", [.transfer amount] => some amount
+      | _, _, _ => none).sum
+    let price := admitted.outgoing.filterMap (fun receipt =>
+      match receipt.receipt with | .action a => some a.gasPrice | _ => none)
+    (admitted.issue.isNone && executed.issue.isNone, childGas, refund, price,
+      executed.outcomes.map (·.2.gasBurnt), (weightedWorld.settle [call]))
+  let (weightedOk, weightedChild, weightedRefund, weightedPrice, weightedBurnt, weightedSettled) := weightedRun "w1"
+  let (plainOk, plainChild, plainRefund, plainPrice, plainBurnt, plainSettled) := weightedRun "w0"
+  check r "weighted call: the child receipt gets the distributed gas, a plain one none"
+    (weightedOk && plainOk && plainChild == [0] && weightedChild.length == 1 && weightedChild.all (· > 0))
+    s!"weighted {weightedChild}, plain {plainChild}"
+  -- With all prepaid gas used, only the price surplus on burnt gas comes back
+  -- (`settleGas`: no gross refund, so no refund penalty either).
+  check r "weighted call: gas used includes the distributed gas, so only the price surplus is refunded"
+    (cfg.accountCostIncrease && weightedPrice.length == 1 && weightedBurnt.length == 1 &&
+      weightedRefund == (weightedPrice.sum - World.ap.gasPrice) * weightedBurnt.sum &&
+      weightedPrice == plainPrice && weightedBurnt == plainBurnt && plainRefund > weightedRefund)
+    s!"refunds {weightedRefund} / {plainRefund}, child {weightedChild}, price {weightedPrice}, burnt {weightedBurnt} / {plainBurnt}, price {plainPrice}"
+  check r "weighted and plain calls conserve funds and gas backing through the child receipt"
+    (weightedSettled.issue.isNone && plainSettled.issue.isNone &&
+      weightedSettled.total == weightedWorld.total && plainSettled.total == weightedWorld.total)
+
   -- Raw deployment length must not be supplied by the external module decoder.
   let deployWat := "(module (import \"env\" \"promise_batch_create\" (func $batch (param i64 i64) (result i64))) " ++
     "(import \"env\" \"promise_batch_action_deploy_contract\" (func $deploy (param i64 i64 i64))) (memory 1) " ++
