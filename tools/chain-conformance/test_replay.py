@@ -16,14 +16,17 @@ PK = [0] + [1] * 32
 
 
 def account(amount, code=None):
-    return {"amount": str(amount), "locked": "0", "codeHash": code, "storageUsage": 182}
+    return {"amount": str(amount), "locked": "0", "codeHash": code, "global": None,
+            "versionTwo": False, "storageUsage": 182}
 
 
 def empty_state():
     return {"accounts": [["alice.near", account(100 * ONE)], ["bob.near", account(10 * ONE)]],
             "accessKeys": [[["alice.near", PK], {"nonce": 0, "permission": {"kind": "fullAccess"}}]],
             "storage": [], "postponed": [], "pendingDataCount": [], "postponedByData": [],
-            "receivedData": [], "delayed": [], "nextId": 1}
+            "receivedData": [], "delayed": [], "nextId": 1, "globalCode": [], "globalNonces": [],
+            "gasKeyNonces": [], "yieldIndices": None, "yieldTimeouts": [], "yieldReceipts": [],
+            "yieldStatus": []}
 
 
 def block(transactions=(), incoming=None, height=7):
@@ -53,7 +56,7 @@ def receipt(payload, identifier=20):
 def action_receipt(actions, identifier=20):
     return receipt({"kind": "action", "signerId": "alice.near", "signerPublicKey": PK,
                     "gasPrice": "100000000", "outputDataReceivers": [[41, "alice.near"]],
-                    "inputDataIds": [40], "actions": actions}, identifier)
+                    "inputDataIds": [40], "actions": actions, "yieldDataId": None}, identifier)
 
 
 def request():
@@ -142,8 +145,8 @@ class ChainReplayTests(unittest.TestCase):
                            "kind": "functionCall", "allowance": "123", "receiverId": "bob.near", "methodNames": ["x"]}}},
                        {"kind": "deleteKey", "publicKey": PK}, {"kind": "deleteAccount", "beneficiaryId": "alice.near"}]
             action = action_receipt(actions)
-            failed = receipt({"kind": "data", "dataId": 43, "data": None}, 22)
-            empty = receipt({"kind": "data", "dataId": 44, "data": []}, 23)
+            failed = receipt({"kind": "data", "dataId": 43, "data": None, "resumeDataId": None}, 22)
+            empty = receipt({"kind": "data", "dataId": 44, "data": [], "resumeDataId": None}, 23)
             state = value["initialState"]
             state["accounts"][0][1].update(codeHash="replay", locked="345")
             state["accessKeys"].append([["bob.near", [0] + [2] * 32], {"nonce": 8, "permission": {
