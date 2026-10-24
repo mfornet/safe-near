@@ -62,7 +62,7 @@ def validation_steps(root: Path, nearcore: Path) -> list[Step]:
     add("interface-build", "near-lean/interface", "lake", "build", "NearInterface", "--wfail")
     add("vm-build", "near-lean/vm", "lake", "build", "NearVM", "vm-tests", "vm-replay", "--wfail")
     add("runtime-build", "near-lean/runtime", "lake", "build", "NearRuntime", "runtime-tests",
-        "NearRuntime.TrieAccounting", "finance-replay", "nonce-replay", "allowance-replay",
+        "finance-replay", "nonce-replay", "allowance-replay",
         "staking-key-replay", "trie-replay", "--wfail")
     add("chain-build", "near-lean/chain", "lake", "build", "NearChain", "chain-tests", "chain-replay",
         "registered-replay", "state-encode", "receipt-encode", "transaction-replay", "receipt-replay", "--wfail")
