@@ -3,56 +3,106 @@
     "build": {
       "commit": "bae421bad659b050937fd2fd1839fef243bb58c3",
       "date": "2026-10-24",
-      "report": "reports/periodic/2026-10-23/README.md",
-      "issues": []
+      "report": "https://linear.app/safe-near/issue/SAF-27",
+      "issues": [
+        "SAF-27",
+        "SAF-50"
+      ]
     },
     "trusted-base": {
       "commit": "bae421bad659b050937fd2fd1839fef243bb58c3",
       "date": "2026-10-24",
-      "report": "reports/periodic/2026-10-23/README.md",
-      "issues": []
+      "report": "https://linear.app/safe-near/issue/SAF-27",
+      "issues": [
+        "SAF-27",
+        "SAF-44"
+      ]
     },
     "pins": {
       "commit": "dbf9d11003449a8cc1cd25340bb37873187f6c18",
       "date": "2026-10-20",
-      "report": "reports/periodic/2026-10-20/README.md",
+      "report": "git:a058551:reports/periodic/2026-10-20/README.md",
       "issues": []
     },
     "dead-code": {
       "commit": "bae421bad659b050937fd2fd1839fef243bb58c3",
       "date": "2026-10-24",
-      "report": "reports/periodic/2026-10-23/README.md",
-      "issues": []
+      "report": "https://linear.app/safe-near/issue/SAF-27",
+      "issues": [
+        "SAF-27",
+        "SAF-48",
+        "SAF-55"
+      ]
     },
     "simplification": {
       "commit": "bae421bad659b050937fd2fd1839fef243bb58c3",
       "date": "2026-10-24",
-      "report": "reports/periodic/2026-10-23/README.md",
-      "issues": []
+      "report": "https://linear.app/safe-near/issue/SAF-27",
+      "issues": [
+        "SAF-27",
+        "SAF-44",
+        "SAF-45",
+        "SAF-46",
+        "SAF-47",
+        "SAF-48",
+        "SAF-49"
+      ]
     },
     "divergence": {
       "commit": "bae421bad659b050937fd2fd1839fef243bb58c3",
       "date": "2026-10-24",
-      "report": "reports/periodic/2026-10-23/README.md",
-      "issues": []
+      "report": "https://linear.app/safe-near/issue/SAF-27",
+      "issues": [
+        "SAF-27",
+        "SAF-28",
+        "SAF-29",
+        "SAF-30",
+        "SAF-31",
+        "SAF-32",
+        "SAF-33",
+        "SAF-34",
+        "SAF-35",
+        "SAF-36"
+      ]
     },
     "docs": {
       "commit": "bae421bad659b050937fd2fd1839fef243bb58c3",
       "date": "2026-10-24",
-      "report": "reports/periodic/2026-10-23/README.md",
-      "issues": []
+      "report": "https://linear.app/safe-near/issue/SAF-27",
+      "issues": [
+        "SAF-27",
+        "SAF-56",
+        "SAF-57"
+      ]
     },
     "tests-ci": {
       "commit": "bae421bad659b050937fd2fd1839fef243bb58c3",
       "date": "2026-10-24",
-      "report": "reports/periodic/2026-10-23/README.md",
-      "issues": []
+      "report": "https://linear.app/safe-near/issue/SAF-27",
+      "issues": [
+        "SAF-27",
+        "SAF-50",
+        "SAF-51",
+        "SAF-52",
+        "SAF-53",
+        "SAF-54",
+        "SAF-58"
+      ]
     },
     "features": {
       "commit": "bae421bad659b050937fd2fd1839fef243bb58c3",
       "date": "2026-10-24",
-      "report": "reports/periodic/2026-10-23/README.md",
-      "issues": []
+      "report": "https://linear.app/safe-near/issue/SAF-27",
+      "issues": [
+        "SAF-27",
+        "SAF-37",
+        "SAF-38",
+        "SAF-39",
+        "SAF-40",
+        "SAF-41",
+        "SAF-42",
+        "SAF-43"
+      ]
     }
   }
 }

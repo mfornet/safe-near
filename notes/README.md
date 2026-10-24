@@ -21,4 +21,5 @@ and remove it from the TODO.
 - [Proving](design/PROVING.md): blueprint, accepted axioms, audits.
 - [Periodic checks](design/PERIODIC_CHECK.md): weekly consolidation review.
 
-Dated check reports live in [reports/periodic/](../reports/periodic/).
+Check reports live in Linear (label `periodic-check`); the ledger of what
+each section last covered is [reports/periodic/LEDGER.json](../reports/periodic/LEDGER.json).
