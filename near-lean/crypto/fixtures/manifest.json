@@ -1,0 +1,17 @@
+{
+  "crates": "near-crypto =0.37.4, ed25519-dalek =2.2.0, curve25519-dalek =4.1.3, sha2 =0.10.9, sha3 =0.10.9, ripemd 0.1",
+  "files": {
+    "ed25519.jsonl": {
+      "keypair": 28,
+      "keypair-check": 13,
+      "pubkey": 233,
+      "sign": 29,
+      "verify": 528
+    },
+    "hash.jsonl": {
+      "hash": 405
+    }
+  },
+  "seed": "0x4e45415200000002",
+  "verifier": "near_crypto::Signature::verify -> ed25519_dalek::VerifyingKey::from_bytes + Verifier::verify (non-strict, no legacy_compatibility)"
+}

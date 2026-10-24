@@ -114,3 +114,49 @@ bytes of the right length; Borsh does not verify them.
 
 `just node-conformance-types` decodes every line with the Lean `Impl` and `Spec` Borsh codecs,
 re-encodes with both, and compares with the fixture and with the derived hashes.
+
+## Crypto oracle (M2)
+
+`crypto-fixtures` writes the fixtures of `near-lean/crypto` (milestone M2). It uses the same
+locked crates, plus the ones nearcore's VM and `near-crypto` use directly: `sha2` 0.10.9,
+`sha3` 0.10.9 (`Keccak256`, `Keccak512`, the legacy padding), `ripemd` 0.1.3, `ed25519-dalek`
+2.2.0 and `curve25519-dalek` 4.1.3 (the last two with the feature set `near-crypto` builds).
+
+```sh
+cd tools/node-conformance
+cargo run --release --locked --bin crypto-fixtures -- ../../near-lean/crypto/fixtures
+```
+
+The output is a pure function of the code and the locked crates: two runs give identical files.
+`manifest.json` lists the crates and the number of lines of each kind. `just crypto-tests` checks
+all of it in Lean; CI never builds this crate.
+
+- `hash.jsonl`: `{"alg", "name", "msg", "digest"}` for `sha256` (through `CryptoHash::hash_bytes`),
+  `sha512`, `keccak256`, `keccak512` and `ripemd160`: the classic vectors, random messages of 59
+  lengths around every block and padding boundary (0 to 20000 bytes), all-zero and all-ones
+  messages at those boundaries, and one million `a`, spelled `{"unit", "count"}` instead of `msg`.
+- `ed25519.jsonl`, one object per line, by `kind`. The verdicts are those of
+  `near_crypto::Signature::verify`, which is `ed25519_dalek::VerifyingKey::from_bytes` followed by
+  the non-strict `Verifier::verify` (no `legacy_compatibility` feature); key decoding is checked
+  with `VerifyingKey::from_bytes` itself.
+  - `keypair`: `seed`, `public`, `keypair` (`near-crypto`'s 64-byte `ED25519SecretKey`: seed then
+    public key): the five RFC 8032 seeds, edge seeds and random ones.
+  - `keypair-check`: `keypair`, `valid`: `SigningKey::from_keypair_bytes` accepts only when the
+    public half is the derived one, byte for byte.
+  - `sign`: `seed`, `public`, `msg`, `sig` by `near_crypto::SecretKey::sign` (deterministic).
+  - `verify`: `public`, `msg`, `sig`, `valid`. Per signature: wrong message, a flipped bit in
+    `R`, in `S` (including the top bits) and in the key, another key, `S + kℓ` for `k` up to 15,
+    swapped halves; the scalar boundary (`S` = 0, ℓ-1, ℓ, ℓ+1, 2^253-1, 2^256-1); the ZIP 215
+    matrix (196 vectors: the 14 encodings of the 8 small-order points, canonical or not, as both
+    key and `R`, `S` = 0, message `Zcash`); the identity key (accepts every message); small-order
+    keys with a real accepting `R` found by search; mixed-order keys `A + T` that verify when
+    `k ≡ 0 (mod 8)` and fail otherwise.
+  - `pubkey`: `public`, `valid`: key decoding, including `y ≥ p`, `x = 0` with the sign bit set,
+    the small-order encodings and 120 random strings.
+
+`crypto-bench` times the same primitives natively (release mode, `std::time`, at least 0.3 s each)
+and prints one JSON line per benchmark; the names match `node-bench`:
+
+```sh
+cargo run --release --locked --bin crypto-bench
+```
