@@ -166,10 +166,10 @@ theorem processWithInstants_postponed_ownership (cfg : RuntimeConfig) (ap : Appl
         · exact (List.mem_filter.mp hnew).2)
     (by
       rintro st' r' ⟨rfl, rfl⟩ hne
-      exact processReceipt_postponed_ownership cfg ap decoder st r' h)
+      exact processReceipt_postponed_ownership cfg ap decoder st' r' h)
     (by
       rintro st' r' ⟨rfl, rfl⟩ hi
-      have hp := processReceipt_postponed_ownership cfg ap decoder st r' h
+      have hp := processReceipt_postponed_ownership cfg ap decoder st' r' h
       exact ⟨hp.1, hp.2, fun x hx => (List.mem_filter.mp hx).2⟩)
   exact key st receipt ⟨rfl, rfl⟩
 
