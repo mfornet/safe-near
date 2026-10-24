@@ -16,277 +16,135 @@ theorem gasFn_encodingInvariant : NearHostFn.PreservesLive EncodingInvariant gas
       | none => exact h
   · trivial
 
-set_option maxHeartbeats 2000000 in
+/-- A host the model rejects (`unsupportedRuntimeHost`) traps before any effect. -/
+local macro "unsupported_encoding" : tactic =>
+  `(tactic| (
+    apply metered_raw_encodingInvariant
+    intro st args hwf hs hguard _
+    simp (disch := decide) only [prepareStorageCall_other]
+    trivial))
+
 /-- Every published metered host preserves strict policy and raw receipt encoding on
 live returns. Terminal model/contract/gas errors carry no speculative guarantee. -/
 theorem meteredHostFns_encodingInvariant
     (cfg : RuntimeConfig) (entry : ImportDecl × NearHostFn NearState)
     (h : entry ∈ meteredHostFns cfg) : NearHostFn.PreservesLive EncodingInvariant entry.2 := by
-  simp only [meteredHostFns, List.mem_append, List.mem_map, List.mem_singleton] at h
-  rcases h with ⟨⟨decl, fn⟩, hin, heq⟩ | heq
-  · subst entry
-    simp only [nearHostFns, List.mem_cons, List.not_mem_nil, or_false] at hin
-    rcases hin with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
-    · cases h
-      apply meteredNeutral_encodingInvariant
-      · exact inputFn_encodingFrame
-    · cases h
-      apply meteredNeutral_encodingInvariant
-      · exact readRegisterFn_encodingFrame
-    · cases h
-      apply meteredNeutral_encodingInvariant
-      · exact registerLenFn_encodingFrame
-    · cases h
-      apply meteredNeutral_encodingInvariant
-      · exact writeRegisterFn_encodingFrame
-    · cases h
-      apply meteredNeutral_encodingInvariant
-      · exact valueReturnFn_encodingFrame
-    · cases h
-      apply meteredNeutral_encodingInvariant
-      · exact storageWriteFn_encodingFrame
-    · cases h
-      apply meteredNeutral_encodingInvariant
-      · exact storageReadFn_encodingFrame
-    · cases h
-      apply meteredNeutral_encodingInvariant
-      · exact storageRemoveFn_encodingFrame
-    · cases h
-      apply meteredNeutral_encodingInvariant
-      · exact storageHasKeyFn_encodingFrame
-    · cases h
-      apply meteredNeutral_encodingInvariant
-      · exact panicMetered_encodingFrame
-    · cases h
-      apply meteredNeutral_encodingInvariant
-      · exact panicUtf8Metered_encodingFrame
-    · cases h
-      apply meteredNeutral_encodingInvariant
-      · exact currentAccountIdFn_encodingFrame
-    · cases h
-      apply meteredNeutral_encodingInvariant
-      · exact predecessorAccountIdFn_encodingFrame
-    · cases h
-      apply meteredNeutral_encodingInvariant
-      · exact signerAccountIdFn_encodingFrame
-    · cases h
-      apply meteredNeutral_encodingInvariant
-      · exact attachedDepositFn_encodingFrame
-    · cases h
-      apply meteredNeutral_encodingInvariant
-      · exact logUtf8Fn_encodingFrame
-    · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
-    · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
-    · cases h
-      apply meteredNeutral_encodingInvariant
-      · exact signerAccountPkFn_encodingFrame
-    · cases h
-      apply meteredNeutral_encodingInvariant
-      · exact blockIndexFn_encodingFrame
-    · cases h
-      apply meteredNeutral_encodingInvariant
-      · exact blockIndexFn_encodingFrame
-    · cases h
-      apply meteredNeutral_encodingInvariant
-      · exact blockTimestampFn_encodingFrame
-    · cases h
-      apply meteredNeutral_encodingInvariant
-      · exact epochHeightFn_encodingFrame
-    · cases h
-      apply meteredNeutral_encodingInvariant
-      · exact storageUsageFn_encodingFrame
-    · cases h
-      apply meteredNeutral_encodingInvariant
-      · exact accountBalanceFn_encodingFrame
-    · cases h
-      apply meteredNeutral_encodingInvariant
-      · exact accountLockedBalanceFn_encodingFrame
-    · cases h
-      apply meteredNeutral_encodingInvariant
-      · exact prepaidGasFn_encodingFrame
-    · cases h
-      apply meteredNeutral_encodingInvariant
-      · exact usedGasFn_encodingFrame
-    · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
-    · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
-    · cases h
-      apply meteredNeutral_encodingInvariant
-      · exact logUtf16Fn_encodingFrame
-    · cases h
-      apply meteredNeutral_encodingInvariant
-      · exact abortMetered_encodingFrame
-    · cases h
-      intro st args hwf
-      trivial
-    · cases h
-      intro st args hwf
-      trivial
-    · cases h
-      intro st args hwf
-      trivial
-    · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
-    · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
-    · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
-    · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
-    · cases h
-      apply meteredNeutral_encodingInvariant
-      · exact randomSeedFn_encodingFrame
-    · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
-    · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
-    · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
-    · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
-    · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
-    · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
-    · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
-    · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
-    · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
-    · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
-    · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
-    · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
-    · cases h
-      exact meteredCreate_encodingInvariant _
-    · cases h
-      exact meteredThen_encodingInvariant _
-    · cases h
-      exact meteredJoin_encodingInvariant _
-    · cases h
-      exact meteredBatchCreate_encodingInvariant _
-    · cases h
-      exact meteredBatchThen_encodingInvariant _
-    · cases h
-      exact meteredActionCreateAccount_encodingInvariant _
-    · cases h
-      exact meteredActionDeployContract_encodingInvariant _
-    · cases h
-      exact meteredActionFunctionCall_encodingInvariant _
-    · cases h
-      exact meteredActionFunctionCallWeight_encodingInvariant _
-    · cases h
-      exact meteredActionTransfer_encodingInvariant _
-    · cases h
-      exact meteredActionStake_encodingInvariant _
-    · cases h
-      exact meteredActionAddKeyWithFullAccess_encodingInvariant _
-    · cases h
-      exact meteredActionAddKeyWithFunctionCall_encodingInvariant _
-    · cases h
-      exact meteredActionDeleteKey_encodingInvariant _
-    · cases h
-      exact meteredActionDeleteAccount_encodingInvariant _
-    · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
-    · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
-    · cases h
-      exact meteredActionUseGlobalContract_encodingInvariant _
-    · cases h
-      exact meteredActionUseGlobalContractByAccountId_encodingInvariant _
-    · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
-    · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
-    · cases h
-      apply meteredNeutral_encodingInvariant
-      · exact promiseResultsCountFn_encodingFrame
-    · cases h
-      apply meteredNeutral_encodingInvariant
-      · exact promiseResultFn_encodingFrame
-    · cases h
-      apply meteredNeutral_encodingInvariant
-      · exact promiseReturnFn_encodingFrame
-  · subst entry
-    exact gasFn_encodingInvariant
+  revert entry h
+  simp only [meteredHostFns, List.forall_mem_append, List.forall_mem_map, List.forall_mem_singleton]
+  refine ⟨?_, gasFn_encodingInvariant⟩
+  simp only [nearHostFns, List.forall_mem_cons]
+  and_intros
+  · apply meteredNeutral_encodingInvariant
+    · exact inputFn_encodingFrame
+  · apply meteredNeutral_encodingInvariant
+    · exact readRegisterFn_encodingFrame
+  · apply meteredNeutral_encodingInvariant
+    · exact registerLenFn_encodingFrame
+  · apply meteredNeutral_encodingInvariant
+    · exact writeRegisterFn_encodingFrame
+  · apply meteredNeutral_encodingInvariant
+    · exact valueReturnFn_encodingFrame
+  · apply meteredNeutral_encodingInvariant
+    · exact storageWriteFn_encodingFrame
+  · apply meteredNeutral_encodingInvariant
+    · exact storageReadFn_encodingFrame
+  · apply meteredNeutral_encodingInvariant
+    · exact storageRemoveFn_encodingFrame
+  · apply meteredNeutral_encodingInvariant
+    · exact storageHasKeyFn_encodingFrame
+  · apply meteredNeutral_encodingInvariant
+    · exact panicMetered_encodingFrame
+  · apply meteredNeutral_encodingInvariant
+    · exact panicUtf8Metered_encodingFrame
+  · apply meteredNeutral_encodingInvariant
+    · exact currentAccountIdFn_encodingFrame
+  · apply meteredNeutral_encodingInvariant
+    · exact predecessorAccountIdFn_encodingFrame
+  · apply meteredNeutral_encodingInvariant
+    · exact signerAccountIdFn_encodingFrame
+  · apply meteredNeutral_encodingInvariant
+    · exact attachedDepositFn_encodingFrame
+  · apply meteredNeutral_encodingInvariant
+    · exact logUtf8Fn_encodingFrame
+  · unsupported_encoding
+  · unsupported_encoding
+  · apply meteredNeutral_encodingInvariant
+    · exact signerAccountPkFn_encodingFrame
+  · apply meteredNeutral_encodingInvariant
+    · exact blockIndexFn_encodingFrame
+  · apply meteredNeutral_encodingInvariant
+    · exact blockIndexFn_encodingFrame
+  · apply meteredNeutral_encodingInvariant
+    · exact blockTimestampFn_encodingFrame
+  · apply meteredNeutral_encodingInvariant
+    · exact epochHeightFn_encodingFrame
+  · apply meteredNeutral_encodingInvariant
+    · exact storageUsageFn_encodingFrame
+  · apply meteredNeutral_encodingInvariant
+    · exact accountBalanceFn_encodingFrame
+  · apply meteredNeutral_encodingInvariant
+    · exact accountLockedBalanceFn_encodingFrame
+  · apply meteredNeutral_encodingInvariant
+    · exact prepaidGasFn_encodingFrame
+  · apply meteredNeutral_encodingInvariant
+    · exact usedGasFn_encodingFrame
+  · unsupported_encoding
+  · unsupported_encoding
+  · apply meteredNeutral_encodingInvariant
+    · exact logUtf16Fn_encodingFrame
+  · apply meteredNeutral_encodingInvariant
+    · exact abortMetered_encodingFrame
+  · intro st args hwf
+    trivial
+  · intro st args hwf
+    trivial
+  · intro st args hwf
+    trivial
+  · unsupported_encoding
+  · unsupported_encoding
+  · unsupported_encoding
+  · unsupported_encoding
+  · apply meteredNeutral_encodingInvariant
+    · exact randomSeedFn_encodingFrame
+  · unsupported_encoding
+  · unsupported_encoding
+  · unsupported_encoding
+  · unsupported_encoding
+  · unsupported_encoding
+  · unsupported_encoding
+  · unsupported_encoding
+  · unsupported_encoding
+  · unsupported_encoding
+  · unsupported_encoding
+  · unsupported_encoding
+  · unsupported_encoding
+  · exact meteredCreate_encodingInvariant _
+  · exact meteredThen_encodingInvariant _
+  · exact meteredJoin_encodingInvariant _
+  · exact meteredBatchCreate_encodingInvariant _
+  · exact meteredBatchThen_encodingInvariant _
+  · exact meteredActionCreateAccount_encodingInvariant _
+  · exact meteredActionDeployContract_encodingInvariant _
+  · exact meteredActionFunctionCall_encodingInvariant _
+  · exact meteredActionFunctionCallWeight_encodingInvariant _
+  · exact meteredActionTransfer_encodingInvariant _
+  · exact meteredActionStake_encodingInvariant _
+  · exact meteredActionAddKeyWithFullAccess_encodingInvariant _
+  · exact meteredActionAddKeyWithFunctionCall_encodingInvariant _
+  · exact meteredActionDeleteKey_encodingInvariant _
+  · exact meteredActionDeleteAccount_encodingInvariant _
+  · unsupported_encoding
+  · unsupported_encoding
+  · exact meteredActionUseGlobalContract_encodingInvariant _
+  · exact meteredActionUseGlobalContractByAccountId_encodingInvariant _
+  · unsupported_encoding
+  · unsupported_encoding
+  · apply meteredNeutral_encodingInvariant
+    · exact promiseResultsCountFn_encodingFrame
+  · apply meteredNeutral_encodingInvariant
+    · exact promiseResultFn_encodingFrame
+  · apply meteredNeutral_encodingInvariant
+    · exact promiseReturnFn_encodingFrame
+  · simp
 
 end Wasm.Near
