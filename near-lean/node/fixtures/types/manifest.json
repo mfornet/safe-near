@@ -432,6 +432,10 @@
       "accept": 48,
       "reject": 46
     },
+    "FlatStateValue": {
+      "accept": 52,
+      "reject": 66
+    },
     "FunctionCallError": {
       "accept": 29,
       "reject": 54
@@ -583,6 +587,18 @@
     "PublicKey": {
       "accept": 53,
       "reject": 75
+    },
+    "RawStateChange": {
+      "accept": 31,
+      "reject": 45
+    },
+    "RawStateChangesWithTrieKey": {
+      "accept": 68,
+      "reject": 52
+    },
+    "RawTrieNodeWithSize": {
+      "accept": 105,
+      "reject": 72
     },
     "Receipt": {
       "accept": 206,
@@ -824,6 +840,22 @@
       "accept": 52,
       "reject": 2
     },
+    "StateChangeCause": {
+      "accept": 17,
+      "reject": 36
+    },
+    "StateChangesForBlock": {
+      "accept": 37,
+      "reject": 37
+    },
+    "StateChangesForBlockRange": {
+      "accept": 9,
+      "reject": 21
+    },
+    "StateChangesForShard": {
+      "accept": 39,
+      "reject": 40
+    },
     "StateHeaderKey": {
       "accept": 30,
       "reject": 30
@@ -904,6 +936,10 @@
       "accept": 48,
       "reject": 52
     },
+    "TrieKey": {
+      "accept": 143,
+      "reject": 173
+    },
     "TrieQueueIndices": {
       "accept": 30,
       "reject": 31
@@ -951,6 +987,10 @@
     "ValidatorWeight": {
       "accept": 6,
       "reject": 6
+    },
+    "ValueRef": {
+      "accept": 62,
+      "reject": 36
     },
     "VersionedPartialEncodedStateWitness": {
       "accept": 42,
