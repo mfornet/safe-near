@@ -705,6 +705,64 @@ Acceptance: the state roots of the M3 corpus and a restart test. `just node-stat
   nearcore-produced witness (the corpus has none); memtrie, trie caches and prefetching, state parts and sync (M7),
   resharding (`split.rs`, flat `Resharding` status), `delete_range`, the disk-resident store and `fsync`.
 
+### M5 chain
+
+M5a (header and block validation) is done; M5b (the epoch manager's computation, chunk application in the chain, the
+chain store) is not. Acceptance of M5a: `just chain-validate-corpus` (sources: `near-lean/node/NearNode/Chain/`,
+`NodeConformance/ChainValidate.lean`, `tools/localnet/{chain_exporter.rs,chain_corpus.py,chain_validate.py}`).
+
+- **Corpus** (`near-lean/node/corpus/blocks/{single,sharded}`, 1.9 MB of gzip, budget 20 MB). The pinned `neard`
+  databases of the M3 localnets read by `safe-near-chain-export` (an overlay on `state-viewer`, like the chunk exporter;
+  `build.py --only safe-near-chain-export`; all 436 M3 chunks belong to these blocks). Per chain: `meta.json` (genesis,
+  economics, static shard layout), `epochs.jsonl` (`EpochInfo` and shard layout of every epoch, 19 each),
+  `blocks.jsonl` (every block from genesis to the head, 514 and 512, as Borsh `Block`, with what nearcore derived:
+  `BlockInfo`, block merkle tree and root, block producer, the approvers `EpochManager` ordered with both stakes,
+  chunk producers, chunk validator assignments, `ChunkExtra` per shard, whether the next block starts an epoch) and
+  `variants.jsonl`. Not exported in M5a: chunk bodies and parts (nothing validated here reads them). The healthy
+  localnets have no skipped heights and no missing chunk; 34 blocks per chain need approvals of the next epoch, and the
+  sharded chain alternates two block producers.
+- **Invalid variants** (931 and 937, 39 kinds on 24 base blocks per chain: the first two blocks, epoch boundaries, and
+  seeded picks). Each is built from a valid block, re-derived and **re-signed by the producer's key** (`validator_key.json`)
+  so that exactly one check fails: tampered signature, body and approvals, a signer that is not the producer, wrong
+  prev hash (existing and unknown), height, timestamp, epoch ids, `next_bp_hash`, finality fields, merkle root,
+  ordinal, epoch sync hash, gas price, total supply, random value, VRF proof and value, chunk mask and bitmap, chunk
+  headers root and every other root, a chunk's signature and `prev_block_hash`, validator proposals, protocol version,
+  chunk endorsement signatures and counts. The verdict is the error of the pinned
+  `Chain::start_process_block_async` (the entry that runs `verify_block_hash_and_signature`, `preprocess_block`,
+  `validate_header` and `validate_block`) on the real database, on a copy because even a rejection writes
+  bookkeeping; the exporter aborts if nearcore accepts a variant. The comparison is by `Error` variant (26 kinds).
+- **Validated** (`Chain/Validate.lean`, in nearcore's order; `chain.rs` unless noted): `verify_block_hash_and_signature`
+  (body hash, producer signature via `sample_block_producer`); `preprocess_block` (epoch known, chunk header count,
+  known block, height bound, orphan with `partial_verify_orphan_header_signature`); `validate_header` with
+  `Provenance::NONE` (challenges, signature, `epoch_id` and `next_epoch_id` from the previous block, protocol version,
+  `next_bp_hash`, chunk mask length, `prev_height`, timestamp, `verify_approval_with_approvers_info`
+  (`approval_verification.rs`) over `get_all_block_approvers_ordered` (`epoch-manager/lib.rs`: next-epoch approvers
+  when `next_block_need_approvals_from_next_epoch`), `Doomslug::can_approved_block_be_produced` (`doomslug.rs`),
+  `last_ds_final_block`, `last_final_block`, `block_merkle_root`, `block_ordinal`, `epoch_sync_data_hash`
+  (`compute_epoch_sync_data_hash`), `validate_chunk_endorsements_in_header`); the VRF (`signature_verification.rs`) and
+  `random_value`; `validate_block_impl` (genesis chunks, shard, `prev_block_hash`, chunk signature by the producer at
+  height `prev + 1` (`get_chunk_producer_info_db` without `EarlyKickout`), `Block::check_validity`);
+  `validate_block_shard_split` (static layout: no split); `verify_gas_price_checked`, `verify_total_supply_checked`
+  (`block.rs`); `validate_chunk_headers` and `validate_block_proposals`; `validate_chunk_endorsements_in_block`
+  (`stateless_validation/chunk_endorsement.rs`: `sample_chunk_validators`, signatures, the 2/3 stake rule, the bitmap).
+  The chain state derives the `BlockInfo` (`BlockInfo::from_header`, `record_block_info_impl`: epoch id, first block,
+  last finalized height) and the block merkle tree of each accepted block; the harness compares both with the stored
+  ones. Header V4 to V6 and block V4 with body V2 (what protocol 86 produces); other versions and SPICE are rejected.
+- **Result.** `just chain-validate-corpus`: 1024/1024 blocks accepted, 1024/1024 with all derived values equal
+  (`BlockInfo`, tree, root, epoch ids, producers, approvers, chunk producers and validators), 1868/1868 variants
+  rejected with nearcore's error variant, about 6 s. Python tests (`tools/tests/test_chain_corpus.py`) check the corpus
+  files and that the harness fails on a changed verdict, derived value or block.
+- **Not checked, with the reason.** The clock (`InvalidBlockFutureTime`); `ping_missing_chunks` and
+  `collect_incoming_receipts_from_chunks` (chunk bodies); `check_if_finalizable`, `get_gc_stop_height`, catch-up and
+  state-sync state (they depend on the node's final head, tracking and garbage collection, not on the block); the head
+  is the accepted block of largest height; the `InvalidBlockHeight` bound uses it; `EarlyKickout` and dynamic
+  resharding (nightly); resharding of `get_prev_chunk_headers`.
+- **For M5b.** Computing the next `EpochInfo` (`finalize_epoch`: proposals to validators, kickouts, rewards, the
+  samplers, `EpochSummary`, the aggregator) so that the given `epochs.jsonl` becomes a check; applying chunks to
+  produce `ChunkExtra` and the state roots (the corpus already carries nearcore's `ChunkExtra` per block and shard)
+  and the chunk-body checks; the chain store (M4 store) with heads and final head; skipped heights and missing chunks
+  need a chain that has them (the corpus has none), and a fork.
+
 ## Open points
 
 - Numeric performance target for M10, measured against nearcore (M2's and M4's are proposed above).

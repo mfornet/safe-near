@@ -270,3 +270,19 @@ What remains:
 
 Bandwidth requests are empty in every corpus chunk, so the request grants and the random tie breaks of the
 scheduler are covered by unit tests with values from the Rust crates (`runtime-tests`), not by replay.
+
+## 11. The block corpus (M5a)
+
+`near-lean/node/corpus/blocks/` holds, for both localnets, every block from genesis to the head and invalid variants of
+some of them, each with nearcore's own verdict: see the M5 section of `notes/design/NEAR_NODE.md` for the contents and
+the checks. `chain_exporter.rs` is a third overlay (`state-viewer`, binary `safe-near-chain-export`); build only it with
+`python3 tools/localnet/build.py --only safe-near-chain-export`, then
+
+```sh
+just chain-corpus-generate        # chain_corpus.py export (on a copy of data/<topology>/node0) and pack
+just chain-validate-corpus        # the Lean validator on the packed corpus; exit 0 only when all agree
+python3 tools/localnet/chain_corpus.py check      # manifest hashes and internal consistency, no neard
+```
+
+The export is a deterministic function of the database (Ed25519 signatures, seeded choice of base blocks), so
+regenerating from the same database gives the same files; a new `just corpus-generate` run gives a different chain.
