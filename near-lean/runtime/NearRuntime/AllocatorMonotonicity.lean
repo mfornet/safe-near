@@ -14,12 +14,13 @@ theorem commitFunctionCall_nextId_mono (exec : Exec) (c : ReceiptCtx) (account :
     (outcome : VMOutcome) (isLast : Bool) (effects : FunctionCallEffects)
     (heffects : functionCallEffects c account outcome isLast exec.state = .ok effects) :
     exec.state.nextId ≤ (exec.commitFunctionCall outcome effects).state.nextId := by
-  change exec.state.nextId ≤ effects.state.nextId
+  rw [show (exec.commitFunctionCall outcome effects).state = effects.state from rfl]
   rw [functionCallEffects_success c account outcome isLast exec.state effects heffects]
-  exact materializeFunctionCall_nextId_mono c isLast outcome
+  exact (materializeFunctionCall_nextId_mono c isLast outcome
     ((exec.state.setAccount c.receipt.receiverId
       { account with amount := outcome.balance, storageUsage := outcome.storageUsage }).setContractStorage
-        c.receipt.receiverId outcome.storage)
+        c.receipt.receiverId outcome.storage)).trans
+    (functionCallYields_nextId_mono _ _ _)
 
 theorem refundAllowance_nextId (st : ChainState) (receiver : AccountId) (pk : PublicKey) (amount : Nat) :
     (st.refundAllowance receiver pk amount).nextId = st.nextId := by
@@ -47,7 +48,7 @@ theorem applyAction_nextId_mono (c : ReceiptCtx) (isLast : Bool) (action : Actio
     | none => exact Nat.le_refl _
     | some account =>
       dsimp only
-      cases hc : account.code with
+      cases hc : resolveContract before.state account with
       | none => exact Nat.le_refl _
       | some code =>
         dsimp only
@@ -71,6 +72,7 @@ theorem applyAction_nextId_mono (c : ReceiptCtx) (isLast : Bool) (action : Actio
     split
     · exact Nat.le_of_eq (transferCreditState_nextId _ _ _ _).symm
     · split
+      · exact Nat.le_refl _
       · exact Nat.le_refl _
       · split <;> exact Nat.le_refl _
   | stake amount pk =>
@@ -230,7 +232,7 @@ theorem finalizeReceipt_nextId_mono (c : ReceiptCtx) (st : ChainState) (raw : Ex
     (Fees.receiptGasBudget c.cfg c.receipt.receiverId c.action.actions) base.gasUsed base.gasBurnt
     ((st.account? c.receipt.receiverId).isNone && (base.state.account? c.receipt.receiverId).isSome && failed.isNone)
   let charged := { base with
-    tokensBurnt := if c.receipt.isRefund then 0 else settlement.tokensBurnt
+    tokensBurnt := (if c.receipt.isRefund then 0 else settlement.tokensBurnt) + base.actionTokensBurnt
     otherTokensBurnt := if c.receipt.isRefund && failed.isSome then Fees.totalDeposit c.action.actions else 0 }
   let depositRefund := if failed.isSome then Fees.totalDeposit c.action.actions else 0
   let gasRefund := if c.receipt.isRefund then 0 else settlement.refund
@@ -305,19 +307,27 @@ theorem processReceipt_nextId_mono (cfg : RuntimeConfig) (ap : ApplyState) (deco
               (releasePostponedState (receivePostponedDataState st data) id) waiting
     | some dataId =>
       rw [processReceipt_resume cfg ap decoder st receipt data dataId hr hres]
-      split
-      · exact Nat.le_refl _
-      · split
-        · rename_i y _
-          split
-          · rename_i a _
+      by_cases hmoot : (data.data.isNone &&
+          Assoc.lookup st.yieldStatus (receipt.receiverId, dataId) == some YieldStatus.resumeInitiated) = true
+      · simp only [hmoot, ite_true]; exact Nat.le_refl _
+      · simp only [hmoot, Bool.false_eq_true, ite_false]
+        cases hy : Assoc.lookup st.yieldReceipts (receipt.receiverId, dataId) with
+        | none => exact Nat.le_refl _
+        | some y =>
+          dsimp only
+          cases hyr : y.receipt with
+          | action a =>
+            dsimp only
             rw [runActionReceipt_eq]
             unfold processedOfExec
             split
             · exact Nat.le_refl _
-            · exact applyActionReceipt_nextId_mono _ _
-          · exact Nat.le_refl _
-        · exact Nat.le_refl _
+            · exact applyActionReceipt_nextId_mono
+                { cfg, ap, receipt := y, action := a, promiseResults := [data.promiseResult], codeOf := decoder
+                  vmYields := yieldsOf (resumeYieldState st (receipt.receiverId, dataId)) y.receiverId }
+                (resumeYieldState st (receipt.receiverId, dataId))
+          | data _ => dsimp only; exact Nat.le_refl _
+          | globalDistribution _ => dsimp only; exact Nat.le_refl _
   | globalDistribution g =>
     rw [processReceipt_distribution cfg ap decoder st receipt g hr]
     exact (processDistribution_advance cfg ap st receipt g).nextId_le

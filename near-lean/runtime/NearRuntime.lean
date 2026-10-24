@@ -21,6 +21,9 @@ import NearRuntime.ReceiptFunding
 import NearRuntime.MixedFunding
 import NearRuntime.AllActionFunding
 import NearRuntime.ScopedRoutingFunding
+import NearRuntime.NewActionRun
+import NearRuntime.NewActionFunding
+import NearRuntime.InstantFunding
 import NearRuntime.Boundary
 import NearRuntime.BoundarySeam
 import NearRuntime.BoundaryResolution
