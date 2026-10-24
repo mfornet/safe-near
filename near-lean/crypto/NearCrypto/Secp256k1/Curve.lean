@@ -7,8 +7,9 @@ import NearCrypto.Wnaf
 Points are `(X : Y : Z)` with `x = X / Z²` and `y = Y / Z³`, on `y² = x³ + 7`. The formulas are
 `dbl-2009-l`, `madd-2007-bl` and `add-2007-bl`; the exceptional cases (equal or opposite operands,
 infinity) are tested explicitly because the arithmetic is in variable time. Scalar multiplication
-is a width-5 NAF for a variable point and a width-8 NAF over a precomputed affine table for the
-base point, joined by Shamir's trick.
+uses the endomorphism `λ (x, y) = (β x, y)`: both scalars are split into two halves of 128 bits and
+four NAF streams (width 5 for the variable point and its image, width 8 over precomputed affine
+tables for the base point and its image) share 129 doublings.
 -/
 
 namespace NearCrypto.Secp256k1
@@ -199,46 +200,92 @@ def oddMultiples (P : Jac) (count : Nat) : Array Jac :=
       go k next (t.push next)
   go (count - 1) P #[P]
 
-/-- Odd multiples of the base point up to 255 (width-8 NAF digits), in affine form. -/
+/-- The cube root of unity of the field with `λ (x, y) = (β x, y)` (`secp256k1_const_beta`). -/
+def beta : Fp :=
+  Fp.ofNat 0x7ae96a2b657c07106e64479eac3434e99cf0497512f58995c1396c28719501ee
+
+/-- The cube root of unity modulo `n` (`secp256k1_const_lambda`). -/
+def lambda : Nat :=
+  0x5363ad4cc05c30e0a5261c028812645a122e22ea20816678df02967c1b23bd72
+
+/-- `k = r1 + r2 λ (mod n)` with `|r1|, |r2| < 2¹²⁸`, as in `secp256k1_scalar_split_lambda`: the
+two magnitudes and whether each is the negative of the value. -/
+def splitLambda (k : Nat) : (Nat × Bool) × (Nat × Bool) :=
+  let g1 := 0x3086d221a7d46bcde86c90e49284eb153daa8a1471e8ca7fe893209a45dbb031
+  let g2 := 0xe4437ed6010e88286f547fa90abfe4c4221208ac9df506c61571b4ae8ac47f71
+  let minusB1 := 0xe4437ed6010e88286f547fa90abfe4c3
+  let minusB2 := 0xfffffffffffffffffffffffffffffffe8a280ac50774346dd765cda83db1562c
+  let mulShift (a b : Nat) : Nat := ((a * b) >>> 384) + (((a * b) >>> 383) &&& 1)
+  let c1 := mulShift k g1 * minusB1 % n
+  let c2 := mulShift k g2 * minusB2 % n
+  let r2 := (c1 + c2) % n
+  let r1 := (k % n + n - r2 * lambda % n) % n
+  let high (r : Nat) := r > n / 2
+  ((if high r1 then n - r1 else r1, high r1), (if high r2 then n - r2 else r2, high r2))
+
+/-- Odd multiples of the base point up to 127 (width-8 NAF digits), in affine form. -/
 def baseTable : Array Aff :=
-  batchAffine (oddMultiples (Jac.ofAff Aff.base) 128)
+  batchAffine (oddMultiples (Jac.ofAff Aff.base) 64)
+
+/-- The same multiples of `λ G = (β x, y)`. -/
+def baseTableLambda : Array Aff :=
+  baseTable.map fun P => ⟨mul beta P.x, P.y⟩
 
 namespace Jac
 
-/-- Add `digit · P` for the odd `digit` using the Jacobian table of odd multiples. -/
+/-- Add `±digit · P` for the odd `digit` using the Jacobian table of odd multiples; the sign is
+flipped when `neg`. -/
 @[inline]
-def addDigit (R : Jac) (table : Array Jac) (digit : Int) : Jac :=
+def addDigit (R : Jac) (table : Array Jac) (digit : Int) (neg : Bool) : Jac :=
+  let digit := if neg then -digit else digit
   if digit > 0 then R.add table[(digit.toNat - 1) / 2]!
   else if digit < 0 then R.add (table[((-digit).toNat - 1) / 2]!).neg else R
 
-/-- Add `digit · G` using the affine table of the base point. -/
+/-- Add `±digit · G` (or `· λ G`) using an affine table. -/
 @[inline]
-def addBaseDigit (R : Jac) (digit : Int) : Jac :=
-  if digit > 0 then R.addAff baseTable[(digit.toNat - 1) / 2]!
-  else if digit < 0 then R.addAff (baseTable[((-digit).toNat - 1) / 2]!).neg else R
+def addAffDigit (R : Jac) (table : Array Aff) (digit : Int) (neg : Bool) : Jac :=
+  let digit := if neg then -digit else digit
+  if digit > 0 then R.addAff table[(digit.toNat - 1) / 2]!
+  else if digit < 0 then R.addAff (table[((-digit).toNat - 1) / 2]!).neg else R
 
-/-- Shamir's trick from digit `i - 1` down: `R = 2 R + a_j A + b_j G`. -/
-private def shamir (nafA nafB : Array Int) (tableA : Array Jac) : Nat → Jac → Jac
+/-- Multiples of the point `λ P`, from those of `P`. -/
+def mulLambda (P : Jac) : Jac :=
+  ⟨mul beta P.x, P.y, P.z, P.inf⟩
+
+/-- The streams of `a · A + b · G` once `a` and `b` are split: from digit `i - 1` down,
+`R = 2 R ± a1_j A ± a2_j λ A ± b1_j G ± b2_j λ G`. -/
+private def glvLoop (na1 na2 nb1 nb2 : Array Int) (sa1 sa2 sb1 sb2 : Bool) (tA tAL : Array Jac) :
+    Nat → Jac → Jac
   | 0, R => R
   | i + 1, R =>
     let R := R.dbl
-    let R := R.addDigit tableA nafA[i]!
-    shamir nafA nafB tableA i (R.addBaseDigit nafB[i]!)
+    let R := R.addDigit tA na1[i]! sa1
+    let R := R.addDigit tAL na2[i]! sa2
+    let R := R.addAffDigit baseTable nb1[i]! sb1
+    glvLoop na1 na2 nb1 nb2 sa1 sa2 sb1 sb2 tA tAL i (R.addAffDigit baseTableLambda nb2[i]! sb2)
 
-/-- `a · A + b · G` for `a, b < 2²⁵⁶`, in variable time. -/
+/-- `a · A + b · G`, in variable time, with the endomorphism: both scalars are split into two
+halves of 128 bits, so the 129 doublings are shared by four width-5 and width-8 NAF streams. -/
 def ecmult (a : Nat) (A : Aff) (b : Nat) : Jac :=
-  let nafA := Wnaf.naf 256 5 a
-  let nafB := Wnaf.naf 256 8 b
-  let top := ((List.range 257).reverse.find? fun i => nafA[i]! != 0 || nafB[i]! != 0).getD 0
-  shamir nafA nafB (oddMultiples (ofAff A) 8) (top + 1) infinity
+  let ((a1, sa1), (a2, sa2)) := splitLambda a
+  let ((b1, sb1), (b2, sb2)) := splitLambda b
+  let na1 := Wnaf.naf 128 5 a1
+  let na2 := Wnaf.naf 128 5 a2
+  let nb1 := Wnaf.naf 128 8 b1
+  let nb2 := Wnaf.naf 128 8 b2
+  let tA := oddMultiples (ofAff A) 8
+  glvLoop na1 na2 nb1 nb2 sa1 sa2 sb1 sb2 tA (tA.map mulLambda) 129 infinity
 
-/-- `b · G` for `b < 2²⁵⁶`. -/
+/-- `b · G`. -/
 def mulBase (b : Nat) : Jac :=
-  let nafB := Wnaf.naf 256 8 b
+  let ((b1, sb1), (b2, sb2)) := splitLambda b
+  let nb1 := Wnaf.naf 128 8 b1
+  let nb2 := Wnaf.naf 128 8 b2
   let rec go : Nat → Jac → Jac
     | 0, R => R
-    | i + 1, R => go i ((R.dbl).addBaseDigit nafB[i]!)
-  go 257 infinity
+    | i + 1, R =>
+      go i (((R.dbl).addAffDigit baseTable nb1[i]! sb1).addAffDigit baseTableLambda nb2[i]! sb2)
+  go 129 infinity
 
 end Jac
 

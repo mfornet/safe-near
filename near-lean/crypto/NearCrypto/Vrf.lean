@@ -2,6 +2,7 @@ import NearCrypto.Blake2b
 import NearCrypto.Ristretto
 import NearCrypto.Sha256
 import NearCrypto.Ed25519
+import NearCrypto.ModInv
 
 /-!
 # The NEAR VRF
@@ -128,18 +129,9 @@ def canonical (b : ByteArray) (off : Nat) : Option Nat :=
 def basemul (s : Nat) : ByteArray :=
   Ristretto.Impl.compress (Ext.mulBase s)
 
-/-- The inverse modulo `ℓ`, and `1` for zero (`safe_invert`), by the extended Euclidean algorithm. -/
+/-- The inverse modulo `ℓ`, and `1` for zero (`safe_invert`). -/
 def safeInvert (s : Nat) : Nat :=
-  if s % ell == 0 then 1
-  else
-    let rec go : Nat → Nat → Nat → Int → Int → Nat
-      | 0, _, _, _, _ => 0
-      | fuel + 1, r0, r1, t0, t1 =>
-        if r1 == 0 then (t0 % (ell : Int)).toNat
-        else
-          let q := r0 / r1
-          go fuel r1 (r0 - q * r1) t1 (t0 - (q : Int) * t1)
-    go 600 ell (s % ell) 0 1
+  if s % ell == 0 then 1 else ModInv.inv s ell
 
 /-- A VRF secret key: a canonical scalar and its public key. -/
 structure SecretKey where

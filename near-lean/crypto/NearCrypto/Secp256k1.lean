@@ -1,6 +1,7 @@
 import NearCrypto.Secp256k1.Curve
 import NearCrypto.Secp256k1.Spec
 import NearCrypto.Hmac
+import NearCrypto.ModInv
 
 /-!
 # secp256k1 ECDSA
@@ -30,16 +31,9 @@ def toBytes (x : Nat) : ByteArray :=
       (x >>> 64).toUInt64)
     x.toUInt64
 
-/-- The inverse of `a ≠ 0` modulo the prime `m`, by the extended Euclidean algorithm. -/
+/-- The inverse of `a ≠ 0` modulo the prime `m` (`ModInv`). -/
 def inv (a m : Nat) : Nat :=
-  let rec go : Nat → Nat → Nat → Int → Int → Nat
-    | 0, _, _, _, _ => 0
-    | fuel + 1, r0, r1, t0, t1 =>
-      if r1 == 0 then (t0 % (m : Int)).toNat
-      else
-        let q := r0 / r1
-        go fuel r1 (r0 - q * r1) t1 (t0 - (q : Int) * t1)
-  go 600 m a 0 1
+  ModInv.inv a m
 
 end Scalar
 

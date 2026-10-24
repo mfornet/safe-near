@@ -236,6 +236,25 @@ def signTests (t : Tally) (r : Rng) : Tally × Rng :=
             !Spec.verify sk.publicKey msg (sig.push 0))
     return (t, r)
 
+/-- The limb inverse agrees with the `Nat` one for several odd moduli, edge and random residues. -/
+def modInvTests (t : Tally) (r : Rng) : Tally × Rng :=
+  Id.run do
+    let mut t := t
+    let mut r := r
+    let mods :=
+      [Secp256k1.n, Secp256k1.p, Ed25519.ell, Ed25519.p, 2 ^ 255 + 95, 2 ^ 256 - 189, 3, 5, 7,
+        2 ^ 64 + 13, 2 ^ 128 - 159, 1]
+    for m in mods do
+      for a in [0, 1, 2, m - 1, m - 2, m / 2, m / 2 + 1, m, m + 1] do
+        t := check t s!"inv edge {m} {a}" (ModInv.inv a m == ModInv.invEuclid a m)
+      for i in [0:40] do
+        let (a, r') := r.nat 32
+        r := r'
+        let inv := ModInv.inv a m
+        t := check t s!"inv {m} {i}" (inv == ModInv.invEuclid a m)
+        t := check t s!"inv product {m} {i}" (m == 1 || a % m == 0 || a * inv % m == 1)
+    return (t, r)
+
 /-! ### secp256k1 -/
 
 /-- Field values that stress the limb boundaries. -/
@@ -319,8 +338,31 @@ def secpPointTests (t : Tally) (r : Rng) : Tally × Rng :=
     t := check t "secp base on curve" G.onCurve
     t :=
       check t "secp base table"
-        (Secp256k1.baseTable.size == 128 && secpSpec (some Secp256k1.baseTable[0]!) == specG &&
-          secpSpec (some Secp256k1.baseTable[127]!) == Secp256k1.Spec.ecmult 0 none 255)
+        (Secp256k1.baseTable.size == 64 && secpSpec (some Secp256k1.baseTable[0]!) == specG &&
+          secpSpec (some Secp256k1.baseTable[63]!) == Secp256k1.Spec.ecmult 0 none 127)
+    -- the endomorphism: λ G = (β x, y), and λ P for a few points
+    t :=
+      check t "secp lambda on G"
+        (Secp256k1.Spec.ecmult 0 none Secp256k1.lambda ==
+          some (Secp256k1.Fp.mul Secp256k1.beta G.x |>.toNat, G.y.toNat))
+    t := check t "secp lambda cube" (Secp256k1.lambda ^ 3 % n == 1)
+    t :=
+      check t "secp beta cube"
+        ((Secp256k1.Fp.mul Secp256k1.beta (Secp256k1.Fp.sq Secp256k1.beta)).toNat == 1)
+    t :=
+      check t "secp base table lambda"
+        (secpSpec (some Secp256k1.baseTableLambda[5]!) ==
+          Secp256k1.Spec.ecmult 0 none (Secp256k1.lambda * 11 % n))
+    for k in
+      [0, 1, 2, n - 1, n, 2 ^ 128, 2 ^ 255, 2 ^ 256 - 1, Secp256k1.lambda, Secp256k1.lambda + 1,
+        n / 2, n / 2 + 1] do
+      let ((r1, s1), (r2, s2)) := Secp256k1.splitLambda k
+      let v1 : Int := if s1 then -(r1 : Int) else r1
+      let v2 : Int := if s2 then -(r2 : Int) else r2
+      t :=
+        check t s!"secp split {k}"
+          ((v1 + v2 * (Secp256k1.lambda : Int) - (k : Int)) % (n : Int) == 0 && r1 < 2 ^ 128 &&
+            r2 < 2 ^ 128)
     -- scalars that exercise the recoding and the exceptional additions
     let edgeScalars :=
       [0, 1, 2, 3, 15, 16, 255, 256, 2 ^ 128, n - 1, n, n + 1, 2 ^ 255, 2 ^ 256 - 1]
@@ -343,6 +385,8 @@ def secpPointTests (t : Tally) (r : Rng) : Tally × Rng :=
       let (b, r') := r'.nat 32
       let (c, r') := r'.nat 32
       r := r'
+      let ((r1, _), (r2, _)) := Secp256k1.splitLambda a
+      t := check t s!"secp split random {i}" (r1 < 2 ^ 128 && r2 < 2 ^ 128)
       let some P := (Secp256k1.Jac.mulBase (c % n)).toAff | t := check t s!"secp point {i}" false
       let specP := secpSpec (some P)
       t :=
@@ -558,6 +602,7 @@ def main : IO UInt32 := do
   (t, r) := pointTests t r
   (t, r) := decodeTests t r
   (t, r) := signTests t r
+  (t, r) := modInvTests t r
   (t, r) := secpFieldTests t r
   (t, r) := secpScalarTests t r
   (t, r) := secpPointTests t r
