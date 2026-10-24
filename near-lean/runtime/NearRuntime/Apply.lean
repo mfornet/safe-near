@@ -320,6 +320,10 @@ def stageContractStorageRemoval (account : AccountId) (storage : List (Bytes × 
   accounting.map fun trie => storage.foldl (fun trie (key, _) =>
     trie.remove (TrieOverlay.contractKey account.toUTF8.toList key)) trie
 
+/-- `Account::MAX_ACCOUNT_DELETION_STORAGE_USAGE`: the most state, in bytes and
+excluding contract code, that a DeleteAccount action may remove. -/
+def maxAccountDeletionStorageUsage : Nat := 10_000
+
 def applyAction (c : ReceiptCtx) (isLast : Bool) : Action → ExecM Unit
   | .createAccount => do
     let id := c.receipt.receiverId
@@ -392,6 +396,10 @@ def applyAction (c : ReceiptCtx) (isLast : Bool) : Action → ExecM Unit
     unless isLast do throw .deleteActionMustBeFinal
     let a ← getAccount id
     if a.locked > 0 then throw (.deleteAccountStaking id)
+    -- nearcore refuses to delete more than `MAX_ACCOUNT_DELETION_STORAGE_USAGE`
+    -- bytes of state, not counting the contract code (`actions.rs`).
+    if a.storageUsage - ((a.code.map (·.size)).getD 0) > maxAccountDeletionStorageUsage then
+      throw (.deleteAccountWithLargeState id)
     let st ← getState
     -- nearcore pays the balance out only when there is one (`actions.rs`).
     if a.amount > 0 then

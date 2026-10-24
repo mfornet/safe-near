@@ -173,6 +173,22 @@ def checkTransactionRouting (r : IO.Ref Report) (cfg : RuntimeConfig) (code : Co
       (deleted.issue.isNone && (deleted.state.account? "carol.near").isNone &&
         payouts.map (Fees.totalDeposit ·.actions) == (if amount == 0 then [] else [amount]))
       s!"{payouts.length} payouts"
+  -- ... and refuses to remove more than 10 000 bytes of state, contract code excluded.
+  let deleteCarol (account : Account) :=
+    Near.apply cfg World.ap (fun _ => code) (genesis.setAccount "carol.near" account) [] [{
+      predecessorId := "carol.near", receiverId := "carol.near", receiptId := 101
+      receipt := .action {
+        signerId := "carol.near", signerPublicKey := pkOf 4
+        gasPrice := 0, actions := [.deleteAccount "bob.near"] } }]
+  let large := deleteCarol { amount := oneNear, storageUsage := 10_001 }
+  check r "deleting an account with more than 10 000 bytes of state fails"
+    (large.issue.isNone && (large.state.account? "carol.near").isSome &&
+      large.outcomes.map (·.2.status) == [.failure (.deleteAccountWithLargeState "carol.near")])
+  let atLimit := deleteCarol { amount := oneNear, storageUsage := 10_000 }
+  let withCode := deleteCarol { amount := oneNear, storageUsage := 10_000 + code.size, code := some code }
+  check r "the deletion limit is inclusive and does not count contract code"
+    (atLimit.issue.isNone && (atLimit.state.account? "carol.near").isNone &&
+      withCode.issue.isNone && (withCode.state.account? "carol.near").isNone)
 
 /-- Restricted-key availability across real VM execution and delayed refunds. -/
 def checkRefundScenarios (r : IO.Ref Report) (cfg : RuntimeConfig) (code : ContractCode)

@@ -165,6 +165,8 @@ theorem applyDeleteAccount_run (c : ReceiptCtx) (isLast : Bool) (beneficiary : A
         | none => (.error (.accountDoesNotExist c.receipt.receiverId), before)
         | some account =>
           if account.locked > 0 then (.error (.deleteAccountStaking c.receipt.receiverId), before)
+          else if account.storageUsage - ((account.code.map (·.size)).getD 0) > maxAccountDeletionStorageUsage
+          then (.error (.deleteAccountWithLargeState c.receipt.receiverId), before)
           else (.ok (), deleteAccountFundedResult c before account beneficiary) := by
   cases isLast with
   | false => simp [-StateT.run_bind, applyAction]
@@ -172,8 +174,11 @@ theorem applyDeleteAccount_run (c : ReceiptCtx) (isLast : Bool) (beneficiary : A
     cases ha : before.state.account? c.receipt.receiverId with
     | none => simp [-StateT.run_bind, applyAction, getAccount, getState, ha]
     | some account =>
-      by_cases hl : account.locked > 0 <;> by_cases hamount : account.amount > 0 <;>
-        simp [-StateT.run_bind, applyAction, getAccount, getState, emit, ha, hl, hamount,
+      by_cases hl : account.locked > 0 <;>
+        by_cases hlarge : account.storageUsage - ((account.code.map (·.size)).getD 0) >
+          maxAccountDeletionStorageUsage <;>
+        by_cases hamount : account.amount > 0 <;>
+        simp [-StateT.run_bind, applyAction, getAccount, getState, emit, ha, hl, hlarge, hamount,
           deleteAccountFundedResult, Exec.addBalanceRefund]
 
 /-- Deletion funds the beneficiary refund by removing precisely the unlocked
@@ -214,6 +219,8 @@ theorem funded_deleteAccount (c : ReceiptCtx) (isLast : Bool) (beneficiary : Acc
       split at hrun
       · have hbad := congrArg Prod.fst hrun; cases hbad
       · rename_i hlocked
+        split at hrun
+        · have hbad := congrArg Prod.fst hrun; cases hbad
         apply balance_return_funded c.cfg c.action.gasPrice 0 before after _ value ?_ ?_ ?_ ?_ ?_ hrun
         · unfold deleteAccountFundedResult; split <;> exact hwf.removeAccount _
         · simpa only [Nat.add_zero] using deleteAccountFundedResult_funds c before account beneficiary hwf ha (by omega)

@@ -111,16 +111,8 @@ theorem applyAction_outputIds (c : ReceiptCtx) (isLast : Bool) (action : Action)
   | useGlobalContract _ => exact h
   | deleteAccount beneficiary =>
     rw [applyDeleteAccount_run]
-    split
-    · exact h
-    · split
-      · exact h
-      · split
-        · exact h
-        · dsimp only [deleteAccountFundedResult]
-          split
-          · exact Exec.addBalanceRefund_outputIds before beneficiary _ h
-          · exact h
+    dsimp only [deleteAccountFundedResult]
+    repeat' (first | exact h | exact Exec.addBalanceRefund_outputIds before beneficiary _ h | split)
 
 /-- The callback bound is required at entry, while monotonicity transports it
 between successive operations. -/

@@ -141,16 +141,8 @@ theorem applyAction_freshIds (c : ReceiptCtx) (isLast : Bool) (action : Action) 
   | useGlobalContract _ => exact h
   | deleteAccount beneficiary =>
     rw [applyDeleteAccount_run]
-    split
-    · exact h
-    · split
-      · exact h
-      · split
-        · exact h
-        · dsimp only [deleteAccountFundedResult]
-          split
-          · exact Exec.addBalanceRefund_freshIds before beneficiary _ lower h hfloor
-          · exact h
+    dsimp only [deleteAccountFundedResult]
+    repeat' (first | exact h | exact Exec.addBalanceRefund_freshIds before beneficiary _ lower h hfloor | split)
 
 /-- A fixed allocation floor is retained while each operation reserves new ids. -/
 def ExecM.PreservesFreshIds (lower : Nat) (operation : ExecM α) : Prop :=
