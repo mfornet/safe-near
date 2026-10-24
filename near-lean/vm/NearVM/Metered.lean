@@ -896,7 +896,8 @@ theorem gas_ite {P : GasCounter → Prop} {c : Prop} [Decidable c]
   · simp only [h, ↓reduceIte]; exact ha h
   · simp only [h, ↓reduceIte]; exact hb h
 
-set_option maxHeartbeats 0 in
+-- Needs about 500k heartbeats (2026-10-24); the bound leaves twice that.
+set_option maxHeartbeats 1000000 in
 /-- The storage phase changes gas only by billing charges, so any property of
 the counter that billing preserves holds after it. -/
 theorem prepareStorageCallAux_gas (P : GasCounter → Prop) (name : String)
