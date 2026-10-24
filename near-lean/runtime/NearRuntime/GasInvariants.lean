@@ -221,7 +221,8 @@ theorem gasBound_applyDelegateAction (c : ReceiptCtx) (act : Action) :
         + Fees.prepaidSend c.cfg.fees.actionFees c.cfg.wasm.ethImplicitAccounts act) := by
   have hrequired : delegateRequired c act ≤
       act.attachedGas + Fees.nestedExec c.cfg.fees.actionFees c.cfg.wasm.ethImplicitAccounts act := by
-    cases act <;> simp [delegateRequired, Action.attachedGas, Fees.nestedExec, Fees.attachedGasList_eq] <;> omega
+    cases act <;> simp [delegateRequired, Action.attachedGas, Fees.nestedExec, Fees.attachedGasList_eq]
+    all_goals omega
   unfold applyDelegateAction
   have h : (liftExcept (delegateChecks c act) >>= fun _ => getState >>= fun st =>
       liftExcept (delegateState c st act) >>= fun moved => modifyState (fun _ => moved) >>= fun _ =>

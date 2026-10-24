@@ -171,7 +171,7 @@ theorem processReceipt_resume_scopedWellFormed (cfg : RuntimeConfig) (ap : Apply
     cases hy : Assoc.lookup st.yieldReceipts (receipt.receiverId, dataId) with
     | none => exact hwf
     | some y =>
-      simp only [hy]
+      dsimp only
       obtain ⟨a, ha, _⟩ := hwf.yieldEntries _ y hy
       simp only [ha]
       have hbase := resumeYieldState_scopedWellFormed st (receipt.receiverId, dataId) hwf
@@ -351,7 +351,7 @@ theorem processReceipt_resume_scope_conservation (cfg : RuntimeConfig) (ap : App
   · simp only [hmoot, Bool.false_eq_true, ite_false] at hsupported ⊢
     cases hy : Assoc.lookup st.yieldReceipts (receipt.receiverId, dataId) with
     | none =>
-      simp only [hy, Processed.totalFunds, Processed.netTokensBurnt, receiptsFunds, List.map_nil, List.sum_nil,
+      simp only [Processed.totalFunds, Processed.netTokensBurnt, receiptsFunds, List.map_nil, List.sum_nil,
         Nat.add_zero, Nat.sub_zero, Fees.receiptFunds, hdata]
     | some y =>
       simp only [hy] at hsupported ⊢

@@ -269,7 +269,7 @@ theorem applyDeleteKey_run (c : ReceiptCtx) (isLast : Bool) (pk : PublicKey) (be
         have hb := AccessKey.gasBalance_of_some key balance nonces hg
         by_cases hmax : balance > maxGasKeyBalanceToBurn
         · simp [-StateT.run_bind, applyAction, getAccount, getState, putAccount, modifyState, hk, ha, hg, hb,
-            hmax, deleteKeyMetadataState, Account.withStorage]
+            hmax]
         · simp [-StateT.run_bind, applyAction, getAccount, getState, putAccount, modifyState, hk, ha, hg, hb,
             hmax, deleteKeyMetadataState, Exec.burnAction, Account.withStorage]
 

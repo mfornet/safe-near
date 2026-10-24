@@ -181,7 +181,8 @@ def nestedExec (f : ActionFees) (ethEnabled : Bool) : Action → Nat
 
 theorem prepaidExec_eq (f : ActionFees) (ethEnabled : Bool) (receiver : AccountId) (action : Action) :
     prepaidExec f ethEnabled receiver action = exec f ethEnabled receiver action + nestedExec f ethEnabled action := by
-  cases action <;> simp [prepaidExec, nestedExec, exec] <;> omega
+  cases action <;> simp [prepaidExec, nestedExec, exec]
+  all_goals omega
 
 /-- Send fees of the actions a delegate action will create, prepaid by the relayer
 (`total_prepaid_send_fees`). -/

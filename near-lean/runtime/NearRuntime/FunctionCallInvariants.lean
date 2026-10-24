@@ -21,7 +21,7 @@ theorem resumeReceipts_funds (cfg : RuntimeConfig) (account : AccountId) (resume
     receiptsFunds cfg (resumeReceipts account resumes initial receipts).2 = receiptsFunds cfg receipts := by
   unfold resumeReceipts
   exact foldl_frame (fun pair : ChainState × List Receipt => receiptsFunds cfg pair.2) _
-    (by intros; simp [receiptsFunds_append, receiptsFunds, Fees.receiptFunds]) resumes (initial, receipts)
+    (by intros; simp [receiptsFunds, Fees.receiptFunds]) resumes (initial, receipts)
 
 theorem yieldBookkeeping_frame (c : ReceiptCtx) (outcome : VMOutcome) (initial : ChainState) :
     (yieldBookkeeping c outcome initial).withoutIds = initial.withoutIds := by

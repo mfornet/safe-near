@@ -167,7 +167,7 @@ theorem processReceipt_resume_postponedWellFormed (cfg : RuntimeConfig) (ap : Ap
     cases hy : Assoc.lookup st.yieldReceipts (receipt.receiverId, dataId) with
     | none => exact hwf
     | some y =>
-      simp only [hy]
+      dsimp only
       obtain ⟨a, ha, _⟩ := hwf.yieldEntries _ y hy
       simp only [ha]
       have hbase := resumeYieldState_postponedWellFormed st (receipt.receiverId, dataId) hwf

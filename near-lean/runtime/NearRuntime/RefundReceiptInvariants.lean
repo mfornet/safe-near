@@ -46,7 +46,7 @@ theorem applyAction_functionCallBound (c : ReceiptCtx) (isLast : Bool) (action :
     change ((applyDelegateAction c _).run.run before).2.gasBurntForFunctionCall ≤ _
     rw [applyDelegateAction_run]
     repeat' (first | exact Nat.le_add_right _ _ | split)
-  · push_neg at hd
+  · push Not at hd
     exact functionCallBound_of_gasBound (applyAction_gasBound_plain c isLast action hd)
 
 theorem runReceiptAction_functionCallBound (c : ReceiptCtx) (onlyAction isLast : Bool) (action : Action) :

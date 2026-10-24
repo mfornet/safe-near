@@ -155,7 +155,7 @@ theorem processReceipt_resume_conservation (cfg : RuntimeConfig) (ap : ApplyStat
   · simp only [hmoot, Bool.false_eq_true, ite_false] at hsupported ⊢
     cases hy : Assoc.lookup st.yieldReceipts (receipt.receiverId, dataId) with
     | none =>
-      simp only [hy, Processed.totalFunds, Processed.netTokensBurnt, receiptsFunds, List.map_nil, List.sum_nil,
+      simp only [Processed.totalFunds, Processed.netTokensBurnt, receiptsFunds, List.map_nil, List.sum_nil,
         Nat.add_zero, Nat.sub_zero, Fees.receiptFunds, hdata]
     | some y =>
       simp only [hy] at hsupported ⊢
@@ -329,7 +329,7 @@ theorem processReceipt_resume_accountsUnique (cfg : RuntimeConfig) (ap : ApplySt
   · simp only [hmoot, ite_true]; exact hwf
   · simp only [hmoot, Bool.false_eq_true, ite_false] at hsupported ⊢
     cases hy : Assoc.lookup st.yieldReceipts (receipt.receiverId, dataId) with
-    | none => simp only [hy]; exact hwf
+    | none => exact hwf
     | some y =>
       simp only [hy] at hsupported ⊢
       obtain ⟨a, ha, hshape⟩ := hpost.yieldEntries _ y hy

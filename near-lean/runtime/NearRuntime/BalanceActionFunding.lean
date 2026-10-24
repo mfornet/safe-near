@@ -239,15 +239,15 @@ theorem applyDeleteAccount_run (c : ReceiptCtx) (isLast : Bool) (beneficiary : A
       · by_cases hlarge : account.storageUsage - deleteAccountContractBytes c account > maxAccountDeletionStorageUsage
         · have hlarge' := hlarge
           simp only [deleteAccountContractBytes, gt_iff_lt] at hlarge'
-          simp [-StateT.run_bind, applyAction, getAccount, getState, hl, ha, hlock, hlarge, hlarge',
+          simp [-StateT.run_bind, applyAction, getAccount, getState, hl, ha, hlock, hlarge',
             deleteAccountContractBytes]
         · have hlarge' := hlarge
           simp only [deleteAccountContractBytes, gt_iff_lt] at hlarge'
           by_cases hkeys : before.state.gasKeyBalances c.receipt.receiverId > maxGasKeyBalanceToBurn
-          · simp [-StateT.run_bind, applyAction, getAccount, getState, hl, ha, hlock, hlarge, hlarge', hkeys,
+          · simp [-StateT.run_bind, applyAction, getAccount, getState, hl, ha, hlock, hlarge', hkeys,
               deleteAccountContractBytes]
           · by_cases hpos : account.amount > 0 <;>
-              simp [-StateT.run_bind, applyAction, getAccount, getState, hl, ha, hlock, hlarge, hlarge', hkeys, hpos,
+              simp [-StateT.run_bind, applyAction, getAccount, getState, hl, ha, hlock, hlarge', hkeys, hpos,
                 deleteAccountFundedResult, Exec.burnAction, emit, deleteAccountContractBytes]
   · simp [-StateT.run_bind, applyAction, hl]
 
