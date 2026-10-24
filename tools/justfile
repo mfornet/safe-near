@@ -31,12 +31,18 @@ crypto-tests: crypto-build
 
 # Build the NEAR node (notes/design/NEAR_NODE.md) and its executables.
 node-build:
-    cd near-lean/node && lake build NearNode near-lean-node node-bench node-conformance-types --wfail
+    cd near-lean/node && lake build NearNode near-lean-node node-bench node-conformance-types node-trie-tests --wfail
 
 # M1: the Borsh codecs of every near-primitives type against the committed nearcore oracle fixtures.
 [positional-arguments]
 node-conformance-types *options: node-build
     near-lean/node/.lake/build/bin/node-conformance-types "$@"
+
+# M4: the trie Impl against the Spec (NearInterface.TrieConstruction) on seeded random entry sets and
+# updates; the optional argument is the number of cases.
+[positional-arguments]
+node-trie-tests *options: node-build
+    near-lean/node/.lake/build/bin/node-trie-tests "$@"
 
 # Run the node benchmarks (`crypto/` and `sha256` for M2); options are --filter SUBSTRING and --out FILE.
 [positional-arguments]

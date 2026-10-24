@@ -5,7 +5,7 @@
 # verification never builds it (`just node-isolation`).
 name = "NearNode"
 version = "0.1.0"
-defaultTargets = ["NearNode", "near-lean-node", "node-conformance-types"]
+defaultTargets = ["NearNode", "near-lean-node", "node-conformance-types", "node-trie-tests"]
 packagesDir = "../.lake/packages"
 
 [[require]]
@@ -38,3 +38,11 @@ name = "NodeConformance"
 [[lean_exe]]
 name = "node-conformance-types"
 root = "NodeConformance.Types"
+
+# `lake exe node-trie-tests`: the trie `Impl` against `Spec` on seeded random entry sets and updates.
+[[lean_lib]]
+name = "NodeTests"
+
+[[lean_exe]]
+name = "node-trie-tests"
+root = "NodeTests.TrieTests"
