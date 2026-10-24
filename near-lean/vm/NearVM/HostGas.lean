@@ -148,6 +148,50 @@ theorem randomSeedFn_gas : HostPreservesGas randomSeedFn := by
   unfold randomSeedFn
   host_gas_tac
 
+theorem cryptoHostFn_gas (name : String) (params results : List ValType) : HostPreservesGas (cryptoHostFn name params results) := by
+  intro st args
+  unfold cryptoHostFn
+  dsimp only
+  repeat (first | rfl | exact writeRegisterResult_gas _ _ _ _ _ | split)
+
+theorem sha256Fn_gas : HostPreservesGas sha256Fn := cryptoHostFn_gas _ _ _
+
+theorem keccak256Fn_gas : HostPreservesGas keccak256Fn := cryptoHostFn_gas _ _ _
+
+theorem keccak512Fn_gas : HostPreservesGas keccak512Fn := cryptoHostFn_gas _ _ _
+
+theorem ripemd160Fn_gas : HostPreservesGas ripemd160Fn := cryptoHostFn_gas _ _ _
+
+theorem ecrecoverFn_gas : HostPreservesGas ecrecoverFn := cryptoHostFn_gas _ _ _
+
+theorem ed25519VerifyFn_gas : HostPreservesGas ed25519VerifyFn := cryptoHostFn_gas _ _ _
+
+theorem p256VerifyFn_gas : HostPreservesGas p256VerifyFn := cryptoHostFn_gas _ _ _
+
+theorem altBn128G1MultiexpFn_gas : HostPreservesGas altBn128G1MultiexpFn := cryptoHostFn_gas _ _ _
+
+theorem altBn128G1SumFn_gas : HostPreservesGas altBn128G1SumFn := cryptoHostFn_gas _ _ _
+
+theorem altBn128PairingCheckFn_gas : HostPreservesGas altBn128PairingCheckFn := cryptoHostFn_gas _ _ _
+
+theorem bls12381P1SumFn_gas : HostPreservesGas bls12381P1SumFn := cryptoHostFn_gas _ _ _
+
+theorem bls12381P2SumFn_gas : HostPreservesGas bls12381P2SumFn := cryptoHostFn_gas _ _ _
+
+theorem bls12381G1MultiexpFn_gas : HostPreservesGas bls12381G1MultiexpFn := cryptoHostFn_gas _ _ _
+
+theorem bls12381G2MultiexpFn_gas : HostPreservesGas bls12381G2MultiexpFn := cryptoHostFn_gas _ _ _
+
+theorem bls12381MapFpToG1Fn_gas : HostPreservesGas bls12381MapFpToG1Fn := cryptoHostFn_gas _ _ _
+
+theorem bls12381MapFp2ToG2Fn_gas : HostPreservesGas bls12381MapFp2ToG2Fn := cryptoHostFn_gas _ _ _
+
+theorem bls12381P1DecompressFn_gas : HostPreservesGas bls12381P1DecompressFn := cryptoHostFn_gas _ _ _
+
+theorem bls12381P2DecompressFn_gas : HostPreservesGas bls12381P2DecompressFn := cryptoHostFn_gas _ _ _
+
+theorem bls12381PairingCheckFn_gas : HostPreservesGas bls12381PairingCheckFn := cryptoHostFn_gas _ _ _
+
 theorem chainIdFn_gas : HostPreservesGas chainIdFn := by
   intro st args
   unfold chainIdFn contextRegisterFn

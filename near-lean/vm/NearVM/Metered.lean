@@ -24,94 +24,9 @@ gas on storage-heavy calls must account for the difference.
 -- context supplies `storageAccounting` (`prepareStorageCallAux`); without it they are skipped.
 namespace Wasm.Near
 
-/-- One gas charge. -/
-inductive Charge
-  /-- `times` × the named `ExtCosts` entry, burnt. -/
-  | ext (name : String) (times : Nat := 1)
-  | burn (gas : Nat)
-  /-- `pay_action_base`. -/
-  | actionBase (fee : ActionFees → Fee) (sir : Bool)
-  /-- `pay_action_per_byte`. -/
-  | actionBytes (fee : ActionFees → Fee) (n : Nat) (sir : Bool)
-  /-- `pay_gas_for_new_receipt`: one action receipt plus one data receipt per dependency. -/
-  | newReceipt (sir : Bool) (depsSir : List Bool)
-  /-- `prepay_gas`: gas attached to a function call action. -/
-  | prepay (gas : Nat)
-  /-- `pay_action_accumulated(burn, burn + execution)`: a send cost burnt now with the
-  execution cost it obliges, when neither is a plain per-byte multiple of one fee. -/
-  | pay (burn execution : Nat)
-
-def applyCharge (ns : NearState) : Charge → NearState × Option HostError
-  | .ext name times =>
-    let (g, e) := ns.gas.burn (ns.extCosts.cost name * times)
-    ({ ns with gas := g, gasProfile := ns.gasProfile.addExt name (g.burnt - ns.gas.burnt) }, e)
-  | .burn n =>
-    let (g, e) := ns.gas.burn n
-    ({ ns with gas := g, gasProfile := { ns.gasProfile with
-      actionBurnt := ns.gasProfile.actionBurnt + (g.burnt - ns.gas.burnt) } }, e)
-  | .actionBase fee sir =>
-    let f := fee ns.fees
-    let (g, e) := ns.gas.payAction (f.send sir) f.execution
-    ({ ns with gas := g, gasProfile := { ns.gasProfile with
-      actionBurnt := ns.gasProfile.actionBurnt + (g.burnt - ns.gas.burnt) } }, e)
-  | .actionBytes fee n sir =>
-    let f := fee ns.fees
-    let (g, e) := ns.gas.payAction (f.send sir * n) (f.execution * n)
-    ({ ns with gas := g, gasProfile := { ns.gasProfile with
-      actionBurnt := ns.gasProfile.actionBurnt + (g.burnt - ns.gas.burnt) } }, e)
-  | .newReceipt sir depsSir =>
-    let a := ns.fees.newActionReceipt
-    let d := ns.fees.newDataReceiptBase
-    -- Both sending and executing dependency data receipts are burnt here,
-    -- rather than reserving their execution fee for the callback runtime.
-    let burn := a.send sir + (depsSir.map fun s => d.send s + d.execution).sum
-    let use := a.execution
-    let (g, e) := ns.gas.payAction burn use
-    ({ ns with gas := g, gasProfile := { ns.gasProfile with
-      actionBurnt := ns.gasProfile.actionBurnt + (g.burnt - ns.gas.burnt) } }, e)
-  | .prepay n =>
-    let (g, e) := ns.gas.prepay n
-    ({ ns with gas := g }, e)
-  | .pay burn execution =>
-    let (g, e) := ns.gas.payAction burn execution
-    ({ ns with gas := g, gasProfile := { ns.gasProfile with
-      actionBurnt := ns.gasProfile.actionBurnt + (g.burnt - ns.gas.burnt) } }, e)
-
-def applyCharges (ns : NearState) : List Charge → NearState × Option HostError
-  | [] => (ns, none)
-  | c :: cs =>
-    match applyCharge ns c with
-    | (ns', none) => applyCharges ns' cs
-    | (ns', some e) => (ns', some e)
-
 /-- Trap with a structured error recorded in the host state. -/
 def trapWith (st : HostStore NearState) (e : HostError) : HostResult NearState :=
   .Trap { st with host := { st.host with lastError := some e } } e.message
-
-/-! ## Cost rules -/
-
-def argU64 (args : List Value) (i : Nat) : UInt64 :=
-  match args[i]? with
-  | some (.i64 n) => n
-  | _ => 0
-
-/-- Bytes of a `(len, ptr)` argument following `get_memory_or_register`. -/
-def spanLen (st : HostStore NearState) (len ptr : UInt64) : Nat :=
-  if len = u64Max then ((st.host.registers ptr.toNat).map List.length).getD 0 else len.toNat
-
-/-- Reading a `(len, ptr)` argument: memory or register costs. -/
-def readSpan (st : HostStore NearState) (len ptr : UInt64) : List Charge :=
-  if len = u64Max then
-    match st.host.registers ptr.toNat with
-    | none => []
-    | some bytes => [.ext "read_register_base", .ext "read_register_byte" bytes.length]
-  else [.ext "read_memory_base", .ext "read_memory_byte" len.toNat]
-
-def readMem (n : Nat) : List Charge := [.ext "read_memory_base", .ext "read_memory_byte" n]
-def writeMem (n : Nat) : List Charge := [.ext "write_memory_base", .ext "write_memory_byte" n]
-def writeReg (n : Nat) : List Charge := [.ext "write_register_base", .ext "write_register_byte" n]
-def utf8 (n : Nat) : List Charge := [.ext "utf8_decoding_base", .ext "utf8_decoding_byte" n]
-def utf16 (n : Nat) : List Charge := [.ext "utf16_decoding_base", .ext "utf16_decoding_byte" n]
 
 /-- Receiver of promise `idx`, if it is a receipt. -/
 def promiseReceiver? (st : HostStore NearState) (idx : Nat) : Option (List UInt8) :=
@@ -225,9 +140,6 @@ def functionCallInputs? (name : String) (args : List Value) : Option FunctionCal
 structure FunctionCallPlan where
   charges : List Charge
   error : Option HostError := none
-
-def spanReadError (len ptr : UInt64) : HostError :=
-  if len == u64Max then .invalidRegisterId ptr.toNat else .memoryAccessViolation
 
 def functionCallTargetError (st : HostStore NearState) (index : Nat) : Option HostError :=
   match getPromise? st.host.promises index with
@@ -546,24 +458,6 @@ def chargesBeforeUnvalidated (name : String) (st : HostStore NearState) (args : 
   | "validator_stake" =>
     [base, .ext "validator_stake_base"] ++ readSpan st (a 0) (a 1) ++ utf8 (spanLen st (a 0) (a 1)) ++ writeMem 16
   | "validator_total_stake" => [base, .ext "validator_total_stake_base"] ++ writeMem 16
-  | "sha256" =>
-    let n := spanLen st (a 0) (a 1)
-    [base, .ext "sha256_base", .ext "sha256_byte" n] ++ readSpan st (a 0) (a 1) ++ writeReg 32
-  | "keccak256" =>
-    let n := spanLen st (a 0) (a 1)
-    [base, .ext "keccak256_base", .ext "keccak256_byte" n] ++ readSpan st (a 0) (a 1) ++ writeReg 32
-  | "keccak512" =>
-    let n := spanLen st (a 0) (a 1)
-    [base, .ext "keccak512_base", .ext "keccak512_byte" n] ++ readSpan st (a 0) (a 1) ++ writeReg 64
-  | "ripemd160" =>
-    let n := spanLen st (a 0) (a 1)
-    [base, .ext "ripemd160_base", .ext "ripemd160_block" ((n + 8) / 64 + 1)] ++ readSpan st (a 0) (a 1) ++ writeReg 20
-  | "ecrecover" =>
-    [base, .ext "ecrecover_base"] ++ readSpan st (a 0) (a 1) ++ readSpan st (a 2) (a 3) ++ writeReg 64
-  | "ed25519_verify" =>
-    let n := spanLen st (a 2) (a 3)
-    [base, .ext "ed25519_verify_base", .ext "ed25519_verify_byte" n] ++ readSpan st (a 0) (a 1)
-      ++ readSpan st (a 2) (a 3) ++ readSpan st (a 4) (a 5)
   | "log_utf8" =>
     let n := spanLen st (a 0) (a 1)
     [base] ++ readSpan st (a 0) (a 1) ++ utf8 n ++ [.ext "log_base", .ext "log_byte" n]
@@ -648,7 +542,10 @@ def chargesBeforeUnvalidated (name : String) (st : HostStore NearState) (args : 
   | "promise_result" => [base]
   | "promise_return" => [base, .ext "promise_return"]
   | "gas" => [.burn (a 0).toNat]
-  | _ => [base]
+  | _ =>
+    match cryptoEval name st args with
+    | some plan => extCharges plan.charges
+    | none => [base]
 
 /-- The storage adapter is reached only after input reads and length checks.
 Its old-value charge precedes the output-register operation, even if that traps. -/
@@ -823,7 +720,13 @@ def chargesAfter (name : String) (before after : HostStore NearState) (args : Li
     match getPromiseResult? after.host.promiseResults (a 0).toNat with
     | some (.successful _) => [.ext "write_register_base"]
     | _ => []
-  | _ => []
+  | _ =>
+    -- A cryptographic host function pays for the register it wrote, if it wrote one.
+    if cryptoHostNames.contains name then
+      match after.host.registerWrite with
+      | some written => writeReg written
+      | none => []
+    else []
 
 /-- `storage_usage` after a storage host function: new records cost
 key + value + `num_extra_bytes_record`, overwrites the value difference. -/
@@ -1228,23 +1131,20 @@ def metered (extraBytes : Nat) (name : String) (fn : NearHostFn NearState) : Nea
         | some error => trapWith st1 error
         | none => invokeStorageCall extraBytes name fn st1 args }
 
--- nearcore divergence: hashing, signature, curve and validator host functions are rejected as
--- execution issues instead of being executed.
+-- nearcore divergence: the validator host functions are rejected as execution issues instead of
+-- being executed.
 /-- These host operations require semantics not supplied by `VMContext`.
 Reject them on invocation instead of using the functional host's placeholder
-crypto or validator implementations. Merely importing one is allowed.
+validator implementations. Merely importing one is allowed.
 nearcore divergence: `promise_yield_create_with_id`, `promise_yield_resume_with_yield_id`,
 `promise_set_refund_to` and `promise_batch_action_state_init_by_account_id` are linked but trap
 when called, because the receipt forms they need (a refund target, deterministic state init)
-are outside the modelled receipts. -/
+are outside the modelled receipts. The hashing, signature and curve host functions run on the
+cryptography `RuntimeConfig.hostCrypto` supplies and are rejected (`unsupported`) without it. -/
 def unsupportedRuntimeHost (name : String) : Bool :=
-  ["sha256", "keccak256", "keccak512", "ripemd160", "ecrecover", "ed25519_verify",
-   "validator_stake", "validator_total_stake",
+  ["validator_stake", "validator_total_stake",
    "promise_yield_create_with_id", "promise_yield_resume_with_yield_id", "promise_set_refund_to",
-   "promise_batch_action_state_init_by_account_id", "alt_bn128_g1_multiexp", "alt_bn128_g1_sum", "alt_bn128_pairing_check",
-   "bls12381_g1_multiexp", "bls12381_g2_multiexp", "bls12381_map_fp_to_g1",
-   "bls12381_map_fp2_to_g2", "bls12381_p1_decompress", "bls12381_p2_decompress",
-   "bls12381_p1_sum", "bls12381_p2_sum", "bls12381_pairing_check"].contains name
+   "promise_batch_action_state_init_by_account_id"].contains name
 
 /-- The name a host is metered under. nearcore's weighted function call is the
 plain one plus a weight: same charges, checks and errors. -/

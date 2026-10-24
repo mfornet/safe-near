@@ -324,6 +324,56 @@ theorem randomSeedFn_reservationView : HostPreservesReservationView randomSeedFn
     | trivial | rfl | exact writeRegisterResult_reservationView _ _ _ _ _
     | split)
 
+theorem cryptoHostFn_reservationView (name : String) (params results : List ValType) : HostPreservesReservationView (cryptoHostFn name params results) := by
+  intro st args
+  unfold cryptoHostFn
+  try dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
+    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
+    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
+    NearState.selectReturnValue, NearState.selectReturnPromise,
+    NearState.setStorage, NearState.removeStorage, NearState.invalidateIterators]
+  repeat' (first
+    | trivial | rfl | exact writeRegisterResult_reservationView _ _ _ _ _
+    | split)
+
+theorem sha256Fn_reservationView : HostPreservesReservationView sha256Fn := cryptoHostFn_reservationView _ _ _
+
+theorem keccak256Fn_reservationView : HostPreservesReservationView keccak256Fn := cryptoHostFn_reservationView _ _ _
+
+theorem keccak512Fn_reservationView : HostPreservesReservationView keccak512Fn := cryptoHostFn_reservationView _ _ _
+
+theorem ripemd160Fn_reservationView : HostPreservesReservationView ripemd160Fn := cryptoHostFn_reservationView _ _ _
+
+theorem ecrecoverFn_reservationView : HostPreservesReservationView ecrecoverFn := cryptoHostFn_reservationView _ _ _
+
+theorem ed25519VerifyFn_reservationView : HostPreservesReservationView ed25519VerifyFn := cryptoHostFn_reservationView _ _ _
+
+theorem p256VerifyFn_reservationView : HostPreservesReservationView p256VerifyFn := cryptoHostFn_reservationView _ _ _
+
+theorem altBn128G1MultiexpFn_reservationView : HostPreservesReservationView altBn128G1MultiexpFn := cryptoHostFn_reservationView _ _ _
+
+theorem altBn128G1SumFn_reservationView : HostPreservesReservationView altBn128G1SumFn := cryptoHostFn_reservationView _ _ _
+
+theorem altBn128PairingCheckFn_reservationView : HostPreservesReservationView altBn128PairingCheckFn := cryptoHostFn_reservationView _ _ _
+
+theorem bls12381P1SumFn_reservationView : HostPreservesReservationView bls12381P1SumFn := cryptoHostFn_reservationView _ _ _
+
+theorem bls12381P2SumFn_reservationView : HostPreservesReservationView bls12381P2SumFn := cryptoHostFn_reservationView _ _ _
+
+theorem bls12381G1MultiexpFn_reservationView : HostPreservesReservationView bls12381G1MultiexpFn := cryptoHostFn_reservationView _ _ _
+
+theorem bls12381G2MultiexpFn_reservationView : HostPreservesReservationView bls12381G2MultiexpFn := cryptoHostFn_reservationView _ _ _
+
+theorem bls12381MapFpToG1Fn_reservationView : HostPreservesReservationView bls12381MapFpToG1Fn := cryptoHostFn_reservationView _ _ _
+
+theorem bls12381MapFp2ToG2Fn_reservationView : HostPreservesReservationView bls12381MapFp2ToG2Fn := cryptoHostFn_reservationView _ _ _
+
+theorem bls12381P1DecompressFn_reservationView : HostPreservesReservationView bls12381P1DecompressFn := cryptoHostFn_reservationView _ _ _
+
+theorem bls12381P2DecompressFn_reservationView : HostPreservesReservationView bls12381P2DecompressFn := cryptoHostFn_reservationView _ _ _
+
+theorem bls12381PairingCheckFn_reservationView : HostPreservesReservationView bls12381PairingCheckFn := cryptoHostFn_reservationView _ _ _
+
 theorem chainIdFn_reservationView : HostPreservesReservationView chainIdFn := by
   intro st args
   unfold chainIdFn contextRegisterFn
@@ -393,8 +443,11 @@ theorem abortMetered_reservationView : HostPreservesReservationView abortMetered
   trivial
 
 /-- These published host names create no onward execution/prepaid obligation. -/
-def reservationNeutralNames : List String :=
+def reservationNeutralLocal : List String :=
   ["input", "read_register", "register_len", "write_register", "value_return", "storage_write", "storage_read", "storage_remove", "storage_has_key", "current_account_id", "predecessor_account_id", "signer_account_id", "attached_deposit", "log_utf8", "signer_account_pk", "block_index", "block_height", "block_timestamp", "epoch_height", "storage_usage", "account_balance", "account_locked_balance", "prepaid_gas", "used_gas", "log_utf16", "random_seed", "chain_id", "promise_results_count", "promise_result", "promise_return", "panic", "panic_utf8", "abort"]
+
+/-- The cryptographic hosts burn ext-cost gas only, and create no onward obligation. -/
+def reservationNeutralNames : List String := reservationNeutralLocal ++ cryptoHostNames
 
 @[simp] theorem storageValueCharges_reservation (st : HostStore NearState) (cost : String)
     (key : List UInt8) (fees : ActionFees) :
@@ -428,12 +481,12 @@ theorem chargesBefore_storage_reservation (name : String) (st : HostStore NearSt
   · rename_i plan he
     exact storageMutationPlan_reservation name st args plan st.host.fees he
   · rcases hname with h | h <;> subst name <;>
-      simp [chargesBeforeUnvalidated, creationAccountArgs, Charge.reservation]
+      simp [chargesBeforeUnvalidated, creationAccountArgs, Charge.reservation, cryptoEval]
 
-theorem chargesBefore_neutral_reservation (name : String) (st : HostStore NearState) (args : List Value)
-    (hname : name ∈ reservationNeutralNames) :
+theorem chargesBefore_local_reservation (name : String) (st : HostStore NearState) (args : List Value)
+    (hname : name ∈ reservationNeutralLocal) :
     ((chargesBefore name st args).map (fun charge => charge.reservation st.host.fees)).sum = 0 := by
-  simp only [reservationNeutralNames, List.mem_cons, List.not_mem_nil, or_false] at hname
+  simp only [reservationNeutralLocal, List.mem_cons, List.not_mem_nil, or_false] at hname
   rcases hname with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
   all_goals subst name
   all_goals first
@@ -442,8 +495,31 @@ theorem chargesBefore_neutral_reservation (name : String) (st : HostStore NearSt
     | skip
   all_goals dsimp only [chargesBefore, chargesBeforeUnvalidated, storageMutationPlan?, creationAccountArgs, argU64,
     readMem, writeMem, writeReg, readSpan, utf8, utf16, Charge.reservation]
-  all_goals simp
+  all_goals simp [cryptoEval]
   all_goals repeat' (first | rfl | contradiction | constructor | split)
+
+theorem extCharges_reservation (cs : List (String × Nat)) (fees : ActionFees) :
+    ((extCharges cs).map (fun charge => charge.reservation fees)).sum = 0 := by
+  unfold extCharges
+  induction cs with
+  | nil => rfl
+  | cons p ps ih => simpa [Charge.reservation] using ih
+
+theorem chargesBefore_crypto_reservation (name : String) (st : HostStore NearState)
+    (args : List Value) (hname : name ∈ cryptoHostNames) :
+    ((chargesBefore name st args).map (fun charge => charge.reservation st.host.fees)).sum = 0 := by
+  simp only [cryptoHostNames, List.mem_cons, List.not_mem_nil, or_false] at hname
+  rcases hname with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
+  all_goals subst name
+  all_goals simp [chargesBefore, chargesBeforeUnvalidated, storageMutationPlan?, creationAccountArgs,
+    cryptoEval, extCharges_reservation]
+
+theorem chargesBefore_neutral_reservation (name : String) (st : HostStore NearState) (args : List Value)
+    (hname : name ∈ reservationNeutralNames) :
+    ((chargesBefore name st args).map (fun charge => charge.reservation st.host.fees)).sum = 0 := by
+  rcases List.mem_append.1 hname with h | h
+  · exact chargesBefore_local_reservation name st args h
+  · exact chargesBefore_crypto_reservation name st args h
 
 /-- Local precharges and raw local hosts compose with the post-call theorem. -/
 theorem meteredNeutral_reservationInvariant (fees : ActionFees) (ethEnabled : Bool) (extra : Nat)

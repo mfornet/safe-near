@@ -212,6 +212,53 @@ theorem randomSeedFn_selection : HostPreservesSelection randomSeedFn := by
     | exact writeRegisterResult_selection _ _ _ _ _ hwf
     | split)
 
+theorem cryptoHostFn_selection (name : String) (params results : List ValType) : HostPreservesSelection (cryptoHostFn name params results) := by
+  intro st args hwf
+  unfold cryptoHostFn
+  try dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
+  repeat (first
+    | exact hwf
+    | exact writeRegisterResult_selection _ _ _ _ _ hwf
+    | split)
+
+theorem sha256Fn_selection : HostPreservesSelection sha256Fn := cryptoHostFn_selection _ _ _
+
+theorem keccak256Fn_selection : HostPreservesSelection keccak256Fn := cryptoHostFn_selection _ _ _
+
+theorem keccak512Fn_selection : HostPreservesSelection keccak512Fn := cryptoHostFn_selection _ _ _
+
+theorem ripemd160Fn_selection : HostPreservesSelection ripemd160Fn := cryptoHostFn_selection _ _ _
+
+theorem ecrecoverFn_selection : HostPreservesSelection ecrecoverFn := cryptoHostFn_selection _ _ _
+
+theorem ed25519VerifyFn_selection : HostPreservesSelection ed25519VerifyFn := cryptoHostFn_selection _ _ _
+
+theorem p256VerifyFn_selection : HostPreservesSelection p256VerifyFn := cryptoHostFn_selection _ _ _
+
+theorem altBn128G1MultiexpFn_selection : HostPreservesSelection altBn128G1MultiexpFn := cryptoHostFn_selection _ _ _
+
+theorem altBn128G1SumFn_selection : HostPreservesSelection altBn128G1SumFn := cryptoHostFn_selection _ _ _
+
+theorem altBn128PairingCheckFn_selection : HostPreservesSelection altBn128PairingCheckFn := cryptoHostFn_selection _ _ _
+
+theorem bls12381P1SumFn_selection : HostPreservesSelection bls12381P1SumFn := cryptoHostFn_selection _ _ _
+
+theorem bls12381P2SumFn_selection : HostPreservesSelection bls12381P2SumFn := cryptoHostFn_selection _ _ _
+
+theorem bls12381G1MultiexpFn_selection : HostPreservesSelection bls12381G1MultiexpFn := cryptoHostFn_selection _ _ _
+
+theorem bls12381G2MultiexpFn_selection : HostPreservesSelection bls12381G2MultiexpFn := cryptoHostFn_selection _ _ _
+
+theorem bls12381MapFpToG1Fn_selection : HostPreservesSelection bls12381MapFpToG1Fn := cryptoHostFn_selection _ _ _
+
+theorem bls12381MapFp2ToG2Fn_selection : HostPreservesSelection bls12381MapFp2ToG2Fn := cryptoHostFn_selection _ _ _
+
+theorem bls12381P1DecompressFn_selection : HostPreservesSelection bls12381P1DecompressFn := cryptoHostFn_selection _ _ _
+
+theorem bls12381P2DecompressFn_selection : HostPreservesSelection bls12381P2DecompressFn := cryptoHostFn_selection _ _ _
+
+theorem bls12381PairingCheckFn_selection : HostPreservesSelection bls12381PairingCheckFn := cryptoHostFn_selection _ _ _
+
 theorem chainIdFn_selection : HostPreservesSelection chainIdFn := by
   intro st args hwf
   unfold chainIdFn contextRegisterFn

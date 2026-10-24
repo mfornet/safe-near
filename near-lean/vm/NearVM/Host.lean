@@ -1,4 +1,5 @@
 import NearVM.State
+import NearVM.CryptoHost
 
 /-!
 # NEAR host-function registry (`nearEnv`)
@@ -16,9 +17,10 @@ of imports is resolved by name/signature into the right positional order.
 
 ## Incremental strategy
 
-This functional host permits injected cryptographic and validator operations
-through `NearState`. Their defaults are placeholders, not NEAR semantics.
-`NearVM.run` uses the metered table, which explicitly rejects these operations
+The cryptographic host functions take their primitives from `NearState.crypto`
+(`HostCrypto`) and are reported as unsupported without it; the validator operations are
+injected through `NearState` and their defaults are placeholders, not NEAR semantics.
+`NearVM.run` uses the metered table, which explicitly rejects the validator operations
 and the unimplemented yield lifecycle on invocation. Use that entry point for
 runtime execution. This table alone does not account for gas or schedule
 promises; those responsibilities belong to the metered VM and receipt runtime.
@@ -782,29 +784,42 @@ def validatorStakeFn : NearHostFn NearState :=
 def validatorTotalStakeFn : NearHostFn NearState :=
   contextU128MemFn "validator_total_stake" (·.validatorTotalStake)
 
-/-! ## Crypto and math, modelled as pure host-state hooks -/
+/-! ## Cryptographic host functions -/
 
-def digestFn (name : String) (hash : NearState → List UInt8 → List UInt8) : NearHostFn NearState :=
-  { params := [.i64, .i64, .i64], results := []
-    invoke := fun st args => match args with
-      | [.i64 valueLen, .i64 valuePtr, .i64 regId] =>
-        match getMemOrReg st valuePtr valueLen with
-        | none => .Trap st s!"{name}: invalid input"
-        | some value =>
-          writeRegisterResult name st regId (hash st.host value)
-      | _ => .Trap st s!"{name}: bad args" }
+/-- A cryptographic host function: `cryptoEval` has already validated the arguments and paid for
+them (`Metered`), so this runs the primitive and writes its result. A register write is recorded
+in `registerWrite`, whose gas is charged once it is known. -/
+def cryptoHostFn (name : String) (params results : List ValType) : NearHostFn NearState :=
+  { params, results
+    invoke := fun st args =>
+      match cryptoEval name st args with
+      | none => .Trap st s!"{name}: not a cryptographic host function"
+      | some plan =>
+        match plan.error with
+        | some error =>
+          .Trap { st with host := { st.host with lastError := some error } } error.message
+        | none =>
+        match plan.compute () with
+        | .trap error =>
+          .Trap { st with host := { st.host with lastError := some error } } error.message
+        | .done results none =>
+          .Return results { st with host := { st.host with registerWrite := none } }
+        | .done results (some (register, data)) =>
+          if withinLimit st.host.config.maxRegisterLen data.length then
+            writeRegisterResult name
+              { st with host := { st.host with registerWrite := some data.length } }
+              register data results
+          else
+            .Trap { st with host := { st.host with lastError := some .memoryAccessViolation } }
+              HostError.memoryAccessViolation.message }
 
-def sha256Fn : NearHostFn NearState :=
-  digestFn "sha256" (·.sha256)
+def sha256Fn : NearHostFn NearState := cryptoHostFn "sha256" [.i64, .i64, .i64] []
 
-def keccak256Fn : NearHostFn NearState :=
-  digestFn "keccak256" (·.keccak256)
+def keccak256Fn : NearHostFn NearState := cryptoHostFn "keccak256" [.i64, .i64, .i64] []
 
-def keccak512Fn : NearHostFn NearState :=
-  digestFn "keccak512" (·.keccak512)
+def keccak512Fn : NearHostFn NearState := cryptoHostFn "keccak512" [.i64, .i64, .i64] []
 
-def ripemd160Fn : NearHostFn NearState :=
-  digestFn "ripemd160" (·.ripemd160)
+def ripemd160Fn : NearHostFn NearState := cryptoHostFn "ripemd160" [.i64, .i64, .i64] []
 
 def randomSeedFn : NearHostFn NearState :=
   { params := [.i64], results := []
@@ -814,98 +829,49 @@ def randomSeedFn : NearHostFn NearState :=
       | _ => .Trap st "random_seed: bad args" }
 
 def ecrecoverFn : NearHostFn NearState :=
-  { params := [.i64, .i64, .i64, .i64, .i64, .i64], results := [.i64]
-    invoke := fun st args => match args with
-      | [.i64 hashLen, .i64 hashPtr, .i64 sigLen, .i64 sigPtr, .i64 v, .i64 malleabilityFlag] =>
-        match getMemOrReg st hashPtr hashLen, getMemOrReg st sigPtr sigLen with
-        | some hash, some sig =>
-          match st.host.ecrecover hash sig v (malleabilityFlag != 0) with
-          | some pk =>
-            checkPublicKey "ecrecover" st pk <| fun _ =>
-              writeRegisterResult "ecrecover" st 0 pk [.i64 1]
-          | none => .Return [.i64 0] st
-        | _, _ => .Trap st "ecrecover: invalid input"
-      | _ => .Trap st "ecrecover: bad args" }
+  cryptoHostFn "ecrecover" [.i64, .i64, .i64, .i64, .i64, .i64, .i64] [.i64]
 
 def ed25519VerifyFn : NearHostFn NearState :=
-  { params := [.i64, .i64, .i64, .i64, .i64, .i64], results := [.i64]
-    invoke := fun st args => match args with
-      | [.i64 sigLen, .i64 sigPtr, .i64 msgLen, .i64 msgPtr, .i64 pkLen, .i64 pkPtr] =>
-        match getMemOrReg st sigPtr sigLen, getMemOrReg st msgPtr msgLen, getMemOrReg st pkPtr pkLen with
-        | some sig, some msg, some pk =>
-          checkPublicKey "ed25519_verify" st pk <| fun _ =>
-            .Return [.i64 (if st.host.ed25519Verify sig msg pk then 1 else 0)] st
-        | _, _, _ => .Trap st "ed25519_verify: invalid input"
-      | _ => .Trap st "ed25519_verify: bad args" }
+  cryptoHostFn "ed25519_verify" [.i64, .i64, .i64, .i64, .i64, .i64] [.i64]
 
-def mathRegisterFn (name : String) (op : NearState → List UInt8 → List UInt8) : NearHostFn NearState :=
-  { params := [.i64, .i64, .i64], results := []
-    invoke := fun st args => match args with
-      | [.i64 valueLen, .i64 valuePtr, .i64 regId] =>
-        match getMemOrReg st valuePtr valueLen with
-        | some value => writeRegisterResult name st regId (op st.host value)
-        | none => .Trap st s!"{name}: invalid input"
-      | _ => .Trap st s!"{name}: bad args" }
-
-def mathStatusRegisterFn (name : String)
-    (op : NearState → List UInt8 → UInt64 × List UInt8) : NearHostFn NearState :=
-  { params := [.i64, .i64, .i64], results := [.i64]
-    invoke := fun st args => match args with
-      | [.i64 valueLen, .i64 valuePtr, .i64 regId] =>
-        match getMemOrReg st valuePtr valueLen with
-        | some value =>
-          let (status, out) := op st.host value
-          if status == 0 then
-            writeRegisterResult name st regId out [.i64 status]
-          else
-            .Return [.i64 status] st
-        | none => .Trap st s!"{name}: invalid input"
-      | _ => .Trap st s!"{name}: bad args" }
-
-def mathStatusFn (name : String) (op : NearState → List UInt8 → UInt64) : NearHostFn NearState :=
-  { params := [.i64, .i64], results := [.i64]
-    invoke := fun st args => match args with
-      | [.i64 valueLen, .i64 valuePtr] =>
-        match getMemOrReg st valuePtr valueLen with
-        | some value => .Return [.i64 (op st.host value)] st
-        | none => .Trap st s!"{name}: invalid input"
-      | _ => .Trap st s!"{name}: bad args" }
+def p256VerifyFn : NearHostFn NearState :=
+  cryptoHostFn "p256_verify" [.i64, .i64, .i64, .i64, .i64, .i64] [.i64]
 
 def altBn128G1MultiexpFn : NearHostFn NearState :=
-  mathRegisterFn "alt_bn128_g1_multiexp" (·.altBn128G1Multiexp)
+  cryptoHostFn "alt_bn128_g1_multiexp" [.i64, .i64, .i64] []
 
 def altBn128G1SumFn : NearHostFn NearState :=
-  mathRegisterFn "alt_bn128_g1_sum" (·.altBn128G1Sum)
+  cryptoHostFn "alt_bn128_g1_sum" [.i64, .i64, .i64] []
 
 def altBn128PairingCheckFn : NearHostFn NearState :=
-  mathStatusFn "alt_bn128_pairing_check" (·.altBn128PairingCheck)
+  cryptoHostFn "alt_bn128_pairing_check" [.i64, .i64] [.i64]
 
 def bls12381G1MultiexpFn : NearHostFn NearState :=
-  mathStatusRegisterFn "bls12381_g1_multiexp" (·.bls12381G1Multiexp)
+  cryptoHostFn "bls12381_g1_multiexp" [.i64, .i64, .i64] [.i64]
 
 def bls12381G2MultiexpFn : NearHostFn NearState :=
-  mathStatusRegisterFn "bls12381_g2_multiexp" (·.bls12381G2Multiexp)
+  cryptoHostFn "bls12381_g2_multiexp" [.i64, .i64, .i64] [.i64]
 
 def bls12381MapFpToG1Fn : NearHostFn NearState :=
-  mathStatusRegisterFn "bls12381_map_fp_to_g1" (·.bls12381MapFpToG1)
+  cryptoHostFn "bls12381_map_fp_to_g1" [.i64, .i64, .i64] [.i64]
 
 def bls12381MapFp2ToG2Fn : NearHostFn NearState :=
-  mathStatusRegisterFn "bls12381_map_fp2_to_g2" (·.bls12381MapFp2ToG2)
+  cryptoHostFn "bls12381_map_fp2_to_g2" [.i64, .i64, .i64] [.i64]
 
 def bls12381P1DecompressFn : NearHostFn NearState :=
-  mathStatusRegisterFn "bls12381_p1_decompress" (·.bls12381P1Decompress)
+  cryptoHostFn "bls12381_p1_decompress" [.i64, .i64, .i64] [.i64]
 
 def bls12381P2DecompressFn : NearHostFn NearState :=
-  mathStatusRegisterFn "bls12381_p2_decompress" (·.bls12381P2Decompress)
+  cryptoHostFn "bls12381_p2_decompress" [.i64, .i64, .i64] [.i64]
 
 def bls12381P1SumFn : NearHostFn NearState :=
-  mathStatusRegisterFn "bls12381_p1_sum" (·.bls12381P1Sum)
+  cryptoHostFn "bls12381_p1_sum" [.i64, .i64, .i64] [.i64]
 
 def bls12381P2SumFn : NearHostFn NearState :=
-  mathStatusRegisterFn "bls12381_p2_sum" (·.bls12381P2Sum)
+  cryptoHostFn "bls12381_p2_sum" [.i64, .i64, .i64] [.i64]
 
 def bls12381PairingCheckFn : NearHostFn NearState :=
-  mathStatusFn "bls12381_pairing_check" (·.bls12381PairingCheck)
+  cryptoHostFn "bls12381_pairing_check" [.i64, .i64] [.i64]
 
 /-! ## Deprecated storage iterators -/
 
@@ -1199,8 +1165,9 @@ def nearHostFns : List (ImportDecl × NearHostFn NearState) :=
   , (imp "storage_iter_next"      [.i64, .i64, .i64] [.i64], storageIterNextFn)
   , (imp "keccak512"        [.i64, .i64, .i64] [], keccak512Fn)
   , (imp "ripemd160"        [.i64, .i64, .i64] [], ripemd160Fn)
-  , (imp "ecrecover"        [.i64, .i64, .i64, .i64, .i64, .i64] [.i64], ecrecoverFn)
+  , (imp "ecrecover"        [.i64, .i64, .i64, .i64, .i64, .i64, .i64] [.i64], ecrecoverFn)
   , (imp "ed25519_verify"   [.i64, .i64, .i64, .i64, .i64, .i64] [.i64], ed25519VerifyFn)
+  , (imp "p256_verify"      [.i64, .i64, .i64, .i64, .i64, .i64] [.i64], p256VerifyFn)
   , (imp "random_seed"      [.i64] [], randomSeedFn)
   , (imp "alt_bn128_g1_multiexp" [.i64, .i64, .i64] [], altBn128G1MultiexpFn)
   , (imp "alt_bn128_g1_sum" [.i64, .i64, .i64] [], altBn128G1SumFn)
