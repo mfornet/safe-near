@@ -14,3 +14,4 @@ import NearCrypto.Shake
 import NearCrypto.MlDsa.Spec
 import NearCrypto.MlDsa.Impl
 import NearCrypto.Pairing.Spec
+import NearCrypto.Pairing.Impl
