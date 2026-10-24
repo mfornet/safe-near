@@ -1,5 +1,7 @@
 import NearCrypto
 import CryptoTests.Fixtures
+import CryptoTests.Rng
+import CryptoTests.DiffPairing
 
 /-!
 `crypto-differential`: the `Spec` of every primitive against its `Impl` on seeded random inputs
@@ -11,33 +13,7 @@ random keys and random signature bytes.
 
 open NearCrypto CryptoTests Ed25519
 
-/-- SplitMix64. -/
-structure Rng where
-  state : UInt64
-
 namespace Rng
-
-def next (r : Rng) : UInt64 × Rng :=
-  let s := r.state + 0x9e3779b97f4a7c15
-  let z := (s ^^^ (s >>> 30)) * 0xbf58476d1ce4e5b9
-  let z := (z ^^^ (z >>> 27)) * 0x94d049bb133111eb
-  (z ^^^ (z >>> 31), ⟨s⟩)
-
-/-- `n` random bytes. -/
-def bytes (r : Rng) (n : Nat) : ByteArray × Rng :=
-  Id.run do
-    let mut out := ByteArray.empty
-    let mut r := r
-    for _ in [0:n] do
-      let (x, r') := r.next
-      out := out.push x.toUInt8
-      r := r'
-    return (out, r)
-
-/-- A random number below `n`. -/
-def below (r : Rng) (n : Nat) : Nat × Rng :=
-  let (x, r) := r.next
-  (x.toNat % n, r)
 
 /-- A random number of `n` bytes. -/
 def nat (r : Rng) (n : Nat) : Nat × Rng :=
@@ -861,4 +837,6 @@ def main : IO UInt32 := do
   (t, r) := mldsaArithmeticTests t r
   (t, r) := mldsaRoundingTests t r
   (t, r) := mldsaTests t r
+  (t, r) := DiffPairing.tests DiffPairing.bn254Kit t r
+  (t, r) := DiffPairing.bnOpsTests t r
   finish "crypto-differential" t

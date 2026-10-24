@@ -3,11 +3,13 @@ import CryptoTests.Fixtures
 import CryptoTests.Secp256k1
 import CryptoTests.MlDsa
 import CryptoTests.Vrf
+import CryptoTests.Bn254
 
 /-!
-`crypto-conformance [FIXTURES_DIR]`: every hash vector and Ed25519 vector of the oracle
-(`tools/node-conformance`, `crypto-fixtures`) against both the `Spec` and the `Impl` of each
-primitive. A failure names the file, line and vector. The exit code is nonzero on any failure.
+`crypto-conformance [FIXTURES_DIR [NAME...]]`: every vector of the oracle (`tools/node-conformance`,
+`crypto-fixtures`) against both the `Spec` and the `Impl` of each primitive; with names (`hash`,
+`bn254`, ...) only those files. A failure names the file, line and vector. The exit code is nonzero
+on any failure.
 -/
 
 open Lean NearCrypto CryptoTests
@@ -135,12 +137,22 @@ def runFile (t : Tally) (path : System.FilePath) (check : Json → Except String
 
 def main (args : List String) : IO UInt32 := do
   let dir : System.FilePath := args.headD "fixtures"
+  let only := args.drop 1
+  let wanted (name : String) := only.isEmpty || only.contains name
   let mut t : Tally := {}
-  t ← runFile t (dir / "hash.jsonl") checkHash
-  t ← runFile t (dir / "shake.jsonl") checkShake
-  t ← runFile t (dir / "ed25519.jsonl") checkEd25519
-  t ← runFile t (dir / "secp256k1.jsonl") Secp.check
-  t ← runFile t (dir / "vrf.jsonl") Vrf.check
-  let mldsa ← readJsonLines (dir / "mldsa.jsonl")
-  t ← runFile t (dir / "mldsa.jsonl") (MlDsa.check (MlDsa.keysOf mldsa))
+  if wanted "hash" then
+    t ← runFile t (dir / "hash.jsonl") checkHash
+  if wanted "shake" then
+    t ← runFile t (dir / "shake.jsonl") checkShake
+  if wanted "ed25519" then
+    t ← runFile t (dir / "ed25519.jsonl") checkEd25519
+  if wanted "secp256k1" then
+    t ← runFile t (dir / "secp256k1.jsonl") Secp.check
+  if wanted "vrf" then
+    t ← runFile t (dir / "vrf.jsonl") Vrf.check
+  if wanted "mldsa" then
+    let mldsa ← readJsonLines (dir / "mldsa.jsonl")
+    t ← runFile t (dir / "mldsa.jsonl") (MlDsa.check (MlDsa.keysOf mldsa))
+  if wanted "bn254" then
+    t ← runFile t (dir / "bn254.jsonl") Bn.check
   finish "crypto-conformance" t
