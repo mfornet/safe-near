@@ -6,7 +6,7 @@ import NearNode.Primitives
 import NearCrypto
 
 /-!
-# Ed25519 and secp256k1 signatures in the fixtures
+# Ed25519, secp256k1 and ML-DSA-65 signatures in the fixtures
 
 The oracle signs with real ED25519 and SECP256K1 keys, but the Borsh fixtures do not carry the key of an
 approval, a block header, an endorsement and so on. `tools/node-conformance` therefore writes
@@ -22,6 +22,13 @@ make (`signers`, ED25519). Two checks verify them in Lean with `NearCrypto.ed255
   each covers are computed from the value (the transaction hash, the block hash, the chunk hash, the
   Borsh of an `inner`, ...) and must verify under the key of the transaction, of the recorded
   signature, or of one of the line's signers. A recorded message must equal the computed one.
+
+* **ML-DSA-65.** ML-DSA signing is randomised, so the oracle's ML-DSA \"signatures\" are seeded random bytes
+  (the Borsh codecs do not verify them) and none of them is valid. Each is recorded with its key, its
+  message and `valid`, the verdict of `near_crypto::Signature::verify` (`false`), and Lean must reach the
+  same verdict with `NearCrypto.mlDsa65Verify` (the recorded signatures found in the line's bytes, and the
+  typed ones under the key of the value or the record). Real ML-DSA signatures with verdicts are in
+  `near-lean/crypto/fixtures/mldsa.jsonl`.
 
 Lines without a record (the mutated ones, whose signatures are no longer valid) are not checked. A
 value built once and used in several lines (a chunk header in blocks) has its signatures recorded
@@ -44,6 +51,8 @@ structure Recorded where
   sig : ByteArray
   key : ByteArray
   msg : ByteArray
+  /-- The oracle's verdict (ML-DSA records only; the other signatures are all valid). -/
+  valid : Bool := true
 
 /-- What the oracle recorded for one line. -/
 structure Sidecar where
@@ -71,7 +80,8 @@ def loadSidecars (path : System.FilePath) : IO (List (String × Sidecar)) := do
         (← j.getObjValAs? (Array Json) "sigs").toList.mapM fun s => do
             pure
                 { sig := ← hexField s "sig", key := ← hexField s "public",
-                  msg := ← hexField s "msg" : Recorded }
+                  msg := ← hexField s "msg",
+                  valid := (s.getObjValAs? Bool "valid").toOption.getD true : Recorded }
       let signers ←
         (← j.getObjValAs? (Array String) "signers").toList.mapM fun s =>
             match ofHex s with
@@ -182,11 +192,13 @@ def signedRegistry : List (String × (ByteArray → Option (List Signed))) :=
 
 /-! ### Verification -/
 
-/-- What was checked on one line; `secp` counts the SECP256K1 checks among `recorded` and `typed`. -/
+/-- What was checked on one line; `secp` counts the SECP256K1 checks and `mldsa` the ML-DSA-65 ones among
+`recorded` and `typed`. -/
 structure Outcome where
   recorded : Nat := 0
   typed : Nat := 0
   secp : Nat := 0
+  mldsa : Nat := 0
   failures : List String := []
 
 /-- The per-line cache of verified `(signature, key, message)` triples. -/
@@ -197,10 +209,12 @@ private def tripleKey (sig pk msg : ByteArray) : String :=
   s!"{toHex sig}:{toHex pk}:{toHex msg}"
 
 /-- Verify under the scheme the lengths select: 32-byte key and 64-byte signature for ED25519,
-64 and 65 for SECP256K1. -/
+64 and 65 for SECP256K1, 1952 and 3309 for ML-DSA-65. -/
 def verifyAny (pk msg sig : ByteArray) : Bool :=
   if pk.size == 32 && sig.size == 64 then NearCrypto.ed25519Verify pk msg sig
-  else if pk.size == 64 && sig.size == 65 then NearCrypto.secp256k1Verify pk msg sig else false
+  else
+    if pk.size == 64 && sig.size == 65 then NearCrypto.secp256k1Verify pk msg sig
+    else if pk.size == 1952 && sig.size == 3309 then NearCrypto.mlDsa65Verify pk msg sig else false
 
 /-- Verify, remembering the triples that already passed (a block's header occurs in many lines). -/
 private def verifyCached (seen : IO.Ref Seen) (pk msg sig : ByteArray) : IO Bool := do
@@ -212,6 +226,15 @@ private def verifyCached (seen : IO.Ref Seen) (pk msg sig : ByteArray) : IO Bool
     seen.modify (·.insert k)
   return ok
 
+/-- The failure of an ML-DSA signature whose verdict is not the expected one, if any. A signature the
+oracle did not record is expected invalid (it is random bytes). -/
+private def mlDsaVerdict (pk : ByteArray) (message sig : ByteArray) (expected : Bool) :
+    Option String :=
+  let got := NearCrypto.mlDsa65Verify pk message sig
+  if got == expected then none
+  else
+    some s!"ML-DSA-65 signature {(toHex sig).take 12}: verifies {got}, the oracle says {expected}"
+
 /-- Check one accepted line against its record. -/
 def verifyLine (seen : IO.Ref Seen) (pool : Std.HashMap ByteArray Recorded)
     (extract : Option (ByteArray → Option (List Signed))) (borsh : ByteArray) (side : Sidecar) :
@@ -219,7 +242,15 @@ def verifyLine (seen : IO.Ref Seen) (pool : Std.HashMap ByteArray Recorded)
   let mut out : Outcome := {}
   for r in side.sigs do
     if containsBytes borsh r.sig then
-      if ← verifyCached seen r.key r.msg r.sig then
+      if r.sig.size == 3309 then
+        match mlDsaVerdict r.key r.msg r.sig r.valid with
+        | none =>
+          out :=
+            { out with
+              recorded := out.recorded + 1, mldsa := out.mldsa + 1 }
+        | some f =>
+          out := { out with failures := f :: out.failures }
+      else if ← verifyCached seen r.key r.msg r.sig then
         out :=
           { out with
             recorded := out.recorded + 1
@@ -234,6 +265,36 @@ def verifyLine (seen : IO.Ref Seen) (pool : Std.HashMap ByteArray Recorded)
       out := { out with failures := "the value did not decode" :: out.failures }
     | some signed =>
       for s in signed do
+        if let .mldsa65 sig := s.signature then
+          let known : Option Recorded :=
+            match side.sigs.find? (fun (r : Recorded) => r.sig == sig) with
+            | some r => some r
+            | none => pool[sig]?
+          let key :=
+            match s.key with
+            | some (.mldsa65 pk) => some pk
+            | _ => known.map fun (r : Recorded) => r.key
+          if let some pk := key then
+            let expected := (known.map fun (r : Recorded) => r.valid).getD false
+            match known with
+            | some r =>
+              if r.msg != s.message then
+                out :=
+                  { out with
+                    failures :=
+                      s!"ML-DSA-65 signature {(toHex sig).take 12}: the oracle signed {toHex r.msg}, the value computes {toHex s.message}" ::
+                        out.failures }
+                continue
+            | none =>
+              pure ()
+            match mlDsaVerdict pk s.message sig expected with
+            | none =>
+              out :=
+                { out with
+                  typed := out.typed + 1, mldsa := out.mldsa + 1 }
+            | some f =>
+              out := { out with failures := f :: out.failures }
+          continue
         let sig ←
           match s.signature with
           | .ed25519 sig =>

@@ -1,5 +1,6 @@
 //! A record of the ED25519 and SECP256K1 signatures the oracle makes (the signature as 64 or 65
-//! bytes, the key as 32 or 64), so that the Lean side can verify the real signatures in the Borsh
+//! bytes, the key as 32 or 64) and of the ML-DSA-65 "signatures" it draws (3309 random bytes with the
+//! 1952-byte key and the verdict of `near_crypto::Signature::verify`, which is `false`), so that the Lean side can verify the real signatures in the Borsh
 //! fixtures. The fixture files do not carry the signer's key, and the
 //! fixtures stay byte for byte what they were; `signatures.jsonl` is written beside them.
 //!
@@ -13,7 +14,7 @@ use near_crypto::{PublicKey, SecretKey, Signature};
 use std::sync::Mutex;
 
 pub enum Entry {
-    Sig { sig: Vec<u8>, public: Vec<u8>, msg: Vec<u8> },
+    Sig { sig: Vec<u8>, public: Vec<u8>, msg: Vec<u8>, valid: Option<bool> },
     Signer { public: [u8; 32] },
 }
 
@@ -28,12 +29,19 @@ fn hex(b: &[u8]) -> String {
 pub fn record(sig: &Signature, public: &PublicKey, msg: &[u8]) {
     let entry = match (sig, public) {
         (Signature::ED25519(s), PublicKey::ED25519(k)) => {
-            Entry::Sig { sig: s.to_bytes().to_vec(), public: k.0.to_vec(), msg: msg.to_vec() }
+            Entry::Sig { sig: s.to_bytes().to_vec(), public: k.0.to_vec(), msg: msg.to_vec(), valid: None }
         }
         (Signature::SECP256K1(s), PublicKey::SECP256K1(k)) => Entry::Sig {
             sig: <[u8; 65]>::from(s.clone()).to_vec(),
             public: k.as_ref().to_vec(),
             msg: msg.to_vec(),
+            valid: None,
+        },
+        (Signature::MLDSA65(s), PublicKey::MLDSA65(k)) => Entry::Sig {
+            sig: s.0.to_vec(),
+            public: k.0.to_vec(),
+            msg: msg.to_vec(),
+            valid: Some(sig.verify(msg, public)),
         },
         _ => return,
     };
@@ -67,8 +75,13 @@ pub fn attach(ty: &str, index: usize, name: &str) {
     let mut signers: Vec<String> = vec![];
     for e in entries {
         match e {
-            Entry::Sig { sig, public, msg } => sigs.push(serde_json::json!({
-                "sig": hex(&sig), "public": hex(&public), "msg": hex(&msg) })),
+            Entry::Sig { sig, public, msg, valid } => {
+                let mut v = serde_json::json!({ "sig": hex(&sig), "public": hex(&public), "msg": hex(&msg) });
+                if let Some(valid) = valid {
+                    v["valid"] = serde_json::json!(valid);
+                }
+                sigs.push(v)
+            }
             Entry::Signer { public } => {
                 let h = hex(&public);
                 if !signers.contains(&h) {

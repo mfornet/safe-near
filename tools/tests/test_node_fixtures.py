@@ -52,7 +52,7 @@ class NodeFixtureTests(unittest.TestCase):
 
 class SignatureRecordTests(unittest.TestCase):
     """`signatures.jsonl` records the keys of the oracle's ED25519 and SECP256K1 signatures per
-    fixture line."""
+    fixture line, and the ML-DSA-65 random bytes with the oracle's verdict."""
 
     @classmethod
     def setUpClass(cls):
@@ -81,10 +81,15 @@ class SignatureRecordTests(unittest.TestCase):
         for record in self.records:
             where = f"{record['type']}#{record['line']}"
             for signature in record["sigs"]:
-                self.assertEqual(set(signature), {"sig", "public", "msg"}, where)
+                self.assertEqual(set(signature) - {"valid"}, {"sig", "public", "msg"}, where)
                 self.assertRegex(signature["sig"], HEX, where)
-                # ED25519: a 64-byte signature and a 32-byte key; SECP256K1: 65 and 64 bytes
-                self.assertIn((len(signature["sig"]), len(signature["public"])), {(128, 64), (130, 128)}, where)
+                # ED25519: a 64-byte signature and a 32-byte key; SECP256K1: 65 and 64 bytes;
+                # ML-DSA-65 (random bytes, with the verdict `false` of near-crypto): 3309 and 1952
+                self.assertIn((len(signature["sig"]), len(signature["public"])),
+                              {(128, 64), (130, 128), (6618, 3904)}, where)
+                self.assertEqual("valid" in signature, len(signature["sig"]) == 6618, where)
+                if "valid" in signature:
+                    self.assertIs(signature["valid"], False, where)
                 self.assertRegex(signature["public"], HEX, where)
                 self.assertRegex(signature["msg"], HEX, where)
             for signer in record["signers"]:
@@ -111,6 +116,10 @@ class SignatureRecordTests(unittest.TestCase):
                          "PartialEncodedStateWitness", "SignedDelegateAction", "SpiceChunkEndorsement"]:
             self.assertIn(required, signed)
         self.assertLess(SIGNATURES.stat().st_size, 5 * 1024 * 1024)
+
+    def test_ml_dsa_signatures_are_recorded_invalid(self):
+        recorded = [s for r in self.records for s in r["sigs"] if len(s["sig"]) == 6618]
+        self.assertGreater(len(recorded), 5)
 
 
 if __name__ == "__main__":

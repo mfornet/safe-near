@@ -174,7 +174,9 @@ impl G {
             KeyType::MLDSA65 => {
                 let mut b = vec![0u8; 3309];
                 self.0.fill_bytes(&mut b);
-                Signature::from_parts(KeyType::MLDSA65, &b).unwrap()
+                let sig = Signature::from_parts(KeyType::MLDSA65, &b).unwrap();
+                crate::sigs::record(&sig, &sk.public_key(), msg);
+                sig
             }
             _ => {
                 let sig = sk.sign(msg);

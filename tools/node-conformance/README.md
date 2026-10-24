@@ -110,7 +110,8 @@ named value, classified by the crates. Values are the hand-written edge cases (e
 variant at least once, empty and large vectors, `u128::MAX`, every key type, nested
 delegate actions, every receipt kind) and seeded random ones. ED25519 and SECP256K1
 signatures are real. ML-DSA-65 signing is randomised, so those signatures are seeded random
-bytes of the right length; Borsh does not verify them.
+bytes of the right length (none is valid; `signatures.jsonl` records the verdict `false`); Borsh does not
+verify them.
 
 `just node-conformance-types` decodes every line with the Lean `Impl` and `Spec` Borsh codecs,
 re-encodes with both, and compares with the fixture and with the derived hashes.
@@ -140,7 +141,10 @@ once and reused in several lines is recorded with the first line only.
 found in a line's bytes, and, for the signed types, the signatures recomputed from the decoded value
 (transaction and delegate hashes, block and chunk hashes, the Borsh of an `inner`), with the key from
 the value or the record. ED25519 and SECP256K1 signatures are checked (the records hold 64-byte
-signatures with 32-byte keys, and 65-byte ones with 64-byte keys); ML-DSA signatures are not.
+signatures with 32-byte keys, and 65-byte ones with 64-byte keys). The ML-DSA-65 "signatures" are random
+bytes (see above) and are recorded too, with a 1952-byte key and `valid`, the verdict of
+`Signature::verify`, which is `false`; Lean must reach the same verdict. Real ML-DSA signatures are in the
+crypto fixtures (`mldsa.jsonl`).
 
 ## Crypto oracle (M2)
 
@@ -148,7 +152,8 @@ signatures with 32-byte keys, and 65-byte ones with 64-byte keys); ML-DSA signat
 locked crates, plus the ones nearcore's VM and `near-crypto` use directly: `sha2` 0.10.9,
 `sha3` 0.10.9 (`Keccak256`, `Keccak512`, the legacy padding), `ripemd` 0.1.3, `blake2` 0.10.6,
 `ed25519-dalek` 2.2.0, `curve25519-dalek` 4.1.3 and `secp256k1` 0.27.0 (with the feature set
-`near-crypto` builds; its `libsecp256k1` is the C code of `secp256k1-sys` 0.8.2).
+`near-crypto` builds; its `libsecp256k1` is the C code of `secp256k1-sys` 0.8.2), and for ML-DSA-65
+`aws-lc-rs` 1.16.2 (`aws-lc-sys` 0.39.1), which `near-crypto`'s `MLDSA65` key type calls.
 
 ```sh
 cd tools/node-conformance
@@ -209,6 +214,33 @@ all of it in Lean; CI never builds this crate.
   (`convert_public_key` of 32-byte strings), `compute` (`compute_vrf_with_proof`), `vrf-public` and
   `vrf-secret` (decoding of keys), `verify` (`is_vrf_valid`) and `block` (a nearcore
   `ValidatorSigner`'s VRF over a previous random value, and its SHA-256).
+
+- `shake.jsonl` (`src/crypto_mldsa.rs`): `{"kind": "shake", "alg", "name", "msg", "outLen", "digest"}` for
+  SHAKE128 and SHAKE256 of `sha3` 0.10.9: messages of 0 to 4096 bytes around the rates (168 and 136) and
+  outputs from 1 byte to 5000, every output length around the first blocks, and one million `a`.
+- `mldsa.jsonl` (`src/crypto_mldsa.rs`), by `kind`. `near-crypto` 0.37.4 `MLDSA65` is `aws-lc-rs`: keys are
+  `PqdsaKeyPair::from_seed` (the 32-byte FIPS 204 seed, `ml_dsa_65_from_seed` is private so the oracle makes the
+  same two calls) and `from_raw_private_key` (`SecretKey::from_str`, `SecretKey::sign`), a signature is
+  `PqdsaKeyPair::sign` (`EVP_DigestSign`, pure mode, empty context, 32 fresh random bytes), and
+  `Signature::verify` is `UnparsedPublicKey::new(&ML_DSA_65, pk).verify` (empty context). Signing is never
+  reproducible, so the oracle calls the C function under it with the randomness chosen
+  (`ml_dsa_65_sign_internal`, declared by hand because `aws-lc-sys` does not bind it; the symbol name carries
+  the crate version) and checks with `near-crypto` that each signature verifies. Verdicts are those of
+  `near_crypto::Signature::verify` for 1952-byte keys and 3309-byte signatures, and of `aws-lc-rs` for other
+  lengths (asserted equal where both apply).
+  - `keygen`: `name`, `seed`, `public` (1952 bytes), `secret` (4032 bytes, `ρ ‖ K ‖ tr ‖ s1 ‖ s2 ‖ t0`).
+  - `secret`: `secret`, `valid`, and `public` when valid: what `from_raw_private_key` accepts: the keys
+    above, a flipped bit in `K` (accepted), `ρ`, `tr` or `t0`, nibbles 9 and 15 in `s1` and `s2` (out of the
+    range `[-4, 4]`), an in-range change of one coefficient, other lengths.
+  - `sign`: `key` (a `keygen` name), `msg` (or `unit` and `count`), `rnd` (all-zero for the deterministic
+    variant), `sig`; includes signatures with the most hints found by search.
+  - `verify`: `key` or a literal `public`, `msg`, `sig`, `valid`: per base signature a changed message
+    (flipped, extended, truncated), another key, bit flips in `c~`, `z` and the hint, `z` coefficients at
+    and next to the bound `γ1 - β`; malformed hints on a real prefix (unsorted, duplicate, decreasing or
+    over-large counts, nonzero padding, a full hint of 55 indices); other lengths of signature and key;
+    garbage signatures; and the other modes of FIPS 204 (non-empty contexts of 1, 3 and 255 bytes, no
+    domain prefix, HashML-DSA with SHA-256, ExternalMu) that `near-crypto` must reject, with one that it
+    accepts (ExternalMu of the pure `μ`).
 
 `crypto-bench` times the same primitives natively (release mode, `std::time`, at least 0.3 s each)
 and prints one JSON line per benchmark; the names match `node-bench`:

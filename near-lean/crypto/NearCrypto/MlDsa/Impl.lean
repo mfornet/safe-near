@@ -539,3 +539,24 @@ def verify (pk msg sig : ByteArray) : Bool :=
   verifyInternal pk (pure' msg) sig
 
 end NearCrypto.MlDsa.Impl
+
+namespace NearCrypto
+
+/-- `near-crypto`'s ML-DSA-65 `Signature::verify`: a 1952-byte key, a 3309-byte signature, pure mode
+with an empty context. -/
+def mlDsa65Verify (pk msg sig : ByteArray) : Bool :=
+  MlDsa.Impl.verify pk msg sig
+
+/-- The public and the 4032-byte secret key of the 32-byte seed (`near-crypto`'s `ml_dsa_65_from_seed`). -/
+def mlDsa65KeyGen (seed : ByteArray) : Option (ByteArray × ByteArray) :=
+  if seed.size == 32 then some (MlDsa.Impl.keyGen seed) else none
+
+/-- The public key of a 4032-byte secret key, `none` for a key `near-crypto` refuses (`SecretKey::from_str`). -/
+def mlDsa65PublicKey (sk : ByteArray) : Option ByteArray :=
+  MlDsa.Impl.publicKeyOfSecret sk
+
+/-- A signature of `msg` given 32 bytes of randomness (`near-crypto` draws them at random). -/
+def mlDsa65Sign (sk msg rnd : ByteArray) : Option ByteArray :=
+  if rnd.size == 32 then MlDsa.Impl.sign sk msg rnd else none
+
+end NearCrypto
