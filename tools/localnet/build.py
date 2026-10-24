@@ -58,7 +58,7 @@ def neard_environment(outdir: Path) -> dict:
     import resource
     environment = dict(os.environ)
     if resource.getrlimit(resource.RLIMIT_NOFILE)[1] < 65535:
-        environment["LD_PRELOAD"] = str(outdir / "nofile_shim.so")
+        environment["LD_PRELOAD"] = str(outdir / "sandbox_shim.so")
     return environment
 
 
@@ -146,11 +146,11 @@ def build(source: Path, revision: str, outdir: Path, with_adapters: bool, jobs: 
             raise ValueError("nearcore checkout changed during the build")
         contracts = outdir / "contracts"
         evidence["contracts"] = publish_contracts(source, contracts)
-        shim = outdir / "nofile_shim.so"
-        subprocess.run(["gcc", "-shared", "-fPIC", "-O2", "-o", str(shim), str(HERE / "nofile_shim.c"), "-ldl"], check=True)
+        shim = outdir / "sandbox_shim.so"
+        subprocess.run(["gcc", "-shared", "-fPIC", "-O2", "-o", str(shim), str(HERE / "sandbox_shim.c"), "-ldl"], check=True)
         evidence["neardVersion"] = subprocess.check_output([str(outdir / "neard"), "--version"], text=True,
                                                            env=neard_environment(outdir)).strip()
-        evidence["nofileShimSha256"] = prepare.digest((HERE / "nofile_shim.c").read_bytes())
+        evidence["sandboxShimSha256"] = prepare.digest((HERE / "sandbox_shim.c").read_bytes())
         prepare.atomic_write(outdir / "build.json", (json.dumps(evidence, indent=2) + "\n").encode())
         return evidence
 

@@ -121,7 +121,7 @@ fn main() -> Result<()> {
     let mut exported = 0usize;
     for height in args.from..=args.to {
         let Ok(block_hash) = chain_store.get_block_hash_by_height(height) else { continue };
-        let block = chain_store.get_block(&block_hash)?;
+        let block = chain_store.get_block(&block_hash).with_context(|| format!("block at height {height}"))?;
         if block.header().is_genesis() {
             continue;
         }
@@ -166,7 +166,7 @@ fn export_chunk(
     let height = block.header().height();
     let block_hash = *block.header().hash();
     let prev_hash = *block.header().prev_hash();
-    let prev_block = chain_store.get_block(&prev_hash)?;
+    let prev_block = chain_store.get_block(&prev_hash).with_context(|| format!("previous block {prev_hash}"))?;
     let epoch_id = *block.header().epoch_id();
     let shard_uid = shard_id_to_uid(epoch_manager, shard_id, &epoch_id)?;
     let shard_index = shard_id_to_index(epoch_manager, shard_id, &epoch_id)?;
@@ -288,8 +288,9 @@ fn export_chunk(
         let recorded: ExecutionOutcomeWithProof = store
             .get_ser(DBCol::TransactionResultForBlock, &get_outcome_id_block_hash(id, &block_hash))
             .with_context(|| format!("missing recorded outcome {id}"))?;
-        if *id != applied.id || recorded.outcome != applied.outcome {
-            bail!("recorded outcome {id} differs from the re-applied outcome");
+        // `compute_usage` is not part of the Borsh encoding, so the database does not have it.
+        if *id != applied.id || borsh_bytes(&recorded.outcome)? != borsh_bytes(&applied.outcome)? {
+            bail!("recorded outcome {id} differs from the re-applied outcome: {:?} vs {:?}", recorded.outcome, applied.outcome);
         }
         let with_id = near_primitives::transaction::ExecutionOutcomeWithId { id: *id, outcome: recorded.outcome.clone() };
         let view = ExecutionOutcomeView::from(recorded.outcome.clone());
@@ -297,7 +298,7 @@ fn export_chunk(
             "id": hash_hex(id),
             "borsh": hex(&borsh_bytes(&with_id)?),
             "view": serde_json::to_value(&view)?,
-            "computeUsage": recorded.outcome.compute_usage,
+            "computeUsage": applied.outcome.compute_usage,
         }));
     }
     let recorded_outgoing = chain_store.get_outgoing_receipts(&block_hash, shard_id)?;

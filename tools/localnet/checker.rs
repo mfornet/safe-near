@@ -16,6 +16,9 @@ use near_primitives::receipt::Receipt;
 use near_primitives::shard_layout::{ShardLayout, ShardUId};
 use near_primitives::transaction::SignedTransaction;
 use near_primitives::types::{AccountId, Balance, EpochId, EpochInfoProvider, Gas, ShardId};
+use near_primitives::state_record::StateRecord;
+use near_primitives::trie_key::trie_key_parsers::parse_account_id_from_raw_key;
+use near_primitives::trie_key::{TrieKey, col};
 use near_primitives::views::ExecutionOutcomeView;
 use near_store::test_utils::TestTriesBuilder;
 use near_store::trie::AccessOptions;
@@ -264,7 +267,7 @@ fn apply_bundle(bundle: &Value) -> Result<Value> {
             }))
         })
         .collect::<Result<_>>()?;
-    let hashes: Vec<CryptoHash> = result.outcomes.iter().flat_map(|o| o.to_hashes()).collect();
+    let hashes: Vec<Vec<CryptoHash>> = result.outcomes.iter().map(|o| o.to_hashes()).collect();
     let (outcome_root, _) = near_primitives::merkle::merklize(&hashes);
     let total_gas: u64 = result.outcomes.iter().map(|o| o.outcome.gas_burnt.as_gas()).sum();
     let stats = &result.stats.balance;
@@ -296,9 +299,65 @@ fn apply_bundle(bundle: &Value) -> Result<Value> {
     }))
 }
 
+/// Readable projection of raw trie entries through the pinned decoders.  Columns that
+/// upstream's `StateRecord` does not know are marked opaque; the raw bytes stay authoritative.
+fn decode_entries(rows: &Value) -> Result<Value> {
+    let mut records = Vec::new();
+    for row in rows.as_array().ok_or("entries")? {
+        let key = unhex(&row[0])?;
+        let value = unhex(&row[1])?;
+        let first = key.first().copied();
+        if matches!(first, Some(col::PENDING_DATA_COUNT | col::POSTPONED_RECEIPT_ID)) {
+            let receiver_id = parse_account_id_from_raw_key(&key)?.ok_or("missing queue receiver")?;
+            let identifier: CryptoHash = borsh::from_slice(&key[key.len() - 32..])?;
+            let (typed, record) = if first == Some(col::PENDING_DATA_COUNT) {
+                let count: u32 = borsh::from_slice(&value)?;
+                (TrieKey::PendingDataCount { receiver_id: receiver_id.clone(), receipt_id: identifier },
+                 json!({"PendingDataCount": {"account_id": receiver_id, "receipt_id": identifier, "count": count}}))
+            } else {
+                let receipt_id: CryptoHash = borsh::from_slice(&value)?;
+                (TrieKey::PostponedReceiptId { receiver_id: receiver_id.clone(), data_id: identifier },
+                 json!({"PostponedReceiptId": {"account_id": receiver_id, "data_id": identifier, "receipt_id": receipt_id}}))
+            };
+            if typed.to_vec() != key {
+                return Err("noncanonical queue key".into());
+            }
+            records.push(json!({"key": hex(&key), "record": record}));
+            continue;
+        }
+        if !matches!(first, Some(col::ACCOUNT | col::CONTRACT_DATA | col::CONTRACT_CODE | col::ACCESS_KEY
+            | col::RECEIVED_DATA | col::POSTPONED_RECEIPT | col::DELAYED_RECEIPT_OR_INDICES)) {
+            records.push(json!({"key": hex(&key), "opaque": true}));
+            continue;
+        }
+        match StateRecord::from_raw_key_value_impl(&key, value.clone()) {
+            Ok(Some(record)) => {
+                let mut out = json!({"key": hex(&key), "record": record});
+                if let StateRecord::DelayedReceipt(receipt) = &record {
+                    out["queueIndex"] = json!(receipt.index);
+                }
+                records.push(out);
+            }
+            Ok(None) => records.push(json!({"key": hex(&key), "opaque": true})),
+            Err(error) => records.push(json!({"key": hex(&key), "decodeError": error.to_string()})),
+        }
+    }
+    Ok(Value::Array(records))
+}
+
 fn main() -> Result<()> {
-    let path = std::env::args().nth(1).ok_or("usage: safe-near-corpus-check BUNDLE.json")?;
-    let bundle: Value = serde_json::from_slice(&std::fs::read(path)?)?;
+    let mut arguments = std::env::args().skip(1);
+    let first = arguments.next().ok_or("usage: safe-near-corpus-check [--decode] BUNDLE.json")?;
+    if first == "--decode" {
+        let path = arguments.next().ok_or("missing bundle")?;
+        let bundle: Value = serde_json::from_slice(&std::fs::read(path)?)?;
+        let pre = decode_entries(&bundle["preState"]["entries"])?;
+        let diff: Vec<Value> = bundle["expected"]["stateDiff"].as_array().ok_or("stateDiff")?.iter()
+            .filter(|row| !row[1].is_null()).cloned().collect();
+        println!("{}", serde_json::to_string(&json!({"preState": pre, "postChanged": decode_entries(&Value::Array(diff))?}))?);
+        return Ok(());
+    }
+    let bundle: Value = serde_json::from_slice(&std::fs::read(first)?)?;
     let actual = apply_bundle(&bundle)?;
     println!("{}", serde_json::to_string(&actual)?);
     Ok(())
