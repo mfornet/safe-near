@@ -1,0 +1,4 @@
+.nearcore/
+target/
+data/
+__pycache__/
