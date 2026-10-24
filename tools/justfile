@@ -31,7 +31,7 @@ crypto-tests: crypto-build
 
 # Build the NEAR node (notes/design/NEAR_NODE.md) and its executables.
 node-build:
-    cd near-lean/node && lake build NearNode near-lean-node node-bench node-conformance-types node-trie-tests node-store-tests node-state-roots --wfail
+    cd near-lean/node && lake build NearNode near-lean-node node-bench node-conformance-types node-trie-tests node-store-tests node-state-roots node-chain-validate --wfail
 
 # M1: the Borsh codecs of every near-primitives type against the committed nearcore oracle fixtures.
 [positional-arguments]
@@ -50,6 +50,18 @@ node-trie-tests *options: node-build
 node-state-roots *options: node-build
     cd near-lean/chain && lake build registered-replay --wfail
     python3 tools/localnet/state_roots.py "$@"
+
+# M5a: the block corpus (every block of both localnets, plus invalid variants with nearcore's own verdict) through
+# the Lean header and block validator; exits 0 only when every block and variant agrees with nearcore.
+chain-validate-corpus: node-build
+    python3 tools/localnet/chain_validate.py
+
+# M5a: rebuild the block corpus from the localnet databases (needs `python3 tools/localnet/build.py --only
+# safe-near-chain-export` and the databases of `just corpus-generate`).
+[positional-arguments]
+chain-corpus-generate *options:
+    python3 tools/localnet/chain_corpus.py export "$@"
+    python3 tools/localnet/chain_corpus.py pack
 
 # M4: the persistent store: unit tests, then a restart and kill-in-the-middle test on the corpus tries.
 node-store-tests: node-build
