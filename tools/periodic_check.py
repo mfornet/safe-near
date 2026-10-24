@@ -65,6 +65,13 @@ def validation_steps(root: Path, nearcore: Path) -> list[Step]:
         "staking-key-replay", "trie-replay", "--wfail")
     add("chain-build", "near-lean/chain", "lake", "build", "NearChain", "chain-tests", "chain-replay",
         "registered-replay", "state-encode", "receipt-encode", "transaction-replay", "receipt-replay", "--wfail")
+    add("crypto-build", "near-lean/crypto", "lake", "build", "NearCrypto", "crypto-conformance",
+        "crypto-differential", "--wfail")
+    add("node-build", "near-lean/node", "lake", "build", "NearNode", "near-lean-node", "node-bench",
+        "node-conformance-types", "--wfail")
+    add("crypto-conformance", "near-lean/crypto", "./.lake/build/bin/crypto-conformance", "fixtures")
+    add("crypto-differential", "near-lean/crypto", "./.lake/build/bin/crypto-differential")
+    add("node-conformance-types", "near-lean/node", "./.lake/build/bin/node-conformance-types", "fixtures/types")
     # Contracts with a ContractModel instance: the adapter executable compares the
     # binary with the model; `refines_<name>` in Proofs.Refinement is the open proof.
     adapter_contracts = [("w-near", "wnear")]
@@ -100,10 +107,13 @@ def validation_steps(root: Path, nearcore: Path) -> list[Step]:
     python("formatter-regressions", "tools/tests/check_lean_format.py")
     python("vm-dependencies", "tools/check_vm_dependencies.py", "--no-build")
     python("dependency-regressions", "tools/tests/check_vm_dependencies.py")
+    python("node-isolation", "tools/check_node_isolation.py")
+    python("verification-buildtime", "tools/verification_buildtime.py")
     python("audit-regressions", "tools/tests/check_axiom_audit.py")
     for package, report in [("near-lean/wasm", "wasm"), ("near-lean/wasm-logic", "wasm-logic"),
                             ("near-lean/interface", "interface"), ("near-lean/vm", "vm"),
-                            ("near-lean/runtime", "runtime"), ("near-lean/chain", "chain")]:
+                            ("near-lean/runtime", "runtime"), ("near-lean/chain", "chain"),
+                            ("near-lean/crypto", "crypto")]:
         python(f"audit-{report}", "tools/axiom-audit.py", package, "--no-build", "--report", f"audit/{report}.json")
     for contract, report in adapter_contracts:
         python(f"audit-{report}", "tools/axiom-audit.py", f"contracts/{contract}/verification", "--no-build",

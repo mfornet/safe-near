@@ -1,0 +1,35 @@
+{
+ "applyReason": "UpdateTrackedShard",
+ "bandwidthRequests": "0100000000000000000000000000000000",
+ "blockHeight": 251,
+ "blockTimestamp": 1792817765470080932,
+ "congestionInfo": [
+  [
+   0,
+   "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+   0
+  ]
+ ],
+ "currentProtocolVersion": 86,
+ "epochHeight": 8,
+ "epochId": "eb0dd6aef4fed77d43d80d51886674eaecc8409c92b2f3fb1537c5afd5cd79ee",
+ "epochInfo": {
+  "chainId": "safe-near-localnet-1s",
+  "minimumStake": "800129708025533012910361444",
+  "totalStake": "50000078369059624673421886313738",
+  "validators": [
+   [
+    "node0",
+    "50000078369059624673421886313738"
+   ]
+  ]
+ },
+ "gasLimit": 1000000000000000,
+ "gasPrice": "100000000",
+ "isNewChunk": true,
+ "prevBlockHash": "413bbcb65a499b5871fa3ddfa12e9a3a40308d97d9568a750e2a67c8d5d23bdb",
+ "proofSizeSoftLimit": 4000000,
+ "randomSeed": "fa32e449e90bca306c1dacf1379162958f90c6126e0e53bda311495c963ed3cd",
+ "shardLayout": "020000000001000000000000000000000001000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000",
+ "validatorAccountsUpdate": null
+}
