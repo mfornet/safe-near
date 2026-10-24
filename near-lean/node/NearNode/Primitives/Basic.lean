@@ -1,5 +1,5 @@
 import NearNode.Borsh
-import NearRuntime.Sha256
+import NearCrypto.Sha256
 
 /-!
 # Scalars, hashes, account ids and keys
@@ -56,7 +56,7 @@ def zero : CryptoHash :=
 
 /-- SHA-256 of `data`. -/
 def hash (data : ByteArray) : CryptoHash :=
-  ⟨ByteArray.mk (Near.Sha256.hash data.toList).toArray⟩
+  ⟨NearCrypto.sha256 data⟩
 
 /-- Hash of the Borsh encoding of `a`. -/
 def hashBorsh [Codec α] (a : α) : CryptoHash :=

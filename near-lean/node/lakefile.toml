@@ -12,6 +12,10 @@ packagesDir = "../.lake/packages"
 name = "NearChain"
 path = "../chain"
 
+[[require]]
+name = "NearCrypto"
+path = "../crypto"
+
 [[lean_lib]]
 name = "NearNode"
 
