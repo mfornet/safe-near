@@ -592,6 +592,78 @@ def vrfTests (t : Tally) (r : Rng) : Tally × Rng :=
           (Vrf.Impl.convertPublicKey other == Vrf.Spec.convertPublicKey other)
     return (t, r)
 
+/-- A field element with arbitrary limbs up to the largest limbs `Fp.carry` can leave (`REDUCED` in `scripts/gen_point_ops.py`), biased towards
+the extremes (zero, one, the maximum), as no arithmetic path should produce a wrong value there. -/
+def secpExtremeFp (r : Rng) : Secp256k1.Fp × Rng :=
+  Id.run do
+    let mut r := r
+    let mut limbs : Array UInt64 := #[]
+    let maxima : Array UInt64 :=
+      #[0x3ffffff, 0x3ffffff, 0x4100000, 0x3ffffff, 0x3ffffff, 0x3ffffff, 0x3ffffff, 0x3ffffff,
+        0x3ffffff, 0x3fffff]
+    for i in [0:10] do
+      let (x, r') := r.next
+      r := r'
+      let m := maxima[i]!
+      let v :=
+        match (x >>> 60).toNat % 4 with
+        | 0 => 0
+        | 1 => m
+        | 2 => 1
+        | _ => (x &&& 0xfffffffffff) % (m + 1)
+      limbs := limbs.push v
+    return (⟨limbs[0]!, limbs[1]!, limbs[2]!, limbs[3]!, limbs[4]!, limbs[5]!, limbs[6]!, limbs[7]!,
+          limbs[8]!, limbs[9]!⟩,
+        r)
+
+/-- The field operations on elements with extreme limbs agree with `Nat`. -/
+def secpExtremeFieldTests (t : Tally) (r : Rng) : Tally × Rng :=
+  Id.run do
+    let mut t := t
+    let mut r := r
+    let p := Secp256k1.p
+    for i in [0:1500] do
+      let (a, r') := secpExtremeFp r
+      let (b, r') := secpExtremeFp r'
+      r := r'
+      let (x, y) := (a.value, b.value)
+      t := check t s!"secp extreme mul {i}" ((Secp256k1.Fp.mul a b).toNat == x * y % p)
+      t := check t s!"secp extreme sq {i}" ((Secp256k1.Fp.sq a).toNat == x * x % p)
+      t := check t s!"secp extreme add {i}" ((Secp256k1.Fp.add a b).toNat == (x + y) % p)
+      t := check t s!"secp extreme sub {i}" ((Secp256k1.Fp.sub a b).toNat == (x + p - y % p) % p)
+      t :=
+        check t s!"secp extreme mulInt {i}" ((Secp256k1.Fp.mulInt a 15632).toNat == x * 15632 % p)
+      t := check t s!"secp extreme isZero {i}" (a.isZero == (x % p == 0))
+      t := check t s!"secp extreme eq {i}" (Secp256k1.Fp.eq a b == (x % p == y % p))
+      t :=
+        check t s!"secp extreme chain {i}"
+          ((Secp256k1.Fp.mul (Secp256k1.Fp.add (Secp256k1.Fp.mul a b) a)
+                (Secp256k1.Fp.sub a (Secp256k1.Fp.sq b))).toNat ==
+            (((x * y + x) % p) * ((x + p - y * y % p) % p)) % p)
+    return (t, r)
+
+def secpFormulaTests (t : Tally) (r : Rng) : Tally × Rng :=
+  Id.run do
+    let mut t := t
+    let mut r := r
+    let same (a b : Secp256k1.Jac) : Bool :=
+      a.x.toNat == b.x.toNat && a.y.toNat == b.y.toNat && a.z.toNat == b.z.toNat && a.inf == b.inf
+    for i in [0:1500] do
+      let (x1, r') := secpExtremeFp r
+      let (y1, r') := secpExtremeFp r'
+      let (z1, r') := secpExtremeFp r'
+      let (x2, r') := secpExtremeFp r'
+      let (y2, r') := secpExtremeFp r'
+      let (z2, r') := secpExtremeFp r'
+      r := r'
+      let P : Secp256k1.Jac := ⟨x1, y1, z1, false⟩
+      let Q : Secp256k1.Jac := ⟨x2, y2, z2, false⟩
+      t := check t s!"secp dbl lazy {i}" (same P.dbl P.dblSimple)
+      t := check t s!"secp add lazy {i}" (same (P.add Q) (P.addSimple Q))
+      let A : Secp256k1.Aff := ⟨x2, y2⟩
+      t := check t s!"secp addAff lazy {i}" (same (P.addAff A) (P.addAffSimple A))
+    return (t, r)
+
 def main : IO UInt32 := do
   let mut t : Tally := {}
   let mut r : Rng := ⟨0x4e45415243525950⟩
@@ -607,6 +679,8 @@ def main : IO UInt32 := do
   (t, r) := secpScalarTests t r
   (t, r) := secpPointTests t r
   (t, r) := secpKeyTests t r
+  (t, r) := secpExtremeFieldTests t r
+  (t, r) := secpFormulaTests t r
   (t, r) := ristrettoTests t r
   (t, r) := vrfTests t r
   finish "crypto-differential" t

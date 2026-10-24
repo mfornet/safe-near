@@ -32,6 +32,10 @@ class GeneratedSourceTests(unittest.TestCase):
         committed = (CRYPTO / "NearCrypto/Blake2bRounds.lean").read_text()
         self.assertEqual(tokens(generated("gen_blake2b.py")), tokens(committed))
 
+    def test_point_ops_are_up_to_date(self):
+        committed = (CRYPTO / "NearCrypto/Secp256k1/PointOps.lean").read_text()
+        self.assertEqual(tokens(generated("gen_point_ops.py")), tokens(committed))
+
     def test_mod_inv_is_up_to_date(self):
         committed = (CRYPTO / "NearCrypto/ModInv.lean").read_text()
         self.assertEqual(tokens(generated("gen_modinv.py")), tokens(committed))

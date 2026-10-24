@@ -1,4 +1,4 @@
-import NearCrypto.Secp256k1.FpMul
+import NearCrypto.Secp256k1.PointOps
 import NearCrypto.Wnaf
 
 /-!
@@ -14,104 +14,33 @@ tables for the base point and its image) share 129 doublings.
 
 namespace NearCrypto.Secp256k1
 
-namespace Fp
-
-/-- `a ^ (2 ^ k)`. -/
-def pow2k (a : Fp) : Nat → Fp
-  | 0 => a
-  | k + 1 => pow2k (sq a) k
-
-/-- `(a ^ 3, a ^ (2 ^ 22 - 1), a ^ (2 ^ 223 - 1), a ^ (2 ^ 2 - 1))`, the blocks of ones in
-`p - 2` and `(p + 1) / 4`. -/
-def blocks (a : Fp) : Fp × Fp × Fp × Fp :=
-  let x2 := mul (sq a) a
-  let x3 := mul (sq x2) a
-  let x6 := mul (pow2k x3 3) x3
-  let x9 := mul (pow2k x6 3) x3
-  let x11 := mul (pow2k x9 2) x2
-  let x22 := mul (pow2k x11 11) x11
-  let x44 := mul (pow2k x22 22) x22
-  let x88 := mul (pow2k x44 44) x44
-  let x176 := mul (pow2k x88 88) x88
-  let x220 := mul (pow2k x176 44) x44
-  let x223 := mul (pow2k x220 3) x3
-  (x3, x22, x223, x2)
-
-/-- `a ^ (p - 2)`, the inverse (zero for zero). -/
-def inv (a : Fp) : Fp :=
-  let (_, x22, x223, x2) := blocks a
-  let t := mul (pow2k x223 23) x22
-  let t := mul (pow2k t 5) a
-  let t := mul (pow2k t 3) x2
-  mul (pow2k t 2) a
-
-/-- `a ^ ((p + 1) / 4)`: a square root of `a` when `a` is a square. -/
-def sqrtCandidate (a : Fp) : Fp :=
-  let (_, x22, x223, x2) := blocks a
-  let t := mul (pow2k x223 23) x22
-  let t := mul (pow2k t 6) x2
-  pow2k t 2
-
-/-- A square root of `a` when there is one. -/
-def sqrt (a : Fp) : Option Fp :=
-  let r := sqrtCandidate a
-  if eq (sq r) a then some r else none
-
-/-- `x³ + 7`. -/
-def curveRhs (x : Fp) : Fp :=
-  add (mul (sq x) x) (ofNat 7)
-
-end Fp
-
 open Fp
-
-/-- An affine point. -/
-structure Aff where
-  x : Fp
-  y : Fp
-  deriving Inhabited
-
-/-- A Jacobian point; `inf` is the point at infinity. -/
-structure Jac where
-  x : Fp
-  y : Fp
-  z : Fp
-  inf : Bool
-  deriving Inhabited
-
-namespace Aff
-
-/-- The base point. -/
-def base : Aff :=
-  ⟨Fp.ofNat 0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798,
-    Fp.ofNat 0x483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8⟩
-
-/-- Whether the point is on the curve. -/
-def onCurve (P : Aff) : Bool :=
-  eq (sq P.y) (curveRhs P.x)
-
-/-- The negative of a point. -/
-def neg (P : Aff) : Aff :=
-  ⟨P.x, Fp.neg P.y⟩
-
-end Aff
 
 namespace Jac
 
-/-- The point at infinity. -/
-def infinity : Jac :=
-  ⟨zero, one, zero, true⟩
-
-/-- Lift an affine point. -/
-def ofAff (P : Aff) : Jac :=
-  ⟨P.x, P.y, one, false⟩
-
-/-- The negative of a point. -/
-def neg (P : Jac) : Jac :=
-  ⟨P.x, Fp.neg P.y, P.z, P.inf⟩
-
-/-- Doubling (`dbl-2009-l`). -/
+/-- Doubling (`dbl-2009-l`), with lazy reduction (`PointOps`). -/
 def dbl (P : Jac) : Jac :=
+  if P.inf then P else dblCore P.x P.y P.z
+
+/-- `P + Q` for an affine `Q` (`madd-2007-bl`). -/
+def addAff (P : Jac) (Q : Aff) : Jac :=
+  if P.inf then ofAff Q
+  else
+    let (z1z1, h, r0) := addAffPre P.x P.y P.z Q.x Q.y
+    if isZero h then (if isZero r0 then dbl P else infinity) else addAffPost P.x P.y P.z z1z1 h r0
+
+/-- `P + Q` (`add-2007-bl`). -/
+def add (P Q : Jac) : Jac :=
+  if P.inf then Q
+  else
+    if Q.inf then P
+    else
+      let (z1z1, z2z2, u1, s1, h, r0) := addPre P.x P.y P.z Q.x Q.y Q.z
+      if isZero h then (if isZero r0 then dbl P else infinity)
+      else addPost P.z Q.z z1z1 z2z2 u1 s1 h r0
+
+/-- Doubling (`dbl-2009-l`) with every operation reduced at once: the reference of `dbl`. -/
+def dblSimple (P : Jac) : Jac :=
   if P.inf then P
   else
     let a := sq P.x
@@ -122,14 +51,14 @@ def dbl (P : Jac) : Jac :=
     let x3 := sub (sq e) (mulInt d 2)
     ⟨x3, sub (mul e (sub d x3)) (mulInt c 8), mulInt (mul P.y P.z) 2, false⟩
 
-/-- `P + Q` for an affine `Q` (`madd-2007-bl`). -/
-def addAff (P : Jac) (Q : Aff) : Jac :=
+/-- `P + Q` for an affine `Q` (`madd-2007-bl`), reduced at once: the reference of `addAff`. -/
+def addAffSimple (P : Jac) (Q : Aff) : Jac :=
   if P.inf then ofAff Q
   else
     let z1z1 := sq P.z
     let h := sub (mul Q.x z1z1) P.x
     let r0 := sub (mul (mul Q.y P.z) z1z1) P.y
-    if isZero h then (if isZero r0 then dbl P else infinity)
+    if isZero h then (if isZero r0 then dblSimple P else infinity)
     else
       let hh := sq h
       let i := mulInt hh 4
@@ -140,8 +69,8 @@ def addAff (P : Jac) (Q : Aff) : Jac :=
       ⟨x3, sub (mul r (sub v x3)) (mulInt (mul P.y j) 2), sub (sub (sq (Fp.add P.z h)) z1z1) hh,
         false⟩
 
-/-- `P + Q` (`add-2007-bl`). -/
-def add (P Q : Jac) : Jac :=
+/-- `P + Q` (`add-2007-bl`), reduced at once: the reference of `add`. -/
+def addSimple (P Q : Jac) : Jac :=
   if P.inf then Q
   else
     if Q.inf then P
@@ -152,7 +81,7 @@ def add (P Q : Jac) : Jac :=
       let h := sub (mul Q.x z1z1) u1
       let s1 := mul (mul P.y Q.z) z2z2
       let r0 := sub (mul (mul Q.y P.z) z1z1) s1
-      if isZero h then (if isZero r0 then dbl P else infinity)
+      if isZero h then (if isZero r0 then dblSimple P else infinity)
       else
         let i := sq (mulInt h 2)
         let j := mul h i
