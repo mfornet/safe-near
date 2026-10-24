@@ -427,13 +427,20 @@ def main (args : List String) : IO UInt32 := do
       (submitted.issue.isNone && submitted.outgoing.length == 1 &&
         (submitted.state.accessKey? "alice.near" (pkOf 1)).map (·.nonce) == some 1)
     let missing := Near.apply cfg World.ap (fun _ => code) submitted.state [] submitted.outgoing
-    check r s!"{label} implicit creation reports a model issue"
-      ((missing.issue.map (·.2)) == some (.unsupportedAction "implicit account creation (ETH/deterministic contracts)"))
-    check r s!"{label} implicit delivery issue rolls back receiver execution and preserves committed submission"
-      (missing.state.totalBalance == submitted.state.totalBalance &&
-        (missing.state.account? receiver).isNone && missing.state.storage == submitted.state.storage &&
-        missing.state.accessKeys == submitted.state.accessKeys && missing.state.nextId == submitted.state.nextId &&
-        missing.outcomes.isEmpty && missing.outgoing.isEmpty && missing.tokensBurnt == 0)
+    check r s!"{label} implicit creation installs the account on delivery"
+      (missing.issue.isNone && (missing.state.account? receiver).map (·.amount) == some oneNear)
+    check r s!"{label} implicit account has the wallet identity (ETH) or none (deterministic)"
+      (match (missing.state.account? receiver) with
+        | some a => a.global.isSome == (label == "ETH") && a.code.isNone
+        | none => false)
+    if label == "ETH" then
+      let legacy := { cfg with wasm := { cfg.wasm with ethImplicitGlobalContract := false } }
+      let legacyMissing := Near.apply legacy World.ap (fun _ => code) submitted.state [] submitted.outgoing
+      check r "legacy ETH wallet creation reports a model issue and rolls back delivery"
+        ((legacyMissing.issue.map (·.2)) ==
+            some (.unsupportedAction "ETH-implicit account creation with the legacy wallet contract") &&
+          (legacyMissing.state.account? receiver).isNone && legacyMissing.state.nextId == submitted.state.nextId &&
+          legacyMissing.outcomes.isEmpty && legacyMissing.outgoing.isEmpty && legacyMissing.tokensBurnt == 0)
     let present := genesis.setAccount receiver (genesisAccount oneNear)
     let sent := Near.apply cfg World.ap (fun _ => code) present [tx] []
     let applied := Near.apply cfg World.ap (fun _ => code) sent.state [] sent.outgoing
