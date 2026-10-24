@@ -21,10 +21,14 @@ def keyJson (pk : PublicKey) : Option AccessKey → Json
     | .functionCall allowance receiver methods => Json.mkObj [
       ("nonce", toJson key.nonce), ("kind", toJson "functionCall"),
       ("allowance", toJson (allowance.map toString)), ("receiverId", toJson receiver), ("methods", toJson methods), ("storageBytes", toJson (accessKeyStorageBytes pk key))]
+    | .gasKeyFullAccess .. => Json.mkObj [
+      ("nonce", toJson key.nonce), ("kind", toJson "gasKeyFullAccess"), ("storageBytes", toJson (accessKeyStorageBytes pk key))]
+    | .gasKeyFunctionCall .. => Json.mkObj [
+      ("nonce", toJson key.nonce), ("kind", toJson "gasKeyFunctionCall"), ("storageBytes", toJson (accessKeyStorageBytes pk key))]
 
 def receiptMetadata (receipt : Receipt) : Json :=
   match receipt.receipt with
-  | .data _ => Json.null
+  | .data _ | .globalDistribution _ => Json.null
   | .action action => Json.mkObj [
     ("predecessorId", toJson receipt.predecessorId), ("receiverId", toJson receipt.receiverId),
     ("signerId", toJson action.signerId), ("signerPublicKey", toJson (action.signerPublicKey.map UInt8.toNat)),
