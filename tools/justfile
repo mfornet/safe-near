@@ -31,7 +31,7 @@ crypto-tests: crypto-build
 
 # Build the NEAR node (notes/design/NEAR_NODE.md) and its executables.
 node-build:
-    cd near-lean/node && lake build NearNode near-lean-node node-bench node-conformance-types node-trie-tests node-store-tests node-state-roots node-chain-validate --wfail
+    cd near-lean/node && lake build NearNode near-lean-node node-bench node-conformance-types node-trie-tests node-store-tests node-state-roots node-chain-validate node-chain-apply --wfail
 
 # M1: the Borsh codecs of every near-primitives type against the committed nearcore oracle fixtures.
 [positional-arguments]
@@ -62,6 +62,14 @@ chain-validate-corpus: node-build
 chain-corpus-generate *options:
     python3 tools/localnet/chain_corpus.py export "$@"
     python3 tools/localnet/chain_corpus.py pack
+    python3 tools/localnet/chain_apply.py extras
+
+# M5b: a localnet chain run from genesis by the Lean node: every EpochInfo computed (not given) and equal to
+# nearcore's, the epoch-start validator account updates, and (as the stages land) every chunk applied with
+# the ChunkExtra compared and a restart from the store; exits 0 only when all agree.
+[positional-arguments]
+chain-apply-corpus *options: node-build
+    python3 tools/localnet/chain_apply.py run -- "$@"
 
 # M4: the persistent store: unit tests, then a restart and kill-in-the-middle test on the corpus tries.
 node-store-tests: node-build
