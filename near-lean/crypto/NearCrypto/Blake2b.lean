@@ -1,4 +1,5 @@
 import NearCrypto.Bytes
+import NearCrypto.Blake2bRounds
 import NearCrypto.Sha512
 
 /-!
@@ -7,7 +8,8 @@ import NearCrypto.Sha512
 Unkeyed, with a digest length of 1 to 64 bytes. `near-crypto`'s VRF hashes with BLAKE2b-256
 (`Blake2bVar::new(32)`) and BLAKE2b-512 (`Blake2b512`); the digest length is part of the
 parameter block, so the 32-byte digest is not a prefix of the 64-byte one. `Spec` keeps the
-sixteen working words in a list; `Impl` updates an array in place.
+sixteen working words in a list; `Impl` is the unrolled compression function of `Blake2bRounds`
+on unboxed registers.
 -/
 
 namespace NearCrypto.Blake2b
@@ -109,63 +111,31 @@ end Spec
 
 namespace Impl
 
-/-- The mixing function on the array `v`, updated in place. -/
-@[inline]
-def mix (v : Array UInt64) (a b c d : Nat) (x y : UInt64) : Array UInt64 :=
-  let va := v[a]! + v[b]! + x
-  let vd := rotr (v[d]! ^^^ va) 32
-  let vc := v[c]! + vd
-  let vb := rotr (v[b]! ^^^ vc) 24
-  let va := va + vb + y
-  let vd := rotr (vd ^^^ va) 16
-  let vc := vc + vd
-  let vb := rotr (vb ^^^ vc) 63
-  ((((v.set! a va).set! b vb).set! c vc).set! d vd)
+private def init (nn : Nat) : State512 :=
+  ⟨0x6a09e667f3bcc908 ^^^ 0x01010000 ^^^ nn.toUInt64, 0xbb67ae8584caa73b, 0x3c6ef372fe94f82b,
+    0xa54ff53a5f1d36f1, 0x510e527fade682d1, 0x9b05688c2b3e6c1f, 0x1f83d9abfb41bd6b,
+    0x5be0cd19137e2179⟩
 
-/-- The message word at byte offset `off` of the (zero padded) message. -/
-@[inline]
-def word (m : ByteArray) (off : Nat) : UInt64 :=
-  if off + 8 ≤ m.size then le64 m off
-  else
-    (List.range 8).foldr
-      (fun j acc => acc <<< 8 ||| (if off + j < m.size then m.get! (off + j) else 0).toUInt64) 0
-
-/-- One round with schedule row `s` (an array of 16 indices). -/
-def round (v : Array UInt64) (w : Array UInt64) (s : Array Nat) : Array UInt64 :=
-  let v := mix v 0 4 8 12 w[s[0]!]! w[s[1]!]!
-  let v := mix v 1 5 9 13 w[s[2]!]! w[s[3]!]!
-  let v := mix v 2 6 10 14 w[s[4]!]! w[s[5]!]!
-  let v := mix v 3 7 11 15 w[s[6]!]! w[s[7]!]!
-  let v := mix v 0 5 10 15 w[s[8]!]! w[s[9]!]!
-  let v := mix v 1 6 11 12 w[s[10]!]! w[s[11]!]!
-  let v := mix v 2 7 8 13 w[s[12]!]! w[s[13]!]!
-  mix v 3 4 9 14 w[s[14]!]! w[s[15]!]!
-
-private def schedule : Array (Array Nat) :=
-  (sigma.map List.toArray).toArray
-
-private def ivArray : Array UInt64 :=
-  iv.toArray
-
-/-- The compression function. -/
-def compress (h : Array UInt64) (w : Array UInt64) (t : UInt64) (last : Bool) : Array UInt64 :=
-  let v := h ++ ivArray
-  let v := v.set! 12 (v[12]! ^^^ t)
-  let v := if last then v.set! 14 (~~~v[14]!) else v
-  let v := (List.range 12).foldl (fun v r => round v w schedule[r % 10]!) v
-  (Array.range 8).map fun i => h[i]! ^^^ v[i]! ^^^ v[i + 8]!
+private def run (data : ByteArray) (off : Nat) (s : State512) : Nat → State512
+  | 0 => s
+  | n + 1 => run data (off + 128) (compressBlake2b s data off (off + 128).toUInt64 false) n
 
 /-- BLAKE2b with a digest of `nn` bytes (1 to 64) of `m`, unkeyed. -/
 def hash (nn : Nat) (m : ByteArray) : ByteArray :=
   let blocks := if m.size == 0 then 1 else (m.size + 127) / 128
-  let h :=
-    (List.range blocks).foldl
-      (fun h i =>
-        let last := i + 1 == blocks
-        let t := if last then m.size else 128 * (i + 1)
-        compress h ((Array.range 16).map fun j => word m (128 * i + 8 * j)) t.toUInt64 last)
-      (init nn).toArray
-  output h.toList nn
+  let s := run m 0 (init nn) (blocks - 1)
+  let tail := m.extract (128 * (blocks - 1)) m.size
+  let tail := tail ++ zeros (128 - tail.size)
+  let s := compressBlake2b s tail 0 m.size.toUInt64 true
+  let all :=
+    pushLe64
+      (pushLe64
+        (pushLe64
+          (pushLe64 (pushLe64 (pushLe64 (pushLe64 (pushLe64 ByteArray.empty s.a) s.b) s.c) s.d) s.e)
+          s.f)
+        s.g)
+      s.h
+  all.extract 0 nn
 
 end Impl
 

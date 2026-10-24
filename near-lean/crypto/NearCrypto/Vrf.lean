@@ -176,9 +176,8 @@ def isValid (pk input value proof : ByteArray) : Bool :=
       canonical proof 32 with
     | some pkPoint, some p, some r, some c =>
       let u :=
-        Ristretto.Impl.compress
-          (Ext.doubleMul ((r + c * offset pk input) % ell) Ext.basePoint c pkPoint)
-      let w := Ristretto.Impl.compress (Ext.doubleMul r p c Ext.basePoint)
+        Ristretto.Impl.compress (Ext.doubleMulBase c pkPoint ((r + c * offset pk input) % ell))
+      let w := Ristretto.Impl.compress (Ext.doubleMulBase r p c)
       hashS [pk, value, u, w] == c
     | _, _, _, _ => false
 
