@@ -44,10 +44,10 @@
           "sha256": "276165865c16acbd32f3839fc60dd4816da42e4ab6192436d6a665bf4e4f2d28"
         },
         "chunks.jsonl.gz": {
-          "bytes": 1061006,
+          "bytes": 1594231,
           "lines": 288,
-          "rawSha256": "fb741bf11eda5243ba83f5ac5a2080dfbfeb6bdf6623c025059d924fc91bf819",
-          "sha256": "c927d3a9bb60160ff9a903298c5b66a237b26857b8db4732e3b0e11943dfddca"
+          "rawSha256": "aed148cb961f71666428b4c8f7bc00204c74a0f9f85cf7659afbae6f87868d0f",
+          "sha256": "a00bc6172f072de6a871a43eb841686821fbc1f9fc285dc7b92f230b3d5972a9"
         },
         "epochs.jsonl.gz": {
           "bytes": 6046,
@@ -189,10 +189,10 @@
           "sha256": "06a3b225a2be2f1b377c97251bb4dd1dea508adbfb89b4c622e34b6d030fc844"
         },
         "chunks.jsonl.gz": {
-          "bytes": 304738,
+          "bytes": 837054,
           "lines": 148,
-          "rawSha256": "d6c3691db85b2e7666c1d9a05efb29f2b2f3716137312331241da8a643c8c8c8",
-          "sha256": "a06c018b02186e7b2427d7cfbae4a2c6637afbc97d0a42f4ea7052b415200d3f"
+          "rawSha256": "7d1b9369badc768f5b3b1b58956b0f6f1df483f06e8f5d962049046685bb22f5",
+          "sha256": "9c4856de1180af17dcb317f9fd58f4d5ab677136d290af913501de0aba98fbf4"
         },
         "epochs.jsonl.gz": {
           "bytes": 4008,
@@ -294,5 +294,5 @@
       "variants": 931
     }
   },
-  "totalBytes": 3278546
+  "totalBytes": 4344087
 }

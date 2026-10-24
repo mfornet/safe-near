@@ -26,6 +26,7 @@ import sys
 import tempfile
 
 import chain_corpus
+import corpus
 import nearcodec as nc
 
 ROOT = chain_corpus.ROOT
@@ -105,9 +106,8 @@ def chunk_rows(topology: str) -> list[dict]:
         if not directory.name.startswith(topology + "-"):
             continue
         meta = json.loads((directory / "meta.json").read_text())
-        inputs = json.loads(gzip.decompress((directory / "inputs.json.gz").read_bytes()))
-        expected = json.loads(gzip.decompress((directory / "expected.json.gz").read_bytes()))
-        context = json.loads((directory / "context.json").read_text())
+        bundle = corpus.unpack(directory)       # values of 1 KiB or more are stored once, by digest
+        inputs, expected, context = bundle["inputs"], bundle["expected"], bundle["context"]
         rows.append({
             "height": meta["height"], "shardId": meta["shardId"],
             "transactions": [t["borsh"] for t in inputs["transactions"]],

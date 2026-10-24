@@ -2,6 +2,8 @@ import Lean.Data.Json
 import NodeConformance.Runner
 import NearNode.Chain
 import NearNode.Epoch
+import NearNode.Chain.Genesis
+import ChainReplay.HostCrypto
 
 /-!
 `node-chain-apply DIR`: a localnet chain run by the Lean node from genesis (M5b).
@@ -13,7 +15,8 @@ is computed when the last block of an epoch is accepted (`Epoch.processBlock`), 
 `epochs.jsonl` file is only what the result is compared with, byte for byte.
 -/
 
-open Lean Near.Node Near.Node.Chain Near.Node.Epoch Near.Node.Conformance Near.Node.Borsh
+open Lean Near.Node Near.Node.Chain Near.Node.Epoch Near.Node.Apply Near.Node.Conformance
+  Near.Node.Borsh
 
 namespace ChainApply
 
@@ -102,6 +105,11 @@ structure Tally where
   epochsEqual : Nat := 0
   updates : Nat := 0
   updatesEqual : Nat := 0
+  chunks : Nat := 0
+  extrasEqual : Nat := 0
+  roundTrips : Nat := 0
+  receiptsChecked : Nat := 0
+  receiptsEqual : Nat := 0
   failures : Array String := #[]
 
 def Tally.fail (t : Tally) (msg : String) : Tally :=
@@ -153,6 +161,54 @@ def sameUpdate (got : Option AccountsUpdate) (want : Json) : Except String Bool 
             ((← field want "protocolTreasuryAccountId").getStr?.toOption))
   | _, _ =>
     pure false
+
+/-- The account and access key records of the genesis. -/
+def parseRecords (records : Array Json) : Except String (Array GenesisAccount × Array GenesisKey) :=
+  do
+  let mut accounts : Array GenesisAccount := #[]
+  let mut keys : Array GenesisKey := #[]
+  for r in records do
+    match r.getObjVal? "account" with
+    | .ok a =>
+      accounts :=
+        accounts.push
+          { id := ⟨← str a "id"⟩, amount := (← str a "amount").toNat!,
+            locked := (← str a "locked").toNat! }
+    | .error _ =>
+      let k ← field r "accessKey"
+      keys :=
+        keys.push
+          { id := ⟨← str k "id"⟩,
+            publicKey := ← decode PublicKey "access key" (← bytes k "publicKey"),
+            nonce := ← nat k "nonce" }
+  pure (accounts, keys)
+
+/-- A chunk body of the corpus: transactions and the receipts nearcore recorded. -/
+def parseBody (row : Json) : Except String Body := do
+  let list (k : String) : Except String (Array ByteArray) := do
+    (← (← field row k).getArr?).mapM fun j => do
+        match ofHex (← j.getStr?) with
+        | some b =>
+          pure b
+        | none =>
+          throw s!"{k} is not hex"
+  pure
+      { transactions := ← (← list "transactions").mapM (decode SignedTransaction "transaction"),
+        claimedOutgoing := ← list "outgoingReceipts", claimedIncoming := ← list "incomingReceipts" }
+
+/-- The fields in which two chunk extras differ. -/
+def describeExtra (a b : ChunkExtra) : String :=
+  match a, b with
+  | .v5 x, .v5 y =>
+    let checks : List (String × Bool) :=
+      [("stateRoot", x.stateRoot == y.stateRoot), ("outcomeRoot", x.outcomeRoot == y.outcomeRoot),
+        ("validatorProposals", x.validatorProposals == y.validatorProposals),
+        ("gasUsed", x.gasUsed == y.gasUsed), ("gasLimit", x.gasLimit == y.gasLimit),
+        ("balanceBurnt", x.balanceBurnt == y.balanceBurnt),
+        ("congestionInfo", x.congestionInfo == y.congestionInfo),
+        ("bandwidthRequests", x.bandwidthRequests == y.bandwidthRequests)]
+    ", ".intercalate ((checks.filter (!·.2)).map (·.1))
+  | _, _ => "version"
 
 end ChainApply
 
@@ -242,6 +298,44 @@ def main (args : List String) : IO UInt32 := do
   for r in chunkRows do
     let h ← orThrow (nat r "height")
     rowsAt := rowsAt.insert h ((rowsAt.getD h #[]).push r)
+  -- the genesis state of every shard
+  let (genesisAccounts, genesisKeys) ← orThrow (parseRecords genesis.records)
+  let tries ← orThrow (genesisTries genesisEpoch.layout genesisAccounts genesisKeys)
+  for c in genesisBlock.chunks do
+    match tries[c.shardId]? with
+    | some trie =>
+      if trie.root != c.prevStateRoot then
+        t :=
+          t.fail s!"genesis state root of shard {c.shardId} differs from the genesis chunk header"
+    | none =>
+      t := t.fail "genesis shard"
+  let configs : System.FilePath :=
+    ((args.dropWhile (· != "--configs")).tail.head?).getD "near-lean/vm/configs"
+  let protocol := genesis.setup.reward.genesisProtocolVersion.toNat
+  let runtimeConfig ← ChainReplay.HostCrypto.loadConfig configs protocol
+  let congestion ← Near.Congestion.Config.load configs protocol
+  let params : Params :=
+    { setup := genesis.setup, cfg := runtimeConfig, congestion, protocol,
+      chainId := genesis.chainId }
+  let mut progress : Progress := { tries }
+  for c in genesisBlock.chunks do
+    let some trie := tries[c.shardId]? | continue
+    let some congestionInfo := congestionOf c | continue
+    progress :=
+      { progress with
+        outgoing := progress.outgoing.insert (genesisHash.bytes, c.shardId) #[],
+        extras :=
+          progress.extras.insert (genesisHash.bytes, c.shardId)
+            (.v5
+              { stateRoot := trie.root, outcomeRoot := CryptoHash.zero, validatorProposals := #[],
+                gasUsed := 0, gasLimit := c.gasLimit, balanceBurnt := ⟨0⟩, congestionInfo,
+                bandwidthRequests := .v1 ⟨#[]⟩, proposedSplit := none }) }
+  let bodies : Std.HashMap (Nat × UInt64) Body ←
+    chunkRows.foldlM (init := {}) fun m r => do
+        let h ← orThrow (nat r "height")
+        let shard := (← orThrow (nat r "shardId")).toUInt64
+        pure (m.insert (h, shard) (← orThrow (parseBody r)))
+  let applyOn := (args.contains "--no-apply") == false
   let started ← IO.monoMsNow
   let maxHeight := (args.dropWhile (· != "--max-height")).tail.head?.bind String.toNat?
   for line in blockLines.extract 1 blockLines.size do
@@ -282,6 +376,61 @@ def main (args : List String) : IO UInt32 := do
             t := { t with updatesEqual := t.updatesEqual + 1 }
           else
             t := t.fail s!"update at height {height} shard {shard} differs"
+      if applyOn then
+        let empty : Body := { transactions := #[], claimedOutgoing := #[], claimedIncoming := #[] }
+        match
+          applyBlock params st block (fun shard => (bodies[(height, shard)]?).getD empty)
+            progress with
+        | .error m =>
+          t := t.fail s!"block {height}: applying the chunks failed: {m}"
+          break
+        | .ok (pr, reports) =>
+          progress := pr
+          let want ←
+            orThrow
+                (do
+                  (← field (← field line "derived") "chunkExtras").getArr?)
+          for rep in reports do
+            t := { t with chunks := t.chunks + 1 }
+            if rep.roundTrip then
+              t := { t with roundTrips := t.roundTrips + 1 }
+            else
+              t :=
+                t.fail
+                  s!"block {height} shard {rep.shard}: the pre-state does not convert back to its entries"
+            let theirs? ←
+              orThrow
+                  (want.foldlM (init := none) fun acc row => do
+                    if (← (← row.getArrVal? 0).getNat?).toUInt64 == rep.shard then
+                      match ofHex (← (← row.getArrVal? 1).getStr?) with
+                      | some b =>
+                        pure (some b)
+                      | none =>
+                        throw "chunk extra is not hex"
+                    else
+                      pure acc)
+            match theirs? with
+            | some b =>
+              if Codec.encode rep.extra == b then
+                t := { t with extrasEqual := t.extrasEqual + 1 }
+              else
+                let theirs ← orThrow (decode ChunkExtra "ChunkExtra" b)
+                t :=
+                  t.fail
+                    s!"block {height} shard {rep.shard}: ChunkExtra differs in {describeExtra rep.extra theirs}"
+                if args.contains "--debug" then
+                  for o in rep.outcomes do
+                    IO.eprintln s!"  outcome {toHex (Codec.encode o)}"
+            | none =>
+              t := t.fail s!"block {height} shard {rep.shard}: no ChunkExtra in the corpus"
+            if let some body := bodies[(height, rep.shard)]? then
+              t := { t with receiptsChecked := t.receiptsChecked + 1 }
+              if body.claimedIncoming == rep.incoming then
+                t := { t with receiptsEqual := t.receiptsEqual + 1 }
+              else
+                t :=
+                  t.fail
+                    s!"block {height} shard {rep.shard}: incoming receipts differ from nearcore's"
       if let some f := fin then
         t := { t with epochs := t.epochs + 1 }
         match given[f.epochId.hash.bytes]? with
@@ -297,7 +446,7 @@ def main (args : List String) : IO UInt32 := do
           t := t.fail s!"epoch finalized at height {height} is not in the corpus"
   let elapsed := (← IO.monoMsNow) - started
   IO.println
-      s!"{genesis.chainId}: epochs {t.epochsEqual}/{t.epochs} equal, validator accounts updates {t.updatesEqual}/{t.updates} equal, blocks {t.accepted}/{t.blocks} accepted ({elapsed} ms)"
+      s!"{genesis.chainId}: epochs {t.epochsEqual}/{t.epochs} equal, validator accounts updates {t.updatesEqual}/{t.updates} equal, chunks: ChunkExtra equal {t.extrasEqual}/{t.chunks}, pre-state round trip {t.roundTrips}/{t.chunks}, incoming receipts equal {t.receiptsEqual}/{t.receiptsChecked}, blocks {t.accepted}/{t.blocks} accepted ({elapsed} ms)"
   for f in t.failures.extract 0 40 do
     IO.println s!"  FAIL {f}"
   return if t.failures.isEmpty && t.blocks == t.accepted then 0 else 1
