@@ -185,10 +185,6 @@ def checkRefFeature (ctx : Context) : M Unit :=
 def checkBulkFeature (ctx : Context) : M Unit :=
   requireFeature ctx.features.bulkMemory "bulk-memory"
 
-def checkValType (ctx : Context) : ValType → M Unit
-  | .ref _ => checkRefFeature ctx
-  | .num _ => pure ()
-
 def funcType (ctx : Context) (i : Nat) : M FuncType := do
   match ctx.funcs[i]? with
   | some ft => return ft

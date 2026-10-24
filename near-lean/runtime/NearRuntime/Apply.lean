@@ -364,6 +364,8 @@ def applyAction (c : ReceiptCtx) (isLast : Bool) : Action → ExecM Unit
     let _ := pk
     if stake == 0 && a.locked == 0 then throw (.triesToUnstake id)
     if stake > a.amount + a.locked then throw (.triesToStake id stake a.locked a.amount)
+    -- nearcore divergence: staking (validator proposals, minimum stake from the epoch provider)
+    -- is not modeled; any stake that passes the balance checks is an `unsupportedAction` issue.
     if stake < a.locked then
       throw (.executionIssue (.unsupportedAction "unstake (epoch machinery)"))
     -- Staking also emits validator proposals and depends on epoch-provider
@@ -398,6 +400,7 @@ def applyAction (c : ReceiptCtx) (isLast : Bool) : Action → ExecM Unit
     modify fun e => { e with actorId := c.receipt.predecessorId }
     emit r
   | .useGlobalContract _ =>
+    -- nearcore divergence: global contracts (deploy, use, distribution) are not modeled.
     -- Resolving the identifier needs the global contract registry and its
     -- distribution, which the model does not have.
     throw (.executionIssue (.unsupportedAction "use global contract"))
@@ -476,6 +479,8 @@ def runReceiptAction (c : ReceiptCtx) (onlyAction isLast : Bool) (act : Action) 
   checkReceiptAction c onlyAction act
   applyAction c isLast act
 
+-- nearcore divergence: with `nativeReceiptHashes = none` a call sees the block (or supplied)
+-- seed directly rather than `create_random_seed(action_hash, random_seed)`.
 /-- Native VM randomness uses this receipt's original action position and
 current execution height, including delayed and postponed receipt execution.
 Missing/malformed exact-mode inputs are errors, never direct-seed fallbacks. -/
@@ -808,6 +813,9 @@ def convertTransaction (cfg : RuntimeConfig) (ap : ApplyState) (st : ChainState)
   | .error error => throw (.actionsValidation error)
   | .ok () => convertTransactionCore cfg ap st tx
 
+-- nearcore divergence: one shard; no congestion-control buffering, bandwidth scheduler,
+-- instant receipts, yield timeouts, epoch validator-account updates or incoming-receipt
+-- validation (`Runtime::apply`, `process_receipts`).
 /-- `Runtime::apply`. Transactions first; only signer-is-receiver receipts
 are local. Other transaction receipts are outgoing work for a later chunk.
 Local, delayed and incoming receipts execute in that order; receipts beyond

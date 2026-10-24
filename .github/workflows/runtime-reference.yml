@@ -53,7 +53,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             reference-nearcore/target
-          key: finance-nearcore-${{ runner.os }}-${{ runner.arch }}-44f7ae6-1.93.0-debug0-v2
+          key: finance-nearcore-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('near-lean/runtime/reference.json') }}-1.93.0-debug0-v2
       - name: Build reference adapter and compare financial observations
         run: |
           python3 tools/runtime-finance-reference/build.py reference-nearcore

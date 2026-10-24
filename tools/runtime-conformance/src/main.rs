@@ -222,6 +222,12 @@ fn execute(request: Request) -> Result<Value> {
     }
     let configs = RuntimeConfigStore::new(None);
     let config = configs.get_config(request.protocol_version);
+    // Only the default `wasmtime_vm` engine is compiled in. Configs that name NearVm keep it on
+    // x86_64 (`replace_with_wasmtime_if_unsupported` swaps it elsewhere), so pin Wasmtime here
+    // to get the same oracle on every host.
+    let mut wasm_config = near_parameters::vm::Config::clone(&config.wasm_config);
+    wasm_config.vm_kind = near_parameters::vm::VMKind::Wasmtime;
+    let wasm_config = Arc::new(wasm_config);
     let context = VMContext {
         current_account_id: request.current_account_id.parse()?,
         signer_account_id: request.signer_account_id.parse()?,
@@ -261,9 +267,9 @@ fn execute(request: Request) -> Result<Value> {
     };
     let prepared = near_vm_runner::prepare(
         &ext.inner,
-        config.wasm_config.clone(),
+        Arc::clone(&wasm_config),
         None,
-        context.make_gas_counter(&config.wasm_config),
+        context.make_gas_counter(&wasm_config),
         &request.method,
     );
     let outcome = near_vm_runner::run(prepared, &mut ext, &context, Arc::clone(&config.fees))?;

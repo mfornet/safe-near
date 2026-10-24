@@ -13,7 +13,8 @@ contracts/<name>/verification/
     blueprint/   -- Prose explanations linked to statements and proofs
 ```
 
-wNEAR has a verification project.
+wNEAR is complete at the model level; `sputnik-dao-factory` and
+`sputnikdao2-v3.2` are in progress (see `contracts/VERIFICATION.md`).
 
 ## Shared vocabulary
 
