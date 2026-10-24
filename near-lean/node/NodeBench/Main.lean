@@ -1,23 +1,20 @@
+import NodeBench.Crypto
 import NodeBench.Harness
-import NearRuntime.Sha256
 import NearNode.Primitives
 
 /-!
 `node-bench [--filter SUBSTRING] [--out FILE]`: run the node benchmarks and
-print (or write) their JSON report. Baselines for M2 start from the existing
-`Near.Sha256.hash`; the Borsh benchmarks encode and decode a `SignedTransaction` with eight
-actions; the block benchmarks a four-chunk block with 80 approvals; the epoch benchmarks a chunk
-state witness of about 400 KB and the sampling of producers and chunk validators.
+print (or write) their JSON report. The crypto benchmarks (`NodeBench.Crypto`) compare
+`NearCrypto` with the former `Near.Sha256.hash` and with the native crates; the Borsh benchmarks
+encode and decode a `SignedTransaction` with eight actions; the block benchmarks a four-chunk block
+with 80 approvals; the epoch benchmarks a chunk state witness of about 400 KB and the sampling of
+producers and chunk validators.
 -/
 
 open Near.Node.Bench
 
 def input (size seed : Nat) : List UInt8 :=
   (List.range size).map fun i => UInt8.ofNat (i * 31 + seed)
-
-def sha256 (size iterations : Nat) : Benchmark :=
-  { name := s!"sha256/{size}B", iterations,
-    run := fun i => ((Near.Sha256.hash (input size i)).foldl (fun a b => a * 31 + b.toUInt64) 0) }
 
 open Near.Node Near.Node.Borsh
 
@@ -61,9 +58,8 @@ def nonceOf : Except Error SignedTransaction → UInt64
   | _ => 0
 
 def txBenchmarks : List Benchmark :=
-  [sha256 64 2000, sha256 1024 200, sha256 65536 4,
-    { name := s!"borsh/encode SignedTransaction ({sampleBytes.size}B)", iterations := 20000,
-      run := fun i => (Codec.encode (sampleTx i)).size.toUInt64 },
+  [{ name := s!"borsh/encode SignedTransaction ({sampleBytes.size}B)", iterations := 20000,
+     run := fun i => (Codec.encode (sampleTx i)).size.toUInt64 },
     { name := "borsh/decode SignedTransaction", iterations := 20000,
       run := fun _ => nonceOf (decodeTx sampleBytes) },
     { name := "borsh/spec encode SignedTransaction", iterations := 2000,
@@ -231,7 +227,7 @@ def epochBenchmarks : List Benchmark :=
         ((sampleEpoch.sampleChunkValidators i.toUInt64).map (·.size.toUInt64)).getD 0 }]
 
 def benchmarks : List Benchmark :=
-  txBenchmarks ++ chainBenchmarks ++ epochBenchmarks
+  Crypto.benchmarks ++ txBenchmarks ++ chainBenchmarks ++ epochBenchmarks
 
 structure Options where
   filter : String := ""

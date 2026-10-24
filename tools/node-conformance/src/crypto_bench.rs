@@ -79,5 +79,11 @@ fn main() {
             _ => 0,
         }
     }));
+    // The prepared key: the expanded secret is held, so only the signing arithmetic remains.
+    let prepared = ed25519_dalek::SigningKey::from_bytes(&seed);
+    report("ed25519/sign-prepared", measure(|i| {
+        message[0] = i as u8;
+        ed25519_dalek::Signer::sign(&prepared, black_box(&message)).to_bytes()[0] as u64
+    }));
     let _ = KeyType::ED25519;
 }
