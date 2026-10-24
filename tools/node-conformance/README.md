@@ -139,14 +139,16 @@ once and reused in several lines is recorded with the first line only.
 `just node-conformance-types` verifies the signatures with `NearCrypto`: every recorded signature
 found in a line's bytes, and, for the signed types, the signatures recomputed from the decoded value
 (transaction and delegate hashes, block and chunk hashes, the Borsh of an `inner`), with the key from
-the value or the record. ML-DSA and SECP256K1 signatures are not checked.
+the value or the record. ED25519 and SECP256K1 signatures are checked (the records hold 64-byte
+signatures with 32-byte keys, and 65-byte ones with 64-byte keys); ML-DSA signatures are not.
 
 ## Crypto oracle (M2)
 
 `crypto-fixtures` writes the fixtures of `near-lean/crypto` (milestone M2). It uses the same
 locked crates, plus the ones nearcore's VM and `near-crypto` use directly: `sha2` 0.10.9,
-`sha3` 0.10.9 (`Keccak256`, `Keccak512`, the legacy padding), `ripemd` 0.1.3, `ed25519-dalek`
-2.2.0 and `curve25519-dalek` 4.1.3 (the last two with the feature set `near-crypto` builds).
+`sha3` 0.10.9 (`Keccak256`, `Keccak512`, the legacy padding), `ripemd` 0.1.3, `blake2` 0.10.6,
+`ed25519-dalek` 2.2.0, `curve25519-dalek` 4.1.3 and `secp256k1` 0.27.0 (with the feature set
+`near-crypto` builds; its `libsecp256k1` is the C code of `secp256k1-sys` 0.8.2).
 
 ```sh
 cd tools/node-conformance
@@ -158,7 +160,8 @@ The output is a pure function of the code and the locked crates: two runs give i
 all of it in Lean; CI never builds this crate.
 
 - `hash.jsonl`: `{"alg", "name", "msg", "digest"}` for `sha256` (through `CryptoHash::hash_bytes`),
-  `sha512`, `keccak256`, `keccak512` and `ripemd160`: the classic vectors, random messages of 59
+  `sha512`, `keccak256`, `keccak512`, `ripemd160`, `blake2b256` (`Blake2bVar::new(32)`) and
+  `blake2b512`: the classic vectors, random messages of 59
   lengths around every block and padding boundary (0 to 20000 bytes), all-zero and all-ones
   messages at those boundaries, and one million `a`, spelled `{"unit", "count"}` instead of `msg`.
 - `ed25519.jsonl`, one object per line, by `kind`. The verdicts are those of
@@ -179,6 +182,33 @@ all of it in Lean; CI never builds this crate.
     `k ≡ 0 (mod 8)` and fail otherwise.
   - `pubkey`: `public`, `valid`: key decoding, including `y ≥ p`, `x = 0` with the sign bit set,
     the small-order encodings and 120 random strings.
+
+- `secp256k1.jsonl` (`src/crypto_secp.rs`), by `kind`; keys are `near-crypto`'s 64 bytes `x ‖ y`,
+  signatures its 65 bytes `r ‖ s ‖ v`, and the verdicts those of `near_crypto::Signature::verify`
+  (`verify`), `secp256k1::PublicKey::from_slice` (`pubkey`), `SecretKey::from_slice` (`secret`),
+  `ecdsa::RecoverableSignature::from_compact` and `recover_ecdsa` (`recover`, with `v` as any `i32`,
+  checked against `Secp256K1Signature::recover` for `v < 4`) and, for `ecrecover`,
+  `Secp256K1Signature::check_signature_values` followed by `recover` as the VM's `ecrecover` does for
+  well-formed arguments (`near-vm-runner` is not linked; its body is read, not run):
+  - `secret`: `secret`, `valid`. `keypair`: `secret`, `public`, `compressed`: edge scalars, five seeds
+    of `SecretKey::from_seed(SECP256K1, ..)` and random keys. `sign`: `secret`, `public`, `msg`, `sig`
+    by `SecretKey::sign` (deterministic RFC 6979).
+  - `pubkey`: `bytes`, `valid`, and for valid ones `public` and `compressed`: the forms of each key,
+    other tags and lengths, hybrid forms with either parity, flipped bits, `x` over the edge values
+    (`p`, `p + 1`, `2^256 - 1`), small `x` and random strings.
+  - `recover`: `msg`, `sig` (`r ‖ s`), `v`, `valid`, `public`: valid signatures with every id, high `s`,
+    wrong message, `v` 4, 5, 255 and -1, `r` and `s` over the 16 edge values (`0`, `n`, `p - n`, ...), small
+    `r` (the abscissae `r` and `r + n`), `r` around `p - n`, random.
+  - `verify`: `public`, `msg`, `sig`, `valid`: per signature wrong message and lengths, every `v`,
+    high `s` with either `v`, another key, flipped bits of `r`, `s` and the key, `r + n`, `s + n`; edge
+    `r` and `s`; keys that are not points.
+  - `ecrecover`: `hash`, `sig` (64 bytes), `v`, `malleability` (0 or 1), `valid`, `public`.
+- `vrf.jsonl` (`src/crypto_vrf.rs`), by `kind`: `ristretto` (`bytes`, `valid`, `double`: decoding by
+  `CompressedRistretto::decompress`), `basemul` and `vmul2` (products encoded), `key` (an ed25519 seed,
+  its public key, the VRF secret `convert_secret_key` derives and the VRF public key), `convert`
+  (`convert_public_key` of 32-byte strings), `compute` (`compute_vrf_with_proof`), `vrf-public` and
+  `vrf-secret` (decoding of keys), `verify` (`is_vrf_valid`) and `block` (a nearcore
+  `ValidatorSigner`'s VRF over a previous random value, and its SHA-256).
 
 `crypto-bench` times the same primitives natively (release mode, `std::time`, at least 0.3 s each)
 and prints one JSON line per benchmark; the names match `node-bench`:

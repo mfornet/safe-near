@@ -167,11 +167,12 @@ oracle.
 `just crypto-tests` builds `near-lean/crypto` (`NearCrypto`) and runs `crypto-conformance` (every
 oracle vector against both the `Spec` and the `Impl` of each primitive) and `crypto-differential`
 (`Spec` against `Impl` on seeded random inputs). `just node-conformance-types` now also verifies
-Ed25519 signatures in Lean.
+Ed25519 and secp256k1 signatures in Lean. M2a is the hashes and Ed25519, M2b secp256k1 (with the VM's
+`ecrecover`), BLAKE2b, ristretto255 and the VRF; M2c (ML-DSA-65) is still to come.
 
 - **Package.** `NearCrypto` requires nothing from this repository and no Mathlib, so contract builds
   are unaffected and `NearVM` can adopt it later without pulling the node in; `just node-isolation`
-  enforces it. The VM keeps taking its digests and `ed25519Verify` as host parameters. The node
+  enforces it. The VM keeps taking its digests, `ed25519Verify` and `ecrecover` as host parameters. The node
   requires it by path: `CryptoHash.hash` (so every block, chunk and outcome hash and the sampler
   seeds) is the `NearCrypto` SHA-256 `Impl`. Pure Lean throughout, no `@[extern]`.
 - **Spec and Impl.** Each primitive has a `Spec`, simple and close to the standard (lists, `Nat`,
@@ -183,6 +184,9 @@ Ed25519 signatures in Lean.
   | Keccak-256/512 | FIPS 202 permutation on 25 lanes; offsets and round constants derived | unrolled round on 25 registers |
   | RIPEMD-160 | the two 80-step lines over lists | one loop on `UInt32` registers |
   | Ed25519 | `Nat` and projective points (`add-2008-bbjlp`), Fermat inversion | ten 25.5-bit limbs (`scripts/gen_fe.py`), extended coordinates, width-5 and width-7 NAF with Shamir's trick |
+  | BLAKE2b-256/512, HMAC-SHA256 | RFC 7693 over lists; RFC 2104 over the `Spec` SHA-256 | the 12 rounds unrolled on 16 registers (`scripts/gen_blake2b.py`); HMAC over the `Impl` SHA-256 |
+  | secp256k1 | `Nat`, Jacobian points, one shared double-and-add chain, Fermat inversion, the C library's formulas for ECDSA | ten 26-bit limbs (`scripts/gen_fp.py`), Jacobian points with lazy reduction (`scripts/gen_point_ops.py`), GLV endomorphism with four NAF streams, binary gcd inversion of scalars (`scripts/gen_modinv.py`) |
+  | ristretto255, VRF | RFC 9496 over the Ed25519 `Spec`, the VRF of `vrf.rs` over `Nat` | the Ed25519 limbs and points; `Ext.doubleMul` for two arbitrary points |
 
   Keccak is the original padding (`0x01`), not SHA-3's, as `sha3::Keccak256`/`Keccak512` in the VM.
   The `Spec`/`Impl` agreement is a differential test for now (every fixture, every length 0 to 300 for
@@ -207,63 +211,159 @@ Ed25519 signatures in Lean.
   public key); `sign` is RFC 8032 (SHA-512 of the seed, clamp, `a` reduced mod `ℓ`); a key pair whose
   public half is not the derived one, byte for byte, is `none` where `near-crypto` panics
   (`from_keypair_bytes`).
+- **secp256k1 acceptance.** `near-crypto` 0.37.4 reaches `libsecp256k1` (the C sources vendored in
+  `secp256k1-sys` 0.8.2, `depend/secp256k1/src`) through `secp256k1` 0.27.0. The Lean `verify`
+  (`Signature::verify`, `signature.rs:1086`), `recover` (`Secp256K1Signature::recover`, `signature.rs:979`)
+  and `sign` (`SecretKey::sign`, `signature.rs:792`) match:
+  1. **Keys** are the 64 bytes `x ‖ y`, given tag `04` and parsed by `secp256k1_eckey_pubkey_parse`
+     (`eckey_impl.h:17`): `x, y < p` (`fe_set_b32` rejects `≥ p`) and on the curve. The parser also
+     takes 33 bytes `02`/`03` (`ge_set_xo_var`: `x³ + 7` needs a root, the one of the stated parity)
+     and 65 bytes `06`/`07` whose parity matches the tag; any other tag or length fails, and the
+     origin is off the curve.
+  2. **Signatures** are `r ‖ s ‖ v` (65 bytes). `v` must be 0 to 3 (`RecoveryId::from_i32`, `recovery.rs:39`)
+     and `r, s < n` (`ecdsa_recoverable_signature_parse_compact`, `recovery/main_impl.h:38`); zeros
+     parse and fail later. The message must be exactly 32 bytes (`Message::from_slice`) and is
+     reduced modulo `n`, never rejected.
+  3. **Verification** (`secp256k1_ecdsa_verify`, `secp256k1.c:381`; `ecdsa_sig_verify`, `ecdsa_impl.h:207`)
+     rejects a **high `s`** (`s > (n-1)/2`) before anything else, needs `r, s ≠ 0`, and accepts when
+     `x(s⁻¹ m G + s⁻¹ r Q) mod n = r`. The id `v` only has to be in range. `s' = n - s` with the
+     other `v` does not verify, although it recovers the same key.
+  4. **Recovery** (`ecdsa_sig_recover`, `recovery/main_impl.h:87`) needs `r, s ≠ 0`; for `v ≥ 2` it fails
+     when `r ≥ p - n` and takes the abscissa `r + n`; the point has the parity `v & 1` (no root: fails);
+     `Q = r⁻¹ (s R - m G)`; infinity fails. It does not reject high `s`. Of the oracle's recoveries,
+     198, 194, 39 and 39 succeed for `v` = 0, 1, 2, 3.
+  5. **Signing** is `sign_ecdsa_recoverable` with `secp256k1_nonce_function_rfc6979` and no extra data
+     (`secp256k1.c:402`, the HMAC-SHA256 DRBG of `hash_impl.h:215`): the nonce of attempt `c` is the
+     `(c + 1)`-st output seeded with `sk ‖ (m mod n)`; an invalid nonce, `r = 0` or `s = 0` goes to
+     the next attempt; `s` is made low and `v = 2 [R.x ≥ n] + (R.y odd xor s was high)`
+     (`ecdsa_impl.h:277`). The public key is `d G`, uncompressed, without the tag. `near-crypto`
+     panics on a message that is not 32 bytes and on an invalid secret; Lean returns `none`.
+  Lean reproduces every vector of the oracle (below), and the Spec was written from the C code before
+  the Impl (the Python tests then recompute the oracle's keys, signatures and recoveries with plain
+  integers).
+- **`ecrecover`.** The VM host function (`near-vm-runner` 0.37.4, `logic.rs:1713`) traps unless
+  `sig` is 64 bytes, `v < 4`, `hash` is 32 bytes and the flag is 0 or 1 (errors of the VM, kept there), then
+  returns 0 unless `check_signature_values(flag != 0)` (`signature.rs:960`: `r < n` and `s < n`, or
+  `s < n/2 + 1` with the flag) passes and `recover` succeeds, and otherwise writes the 64-byte key to the
+  register and returns 1. `NearCrypto.ecrecover hash sig v malleability : Option ByteArray` is that last
+  step for arguments the VM has checked; M3 maps it to `NearState.host.ecrecover`. The oracle calls the
+  same two public `near-crypto` functions on the VM's well-formed arguments (it does not run the VM):
+  1478 lines, 809 recovering, with both flags on every case that recovers, including the high-`s` ones
+  that only the flag rejects.
+- **VRF.** `near-crypto` `vrf.rs` over ristretto255 (`curve25519-dalek` 4.1.3 `ristretto.rs`); Lean follows
+  it: `offset = H256(pk ‖ input)`, `x = sk + offset`, value `enc(B / x)` (`1 / 0 = 1`), `k = H512(x)`,
+  `c = H256(pk ‖ value ‖ enc(k B) ‖ enc((k / x) B))`, proof `(k - c x) ‖ c`; verification needs the
+  value to decode, `r` and `c` canonical (`< ℓ`, `Scalar::from_canonical_bytes`) and
+  `H256(pk ‖ value ‖ enc((r + c offset) B + c pk) ‖ enc(r value + c B)) = c`. `H256` is
+  `Blake2bVar::new(32)`, not a prefix of BLAKE2b-512. Ristretto decoding accepts only an even `s < p`
+  (bit 255 rejects) whose `v (1 + s²)²` is a nonzero square and gives `t` even and `y ≠ 0`
+  (RFC 9496 section 4.3.1, `decompress`); the encoder is `compress`; the Spec is the RFC and the Impl
+  agrees on the 16 multiples of the base point of RFC 9496 appendix A. A block producer's VRF key is the
+  ristretto form of its ed25519 key if that decodes as an Edwards point and is torsion free
+  (`key_conversion.rs`, `convert_public_key`), its secret the clamped scalar of the seed reduced modulo `ℓ`
+  (`convert_secret_key`). nearcore 2.13.4 checks each block with `verify_block_vrf`
+  (`chain/chain/src/signature_verification.rs:12`: `convert_public_key(...).unwrap()` then
+  `is_vrf_valid(prev.random_value, value, proof)`) and requires the header's `random_value` to be
+  the SHA-256 of the value (`chain.rs`, `get_block_metadata` in `near-primitives` `utils.rs:481` computes it);
+  Lean has `blockVrfValid` and `randomValue`. The M1 block fixtures hold random bytes in these fields
+  (the oracle draws `vrf_value`, `vrf_proof` and `random_value` independently), so there is nothing to
+  check on them; `vrf.jsonl` has ten `block` lines made by nearcore's own validator signer instead.
 - **Not constant time.** Verification handles public data and the arithmetic is variable time (`Nat`
-  scalars, NAF with branches on digits). `sign` is correct but neither constant time nor hardened:
+  scalars, NAF with branches on digits, `isZero` tests inside the additions). `sign` for Ed25519 and for
+  secp256k1, and the VRF's `compute`, are correct but neither constant time nor hardened:
   signing with the validator's secret key needs a constant-time implementation (secret-independent
-  scalar multiplication and recoding) before the node signs on a hostile network. Open for M8.
+  scalar multiplication and recoding, nonce handling) before the node signs on a hostile network. Open
+  for M8. Nothing in the node signs yet.
 - **Fixtures.** `tools/node-conformance` `crypto-fixtures` writes `near-lean/crypto/fixtures/`
-  (reproducible; 0.7 MB): 405 hash vectors (the classic ones, 59 random lengths around every block and
+  (reproducible; 3.6 MB): 567 hash vectors (the classic ones, 59 random lengths around every block and
   padding boundary up to 20000 bytes, all-zero and all-ones messages at the boundaries, one million
-  `a`) and 831 Ed25519 lines: 28 key derivations (RFC 8032 and `near-crypto` seeds), 13 key-pair
-  checks, 29 `near-crypto` signatures, 233 key decodings and 528 verifications (bit flips in `R`, `S`
-  and `A`, `S + kℓ`, the `S` boundary, the ZIP 215 matrix, the identity key, small-order keys with an
-  accepting `R` found by search, and mixed-order keys `A + T` that verify when `k ≡ 0 mod 8`).
-  `tools/tests/test_crypto_fixtures.py` checks the files and cross-checks SHA-2 against `hashlib`.
+  `a`; BLAKE2b at 32 and 64 bytes added), 831 Ed25519 lines: 28 key derivations (RFC 8032 and
+  `near-crypto` seeds), 13 key-pair checks, 29 `near-crypto` signatures, 233 key decodings and 528
+  verifications (bit flips in `R`, `S` and `A`, `S + kℓ`, the `S` boundary, the ZIP 215 matrix, the
+  identity key, small-order keys with an accepting `R` found by search, and mixed-order keys `A + T`
+  that verify when `k ≡ 0 mod 8`), 5964 secp256k1 lines and 1876 ristretto and VRF lines.
+  secp256k1: 16 secret keys (0, `n`, `n ± 1`, ...), 45 key derivations (small and edge scalars, 5
+  `near-crypto` seeds, random), 151 signatures (edge messages `0`, `n - 1`, `n`, `2²⁵⁶ - 1`, ...), 875 key
+  parses (valid in all forms, wrong tags and lengths, `x ≥ p`, off-curve, bit flips), 1820 recoveries
+  (all four ids on valid signatures and on small `r`, `r` and `s` over the 16 edge values, `r` around
+  `p - n`, high `s`, wrong message, `v` 4, 5, 255 and -1), 1579 verifications (170 accepted: bit flips of
+  `r`, `s`, the key and the message, other lengths, `v` 0 to 7 and 255, high `s`, `r + n`, `s + n`, edge `r` and
+  `s`, keys off the curve) and 1478 `ecrecover` lines. Ristretto and VRF: 273 decodings (the multiples of the
+  base point, `s = p + k`, odd `s`, random strings), 29 base multiples, 60 double products, 17 keys, 269
+  ed25519 key conversions (identity, the eight torsion points, `y ≥ p`, mixed-order, random), 93
+  value and proof computations, 847 verifications (24 accepted: wrong input, other key, bits of value and
+  proof, `r + ℓ`, `c + ℓ`, swapped halves, zero proof, odd and non-decodable values) and 10 block lines.
+  `tools/tests/test_crypto_fixtures.py` checks the files and cross-checks the SHA-2 and BLAKE2b digests
+  with `hashlib`, the secp256k1 keys, signatures and recoveries and the RFC 9496 multiples with plain
+  Python integers.
 - **Signatures in the M1 fixtures.** The Borsh fixtures do not hold the key of an approval, a header or
   an endorsement, and they stay byte for byte as they were, so the oracle writes
   `near-lean/node/fixtures/signatures.jsonl` beside them (the signatures and keys it made, per
-  line). `node-conformance-types` verifies in Lean 3923 recorded signatures found in their lines and
-  recomputes 1454 from the decoded values (transaction, delegate, block and chunk hashes, approvals,
-  endorsements, partial witnesses, contract messages, spice data) under the key in the value, the
-  recorded key or the line's signer. ML-DSA and secp256k1 are skipped.
+  line, 65-byte signatures and 64-byte keys for SECP256K1). `node-conformance-types` verifies in Lean 4229
+  recorded signatures found in their lines (306 of them secp256k1) and recomputes 1577 from the decoded
+  values (transaction, delegate, block and chunk hashes, approvals, endorsements, partial witnesses,
+  contract messages, spice data; 123 secp256k1) under the key in the value, the recorded key or the
+  line's signer. ML-DSA is skipped (M2c). A Python test verifies the recorded secp256k1 signatures
+  independently.
 - **Representation by benchmark.** The first `Impl` kept field elements as `Nat` below `p`: a product
   and one `%` cost 280 ns (the fold of the high half cost 900 ns), and Ed25519 verification 1.44 ms and
   signing 1.1 ms. Ten limbs of 25.5 bits on unboxed `UInt64` registers cost 53 ns a product and 30 ns a
-  square, and verification fell to 0.2 ms. Scalars stay `Nat`: a few operations per signature.
-- **Performance** (this development machine, 4 cores, release builds, mean time per call; the Lean
-  column is `node-bench`, the native one `crypto-bench` in `tools/node-conformance` on the crates
-  nearcore uses, `sha2` without SHA-NI here):
+  square, and verification fell to 0.2 ms. Scalars stay `Nat` for Ed25519: a few operations per signature.
+  For secp256k1, ten 26-bit limbs cost 58 ns a product and 38 ns a square, an inversion 8.9 µs. Three
+  measurements shaped the rest. The `Nat` extended Euclidean algorithm for scalars took 68 µs (30% of a
+  verification, 614 ns per `Nat` product and `%`); the binary algorithm on four unboxed limbs takes 8 µs,
+  is checked against the `Nat` algorithm on every call and serves the VRF scalars too. The endomorphism
+  `λ (x, y) = (β x, y)` (the split of `secp256k1_scalar_split_lambda`) halves the doublings: verification
+  fell from 293 to 148 µs and recovery from 296 to 173 µs. Combining the terms of each point formula
+  before reducing (generated with checked bounds, `PointOps`) took a scalar multiplication from 120 to
+  107 µs; carrying all limbs in two parallel passes was no faster and was not kept. BLAKE2b over an
+  array took 6.6 µs for 64 bytes; unrolled on registers 0.9 µs.
+- **Performance** (this development machine, 4 cores, release builds, mean time per call, best of
+  three runs; the Lean column is `node-bench`, the native one `crypto-bench` in `tools/node-conformance`
+  on the crates nearcore uses, `sha2` without SHA-NI here; the 64-byte hash rows include per-call setup):
 
   | | Lean | native | Lean / native | old `Near.Sha256` |
   |---|---|---|---|---|
-  | SHA-256 64 B | 1.16 µs | 0.65 µs | 1.8 | 11.0 µs |
-  | SHA-256 1 KiB | 6.7 µs | 5.2 µs | 1.3 | 63 µs |
-  | SHA-256 64 KiB | 386 µs | 304 µs | 1.3 | 3.9 ms |
-  | SHA-512 64 B / 1 KiB / 64 KiB | 1.03 µs / 5.1 µs / 250 µs | 0.31 / 2.5 / 139 µs | 3.4 / 2.1 / 1.8 | |
-  | Keccak-256 64 B / 1 KiB / 64 KiB | 1.35 µs / 7.0 µs / 393 µs | 0.44 / 3.3 / 201 µs | 3.1 / 2.1 / 2.0 | |
-  | Keccak-512 64 B / 1 KiB / 64 KiB | 1.21 µs / 12.1 µs / 730 µs | 0.43 / 6.3 / 371 µs | 2.8 / 1.9 / 2.0 | |
-  | RIPEMD-160 64 B / 1 KiB / 64 KiB | 2.1 µs / 15.1 µs / 893 µs | 0.48 / 3.8 / 228 µs | 4.4 / 3.9 / 3.9 | |
-  | Ed25519 verify (100 B message) | 202 µs | 41 µs | 4.9 | |
-  | Ed25519 sign, key pair decoded each time | 376 µs | 42 µs | 8.9 | |
-  | Ed25519 sign, key prepared | 156 µs | 19.6 µs | 8.0 | |
+  | SHA-256 64 B / 1 KiB / 64 KiB | 1.16 µs / 6.7 µs / 380 µs | 0.63 / 5.2 / 311 µs | 1.8 / 1.3 / 1.2 | 11.0 µs / 63 µs / 3.9 ms |
+  | SHA-512 64 B / 1 KiB / 64 KiB | 1.02 µs / 5.1 µs / 250 µs | 0.30 / 2.5 / 138 µs | 3.4 / 2.0 / 1.8 | |
+  | Keccak-256 64 B / 1 KiB / 64 KiB | 1.43 µs / 7.1 µs / 390 µs | 0.45 / 3.4 / 198 µs | 3.2 / 2.1 / 2.0 | |
+  | Keccak-512 64 B / 1 KiB / 64 KiB | 1.23 µs / 11.7 µs / 687 µs | 0.44 / 6.2 / 370 µs | 2.8 / 1.9 / 1.9 | |
+  | RIPEMD-160 64 B / 1 KiB / 64 KiB | 2.1 µs / 15.3 µs / 902 µs | 0.50 / 3.9 / 229 µs | 4.2 / 3.9 / 3.9 | |
+  | BLAKE2b-256 64 B / 1 KiB / 64 KiB | 0.84 µs / 3.0 µs / 161 µs | 0.19 / 1.4 / 81 µs | 4.3 / 2.1 / 2.0 | |
+  | BLAKE2b-512 64 B / 1 KiB / 64 KiB | 0.82 µs / 3.0 µs / 169 µs | 0.20 / 1.3 / 81 µs | 4.1 / 2.2 / 2.1 | |
+  | Ed25519 verify (100 B message) | 201 µs | 40.6 µs | 5.0 | |
+  | Ed25519 sign, key pair decoded each time | 300 µs | 42.5 µs | 7.1 | |
+  | Ed25519 sign, key prepared | 144 µs | 20.3 µs | 7.1 | |
+  | secp256k1 recover (32 B hash) | 164 µs | 44.7 µs | 3.7 | |
+  | secp256k1 verify (32 B hash) | 151 µs | 36.1 µs | 4.2 | |
+  | secp256k1 sign (32 B hash) | 111 µs | 34.2 µs | 3.3 | |
+  | VRF compute with proof (32 B input) | 476 µs | 69.9 µs | 6.8 | |
+  | VRF verify (32 B input) | 432 µs | 83.5 µs | 5.2 | |
 
   The new SHA-256 is 9.5 to 10 times faster than the list-based one the node used. The numbers vary by
-  up to 20% between runs on this shared machine. The native SHA-256 is the portable software one; a
-  CPU with SHA extensions makes the `sha2` crate several times faster, which pure Lean cannot match.
+  up to 20% (secp256k1 recovery by a factor of 1.9 between two runs) on this shared machine. The native
+  SHA-256 is the portable software one; a CPU with SHA extensions makes the `sha2` crate several times
+  faster, which pure Lean cannot match. The native secp256k1 and Ed25519 use 64-bit limbs with
+  128-bit products and large precomputed tables; the Lean code cannot (no 128-bit product), which is
+  part of the remaining factor.
 - **Proposed targets for M2** (from these measurements; the current code meets them): every hash within
   5x of the native crate at 1 KiB and 64 KiB (SHA-256 within 1.5x there, since every node hash goes
-  through it), Ed25519 verification within 6x (at most 0.25 ms, about 5,000 per second per core), signing
-  within 10x. A faster `Ed25519` is open work with known levers: avoid the carries of `add` and `sub`
-  where the next product tolerates wide limbs, convert field elements to bytes without `Nat`, a
-  fixed-base table for signing, and batch verification of the many signatures of a block, none of which
-  changes the `Spec`. The matching targets for M4 (trie) and M10 remain open below.
-- **Still to come.** M2b: secp256k1 (`ecrecover`, ECDSA verification) and the VRF of `near-crypto`'s
-  `vrf.rs`. M2c: ML-DSA-65. The `Merkle` row of the layer table stays in the node (M1 already has
-  `merklize`).
+  through it; BLAKE2b within 2.5x), Ed25519 verification within 6x (at most 0.25 ms, about 5,000 per
+  second per core), signing within 10x; secp256k1 verification and recovery within 5x (at most 0.2 ms,
+  about 5,000 per second per core, the rate an `ecrecover`-heavy contract needs), signing within 4x; the
+  VRF within 7x (at most 0.5 ms; nodes verify one per block). Open work with known levers, none of
+  which changes a `Spec`: for Ed25519 avoid the carries of `add` and `sub` where the next product
+  tolerates wide limbs (done for secp256k1 in the point formulas), convert field elements to bytes
+  without `Nat`, fixed-base comb tables for signing and the VRF; for secp256k1 a table of the variable
+  point with a shared denominator (`ge_globalz_set_table_gej`) and a wider window for the base point; and
+  batch verification of the many signatures of a block. The matching targets for M4 (trie) and M10 remain
+  open below.
+- **Still to come.** M2c: ML-DSA-65 (verification of the PQ keys and signatures that `near-crypto` accepts).
+  The `Merkle` row of the layer table stays in the node (M1 already has `merklize`).
 
 ## Open points
 
 - Numeric performance targets for M4 and M10, measured against nearcore (M2's are proposed above).
 - Whether crypto host functions in `NearVM` slow contract verification. If they
   do, `NearVM` takes host crypto as a parameter and the node supplies it. Today the VM takes its
-  digests and `ed25519Verify` as parameters; `NearCrypto` is a separate package it can import later.
+  digests, `ed25519Verify` and `ecrecover` as parameters; `NearCrypto` is a separate package it can import later.
