@@ -174,6 +174,26 @@ theorem randomSeedFn_noDeposits : HostCreatesNoDeposits randomSeedFn := by
   unfold randomSeedFn
   no_deposits_tac
 
+theorem sha256Fn_noDeposits : HostCreatesNoDeposits sha256Fn := by
+  intro st args
+  unfold sha256Fn digestFn
+  no_deposits_tac
+
+theorem keccak256Fn_noDeposits : HostCreatesNoDeposits keccak256Fn := by
+  intro st args
+  unfold keccak256Fn digestFn
+  no_deposits_tac
+
+theorem keccak512Fn_noDeposits : HostCreatesNoDeposits keccak512Fn := by
+  intro st args
+  unfold keccak512Fn digestFn
+  no_deposits_tac
+
+theorem ripemd160Fn_noDeposits : HostCreatesNoDeposits ripemd160Fn := by
+  intro st args
+  unfold ripemd160Fn digestFn
+  no_deposits_tac
+
 theorem logUtf8Fn_noDeposits : HostCreatesNoDeposits logUtf8Fn := by
   intro st args
   unfold logUtf8Fn

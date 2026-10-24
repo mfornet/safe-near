@@ -42,7 +42,7 @@ looks for simplifications that are neither marked nor listed.
 | `vm/NearVM/Run.lean` `runAttempt` (start) | Start function is an execution issue | Unsupported; no contract in the dataset has one |
 | `vm/NearVM/Run.lean` `runAttempt` (imports) | Six v86 host functions (`promise_set_refund_to`, state-init, `current_contract_code`, `refund_to_account_id`) are unknown imports | Not yet implemented; reported as `unsupportedHost` |
 | `vm/NearVM/Metered.lean` header, `prepareStorageCallAux` | Trie-node costs charged only with `storageAccounting` | Needs the chunk trie, which callers may omit |
-| `vm/NearVM/Metered.lean` `unsupportedRuntimeHost` | Crypto, validator, yield and global-deploy hosts are execution issues | Semantics not supplied by `VMContext` |
+| `vm/NearVM/Metered.lean` `unsupportedRuntimeHost` | Signature and curve, validator, yield and global-deploy hosts are execution issues; the hash hosts (SHA-256, Keccak-256/512, RIPEMD-160) run on pure Lean implementations | Semantics not supplied by `VMContext` |
 | `chain/NearChain/Step.lean` `step` | Block context arbitrary; receipt delivery any schedule | Over-approximates nearcore ordering; consensus out of scope |
 | `chain/NearChain/Step.lean` `settle` | Every settling block reuses one `ApplyState` | Test/proof helper, not block production |
 

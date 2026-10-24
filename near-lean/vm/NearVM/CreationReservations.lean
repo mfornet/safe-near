@@ -21,10 +21,12 @@ theorem preInvokeError_creation_checks (name : String) (st : HostStore NearState
     · rfl
     · simp only [Bool.or_eq_true, beq_iff_eq] at he
       rcases he with rfl | rfl <;> simp [allocatesPromise] at halloc
-  have hv : (name == "value_return") = false := by
-    cases he : name == "value_return"
+  have hv : spanInputHost name = false := by
+    cases he : spanInputHost name
     · rfl
-    · simp only [beq_iff_eq] at he; subst name; simp [allocatesPromise] at halloc
+    · simp only [spanInputHost, List.contains_cons, List.contains_nil, Bool.or_false, Bool.or_eq_true,
+        beq_iff_eq] at he
+      rcases he with rfl | rfl | rfl | rfl | rfl <;> simp [allocatesPromise] at halloc
   have hg : globalContractInputs? name = none := by
     simp only [allocatesPromise, List.contains_cons, List.contains_nil] at halloc
     simp only [globalContractInputs?]

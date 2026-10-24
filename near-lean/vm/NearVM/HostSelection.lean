@@ -132,6 +132,26 @@ theorem randomSeedFn_selection : HostPreservesSelection randomSeedFn := by
   unfold randomSeedFn
   host_selection_tac hwf
 
+theorem sha256Fn_selection : HostPreservesSelection sha256Fn := by
+  intro st args hwf
+  unfold sha256Fn digestFn
+  host_selection_tac hwf
+
+theorem keccak256Fn_selection : HostPreservesSelection keccak256Fn := by
+  intro st args hwf
+  unfold keccak256Fn digestFn
+  host_selection_tac hwf
+
+theorem keccak512Fn_selection : HostPreservesSelection keccak512Fn := by
+  intro st args hwf
+  unfold keccak512Fn digestFn
+  host_selection_tac hwf
+
+theorem ripemd160Fn_selection : HostPreservesSelection ripemd160Fn := by
+  intro st args hwf
+  unfold ripemd160Fn digestFn
+  host_selection_tac hwf
+
 theorem logUtf8Fn_selection : HostPreservesSelection logUtf8Fn := by
   intro st args hwf
   unfold logUtf8Fn

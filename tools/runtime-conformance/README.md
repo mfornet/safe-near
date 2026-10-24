@@ -91,6 +91,11 @@ body size, tables, table elements, locals) and the rejected imports (another
 module, globals, tables, memory): a no-op outcome with `PrepareError` and no
 gas. A module at the locals limit is left out: Wasmtime fails to compile it.
 
+`hashes.json` runs `sha256`, `keccak256`, `keccak512` and `ripemd160` (pure
+Lean in `near-lean/interface`) on empty, short and multi-block inputs, a chain
+of digests read from registers, an out-of-bounds read, an invalid register and
+gas exhaustion: digests, charges and errors match exactly.
+
 `promise_graphs.json` checks exact ordered receipt dependencies and returned
 receipt identity for ordinary, nested, duplicate and empty joins. Failure cases
 cover joint return/action restrictions, nonexistent handles, view calls and

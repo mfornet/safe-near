@@ -141,6 +141,26 @@ theorem randomSeedFn_preserves : HostPreservesPromises randomSeedFn := by
   unfold randomSeedFn
   host_dispatch_tac hwf
 
+theorem sha256Fn_preserves : HostPreservesPromises sha256Fn := by
+  intro st args hwf
+  unfold sha256Fn digestFn
+  host_dispatch_tac hwf
+
+theorem keccak256Fn_preserves : HostPreservesPromises keccak256Fn := by
+  intro st args hwf
+  unfold keccak256Fn digestFn
+  host_dispatch_tac hwf
+
+theorem keccak512Fn_preserves : HostPreservesPromises keccak512Fn := by
+  intro st args hwf
+  unfold keccak512Fn digestFn
+  host_dispatch_tac hwf
+
+theorem ripemd160Fn_preserves : HostPreservesPromises ripemd160Fn := by
+  intro st args hwf
+  unfold ripemd160Fn digestFn
+  host_dispatch_tac hwf
+
 theorem logUtf8Fn_preserves : HostPreservesPromises logUtf8Fn := by
   intro st args hwf
   unfold logUtf8Fn
@@ -208,6 +228,10 @@ theorem meteredHostFns_preserves (cfg : RuntimeConfig) (entry : ImportDecl × Ne
       | exact prepaidGasFn_preserves
       | exact usedGasFn_preserves
       | exact randomSeedFn_preserves
+      | exact sha256Fn_preserves
+      | exact keccak256Fn_preserves
+      | exact keccak512Fn_preserves
+      | exact ripemd160Fn_preserves
       | exact logUtf8Fn_preserves
       | exact logUtf16Fn_preserves
       | exact panicMetered_preserves

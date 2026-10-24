@@ -66,8 +66,10 @@ theorem meteredHostFns_encodingInvariant
     · exact attachedDepositFn_encodingFrame
   · apply meteredNeutral_encodingInvariant
     · exact logUtf8Fn_encodingFrame
-  · unsupported_encoding
-  · unsupported_encoding
+  · apply meteredNeutral_encodingInvariant
+    · exact sha256Fn_encodingFrame
+  · apply meteredNeutral_encodingInvariant
+    · exact keccak256Fn_encodingFrame
   · apply meteredNeutral_encodingInvariant
     · exact signerAccountPkFn_encodingFrame
   · apply meteredNeutral_encodingInvariant
@@ -100,8 +102,10 @@ theorem meteredHostFns_encodingInvariant
     trivial
   · intro st args hwf
     trivial
-  · unsupported_encoding
-  · unsupported_encoding
+  · apply meteredNeutral_encodingInvariant
+    · exact keccak512Fn_encodingFrame
+  · apply meteredNeutral_encodingInvariant
+    · exact ripemd160Fn_encodingFrame
   · unsupported_encoding
   · unsupported_encoding
   · apply meteredNeutral_encodingInvariant

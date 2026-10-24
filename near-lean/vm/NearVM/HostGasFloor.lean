@@ -136,8 +136,8 @@ theorem meteredHostFns_gasFloor (cfg : RuntimeConfig) (entry : ImportDecl × Nea
   · apply metered_preserves_gasFloor; exact HostPreservesGas.floor signerAccountIdFn_gas
   · apply metered_preserves_gasFloor; exact HostPreservesGas.floor attachedDepositFn_gas
   · apply metered_preserves_gasFloor; exact HostPreservesGas.floor logUtf8Fn_gas
-  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- sha256
-  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- keccak256
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor sha256Fn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor keccak256Fn_gas
   · apply metered_preserves_gasFloor; exact HostPreservesGas.floor signerAccountPkFn_gas
   · apply metered_preserves_gasFloor; exact HostPreservesGas.floor blockIndexFn_gas
   · apply metered_preserves_gasFloor; exact HostPreservesGas.floor blockIndexFn_gas
@@ -155,8 +155,8 @@ theorem meteredHostFns_gasFloor (cfg : RuntimeConfig) (entry : ImportDecl × Nea
   · intro b prepaid maxBurnt st args hwf; exact hwf -- storage_iter_prefix
   · intro b prepaid maxBurnt st args hwf; exact hwf -- storage_iter_range
   · intro b prepaid maxBurnt st args hwf; exact hwf -- storage_iter_next
-  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- keccak512
-  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- ripemd160
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor keccak512Fn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor ripemd160Fn_gas
   · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- ecrecover
   · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- ed25519_verify
   · apply metered_preserves_gasFloor; exact HostPreservesGas.floor randomSeedFn_gas

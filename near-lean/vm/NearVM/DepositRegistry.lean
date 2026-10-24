@@ -29,8 +29,8 @@ theorem meteredHostFns_funding (cfg : RuntimeConfig) (entry : ImportDecl × Near
   · apply metered_funding; exact signerAccountIdFn_noDeposits
   · apply metered_funding; exact attachedDepositFn_noDeposits
   · apply metered_funding; exact logUtf8Fn_noDeposits
-  · apply metered_funding; intro st args; trivial -- sha256
-  · apply metered_funding; intro st args; trivial -- keccak256
+  · apply metered_funding; exact sha256Fn_noDeposits
+  · apply metered_funding; exact keccak256Fn_noDeposits
   · apply metered_funding; exact signerAccountPkFn_noDeposits
   · apply metered_funding; exact blockIndexFn_noDeposits
   · apply metered_funding; exact blockIndexFn_noDeposits
@@ -48,8 +48,8 @@ theorem meteredHostFns_funding (cfg : RuntimeConfig) (entry : ImportDecl × Near
   · intro st args; trivial -- storage_iter_prefix
   · intro st args; trivial -- storage_iter_range
   · intro st args; trivial -- storage_iter_next
-  · apply metered_funding; intro st args; trivial -- keccak512
-  · apply metered_funding; intro st args; trivial -- ripemd160
+  · apply metered_funding; exact keccak512Fn_noDeposits
+  · apply metered_funding; exact ripemd160Fn_noDeposits
   · apply metered_funding; intro st args; trivial -- ecrecover
   · apply metered_funding; intro st args; trivial -- ed25519_verify
   · apply metered_funding; exact randomSeedFn_noDeposits

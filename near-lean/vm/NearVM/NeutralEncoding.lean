@@ -180,6 +180,26 @@ theorem randomSeedFn_encodingFrame : HostPreservesEncodingFrame randomSeedFn := 
   unfold randomSeedFn
   neutral_encoding_tac
 
+theorem sha256Fn_encodingFrame : HostPreservesEncodingFrame sha256Fn := by
+  intro st args
+  unfold sha256Fn digestFn
+  neutral_encoding_tac
+
+theorem keccak256Fn_encodingFrame : HostPreservesEncodingFrame keccak256Fn := by
+  intro st args
+  unfold keccak256Fn digestFn
+  neutral_encoding_tac
+
+theorem keccak512Fn_encodingFrame : HostPreservesEncodingFrame keccak512Fn := by
+  intro st args
+  unfold keccak512Fn digestFn
+  neutral_encoding_tac
+
+theorem ripemd160Fn_encodingFrame : HostPreservesEncodingFrame ripemd160Fn := by
+  intro st args
+  unfold ripemd160Fn digestFn
+  neutral_encoding_tac
+
 theorem promiseResultsCountFn_encodingFrame : HostPreservesEncodingFrame promiseResultsCountFn := by
   intro st args
   unfold promiseResultsCountFn

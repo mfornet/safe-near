@@ -215,7 +215,8 @@ def main (args : List String) : IO UInt32 := do
   -- Execute unsupported operations, rather than checking the host registry.
   -- Imports alone must remain usable for contracts with unreachable crypto code.
   for (name, params, arguments, results) in
-      [("sha256", "i64 i64 i64", "i64.const 0 i64.const 0 i64.const 0", ""),
+      [("ed25519_verify", "i64 i64 i64 i64 i64 i64",
+        "i64.const 0 i64.const 0 i64.const 0 i64.const 0 i64.const 0 i64.const 0", "(result i64)"),
        ("validator_total_stake", "i64", "i64.const 0", ""),
        ("promise_yield_resume", "i64 i64 i64 i64",
         "i64.const 0 i64.const 0 i64.const 0 i64.const 0", "(result i64)"),

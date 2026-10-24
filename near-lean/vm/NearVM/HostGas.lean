@@ -148,6 +148,26 @@ theorem randomSeedFn_gas : HostPreservesGas randomSeedFn := by
   unfold randomSeedFn
   host_gas_tac
 
+theorem sha256Fn_gas : HostPreservesGas sha256Fn := by
+  intro st args
+  unfold sha256Fn digestFn
+  host_gas_tac
+
+theorem keccak256Fn_gas : HostPreservesGas keccak256Fn := by
+  intro st args
+  unfold keccak256Fn digestFn
+  host_gas_tac
+
+theorem keccak512Fn_gas : HostPreservesGas keccak512Fn := by
+  intro st args
+  unfold keccak512Fn digestFn
+  host_gas_tac
+
+theorem ripemd160Fn_gas : HostPreservesGas ripemd160Fn := by
+  intro st args
+  unfold ripemd160Fn digestFn
+  host_gas_tac
+
 theorem logUtf8Fn_gas : HostPreservesGas logUtf8Fn := by
   intro st args
   unfold logUtf8Fn

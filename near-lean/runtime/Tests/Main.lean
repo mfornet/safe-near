@@ -390,8 +390,9 @@ def main (args : List String) : IO UInt32 := do
   -- Neither charged transactions, queued outgoing receipts nor a preceding
   -- successfully executed local receipt in the same apply may be committed.
   let unsupportedModule ← match ← Wat.compile
-      "(module (import \"env\" \"sha256\" (func $hash (param i64 i64 i64)))
-       (memory 1) (func (export \"test\") i64.const 0 i64.const 0 i64.const 0 call $hash))" with
+      "(module (import \"env\" \"ed25519_verify\" (func $verify (param i64 i64 i64 i64 i64 i64) (result i64)))
+       (memory 1) (func (export \"test\") i64.const 0 i64.const 0 i64.const 0 i64.const 0 i64.const 0
+         i64.const 0 call $verify drop))" with
     | .ok m => pure m
     | .error e => throw (IO.userError s!"unsupported runtime fixture: {e}")
   let unsupportedCode : ContractCode := { module := unsupportedModule, size := 0, hash := "unsupported-fixture" }
@@ -409,7 +410,7 @@ def main (args : List String) : IO UInt32 := do
   let stopped := Near.apply cfg World.ap (fun _ => unsupportedCode) unsupportedState
     [transferTx, localTransferTx, unsupportedTx] []
   check r "unsupported host is an apply issue, not a receipt failure"
-    ((stopped.issue.map (·.2)) == some (.unsupportedHost "sha256"))
+    ((stopped.issue.map (·.2)) == some (.unsupportedHost "ed25519_verify"))
   check r "unsupported apply publishes no outcomes, refunds or burnt tokens"
     (stopped.outcomes.isEmpty && stopped.outgoing.isEmpty && stopped.tokensBurnt == 0)
   check r "unsupported apply rolls back prior transfers and charged transaction balances"
@@ -425,7 +426,7 @@ def main (args : List String) : IO UInt32 := do
   let rejectedDelivery := Near.apply cfg World.ap (fun _ => unsupportedCode) accepted.state [] accepted.outgoing
   check r "unsupported contract execution is discovered at delivery, not transaction acceptance"
     (accepted.issue.isNone && accepted.outgoing.length == 2 && accepted.outcomes.length == 2
-      && rejectedDelivery.issue.map (·.2) == some (.unsupportedHost "sha256"))
+      && rejectedDelivery.issue.map (·.2) == some (.unsupportedHost "ed25519_verify"))
   check r "a delivery issue retains already committed transaction charges and nonces"
     (rejectedDelivery.state.totalBalance == accepted.state.totalBalance
       && rejectedDelivery.state.accessKey? "alice.near" (pkOf 1) == accepted.state.accessKey? "alice.near" (pkOf 1)

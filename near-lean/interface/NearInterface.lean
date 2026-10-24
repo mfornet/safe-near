@@ -6,3 +6,5 @@ import NearInterface.Boundary
 import NearInterface.Model
 import NearInterface.Refines
 import NearInterface.Json
+import NearInterface.Keccak
+import NearInterface.Ripemd160

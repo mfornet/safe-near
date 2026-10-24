@@ -401,18 +401,18 @@ def chargesBeforeUnvalidated (name : String) (st : HostStore NearState) (args : 
   | "validator_stake" =>
     [base, .ext "validator_stake_base"] ++ readSpan st (a 0) (a 1) ++ utf8 (spanLen st (a 0) (a 1)) ++ writeMem 16
   | "validator_total_stake" => [base, .ext "validator_total_stake_base"] ++ writeMem 16
-  | "sha256" =>
-    let n := spanLen st (a 0) (a 1)
-    [base, .ext "sha256_base", .ext "sha256_byte" n] ++ readSpan st (a 0) (a 1) ++ writeReg 32
-  | "keccak256" =>
-    let n := spanLen st (a 0) (a 1)
-    [base, .ext "keccak256_base", .ext "keccak256_byte" n] ++ readSpan st (a 0) (a 1) ++ writeReg 32
-  | "keccak512" =>
-    let n := spanLen st (a 0) (a 1)
-    [base, .ext "keccak512_base", .ext "keccak512_byte" n] ++ readSpan st (a 0) (a 1) ++ writeReg 64
-  | "ripemd160" =>
-    let n := spanLen st (a 0) (a 1)
-    [base, .ext "ripemd160_base", .ext "ripemd160_block" ((n + 8) / 64 + 1)] ++ readSpan st (a 0) (a 1) ++ writeReg 20
+  -- Hashes pay their own base (not `base`), read the input, then pay per byte
+  -- (per block for RIPEMD-160) and write the digest register (`logic.rs`).
+  | "sha256" | "keccak256" | "keccak512" | "ripemd160" =>
+    let (perInput, digest) : (Nat → Charge) × Nat := match name with
+      | "sha256" => (fun n => .ext "sha256_byte" n, 32)
+      | "keccak256" => (fun n => .ext "keccak256_byte" n, 32)
+      | "keccak512" => (fun n => .ext "keccak512_byte" n, 64)
+      | _ => (fun n => .ext "ripemd160_block" ((n + 8) / 64 + 1), 20)
+    [.ext (name ++ "_base")] ++ readSpan st (a 0) (a 1) ++
+      (match getMemOrReg st (a 1) (a 0) with
+       | some value => [perInput value.length] ++ writeReg digest
+       | none => [])
   | "ecrecover" =>
     [base, .ext "ecrecover_base"] ++ readSpan st (a 0) (a 1) ++ readSpan st (a 2) (a 3) ++ writeReg 64
   | "ed25519_verify" =>
@@ -605,6 +605,11 @@ theorem transferInputError_invalidAmount (st : HostStore NearState) (index amoun
     transferInputError st [.i64 index, .i64 amountPtr] = some .memoryAccessViolation := by
   simp only [transferInputError, h, Option.isNone_none, ite_true]
 
+/-- Hosts whose first argument pair is a value read before anything else is
+charged, so an unreadable value is nearcore's typed read error. -/
+def spanInputHost (name : String) : Bool :=
+  ["value_return", "sha256", "keccak256", "keccak512", "ripemd160"].contains name
+
 def invocationArgumentError (name : String) (st : HostStore NearState) (args : List Value) : Option HostError :=
   if let some plan := storageMutationPlan? name st args then plan.error
   else if name == "promise_and" then promiseJoinError st args
@@ -613,7 +618,7 @@ def invocationArgumentError (name : String) (st : HostStore NearState) (args : L
   else if let some byAccount := globalContractInputs? name then
     (globalContractPlan st byAccount (argU64 args 0).toNat (argU64 args 1) (argU64 args 2) false).error
   else if name == "log_utf8" || name == "log_utf16" then (logPlan name st args).error
-  else if name == "value_return" then
+  else if spanInputHost name then
     if (getMemOrReg st (argU64 args 1) (argU64 args 0)).isNone then
       some (spanReadError (argU64 args 0) (argU64 args 1))
     else none
@@ -1060,13 +1065,13 @@ def metered (extraBytes : Nat) (name : String) (fn : NearHostFn NearState) : Nea
         | some error => trapWith st1 error
         | none => invokeStorageCall extraBytes name fn st1 args }
 
--- nearcore divergence: hashing, signature, curve, validator, yield and global-deploy host
+-- nearcore divergence: signature, curve, validator, yield and global-deploy host
 -- functions are rejected as execution issues instead of being executed.
 /-- These host operations require semantics not supplied by `VMContext`.
 Reject them on invocation instead of using the functional host's placeholder
 crypto, validator, or yield implementations. Merely importing one is allowed. -/
 def unsupportedRuntimeHost (name : String) : Bool :=
-  ["sha256", "keccak256", "keccak512", "ripemd160", "ecrecover", "ed25519_verify",
+  ["ecrecover", "ed25519_verify",
    "validator_stake", "validator_total_stake", "promise_yield_create", "promise_yield_resume",
    "alt_bn128_g1_multiexp", "alt_bn128_g1_sum", "alt_bn128_pairing_check",
    "bls12381_g1_multiexp", "bls12381_g2_multiexp", "bls12381_map_fp_to_g1",

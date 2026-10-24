@@ -3,6 +3,9 @@ import NearVM.Error
 import NearVM.Gas
 import NearVM.TrieOverlay
 import NearInterface.Raw
+import NearInterface.Sha256
+import NearInterface.Keccak
+import NearInterface.Ripemd160
 
 /-!
 # NEAR host state (`α := NearState`)
@@ -151,10 +154,10 @@ structure NearState where
   /-- Successful `promise_yield_resume` payloads, newest last. -/
   yieldResumes : List (List UInt8 × List UInt8) := []
   config     : NearConfig := {}
-  sha256     : List UInt8 → List UInt8 := fun _ => []
-  keccak256  : List UInt8 → List UInt8 := fun _ => []
-  keccak512  : List UInt8 → List UInt8 := fun _ => []
-  ripemd160  : List UInt8 → List UInt8 := fun _ => []
+  sha256     : List UInt8 → List UInt8 := Near.Sha256.hash
+  keccak256  : List UInt8 → List UInt8 := Near.Keccak.keccak256
+  keccak512  : List UInt8 → List UInt8 := Near.Keccak.keccak512
+  ripemd160  : List UInt8 → List UInt8 := Near.Ripemd160.hash
   randomSeed : List UInt8 := []
   /-- Gas counter of this execution; charged by the metered host functions
   (`NearVM.Metered`) and by the step loop (`NearVM.Run`). -/
