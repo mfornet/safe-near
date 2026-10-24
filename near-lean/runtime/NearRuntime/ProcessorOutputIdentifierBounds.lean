@@ -83,7 +83,7 @@ theorem processReceipt_outputIds (cfg : RuntimeConfig) (ap : ApplyState) (decode
         · rename_i y hy
           split
           · rename_i a ha
-            have hyl := ((ChainState.idsBelowNext_iff st).mp hstate).yields (receipt.receiverId, dataId, y)
+            have hyl := ((ChainState.idsBelowNext_iff st).mp hstate).yields ((receipt.receiverId, dataId), y)
               (Assoc.lookup_some_mem _ _ _ hy)
             have hbase := resumeYieldState_idsBelowNext st (receipt.receiverId, dataId) hstate
             rw [runActionReceipt_eq]
@@ -149,10 +149,10 @@ theorem processWithInstants_identifier_bounds (cfg : RuntimeConfig) (ap : ApplyS
         · exact hb.2 x (List.mem_filter.mp hnew).1 id hid)
     (by
       rintro st' r' ⟨rfl, rfl⟩ hne
-      exact processReceipt_identifier_bounds cfg ap decoder st r' hstate hreceipt)
+      exact processReceipt_identifier_bounds cfg ap decoder st' r' hstate hreceipt)
     (by
       rintro st' r' ⟨rfl, rfl⟩ hi
-      have hb := processReceipt_identifier_bounds cfg ap decoder st r' hstate hreceipt
+      have hb := processReceipt_identifier_bounds cfg ap decoder st' r' hstate hreceipt
       refine ⟨hb.1, ?_, ?_⟩
       · intro x hx id hid
         exact hb.2 x (List.mem_filter.mp hx).1 id hid
