@@ -1,6 +1,7 @@
 import NearRuntime
 import Tests.Decoder
 import Tests.Gas
+import Tests.Shard
 import Wasm.Wat
 
 /-!
@@ -250,7 +251,8 @@ def main (args : List String) : IO UInt32 := do
   let cfg ← RuntimeConfig.load configs RuntimeConfig.latestVersion
   let decoderChecks ← NearRuntime.Tests.Decoder.run cfg
   let gasChecks ← NearRuntime.Tests.Gas.run cfg
-  r.modify fun report => { report with passed := report.passed + decoderChecks + gasChecks }
+  let shardChecks ← NearRuntime.Tests.Shard.run
+  r.modify fun report => { report with passed := report.passed + decoderChecks + gasChecks + shardChecks }
   let text ← IO.FS.readFile wat
   let module ← match ← Wat.compile text with
     | .ok m => pure m

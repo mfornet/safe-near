@@ -27,3 +27,8 @@ import NearRuntime.InstantFunding
 import NearRuntime.Boundary
 import NearRuntime.BoundarySeam
 import NearRuntime.BoundaryResolution
+import NearRuntime.Wire
+import NearRuntime.ShardLayout
+import NearRuntime.ChaCha
+import NearRuntime.Congestion
+import NearRuntime.Bandwidth
