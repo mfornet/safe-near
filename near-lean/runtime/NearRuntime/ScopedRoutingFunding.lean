@@ -202,7 +202,7 @@ theorem processReceipt_scopedWellFormed (cfg : RuntimeConfig) (ap : ApplyState) 
 /-- Running a stored receipt conserves the complete runtime-state ledger under the broader scope. -/
 theorem runActionReceipt_scope_conservation (cfg : RuntimeConfig) (ap : ApplyState)
     (decoder : Bytes → ContractCode) (st : ChainState) (receipt : Receipt) (action : ActionReceipt)
-    (results : List PromiseResult) (hwf : st.AccountsUnique) (hmissing : st.SystemAccountAbsent)
+    (results : List Wasm.PromiseResult) (hwf : st.AccountsUnique) (hmissing : st.SystemAccountAbsent)
     (haction : receipt.receipt = .action action) (hshape : ReceiptFinancialScope receipt)
     (hnew : cfg.accountCostIncrease = true) (hratio : cfg.fees.burntGasReward.1 ≤ cfg.fees.burntGasReward.2)
     (hsupported : (runActionReceipt cfg ap decoder st receipt action results).issue = none) :
