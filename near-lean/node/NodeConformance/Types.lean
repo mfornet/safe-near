@@ -2,6 +2,7 @@ import NodeConformance.Runner
 import NodeConformance.Chain
 import NodeConformance.Stateless
 import NodeConformance.Epoch
+import NodeConformance.Sync
 import NearNode.Protocol
 import NearNode.Primitives
 
@@ -21,7 +22,7 @@ private def hashOf (h : CryptoHash) : List (String × ByteArray) :=
 
 /-- Every fixture type with its check. -/
 def registry : List (String × Check) :=
-  chainRegistry ++ statelessRegistry ++ epochRegistry ++
+  chainRegistry ++ statelessRegistry ++ epochRegistry ++ syncRegistry ++
     [("Bool", check Bool), ("U128", check U128), ("String", check String),
       ("Bytes", check ByteArray), ("OptionU64", check (Option UInt64)),
       ("BytesMap", @check _ bytesMap fun _ => []), ("CryptoHash", check CryptoHash),
