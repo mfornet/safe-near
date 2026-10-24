@@ -3,12 +3,13 @@ import NearRuntime.ShardLayout
 import NearRuntime.ChaCha
 import NearRuntime.Congestion
 import NearRuntime.Bandwidth
+import NearRuntime.ShardSink
 
 /-! Shard machinery against values `rand 0.8.5`, `rand_chacha 0.3.1` and nearcore's own unit tests
 produce (`distribute_remaining.rs`, `bandwidth_scheduler.rs`). -/
 namespace NearRuntime.Tests.Shard
 
-open Near Near.Sharding Near.ChaCha Near.Congestion Near.Bandwidth
+open Near Near.Sharding Near.ChaCha Near.Congestion Near.Bandwidth Near.ShardSink
 
 private def require (count : IO.Ref Nat) (name : String) (ok : Bool) : IO Unit := do
   unless ok do
@@ -121,6 +122,80 @@ def run : IO Nat := do
   require count "mix of equal ends" (mix 7 7 0.3 == 7)
   require count "mix rounds" (mix 50 80 0.33 == 60 && mix 0 1000 0.5 == 500)
   require count "clamped fraction" (clampedFraction 5 10 == 0.5 && clampedFraction 10 10 == 1.0)
+  return ← count.get
+
+
+/-- A Borsh receipt header: predecessor, receiver, id, then the tag byte and `rest`. -/
+private def receiptBytes (receiver : String) (tag : UInt8) (rest : Bytes) : Bytes :=
+  let text (s : String) := Wire.little 4 s.toUTF8.toList.length ++ s.toUTF8.toList
+  text "alice.near" ++ text receiver ++ List.replicate 32 7 ++ [tag] ++ rest
+
+private def filler (n : Nat) : Bytes := List.replicate n 9
+
+private def shardFixture (limits : List (Nat × Limit)) : Sink :=
+  let layout := ShardLayout.mk ["m"] [0, 1]
+  { config := default, layout, shard := 0, info := {}, limits, buffers := {} }
+
+def runSink : IO Nat := do
+  let count ← IO.mkRef 0
+  let config : Config := { (default : Config) with maxReceiptSize := 4_194_304 }
+  let layout := ShardLayout.mk ["m"] [0, 1]
+  let route := Route.ofReceipt (receiptBytes "zed.near" 0 (filler 20))
+  require count "a receipt routes by its receiver" ((route.map (·.shard layout)) == .ok 1)
+  let dist := Route.ofReceipt (receiptBytes "system" 4 ([1, 0] ++ List.replicate 32 3 ++ Wire.little 8 0 ++ filler 4))
+  require count "a distribution routes by its target shard" ((dist.map (·.shard layout)) == .ok 0)
+  let sink : Sink := { shardFixture [(1, { gas := 1000, size := 500 }), (0, { gas := gasMax, size := 500 })]
+    with config }
+  let near := receiptBytes "a.near" 0 (filler 100)
+  let far := receiptBytes "zed.near" 0 (filler 100)
+  -- the first fits, the second no longer does and is buffered with its metadata
+  let r := sink.forwardOrBuffer far 600 >>= fun s => s.forwardOrBuffer far 600
+  match r with
+  | .error e => throw (IO.userError s!"sink: {e}")
+  | .ok s =>
+    require count "an unaffordable receipt is buffered, not sent"
+      (s.outgoing == [far] && s.buffers.length 1 == 1 && s.info.bufferedGas == 600 &&
+        s.info.receiptBytes == far.length)
+  match sink.forwardOrBuffer near 5 with
+  | .error e => throw (IO.userError s!"sink: {e}")
+  | .ok s => require count "an affordable receipt is sent at once" (s.outgoing == [near] && s.buffers.queues.isEmpty)
+  -- groups: two receipts of 100 kB share a group only up to the bound
+  let small := receiptBytes "zed.near" 0 (filler 50)
+  let blocked : Sink := { sink with limits := [(1, { gas := 1000, size := 0 })] }
+  let big := blocked.forwardOrBuffer small 0 >>= fun s => s.forwardOrBuffer small 0
+  match big with
+  | .error e => throw (IO.userError s!"sink: {e}")
+  | .ok s =>
+    let groups := ((s.buffers.groups.find? (·.1 == 1)).map (·.2)).getD {}
+    require count "receipts of one buffer share a group"
+      (groups.groups.length == 1 && groups.totalReceipts == 2 && groups.totalSize == 2 * small.length)
+    -- the round trip of the raw columns, and the bytes nearcore stores for a 2-receipt group
+    match s.buffers.entries with
+    | .error e => throw (IO.userError s!"entries: {e}")
+    | .ok entries =>
+      require count "buffer columns round trip" ((Buffers.ofEntries entries).toOption == some s.buffers)
+      require count "group queue data layout"
+        (entries.contains ([16] ++ Wire.little 8 1,
+          [0] ++ Wire.little 8 0 ++ Wire.little 8 1 ++ Wire.little 8 (2 * small.length) ++ Wire.little 16 0 ++
+            Wire.little 8 2))
+  -- bandwidth requests ask for the group sizes above the base bandwidth
+  let oversize := receiptBytes "zed.near" 0 (filler 150_000)
+  match blocked.forwardOrBuffer oversize 0 with
+  | .error e => throw (IO.userError s!"sink: {e}")
+  | .ok s =>
+    require count "a large buffered receipt makes a request"
+      ((s.requests (Params.protocol 2 4_194_304)).length == 1)
+  -- forwarding from the buffer stops at the first receipt that does not fit
+  match (blocked.forwardOrBuffer far 600 >>= fun s => s.forwardOrBuffer far 600) with
+  | .error e => throw (IO.userError s!"sink: {e}")
+  | .ok s =>
+    let again := { s with outgoing := [], limits := [(1, { gas := 700, size := 10_000 })] }
+    match again.forwardFromBuffer 1 with
+    | .error e => throw (IO.userError s!"forward: {e}")
+    | .ok t =>
+      require count "buffered receipts are sent once they fit"
+        (t.outgoing == [far] && t.buffers.length 1 == 1 && t.info.bufferedGas == 600 &&
+          t.info.receiptBytes == far.length && (t.buffers.entries.toOption.map (·.length)) == some 4)
   return ← count.get
 
 end NearRuntime.Tests.Shard

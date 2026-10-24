@@ -252,7 +252,8 @@ def main (args : List String) : IO UInt32 := do
   let decoderChecks ← NearRuntime.Tests.Decoder.run cfg
   let gasChecks ← NearRuntime.Tests.Gas.run cfg
   let shardChecks ← NearRuntime.Tests.Shard.run
-  r.modify fun report => { report with passed := report.passed + decoderChecks + gasChecks + shardChecks }
+  let sinkChecks ← NearRuntime.Tests.Shard.runSink
+  r.modify fun report => { report with passed := report.passed + decoderChecks + gasChecks + shardChecks + sinkChecks }
   let text ← IO.FS.readFile wat
   let module ← match ← Wat.compile text with
     | .ok m => pure m

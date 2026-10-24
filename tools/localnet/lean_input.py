@@ -32,6 +32,8 @@ EMPTY_CODE_HASH = "1" * 32
 # columns of the raw trie the Lean state model has a place for
 MODEL_COLUMNS = {0, 1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 18, 19, 20}
 SCHEDULER_COLUMN = 15
+# the outgoing buffers: indices, receipts, and the receipt group metadata (13, 14, 16, 17) are decoded by Lean itself
+BUFFER_COLUMNS = {13, 14, 16, 17}
 UNREPRESENTED_ACTIONS = {
     "DeterministicStateInit": "action DeterministicStateInit",
 }
@@ -79,6 +81,18 @@ def public_key(text: str) -> list[int]:
     return [prefix] + list(b58(body))
 
 
+def layout_shard_ids(layout_hex: str) -> list[int]:
+    """Shard ids of a Borsh ``ShardLayout::V2`` in layout order (Lean parses and checks the rest)."""
+    raw = bytes.fromhex(layout_hex)
+    if raw[0] != 2:
+        raise Unsupported([f"shard layout version {raw[0]}"])
+    at = 5
+    for _ in range(int.from_bytes(raw[1:5], "little")):
+        at += 4 + int.from_bytes(raw[at:at + 4], "little")
+    count = int.from_bytes(raw[at:at + 4], "little")
+    return [int.from_bytes(raw[at + 4 + 8 * i:at + 12 + 8 * i], "little") for i in range(count)]
+
+
 def view_action_kinds(actions) -> list[str]:
     return corpus.action_kinds(actions)
 
@@ -88,10 +102,8 @@ def blockers(bundle: dict) -> list[str]:
     """Features of this chunk the Lean model cannot express, most fundamental first."""
     found: list[str] = []
     context, inputs, expected = bundle["context"], bundle["inputs"], bundle["expected"]
-    if len(context["congestionInfo"]) > 1:
-        found.append("multi-shard layout (the chunk model assumes the single-shard reference layout)")
     for number in sorted({column(key) for key, _ in bundle["preState"]["entries"]}):
-        if number not in MODEL_COLUMNS and number != SCHEDULER_COLUMN:
+        if number not in MODEL_COLUMNS and number != SCHEDULER_COLUMN and number not in BUFFER_COLUMNS:
             found.append(f"pre-state column {column_name(number)}")
     kinds: list[str] = []
     for row in inputs["transactions"]:
@@ -182,6 +194,24 @@ def transaction_block_hash(raw: bytes) -> list[int]:
     _, at = read_string(raw, at)
     return list(raw[at:at + 32])
 
+
+
+def delayed_form(raw: bytes) -> tuple[bytes, dict]:
+    """The receipt bytes of a delayed queue entry and how it was stored (``StateStoredReceipt`` or plain)."""
+    if raw[:2] == b"\xff\xff":
+        version = raw[2]
+        if version not in (0, 1):
+            raise Unsupported([f"state-stored receipt version {version}"])
+        return raw[3:-16], {"kind": f"storedV{version}", "gas": int.from_bytes(raw[-16:-8], "little"),
+                            "size": int.from_bytes(raw[-8:], "little")}
+    return raw, {"kind": "receipt"}
+
+
+def received_payload(data) -> list[int] | None:
+    """``ReceivedData.data`` of a decoded record: absent, or the bytes."""
+    if data is None:
+        return None
+    return list(base64.b64decode(data)) if isinstance(data, str) else list(data)
 
 
 class Reader:
@@ -371,6 +401,23 @@ class Converter:
                 "receipt": body}, kind
 
     # --- columns the state view leaves undecoded: read straight from the raw trie entries -----------------------
+    def state_receipt(self, record: dict, raw: bytes) -> dict:
+        """A receipt stored in the shard (postponed or delayed) as the model's receipt JSON."""
+        name, payload = next(iter(record["receipt"].items()))
+        if name in ("Action", "ActionV2"):
+            variant = "Action"
+        elif name == "Data":
+            variant = name
+            if isinstance(payload.get("data"), list):                    # the typed form lists the bytes
+                payload = dict(payload, data=base64.b64encode(bytes(payload["data"])).decode())
+        else:
+            variant = name
+        view = {"predecessor_id": record["predecessor_id"], "receiver_id": record["receiver_id"],
+                "receipt_id": record["receipt_id"], "receipt": {variant: payload}}
+        receipt, kind = self.model_receipt(view, {"receipt": record["receipt"]}, raw)
+        self.yield_formats.append([receipt["receiptId"], kind if kind in ("legacy", "v2") else "legacy"])
+        return receipt
+
     def raw_action(self, reader: Reader) -> dict:
         tag = reader.take(1)[0]
         if tag == 0:
@@ -481,6 +528,8 @@ class Converter:
     def state(self) -> tuple[dict, dict | None, dict]:
         """Model state from the decoded pre-state records; also the delayed-queue header and the scheduler."""
         accounts, keys, storage, contracts, gas_nonces = [], [], {}, {}, []
+        postponed, counts, by_data, received, delayed_rows = [], [], [], [], []
+        raw_entries = {key: value for key, value in self.bundle["preState"]["entries"]}
         for row in self.decoded["preState"]:
             if "decodeError" in row:
                 raise Unsupported([f"pre-state record that upstream cannot decode ({row['decodeError']})"])
@@ -516,8 +565,20 @@ class Converter:
                 label = nc.b58encode(hashlib.sha256(blob).digest())
                 self.codes[label] = blob
                 contracts[value["account_id"]] = label
-            elif kind in ("PostponedReceipt", "PostponedReceiptId", "PendingDataCount", "ReceivedData", "DelayedReceipt"):
-                raise Unsupported([f"pre-state callback or delayed-queue record {kind}"])
+            elif kind == "PostponedReceipt":
+                receipt = self.state_receipt(value, bytes.fromhex(raw_entries[row["key"]]))
+                postponed.append([receipt["receiptId"], receipt])
+            elif kind == "PostponedReceiptId":
+                self.data_receivers[value["data_id"]] = value["account_id"]
+                by_data.append([self.fresh(self.data_ids, value["data_id"]),
+                                self.fresh(self.receipt_ids, value["receipt_id"])])
+            elif kind == "PendingDataCount":
+                counts.append([self.fresh(self.receipt_ids, value["receipt_id"]), value["count"]])
+            elif kind == "ReceivedData":
+                self.data_receivers[value["data_id"]] = value["account_id"]
+                received.append([self.fresh(self.data_ids, value["data_id"]), received_payload(value["data"])])
+            elif kind == "DelayedReceipt":
+                delayed_rows.append((row["queueIndex"], row["key"], value))
             else:
                 raise Unsupported([f"pre-state record {kind}"])
         for identifier, account in accounts:
@@ -526,24 +587,30 @@ class Converter:
                 raise Unsupported(["account code hash without a matching contract record"])
         state = {"accounts": accounts, "accessKeys": keys,
                  "storage": [[name, sorted(rows)] for name, rows in sorted(storage.items())],
-                 "postponed": [], "pendingDataCount": [], "postponedByData": [], "receivedData": [], "delayed": [],
+                 "postponed": postponed, "pendingDataCount": counts, "postponedByData": by_data,
+                 "receivedData": received, "delayed": [],
                  "nextId": 1, "gasKeyNonces": gas_nonces, **self.raw_columns()}
-        entries = {key: value for key, value in self.bundle["preState"]["entries"]}
+        entries = raw_entries
         header = entries.get("07")
         delayed = None
         if header is not None:
             raw = bytes.fromhex(header)
             first, last = int.from_bytes(raw[:8], "little"), int.from_bytes(raw[8:16], "little")
-            if first != last or len(raw) != 16:
-                raise Unsupported(["pre-state delayed receipt queue"])
-            delayed = {"firstIndex": first, "forms": []}
+            if len(raw) != 16 or [index for index, _, _ in sorted(delayed_rows)] != list(range(first, last)):
+                raise Unsupported(["pre-state delayed receipt queue header disagrees with its entries"])
+            forms = []
+            for index, key, record in sorted(delayed_rows):
+                body, form = delayed_form(bytes.fromhex(entries[key]))
+                receipt = self.state_receipt(record, body)
+                state["delayed"].append(receipt)
+                forms.append(form)
+            delayed = {"firstIndex": first, "forms": forms}
+        elif delayed_rows:
+            raise Unsupported(["delayed receipts without a queue header"])
         scheduler = None
         value = entries.get("0f")
         if value is not None:
-            raw = bytes.fromhex(value)
-            if len(raw) != 61 or raw[0] != 0 or int.from_bytes(raw[1:5], "little") != 1:
-                raise Unsupported(["bandwidth scheduler state with more than one link"])
-            scheduler = {"allowance": int.from_bytes(raw[21:29], "little"), "sanity": list(raw[29:61])}
+            scheduler = {"raw": list(bytes.fromhex(value))}
         return state, delayed, scheduler
 
     def build(self) -> dict:
@@ -583,14 +650,20 @@ class Converter:
                         "gasLimit": context["gasLimit"], "randomSeed": list(bytes.fromhex(context["randomSeed"])),
                         "transactions": transactions, "incomingIndices": None,
                         "chainId": bundle["meta"]["chainId"], "shardId": bundle["meta"]["shardId"],
-                        "shardIds": [bundle["meta"]["shardId"]]}],
+                        "shardIds": layout_shard_ids(context["shardLayout"])}],
             "transactionBlockHashes": [hashes], "queueContext": registry,
             "schedulerInputs": [{"congestionInfo": [[shard, list(bytes.fromhex(info)), missed]
                                                     for shard, info, missed in context["congestionInfo"]],
-                                 "bandwidthRequests": list(bytes.fromhex(context["bandwidthRequests"]))}],
+                                 "bandwidthRequests": list(bytes.fromhex(context["bandwidthRequests"])),
+                                 "shardLayout": list(bytes.fromhex(context["shardLayout"])),
+                                 "prevBlockHash": list(bytes.fromhex(context["prevBlockHash"]))}],
         }
         if scheduler is not None:
             request["initialScheduler"] = scheduler
+        buffers = [[list(bytes.fromhex(key)), list(bytes.fromhex(value))]
+                   for key, value in bundle["preState"]["entries"] if column(key) in BUFFER_COLUMNS]
+        if buffers:
+            request["initialBuffers"] = buffers
         return request
 
 
@@ -703,6 +776,13 @@ def compare(bundle: dict, request: dict, answer: dict, extra: list[str]) -> None
         raise Mismatch("balanceStats.burnt", extra)
     if int(trace["execution"]["subsidizedAmount"]) != int(stats["subsidized"]):
         raise Mismatch("balanceStats.subsidized", extra)
+    published = {"congestionInfo": bytes(trace["congestionInfo"]).hex(),
+                 "bandwidthRequests": bytes(trace["bandwidthRequests"]).hex(),
+                 "bandwidthSchedulerStateHash": bytes(trace["schedulerStateHash"]).hex(),
+                 "delayedReceiptsCount": trace["delayedReceiptsCount"]}
+    for name, value in published.items():
+        if expected[name] != value:
+            raise Mismatch(name, extra)
     difference = first_state_difference(expected_post_state(bundle), entry_map(trace["chunkEntries"]), "postState")
     if difference:
         raise Mismatch(difference, extra)

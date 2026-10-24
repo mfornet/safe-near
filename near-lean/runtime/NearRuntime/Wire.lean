@@ -46,4 +46,8 @@ def run (parser : Parser α) (bytes : Bytes) : Except String α := do
   unless rest.isEmpty do throw "trailing bytes"
   return value
 
+/-- Run a parser on the start of a record and ignore what follows. -/
+def runPrefix (parser : Parser α) (bytes : Bytes) : Except String α := do
+  return (← parser.run bytes).1
+
 end Near.Wire
