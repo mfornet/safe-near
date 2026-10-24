@@ -35,4 +35,11 @@ def storageRegistry : List (String × Check) :=
     ("StateChangesForShard", check StateChangesForShard),
     ("StateChangesForBlock", check StateChangesForBlock),
     ("StateChangesForBlockRange", check StateChangesForBlockRange),
-    ("RawTrieNodeWithSize", check RawTrieNodeWithSize nodeHashes)]
+    ("RawTrieNodeWithSize", check RawTrieNodeWithSize nodeHashes),
+    ("FlatBlockInfo", check FlatBlockInfo),
+    ("FlatStateDeltaMetadata", check FlatStateDeltaMetadata),
+    ("FlatStateChanges", check FlatStateChanges),
+    ("KeyForFlatStateDelta",
+      check (ShardUId × CryptoHash) fun (u, h) => [("key", u.key ++ h.bytes)]),
+    ("FlatStorageStatus", check FlatStorageStatus),
+    ("ShardUIdKey", check ShardUId fun u => [("key", u.key)])]

@@ -1,6 +1,7 @@
 import NearNode.Store
 import NearNode.Trie
 import NodeTests.Rng
+import NodeTests.FlatTests
 
 /-!
 `node-store-tests [CASES [CHUNKS]]`: the persistent store.
@@ -436,6 +437,17 @@ private def corpusTests (dir : System.FilePath) (count : Nat) : IO Bool := do
   for f in files do
     cases := cases.push (← IO.ofExcept ((parseCase.run' { data := ← IO.FS.readBinFile f })))
   let shard := shardUIdKey 0 0
+  let mut flatOk := true
+  let mut inlined := 0
+  let mut refs := 0
+  for i in [0:min 12 cases.size] do
+    let (preRoot, pre, diff, postRoot) := cases[i]!
+    let (good, a, b) ← FlatTests.corpusChunk (files[i]!.fileStem.getD "?") preRoot postRoot pre diff
+    flatOk := flatOk && good
+    inlined := inlined + a
+    refs := refs + b
+  IO.println
+      s!"  flat storage on {min 12 cases.size} chunks: {if flatOk then "ok" else "FAILED"} ({inlined} inlined values, {refs} references)"
   let work ← tempDir "corpus"
   let started ← IO.monoMsNow
   let (s, _) ← Store.open (work / "a") { logLimit := 1 <<< 40 }
@@ -447,7 +459,7 @@ private def corpusTests (dir : System.FilePath) (count : Nat) : IO Bool := do
   IO.println
       s!"  {cases.size} chunks, {total} commits, log {logSize / 1024} KiB, written in {(← IO.monoMsNow) - started} ms"
   -- clean restart
-  let mut ok := true
+  let mut ok := flatOk
   let t0 ← IO.monoMsNow
   let (s, r) ← Store.open (work / "a")
   ok :=
@@ -530,6 +542,9 @@ def main (args : List String) : IO UInt32 := do
   IO.println "log cut at every byte, flipped byte in every record: done"
   ok := ok && (← compactionCrash 5)
   IO.println "crash in compaction: done"
+  for seed in [0:40] do
+    ok := ok && (← FlatTests.model seed)
+  IO.println "flat storage against a model of forked chains: done"
   if let some dir := args.head? then
     let count := (args[1]? >>= String.toNat?).getD 60
     IO.println s!"corpus store test on {dir}"

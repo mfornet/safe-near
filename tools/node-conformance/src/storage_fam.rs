@@ -18,6 +18,8 @@ use near_primitives::types::{
     StateChangesForBlockRange, StateChangesForShard,
 };
 use near_primitives_core::types::ShardId;
+use near_primitives::shard_layout::ShardUId;
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 fn handle(g: &mut G) -> PublicKeyHandle {
@@ -178,6 +180,84 @@ pub struct RawTrieNodeWithSize {
 
 // ---- end of copy ----
 
+
+// ---- copied from core/store/src/flat/{types,delta}.rs ----
+
+#[derive(BorshSerialize, BorshDeserialize, Debug, Copy, Clone, PartialEq, Eq)]
+pub struct BlockInfo {
+    pub hash: CryptoHash,
+    pub height: u64,
+    pub prev_hash: CryptoHash,
+}
+
+#[derive(BorshSerialize, BorshDeserialize, Debug, Clone, Copy)]
+pub struct BlockWithChangesInfo {
+    pub hash: CryptoHash,
+    pub height: u64,
+}
+
+#[derive(BorshSerialize, BorshDeserialize, Debug, Clone, Copy)]
+pub struct FlatStateDeltaMetadata {
+    pub block: BlockInfo,
+    pub prev_block_with_changes: Option<BlockWithChangesInfo>,
+}
+
+#[derive(BorshSerialize, BorshDeserialize, Debug)]
+pub struct KeyForFlatStateDelta {
+    pub shard_uid: ShardUId,
+    pub block_hash: CryptoHash,
+}
+
+#[derive(BorshSerialize, BorshDeserialize, Clone, Default, PartialEq, Eq)]
+pub struct FlatStateChanges(pub HashMap<Vec<u8>, Option<FlatStateValue>>);
+
+#[derive(BorshSerialize, BorshDeserialize, Debug, PartialEq, Eq, Clone)]
+pub struct FlatStorageReadyStatus {
+    pub flat_head: BlockInfo,
+}
+
+/// The variants a node uses: the full enum also has `Creation = 2` (deprecated) and
+/// `Resharding = 4`, which this copy omits.
+#[derive(BorshSerialize, BorshDeserialize, Debug, PartialEq, Eq, Clone)]
+#[borsh(use_discriminant = true)]
+#[repr(u8)]
+pub enum FlatStorageStatus {
+    Disabled = 0,
+    Empty = 1,
+    Ready(FlatStorageReadyStatus) = 3,
+}
+
+// ---- end of copy ----
+
+fn block_info(g: &mut G) -> BlockInfo {
+    BlockInfo { hash: g.hash(), height: g.u64(), prev_hash: g.hash() }
+}
+
+fn delta_metadata(g: &mut G) -> FlatStateDeltaMetadata {
+    FlatStateDeltaMetadata {
+        block: block_info(g),
+        prev_block_with_changes: g.opt(|g| BlockWithChangesInfo { hash: g.hash(), height: g.u64() }),
+    }
+}
+
+fn flat_changes(g: &mut G) -> FlatStateChanges {
+    FlatStateChanges(
+        g.vec(5, |g| {
+            let k = g.bytes(12);
+            let v = g.opt(|g| {
+                if g.bool() { FlatStateValue::Ref(value_ref(g)) } else { FlatStateValue::Inlined(g.bytes(40)) }
+            });
+            (k, v)
+        })
+        .into_iter()
+        .collect(),
+    )
+}
+
+fn shard_uid(g: &mut G) -> ShardUId {
+    ShardUId { version: g.u32(), shard_id: g.u32() }
+}
+
 fn children(g: &mut G) -> Children {
     let mut c = Children([None; 16]);
     for slot in c.0.iter_mut() {
@@ -310,6 +390,55 @@ pub fn storage(m: &mut Manifest, dir: &PathBuf) {
     empty_branch.extend(42u64.to_le_bytes());
     f.raw("branch-no-children", empty_branch);
     f.raw("tag4", vec![4; 60]);
+    f.finish(m, dir);
+
+    let mut f = Fam::<BlockInfo>::new("FlatBlockInfo", SEED);
+    f.rand(20, block_info);
+    f.finish(m, dir);
+
+    let mut f = Fam::<FlatStateDeltaMetadata>::new("FlatStateDeltaMetadata", SEED);
+    f.rand(30, delta_metadata);
+    f.raw("tag2", {
+        let mut b = vec![0u8; 72];
+        b.push(2);
+        b
+    });
+    f.finish(m, dir);
+
+    let mut f = Fam::<FlatStateChanges>::new("FlatStateChanges", SEED);
+    f.edge("empty", FlatStateChanges::default());
+    f.rand(30, flat_changes);
+    // unsorted entries decode and re-encode sorted
+    let entry = |k: u8| {
+        let mut b = vec![1, 0, 0, 0, k];
+        b.push(0);
+        b
+    };
+    let mut unsorted = 2u32.to_le_bytes().to_vec();
+    unsorted.extend(entry(9));
+    unsorted.extend(entry(3));
+    f.raw("unsorted", unsorted);
+    f.finish(m, dir);
+
+    let mut f = Fam::<KeyForFlatStateDelta>::new("KeyForFlatStateDelta", SEED);
+    f.hash(|k| {
+        let mut key = k.shard_uid.to_bytes().to_vec();
+        key.extend(k.block_hash.as_bytes());
+        vec![("key", hex(&key))]
+    });
+    f.rand(20, |g| KeyForFlatStateDelta { shard_uid: shard_uid(g), block_hash: g.hash() });
+    f.finish(m, dir);
+
+    let mut f = Fam::<FlatStorageStatus>::new("FlatStorageStatus", SEED);
+    f.edge("disabled", FlatStorageStatus::Disabled);
+    f.edge("empty", FlatStorageStatus::Empty);
+    f.rand(20, |g| FlatStorageStatus::Ready(FlatStorageReadyStatus { flat_head: block_info(g) }));
+    f.raw("tag5", vec![5]);
+    f.finish(m, dir);
+
+    let mut f = Fam::<ShardUId>::new("ShardUIdKey", SEED);
+    f.hash(|u| vec![("key", hex(&u.to_bytes()))]);
+    f.rand(20, shard_uid);
     f.finish(m, dir);
 
     let _ = KeyType::ED25519;

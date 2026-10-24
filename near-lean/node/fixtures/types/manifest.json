@@ -432,9 +432,25 @@
       "accept": 48,
       "reject": 46
     },
+    "FlatBlockInfo": {
+      "accept": 44,
+      "reject": 36
+    },
+    "FlatStateChanges": {
+      "accept": 23,
+      "reject": 37
+    },
+    "FlatStateDeltaMetadata": {
+      "accept": 54,
+      "reject": 37
+    },
     "FlatStateValue": {
       "accept": 52,
       "reject": 66
+    },
+    "FlatStorageStatus": {
+      "accept": 34,
+      "reject": 55
     },
     "FunctionCallError": {
       "accept": 29,
@@ -471,6 +487,10 @@
     "InvalidTxError": {
       "accept": 111,
       "reject": 116
+    },
+    "KeyForFlatStateDelta": {
+      "accept": 43,
+      "reject": 36
     },
     "LinkAllowance": {
       "accept": 30,
@@ -735,6 +755,10 @@
     "ShardUId": {
       "accept": 29,
       "reject": 28
+    },
+    "ShardUIdKey": {
+      "accept": 41,
+      "reject": 31
     },
     "Signature": {
       "accept": 52,
