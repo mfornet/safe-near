@@ -25,7 +25,8 @@ class NodeIsolationTests(unittest.TestCase):
         self.package("near-lean/vm", [])
         self.package("near-lean/runtime", ["../vm"])
         self.package("near-lean/chain", ["../runtime"])
-        self.package("near-lean/node", ["../chain"])
+        self.package("near-lean/crypto", [])
+        self.package("near-lean/node", ["../chain", "../crypto"])
         self.write("near-lean/node/NearNode/Protocol.lean", PROTOCOL)
         self.package("contracts/c/verification", ["../../../near-lean/runtime"])
 
@@ -50,6 +51,17 @@ class NodeIsolationTests(unittest.TestCase):
     def test_only_node_may_require_node(self):
         self.package("near-lean/tool", ["../node"])
         self.assertEqual(isolation.check(self.root), ["near-lean/tool: only the node may depend on near-lean/node"])
+
+    def test_crypto_requires_no_repository_package(self):
+        self.package("near-lean/crypto", ["../vm"])
+        self.assertEqual(
+            isolation.check(self.root),
+            ["near-lean/crypto: the crypto package must not require repository packages (near-lean/vm)"])
+
+    def test_crypto_may_not_require_the_node(self):
+        self.package("near-lean/crypto", ["../node"])
+        errors = isolation.check(self.root)
+        self.assertIn("near-lean/crypto: only the node may depend on near-lean/node", errors)
 
     def test_native_attributes_and_link_settings_fail(self):
         self.write("near-lean/vm/A.lean", "-- prose about extern is fine\n@[extern \"f\"] opaque f : Nat\n")

@@ -1,0 +1,25 @@
+# NearCrypto: pure-Lean hashes, curves and signatures for the NEAR node
+# (notes/design/NEAR_NODE.md, milestone M2).
+#
+# Requires nothing from this repository, so NearVM can adopt it later without
+# pulling the node in (`just node-isolation`).
+name = "NearCrypto"
+version = "0.1.0"
+defaultTargets = ["NearCrypto", "crypto-conformance", "crypto-differential"]
+packagesDir = "../.lake/packages"
+
+[[lean_lib]]
+name = "NearCrypto"
+
+# `lake exe crypto-conformance`: every primitive against the committed oracle fixtures.
+[[lean_lib]]
+name = "CryptoTests"
+
+[[lean_exe]]
+name = "crypto-conformance"
+root = "CryptoTests.Conformance"
+
+# `lake exe crypto-differential`: Spec against Impl on seeded random inputs.
+[[lean_exe]]
+name = "crypto-differential"
+root = "CryptoTests.Differential"

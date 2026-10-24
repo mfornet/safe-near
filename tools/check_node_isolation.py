@@ -11,6 +11,8 @@ building anything:
 2. No repository Lean source uses `@[extern]` or `@[implemented_by]`, and no
    lakefile links native code.
 3. The node's protocol pin matches near-lean/runtime/reference.json.
+4. The crypto package requires nothing from this repository, so NearVM can adopt it without
+   pulling anything else in.
 """
 
 import argparse
@@ -25,6 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from check_lean_toolchains import repository_files  # noqa: E402
 
 NODE = Path("near-lean/node")
+CRYPTO = Path("near-lean/crypto")
 # Packages the node builds on. Contract verification must not pay for them.
 NODE_ONLY = {NODE, Path("near-lean/chain")}
 NATIVE_ATTRIBUTE = re.compile(r"(@\[|attribute\s*\[)[^\]]*\b(extern|implemented_by)\b")
@@ -60,6 +63,9 @@ def check_isolation(graph: dict[Path, list[Path]]) -> list[str]:
                 errors.append(f"{package}: contract verification depends on {reached}")
         if package != NODE and NODE in graph.get(package, []):
             errors.append(f"{package}: only the node may depend on {NODE}")
+        if package == CRYPTO and graph[package]:
+            errors.append(f"{package}: the crypto package must not require repository packages "
+                          f"({', '.join(str(r) for r in sorted(graph[package]))})")
     return errors
 
 
@@ -111,7 +117,8 @@ def main() -> int:
         print(error, file=sys.stderr)
     if errors:
         return 1
-    print("Contract verification does not reach the node; no native code in our Lean; protocol pin matches.")
+    print("Contract verification does not reach the node; the crypto package is self-contained; "
+              "no native code in our Lean; protocol pin matches.")
     return 0
 
 
