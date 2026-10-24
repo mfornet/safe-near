@@ -158,6 +158,21 @@ def checkTransactionRouting (r : IO.Ref Report) (cfg : RuntimeConfig) (code : Co
       ["alice.near", "alice.near", "alice.near", "bob.near"]
       && (mixed.state.account? "bob.near").map (·.amount) == some (10 * oneNear + 7)
       && (mixed.outgoing.head?.map (·.receiverId)) == some "bob.near")
+  -- DeleteAccount pays the balance out only when there is one (nearcore `actions.rs`).
+  for (label, amount) in [("an empty", 0), ("a funded", oneNear)] do
+    let doomed := genesis.setAccount "carol.near" { amount, storageUsage := 182 }
+    let deletion : Receipt := {
+      predecessorId := "carol.near", receiverId := "carol.near", receiptId := 101
+      receipt := .action {
+        signerId := "carol.near", signerPublicKey := pkOf 4
+        gasPrice := 0, actions := [.deleteAccount "bob.near"] } }
+    let deleted := Near.apply cfg World.ap (fun _ => code) doomed [] [deletion]
+    let payouts := deleted.outgoing.filter fun receipt =>
+      receipt.isRefund && receipt.receiverId == "bob.near"
+    check r s!"deleting {label} account {if amount == 0 then "sends no" else "sends the"} balance refund"
+      (deleted.issue.isNone && (deleted.state.account? "carol.near").isNone &&
+        payouts.map (Fees.totalDeposit ·.actions) == (if amount == 0 then [] else [amount]))
+      s!"{payouts.length} payouts"
 
 /-- Restricted-key availability across real VM execution and delayed refunds. -/
 def checkRefundScenarios (r : IO.Ref Report) (cfg : RuntimeConfig) (code : ContractCode)

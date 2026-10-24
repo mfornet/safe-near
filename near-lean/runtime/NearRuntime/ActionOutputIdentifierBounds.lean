@@ -117,7 +117,10 @@ theorem applyAction_outputIds (c : ReceiptCtx) (isLast : Bool) (action : Action)
       · exact h
       · split
         · exact h
-        · exact Exec.addBalanceRefund_outputIds before beneficiary _ h
+        · dsimp only [deleteAccountFundedResult]
+          split
+          · exact Exec.addBalanceRefund_outputIds before beneficiary _ h
+          · exact h
 
 /-- The callback bound is required at entry, while monotonicity transports it
 between successive operations. -/

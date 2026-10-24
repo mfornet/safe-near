@@ -83,6 +83,7 @@ theorem applyAction_nextId_mono (c : ReceiptCtx) (isLast : Bool) (action : Actio
   | useGlobalContract _ => exact Nat.le_refl _
   | deleteAccount beneficiary =>
     rw [applyDeleteAccount_run]
+    dsimp only [deleteAccountFundedResult]
     repeat' (first | exact Nat.le_refl _ | exact Nat.le_succ _ | split)
 
 /-- Counter progress composes through the same action monad on all outcomes. -/

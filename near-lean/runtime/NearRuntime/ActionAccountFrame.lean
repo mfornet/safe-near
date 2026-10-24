@@ -62,6 +62,7 @@ theorem applyAction_account_ne (c : ReceiptCtx) (isLast : Bool) (action : Action
   | useGlobalContract _ => rfl
   | deleteAccount beneficiary =>
     rw [applyDeleteAccount_run]
+    dsimp only [deleteAccountFundedResult]
     repeat' (first | rfl | exact ChainState.account?_removeAccount_ne _ _ _ hne | split)
 
 end Near

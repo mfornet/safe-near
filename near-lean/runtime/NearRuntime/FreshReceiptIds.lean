@@ -147,7 +147,10 @@ theorem applyAction_freshIds (c : ReceiptCtx) (isLast : Bool) (action : Action) 
       · exact h
       · split
         · exact h
-        · exact Exec.addBalanceRefund_freshIds before beneficiary _ lower h hfloor
+        · dsimp only [deleteAccountFundedResult]
+          split
+          · exact Exec.addBalanceRefund_freshIds before beneficiary _ lower h hfloor
+          · exact h
 
 /-- A fixed allocation floor is retained while each operation reserves new ids. -/
 def ExecM.PreservesFreshIds (lower : Nat) (operation : ExecM α) : Prop :=

@@ -147,10 +147,11 @@ theorem funded_transfer (c : ReceiptCtx) (isLast : Bool) (deposit : Nat) :
           omega
         all_goals rfl
 
-/-- The deletion result retains the actual refund receipt and fresh id while
-removing the receiver's liquid balance from the account map. -/
+/-- The deletion result retains the actual refund receipt and fresh id, when
+there is a balance to pay out, while removing the receiver's liquid balance
+from the account map. -/
 def deleteAccountFundedResult (c : ReceiptCtx) (before : Exec) (account : Account) (beneficiary : AccountId) : Exec :=
-  let refunded := before.addBalanceRefund beneficiary account.amount
+  let refunded := if account.amount > 0 then before.addBalanceRefund beneficiary account.amount else before
   { refunded with
     state := refunded.state.removeAccount c.receipt.receiverId
     actorId := c.receipt.predecessorId
@@ -171,8 +172,8 @@ theorem applyDeleteAccount_run (c : ReceiptCtx) (isLast : Bool) (beneficiary : A
     cases ha : before.state.account? c.receipt.receiverId with
     | none => simp [-StateT.run_bind, applyAction, getAccount, getState, ha]
     | some account =>
-      by_cases hl : account.locked > 0 <;>
-        simp [-StateT.run_bind, applyAction, getAccount, getState, emit, ha, hl,
+      by_cases hl : account.locked > 0 <;> by_cases hamount : account.amount > 0 <;>
+        simp [-StateT.run_bind, applyAction, getAccount, getState, emit, ha, hl, hamount,
           deleteAccountFundedResult, Exec.addBalanceRefund]
 
 /-- Deletion funds the beneficiary refund by removing precisely the unlocked
@@ -181,13 +182,19 @@ theorem deleteAccountFundedResult_funds (c : ReceiptCtx) (before : Exec) (accoun
     (hwf : before.state.AccountsUnique) (ha : before.state.account? c.receipt.receiverId = some account)
     (hlocked : account.locked = 0) :
     (deleteAccountFundedResult c before account beneficiary).totalFunds c.cfg = before.totalFunds c.cfg := by
-  let refunded := before.addBalanceRefund beneficiary account.amount
-  have hwu : refunded.state.AccountsUnique := hwf
-  have hlookup : refunded.state.account? c.receipt.receiverId = some account := ha
+  let refunded := if account.amount > 0 then before.addBalanceRefund beneficiary account.amount else before
+  have hstate : refunded.state.account? c.receipt.receiverId = before.state.account? c.receipt.receiverId ∧
+      refunded.state.AccountsUnique = before.state.AccountsUnique := by
+    dsimp only [refunded]; split <;> exact ⟨rfl, rfl⟩
+  have hwu : refunded.state.AccountsUnique := hstate.2 ▸ hwf
+  have hlookup : refunded.state.account? c.receipt.receiverId = some account := hstate.1.trans ha
   have hb := refunded.state.totalBalance_removeAccount c.receipt.receiverId account hwu hlookup
   rw [hlocked, Nat.add_zero] at hb
-  have hf := addBalanceRefund_totalFunds c.cfg before beneficiary account.amount
-  change refunded.totalFunds c.cfg = before.totalFunds c.cfg + account.amount at hf
+  have hf : refunded.totalFunds c.cfg = before.totalFunds c.cfg + account.amount := by
+    dsimp only [refunded]
+    split
+    · exact addBalanceRefund_totalFunds c.cfg before beneficiary account.amount
+    · omega
   unfold Exec.totalFunds at hf ⊢
   change (refunded.state.removeAccount c.receipt.receiverId).totalBalance + receiptsFunds c.cfg refunded.newReceipts = _
   omega
@@ -208,8 +215,8 @@ theorem funded_deleteAccount (c : ReceiptCtx) (isLast : Bool) (beneficiary : Acc
       · have hbad := congrArg Prod.fst hrun; cases hbad
       · rename_i hlocked
         apply balance_return_funded c.cfg c.action.gasPrice 0 before after _ value ?_ ?_ ?_ ?_ ?_ hrun
-        · exact hwf.removeAccount _
+        · unfold deleteAccountFundedResult; split <;> exact hwf.removeAccount _
         · simpa only [Nat.add_zero] using deleteAccountFundedResult_funds c before account beneficiary hwf ha (by omega)
-        all_goals rfl
+        all_goals (unfold deleteAccountFundedResult; split <;> rfl)
 
 end Near

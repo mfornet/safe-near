@@ -77,6 +77,7 @@ theorem applyAction_idsBelowNext (c : ReceiptCtx) (isLast : Bool) (action : Acti
   | useGlobalContract _ => exact h
   | deleteAccount beneficiary =>
     rw [applyDeleteAccount_run]
+    dsimp only [deleteAccountFundedResult]
     repeat' (first | exact h | exact h.freshId | split)
 
 /-- The invariant is required after failures as well as successes, so it can

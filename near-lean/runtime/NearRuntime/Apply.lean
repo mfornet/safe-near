@@ -393,12 +393,19 @@ def applyAction (c : ReceiptCtx) (isLast : Bool) : Action → ExecM Unit
     let a ← getAccount id
     if a.locked > 0 then throw (.deleteAccountStaking id)
     let st ← getState
-    let (r, st) := refundReceipt st beneficiary a.amount
-    modify fun exec => { exec with
-      state := st.removeAccount id
-      storageAccounting := stageContractStorageRemoval id (st.contractStorage id) exec.storageAccounting }
-    modify fun e => { e with actorId := c.receipt.predecessorId }
-    emit r
+    -- nearcore pays the balance out only when there is one (`actions.rs`).
+    if a.amount > 0 then
+      let (r, st) := refundReceipt st beneficiary a.amount
+      modify fun exec => { exec with
+        state := st.removeAccount id
+        storageAccounting := stageContractStorageRemoval id (st.contractStorage id) exec.storageAccounting }
+      modify fun e => { e with actorId := c.receipt.predecessorId }
+      emit r
+    else
+      modify fun exec => { exec with
+        state := st.removeAccount id
+        storageAccounting := stageContractStorageRemoval id (st.contractStorage id) exec.storageAccounting }
+      modify fun e => { e with actorId := c.receipt.predecessorId }
   | .useGlobalContract _ =>
     -- nearcore divergence: global contracts (deploy, use, distribution) are not modeled.
     -- Resolving the identifier needs the global contract registry and its
