@@ -228,7 +228,7 @@ def main() -> int:
     parser.add_argument("--output", type=Path, help="new evidence directory (default: audit/periodic/<UTC timestamp>)")
     parser.add_argument("--due", action="store_true", help="list the checklist sections with changes since their last check")
     parser.add_argument("--record", nargs="+", metavar="SECTION", help="mark sections as checked at HEAD")
-    parser.add_argument("--report", help="with --record: the report that covers the sections")
+    parser.add_argument("--report", help="with --record: the Linear review issue that holds the report")
     parser.add_argument("--issue", action="append", default=[], help="with --record: a Linear issue the check filed")
     parser.add_argument("--ledger", type=Path, default=LEDGER, help=argparse.SUPPRESS)
     args = parser.parse_args()
