@@ -73,6 +73,11 @@ rollback on panic and fee exhaustion. The fees come from nearcore's `77.yaml`
 protocol versions are not compared: nearcore rejects the import there, while
 the model's host table is not gated by protocol version.
 
+`value_return.json` returns values below, at and one byte over
+`max_length_returned_data`, and from out-of-bounds memory, with and without
+output data receivers: nearcore reads and checks the length before burning
+the data receipt bytes. A case may set `outputDataReceivers`.
+
 `promise_graphs.json` checks exact ordered receipt dependencies and returned
 receipt identity for ordinary, nested, duplicate and empty joins. Failure cases
 cover joint return/action restrictions, nonexistent handles, view calls and

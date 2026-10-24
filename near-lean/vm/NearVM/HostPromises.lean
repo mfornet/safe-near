@@ -505,12 +505,12 @@ theorem metered_promiseBatchActionUseGlobalContractByAccountIdFn_preserves (extr
 theorem checkDataLimit_preserves_promises (name label : String) (limit : Option Nat) (size : Nat)
     (st : HostStore NearState) (next : Unit → HostResult NearState)
     (hwf : PromisesWellFormedFrom 0 st.host.promises)
-    (hnext : HostResultPromisesWellFormed (next ())) :
-    HostResultPromisesWellFormed (checkDataLimit name label limit size st next) := by
+    (hnext : HostResultPromisesWellFormed (next ())) {error : Option (Nat → Nat → HostError)} :
+    HostResultPromisesWellFormed (checkDataLimit name label limit size st next error) := by
   unfold checkDataLimit
   split
   · exact hnext
-  · exact hwf
+  · split <;> exact hwf
 
 theorem checkedSetRegister_promises {st after : HostStore NearState} {register : UInt64}
     {bytes : List UInt8} (h : checkedSetRegister? st register bytes = some after) :

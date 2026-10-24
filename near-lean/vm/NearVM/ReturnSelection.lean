@@ -100,12 +100,12 @@ theorem checkPublicKey_selection (name : String) (st : HostStore NearState) (key
 
 theorem checkDataLimit_selection (name label : String) (limit : Option Nat) (size : Nat)
     (st : HostStore NearState) (next : Unit → HostResult NearState) (hwf : ReturnSelectionValid st.host)
-    (hnext : HostResultSelectionValid (next ())) :
-    HostResultSelectionValid (checkDataLimit name label limit size st next) := by
+    (hnext : HostResultSelectionValid (next ())) {error : Option (Nat → Nat → HostError)} :
+    HostResultSelectionValid (checkDataLimit name label limit size st next error) := by
   unfold checkDataLimit
   split
   · exact hnext
-  · exact hwf
+  · split <;> exact hwf
 
 theorem disallowInView_selection (name : String) (fn : NearHostFn NearState)
     (hfn : HostPreservesSelection fn) : HostPreservesSelection (disallowInView name fn) := by

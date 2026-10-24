@@ -389,7 +389,12 @@ def chargesBeforeUnvalidated (name : String) (st : HostStore NearState) (args : 
     let dataGas := (st.host.outputDataReceivers.map fun r =>
       let sir := r == st.host.context.currentAccountId
       byte.send sir * n + byte.execution * n).sum
-    [base] ++ readSpan st (a 0) (a 1) ++ [.burn dataGas]
+    -- nearcore reads the value and checks its length before burning the data
+    -- receipt bytes.
+    [base] ++ readSpan st (a 0) (a 1) ++
+      (match getMemOrReg st (a 1) (a 0) with
+       | some value => if withinLimit st.host.config.maxReturnLen value.length then [.burn dataGas] else []
+       | none => [])
   | "storage_read" =>
     let k := spanLen st (a 0) (a 1)
     [base, .ext "storage_read_base"] ++ readSpan st (a 0) (a 1) ++ [.ext "storage_read_key_byte" k]
@@ -567,6 +572,10 @@ def invocationArgumentError (name : String) (st : HostStore NearState) (args : L
   else if name == "promise_batch_action_add_key_with_function_call" then (functionKeyPlan st (functionKeyInputs args) false).error
   else if let some byAccount := globalContractInputs? name then
     (globalContractPlan st byAccount (argU64 args 0).toNat (argU64 args 1) (argU64 args 2) false).error
+  else if name == "value_return" then
+    if (getMemOrReg st (argU64 args 1) (argU64 args 0)).isNone then
+      some (spanReadError (argU64 args 0) (argU64 args 1))
+    else none
   else creationPrefixError name st args
 
 def preInvokeError (name : String) (st : HostStore NearState) (args : List Value) : Option HostError :=

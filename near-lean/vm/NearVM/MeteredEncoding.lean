@@ -77,10 +77,13 @@ theorem preInvokeError_creationAccount_valid (name : String) (st : HostStore Nea
   · simp [hg, creationAccountError, creationAccountArgs]
   by_cases hga : name = "promise_batch_action_use_global_contract_by_account_id"
   · simp [hga, creationAccountError, creationAccountArgs]
+  by_cases hv : name = "value_return"
+  · simp [hv, creationAccountError, creationAccountArgs]
   have hgi : globalContractInputs? name = none := by
     simp [globalContractInputs?, beq_eq_false_iff_ne.mpr hg, beq_eq_false_iff_ne.mpr hga]
   simp only [invocationArgumentError, hs, beq_eq_false_iff_ne.mpr hj,
-    beq_eq_false_iff_ne.mpr ht, beq_eq_false_iff_ne.mpr hk, Bool.false_eq_true, ite_false, hgi] at hi
+    beq_eq_false_iff_ne.mpr ht, beq_eq_false_iff_ne.mpr hk, beq_eq_false_iff_ne.mpr hv,
+    Bool.false_eq_true, ite_false, hgi] at hi
   cases he : creationAccountError name st args with
   | none => rfl
   | some error => simp [creationPrefixError, he] at hi
