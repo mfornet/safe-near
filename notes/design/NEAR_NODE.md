@@ -566,11 +566,10 @@ reports. Rebuild steps and formats: [`tools/localnet/CORPUS.md`](../../tools/loc
   complete post-state with the record, never the reverse. Result per chunk: `pass`, `fail: <first field>` or
   `unsupported: <reason>`. The recipe exits 0 only if all pass; `just chain-replay-corpus-report` prints the table
   and always exits 0. Python tests check codec, format, manifest and converter in CI without neard.
-- **Current report (M3d): 426 pass, 10 fail, 0 unsupported of 436** (M3c: 405, 14, 17; M3b: 129, 6, 301; M3a: 70, 18,
-  348). The work list, by first reason:
-
-  | Chunks | First reason | Stage |
-  |---:|---|---|
+- **Current report: 436 pass, 0 fail, 0 unsupported of 436: M3 is accepted** (`just chain-replay-corpus` exits 0).
+  Earlier: M3d 426, 10, 0; M3c 405, 14, 17; M3b 129, 6, 301; M3a 70, 18, 348. The last two chunks (`h205`) needed
+  the crypto (M3e) and validator (M3d) hosts together, code a contract deploys from its own memory (decoded by the
+  replay like catalogue code), and nearcore's UTF-8/UTF-16 log decoding (`NearVM/LogRead.lean`).
 
   M3d closed the 25 staking and epoch chunks. `Stake`/`Unstake` follow `action_stake` (`TriesToStake`,
   `TriesToUnstake`, `InsufficientStake` against the epoch's minimum stake, the locked balance, and a validator
