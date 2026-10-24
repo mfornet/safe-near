@@ -44,6 +44,22 @@ fn sub_small(a: &[u8], k: u64) -> Vec<u8> {
     out
 }
 
+/// Big-endian `a - b` over `a.len()` bytes, `a >= b`.
+fn sub_be(a: &[u8], b: &[u8]) -> Vec<u8> {
+    let mut out = a.to_vec();
+    let mut borrow = 0i16;
+    for i in (0..a.len()).rev() {
+        let mut d = a[i] as i16 - b[i] as i16 - borrow;
+        borrow = 0;
+        if d < 0 {
+            d += 256;
+            borrow = 1;
+        }
+        out[i] = d as u8;
+    }
+    out
+}
+
 /// A group of the curve: generator, arithmetic and the encodings, over the `blst` functions.
 trait Grp {
     const SIZE: usize;
@@ -540,6 +556,9 @@ pub fn bls12381(out: &mut Out) {
             o
         }),
         ("11".into(), add_small(&vec![0; 48], 11)),
+        // u with 11 u^2 = -1: the denominator of the SSWU map vanishes (the exceptional case)
+        ("exceptional".into(), unhex("01f7462c8b6cbf74db38f4a9a3d71bda12f01df4948d09ff046edbdd403fc31088b69520ee5c57fb7cc51062bde821b8")),
+        ("exceptional-neg".into(), sub_be(&unhex(P), &unhex("01f7462c8b6cbf74db38f4a9a3d71bda12f01df4948d09ff046edbdd403fc31088b69520ee5c57fb7cc51062bde821b8"))),
         ("p".into(), p.clone()),
         ("p+1".into(), add_small(&p, 1)),
         ("2^384-1".into(), vec![0xff; 48]),

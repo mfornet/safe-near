@@ -242,6 +242,18 @@ pub fn p256(out: &mut Out) {
         let m = rng.bytes(32);
         c.run(&format!("small-secret-{k}"), &sign(&sk, &m), &m, &qk);
     }
+    // order of the host's checks: a signature outside [1, n - 1] answers false before the key or
+    // the message is looked at (no trap for a bad key length), a bad key length traps before the
+    // message is looked at, and a key that does not parse answers false whatever the message
+    let bad_sig = join(&vec![0u8; 32], &s);
+    for len in [0usize, 32, 34] {
+        c.run(&format!("bad-sig-value-key-length-{len}"), &bad_sig, &msg, &vec![2u8; len]);
+    }
+    c.run("bad-sig-value-short-message-bad-key-length", &bad_sig, &msg[..4], &pk[..32]);
+    c.run("good-sig-short-message-bad-key-length", &sig, &msg[..4], &pk[..32]);
+    c.run("good-sig-short-message-bad-key", &sig, &msg[..4], &key_cases[1].1);
+    c.run("good-sig-empty-message-bad-key-length", &sig, &[], &pk[..1]);
+    c.run("bad-sig-length-bad-key-length", &sig[..63], &msg, &pk[..32]);
     // r equals the abscissa reduced modulo n: the signature of a message whose digest is zero
     let zero_msg = vec![0u8; 32];
     c.run("zero-digest", &sign(&keys[2].0, &zero_msg), &zero_msg, &keys[2].1);

@@ -4,8 +4,8 @@
     "bls12381.jsonl": {
       "g1_multiexp": 112,
       "g2_multiexp": 120,
-      "map_fp2_to_g2": 95,
-      "map_fp_to_g1": 48,
+      "map_fp2_to_g2": 99,
+      "map_fp_to_g1": 50,
       "p1_decompress": 88,
       "p1_sum": 109,
       "p2_decompress": 88,
@@ -35,7 +35,7 @@
       "verify": 282
     },
     "p256.jsonl": {
-      "verify": 207
+      "verify": 215
     },
     "secp256k1.jsonl": {
       "ecrecover": 1478,
