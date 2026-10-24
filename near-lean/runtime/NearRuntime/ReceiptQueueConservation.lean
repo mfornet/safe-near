@@ -86,8 +86,48 @@ def ReceiptQueue.TerminalLedger (cfg : RuntimeConfig) (assets initialSubsidy : N
       receiptsFunds cfg pass.2.2.2.2.2.2.2.1 + receiptsFunds cfg pass.2.2.2.2.2.2.2.2.1 + initialSubsidy =
         assets + pass.2.2.2.2.2.1
 
-theorem receiptsFunds_cons (cfg : RuntimeConfig) (receipt : Receipt) (rest : List Receipt) :
-    receiptsFunds cfg (receipt :: rest) = Fees.receiptFunds cfg receipt + receiptsFunds cfg rest := rfl
+theorem resolveYieldTimeouts_funds (cfg : RuntimeConfig) (ap : ApplyState) (limit : Option Nat) (used fuel : Nat) :
+    ∀ (acc : ChainState × List Receipt × List ReceiptIdentityBirth),
+      (resolveYieldTimeouts ap limit used fuel acc).1.totalFunds cfg = acc.1.totalFunds cfg ∧
+      receiptsFunds cfg (resolveYieldTimeouts ap limit used fuel acc).2.1 = receiptsFunds cfg acc.2.1 := by
+  induction fuel with
+  | zero => intro acc; exact ⟨rfl, rfl⟩
+  | succ fuel ih =>
+    rintro ⟨st, receipts, births⟩
+    unfold resolveYieldTimeouts
+    dsimp only
+    split
+    · exact ⟨rfl, rfl⟩
+    · split
+      · split
+        · exact ⟨rfl, rfl⟩
+        · split
+          · exact ⟨rfl, rfl⟩
+          · split
+            · refine ⟨(ih _).1.trans rfl, (ih _).2.trans ?_⟩
+              simp [receiptsFunds, Fees.receiptFunds]
+            · exact ih _
+      · exact ⟨rfl, rfl⟩
+theorem resolveYieldTimeouts_delayed (ap : ApplyState) (limit : Option Nat) (used fuel : Nat) :
+    ∀ (acc : ChainState × List Receipt × List ReceiptIdentityBirth),
+      (resolveYieldTimeouts ap limit used fuel acc).1.delayed = acc.1.delayed := by
+  induction fuel with
+  | zero => intro acc; rfl
+  | succ fuel ih =>
+    rintro ⟨st, receipts, births⟩
+    unfold resolveYieldTimeouts
+    dsimp only
+    split
+    · rfl
+    · split
+      · split
+        · rfl
+        · split
+          · rfl
+          · split
+            · exact (ih _).trans rfl
+            · exact ih _
+      · rfl
 
 /-- Conservation across the actual indexed receipt loop, including both delayed
 buffers, transaction gas, callback resumption, refunds and rewards. The input
@@ -183,10 +223,34 @@ theorem applyReceiptQueue_conservation (cfg : RuntimeConfig) (ap : ApplyState) (
     have hf := hfinal
     simp only [ReceiptQueue.TerminalLedger, he] at hf
     intro hsupported
-    dsimp only [assets, ChainState.totalFunds, ChainState.queuedFunds, ChainState.totalBalance, ChainState.postponedFunds] at hf ⊢
+    have htf := (resolveYieldTimeouts_funds cfg ap ap.gasLimit result.2.2.2.2.2.2.2.2.2.1
+      (result.2.1.yieldTimeouts.length + 1) (result.2.1, [], [])).1
+    have hrf := (resolveYieldTimeouts_funds cfg ap ap.gasLimit result.2.2.2.2.2.2.2.2.2.1
+      (result.2.1.yieldTimeouts.length + 1) (result.2.1, [], [])).2
+    have hdl := resolveYieldTimeouts_delayed ap ap.gasLimit result.2.2.2.2.2.2.2.2.2.1
+      (result.2.1.yieldTimeouts.length + 1) (result.2.1, [], [])
+    have h0 : receiptsFunds cfg ([] : List Receipt) = 0 := rfl
+    dsimp only at hrf
+    rw [h0] at hrf
+    dsimp only at hdl htf
+    have hset : ∀ (S : ChainState) (d : List Receipt),
+        ({ S with delayed := d } : ChainState).totalFunds cfg + receiptsFunds cfg S.delayed =
+          S.totalFunds cfg + receiptsFunds cfg d := by
+      intro S d
+      have h1 : ({ S with delayed := d } : ChainState).gasKeyFunds = S.gasKeyFunds := rfl
+      have h2 : ChainState.yieldFunds cfg ({ S with delayed := d } : ChainState) = ChainState.yieldFunds cfg S := rfl
+      simp only [ChainState.totalFunds, ChainState.queuedFunds, ChainState.totalBalance, ChainState.postponedFunds,
+        h1, h2]
+      omega
+    have hs := hset (resolveYieldTimeouts ap ap.gasLimit result.2.2.2.2.2.2.2.2.2.1
+      (result.2.1.yieldTimeouts.length + 1) (result.2.1, [], [])).1
+      (result.2.2.2.2.2.2.2.1 ++ result.2.2.2.2.2.2.2.2.1)
+    rw [hdl, hf.1, h0, receiptsFunds_append] at hs
+    dsimp only [assets]
     rw [receiptsFunds_append]
-    simp only [hf.1, receiptsFunds, List.map_nil, List.sum_nil, Nat.add_zero] at hf
-    dsimp only [receiptsFunds] at hf ⊢
+    have hf2 := hf.2
+    dsimp only [assets] at hf2
+    rw [hrf]
     omega
 
 end Near
