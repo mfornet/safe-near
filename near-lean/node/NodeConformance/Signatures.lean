@@ -6,14 +6,15 @@ import NearNode.Primitives
 import NearCrypto
 
 /-!
-# Ed25519 signatures in the fixtures
+# Ed25519 and secp256k1 signatures in the fixtures
 
-The oracle signs with real ED25519 keys, but the Borsh fixtures do not carry the key of an
+The oracle signs with real ED25519 and SECP256K1 keys, but the Borsh fixtures do not carry the key of an
 approval, a block header, an endorsement and so on. `tools/node-conformance` therefore writes
 `signatures.jsonl` beside the fixtures: for each accepted line that was built with signatures, the
-signatures it made itself (`sigs`: signature, public key, message) and the keys of the validator
-signers whose signatures nearcore's constructors make (`signers`). Two checks verify them in Lean
-with `NearCrypto.ed25519Verify`:
+signatures it made itself (`sigs`: signature, public key, message; 64 and 32 bytes for ED25519, 65 and
+64 for SECP256K1) and the keys of the validator signers whose signatures nearcore's constructors
+make (`signers`, ED25519). Two checks verify them in Lean with `NearCrypto.ed25519Verify` and
+`NearCrypto.secp256k1Verify`, by the lengths of the key and the signature (ML-DSA is skipped):
 
 * **Recorded.** Every recorded signature that occurs in the line's Borsh bytes verifies under its key
   and message.
@@ -181,10 +182,11 @@ def signedRegistry : List (String × (ByteArray → Option (List Signed))) :=
 
 /-! ### Verification -/
 
-/-- What was checked on one line. -/
+/-- What was checked on one line; `secp` counts the SECP256K1 checks among `recorded` and `typed`. -/
 structure Outcome where
   recorded : Nat := 0
   typed : Nat := 0
+  secp : Nat := 0
   failures : List String := []
 
 /-- The per-line cache of verified `(signature, key, message)` triples. -/
@@ -194,12 +196,18 @@ abbrev Seen :=
 private def tripleKey (sig pk msg : ByteArray) : String :=
   s!"{toHex sig}:{toHex pk}:{toHex msg}"
 
+/-- Verify under the scheme the lengths select: 32-byte key and 64-byte signature for ED25519,
+64 and 65 for SECP256K1. -/
+def verifyAny (pk msg sig : ByteArray) : Bool :=
+  if pk.size == 32 && sig.size == 64 then NearCrypto.ed25519Verify pk msg sig
+  else if pk.size == 64 && sig.size == 65 then NearCrypto.secp256k1Verify pk msg sig else false
+
 /-- Verify, remembering the triples that already passed (a block's header occurs in many lines). -/
 private def verifyCached (seen : IO.Ref Seen) (pk msg sig : ByteArray) : IO Bool := do
   let k := tripleKey sig pk msg
   if (← seen.get).contains k then
     return true
-  let ok := NearCrypto.ed25519Verify pk msg sig
+  let ok := verifyAny pk msg sig
   if ok then
     seen.modify (·.insert k)
   return ok
@@ -212,7 +220,10 @@ def verifyLine (seen : IO.Ref Seen) (pool : Std.HashMap ByteArray Recorded)
   for r in side.sigs do
     if containsBytes borsh r.sig then
       if ← verifyCached seen r.key r.msg r.sig then
-        out := { out with recorded := out.recorded + 1 }
+        out :=
+          { out with
+            recorded := out.recorded + 1
+            secp := out.secp + if r.sig.size == 65 then 1 else 0 }
       else
         out :=
           { out with
@@ -223,20 +234,38 @@ def verifyLine (seen : IO.Ref Seen) (pool : Std.HashMap ByteArray Recorded)
       out := { out with failures := "the value did not decode" :: out.failures }
     | some signed =>
       for s in signed do
-        let .ed25519 sig := s.signature | continue
+        let sig ←
+          match s.signature with
+          | .ed25519 sig =>
+            pure sig
+          | .secp256k1 sig =>
+            pure sig
+          | .mldsa65 _ =>
+            continue
+        let isSecp := if sig.size == 65 then 1 else 0
         let tag := toHex sig
         let tag := (tag.take 12).toString
-        match s.key with
-        | some (.ed25519 pk) =>
+        let keyInValue ←
+          match s.key with
+          | some (.ed25519 pk) =>
+            pure (some pk)
+          | some (.secp256k1 pk) =>
+            pure (some pk)
+          | some (.mldsa65 _) =>
+            continue
+          | none =>
+            pure none
+        match keyInValue with
+        | some pk =>
           if ← verifyCached seen pk s.message sig then
-            out := { out with typed := out.typed + 1 }
+            out :=
+              { out with
+                typed := out.typed + 1, secp := out.secp + isSecp }
           else
             out :=
               { out with
                 failures :=
                   s!"signature {tag} does not verify under the key in the value" :: out.failures }
-        | some _ =>
-          pure ()
         | none =>
           match (side.sigs.find? (·.sig == sig)).orElse fun _ => pool[sig]? with
           | some r =>
@@ -247,7 +276,9 @@ def verifyLine (seen : IO.Ref Seen) (pool : Std.HashMap ByteArray Recorded)
                     s!"signature {tag}: the oracle signed {toHex r.msg}, the value computes {toHex s.message}" ::
                       out.failures }
             else if ← verifyCached seen r.key s.message sig then
-              out := { out with typed := out.typed + 1 }
+              out :=
+                { out with
+                  typed := out.typed + 1, secp := out.secp + isSecp }
             else
               out :=
                 { out with
@@ -259,7 +290,9 @@ def verifyLine (seen : IO.Ref Seen) (pool : Std.HashMap ByteArray Recorded)
               if !ok && (← verifyCached seen pk s.message sig) then
                 ok := true
             if ok then
-              out := { out with typed := out.typed + 1 }
+              out :=
+                { out with
+                  typed := out.typed + 1, secp := out.secp + isSecp }
             else
               out :=
                 { out with

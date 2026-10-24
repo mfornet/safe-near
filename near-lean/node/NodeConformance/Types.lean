@@ -11,7 +11,7 @@ import NearNode.Primitives
 /-!
 `node-conformance-types [DIR [SIGNATURES]]`: check the Borsh codecs of every `near-primitives` type
 against the fixtures written by `tools/node-conformance` (default `near-lean/node/fixtures/types`),
-and verify with `NearCrypto` the Ed25519 signatures that the fixtures carry, using the keys in
+and verify with `NearCrypto` the Ed25519 and secp256k1 signatures that the fixtures carry, using the keys in
 `SIGNATURES` (default `DIR/../signatures.jsonl`; see `NodeConformance.Signatures`).
 -/
 
@@ -135,6 +135,7 @@ def main (args : List String) : IO UInt32 := do
   let mut matched := 0
   let mut recordedTotal := 0
   let mut typedTotal := 0
+  let mut secpTotal := 0
   let utf8 := utf8Disagreements
   if utf8 != 0 then
     IO.eprintln s!"Spec.utf8Valid and ByteArray.validateUTF8 disagree on {utf8} short inputs"
@@ -155,6 +156,7 @@ def main (args : List String) : IO UInt32 := do
     let mut badCount := 0
     let mut recorded := 0
     let mut typed := 0
+    let mut secp := 0
     let mut index := 0
     for raw in text.splitOn "\n" do
       if raw.isEmpty then
@@ -179,10 +181,11 @@ def main (args : List String) : IO UInt32 := do
             let o ← verifyLine seen pool (signedRegistry.lookup name) line.borsh side
             recorded := recorded + o.recorded
             typed := typed + o.typed
+            secp := secp + o.secp
             for f in o.failures do
               badCount := badCount + 1
               if bad.size < 3 then
-                bad := bad.push s!"  {line.name}: Ed25519: {f}"
+                bad := bad.push s!"  {line.name}: signature: {f}"
     if accept != wantAccept || reject != wantReject then
       bad :=
         bad.push
@@ -193,9 +196,10 @@ def main (args : List String) : IO UInt32 := do
     totalReject := totalReject + reject
     recordedTotal := recordedTotal + recorded
     typedTotal := typedTotal + typed
+    secpTotal := secpTotal + secp
     let sigs :=
       if recorded + typed == 0 then ""
-      else s!", ed25519 {recorded} recorded and {typed} typed verified"
+      else s!", signatures {recorded} recorded and {typed} typed verified ({secp} secp256k1)"
     let status := (if badCount == 0 then "ok" else s!"FAILED ({badCount})") ++ sigs
     IO.println s!"{name}: accept {accept}, reject {reject}: {status}"
     for b in bad do
@@ -205,8 +209,8 @@ def main (args : List String) : IO UInt32 := do
     IO.eprintln s!"{sidecars.size} signature records, {matched} matched a fixture line"
     failures := failures + 1
   IO.println
-      s!"Ed25519: {recordedTotal} recorded and {typedTotal} typed signature checks passed \
-    ({sidecars.size} lines with records)"
+      s!"Ed25519 and secp256k1: {recordedTotal} recorded and {typedTotal} typed signature checks \
+    passed, {secpTotal} of them secp256k1 ({sidecars.size} lines with records)"
   IO.println
       s!"{registry.length} types, {totalAccept} accepted and {totalReject} rejected inputs, \
     {failures} failures"

@@ -2,8 +2,13 @@
 //! nearcore uses, in release mode: `cargo run --release --locked --bin crypto-bench`. Prints one
 //! JSON object per line: `{"name", "nanosPerIteration"}`. The names match `node-bench`.
 
-use near_crypto::{ED25519PublicKey, ED25519SecretKey, KeyType, PublicKey, SecretKey, Signature};
+use near_crypto::key_conversion::convert_secret_key;
+use near_crypto::{
+    ED25519PublicKey, ED25519SecretKey, KeyType, PublicKey, Secp256K1Signature, SecretKey, Signature,
+};
 use near_primitives::hash::CryptoHash;
+use blake2::digest::{Update, VariableOutput};
+use blake2::{Blake2b512, Blake2bVar};
 use ripemd::Ripemd160;
 use sha2::{Digest, Sha512};
 use sha3::{Keccak256, Keccak512};
@@ -59,6 +64,19 @@ fn main() {
             data[0] = i as u8;
             Ripemd160::digest(black_box(&data))[0] as u64
         }));
+        // `near_crypto::vrf` hashes with `Blake2bVar::new(32)` and `Blake2b512`.
+        report(&format!("blake2b256/{label}"), measure(|i| {
+            data[0] = i as u8;
+            let mut h = Blake2bVar::new(32).unwrap();
+            h.update(black_box(&data));
+            let mut out = [0u8; 32];
+            h.finalize_variable(&mut out).unwrap();
+            out[0] as u64
+        }));
+        report(&format!("blake2b512/{label}"), measure(|i| {
+            data[0] = i as u8;
+            Blake2b512::digest(black_box(&data))[0] as u64
+        }));
     }
     let seed = [7u8; 32];
     let keypair = ed25519_dalek::SigningKey::from_bytes(&seed).to_keypair_bytes();
@@ -86,4 +104,45 @@ fn main() {
         ed25519_dalek::Signer::sign(&prepared, black_box(&message)).to_bytes()[0] as u64
     }));
     let _ = KeyType::ED25519;
+
+    // secp256k1: a 32-byte message; the first byte varies, so verification fails at the final
+    // comparison and recovery returns a different key every time.
+    let secret = SecretKey::SECP256K1(secp256k1::SecretKey::from_slice(&[7u8; 32]).unwrap());
+    let public = secret.public_key();
+    let mut hash = input(32, 5);
+    let signature = secret.sign(&hash);
+    let sig65 = match &signature {
+        Signature::SECP256K1(s) => <[u8; 65]>::from(s.clone()),
+        _ => unreachable!(),
+    };
+    report("secp256k1/recover", measure(|i| {
+        hash[0] = i as u8;
+        let message: [u8; 32] = black_box(&hash)[..].try_into().unwrap();
+        Secp256K1Signature::from(black_box(sig65)).recover(message).unwrap().as_ref()[5] as u64
+    }));
+    report("secp256k1/verify", measure(|i| {
+        hash[0] = i as u8;
+        signature.verify(black_box(&hash), black_box(&public)) as u64
+    }));
+    report("secp256k1/sign", measure(|i| {
+        hash[0] = i as u8;
+        match secret.sign(black_box(&hash)) {
+            Signature::SECP256K1(s) => <[u8; 65]>::from(s)[5] as u64,
+            _ => 0,
+        }
+    }));
+
+    // The VRF of a 32-byte input under the key converted from an ed25519 key, prepared once.
+    let vrf_key = convert_secret_key(&ED25519SecretKey(keypair));
+    let mut vrf_input = input(32, 9);
+    let (value, proof) = vrf_key.compute_vrf_with_proof(&vrf_input);
+    report("vrf/compute-with-proof", measure(|i| {
+        vrf_input[0] = i as u8;
+        vrf_key.compute_vrf_with_proof(black_box(&vrf_input)).0.0[3] as u64
+    }));
+    let mut vrf_input = input(32, 9);
+    report("vrf/verify", measure(|i| {
+        vrf_input[0] = i as u8;
+        vrf_key.public_key().is_vrf_valid(&black_box(&vrf_input).to_vec(), &value, &proof) as u64
+    }));
 }

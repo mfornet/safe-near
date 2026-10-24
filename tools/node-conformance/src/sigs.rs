@@ -1,5 +1,6 @@
-//! A record of the ED25519 signatures the oracle makes, so that the Lean side can verify the real
-//! signatures in the Borsh fixtures. The fixture files do not carry the signer's key, and the
+//! A record of the ED25519 and SECP256K1 signatures the oracle makes (the signature as 64 or 65
+//! bytes, the key as 32 or 64), so that the Lean side can verify the real signatures in the Borsh
+//! fixtures. The fixture files do not carry the signer's key, and the
 //! fixtures stay byte for byte what they were; `signatures.jsonl` is written beside them.
 //!
 //! Every accepted line that is not a mutation or a hand-written byte string gets a record (the
@@ -12,7 +13,7 @@ use near_crypto::{PublicKey, SecretKey, Signature};
 use std::sync::Mutex;
 
 pub enum Entry {
-    Sig { sig: [u8; 64], public: [u8; 32], msg: Vec<u8> },
+    Sig { sig: Vec<u8>, public: Vec<u8>, msg: Vec<u8> },
     Signer { public: [u8; 32] },
 }
 
@@ -25,9 +26,18 @@ fn hex(b: &[u8]) -> String {
 
 /// Record `sig` as made by `public` over `msg`; other key types are ignored.
 pub fn record(sig: &Signature, public: &PublicKey, msg: &[u8]) {
-    if let (Signature::ED25519(s), PublicKey::ED25519(k)) = (sig, public) {
-        PENDING.lock().unwrap().push(Entry::Sig { sig: s.to_bytes(), public: k.0, msg: msg.to_vec() });
-    }
+    let entry = match (sig, public) {
+        (Signature::ED25519(s), PublicKey::ED25519(k)) => {
+            Entry::Sig { sig: s.to_bytes().to_vec(), public: k.0.to_vec(), msg: msg.to_vec() }
+        }
+        (Signature::SECP256K1(s), PublicKey::SECP256K1(k)) => Entry::Sig {
+            sig: <[u8; 65]>::from(s.clone()).to_vec(),
+            public: k.as_ref().to_vec(),
+            msg: msg.to_vec(),
+        },
+        _ => return,
+    };
+    PENDING.lock().unwrap().push(entry);
 }
 
 /// Record a validator signer whose signatures are made inside nearcore's constructors.
