@@ -19,7 +19,20 @@ findings are drafted in [linear-drafts.md](linear-drafts.md) (31 drafts:
 
 ## 1. Build and tests — four failures found and fixed
 
-`just periodic-check` (78 steps) at the branch head: SECTION1_RESULT
+`just periodic-check` (78 steps) at `2941d45`, clean tree: **all 78 passed**
+(evidence in the local, uncommitted `audit/periodic/20261023T233753.860662Z/`). Highlights:
+
+- VM / runtime / chain scenarios **118 / 179 / 46** passed (65 / 139 / 25 last
+  time); wNEAR adapter suite passed (212 checks).
+- Independent VM / finance / allowance / nonce comparisons **400 / 72 / 66 / 126**
+  passed, **zero differences**; receipt-result conformance passed with its 37
+  full-trace differences reported explicitly, as designed.
+- The Wasm testsuite report matches the committed baseline byte for byte, with
+  zero `fail`. The wasm-logic byte check, smoke client and mutation test passed.
+- All nine Lean packages built with `--wfail` except the wNEAR proofs, whose only
+  warning is the known `refines_wnear_exported` `sorry`. All axiom audits, the
+  style and formatter regressions, the config dump comparison, fixture rebuilds
+  and the 24 chain-conformance suites passed.
 
 Failures found on `main`, each fixed before continuing:
 
@@ -164,7 +177,11 @@ scenario for `use_global_contract`, no runtime test of `distributedGas`, no test
 of the wasm-tools version suffix), T5 (two Python regressions skipped by
 `unittest discover`), X4 (nearcore SHA repeated in `runtime-reference.yml:30`).
 Over-broad Lake cache keys (an iris bump invalidates vm/runtime/chain) cost time
-only; not filed. Timings: SECTION8_TIMINGS
+only; not filed. Timings: the previous report's build timings were no-op
+rebuilds, so nothing can be compared for doubling; this run sets the baseline.
+The plan took **190 min** of wall time on 4 cores. The slowest steps were the
+chain reference build (27 min), the nearcore finance build (14) and the chain
+suites (11–16 each; 24 suites, about 4 h together with a cold reference).
 
 ## 9. Missing features — first run; 7 filed
 
@@ -180,4 +197,14 @@ the Comparator check, the wasm-logic milestone, pending catalog builds.
 
 ## 10. Cost
 
-SECTION10_COST
+- Section 1: the final plan run took 190 min wall time. Five earlier partial runs
+  stopped at the failures in section 1, and two of them on disk space, adding
+  about 2.5 h, mostly cold nearcore builds.
+- Agents: one coordinator and seven section agents (Sonnet for sections 2, 4, 7
+  and 8; Opus for 5, 6 and 9). Sub-agent usage was about 820k tokens: divergence
+  243k, docs 129k, simplification 105k (including a timed vm build), dead code
+  97k, features 91k, tests/CI 90k, trusted base 68k. Coordinator usage and a
+  dollar cost are not exposed to the session.
+- This is the first check to run sections 5, 6 and 9, so there is no earlier
+  cost to compare against. Divergence was the largest; later runs only review
+  the diff since this commit.
