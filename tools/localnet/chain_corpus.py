@@ -37,7 +37,10 @@ NODES = {"single": ("node0",), "sharded": ("node0", "node1")}
 
 
 def gz(data: bytes) -> bytes:
-    return gzip.compress(data, compresslevel=9, mtime=0)
+    # The header's OS byte depends on the Python version (3 on 3.12, 255 on 3.13); pin it to 255.
+    packed = bytearray(gzip.compress(data, compresslevel=9, mtime=0))
+    packed[9] = 0xFF
+    return bytes(packed)
 
 
 def sha256(data: bytes) -> str:
