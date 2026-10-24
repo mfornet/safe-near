@@ -1,0 +1,45 @@
+{
+ "neard": {
+  "adapterSha256": {
+   "safe-near-corpus-check": "5ebfb43a5d3780483871f3e689e28ced049c128de9102b3d99f2178da1cb60f1",
+   "safe-near-corpus-export": "72e690229cc025502f7d0e3de3c16dec589aa2cc79f85d9db538479d212cff05"
+  },
+  "binaries": {
+   "neard": "988c3a52cb77e148b139f7349164de086d778721509497ab290dd514b9c8ba21",
+   "safe-near-corpus-check": "9875585b201649311b8d66643e4613cb968f67b8334b91ede3e6611f27306646",
+   "safe-near-corpus-export": "5f350557b857c3b0d6ccac86cbcaba10482f9818530ee987d9c32e12cd6e8f54"
+  },
+  "cargoLockSha256": "6cc67ca2874d67ca122c9664beca331814ee97aafba1d3beb6bc593d881bc4f7",
+  "contracts": {
+   "estimator_contract.wasm": "bef7ef59663e3a3990422c605051ec010ec50c5feae138b484d95d3168ec025a",
+   "fungible_token.wasm": "b10ed11ac6d60698c6809ef7e96b578f2e5768354fe4b15d044843c2b6ab8a04",
+   "sharded_contract.wasm": "25406ca1995ec08cb14425897cc9d439da7c7ef0d76a15d80081d5585aab9bec",
+   "test_contract_rs.wasm": "86f1effb9d7002abbedb3d2319df42f29cf54f9f5144ec1e1de35ca131acc6f6"
+  },
+  "neardVersion": "neard (release 2.13.4) (build 44f7ae6) (commit 44f7ae6cd7ef08bab604e20a473bf77e35d4c993) (rustc 1.93.0) (min_protocol 83) (protocol 86) (db 49)\nfeatures: [default, dump_test_contract, json_rpc, near_dump_test_contract, rosetta_rpc]",
+  "profile": "release",
+  "profileOverrides": {
+   "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "16",
+   "CARGO_PROFILE_RELEASE_DEBUG": "0",
+   "CARGO_PROFILE_RELEASE_INCREMENTAL": "false",
+   "CARGO_PROFILE_RELEASE_LTO": "off"
+  },
+  "rustToolchain": "1.93.0",
+  "rustc": "rustc 1.93.0 (254b59607 2026-01-19)",
+  "sandboxShimSha256": "d7699e807d07617120adda9620313a3f4a8e16f77cd4a1a6f838fc7642a39e7d",
+  "sourceImplementationClean": true,
+  "sourceRevision": "44f7ae6cd7ef08bab604e20a473bf77e35d4c993"
+ },
+ "workload": {
+  "sharded": {
+   "lastHeight": 511,
+   "seed": 1,
+   "transactions": 140
+  },
+  "single": {
+   "lastHeight": 513,
+   "seed": 1,
+   "transactions": 140
+  }
+ }
+}
