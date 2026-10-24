@@ -58,7 +58,7 @@ Each milestone is done when its `just` target passes locally and in CI.
 | M1 | SAF-15 | Borsh and all `near-primitives` types | M0 | `just node-conformance-types` |
 | M2 | SAF-16 | Crypto in pure Lean | M0 | `just crypto-tests` |
 | M3 | SAF-17 | Complete runtime | M2 | `just chain-replay-corpus` |
-| M4 | SAF-18 | Trie and storage | M1 | state roots on M3 corpus, restart test |
+| M4 | SAF-18 | Trie and storage | M1 | `just node-state-roots`, `just node-store-tests` |
 | M5 | SAF-19 | Chain and epoch manager | M1, M2, M4 | `just chain-validate-corpus` |
 | M6 | SAF-20 | P2P networking | M1, M2 | `just localnet-peer` |
 | M7 | SAF-21 | Syncing observer | M3–M6 | `just localnet-follow` |
@@ -626,9 +626,88 @@ reports. Rebuild steps and formats: [`tools/localnet/CORPUS.md`](../../tools/loc
   `single-h199-s0`. Full replay after M3e: 411 pass, 8 fail (`Stake`/`Unstake`), 17 unsupported (epoch boundary, `validator_stake`,
   `validator_total_stake`): all remaining ones are M3d.
 
+### M4 trie and storage
+
+Acceptance: the state roots of the M3 corpus and a restart test. `just node-state-roots` and `just node-store-tests`
+(sources: `near-lean/node/NearNode/{Trie,Store}`, `Primitives/{Storage,TrieNode,Flat}.lean`).
+
+- **Types.** `TrieKey` (24 variants, Borsh tag = column except `DelayedReceipt` 8 and `GasKeyNonce` 21; `toVec?` is
+  `TrieKey::to_vec`, `parse?` its inverse, checked against the oracle's bytes), `PublicKeyHandle`, `ValueRef`,
+  `FlatStateValue`, `StateChangeCause`, `RawStateChange(sWithTrieKey)`, `StateChangesForShard/Block/BlockRange`,
+  `RawTrieNode(WithSize)` and the flat storage types. Fixtures come from `tools/node-conformance` (`storage_fam.rs`);
+  `near-store` is not linked there, so `RawTrieNode*` and the flat types are copies of `raw_node.rs`, `flat/types.rs`
+  and `flat/delta.rs` at the pin (node hashes are additionally checked against 436 real roots). `FlatStorageStatus`
+  has `Disabled`, `Empty`, `Ready`; `Creation` (deprecated) and `Resharding` are rejected. `node-conformance-types`:
+  256 types, 0 failures; the existing fixtures are unchanged.
+- **Trie, Impl.** `Trie/Update.lean` ports `Trie::update` (`trie_storage_update.rs`, `ops/insert_delete.rs`,
+  `ops/squash.rs`) over `ByteArray` and the `NearCrypto` SHA-256: a working trie of updated nodes with `old h` for
+  subtrees not loaded, batched insert/delete in order, squash after deletion, then bottom-up serialization and
+  hashing. It returns `TrieChanges` (insertions with data and count, deletions, sorted by hash) exactly as
+  `TrieRefcountDeltaMap` does: a node read is a reference removed (`move_node_to_mutable`), a node of the new trie
+  that was read or created is a reference added, values likewise. Memory usage is `direct + children`, kept as a
+  delta along the path (`TRIE_COSTS` 50/2/1). `Trie/Lookup.lean`: `get`, `contains`, in-order iteration from a lower
+  bound, and the recorder (`Recorder.partialState` is `PartialStorage`: every node read plus the value a `get`
+  fetches; an `update` records the nodes it loads). `Trie/Mem.lean`: a refcounted in-memory node store.
+  The functions are `partial` (fuel-free recursion on the key); proofs are future work.
+- **Trie, Spec.** `NearInterface.TrieConstruction.build` on the whole entry set. `node-trie-tests` (3000 cases
+  checked, 800k checks): root and memory usage equal after random batches; the node store after any number of
+  updates equals the store of the final entry set built from scratch, hash by hash with its refcount (so the deltas
+  are exact); lookups and iteration (every lower bound) equal a sorted list; an update run on the recorded nodes
+  alone gives identical changes. A deliberately broken `squash` fails it.
+- **Corpus.** For each of the 436 chunks: the trie built from the raw pre-state has the bundle's pre-state root;
+  `update` with the recorded `stateDiff` gives `postStateRoot`, and the resulting store equals the post-state built
+  from scratch (every refcount); Lean's own replayed post-state (`registered-replay`, M3) built from scratch and
+  applied as a diff through `update` gives the same root; on the 204 chunks small enough for the list-based Spec
+  SHA-256, the Spec's roots agree too. Result: **436/436 pre, 436/436 post (diff), 436/436 refcounts,
+  436/436 + 436/436 for the Lean replay, 204/204 Spec**. This is the end-to-end state-root check of the M3 runtime.
+  The replay takes about 15 minutes (`--no-replay` skips it and checks the diff only, 8 s).
+- **Store.** `Store/Db.lean`: columns after `DBCol` (`State` refcounted, `FlatState`, `FlatStateChanges`,
+  `FlatStateDeltaMetadata`, `FlatStorageStatus`, `BlockMisc`, `ChunkExtra`) held in memory, made durable by an
+  append-only log (one `NRCD` record per commit: length, CRC-32, sequence number, operations `set`/`delete`/`rcAdd`)
+  and snapshots (`snapshot-G.bin` with a checksum footer, written as `.tmp` and renamed). Recovery takes the highest
+  complete generation, replays its log while checksum and sequence hold, truncates the first bad record and all after
+  it, deletes `.tmp` and older generations. *Crash safety:* a commit is applied entirely or not at all (one checksummed
+  record); a crash while writing leaves a prefix that recovery drops; a crash during compaction leaves the old
+  generation whole or the new snapshot whole (it is written from memory after the old log was applied); a failed
+  write poisons the handle. *Limit:* Lean's `IO.FS` has no `fsync`, `seek` or `pread`: `commit` is `write` +
+  `flush`, which survives a process kill but not power loss (`Options.sync` runs the system `sync -f` after each
+  commit), and values stay in memory (no disk-resident tier); both are deferred. Tests (`node-store-tests`): a log cut
+  at every byte and a flipped byte in every record, a crash after each compaction step, a cut snapshot falling back;
+  on the corpus, the 148 single-shard chunks (444 commits, 43 MiB of log): pre-state and update written as commits with a head pointer, restart, 29 random and
+  boundary cut points of the log (recovered commits are exactly the complete ones, head pointer, node count and the
+  root of every post-state rebuilt from the store), garbage collection of replaced nodes leaves exactly the references
+  of the post-state tries, and a run with a small log limit that compacts several times. Replaced nodes are released
+  in a separate commit (`trieDeleteOps`), as nearcore does at garbage collection, so older roots stay readable until then.
+- **Flat storage.** `Store/Flat.lean` follows `FlatStorage`: `get_value`/`contains_key` at a block through
+  `get_blocks_to_head` (with `prev_block_with_changes`), a changed key answers as a `ValueRef`, otherwise the
+  `FlatState` column; `add_delta`, `get_new_flat_head`, `update_flat_head` (applies deltas to the column, sets the
+  status, drops deltas at or below the new head). Functions return store operations to commit atomically. Tested
+  against a model of forked chains (head moves, restart) and on the corpus (flat state of the pre-state, the delta of
+  the `stateDiff`, the moved head equal to the post-state, values above 4000 bytes by reference).
+- **Measured** (100 000 entries, batches of 1 000 writes, one core, `node-bench --filter trie/`; native is
+  `just node-trie-native-bench`, `near-store` at the pin over an in-memory `TestDB`, no memtrie, no RocksDB):
+
+  | per key | Lean | native |
+  |---|---|---|
+  | build the trie from scratch | 11 us | 6.8 us |
+  | update (70% overwrite, 20% insert, 10% delete) | 46 us | 24 us |
+  | get | 8.1 us | 6.3 us |
+  | get with recording | 10.7 us | |
+  | iterate | 0.13 us | |
+  | store commit of the changes (1.3 KB per write) | 22 us | |
+  | store open: replay 28 MiB / snapshot write (per node) | 2.6 / 1.2 us | |
+
+  The native memtrie update is 38 us per key in the same harness, which includes its flat-storage bookkeeping.
+  **Proposed M4 target:** trie `update` and `build` within 2.5x of native `near-store` per key and at least 20 000 keys/s
+  on one core, `get` within 2x (all met: 1.9x, 1.6x, 1.3x); store commit at least 20 000 writes/s. The time is
+  SHA-256 (about 165 MB/s, M2) and allocation; M10 revisits.
+- **Doubts and deferred.** The recorded set of an update follows the source but is not compared with a
+  nearcore-produced witness (the corpus has none); memtrie, trie caches and prefetching, state parts and sync (M7),
+  resharding (`split.rs`, flat `Resharding` status), `delete_range`, the disk-resident store and `fsync`.
+
 ## Open points
 
-- Numeric performance targets for M4 and M10, measured against nearcore (M2's are proposed above).
+- Numeric performance target for M10, measured against nearcore (M2's and M4's are proposed above).
 - Whether crypto host functions in `NearVM` slow contract verification. If they
   do, `NearVM` takes host crypto as a parameter and the node supplies it. Today the VM takes its
   digests, `ed25519Verify` and `ecrecover` as parameters; `NearCrypto` is a separate package it can import later.

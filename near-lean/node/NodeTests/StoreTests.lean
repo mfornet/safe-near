@@ -11,7 +11,7 @@ restart, compaction and the recovery of every file state a crash can leave: a lo
 byte, a flipped byte, and a crash at each step of compaction.
 
 With a directory of corpus cases (`tools/localnet/state_roots.py --cases-only`) the tries of the
-first `CHUNKS` (default 60) single-shard chunks are written to the store, the pre-state of each
+first `CHUNKS` (default 148, all the single-shard chunks) single-shard chunks are written to the store, the pre-state of each
 then the update by its `stateDiff`, with a head pointer in `BlockMisc` per chunk. The test
 
 * restarts cleanly and rebuilds the root of every committed trie from what the store returns,
@@ -546,7 +546,7 @@ def main (args : List String) : IO UInt32 := do
     ok := ok && (← FlatTests.model seed)
   IO.println "flat storage against a model of forked chains: done"
   if let some dir := args.head? then
-    let count := (args[1]? >>= String.toNat?).getD 60
+    let count := (args[1]? >>= String.toNat?).getD 148
     IO.println s!"corpus store test on {dir}"
     ok := ok && (← corpusTests dir count)
   IO.println (if ok then "store tests passed" else "store tests FAILED")

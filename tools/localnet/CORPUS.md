@@ -224,6 +224,12 @@ with the first reason, plus all blockers, tags and seconds; `--report` always ex
 Not compared yet: gas profiles, `computeUsage`, state changes in Borsh, the outcome root, the exact failure error
 variants.
 
+## 8b. State roots (M4)
+
+`just node-state-roots` (`state_roots.py`) writes a case file per chunk (raw pre-state, `stateDiff`, recorded post-state
+root and Lean's replayed post-state) and runs `node-state-roots`, which rebuilds the trie, applies the diff and
+compares roots: see the M4 section of `notes/design/NEAR_NODE.md`.
+
 ## 9. Regenerating everything
 
 ```sh

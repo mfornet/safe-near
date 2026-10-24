@@ -56,6 +56,12 @@ node-store-tests: node-build
     python3 tools/localnet/state_roots.py --no-replay --cases-only --work near-lean/node/.lake/state-roots-cases
     near-lean/node/.lake/build/bin/node-store-tests near-lean/node/.lake/state-roots-cases
 
+# M4: the same trie workload with nearcore's own near-store (needs the pinned checkout in
+# tools/localnet/.nearcore, see `just corpus-build`); add --memtrie for the in-memory trie.
+[positional-arguments]
+node-trie-native-bench *options:
+    cd tools/node-conformance/native-trie && cargo run --release --bin native-trie-bench -- "$@"
+
 # Run the node benchmarks (`crypto/` and `sha256` for M2); options are --filter SUBSTRING and --out FILE.
 [positional-arguments]
 node-bench *options: node-build
