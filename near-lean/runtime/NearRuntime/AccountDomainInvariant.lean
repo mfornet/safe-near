@@ -11,32 +11,62 @@ theorem processReceipt_accountsUnique_of_systemAbsent (cfg : RuntimeConfig) (ap 
     (processReceipt cfg ap decoder st receipt).state.AccountsUnique := by
   cases hr : receipt.receipt with
   | action action =>
-    cases he : (action.inputDataIds.filter fun id => !(Assoc.contains st.receivedData id)).isEmpty with
-    | false =>
-      rw [processReceipt_waiting cfg ap decoder st receipt action hr he]
-      exact hwf
-    | true =>
-      rw [processReceipt_ready cfg ap decoder st receipt action hr he]
-      unfold processedOfExec
+    cases hy : action.yieldDataId with
+    | some dataId =>
+      rw [processReceipt_yield_unfold cfg ap decoder st receipt action dataId hr hy]
       split
       · exact hwf
-      · exact applyActionReceipt_accountsUnique_of_systemAbsent
-          (readyActionContext cfg ap decoder st receipt action) (consumeReceiptDataState st action) hwf hmissing
-  | data data =>
-    rw [processReceipt_data cfg ap decoder st receipt data hr]
-    cases hroute : Assoc.lookup st.postponedByData data.dataId with
-    | none => exact hwf
-    | some id =>
-      simp only
-      cases hpending : ((Assoc.lookup st.pendingDataCount id).getD 1 - 1 == 0) with
-      | false => simp only [Bool.false_eq_true, ite_false]; exact hwf
+      · exact hwf
+    | none =>
+      cases he : (action.inputDataIds.filter fun id => !(Assoc.contains st.receivedData id)).isEmpty with
+      | false =>
+        rw [processReceipt_waiting cfg ap decoder st receipt action hr hy he]
+        exact hwf
       | true =>
-        simp only [ite_true]
-        cases hwaiting : Assoc.lookup st.postponed id with
-        | none => exact hwf
-        | some waiting =>
-          exact processReceipt_accountsUnique_of_systemAbsent cfg ap decoder
-            (releasePostponedState (receivePostponedDataState st data) id) waiting hwf hmissing
+        rw [processReceipt_ready cfg ap decoder st receipt action hr hy he]
+        unfold processedOfExec
+        split
+        · exact hwf
+        · exact applyActionReceipt_accountsUnique_of_systemAbsent
+            (readyActionContext cfg ap decoder st receipt action) (consumeReceiptDataState st action) hwf hmissing
+  | data data =>
+    cases hres : data.resumeDataId with
+    | none =>
+      rw [processReceipt_data cfg ap decoder st receipt data hr hres]
+      cases hroute : Assoc.lookup st.postponedByData data.dataId with
+      | none => exact hwf
+      | some id =>
+        simp only
+        cases hpending : ((Assoc.lookup st.pendingDataCount id).getD 1 - 1 == 0) with
+        | false => simp only [Bool.false_eq_true, ite_false]; exact hwf
+        | true =>
+          simp only [ite_true]
+          cases hwaiting : Assoc.lookup st.postponed id with
+          | none => exact hwf
+          | some waiting =>
+            exact processReceipt_accountsUnique_of_systemAbsent cfg ap decoder
+              (releasePostponedState (receivePostponedDataState st data) id) waiting hwf hmissing
+    | some dataId =>
+      rw [processReceipt_resume cfg ap decoder st receipt data dataId hr hres]
+      split
+      · exact hwf
+      · split
+        · rename_i y _
+          split
+          · rename_i a _
+            rw [runActionReceipt_eq]
+            unfold processedOfExec
+            split
+            · exact hwf
+            · exact applyActionReceipt_accountsUnique_of_systemAbsent _ _ hwf hmissing
+          · exact hwf
+        · exact hwf
+  | globalDistribution g =>
+    rw [processReceipt_distribution cfg ap decoder st receipt g hr]
+    have hl := processDistribution_ledger cfg ap st receipt g
+    unfold ChainState.ledgerState at hl
+    simp only [Prod.mk.injEq] at hl
+    exact hwf.congr hl.1.symm hl.2.1.symm
 termination_by st.postponed.length
 decreasing_by exact Assoc.erase_length_lt_of_lookup _ _ _ hwaiting
 
