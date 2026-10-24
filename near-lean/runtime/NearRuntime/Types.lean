@@ -17,6 +17,9 @@ open Wasm
 abbrev AccountId := String
 abbrev Bytes := List UInt8
 abbrev PublicKey := Bytes
+-- nearcore divergence: receipt and data ids are counters from `ChainState.freshId`, not the
+-- hashes of `create_receipt_id_from_*`/`create_data_id`; transaction outcomes use id 0, not the
+-- transaction hash. Hash-level identity is bound separately (`NativeIdentity`).
 abbrev ReceiptId := Nat
 abbrev DataId := Nat
 
@@ -74,6 +77,8 @@ deriving instance Repr for Wasm.GlobalContractId
 /-- How a global contract is identified when deployed (`GlobalContractDeployMode`). -/
 abbrev GlobalDeployMode := Wasm.GlobalContractDeployMode
 
+-- nearcore divergence: no DeterministicStateInit action; it is outside the represented
+-- runtime and cannot be expressed as a model input.
 inductive Action
   | createAccount
   | deployContract (code : ContractCode)
@@ -182,6 +187,8 @@ structure GlobalDistribution where
   nonce : Nat
   deriving Inhabited
 
+-- nearcore divergence: no ActionV2 (`refund_to`) receipts, so deposit refunds always go to
+-- the predecessor (nearcore: `balance_refund_receiver`).
 inductive ReceiptEnum
   | action (r : ActionReceipt)
   | data (d : DataReceipt)
@@ -221,6 +228,8 @@ instance : LawfulBEq NonceMode where
   rfl := by intro mode; cases mode <;> rfl
   eq_of_beq := by intro a b h; cases a <;> cases b <;> cases h <;> rfl
 
+-- nearcore divergence: no `block_hash`, so the validity-period (`Expired`) check is absent;
+-- which transactions a chunk includes is a chain-level input to `apply`.
 /-- A transaction; the signature is trusted. -/
 structure Transaction where
   /-- Native transaction envelope tag. V1 is enabled by the GasKeys feature. -/

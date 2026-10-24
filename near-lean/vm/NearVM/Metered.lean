@@ -15,11 +15,13 @@ values). It also keeps `storage_usage` in step with storage writes and turns
 `panic`/`panic_utf8` into structured `guestPanic` errors carrying the message.
 
 Costs that depend on the state trie (`touching_trie_node`,
-`read_cached_trie_node`) are not charged: they need the trie shape, which
-the runtime does not model. Replay comparisons of burnt gas on storage-heavy
-calls must account for that.
+`read_cached_trie_node`) are charged only when the context supplies
+`storageAccounting` (the trie shape); without it, replay comparisons of burnt
+gas on storage-heavy calls must account for the difference.
 -/
 
+-- nearcore divergence: `touching_trie_node`/`read_cached_trie_node` are charged only when the
+-- context supplies `storageAccounting` (`prepareStorageCallAux`); without it they are skipped.
 namespace Wasm.Near
 
 /-- One gas charge. -/
@@ -1226,6 +1228,8 @@ def metered (extraBytes : Nat) (name : String) (fn : NearHostFn NearState) : Nea
         | some error => trapWith st1 error
         | none => invokeStorageCall extraBytes name fn st1 args }
 
+-- nearcore divergence: hashing, signature, curve and validator host functions are rejected as
+-- execution issues instead of being executed.
 /-- These host operations require semantics not supplied by `VMContext`.
 Reject them on invocation instead of using the functional host's placeholder
 crypto or validator implementations. Merely importing one is allowed.

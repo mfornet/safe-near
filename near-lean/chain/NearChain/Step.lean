@@ -33,6 +33,8 @@ structure Block where
   receipts : ReceiptSchedule := .all
   deriving Inhabited
 
+-- nearcore divergence: block context is arbitrary input (no height/gas-price evolution, epochs
+-- or rewards) and delivery is any schedule, a superset of nearcore's per-shard receipt order.
 /-- Invalid delivery schedules are rejected before applying transactions.
 Supported blocks retain deferred receipts before their newly outgoing work.
 Runtime-delayed and postponed queues remain governed by `Near.apply`. -/
@@ -122,6 +124,7 @@ theorem RunResult.finish_quiescent_iff (s : Snapshot) (rs : List ApplyResult) :
   simp only [RunResult.finish]
   split <;> simp_all
 
+-- nearcore divergence: every settling block reuses one `ApplyState` (height, seed, gas price).
 /-- Apply empty blocks until quiescent (at most `fuel` of them). A pending
 callback without its data is incomplete even if no receipt can run now. -/
 def settle (cfg : RuntimeConfig) (codeOf : CodeTable) (ap : ApplyState) (s : Snapshot)

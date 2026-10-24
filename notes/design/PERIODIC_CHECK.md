@@ -19,14 +19,14 @@ Start a check with `/periodic-check` in a Claude Code session
 ## Which sections are due
 
 `reports/periodic/LEDGER.json` records, per section, the commit it was last
-checked at, the report and the Linear issues it filed. `just periodic-due`
+checked at, the report (a Linear issue) and the Linear issues it filed. `just periodic-due`
 lists the sections whose watched paths changed since then (the path map is
 `SECTIONS` in `tools/periodic_check.py`); pins are due by age instead, once a
 week. Only due sections run. If nothing is due, there is no check.
 
 After a check, record what it covered:
 
-    python3 tools/periodic_check.py --record <section>... --report reports/periodic/<date>/README.md --issue SAF-12
+    python3 tools/periodic_check.py --record <section>... --report <review issue URL> --issue SAF-27 --issue SAF-28
 
 ## Rules for fixes
 
@@ -154,10 +154,15 @@ would go.
 
 ### 10. Report
 
-Write a dated report in `reports/periodic/` with the numbers from section 2,
-the pins from section 3, every finding and its resolution (fixed, filed with
-its Linear ID, or needs maintainer action), the sections that were skipped as
-not due, and the cost of the agent runs. Then update the ledger.
+Reports live in Linear, not in the repository. Open a review issue in the
+Safe-near team, "Review periodic check <date> findings" (label
+`periodic-check`, assigned to the maintainer), and attach the report to it as
+a document: the numbers from section 2, the pins from section 3, every finding
+and its resolution (fixed, filed with its Linear ID, or needs maintainer
+action), the sections that were skipped as not due, and the cost of the agent
+runs. Filed findings are sub-issues of the review issue. Then update the
+ledger, the only file the report adds to the repository. Build logs and
+evidence stay in the ignored `audit/periodic/`.
 
 ## Findings in Linear
 
@@ -165,7 +170,8 @@ Findings that aren't fixed in the check become issues in the Safe-near team,
 labeled `periodic-check` and one of `divergence`, `missing-feature`,
 `simplification`, `stale`, `test-coverage`, `upgrade`. Before filing, search
 the open issues with the same label; comment on an existing issue instead of
-opening a duplicate. Each issue names the files and lines, and the commit the
+opening a duplicate. File new issues in Backlog as sub-issues of the review
+issue (see section 10). Each issue names the files and lines, and the commit the
 check ran at.
 
 ## Running the check with agents

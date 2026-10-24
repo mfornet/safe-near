@@ -70,7 +70,7 @@ requires the open runtime refinement proof and explicit gas/storage assumptions.
 | `InitOnce` | `new` cannot run twice; nothing runs before `new` | proved |
 | `ProjectEncode` | The view recovers every well-formed state from its storage | proved |
 | `StorageCoverage` | Occupied storage is at most the `STATE` record plus `account_storage_usage` per registered account | proved |
-| `refines_wnear` | `NearInterface.Refines` for `contract.wasm` on near-lean's function-call boundary and the `wnear` contract model: every input, every amount of gas, every resource state | stated, open |
+| `refines_wnear` | `NearInterface.Refines` for `contract.wasm` on near-lean's function-call boundary and the `wnear` contract model: every input, every amount of gas, every resource state | proved for methods the binary does not export; open for the 15 exported ones (`refines_wnear_exported`) |
 
 ## Proof approach and lessons
 
