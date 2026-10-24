@@ -58,8 +58,10 @@ def benchmarks : List Benchmark :=
          if ed25519Verify signingKey.publicKey (vary message i) signature then 1 else 0 },
       { name := "ed25519/sign", iterations := 300,
         run := fun i =>
-          -- the key pair is decoded for every signature, as `near_crypto::SecretKey::sign` does
-          let key := (Ed25519.Impl.SigningKey.ofKeypair keypair).getD default
+          -- the key pair is decoded for every signature, as `near_crypto::SecretKey::sign` does;
+          -- the extra byte, never present, keeps the decoding from being hoisted out of the loop
+          let pair := if i == 1000000000 then keypair.push 0 else keypair
+          let key := (Ed25519.Impl.SigningKey.ofKeypair pair).getD default
           (key.sign (vary message i)).get! 0 |>.toUInt64 },
       { name := "ed25519/sign-prepared", iterations := 300,
         run := fun i => (signingKey.sign (vary message i)).get! 0 |>.toUInt64 }]

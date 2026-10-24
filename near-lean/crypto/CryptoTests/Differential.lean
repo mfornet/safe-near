@@ -72,28 +72,53 @@ def hashTests (t : Tally) (r : Rng) : Tally × Rng :=
         t := check t s!"{name} length {n}" (spec m == impl m) s!"digests differ on {toHex m}"
     return (t, r)
 
+/-- Field elements that stress the limb boundaries. -/
+def fieldEdges : List Nat :=
+  [0, 1, 2, 18, 19, 20, Spec.p - 1, Spec.p, Spec.p + 1, 2 ^ 255 - 1, 2 ^ 254, 2 ^ 26, 2 ^ 26 - 1,
+    2 ^ 51, 2 ^ 51 - 1, 2 ^ 230, 2 ^ 230 - 1, 2 ^ 252 + 12345, Spec.sqrtM1, Spec.d]
+
 def fieldTests (t : Tally) (r : Rng) : Tally × Rng :=
   Id.run do
     let mut t := t
     let mut r := r
-    t := check t "constant d" (Field.d == Spec.d)
-    t := check t "constant sqrt(-1)" (Field.sqrtM1 == Spec.sqrtM1)
-    t := check t "constant 2d" (Field.d2 == 2 * Spec.d % Spec.p)
+    t := check t "constant d" (Fe.d.toNat == Spec.d)
+    t := check t "constant sqrt(-1)" (Fe.sqrtM1.toNat == Spec.sqrtM1)
+    t := check t "constant 2d" (Fe.d2.toNat == 2 * Spec.d % Spec.p)
     t := check t "order" (ell == Spec.ell)
     t := check t "prime" (p == Spec.p)
     t := check t "base point" (Ext.compress Ext.basePoint == Spec.compress Spec.basePoint)
-    for i in [0:100] do
+    let mut values := fieldEdges
+    for _ in [0:60] do
       let (a, r') := r.nat 32
-      let (u, r') := r'.nat 32
       r := r'
-      let a := if i = 0 then 0 else a % Spec.p
-      t := check t s!"inv {i}" (Field.inv a == Spec.inv a)
-      t := check t s!"powP58 {i}" (Field.powP58 a == Spec.powMod a ((Spec.p - 5) / 8))
+      values := values ++ [a % 2 ^ 255]
+    let reduced (n : Nat) := n % Spec.p
+    for a in values do
+      let fa := Fe.ofNat a
+      t := check t s!"toNat {a}" (fa.toNat == reduced a)
+      t := check t s!"inv {a}" ((Fe.inv fa).toNat == Spec.inv a)
+      t := check t s!"powP58 {a}" ((Fe.powP58 fa).toNat == Spec.powMod a ((Spec.p - 5) / 8))
+      t := check t s!"sq {a}" ((Fe.sq fa).toNat == reduced (a * a))
+      t := check t s!"neg {a}" ((Fe.neg fa).toNat == (Spec.p - reduced a) % Spec.p)
+    for (a, b) in values.zip (values.drop 7 ++ values.take 7) do
+      let (fa, fb) := (Fe.ofNat a, Fe.ofNat b)
+      t := check t s!"mul {a} {b}" ((Fe.mul fa fb).toNat == reduced (a * b))
+      t := check t s!"add {a} {b}" ((Fe.add fa fb).toNat == reduced (a + b))
       t :=
-        check t s!"sqrtRatio {i}"
-          ((Field.sqrtRatio u a).isSome == (Spec.sqrtRatio u a).isSome &&
-            ((Field.sqrtRatio u a).all fun x =>
-              x * x % p * a % p == u % p || x * x % p * a % p == (p - u % p) % p))
+        check t s!"sub {a} {b}" ((Fe.sub fa fb).toNat == (reduced a + Spec.p - reduced b) % Spec.p)
+      -- long chains keep every limb in range
+      let chain := (List.range 20).foldl (fun x _ => Fe.sub (Fe.mul x fb) (Fe.add x fa)) fa
+      let chainNat :=
+        (List.range 20).foldl (fun x _ => ((x * b) % Spec.p + Spec.p - (x + a) % Spec.p) % Spec.p)
+          (reduced a)
+      t := check t s!"chain {a} {b}" (chain.toNat == chainNat)
+      let (u, v) := (reduced a, reduced b)
+      t :=
+        check t s!"sqrtRatio {a} {b}"
+          ((Fe.sqrtRatio fa fb).isSome == (Spec.sqrtRatio u v).isSome &&
+            ((Fe.sqrtRatio fa fb).all fun x =>
+              x.toNat * x.toNat % Spec.p * v % Spec.p == u ||
+                x.toNat * x.toNat % Spec.p * v % Spec.p == (Spec.p - u) % Spec.p))
     return (t, r)
 
 def scalarTests (t : Tally) (r : Rng) : Tally × Rng :=
