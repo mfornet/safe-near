@@ -171,11 +171,12 @@ def main (args : List String) : IO UInt32 := do
   check r "invalid graph rejection restores funds, storage and usage"
     (observed.balance == 99 && observed.storageUsage == 123 && observed.storage == [(alice, [7])] &&
       observed.receipts.isEmpty)
+  let dataId : List UInt8 := List.replicate 32 7
   let cyclicJoin : List NearPromise := [.and [0]]
   check r "raw join cycles cannot disappear through bounded flattening"
     ((joined.checkPromises 99 123 [] cyclicJoin).issue?.isSome)
-  check r "unsupported yielded handles cannot disappear during conversion"
-    ((joined.checkPromises 99 123 [] [.yielded [] [] 0 0 []]).issue?.isSome)
+  check r "a yielded promise is checked like any other receipt"
+    ((joined.checkPromises 99 123 [] [.yielded alice [.transfer 1] dataId]).issue?.isNone)
 
   let nestedHandles : List NearPromise := [
     .batch alice [.transfer 1], .and [0], .callback 1 bob [.transfer 2],
@@ -195,8 +196,9 @@ def main (args : List String) : IO UInt32 := do
     ((convertPromises [.and [0]]).isNone &&
       (convertPromises [.callback 0 alice []]).isNone &&
       (convertPromises [.and [99]]).isNone)
-  check r "conversion does not silently drop unsupported yielded promises"
-    ((convertPromises [.yielded [] [] 0 0 []]).isNone)
+  check r "a yielded promise converts to a receipt waiting for its data id"
+    ((convertPromises [.yielded alice [.transfer 1] dataId]).map (·.receipts.map (·.yieldDataId)) ==
+      some [some dataId])
 
   let exhausted := run cfg code h.codeSize "new" (ctx alice "new" "{}" 0) [] 0
   check r "fuel exhaustion is explicitly incomplete"

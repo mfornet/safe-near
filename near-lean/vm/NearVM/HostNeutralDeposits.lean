@@ -864,7 +864,7 @@ theorem promiseResultFn_noDeposits : HostCreatesNoDeposits promiseResultFn := by
     | exact createCallbackPromiseResult_deposits _ _ _ _
     | split)
 
-theorem gasFn_noDeposits : HostCreatesNoDeposits gasFn := by
+theorem gasFn_noDeposits (opCost : Nat) : HostCreatesNoDeposits (gasFn opCost) := by
   intro st args
   unfold gasFn
   dsimp only
@@ -887,11 +887,22 @@ theorem HostCreatesNoDeposits.funding {fn : NearHostFn NearState} (h : HostCreat
     simp only [NearState.liquidFunds, hp.1, hp.2.1, hp.2.2, Nat.add_zero]
 
 
--- TODO(proof): yield create/resume create no deposits.
 theorem promiseYieldCreateFn_noDeposits : HostCreatesNoDeposits promiseYieldCreateFn := by
-  sorry
+  intro st args
+  unfold promiseYieldCreateFn
+  dsimp only [disallowInView]
+  repeat (first | trivial | exact ⟨rfl, rfl, rfl⟩ | split)
+  all_goals first
+    | trivial
+    | (obtain ⟨a1, a2, a3⟩ := checkedSetRegister_deposits ‹_›
+       refine ⟨a1, a2, (appendPromise_deposits _ _).trans ?_⟩
+       rw [a3]
+       simp [promiseValue, depositValue, PromiseAction.deposit])
 
 theorem promiseYieldResumeFn_noDeposits : HostCreatesNoDeposits promiseYieldResumeFn := by
-  sorry
+  intro st args
+  unfold promiseYieldResumeFn
+  dsimp only [disallowInView]
+  repeat (first | trivial | exact ⟨rfl, rfl, rfl⟩ | split)
 
 end Wasm.Near

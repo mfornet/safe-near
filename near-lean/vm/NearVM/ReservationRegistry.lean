@@ -4,22 +4,22 @@ namespace Wasm.Near
 
 /-- Legacy instruction metering reserves no additional promise gas on success.
 Gas exhaustion traps and discards the speculative counter instead. -/
-theorem gasFn_reservationInvariant (fees : ActionFees) (ethEnabled : Bool) :
-    NearHostFn.PreservesLive (ReservationInvariant fees ethEnabled) gasFn := by
+theorem gasFn_reservationInvariant (fees : ActionFees) (ethEnabled : Bool) (opCost : Nat) :
+    NearHostFn.PreservesLive (ReservationInvariant fees ethEnabled) (gasFn opCost) := by
   intro st args h
   unfold gasFn
   dsimp only
   split
   · rename_i n
-    cases hc : st.host.gas.burn n.toNat with
+    cases hc : st.host.gas.burn (n.toNat * opCost) with
     | mk gas error =>
       cases error with
       | some error => trivial
       | none =>
-        have hp : (st.host.gas.burn n.toNat).1.promises = st.host.gas.promises := by
-          have hs : (st.host.gas.burn n.toNat).2 = none := by rw [hc]
+        have hp : (st.host.gas.burn (n.toNat * opCost)).1.promises = st.host.gas.promises := by
+          have hs : (st.host.gas.burn (n.toNat * opCost)).2 = none := by rw [hc]
           simpa only [GasCounter.burn, Nat.sub_self, Nat.add_zero] using
-            (GasCounter.deduct_success st.host.gas n.toNat n.toNat (Nat.le_refl _) hs).2.1
+            (GasCounter.deduct_success st.host.gas (n.toNat * opCost) (n.toNat * opCost) (Nat.le_refl _) hs).2.1
         rw [hc] at hp
         change ReservationInvariant fees ethEnabled _
         exact ⟨h.1, h.2.1, by
@@ -350,6 +350,6 @@ theorem meteredHostFns_reservationInvariant (fees : ActionFees) (ethEnabled : Bo
       · decide
       · exact chainIdFn_reservationView
   · subst entry
-    exact gasFn_reservationInvariant fees ethEnabled
+    exact gasFn_reservationInvariant fees ethEnabled _
 
 end Wasm.Near

@@ -266,7 +266,7 @@ theorem abortMetered_selection : HostPreservesSelection abortMetered := by
     | exact writeRegisterResult_selection _ _ _ _ _ hwf
     | split)
 
-theorem gasFn_selection : HostPreservesSelection gasFn := by
+theorem gasFn_selection (opCost : Nat) : HostPreservesSelection (gasFn opCost) := by
   intro st args hwf
   unfold gasFn
   dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
@@ -639,11 +639,21 @@ theorem promiseResultFn_selection : HostPreservesSelection promiseResultFn := by
     | split)
 
 
--- TODO(proof): yield create/resume selection preservation.
 theorem promiseYieldCreateFn_selection : HostPreservesSelection promiseYieldCreateFn := by
-  sorry
+  unfold promiseYieldCreateFn
+  apply disallowInView_selection
+  intro st args hwf
+  dsimp only
+  repeat (first | exact hwf | split)
+  all_goals first
+    | trivial
+    | exact appendPromise_selection _ _ (checkedSetRegister_selection ‹_› hwf)
 
 theorem promiseYieldResumeFn_selection : HostPreservesSelection promiseYieldResumeFn := by
-  sorry
+  unfold promiseYieldResumeFn
+  apply disallowInView_selection
+  intro st args hwf
+  dsimp only
+  repeat (first | exact hwf | split)
 
 end Wasm.Near

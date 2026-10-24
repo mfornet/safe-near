@@ -491,7 +491,9 @@ def dataIdLength : Nat := 32
 /-- `promise_yield_create(method_name_len, method_name_ptr, arguments_len, arguments_ptr,
 gas, gas_weight, register_id) -> promise_index`: a new receipt to the current account whose
 function call waits for a data id, which is written to `register_id`. The charges, the empty
-method name and the promise limit are checked by the metered layer. -/
+method name and the promise limit are checked by the metered layer.
+nearcore divergence: the executing account id must be valid UTF-8 and the call traps otherwise,
+which keeps the encoding of the yielded receipt total; nearcore never meets such an id. -/
 def promiseYieldCreateFn : NearHostFn NearState :=
   disallowInView "promise_yield_create" <|
   { params := [.i64, .i64, .i64, .i64, .i64, .i64, .i64], results := [.i64]

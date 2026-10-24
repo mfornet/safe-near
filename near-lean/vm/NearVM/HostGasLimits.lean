@@ -24,13 +24,13 @@ theorem applyCharges_gasLimits (ns : NearState) (charges : List Charge)
   have hl := applyCharges_gas_limits ns charges
   exact ⟨hl.1.trans h.1, hl.2.trans h.2⟩
 
-theorem gasFn_gasLimits : HostPreservesGasLimits gasFn := by
+theorem gasFn_gasLimits (opCost : Nat) : HostPreservesGasLimits (gasFn opCost) := by
   intro prepaid maxBurnt st args hwf
   unfold gasFn
   dsimp only
   split
   · rename_i n
-    have hl := GasCounter.deduct_limits st.host.gas n.toNat n.toNat
+    have hl := GasCounter.deduct_limits st.host.gas (n.toNat * opCost) (n.toNat * opCost)
     split <;> exact ⟨hl.1.trans hwf.1, hl.2.trans hwf.2⟩
   · exact hwf
 
@@ -148,7 +148,7 @@ theorem meteredHostFns_gasLimits (cfg : RuntimeConfig) (entry : ImportDecl × Ne
       | exact HostPreservesGas.limits panicMetered_gas
       | exact HostPreservesGas.limits panicUtf8Metered_gas
       | exact HostPreservesGas.limits abortMetered_gas
-      | exact gasFn_gasLimits
+      | exact gasFn_gasLimits _
       | exact HostPreservesGas.limits promiseCreateFn_gas
       | exact HostPreservesGas.limits promiseThenFn_gas
       | exact HostPreservesGas.limits promiseAndFn_gas
@@ -179,7 +179,7 @@ theorem meteredHostFns_gasLimits (cfg : RuntimeConfig) (entry : ImportDecl × Ne
       | exact HostPreservesGas.limits promiseResultsCountFn_gas
       | exact HostPreservesGas.limits promiseResultFn_gas
   · subst entry
-    exact gasFn_gasLimits
+    exact gasFn_gasLimits _
 
 /-- Resolution cannot introduce a function outside the proved host registry. -/
 theorem resolveMeteredImports_gasLimits (cfg : RuntimeConfig) (imports : List ImportDecl)

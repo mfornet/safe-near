@@ -31,13 +31,13 @@ theorem applyCharges_gasFloor (ns : NearState) (charges : List Charge)
     (h : GasFloor b prepaid maxBurnt ns) : GasFloor b prepaid maxBurnt (applyCharges ns charges).1 :=
   applyCharges_floor ns charges h
 
-theorem gasFn_gasFloor : HostPreservesGasFloor gasFn := by
+theorem gasFn_gasFloor (opCost : Nat) : HostPreservesGasFloor (gasFn opCost) := by
   intro b prepaid maxBurnt st args hwf
   unfold gasFn
   dsimp only
   split
   · rename_i n
-    have hl := GasCounter.deduct_floor n.toNat n.toNat hwf
+    have hl := GasCounter.deduct_floor (n.toNat * opCost) (n.toNat * opCost) hwf
     split <;> exact hl
   · exact hwf
 
@@ -154,7 +154,7 @@ theorem meteredHostFns_gasFloor (cfg : RuntimeConfig) (entry : ImportDecl × Nea
       | exact HostPreservesGas.floor panicMetered_gas
       | exact HostPreservesGas.floor panicUtf8Metered_gas
       | exact HostPreservesGas.floor abortMetered_gas
-      | exact gasFn_gasFloor
+      | exact gasFn_gasFloor _
       | exact HostPreservesGas.floor promiseCreateFn_gas
       | exact HostPreservesGas.floor promiseThenFn_gas
       | exact HostPreservesGas.floor promiseAndFn_gas
@@ -185,7 +185,7 @@ theorem meteredHostFns_gasFloor (cfg : RuntimeConfig) (entry : ImportDecl × Nea
       | exact HostPreservesGas.floor promiseResultsCountFn_gas
       | exact HostPreservesGas.floor promiseResultFn_gas
   · subst entry
-    exact gasFn_gasFloor
+    exact gasFn_gasFloor _
 
 /-- Resolution cannot introduce a function outside the proved host registry. -/
 theorem resolveMeteredImports_gasFloor (cfg : RuntimeConfig) (imports : List ImportDecl)

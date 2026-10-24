@@ -3,13 +3,14 @@ import NearVM.EncodingHosts
 namespace Wasm.Near
 
 /-- Legacy gas metering changes no encoding field on a live return. -/
-theorem gasFn_encodingInvariant : NearHostFn.PreservesLive EncodingInvariant gasFn := by
+theorem gasFn_encodingInvariant (opCost : Nat) :
+    NearHostFn.PreservesLive EncodingInvariant (gasFn opCost) := by
   intro st args h
   unfold gasFn
   dsimp only
   split
   · rename_i n
-    cases hc : st.host.gas.burn n.toNat with
+    cases hc : st.host.gas.burn (n.toNat * opCost) with
     | mk gas error =>
       cases error with
       | some error => trivial
@@ -304,6 +305,6 @@ theorem meteredHostFns_encodingInvariant
       apply meteredNeutral_encodingInvariant
       · exact chainIdFn_encodingFrame
   · subst entry
-    exact gasFn_encodingInvariant
+    exact gasFn_encodingInvariant _
 
 end Wasm.Near

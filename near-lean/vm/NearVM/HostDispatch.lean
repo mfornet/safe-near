@@ -266,7 +266,7 @@ theorem abortMetered_preserves : HostPreservesPromises abortMetered := by
     | exact writeRegisterResult_preserves _ _ _ _ _ hwf
     | split)
 
-theorem gasFn_preserves : HostPreservesPromises gasFn := by
+theorem gasFn_preserves (opCost : Nat) : HostPreservesPromises (gasFn opCost) := by
   intro st args hwf
   unfold gasFn
   dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
@@ -317,7 +317,7 @@ theorem meteredHostFns_preserves (cfg : RuntimeConfig) (entry : ImportDecl × Ne
       | exact panicMetered_preserves
       | exact panicUtf8Metered_preserves
       | exact abortMetered_preserves
-      | exact gasFn_preserves
+      | exact gasFn_preserves _
       | exact promiseCreateFn_preserves
       | exact promiseThenFn_preserves
       | exact promiseAndFn_preserves
@@ -348,7 +348,7 @@ theorem meteredHostFns_preserves (cfg : RuntimeConfig) (entry : ImportDecl × Ne
       | exact promiseResultsCountFn_preserves
       | exact promiseResultFn_preserves
   · subst entry
-    exact gasFn_preserves
+    exact gasFn_preserves _
 
 /-- Resolution cannot introduce a function outside the proved host registry. -/
 theorem resolveMeteredImports_preserves (cfg : RuntimeConfig) (imports : List ImportDecl)

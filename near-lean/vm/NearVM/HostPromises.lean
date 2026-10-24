@@ -824,7 +824,14 @@ theorem chainIdFn_preserves : HostPreservesPromises chainIdFn := by
   · exact hwf
 
 theorem promiseYieldCreateFn_preserves : HostPreservesPromises promiseYieldCreateFn := by
-  sorry
+  unfold promiseYieldCreateFn
+  apply disallowInView_preserves_promises
+  intro st args hwf
+  dsimp only
+  repeat (first | exact hwf | split)
+  all_goals first
+    | trivial
+    | exact appendPromise_preserves _ _ (by rw [checkedSetRegister_promises ‹_›]; exact hwf) trivial
 
 theorem promiseYieldResumeFn_preserves : HostPreservesPromises promiseYieldResumeFn := by
   unfold promiseYieldResumeFn

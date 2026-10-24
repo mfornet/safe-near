@@ -570,11 +570,17 @@ theorem promiseResultFn_gas : HostPreservesGas promiseResultFn := by
   repeat (first | rfl | exact writeRegisterResult_gas _ _ _ _ _ | split)
 
 
--- TODO(proof): yield create/resume gas preservation.
 theorem promiseYieldCreateFn_gas : HostPreservesGas promiseYieldCreateFn := by
-  sorry
+  intro st args
+  unfold promiseYieldCreateFn
+  dsimp only [disallowInView, appendPromise]
+  repeat (first | rfl | split)
+  all_goals first | trivial | (simp only [HostResult.Satisfies]; exact checkedSetRegister_gas ‹_›)
 
 theorem promiseYieldResumeFn_gas : HostPreservesGas promiseYieldResumeFn := by
-  sorry
+  intro st args
+  unfold promiseYieldResumeFn
+  dsimp only [disallowInView]
+  repeat (first | rfl | trivial | split)
 
 end Wasm.Near

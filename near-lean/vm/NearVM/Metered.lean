@@ -362,7 +362,9 @@ def promiseReceiverLen (st : HostStore NearState) (index : Nat) : Nat :=
 
 /-- `promise_batch_action_transfer_to_gas_key`: the public key is read, then the amount, then the
 target is looked up; the base fee and the per-byte fee follow (`gas_key_transfer_{send,exec}_fee`).
-A key that does not decode is charged as empty and fails only after the fees. -/
+A key that does not decode is charged as empty and fails only after the fees.
+nearcore divergence: a call whose key does not decode and whose balance is too small reports
+`InvalidPublicKey` here; nearcore checks the balance first and reports the balance error. -/
 def transferToGasKeyPlan (st : HostStore NearState) (args : List Value) : FunctionCallPlan :=
   let a := argU64 args
   let keyCharges := [.ext "base"] ++ readSpan st (a 1) (a 2)
@@ -916,13 +918,14 @@ def abortMetered : NearHostFn NearState :=
   { params := [.i32, .i32, .i32, .i32], results := []
     invoke := fun st _ => trapWith st (.guestPanic "abort") }
 
-/-- The `gas(n)` import used by older metering schemes. -/
-def gasFn : NearHostFn NearState :=
+/-- The `gas(opcodes)` import used by older metering schemes: `opcodes` regular instructions
+(`gas_seen_from_wasm`). -/
+def gasFn (opCost : Nat) : NearHostFn NearState :=
   { params := [.i32], results := []
     invoke := fun st args =>
       match args with
       | [.i32 n] =>
-        let (g, e) := st.host.gas.burn n.toNat
+        let (g, e) := st.host.gas.burn (n.toNat * opCost)
         let st' := { st with host := { st.host with gas := g, gasProfile := { st.host.gasProfile with
           wasm := st.host.gasProfile.wasm + (g.burnt - st.host.gas.burnt) } } }
         match e with
@@ -1223,7 +1226,11 @@ def metered (extraBytes : Nat) (name : String) (fn : NearHostFn NearState) : Nea
 
 /-- These host operations require semantics not supplied by `VMContext`.
 Reject them on invocation instead of using the functional host's placeholder
-crypto, validator, or yield implementations. Merely importing one is allowed. -/
+crypto or validator implementations. Merely importing one is allowed.
+nearcore divergence: `promise_yield_create_with_id`, `promise_yield_resume_with_yield_id`,
+`promise_set_refund_to` and `promise_batch_action_state_init_by_account_id` are linked but trap
+when called, because the receipt forms they need (a refund target, deterministic state init)
+are outside the modelled receipts. -/
 def unsupportedRuntimeHost (name : String) : Bool :=
   ["sha256", "keccak256", "keccak512", "ripemd160", "ecrecover", "ed25519_verify",
    "validator_stake", "validator_total_stake",
@@ -1252,7 +1259,7 @@ def meteredHostFns (cfg : RuntimeConfig) : List (ImportDecl × NearHostFn NearSt
     | "abort" => abortMetered
     | _ => fn
   (nearHostFns.map fun (decl, fn) => (decl, metered extra (meteringName decl.name) (swap decl fn)))
-    ++ [({ «module» := "env", name := "gas", params := [.i32], results := [] }, gasFn)]
+    ++ [({ «module» := "env", name := "gas", params := [.i32], results := [] }, gasFn cfg.wasm.regularOpCost)]
 
 /-- Resolve imports in declaration order, retaining the first unknown-import
 error. Structural recursion exposes the environment invariant to proofs. -/

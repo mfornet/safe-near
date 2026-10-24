@@ -136,7 +136,7 @@ theorem meteredHostFns_selection (cfg : RuntimeConfig) (entry : ImportDecl × Ne
       | exact panicMetered_selection
       | exact panicUtf8Metered_selection
       | exact abortMetered_selection
-      | exact gasFn_selection
+      | exact gasFn_selection _
       | exact promiseCreateFn_selection
       | exact promiseThenFn_selection
       | exact promiseAndFn_selection
@@ -167,7 +167,7 @@ theorem meteredHostFns_selection (cfg : RuntimeConfig) (entry : ImportDecl × Ne
       | exact promiseResultsCountFn_selection
       | exact promiseResultFn_selection
   · subst entry
-    exact gasFn_selection
+    exact gasFn_selection _
 
 /-- Resolution cannot introduce a function outside the proved host registry. -/
 theorem resolveMeteredImports_selection (cfg : RuntimeConfig) (imports : List ImportDecl)

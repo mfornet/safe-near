@@ -464,4 +464,52 @@ theorem meteredNeutral_reservationInvariant (fees : ActionFees) (ethEnabled : Bo
   cases he : fn.invoke ready args <;>
     rw [he] at hr <;> first | trivial | exact ReservationInvariant.of_view_eq hr hp
 
+/-- A yielded promise appended after a register write consumes exactly the reserved gas. -/
+theorem yieldReturn_reservationInvariant (fees : ActionFees) (ethEnabled : Bool)
+    (st : HostStore NearState) (args values : List Value) (promise : NearPromise)
+    (h : ReservationInvariant fees ethEnabled st.host)
+    (hsuccess : (applyCharges st.host (chargesBefore "promise_yield_create" st args)).2 = none)
+    (hres : ((chargesBefore "promise_yield_create" st args).map
+      (fun charge => charge.reservation st.host.fees)).sum =
+        promiseValue (receiptGasValue st.host.fees st.host.config.ethImplicitAccounts) promise)
+    (mid : HostStore NearState)
+    (hmid : reservationView mid.host = reservationView (prechargedStore "promise_yield_create" st args).host)
+    (weights : List (Nat × Nat × Nat)) :
+    HostResult.LiveSatisfies (ReservationInvariant fees ethEnabled)
+      (.Return values { appendPromise mid promise with
+        host := { (appendPromise mid promise).host with gasWeights := weights } }) := by
+  have h1 := appendPrechargedPromise_reservationInvariant fees ethEnabled "promise_yield_create" st args
+    values promise h hsuccess hres
+  change ReservationInvariant fees ethEnabled _
+  apply reservationInvariant_of_view _ h1
+  simp only [reservationView, reservationFrame, appendPromise, Prod.mk.injEq] at hmid ⊢
+  obtain ⟨⟨hf, he, hp⟩, hg⟩ := hmid
+  exact ⟨⟨hf, he, by rw [hp]⟩, hg⟩
+
+theorem prechargedYieldCreate_reservationInvariant (fees : ActionFees) (ethEnabled : Bool)
+    (st : HostStore NearState) (args : List Value)
+    (h : ReservationInvariant fees ethEnabled st.host)
+    (hsuccess : (applyCharges st.host (chargesBefore "promise_yield_create" st args)).2 = none)
+    (hguard : preInvokeError "promise_yield_create" (prechargedStore "promise_yield_create" st args) args = none) :
+    HostResult.LiveSatisfies (ReservationInvariant fees ethEnabled)
+      (promiseYieldCreateFn.invoke (prechargedStore "promise_yield_create" st args) args) := by
+  have he := preInvokeError_yieldCreate_valid hguard
+  rw [prechargedStore_yieldCreatePlan_error] at he
+  obtain ⟨method, callArgs, hm, ha, hres⟩ := chargesBefore_yieldCreate_reservation st args he
+  unfold promiseYieldCreateFn
+  dsimp only [disallowInView]
+  repeat' (first | trivial | split)
+  all_goals
+    refine yieldReturn_reservationInvariant fees ethEnabled st _ _ _ h hsuccess ?_ _ ?_ _
+    · simp_all [argU64, promiseValue, receiptGasValue, actionExecutionGas]
+    · exact checkedSetRegister_reservationView ‹_›
+
+theorem meteredYieldCreate_reservationInvariant (fees : ActionFees) (ethEnabled : Bool) (extra : Nat) :
+    NearHostFn.PreservesLive (ReservationInvariant fees ethEnabled)
+      (metered extra "promise_yield_create" promiseYieldCreateFn) := by
+  apply metered_reservationInvariant
+  intro st args h hs hg _
+  simp (disch := decide) only [prepareStorageCall_other]
+  exact prechargedYieldCreate_reservationInvariant fees ethEnabled st args h hs hg
+
 end Wasm.Near

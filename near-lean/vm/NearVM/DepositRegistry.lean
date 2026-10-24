@@ -47,7 +47,7 @@ theorem meteredHostFns_funding (cfg : RuntimeConfig) (entry : ImportDecl × Near
       | exact panicMetered_noDeposits
       | exact panicUtf8Metered_noDeposits
       | exact abortMetered_noDeposits
-      | exact HostCreatesNoDeposits.funding gasFn_noDeposits
+      | exact HostCreatesNoDeposits.funding (gasFn_noDeposits _)
       | exact promiseCreateFn_deposits
       | exact promiseThenFn_deposits
       | exact promiseAndFn_noDeposits
@@ -78,7 +78,7 @@ theorem meteredHostFns_funding (cfg : RuntimeConfig) (entry : ImportDecl × Near
       | exact promiseResultsCountFn_noDeposits
       | exact promiseResultFn_noDeposits
   · subst entry
-    exact HostCreatesNoDeposits.funding gasFn_noDeposits
+    exact HostCreatesNoDeposits.funding (gasFn_noDeposits _)
 
 /-- Resolution cannot introduce a function outside the proved host registry. -/
 theorem resolveMeteredImports_funding (cfg : RuntimeConfig) (imports : List ImportDecl)
