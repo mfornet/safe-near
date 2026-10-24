@@ -40,7 +40,9 @@ pub fn h(c: &CryptoHash) -> String {
 /// An ED25519 signer for a random account.
 pub fn signer(g: &mut G) -> ValidatorSigner {
     let seed = format!("s{}", g.u64());
-    InMemoryValidatorSigner::from_seed(g.account(), KeyType::ED25519, &seed)
+    let signer = InMemoryValidatorSigner::from_seed(g.account(), KeyType::ED25519, &seed);
+    crate::sigs::record_signer(&signer.public_key());
+    signer
 }
 
 fn key(g: &mut G) -> ChunkProductionKey {
@@ -87,7 +89,9 @@ fn signed<T: BorshDeserialize>(
 ) -> T {
     let mut b: Vec<u8> = tag.into_iter().collect();
     b.extend(&inner);
-    b.extend(borsh::to_vec(&signer.sign_bytes(&inner)).unwrap());
+    let signature = signer.sign_bytes(&inner);
+    crate::sigs::record(&signature, &signer.public_key(), &inner);
+    b.extend(borsh::to_vec(&signature).unwrap());
     let v = T::try_from_slice(&b).expect("signed message does not decode");
     assert!(verify(&v, &signer.public_key()), "signature does not cover the Borsh of inner");
     v

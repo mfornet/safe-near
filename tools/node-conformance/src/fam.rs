@@ -123,9 +123,11 @@ impl<T: BorshSerialize + BorshDeserialize> Fam<T> {
             .unwrap_or_else(|e| panic!("{}/{name}: the oracle cannot decode its own encoding: {e}", self.ty));
         assert_eq!(borsh::to_vec(&d).unwrap(), bytes, "{}/{name}: re-encoding differs", self.ty);
         if !self.seen.insert(bytes.clone()) {
+            crate::sigs::discard();
             return;
         }
         self.emit(name, &bytes, &d, None);
+        crate::sigs::attach(&self.ty, self.lines.len() - 1, name);
         if mutate && bytes.len() <= self.max_mutated_len {
             self.mutations(name, &bytes);
         }

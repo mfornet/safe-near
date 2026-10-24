@@ -158,7 +158,7 @@ pub fn spice_signed_data(g: &mut G) -> SpiceEndorsementSignedData {
 pub fn endorsement_core_statement(g: &mut G) -> SpiceEndorsementCoreStatement {
     let sk = g.secret(KeyType::ED25519);
     let data = spice_signed_data(g);
-    let signature = sk.sign(&spice_signing_data(&data));
+    let signature = crate::sigs::sign(&sk, &spice_signing_data(&data));
     let s = testonly_create_endorsement_core_statement(g.account(), signature, data);
     assert!(s.verified_signed_data(&sk.public_key()).is_some(), "spice signing data differs");
     s
@@ -182,7 +182,7 @@ pub fn spice_chunk_endorsement(g: &mut G) -> SpiceChunkEndorsement {
         execution_result_hash: execution_result.compute_hash(),
         chunk_id: chunk_id.clone(),
     };
-    let signature = sk.sign(&spice_signing_data(&data));
+    let signature = crate::sigs::sign(&sk, &spice_signing_data(&data));
     let e = testonly_create_chunk_endorsement(chunk_id, g.account(), signature, execution_result);
     assert!(e.clone().into_verified(&sk.public_key()).is_some(), "spice signing data differs");
     e

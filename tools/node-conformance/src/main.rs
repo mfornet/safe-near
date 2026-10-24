@@ -7,6 +7,7 @@ mod chain_fam;
 mod epoch_fam;
 mod fam;
 mod rng;
+mod sigs;
 mod sync_fam;
 mod stateless_fam;
 mod values;
@@ -29,7 +30,13 @@ pub const SEED: u64 = 0x4e45_4152_0000_0001;
 const REFERENCE: &str = include_str!("../../../near-lean/runtime/reference.json");
 
 fn main() {
-    let out_dir = PathBuf::from(std::env::args().nth(1).expect("usage: node-conformance-fixtures <out dir>"));
+    let out_dir = PathBuf::from(
+        std::env::args().nth(1).expect("usage: node-conformance-fixtures <out dir> [signatures file]"),
+    );
+    let signatures = std::env::args()
+        .nth(2)
+        .map(PathBuf::from)
+        .unwrap_or_else(|| out_dir.join("../signatures.jsonl"));
     let reference: serde_json::Value = serde_json::from_str(REFERENCE).unwrap();
     let pinned = reference["reference_protocol_version"].as_u64().unwrap();
     assert_eq!(PROTOCOL_VERSION as u64, 86, "the oracle crates must be protocol 86");
@@ -50,6 +57,7 @@ fn main() {
     sync_fam::sync(&mut m, &out_dir);
 
     m.write(&out_dir);
+    sigs::write(&signatures);
 }
 
 fn primitives(m: &mut Manifest, dir: &PathBuf) {

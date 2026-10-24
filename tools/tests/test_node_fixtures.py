@@ -5,6 +5,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = ROOT / "near-lean/node/fixtures/types"
+SIGNATURES = ROOT / "near-lean/node/fixtures/signatures.jsonl"
 HEX = re.compile(r"^(?:[0-9a-f]{2})*$")
 LIMIT = 20 * 1024 * 1024
 
@@ -43,6 +44,54 @@ class NodeFixtureTests(unittest.TestCase):
                         if key not in {"type", "name"}:
                             self.assertTrue(value is None or HEX.match(value), f"{where} {key}")
             self.assertEqual((accept, reject), (counts["accept"], counts["reject"]), name)
+
+
+class SignatureRecordTests(unittest.TestCase):
+    """`signatures.jsonl` records the keys of the oracle's ED25519 signatures per fixture line."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.records = [json.loads(line) for line in SIGNATURES.read_text().splitlines()]
+        cls.manifest = json.loads((FIXTURES / "manifest.json").read_text())
+
+    def test_records_name_fixture_lines(self):
+        line_counts = {}
+        seen = set()
+        for record in self.records:
+            self.assertEqual(set(record), {"type", "line", "name", "sigs", "signers"}, record["name"])
+            key = (record["type"], record["line"])
+            self.assertNotIn(key, seen)
+            seen.add(key)
+            self.assertIn(record["type"], self.manifest["types"])
+            if record["type"] not in line_counts:
+                line_counts[record["type"]] = [json.loads(l) for l in
+                                               (FIXTURES / f"{record['type']}.jsonl").read_text().splitlines()]
+            lines = line_counts[record["type"]]
+            self.assertLess(record["line"], len(lines), key)
+            fixture = lines[record["line"]]
+            self.assertEqual(fixture["name"], record["name"], key)
+            self.assertFalse(fixture.get("reject"), key)
+
+    def test_fields_are_hex_of_the_right_size(self):
+        for record in self.records:
+            where = f"{record['type']}#{record['line']}"
+            for signature in record["sigs"]:
+                self.assertEqual(set(signature), {"sig", "public", "msg"}, where)
+                self.assertRegex(signature["sig"], HEX, where)
+                self.assertEqual(len(signature["sig"]), 128, where)
+                self.assertEqual(len(signature["public"]), 64, where)
+                self.assertRegex(signature["public"], HEX, where)
+                self.assertRegex(signature["msg"], HEX, where)
+            for signer in record["signers"]:
+                self.assertRegex(signer, HEX, where)
+                self.assertEqual(len(signer), 64, where)
+
+    def test_records_cover_the_signed_types(self):
+        signed = {r["type"] for r in self.records if r["sigs"] or r["signers"]}
+        for required in ["SignedTransaction", "BlockHeader", "ShardChunkHeader", "Approval", "Block", "ChunkEndorsement",
+                         "PartialEncodedStateWitness", "SignedDelegateAction", "SpiceChunkEndorsement"]:
+            self.assertIn(required, signed)
+        self.assertLess(SIGNATURES.stat().st_size, 5 * 1024 * 1024)
 
 
 if __name__ == "__main__":

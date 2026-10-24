@@ -115,6 +115,32 @@ bytes of the right length; Borsh does not verify them.
 `just node-conformance-types` decodes every line with the Lean `Impl` and `Spec` Borsh codecs,
 re-encodes with both, and compares with the fixture and with the derived hashes.
 
+### Signature records
+
+The Borsh fixtures do not carry the key of most signatures (an approval, a block header, an
+endorsement, ...), so `node-conformance-fixtures <out dir> [signatures file]` also writes
+`signatures.jsonl` (default `<out dir>/../signatures.jsonl`, that is
+`near-lean/node/fixtures/signatures.jsonl`) and leaves the type files byte for byte unchanged.
+`sigs.rs` records every ED25519 signature the oracle makes (`G::sign`, the spice endorsements, the
+signed stateless messages) and the key of every validator signer; each accepted line that is not a
+mutation or a hand-written byte string gets one record:
+
+```json
+{"type":"Approval","line":12,"name":"rand-3","sigs":[{"sig":"<64 B>","public":"<32 B>","msg":"<hex>"}],"signers":["<32 B>"]}
+```
+
+`line` is the 0-based position in `<type>.jsonl` (names repeat within a file). `sigs` are the
+signatures made while the value was built, with the key and message; `signers` are the keys of
+validator signers whose signatures nearcore's constructors make internally (a `ChunkEndorsement`,
+the partial witnesses, the contract messages), which the Lean side tries for the signatures of that
+value. Lines of a mutation are not recorded: their signatures are no longer valid. A value built
+once and reused in several lines is recorded with the first line only.
+
+`just node-conformance-types` verifies the signatures with `NearCrypto`: every recorded signature
+found in a line's bytes, and, for the signed types, the signatures recomputed from the decoded value
+(transaction and delegate hashes, block and chunk hashes, the Borsh of an `inner`), with the key from
+the value or the record. ML-DSA and SECP256K1 signatures are not checked.
+
 ## Crypto oracle (M2)
 
 `crypto-fixtures` writes the fixtures of `near-lean/crypto` (milestone M2). It uses the same
