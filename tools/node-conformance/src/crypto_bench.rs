@@ -11,7 +11,10 @@ use blake2::digest::{Update, VariableOutput};
 use blake2::{Blake2b512, Blake2bVar};
 use ripemd::Ripemd160;
 use sha2::{Digest, Sha512};
-use sha3::{Keccak256, Keccak512};
+use aws_lc_rs::encoding::{AsRawBytes, PqdsaPrivateKeyRaw};
+use aws_lc_rs::unstable::signature::{PqdsaKeyPair, ML_DSA_65_SIGNING};
+use sha3::digest::{ExtendableOutput, XofReader};
+use sha3::{Keccak256, Keccak512, Shake256};
 use std::hint::black_box;
 use std::time::Instant;
 
@@ -78,6 +81,17 @@ fn main() {
             Blake2b512::digest(black_box(&data))[0] as u64
         }));
     }
+    {
+        let mut data = input(1024, 3);
+        report("shake256/1KiB", measure(|i| {
+            data[0] = i as u8;
+            let mut h = Shake256::default();
+            sha3::digest::Update::update(&mut h, black_box(&data));
+            let mut out = [0u8; 32];
+            h.finalize_xof().read(&mut out);
+            out[0] as u64
+        }));
+    }
     let seed = [7u8; 32];
     let keypair = ed25519_dalek::SigningKey::from_bytes(&seed).to_keypair_bytes();
     let secret = SecretKey::ED25519(ED25519SecretKey(keypair));
@@ -130,6 +144,44 @@ fn main() {
             Signature::SECP256K1(s) => <[u8; 65]>::from(s)[5] as u64,
             _ => 0,
         }
+    }));
+
+    // ML-DSA-65 as `near-crypto` 0.37.4 uses it (`aws-lc-rs`): the key from a 32-byte seed
+    // (`ml_dsa_65_from_seed`: `from_seed`, then the raw private key), `SecretKey::sign`, which
+    // decodes the 4032-byte key (and rederives the public key) before every signature, hedged with
+    // fresh randomness, and `Signature::verify`.
+    let mut mseed = [3u8; 32];
+    report("mldsa65/keygen", measure(|i| {
+        mseed[0] = i as u8;
+        let kp = PqdsaKeyPair::from_seed(&ML_DSA_65_SIGNING, black_box(&mseed)).unwrap();
+        let raw: PqdsaPrivateKeyRaw<'static> = kp.private_key().as_raw_bytes().unwrap();
+        let bytes: &[u8] = raw.as_ref();
+        bytes[40] as u64
+    }));
+    let kp = PqdsaKeyPair::from_seed(&ML_DSA_65_SIGNING, &[7u8; 32]).unwrap();
+    let raw: PqdsaPrivateKeyRaw<'static> = kp.private_key().as_raw_bytes().unwrap();
+    let raw_bytes: &[u8] = raw.as_ref();
+    let text = format!("ml-dsa-65:{}", bs58::encode(raw_bytes).into_string());
+    let msecret: SecretKey = text.parse().unwrap();
+    let mpublic = msecret.public_key();
+    let mut mmsg = input(100, 5);
+    let msig = msecret.sign(&mmsg);
+    report("mldsa65/sign", measure(|i| {
+        mmsg[0] = i as u8;
+        match msecret.sign(black_box(&mmsg)) {
+            Signature::MLDSA65(s) => s.0[100] as u64,
+            _ => 0,
+        }
+    }));
+    let mut sigbuf = vec![0u8; 3309];
+    report("mldsa65/sign-prepared", measure(|i| {
+        mmsg[0] = i as u8;
+        kp.sign(black_box(&mmsg), &mut sigbuf).unwrap();
+        sigbuf[100] as u64
+    }));
+    report("mldsa65/verify", measure(|i| {
+        mmsg[0] = i as u8;
+        msig.verify(black_box(&mmsg), black_box(&mpublic)) as u64
     }));
 
     // The VRF of a 32-byte input under the key converted from an ed25519 key, prepared once.

@@ -7,7 +7,9 @@ Benchmarks of `NearCrypto`. The names match `tools/node-conformance`'s `crypto-b
 the same operations with the Rust crates in release mode: SHA-256, SHA-512, Keccak-256/512 and
 RIPEMD-160 and BLAKE2b-256/512 over 64 B, 1 KiB and 64 KiB, Ed25519 verification of a 100-byte
 message and signing, secp256k1 recovery, verification and signing of a 32-byte message, and the
-VRF (`compute_vrf_with_proof` and `is_vrf_valid`) of a 32-byte input. `sha256-old` is the list-based `Near.Sha256` the node used before M2. The first
+VRF (`compute_vrf_with_proof` and `is_vrf_valid`) of a 32-byte input, SHAKE256 of 1 KiB, and ML-DSA-65:
+key generation from a seed, signing of a 100-byte message with the key decoded and checked for every
+signature (`near_crypto::SecretKey::sign`) and with it prepared, and verification. `sha256-old` is the list-based `Near.Sha256` the node used before M2. The first
 byte of the message varies with the iteration, so no call is a repeat; verification then fails at
 the final comparison, after all the arithmetic of a valid one.
 -/
@@ -70,6 +72,24 @@ private def vrfInput : ByteArray :=
 private def vrfProof : ByteArray × ByteArray :=
   vrfKey.computeWithProof vrfInput
 
+private def shakeData : ByteArray :=
+  input 1024 3
+
+private def mldsaSeed : ByteArray :=
+  ⟨(List.range 32).toArray.map fun i => UInt8.ofNat (i * 7 + 1)⟩
+
+private def mldsaKeys : ByteArray × ByteArray :=
+  MlDsa.Impl.keyGen mldsaSeed
+
+private def mldsaMessage : ByteArray :=
+  input 100 5
+
+private def mldsaRnd : ByteArray :=
+  input 32 11
+
+private def mldsaSignature : ByteArray :=
+  (MlDsa.Impl.sign mldsaKeys.2 mldsaMessage mldsaRnd).getD ByteArray.empty
+
 def benchmarks : List Benchmark :=
   hashBenchmarks "sha256" sha256 ++ hashBenchmarks "sha512" sha512 ++
     hashBenchmarks "keccak256" keccak256 ++
@@ -77,6 +97,8 @@ def benchmarks : List Benchmark :=
     hashBenchmarks "ripemd160" ripemd160 ++
     hashBenchmarks "blake2b256" blake2b256 ++
     hashBenchmarks "blake2b512" blake2b512 ++
+    [{ name := "shake256/1KiB", iterations := 20000,
+       run := fun i => (shake256 (vary shakeData i) 32).get! 0 |>.toUInt64 }] ++
     hashBenchmarks "sha256-old" (fun m => ⟨(Near.Sha256.hash m.toList).toArray⟩) true ++
     [{ name := "ed25519/verify", iterations := 1500,
        run := fun i =>
@@ -102,6 +124,21 @@ def benchmarks : List Benchmark :=
           ((Secp256k1.Impl.signRecoverable secpSecret (vary secpMessage i)).getD
                   ByteArray.empty).get!
               5 |>.toUInt64 },
+      { name := "mldsa65/keygen", iterations := 300,
+        run := fun i => (MlDsa.Impl.keyGen (vary mldsaSeed i)).1.get! 40 |>.toUInt64 },
+      { name := "mldsa65/sign", iterations := 300,
+        run := fun i =>
+          ((MlDsa.Impl.sign mldsaKeys.2 (vary mldsaMessage i) mldsaRnd).getD ByteArray.empty).get!
+              100 |>.toUInt64 },
+      { name := "mldsa65/sign-prepared", iterations := 300,
+        run := fun i =>
+          ((MlDsa.Impl.signInternal mldsaKeys.2 (MlDsa.Impl.pure' (vary mldsaMessage i))
+                      mldsaRnd).getD
+                  ByteArray.empty).get!
+              100 |>.toUInt64 },
+      { name := "mldsa65/verify", iterations := 500,
+        run := fun i =>
+          if MlDsa.Impl.verify mldsaKeys.1 (vary mldsaMessage i) mldsaSignature then 1 else 0 },
       { name := "vrf/compute-with-proof", iterations := 400,
         run := fun i => (vrfKey.computeWithProof (vary vrfInput i)).1.get! 3 |>.toUInt64 },
       { name := "vrf/verify", iterations := 400,

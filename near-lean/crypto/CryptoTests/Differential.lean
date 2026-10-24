@@ -683,6 +683,155 @@ def secpFormulaTests (t : Tally) (r : Rng) : Tally × Rng :=
       t := check t s!"secp addAff lazy {i}" (same (P.addAff A) (P.addAffSimple A))
     return (t, r)
 
+/-- A random polynomial with coefficients below `q`, as `Spec` and as `Impl` data. -/
+def randomPoly (r : Rng) : (Array Int × Array UInt32) × Rng :=
+  Id.run do
+    let mut xs : Array Int := #[]
+    let mut r := r
+    for _ in [0:256] do
+      let (x, r') := r.below 8380417
+      r := r'
+      xs := xs.push (x : Int)
+    return ((xs, xs.map fun x => x.toNat.toUInt32), r)
+
+/-- The Montgomery product against `Nat` arithmetic, and the NTT against the `Spec` NTT and the
+schoolbook negacyclic product. -/
+def mldsaArithmeticTests (t : Tally) (r : Rng) : Tally × Rng :=
+  Id.run do
+    let mut t := t
+    let mut r := r
+    let q := 8380417
+    let r32 := 2 ^ 32
+    -- montmul a b * 2^32 = a b mod q
+    let edgesA : List Nat := [0, 1, 2, q - 1, q - 2, 4190208, 4190209, 8191, 8192]
+    let edgesB : List Nat := [0, 1, q - 1, q, q + 1, r32 - 1, r32 - q, 2 ^ 31, 123456789]
+    let mut pairs : List (Nat × Nat) := edgesA.flatMap fun a => edgesB.map fun b => (a, b)
+    for _ in [0:2000] do
+      let (a, r') := r.below q
+      let (b, r') := r'.below r32
+      r := r'
+      pairs := (a, b) :: pairs
+    for (a, b) in pairs do
+      let got := (MlDsa.Impl.montmul a.toUInt32 b.toUInt32).toNat
+      t := check t s!"montmul {a} {b}" (got < q && got * r32 % q == a * b % q)
+    -- NTT
+    let mut polys : List ((Array Int × Array UInt32)) := []
+    for _ in [0:12] do
+      let (p, r') := randomPoly r
+      r := r'
+      polys := p :: polys
+    let edge : Array Int := Array.replicate 256 (q - 1)
+    let edge0 : Array Int := (Array.replicate 256 (0 : Int)).set! 0 1
+    polys :=
+      (edge, edge.map fun x => x.toNat.toUInt32) ::
+        (edge0, edge0.map fun x => x.toNat.toUInt32) :: polys
+    for (sp, ip) in polys do
+      let fast := MlDsa.Impl.nttAt ip 0
+      t := check t "ntt" (fast.map (fun x => (x.toNat : Int)) == MlDsa.Spec.ntt sp)
+    for ((sa, ia), (sb, ib)) in polys.zip (polys.drop 1) do
+      -- the pointwise product of two NTTs, inverted, is the product modulo X^256 + 1
+      let prod := MlDsa.Spec.invNtt (MlDsa.Spec.pmul (MlDsa.Spec.ntt sa) (MlDsa.Spec.ntt sb))
+      let school : Array Int :=
+        (Array.range 256).map fun k =>
+          ((List.range 256).foldl
+              (fun (acc : Int) i =>
+                let j := (k + 256 - i) % 256
+                let term := sa[i]! * sb[j]!
+                if i ≤ k then acc + term else acc - term)
+              0) %
+            q
+      t := check t "ntt product is the negacyclic product" (prod == school)
+      let fa := MlDsa.Impl.nttAt ia 0
+      let fb := MlDsa.Impl.nttAt ib 0
+      let fprod :=
+        MlDsa.Impl.invNttAt ((Array.range 256).map fun i => MlDsa.Impl.montmul fa[i]! fb[i]!) 0
+      t := check t "fast ntt product" (fprod.map (fun x => (x.toNat : Int)) == school)
+    return (t, r)
+
+/-- The rounding functions of `Impl` against `Spec` at the values where they change behaviour and
+at random ones. -/
+def mldsaRoundingTests (t : Tally) (r : Rng) : Tally × Rng :=
+  Id.run do
+    let mut t := t
+    let mut r := r
+    let q := 8380417
+    let mut values : List Nat := []
+    for m in List.range 18 do
+      for d in [0, 1, 2, 3] do
+        for base in [m * 523776, m * 523776 + 261888, m * 8192, m * 8192 + 4096] do
+          values := values ++ [base + d, base - d]
+    values := values.filter (· < q)
+    for _ in [0:20000] do
+      let (x, r') := r.below q
+      r := r'
+      values := x :: values
+    for v in values do
+      let sv : Int := v
+      let iv := v.toUInt32
+      let (r1, r0) := MlDsa.Spec.decompose sv
+      t := check t s!"highBits {v}" ((MlDsa.Impl.highBits iv).toNat == r1)
+      t := check t s!"lowAbs {v}" ((MlDsa.Impl.lowAbs iv).toNat == r0.natAbs)
+      t := check t s!"lowPos {v}" (MlDsa.Impl.lowPos iv == decide (r0 > 0))
+      for h in [false, true] do
+        t :=
+          check t s!"useHint {h} {v}" ((MlDsa.Impl.useHint h iv).toNat == MlDsa.Spec.useHint h sv)
+    return (t, r)
+
+/-- Keys, signatures and verdicts of `Impl` against `Spec` on seeded random keys and messages, and
+on corrupted signatures and secret keys. -/
+def mldsaTests (t : Tally) (r : Rng) : Tally × Rng :=
+  Id.run do
+    let mut t := t
+    let mut r := r
+    for round in [0:5] do
+      let (seed, r') := r.bytes 32
+      let (len, r') := r'.below 300
+      let (msg, r') := r'.bytes len
+      let (rnd, r') := r'.bytes 32
+      r := r'
+      let (spk, ssk) := MlDsa.Spec.keyGen seed
+      let (ipk, isk) := MlDsa.Impl.keyGen seed
+      t := check t s!"mldsa key round {round}" (spk == ipk && ssk == isk)
+      let sig := (MlDsa.Spec.sign ssk msg rnd).getD ByteArray.empty
+      t :=
+        check t s!"mldsa sign round {round}"
+          (sig.size == 3309 && MlDsa.Impl.sign ssk msg rnd == some sig)
+      t :=
+        check t s!"mldsa verify round {round}"
+          (MlDsa.Impl.verify ipk msg sig && MlDsa.Spec.verify spk msg sig)
+      -- corrupted signatures: random bit flips anywhere, in the hint, and random bytes in the hint area
+      let mut bad : List ByteArray := []
+      for _ in [0:12] do
+        let (pos, r') := r.below 3309
+        let (bit, r') := r'.below 8
+        r := r'
+        bad := bad ++ [sig.set! pos (sig.get! pos ^^^ (1 <<< bit.toUInt8))]
+      for _ in [0:6] do
+        let (pos, r') := r.below 61
+        let (v, r') := r'.below 256
+        r := r'
+        bad := bad ++ [sig.set! (3248 + pos) v.toUInt8]
+      bad := bad ++ [sig.extract 0 3308, sig.push 0, ByteArray.empty]
+      for b in bad do
+        t :=
+          check t s!"mldsa corrupted signature {toHex (b.extract 0 8)} round {round}"
+            (MlDsa.Impl.verify ipk msg b == MlDsa.Spec.verify spk msg b)
+      let (m2, r') := r.bytes (len + 1)
+      r := r'
+      t :=
+        check t s!"mldsa other message round {round}"
+          (!MlDsa.Impl.verify ipk m2 sig && !MlDsa.Spec.verify spk m2 sig)
+      -- corrupted secret keys: the acceptance agrees
+      for _ in [0:8] do
+        let (pos, r') := r.below 4032
+        let (bit, r') := r'.below 8
+        r := r'
+        let bk := ssk.set! pos (ssk.get! pos ^^^ (1 <<< bit.toUInt8))
+        t :=
+          check t s!"mldsa corrupted secret key at {pos} round {round}"
+            (MlDsa.Impl.publicKeyOfSecret bk == MlDsa.Spec.publicKeyOfSecret bk)
+    return (t, r)
+
 def main : IO UInt32 := do
   let mut t : Tally := {}
   let mut r : Rng := ⟨0x4e45415243525950⟩
@@ -703,4 +852,7 @@ def main : IO UInt32 := do
   (t, r) := ristrettoTests t r
   (t, r) := vrfTests t r
   (t, r) := shakeTests t r
+  (t, r) := mldsaArithmeticTests t r
+  (t, r) := mldsaRoundingTests t r
+  (t, r) := mldsaTests t r
   finish "crypto-differential" t

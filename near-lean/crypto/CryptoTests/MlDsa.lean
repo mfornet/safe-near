@@ -69,7 +69,9 @@ def check (keys : Keys) (j : Json) : Except String (Option String) := do
     let sig ← bytes j "sig"
     pure <|
         firstError
-          [expectOpt "Spec sign" (Spec.sign sk msg rnd) (some sig),
+          [expectOpt "Impl sign" (Impl.sign sk msg rnd) (some sig),
+            expectBool "Impl verify" (Impl.verify pk msg sig) true,
+            expectOpt "Spec sign" (Spec.sign sk msg rnd) (some sig),
             expectBool "Spec verify" (Spec.verify pk msg sig) true]
   | "verify" =>
     let (pk, _) ← keyOf keys j
