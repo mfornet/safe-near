@@ -27,6 +27,7 @@ jobs:
       - name: Check repository pins and offline tooling regressions
         run: |
           python3 tools/check_lean_toolchains.py
+          python3 tools/check_nearcore_pin.py
           python3 -m unittest discover -s tools/tests -v
           python3 -m unittest discover -s tools/runtime-conformance -p 'test_*.py' -v
 

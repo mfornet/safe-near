@@ -55,6 +55,7 @@ def validation_steps(root: Path, nearcore: Path) -> list[Step]:
     # Build each package sequentially. Finish every executor build before native
     # comparisons freeze and attest their binaries.
     python("toolchains", "tools/check_lean_toolchains.py")
+    python("nearcore-pin", "tools/check_nearcore_pin.py")
     add("tooling-tests", "", sys.executable, "-m", "unittest", "discover", "-s", "tools/tests", "-v")
     add("wasm-build", "near-lean/wasm", "lake", "build", "Wasm", "testsuite", "wasm", "--wfail")
     add("wasm-logic-build", "near-lean/wasm-logic", "lake", "build", "--wfail")

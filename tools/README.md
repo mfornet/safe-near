@@ -10,7 +10,7 @@ core axiom audits, formatter integration checks and contract builds.
 | `just chain-replay-test` | Exercise trusted JSON block replay and complete-state continuation |
 | `just audit-all` | Audit all core packages |
 | `just check` | Run the combined repository checks |
-| `just check-toolchains` | Check every owned Lake package against the root `lean-toolchain` |
+| `just check-toolchains` | Check every owned Lake package against the root `lean-toolchain`, and every hardcoded nearcore revision against `near-lean/runtime/reference.json` |
 | `just vm-dependencies` | Check Lean's actual VM import closure for legacy interpreters and proof APIs |
 | `just lean-lint` | Check all owned Lean files with pinned Mathlib text-based style linters |
 | `just lean-format [files...]` | Apply validated syntax formatting to handwritten package sources |
@@ -42,7 +42,12 @@ repository-owned Lake package also carries that pin so it works independently.
 including newly added local files. Submodules and ignored build dependencies
 are outside its scope. When upgrading Lean, update all pins together.
 
-The Lean quality workflow runs the pin check and the offline tool tests on
+`near-lean/runtime/reference.json` is the canonical nearcore pin.
+`check_nearcore_pin.py` requires the same revision in workflow checkouts of
+`near/nearcore`, in the native reference adapters (`tools/runtime-*-reference/`)
+and in pinned nearcore source links. When moving the pin, update them together.
+
+The Lean quality workflow runs both pin checks and the offline tool tests on
 every push; the source-style and formatter integration checks run only when
 the workflow is dispatched by hand. The text-style driver uses the Mathlib
 revision in the VM package's committed Lake manifest. It checks line endings, trailing whitespace,
