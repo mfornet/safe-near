@@ -249,6 +249,16 @@ theorem randomSeedFn_gas : HostPreservesGas randomSeedFn := by
     NearState.selectReturnValue, NearState.selectReturnPromise]
   repeat (first | rfl | exact writeRegisterResult_gas _ _ _ _ _ | split)
 
+theorem chainIdFn_gas : HostPreservesGas chainIdFn := by
+  intro st args
+  unfold chainIdFn contextRegisterFn
+  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
+    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
+    checkAccountId, checkPublicKey, NearState.setRegister, trapWith, appendPromise,
+    appendPromiseActionResult, createBatchPromiseResult, createCallbackPromiseResult,
+    NearState.selectReturnValue, NearState.selectReturnPromise]
+  repeat (first | rfl | exact writeRegisterResult_gas _ _ _ _ _ | split)
+
 theorem logUtf8Fn_gas : HostPreservesGas logUtf8Fn := by
   intro st args
   unfold logUtf8Fn
@@ -399,6 +409,16 @@ theorem promiseBatchActionTransferFn_gas : HostPreservesGas promiseBatchActionTr
     NearState.selectReturnValue, NearState.selectReturnPromise]
   repeat (first | rfl | exact writeRegisterResult_gas _ _ _ _ _ | split)
 
+theorem promiseBatchActionTransferToGasKeyFn_gas : HostPreservesGas promiseBatchActionTransferToGasKeyFn := by
+  intro st args
+  unfold promiseBatchActionTransferToGasKeyFn
+  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
+    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
+    checkAccountId, checkPublicKey, NearState.setRegister, trapWith, appendPromise,
+    appendPromiseActionResult, createBatchPromiseResult, createCallbackPromiseResult,
+    NearState.selectReturnValue, NearState.selectReturnPromise]
+  repeat (first | rfl | exact writeRegisterResult_gas _ _ _ _ _ | split)
+
 theorem promiseBatchActionStakeFn_gas : HostPreservesGas promiseBatchActionStakeFn := by
   intro st args
   unfold promiseBatchActionStakeFn
@@ -419,9 +439,29 @@ theorem promiseBatchActionAddKeyWithFullAccessFn_gas : HostPreservesGas promiseB
     NearState.selectReturnValue, NearState.selectReturnPromise]
   repeat (first | rfl | exact writeRegisterResult_gas _ _ _ _ _ | split)
 
+theorem promiseBatchActionAddGasKeyWithFullAccessFn_gas : HostPreservesGas promiseBatchActionAddGasKeyWithFullAccessFn := by
+  intro st args
+  unfold promiseBatchActionAddGasKeyWithFullAccessFn
+  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
+    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
+    checkAccountId, checkPublicKey, NearState.setRegister, trapWith, appendPromise,
+    appendPromiseActionResult, createBatchPromiseResult, createCallbackPromiseResult,
+    NearState.selectReturnValue, NearState.selectReturnPromise]
+  repeat (first | rfl | exact writeRegisterResult_gas _ _ _ _ _ | split)
+
 theorem promiseBatchActionAddKeyWithFunctionCallFn_gas : HostPreservesGas promiseBatchActionAddKeyWithFunctionCallFn := by
   intro st args
   unfold promiseBatchActionAddKeyWithFunctionCallFn
+  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
+    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
+    checkAccountId, checkPublicKey, NearState.setRegister, trapWith, appendPromise,
+    appendPromiseActionResult, createBatchPromiseResult, createCallbackPromiseResult,
+    NearState.selectReturnValue, NearState.selectReturnPromise]
+  repeat (first | rfl | exact writeRegisterResult_gas _ _ _ _ _ | split)
+
+theorem promiseBatchActionAddGasKeyWithFunctionCallFn_gas : HostPreservesGas promiseBatchActionAddGasKeyWithFunctionCallFn := by
+  intro st args
+  unfold promiseBatchActionAddGasKeyWithFunctionCallFn
   dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
     contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
     checkAccountId, checkPublicKey, NearState.setRegister, trapWith, appendPromise,
@@ -459,9 +499,29 @@ theorem promiseBatchActionUseGlobalContractFn_gas : HostPreservesGas promiseBatc
     NearState.selectReturnValue, NearState.selectReturnPromise]
   repeat (first | rfl | exact writeRegisterResult_gas _ _ _ _ _ | split)
 
+theorem promiseBatchActionDeployGlobalContractFn_gas : HostPreservesGas promiseBatchActionDeployGlobalContractFn := by
+  intro st args
+  unfold promiseBatchActionDeployGlobalContractFn deployGlobalContractFn
+  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
+    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
+    checkAccountId, checkPublicKey, NearState.setRegister, trapWith, appendPromise,
+    appendPromiseActionResult, createBatchPromiseResult, createCallbackPromiseResult,
+    NearState.selectReturnValue, NearState.selectReturnPromise]
+  repeat (first | rfl | exact writeRegisterResult_gas _ _ _ _ _ | split)
+
 theorem promiseBatchActionUseGlobalContractByAccountIdFn_gas : HostPreservesGas promiseBatchActionUseGlobalContractByAccountIdFn := by
   intro st args
   unfold promiseBatchActionUseGlobalContractByAccountIdFn useGlobalContractFn
+  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
+    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
+    checkAccountId, checkPublicKey, NearState.setRegister, trapWith, appendPromise,
+    appendPromiseActionResult, createBatchPromiseResult, createCallbackPromiseResult,
+    NearState.selectReturnValue, NearState.selectReturnPromise]
+  repeat (first | rfl | exact writeRegisterResult_gas _ _ _ _ _ | split)
+
+theorem promiseBatchActionDeployGlobalContractByAccountIdFn_gas : HostPreservesGas promiseBatchActionDeployGlobalContractByAccountIdFn := by
+  intro st args
+  unfold promiseBatchActionDeployGlobalContractByAccountIdFn deployGlobalContractFn
   dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
     contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
     checkAccountId, checkPublicKey, NearState.setRegister, trapWith, appendPromise,
@@ -508,5 +568,13 @@ theorem promiseResultFn_gas : HostPreservesGas promiseResultFn := by
     appendPromiseActionResult, createBatchPromiseResult, createCallbackPromiseResult,
     NearState.selectReturnValue, NearState.selectReturnPromise]
   repeat (first | rfl | exact writeRegisterResult_gas _ _ _ _ _ | split)
+
+
+-- TODO(proof): yield create/resume gas preservation.
+theorem promiseYieldCreateFn_gas : HostPreservesGas promiseYieldCreateFn := by
+  sorry
+
+theorem promiseYieldResumeFn_gas : HostPreservesGas promiseYieldResumeFn := by
+  sorry
 
 end Wasm.Near

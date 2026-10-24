@@ -14,7 +14,7 @@ def ActionReceiptFinancialShape (receipt : Receipt) (action : ActionReceipt) : P
 def ReceiptFinancialShape (receipt : Receipt) : Prop :=
   match receipt.receipt with
   | .action action => ActionReceiptFinancialShape receipt action
-  | .data _ => True
+  | .data _ | .globalDistribution _ => True
 
 /-- Net gas burn plus non-gas token destruction, such as undeliverable refunds. -/
 def Exec.netTokensBurnt (exec : Exec) : Nat :=

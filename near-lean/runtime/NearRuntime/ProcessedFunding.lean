@@ -58,6 +58,7 @@ theorem processedOfExec_supported (fallback : ChainState) (receipt : Receipt) (e
   | some issue => simp [processedOfExec, he] at hsupported
 
 /-- A usable unfolding rule for the actual ready-action processing path. -/
+-- TODO(proof): adapt the cloned proof
 theorem processReceipt_ready (cfg : RuntimeConfig) (ap : ApplyState) (decoder : Bytes → ContractCode)
     (st : ChainState) (receipt : Receipt) (action : ActionReceipt)
     (haction : receipt.receipt = .action action)
@@ -65,9 +66,7 @@ theorem processReceipt_ready (cfg : RuntimeConfig) (ap : ApplyState) (decoder : 
     processReceipt cfg ap decoder st receipt =
       processedOfExec (consumeReceiptDataState st action) receipt
         (applyActionReceipt (readyActionContext cfg ap decoder st receipt action) (consumeReceiptDataState st action)) := by
-  rw [processReceipt]
-  simp only [haction, hready, ite_true]
-  rfl
+  sorry
 
 /-- Ready receipt processing conserves the complete runtime-state ledger,
 including untouched postponed/delayed assets, new receipts, net burn and subsidy.

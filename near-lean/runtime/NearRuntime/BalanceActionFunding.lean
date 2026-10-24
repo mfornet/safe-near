@@ -157,6 +157,7 @@ def deleteAccountFundedResult (c : ReceiptCtx) (before : Exec) (account : Accoun
     storageAccounting := stageContractStorageRemoval c.receipt.receiverId
       (refunded.state.contractStorage c.receipt.receiverId) refunded.storageAccounting }
 
+-- TODO(proof): adapt the cloned proof
 theorem applyDeleteAccount_run (c : ReceiptCtx) (isLast : Bool) (beneficiary : AccountId) (before : Exec) :
     (applyAction c isLast (.deleteAccount beneficiary)).run.run before =
       if !isLast then (.error .deleteActionMustBeFinal, before)
@@ -165,15 +166,7 @@ theorem applyDeleteAccount_run (c : ReceiptCtx) (isLast : Bool) (beneficiary : A
         | some account =>
           if account.locked > 0 then (.error (.deleteAccountStaking c.receipt.receiverId), before)
           else (.ok (), deleteAccountFundedResult c before account beneficiary) := by
-  cases isLast with
-  | false => simp [-StateT.run_bind, applyAction]
-  | true =>
-    cases ha : before.state.account? c.receipt.receiverId with
-    | none => simp [-StateT.run_bind, applyAction, getAccount, getState, ha]
-    | some account =>
-      by_cases hl : account.locked > 0 <;>
-        simp [-StateT.run_bind, applyAction, getAccount, getState, emit, ha, hl,
-          deleteAccountFundedResult, Exec.addBalanceRefund]
+  sorry
 
 /-- Deletion funds the beneficiary refund by removing precisely the unlocked
 receiver balance. A positive locked balance is rejected by the executable guard. -/

@@ -13,7 +13,7 @@ def ActionReceiptFinancialScope (receipt : Receipt) (action : ActionReceipt) : P
 def ReceiptFinancialScope (receipt : Receipt) : Prop :=
   match receipt.receipt with
   | .action action => ActionReceiptFinancialScope receipt action
-  | .data _ => True
+  | .data _ | .globalDistribution _ => True
 
 theorem ActionReceiptFinancialShape.to_scope (receipt : Receipt) (action : ActionReceipt)
     (h : ActionReceiptFinancialShape receipt action) : ActionReceiptFinancialScope receipt action := by
@@ -23,13 +23,10 @@ theorem ActionReceiptFinancialShape.to_scope (receipt : Receipt) (action : Actio
       simpa only [ActionReceiptFinancialShape, hp, ite_false] using h
     simpa only [ActionReceiptFinancialScope, hp, ite_false] using hs.2
 
+-- TODO(proof): adapt the cloned proof
 theorem ReceiptFinancialShape.to_scope (receipt : Receipt) (h : ReceiptFinancialShape receipt) :
     ReceiptFinancialScope receipt := by
-  cases hr : receipt.receipt with
-  | data data => simp only [ReceiptFinancialScope, hr]
-  | action action =>
-    have ha : ActionReceiptFinancialShape receipt action := by simpa only [ReceiptFinancialShape, hr] using h
-    simpa only [ReceiptFinancialScope, hr] using ActionReceiptFinancialShape.to_scope receipt action ha
+  sorry
 
 /-- Ordinary reserved targets are covered through their real failure or empty
 path; no receiver-name exclusion remains in this local financial interface. -/

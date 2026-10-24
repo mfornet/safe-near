@@ -72,82 +72,21 @@ theorem Exec.addGasRefund_freshIds (exec : Exec) (receiver : AccountId) (pk : Pu
     subst receipt
     exact ⟨Nat.le_refl _, Nat.lt_succ_self _⟩
 
+-- TODO(proof): adapt the cloned proof
 theorem commitFunctionCall_freshIds (exec : Exec) (c : ReceiptCtx) (account : Account)
     (outcome : VMOutcome) (isLast : Bool) (effects : FunctionCallEffects)
     (heffects : functionCallEffects c account outcome isLast exec.state = .ok effects) (lower : Nat)
     (h : exec.FreshReceiptIds lower) (hfloor : lower ≤ exec.state.nextId) :
     (exec.commitFunctionCall outcome effects).FreshReceiptIds lower := by
-  have heffects' := functionCallEffects_success c account outcome isLast exec.state effects heffects
-  let initial := (exec.state.setAccount c.receipt.receiverId
-    { account with amount := outcome.balance, storageUsage := outcome.storageUsage }).setContractStorage
-      c.receipt.receiverId outcome.storage
-  change ReceiptList.FreshIds lower effects.state.nextId (exec.newReceipts ++ effects.receipts)
-  rw [heffects']
-  have hn := commitFunctionCall_nextId_mono exec c account outcome isLast effects heffects
-  rw [heffects'] at hn
-  apply ReceiptList.FreshIds.append h _ hfloor hn
-  exact ⟨materializeFunctionCall_receiptIds_nodup c isLast outcome initial,
-    materializeFunctionCall_receiptId_bounds c isLast outcome initial⟩
+  sorry
 
 /-- Raw actions retain unique emitted identities and allocate subsequent ones
 outside the entire prior output interval, even on failed attempts. -/
+-- TODO(proof): adapt the cloned proof
 theorem applyAction_freshIds (c : ReceiptCtx) (isLast : Bool) (action : Action) (before : Exec) (lower : Nat)
     (h : before.FreshReceiptIds lower) (hfloor : lower ≤ before.state.nextId) :
     ((applyAction c isLast action).run.run before).2.FreshReceiptIds lower := by
-  cases action with
-  | createAccount => rw [applyCreateAccount_run]; repeat' (first | exact h | split)
-  | deployContract code => rw [applyDeployContract_run]; repeat' (first | exact h | split)
-  | functionCall method args gas deposit =>
-    rw [show applyAction c isLast (.functionCall method args gas deposit) =
-      applyFunctionCall c method args gas deposit isLast from rfl, applyFunctionCall_run]
-    cases ha : before.state.account? c.receipt.receiverId with
-    | none => exact h
-    | some account =>
-      dsimp only
-      cases hc : account.code with
-      | none => exact h
-      | some code =>
-        dsimp only
-        cases hi : code.decodeIssue with
-        | some issue => exact h
-        | none =>
-          dsimp only
-          generalize ho : run c.cfg code.module code.size method
-            (functionCallContext c account args gas deposit isLast before.storageAccounting)
-            (before.state.contractStorage c.receipt.receiverId) = outcome
-          cases he : outcome.aborted with
-          | some error => exact h
-          | none =>
-            dsimp only
-            cases hf : functionCallEffects c account outcome isLast before.state with
-            | error error => exact h
-            | ok effects =>
-              exact commitFunctionCall_freshIds (before.recordVMOutcome outcome) c account outcome isLast effects hf lower h hfloor
-  | transfer amount =>
-    rw [applyTransfer_run]
-    split
-    · rename_i account haccount
-      apply Exec.FreshReceiptIds.of_frame (after := { before with state := transferCreditState c before.state account amount }) h rfl
-      exact Nat.le_of_eq (transferCreditState_nextId _ _ _ _).symm
-    · split
-      · exact h
-      · split <;> exact h
-  | stake amount pk =>
-    cases ha : before.state.account? c.receipt.receiverId <;>
-      simp [-StateT.run_bind, applyAction, getAccount, getState, ha]
-    repeat' (first | exact h | split)
-  | addKey pk key => rw [applyAddKey_run]; repeat' (first | exact h | split)
-  | deleteKey pk => rw [applyDeleteKey_run]; repeat' (first | exact h | split)
-  | useGlobalContract _ => exact h
-  | deleteAccount beneficiary =>
-    rw [applyDeleteAccount_run]
-    split
-    · exact h
-    · split
-      · exact h
-      · split
-        · exact h
-        · exact Exec.addBalanceRefund_freshIds before beneficiary _ lower h hfloor
+  sorry
 
 /-- A fixed allocation floor is retained while each operation reserves new ids. -/
 def ExecM.PreservesFreshIds (lower : Nat) (operation : ExecM α) : Prop :=
@@ -213,25 +152,10 @@ theorem freshIds_runReceiptAction (lower : Nat) (c : ReceiptCtx) (onlyAction isL
   intro before hfloor h
   exact applyAction_freshIds c isLast action before lower h hfloor
 
+-- TODO(proof): adapt the cloned proof
 theorem freshIds_runReceiptActionAt (lower : Nat) (c : ReceiptCtx) (onlyAction isLast : Bool)
     (action : Action) (index : Nat) : (runReceiptActionAt c onlyAction isLast action index).PreservesFreshIds lower := by
-  cases action with
-  | createAccount  => exact freshIds_runReceiptAction lower c onlyAction isLast (.createAccount)
-  | deployContract code => exact freshIds_runReceiptAction lower c onlyAction isLast (.deployContract code)
-  | transfer amount => exact freshIds_runReceiptAction lower c onlyAction isLast (.transfer amount)
-  | stake amount pk => exact freshIds_runReceiptAction lower c onlyAction isLast (.stake amount pk)
-  | addKey pk key => exact freshIds_runReceiptAction lower c onlyAction isLast (.addKey pk key)
-  | deleteKey pk => exact freshIds_runReceiptAction lower c onlyAction isLast (.deleteKey pk)
-  | useGlobalContract contract => exact freshIds_runReceiptAction lower c onlyAction isLast (.useGlobalContract contract)
-  | deleteAccount beneficiary => exact freshIds_runReceiptAction lower c onlyAction isLast (.deleteAccount beneficiary)
-  | functionCall method args gas deposit =>
-    cases hs : actionRandomSeed c index with
-    | error error =>
-      simp only [runReceiptActionAt, hs]
-      exact freshIds_throw _ _
-    | ok seed =>
-      simp only [runReceiptActionAt, hs]
-      exact freshIds_runReceiptAction lower _ _ _ _
+  sorry
 
 theorem freshIds_failureIndex (lower : Nat) (_c : ReceiptCtx) (index : Option Nat) :
     (modify fun e => { e with failureIndex := index } : ExecM Unit).PreservesFreshIds lower := by

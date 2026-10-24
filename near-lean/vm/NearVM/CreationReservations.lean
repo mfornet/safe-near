@@ -2,6 +2,17 @@ import NearVM.ActionReservations
 
 namespace Wasm.Near
 
+/-- The hosts that allocate a handle by creating a receipt are none of the action hosts
+with their own argument checks. -/
+theorem allocatesPromise_ne (name : String) (h : allocatesPromise name = true) :
+    name ≠ "promise_batch_action_deploy_global_contract" ∧
+    name ≠ "promise_batch_action_deploy_global_contract_by_account_id" ∧
+    name ≠ "promise_batch_action_transfer_to_gas_key" ∧
+    name ≠ "promise_batch_action_add_gas_key_with_full_access" ∧
+    name ≠ "promise_batch_action_add_gas_key_with_function_call" ∧
+    name ≠ "promise_yield_create" ∧ name ≠ "promise_yield_resume" := by
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;> intro he <;> subst he <;> simp [allocatesPromise] at h
+
 /-- Successful creation dispatch passes receiver/index validation and the
 allocation limit. These facts are derived from the actual pre-invocation guard. -/
 theorem preInvokeError_creation_checks (name : String) (st : HostStore NearState) (args : List Value)
@@ -16,6 +27,7 @@ theorem preInvokeError_creation_checks (name : String) (st : HostStore NearState
   have hr : name ≠ "storage_remove" := by
     intro he; subst name; simp [allocatesPromise] at halloc
   have hs : storageMutationPlan? name st args = none := by simp [storageMutationPlan?, hw, hr]
+  obtain ⟨n1, n2, n3, n4, n5, n6, n7⟩ := allocatesPromise_ne name halloc
   have hg : globalContractInputs? name = none := by
     simp only [allocatesPromise, List.contains_cons, List.contains_nil] at halloc
     simp only [globalContractInputs?]
@@ -27,12 +39,12 @@ theorem preInvokeError_creation_checks (name : String) (st : HostStore NearState
   have hp : creationPrefixError name st args = none := by
     cases he : creationPrefixError name st args with
     | none => rfl
-    | some error => simp [preInvokeError, invocationArgumentError, hs, hjoin, htransfer, hkey, hg, he] at h
+    | some error => simp [preInvokeError, invocationArgumentError, hs, hjoin, htransfer, hkey, hg, he, n1, n2, n3, n4, n5, n6, n7] at h
   have hc : promiseCapacityError st = none := by
     cases he : promiseCapacityError st with
     | none => rfl
     | some error =>
-      simp [preInvokeError, invocationArgumentError, hs, hjoin, htransfer, hkey, hg, hp, halloc, he] at h
+      simp [preInvokeError, invocationArgumentError, hs, hjoin, htransfer, hkey, hg, hp, halloc, he, n1, n2, n3, n4, n5, n6, n7] at h
   refine ⟨?_, hp, hc⟩
   cases he : creationAccountError name st args with
   | none => rfl

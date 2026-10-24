@@ -107,7 +107,10 @@ theorem appendPromiseAction_preserves {ps result : List NearPromise} {index star
           (.callback base account (actions ++ [action])) := hbase
       exact ⟨setPromise_preserves hwf hnew h, setPromise_length h⟩
     | and dependencies => simp [lookup] at h
-    | yielded => simp [lookup] at h
+    | yielded account actions dataId =>
+      simp only [lookup] at h
+      exact ⟨setPromise_preserves (p := .yielded account (actions ++ [action]) dataId) hwf trivial h,
+        setPromise_length h⟩
 
 theorem appendPromise_preserves (st : HostStore NearState) (p : NearPromise)
     (hwf : PromisesWellFormedFrom 0 st.host.promises)
@@ -493,6 +496,91 @@ theorem promiseBatchActionUseGlobalContractByAccountIdFn_preserves : HostPreserv
     | apply checkPublicKey_preserves_promises _ _ _ _ hwf
     | split)
 
+theorem promiseBatchActionTransferToGasKeyFn_preserves : HostPreservesPromises promiseBatchActionTransferToGasKeyFn := by
+  unfold promiseBatchActionTransferToGasKeyFn
+  apply disallowInView_preserves_promises
+  intro st args hwf
+  dsimp only
+  repeat (first
+    | exact hwf
+    | exact appendBatchPromise_preserves _ _ _ hwf
+    | exact appendCallbackPromise_preserves _ _ _ _ hwf (by assumption)
+    | exact appendJointPromise_find_preserves _ _ hwf (by assumption)
+    | exact appendPromiseActionResult_preserves _ _ _ _ hwf
+    | exact createBatchPromiseResult_preserves _ _ _ hwf
+    | exact createCallbackPromiseResult_preserves _ _ _ _ hwf
+    | apply checkAccountId_preserves_promises _ _ _ _ hwf
+    | apply checkPublicKey_preserves_promises _ _ _ _ hwf
+    | split)
+
+theorem promiseBatchActionAddGasKeyWithFullAccessFn_preserves : HostPreservesPromises promiseBatchActionAddGasKeyWithFullAccessFn := by
+  unfold promiseBatchActionAddGasKeyWithFullAccessFn
+  apply disallowInView_preserves_promises
+  intro st args hwf
+  dsimp only
+  repeat (first
+    | exact hwf
+    | exact appendBatchPromise_preserves _ _ _ hwf
+    | exact appendCallbackPromise_preserves _ _ _ _ hwf (by assumption)
+    | exact appendJointPromise_find_preserves _ _ hwf (by assumption)
+    | exact appendPromiseActionResult_preserves _ _ _ _ hwf
+    | exact createBatchPromiseResult_preserves _ _ _ hwf
+    | exact createCallbackPromiseResult_preserves _ _ _ _ hwf
+    | apply checkAccountId_preserves_promises _ _ _ _ hwf
+    | apply checkPublicKey_preserves_promises _ _ _ _ hwf
+    | split)
+
+theorem promiseBatchActionAddGasKeyWithFunctionCallFn_preserves : HostPreservesPromises promiseBatchActionAddGasKeyWithFunctionCallFn := by
+  unfold promiseBatchActionAddGasKeyWithFunctionCallFn
+  apply disallowInView_preserves_promises
+  intro st args hwf
+  dsimp only
+  repeat (first
+    | exact hwf
+    | exact appendBatchPromise_preserves _ _ _ hwf
+    | exact appendCallbackPromise_preserves _ _ _ _ hwf (by assumption)
+    | exact appendJointPromise_find_preserves _ _ hwf (by assumption)
+    | exact appendPromiseActionResult_preserves _ _ _ _ hwf
+    | exact createBatchPromiseResult_preserves _ _ _ hwf
+    | exact createCallbackPromiseResult_preserves _ _ _ _ hwf
+    | apply checkAccountId_preserves_promises _ _ _ _ hwf
+    | apply checkPublicKey_preserves_promises _ _ _ _ hwf
+    | split)
+
+theorem promiseBatchActionDeployGlobalContractFn_preserves : HostPreservesPromises promiseBatchActionDeployGlobalContractFn := by
+  unfold promiseBatchActionDeployGlobalContractFn deployGlobalContractFn
+  apply disallowInView_preserves_promises
+  intro st args hwf
+  dsimp only
+  repeat (first
+    | exact hwf
+    | exact appendBatchPromise_preserves _ _ _ hwf
+    | exact appendCallbackPromise_preserves _ _ _ _ hwf (by assumption)
+    | exact appendJointPromise_find_preserves _ _ hwf (by assumption)
+    | exact appendPromiseActionResult_preserves _ _ _ _ hwf
+    | exact createBatchPromiseResult_preserves _ _ _ hwf
+    | exact createCallbackPromiseResult_preserves _ _ _ _ hwf
+    | apply checkAccountId_preserves_promises _ _ _ _ hwf
+    | apply checkPublicKey_preserves_promises _ _ _ _ hwf
+    | split)
+
+theorem promiseBatchActionDeployGlobalContractByAccountIdFn_preserves : HostPreservesPromises promiseBatchActionDeployGlobalContractByAccountIdFn := by
+  unfold promiseBatchActionDeployGlobalContractByAccountIdFn deployGlobalContractFn
+  apply disallowInView_preserves_promises
+  intro st args hwf
+  dsimp only
+  repeat (first
+    | exact hwf
+    | exact appendBatchPromise_preserves _ _ _ hwf
+    | exact appendCallbackPromise_preserves _ _ _ _ hwf (by assumption)
+    | exact appendJointPromise_find_preserves _ _ hwf (by assumption)
+    | exact appendPromiseActionResult_preserves _ _ _ _ hwf
+    | exact createBatchPromiseResult_preserves _ _ _ hwf
+    | exact createCallbackPromiseResult_preserves _ _ _ _ hwf
+    | apply checkAccountId_preserves_promises _ _ _ _ hwf
+    | apply checkPublicKey_preserves_promises _ _ _ _ hwf
+    | split)
+
 /-- Gas accounting, including exhaustion, does not mutate promise handles. -/
 theorem applyCharge_promises (ns : NearState) (charge : Charge) :
     (applyCharge ns charge).1.promises = ns.promises := by
@@ -674,6 +762,26 @@ theorem metered_promiseBatchActionUseGlobalContractByAccountIdFn_preserves (extr
     HostPreservesPromises (metered extra name promiseBatchActionUseGlobalContractByAccountIdFn) :=
   metered_preserves_promises extra name promiseBatchActionUseGlobalContractByAccountIdFn promiseBatchActionUseGlobalContractByAccountIdFn_preserves
 
+theorem metered_promiseBatchActionTransferToGasKeyFn_preserves (extra : Nat) (name : String) :
+    HostPreservesPromises (metered extra name promiseBatchActionTransferToGasKeyFn) :=
+  metered_preserves_promises extra name promiseBatchActionTransferToGasKeyFn promiseBatchActionTransferToGasKeyFn_preserves
+
+theorem metered_promiseBatchActionAddGasKeyWithFullAccessFn_preserves (extra : Nat) (name : String) :
+    HostPreservesPromises (metered extra name promiseBatchActionAddGasKeyWithFullAccessFn) :=
+  metered_preserves_promises extra name promiseBatchActionAddGasKeyWithFullAccessFn promiseBatchActionAddGasKeyWithFullAccessFn_preserves
+
+theorem metered_promiseBatchActionAddGasKeyWithFunctionCallFn_preserves (extra : Nat) (name : String) :
+    HostPreservesPromises (metered extra name promiseBatchActionAddGasKeyWithFunctionCallFn) :=
+  metered_preserves_promises extra name promiseBatchActionAddGasKeyWithFunctionCallFn promiseBatchActionAddGasKeyWithFunctionCallFn_preserves
+
+theorem metered_promiseBatchActionDeployGlobalContractFn_preserves (extra : Nat) (name : String) :
+    HostPreservesPromises (metered extra name promiseBatchActionDeployGlobalContractFn) :=
+  metered_preserves_promises extra name promiseBatchActionDeployGlobalContractFn promiseBatchActionDeployGlobalContractFn_preserves
+
+theorem metered_promiseBatchActionDeployGlobalContractByAccountIdFn_preserves (extra : Nat) (name : String) :
+    HostPreservesPromises (metered extra name promiseBatchActionDeployGlobalContractByAccountIdFn) :=
+  metered_preserves_promises extra name promiseBatchActionDeployGlobalContractByAccountIdFn promiseBatchActionDeployGlobalContractByAccountIdFn_preserves
+
 theorem checkDataLimit_preserves_promises (name label : String) (limit : Option Nat) (size : Nat)
     (st : HostStore NearState) (next : Unit → HostResult NearState)
     (hwf : PromisesWellFormedFrom 0 st.host.promises)
@@ -706,6 +814,26 @@ theorem writeRegisterResult_preserves (name : String) (st : HostStore NearState)
     change PromisesWellFormedFrom 0 after.host.promises
     rw [checkedSetRegister_promises h]
     exact hwf
+
+theorem chainIdFn_preserves : HostPreservesPromises chainIdFn := by
+  intro st args hwf
+  unfold chainIdFn contextRegisterFn
+  dsimp only
+  split
+  · exact writeRegisterResult_preserves _ _ _ _ _ hwf
+  · exact hwf
+
+theorem promiseYieldCreateFn_preserves : HostPreservesPromises promiseYieldCreateFn := by
+  sorry
+
+theorem promiseYieldResumeFn_preserves : HostPreservesPromises promiseYieldResumeFn := by
+  unfold promiseYieldResumeFn
+  apply disallowInView_preserves_promises
+  intro st args hwf
+  dsimp only
+  repeat (first
+    | exact hwf
+    | split)
 
 theorem valueReturnFn_preserves : HostPreservesPromises valueReturnFn := by
   intro st args hwf

@@ -422,6 +422,23 @@ theorem randomSeedFn_noDeposits : HostCreatesNoDeposits randomSeedFn := by
     | exact createCallbackPromiseResult_deposits _ _ _ _
     | split)
 
+theorem chainIdFn_noDeposits : HostCreatesNoDeposits chainIdFn := by
+  intro st args
+  unfold chainIdFn contextRegisterFn
+  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
+    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
+    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
+    NearState.selectReturnValue, NearState.selectReturnPromise]
+  repeat (first
+    | trivial
+    | exact ⟨rfl, rfl, rfl⟩
+    | exact writeRegisterResult_deposits _ _ _ _ _
+    | exact appendPromise_return_deposits _ _ _
+    | exact appendPromiseActionResult_deposits _ _ _ _
+    | exact createBatchPromiseResult_deposits _ _ _
+    | exact createCallbackPromiseResult_deposits _ _ _ _
+    | split)
+
 theorem logUtf8Fn_noDeposits : HostCreatesNoDeposits logUtf8Fn := by
   intro st args
   unfold logUtf8Fn
@@ -626,9 +643,43 @@ theorem promiseBatchActionAddKeyWithFullAccessFn_noDeposits : HostCreatesNoDepos
     | exact createCallbackPromiseResult_deposits _ _ _ _
     | split)
 
+theorem promiseBatchActionAddGasKeyWithFullAccessFn_noDeposits : HostCreatesNoDeposits promiseBatchActionAddGasKeyWithFullAccessFn := by
+  intro st args
+  unfold promiseBatchActionAddGasKeyWithFullAccessFn
+  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
+    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
+    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
+    NearState.selectReturnValue, NearState.selectReturnPromise]
+  repeat (first
+    | trivial
+    | exact ⟨rfl, rfl, rfl⟩
+    | exact writeRegisterResult_deposits _ _ _ _ _
+    | exact appendPromise_return_deposits _ _ _
+    | exact appendPromiseActionResult_deposits _ _ _ _
+    | exact createBatchPromiseResult_deposits _ _ _
+    | exact createCallbackPromiseResult_deposits _ _ _ _
+    | split)
+
 theorem promiseBatchActionAddKeyWithFunctionCallFn_noDeposits : HostCreatesNoDeposits promiseBatchActionAddKeyWithFunctionCallFn := by
   intro st args
   unfold promiseBatchActionAddKeyWithFunctionCallFn
+  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
+    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
+    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
+    NearState.selectReturnValue, NearState.selectReturnPromise]
+  repeat (first
+    | trivial
+    | exact ⟨rfl, rfl, rfl⟩
+    | exact writeRegisterResult_deposits _ _ _ _ _
+    | exact appendPromise_return_deposits _ _ _
+    | exact appendPromiseActionResult_deposits _ _ _ _
+    | exact createBatchPromiseResult_deposits _ _ _
+    | exact createCallbackPromiseResult_deposits _ _ _ _
+    | split)
+
+theorem promiseBatchActionAddGasKeyWithFunctionCallFn_noDeposits : HostCreatesNoDeposits promiseBatchActionAddGasKeyWithFunctionCallFn := by
+  intro st args
+  unfold promiseBatchActionAddGasKeyWithFunctionCallFn
   dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
     contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
     checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
@@ -694,9 +745,43 @@ theorem promiseBatchActionUseGlobalContractFn_noDeposits : HostCreatesNoDeposits
     | exact createCallbackPromiseResult_deposits _ _ _ _
     | split)
 
+theorem promiseBatchActionDeployGlobalContractFn_noDeposits : HostCreatesNoDeposits promiseBatchActionDeployGlobalContractFn := by
+  intro st args
+  unfold promiseBatchActionDeployGlobalContractFn deployGlobalContractFn
+  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
+    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
+    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
+    NearState.selectReturnValue, NearState.selectReturnPromise]
+  repeat (first
+    | trivial
+    | exact ⟨rfl, rfl, rfl⟩
+    | exact writeRegisterResult_deposits _ _ _ _ _
+    | exact appendPromise_return_deposits _ _ _
+    | exact appendPromiseActionResult_deposits _ _ _ _
+    | exact createBatchPromiseResult_deposits _ _ _
+    | exact createCallbackPromiseResult_deposits _ _ _ _
+    | split)
+
 theorem promiseBatchActionUseGlobalContractByAccountIdFn_noDeposits : HostCreatesNoDeposits promiseBatchActionUseGlobalContractByAccountIdFn := by
   intro st args
   unfold promiseBatchActionUseGlobalContractByAccountIdFn useGlobalContractFn
+  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
+    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
+    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
+    NearState.selectReturnValue, NearState.selectReturnPromise]
+  repeat (first
+    | trivial
+    | exact ⟨rfl, rfl, rfl⟩
+    | exact writeRegisterResult_deposits _ _ _ _ _
+    | exact appendPromise_return_deposits _ _ _
+    | exact appendPromiseActionResult_deposits _ _ _ _
+    | exact createBatchPromiseResult_deposits _ _ _
+    | exact createCallbackPromiseResult_deposits _ _ _ _
+    | split)
+
+theorem promiseBatchActionDeployGlobalContractByAccountIdFn_noDeposits : HostCreatesNoDeposits promiseBatchActionDeployGlobalContractByAccountIdFn := by
+  intro st args
+  unfold promiseBatchActionDeployGlobalContractByAccountIdFn deployGlobalContractFn
   dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
     contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
     checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
@@ -800,5 +885,13 @@ theorem HostCreatesNoDeposits.funding {fn : NearHostFn NearState} (h : HostCreat
     change DepositEffect st.host paid.host 0 at hp
     change paid.host.liquidFunds + st.host.subsidizedAmount = st.host.liquidFunds + paid.host.subsidizedAmount
     simp only [NearState.liquidFunds, hp.1, hp.2.1, hp.2.2, Nat.add_zero]
+
+
+-- TODO(proof): yield create/resume create no deposits.
+theorem promiseYieldCreateFn_noDeposits : HostCreatesNoDeposits promiseYieldCreateFn := by
+  sorry
+
+theorem promiseYieldResumeFn_noDeposits : HostCreatesNoDeposits promiseYieldResumeFn := by
+  sorry
 
 end Wasm.Near

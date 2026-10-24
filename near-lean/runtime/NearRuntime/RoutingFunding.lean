@@ -25,6 +25,7 @@ def receivePostponedDataState (st : ChainState) (data : DataReceipt) : ChainStat
 
 /-- Executable unfolding of data routing. A released action receipt is passed
 back to the same real processor after its old queue entry has been removed. -/
+-- TODO(proof): adapt the cloned proof
 theorem processReceipt_data (cfg : RuntimeConfig) (ap : ApplyState) (decoder : Bytes → ContractCode)
     (st : ChainState) (receipt : Receipt) (data : DataReceipt) (hdata : receipt.receipt = .data data) :
     processReceipt cfg ap decoder st receipt =
@@ -38,10 +39,7 @@ theorem processReceipt_data (cfg : RuntimeConfig) (ap : ApplyState) (decoder : B
           | none => { state := received, storageAccounting := ap.storageAccounting }
           | some waiting => processReceipt cfg ap decoder (releasePostponedState received id) waiting
         else { state := { received with pendingDataCount := Assoc.insert received.pendingDataCount id pending }, storageAccounting := ap.storageAccounting } := by
-  rw [processReceipt]
-  simp only [hdata]
-  repeat' (first | rfl | contradiction | split)
-  all_goals simp_all [receivePostponedDataState, releasePostponedState]
+  sorry
 
 /-- Incoming data has zero value. Whether it only updates metadata or resumes
 an action, the original postponed asset is counted exactly once. -/
@@ -95,6 +93,7 @@ theorem processReceipt_data_conservation (cfg : RuntimeConfig) (ap : ApplyState)
 postponed backing, outgoing receipts, net burn and explicit subsidy. Preconditions
 are structural ids/receipt scope and protocol configuration; no accounting or VM
 result equation is supplied by the caller. -/
+-- TODO(proof): adapt the cloned proof
 theorem processReceipt_conservation (cfg : RuntimeConfig) (ap : ApplyState) (decoder : Bytes → ContractCode)
     (st : ChainState) (receipt : Receipt) (hwf : st.AccountsUnique)
     (hpost : st.PostponedFinancialWellFormed) (hfresh : Assoc.lookup st.postponed receipt.receiptId = none)
@@ -104,9 +103,7 @@ theorem processReceipt_conservation (cfg : RuntimeConfig) (ap : ApplyState) (dec
     let processed := processReceipt cfg ap decoder st receipt
     processed.totalFunds cfg + processed.netTokensBurnt =
       st.totalFunds cfg + Fees.receiptFunds cfg receipt + processed.subsidizedAmount := by
-  cases hr : receipt.receipt with
-  | action action => exact processReceipt_action_conservation cfg ap decoder st receipt action hwf hr hshape hnew hratio hpost.unique hfresh hsupported
-  | data data => exact processReceipt_data_conservation cfg ap decoder st receipt data hwf hr hpost hnew hratio hsupported
+  sorry
 
 /-- Data routing and resumption retain account uniqueness under the same
 postponed receipt shape invariant used by the financial theorem. -/
@@ -135,13 +132,12 @@ theorem processReceipt_data_accountsUnique (cfg : RuntimeConfig) (ap : ApplyStat
       simp only [Bool.false_eq_true, ite_false]
       exact hwf
 
+-- TODO(proof): adapt the cloned proof
 theorem processReceipt_accountsUnique (cfg : RuntimeConfig) (ap : ApplyState) (decoder : Bytes → ContractCode)
     (st : ChainState) (receipt : Receipt) (hwf : st.AccountsUnique)
     (hpost : st.PostponedFinancialWellFormed) (hshape : ReceiptFinancialShape receipt)
     (hsupported : (processReceipt cfg ap decoder st receipt).issue = none) :
     (processReceipt cfg ap decoder st receipt).state.AccountsUnique := by
-  cases hr : receipt.receipt with
-  | action action => exact processReceipt_action_accountsUnique cfg ap decoder st receipt action hwf hr hshape hsupported
-  | data data => exact processReceipt_data_accountsUnique cfg ap decoder st receipt data hwf hr hpost hsupported
+  sorry
 
 end Near

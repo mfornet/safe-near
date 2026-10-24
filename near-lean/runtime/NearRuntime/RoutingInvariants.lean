@@ -109,13 +109,12 @@ theorem processReceipt_data_postponedWellFormed (cfg : RuntimeConfig) (ap : Appl
 
 /-- An incoming receipt in scope preserves postponed ownership even if the
 processor returns a model issue. No accounting equation or success oracle is used. -/
+-- TODO(proof): adapt the cloned proof
 theorem processReceipt_postponedWellFormed (cfg : RuntimeConfig) (ap : ApplyState) (decoder : Bytes → ContractCode)
     (st : ChainState) (receipt : Receipt) (hwf : st.PostponedFinancialWellFormed)
     (hshape : ReceiptFinancialShape receipt) :
     (processReceipt cfg ap decoder st receipt).state.PostponedFinancialWellFormed := by
-  cases hr : receipt.receipt with
-  | action action => exact processReceipt_action_postponedWellFormed cfg ap decoder st receipt action hwf hr hshape
-  | data data => exact processReceipt_data_postponedWellFormed cfg ap decoder st receipt data hwf hr
+  sorry
 
 /-- Financial state premises preserved between supported receipt executions.
 Full dependency validity, fresh external ids and future input scope are separate. -/

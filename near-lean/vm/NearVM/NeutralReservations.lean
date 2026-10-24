@@ -324,6 +324,18 @@ theorem randomSeedFn_reservationView : HostPreservesReservationView randomSeedFn
     | trivial | rfl | exact writeRegisterResult_reservationView _ _ _ _ _
     | split)
 
+theorem chainIdFn_reservationView : HostPreservesReservationView chainIdFn := by
+  intro st args
+  unfold chainIdFn contextRegisterFn
+  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
+    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
+    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
+    NearState.selectReturnValue, NearState.selectReturnPromise,
+    NearState.setStorage, NearState.removeStorage, NearState.invalidateIterators]
+  repeat' (first
+    | trivial | rfl | exact writeRegisterResult_reservationView _ _ _ _ _
+    | split)
+
 theorem promiseResultsCountFn_reservationView : HostPreservesReservationView promiseResultsCountFn := by
   intro st args
   unfold promiseResultsCountFn
@@ -382,7 +394,7 @@ theorem abortMetered_reservationView : HostPreservesReservationView abortMetered
 
 /-- These published host names create no onward execution/prepaid obligation. -/
 def reservationNeutralNames : List String :=
-  ["input", "read_register", "register_len", "write_register", "value_return", "storage_write", "storage_read", "storage_remove", "storage_has_key", "current_account_id", "predecessor_account_id", "signer_account_id", "attached_deposit", "log_utf8", "signer_account_pk", "block_index", "block_height", "block_timestamp", "epoch_height", "storage_usage", "account_balance", "account_locked_balance", "prepaid_gas", "used_gas", "log_utf16", "random_seed", "promise_results_count", "promise_result", "promise_return", "panic", "panic_utf8", "abort"]
+  ["input", "read_register", "register_len", "write_register", "value_return", "storage_write", "storage_read", "storage_remove", "storage_has_key", "current_account_id", "predecessor_account_id", "signer_account_id", "attached_deposit", "log_utf8", "signer_account_pk", "block_index", "block_height", "block_timestamp", "epoch_height", "storage_usage", "account_balance", "account_locked_balance", "prepaid_gas", "used_gas", "log_utf16", "random_seed", "chain_id", "promise_results_count", "promise_result", "promise_return", "panic", "panic_utf8", "abort"]
 
 @[simp] theorem storageValueCharges_reservation (st : HostStore NearState) (cost : String)
     (key : List UInt8) (fees : ActionFees) :
@@ -422,7 +434,7 @@ theorem chargesBefore_neutral_reservation (name : String) (st : HostStore NearSt
     (hname : name ∈ reservationNeutralNames) :
     ((chargesBefore name st args).map (fun charge => charge.reservation st.host.fees)).sum = 0 := by
   simp only [reservationNeutralNames, List.mem_cons, List.not_mem_nil, or_false] at hname
-  rcases hname with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
+  rcases hname with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
   all_goals subst name
   all_goals first
     | exact chargesBefore_storage_reservation _ _ _ (Or.inl rfl)

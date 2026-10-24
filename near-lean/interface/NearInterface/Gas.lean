@@ -64,6 +64,11 @@ structure ActionFees where
   delegate : Fee := {}
   useGlobalContractBase : Fee := {}
   useGlobalContractByte : Fee := {}
+  deployGlobalContractBase : Fee := {}
+  deployGlobalContractByte : Fee := {}
+  gasKeyTransferBase : Fee := {}
+  gasKeyByte : Fee := {}
+  gasKeyNonceWriteBase : Fee := {}
   deriving Repr, Inhabited
 
 /-- `ExtCosts` as a lookup by nearcore's snake_case name; missing names cost

@@ -52,6 +52,7 @@ def storageUsageOf (cfg : RuntimeConfig) (raw : RawStorage) : Nat :=
 def PromiseAction.deposit : PromiseAction → Balance
   | .functionCall _ _ amount _ => amount
   | .transfer amount => amount
+  | .transferToGasKey _ amount => amount
   | _ => 0
 
 /-- Total deposit of the receipts a call creates. -/
@@ -95,6 +96,12 @@ structure Context where
   randomSeed : Bytes
   trie : Near.TrieOverlay.State
   protocol : RuntimeConfig
+  /-- The hash of the executing action, from which `promise_yield_create` derives data ids. -/
+  actionHash : Bytes := []
+  /-- Data ids of the account's yields that `promise_yield_resume` may resume. -/
+  existingYields : List Bytes := []
+  /-- The chain's name, for `chain_id`. -/
+  chainId : Bytes := []
 
 /-- Records stored under `account` in a trie view (`TrieKey::ContractData`). -/
 def contractData (trie : Near.TrieOverlay.State) (account : Bytes) : RawStorage :=

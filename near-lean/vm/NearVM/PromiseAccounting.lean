@@ -2,10 +2,10 @@ import NearVM.Run
 
 namespace Wasm
 
-/-- Only transfers and function-call deposits move funds into a promise.
+/-- Only transfers (including to a gas key) and function-call deposits move funds into a promise.
 Stake amounts are receiver-side targets, not deposits. -/
 def PromiseAction.deposit : PromiseAction → Nat
-  | .functionCall _ _ amount _ | .transfer amount => amount
+  | .functionCall _ _ amount _ | .transfer amount | .transferToGasKey _ amount => amount
   | _ => 0
 
 end Wasm
@@ -20,8 +20,9 @@ def receiptsValue (value : ReceiptValuation) (receipts : List ReceiptSpec) : Nat
   (receipts.map fun receipt => value receipt.receiverId receipt.actions).sum
 
 def promiseValue (value : ReceiptValuation) : NearPromise → Nat
-  | .batch account actions | .callback _ account actions => value account actions
-  | .and _ | .yielded .. => 0
+  | .batch account actions | .callback _ account actions | .yielded account actions _ =>
+    value account actions
+  | .and _ => 0
 
 def promisesValue (value : ReceiptValuation) (promises : List NearPromise) : Nat :=
   (promises.map (promiseValue value)).sum
@@ -234,7 +235,17 @@ theorem appendPromiseAction_deposits (promises result : List NearPromise) (index
       change promisesValue depositValue result = promisesValue depositValue promises + action.deposit
       omega
     | and dependencies => simp [hg] at h
-    | yielded => simp [hg] at h
+    | yielded account actions dataId =>
+      have hs : setPromise? promises index (.yielded account (actions ++ [action]) dataId) = some result := by
+        simpa only [hg] using h
+      have hv := setPromise_value depositValue promises result index (.yielded account actions dataId)
+        (.yielded account (actions ++ [action]) dataId) hg hs
+      have hn : promiseValue depositValue (.yielded account (actions ++ [action]) dataId) =
+          promiseValue depositValue (.yielded account actions dataId) + action.deposit := by
+        simp [promiseValue, depositValue]
+      rw [hn] at hv
+      change promisesValue depositValue result = promisesValue depositValue promises + action.deposit
+      omega
 
 /-- Creating a raw receipt funds it once; empty batches and joints add zero
 attached deposits. -/

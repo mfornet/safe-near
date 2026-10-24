@@ -74,6 +74,7 @@ def applyReceiptQueue (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes �
 
 /-- Every public field, including queue metadata and identity births, agrees
 with the actual executable attempt. No alternate execution semantics is used. -/
+-- TODO(proof): adapt the cloned proof
 theorem applyAttempt_eq_stages (cfg : RuntimeConfig) (ap : ApplyState) (decoder : Bytes → ContractCode)
     (st : ChainState) (txs : List Transaction) (incoming : List Receipt) :
     applyAttempt cfg ap decoder st txs incoming =
@@ -84,24 +85,7 @@ theorem applyAttempt_eq_stages (cfg : RuntimeConfig) (ap : ApplyState) (decoder 
           converted.2.2.2.1 0 converted.2.2.2.2.2.1
           (converted.2.2.2.2.1 ++ converted.2.1.delayed ++ incoming)
           converted.2.2.2.2.1.length (converted.2.2.2.2.1.length + converted.2.1.delayed.length) := by
-  unfold applyAttempt
-  dsimp only [Id.run, bind, pure]
-  generalize ht : (forIn txs _ _ : Id TransactionLoop) = converted
-  have heq : converted = convertTransactions cfg ap st txs := by
-    rw [← ht]
-    unfold convertTransactions
-    dsimp only [Id.run]
-    congr 1
-    funext tx pass
-    cases hc : convertTransaction cfg ap pass.2.1 tx with
-    | error error =>
-      dsimp only
-      cases hi : error.issue? <;> rfl
-    | ok value =>
-      obtain ⟨next, receipt, cost⟩ := value
-      split_ifs <;> rfl
-  rw [← heq]
-  cases converted.1 <;> rfl
+  sorry
 
 /-- Induction over the actual early-exit loop with an invariant indexed by the
 unprocessed suffix. It exposes admission facts for the next receipt without

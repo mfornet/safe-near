@@ -26,7 +26,7 @@ theorem meteredHostFns_encodingInvariant
   rcases h with ⟨⟨decl, fn⟩, hin, heq⟩ | heq
   · subst entry
     simp only [nearHostFns, List.mem_cons, List.not_mem_nil, or_false] at hin
-    rcases hin with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
+    rcases hin with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
     · cases h
       apply meteredNeutral_encodingInvariant
       · exact inputFn_encodingFrame
@@ -254,29 +254,17 @@ theorem meteredHostFns_encodingInvariant
     · cases h
       exact meteredActionDeleteAccount_encodingInvariant _
     · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      exact meteredActionDeployGlobalContract_encodingInvariant _
     · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      exact meteredActionDeployGlobalContractByAccountId_encodingInvariant _
     · cases h
       exact meteredActionUseGlobalContract_encodingInvariant _
     · cases h
       exact meteredActionUseGlobalContractByAccountId_encodingInvariant _
     · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      exact meteredYieldCreate_encodingInvariant _
     · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      exact meteredYieldResume_encodingInvariant _
     · cases h
       apply meteredNeutral_encodingInvariant
       · exact promiseResultsCountFn_encodingFrame
@@ -286,6 +274,35 @@ theorem meteredHostFns_encodingInvariant
     · cases h
       apply meteredNeutral_encodingInvariant
       · exact promiseReturnFn_encodingFrame
+    · cases h
+      exact meteredActionTransferToGasKey_encodingInvariant _
+    · cases h
+      exact meteredActionAddGasKeyWithFullAccess_encodingInvariant _
+    · cases h
+      exact meteredActionAddGasKeyWithFunctionCall_encodingInvariant _
+    · cases h
+      apply metered_raw_encodingInvariant
+      intro st args hwf hs hguard _
+      simp (disch := decide) only [prepareStorageCall_other]
+      trivial
+    · cases h
+      apply metered_raw_encodingInvariant
+      intro st args hwf hs hguard _
+      simp (disch := decide) only [prepareStorageCall_other]
+      trivial
+    · cases h
+      apply metered_raw_encodingInvariant
+      intro st args hwf hs hguard _
+      simp (disch := decide) only [prepareStorageCall_other]
+      trivial
+    · cases h
+      apply metered_raw_encodingInvariant
+      intro st args hwf hs hguard _
+      simp (disch := decide) only [prepareStorageCall_other]
+      trivial
+    · cases h
+      apply meteredNeutral_encodingInvariant
+      · exact chainIdFn_encodingFrame
   · subst entry
     exact gasFn_encodingInvariant
 

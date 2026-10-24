@@ -113,6 +113,7 @@ theorem metered_preserves_gasFloor (extra : Nat) (name : String) (fn : NearHostF
           | some error => cases error <;> exact hwf2
 
 set_option maxRecDepth 16384 in
+set_option maxHeartbeats 1600000 in
 /-- Every published metered host keeps burnt gas at or above its floor. -/
 theorem meteredHostFns_gasFloor (cfg : RuntimeConfig) (entry : ImportDecl × NearHostFn NearState)
     (h : entry ∈ meteredHostFns cfg) : HostPreservesGasFloor entry.2 := by
@@ -120,7 +121,7 @@ theorem meteredHostFns_gasFloor (cfg : RuntimeConfig) (entry : ImportDecl × Nea
   rcases h with ⟨⟨decl, fn⟩, hin, heq⟩ | heq
   · subst entry
     simp only [nearHostFns, List.mem_cons, List.not_mem_nil, or_false] at hin
-    rcases hin with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
+    rcases hin with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
     all_goals cases h
     all_goals first
       | (intro b prepaid maxBurnt st args hwf; exact hwf)
@@ -171,6 +172,14 @@ theorem meteredHostFns_gasFloor (cfg : RuntimeConfig) (entry : ImportDecl × Nea
       | exact HostPreservesGas.floor promiseBatchActionDeleteAccountFn_gas
       | exact HostPreservesGas.floor promiseBatchActionUseGlobalContractFn_gas
       | exact HostPreservesGas.floor promiseBatchActionUseGlobalContractByAccountIdFn_gas
+      | exact HostPreservesGas.floor promiseBatchActionDeployGlobalContractFn_gas
+      | exact HostPreservesGas.floor promiseBatchActionDeployGlobalContractByAccountIdFn_gas
+      | exact HostPreservesGas.floor promiseBatchActionTransferToGasKeyFn_gas
+      | exact HostPreservesGas.floor promiseBatchActionAddGasKeyWithFullAccessFn_gas
+      | exact HostPreservesGas.floor promiseBatchActionAddGasKeyWithFunctionCallFn_gas
+      | exact HostPreservesGas.floor promiseYieldCreateFn_gas
+      | exact HostPreservesGas.floor promiseYieldResumeFn_gas
+      | exact HostPreservesGas.floor chainIdFn_gas
       | exact HostPreservesGas.floor valueReturnFn_gas
       | exact HostPreservesGas.floor promiseReturnFn_gas
       | exact HostPreservesGas.floor promiseResultsCountFn_gas

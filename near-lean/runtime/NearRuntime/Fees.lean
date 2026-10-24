@@ -13,13 +13,24 @@ namespace Near
 
 open Wasm.Near
 
+/-- Borsh size of a `FunctionCallPermission`. -/
+def functionCallPermissionBytes (allowance : Option Nat) (receiver : String) (methods : List String) : Nat :=
+  (match allowance with | none => 1 | some _ => 17) + 4 + receiver.utf8ByteSize + 4
+    + (methods.map (·.utf8ByteSize + 4)).sum
+
 /-- Bytes of a public key plus an access key, as stored for storage accounting. -/
 def accessKeyStorageBytes (pk : PublicKey) (k : AccessKey) : Nat :=
   pk.length + 8 + (match k.permission with
     | .fullAccess => 1
-    | .functionCall allowance receiver methods =>
-      1 + (match allowance with | none => 1 | some _ => 17) + 4 + receiver.utf8ByteSize + 4
-        + (methods.map (·.utf8ByteSize + 4)).sum)
+    | .functionCall allowance receiver methods => 1 + functionCallPermissionBytes allowance receiver methods
+    | .gasKeyFullAccess .. => 1 + 18
+    | .gasKeyFunctionCall _ _ allowance receiver methods =>
+      1 + 18 + functionCallPermissionBytes allowance receiver methods)
+
+/-- Storage a gas key adds beyond its access key row: one nonce row per lane
+(`gas_key_storage_cost`). -/
+def gasKeyNonceStorageBytes (extraBytesRecord : Nat) (pk : PublicKey) (numNonces : Nat) : Nat :=
+  numNonces * (gasKeyPublicKeyLen pk + 2 + 8 + extraBytesRecord)
 
 /-- 64 lowercase hex characters: an implicit (NEAR) account. -/
 def isImplicitAccount (id : AccountId) : Bool :=
@@ -50,7 +61,47 @@ def initialNonce (blockHeight : Nat) : Nat := (blockHeight - 1) * 1_000_000
 
 namespace Fees
 
-/-- Send fee of one action (`total_send_fees` summand). -/
+/-- Send fee of `TransferToGasKey`/`WithdrawFromGasKey` (`gas_key_transfer_send_fee`). -/
+def gasKeyTransferSend (f : ActionFees) (sir : Bool) (pkLen : Nat) : Nat :=
+  f.gasKeyTransferBase.send sir + f.gasKeyByte.send sir * pkLen
+
+/-- Execution fee of `TransferToGasKey`/`WithdrawFromGasKey` (`gas_key_transfer_exec_fee`):
+the access key row the receiver reads and writes. -/
+def gasKeyTransferExec (f : ActionFees) (receiverLen pkLen : Nat) : Nat :=
+  f.gasKeyTransferBase.execution +
+    f.gasKeyByte.execution * (accessKeyKeyLen receiverLen pkLen + minGasKeyBorshLen)
+
+/-- Send fee of an `AddKey` by permission (`permission_send_fees`). -/
+def permissionSend (f : ActionFees) (sir : Bool) : AccessKeyPermission → Nat
+  | .fullAccess => f.addFullAccessKey.send sir
+  | .functionCall _ _ methods =>
+    f.addFunctionCallKeyBase.send sir
+      + f.addFunctionCallKeyByte.send sir * (methods.map fun m => m.utf8ByteSize + 1).sum
+  | .gasKeyFullAccess .. => f.addFullAccessKey.send sir + f.gasKeyByte.send sir * gasKeyInfoBorshLen
+  | .gasKeyFunctionCall _ _ _ _ methods =>
+    f.addFunctionCallKeyBase.send sir
+      + f.addFunctionCallKeyByte.send sir * (methods.map fun m => m.utf8ByteSize + 1).sum
+      + f.gasKeyByte.send sir * gasKeyInfoBorshLen
+
+/-- Execution fee of an `AddKey` by permission (`permission_exec_fees`); a gas key also pays
+for writing its nonce rows. -/
+def permissionExec (f : ActionFees) (receiverLen pkLen : Nat) : AccessKeyPermission → Nat
+  | .fullAccess => f.addFullAccessKey.execution
+  | .functionCall _ _ methods =>
+    f.addFunctionCallKeyBase.execution
+      + f.addFunctionCallKeyByte.execution * (methods.map fun m => m.utf8ByteSize + 1).sum
+  | .gasKeyFullAccess _ nonces =>
+    f.addFullAccessKey.execution + f.gasKeyNonceWriteBase.execution * nonces
+      + f.gasKeyByte.execution * (accessKeyKeyLen receiverLen pkLen + 2 + 8) * nonces
+  | .gasKeyFunctionCall _ nonces _ _ methods =>
+    f.addFunctionCallKeyBase.execution
+      + f.addFunctionCallKeyByte.execution * (methods.map fun m => m.utf8ByteSize + 1).sum
+      + (f.gasKeyNonceWriteBase.execution * nonces
+        + f.gasKeyByte.execution * (accessKeyKeyLen receiverLen pkLen + 2 + 8) * nonces)
+
+mutual
+/-- Send fee of one action (`total_send_fees` summand). A delegate action also pays to
+send its inner actions, as seen from the same sender. -/
 def send (f : ActionFees) (ethEnabled : Bool) (sir : Bool) (receiver : AccountId) : Action → Nat
   | .createAccount => f.createAccount.send sir
   | .deployContract code => f.deployContractBase.send sir + f.deployContractByte.send sir * code.size
@@ -59,15 +110,20 @@ def send (f : ActionFees) (ethEnabled : Bool) (sir : Bool) (receiver : AccountId
   | .transfer _ =>
     (transferFees f ethEnabled receiver.toUTF8.toList).send sir
   | .stake _ _ => f.stake.send sir
-  | .addKey _ k =>
-    match k.permission with
-    | .fullAccess => f.addFullAccessKey.send sir
-    | .functionCall _ _ methods =>
-      f.addFunctionCallKeyBase.send sir
-        + f.addFunctionCallKeyByte.send sir * (methods.map fun m => m.utf8ByteSize + 1).sum
+  | .addKey _ k => permissionSend f sir k.permission
   | .deleteKey _ => f.deleteKey.send sir
   | .deleteAccount _ => f.deleteAccount.send sir
   | .useGlobalContract id => f.useGlobalContractBase.send sir + f.useGlobalContractByte.send sir * id.length
+  | .deployGlobalContract code _ =>
+    f.deployGlobalContractBase.send sir + f.deployGlobalContractByte.send sir * code.size
+  | .transferToGasKey pk _ | .withdrawFromGasKey pk _ => gasKeyTransferSend f sir (gasKeyPublicKeyLen pk)
+  | .delegate _ inner actions .. => f.delegate.send sir + sendList f ethEnabled sir inner actions
+
+def sendList (f : ActionFees) (ethEnabled : Bool) (sir : Bool) (receiver : AccountId) :
+    List Action → Nat
+  | [] => 0
+  | a :: rest => send f ethEnabled sir receiver a + sendList f ethEnabled sir receiver rest
+end
 
 /-- Execution fee of one action (`exec_fee`). -/
 def exec (f : ActionFees) (ethEnabled : Bool) (receiver : AccountId) : Action → Nat
@@ -78,15 +134,14 @@ def exec (f : ActionFees) (ethEnabled : Bool) (receiver : AccountId) : Action �
   | .transfer _ =>
     (transferFees f ethEnabled receiver.toUTF8.toList).execution
   | .stake _ _ => f.stake.execution
-  | .addKey _ k =>
-    match k.permission with
-    | .fullAccess => f.addFullAccessKey.execution
-    | .functionCall _ _ methods =>
-      f.addFunctionCallKeyBase.execution
-        + f.addFunctionCallKeyByte.execution * (methods.map fun m => m.utf8ByteSize + 1).sum
+  | .addKey pk k => permissionExec f receiver.utf8ByteSize (gasKeyPublicKeyLen pk) k.permission
   | .deleteKey _ => f.deleteKey.execution
   | .deleteAccount _ => f.deleteAccount.execution
   | .useGlobalContract id => f.useGlobalContractBase.execution + f.useGlobalContractByte.execution * id.length
+  | .deployGlobalContract code _ =>
+    f.deployGlobalContractBase.execution + f.deployGlobalContractByte.execution * code.size
+  | .transferToGasKey pk _ | .withdrawFromGasKey pk _ => gasKeyTransferExec f receiver.utf8ByteSize (gasKeyPublicKeyLen pk)
+  | .delegate .. => f.delegate.execution
 
 def totalSend (f : ActionFees) (ethEnabled : Bool) (sir : Bool) (receiver : AccountId) (actions : List Action) : Nat :=
   (actions.map (send f ethEnabled sir receiver)).sum
@@ -94,13 +149,52 @@ def totalSend (f : ActionFees) (ethEnabled : Bool) (sir : Bool) (receiver : Acco
 def totalExec (f : ActionFees) (ethEnabled : Bool) (receiver : AccountId) (actions : List Action) : Nat :=
   (actions.map (exec f ethEnabled receiver)).sum
 
+mutual
+/-- Execution fees a receipt owes before it runs (`total_prepaid_exec_fees`): a delegate action
+also owes the receipt and the actions it will create. -/
+def prepaidExec (f : ActionFees) (ethEnabled : Bool) (receiver : AccountId) : Action → Nat
+  | .delegate _ inner actions .. =>
+    prepaidExecList f ethEnabled inner actions + f.delegate.execution + f.newActionReceipt.execution
+  | action => exec f ethEnabled receiver action
+
+def prepaidExecList (f : ActionFees) (ethEnabled : Bool) (receiver : AccountId) :
+    List Action → Nat
+  | [] => 0
+  | a :: rest => prepaidExec f ethEnabled receiver a + prepaidExecList f ethEnabled receiver rest
+end
+
+/-- What `prepaidExec` adds to `exec`: a delegate action's receipt and the actions it carries. -/
+def nestedExec (f : ActionFees) (ethEnabled : Bool) : Action → Nat
+  | .delegate _ inner actions .. => prepaidExecList f ethEnabled inner actions + f.newActionReceipt.execution
+  | _ => 0
+
+theorem prepaidExec_eq (f : ActionFees) (ethEnabled : Bool) (receiver : AccountId) (action : Action) :
+    prepaidExec f ethEnabled receiver action = exec f ethEnabled receiver action + nestedExec f ethEnabled action := by
+  cases action <;> simp [prepaidExec, nestedExec, exec] <;> omega
+
+/-- Send fees of the actions a delegate action will create, prepaid by the relayer
+(`total_prepaid_send_fees`). -/
+def prepaidSend (f : ActionFees) (ethEnabled : Bool) : Action → Nat
+  | .delegate sender inner actions .. => sendList f ethEnabled (sender == inner) inner actions
+  | _ => 0
+
+def totalPrepaidSend (f : ActionFees) (ethEnabled : Bool) (actions : List Action) : Nat :=
+  (actions.map (prepaidSend f ethEnabled)).sum
+
 def totalPrepaid (actions : List Action) : Nat := (actions.map Action.attachedGas).sum
+
+theorem attachedGasList_eq (actions : List Action) : Action.attachedGasList actions = totalPrepaid actions := by
+  induction actions with
+  | nil => rfl
+  | cons a rest ih => simp [Action.attachedGasList, totalPrepaid, ih]
 
 def totalDeposit (actions : List Action) : Nat := (actions.map Action.deposit).sum
 
 /-- Gas budget carried by an ordinary action receipt. -/
 def receiptGasBudget (cfg : RuntimeConfig) (receiver : AccountId) (actions : List Action) : Nat :=
-  cfg.fees.actionFees.newActionReceipt.execution + totalExec cfg.fees.actionFees cfg.wasm.ethImplicitAccounts receiver actions + totalPrepaid actions
+  cfg.fees.actionFees.newActionReceipt.execution
+    + (actions.map (prepaidExec cfg.fees.actionFees cfg.wasm.ethImplicitAccounts receiver)).sum
+    + totalPrepaid actions + totalPrepaidSend cfg.fees.actionFees cfg.wasm.ethImplicitAccounts actions
 
 /-- Funds carried by a receipt: deposits plus gas purchased for future execution.
 System refunds carry only their transfer balance; data receipts carry no funds. -/
@@ -108,7 +202,7 @@ def receiptFunds (cfg : RuntimeConfig) (r : Receipt) : Nat :=
   match r.receipt with
   | .action a => totalDeposit a.actions +
       (if r.isRefund then 0 else receiptGasBudget cfg r.receiverId a.actions * a.gasPrice)
-  | .data _ => 0
+  | .data _ | .globalDistribution _ => 0
 
 /-- The cost of a transaction (`tx_cost`): gas burnt now, gas prepaid for
 the receipt, and the total yoctoNEAR charged to the signer. -/

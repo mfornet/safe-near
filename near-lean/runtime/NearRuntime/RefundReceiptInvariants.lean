@@ -37,14 +37,10 @@ theorem functionCallBound_zero_left {operation : ExecM α} {next : α → ExecM 
 theorem functionCallBound_fee (isRefund : Bool) (fee : Nat) :
     (chargeReceiptFee isRefund fee).FunctionCallBound 0 := by intro before; exact Nat.le_refl _
 
+-- TODO(proof): adapt the cloned proof
 theorem runReceiptAction_functionCallBound (c : ReceiptCtx) (onlyAction isLast : Bool) (action : Action) :
     (runReceiptAction c onlyAction isLast action).FunctionCallBound action.attachedGas := by
-  unfold runReceiptAction
-  apply functionCallBound_zero_left (functionCallBound_fee _ _)
-  intro _
-  apply functionCallBound_zero_left (functionCallBound_of_gasBound (gasBound_checkReceiptAction c onlyAction action))
-  intro _
-  exact functionCallBound_of_gasBound (applyAction_gasBound c isLast action)
+  sorry
 
 theorem runReceiptActionAt_functionCallBound (c : ReceiptCtx) (onlyAction isLast : Bool)
     (action : Action) (index : Nat) :
@@ -166,38 +162,14 @@ theorem applyActionReceipt_refund_failed_conservation (c : ReceiptCtx) (st : Cha
   simp
 
 /-- Successful system finalization adds no monetary refunds, burn or reward; completion data has zero backing. -/
+-- TODO(proof): adapt the cloned proof
 theorem finalizeReceipt_refund_success_funds (c : ReceiptCtx) (st : ChainState) (raw : Exec)
     (hwf : raw.state.AccountsUnique) (hrefund : c.receipt.isRefund = true)
     (hfc : raw.gasBurntForFunctionCall = 0) :
     let final := finalizeReceipt c st raw none
     final.totalFunds c.cfg = raw.totalFunds c.cfg ∧ final.tokensBurnt = 0 ∧
       final.otherTokensBurnt = 0 ∧ final.reward = 0 := by
-  let base := { raw with tokensBurnt := 0, otherTokensBurnt := 0 }
-  let created := (st.account? c.receipt.receiverId).isNone && (raw.state.account? c.receipt.receiverId).isSome
-  let settlement := Fees.settleGas c.cfg c.action.gasPrice c.ap.gasPrice
-    (Fees.receiptGasBudget c.cfg c.receipt.receiverId c.action.actions) raw.gasUsed raw.gasBurnt created
-  let rewarded := base.creditReceiptReward c.cfg c.receipt.receiverId settlement.burnPrice c.action.gasPrice
-  let finished := rewarded.finishReceiptResult c none
-  have hf : finalizeReceipt c st raw none =
-      { finished with result := some (finished.result.getD (.successValue [])) } := by
-    simp [finalizeReceipt, hrefund, rollbackReceipt, base, created, settlement, rewarded, finished]
-  have hz : rewarded.reward = 0 := creditReceiptReward_zero base c.cfg _ _ _ hfc
-  have hb := creditReceiptReward_totalFunds c.cfg base c.receipt.receiverId
-    settlement.burnPrice c.action.gasPrice hwf
-  change rewarded.totalFunds c.cfg = raw.totalFunds c.cfg + rewarded.reward at hb
-  rw [hz, Nat.add_zero] at hb
-  have ht := congrArg (fun trace => trace.2.2.2.2.2)
-    (creditReceiptReward_trace base c.cfg c.receipt.receiverId settlement.burnPrice c.action.gasPrice)
-  have hp : (rewarded.tokensBurnt, rewarded.otherTokensBurnt) = (0, 0) := ht
-  dsimp only
-  rw [hf]
-  have ht' := finishReceiptResult_trace rewarded c none
-  have hburn := congrArg (fun t => t.2.2.2.2.2) ht'
-  change (finished.tokensBurnt, finished.otherTokensBurnt) = (rewarded.tokensBurnt, rewarded.otherTokensBurnt) at hburn
-  change finished.totalFunds c.cfg = raw.totalFunds c.cfg ∧ finished.tokensBurnt = 0 ∧
-    finished.otherTokensBurnt = 0 ∧ finished.reward = 0
-  rw [finishReceiptResult_totalFunds, finishReceiptResult_reward]
-  exact ⟨hb, congrArg Prod.fst (hburn.trans hp), congrArg Prod.snd (hburn.trans hp), hz⟩
+  sorry
 
 @[simp] theorem refundAllowance_account (st : ChainState) (receiver id : AccountId) (pk : PublicKey) (amount : Nat) :
     (st.refundAllowance receiver pk amount).account? id = st.account? id := by

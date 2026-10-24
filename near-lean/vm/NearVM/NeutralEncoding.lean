@@ -344,6 +344,24 @@ theorem randomSeedFn_encodingFrame : HostPreservesEncodingFrame randomSeedFn := 
     | trivial | rfl | exact writeRegisterResult_encodingFrame _ _ _ _ _
     | split)
 
+theorem chainIdFn_encodingFrame : HostPreservesEncodingFrame chainIdFn := by
+  intro st args
+  unfold chainIdFn contextRegisterFn
+  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
+    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
+    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
+    NearState.selectReturnValue, NearState.selectReturnPromise,
+    NearState.setStorage, NearState.removeStorage, NearState.invalidateIterators]
+  repeat' (first
+    | trivial | rfl | exact writeRegisterResult_encodingFrame _ _ _ _ _
+    | split)
+
+theorem promiseYieldResumeFn_encodingFrame : HostPreservesEncodingFrame promiseYieldResumeFn := by
+  intro st args
+  unfold promiseYieldResumeFn
+  dsimp only [disallowInView]
+  repeat' (first | trivial | rfl | split)
+
 theorem promiseResultsCountFn_encodingFrame : HostPreservesEncodingFrame promiseResultsCountFn := by
   intro st args
   unfold promiseResultsCountFn

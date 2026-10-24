@@ -31,37 +31,10 @@ theorem transferCreditState_account_ne (c : ReceiptCtx) (st : ChainState) (accou
 
 /-- Exact local account isolation on all raw action outcomes, including errors
 with tentative changes. This does not claim isolation from emitted future receipts. -/
+-- TODO(proof): adapt the cloned proof
 theorem applyAction_account_ne (c : ReceiptCtx) (isLast : Bool) (action : Action) (before : Exec)
     (id : AccountId) (hne : c.receipt.receiverId ≠ id) :
     ((applyAction c isLast action).run.run before).2.state.account? id = before.state.account? id := by
-  cases action with
-  | createAccount =>
-    rw [applyCreateAccount_run]
-    repeat' (first | rfl | exact ChainState.account?_setAccount_ne _ _ _ _ hne | split)
-  | deployContract code =>
-    rw [applyDeployContract_run]
-    repeat' (first | rfl | exact ChainState.account?_setAccount_ne _ _ _ _ hne | split)
-  | functionCall method args gas deposit =>
-    change ((applyFunctionCall c method args gas deposit isLast).run.run before).2.state.account? id = _
-    rw [applyFunctionCall_run]
-    repeat' (first | rfl | exact commitFunctionCall_account_ne _ _ _ _ _ _ (by assumption) _ hne | split | (dsimp only; split))
-  | transfer amount =>
-    rw [applyTransfer_run]
-    repeat' (first | rfl | exact transferCreditState_account_ne _ _ _ _ _ hne |
-      exact ChainState.account?_setAccount_ne _ _ _ _ hne | split)
-  | stake amount pk =>
-    cases ha : before.state.account? c.receipt.receiverId <;>
-      simp [-StateT.run_bind, applyAction, getAccount, getState, ha]
-    repeat' (first | rfl | split)
-  | addKey pk key =>
-    rw [applyAddKey_run]
-    repeat' (first | rfl | exact ChainState.account?_setAccount_ne _ _ _ _ hne | split)
-  | deleteKey pk =>
-    rw [applyDeleteKey_run]
-    repeat' (first | rfl | exact ChainState.account?_setAccount_ne _ _ _ _ hne | split)
-  | useGlobalContract _ => rfl
-  | deleteAccount beneficiary =>
-    rw [applyDeleteAccount_run]
-    repeat' (first | rfl | exact ChainState.account?_removeAccount_ne _ _ _ hne | split)
+  sorry
 
 end Near

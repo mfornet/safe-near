@@ -47,6 +47,13 @@ structure VMContext where
   storageReadsFromTrie : Bool := false
   /-- Accounts whose pending receipts wait for this call's result. -/
   outputDataReceivers : List Bytes := []
+  /-- Hash of the executing action (`create_action_hash_from_receipt_id`), from which the
+  data ids of this call derive; empty when the caller supplies no native identity. -/
+  actionHash : Bytes := []
+  /-- Native data ids of the current account's yields that have a receipt or status in state. -/
+  existingYields : List Bytes := []
+  /-- `chain_id` of the epoch provider. -/
+  chainId : Bytes := []
   deriving Inhabited
 
 /-- Storage keys in byte order: the order the trie iterates them in, and one
@@ -81,7 +88,10 @@ def toNearState (cfg : RuntimeConfig) (ctx : VMContext)
       accountLockedBalance := ctx.accountLockedBalance
       attachedDeposit := ctx.attachedDeposit
       prepaidGas := UInt64.ofNat ctx.prepaidGas
-      usedGas := 0 }
+      usedGas := 0
+      chainId := ctx.chainId }
+    actionHash := ctx.actionHash
+    existingYields := ctx.existingYields
     storage := fun k => (storage.find? (·.1 == k)).map (·.2)
     storageKeys := sortedKeys storage
     storageAccounting := ctx.storageAccounting
@@ -100,6 +110,8 @@ def toNearState (cfg : RuntimeConfig) (ctx : VMContext)
       oneYoctoOnPromise := cfg.wasm.oneYoctoOnPromise
       ethImplicitAccounts := cfg.wasm.ethImplicitAccounts
       maxPromises := some cfg.wasm.limits.maxPromisesPerFunctionCallAction
+      maxContractSize := some cfg.wasm.limits.maxContractSize
+      maxYieldPayloadSize := some cfg.wasm.limits.maxYieldPayloadSize
       validAccountId := if cfg.wasm.limits.accountIdValidityRulesVersion == 2 then validAccountIdBytes
         else fun _ => true }
     randomSeed := ctx.randomSeed

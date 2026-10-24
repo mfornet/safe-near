@@ -69,7 +69,7 @@ theorem appendPromiseAction_selection {ps result : List NearPromise} {index sele
     | batch account actions => exact setPromise_nonJoint (p := .batch account (actions ++ [action])) (by simpa only [hget] using h) trivial hselected
     | callback base account actions => exact setPromise_nonJoint (p := .callback base account (actions ++ [action])) (by simpa only [hget] using h) trivial hselected
     | and dependencies => simp [hget] at h
-    | yielded => simp [hget] at h
+    | yielded account actions dataId => exact setPromise_nonJoint (p := .yielded account (actions ++ [action]) dataId) (by simpa only [hget] using h) trivial hselected
 
 theorem appendPromiseActionResult_selection {weight : UInt64} (name : String) (st : HostStore NearState)
     (index : UInt64) (action : PromiseAction) (hwf : ReturnSelectionValid st.host) :

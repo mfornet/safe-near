@@ -20,11 +20,21 @@ deriving Inhabited, BEq
 /-- Function-call access-key allowance. `none` represents no allowance. -/
 abbrev Allowance := Option Nat
 
-/-- Access-key permission carried by promise batch add-key actions. -/
+/-- Access-key permission carried by promise batch add-key actions. The gas-key
+variants carry the number of nonce lanes; a new gas key starts with balance zero. -/
 inductive AccessKeyPermission where
   | fullAccess
   | functionCall (allowance : Allowance) (receiverId methodNames : List UInt8)
+  | gasKeyFullAccess (numNonces : Nat)
+  | gasKeyFunctionCall (numNonces : Nat) (allowance : Allowance) (receiverId methodNames : List UInt8)
 deriving Inhabited, BEq
+
+/-- `GlobalContractDeployMode`: the global contract is identified by the hash
+of its code or by the deploying account. -/
+inductive GlobalContractDeployMode where
+  | codeHash
+  | accountId
+deriving Inhabited, BEq, Repr
 
 /-- `GlobalContractIdentifier`: a 32-byte code hash, or the account that
 deployed the contract. -/
@@ -49,6 +59,8 @@ inductive PromiseAction where
   | deleteKey (publicKey : List UInt8)
   | deleteAccount (beneficiaryId : List UInt8)
   | useGlobalContract (contract : GlobalContractId)
+  | deployGlobalContract (code : List UInt8) (mode : GlobalContractDeployMode)
+  | transferToGasKey (publicKey : List UInt8) (amount : Nat)
 deriving Inhabited, BEq
 
 end Wasm
@@ -72,6 +84,9 @@ structure ReceiptSpec where
   receiverId : List UInt8
   actions : List PromiseAction
   dependencies : List Nat := []
+  /-- A `promise_yield_create` receipt: it waits for exactly one data id, generated
+  by the call and handed to the contract, which `promise_yield_resume` can supply. -/
+  yieldDataId : Option (List UInt8) := none
   deriving BEq, Inhabited
 
 /-- Each dependency refers to a receipt created earlier in this call. Repeated

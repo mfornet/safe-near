@@ -106,6 +106,7 @@ theorem metered_preserves_gasLimits (extra : Nat) (name : String) (fn : NearHost
           | some error => cases error <;> exact hwf2
 
 set_option maxRecDepth 16384 in
+set_option maxHeartbeats 1600000 in
 /-- Every published metered host preserves call gas limits, including
 unsupported/deprecated rejection paths and the explicit gas import. -/
 theorem meteredHostFns_gasLimits (cfg : RuntimeConfig) (entry : ImportDecl × NearHostFn NearState)
@@ -114,7 +115,7 @@ theorem meteredHostFns_gasLimits (cfg : RuntimeConfig) (entry : ImportDecl × Ne
   rcases h with ⟨⟨decl, fn⟩, hin, heq⟩ | heq
   · subst entry
     simp only [nearHostFns, List.mem_cons, List.not_mem_nil, or_false] at hin
-    rcases hin with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
+    rcases hin with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
     all_goals cases h
     all_goals first
       | (intro prepaid maxBurnt st args hwf; exact hwf)
@@ -165,6 +166,14 @@ theorem meteredHostFns_gasLimits (cfg : RuntimeConfig) (entry : ImportDecl × Ne
       | exact HostPreservesGas.limits promiseBatchActionDeleteAccountFn_gas
       | exact HostPreservesGas.limits promiseBatchActionUseGlobalContractFn_gas
       | exact HostPreservesGas.limits promiseBatchActionUseGlobalContractByAccountIdFn_gas
+      | exact HostPreservesGas.limits promiseBatchActionDeployGlobalContractFn_gas
+      | exact HostPreservesGas.limits promiseBatchActionDeployGlobalContractByAccountIdFn_gas
+      | exact HostPreservesGas.limits promiseBatchActionTransferToGasKeyFn_gas
+      | exact HostPreservesGas.limits promiseBatchActionAddGasKeyWithFullAccessFn_gas
+      | exact HostPreservesGas.limits promiseBatchActionAddGasKeyWithFunctionCallFn_gas
+      | exact HostPreservesGas.limits promiseYieldCreateFn_gas
+      | exact HostPreservesGas.limits promiseYieldResumeFn_gas
+      | exact HostPreservesGas.limits chainIdFn_gas
       | exact HostPreservesGas.limits valueReturnFn_gas
       | exact HostPreservesGas.limits promiseReturnFn_gas
       | exact HostPreservesGas.limits promiseResultsCountFn_gas

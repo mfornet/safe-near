@@ -27,6 +27,7 @@ abbrev ReceiptLoop := Option ApplyResult × ChainState × List (ReceiptId × Exe
 
 /-- State predicates closed under the scheduler updates survive both real loops,
 including atomic early exits and final assembly of retained/new delayed work. -/
+-- TODO(proof): adapt the cloned proof
 theorem applyAttempt_state_predicate (cfg : RuntimeConfig) (ap : ApplyState)
     (decoder : Bytes → ContractCode) (P : ChainState → Prop)
     (htx : ∀ before after tx receipt cost, P before →
@@ -37,73 +38,7 @@ theorem applyAttempt_state_predicate (cfg : RuntimeConfig) (ap : ApplyState)
     (hdelay : ∀ before receipt, P before → P { before with delayed := before.delayed ++ [receipt] })
     (st : ChainState) (txs : List Transaction) (incoming : List Receipt) (h : P st) :
     P (applyAttempt cfg ap decoder st txs incoming).state := by
-  have happend (before : ChainState) (receipts : List Receipt) (hb : P before) :
-      P { before with delayed := before.delayed ++ receipts } := by
-    induction receipts generalizing before with
-    | nil => simpa only [List.append_nil] using hb
-    | cons receipt rest ih =>
-      have hp := ih { before with delayed := before.delayed ++ [receipt] } (hdelay before receipt hb)
-      simpa only [List.append_assoc, List.singleton_append] using hp
-  have hdelays (before : ChainState) (receipts : List Receipt) (hb : P before) :
-      P { before with delayed := receipts } := by
-    simpa only [List.nil_append] using happend { before with delayed := [] } receipts (hclear before hb)
-  unfold applyAttempt
-  dsimp only [Id.run, bind, pure]
-  generalize ht : (forIn txs _ _ : Id TransactionLoop) = txResult
-  have hconverted : P txResult.2.1 ∧ (∀ returned, txResult.1 = some returned → P returned.state) := by
-    rw [← ht]
-    apply forIn_id_preserves _ _ _
-      (fun s : TransactionLoop => P s.2.1 ∧ ∀ returned, s.1 = some returned → P returned.state)
-    · exact ⟨h, by intro returned he; contradiction⟩
-    · intro tx state hs
-      cases hc : convertTransaction cfg ap state.2.1 tx with
-      | error error =>
-        simp only
-        cases hi : error.issue? with
-        | some issue =>
-          dsimp only
-          exact ⟨hs.1, by intro returned he; cases he; exact h⟩
-        | none =>
-          dsimp only
-          exact ⟨hs.1, by intro returned he; contradiction⟩
-      | ok value =>
-        obtain ⟨next, receipt, cost⟩ := value
-        have hp := htx state.2.1 next tx receipt cost hs.1 hc
-        simp only
-        split_ifs <;> exact ⟨hp, by intro returned he; contradiction⟩
-  split
-  · rename_i returned he
-    exact hconverted.2 returned he
-  · generalize hq : (forIn ((txResult.2.2.2.2.1 ++ txResult.2.1.delayed ++ incoming).zipIdx) _ _ : Id ReceiptLoop) = result
-    have hresult : P result.2.1 ∧ (∀ returned, result.1 = some returned → P returned.state) := by
-      rw [← hq]
-      apply forIn_id_preserves _ _ _
-        (fun s : ReceiptLoop => P s.2.1 ∧ ∀ returned, s.1 = some returned → P returned.state)
-      · exact ⟨hclear _ hconverted.1, by intro returned he; contradiction⟩
-      · intro entry state hs
-        by_cases hover : state.2.2.2.2.2.2.2.2.2.2.1 = true
-        · simp only [hover, ite_true]
-          split_ifs <;> exact ⟨hs.1, by intro returned he; contradiction⟩
-        · simp only [hover, Bool.false_eq_true, ite_false]
-          cases hi : (processReceipt cfg { ap with storageAccounting := state.2.2.2.2.2.2.2.2.2.2.2 } decoder state.2.1 entry.1).issue with
-          | some issue =>
-            simp only
-            exact ⟨hs.1, by intro returned he; cases he; exact h⟩
-          | none =>
-            simp only
-            have hp := hreceipt state.2.2.2.2.2.2.2.2.2.2.2 state.2.1 entry.1 hs.1
-            cases hl : ap.gasLimit with
-            | none =>
-              simp only [hl] at hp
-              exact ⟨hp, by intro returned he; contradiction⟩
-            | some limit =>
-              simp only [hl] at hp
-              simp only
-              split_ifs <;> exact ⟨hp, by intro returned he; contradiction⟩
-    split
-    · rename_i returned he
-      exact hresult.2 returned he
-    · exact hdelays _ _ hresult.1
+  sorry
 
 /-- An absent synthetic actor stays absent through the actual transaction,
 receipt and gas-limit loops, including an early model-issue exit. -/

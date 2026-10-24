@@ -27,7 +27,7 @@ theorem refundAllowanceUpdate_storageBytes (key updated : AccessKey) (pk : Publi
     (h : refundAllowanceUpdate key deposit = some updated) :
     accessKeyStorageBytes pk updated = accessKeyStorageBytes pk key := by
   obtain ⟨_, _, _, hp, _, hu, _⟩ := refundAllowanceUpdate_some key updated deposit h
-  simp [accessKeyStorageBytes, hp, hu]
+  simp [accessKeyStorageBytes, functionCallPermissionBytes, hp, hu]
 
 theorem refundAllowanceUpdate_zero (key : AccessKey) : refundAllowanceUpdate key 0 = none := by
   unfold refundAllowanceUpdate

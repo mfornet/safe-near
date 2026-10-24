@@ -12,7 +12,9 @@ private def unique [BEq α] (name : String) (values : List α) : Except String U
 
 private def register (height : Nat) (context : QueueEncoding.Context)
     (birth : ReceiptIdentityBirth) : Except String QueueEncoding.Context := do
-  let parent ← NativeIdentity.resolve context.receipts birth.parent
+  let parent ← match birth.parentHash with
+    | some hash => NativeIdentity.checkedHash hash
+    | none => NativeIdentity.resolve context.receipts birth.parent
   unique "child identity" birth.children
   unique "VM action position" (birth.vmActions.map (·.actionIndex))
   let vmReceipts := birth.vmActions.flatMap (·.receipts)
@@ -23,13 +25,14 @@ private def register (height : Nat) (context : QueueEncoding.Context)
   for (id, index) in birth.children.zipIdx do
     if next.receipts.any (·.1 == id) || next.formats.any (·.1 == id) || next.data.any (·.id == id) then
       throw "child logical identity is already registered"
-    let hash ← NativeIdentity.receipt parent height index
+    let hash ← NativeIdentity.receipt parent height (birth.startIndex + index)
     next := { next with
       receipts := next.receipts ++ [(id, hash)]
       formats := next.formats ++ [(id, if vmReceipts.contains id then .v2 else .legacy)] }
   for action in birth.vmActions do
     let actionHash ← NativeIdentity.action parent height action.actionIndex
-    for ((id, receiver), index) in action.data.zipIdx do
+    for (((id, receiver), position), nth) in (action.data.zipIdx).zipIdx do
+      let index := if action.dataIndices.isEmpty then position else action.dataIndices.getD nth position
       if next.data.any (·.id == id) || next.receipts.any (·.1 == id) then
         throw "data logical identity is already registered"
       unless Wasm.Near.validAccountIdBytes receiver.toUTF8.toList do throw "invalid data receiver"

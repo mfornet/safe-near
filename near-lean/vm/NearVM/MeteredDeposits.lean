@@ -150,6 +150,10 @@ theorem meteredTransfer_funding (extra : Nat) :
     HostPreservesFunding (metered extra "promise_batch_action_transfer" promiseBatchActionTransferFn) :=
   metered_funding _ _ _ promiseBatchActionTransferFn_deposits
 
+theorem meteredTransferToGasKey_funding (extra : Nat) :
+    HostPreservesFunding (metered extra "promise_batch_action_transfer_to_gas_key" promiseBatchActionTransferToGasKeyFn) :=
+  metered_funding _ _ _ promiseBatchActionTransferToGasKeyFn_deposits
+
 theorem meteredBatchCall_funding (extra : Nat) :
     HostPreservesFunding (metered extra "promise_batch_action_function_call" promiseBatchActionFunctionCallFn) :=
   metered_funding _ _ _ promiseBatchActionFunctionCallFn_deposits

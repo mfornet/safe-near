@@ -35,6 +35,9 @@ inductive Charge
   | newReceipt (sir : Bool) (depsSir : List Bool)
   /-- `prepay_gas`: gas attached to a function call action. -/
   | prepay (gas : Nat)
+  /-- `pay_action_accumulated(burn, burn + execution)`: a send cost burnt now with the
+  execution cost it obliges, when neither is a plain per-byte multiple of one fee. -/
+  | pay (burn execution : Nat)
 
 def applyCharge (ns : NearState) : Charge → NearState × Option HostError
   | .ext name times =>
@@ -67,6 +70,10 @@ def applyCharge (ns : NearState) : Charge → NearState × Option HostError
   | .prepay n =>
     let (g, e) := ns.gas.prepay n
     ({ ns with gas := g }, e)
+  | .pay burn execution =>
+    let (g, e) := ns.gas.payAction burn execution
+    ({ ns with gas := g, gasProfile := { ns.gasProfile with
+      actionBurnt := ns.gasProfile.actionBurnt + (g.burnt - ns.gas.burnt) } }, e)
 
 def applyCharges (ns : NearState) : List Charge → NearState × Option HostError
   | [] => (ns, none)
@@ -109,6 +116,7 @@ def promiseReceiver? (st : HostStore NearState) (idx : Nat) : Option (List UInt8
   match getPromise? st.host.promises idx with
   | some (.batch acct _) => some acct
   | some (.callback _ acct _) => some acct
+  | some (.yielded acct _ _) => some acct
   | _ => none
 
 /-- Same-shard ("sir") test: the receiver is the current account. -/
@@ -221,7 +229,7 @@ def spanReadError (len ptr : UInt64) : HostError :=
 
 def functionCallTargetError (st : HostStore NearState) (index : Nat) : Option HostError :=
   match getPromise? st.host.promises index with
-  | some (.batch ..) | some (.callback ..) => none
+  | some (.batch ..) | some (.callback ..) | some (.yielded ..) => none
   | some (.and _) => some .cannotAppendActionToJointPromise
   | _ => some (.invalidPromiseIndex index)
 
@@ -333,6 +341,184 @@ def globalContractPlan (st : HostStore NearState) (byAccount : Bool) (target : N
         { charges := idCharges ++ [.actionBase (·.useGlobalContractBase) sir,
             .actionBytes (·.useGlobalContractByte) id.length sir] }
 
+/-- The width the fee schedule charges for a serialized public key; an invalid key is
+read as empty and rejected only when the action is appended. -/
+def gasKeyPublicKeyLen (publicKey : List UInt8) : Nat :=
+  if serializedPublicKeyValid publicKey then publicKey.length else 0
+
+/-- Serialized `AccessKey` of the smallest gas key (`min_gas_key_borsh_len`): nonce, the
+`GasKeyFullAccess` tag, the balance and the number of nonces. -/
+def minGasKeyBorshLen : Nat := 8 + 1 + 16 + 2
+
+/-- Serialized `GasKeyInfo`: balance and number of nonces. -/
+def gasKeyInfoBorshLen : Nat := 16 + 2
+
+/-- Length of the trie key of an access key (`access_key_key_len`). -/
+def accessKeyKeyLen (accountIdLen publicKeyLen : Nat) : Nat := 1 + accountIdLen + 1 + publicKeyLen
+
+/-- Receiver length of the promise a gas key action is appended to. -/
+def promiseReceiverLen (st : HostStore NearState) (index : Nat) : Nat :=
+  ((promiseReceiver? st index).map List.length).getD 0
+
+/-- `promise_batch_action_transfer_to_gas_key`: the public key is read, then the amount, then the
+target is looked up; the base fee and the per-byte fee follow (`gas_key_transfer_{send,exec}_fee`).
+A key that does not decode is charged as empty and fails only after the fees. -/
+def transferToGasKeyPlan (st : HostStore NearState) (args : List Value) : FunctionCallPlan :=
+  let a := argU64 args
+  let keyCharges := [.ext "base"] ++ readSpan st (a 1) (a 2)
+  match getMemOrReg st (a 2) (a 1) with
+  | none => { charges := keyCharges, error := some (spanReadError (a 1) (a 2)) }
+  | some publicKey =>
+    let amountCharges := keyCharges ++ readMem 16
+    match readU128Mem st (a 3) with
+    | none => { charges := amountCharges, error := some .memoryAccessViolation }
+    | some _ =>
+      match functionCallTargetError st (a 0).toNat with
+      | some error => { charges := amountCharges, error := some error }
+      | none =>
+        let sir := sirOf st (promiseReceiver? st (a 0).toNat)
+        let keyLen := gasKeyPublicKeyLen publicKey
+        let fees := st.host.fees
+        { charges := amountCharges ++
+            [.actionBase (·.gasKeyTransferBase) sir,
+             .pay (fees.gasKeyByte.send sir * keyLen)
+               (fees.gasKeyByte.execution *
+                 (accessKeyKeyLen (promiseReceiverLen st (a 0).toNat) keyLen + minGasKeyBorshLen))]
+          error := if serializedPublicKeyValid publicKey then none else some .invalidPublicKey }
+
+/-- The fees for the nonce rows of a new gas key (`pay_gas_key_add_key_fees`). -/
+def gasKeyAddCharges (st : HostStore NearState) (sir : Bool) (receiverLen keyLen numNonces : Nat) :
+    List Charge :=
+  let fees := st.host.fees
+  let nonceKeyLen := accessKeyKeyLen receiverLen keyLen + 2
+  [.pay 0 (fees.gasKeyNonceWriteBase.execution * numNonces),
+   .pay (fees.gasKeyByte.send sir * gasKeyInfoBorshLen)
+     (fees.gasKeyByte.execution * (nonceKeyLen + 8) * numNonces)]
+
+/-- `promise_batch_action_add_gas_key_with_full_access`. -/
+def addGasKeyFullAccessPlan (st : HostStore NearState) (args : List Value) : FunctionCallPlan :=
+  let a := argU64 args
+  let keyCharges := [.ext "base"] ++ readSpan st (a 1) (a 2)
+  match getMemOrReg st (a 2) (a 1) with
+  | none => { charges := keyCharges, error := some (spanReadError (a 1) (a 2)) }
+  | some publicKey =>
+    if (a 3).toNat ≥ 2 ^ 16 then { charges := keyCharges, error := some .integerOverflow }
+    else
+      match functionCallTargetError st (a 0).toNat with
+      | some error => { charges := keyCharges, error := some error }
+      | none =>
+        let sir := sirOf st (promiseReceiver? st (a 0).toNat)
+        let keyLen := gasKeyPublicKeyLen publicKey
+        { charges := keyCharges ++ [.actionBase (·.addFullAccessKey) sir] ++
+            gasKeyAddCharges st sir (promiseReceiverLen st (a 0).toNat) keyLen (a 3).toNat
+          error := if serializedPublicKeyValid publicKey then none else some .invalidPublicKey }
+
+/-- `promise_batch_action_add_gas_key_with_function_call`: the order of the function-call key
+host, with the number of nonces converted to `u16` right after the key is read. -/
+def addGasKeyFunctionCallPlan (st : HostStore NearState) (args : List Value) (sir : Bool) :
+    FunctionCallPlan :=
+  let input := functionKeyInputs args
+  let keyCharges := [.ext "base"] ++ readSpan st input.publicKeyLen input.publicKeyPtr
+  match getMemOrReg st input.publicKeyPtr input.publicKeyLen with
+  | none => { charges := keyCharges, error := some (spanReadError input.publicKeyLen input.publicKeyPtr) }
+  | some publicKey =>
+    if (argU64 args 3).toNat ≥ 2 ^ 16 then { charges := keyCharges, error := some .integerOverflow }
+    else
+    let allowanceCharges := keyCharges ++ readMem 16
+    match readU128Mem st input.allowancePtr with
+    | none => { charges := allowanceCharges, error := some .memoryAccessViolation }
+    | some _ =>
+      let receiverCharges := allowanceCharges ++ readSpan st input.receiverLen input.receiverPtr
+      match getMemOrReg st input.receiverPtr input.receiverLen with
+      | none => { charges := receiverCharges, error := some (spanReadError input.receiverLen input.receiverPtr) }
+      | some receiver =>
+        let parsedCharges := receiverCharges ++ utf8 receiver.length
+        if (String.fromUTF8? ⟨receiver.toArray⟩).isNone then { charges := parsedCharges, error := some .badUTF8 }
+        else if !st.host.config.validAccountId receiver then { charges := parsedCharges, error := some .invalidAccountId }
+        else
+          let methodsCharges := parsedCharges ++ readSpan st input.methodsLen input.methodsPtr
+          match getMemOrReg st input.methodsPtr input.methodsLen with
+          | none => { charges := methodsCharges, error := some (spanReadError input.methodsLen input.methodsPtr) }
+          | some methods =>
+            if !methodNamesValid methods then { charges := methodsCharges, error := some .emptyMethodName }
+            else match functionCallTargetError st input.target with
+            | some error => { charges := methodsCharges, error := some error }
+            | none =>
+              { charges := methodsCharges ++ [.actionBase (·.addFunctionCallKeyBase) sir,
+                  .actionBytes (·.addFunctionCallKeyByte) (methodNamesGasBytes methods) sir] ++
+                  gasKeyAddCharges st sir (promiseReceiverLen st input.target)
+                    (gasKeyPublicKeyLen publicKey) (argU64 args 3).toNat
+                error := if serializedPublicKeyValid publicKey then none else some .invalidPublicKey }
+
+/-- `promise_batch_action_deploy_global_contract{,_by_account_id}`: the code is read and
+checked against `max_contract_size` before the target is looked up and the fees are charged. -/
+def deployGlobalContractPlan (st : HostStore NearState) (target : Nat) (len ptr : UInt64)
+    (sir : Bool) : FunctionCallPlan :=
+  let readCharges := [.ext "base"] ++ readSpan st len ptr
+  match getMemOrReg st ptr len with
+  | none => { charges := readCharges, error := some (spanReadError len ptr) }
+  | some code =>
+    match st.host.config.maxContractSize with
+    | some limit =>
+      if code.length > limit then
+        { charges := readCharges, error := some (.contractSizeExceeded code.length limit) }
+      else
+        match functionCallTargetError st target with
+        | some error => { charges := readCharges, error := some error }
+        | none => { charges := readCharges ++ [.actionBase (·.deployGlobalContractBase) sir,
+            .actionBytes (·.deployGlobalContractByte) code.length sir] }
+    | none =>
+      match functionCallTargetError st target with
+      | some error => { charges := readCharges, error := some error }
+      | none => { charges := readCharges ++ [.actionBase (·.deployGlobalContractBase) sir,
+          .actionBytes (·.deployGlobalContractByte) code.length sir] }
+
+/-- `promise_yield_create`: the method name (non-empty) and the arguments are read, the callback's
+gas is prepaid, the receipt with its one data dependency is paid for, and only then is the promise
+registered (which can exceed the promise limit) and the yielded function call paid for. -/
+def yieldCreatePlan (st : HostStore NearState) (args : List Value) : FunctionCallPlan :=
+  let a := argU64 args
+  let methodCharges := [.ext "base", .ext "yield_create_base"] ++ readSpan st (a 0) (a 1)
+  match getMemOrReg st (a 1) (a 0) with
+  | none => { charges := methodCharges, error := some (spanReadError (a 0) (a 1)) }
+  | some method =>
+    if method.isEmpty then { charges := methodCharges, error := some .emptyMethodName }
+    else
+      let argCharges := methodCharges ++ readSpan st (a 2) (a 3)
+      match getMemOrReg st (a 3) (a 2) with
+      | none => { charges := argCharges, error := some (spanReadError (a 2) (a 3)) }
+      | some arguments =>
+        let bytes := method.length + arguments.length
+        let receiptCharges := argCharges ++
+          [.ext "yield_create_byte" bytes, .prepay (a 4).toNat, .newReceipt true [true]]
+        match promiseCapacityError st with
+        | some error => { charges := receiptCharges, error := some error }
+        | none => { charges := receiptCharges ++
+            [.actionBase (·.functionCallBase) true, .actionBytes (·.functionCallByte) bytes true] }
+
+/-- `promise_yield_resume`: the payload length is charged as given, then the data id and the
+payload are read, the payload is limited and the data id must be 32 bytes. -/
+def yieldResumePlan (st : HostStore NearState) (args : List Value) : FunctionCallPlan :=
+  let a := argU64 args
+  let idCharges := [.ext "base", .ext "yield_resume_base", .ext "yield_resume_byte" (a 2).toNat]
+    ++ readSpan st (a 0) (a 1)
+  match getMemOrReg st (a 1) (a 0) with
+  | none => { charges := idCharges, error := some (spanReadError (a 0) (a 1)) }
+  | some dataId =>
+    let payloadCharges := idCharges ++ readSpan st (a 2) (a 3)
+    match getMemOrReg st (a 3) (a 2) with
+    | none => { charges := payloadCharges, error := some (spanReadError (a 2) (a 3)) }
+    | some payload =>
+      match st.host.config.maxYieldPayloadSize with
+      | some limit =>
+        if payload.length > limit then
+          { charges := payloadCharges, error := some (.yieldPayloadLength payload.length limit) }
+        else if dataId.length != 32 then { charges := payloadCharges, error := some .dataIdMalformed }
+        else { charges := payloadCharges }
+      | none =>
+        if dataId.length != 32 then { charges := payloadCharges, error := some .dataIdMalformed }
+        else { charges := payloadCharges }
+
 /-- Argument-dependent charge plan before validating promise handles. -/
 def chargesBeforeUnvalidated (name : String) (st : HostStore NearState) (args : List Value) : List Charge :=
   let a := argU64 args
@@ -442,6 +628,16 @@ def chargesBeforeUnvalidated (name : String) (st : HostStore NearState) (args : 
     (globalContractPlan st false (a 0).toNat (a 1) (a 2) (sirOf st (promiseReceiver? st (a 0).toNat))).charges
   | "promise_batch_action_use_global_contract_by_account_id" =>
     (globalContractPlan st true (a 0).toNat (a 1) (a 2) (sirOf st (promiseReceiver? st (a 0).toNat))).charges
+  | "promise_batch_action_deploy_global_contract"
+  | "promise_batch_action_deploy_global_contract_by_account_id" =>
+    (deployGlobalContractPlan st (a 0).toNat (a 1) (a 2) (sirOf st (promiseReceiver? st (a 0).toNat))).charges
+  | "promise_batch_action_transfer_to_gas_key" => (transferToGasKeyPlan st args).charges
+  | "promise_batch_action_add_gas_key_with_full_access" => (addGasKeyFullAccessPlan st args).charges
+  | "promise_batch_action_add_gas_key_with_function_call" =>
+    (addGasKeyFunctionCallPlan st args (sirOf st (promiseReceiver? st (a 0).toNat))).charges
+  | "promise_yield_create" => (yieldCreatePlan st args).charges
+  | "promise_yield_resume" => (yieldResumePlan st args).charges
+  | "chain_id" => [base] ++ writeReg st.host.context.chainId.length
   | "promise_results_count" => [base]
   | "promise_result" => [base]
   | "promise_return" => [base, .ext "promise_return"]
@@ -565,6 +761,15 @@ def invocationArgumentError (name : String) (st : HostStore NearState) (args : L
   else if name == "promise_batch_action_add_key_with_function_call" then (functionKeyPlan st (functionKeyInputs args) false).error
   else if let some byAccount := globalContractInputs? name then
     (globalContractPlan st byAccount (argU64 args 0).toNat (argU64 args 1) (argU64 args 2) false).error
+  else if name == "promise_batch_action_deploy_global_contract" ||
+      name == "promise_batch_action_deploy_global_contract_by_account_id" then
+    (deployGlobalContractPlan st (argU64 args 0).toNat (argU64 args 1) (argU64 args 2) false).error
+  else if name == "promise_batch_action_transfer_to_gas_key" then (transferToGasKeyPlan st args).error
+  else if name == "promise_batch_action_add_gas_key_with_full_access" then (addGasKeyFullAccessPlan st args).error
+  else if name == "promise_batch_action_add_gas_key_with_function_call" then
+    (addGasKeyFunctionCallPlan st args false).error
+  else if name == "promise_yield_create" then (yieldCreatePlan st args).error
+  else if name == "promise_yield_resume" then (yieldResumePlan st args).error
   else creationPrefixError name st args
 
 def preInvokeError (name : String) (st : HostStore NearState) (args : List Value) : Option HostError :=
@@ -672,6 +877,7 @@ def promiseDeposit? (name : String) (before : HostStore NearState) (args : List 
   | "promise_then" => amountAt (a 7)
   | "promise_batch_action_function_call" => amountAt (a 5)
   | "promise_batch_action_transfer" => amountAt (a 1)
+  | "promise_batch_action_transfer_to_gas_key" => amountAt (a 3)
   | _ => some 0
 
 def deductDeposit (name : String) (before after : HostStore NearState) (args : List Value) :
@@ -737,16 +943,24 @@ def viewRestrictedHost (name : String) : Bool :=
    "promise_return", "promise_batch_action_deploy_global_contract",
    "promise_batch_action_deploy_global_contract_by_account_id",
    "promise_batch_action_use_global_contract",
-   "promise_batch_action_use_global_contract_by_account_id"].contains name
+   "promise_batch_action_use_global_contract_by_account_id",
+   "promise_batch_action_transfer_to_gas_key", "promise_batch_action_add_gas_key_with_full_access",
+   "promise_batch_action_add_gas_key_with_function_call"].contains name
 
 def deprecatedRuntimeHost (name : String) : Bool :=
   ["storage_iter_prefix", "storage_iter_range", "storage_iter_next"].contains name
 
 /-- Method bytes passed to the external receipt builder. The key ABI supplies
 CSV bytes: ASCII separators cannot split a UTF-8 multibyte sequence. -/
+def usesKeyMethodFields (name : String) : Bool :=
+  name == "promise_batch_action_add_key_with_function_call" ||
+    name == "promise_batch_action_add_gas_key_with_function_call"
+
 def actionMethodBytes? (name : String) (before : HostStore NearState) (args : List Value) : Option (List UInt8) :=
-  if name == "promise_batch_action_add_key_with_function_call" then
+  if usesKeyMethodFields name then
     getMemOrReg before (argU64 args 8) (argU64 args 7)
+  else if name == "promise_yield_create" then
+    getMemOrReg before (argU64 args 1) (argU64 args 0)
   else (functionCallInputs? name args).bind fun input => getMemOrReg before input.methodPtr input.methodLen
 
 /-- Runtime externals decode method names after fees/prepayment and balance
@@ -755,7 +969,7 @@ def actionMethodEncodingError (name : String) (before : HostStore NearState) (ar
   if before.host.config.validateActionMethodUtf8 then
     match actionMethodBytes? name before args with
     | some bytes =>
-      if name == "promise_batch_action_add_key_with_function_call" then
+      if usesKeyMethodFields name then
         if methodNameFieldsUtf8 bytes then none else some .invalidMethodName
       else if (String.fromUTF8? ⟨bytes.toArray⟩).isNone then some .invalidMethodName else none
     | none => none
@@ -1012,13 +1226,12 @@ Reject them on invocation instead of using the functional host's placeholder
 crypto, validator, or yield implementations. Merely importing one is allowed. -/
 def unsupportedRuntimeHost (name : String) : Bool :=
   ["sha256", "keccak256", "keccak512", "ripemd160", "ecrecover", "ed25519_verify",
-   "validator_stake", "validator_total_stake", "promise_yield_create", "promise_yield_resume",
-   "alt_bn128_g1_multiexp", "alt_bn128_g1_sum", "alt_bn128_pairing_check",
+   "validator_stake", "validator_total_stake",
+   "promise_yield_create_with_id", "promise_yield_resume_with_yield_id", "promise_set_refund_to",
+   "promise_batch_action_state_init_by_account_id", "alt_bn128_g1_multiexp", "alt_bn128_g1_sum", "alt_bn128_pairing_check",
    "bls12381_g1_multiexp", "bls12381_g2_multiexp", "bls12381_map_fp_to_g1",
    "bls12381_map_fp2_to_g2", "bls12381_p1_decompress", "bls12381_p2_decompress",
-   "bls12381_p1_sum", "bls12381_p2_sum", "bls12381_pairing_check",
-   "promise_batch_action_deploy_global_contract",
-   "promise_batch_action_deploy_global_contract_by_account_id"].contains name
+   "bls12381_p1_sum", "bls12381_p2_sum", "bls12381_pairing_check"].contains name
 
 /-- The name a host is metered under. nearcore's weighted function call is the
 plain one plus a weight: same charges, checks and errors. -/

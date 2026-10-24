@@ -234,6 +234,7 @@ def outcomeOfExecution (ctx : VMContext) (storage : List (List UInt8 × List UIn
           graph.receipts
         { outcome with
           returnData := returnData
+          resumes := ns.yieldResumes
           receipts := distributed.1
           usedGas := ns.gas.used + distributed.2
           distributedGas := distributed.2 }

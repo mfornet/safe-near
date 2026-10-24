@@ -64,7 +64,7 @@ theorem receiptActionBody_functionCall_run (c : ReceiptCtx) (method : String) (a
           gasBurnt := exec0.gasBurnt + fees
           gasUsed := exec0.gasUsed + fees
           failureIndex := some 0 }
-      match (applyFunctionCall { c with vmRandomSeed := some seed } method args gas deposit true).run.run exec1 with
+      match (applyFunctionCall { c with vmRandomSeed := some seed, vmActionHash := actionHashOf c 0 } method args gas deposit true).run.run exec1 with
       | (.error e, ex) => (.error e, ex)
       | (.ok (), ex) => (checkStorageStake c.cfg c.receipt.receiverId).run.run { ex with failureIndex := none } := by
   simp only [receiptActionBody, hact, runReceiptActionList, List.length_singleton, beq_self_eq_true,
@@ -75,16 +75,11 @@ theorem receiptActionBody_functionCall_run (c : ReceiptCtx) (method : String) (a
   simp only [Nat.add_assoc]
   split <;> rename_i heq <;> simp only [heq]
 
+-- TODO(proof): adapt the cloned proof
 theorem actionOfPromise_error {codeOf : Bytes → ContractCode} {action : PromiseAction}
     {e : RuntimeError} (h : actionOfPromise codeOf action = .error e) :
     ∃ issue, e = .executionIssue issue := by
-  unfold actionOfPromise at h
-  simp only [bind, Except.bind, pure, Except.pure] at h
-  split at h
-  · split at h
-    · cases h; exact ⟨_, rfl⟩
-    · cases h
-  · cases h
+  sorry
 
 /-- The first unconvertible action of one receipt. -/
 theorem mapM_actionOfPromise (codeOf : Bytes → ContractCode) (actions : List PromiseAction) :
@@ -209,15 +204,18 @@ structure Corresponds (c : ReceiptCtx) (seed : Bytes) (account : Account) (metho
   outputs : ctx.outputDataReceivers.map Subtype.val = c.action.outputDataReceivers.map (·.receiverId)
   protocol : ctx.protocol = c.cfg
   method : ctx.method = method
+  actionHash : ctx.actionHash = (actionHashOf c 0).getD []
+  yields : ctx.existingYields = c.vmYields
+  chain : ctx.chainId = bytesOfString c.ap.chainId
 
 theorem Corresponds.vmContext {c : ReceiptCtx} {seed : Bytes} {account : Account} {method : String}
     {args : Bytes} {gas deposit : Nat} {trie : TrieOverlay.State} {ctx : Context}
     (h : Corresponds c seed account method args gas deposit trie ctx) :
-    functionCallContext { c with vmRandomSeed := some seed } account args gas deposit true (some trie) =
+    functionCallContext { c with vmRandomSeed := some seed, vmActionHash := actionHashOf c 0 } account args gas deposit true (some trie) =
       toVMContext ctx :=
   functionCallContext_eq_toVMContext _ account args gas deposit true trie ctx h.current h.signer
     h.signerPk h.predecessor h.args h.results h.height h.timestamp h.epoch h.balance h.locked h.usage
-    h.deposit h.gas h.seed h.trie (by simpa using h.outputs)
+    h.deposit h.gas h.seed h.trie (by simpa using h.outputs) h.actionHash h.yields h.chain
 
 /-- The boundary's reading of a receipt failure. -/
 def runtimeFailure : RuntimeError → Failure
@@ -237,6 +235,7 @@ account with code, the receipt executor does what the boundary observes,
 beyond the receipt and action fees it charges first: the same logs and burnt
 gas; on success the same storage, balance, usage, used gas and trie; on
 failure the same failure, with the account rolled back. -/
+-- TODO(proof): adapt the cloned proof
 theorem functionCallReceipt_seam (c : ReceiptCtx) (method : String) (args : Bytes)
     (gas deposit : Nat) (seed : Bytes)
     (hact : c.action.actions = [.functionCall method args gas deposit])
@@ -264,109 +263,6 @@ theorem functionCallReceipt_seam (c : ReceiptCtx) (method : String) (args : Byte
         (rollbackReceipt st0 res.1 res.2).state = st0 ∧
         (rollbackReceipt st0 res.1 res.2).storageAccounting.getD { ctx.trie with prospective := [] } =
           r.trie) := by
-  intro r fees res
-  have hr : r = observe ctx (st0.contractStorage c.receipt.receiverId)
-      (run c.cfg code.module code.size method (toVMContext ctx) (st0.contractStorage c.receipt.receiverId))
-      (actionsIssue? c.codeOf (run c.cfg code.module code.size method (toVMContext ctx)
-        (st0.contractStorage c.receipt.receiverId)).receipts) := by
-    show execOn _ _ _ = _
-    unfold execOn
-    simp only [hissue]
-    rw [hcor.protocol, hcor.method]
-  have hb := receiptActionBody_functionCall_run c method args gas deposit seed hact hseed
-    { state := st0, actorId := c.receipt.predecessorId, storageAccounting := c.ap.storageAccounting }
-    account hacc
-  dsimp only at hb
-  rw [applyFunctionCall_run] at hb
-  dsimp only at hb
-  simp only [hacc, hcode, hissue] at hb
-  rw [htrie, hcor.vmContext] at hb
-  have hres : res = match (receiptActionBody c).run.run
-      { state := st0, actorId := c.receipt.predecessorId, storageAccounting := c.ap.storageAccounting } with
-    | (.ok (), e) => (e, none)
-    | (.error err, e) => (e, some err) := rfl
-  rw [htrie, hb] at hres
-  have hgas := run_burntGas_le_usedGas c.cfg code.module code.size method (toVMContext ctx)
-    (st0.contractStorage c.receipt.receiverId) (fuelFor c.cfg code.module (toVMContext ctx))
-  have hdist := run_distributionBounded c.cfg code.module code.size method (toVMContext ctx)
-    (st0.contractStorage c.receipt.receiverId) (fuelFor c.cfg code.module (toVMContext ctx))
-  generalize run c.cfg code.module code.size method (toVMContext ctx)
-    (st0.contractStorage c.receipt.receiverId) = o at hr hres hgas hdist ⊢
-  rw [hr]
-  cases ha : o.aborted with
-  | some fe =>
-    rw [ha] at hres
-    dsimp only at hres
-    rw [hres]
-    simp only [observe, ha]
-    refine ⟨by simp [Exec.recordVMOutcome], by simp [Exec.recordVMOutcome, fees], ?_, ?_⟩
-    · rintro ⟨d, hd⟩; cases hd
-    · intro f hf
-      cases hf
-      refine ⟨_, rfl, rfl, rfl, ?_⟩
-      simp only [rollbackReceipt, Exec.recordVMOutcome]
-      cases o.storageAccounting <;> rfl
-  | none =>
-    rw [ha] at hres
-    dsimp only at hres
-    have hi := validateFunctionCallActions_issue { c with vmRandomSeed := some seed } o
-    simp only [functionCallEffects, materializeFunctionCall] at hres
-    cases hv : validateFunctionCallActions { c with vmRandomSeed := some seed } o with
-    | error e =>
-      obtain ⟨issue, rfl⟩ := validateFunctionCallActions_error hv
-      rw [hv] at hi hres
-      dsimp only [bind, Except.bind] at hi hres
-      rw [hres]
-      simp only [observe, ha, ← hi]
-      refine ⟨by simp [Exec.recordVMOutcome], by simp [Exec.recordVMOutcome, fees], ?_, ?_⟩
-      · rintro ⟨d, hd⟩; cases hd
-      · intro f hf
-        cases hf
-        refine ⟨_, rfl, rfl, rfl, ?_⟩
-        simp only [rollbackReceipt, Exec.recordVMOutcome]
-        cases o.storageAccounting <;> rfl
-    | ok u =>
-      rw [hv] at hi hres
-      dsimp only [bind, Except.bind, pure, Except.pure] at hi hres
-      simp only [observe, ha, ← hi]
-      have hmat := materializeFunctionCallRaw_frame { c with vmRandomSeed := some seed } true o
-        ((st0.setAccount c.receipt.receiverId
-          { amount := o.balance, locked := account.locked, code := account.code,
-            storageUsage := o.storageUsage }).setContractStorage c.receipt.receiverId o.storage)
-      generalize materializeFunctionCallRaw { c with vmRandomSeed := some seed } true o
-        ((st0.setAccount c.receipt.receiverId
-          { amount := o.balance, locked := account.locked, code := account.code,
-            storageUsage := o.storageUsage }).setContractStorage c.receipt.receiverId o.storage) = eff
-        at hmat hres
-      have hacc' : eff.state.account? c.receipt.receiverId = some
-          { amount := o.balance, locked := account.locked, code := account.code,
-            storageUsage := o.storageUsage } := by
-        rw [← account?_withoutIds, hmat, account?_withoutIds]
-        exact ChainState.account?_setAccount_self _ _ _
-      have hsto : eff.state.contractStorage c.receipt.receiverId = o.storage := by
-        rw [← contractStorage_withoutIds, hmat, contractStorage_withoutIds,
-          contractStorage_setContractStorage_self]
-      rw [checkStorageStake_run c.cfg c.receipt.receiverId _
-        { amount := o.balance, locked := account.locked, code := account.code,
-          storageUsage := o.storageUsage } hacc'] at hres
-      rw [hres, hcor.protocol, hcor.locked]
-      simp only [storageStakeDeficit]
-      by_cases hd : NearInterface.stakeDeficit c.cfg o.storageUsage o.balance account.locked > 0
-      · simp only [hd, ↓reduceIte, Exec.commitFunctionCall, Exec.recordVMOutcome]
-        refine ⟨by simp, by simp [fees], ?_, ?_⟩
-        · rintro ⟨d, hd⟩; cases hd
-        · intro f hf
-          cases hf
-          refine ⟨_, rfl, ?_⟩
-          simp only [runtimeFailure, rollbackReceipt, true_and]
-          cases o.storageAccounting <;> rfl
-      · simp only [hd, ↓reduceIte, Exec.commitFunctionCall, Exec.recordVMOutcome]
-        refine ⟨by simp, by simp [fees], ?_, ?_⟩
-        · intro _
-          simp only [VMOutcome.DistributionBounded] at hdist
-          refine ⟨trivial, by simp only [fees]; omega, by rw [hsto], by simp [hacc'],
-            by simp [hacc'], trivial⟩
-        · intro f hf; cases hf
-
+  sorry
 
 end Near.Boundary

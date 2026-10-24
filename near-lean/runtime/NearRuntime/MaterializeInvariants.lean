@@ -57,6 +57,7 @@ def emitFunctionCallActions (c : ReceiptCtx) (specs : List ReceiptSpec) (ids : A
         gasPrice := c.action.gasPrice
         outputDataReceivers := outputs[i]?.getD []
         inputDataIds := inputs[i]?.getD []
+        yieldDataId := spec.yieldDataId
         actions := spec.actions.map (actionOfPromiseRaw c.codeOf) } }]
   return receipts
 
@@ -88,7 +89,8 @@ theorem foldl_frame (view : β → γ) (step : β → α → β)
   | cons item rest ih => exact (ih (step initial item)).trans (h initial item)
 
 /-- All non-id chain fields; this projection also preserves pending work. -/
-def ChainState.withoutIds (st : ChainState) : ChainState := { st with nextId := 0 }
+def ChainState.withoutIds (st : ChainState) : ChainState :=
+  { st with nextId := 0, yieldIndices := none, yieldTimeouts := [], yieldStatus := [] }
 
 theorem allocateFunctionCallIds_frame (specs : List ReceiptSpec) (initial : ChainState)
     (ids : Array ReceiptId) :
@@ -128,7 +130,7 @@ theorem foldl_additive (value : β → Nat) (step : β → α → β) (weight : 
 /-- Valuation ignores metadata and gives data receipts zero financial backing. -/
 def chainReceiptValue (value : AccountId → List Action → Nat) (receipt : Receipt) : Nat :=
   match receipt.receipt with
-  | .data _ => 0
+  | .data _ | .globalDistribution _ => 0
   | .action action => value receipt.receiverId action.actions
 
 def chainReceiptsValue (value : AccountId → List Action → Nat) (receipts : List Receipt) : Nat :=
@@ -224,7 +226,7 @@ theorem foldl_preserves (P : β → Prop) (step : β → α → β)
 def Receipt.FromVM (c : ReceiptCtx) (receipt : Receipt) : Prop :=
   receipt.predecessorId = c.receipt.receiverId ∧
   match receipt.receipt with
-  | .data _ => True
+  | .data _ | .globalDistribution _ => True
   | .action action => action.gasPrice = c.action.gasPrice
 
 theorem emitFunctionCallData_origin (c : ReceiptCtx) (bytes : Bytes) (outputs : List DataReceiver)
@@ -269,6 +271,7 @@ theorem receiptFunds_fromVM (c : ReceiptCtx) (receipt : Receipt) (h : receipt.Fr
     Fees.receiptFunds c.cfg receipt = chainReceiptValue (functionCallReceiptValue c) receipt := by
   cases hr : receipt.receipt with
   | data data => simp [Fees.receiptFunds, chainReceiptValue, hr]
+  | globalDistribution distribution => simp [Fees.receiptFunds, chainReceiptValue, hr]
   | action action =>
     have hp : action.gasPrice = c.action.gasPrice := by simpa only [Receipt.FromVM, hr] using h.2
     simp only [Fees.receiptFunds, hr, Receipt.isRefund, h.1, hp,

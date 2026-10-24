@@ -39,6 +39,10 @@ structure LimitConfig where
   maxNumberRegisters : Nat
   registersMemoryLimit : Nat
   accountIdValidityRulesVersion : Nat
+  /-- `yield_timeout_length_in_blocks`: blocks until an unresumed `promise_yield_create` times out. -/
+  yieldTimeoutLengthInBlocks : Nat := 200
+  /-- `max_yield_payload_size`: bytes `promise_yield_resume` accepts. -/
+  maxYieldPayloadSize : Nat := 1024
   deriving Repr, Inhabited
 
 /-- `near_parameters::vm::Config`. -/
@@ -53,6 +57,8 @@ structure WasmConfig where
   ethImplicitAccounts : Bool := false
   /-- Whether method-resolution failures retain the contract-loading charge. -/
   fixContractLoadingCost : Bool := false
+  /-- `eth_implicit_global_contract`: ETH-implicit accounts use the global wallet contract. -/
+  ethImplicitGlobalContract : Bool := false
   limits : LimitConfig
   deriving Inhabited
 
@@ -81,6 +87,19 @@ structure RuntimeConfig where
   minGasPurchasePrice : Nat := 0
   accountCreationCharge : Nat := 0
   storageAmountPerByte : Nat
+  /-- `global_contract_storage_amount_per_byte`: tokens burnt per byte of a deployed global contract. -/
+  globalContractStorageAmountPerByte : Nat := 0
+  /-- Compute charged for applying a distribution receipt: base plus per code byte. -/
+  deployGlobalContractExecutionBase : Nat := 0
+  deployGlobalContractExecutionPerByte : Nat := 0
+  /-- `IncludeDeployGlobalContractOutcomeBurntStorage`: the storage cost is part of the outcome's burn. -/
+  includeDeployGlobalContractOutcomeBurntStorage : Bool := false
+  /-- `GlobalContractDistributionNonce`: distribution receipts carry a freshness nonce. -/
+  globalContractDistributionNonce : Bool := false
+  /-- `FixDeleteAccountGlobalContractStorageUsage`. -/
+  fixDeleteAccountGlobalContractStorageUsage : Bool := false
+  /-- `FixDelegateActionDepositWithFunctionCallError`. -/
+  fixDelegateActionDepositWithFunctionCallError : Bool := false
   fees : FeesConfig
   wasm : WasmConfig
   accountCreation : AccountCreationConfig
@@ -146,7 +165,9 @@ private def limits (j : Json) : Except String LimitConfig := do
     maxRegisterSize := ← nat j "max_register_size"
     maxNumberRegisters := ← nat j "max_number_registers"
     registersMemoryLimit := ← nat j "registers_memory_limit"
-    accountIdValidityRulesVersion := ← nat j "account_id_validity_rules_version" }
+    accountIdValidityRulesVersion := ← nat j "account_id_validity_rules_version"
+    yieldTimeoutLengthInBlocks := (nat j "yield_timeout_length_in_blocks").toOption.getD 200
+    maxYieldPayloadSize := (nat j "max_yield_payload_size").toOption.getD 1024 }
 
 private def extCosts (j : Json) : Except String ExtCosts := do
   match j with
@@ -180,6 +201,31 @@ def ofJson (j : Json) : Except String RuntimeConfig := do
     else disabled
   let useGlobalByte : Fee := if hostFns then
     { sendSir := 6_812_999, sendNotSir := 47_683_715, execution := 64_572_944 } else disabled
+  -- `runtime_extra` carries what the RPC view omits (see `tools/dump-runtime-config`).
+  let extra : Option Json := (field j "runtime_extra").toOption
+  let extraFee (k : String) (fallback : Fee) : Except String Fee :=
+    match extra with
+    | none => pure fallback
+    | some e => do feeAt (← field e "action_fees") k
+  let extraFlag (k : String) : Bool :=
+    match extra with
+    | none => false
+    | some e => ((field e k).toOption.bind (·.getBool?.toOption)).getD false
+  let extraNat (k : String) : Nat :=
+    match extra with
+    | none => 0
+    | some e => ((nat e k).toOption).getD 0
+  let extraString (k : String) : Nat :=
+    match extra with
+    | none => 0
+    | some e => ((natString e k).toOption).getD 0
+  let useGlobalBase ← extraFee "use_global_contract_base" useGlobalBase
+  let useGlobalByte ← extraFee "use_global_contract_byte" useGlobalByte
+  let deployGlobalBase ← extraFee "deploy_global_contract_base" disabled
+  let deployGlobalByte ← extraFee "deploy_global_contract_byte" disabled
+  let gasKeyTransferBase ← extraFee "gas_key_transfer_base" disabled
+  let gasKeyByte ← extraFee "gas_key_byte" disabled
+  let gasKeyNonceWriteBase ← extraFee "gas_key_nonce_write_base" disabled
   let actionFees : ActionFees := {
     createAccount := ← feeAt ac "create_account_cost"
     deleteAccount := ← feeAt ac "delete_account_cost"
@@ -199,7 +245,12 @@ def ofJson (j : Json) : Except String RuntimeConfig := do
     delegate := ← feeAt ac "delegate_cost"
     useGlobalContractBase := (feeAt ac "use_global_contract_cost").toOption.getD useGlobalBase
     useGlobalContractByte :=
-      (feeAt ac "use_global_contract_cost_per_identifier_byte").toOption.getD useGlobalByte }
+      (feeAt ac "use_global_contract_cost_per_identifier_byte").toOption.getD useGlobalByte
+    deployGlobalContractBase := deployGlobalBase
+    deployGlobalContractByte := deployGlobalByte
+    gasKeyTransferBase
+    gasKeyByte
+    gasKeyNonceWriteBase }
   let finance ← field j "runtime_finance"
   pure {
     strictNonceEnabled := ← (← field (← field j "runtime_admission") "strict_nonce").getBool?
@@ -209,6 +260,13 @@ def ofJson (j : Json) : Except String RuntimeConfig := do
     minGasPurchasePrice := ← natString j "min_gas_purchase_price"
     accountCreationCharge := ← natString j "account_creation_charge"
     storageAmountPerByte := ← natString j "storage_amount_per_byte"
+    globalContractStorageAmountPerByte := extraString "global_contract_storage_amount_per_byte"
+    deployGlobalContractExecutionBase := extraNat "deploy_global_contract_execution_base"
+    deployGlobalContractExecutionPerByte := extraNat "deploy_global_contract_execution_per_byte"
+    includeDeployGlobalContractOutcomeBurntStorage := extraFlag "include_deploy_global_contract_outcome_burnt_storage"
+    globalContractDistributionNonce := extraFlag "global_contract_distribution_nonce"
+    fixDeleteAccountGlobalContractStorageUsage := extraFlag "fix_delete_account_global_contract_storage_usage"
+    fixDelegateActionDepositWithFunctionCallError := extraFlag "fix_delegate_action_deposit_with_function_call_error"
     fees := {
       actionFees
       gasRefundPenalty := ← ratio finance "gas_refund_penalty"
@@ -226,6 +284,7 @@ def ofJson (j : Json) : Except String RuntimeConfig := do
       ethImplicitAccounts := ← (← field wasm "eth_implicit_accounts").getBool?
       oneYoctoOnPromise := ← (← field wasm "one_yocto_on_promise").getBool?
       fixContractLoadingCost := ← (← field wasm "fix_contract_loading_cost").getBool?
+      ethImplicitGlobalContract := ((field wasm "eth_implicit_global_contract").toOption.bind (·.getBool?.toOption)).getD false
       limits := ← limits (← field wasm "limit_config") }
     accountCreation := {
       minAllowedTopLevelAccountLength := ← nat acc "min_allowed_top_level_account_length"

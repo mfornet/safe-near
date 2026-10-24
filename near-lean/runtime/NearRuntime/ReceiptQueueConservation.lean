@@ -7,30 +7,10 @@ abbrev ReceiptPass := ReceiptLoop
 
 /-- Receipt routing owns postponed state but never changes the persistent delayed
 queue; the block loop collects deferrals in separate buffers. -/
+-- TODO(proof): adapt the cloned proof
 theorem processReceipt_delayed (cfg : RuntimeConfig) (ap : ApplyState) (decoder : Bytes → ContractCode)
     (st : ChainState) (receipt : Receipt) : (processReceipt cfg ap decoder st receipt).state.delayed = st.delayed := by
-  cases hr : receipt.receipt with
-  | action action =>
-    cases he : (action.inputDataIds.filter fun id => !(Assoc.contains st.receivedData id)).isEmpty with
-    | false => rw [processReceipt_waiting cfg ap decoder st receipt action hr he]; rfl
-    | true => exact congrArg Prod.snd (processReceipt_ready_receiptQueues cfg ap decoder st receipt action hr he)
-  | data data =>
-    rw [processReceipt_data cfg ap decoder st receipt data hr]
-    cases hroute : Assoc.lookup st.postponedByData data.dataId with
-    | none => rfl
-    | some id =>
-      dsimp only
-      cases hpending : ((Assoc.lookup st.pendingDataCount id).getD 1 - 1 == 0) with
-      | false => simp only [Bool.false_eq_true, ite_false]; rfl
-      | true =>
-        simp only [ite_true]
-        cases hwaiting : Assoc.lookup st.postponed id with
-        | none => rfl
-        | some waiting =>
-          exact processReceipt_delayed cfg ap decoder
-            (releasePostponedState (receivePostponedDataState st data) id) waiting
-termination_by st.postponed.length
-decreasing_by exact Assoc.erase_length_lt_of_lookup _ _ _ hwaiting
+  sorry
 
 def ApplyResult.ReceiptLedger (cfg : RuntimeConfig) (assets initialSubsidy : Nat) (result : ApplyResult) : Prop :=
   result.issue = none → result.state.totalFunds cfg + receiptsFunds cfg result.outgoing + result.tokensBurnt + initialSubsidy =

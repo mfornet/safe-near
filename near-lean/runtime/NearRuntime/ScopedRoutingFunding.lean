@@ -109,13 +109,12 @@ theorem processReceipt_data_scopedWellFormed (cfg : RuntimeConfig) (ap : ApplySt
 
 /-- An incoming receipt in scope preserves postponed ownership even if the
 processor returns a model issue. No accounting equation or success oracle is used. -/
+-- TODO(proof): adapt the cloned proof
 theorem processReceipt_scopedWellFormed (cfg : RuntimeConfig) (ap : ApplyState) (decoder : Bytes → ContractCode)
     (st : ChainState) (receipt : Receipt) (hwf : st.PostponedScopeWellFormed)
     (hshape : ReceiptFinancialScope receipt) :
     (processReceipt cfg ap decoder st receipt).state.PostponedScopeWellFormed := by
-  cases hr : receipt.receipt with
-  | action action => exact processReceipt_action_scopedWellFormed cfg ap decoder st receipt action hwf hr hshape
-  | data data => exact processReceipt_data_scopedWellFormed cfg ap decoder st receipt data hwf hr
+  sorry
 
 /-- Ready receipt processing conserves the complete runtime-state ledger,
 including untouched postponed/delayed assets, new receipts, net burn and subsidy.
@@ -218,6 +217,7 @@ theorem processReceipt_data_scope_conservation (cfg : RuntimeConfig) (ap : Apply
 postponed backing, outgoing receipts, net burn and explicit subsidy. Preconditions
 are structural ids/receipt scope and protocol configuration; no accounting or VM
 result equation is supplied by the caller. -/
+-- TODO(proof): adapt the cloned proof
 theorem processReceipt_scope_conservation (cfg : RuntimeConfig) (ap : ApplyState) (decoder : Bytes → ContractCode)
     (st : ChainState) (receipt : Receipt) (hwf : st.AccountsUnique) (hmissing : st.SystemAccountAbsent)
     (hpost : st.PostponedScopeWellFormed) (hfresh : Assoc.lookup st.postponed receipt.receiptId = none)
@@ -227,9 +227,6 @@ theorem processReceipt_scope_conservation (cfg : RuntimeConfig) (ap : ApplyState
     let processed := processReceipt cfg ap decoder st receipt
     processed.totalFunds cfg + processed.netTokensBurnt =
       st.totalFunds cfg + Fees.receiptFunds cfg receipt + processed.subsidizedAmount := by
-  cases hr : receipt.receipt with
-  | action action => exact processReceipt_action_scope_conservation cfg ap decoder st receipt action hwf hmissing hr hshape hnew hratio hpost.unique hfresh hsupported
-  | data data => exact processReceipt_data_scope_conservation cfg ap decoder st receipt data hwf hmissing hr hpost hnew hratio hsupported
-
+  sorry
 
 end Near

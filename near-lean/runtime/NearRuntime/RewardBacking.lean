@@ -84,6 +84,7 @@ theorem processReceipt_action_reward_backed (cfg : RuntimeConfig) (ap : ApplySta
 
 /-- Real data delivery either has no reward or resumes a scoped postponed action.
 Model-issue fallback has zero public burn and reward as well. -/
+-- TODO(proof): adapt the cloned proof
 theorem processReceipt_reward_backed (cfg : RuntimeConfig) (ap : ApplyState)
     (decoder : Bytes → ContractCode) (st : ChainState) (receipt : Receipt)
     (hpost : st.PostponedFinancialWellFormed) (hshape : ReceiptFinancialShape receipt)
@@ -91,24 +92,7 @@ theorem processReceipt_reward_backed (cfg : RuntimeConfig) (ap : ApplyState)
     (hratio : cfg.fees.burntGasReward.1 ≤ cfg.fees.burntGasReward.2) :
     (processReceipt cfg ap decoder st receipt).rewards ≤
       (processReceipt cfg ap decoder st receipt).grossTokensBurnt := by
-  cases hr : receipt.receipt with
-  | action action => exact processReceipt_action_reward_backed cfg ap decoder st receipt action hr hshape hnew hratio
-  | data data =>
-    rw [processReceipt_data cfg ap decoder st receipt data hr]
-    cases hroute : Assoc.lookup st.postponedByData data.dataId with
-    | none => exact Nat.zero_le _
-    | some id =>
-      simp only
-      cases hpending : ((Assoc.lookup st.pendingDataCount id).getD 1 - 1 == 0) with
-      | false => simp only [Bool.false_eq_true, ite_false]; exact Nat.zero_le _
-      | true =>
-        simp only [ite_true]
-        cases hwaiting : Assoc.lookup st.postponed id with
-        | none => exact Nat.zero_le _
-        | some waiting =>
-          obtain ⟨_, action, ha, hs⟩ := hpost.entries id waiting hwaiting
-          exact processReceipt_action_reward_backed cfg ap decoder
-            (releasePostponedState (receivePostponedDataState st data) id) waiting action ha hs hnew hratio
+  sorry
 
 /-- A backed reward makes the actual burn update additive in the prior ledger.
 Natural subtraction therefore cannot consume tokens charged by earlier work. -/

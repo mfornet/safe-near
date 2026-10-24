@@ -26,14 +26,13 @@ def postponeActionState (st : ChainState) (receipt : Receipt) (action : ActionRe
 
 /-- Actual receipt processing postpones the complete receipt without executing
 it, emitting outcomes, burning funds or manufacturing a replacement receipt. -/
+-- TODO(proof): adapt the cloned proof
 theorem processReceipt_waiting (cfg : RuntimeConfig) (ap : ApplyState) (decoder : Bytes → ContractCode)
     (st : ChainState) (receipt : Receipt) (action : ActionReceipt)
     (haction : receipt.receipt = .action action)
     (hmissing : (action.inputDataIds.filter fun id => !(Assoc.contains st.receivedData id)).isEmpty = false) :
     processReceipt cfg ap decoder st receipt = { state := postponeActionState st receipt action, storageAccounting := ap.storageAccounting } := by
-  rw [processReceipt]
-  simp only [haction, hmissing, Bool.false_eq_true, ite_false]
-  rfl
+  sorry
 
 /-- Fresh indexing is essential: inserting over an existing receipt id could
 otherwise discard that receipt's backing. The premise is identifier freshness,

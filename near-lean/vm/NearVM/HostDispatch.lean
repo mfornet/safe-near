@@ -284,7 +284,7 @@ theorem meteredHostFns_preserves (cfg : RuntimeConfig) (entry : ImportDecl × Ne
   rcases h with ⟨⟨decl, fn⟩, hin, heq⟩ | heq
   · subst entry
     simp only [nearHostFns, List.mem_cons, List.not_mem_nil, or_false] at hin
-    rcases hin with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
+    rcases hin with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
     all_goals cases h
     all_goals first
       | (intro st args hwf; exact hwf)
@@ -335,6 +335,14 @@ theorem meteredHostFns_preserves (cfg : RuntimeConfig) (entry : ImportDecl × Ne
       | exact promiseBatchActionDeleteAccountFn_preserves
       | exact promiseBatchActionUseGlobalContractFn_preserves
       | exact promiseBatchActionUseGlobalContractByAccountIdFn_preserves
+      | exact promiseBatchActionDeployGlobalContractFn_preserves
+      | exact promiseBatchActionDeployGlobalContractByAccountIdFn_preserves
+      | exact promiseBatchActionTransferToGasKeyFn_preserves
+      | exact promiseBatchActionAddGasKeyWithFullAccessFn_preserves
+      | exact promiseBatchActionAddGasKeyWithFunctionCallFn_preserves
+      | exact promiseYieldCreateFn_preserves
+      | exact promiseYieldResumeFn_preserves
+      | exact chainIdFn_preserves
       | exact valueReturnFn_preserves
       | exact promiseReturnFn_preserves
       | exact promiseResultsCountFn_preserves

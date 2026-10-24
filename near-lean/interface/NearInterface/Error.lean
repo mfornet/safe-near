@@ -61,6 +61,8 @@ inductive HostError
   | deprecated (methodName : String)
   | unsupported (methodName : String)
   | contractCodeHashMalformed
+  | dataIdMalformed
+  | yieldPayloadLength (length limit : Nat)
   deriving Repr, BEq, Inhabited
 
 def HostError.message : HostError → String
@@ -98,6 +100,8 @@ def HostError.message : HostError → String
   | .deprecated m => s!"Attempted to call deprecated host function {m}"
   | .unsupported m => s!"Attempted to call unsupported host function {m}"
   | .contractCodeHashMalformed => "contract code hash is malformed"
+  | .dataIdMalformed => "Malformed data id"
+  | .yieldPayloadLength l n => s!"The length of a yield payload {l} exceeds the limit {n}"
 
 /-- Why a Wasm execution trapped (`near_vm_runner::logic::errors::WasmTrap`). -/
 inductive WasmTrap

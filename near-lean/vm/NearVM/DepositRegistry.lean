@@ -14,7 +14,7 @@ theorem meteredHostFns_funding (cfg : RuntimeConfig) (entry : ImportDecl × Near
   rcases h with ⟨⟨decl, fn⟩, hin, heq⟩ | heq
   · subst entry
     simp only [nearHostFns, List.mem_cons, List.not_mem_nil, or_false] at hin
-    rcases hin with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
+    rcases hin with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
     all_goals cases h
     all_goals first
       | (intro st args; trivial)
@@ -65,6 +65,14 @@ theorem meteredHostFns_funding (cfg : RuntimeConfig) (entry : ImportDecl × Near
       | exact promiseBatchActionDeleteAccountFn_noDeposits
       | exact promiseBatchActionUseGlobalContractFn_noDeposits
       | exact promiseBatchActionUseGlobalContractByAccountIdFn_noDeposits
+      | exact promiseBatchActionDeployGlobalContractFn_noDeposits
+      | exact promiseBatchActionDeployGlobalContractByAccountIdFn_noDeposits
+      | exact promiseBatchActionTransferToGasKeyFn_deposits
+      | exact promiseBatchActionAddGasKeyWithFullAccessFn_noDeposits
+      | exact promiseBatchActionAddGasKeyWithFunctionCallFn_noDeposits
+      | exact promiseYieldCreateFn_noDeposits
+      | exact promiseYieldResumeFn_noDeposits
+      | exact chainIdFn_noDeposits
       | exact valueReturnFn_noDeposits
       | exact promiseReturnFn_noDeposits
       | exact promiseResultsCountFn_noDeposits

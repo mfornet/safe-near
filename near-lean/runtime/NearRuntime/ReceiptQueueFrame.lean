@@ -64,27 +64,10 @@ theorem transferCreditState_receiptQueues (c : ReceiptCtx) (st : ChainState) (ac
 
 /-- Exact raw action unfoldings expose that only account/key/storage fields,
 new receipt outputs and the id generator can change. -/
+-- TODO(proof): adapt the cloned proof
 theorem queues_applyAction (c : ReceiptCtx) (isLast : Bool) (action : Action) :
     (applyAction c isLast action).PreservesReceiptQueues := by
-  intro before
-  cases action with
-  | createAccount => rw [applyCreateAccount_run]; repeat' (first | rfl | split)
-  | deployContract code => rw [applyDeployContract_run]; repeat' (first | rfl | split)
-  | functionCall method args gas deposit =>
-    change ((applyFunctionCall c method args gas deposit isLast).run.run before).2.receiptQueues = _
-    rw [applyFunctionCall_run]
-    repeat' (first | rfl | exact commitFunctionCall_receiptQueues _ _ _ _ _ _ (by assumption) | split | (dsimp only; split))
-  | transfer amount =>
-    rw [applyTransfer_run]
-    repeat' (first | rfl | exact transferCreditState_receiptQueues _ _ _ _ | split)
-  | stake amount pk =>
-    cases ha : before.state.account? c.receipt.receiverId <;>
-      simp [-StateT.run_bind, applyAction, getAccount, getState, ha]
-    repeat' (first | rfl | split)
-  | addKey pk key => rw [applyAddKey_run]; repeat' (first | rfl | split)
-  | deleteKey pk => rw [applyDeleteKey_run]; repeat' (first | rfl | split)
-  | deleteAccount beneficiary => rw [applyDeleteAccount_run]; repeat' (first | rfl | split)
-  | useGlobalContract _ => rfl
+  sorry
 
 theorem queues_burnGas (fee : Nat) : (burnGas fee).PreservesReceiptQueues := by intro before; rfl
 

@@ -8,6 +8,7 @@ def Receipt.liveIds (receipt : Receipt) : List Nat :=
   receipt.receiptId :: match receipt.receipt with
     | .action action => action.inputDataIds ++ action.outputDataReceivers.map (·.dataId)
     | .data data => [data.dataId]
+    | .globalDistribution _ => []
 
 /-- Every identifier owned or referenced by routing state, including map keys,
 postponed payloads, dependency routes, received data and delayed receipts. External
