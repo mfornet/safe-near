@@ -4,6 +4,7 @@ import CryptoTests.Secp256k1
 import CryptoTests.MlDsa
 import CryptoTests.Vrf
 import CryptoTests.Bn254
+import CryptoTests.Bls12381
 
 /-!
 `crypto-conformance [FIXTURES_DIR [NAME...]]`: every vector of the oracle (`tools/node-conformance`,
@@ -155,4 +156,6 @@ def main (args : List String) : IO UInt32 := do
     t ← runFile t (dir / "mldsa.jsonl") (MlDsa.check (MlDsa.keysOf mldsa))
   if wanted "bn254" then
     t ← runFile t (dir / "bn254.jsonl") Bn.check
+  if wanted "bls12381" then
+    t ← runFile t (dir / "bls12381.jsonl") Bls.check
   finish "crypto-conformance" t

@@ -138,6 +138,118 @@ def bn254Kit : Kit :=
         ⟨8495653923123431417604973247489272438418190587263600148770280649306958101930,
           4082367875863433681332203403145435568316851327593401208105741076214120093531⟩) }
 
+def blsKit : Kit :=
+  { name := "bls12381", curve := Bls12381.curve, params := Bls12381.params,
+    g1 :=
+      (0x17f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac586c55e83ff97a1aeffb3af00adb22c6bb,
+        0x08b3f481e3aaa0f1a09e30ed741d8ae4fcf5e095d5d00af600db18cb2c04b3edd03cc744a2888ae40caa232946c5e7e1),
+    g2 :=
+      (⟨0x024aa2b2f08f0a91260805272dc51051c6e47ad4fa403b02b4510b647ae3d1770bac0326a805bbefd48056c8c121bdb8,
+          0x13e02b6052719f607dacd3a088274f65596bd0d09920b61ab5da61bbdc7f5049334cf11213945d57e5ac7d055d042b7e⟩,
+        ⟨0x0ce5d527727d6e118cc9cdc6da2e351aadfd9baa8cbdd3a76d429a695160d12c923ac9cc3baca289e193548608b82801,
+          0x0606c4a02ea734cc32acd2b02bc28b99cb3e287e85a763af267492ab572e99ab3f370d275cec1da1aaa9075ff05f79be⟩) }
+
+/-- A point of `E(Fp)` by abscissa: on the curve, outside `G1` in general. -/
+def randE1 (r : Rng) : Option (Nat × Nat) × Rng :=
+  Id.run do
+    let mut r := r
+    for _ in [0:200] do
+      let (x, r') := below r Bls12381.p
+      r := r'
+      match sqrtMod Bls12381.p (Bls12381.curveRhs x) with
+      | some y =>
+        return (some (x, y), r)
+      | none =>
+        pure ()
+    return (none, r)
+
+/-- BLS12-381 host-level operations: the fast ones against the reference ones. -/
+def blsOpsTests (t : Tally) (r : Rng) : Tally × Rng :=
+  Id.run do
+    let K := blsKit
+    let c := K.curve
+    let mut t := t
+    let mut r := r
+    let F1 := Bls12381.f1
+    let F2 := Bls12381.f2
+    -- the subgroup tests of blst against `[r] P = O`, on members, non-members and sums of both
+    for i in [0:8] do
+      let (e, r1) := randE1 r
+      let (k, r2) := below r1 c.r
+      r := r2
+      let member := mulG1 K k
+      t :=
+        chk t s!"bls g1 member {i}" (Bls12381.Impl.inG1 member && Bls12381.Spec.inGroup F1 member)
+      t := chk t s!"bls g1 random {i}" (Bls12381.Impl.inG1 e == Bls12381.Spec.inGroup F1 e)
+      let mixed := Jac.toAffine F1 (Jac.add F1 (Jac.ofAffine F1 member) (Jac.ofAffine F1 e))
+      t := chk t s!"bls g1 mixed {i}" (Bls12381.Impl.inG1 mixed == Bls12381.Spec.inGroup F1 mixed)
+      let (q, r3) := randTwist K r
+      r := r3
+      let member2 := mulG2 K k
+      t :=
+        chk t s!"bls g2 member {i}" (Bls12381.Impl.inG2 member2 && Bls12381.Spec.inGroup F2 member2)
+      t :=
+        chk t s!"bls g2 random {i}"
+          (Bls12381.Impl.inG2 (some q) == Bls12381.Spec.inGroup F2 (some q))
+      let mixed2 :=
+        Jac.toAffine F2 (Jac.add F2 (Jac.ofAffine F2 member2) (Jac.ofAffine F2 (some q)))
+      t := chk t s!"bls g2 mixed {i}" (Bls12381.Impl.inG2 mixed2 == Bls12381.Spec.inGroup F2 mixed2)
+      -- clearing the cofactor: blst's endomorphism formula equals the multiplication by h_eff
+      t :=
+        chk t s!"bls clear cofactor g2 {i}"
+          (Bls12381.HashToCurve.clear2Impl (some q) == Bls12381.HashToCurve.clear2Spec (some q))
+      t :=
+        chk t s!"bls clear cofactor g2 member {i}"
+          (Bls12381.HashToCurve.clear2Impl member2 == Bls12381.HashToCurve.clear2Spec member2)
+      -- the maps land in the groups
+      let (u, r4) := below r c.p
+      let (v, r5) := below r4 c.p
+      r := r5
+      let m1 := Bls12381.HashToCurve.clear1 (Bls12381.HashToCurve.mapToE1 u)
+      t :=
+        chk t s!"bls map g1 {i}"
+          (Bls12381.Impl.inG1 m1 && Bls12381.Spec.inGroup F1 m1 && m1 != none)
+      let m2 := Bls12381.HashToCurve.clear2Impl (Bls12381.HashToCurve.mapToE2 ⟨u, v⟩)
+      t :=
+        chk t s!"bls map g2 {i}"
+          (Bls12381.Impl.inG2 m2 && Bls12381.Spec.inGroup F2 m2 && m2 != none)
+    -- the order-3 points (0, ±2) are outside G1 for both tests
+    t :=
+      chk t "bls order 3"
+        (!Bls12381.Impl.inG1 (some (0, 2)) && !Bls12381.Spec.inGroup F1 (some (0, 2)))
+    -- multi-exponentiations and sums over both groups, with zero scalars and infinity
+    for i in [0:6] do
+      let mut t1 : List (Option (Nat × Nat) × Nat) := []
+      let mut t2 : List (Option (Fp2 × Fp2) × Nat) := []
+      let mut s1 : List (Bool × Option (Nat × Nat)) := []
+      let mut s2 : List (Bool × Option (Fp2 × Fp2)) := []
+      let (cnt, r1) := below r 7
+      r := r1
+      for _ in [0:cnt] do
+        let (k, r2) := below r c.r
+        let (m, r3) := below r2 4
+        let (kk, r4) := below r3 (if m == 2 then 3 else 1 <<< 256)
+        r := r4
+        let g1p := if m == 0 then none else mulG1 K k
+        let g2p := if m == 0 then none else mulG2 K k
+        t1 := t1 ++ [(g1p, kk)]
+        t2 := t2 ++ [(g2p, kk)]
+        s1 := s1 ++ [(k % 3 == 0, g1p)]
+        s2 := s2 ++ [(k % 3 == 0, g2p)]
+      t :=
+        chk t s!"bls g1 multiexp {i}" (Bls12381.Impl.multiexp F1 t1 == Bls12381.Spec.multiexp F1 t1)
+      t :=
+        chk t s!"bls g2 multiexp {i}" (Bls12381.Impl.multiexp F2 t2 == Bls12381.Spec.multiexp F2 t2)
+      t :=
+        chk t s!"bls g1 sum {i}"
+          (Bls12381.Spec.sum F1 s1 ==
+            Bls12381.Impl.multiexp F1 (s1.map fun (neg, pt) => (pt, if neg then c.r - 1 else 1)))
+      t :=
+        chk t s!"bls g2 sum {i}"
+          (Bls12381.Spec.sum F2 s2 ==
+            Bls12381.Impl.multiexp F2 (s2.map fun (neg, pt) => (pt, if neg then c.r - 1 else 1)))
+    return (t, r)
+
 /-- BN254 host-level operations: the fast ones against the reference ones. -/
 def bnOpsTests (t : Tally) (r : Rng) : Tally × Rng :=
   Id.run do

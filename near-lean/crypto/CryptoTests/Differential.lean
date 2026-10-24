@@ -839,4 +839,6 @@ def main : IO UInt32 := do
   (t, r) := mldsaTests t r
   (t, r) := DiffPairing.tests DiffPairing.bn254Kit t r
   (t, r) := DiffPairing.bnOpsTests t r
+  (t, r) := DiffPairing.tests DiffPairing.blsKit t r
+  (t, r) := DiffPairing.blsOpsTests t r
   finish "crypto-differential" t
