@@ -4,6 +4,7 @@
 
 mod chain;
 mod chain_fam;
+mod epoch_fam;
 mod fam;
 mod rng;
 mod stateless_fam;
@@ -44,6 +45,7 @@ fn main() {
     outcomes(&mut m, &out_dir);
     chain_fam::chain(&mut m, &out_dir);
     stateless_fam::stateless(&mut m, &out_dir);
+    epoch_fam::epoch(&mut m, &out_dir);
 
     m.write(&out_dir);
 }

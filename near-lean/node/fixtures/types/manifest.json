@@ -104,6 +104,10 @@
       "accept": 28,
       "reject": 17
     },
+    "BlockChunkValidatorStats": {
+      "accept": 28,
+      "reject": 30
+    },
     "BlockDoubleSign": {
       "accept": 19,
       "reject": 41
@@ -171,6 +175,10 @@
     "BlockHeaderV7": {
       "accept": 28,
       "reject": 12
+    },
+    "BlockInfo": {
+      "accept": 80,
+      "reject": 70
     },
     "BlockV1": {
       "accept": 22,
@@ -276,6 +284,10 @@
       "accept": 30,
       "reject": 30
     },
+    "ChunkStats": {
+      "accept": 28,
+      "reject": 30
+    },
     "CodeBytes": {
       "accept": 16,
       "reject": 38
@@ -291,6 +303,10 @@
     "CompilationError": {
       "accept": 11,
       "reject": 44
+    },
+    "CompressedEpochSyncProof": {
+      "accept": 12,
+      "reject": 25
     },
     "CongestionInfo": {
       "accept": 34,
@@ -356,6 +372,30 @@
       "accept": 30,
       "reject": 30
     },
+    "EpochInfo": {
+      "accept": 76,
+      "reject": 70
+    },
+    "EpochSummary": {
+      "accept": 40,
+      "reject": 40
+    },
+    "EpochSyncProof": {
+      "accept": 10,
+      "reject": 8
+    },
+    "EpochSyncProofCurrentEpochData": {
+      "accept": 13,
+      "reject": 12
+    },
+    "EpochSyncProofEpochData": {
+      "accept": 18,
+      "reject": 12
+    },
+    "EpochSyncProofLastEpochData": {
+      "accept": 12,
+      "reject": 8
+    },
     "ExecutionMetadata": {
       "accept": 32,
       "reject": 60
@@ -419,6 +459,10 @@
     "MainTransitionKey": {
       "accept": 24,
       "reject": 24
+    },
+    "MandatesInput": {
+      "accept": 46,
+      "reject": 2
     },
     "MaybeEncodedShardChunk": {
       "accept": 33,
@@ -540,6 +584,10 @@
       "accept": 6,
       "reject": 23
     },
+    "RngCase": {
+      "accept": 26,
+      "reject": 2
+    },
     "ShardChunk": {
       "accept": 48,
       "reject": 24
@@ -596,9 +644,17 @@
       "accept": 43,
       "reject": 42
     },
+    "ShardLayout": {
+      "accept": 62,
+      "reject": 75
+    },
     "ShardProof": {
       "accept": 36,
       "reject": 38
+    },
+    "ShardUId": {
+      "accept": 29,
+      "reject": 28
     },
     "Signature": {
       "accept": 52,
@@ -611,6 +667,10 @@
     "SignedTransaction": {
       "accept": 216,
       "reject": 62
+    },
+    "SlashState": {
+      "accept": 3,
+      "reject": 8
     },
     "SlashedValidator": {
       "accept": 12,
@@ -692,6 +752,14 @@
       "accept": 20,
       "reject": 40
     },
+    "StakeWeightedIndex": {
+      "accept": 55,
+      "reject": 42
+    },
+    "StakeWeights": {
+      "accept": 52,
+      "reject": 2
+    },
     "StateStoredReceipt": {
       "accept": 70,
       "reject": 50
@@ -760,6 +828,18 @@
       "accept": 45,
       "reject": 34
     },
+    "ValidatorKickoutReason": {
+      "accept": 28,
+      "reject": 52
+    },
+    "ValidatorMandates": {
+      "accept": 42,
+      "reject": 39
+    },
+    "ValidatorMandatesConfig": {
+      "accept": 24,
+      "reject": 27
+    },
     "ValidatorStake": {
       "accept": 40,
       "reject": 57
@@ -771,6 +851,14 @@
     "ValidatorStakes": {
       "accept": 28,
       "reject": 43
+    },
+    "ValidatorStats": {
+      "accept": 28,
+      "reject": 28
+    },
+    "ValidatorWeight": {
+      "accept": 6,
+      "reject": 6
     },
     "VersionedPartialEncodedStateWitness": {
       "accept": 42,

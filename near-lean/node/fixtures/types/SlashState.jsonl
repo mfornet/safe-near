@@ -1,0 +1,11 @@
+{"type":"SlashState","name":"double-sign","borsh":"00","hash":null}
+{"type":"SlashState","name":"double-sign/trunc","borsh":"","reject":true}
+{"type":"SlashState","name":"double-sign/flip0","borsh":"93","reject":true}
+{"type":"SlashState","name":"double-sign/tag255","borsh":"ff","reject":true}
+{"type":"SlashState","name":"double-sign/trailing","borsh":"0000","reject":true}
+{"type":"SlashState","name":"already-slashed","borsh":"01","hash":null}
+{"type":"SlashState","name":"already-slashed/flip0","borsh":"cd","reject":true}
+{"type":"SlashState","name":"already-slashed/trailing","borsh":"0100","reject":true}
+{"type":"SlashState","name":"other","borsh":"02","hash":null}
+{"type":"SlashState","name":"other/flip0","borsh":"c1","reject":true}
+{"type":"SlashState","name":"other/trailing","borsh":"0200","reject":true}
