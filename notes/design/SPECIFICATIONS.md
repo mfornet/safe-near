@@ -28,13 +28,15 @@ import it cheaply), and always have an up-to-date audit.
 ## Refinement
 
 There is one refinement statement for every contract,
-`NearInterface.Refines R code M` (design: `notes/todo/refinement_equivalence.md`).
+`NearInterface.Refines R protocol code M` (design: `notes/todo/refinement_equivalence.md`).
 A contract provides a `ContractModel`: its state encoding and invariant,
 `Parses` (which inputs are calls), a `step` from the boundary `Context`, exact
 encodings of return values, receipts and failures, and a gas bound. The
 runtime provides a `RuntimeInterface`; near-lean's is
 `Near.Boundary.nearRuntime`. The statement has no hypotheses beyond storage
-representing a model state and the context being one the runtime builds:
+representing a model state and the context being one the runtime builds with
+the protocol configuration `protocol` (gas costs and limits are protocol
+parameters, so a gas bound holds for given configurations, not for all):
 
 - with at least the model's gas bound attached, the execution is the model's
   and uses at most that much gas;
@@ -42,8 +44,9 @@ representing a model state and the context being one the runtime builds:
 - input that is no call fails with no effects;
 - no execution reports an interpreter limitation.
 
-wNEAR (`refines_wnear`) states it for its deployed binary, with adapter tests
-that run the binary against the model.
+wNEAR (`refines_wnear`) states it for its deployed binary under protocol
+version 86, with adapter tests that run the binary against the model under the
+same configuration.
 
 Specifications about the model become facts about the binary through
 `Refines.transfer`. Specifications that need resources (a withdrawal needs

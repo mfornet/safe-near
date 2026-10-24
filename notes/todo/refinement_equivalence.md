@@ -330,6 +330,12 @@ statement, the instance, the model extensions, re-proved specs and tests.
   for every context it builds (integer widths, usage counting the records, a
   canonical trie holding `raw`). It does not depend on the call or the
   contract, so it does not reintroduce `Supports`-style exclusions.
+- `Refines` takes the protocol configuration and has a third hypothesis,
+  `ctx.protocol = protocol`. `Context.WF` constrains the protocol only by
+  positive op costs, and over every configuration the statement is false: a
+  gas bound of measured constants fails once `regular_op_cost` is large, and
+  a binary that logs fails with a host error under `max_number_logs = 0`.
+  wNEAR pins version 86, the config its adapter tests run on.
 - The gas clause compares against `ctx.gasLimit = min prepaidGas
   maxGasBurnt`: above the burn limit more prepaid gas does not help.
 - `Context` also carries `outputDataReceivers` (the VM reads them).
