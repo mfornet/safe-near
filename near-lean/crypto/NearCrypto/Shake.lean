@@ -1,11 +1,13 @@
 import NearCrypto.Keccak
 
 /-!
-# SHAKE128 and SHAKE256
+# SHAKE128, SHAKE256 and SHA3-256
 
 The extendable-output functions of FIPS 202: Keccak-f[1600] with the rate of 168 and 136 bytes,
 the domain bits `1111` appended to the message (the padded block starts `0x1f` and ends `0x80`)
-and an output of any length, squeezed block by block. `Spec` is the definition over lists on
+and an output of any length, squeezed block by block. SHA3-256 is the same sponge with the rate of
+136 bytes, the domain bits `01` (`0x06`) and 32 bytes of output; `near-crypto` hashes an ML-DSA-65
+public key with it (`MlDsa65PublicKey::to_public_key_handle`). `Spec` is the definition over lists on
 the `Keccak.Spec` permutation; `Impl` reuses the unrolled `Keccak.Impl` round and also exposes the
 sponge block by block (`Xof`), which is how ML-DSA samples.
 -/
@@ -18,30 +20,35 @@ namespace Spec
 
 open Keccak.Spec
 
-/-- Pad10*1 after the domain bits `1111`, to a multiple of `rate` bytes. -/
-def padXof (rate : Nat) (m : List UInt8) : List UInt8 :=
+/-- Pad10*1 after the domain byte `d` (`0x1f` for SHAKE, `0x06` for SHA-3), to a multiple of `rate`
+bytes. -/
+def padXof (d : UInt8) (rate : Nat) (m : List UInt8) : List UInt8 :=
   let q := rate - m.length % rate
-  if q = 1 then m ++ [0x9f] else m ++ [0x1f] ++ List.replicate (q - 2) 0 ++ [0x80]
+  if q = 1 then m ++ [d ||| 0x80] else m ++ [d] ++ List.replicate (q - 2) 0 ++ [0x80]
 
 /-- `blocks` blocks of output of `rate` bytes: squeeze, permute, repeat. -/
 def squeezeBlocks (rate : Nat) (a : State) : Nat → List UInt8
   | 0 => []
   | blocks + 1 => squeeze a rate ++ squeezeBlocks rate (permute a) blocks
 
-/-- SHAKE with `rate` bytes of rate and `n` bytes of output. -/
-def xof (rate : Nat) (m : List UInt8) (n : Nat) : List UInt8 :=
+/-- The sponge with the domain byte `d`, `rate` bytes of rate and `n` bytes of output. -/
+def xof (d : UInt8) (rate : Nat) (m : List UInt8) (n : Nat) : List UInt8 :=
   let a :=
-    (SpecConstants.chunks rate (padXof rate m)).foldl (fun a blk => permute (absorb a blk))
+    (SpecConstants.chunks rate (padXof d rate m)).foldl (fun a blk => permute (absorb a blk))
       (Array.replicate 25 0)
   (squeezeBlocks rate a ((n + rate - 1) / rate)).take n
 
 /-- SHAKE128. -/
 def shake128 (m : ByteArray) (n : Nat) : ByteArray :=
-  ⟨(xof 168 m.toList n).toArray⟩
+  ⟨(xof 0x1f 168 m.toList n).toArray⟩
 
 /-- SHAKE256. -/
 def shake256 (m : ByteArray) (n : Nat) : ByteArray :=
-  ⟨(xof 136 m.toList n).toArray⟩
+  ⟨(xof 0x1f 136 m.toList n).toArray⟩
+
+/-- SHA3-256. -/
+def sha3_256 (m : ByteArray) : ByteArray :=
+  ⟨(xof 0x06 136 m.toList 32).toArray⟩
 
 end Spec
 
@@ -85,8 +92,8 @@ structure Xof where
   /-- No block has been read yet, so the state is not to be permuted before the next one. -/
   fresh : Bool
 
-/-- Absorb `m` into a sponge of `rate` bytes of rate and pad it. -/
-def Xof.init (rate : Nat) (m : ByteArray) : Xof :=
+/-- Absorb `m` into a sponge of `rate` bytes of rate and pad it after the domain byte `d`. -/
+def Xof.init (rate : Nat) (m : ByteArray) (d : UInt8 := 0x1f) : Xof :=
   let full := m.size / rate
   let s :=
     Keccak.Impl.run rate m 0
@@ -94,8 +101,8 @@ def Xof.init (rate : Nat) (m : ByteArray) : Xof :=
   let rest := m.size - rate * full
   let tail := m.extract (rate * full) m.size
   let tail :=
-    if rest + 1 = rate then tail.push 0x9f
-    else (tail.push 0x1f ++ zeros (rate - rest - 2)).push 0x80
+    if rest + 1 = rate then tail.push (d ||| 0x80)
+    else (tail.push d ++ zeros (rate - rest - 2)).push 0x80
   ⟨Keccak.Impl.run rate tail 0 s 1, rate, true⟩
 
 /-- The `n` lanes of the state as bytes, appended to `out`. -/
@@ -121,17 +128,21 @@ private def squeezeAll (x : Xof) (out : ByteArray) : Nat → ByteArray
     let (b, x) := x.block
     squeezeAll x (out ++ b) blocks
 
-/-- SHAKE with `rate` bytes of rate and `n` bytes of output. -/
-def xof (rate : Nat) (m : ByteArray) (n : Nat) : ByteArray :=
-  (squeezeAll (Xof.init rate m) ByteArray.empty ((n + rate - 1) / rate)).extract 0 n
+/-- The sponge with the domain byte `d`, `rate` bytes of rate and `n` bytes of output. -/
+def xof (d : UInt8) (rate : Nat) (m : ByteArray) (n : Nat) : ByteArray :=
+  (squeezeAll (Xof.init rate m d) ByteArray.empty ((n + rate - 1) / rate)).extract 0 n
 
 /-- SHAKE128. -/
 def shake128 (m : ByteArray) (n : Nat) : ByteArray :=
-  xof 168 m n
+  xof 0x1f 168 m n
 
 /-- SHAKE256. -/
 def shake256 (m : ByteArray) (n : Nat) : ByteArray :=
-  xof 136 m n
+  xof 0x1f 136 m n
+
+/-- SHA3-256. -/
+def sha3_256 (m : ByteArray) : ByteArray :=
+  xof 0x06 136 m 32
 
 end Impl
 
@@ -146,5 +157,9 @@ def shake128 (m : ByteArray) (n : Nat) : ByteArray :=
 /-- SHAKE256 with `n` bytes of output (FIPS 202). -/
 def shake256 (m : ByteArray) (n : Nat) : ByteArray :=
   Shake.Impl.shake256 m n
+
+/-- SHA3-256 (FIPS 202: the padding `0x06`, not Keccak's `0x01`). -/
+def sha3_256 (m : ByteArray) : ByteArray :=
+  Shake.Impl.sha3_256 m
 
 end NearCrypto

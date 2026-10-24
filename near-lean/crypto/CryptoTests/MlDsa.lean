@@ -89,6 +89,10 @@ def check (keys : Keys) (j : Json) : Except String (Option String) := do
         firstError
           [expectBool "Impl verify" (Impl.verify pk msg sig) valid,
             expectBool "Spec verify" (Spec.verify pk msg sig) valid]
+  | "handle" =>
+    let (pk, _) ← keyOf keys j
+    let handle ← bytes j "handle"
+    pure <| expect "mlDsa65PublicKeyHandle" (mlDsa65PublicKeyHandle pk) handle
   | k =>
     throw s!"unknown kind {k}"
 

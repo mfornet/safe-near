@@ -629,4 +629,9 @@ def mlDsa65PublicKey (sk : ByteArray) : Option ByteArray :=
 def mlDsa65Sign (sk msg rnd : ByteArray) : Option ByteArray :=
   if rnd.size == 32 then MlDsa.Impl.sign sk msg rnd else none
 
+/-- The on-trie identifier of an ML-DSA-65 access key: SHA3-256 of the domain tag
+`near:ml-dsa-65-pubkey-hash:v1` and the 1952 key bytes (`MlDsa65PublicKey::to_public_key_handle`). -/
+def mlDsa65PublicKeyHandle (pk : ByteArray) : ByteArray :=
+  sha3_256 ("near:ml-dsa-65-pubkey-hash:v1".toUTF8 ++ pk)
+
 end NearCrypto

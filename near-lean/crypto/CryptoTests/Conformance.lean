@@ -58,6 +58,12 @@ def checkShake (j : Json) : Except String (Option String) := do
         firstError
           [expect "shake256 Impl" (Shake.Impl.shake256 msg n) want,
             expect "shake256 Spec" (Shake.Spec.shake256 msg n) want]
+  | "sha3_256" =>
+    pure <|
+        firstError
+          [expect "sha3_256 Impl" (Shake.Impl.sha3_256 msg) want,
+            expect "sha3_256 Spec" (Shake.Spec.sha3_256 msg) want,
+            expectBool "sha3_256 output length" (n == 32) true]
   | _ =>
     throw s!"unknown algorithm {alg}"
 

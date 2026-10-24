@@ -91,6 +91,12 @@ def shakeTests (t : Tally) (r : Rng) : Tally × Rng :=
         let (m, r') := r.bytes n
         r := r'
         t := check t s!"{name} length {n} output {k}" (spec m k == impl m k) s!"differ on {toHex m}"
+    for n in List.range 300 do
+      let (m, r') := r.bytes n
+      r := r'
+      t :=
+        check t s!"sha3_256 length {n}" (Shake.Spec.sha3_256 m == Shake.Impl.sha3_256 m)
+          s!"differ on {toHex m}"
     return (t, r)
 
 /-- HMAC-SHA256 agrees for keys shorter than, equal to and longer than a block. -/

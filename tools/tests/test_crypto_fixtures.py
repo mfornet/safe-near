@@ -96,16 +96,22 @@ class CryptoFixtureTests(unittest.TestCase):
                 message = bytes.fromhex(record["msg"])
             else:
                 message = bytes.fromhex(record["unit"]) * record["count"]
-            digest = hashlib.new(record["alg"], message).hexdigest(record["outLen"])
+            if record["alg"] == "sha3_256":
+                self.assertEqual(record["outLen"], 32, record["name"])
+                digest = hashlib.sha3_256(message).hexdigest()
+            else:
+                digest = hashlib.new(record["alg"], message).hexdigest(record["outLen"])
             self.assertEqual(digest, record["digest"], record["name"])
-        for alg, rate in (("shake128", 168), ("shake256", 136)):
+        for alg, rate in (("shake128", 168), ("shake256", 136), ("sha3_256", 136)):
             lengths = {len(r["msg"]) // 2 for r in self.shake if r["alg"] == alg and "msg" in r}
-            for length in (0, rate - 1, rate, rate + 1, 2 * rate, 3 * rate + 1):
+            for length in (0, rate - 1, rate, rate + 1, 2 * rate) + (() if alg == "sha3_256" else (3 * rate + 1,)):
                 self.assertIn(length, lengths, alg)
+            self.assertIn((alg, "million-a"), names)
+            if alg == "sha3_256":
+                continue
             outs = {r["outLen"] for r in self.shake if r["alg"] == alg}
             for length in (1, rate - 1, rate, rate + 1, 2 * rate):
                 self.assertIn(length, outs, alg)
-            self.assertIn((alg, "million-a"), names)
             self.assertTrue(any(r["alg"] == alg and r["outLen"] > 3 * rate for r in self.shake))
 
     def mldsa_inputs(self, record, keys):
@@ -120,7 +126,7 @@ class CryptoFixtureTests(unittest.TestCase):
         seen = set()
         for number, record in enumerate(self.mldsa, 1):
             where = f"mldsa.jsonl:{number}"
-            self.assertIn(record["kind"], {"keygen", "secret", "sign", "verify"}, where)
+            self.assertIn(record["kind"], {"keygen", "secret", "sign", "verify", "handle"}, where)
             key = (record["kind"], record["name"], record.get("sig"), record.get("secret"), record.get("public"))
             self.assertNotIn(key, seen, where)
             seen.add(key)
@@ -154,6 +160,15 @@ class CryptoFixtureTests(unittest.TestCase):
                 self.assertEqual(pk is not None, record["valid"], record["name"])
                 if record["valid"]:
                     self.assertEqual(pk.hex(), record["public"], record["name"])
+
+    def test_mldsa_public_key_handles_against_hashlib(self):
+        keys = {r["name"]: bytes.fromhex(r["public"]) for r in self.mldsa if r["kind"] == "keygen"}
+        handles = [r for r in self.mldsa if r["kind"] == "handle"]
+        self.assertGreaterEqual(len(handles), 14)
+        for record in handles:
+            public = keys[record["key"]] if "key" in record else bytes.fromhex(record["public"])
+            digest = hashlib.sha3_256(b"near:ml-dsa-65-pubkey-hash:v1" + public).hexdigest()
+            self.assertEqual(digest, record["handle"], record["name"])
 
     def test_mldsa_signatures_against_plain_python(self):
         keys = {r["name"]: (bytes.fromhex(r["public"]), bytes.fromhex(r["secret"]))

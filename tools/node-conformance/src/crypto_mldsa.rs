@@ -26,7 +26,7 @@ use aws_lc_rs::unstable::signature::{PqdsaKeyPair, ML_DSA_65, ML_DSA_65_SIGNING}
 use near_crypto::{KeyType, MlDsa65PublicKey, PublicKey, SecretKey, Signature};
 use serde_json::json;
 use sha3::digest::{ExtendableOutput, Update, XofReader};
-use sha3::{Shake128, Shake256};
+use sha3::{Digest, Sha3_256, Shake128, Shake256};
 
 const PK_LEN: usize = 1952;
 const SK_LEN: usize = 4032;
@@ -122,6 +122,17 @@ pub fn shake_fixtures(out: &mut Out) {
         let million = vec![b'a'; 1_000_000];
         out.push("shake", json!({"kind": "shake", "alg": alg, "name": "million-a", "unit": "61", "count": 1_000_000, "outLen": 64, "digest": hex(&shake(alg, &million, 64))}));
     }
+
+    // SHA3-256 (the padding 0x06, rate 136): `near-crypto` hashes an ML-DSA-65 public key with it.
+    assert_eq!(hex(&Sha3_256::digest(b"")), "a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a");
+    assert_eq!(hex(&Sha3_256::digest(b"abc")), "3a985da74fe225b2045c172d6bd390bd855f086e3e9d525b46bfe24511431532");
+    let mut rng = Rng::new(super::fnv("sha3_256"));
+    for n in [0usize, 1, 2, 3, 31, 32, 33, 64, 100, 134, 135, 136, 137, 200, 271, 272, 273, 500, 1000, 1952, 1981, 4096] {
+        let msg = rng.bytes(n);
+        out.push("shake", json!({"kind": "shake", "alg": "sha3_256", "name": format!("msg-{n}-out-32"), "msg": hex(&msg), "outLen": 32, "digest": hex(&Sha3_256::digest(&msg))}));
+    }
+    let million = vec![b'a'; 1_000_000];
+    out.push("shake", json!({"kind": "shake", "alg": "sha3_256", "name": "million-a", "unit": "61", "count": 1_000_000, "outLen": 32, "digest": hex(&Sha3_256::digest(&million))}));
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -489,5 +500,15 @@ pub fn mldsa_fixtures(out: &mut Out) {
         let sig = sign_extmu(&key.sk, &mu, &[], &rnd);
         mode(out, "external-mu-of-msg", sig.clone(), &msg);
         mode(out, "external-mu-as-msg", sig, &mu);
+    }
+
+    // The on-trie identifier of a public key: SHA3-256 of a domain tag and the key
+    // (`MlDsa65PublicKey::to_public_key_handle`).
+    let handle = |pk: &[u8]| -> String { hex(&MlDsa65PublicKey(Box::new(pk.try_into().unwrap())).to_public_key_handle().0) };
+    for key in &keys {
+        out.push("handle", json!({"kind": "handle", "name": key.name, "key": key.name, "handle": handle(&key.pk)}));
+    }
+    for (name, pk) in [("zeros", vec![0u8; PK_LEN]), ("ones", vec![0xffu8; PK_LEN])] {
+        out.push("handle", json!({"kind": "handle", "name": name, "public": hex(&pk), "handle": handle(&pk)}));
     }
 }

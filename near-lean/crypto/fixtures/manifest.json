@@ -12,6 +12,7 @@
       "hash": 567
     },
     "mldsa.jsonl": {
+      "handle": 14,
       "keygen": 12,
       "secret": 39,
       "sign": 54,
@@ -27,7 +28,7 @@
       "verify": 1579
     },
     "shake.jsonl": {
-      "shake": 341
+      "shake": 364
     },
     "vrf.jsonl": {
       "basemul": 29,

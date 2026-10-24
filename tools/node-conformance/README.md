@@ -217,7 +217,9 @@ all of it in Lean; CI never builds this crate.
 
 - `shake.jsonl` (`src/crypto_mldsa.rs`): `{"kind": "shake", "alg", "name", "msg", "outLen", "digest"}` for
   SHAKE128 and SHAKE256 of `sha3` 0.10.9: messages of 0 to 4096 bytes around the rates (168 and 136) and
-  outputs from 1 byte to 5000, every output length around the first blocks, and one million `a`.
+  outputs from 1 byte to 5000, every output length around the first blocks, and one million `a`; and
+  `sha3_256` (`Sha3_256`, the padding `0x06`, which `near-crypto` applies to public keys) on messages around
+  its rate of 136.
 - `mldsa.jsonl` (`src/crypto_mldsa.rs`), by `kind`. `near-crypto` 0.37.4 `MLDSA65` is `aws-lc-rs`: keys are
   `PqdsaKeyPair::from_seed` (the 32-byte FIPS 204 seed, `ml_dsa_65_from_seed` is private so the oracle makes the
   same two calls) and `from_raw_private_key` (`SecretKey::from_str`, `SecretKey::sign`), a signature is
@@ -232,6 +234,8 @@ all of it in Lean; CI never builds this crate.
   - `secret`: `secret`, `valid`, and `public` when valid: what `from_raw_private_key` accepts: the keys
     above, a flipped bit in `K` (accepted), `ρ`, `tr` or `t0`, nibbles 9 and 15 in `s1` and `s2` (out of the
     range `[-4, 4]`), an in-range change of one coefficient, other lengths.
+  - `handle`: `key` (or a literal `public`), `handle`: `MlDsa65PublicKey::to_public_key_handle`, the SHA3-256
+    of `near:ml-dsa-65-pubkey-hash:v1` and the key, which names an ML-DSA access key in the trie.
   - `sign`: `key` (a `keygen` name), `msg` (or `unit` and `count`), `rnd` (all-zero for the deterministic
     variant), `sig`; includes signatures with the most hints found by search.
   - `verify`: `key` or a literal `public`, `msg`, `sig`, `valid`: per base signature a changed message
