@@ -479,6 +479,49 @@ Ed25519, secp256k1 and ML-DSA-65 signatures in Lean. M2a is the hashes and Ed255
   erasure coding (chunk parts) is not cryptography and is not here either; M6 confirms the network
   handshake needs nothing more than Ed25519.
 
+### M3 runtime
+
+Acceptance is `just chain-replay-corpus`: the Lean runtime replays real protocol-86 chunks and matches what nearcore
+2.13.4 produced, byte for byte. M3a builds the corpus and the harness; later stages close the gaps the harness
+reports. Rebuild steps and formats: [`tools/localnet/CORPUS.md`](../../tools/localnet/CORPUS.md).
+
+- **Why a localnet, why the full state.** Gas depends on the trie nodes a chunk touches, so replay needs the real trie
+  shape; public RPC cannot give trie nodes. A Merkle-Patricia trie is a function of its key/value set, so the complete
+  raw state of a shard before a chunk rebuilds the original trie (the oracle checks the root). A neard built from the
+  pinned revision (`tools/localnet/build.py`: release, the revision's toolchain, `--locked`, metadata recorded) runs a
+  1-validator/1-shard and a 2-validator/4-shard localnet at protocol 86, driven by a seeded workload (transfers,
+  named, NEAR- and ETH-implicit accounts, keys, contracts and host functions, promises, yield, stake, deletion,
+  delegation, global contracts, gas keys, delayed receipts, epoch boundaries).
+- **Bundle.** Per new chunk: all pre-state entries of its shard, transactions and incoming receipts in apply order,
+  the `ApplyState`-level context (validators, congestion info and bandwidth requests of all shards), and what neard
+  recorded (post-state root, every outcome, outgoing receipts, gas, balance burnt, proposals, congestion), plus state
+  changes from the same `Runtime::apply` call. The corpus: 436 chunks (148 single-shard, 288 four-shard), 7.7 MB, in
+  `near-lean/chain/corpus`.
+- **Gates.** The exporter aborts unless `Runtime::apply` on the database reproduces the record. `just
+  corpus-selfcheck` re-applies each bundle from its own data: 436 of 436 reproduce bit for bit (2520 of 2520 before
+  selection). `just chain-replay-corpus` converts each bundle for `registered-replay`, requires Lean to rebuild the
+  pre-state entries byte for byte, runs the chunk and compares outcomes, outgoing receipt bytes, burnt totals and the
+  complete post-state with the record, never the reverse. Result per chunk: `pass`, `fail: <first field>` or
+  `unsupported: <reason>`. The recipe exits 0 only if all pass; `just chain-replay-corpus-report` prints the table
+  and always exits 0. Python tests check codec, format, manifest and converter in CI without neard.
+- **Current report (M3a): 70 pass, 18 fail, 348 unsupported of 436**; this is the work list, by first reason:
+
+  | Chunks | First reason |
+  |---:|---|
+  | 288 | multi-shard layout (chunk model: single-shard scheduler and congestion) |
+  | 26 | pre-state yield queues |
+  | 24 + 1 | pre-state global contract code and nonces |
+  | 13 | fail: VM host `promise_batch_action_transfer_to_gas_key` unsupported (every call into `test_contract_rs`) |
+  | 3 | epoch boundary: validator accounts update (rewards, stake return) |
+  | 3 | pre-state callback or delayed-queue records |
+  | 3 | fail: `Stake`/`Unstake` need the epoch machinery |
+  | 2 + 2 | host `validator_stake` needs the validator set; fail: host `ecrecover` unsupported |
+  | 1 | `DeployGlobalContract` |
+
+  Behind the first reasons stand `Delegate`, `UseGlobalContract`, gas-key actions, global contract distribution
+  receipts and the buffered-receipt (congestion) columns. Not exercised by the workload: `DelegateV2`,
+  `DeterministicStateInit`, secp256k1 and ML-DSA signers, chunks invalid at application, missing chunks, resharding.
+
 ## Open points
 
 - Numeric performance targets for M4 and M10, measured against nearcore (M2's are proposed above).
