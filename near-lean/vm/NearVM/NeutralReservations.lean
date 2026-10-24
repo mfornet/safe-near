@@ -464,7 +464,9 @@ theorem panicUtf8Metered_reservationView : HostPreservesReservationView panicUtf
 
 theorem abortMetered_reservationView : HostPreservesReservationView abortMetered := by
   intro st args
-  trivial
+  unfold abortMetered
+  dsimp only [trapWith]
+  repeat' (first | trivial | split)
 
 /-- These published host names create no onward execution/prepaid obligation. -/
 def reservationNeutralLocal : List String :=
@@ -507,6 +509,13 @@ theorem chargesBefore_storage_reservation (name : String) (st : HostStore NearSt
   · rcases hname with h | h <;> subst name <;>
       simp [chargesBeforeUnvalidated, creationAccountArgs, Charge.reservation, cryptoEval]
 
+theorem extCharges_reservation (cs : List (String × Nat)) (fees : ActionFees) :
+    ((extCharges cs).map (fun charge => charge.reservation fees)).sum = 0 := by
+  unfold extCharges
+  induction cs with
+  | nil => rfl
+  | cons p ps ih => simpa [Charge.reservation] using ih
+
 theorem chargesBefore_local_reservation (name : String) (st : HostStore NearState) (args : List Value)
     (hname : name ∈ reservationNeutralLocal) :
     ((chargesBefore name st args).map (fun charge => charge.reservation st.host.fees)).sum = 0 := by
@@ -520,14 +529,7 @@ theorem chargesBefore_local_reservation (name : String) (st : HostStore NearStat
   all_goals dsimp only [chargesBefore, chargesBeforeUnvalidated, storageMutationPlan?, creationAccountArgs, argU64,
     readMem, writeMem, writeReg, readSpan, utf8, utf16, Charge.reservation]
   all_goals simp [cryptoEval]
-  all_goals repeat' (first | rfl | contradiction | constructor | split)
-
-theorem extCharges_reservation (cs : List (String × Nat)) (fees : ActionFees) :
-    ((extCharges cs).map (fun charge => charge.reservation fees)).sum = 0 := by
-  unfold extCharges
-  induction cs with
-  | nil => rfl
-  | cons p ps ih => simpa [Charge.reservation] using ih
+  all_goals repeat' (first | rfl | contradiction | exact extCharges_reservation _ _ | constructor | split)
 
 theorem chargesBefore_crypto_reservation (name : String) (st : HostStore NearState)
     (args : List Value) (hname : name ∈ cryptoHostNames) :

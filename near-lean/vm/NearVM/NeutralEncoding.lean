@@ -490,6 +490,8 @@ theorem panicUtf8Metered_encodingFrame : HostPreservesEncodingFrame panicUtf8Met
 
 theorem abortMetered_encodingFrame : HostPreservesEncodingFrame abortMetered := by
   intro st args
-  trivial
+  unfold abortMetered
+  dsimp only [trapWith]
+  repeat' (first | trivial | split)
 
 end Wasm.Near

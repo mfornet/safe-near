@@ -90,6 +90,7 @@ structure NearConfig where
   ethImplicitAccounts : Bool := false
   maxRegisterLen     : Option Nat := none
   maxReturnLen       : Option Nat := none
+  /-- `max_total_log_length`: the bytes of all log messages (UTF-8, after decoding). -/
   maxLogLen          : Option Nat := none
   maxNumberLogs      : Option Nat := none
   maxStorageKeyLen   : Option Nat := none

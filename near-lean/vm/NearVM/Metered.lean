@@ -458,15 +458,11 @@ def chargesBeforeUnvalidated (name : String) (st : HostStore NearState) (args : 
   | "validator_stake" =>
     [base] ++ readSpan st (a 0) (a 1) ++ utf8 (spanLen st (a 0) (a 1)) ++ [.ext "validator_stake_base"] ++ writeMem 16
   | "validator_total_stake" => [base, .ext "validator_total_stake_base"] ++ writeMem 16
-  | "log_utf8" =>
-    let n := spanLen st (a 0) (a 1)
-    [base] ++ readSpan st (a 0) (a 1) ++ utf8 n ++ [.ext "log_base", .ext "log_byte" n]
-  | "log_utf16" =>
-    let n := spanLen st (a 0) (a 1)
-    [base] ++ readSpan st (a 0) (a 1) ++ utf16 n ++ [.ext "log_base", .ext "log_byte" n]
+  | "log_utf8" | "log_utf16" | "panic_utf8" | "abort" =>
+    match stringHostRead? name st args with
+    | some read => extCharges read.charges
+    | none => [base]
   | "panic" => [base]
-  | "panic_utf8" => [base] ++ readSpan st (a 0) (a 1) ++ utf8 (spanLen st (a 0) (a 1))
-  | "abort" => [base]
   | "value_return" =>
     let n := spanLen st (a 0) (a 1)
     let byte := st.host.fees.newDataReceiptByte
@@ -810,20 +806,26 @@ def panicUtf8Metered : NearHostFn NearState :=
     invoke := fun st args =>
       match args with
       | [.i64 len, .i64 ptr] =>
-        match getMemOrReg st ptr len with
-        | some bytes =>
-          match String.fromUTF8? ⟨bytes.toArray⟩ with
-          | some msg => trapWith st (.guestPanic msg)
-          | none => trapWith st .badUTF8
-        | none => trapWith st .memoryAccessViolation
+        match (panicUtf8Read st len ptr).result with
+        | .ok bytes => trapWith st (.guestPanic (utf8String bytes))
+        | .error error => trapWith st error
       | _ => trapWith st .memoryAccessViolation }
 
 def panicMetered : NearHostFn NearState :=
   { invoke := fun st _ => trapWith st (.guestPanic "explicit guest panic") }
 
+/-- `abort(msg_ptr, filename_ptr, line, col)`: logs `ABORT: <message>` and panics with the message. -/
 def abortMetered : NearHostFn NearState :=
   { params := [.i32, .i32, .i32, .i32], results := []
-    invoke := fun st _ => trapWith st (.guestPanic "abort") }
+    invoke := fun st args =>
+      match args with
+      | [.i32 msgPtr, .i32 filePtr, .i32 line, .i32 col] =>
+        match (abortRead st msgPtr filePtr line col).result with
+        | .ok message =>
+          trapWith { st with host := { st.host with logs := st.host.logs ++ [abortLogPrefix ++ message] } }
+            (.guestPanic (utf8String message))
+        | .error error => trapWith st error
+      | _ => trapWith st (.guestPanic "abort") }
 
 /-- The `gas(opcodes)` import used by older metering schemes: `opcodes` regular instructions
 (`gas_seen_from_wasm`). -/

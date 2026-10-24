@@ -1,5 +1,6 @@
 import NearVM.State
 import NearVM.CryptoHost
+import NearVM.LogRead
 
 /-!
 # NEAR host-function registry (`nearEnv`)
@@ -36,10 +37,6 @@ namespace Near
 `2^128 - 1` are truncated modulo `2^128`, matching fixed-width writes. -/
 def leU128Bytes (n : Nat) : List UInt8 :=
   (List.range 16).map (fun i => UInt8.ofNat (n / 2 ^ (8 * i) % 256))
-
-def leBytesToNat : List UInt8 → Nat
-  | [] => 0
-  | b :: bs => b.toNat + 256 * leBytesToNat bs
 
 def readMemNat (st : HostStore NearState) (ptr : UInt64) (len : Nat) : Option Nat :=
   if ptr.toNat + len > memBytes st then
@@ -121,15 +118,16 @@ def disallowInView (name : String) (hf : NearHostFn NearState) : NearHostFn Near
       else
         hf.invoke st args }
 
-/-- Append a log payload. The reference model stores log data as raw bytes:
-`log_utf8`/`log_utf16` names describe the guest ABI, but UTF decoding is not
-part of functional correctness here. Optional config limits model the
-nearcore-style log length/count traps when proofs opt into them. -/
-def appendLogResult (name : String) (st : HostStore NearState)
-    (msg : List UInt8) : HostResult NearState :=
-  checkDataLimit name "log" st.host.config.maxLogLen msg.length st <| fun _ =>
-  checkDataLimit name "log count" st.host.config.maxNumberLogs (st.host.logs.length + 1) st <| fun _ =>
-    .Return [] { st with host := { st.host with logs := st.host.logs ++ [msg] } }
+/-- Append a decoded log message (UTF-8 bytes, from `NearVM.LogRead`), or fail with the error that
+read it: `BadUTF8`, `BadUTF16`, `TotalLogLengthExceeded`, `NumberOfLogsExceeded`, a memory
+violation. The `log_utf8`/`log_utf16` string reading, its limits and its gas live in `LogRead`, which
+follows nearcore's `get_utf8_string`/`get_utf16_string`/`checked_push_log`. Log limits apply when
+the configuration sets them (`maxLogLen` is `max_total_log_length`, over all messages). -/
+def appendLogResult (st : HostStore NearState) (r : Except HostError (List UInt8)) :
+    HostResult NearState :=
+  match r with
+  | .ok msg => .Return [] { st with host := { st.host with logs := st.host.logs ++ [msg] } }
+  | .error e => .Trap { st with host := { st.host with lastError := some e } } e.message
 
 def getPromise? : List NearPromise → Nat → Option NearPromise
   | [], _ => none
@@ -1047,7 +1045,8 @@ def storageHasKeyFn : NearHostFn NearState :=
 def panicFn : NearHostFn NearState :=
   { invoke := fun st _ => .Trap st "explicit guest panic" }
 
-/-- `panic_utf8(len, ptr)`: always traps (message content not modelled). -/
+/-- `panic_utf8(len, ptr)`: always traps. The metered table replaces it with `panicUtf8Metered`,
+which reads and reports the message. -/
 def panicUtf8Fn : NearHostFn NearState :=
   { params := [.i64, .i64], results := []
     invoke := fun st _ => .Trap st "guest panic (utf8)" }
@@ -1055,21 +1054,17 @@ def panicUtf8Fn : NearHostFn NearState :=
 def logUtf8Fn : NearHostFn NearState :=
   { params := [.i64, .i64], results := []
     invoke := fun st args => match args with
-      | [.i64 len, .i64 ptr] =>
-        match getMemOrReg st ptr len with
-        | none => .Trap st "log_utf8: invalid memory"
-        | some msg => appendLogResult "log_utf8" st msg
+      | [.i64 len, .i64 ptr] => appendLogResult st (logUtf8Read st len ptr).result
       | _ => .Trap st "log_utf8: bad args" }
 
 def logUtf16Fn : NearHostFn NearState :=
   { params := [.i64, .i64], results := []
     invoke := fun st args => match args with
-      | [.i64 len, .i64 ptr] =>
-        match getMemOrReg st ptr len with
-        | none => .Trap st "log_utf16: invalid memory"
-        | some msg => appendLogResult "log_utf16" st msg
+      | [.i64 len, .i64 ptr] => appendLogResult st (logUtf16Read st len ptr).result
       | _ => .Trap st "log_utf16: bad args" }
 
+/-- `abort`: always traps. The metered table replaces it with `abortMetered`, which logs the
+message. -/
 def abortFn : NearHostFn NearState :=
   { params := [.i32, .i32, .i32, .i32], results := []
     invoke := fun st _ => .Trap st "guest abort" }

@@ -1,6 +1,7 @@
 import NearVM
 import tests.TrieStorage
 import tests.CryptoHosts
+import tests.LogHosts
 import Wasm.Wat
 
 /-!
@@ -462,6 +463,7 @@ def main (args : List String) : IO UInt32 := do
   TrieStorage.check cfg (fun name ok => check r name ok)
   StorageCosts.check cfg (fun name ok => check r name ok)
   CryptoHosts.check cfg (fun name ok => check r name ok)
+  LogHosts.check cfg (fun name ok => check r name ok)
   let s ← r.get
   IO.println s!"{s.passed} passed, {s.failed} failed"
   return (if s.failed = 0 then 0 else 1)
