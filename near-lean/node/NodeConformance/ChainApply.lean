@@ -2,7 +2,7 @@ import Lean.Data.Json
 import NodeConformance.Runner
 import NearNode.Chain
 import NearNode.Epoch
-import NearNode.Chain.Genesis
+import NearNode.Chain.Persist
 import ChainReplay.HostCrypto
 
 /-!
@@ -110,6 +110,7 @@ structure Tally where
   roundTrips : Nat := 0
   receiptsChecked : Nat := 0
   receiptsEqual : Nat := 0
+  sentEqual : Nat := 0
   failures : Array String := #[]
 
 def Tally.fail (t : Tally) (msg : String) : Tally :=
@@ -268,6 +269,8 @@ def main (args : List String) : IO UInt32 := do
     (({} : Std.HashMap ByteArray BlockRec).insert CryptoHash.zero.bytes zeroRec).insert
       genesisHash.bytes rec0
   let mut t : Tally := {}
+  -- what the genesis checks found, counted once: not when a stored chain is continued
+  let mut g : Tally := {}
   -- the genesis epoch, computed from the genesis configuration, under both of its ids
   let genesisEpoch ←
     match genesisEpochInfo genesis.setup genesis.validators with
@@ -279,16 +282,16 @@ def main (args : List String) : IO UInt32 := do
   let mut epochs : Std.HashMap ByteArray EpochData := {}
   epochs := (epochs.insert CryptoHash.zero.bytes genesisEpoch).insert genesisHash.bytes genesisEpoch
   for id in [CryptoHash.zero.bytes, genesisHash.bytes] do
-    t := { t with epochs := t.epochs + 1 }
+    g := { g with epochs := g.epochs + 1 }
     match given[id]? with
     | some (i, l) =>
       if Codec.encode genesisEpoch.info == i && Codec.encode genesisEpoch.layout == l then
-        t := { t with epochsEqual := t.epochsEqual + 1 }
+        g := { g with epochsEqual := g.epochsEqual + 1 }
       else
         let theirs ← orThrow (decode EpochInfo "EpochInfo" i)
-        t := t.fail s!"genesis epoch differs: {describeDifference genesisEpoch.info theirs}"
+        g := g.fail s!"genesis epoch differs: {describeDifference genesisEpoch.info theirs}"
     | none =>
-      t := t.fail "genesis epoch missing from the corpus"
+      g := g.fail "genesis epoch missing from the corpus"
   let mut st : ChainState :=
     { config, epochs, blocks, head := genesisHash, headHeight := gv.height, genesisHash,
       genesisChunks := genesisBlock.chunks }
@@ -300,15 +303,16 @@ def main (args : List String) : IO UInt32 := do
     rowsAt := rowsAt.insert h ((rowsAt.getD h #[]).push r)
   -- the genesis state of every shard
   let (genesisAccounts, genesisKeys) ← orThrow (parseRecords genesis.records)
-  let tries ← orThrow (genesisTries genesisEpoch.layout genesisAccounts genesisKeys)
+  let (roots, genesisTrieOps) ←
+    orThrow (genesisTries genesisEpoch.layout genesisAccounts genesisKeys)
   for c in genesisBlock.chunks do
-    match tries[c.shardId]? with
-    | some trie =>
-      if trie.root != c.prevStateRoot then
-        t :=
-          t.fail s!"genesis state root of shard {c.shardId} differs from the genesis chunk header"
+    match roots[c.shardId]? with
+    | some root =>
+      if root != c.prevStateRoot then
+        g :=
+          g.fail s!"genesis state root of shard {c.shardId} differs from the genesis chunk header"
     | none =>
-      t := t.fail "genesis shard"
+      g := g.fail "genesis shard"
   let configs : System.FilePath :=
     ((args.dropWhile (· != "--configs")).tail.head?).getD "near-lean/vm/configs"
   let protocol := genesis.setup.reward.genesisProtocolVersion.toNat
@@ -317,25 +321,54 @@ def main (args : List String) : IO UInt32 := do
   let params : Params :=
     { setup := genesis.setup, cfg := runtimeConfig, congestion, protocol,
       chainId := genesis.chainId }
-  let mut progress : Progress := { tries }
+  let mut progress : Progress := { roots, tables := genesisTrieOps.foldl Store.Tables.apply {} }
+  let mut genesisExtras : Array (ByteArray × ChunkExtra) := #[]
   for c in genesisBlock.chunks do
-    let some trie := tries[c.shardId]? | continue
+    let some root := roots[c.shardId]? | continue
     let some congestionInfo := congestionOf c | continue
+    let extra : ChunkExtra :=
+      .v5
+        { stateRoot := root, outcomeRoot := CryptoHash.zero, validatorProposals := #[],
+          gasUsed := 0, gasLimit := c.gasLimit, balanceBurnt := ⟨0⟩, congestionInfo,
+          bandwidthRequests := .v1 ⟨#[]⟩, proposedSplit := none }
+    genesisExtras :=
+      genesisExtras.push (blockShardKey genesisHash genesisEpoch.layout c.shardId, extra)
     progress :=
       { progress with
         outgoing := progress.outgoing.insert (genesisHash.bytes, c.shardId) #[],
-        extras :=
-          progress.extras.insert (genesisHash.bytes, c.shardId)
-            (.v5
-              { stateRoot := trie.root, outcomeRoot := CryptoHash.zero, validatorProposals := #[],
-                gasUsed := 0, gasLimit := c.gasLimit, balanceBurnt := ⟨0⟩, congestionInfo,
-                bandwidthRequests := .v1 ⟨#[]⟩, proposedSplit := none }) }
+        extras := progress.extras.insert (genesisHash.bytes, c.shardId) extra }
   let bodies : Std.HashMap (Nat × UInt64) Body ←
     chunkRows.foldlM (init := {}) fun m r => do
         let h ← orThrow (nat r "height")
         let shard := (← orThrow (nat r "shardId")).toUInt64
         pure (m.insert (h, shard) (← orThrow (parseBody r)))
   let applyOn := (args.contains "--no-apply") == false
+  -- the store: a chain that is already in it is continued, otherwise the genesis is written to it
+  let storeDir? := (args.dropWhile (· != "--store")).tail.head?
+  let mut store? : Option Store.Store := none
+  let mut startHeight : UInt64 := gv.height
+  let mut resumed := false
+  if let some dir := storeDir? then
+    let (s, _) ← Store.Store.open dir
+    match ← orThrow (load config (← s.view)) with
+    | some (st0, pr0) =>
+      st := st0
+      progress := pr0
+      startHeight := st0.headHeight
+      resumed := true
+      IO.println s!"{genesis.chainId}: continuing from the store at height {startHeight}"
+    | none =>
+      let ops :=
+        genesisOps genesisBlock rec0 zeroRec
+          #[(CryptoHash.zero.bytes, genesisEpoch), (genesisHash.bytes, genesisEpoch)] genesisTrieOps
+          genesisExtras
+      discard <| s.commit ops
+    store? := some s
+  if !resumed then
+    t :=
+      { t with
+        epochs := g.epochs, epochsEqual := g.epochsEqual, failures := g.failures }
+  let mut pendingOps : Array Store.Op := #[]
   let started ← IO.monoMsNow
   let maxHeight := (args.dropWhile (· != "--max-height")).tail.head?.bind String.toNat?
   for line in blockLines.extract 1 blockLines.size do
@@ -343,11 +376,17 @@ def main (args : List String) : IO UInt32 := do
     if let some m := maxHeight then
       if height > m then
         break
+    if height.toUInt64 ≤ startHeight then
+      continue
+    pendingOps := #[]
     let block ←
       orThrow
           (do
             decode Block s!"block {height}" (← bytes line "block"))
     t := { t with blocks := t.blocks + 1 }
+    if args.contains "--chunks" then
+      IO.eprintln
+          s!"block {height}: chunks {block.chunks.map fun c => (c.shardId, c.heightIncluded, c.heightCreated)}"
     match processBlock genesis.setup st block with
     | .error e =>
       t := t.fail s!"block {height} rejected: {e.kind} {e.detail}"
@@ -384,8 +423,9 @@ def main (args : List String) : IO UInt32 := do
         | .error m =>
           t := t.fail s!"block {height}: applying the chunks failed: {m}"
           break
-        | .ok (pr, reports) =>
+        | .ok (pr, reports, chunkOps) =>
           progress := pr
+          pendingOps := chunkOps
           let want ←
             orThrow
                 (do
@@ -425,12 +465,24 @@ def main (args : List String) : IO UInt32 := do
               t := t.fail s!"block {height} shard {rep.shard}: no ChunkExtra in the corpus"
             if let some body := bodies[(height, rep.shard)]? then
               t := { t with receiptsChecked := t.receiptsChecked + 1 }
+              if body.claimedOutgoing == rep.outgoing then
+                t := { t with sentEqual := t.sentEqual + 1 }
+              else
+                t :=
+                  t.fail
+                    s!"block {height} shard {rep.shard}: outgoing receipts differ from nearcore's"
               if body.claimedIncoming == rep.incoming then
                 t := { t with receiptsEqual := t.receiptsEqual + 1 }
               else
                 t :=
                   t.fail
                     s!"block {height} shard {rep.shard}: incoming receipts differ from nearcore's"
+                if args.contains "--debug" then
+                  IO.eprintln s!"  ours {rep.incoming.size} theirs {body.claimedIncoming.size}"
+                  for r in rep.incoming do
+                    IO.eprintln s!"  ours   {(toHex r).take 80}"
+                  for r in body.claimedIncoming do
+                    IO.eprintln s!"  theirs {(toHex r).take 80}"
       if let some f := fin then
         t := { t with epochs := t.epochs + 1 }
         match given[f.epochId.hash.bytes]? with
@@ -444,9 +496,14 @@ def main (args : List String) : IO UInt32 := do
                 s!"epoch finalized at height {height} differs: {describeDifference f.data.info theirs}"
         | none =>
           t := t.fail s!"epoch finalized at height {height} is not in the corpus"
+      if let some s := store? then
+        if t.failures.isEmpty then
+          discard <| s.commit (← orThrow (commitOps st block fin pendingOps))
+  if let some s := store? then
+    s.close
   let elapsed := (← IO.monoMsNow) - started
   IO.println
-      s!"{genesis.chainId}: epochs {t.epochsEqual}/{t.epochs} equal, validator accounts updates {t.updatesEqual}/{t.updates} equal, chunks: ChunkExtra equal {t.extrasEqual}/{t.chunks}, pre-state round trip {t.roundTrips}/{t.chunks}, incoming receipts equal {t.receiptsEqual}/{t.receiptsChecked}, blocks {t.accepted}/{t.blocks} accepted ({elapsed} ms)"
+      s!"{genesis.chainId}: epochs {t.epochsEqual}/{t.epochs} equal, validator accounts updates {t.updatesEqual}/{t.updates} equal, chunks: ChunkExtra equal {t.extrasEqual}/{t.chunks}, pre-state round trip {t.roundTrips}/{t.chunks}, incoming receipts equal {t.receiptsEqual}/{t.receiptsChecked}, outgoing receipts equal {t.sentEqual}/{t.receiptsChecked}, blocks {t.accepted}/{t.blocks} accepted ({elapsed} ms)"
   for f in t.failures.extract 0 40 do
     IO.println s!"  FAIL {f}"
   return if t.failures.isEmpty && t.blocks == t.accepted then 0 else 1

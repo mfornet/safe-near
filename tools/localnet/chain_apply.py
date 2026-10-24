@@ -21,6 +21,7 @@ import argparse
 import gzip
 import json
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
@@ -140,7 +141,25 @@ def unpack(corpus: Path, destination: Path, topology: str) -> Path:
     return target
 
 
+REPORT = re.compile(
+    r"epochs (\d+)/(\d+) equal, validator accounts updates (\d+)/(\d+) equal, chunks: ChunkExtra equal (\d+)/(\d+), "
+    r"pre-state round trip (\d+)/(\d+), incoming receipts equal (\d+)/(\d+), outgoing receipts equal (\d+)/(\d+), "
+    r"blocks (\d+)/(\d+) accepted \((\d+) ms\)")
+NAMES = ("epochs", "validator accounts updates", "ChunkExtra", "pre-state round trips", "incoming receipts",
+         "outgoing receipts", "blocks accepted")
+
+
+def run_binary(binary: Path, directory: Path, options: list[str]) -> tuple[bool, list[int] | None]:
+    result = subprocess.run([str(binary), str(directory)] + options, text=True, capture_output=True)
+    print(result.stdout, end="")
+    print(result.stderr, end="", file=sys.stderr)
+    match = REPORT.search(result.stdout)
+    return result.returncode == 0, ([int(x) for x in match.groups()] if match else None)
+
+
 def run(args: argparse.Namespace) -> None:
+    """Each chain is applied in two processes with the store in between: the first stops half way, the
+    second continues from what the first stored (`--no-restart` runs it in one)."""
     problems = chain_corpus.check(args.corpus)
     if problems:
         print("\n".join(problems), file=sys.stderr)
@@ -149,9 +168,26 @@ def run(args: argparse.Namespace) -> None:
     with tempfile.TemporaryDirectory(prefix="safe-near-apply-") as temporary:
         for topology in args.topologies:
             directory = unpack(args.corpus, Path(temporary), topology)
-            command = [str(args.binary), str(directory)] + args.options
-            result = subprocess.run(command, text=True)
-            ok = ok and result.returncode == 0
+            meta = json.loads((directory / "meta.json").read_text())
+            if args.no_restart:
+                runs = [[] + args.options]
+            else:
+                store = Path(temporary) / f"store-{topology}"
+                half = args.restart_at or meta["headHeight"] // 2
+                runs = [["--store", str(store), "--max-height", str(half)] + args.options,
+                        ["--store", str(store)] + args.options]
+            totals = [0] * 15
+            for options in runs:
+                good, counts = run_binary(args.binary, directory, options)
+                ok = ok and good and counts is not None
+                if counts:
+                    pairs = list(zip(counts[0:12:2], counts[1:12:2])) + [(counts[12], counts[13])]
+                    ok = ok and all(a == b for a, b in pairs)
+                    totals = [x + y for x, y in zip(totals, counts)]
+            pairs = [(totals[i], totals[i + 1]) for i in (0, 2, 4, 6, 8, 10, 12)]
+            summary = ", ".join(f"{name} {a}/{b}" for name, (a, b) in zip(NAMES, pairs))
+            print(f"chain-apply-corpus {topology}: {summary}" +
+                  ("" if args.no_restart else f" (restarted from the store at height {half})"))
     print("all agree" if ok else "DISAGREEMENT")
     sys.exit(0 if ok else 1)
 
@@ -165,7 +201,9 @@ def main() -> None:
     r.add_argument("--corpus", type=Path, default=chain_corpus.DEFAULT_CORPUS)
     r.add_argument("--binary", type=Path, default=BINARY)
     r.add_argument("--topologies", nargs="*", default=list(chain_corpus.TOPOLOGIES))
-    r.add_argument("options", nargs="*", help="passed to node-chain-apply (for example --max-height 100)")
+    r.add_argument("--no-restart", action="store_true", help="apply the chain in one process, without the store")
+    r.add_argument("--restart-at", type=int, default=0, help="height at which the first process stops")
+    r.add_argument("options", nargs="*", help="passed to node-chain-apply (for example --no-apply)")
     a = parser.parse_args()
     if a.command == "extras":
         add_extras(a.corpus)

@@ -96,7 +96,7 @@ def contextOf (conv : Conv) (delayed : Option Near.QueueEncoding.Delayed) :
 
 /-- Convert a chunk's inputs. `pending` are the incoming receipts in apply order. -/
 def prepare (entries : Array (ByteArray × ByteArray)) (txs : Array SignedTransaction)
-    (pending : Array Receipt) (ctx : ChunkContext) (cache : CodeCache) :
+    (pending : Array Receipt) (claimed : Array ByteArray) (ctx : ChunkContext) (cache : CodeCache) :
     Except String (Prepared × CodeCache) := do
   let (result, conv) ←
     (do
@@ -121,7 +121,14 @@ def prepare (entries : Array (ByteArray × ByteArray)) (txs : Array SignedTransa
     | some raw =>
       Near.Bandwidth.State.ofBorsh raw
   let buffers ← Near.ShardSink.Buffers.ofEntries d.buffers
-  let codes : ChainReplay.Catalogue := conv.cache.toList.map (·.2)
+  -- Code a contract deploys from its own memory is in no input; the receipts the chunk's producer
+  -- says it sent carry it, and the runtime must produce the same receipts.
+  let mut cache := conv.cache
+  for raw in claimed do
+    if let .ok r := Codec.decodeAll (α := Receipt) raw then
+      if let .ok (_, c) := (receipt r).run { conv with cache } then
+        cache := c.cache
+  let codes : ChainReplay.Catalogue := cache.toList.map (·.2)
   let state := { d.state with nextId := conv.next }
   let ap : Near.ApplyState :=
     { blockHeight := ctx.height, blockTimestamp := ctx.timestamp, epochHeight := ctx.epochHeight,

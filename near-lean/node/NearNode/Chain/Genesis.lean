@@ -57,14 +57,16 @@ def genesisEntries (layout : ShardLayout) (shard : ShardId) (accounts : Array Ge
   let entries ← Near.QueueEncoding.encode state [] {} none
   pure (entries.toArray.map fun (k, v) => (⟨k.toArray⟩, ⟨v.toArray⟩))
 
-/-- The tries of the genesis state, one per shard. -/
+/-- The tries of the genesis state, one per shard: the roots and the operations that store the nodes. -/
 def genesisTries (layout : ShardLayout) (accounts : Array GenesisAccount)
-    (keys : Array GenesisKey) : Except String (Std.HashMap UInt64 ShardTrie) := do
-  let mut out : Std.HashMap UInt64 ShardTrie := {}
+    (keys : Array GenesisKey) : Except String (Std.HashMap UInt64 CryptoHash × Array Store.Op) := do
+  let mut roots : Std.HashMap UInt64 CryptoHash := {}
+  let mut ops : Array Store.Op := #[]
   for shard in layout.shardIds do
     let entries ← genesisEntries layout shard accounts keys
     let changes ← fromEntries entries
-    out := out.insert shard { root := changes.newRoot, store := ← (MemStore.mk {}).apply changes }
-  return out
+    roots := roots.insert shard changes.newRoot
+    ops := ops ++ Store.trieInsertOps (shardKey layout shard) changes
+  return (roots, ops)
 
 end Near.Node.Apply

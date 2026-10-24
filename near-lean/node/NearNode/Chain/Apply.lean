@@ -1,28 +1,26 @@
 import NearNode.Chain.ApplyChunk
 import NearNode.Epoch
 import NearNode.Trie
+import NearNode.Store
 
 /-!
 # Applying the chunks of a block
 
-What `Chain::postprocess_block` and `apply_chunks` do for an accepted block, for a chain without
-missing chunks: for every shard the incoming receipts the block's chunks carry for it
-(`collect_incoming_receipts_from_chunks`), the context of the chunk (`ApplyChunkBlockContext`,
-`NightshadeRuntime::process_state_update`), the runtime, the new state in the shard's trie, and the
-`ChunkExtra` that nearcore stores for the block and the shard.
+What `Chain::postprocess_block` and `apply_chunks` do for an accepted block: for every shard the
+incoming receipts the block's new chunks carry for it (`collect_incoming_receipts_from_chunks`) and
+those delivered since its last chunk (`get_incoming_receipts_for_shard`), the context of the chunk
+(`ApplyChunkBlockContext`, `NightshadeRuntime::process_state_update`), the runtime, the new state in
+the shard's trie, and the `ChunkExtra` that nearcore stores for the block and the shard. A shard
+whose chunk is missing in the block gets `apply_old_chunk`: the epoch's accounts update and the
+scheduler, and the previous `ChunkExtra` with the new state root.
 -/
 
 namespace Near.Node.Apply
 
 open Near.Node Near.Node.Borsh Near.Node.Chain Near.Node.Trie
 
-/-- The shard's state: its root and the nodes. -/
-structure ShardTrie where
-  root : CryptoHash
-  store : MemStore
-
 /-- The body of a chunk as the block carries it: the transactions and, for the checks, the receipts
-the chunk's producer says the previous chunk sent and the receipts nearcore delivered. -/
+that applying the chunk sent according to nearcore and the receipts it was delivered. -/
 structure Body where
   transactions : Array SignedTransaction
   claimedOutgoing : Array ByteArray
@@ -38,10 +36,16 @@ structure Params where
 
 /-- What the node knows about the chunks applied so far. -/
 structure Progress where
-  tries : Std.HashMap UInt64 ShardTrie := {}
+  /-- The nodes of every shard's trie, the chunk extras and the receipts, as the store keeps them. -/
+  tables : Store.Tables := {}
+  /-- The state root of every shard after the last block. -/
+  roots : Std.HashMap UInt64 CryptoHash := {}
   /-- The receipts each chunk applied at a block sent, by block hash and shard. -/
   outgoing : Std.HashMap (ByteArray × UInt64) (Array ByteArray) := {}
   extras : Std.HashMap (ByteArray × UInt64) ChunkExtra := {}
+  /-- The receipts each block delivers to each shard in the order they are applied
+  (`save_incoming_receipt`), kept for shards whose chunk is missing. -/
+  incoming : Std.HashMap (ByteArray × UInt64) (Array ByteArray) := {}
   cache : CodeCache := {}
 
 /-- The result of one chunk. -/
@@ -80,17 +84,26 @@ private def hex (b : ByteArray) : String :=
 
 /-! ### Trie access -/
 
+/-- `ShardUId` as the `State` column and the per-shard columns key it. -/
+def shardKey (layout : ShardLayout) (shard : UInt64) : ByteArray :=
+  Store.shardUIdKey layout.version shard.toUInt32
+
+/-- The key of a per-block, per-shard column (`get_block_shard_uid`). -/
+def blockShardKey (block : CryptoHash) (layout : ShardLayout) (shard : UInt64) : ByteArray :=
+  block.bytes ++ shardKey layout shard
+
 /-- All entries of a shard's trie. -/
-def trieEntries (t : ShardTrie) : Except String (Array (ByteArray × ByteArray)) := do
-  let refs ← Trie.entries t.store.source t.root
+def trieEntries (src : NodeSource) (root : CryptoHash) :
+    Except String (Array (ByteArray × ByteArray)) := do
+  let refs ← Trie.entries src root
   refs.mapM fun (k, r) =>
-      match t.store.source.read r.hash with
+      match src.read r.hash with
       | some v => pure (k, v)
       | none => throw "trie value missing"
 
-/-- Apply the difference between two sets of entries to a shard's trie. -/
-def updateTrie (t : ShardTrie) (old new : Array (ByteArray × ByteArray)) :
-    Except String ShardTrie := do
+/-- The new root and changes that turn the entries `old` of the trie at `root` into `new`. -/
+def updateTrie (src : NodeSource) (root : CryptoHash) (old new : Array (ByteArray × ByteArray)) :
+    Except String TrieChanges := do
   let oldMap : Std.HashMap ByteArray ByteArray := old.foldl (fun m (k, v) => m.insert k v) {}
   let newMap : Std.HashMap ByteArray ByteArray := new.foldl (fun m (k, v) => m.insert k v) {}
   let mut changes : Array Change := #[]
@@ -100,22 +113,28 @@ def updateTrie (t : ShardTrie) (old new : Array (ByteArray × ByteArray)) :
   for (k, _) in old do
     if !newMap.contains k then
       changes := changes.push (k, none)
-  let u ← update t.store.source t.root changes
-  pure { root := u.changes.newRoot, store := ← t.store.apply u.changes }
+  pure (← update src root changes).changes
 
 /-! ### Receipts -/
 
-/-- The shard of a receipt's receiver. -/
+/-- `Receipt::receiver_shard_id`: the shard of the receiver, or the target shard of a global
+contract distribution. -/
 def receiverShard (layout : ShardLayout) (r : ByteArray) : Except String UInt64 := do
   match Codec.decodeAll (α := Receipt) r with
   | .error e =>
     throw s!"receipt does not decode: {repr e}"
   | .ok (.v0 r) =>
-    match layout.accountIdToShardId r.receiverId with
-    | some s =>
-      pure s
-    | none =>
-      throw "receiver has no shard"
+    match r.receipt with
+    | .globalContractDistribution (.v1 d) =>
+      pure d.targetShard
+    | .globalContractDistribution (.v2 d) =>
+      pure d.targetShard
+    | _ =>
+      match layout.accountIdToShardId r.receiverId with
+      | some s =>
+        pure s
+      | none =>
+        throw "receiver has no shard"
 
 /-- `create_receipts_proofs_from_outgoing_receipts`: the outgoing receipts of one chunk grouped by
 the shard that receives them, one group per shard of the layout in index order. -/
@@ -142,18 +161,31 @@ def receiptHashes (layout : ShardLayout) (groups : Array (Array ByteArray)) :
     out := out.push (CryptoHash.hashBorsh (id, receipts))
   return out
 
-/-- The incoming receipts of every shard of a block: each new chunk contributes the receipts its
-previous chunk sent, grouped by receiving shard, and the contributions to a shard are shuffled with
-the previous block's hash as the seed. `sent` are those receipts per source shard (index order). -/
+/-- The receipts every shard is delivered by a block (`collect_incoming_receipts_from_chunks`): each
+new chunk contributes the receipts its previous chunk sent, grouped by receiving shard, and the
+contributions to a shard are shuffled with the previous block's hash as the seed. `sent` has an entry
+for every chunk of the block (index order) and `none` for a chunk that is not new. -/
 def incomingReceipts (layout : ShardLayout) (prevHash : CryptoHash)
-    (sent : Array (Array ByteArray)) : Except String (Array (Array ByteArray)) := do
-  let grouped ← sent.mapM (groupByShard layout)
+    (sent : Array (Option (Array ByteArray))) : Except String (Array (Array ByteArray)) := do
+  let grouped ← sent.filterMapM fun s => s.mapM (groupByShard layout)
   let mut result : Array (Array ByteArray) := #[]
   for target in [0:layout.numShards.toNat] do
     let proofs : Array (Array ByteArray) := grouped.map (·[target]!)
     let (shuffled, _) := (ChaCha20Rng.fromSeed prevHash.bytes).shuffle proofs
     result := result.push (shuffled.foldl (· ++ ·) #[])
   return result
+
+/-- The block of the chain at `height`, walking back from `rec`. -/
+def blockAtHeight (st : Near.Node.Chain.ChainState) (rec : BlockRec) (height : BlockHeight) :
+    Except String BlockRec := do
+  let mut cur := rec
+  for _ in [0:100000] do
+    if cur.view.height == height then
+      return cur
+    if cur.view.height < height then
+      break
+    cur ← (st.block cur.view.prevHash |>.mapError (·.kind))
+  throw s!"no block at height {height} below {rec.view.height}"
 
 /-! ### The context of a chunk -/
 
@@ -197,9 +229,10 @@ def schedulerInput (block : Block) (layout : ShardLayout) (prevHash : CryptoHash
 
 /-! ### Applying a block -/
 
-/-- Apply the new chunks of an accepted block. `body shard` is the chunk's body. -/
+/-- Apply the chunks of an accepted block. `body shard` is the chunk's body. Returns the progress,
+a report per shard and the store operations of the block. -/
 def applyBlock (p : Params) (st : Near.Node.Chain.ChainState) (block : Block) (body : UInt64 → Body)
-    (pr : Progress) : Except String (Progress × Array ShardReport) := do
+    (pr : Progress) : Except String (Progress × Array ShardReport × Array Store.Op) := do
   let hash := block.header.hash
   let some v := block.header.view? | throw "header version"
   let rec_ ← st.block hash |>.mapError (·.kind)
@@ -207,41 +240,63 @@ def applyBlock (p : Params) (st : Near.Node.Chain.ChainState) (block : Block) (b
   let epoch ← st.epoch epochId |>.mapError (·.kind)
   let layout := epoch.layout
   let prevRec ← st.block v.prevHash |>.mapError (·.kind)
-  let sent ←
-    block.chunks.mapM fun c =>
-        match pr.outgoing[(v.prevHash.bytes, c.shardId)]? with
-        | some r => pure r
-        | none => throw s!"no outgoing receipts of shard {c.shardId} at the previous block"
+  -- what the previous chunk of each new chunk sent: the receipts of the block that included it
+  let mut sent : Array (Option (Array ByteArray)) := #[]
+  for index in [0:block.chunks.size] do
+    let c := block.chunks[index]!
+    if c.isNewChunk v.height then
+      let some prevChunk := prevRec.chunks[index]? | throw "previous chunk missing"
+      let included ← blockAtHeight st prevRec prevChunk.heightIncluded
+      match pr.outgoing[(included.hash.bytes, c.shardId)]? with
+      | some r =>
+        sent := sent.push (some r)
+      | none =>
+        throw s!"no outgoing receipts of shard {c.shardId} at height {prevChunk.heightIncluded}"
+    else
+      sent := sent.push none
   let incoming ← incomingReceipts layout v.prevHash sent
   let provider ← providerOf p st v.prevHash epochId |>.mapError (·.kind)
   let input ← schedulerInput block layout v.prevHash
   let mut pr := pr
   let mut reports : Array ShardReport := #[]
+  let mut ops : Array Store.Op := #[]
   for index in [0:block.chunks.size] do
     let chunk := block.chunks[index]!
     let shard := chunk.shardId
     let isNew := chunk.isNewChunk v.height
     -- the receipts of the previous chunks must hash to the root the chunk header commits to
-    let groups ← groupByShard layout (sent[index]!)
-    let (root, _) := merklize (← receiptHashes layout groups)
-    unless root == chunk.prevOutgoingReceiptsRoot || !isNew do
-      throw
-          s!"shard {shard}: the outgoing receipts of the previous chunk do not match prev_outgoing_receipts_root"
-    let some trie := pr.tries[shard]? | throw s!"no state for shard {shard}"
+    if let some own := sent[index]! then
+      let groups ← groupByShard layout own
+      let (root, _) := merklize (← receiptHashes layout groups)
+      unless root == chunk.prevOutgoingReceiptsRoot do
+        throw
+            s!"shard {shard}: the outgoing receipts of the previous chunk do not match prev_outgoing_receipts_root"
+    let some root := pr.roots[shard]? | throw s!"no state for shard {shard}"
+    let src := pr.tables.nodeSource (shardKey layout shard)
     let prevExtra? := pr.extras[(v.prevHash.bytes, shard)]?
     let expectedRoot :=
       if isNew then chunk.prevStateRoot
       else
         match prevExtra? with
         | some (.v5 e) => e.stateRoot
-        | _ => trie.root
-    unless trie.root == expectedRoot do
+        | _ => root
+    unless root == expectedRoot do
       throw
-          s!"shard {shard}: state root {hex trie.root.bytes} but the chunk header says {hex expectedRoot.bytes}"
+          s!"shard {shard}: state root {hex root.bytes} but the chunk header says {hex expectedRoot.bytes}"
     let b := body shard
-    let entries ← trieEntries trie
+    let entries ← trieEntries src root
+    -- the receipts of this block, then those delivered since the shard's previous chunk
+    let mut delivered := incoming[(layout.getShardIndex shard).getD 0]!
+    if isNew then
+      let some prevChunk := prevRec.chunks[index]? | throw "previous chunk missing"
+      let mut cur := prevRec
+      for _ in [0:100000] do
+        if cur.view.height ≤ prevChunk.heightIncluded then
+          break
+        delivered := delivered ++ ((pr.incoming[(cur.hash.bytes, shard)]?).getD #[])
+        cur ← (st.block cur.view.prevHash |>.mapError (·.kind))
     let pending ←
-      (if isNew then incoming[index]! else #[]).mapM fun r =>
+      (if isNew then delivered else #[]).mapM fun r =>
           match Codec.decodeAll (α := Receipt) r with
           | .ok r => pure r
           | .error e => throw s!"receipt does not decode: {repr e}"
@@ -261,7 +316,8 @@ def applyBlock (p : Params) (st : Near.Node.Chain.ChainState) (block : Block) (b
         shardIds := layout.shardIds.toList.map (·.toNat), epochInfo := provider,
         update := update.map modelUpdate, scheduler := input }
     let (prepared, cache) ←
-      prepare entries (if isNew then b.transactions else #[]) pending ctx pr.cache
+      prepare entries (if isNew then b.transactions else #[]) pending
+          (if isNew then b.claimedOutgoing else #[]) ctx pr.cache
     pr := { pr with cache }
     let reencoded ← reencode p.cfg prepared
     let originalMap : Std.HashMap (List UInt8) (List UInt8) :=
@@ -276,7 +332,7 @@ def applyBlock (p : Params) (st : Near.Node.Chain.ChainState) (block : Block) (b
           pure
               (result.entries,
                 (ChunkExtra.v5
-                  { stateRoot := trie.root, outcomeRoot, validatorProposals := result.proposals,
+                  { stateRoot := root, outcomeRoot, validatorProposals := result.proposals,
                     gasUsed := result.gasBurnt.toUInt64, gasLimit := chunk.gasLimit,
                     balanceBurnt := ⟨result.balanceBurnt⟩, congestionInfo := result.congestion,
                     bandwidthRequests := result.requests, proposedSplit := none }),
@@ -286,18 +342,36 @@ def applyBlock (p : Params) (st : Near.Node.Chain.ChainState) (block : Block) (b
           let entries ← runOldChunk p.cfg p.congestion ctx prepared
           let some (.v5 old) := prevExtra? | throw "no chunk extra before an old chunk"
           pure (entries, ChunkExtra.v5 old, #[], #[])
-    let next ← updateTrie trie entries newEntries
+    let changes ← updateTrie src root entries newEntries
     let extra : ChunkExtra :=
       match extra with
-      | .v5 e => .v5 { e with stateRoot := next.root }
+      | .v5 e => .v5 { e with stateRoot := changes.newRoot }
       | e => e
+    let shardOps : Array Store.Op :=
+      Store.trieInsertOps (shardKey layout shard) changes ++
+        #[.set .chunkExtra (blockShardKey hash layout shard) (Codec.encode extra),
+          .set .outgoingReceipts (blockShardKey hash layout shard) (Codec.encode outgoing)]
+    ops := ops ++ shardOps
     pr :=
       { pr with
-        tries := pr.tries.insert shard next,
+        tables := shardOps.foldl Store.Tables.apply pr.tables,
+        roots := pr.roots.insert shard changes.newRoot,
         outgoing := pr.outgoing.insert (hash.bytes, shard) outgoing,
         extras := pr.extras.insert (hash.bytes, shard) extra }
     reports :=
-      reports.push { shard, extra, incoming := incoming[index]!, outgoing, roundTrip, outcomes }
-  return (pr, reports)
+      reports.push
+        { shard, extra, incoming := if isNew then delivered else #[], outgoing, roundTrip,
+          outcomes }
+  -- what the block delivers to each shard stays until the shard has a chunk again
+  for i in [0:layout.numShards.toNat] do
+    let some shard := layout.getShardId i | throw "shard index out of range"
+    let op : Store.Op :=
+      .set .incomingReceipts (blockShardKey hash layout shard) (Codec.encode incoming[i]!)
+    ops := ops.push op
+    pr :=
+      { pr with
+        tables := Store.Tables.apply pr.tables op,
+        incoming := pr.incoming.insert (hash.bytes, shard) incoming[i]! }
+  return (pr, reports, ops)
 
 end Near.Node.Apply
