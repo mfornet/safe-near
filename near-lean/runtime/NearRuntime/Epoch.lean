@@ -8,6 +8,9 @@ longer need to keep locked, and pays the protocol treasury. The chain supplies t
 
 namespace Near
 
+-- nearcore divergence: the update is an input computed by the epoch manager (rewards, stake info,
+-- last proposals); an inconsistency is an `Except` error, and the trie nodes the update reads are
+-- not replayed into the chunk's node cache (the chunk trie is built from the updated accounts).
 /-- `ValidatorAccountsUpdate`, restricted to what this shard holds. -/
 structure ValidatorAccountsUpdate where
   /-- Per validator account: the maximum of its stakes in the past three epochs

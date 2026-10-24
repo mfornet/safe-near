@@ -566,14 +566,28 @@ reports. Rebuild steps and formats: [`tools/localnet/CORPUS.md`](../../tools/loc
   complete post-state with the record, never the reverse. Result per chunk: `pass`, `fail: <first field>` or
   `unsupported: <reason>`. The recipe exits 0 only if all pass; `just chain-replay-corpus-report` prints the table
   and always exits 0. Python tests check codec, format, manifest and converter in CI without neard.
-- **Current report (M3c): 405 pass, 14 fail, 17 unsupported of 436** (M3b: 129, 6, 301; M3a: 70, 18, 348). The work
-  list, by first reason:
+- **Current report (M3d): 426 pass, 10 fail, 0 unsupported of 436** (M3c: 405, 14, 17; M3b: 129, 6, 301; M3a: 70, 18,
+  348). The work list, by first reason:
 
   | Chunks | First reason | Stage |
   |---:|---|---|
-  | 12 | epoch boundary: validator accounts update (rewards, stake return) | M3d |
-  | 5 + 4 + 1 | host `validator_stake` / `validator_total_stake`; fail: `Stake`/`Unstake` need the epoch machinery (4 + 4) | M3d |
-  | 5 + 1 | fail: crypto host functions `ecrecover` and `sha256` unsupported in the VM | M3e |
+  | 5 + 4 + 1 | fail: crypto host functions `ecrecover`, `sha256` and `ripemd160` unsupported in the VM | M3e |
+
+  M3d closed the 25 staking and epoch chunks. `Stake`/`Unstake` follow `action_stake` (`TriesToStake`,
+  `TriesToUnstake`, `InsufficientStake` against the epoch's minimum stake, the locked balance, and a validator
+  proposal per accepted action; a failed receipt keeps none). The epoch is an input, not computed:
+  `ApplyState.epochInfo` carries what `EpochInfoProvider` answers (minimum stake, each validator's stake, the total),
+  which `validator_stake` and `validator_total_stake` read in the VM (`VMContext.validatorStake`; gas in
+  `near-vm-runner` order: base, account id read and decoding, `validator_stake_base`, the 16-byte write).
+  Proposals travel in each `ExecutionOutcome` and in `ApplyResult.proposals`; `uniqueProposals` is the chunk's dedup
+  (`Runtime::apply` walks them backwards, last proposal of an account wins), and `registered-replay` reports them as
+  Borsh `Vec<ValidatorStake>` for the harness to compare with `validatorProposals`. At an epoch's first chunk the
+  harness passes the `ValidatorAccountsUpdate` and `NearRuntime.Epoch` applies `update_validator_accounts` (rewards
+  added to the locked balance, the staking invariant checked, everything above `max(max_of_stakes, last_proposal)`
+  returned to the liquid balance, the treasury paid unless it is a validator) before anything else runs, so the
+  chunk trie already holds the updated accounts. The update is outside the proved `apply`. The four chunks that call
+  `sha256` or `ripemd160` besides `validator_stake` (`sharded-h48-s1`, `sharded-h48-s2`, `single-h48-s0`, the `h205`
+  chunks) stop at the crypto host, so their validator gas is verified only up to it, until M3e.
 
   M3c closed the 288 four-shard chunks and the 8 converter chunks: the `ShardLayout` (V2, ids 3, 1, 0, 2 over the
   boundaries `test1`..`test3`; routing as `account_id_to_shard_id`, shard order as `shard_ids()`), the bandwidth

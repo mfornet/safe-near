@@ -683,6 +683,8 @@ def applyAction (c : ReceiptCtx) (isLast : Bool) : Action → ExecM Unit
         else throw (.accountDoesNotExist id)
   | .stake stake pk => do
     -- `action_stake`: the locked balance grows out of the liquid one, a proposal goes to the epoch.
+    -- nearcore divergence: the minimum stake is `ApplyState.epochInfo`, supplied by the chain, and
+    -- proposals are returned in `ApplyResult.proposals`; there is no epoch manager here.
     let id := c.receipt.receiverId
     let a ← getAccount id
     let increment := stake - a.locked
