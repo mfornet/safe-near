@@ -22,6 +22,8 @@ ensure() {
 run() {
     ensure
     (cd "$here" && lake build testsuite > /dev/null)
+    # The driver reads vendor/testsuite and testsuite_out_of_scope.txt relative to its directory.
+    cd "$here"
     exec "$here/.lake/build/bin/testsuite" "$@"
 }
 
@@ -34,7 +36,7 @@ report() {
     fi
     ensure
     (cd "$here" && lake build testsuite > /dev/null)
-    "$here/.lake/build/bin/testsuite" --report > "$here/testsuite_report.txt"
+    (cd "$here" && "$here/.lake/build/bin/testsuite" --report) > "$here/testsuite_report.txt"
     echo "wrote $here/testsuite_report.txt"
     summary "$here/testsuite_report.txt"
 }

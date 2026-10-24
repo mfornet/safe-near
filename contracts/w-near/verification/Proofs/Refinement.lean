@@ -18,7 +18,8 @@ and two facts about it (no start function; the exported functions) are
 hypotheses, which the adapter tests (`just runtime-adapter-test`) check on the
 binary.
 
-The theorem is the only open proof in the project. `just wnear-audit`
+`refines_wnear_exported` (the 15 exported methods) is the only open proof in
+this project; `refines_wnear` and its corollaries depend on it. `just wnear-audit`
 tolerates `sorryAx` in this module alone.
 -/
 

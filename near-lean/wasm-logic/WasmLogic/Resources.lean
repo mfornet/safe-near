@@ -81,10 +81,6 @@ def memBytes (n i : Nat) (bs : List UInt8) : IProp GF :=
 def bytes32 (v : UInt32) : List UInt8 :=
   (List.range 4).map fun k => UInt8.ofNat (v.toNat >>> (8 * k))
 
-/-- The little-endian bytes of a 64-bit word. -/
-def bytes64 (v : UInt64) : List UInt8 :=
-  (List.range 8).map fun k => UInt8.ofNat (v.toNat >>> (8 * k))
-
 def memLength (n len : Nat) : IProp GF := Loc.memLength n ↦ₛ (.memLength len : Cell H)
 def memLimit (n : Nat) (mx : Option Nat) : IProp GF := Loc.memLimit n ↦ₛ□ (.memLimit mx : Cell H)
 def globalPt (g : Nat) (gi : GlobalInst) : IProp GF := Loc.global g ↦ₛ (.global gi : Cell H)

@@ -36,6 +36,8 @@ def actionJson : Action → Json
   | .addKey pk key => obj [kind "addKey", ("publicKey", bytesJson pk), ("accessKey", keyJson key)]
   | .deleteKey pk => obj [kind "deleteKey", ("publicKey", bytesJson pk)]
   | .deleteAccount beneficiary => obj [kind "deleteAccount", ("beneficiaryId", toJson beneficiary)]
+  | .useGlobalContract (.codeHash hash) => obj [kind "useGlobalContract", ("codeHash", bytesJson hash)]
+  | .useGlobalContract (.accountId id) => obj [kind "useGlobalContract", ("accountId", bytesJson id)]
 
 def receiptJson (r : Receipt) : Json :=
   obj
