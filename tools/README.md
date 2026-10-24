@@ -176,6 +176,12 @@ The full transaction/receipt reference is documented in
 trie-backed `Runtime::apply` and preserves complete raw state. Its smoke checks
 do not yet compare the Lean chain runner with nearcore.
 
+## Real-chunk corpus
+
+[`localnet/CORPUS.md`](localnet/CORPUS.md) describes the neard localnet corpus that the Lean runtime is
+replayed against (`just chain-replay-corpus`): how neard is built from the pinned source, the localnets and the
+deterministic workload, the exported bundles, the oracle self-check and the Lean harness.
+
 ## Snapshots
 
 See [SNAPSHOTS.md](SNAPSHOTS.md) for format, trust boundary, prefix-filtered

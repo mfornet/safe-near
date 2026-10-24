@@ -1,0 +1,40 @@
+# NearNode: a full NEAR validator node (notes/design/NEAR_NODE.md).
+#
+# Wire types, chain and epoch management, consensus, networking and storage on
+# top of NearChain (../chain). Nothing depends on this package: contract
+# verification never builds it (`just node-isolation`).
+name = "NearNode"
+version = "0.1.0"
+defaultTargets = ["NearNode", "near-lean-node", "node-conformance-types"]
+packagesDir = "../.lake/packages"
+
+[[require]]
+name = "NearChain"
+path = "../chain"
+
+[[require]]
+name = "NearCrypto"
+path = "../crypto"
+
+[[lean_lib]]
+name = "NearNode"
+
+[[lean_exe]]
+name = "near-lean-node"
+root = "NearNode.Cli"
+
+# `lake exe node-bench`: timing of node hot paths, written as JSON.
+[[lean_lib]]
+name = "NodeBench"
+
+[[lean_exe]]
+name = "node-bench"
+root = "NodeBench.Main"
+
+# `lake exe node-conformance-types`: Borsh codecs against the nearcore oracle fixtures.
+[[lean_lib]]
+name = "NodeConformance"
+
+[[lean_exe]]
+name = "node-conformance-types"
+root = "NodeConformance.Types"

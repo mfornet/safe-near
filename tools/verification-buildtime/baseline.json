@@ -1,0 +1,15 @@
+{
+  "w-near@pro.local": {
+    "jobs": 805,
+    "machine": "macOS-26.6.2-arm64-arm-64bit",
+    "recorded": "2026-10-23T19:44:28+00:00",
+    "samples": [
+      134.4
+    ],
+    "seconds": 134.4,
+    "targets": [
+      "Model",
+      "Spec"
+    ]
+  }
+}

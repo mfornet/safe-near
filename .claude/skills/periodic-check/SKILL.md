@@ -31,14 +31,15 @@ it. You are the coordinator: you own the report and delegate the sections.
    package. Accept a fix only after a rebuild that actually ran.
 
 5. **File what isn't fixed** in Linear, team Safe-near, following "Findings in
-   Linear": search the open issues with the label first and comment instead of
-   duplicating.
+   Linear": open the review issue first, search the open issues with the label
+   and comment instead of duplicating, and file the rest as its sub-issues.
 
-6. **Report and ledger.** Write `reports/periodic/<YYYY-MM-DD>/README.md` as
-   section 10 describes, then record the sections that ran:
+6. **Report and ledger.** Attach the report to the review issue as a Linear
+   document, as section 10 describes; don't commit it. Then record the
+   sections that ran:
 
-       python3 tools/periodic_check.py --record <section>... --report reports/periodic/<date>/README.md --issue <ID>...
+       python3 tools/periodic_check.py --record <section>... --report <review issue URL> --issue <ID>...
 
-7. **PR.** Run `just ci-check`, commit the fixes, report and ledger, and open a
+7. **PR.** Run `just ci-check`, commit the fixes and the ledger, and open a
    PR. Its description lists the findings, their Linear IDs and anything that
    needs the maintainer.

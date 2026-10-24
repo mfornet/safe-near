@@ -24,4 +24,5 @@ and remove it from the TODO.
 Finished plans are kept for their rationale in [history/](history/), for
 example the [Wasm runtime rewrite](history/wasm_runtime_rewrite.md).
 
-Dated check reports live in [reports/periodic/](../reports/periodic/).
+Check reports live in Linear (label `periodic-check`); the ledger of what
+each section last covered is [reports/periodic/LEDGER.json](../reports/periodic/LEDGER.json).

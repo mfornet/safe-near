@@ -1,0 +1,11 @@
+{"type":"StateRequestAckBody","name":"will-respond","borsh":"00","hash":null}
+{"type":"StateRequestAckBody","name":"will-respond/trunc","borsh":"","reject":true}
+{"type":"StateRequestAckBody","name":"will-respond/flip0","borsh":"f8","reject":true}
+{"type":"StateRequestAckBody","name":"will-respond/tag255","borsh":"ff","reject":true}
+{"type":"StateRequestAckBody","name":"will-respond/trailing","borsh":"0000","reject":true}
+{"type":"StateRequestAckBody","name":"busy","borsh":"01","hash":null}
+{"type":"StateRequestAckBody","name":"busy/flip0","borsh":"cc","reject":true}
+{"type":"StateRequestAckBody","name":"busy/trailing","borsh":"0100","reject":true}
+{"type":"StateRequestAckBody","name":"error","borsh":"02","hash":null}
+{"type":"StateRequestAckBody","name":"error/trailing","borsh":"0200","reject":true}
+{"type":"StateRequestAckBody","name":"tag3","borsh":"03","reject":true}

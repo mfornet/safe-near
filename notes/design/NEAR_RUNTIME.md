@@ -13,10 +13,11 @@ keys and gas.
 
 ## Trust and validation
 
-- Consensus and cryptography are out of scope. Block context is an input, and
-  proofs must state which inputs they trust. It includes the epoch's validator
-  stakes (`ApplyState.validators`); a replay that does not supply them reads
-  zero stakes.
+- Consensus and cryptography are out of scope for these packages. Block context
+  is an input, and proofs must state which inputs they trust. The node built
+  on top of them supplies that context (see `NEAR_NODE.md`). It includes the
+  epoch's validator stakes (`ApplyState.validators`); a replay that does not
+  supply them reads zero stakes.
 - Conformance harnesses compare supported VM and runtime behavior with pinned
   nearcore adapters (`tools/runtime-*-reference`). They are tests, not an
   equivalence proof.

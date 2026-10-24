@@ -1,0 +1,968 @@
+{
+  "crates": "near-primitives =0.37.4, near-crypto =0.37.4, near-primitives-core =0.37.4",
+  "nearcore_release": "2.13.4",
+  "protocol_version": 86,
+  "seed": "0x4e45415200000001",
+  "types": {
+    "AccessKey": {
+      "accept": 156,
+      "reject": 45
+    },
+    "AccessKeyPermission": {
+      "accept": 33,
+      "reject": 49
+    },
+    "Account": {
+      "accept": 181,
+      "reject": 51
+    },
+    "AccountContract": {
+      "accept": 32,
+      "reject": 50
+    },
+    "AccountId": {
+      "accept": 50,
+      "reject": 117
+    },
+    "Action": {
+      "accept": 295,
+      "reject": 111
+    },
+    "ActionError": {
+      "accept": 107,
+      "reject": 51
+    },
+    "ActionErrorKind": {
+      "accept": 132,
+      "reject": 150
+    },
+    "ActionReceipt": {
+      "accept": 70,
+      "reject": 50
+    },
+    "ActionReceiptV2": {
+      "accept": 67,
+      "reject": 53
+    },
+    "ActionsValidationError": {
+      "accept": 86,
+      "reject": 106
+    },
+    "AnnounceAccount": {
+      "accept": 26,
+      "reject": 54
+    },
+    "Approval": {
+      "accept": 75,
+      "reject": 57
+    },
+    "ApprovalInner": {
+      "accept": 17,
+      "reject": 37
+    },
+    "ApprovalMessage": {
+      "accept": 39,
+      "reject": 51
+    },
+    "BandwidthRequest": {
+      "accept": 42,
+      "reject": 36
+    },
+    "BandwidthRequestBitmap": {
+      "accept": 35,
+      "reject": 36
+    },
+    "BandwidthRequests": {
+      "accept": 16,
+      "reject": 33
+    },
+    "BandwidthRequestsV1": {
+      "accept": 16,
+      "reject": 36
+    },
+    "BandwidthSchedulerParams": {
+      "accept": 27,
+      "reject": 30
+    },
+    "BandwidthSchedulerState": {
+      "accept": 25,
+      "reject": 51
+    },
+    "BandwidthSchedulerStateV1": {
+      "accept": 27,
+      "reject": 48
+    },
+    "BitArray": {
+      "accept": 12,
+      "reject": 30
+    },
+    "Block": {
+      "accept": 95,
+      "reject": 62
+    },
+    "BlockBody": {
+      "accept": 49,
+      "reject": 29
+    },
+    "BlockBodyV1": {
+      "accept": 29,
+      "reject": 16
+    },
+    "BlockBodyV2": {
+      "accept": 28,
+      "reject": 17
+    },
+    "BlockChunkValidatorStats": {
+      "accept": 28,
+      "reject": 30
+    },
+    "BlockDoubleSign": {
+      "accept": 19,
+      "reject": 41
+    },
+    "BlockHeader": {
+      "accept": 125,
+      "reject": 65
+    },
+    "BlockHeaderInnerLite": {
+      "accept": 55,
+      "reject": 39
+    },
+    "BlockHeaderInnerRest": {
+      "accept": 27,
+      "reject": 13
+    },
+    "BlockHeaderInnerRestV2": {
+      "accept": 28,
+      "reject": 12
+    },
+    "BlockHeaderInnerRestV3": {
+      "accept": 28,
+      "reject": 12
+    },
+    "BlockHeaderInnerRestV4": {
+      "accept": 27,
+      "reject": 13
+    },
+    "BlockHeaderInnerRestV5": {
+      "accept": 28,
+      "reject": 12
+    },
+    "BlockHeaderInnerRestV6": {
+      "accept": 28,
+      "reject": 12
+    },
+    "BlockHeaderInnerRestV7": {
+      "accept": 28,
+      "reject": 12
+    },
+    "BlockHeaderV1": {
+      "accept": 27,
+      "reject": 13
+    },
+    "BlockHeaderV2": {
+      "accept": 28,
+      "reject": 12
+    },
+    "BlockHeaderV3": {
+      "accept": 28,
+      "reject": 12
+    },
+    "BlockHeaderV4": {
+      "accept": 27,
+      "reject": 13
+    },
+    "BlockHeaderV5": {
+      "accept": 27,
+      "reject": 13
+    },
+    "BlockHeaderV6": {
+      "accept": 28,
+      "reject": 12
+    },
+    "BlockHeaderV7": {
+      "accept": 28,
+      "reject": 12
+    },
+    "BlockInfo": {
+      "accept": 80,
+      "reject": 70
+    },
+    "BlockV1": {
+      "accept": 22,
+      "reject": 8
+    },
+    "BlockV2": {
+      "accept": 22,
+      "reject": 8
+    },
+    "BlockV3": {
+      "accept": 21,
+      "reject": 9
+    },
+    "BlockV4": {
+      "accept": 21,
+      "reject": 9
+    },
+    "Bool": {
+      "accept": 2,
+      "reject": 7
+    },
+    "BufferedReceiptIndices": {
+      "accept": 37,
+      "reject": 50
+    },
+    "Bytes": {
+      "accept": 32,
+      "reject": 58
+    },
+    "BytesList": {
+      "accept": 39,
+      "reject": 61
+    },
+    "BytesMap": {
+      "accept": 28,
+      "reject": 66
+    },
+    "CachedParts": {
+      "accept": 8,
+      "reject": 24
+    },
+    "Challenge": {
+      "accept": 33,
+      "reject": 12
+    },
+    "ChallengeBody": {
+      "accept": 39,
+      "reject": 29
+    },
+    "ChunkContractAccesses": {
+      "accept": 29,
+      "reject": 52
+    },
+    "ChunkContractDeploys": {
+      "accept": 9,
+      "reject": 21
+    },
+    "ChunkEndorsement": {
+      "accept": 35,
+      "reject": 52
+    },
+    "ChunkEndorsementsBitmap": {
+      "accept": 13,
+      "reject": 39
+    },
+    "ChunkExecutionResult": {
+      "accept": 51,
+      "reject": 49
+    },
+    "ChunkExecutionResultHash": {
+      "accept": 15,
+      "reject": 15
+    },
+    "ChunkExtra": {
+      "accept": 60,
+      "reject": 70
+    },
+    "ChunkHash": {
+      "accept": 30,
+      "reject": 30
+    },
+    "ChunkHashHeight": {
+      "accept": 29,
+      "reject": 30
+    },
+    "ChunkProductionKey": {
+      "accept": 41,
+      "reject": 39
+    },
+    "ChunkProofs": {
+      "accept": 23,
+      "reject": 12
+    },
+    "ChunkState": {
+      "accept": 22,
+      "reject": 13
+    },
+    "ChunkStateTransition": {
+      "accept": 39,
+      "reject": 42
+    },
+    "ChunkStateWitness": {
+      "accept": 20,
+      "reject": 19
+    },
+    "ChunkStateWitnessAck": {
+      "accept": 30,
+      "reject": 30
+    },
+    "ChunkStats": {
+      "accept": 28,
+      "reject": 30
+    },
+    "CodeBytes": {
+      "accept": 16,
+      "reject": 38
+    },
+    "CodeHash": {
+      "accept": 24,
+      "reject": 24
+    },
+    "CodeHashes": {
+      "accept": 18,
+      "reject": 29
+    },
+    "CompilationError": {
+      "accept": 11,
+      "reject": 44
+    },
+    "CompressedEpochSyncProof": {
+      "accept": 12,
+      "reject": 25
+    },
+    "CongestionInfo": {
+      "accept": 34,
+      "reject": 52
+    },
+    "CongestionInfoV1": {
+      "accept": 47,
+      "reject": 42
+    },
+    "ContractCodeRequest": {
+      "accept": 26,
+      "reject": 49
+    },
+    "ContractCodeResponse": {
+      "accept": 30,
+      "reject": 50
+    },
+    "ContractCodeResponseV1": {
+      "accept": 31,
+      "reject": 34
+    },
+    "ContractCodeResponseV2": {
+      "accept": 26,
+      "reject": 34
+    },
+    "CryptoHash": {
+      "accept": 56,
+      "reject": 39
+    },
+    "DataReceipt": {
+      "accept": 65,
+      "reject": 40
+    },
+    "DataReceiver": {
+      "accept": 39,
+      "reject": 41
+    },
+    "DeterministicAccountStateInit": {
+      "accept": 45,
+      "reject": 54
+    },
+    "EncodedChunkStateWitness": {
+      "accept": 16,
+      "reject": 38
+    },
+    "EncodedShardChunk": {
+      "accept": 44,
+      "reject": 16
+    },
+    "EncodedShardChunkBody": {
+      "accept": 21,
+      "reject": 31
+    },
+    "EncodedShardChunkV1": {
+      "accept": 44,
+      "reject": 36
+    },
+    "EncodedShardChunkV2": {
+      "accept": 32,
+      "reject": 48
+    },
+    "EpochId": {
+      "accept": 30,
+      "reject": 30
+    },
+    "EpochInfo": {
+      "accept": 76,
+      "reject": 70
+    },
+    "EpochSummary": {
+      "accept": 40,
+      "reject": 40
+    },
+    "EpochSyncProof": {
+      "accept": 10,
+      "reject": 8
+    },
+    "EpochSyncProofCurrentEpochData": {
+      "accept": 13,
+      "reject": 12
+    },
+    "EpochSyncProofEpochData": {
+      "accept": 18,
+      "reject": 12
+    },
+    "EpochSyncProofLastEpochData": {
+      "accept": 12,
+      "reject": 8
+    },
+    "ExecutionMetadata": {
+      "accept": 32,
+      "reject": 60
+    },
+    "ExecutionOutcome": {
+      "accept": 162,
+      "reject": 48
+    },
+    "ExecutionOutcomeWithId": {
+      "accept": 176,
+      "reject": 40
+    },
+    "ExecutionOutcomeWithIdAndProof": {
+      "accept": 51,
+      "reject": 49
+    },
+    "ExecutionOutcomeWithProof": {
+      "accept": 41,
+      "reject": 49
+    },
+    "ExecutionStatus": {
+      "accept": 48,
+      "reject": 46
+    },
+    "FunctionCallError": {
+      "accept": 29,
+      "reject": 54
+    },
+    "FunctionCallPermission": {
+      "accept": 34,
+      "reject": 62
+    },
+    "GenesisId": {
+      "accept": 17,
+      "reject": 49
+    },
+    "GlobalContractDistributionReceipt": {
+      "accept": 52,
+      "reject": 60
+    },
+    "GlobalContractIdentifier": {
+      "accept": 32,
+      "reject": 60
+    },
+    "HashList": {
+      "accept": 51,
+      "reject": 70
+    },
+    "HostError": {
+      "accept": 91,
+      "reject": 130
+    },
+    "InvalidAccessKeyError": {
+      "accept": 27,
+      "reject": 53
+    },
+    "InvalidTxError": {
+      "accept": 111,
+      "reject": 116
+    },
+    "LinkAllowance": {
+      "accept": 30,
+      "reject": 30
+    },
+    "MainTransitionKey": {
+      "accept": 24,
+      "reject": 24
+    },
+    "MandatesInput": {
+      "accept": 46,
+      "reject": 2
+    },
+    "MaybeEncodedShardChunk": {
+      "accept": 33,
+      "reject": 18
+    },
+    "MerklePathItem": {
+      "accept": 18,
+      "reject": 19
+    },
+    "MethodResolveError": {
+      "accept": 3,
+      "reject": 8
+    },
+    "MissingTrieValue": {
+      "accept": 20,
+      "reject": 40
+    },
+    "NonDelegateAction": {
+      "accept": 84,
+      "reject": 102
+    },
+    "OptimisticBlock": {
+      "accept": 53,
+      "reject": 37
+    },
+    "OptimisticBlockInner": {
+      "accept": 30,
+      "reject": 30
+    },
+    "OptionU64": {
+      "accept": 12,
+      "reject": 31
+    },
+    "PartIdOrHeader": {
+      "accept": 4,
+      "reject": 14
+    },
+    "PartialEncodedChunk": {
+      "accept": 48,
+      "reject": 24
+    },
+    "PartialEncodedChunkPart": {
+      "accept": 41,
+      "reject": 37
+    },
+    "PartialEncodedChunkV1": {
+      "accept": 47,
+      "reject": 38
+    },
+    "PartialEncodedChunkV2": {
+      "accept": 34,
+      "reject": 51
+    },
+    "PartialEncodedContractDeploys": {
+      "accept": 23,
+      "reject": 52
+    },
+    "PartialEncodedContractDeploysPart": {
+      "accept": 28,
+      "reject": 32
+    },
+    "PartialEncodedStateWitness": {
+      "accept": 37,
+      "reject": 38
+    },
+    "PartialEncodedStateWitnessV2": {
+      "accept": 38,
+      "reject": 37
+    },
+    "PartialExecutionOutcome": {
+      "accept": 46,
+      "reject": 54
+    },
+    "PartialMerkleTree": {
+      "accept": 61,
+      "reject": 84
+    },
+    "PartialState": {
+      "accept": 12,
+      "reject": 23
+    },
+    "PeerId": {
+      "accept": 27,
+      "reject": 48
+    },
+    "PrepareError": {
+      "accept": 19,
+      "reject": 37
+    },
+    "ProfileDataV2": {
+      "accept": 36,
+      "reject": 56
+    },
+    "ProfileDataV3": {
+      "accept": 37,
+      "reject": 56
+    },
+    "PromiseYieldTimeout": {
+      "accept": 27,
+      "reject": 53
+    },
+    "PublicKey": {
+      "accept": 53,
+      "reject": 75
+    },
+    "Receipt": {
+      "accept": 206,
+      "reject": 54
+    },
+    "ReceiptEnum": {
+      "accept": 83,
+      "reject": 76
+    },
+    "ReceiptOrStateStoredReceipt": {
+      "accept": 94,
+      "reject": 53
+    },
+    "ReceiptProof": {
+      "accept": 51,
+      "reject": 55
+    },
+    "ReceiptProofResponse": {
+      "accept": 29,
+      "reject": 31
+    },
+    "ReceiptValidationError": {
+      "accept": 46,
+      "reject": 89
+    },
+    "ReceivedData": {
+      "accept": 6,
+      "reject": 23
+    },
+    "RngCase": {
+      "accept": 26,
+      "reject": 2
+    },
+    "RootProof": {
+      "accept": 28,
+      "reject": 32
+    },
+    "ShardChunk": {
+      "accept": 48,
+      "reject": 24
+    },
+    "ShardChunkHeader": {
+      "accept": 124,
+      "reject": 60
+    },
+    "ShardChunkHeaderInner": {
+      "accept": 58,
+      "reject": 48
+    },
+    "ShardChunkHeaderInnerV1": {
+      "accept": 47,
+      "reject": 38
+    },
+    "ShardChunkHeaderInnerV2": {
+      "accept": 49,
+      "reject": 36
+    },
+    "ShardChunkHeaderInnerV3": {
+      "accept": 49,
+      "reject": 36
+    },
+    "ShardChunkHeaderInnerV4": {
+      "accept": 49,
+      "reject": 36
+    },
+    "ShardChunkHeaderInnerV5": {
+      "accept": 49,
+      "reject": 36
+    },
+    "ShardChunkHeaderInnerV6": {
+      "accept": 49,
+      "reject": 36
+    },
+    "ShardChunkHeaderV1": {
+      "accept": 37,
+      "reject": 24
+    },
+    "ShardChunkHeaderV2": {
+      "accept": 36,
+      "reject": 19
+    },
+    "ShardChunkHeaderV3": {
+      "accept": 58,
+      "reject": 48
+    },
+    "ShardChunkV1": {
+      "accept": 46,
+      "reject": 34
+    },
+    "ShardChunkV2": {
+      "accept": 43,
+      "reject": 42
+    },
+    "ShardLayout": {
+      "accept": 62,
+      "reject": 75
+    },
+    "ShardProof": {
+      "accept": 36,
+      "reject": 38
+    },
+    "ShardStateSyncResponse": {
+      "accept": 45,
+      "reject": 39
+    },
+    "ShardStateSyncResponseHeader": {
+      "accept": 23,
+      "reject": 17
+    },
+    "ShardStateSyncResponseHeaderV1": {
+      "accept": 16,
+      "reject": 9
+    },
+    "ShardStateSyncResponseHeaderV2": {
+      "accept": 17,
+      "reject": 12
+    },
+    "ShardStateSyncResponseV1": {
+      "accept": 11,
+      "reject": 8
+    },
+    "ShardStateSyncResponseV2": {
+      "accept": 11,
+      "reject": 8
+    },
+    "ShardStateSyncResponseV3": {
+      "accept": 14,
+      "reject": 8
+    },
+    "ShardStateSyncResponseV4": {
+      "accept": 9,
+      "reject": 8
+    },
+    "ShardUId": {
+      "accept": 29,
+      "reject": 28
+    },
+    "Signature": {
+      "accept": 52,
+      "reject": 75
+    },
+    "SignedDelegateAction": {
+      "accept": 68,
+      "reject": 52
+    },
+    "SignedTransaction": {
+      "accept": 216,
+      "reject": 62
+    },
+    "SlashState": {
+      "accept": 3,
+      "reject": 8
+    },
+    "SlashedValidator": {
+      "accept": 12,
+      "reject": 48
+    },
+    "SpiceBlockBodyV3": {
+      "accept": 29,
+      "reject": 16
+    },
+    "SpiceChunkContractAccesses": {
+      "accept": 35,
+      "reject": 40
+    },
+    "SpiceChunkEndorsement": {
+      "accept": 40,
+      "reject": 51
+    },
+    "SpiceChunkEndorsementStats": {
+      "accept": 30,
+      "reject": 30
+    },
+    "SpiceChunkId": {
+      "accept": 30,
+      "reject": 30
+    },
+    "SpiceChunkStateWitness": {
+      "accept": 18,
+      "reject": 12
+    },
+    "SpiceContractCodeRequest": {
+      "accept": 25,
+      "reject": 50
+    },
+    "SpiceContractCodeResponse": {
+      "accept": 20,
+      "reject": 40
+    },
+    "SpiceCoreStatement": {
+      "accept": 52,
+      "reject": 49
+    },
+    "SpiceCoreStatements": {
+      "accept": 18,
+      "reject": 35
+    },
+    "SpiceDataCommitment": {
+      "accept": 24,
+      "reject": 24
+    },
+    "SpiceDataIdentifier": {
+      "accept": 24,
+      "reject": 47
+    },
+    "SpiceDataPart": {
+      "accept": 24,
+      "reject": 34
+    },
+    "SpiceEndorsementCoreStatement": {
+      "accept": 39,
+      "reject": 51
+    },
+    "SpiceEndorsementSignedData": {
+      "accept": 44,
+      "reject": 36
+    },
+    "SpicePartialData": {
+      "accept": 25,
+      "reject": 50
+    },
+    "SpiceStoredVerifiedEndorsement": {
+      "accept": 39,
+      "reject": 36
+    },
+    "SpiceUncertifiedChunkInfo": {
+      "accept": 40,
+      "reject": 40
+    },
+    "SpiceVerifiedPartialData": {
+      "accept": 20,
+      "reject": 40
+    },
+    "StakeWeightedIndex": {
+      "accept": 55,
+      "reject": 42
+    },
+    "StakeWeights": {
+      "accept": 52,
+      "reject": 2
+    },
+    "StateHeaderKey": {
+      "accept": 30,
+      "reject": 30
+    },
+    "StatePart": {
+      "accept": 24,
+      "reject": 38
+    },
+    "StatePartKey": {
+      "accept": 30,
+      "reject": 30
+    },
+    "StateRequestAck": {
+      "accept": 38,
+      "reject": 36
+    },
+    "StateRequestAckBody": {
+      "accept": 3,
+      "reject": 8
+    },
+    "StateRootNode": {
+      "accept": 35,
+      "reject": 72
+    },
+    "StateStoredReceipt": {
+      "accept": 70,
+      "reject": 50
+    },
+    "StateSyncDumpProgress": {
+      "accept": 32,
+      "reject": 49
+    },
+    "StateSyncInfo": {
+      "accept": 31,
+      "reject": 50
+    },
+    "StateSyncInfoV0": {
+      "accept": 28,
+      "reject": 32
+    },
+    "StateSyncInfoV1": {
+      "accept": 30,
+      "reject": 30
+    },
+    "StorageError": {
+      "accept": 24,
+      "reject": 59
+    },
+    "StoredChunkStateTransitionData": {
+      "accept": 24,
+      "reject": 51
+    },
+    "String": {
+      "accept": 38,
+      "reject": 92
+    },
+    "Tip": {
+      "accept": 30,
+      "reject": 30
+    },
+    "Transaction": {
+      "accept": 219,
+      "reject": 71
+    },
+    "TransactionNonce": {
+      "accept": 22,
+      "reject": 50
+    },
+    "TransactionReceipt": {
+      "accept": 23,
+      "reject": 32
+    },
+    "TransactionV0": {
+      "accept": 51,
+      "reject": 49
+    },
+    "TransactionV1": {
+      "accept": 48,
+      "reject": 52
+    },
+    "TrieQueueIndices": {
+      "accept": 30,
+      "reject": 31
+    },
+    "TrieSplit": {
+      "accept": 20,
+      "reject": 46
+    },
+    "TxExecutionError": {
+      "accept": 276,
+      "reject": 60
+    },
+    "U128": {
+      "accept": 45,
+      "reject": 34
+    },
+    "ValidatorKickoutReason": {
+      "accept": 28,
+      "reject": 52
+    },
+    "ValidatorMandates": {
+      "accept": 42,
+      "reject": 39
+    },
+    "ValidatorMandatesConfig": {
+      "accept": 24,
+      "reject": 27
+    },
+    "ValidatorStake": {
+      "accept": 40,
+      "reject": 57
+    },
+    "ValidatorStakeV1": {
+      "accept": 36,
+      "reject": 54
+    },
+    "ValidatorStakes": {
+      "accept": 28,
+      "reject": 43
+    },
+    "ValidatorStats": {
+      "accept": 28,
+      "reject": 28
+    },
+    "ValidatorWeight": {
+      "accept": 6,
+      "reject": 6
+    },
+    "VersionedPartialEncodedStateWitness": {
+      "accept": 42,
+      "reject": 48
+    },
+    "VersionedSignedDelegateAction": {
+      "accept": 69,
+      "reject": 51
+    },
+    "WasmTrap": {
+      "accept": 9,
+      "reject": 19
+    }
+  }
+}

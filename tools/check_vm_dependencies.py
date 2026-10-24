@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check NearVM's import closure: the Wasm runtime, and no Talos interpreter or proof API."""
+"""Check NearVM's import closure: the Wasm runtime, and no Talos interpreter, proof API or node packages."""
 
 import argparse
 import json
@@ -22,9 +22,14 @@ run_cmd do
   let names := (← getEnv).header.moduleNames.map Name.toString
   let required := #["NearVM", "Wasm.Exec", "Wasm.Link", "Wasm.Validate"]
   let missing := required.filter (!names.contains ·)
+  -- The legacy interpreter and proof API, and the node-side packages that
+  -- contract verification must never build (notes/design/NEAR_NODE.md). NearCrypto is
+  -- self-contained but the VM takes its digests as host parameters, so it stays out until the
+  -- design's open point on crypto host functions is settled.
   let forbidden := names.filter fun name =>
-    name == "Interpreter" || name.startsWith "Interpreter." ||
-    name == "CodeLib" || name.startsWith "CodeLib."
+    ["Interpreter", "CodeLib", "NearRuntime", "NearChain", "ChainReplay", "NearNode", "NodeBench",
+     "NearCrypto"].any
+      fun root => name == root || name.startsWith (root ++ ".")
   let relevant := names.filter fun name =>
     name == "NearVM" || name.startsWith "NearVM." || name.startsWith "Wasm."
   let report := Json.mkObj [
@@ -34,7 +39,7 @@ run_cmd do
   unless missing.isEmpty do
     throwError "VM dependency audit is missing required execution modules: {missing}"
   unless forbidden.isEmpty do
-    throwError "VM execution imports the legacy interpreter or proof API: {forbidden}"
+    throwError "VM execution imports the legacy interpreter, proof API or node packages: {forbidden}"
 '''.replace("REPORT", json.dumps(str(report.resolve()), ensure_ascii=False))
 
 
@@ -69,7 +74,8 @@ def main():
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         print(f"VM dependency audit failed: {error}", file=sys.stderr)
         return 2
-    print(f"NearVM imports {len(evidence['modules'])} project modules; no legacy interpreter or proof API.")
+    print(f"NearVM imports {len(evidence['modules'])} project modules; "
+          "no legacy interpreter, proof API or node packages.")
     print(f"Full report: {args.report}")
     return 0
 

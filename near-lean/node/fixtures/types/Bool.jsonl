@@ -1,0 +1,9 @@
+{"type":"Bool","name":"false","borsh":"00","hash":null}
+{"type":"Bool","name":"false/trunc","borsh":"","reject":true}
+{"type":"Bool","name":"false/flip0","borsh":"d8","reject":true}
+{"type":"Bool","name":"false/tag255","borsh":"ff","reject":true}
+{"type":"Bool","name":"false/trailing","borsh":"0000","reject":true}
+{"type":"Bool","name":"true","borsh":"01","hash":null}
+{"type":"Bool","name":"true/flip0","borsh":"8b","reject":true}
+{"type":"Bool","name":"true/trailing","borsh":"0100","reject":true}
+{"type":"Bool","name":"2","borsh":"02","reject":true}

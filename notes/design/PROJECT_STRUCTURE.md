@@ -4,7 +4,7 @@
 safe-near/
     notes/              -- Design notes, TODO and finished plans (history/)
     tools/              -- Conformance, snapshots, audits and Lean quality tools
-    reports/periodic/   -- Dated periodic check reports
+    reports/periodic/   -- Periodic check ledger (reports are in Linear)
     lean-toolchain      -- Lean version shared by every package
     near-lean/
       wasm/             -- Wasm runtime, written from the spec, tested on the official testsuite
