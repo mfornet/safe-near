@@ -131,6 +131,7 @@ def runtimeErrorJson (executor : AccountId) : RuntimeError → Json
         else obj [kind "compilationError", ("message", toJson message)]
       | .linkError _ | .hostError _ | .wasmTrap _ => obj [kind "executionError", ("message", toJson error.message)]
       | .internal message => obj [kind "internal", ("message", toJson message)]
+      | .prepareError e => obj [kind "compilationError", ("prepareError", toJson e.name)]
       | .executionIssue issue => obj [kind "executionIssue", ("message", toJson issue.message)]
     obj [kind "functionCallError", ("error", inner)]
   | .deleteActionMustBeFinal => obj [kind "deleteActionMustBeFinal"]

@@ -60,6 +60,8 @@ theorem runAttempt_not_exported (cfg : RuntimeConfig) (code : Module) (codeSize 
   dsimp only
   split
   · exact ⟨_, _, _, rfl, rfl⟩
+  split
+  · exact ⟨_, _, _, rfl, rfl⟩
   · cases hload : applyCharges (ctx.toNearState cfg storage) (loadingCharges codeSize) with
     | mk host1 loadErr =>
       dsimp only

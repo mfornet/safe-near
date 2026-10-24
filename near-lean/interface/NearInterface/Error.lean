@@ -130,6 +130,41 @@ inductive MethodResolveError
   | methodInvalidSignature
   deriving Repr, BEq, Inhabited
 
+/-- `near_vm_runner::logic::errors::PrepareError`: the module was rejected
+before instantiation. -/
+inductive PrepareError
+  | instantiate
+  | memory
+  | tooManyFunctions
+  | tooManyLocals
+  | tooManyTables
+  | tooManyTableElements
+  | functionBodyTooLarge
+  | tooManyTypes
+  deriving Repr, BEq, Inhabited
+
+/-- nearcore's `Display` text. -/
+def PrepareError.message : PrepareError → String
+  | .instantiate => "Error happened during instantiation."
+  | .memory => "Error creating memory."
+  | .tooManyFunctions => "Too many functions in contract."
+  | .tooManyLocals => "Too many locals declared in the contract."
+  | .tooManyTables => "Too many tables declared in the contract."
+  | .tooManyTableElements => "Too many table elements declared in the contract."
+  | .functionBodyTooLarge => "A function body in the contract exceeds the size limit."
+  | .tooManyTypes => "Too many type-section entries declared in the contract."
+
+/-- The variant name nearcore serializes. -/
+def PrepareError.name : PrepareError → String
+  | .instantiate => "Instantiate"
+  | .memory => "Memory"
+  | .tooManyFunctions => "TooManyFunctions"
+  | .tooManyLocals => "TooManyLocals"
+  | .tooManyTables => "TooManyTables"
+  | .tooManyTableElements => "TooManyTableElements"
+  | .functionBodyTooLarge => "FunctionBodyTooLarge"
+  | .tooManyTypes => "TooManyTypes"
+
 /-- `near_vm_runner::logic::errors::FunctionCallError`. -/
 inductive FunctionCallError
   | compilationError (msg : String)
@@ -142,6 +177,8 @@ inductive FunctionCallError
   | internal (msg : String)
   /-- Execution stopped without establishing a protocol outcome. -/
   | executionIssue (issue : ExecutionIssue)
+  /-- `CompilationError::PrepareError`. -/
+  | prepareError (e : PrepareError)
   deriving Repr, BEq, Inhabited
 
 def FunctionCallError.message : FunctionCallError → String
@@ -153,6 +190,7 @@ def FunctionCallError.message : FunctionCallError → String
   | .wasmTrap t => s!"WebAssembly trap: {t.message}"
   | .hostError e => e.message
   | .internal m => s!"Internal({m})"
+  | .prepareError e => s!"PrepareError: {e.message}"
   | .executionIssue issue => issue.message
 
 /-- Model limitations must be propagated separately from protocol failures.

@@ -39,6 +39,13 @@ structure LimitConfig where
   maxNumberRegisters : Nat
   registersMemoryLimit : Nat
   accountIdValidityRulesVersion : Nat
+  /-- `prepare_v3` limits; `none` when the protocol version does not set one. -/
+  maxFunctionsNumberPerContract : Option Nat := none
+  maxLocalsPerContract : Option Nat := none
+  maxFunctionBodySize : Option Nat := none
+  maxTablesPerContract : Option Nat := none
+  maxElementsPerContractTable : Option Nat := none
+  maxTypesPerContract : Option Nat := none
   deriving Repr, Inhabited
 
 /-- `near_parameters::vm::Config`. -/
@@ -99,6 +106,15 @@ private def nat (j : Json) (k : String) : Except String Nat := do
   | .ok n => pure n
   | .error _ => .error s!"key {k} is not a natural number"
 
+/-- An optional natural number: absent or `null` is `none`. -/
+private def optNat (j : Json) (k : String) : Except String (Option Nat) :=
+  match j.getObjVal? k with
+  | .error _ | .ok .null => .ok none
+  | .ok v =>
+    match v.getNat? with
+    | .ok n => .ok (some n)
+    | .error _ => .error s!"key {k} is not a natural number"
+
 /-- Decimal string holding a `u128`. -/
 private def natString (j : Json) (k : String) : Except String Nat := do
   let v ← field j k
@@ -146,7 +162,13 @@ private def limits (j : Json) : Except String LimitConfig := do
     maxRegisterSize := ← nat j "max_register_size"
     maxNumberRegisters := ← nat j "max_number_registers"
     registersMemoryLimit := ← nat j "registers_memory_limit"
-    accountIdValidityRulesVersion := ← nat j "account_id_validity_rules_version" }
+    accountIdValidityRulesVersion := ← nat j "account_id_validity_rules_version"
+    maxFunctionsNumberPerContract := ← optNat j "max_functions_number_per_contract"
+    maxLocalsPerContract := ← optNat j "max_locals_per_contract"
+    maxFunctionBodySize := ← optNat j "max_function_body_size"
+    maxTablesPerContract := ← optNat j "max_tables_per_contract"
+    maxElementsPerContractTable := ← optNat j "max_elements_per_contract_table"
+    maxTypesPerContract := ← optNat j "max_types_per_contract" }
 
 private def extCosts (j : Json) : Except String ExtCosts := do
   match j with

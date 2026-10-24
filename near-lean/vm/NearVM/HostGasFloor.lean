@@ -110,73 +110,93 @@ theorem metered_preserves_gasFloor (extra : Nat) (name : String) (fn : NearHostF
           have hwf2 : GasFloor b prepaid maxBurnt st2.host := prepareStorageCall_floor name st1 args hwf1
           cases hs : (prepareStorageCall name st1 args).2 with
           | none => exact finishMeteredCall_gasFloor extra name st2 args _ (hfn b prepaid maxBurnt st2 args hwf2)
-          | some error => cases error <;> exact hwf2
+          | some error => split <;> first | exact hwf2 | contradiction
 
-set_option maxRecDepth 16384 in
 /-- Every published metered host keeps burnt gas at or above its floor. -/
 theorem meteredHostFns_gasFloor (cfg : RuntimeConfig) (entry : ImportDecl × NearHostFn NearState)
     (h : entry ∈ meteredHostFns cfg) : HostPreservesGasFloor entry.2 := by
-  simp only [meteredHostFns, List.mem_append, List.mem_map, List.mem_singleton] at h
-  rcases h with ⟨⟨decl, fn⟩, hin, heq⟩ | heq
-  · subst entry
-    simp only [nearHostFns, List.mem_cons, List.not_mem_nil, or_false] at hin
-    rcases hin with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
-    all_goals cases h
-    all_goals first
-      | (intro b prepaid maxBurnt st args hwf; exact hwf)
-      | apply metered_preserves_gasFloor
-    all_goals first
-      | exact HostPreservesGas.floor inputFn_gas
-      | exact HostPreservesGas.floor readRegisterFn_gas
-      | exact HostPreservesGas.floor registerLenFn_gas
-      | exact HostPreservesGas.floor writeRegisterFn_gas
-      | exact HostPreservesGas.floor storageWriteFn_gas
-      | exact HostPreservesGas.floor storageReadFn_gas
-      | exact HostPreservesGas.floor storageRemoveFn_gas
-      | exact HostPreservesGas.floor storageHasKeyFn_gas
-      | exact HostPreservesGas.floor currentAccountIdFn_gas
-      | exact HostPreservesGas.floor predecessorAccountIdFn_gas
-      | exact HostPreservesGas.floor signerAccountIdFn_gas
-      | exact HostPreservesGas.floor signerAccountPkFn_gas
-      | exact HostPreservesGas.floor attachedDepositFn_gas
-      | exact HostPreservesGas.floor blockIndexFn_gas
-      | exact HostPreservesGas.floor blockTimestampFn_gas
-      | exact HostPreservesGas.floor epochHeightFn_gas
-      | exact HostPreservesGas.floor storageUsageFn_gas
-      | exact HostPreservesGas.floor accountBalanceFn_gas
-      | exact HostPreservesGas.floor accountLockedBalanceFn_gas
-      | exact HostPreservesGas.floor prepaidGasFn_gas
-      | exact HostPreservesGas.floor usedGasFn_gas
-      | exact HostPreservesGas.floor randomSeedFn_gas
-      | exact HostPreservesGas.floor logUtf8Fn_gas
-      | exact HostPreservesGas.floor logUtf16Fn_gas
-      | exact HostPreservesGas.floor panicMetered_gas
-      | exact HostPreservesGas.floor panicUtf8Metered_gas
-      | exact HostPreservesGas.floor abortMetered_gas
-      | exact gasFn_gasFloor
-      | exact HostPreservesGas.floor promiseCreateFn_gas
-      | exact HostPreservesGas.floor promiseThenFn_gas
-      | exact HostPreservesGas.floor promiseAndFn_gas
-      | exact HostPreservesGas.floor promiseBatchCreateFn_gas
-      | exact HostPreservesGas.floor promiseBatchThenFn_gas
-      | exact HostPreservesGas.floor promiseBatchActionCreateAccountFn_gas
-      | exact HostPreservesGas.floor promiseBatchActionDeployContractFn_gas
-      | exact HostPreservesGas.floor promiseBatchActionFunctionCallFn_gas
-      | exact HostPreservesGas.floor promiseBatchActionFunctionCallWeightFn_gas
-      | exact HostPreservesGas.floor promiseBatchActionTransferFn_gas
-      | exact HostPreservesGas.floor promiseBatchActionStakeFn_gas
-      | exact HostPreservesGas.floor promiseBatchActionAddKeyWithFullAccessFn_gas
-      | exact HostPreservesGas.floor promiseBatchActionAddKeyWithFunctionCallFn_gas
-      | exact HostPreservesGas.floor promiseBatchActionDeleteKeyFn_gas
-      | exact HostPreservesGas.floor promiseBatchActionDeleteAccountFn_gas
-      | exact HostPreservesGas.floor promiseBatchActionUseGlobalContractFn_gas
-      | exact HostPreservesGas.floor promiseBatchActionUseGlobalContractByAccountIdFn_gas
-      | exact HostPreservesGas.floor valueReturnFn_gas
-      | exact HostPreservesGas.floor promiseReturnFn_gas
-      | exact HostPreservesGas.floor promiseResultsCountFn_gas
-      | exact HostPreservesGas.floor promiseResultFn_gas
-  · subst entry
-    exact gasFn_gasFloor
+  revert entry h
+  simp only [meteredHostFns, List.forall_mem_append, List.forall_mem_map, List.forall_mem_singleton]
+  refine ⟨?_, gasFn_gasFloor⟩
+  simp only [nearHostFns, List.forall_mem_cons]
+  and_intros
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor inputFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor readRegisterFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor registerLenFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor writeRegisterFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor valueReturnFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor storageWriteFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor storageReadFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor storageRemoveFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor storageHasKeyFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor panicMetered_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor panicUtf8Metered_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor currentAccountIdFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor predecessorAccountIdFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor signerAccountIdFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor attachedDepositFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor logUtf8Fn_gas
+  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- sha256
+  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- keccak256
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor signerAccountPkFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor blockIndexFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor blockIndexFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor blockTimestampFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor epochHeightFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor storageUsageFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor accountBalanceFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor accountLockedBalanceFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor prepaidGasFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor usedGasFn_gas
+  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- validator_stake
+  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- validator_total_stake
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor logUtf16Fn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor abortMetered_gas
+  · intro b prepaid maxBurnt st args hwf; exact hwf -- storage_iter_prefix
+  · intro b prepaid maxBurnt st args hwf; exact hwf -- storage_iter_range
+  · intro b prepaid maxBurnt st args hwf; exact hwf -- storage_iter_next
+  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- keccak512
+  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- ripemd160
+  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- ecrecover
+  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- ed25519_verify
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor randomSeedFn_gas
+  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- alt_bn128_g1_multiexp
+  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- alt_bn128_g1_sum
+  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- alt_bn128_pairing_check
+  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- bls12381_g1_multiexp
+  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- bls12381_g2_multiexp
+  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- bls12381_map_fp_to_g1
+  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- bls12381_map_fp2_to_g2
+  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- bls12381_p1_decompress
+  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- bls12381_p2_decompress
+  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- bls12381_p1_sum
+  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- bls12381_p2_sum
+  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- bls12381_pairing_check
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor promiseCreateFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor promiseThenFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor promiseAndFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor promiseBatchCreateFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor promiseBatchThenFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor promiseBatchActionCreateAccountFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor promiseBatchActionDeployContractFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor promiseBatchActionFunctionCallFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor promiseBatchActionFunctionCallWeightFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor promiseBatchActionTransferFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor promiseBatchActionStakeFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor promiseBatchActionAddKeyWithFullAccessFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor promiseBatchActionAddKeyWithFunctionCallFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor promiseBatchActionDeleteKeyFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor promiseBatchActionDeleteAccountFn_gas
+  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- promise_batch_action_deploy_global_contract
+  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- promise_batch_action_deploy_global_contract_by_account_id
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor promiseBatchActionUseGlobalContractFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor promiseBatchActionUseGlobalContractByAccountIdFn_gas
+  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- promise_yield_create
+  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- promise_yield_resume
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor promiseResultsCountFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor promiseResultFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor promiseReturnFn_gas
+  · simp
 
 /-- Resolution cannot introduce a function outside the proved host registry. -/
 theorem resolveMeteredImports_gasFloor (cfg : RuntimeConfig) (imports : List ImportDecl)

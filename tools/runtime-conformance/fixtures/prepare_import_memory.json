@@ -1,0 +1,14 @@
+{
+  "code": "tools/runtime-conformance/fixtures/prepare_import_memory.wasm",
+  "sha256": "f21ebc82635d536601d58b10d33af79bd353abd4058b5c3f89e219a34058bf72",
+  "protocolVersion": 86,
+  "initialBalance": "100000000000000000000000000",
+  "storage": [],
+  "calls": [
+    {
+      "name": "prepare: import_memory",
+      "method": "f",
+      "args": {}
+    }
+  ]
+}

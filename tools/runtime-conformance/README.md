@@ -84,6 +84,13 @@ out-of-bounds reads, a non-ASCII UTF-16 message and gas exhaustion mid-loop.
 NUL-terminated logs (`u64::MAX` length) are not compared: the model reads a
 register there.
 
+`prepare_*.json` (written by `gen_prepare_limits.py`, which keeps the large
+modules out of WAT) checks nearcore's `prepare_v3` limits at and one over
+each protocol-86 limit (types, functions including imported ones, function
+body size, tables, table elements, locals) and the rejected imports (another
+module, globals, tables, memory): a no-op outcome with `PrepareError` and no
+gas. A module at the locals limit is left out: Wasmtime fails to compile it.
+
 `promise_graphs.json` checks exact ordered receipt dependencies and returned
 receipt identity for ordinary, nested, duplicate and empty joins. Failure cases
 cover joint return/action restrictions, nonexistent handles, view calls and
