@@ -50,6 +50,11 @@ def tryIsoOf (c : Codec α) (f : α → Except Error β) (g : β → α) : Codec
 def iso (α : Type) [c : Codec α] (f : α → β) (g : β → α) : Codec β :=
   isoOf c f g
 
+/-- `tryIsoOf` with the codec found by instance search. -/
+@[instance_reducible]
+def tryIso (α : Type) [c : Codec α] (f : α → Except Error β) (g : β → α) : Codec β :=
+  tryIsoOf c f g
+
 instance : Codec UInt8 :=
   ⟨Spec.u8, Impl.u8⟩
 
