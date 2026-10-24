@@ -107,23 +107,72 @@ def subRef (h : CryptoHash) (n : Int) : M Unit :=
 def record (h : CryptoHash) (data : ByteArray) : M Unit :=
   modify fun s => { s with recorder := s.recorder.map (·.insert h data) }
 
-/-- Decode a stored node into a working node, whose children are not loaded. -/
-def toW (n : RawTrieNodeWithSize) : Except String W := do
-  let slots (c : Children) : Array W :=
-    c.slots.map fun
-      | some h => .old h
-      | none => .empty
-  match n.node with
-  | .leaf k v =>
-    let (e, _) ← hpDecode k
-    return .leaf e (.ref v) n.memoryUsage
-  | .extension k c =>
-    let (e, _) ← hpDecode k
-    return .ext e (.old c) n.memoryUsage
-  | .branchNoValue c =>
-    return .branch (slots c) none n.memoryUsage
-  | .branchWithValue v c =>
-    return .branch (slots c) (some (.ref v)) n.memoryUsage
+private def u16At (b : ByteArray) (o : Nat) : Nat :=
+  (b.get! o).toNat ||| (b.get! (o + 1)).toNat <<< 8
+
+private def u32At (b : ByteArray) (o : Nat) : Nat :=
+  u16At b o ||| u16At b (o + 2) <<< 16
+
+private def u64At (b : ByteArray) (o : Nat) : UInt64 :=
+  (List.range 8).foldl (fun acc i => acc ||| (b.get! (o + i)).toUInt64 <<< (8 * i).toUInt64) 0
+
+private def popcount16 (x : Nat) : Nat :=
+  (List.range 16).foldl (fun n i => if x >>> i &&& 1 == 1 then n + 1 else n) 0
+
+private def refAt (b : ByteArray) (o : Nat) : ValueRef :=
+  ⟨(u32At b o).toUInt32, ⟨b.extract (o + 4) (o + 36)⟩⟩
+
+/-- The children of a branch whose bitmap is at `o`, as working slots. -/
+private def slotsAt (b : ByteArray) (o : Nat) : Array W :=
+  Id.run do
+    let mask := u16At b o
+    let mut slots := emptySlots
+    let mut p := o + 2
+    for i in [0:16] do
+      if mask >>> i &&& 1 == 1 then
+        slots := slots.set! i (.old ⟨b.extract p (p + 32)⟩)
+        p := p + 32
+    return slots
+
+/-- Decode the bytes of a stored node into a working node, whose children are not loaded. This is
+`RawTrieNodeWithSize`'s Borsh decoder with the same rejections (a cut or over-long node), without
+building the intermediate value. -/
+def decodeW (b : ByteArray) : Except String W := do
+  if b.size < 9 then
+    throw "trie node too short"
+  let mem := u64At b (b.size - 8)
+  let bad : Except String W := throw "corrupt trie node"
+  match b.get! 0 with
+  | 0 =>
+    let n := u32At b 1
+    if b.size != 5 + n + 36 + 8 then
+      bad
+    else
+      let (e, _) ← hpDecode (b.extract 5 (5 + n))
+      return .leaf e (.ref (refAt b (5 + n))) mem
+  | 1 =>
+    if b.size < 11 then
+      bad
+    else if b.size != 3 + 32 * popcount16 (u16At b 1) + 8 then
+      bad
+    else
+      return .branch (slotsAt b 1) none mem
+  | 2 =>
+    if b.size < 47 then
+      bad
+    else if b.size != 39 + 32 * popcount16 (u16At b 37) + 8 then
+      bad
+    else
+      return .branch (slotsAt b 37) (some (.ref (refAt b 1))) mem
+  | 3 =>
+    let n := u32At b 1
+    if b.size != 5 + n + 32 + 8 then
+      bad
+    else
+      let (e, _) ← hpDecode (b.extract 5 (5 + n))
+      return .ext e (.old ⟨b.extract (5 + n) (37 + n)⟩) mem
+  | _ =>
+    bad
 
 /-- `move_node_to_mutable`: read a node, record it and drop its reference. -/
 def load (h : CryptoHash) : M W := do
@@ -134,16 +183,12 @@ def load (h : CryptoHash) : M W := do
     throw s!"missing trie node {hashHex h}"
   | some bytes =>
     record h bytes
-    match Codec.decodeAll (α := RawTrieNodeWithSize) bytes with
+    match decodeW bytes with
     | .error e =>
-      throw s!"corrupt trie node {hashHex h}: {repr e}"
-    | .ok n =>
+      throw s!"corrupt trie node {hashHex h}: {e}"
+    | .ok w =>
       subRef h 1
-      liftExcept (toW n)
-where liftExcept {α} (e : Except String α) : M α :=
-    match e with
-    | .ok a => pure a
-    | .error s => throw s
+      return w
 
 def ensure : W → M W
   | .old h => load h
