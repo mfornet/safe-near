@@ -266,3 +266,32 @@ chain-action-randomness-test:
 chain-registered-comparison-test:
     cd near-lean/chain && lake build chain-replay registered-replay --wfail
     python3 tools/chain-conformance/test_registered_comparison.py
+
+# Build neard (release, pinned source), the corpus exporter and the oracle checker. Cold build: about 20 minutes.
+[positional-arguments]
+corpus-build *options:
+    python3 tools/localnet/build.py "$@"
+
+# Run a fresh localnet (single | sharded), drive the deterministic workload, stop it and export raw bundles.
+[positional-arguments]
+corpus-generate topology *options:
+    python3 tools/localnet/generate.py "$@"
+
+# Select a covering subset of the raw bundles of both topologies and pack it into near-lean/chain/corpus.
+corpus-pack *options:
+    python3 tools/localnet/corpus.py build --raw single=tools/localnet/data/single/raw --raw sharded=tools/localnet/data/sharded/raw {{options}}
+
+# Oracle self-check: re-apply every corpus chunk with the pinned nearcore Runtime::apply (needs corpus-build).
+[positional-arguments]
+corpus-selfcheck *chunks:
+    python3 tools/localnet/corpus.py check "$@"
+
+# Replay the real-chunk corpus through the Lean runtime; exits 0 only when every chunk matches nearcore bit for bit.
+chain-replay-corpus:
+    cd near-lean/chain && lake build registered-replay --wfail
+    python3 tools/localnet/replay_corpus.py
+
+# The same replay, always exit 0: prints the status and reason table that is the M3 work list.
+chain-replay-corpus-report:
+    cd near-lean/chain && lake build registered-replay --wfail
+    python3 tools/localnet/replay_corpus.py --report
