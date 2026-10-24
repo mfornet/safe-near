@@ -21,16 +21,18 @@ structure Fld (α : Type) where
   inv : α → α
   isZero : α → Bool
   eq : α → α → Bool
+  /-- The coefficient `a` of `y² = x³ + a x + b`; zero for the curves with `j = 0`. -/
+  a : α
 
 /-- The field `Fp` as a record. -/
 def fpFld (p : Nat) : Fld Nat :=
   { zero := 0, one := 1, add := Fp2.addMod p, sub := Fp2.subMod p, mul := fun a b => a * b % p,
-    neg := Fp2.subMod p 0, inv := invMod p, isZero := (· == 0), eq := (· == ·) }
+    neg := Fp2.subMod p 0, inv := invMod p, isZero := (· == 0), eq := (· == ·), a := 0 }
 
 /-- The field `Fp2` as a record. -/
 def fp2Fld (p : Nat) : Fld Fp2 :=
   { zero := Fp2.zero, one := Fp2.one, add := Fp2.add p, sub := Fp2.sub p, mul := Fp2.mul p,
-    neg := Fp2.neg p, inv := Fp2.inv p, isZero := Fp2.isZero, eq := (· == ·) }
+    neg := Fp2.neg p, inv := Fp2.inv p, isZero := Fp2.isZero, eq := (· == ·), a := Fp2.zero }
 
 /-- A Jacobian point. -/
 structure Jac (α : Type) where
@@ -65,7 +67,7 @@ def toAffine (F : Fld α) (P : Jac α) : Option (α × α) :=
 def neg (F : Fld α) (P : Jac α) : Jac α :=
   ⟨P.x, F.neg P.y, P.z⟩
 
-/-- Doubling (`dbl-2009-l`, `a = 0`). -/
+/-- Doubling (`dbl-2009-l`; with `a ≠ 0` the slope numerator gains `a Z⁴`, as in `dbl-2007-bl`). -/
 def dbl (F : Fld α) (P : Jac α) : Jac α :=
   if F.isZero P.z || F.isZero P.y then inf F
   else
@@ -76,6 +78,11 @@ def dbl (F : Fld α) (P : Jac α) : Jac α :=
     let d := F.sub (F.sub (F.mul t t) a) c
     let d := F.add d d
     let e := F.add (F.add a a) a
+    let e :=
+      if F.isZero F.a then e
+      else
+        let zz := F.mul P.z P.z
+        F.add e (F.mul F.a (F.mul zz zz))
     let f := F.mul e e
     let x3 := F.sub f (F.add d d)
     let c8 := F.add c c

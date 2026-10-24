@@ -1,4 +1,5 @@
 import NearCrypto.Bytes
+import NearCrypto.ModInv
 
 /-!
 # Integers modulo a prime, and their byte forms
@@ -21,9 +22,10 @@ def powMod (m a e : Nat) : Nat :=
       b := b * b % m
     return r
 
-/-- The inverse of `a` modulo the prime `m`; zero for zero. -/
+/-- The inverse of `a` modulo the prime `m`; zero for zero. Below `2²⁵⁶` by `ModInv` (checked
+there), above by Fermat's little theorem. -/
 def invMod (m a : Nat) : Nat :=
-  powMod m a (m - 2)
+  if m < 2 ^ 256 then ModInv.inv a m else powMod m a (m - 2)
 
 /-- A square root of `a` modulo the prime `m ≡ 3 (mod 4)`, when there is one. -/
 def sqrtMod (m a : Nat) : Option Nat :=

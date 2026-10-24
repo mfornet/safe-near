@@ -2,6 +2,7 @@ import NearCrypto
 import CryptoTests.Fixtures
 import CryptoTests.Rng
 import CryptoTests.DiffPairing
+import CryptoTests.DiffP256
 
 /-!
 `crypto-differential`: the `Spec` of every primitive against its `Impl` on seeded random inputs
@@ -841,4 +842,5 @@ def main : IO UInt32 := do
   (t, r) := DiffPairing.bnOpsTests t r
   (t, r) := DiffPairing.tests DiffPairing.blsKit t r
   (t, r) := DiffPairing.blsOpsTests t r
+  (t, r) := DiffP256.tests t r
   finish "crypto-differential" t
