@@ -477,7 +477,8 @@ def deployGlobalContractPlan (st : HostStore NearState) (target : Nat) (len ptr 
 
 /-- `promise_yield_create`: the method name (non-empty) and the arguments are read, the callback's
 gas is prepaid, the receipt with its one data dependency is paid for, and only then is the promise
-registered (which can exceed the promise limit) and the yielded function call paid for. -/
+registered (which can exceed the promise limit), the yielded function call paid for and the data id
+written to its register. -/
 def yieldCreatePlan (st : HostStore NearState) (args : List Value) : FunctionCallPlan :=
   let a := argU64 args
   let methodCharges := [.ext "base", .ext "yield_create_base"] ++ readSpan st (a 0) (a 1)
@@ -496,7 +497,8 @@ def yieldCreatePlan (st : HostStore NearState) (args : List Value) : FunctionCal
         match promiseCapacityError st with
         | some error => { charges := receiptCharges, error := some error }
         | none => { charges := receiptCharges ++
-            [.actionBase (·.functionCallBase) true, .actionBytes (·.functionCallByte) bytes true] }
+            [.actionBase (·.functionCallBase) true, .actionBytes (·.functionCallByte) bytes true] ++
+              writeReg dataIdLength }
 
 /-- `promise_yield_resume`: the payload length is charged as given, then the data id and the
 payload are read, the payload is limited and the data id must be 32 bytes. -/

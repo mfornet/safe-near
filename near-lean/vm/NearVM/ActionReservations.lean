@@ -573,7 +573,7 @@ theorem yieldCreatePlan_valid {st : HostStore NearState} {args : List Value}
         | none =>
           refine ⟨method, arguments, rfl, rfl, ?_⟩
           simp only [List.map_append, List.sum_append, readSpan_reservation]
-          simp [Charge.reservation]
+          simp [Charge.reservation, writeReg]
           omega
 
 theorem chargesBefore_yieldCreate_reservation (st : HostStore NearState) (args : List Value)
