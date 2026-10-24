@@ -613,7 +613,8 @@ reports. Rebuild steps and formats: [`tools/localnet/CORPUS.md`](../../tools/loc
   `vm-tests` runs every function on a recording stub. The proofs over the metered registry gained one generic lemma
   per invariant for `cryptoHostFn` (13 files, none of them restated); `applyCharge` and the other proved definitions
   are unchanged. The six chunks pass: `sharded-h48-s1`, `sharded-h193-s2/s3`, `sharded-h199-s3`, `single-h193-s0`,
-  `single-h199-s0`.
+  `single-h199-s0`. Full replay after M3e: 411 pass, 8 fail (`Stake`/`Unstake`), 17 unsupported (epoch boundary, `validator_stake`,
+  `validator_total_stake`): all remaining ones are M3d.
 
 ## Open points
 
