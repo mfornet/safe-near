@@ -16,6 +16,46 @@ structure ReceiptLoop.FreshInvariant (lower : Nat) (pass : ReceiptLoop) : Prop w
   outgoing : ReceiptList.FreshIds lower pass.2.1.nextId pass.2.2.2.1
   returned : ∀ result, pass.1 = some result → result.FreshReceiptIds lower
 
+theorem resolveYieldTimeouts_freshIds (ap : ApplyState) (limit : Option Nat) (used fuel : Nat) (lower : Nat)
+    (outgoing : List Receipt) :
+    ∀ (acc : ChainState × List Receipt × List ReceiptIdentityBirth), lower ≤ acc.1.nextId →
+      ReceiptList.FreshIds lower acc.1.nextId (outgoing ++ acc.2.1) →
+      ReceiptList.FreshIds lower (resolveYieldTimeouts ap limit used fuel acc).1.nextId
+        (outgoing ++ (resolveYieldTimeouts ap limit used fuel acc).2.1) := by
+  induction fuel with
+  | zero => intro acc _ h; exact h
+  | succ fuel ih =>
+    rintro ⟨st, receipts, births⟩ hl h
+    unfold resolveYieldTimeouts
+    dsimp only at hl h ⊢
+    split
+    · exact h
+    · split
+      · split
+        · exact h
+        · split
+          · exact h
+          · split
+            · apply ih
+              · exact hl.trans (Nat.le_succ _)
+              · rw [← List.append_assoc]
+                apply ReceiptList.FreshIds.append h _ hl (Nat.le_succ _)
+                constructor
+                · simp
+                · intro receipt hm
+                  have he := List.mem_singleton.mp hm
+                  subst receipt
+                  exact ⟨Nat.le_refl _, Nat.lt_succ_self _⟩
+            · exact ih _ hl h
+      · exact h
+
+theorem timeouts_freshIds (ap : ApplyState) (limit : Option Nat) (used fuel : Nat) (lower : Nat)
+    (st : ChainState) (outgoing : List Receipt) (hl : lower ≤ st.nextId)
+    (hout : ReceiptList.FreshIds lower st.nextId outgoing) :
+    ReceiptList.FreshIds lower (resolveYieldTimeouts ap limit used fuel (st, [], [])).1.nextId
+      (outgoing ++ (resolveYieldTimeouts ap limit used fuel (st, [], [])).2.1) :=
+  resolveYieldTimeouts_freshIds ap limit used fuel lower outgoing (st, [], []) hl (by simpa using hout)
+
 /-- The actual block accumulator appends disjoint allocation intervals for
 nonlocal transactions and executed receipts. Early issues discard output atomically. -/
 theorem applyAttempt_freshIds (cfg : RuntimeConfig) (ap : ApplyState)
@@ -90,7 +130,7 @@ theorem applyAttempt_freshIds (cfg : RuntimeConfig) (ap : ApplyState)
     split
     · rename_i returned he
       exact hresult.returned returned he
-    · exact hresult.outgoing
+    · exact timeouts_freshIds ap ap.gasLimit _ _ st.nextId _ _ hresult.counter hresult.outgoing
 
 /-- A public block's outgoing envelope ids are distinct and allocated no earlier
 than the initial counter, on supported and rejected attempts alike. -/
