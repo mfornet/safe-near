@@ -10,12 +10,16 @@ theorem materializeFunctionCall_nextId_mono (c : ReceiptCtx) (isLast : Bool) (ou
   rw [materializeFunctionCallRaw_nextId]
   exact (Nat.le_add_right _ _).trans (Nat.le_add_right _ _)
 
--- TODO(proof): adapt the cloned proof
 theorem commitFunctionCall_nextId_mono (exec : Exec) (c : ReceiptCtx) (account : Account)
     (outcome : VMOutcome) (isLast : Bool) (effects : FunctionCallEffects)
     (heffects : functionCallEffects c account outcome isLast exec.state = .ok effects) :
     exec.state.nextId ≤ (exec.commitFunctionCall outcome effects).state.nextId := by
-  sorry
+  change exec.state.nextId ≤ effects.state.nextId
+  rw [functionCallEffects_success c account outcome isLast exec.state effects heffects]
+  exact materializeFunctionCall_nextId_mono c isLast outcome
+    ((exec.state.setAccount c.receipt.receiverId
+      { account with amount := outcome.balance, storageUsage := outcome.storageUsage }).setContractStorage
+        c.receipt.receiverId outcome.storage)
 
 theorem refundAllowance_nextId (st : ChainState) (receiver : AccountId) (pk : PublicKey) (amount : Nat) :
     (st.refundAllowance receiver pk amount).nextId = st.nextId := by
@@ -31,10 +35,71 @@ theorem transferCreditState_nextId (c : ReceiptCtx) (st : ChainState) (account :
 
 /-- Even failed raw action attempts never rewind the allocator. Receipt rollback
 is handled separately relative to the receipt's initial state. -/
--- TODO(proof): adapt the cloned proof
 theorem applyAction_nextId_mono (c : ReceiptCtx) (isLast : Bool) (action : Action) (before : Exec) :
     before.state.nextId ≤ ((applyAction c isLast action).run.run before).2.state.nextId := by
-  sorry
+  cases action with
+  | createAccount => rw [applyCreateAccount_run]; repeat' (first | exact Nat.le_refl _ | split)
+  | deployContract code => rw [applyDeployContract_run]; repeat' (first | exact Nat.le_refl _ | split)
+  | functionCall method args gas deposit =>
+    rw [show applyAction c isLast (.functionCall method args gas deposit) =
+      applyFunctionCall c method args gas deposit isLast from rfl, applyFunctionCall_run]
+    cases ha : before.state.account? c.receipt.receiverId with
+    | none => exact Nat.le_refl _
+    | some account =>
+      dsimp only
+      cases hc : account.code with
+      | none => exact Nat.le_refl _
+      | some code =>
+        dsimp only
+        cases hi : code.decodeIssue with
+        | some issue => exact Nat.le_refl _
+        | none =>
+          dsimp only
+          generalize ho : run c.cfg code.module code.size method
+            (functionCallContext c account args gas deposit isLast before.storageAccounting)
+            (before.state.contractStorage c.receipt.receiverId) = outcome
+          cases he : outcome.aborted with
+          | some error => exact Nat.le_refl _
+          | none =>
+            dsimp only
+            cases hf : functionCallEffects c account outcome isLast before.state with
+            | error error => exact Nat.le_refl _
+            | ok effects =>
+              exact commitFunctionCall_nextId_mono (before.recordVMOutcome outcome) c account outcome isLast effects hf
+  | transfer amount =>
+    rw [applyTransfer_run]
+    split
+    · exact Nat.le_of_eq (transferCreditState_nextId _ _ _ _).symm
+    · split
+      · exact Nat.le_refl _
+      · split <;> exact Nat.le_refl _
+  | stake amount pk =>
+    cases ha : before.state.account? c.receipt.receiverId <;>
+      simp [-StateT.run_bind, applyAction, getAccount, getState, ha]
+    repeat' (first | exact Nat.le_refl _ | split)
+  | addKey pk key =>
+    rw [applyAddKey_run]
+    repeat' (first | exact Nat.le_refl _ | exact (ChainState.RoutingAdvance.of_routing (addKeyMetadataState_routing _ _ _ _ _)).nextId_le | split)
+  | deleteKey pk =>
+    rw [applyDeleteKey_run]
+    repeat' (first | exact Nat.le_refl _ | exact (ChainState.RoutingAdvance.of_routing (deleteKeyMetadataState_routing _ _ _ _ _)).nextId_le | split)
+  | useGlobalContract contract => rw [applyUseGlobalContract_run]; repeat' (first | exact Nat.le_refl _ | split)
+  | deployGlobalContract code mode =>
+    rw [applyDeployGlobalContract_run]
+    repeat' (first | exact Nat.le_refl _ | exact ((ChainState.RoutingAdvance.of_routing (deployGlobalMoved_routing c _ _)).trans (ChainState.RoutingAdvance.freshId _)).nextId_le | split)
+  | transferToGasKey pk deposit =>
+    rw [applyTransferToGasKey_run]
+    repeat' (first | exact Nat.le_refl _ | exact (ChainState.RoutingAdvance.of_routing (gasKeyDeposit_routing (by assumption))).nextId_le | split)
+  | withdrawFromGasKey pk amount =>
+    rw [applyWithdrawFromGasKey_run]
+    repeat' (first | exact Nat.le_refl _ | exact (ChainState.RoutingAdvance.of_routing (gasKeyWithdrawal_routing (by assumption))).nextId_le | split)
+  | delegate sender receiver inner nonce nonceIndex maxBlockHeight pk signature v2 =>
+    change before.state.nextId ≤ ((applyDelegateAction c _).run.run before).2.state.nextId
+    rw [applyDelegateAction_run]
+    repeat' (first | exact Nat.le_refl _ | exact ((ChainState.RoutingAdvance.of_routing (delegateState_routing (by assumption))).trans (ChainState.RoutingAdvance.freshId _)).nextId_le | split)
+  | deleteAccount beneficiary =>
+    rw [applyDeleteAccount_run]
+    repeat' (first | exact Nat.le_refl _ | exact (deleteAccountFundedResult_advance _ _ _ _).nextId_le | split)
 
 /-- Counter progress composes through the same action monad on all outcomes. -/
 def ExecM.NextIdMonotone (operation : ExecM α) : Prop :=
@@ -91,10 +156,17 @@ theorem nextId_runReceiptAction (c : ReceiptCtx) (onlyAction isLast : Bool) (act
   exact (nextId_fee _ _).bind (fun _ => (nextId_checkReceiptAction _ _ _).bind
     (fun _ => applyAction_nextId_mono _ _ _))
 
--- TODO(proof): adapt the cloned proof
 theorem nextId_runReceiptActionAt (c : ReceiptCtx) (onlyAction isLast : Bool)
     (action : Action) (index : Nat) : (runReceiptActionAt c onlyAction isLast action index).NextIdMonotone := by
-  sorry
+  cases action <;> try exact nextId_runReceiptAction c onlyAction isLast _
+  case functionCall method args gas deposit =>
+    cases hs : actionRandomSeed c index with
+    | error error =>
+      simp only [runReceiptActionAt, hs]
+      exact nextId_throw _
+    | ok seed =>
+      simp only [runReceiptActionAt, hs]
+      exact nextId_runReceiptAction _ _ _ _
 
 theorem nextId_failureIndex (index : Option Nat) :
     (modify fun e => { e with failureIndex := index } : ExecM Unit).NextIdMonotone := by
@@ -150,11 +222,43 @@ theorem Exec.creditReceiptReward_nextId (exec : Exec) (cfg : RuntimeConfig) (rec
 
 /-- Rollback may discard speculative allocations, but finalization never rewinds
 past the receipt's initial counter. -/
--- TODO(proof): adapt the cloned proof
 theorem finalizeReceipt_nextId_mono (c : ReceiptCtx) (st : ChainState) (raw : Exec) (failed : Option RuntimeError)
     (hraw : st.nextId ≤ raw.state.nextId) :
     st.nextId ≤ (finalizeReceipt c st raw failed).state.nextId := by
-  sorry
+  let base := rollbackReceipt st raw failed
+  let settlement := Fees.settleGas c.cfg c.action.gasPrice c.ap.gasPrice
+    (Fees.receiptGasBudget c.cfg c.receipt.receiverId c.action.actions) base.gasUsed base.gasBurnt
+    ((st.account? c.receipt.receiverId).isNone && (base.state.account? c.receipt.receiverId).isSome && failed.isNone)
+  let charged := { base with
+    tokensBurnt := if c.receipt.isRefund then 0 else settlement.tokensBurnt
+    otherTokensBurnt := if c.receipt.isRefund && failed.isSome then Fees.totalDeposit c.action.actions else 0 }
+  let depositRefund := if failed.isSome then Fees.totalDeposit c.action.actions else 0
+  let gasRefund := if c.receipt.isRefund then 0 else settlement.refund
+  let balance := if depositRefund > 0 && c.receipt.predecessorId != systemAccount then
+    charged.addBalanceRefund c.receipt.predecessorId depositRefund else charged
+  let gas := if gasRefund > 0 && c.action.signerId != systemAccount then
+    balance.addGasRefund c.action.signerId c.action.signerPublicKey gasRefund else balance
+  let rewarded := gas.creditReceiptReward c.cfg c.receipt.receiverId settlement.burnPrice c.action.gasPrice
+  let finished := rewarded.finishReceiptResult c failed
+  have hbase : st.nextId ≤ base.state.nextId := by
+    cases failed <;> first | exact hraw | exact Nat.le_refl _
+  have hcharged : st.nextId ≤ charged.state.nextId := hbase
+  have hbalance : st.nextId ≤ balance.state.nextId := by
+    dsimp only [balance]
+    split
+    · exact hcharged.trans (Exec.addBalanceRefund_nextId_mono charged _ _)
+    · exact hcharged
+  have hgas : st.nextId ≤ gas.state.nextId := by
+    dsimp only [gas]
+    split
+    · exact hbalance.trans (Exec.addGasRefund_nextId_mono balance _ _ _)
+    · exact hbalance
+  have hrewarded : st.nextId ≤ rewarded.state.nextId := by
+    rw [Exec.creditReceiptReward_nextId]
+    exact hgas
+  have hfinished : st.nextId ≤ finished.state.nextId := by
+    exact hrewarded.trans (Exec.finishReceiptResult_nextId_mono rewarded c failed)
+  exact hfinished
 
 theorem applyActionReceipt_nextId_mono (c : ReceiptCtx) (st : ChainState) :
     st.nextId ≤ (applyActionReceipt c st).state.nextId :=
@@ -162,9 +266,62 @@ theorem applyActionReceipt_nextId_mono (c : ReceiptCtx) (st : ChainState) :
 
 /-- Every processor path advances or retains the allocator, including recursive
 release and unsupported/incomplete fallback. No well-formedness premise is used. -/
--- TODO(proof): adapt the cloned proof
 theorem processReceipt_nextId_mono (cfg : RuntimeConfig) (ap : ApplyState) (decoder : Bytes → ContractCode)
     (st : ChainState) (receipt : Receipt) : st.nextId ≤ (processReceipt cfg ap decoder st receipt).state.nextId := by
-  sorry
+  cases hr : receipt.receipt with
+  | action action =>
+    cases hy : action.yieldDataId with
+    | some dataId =>
+      rw [processReceipt_yield_unfold cfg ap decoder st receipt action dataId hr hy]
+      split <;> exact Nat.le_refl _
+    | none =>
+      cases he : (action.inputDataIds.filter fun id => !(Assoc.contains st.receivedData id)).isEmpty with
+      | false =>
+        rw [processReceipt_waiting cfg ap decoder st receipt action hr hy he]
+        exact Nat.le_refl _
+      | true =>
+        rw [processReceipt_ready cfg ap decoder st receipt action hr hy he]
+        unfold processedOfExec
+        split
+        · exact Nat.le_refl _
+        · exact applyActionReceipt_nextId_mono (readyActionContext cfg ap decoder st receipt action)
+            (consumeReceiptDataState st action)
+  | data data =>
+    cases hres : data.resumeDataId with
+    | none =>
+      rw [processReceipt_data cfg ap decoder st receipt data hr hres]
+      cases hroute : Assoc.lookup st.postponedByData data.dataId with
+      | none => exact Nat.le_refl _
+      | some id =>
+        simp only
+        cases hpending : ((Assoc.lookup st.pendingDataCount id).getD 1 - 1 == 0) with
+        | false => simp only [Bool.false_eq_true, ite_false]; exact Nat.le_refl _
+        | true =>
+          simp only [ite_true]
+          cases hwaiting : Assoc.lookup st.postponed id with
+          | none => exact Nat.le_refl _
+          | some waiting =>
+            exact processReceipt_nextId_mono cfg ap decoder
+              (releasePostponedState (receivePostponedDataState st data) id) waiting
+    | some dataId =>
+      rw [processReceipt_resume cfg ap decoder st receipt data dataId hr hres]
+      split
+      · exact Nat.le_refl _
+      · split
+        · rename_i y _
+          split
+          · rename_i a _
+            rw [runActionReceipt_eq]
+            unfold processedOfExec
+            split
+            · exact Nat.le_refl _
+            · exact applyActionReceipt_nextId_mono _ _
+          · exact Nat.le_refl _
+        · exact Nat.le_refl _
+  | globalDistribution g =>
+    rw [processReceipt_distribution cfg ap decoder st receipt g hr]
+    exact (processDistribution_advance cfg ap st receipt g).nextId_le
+termination_by st.postponed.length
+decreasing_by exact Assoc.erase_length_lt_of_lookup _ _ _ hwaiting
 
 end Near

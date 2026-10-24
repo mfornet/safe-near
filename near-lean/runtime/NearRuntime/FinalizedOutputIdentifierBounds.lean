@@ -65,12 +65,25 @@ theorem Exec.addSuccessData_outputIds (exec : Exec) (receiver : AccountId) (byte
   · exact (h receipt hold id hid).trans_le hf.1
   · exact hf.2 receipt hnew id hid
 
--- TODO(proof): adapt the cloned proof
 theorem Receipt.forwardResult_idsBelow (receipt : Receipt) (target : ReceiptId) (outputs : List DataReceiver)
     (bound : Nat) (h : ∀ id ∈ receipt.liveIds, id < bound)
     (houtputs : ∀ output ∈ outputs, output.dataId < bound) :
     ∀ id ∈ (receipt.forwardResult target outputs).liveIds, id < bound := by
-  sorry
+  unfold Receipt.forwardResult
+  split
+  · cases hr : receipt.receipt with
+    | data data => exact h
+    | globalDistribution g => exact h
+    | action action =>
+      intro id hid
+      simp only [Receipt.liveIds, List.map_append, List.mem_cons, List.mem_append] at hid
+      rcases hid with he | hi | ho | hn
+      · exact h id (by simp [Receipt.liveIds, hr, he])
+      · exact h id (by simp [Receipt.liveIds, hr, hi])
+      · exact h id (by simp [Receipt.liveIds, hr, ho])
+      · obtain ⟨output, hm, rfl⟩ := List.mem_map.mp hn
+        exact houtputs output hm
+  · exact h
 
 theorem Exec.forwardResult_outputIds (exec : Exec) (target : ReceiptId) (outputs : List DataReceiver)
     (h : exec.OutputIdsBelowNext) (houtputs : ∀ output ∈ outputs, output.dataId < exec.state.nextId) :
@@ -100,12 +113,61 @@ theorem Exec.creditReceiptReward_outputIds (exec : Exec) (cfg : RuntimeConfig) (
 
 /-- Finalization discards speculative receipts on failure before allocating
 refunds and failed callback deliveries, all below the committed counter. -/
--- TODO(proof): adapt the cloned proof
 theorem finalizeReceipt_outputIds (c : ReceiptCtx) (st : ChainState) (raw : Exec) (failed : Option RuntimeError)
     (hraw : raw.OutputIdsBelowNext) (hmono : st.nextId ≤ raw.state.nextId)
     (hcallbacks : c.CallbackIdsBelow st.nextId) :
     (finalizeReceipt c st raw failed).OutputIdsBelowNext := by
-  sorry
+  let base := rollbackReceipt st raw failed
+  let settlement := Fees.settleGas c.cfg c.action.gasPrice c.ap.gasPrice
+    (Fees.receiptGasBudget c.cfg c.receipt.receiverId c.action.actions) base.gasUsed base.gasBurnt
+    ((st.account? c.receipt.receiverId).isNone && (base.state.account? c.receipt.receiverId).isSome && failed.isNone)
+  let charged := { base with
+    tokensBurnt := if c.receipt.isRefund then 0 else settlement.tokensBurnt
+    otherTokensBurnt := if c.receipt.isRefund && failed.isSome then Fees.totalDeposit c.action.actions else 0 }
+  let depositRefund := if failed.isSome then Fees.totalDeposit c.action.actions else 0
+  let gasRefund := if c.receipt.isRefund then 0 else settlement.refund
+  let balance := if depositRefund > 0 && c.receipt.predecessorId != systemAccount then
+    charged.addBalanceRefund c.receipt.predecessorId depositRefund else charged
+  let gas := if gasRefund > 0 && c.action.signerId != systemAccount then
+    balance.addGasRefund c.action.signerId c.action.signerPublicKey gasRefund else balance
+  let rewarded := gas.creditReceiptReward c.cfg c.receipt.receiverId settlement.burnPrice c.action.gasPrice
+  let finished := rewarded.finishReceiptResult c failed
+  have hbase : base.OutputIdsBelowNext := by
+    cases failed with
+    | none => exact hraw
+    | some error => intro receipt hm; contradiction
+  have hnbase : st.nextId ≤ base.state.nextId := by
+    cases failed <;> first | exact hmono | exact Nat.le_refl _
+  have hcharged : charged.OutputIdsBelowNext := hbase
+  have hbalance : balance.OutputIdsBelowNext := by
+    dsimp only [balance]
+    split
+    · exact Exec.addBalanceRefund_outputIds charged _ _ hcharged
+    · exact hcharged
+  have hnbalance : st.nextId ≤ balance.state.nextId := by
+    dsimp only [balance]
+    split
+    · exact hnbase.trans (Exec.addBalanceRefund_nextId_mono charged _ _)
+    · exact hnbase
+  have hgas : gas.OutputIdsBelowNext := by
+    dsimp only [gas]
+    split
+    · exact Exec.addGasRefund_outputIds balance _ _ _ hbalance
+    · exact hbalance
+  have hngas : st.nextId ≤ gas.state.nextId := by
+    dsimp only [gas]
+    split
+    · exact hnbalance.trans (Exec.addGasRefund_nextId_mono balance _ _ _)
+    · exact hnbalance
+  have hrewarded : rewarded.OutputIdsBelowNext :=
+    Exec.creditReceiptReward_outputIds gas _ _ _ _ hgas
+  have hnrewarded : st.nextId ≤ rewarded.state.nextId := by
+    rw [Exec.creditReceiptReward_nextId]
+    exact hngas
+  have hfinished : finished.OutputIdsBelowNext := by
+    exact Exec.finishReceiptResult_outputIds rewarded c failed hrewarded
+      (fun output hm => (hcallbacks output hm).trans_le hnrewarded)
+  exact hfinished
 
 theorem applyActionReceipt_outputIds (c : ReceiptCtx) (st : ChainState) (hcallbacks : c.CallbackIdsBelow st.nextId) :
     (applyActionReceipt c st).OutputIdsBelowNext :=

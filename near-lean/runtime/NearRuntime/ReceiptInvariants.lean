@@ -21,14 +21,14 @@ def Exec.totalFunds (exec : Exec) (cfg : RuntimeConfig) : Nat :=
 @[simp] theorem addBalanceRefund_totalFunds (cfg : RuntimeConfig) (exec : Exec) (receiver : AccountId) (amount : Nat) :
     (exec.addBalanceRefund receiver amount).totalFunds cfg = exec.totalFunds cfg + amount := by
   simp [Exec.totalFunds, Exec.addBalanceRefund, refundReceipt, ChainState.freshId,
-    ChainState.totalBalance, receiptsFunds, Fees.receiptFunds, Fees.totalDeposit, Action.deposit,
+    ChainState.totalBalance, ChainState.gasKeyFunds, receiptsFunds, Fees.receiptFunds, Fees.totalDeposit, Action.deposit,
     Receipt.isRefund, Nat.add_assoc]
 
 @[simp] theorem addGasRefund_totalFunds (cfg : RuntimeConfig) (exec : Exec) (receiver : AccountId)
     (pk : PublicKey) (amount : Nat) :
     (exec.addGasRefund receiver pk amount).totalFunds cfg = exec.totalFunds cfg + amount := by
   simp [Exec.totalFunds, Exec.addGasRefund, gasRefundReceipt, ChainState.freshId,
-    ChainState.totalBalance, receiptsFunds, Fees.receiptFunds, Fees.totalDeposit, Action.deposit,
+    ChainState.totalBalance, ChainState.gasKeyFunds, receiptsFunds, Fees.receiptFunds, Fees.totalDeposit, Action.deposit,
     Receipt.isRefund, Nat.add_assoc]
 
 theorem failureDataFold_state (receiver : AccountId) (outputs : List DataReceiver)
@@ -58,7 +58,7 @@ theorem failureDataFold_funds (cfg : RuntimeConfig) (receiver : AccountId) (outp
   unfold Exec.addFailureData Exec.totalFunds
   dsimp only
   rw [receiptsFunds_append, failureDataFold_state, failureDataFold_funds]
-  simp [ChainState.totalBalance, receiptsFunds]
+  simp [ChainState.totalBalance, ChainState.gasKeyFunds, receiptsFunds]
 
 theorem successDataFold_state (receiver : AccountId) (bytes : Bytes) (outputs : List DataReceiver)
     (st : ChainState) (receipts : List Receipt) :
@@ -87,7 +87,7 @@ theorem successDataFold_funds (cfg : RuntimeConfig) (receiver : AccountId) (byte
   unfold Exec.addSuccessData Exec.totalFunds
   dsimp only
   rw [receiptsFunds_append, successDataFold_state, successDataFold_funds]
-  simp [ChainState.totalBalance, receiptsFunds]
+  simp [ChainState.totalBalance, ChainState.gasKeyFunds, receiptsFunds]
 
 @[simp] theorem forwardResult_receiptFunds (cfg : RuntimeConfig) (receipt : Receipt)
     (target : ReceiptId) (outputs : List DataReceiver) :

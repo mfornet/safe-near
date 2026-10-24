@@ -8,8 +8,12 @@ map's indexing metadata is not a second copy of the asset. -/
 def ChainState.postponedFunds (cfg : RuntimeConfig) (st : ChainState) : Nat :=
   Assoc.mass (Fees.receiptFunds cfg) st.postponed
 
+/-- A yielded receipt retains its deposits and purchased gas until it resumes or times out. -/
+def ChainState.yieldFunds (cfg : RuntimeConfig) (st : ChainState) : Nat :=
+  receiptsFunds cfg (st.yieldReceipts.map (·.2))
+
 def ChainState.queuedFunds (cfg : RuntimeConfig) (st : ChainState) : Nat :=
-  st.postponedFunds cfg + receiptsFunds cfg st.delayed
+  st.postponedFunds cfg + receiptsFunds cfg st.delayed + st.yieldFunds cfg
 
 /-- Ledger value inside the runtime state, excluding incoming/outgoing receipts
 still held by the caller. This is not merely account liquidity. -/
@@ -26,13 +30,19 @@ def postponeActionState (st : ChainState) (receipt : Receipt) (action : ActionRe
 
 /-- Actual receipt processing postpones the complete receipt without executing
 it, emitting outcomes, burning funds or manufacturing a replacement receipt. -/
--- TODO(proof): adapt the cloned proof
 theorem processReceipt_waiting (cfg : RuntimeConfig) (ap : ApplyState) (decoder : Bytes → ContractCode)
     (st : ChainState) (receipt : Receipt) (action : ActionReceipt)
-    (haction : receipt.receipt = .action action)
+    (haction : receipt.receipt = .action action) (hyield : action.yieldDataId = none)
     (hmissing : (action.inputDataIds.filter fun id => !(Assoc.contains st.receivedData id)).isEmpty = false) :
     processReceipt cfg ap decoder st receipt = { state := postponeActionState st receipt action, storageAccounting := ap.storageAccounting } := by
-  sorry
+  rw [processReceipt]
+  simp only [haction, hyield, hmissing, Bool.false_eq_true, ite_false]
+  rfl
+
+/-- The funds a yielded receipt table retains are its receipts' funds. -/
+theorem ChainState.yieldFunds_eq_mass (cfg : RuntimeConfig) (st : ChainState) :
+    st.yieldFunds cfg = Assoc.mass (Fees.receiptFunds cfg) st.yieldReceipts := by
+  simp [ChainState.yieldFunds, receiptsFunds, Assoc.mass, List.map_map, Function.comp_def]
 
 /-- Fresh indexing is essential: inserting over an existing receipt id could
 otherwise discard that receipt's backing. The premise is identifier freshness,
@@ -43,19 +53,18 @@ theorem postponeActionState_funds (cfg : RuntimeConfig) (st : ChainState) (recei
   have hm := Assoc.mass_insert_accounting (Fees.receiptFunds cfg) st.postponed receipt.receiptId receipt hunique
   simp only [hfresh, Option.map_none, Option.getD_none, Nat.add_zero] at hm
   unfold ChainState.totalFunds ChainState.queuedFunds ChainState.postponedFunds
-  change st.totalBalance + (Assoc.mass (Fees.receiptFunds cfg) (Assoc.insert st.postponed receipt.receiptId receipt) +
-    receiptsFunds cfg st.delayed) = _
+  simp only [postponeActionState, ChainState.yieldFunds, ChainState.totalBalance, ChainState.gasKeyFunds]
   omega
 
 /-- The executable waiting branch preserves all account and in-flight value
 by moving the incoming receipt into the postponed map exactly once. -/
 theorem processReceipt_waiting_funds (cfg : RuntimeConfig) (ap : ApplyState) (decoder : Bytes → ContractCode)
     (st : ChainState) (receipt : Receipt) (action : ActionReceipt)
-    (haction : receipt.receipt = .action action)
+    (haction : receipt.receipt = .action action) (hyield : action.yieldDataId = none)
     (hmissing : (action.inputDataIds.filter fun id => !(Assoc.contains st.receivedData id)).isEmpty = false)
     (hunique : Assoc.KeysUnique st.postponed) (hfresh : Assoc.lookup st.postponed receipt.receiptId = none) :
     (processReceipt cfg ap decoder st receipt).state.totalFunds cfg = st.totalFunds cfg + Fees.receiptFunds cfg receipt := by
-  rw [processReceipt_waiting cfg ap decoder st receipt action haction hmissing]
+  rw [processReceipt_waiting cfg ap decoder st receipt action haction hyield hmissing]
   exact postponeActionState_funds cfg st receipt action hunique hfresh
 
 def releasePostponedState (st : ChainState) (id : ReceiptId) : ChainState :=
@@ -69,23 +78,52 @@ theorem releasePostponedState_funds (cfg : RuntimeConfig) (st : ChainState) (id 
   have hm := Assoc.mass_erase_lookup (Fees.receiptFunds cfg) st.postponed id hunique
   simp only [hlookup, Option.map_some, Option.getD_some] at hm
   unfold ChainState.totalFunds ChainState.queuedFunds ChainState.postponedFunds
-  change st.totalBalance + (Assoc.mass (Fees.receiptFunds cfg) (Assoc.erase st.postponed id) +
-    receiptsFunds cfg st.delayed) + _ = _
+  simp only [releasePostponedState, ChainState.yieldFunds, ChainState.totalBalance, ChainState.gasKeyFunds]
+  omega
+
+/-- A yielded receipt waits with its complete backing in the yield table. -/
+theorem yieldInsert_funds (cfg : RuntimeConfig) (st : ChainState) (key : AccountId × Bytes) (receipt : Receipt)
+    (hunique : Assoc.KeysUnique st.yieldReceipts) (hfresh : Assoc.lookup st.yieldReceipts key = none) :
+    ({ st with yieldReceipts := Assoc.insert st.yieldReceipts key receipt } : ChainState).totalFunds cfg =
+      st.totalFunds cfg + Fees.receiptFunds cfg receipt := by
+  have hm := Assoc.mass_insert_accounting (Fees.receiptFunds cfg) st.yieldReceipts key receipt hunique
+  simp only [hfresh, Option.map_none, Option.getD_none, Nat.add_zero] at hm
+  have hy := ChainState.yieldFunds_eq_mass cfg st
+  have hy' := ChainState.yieldFunds_eq_mass cfg { st with yieldReceipts := Assoc.insert st.yieldReceipts key receipt }
+  simp only [ChainState.totalFunds, ChainState.queuedFunds, ChainState.postponedFunds, ChainState.totalBalance,
+    ChainState.gasKeyFunds] at hy hy' ⊢
+  omega
+
+/-- Resuming a yield removes precisely its receipt's backing from the yield table. -/
+theorem yieldErase_funds (cfg : RuntimeConfig) (st : ChainState) (key : AccountId × Bytes) (receipt : Receipt)
+    (hunique : Assoc.KeysUnique st.yieldReceipts) (hlookup : Assoc.lookup st.yieldReceipts key = some receipt)
+    (status : List ((AccountId × Bytes) × YieldStatus)) :
+    ({ st with yieldReceipts := Assoc.erase st.yieldReceipts key, yieldStatus := status } : ChainState).totalFunds cfg +
+      Fees.receiptFunds cfg receipt = st.totalFunds cfg := by
+  have hm := Assoc.mass_erase_lookup (Fees.receiptFunds cfg) st.yieldReceipts key hunique
+  simp only [hlookup, Option.map_some, Option.getD_some] at hm
+  have hy := ChainState.yieldFunds_eq_mass cfg st
+  have hy' := ChainState.yieldFunds_eq_mass cfg
+    { st with yieldReceipts := Assoc.erase st.yieldReceipts key, yieldStatus := status }
+  simp only [ChainState.totalFunds, ChainState.queuedFunds, ChainState.postponedFunds, ChainState.totalBalance,
+    ChainState.gasKeyFunds] at hy hy' ⊢
   omega
 
 /-- Delaying receipts retains their entire backing, not just attached deposits. -/
 theorem ChainState.delayed_append_funds (cfg : RuntimeConfig) (st : ChainState) (receipts : List Receipt) :
     ({ st with delayed := st.delayed ++ receipts } : ChainState).totalFunds cfg =
       st.totalFunds cfg + receiptsFunds cfg receipts := by
-  simp [ChainState.totalFunds, ChainState.queuedFunds, ChainState.postponedFunds, ChainState.totalBalance, receiptsFunds_append, Nat.add_assoc]
+  simp [ChainState.totalFunds, ChainState.queuedFunds, ChainState.postponedFunds, ChainState.yieldFunds,
+    ChainState.totalBalance, ChainState.gasKeyFunds, receiptsFunds_append, Nat.add_assoc]
+  omega
 
 /-- Removing the next delayed receipt transfers its complete backing to the
 execution frontier. No quiescence or fairness claim is made. -/
 theorem ChainState.delayed_cons_funds (cfg : RuntimeConfig) (st : ChainState) (receipt : Receipt) (rest : List Receipt)
     (hdelayed : st.delayed = receipt :: rest) :
     ({ st with delayed := rest } : ChainState).totalFunds cfg + Fees.receiptFunds cfg receipt = st.totalFunds cfg := by
-  simp only [ChainState.totalFunds, ChainState.queuedFunds, ChainState.postponedFunds, ChainState.totalBalance, hdelayed,
-    receiptsFunds, List.map_cons, List.sum_cons]
+  simp only [ChainState.totalFunds, ChainState.queuedFunds, ChainState.postponedFunds, ChainState.yieldFunds,
+    ChainState.totalBalance, ChainState.gasKeyFunds, hdelayed, receiptsFunds, List.map_cons, List.sum_cons]
   omega
 
 end Near

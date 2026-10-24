@@ -28,11 +28,15 @@ theorem commitFunctionCall_funded_gas (exec : Exec) (c : ReceiptCtx) (account : 
   exact hf
 
 /-- Additive conservation at an action boundary. Gas used purchases both burn
-and onward receipt obligations; subsidy is an explicit external source. The
-cross terms let consecutive steps compose without truncated subtraction. -/
+and onward receipt obligations; subsidy is an explicit external source, and the tokens an action
+burns itself (global contract storage, the balance of a deleted gas key or account) leave the
+funds and enter `actionTokensBurnt`. The cross terms let consecutive steps compose without
+truncated subtraction. -/
 def Exec.FundingStep (cfg : RuntimeConfig) (price deposit : Nat) (before after : Exec) : Prop :=
-  after.totalFunds cfg + before.subsidizedAmount + after.gasBurnt * price + before.gasUsed * price =
+  after.totalFunds cfg + before.subsidizedAmount + after.gasBurnt * price + before.gasUsed * price
+      + after.actionTokensBurnt =
     before.totalFunds cfg + deposit + after.subsidizedAmount + before.gasBurnt * price + after.gasUsed * price
+      + before.actionTokensBurnt
 
 /-- Consecutive funded actions telescope without assuming either intermediate
 state has zero gas, no prior receipts, or zero subsidy. -/
@@ -66,6 +70,7 @@ theorem applyFunctionCall_success_funding_step (c : ReceiptCtx) (method : String
   rw [hg] at hf
   have hburn : after.gasBurnt = before.gasBurnt + outcome.burntGas := by rw [heq]; rfl
   have hused : after.gasUsed = before.gasUsed + outcome.burntGas + (outcome.usedGas - outcome.burntGas) := by rw [heq]; rfl
+  have htokens : after.actionTokensBurnt = before.actionTokensBurnt := by rw [heq]; rfl
   unfold Exec.FundingStep
   rw [hburn, hused]
   simp only [Nat.add_mul]

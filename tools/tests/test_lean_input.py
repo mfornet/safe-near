@@ -22,7 +22,7 @@ def tx_bundle(actions=None, receipts=(), entries=None, shards=1):
     view = {"signer_id": "alice.near", "receiver_id": "bob.near", "public_key": PK, "nonce": 5,
             "actions": actions or [{"Transfer": {"deposit": "7"}}]}
     return {
-        "formatVersion": 1, "meta": {"height": 9, "shardId": 0},
+        "formatVersion": 1, "meta": {"height": 9, "shardId": 0, "chainId": "safe-near-localnet-1s"},
         "context": {"currentProtocolVersion": 86, "validatorAccountsUpdate": None, "blockHeight": 9,
                     "blockTimestamp": 5, "epochHeight": 1, "gasPrice": "100", "gasLimit": 10**15,
                     "randomSeed": "ab" * 32, "bandwidthRequests": "0100000000000000000000000000000000",
@@ -60,7 +60,9 @@ class Parsing(unittest.TestCase):
         self.assertEqual(li.receipt_format(header + b"\x01"), ("data", False))
         self.assertEqual(li.receipt_format(header + b"\x05" + nc.string("s.near") + b"\x00"), ("v2", False))
         self.assertEqual(li.receipt_format(header + b"\x05" + nc.string("s.near") + b"\x01"), ("v2", True))
-        self.assertEqual(li.receipt_format(header + b"\x03")[0], "tag 3")
+        self.assertEqual(li.receipt_format(header + b"\x03")[0], "resume")
+        self.assertEqual(li.receipt_format(header + b"\x04")[0], "distribution")
+        self.assertEqual(li.receipt_format(header + b"\x09")[0], "tag 9")
 
     def test_public_keys(self):
         self.assertEqual(li.public_key(PK), [0] + list(KEY.public))
@@ -73,20 +75,22 @@ class Blockers(unittest.TestCase):
         self.assertEqual(li.blockers(tx_bundle()), [])
 
     def test_each_unrepresented_feature_is_named(self):
-        bundle = tx_bundle(actions=[{"Delegate": {}}, {"TransferToGasKey": {}}, "CreateAccount"], shards=4)
-        bundle["preState"]["entries"] = [["0a", "00"], ["0f", "00"], ["12", "00"]]
+        bundle = tx_bundle(actions=[{"DeterministicStateInit": {}}, "CreateAccount"], shards=4)
+        bundle["preState"]["entries"] = [["0a", "00"], ["0f", "00"], ["0d", "00"]]
         bundle["context"]["validatorAccountsUpdate"] = {}
         bundle["inputs"]["transactions"][0]["valid"] = False
         found = li.blockers(bundle)
-        for text in ["multi-shard layout", "pre-state column promise-yield-indices", "pre-state column global-contract-code",
-                     "action Delegate", "action TransferToGasKey", "epoch boundary", "transaction rejected"]:
+        for text in ["multi-shard layout", "pre-state column buffered-receipt",
+                     "action DeterministicStateInit", "epoch boundary", "transaction rejected"]:
             self.assertTrue(any(text in reason for reason in found), (text, found))
         self.assertFalse(any("bandwidth" in reason for reason in found))      # column 15 is the modelled scheduler
         self.assertEqual(found, list(dict.fromkeys(found)))
 
     def test_model_actions(self):
         self.assertEqual(li.model_action_blockers(["Transfer", "FunctionCall"]), [])
-        self.assertEqual(li.model_action_blockers(["Transfer", "UseGlobalContract"]), ["action UseGlobalContract"])
+        self.assertEqual(li.model_action_blockers(["Transfer", "UseGlobalContract", "Delegate", "TransferToGasKey"]), [])
+        self.assertEqual(li.model_action_blockers(["Transfer", "DeterministicStateInit"]),
+                         ["action DeterministicStateInit"])
 
     def test_host_functions_that_need_the_epoch(self):
         bundle = tx_bundle()
@@ -104,7 +108,8 @@ class Conversion(unittest.TestCase):
         bundle = tx_bundle()
         request = self.convert(bundle)
         self.assertEqual(request["initialState"]["accounts"],
-                         [["alice.near", {"amount": "1000", "locked": "0", "storageUsage": 182, "codeHash": None}]])
+                         [["alice.near", {"amount": "1000", "locked": "0", "storageUsage": 182, "codeHash": None,
+                           "global": None, "versionTwo": False}]])
         self.assertEqual(request["initialState"]["accessKeys"][0][0], ["alice.near", [0] + list(KEY.public)])
         tx = request["blocks"][0]["transactions"][0]
         self.assertEqual((tx["signerId"], tx["receiverId"], tx["nonce"]), ("alice.near", "bob.near", 5))
@@ -150,7 +155,7 @@ class Conversion(unittest.TestCase):
             self.convert(tx_bundle(), rows)
         self.assertIn("PostponedReceipt", caught.exception.reasons[0])
         rows = decoded()
-        rows["preState"][0]["record"]["Account"]["account"]["global_contract_hash"] = None
+        rows["preState"][0]["record"]["Account"]["account"]["mystery_field"] = 1
         with self.assertRaises(li.Unsupported):
             self.convert(tx_bundle(), rows)
 

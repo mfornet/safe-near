@@ -55,6 +55,17 @@ by the 32 decoded bytes, rather than the 64 ASCII hexadecimal characters. -/
 def implicitPublicKey? (id : AccountId) : Option PublicKey :=
   if isImplicitAccount id then (decodeHex id.toList).map (0 :: ·) else none
 
+/-- `eth_wallet_global_contract_hash`: the global contract ETH-implicit accounts use. Mainnet (and
+mocknet) and testnet have fixed hashes; every other chain uses the embedded localnet wallet. -/
+def ethWalletGlobalContractHash (chainId : String) : Bytes :=
+  let hex :=
+    if chainId == "mainnet" || chainId == "mocknet" then
+      "1daa835c4637f7ae3d924095ba3f0bf2829bcfa17b1068cd58bd853dcad7ceb5"
+    else if chainId == "testnet" then
+      "238feac1f86cc9f9f4003e3f6d5aebc04eaea9c394032bd29470e9609b67f6c5"
+    else "d2884a900d4fa370e48f1e3d4865d4dc0dbd093c89f0e7baef2eddc142c49e8d"
+  (decodeHex hex.toList).getD []
+
 /-- New keys start in the block's nonce range (`access_keys.rs` in the pinned
 reference). Block zero is a synthetic fixture; real execution starts above it. -/
 def initialNonce (blockHeight : Nat) : Nat := (blockHeight - 1) * 1_000_000

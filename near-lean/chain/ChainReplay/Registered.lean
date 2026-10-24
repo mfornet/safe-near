@@ -1,4 +1,5 @@
 import ChainReplay.Encode
+import ChainReplay.DelegateSignature
 import ChainReplay.QueueContext
 import ChainReplay.ChunkTrie
 import NearRuntime.TransactionRegistry
@@ -60,12 +61,14 @@ def birthsJson (births : List ReceiptIdentityBirth) : Json :=
     (births.map fun birth =>
       obj
         [("parent", toJson birth.parent), ("children", toJson birth.children),
+          ("parentHash", toJson (birth.parentHash.map bytesJson)),
+          ("startIndex", toJson birth.startIndex),
           ("vmActions",
             toJson
               (birth.vmActions.map fun action =>
                 obj
                   [("actionIndex", toJson action.actionIndex), ("receipts", toJson action.receipts),
-                    ("data", toJson action.data)]))])
+                    ("data", toJson action.data), ("dataIndices", toJson action.dataIndices)]))])
 
 def accountingJson (state : Option TrieOverlay.State) : Json :=
   match state with
@@ -133,7 +136,8 @@ def run (protocol : Nat) (cfg : Wasm.Near.RuntimeConfig) (codes : Catalogue) (in
         ap :=
           { block.ap with
             nativeReceiptHashes := some admitted.context.receipts,
-            storageAccounting := some trie } }
+            storageAccounting := some trie,
+            verifyDelegate := DelegateSignature.verify catalogue } }
     match step cfg (codeOf codes) snapshot block with
     | .error (.unavailableIndex index) =>
       return finish snapshot trace "invalidSchedule" (blocks.length - position - 1)

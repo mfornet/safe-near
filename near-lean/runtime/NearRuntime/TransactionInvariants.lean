@@ -135,15 +135,57 @@ theorem convertTransaction_size_bound (cfg : RuntimeConfig) (ap : ApplyState)
 /-- The commit operation debits exactly its validated transaction cost, leaving
 locked funds unchanged. Unique account keys prevent hidden duplicate balances. -/
 theorem commitTransaction_totalBalance (st : ChainState) (tx : Transaction)
-    (signer : Account) (newKey : AccessKey) (cost : Fees.TxCost)
+    (signer : Account) (newKey key : AccessKey) (cost : Fees.TxCost)
     (hwf : st.AccountsUnique) (hs : st.account? tx.signerId = some signer)
-    (hfunded : cost.total ≤ signer.amount) :
+    (hfunded : cost.total ≤ signer.amount) (hk : st.accessKey? tx.signerId tx.publicKey = some key)
+    (hgas : newKey.gasBalance = key.gasBalance) :
     (commitTransaction st tx signer newKey cost).1.totalBalance + cost.total = st.totalBalance := by
   have hb := ChainState.totalBalance_setAccount st tx.signerId
     { signer with amount := signer.amount - cost.total } signer hwf hs
-  change (st.setAccount tx.signerId { signer with amount := signer.amount - cost.total }).totalBalance + cost.total = _
+  have hk' : (st.setAccount tx.signerId { signer with amount := signer.amount - cost.total }).accessKey?
+      tx.signerId tx.publicKey = some key := hk
+  have hkey := ChainState.totalBalance_setAccessKey_same
+    (st.setAccount tx.signerId { signer with amount := signer.amount - cost.total }) tx.signerId tx.publicKey
+    newKey key (hwf.setAccount _ _) hk' hgas
+  change ((st.setAccount tx.signerId { signer with amount := signer.amount - cost.total }).setAccessKey
+    tx.signerId tx.publicKey newKey).totalBalance + cost.total = _
   dsimp only at hb
   omega
+
+/-- A key accepted for a transaction holds no gas balance, before or after the update. -/
+theorem validateTransactionAccessKey_gasBalance (tx : Transaction) (key newKey : AccessKey) (cost : Fees.TxCost)
+    (h : validateTransactionAccessKey tx key cost = .ok newKey) :
+    newKey.gasBalance = key.gasBalance := by
+  unfold validateTransactionAccessKey at h
+  cases hp : key.permission with
+  | fullAccess =>
+    simp only [hp] at h
+    cases h
+    simp [AccessKey.gasBalance, AccessKeyPermission.gasKeyInfo?, hp]
+  | functionCall allowance receiver methods =>
+    simp only [hp] at h
+    split at h
+    · rename_i m _ _ deposit
+      split at h
+      · simp at h
+      · split at h
+        · simp at h
+        · split at h
+          · simp at h
+          · cases allowance with
+            | none =>
+              simp only [pure, Except.pure] at h
+              cases h
+              simp [AccessKey.gasBalance, AccessKeyPermission.gasKeyInfo?, hp]
+            | some al =>
+              by_cases hlt : al < cost.total
+              · simp [hlt] at h
+              · simp [hlt, pure, Except.pure] at h
+                cases h
+                simp [AccessKey.gasBalance, AccessKeyPermission.gasKeyInfo?, hp]
+    · simp at h
+  | gasKeyFullAccess _ _ => simp [hp] at h
+  | gasKeyFunctionCall _ _ _ _ _ => simp [hp] at h
 
 /-- Transaction conversion conserves account funds plus the transaction debit. -/
 theorem convertTransaction_totalBalance (cfg : RuntimeConfig) (ap : ApplyState)
@@ -151,8 +193,10 @@ theorem convertTransaction_totalBalance (cfg : RuntimeConfig) (ap : ApplyState)
     (hwf : st.AccountsUnique)
     (h : convertTransaction cfg ap st tx = .ok (st', receipt, cost)) :
     st'.totalBalance + cost.total = st.totalBalance := by
-  obtain ⟨signer, newKey, hs, hfunded, hc, _⟩ := convertTransaction_success_commit cfg ap st st' tx receipt cost h
-  have hb := commitTransaction_totalBalance st tx signer newKey _ hwf hs hfunded
+  obtain ⟨signer, newKey, hs, hfunded, hc, key, hkey, _, hvalid, _⟩ :=
+    convertTransaction_success_commit cfg ap st st' tx receipt cost h
+  have hb := commitTransaction_totalBalance st tx signer newKey key _ hwf hs hfunded hkey
+    (validateTransactionAccessKey_gasBalance tx key newKey _ hvalid)
   have hcost := congrArg (fun result => result.2.2) hc
   have hstate := congrArg (fun result => result.1) hc
   change Fees.txCost cfg ap.gasPrice tx.signerId tx.receiverId tx.actions = cost at hcost
@@ -166,7 +210,8 @@ theorem commitTransaction_mapsUnique (st : ChainState) (tx : Transaction)
     (signer : Account) (newKey : AccessKey) (cost : Fees.TxCost) (h : st.MapsUnique) :
     (commitTransaction st tx signer newKey cost).1.MapsUnique :=
   ((h.setAccount tx.signerId { signer with amount := signer.amount - cost.total }).setAccessKey
-    tx.signerId tx.publicKey newKey).freshId
+    tx.signerId tx.publicKey newKey
+    (ChainState.account?_isSome_setAccount st tx.signerId tx.signerId _ (Or.inl rfl))).freshId
 
 theorem convertTransaction_mapsUnique (cfg : RuntimeConfig) (ap : ApplyState)
     (st st' : ChainState) (tx : Transaction) (receipt : Receipt) (cost : Fees.TxCost)
@@ -216,9 +261,11 @@ theorem convertTransaction_conservation (cfg : RuntimeConfig) (ap : ApplyState)
     (hwf : st.AccountsUnique) (hnotSystem : tx.signerId ≠ systemAccount)
     (h : convertTransaction cfg ap st tx = .ok (st', receipt, cost)) :
     st'.totalBalance + Fees.receiptFunds cfg receipt + cost.gasBurnt * ap.gasPrice = st.totalBalance := by
-  obtain ⟨signer, newKey, hs, hfunded, hc, _⟩ := convertTransaction_success_commit cfg ap st st' tx receipt cost h
+  obtain ⟨signer, newKey, hs, hfunded, hc, key, hkey, _, hvalid, _⟩ :=
+    convertTransaction_success_commit cfg ap st st' tx receipt cost h
   let expected := Fees.txCost cfg ap.gasPrice tx.signerId tx.receiverId tx.actions
-  have hb := commitTransaction_totalBalance st tx signer newKey expected hwf hs hfunded
+  have hb := commitTransaction_totalBalance st tx signer newKey key expected hwf hs hfunded hkey
+    (validateTransactionAccessKey_gasBalance tx key newKey _ hvalid)
   have hp : Fees.receiptFunds cfg (commitTransaction st tx signer newKey expected).2.1 +
       expected.gasBurnt * ap.gasPrice = expected.total := by
     simp [commitTransaction, Fees.receiptFunds, Receipt.isRefund, hnotSystem, expected, Fees.txCost]

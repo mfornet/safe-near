@@ -12,23 +12,49 @@ def successSettlement (c : ReceiptCtx) (st : ChainState) (raw : Exec) : Fees.Gas
     ((st.account? c.receipt.receiverId).isNone && (raw.state.account? c.receipt.receiverId).isSome)
 
 /-- Successful finalization keeps execution observations and explicit subsidy;
-ordinary gas burn is precisely the settlement's gross burn. -/
--- TODO(proof): adapt the cloned proof
+ordinary gas burn is precisely the settlement's gross burn, beside what the actions burnt. -/
 theorem finalizeReceipt_success_trace (c : ReceiptCtx) (st : ChainState) (raw : Exec) :
     (finalizeReceipt c st raw none).finalizationTrace =
       (raw.gasBurnt, raw.gasUsed, raw.gasBurntForFunctionCall, raw.logs, raw.subsidizedAmount,
-        if c.receipt.isRefund then 0 else (successSettlement c st raw).tokensBurnt, 0) := by
-  sorry
+        (if c.receipt.isRefund then 0 else (successSettlement c st raw).tokensBurnt) + raw.actionTokensBurnt, 0) := by
+  unfold finalizeReceipt
+  simp only [setResult_trace, finishReceiptResult_trace, creditReceiptReward_trace,
+    ite_trace, addBalanceRefund_trace, addGasRefund_trace, ite_self]
+  simp [rollbackReceipt, Exec.finalizationTrace, successSettlement]
 
 /-- Ordinary successful finalization adds only the unused-gas refund and the
 receiver reward to the already-funded raw action ledger. -/
--- TODO(proof): adapt the cloned proof
 theorem finalizeReceipt_success_funds (c : ReceiptCtx) (st : ChainState) (raw : Exec)
     (hwf : raw.state.AccountsUnique) (hpred : c.receipt.predecessorId ≠ systemAccount)
     (hsigner : c.action.signerId ≠ systemAccount) :
     (finalizeReceipt c st raw none).totalFunds c.cfg =
       raw.totalFunds c.cfg + (successSettlement c st raw).refund + (finalizeReceipt c st raw none).reward := by
-  sorry
+  let settlement := successSettlement c st raw
+  let base := { raw with tokensBurnt := settlement.tokensBurnt + raw.actionTokensBurnt, otherTokensBurnt := 0 }
+  let gas := if settlement.refund > 0 then
+    base.addGasRefund c.action.signerId c.action.signerPublicKey settlement.refund else base
+  have hg : gas.totalFunds c.cfg = raw.totalFunds c.cfg + settlement.refund := by
+    dsimp only [gas]
+    split
+    · rw [addGasRefund_totalFunds]; rfl
+    · rename_i h
+      have hz : settlement.refund = 0 := by omega
+      simp [hz, base, Exec.totalFunds]
+  have hgu : gas.state.AccountsUnique := by
+    dsimp only [gas]
+    split <;> simpa [base] using hwf
+  have hr := creditReceiptReward_totalFunds c.cfg gas c.receipt.receiverId
+    settlement.burnPrice c.action.gasPrice hgu
+  rw [hg] at hr
+  have hrefund : c.receipt.isRefund = false := by simp [Receipt.isRefund, hpred]
+  let rewarded := gas.creditReceiptReward c.cfg c.receipt.receiverId settlement.burnPrice c.action.gasPrice
+  let finished := rewarded.finishReceiptResult c none
+  have hf : finalizeReceipt c st raw none =
+      { finished with result := some (finished.result.getD (.successValue [])) } := by
+    simp [finalizeReceipt, rollbackReceipt, hrefund, hsigner, base, gas, settlement, rewarded, finished, successSettlement]
+  rw [hf]
+  change finished.totalFunds c.cfg = raw.totalFunds c.cfg + (successSettlement c st raw).refund + finished.reward
+  simpa only [finished, finishReceiptResult_totalFunds, finishReceiptResult_reward] using hr
 
 /-- Funded ordinary receipts conserve the complete incoming
 ledger, outgoing receipt backing, explicit subsidy, gross gas burn and receiver
@@ -46,7 +72,7 @@ theorem applyActionReceipt_success_conservation_of_funded (c : ReceiptCtx) (st :
   let raw := (runReceiptActions c st).1
   let final := finalizeReceipt c st raw none
   have hf := runReceiptActions_success_funded_of_body c st hwf hbody hsuccess
-  change raw.state.AccountsUnique ∧ raw.totalFunds c.cfg + raw.gasBurnt * c.action.gasPrice =
+  change raw.state.AccountsUnique ∧ raw.totalFunds c.cfg + raw.gasBurnt * c.action.gasPrice + raw.actionTokensBurnt =
     st.totalBalance + Fees.totalDeposit c.action.actions + raw.subsidizedAmount + raw.gasUsed * c.action.gasPrice at hf
   have hg := runReceiptActions_gas_bounds c st
   change raw.gasBurntForFunctionCall ≤ raw.gasBurnt ∧ raw.gasBurnt ≤ raw.gasUsed ∧
@@ -135,7 +161,7 @@ theorem applyActionReceipt_success_net_conservation_of_funded (c : ReceiptCtx) (
     Bool.false_eq_true, ite_false] at ht
   have hreward : (applyActionReceipt c st).reward ≤ (applyActionReceipt c st).tokensBurnt := by
     rw [hfinal]
-    exact (hr.trans hbound).trans (by simpa only [ht, Exec.commitStorage] using hlower)
+    exact (hr.trans hbound).trans (by simp only [ht, Exec.commitStorage]; omega)
   dsimp only at hf ⊢
   omega
 

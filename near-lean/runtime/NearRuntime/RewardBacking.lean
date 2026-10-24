@@ -25,7 +25,7 @@ theorem applyActionReceipt_success_reward_backed (c : ReceiptCtx) (st : ChainSta
   simp only [Exec.finalizationTrace, Receipt.isRefund, beq_eq_false_iff_ne.mpr hpred,
     Bool.false_eq_true, ite_false] at ht
   rw [hfinal]
-  exact (hr.trans hbound).trans (by simpa only [ht, Exec.commitStorage] using hlower)
+  exact (hr.trans hbound).trans (by simp only [ht, Exec.commitStorage]; omega)
 
 theorem finalizeReceipt_reward_zero (c : ReceiptCtx) (st : ChainState) (raw : Exec)
     (failed : Option RuntimeError) (hfc : raw.gasBurntForFunctionCall = 0) :
@@ -61,6 +61,26 @@ theorem applyActionReceipt_reward_backed (c : ReceiptCtx) (st : ChainState)
 def Processed.grossTokensBurnt (processed : Processed) : Nat :=
   (processed.outcomes.map (fun outcome => outcome.2.tokensBurnt)).sum + processed.otherTokensBurnt
 
+/-- Running a stored receipt backs its reward by its burn, like any ready action receipt. -/
+theorem runActionReceipt_reward_backed (cfg : RuntimeConfig) (ap : ApplyState)
+    (decoder : Bytes → ContractCode) (st : ChainState) (receipt : Receipt) (action : ActionReceipt)
+    (results : List Wasm.PromiseResult) (ha : receipt.receipt = .action action)
+    (hshape : ReceiptFinancialShape receipt) (hnew : cfg.accountCostIncrease = true)
+    (hratio : cfg.fees.burntGasReward.1 ≤ cfg.fees.burntGasReward.2) :
+    (runActionReceipt cfg ap decoder st receipt action results).rewards ≤
+      (runActionReceipt cfg ap decoder st receipt action results).grossTokensBurnt := by
+  rw [runActionReceipt_eq]
+  unfold processedOfExec
+  split
+  · exact Nat.zero_le _
+  · have hs : ActionReceiptFinancialShape receipt action := by simpa only [ReceiptFinancialShape, ha] using hshape
+    have hb := applyActionReceipt_reward_backed
+      { cfg, ap, receipt, action, promiseResults := results, codeOf := decoder
+        vmYields := yieldsOf st receipt.receiverId } st hs hnew hratio
+    simpa only [processedExecOutput, Processed.grossTokensBurnt, List.map_cons, List.map_nil,
+      List.sum_cons, List.sum_nil, Nat.add_zero, outcomeOf] using
+      hb.trans (Nat.le_add_right _ _)
+
 theorem processReceipt_action_reward_backed (cfg : RuntimeConfig) (ap : ApplyState)
     (decoder : Bytes → ContractCode) (st : ChainState) (receipt : Receipt) (action : ActionReceipt)
     (ha : receipt.receipt = .action action) (hshape : ReceiptFinancialShape receipt)
@@ -68,23 +88,27 @@ theorem processReceipt_action_reward_backed (cfg : RuntimeConfig) (ap : ApplySta
     (hratio : cfg.fees.burntGasReward.1 ≤ cfg.fees.burntGasReward.2) :
     (processReceipt cfg ap decoder st receipt).rewards ≤
       (processReceipt cfg ap decoder st receipt).grossTokensBurnt := by
-  cases he : (action.inputDataIds.filter fun id => !(Assoc.contains st.receivedData id)).isEmpty with
-  | false => rw [processReceipt_waiting cfg ap decoder st receipt action ha he]; exact Nat.zero_le _
-  | true =>
-    rw [processReceipt_ready cfg ap decoder st receipt action ha he]
-    unfold processedOfExec
-    split
-    · exact Nat.zero_le _
-    · have hs : ActionReceiptFinancialShape receipt action := by simpa only [ReceiptFinancialShape, ha] using hshape
-      have hb := applyActionReceipt_reward_backed (readyActionContext cfg ap decoder st receipt action)
-        (consumeReceiptDataState st action) hs hnew hratio
-      simpa only [processedExecOutput, Processed.grossTokensBurnt, List.map_cons, List.map_nil,
-        List.sum_cons, List.sum_nil, Nat.add_zero, outcomeOf] using
-        hb.trans (Nat.le_add_right _ _)
+  cases hy : action.yieldDataId with
+  | some dataId =>
+    rw [processReceipt_yield_unfold cfg ap decoder st receipt action dataId ha hy]
+    split <;> exact Nat.zero_le _
+  | none =>
+    cases he : (action.inputDataIds.filter fun id => !(Assoc.contains st.receivedData id)).isEmpty with
+    | false => rw [processReceipt_waiting cfg ap decoder st receipt action ha hy he]; exact Nat.zero_le _
+    | true =>
+      rw [processReceipt_ready cfg ap decoder st receipt action ha hy he]
+      unfold processedOfExec
+      split
+      · exact Nat.zero_le _
+      · have hs : ActionReceiptFinancialShape receipt action := by simpa only [ReceiptFinancialShape, ha] using hshape
+        have hb := applyActionReceipt_reward_backed (readyActionContext cfg ap decoder st receipt action)
+          (consumeReceiptDataState st action) hs hnew hratio
+        simpa only [processedExecOutput, Processed.grossTokensBurnt, List.map_cons, List.map_nil,
+          List.sum_cons, List.sum_nil, Nat.add_zero, outcomeOf] using
+          hb.trans (Nat.le_add_right _ _)
 
 /-- Real data delivery either has no reward or resumes a scoped postponed action.
 Model-issue fallback has zero public burn and reward as well. -/
--- TODO(proof): adapt the cloned proof
 theorem processReceipt_reward_backed (cfg : RuntimeConfig) (ap : ApplyState)
     (decoder : Bytes → ContractCode) (st : ChainState) (receipt : Receipt)
     (hpost : st.PostponedFinancialWellFormed) (hshape : ReceiptFinancialShape receipt)
@@ -92,7 +116,47 @@ theorem processReceipt_reward_backed (cfg : RuntimeConfig) (ap : ApplyState)
     (hratio : cfg.fees.burntGasReward.1 ≤ cfg.fees.burntGasReward.2) :
     (processReceipt cfg ap decoder st receipt).rewards ≤
       (processReceipt cfg ap decoder st receipt).grossTokensBurnt := by
-  sorry
+  cases hr : receipt.receipt with
+  | action action => exact processReceipt_action_reward_backed cfg ap decoder st receipt action hr hshape hnew hratio
+  | data data =>
+    cases hres : data.resumeDataId with
+    | none =>
+      rw [processReceipt_data cfg ap decoder st receipt data hr hres]
+      cases hroute : Assoc.lookup st.postponedByData data.dataId with
+      | none => exact Nat.zero_le _
+      | some id =>
+        simp only
+        cases hpending : ((Assoc.lookup st.pendingDataCount id).getD 1 - 1 == 0) with
+        | false => simp only [Bool.false_eq_true, ite_false]; exact Nat.zero_le _
+        | true =>
+          simp only [ite_true]
+          cases hwaiting : Assoc.lookup st.postponed id with
+          | none => exact Nat.zero_le _
+          | some waiting =>
+            obtain ⟨_, action, ha, hs⟩ := hpost.entries id waiting hwaiting
+            exact processReceipt_action_reward_backed cfg ap decoder
+              (releasePostponedState (receivePostponedDataState st data) id) waiting action ha hs hnew hratio
+    | some dataId =>
+      rw [processReceipt_resume cfg ap decoder st receipt data dataId hr hres]
+      split
+      · exact Nat.zero_le _
+      · split
+        · rename_i y hy
+          split
+          · rename_i a ha
+            obtain ⟨a', ha', hs⟩ := hpost.yieldEntries _ y hy
+            have hsame : a' = a := by
+              rw [ha] at ha'
+              exact (ReceiptEnum.action.inj ha').symm
+            subst hsame
+            exact runActionReceipt_reward_backed cfg ap decoder _ y a' _ ha' hs hnew hratio
+          · exact Nat.zero_le _
+        · exact Nat.zero_le _
+  | globalDistribution g =>
+    rw [processReceipt_distribution cfg ap decoder st receipt g hr]
+    obtain ⟨_, _, hw, _⟩ := processDistribution_outcomes cfg ap st receipt g
+    rw [hw]
+    exact Nat.zero_le _
 
 /-- A backed reward makes the actual burn update additive in the prior ledger.
 Natural subtraction therefore cannot consume tokens charged by earlier work. -/

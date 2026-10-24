@@ -10,7 +10,9 @@ theorem convertTransaction_accountsUnique (cfg : RuntimeConfig) (ap : ApplyState
   obtain ⟨signer, key, _, _, hcommit, _⟩ := convertTransaction_success_commit cfg ap before after tx receipt cost hc
   let expected := Fees.txCost cfg ap.gasPrice tx.signerId tx.receiverId tx.actions
   have hu : (commitTransaction before tx signer key expected).1.AccountsUnique :=
-    h.setAccount tx.signerId { signer with amount := signer.amount - expected.total }
+    (h.setAccount tx.signerId { signer with amount := signer.amount - expected.total }).setAccessKey
+      tx.signerId tx.publicKey _
+      (ChainState.account?_isSome_setAccount before tx.signerId tx.signerId _ (Or.inl rfl))
   have he := congrArg (fun result => result.1) hcommit
   dsimp only at he
   rw [← he]
@@ -19,10 +21,11 @@ theorem convertTransaction_accountsUnique (cfg : RuntimeConfig) (ap : ApplyState
 theorem convertTransaction_queue_frame (cfg : RuntimeConfig) (ap : ApplyState)
     (before after : ChainState) (tx : Transaction) (receipt : Receipt) (cost : Fees.TxCost)
     (hc : convertTransaction cfg ap before tx = .ok (after, receipt, cost)) :
-    after.postponed = before.postponed ∧ after.delayed = before.delayed := by
+    after.postponed = before.postponed ∧ after.delayed = before.delayed ∧
+      after.yieldReceipts = before.yieldReceipts := by
   obtain ⟨signer, key, _, _, hcommit, _⟩ := convertTransaction_success_commit cfg ap before after tx receipt cost hc
   have hf := congrArg (fun result => result.1.receiptQueues) hcommit
-  exact ⟨(congrArg Prod.fst hf).symm, (congrArg Prod.snd hf).symm⟩
+  exact ⟨(congrArg Prod.fst hf).symm, (congrArg (fun q => q.2.1) hf).symm, (congrArg (fun q => q.2.2) hf).symm⟩
 
 theorem convertTransaction_totalFunds_conservation (cfg : RuntimeConfig) (ap : ApplyState)
     (before after : ChainState) (tx : Transaction) (receipt : Receipt) (cost : Fees.TxCost)
@@ -32,7 +35,7 @@ theorem convertTransaction_totalFunds_conservation (cfg : RuntimeConfig) (ap : A
   have hb := convertTransaction_conservation cfg ap before after tx receipt cost h hsigner hc
   have hf := convertTransaction_queue_frame cfg ap before after tx receipt cost hc
   have hq : after.queuedFunds cfg = before.queuedFunds cfg := by
-    simp only [ChainState.queuedFunds, ChainState.postponedFunds, hf.1, hf.2]
+    simp only [ChainState.queuedFunds, ChainState.postponedFunds, ChainState.yieldFunds, hf.1, hf.2.1, hf.2.2]
   dsimp only [ChainState.totalFunds]
   rw [hq]
   omega
@@ -109,7 +112,7 @@ theorem convertTransactions_financial (cfg : RuntimeConfig) (ap : ApplyState) (i
       dsimp only
       split_ifs
       · refine ⟨convertTransaction_accountsUnique cfg ap pass.2.1 after tx receipt cost h.accounts hc,
-          h.postponed.of_postponed_eq hframe.1, hframe.1.trans h.postponedFrame, hframe.2.trans h.delayedFrame,
+          h.postponed.of_postponed_eq hframe.1 hframe.2.2, hframe.1.trans h.postponedFrame, hframe.2.1.trans h.delayedFrame,
           h.counter.trans hmono, ReceiptList.FreshIds.append h.localIds hsingle h.counter hmono, hshape, ?_,
           by intro result he; contradiction⟩
         rw [receiptsFunds_append]
@@ -117,7 +120,7 @@ theorem convertTransactions_financial (cfg : RuntimeConfig) (ap : ApplyState) (i
         dsimp only [receiptsFunds] at hl
         omega
       · refine ⟨convertTransaction_accountsUnique cfg ap pass.2.1 after tx receipt cost h.accounts hc,
-          h.postponed.of_postponed_eq hframe.1, hframe.1.trans h.postponedFrame, hframe.2.trans h.delayedFrame,
+          h.postponed.of_postponed_eq hframe.1 hframe.2.2, hframe.1.trans h.postponedFrame, hframe.2.1.trans h.delayedFrame,
           h.counter.trans hmono, h.localIds.mono_upper hmono, h.shapes, ?_, by intro result he; contradiction⟩
         rw [receiptsFunds_append]
         simp only [receiptsFunds, List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, Nat.add_zero]

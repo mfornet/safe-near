@@ -15,6 +15,13 @@ abbrev Result :=
 def field [FromJson α] (j : Json) (name : String) : Result α :=
   j.getObjValAs? α name
 
+/-- An absent field reads as `null`/`none`, so that older requests stay valid. -/
+def optionalField [FromJson α] (j : Json) (name : String) : Result (Option α) :=
+  match j.getObjVal? name with
+  | .error _ => pure none
+  | .ok .null => pure none
+  | .ok value => (fromJson? value : Except String α).map some
+
 def object (j : Json) (allowed : List String) : Result Unit := do
   let values ← j.getObj?
   for (name, _) in values.toList do
@@ -61,6 +68,15 @@ def permission (j : Json) : Result Near.AccessKeyPermission := do
     pure
         (.functionCall (← allowance.mapM balance) (← field j "receiverId")
           (← field j "methodNames"))
+  | "gasKeyFullAccess" =>
+    object j ["kind", "balance", "numNonces"]
+    pure (.gasKeyFullAccess (← amount j "balance") (← field j "numNonces"))
+  | "gasKeyFunctionCall" =>
+    object j ["kind", "balance", "numNonces", "allowance", "receiverId", "methodNames"]
+    let allowance : Option String ← field j "allowance"
+    pure
+        (.gasKeyFunctionCall (← amount j "balance") (← field j "numNonces") (← allowance.mapM balance)
+          (← field j "receiverId") (← field j "methodNames"))
   | _ =>
     throw s!"unknown access key permission: {kind}"
 
@@ -89,7 +105,16 @@ def codeOf (codes : Catalogue) (blob : Near.Bytes) : ContractCode :=
       hash := ""
       decodeIssue := some (.interpreterError "deployed bytes absent from replay code catalogue") }
 
-def action (codes : Catalogue) (j : Json) : Result Action := do
+/-- A global contract identifier: exactly one of the hash and the deploying account. -/
+def globalIdentifier (j : Json) : Result Wasm.GlobalContractId := do
+  object j ["codeHash", "accountId"]
+  match j.getObjVal? "codeHash", j.getObjVal? "accountId" with
+  | .ok _, .error _ => pure (.codeHash (← byteField j "codeHash"))
+  | .error _, .ok _ => pure (.accountId (← byteField j "accountId"))
+  | _, _ => throw "a global contract identifier needs exactly one of codeHash and accountId"
+
+/-- Actions, with the actions a delegate action carries (not nested further). -/
+partial def action (codes : Catalogue) (j : Json) : Result Action := do
   let kind : String ← field j "kind"
   match kind with
   | "createAccount" =>
@@ -127,6 +152,30 @@ def action (codes : Catalogue) (j : Json) : Result Action := do
       pure (.useGlobalContract (.accountId (← byteField j "accountId")))
     | _, _ =>
       throw "useGlobalContract needs exactly one of codeHash and accountId"
+  | "deployGlobalContract" =>
+    object j ["kind", "codeHash", "mode"]
+    let mode : String ← field j "mode"
+    pure
+        (.deployGlobalContract (← codeByHash codes (← field j "codeHash"))
+          (← match mode with
+            | "codeHash" => pure .codeHash
+            | "accountId" => pure .accountId
+            | _ => throw s!"unknown global contract deploy mode: {mode}"))
+  | "transferToGasKey" =>
+    object j ["kind", "publicKey", "deposit"]
+    pure (.transferToGasKey (← byteField j "publicKey") (← amount j "deposit"))
+  | "withdrawFromGasKey" =>
+    object j ["kind", "publicKey", "amount"]
+    pure (.withdrawFromGasKey (← byteField j "publicKey") (← amount j "amount"))
+  | "delegate" =>
+    object j ["kind", "v2", "senderId", "receiverId", "actions", "nonce", "nonceIndex", "maxBlockHeight",
+      "publicKey", "signature"]
+    let inner : List Json ← field j "actions"
+    let nonceIndex : Option Nat ← field j "nonceIndex"
+    pure
+        (.delegate (← field j "senderId") (← field j "receiverId") (← inner.mapM (action codes))
+          (← u64 j "nonce") nonceIndex (← u64 j "maxBlockHeight") (← byteField j "publicKey")
+          (← byteField j "signature") (← field j "v2"))
   | _ =>
     throw s!"unknown action: {kind}"
 
@@ -174,16 +223,31 @@ def receipt (codes : Catalogue) (j : Json) : Result Receipt := do
     match kind with
     | "data" =>
       do
-        object payload ["kind", "dataId", "data"]
+        object payload ["kind", "dataId", "data", "resumeDataId"]
         let data : Option (List Nat) ← field payload "data"
-        pure (.data { dataId := ← field payload "dataId", data := ← data.mapM bytes })
+        let resume : Option (List Nat) ← optionalField payload "resumeDataId"
+        pure
+            (.data
+              { dataId := ← field payload "dataId", data := ← data.mapM bytes,
+                resumeDataId := ← resume.mapM bytes })
+    | "globalDistribution" =>
+      do
+        object payload ["kind", "id", "targetShard", "alreadyDelivered", "codeHash", "nonce"]
+        pure
+            (.globalDistribution
+              { id := ← globalIdentifier (← field payload "id")
+                targetShard := ← field payload "targetShard"
+                alreadyDelivered := ← field payload "alreadyDelivered"
+                code := ← codeByHash codes (← field payload "codeHash")
+                nonce := ← u64 payload "nonce" })
     | "action" =>
       do
         object payload
             ["kind", "signerId", "signerPublicKey", "gasPrice", "outputDataReceivers",
-              "inputDataIds", "actions"]
+              "inputDataIds", "actions", "yieldDataId"]
         let outputs : List (Nat × String) ← field payload "outputDataReceivers"
         let actions : List Json ← field payload "actions"
+        let yieldId : Option (List Nat) ← optionalField payload "yieldDataId"
         pure
             (.action
               { signerId := ← field payload "signerId"
@@ -192,6 +256,7 @@ def receipt (codes : Catalogue) (j : Json) : Result Receipt := do
                 outputDataReceivers :=
                   outputs.map fun (dataId, receiverId) => { dataId, receiverId }
                 inputDataIds := ← field payload "inputDataIds"
+                yieldDataId := ← yieldId.mapM bytes
                 actions := ← actions.mapM (action codes) })
     | _ =>
       throw s!"unknown receipt: {kind}"
@@ -202,18 +267,23 @@ def receipt (codes : Catalogue) (j : Json) : Result Receipt := do
         receipt := value }
 
 def account (codes : Catalogue) (j : Json) : Result Account := do
-  object j ["amount", "locked", "codeHash", "storageUsage"]
+  object j ["amount", "locked", "codeHash", "storageUsage", "global", "versionTwo"]
   let hash : Option String ← field j "codeHash"
+  let global : Option Json ← optionalField j "global"
+  let versionTwo : Option Bool ← optionalField j "versionTwo"
   pure {
         amount := ← amount j "amount"
         locked := ← amount j "locked"
         storageUsage := ← u64 j "storageUsage"
-        code := ← hash.mapM (codeByHash codes) }
+        code := ← hash.mapM (codeByHash codes)
+        global := ← global.mapM globalIdentifier
+        versionTwo := versionTwo.getD false }
 
 def state (codes : Catalogue) (j : Json) : Result ChainState := do
   object j
       ["accounts", "accessKeys", "storage", "postponed", "pendingDataCount", "postponedByData",
-        "receivedData", "delayed", "nextId"]
+        "receivedData", "delayed", "nextId", "globalCode", "globalNonces", "gasKeyNonces", "yieldIndices",
+        "yieldTimeouts", "yieldReceipts", "yieldStatus"]
   let accounts : List (String × Json) ← field j "accounts"
   unique "account" (accounts.map (·.1))
   let keys : List ((String × List Nat) × Json) ← field j "accessKeys"
@@ -243,6 +313,13 @@ def state (codes : Catalogue) (j : Json) : Result ChainState := do
   let received : List (Nat × Option (List Nat)) ← field j "receivedData"
   unique "received data id" (received.map (·.1))
   let delayed : List Json ← field j "delayed"
+  let globalCode : List (Json × String) := (← optionalField j "globalCode").getD []
+  let globalNonces : List (Json × Nat) := (← optionalField j "globalNonces").getD []
+  let gasKeyNonces : List (String × List Nat × Nat × Nat) := (← optionalField j "gasKeyNonces").getD []
+  let yieldIndices : Option (Nat × Nat) ← optionalField j "yieldIndices"
+  let yieldTimeouts : List (Nat × String × List Nat × Nat) := (← optionalField j "yieldTimeouts").getD []
+  let yieldReceipts : List (String × List Nat × Json) := (← optionalField j "yieldReceipts").getD []
+  let yieldStatus : List (String × List Nat × String) := (← optionalField j "yieldStatus").getD []
   pure {
         accounts :=
           ←
@@ -261,12 +338,30 @@ def state (codes : Catalogue) (j : Json) : Result ChainState := do
             received.mapM fun (id, data) => do
                 pure (id, ← data.mapM bytes)
         delayed := ← delayed.mapM (receipt codes)
+        globalCode :=
+          ← globalCode.mapM fun (id, label) => do pure (← globalIdentifier id, ← codeByHash codes label)
+        globalNonces := ← globalNonces.mapM fun (id, nonce) => do pure (← globalIdentifier id, nonce)
+        gasKeyNonces :=
+          ← gasKeyNonces.mapM fun (id, pk, lane, nonce) => do pure ((id, ← bytes pk, lane), nonce)
+        yieldIndices
+        yieldTimeouts :=
+          ← yieldTimeouts.mapM fun (index, account, dataId, expiresAt) => do
+              pure (index, { account, dataId := ← bytes dataId, expiresAt })
+        yieldReceipts :=
+          ← yieldReceipts.mapM fun (account, dataId, r) => do pure ((account, ← bytes dataId), ← receipt codes r)
+        yieldStatus :=
+          ← yieldStatus.mapM fun (account, dataId, status) => do
+              pure ((account, ← bytes dataId),
+                ← match status with
+                  | "yielded" => pure YieldStatus.yielded
+                  | "resumeInitiated" => pure YieldStatus.resumeInitiated
+                  | _ => throw s!"unknown yield status: {status}")
         nextId := ← field j "nextId" }
 
 def block (codes : Catalogue) (j : Json) : Result Block := do
   object j
       ["blockHeight", "blockTimestamp", "epochHeight", "gasPrice", "gasLimit", "randomSeed",
-        "transactions", "incomingIndices"]
+        "transactions", "incomingIndices", "chainId", "shardId", "shardIds"]
   let gasLimit : Option Nat ← field j "gasLimit"
   let seed ← byteField j "randomSeed"
   unless seed.length == 32 do
@@ -280,7 +375,10 @@ def block (codes : Catalogue) (j : Json) : Result Block := do
             epochHeight := ← u64 j "epochHeight"
             gasPrice := ← amount j "gasPrice"
             gasLimit := ← gasLimit.mapM (bounded 64)
-            randomSeed := seed }
+            randomSeed := seed
+            chainId := (← optionalField j "chainId").getD ""
+            shardId := (← optionalField j "shardId").getD 0
+            shardIds := (← optionalField j "shardIds").getD [0] }
         txs := ← transactions.mapM (transaction codes)
         receipts := positions.elim .all .indices }
 

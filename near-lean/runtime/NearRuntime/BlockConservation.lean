@@ -45,7 +45,7 @@ theorem applyAttempt_conservation (cfg : RuntimeConfig) (ap : ApplyState) (decod
     intro receipt hm
     exact hold receipt hm _ (by simp [Receipt.liveIds])
   have hreadyPost : ready.PostponedFinancialWellFormed :=
-    hf.postponed.of_postponed_eq (before := converted.2.1) rfl
+    hf.postponed.of_postponed_eq (before := converted.2.1) rfl rfl
   have hadmission : ReceiptQueue.PostponedAdmission ready queue := by
     refine ⟨hreadyPost.idsMatch, ?_, ?_⟩
     · rw [hqueue, List.map_append, List.nodup_append]
@@ -72,8 +72,11 @@ theorem applyAttempt_conservation (cfg : RuntimeConfig) (ap : ApplyState) (decod
     · exact hf.shapes receipt hl
     · exact h.queueShapes receipt ho
   have hclear : ready.totalFunds cfg + receiptsFunds cfg converted.2.1.delayed = converted.2.1.totalFunds cfg := by
-    change (converted.2.1.totalBalance + (converted.2.1.postponedFunds cfg + 0)) + receiptsFunds cfg converted.2.1.delayed =
-      converted.2.1.totalBalance + (converted.2.1.postponedFunds cfg + receiptsFunds cfg converted.2.1.delayed)
+    have h1 : ready.totalBalance = converted.2.1.totalBalance := rfl
+    have h2 : ready.postponedFunds cfg = converted.2.1.postponedFunds cfg := rfl
+    have h3 : ready.yieldFunds cfg = converted.2.1.yieldFunds cfg := rfl
+    have h4 : receiptsFunds cfg ready.delayed = 0 := rfl
+    unfold ChainState.totalFunds ChainState.queuedFunds
     omega
   have hbudget : ready.totalFunds cfg + receiptsFunds cfg converted.2.2.2.1 + converted.2.2.2.2.2.1 + receiptsFunds cfg queue =
       st.totalFunds cfg + receiptsFunds cfg incoming := by

@@ -146,8 +146,14 @@ def gasKeyBalances (st : ChainState) (id : AccountId) : Nat :=
   (st.accessKeys.filter (·.1.1 == id)).foldl
     (fun total e => total + ((e.2.permission.gasKeyInfo?).map (·.1)).getD 0) 0
 
-/-- Sum of all account balances (amount + locked). -/
-def totalBalance (st : ChainState) : Nat := (st.accounts.map fun (_, a) => a.amount + a.locked).sum
+/-- Gas keys hold balance outside the account (`GasKeyInfo.balance`). -/
+def gasKeyFunds (st : ChainState) : Nat :=
+  (st.accessKeys.map fun entry => ((entry.2.permission.gasKeyInfo?).map (·.1)).getD 0).sum
+
+/-- Sum of all account balances (amount + locked) and of the balances of gas keys, which hold
+funds beside their account. -/
+def totalBalance (st : ChainState) : Nat :=
+  (st.accounts.map fun (_, a) => a.amount + a.locked).sum + st.gasKeyFunds
 
 end ChainState
 

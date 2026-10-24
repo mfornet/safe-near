@@ -125,6 +125,10 @@ def Action.attachedGasList : List Action → Nat
   | a :: rest => a.attachedGas + Action.attachedGasList rest
 end
 
+def Action.isDelegate : Action → Bool
+  | .delegate .. => true
+  | _ => false
+
 def Action.isFunctionCall : Action → Bool
   | .functionCall .. => true
   | _ => false

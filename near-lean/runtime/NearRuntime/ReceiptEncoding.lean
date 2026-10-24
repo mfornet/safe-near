@@ -37,6 +37,13 @@ private def delegateNonce (v2 : Bool) (nonce : Nat) (index : Option Nat) : Excep
     unless index.isNone do throw "a V1 delegate action has no nonce lane"
     unsigned 8 nonce
 
+/-- The fields of a delegate action around its encoded inner actions. -/
+def delegateFields (v2 : Bool) (sender receiver : AccountId) (count : Nat) (body : Bytes) (nonce : Nat)
+    (nonceIndex : Option Nat) (maxHeight : Nat) (key : PublicKey) : Except String Bytes := do
+  return (if v2 then [0] else []) ++ (← account sender) ++ (← account receiver)
+    ++ (← unsigned 4 count) ++ body ++ (← delegateNonce v2 nonce nonceIndex) ++ (← unsigned 8 maxHeight)
+    ++ (← StateEncoding.publicKey key)
+
 mutual
 def action (codes : List (String × Bytes)) : Action → Except String Bytes
   | .createAccount => pure [0]
@@ -68,15 +75,21 @@ def action (codes : List (String × Bytes)) : Action → Except String Bytes
   | .withdrawFromGasKey key amount => do
     return [13] ++ (← StateEncoding.publicKey key) ++ (← unsigned 16 amount)
   | .delegate sender receiver inner nonce nonceIndex maxHeight key signature v2 => do
-    return [if v2 then 14 else 8] ++ (if v2 then [0] else []) ++ (← account sender) ++ (← account receiver)
-      ++ (← unsigned 4 inner.length) ++ (← actionList codes inner)
-      ++ (← delegateNonce v2 nonce nonceIndex) ++ (← unsigned 8 maxHeight)
-      ++ (← StateEncoding.publicKey key) ++ signature
+    let body ← actionList codes inner
+    return [if v2 then 14 else 8] ++
+      (← delegateFields v2 sender receiver inner.length body nonce nonceIndex maxHeight key) ++ signature
 
 def actionList (codes : List (String × Bytes)) : List Action → Except String Bytes
   | [] => pure []
   | a :: rest => do return (← action codes a) ++ (← actionList codes rest)
 end
+
+/-- The signed part of a delegate action (`DelegateAction`, or the versioned `DelegateActionV2`
+payload): the NEP-461 hash covers exactly these bytes behind the message discriminant. -/
+def delegatePayload (codes : List (String × Bytes)) : Action → Except String Bytes
+  | .delegate sender receiver inner nonce nonceIndex maxHeight key _ v2 => do
+    delegateFields v2 sender receiver inner.length (← actionList codes inner) nonce nonceIndex maxHeight key
+  | _ => throw "not a delegate action"
 
 /-- Borsh `ReceivedData` wraps only Option<Vec<u8>>. None and Some(empty)
 remain distinct native state values. -/

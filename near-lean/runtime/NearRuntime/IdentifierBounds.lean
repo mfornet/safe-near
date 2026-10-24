@@ -1,4 +1,4 @@
-import NearRuntime.RewardBacking
+import NearRuntime.InstantFunding
 
 namespace Near
 open Wasm.Near
@@ -17,7 +17,8 @@ def ChainState.liveIds (st : ChainState) : List Nat :=
   st.postponed.flatMap (fun entry => entry.1 :: entry.2.liveIds) ++
   st.pendingDataCount.map (·.1) ++
   st.postponedByData.flatMap (fun entry => [entry.1, entry.2]) ++
-  st.receivedData.map (·.1) ++ st.delayed.flatMap Receipt.liveIds
+  st.receivedData.map (·.1) ++ st.delayed.flatMap Receipt.liveIds ++
+  st.yieldReceipts.flatMap (fun entry => entry.2.liveIds)
 
 def ChainState.IdsBelowNext (st : ChainState) : Prop :=
   ∀ id ∈ st.liveIds, id < st.nextId
@@ -99,7 +100,7 @@ theorem ChainState.IdsBelowNext.postponed_lookup_none {st : ChainState}
     exact ⟨entry, hentry, by simp [he]⟩
   have hall : id ∈ st.liveIds := by
     simp only [ChainState.liveIds, List.mem_append]
-    exact Or.inl (Or.inl (Or.inl (Or.inl hp)))
+    exact Or.inl (Or.inl (Or.inl (Or.inl (Or.inl hp))))
   have := h id hall
   omega
 
@@ -132,7 +133,7 @@ theorem convertTransaction_postponed_fresh (cfg : RuntimeConfig) (ap : ApplyStat
     List.mem_flatMap.mpr ⟨entry, hentry, by simp [he]⟩
   have hall : receipt.receiptId ∈ st'.liveIds := by
     simp only [ChainState.liveIds, List.mem_append]
-    exact Or.inl (Or.inl (Or.inl (Or.inl hp)))
+    exact Or.inl (Or.inl (Or.inl (Or.inl (Or.inl hp))))
   rw [hf] at hall
   exact convertTransaction_receipt_fresh cfg ap st st' tx receipt cost h hc hall
 

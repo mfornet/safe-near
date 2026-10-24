@@ -52,7 +52,7 @@ def applyReceiptQueue (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes �
       else
         newlyDelayed := newlyDelayed ++ [receipt]
     else
-      let processed := processReceipt cfg { ap with storageAccounting } codeOf st receipt
+      let processed := processWithInstants cfg { ap with storageAccounting } codeOf st receipt
       storageAccounting := processed.storageAccounting
       if let some issue := processed.issue then
         return { state := initial, outgoing := [], outcomes := [], tokensBurnt := 0, issue := some issue }
@@ -64,9 +64,16 @@ def applyReceiptQueue (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes �
       for (_, outcome) in processed.outcomes do
         gasUsed := gasUsed + outcome.gasBurnt
         tokensBurnt := tokensBurnt + outcome.tokensBurnt
+      gasUsed := gasUsed + processed.extraCompute
       tokensBurnt := tokensBurnt + processed.otherTokensBurnt - processed.rewards
       if let some limit := ap.gasLimit then
         if gasUsed ≥ limit then overLimit := true
+  -- Yields that timed out wake up with a resume receipt, after all incoming receipts.
+  let (stTimed, timeoutReceipts, timeoutBirths) := resolveYieldTimeouts ap ap.gasLimit gasUsed
+    (st.yieldTimeouts.length + 1) (st, [], [])
+  st := stTimed
+  outgoing := outgoing ++ timeoutReceipts
+  identityBirths := identityBirths ++ timeoutBirths
   return {
     state := { st with delayed := retainedDelayed ++ newlyDelayed }, outgoing, outcomes, tokensBurnt, subsidizedAmount, identityBirths
     storageAccounting
@@ -74,7 +81,6 @@ def applyReceiptQueue (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes �
 
 /-- Every public field, including queue metadata and identity births, agrees
 with the actual executable attempt. No alternate execution semantics is used. -/
--- TODO(proof): adapt the cloned proof
 theorem applyAttempt_eq_stages (cfg : RuntimeConfig) (ap : ApplyState) (decoder : Bytes → ContractCode)
     (st : ChainState) (txs : List Transaction) (incoming : List Receipt) :
     applyAttempt cfg ap decoder st txs incoming =
@@ -85,7 +91,24 @@ theorem applyAttempt_eq_stages (cfg : RuntimeConfig) (ap : ApplyState) (decoder 
           converted.2.2.2.1 0 converted.2.2.2.2.2.1
           (converted.2.2.2.2.1 ++ converted.2.1.delayed ++ incoming)
           converted.2.2.2.2.1.length (converted.2.2.2.2.1.length + converted.2.1.delayed.length) := by
-  sorry
+  unfold applyAttempt
+  dsimp only [Id.run, bind, pure]
+  generalize ht : (forIn txs _ _ : Id TransactionLoop) = converted
+  have heq : converted = convertTransactions cfg ap st txs := by
+    rw [← ht]
+    unfold convertTransactions
+    dsimp only [Id.run]
+    congr 1
+    funext tx pass
+    cases hc : convertTransaction cfg ap pass.2.1 tx with
+    | error error =>
+      dsimp only
+      cases hi : error.issue? <;> rfl
+    | ok value =>
+      obtain ⟨next, receipt, cost⟩ := value
+      split_ifs <;> rfl
+  rw [← heq]
+  cases converted.1 <;> rfl
 
 /-- Induction over the actual early-exit loop with an invariant indexed by the
 unprocessed suffix. It exposes admission facts for the next receipt without

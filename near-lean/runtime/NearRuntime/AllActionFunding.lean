@@ -1,4 +1,5 @@
 import NearRuntime.BalanceActionFunding
+import NearRuntime.NewActionFunding
 import NearRuntime.MixedFunding
 
 namespace Near
@@ -21,19 +22,26 @@ theorem funded_stake_rejection (c : ReceiptCtx) (isLast : Bool) (stake : Nat) (p
       | (have hbad := congrArg Prod.fst hrun; cases hbad)
       | split at hrun)
 
-/-- Using a global contract is outside the model and never succeeds. -/
--- TODO(proof): adapt the cloned proof
-theorem funded_useGlobalContract_rejection (c : ReceiptCtx) (isLast : Bool) (contract : Wasm.GlobalContractId) :
-    (applyAction c isLast (.useGlobalContract contract)).Funded c.cfg c.action.gasPrice 0 := by
-  sorry
-
 /-- Every modeled action has a concrete funding rule. Unsupported staking
 cannot succeed; supported actions preserve account uniqueness and exact funding. -/
--- TODO(proof): adapt the cloned proof
 theorem funded_applyAction (c : ReceiptCtx) (isLast : Bool) (action : Action)
     (hreceiver : c.receipt.receiverId ≠ systemAccount) :
     (applyAction c isLast action).Funded c.cfg c.action.gasPrice action.deposit := by
-  sorry
+  cases action with
+  | createAccount => exact funded_createAccount c isLast
+  | deployContract code => exact funded_deployContract c isLast code
+  | functionCall method args gas deposit => exact funded_functionCall c method args gas deposit isLast hreceiver
+  | transfer deposit => exact funded_transfer c isLast deposit
+  | stake stake pk => exact funded_stake_rejection c isLast stake pk
+  | addKey pk key => exact funded_addKey c isLast pk key
+  | deleteKey pk => exact funded_deleteKey c isLast pk
+  | deleteAccount beneficiary => exact funded_deleteAccount c isLast beneficiary
+  | useGlobalContract contract => exact funded_useGlobalContract c isLast contract
+  | deployGlobalContract code mode => exact funded_deployGlobalContract c isLast code mode
+  | transferToGasKey pk deposit => exact funded_transferToGasKey c isLast pk deposit
+  | withdrawFromGasKey pk amount => exact funded_withdrawFromGasKey c isLast pk amount
+  | delegate sender receiver inner nonce nonceIndex maxBlockHeight pk signature v2 =>
+    exact funded_delegate c isLast sender receiver inner nonce nonceIndex maxBlockHeight pk signature v2 hreceiver
 
 theorem funded_runReceiptAction (c : ReceiptCtx) (onlyAction isLast : Bool) (action : Action)
     (hreceiver : c.receipt.receiverId ≠ systemAccount) :

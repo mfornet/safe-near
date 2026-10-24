@@ -5,11 +5,77 @@ open Wasm.Near
 
 /-- No raw action can succeed against the absent reserved receiver. In
 particular creation cannot install the actor before a later function call. -/
--- TODO(proof): adapt the cloned proof
 theorem applyAction_system_no_success (c : ReceiptCtx) (isLast : Bool) (action : Action) (before : Exec)
     (hreceiver : c.receipt.receiverId = systemAccount) (hmissing : before.state.SystemAccountAbsent) :
     ((applyAction c isLast action).run.run before).1 ≠ .ok () := by
-  sorry
+  have hn : before.state.account? systemAccount = none := hmissing
+  cases action with
+  | createAccount =>
+    rw [applyCreateAccount_system_missing c isLast before hreceiver hn]
+    intro he; cases he
+  | deployContract code =>
+    rw [applyDeployContract_run]
+    simp [hreceiver, hn]
+    split <;> simp
+  | functionCall method args gas deposit =>
+    rw [show applyAction c isLast (.functionCall method args gas deposit) =
+      applyFunctionCall c method args gas deposit isLast from rfl, applyFunctionCall_run]
+    simp [hreceiver, hn]
+  | transfer amount =>
+    rw [applyTransfer_run]
+    simp only [hreceiver, hn, specialImplicitAccount_system, implicitPublicKey_system]
+    split <;> simp
+  | stake amount pk =>
+    simp [-StateT.run_bind, applyAction, getAccount, getState, hreceiver, hn]
+  | addKey pk key =>
+    rw [applyAddKey_run]
+    simp only [hreceiver, hn]
+    split <;> simp
+  | deleteKey pk =>
+    rw [applyDeleteKey_run]
+    simp only [hreceiver, hn]
+    split <;> simp
+  | useGlobalContract contract =>
+    rw [applyUseGlobalContract_run]
+    simp only [hreceiver, hn]
+    split <;> simp
+  | deployGlobalContract code mode =>
+    rw [applyDeployGlobalContract_run]
+    simp [hreceiver, hn]
+  | transferToGasKey pk deposit =>
+    rw [applyTransferToGasKey_run]
+    split
+    · intro he; cases he
+    · rename_i moved hmoved
+      rw [hreceiver] at hmoved
+      have := gasKeyDeposit_account_isSome hmoved
+      rw [hn] at this
+      cases this
+  | withdrawFromGasKey pk amount =>
+    rw [applyWithdrawFromGasKey_run]
+    split
+    · intro he; cases he
+    · rename_i moved hmoved
+      have := (gasKeyWithdrawal_account hmoved).1
+      rw [hreceiver, hn] at this
+      cases this
+  | delegate sender receiver inner nonce nonceIndex maxBlockHeight pk signature v2 =>
+    change ((applyDelegateAction c _).run.run before).1 ≠ .ok ()
+    rw [applyDelegateAction_run]
+    split
+    · intro he; cases he
+    · rename_i hchecks
+      split
+      · intro he; cases he
+      · rename_i moved hmoved
+        obtain ⟨_, hsender⟩ := delegateChecks_inner hchecks
+        have := delegateState_account_isSome hmoved
+        rw [hsender, hreceiver, hn] at this
+        cases this
+  | deleteAccount beneficiary =>
+    rw [applyDeleteAccount_run]
+    simp only [hreceiver, hn]
+    split <;> simp
 
 /-- A rejection rule used only for operations targeting the reserved receiver. -/
 def ExecM.RejectsAbsentSystem (operation : ExecM Unit) : Prop :=

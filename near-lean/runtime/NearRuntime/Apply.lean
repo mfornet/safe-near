@@ -430,6 +430,7 @@ def gasKeyStorageCost (extra : Nat) (pk : PublicKey) (key : AccessKey) (nonces :
 
 /-- `check_actor_permissions` for the gas key withdrawal: the key must be a gas key. -/
 def gasKeyOf (st : ChainState) (id : AccountId) (pk : PublicKey) : Except RuntimeError (AccessKey × Nat × Nat) :=
+  if (st.account? id).isNone then .error (.accountDoesNotExist id) else
   match st.accessKey? id pk with
   | some key =>
     match key.permission.gasKeyInfo? with
@@ -456,11 +457,12 @@ def gasKeyWithdrawal (st : ChainState) (id : AccountId) (pk : PublicKey) (amount
 def Exec.burnAction (exec : Exec) (amount : Nat) : Exec :=
   { exec with actionTokensBurnt := exec.actionTokensBurnt + amount }
 
-/-- `validate_delegate_action_key`: the delegate's key, nonce and permission, with the nonce
-update applied on success. -/
-def delegateKeyState (c : ReceiptCtx) (st : ChainState) (sender : AccountId) (pk : PublicKey)
+/-- `validate_delegate_action_key`: the delegate's key, nonce and permission. It returns the
+nonce lane of a gas key (`none` for an ordinary key). -/
+def delegateKeyCheck (c : ReceiptCtx) (st : ChainState) (sender : AccountId) (pk : PublicKey)
     (nonce : Nat) (nonceIndex : Option Nat) (inner : List Action) (receiver : AccountId) :
-    Except RuntimeError ChainState := do
+    Except RuntimeError (Option Nat) := do
+  if (st.account? sender).isNone then throw (.accountDoesNotExist sender)
   let some key := st.accessKey? sender pk
     | throw (.delegateActionAccessKeyError s!"AccessKeyNotFound {sender} {repr pk}")
   let (current, lane) ← match nonceIndex with
@@ -489,15 +491,33 @@ def delegateKeyState (c : ReceiptCtx) (st : ChainState) (sender : AccountId) (pk
       unless methods.isEmpty || methods.contains method do
         throw (.delegateActionAccessKeyError s!"MethodNameMismatch {method}")
     | _ => throw (.delegateActionAccessKeyError "RequiresFullAccess")
+  return lane
+
+/-- The delegate's nonce moves: the key's own nonce, or the lane of a gas key. -/
+def delegateKeyUpdate (st : ChainState) (sender : AccountId) (pk : PublicKey) (lane : Option Nat)
+    (nonce : Nat) : ChainState :=
   match lane with
-  | none => return st.setAccessKey sender pk { key with nonce }
-  | some index => return st.setGasKeyNonce sender pk index nonce
+  | none =>
+    match st.accessKey? sender pk with
+    | some key => st.setAccessKey sender pk { key with nonce }
+    | none => st
+  | some index => st.setGasKeyNonce sender pk index nonce
+
+/-- `validate_delegate_action_key` with the nonce update applied on success. -/
+def delegateKeyState (c : ReceiptCtx) (st : ChainState) (sender : AccountId) (pk : PublicKey)
+    (nonce : Nat) (nonceIndex : Option Nat) (inner : List Action) (receiver : AccountId) :
+    Except RuntimeError ChainState := do
+  let lane ← delegateKeyCheck c st sender pk nonce nonceIndex inner receiver
+  return delegateKeyUpdate st sender pk lane nonce
 
 /-- The checks of `apply_delegate_action` that precede the key: signature, expiry, sender. -/
 def delegateChecks (c : ReceiptCtx) (act : Action) : Except RuntimeError Unit :=
   match act with
-  | .delegate sender _ _ _ _ maxHeight _ _ _ =>
-    if !c.ap.verifyDelegate act then .error .delegateActionInvalidSignature
+  | .delegate sender _ inner _ _ maxHeight _ _ _ =>
+    -- nearcore types the inner actions as `NonDelegateAction`, so a nested delegate cannot occur.
+    if inner.any Action.isDelegate then
+      .error (.executionIssue (.unsupportedAction "nested delegate action"))
+    else if !c.ap.verifyDelegate act then .error .delegateActionInvalidSignature
     else if c.ap.blockHeight > maxHeight then .error .delegateActionExpired
     else if sender != c.receipt.receiverId then
       .error (.delegateActionSenderDoesNotMatchTxReceiver sender c.receipt.receiverId)
@@ -534,7 +554,12 @@ def delegateReceipt (c : ReceiptCtx) (act : Action) (id : ReceiptId) : Receipt :
   | _ => { predecessorId := "", receiverId := "", receiptId := id, receipt := .data { dataId := 0, data := none } }
 
 /-- `apply_delegate_action`: check the signed action, advance the sender's nonce and emit the
-receipt carrying the inner actions, whose execution and sending the relayer already paid for. -/
+receipt carrying the inner actions, whose execution and sending the relayer already paid for.
+nearcore divergence: the send fees of the inner actions are computed for each delegate action,
+where nearcore sums them over all actions of the receipt before it burns them; the totals agree
+whenever a receipt carries one delegate action. Access-key failures of the delegate (key
+missing, nonce, permission) carry their description as text instead of nearcore's structured
+`InvalidAccessKeyError`. -/
 def applyDelegateAction (c : ReceiptCtx) (act : Action) : ExecM Unit := do
   liftExcept (delegateChecks c act)
   let st ← getState
@@ -557,6 +582,10 @@ def planDeployGlobal (c : ReceiptCtx) (st : ChainState) (account : Account) (cod
     (mode : GlobalDeployMode) : Except RuntimeError DeployGlobalPlan := do
   let id := c.receipt.receiverId
   if let some issue := code.decodeIssue then throw (.executionIssue issue)
+  -- nearcore divergence: before `IncludeDeployGlobalContractOutcomeBurntStorage` the storage cost is
+  -- burnt without appearing in the outcome's burnt tokens; only the protocols that report it are modelled.
+  unless c.cfg.includeDeployGlobalContractOutcomeBurntStorage do
+    throw (.executionIssue (.unsupportedAction "deploy global contract without burnt storage in the outcome"))
   let cost := c.cfg.globalContractStorageAmountPerByte * code.size
   if account.amount < cost then throw (.lackBalanceForState id cost)
   let identifier : Wasm.GlobalContractId ← match mode with
@@ -567,7 +596,7 @@ def planDeployGlobal (c : ReceiptCtx) (st : ChainState) (account : Account) (cod
       | none => throw (.executionIssue (.unsupportedAction "global contract code hash"))
   return { account := { account with amount := account.amount - cost }, identifier
            nonce := if c.cfg.globalContractDistributionNonce then st.globalNonce identifier + 1 else 0
-           burn := if c.cfg.includeDeployGlobalContractOutcomeBurntStorage then cost else 0 }
+           burn := cost }
 
 /-- `action_deploy_global_contract`: the storage is paid for by burning, and a distribution
 receipt carries the code to every shard. -/
@@ -586,6 +615,22 @@ def applyDeployGlobalContract (c : ReceiptCtx) (code : ContractCode) (mode : Glo
     receiverId := systemReceiver
     receiptId := rid
     receipt := .globalDistribution { id := plan.identifier, targetShard := c.ap.shardId, code, nonce := plan.nonce } }
+
+/-- The account a transfer creates for an ETH-implicit or deterministic receiver
+(`action_implicit_account_creation_transfer`): ETH-implicit accounts use the wallet global contract.
+nearcore divergence: before `EthImplicitGlobalContract` the wallet contract is deployed as local code
+(`near[wallet contract hash]` magic bytes); that protocol range is reported as unsupported. -/
+def specialImplicitAccount (c : ReceiptCtx) (id : AccountId) (deposit : Nat) :
+    Except RuntimeError (Option Account) :=
+  if !c.cfg.wasm.ethImplicitAccounts then .ok none
+  else match accountKind (bytesOfString id) with
+    | .ethImplicit =>
+      if c.cfg.wasm.ethImplicitGlobalContract then
+        .ok (some { amount := deposit, storageUsage := c.cfg.fees.numBytesAccount + 32
+                    global := some (.codeHash (ethWalletGlobalContractHash c.ap.chainId)), versionTwo := true })
+      else .error (.executionIssue (.unsupportedAction "ETH-implicit account creation with the legacy wallet contract"))
+    | .nearDeterministic => .ok (some { amount := deposit, storageUsage := c.cfg.fees.numBytesAccount })
+    | _ => .ok none
 
 def applyAction (c : ReceiptCtx) (isLast : Bool) : Action → ExecM Unit
   | .createAccount => do
@@ -616,17 +661,20 @@ def applyAction (c : ReceiptCtx) (isLast : Bool) : Action → ExecM Unit
       if c.receipt.isGasRefund then
         modifyState (·.refundAllowance id c.action.signerPublicKey deposit)
     | none =>
-      if unsupportedImplicitCreation c.cfg.wasm.ethImplicitAccounts (bytesOfString id) then
-        throw (.executionIssue (.unsupportedAction "implicit account creation (ETH/deterministic contracts)"))
       -- implicit account creation on transfer
-      if let some pk := implicitPublicKey? id then
-        let key : AccessKey := { nonce := initialNonce c.ap.blockHeight, permission := .fullAccess }
-        putAccount id { amount := deposit, storageUsage := c.cfg.fees.numBytesAccount
-          + accessKeyStorageBytes pk key
-          + c.cfg.fees.numExtraBytesRecord }
-        modifyState (·.setAccessKey id pk key)
+      match ← liftExcept (specialImplicitAccount c id deposit) with
+      | some account =>
+        putAccount id account
         modify fun e => { e with actorId := id }
-      else throw (.accountDoesNotExist id)
+      | none =>
+        if let some pk := implicitPublicKey? id then
+          let key : AccessKey := { nonce := initialNonce c.ap.blockHeight, permission := .fullAccess }
+          putAccount id { amount := deposit, storageUsage := c.cfg.fees.numBytesAccount
+            + accessKeyStorageBytes pk key
+            + c.cfg.fees.numExtraBytesRecord }
+          modifyState (·.setAccessKey id pk key)
+          modify fun e => { e with actorId := id }
+        else throw (.accountDoesNotExist id)
   | .stake stake pk => do
     let id := c.receipt.receiverId
     let a ← getAccount id
@@ -646,7 +694,8 @@ def applyAction (c : ReceiptCtx) (isLast : Bool) : Action → ExecM Unit
     let extra := c.cfg.fees.numExtraBytesRecord
     match key.permission.gasKeyInfo? with
     | some (_, nonces) =>
-      let stored : AccessKey := { key with nonce := 0 }
+      -- A new gas key starts empty: action validation rejects a gas key added with a balance.
+      let stored : AccessKey := { key with nonce := 0, permission := key.permission.withGasBalance 0 }
       putAccount id { a with storageUsage := a.storageUsage + gasKeyStorageCost extra pk stored nonces }
       modifyState fun st => (List.range nonces).foldl
         (fun st lane => st.setGasKeyNonce id pk lane (initialNonce c.ap.blockHeight))
@@ -1063,8 +1112,14 @@ def processReceipt (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → C
     match a.yieldDataId with
     | some dataId =>
       -- A yield only waits, stored until its data or its timeout arrives.
-      { state := { st with yieldReceipts := Assoc.insert st.yieldReceipts (r.receiverId, dataId) r },
-        storageAccounting := ap.storageAccounting }
+      -- nearcore divergence: a data id that is already waiting would be overwritten in the trie;
+      -- hashes make that unreachable, and the model reports it instead of losing the funds.
+      if (Assoc.lookup st.yieldReceipts (r.receiverId, dataId)).isSome then
+        { state := st, storageAccounting := ap.storageAccounting
+          issue := some (r.receiptId, .unsupportedAction "duplicate yielded data id") }
+      else
+        { state := { st with yieldReceipts := Assoc.insert st.yieldReceipts (r.receiverId, dataId) r },
+          storageAccounting := ap.storageAccounting }
     | none =>
     let missing := a.inputDataIds.filter fun d => !(Assoc.contains st.receivedData d)
     if missing.isEmpty then
@@ -1133,14 +1188,31 @@ def Processed.append (p q : Processed) : Processed :=
     extraCompute := p.extraCompute + q.extraCompute
     issue := p.issue.orElse fun _ => q.issue }
 
+/-- The receipt shapes the funding theory covers: a system refund is one transfer, every other
+receipt names neither the system account as receiver nor as signer. -/
+def Receipt.fundedShape (r : Receipt) : Bool :=
+  match r.receipt with
+  | .action a =>
+    if r.predecessorId == systemAccount then
+      match a.actions with
+      | [.transfer _] => true
+      | _ => false
+    else r.receiverId != systemAccount && a.signerId != systemAccount
+  | .data _ | .globalDistribution _ => true
+
 /-- The instant receipts a processed receipt created run right after it, in creation order,
-and are not sent out (`process_receipt_and_instant_receipts`). -/
+and are not sent out (`process_receipt_and_instant_receipts`).
+nearcore divergence: an instant receipt outside `Receipt.fundedShape`, in practice one addressed to
+the `system` account, is reported as unsupported instead of executed. -/
 def processInstants (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → ContractCode) :
     Nat → Processed → List Receipt → Processed
   | _, acc, [] => acc
   | 0, acc, r :: _ =>
     { acc with issue := some (r.receiptId, .interpreterError "instant receipts did not settle") }
   | fuel + 1, acc, r :: rest =>
+    if !r.fundedShape then
+      { acc with issue := some (r.receiptId, .unsupportedAction "instant receipt addressed to the system account") }
+    else
     let p := processReceipt cfg { ap with storageAccounting := acc.storageAccounting } codeOf acc.state r
     if p.issue.isSome then { acc with issue := p.issue } else
     let instant := p.receipts.filter Receipt.isInstant

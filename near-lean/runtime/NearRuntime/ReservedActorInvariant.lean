@@ -9,13 +9,83 @@ def ChainState.SystemAccountAbsent (st : ChainState) : Prop := st.account? syste
 
 @[simp] theorem implicitPublicKey_system : implicitPublicKey? systemAccount = none := by decide
 
+theorem specialImplicitAccount_system (c : ReceiptCtx) (deposit : Nat) :
+    specialImplicitAccount c systemAccount deposit = .ok none := by
+  unfold specialImplicitAccount
+  split
+  · rfl
+  · have hk : accountKind (bytesOfString systemAccount) = .named := by
+      unfold systemAccount bytesOfString
+      decide +kernel
+    rw [hk]
+
+theorem gasKeyWithdrawal_systemAbsent {st moved : ChainState} {id : AccountId} {pk : PublicKey} {amount : Nat}
+    (h : gasKeyWithdrawal st id pk amount = .ok moved) (hmissing : st.account? systemAccount = none) :
+    moved.account? systemAccount = none := by
+  by_cases hid : id = systemAccount
+  · have := (gasKeyWithdrawal_account h).1
+    rw [hid, hmissing] at this
+    cases this
+  · exact ((gasKeyWithdrawal_account h).2 systemAccount hid).trans hmissing
+
 /-- No raw action creates the reserved actor. The direct-target case uses real
 creation rejection and the fact that the name is not an implicit public key. -/
--- TODO(proof): adapt the cloned proof
 theorem applyAction_systemAbsent (c : ReceiptCtx) (isLast : Bool) (action : Action) (before : Exec)
     (hmissing : before.state.SystemAccountAbsent) :
     ((applyAction c isLast action).run.run before).2.state.SystemAccountAbsent := by
-  sorry
+  change before.state.account? systemAccount = none at hmissing
+  change ((applyAction c isLast action).run.run before).2.state.account? systemAccount = none
+  by_cases hreceiver : c.receipt.receiverId = systemAccount
+  · cases action with
+    | createAccount => rw [applyCreateAccount_run]; simp [hreceiver, hmissing]
+    | deployContract code =>
+      rw [applyDeployContract_run]
+      simp [hreceiver, hmissing]
+      split <;> exact hmissing
+    | functionCall method args gas deposit =>
+      change ((applyFunctionCall c method args gas deposit isLast).run.run before).2.state.account? systemAccount = none
+      rw [applyFunctionCall_run]
+      simp [hreceiver, hmissing]
+    | transfer amount =>
+      rw [applyTransfer_run]
+      simp only [hreceiver, hmissing, specialImplicitAccount_system, implicitPublicKey_system]
+    | stake amount pk =>
+      simp [-StateT.run_bind, applyAction, getAccount, getState, hreceiver, hmissing]
+    | addKey pk key =>
+      rw [applyAddKey_run]
+      simp only [hreceiver, hmissing]
+      split <;> exact hmissing
+    | deleteKey pk =>
+      rw [applyDeleteKey_run]
+      simp only [hreceiver, hmissing]
+      split <;> exact hmissing
+    | useGlobalContract contract =>
+      rw [applyUseGlobalContract_run]
+      simp only [hreceiver, hmissing]
+      repeat' (first | exact hmissing | split)
+    | deployGlobalContract code mode =>
+      rw [applyDeployGlobalContract_run]
+      simp only [hreceiver, hmissing]
+    | transferToGasKey pk deposit =>
+      rw [applyTransferToGasKey_run]
+      repeat' (first | exact hmissing | exact (gasKeyDeposit_account (by assumption) _).trans hmissing | split)
+    | withdrawFromGasKey pk amount =>
+      rw [applyWithdrawFromGasKey_run]
+      repeat' (first | exact hmissing | exact gasKeyWithdrawal_systemAbsent (by assumption) hmissing | split)
+    | deleteAccount beneficiary =>
+      rw [applyDeleteAccount_run]
+      simp only [hreceiver, hmissing]
+      split <;> exact hmissing
+    | delegate sender receiver inner nonce nonceIndex maxBlockHeight pk signature v2 =>
+      change ((applyDelegateAction c _).run.run before).2.state.account? systemAccount = none
+      rw [applyDelegateAction_run]
+      repeat' (first | exact hmissing | split)
+      all_goals
+        dsimp only
+        rw [delegateResult_account]
+        have h := delegateState_account (by assumption) systemAccount
+        exact h.trans hmissing
+  · exact (applyAction_account_ne c isLast action before systemAccount hreceiver).trans hmissing
 
 /-- The invariant is required after failures as well as successes, so it can
 compose through arbitrary action sequences before receipt rollback. -/
@@ -145,11 +215,72 @@ theorem applyActionReceipt_systemAbsent (c : ReceiptCtx) (st : ChainState) (h : 
 
 /-- Processing any receipt preserves absence of the synthetic actor, even when
 malformed stored data receipts recursively release further postponed work. -/
--- TODO(proof): adapt the cloned proof
 theorem processReceipt_systemAbsent (cfg : RuntimeConfig) (ap : ApplyState) (decoder : Bytes → ContractCode)
     (st : ChainState) (receipt : Receipt) (h : st.SystemAccountAbsent) :
     (processReceipt cfg ap decoder st receipt).state.SystemAccountAbsent := by
-  sorry
+  cases hr : receipt.receipt with
+  | action action =>
+    cases hy : action.yieldDataId with
+    | some dataId =>
+      rw [processReceipt_yield_unfold cfg ap decoder st receipt action dataId hr hy]
+      split
+      · exact h
+      · exact h
+    | none =>
+      cases he : (action.inputDataIds.filter fun id => !(Assoc.contains st.receivedData id)).isEmpty with
+      | false =>
+        rw [processReceipt_waiting cfg ap decoder st receipt action hr hy he]
+        exact h
+      | true =>
+        rw [processReceipt_ready cfg ap decoder st receipt action hr hy he]
+        unfold processedOfExec
+        split
+        · exact h
+        · exact applyActionReceipt_systemAbsent _ _ h
+  | data data =>
+    cases hres : data.resumeDataId with
+    | none =>
+      rw [processReceipt_data cfg ap decoder st receipt data hr hres]
+      cases hroute : Assoc.lookup st.postponedByData data.dataId with
+      | none => exact h
+      | some id =>
+        simp only
+        cases hpending : ((Assoc.lookup st.pendingDataCount id).getD 1 - 1 == 0) with
+        | false => simp only [Bool.false_eq_true, ite_false]; exact h
+        | true =>
+          simp only [ite_true]
+          cases hwaiting : Assoc.lookup st.postponed id with
+          | none => exact h
+          | some waiting =>
+            exact processReceipt_systemAbsent cfg ap decoder
+              (releasePostponedState (receivePostponedDataState st data) id) waiting h
+    | some dataId =>
+      rw [processReceipt_resume cfg ap decoder st receipt data dataId hr hres]
+      split
+      · exact h
+      · split
+        · rename_i y _
+          split
+          · rename_i a _
+            rw [runActionReceipt_eq]
+            unfold processedOfExec
+            split
+            · exact h
+            · exact applyActionReceipt_systemAbsent _ _ h
+          · exact h
+        · exact h
+  | globalDistribution g =>
+    rw [processReceipt_distribution cfg ap decoder st receipt g hr]
+    have hl := processDistribution_ledger cfg ap st receipt g
+    unfold ChainState.ledgerState at hl
+    simp only [Prod.mk.injEq] at hl
+    change (processDistribution cfg ap st receipt g).state.account? systemAccount = none
+    unfold ChainState.account?
+    rw [hl.1]
+    exact h
+termination_by st.postponed.length
+decreasing_by
+  exact Assoc.erase_length_lt_of_lookup _ _ _ hwaiting
 
 /-- An absent synthetic actor cannot authenticate a transaction; successful
 conversion can therefore update only an ordinary signer account. -/

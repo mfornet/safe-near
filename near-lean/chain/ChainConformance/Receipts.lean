@@ -73,6 +73,7 @@ def receiptJson (r : Receipt) : Json :=
           ("data_id", toJson d.dataId), ("receiver_id", toJson d.receiverId)])),
         ("actions", toJson (a.actions.map actionJson))]
     | .data d => Json.mkObj [("kind", toJson "data"), ("dataId", toJson d.dataId), ("data", toJson d.data)]
+    | .globalDistribution _ => Json.mkObj [("kind", toJson "globalDistribution")]
   Json.mkObj [("id", toJson r.receiptId), ("predecessor", toJson r.predecessorId),
     ("receiver", toJson r.receiverId), ("body", body)]
 

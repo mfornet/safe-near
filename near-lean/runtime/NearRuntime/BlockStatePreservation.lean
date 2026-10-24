@@ -14,9 +14,10 @@ theorem applyAttempt_preserves_state (cfg : RuntimeConfig) (ap : ApplyState)
       P (processReceipt cfg { ap with storageAccounting := accounting } decoder before receipt).state)
     (hclear : ∀ before, P before → P { before with delayed := [] })
     (hdelay : ∀ before receipt, P before → P { before with delayed := before.delayed ++ [receipt] })
+    (htimeout : ∀ before after, P before → before.TimeoutStep after → P after)
     (st : ChainState) (txs : List Transaction) (incoming : List Receipt) (h : P st) :
     P (applyAttempt cfg ap decoder st txs incoming).state :=
-  applyAttempt_state_predicate cfg ap decoder P htx hreceipt hclear hdelay st txs incoming h
+  applyAttempt_state_predicate cfg ap decoder P htx hreceipt hclear hdelay htimeout st txs incoming h
 
 theorem apply_preserves_state (cfg : RuntimeConfig) (ap : ApplyState)
     (decoder : Bytes → ContractCode) (P : ChainState → Prop)
@@ -26,13 +27,14 @@ theorem apply_preserves_state (cfg : RuntimeConfig) (ap : ApplyState)
       P (processReceipt cfg { ap with storageAccounting := accounting } decoder before receipt).state)
     (hclear : ∀ before, P before → P { before with delayed := [] })
     (hdelay : ∀ before receipt, P before → P { before with delayed := before.delayed ++ [receipt] })
+    (htimeout : ∀ before after, P before → before.TimeoutStep after → P after)
     (st : ChainState) (txs : List Transaction) (incoming : List Receipt) (h : P st) :
     P (apply cfg ap decoder st txs incoming).state := by
   unfold apply
   dsimp only
   split
   · exact h
-  · exact applyAttempt_preserves_state cfg ap decoder P htx hreceipt hclear hdelay st txs incoming h
+  · exact applyAttempt_preserves_state cfg ap decoder P htx hreceipt hclear hdelay htimeout st txs incoming h
 
 theorem convertTransaction_postponedIdsMatch (cfg : RuntimeConfig) (ap : ApplyState)
     (before after : ChainState) (tx : Transaction) (receipt : Receipt) (cost : Fees.TxCost)
@@ -53,6 +55,10 @@ theorem apply_postponedIdsMatch (cfg : RuntimeConfig) (ap : ApplyState)
     exact (processReceipt_postponed_ownership cfg { ap with storageAccounting := accounting } decoder before receipt hb).1
   · intro before hb; exact hb
   · intro before receipt hb; exact hb
+  · intro before after hb hstep
+    unfold ChainState.PostponedIdsMatch at hb ⊢
+    rw [hstep.postponed]
+    exact hb
   · exact h
 
 end Near

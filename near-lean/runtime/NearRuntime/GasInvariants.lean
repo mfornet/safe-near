@@ -1,4 +1,5 @@
 import NearRuntime.Apply
+import NearRuntime.NewActionRun
 
 namespace Near
 open Wasm.Near
@@ -38,26 +39,6 @@ end GasDelta
 /-- A budget bound on both successful and failed executions of a receipt operation. -/
 def ExecM.GasBound (operation : ExecM α) (budget : Nat) : Prop :=
   ∀ before, GasDelta budget before (operation.run.run before).2
-
-@[simp] theorem exec_id_pure (value : α) : (pure value : Id α) = value := rfl
-
-@[simp] theorem execM_run_bind (operation : ExecM α) (next : α → ExecM β) (before : Exec) :
-    (operation >>= next).run.run before =
-      (match operation.run.run before with
-        | (result, middle) => match result with
-          | .ok value => (next value).run.run middle
-          | .error error => (.error error, middle) : Except RuntimeError β × Exec) := by
-  simp only [ExceptT.run_bind, StateT.run_bind]
-  cases he : operation.run.run before with
-  | mk result middle => cases result <;> rfl
-
-@[simp] theorem execM_run_get (before : Exec) : (get : ExecM Exec).run.run before = (.ok before, before) := rfl
-@[simp] theorem execM_run_modify (f : Exec → Exec) (before : Exec) :
-    (modify f : ExecM Unit).run.run before = (.ok (), f before) := rfl
-@[simp] theorem execM_run_pure (value : α) (before : Exec) :
-    (pure value : ExecM α).run.run before = (.ok value, before) := rfl
-@[simp] theorem execM_run_throw (error : RuntimeError) (before : Exec) :
-    (throw error : ExecM α).run.run before = (.error error, before) := rfl
 
 theorem ExecM.GasBound.bind {operation : ExecM α} {next : α → ExecM β} {first second : Nat}
     (hfirst : operation.GasBound first) (hsecond : ∀ value, (next value).GasBound second) :

@@ -75,13 +75,13 @@ theorem materializeFunctionCallRaw_funds_split (c : ReceiptCtx) (isLast : Bool) 
 theorem functionCallYields_totalBalance (c : ReceiptCtx) (outcome : VMOutcome) (effects : FunctionCallEffects) :
     (functionCallYields c outcome effects).state.totalBalance = effects.state.totalBalance := by
   have h := congrArg ChainState.totalBalance (functionCallYields_frame c outcome effects)
-  simpa only [ChainState.totalBalance, ChainState.withoutIds] using h
+  simpa only [ChainState.totalBalance, ChainState.gasKeyFunds, ChainState.withoutIds] using h
 
 theorem materializeFunctionCallRaw_totalBalance (c : ReceiptCtx) (isLast : Bool) (outcome : VMOutcome)
     (initial : ChainState) :
     (materializeFunctionCallRaw c isLast outcome initial).state.totalBalance = initial.totalBalance := by
   have h := congrArg ChainState.totalBalance (materializeFunctionCallRaw_frame c isLast outcome initial)
-  simpa only [ChainState.totalBalance, ChainState.withoutIds] using h
+  simpa only [ChainState.totalBalance, ChainState.gasKeyFunds, ChainState.withoutIds] using h
 
 /-- Successful validation identifies the exact executable constructor used by commit. -/
 theorem functionCallEffects_success (c : ReceiptCtx) (account : Account) (outcome : VMOutcome)
@@ -114,9 +114,11 @@ theorem commitFunctionCall_accountsUnique (exec : Exec) (c : ReceiptCtx) (accoun
   change (exec.commitFunctionCall outcome effects).state.accounts =
     (exec.state.setAccount c.receipt.receiverId
       { account with amount := outcome.balance, storageUsage := outcome.storageUsage }).accounts at hf
-  unfold ChainState.AccountsUnique
-  rw [hf]
-  exact h.setAccount _ _
+  have hk := congrArg ChainState.accessKeys (commitFunctionCall_frame exec c account outcome isLast effects heffects)
+  change (exec.commitFunctionCall outcome effects).state.accessKeys =
+    (exec.state.setAccount c.receipt.receiverId
+      { account with amount := outcome.balance, storageUsage := outcome.storageUsage }).accessKeys at hk
+  exact ChainState.AccountsUnique.congr hf.symm hk.symm (h.setAccount _ _)
 
 theorem commitFunctionCall_balance (exec : Exec) (c : ReceiptCtx) (account : Account)
     (outcome : VMOutcome) (isLast : Bool) (effects : FunctionCallEffects)

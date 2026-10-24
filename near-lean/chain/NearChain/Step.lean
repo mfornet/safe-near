@@ -245,7 +245,7 @@ theorem runBlocks_reachable (cfg : RuntimeConfig) (codeOf : CodeTable) (genesis 
 /-! ## Predicates on transitions -/
 
 def Action.upgrades : Action → Bool
-  | .deployContract _ | .deleteAccount _ => true
+  | .deployContract _ | .deleteAccount _ | .useGlobalContract _ => true
   | _ => false
 
 /-- The receipt deploys code to, or deletes, `c`. -/
@@ -260,14 +260,14 @@ def Receipt.touches (u : AccountId) (r : Receipt) : Bool :=
   r.predecessorId == u || r.receiverId == u ||
     (match r.receipt with
     | .action a => a.signerId == u
-    | .data _ => false)
+    | .data _ | .globalDistribution _ => false)
 
 def Transaction.touches (u : AccountId) (tx : Transaction) : Bool :=
   tx.signerId == u || tx.receiverId == u
 
 /-- Every receipt already in flight, including delayed and postponed work. -/
 def Snapshot.inFlight (s : Snapshot) : List Receipt :=
-  s.pending ++ s.state.delayed ++ s.state.postponed.map (·.2)
+  s.pending ++ s.state.delayed ++ s.state.postponed.map (·.2) ++ s.state.yieldReceipts.map (·.2)
 
 /-- Account and in-flight funds, including purchased gas in every receipt queue.
 Minted subsidy and burnt tokens are separate transition observations. -/
