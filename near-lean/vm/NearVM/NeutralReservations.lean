@@ -226,6 +226,22 @@ theorem chargesBefore_storage_reservation (name : String) (st : HostStore NearSt
   · rcases hname with h | h <;> subst name <;>
       simp [chargesBeforeUnvalidated, creationAccountArgs, Charge.reservation]
 
+/-- Log plans contain only local ext-cost burns. -/
+theorem logPlan_reservation (name : String) (st : HostStore NearState) (args : List Value)
+    (fees : ActionFees) : ((logPlan name st args).charges.map (fun charge => charge.reservation fees)).sum = 0 := by
+  unfold logPlan
+  dsimp only [Id.run]
+  repeat' split
+  all_goals simp only [pure, List.map_append, List.sum_append, readSpan_reservation, Nat.add_zero]
+  all_goals simp [Charge.reservation]
+
+theorem chargesBefore_log_reservation (name : String) (st : HostStore NearState) (args : List Value)
+    (hname : name = "log_utf8" ∨ name = "log_utf16") :
+    ((chargesBefore name st args).map (fun charge => charge.reservation st.host.fees)).sum = 0 := by
+  rcases hname with h | h <;> subst name <;>
+    simpa [chargesBefore, chargesBeforeUnvalidated, storageMutationPlan?, creationAccountArgs] using
+      logPlan_reservation _ st args st.host.fees
+
 theorem chargesBefore_neutral_reservation (name : String) (st : HostStore NearState) (args : List Value)
     (hname : name ∈ reservationNeutralNames) :
     ((chargesBefore name st args).map (fun charge => charge.reservation st.host.fees)).sum = 0 := by
@@ -235,6 +251,8 @@ theorem chargesBefore_neutral_reservation (name : String) (st : HostStore NearSt
   all_goals first
     | exact chargesBefore_storage_reservation _ _ _ (Or.inl rfl)
     | exact chargesBefore_storage_reservation _ _ _ (Or.inr rfl)
+    | exact chargesBefore_log_reservation _ _ _ (Or.inl rfl)
+    | exact chargesBefore_log_reservation _ _ _ (Or.inr rfl)
     | skip
   all_goals dsimp only [chargesBefore, chargesBeforeUnvalidated, storageMutationPlan?, creationAccountArgs, argU64,
     readMem, writeMem, writeReg, readSpan, utf8, utf16, Charge.reservation]

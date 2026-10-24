@@ -79,10 +79,15 @@ theorem preInvokeError_creationAccount_valid (name : String) (st : HostStore Nea
   · simp [hga, creationAccountError, creationAccountArgs]
   by_cases hv : name = "value_return"
   · simp [hv, creationAccountError, creationAccountArgs]
+  by_cases hl8 : name = "log_utf8"
+  · simp [hl8, creationAccountError, creationAccountArgs]
+  by_cases hl16 : name = "log_utf16"
+  · simp [hl16, creationAccountError, creationAccountArgs]
   have hgi : globalContractInputs? name = none := by
     simp [globalContractInputs?, beq_eq_false_iff_ne.mpr hg, beq_eq_false_iff_ne.mpr hga]
   simp only [invocationArgumentError, hs, beq_eq_false_iff_ne.mpr hj,
     beq_eq_false_iff_ne.mpr ht, beq_eq_false_iff_ne.mpr hk, beq_eq_false_iff_ne.mpr hv,
+    beq_eq_false_iff_ne.mpr hl8, beq_eq_false_iff_ne.mpr hl16, Bool.or_false,
     Bool.false_eq_true, ite_false, hgi] at hi
   cases he : creationAccountError name st args with
   | none => rfl

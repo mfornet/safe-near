@@ -986,13 +986,38 @@ def logUtf8Fn : NearHostFn NearState :=
         | some msg => appendLogResult "log_utf8" st msg
       | _ => .Trap st "log_utf8: bad args" }
 
+/-- Little-endian UTF-16 code units; `none` for an odd byte count. -/
+def utf16Units : List UInt8 → Option (List Nat)
+  | [] => some []
+  | [_] => none
+  | lo :: hi :: rest => ((lo.toNat + 256 * hi.toNat) :: ·) <$> utf16Units rest
+
+/-- Rust's `char::decode_utf16`, failing on an unpaired surrogate. -/
+def decodeUtf16Units : List Nat → Option (List Char)
+  | [] => some []
+  | [u] => if u < 0xD800 || u > 0xDFFF then some [Char.ofNat u] else none
+  | u :: v :: rest =>
+    if u < 0xD800 || u > 0xDFFF then (Char.ofNat u :: ·) <$> decodeUtf16Units (v :: rest)
+    else if u ≤ 0xDBFF && 0xDC00 ≤ v && v ≤ 0xDFFF then
+      (Char.ofNat (0x10000 + (u - 0xD800) * 0x400 + (v - 0xDC00)) :: ·) <$> decodeUtf16Units rest
+    else none
+
+/-- A UTF-16LE message as the UTF-8 bytes of nearcore's decoded `String`. -/
+def decodeUtf16 (bytes : List UInt8) : Option (List UInt8) := do
+  let chars ← decodeUtf16Units (← utf16Units bytes)
+  return (String.ofList chars).toUTF8.toList
+
+/-- `log_utf16`: the log stores the decoded message, as nearcore's `String` logs do. -/
 def logUtf16Fn : NearHostFn NearState :=
   { params := [.i64, .i64], results := []
     invoke := fun st args => match args with
       | [.i64 len, .i64 ptr] =>
         match getMemOrReg st ptr len with
         | none => .Trap st "log_utf16: invalid memory"
-        | some msg => appendLogResult "log_utf16" st msg
+        | some raw =>
+          match decodeUtf16 raw with
+          | none => .Trap st "log_utf16: bad UTF-16"
+          | some msg => appendLogResult "log_utf16" st msg
       | _ => .Trap st "log_utf16: bad args" }
 
 def abortFn : NearHostFn NearState :=

@@ -335,6 +335,51 @@ def globalContractPlan (st : HostStore NearState) (byAccount : Bool) (target : N
         { charges := idCharges ++ [.actionBase (·.useGlobalContractBase) sir,
             .actionBytes (·.useGlobalContractByte) id.length sir] }
 
+/-- A log host's charges, in nearcore's order, and the error that stops it
+(`logic.rs`): the count check, the decoding base, the remaining-length check,
+the read, the decoding bytes, `log_base` and `log_byte` on the decoded length,
+then the running-total check. A `u64::MAX` length reads a register here, where
+nearcore reads a NUL-terminated string. -/
+structure LogPlan where
+  charges : List Charge
+  error : Option HostError := none
+
+def logPlan (name : String) (st : HostStore NearState) (args : List Value) : LogPlan := Id.run do
+  let a := argU64 args
+  let base : Charge := .ext "base"
+  let total := (st.host.logs.map List.length).sum
+  let fits (n : Nat) := withinLimit st.host.config.maxLogLen n
+  let limit := st.host.config.maxLogLen.getD 0
+  if let some count := st.host.config.maxNumberLogs then
+    if st.host.logs.length ≥ count then
+      return { charges := [base], error := some (.numberOfLogsExceeded count) }
+  let (len, ptr) := (a 0, a 1)
+  if name == "log_utf8" then
+    let charges := [base, .ext "utf8_decoding_base"]
+    if len != u64Max && !fits (total + len.toNat) then
+      return { charges, error := some (.totalLogLengthExceeded (total + len.toNat) limit) }
+    let charges := charges ++ readSpan st len ptr
+    let some msg := getMemOrReg st ptr len | return { charges, error := some (spanReadError len ptr) }
+    let charges := charges ++ [.ext "utf8_decoding_byte" msg.length]
+    if (String.fromUTF8? ⟨msg.toArray⟩).isNone then return { charges, error := some .badUTF8 }
+    let charges := charges ++ [.ext "log_base", .ext "log_byte" msg.length]
+    -- nearcore adds the length to the total before reporting it.
+    if !fits (total + msg.length) then
+      return { charges, error := some (.totalLogLengthExceeded (total + 2 * msg.length) limit) }
+    return { charges }
+  else
+    let charges := [base, .ext "utf16_decoding_base"] ++ readSpan st len ptr
+    let some raw := getMemOrReg st ptr len | return { charges, error := some (spanReadError len ptr) }
+    if raw.length % 2 != 0 then return { charges, error := some .badUTF16 }
+    if !fits (total + raw.length) then
+      return { charges, error := some (.totalLogLengthExceeded (total + raw.length) limit) }
+    let charges := charges ++ [.ext "utf16_decoding_byte" raw.length]
+    let some msg := decodeUtf16 raw | return { charges, error := some .badUTF16 }
+    let charges := charges ++ [.ext "log_base", .ext "log_byte" msg.length]
+    if !fits (total + msg.length) then
+      return { charges, error := some (.totalLogLengthExceeded (total + 2 * msg.length) limit) }
+    return { charges }
+
 /-- Argument-dependent charge plan before validating promise handles. -/
 def chargesBeforeUnvalidated (name : String) (st : HostStore NearState) (args : List Value) : List Charge :=
   let a := argU64 args
@@ -374,12 +419,7 @@ def chargesBeforeUnvalidated (name : String) (st : HostStore NearState) (args : 
     let n := spanLen st (a 2) (a 3)
     [base, .ext "ed25519_verify_base", .ext "ed25519_verify_byte" n] ++ readSpan st (a 0) (a 1)
       ++ readSpan st (a 2) (a 3) ++ readSpan st (a 4) (a 5)
-  | "log_utf8" =>
-    let n := spanLen st (a 0) (a 1)
-    [base] ++ readSpan st (a 0) (a 1) ++ utf8 n ++ [.ext "log_base", .ext "log_byte" n]
-  | "log_utf16" =>
-    let n := spanLen st (a 0) (a 1)
-    [base] ++ readSpan st (a 0) (a 1) ++ utf16 n ++ [.ext "log_base", .ext "log_byte" n]
+  | "log_utf8" | "log_utf16" => (logPlan name st args).charges
   | "panic" => [base]
   | "panic_utf8" => [base] ++ readSpan st (a 0) (a 1) ++ utf8 (spanLen st (a 0) (a 1))
   | "abort" => [base]
@@ -572,6 +612,7 @@ def invocationArgumentError (name : String) (st : HostStore NearState) (args : L
   else if name == "promise_batch_action_add_key_with_function_call" then (functionKeyPlan st (functionKeyInputs args) false).error
   else if let some byAccount := globalContractInputs? name then
     (globalContractPlan st byAccount (argU64 args 0).toNat (argU64 args 1) (argU64 args 2) false).error
+  else if name == "log_utf8" || name == "log_utf16" then (logPlan name st args).error
   else if name == "value_return" then
     if (getMemOrReg st (argU64 args 1) (argU64 args 0)).isNone then
       some (spanReadError (argU64 args 0) (argU64 args 1))

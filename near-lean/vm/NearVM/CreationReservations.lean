@@ -16,6 +16,11 @@ theorem preInvokeError_creation_checks (name : String) (st : HostStore NearState
   have hr : name ≠ "storage_remove" := by
     intro he; subst name; simp [allocatesPromise] at halloc
   have hs : storageMutationPlan? name st args = none := by simp [storageMutationPlan?, hw, hr]
+  have hlog : (name == "log_utf8" || name == "log_utf16") = false := by
+    cases he : (name == "log_utf8" || name == "log_utf16")
+    · rfl
+    · simp only [Bool.or_eq_true, beq_iff_eq] at he
+      rcases he with rfl | rfl <;> simp [allocatesPromise] at halloc
   have hv : (name == "value_return") = false := by
     cases he : name == "value_return"
     · rfl
@@ -31,12 +36,12 @@ theorem preInvokeError_creation_checks (name : String) (st : HostStore NearState
   have hp : creationPrefixError name st args = none := by
     cases he : creationPrefixError name st args with
     | none => rfl
-    | some error => simp [preInvokeError, invocationArgumentError, hs, hjoin, htransfer, hkey, hg, hv, he] at h
+    | some error => simp [preInvokeError, invocationArgumentError, hs, hjoin, htransfer, hkey, hg, hlog, hv, he] at h
   have hc : promiseCapacityError st = none := by
     cases he : promiseCapacityError st with
     | none => rfl
     | some error =>
-      simp [preInvokeError, invocationArgumentError, hs, hjoin, htransfer, hkey, hg, hv, hp, halloc, he] at h
+      simp [preInvokeError, invocationArgumentError, hs, hjoin, htransfer, hkey, hg, hlog, hv, hp, halloc, he] at h
   refine ⟨?_, hp, hc⟩
   cases he : creationAccountError name st args with
   | none => rfl

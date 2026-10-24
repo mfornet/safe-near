@@ -65,7 +65,7 @@ inductive HostError
 
 def HostError.message : HostError → String
   | .badUTF8 => "String encoding is bad UTF-8 sequence."
-  | .badUTF16 => "String encoding is bad UTF-16 sequence"
+  | .badUTF16 => "String encoding is bad UTF-16 sequence."
   | .gasExceeded => "Exceeded the prepaid gas."
   | .gasLimitExceeded => "Exceeded the maximum amount of gas allowed to burn per contract."
   | .balanceExceeded => "Exceeded the account balance."
@@ -90,8 +90,8 @@ def HostError.message : HostError → String
   | .contractSizeExceeded n l => s!"The size of a contract code in DeployContract action {n} exceeds the limit {l}"
   | .keyLengthExceeded n l => s!"The length of a storage key {n} exceeds the limit {l}"
   | .valueLengthExceeded n l => s!"The length of a storage value {n} exceeds the limit {l}"
-  | .totalLogLengthExceeded n l => s!"The length of a total log is {n} but the limit is {l}"
-  | .numberOfLogsExceeded l => s!"The number of logs exceeds the limit {l}"
+  | .totalLogLengthExceeded n l => s!"The length of a log message {n} exceeds the limit {l}"
+  | .numberOfLogsExceeded l => s!"The number of logs will exceed the limit {l}"
   | .numberPromisesExceeded n l => s!"The number of promises within a FunctionCall {n} exceeds the limit {l}"
   | .numberInputDataDependenciesExceeded n l => s!"The number of input data dependencies {n} exceeds the limit {l}"
   | .prohibitedInView m => s!"{m} is not allowed in view calls"

@@ -78,6 +78,12 @@ the model's host table is not gated by protocol version.
 output data receivers: nearcore reads and checks the length before burning
 the data receipt bytes. A case may set `outputDataReceivers`.
 
+`logs.json` drives `log_utf8` and `log_utf16` into the number-of-logs limit,
+the per-message and running-total length limits, bad UTF-8 and UTF-16,
+out-of-bounds reads, a non-ASCII UTF-16 message and gas exhaustion mid-loop.
+NUL-terminated logs (`u64::MAX` length) are not compared: the model reads a
+register there.
+
 `promise_graphs.json` checks exact ordered receipt dependencies and returned
 receipt identity for ordinary, nested, duplicate and empty joins. Failure cases
 cover joint return/action restrictions, nonexistent handles, view calls and

@@ -41,6 +41,26 @@ theorem applyCharges_abiFrame (ns : NearState) (charges : List Charge) :
   have hm : (prechargedStore name st args).mem = st.mem := rfl
   simp only [getMemOrReg, hr, hm]
 
+/-- Charging leaves the logs fixed. -/
+theorem applyCharges_logs (ns : NearState) (charges : List Charge) :
+    (applyCharges ns charges).1.logs = ns.logs := by
+  induction charges generalizing ns with
+  | nil => rfl
+  | cons charge rest ih =>
+    have hp : (applyCharge ns charge).1.logs = ns.logs := by cases charge <;> rfl
+    cases hc : applyCharge ns charge with
+    | mk paid error =>
+      rw [hc] at hp
+      cases error with
+      | some error => simpa only [applyCharges, hc] using hp
+      | none => simpa only [applyCharges, hc] using (ih paid).trans hp
+
+@[simp] theorem prechargedStore_readSpan (name : String) (st : HostStore NearState) (args : List Value)
+    (len ptr : UInt64) : readSpan (prechargedStore name st args) len ptr = readSpan st len ptr := by
+  have hr := congrArg Prod.fst (applyCharges_abiFrame st.host (chargesBefore name st args))
+  change (prechargedStore name st args).host.registers = st.host.registers at hr
+  simp only [readSpan, hr]
+
 @[simp] theorem prechargedStore_readU128Mem (name : String) (st : HostStore NearState) (args : List Value)
     (ptr : UInt64) : readU128Mem (prechargedStore name st args) ptr = readU128Mem st ptr := rfl
 
@@ -57,6 +77,13 @@ theorem applyCharges_abiFrame (ns : NearState) (charges : List Charge) :
 @[simp] theorem prechargedStore_promises (name : String) (st : HostStore NearState) (args : List Value) :
     (prechargedStore name st args).host.promises = st.host.promises :=
   congrArg (fun frame => frame.2.2) (applyCharges_abiFrame st.host (chargesBefore name st args))
+
+/-- A log host's plan reads only logs, configuration, memory and registers. -/
+@[simp] theorem prechargedStore_logPlan (name : String) (st : HostStore NearState) (args : List Value)
+    (host : String) : logPlan host (prechargedStore name st args) args = logPlan host st args := by
+  have hl : (prechargedStore name st args).host.logs = st.host.logs :=
+    applyCharges_logs st.host (chargesBefore name st args)
+  simp only [logPlan, hl, prechargedStore_config, prechargedStore_getMemOrReg, prechargedStore_readSpan]
 
 @[simp] theorem prechargedStore_targetError (name : String) (st : HostStore NearState) (args : List Value) (index : Nat) :
     functionCallTargetError (prechargedStore name st args) index = functionCallTargetError st index := by
