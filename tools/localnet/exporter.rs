@@ -374,7 +374,8 @@ fn export_chunk(
         .iter()
         .zip(&validity)
         .map(|(tx, ok)| Ok(json!({"borsh": hex(&borsh_bytes(tx)?), "valid": ok, "hash": hash_hex(&tx.get_hash()),
-            "view": serde_json::to_value(SignedTransactionView::from(tx.clone()))?})))
+            "view": serde_json::to_value(SignedTransactionView::from(tx.clone()))?,
+            "actions": serde_json::to_value(tx.transaction.actions())?})))
         .collect::<Result<_>>()?;
     let treasury = &near_config.genesis.config.protocol_treasury_account;
     let update_json = match &validator_update {
@@ -432,6 +433,7 @@ fn export_chunk(
             "transactions": tx_rows,
             "incomingReceipts": receipts.iter().map(|r| Ok(hex(&borsh_bytes(r)?))).collect::<Result<Vec<_>>>()?,
             "incomingReceiptViews": receipts.iter().map(|r| Ok(serde_json::to_value(ReceiptView::from(r.clone()))?)).collect::<Result<Vec<_>>>()?,
+            "incomingReceiptTyped": receipts.iter().map(|r| Ok(serde_json::to_value(r)?)).collect::<Result<Vec<_>>>()?,
         },
         "expected": {
             "postStateRoot": hash_hex(&post_root),
