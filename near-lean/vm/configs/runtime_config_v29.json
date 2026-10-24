@@ -280,5 +280,54 @@
     "strict_nonce": false,
     "transaction_size_includes_signature": false,
     "v1_transactions": false
+  },
+  "runtime_extra": {
+    "action_fees": {
+      "deploy_global_contract_base": {
+        "execution": 999999999999999,
+        "send_not_sir": 999999999999999,
+        "send_sir": 999999999999999
+      },
+      "deploy_global_contract_byte": {
+        "execution": 999999999999999,
+        "send_not_sir": 999999999999999,
+        "send_sir": 999999999999999
+      },
+      "gas_key_byte": {
+        "execution": 101435400,
+        "send_not_sir": 59357464,
+        "send_sir": 59357464
+      },
+      "gas_key_nonce_write_base": {
+        "execution": 64196736000,
+        "send_not_sir": 0,
+        "send_sir": 0
+      },
+      "gas_key_transfer_base": {
+        "execution": 235676644250,
+        "send_not_sir": 115123062500,
+        "send_sir": 115123062500
+      },
+      "use_global_contract_base": {
+        "execution": 999999999999999,
+        "send_not_sir": 999999999999999,
+        "send_sir": 999999999999999
+      },
+      "use_global_contract_byte": {
+        "execution": 999999999999999,
+        "send_not_sir": 999999999999999,
+        "send_sir": 999999999999999
+      }
+    },
+    "delegate_v2": false,
+    "deploy_global_contract_execution_base": 0,
+    "deploy_global_contract_execution_per_byte": 0,
+    "eth_implicit_global_contract": false,
+    "fix_delegate_action_deposit_with_function_call_error": false,
+    "fix_delete_account_global_contract_storage_usage": false,
+    "global_contract_distribution_nonce": false,
+    "global_contract_storage_amount_per_byte": "999999999999999999999999999",
+    "include_deploy_global_contract_outcome_burnt_storage": false,
+    "yield_with_id": false
   }
 }

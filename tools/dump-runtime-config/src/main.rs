@@ -12,7 +12,7 @@ use std::path::Path;
 use std::process::ExitCode;
 
 use near_parameters::view::RuntimeConfigView;
-use near_parameters::{RuntimeConfig, RuntimeConfigStore};
+use near_parameters::{ActionCosts, RuntimeConfig, RuntimeConfigStore};
 use near_primitives_core::types::ProtocolVersion;
 use near_primitives_core::version::{
     ProtocolFeature, PROD_GENESIS_PROTOCOL_VERSION, PROTOCOL_VERSION,
@@ -28,6 +28,17 @@ struct ConfigDump {
     // explicit instead of silently choosing zero or copying protocol constants.
     runtime_finance: Value,
     runtime_admission: Value,
+    // Global-contract and gas-key execution parameters, also omitted by the view.
+    runtime_extra: Value,
+}
+
+fn fee_json(config: &RuntimeConfig, cost: ActionCosts) -> Value {
+    let fee = config.fees.fee(cost);
+    json!({
+        "send_sir": fee.send_sir.gas().as_gas(),
+        "send_not_sir": fee.send_not_sir.gas().as_gas(),
+        "execution": fee.execution.gas().as_gas(),
+    })
 }
 
 fn config_json(store: &RuntimeConfigStore, version: ProtocolVersion) -> String {
@@ -47,6 +58,34 @@ fn config_json(store: &RuntimeConfigStore, version: ProtocolVersion) -> String {
             "strict_nonce": ProtocolFeature::StrictNonce.enabled(version),
             "v1_transactions": ProtocolFeature::GasKeys.enabled(version),
             "transaction_size_includes_signature": ProtocolFeature::PostQuantumSignatures.enabled(version),
+        }),
+        runtime_extra: json!({
+            "action_fees": {
+                "deploy_global_contract_base": fee_json(config, ActionCosts::deploy_global_contract_base),
+                "deploy_global_contract_byte": fee_json(config, ActionCosts::deploy_global_contract_byte),
+                "use_global_contract_base": fee_json(config, ActionCosts::use_global_contract_base),
+                "use_global_contract_byte": fee_json(config, ActionCosts::use_global_contract_byte),
+                "gas_key_transfer_base": fee_json(config, ActionCosts::gas_key_transfer_base),
+                "gas_key_byte": fee_json(config, ActionCosts::gas_key_byte),
+                "gas_key_nonce_write_base": fee_json(config, ActionCosts::gas_key_nonce_write_base),
+            },
+            "global_contract_storage_amount_per_byte":
+                config.fees.storage_usage_config.global_contract_storage_amount_per_byte.as_yoctonear().to_string(),
+            "deploy_global_contract_execution_base":
+                config.fees.deploy_global_contract_execution_base,
+            "deploy_global_contract_execution_per_byte":
+                config.fees.deploy_global_contract_execution_per_byte,
+            "include_deploy_global_contract_outcome_burnt_storage":
+                ProtocolFeature::IncludeDeployGlobalContractOutcomeBurntStorage.enabled(version),
+            "global_contract_distribution_nonce":
+                ProtocolFeature::GlobalContractDistributionNonce.enabled(version),
+            "fix_delete_account_global_contract_storage_usage":
+                ProtocolFeature::FixDeleteAccountGlobalContractStorageUsage.enabled(version),
+            "fix_delegate_action_deposit_with_function_call_error":
+                ProtocolFeature::FixDelegateActionDepositWithFunctionCallError.enabled(version),
+            "delegate_v2": ProtocolFeature::DelegateV2.enabled(version),
+            "yield_with_id": ProtocolFeature::YieldWithId.enabled(version),
+            "eth_implicit_global_contract": ProtocolFeature::EthImplicitGlobalContract.enabled(version),
         }),
     };
     serde_json::to_string_pretty(&dump).expect("runtime configuration serialization cannot fail")
