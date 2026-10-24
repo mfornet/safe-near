@@ -22,14 +22,15 @@ private def input (size seed : Nat) : ByteArray :=
 private def vary (m : ByteArray) (i : Nat) : ByteArray :=
   m.set! 0 (UInt8.ofNat i)
 
-private def sizes : List (String × Nat × Nat) :=
-  [("64B", 64, 5000), ("1KiB", 1024, 500), ("64KiB", 65536, 20)]
+/-- Label, size and iteration counts of a fast and of a slow hash. -/
+private def sizes : List (String × Nat × Nat × Nat) :=
+  [("64B", 64, 5000, 500), ("1KiB", 1024, 500, 50), ("64KiB", 65536, 50, 5)]
 
-private def hashBenchmarks (name : String) (f : ByteArray → ByteArray) (scale : Nat := 1) :
+private def hashBenchmarks (name : String) (f : ByteArray → ByteArray) (slow : Bool := false) :
     List Benchmark :=
-  sizes.map fun (label, size, iterations) =>
+  sizes.map fun (label, size, fast, slowIterations) =>
     let data := input size 3
-    { name := s!"{name}/{label}", iterations := max 2 (iterations / scale),
+    { name := s!"{name}/{label}", iterations := if slow then slowIterations else fast,
       run := fun i => (f (vary data i)).get! 0 |>.toUInt64 }
 
 private def seed : ByteArray :=
@@ -52,7 +53,7 @@ def benchmarks : List Benchmark :=
     hashBenchmarks "keccak256" keccak256 ++
     hashBenchmarks "keccak512" keccak512 ++
     hashBenchmarks "ripemd160" ripemd160 ++
-    hashBenchmarks "sha256-old" (fun m => ⟨(Near.Sha256.hash m.toList).toArray⟩) 40 ++
+    hashBenchmarks "sha256-old" (fun m => ⟨(Near.Sha256.hash m.toList).toArray⟩) true ++
     [{ name := "ed25519/verify", iterations := 300,
        run := fun i =>
          if ed25519Verify signingKey.publicKey (vary message i) signature then 1 else 0 },
