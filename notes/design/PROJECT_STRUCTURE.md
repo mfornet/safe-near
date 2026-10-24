@@ -2,7 +2,7 @@
 
 ```text
 safe-near/
-    notes/              -- Design notes and TODO
+    notes/              -- Design notes, TODO and finished plans (history/)
     tools/              -- Conformance, snapshots, audits and Lean quality tools
     reports/periodic/   -- Dated periodic check reports
     lean-toolchain      -- Lean version shared by every package
