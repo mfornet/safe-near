@@ -5,7 +5,7 @@
 # verification never builds it (`just node-isolation`).
 name = "NearNode"
 version = "0.1.0"
-defaultTargets = ["NearNode", "near-lean-node", "node-conformance-types", "node-trie-tests"]
+defaultTargets = ["NearNode", "near-lean-node", "node-conformance-types", "node-trie-tests", "node-store-tests", "node-state-roots"]
 packagesDir = "../.lake/packages"
 
 [[require]]
@@ -46,3 +46,13 @@ name = "NodeTests"
 [[lean_exe]]
 name = "node-trie-tests"
 root = "NodeTests.TrieTests"
+
+# `lake exe node-state-roots DIR`: the state roots of the M3 corpus through the trie.
+[[lean_exe]]
+name = "node-state-roots"
+root = "NodeConformance.StateRoots"
+
+# `lake exe node-store-tests [CASES [CHUNKS]]`: the persistent store, crash recovery and restarts.
+[[lean_exe]]
+name = "node-store-tests"
+root = "NodeTests.StoreTests"

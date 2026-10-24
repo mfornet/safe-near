@@ -56,8 +56,9 @@ class Mismatch(Exception):
 
 
 class Replayed:
-    def __init__(self, blockers: list[str]):
+    def __init__(self, blockers: list[str], post_state: dict[bytes, bytes] | None = None):
         self.blockers = blockers
+        self.post_state = post_state       # the complete post-state entries of Lean's replay
 
 
 def column(key_hex: str) -> int:
@@ -847,4 +848,5 @@ def replay(bundle: dict, binary: Path) -> Replayed:
             raise Unsupported([f"pre-state not reproduced by the Lean encoding: {difference}"])
         answer = run_lean(binary, request, workdir)
         compare(bundle, request, answer, found)
-    return Replayed(found)
+        post_state = entry_map(answer["blocks"][0]["chunkEntries"])
+    return Replayed(found, post_state)

@@ -74,6 +74,6 @@ structure TrieChanges where
 
 /-- The hash as a hex string, for messages. -/
 def hashHex (h : CryptoHash) : String :=
-  h.bytes.foldl (fun s b => s ++ (Nat.toDigits 16 (b.toNat + 256)).toString.drop 1) ""
+  h.bytes.foldl (fun s b => s ++ String.ofList (Nat.toDigits 16 (b.toNat + 256)).tail) ""
 
 end Near.Node.Trie
