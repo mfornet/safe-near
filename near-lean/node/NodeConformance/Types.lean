@@ -1,4 +1,6 @@
+import Std.Data.HashMap
 import NodeConformance.Runner
+import NodeConformance.Signatures
 import NodeConformance.Chain
 import NodeConformance.Stateless
 import NodeConformance.Epoch
@@ -7,8 +9,10 @@ import NearNode.Protocol
 import NearNode.Primitives
 
 /-!
-`node-conformance-types [DIR]`: check the Borsh codecs of every `near-primitives` type against
-the fixtures written by `tools/node-conformance` (default `near-lean/node/fixtures/types`).
+`node-conformance-types [DIR [SIGNATURES]]`: check the Borsh codecs of every `near-primitives` type
+against the fixtures written by `tools/node-conformance` (default `near-lean/node/fixtures/types`),
+and verify with `NearCrypto` the Ed25519 signatures that the fixtures carry, using the keys in
+`SIGNATURES` (default `DIR/../signatures.jsonl`; see `NodeConformance.Signatures`).
 -/
 
 open Lean Near.Node Near.Node.Conformance Near.Node.Borsh
@@ -121,6 +125,16 @@ def main (args : List String) : IO UInt32 := do
     if (registry.lookup k).isNone then
       IO.eprintln s!"{k}: fixtures exist but the Lean registry has no entry"
       failures := failures + 1
+  let sigPath : System.FilePath :=
+    args[1]?.map System.FilePath.mk |>.getD (dir / ".." / "signatures.jsonl")
+  let records ← loadSidecars sigPath
+  let sidecars : Std.HashMap String Sidecar := Std.HashMap.ofList records
+  let pool : Std.HashMap ByteArray Recorded :=
+    records.foldl (init := {}) fun m (_, side) => side.sigs.foldl (fun m r => m.insert r.sig r) m
+  let seen ← IO.mkRef ({} : Seen)
+  let mut matched := 0
+  let mut recordedTotal := 0
+  let mut typedTotal := 0
   let utf8 := utf8Disagreements
   if utf8 != 0 then
     IO.eprintln s!"Spec.utf8Valid and ByteArray.validateUTF8 disagree on {utf8} short inputs"
@@ -139,9 +153,13 @@ def main (args : List String) : IO UInt32 := do
     let mut reject := 0
     let mut bad : Array String := #[]
     let mut badCount := 0
+    let mut recorded := 0
+    let mut typed := 0
+    let mut index := 0
     for raw in text.splitOn "\n" do
       if raw.isEmpty then
         continue
+      index := index + 1
       match parseLine raw with
       | .error e =>
         badCount := badCount + 1
@@ -155,6 +173,16 @@ def main (args : List String) : IO UInt32 := do
           badCount := badCount + 1
           if bad.size < 3 then
             bad := bad.push s!"  {line.name}: {msg}\n    borsh {preview line.borsh}"
+        if !line.reject then
+          if let some side := sidecars[s!"{name}#{index - 1}"]? then
+            matched := matched + 1
+            let o ← verifyLine seen pool (signedRegistry.lookup name) line.borsh side
+            recorded := recorded + o.recorded
+            typed := typed + o.typed
+            for f in o.failures do
+              badCount := badCount + 1
+              if bad.size < 3 then
+                bad := bad.push s!"  {line.name}: Ed25519: {f}"
     if accept != wantAccept || reject != wantReject then
       bad :=
         bad.push
@@ -163,11 +191,22 @@ def main (args : List String) : IO UInt32 := do
       badCount := badCount + 1
     totalAccept := totalAccept + accept
     totalReject := totalReject + reject
-    let status := if badCount == 0 then "ok" else s!"FAILED ({badCount})"
+    recordedTotal := recordedTotal + recorded
+    typedTotal := typedTotal + typed
+    let sigs :=
+      if recorded + typed == 0 then ""
+      else s!", ed25519 {recorded} recorded and {typed} typed verified"
+    let status := (if badCount == 0 then "ok" else s!"FAILED ({badCount})") ++ sigs
     IO.println s!"{name}: accept {accept}, reject {reject}: {status}"
     for b in bad do
       IO.println b
     failures := failures + badCount
+  if matched != sidecars.size then
+    IO.eprintln s!"{sidecars.size} signature records, {matched} matched a fixture line"
+    failures := failures + 1
+  IO.println
+      s!"Ed25519: {recordedTotal} recorded and {typedTotal} typed signature checks passed \
+    ({sidecars.size} lines with records)"
   IO.println
       s!"{registry.length} types, {totalAccept} accepted and {totalReject} rejected inputs, \
     {failures} failures"
