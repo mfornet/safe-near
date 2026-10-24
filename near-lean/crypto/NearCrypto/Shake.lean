@@ -103,10 +103,16 @@ private def pushLanes (s : Keccak.Impl.State) (out : ByteArray) : Nat → Nat �
   | _, 0 => out
   | i, n + 1 => pushLanes s (pushLe64 out (lane s i)) (i + 1) n
 
+/-- The state whose first `rate` bytes are the next block of output (lane `i` holds bytes `8 i` to
+`8 i + 7`, least significant first). -/
+def Xof.next (x : Xof) : Keccak.Impl.State × Xof :=
+  let s := if x.fresh then x.state else Keccak.Impl.permute x.state 24
+  (s, ⟨s, x.rate, false⟩)
+
 /-- The next `rate` bytes of output. -/
 def Xof.block (x : Xof) : ByteArray × Xof :=
-  let s := if x.fresh then x.state else Keccak.Impl.permute x.state 24
-  (pushLanes s (ByteArray.emptyWithCapacity x.rate) 0 (x.rate / 8), ⟨s, x.rate, false⟩)
+  let (s, x) := x.next
+  (pushLanes s (ByteArray.emptyWithCapacity x.rate) 0 (x.rate / 8), x)
 
 /-- The first `n` bytes of output, block by block. -/
 private def squeezeAll (x : Xof) (out : ByteArray) : Nat → ByteArray

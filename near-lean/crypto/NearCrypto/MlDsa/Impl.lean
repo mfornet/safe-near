@@ -48,22 +48,27 @@ def gamma1 : UInt32 :=
 def beta : UInt32 :=
   196
 
+/-- `x - q` if `x ≥ q`, else `x`, for `x < 2^31` (without a branch: the sign bit of `x - q` selects). -/
+@[inline]
+def csubq (x : UInt32) : UInt32 :=
+  let d := x - q
+  d + (q &&& ((0 : UInt32) - (d >>> 31)))
+
 /-- `a b 2^-32 mod q` for `a < q` and any `b < 2^32`, in `[0, q)`. -/
 @[inline]
 def montmul (a b : UInt32) : UInt32 :=
   let t := a.toUInt64 * b.toUInt64
   let m := t.toUInt32 * qInv
-  let r := (t >>> 32).toUInt32 + q - ((m.toUInt64 * q.toUInt64) >>> 32).toUInt32
-  if r ≥ q then r - q else r
+  csubq ((t >>> 32).toUInt32 + q - ((m.toUInt64 * 8380417) >>> 32).toUInt32)
 
 @[inline]
 def addq (a b : UInt32) : UInt32 :=
-  let s := a + b
-  if s ≥ q then s - q else s
+  csubq (a + b)
 
 @[inline]
 def subq (a b : UInt32) : UInt32 :=
-  if a ≥ b then a - b else a + q - b
+  let d := a - b
+  d + (q &&& ((0 : UInt32) - (d >>> 31)))
 
 /-- `x` seen in `(-q/2, q/2]`, as an absolute value. -/
 @[inline]
@@ -227,27 +232,89 @@ def packWith (out : ByteArray) (n bits : Nat) (f : Nat → UInt32) : ByteArray :
     for i in [0:n] do
       acc := acc ||| ((f i).toUInt64 <<< nb.toUInt64)
       nb := nb + bits
-      for _ in [0:3] do
-        if nb ≥ 8 then
-          out := out.push acc.toUInt8
-          acc := acc >>> 8
-          nb := nb - 8
+      if nb ≥ 8 then
+        out := out.push acc.toUInt8
+        acc := acc >>> 8
+        nb := nb - 8
+      if nb ≥ 8 then
+        out := out.push acc.toUInt8
+        acc := acc >>> 8
+        nb := nb - 8
+      if nb ≥ 8 then
+        out := out.push acc.toUInt8
+        acc := acc >>> 8
+        nb := nb - 8
+    return out
+
+/-- `γ1 - f` modulo `q` for a 20-bit field `f`. -/
+@[inline]
+def maskCoeff (f : UInt32) : UInt32 :=
+  if f ≤ gamma1 then gamma1 - f else q + gamma1 - f
+
+/-- Store `count` 20-bit fields from byte `off` of `b` (two per five bytes) as coefficients
+`γ1 - f` from index `o` of `out`. -/
+def unpack20 (b : ByteArray) (off count : Nat) (out : Array UInt32) (o : Nat) : Array UInt32 :=
+  Id.run do
+    let mut out := out
+    for i in [0:count / 2] do
+      let p := off + 5 * i
+      let b0 := (b.get! p).toUInt32
+      let b1 := (b.get! (p + 1)).toUInt32
+      let b2 := (b.get! (p + 2)).toUInt32
+      let b3 := (b.get! (p + 3)).toUInt32
+      let b4 := (b.get! (p + 4)).toUInt32
+      out := out.set! (o + 2 * i) (maskCoeff (b0 ||| b1 <<< 8 ||| (b2 &&& 15) <<< 16))
+      out := out.set! (o + 2 * i + 1) (maskCoeff (b2 >>> 4 ||| b3 <<< 4 ||| b4 <<< 12))
+    return out
+
+/-- The 1536 coefficients `t1 · 2^13` from the 10-bit fields (four per five bytes) after the first 32
+bytes of a public key. -/
+def unpackT1 (pk : ByteArray) : Array UInt32 :=
+  Id.run do
+    let mut out : Array UInt32 := Array.replicate 1536 0
+    for i in [0:384] do
+      let p := 32 + 5 * i
+      let b0 := (pk.get! p).toUInt32
+      let b1 := (pk.get! (p + 1)).toUInt32
+      let b2 := (pk.get! (p + 2)).toUInt32
+      let b3 := (pk.get! (p + 3)).toUInt32
+      let b4 := (pk.get! (p + 4)).toUInt32
+      out := out.set! (4 * i) ((b0 ||| (b1 &&& 3) <<< 8) <<< 13)
+      out := out.set! (4 * i + 1) ((b1 >>> 2 ||| (b2 &&& 15) <<< 6) <<< 13)
+      out := out.set! (4 * i + 2) ((b2 >>> 4 ||| (b3 &&& 63) <<< 4) <<< 13)
+      out := out.set! (4 * i + 3) ((b3 >>> 6 ||| b4 <<< 2) <<< 13)
     return out
 
 /-! ### Sampling -/
 
-/-- Fill `out[o + cnt ..]` with the 3-byte candidates `< q` of a 168-byte block (algorithm 14). -/
-private def fillNtt (b : ByteArray) (out : Array UInt32) (o cnt : Nat) : Array UInt32 × Nat :=
+/-- The `k`-th of the eight 3-byte candidates (23 bits) held by three consecutive lanes. -/
+@[inline]
+private def candidate (l0 l1 l2 : UInt64) : Nat → UInt32
+  | 0 => l0.toUInt32 &&& 0x7fffff
+  | 1 => (l0 >>> 24).toUInt32 &&& 0x7fffff
+  | 2 => ((l0 >>> 48) ||| (l1 <<< 16)).toUInt32 &&& 0x7fffff
+  | 3 => (l1 >>> 8).toUInt32 &&& 0x7fffff
+  | 4 => (l1 >>> 32).toUInt32 &&& 0x7fffff
+  | 5 => ((l1 >>> 56) ||| (l2 <<< 8)).toUInt32 &&& 0x7fffff
+  | 6 => (l2 >>> 16).toUInt32 &&& 0x7fffff
+  | _ => (l2 >>> 40).toUInt32 &&& 0x7fffff
+
+/-- Fill `out[o + cnt ..]` with the 3-byte candidates below `q` of a SHAKE128 block (algorithm 14). The
+168 bytes are the lanes 0 to 20, and every three lanes hold eight candidates. -/
+private def fillNtt (s : Keccak.Impl.State) (out : Array UInt32) (o cnt : Nat) :
+    Array UInt32 × Nat :=
   Id.run do
     let mut out := out
     let mut cnt := cnt
-    for p in [0:56] do
-      let z :=
-        (b.get! (3 * p)).toUInt32 ||| (b.get! (3 * p + 1)).toUInt32 <<< 8 |||
-          ((b.get! (3 * p + 2)).toUInt32 &&& 0x7f) <<< 16
-      if z < q && cnt < 256 then
-        out := out.set! (o + cnt) z
-        cnt := cnt + 1
+    for g in [0:7] do
+      let l0 := Shake.Impl.lane s (3 * g)
+      let l1 := Shake.Impl.lane s (3 * g + 1)
+      let l2 := Shake.Impl.lane s (3 * g + 2)
+      for k in [0:8] do
+        let z := candidate l0 l1 l2 k
+        if z < q && cnt < 256 then
+          out := out.set! (o + cnt) z
+          cnt := cnt + 1
     return (out, cnt)
 
 private def sampleNtt (seed : ByteArray) (out : Array UInt32) (o : Nat) : Array UInt32 :=
@@ -256,8 +323,8 @@ private def sampleNtt (seed : ByteArray) (out : Array UInt32) (o : Nat) : Array 
     | fuel + 1 =>
       if cnt ≥ 256 then out
       else
-        let (b, x) := x.block
-        let (out, cnt) := fillNtt b out o cnt
+        let (s, x) := x.next
+        let (out, cnt) := fillNtt s out o cnt
         go x out cnt fuel
   go (Shake.Impl.Xof.init 168 seed) out 0 64
 
@@ -275,16 +342,20 @@ def expandA (rho : ByteArray) : Array UInt32 :=
 private def etaCoeff (b : UInt32) : UInt32 :=
   if b ≤ 4 then 4 - b else q + 4 - b
 
-private def fillBounded (b : ByteArray) (out : Array UInt32) (o cnt : Nat) : Array UInt32 × Nat :=
+/-- Fill `out[o + cnt ..]` with `4 - b` for the nibbles `b < 9` of a SHAKE256 block (algorithm 15): the
+lanes 0 to 16, low nibble first. -/
+private def fillBounded (s : Keccak.Impl.State) (out : Array UInt32) (o cnt : Nat) :
+    Array UInt32 × Nat :=
   Id.run do
     let mut out := out
     let mut cnt := cnt
-    for p in [0:272] do
-      let byte := (b.get! (p / 2)).toUInt32
-      let nib := if p % 2 == 0 then byte &&& 15 else byte >>> 4
-      if nib < 9 && cnt < 256 then
-        out := out.set! (o + cnt) (etaCoeff nib)
-        cnt := cnt + 1
+    for g in [0:17] do
+      let l := Shake.Impl.lane s g
+      for k in [0:16] do
+        let nib := ((l >>> (4 * k).toUInt64) &&& 15).toUInt32
+        if nib < 9 && cnt < 256 then
+          out := out.set! (o + cnt) (etaCoeff nib)
+          cnt := cnt + 1
     return (out, cnt)
 
 private def sampleBounded (seed : ByteArray) (out : Array UInt32) (o : Nat) : Array UInt32 :=
@@ -293,8 +364,8 @@ private def sampleBounded (seed : ByteArray) (out : Array UInt32) (o : Nat) : Ar
     | fuel + 1 =>
       if cnt ≥ 256 then out
       else
-        let (b, x) := x.block
-        let (out, cnt) := fillBounded b out o cnt
+        let (s, x) := x.next
+        let (out, cnt) := fillBounded s out o cnt
         go x out cnt fuel
   go (Shake.Impl.Xof.init 136 seed) out 0 64
 
@@ -314,14 +385,9 @@ def expandS (rho : ByteArray) : Array UInt32 × Array UInt32 :=
 
 /-- `y` (algorithm 34): the coefficient `γ1 - v` of a 20-bit field `v`, modulo `q`. -/
 def expandMask (rho : ByteArray) (kappa : Nat) : Array UInt32 :=
-  Id.run do
-    let mut y := Array.replicate (5 * 256) 0
-    for r in [0:5] do
-      let v := Shake.Impl.shake256 (rho ++ le16 (kappa + r)) 640
-      for i in [0:256] do
-        let f := field v 0 i 20
-        y := y.set! (r * 256 + i) (if f ≤ gamma1 then gamma1 - f else q + gamma1 - f)
-    return y
+  (List.range 5).foldl
+    (fun y r => unpack20 (Shake.Impl.shake256 (rho ++ le16 (kappa + r)) 640) 0 256 y (r * 256))
+    (Array.replicate (5 * 256) 0)
 
 /-- The position in the SHAKE256 stream of `SampleInBall`: the current block and the next byte of it. -/
 private structure Ball where
@@ -392,7 +458,11 @@ def hintPack (h : Array UInt32) : ByteArray :=
 
 /-- `w1` as 4-bit fields. -/
 def w1Pack (w1 : Array UInt32) : ByteArray :=
-  packWith (ByteArray.emptyWithCapacity 768) (6 * 256) 4 fun i => w1[i]!
+  Id.run do
+    let mut out := ByteArray.emptyWithCapacity 768
+    for i in [0:768] do
+      out := out.push (w1[2 * i]! ||| w1[2 * i + 1]! <<< 4).toUInt8
+    return out
 
 /-- The fields `bits` bits wide of `n` polynomials at byte `off`, as `f` maps each. -/
 @[inline]
@@ -522,13 +592,13 @@ def verifyInternal (pk mPrime sig : ByteArray) : Bool :=
     match hintUnpack sig (48 + 5 * 640) with
     | none => false
     | some h =>
-      let z := unpackPolys sig 48 5 20 fun f => if f ≤ gamma1 then gamma1 - f else q + gamma1 - f
+      let z := unpack20 sig 48 1280 (Array.replicate 1280 (0 : UInt32)) 0
       if z.any fun x => absq x ≥ gamma1 - beta then false
       else
         let ctilde := sig.extract 0 48
         let mu := Shake.Impl.shake256 (Shake.Impl.shake256 pk 64 ++ mPrime) 64
         let chat := nttAt (sampleInBall ctilde) 0
-        let t1d := nttVec (unpackPolys pk 32 6 10 fun t => t <<< 13) 6
+        let t1d := nttVec (unpackT1 pk) 6
         let az := matVec (expandA (pk.extract 0 32)) (nttVec z 5)
         let w := invNttVec (vsub az (scale chat t1d 6)) 6
         let w1 := useHints h w
