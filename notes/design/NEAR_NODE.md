@@ -23,8 +23,9 @@ A full NEAR validator node written in Lean. It runs in a localnet next to
 | `near-lean/node` | `NearNode` | Wire types, chain, epochs, consensus, network, storage |
 | `tools/node-conformance` | (Rust) | nearcore oracle pinned to `reference.json` |
 
-`NearNode` depends on `NearChain`, `NearRuntime` and `NearVM`. Nothing depends on
-`NearNode`.
+`NearNode` depends on `NearChain`, `NearRuntime`, `NearVM` and `NearCrypto`. Nothing depends on
+`NearNode`. `NearCrypto` depends on nothing in the repository (not even Mathlib), so `NearVM`
+can adopt it later.
 
 ## Rules
 
@@ -88,9 +89,8 @@ The detailed acceptance criteria live in each Linear issue.
   that is ported.
 
 `just node-bench [--filter S] [--out FILE]` runs the benchmarks and prints a
-JSON report. The first benchmarks time the existing `Near.Sha256.hash`, which
-is the starting point for M2. The Rust oracle `tools/node-conformance`
-arrives with M1 (below).
+JSON report (the crypto ones are described under M2 below). The Rust oracle
+`tools/node-conformance` arrived with M1.
 
 ### M1 types
 
@@ -160,8 +160,108 @@ chunks, the network, stateless validation, epochs and state sync round-trips
 with the crates on every fixture, and every derived value in scope matches the
 oracle.
 
+### M2 crypto
+
+`just crypto-tests` builds `near-lean/crypto` (`NearCrypto`) and runs `crypto-conformance` (every
+oracle vector against both the `Spec` and the `Impl` of each primitive) and `crypto-differential`
+(`Spec` against `Impl` on seeded random inputs). `just node-conformance-types` now also verifies
+Ed25519 signatures in Lean.
+
+- **Package.** `NearCrypto` requires nothing from this repository and no Mathlib, so contract builds
+  are unaffected and `NearVM` can adopt it later without pulling the node in; `just node-isolation`
+  enforces it. The VM keeps taking its digests and `ed25519Verify` as host parameters. The node
+  requires it by path: `CryptoHash.hash` (so every block, chunk and outcome hash and the sampler
+  seeds) is the `NearCrypto` SHA-256 `Impl`. Pure Lean throughout, no `@[extern]`.
+- **Spec and Impl.** Each primitive has a `Spec`, simple and close to the standard (lists, `Nat`,
+  constants derived from their definitions), and a fast `Impl`:
+
+  | | `Spec` | `Impl` |
+  |---|---|---|
+  | SHA-256, SHA-512 | FIPS 180-4 over lists; `K` and `H0` from roots of primes | `ByteArray` in, block function unrolled onto `UInt32`/`UInt64` registers (`scripts/gen_sha.py`) |
+  | Keccak-256/512 | FIPS 202 permutation on 25 lanes; offsets and round constants derived | unrolled round on 25 registers |
+  | RIPEMD-160 | the two 80-step lines over lists | one loop on `UInt32` registers |
+  | Ed25519 | `Nat` and projective points (`add-2008-bbjlp`), Fermat inversion | ten 25.5-bit limbs (`scripts/gen_fe.py`), extended coordinates, width-5 and width-7 NAF with Shamir's trick |
+
+  Keccak is the original padding (`0x01`), not SHA-3's, as `sha3::Keccak256`/`Keccak512` in the VM.
+  The `Spec`/`Impl` agreement is a differential test for now (every fixture, every length 0 to 300 for
+  each hash, random keys, signatures and field elements including limb boundaries); equivalence
+  theorems come later.
+- **Ed25519 acceptance.** `near-crypto` 0.37.4 `Signature::verify` (`signature.rs`) calls
+  `ed25519_dalek::VerifyingKey::from_bytes` and then the non-strict `Verifier::verify`
+  (`ed25519-dalek` 2.2.0, `verifying.rs`; `curve25519-dalek` 4.1.3; the `legacy_compatibility` feature
+  is off in the locked build). The Lean `verify` matches:
+  1. The key is decoded by `CompressedEdwardsY::decompress` (`edwards.rs`): bit 255 is the sign, `y` is
+     the other 255 bits **mod p with no canonical check** (`y ≥ p` is accepted), `x² = (y²-1)/(dy²+1)`
+     must have a root, and `x = 0` with the sign bit set is accepted (ZIP 215). Small-order and
+     mixed-order keys are accepted.
+  2. `S` must be below `ℓ` (`check_scalar` in `signature.rs`, `Scalar::from_canonical_bytes`).
+  3. `compress([S]B - [k]A)` must equal the 32 bytes of `R` as given (`RCompute::finish`): the check is
+     cofactorless, and a non-canonical `R` can never match, so it is rejected.
+  4. `k = SHA-512(R ‖ A ‖ M) mod ℓ` with `A` the key bytes as given.
+  5. `near-crypto`'s Borsh decoder also rejects a signature whose last byte has any of its top three
+     bits set (`BorshDeserialize for Signature`); that sits in the node's codec, not in `verify`.
+  The 196 ZIP 215 vectors (14 small-order encodings as key and as `R`, `S = 0`) have 12 accepts and 184
+  rejects in the oracle, and Lean reproduces each. Keys are the 64-byte `ED25519SecretKey` (seed, then
+  public key); `sign` is RFC 8032 (SHA-512 of the seed, clamp, `a` reduced mod `ℓ`); a key pair whose
+  public half is not the derived one, byte for byte, is `none` where `near-crypto` panics
+  (`from_keypair_bytes`).
+- **Not constant time.** Verification handles public data and the arithmetic is variable time (`Nat`
+  scalars, NAF with branches on digits). `sign` is correct but neither constant time nor hardened:
+  signing with the validator's secret key needs a constant-time implementation (secret-independent
+  scalar multiplication and recoding) before the node signs on a hostile network. Open for M8.
+- **Fixtures.** `tools/node-conformance` `crypto-fixtures` writes `near-lean/crypto/fixtures/`
+  (reproducible; 0.7 MB): 405 hash vectors (the classic ones, 59 random lengths around every block and
+  padding boundary up to 20000 bytes, all-zero and all-ones messages at the boundaries, one million
+  `a`) and 831 Ed25519 lines: 28 key derivations (RFC 8032 and `near-crypto` seeds), 13 key-pair
+  checks, 29 `near-crypto` signatures, 233 key decodings and 528 verifications (bit flips in `R`, `S`
+  and `A`, `S + kℓ`, the `S` boundary, the ZIP 215 matrix, the identity key, small-order keys with an
+  accepting `R` found by search, and mixed-order keys `A + T` that verify when `k ≡ 0 mod 8`).
+  `tools/tests/test_crypto_fixtures.py` checks the files and cross-checks SHA-2 against `hashlib`.
+- **Signatures in the M1 fixtures.** The Borsh fixtures do not hold the key of an approval, a header or
+  an endorsement, and they stay byte for byte as they were, so the oracle writes
+  `near-lean/node/fixtures/signatures.jsonl` beside them (the signatures and keys it made, per
+  line). `node-conformance-types` verifies in Lean 3923 recorded signatures found in their lines and
+  recomputes 1454 from the decoded values (transaction, delegate, block and chunk hashes, approvals,
+  endorsements, partial witnesses, contract messages, spice data) under the key in the value, the
+  recorded key or the line's signer. ML-DSA and secp256k1 are skipped.
+- **Representation by benchmark.** The first `Impl` kept field elements as `Nat` below `p`: a product
+  and one `%` cost 280 ns (the fold of the high half cost 900 ns), and Ed25519 verification 1.44 ms and
+  signing 1.1 ms. Ten limbs of 25.5 bits on unboxed `UInt64` registers cost 53 ns a product and 30 ns a
+  square, and verification fell to 0.2 ms. Scalars stay `Nat`: a few operations per signature.
+- **Performance** (this development machine, 4 cores, release builds, mean time per call; the Lean
+  column is `node-bench`, the native one `crypto-bench` in `tools/node-conformance` on the crates
+  nearcore uses, `sha2` without SHA-NI here):
+
+  | | Lean | native | Lean / native | old `Near.Sha256` |
+  |---|---|---|---|---|
+  | SHA-256 64 B | 1.16 µs | 0.65 µs | 1.8 | 11.0 µs |
+  | SHA-256 1 KiB | 6.7 µs | 5.2 µs | 1.3 | 63 µs |
+  | SHA-256 64 KiB | 386 µs | 304 µs | 1.3 | 3.9 ms |
+  | SHA-512 64 B / 1 KiB / 64 KiB | 1.03 µs / 5.1 µs / 250 µs | 0.31 / 2.5 / 139 µs | 3.4 / 2.1 / 1.8 | |
+  | Keccak-256 64 B / 1 KiB / 64 KiB | 1.35 µs / 7.0 µs / 393 µs | 0.44 / 3.3 / 201 µs | 3.1 / 2.1 / 2.0 | |
+  | Keccak-512 64 B / 1 KiB / 64 KiB | 1.21 µs / 12.1 µs / 730 µs | 0.43 / 6.3 / 371 µs | 2.8 / 1.9 / 2.0 | |
+  | RIPEMD-160 64 B / 1 KiB / 64 KiB | 2.1 µs / 15.1 µs / 893 µs | 0.48 / 3.8 / 228 µs | 4.4 / 3.9 / 3.9 | |
+  | Ed25519 verify (100 B message) | 202 µs | 41 µs | 4.9 | |
+  | Ed25519 sign, key pair decoded each time | 376 µs | 42 µs | 8.9 | |
+  | Ed25519 sign, key prepared | 156 µs | 19.6 µs | 8.0 | |
+
+  The new SHA-256 is 9.5 to 10 times faster than the list-based one the node used. The numbers vary by
+  up to 20% between runs on this shared machine. The native SHA-256 is the portable software one; a
+  CPU with SHA extensions makes the `sha2` crate several times faster, which pure Lean cannot match.
+- **Proposed targets for M2** (from these measurements; the current code meets them): every hash within
+  5x of the native crate at 1 KiB and 64 KiB (SHA-256 within 1.5x there, since every node hash goes
+  through it), Ed25519 verification within 6x (at most 0.25 ms, about 5,000 per second per core), signing
+  within 10x. A faster `Ed25519` is open work with known levers: avoid the carries of `add` and `sub`
+  where the next product tolerates wide limbs, convert field elements to bytes without `Nat`, a
+  fixed-base table for signing, and batch verification of the many signatures of a block, none of which
+  changes the `Spec`. The matching targets for M4 (trie) and M10 remain open below.
+- **Still to come.** M2b: secp256k1 (`ecrecover`, ECDSA verification) and the VRF of `near-crypto`'s
+  `vrf.rs`. M2c: ML-DSA-65. The `Merkle` row of the layer table stays in the node (M1 already has
+  `merklize`).
+
 ## Open points
 
-- Numeric performance targets for M2, M4 and M10, measured against nearcore.
+- Numeric performance targets for M4 and M10, measured against nearcore (M2's are proposed above).
 - Whether crypto host functions in `NearVM` slow contract verification. If they
-  do, `NearVM` takes host crypto as a parameter and the node supplies it.
+  do, `NearVM` takes host crypto as a parameter and the node supplies it. Today the VM takes its
+  digests and `ed25519Verify` as parameters; `NearCrypto` is a separate package it can import later.

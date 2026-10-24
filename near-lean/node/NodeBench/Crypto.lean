@@ -24,7 +24,7 @@ private def vary (m : ByteArray) (i : Nat) : ByteArray :=
 
 /-- Label, size and iteration counts of a fast and of a slow hash. -/
 private def sizes : List (String × Nat × Nat × Nat) :=
-  [("64B", 64, 5000, 500), ("1KiB", 1024, 500, 50), ("64KiB", 65536, 50, 5)]
+  [("64B", 64, 100000, 20000), ("1KiB", 1024, 20000, 2000), ("64KiB", 65536, 800, 80)]
 
 private def hashBenchmarks (name : String) (f : ByteArray → ByteArray) (slow : Bool := false) :
     List Benchmark :=
@@ -54,17 +54,17 @@ def benchmarks : List Benchmark :=
     hashBenchmarks "keccak512" keccak512 ++
     hashBenchmarks "ripemd160" ripemd160 ++
     hashBenchmarks "sha256-old" (fun m => ⟨(Near.Sha256.hash m.toList).toArray⟩) true ++
-    [{ name := "ed25519/verify", iterations := 300,
+    [{ name := "ed25519/verify", iterations := 1500,
        run := fun i =>
          if ed25519Verify signingKey.publicKey (vary message i) signature then 1 else 0 },
-      { name := "ed25519/sign", iterations := 300,
+      { name := "ed25519/sign", iterations := 1000,
         run := fun i =>
           -- the key pair is decoded for every signature, as `near_crypto::SecretKey::sign` does;
           -- the extra byte, never present, keeps the decoding from being hoisted out of the loop
           let pair := if i == 1000000000 then keypair.push 0 else keypair
           let key := (Ed25519.Impl.SigningKey.ofKeypair pair).getD default
           (key.sign (vary message i)).get! 0 |>.toUInt64 },
-      { name := "ed25519/sign-prepared", iterations := 300,
+      { name := "ed25519/sign-prepared", iterations := 2000,
         run := fun i => (signingKey.sign (vary message i)).get! 0 |>.toUInt64 }]
 
 end Near.Node.Bench.Crypto
