@@ -11,3 +11,4 @@ import NearCrypto.Ristretto
 import NearCrypto.Vrf
 import NearCrypto.ModInv
 import NearCrypto.Shake
+import NearCrypto.MlDsa.Spec

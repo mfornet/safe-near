@@ -1,6 +1,7 @@
 import NearCrypto
 import CryptoTests.Fixtures
 import CryptoTests.Secp256k1
+import CryptoTests.MlDsa
 import CryptoTests.Vrf
 
 /-!
@@ -134,4 +135,6 @@ def main (args : List String) : IO UInt32 := do
   t ← runFile t (dir / "ed25519.jsonl") checkEd25519
   t ← runFile t (dir / "secp256k1.jsonl") Secp.check
   t ← runFile t (dir / "vrf.jsonl") Vrf.check
+  let mldsa ← readJsonLines (dir / "mldsa.jsonl")
+  t ← runFile t (dir / "mldsa.jsonl") (MlDsa.check (MlDsa.keysOf mldsa))
   finish "crypto-conformance" t
