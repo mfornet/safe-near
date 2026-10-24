@@ -103,14 +103,15 @@ theorem deposit_available_at_boundary : DepositAvailableAtBoundary := by
   simp only [hout, Nat.not_lt_zero, ↓reduceIte, Nat.sub_zero, hprom]
 
 open NearInterface in
-/-- What `Refines` buys: on a runtime the binary refines the model in, a
-withdrawal attached with at least the model's gas bound succeeds on the binary,
+/-- What `Refines` buys: on a runtime and protocol configuration the binary
+refines the model in, a withdrawal attached with at least the model's gas bound succeeds on the binary,
 returns the payout receipt and stores the model's new state. -/
 @[blueprint "thm:withdraw-available-binary"
   (statement := /-- If a binary refines \cref{def:contract-model}, then under the hypotheses of \cref{spec:withdraw-available-boundary}, for arguments that are the call \texttt{near\_withdraw}$(a)$ and at least the model's gas bound attached, the binary's execution returns receipt index 0 and its storage encodes the resulting state. -/)]
-theorem withdraw_available_binary {R : RuntimeInterface} {code : R.Code} {cfg : Config}
-    (href : Refines R code (wnear cfg)) {s : State} {ctx : Context} {amount : Nat}
-    (hs : Inv cfg s) (hwf : ctx.WF (encode s))
+theorem withdraw_available_binary {R : RuntimeInterface} {protocol : Wasm.Near.RuntimeConfig}
+    {code : R.Code} {cfg : Config}
+    (href : Refines R protocol code (wnear cfg)) {s : State} {ctx : Context} {amount : Nat}
+    (hs : Inv cfg s) (hwf : ctx.WF (encode s)) (hprot : ctx.protocol = protocol)
     (hparse : Parses ctx.method ctx.args (.nearWithdraw amount))
     (hreg : AccountId.ofNear ctx.predecessor ∈ s.registered)
     (hamt : amount ≤ s.balance (AccountId.ofNear ctx.predecessor)) (hdep : ctx.attached = 1)
@@ -126,7 +127,7 @@ theorem withdraw_available_binary {R : RuntimeInterface} {code : R.Code} {cfg : 
             (s.balance (AccountId.ofNear ctx.predecessor) - amount) with
           totalSupply := s.totalSupply - amount } := by
   have hrep : (wnear cfg).Represents (encode s) (some s) := ⟨hs, rfl⟩
-  have hm := href.transfer (c := (Call.nearWithdraw amount : Call)) hrep hwf hparse hgas
+  have hm := href.transfer (c := (Call.nearWithdraw amount : Call)) hrep hwf hprot hparse hgas
   change Matches (wnear cfg) ctx (encode s) _ (contractStep ctx (some s) (.nearWithdraw amount)) at hm
   rw [withdraw_available_at_boundary cfg s ctx amount hs hreg hamt hdep hbound hbal hrent] at hm
   exact ⟨hm.1, hm.2.1⟩
