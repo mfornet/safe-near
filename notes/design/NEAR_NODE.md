@@ -129,8 +129,36 @@ the pinned nearcore crates.
   proofs, the block's chunk roots, block body hash, `check_validity`, the
   block-producer-set hash, receipt proof roots and the encoded chunk merkle
   root. The block producer signs the block hash, so there are no other signing
-  bytes. Not covered: stateless validation witnesses and chunk endorsements
-  (network, M-later), epoch and state types (M1c).
+  bytes.
+- **Covered (M1c).** Stateless validation: `ChunkEndorsement` (V2, tag 1),
+  `ChunkStateWitness` (V2) with `ChunkStateTransition`, the partial encoded
+  witnesses V1 and V2, `ChunkContractAccesses`, `ContractCodeRequest` and
+  `Response` V1 and V2, `PartialEncodedContractDeploys`,
+  `StoredChunkStateTransitionData`, the SPICE witness, partial data and
+  contract messages, with their signing bytes (checked against real signatures
+  by the oracle) and production keys. Epochs: `EpochInfo` V1 to V5 with
+  `StakeWeightedIndex`, `ValidatorMandates` and `ShardLayout` V0 to V3,
+  `BlockInfo` V1 to V5, `EpochSummary`, `EpochSyncProof`. Their pure functions
+  are checked at 46 heights: `sample_block_producer`, `sample_chunk_producer`,
+  `sample_chunk_validators` (a pure Lean `ChaCha20Rng` with the `rand` 0.8
+  `gen_range` and `shuffle`), the alias tables, the mandate price and
+  `ValidatorMandates::new`. State sync: `ShardStateSyncResponseHeader` V1, V2,
+  `ShardStateSyncResponse` V1 to V4, `StatePart`, request keys and
+  acknowledgements, plus `PeerId`, `AnnounceAccount` and `GenesisId`. The zstd
+  frames (`EncodedChunkStateWitness`, `CompressedContractCode`,
+  `CompressedEpochSyncProof`, `StatePartV1`) are opaque bytes until M2 needs a
+  decoder.
+- **Not covered.** Storage-layer types, which M4 brings with the trie and
+  columns: `TrieKey`, `ValueRef`, `FlatStateValue`, the state change types,
+  `ReceiptToTxInfo`, `ProcessedReceiptMetadata`, `ChunkApplyStats` (debug
+  statistics), `PromiseYieldStatus`; the RPC-only `StoreKey`, `StoreValue` and
+  `FunctionArgs`; and the serialize-only `SignableMessage` and
+  `OptimisticBlockKeySource`.
+
+**M1 complete.** Every Borsh type of `near-primitives` reachable from blocks,
+chunks, the network, stateless validation, epochs and state sync round-trips
+with the crates on every fixture, and every derived value in scope matches the
+oracle.
 
 ## Open points
 

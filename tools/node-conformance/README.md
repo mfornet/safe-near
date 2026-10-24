@@ -10,6 +10,8 @@ unless the crates' `PROTOCOL_VERSION` is 86 and equals `reference.json`. As for 
 configuration crates, equality of the published crates with the clean nearcore
 revision is not assumed.
 
+`near-primitives` is built with its `rand` feature, which `EpochInfo::sample_chunk_validators` needs.
+
 ## Regenerating
 
 ```sh
@@ -64,6 +66,42 @@ seed and the number of accepted and rejected lines per type. Each type has one
   Chunk and block hashes are not on the wire; decoding recomputes them, so every line also checks
   that. The oracle is built in release mode: `prev_state_root` of a spice (V6) chunk is the zero
   hash there, a debug assertion otherwise.
+- M1c derived values (one field each, hex; an empty string means that nearcore panics or overflows, or
+  that the oracle skips a case that would allocate without bound, and the Lean function returns
+  `none`):
+  - Signed stateless messages (`ChunkEndorsement`, the partial witnesses, the contract-distribution
+    messages, `SpicePartialData`, ...): `sigData`, the bytes the signature covers. nearcore does not
+    expose them, so the oracle signs with a real ED25519 key, asserts that the crate's `verify`
+    accepts the signature, and emits the Borsh prefix before it (`SpicePartialData`: that prefix and
+    the Borsh string `"SpicePartialData"`). `ChunkEndorsement` also has `metaSigData` (the metadata
+    signature) and `key` (the `ChunkProductionKey`); `ChunkStateWitness`: `key` and `ack`. `HashMap`
+    fields decode in any key order, so the witnesses have unsorted and repeated-key cases.
+    `CodeHashes`: `compute_contract_accesses_hash`.
+  - `ShardLayout`: `version`, `numShards`, `shardIndexes` and `shardIds` (Borsh `Vec<Option<u64>>`
+    of `get_shard_index` over shard ids 0..7, 1000, 2000, `u64::MAX` and `get_shard_id` over 0..7)
+    and `accountShards` (`account_id_to_shard_id` over six accounts and the layout's boundaries).
+  - `EpochInfo`: `validatorAccounts` (Borsh `Vec<AccountId>`), `validatorIds` (`get_validator_id` of
+    each validator and two others), `bp` (`sample_block_producer`) and `cp` (`sample_chunk_producer`
+    for each shard of the layout, then three more shard ids, over each height), both Borsh
+    `Vec<Option<u64>>` over the 46 heights of `sample_heights` (`epoch_fam.rs`, the same list as
+    `NodeConformance/Epoch.lean`), and `cv` (`sample_chunk_validators`, Borsh of the results at every
+    seventh of those heights). V1 to V4 have no layout of their own: the shard id is the index.
+    `cv` is empty for a mandates config of more than 4096 shards or 10^6 mandates.
+  - `StakeWeights` (`Vec<u128>`): `hash`, the Borsh `StakeWeightedIndex::new`. `StakeWeightedIndex`:
+    `samples`, `sample` of the SHA-256 of 0..39. `MandatesInput` (config and validators, with at most
+    64 shards and a target of at most 1000): `hash`, the Borsh `ValidatorMandates::new`.
+    `RngCase` (a seed and a count of 1 to 4096): `u32s`, `u64s` (`ChaCha20Rng` words), `range`
+    (`gen_range(0..n)`) and `shuffle` (the shuffle of 0..n, then the next `u64`).
+  - `BlockInfo`: `hash`, `height`, `prevHash`, `epochId`, `isGenesis`.
+    `EpochSyncProofLastEpochData`: `hash`, `compute_epoch_sync_data_hash`.
+  - State sync: `StateRootNode` and `ShardStateSyncResponseHeader`: `numParts`
+    (`get_num_state_parts`; empty where the sum overflows, as nearcore is built with overflow
+    checks and this crate is not); the header also `heightIncluded` and `prevStateRoot`;
+    `StatePart`: `payloadLength` and `partialState` (`to_partial_state` of an uncompressed part,
+    with the entry limit; empty for a compressed one, which needs zstd);
+    `ShardStateSyncResponse`: `partId` and `payloadLength`; `AnnounceAccount`: `hash`.
+  The compressed types (`EncodedChunkStateWitness`, `CompressedContractCode`,
+  `CompressedEpochSyncProof`, `StatePartV1`) are zstd frames made by the crates and stay opaque.
 - `canonical`: present when the input is accepted but re-encodes to other bytes (the profile
   data decoders pad or truncate their arrays, and a `BTreeMap` decodes unsorted input).
 

@@ -6,7 +6,8 @@ import NearNode.Primitives
 `node-bench [--filter SUBSTRING] [--out FILE]`: run the node benchmarks and
 print (or write) their JSON report. Baselines for M2 start from the existing
 `Near.Sha256.hash`; the Borsh benchmarks encode and decode a `SignedTransaction` with eight
-actions; the block benchmarks a four-chunk block with 80 approvals.
+actions; the block benchmarks a four-chunk block with 80 approvals; the epoch benchmarks a chunk
+state witness of about 400 KB and the sampling of producers and chunk validators.
 -/
 
 open Near.Node.Bench
@@ -158,8 +159,79 @@ def chainBenchmarks : List Benchmark :=
     { name := "block/chunk roots and validity", iterations := 500,
       run := fun i => (BlockValidityError.code (blockAt i).checkValidity).toUInt64 }]
 
+/-- A trie value of 200 bytes. -/
+def trieValue (i : Nat) : ByteArray :=
+  bytesOf 200 i
+
+/-- A state transition over `n` trie values. -/
+def sampleTransition (n : Nat) : ChunkStateTransition :=
+  { blockHash := sampleHash 30, baseState := .trieValues ((List.range n).toArray.map trieValue),
+    postStateRoot := sampleHash 31 }
+
+/-- A chunk state witness of about 400 KB: a main transition of 1500 trie values, two implicit
+transitions, receipt proofs from four shards and eight transactions. -/
+def sampleWitness : ChunkStateWitness :=
+  .v2
+    { epochId := ⟨sampleHash 32⟩, chunkHeader := sampleChunk 1,
+      mainStateTransition := sampleTransition 1500,
+      sourceReceiptProofs :=
+        ⟨(List.range 4).toArray.map fun i =>
+            (⟨sampleHash (40 + i)⟩,
+              ⟨#[], ⟨i.toUInt64, 1, #[⟨sampleHash 50, .left⟩, ⟨sampleHash 51, .right⟩]⟩⟩)⟩,
+      appliedReceiptsHash := sampleHash 33, transactions := (List.range 8).toArray.map sampleTx,
+      implicitTransitions := #[sampleTransition 40, sampleTransition 40], newTransactions := #[] }
+
+def witnessBytes : ByteArray :=
+  Codec.encode sampleWitness
+
+@[never_extract, noinline]
+def decodeWitness (d : ByteArray) : Except Error ChunkStateWitness :=
+  Codec.decodeAll d
+
+def witnessTxs : Except Error ChunkStateWitness → UInt64
+  | .ok (.v2 w) => w.transactions.size.toUInt64
+  | _ => 0
+
+/-- An epoch of 100 validators with stakes between 10^24 and 10^26, 100 block producer seats and
+four shards of 60 chunk producers, with 400 mandates per shard. -/
+def sampleEpoch : EpochInfo :=
+  let validators : Array ValidatorStake :=
+    (Array.range 100).map fun i =>
+      .v1 ⟨account s!"validator{i}.near", sampleKey i, ⟨10 ^ 24 * (1 + i * i % 97)⟩⟩
+  let stakeOf (ids : Array UInt64) : Array Balance :=
+    ids.map fun id =>
+      match validators[id.toNat]! with
+      | .v1 v => v.stake
+  let bps := (Array.range 100).map Nat.toUInt64
+  let cps : Array (Array UInt64) :=
+    (Array.range 4).map fun s => (Array.range 60).map fun i => ((s * 17 + i) % 100).toUInt64
+  let index (ids : Array UInt64) : StakeWeightedIndex :=
+    (StakeWeightedIndex.new (stakeOf ids)).getD default
+  let mandates := (ValidatorMandates.new ⟨400, 4⟩ validators).getD default
+  .v5
+    { epochHeight := 7, validators, validatorToIndex := ⟨#[]⟩, blockProducersSettlement := bps,
+      chunkProducersSettlement := cps, stakeChange := ⟨#[]⟩, validatorReward := ⟨#[]⟩,
+      validatorKickout := ⟨#[]⟩, mintedAmount := 0, seatPrice := 1, protocolVersion := 86,
+      shardLayout := .v0 ⟨4, 0⟩, lastResharding := none, rngSeed := ⟨bytesOf 32 99⟩,
+      blockProducersSampler := index bps, chunkProducersSampler := cps.map index,
+      validatorMandates := mandates }
+
+def epochBenchmarks : List Benchmark :=
+  [{ name := s!"borsh/encode ChunkStateWitness ({witnessBytes.size}B)", iterations := 50,
+     run := fun i => (Codec.encode (if i % 2 == 0 then sampleWitness else default)).size.toUInt64 },
+    { name := "borsh/decode ChunkStateWitness", iterations := 200,
+      run := fun _ => witnessTxs (decodeWitness witnessBytes) },
+    { name := "epoch/sample_block_producer (100 seats)", iterations := 20000,
+      run := fun i => (sampleEpoch.sampleBlockProducer i.toUInt64).getD 0 },
+    { name := "epoch/sample_chunk_producer (60 per shard)", iterations := 20000,
+      run := fun i =>
+        (sampleEpoch.sampleChunkProducer (.v0 ⟨4, 0⟩) (i % 4).toUInt64 i.toUInt64).getD 0 },
+    { name := "epoch/sample_chunk_validators (4 x 400 mandates)", iterations := 20,
+      run := fun i =>
+        ((sampleEpoch.sampleChunkValidators i.toUInt64).map (·.size.toUInt64)).getD 0 }]
+
 def benchmarks : List Benchmark :=
-  txBenchmarks ++ chainBenchmarks
+  txBenchmarks ++ chainBenchmarks ++ epochBenchmarks
 
 structure Options where
   filter : String := ""
