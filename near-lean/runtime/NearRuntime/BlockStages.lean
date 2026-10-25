@@ -43,10 +43,9 @@ def applyReceiptQueue (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes �
   let mut retainedDelayed : List Receipt := []
   let mut newlyDelayed : List Receipt := []
   -- `total.compute`: the chunk stops taking receipts once their compute reaches the gas limit.
-  -- nearcore divergence: nearcore also stops at the storage proof soft limit; the model records no
-  -- trie proof.
+  -- It also stops once the chunk's recorded storage proof passes its soft limit (`storageProofFull`).
   let mut compute := outcomes.foldl (fun total pair => total + pair.2.computeUsage) 0
-  let mut overLimit := ap.gasLimit.any (compute ≥ ·)
+  let mut overLimit := ap.gasLimit.any (compute ≥ ·) || storageProofFull cfg ap ap.storageAccounting
   let mut storageAccounting := ap.storageAccounting
   for (receipt, position) in queue.zipIdx do
     if overLimit then
@@ -71,8 +70,10 @@ def applyReceiptQueue (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes �
       tokensBurnt := tokensBurnt + processed.otherTokensBurnt - processed.rewards
       if let some limit := ap.gasLimit then
         if compute ≥ limit then overLimit := true
+      if storageProofFull cfg ap storageAccounting then overLimit := true
   -- Yields that timed out wake up with a resume receipt, after all incoming receipts.
-  let (stTimed, timeoutReceipts, timeoutBirths) := resolveYieldTimeouts ap ap.gasLimit compute
+  let (stTimed, timeoutReceipts, timeoutBirths) := resolveYieldTimeouts ap
+    (if storageProofFull cfg ap storageAccounting then some 0 else ap.gasLimit) compute
     (st.yieldTimeouts.length + 1) (st, [], [])
   st := stTimed
   outgoing := outgoing ++ timeoutReceipts

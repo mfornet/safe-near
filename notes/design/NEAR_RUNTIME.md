@@ -15,7 +15,10 @@ keys and gas.
 
 - Consensus and cryptography are out of scope for these packages. Block context
   is an input, and proofs must state which inputs they trust. The node built
-  on top of them supplies that context (see `NEAR_NODE.md`).
+  on top of them supplies that context (see `NEAR_NODE.md`). The chunk's
+  recorded storage proof size (`ApplyState.storageProofSize`) is such an
+  input: with it the runtime checks `main_storage_proof_size_soft_limit` and
+  the VM checks `per_receipt_storage_proof_size_limit`.
 - Conformance harnesses compare supported VM and runtime behavior with pinned
   nearcore adapters (`tools/runtime-*-reference`). They are tests, not an
   equivalence proof.
@@ -44,7 +47,7 @@ looks for simplifications that are neither marked nor listed.
 | `runtime/NearRuntime/Congestion.lean` `shardAcceptsTransactions` | Admission by congestion is a function here but is not applied by `apply` | nearcore applies it when a chunk producer selects and a validator validates transactions (`chain/chain/src/runtime/mod.rs`), not inside `Runtime::apply` |
 | `chain/ChainReplay/ShardChunk.lean` | Missing chunks (`is_new_chunk = false`), receipt validation of incoming receipts and the storage-proof limit are not modelled | The corpus has none of them |
 | `runtime/NearRuntime/Epoch.lean` `ValidatorAccountsUpdate.apply` | `update_validator_accounts` runs on a supplied `ValidatorAccountsUpdate`, restricted to the shard's accounts; the rewards, `stake_info` and `last_proposals` are the epoch manager's output, not computed. The trie nodes the update reads are not replayed into the chunk's node cache: the chunk trie is built from the already updated accounts. A `StorageInconsistentState` or overflow is an `Except` error that stops the replay. The update's `HashMap` order is the list order | Same as above; the update only moves balances, and the one corpus shape (a validator account, the treasury) does not depend on order or on the cache |
-| `runtime/NearRuntime/Apply.lean` `applyAttempt` (delay), `resolveYieldTimeouts` | Receipts and yield timeouts stop at the compute limit only; nearcore also stops when the chunk's recorded storage proof exceeds `main_storage_proof_size_soft_limit`, and aborts a call whose proof grows past `per_receipt_storage_proof_size_limit` | The model records no trie proof (SAF-33) |
+| `runtime/NearRuntime/State.lean` `ApplyState.storageProofSize`, `vm/NearVM/Metered.lean` `recordedStorageError` | The recorded storage proof (`recorded_storage_size_upper_bound`) is a trusted input, a function of the trie overlay state supplied by the node; without it neither the chunk soft limit nor the per-receipt limit is checked | The model records no trie proof; the node's trie recorder does (SAF-33) |
 | `vm/NearVM/Run.lean` `execLimits` | Call depth 10000 instead of `max_stack_height` stack limiter | Stack-limiter instrumentation not modeled |
 | `vm/NearVM/Run.lean` `runAttempt` (start) | Start function is an execution issue | Unsupported; no contract in the dataset has one |
 | `vm/NearVM/Run.lean` `runAttempt` (imports) | Six v86 host functions (`promise_set_refund_to`, state-init, `current_contract_code`, `refund_to_account_id`) are unknown imports | Not yet implemented; reported as `unsupportedHost` |

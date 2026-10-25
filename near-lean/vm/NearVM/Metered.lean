@@ -914,6 +914,16 @@ def finishMeteredCall (extraBytes : Nat) (name : String) (before : HostStore Nea
         | none => .Return vals (updateStorageUsage extraBytes name before st4 args)
   | .Trap st2 msg => .Trap st2 msg
 
+/-- `RecordedStorageCounter::observe_size`, after a storage operation reached `trie`: the
+receipt's recorded proof (a trusted input) must stay within the per-receipt limit. -/
+def recordedStorageError (host : NearState) (trie : _root_.Near.TrieOverlay.State) : Option FunctionCallError :=
+  match host.storageProofSize with
+  | some size =>
+    if size trie > host.config.maxStorageProofSize then
+      some (.hostError (.recordedStorageExceeded host.config.maxStorageProofSize))
+    else none
+  | none => none
+
 /-- RuntimeExt's external storage phase. The base trie is immutable within the
 chunk; prospective updates bypass it. Cache warming survives every gas failure.
 Reads bill lookup nodes before value bytes, then dereference with a free gas
@@ -951,6 +961,8 @@ private def prepareStorageCallAux (name : String) (before : HostStore NearState)
     let (paid, error) := bill st (totals trie)
     st := paid
     if error.isSome then return (st, error)
+    -- nearcore observes the proof after the lookup, before it reads the value.
+    if let some error := recordedStorageError st.host trie then return (st, some error)
   if name != "storage_has_key" then
     if let some pointer := pointer then
       let length := pointer.reference.2.length
@@ -979,6 +991,8 @@ private def prepareStorageCallAux (name : String) (before : HostStore NearState)
       | return (st, some (.hostError (spanReadError (a 2) (a 3))))
     trie := trie.set rawKey value
     st := { st with host := { st.host with storageAccounting := some trie } }
+  if mutation then
+    if let some error := recordedStorageError st.host trie then return (st, some error)
   return (st, none)
 
 /-- Burnt gas is at least `b` and within fixed limits: what a charge preserves.
@@ -1059,15 +1073,7 @@ theorem prepareStorageCallAux_gas (P : GasCounter → Prop) (name : String)
         · dsimp only
           rcases before.host.config.maxStorageKeyLen with _ | limit
           all_goals dsimp only
-          all_goals rcases pointer with _ | ptr
-          all_goals (try dsimp only)
-          all_goals repeat' (first | exact hP | (refine gas_ite ?_ ?_ <;> intro _) | apply hbill)
-          all_goals (try (rcases getMemOrReg before (argU64 args 3) (argU64 args 2) with _ | value))
-          all_goals (try dsimp only)
-          all_goals repeat' (first | exact hP | apply hbill)
-          all_goals rcases Near.TrieOverlay.dereference looked ptr with msg | ⟨fetched, stored⟩
-          all_goals (try dsimp only)
-          all_goals repeat' (first | exact hP | (refine gas_ite ?_ ?_ <;> intro _) | apply hbill)
+          all_goals repeat' (first | exact hP | (refine gas_ite ?_ ?_ <;> intro _) | apply hbill | split)
   · simp only [hname, Bool.false_eq_true, ↓reduceIte]; exact hP
 
 /-- Expose only the fields the external storage phase may change. On success

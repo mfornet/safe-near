@@ -101,6 +101,8 @@ structure NearConfig where
   maxContractSize : Option Nat := none
   /-- `max_yield_payload_size`, checked by `promise_yield_resume`. -/
   maxYieldPayloadSize : Option Nat := none
+  /-- `per_receipt_storage_proof_size_limit`, checked after each storage operation. -/
+  maxStorageProofSize : Nat := 2 ^ 32 - 1
   /-- The behaviour version of the `bls12381_*` host functions (`1` with NEP-488). -/
   blsVersion : Nat := 0
   validAccountId     : List UInt8 → Bool := fun _ => true
@@ -147,6 +149,8 @@ structure NearState where
   /-- Optional full chunk trie and shared accounting cache. Contract storage remains
   the functional projection; disagreement is an explicit model execution issue. -/
   storageAccounting : Option _root_.Near.TrieOverlay.State := none
+  /-- See `VMContext.storageProofSize`. -/
+  storageProofSize : Option (_root_.Near.TrieOverlay.State → Nat) := none
   /-- Reads/has-key use flat storage by default; writes/removes always traverse the trie. -/
   storageReadsFromTrie : Bool := false
   /-- Finite key support for deprecated storage iterator APIs. -/

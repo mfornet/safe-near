@@ -206,6 +206,23 @@ structure ReceiptCtx where
   /-- Decoder for code deployed by contracts (not available in Lean yet). -/
   codeOf : Bytes → ContractCode
 
+/-- `check_proof_size_limit_exceed`: the chunk's recorded storage proof (a trusted input) has
+passed `main_storage_proof_size_soft_limit`, so the chunk takes no more receipts or timeouts. -/
+def storageProofFull (cfg : RuntimeConfig) (ap : ApplyState) (trie : Option TrieOverlay.State) : Bool :=
+  match ap.storageProofSize, trie with
+  | some size, some trie => size trie > cfg.mainStorageProofSizeSoftLimit
+  | _, _ => false
+
+/-- The receipt's own recorded storage proof, as the VM checks it against
+`per_receipt_storage_proof_size_limit`: the growth of the chunk's proof since the receipt started
+(`EnforcePerReceiptStorageProofLimit`), or before that feature since the call started. -/
+def receiptStorageProofSize (c : ReceiptCtx) (callStart : Option TrieOverlay.State) :
+    Option (TrieOverlay.State → Nat) :=
+  c.ap.storageProofSize.map fun size =>
+    let start := if c.cfg.enforcePerReceiptStorageProofLimit then c.ap.storageAccounting else callStart
+    let base := (start.map size).getD 0
+    fun trie => size trie - base
+
 /-- Exact VM context used by a receipt function-call action. -/
 def functionCallContext (c : ReceiptCtx) (account : Account) (args : Bytes) (gas deposit : Nat)
     (isLast : Bool) (storageAccounting : Option TrieOverlay.State := none) : VMContext :=
@@ -228,6 +245,7 @@ def functionCallContext (c : ReceiptCtx) (account : Account) (args : Bytes) (gas
     prepaidGas := gas
     randomSeed := c.vmRandomSeed.getD c.ap.randomSeed
     storageAccounting
+    storageProofSize := receiptStorageProofSize c storageAccounting
     chargeStorageValueAccess := true
     outputDataReceivers := if isLast then c.action.outputDataReceivers.map fun d => bytesOfString d.receiverId else []
     actionHash := c.vmActionHash.getD []
@@ -1526,10 +1544,9 @@ def applyAttempt (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → Con
   let mut retainedDelayed : List Receipt := []
   let mut newlyDelayed : List Receipt := []
   -- `total.compute`: the chunk stops taking receipts once their compute reaches the gas limit.
-  -- nearcore divergence: nearcore also stops at the storage proof soft limit; the model records no
-  -- trie proof.
+  -- It also stops once the chunk's recorded storage proof passes its soft limit (`storageProofFull`).
   let mut compute := outcomes.foldl (fun total pair => total + pair.2.computeUsage) 0
-  let mut overLimit := ap.gasLimit.any (compute ≥ ·)
+  let mut overLimit := ap.gasLimit.any (compute ≥ ·) || storageProofFull cfg ap ap.storageAccounting
   let mut storageAccounting := ap.storageAccounting
   for (r, position) in queue.zipIdx do
     if overLimit then
@@ -1556,8 +1573,10 @@ def applyAttempt (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → Con
       tokensBurnt := tokensBurnt + p.otherTokensBurnt - p.rewards
       if let some limit := ap.gasLimit then
         if compute ≥ limit then overLimit := true
+      if storageProofFull cfg ap storageAccounting then overLimit := true
   -- Yields that timed out wake up with a resume receipt, after all incoming receipts.
-  let (stTimed, timeoutReceipts, timeoutBirths) := resolveYieldTimeouts ap ap.gasLimit compute
+  let (stTimed, timeoutReceipts, timeoutBirths) := resolveYieldTimeouts ap
+    (if storageProofFull cfg ap storageAccounting then some 0 else ap.gasLimit) compute
     (st.yieldTimeouts.length + 1) (st, [], [])
   st := stTimed
   outgoing := outgoing ++ timeoutReceipts

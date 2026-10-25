@@ -202,6 +202,8 @@ structure Corresponds (c : ReceiptCtx) (seed : Bytes) (account : Account) (metho
   deposit : ctx.attached = deposit
   gas : ctx.prepaidGas = gas
   seed : ctx.randomSeed = seed
+  -- Before the `trie` field, which shadows the parameter.
+  storageProofSize : ctx.storageProofSize = receiptStorageProofSize c (some trie)
   trie : ctx.trie = trie
   outputs : ctx.outputDataReceivers.map Subtype.val = c.action.outputDataReceivers.map (·.receiverId)
   protocol : ctx.protocol = c.cfg
@@ -220,6 +222,7 @@ theorem Corresponds.vmContext {c : ReceiptCtx} {seed : Bytes} {account : Account
   functionCallContext_eq_toVMContext _ account args gas deposit true trie ctx h.current h.signer
     h.signerPk h.predecessor h.args h.results h.height h.timestamp h.epoch h.balance h.locked h.usage
     h.deposit h.gas h.seed h.trie (by simpa using h.outputs) h.actionHash h.yields h.chain h.validatorStake h.validatorTotalStake
+    h.storageProofSize
 
 /-- The boundary's reading of a receipt failure. -/
 def runtimeFailure : RuntimeError → Failure

@@ -119,7 +119,8 @@ theorem applyAttempt_state_predicate (cfg : RuntimeConfig) (ap : ApplyState)
             cases hl : ap.gasLimit with
             | none =>
               simp only [hl] at hp
-              exact ⟨hp, by intro returned he; contradiction⟩
+              simp only
+              split_ifs <;> exact ⟨hp, by intro returned he; contradiction⟩
             | some limit =>
               simp only [hl] at hp
               simp only
