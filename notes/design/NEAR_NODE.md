@@ -1295,6 +1295,17 @@ chunks). Sources: `NearNode/Validator/{Pool,Prepare}.lean`, `Follow.lean` (`buil
 - **Not done.** The `config.json` keys other than the three above are ignored; the logs are not per-target levels; there is no
   `neard init`-compatible layout of `data/` (the store is the node's own format).
 
+#### The fork after a pause (M9 acceptance)
+
+`validator_accept.py` stops the Lean node for 12 s (SIGSTOP) and resumes it. On resume both validators have approvals for several target
+heights and each produces a block at every height it is producer of on the parent it has: neard produced five blocks 108 to 112 in
+12 ms on block 107 (debug logs of `chain`/`client`/`network`, `NEARD_RUST_LOG`), and in another run neard built 104 and 105 on 103
+while the Lean node, whose tip was still 103, built 107 on 103 with valid skip approvals; neard received that block, accepted it and
+made it its head. The fork choice then orphans the blocks that are not on the chosen chain, whichever node produced them. Nothing
+was rejected: every block the Lean node applied was held by neard. The check therefore asks what nearcore guarantees: a block of the Lean
+node that is off neard's canonical chain must be held by neard (`block` by hash), and is reported as an orphan; a block neard does not hold
+is a problem. Two runs on the final build: 0 orphans, and 4 orphans (107 to 110), both `ok`.
+
 ## Open points
 
 - Numeric performance target for M10, measured against nearcore (M2's and M4's are proposed above).

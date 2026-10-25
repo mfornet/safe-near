@@ -150,6 +150,15 @@ def stall_test(lean: subprocess.Popen, seconds: int = 12) -> dict:
             "stalled": during - before <= 2, "resumed": after - during >= 5}
 
 
+def neard_holds(hash_hex: str) -> bool:
+    """Whether neard holds the block (on its canonical chain or not)."""
+    try:
+        rpc("block", {"block_id": nc.b58encode(bytes.fromhex(hash_hex))})
+        return True
+    except (RuntimeError, urllib.error.HTTPError):
+        return False
+
+
 def chain_rows(last: int) -> list[dict]:
     """Every block of neard's chain with its producer and its chunks."""
     rows = []
@@ -231,7 +240,11 @@ def outcome_comparison(applied: list[dict], rows: list[dict]) -> dict:
 
 
 def analyse(work: Path, report: dict, stall: dict | None, rows: list[dict], head: int, final: int,
-            require_txs: bool = True) -> dict:
+            require_txs: bool = True, known=None) -> dict:
+    """``known(hash_hex)`` tells whether neard holds the block with that hash (also off its canonical chain).  After a pause
+    both producers can build on the same parent at different heights (nearcore does it too: a block per height whose
+    approvals are ready), and the fork choice orphans some blocks.  What is guaranteed is that every block the Lean node
+    applied is valid for neard, i.e. neard accepted and stored it; a block off neard's chain is an orphan if neard holds it."""
     applied = [json.loads(line) for line in (work / "applied.jsonl").read_text().splitlines() if line.strip()]
     by_height = {r["height"]: r for r in rows}
     result: dict = {"headHeight": head, "finalHeight": final}
@@ -243,17 +256,20 @@ def analyse(work: Path, report: dict, stall: dict | None, rows: list[dict], head
     # the Lean node's chain is neard's chain, block by block, with the same state roots
     same_hash = same_root = checked_root = 0
     problems = []
+    orphans = []
     lean_hashes = {}
     for row in applied:
         mine = by_height.get(row["height"])
-        if mine is None:
-            problems.append(f"height {row['height']}: not in neard's chain")
+        if mine is None or nc.b58decode(mine["hash"]).hex() != row["hash"]:
+            if known is not None and known(row["hash"]):
+                orphans.append(row["height"])
+            elif mine is None:
+                problems.append(f"height {row['height']}: not in neard's chain, and neard does not hold the block")
+            else:
+                problems.append(f"height {row['height']}: block hash differs, and neard does not hold the block")
             continue
         lean_hashes[row["height"]] = row["hash"]
-        if nc.b58decode(mine["hash"]).hex() == row["hash"]:
-            same_hash += 1
-        else:
-            problems.append(f"height {row['height']}: block hash differs")
+        same_hash += 1
         nxt = by_height.get(row["height"] + 1)
         if nxt:
             for chunk, report_chunk in zip(nxt["chunks"], row["chunks"]):
@@ -263,7 +279,7 @@ def analyse(work: Path, report: dict, stall: dict | None, rows: list[dict], head
                         same_root += 1
                     else:
                         problems.append(f"height {row['height']} shard {chunk['shard']}: state root differs")
-    result.update(blocksApplied=len(applied), sameHash=same_hash, stateRootsChecked=checked_root, stateRootsEqual=same_root,
+    result.update(blocksApplied=len(applied), sameHash=same_hash, orphans=orphans, stateRootsChecked=checked_root, stateRootsEqual=same_root,
                   problems=problems[:10], disconnects=[d for d in report.get("disconnects", []) if "connection refused" not in d], failure=report.get("failure"),
                   leanStats=report.get("stats", {}), stall=stall)
     lean_tx_chunks = [(r["height"], c) for r in rows for c in r["chunks"]
@@ -274,7 +290,7 @@ def analyse(work: Path, report: dict, stall: dict | None, rows: list[dict], head
     # neard's blocks signed by the Lean node verify on neard's side by being in its chain; finality moved
     result["finalityAdvanced"] = final > 5 and head - final < 20
     ok = (result["blocksByLean"] > 0 and result["chunksByLean"] > 0 and not problems and not result["failure"]
-          and not result["disconnects"] and report.get("handshakes") == 1 and same_hash == len(applied) and same_root == checked_root and checked_root > 0
+          and not result["disconnects"] and report.get("handshakes") == 1 and same_hash + len(orphans) == len(applied) and same_root == checked_root and checked_root > 0
           and result["finalityAdvanced"]
           and (not require_txs or (result["leanChunksWithTransactions"] > 0
                                    and result["outcomes"]["outcomesChecked"] > 0
@@ -309,7 +325,7 @@ def main() -> None:
         lean.wait(timeout=60)
         rows = chain_rows(head_height())   # the chain went on while the Lean node was stopping
         report = json.loads((options.work / "report.json").read_text()) if (options.work / "report.json").exists() else {}
-        result = analyse(options.work, report, stall, rows, head, final, require_txs=not options.no_workload)
+        result = analyse(options.work, report, stall, rows, head, final, require_txs=not options.no_workload, known=neard_holds)
         print(json.dumps(result, indent=1))
         (options.work / "result.json").write_text(json.dumps(result, indent=1) + "\n")
         sys.exit(0 if result["ok"] else 1)
