@@ -31,7 +31,7 @@ crypto-tests: crypto-build
 
 # Build the NEAR node (notes/design/NEAR_NODE.md) and its executables.
 node-build:
-    cd near-lean/node && lake build NearNode near-lean-node node-bench node-conformance-types node-conformance-network node-trie-tests node-store-tests node-state-roots node-chain-validate node-chain-apply --wfail
+    cd near-lean/node && lake build NearNode near-lean-node node-bench node-conformance-types node-conformance-network node-conformance-sync node-trie-tests node-store-tests node-state-roots node-chain-validate node-chain-apply --wfail
 
 # M1: the Borsh codecs of every near-primitives type against the committed nearcore oracle fixtures.
 [positional-arguments]
@@ -44,6 +44,16 @@ node-conformance-types *options: node-build
 [positional-arguments]
 node-conformance-network *options: node-build
     near-lean/node/.lake/build/bin/node-conformance-network "$@"
+
+# M7: zstd and the state parts of the trie against fixtures from the `zstd` crate and `near-store` at the pin
+# (`just node-sync-oracle` writes them).
+node-conformance-sync *options: node-build
+    near-lean/node/.lake/build/bin/node-conformance-sync "$@"
+
+# M7: regenerate near-lean/node/fixtures/state-sync with nearcore's own zstd and near-store (needs the clean nearcore
+# checkout of `tools/localnet/build.py` and a Rust toolchain; CI never builds it).
+node-sync-oracle:
+    cd tools/node-conformance/native-trie && cargo run --release --bin state_sync_oracle -- ../../../near-lean/node/fixtures/state-sync
 
 # M4: the trie Impl against the Spec (NearInterface.TrieConstruction) on seeded random entry sets and
 # updates; the optional argument is the number of cases.
