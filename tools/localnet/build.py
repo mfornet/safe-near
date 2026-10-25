@@ -33,7 +33,28 @@ OVERLAYS = [
      "checker.rs", "safe-near-corpus-check"),
     ("state-viewer", "tools/state-viewer/Cargo.toml", "tools/state-viewer/safe_near_chain_export.rs",
      "chain_exporter.rs", "safe-near-chain-export"),
+    ("near-network", "chain/network/Cargo.toml", "chain/network/safe_near_network_oracle.rs",
+     "network_oracle_main.rs", "safe-near-network-oracle"),
 ]
+
+# `near-network` keeps its protocol types private, so the network oracle is a module of the crate itself:
+# the adapter adds `src/safe_near_oracle.rs` and one `pub mod` line to `src/lib.rs`, nothing else, and
+# both are removed again after the build.  Per binary: new files (repository path, source here) and
+# appended text (repository path, text).
+ADAPTER_FILES = {
+    "safe-near-network-oracle": [("chain/network/src/safe_near_oracle.rs", "network_oracle.rs")],
+}
+ADAPTER_APPENDS = {
+    "safe-near-network-oracle": [("chain/network/src/lib.rs",
+                                  b'\n#[path = "safe_near_oracle.rs"]\npub mod safe_near_oracle;\n')],
+}
+
+
+def adapter_sources(names):
+    """The repository paths that the adapters named `names` add or append to."""
+    added = [path for n in names for path, _ in ADAPTER_FILES.get(n, [])]
+    appended = [path for n in names for path, _ in ADAPTER_APPENDS.get(n, [])]
+    return added, appended
 
 
 def stanza(shim: str, name: str) -> bytes:
@@ -93,10 +114,16 @@ def build(source: Path, revision: str, outdir: Path, with_adapters: bool, jobs: 
         if prepare.git(source, "rev-parse", "HEAD").decode().strip() != revision:
             raise ValueError("nearcore checkout does not match the pinned revision")
         originals = {m: prepare.git(source, "show", f"{revision}:{m}") for _, m, _, _, _ in OVERLAYS}
+        added, appended = adapter_sources([o[4] for o in OVERLAYS])
+        originals.update({a: prepare.git(source, "show", f"{revision}:{a}") for a in appended})
         # restore a previously interrupted overlay
         for _, manifest, shim, _, name in OVERLAYS:
             (source / manifest).write_bytes(originals[manifest])
             (source / shim).unlink(missing_ok=True)
+        for path in added:
+            (source / path).unlink(missing_ok=True)
+        for path in appended:
+            (source / path).write_bytes(originals[path])
         changed = prepare.git(source, "status", "--porcelain").decode().strip()
         if changed:
             raise ValueError(f"nearcore source is not clean:\n{changed}")
@@ -128,7 +155,12 @@ def build(source: Path, revision: str, outdir: Path, with_adapters: bool, jobs: 
                     adapters[name] = prepare.digest(body)
                     (source / shim).write_bytes(body)
                     adapter_packages.append((package, name))
-                for manifest in originals:
+                    for path, local_source in ADAPTER_FILES.get(name, []):
+                        (source / path).write_bytes((HERE / local_source).read_bytes())
+                        adapters[local_source] = prepare.digest((HERE / local_source).read_bytes())
+                    for path, text in ADAPTER_APPENDS.get(name, []):
+                        (source / path).write_bytes(originals[path] + text)
+                for manifest in {o[1] for o in OVERLAYS}:
                     (source / manifest).write_bytes(
                         overlaid(originals[manifest], [o for o in OVERLAYS if o[1] == manifest]))
                 cargo_build(adapter_packages)
@@ -136,6 +168,10 @@ def build(source: Path, revision: str, outdir: Path, with_adapters: bool, jobs: 
                 for _, manifest, shim, _, _ in OVERLAYS:
                     (source / manifest).write_bytes(originals[manifest])
                     (source / shim).unlink(missing_ok=True)
+                for path in added:
+                    (source / path).unlink(missing_ok=True)
+                for path in appended:
+                    (source / path).write_bytes(originals[path])
             packages += adapter_packages
         if (source / "Cargo.lock").read_bytes() != cargo_lock:
             raise ValueError("nearcore Cargo.lock changed during compilation")
@@ -169,9 +205,15 @@ def build_overlay(source: Path, revision: str, outdir: Path, name: str, jobs: st
     with (source / ".git/safe-near-localnet.lock").open("a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         originals = {m: prepare.git(source, "show", f"{revision}:{m}") for _, m, _, _, _ in OVERLAYS}
+        added, appended = adapter_sources([o[4] for o in OVERLAYS])
+        originals.update({a: prepare.git(source, "show", f"{revision}:{a}") for a in appended})
         for _, manifest, shim, _, _ in OVERLAYS:
             (source / manifest).write_bytes(originals[manifest])
             (source / shim).unlink(missing_ok=True)
+        for path in added:
+            (source / path).unlink(missing_ok=True)
+        for path in appended:
+            (source / path).write_bytes(originals[path])
         channel = re.search(r'^channel\s*=\s*"(\d+\.\d+\.\d+)"',
                             (source / "rust-toolchain.toml").read_text(), re.MULTILINE).group(1)
         env = os.environ.copy()
@@ -183,6 +225,10 @@ def build_overlay(source: Path, revision: str, outdir: Path, name: str, jobs: st
             for package, manifest, shim, local, binary in chosen:
                 (source / shim).write_bytes((HERE / local).read_bytes())
                 (source / manifest).write_bytes(overlaid(originals[manifest], chosen))
+                for path, local_source in ADAPTER_FILES.get(binary, []):
+                    (source / path).write_bytes((HERE / local_source).read_bytes())
+                for path, text in ADAPTER_APPENDS.get(binary, []):
+                    (source / path).write_bytes(originals[path] + text)
             command = ["cargo", f"+{channel}", "build", "--release", "--locked"]
             for package, _, _, _, binary in chosen:
                 command += ["-p", package, "--bin", binary]
@@ -191,6 +237,10 @@ def build_overlay(source: Path, revision: str, outdir: Path, name: str, jobs: st
             for _, manifest, shim, _, _ in OVERLAYS:
                 (source / manifest).write_bytes(originals[manifest])
                 (source / shim).unlink(missing_ok=True)
+            for path in added:
+                (source / path).unlink(missing_ok=True)
+            for path in appended:
+                (source / path).write_bytes(originals[path])
         outdir.mkdir(parents=True, exist_ok=True)
         prepare.publish_binary(HERE / "target/release" / name, outdir / name)
 
