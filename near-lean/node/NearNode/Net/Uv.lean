@@ -21,14 +21,14 @@ open Std.Internal.UV.TCP Std.Net
 
 /-- A socket address of Lean's `Std.Net`. -/
 def toSocketAddress (a : Addr) : Except String SocketAddress :=
-  if a.ip.size == 4 then
-    .ok (.v4 ⟨IPv4Addr.ofParts a.ip[0]! a.ip[1]! a.ip[2]! a.ip[3]!, a.port⟩)
+  if a.ip.size == 4 then .ok (.v4 ⟨IPv4Addr.ofParts a.ip[0]! a.ip[1]! a.ip[2]! a.ip[3]!, a.port⟩)
   else .error "only IPv4 addresses are supported"
 
 def ofSocketAddress : SocketAddress → Addr
   | .v4 a => ⟨ByteArray.mk a.addr.octets.toArray, a.port⟩
   | .v6 a =>
-    ⟨ByteArray.mk (a.addr.segments.toArray.flatMap fun (s : UInt16) => #[(s >>> 8).toUInt8, s.toUInt8]),
+    ⟨ByteArray.mk
+        (a.addr.segments.toArray.flatMap fun (s : UInt16) => #[(s >>> 8).toUInt8, s.toUInt8]),
       a.port⟩
 
 /-- The receive side of a connection, shared with its reader task. -/
@@ -59,23 +59,27 @@ private partial def awaitLoop (p : IO.Promise (Except IO.Error α)) (timeoutMs s
     (delay : UInt32) : IO (Option α) := do
   if ← p.isResolved then
     match ← IO.wait p.result? with
-    | some (.ok a) => return some a
-    | some (.error e) => throw e
-    | none => throw (IO.userError "promise dropped")
+    | some (.ok a) =>
+      return some a
+    | some (.error e) =>
+      throw e
+    | none =>
+      throw (IO.userError "promise dropped")
   if (← IO.monoMsNow) - started ≥ timeoutMs then
     return none
   IO.sleep delay
   awaitLoop p timeoutMs started (if delay < 8 then delay * 2 else delay)
 
-private def awaitPromise (p : IO.Promise (Except IO.Error α)) (timeoutMs : Nat) :
-    IO (Option α) := do
+private def awaitPromise (p : IO.Promise (Except IO.Error α)) (timeoutMs : Nat) : IO (Option α) :=
+  do
   awaitLoop p timeoutMs (← IO.monoMsNow) 1
 
 /-- Accepts from a listening socket, polling until `timeoutMs` has passed. -/
 private partial def acceptLoop (server : Socket) (timeoutMs started : Nat) (delay : UInt32)
     (wrap : Socket → IO Stream) : IO (Option Stream) := do
   match ← IO.ofExcept (← server.tryAccept) with
-  | some sock => return some (← wrap sock)
+  | some sock =>
+    return some (← wrap sock)
   | none =>
     if (← IO.monoMsNow) - started ≥ timeoutMs then
       return none
@@ -90,7 +94,7 @@ private partial def takeLoop (inbox : Inbox) (max timeoutMs started : Nat) (dela
     let n := Nat.min max d.size
     inbox.data.set (d.extract n d.size)
     return .ok (some (d.extract 0 n))
-  if let some why ← inbox.ended.get then
+  if let some why← inbox.ended.get then
     -- the reader may have appended just before it ended
     if (← inbox.data.get).size == 0 then
       return .error why
@@ -105,21 +109,25 @@ private def stream (sock : Socket) (peer : Addr) : IO Stream := do
   let inbox : Inbox :=
     { data := ← IO.mkRef ByteArray.empty, ended := ← IO.mkRef none, stopped := ← IO.mkRef false }
   discard <| IO.asTask (readerLoop sock inbox) Task.Priority.dedicated
-  pure
-      { peer
-        read := fun max timeoutMs => do takeLoop inbox max timeoutMs (← IO.monoMsNow) 1
+  pure {
+        peer
+        read := fun max timeoutMs => do
+          takeLoop inbox max timeoutMs (← IO.monoMsNow) 1
         write := fun bytes timeoutMs => do
-          if let some why ← inbox.ended.get then
+          if let some why← inbox.ended.get then
             throw (IO.userError s!"connection closed: {repr why}")
           let promise ← sock.send #[bytes]
           match ← awaitPromise promise timeoutMs with
-          | some _ => pure ()
-          | none => throw (IO.userError "write timed out")
+          | some _ =>
+            pure ()
+          | none =>
+            throw (IO.userError "write timed out")
         close := do
           inbox.stopped.set true
           try
             discard <| sock.shutdown
-          catch _ => pure ()
+          catch _ =>
+            pure ()
           sock.cancelRecv }
 
 /-- TCP on libuv. -/
@@ -132,20 +140,21 @@ def net : Net where
     | some _ =>
       sock.noDelay
       stream sock addr
-    | none => throw (IO.userError s!"connect to {addr} timed out")
+    | none =>
+      throw (IO.userError s!"connect to {addr} timed out")
   listen addr := do
     let target ← IO.ofExcept (toSocketAddress addr |>.mapError IO.userError)
     let server ← Socket.new
     server.bind target
     server.listen 128
     let local_ ← server.getSockName
-    pure
-        { addr := ofSocketAddress local_
+    pure {
+          addr := ofSocketAddress local_
           accept := fun timeoutMs => do
             acceptLoop server timeoutMs (← IO.monoMsNow) 1 fun sock => do
-              sock.noDelay
-              let peer ← sock.getPeerName
-              stream sock (ofSocketAddress peer)
+                sock.noDelay
+                let peer ← sock.getPeerName
+                stream sock (ofSocketAddress peer)
           close := pure () }
 
 end Near.Node.Net.Uv

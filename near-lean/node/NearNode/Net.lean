@@ -40,8 +40,7 @@ def parse? (s : String) : Option Addr :=
 
 instance : ToString Addr :=
   ⟨fun a =>
-    if a.ip.size == 4 then
-      s!"{a.ip[0]!}.{a.ip[1]!}.{a.ip[2]!}.{a.ip[3]!}:{a.port}"
+    if a.ip.size == 4 then s!"{a.ip[0]!}.{a.ip[1]!}.{a.ip[2]!}.{a.ip[3]!}:{a.port}"
     else s!"[{a.ip.size} octets]:{a.port}"⟩
 
 end Addr
@@ -82,10 +81,12 @@ structure Net where
   listen : Addr → IO Listener
 
 /-- nearcore's `NETWORK_MESSAGE_MAX_SIZE_BYTES`. -/
-def maxFrameBytes : Nat := 512 * 1048576
+def maxFrameBytes : Nat :=
+  512 * 1048576
 
 /-- nearcore's `READ_TIMEOUT` and `WRITE_TIMEOUT`, in milliseconds. -/
-def ioTimeoutMs : Nat := 120000
+def ioTimeoutMs : Nat :=
+  120000
 
 /-- What `Framed.recv` returns. -/
 inductive Frame where
@@ -119,14 +120,14 @@ def send (f : Framed) (msg : ByteArray) (timeoutMs : Nat := ioTimeoutMs) : IO Un
 
 /-- The first complete message of `buf`, and the rest. -/
 private def split (buf : ByteArray) (max : Nat) : Except Nat (Option (ByteArray × ByteArray)) :=
-  if buf.size < 4 then
-    .ok none
+  if buf.size < 4 then .ok none
   else
     let n :=
       buf[0]!.toNat ||| (buf[1]!.toNat <<< 8) ||| (buf[2]!.toNat <<< 16) ||| (buf[3]!.toNat <<< 24)
     if n > max then .error n
-    else if buf.size < 4 + n then .ok none
-    else .ok (some (buf.extract 4 (4 + n), buf.extract (4 + n) buf.size))
+    else
+      if buf.size < 4 + n then .ok none
+      else .ok (some (buf.extract 4 (4 + n), buf.extract (4 + n) buf.size))
 
 /-- Reads one message, waiting at most `timeoutMs` for it to be complete; what was read of an
 incomplete message stays for the next call. -/
@@ -135,7 +136,8 @@ partial def recv (f : Framed) (timeoutMs : Nat) : IO Frame := do
   let rec loop : IO Frame := do
     let buf ← f.pending.get
     match split buf f.maxFrame with
-    | .error n => return .tooLarge n
+    | .error n =>
+      return .tooLarge n
     | .ok (some (msg, rest)) =>
       f.pending.set rest
       return .message msg
@@ -145,14 +147,19 @@ partial def recv (f : Framed) (timeoutMs : Nat) : IO Frame := do
         return .timeout
       let want :=
         if buf.size ≥ 4 then
-          let n := buf[0]!.toNat ||| (buf[1]!.toNat <<< 8) ||| (buf[2]!.toNat <<< 16) |||
-            (buf[3]!.toNat <<< 24)
+          let n :=
+            buf[0]!.toNat ||| (buf[1]!.toNat <<< 8) ||| (buf[2]!.toNat <<< 16) |||
+              (buf[3]!.toNat <<< 24)
           max 4096 (min (4 + n - buf.size) 1048576)
         else 4096
       match ← f.stream.read want (timeoutMs - elapsed) with
-      | .error why => return .closed why
+      | .error why =>
+        return .closed why
       | .ok none =>
-        if timeoutMs == 0 then return .timeout else loop
+        if timeoutMs == 0 then
+          return .timeout
+        else
+          loop
       | .ok (some bytes) =>
         f.pending.set (buf ++ bytes)
         loop

@@ -91,9 +91,10 @@ def net (h : Hub) : Net where
       throw (IO.userError s!"address in use: {addr}")
     let queue ← IO.mkRef #[]
     h.listeners.modify ((addr, queue) :: ·)
-    pure
-        { addr
-          accept := fun timeoutMs => do acceptLoop queue timeoutMs (← IO.monoMsNow)
+    pure {
+          addr
+          accept := fun timeoutMs => do
+            acceptLoop queue timeoutMs (← IO.monoMsNow)
           close := h.listeners.modify (·.filter (·.1 != addr)) }
 
 end Hub
