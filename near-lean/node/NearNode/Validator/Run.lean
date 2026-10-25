@@ -33,6 +33,8 @@ structure Options where
   /-- The node ends, and writes its report, when this file exists. -/
   stopFile : Option System.FilePath := none
   quiet : Bool := false
+  /-- `text` (`[12.3s] message`) or `json` (one object per line: `ts`, `level`, `target`, `msg`). -/
+  logFormat : String := "text"
   /-- Where the JSON-RPC server listens (`rpc.addr` of `config.json`); none: no server. -/
   rpcAddr : Option Addr := none
   /-- neard's `genesis.json`, from which the RPC answers `EXPERIMENTAL_genesis_config`. -/
@@ -77,8 +79,16 @@ def run (o : Options) : IO UInt32 := do
   let started ← IO.monoMsNow
   let log (msg : String) : IO Unit := do
     unless o.quiet do
-      IO.eprintln
-          s!"[{((← IO.monoMsNow) - started) / 1000}.{(((← IO.monoMsNow) - started) % 1000) / 100}s] {msg}"
+      if o.logFormat == "json" then
+        let ms := (← IO.monoMsNow) - started
+        IO.eprintln
+            (Json.mkObj
+                [("ts", Json.num (JsonNumber.fromNat (← wallSeconds))),
+                  ("uptime_ms", Json.num (JsonNumber.fromNat ms)), ("level", "INFO"),
+                  ("target", "near-lean-node"), ("msg", Json.str msg)]).compress
+      else
+        IO.eprintln
+            s!"[{((← IO.monoMsNow) - started) / 1000}.{(((← IO.monoMsNow) - started) % 1000) / 100}s] {msg}"
   log s!"validator {signer.accountId.val}, node {nodeKey.peerId.key.toText}"
   let total := numTotalParts boot.genesis.setup.config.numBlockProducerSeats
   let code ← IO.ofExcept (chunkCode total |>.mapError IO.userError)
@@ -125,6 +135,11 @@ def run (o : Options) : IO UInt32 := do
   let stop ← IO.mkRef false
   let connected ← IO.mkRef false
   let rpcStop ← IO.mkRef false
+  -- SIGTERM and SIGINT end the node as the stop file does: the loop leaves, the store is closed, the report written
+  for signum in [15, 2] do
+    Uv.onSignal signum do
+        log "signal received, shutting down"
+        stop.set true
   if let some addr := o.rpcAddr then
     let genesisConfig : Json ←
       match o.genesisConfig with
@@ -225,6 +240,7 @@ def run (o : Options) : IO UInt32 := do
       log s!"connection to {addr} failed: {err}"
       disconnects.modify (·.push s!"{err}")
       IO.sleep 1000
+  log "stopping: closing the RPC server and the store"
   rpcStop.set true
   if let some store := store? then
     store.close

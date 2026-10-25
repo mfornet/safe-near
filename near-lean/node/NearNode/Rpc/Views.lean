@@ -154,7 +154,7 @@ def signedTransactionView (t : SignedTransaction) : Json :=
     (match tx.nonceIndex with
       | some i => [("nonce_index", jn i.toNat)]
       | none => []) ++
-      (if tx.isStrict then [("nonce_mode", Json.str "Strict")] else [])
+      (if tx.isStrict then [("nonce_mode", Json.str "strict")] else [])
   Json.mkObj (base ++ extra)
 
 /-! ### Receipts -/

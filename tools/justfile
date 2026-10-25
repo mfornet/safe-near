@@ -114,6 +114,13 @@ localnet-follow *options: node-build
 localnet-validator *options: node-build
     python3 tools/localnet/validator_accept.py "$@"
 
+# M9b: the JSON-RPC conformance run: the same requests to neard and to the Lean node, field by field; transactions sent
+# through the Lean RPC; a restart of the Lean validator. Options: `serve` (bring the topology up for manual use), `check`
+# (run the request set against a topology that is up). See notes/design/NEAR_NODE.md, M9b.
+[positional-arguments]
+node-rpc-conformance *options: node-build
+    python3 tools/localnet/rpc_conformance.py "$@"
+
 # M5a: rebuild the block corpus from the localnet databases (needs `python3 tools/localnet/build.py --only
 # safe-near-chain-export` and the databases of `just corpus-generate`).
 [positional-arguments]

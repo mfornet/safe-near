@@ -30,8 +30,9 @@ structure Ctx where
 
 /-! ### Block references -/
 
-/-- `BlockReference` from the members of a request object. -/
-def parseBlockRef (o : Json) : Except String BlockRef := do
+/-- `BlockReference` from the members of a request object; `flattened` when it is a part of a larger request
+(a query), which changes the words of the error when it is missing. -/
+def parseBlockRef (o : Json) (flattened : Bool := false) : Except String BlockRef := do
   if let some f := field? o "finality" then
     match f with
     | .str "final" =>
@@ -51,8 +52,11 @@ def parseBlockRef (o : Json) : Except String BlockRef := do
       | .error _ =>
         throw s!"invalid value: {n}, expected u64"
     | .str _ =>
-      do
-        pure (.hash (← parseHash b))
+      match parseHash b with
+      | .ok h =>
+        pure (.hash h)
+      | .error _ =>
+        throw "data did not match any variant of untagged enum BlockId"
     | _ =>
       throw "data did not match any variant of untagged enum BlockId"
   else if let some c := field? o "sync_checkpoint" then
@@ -63,8 +67,21 @@ def parseBlockRef (o : Json) : Except String BlockRef := do
       pure .earliest
     | _ =>
       throw "unknown variant of sync_checkpoint"
+  else if flattened then
+    throw "no variant of enum BlockReference found in flattened data"
   else
-    throw "no block reference: expected one of block_id, finality, sync_checkpoint"
+    match o with
+    | .obj kvs =>
+      match kvs.toList.head? with
+      | some (k, _) =>
+        if kvs.size == 1 then
+          throw s!"unknown variant `{k}`, expected one of `block_id`, `finality`, `sync_checkpoint`"
+        else
+          throw "invalid value: map, expected map with a single key"
+      | none =>
+        throw "invalid value: map, expected map with a single key"
+    | _ =>
+      throw "invalid type, expected a block reference"
 
 /-- `BlockId` from a bare value (the `[block_id]` form). -/
 def parseBlockId (j : Json) : Except String BlockRef :=
@@ -157,7 +174,16 @@ def gasPrice (c : Ctx) (params : Json) : IO R := do
     | some b =>
       return .ok (Json.mkObj [("gas_price", jbal b.view.nextGasPrice)])
     | none =>
-      return .error (unknownBlock s params r')
+      let e := unknownBlock s params r'
+      let fix (m : String) : String :=
+        match r' with
+        | .hash _ => m.replace "BLOCK:" "BLOCK HEADER:"
+        | _ => m
+      return .error
+          { e with
+            error :=
+              e.error.setObjVal! "data"
+                (Json.str (fix ((e.error.getObjValD "data").getStr?.toOption.getD ""))) }
 
 /-! ### block and chunk -/
 
@@ -168,7 +194,7 @@ def block (c : Ctx) (params : Json) : IO R := do
     | .arr #[x] => parseBlockId x
     | .obj _ => parseBlockRef params
     | .null => throw "invalid type: null, expected string or map"
-    | _ => throw "invalid length, expected a block reference"
+    | _ => throw "invalid type: sequence, expected string or map"
   match liftParse ref with
   | .error e =>
     return .error e
@@ -224,10 +250,15 @@ def chunk (c : Ctx) (params : Json) : IO R := do
               (Json.str
                 s!"Chunk Missing (unavailable on the node): ChunkHash(`{base58Encode h.bytes}`) \n Cause: Unknown"))
     | none =>
-      return .error
-          (RpcError.handler "UNKNOWN_CHUNK" (some (Json.mkObj [("chunk_hash", jhash h)]))
-            (Json.str
-              s!"Chunk Missing (unavailable on the node): ChunkHash(`{base58Encode h.bytes}`) \n Cause: Unknown"))
+      -- the chunks of the genesis block have no body
+      match s.st.genesisChunks.find? (·.chunkHash.hash == h) with
+      | some header =>
+        return .ok (chunkViewJson s (header.withHeightIncluded 0) ⟨#[], #[]⟩)
+      | none =>
+        return .error
+            (RpcError.handler "UNKNOWN_CHUNK" (some (Json.mkObj [("chunk_hash", jhash h)]))
+              (Json.str
+                s!"Chunk Missing (unavailable on the node): ChunkHash(`{base58Encode h.bytes}`) \n Cause: Unknown"))
   | .ok (.inr (r, shard)) =>
     match resolve s r with
     | none =>
@@ -277,7 +308,10 @@ def protocolConfig (c : Ctx) (params : Json) : IO R := do
   | .ok r =>
     match resolve s r with
     | none =>
-      return .error (unknownBlock s params r)
+      let e := unknownBlock s params r
+      return .error
+          { e with
+            error := e.error.setObjVal! "data" (Json.str s!"Block Not Found: {r.unknownMessage}") }
     | some _ =>
       let keep :=
         ["block_producer_kickout_threshold", "chain_id", "chunk_producer_kickout_threshold",

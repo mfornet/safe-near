@@ -36,7 +36,7 @@ def base64Encode (b : ByteArray) : String :=
           '='
     return out
 
-private def value? (c : Char) : Option Nat :=
+def value? (c : Char) : Option Nat :=
   if 'A' ≤ c && c ≤ 'Z' then some (c.toNat - 65)
   else
     if 'a' ≤ c && c ≤ 'z' then some (c.toNat - 97 + 26)
@@ -81,5 +81,26 @@ def base64Decode? (s : String) : Option ByteArray := do
               (((v1 &&& 15) <<< 4 ||| v2 >>> 2).toUInt8) |>.push
             (((v2 &&& 3) <<< 6 ||| v3).toUInt8)
   pure out
+
+end Near.Node.Rpc
+
+namespace Near.Node.Rpc
+
+/-- Decodes like `base64base64Decode?` but says why it cannot, in the words of the `base64` crate's
+`DecodeError` (`Invalid byte 33, offset 0.`). -/
+def base64Decode (s : String) : Except String ByteArray :=
+  match base64Decode? s with
+  | some b => .ok b
+  | none =>
+    let bytes := s.toUTF8
+    let bad : Option (Nat × UInt8) :=
+      (List.range bytes.size).findSome? fun i =>
+        let c := bytes[i]!
+        if c == 61 || (value? (Char.ofNat c.toNat)).isSome then none else some (i, c)
+    match bad with
+    | some (i, c) => .error s!"Invalid byte {c}, offset {i}."
+    | none =>
+      if bytes.size % 4 != 0 then .error "Invalid input length: not a multiple of four"
+      else .error "Invalid padding"
 
 end Near.Node.Rpc

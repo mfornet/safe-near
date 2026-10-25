@@ -1239,6 +1239,63 @@ chunks). Sources: `NearNode/Validator/{Pool,Prepare}.lean`, `Follow.lean` (`buil
   there are none or any differ. Last run (100 s): 12 Lean chunks with 46 transactions, 276 outcomes checked, 276 equal; 154 block
   hashes and 152 state roots equal.
 
+#### M9b, JSON-RPC server (done, except the points listed)
+
+`NearNode.Rpc.*`; reference `chain/jsonrpc/src/lib.rs`, `chain/jsonrpc-primitives`, `chain/client/src/view_client_actor.rs`.
+
+- **Server.** HTTP/1.1 over the node's own `Net` listener (keep-alive, chunked bodies, one task per connection, CORS), `POST /` JSON-RPC
+  2.0 and `GET /status`, `/health`, `/network_info`. Errors have the shape of `RpcError` (`REQUEST_VALIDATION_ERROR` /
+  `HANDLER_ERROR` / `INTERNAL_ERROR`, `cause`, `code`, `data`) and the HTTP status of `rpc_handler`.
+- **Methods.** `status`, `health`, `network_info`, `gas_price`, `block`, `chunk`, `query` (`view_account`, `view_code`,
+  `view_access_key`, `view_access_key_list`, `view_state`, `call_function` through the node's own `Wasm.Near.run` with a view
+  context), `tx` / `EXPERIMENTAL_tx_status` (outcomes with proofs, receipts, `wait_until`), `send_tx`, `broadcast_tx_async`,
+  `broadcast_tx_commit`, `validators` (current epoch from the aggregator, finished epochs from their blocks),
+  `EXPERIMENTAL_protocol_config`, `EXPERIMENTAL_genesis_config`.
+- **Transactions.** The RPC hands a transaction to the node's loop (`Env.txQueue`, drained by `tick`), which runs `processTx`
+  (the same entry as a forwarded transaction), so a transaction sent to the Lean node enters its pool, is forwarded to the chunk
+  producers and lands in a chunk.
+- **Data the RPC needs** is kept in `VState` (`canon` height index, `outcomes`, `txIndex`, `receiptsById`, yielded receipts) and in the
+  store (columns `chunkBody`, `outcome`, `receipt`, `txIndex`, `delivered`).
+- **Acceptance.** `just node-rpc-conformance` (`tools/localnet/rpc_conformance.py`): brings up neard (node0) and the Lean validator (node1),
+  runs the finite workload, sends one request set to both RPCs and compares the answers field by field, then sends transactions
+  through the Lean RPC, then kills the Lean validator and starts it again from its store. `serve` only brings the topology up,
+  `check` runs the request set against a topology that is up. Head-dependent requests are repeated until both nodes answered at the
+  same head. The result is written to `rpc-conformance.json` in the work directory.
+- **Normalisation (the whole list).** `status`: `version`, `rpc_addr`, `uptime_sec`, `validator_account_id`, `validator_public_key`,
+  `node_public_key`, `node_key`. `network_info`: peers and known producers compared as a count, traffic counters dropped. In
+  every response: the payload of an execution `Failure` (which action failed and why) is replaced by a marker, and the outcome
+  `metadata` (version, gas profile, contracts) is dropped; the Lean runtime model computes neither.
+- **Last run** (one full `run`, 496 requests, 495 equal): block 84/84, chunk 63/63, `query` 109/109 (`view_account` 26, `view_access_key` 17,
+  `view_access_key_list` 18, `view_code` 9, `view_state` 12, `call_function` 32), `tx` 150/150, `EXPERIMENTAL_tx_status` 36/37,
+  `gas_price` 6/6, `validators` 4/4, protocol and genesis config 6/6, status, health, network_info 3/3; error cases are among
+  these (40 of them from success-or-error requests with the same error on both nodes). Transactions through the Lean RPC: `send_tx`,
+  `broadcast_tx_async` and `broadcast_tx_commit` one each, all three landed and `tx` at FINAL is equal on both nodes; 8 invalid
+  transactions (bad nonce, unknown signer, wrong key, insufficient balance, bad signature, expired, unknown receiver, malformed)
+  through `send_tx` and `broadcast_tx_async` each, 16/16 same error. Restart: SIGKILL of the Lean validator at final height 363,
+  restart from the store, caught up in 8.5 s, final height 372 on both nodes afterwards, 5/5 requests equal after the restart.
+  The one difference: `EXPERIMENTAL_tx_status` of a transaction with a yielded promise lists the receipts of the Lean node without the
+  receipt of the yield callback (3 receipts at neard, 2 at Lean).
+- **Not done.** `EXPERIMENTAL_changes`, `EXPERIMENTAL_changes_in_block` (needs the trie diff of each block kept per key kind),
+  `include_proof` of `view_state`, `view_gas_key_nonces` and the global-contract queries, `light_client_proof`, `next_light_client_block`,
+  `maintenance_windows`, `client_config`, `EXPERIMENTAL_receipt`. A request for any of them answers `METHOD_NOT_FOUND`. A transaction
+  whose receipts include a yielded promise (`promise_yield_create`) still shows one receipt less than neard in one request of the
+  set (see the run below).
+
+#### M9c, persistence and operation (done, except the points listed)
+
+- **Chain store.** The observer's store (blocks, `BlockInfo`, epochs, trie nodes, chunk extras, heads) plus the RPC data above is
+  committed with every applied block. `Validator.Persist.resume` rebuilds the `VState` from it.
+- **Safety state.** Committed before the act it guards: the largest approval target height (`LARGEST_TARGET_HEIGHT`, as
+  `save_largest_target_height`), the last block produced, the chunks produced per (height, shard) and the chunk endorsements. A
+  restarted validator never signs a second approval for a height nor produces a second block or chunk for a height.
+- **Flags.** `--home DIR` takes `node_key.json`, `validator_key.json`, `genesis.json`, `data/` and, from `config.json`, `rpc.addr`,
+  `network.addr` (listen port) and `network.boot_nodes`; a flag on the command line wins. `--log-format text|json` (one JSON object per
+  line: `ts`, `uptime_ms`, `level`, `target`, `msg`). `--rpc-addr`, `--genesis-config`, `--store` as before.
+- **Shutdown.** SIGTERM and SIGINT (libuv signal handles in `Net.Uv`) end the node like `--stop-file`: the loop leaves, the RPC server stops, the
+  store is closed, the report is written.
+- **Not done.** The `config.json` keys other than the three above are ignored; the logs are not per-target levels; there is no
+  `neard init`-compatible layout of `data/` (the store is the node's own format).
+
 ## Open points
 
 - Numeric performance target for M10, measured against nearcore (M2's and M4's are proposed above).

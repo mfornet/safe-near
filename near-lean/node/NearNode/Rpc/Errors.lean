@@ -98,11 +98,66 @@ def parseHash (j : Json) : Except String CryptoHash :=
     | none => throw s!"invalid value: \"{s}\", expected base58-encoded 256-bit hash"
   | _ => throw "invalid type, expected a base58-encoded hash"
 
+/-- Rust's `{:?}` of a character. -/
+private def charDebug (c : Char) : String :=
+  match c with
+  | '\n' => "'\\n'"
+  | '\t' => "'\\t'"
+  | '\r' => "'\\r'"
+  | '\'' => "'\\''"
+  | '\\' => "'\\\\'"
+  | _ => s!"'{c}'"
+
+/-- Rust's `{:?}` of a string. -/
+def stringDebug (s : String) : String :=
+  "\"" ++
+    String.join
+      (s.toList.map fun c =>
+        match c with
+        | '"' => "\\\""
+        | '\\' => "\\\\"
+        | '\n' => "\\n"
+        | '\t' => "\\t"
+        | '\r' => "\\r"
+        | _ => c.toString) ++
+    "\""
+
+/-- Why `near_account_id::validate` refuses `s` (the `Display` of `ParseAccountError`). -/
+def accountIdError (s : String) : Option String :=
+  Id.run do
+    let n := s.length
+    if n < 2 then
+      return some "the Account ID is too short"
+    if n > 64 then
+      return some "the Account ID is too long"
+    let mut lastSeparator := true
+    let mut last : Option (Nat × Char) := none
+    let mut i := 0
+    for c in s.toList do
+      last := some (i, c)
+      let isChar := ('a' ≤ c && c ≤ 'z') || ('0' ≤ c && c ≤ '9')
+      let isSep := c == '-' || c == '_' || c == '.'
+      if !isChar && !isSep then
+        return some s!"the Account ID contains an invalid character {charDebug c} at index {i}"
+      let separator := isSep
+      if separator && lastSeparator then
+        return some s!"the Account ID has a redundant separator {charDebug c} at index {i}"
+      lastSeparator := separator
+      i := i + 1
+    if lastSeparator then
+      match last with
+      | some (j, c) =>
+        return some s!"the Account ID has a redundant separator {charDebug c} at index {j}"
+      | none =>
+        pure ()
+    return none
+
 def parseAccount (j : Json) : Except String AccountId :=
   match j with
   | .str s =>
-    if AccountId.isValid s then pure ⟨s⟩
-    else throw s!"invalid value: \"{s}\", the Account ID is invalid"
+    match accountIdError s with
+    | none => pure ⟨s⟩
+    | some why => throw s!"invalid value: {stringDebug s}, {why}"
   | _ => throw "invalid type: expected a string account id"
 
 def parseU64 (j : Json) : Except String Nat :=

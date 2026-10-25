@@ -245,13 +245,16 @@ def txStatus (s : VState) (hash : CryptoHash) (withReceipts : Bool) : Option (Js
 def parseSignedTx (j : Json) : Except String SignedTransaction :=
   match j with
   | .str s =>
-    match base64Decode? s with
-    | none => throw "the value could not decoded from base64 due to: Invalid byte, offset 0."
-    | some bytes =>
+    match base64Decode s with
+    | .error why => throw s!"the value could not decoded from base64 due to: {why}"
+    | .ok bytes =>
       match Codec.decodeAll (α := SignedTransaction) bytes with
       | .ok t => pure t
       | .error .eof =>
         throw "the value could not decoded from borsh due to: Unexpected length of input"
+      | .error (.tag "Transaction" v) =>
+        throw
+          s!"the value could not decoded from borsh due to: invalid transaction version tag: {v}"
       | .error e => throw s!"the value could not decoded from borsh due to: {repr e}"
   | _ => throw "invalid type: expected a string of base64"
 
@@ -334,6 +337,8 @@ def txStatusRequest (c : Ctx) (params : Json) (withReceipts : Bool) : IO R := do
   | .error e =>
     return .error e
   | .ok (hash, _, wait, tx?) =>
+    if wait == .none && tx?.isNone && (txStatus (← c.env.get) hash withReceipts).isNone then
+      return .error (unknownTransaction hash)
     let r ←
       poll
           (do
@@ -431,9 +436,13 @@ def broadcastAsync (c : Ctx) (params : Json) : IO R := do
       | some x => parseSignedTx x
       | none => throw "missing field `signed_tx_base64`"
     | _ => throw "invalid type, expected a transaction"
-  match liftParse parsed with
-  | .error e =>
-    return .error e
+  let marker := "the value could not decoded from borsh due to: "
+  match parsed with
+  | .error m =>
+    if m.startsWith marker then
+      return .error (RpcError.parse s!"Failed to decode transaction: {m.drop marker.length}")
+    else
+      return .error (RpcError.parse s!"Failed parsing args: {m}")
   | .ok t =>
     -- the transaction is handed to the node's loop; the answer does not wait for it
     let p ← IO.Promise.new

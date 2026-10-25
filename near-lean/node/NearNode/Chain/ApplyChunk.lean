@@ -63,6 +63,9 @@ structure ChunkResult where
   schedulerHash : ByteArray
   /-- The hashes of the chunk's transactions, in order. -/
   txHashes : Array ByteArray
+  /-- The yielded receipts the chunk stored (`promise_yield_create`), which no chunk sends: the RPC serves
+  them as the receipts of the outcomes they get later. -/
+  yielded : Array ByteArray := #[]
 
 private def bytesOf (l : List UInt8) : ByteArray :=
   ⟨l.toArray⟩
@@ -256,6 +259,14 @@ def runChunk (prof : Option Prof) (cfg : Wasm.Near.RuntimeConfig)
           | _ =>
             throw "an appended delayed receipt must be stored with its metadata"
         pure change
+  -- the yielded receipts this chunk created (they are not in the outgoing receipts)
+  let yielded : Array ByteArray :=
+    ((next.state.yieldReceipts.filter fun (k, _) =>
+            (snapshot.state.yieldReceipts.find? (·.1 == k)).isNone).filterMap
+        fun (_, receipt) =>
+        match Near.QueueEncoding.receiptBytes context catalogue receipt with
+        | .ok b => some (bytesOf b)
+        | .error _ => none).toArray
   let outcome ←
     timed prof "run/scheduler" fun _ =>
         ChainReplay.ShardChunk.finish congestion ctx.scheduler block.ap.shardId block.ap.blockHeight
@@ -316,7 +327,7 @@ def runChunk (prof : Option Prof) (cfg : Wasm.Near.RuntimeConfig)
             gasBurnt := result.outcomes.foldl (fun s (_, o) => s + o.gasBurnt) 0,
             balanceBurnt := result.tokensBurnt - result.subsidizedAmount, proposals,
             congestion := info, requests, delayedCount := next.state.delayed.length,
-            schedulerHash := bytesOf outcome.schedulerHash, txHashes }
+            schedulerHash := bytesOf outcome.schedulerHash, txHashes, yielded }
 
 /-- A chunk that is not new (`apply_old_chunk`): no transaction or receipt is applied, but the
 epoch's validator accounts update and the bandwidth scheduler still run

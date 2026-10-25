@@ -75,9 +75,9 @@ inductive QueryRequest where
 private def b64Field (o : Json) (k : String) : Except String ByteArray :=
   match field? o k with
   | some (.str s) =>
-    match base64Decode? s with
-    | some b => pure b
-    | none => throw s!"the value could not decoded from base64 due to: Invalid byte, offset 0."
+    match base64Decode s with
+    | .ok b => pure b
+    | .error why => throw why
   | _ => throw s!"missing field `{k}`"
 
 private def accountField (o : Json) : Except String AccountId :=
@@ -147,7 +147,9 @@ private def vmErrorText (e : Wasm.Near.FunctionCallError) : String :=
     | .wasmTrap .genericTrap => "WasmTrap(GenericTrap)"
     | .hostError .gasExceeded => "HostError(GasExceeded)"
     | .hostError .gasLimitExceeded => "HostError(GasLimitExceeded)"
-    | .hostError (.guestPanic m) => s!"HostError(GuestPanic \{ panic_msg: {repr m} })"
+    | .hostError (.prohibitedInView m) =>
+      s!"HostError(ProhibitedInView \{ method_name: {stringDebug m} })"
+    | .hostError (.guestPanic m) => s!"HostError(GuestPanic \{ panic_msg: {stringDebug m} })"
     | other => other.message
   s!"wasm execution failed with error: {debug}"
 
@@ -167,16 +169,24 @@ def callFunction (c : Ctx) (s : VState) (view : StateAt) (b : BlockRec) (a : Acc
       | .v2 _ _ _ (.global h) => some (.globalContractCode (.codeHash h))
       | .v2 _ _ _ (.globalByAccount id) => some (.globalContractCode (.accountId id))
       | .v2 _ _ _ .none => none
-    let noCode : RpcError :=
+    let _noCode : RpcError :=
       RpcError.handler "NO_CONTRACT_CODE"
         (some (Json.mkObj ([("contract_account_id", jacc a)] ++ blockInfo b)))
         (Json.str s!"Contract code for contract ID #{a.val} has never been observed on the node")
+    let compilation : R :=
+      .ok
+        (Json.mkObj
+          ([("error",
+                Json.str
+                  s!"wasm execution failed with error: CompilationError(CodeDoesNotExist \{ account_id: {stringDebug a.val} })"),
+              ("logs", Json.arr #[])] ++
+            blockInfo b))
     match codeKey with
-    | none => .error noCode
+    | none => compilation
     | some key =>
       match view.get key with
       | .error m => .error (internalError m)
-      | .ok none => .error noCode
+      | .ok none => compilation
       | .ok (some blob) =>
         match (Apply.code blob).run {} with
         | .error m => .error (internalError m)
@@ -230,7 +240,7 @@ def query (c : Ctx) (params : Json) : IO R := do
       throw "invalid type: null, expected string or map"
     | _ =>
       throw "invalid type, expected a map"
-    let ref ← parseBlockRef params
+    let ref ← parseBlockRef params (flattened := true)
     pure (ref, ← parseRequest params)
   match liftParse parsed with
   | .error e =>
@@ -290,23 +300,17 @@ def query (c : Ctx) (params : Json) : IO R := do
             [("error", Json.str s!"access key {k.toText} does not exist while viewing"),
               ("logs", Json.arr #[])]
     | .accessKeys a =>
-      match view.account a with
+      match view.accessKeys a with
       | .error m =>
         return .error (internalError m)
-      | .ok none =>
-        return .error (unknownAccount b a)
-      | .ok (some _) =>
-        match view.accessKeys a with
-        | .error m =>
-          return .error (internalError m)
-        | .ok keys =>
-          withBlock b
-                [("keys",
-                    jarr
-                      (fun (kk : PublicKey × AccessKey) =>
-                        Json.mkObj [("public_key", jkey kk.1), ("access_key", accessKeyView kk.2)])
-                      keys)] |>
-              pure
+      | .ok keys =>
+        withBlock b
+              [("keys",
+                  jarr
+                    (fun (kk : PublicKey × AccessKey) =>
+                      Json.mkObj [("public_key", jkey kk.1), ("access_key", accessKeyView kk.2)])
+                    keys)] |>
+            pure
     | .state a p after limit _ =>
       match view.account a with
       | .error m =>
