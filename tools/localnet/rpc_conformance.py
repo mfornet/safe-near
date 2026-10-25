@@ -102,7 +102,10 @@ def wait_for(predicate, timeout, what, step=0.5):
     raise TimeoutError(f"{what} ({last})")
 
 
-GC_EPOCHS: list[int] = []     # --gc-epochs-to-keep for the Lean node, when --gc-epochs is given
+# --gc-epochs-to-keep of the Lean node.  `localnet.py` gives neard `gc_num_epochs_to_keep = 10000` (the whole history is kept
+# for the exporter), and the requests ask for blocks and transactions of the first epochs, so the Lean node keeps them too;
+# the default window of 5 epochs would answer UNKNOWN_BLOCK where neard answers (that is what the collection is for).
+GC_EPOCHS: list[int] = [10_000]
 
 
 def lean_extra(home: Path) -> list[str]:
@@ -627,7 +630,7 @@ def main() -> None:
     parser.add_argument("--gc-epochs", type=int, default=None, help="--gc-epochs-to-keep of the Lean node (default: its own)")
     options = parser.parse_args()
     if options.gc_epochs is not None:
-        GC_EPOCHS.append(options.gc_epochs)
+        GC_EPOCHS[:] = [options.gc_epochs]
     options.work.mkdir(parents=True, exist_ok=True)
     (options.work / "serve-stop").unlink(missing_ok=True)
     if options.mode == "serve":

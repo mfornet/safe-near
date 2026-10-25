@@ -1425,7 +1425,7 @@ reached the head after 8.3 s, peak lag 5, caught up 6.0 s after the burst (limit
 peak 4, caught up in 5.9 s, 4001 state roots equal; no disconnect on either.
 
 **Not done, doubts.** (The soak used to leave out `sanity_check`, the call that deploys contract code from the memory of a
-contract; closed by H1 below.) The RSS slope is not flat: the node keeps the trie nodes of its history in memory (the store tables), so memory grows with
+contract; closed by H1 below.) (Closed by H3 below.) The RSS slope is not flat: the node keeps the trie nodes of its history in memory (the store tables), so memory grows with
 the chain (about 3 MB per 100 blocks of this workload); a longer soak needs garbage collection of old state. `encode-state` is still
 quadratic in the number of entries. The generator of the differential test covers the integer and control instructions and the
 host functions much better than floating point; the engine hands tables, references and `memory.init` back to the specification, so
@@ -1545,6 +1545,22 @@ have no trie changes to take back; state parts, the state-transition data and th
 store's log still grows between compactions (55 MB per hour of this workload at the 64 MiB limit) and the compaction rewrites it
 from memory; a disk-resident tier is still not there. Contract code (`CodeCache.byLabel`) is not collected: it grows with the
 distinct contracts deployed, not with the height.
+
+##### Acceptance of the hardening (one run of each, on the final build)
+
+| Run | Result |
+|---|---|
+| `soak.py`, 3595 s, full workload (`sanity_check` included, no `--no-deploy-from-memory`), default window of 5 epochs | head 3 to 5768, final 5766; 5840 of 5840 block hashes and 5747 of 5747 state roots equal, no orphan; head minus final at most 10, no window without finality; lag at most 2 outside bursts, 1 inside (10 light bursts), median 0; no disconnect, RPC answered at all 714 samples; Lean produced 3406 blocks and 3381 chunks (659 transactions), 2381 witnesses of neard valid, 0 invalid; longest turn of the loop 157 ms; 5642 heights collected; **RSS 167.8 MB after warm-up to 180.8 MB, peak 211.4 MB, slope 11.6 MB/h** (111 MB/h before) |
+| `validator_accept.py` (1) | ok: 365 blocks applied, 363 same hash and 2 orphans neard holds, 361 of 361 roots, 537 of 537 outcomes equal, 129 transactions in 50 Lean chunks, 167 witnesses valid, stall test stalled and resumed |
+| `validator_accept.py` (2) | ok: 365 applied, 364 same hash and 1 orphan, 359 of 359 roots, 531 of 531 outcomes, 119 transactions in 42 chunks, 157 witnesses valid, stall test ok |
+| `follow_accept.py --lightburst --topologies single sharded` | single: head reached after 7.3 s, max lag 8, 1001 of 1001 roots, caught up after the burst; sharded: 7.2 s, max lag 6, 4003 of 4003 roots, caught up; no disconnect; `localnet-follow: all agree` |
+| `rpc_conformance.py run` | 491 of 491 requests equal (block 79, chunk 63, tx 150, query 114, ...); the three transactions through the Lean RPC landed; SIGKILL at final height 335, back in 8.5 s, final 343 on both |
+
+In the `validator_accept.py` runs the longest turn of the loop is the 12 s pause the test imposes with SIGSTOP; the outcomes
+check lists a few `408` answers of neard's `EXPERIMENTAL_tx_status` for transactions of the last blocks, which cannot be final
+once the Lean node (half the stake) has been stopped, and does not count them. `rpc_conformance.py` starts the Lean node with
+`--gc-epochs-to-keep 10000`, as `localnet.py` configures neard (`gc_num_epochs_to_keep`), because its requests ask for the first
+epochs; the node does not yet read that key from `config.json` (`--home`).
 
 ## Open points
 
