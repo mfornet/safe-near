@@ -18,7 +18,7 @@ def usage : String :=
     "           [--listen PORT] [--store DIR] [--no-apply] [--seconds N] [--follow N] [--drain N]\n" ++
     "           [--applied-log FILE] [--report FILE] [--configs DIR] [--quiet]\n" ++
     "           [--sync-mode blocks|state|auto] [--track-shards ID,ID,...] [--public-addr IP:PORT]\n" ++
-    "           [--lag-log FILE] [--reach-lag N] [--profile]"
+    "           [--lag-log FILE] [--reach-lag N] [--profile] [--save-state DIR]"
 
 /-- The value after a flag. -/
 private def flagValue (args : List String) (flag : String) : Option String :=
@@ -65,7 +65,8 @@ def peerCommand (args : List String) : IO UInt32 := do
       ((t.splitOn ",").filterMap String.toNat?).toArray.map (·.toUInt64)
   run
       { mode, tracked := tracked?, publicAddr := (flagValue args "--public-addr").bind Addr.parse?,
-        lagLog := flagValue args "--lag-log", profile := args.contains "--profile",
+        lagLog := flagValue args "--lag-log", saveState := flagValue args "--save-state",
+        profile := args.contains "--profile",
         reachLag := ((flagValue args "--reach-lag").bind String.toNat?).getD 5, chainDir, keyFile,
         peers := peers.toArray, configs := (flagValue args "--configs").getD "near-lean/vm/configs",
         listen := (flagValue args "--listen").bind String.toNat? |>.map (·.toUInt16),

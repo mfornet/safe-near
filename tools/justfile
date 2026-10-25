@@ -31,7 +31,7 @@ crypto-tests: crypto-build
 
 # Build the NEAR node (notes/design/NEAR_NODE.md) and its executables.
 node-build:
-    cd near-lean/node && lake build NearNode near-lean-node node-bench node-conformance-types node-conformance-network node-conformance-sync node-trie-tests node-store-tests node-state-roots node-chain-validate node-chain-apply --wfail
+    cd near-lean/node && lake build NearNode near-lean-node node-bench node-conformance-types node-conformance-network node-conformance-sync node-sync-tests node-trie-tests node-store-tests node-state-roots node-chain-validate node-chain-apply --wfail
 
 # M1: the Borsh codecs of every near-primitives type against the committed nearcore oracle fixtures.
 [positional-arguments]
@@ -54,6 +54,10 @@ node-conformance-sync *options: node-build
 # checkout of `tools/localnet/build.py` and a Rust toolchain; CI never builds it).
 node-sync-oracle:
     cd tools/node-conformance/native-trie && cargo run --release --bin state_sync_oracle -- ../../../near-lean/node/fixtures/state-sync
+
+# M7: header sync, the sync block and the refusal of changed headers and bodies, on the in-memory network.
+node-sync-tests: node-build
+    python3 tools/localnet/sync_tests.py
 
 # M4: the trie Impl against the Spec (NearInterface.TrieConstruction) on seeded random entry sets and
 # updates; the optional argument is the number of cases.

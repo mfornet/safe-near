@@ -5,7 +5,7 @@
 # verification never builds it (`just node-isolation`).
 name = "NearNode"
 version = "0.1.0"
-defaultTargets = ["NearNode", "near-lean-node", "node-conformance-types", "node-conformance-network", "node-conformance-sync", "node-trie-tests", "node-store-tests", "node-net-tests", "node-handshake-tests", "node-state-roots", "node-chain-validate", "node-chain-apply"]
+defaultTargets = ["NearNode", "near-lean-node", "node-conformance-types", "node-conformance-network", "node-conformance-sync", "node-trie-tests", "node-store-tests", "node-net-tests", "node-handshake-tests", "node-sync-tests", "node-state-roots", "node-chain-validate", "node-chain-apply"]
 packagesDir = "../.lake/packages"
 
 [[require]]
@@ -66,6 +66,11 @@ root = "NodeTests.NetTests"
 [[lean_exe]]
 name = "node-handshake-tests"
 root = "NodeTests.HandshakeTests"
+
+# `lake exe node-sync-tests DIR`: header sync and the sync block, a client and a server on the in-memory network.
+[[lean_exe]]
+name = "node-sync-tests"
+root = "NodeTests.SyncTests"
 
 # `lake exe node-state-roots DIR`: the state roots of the M3 corpus through the trie.
 [[lean_exe]]

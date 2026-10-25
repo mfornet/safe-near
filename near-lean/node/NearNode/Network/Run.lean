@@ -45,6 +45,8 @@ structure Options where
   lagLog : Option System.FilePath := none
   /-- Time the stages of chunk application and report them. -/
   profile : Bool := false
+  /-- Keep the state sync headers and block headers here, for tests. -/
+  saveState : Option System.FilePath := none
   /-- The node has reached the head when the applied height is within this many blocks of the peer's. -/
   reachLag : Nat := 5
 

@@ -107,6 +107,11 @@ structure DriverConfig where
   retryMs : Nat := 4000
   /-- Milliseconds before a state header or part is asked for again. -/
   stateRetryMs : Nat := 5000
+  /-- A directory to keep what a state sync receives in (the headers and the block headers around them),
+  for the tests of the header checks. -/
+  saveDir : Option System.FilePath := none
+  /-- Block requests per second (`BlockRequest` is limited to 10 a second by a nearcore peer). -/
+  blockRate : Nat := 8
   /-- In `auto` mode the head must be this many epochs from the genesis for a state sync. -/
   autoEpochs : Nat := 3
 
@@ -222,6 +227,9 @@ def Driver.new (cfg : DriverConfig) (shared : Shared) (st : Near.Node.Chain.Chai
         { st, children, cursor := if cfg.mode == .blocks then some st.head else none,
           startHeight := st.headHeight, bodyTipHeight := st.headHeight : DriverState }
   pure { cfg, shared, state, outbox, inbox := ← IO.mkRef #[], clock }
+
+private def toHexString (b : ByteArray) : String :=
+  b.foldl (fun s x => s ++ String.ofList (Nat.toDigits 16 (x.toNat + 256)).tail) ""
 
 private def Driver.send (d : Driver) (m : PeerMessage) : IO Unit :=
   d.outbox.modify (·.push m)
@@ -438,6 +446,17 @@ private def Driver.stateStep (d : Driver) (s : DriverState) (now : Nat) : IO Dri
           tables := Store.Tables.apply tables (.rcAdd .state (Store.stateKey key h) data rc.toNat)
       starts := starts.insert shard start
     d.shared.install.set (some { tables, starts })
+    if let some dir := d.cfg.saveDir then
+      -- the block headers a header check reads, and what is needed to rebuild the chain around them
+      let h := blockRec.view.height
+      let mut lines : Array String := #[]
+      for (_, r) in s.st.blocks.toList do
+        if r.hash != CryptoHash.zero && r.view.height + 120 ≥ h && r.view.height ≤ h then
+          lines := lines.push (toHexString (Codec.encode r.header))
+      IO.FS.writeFile (dir / "headers.txt") ("\n".intercalate lines.toList ++ "\n")
+      IO.FS.writeFile (dir / "layout.hex") (toHexString (Codec.encode layout))
+      IO.FS.writeFile (dir / "sync.txt")
+          s!"{toHexString sync.hash.bytes} {"".intercalate (sync.shards.toList.map (s!"{·} "))}"
     sync :=
       { sync with
         done := true, doneAt := ms }
@@ -465,6 +484,9 @@ private def Driver.onStateInfo (d : Driver) (s : DriverState) (info : StateRespo
     match validateStateHeader s.st sync.hash shard header with
     | .ok start =>
       sync := { sync with headers := sync.headers.insert shard start }
+      if let some dir := d.cfg.saveDir then
+        IO.FS.createDirAll dir
+        IO.FS.writeBinFile (dir / s!"header-{shard}.bin") (Codec.encode header)
     | .error e =>
       sync := { sync with refused := sync.refused + 1 }
       d.shared.fail s!"shard {shard}: {e}"
@@ -620,11 +642,11 @@ def Driver.tick (d : Driver) : IO Unit := do
   -- blocks along the chain from the cursor, and the ones asked for by hash
   let applied ← d.shared.applied.get
   let waiting := if d.cfg.apply then (s.bodyTipHeight - applied).toNat else 0
-  let refill := (ms - s.lastRefill) * 8 / 1000
+  let refill := (ms - s.lastRefill) * d.cfg.blockRate / 1000
   if refill > 0 then
     s :=
       { s with
-        tokens := Nat.min 8 (s.tokens + refill), lastRefill := ms }
+        tokens := Nat.min d.cfg.blockRate (s.tokens + refill), lastRefill := ms }
   if waiting < d.cfg.ahead then
     let mut ask : Array CryptoHash := s.wanted.filter fun h => !s.st.hasBodyOf h
     if let some cur := s.cursor then

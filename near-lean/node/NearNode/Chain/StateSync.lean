@@ -109,9 +109,8 @@ def validateStateHeader (st : Near.Node.Chain.ChainState) (syncHash : CryptoHash
     let roots := h.rootProofs[i]!
     unless response.proofs.size == roots.size do
       fail' "the proofs of the incoming receipts do not match them"
-    unless block.hasBody do
-      fail' "the body of a block with incoming receipts is not known"
-    unless response.proofs.size == (block.chunks.filter (·.isNewChunk block.view.height)).size do
+    let included := block.view.chunkMask.foldl (fun n new => if new then n + 1 else n) 0
+    unless response.proofs.size == included do
       fail' "a block's incoming receipts are not one proof per chunk it included"
     let mut seen : Array ShardId := #[]
     let mut receipts : Array ByteArray := #[]
