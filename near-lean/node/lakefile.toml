@@ -81,3 +81,7 @@ root = "NodeConformance.ChainValidate"
 [[lean_exe]]
 name = "node-chain-apply"
 root = "NodeConformance.ChainApply"
+
+[[lean_exe]]
+name = "node-probe"
+root = "NodeConformance.Probe"

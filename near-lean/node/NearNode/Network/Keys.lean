@@ -50,13 +50,13 @@ def base58Encode (b : ByteArray) : String :=
     return String.ofList (List.replicate zeros '1' ++ out)
 
 /-- `ed25519:` and the base58 of the key bytes. -/
-def PublicKey.toText : PublicKey → String
+def _root_.Near.Node.PublicKey.toText : PublicKey → String
   | .ed25519 k => "ed25519:" ++ base58Encode k
   | .secp256k1 k => "secp256k1:" ++ base58Encode k
   | .mldsa65 k => "mldsa65:" ++ base58Encode k
 
 /-- Parses `ed25519:<base58>`; other key types are not node keys. -/
-def PublicKey.parse? (s : String) : Option PublicKey := do
+def _root_.Near.Node.PublicKey.parse? (s : String) : Option PublicKey := do
   let body ← s.dropPrefix? "ed25519:"
   let k ← base58Decode? body.toString
   if k.size == 32 then

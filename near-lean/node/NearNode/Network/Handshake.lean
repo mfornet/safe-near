@@ -73,6 +73,25 @@ inductive HandshakeError where
   | closed (what : String)
   deriving BEq, Inhabited
 
+/-- A line for a log. -/
+def HandshakeError.describe : HandshakeError → String
+  | .protocolVersion v => s!"the peer answered with protocol version {v}"
+  | .genesis => "the peer is on another chain"
+  | .peerId => "the peer is not the one expected"
+  | .tier => "the peer answered for another tier"
+  | .nonce => "the peer answered for another nonce"
+  | .badNonce => "the nonce is not within 20 minutes of the clock"
+  | .invalidEdge => "the edge is not signed by both"
+  | .ownedAccountSignature => "the owned account is not signed by its key"
+  | .ownedAccountMismatch => "the owned account belongs to another peer"
+  | .clockSkew => "the owned account is signed too long ago"
+  | .failure (.protocolVersionMismatch v o) =>
+    s!"the peer refused the version (it speaks {v}, oldest {o})"
+  | .failure (.genesisMismatch g) => s!"the peer is on chain {g.chainId}, another genesis"
+  | .failure .invalidTarget => "the peer is not the one addressed"
+  | .invalidLastEdge => "the peer showed an edge that is not valid"
+  | .closed w => w
+
 /-- The handshake message of a tier. -/
 def Tier.message : Tier → Handshake → PeerMessage
   | .t1, h => .tier1Handshake h
