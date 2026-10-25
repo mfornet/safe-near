@@ -38,6 +38,14 @@ structure ChunkContext where
   /-- The scheduler's view of the network (`ChainReplay.ShardChunk.Input`). -/
   scheduler : ChainReplay.ShardChunk.Input
 
+/-- The failure of an outcome: the runtime's model says that the execution failed (and why, in its own words), and
+the outcome root only depends on that (`PartialExecutionStatus::Failure`). The `TxExecutionError` tree of nearcore
+(which action failed and with what) is not reproduced; this value stands for it and survives a round trip through
+Borsh, unlike `default` (whose account id is empty). -/
+def placeholderFailure : TxExecutionError :=
+  .actionError
+    ⟨none, .functionCallError (.executionError "the failure is not detailed by the node")⟩
+
 /-- What applying a chunk produced. -/
 structure ChunkResult where
   /-- The entries of the shard after the chunk. -/
@@ -277,7 +285,7 @@ def runChunk (prof : Option Prof) (cfg : Wasm.Near.RuntimeConfig)
           | .successReceiptId r =>
             pure (.successReceiptId (← native r))
           | .failure _ =>
-            pure (.failure default)
+            pure (.failure placeholderFailure)
         outcomes :=
           outcomes.push
             { id := identity,

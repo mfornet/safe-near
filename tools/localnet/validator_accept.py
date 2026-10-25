@@ -106,7 +106,8 @@ def prepare(work: Path) -> Path:
     return home
 
 
-def start_lean(home: Path, work: Path, seconds: int, binary: Path) -> subprocess.Popen:
+def start_lean(home: Path, work: Path, seconds: int, binary: Path, extra: list[str] | None = None,
+               log_name: str = "lean.log") -> subprocess.Popen:
     boot_key = json.loads((home / "node0/node_key.json").read_text())["public_key"]
     port = localnet.network_port(TOPOLOGY, 0)
     command = [str(binary), "validator", "--chain-dir", str(work),
@@ -114,7 +115,8 @@ def start_lean(home: Path, work: Path, seconds: int, binary: Path) -> subprocess
                "--boot", f"{boot_key}@127.0.0.1:{port}", "--listen", str(localnet.network_port(TOPOLOGY, 1)),
                "--seconds", str(seconds), "--report", str(work / "report.json"),
                "--applied-log", str(work / "applied.jsonl"), "--stop-file", str(work / "stop"), "--configs", str(ROOT / "near-lean/vm/configs")]
-    log = (work / "lean.log").open("w")
+    command += extra or []
+    log = (work / log_name).open("a" if log_name != "lean.log" else "w")
     return subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, cwd=ROOT, start_new_session=True)
 
 

@@ -1,5 +1,6 @@
 import Lean.Data.Json
 import NearNode.Validator.Follow
+import NearNode.Validator.Persist
 
 /-!
 # Driving the validator
@@ -73,7 +74,7 @@ def Env.applyOne (e : Env) (b : Block) : IO Bool := do
       e.failure.modify fun f =>
           f.orElse fun _ => some s!"block {v.height}: applying the chunks failed: {m}"
       return false
-    | .ok (pr, reports, _) =>
+    | .ok (pr, reports, chunkOps) =>
       e.state.modify fun s =>
           let delivered :=
             reports.foldl (fun m r => m.insert (hash.bytes, r.shard) r.incoming) s.deliveredAt
@@ -81,6 +82,18 @@ def Env.applyOne (e : Env) (b : Block) : IO Bool := do
             pr, applied := s.applied.insert hash.bytes v.height,
             pending := s.pending.filter (· != hash), deliveredAt := delivered }
       e.bump "blocksApplied"
+      -- the block, its chunks and what the RPC serves of it go to the store in one commit
+      let s1 ← e.get
+      let (extraOps, s2) := appliedOps s1 b reports
+      match commitOps s1.st b (s1.finalized[hash.bytes]?) chunkOps with
+      | .ok ops =>
+        e.commit (ops ++ extraOps)
+      | .error m =>
+        e.failure.modify fun f => f.orElse fun _ => some s!"block {v.height}: {m}"
+      e.state.modify fun s =>
+          { s with
+            outcomes := s2.outcomes, txIndex := s2.txIndex, receiptsById := s2.receiptsById,
+            finalized := s.finalized.erase hash.bytes }
       if let some h := e.appliedLog then
         let hex (b : ByteArray) : String :=
           b.foldl (fun s x => s ++ String.ofList (Nat.toDigits 16 (x.toNat + 256)).tail) ""
@@ -157,7 +170,8 @@ def Env.onApplied (e : Env) (b : Block) : IO Unit := do
     let now ← e.nowMs
     e.state.modify fun s =>
         { s with
-          ds := s.ds.setTip hash v.height lastFinal now, tip := hash, tipHeight := v.height }
+          ds := s.ds.setTip hash v.height lastFinal now, tip := hash, tipHeight := v.height,
+          canon := s.canonWith hash v.height }
     e.produceChunks b
   e.dropIncluded b
   let s ← e.get
@@ -222,7 +236,11 @@ partial def Env.ingestBlock (e : Env) (b : Block) : IO Unit := do
     e.state.modify fun s =>
         { s with
           st := st', blocks := s.blocks.insert h.bytes b, pending := s.pending.push h,
-          latestKnown := max s.latestKnown v.height }
+          latestKnown := max s.latestKnown v.height,
+          finalized :=
+            match fin with
+            | some f => s.finalized.insert h.bytes f
+            | none => s.finalized }
     for c in newChunksOf b do
       e.noteHeader c
       e.state.modify fun s => s.withChunk c.chunkHash fun x => { x with verified := true }
@@ -351,6 +369,8 @@ def Env.produceBlock (e : Env) (height : BlockHeight) : IO Unit := do
     | .error m =>
       e.log s!"block {height} not produced: {m}"
     | .ok blk =>
+      -- a block is never produced twice for a height, not after a restart either
+      e.commit #[.set .blockMisc lastProducedBlockKey (u64Bytes height)]
       e.state.modify fun s => { s with latestKnown := max s.latestKnown height }
       e.outbox.modify (·.push (.block blk))
       e.bump "blocksProduced"
@@ -415,14 +435,6 @@ def Env.onChunkResponse (e : Env) (r : PartialEncodedChunkResponseMsg) : IO Bool
 
 /-! ### Transactions -/
 
-/-- What `process_tx` answers (`ProcessTxResponse`). -/
-inductive TxVerdict where
-  | valid
-  | invalid (reason : String)
-  | routed
-  | noResponse
-  deriving BEq, Repr
-
 /-- Whether `me` is one of the chunk producers of `shard` in `epoch` (`get_epoch_chunk_producers_for_shard`). -/
 def Env.producesShard (e : Env) (s : VState) (epoch : EpochId) (shard : ShardId) : Bool :=
   match s.st.epoch epoch with
@@ -463,10 +475,11 @@ def Env.processTx (e : Env) (t : SignedTransaction) (forwarded : Bool) : IO TxVe
   let s ← e.get
   match lift (s.st.epochIdFromPrevBlock s.tip) with
   | .error m =>
-    return .invalid m
+    return .invalid (.state m)
   | .ok epoch =>
     let some layout := (s.st.epoch epoch).toOption.map (·.layout) | return .noResponse
-    let some shard := layout.accountIdToShardId t.transaction.signerId | return .invalid "shard"
+    let some shard :=
+      layout.accountIdToShardId t.transaction.signerId | return .invalid (.state "shard")
     match e.txContext s s.tip shard with
     | .error _ =>
       -- the node has not caught up with its own tip
@@ -554,7 +567,7 @@ def Env.onRouted (e : Env) (m : RoutedMessage) : IO Unit := do
         match ← e.processTx t true with
         | .invalid why =>
           e.bump "ForwardTxInvalid"
-          e.log s!"forwarded transaction {base58Encode t.hash.bytes} refused: {why}"
+          e.log s!"forwarded transaction {base58Encode t.hash.bytes} refused: {why.describe}"
         | _ =>
           pure ()
         pure false
@@ -565,13 +578,24 @@ def Env.onRouted (e : Env) (m : RoutedMessage) : IO Unit := do
   if changed then
     e.tryApply
 
+/-- The transactions the RPC handed over (`ProcessTxRequest`): each is processed and its sender answered. -/
+def Env.drainTxQueue (e : Env) : IO Unit := do
+  let queue ← e.txQueue.modifyGet fun q => (q, #[])
+  for (t, promise) in queue do
+    let verdict ← e.processTx t false
+    promise.resolve verdict
+
 /-- One step: the timer, the production of blocks, the blocks that can be applied. -/
 def Env.tick (e : Env) : IO Unit := do
   if (← e.failure.get).isSome then
     return
+  e.drainTxQueue
   let now ← e.nowMs
   let s ← e.get
   let (ds, approvals) := s.ds.processTimer now (some e.signer)
+  -- the largest target height is stored before any approval for it is sent (`save_largest_target_height`)
+  if ds.largestTargetHeight != s.ds.largestTargetHeight then
+    e.commit #[.set .blockMisc largestTargetKey (u64Bytes ds.largestTargetHeight)]
   e.state.modify fun s => { s with ds }
   for a in approvals do
     e.sendApproval a

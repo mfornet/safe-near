@@ -22,6 +22,7 @@ def usage : String :=
     "           [--lag-log FILE] [--reach-lag N] [--profile] [--save-state DIR]\n" ++
     "       near-lean-node validator --chain-dir DIR --node-key FILE --validator-key FILE --boot PEERID@IP:PORT\n" ++
     "           [--listen PORT] [--seconds N] [--report FILE] [--applied-log FILE] [--stop-file FILE] [--configs DIR] [--quiet]\n" ++
+    "           [--rpc-addr IP:PORT] [--genesis-config FILE] [--store DIR]\n" ++
     "           [--delays ENDORSEMENT,BASE,CAP]"
 
 /-- The value after a flag. -/
@@ -94,13 +95,18 @@ def validatorCommand (args : List String) : IO UInt32 := do
   let some peer := (flagValues args "--boot").filterMap parsePeer |>.head? |
     IO.eprintln "--boot PEERID@IP:PORT is required"
     return 2
-  let delays := ((flagValue args "--delays").map fun t => (t.splitOn ",").filterMap String.toNat?).getD []
+  let delays :=
+    ((flagValue args "--delays").map fun t => (t.splitOn ",").filterMap String.toNat?).getD []
   let opts : Validator.Options :=
-    { chainDir, nodeKey, validatorKey, peer, configs := (flagValue args "--configs").getD "near-lean/vm/configs",
+    { chainDir, nodeKey, validatorKey, peer,
+      configs := (flagValue args "--configs").getD "near-lean/vm/configs",
       listen := (flagValue args "--listen").bind String.toNat? |>.map (·.toUInt16),
-      seconds := (flagValue args "--seconds").bind String.toNat?, report := flagValue args "--report",
-      appliedLog := flagValue args "--applied-log", stopFile := flagValue args "--stop-file", quiet := args.contains "--quiet",
-      endorsementDelay := delays.getD 0 600, baseDelay := delays.getD 1 2000, capDelay := delays.getD 2 6000 }
+      seconds := (flagValue args "--seconds").bind String.toNat?,
+      report := flagValue args "--report", appliedLog := flagValue args "--applied-log",
+      stopFile := flagValue args "--stop-file", quiet := args.contains "--quiet",
+      rpcAddr := (flagValue args "--rpc-addr").bind Addr.parse?, store := flagValue args "--store",
+      genesisConfig := flagValue args "--genesis-config", endorsementDelay := delays.getD 0 600,
+      baseDelay := delays.getD 1 2000, capDelay := delays.getD 2 6000 }
   Validator.run opts
 
 def main (args : List String) : IO UInt32 := do

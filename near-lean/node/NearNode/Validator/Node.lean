@@ -1,4 +1,5 @@
 import NearNode.Validator.State
+import NearNode.Validator.Prepare
 import NearNode.Validator.WitnessMake
 import NearNode.Validator.Wire
 import NearNode.Validator.Witness
@@ -6,6 +7,7 @@ import NearNode.Validator.Messages
 import NearNode.Epoch
 import NearNode.Network.Peer
 import NearNode.Network.Node
+import NearNode.Store
 
 /-!
 # The validator
@@ -45,6 +47,10 @@ structure Env where
   /-- `transaction_validity_period` of the genesis. -/
   validityPeriod : Nat := 86400
   state : IO.Ref VState
+  /-- Transactions from the RPC, taken up by the loop (the pool is touched there only). -/
+  txQueue : IO.Ref (Array (SignedTransaction × IO.Promise TxVerdict))
+  /-- The chain store (none: the node keeps nothing across a restart). -/
+  store : Option Store.Store := none
   outbox : IO.Ref (Array PeerMessage)
   /-- The first thing that went wrong that the node cannot go on after. -/
   failure : IO.Ref (Option String)
@@ -70,6 +76,15 @@ def wallSeconds : IO Nat := do
 
 def Env.get (e : Env) : IO VState :=
   e.state.get
+
+/-- Commits `ops` to the store before returning (`Store.commit` has written and flushed the record). -/
+def Env.commit (e : Env) (ops : Array Store.Op) : IO Unit := do
+  if let some s := e.store then
+    unless ops.isEmpty do
+      try
+        discard <| s.commit ops
+      catch err =>
+        e.failure.modify fun f => f.orElse fun _ => some s!"the store failed: {err}"
 
 def Env.bumpBy (e : Env) (name : String) (n : Nat) : IO Unit :=
   e.state.modify fun s => { s with stats := s.stats.insert name (s.stats.getD name 0 + n) }

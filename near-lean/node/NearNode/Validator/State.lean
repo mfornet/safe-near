@@ -44,6 +44,15 @@ structure WitnessEntry where
   done : Bool := false
   deriving Inhabited
 
+/-- An execution outcome as the store keeps it (`ExecutionOutcomeWithProof` and the block it was produced
+in): the path of its leaf in the outcome tree of the shard's chunk. -/
+structure OutcomeRec where
+  block : CryptoHash
+  shard : UInt64
+  proof : Array MerklePathItem
+  outcome : ExecutionOutcomeWithId
+  deriving Inhabited
+
 /-- Everything the validator keeps. -/
 structure VState where
   st : CS
@@ -76,10 +85,46 @@ structure VState where
   producedChunks : Std.HashSet (UInt64 × UInt64) := {}
   /-- Approvals whose parent block is not known yet. -/
   parkedApprovals : Array Approval := #[]
+  /-- The applied blocks of the chain of the tip, by height. -/
+  canon : Std.HashMap UInt64 ByteArray := {}
+  /-- Execution outcomes by transaction hash or receipt id. -/
+  outcomes : Std.HashMap ByteArray OutcomeRec := {}
+  /-- The applied transactions by hash: the block and the chunk that included them. -/
+  txIndex : Std.HashMap ByteArray (CryptoHash × ChunkHash) := {}
+  /-- The receipts of the chunks applied, by receipt id (`DBCol::Receipts`). -/
+  receiptsById : Std.HashMap ByteArray Receipt := {}
+  /-- Epochs the accepted blocks finalized, until the block is applied and stored. -/
+  finalized : Std.HashMap ByteArray Epoch.Finalized := {}
   /-- The transaction pool of each shard the node produces chunks for. -/
   pools : Std.HashMap UInt64 Pool := {}
   /-- Counters for the report. -/
   stats : Std.HashMap String Nat := {}
+
+/-- The height index after `hash` at `height` became the tip: the heights above are dropped and the
+chain is followed back until it meets the index again. -/
+def VState.canonWith (s : VState) (hash : CryptoHash) (height : BlockHeight) :
+    Std.HashMap UInt64 ByteArray :=
+  Id.run do
+    let mut canon := s.canon
+    -- a block that is not above the old tip replaced a fork
+    if height ≤ s.tipHeight then
+      for h in [height.toNat:s.tipHeight.toNat + 1] do
+        canon := canon.erase h.toUInt64
+    let mut cur := hash
+    let mut h := height
+    for _ in [0:100000] do
+      if canon[h]? == some cur.bytes then
+        break
+      canon := canon.insert h cur.bytes
+      match s.st.block cur with
+      | .ok r =>
+        if h == 0 || r.view.prevHash == CryptoHash.zero then
+          break
+        cur := r.view.prevHash
+        h := r.view.prevHeight
+      | .error _ =>
+        break
+    return canon
 
 def VState.bump (s : VState) (name : String) : VState :=
   { s with stats := s.stats.insert name (s.stats.getD name 0 + 1) }

@@ -1,5 +1,6 @@
 import NearNode.Validator.Endorse
 import NearNode.Validator.Prepare
+import NearNode.Validator.Persist
 
 /-!
 # Following the chain and producing chunks
@@ -171,6 +172,7 @@ def Env.produceChunk (e : Env) (b : Block) (shard : ShardId) : IO Unit := do
         {}
     let body : TransactionReceipt := ⟨c.txs, c.outgoing⟩
     let now ← e.nowMs
+    e.commit #[.set .blockMisc (producedChunkKey (v.height + 1) shard) ByteArray.empty]
     e.state.modify fun s =>
         let s :=
           s.withChunk header.chunkHash fun x =>

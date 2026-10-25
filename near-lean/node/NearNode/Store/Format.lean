@@ -48,6 +48,16 @@ inductive Col where
   | outgoingReceipts
   /-- The receipts a block delivers to a shard, by block hash and shard (`DBCol::IncomingReceipts`). -/
   | incomingReceipts
+  /-- The bodies of the chunks blocks included, by chunk hash (`DBCol::Chunks`). -/
+  | chunkBody
+  /-- Execution outcomes with their proofs, by transaction hash or receipt id (`DBCol::TransactionResultForBlock`). -/
+  | outcome
+  /-- Receipts by receipt id (`DBCol::Receipts`). -/
+  | receipt
+  /-- The block and chunk that included a transaction, by transaction hash. -/
+  | txIndex
+  /-- The receipts a chunk applied at a block and shard, in order, by block hash and shard. -/
+  | delivered
   deriving BEq, Inhabited, Repr
 
 namespace Col
@@ -67,11 +77,16 @@ def id : Col → UInt8
   | .blockMerkleTree => 11
   | .outgoingReceipts => 12
   | .incomingReceipts => 13
+  | .chunkBody => 14
+  | .outcome => 15
+  | .receipt => 16
+  | .txIndex => 17
+  | .delivered => 18
 
 def all : List Col :=
   [.state, .flatState, .flatStateChanges, .flatStateDeltaMetadata, .flatStorageStatus, .blockMisc,
     .chunkExtra, .blockHeader, .block, .blockInfo, .epochInfo, .blockMerkleTree, .outgoingReceipts,
-    .incomingReceipts]
+    .incomingReceipts, .chunkBody, .outcome, .receipt, .txIndex, .delivered]
 
 def ofId? (n : UInt8) : Option Col :=
   all.find? (·.id == n)
