@@ -1,4 +1,5 @@
 import NearNode.Chain.ApplyChunk
+import NearNode.Chain.StateChanges
 import NearNode.Chain.Profile
 import NearNode.Epoch
 import NearNode.Trie
@@ -134,19 +135,24 @@ def trieEntries (src : NodeSource) (root : CryptoHash) :
       | some v => pure (k, v)
       | none => throw "trie value missing"
 
+/-- The entries that differ between the entries `old` and `new` of a shard: the new value, or `none` for an entry that is gone. -/
+def diffEntries (old new : Array (ByteArray × ByteArray)) : Array Change :=
+  let oldMap : Std.HashMap ByteArray ByteArray := old.foldl (fun m (k, v) => m.insert k v) {}
+  let newMap : Std.HashMap ByteArray ByteArray := new.foldl (fun m (k, v) => m.insert k v) {}
+  Id.run do
+    let mut changes : Array Change := #[]
+    for (k, v) in new do
+      if oldMap[k]? != some v then
+        changes := changes.push (k, some v)
+    for (k, _) in old do
+      if !newMap.contains k then
+        changes := changes.push (k, none)
+    return changes
+
 /-- The new root and changes that turn the entries `old` of the trie at `root` into `new`. -/
 def updateTrie (src : NodeSource) (root : CryptoHash) (old new : Array (ByteArray × ByteArray)) :
     Except String TrieChanges := do
-  let oldMap : Std.HashMap ByteArray ByteArray := old.foldl (fun m (k, v) => m.insert k v) {}
-  let newMap : Std.HashMap ByteArray ByteArray := new.foldl (fun m (k, v) => m.insert k v) {}
-  let mut changes : Array Change := #[]
-  for (k, v) in new do
-    if oldMap[k]? != some v then
-      changes := changes.push (k, some v)
-  for (k, _) in old do
-    if !newMap.contains k then
-      changes := changes.push (k, none)
-  pure (← update src root changes).changes
+  pure (← update src root (diffEntries old new)).changes
 
 /-! ### Receipts -/
 
@@ -430,7 +436,9 @@ def applyBlock (prof : Option Prof) (p : Params) (st : Near.Node.Chain.ChainStat
             timed prof "run/old-chunk" fun _ => runOldChunk p.cfg p.congestion ctx prepared
           let some (.v5 old) := prevExtra? | throw "no chunk extra before an old chunk"
           pure (entries, ChunkExtra.v5 old, #[], #[], #[])
-    let changes ← timed prof "trie-update" fun _ => updateTrie src root entries newEntries
+    let diff := diffEntries entries newEntries
+    let changes ← timed prof "trie-update" fun _ => do pure (← Near.Node.Trie.update src root diff).changes
+    let touched := touchedOf diff
     let extra : ChunkExtra :=
       match extra with
       | .v5 e => .v5 { e with stateRoot := changes.newRoot }
@@ -439,7 +447,9 @@ def applyBlock (prof : Option Prof) (p : Params) (st : Near.Node.Chain.ChainStat
       Store.trieInsertOps (shardKey layout shard) changes ++
         #[.set .chunkExtra (blockShardKey hash layout shard) (Codec.encode extra),
           .set .outgoingReceipts (blockShardKey hash layout shard) (Codec.encode outgoing),
-          .set .trieChanges (blockShardKey hash layout shard) (Store.changesBytes changes)]
+          .set .trieChanges (blockShardKey hash layout shard) (Store.changesBytes changes)] ++
+        (if touched.isEmpty then #[]
+        else #[.set .stateChanges (blockShardKey hash layout shard) (touchedBytes touched)])
     ops := ops ++ shardOps
     pr :=
       { pr with

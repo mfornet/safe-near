@@ -282,6 +282,49 @@ private def compactionCrash (seed : Nat) : IO Bool := do
   IO.FS.removeDirAll dir
   return ok
 
+/-- The ratio rule: the same keys are overwritten for ever (the live data stays at 200 values of 100 bytes). Without it the
+log grows with the number of commits; with it the files stay within a constant factor of the live data, the store
+compacts several times, and a restart finds the same content. -/
+private def ratioCompaction : IO Bool := do
+  let dir ← tempDir "ratio"
+  let fileBytes (d : System.FilePath) : IO Nat := do
+    let mut n := 0
+    for e in ← d.readDir do
+      if e.fileName != "LOCK" then
+        n := n + (← e.path.metadata).byteSize.toNat
+    return n
+  let write (s : Store) (round : Nat) : IO Unit := do
+    let ops := (Array.range 20).map fun i =>
+      Op.set .blockMisc s!"key{(round * 7 + i) % 200}".toUTF8 ⟨Array.replicate 100 (UInt8.ofNat round)⟩
+    discard <| s.commit ops
+  -- without the rule
+  let (plain, _) ← Store.open (dir / "plain")
+  for r in [0:3000] do
+    write plain r
+  let plainBytes ← fileBytes (dir / "plain")
+  plain.close
+  -- with it
+  let opts : Options := { minLog := 20000, logPercent := 100 }
+  let (s, _) ← Store.open (dir / "ratio") opts
+  let mut worst := 0
+  for r in [0:3000] do
+    write s r
+    if r % 50 == 0 then
+      worst := max worst (← fileBytes (dir / "ratio"))
+  let gens ← s.generation
+  let want ← s.view
+  s.close
+  let (s2, r) ← Store.open (dir / "ratio") opts
+  let mut ok ← check (Tables.equal (← s2.view) want) "ratio: restart content"
+  ok := ok && (← check (r.generation == gens) "ratio: same generation")
+  -- live data is 200 * (100 + 6) bytes: the files stay below about 3 times it plus the minimum log
+  ok := ok && (← check (gens ≥ 5) s!"ratio: compacted {gens} times")
+  ok := ok && (← check (worst < 3 * 22000 + 2 * 20000) s!"ratio: files at most {worst} bytes")
+  ok := ok && (← check (plainBytes > 5 * worst) s!"ratio: without the rule {plainBytes} bytes against {worst}")
+  s2.close
+  IO.FS.removeDirAll dir
+  return ok
+
 -- Corpus
 
 /-- The pre-state entries and root, the diff and the post-state root of a case file. -/
@@ -542,6 +585,8 @@ def main (args : List String) : IO UInt32 := do
   IO.println "log cut at every byte, flipped byte in every record: done"
   ok := ok && (← compactionCrash 5)
   IO.println "crash in compaction: done"
+  ok := ok && (← ratioCompaction)
+  IO.println "compaction by ratio of log to live data: done"
   for seed in [0:40] do
     ok := ok && (← FlatTests.model seed)
   IO.println "flat storage against a model of forked chains: done"

@@ -417,6 +417,22 @@ def build_requests(chain: Chain) -> list[Request]:
     add("tx", "tx", {"tx_hash": "11111111111111111111111111111111", "sender_account_id": "node0", "wait_until": "NONE"}, note="unknown transaction")
     add("tx", "tx", ["abc", "node0"], note="malformed hash")
     add("tx", "tx", {"sender_account_id": "node0"}, note="no hash")
+    # state changes by kind of every block (EXPERIMENTAL_changes_in_block, which the Lean node keeps for its GC window)
+    for h in sorted(chain.blocks):
+        add("EXPERIMENTAL_changes_in_block", "EXPERIMENTAL_changes_in_block", {"block_id": h})
+    for h in heights[:: max(1, len(heights) // 10)]:
+        if h in chain.blocks:
+            add("EXPERIMENTAL_changes_in_block", "EXPERIMENTAL_changes_in_block", {"block_id": chain.blocks[h]["header"]["hash"]})
+    for finality in ("final", "optimistic", "near-final"):
+        add("EXPERIMENTAL_changes_in_block", "EXPERIMENTAL_changes_in_block", {"finality": finality}, head=True)
+    add("EXPERIMENTAL_changes_in_block", "EXPERIMENTAL_changes_in_block", {"sync_checkpoint": "genesis"})
+    add("EXPERIMENTAL_changes_in_block", "block_effects", {"block_id": at_height}, note="the other name")
+    add("EXPERIMENTAL_changes_in_block", "EXPERIMENTAL_changes_in_block", {"block_id": 10 ** 9}, note="unknown block, above the head")
+    add("EXPERIMENTAL_changes_in_block", "EXPERIMENTAL_changes_in_block", {"block_id": "11111111111111111111111111111111"}, note="unknown hash")
+    add("EXPERIMENTAL_changes_in_block", "EXPERIMENTAL_changes_in_block", {"block_id": "abc"}, note="malformed hash")
+    add("EXPERIMENTAL_changes_in_block", "EXPERIMENTAL_changes_in_block", {}, note="no reference")
+    add("EXPERIMENTAL_changes_in_block", "EXPERIMENTAL_changes_in_block", [at_height], note="not a map")
+    add("EXPERIMENTAL_changes_in_block", "EXPERIMENTAL_changes_in_block", None, note="no parameters")
     # validators and configuration
     add("validators", "validators", [None], head=True)
     add("validators", "validators", {"epoch_id": chain.at["header"]["epoch_id"]}, note="an epoch that is over or the current one")

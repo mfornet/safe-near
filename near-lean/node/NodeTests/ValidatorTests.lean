@@ -62,6 +62,29 @@ private def learnedCode (f : IO.Ref Nat) : IO Unit := do
   check f "known bytes are answered from the catalogue"
       (known.decodeIssue.isNone && known.hash == "known")
 
+/-- The code cache forgets the contract code that no retained state references, and nothing else. -/
+private def codePruning (f : IO.Ref Nat) : IO Unit := do
+  let blob (i : Nat) : ByteArray := ⟨(Array.range 3000).map fun j => (i * 31 + j).toUInt8⟩
+  let blobs := [blob 1, blob 2, blob 3]
+  match ((blobs.mapM Near.Node.Apply.code).run {} : Except String _) with
+  | .error e => check f s!"code decoding: {e}" false
+  | .ok (_, conv) =>
+    let cache := conv.cache
+    check f "three codes cached" (cache.byLabel.size == 3 && cache.labels.size == 3 && cache.lists.size == 3)
+    let hash (b : ByteArray) : ByteArray := NearCrypto.sha256 b
+    let hashOfLabel (l : String) : Option ByteArray := (Near.Node.Apply.hashOfLabel? l).map fun b => ⟨b.toArray⟩
+    let live : Std.HashSet ByteArray := ({} : Std.HashSet ByteArray).insert (hash (blob 2))
+    let pruned := cache.prune live hashOfLabel
+    check f "only the referenced code stays"
+        (pruned.byLabel.size == 1 && pruned.labels.size == 1 && pruned.lists.size == 1
+          && pruned.labels.contains (blob 2) && pruned.lists.contains (blob 2))
+    check f "the next prune waits for the cache to double" (pruned.pruneAt == 32)
+    let none := cache.prune {} hashOfLabel
+    check f "nothing referenced, nothing kept"
+        (none.byLabel.size == 0 && none.labels.size == 0 && none.lists.size == 0)
+    let all := cache.prune (live.insert (hash (blob 1)) |>.insert (hash (blob 3))) hashOfLabel
+    check f "everything referenced, everything kept" (all.byLabel.size == 3 && all.labels.size == 3)
+
 /-- The reference count changes that garbage collection reads back from `DBCol::TrieChanges`. -/
 private def trieChangesRecord (f : IO.Ref Nat) : IO Unit := do
   let c : Near.Node.Trie.TrieChanges :=
@@ -414,6 +437,7 @@ private def poolTests (f : IO.Ref Nat) : IO Unit := do
 def main : IO UInt32 := do
   let failures ← IO.mkRef 0
   learnedCode failures
+  codePruning failures
   trieChangesRecord failures
   basic failures
   delayValues failures

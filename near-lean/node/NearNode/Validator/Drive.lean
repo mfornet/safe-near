@@ -233,6 +233,7 @@ partial def Env.tryApply (e : Env) : IO Unit := do
       e.onApplied a.block
       -- between two applications: the next one starts on the state this leaves
       e.collectGarbage
+      e.pruneCodes
     else
       return
   let s ← e.get

@@ -1,4 +1,5 @@
 import NearNode.Rpc.Errors
+import NearNode.Chain.StateChanges
 import NearNode.Rpc.StateViews
 import NearNode.Protocol
 
@@ -289,6 +290,52 @@ def chunk (c : Ctx) (params : Json) : IO R := do
                     (some (Json.mkObj [("chunk_hash", jhash header.chunkHash.hash)]))
                     (Json.str
                       s!"Chunk Missing (unavailable on the node): ChunkHash(`{base58Encode header.chunkHash.hash.bytes}`) \n Cause: Unknown"))
+
+/-! ### EXPERIMENTAL_changes_in_block -/
+
+/-- `RpcStateChangesError::UnknownBlock` as `HandlerError`: the cause and the data are both `{"info": {}, "name": "UNKNOWN_BLOCK"}`. -/
+private def unknownStateChangesBlock (s : VState) (params : Json) : RpcError :=
+  let cause := Json.mkObj [("info", Json.mkObj []), ("name", "UNKNOWN_BLOCK")]
+  RpcError.handler "UNKNOWN_BLOCK" (some (Json.mkObj [])) cause (unknownBlockStatus s params)
+
+/-- `EXPERIMENTAL_changes_in_block` / `block_effects` (`changes_in_block`, `GetStateChangesInBlock`,
+`ChainStore::get_state_changes_in_block`): one entry for every trie key of the account, contract code, access key and contract data
+kinds that the block's chunks changed, in key order. The node keeps the keys whose entry differs between the pre-state and the
+post-state of a chunk (`Chain/StateChanges.lean`). -/
+def changesInBlock (c : Ctx) (params : Json) : IO R := do
+  let s ← c.env.get
+  let ref : Except String BlockRef :=
+    match params with
+    | .obj _ => parseBlockRef params (flattened := true)
+    | .null => throw "invalid type: null, expected struct RpcStateChangesInBlockRequest"
+    | .arr _ => throw "invalid type: sequence, expected struct RpcStateChangesInBlockRequest"
+    | _ => throw "invalid type, expected struct RpcStateChangesInBlockRequest"
+  match liftParse ref with
+  | .error e =>
+    return .error e
+  | .ok r =>
+    match resolve s r with
+    | none =>
+      return .error (unknownStateChangesBlock s params)
+    | some b =>
+      let shards := ((epochDataOf s b).map fun e => e.layout.shardIds.map (blockShardKey b.hash e.layout ·)).getD #[]
+      let mut keys : Array (ByteArray × Bool) := #[]
+      for key in shards do
+        if let some bytes := s.pr.tables.get .stateChanges key then
+          keys := keys ++ (touchedOfBytes? bytes).getD #[]
+      let sorted := keys.qsort fun a b => keyLt a.1 b.1
+      let changes :=
+        sorted.filterMap fun (k, _) =>
+          (kindOfKey? k).map fun (kind, account) =>
+            Json.mkObj
+              [("type",
+                  match kind with
+                  | .account => "account_touched"
+                  | .accessKey => "access_key_touched"
+                  | .data => "data_touched"
+                  | .contractCode => "contract_code_touched"),
+                ("account_id", jacc account)]
+      return .ok (Json.mkObj [("block_hash", jhash b.hash), ("changes", Json.arr changes)])
 
 /-! ### Genesis and protocol configuration -/
 

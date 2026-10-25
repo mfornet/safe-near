@@ -34,6 +34,8 @@ structure CodeCache where
   lists : Std.HashMap ByteArray (List UInt8) := {}
   /-- The label of contract bytes, by content (so that unchanged code is not hashed again). -/
   labels : Std.HashMap ByteArray String := {}
+  /-- Prune when `byLabel` has this many entries (twice what it had after the last pruning, at least 32). -/
+  pruneAt : Nat := 32
 
 /-- Byte strings from this size on are remembered. -/
 def CodeCache.bigSize : Nat :=
@@ -50,6 +52,27 @@ def CodeCache.list (c : CodeCache) (b : ByteArray) : List UInt8 × CodeCache :=
       -- old versions of contracts are forgotten when there are many
       let lists := if c.lists.size ≥ 512 then {} else c.lists
       (l, { c with lists := lists.insert b l })
+
+/-- Forgets the contract code that nothing references: `live` holds the hashes of the values the retained tries reference
+(`State` entries with a positive count), and a code is its value, named by its hash. nearcore counts references to contract
+code in the trie in the same way (the `State` column stores the code under `sha256(code)` with a count, and garbage
+collection removes it when the last state that held it goes). Everything dropped here is a cache of work the node does again
+on the next use (`Model.code` decodes the bytes it meets), so pruning between two applications changes no result. -/
+def CodeCache.prune (c : CodeCache) (live : Std.HashSet ByteArray) (hashOfLabel : String → Option ByteArray) :
+    CodeCache :=
+  let byLabel :=
+    c.byLabel.fold
+      (fun m label _ =>
+        match hashOfLabel label with
+        | some h => if live.contains h then m else m.erase label
+        | none => m.erase label)
+      c.byLabel
+  let (labels, lists) :=
+    c.labels.fold
+      (fun (labels, lists) bytes label =>
+        if byLabel.contains label then (labels, lists) else (labels.erase bytes, lists.erase bytes))
+      (c.labels, c.lists)
+  { byLabel, labels, lists, pruneAt := max 32 (2 * byLabel.size) }
 
 /-- The inverse: a list equal to a remembered one gives back its `ByteArray`. -/
 def CodeCache.bytesOf (known : Array (ByteArray × List UInt8)) (l : List UInt8) : ByteArray :=
