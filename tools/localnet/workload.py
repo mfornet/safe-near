@@ -512,12 +512,71 @@ class Workload:
         self.round("burst", heavy)
 
 
+    def steady(self, seconds: float, period: float = 1.0, seed_offset: int = 0):
+        """Light traffic until `seconds` have passed: transfers, small contract calls, storage writes and
+        cross-account promise calls, a few transactions per round, chosen by a seeded generator.  It needs the
+        accounts and contracts of the full workload and sets nothing up."""
+        import random
+        rng = random.Random(self.seed * 1000 + seed_offset + 7)
+        names = ["a.node0", "test1.node0", "test2.node0", "test3.node0"]
+        for name in names:
+            self.actor(name)
+        t = self.actors
+        u64 = lambda *values: b"".join(v.to_bytes(8, "little") for v in values)
+        end = time.time() + seconds
+        number = 0
+        while time.time() < end:
+            number += 1
+            items = []
+            for _ in range(rng.randint(2, 5)):
+                sender = t[rng.choice(names)]
+                receiver = rng.choice(names)
+                kind = rng.randrange(8)
+                if kind == 0:
+                    items.append((sender, receiver, [nc.transfer(rng.randint(1, 3) * NEAR // 100)]))
+                elif kind == 1:
+                    items.append((sender, receiver, [self.fc("log_something")]))
+                elif kind == 2:
+                    items.append((sender, receiver, [self.fc("write_key_value", f"s{number}".encode() + u64(number))]))
+                elif kind == 3:
+                    items.append((sender, receiver, [self.fc("sum_n", u64(rng.randint(100, 20000)))]))
+                elif kind == 4:
+                    items.append((sender, receiver, [self.fc("insert_strings", u64(number % 50, rng.randint(1, 6)))]))
+                elif kind == 5:
+                    items.append((sender, receiver, [self.fc("fibonacci", bytes([rng.randint(5, 18)]))]))
+                elif kind == 6:
+                    step = {"create": {"account_id": rng.choice(names), "method_name": "log_something",
+                                       "arguments": {}, "amount": "0", "gas": 20 * TGAS}, "id": 0}
+                    items.append((sender, receiver, [self.fc("call_promise", json.dumps([step]).encode(), gas=100 * TGAS)]))
+                else:
+                    items.append((sender, receiver, [self.fc("sum_with_input", u64(rng.randint(1, 100), rng.randint(1, 100)))]))
+            self.round(f"steady-{number}", items)
+            time.sleep(period)
+
+    def lightburst(self, calls: int = 10, n: int = 1_500_000):
+        """Many calls that each take the Lean interpreter seconds, in one block: the same shape as `burst`,
+        1/20 of its gas per call."""
+        a = self.actor("a.node0")
+        for name in ["test1.node0", "test2.node0"]:
+            self.actor(name)
+        heavy = [(a, "test1.node0" if i % 2 else "test2.node0",
+                  [self.fc("sum_n", n.to_bytes(8, "little"), gas=300 * TGAS)]) for i in range(calls)]
+        self.round("lightburst", heavy)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("topology", choices=sorted(localnet.TOPOLOGIES))
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--only", help="run only the named scenario after setup")
     parser.add_argument("--skip", nargs="*", default=[], help="scenarios to leave out (and `wait`, the final wait)")
+    parser.add_argument("--steady", type=float, default=0, help="seconds of light traffic after the scenarios; with "
+                        "--no-scenarios only that")
+    parser.add_argument("--period", type=float, default=1.0, help="seconds between rounds of --steady")
+    parser.add_argument("--no-scenarios", action="store_true", help="run only what --steady or --inject name; the "
+                        "accounts and contracts must exist already")
+    parser.add_argument("--inject", nargs="*", default=[], help="scenarios of a running workload to run alone "
+                        "(`lightburst`)")
     arguments = parser.parse_args()
     workload = Workload(Net(arguments.topology), arguments.seed)
     first = workload.net.height()
@@ -525,8 +584,12 @@ def main() -> None:
         if arguments.only:
             workload.setup()
             getattr(workload, arguments.only)()
-        else:
+        elif not arguments.no_scenarios:
             workload.run_all(frozenset(arguments.skip))
+        for name in arguments.inject:
+            getattr(workload, name)()
+        if arguments.steady:
+            workload.steady(arguments.steady, arguments.period)
     finally:
         last = workload.net.height()
         out = localnet.home(arguments.topology) / "workload.json"

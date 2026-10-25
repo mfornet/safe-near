@@ -2349,6 +2349,7 @@ dependencies = [
  "near-crypto",
  "near-primitives",
  "near-store",
+ "zstd",
 ]
 
 [[package]]

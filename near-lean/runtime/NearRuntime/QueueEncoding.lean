@@ -139,14 +139,15 @@ def queues (state : ChainState) (codes : List (String × Bytes)) (context : Cont
 /-- Combine typed account state and typed queue state. Opaque shard columns are
 still outside the represented state; this does not claim an original shard root. -/
 def encode (state : ChainState) (codes : List (String × Bytes)) (context : Context)
-    (cfg : Option Wasm.Near.RuntimeConfig := none) : Except String (List (Bytes × Bytes)) := do
+    (cfg : Option Wasm.Near.RuntimeConfig := none) (digest : Bytes → Bytes := Sha256.hash) :
+    Except String (List (Bytes × Bytes)) := do
   let accountState := { state with
     postponed := []
     pendingDataCount := []
     postponedByData := []
     receivedData := []
     delayed := [] }
-  let accounts ← StateEncoding.encode accountState codes
+  let accounts ← StateEncoding.encode accountState codes digest
   let queues ← queues state codes context cfg
   return accounts ++ queues
 

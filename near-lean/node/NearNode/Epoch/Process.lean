@@ -1,4 +1,4 @@
-import NearNode.Chain.Validate
+import NearNode.Chain.Header
 import NearNode.Epoch.Manager
 
 /-!
@@ -20,19 +20,30 @@ structure Finalized where
   data : EpochData
   summary : Summary
 
-/-- Accept a block; if it ends its epoch, compute and store the epoch two ahead. -/
-def processBlock (setup : Setup) (st : ChainState) (block : Block) :
+/-- If the recorded block ends its epoch, compute and store the epoch two ahead
+(`EpochManager::record_block_info`). -/
+def finishBlock (setup : Setup) (st : ChainState) (header : BlockHeader) :
     Result (ChainState × Option Finalized) := do
-  let st ← acceptBlock st block
-  let hash := block.header.hash
+  let hash := header.hash
   let rec_ ← st.block hash
   if ← st.isNextBlockInNextEpoch rec_.info then
-    let some v := block.header.view? | fail "Unsupported" "header version"
+    let some v := header.view? | fail "Unsupported" "header version"
     let (data, summary) ← finalizeEpoch setup st rec_ ⟨v.randomValue.bytes⟩
     let epochId : EpochId := ⟨hash⟩
     pure ({ st with epochs := st.epochs.insert hash.bytes data }, some { epochId, data, summary })
   else
     pure (st, none)
+
+/-- Accept a block; if it ends its epoch, compute and store the epoch two ahead. -/
+def processBlock (setup : Setup) (st : ChainState) (block : Block) :
+    Result (ChainState × Option Finalized) := do
+  finishBlock setup (← acceptBlock st block) block.header
+
+/-- Accept a header (`Chain::sync_block_headers`); a header that ends its epoch finalizes the
+epoch, as `add_validator_proposals` does for a header in nearcore. -/
+def processHeader (setup : Setup) (st : ChainState) (header : BlockHeader) :
+    Result (ChainState × Option Finalized) := do
+  finishBlock setup (← acceptHeader st header) header
 
 end Near.Node.Epoch
 

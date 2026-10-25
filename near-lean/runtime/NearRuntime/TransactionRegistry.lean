@@ -55,8 +55,10 @@ transactions leave the threaded state and identity context unchanged, so later
 nonces are checked against exactly the admitted prefix. Protocol errors remain
 attempts; model limitations or unencodable original bodies abort observation. -/
 def observe (cfg : Wasm.Near.RuntimeConfig) (ap : ApplyState) (codes : List (String × Bytes))
-    (initial : ChainState) (inputs : List Input) (context : QueueEncoding.Context := {}) : Except String Result := do
-  let _ ← QueueEncoding.encode initial codes context (some cfg)
+    (initial : ChainState) (inputs : List Input) (context : QueueEncoding.Context := {})
+    (preflight : Bool := true) : Except String Result := do
+  if preflight then
+    let _ ← QueueEncoding.encode initial codes context (some cfg)
   let mut result : Result := { state := initial, context }
   for (input, index) in inputs.zipIdx do
     let body ← TransactionEncoding.encode codes input.blockHash input.transaction

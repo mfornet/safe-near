@@ -1,4 +1,5 @@
 import NearNode.Primitives
+import NearCrypto.Sha256
 import NearRuntime
 import ChainReplay.Wire
 
@@ -91,10 +92,16 @@ def setReceiver (native : CryptoHash) (account : AccountId) : M Unit :=
 def addFormat (id : Nat) (format : Near.ReceiptEncoding.ActionFormat) : M Unit :=
   modify fun s => { s with formats := s.formats.push (id, format) }
 
+/-- SHA-256 of a byte list with the `NearCrypto` implementation: the digest the runtime's encoders are
+given in place of the list-based specification (`Near.Sha256.hash`, which takes seconds for a
+megabyte of contract code). -/
+def digest (b : List UInt8) : List UInt8 :=
+  (NearCrypto.sha256 ⟨b.toArray⟩).toList
+
 /-- The catalogue entry of contract bytes, decoded once. A module that does not decode is kept
 with its issue, as `ChainReplay.codeOf` does. -/
 def code (blob : ByteArray) : M ChainReplay.LoadedCode := do
-  let label := Near.StateEncoding.base58 (Near.Sha256.hash blob.toList)
+  let label := Near.StateEncoding.base58 (NearCrypto.sha256 blob).toList
   let s ← get
   let entry ←
     match s.cache[label]? with

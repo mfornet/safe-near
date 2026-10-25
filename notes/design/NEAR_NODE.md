@@ -882,8 +882,99 @@ Acceptance: `just localnet-peer` (sources: `near-lean/node/NearNode/{Proto,Net,N
   drain (423 blocks at the end, because `neard` kept producing while the node drained).
 - **Deferred.** Tier 1 (account data is accepted, not verified or kept), routing beyond one peer (no forwarding,
   no route-back cache, no peer store or connection pool), `TxStatusResponse`, fork choice and reorgs, header
-  validation before the block, Reed-Solomon reconstruction of chunks with missing parts, state sync (M7), the
-  genesis block from `genesis.json` (M7), IPv6 in `Net/Uv`, production of anything (M8).
+  validation before the block, Reed-Solomon reconstruction of chunks with missing parts, (state sync and the
+  genesis block: done in M7), IPv6 in `Net/Uv`, production of anything (M8).
+
+### M7 sync
+
+Acceptance: `just localnet-follow` (sources: `near-lean/node/NearNode/{Chain/{StateSync,Header,Profile},Trie/{StateParts,Witness},
+Zstd,Network/{Driver,Run}}.lean`, `tools/localnet/follow_accept.py`); the gates are `just node-conformance-sync`
+(zstd and state parts against nearcore's own code), `just node-sync-tests` (header sync and body attach on the
+in-memory `Net`) and the existing ones.
+
+- **Profile of the application.** `Chain.Prof` times the stages of `applyBlock`/`runChunk` (`node-chain-apply
+  --profile`, `near-lean-node --profile`). On the single-shard corpus (heights 1..213) the time went to the list-based
+  `Sha256.hash` that the runtime's encoders use (the shard was re-encoded four or five times a chunk), the storage-accounting
+  trie that was rebuilt from the entries on every chunk (`TrieOverlay.start`, quadratic), the pre-flight encode of
+  `TransactionRegistry.observe`, and the interpreter (about 5M instructions a second). Fixes, all node side: contract code
+  and the encoders hash with `NearCrypto`'s SHA-256 (`Model.digest`), the runtime gets the trie the node stores
+  (`Trie.objects`) instead of rebuilding one, the dead and duplicate encodes are gone, and the round trip of the
+  pre-state is a flag. **Runtime change:** only defaulted parameters `digest` (default `Sha256.hash`) and `preflight`
+  (default `true`) on `StateEncoding`, `QueueEncoding` and `TransactionRegistry`; no theorem statement changed, no
+  `sorry` or axiom, the contract proofs build. **Effect:** 120 blocks took 75 s before (0.62 s a block), 213 blocks 23 s
+  after (0.11 s a block, six times faster); every `ChunkExtra`, receipt set and epoch is still equal to nearcore's.
+  Steady-state shares on the live sharded run (4 shards, 484 chunks, 31.8 s): `trie-witness` 29 %, `encode-state`
+  21 %, `results` 14 %, `observe-queues` 12 %, shard start 8 %, decode 5 %, interpreter 5 %. What remains is
+  the interpreter on heavy contracts: block 214 of the full-workload corpus (the 300 Tgas calls) takes 853 s, 98 % in
+  `Near.step`/`runMetered`. It was not made faster; the VM is the specification, and a faster interpreter is a task for M10.
+  `just chain-replay-corpus` after the change: 436 of 436 chunks pass, 31 min wall (89 min CPU; the heavy-call chunks dominate);
+  the runtime change is defaulted parameters, so no timing change is expected there and no earlier timing exists for the full corpus.
+- **Header sync** (`Network/Driver.lean`, `Chain/Header.lean`, `Epoch.processHeader`): `GetBlockHeaders` from the
+  locator; an answered header gets `Chain::sync_block_headers`'s checks (`acceptHeader`: `validate_header`, then the
+  epoch manager's `BlockInfo::from_header`, no chunk needed), and epochs are finalised from headers alone, so the node
+  knows the epoch while the bodies are behind. Header-only `BlockRec`s are upgraded by `attachBody` when the body arrives; the driver's
+  `cursor` is where the attach resumes. The flow follows `chain/client/src/sync/header.rs`.
+- **State sync** (`Chain/StateSync.lean`, `Trie/StateParts.lean`, `Zstd.lean`; nearcore `chain/client/src/sync/state/`,
+  `chain/chain/src/state_sync/{utils,adapter}.rs`, `core/store/src/trie/state_parts.rs`).
+  - The sync hash is nearcore's (`get_sync_hash` in `state_sync/utils.rs`): the child of the first block of the
+    epoch in which every shard has at least two new chunks, once that block is final; the extra blocks are those from its
+    previous block down to the lowest `height_included` of the chunks of that block (`get_extra_sync_block_hashes`).
+    `node-sync-tests` checks both as properties on the corpus chains.
+  - `StateRequestHeader` and `StateRequestPart` are routed T2 messages that carry the requester's address. The host answers
+    with a `StateRequestAck` on T2 and the `VersionedStateResponse` on a Tier-3 connection it opens to the requester's
+    listener, so the node listens (`Network/Run.lean`). A refused or unanswered request is sent again after 5 s
+    (`stateRetryMs`); no external storage is used (the localnet has none).
+  - The header (`ShardStateSyncResponseHeader` V2) is checked as `set_state_header` does: chunk hash, transaction root and
+    receipts root of the chunk, merkle paths of the chunk and its predecessor against `chunk_headers_root` of the
+    blocks, the incoming receipts block by block from the sync block back to the previous chunk (merkle path of each
+    receipt group to the sending chunk's outgoing receipts root and from there to the block's
+    `prev_chunk_outgoing_receipts_root`, one proof per chunk the block included, from the chunk mask), and the state root node
+    against the state root (hash and memory usage). The state is the one at the `prev_state_root` of the chunk in the
+    block before the sync block, so the node starts applying chunks at that chunk's height (`ShardStart`), with the
+    receipts delivered so far from the header. The first block applied cross-checks the header's receipts for that block
+    against the ones derived from the bodies.
+  - A part is zstd-decompressed (`Zstd.decompress`, pure Lean: frames, FSE and Huffman tables, sequences, repeat
+    offsets, xxh64 checksum, skippable frames) into a `PartialState`, and validated as `Trie::validate_state_part`
+    does: the interval of the part is re-walked with the part as the only storage (`find_state_part_boundary`,
+    `visit_nodes_interval`) and the set of nodes visited must be the set of nodes given. A missing or an extra
+    node, a changed node, and a part of another index or count fail. `applyPart` gives the nodes with their reference counts
+    for the store. The conformance gate `node-conformance-sync` compares with the verdicts of nearcore's own
+    `zstd` and `near-store` over tries of many shapes (good parts, a node removed, repeated, changed or added, other
+    index, other count, empty) and with frames of the `zstd` crate in many shapes (levels, with checksum, several frames, skippable,
+    cut or flipped).
+  - The apply worker gets the synced tries through `Shared.install`; shards the node does not track are not started and
+    their chunks are neither fetched nor applied (`--track-shards 0,2`).
+  - Sync flow: headers first, then the state of the sync epoch, then blocks from the sync point, as the `EpochSync -> HeaderSync ->
+    StateSync -> BlockSync` of nearcore minus epoch sync, which the localnet does not need (the node starts from the genesis
+    files and the first blocks, as in M6, and takes the headers from there).
+- **Acceptance** (`follow_accept.py`: the pinned `neard` localnet runs the workload with `--full-workload`, then the node starts
+  fresh; a 1 Hz RPC sampler gives `neard`'s head and the node's lag log (JSONL per second) gives its applied
+  height; the lag is the difference; every applied chunk's `ChunkExtra` is compared with the next chunk header's, its outgoing receipts
+  with the next chunk body's, and the state root with `neard`'s over RPC). Results, 600 s followed after reaching the head:
+
+  | topology | state sync point (shards at height) | reached head | max / median lag | state roots over RPC | disconnects |
+  |---|---|---|---|---|---|
+  | single | height 543, 1 shard, 1 part, 141 KB | 2.2 s | 2 / 0 blocks | 996 of 996 equal | 0 |
+  | sharded (4) | height 543, 4 shards, 1 part each, 316 KB | 7.3 s | 9 / 1 blocks | 4003 of 4003 equal | 0 |
+
+  With `--track-shards 0,2` on the sharded localnet: 158 of 158 roots equal over 40 s, max lag 10, median 1.
+  The node was within 10 blocks of the head for the whole window in all three runs. The profile of the sharded
+  run: 4004 chunks in 313 s of CPU over 598 s, so the node has 1.9x headroom at the localnet's block rate with four shards.
+- **Bursts (honest result).** With `--lightburst` (heavy calls sent 70 s after the node reached the head) the node
+  falls behind, because each heavy chunk is interpreter bound and about 10 to 100 times slower than a normal chunk:
+  162 s of interpreter time for the burst's 1003-chunk window against 126 s for everything else. Single shard, followed 600 s: lag
+  peaked at 253 blocks 155 s after the burst was sent, the node was back within 10 blocks 192 s after it, and the median
+  lag over the window was 1; all 1003 state roots equal, no disconnect. With 240 s followed (single and sharded) the
+  node was still draining at the end (peak 262 and 272 blocks, not caught up inside the window), which is why the
+  catch-up limit of the harness, 240 s, only holds with a window of at least 600 s. The remaining bottleneck is the
+  interpreter at about 5M instructions a second, not the node: a burst of N Tgas of contract code costs about
+  so the node keeps up with traffic that fits its 0.11 s a block and falls behind by the burst's extra CPU time
+  while it lasts.
+- **Deferred.** Epoch sync proofs (not needed: the localnet nodes start at genesis headers), state sync from external
+  storage, a state sync that spans an epoch change while running, retrying a sync hash that moved on, a synthetic unit
+  test of `validateStateHeader` (it is exercised by every live run and by the tamper tests of the parts, but no
+  tampered header is tried: left for M8, which needs the same checks for stateless validation), a faster interpreter for the heavy-call blocks (M10), and
+  the pool of parallel part downloads for shards with many parts (the localnet state is one part a shard).
 
 ## Open points
 

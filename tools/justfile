@@ -32,7 +32,7 @@ crypto-tests: crypto-build
 
 # Build the NEAR node (notes/design/NEAR_NODE.md) and its executables.
 node-build:
-    cd near-lean/node && lake build NearNode near-lean-node node-bench node-conformance-types node-conformance-network node-trie-tests node-store-tests node-state-roots node-chain-validate node-chain-apply --wfail
+    cd near-lean/node && lake build NearNode near-lean-node node-bench node-conformance-types node-conformance-network node-conformance-sync node-sync-tests node-trie-tests node-store-tests node-state-roots node-chain-validate node-chain-apply --wfail
 
 # M1: the Borsh codecs of every near-primitives type against the committed nearcore oracle fixtures.
 [positional-arguments]
@@ -45,6 +45,20 @@ node-conformance-types *options: node-build
 [positional-arguments]
 node-conformance-network *options: node-build
     near-lean/node/.lake/build/bin/node-conformance-network "$@"
+
+# M7: zstd and the state parts of the trie against fixtures from the `zstd` crate and `near-store` at the pin
+# (`just node-sync-oracle` writes them).
+node-conformance-sync *options: node-build
+    near-lean/node/.lake/build/bin/node-conformance-sync "$@"
+
+# M7: regenerate near-lean/node/fixtures/state-sync with nearcore's own zstd and near-store (needs the clean nearcore
+# checkout of `tools/localnet/build.py` and a Rust toolchain; CI never builds it).
+node-sync-oracle:
+    cd tools/node-conformance/native-trie && cargo run --release --bin state_sync_oracle -- ../../../near-lean/node/fixtures/state-sync
+
+# M7: header sync, the sync block and the refusal of changed headers and bodies, on the in-memory network.
+node-sync-tests: node-build
+    python3 tools/localnet/sync_tests.py
 
 # M4: the trie Impl against the Spec (NearInterface.TrieConstruction) on seeded random entry sets and
 # updates; the optional argument is the number of cases.
@@ -69,6 +83,14 @@ chain-validate-corpus: node-build
 [positional-arguments]
 localnet-peer *options: node-build
     python3 tools/localnet/peer_accept.py "$@"
+
+# M7: the Lean node syncs a running neard localnet (headers, state of the shards over the peer-to-peer network, then blocks)
+# and follows its head: within a few blocks of it, with every state root and ChunkExtra equal to neard's. The options
+# include --topologies single sharded, --follow SECONDS, --full-workload (the heavy scenarios in the history) and
+# --lightburst (a burst of heavy calls while following).
+[positional-arguments]
+localnet-follow *options: node-build
+    python3 tools/localnet/follow_accept.py "$@"
 
 # M5a: rebuild the block corpus from the localnet databases (needs `python3 tools/localnet/build.py --only
 # safe-near-chain-export` and the databases of `just corpus-generate`).

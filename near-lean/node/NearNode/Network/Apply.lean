@@ -92,6 +92,8 @@ structure WorkerEnv where
   /-- The log of applied blocks. -/
   appliedLog : Option IO.FS.Handle
   log : String → IO Unit
+  /-- Stage timers, when asked for. -/
+  prof : Option Prof := none
 
 /-- Applies one block. -/
 def applyWork (env : WorkerEnv) (work : Work) : IO Unit := do
@@ -99,7 +101,10 @@ def applyWork (env : WorkerEnv) (work : Work) : IO Unit := do
   let height := work.block.header.view?.get!.height
   let empty : Body := { transactions := #[], claimedOutgoing := #[], claimedIncoming := #[] }
   let pr ← env.progress.get
-  match applyBlock env.params work.st work.block (fun s => (work.bodies[s]?).getD empty) pr with
+  let applied ←
+    (applyBlock env.prof env.params work.st work.block (fun s => (work.bodies[s]?).getD empty)
+          pr).run
+  match applied with
   | .error m =>
     env.shared.fail s!"block {height}: applying the chunks failed: {m}"
   | .ok (pr, reports, chunkOps) =>
@@ -150,6 +155,10 @@ def applyWork (env : WorkerEnv) (work : Work) : IO Unit := do
 partial def applyLoop (env : WorkerEnv) : IO Unit := do
   if (← env.shared.failure.get).isSome then
     return
+  -- the tries a state sync built replace the genesis state, keeping the contracts decoded so far
+  if let some p← env.shared.install.modifyGet fun x => (x, none) then
+    let old ← env.progress.get
+    env.progress.set { p with cache := old.cache }
   let q ← env.shared.queue.modifyGet fun q => (q[0]?, q.extract 1 q.size)
   match q with
   | some work =>
