@@ -83,32 +83,36 @@ within the transfer and distinct accounts (which the transfer guaranteed). -/
 theorem resolveRefund_nep141 {s : State} {sender receiver : AccountId} {amount unused used : Nat}
     {o : Outcome} (hdistinct : receiver ≠ sender) (hunused : unused ≤ amount)
     (h : resolveRefund s sender receiver amount unused = .ok o) (hret : o.ret = .u128 used) :
-    Nep141.Resolve s.ftView o.state.ftView sender receiver amount used := by
+    Nep141.Resolve s.ftView o.state.ftView sender receiver amount unused used := by
+  have hmin : min unused (s.ftView.balanceOf receiver) = min (s.balanceOf receiver) unused :=
+    Nat.min_comm _ _
   unfold resolveRefund at h
   by_cases hu : 0 < unused
   swap
   · simp only [hu, ↓reduceIte, pure_eq_ok, Except.ok.injEq] at h
     subst h
     simp only [Ret.u128.injEq] at hret
-    exact .refund 0 (Nat.zero_le _) (Nat.zero_le _) hdistinct (move_zero _ _ _).symm (by omega)
+    have h0 : min unused (s.ftView.balanceOf receiver) = 0 := by omega
+    exact .refund hunused hdistinct (by rw [h0, move_zero]) (by omega)
   simp only [hu, ↓reduceIte] at h
   by_cases hb : 0 < s.balanceOf receiver
   swap
   · simp only [hb, ↓reduceIte, pure_eq_ok, Except.ok.injEq] at h
     subst h
     simp only [Ret.u128.injEq] at hret
-    exact .refund 0 (Nat.zero_le _) (Nat.zero_le _) hdistinct (move_zero _ _ _).symm (by omega)
+    have h0 : min unused (s.ftView.balanceOf receiver) = 0 := by
+      simp only [State.ftView]; omega
+    exact .refund hunused hdistinct (by rw [h0, move_zero]) (by omega)
   simp only [hb, ↓reduceIte] at h
   obtain ⟨hrreg, hrbal⟩ := State.balanceOf_pos_mem hb
-  have hrefund : min (s.balanceOf receiver) unused ≤ amount := (Nat.min_le_right _ _).trans hunused
-  have hheld : min (s.balanceOf receiver) unused ≤ s.ftView.balanceOf receiver := Nat.min_le_left _ _
   by_cases hsreg : sender ∈ s.registered
   · simp only [State.setBalance_registered, hsreg, ↓reduceIte, bind, bind_require, pure_eq_ok] at h
     split_ifs at h with hover
     simp only [Except.ok.injEq] at h
     subst h
     simp only [Ret.u128.injEq] at hret
-    refine .refund _ hrefund hheld hdistinct ?_ hret.symm
+    refine .refund hunused hdistinct ?_ (by rw [hmin]; exact hret.symm)
+    rw [hmin]
     simp only [State.ftView, Nep141.View.move, Nep141.View.mk.injEq, State.setBalance_totalSupply,
       and_true]
     funext a
@@ -124,7 +128,8 @@ theorem resolveRefund_nep141 {s : State} {sender receiver : AccountId} {amount u
     simp only [Except.ok.injEq] at h
     subst h
     simp only [Ret.u128.injEq] at hret
-    refine .burn _ hrefund hheld hsupply ?_ hret.symm
+    refine .burn hunused (by rw [hmin]; exact hsupply) ?_ hret.symm
+    rw [hmin]
     simp only [State.ftView, Nep141.View.burn, Nep141.View.mk.injEq]
     refine ⟨?_, rfl⟩
     funext a
@@ -144,18 +149,19 @@ theorem unusedAmount_le {amount u : Nat} {r : PromiseResult} (h : unusedAmount a
     | none => simp only [unusedAmount, pure_eq_ok, Except.ok.injEq] at h; omega
     | some n => simp only [unusedAmount, pure_eq_ok, Except.ok.injEq] at h; omega
 
-/-- `ft_resolve_transfer` is a NEP-141 resolution of a transfer between distinct accounts. -/
+/-- `ft_resolve_transfer` is a NEP-141 resolution of a transfer between distinct accounts, for
+the unused amount `ft_on_transfer` reported. -/
 theorem ftResolveTransfer_nep141 {s : State} {env : Env} {sender receiver : AccountId}
     {amount used : Nat} {o : Outcome} (hdistinct : receiver ≠ sender)
     (h : ftResolveTransfer s env sender receiver amount = .ok o) (hret : o.ret = .u128 used) :
-    Nep141.Resolve s.ftView o.state.ftView sender receiver amount used := by
+    ∃ unused, Nep141.Resolve s.ftView o.state.ftView sender receiver amount unused used := by
   unfold ftResolveTransfer at h
   cases hr : env.promiseResult with
   | none => simp [hr] at h
   | some r =>
     simp only [hr, bind, pure_eq_ok] at h
     obtain ⟨u, hu, h⟩ := bind_ok_iff.mp (by simpa only [bind_ok'] using h)
-    exact resolveRefund_nep141 hdistinct (unusedAmount_le hu) h hret
+    exact ⟨u, resolveRefund_nep141 hdistinct (unusedAmount_le hu) h hret⟩
 
 /-- wNEAR's storage registration as callers observe it. -/
 def State.storageView (s : State) : Nep145.View AccountId :=
