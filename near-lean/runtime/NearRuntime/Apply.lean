@@ -97,6 +97,12 @@ structure Exec where
   proposals : List ValidatorProposal := []
   result : Option ExecutionStatus := none
   failureIndex : Option Nat := none
+  /-- The gas profile of each VM call, in order; their compute is rounded per call. -/
+  vmProfiles : List GasProfile := []
+  /-- Compute the actions used without gas (removing gas key nonces); kept on failure. -/
+  actionCompute : Nat := 0
+  /-- The receipt's compute usage, set when it is finalized (`receiptComputeUsage`). -/
+  computeUsage : Nat := 0
   deriving Inhabited
 
 abbrev ExecM := ExceptT RuntimeError (StateM Exec)
@@ -237,7 +243,8 @@ def Exec.recordVMOutcome (exec : Exec) (outcome : VMOutcome) : Exec :=
     logs := exec.logs ++ outcome.logs
     gasBurntForFunctionCall := exec.gasBurntForFunctionCall + outcome.burntGas
     gasBurnt := exec.gasBurnt + outcome.burntGas
-    gasUsed := exec.gasUsed + outcome.burntGas + (outcome.usedGas - outcome.burntGas) }
+    gasUsed := exec.gasUsed + outcome.burntGas + (outcome.usedGas - outcome.burntGas)
+    vmProfiles := exec.vmProfiles ++ [outcome.gasProfile] }
 
 structure FunctionCallEffects where
   state : ChainState
@@ -496,8 +503,17 @@ def gasKeyWithdrawal (st : ChainState) (id : AccountId) (pk : PublicKey) (amount
   | some a => return st.setAccount id { a with amount := a.amount + amount }
   | none => throw (.accountDoesNotExist id)
 
-def Exec.burnAction (exec : Exec) (amount : Nat) : Exec :=
-  { exec with actionTokensBurnt := exec.actionTokensBurnt + amount }
+def Exec.burnAction (exec : Exec) (amount : Nat) (compute : Nat := 0) : Exec :=
+  { exec with actionTokensBurnt := exec.actionTokensBurnt + amount, actionCompute := exec.actionCompute + compute }
+
+/-- The length of a `TrieKey::GasKeyNonce` row's key: access-key column, account, separator,
+public key and the nonce index. -/
+def gasKeyNonceKeyLen (id : AccountId) (pk : PublicKey) : Nat := 1 + id.utf8ByteSize + 1 + pk.length + 2
+
+/-- The compute of removing the given gas key nonce rows (8-byte values), as
+`storage_removes_compute`. -/
+def nonceRemovalCompute (cfg : RuntimeConfig) (rows : List (AccountId × PublicKey)) : Nat :=
+  cfg.storageRemovesCompute rows.length ((rows.map fun (id, pk) => gasKeyNonceKeyLen id pk).sum) (8 * rows.length)
 
 /-- `validate_delegate_action_key`: the delegate's key, nonce and permission. It returns the
 nonce lane of a gas key (`none` for an ordinary key). -/
@@ -757,7 +773,7 @@ def applyAction (c : ReceiptCtx) (isLast : Bool) : Action → ExecM Unit
     match key.permission.gasKeyInfo? with
     | some (balance, nonces) =>
       if balance > maxGasKeyBalanceToBurn then throw (.gasKeyBalanceTooHigh id (some pk) balance)
-      modify (·.burnAction balance)
+      modify (·.burnAction balance (nonceRemovalCompute c.cfg (List.replicate nonces (id, pk))))
       putAccount id { a with storageUsage := a.storageUsage - gasKeyStorageCost extra pk key nonces }
       modifyState fun st => (st.removeAccessKey id pk).removeGasKeyNonces id pk
     | none =>
@@ -779,7 +795,8 @@ def applyAction (c : ReceiptCtx) (isLast : Bool) : Action → ExecM Unit
     modify fun exec => { exec with
       state := st'.removeAccount id
       storageAccounting := stageContractStorageRemoval id (st'.contractStorage id) exec.storageAccounting }
-    modify (·.burnAction gasKeys)
+    modify (·.burnAction gasKeys
+      (nonceRemovalCompute c.cfg ((st.gasKeyNonces.filter (·.1.1 == id)).map fun ((id, pk, _), _) => (id, pk))))
     modify fun e => { e with actorId := c.receipt.predecessorId }
     if a.amount > 0 then emit r
   | .useGlobalContract contract => do
@@ -1026,6 +1043,23 @@ def Exec.finishReceiptResult (exec : Exec) (c : ReceiptCtx) (failed : Option Run
       { exec with result := none } else exec
   exec.deliverResult c.receipt.receiverId c.action.outputDataReceivers
 
+/-- The compute a receipt used (`ActionReceiptResult::compute_usage`): its burnt gas, with the
+receipt's execution fee, the execution fee of each action it charged (up to the failed one) and
+each VM call's host costs counted at their compute cost instead, plus the compute its actions
+used without gas. -/
+def receiptComputeUsage (cfg : RuntimeConfig) (r : Receipt) (e : Exec) : Nat :=
+  let gas := cfg.fees.actionFees
+  let compute := cfg.computeActionFees
+  let eth := cfg.wasm.ethImplicitAccounts
+  let charged := match e.failureIndex with
+    | some index => r.actions.take (index + 1)
+    | none => r.actions
+  let actions : Int := (compute.newActionReceipt.execution : Int) - gas.newActionReceipt.execution +
+    (charged.map fun act =>
+      (Fees.exec compute eth r.receiverId act : Int) - Fees.exec gas eth r.receiverId act).sum
+  let calls : Int := (e.vmProfiles.map fun p => (cfg.vmComputeUsage p : Int) - p.total).sum
+  (e.gasBurnt + e.actionCompute + actions + calls).toNat
+
 /-- Finalize a receipt attempt: rollback, settlement, refunds, reward and data. -/
 def finalizeReceipt (c : ReceiptCtx) (st0 : ChainState) (exec : Exec) (failed : Option RuntimeError) : Exec :=
   let receiver := c.receipt.receiverId
@@ -1051,7 +1085,9 @@ def finalizeReceipt (c : ReceiptCtx) (st0 : ChainState) (exec : Exec) (failed : 
     else exec
   let exec := exec.creditReceiptReward c.cfg receiver settlement.burnPrice c.action.gasPrice
   let exec := exec.finishReceiptResult c failed
-  { exec with result := some (exec.result.getD (.successValue [])) }
+  { exec with
+    result := some (exec.result.getD (.successValue []))
+    computeUsage := receiptComputeUsage c.cfg c.receipt exec }
 
 
 /-- Publish successful receipt writes without rebuilding the chunk base trie.
@@ -1078,6 +1114,7 @@ def outcomeOf (r : Receipt) (e : Exec) : ExecutionOutcome :=
       | .action _ => some receipt.receiptId
       | .data _ | .globalDistribution _ => none)
     gasBurnt := e.gasBurnt
+    computeUsage := e.computeUsage
     tokensBurnt := e.tokensBurnt
     proposals := e.proposals }
 
@@ -1475,6 +1512,7 @@ def applyAttempt (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → Con
           status := .successReceiptId r.receiptId
           receiptIds := [r.receiptId]
           gasBurnt := cost.gasBurnt
+          computeUsage := cost.gasBurnt
           tokensBurnt := cost.gasBurnt * ap.gasPrice }
       outcomes := outcomes ++ [(0, o)]
     | .error e =>
@@ -1487,8 +1525,11 @@ def applyAttempt (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → Con
   st := { st with delayed := [] }
   let mut retainedDelayed : List Receipt := []
   let mut newlyDelayed : List Receipt := []
-  let mut gasUsed := outcomes.foldl (fun total pair => total + pair.2.gasBurnt) 0
-  let mut overLimit := ap.gasLimit.any (gasUsed ≥ ·)
+  -- `total.compute`: the chunk stops taking receipts once their compute reaches the gas limit.
+  -- nearcore divergence: nearcore also stops at the storage proof soft limit; the model records no
+  -- trie proof.
+  let mut compute := outcomes.foldl (fun total pair => total + pair.2.computeUsage) 0
+  let mut overLimit := ap.gasLimit.any (compute ≥ ·)
   let mut storageAccounting := ap.storageAccounting
   for (r, position) in queue.zipIdx do
     if overLimit then
@@ -1509,14 +1550,14 @@ def applyAttempt (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → Con
       outgoing := outgoing ++ p.receipts
       outcomes := outcomes ++ p.outcomes
       for (_, o) in p.outcomes do
-        gasUsed := gasUsed + o.gasBurnt
+        compute := compute + o.computeUsage
         tokensBurnt := tokensBurnt + o.tokensBurnt
-      gasUsed := gasUsed + p.extraCompute
+      compute := compute + p.extraCompute
       tokensBurnt := tokensBurnt + p.otherTokensBurnt - p.rewards
       if let some limit := ap.gasLimit then
-        if gasUsed ≥ limit then overLimit := true
+        if compute ≥ limit then overLimit := true
   -- Yields that timed out wake up with a resume receipt, after all incoming receipts.
-  let (stTimed, timeoutReceipts, timeoutBirths) := resolveYieldTimeouts ap ap.gasLimit gasUsed
+  let (stTimed, timeoutReceipts, timeoutBirths) := resolveYieldTimeouts ap ap.gasLimit compute
     (st.yieldTimeouts.length + 1) (st, [], [])
   st := stTimed
   outgoing := outgoing ++ timeoutReceipts

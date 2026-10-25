@@ -29,6 +29,10 @@ def GasProfile.addExt (profile : GasProfile) (name : String) (amount : Nat) : Ga
     let previous := ((profile.ext.find? (·.1 == name)).map (·.2)).getD 0
     { profile with ext := (name, previous + amount) :: profile.ext.filter (·.1 != name) }
 
+/-- All the gas the profile records. -/
+def GasProfile.total (profile : GasProfile) : Nat :=
+  (profile.ext.map (·.2)).sum + profile.actionBurnt + profile.wasm
+
 /-- One action fee: `send_sir`, `send_not_sir`, `execution`. -/
 structure Fee where
   sendSir : Nat := 0
@@ -70,6 +74,36 @@ structure ActionFees where
   gasKeyByte : Fee := {}
   gasKeyNonceWriteBase : Fee := {}
   deriving Repr, Inhabited
+
+/-- Replace the execution fee of the `ActionCosts` variant `name` (nearcore's snake_case
+name); `none` for a name this table does not have. -/
+def ActionFees.setExecution (f : ActionFees) (name : String) (execution : Nat) : Option ActionFees :=
+  let set (fee : Fee) : Fee := { fee with execution }
+  match name with
+  | "create_account" => some { f with createAccount := set f.createAccount }
+  | "delete_account" => some { f with deleteAccount := set f.deleteAccount }
+  | "deploy_contract_base" => some { f with deployContractBase := set f.deployContractBase }
+  | "deploy_contract_byte" => some { f with deployContractByte := set f.deployContractByte }
+  | "function_call_base" => some { f with functionCallBase := set f.functionCallBase }
+  | "function_call_byte" => some { f with functionCallByte := set f.functionCallByte }
+  | "transfer" => some { f with transfer := set f.transfer }
+  | "stake" => some { f with stake := set f.stake }
+  | "add_full_access_key" => some { f with addFullAccessKey := set f.addFullAccessKey }
+  | "add_function_call_key_base" => some { f with addFunctionCallKeyBase := set f.addFunctionCallKeyBase }
+  | "add_function_call_key_byte" => some { f with addFunctionCallKeyByte := set f.addFunctionCallKeyByte }
+  | "delete_key" => some { f with deleteKey := set f.deleteKey }
+  | "new_action_receipt" => some { f with newActionReceipt := set f.newActionReceipt }
+  | "new_data_receipt_base" => some { f with newDataReceiptBase := set f.newDataReceiptBase }
+  | "new_data_receipt_byte" => some { f with newDataReceiptByte := set f.newDataReceiptByte }
+  | "delegate" => some { f with delegate := set f.delegate }
+  | "use_global_contract_base" => some { f with useGlobalContractBase := set f.useGlobalContractBase }
+  | "use_global_contract_byte" => some { f with useGlobalContractByte := set f.useGlobalContractByte }
+  | "deploy_global_contract_base" => some { f with deployGlobalContractBase := set f.deployGlobalContractBase }
+  | "deploy_global_contract_byte" => some { f with deployGlobalContractByte := set f.deployGlobalContractByte }
+  | "gas_key_transfer_base" => some { f with gasKeyTransferBase := set f.gasKeyTransferBase }
+  | "gas_key_byte" => some { f with gasKeyByte := set f.gasKeyByte }
+  | "gas_key_nonce_write_base" => some { f with gasKeyNonceWriteBase := set f.gasKeyNonceWriteBase }
+  | _ => none
 
 /-- `ExtCosts` as a lookup by nearcore's snake_case name; missing names cost
 `0` so a partial table degrades gracefully instead of trapping. -/

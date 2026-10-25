@@ -234,7 +234,7 @@ theorem finalizeReceipt_nextId_mono (c : ReceiptCtx) (st : ChainState) (raw : Ex
     (fun e _ _ _ h => h.trans (Exec.addGasRefund_nextId_mono e _ _ _))
     (fun e _ _ h => by rw [Exec.creditReceiptReward_nextId]; exact h)
     (fun e h => h.trans (Exec.finishReceiptResult_nextId_mono e c failed))
-    (fun _ _ h => h)
+    (fun _ _ _ h => h)
   cases failed <;> first | exact hraw | exact Nat.le_refl _
 
 theorem applyActionReceipt_nextId_mono (c : ReceiptCtx) (st : ChainState) :

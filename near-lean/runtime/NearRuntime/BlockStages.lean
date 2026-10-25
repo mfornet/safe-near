@@ -13,7 +13,7 @@ def convertTransactions (cfg : RuntimeConfig) (ap : ApplyState) (initial : Chain
     | .ok (next, receipt, cost) =>
       let outcome : ExecutionOutcome := {
         executorId := tx.signerId, status := .successReceiptId receipt.receiptId
-        receiptIds := [receipt.receiptId], gasBurnt := cost.gasBurnt
+        receiptIds := [receipt.receiptId], gasBurnt := cost.gasBurnt, computeUsage := cost.gasBurnt
         tokensBurnt := cost.gasBurnt * ap.gasPrice }
       if tx.signerId == tx.receiverId then
         .yield (none, next, pass.2.2.1 ++ [(0, outcome)], pass.2.2.2.1,
@@ -42,8 +42,11 @@ def applyReceiptQueue (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes �
   let mut tokensBurnt := tokensBurnt
   let mut retainedDelayed : List Receipt := []
   let mut newlyDelayed : List Receipt := []
-  let mut gasUsed := outcomes.foldl (fun total pair => total + pair.2.gasBurnt) 0
-  let mut overLimit := ap.gasLimit.any (gasUsed ≥ ·)
+  -- `total.compute`: the chunk stops taking receipts once their compute reaches the gas limit.
+  -- nearcore divergence: nearcore also stops at the storage proof soft limit; the model records no
+  -- trie proof.
+  let mut compute := outcomes.foldl (fun total pair => total + pair.2.computeUsage) 0
+  let mut overLimit := ap.gasLimit.any (compute ≥ ·)
   let mut storageAccounting := ap.storageAccounting
   for (receipt, position) in queue.zipIdx do
     if overLimit then
@@ -62,14 +65,14 @@ def applyReceiptQueue (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes �
       outgoing := outgoing ++ processed.receipts
       outcomes := outcomes ++ processed.outcomes
       for (_, outcome) in processed.outcomes do
-        gasUsed := gasUsed + outcome.gasBurnt
+        compute := compute + outcome.computeUsage
         tokensBurnt := tokensBurnt + outcome.tokensBurnt
-      gasUsed := gasUsed + processed.extraCompute
+      compute := compute + processed.extraCompute
       tokensBurnt := tokensBurnt + processed.otherTokensBurnt - processed.rewards
       if let some limit := ap.gasLimit then
-        if gasUsed ≥ limit then overLimit := true
+        if compute ≥ limit then overLimit := true
   -- Yields that timed out wake up with a resume receipt, after all incoming receipts.
-  let (stTimed, timeoutReceipts, timeoutBirths) := resolveYieldTimeouts ap ap.gasLimit gasUsed
+  let (stTimed, timeoutReceipts, timeoutBirths) := resolveYieldTimeouts ap ap.gasLimit compute
     (st.yieldTimeouts.length + 1) (st, [], [])
   st := stTimed
   outgoing := outgoing ++ timeoutReceipts

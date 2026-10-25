@@ -334,5 +334,22 @@
     "global_contract_storage_amount_per_byte": "100000000000000000000",
     "include_deploy_global_contract_outcome_burnt_storage": false,
     "yield_with_id": false
+  },
+  "compute_costs": {
+    "action_execution": {},
+    "action_send": {},
+    "ext": {
+      "read_cached_trie_node": 4000000000,
+      "storage_has_key_base": 158000000000,
+      "storage_has_key_byte": 10000000,
+      "storage_large_read_overhead_base": 41000000000,
+      "storage_large_read_overhead_byte": 3111005,
+      "storage_read_base": 159000000000,
+      "storage_read_key_byte": 10000000,
+      "storage_read_value_byte": 2500000,
+      "storage_remove_base": 200000000000,
+      "storage_write_base": 200000000000,
+      "touching_trie_node": 4000000000
+    }
   }
 }

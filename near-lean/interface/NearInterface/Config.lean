@@ -118,6 +118,11 @@ structure RuntimeConfig where
   fixDeleteAccountGlobalContractStorageUsage : Bool := false
   /-- `FixDelegateActionDepositWithFunctionCallError`. -/
   fixDelegateActionDepositWithFunctionCallError : Bool := false
+  /-- `compute_costs.ext`: the `ExtCosts` whose compute cost differs from their gas cost. -/
+  extCompute : List (String × Nat) := []
+  /-- `compute_costs.action_execution`: the action execution fees whose compute cost differs from
+  their gas cost. Send fees always have compute equal to gas (the parser rejects other configs). -/
+  actionExecutionCompute : List (String × Nat) := []
   fees : FeesConfig
   wasm : WasmConfig
   accountCreation : AccountCreationConfig
@@ -126,6 +131,33 @@ structure RuntimeConfig where
   deriving Inhabited
 
 namespace RuntimeConfig
+
+/-- The action fees with each execution fee at its compute cost (`FeeComponent::compute`). -/
+def computeActionFees (cfg : RuntimeConfig) : ActionFees :=
+  cfg.actionExecutionCompute.foldl (fun fees (name, compute) => (fees.setExecution name compute).getD fees)
+    cfg.fees.actionFees
+
+/-- The compute cost of the `ExtCosts` named `name`: its override, else its gas cost. -/
+def extComputeCost (cfg : RuntimeConfig) (name : String) : Nat :=
+  (cfg.extCompute.lookup name).getD (cfg.wasm.extCosts.cost name)
+
+/-- `storage_removes_compute`: the compute of `count` storage removals of `keyBytes` key bytes
+and `valueBytes` value bytes in all, which the runtime charges without gas. -/
+def storageRemovesCompute (cfg : RuntimeConfig) (count keyBytes valueBytes : Nat) : Nat :=
+  cfg.extComputeCost "storage_remove_base" * count + cfg.extComputeCost "storage_remove_key_byte" * keyBytes +
+    cfg.extComputeCost "storage_remove_ret_value_byte" * valueBytes
+
+/-- `ProfileDataV3::total_compute_usage` of one VM call: each host cost's burnt gas scaled by
+its compute-to-gas ratio (rounded down per cost), plus the action and Wasm gas, whose
+compute equals their gas. -/
+def vmComputeUsage (cfg : RuntimeConfig) (profile : GasProfile) : Nat :=
+  let ext := profile.ext.foldl (fun total (name, gas) =>
+    total + match cfg.extCompute.lookup name with
+      | some compute =>
+        let unit := cfg.wasm.extCosts.cost name
+        if unit == 0 then gas else gas * compute / unit
+      | none => gas) 0
+  ext + profile.actionBurnt + profile.wasm
 
 private def field (j : Json) (k : String) : Except String Json :=
   match j.getObjVal? k with
@@ -217,6 +249,31 @@ private def extCosts (j : Json) : Except String ExtCosts := do
     pure { lookup := fun name => (arr.find? (·.1 == name)).map (·.2) |>.getD 0 }
   | _ => .error "ext_costs is not an object"
 
+private def natTable (j : Json) (what : String) : Except String (List (String × Nat)) := do
+  match j with
+  | .obj kvs =>
+    kvs.toArray.toList.mapM fun (k, v) => do
+      match v.getNat? with
+      | .ok n => pure (k, n)
+      | .error _ => throw s!"{what} {k} is not a natural number"
+  | _ => throw s!"{what} is not an object"
+
+/-- `compute_costs`: compute costs that differ from gas. Absent (configs dumped before it
+existed) means none. An unknown action name or a send-fee override is rejected: the model
+would otherwise charge it as gas. -/
+private def computeCosts (j : Json) (fees : ActionFees) :
+    Except String (List (String × Nat) × List (String × Nat)) := do
+  match field j "compute_costs" with
+  | .error _ => pure ([], [])
+  | .ok costs =>
+    let ext ← natTable (← field costs "ext") "ext compute cost"
+    let execution ← natTable (← field costs "action_execution") "action execution compute cost"
+    let send ← natTable (← field costs "action_send") "action send compute cost"
+    unless send.isEmpty do throw "action send fees with a compute cost other than gas are not modeled"
+    for (name, n) in execution do
+      if (fees.setExecution name n).isNone then throw s!"unknown action cost {name}"
+    pure (ext, execution)
+
 /-- Parse nearcore's `RuntimeConfigView` JSON. -/
 def ofJson (j : Json) : Except String RuntimeConfig := do
   let tc ← field j "transaction_costs"
@@ -288,6 +345,7 @@ def ofJson (j : Json) : Except String RuntimeConfig := do
     gasKeyByte
     gasKeyNonceWriteBase }
   let finance ← field j "runtime_finance"
+  let (computeExt, computeExecution) ← computeCosts j actionFees
   pure {
     strictNonceEnabled := ← (← field (← field j "runtime_admission") "strict_nonce").getBool?
     v1TransactionsEnabled := ← (← field (← field j "runtime_admission") "v1_transactions").getBool?
@@ -304,6 +362,8 @@ def ofJson (j : Json) : Except String RuntimeConfig := do
     globalContractDistributionNonce := extraFlag "global_contract_distribution_nonce"
     fixDeleteAccountGlobalContractStorageUsage := extraFlag "fix_delete_account_global_contract_storage_usage"
     fixDelegateActionDepositWithFunctionCallError := extraFlag "fix_delegate_action_deposit_with_function_call_error"
+    extCompute := computeExt
+    actionExecutionCompute := computeExecution
     fees := {
       actionFees
       gasRefundPenalty := ← ratio finance "gas_refund_penalty"

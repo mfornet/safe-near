@@ -131,7 +131,7 @@ theorem finalizeReceipt_outputIds (c : ReceiptCtx) (st : ChainState) (raw : Exec
     (fun e h => ⟨Exec.finishReceiptResult_outputIds e c failed h.1
         (fun output hm => (hcallbacks output hm).trans_le h.2),
       h.2.trans (Exec.finishReceiptResult_nextId_mono e c failed)⟩)
-    (fun _ _ h => h)).1
+    (fun _ _ _ h => h)).1
   cases failed with
   | none => exact ⟨hraw, hmono⟩
   | some error => exact ⟨fun receipt hm => by contradiction, Nat.le_refl _⟩

@@ -246,16 +246,17 @@ class Comparison(unittest.TestCase):
     def test_expected_outcomes_projection(self):
         bundle = tx_bundle()
         bundle["expected"]["outcomes"] = [
-            {"id": "aa", "view": {"executor_id": "alice.near", "status": {"SuccessReceiptId": nc.b58encode(bytes([7]) * 32)},
+            {"id": "aa", "computeUsage": 7, "view": {"executor_id": "alice.near", "status": {"SuccessReceiptId": nc.b58encode(bytes([7]) * 32)},
                                   "logs": ["l"], "receipt_ids": [nc.b58encode(bytes([7]) * 32)], "gas_burnt": 5,
                                   "tokens_burnt": "50"}},
-            {"id": "bb", "view": {"executor_id": "bob.near", "status": {"SuccessValue": base64.b64encode(b"hi").decode()},
+            {"id": "bb", "computeUsage": 1, "view": {"executor_id": "bob.near", "status": {"SuccessValue": base64.b64encode(b"hi").decode()},
                                   "logs": [], "receipt_ids": [], "gas_burnt": 1, "tokens_burnt": "10"}},
-            {"id": "cc", "view": {"executor_id": "bob.near", "status": {"Failure": {}}, "logs": [], "receipt_ids": [],
+            {"id": "cc", "computeUsage": 0, "view": {"executor_id": "bob.near", "status": {"Failure": {}}, "logs": [], "receipt_ids": [],
                                   "gas_burnt": 0, "tokens_burnt": "0"}}]
         rows = li.expected_outcomes(bundle)
         self.assertEqual(rows[0]["status"], ["receipt", (bytes([7]) * 32).hex()])
         self.assertEqual(rows[0]["tokensBurnt"], 50)
+        self.assertEqual(rows[0]["computeUsage"], 7)
         self.assertEqual(rows[1]["status"], ["value", list(b"hi")])
         self.assertEqual(rows[2]["status"], ["failure"])
 

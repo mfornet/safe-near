@@ -156,6 +156,12 @@ def deleteKeyMetadataState (c : ReceiptCtx) (st : ChainState) (account : Account
     let usage := account.storageUsage - (accessKeyStorageBytes pk key + extra)
     (st.setAccount id (account.withStorage usage)).removeAccessKey id pk
 
+/-- The compute of deleting `key`: removing its gas key nonces, if it is a gas key. -/
+def deleteKeyCompute (c : ReceiptCtx) (pk : PublicKey) (key : AccessKey) : Nat :=
+  match key.permission.gasKeyInfo? with
+  | some (_, nonces) => nonceRemovalCompute c.cfg (List.replicate nonces (c.receipt.receiverId, pk))
+  | none => 0
+
 theorem ChainState.foldl_setGasKeyNonce_routing (id : AccountId) (pk : PublicKey) (nonce : Nat) (lanes : List Nat)
     (st : ChainState) :
     (lanes.foldl (fun st lane => st.setGasKeyNonce id pk lane nonce) st).routingState = st.routingState := by
@@ -251,7 +257,8 @@ theorem applyDeleteKey_run (c : ReceiptCtx) (isLast : Bool) (pk : PublicKey) (be
           else
             let result := { before with
               state := deleteKeyMetadataState c before.state account pk key
-              actionTokensBurnt := before.actionTokensBurnt + key.gasBalance }
+              actionTokensBurnt := before.actionTokensBurnt + key.gasBalance
+              actionCompute := before.actionCompute + deleteKeyCompute c pk key }
             (.ok (), result) := by
   cases hk : before.state.accessKey? c.receipt.receiverId pk with
   | none => simp [-StateT.run_bind, applyAction, getState, hk]
@@ -263,7 +270,7 @@ theorem applyDeleteKey_run (c : ReceiptCtx) (isLast : Bool) (pk : PublicKey) (be
       | none =>
         have hb := AccessKey.gasBalance_of_none key hg
         simp [-StateT.run_bind, applyAction, getAccount, getState, putAccount, modifyState, hk, ha, hg, hb,
-          deleteKeyMetadataState, maxGasKeyBalanceToBurn, Account.withStorage]
+          deleteKeyMetadataState, deleteKeyCompute, maxGasKeyBalanceToBurn, Account.withStorage]
       | some info =>
         obtain ⟨balance, nonces⟩ := info
         have hb := AccessKey.gasBalance_of_some key balance nonces hg
@@ -271,7 +278,7 @@ theorem applyDeleteKey_run (c : ReceiptCtx) (isLast : Bool) (pk : PublicKey) (be
         · simp [-StateT.run_bind, applyAction, getAccount, getState, putAccount, modifyState, hk, ha, hg, hb,
             hmax]
         · simp [-StateT.run_bind, applyAction, getAccount, getState, putAccount, modifyState, hk, ha, hg, hb,
-            hmax, deleteKeyMetadataState, Exec.burnAction, Account.withStorage]
+            hmax, deleteKeyMetadataState, deleteKeyCompute, Exec.burnAction, Account.withStorage]
 
 theorem funded_addKey (c : ReceiptCtx) (isLast : Bool) (pk : PublicKey) (key : AccessKey) :
     (applyAction c isLast (.addKey pk key)).Funded c.cfg c.action.gasPrice 0 := by
