@@ -31,12 +31,19 @@ crypto-tests: crypto-build
 
 # Build the NEAR node (notes/design/NEAR_NODE.md) and its executables.
 node-build:
-    cd near-lean/node && lake build NearNode near-lean-node node-bench node-conformance-types node-trie-tests node-store-tests node-state-roots node-chain-validate node-chain-apply --wfail
+    cd near-lean/node && lake build NearNode near-lean-node node-bench node-conformance-types node-conformance-network node-trie-tests node-store-tests node-state-roots node-chain-validate node-chain-apply --wfail
 
 # M1: the Borsh codecs of every near-primitives type against the committed nearcore oracle fixtures.
 [positional-arguments]
 node-conformance-types *options: node-build
     near-lean/node/.lake/build/bin/node-conformance-types "$@"
+
+# M6: the peer protocol (protobuf messages and the Borsh types they carry) against the fixtures of nearcore's
+# own network code (`safe-near-network-oracle`, see tools/localnet/network_oracle.rs); the optional argument is the
+# fixtures directory.
+[positional-arguments]
+node-conformance-network *options: node-build
+    near-lean/node/.lake/build/bin/node-conformance-network "$@"
 
 # M4: the trie Impl against the Spec (NearInterface.TrieConstruction) on seeded random entry sets and
 # updates; the optional argument is the number of cases.
