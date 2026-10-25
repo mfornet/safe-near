@@ -137,15 +137,14 @@ def main (args : List String) : IO UInt32 := do
   let dir : System.FilePath := dir
   let configs : System.FilePath :=
     ((args.dropWhile (· != "--configs")).tail.head?).getD "near-lean/vm/configs"
-  let boot ←
-    Boot.load (dir / "meta.json") (dir / "genesis.json") (dir / "blocks.jsonl") configs
+  let boot ← Boot.load (dir / "meta.json") (dir / "genesis.json") (dir / "blocks.jsonl") configs
   let config := boot.config
   let genesis := boot.genesis
   let genesisHash := boot.genesisHash
   let rec0 := boot.genesisRec
   let genesisEpoch := boot.genesisEpoch
   let gv := rec0.view
-  let params := boot.params
+  let params := { boot.params with roundTrip := !args.contains "--no-round-trip" }
   let blockLines ← lines (dir / "blocks.jsonl")
   let mut given : Std.HashMap ByteArray (ByteArray × ByteArray) := {}
   for j in ← lines (dir / "epochs.jsonl") do
@@ -181,6 +180,11 @@ def main (args : List String) : IO UInt32 := do
         let shard := (← orThrow (nat r "shardId")).toUInt64
         pure (m.insert (h, shard) (← orThrow (parseBody r)))
   let applyOn := (args.contains "--no-apply") == false
+  let prof ←
+    if args.contains "--profile" then
+      pure (some (← Prof.new))
+    else
+      pure none
   -- the store: a chain that is already in it is continued, otherwise the genesis is written to it
   let storeDir? := (args.dropWhile (· != "--store")).tail.head?
   let mut store? : Option Store.Store := none
@@ -253,9 +257,10 @@ def main (args : List String) : IO UInt32 := do
             t := t.fail s!"update at height {height} shard {shard} differs"
       if applyOn then
         let empty : Body := { transactions := #[], claimedOutgoing := #[], claimedIncoming := #[] }
-        match
-          applyBlock params st block (fun shard => (bodies[(height, shard)]?).getD empty)
-            progress with
+        let applied ←
+          (applyBlock prof params st block (fun shard => (bodies[(height, shard)]?).getD empty)
+                progress).run
+        match applied with
         | .error m =>
           t := t.fail s!"block {height}: applying the chunks failed: {m}"
           break
@@ -345,4 +350,7 @@ def main (args : List String) : IO UInt32 := do
       s!"{genesis.chainId}: epochs {t.epochsEqual}/{t.epochs} equal, validator accounts updates {t.updatesEqual}/{t.updates} equal, chunks: ChunkExtra equal {t.extrasEqual}/{t.chunks}, pre-state round trip {t.roundTrips}/{t.chunks}, incoming receipts equal {t.receiptsEqual}/{t.receiptsChecked}, outgoing receipts equal {t.sentEqual}/{t.receiptsChecked}, blocks {t.accepted}/{t.blocks} accepted ({elapsed} ms)"
   for f in t.failures.extract 0 40 do
     IO.println s!"  FAIL {f}"
+  if let some pf := prof then
+    IO.eprintln s!"profile of the application of {t.blocks} blocks, {t.chunks} chunks:"
+    IO.eprintln (← pf.render)
   return if t.failures.isEmpty && t.blocks == t.accepted then 0 else 1

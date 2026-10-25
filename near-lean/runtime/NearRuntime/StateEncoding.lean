@@ -70,7 +70,8 @@ def globalIdentifier : Wasm.GlobalContractId → Except String Bytes
 
 /-- The contract an account points at (`AccountContract`): the hash of its own code, or the global
 identifier. -/
-def accountContract (local? : Option Bytes) (account : Account) : Except String Bytes :=
+def accountContract (local? : Option Bytes) (account : Account)
+    (digest : Bytes → Bytes := Sha256.hash) : Except String Bytes :=
   match account.global with
   | some (.codeHash hash) => do
     unless hash.length == 32 do throw "global code hash is not 32 bytes"
@@ -80,24 +81,26 @@ def accountContract (local? : Option Bytes) (account : Account) : Except String 
     return [3] ++ (← vector id)
   | none =>
     match local? with
-    | some bytes => pure ([1] ++ Sha256.hash bytes)
+    | some bytes => pure ([1] ++ digest bytes)
     | none => pure [0]
 
 /-- `Account`: V1 unless the account ever pointed at a global contract (`AccountV2`, behind the
 `u128::MAX` sentinel). -/
-def accountValue (local? : Option Bytes) (account : Account) : Except String Bytes := do
+def accountValue (local? : Option Bytes) (account : Account) (digest : Bytes → Bytes := Sha256.hash) :
+    Except String Bytes := do
   let amount ← unsigned 16 account.amount
   let locked ← unsigned 16 account.locked
   let storage ← unsigned 8 account.storageUsage
   if account.versionTwo || account.global.isSome then
-    return List.replicate 16 255 ++ [0] ++ amount ++ locked ++ storage ++ (← accountContract local? account)
+    return List.replicate 16 255 ++ [0] ++ amount ++ locked ++ storage ++ (← accountContract local? account digest)
   else
-    return amount ++ locked ++ (local?.elim (List.replicate 32 0) Sha256.hash) ++ storage
+    return amount ++ locked ++ (local?.elim (List.replicate 32 0) digest) ++ storage
 
 /-- Encode actual runtime records. Code payloads must be present, size-matched,
 and SHA256-bound to the model's canonical hash name. No native output is input.
 `nextId` is manipulator metadata and has no native trie column. -/
-def encode (state : ChainState) (codes : List (String × Bytes)) : Except String (List (Bytes × Bytes)) := do
+def encode (state : ChainState) (codes : List (String × Bytes))
+    (digest : Bytes → Bytes := Sha256.hash) : Except String (List (Bytes × Bytes)) := do
   unless state.postponed.isEmpty && state.pendingDataCount.isEmpty && state.postponedByData.isEmpty &&
       state.receivedData.isEmpty && state.delayed.isEmpty do
     throw "native receipt/data identity encoding is unavailable"
@@ -106,7 +109,7 @@ def encode (state : ChainState) (codes : List (String × Bytes)) : Except String
   unique "storage account" (state.storage.map Prod.fst)
   unique "catalogue hash" (codes.map Prod.fst)
   for (name, bytes) in codes do
-    unless base58 (Sha256.hash bytes) == name do throw "code hash does not bind catalogue bytes"
+    unless base58 (digest bytes) == name do throw "code hash does not bind catalogue bytes"
   let mut entries := []
   for (id, account) in state.accounts do
     let id ← accountId id
@@ -114,7 +117,7 @@ def encode (state : ChainState) (codes : List (String × Bytes)) : Except String
       let some bytes := Assoc.lookup codes code.hash | throw "code bytes absent from catalogue"
       unless bytes.length == code.size do throw "code size disagrees with catalogue bytes"
       return bytes
-    entries := entries ++ [([0] ++ id, ← accountValue code account)]
+    entries := entries ++ [([0] ++ id, ← accountValue code account digest)]
     if let some bytes := code then entries := entries ++ [([1] ++ id, bytes)]
   for ((id, pk), key) in state.accessKeys do
     unless Assoc.contains state.accounts id do throw "access key account is absent"

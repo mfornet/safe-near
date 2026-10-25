@@ -78,6 +78,8 @@ structure Hooks where
   onHeaders : Array BlockHeader → IO Unit
   onBlock : Block → IO Unit
   onRouted : RoutedMessage → IO Unit
+  /-- A state sync response, which arrives on a Tier 3 connection the peer opens to this node. -/
+  onStateResponse : StateResponseInfo → IO Unit
   /-- The block sent to the peer every minute. -/
   latestBlock : IO (Option Block)
   headersAfter : Array CryptoHash → IO (Array BlockHeader)
@@ -176,6 +178,8 @@ private def handle (env : Env) (hooks : Hooks) (link : Link) (m : PeerMessage) :
     hooks.onHeaders hs
   | .block b =>
     hooks.onBlock b
+  | .versionedStateResponse i =>
+    hooks.onStateResponse i
   | .routed r =>
     if !r.verify then
       return some ⟨"a routed message with an invalid signature", false⟩
@@ -203,12 +207,13 @@ private def handle (env : Env) (hooks : Hooks) (link : Link) (m : PeerMessage) :
 /-- The loop over one connection until it ends. -/
 partial def runLink (env : Env) (hooks : Hooks) (link : Link) : IO Ended := do
   let started ← IO.monoMsNow
-  -- what a new connection sends
+  -- what a new connection sends; a Tier 3 connection only carries state sync responses
   let graph ← env.graph.get
-  env.outbox.modify (·.push (.syncRoutingTable ⟨graph.toArray.map (·.2), #[]⟩))
-  env.outbox.modify (·.push (.syncSnapshotHosts #[]))
-  if link.outbound then
-    env.outbox.modify (·.push (.syncAccountsData ⟨#[], false, true⟩))
+  if link.tier != .t3 then
+    env.outbox.modify (·.push (.syncRoutingTable ⟨graph.toArray.map (·.2), #[]⟩))
+    env.outbox.modify (·.push (.syncSnapshotHosts #[]))
+    if link.outbound then
+      env.outbox.modify (·.push (.syncAccountsData ⟨#[], false, true⟩))
   let mut lastPeers : Option Nat := none
   let mut lastBlock : Option Nat := none
   let mut lastNonce := started
@@ -220,10 +225,10 @@ partial def runLink (env : Env) (hooks : Hooks) (link : Link) : IO Ended := do
       break
     let now ← IO.monoMsNow
     -- the periodic messages
-    if lastPeers.all (fun t => now - t ≥ minuteMs) then
+    if link.tier != .t3 && lastPeers.all (fun t => now - t ≥ minuteMs) then
       env.outbox.modify (·.push (.peersRequest ⟨some 32, some 128⟩))
       lastPeers := some now
-    if lastBlock.all (fun t => now - t ≥ minuteMs) then
+    if link.tier != .t3 && lastBlock.all (fun t => now - t ≥ minuteMs) then
       if let some b← hooks.latestBlock then
         env.outbox.modify (·.push (.block b))
       lastBlock := some now
@@ -232,7 +237,9 @@ partial def runLink (env : Env) (hooks : Hooks) (link : Link) : IO Ended := do
       env.outbox.modify (·.push (.requestUpdateNonce (env.cfg.key.partialEdge link.peer nonce)))
       lastNonce := now
     if now - lastReport ≥ 2000 then
-      env.log (← hooks.status)
+      let line ← hooks.status
+      if !line.isEmpty then
+        env.log line
       lastReport := now
     hooks.tick
     -- everything queued goes out

@@ -332,6 +332,34 @@ def validateChunkHeaders (st : ChainState) (v : HeaderView) (prev : BlockRec)
   let expected := (newChunks chunks v.height).foldl (fun a c => a ++ c.prevValidatorProposals) #[]
   guardErr (expected != v.prevValidatorProposals) "InvalidValidatorProposals"
 
+/-- What `start_process_block_async` checks of a block beyond its header (`validate_header` and the
+orphan and known checks are the caller's): the VRF and `random_value`, `validate_block_impl`, the
+shard split, the gas price and total supply, the chunk headers and the chunk endorsements. `prev` is
+the parent; where its chunk headers are not known (a header-only record) the comparison of old chunks
+with them is empty. -/
+def validateBody (st : ChainState) (block : Block) (v : HeaderView) (prev : BlockRec) :
+    Result Unit := do
+  let chunks := block.chunks
+  -- the VRF
+  let producer ← st.blockProducer v.epochId v.height
+  let (vrfValue, vrfProof) := block.vrf
+  match producer.publicKey with
+  | .ed25519 key =>
+    guardErr
+        (!NearCrypto.Vrf.Impl.blockVrfValid key prev.view.randomValue.bytes vrfValue.bytes
+            vrfProof.bytes)
+        "InvalidRandomnessBeaconOutput"
+  | _ =>
+    fail "InvalidRandomnessBeaconOutput"
+  guardErr (v.randomValue.bytes != NearCrypto.Vrf.Impl.randomValue vrfValue.bytes)
+      "InvalidRandomnessBeaconOutput"
+  validateBlockImpl st block v
+  validateBlockShardSplit st v
+  validateEconomics st v prev chunks
+  validateChunkHeaders st v prev chunks
+  validateChunkEndorsementsInBlock st block v chunks
+  guardErr block.isSpiceBlock "Other" "encountered spice block without spice feature enabled"
+
 /-- The block is rejected or accepted by nearcore's checks that need no chunk bodies; `Chain`'s
 `start_process_block_async` up to `ping_missing_chunks`. -/
 def validateBlock (st : ChainState) (block : Block) : Result Unit := do
@@ -359,25 +387,7 @@ def validateBlock (st : ChainState) (block : Block) : Result Unit := do
     fail "Orphan"
   let prev ← st.block v.prevHash
   validateHeader st v hash
-  -- the VRF
-  let producer ← st.blockProducer v.epochId v.height
-  let (vrfValue, vrfProof) := block.vrf
-  match producer.publicKey with
-  | .ed25519 key =>
-    guardErr
-        (!NearCrypto.Vrf.Impl.blockVrfValid key prev.view.randomValue.bytes vrfValue.bytes
-            vrfProof.bytes)
-        "InvalidRandomnessBeaconOutput"
-  | _ =>
-    fail "InvalidRandomnessBeaconOutput"
-  guardErr (v.randomValue.bytes != NearCrypto.Vrf.Impl.randomValue vrfValue.bytes)
-      "InvalidRandomnessBeaconOutput"
-  validateBlockImpl st block v
-  validateBlockShardSplit st v
-  validateEconomics st v prev chunks
-  validateChunkHeaders st v prev chunks
-  validateChunkEndorsementsInBlock st block v chunks
-  guardErr block.isSpiceBlock "Other" "encountered spice block without spice feature enabled"
+  validateBody st block v prev
 
 /-- Validate a block and, if it is accepted, record it. -/
 def acceptBlock (st : ChainState) (block : Block) : Result ChainState := do

@@ -1,3 +1,4 @@
+import NearNode.Zstd
 import NearNode.Primitives.Epoch
 import NearNode.Primitives.Block
 
@@ -258,16 +259,27 @@ def payloadLength : StatePart → Nat
 def entryLimit : Nat :=
   2 * statePartMemoryLimit / 50
 
-/-- `StatePart::to_partial_state` for an uncompressed part: the Borsh `PartialState`, if its entry
-count is within the limit. A compressed part needs zstd, which is not implemented. -/
+/-- `PART_SIZE_LIMIT`: the most a decompressed part may be. -/
+def sizeLimit : Nat :=
+  512 * 1048576
+
+/-- The Borsh `PartialState` of decompressed bytes, if its entry count is within the limit. -/
+private def partialOfBytes? (bytes : ByteArray) : Option PartialState :=
+  if bytes.size < 5 || bytes.get! 0 != 0 then none
+  else
+    match Codec.decodeAll (α := UInt32) (bytes.extract 1 5) with
+    | .ok n => if n.toNat ≤ entryLimit then (Codec.decodeAll bytes).toOption else none
+    | .error _ => none
+
+/-- `StatePart::to_partial_state`: the Borsh `PartialState` of an uncompressed part, or of a zstd
+frame (`NearNode.Zstd`) decompressed to at most `sizeLimit` bytes, if its entry count is within the
+limit. -/
 def toPartialState? : StatePart → Option PartialState
-  | .v0 p =>
-    if p.bytes.size < 5 || p.bytes.get! 0 != 0 then none
-    else
-      match Codec.decodeAll (α := UInt32) (p.bytes.extract 1 5) with
-      | .ok n => if n.toNat ≤ entryLimit then (Codec.decodeAll p.bytes).toOption else none
-      | .error _ => none
-  | .v1 _ => none
+  | .v0 p => partialOfBytes? p.bytes
+  | .v1 p =>
+    match Zstd.decompress p.bytesCompressed sizeLimit with
+    | .ok bytes => partialOfBytes? bytes
+    | .error _ => none
 
 end StatePart
 
@@ -407,5 +419,27 @@ structure GenesisId where
 
 instance : Codec GenesisId :=
   .iso (String × CryptoHash) (fun (c, h) => ⟨c, h⟩) fun x => (x.chainId, x.hash)
+
+end Near.Node
+
+namespace Near.Node
+
+namespace ShardStateSyncResponse
+
+/-- `take_header`. -/
+def takeHeader? : ShardStateSyncResponse → Option ShardStateSyncResponseHeader
+  | .v1 r => r.header.map .v1
+  | .v2 r => r.header.map .v2
+  | .v3 r => r.header.map .v2
+  | .v4 r => r.header.map .v2
+
+/-- `take_part`: an old response carries the bytes of an uncompressed part. -/
+def takePart? : ShardStateSyncResponse → Option (UInt64 × StatePart)
+  | .v1 r => r.part.map fun (i, b) => (i, .v0 ⟨b⟩)
+  | .v2 r => r.part.map fun (i, b) => (i, .v0 ⟨b⟩)
+  | .v3 r => r.part.map fun (i, b) => (i, .v0 ⟨b⟩)
+  | .v4 r => r.part
+
+end ShardStateSyncResponse
 
 end Near.Node

@@ -112,11 +112,9 @@ impl CloneBytes for PartialState {
 }
 
 fn part_fields(p: &StatePart) -> Vec<(&'static str, String)> {
-    // Only an uncompressed part is checked: the Lean side has no zstd.
-    let partial = match p {
-        StatePart::V0(_) => p.to_partial_state().map(|s| hex(&ser(&s))).unwrap_or_default(),
-        StatePart::V1(_) => String::new(),
-    };
+    // The decoded partial state of either version (a compressed part is a zstd frame); empty where
+    // nearcore refuses it.
+    let partial = p.to_partial_state().map(|s| hex(&ser(&s))).unwrap_or_default();
     vec![("payloadLength", hex(&(p.payload_length() as u64).to_le_bytes())), ("partialState", partial)]
 }
 

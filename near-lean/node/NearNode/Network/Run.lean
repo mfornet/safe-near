@@ -35,6 +35,20 @@ structure Options where
   appliedLog : Option System.FilePath := none
   report : Option System.FilePath := none
   quiet : Bool := false
+  /-- Where the state comes from (`blocks`: the genesis; `state`; `auto`). -/
+  mode : SyncMode := .blocks
+  /-- The shards applied; `none` is all of them. -/
+  tracked : Option (Array UInt64) := none
+  /-- The address the peer reaches this node at for state sync answers; default `127.0.0.1:listen`. -/
+  publicAddr : Option Addr := none
+  /-- One JSON line a second: the heights of the peer, the headers, the bodies and the applied blocks. -/
+  lagLog : Option System.FilePath := none
+  /-- Time the stages of chunk application and report them. -/
+  profile : Bool := false
+  /-- Keep the state sync headers and block headers here, for tests. -/
+  saveState : Option System.FilePath := none
+  /-- The node has reached the head when the applied height is within this many blocks of the peer's. -/
+  reachLag : Nat := 5
 
 /-- A node key from a `node_key.json`, or a new one written to `file`. -/
 def loadOrCreateKey (file : System.FilePath) : IO NodeKey := do
@@ -67,6 +81,14 @@ structure Summary where
   applied : UInt64 := 0
   reachedHeadAt : Option Nat := none
   seconds : Nat := 0
+  /-- The most the applied height trailed the peer's, once the node had reached the head. -/
+  maxLagAfterHead : Nat := 0
+  /-- The greatest lag seen at all, and the sum and number of the samples (once a second). -/
+  maxLag : Nat := 0
+  lagSum : Nat := 0
+  lagSamples : Nat := 0
+  /-- Seconds the lag was above the reach threshold after the node had reached the head. -/
+  behindSeconds : Nat := 0
 
 private def ratio (a b : Nat) : String :=
   s!"{a}/{b}"
@@ -89,7 +111,9 @@ def run (o : Options) : IO UInt32 := do
   let mut progress := boot.progress
   let mut store? : Option Store.Store := none
   let mut resumed := false
-  if o.apply then
+  if o.apply && o.mode != .blocks && o.store.isSome then
+    log "a node that syncs state does not keep a store: it syncs again after a restart"
+  if o.apply && o.mode == .blocks then
     if let some dir := o.store then
       let (s, _) ← Store.Store.open dir
       match ← orThrow (Near.Node.Apply.load boot.config (← s.view)) with
@@ -103,8 +127,11 @@ def run (o : Options) : IO UInt32 := do
       store? := some s
   let shared ← Shared.new st.headHeight
   let outbox ← IO.mkRef #[]
+  let addr : Addr := o.publicAddr.getD ⟨ByteArray.mk #[127, 0, 0, 1], o.listen.getD 0⟩
   let driver ←
-    Driver.new { key, peer := (o.peers[0]!).1, setup := boot.genesis.setup, apply := o.apply }
+    Driver.new
+        { key, peer := (o.peers[0]!).1, setup := boot.genesis.setup, apply := o.apply,
+          mode := o.mode, tracked := o.tracked, addr := .v4 (addr.ip.extract 0 4) addr.port }
         shared st outbox clock
   let appliedLog ←
     match o.appliedLog with
@@ -114,9 +141,17 @@ def run (o : Options) : IO UInt32 := do
       pure none
   let stats ← IO.mkRef ({} : ApplyStats)
   let progressRef ← IO.mkRef progress
+  let prof ←
+    if o.profile then
+      pure (some (← Prof.new))
+    else
+      pure none
   let workerEnv : WorkerEnv :=
-    { params := boot.params, shared, store := store?, progress := progressRef, stats, appliedLog,
-      log }
+    {
+      params :=
+        { boot.params with
+          roundTrip := false, tracked := o.tracked },
+      shared, store := store?, progress := progressRef, stats, appliedLog, log, prof }
   let worker ←
     if o.apply then
       some <$> IO.asTask (applyLoop workerEnv) Task.Priority.dedicated
@@ -128,47 +163,89 @@ def run (o : Options) : IO UInt32 := do
   let env : Env :=
     { cfg, clock, outbox, graph := ← IO.mkRef {}, stop := shared.stop, counts := ← IO.mkRef {},
       edgesOk := ← IO.mkRef 0, edgesBad := ← IO.mkRef 0, log }
-  -- when to stop
+  -- when to stop, and the lag samples
+  let lagHandle ←
+    match o.lagLog with
+    | some f =>
+      pure (some (← IO.FS.Handle.mk f .write))
+    | none =>
+      pure none
+  let lastSample ← IO.mkRef 0
+  let notesShown ← IO.mkRef 0
   let monitor : IO Unit := do
     let now ← IO.monoMsNow
     let elapsed := (now - started) / 1000
     let s ← driver.state.get
     let applied ← shared.applied.get
+    let syncDone := s.sync.all (·.done) || s.sync.isNone
     summary.modify fun x =>
         { x with
-          peerHeight := s.peerHeight, tipHeight := s.tipHeight, validated := s.validated, applied }
+          peerHeight := s.peerHeight, tipHeight := s.st.headHeight, validated := s.validated,
+          applied }
+    for note in s.notes.extract (← notesShown.get) s.notes.size do
+      log note
+    notesShown.set s.notes.size
     if (← shared.failure.get).isSome then
       shared.stop.set true
     if let some limit := o.seconds then
       if elapsed ≥ limit then
         shared.stop.set true
+    -- the height the node is measured by: what it applied, or the headers when it applies nothing
+    let mine := if o.apply then applied else s.st.headHeight
+    let lag := if s.peerHeight > mine then (s.peerHeight - mine).toNat else 0
+    let atHead :=
+      s.peerHeight > 0 && s.hdrQueue.isEmpty && s.st.headHeight + 2 ≥ s.peerHeight &&
+        (!o.apply || (syncDone && s.cursor.isSome && lag ≤ o.reachLag))
+    let x ← summary.get
+    if x.reachedHeadAt.isNone && atHead then
+      summary.modify fun x => { x with reachedHeadAt := some elapsed }
+      log s!"reached the peer's head at height {mine} after {elapsed} s"
+    if now - (← lastSample.get) ≥ 1000 && s.peerHeight > 0 then
+      lastSample.set now
+      let unixMs ← Std.Time.Timestamp.now
+      if let some h := lagHandle then
+        h.putStrLn
+            s!"\{\"unixMs\":{unixMs.toMillisecondsSinceUnixEpoch.val},\"peer\":{s.peerHeight},\"headers\":{s.st.headHeight},\"bodies\":{s.bodyTipHeight},\"applied\":{applied},\"blocks\":{(← stats.get).blocks}}"
+        h.flush
+      summary.modify fun x =>
+          { x with
+            maxLag := Nat.max x.maxLag lag, lagSum := x.lagSum + lag,
+            lagSamples := x.lagSamples + 1,
+            maxLagAfterHead :=
+              if x.reachedHeadAt.isSome then Nat.max x.maxLagAfterHead lag else x.maxLagAfterHead,
+            behindSeconds :=
+              x.behindSeconds + (if x.reachedHeadAt.isSome && lag > o.reachLag then 1 else 0) }
     if let some follow := o.follow then
       let x ← summary.get
-      -- caught up: the tip is the peer's head and nothing is waiting
-      if
-          x.reachedHeadAt.isNone && s.peerHeight > 0 && s.tipHeight + 2 ≥ s.peerHeight &&
-            s.pending.isEmpty then
-        summary.modify fun x => { x with reachedHeadAt := some elapsed }
-        log s!"reached the peer's head at height {s.tipHeight}"
       if let some t := x.reachedHeadAt then
-        let drainOver := !o.apply || applied + 3 ≥ s.tipHeight || elapsed ≥ t + follow + o.drain
-        if elapsed ≥ t + follow && drainOver then
+        if elapsed ≥ t + follow then
           shared.stop.set true
   let hooks : Hooks :=
     { tick := do
         driver.tick;
         monitor
       onHeaders := driver.onHeaders, onBlock := driver.onBlock, onRouted := driver.onRouted
+      onStateResponse := driver.onStateResponse
       latestBlock := do
-        driver.blockOf (← driver.state.get).tipHash
+        let s ← driver.state.get
+        match s.cursor with
+        | some h =>
+          driver.blockOf h
+        | none =>
+          pure none
       headersAfter := driver.headersAfter, blockOf := driver.blockOf
       status := do
         let s ← driver.state.get
         let a ← shared.applied.get
         let q := (← shared.queue.get).size
         let wk ← stats.get
+        let syncInfo :=
+          match s.sync with
+          | some y =>
+            s!" state {y.headers.size}/{y.shards.size} headers {y.parts.size} parts{if y.done then " done" else ""}"
+          | none => ""
         pure
-            s!"tip {s.tipHeight} (peer {s.peerHeight}) validated {s.validated} staged {s.staged.size} jobs {s.jobs.size} queued {q} applied {a} ({wk.chunks} chunks)" }
+            s!"headers {s.st.headHeight} (peer {s.peerHeight}) bodies {s.bodyTipHeight} staged {s.staged.size} jobs {s.jobs.size} queued {q} applied {a} ({wk.chunks} chunks){syncInfo}" }
   -- the listener
   let listener ←
     match o.listen with
@@ -247,16 +324,23 @@ def run (o : Options) : IO UInt32 := do
   let failure ← shared.failure.get
   let elapsed := ((← IO.monoMsNow) - started) / 1000
   let applied ← shared.applied.get
+  let profileText : Json ←
+    match workerEnv.prof with
+    | some p =>
+      pure (Json.str (← p.render))
+    | none =>
+      pure Json.null
   let json : Json :=
     Json.mkObj
       [("chainId", boot.genesis.chainId), ("genesisHash", base58Encode boot.genesisHash.bytes),
         ("nodePeerId", key.peerId.key.toText), ("handshakes", jsonNat x.handshakes),
         ("disconnects", Json.arr (x.disconnects.map Json.str)),
         ("peerHeight", jsonNat s.peerHeight.toNat), ("startHeight", jsonNat x.startHeight.toNat),
-        ("tipHeight", jsonNat s.tipHeight.toNat), ("blocksValidated", jsonNat s.validated),
-        ("appliedHeight", jsonNat applied.toNat), ("blocksApplied", jsonNat wk.blocks),
-        ("chunksApplied", jsonNat wk.chunks), ("extrasChecked", jsonNat wk.extrasChecked),
-        ("extrasAgree", jsonNat wk.extrasAgree), ("receiptsChecked", jsonNat wk.receiptsChecked),
+        ("tipHeight", jsonNat s.st.headHeight.toNat), ("blocksValidated", jsonNat s.validated),
+        ("headersAccepted", jsonNat s.headersAccepted), ("appliedHeight", jsonNat applied.toNat),
+        ("blocksApplied", jsonNat wk.blocks), ("chunksApplied", jsonNat wk.chunks),
+        ("extrasChecked", jsonNat wk.extrasChecked), ("extrasAgree", jsonNat wk.extrasAgree),
+        ("receiptsChecked", jsonNat wk.receiptsChecked),
         ("receiptsAgree", jsonNat wk.receiptsAgree),
         ("mismatches", Json.arr (wk.mismatches.map Json.str)), ("applyMillis", jsonNat wk.millis),
         ("reachedHeadAtSeconds",
@@ -269,6 +353,37 @@ def run (o : Options) : IO UInt32 := do
         ("received", Json.mkObj (counts.toList.map fun (k, v) => (k, jsonNat v))),
         ("chunkResponses", jsonNat s.chunkResponses),
         ("chunkPartsRefused", jsonNat s.chunkPartsRefused),
+        ("mode",
+          match o.mode with
+          | .blocks => "blocks"
+          | .state => "state"
+          | .auto => "auto"),
+        ("headersDoneAtSeconds",
+          match s.headersDoneAt with
+          | some t => jsonNat ((t - started) / 1000)
+          | none => Json.null),
+        ("stateSync",
+          match s.sync with
+          | none => Json.null
+          | some y =>
+            Json.mkObj
+              [("syncHash", base58Encode y.hash.bytes),
+                ("shards", Json.arr (y.shards.map fun x => jsonNat x.toNat)),
+                ("headers", jsonNat y.headers.size), ("parts", jsonNat y.parts.size),
+                ("partBytes", jsonNat y.partBytes), ("refused", jsonNat y.refused),
+                ("acks", jsonNat y.acks), ("busy", jsonNat y.busy), ("done", Json.bool y.done),
+                ("startedAtSeconds", jsonNat ((y.startedAt - started) / 1000)),
+                ("doneAtSeconds", jsonNat ((y.doneAt - started) / 1000)),
+                ("startHeights",
+                  Json.arr
+                    (y.headers.toArray.map fun (k, st) =>
+                      Json.mkObj
+                        [("shard", jsonNat k.toNat), ("height", jsonNat st.height.toNat),
+                          ("numParts", jsonNat st.numParts.toNat)]))]),
+        ("maxLag", jsonNat x.maxLag), ("maxLagAfterHead", jsonNat x.maxLagAfterHead),
+        ("meanLag",
+          Json.num ⟨(if x.lagSamples == 0 then 0 else (x.lagSum * 1000 / x.lagSamples : Nat)), 3⟩),
+        ("behindSecondsAfterHead", jsonNat x.behindSeconds), ("profile", profileText),
         ("failure",
           match failure with
           | some f => Json.str f
