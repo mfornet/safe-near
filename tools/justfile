@@ -63,6 +63,12 @@ node-state-roots *options: node-build
 chain-validate-corpus: node-build
     python3 tools/localnet/chain_validate.py
 
+# M6: the Lean node as a peer of the pinned neard localnet: handshake, routing exchange, every block validated and
+# applied, followed for a while; roots and ChunkExtra compared with neard's (see notes/design/NEAR_NODE.md, M6).
+[positional-arguments]
+localnet-peer *options: node-build
+    python3 tools/localnet/peer_accept.py "$@"
+
 # M5a: rebuild the block corpus from the localnet databases (needs `python3 tools/localnet/build.py --only
 # safe-near-chain-export` and the databases of `just corpus-generate`).
 [positional-arguments]
