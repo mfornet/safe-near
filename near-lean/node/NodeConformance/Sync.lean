@@ -17,7 +17,7 @@ private def headerFields (h : ShardStateSyncResponseHeader) : List (String × By
   [("numParts", encodeOpt h.numStateParts), ("heightIncluded", Codec.encode h.chunkHeightIncluded),
     ("prevStateRoot", h.chunkPrevStateRoot.bytes)]
 
-/-- Only an uncompressed part is checked: there is no zstd. -/
+/-- The decoded partial state of either version (a compressed part is a zstd frame). -/
 private def partFields (p : StatePart) : List (String × ByteArray) :=
   [("payloadLength", Codec.encode p.payloadLength.toUInt64),
     ("partialState",

@@ -1,4 +1,6 @@
 import NearNode.Chain.StateDecode
+import NearNode.Trie
+import NearNode.Chain.Profile
 import ChainReplay.ShardChunk
 import ChainReplay.DelegateSignature
 import ChainReplay.HostCrypto
@@ -72,6 +74,17 @@ private def proposalsOf (proposals : List Near.ValidatorProposal) :
         throw s!"proposal key: {repr e}"
     out := out.push (.v1 ⟨⟨p.account⟩, key, ⟨p.stake⟩⟩)
   return out
+
+/-- The trie of a shard's stored state as the runtime's storage accounting reads it
+(`TrieOverlay.start` builds the same from the entries; this reads the objects the node holds). -/
+def overlayOf (src : Near.Node.Trie.NodeSource) (root : CryptoHash)
+    (entries : Array (ByteArray × ByteArray)) : Except String Near.TrieOverlay.State := do
+  let (usage, objects) ← Near.Node.Trie.objects src root
+  pure
+      { entries := entries.toList.map fun (k, v) => (k.toList, v.toList),
+        base :=
+          { root := root.bytes.toList, memoryUsage := usage.toNat,
+            witness := objects.toList.map fun (h, b) => (h.bytes.toList, b.toList) } }
 
 /-- Everything the runtime consumes for one chunk, converted. -/
 structure Prepared where
@@ -149,129 +162,153 @@ def prepare (entries : Array (ByteArray × ByteArray)) (txs : Array SignedTransa
 def reencode (cfg : Wasm.Near.RuntimeConfig) (p : Prepared) :
     Except String (List (List UInt8 × List UInt8)) := do
   let catalogue := p.codes.map fun c => (c.code.hash, c.bytes)
-  let entries ← Near.QueueEncoding.encode p.initial.state catalogue p.context (some cfg)
+  let entries ← Near.QueueEncoding.encode p.initial.state catalogue p.context (some cfg) digest
   let shard ← p.shard.entries
   pure (entries ++ shard)
 
-/-- Run a prepared chunk (one block of `Registered.run`). -/
-def runChunk (cfg : Wasm.Near.RuntimeConfig) (congestion : Near.Congestion.Config)
-    (ctx : ChunkContext) (p : Prepared) : Except String ChunkResult := do
+/-- Run a prepared chunk (one block of `Registered.run`). Each stage is charged to `prof` under the
+name `run/...`. -/
+def runChunk (prof : Option Prof) (cfg : Wasm.Near.RuntimeConfig)
+    (congestion : Near.Congestion.Config) (ctx : ChunkContext) (p : Prepared)
+    (overlay : Option Near.TrieOverlay.State) : AM ChunkResult := do
   let catalogue := p.codes.map fun c => (c.code.hash, c.bytes)
-  let _ ← Near.QueueEncoding.encode p.initial.state catalogue p.context (some cfg)
   let mut snapshot := p.initial
   if let some update := ctx.update then
-    snapshot := { snapshot with state := ← update.apply snapshot.state }
-  let trie ← ChainReplay.ShardChunk.start cfg catalogue p.context snapshot.state p.shard
+    snapshot ←
+      timed prof "run/accounts-update" fun _ => do
+          pure { snapshot with state := ← update.apply snapshot.state }
+  -- the trie of the state the chunk starts from: the node's own when the state is the one it stores
+  -- (not after the epoch's accounts update), otherwise built from the encoded state
+  let trie ←
+    timed prof "run/shard-start" fun _ =>
+        match overlay with
+        | some o => pure o
+        | none => do
+          Near.TrieOverlay.start
+              ((← Near.QueueEncoding.encode snapshot.state catalogue p.context (some cfg) digest) ++
+                (← p.shard.entries))
   let inputs :=
     (p.block.txs.zip p.hashes).map fun (transaction, blockHash) =>
       ({ transaction, blockHash } : Near.TransactionRegistry.Input)
   let admitted ←
-    Near.TransactionRegistry.observe cfg p.block.ap catalogue snapshot.state inputs p.context
+    timed prof "run/transaction-registry" fun _ =>
+        Near.TransactionRegistry.observe cfg p.block.ap catalogue snapshot.state inputs p.context
+          (preflight := false)
   let block :=
     { p.block with
       ap :=
         { p.block.ap with
           nativeReceiptHashes := some admitted.context.receipts, storageAccounting := some trie,
           verifyDelegate := ChainReplay.DelegateSignature.verify catalogue } }
-  match Near.step cfg (ChainReplay.codeOf p.codes) snapshot block with
-  | .error e =>
-    throw s!"invalid receipt schedule: {repr e}"
-  | .ok (next, result) =>
-    if let some issue := result.issue then
-      throw s!"model execution issue: {issue.2.message}"
-    let context ←
-      Near.ReceiptRegistry.observeQueues cfg catalogue block.ap.blockHeight snapshot.state result
+  let (next, result) ←
+    timed prof "run/interpreter" fun _ =>
+        match Near.step cfg (ChainReplay.codeOf p.codes) snapshot block with
+        | .error e => throw s!"invalid receipt schedule: {repr e}"
+        | .ok r => pure r
+  if let some issue := result.issue then
+    throw s!"model execution issue: {issue.2.message}"
+  let context ←
+    timed prof "run/observe-queues" fun _ =>
+        Near.ReceiptRegistry.observeQueues cfg catalogue block.ap.blockHeight snapshot.state result
           admitted.context
-    let sent ←
-      result.outgoing.mapM fun receipt => do
+  let sent ←
+    timed prof "run/outgoing-receipts" fun _ =>
+        result.outgoing.mapM fun receipt => do
           pure
               (receipt.receiptId,
                 ({  bytes := ← Near.QueueEncoding.receiptBytes context catalogue receipt
                     gas := Near.QueueEncoding.congestionGas cfg receipt } :
                   ChainReplay.ShardChunk.Sent))
-    let oldForms := (p.context.delayed.map (·.forms)).getD []
-    let mut change : ChainReplay.ShardChunk.DelayedChange := {}
-    for (receipt, form) in (snapshot.state.delayed.zip oldForms).take result.delayedConsumed do
-      let (gas, size) ←
-        match form with
-        | .storedV0 gas size | .storedV1 gas size =>
-          pure (gas, size)
-        | .receipt =>
-          pure
-              (Near.QueueEncoding.congestionGas cfg receipt,
-                (← Near.QueueEncoding.receiptBytes p.context catalogue receipt).length)
-        | .newStored =>
-          throw "a pre-state delayed receipt cannot be newly stored"
-      change :=
-        { change with
-          removedGas := change.removedGas + gas, removedBytes := change.removedBytes + size }
-    let newForms :=
-      ((context.delayed.map (·.forms)).getD []).drop (oldForms.length - result.delayedConsumed)
-    for form in newForms do
-      match form with
-      | .storedV0 gas size | .storedV1 gas size =>
-        change :=
-          { change with
-            addedGas := change.addedGas + gas, addedBytes := change.addedBytes + size }
-      | _ =>
-        throw "an appended delayed receipt must be stored with its metadata"
-    let outcome ←
-      ChainReplay.ShardChunk.finish congestion ctx.scheduler block.ap.shardId block.ap.blockHeight
+  let change ←
+    timed prof "run/delayed-queue" fun _ => do
+        let oldForms := (p.context.delayed.map (·.forms)).getD []
+        let mut change : ChainReplay.ShardChunk.DelayedChange := {}
+        for (receipt, form) in (snapshot.state.delayed.zip oldForms).take result.delayedConsumed do
+          let (gas, size) ←
+            match form with
+            | .storedV0 gas size | .storedV1 gas size =>
+              pure (gas, size)
+            | .receipt =>
+              pure
+                  (Near.QueueEncoding.congestionGas cfg receipt,
+                    (← Near.QueueEncoding.receiptBytes p.context catalogue receipt).length)
+            | .newStored =>
+              throw "a pre-state delayed receipt cannot be newly stored"
+          change :=
+            { change with
+              removedGas := change.removedGas + gas, removedBytes := change.removedBytes + size }
+        let newForms :=
+          ((context.delayed.map (·.forms)).getD []).drop (oldForms.length - result.delayedConsumed)
+        for form in newForms do
+          match form with
+          | .storedV0 gas size | .storedV1 gas size =>
+            change :=
+              { change with
+                addedGas := change.addedGas + gas, addedBytes := change.addedBytes + size }
+          | _ =>
+            throw "an appended delayed receipt must be stored with its metadata"
+        pure change
+  let outcome ←
+    timed prof "run/scheduler" fun _ =>
+        ChainReplay.ShardChunk.finish congestion ctx.scheduler block.ap.shardId block.ap.blockHeight
           p.shard (sent.map (·.2)) change
-    let stateEntries ← Near.QueueEncoding.encode next.state catalogue context (some cfg)
-    let shardEntries ← outcome.state.entries
-    -- the outcomes with the native ids of their receipts
-    let native (id : Nat) : Except String CryptoHash :=
-      match context.receipts.find? (·.1 == id) with
-      | some (_, h) => pure ⟨bytesOf h⟩
-      | none => throw s!"outcome of receipt {id} has no native id"
-    let txHashes := admitted.attempts.toArray.map fun a => bytesOf a.hash
-    let mut outcomes : Array ExecutionOutcomeWithId := #[]
-    for ((id, o), index) in result.outcomes.zipIdx do
-      let identity ←
-        if h : index < txHashes.size then
-          pure (CryptoHash.mk txHashes[index])
-        else
-          native id
-      let status : ExecutionStatus ←
-        match o.status with
-        | .successValue v =>
-          pure (.successValue (bytesOf v))
-        | .successReceiptId r =>
-          pure (.successReceiptId (← native r))
-        | .failure _ =>
-          pure (.failure default)
-      outcomes :=
-        outcomes.push
-          { id := identity,
-            outcome :=
-              { logs := o.logs.toArray, receiptIds := (← o.receiptIds.mapM native).toArray,
-                gasBurnt := o.gasBurnt.toUInt64, tokensBurnt := ⟨o.tokensBurnt⟩,
-                executorId := ⟨o.executorId⟩, status, metadata := default } }
-    let info ←
-      match Codec.decodeAll (α := CongestionInfo) (bytesOf outcome.info.toBorsh) with
-      | .ok i =>
-        pure i
-      | .error e =>
-        throw s!"congestion info: {repr e}"
-    let requests ←
-      match
-        Codec.decodeAll (α := BandwidthRequests)
-          (bytesOf (Near.Bandwidth.requestsToBorsh outcome.requests)) with
-      | .ok i =>
-        pure i
-      | .error e =>
-        throw s!"bandwidth requests: {repr e}"
-    let proposals ← proposalsOf (Near.uniqueProposals result.proposals)
-    pure
-        {
-          entries :=
-            (stateEntries ++ shardEntries).toArray.map fun (k, v) => (bytesOf k, bytesOf v),
-          outcomes, outgoing := outcome.outgoing.toArray.map bytesOf,
-          gasBurnt := result.outcomes.foldl (fun s (_, o) => s + o.gasBurnt) 0,
-          balanceBurnt := result.tokensBurnt - result.subsidizedAmount, proposals,
-          congestion := info, requests, delayedCount := next.state.delayed.length,
-          schedulerHash := bytesOf outcome.schedulerHash, txHashes }
+  let stateEntries ←
+    timed prof "run/encode-state" fun _ =>
+        Near.QueueEncoding.encode next.state catalogue context (some cfg) digest
+  let shardEntries ← timed prof "run/encode-shard" fun _ => outcome.state.entries
+  timed prof "run/results" fun _ => do
+      -- the outcomes with the native ids of their receipts
+      let native (id : Nat) : Except String CryptoHash :=
+        match context.receipts.find? (·.1 == id) with
+        | some (_, h) => pure ⟨bytesOf h⟩
+        | none => throw s!"outcome of receipt {id} has no native id"
+      let txHashes := admitted.attempts.toArray.map fun a => bytesOf a.hash
+      let mut outcomes : Array ExecutionOutcomeWithId := #[]
+      for ((id, o), index) in result.outcomes.zipIdx do
+        let identity ←
+          if h : index < txHashes.size then
+            pure (CryptoHash.mk txHashes[index])
+          else
+            native id
+        let status : ExecutionStatus ←
+          match o.status with
+          | .successValue v =>
+            pure (.successValue (bytesOf v))
+          | .successReceiptId r =>
+            pure (.successReceiptId (← native r))
+          | .failure _ =>
+            pure (.failure default)
+        outcomes :=
+          outcomes.push
+            { id := identity,
+              outcome :=
+                { logs := o.logs.toArray, receiptIds := (← o.receiptIds.mapM native).toArray,
+                  gasBurnt := o.gasBurnt.toUInt64, tokensBurnt := ⟨o.tokensBurnt⟩,
+                  executorId := ⟨o.executorId⟩, status, metadata := default } }
+      let info ←
+        match Codec.decodeAll (α := CongestionInfo) (bytesOf outcome.info.toBorsh) with
+        | .ok i =>
+          pure i
+        | .error e =>
+          throw s!"congestion info: {repr e}"
+      let requests ←
+        match
+          Codec.decodeAll (α := BandwidthRequests)
+            (bytesOf (Near.Bandwidth.requestsToBorsh outcome.requests)) with
+        | .ok i =>
+          pure i
+        | .error e =>
+          throw s!"bandwidth requests: {repr e}"
+      let proposals ← proposalsOf (Near.uniqueProposals result.proposals)
+      pure
+          {
+            entries :=
+              (stateEntries ++ shardEntries).toArray.map fun (k, v) => (bytesOf k, bytesOf v),
+            outcomes, outgoing := outcome.outgoing.toArray.map bytesOf,
+            gasBurnt := result.outcomes.foldl (fun s (_, o) => s + o.gasBurnt) 0,
+            balanceBurnt := result.tokensBurnt - result.subsidizedAmount, proposals,
+            congestion := info, requests, delayedCount := next.state.delayed.length,
+            schedulerHash := bytesOf outcome.schedulerHash, txHashes }
 
 /-- A chunk that is not new (`apply_old_chunk`): no transaction or receipt is applied, but the
 epoch's validator accounts update and the bandwidth scheduler still run
@@ -292,7 +329,7 @@ def runOldChunk (cfg : Wasm.Near.RuntimeConfig) (congestion : Near.Congestion.Co
   let scheduled :=
     Near.Bandwidth.schedule layout p.shard.scheduler params input.requests status
       input.prevBlockHash
-  let stateEntries ← Near.QueueEncoding.encode snapshot.state catalogue p.context (some cfg)
+  let stateEntries ← Near.QueueEncoding.encode snapshot.state catalogue p.context (some cfg) digest
   let shardEntries ←
     ({ p.shard with scheduler := scheduled.state } : ChainReplay.ShardChunk.State).entries
   pure ((stateEntries ++ shardEntries).toArray.map fun (k, v) => (bytesOf k, bytesOf v))

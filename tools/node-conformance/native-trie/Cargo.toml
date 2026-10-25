@@ -13,6 +13,7 @@ publish = false
 [dependencies]
 near-store = { path = "../../localnet/.nearcore/44f7ae6cd7ef08bab604e20a473bf77e35d4c993/core/store" }
 near-primitives = { path = "../../localnet/.nearcore/44f7ae6cd7ef08bab604e20a473bf77e35d4c993/core/primitives" }
+zstd = "0.13.1"
 near-crypto = { path = "../../localnet/.nearcore/44f7ae6cd7ef08bab604e20a473bf77e35d4c993/core/crypto" }
 
 [profile.release]

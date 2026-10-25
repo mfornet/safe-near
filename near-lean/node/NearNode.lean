@@ -1,6 +1,7 @@
 import NearNode.Protocol
 import NearNode.Borsh
 import NearNode.Primitives
+import NearNode.Zstd
 import NearNode.Trie
 import NearNode.Store
 import NearNode.Chain
