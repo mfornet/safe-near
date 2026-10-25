@@ -46,11 +46,20 @@ def rootsOf (s : VState) (layout : ShardLayout) (parent : CryptoHash) :
       | _ => m)
     {}
 
-/-- Applies `b`: its chunks, on the state its parent left. -/
-def Env.applyOne (e : Env) (b : Block) : IO Bool := do
+/-- The body of a chunk as the application gets it: its transactions (the receipts it claims are not known to a
+node that applies at the head). -/
+private def emptyBody : Body :=
+  { transactions := #[], claimedOutgoing := #[], claimedIncoming := #[] }
+
+/-- Starts to apply `b`, its chunks on the state its parent left, on a thread of its own (nearcore applies chunks in
+a pool apart from the client actor: `ApplyChunksIterationMode`, `apply_chunks_spawner`). The application reads a
+snapshot of the chain state and of the progress, and writes nothing: what it computes is taken up by `finishApply`
+on the event loop, so everything else the node does (answering the peer, collecting approvals, serving the RPC,
+forwarding parts, the Doomslug timers) goes on, and nothing is produced on a block that is not applied, because the
+tip only moves when `finishApply` and `onApplied` run. Returns false when it cannot start. -/
+def Env.startApply (e : Env) (b : Block) : IO Bool := do
   let s ← e.get
   let some v := b.header.view? | return false
-  let hash := b.header.hash
   let started ← IO.monoMsNow
   let layoutE : Except String ShardLayout := do
     let epoch ← lift (s.st.epochIdFromPrevBlock v.prevHash)
@@ -61,90 +70,108 @@ def Env.applyOne (e : Env) (b : Block) : IO Bool := do
     return false
   | .ok layout =>
     let pr0 := { s.pr with roots := rootsOf s layout v.prevHash }
-    let bodyOf (shard : UInt64) : Body :=
-      let empty : Body := { transactions := #[], claimedOutgoing := #[], claimedIncoming := #[] }
-      match b.chunks.find? (·.shardId == shard) with
-      | some c =>
-        match (s.chunks[c.chunkHash.hash.bytes]?).bind (·.body) with
-        | some body => { empty with transactions := body.transactions }
-        | none => empty
-      | none => empty
-    match ← (applyBlock none e.params s.st b bodyOf pr0).run with
+    let bodies : Std.HashMap UInt64 Body :=
+      b.chunks.foldl
+        (fun m c =>
+          match (s.chunks[c.chunkHash.hash.bytes]?).bind (·.body) with
+          | some body => m.insert c.shardId { emptyBody with transactions := body.transactions }
+          | none => m)
+        {}
+    let params := e.params
+    let st := s.st
+    let task ←
+      IO.asTask ((applyBlock none params st b (fun shard => bodies.getD shard emptyBody) pr0).run)
+          Task.Priority.dedicated
+    e.applying.set (some { block := b, bodies, startedMs := started, task })
+    return true
+
+/-- Takes up a block whose application has finished: the progress and the store operations. -/
+def Env.finishApply (e : Env) (a : Applying) : IO Bool := do
+  let b := a.block
+  let some v := b.header.view? | return false
+  let hash := b.header.hash
+  let bodyOf (shard : UInt64) : Body := a.bodies.getD shard emptyBody
+  let applied ←
+    match a.task.get with
+    | .ok r =>
+      pure r
+    | .error err =>
+      pure (.error s!"the thread failed: {err}")
+  match applied with
+  | .error m =>
+    e.failure.modify fun f =>
+        f.orElse fun _ => some s!"block {v.height}: applying the chunks failed: {m}"
+    return false
+  | .ok (pr, reports, chunkOps) =>
+    e.state.modify fun s =>
+        let delivered :=
+          reports.foldl (fun m r => m.insert (hash.bytes, r.shard) r.incoming) s.deliveredAt
+        { s with
+          pr, applied := s.applied.insert hash.bytes v.height,
+          pending := s.pending.filter (· != hash), deliveredAt := delivered }
+    e.bump "blocksApplied"
+    -- the block, its chunks and what the RPC serves of it go to the store in one commit
+    let s1 ← e.get
+    let (extraOps, s2) := appliedOps s1 b reports
+    match commitOps s1.st b (s1.finalized[hash.bytes]?) chunkOps with
+    | .ok ops =>
+      e.commit (ops ++ extraOps)
     | .error m =>
-      e.failure.modify fun f =>
-          f.orElse fun _ => some s!"block {v.height}: applying the chunks failed: {m}"
-      return false
-    | .ok (pr, reports, chunkOps) =>
-      e.state.modify fun s =>
-          let delivered :=
-            reports.foldl (fun m r => m.insert (hash.bytes, r.shard) r.incoming) s.deliveredAt
+      e.failure.modify fun f => f.orElse fun _ => some s!"block {v.height}: {m}"
+    e.state.modify fun s =>
+        { s with
+          outcomes := s2.outcomes, txIndex := s2.txIndex, receiptsById := s2.receiptsById,
+          finalized := s.finalized.erase hash.bytes }
+    if let some h := e.appliedLog then
+      let hex (b : ByteArray) : String :=
+        b.foldl (fun s x => s ++ String.ofList (Nat.toDigits 16 (x.toNat + 256)).tail) ""
+      let outcomeJson (o : ExecutionOutcomeWithId) : Lean.Json :=
+        Lean.Json.mkObj
+          [("id", Lean.Json.str (hex o.id.bytes)),
+            ("executor", Lean.Json.str o.outcome.executorId.val),
+            ("gasBurnt", Lean.Json.num (Lean.JsonNumber.fromNat o.outcome.gasBurnt.toNat)),
+            ("tokensBurnt", Lean.Json.str (toString o.outcome.tokensBurnt.val)),
+            ("status",
+              Lean.Json.str
+                (match o.outcome.status with
+                | .successValue v => s!"value:{hex v}"
+                | .successReceiptId r => s!"receipt:{hex r.bytes}"
+                | .failure _ => "failure"
+                | .unknown => "unknown")),
+            ("receipts",
+              Lean.Json.arr (o.outcome.receiptIds.map fun r => Lean.Json.str (hex r.bytes)))]
+      let chunks :=
+        reports.toList.map fun r =>
+          let isNew := (b.chunks.find? (·.shardId == r.shard)).any (·.isNewChunk v.height)
+          let txs :=
+            if isNew then
+              (bodyOf r.shard).transactions.map fun t => Lean.Json.str (hex t.hash.bytes)
+            else #[]
+          let base : List (String × Lean.Json) :=
+            [("shard", Lean.Json.num (Lean.JsonNumber.fromNat r.shard.toNat)),
+              ("txs", Lean.Json.arr txs), ("outcomes", Lean.Json.arr (r.outcomes.map outcomeJson))]
+          match r.extra with
+          | .v5 x =>
+            Lean.Json.mkObj
+              (base ++
+                [("stateRoot", Lean.Json.str (hex x.stateRoot.bytes)),
+                  ("gasUsed", Lean.Json.num (Lean.JsonNumber.fromNat x.gasUsed.toNat))])
+          | _ => Lean.Json.mkObj base
+      h.putStrLn
+          (Lean.Json.mkObj
+              [("height", Lean.Json.num (Lean.JsonNumber.fromNat v.height.toNat)),
+                ("hash", Lean.Json.str (hex hash.bytes)),
+                ("chunks", Lean.Json.arr chunks.toArray)]).compress
+      h.flush
+    let took := (← IO.monoMsNow) - a.startedMs
+    if took > 400 then
+      e.log s!"block {v.height} took {took} ms to apply"
+    e.state.modify fun s =>
+        s.bump s!"applyMillis" |>.bump "applyMillisTotal" |> fun s =>
           { s with
-            pr, applied := s.applied.insert hash.bytes v.height,
-            pending := s.pending.filter (· != hash), deliveredAt := delivered }
-      e.bump "blocksApplied"
-      -- the block, its chunks and what the RPC serves of it go to the store in one commit
-      let s1 ← e.get
-      let (extraOps, s2) := appliedOps s1 b reports
-      match commitOps s1.st b (s1.finalized[hash.bytes]?) chunkOps with
-      | .ok ops =>
-        e.commit (ops ++ extraOps)
-      | .error m =>
-        e.failure.modify fun f => f.orElse fun _ => some s!"block {v.height}: {m}"
-      e.state.modify fun s =>
-          { s with
-            outcomes := s2.outcomes, txIndex := s2.txIndex, receiptsById := s2.receiptsById,
-            finalized := s.finalized.erase hash.bytes }
-      if let some h := e.appliedLog then
-        let hex (b : ByteArray) : String :=
-          b.foldl (fun s x => s ++ String.ofList (Nat.toDigits 16 (x.toNat + 256)).tail) ""
-        let outcomeJson (o : ExecutionOutcomeWithId) : Lean.Json :=
-          Lean.Json.mkObj
-            [("id", Lean.Json.str (hex o.id.bytes)),
-              ("executor", Lean.Json.str o.outcome.executorId.val),
-              ("gasBurnt", Lean.Json.num (Lean.JsonNumber.fromNat o.outcome.gasBurnt.toNat)),
-              ("tokensBurnt", Lean.Json.str (toString o.outcome.tokensBurnt.val)),
-              ("status",
-                Lean.Json.str
-                  (match o.outcome.status with
-                  | .successValue v => s!"value:{hex v}"
-                  | .successReceiptId r => s!"receipt:{hex r.bytes}"
-                  | .failure _ => "failure"
-                  | .unknown => "unknown")),
-              ("receipts",
-                Lean.Json.arr (o.outcome.receiptIds.map fun r => Lean.Json.str (hex r.bytes)))]
-        let chunks :=
-          reports.toList.map fun r =>
-            let isNew := (b.chunks.find? (·.shardId == r.shard)).any (·.isNewChunk v.height)
-            let txs :=
-              if isNew then
-                (bodyOf r.shard).transactions.map fun t => Lean.Json.str (hex t.hash.bytes)
-              else #[]
-            let base : List (String × Lean.Json) :=
-              [("shard", Lean.Json.num (Lean.JsonNumber.fromNat r.shard.toNat)),
-                ("txs", Lean.Json.arr txs),
-                ("outcomes", Lean.Json.arr (r.outcomes.map outcomeJson))]
-            match r.extra with
-            | .v5 x =>
-              Lean.Json.mkObj
-                (base ++
-                  [("stateRoot", Lean.Json.str (hex x.stateRoot.bytes)),
-                    ("gasUsed", Lean.Json.num (Lean.JsonNumber.fromNat x.gasUsed.toNat))])
-            | _ => Lean.Json.mkObj base
-        h.putStrLn
-            (Lean.Json.mkObj
-                [("height", Lean.Json.num (Lean.JsonNumber.fromNat v.height.toNat)),
-                  ("hash", Lean.Json.str (hex hash.bytes)),
-                  ("chunks", Lean.Json.arr chunks.toArray)]).compress
-        h.flush
-      let took := (← IO.monoMsNow) - started
-      if took > 400 then
-        e.log s!"block {v.height} took {took} ms to apply"
-      e.state.modify fun s =>
-          s.bump s!"applyMillis" |>.bump "applyMillisTotal" |> fun s =>
-            { s with
-              stats :=
-                s.stats.insert "applyMillisTotal" (s.stats.getD "applyMillisTotal" 0 + took - 1) }
-      return true
+            stats :=
+              s.stats.insert "applyMillisTotal" (s.stats.getD "applyMillisTotal" 0 + took - 1) }
+    return true
 
 /-- The transactions of the chunks a block includes leave the pools (`remove_transactions` when a block is
 accepted). -/
@@ -163,6 +190,8 @@ def Env.onApplied (e : Env) (b : Block) : IO Unit := do
   let s ← e.get
   let some v := b.header.view? | return
   let hash := b.header.hash
+  if v.height % 100 == 0 then
+    e.log s.census
   if v.height > s.tipHeight then
     let lastFinal : BlockHeight :=
       if v.lastFinalBlock == CryptoHash.zero then s.st.config.genesisHeight
@@ -183,10 +212,20 @@ def Env.onApplied (e : Env) (b : Block) : IO Unit := do
   for w in ready do
     e.processWitness w
 
-/-- Applies every block that can be applied, in order. -/
+/-- Applies the blocks that can be applied, one after the other (a block is applied on the state its parent left).
+A block starts on a thread of its own (`startApply`) and is taken up here once the thread is done: this is called on
+every turn of the loop, so a finished block is noticed within a turn and the next one starts at once. -/
 partial def Env.tryApply (e : Env) : IO Unit := do
   if (← e.failure.get).isSome then
     return
+  if let some a← e.applying.get then
+    unless ← IO.hasFinished a.task do
+      return
+    e.applying.set none
+    if ← e.finishApply a then
+      e.onApplied a.block
+    else
+      return
   let s ← e.get
   let candidates :=
     s.pending.filterMap fun h => (s.blocks[h.bytes]?).bind fun b => b.header.view?.map (b, ·.height)
@@ -195,9 +234,7 @@ partial def Env.tryApply (e : Env) : IO Unit := do
     let some v := b.header.view? | continue
     if s.applied.contains v.prevHash.bytes then
       if s.bodiesReady b then
-        if ← e.applyOne b then
-          e.onApplied b
-          e.tryApply
+        discard <| e.startApply b
         return
       else
         e.requestBodies b
@@ -585,22 +622,60 @@ def Env.drainTxQueue (e : Env) : IO Unit := do
     let verdict ← e.processTx t false
     promise.resolve verdict
 
-/-- One step: the timer, the production of blocks, the blocks that can be applied. -/
+/-- The time since the previous turn of the loop. The loop waits at most 20 ms for a message, so a longer gap is
+time spent in a turn: the longest one is `loopMaxGapMs` of the report, and a gap of a second or more is logged
+and counted (`loopStalls`). -/
+def Env.noteTurn (e : Env) : IO Unit := do
+  let now ← e.nowMs
+  let last ← e.lastTurn.get
+  e.lastTurn.set now
+  if last != 0 then
+    let gap := now - last
+    e.state.modify fun s =>
+        { s with stats := s.stats.insert "loopMaxGapMs" (max gap (s.stats.getD "loopMaxGapMs" 0)) }
+    if gap ≥ 1000 then
+      e.bump "loopStalls"
+      e.log s!"the event loop was away for {gap} ms"
+
+/-- Whether a block that will move the tip is being applied. Until it is, the tip is stale: the approvals the
+timers would send are for a block the node knows it is about to supersede, and a block produced now would have the
+stale tip as its parent and compete with the block being applied (with both validators needed for every
+threshold, that fork orphans a block of the chain's own tip). Nothing is sent or produced from the tip meanwhile;
+the loop goes on with everything else, and the timers restart when the block is applied (`setTip`). -/
+def Env.tipIsStale (e : Env) : IO Bool := do
+  let s ← e.get
+  match ← e.applying.get with
+  | some a =>
+    match a.block.header.view? with
+    | some v =>
+      pure (decide (v.height > s.tipHeight))
+    | none =>
+      pure false
+  | none =>
+    pure false
+
+/-- One step: the blocks that can be applied, the timer, the production of blocks. -/
 def Env.tick (e : Env) : IO Unit := do
   if (← e.failure.get).isSome then
     return
+  e.noteTurn
   e.drainTxQueue
-  let now ← e.nowMs
-  let s ← e.get
-  let (ds, approvals) := s.ds.processTimer now (some e.signer)
-  -- the largest target height is stored before any approval for it is sent (`save_largest_target_height`)
-  if ds.largestTargetHeight != s.ds.largestTargetHeight then
-    e.commit #[.set .blockMisc largestTargetKey (u64Bytes ds.largestTargetHeight)]
-  e.state.modify fun s => { s with ds }
-  for a in approvals do
-    e.sendApproval a
-  e.retryParked
   e.tryApply
-  e.tryProduceBlocks
+  let stale ← e.tipIsStale
+  if stale then
+    e.bump "turnsOnStaleTip"
+  else
+    let now ← e.nowMs
+    let s ← e.get
+    let (ds, approvals) := s.ds.processTimer now (some e.signer)
+    -- the largest target height is stored before any approval for it is sent (`save_largest_target_height`)
+    if ds.largestTargetHeight != s.ds.largestTargetHeight then
+      e.commit #[.set .blockMisc largestTargetKey (u64Bytes ds.largestTargetHeight)]
+    e.state.modify fun s => { s with ds }
+    for a in approvals do
+      e.sendApproval a
+  e.retryParked
+  unless stale do
+    e.tryProduceBlocks
 
 end Near.Node.Validator

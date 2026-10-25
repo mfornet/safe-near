@@ -100,7 +100,7 @@ class Soak:
         self.samples: list[dict] = []
         self.bursts: list[float] = []
         self.rpc_failures: list[str] = []
-        self.compared = {"blocks": 0, "hashEqual": 0, "roots": 0, "rootsEqual": 0, "problems": []}
+        self.compared = {"blocks": 0, "hashEqual": 0, "orphans": 0, "roots": 0, "rootsEqual": 0, "problems": []}
         self.applied_offset = 0
         self.pending: list[dict] = []
         self.stop = threading.Event()
@@ -147,7 +147,11 @@ class Soak:
                 block = va.rpc("block", {"block_id": row["height"]})
             except Exception:           # noqa: BLE001  (a skipped height, or not there yet)
                 if row["height"] < self.last_neard_head() - 3:
-                    self.compared["problems"].append(f"height {row['height']}: neard has no block")
+                    # a block the Lean node applied at a height neard skipped is an orphan, fine if neard holds it
+                    if va.neard_holds(row["hash"]):
+                        self.compared["orphans"] += 1
+                    else:
+                        self.compared["problems"].append(f"height {row['height']}: neard has no block")
                     continue
                 still.append(row)
                 continue
@@ -185,7 +189,7 @@ def workload_thread(options: argparse.Namespace, soak: Soak, work: Path) -> thre
     def run() -> None:
         python = sys.executable
         script = str(HERE / "workload.py")
-        skip = [] if options.full_workload else ["hostcalls", "burst", "wait"]
+        skip = ([] if options.full_workload else ["hostcalls", "burst", "wait"]) + options.skip
         # the scenarios once, then light traffic until the end
         leave_out = ["--no-deploy-from-memory"] if options.no_deploy_from_memory else []
         scenario = subprocess.Popen([python, script, TOPOLOGY, *leave_out, "--skip"] + skip,
@@ -240,6 +244,7 @@ def summarize(options: argparse.Namespace, soak: Soak, report: dict) -> dict:
         "durationSeconds": duration, "samples": len(samples), "bursts": len(soak.bursts),
         "blocksCompared": soak.compared["blocks"], "blockHashesEqual": soak.compared["hashEqual"],
         "stateRootsCompared": soak.compared["roots"], "stateRootsEqual": soak.compared["rootsEqual"],
+        "orphansHeldByNeard": soak.compared["orphans"],
         "problems": soak.compared["problems"][:10],
         "neardHeadStart": both[0]["neardHead"] if both else None, "neardHeadEnd": both[-1]["neardHead"] if both else None,
         "finalHeightEnd": finals[-1][1] if finals else None, "maxHeadMinusFinal": final_lag,
@@ -287,6 +292,8 @@ def main() -> None:
     parser.add_argument("--period", type=float, default=1.0, help="seconds between rounds of light traffic")
     parser.add_argument("--no-full-workload", dest="full_workload", action="store_false",
                         help="leave out the host function calls, the 14 heavy calls and the yield wait")
+    parser.add_argument("--verbose", action="store_true", help="let the Lean node log (lean.log in the work directory)")
+    parser.add_argument("--skip", nargs="*", default=[], help="more scenarios of workload.py to leave out")
     parser.add_argument("--no-deploy-from-memory", action="store_true",
                         help="leave out the call that deploys contract code from a contract's memory (`sanity_check`)")
     parser.add_argument("--binary", type=Path, default=va.BINARY)
@@ -296,7 +303,7 @@ def main() -> None:
     home = va.prepare(work)
     store = work / "store"
     localnet.start(TOPOLOGY)
-    extra = ["--rpc-addr", f"{LEAN_RPC[0]}:{LEAN_RPC[1]}", "--store", str(store), "--quiet"]
+    extra = ["--rpc-addr", f"{LEAN_RPC[0]}:{LEAN_RPC[1]}", "--store", str(store)] + ([] if options.verbose else ["--quiet"])
     lean = va.start_lean(home, work, options.duration + 600, options.binary, extra)
     soak = Soak(options, lean, store, work)
     result: dict = {"ok": False}

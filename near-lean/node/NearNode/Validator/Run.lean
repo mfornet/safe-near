@@ -131,7 +131,7 @@ def run (o : Options) : IO UInt32 := do
           (match o.appliedLog with
             | some f => some <$> IO.FS.Handle.mk f .write
             | none => pure none),
-      nowMs := IO.monoMsNow }
+      nowMs := IO.monoMsNow, applying := ← IO.mkRef none, lastTurn := ← IO.mkRef 0 }
   let stop ← IO.mkRef false
   let connected ← IO.mkRef false
   let rpcStop ← IO.mkRef false

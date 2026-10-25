@@ -1203,7 +1203,7 @@ Produce,Wire,State,WitnessMake,Node,Endorse,Follow,Drive,Run}.lean`, the `valida
   Three earlier runs after the fix (130 s) also passed; before it, three of the runs I watched were banned at an epoch boundary.
 - **Deferred.** Chunks are empty (no transaction pool, no `ForwardTx` use beyond receiving), no fork choice (the node
   follows one chain), no persistence (the node starts from the exported genesis corpus), no `ChunkContractAccesses`,
-  inline apply stalls the event loop for a few seconds on heavy blocks (block 75 took 7.5 s in one run), the witness is not
+  inline apply stalls the event loop for a few seconds on heavy blocks (block 75 took 7.5 s in one run; closed by H2), the witness is not
   really compressed (stored zstd frames), the signer is not constant time, and a witness from neard is checked by
   recomputing the node's own skeleton, not by replaying the transitions independently. Kickouts are off in the
   validator genesis, so the kickout path of a Lean validator is exercised only by the conformance corpora.
@@ -1398,7 +1398,7 @@ Quiet single-shard block: 140 ms before, 40 ms after (39.5 s for 1000 blocks inc
 `NearRuntime.StateEncoding` compares all keys pairwise, and the runtime is not touched here), `shard-start` (10 ms), `results` (7 ms).
 Inline application still blocks the event loop: the full burst (14 calls of 300 Tgas) stops the head for 30 s in the validator
 topology (neither validator can progress without the other), everything else is under a second; moving application off the network
-thread is not done (see below).
+thread was done afterwards (H2).
 
 #### M10d, soak (`just localnet-soak`)
 
@@ -1457,6 +1457,44 @@ catalogue`, node exit. After: the same run passes the call (`sanity-check: ... S
 613 of 613 block hashes and 595 of 595 state roots equal to neard's. `soak.py` no longer passes `--no-deploy-from-memory` unless
 asked to (`--no-deploy-from-memory` is now an option of `soak.py`, off by default). `node-validator-tests` checks the hex text and
 the decoder.
+
+##### H2, applying off the event loop
+
+*Cause.* `Env.applyOne` ran `applyBlock` inline in the handler that received the block, so a block of heavy calls (13 to 14 s for
+four chunks of 300 Tgas each on the fast engine) kept the loop away from everything else: pings, approvals, RPC state, parts. The
+follower already applies on a worker thread (`Network/Apply.lean`); the validator did not.
+
+*Fix* (`Validator/Drive.lean`, following nearcore's split of the client actor from the apply pool). `Env.startApply` snapshots the
+chain state and the progress, collects the chunk bodies by shard, and runs `applyBlock` with `IO.asTask` on a dedicated thread; the
+`Applying` record (block, bodies, start time, task) is kept in `Env.applying`. `Env.tryApply`, called on every turn of the loop and
+whenever a block or chunk arrives, takes the result with `IO.hasFinished` and runs the rest of the former `applyOne` on the loop
+(`finishApply`: the new progress into the state, the commit, the applied log), then `onApplied` (Doomslug tip, chunk production,
+witnesses that waited) and starts the next block whose parent is applied, so blocks are still applied one after the other and
+only the loop thread writes the state. Nothing changes the tip but `onApplied`, so nothing is produced on an unapplied block.
+
+*Found by the first version: the stale tip.* With the loop free, the timers kept running on the tip while the block being applied
+was about to replace it. Two things followed in a run of the burst: the node sent `Skip(tip)` approvals for the heights above
+the block it was applying, and `tryProduceBlocks` produced blocks with the stale tip as parent (the approvals for it were the
+node's own and neard's skips), forking the chain at the block being applied: nine heavy blocks applied instead of four, `neard`
+holding none of the extra blocks at their heights, finality stuck for two minutes. In the inline version this could not happen
+because the tip moved before the loop looked at the timers. `Env.tipIsStale` is true while a block above the tip is being applied;
+then `tick` neither runs `processTimer` (no approval, no `largest_target_height` change) nor produces a block, and counts the turn
+(`turnsOnStaleTip`). The timers restart in `setTip` when the block is applied, as after any new head, so there is no burst of skip
+approvals afterwards. Approvals are still collected, parts forwarded and served, the RPC answered, transactions pooled.
+
+*Measure* (`Env.noteTurn`: the time between two turns of the loop, which waits at most 20 ms for a message; `loopMaxGapMs` and
+`loopStalls`, the turns of a second or more, are in the report). `soak.py --duration 330 --skip hostcalls wait`, the burst of 14
+calls of 300 Tgas, the same machine, the same workload:
+
+| | longest turn of the loop | turns of 1 s or more | heavy blocks | roots and hashes equal |
+|---|---|---|---|---|
+| inline (before) | 13016 ms | 4 | 193, 195, 197 (14.2, 14.1, 13.9 s), 199 (6.7 s) | 453 of 453 |
+| thread, tip held while a block is applied | 282 ms | 0 | 185, 187, 189 (12.9, 12.7, 13.8 s), 184, 191 (3.4, 3.3 s) | 448 of 448, no orphan |
+
+The application takes as long as before (the head still waits for the node: with equal stakes neither validator can go on without
+the other); what changed is that the loop is not away. A block of quiet traffic costs about 19 % more on the thread (89 ms against
+75 ms over 251 blocks: starting a thread, and the objects shared with the loop being reference counted atomically).
+`validator_accept.py`: ok, 527 of 527 outcomes equal, the stall test (12 s) stalls and resumes.
 
 ## Open points
 

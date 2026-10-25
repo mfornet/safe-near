@@ -34,6 +34,15 @@ namespace Near.Node.Validator
 open Near.Node Near.Node.Chain Near.Node.Network Near.Node.Apply Near.Node.Borsh
   Near.Node.ReedSolomon
 
+/-- A block whose chunks are being applied on a thread of their own (`Env.startApply`). The event loop goes on
+meanwhile; `Env.tryApply` takes the result when the task has finished. -/
+structure Applying where
+  block : Block
+  /-- The bodies of its chunks, by shard, as the application got them. -/
+  bodies : Std.HashMap UInt64 Body
+  startedMs : Nat
+  task : Task (Except IO.Error (Except String (Progress × Array ShardReport × Array Store.Op)))
+
 /-- What the validator needs besides its state. -/
 structure Env where
   signer : Signer
@@ -59,6 +68,10 @@ structure Env where
   log : String → IO Unit
   /-- Milliseconds on the monotonic clock. -/
   nowMs : IO Nat
+  /-- The block being applied, if any. At most one: a block is applied on the state its parent left. -/
+  applying : IO.Ref (Option Applying)
+  /-- When the previous turn of the loop began, to measure how long the loop is away (0: none yet). -/
+  lastTurn : IO.Ref Nat
 
 def Env.me (e : Env) : AccountId :=
   e.signer.accountId
