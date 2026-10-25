@@ -5,7 +5,7 @@
 # verification never builds it (`just node-isolation`).
 name = "NearNode"
 version = "0.1.0"
-defaultTargets = ["NearNode", "near-lean-node", "node-conformance-types", "node-conformance-network", "node-conformance-sync", "node-trie-tests", "node-store-tests", "node-net-tests", "node-handshake-tests", "node-sync-tests", "node-state-roots", "node-chain-validate", "node-chain-apply"]
+defaultTargets = ["NearNode", "near-lean-node", "node-conformance-types", "node-conformance-network", "node-conformance-sync", "node-conformance-validator", "node-trie-tests", "node-store-tests", "node-net-tests", "node-validator-tests", "node-handshake-tests", "node-sync-tests", "node-state-roots", "node-chain-validate", "node-chain-apply"]
 packagesDir = "../.lake/packages"
 
 [[require]]
@@ -49,6 +49,11 @@ root = "NodeConformance.Network"
 name = "node-conformance-sync"
 root = "NodeConformance.StateSync"
 
+# `lake exe node-conformance-validator [DIR]`: the validator's building blocks against the oracle fixtures.
+[[lean_exe]]
+name = "node-conformance-validator"
+root = "NodeConformance.Validator"
+
 # `lake exe node-trie-tests`: the trie `Impl` against `Spec` on seeded random entry sets and updates.
 [[lean_lib]]
 name = "NodeTests"
@@ -61,6 +66,11 @@ root = "NodeTests.TrieTests"
 [[lean_exe]]
 name = "node-net-tests"
 root = "NodeTests.NetTests"
+
+# `lake exe node-validator-tests`: Doomslug and the other state machines of a validator.
+[[lean_exe]]
+name = "node-validator-tests"
+root = "NodeTests.ValidatorTests"
 
 # `lake exe node-handshake-tests`: both sides of the peer handshake against each other, in memory.
 [[lean_exe]]
