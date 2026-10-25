@@ -1,3 +1,4 @@
+import NearNode.Chain.ApplyChunk
 import NearNode.Validator.Doomslug
 import NearNode.Validator.Messages
 import NearNode.Validator.Pool
@@ -36,6 +37,29 @@ private def stakeOf (name : String) (this next : Nat) : ApprovalStake :=
 
 private def delays : Delays :=
   { endorsement := 400, base := 1000, cap := 3000 }
+
+/-- The decoder that lets a validator learn code a contract deploys from its own memory: the bytes it does not
+know travel in the text of an issue and come out unchanged; the bytes it knows are answered from the catalogue. -/
+private def learnedCode (f : IO.Ref Nat) : IO Unit := do
+  let all : List UInt8 := (List.range 256).map (·.toUInt8)
+  let text := Near.Node.Apply.hexOfBytes all
+  check f "hex text of all byte values" (text.length == 512 && text.take 6 == "000102")
+  check f "hex round trip" ((Near.Node.Apply.bytesOfHexPrefix text).toList == all)
+  check f "hex stops at the first other character"
+      ((Near.Node.Apply.bytesOfHexPrefix "00ff zz01").toList == [0, 255])
+  let blob : List UInt8 := [0, 97, 115, 109, 1, 0, 0, 0, 255]
+  let unknown := Near.Node.Apply.learningCodeOf [] blob
+  let message := (unknown.decodeIssue.map (·.message)).getD ""
+  check f "unknown bytes carry an issue" unknown.decodeIssue.isSome
+  check f "the issue hands the bytes back"
+      ((Near.Node.Apply.undeclaredBytes? message).map (·.toList) == some blob)
+  check f "an ordinary issue hands nothing back"
+      ((Near.Node.Apply.undeclaredBytes? "Interpreter error: out of fuel").isNone)
+  let entry : ChainReplay.LoadedCode :=
+    { bytes := blob, code := { module := default, size := blob.length, hash := "known" } }
+  let known := Near.Node.Apply.learningCodeOf [entry] blob
+  check f "known bytes are answered from the catalogue"
+      (known.decodeIssue.isNone && known.hash == "known")
 
 /-- `test_endorsements_and_skips_basic`. -/
 private def basic (f : IO.Ref Nat) : IO Unit := do
@@ -358,6 +382,7 @@ private def poolTests (f : IO.Ref Nat) : IO Unit := do
 
 def main : IO UInt32 := do
   let failures ← IO.mkRef 0
+  learnedCode failures
   basic failures
   delayValues failures
   approvals failures

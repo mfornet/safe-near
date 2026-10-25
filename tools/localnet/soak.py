@@ -187,8 +187,9 @@ def workload_thread(options: argparse.Namespace, soak: Soak, work: Path) -> thre
         script = str(HERE / "workload.py")
         skip = [] if options.full_workload else ["hostcalls", "burst", "wait"]
         # the scenarios once, then light traffic until the end
-        scenario = subprocess.Popen([python, script, TOPOLOGY, "--no-deploy-from-memory", "--skip"] + skip, stdout=(work / "workload.log").open("w"),
-                                    stderr=subprocess.STDOUT, cwd=HERE)
+        leave_out = ["--no-deploy-from-memory"] if options.no_deploy_from_memory else []
+        scenario = subprocess.Popen([python, script, TOPOLOGY, *leave_out, "--skip"] + skip,
+                                    stdout=(work / "workload.log").open("w"), stderr=subprocess.STDOUT, cwd=HERE)
         steady_left = options.duration + 600
         deadline = soak.started + options.duration
         while scenario.poll() is None and not soak.stop.is_set():
@@ -286,6 +287,8 @@ def main() -> None:
     parser.add_argument("--period", type=float, default=1.0, help="seconds between rounds of light traffic")
     parser.add_argument("--no-full-workload", dest="full_workload", action="store_false",
                         help="leave out the host function calls, the 14 heavy calls and the yield wait")
+    parser.add_argument("--no-deploy-from-memory", action="store_true",
+                        help="leave out the call that deploys contract code from a contract's memory (`sanity_check`)")
     parser.add_argument("--binary", type=Path, default=va.BINARY)
     parser.add_argument("--work", type=Path, default=localnet.DATA / "soak-run")
     options = parser.parse_args()

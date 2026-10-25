@@ -1424,14 +1424,39 @@ Follow with `--lightburst`, default checks (600 s of following, the burst a minu
 reached the head after 8.3 s, peak lag 5, caught up 6.0 s after the burst (limit 240 s), 1000 state roots equal; four shards 7.3 s,
 peak 4, caught up in 5.9 s, 4001 state roots equal; no disconnect on either.
 
-**Not done, doubts.** The soak leaves out `sanity_check`, the call that deploys contract code from the memory of a contract
-(`workload.py --no-deploy-from-memory`): a validator that applies a block at the head cannot know the deployed bytes (a follower
-gets them from the next chunk), and the run stops with "code bytes absent from catalogue". That is a gap of M8, found here, not
-closed. The RSS slope is not flat: the node keeps the trie nodes of its history in memory (the store tables), so memory grows with
+**Not done, doubts.** (The soak used to leave out `sanity_check`, the call that deploys contract code from the memory of a
+contract; closed by H1 below.) The RSS slope is not flat: the node keeps the trie nodes of its history in memory (the store tables), so memory grows with
 the chain (about 3 MB per 100 blocks of this workload); a longer soak needs garbage collection of old state. `encode-state` is still
 quadratic in the number of entries. The generator of the differential test covers the integer and control instructions and the
 host functions much better than floating point; the engine hands tables, references and `memory.init` back to the specification, so
 those are not exercised at all. No equivalence theorem was written; the differential tests are the evidence, as rule 2 allows.
+
+#### Hardening after M10 (SAF-8)
+
+##### H1, code a contract deploys from its own memory
+
+*Cause.* A function call can emit `DeployContract` with bytes it assembled in its memory. The runtime hands its decoder
+(`Bytes → ContractCode`) those bytes and keeps only the answer (module, size, hash); the encoders that write the outgoing
+receipt then look the bytes up in the chunk's catalogue by hash. The catalogue holds the code of the state and of the incoming
+receipts, and of the chunk's own `claimed` outgoing receipts, which a follower reads from the next chunk's body. A validator
+applying a block at the head has no next chunk, so the bytes were nowhere and the apply stopped with "code bytes absent from
+catalogue" (block 205 of the soak with the full workload, after the `sanity_check` call).
+
+*Fix* (`Chain/ApplyChunk.lean`, `stepLearning`; no runtime definition changed). The decoder is the only place that sees the bytes
+and a pure function can return nothing else, so the step runs with `learningCodeOf`: the catalogue's code for bytes it holds, and
+for bytes it does not hold a code whose `decodeIssue` carries them as hexadecimal text. A decode issue makes the runtime reject
+the whole attempt atomically (`Near.apply` returns the initial state with the issue), so nothing leaks: the node reads the bytes off
+the issue, decodes them as `Model.code` decodes the code of an incoming receipt (same label, same module, same decode issue for
+bytes that do not decode), adds the entry to the catalogue and the cache and runs the step again, now answering these bytes from
+the catalogue. Each rerun gets one distinct deployment further (at most 256 per chunk); a chunk without such a deployment runs
+once, as before. The outgoing receipt bytes, the state encoding and every other consumer of the catalogue then see the code.
+The cost is one extra run of the part of the chunk up to the deploying receipt per distinct code.
+
+*Evidence.* Before (main, `soak.py --duration 420`, full workload): `block 205: applying the chunks failed: code bytes absent from
+catalogue`, node exit. After: the same run passes the call (`sanity-check: ... SuccessValue` at block 212) and ends at block 603 with
+613 of 613 block hashes and 595 of 595 state roots equal to neard's. `soak.py` no longer passes `--no-deploy-from-memory` unless
+asked to (`--no-deploy-from-memory` is now an option of `soak.py`, off by default). `node-validator-tests` checks the hex text and
+the decoder.
 
 ## Open points
 

@@ -408,6 +408,13 @@ def applyBlock (prof : Option Prof) (p : Params) (st : Near.Node.Chain.ChainStat
             pr := { pr with cache }
             overlay := some o
           let result ← runChunk prof p.cfg p.congestion ctx prepared overlay pr.cache
+          -- the next chunks meet the code this one's contracts deployed from their memory in the state
+          pr :=
+            { pr with
+              cache :=
+                { pr.cache with
+                  byLabel :=
+                    result.learned.foldl (fun m e => m.insert e.code.hash e) pr.cache.byLabel } }
           let (outcomeRoot, _) := merklizeHashes (result.outcomes.map (·.leafHash))
           pure
               (result.entries,
