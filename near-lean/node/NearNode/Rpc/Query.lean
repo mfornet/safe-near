@@ -1,4 +1,5 @@
 import NearNode.Rpc.Methods
+import NearNode.Chain.FastEngine
 
 /-!
 # `query`
@@ -213,7 +214,8 @@ def callFunction (c : Ctx) (s : VState) (view : StateAt) (b : BlockRec) (a : Acc
                 storageUsage := usage.toNat, attachedDeposit := 0, prepaidGas := gas,
                 randomSeed := view.root.bytes.toList, viewConfig := some { maxGasBurnt := gas },
                 chargeStorageValueAccess := true, chainId := c.env.params.chainId.toUTF8.toList }
-            let outcome := Wasm.Near.run cfg loaded.code.module loaded.code.size method ctx storage
+            let outcome :=
+              Near.VmEngine.run cfg loaded.code.module loaded.code.size method ctx storage
             match outcome.aborted with
             | some err =>
               .ok

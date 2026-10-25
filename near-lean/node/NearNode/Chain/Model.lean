@@ -25,9 +25,39 @@ abbrev Fail :=
 
 /-! ### The conversion state -/
 
-/-- Contract code by label (`base58(sha256(bytes))`), shared by all chunks. -/
-abbrev CodeCache :=
-  Std.HashMap String ChainReplay.LoadedCode
+/-- Contract code by label (`base58(sha256(bytes))`), shared by all chunks, and what is worth remembering
+about large byte strings from one chunk to the next: converting a contract between `ByteArray` and
+`List UInt8` and hashing it each time was a third of the work of a quiet chunk. -/
+structure CodeCache where
+  byLabel : Std.HashMap String ChainReplay.LoadedCode := {}
+  /-- The list of a large byte string, by content. -/
+  lists : Std.HashMap ByteArray (List UInt8) := {}
+  /-- The label of contract bytes, by content (so that unchanged code is not hashed again). -/
+  labels : Std.HashMap ByteArray String := {}
+
+/-- Byte strings from this size on are remembered. -/
+def CodeCache.bigSize : Nat :=
+  2048
+
+/-- The list of `b`; a large `b` is converted once. -/
+def CodeCache.list (c : CodeCache) (b : ByteArray) : List UInt8 × CodeCache :=
+  if b.size < CodeCache.bigSize then (b.toList, c)
+  else
+    match c.lists[b]? with
+    | some l => (l, c)
+    | none =>
+      let l := b.toList
+      -- old versions of contracts are forgotten when there are many
+      let lists := if c.lists.size ≥ 512 then {} else c.lists
+      (l, { c with lists := lists.insert b l })
+
+/-- The inverse: a list equal to a remembered one gives back its `ByteArray`. -/
+def CodeCache.bytesOf (known : Array (ByteArray × List UInt8)) (l : List UInt8) : ByteArray :=
+  if l.length < CodeCache.bigSize then ⟨l.toArray⟩
+  else
+    match known.find? (fun (_, l') => l' == l) with
+    | some (b, _) => b
+    | none => ⟨l.toArray⟩
 
 /-- The ids handed out and the facts that bind them to native hashes. -/
 structure Conv where
@@ -98,30 +128,54 @@ megabyte of contract code). -/
 def digest (b : List UInt8) : List UInt8 :=
   (NearCrypto.sha256 ⟨b.toArray⟩).toList
 
+/-- The 32 bytes a base58 label stands for, if it is the label of exactly that hash (`Near.StateEncoding.base58`). -/
+def hashOfLabel? (label : String) : Option (List UInt8) :=
+  let alphabet := "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz".toList
+  let n? :=
+    label.toList.foldl (fun acc c => acc.bind fun n => (alphabet.idxOf? c).map fun d => n * 58 + d)
+      (some 0)
+  n?.bind fun n =>
+    let bytes := (List.range 32).reverse.map fun i => UInt8.ofNat (n / 256 ^ i % 256)
+    if Near.StateEncoding.base58 bytes == label then some bytes else none
+
+/-- `digest`, except that the contract bytes of the catalogue (which the encoders look up
+by label) are not hashed again: their label is the SHA-256 of exactly those bytes, computed when the code was
+decoded (`code` below). Hashing every contract of the shard twice per chunk was the largest part of
+`encode-state`. -/
+def digestFor (catalogue : List (String × List UInt8)) (b : List UInt8) : List UInt8 :=
+  match catalogue.find? (fun (_, bytes) => bytes == b) with
+  | some (label, _) => (hashOfLabel? label).getD (digest b)
+  | none => digest b
+
 /-- The catalogue entry of contract bytes, decoded once. A module that does not decode is kept
 with its issue, as `ChainReplay.codeOf` does. -/
 def code (blob : ByteArray) : M ChainReplay.LoadedCode := do
-  let label := Near.StateEncoding.base58 (NearCrypto.sha256 blob).toList
   let s ← get
-  let entry ←
-    match s.cache[label]? with
-    | some e =>
-      pure e
+  let label :=
+    match s.cache.labels[blob]? with
+    | some l => l
+    | none => Near.StateEncoding.base58 (NearCrypto.sha256 blob).toList
+  let (bytes, cache) :=
+    match s.cache.byLabel[label]? with
+    | some e => (e.bytes, s.cache)
+    | none => s.cache.list blob
+  let entry : ChainReplay.LoadedCode :=
+    match s.cache.byLabel[label]? with
+    | some e => e
     | none =>
-      let e : ChainReplay.LoadedCode :=
-        match Wasm.Binary.decode blob with
-        | .ok module =>
-          { bytes := blob.toList, code := { module, size := blob.size, hash := label } }
-        | .error e =>
-          { bytes := blob.toList,
-            code :=
-              { module := default, size := blob.size, hash := label,
-                decodeIssue :=
-                  some (.interpreterError s!"deployed bytes do not decode: {e.message}") } }
-      pure e
-  modify fun s =>
+      match Wasm.Binary.decode blob with
+      | .ok module => { bytes, code := { module, size := blob.size, hash := label } }
+      | .error e =>
+        { bytes,
+          code :=
+            { module := default, size := blob.size, hash := label,
+              decodeIssue :=
+                some (.interpreterError s!"deployed bytes do not decode: {e.message}") } }
+  set
       { s with
-        cache := s.cache.insert label entry,
+        cache :=
+          { cache with
+            byLabel := cache.byLabel.insert label entry, labels := cache.labels.insert blob label },
         used := if s.used.contains label then s.used else s.used.push label }
   return entry
 
