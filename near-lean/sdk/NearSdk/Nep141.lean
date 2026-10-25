@@ -38,17 +38,16 @@ structure Transfer (v v' : View α) (sender receiver : α) (amount : Nat) : Prop
   covered : amount ≤ v.balanceOf sender
   effect : v' = v.move sender receiver amount
 
-/-- A successful `ft_resolve_transfer(sender, receiver, amount)` after `ft_on_transfer`:
-`refund ≤ amount` of the transferred tokens, capped by what the receiver still holds,
-go back to the sender, who keeps `used = amount - refund`; if the sender is gone
-they are burnt and the whole amount counts as used. -/
-inductive Resolve (v v' : View α) (sender receiver : α) (amount used : Nat) : Prop where
-  | refund (refund : Nat) (hle : refund ≤ amount) (hheld : refund ≤ v.balanceOf receiver)
-      (hdistinct : receiver ≠ sender)
-      (heffect : v' = v.move receiver sender refund) (hused : used = amount - refund)
-  | burn (refund : Nat) (hle : refund ≤ amount) (hheld : refund ≤ v.balanceOf receiver)
-      (hsupply : refund ≤ v.totalSupply)
-      (heffect : v' = v.burn receiver refund) (hused : used = amount)
+/-- A successful `ft_resolve_transfer(sender, receiver, amount)` after `ft_on_transfer`
+reported `unused` tokens: the refund is `min(unused, balance(receiver))` with
+`unused ≤ amount`. It goes back to the sender, who keeps `used = amount - refund`; if the
+sender is gone it is burnt and the whole amount counts as used. -/
+inductive Resolve (v v' : View α) (sender receiver : α) (amount unused used : Nat) : Prop where
+  | refund (hle : unused ≤ amount) (hdistinct : receiver ≠ sender)
+      (heffect : v' = v.move receiver sender (min unused (v.balanceOf receiver)))
+      (hused : used = amount - min unused (v.balanceOf receiver))
+  | burn (hle : unused ≤ amount) (hsupply : min unused (v.balanceOf receiver) ≤ v.totalSupply)
+      (heffect : v' = v.burn receiver (min unused (v.balanceOf receiver))) (hused : used = amount)
 
 /-- A transfer changes no total supply. -/
 theorem Transfer.totalSupply {v v' : View α} {sender receiver : α} {amount : Nat}
@@ -77,15 +76,15 @@ theorem Transfer.other_balance {v v' : View α} {sender receiver : α} {amount :
   simp [View.move, hs, hr]
 
 /-- The receiver keeps at most what was transferred. -/
-theorem Resolve.used_le {v v' : View α} {sender receiver : α} {amount used : Nat}
-    (h : Resolve v v' sender receiver amount used) : used ≤ amount := by
+theorem Resolve.used_le {v v' : View α} {sender receiver : α} {amount unused used : Nat}
+    (h : Resolve v v' sender receiver amount unused used) : used ≤ amount := by
   cases h <;> omega
 
 /-- Resolution never mints. -/
-theorem Resolve.totalSupply_le {v v' : View α} {sender receiver : α} {amount used : Nat}
-    (h : Resolve v v' sender receiver amount used) : v'.totalSupply ≤ v.totalSupply := by
+theorem Resolve.totalSupply_le {v v' : View α} {sender receiver : α} {amount unused used : Nat}
+    (h : Resolve v v' sender receiver amount unused used) : v'.totalSupply ≤ v.totalSupply := by
   cases h with
-  | refund _ _ _ _ heffect _ => rw [heffect]; exact Nat.le_refl _
-  | burn _ _ _ _ heffect _ => rw [heffect]; exact Nat.sub_le _ _
+  | refund _ _ heffect _ => rw [heffect]; exact Nat.le_refl _
+  | burn _ _ heffect _ => rw [heffect]; exact Nat.sub_le _ _
 
 end NearSdk.Nep141
