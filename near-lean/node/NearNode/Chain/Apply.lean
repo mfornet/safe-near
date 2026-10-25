@@ -26,6 +26,11 @@ structure Body where
   transactions : Array SignedTransaction
   claimedOutgoing : Array ByteArray
   claimedIncoming : Array ByteArray
+  /-- The `prev_outgoing_receipts` of the chunk's own body: what the chunk before it sent, which is
+  where `collect_incoming_receipts_from_chunks` reads the receipts the block delivers. Without it
+  (the corpus does not have it) they are the outgoing receipts of the previous chunk as this node
+  applied it. -/
+  prevOutgoing : Option (Array ByteArray) := none
 
 /-- The parameters of the chain. -/
 structure Params where
@@ -37,6 +42,25 @@ structure Params where
   /-- Whether each chunk's pre-state is converted back and compared with the trie's entries (a test of
   the conversion; the sync node leaves it off). -/
   roundTrip : Bool := true
+  /-- The shards whose chunks are applied; `none` is all of them (`tracked_shards_config`). -/
+  tracked : Option (Array UInt64) := none
+
+/-- A shard's place in a state sync: the state before the chunk included at `height` is `root`, and
+`delivered` are the receipts to apply with it (the blocks from that height back to the previous chunk,
+newest first); `incoming` are the receipts of every block of the header, newest first. -/
+structure ShardStart where
+  shard : ShardId
+  syncHash : CryptoHash
+  height : BlockHeight
+  root : CryptoHash
+  numParts : UInt64
+  memoryUsage : UInt64
+  /-- The height of the chunk before the one at `height` (zero at the genesis). -/
+  prevHeight : BlockHeight
+  transactions : Array SignedTransaction
+  delivered : Array ByteArray
+  incoming : Array (CryptoHash × Array ByteArray)
+  rootNode : StateRootNode
 
 /-- What the node knows about the chunks applied so far. -/
 structure Progress where
@@ -51,6 +75,9 @@ structure Progress where
   (`save_incoming_receipt`), kept for shards whose chunk is missing. -/
   incoming : Std.HashMap (ByteArray × UInt64) (Array ByteArray) := {}
   cache : CodeCache := {}
+  /-- Shards synced from a peer's state that have not had their first chunk applied: the state
+  before the chunk included at the start's height is in `tables` (state sync, M7). -/
+  starts : Std.HashMap UInt64 ShardStart := {}
 
 /-- The result of one chunk. -/
 structure ShardReport where
@@ -254,13 +281,17 @@ def applyBlock (prof : Option Prof) (p : Params) (st : Near.Node.Chain.ChainStat
   for index in [0:block.chunks.size] do
     let c := block.chunks[index]!
     if c.isNewChunk v.height then
-      let some prevChunk := prevRec.chunks[index]? | throw "previous chunk missing"
-      let included ← blockAtHeight st prevRec prevChunk.heightIncluded
-      match pr.outgoing[(included.hash.bytes, c.shardId)]? with
+      match (body c.shardId).prevOutgoing with
       | some r =>
         sent := sent.push (some r)
       | none =>
-        throw s!"no outgoing receipts of shard {c.shardId} at height {prevChunk.heightIncluded}"
+        let some prevChunk := prevRec.chunks[index]? | throw "previous chunk missing"
+        let included ← blockAtHeight st prevRec prevChunk.heightIncluded
+        match pr.outgoing[(included.hash.bytes, c.shardId)]? with
+        | some r =>
+          sent := sent.push (some r)
+        | none =>
+          throw s!"no outgoing receipts of shard {c.shardId} at height {prevChunk.heightIncluded}"
     else
       sent := sent.push none
   let incoming ← incomingReceipts layout v.prevHash sent
@@ -280,6 +311,21 @@ def applyBlock (prof : Option Prof) (p : Params) (st : Near.Node.Chain.ChainStat
       unless root == chunk.prevOutgoingReceiptsRoot do
         throw
             s!"shard {shard}: the outgoing receipts of the previous chunk do not match prev_outgoing_receipts_root"
+    -- a shard that is not tracked, or whose synced state starts later, has no chunk applied here
+    if let some tracked := p.tracked then
+      unless tracked.contains shard do
+        continue
+    let mut start? : Option ShardStart := none
+    if !pr.roots.contains shard then
+      let some s := pr.starts[shard]? | throw s!"no state for shard {shard}"
+      if v.height < s.height then
+        continue
+      unless v.height == s.height && isNew do
+        throw s!"shard {shard}: its synced state starts at height {s.height}, not at this block"
+      start? := some s
+      pr :=
+        { pr with
+          roots := pr.roots.insert shard s.root, starts := pr.starts.erase shard }
     let some root := pr.roots[shard]? | throw s!"no state for shard {shard}"
     let src := pr.tables.nodeSource (shardKey layout shard)
     let prevExtra? := pr.extras[(v.prevHash.bytes, shard)]?
@@ -300,7 +346,14 @@ def applyBlock (prof : Option Prof) (p : Params) (st : Near.Node.Chain.ChainStat
     let entries ← timed prof "trie-read" fun _ => trieEntries src root
     -- the receipts of this block, then those delivered since the shard's previous chunk
     let mut delivered := incoming[(layout.getShardIndex shard).getD 0]!
-    if isNew then
+    if let some s := start? then
+      -- the receipts the state header delivered with the first chunk, which also says what this
+      -- block delivered
+      if let some (_, mine) := s.incoming.find? (·.1 == hash) then
+        unless mine == delivered do
+          throw s!"shard {shard}: the receipts of the state sync header differ from the block's"
+      delivered := s.delivered
+    else if isNew then
       let some prevChunk := prevRec.chunks[index]? | throw "previous chunk missing"
       let mut cur := prevRec
       for _ in [0:100000] do

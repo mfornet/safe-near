@@ -16,7 +16,9 @@ def usage : String :=
   "usage: near-lean-node --version\n" ++
     "       near-lean-node peer --chain-dir DIR --node-key FILE --boot PEERID@IP:PORT\n" ++
     "           [--listen PORT] [--store DIR] [--no-apply] [--seconds N] [--follow N] [--drain N]\n" ++
-    "           [--applied-log FILE] [--report FILE] [--configs DIR] [--quiet]"
+    "           [--applied-log FILE] [--report FILE] [--configs DIR] [--quiet]\n" ++
+    "           [--sync-mode blocks|state|auto] [--track-shards ID,ID,...] [--public-addr IP:PORT]\n" ++
+    "           [--lag-log FILE] [--reach-lag N] [--profile]"
 
 /-- The value after a flag. -/
 private def flagValue (args : List String) (flag : String) : Option String :=
@@ -47,9 +49,25 @@ def peerCommand (args : List String) : IO UInt32 := do
   if peers.isEmpty then
     IO.eprintln "--boot PEERID@IP:PORT is required"
     return 2
+  let mode ←
+    match (flagValue args "--sync-mode") with
+    | none =>
+      pure SyncMode.blocks
+    | some m =>
+      match SyncMode.parse? m with
+      | some x =>
+        pure x
+      | none =>
+        IO.eprintln "--sync-mode is blocks, state or auto"
+        return 2
+  let tracked? : Option (Array UInt64) :=
+    (flagValue args "--track-shards").map fun t =>
+      ((t.splitOn ",").filterMap String.toNat?).toArray.map (·.toUInt64)
   run
-      { chainDir, keyFile, peers := peers.toArray,
-        configs := (flagValue args "--configs").getD "near-lean/vm/configs",
+      { mode, tracked := tracked?, publicAddr := (flagValue args "--public-addr").bind Addr.parse?,
+        lagLog := flagValue args "--lag-log", profile := args.contains "--profile",
+        reachLag := ((flagValue args "--reach-lag").bind String.toNat?).getD 5, chainDir, keyFile,
+        peers := peers.toArray, configs := (flagValue args "--configs").getD "near-lean/vm/configs",
         listen := (flagValue args "--listen").bind String.toNat? |>.map (·.toUInt16),
         store := flagValue args "--store", apply := !args.contains "--no-apply",
         seconds := (flagValue args "--seconds").bind String.toNat?,

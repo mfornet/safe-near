@@ -155,6 +155,10 @@ def applyWork (env : WorkerEnv) (work : Work) : IO Unit := do
 partial def applyLoop (env : WorkerEnv) : IO Unit := do
   if (← env.shared.failure.get).isSome then
     return
+  -- the tries a state sync built replace the genesis state, keeping the contracts decoded so far
+  if let some p← env.shared.install.modifyGet fun x => (x, none) then
+    let old ← env.progress.get
+    env.progress.set { p with cache := old.cache }
   let q ← env.shared.queue.modifyGet fun q => (q[0]?, q.extract 1 q.size)
   match q with
   | some work =>
