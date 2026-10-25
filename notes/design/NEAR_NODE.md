@@ -1027,8 +1027,7 @@ chunk_producer,chunk_inclusion_tracker,chunk_endorsement_handler}.rs`, `chain/cl
    pool filtered by the validity period and the signer's nonce (an empty list is a valid chunk); `tx_root` and
    `prev_outgoing_receipts_root` are merkle roots; the body is `TransactionReceipt(txs, receipts)` Borsh, Reed-Solomon
    encoded into `num_total_parts` parts (`Chunks.numTotalParts`: the genesis block producer seats, at least 2; data parts
-   `(total - 1) / 3`, at least 1; two parts, one of them data, on the two-validator localnet), `encoded_merkle_root` over the parts, header V3 over inner V4 (V5 with dynamic
-   resharding, off at 86), signed. Then `distribute_encoded_chunk`: every part owner (`get_part_owner(epoch, ord)`, part
+   `(total - 1) / 3`, at least 1; two parts, one of them data, on the two-validator localnet), `encoded_merkle_root` over the parts, header V3 over inner V5 (`DynamicResharding` is on from protocol 85; V4 before), signed. Then `distribute_encoded_chunk`: every part owner (`get_part_owner(epoch, ord)`, part
    `i` goes to block producer `i mod n`) and the next epoch's block producers get a `PartialEncodedChunk` with
    their parts, the receipt proofs for shards they care about and the Merkle path of each part, routed
    `VersionedPartialEncodedChunk` to the account; each part owner forwards the parts it owns
@@ -1134,6 +1133,39 @@ chunk_producer,chunk_inclusion_tracker,chunk_endorsement_handler}.rs`, `chain/cl
 | M8b | Reed-Solomon over GF(2^8) (`reed-solomon-erasure` 6.0.0), `EncodedShardChunk` construction with merkle paths and `PartialEncodedChunk`, signatures and constructors of approvals, endorsements, partial witnesses, the account data; witness construction; oracle fixtures from the pinned crates | `just node-conformance-validator` |
 | M8c | Doomslug state machine, block production, chunk production, witness and endorsement paths, `AccountData` and routed message signing, pool, fork choice; unit tests and corpus replay (the node produces the blocks of the corpus and Lean's own validation accepts them) | `just node-validator-tests` |
 | M8d | `localnet-validator` harness and the acceptance run | `just localnet-validator` |
+
+#### M8b, building blocks (done)
+
+Gate: `just node-conformance-validator` (1856 checks, 0 failures). Sources: `NearNode/Validator/{ReedSolomon,Signer,
+Chunk,Messages,Witness,Block}.lean`, `NodeConformance/Validator.lean`, `tools/node-conformance/src/validator_*.rs`
+(`validator-fixtures`, `just node-validator-oracle`), fixtures `near-lean/node/fixtures/validator` (5.9 MB; a second
+run of the oracle writes the same bytes). The oracle links `near-primitives` `=0.37.4` with `solomon` and `clock`,
+`reed-solomon-erasure` `=6.0.0` and `zstd` 0.13.
+
+- **Reed-Solomon.** GF(2^8) with polynomial 29 (tables as `build.rs`; `Gf.mulSpec` by shifting is checked against the
+  tables on all 65536 pairs), the systematic matrix `V * (top V)^-1`, `encode`, `reconstruct` (the first `data` shards
+  present), and the wrappers of `reed_solomon.rs`. Checked against the crate on every product, quotient and power, `num_data_parts`
+  for 0 to 255 parts at 0.6 (the `f64` truncation is reproduced with Lean's `Float`), the parity of random data for 16 code shapes up to
+  (171, 84) and (1, 255), 228 reconstructions (from nothing missing to everything missing, with the crate's errors) and 689
+  wrapped encodings and decodings (`reed_solomon_decode` with the length one short and one long).
+- **Chunks.** `produceChunk` is `ShardChunkWithEncoding::new` for protocol 86 (header V3 over inner V5, signed): 30 chunks
+  with two to ten parts, one to a few hundred transactions bytes and receipts of several shard layouts (V0, V1, V2
+  boundaries) match the crate byte for byte (shard chunk, encoded chunk, every merkle path, chunk hash), as do the receipt
+  proofs (`create_receipts_proofs_from_outgoing_receipts`, whose three functions the oracle transcribes since `near-chain` is not
+  linked; the same Lean code already agreed with the roots of 1024 real blocks) and 120 `create_partial_encoded_chunk` results.
+  *Found:* the root over the per-shard receipt hashes merklizes them as values (a hash of the hash is the leaf), unlike a
+  list of leaf hashes.
+- **Signed messages.** `Approval::new` (24, endorsements and skips), `ChunkEndorsement::new` (12), `PartialEncodedStateWitness::new`
+  and `generate_state_witness_parts` for 1 to 8 validators and witnesses of 0 to 5000 bytes (32 sets, 144 parts), the
+  acknowledgement, all byte for byte. The signatures are Ed25519 of the Lean `Impl`, not constant time.
+- **Zstd.** `compressStored` writes frames of raw blocks (window 2^17, no content size, no checksum). The decoder of the node and the
+  `zstd` crate (stream decoder, as the witness is decoded) both read the eight frames of `zstd-stored.jsonl` (inputs of 0 to
+  131073 bytes), which the node writes and `just node-validator-oracle` re-verifies with the crate.
+- **Blocks.** `produceBlock` is `Block::produce` for header V6 and body V2 with the VRF of `get_block_metadata`: 40 blocks over
+  1 to 4 shards, skipped heights, new and old chunks, the four clock cases (before, equal, after the previous timestamp), a minted amount,
+  a shard split and 0 to 4 approvals match the crate byte for byte, and `Block::check_validity` accepts each.
+- **Not in M8b:** the witness itself (`ChunkStateWitness` from the chain), `AccountData` and routed message signing (the network oracle,
+  M8c), the Doomslug state machine, the epoch queries.
 
 ## Open points
 

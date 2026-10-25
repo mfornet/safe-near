@@ -31,7 +31,7 @@ crypto-tests: crypto-build
 
 # Build the NEAR node (notes/design/NEAR_NODE.md) and its executables.
 node-build:
-    cd near-lean/node && lake build NearNode near-lean-node node-bench node-conformance-types node-conformance-network node-conformance-sync node-sync-tests node-trie-tests node-store-tests node-state-roots node-chain-validate node-chain-apply --wfail
+    cd near-lean/node && lake build NearNode near-lean-node node-bench node-conformance-types node-conformance-network node-conformance-sync node-conformance-validator node-sync-tests node-trie-tests node-store-tests node-state-roots node-chain-validate node-chain-apply --wfail
 
 # M1: the Borsh codecs of every near-primitives type against the committed nearcore oracle fixtures.
 [positional-arguments]
@@ -49,6 +49,18 @@ node-conformance-network *options: node-build
 # (`just node-sync-oracle` writes them).
 node-conformance-sync *options: node-build
     near-lean/node/.lake/build/bin/node-conformance-sync "$@"
+
+# M8b: the validator's building blocks (Reed-Solomon, chunk production, signed messages, witness parts, zstd frames)
+# against fixtures from the pinned crates (`just node-validator-oracle` writes them).
+node-conformance-validator *options: node-build
+    near-lean/node/.lake/build/bin/node-conformance-validator "$@"
+
+# M8b: regenerate near-lean/node/fixtures/validator with near-primitives and reed-solomon-erasure at the pin, then check that
+# the zstd crate decodes the frames the node writes (CI never builds this).
+node-validator-oracle:
+    cd tools/node-conformance && cargo run --release --locked --bin validator-fixtures -- ../../near-lean/node/fixtures/validator
+    near-lean/node/.lake/build/bin/node-conformance-validator --write-zstd
+    cd tools/node-conformance && cargo run --release --locked --bin validator-fixtures -- --verify-zstd ../../near-lean/node/fixtures/validator/zstd-stored.jsonl
 
 # M7: regenerate near-lean/node/fixtures/state-sync with nearcore's own zstd and near-store (needs the clean nearcore
 # checkout of `tools/localnet/build.py` and a Rust toolchain; CI never builds it).

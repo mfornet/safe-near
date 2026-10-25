@@ -13,3 +13,9 @@ import NearNode.Net.Uv
 import NearNode.Network
 import NearNode.Chain.Genesis
 import NearNode.Chain.Persist
+import NearNode.Validator.ReedSolomon
+import NearNode.Validator.Signer
+import NearNode.Validator.Chunk
+import NearNode.Validator.Messages
+import NearNode.Validator.Witness
+import NearNode.Validator.Block
