@@ -976,6 +976,165 @@ in-memory `Net`) and the existing ones.
   tampered header is tried: left for M8, which needs the same checks for stateless validation), a faster interpreter for the heavy-call blocks (M10), and
   the pool of parallel part downloads for shards with many parts (the localnet state is one part a shard).
 
+### M8 validator
+
+Acceptance: `just localnet-validator` (to come in M8d). Sources of the reference, all at the pin
+(`tools/localnet/.nearcore/<revision>`): `chain/chain/src/doomslug.rs`, `chain/client/src/{client,client_actor,
+chunk_producer,chunk_inclusion_tracker,chunk_endorsement_handler}.rs`, `chain/client/src/stateless_validation/**`,
+`chain/chain/src/stateless_validation/{state_witness,chunk_validation,chunk_endorsement}.rs`, `chain/chunks/src/*`,
+`core/primitives/src/{block,sharding,reed_solomon}.rs`, `chain/network/src/peer_manager/network_state/mod.rs`.
+
+#### M8a, inventory (what a validator does at protocol 86)
+
+1. **Doomslug** (`doomslug.rs`, `client.rs`, `client_actor.rs`).
+   - On every new head `set_tip(hash, height, last_final_height)`: the timer restarts at `height + 1` and an
+     endorsement is pending.
+   - Every `doomslug_step_period` (10 ms) `process_timer` (up to 20 iterations):
+     - `endorsement_pending` and `now >= last_endorsement_sent + endorsement_delay` and `tip.height >= largest_target_height`:
+       approval `Endorsement(tip.hash)` for `tip.height + 1`, and `largest_target_height = tip.height + 1`.
+       `Doomslug::new` is called with `min_block_production_delay` as the endorsement delay, `max_block_production_delay`
+       as the base `min_delay` of `T` and `max_block_wait_delay` as its cap; the localnets run 600 ms, 2 s and 6 s.
+     - `now >= timer.started + T(timer.height - last_final_height)` with
+       `T(n) = min(cap, base + (base / 10) * max(n - 2, 0))` (`base` 2 s, `cap` 6 s): a `Skip(tip.height)` approval for
+       `timer.height + 1`, `timer.started += T`, `timer.height += 1`.
+   - The largest target height is persisted before any approval is sent (`save_largest_target_height`): never
+     approve two blocks at one height (slashing-style safety); the node needs the same column.
+   - Approvals go to `get_block_producer(epoch, target_height)` (to the previous epoch's producer too when the
+     final head is still in the previous epoch, for skips); to itself they are collected locally.
+   - Receiving: `collect_block_approval` verifies the signature against the validator of the next block's epoch (or
+     the one after it), keeps only approvals for heights where it is the producer, resolves `Skip` to the parent
+     it knows, parks approvals whose parent it lacks (`pending_approvals`), and `Doomslug::on_approval_message`
+     accumulates stake per `(prev_hash, parent_height, target_height)` tracker; one approval per account per
+     target height (a newer one withdraws the older).
+   - Readiness (`ready_to_produce_block`): approved stake `> 2/3` of this epoch's total and of next epoch's (or the
+     latter is zero) for the tracker of the head; then either all shards have an endorsed chunk
+     (`ChunksReadiness::Ready`) or `now > ready_since + T(...) * chunk_wait_mult` (1/3).
+2. **Block production** (`Client::produce_block_on`, `Block::produce`). When the node is `get_block_producer(epoch, h)`
+   for the next height, nothing in `latest_known` at that height, and doomslug is ready: approvals ordered as
+   `get_epoch_block_approvers_ordered(prev)` with signatures of the tracker's witness, new chunk headers (only
+   chunks with enough endorsements, `height_included = h`, the others are the previous block's), endorsement
+   signatures per chunk, `next_bp_hash`, `epoch_sync_data_hash`, `block_merkle_root` of the tree extended by the
+   parent, `block_ordinal`, `minted_amount` at an epoch start, gas price and total supply from the included
+   chunks, timestamp `max(now, prev + 1ns)` and VRF `(value, proof)` of `prev.random_value`
+   (`get_block_metadata`), header V6 and body V2, signed by the node key, `latest_known` saved, then broadcast
+   (`PeerMessage::Block`) and processed like a received block. Exactly the checks the node already runs on a
+   received block (`Chain/Validate`) hold of the produced one, so the validator is its own oracle.
+3. **Chunk production** (`Client::produce_chunks`, `ChunkProducer::produce_chunk_internal`). When a block is
+   accepted (not syncing), for each shard the node is chunk producer of at `height + 1`
+   (`get_chunk_producer_info_db`): the previous block's `ChunkExtra` gives state root, outcome root, gas used and
+   limit, balance burnt, validator proposals, congestion info and bandwidth requests; the outgoing receipts are
+   those of `get_outgoing_receipts_for_shard_from_store` since the last included chunk; transactions come from the
+   pool filtered by the validity period and the signer's nonce (an empty list is a valid chunk); `tx_root` and
+   `prev_outgoing_receipts_root` are merkle roots; the body is `TransactionReceipt(txs, receipts)` Borsh, Reed-Solomon
+   encoded into `num_total_parts` parts (`Chunks.numTotalParts`: the genesis block producer seats, at least 2; data parts
+   `(total - 1) / 3`, at least 1; two parts, one of them data, on the two-validator localnet), `encoded_merkle_root` over the parts, header V3 over inner V4 (V5 with dynamic
+   resharding, off at 86), signed. Then `distribute_encoded_chunk`: every part owner (`get_part_owner(epoch, ord)`, part
+   `i` goes to block producer `i mod n`) and the next epoch's block producers get a `PartialEncodedChunk` with
+   their parts, the receipt proofs for shards they care about and the Merkle path of each part, routed
+   `VersionedPartialEncodedChunk` to the account; each part owner forwards the parts it owns
+   (`PartialEncodedChunkForward`) to the block producers tracking the shard and to the next chunk producer; the
+   chunk is persisted and marked ready for inclusion. It also answers `PartialEncodedChunkRequest` from its
+   cache, partial chunk store or chunk store.
+4. **Stateless validation, producer side** (`state_witness_producer.rs`, `state_witness.rs`, `partial_witness_actor.rs`).
+   After producing a chunk, `create_state_witness` builds `ChunkStateWitness` V2: the main transition (the last
+   new chunk's application at its block: `base_state` = trie nodes recorded while applying it, post state root), one
+   implicit transition per later block (`apply_old_chunk`: its recorded nodes, post state root), the source receipt
+   proofs (one per chunk included between the second-last and the last new chunk), the previous chunk's
+   transactions, the `applied_receipts_hash` and the new transactions. If the producer is among the chunk's
+   validators it endorses at once. `ChunkContractAccesses` (hashes of contracts called) go to validators first; then
+   the witness is Borsh encoded, zstd compressed (`EncodedChunkStateWitness`) and Reed-Solomon encoded for
+   `ordered_chunk_validators().len()` parts, 60 % data (`witness_part_length`); part `i` goes as
+   `PartialEncodedStateWitness` (signed by the producer, V1) to validator `i`, which forwards it to the other
+   validators (not the producer) as `PartialEncodedStateWitnessForward`. Deployed contracts are distributed as
+   `PartialEncodedContractDeploys` (only when a contract was deployed; also Reed-Solomon, 60 %).
+5. **Stateless validation, validator side** (`partial_witness_tracker.rs`, `chunk_validation_actor.rs`,
+   `chunk_validation.rs`, `validate.rs`). A part is checked (`validate_partial_encoded_state_witness`: epoch, the
+   node is a validator of the chunk, the producer's signature, part ordinal) and, if the node owns the part,
+   forwarded; with enough parts the witness is decoded (Reed-Solomon, zstd, Borsh) and `ChunkStateWitnessAck` goes to
+   the producer. A witness whose previous block is missing waits in the orphan pool (heights head + 2 to head + 5).
+   `pre_validate_chunk_state_witness`: version, validity of the new transactions for the config, the chain walk back
+   to the last two new chunks of the shard, source receipt proofs against the blocks' `prev_outgoing_receipts_root`
+   (merkle path, shard ids, no extra proofs), shuffle with the block's salt, the hash of the receipts applied, the
+   transactions' root against the block's chunk header, the validity period of each transaction.
+   `validate_chunk_state_witness`: apply the last chunk on the recorded storage, compare its post root with the
+   witness, apply the implicit transitions in order comparing each post root, then the chunk header against the
+   resulting `ChunkExtra` and the outgoing receipts root (`validate_chunk_with_chunk_extra_and_receipts_root`), the
+   new transactions' root and the encoded merkle root of the chunk (`validate_chunk_with_encoded_merkle_root`: the
+   body is re-encoded with Reed-Solomon). On success the node sends `ChunkEndorsement` V2 (signature over the
+   chunk hash with `ChunkEndorsementInner` and metadata) to the block producers of heights `h .. h+4` (unique). The
+   block producer's `ChunkEndorsementTracker` validates each endorsement (validator of the chunk, signature, epoch),
+   and `collect_chunk_endorsements` yields the state: a chunk header is included in the block only when the endorsing
+   stake is above 2/3 of the chunk validators' (`ChunkInclusionTracker`), else the previous chunk header is repeated.
+6. **Network duties without which the above cannot reach neard** (`peer_manager`, `network_state/mod.rs`).
+   `send_message_to_account` finds the peer of an account from `accounts_data` (`SyncAccountsData`: a
+   `SignedAccountData` signed with the validator key, carrying the node's peer id and address) or from announced
+   accounts; without it, every approval, chunk part, endorsement and witness part for the node is dropped by `neard`
+   as `UnknownAccount`. The node therefore signs and sends its own `AccountData`. Messages in the protocol-86 tiers:
+   T1 `BlockApproval`, `VersionedPartialEncodedChunk`, `PartialEncodedChunkForward`, `VersionedChunkEndorsement`,
+   `PartialEncodedStateWitness`(`Forward`), `ChunkContractAccesses`, `ContractCodeRequest/Response`,
+   `PartialEncodedContractDeploys`; T2 `ChunkStateWitnessAck`, `ForwardTx`; a T1 message falls back to the routed T2
+   path over the existing connection when no tier-1 connection exists, which is the localnet case.
+
+   | Step | Message (`Network/Types.lean` `RoutedBody` unless noted) | Present |
+   |---|---|---|
+   | approvals | `blockApproval` (tag 0), `Approval` and `get_data_for_sig` | yes (M1b, M6) |
+   | block | `PeerMessage.block` broadcast | yes |
+   | chunk parts | `versionedPartialEncodedChunk` (16), `partialEncodedChunkForward`, request/response (11, 12) | yes (M6 decodes, M7 requests) |
+   | witness | `partialEncodedStateWitness` and `Forward`, `versionedPartialEncodedStateWitness*`, `chunkStateWitnessAck`, `chunkContractAccesses`, `contractCode*`, `partialEncodedContractDeploys` | yes (M1c, M6) |
+   | endorsement | `versionedChunkEndorsement` | yes |
+   | account routing | `SyncAccountsData` with `SignedAccountData` | decoded only; signing and sending to do |
+   | transactions | `forwardTx` | yes; a pool is to do |
+
+   Routed messages the node *creates* need the author's signature over the routed hash (`RoutedMessage` signing); the
+   node has verified them since M6 but signs only edges, so signing is added.
+7. **Epoch assignment** (`EpochManager`): `get_block_producer`, `get_chunk_producer_info(epoch, height, shard)`,
+   `get_chunk_validator_assignments(epoch, shard, height)` (the sampler of M1c), `get_part_owner`,
+   `get_epoch_block_approvers_ordered`; all already in `NearNode.Epoch` (M5), checked at 46 heights against nearcore.
+
+**Decisions.**
+
+- *Topology.* A new `validator` topology: `neard localnet -v 2 -s 1` (the sharded topology already shows its genesis: two validators with 5e31 yoctoNEAR each, two block producer seats); `node0` stays `neard`, `node1`'s
+  `validator_key.json` and `node_key.json` are the Lean node's. The generated genesis gives both validators equal
+  stake (50 % each), so neither holds 2/3 alone and the Lean node's approvals, endorsements and blocks are all
+  needed (every finality gadget threshold is `> 2/3`). Reuses `generate`/`localnet.py` (`TOPOLOGIES` entry) and the
+  M5 chain exporter for the genesis block and its derived `BlockInfo` (a genesis-only corpus), which `Boot.load` reads.
+- *Witness production.* The Lean runtime applies a chunk from the whole shard state; it does not record trie
+  accesses. The node's witness therefore carries, as `base_state`, **every node and value of the shard's trie** at the
+  pre-state root (`Trie.objects`, the function the M5 apply already uses). This is a superset of the recorded proof:
+  `Trie::from_recorded_storage` reads the nodes it needs by hash and ignores the others, and the localnet's state is
+  a few hundred kilobytes (the witness limit is 64 MiB). Contract code is not put in `base_state` (nearcore's
+  recorded proof excludes it) but announced by `ChunkContractAccesses`. The oracle test of M8b checks the claim by
+  having nearcore's own `validate_chunk_state_witness` accept such a witness. Exact recording stays an M10 item
+  (witness size).
+- *Witness validation.* The node tracks every shard of the localnet and has applied the previous blocks, so it validates
+  a witness by what nearcore's validation computes: it runs `pre_validate` in full (receipt proofs, hashes, roots), and
+  instead of re-executing the chunk on the partial trie it compares the witness' post state roots and the
+  resulting `ChunkExtra` and receipts root with its own execution of the same blocks (deterministic runtime, the same
+  inputs), then the chunk header, the transactions' root and the encoded merkle root exactly as
+  `validate_chunk_state_witness_impl` does. A node that does not track the shard would need the runtime to run on a
+  partial trie (deferred; the runtime model takes a whole state).
+- *Zstd.* The node decompresses witnesses with its M7 decoder and compresses with a valid frame of raw blocks (a
+  conforming zstd stream; the size is irrelevant on the localnet). A real compressor is deferred.
+- *Transactions.* The localnet workload sends its transactions to `neard`'s RPC. `neard` forwards them (`ForwardTx`)
+  to the chunk producer of the shard, which may be the Lean node: its chunks carry the transactions it receives, so
+  the node needs a pool with the validity period and nonce filter (M8c); until then it produces empty chunks, which are
+  valid.
+- *Forks.* With two producers, a slow producer produces a competing block now and then. M7 follows one chain without
+  rollback. The validator needs the fork choice of `Chain::update_head` (highest height, then score) and a rollback of
+  the applied state to the fork point; scheduled in M8c, with the rule that the node never approves two blocks at one
+  height.
+- *Signing.* The M2 note says constant-time signing is open for M8. The localnet run signs with the `Impl` Ed25519 `sign`,
+  which is not constant time; this is recorded as the first hardening item, not claimed done.
+
+**Sub-milestones.**
+
+| | Scope | Gate |
+|---|---|---|
+| M8a | This inventory and the decisions | design document |
+| M8b | Reed-Solomon over GF(2^8) (`reed-solomon-erasure` 6.0.0), `EncodedShardChunk` construction with merkle paths and `PartialEncodedChunk`, signatures and constructors of approvals, endorsements, partial witnesses, the account data; witness construction; oracle fixtures from the pinned crates | `just node-conformance-validator` |
+| M8c | Doomslug state machine, block production, chunk production, witness and endorsement paths, `AccountData` and routed message signing, pool, fork choice; unit tests and corpus replay (the node produces the blocks of the corpus and Lean's own validation accepts them) | `just node-validator-tests` |
+| M8d | `localnet-validator` harness and the acceptance run | `just localnet-validator` |
+
 ## Open points
 
 - Numeric performance target for M10, measured against nearcore (M2's and M4's are proposed above).
