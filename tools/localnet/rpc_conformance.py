@@ -18,6 +18,7 @@ the stake each.  The run
 from __future__ import annotations
 
 import argparse
+import collections
 import base64
 import copy
 import json
@@ -148,26 +149,48 @@ def normalise(method: str, response):
         if result is not None:
             strip(result, path.split("."))
     if result is not None:
-        failures_to_marker(result)
+        drop_profiles(result)
         if method == "network_info":
             result["active_peers"] = len(result.get("active_peers", []))
             result["known_producers"] = len(result.get("known_producers", []))
     return out
 
 
-def failures_to_marker(value):
-    """The details of an execution failure (``Failure``: which action failed, with which error) are not reproduced by
-    the Lean runtime model; the status is compared as ``Failure``.  The gas profile of the outcome metadata is not
-    computed either."""
+UNRENDERED = "<unrendered failure>"
+UNRENDERED_KINDS: collections.Counter = collections.Counter()
+
+
+def drop_profiles(value):
+    """The gas profile and the contracts list of the outcome metadata are not computed by the Lean runtime (the metadata
+    ``version`` is compared)."""
     if isinstance(value, dict):
-        if "Failure" in value and len(value) == 1:
-            value["Failure"] = "<failure>"
-        value.pop("metadata", None) if set(value.get("metadata", {}) or {}) <= {"version", "gas_profile", "contracts"} and "gas_burnt" in value else None
+        if "version" in value and "gas_profile" in value:
+            value.pop("gas_profile", None)
+            value.pop("contracts", None)
         for item in value.values():
-            failures_to_marker(item)
+            drop_profiles(item)
     elif isinstance(value, list):
         for item in value:
-            failures_to_marker(item)
+            drop_profiles(item)
+
+
+def unify_unrendered(a, b) -> int:
+    """A ``Failure`` that the Lean node says it does not render (``UNRENDERED``) is made equal to neard's, and counted;
+    every other failure is compared as it is."""
+    count = 0
+    if isinstance(a, dict) and isinstance(b, dict):
+        for k in a:
+            if k in b:
+                if k == "Failure" and b[k] == UNRENDERED:
+                    UNRENDERED_KINDS[json.dumps(a[k])[:150]] += 1
+                    a[k] = UNRENDERED
+                    count += 1
+                else:
+                    count += unify_unrendered(a[k], b[k])
+    elif isinstance(a, list) and isinstance(b, list):
+        for x, y in zip(a, b):
+            count += unify_unrendered(x, y)
+    return count
 
 
 def diff(a, b, path=""):
@@ -217,10 +240,12 @@ def compare(request: Request, attempts: int = 12) -> dict:
     else:
         return {"request": request, "equal": False, "stale": True, "diff": ["the nodes never answered at the same head"]}
     nn, nl = normalise(request.method, rn), normalise(request.method, rl)
+    unrendered = unify_unrendered(nn, nl)
     problems = diff(nn, nl)
     if sn != sl:
         problems.insert(0, f"HTTP status {sn} != {sl}")
-    return {"request": request, "equal": not problems, "diff": problems, "status": sn, "ok": isinstance(rn, dict) and "result" in rn}
+    return {"request": request, "equal": not problems, "diff": problems, "status": sn, "ok": isinstance(rn, dict) and "result" in rn,
+            "unrendered": unrendered}
 
 
 # --------------------------------------------------------------------------------------------------------------------
@@ -418,7 +443,8 @@ def summary(results: list[dict]) -> dict:
     table: dict[str, dict] = {}
     for result in results:
         group = result["request"].group
-        row = table.setdefault(group, {"requests": 0, "equal": 0, "errors": 0, "stale": 0})
+        row = table.setdefault(group, {"requests": 0, "equal": 0, "errors": 0, "stale": 0, "unrendered_failures": 0})
+        row["unrendered_failures"] += result.get("unrendered", 0)
         row["requests"] += 1
         row["equal"] += 1 if result["equal"] else 0
         row["errors"] += 1 if result.get("ok") is False else 0
@@ -552,6 +578,7 @@ def run(options) -> int:
         for group, row in sorted(table.items()):
             print(f"{group:32} {row}")
         print("restart:", restart)
+        print("unrendered failures at the Lean node (neard's payload):", dict(UNRENDERED_KINDS))
         total = len(results)
         equal = sum(1 for r in results if r["equal"])
         print(f"{equal}/{total} requests equal")

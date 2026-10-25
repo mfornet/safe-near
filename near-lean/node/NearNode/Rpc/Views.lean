@@ -223,17 +223,87 @@ def merklePathView (p : Array MerklePathItem) : Json :=
               | .right => "Right"))])
     p
 
-def outcomeView (o : ExecutionOutcome) : Json :=
+/-- The `ActionErrorKind` as nearcore's `serde` renders it. -/
+def actionErrorKindJson : ActionErrorKind → Json
+  | .accountAlreadyExists a => tagged "AccountAlreadyExists" (Json.mkObj [("account_id", jacc a)])
+  | .accountDoesNotExist a => tagged "AccountDoesNotExist" (Json.mkObj [("account_id", jacc a)])
+  | .createAccountOnlyByRegistrar a r p =>
+    tagged "CreateAccountOnlyByRegistrar"
+      (Json.mkObj
+        [("account_id", jacc a), ("registrar_account_id", jacc r), ("predecessor_id", jacc p)])
+  | .createAccountNotAllowed a p =>
+    tagged "CreateAccountNotAllowed"
+      (Json.mkObj [("account_id", jacc a), ("predecessor_id", jacc p)])
+  | .actorNoPermission a x =>
+    tagged "ActorNoPermission" (Json.mkObj [("account_id", jacc a), ("actor_id", jacc x)])
+  | .deleteKeyDoesNotExist a k =>
+    tagged "DeleteKeyDoesNotExist" (Json.mkObj [("account_id", jacc a), ("public_key", jkey k)])
+  | .addKeyAlreadyExists a k =>
+    tagged "AddKeyAlreadyExists" (Json.mkObj [("account_id", jacc a), ("public_key", jkey k)])
+  | .deleteAccountStaking a => tagged "DeleteAccountStaking" (Json.mkObj [("account_id", jacc a)])
+  | .lackBalanceForState a n =>
+    tagged "LackBalanceForState" (Json.mkObj [("account_id", jacc a), ("amount", jbal n)])
+  | .triesToUnstake a => tagged "TriesToUnstake" (Json.mkObj [("account_id", jacc a)])
+  | .triesToStake a s l b =>
+    tagged "TriesToStake"
+      (Json.mkObj
+        [("account_id", jacc a), ("stake", jbal s), ("locked", jbal l), ("balance", jbal b)])
+  | .insufficientStake a s m =>
+    tagged "InsufficientStake"
+      (Json.mkObj [("account_id", jacc a), ("stake", jbal s), ("minimum_stake", jbal m)])
+  | .functionCallError (.executionError m) =>
+    tagged "FunctionCallError" (tagged "ExecutionError" (Json.str m))
+  | .functionCallError (.methodResolveError m) =>
+    tagged "FunctionCallError"
+      (tagged "MethodResolveError"
+        (Json.str
+          (match m with
+          | .methodEmptyName => "MethodEmptyName"
+          | .methodNotFound => "MethodNotFound"
+          | .methodInvalidSignature => "MethodInvalidSignature")))
+  | .deleteAccountWithLargeState a =>
+    tagged "DeleteAccountWithLargeState" (Json.mkObj [("account_id", jacc a)])
+  | .onlyImplicitAccountCreationAllowed a =>
+    tagged "OnlyImplicitAccountCreationAllowed" (Json.mkObj [("account_id", jacc a)])
+  | .delegateActionInvalidSignature => Json.str "DelegateActionInvalidSignature"
+  | .delegateActionSenderDoesNotMatchTxReceiver s r =>
+    tagged "DelegateActionSenderDoesNotMatchTxReceiver"
+      (Json.mkObj [("sender_id", jacc s), ("receiver_id", jacc r)])
+  | .delegateActionExpired => Json.str "DelegateActionExpired"
+  | .delegateActionInvalidNonce d a =>
+    tagged "DelegateActionInvalidNonce"
+      (Json.mkObj [("delegate_nonce", jn d.toNat), ("ak_nonce", jn a.toNat)])
+  | .delegateActionNonceTooLarge d u =>
+    tagged "DelegateActionNonceTooLarge"
+      (Json.mkObj [("delegate_nonce", jn d.toNat), ("upper_bound", jn u.toNat)])
+  | _ => Json.str "<unrendered action error>"
+
+/-- The failure of an outcome. The kinds `actionErrorKindJson` does not render, and the errors the node does not
+tell apart (`placeholderFailure`), are the string `<unrendered failure>`; the conformance run counts them. -/
+def failureView : TxExecutionError → Json
+  | .actionError ⟨some i, k⟩ =>
+    match k with
+    | .functionCallError (.executionError m) =>
+      if m == "the failure is not detailed by the node" then Json.str "<unrendered failure>"
+      else
+        tagged "ActionError" (Json.mkObj [("index", jn i.toNat), ("kind", actionErrorKindJson k)])
+    | _ =>
+      tagged "ActionError" (Json.mkObj [("index", jn i.toNat), ("kind", actionErrorKindJson k)])
+  | _ => Json.str "<unrendered failure>"
+
+def outcomeView (o : ExecutionOutcome) (version : Nat := 1) : Json :=
   let status : Json :=
     match o.status with
     | .unknown => Json.str "Unknown"
-    | .failure _ => tagged "Failure" Json.null
+    | .failure e => tagged "Failure" (failureView e)
     | .successValue v => tagged "SuccessValue" (jbytes v)
     | .successReceiptId r => tagged "SuccessReceiptId" (jhash r)
   Json.mkObj
     [("logs", jarr Json.str o.logs), ("receipt_ids", jarr jhash o.receiptIds),
       ("gas_burnt", jn o.gasBurnt.toNat), ("tokens_burnt", jbal o.tokensBurnt),
       ("executor_id", jacc o.executorId), ("status", status),
-      ("metadata", Json.mkObj [("version", jn 1), ("gas_profile", Json.null)])]
+      ("metadata",
+        Json.mkObj
+          [("version", jn version), ("gas_profile", Json.arr #[]), ("contracts", Json.arr #[])])]
 
 end Near.Node.Rpc

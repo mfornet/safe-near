@@ -28,10 +28,21 @@ class Comparison(unittest.TestCase):
         left, right = {"result": {"version": 1}}, {"result": {"version": 2}}
         self.assertEqual(len(rc.diff(rc.normalise("block", left), rc.normalise("block", right))), 1)
 
-    def test_failure_details_are_one_marker(self):
+    def test_a_failure_is_compared_unless_the_lean_node_says_it_does_not_render_it(self):
         left = {"result": {"status": {"Failure": {"ActionError": {"index": 0}}}}}
         right = {"result": {"status": {"Failure": {"ActionError": {"index": 1}}}}}
+        self.assertEqual(len(rc.diff(rc.normalise("tx", left), rc.normalise("tx", right))), 1)
+        right = {"result": {"status": {"Failure": rc.UNRENDERED}}}
+        a, b = rc.normalise("tx", left), rc.normalise("tx", right)
+        self.assertEqual(rc.unify_unrendered(a, b), 1)
+        self.assertEqual(rc.diff(a, b), [])
+
+    def test_the_gas_profile_is_dropped_and_the_version_is_compared(self):
+        left = {"result": {"metadata": {"version": 4, "gas_profile": [1], "contracts": [None]}}}
+        right = {"result": {"metadata": {"version": 4, "gas_profile": [], "contracts": []}}}
         self.assertEqual(rc.diff(rc.normalise("tx", left), rc.normalise("tx", right)), [])
+        right["result"]["metadata"]["version"] = 3
+        self.assertEqual(len(rc.diff(rc.normalise("tx", left), rc.normalise("tx", right))), 1)
 
     def test_the_peers_of_network_info_are_compared_as_a_count(self):
         left = {"result": {"active_peers": [{"id": "a"}], "known_producers": [], "num_active_peers": 1}}

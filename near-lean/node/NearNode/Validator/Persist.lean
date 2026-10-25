@@ -57,7 +57,7 @@ def appliedOps (s : VState) (b : Block) (reports : Array ShardReport) : Array Op
         let rec_ : OutcomeRec := { block := hash, shard := r.shard, proof := path, outcome := o }
         s := { s with outcomes := s.outcomes.insert o.id.bytes rec_ }
         ops := ops.push (.set .outcome o.id.bytes (Codec.encode (hash, r.shard, path, o)))
-      for raw in r.outgoing do
+      for raw in r.outgoing ++ r.yielded do
         if let .ok rc := Codec.decodeAll (α := Receipt) raw then
           let .v0 r0 := rc
           s := { s with receiptsById := s.receiptsById.insert r0.receiptId.bytes rc }

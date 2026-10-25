@@ -1262,24 +1262,23 @@ chunks). Sources: `NearNode/Validator/{Pool,Prepare}.lean`, `Follow.lean` (`buil
   `check` runs the request set against a topology that is up. Head-dependent requests are repeated until both nodes answered at the
   same head. The result is written to `rpc-conformance.json` in the work directory.
 - **Normalisation (the whole list).** `status`: `version`, `rpc_addr`, `uptime_sec`, `validator_account_id`, `validator_public_key`,
-  `node_public_key`, `node_key`. `network_info`: peers and known producers compared as a count, traffic counters dropped. In
-  every response: the payload of an execution `Failure` (which action failed and why) is replaced by a marker, and the outcome
-  `metadata` (version, gas profile, contracts) is dropped; the Lean runtime model computes neither.
-- **Last run** (one full `run`, 496 requests, 495 equal): block 84/84, chunk 63/63, `query` 109/109 (`view_account` 26, `view_access_key` 17,
-  `view_access_key_list` 18, `view_code` 9, `view_state` 12, `call_function` 32), `tx` 150/150, `EXPERIMENTAL_tx_status` 36/37,
-  `gas_price` 6/6, `validators` 4/4, protocol and genesis config 6/6, status, health, network_info 3/3; error cases are among
-  these (40 of them from success-or-error requests with the same error on both nodes). Transactions through the Lean RPC: `send_tx`,
-  `broadcast_tx_async` and `broadcast_tx_commit` one each, all three landed and `tx` at FINAL is equal on both nodes; 8 invalid
-  transactions (bad nonce, unknown signer, wrong key, insufficient balance, bad signature, expired, unknown receiver, malformed)
-  through `send_tx` and `broadcast_tx_async` each, 16/16 same error. Restart: SIGKILL of the Lean validator at final height 363,
-  restart from the store, caught up in 8.5 s, final height 372 on both nodes afterwards, 5/5 requests equal after the restart.
-  The one difference: `EXPERIMENTAL_tx_status` of a transaction with a yielded promise lists the receipts of the Lean node without the
-  receipt of the yield callback (3 receipts at neard, 2 at Lean).
+  `node_public_key`, `node_key`. `network_info`: peers and known producers compared as a count, traffic counters dropped. In every
+  response: the `gas_profile` and `contracts` members of an outcome's `metadata` are dropped (the `version` is compared: 1 for a
+  transaction, 4 for a receipt); and a `Failure` that the Lean node answers with the string `<unrendered failure>` (an error kind it
+  does not map) is taken as equal, and counted per group. Every other failure, rendered by the Lean node as nearcore does
+  (`ActionError` with the index and kind), is compared as it is. Kinds rendered: all account, key, stake and delegate-action kinds,
+  `FunctionCallError` for host errors, traps and `MethodResolveError`. Not rendered: compilation and link errors, gas-key errors,
+  `NewReceiptValidationError`, global-contract errors; no request of the set meets them.
+- **Last run** (one full `run`, 492 requests, 492 equal, no unrendered failures): block 79/79, chunk 64/64, `query` 114/114,
+  `tx` 150/150, `EXPERIMENTAL_tx_status` 37/37, `gas_price` 6/6, `validators` 4/4, protocol and genesis config 6/6, status,
+  health, network_info 3/3, errors 2/2. Transactions through the Lean RPC: `send_tx`, `broadcast_tx_async` and `broadcast_tx_commit`
+  one each, all three landed and `tx` at FINAL is equal on both nodes; 8 invalid transactions through `send_tx` and `broadcast_tx_async`
+  each, 16/16 same error. Restart: SIGKILL of the Lean validator at final height 353, restart from the store, caught up in 8.5 s, final
+  height 362 on both nodes afterwards, 5/5 requests equal after the restart.
 - **Not done.** `EXPERIMENTAL_changes`, `EXPERIMENTAL_changes_in_block` (needs the trie diff of each block kept per key kind),
   `include_proof` of `view_state`, `view_gas_key_nonces` and the global-contract queries, `light_client_proof`, `next_light_client_block`,
-  `maintenance_windows`, `client_config`, `EXPERIMENTAL_receipt`. A request for any of them answers `METHOD_NOT_FOUND`. A transaction
-  whose receipts include a yielded promise (`promise_yield_create`) still shows one receipt less than neard in one request of the
-  set (see the run below).
+  `maintenance_windows`, `client_config`, `EXPERIMENTAL_receipt`. A request for any of them answers `METHOD_NOT_FOUND`. The gas profile and the
+  contracts list of an outcome's metadata are not computed.
 
 #### M9c, persistence and operation (done, except the points listed)
 
