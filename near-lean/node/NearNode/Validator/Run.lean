@@ -14,7 +14,8 @@ account and the signing key; the node key is the peer id.
 
 namespace Near.Node.Validator
 
-open Lean Near.Node Near.Node.Net Near.Node.Network Near.Node.Chain Near.Node.Bootstrap Near.Node.Apply
+open Lean Near.Node Near.Node.Net Near.Node.Network Near.Node.Chain Near.Node.Bootstrap
+  Near.Node.Apply
 
 structure Options where
   chainDir : System.FilePath
@@ -47,7 +48,8 @@ def Env.headersAfter (e : Env) (hashes : Array CryptoHash) : IO (Array BlockHead
     | .ok r =>
       out := r.header :: out
       cur := r.view.prevHash
-    | .error _ => break
+    | .error _ =>
+      break
   return (out.toArray.extract 0 512)
 
 def run (o : Options) : IO UInt32 := do
@@ -56,29 +58,43 @@ def run (o : Options) : IO UInt32 := do
         o.configs
   let nodeKey ← loadOrCreateKey o.nodeKey
   let signer ←
-    match Signer.ofJson? (← IO.ofExcept (Json.parse (← IO.FS.readFile o.validatorKey) |>.mapError IO.userError)) with
-    | some s => pure s
-    | none => throw (IO.userError s!"{o.validatorKey}: not a validator key")
+    match
+      Signer.ofJson?
+        (← IO.ofExcept (Json.parse (← IO.FS.readFile o.validatorKey) |>.mapError IO.userError)) with
+    | some s =>
+      pure s
+    | none =>
+      throw (IO.userError s!"{o.validatorKey}: not a validator key")
   let started ← IO.monoMsNow
   let log (msg : String) : IO Unit := do
     unless o.quiet do
-      IO.eprintln s!"[{((← IO.monoMsNow) - started) / 1000}.{(((← IO.monoMsNow) - started) % 1000) / 100}s] {msg}"
+      IO.eprintln
+          s!"[{((← IO.monoMsNow) - started) / 1000}.{(((← IO.monoMsNow) - started) % 1000) / 100}s] {msg}"
   log s!"validator {signer.accountId.val}, node {nodeKey.peerId.key.toText}"
   let total := numTotalParts boot.genesis.setup.config.numBlockProducerSeats
   let code ← IO.ofExcept (chunkCode total |>.mapError IO.userError)
-  let delays : Delays := { endorsement := o.endorsementDelay, base := o.baseDelay, cap := o.capDelay }
+  let delays : Delays :=
+    { endorsement := o.endorsementDelay, base := o.baseDelay, cap := o.capDelay }
   let genesisHeight := boot.state.headHeight
   let now0 ← IO.monoMsNow
   let ds := (Doomslug.new now0 0 delays).setTip boot.genesisHash genesisHeight genesisHeight now0
   let vstate : VState :=
     { st := boot.state, pr := boot.progress,
       blocks := ({} : Std.HashMap ByteArray Block).insert boot.genesisHash.bytes boot.genesisBlock,
-      applied := ({} : Std.HashMap ByteArray BlockHeight).insert boot.genesisHash.bytes genesisHeight,
+      applied :=
+        ({} : Std.HashMap ByteArray BlockHeight).insert boot.genesisHash.bytes genesisHeight,
       tip := boot.genesisHash, tipHeight := genesisHeight, ds, latestKnown := genesisHeight }
   let env : Env :=
-    { signer, nodeKey, peer := o.peer.1, setup := boot.genesis.setup, params := boot.params, code, delays,
+    { signer, nodeKey, peer := o.peer.1, setup := boot.genesis.setup, params := boot.params, code,
+      delays,
+      validityPeriod :=
+        (boot.metaJson.getObjValAs? Nat "transactionValidityPeriod").toOption.getD 86400,
       state := ← IO.mkRef vstate, outbox := ← IO.mkRef #[], failure := ← IO.mkRef none, log,
-      appliedLog := ← (match o.appliedLog with | some f => some <$> IO.FS.Handle.mk f .write | none => pure none),
+      appliedLog :=
+        ←
+          (match o.appliedLog with
+            | some f => some <$> IO.FS.Handle.mk f .write
+            | none => pure none),
       nowMs := IO.monoMsNow }
   let stop ← IO.mkRef false
   let cfg : Near.Node.Network.Config :=
@@ -111,11 +127,13 @@ def run (o : Options) : IO UInt32 := do
         let s ← env.get
         pure (s.blocks[s.tip.bytes]?)
       headersAfter := env.headersAfter
-      blockOf := fun h => do pure ((← env.get).blocks[h.bytes]?)
+      blockOf := fun h => do
+        pure ((← env.get).blocks[h.bytes]?)
       status := do
         let s ← env.get
         let n (k : String) := s.stats.getD k 0
-        pure s!"tip {s.tipHeight} (head {s.st.headHeight}) applied {n "blocksApplied"} pending {s.pending.size} produced {n "blocksProduced"} blocks, {n "chunksProduced"} chunks; approvals sent {n "approvalsSent"} collected {n "approvalsCollected"}; endorsements sent {n "endorsementsSent"}; witnesses sent {n "witnessesSent"} valid {n "witnessesValid"} invalid {n "witnessesInvalid"}" }
+        pure
+            s!"tip {s.tipHeight} (head {s.st.headHeight}) applied {n "blocksApplied"} pending {s.pending.size} produced {n "blocksProduced"} blocks, {n "chunksProduced"} chunks; approvals sent {n "approvalsSent"} collected {n "approvalsCollected"}; endorsements sent {n "endorsementsSent"}; witnesses sent {n "witnessesSent"} valid {n "witnessesValid"} invalid {n "witnessesInvalid"}" }
   let (peerId, addr) := o.peer
   while !(← stop.get) do
     try
@@ -146,11 +164,14 @@ def run (o : Options) : IO UInt32 := do
   let json : Json :=
     Json.mkObj
       [("account", signer.accountId.val), ("chainId", boot.genesis.chainId),
-        ("genesisHash", base58Encode boot.genesisHash.bytes), ("handshakes", Json.num (JsonNumber.fromNat (← handshakes.get))),
+        ("genesisHash", base58Encode boot.genesisHash.bytes),
+        ("handshakes", Json.num (JsonNumber.fromNat (← handshakes.get))),
         ("disconnects", Json.arr ((← disconnects.get).map Json.str)),
-        ("tipHeight", Json.num (JsonNumber.fromNat s.tipHeight.toNat)), ("headHeight", Json.num (JsonNumber.fromNat s.st.headHeight.toNat)),
+        ("tipHeight", Json.num (JsonNumber.fromNat s.tipHeight.toNat)),
+        ("headHeight", Json.num (JsonNumber.fromNat s.st.headHeight.toNat)),
         ("tipHash", base58Encode s.tip.bytes),
-        ("stats", Json.mkObj (s.stats.toList.map fun (k, v) => (k, Json.num (JsonNumber.fromNat v)))),
+        ("stats",
+          Json.mkObj (s.stats.toList.map fun (k, v) => (k, Json.num (JsonNumber.fromNat v)))),
         ("seconds", Json.num (JsonNumber.fromNat (((← IO.monoMsNow) - started) / 1000))),
         ("failure",
           match failure with

@@ -4,6 +4,7 @@ import NearNode.Validator.Inclusion
 import NearNode.Validator.Produce
 import NearNode.Validator.Chunk
 import NearNode.Validator.ReedSolomon
+import NearNode.Validator.Pool
 
 /-!
 # The state of a running validator
@@ -14,9 +15,11 @@ which chunks of the store are complete, who owns a part of a chunk, which blocks
 
 namespace Near.Node.Validator
 
-abbrev CS := Near.Node.Chain.ChainState
+abbrev CS :=
+  Near.Node.Chain.ChainState
 
-open Near.Node Near.Node.Chain Near.Node.Network Near.Node.Apply Near.Node.Borsh Near.Node.ReedSolomon
+open Near.Node Near.Node.Chain Near.Node.Network Near.Node.Apply Near.Node.Borsh
+  Near.Node.ReedSolomon
 
 /-- A chunk as the node assembles it from parts. -/
 structure ChunkEntry where
@@ -73,6 +76,8 @@ structure VState where
   producedChunks : Std.HashSet (UInt64 × UInt64) := {}
   /-- Approvals whose parent block is not known yet. -/
   parkedApprovals : Array Approval := #[]
+  /-- The transaction pool of each shard the node produces chunks for. -/
+  pools : Std.HashMap UInt64 Pool := {}
   /-- Counters for the report. -/
   stats : Std.HashMap String Nat := {}
 
@@ -99,8 +104,11 @@ def endorsementTargets (st : CS) (epoch : EpochId) (height : BlockHeight) : Arra
     let mut out : Array AccountId := #[]
     for i in [0:5] do
       match st.blockProducer epoch (height + i.toUInt64) with
-      | .ok v => if !out.contains v.accountId then out := out.push v.accountId
-      | .error _ => break
+      | .ok v =>
+        if !out.contains v.accountId then
+          out := out.push v.accountId
+      | .error _ =>
+        break
     return out
 
 /-- The block at `height` on the chain that ends at `from`. -/
@@ -119,16 +127,18 @@ def chunkCode (total : Nat) : Except String Code :=
   Code.new (Network.numDataParts total) (total - Network.numDataParts total)
 
 /-- Rebuilds the body of a chunk from the parts present: reconstructs the missing data parts. -/
-def assembleBody (code : Code) (h : ShardChunkHeader) (parts : Std.HashMap UInt64 PartialEncodedChunkPart) :
-    Except String TransactionReceipt := do
+def assembleBody (code : Code) (h : ShardChunkHeader)
+    (parts : Std.HashMap UInt64 PartialEncodedChunkPart) : Except String TransactionReceipt := do
   let total := code.total
   let present : Array (Option ByteArray) :=
     (Array.range total).map fun i => (parts[i.toUInt64]?).map (·.part)
   let len := h.encodedLength.toNat
   let bytes ← decodeBytes code present len
   match Codec.decodeAll (α := TransactionReceipt) bytes with
-  | .ok b => pure b
-  | .error e => throw s!"the chunk body does not decode: {repr e}"
+  | .ok b =>
+    pure b
+  | .error e =>
+    throw s!"the chunk body does not decode: {repr e}"
 
 /-- `validate_chunk_with_encoded_merkle_root`: the body re-encoded gives the header's root and length. -/
 def checkEncoding (code : Code) (h : ShardChunkHeader) (body : TransactionReceipt) : Bool :=

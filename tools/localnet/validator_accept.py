@@ -16,6 +16,7 @@ block the Lean node contributes is needed.  The run
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import os
 from pathlib import Path
@@ -161,13 +162,74 @@ def chain_rows(last: int) -> list[dict]:
             detail = rpc("chunk", {"chunk_id": chunk["chunk_hash"]})
             chunks.append({"shard": chunk["shard_id"], "new": chunk["height_included"] == height,
                            "author": detail["author"], "prevStateRoot": chunk["prev_state_root"],
-                           "hash": chunk["chunk_hash"]})
+                           "hash": chunk["chunk_hash"],
+                           "txs": [(t["hash"], t["signer_id"]) for t in detail.get("transactions", [])]
+                           if chunk["height_included"] == height else []})
         rows.append({"height": height, "hash": header["hash"], "author": block["author"], "chunks": chunks,
                      "approvals": sum(1 for a in header["approvals"] if a), "lastFinal": header["last_final_block"]})
     return rows
 
 
-def analyse(work: Path, report: dict, stall: dict | None, rows: list[dict], head: int, final: int) -> dict:
+def neard_status_text(status) -> str:
+    """The status of an outcome as the Lean node's applied log writes it."""
+    if isinstance(status, dict):
+        if "SuccessValue" in status:
+            return "value:" + base64.b64decode(status["SuccessValue"]).hex()
+        if "SuccessReceiptId" in status:
+            return "receipt:" + nc.b58decode(status["SuccessReceiptId"]).hex()
+        if "Failure" in status:
+            return "failure"
+    return "unknown"
+
+
+def outcome_comparison(applied: list[dict], rows: list[dict]) -> dict:
+    """Every transaction of a chunk the Lean node produced (and a sample of neard's): the outcomes of the
+    transaction and of its receipts, from neard's ``EXPERIMENTAL_tx_status``, against those the Lean node
+    computed when it applied the blocks."""
+    lean_outcomes = {}
+    for row in applied:
+        for chunk in row["chunks"]:
+            for o in chunk.get("outcomes", []):
+                lean_outcomes[o["id"]] = o
+    wanted = []
+    for r in rows:
+        for c in r["chunks"]:
+            for tx_hash, signer in c["txs"]:
+                wanted.append((c["author"] == "node1", tx_hash, signer, r["height"]))
+    checked = equal = 0
+    problems = []
+    by_lean = [w for w in wanted if w[0]]
+    by_neard = [w for w in wanted if not w[0]]
+    for lean_made, tx_hash, signer, height in by_lean + by_neard[:40]:
+        try:
+            status = rpc("EXPERIMENTAL_tx_status", {"tx_hash": tx_hash, "sender_account_id": signer,
+                                                    "wait_until": "FINAL"}, timeout=30)
+        except Exception as error:      # noqa: BLE001
+            problems.append(f"{tx_hash}: {error}")
+            continue
+        theirs = [status["transaction_outcome"]] + status.get("receipts_outcome", [])
+        for o in theirs:
+            checked += 1
+            oid = nc.b58decode(o["id"]).hex()
+            mine = lean_outcomes.get(oid)
+            if mine is None:
+                problems.append(f"height {height} {o['id']}: no outcome in the Lean node's log")
+                continue
+            out = o["outcome"]
+            want = {"gasBurnt": out["gas_burnt"], "tokensBurnt": out["tokens_burnt"], "executor": out["executor_id"],
+                    "status": neard_status_text(out["status"]),
+                    "receipts": [nc.b58decode(r).hex() for r in out["receipt_ids"]]}
+            have = {k: mine[k] for k in want}
+            if want == have:
+                equal += 1
+            else:
+                problems.append(f"height {height} {o['id']}: neard {want} Lean {have}")
+    return {"leanTransactions": len(by_lean), "neardTransactionsChecked": min(len(by_neard), 40),
+            "outcomesChecked": checked, "outcomesEqual": equal, "problems": problems[:10]}
+
+
+def analyse(work: Path, report: dict, stall: dict | None, rows: list[dict], head: int, final: int,
+            require_txs: bool = True) -> dict:
     applied = [json.loads(line) for line in (work / "applied.jsonl").read_text().splitlines() if line.strip()]
     by_height = {r["height"]: r for r in rows}
     result: dict = {"headHeight": head, "finalHeight": final}
@@ -202,11 +264,20 @@ def analyse(work: Path, report: dict, stall: dict | None, rows: list[dict], head
     result.update(blocksApplied=len(applied), sameHash=same_hash, stateRootsChecked=checked_root, stateRootsEqual=same_root,
                   problems=problems[:10], disconnects=[d for d in report.get("disconnects", []) if "connection refused" not in d], failure=report.get("failure"),
                   leanStats=report.get("stats", {}), stall=stall)
+    lean_tx_chunks = [(r["height"], c) for r in rows for c in r["chunks"]
+                      if c["new"] and c["author"] == lean and c["txs"]]
+    result["leanChunksWithTransactions"] = len(lean_tx_chunks)
+    result["leanTransactionsIncluded"] = sum(len(c["txs"]) for _, c in lean_tx_chunks)
+    result["outcomes"] = outcome_comparison(applied, rows)
     # neard's blocks signed by the Lean node verify on neard's side by being in its chain; finality moved
     result["finalityAdvanced"] = final > 5 and head - final < 20
     ok = (result["blocksByLean"] > 0 and result["chunksByLean"] > 0 and not problems and not result["failure"]
           and not result["disconnects"] and report.get("handshakes") == 1 and same_hash == len(applied) and same_root == checked_root and checked_root > 0
-          and result["finalityAdvanced"] and (stall is None or (stall["stalled"] and stall["resumed"])))
+          and result["finalityAdvanced"]
+          and (not require_txs or (result["leanChunksWithTransactions"] > 0
+                                   and result["outcomes"]["outcomesChecked"] > 0
+                                   and result["outcomes"]["outcomesChecked"] == result["outcomes"]["outcomesEqual"]))
+          and (stall is None or (stall["stalled"] and stall["resumed"])))
     result["ok"] = ok
     return result
 
@@ -236,7 +307,7 @@ def main() -> None:
         lean.wait(timeout=60)
         rows = chain_rows(head_height())   # the chain went on while the Lean node was stopping
         report = json.loads((options.work / "report.json").read_text()) if (options.work / "report.json").exists() else {}
-        result = analyse(options.work, report, stall, rows, head, final)
+        result = analyse(options.work, report, stall, rows, head, final, require_txs=not options.no_workload)
         print(json.dumps(result, indent=1))
         (options.work / "result.json").write_text(json.dumps(result, indent=1) + "\n")
         sys.exit(0 if result["ok"] else 1)

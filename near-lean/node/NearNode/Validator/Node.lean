@@ -29,7 +29,8 @@ Messages to the account of this node are handled at once; every other account is
 
 namespace Near.Node.Validator
 
-open Near.Node Near.Node.Chain Near.Node.Network Near.Node.Apply Near.Node.Borsh Near.Node.ReedSolomon
+open Near.Node Near.Node.Chain Near.Node.Network Near.Node.Apply Near.Node.Borsh
+  Near.Node.ReedSolomon
 
 /-- What the validator needs besides its state. -/
 structure Env where
@@ -41,6 +42,8 @@ structure Env where
   /-- The Reed-Solomon code of chunk bodies, and the number of parts. -/
   code : Code
   delays : Delays
+  /-- `transaction_validity_period` of the genesis. -/
+  validityPeriod : Nat := 86400
   state : IO.Ref VState
   outbox : IO.Ref (Array PeerMessage)
   /-- The first thing that went wrong that the node cannot go on after. -/
@@ -51,7 +54,8 @@ structure Env where
   /-- Milliseconds on the monotonic clock. -/
   nowMs : IO Nat
 
-def Env.me (e : Env) : AccountId := e.signer.accountId
+def Env.me (e : Env) : AccountId :=
+  e.signer.accountId
 
 private def lift {α : Type} (r : Result α) : Except String α :=
   r.mapError fun e => s!"{e.kind} {e.detail}"
@@ -66,6 +70,9 @@ def wallSeconds : IO Nat := do
 
 def Env.get (e : Env) : IO VState :=
   e.state.get
+
+def Env.bumpBy (e : Env) (name : String) (n : Nat) : IO Unit :=
+  e.state.modify fun s => { s with stats := s.stats.insert name (s.stats.getD name 0 + n) }
 
 def Env.bump (e : Env) (name : String) : IO Unit :=
   e.state.modify (·.bump name)
@@ -87,33 +94,40 @@ def _root_.Near.Node.PartialEncodedChunk.receipts : PartialEncodedChunk → Arra
   | .v1 c => c.prevOutgoingReceipts
   | .v2 c => c.prevOutgoingReceipts
 
-
 /-! ### Sending -/
 
 /-- Delivers `body` to `account`: the peer, or this node itself (see `Drive`). -/
-def Env.send (e : Env) (selfDeliver : RoutedBody → IO Unit) (account : AccountId) (body : RoutedBody) :
-    IO Unit := do
-  if account == e.me then selfDeliver body else e.toPeer body
+def Env.send (e : Env) (selfDeliver : RoutedBody → IO Unit) (account : AccountId)
+    (body : RoutedBody) : IO Unit := do
+  if account == e.me then
+    selfDeliver body
+  else
+    e.toPeer body
 
 /-! ### Chunks -/
 
 /-- Adds parts whose merkle path leads to the header's root, and the receipts. -/
 def ChunkEntry.addParts (c : ChunkEntry) (total : Nat) (parts : Array PartialEncodedChunkPart)
-    (receipts : Array ReceiptProof) : ChunkEntry × Nat := Id.run do
-  let mut c := c
-  let mut refused := 0
-  let some h := c.header | return (c, parts.size)
-  let parts := c.pendingParts ++ parts
-  c := { c with pendingParts := #[] }
-  for p in parts do
-    if p.partOrd.toNat < total && verifyPath h.encodedMerkleRoot p.merkleProof p.part then
-      c := { c with parts := c.parts.insert p.partOrd p }
-    else
-      refused := refused + 1
-  for r in receipts do
-    if !c.receipts.any (fun x => x.proof.toShardId == r.proof.toShardId && x.proof.fromShardId == r.proof.fromShardId) then
-      c := { c with receipts := c.receipts.push r }
-  return (c, refused)
+    (receipts : Array ReceiptProof) : ChunkEntry × Nat :=
+  Id.run do
+    let mut c := c
+    let mut refused := 0
+    let some h := c.header | return (c, parts.size)
+    let parts := c.pendingParts ++ parts
+    c := { c with pendingParts := #[] }
+    for p in parts do
+      if p.partOrd.toNat < total && verifyPath h.encodedMerkleRoot p.merkleProof p.part then
+        c := { c with parts := c.parts.insert p.partOrd p }
+      else
+        refused := refused + 1
+    for r in receipts do
+      if
+          !c.receipts.any
+              (fun x =>
+                x.proof.toShardId == r.proof.toShardId &&
+                  x.proof.fromShardId == r.proof.fromShardId) then
+        c := { c with receipts := c.receipts.push r }
+    return (c, refused)
 
 /-- Tries to rebuild the body of a chunk from its parts: the transactions must hash to `tx_root` and the
 re-encoding must give the header's merkle root. -/
@@ -125,9 +139,11 @@ def ChunkEntry.assemble (c : ChunkEntry) (code : Code) : ChunkEntry × Option St
       match assembleBody code h c.parts with
       | .error m => (c, some m)
       | .ok body =>
-        if (merklize body.transactions).1 != h.txRoot then (c, some "the transactions do not hash to tx_root")
-        else if !checkEncoding code h body then (c, some "the body re-encodes to another merkle root")
-        else ({ c with body := some body }, none)
+        if (merklize body.transactions).1 != h.txRoot then
+          (c, some "the transactions do not hash to tx_root")
+        else
+          if !checkEncoding code h body then (c, some "the body re-encodes to another merkle root")
+          else ({ c with body := some body }, none)
   | _, _ => (c, none)
 
 /-- The parts of block producer seats owned by `me`. -/
@@ -146,8 +162,7 @@ def VState.withChunk (s : VState) (hash : ChunkHash) (f : ChunkEntry → ChunkEn
 def Env.noteHeader (e : Env) (h : ShardChunkHeader) : IO Unit :=
   e.state.modify fun s =>
     let entry := s.chunks.getD h.chunkHash.hash.bytes {}
-    if entry.header.isSome then s
-    else s.withChunk h.chunkHash fun c => { c with header := some h }
+    if entry.header.isSome then s else s.withChunk h.chunkHash fun c => { c with header := some h }
 
 /-- Called when a chunk's parts or header changed: rebuilds the body if possible. Returns whether the
 chunk became complete. -/
@@ -162,8 +177,7 @@ def Env.progressChunk (e : Env) (hash : ChunkHash) : IO Bool := do
   e.state.modify fun s => { s with chunks := s.chunks.insert k c' }
   if c'.body.isSome && !hadBody then
     -- the chunk's body is known: it can be included and applied
-    e.state.modify fun s =>
-      { s with bodies := s.bodies.insert k c'.body.get! }
+    e.state.modify fun s => { s with bodies := s.bodies.insert k c'.body.get! }
     return true
   return false
 
@@ -186,7 +200,8 @@ def Env.refreshChunk (e : Env) (hash : ChunkHash) : IO Bool := do
         e.log s!"a chunk header with an invalid signature for shard {h.shardId}"
         e.state.modify fun s => { s with chunks := s.chunks.erase k }
         return false
-    | .error _ => pure ()
+    | .error _ =>
+      pure ()
   let mut changed ← e.progressChunk hash
   let s ← e.get
   let some c := s.chunks[k]? | return changed
@@ -196,7 +211,8 @@ def Env.refreshChunk (e : Env) (hash : ChunkHash) : IO Bool := do
       if owned.all c.parts.contains then
         if let some producer := (s.st.chunkProducerAfter h.prevBlockHash h.shardId).toOption then
           let now ← e.nowMs
-          e.state.modify fun s => { s with inclusion := s.inclusion.markReady h producer.accountId now }
+          e.state.modify fun s =>
+              { s with inclusion := s.inclusion.markReady h producer.accountId now }
           changed := true
   return changed
 
@@ -205,9 +221,9 @@ def Env.onPartialChunk (e : Env) (c : PartialEncodedChunk) : IO Bool := do
   let h := c.header
   e.bump "PartialEncodedChunk"
   e.state.modify fun s =>
-    s.withChunk h.chunkHash fun x =>
-      let x := if x.header.isSome then x else { x with header := some h }
-      (x.addParts e.code.total c.parts c.receipts).1
+      s.withChunk h.chunkHash fun x =>
+        let x := if x.header.isSome then x else { x with header := some h }
+        (x.addParts e.code.total c.parts c.receipts).1
   e.refreshChunk h.chunkHash
 
 /-- A `PartialEncodedChunkForward`: parts of a chunk whose header may not be known yet. -/
@@ -215,9 +231,9 @@ def Env.onChunkForward (e : Env) (m : PartialEncodedChunkForwardMsg) : IO Bool :
   e.bump "PartialEncodedChunkForward"
   let hash : ChunkHash := ⟨m.chunkHash⟩
   e.state.modify fun s =>
-    s.withChunk hash fun x =>
-      -- parts are kept unchecked until the header is known: check then
-      { x with pendingParts := x.pendingParts ++ m.parts }
+      s.withChunk hash fun x =>
+        -- parts are kept unchecked until the header is known: check then
+        { x with pendingParts := x.pendingParts ++ m.parts }
   e.refreshChunk hash
 
 end Near.Node.Validator

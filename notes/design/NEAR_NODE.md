@@ -1210,6 +1210,35 @@ Produce,Wire,State,WitnessMake,Node,Endorse,Follow,Drive,Run}.lean`, the `valida
 - **Doubts.** The exporter binary was not rebuilt for the genesis-only chain fix (the harness works around it). The run
   is timing dependent: the Lean node missed a few chunks per epoch in every run, which is why the kickout bug showed.
 
+### M9 RPC and operability
+
+#### M9a, transaction pool (done)
+
+Gates: `just node-validator-tests` (the pool tests), `just localnet-validator` (which now needs transactions in Lean's
+chunks). Sources: `NearNode/Validator/{Pool,Prepare}.lean`, `Follow.lean` (`buildChunk`), `Drive.lean` (`processTx`,
+`dropIncluded`), reference `chain/pool/src/lib.rs`, `chain/client/src/{rpc_handler,chunk_producer}.rs`,
+`chain/chain/src/runtime/mod.rs` (`prepare_transactions_extra`), `chain/chain/src/store/utils.rs`.
+
+- **Pool.** One `Pool` per shard in `VState.pools`: groups by `(signer, public key)` keyed by `hash(borsh(pk) ++ seed ++ account)`,
+  visited round robin in key order after the last key used; duplicates by hash; the `transaction_pool_size_limit` (100 MB);
+  `remove` for the transactions a block includes; `prepare` is the loop of `prepare_transactions_extra` (gas limit
+  `process_tx_limit` of the shard's congestion, the 4 MiB `combined_transactions_size_limit`, the strict-nonce gap rule, the
+  reintroduction of the prepared transactions). Not ported: the time limit and the storage proof soft limit, the early
+  preparation job, the SPICE queue.
+- **Per transaction.** `Prepare.admit` follows `prepare_transactions_extra`: congestion of the receiving shard, validity period
+  (`check_transaction_validity_period`), the signer's account and key read from the trie of the previous block's state (the
+  node's own trie, no decoding of the shard) with the changes of the earlier transactions of the chunk in an overlay, and the
+  runtime's `convertTransaction` (what applying the chunk runs) for nonce, balance, allowance and storage stake. Entering the
+  pool (`process_tx_internal`): version, size, actions, signature, validity period and the same check at the tip.
+- **Forwarding.** A `ForwardTx` from the peer is processed as `is_forwarded`; a node that is a chunk producer of the shard
+  pools it. `forwardTx` sends to the chunk producers of the heights 1 to 3 and 7 after the tip (`tx_routing_height_horizon` 4).
+- **Not supported.** Gas-key transactions (the model has no gas keys) and ML-DSA keys are refused at the pool.
+- **Acceptance.** `validator_accept.py` reads every transaction of a Lean chunk from neard's `chunk` RPC, asks neard for
+  `EXPERIMENTAL_tx_status` and compares the outcome of the transaction and of each receipt (id, gas burnt, tokens burnt, executor,
+  status kind, receipt ids) with the outcomes the Lean node computed when it applied the block (`applied.jsonl`), failing if
+  there are none or any differ. Last run (100 s): 12 Lean chunks with 46 transactions, 276 outcomes checked, 276 equal; 154 block
+  hashes and 152 state roots equal.
+
 ## Open points
 
 - Numeric performance target for M10, measured against nearcore (M2's and M4's are proposed above).
