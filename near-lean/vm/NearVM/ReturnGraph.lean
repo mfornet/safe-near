@@ -22,6 +22,7 @@ theorem ConvertsPromise.new_receipt {g next : PromiseGraph} {p : NearPromise}
   cases h with
   | batch => exact ⟨g.receipts.length, by simp [PromiseGraph.addReceipt]⟩
   | callback => exact ⟨g.receipts.length, by simp [PromiseGraph.addReceipt]⟩
+  | yielded => exact ⟨g.receipts.length, by simp [PromiseGraph.addReceipt]⟩
   | joint => cases hp
 
 /-- A non-joint raw handle converts to a receipt at the same handle slot,

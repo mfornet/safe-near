@@ -27,7 +27,7 @@ theorem refundAllowanceUpdate_storageBytes (key updated : AccessKey) (pk : Publi
     (h : refundAllowanceUpdate key deposit = some updated) :
     accessKeyStorageBytes pk updated = accessKeyStorageBytes pk key := by
   obtain ⟨_, _, _, hp, _, hu, _⟩ := refundAllowanceUpdate_some key updated deposit h
-  simp [accessKeyStorageBytes, hp, hu]
+  simp [accessKeyStorageBytes, functionCallPermissionBytes, hp, hu]
 
 theorem refundAllowanceUpdate_zero (key : AccessKey) : refundAllowanceUpdate key 0 = none := by
   unfold refundAllowanceUpdate
@@ -78,21 +78,45 @@ theorem ChainState.refundAllowance_frame (st : ChainState) (id : AccountId) (pk 
   · rfl
   · split <;> rfl
 
-theorem ChainState.refundAllowance_totalBalance (st : ChainState) (id : AccountId) (pk : PublicKey) (deposit : Nat) :
+theorem refundAllowanceUpdate_gasBalance (key updated : AccessKey) (deposit : Nat)
+    (h : refundAllowanceUpdate key deposit = some updated) : updated.gasBalance = key.gasBalance := by
+  unfold refundAllowanceUpdate at h
+  cases hp : key.permission with
+  | functionCall allowance receiver methods =>
+    cases allowance with
+    | none => simp [hp] at h
+    | some a =>
+      simp only [hp] at h
+      split at h
+      · cases h
+        simp [AccessKey.gasBalance, AccessKeyPermission.gasKeyInfo?, hp]
+      · simp at h
+  | fullAccess => simp [hp] at h
+  | gasKeyFullAccess _ _ => simp [hp] at h
+  | gasKeyFunctionCall _ _ _ _ _ => simp [hp] at h
+
+theorem ChainState.refundAllowance_totalBalance (st : ChainState) (id : AccountId) (pk : PublicKey) (deposit : Nat)
+    (hwf : st.AccountsUnique) :
     (st.refundAllowance id pk deposit).totalBalance = st.totalBalance := by
   unfold ChainState.refundAllowance
   split
   · rfl
-  · split <;> rfl
+  · rename_i key hk
+    split
+    · rfl
+    · rename_i updated hu
+      exact ChainState.totalBalance_setAccessKey_same st id pk updated key hwf hk
+        (refundAllowanceUpdate_gasBalance key updated deposit hu)
 
 theorem ChainState.MapsUnique.refundAllowance {st : ChainState} (h : st.MapsUnique)
     (id : AccountId) (pk : PublicKey) (deposit : Nat) : (st.refundAllowance id pk deposit).MapsUnique := by
   unfold ChainState.refundAllowance
   split
   · exact h
-  · split
+  · rename_i key hk
+    split
     · exact h
-    · exact h.setAccessKey id pk _
+    · exact h.setAccessKey id pk _ (ChainState.account_of_accessKey h.accounts id pk key hk)
 
 theorem ChainState.refundAllowance_missing (st : ChainState) (id : AccountId) (pk : PublicKey) (deposit : Nat)
     (h : st.accessKey? id pk = none) : st.refundAllowance id pk deposit = st := by

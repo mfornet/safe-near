@@ -1,5 +1,7 @@
 import NearVM
 import tests.TrieStorage
+import tests.CryptoHosts
+import tests.LogHosts
 import Wasm.Wat
 
 /-!
@@ -171,11 +173,12 @@ def main (args : List String) : IO UInt32 := do
   check r "invalid graph rejection restores funds, storage and usage"
     (observed.balance == 99 && observed.storageUsage == 123 && observed.storage == [(alice, [7])] &&
       observed.receipts.isEmpty)
+  let dataId : List UInt8 := List.replicate 32 7
   let cyclicJoin : List NearPromise := [.and [0]]
   check r "raw join cycles cannot disappear through bounded flattening"
     ((joined.checkPromises 99 123 [] cyclicJoin).issue?.isSome)
-  check r "unsupported yielded handles cannot disappear during conversion"
-    ((joined.checkPromises 99 123 [] [.yielded [] [] 0 0 []]).issue?.isSome)
+  check r "a yielded promise is checked like any other receipt"
+    ((joined.checkPromises 99 123 [] [.yielded alice [.transfer 1] dataId]).issue?.isNone)
 
   let nestedHandles : List NearPromise := [
     .batch alice [.transfer 1], .and [0], .callback 1 bob [.transfer 2],
@@ -195,8 +198,9 @@ def main (args : List String) : IO UInt32 := do
     ((convertPromises [.and [0]]).isNone &&
       (convertPromises [.callback 0 alice []]).isNone &&
       (convertPromises [.and [99]]).isNone)
-  check r "conversion does not silently drop unsupported yielded promises"
-    ((convertPromises [.yielded [] [] 0 0 []]).isNone)
+  check r "a yielded promise converts to a receipt waiting for its data id"
+    ((convertPromises [.yielded alice [.transfer 1] dataId]).map (·.receipts.map (·.yieldDataId)) ==
+      some [some dataId])
 
   let exhausted := run cfg code h.codeSize "new" (ctx alice "new" "{}" 0) [] 0
   check r "fuel exhaustion is explicitly incomplete"
@@ -213,18 +217,15 @@ def main (args : List String) : IO UInt32 := do
   check r "completion on the last interpreter step is not fuel exhaustion" exactBudget.succeeded
 
   -- Execute unsupported operations, rather than checking the host registry.
-  -- Imports alone must remain usable for contracts with unreachable crypto code.
+  -- Imports alone must remain usable for contracts with unreachable code: `sha256` without
+  -- injected cryptography, and the hosts whose receipt forms are not modelled.
   for (name, params, arguments, results) in
-      [-- A crypto host runs only with its oracle (`HostCrypto`); these tests supply none.
-       ("sha256", "i64 i64 i64", "i64.const 0 i64.const 0 i64.const 0", ""),
-       ("alt_bn128_g1_sum", "i64 i64 i64", "i64.const 0 i64.const 0 i64.const 0", ""),
-       ("bls12381_p1_sum", "i64 i64 i64", "i64.const 0 i64.const 0 i64.const 0", "(result i64)"),
-       ("promise_yield_resume", "i64 i64 i64 i64",
-        "i64.const 0 i64.const 0 i64.const 0 i64.const 0", "(result i64)"),
-       ("promise_batch_action_deploy_global_contract", "i64 i64 i64",
-        "i64.const 0 i64.const 0 i64.const 0", ""),
-       ("promise_batch_action_deploy_global_contract_by_account_id", "i64 i64 i64",
-        "i64.const 0 i64.const 0 i64.const 0", "")] do
+      [("sha256", "i64 i64 i64", "i64.const 0 i64.const 0 i64.const 0", ""),
+       ("promise_yield_resume_with_yield_id", "i64 i64 i64 i64",
+        "i64.const 0 i64.const 0 i64.const 0 i64.const 0", "(result i32)"),
+       ("promise_set_refund_to", "i64 i64 i64", "i64.const 0 i64.const 0 i64.const 0", ""),
+       ("promise_batch_action_state_init_by_account_id", "i64 i64 i64 i64",
+        "i64.const 0 i64.const 0 i64.const 0 i64.const 0", "(result i64)")] do
     let wat := s!"(module (import \"env\" \"{name}\" (func $unsupported (param {params}) {results}))
       (memory 1) (func (export \"test\") {arguments} call $unsupported {if results.isEmpty then "" else "drop"})
       (func (export \"unused\")))"
@@ -237,6 +238,35 @@ def main (args : List String) : IO UInt32 := do
     check r s!"{name}: unsupported semantics never emit receipts" outcome.receipts.isEmpty
     let unused := run cfg testCode 0 "unused" (ctx alice "unused" "{}" 0) []
     check r s!"{name}: importing an unused operation is allowed" unused.succeeded
+
+  -- `validator_stake` and `validator_total_stake` read the epoch's validator set from the context.
+  let validators : List (List UInt8 × Nat) := [(alice, 7 * oneNear), (bob, 3 * oneNear)]
+  let validatorCode ← match ← Wat.compile
+      "(module (import \"env\" \"validator_total_stake\" (func $total (param i64)))
+        (import \"env\" \"validator_stake\" (func $stake (param i64 i64 i64)))
+        (import \"env\" \"value_return\" (func $ret (param i64 i64)))
+        (memory 1) (data (i32.const 64) \"alice.near\")
+        (func (export \"test\") i64.const 0 call $total
+          i64.const 10 i64.const 64 i64.const 16 call $stake
+          i64.const 32 i64.const 0 call $ret)
+        (func (export \"other\") i64.const 0 call $total
+          i64.const 3 i64.const 64 i64.const 16 call $stake
+          i64.const 32 i64.const 0 call $ret))" with
+    | .ok m => pure m
+    | .error e => throw (IO.userError s!"validator fixture: {e}")
+  let validatorCtx (method : String) : VMContext :=
+    { ctx alice method "{}" 0 with
+      validatorStake := fun id => ((validators.find? (·.1 == id)).map (·.2)).getD 0
+      validatorTotalStake := 10 * oneNear }
+  let le128 (n : Nat) : List UInt8 := (List.range 16).map fun i => UInt8.ofNat ((n / 256 ^ i) % 256)
+  let known := run cfg validatorCode 0 "test" (validatorCtx "test") []
+  check r "validator_stake and validator_total_stake read the context's validator set"
+    (known.succeeded && known.returnData == .value (le128 (10 * oneNear) ++ le128 (7 * oneNear)))
+    (describe known)
+  let unknown := run cfg validatorCode 0 "other" (validatorCtx "other") []
+  check r "validator_stake of a non-validator is zero"
+    (unknown.succeeded && unknown.returnData == .value (le128 (10 * oneNear) ++ le128 0))
+    (describe unknown)
 
   -- Weighted function calls (nearcore `distribute_gas`): the unused prepaid gas
   -- goes to weights 1 and 2 in proportion, the remainder to the last weighted
@@ -432,6 +462,8 @@ def main (args : List String) : IO UInt32 := do
 
   TrieStorage.check cfg (fun name ok => check r name ok)
   StorageCosts.check cfg (fun name ok => check r name ok)
+  CryptoHosts.check cfg (fun name ok => check r name ok)
+  LogHosts.check cfg (fun name ok => check r name ok)
   let s ← r.get
   IO.println s!"{s.passed} passed, {s.failed} failed"
   return (if s.failed = 0 then 0 else 1)

@@ -13,7 +13,7 @@ def ActionReceiptFinancialScope (receipt : Receipt) (action : ActionReceipt) : P
 def ReceiptFinancialScope (receipt : Receipt) : Prop :=
   match receipt.receipt with
   | .action action => ActionReceiptFinancialScope receipt action
-  | .data _ => True
+  | .data _ | .globalDistribution _ => True
 
 theorem ActionReceiptFinancialShape.to_scope (receipt : Receipt) (action : ActionReceipt)
     (h : ActionReceiptFinancialShape receipt action) : ActionReceiptFinancialScope receipt action := by
@@ -27,6 +27,7 @@ theorem ReceiptFinancialShape.to_scope (receipt : Receipt) (h : ReceiptFinancial
     ReceiptFinancialScope receipt := by
   cases hr : receipt.receipt with
   | data data => simp only [ReceiptFinancialScope, hr]
+  | globalDistribution g => simp only [ReceiptFinancialScope, hr]
   | action action =>
     have ha : ActionReceiptFinancialShape receipt action := by simpa only [ReceiptFinancialShape, hr] using h
     simpa only [ReceiptFinancialScope, hr] using ActionReceiptFinancialShape.to_scope receipt action ha

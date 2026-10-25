@@ -58,7 +58,7 @@ Each milestone is done when its `just` target passes locally and in CI.
 | M1 | SAF-15 | Borsh and all `near-primitives` types | M0 | `just node-conformance-types` |
 | M2 | SAF-16 | Crypto in pure Lean | M0 | `just crypto-tests` |
 | M3 | SAF-17 | Complete runtime | M2 | `just chain-replay-corpus` |
-| M4 | SAF-18 | Trie and storage | M1 | state roots on M3 corpus, restart test |
+| M4 | SAF-18 | Trie and storage | M1 | `just node-state-roots`, `just node-store-tests` |
 | M5 | SAF-19 | Chain and epoch manager | M1, M2, M4 | `just chain-validate-corpus` |
 | M6 | SAF-20 | P2P networking | M1, M2 | `just localnet-peer` |
 | M7 | SAF-21 | Syncing observer | M3–M6 | `just localnet-follow` |
@@ -173,8 +173,7 @@ Ed25519, secp256k1 and ML-DSA-65 signatures in Lean. M2a is the hashes and Ed255
 
 - **Package.** `NearCrypto` requires nothing from this repository and no Mathlib, so contract builds
   are unaffected and `NearVM` can adopt it later without pulling the node in; `just node-isolation`
-  enforces it. The VM takes its digests, `ed25519Verify` and `ecrecover` as oracles (`HostCrypto`,
-  absent ones are unsupported-host issues); the VM conformance replay supplies `NearCrypto`. The node
+  enforces it. The VM keeps taking its digests, `ed25519Verify` and `ecrecover` as host parameters. The node
   requires it by path: `CryptoHash.hash` (so every block, chunk and outcome hash and the sampler
   seeds) is the `NearCrypto` SHA-256 `Impl`. Pure Lean throughout, no `@[extern]`.
 - **Spec and Impl.** Each primitive has a `Spec`, simple and close to the standard (lists, `Nat`,
@@ -471,14 +470,76 @@ Ed25519, secp256k1 and ML-DSA-65 signatures in Lean. M2a is the hashes and Ed255
   | HMAC-SHA256, SHA-512 | RFC 6979 nonces, Ed25519 | yes |
   | `Merkle` (`merklize`, paths) | chunk, block and outcome roots | not crypto: the node (M1) |
 
-  **Not in this package, needed by the VM's host functions for M3** (listed, not implemented): the BN254
-  curve of `alt_bn128_g1_multiexp`, `alt_bn128_g1_sum` and `alt_bn128_pairing_check`; and the BLS12-381 curves
-  of `bls12381_p1_sum`, `bls12381_p2_sum`, `bls12381_g1_multiexp`, `bls12381_g2_multiexp`,
-  `bls12381_map_fp_to_g1`, `bls12381_map_fp2_to_g2`, `bls12381_pairing_check`, `bls12381_p1_decompress`
-  and `bls12381_p2_decompress` (field towers, pairings, hash-to-curve and subgroup checks). The VM keeps taking its
-  digests, `ed25519Verify` and `ecrecover` as parameters until M3 chooses to import `NearCrypto`. Reed-Solomon
-  erasure coding (chunk parts) is not cryptography and is not here either; M6 confirms the network
-  handshake needs nothing more than Ed25519.
+  **Not in this package:** the VM keeps taking its digests, `ed25519Verify` and `ecrecover` as parameters until M3
+  chooses to import `NearCrypto`. Reed-Solomon erasure coding (chunk parts) is not cryptography and is not here
+  either; M6 confirms the network handshake needs nothing more than Ed25519. The pairing-friendly curves and P-256
+  of the VM's host functions are M2d, below.
+
+- **M2d: pairing-friendly curves and P-256.** `NearCrypto.Bn254` (`alt_bn128_g1_multiexp`, `alt_bn128_g1_sum`,
+  `alt_bn128_pairing_check`), `NearCrypto.Bls12381` (the nine `bls12381_*` functions) and `NearCrypto.P256`
+  (`p256_verify`), each a function from the host's input bytes to what the host writes or returns (`Except` for
+  its traps, `none` for the BLS functions' return value 1), with a `Spec` and an `Impl`. The oracle is
+  `near-vm-runner` 0.37.4's own `VMLogic` (`crypto_vm.rs`: a flat memory, the free configuration), not a
+  reimplementation of its wrapping; `zeropool-bn` 0.5.11, `blst` 0.3.11 and `p256` 0.13.2 only build the inputs.
+  The sources matched: `logic/alt_bn128.rs` (little-endian words; `Fq` below `q`, `Fr` below `r`; `G1` on the
+  curve, `(0, 0)` infinity; `G2` on the twist **and** `[r] Q = O`), `logic/bls12381.rs` (ZCash flags; the flag `0x80`
+  rejected on uncompressed input; sums need only curve points, multiexp and pairing the prime-order group;
+  returns 0, 1 or 2), `blst` `e1.c`/`e2.c`/`map_to_g1.c`/`map_to_g2.c`/`pairing.c`, and `logic/logic.rs:1900`
+  (`p256_verify`) with `ecdsa` 0.16.9 `verify_prehash` (the message is the digest: under 16 bytes false, cut to 32;
+  no low-`s` rule; a signature outside `[1, n-1]` answers false **before** the key length can trap).
+  - **Structure.** `Pairing.Group` is one Jacobian implementation over a record of field operations (`Fp`, `Fp2`,
+    any `a`); `Pairing.Spec` is the optimal ate pairing for both families as an `Fp12` of twelve coefficients, a
+    Miller loop on the twist in affine coordinates with each line untwisted and multiplied as an ordinary element,
+    and the final exponentiation as one power; `Pairing.Tower`/`Pairing.Impl` are the Karatsuba tower, one Miller
+    loop for all pairs with Jacobian steps and thirteen-product sparse lines (D- and M-type twists), cyclotomic
+    squaring, and the hard part from its expansion in `x` (BN: `λ₀ + λ₁p + λ₂p² + p³`; BLS:
+    `((x-1)²/3)(x+p)(x²+p²-1) + 1`). The fast pairing equals the reference exactly, so the differential test
+    compares reduced values, not only verdicts. Field elements stay `Nat`: a 381-bit product and `%` costs 0.4 µs, a
+    Montgomery product on 26-bit limbs would cost about as much (225 + 225 limb products), and inversion is the
+    extended Euclidean algorithm (4 µs; Fermat's 250 µs).
+  - **Subgroup tests.** `G2` of BN254 by `ψ(Q) = [6x²] Q`: `deg([6x²] - ψ) = 36x⁴ + p - 6x²t = r`, so the kernel is
+    exactly `G2` (the check the crate makes is `[r] Q = O`, which the reference does). BLS12-381 uses `blst`'s own
+    tests (`σ²(P) = -[z²] P`, whose endomorphism has degree `r`, and `ψ(P) = [z] P` of Scott 2021) and the reference
+    `[r] P = O`; the differential tests compare them on members, non-members and sums of both. `ψ`-based clearing of the
+    `G2` cofactor, as `blst` does, equals `[h_eff]` on random curve points (also a differential test).
+  - **NEP-488.** With `bls12381_not_in_group_fix` off (protocol 86) `p1_sum` and `p1_decompress` reject the order-3
+    points `(0, ±2)`; on (protocol 155) they accept them. Both are fixtures (`v0`, `v1`) and a `version` argument.
+  - **Hash to curve.** The isogeny constants are read out of `blst`'s sources by `scripts/gen_bls_isogeny.py`
+    (`tools/tests/test_crypto_generated.py` regenerates them when the sources are in the cargo registry;
+    `test_bls_isogeny.py` checks they define isogenies). The fast `G1` map takes one exponentiation
+    (`sqrt(-g)` for the non-square case) and one inversion.
+  - **Fixtures** (`bn254.jsonl` 336 lines: 110 multiexp, 91 sum, 135 pairing; `bls12381.jsonl` 883: 112 + 120
+    multiexp, 109 + 113 sum, 88 + 88 decompress, 50 + 99 map, 104 pairing; `p256.jsonl` 215; 1.3 MB, the older
+    files unchanged). Valid and invalid: wrong lengths, non-canonical and over-range field elements and scalars,
+    off-curve points, points outside the groups, infinities, flags, opposite and repeated points, up to 64 points,
+    pairings that hold and fail, the exceptional SSWU input, every `p256_verify` edge. `crypto-conformance` runs
+    all of them on `Impl` and, within a size bound (and on one version unless the two differ), on `Spec`;
+    `tools/tests/test_pairing_fixtures.py` recomputes a sample of every function in plain Python integers with
+    `pairing_reference.py` and an RFC 9380 SSWU written again.
+  - **Performance** (same machine as above, best of three; the native column is `crypto-bench curves`, the host
+    functions themselves with `blst` built `portable` as `near-vm-runner` builds it; 2 pairs, 8 points):
+
+    | | Lean | native | Lean / native |
+    |---|---|---|---|
+    | BN254 pairing check, 1 / 2 pairs | 19.2 / 28.1 ms | 2.95 / 4.24 ms | 6.5 / 6.6 |
+    | BN254 `g1_multiexp` 1 / 8 points | 1.65 / 4.93 ms | 195 / 774 µs | 8.5 / 6.4 |
+    | BN254 `g1_sum` 8 points | 145 µs | 13 µs | 11 |
+    | BLS12-381 pairing check, 1 / 2 pairs | 17.0 / 22.2 ms | 0.89 / 1.32 ms | 19 / 17 |
+    | BLS12-381 `p1_sum` / `p2_sum`, 8 points | 218 / 353 µs | 16 / 31 µs | 13 / 11 |
+    | BLS12-381 `g1_multiexp` 1 / 8 points | 2.5 / 12.4 ms | 203 µs / 1.40 ms | 12 / 8.9 |
+    | BLS12-381 `g2_multiexp` 1 / 8 points | 6.5 / 30.2 ms | 279 µs / 3.16 ms | 23 / 9.5 |
+    | BLS12-381 `map_fp_to_g1` / `map_fp2_to_g2` | 1.40 / 3.64 ms | 61 / 185 µs | 23 / 20 |
+    | BLS12-381 `p1_decompress` / `p2_decompress` | 258 / 656 µs | 21 / 39 µs | 12 / 17 |
+    | P-256 `p256_verify` (32-byte digest) | 2.94 ms | 319 µs | 9.2 |
+
+    The native BN254 crate is slow (`zeropool-bn`), so BN254 is the closest. Proposed targets (the code meets
+    them): BN254 pairing checks within 8x, BLS12-381 pairing checks within 20x (about 25 ms for two pairs), sums,
+    multiexp, decompression and `p256_verify` within 25x, the maps within 25x. Levers, none changing a `Spec`: the
+    subgroup tests dominate multiexp (an eighth of a `G2` multiexp is its tests), a GLV/GLS split of the
+    scalars, mixed additions from affine tables, lazy reduction in the tower, and an unboxed limb field once
+    there is a 128-bit product.
+  - **Open.** Nothing here is constant time (all inputs are public). The host functions' gas is the VM's
+    (M3). `p256_verify` and the BLS functions take the arguments after the VM's own length and memory checks.
 
 ### M3 runtime
 
@@ -505,28 +566,329 @@ reports. Rebuild steps and formats: [`tools/localnet/CORPUS.md`](../../tools/loc
   complete post-state with the record, never the reverse. Result per chunk: `pass`, `fail: <first field>` or
   `unsupported: <reason>`. The recipe exits 0 only if all pass; `just chain-replay-corpus-report` prints the table
   and always exits 0. Python tests check codec, format, manifest and converter in CI without neard.
-- **Current report (M3a): 70 pass, 18 fail, 348 unsupported of 436**; this is the work list, by first reason:
+- **Current report: 436 pass, 0 fail, 0 unsupported of 436: M3 is accepted** (`just chain-replay-corpus` exits 0).
+  Earlier: M3d 426, 10, 0; M3c 405, 14, 17; M3b 129, 6, 301; M3a 70, 18, 348. The last two chunks (`h205`) needed
+  the crypto (M3e) and validator (M3d) hosts together, code a contract deploys from its own memory (decoded by the
+  replay like catalogue code), and nearcore's UTF-8/UTF-16 log decoding (`NearVM/LogRead.lean`).
 
-  | Chunks | First reason |
-  |---:|---|
-  | 288 | multi-shard layout (chunk model: single-shard scheduler and congestion) |
-  | 26 | pre-state yield queues |
-  | 24 + 1 | pre-state global contract code and nonces |
-  | 13 | fail: VM host `promise_batch_action_transfer_to_gas_key` unsupported (every call into `test_contract_rs`) |
-  | 3 | epoch boundary: validator accounts update (rewards, stake return) |
-  | 3 | pre-state callback or delayed-queue records |
-  | 3 | fail: `Stake`/`Unstake` need the epoch machinery |
-  | 2 + 2 | host `validator_stake` needs the validator set; fail: host `ecrecover` unsupported |
-  | 1 | `DeployGlobalContract` |
+  M3d closed the 25 staking and epoch chunks. `Stake`/`Unstake` follow `action_stake` (`TriesToStake`,
+  `TriesToUnstake`, `InsufficientStake` against the epoch's minimum stake, the locked balance, and a validator
+  proposal per accepted action; a failed receipt keeps none). The epoch is an input, not computed:
+  `ApplyState.epochInfo` carries what `EpochInfoProvider` answers (minimum stake, each validator's stake, the total),
+  which `validator_stake` and `validator_total_stake` read in the VM (`VMContext.validatorStake`; gas in
+  `near-vm-runner` order: base, account id read and decoding, `validator_stake_base`, the 16-byte write).
+  Proposals travel in each `ExecutionOutcome` and in `ApplyResult.proposals`; `uniqueProposals` is the chunk's dedup
+  (`Runtime::apply` walks them backwards, last proposal of an account wins), and `registered-replay` reports them as
+  Borsh `Vec<ValidatorStake>` for the harness to compare with `validatorProposals`. At an epoch's first chunk the
+  harness passes the `ValidatorAccountsUpdate` and `NearRuntime.Epoch` applies `update_validator_accounts` (rewards
+  added to the locked balance, the staking invariant checked, everything above `max(max_of_stakes, last_proposal)`
+  returned to the liquid balance, the treasury paid unless it is a validator) before anything else runs, so the
+  chunk trie already holds the updated accounts. The update is outside the proved `apply`.
 
-  Behind the first reasons stand `Delegate`, `UseGlobalContract`, gas-key actions, global contract distribution
-  receipts and the buffered-receipt (congestion) columns. Not exercised by the workload: `DelegateV2`,
-  `DeterministicStateInit`, secp256k1 and ML-DSA signers, chunks invalid at application, missing chunks, resharding.
+  M3c closed the 288 four-shard chunks and the 8 converter chunks: the `ShardLayout` (V2, ids 3, 1, 0, 2 over the
+  boundaries `test1`..`test3`; routing as `account_id_to_shard_id`, shard order as `shard_ids()`), the bandwidth
+  scheduler for any layout (`Bandwidth.lean`: parameters, request bitmaps, the persistent link allowances and sanity
+  hash, tie breaks by `rand_chacha 0.3.1`/`rand 0.8.5` shuffling seeded with the previous block hash, the
+  remaining-bandwidth distribution), congestion control (`Congestion.lean`: levels in IEEE doubles, outgoing gas
+  limits, the allowed shard, `shardAcceptsTransactions` for chunk producers) and the receipt sink (`ShardSink.lean`:
+  per-target limits from congestion and granted bandwidth, forwarding from the outgoing buffers, buffering with
+  `StateStoredReceipt` metadata, receipt groups, bandwidth requests). `ChainReplay/ShardChunk.lean` runs them around
+  `Near.apply` in the order of `Runtime::apply` and reports the outgoing receipts, own `CongestionInfo`, bandwidth
+  requests and scheduler hash; the harness compares all of them and the `buffered-receipt*` columns of the
+  post-state (bundles with a buffered receipt: 10 chunks, 2 of which change the buffers). No existing runtime
+  theorem or definition changed; the proved `apply` still returns every outgoing receipt and the layer around it
+  is new. The converter now decodes pre-state postponed receipts, pending counts, received data and delayed
+  receipts (with their stored gas and size). Not exercised by the workload: bandwidth requests (every request in
+  the corpus is empty, so the tie-break shuffle and request grants are checked by unit tests against the Rust
+  crates, not by chunks), a fully congested shard, missing chunks, resharding. A full replay takes about 15
+  minutes on four cores (`replay_corpus.py --jobs`): the burst chunks `single-h214`, `sharded-h214` and `single-h215`
+  each spend 14 minutes executing 300 Tgas of contract code in the Lean interpreter.
+
+  **M3e (crypto host functions).** The 19 cryptographic host functions of protocol 86 (`sha256`, `keccak256`,
+  `keccak512`, `ripemd160`, `ecrecover`, `ed25519_verify`, `p256_verify`, `alt_bn128_g1_multiexp`/`g1_sum`/
+  `pairing_check`, the nine `bls12381_*`) now run in the metered VM. `vm/NearVM/CryptoHost.lean` follows
+  `near-vm-runner` 0.37.4 `logic.rs` call by call: arguments from memory or a register (a failed read keeps its
+  read charges), the function's own base cost (none of them pays the generic `base`), per-byte, per-block
+  (`ripemd160`) or per-element costs where `logic.rs` pays them, `IntegerOverflow` before any burn when
+  `cost * count` overflows `u64` (the `bls12381_*` element count comes from the declared length, so a register input
+  overflows), the `ecrecover` order (signature, then `v`, then hash, then flag, with the `ECRecoverError` texts),
+  `ed25519_verify`/`p256_verify` early exits (a signature with its top three bits set, or a `p256` signature outside
+  `[1, n-1]`, returns 0 before the message is read or paid), the length errors (`Ed25519VerifyInvalidInput`,
+  `P256VerifyInvalidInput`, `AltBn128InvalidInput`, `BLS12381InvalidInput` with nearcore's messages), the register
+  write and its gas only when the call writes one, and the protocol-86 `bls12381_not_in_group_fix = false` (version 0).
+  The primitives are `HostCrypto` (`interface/NearInterface/HostCrypto.lean`), carried by `RuntimeConfig.hostCrypto`;
+  `chain/ChainReplay/HostCrypto.lean` builds it from `NearCrypto` (`Impl`) for the replay executables, and the VM
+  never imports `NearCrypto` (`check_vm_dependencies.py`). Without one the functions stay `unsupportedHost`.
+  `ecrecover` is declared with its seven arguments (the old table had six), and `p256_verify` is a new import.
+  `vm-tests` runs every function on a recording stub. The proofs over the metered registry gained one generic lemma
+  per invariant for `cryptoHostFn` (13 files, none of them restated); `applyCharge` and the other proved definitions
+  are unchanged. The six chunks pass: `sharded-h48-s1`, `sharded-h193-s2/s3`, `sharded-h199-s3`, `single-h193-s0`,
+  `single-h199-s0`. Full replay after M3e: 411 pass, 8 fail (`Stake`/`Unstake`), 17 unsupported (epoch boundary, `validator_stake`,
+  `validator_total_stake`): all remaining ones are M3d.
+
+### M4 trie and storage
+
+Acceptance: the state roots of the M3 corpus and a restart test. `just node-state-roots` and `just node-store-tests`
+(sources: `near-lean/node/NearNode/{Trie,Store}`, `Primitives/{Storage,TrieNode,Flat}.lean`).
+
+- **Types.** `TrieKey` (24 variants, Borsh tag = column except `DelayedReceipt` 8 and `GasKeyNonce` 21; `toVec?` is
+  `TrieKey::to_vec`, `parse?` its inverse, checked against the oracle's bytes), `PublicKeyHandle`, `ValueRef`,
+  `FlatStateValue`, `StateChangeCause`, `RawStateChange(sWithTrieKey)`, `StateChangesForShard/Block/BlockRange`,
+  `RawTrieNode(WithSize)` and the flat storage types. Fixtures come from `tools/node-conformance` (`storage_fam.rs`);
+  `near-store` is not linked there, so `RawTrieNode*` and the flat types are copies of `raw_node.rs`, `flat/types.rs`
+  and `flat/delta.rs` at the pin (node hashes are additionally checked against 436 real roots). `FlatStorageStatus`
+  has `Disabled`, `Empty`, `Ready`; `Creation` (deprecated) and `Resharding` are rejected. `node-conformance-types`:
+  256 types, 0 failures; the existing fixtures are unchanged.
+- **Trie, Impl.** `Trie/Update.lean` ports `Trie::update` (`trie_storage_update.rs`, `ops/insert_delete.rs`,
+  `ops/squash.rs`) over `ByteArray` and the `NearCrypto` SHA-256: a working trie of updated nodes with `old h` for
+  subtrees not loaded, batched insert/delete in order, squash after deletion, then bottom-up serialization and
+  hashing. It returns `TrieChanges` (insertions with data and count, deletions, sorted by hash) exactly as
+  `TrieRefcountDeltaMap` does: a node read is a reference removed (`move_node_to_mutable`), a node of the new trie
+  that was read or created is a reference added, values likewise. Memory usage is `direct + children`, kept as a
+  delta along the path (`TRIE_COSTS` 50/2/1). `Trie/Lookup.lean`: `get`, `contains`, in-order iteration from a lower
+  bound, and the recorder (`Recorder.partialState` is `PartialStorage`: every node read plus the value a `get`
+  fetches; an `update` records the nodes it loads). `Trie/Mem.lean`: a refcounted in-memory node store.
+  The functions are `partial` (fuel-free recursion on the key); proofs are future work.
+- **Trie, Spec.** `NearInterface.TrieConstruction.build` on the whole entry set. `node-trie-tests` (3000 cases
+  checked, 800k checks): root and memory usage equal after random batches; the node store after any number of
+  updates equals the store of the final entry set built from scratch, hash by hash with its refcount (so the deltas
+  are exact); lookups and iteration (every lower bound) equal a sorted list; an update run on the recorded nodes
+  alone gives identical changes. A deliberately broken `squash` fails it.
+- **Corpus.** For each of the 436 chunks: the trie built from the raw pre-state has the bundle's pre-state root;
+  `update` with the recorded `stateDiff` gives `postStateRoot`, and the resulting store equals the post-state built
+  from scratch (every refcount); Lean's own replayed post-state (`registered-replay`, M3) built from scratch and
+  applied as a diff through `update` gives the same root; on the 204 chunks small enough for the list-based Spec
+  SHA-256, the Spec's roots agree too. Result: **436/436 pre, 436/436 post (diff), 436/436 refcounts,
+  436/436 + 436/436 for the Lean replay, 204/204 Spec**. This is the end-to-end state-root check of the M3 runtime.
+  The replay takes about 15 minutes (`--no-replay` skips it and checks the diff only, 8 s).
+- **Store.** `Store/Db.lean`: columns after `DBCol` (`State` refcounted, `FlatState`, `FlatStateChanges`,
+  `FlatStateDeltaMetadata`, `FlatStorageStatus`, `BlockMisc`, `ChunkExtra`) held in memory, made durable by an
+  append-only log (one `NRCD` record per commit: length, CRC-32, sequence number, operations `set`/`delete`/`rcAdd`)
+  and snapshots (`snapshot-G.bin` with a checksum footer, written as `.tmp` and renamed). Recovery takes the highest
+  complete generation, replays its log while checksum and sequence hold, truncates the first bad record and all after
+  it, deletes `.tmp` and older generations. *Crash safety:* a commit is applied entirely or not at all (one checksummed
+  record); a crash while writing leaves a prefix that recovery drops; a crash during compaction leaves the old
+  generation whole or the new snapshot whole (it is written from memory after the old log was applied); a failed
+  write poisons the handle. *Limit:* Lean's `IO.FS` has no `fsync`, `seek` or `pread`: `commit` is `write` +
+  `flush`, which survives a process kill but not power loss (`Options.sync` runs the system `sync -f` after each
+  commit), and values stay in memory (no disk-resident tier); both are deferred. Tests (`node-store-tests`): a log cut
+  at every byte and a flipped byte in every record, a crash after each compaction step, a cut snapshot falling back;
+  on the corpus, the 148 single-shard chunks (444 commits, 43 MiB of log): pre-state and update written as commits with a head pointer, restart, 29 random and
+  boundary cut points of the log (recovered commits are exactly the complete ones, head pointer, node count and the
+  root of every post-state rebuilt from the store), garbage collection of replaced nodes leaves exactly the references
+  of the post-state tries, and a run with a small log limit that compacts several times. Replaced nodes are released
+  in a separate commit (`trieDeleteOps`), as nearcore does at garbage collection, so older roots stay readable until then.
+- **Flat storage.** `Store/Flat.lean` follows `FlatStorage`: `get_value`/`contains_key` at a block through
+  `get_blocks_to_head` (with `prev_block_with_changes`), a changed key answers as a `ValueRef`, otherwise the
+  `FlatState` column; `add_delta`, `get_new_flat_head`, `update_flat_head` (applies deltas to the column, sets the
+  status, drops deltas at or below the new head). Functions return store operations to commit atomically. Tested
+  against a model of forked chains (head moves, restart) and on the corpus (flat state of the pre-state, the delta of
+  the `stateDiff`, the moved head equal to the post-state, values above 4000 bytes by reference).
+- **Measured** (100 000 entries, batches of 1 000 writes, one core, `node-bench --filter trie/`; native is
+  `just node-trie-native-bench`, `near-store` at the pin over an in-memory `TestDB`, no memtrie, no RocksDB):
+
+  | per key | Lean | native |
+  |---|---|---|
+  | build the trie from scratch | 11 us | 6.8 us |
+  | update (70% overwrite, 20% insert, 10% delete) | 46 us | 24 us |
+  | get | 8.1 us | 6.3 us |
+  | get with recording | 10.7 us | |
+  | iterate | 0.13 us | |
+  | store commit of the changes (1.3 KB per write) | 22 us | |
+  | store open: replay 28 MiB / snapshot write (per node) | 2.6 / 1.2 us | |
+
+  The native memtrie update is 38 us per key in the same harness, which includes its flat-storage bookkeeping.
+  **Proposed M4 target:** trie `update` and `build` within 2.5x of native `near-store` per key and at least 20 000 keys/s
+  on one core, `get` within 2x (all met: 1.9x, 1.6x, 1.3x); store commit at least 20 000 writes/s. The time is
+  SHA-256 (about 165 MB/s, M2) and allocation; M10 revisits.
+- **Doubts and deferred.** The recorded set of an update follows the source but is not compared with a
+  nearcore-produced witness (the corpus has none); memtrie, trie caches and prefetching, state parts and sync (M7),
+  resharding (`split.rs`, flat `Resharding` status), `delete_range`, the disk-resident store and `fsync`.
+
+### M5 chain
+
+M5a (header and block validation) and M5b (the epoch manager's computation, chunk application in the chain, the chain
+store) are done. Acceptance of M5a: `just chain-validate-corpus` (sources: `near-lean/node/NearNode/Chain/`,
+`NodeConformance/ChainValidate.lean`, `tools/localnet/{chain_exporter.rs,chain_corpus.py,chain_validate.py}`).
+Acceptance of M5b: `just chain-apply-corpus` (sources: `NearNode/Epoch/`, `NearNode/Chain/{Model,StateDecode,
+ApplyChunk,Apply,Genesis,Persist}.lean`, `NodeConformance/ChainApply.lean`, `tools/localnet/chain_apply.py`); its
+results are in the M5b bullets after the M5a ones.
+
+- **Corpus** (`near-lean/node/corpus/blocks/{single,sharded}`, 1.9 MB of gzip, budget 20 MB). The pinned `neard`
+  databases of the M3 localnets read by `safe-near-chain-export` (an overlay on `state-viewer`, like the chunk exporter;
+  `build.py --only safe-near-chain-export`; all 436 M3 chunks belong to these blocks). Per chain: `meta.json` (genesis,
+  economics, static shard layout), `epochs.jsonl` (`EpochInfo` and shard layout of every epoch, 19 each),
+  `blocks.jsonl` (every block from genesis to the head, 514 and 512, as Borsh `Block`, with what nearcore derived:
+  `BlockInfo`, block merkle tree and root, block producer, the approvers `EpochManager` ordered with both stakes,
+  chunk producers, chunk validator assignments, `ChunkExtra` per shard, whether the next block starts an epoch) and
+  `variants.jsonl`. Not exported in M5a: chunk bodies and parts (nothing validated here reads them). The
+  localnets have no skipped heights, and every chunk is present except the chunk of shard 0 of the sharded chain in
+  heights 181 to 210 (found in M5b); 34 blocks per chain need approvals of the next epoch, and the
+  sharded chain alternates two block producers.
+- **Invalid variants** (931 and 937, 39 kinds on 24 base blocks per chain: the first two blocks, epoch boundaries, and
+  seeded picks). Each is built from a valid block, re-derived and **re-signed by the producer's key** (`validator_key.json`)
+  so that exactly one check fails: tampered signature, body and approvals, a signer that is not the producer, wrong
+  prev hash (existing and unknown), height, timestamp, epoch ids, `next_bp_hash`, finality fields, merkle root,
+  ordinal, epoch sync hash, gas price, total supply, random value, VRF proof and value, chunk mask and bitmap, chunk
+  headers root and every other root, a chunk's signature and `prev_block_hash`, validator proposals, protocol version,
+  chunk endorsement signatures and counts. The verdict is the error of the pinned
+  `Chain::start_process_block_async` (the entry that runs `verify_block_hash_and_signature`, `preprocess_block`,
+  `validate_header` and `validate_block`) on the real database, on a copy because even a rejection writes
+  bookkeeping; the exporter aborts if nearcore accepts a variant. The comparison is by `Error` variant (26 kinds).
+- **Validated** (`Chain/Validate.lean`, in nearcore's order; `chain.rs` unless noted): `verify_block_hash_and_signature`
+  (body hash, producer signature via `sample_block_producer`); `preprocess_block` (epoch known, chunk header count,
+  known block, height bound, orphan with `partial_verify_orphan_header_signature`); `validate_header` with
+  `Provenance::NONE` (challenges, signature, `epoch_id` and `next_epoch_id` from the previous block, protocol version,
+  `next_bp_hash`, chunk mask length, `prev_height`, timestamp, `verify_approval_with_approvers_info`
+  (`approval_verification.rs`) over `get_all_block_approvers_ordered` (`epoch-manager/lib.rs`: next-epoch approvers
+  when `next_block_need_approvals_from_next_epoch`), `Doomslug::can_approved_block_be_produced` (`doomslug.rs`),
+  `last_ds_final_block`, `last_final_block`, `block_merkle_root`, `block_ordinal`, `epoch_sync_data_hash`
+  (`compute_epoch_sync_data_hash`), `validate_chunk_endorsements_in_header`); the VRF (`signature_verification.rs`) and
+  `random_value`; `validate_block_impl` (genesis chunks, shard, `prev_block_hash`, chunk signature by the producer at
+  height `prev + 1` (`get_chunk_producer_info_db` without `EarlyKickout`), `Block::check_validity`);
+  `validate_block_shard_split` (static layout: no split); `verify_gas_price_checked`, `verify_total_supply_checked`
+  (`block.rs`); `validate_chunk_headers` and `validate_block_proposals`; `validate_chunk_endorsements_in_block`
+  (`stateless_validation/chunk_endorsement.rs`: `sample_chunk_validators`, signatures, the 2/3 stake rule, the bitmap).
+  The chain state derives the `BlockInfo` (`BlockInfo::from_header`, `record_block_info_impl`: epoch id, first block,
+  last finalized height) and the block merkle tree of each accepted block; the harness compares both with the stored
+  ones. Header V4 to V6 and block V4 with body V2 (what protocol 86 produces); other versions and SPICE are rejected.
+- **Result.** `just chain-validate-corpus`: 1024/1024 blocks accepted, 1024/1024 with all derived values equal
+  (`BlockInfo`, tree, root, epoch ids, producers, approvers, chunk producers and validators), 1868/1868 variants
+  rejected with nearcore's error variant, about 6 s. Python tests (`tools/tests/test_chain_corpus.py`) check the corpus
+  files and that the harness fails on a changed verdict, derived value or block.
+- **Not checked, with the reason.** The clock (`InvalidBlockFutureTime`); `ping_missing_chunks` and
+  `collect_incoming_receipts_from_chunks` (chunk bodies); `check_if_finalizable`, `get_gc_stop_height`, catch-up and
+  state-sync state (they depend on the node's final head, tracking and garbage collection, not on the block); the head
+  is the accepted block of largest height; the `InvalidBlockHeight` bound uses it; `EarlyKickout` and dynamic
+  resharding (nightly); resharding of `get_prev_chunk_headers`.
+- **M5b, epoch manager** (`NearNode/Epoch/{Config,Selection,Manager,Process}.lean`, `chain/epoch-manager` at the pin).
+  `EpochConfig` is `EpochConfig::genesis_test` filled with the genesis facts, which is what `EpochManager::new_arc_handle`
+  builds on a chain with no `epoch_configs` directory (the localnets; note `max_inflation_rate` is 1/40 there, not the
+  1/20 of `genesis.json`), `RewardParams` is `RewardCalculator::new`. `Aggregator.updateTail` is
+  `EpochInfoAggregator::update_tail` (block production including missed heights, chunk production, endorsement bits,
+  latest protocol version per producer, latest proposal per account); nearcore keeps the aggregator incrementally up to
+  the last final block and merges the rest at the epoch end, here it is the aggregate over the epoch's blocks at its last
+  block, the same on one chain. `collectBlocksInfo` (version vote and its threshold, `Unstaked`, the online ratio,
+  `compute_validators_to_reward_and_kickout`), `calculateReward` (U256/U512 as `Nat`), `proposalsToEpochInfo`
+  (`apply_epoch_update_to_proposals`, `select_validators` for chunk producers, block producers and chunk validators with the
+  stake threshold, `NotEnoughStake` kickouts, `assign_to_satisfy_shards`, `assign_to_balance_shards` with the
+  shard-assignment RNG, mandates, samplers, `EpochInfo::V5`), `finalizeEpoch`, `genesisEpochInfo`,
+  `computeStakeReturnInfo` and `validatorAccountsUpdate` (`NightshadeRuntime::process_state_update`). `processBlock` is
+  `acceptBlock` plus `finalizeEpoch` when the block ends its epoch, so the epochs of a chain are computed, not given.
+  Result: **19/19 `EpochInfo` on both chains equal to nearcore's, byte for byte** (rewards, minted amount, kickouts,
+  samplers, mandates; a changed inflation rate fails 3 of 19), the genesis epochs from the genesis validators, and the
+  `ValidatorAccountsUpdate` equal on every chunk row (148 and 288, the 12 epoch-start ones non-empty).
+- **M5b, chain apply** (`NearNode/Chain/{Model,StateDecode,ApplyChunk,Apply,Genesis}.lean`). `StateDecode` turns a shard's
+  trie entries into the runtime's model state and the `QueueEncoding.Context` (the inverse of `QueueEncoding.encode`, the
+  Lean twin of `lean_input.py`; every chunk's pre-state is re-encoded and must equal the trie's entries), `Model` converts
+  transactions, actions and receipts, `ApplyChunk` is `ChainReplay.Registered.run` for one block returning typed results,
+  `Apply.applyBlock` is what `postprocess_block` does: for each shard the incoming receipts (each new chunk's previous
+  chunk's outgoing receipts grouped by `receiver_shard_id` (global contract distributions by target shard), one proof per
+  new source chunk, shuffled with ChaCha20 seeded by the previous block hash, then the receipts delivered since the
+  shard's last chunk, newest block first), the `ApplyChunkBlockContext` from the block and its chunk headers (gas price of
+  the previous block, congestion info and bandwidth requests of the headers, `missed_chunks`), the epoch provider, the
+  update, the runtime, the trie update (`Trie.update` on the diff of entries) and the `ChunkExtra` V5 (outcome root from
+  `ExecutionOutcomeWithId::to_hashes`, whose partial status carries no failure details; balance burnt minus subsidized).
+  A chunk that is not new gets `apply_old_chunk`: the accounts update and the bandwidth scheduler, previous extra with
+  the new root. Checks per chunk: header `prev_state_root`, `prev_outgoing_receipts_root` of the previous chunk's
+  receipts, `tx_root` of the transactions, the incoming and outgoing receipts against nearcore's recorded ones, and the
+  `ChunkExtra` against the corpus. The genesis state is built from `genesis.json` (`GenesisStateApplier`, storage usage
+  recomputed) and its roots equal the genesis chunk headers'. Inputs the corpus lacks are taken from the M3 bundles
+  (`chunks.jsonl.gz`, see CORPUS.md section 12): the transactions of a chunk are the bundle's, a chunk without a bundle is
+  empty (the `tx_root` check proves it), and code a contract deploys from its own memory is found in the receipts the bundle
+  records as sent. No exporter change was needed.
+  **Found on the way:** the sharded chain does miss chunks (shard 0 in heights 181 to 210), contrary to the M5a note; the
+  node handles them, and the shuffle of receipt proofs only matched once old chunks were left out of it. No runtime bug
+  was found; `near-lean/{vm,runtime,interface}` are unchanged.
+- **M5b, chain store and restart** (`Chain/Persist.lean`, columns added to `Store/Format.lean`). One commit per block holds
+  the block, its header, `BlockInfo`, merkle tree, the `EpochInfo` of a finalized epoch, the trie nodes of every shard,
+  `ChunkExtra`, outgoing and incoming receipts and `HEAD`, `HEADER_HEAD`, `FINAL_HEAD`, `GENESIS_HASH`. `load` rebuilds the
+  chain state and progress; `chain-apply-corpus` runs every chain in two processes, the second continuing from what the first
+  stored at half the chain.
+- **M5b, result** (`just chain-apply-corpus`): both chains, from genesis to the head, **all agree**. Sharded: 19/19 epochs, 288/288 validator accounts updates, 2044/2044 `ChunkExtra` (511 blocks, four shards), 2044/2044 pre-state round trips, 288/288 incoming and 288/288 outgoing receipt lists. Single: 19/19, 148/148, 513/513, 513/513, 148/148, 148/148 (513 blocks). Each chain was applied in two processes with the store between them (stopped at height 256 and 255). Timing on one core: 54 min for the single-shard chain and 58 min for the sharded one, almost all in the burst blocks 214 to 217 (13 to 27 minutes each: 300 to 1200 Tgas of contract code in the Lean interpreter); the other blocks take about 0.5 s per chunk. The catalogue handed to the encoders must hold only the code a chunk uses (a catalogue of everything seen made block 218 take over 20 minutes).
+- **M5b, deferred and doubts.** A change of shard layout (`StickyResharding`, dynamic resharding, `EarlyKickout`, SPICE) is
+  rejected, not represented; the epoch config is the generated one, real networks load `epoch_configs`; `max_by_key` ties
+  of the version vote are not reproduced; only accounts and full access keys in the genesis; the incremental aggregator is
+  not kept; trie nodes are never garbage collected and flat storage is not updated by the node (M4's tests cover it);
+  chunk production, state witnesses and validation of the chunk body beyond its roots; forks and reorgs (one chain, no
+  rollback); the chain is run chunk by chunk with the shard state converted from the trie each time (about 0.5 s a block,
+  minutes for the burst chunks), performance is M10. `just chain-replay-test` has a failing test, 
+  `test_emitted_deployment_uses_the_catalogue_or_rejects_atomically`, at the base commit already: M3e made the replay decode
+  code a contract deploys from its own memory, and the test still expects an execution issue.
+
+### M6 network
+
+Acceptance: `just localnet-peer` (sources: `near-lean/node/NearNode/{Proto,Net,Network}/`, `NearNode/Chain/Bootstrap.lean`,
+`tools/localnet/{network_oracle.rs,peer_accept.py}`); the conformance gate is `just node-conformance-network`.
+
+- **Protobuf** (`Proto/Wire.lean`). A generic proto3 codec: varints (ten bytes, the tenth 0 or 1; a `uint32` has at most
+  five), tags, zigzag, fixed32/64, length-delimited, packed and unpacked repeated fields, groups (skipped as
+  `protobuf` 3.0.2 does), unknown fields (framing checked, content ignored), and `Schema`s that say which fields are
+  messages so the parser reads them as nearcore's does. Two quirks of the pinned parser are reproduced because the
+  oracle found them: a singular message or oneof member is *replaced* by a later occurrence (every occurrence is still
+  checked), and a nested message that claims more bytes than the input holds is read as far as the input goes
+  (the top-level stream has limit `u64::MAX`), so a message cut inside a nested message at a field boundary is
+  accepted. nearcore writes repeated `uint64` unpacked, fields in declaration order.
+- **Messages** (`Network/{Types,Message}.lean`). `PeerMessage` with all 25 variants of `network.proto`'s oneof
+  (`UpdateNonceResponse` decodes as a routing update), `Handshake` with `OwnedAccount`, `HandshakeFailure`,
+  `RoutingTableUpdate`, `SyncAccountsData`, `PeersRequest/Response`, headers and blocks, `Transaction`, the routed
+  message in both wire forms (`Routed` with the Borsh `RoutedMessageV1`, `RoutedV3` with a `TieredMessageBody`), the
+  routed bodies (every `RoutedMessageBody` variant, with the T1/T2 tags), state sync requests and responses, epoch
+  sync, snapshot hosts, optimistic blocks. Sources: `network_protocol/{network.proto,mod.rs,edge.rs,peer.rs,
+  proto_conv/*}`. `Edge` hash, `verify` and nonce rules, `PeerMessage::max_size` are checked too. Not modelled:
+  `TxStatusResponse` (an RPC view type, `FinalExecutionOutcomeView`); a message with that body does not decode.
+- **Oracle** (`tools/localnet/network_oracle.rs`). `near-network` keeps its types private, so `build.py` adds this file
+  to the crate as a module (plus one `pub mod` line in `src/lib.rs`, restored after the build) and a one-line binary
+  `safe-near-network-oracle`. It builds each variant around the M1 Borsh fixtures, writes nearcore's own
+  serialization and its `PeerMessage::deserialize` verdict on byte and field level mutations (extra and duplicated
+  fields, re-typed fields, groups, long varints, truncation). Fixtures: `near-lean/node/fixtures/network`, 15 files,
+  4373 inputs (1899 accepted, 2474 rejected; 3273 of them `PeerMessage`). Result: **`node-conformance-network`, 0
+  failures**; 180 000 further mutations (other seeds, not committed) also 0. `tools/tests/test_network_fixtures.py`.
+- **Net** (`Net.lean`, `Net/{Uv,Mem}.lean`). `Stream`, `Listener` and `Net` are all the node uses; `Framed` is
+  `stream.rs` (u32 LE length, 512 MiB, partial frames kept across timeouts). `Net/Uv.lean` is the only module that
+  imports `Std.Internal.UV.TCP` (Lean's libuv binding) and has no `@[extern]`: a reader task per connection and polling
+  with timeouts, because `cancelRecv` is documented as dangerous. `Net/Mem.lean` is the in-process network for tests.
+  `node-net-tests` runs the same checks on both. `tools/check_node_isolation.py` needed no change.
+- **Peer protocol.** `Network/Handshake.lean` is `process_handshake` and `handle_msg_connecting` as pure functions
+  (version range 83..86, genesis, target, nonce window of 20 minutes, owned account and 30 minute skew, the edge both
+  sign, `LastEdge` and `HandshakeFailure` answers and retries); `Peer.lean` runs them over a stream with the 20 s
+  handshake timeout; `Node.lean` is the loop of a ready `PeerActor`: routing table, snapshot hosts and accounts sync on
+  connect, `PeersRequest` and the latest block every minute (`READ_TIMEOUT` is two minutes), nonce refresh every ten
+  minutes, replies to `PeersRequest`, `SyncAccountsData`, `RequestUpdateNonce`, `BlockHeadersRequest`, `BlockRequest`
+  and `Ping`, edges and routed signatures verified with the M2 Ed25519 (invalid: close). `node-handshake-tests`: both
+  sides against each other in memory (valid, other genesis, bad signature, versions, stale nonce, wrong target,
+  `LastEdge`, owned accounts), 27 checks. **Found against neard:** an inbound connection without a
+  `sender_listen_port` is dropped (`validate_new_connection`: `peer_info.addr` is none), so the node announces one and
+  listens; `BlockRequest` is limited to 10 a second (`rate_limits/messages_limits.rs`), the driver sends 8.
+- **Sync** (`Network/{Driver,Apply,Run}.lean`). Headers after a locator, blocks by hash, each validated in order by
+  `Epoch.processBlock` (M5a), chunk bodies by routed `PartialEncodedChunkRequest` for all parts: the data parts are the
+  Borsh `TransactionReceipt` of the chunk (merkle paths checked against `encoded_merkle_root`, `tx_root` against the
+  transactions, no Reed-Solomon decoding needed because the peer has every part). A block is applied (M5b) when its own
+  bodies and its child's are in: the child's `prev_outgoing_receipts` are the receipts this chunk sent, which supply
+  the code a contract deploys from its own memory and are compared with what the Lean runtime produced; the child's
+  chunk headers carry the previous `ChunkExtra` (state root, outcome root, gas used, balance burnt, proposals,
+  congestion info, bandwidth requests) and are compared field by field. Validation runs on the connection thread,
+  application on its own thread with the store (`Chain/Persist`), so a heavy block delays application, not following.
+  The chain starts from `Chain/Bootstrap.lean` (extracted from `node-chain-apply`, which uses it): the genesis files of
+  the M5 corpus, whose genesis block and `BlockInfo` nearcore derived; deriving them from `genesis.json` is M7.
+- **Acceptance.** `just localnet-peer` starts the single-node localnet and its workload (without the `hostcalls`,
+  `burst` and `wait` scenarios: the Lean interpreter needs minutes per block of heavy calls; `--full-workload` runs
+  them), then the node with its own key, listening, dialing `neard`. Run of 614 s: one handshake, no disconnect,
+  `neard`'s `network_info` lists the node, 2 edges received and verified, 599 blocks validated (the node was never more
+  than 3 blocks behind the head during validation), 598 blocks / 598 chunks applied, 597 `ChunkExtra` equal to the next
+  chunk header's, 595 outgoing-receipt sets equal to the next chunk bodies', 597 state roots equal to `neard`'s over
+  RPC. Application (about one block a second in the interpreter) is slower than the localnet's block rate under
+  load, so the applied height trails the validated one; the harness reports the lag against `neard`'s head after the
+  drain (423 blocks at the end, because `neard` kept producing while the node drained).
+- **Deferred.** Tier 1 (account data is accepted, not verified or kept), routing beyond one peer (no forwarding,
+  no route-back cache, no peer store or connection pool), `TxStatusResponse`, fork choice and reorgs, header
+  validation before the block, Reed-Solomon reconstruction of chunks with missing parts, state sync (M7), the
+  genesis block from `genesis.json` (M7), IPv6 in `Net/Uv`, production of anything (M8).
 
 ## Open points
 
-- Numeric performance targets for M4 and M10, measured against nearcore (M2's are proposed above).
+- Numeric performance target for M10, measured against nearcore (M2's and M4's are proposed above).
 - Whether crypto host functions in `NearVM` slow contract verification. If they
   do, `NearVM` takes host crypto as a parameter and the node supplies it. Today the VM takes its
-  digests, `ed25519Verify` and `ecrecover` as oracles (`HostCrypto`); only its conformance replay
-  imports `NearCrypto` to supply them.
+  digests, `ed25519Verify` and `ecrecover` as parameters; `NearCrypto` is a separate package it can import later.
+  Resolved in M3e: the VM takes a `HostCrypto` through the runtime configuration and the chain package supplies it.

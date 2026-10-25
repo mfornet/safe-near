@@ -18,13 +18,13 @@ theorem ReceiptList.IdsBelow.mono {before after : Nat} {receipts : List Receipt}
 theorem delayed_clear_idsBelowNext (st : ChainState) (h : st.IdsBelowNext) :
     ({ st with delayed := [] } : ChainState).IdsBelowNext := by
   rw [ChainState.idsBelowNext_iff] at h ⊢
-  exact ⟨h.postponed, h.pending, h.routes, h.received, by simp⟩
+  exact ⟨h.postponed, h.pending, h.routes, h.received, by simp, h.yields⟩
 
 theorem delayed_append_idsBelowNext (st : ChainState) (receipt : Receipt) (h : st.IdsBelowNext)
     (hr : ∀ id ∈ receipt.liveIds, id < st.nextId) :
     ({ st with delayed := st.delayed ++ [receipt] } : ChainState).IdsBelowNext := by
   rw [ChainState.idsBelowNext_iff] at h ⊢
-  refine ⟨h.postponed, h.pending, h.routes, h.received, ?_⟩
+  refine ⟨h.postponed, h.pending, h.routes, h.received, ?_, h.yields⟩
   intro candidate hm id hid
   rcases List.mem_append.mp hm with hold | hnew
   · exact h.delayed candidate hold id hid
@@ -58,6 +58,79 @@ theorem ReceiptList.IdsBelow.append {bound : Nat} {left right : List Receipt}
   rcases List.mem_append.mp hm with h | h
   · exact hl receipt h id hid
   · exact hr receipt h id hid
+
+/-- Yield timeouts only allocate identifiers for the resume receipts they emit. -/
+theorem resolveYieldTimeouts_bounds (ap : ApplyState) (limit : Option Nat) (used fuel : Nat) :
+    ∀ (acc : ChainState × List Receipt × List ReceiptIdentityBirth),
+      acc.1.IdsBelowNext → ReceiptList.IdsBelow acc.1.nextId acc.2.1 →
+      (resolveYieldTimeouts ap limit used fuel acc).1.IdsBelowNext ∧
+      ReceiptList.IdsBelow (resolveYieldTimeouts ap limit used fuel acc).1.nextId
+        (resolveYieldTimeouts ap limit used fuel acc).2.1 := by
+  induction fuel with
+  | zero => intro acc h1 h2; exact ⟨h1, h2⟩
+  | succ fuel ih =>
+    rintro ⟨st, receipts, births⟩ h1 h2
+    unfold resolveYieldTimeouts
+    dsimp only at h1 h2 ⊢
+    split
+    · exact ⟨h1, h2⟩
+    · split
+      · split
+        · exact ⟨h1, h2⟩
+        · split
+          · exact ⟨h1, h2⟩
+          · split
+            · apply ih
+              · exact h1.of_frame rfl (Nat.le_add_right _ _)
+              · intro receipt hm id hid
+                simp only [ChainState.freshId, List.mem_append, List.mem_singleton] at hm ⊢
+                rcases hm with hold | rfl
+                · exact (h2 receipt hold id hid).trans (Nat.lt_succ_self _)
+                · simp [Receipt.liveIds] at hid
+                  omega
+            · apply ih
+              · exact h1
+              · exact h2
+      · exact ⟨h1, h2⟩
+
+theorem resolveYieldTimeouts_nextId_mono (ap : ApplyState) (limit : Option Nat) (used fuel : Nat) :
+    ∀ (acc : ChainState × List Receipt × List ReceiptIdentityBirth),
+      acc.1.nextId ≤ (resolveYieldTimeouts ap limit used fuel acc).1.nextId := by
+  induction fuel with
+  | zero => intro acc; exact Nat.le_refl _
+  | succ fuel ih =>
+    rintro ⟨st, receipts, births⟩
+    unfold resolveYieldTimeouts
+    dsimp only
+    split
+    · exact Nat.le_refl _
+    · split
+      · split
+        · exact Nat.le_refl _
+        · split
+          · exact Nat.le_refl _
+          · split
+            · refine Nat.le_trans ?_ (ih _)
+              exact Nat.le_add_right _ 1
+            · refine Nat.le_trans ?_ (ih _)
+              exact Nat.le_refl _
+      · exact Nat.le_refl _
+
+theorem timeouts_identifier_bounds (ap : ApplyState) (limit : Option Nat) (used fuel : Nat) (st : ChainState)
+    (outgoing retained appended : List Receipt) (hst : st.IdsBelowNext)
+    (hout : ReceiptList.IdsBelow st.nextId outgoing) (hret : ReceiptList.IdsBelow st.nextId retained)
+    (happ : ReceiptList.IdsBelow st.nextId appended) :
+    ({ (resolveYieldTimeouts ap limit used fuel (st, [], [])).1 with
+        delayed := retained ++ appended } : ChainState).IdsBelowNext ∧
+    ReceiptList.IdsBelow (resolveYieldTimeouts ap limit used fuel (st, [], [])).1.nextId
+      (outgoing ++ (resolveYieldTimeouts ap limit used fuel (st, [], [])).2.1) := by
+  have hy := resolveYieldTimeouts_bounds ap limit used fuel (st, [], []) hst
+    (by intro receipt hm; contradiction)
+  have hn := resolveYieldTimeouts_nextId_mono ap limit used fuel (st, [], [])
+  have hs := (ChainState.idsBelowNext_iff _).mp hy.1
+  refine ⟨?_, (hout.mono hn).append hy.2⟩
+  apply (ChainState.idsBelowNext_iff _).mpr
+  exact ⟨hs.postponed, hs.pending, hs.routes, hs.received, (hret.append happ).mono hn, hs.yields⟩
 
 structure TransactionLoop.IdentifierInvariant (lower : Nat) (pass : TransactionLoop) : Prop where
   state : pass.2.1.IdsBelowNext
@@ -148,15 +221,15 @@ theorem applyAttempt_identifier_bounds (cfg : RuntimeConfig) (ap : ApplyState)
           · exact ⟨h.state, h.outgoing, h.queued, h.retained, h.appended.append hsingle,
               by intro returned he; contradiction⟩
         · simp only [hover, Bool.false_eq_true, ite_false]
-          cases hi : (processReceipt cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 entry.1).issue with
+          cases hi : (processWithInstants cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 entry.1).issue with
           | some issue =>
             dsimp only
             exact ⟨h.state, h.outgoing, h.queued, h.retained, h.appended,
               by intro returned he; cases he; exact ⟨hstate, hempty _⟩⟩
           | none =>
             dsimp only
-            have hp := processReceipt_identifier_bounds cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 entry.1 h.state (h.queued entry.1 hmember)
-            have hn := processReceipt_nextId_mono cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 entry.1
+            have hp := processWithInstants_identifier_bounds cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 entry.1 h.state (h.queued entry.1 hmember)
+            have hn := processWithInstants_nextId_mono cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 entry.1
             have hout := (h.outgoing.mono hn).append hp.2
             cases hl : ap.gasLimit with
             | none =>
@@ -171,10 +244,8 @@ theorem applyAttempt_identifier_bounds (cfg : RuntimeConfig) (ap : ApplyState)
     split
     · rename_i returned he
       exact hresult.returned returned he
-    · refine ⟨?_, hresult.outgoing⟩
-      have hs := (ChainState.idsBelowNext_iff result.2.1).mp hresult.state
-      apply (ChainState.idsBelowNext_iff _).mpr
-      exact ⟨hs.postponed, hs.pending, hs.routes, hs.received, hresult.retained.append hresult.appended⟩
+    · exact timeouts_identifier_bounds ap ap.gasLimit _ _ result.2.1 _ _ _ hresult.state hresult.outgoing
+        hresult.retained hresult.appended
 
 /-- The public atomic apply boundary preserves state and outgoing identifier
 bounds even when the attempt is unsupported or incomplete. -/

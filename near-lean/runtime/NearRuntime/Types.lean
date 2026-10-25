@@ -54,16 +54,31 @@ inductive AccessKeyPermission
   | fullAccess
   /-- `allowance = none` means unlimited. `methodNames = []` allows every method. -/
   | functionCall (allowance : Option Nat) (receiverId : AccountId) (methodNames : List String)
+  /-- A gas key with full access: `GasKeyInfo { balance, num_nonces }`. Its nonces live in
+  separate rows (`ChainState.gasKeyNonces`). -/
+  | gasKeyFullAccess (balance numNonces : Nat)
+  /-- A gas key restricted to function calls (`GasKeyFunctionCall`). -/
+  | gasKeyFunctionCall (balance numNonces : Nat) (allowance : Option Nat) (receiverId : AccountId)
+      (methodNames : List String)
   deriving BEq, Repr, Inhabited
+
+/-- The balance and number of nonce lanes of a gas key, `none` for an ordinary key. -/
+def AccessKeyPermission.gasKeyInfo? : AccessKeyPermission → Option (Nat × Nat)
+  | .gasKeyFullAccess balance nonces | .gasKeyFunctionCall balance nonces .. => some (balance, nonces)
+  | _ => none
 
 structure AccessKey where
   nonce : Nat
   permission : AccessKeyPermission
   deriving BEq, Repr, Inhabited
 
--- nearcore divergence: no Delegate/DelegateV2 (meta-transactions), DeployGlobalContract,
--- DeterministicStateInit, TransferToGasKey or WithdrawFromGasKey actions; these are outside
--- the represented runtime and cannot be expressed as model inputs.
+deriving instance Repr for Wasm.GlobalContractId
+
+/-- How a global contract is identified when deployed (`GlobalContractDeployMode`). -/
+abbrev GlobalDeployMode := Wasm.GlobalContractDeployMode
+
+-- nearcore divergence: no DeterministicStateInit action; it is outside the represented
+-- runtime and cannot be expressed as a model input.
 inductive Action
   | createAccount
   | deployContract (code : ContractCode)
@@ -73,19 +88,51 @@ inductive Action
   | addKey (publicKey : PublicKey) (accessKey : AccessKey)
   | deleteKey (publicKey : PublicKey)
   | deleteAccount (beneficiaryId : AccountId)
-  /-- Use a global contract. Created by contracts; executing it is outside the
-  model (an explicit `unsupportedAction` issue). -/
+  /-- Use a global contract: the account's code becomes the registered global one. -/
   | useGlobalContract (contract : Wasm.GlobalContractId)
+  /-- Publish `code` to every shard under its hash or the deploying account. -/
+  | deployGlobalContract (code : ContractCode) (mode : GlobalDeployMode)
+  /-- Fund the gas key `publicKey` of the receiver. -/
+  | transferToGasKey (publicKey : PublicKey) (deposit : Nat)
+  /-- Move `amount` from the receiver's gas key to its balance. -/
+  | withdrawFromGasKey (publicKey : PublicKey) (amount : Nat)
+  /-- A meta transaction (`Delegate`, or `DelegateV2` when `v2`): `actions` run at `receiverId` on
+  behalf of `senderId`. `nonceIndex` selects a gas-key nonce lane. The signature is carried as given
+  and checked by the runtime's injected verifier. -/
+  | delegate (senderId receiverId : AccountId) (actions : List Action) (nonce : Nat)
+      (nonceIndex : Option Nat) (maxBlockHeight : Nat) (publicKey : PublicKey) (signature : Bytes)
+      (v2 : Bool)
   deriving Inhabited
 
+mutual
+/-- Tokens attached to an action; a delegate action carries the deposits of its inner actions. -/
 def Action.deposit : Action → Nat
   | .functionCall _ _ _ d => d
   | .transfer d => d
+  | .transferToGasKey _ d => d
+  | .delegate _ _ actions .. => Action.depositList actions
   | _ => 0
 
+def Action.depositList : List Action → Nat
+  | [] => 0
+  | a :: rest => a.deposit + Action.depositList rest
+end
+
+mutual
+/-- Prepaid gas of an action; a delegate action carries the gas of its inner actions. -/
 def Action.attachedGas : Action → Nat
   | .functionCall _ _ g _ => g
+  | .delegate _ _ actions .. => Action.attachedGasList actions
   | _ => 0
+
+def Action.attachedGasList : List Action → Nat
+  | [] => 0
+  | a :: rest => a.attachedGas + Action.attachedGasList rest
+end
+
+def Action.isDelegate : Action → Bool
+  | .delegate .. => true
+  | _ => false
 
 def Action.isFunctionCall : Action → Bool
   | .functionCall .. => true
@@ -96,7 +143,14 @@ structure Account where
   locked : Nat := 0
   code : Option ContractCode := none
   storageUsage : Nat
+  /-- The global contract the account uses (`AccountContract::Global`/`GlobalByAccount`). -/
+  global : Option Wasm.GlobalContractId := none
+  /-- Serialized as `AccountV2`: set once an account uses a global contract and kept afterwards. -/
+  versionTwo : Bool := false
   deriving Inhabited
+
+/-- Whether the account carries a contract of any kind. -/
+def Account.hasContract (a : Account) : Bool := a.code.isSome || a.global.isSome
 
 structure DataReceiver where
   dataId : DataId
@@ -110,20 +164,35 @@ structure ActionReceipt where
   outputDataReceivers : List DataReceiver := []
   inputDataIds : List DataId := []
   actions : List Action
+  /-- A `PromiseYield` receipt: it waits for the data with this native id, which its
+  creator handed to the contract. Such a receipt has no logical input data id. -/
+  yieldDataId : Option Bytes := none
   deriving Inhabited
 
 structure DataReceipt where
   dataId : DataId
   /-- `none` when the producing receipt failed. -/
   data : Option Bytes
+  /-- A `PromiseResume` receipt: it resumes the yield with this native data id
+  (and then `dataId` is unused). `data = none` is a timeout. -/
+  resumeDataId : Option Bytes := none
   deriving BEq, Repr, Inhabited
 
--- nearcore divergence: no PromiseYield/PromiseResume, ActionV2 (`refund_to`) or
--- GlobalContractDistribution receipts, so deposit refunds always go to the predecessor
--- (nearcore: `balance_refund_receiver`).
+/-- `GlobalContractDistributionReceipt` (V2): code to register under `id` on every shard. -/
+structure GlobalDistribution where
+  id : Wasm.GlobalContractId
+  targetShard : Nat
+  alreadyDelivered : List Nat := []
+  code : ContractCode
+  nonce : Nat
+  deriving Inhabited
+
+-- nearcore divergence: no ActionV2 (`refund_to`) receipts, so deposit refunds always go to
+-- the predecessor (nearcore: `balance_refund_receiver`).
 inductive ReceiptEnum
   | action (r : ActionReceipt)
   | data (d : DataReceipt)
+  | globalDistribution (d : GlobalDistribution)
   deriving Inhabited
 
 structure Receipt where
@@ -137,6 +206,9 @@ def Receipt.actions : Receipt → List Action
   | { receipt := .action r, .. } => r.actions
   | _ => []
 
+/-- The system actor is the predecessor of refunds and the receiver of distributions. -/
+def systemReceiver : AccountId := systemAccount
+
 def Receipt.isRefund (r : Receipt) : Bool := r.predecessorId == systemAccount
 
 /-- A system transfer refunds a key's gas allowance when its signer is its receiver.
@@ -144,7 +216,7 @@ This is the pinned runtime's marker; balance refunds normally name `system`. -/
 def Receipt.isGasRefund (r : Receipt) : Bool :=
   r.isRefund && match r.receipt with
     | .action a => a.signerId == r.receiverId
-    | .data _ => false
+    | .data _ | .globalDistribution _ => false
 
 /-- Legacy transactions are monotonic; v1 can request strict sequential nonces. -/
 inductive NonceMode where
@@ -185,6 +257,10 @@ inductive ActionsValidationError
   | functionCallArgumentsLengthExceeded (length limit : Nat)
   | functionCallZeroAttachedGas
   | unsuitableStakingKey (key : PublicKey)
+  | delegateActionMustBeOnlyOne
+  | gasKeyFunctionCallAllowanceNotAllowed
+  | gasKeyInvalidNumNonces (requested limit : Nat)
+  | addGasKeyWithNonZeroBalance (balance : Nat)
   deriving Repr, BEq, Inhabited
 
 /-- `ReceiptValidationError` for the receipts a function call creates (the
@@ -209,7 +285,7 @@ inductive RuntimeError
   | lackBalanceForState (id : AccountId) (amount : Nat)
   | triesToUnstake (id : AccountId)
   | triesToStake (id : AccountId) (stake locked balance : Nat)
-  | insufficientStake (id : AccountId)
+  | insufficientStake (id : AccountId) (stake minimum : Nat)
   | functionCallError (e : Wasm.Near.FunctionCallError)
   | deleteActionMustBeFinal
   | onlyImplicitAccountCreationAllowed (id : AccountId)
@@ -226,6 +302,19 @@ inductive RuntimeError
   | notEnoughAllowance (id : AccountId) (publicKey : PublicKey) (allowance cost : Nat)
   | notEnoughBalance (id : AccountId) (balance cost : Nat)
   | invalidReceiver (id : AccountId)
+  /-- `UseGlobalContract` of an identifier no `DeployGlobalContract` has registered. -/
+  | globalContractDoesNotExist (identifier : Wasm.GlobalContractId)
+  | gasKeyDoesNotExist (id : AccountId) (publicKey : PublicKey)
+  | insufficientGasKeyBalance (id : AccountId) (publicKey : PublicKey) (balance required : Nat)
+  | gasKeyBalanceTooHigh (id : AccountId) (publicKey : Option PublicKey) (balance : Nat)
+  | delegateActionInvalidSignature
+  | delegateActionSenderDoesNotMatchTxReceiver (sender receiver : AccountId)
+  | delegateActionExpired
+  | delegateActionInvalidNonce (delegateNonce akNonce : Nat)
+  | delegateActionNonceTooLarge (delegateNonce upperBound : Nat)
+  | delegateActionInvalidNonceIndex (nonceIndex numNonces : Nat)
+  /-- The delegate's key is unusable: `reason` names the `InvalidAccessKeyError`. -/
+  | delegateActionAccessKeyError (reason : String)
   | contractSizeExceeded (size limit : Nat)
   | tooManyActions (count limit : Nat)
   /-- A receipt the function call created fails `validate_receipt(NewReceipt)`. -/
@@ -253,6 +342,13 @@ def ExecutionStatus.isSuccess : ExecutionStatus → Bool
   | .failure _ => false
   | _ => true
 
+/-- A validator proposal a `Stake` action makes (`ValidatorStake::new`). -/
+structure ValidatorProposal where
+  account : AccountId
+  publicKey : Bytes
+  stake : Nat
+  deriving Inhabited, Repr, BEq
+
 structure ExecutionOutcome where
   /-- Failed receipt action, absent for transaction errors and final storage checks. -/
   failureIndex : Option Nat := none
@@ -262,6 +358,8 @@ structure ExecutionOutcome where
   receiptIds : List ReceiptId := []
   gasBurnt : Nat := 0
   tokensBurnt : Nat := 0
+  /-- The validator proposals of the receipt's successful `Stake` actions. -/
+  proposals : List ValidatorProposal := []
   deriving Inhabited
 
 end Near

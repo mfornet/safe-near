@@ -13,6 +13,12 @@ packagesDir = "../.lake/packages"
 name = "NearRuntime"
 path = "../runtime"
 
+# Delegate-action signatures are checked with the crypto package's verifiers (the runtime takes the
+# check as an injected function and depends on no signature scheme).
+[[require]]
+name = "NearCrypto"
+path = "../crypto"
+
 [[lean_lib]]
 name = "NearChain"
 

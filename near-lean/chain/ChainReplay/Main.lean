@@ -1,3 +1,4 @@
+import ChainReplay.HostCrypto
 import ChainReplay.Encode
 
 namespace ChainReplay
@@ -54,7 +55,7 @@ def execute (request : Json) : IO Json := do
             { state := ← state codes initial,
               pending := ← (pending : List Json).mapM (receipt codes) }
   let blocks ← IO.ofExcept ((blocks : List Json).mapM (block codes))
-  let cfg ← RuntimeConfig.load (configDir : String) protocol
+  let cfg ← ChainReplay.HostCrypto.loadConfig (configDir : String) protocol
   pure (run protocol cfg codes snapshot blocks)
 
 end ChainReplay

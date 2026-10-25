@@ -3,13 +3,14 @@ import NearVM.EncodingHosts
 namespace Wasm.Near
 
 /-- Legacy gas metering changes no encoding field on a live return. -/
-theorem gasFn_encodingInvariant : NearHostFn.PreservesLive EncodingInvariant gasFn := by
+theorem gasFn_encodingInvariant (opCost : Nat) :
+    NearHostFn.PreservesLive EncodingInvariant (gasFn opCost) := by
   intro st args h
   unfold gasFn
   dsimp only
   split
   · rename_i n
-    cases hc : st.host.gas.burn n.toNat with
+    cases hc : st.host.gas.burn (n.toNat * opCost) with
     | mk gas error =>
       cases error with
       | some error => trivial
@@ -31,7 +32,7 @@ theorem meteredHostFns_encodingInvariant
     (h : entry ∈ meteredHostFns cfg) : NearHostFn.PreservesLive EncodingInvariant entry.2 := by
   revert entry h
   simp only [meteredHostFns, List.forall_mem_append, List.forall_mem_map, List.forall_mem_singleton]
-  refine ⟨?_, gasFn_encodingInvariant⟩
+  refine ⟨?_, gasFn_encodingInvariant _⟩
   simp only [nearHostFns, List.forall_mem_cons]
   and_intros
   · apply meteredNeutral_encodingInvariant
@@ -113,19 +114,33 @@ theorem meteredHostFns_encodingInvariant
   · apply meteredNeutral_encodingInvariant
     · exact ed25519VerifyFn_encodingFrame
   · apply meteredNeutral_encodingInvariant
+    · exact p256VerifyFn_encodingFrame
+  · apply meteredNeutral_encodingInvariant
     · exact randomSeedFn_encodingFrame
-  · unsupported_encoding
-  · unsupported_encoding
-  · unsupported_encoding
-  · unsupported_encoding
-  · unsupported_encoding
-  · unsupported_encoding
-  · unsupported_encoding
-  · unsupported_encoding
-  · unsupported_encoding
-  · unsupported_encoding
-  · unsupported_encoding
-  · unsupported_encoding
+  · apply meteredNeutral_encodingInvariant
+    · exact altBn128G1MultiexpFn_encodingFrame
+  · apply meteredNeutral_encodingInvariant
+    · exact altBn128G1SumFn_encodingFrame
+  · apply meteredNeutral_encodingInvariant
+    · exact altBn128PairingCheckFn_encodingFrame
+  · apply meteredNeutral_encodingInvariant
+    · exact bls12381G1MultiexpFn_encodingFrame
+  · apply meteredNeutral_encodingInvariant
+    · exact bls12381G2MultiexpFn_encodingFrame
+  · apply meteredNeutral_encodingInvariant
+    · exact bls12381MapFpToG1Fn_encodingFrame
+  · apply meteredNeutral_encodingInvariant
+    · exact bls12381MapFp2ToG2Fn_encodingFrame
+  · apply meteredNeutral_encodingInvariant
+    · exact bls12381P1DecompressFn_encodingFrame
+  · apply meteredNeutral_encodingInvariant
+    · exact bls12381P2DecompressFn_encodingFrame
+  · apply meteredNeutral_encodingInvariant
+    · exact bls12381P1SumFn_encodingFrame
+  · apply meteredNeutral_encodingInvariant
+    · exact bls12381P2SumFn_encodingFrame
+  · apply meteredNeutral_encodingInvariant
+    · exact bls12381PairingCheckFn_encodingFrame
   · exact meteredCreate_encodingInvariant _
   · exact meteredThen_encodingInvariant _
   · exact meteredJoin_encodingInvariant _
@@ -141,18 +156,27 @@ theorem meteredHostFns_encodingInvariant
   · exact meteredActionAddKeyWithFunctionCall_encodingInvariant _
   · exact meteredActionDeleteKey_encodingInvariant _
   · exact meteredActionDeleteAccount_encodingInvariant _
-  · unsupported_encoding
-  · unsupported_encoding
+  · exact meteredActionDeployGlobalContract_encodingInvariant _
+  · exact meteredActionDeployGlobalContractByAccountId_encodingInvariant _
   · exact meteredActionUseGlobalContract_encodingInvariant _
   · exact meteredActionUseGlobalContractByAccountId_encodingInvariant _
-  · unsupported_encoding
-  · unsupported_encoding
+  · exact meteredYieldCreate_encodingInvariant _
+  · exact meteredYieldResume_encodingInvariant _
   · apply meteredNeutral_encodingInvariant
     · exact promiseResultsCountFn_encodingFrame
   · apply meteredNeutral_encodingInvariant
     · exact promiseResultFn_encodingFrame
   · apply meteredNeutral_encodingInvariant
     · exact promiseReturnFn_encodingFrame
+  · exact meteredActionTransferToGasKey_encodingInvariant _
+  · exact meteredActionAddGasKeyWithFullAccess_encodingInvariant _
+  · exact meteredActionAddGasKeyWithFunctionCall_encodingInvariant _
+  · unsupported_encoding
+  · unsupported_encoding
+  · unsupported_encoding
+  · unsupported_encoding
+  · apply meteredNeutral_encodingInvariant
+    · exact chainIdFn_encodingFrame
   · simp
 
 end Wasm.Near

@@ -32,12 +32,71 @@ crypto-tests: crypto-build
 
 # Build the NEAR node (notes/design/NEAR_NODE.md) and its executables.
 node-build:
-    cd near-lean/node && lake build NearNode near-lean-node node-bench node-conformance-types --wfail
+    cd near-lean/node && lake build NearNode near-lean-node node-bench node-conformance-types node-conformance-network node-trie-tests node-store-tests node-state-roots node-chain-validate node-chain-apply --wfail
 
 # M1: the Borsh codecs of every near-primitives type against the committed nearcore oracle fixtures.
 [positional-arguments]
 node-conformance-types *options: node-build
     near-lean/node/.lake/build/bin/node-conformance-types "$@"
+
+# M6: the peer protocol (protobuf messages and the Borsh types they carry) against the fixtures of nearcore's
+# own network code (`safe-near-network-oracle`, see tools/localnet/network_oracle.rs); the optional argument is the
+# fixtures directory.
+[positional-arguments]
+node-conformance-network *options: node-build
+    near-lean/node/.lake/build/bin/node-conformance-network "$@"
+
+# M4: the trie Impl against the Spec (NearInterface.TrieConstruction) on seeded random entry sets and
+# updates; the optional argument is the number of cases.
+[positional-arguments]
+node-trie-tests *options: node-build
+    near-lean/node/.lake/build/bin/node-trie-tests "$@"
+
+# M4: the state roots of the 436 corpus chunks through the Lean trie, from the recorded `stateDiff` and
+# from Lean's own replay of each chunk (about 15 minutes on four cores; `--no-replay` skips the replay).
+[positional-arguments]
+node-state-roots *options: node-build
+    cd near-lean/chain && lake build registered-replay --wfail
+    python3 tools/localnet/state_roots.py "$@"
+
+# M5a: the block corpus (every block of both localnets, plus invalid variants with nearcore's own verdict) through
+# the Lean header and block validator; exits 0 only when every block and variant agrees with nearcore.
+chain-validate-corpus: node-build
+    python3 tools/localnet/chain_validate.py
+
+# M6: the Lean node as a peer of the pinned neard localnet: handshake, routing exchange, every block validated and
+# applied, followed for a while; roots and ChunkExtra compared with neard's (see notes/design/NEAR_NODE.md, M6).
+[positional-arguments]
+localnet-peer *options: node-build
+    python3 tools/localnet/peer_accept.py "$@"
+
+# M5a: rebuild the block corpus from the localnet databases (needs `python3 tools/localnet/build.py --only
+# safe-near-chain-export` and the databases of `just corpus-generate`).
+[positional-arguments]
+chain-corpus-generate *options:
+    python3 tools/localnet/chain_corpus.py export "$@"
+    python3 tools/localnet/chain_corpus.py pack
+    python3 tools/localnet/chain_apply.py extras
+
+# M5b: each localnet chain run from genesis by the Lean node, in two processes with the store between them:
+# every EpochInfo computed (not given) and equal to nearcore's, the epoch-start validator account updates, every
+# chunk applied by the runtime on the trie state with its ChunkExtra, incoming and outgoing receipts equal to
+# nearcore's. Takes about an hour (the burst chunks run 300 Tgas in the Lean interpreter); `--no-restart` uses
+# one process, `--topologies single` one chain; exits 0 only when all agree.
+[positional-arguments]
+chain-apply-corpus *options: node-build
+    python3 tools/localnet/chain_apply.py run "$@"
+
+# M4: the persistent store: unit tests, then a restart and kill-in-the-middle test on the corpus tries.
+node-store-tests: node-build
+    python3 tools/localnet/state_roots.py --no-replay --cases-only --work near-lean/node/.lake/state-roots-cases
+    near-lean/node/.lake/build/bin/node-store-tests near-lean/node/.lake/state-roots-cases
+
+# M4: the same trie workload with nearcore's own near-store (needs the pinned checkout in
+# tools/localnet/.nearcore, see `just corpus-build`); add --memtrie for the in-memory trie.
+[positional-arguments]
+node-trie-native-bench *options:
+    cd tools/node-conformance/native-trie && cargo run --release --bin native-trie-bench -- "$@"
 
 # Run the node benchmarks (`crypto/` and `sha256` for M2); options are --filter SUBSTRING and --out FILE.
 [positional-arguments]

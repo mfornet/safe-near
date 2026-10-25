@@ -12,7 +12,7 @@ from secp_reference import G, N, P, ec_add, ec_mul  # noqa: E402
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = ROOT / "near-lean/crypto/fixtures"
 HEX = re.compile(r"^(?:[0-9a-f]{2})*$")
-LIMIT = 8 * 1024 * 1024
+LIMIT = 12 * 1024 * 1024
 DIGEST_BYTES = {"sha256": 32, "sha512": 64, "keccak256": 32, "keccak512": 64, "ripemd160": 20,
                 "blake2b256": 32, "blake2b512": 64}
 FIELD_BYTES = {"seed": 32, "public": 32, "keypair": 64, "sig": 64}
@@ -35,6 +35,9 @@ class CryptoFixtureTests(unittest.TestCase):
         cls.vrf = lines("vrf.jsonl")
         cls.shake = lines("shake.jsonl")
         cls.mldsa = lines("mldsa.jsonl")
+        cls.bn254 = lines("bn254.jsonl")
+        cls.bls = lines("bls12381.jsonl")
+        cls.p256 = lines("p256.jsonl")
 
     def test_size(self):
         self.assertLess(sum(p.stat().st_size for p in FIXTURES.iterdir()), LIMIT)
@@ -42,7 +45,9 @@ class CryptoFixtureTests(unittest.TestCase):
     def test_counts_match_manifest(self):
         for name, records in (("hash.jsonl", self.hashes), ("ed25519.jsonl", self.ed25519),
                               ("secp256k1.jsonl", self.secp), ("vrf.jsonl", self.vrf),
-                              ("shake.jsonl", self.shake), ("mldsa.jsonl", self.mldsa)):
+                              ("shake.jsonl", self.shake), ("mldsa.jsonl", self.mldsa),
+                              ("bn254.jsonl", self.bn254), ("bls12381.jsonl", self.bls),
+                              ("p256.jsonl", self.p256)):
             counts = {}
             for record in records:
                 kind = record.get("kind", "hash")
@@ -50,7 +55,7 @@ class CryptoFixtureTests(unittest.TestCase):
             self.assertEqual(counts, self.manifest["files"][name], name)
         self.assertEqual(set(self.manifest["files"]),
                          {"hash.jsonl", "ed25519.jsonl", "secp256k1.jsonl", "vrf.jsonl", "shake.jsonl",
-                          "mldsa.jsonl"})
+                          "mldsa.jsonl", "bn254.jsonl", "bls12381.jsonl", "p256.jsonl"})
 
     def test_hash_lines(self):
         seen = set()

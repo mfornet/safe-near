@@ -9,6 +9,55 @@ theorem sum_map_add_nat (items : List α) (f g : α → Nat) :
   | nil => rfl
   | cons item items ih => simp [ih, Nat.add_assoc, Nat.add_left_comm]
 
+theorem resumeReceipts_frame (account : AccountId) (resumes : List (Bytes × Bytes)) (initial : ChainState)
+    (receipts : List Receipt) :
+    (resumeReceipts account resumes initial receipts).1.withoutIds = initial.withoutIds := by
+  unfold resumeReceipts
+  exact foldl_frame (fun pair : ChainState × List Receipt => pair.1.withoutIds) _
+    (by intros; rfl) resumes (initial, receipts)
+
+theorem resumeReceipts_funds (cfg : RuntimeConfig) (account : AccountId) (resumes : List (Bytes × Bytes))
+    (initial : ChainState) (receipts : List Receipt) :
+    receiptsFunds cfg (resumeReceipts account resumes initial receipts).2 = receiptsFunds cfg receipts := by
+  unfold resumeReceipts
+  exact foldl_frame (fun pair : ChainState × List Receipt => receiptsFunds cfg pair.2) _
+    (by intros; simp [receiptsFunds, Fees.receiptFunds]) resumes (initial, receipts)
+
+theorem yieldBookkeeping_frame (c : ReceiptCtx) (outcome : VMOutcome) (initial : ChainState) :
+    (yieldBookkeeping c outcome initial).withoutIds = initial.withoutIds := by
+  unfold yieldBookkeeping
+  dsimp only
+  have h1 := foldl_frame (fun st : ChainState => st.withoutIds) (fun (st : ChainState) dataId =>
+    { st with
+      yieldTimeouts := st.yieldTimeouts ++ [((initial.yieldIndices.getD (0, 0)).2 +
+        ((outcome.receipts.filterMap (·.yieldDataId)).idxOf dataId),
+        { account := c.receipt.receiverId, dataId, expiresAt := c.ap.blockHeight + c.cfg.wasm.limits.yieldTimeoutLengthInBlocks })]
+      yieldStatus := Assoc.insert st.yieldStatus (c.receipt.receiverId, dataId) .yielded })
+    (by intros; rfl) (outcome.receipts.filterMap (·.yieldDataId)) initial
+  have h2 := foldl_frame (fun st : ChainState => st.withoutIds) (fun (st : ChainState) resume =>
+    { st with yieldStatus := Assoc.insert st.yieldStatus (c.receipt.receiverId, resume.1) .resumeInitiated })
+    (by intros; rfl) outcome.resumes
+    ((outcome.receipts.filterMap (·.yieldDataId)).foldl (fun (st : ChainState) dataId =>
+    { st with
+      yieldTimeouts := st.yieldTimeouts ++ [((initial.yieldIndices.getD (0, 0)).2 +
+        ((outcome.receipts.filterMap (·.yieldDataId)).idxOf dataId),
+        { account := c.receipt.receiverId, dataId, expiresAt := c.ap.blockHeight + c.cfg.wasm.limits.yieldTimeoutLengthInBlocks })]
+      yieldStatus := Assoc.insert st.yieldStatus (c.receipt.receiverId, dataId) .yielded }) initial)
+  split
+  · exact h2.trans h1
+  · exact h2.trans h1
+
+theorem functionCallYields_frame (c : ReceiptCtx) (outcome : VMOutcome) (effects : FunctionCallEffects) :
+    (functionCallYields c outcome effects).state.withoutIds = effects.state.withoutIds := by
+  unfold functionCallYields
+  dsimp only
+  rw [yieldBookkeeping_frame, resumeReceipts_frame]
+
+theorem functionCallYields_funds (c : ReceiptCtx) (outcome : VMOutcome) (effects : FunctionCallEffects) :
+    receiptsFunds c.cfg (functionCallYields c outcome effects).receipts = receiptsFunds c.cfg effects.receipts := by
+  unfold functionCallYields
+  exact resumeReceipts_funds _ _ _ _ _
+
 /-- Outgoing gas backing is discharged separately from VM deposit conservation. -/
 def functionCallGasFunds (c : ReceiptCtx) (outcome : VMOutcome) : Nat :=
   (outcome.receipts.map fun spec => if c.receipt.receiverId == systemAccount then 0
@@ -23,20 +72,25 @@ theorem materializeFunctionCallRaw_funds_split (c : ReceiptCtx) (isLast : Bool) 
   simp [functionCallReceiptValue, functionCallGasFunds,
     Fees.totalDeposit, List.map_map, Function.comp_def, receiptsDeposits, receiptsValue, depositValue]
 
+theorem functionCallYields_totalBalance (c : ReceiptCtx) (outcome : VMOutcome) (effects : FunctionCallEffects) :
+    (functionCallYields c outcome effects).state.totalBalance = effects.state.totalBalance := by
+  have h := congrArg ChainState.totalBalance (functionCallYields_frame c outcome effects)
+  simpa only [ChainState.totalBalance, ChainState.gasKeyFunds, ChainState.withoutIds] using h
+
 theorem materializeFunctionCallRaw_totalBalance (c : ReceiptCtx) (isLast : Bool) (outcome : VMOutcome)
     (initial : ChainState) :
     (materializeFunctionCallRaw c isLast outcome initial).state.totalBalance = initial.totalBalance := by
   have h := congrArg ChainState.totalBalance (materializeFunctionCallRaw_frame c isLast outcome initial)
-  simpa only [ChainState.totalBalance, ChainState.withoutIds] using h
+  simpa only [ChainState.totalBalance, ChainState.gasKeyFunds, ChainState.withoutIds] using h
 
 /-- Successful validation identifies the exact executable constructor used by commit. -/
 theorem functionCallEffects_success (c : ReceiptCtx) (account : Account) (outcome : VMOutcome)
     (isLast : Bool) (state : ChainState) (effects : FunctionCallEffects)
     (h : functionCallEffects c account outcome isLast state = .ok effects) :
-    effects = materializeFunctionCallRaw c isLast outcome
+    effects = functionCallYields c outcome (materializeFunctionCallRaw c isLast outcome
       ((state.setAccount c.receipt.receiverId
         { account with amount := outcome.balance, storageUsage := outcome.storageUsage }).setContractStorage
-          c.receipt.receiverId outcome.storage) :=
+          c.receipt.receiverId outcome.storage)) :=
   materializeFunctionCall_success c isLast outcome _ effects h
 
 /-- Checked commits change the receiver and id counter, framing the remaining state. -/
@@ -48,7 +102,7 @@ theorem commitFunctionCall_frame (exec : Exec) (c : ReceiptCtx) (account : Accou
         { account with amount := outcome.balance, storageUsage := outcome.storageUsage }).setContractStorage
           c.receipt.receiverId outcome.storage).withoutIds := by
   change effects.state.withoutIds = _
-  rw [functionCallEffects_success c account outcome isLast exec.state effects h]
+  rw [functionCallEffects_success c account outcome isLast exec.state effects h, functionCallYields_frame]
   exact materializeFunctionCallRaw_frame _ _ _ _
 
 theorem commitFunctionCall_accountsUnique (exec : Exec) (c : ReceiptCtx) (account : Account)
@@ -60,9 +114,11 @@ theorem commitFunctionCall_accountsUnique (exec : Exec) (c : ReceiptCtx) (accoun
   change (exec.commitFunctionCall outcome effects).state.accounts =
     (exec.state.setAccount c.receipt.receiverId
       { account with amount := outcome.balance, storageUsage := outcome.storageUsage }).accounts at hf
-  unfold ChainState.AccountsUnique
-  rw [hf]
-  exact h.setAccount _ _
+  have hk := congrArg ChainState.accessKeys (commitFunctionCall_frame exec c account outcome isLast effects heffects)
+  change (exec.commitFunctionCall outcome effects).state.accessKeys =
+    (exec.state.setAccount c.receipt.receiverId
+      { account with amount := outcome.balance, storageUsage := outcome.storageUsage }).accessKeys at hk
+  exact ChainState.AccountsUnique.congr hf.symm hk.symm (h.setAccount _ _)
 
 theorem commitFunctionCall_balance (exec : Exec) (c : ReceiptCtx) (account : Account)
     (outcome : VMOutcome) (isLast : Bool) (effects : FunctionCallEffects)
@@ -78,7 +134,7 @@ theorem commitFunctionCall_balance (exec : Exec) (c : ReceiptCtx) (account : Acc
     { account with amount := outcome.balance, storageUsage := outcome.storageUsage } account hwf haccount
   have he := functionCallEffects_success c account outcome isLast exec.state effects heffects
   change effects.state.totalBalance + account.amount = _
-  rw [he]
+  rw [he, functionCallYields_totalBalance]
   dsimp only at ha
   rw [hm]
   change (exec.state.setAccount c.receipt.receiverId
@@ -96,9 +152,10 @@ theorem commitFunctionCall_totalFunds (exec : Exec) (c : ReceiptCtx) (account : 
   have he := functionCallEffects_success c account outcome isLast exec.state effects heffects
   unfold Exec.totalFunds
   change effects.state.totalBalance + receiptsFunds c.cfg (exec.newReceipts ++ effects.receipts) + account.amount = _
-  rw [receiptsFunds_append, he, materializeFunctionCallRaw_funds_split]
+  rw [receiptsFunds_append, he, functionCallYields_funds, materializeFunctionCallRaw_funds_split]
   change effects.state.totalBalance + account.amount = _ at hb
-  rw [he] at hb
+  rw [he, functionCallYields_totalBalance] at hb
+  rw [functionCallYields_totalBalance]
   omega
 
 /-- The public VM funding theorem discharges the deposit-accounting premise.
@@ -133,8 +190,9 @@ theorem applyFunctionCall_success_funded (c : ReceiptCtx) (method : String) (arg
     (hwf : before.state.AccountsUnique)
     (hrun : (applyFunctionCall c method args gas deposit isLast).run.run before = (.ok (), after)) :
     ∃ (account : Account) (code : ContractCode) (effects : FunctionCallEffects),
-      before.state.account? c.receipt.receiverId = some account ∧ account.code = some code ∧
-      let outcome := run c.cfg code.module code.size method (functionCallContext c account args gas deposit isLast before.storageAccounting)
+      before.state.account? c.receipt.receiverId = some account ∧ resolveContract before.state account = some code ∧
+      let outcome := run c.cfg code.module code.size method
+        (functionCallContext c account args gas deposit isLast before.storageAccounting)
         (before.state.contractStorage c.receipt.receiverId)
       outcome.aborted = none ∧ functionCallEffects c account outcome isLast before.state = .ok effects ∧
       after = (before.recordVMOutcome outcome).commitFunctionCall outcome effects ∧
@@ -147,7 +205,7 @@ theorem applyFunctionCall_success_funded (c : ReceiptCtx) (method : String) (arg
     have bad := congrArg Prod.fst hrun
     cases bad
   | some account =>
-    cases hc : account.code with
+    cases hc : resolveContract before.state account with
     | none =>
       simp only [ha, hc] at hrun
       have bad := congrArg Prod.fst hrun
@@ -159,7 +217,8 @@ theorem applyFunctionCall_success_funded (c : ReceiptCtx) (method : String) (arg
         have bad := congrArg Prod.fst hrun
         cases bad
       | none =>
-        let outcome := run c.cfg code.module code.size method (functionCallContext c account args gas deposit isLast before.storageAccounting)
+        let outcome := run c.cfg code.module code.size method
+          (functionCallContext c account args gas deposit isLast before.storageAccounting)
           (before.state.contractStorage c.receipt.receiverId)
         simp only [ha, hc, hi] at hrun
         change ((match outcome.aborted with

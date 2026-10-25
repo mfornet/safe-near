@@ -37,6 +37,86 @@ theorem Exec.addGasRefund_outputIds (exec : Exec) (receiver : AccountId) (pk : P
     subst id
     exact Nat.lt_succ_self _
 
+theorem Exec.OutputIdsBelowNext.of_advance {before after : Exec} (h : before.OutputIdsBelowNext)
+    (hr : before.state.RoutingAdvance after.state) (hreceipts : after.newReceipts = before.newReceipts) :
+    after.OutputIdsBelowNext :=
+  Exec.OutputIdsBelowNext.of_frame h hreceipts hr.nextId_le
+
+theorem Exec.OutputIdsBelowNext.append_fresh {before after : Exec} (h : before.OutputIdsBelowNext)
+    (r : Receipt) (hr : r.liveIds = [before.state.nextId])
+    (hreceipts : after.newReceipts = before.newReceipts ++ [r])
+    (hnext : before.state.nextId < after.state.nextId) : after.OutputIdsBelowNext := by
+  intro receipt hm id hid
+  rw [hreceipts] at hm
+  rcases List.mem_append.mp hm with hold | hnew
+  · exact (h receipt hold id hid).trans hnext
+  · have hrr := List.mem_singleton.mp hnew
+    subst receipt
+    rw [hr] at hid
+    have := List.mem_singleton.mp hid
+    omega
+
+theorem deployGlobalResult_outputIds (c : ReceiptCtx) (before : Exec) (plan : DeployGlobalPlan) (code : ContractCode)
+    (h : before.OutputIdsBelowNext) : (deployGlobalResult c before plan code).OutputIdsBelowNext := by
+  have hn := ChainState.nextId_of_routing (deployGlobalMoved_routing c before plan)
+  refine Exec.OutputIdsBelowNext.append_fresh (before := before) h _ ?_ rfl ?_
+  · simp [Receipt.liveIds, ChainState.freshId, hn]
+  · change before.state.nextId < (deployGlobalMoved c before plan).nextId + 1
+    omega
+
+theorem delegateResult_outputIds (c : ReceiptCtx) (before : Exec) (act : Action) (moved : ChainState)
+    (hmoved : moved.routingState = before.state.routingState) (hact : act.isDelegate = true)
+    (h : before.OutputIdsBelowNext) : (delegateResult c before act moved).OutputIdsBelowNext := by
+  have hn := ChainState.nextId_of_routing hmoved
+  refine Exec.OutputIdsBelowNext.append_fresh (before := before) h _ ?_ rfl ?_
+  · cases act <;> simp_all [Receipt.liveIds, delegateReceipt, Action.isDelegate, ChainState.freshId]
+  · change before.state.nextId < moved.nextId + 1
+    omega
+
+theorem resumeReceipts_liveIds_below (account : AccountId) (resumes : List (Bytes × Bytes))
+    (initial : ChainState) (receipts : List Receipt)
+    (h : ∀ receipt ∈ receipts, ∀ id ∈ receipt.liveIds, id < initial.nextId) :
+    ∀ receipt ∈ (resumeReceipts account resumes initial receipts).2,
+      ∀ id ∈ receipt.liveIds, id < (resumeReceipts account resumes initial receipts).1.nextId := by
+  unfold resumeReceipts
+  suffices ∀ (items : List (Bytes × Bytes)) (acc : ChainState × List Receipt),
+      (∀ receipt ∈ acc.2, ∀ id ∈ receipt.liveIds, id < acc.1.nextId) →
+      ∀ receipt ∈ (items.foldl (fun (acc : ChainState × List Receipt) resume =>
+        (acc.1.freshId.2, acc.2 ++ [{
+          predecessorId := account
+          receiverId := account
+          receiptId := acc.1.freshId.1
+          receipt := .data { dataId := 0, data := some resume.2, resumeDataId := some resume.1 } }]))
+        acc).2, ∀ id ∈ receipt.liveIds, id < (items.foldl (fun (acc : ChainState × List Receipt) resume =>
+        (acc.1.freshId.2, acc.2 ++ [{
+          predecessorId := account
+          receiverId := account
+          receiptId := acc.1.freshId.1
+          receipt := .data { dataId := 0, data := some resume.2, resumeDataId := some resume.1 } }]))
+        acc).1.nextId from this resumes (initial, receipts) h
+  intro items
+  induction items with
+  | nil => intro acc hacc; exact hacc
+  | cons item rest ih =>
+    intro acc hacc
+    rw [List.foldl_cons]
+    apply ih
+    intro receipt hm id hid
+    simp only [ChainState.freshId, List.mem_append, List.mem_singleton] at hm ⊢
+    rcases hm with hold | rfl
+    · exact (hacc receipt hold id hid).trans (Nat.lt_succ_self _)
+    · simp [Receipt.liveIds] at hid
+      omega
+
+theorem functionCallYields_liveIds_below (c : ReceiptCtx) (outcome : VMOutcome) (effects : FunctionCallEffects)
+    (h : ∀ receipt ∈ effects.receipts, ∀ id ∈ receipt.liveIds, id < effects.state.nextId) :
+    ∀ receipt ∈ (functionCallYields c outcome effects).receipts,
+      ∀ id ∈ receipt.liveIds, id < (functionCallYields c outcome effects).state.nextId := by
+  unfold functionCallYields
+  dsimp only
+  rw [yieldBookkeeping_nextId]
+  exact resumeReceipts_liveIds_below _ _ _ _ h
+
 /-- VM emission extends the already bounded output list and advances the shared
 counter. Inherited callback references are transported from the current context. -/
 theorem commitFunctionCall_outputIds (exec : Exec) (c : ReceiptCtx) (account : Account)
@@ -58,7 +138,21 @@ theorem commitFunctionCall_outputIds (exec : Exec) (c : ReceiptCtx) (account : A
   rw [heffects']
   rcases List.mem_append.mp hm with hold | hnew
   · exact (h receipt hold id hid).trans_le hn
-  · exact he receipt hnew id hid
+  · exact functionCallYields_liveIds_below c outcome _ he receipt hnew id hid
+
+theorem deleteAccountResult_outputIds (c : ReceiptCtx) (before : Exec) (account : Account) (beneficiary : AccountId)
+    (h : before.OutputIdsBelowNext) : (deleteAccountFundedResult c before account beneficiary).OutputIdsBelowNext := by
+  have hadv := deleteAccountFundedResult_advance c before account beneficiary
+  unfold deleteAccountFundedResult at hadv ⊢
+  dsimp only at hadv ⊢
+  by_cases hpos : account.amount > 0
+  · simp only [hpos, ↓reduceIte]
+    refine Exec.OutputIdsBelowNext.append_fresh (before := before) h _ ?_ rfl ?_
+    · simp [Receipt.liveIds, refundReceipt, ChainState.freshId]
+    · change before.state.nextId < before.state.nextId + 1
+      exact Nat.lt_succ_self _
+  · simp only [hpos, ↓reduceIte] at hadv ⊢
+    exact Exec.OutputIdsBelowNext.of_advance h hadv rfl
 
 /-- Output bounds survive raw actions on both success and failure. -/
 theorem applyAction_outputIds (c : ReceiptCtx) (isLast : Bool) (action : Action) (before : Exec)
@@ -74,7 +168,7 @@ theorem applyAction_outputIds (c : ReceiptCtx) (isLast : Bool) (action : Action)
     | none => exact h
     | some account =>
       dsimp only
-      cases hc : account.code with
+      cases hc : resolveContract before.state account with
       | none => exact h
       | some code =>
         dsimp only
@@ -101,18 +195,35 @@ theorem applyAction_outputIds (c : ReceiptCtx) (isLast : Bool) (action : Action)
       exact Nat.le_of_eq (transferCreditState_nextId _ _ _ _).symm
     · split
       · exact h
+      · exact h
       · split <;> exact h
   | stake amount pk =>
     cases ha : before.state.account? c.receipt.receiverId <;>
       simp [-StateT.run_bind, applyAction, getAccount, getState, ha]
     repeat' (first | exact h | split)
-  | addKey pk key => rw [applyAddKey_run]; repeat' (first | exact h | split)
-  | deleteKey pk => rw [applyDeleteKey_run]; repeat' (first | exact h | split)
-  | useGlobalContract _ => exact h
+  | addKey pk key =>
+    rw [applyAddKey_run]
+    repeat' (first | exact h | exact Exec.OutputIdsBelowNext.of_advance (after := { before with state := _ }) h (ChainState.RoutingAdvance.of_routing (addKeyMetadataState_routing _ _ _ _ _)) rfl | split)
+  | deleteKey pk =>
+    rw [applyDeleteKey_run]
+    repeat' (first | exact h | exact Exec.OutputIdsBelowNext.of_advance (after := { before with state := _ }) h (ChainState.RoutingAdvance.of_routing (deleteKeyMetadataState_routing _ _ _ _ _)) rfl | split)
+  | useGlobalContract contract => rw [applyUseGlobalContract_run]; repeat' (first | exact h | split)
+  | deployGlobalContract code mode =>
+    rw [applyDeployGlobalContract_run]
+    repeat' (first | exact h | exact deployGlobalResult_outputIds _ _ _ _ h | split)
+  | transferToGasKey pk deposit =>
+    rw [applyTransferToGasKey_run]
+    repeat' (first | exact h | exact Exec.OutputIdsBelowNext.of_advance (after := { before with state := _ }) h (ChainState.RoutingAdvance.of_routing (gasKeyDeposit_routing (by assumption))) rfl | split)
+  | withdrawFromGasKey pk amount =>
+    rw [applyWithdrawFromGasKey_run]
+    repeat' (first | exact h | exact Exec.OutputIdsBelowNext.of_advance (after := { before with state := _ }) h (ChainState.RoutingAdvance.of_routing (gasKeyWithdrawal_routing (by assumption))) rfl | split)
+  | delegate sender receiver inner nonce nonceIndex maxBlockHeight pk signature v2 =>
+    change ((applyDelegateAction c _).run.run before).2.OutputIdsBelowNext
+    rw [applyDelegateAction_run]
+    repeat' (first | exact h | exact delegateResult_outputIds _ _ _ _ (delegateState_routing (by assumption)) rfl h | split)
   | deleteAccount beneficiary =>
     rw [applyDeleteAccount_run]
-    dsimp only [deleteAccountFundedResult]
-    repeat' (first | exact h | exact Exec.addBalanceRefund_outputIds before beneficiary _ h | split)
+    repeat' (first | exact h | exact deleteAccountResult_outputIds _ _ _ _ h | split)
 
 /-- The callback bound is required at entry, while monotonicity transports it
 between successive operations. -/
@@ -182,25 +293,13 @@ theorem outputIds_runReceiptAction (c : ReceiptCtx) (onlyAction isLast : Bool) (
 
 theorem outputIds_runReceiptActionAt (c : ReceiptCtx) (onlyAction isLast : Bool)
     (action : Action) (index : Nat) : (runReceiptActionAt c onlyAction isLast action index).BoundsOutputIds c := by
-  cases action with
-  | createAccount  => exact outputIds_runReceiptAction c onlyAction isLast (.createAccount)
-  | deployContract code => exact outputIds_runReceiptAction c onlyAction isLast (.deployContract code)
-  | transfer amount => exact outputIds_runReceiptAction c onlyAction isLast (.transfer amount)
-  | stake amount pk => exact outputIds_runReceiptAction c onlyAction isLast (.stake amount pk)
-  | addKey pk key => exact outputIds_runReceiptAction c onlyAction isLast (.addKey pk key)
-  | deleteKey pk => exact outputIds_runReceiptAction c onlyAction isLast (.deleteKey pk)
-  | useGlobalContract contract => exact outputIds_runReceiptAction c onlyAction isLast (.useGlobalContract contract)
-  | deleteAccount beneficiary => exact outputIds_runReceiptAction c onlyAction isLast (.deleteAccount beneficiary)
-  | functionCall method args gas deposit =>
-    intro before hcallbacks h
+  unfold runReceiptActionAt
+  split
+  · intro before hcallbacks h
     cases hs : actionRandomSeed c index with
-    | error error =>
-      simp only [runReceiptActionAt, hs]
-      exact h
-    | ok seed =>
-      simp only [runReceiptActionAt, hs]
-      exact outputIds_runReceiptAction { c with vmRandomSeed := some seed } onlyAction isLast
-        (.functionCall method args gas deposit) before hcallbacks h
+    | error error => exact h
+    | ok seed => exact outputIds_runReceiptAction _ onlyAction isLast _ before hcallbacks h
+  · exact outputIds_runReceiptAction _ _ _ _
 
 theorem outputIds_failureIndex (c : ReceiptCtx) (index : Option Nat) :
     (modify fun e => { e with failureIndex := index } : ExecM Unit).BoundsOutputIds c := by

@@ -7,7 +7,7 @@ establish equivalence with nearcore or correctness of deployed contracts.
 
 Registered chain replay constructs a complete synthetic trie independently from
 encoded model state, including accounts, access keys, code, storage, queues and
-the single-shard bandwidth scheduler. The runtime threads an optional external
+the bandwidth scheduler state and the outgoing receipt buffers of the shard. The runtime threads an optional external
 accounting context through VM calls and receipts. Successful receipts commit
 prospective writes; failures discard writes while preserving cache history and
 burnt gas. Chunk entry rebuilds the trie with a fresh cache. Gas is charged during
@@ -23,6 +23,14 @@ inputs. Complete synthetic chunk bytes and entry roots are compared alongside
 all existing execution observations. These finite comparisons and local proofs
 do not establish general nearcore equivalence, memtrie behavior or original
 historical shard capture.
+
+## Shard machinery
+
+`ShardLayout`, `Congestion`, `Bandwidth`, `ChaCha` and `ShardSink` are executable ports of nearcore's congestion
+control and bandwidth scheduler with unit tests (`Tests/Shard.lean`: values produced by `rand 0.8.5`,
+`rand_chacha 0.3.1` and nearcore's own scheduler tests) and replay against 288 four-shard chunks. No theorem
+mentions them and no theorem of the existing modules changed: they sit around `Near.apply`, which still returns
+every outgoing receipt, and the chain layer decides which are sent or buffered.
 
 ## Reference and trusted inputs
 
@@ -116,20 +124,31 @@ differences rather than treating storage-heavy execution as equivalent.
 
 | Boundary | Implemented | Remaining obligations |
 | --- | --- | --- |
-| VM | Host context, storage, registers, logs, promises, gas counter, rollback on abort | Exact instrumentation and trie costs; host limits and error ordering; cryptographic semantics; module validation and decoding |
-| Actions | Create, deploy, call, transfer, add/delete key, delete account; basic stake rejection checks | Reference validation; integer bounds; staking/epoch semantics; newer action variants |
-| Receipts | Proved per-call graph conversion and acyclicity; input/output dependencies, postponement, failure data, refunds | Global state well-formedness/freshness; receipt-layer reference oracle; yield/resume lifecycle |
+| VM | Host context, storage, registers, logs, promises, gas counter, rollback on abort | Exact instrumentation and trie costs; host limits and error ordering; module validation and decoding |
+| Actions | Create, deploy, call, transfer, add/delete key, delete account, delegate (V1/V2, signature through an injected verifier), global contract deploy/use with distribution receipts, gas-key transfer and withdrawal; `Stake`/unstake against the epoch's minimum stake with validator proposals (`funded_stake`); the epoch-start validator accounts update (`Epoch.lean`) | Reference validation; integer bounds; the epoch manager itself (the epoch's validators and update are inputs); `DeterministicStateInit` and refund targets |
+| Receipts | Proved per-call graph conversion and acyclicity; input/output dependencies, postponement, failure data, refunds | Receipt-layer reference oracle for the yield/resume lifecycle (timeouts, resume receipts) beyond the corpus chunks; global state well-formedness |
 | Chain | Block application, delayed queue, explicit bounded-run completion, reachability restricted to supported applies | Scheduling assumptions; indirect interaction predicates; sufficient prepaid gas specification |
 | wNEAR | Completed local model proofs; checked callback projection; refinement proposition with explicit resources and accounting | Binary refinement proof; callback parsing/serialization proofs; chain-level solvency and availability proofs |
 
 Known unsafe approximations still requiring implementation changes:
 
-- The functional host has injectable cryptographic defaults. The metered VM
-  rejects cryptographic and validator operations instead of invoking those
-  defaults. Concrete cryptographic and validator semantics remain to be supplied.
-- The metered VM rejects yield/resume operations. Their receipt lifecycle is
-  not implemented; the low-level promise conversion is not a yield executor.
-- Unstaking is explicitly rejected as unsupported epoch semantics.
+- The cryptographic host functions (`sha256` ... `bls12381_*`) read their arguments, pay gas and
+  raise errors in the VM (`NearVM/CryptoHost.lean`), and call primitives injected through
+  `RuntimeConfig.hostCrypto`; the proofs about the metered registry treat them through one generic
+  lemma per invariant (`cryptoHostFn_*`) and say nothing about the primitives. Without an injected
+  implementation they are rejected as unsupported.
+- `validator_stake` and `validator_total_stake` read the epoch's validator set that
+  `ApplyState.epochInfo` supplies.
+- Promise yield and resume are executed: yielded receipts, resume data receipts and timeouts
+  (`resolveYieldTimeouts`) are modelled and replayed against the corpus. Only the host functions
+  that name a yield id or refund target (`promise_yield_create_with_id` and friends) trap; see
+  the divergence table in `notes/design/NEAR_RUNTIME.md`.
+- `Stake` and unstaking follow `action_stake` with the epoch supplied as input
+  (`ApplyState.epochInfo`); the proposals are part of each outcome and of `ApplyResult`.
+  `funded_stake` proves a stake moves liquid funds to the locked balance and nothing else.
+  The epoch-start `update_validator_accounts` (`NearRuntime/Epoch.lean`) mints rewards from a supplied
+  update and is applied by the chain replay before `apply`; it is outside the proved `apply`, so
+  the conservation theorems still speak about chunk execution only.
 - Natural-number arithmetic does not by itself reproduce bounded protocol arithmetic.
 - Scenario code supplies a synthetic deployed code size.
 - Fuel exhaustion has a structured execution issue. `VMOutcome.issue?` separates

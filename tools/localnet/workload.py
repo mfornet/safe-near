@@ -173,25 +173,18 @@ class Workload:
             return (root, name, [nc.create_account(), nc.transfer(amount), nc.add_key(self.actors[name].key.pk, nc.access_key_full())])
         self.round("create-accounts", [create(n, (20_000_000 if n == "a.node0" else 2000) * NEAR) for n in names])
 
-    def run_all(self):
+    def run_all(self, skip: frozenset = frozenset()):
         """Features whose state never goes away (yield queues, global contracts, ETH-implicit accounts, gas keys)
-        come last, so that the early chunks stay free of them."""
+        come last, so that the early chunks stay free of them.  `skip` names scenarios to leave out (the
+        peer acceptance run leaves out the heavy ones: ``hostcalls`` and ``burst`` run 300 Tgas calls)."""
         self.setup()
-        self.transfers()
-        self.implicit_accounts()
-        self.deploy_and_call()
-        self.promises()
-        self.keys()
-        self.staking()
-        self.delete_accounts()
-        self.hostcalls()
-        self.burst()
-        self.delegate()
-        self.eth_implicit()
-        self.yields()
-        self.global_contracts()
-        self.gas_keys()
-        self.wait_blocks(215)       # long enough for the unresumed yield to time out (200 blocks)
+        for name in ["transfers", "implicit_accounts", "deploy_and_call", "promises", "keys", "staking",
+                     "delete_accounts", "hostcalls", "burst", "delegate", "eth_implicit", "yields",
+                     "global_contracts", "gas_keys"]:
+            if name not in skip:
+                getattr(self, name)()
+        if "wait" not in skip:
+            self.wait_blocks(215)       # long enough for the unresumed yield to time out (200 blocks)
 
     def wait_blocks(self, count: int):
         start = self.net.height()
@@ -524,6 +517,7 @@ def main() -> None:
     parser.add_argument("topology", choices=sorted(localnet.TOPOLOGIES))
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--only", help="run only the named scenario after setup")
+    parser.add_argument("--skip", nargs="*", default=[], help="scenarios to leave out (and `wait`, the final wait)")
     arguments = parser.parse_args()
     workload = Workload(Net(arguments.topology), arguments.seed)
     first = workload.net.height()
@@ -532,7 +526,7 @@ def main() -> None:
             workload.setup()
             getattr(workload, arguments.only)()
         else:
-            workload.run_all()
+            workload.run_all(frozenset(arguments.skip))
     finally:
         last = workload.net.height()
         out = localnet.home(arguments.topology) / "workload.json"

@@ -1,35 +1,50 @@
 import NearRuntime.BalanceActionFunding
+import NearRuntime.NewActionFunding
 import NearRuntime.MixedFunding
 
 namespace Near
 open Wasm.Near
 
-/-- Epoch-dependent stake/unstake never fabricates a successful state update.
-The successful funding rule is vacuous because the implemented path rejects it. -/
-theorem funded_stake_rejection (c : ReceiptCtx) (isLast : Bool) (stake : Nat) (pk : PublicKey) :
+/-- Staking moves funds from the liquid to the locked balance and records a proposal: the
+account's total stays, and so do gas and the receipts. -/
+theorem funded_stake (c : ReceiptCtx) (isLast : Bool) (stake : Nat) (pk : PublicKey) :
     (applyAction c isLast (.stake stake pk)).Funded c.cfg c.action.gasPrice 0 := by
-  intro before after value _ hrun
+  intro before after value hwf hrun
   cases ha : before.state.account? c.receipt.receiverId with
   | none =>
     simp [-StateT.run_bind, applyAction, getAccount, getState, ha] at hrun
     have hbad := congrArg Prod.fst hrun
     cases hbad
   | some account =>
-    simp [-StateT.run_bind, applyAction, getAccount, getState, ha] at hrun
-    repeat' (first
-      | contradiction
-      | (have hbad := congrArg Prod.fst hrun; cases hbad)
-      | split at hrun)
+    simp [-StateT.run_bind, applyAction, getAccount, getState, putAccount, modifyState, ha] at hrun
+    split at hrun
+    · have hbad := congrArg Prod.fst hrun; cases hbad
+    split at hrun
+    · have hbad := congrArg Prod.fst hrun; cases hbad
+    split at hrun
+    · have hbad := congrArg Prod.fst hrun; cases hbad
+    split at hrun
+    · simp only [execM_run_bind, execM_run_modify] at hrun
+      rename_i hamount _ _ hlt
+      have he := (congrArg Prod.snd hrun).symm
+      dsimp only at he
+      subst after
+      have hb := ChainState.totalBalance_setAccount before.state c.receipt.receiverId
+        { amount := account.amount - (stake - account.locked), locked := stake, code := account.code,
+          storageUsage := account.storageUsage, global := account.global, versionTwo := account.versionTwo }
+        account hwf ha
+      refine ⟨hwf.setAccount _ _, Exec.FundingStep.of_fields c.cfg c.action.gasPrice before _ ?_ rfl rfl rfl rfl⟩
+      unfold Exec.totalFunds
+      dsimp only at hb ⊢
+      omega
+    · simp only [execM_run_bind, execM_run_modify] at hrun
+      have he := (congrArg Prod.snd hrun).symm
+      dsimp only at he
+      subst after
+      exact ⟨hwf, Exec.FundingStep.of_fields c.cfg c.action.gasPrice before _ rfl rfl rfl rfl rfl⟩
 
-/-- Using a global contract is outside the model and never succeeds. -/
-theorem funded_useGlobalContract_rejection (c : ReceiptCtx) (isLast : Bool) (contract : Wasm.GlobalContractId) :
-    (applyAction c isLast (.useGlobalContract contract)).Funded c.cfg c.action.gasPrice 0 := by
-  intro before after value _ hrun
-  have hbad := congrArg Prod.fst hrun
-  cases hbad
-
-/-- Every modeled action has a concrete funding rule. Unsupported staking
-cannot succeed; supported actions preserve account uniqueness and exact funding. -/
+/-- Every modeled action has a concrete funding rule. Staking
+moves liquid funds to the locked balance; the other actions preserve account uniqueness and exact funding. -/
 theorem funded_applyAction (c : ReceiptCtx) (isLast : Bool) (action : Action)
     (hreceiver : c.receipt.receiverId ≠ systemAccount) :
     (applyAction c isLast action).Funded c.cfg c.action.gasPrice action.deposit := by
@@ -38,11 +53,16 @@ theorem funded_applyAction (c : ReceiptCtx) (isLast : Bool) (action : Action)
   | deployContract code => exact funded_deployContract c isLast code
   | functionCall method args gas deposit => exact funded_functionCall c method args gas deposit isLast hreceiver
   | transfer deposit => exact funded_transfer c isLast deposit
-  | stake stake pk => exact funded_stake_rejection c isLast stake pk
+  | stake stake pk => exact funded_stake c isLast stake pk
   | addKey pk key => exact funded_addKey c isLast pk key
   | deleteKey pk => exact funded_deleteKey c isLast pk
   | deleteAccount beneficiary => exact funded_deleteAccount c isLast beneficiary
-  | useGlobalContract contract => exact funded_useGlobalContract_rejection c isLast contract
+  | useGlobalContract contract => exact funded_useGlobalContract c isLast contract
+  | deployGlobalContract code mode => exact funded_deployGlobalContract c isLast code mode
+  | transferToGasKey pk deposit => exact funded_transferToGasKey c isLast pk deposit
+  | withdrawFromGasKey pk amount => exact funded_withdrawFromGasKey c isLast pk amount
+  | delegate sender receiver inner nonce nonceIndex maxBlockHeight pk signature v2 =>
+    exact funded_delegate c isLast sender receiver inner nonce nonceIndex maxBlockHeight pk signature v2 hreceiver
 
 theorem funded_runReceiptAction (c : ReceiptCtx) (onlyAction isLast : Bool) (action : Action)
     (hreceiver : c.receipt.receiverId ≠ systemAccount) :

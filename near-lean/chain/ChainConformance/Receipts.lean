@@ -1,3 +1,4 @@
+import ChainReplay.HostCrypto
 import NearChain.Step
 import Wasm
 
@@ -73,6 +74,7 @@ def receiptJson (r : Receipt) : Json :=
           ("data_id", toJson d.dataId), ("receiver_id", toJson d.receiverId)])),
         ("actions", toJson (a.actions.map actionJson))]
     | .data d => Json.mkObj [("kind", toJson "data"), ("dataId", toJson d.dataId), ("data", toJson d.data)]
+    | .globalDistribution _ => Json.mkObj [("kind", toJson "globalDistribution")]
   Json.mkObj [("id", toJson r.receiptId), ("predecessor", toJson r.predecessorId),
     ("receiver", toJson r.receiverId), ("body", body)]
 
@@ -98,7 +100,7 @@ def main : IO Unit := do
     | .ok r => pure r
     | .error error => throw (IO.userError error)
   unless request.protocolVersion == 86 do throw (IO.userError "receipt replay pins protocol 86")
-  let cfg ← RuntimeConfig.load request.configDir request.protocolVersion
+  let cfg ← ChainReplay.HostCrypto.loadConfig request.configDir request.protocolVersion
   let mut registry : List (String × List UInt8 × ContractCode) := []
   for c in request.contracts do
     let raw ← IO.FS.readBinFile c.codePath

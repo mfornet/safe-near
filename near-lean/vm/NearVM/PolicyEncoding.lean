@@ -136,10 +136,31 @@ theorem promiseBatchActionFunctionCallWeightFn_encodingPolicy : HostPreservesEnc
   unfold promiseBatchActionFunctionCallWeightFn
   policy_encoding_tac
 
+theorem promiseYieldCreateFn_encodingPolicy : HostPreservesEncodingPolicy promiseYieldCreateFn := by
+  intro st args
+  unfold promiseYieldCreateFn
+  dsimp only [disallowInView, appendPromise]
+  repeat' (first | trivial | rfl | split)
+  all_goals
+    rename_i hset
+    unfold checkedSetRegister? at hset
+    split at hset
+    · cases hset; rfl
+    · split at hset
+      · cases hset; rfl
+      · cases hset
+
 theorem promiseBatchActionTransferFn_encodingPolicy : HostPreservesEncodingPolicy promiseBatchActionTransferFn := by
   intro st args
   unfold promiseBatchActionTransferFn
   policy_encoding_tac
+
+theorem promiseBatchActionTransferToGasKeyFn_encodingPolicy : HostPreservesEncodingPolicy promiseBatchActionTransferToGasKeyFn := by
+  intro st args
+  unfold promiseBatchActionTransferToGasKeyFn
+  dsimp only [disallowInView, checkAccountId, checkPublicKey, appendPromise,
+    appendPromiseActionResult, createBatchPromiseResult, createCallbackPromiseResult]
+  repeat' (first | trivial | rfl | split)
 
 theorem promiseBatchActionStakeFn_encodingPolicy : HostPreservesEncodingPolicy promiseBatchActionStakeFn := by
   intro st args
@@ -151,10 +172,24 @@ theorem promiseBatchActionAddKeyWithFullAccessFn_encodingPolicy : HostPreservesE
   unfold promiseBatchActionAddKeyWithFullAccessFn
   policy_encoding_tac
 
+theorem promiseBatchActionAddGasKeyWithFullAccessFn_encodingPolicy : HostPreservesEncodingPolicy promiseBatchActionAddGasKeyWithFullAccessFn := by
+  intro st args
+  unfold promiseBatchActionAddGasKeyWithFullAccessFn
+  dsimp only [disallowInView, checkAccountId, checkPublicKey, appendPromise,
+    appendPromiseActionResult, createBatchPromiseResult, createCallbackPromiseResult]
+  repeat' (first | trivial | rfl | split)
+
 theorem promiseBatchActionAddKeyWithFunctionCallFn_encodingPolicy : HostPreservesEncodingPolicy promiseBatchActionAddKeyWithFunctionCallFn := by
   intro st args
   unfold promiseBatchActionAddKeyWithFunctionCallFn
   policy_encoding_tac
+
+theorem promiseBatchActionAddGasKeyWithFunctionCallFn_encodingPolicy : HostPreservesEncodingPolicy promiseBatchActionAddGasKeyWithFunctionCallFn := by
+  intro st args
+  unfold promiseBatchActionAddGasKeyWithFunctionCallFn
+  dsimp only [disallowInView, checkAccountId, checkPublicKey, appendPromise,
+    appendPromiseActionResult, createBatchPromiseResult, createCallbackPromiseResult]
+  repeat' (first | trivial | rfl | split)
 
 theorem promiseBatchActionDeleteKeyFn_encodingPolicy : HostPreservesEncodingPolicy promiseBatchActionDeleteKeyFn := by
   intro st args
@@ -171,9 +206,26 @@ theorem promiseBatchActionUseGlobalContractFn_encodingPolicy : HostPreservesEnco
   unfold promiseBatchActionUseGlobalContractFn useGlobalContractFn
   policy_encoding_tac
 
+theorem promiseBatchActionDeployGlobalContractFn_encodingPolicy : HostPreservesEncodingPolicy promiseBatchActionDeployGlobalContractFn := by
+  intro st args
+  unfold promiseBatchActionDeployGlobalContractFn deployGlobalContractFn
+  dsimp only [disallowInView, checkAccountId, checkPublicKey, appendPromise,
+    appendPromiseActionResult, createBatchPromiseResult, createCallbackPromiseResult]
+  repeat' (first | trivial | rfl | split)
+
 theorem promiseBatchActionUseGlobalContractByAccountIdFn_encodingPolicy : HostPreservesEncodingPolicy promiseBatchActionUseGlobalContractByAccountIdFn := by
   intro st args
   unfold promiseBatchActionUseGlobalContractByAccountIdFn useGlobalContractFn
   policy_encoding_tac
+
+
+
+
+theorem promiseBatchActionDeployGlobalContractByAccountIdFn_encodingPolicy : HostPreservesEncodingPolicy promiseBatchActionDeployGlobalContractByAccountIdFn := by
+  intro st args
+  unfold promiseBatchActionDeployGlobalContractByAccountIdFn deployGlobalContractFn
+  dsimp only [disallowInView, checkAccountId, checkPublicKey, appendPromise,
+    appendPromiseActionResult, createBatchPromiseResult, createCallbackPromiseResult]
+  repeat' (first | trivial | rfl | split)
 
 end Wasm.Near

@@ -24,93 +24,16 @@ gas on storage-heavy calls must account for the difference.
 -- context supplies `storageAccounting` (`prepareStorageCallAux`); without it they are skipped.
 namespace Wasm.Near
 
-/-- One gas charge. -/
-inductive Charge
-  /-- `times` × the named `ExtCosts` entry, burnt. -/
-  | ext (name : String) (times : Nat := 1)
-  | burn (gas : Nat)
-  /-- `pay_action_base`. -/
-  | actionBase (fee : ActionFees → Fee) (sir : Bool)
-  /-- `pay_action_per_byte`. -/
-  | actionBytes (fee : ActionFees → Fee) (n : Nat) (sir : Bool)
-  /-- `pay_gas_for_new_receipt`: one action receipt plus one data receipt per dependency. -/
-  | newReceipt (sir : Bool) (depsSir : List Bool)
-  /-- `prepay_gas`: gas attached to a function call action. -/
-  | prepay (gas : Nat)
-
-def applyCharge (ns : NearState) : Charge → NearState × Option HostError
-  | .ext name times =>
-    let (g, e) := ns.gas.burn (ns.extCosts.cost name * times)
-    ({ ns with gas := g, gasProfile := ns.gasProfile.addExt name (g.burnt - ns.gas.burnt) }, e)
-  | .burn n =>
-    let (g, e) := ns.gas.burn n
-    ({ ns with gas := g, gasProfile := { ns.gasProfile with
-      actionBurnt := ns.gasProfile.actionBurnt + (g.burnt - ns.gas.burnt) } }, e)
-  | .actionBase fee sir =>
-    let f := fee ns.fees
-    let (g, e) := ns.gas.payAction (f.send sir) f.execution
-    ({ ns with gas := g, gasProfile := { ns.gasProfile with
-      actionBurnt := ns.gasProfile.actionBurnt + (g.burnt - ns.gas.burnt) } }, e)
-  | .actionBytes fee n sir =>
-    let f := fee ns.fees
-    let (g, e) := ns.gas.payAction (f.send sir * n) (f.execution * n)
-    ({ ns with gas := g, gasProfile := { ns.gasProfile with
-      actionBurnt := ns.gasProfile.actionBurnt + (g.burnt - ns.gas.burnt) } }, e)
-  | .newReceipt sir depsSir =>
-    let a := ns.fees.newActionReceipt
-    let d := ns.fees.newDataReceiptBase
-    -- Both sending and executing dependency data receipts are burnt here,
-    -- rather than reserving their execution fee for the callback runtime.
-    let burn := a.send sir + (depsSir.map fun s => d.send s + d.execution).sum
-    let use := a.execution
-    let (g, e) := ns.gas.payAction burn use
-    ({ ns with gas := g, gasProfile := { ns.gasProfile with
-      actionBurnt := ns.gasProfile.actionBurnt + (g.burnt - ns.gas.burnt) } }, e)
-  | .prepay n =>
-    let (g, e) := ns.gas.prepay n
-    ({ ns with gas := g }, e)
-
-def applyCharges (ns : NearState) : List Charge → NearState × Option HostError
-  | [] => (ns, none)
-  | c :: cs =>
-    match applyCharge ns c with
-    | (ns', none) => applyCharges ns' cs
-    | (ns', some e) => (ns', some e)
-
 /-- Trap with a structured error recorded in the host state. -/
 def trapWith (st : HostStore NearState) (e : HostError) : HostResult NearState :=
   .Trap { st with host := { st.host with lastError := some e } } e.message
-
-/-! ## Cost rules -/
-
-def argU64 (args : List Value) (i : Nat) : UInt64 :=
-  match args[i]? with
-  | some (.i64 n) => n
-  | _ => 0
-
-/-- Bytes of a `(len, ptr)` argument following `get_memory_or_register`. -/
-def spanLen (st : HostStore NearState) (len ptr : UInt64) : Nat :=
-  if len = u64Max then ((st.host.registers ptr.toNat).map List.length).getD 0 else len.toNat
-
-/-- Reading a `(len, ptr)` argument: memory or register costs. -/
-def readSpan (st : HostStore NearState) (len ptr : UInt64) : List Charge :=
-  if len = u64Max then
-    match st.host.registers ptr.toNat with
-    | none => []
-    | some bytes => [.ext "read_register_base", .ext "read_register_byte" bytes.length]
-  else [.ext "read_memory_base", .ext "read_memory_byte" len.toNat]
-
-def readMem (n : Nat) : List Charge := [.ext "read_memory_base", .ext "read_memory_byte" n]
-def writeMem (n : Nat) : List Charge := [.ext "write_memory_base", .ext "write_memory_byte" n]
-def writeReg (n : Nat) : List Charge := [.ext "write_register_base", .ext "write_register_byte" n]
-def utf8 (n : Nat) : List Charge := [.ext "utf8_decoding_base", .ext "utf8_decoding_byte" n]
-def utf16 (n : Nat) : List Charge := [.ext "utf16_decoding_base", .ext "utf16_decoding_byte" n]
 
 /-- Receiver of promise `idx`, if it is a receipt. -/
 def promiseReceiver? (st : HostStore NearState) (idx : Nat) : Option (List UInt8) :=
   match getPromise? st.host.promises idx with
   | some (.batch acct _) => some acct
   | some (.callback _ acct _) => some acct
+  | some (.yielded acct _ _) => some acct
   | _ => none
 
 /-- Same-shard ("sir") test: the receiver is the current account. -/
@@ -165,15 +88,6 @@ def creationAccountArgs (name : String) (args : List Value) : Option (UInt64 × 
   else if name == "promise_then" || name == "promise_batch_then" then some (argU64 args 1, argU64 args 2)
   else none
 
-/-- `read_and_parse_account_id`: the read, UTF-8 and account id rule errors. -/
-def accountIdError (st : HostStore NearState) (len ptr : UInt64) : Option HostError :=
-  match getMemOrReg st ptr len with
-  | none => some (if len == u64Max then .invalidRegisterId ptr.toNat else .memoryAccessViolation)
-  | some bytes =>
-    if (String.fromUTF8? ⟨bytes.toArray⟩).isNone then some .badUTF8
-    else if !st.host.config.validAccountId bytes then some .invalidAccountId
-    else none
-
 /-- Receiver parsing precedes receipt creation and the allocation limit. -/
 def creationAccountError (name : String) (st : HostStore NearState) (args : List Value) : Option HostError :=
   match creationAccountArgs name args with
@@ -227,12 +141,9 @@ structure FunctionCallPlan where
   charges : List Charge
   error : Option HostError := none
 
-def spanReadError (len ptr : UInt64) : HostError :=
-  if len == u64Max then .invalidRegisterId ptr.toNat else .memoryAccessViolation
-
 def functionCallTargetError (st : HostStore NearState) (index : Nat) : Option HostError :=
   match getPromise? st.host.promises index with
-  | some (.batch ..) | some (.callback ..) => none
+  | some (.batch ..) | some (.callback ..) | some (.yielded ..) => none
   | some (.and _) => some .cannotAppendActionToJointPromise
   | _ => some (.invalidPromiseIndex index)
 
@@ -344,94 +255,187 @@ def globalContractPlan (st : HostStore NearState) (byAccount : Bool) (target : N
         { charges := idCharges ++ [.actionBase (·.useGlobalContractBase) sir,
             .actionBytes (·.useGlobalContractByte) id.length sir] }
 
-/-- A log host's charges, in nearcore's order, and the error that stops it
-(`logic.rs`): the count check, the decoding base, the remaining-length check,
-the read, the decoding bytes, `log_base` and `log_byte` on the decoded length,
-then the running-total check. A `u64::MAX` length reads a register here, where
-nearcore reads a NUL-terminated string. -/
-structure LogPlan where
-  charges : List Charge
-  error : Option HostError := none
+/-- The width the fee schedule charges for a serialized public key; an invalid key is
+read as empty and rejected only when the action is appended. -/
+def gasKeyPublicKeyLen (publicKey : List UInt8) : Nat :=
+  if serializedPublicKeyValid publicKey then publicKey.length else 0
 
-def logPlan (name : String) (st : HostStore NearState) (args : List Value) : LogPlan := Id.run do
-  let a := argU64 args
-  let base : Charge := .ext "base"
-  let total := (st.host.logs.map List.length).sum
-  let fits (n : Nat) := withinLimit st.host.config.maxLogLen n
-  let limit := st.host.config.maxLogLen.getD 0
-  if let some count := st.host.config.maxNumberLogs then
-    if st.host.logs.length ≥ count then
-      return { charges := [base], error := some (.numberOfLogsExceeded count) }
-  let (len, ptr) := (a 0, a 1)
-  if name == "log_utf8" then
-    let charges := [base, .ext "utf8_decoding_base"]
-    if len != u64Max && !fits (total + len.toNat) then
-      return { charges, error := some (.totalLogLengthExceeded (total + len.toNat) limit) }
-    let charges := charges ++ readSpan st len ptr
-    let some msg := getMemOrReg st ptr len | return { charges, error := some (spanReadError len ptr) }
-    let charges := charges ++ [.ext "utf8_decoding_byte" msg.length]
-    if (String.fromUTF8? ⟨msg.toArray⟩).isNone then return { charges, error := some .badUTF8 }
-    let charges := charges ++ [.ext "log_base", .ext "log_byte" msg.length]
-    -- nearcore adds the length to the total before reporting it.
-    if !fits (total + msg.length) then
-      return { charges, error := some (.totalLogLengthExceeded (total + 2 * msg.length) limit) }
-    return { charges }
-  else
-    let charges := [base, .ext "utf16_decoding_base"] ++ readSpan st len ptr
-    let some raw := getMemOrReg st ptr len | return { charges, error := some (spanReadError len ptr) }
-    if raw.length % 2 != 0 then return { charges, error := some .badUTF16 }
-    if !fits (total + raw.length) then
-      return { charges, error := some (.totalLogLengthExceeded (total + raw.length) limit) }
-    let charges := charges ++ [.ext "utf16_decoding_byte" raw.length]
-    let some msg := decodeUtf16 raw | return { charges, error := some .badUTF16 }
-    let charges := charges ++ [.ext "log_base", .ext "log_byte" msg.length]
-    if !fits (total + msg.length) then
-      return { charges, error := some (.totalLogLengthExceeded (total + 2 * msg.length) limit) }
-    return { charges }
+/-- Serialized `AccessKey` of the smallest gas key (`min_gas_key_borsh_len`): nonce, the
+`GasKeyFullAccess` tag, the balance and the number of nonces. -/
+def minGasKeyBorshLen : Nat := 8 + 1 + 16 + 2
 
-/-- `ecrecover` and `ed25519_verify` in nearcore's order (`logic.rs`): each
-pays its own base (not `base`), reads and checks its inputs one by one, and
-stops at the first invalid one; `ed25519_verify` returns false, unread, after
-a signature whose last byte has a top bit set. The register write follows a
-recovered key. -/
-def cryptoPlan? (name : String) (st : HostStore NearState) (args : List Value) : Option LogPlan := do
+/-- Serialized `GasKeyInfo`: balance and number of nonces. -/
+def gasKeyInfoBorshLen : Nat := 16 + 2
+
+/-- Length of the trie key of an access key (`access_key_key_len`). -/
+def accessKeyKeyLen (accountIdLen publicKeyLen : Nat) : Nat := 1 + accountIdLen + 1 + publicKeyLen
+
+/-- Receiver length of the promise a gas key action is appended to. -/
+def promiseReceiverLen (st : HostStore NearState) (index : Nat) : Nat :=
+  ((promiseReceiver? st index).map List.length).getD 0
+
+/-- `promise_batch_action_transfer_to_gas_key`: the public key is read, then the amount, then the
+target is looked up; the base fee and the per-byte fee follow (`gas_key_transfer_{send,exec}_fee`).
+A key that does not decode is charged as empty and fails only after the fees.
+nearcore divergence: a call whose key does not decode and whose balance is too small reports
+`InvalidPublicKey` here; nearcore checks the balance first and reports the balance error. -/
+def transferToGasKeyPlan (st : HostStore NearState) (args : List Value) : FunctionCallPlan :=
   let a := argU64 args
-  if name == "ecrecover" then
-    some <| Id.run do
-      let charges := [.ext "ecrecover_base"] ++ readSpan st (a 2) (a 3)
-      let some sig := getMemOrReg st (a 3) (a 2) | return { charges, error := some (spanReadError (a 2) (a 3)) }
-      if sig.length != 64 then
-        return { charges, error := some (.ecRecoverError
-          s!"The length of the signature: {sig.length}, exceeds the limit of 64 bytes") }
-      if (a 4).toNat ≥ 4 then
-        return { charges, error := some (.ecRecoverError
-          s!"V recovery byte 0 through 3 are valid but was provided {(a 4).toNat}") }
-      let charges := charges ++ readSpan st (a 0) (a 1)
-      let some hash := getMemOrReg st (a 1) (a 0) | return { charges, error := some (spanReadError (a 0) (a 1)) }
-      if hash.length != 32 then
-        return { charges, error := some (.ecRecoverError
-          s!"The length of the hash: {hash.length}, exceeds the limit of 32 bytes") }
-      if (a 5).toNat > 1 then
-        return { charges, error := some (.ecRecoverError
-          s!"Malleability flag needs to be 0 or 1, but is instead {(a 5).toNat}") }
-      match st.host.crypto.ecrecover.bind fun recover => recover hash sig (a 4).toNat ((a 5).toNat == 1) with
-      | some key => return { charges := charges ++ writeReg key.length }
-      | none => return { charges }
-  else if name == "ed25519_verify" then
-    some <| Id.run do
-      let charges := [.ext "ed25519_verify_base"] ++ readSpan st (a 0) (a 1)
-      let some sig := getMemOrReg st (a 1) (a 0) | return { charges, error := some (spanReadError (a 0) (a 1)) }
-      if sig.length != 64 then
-        return { charges, error := some (.ed25519VerifyInvalidInput "invalid signature length") }
-      if (sig.getLast?.getD 0) &&& 0xE0 != 0 then return { charges }
-      let charges := charges ++ readSpan st (a 2) (a 3)
-      let some message := getMemOrReg st (a 3) (a 2) | return { charges, error := some (spanReadError (a 2) (a 3)) }
-      let charges := charges ++ [.ext "ed25519_verify_byte" message.length] ++ readSpan st (a 4) (a 5)
-      let some key := getMemOrReg st (a 5) (a 4) | return { charges, error := some (spanReadError (a 4) (a 5)) }
-      if key.length != 32 then
-        return { charges, error := some (.ed25519VerifyInvalidInput "invalid public key length") }
-      return { charges }
-  else none
+  let keyCharges := [.ext "base"] ++ readSpan st (a 1) (a 2)
+  match getMemOrReg st (a 2) (a 1) with
+  | none => { charges := keyCharges, error := some (spanReadError (a 1) (a 2)) }
+  | some publicKey =>
+    let amountCharges := keyCharges ++ readMem 16
+    match readU128Mem st (a 3) with
+    | none => { charges := amountCharges, error := some .memoryAccessViolation }
+    | some _ =>
+      match functionCallTargetError st (a 0).toNat with
+      | some error => { charges := amountCharges, error := some error }
+      | none =>
+        let sir := sirOf st (promiseReceiver? st (a 0).toNat)
+        let keyLen := gasKeyPublicKeyLen publicKey
+        let fees := st.host.fees
+        { charges := amountCharges ++
+            [.actionBase (·.gasKeyTransferBase) sir,
+             .pay (fees.gasKeyByte.send sir * keyLen)
+               (fees.gasKeyByte.execution *
+                 (accessKeyKeyLen (promiseReceiverLen st (a 0).toNat) keyLen + minGasKeyBorshLen))]
+          error := if serializedPublicKeyValid publicKey then none else some .invalidPublicKey }
+
+/-- The fees for the nonce rows of a new gas key (`pay_gas_key_add_key_fees`). -/
+def gasKeyAddCharges (st : HostStore NearState) (sir : Bool) (receiverLen keyLen numNonces : Nat) :
+    List Charge :=
+  let fees := st.host.fees
+  let nonceKeyLen := accessKeyKeyLen receiverLen keyLen + 2
+  [.pay 0 (fees.gasKeyNonceWriteBase.execution * numNonces),
+   .pay (fees.gasKeyByte.send sir * gasKeyInfoBorshLen)
+     (fees.gasKeyByte.execution * (nonceKeyLen + 8) * numNonces)]
+
+/-- `promise_batch_action_add_gas_key_with_full_access`. -/
+def addGasKeyFullAccessPlan (st : HostStore NearState) (args : List Value) : FunctionCallPlan :=
+  let a := argU64 args
+  let keyCharges := [.ext "base"] ++ readSpan st (a 1) (a 2)
+  match getMemOrReg st (a 2) (a 1) with
+  | none => { charges := keyCharges, error := some (spanReadError (a 1) (a 2)) }
+  | some publicKey =>
+    if (a 3).toNat ≥ 2 ^ 16 then { charges := keyCharges, error := some .integerOverflow }
+    else
+      match functionCallTargetError st (a 0).toNat with
+      | some error => { charges := keyCharges, error := some error }
+      | none =>
+        let sir := sirOf st (promiseReceiver? st (a 0).toNat)
+        let keyLen := gasKeyPublicKeyLen publicKey
+        { charges := keyCharges ++ [.actionBase (·.addFullAccessKey) sir] ++
+            gasKeyAddCharges st sir (promiseReceiverLen st (a 0).toNat) keyLen (a 3).toNat
+          error := if serializedPublicKeyValid publicKey then none else some .invalidPublicKey }
+
+/-- `promise_batch_action_add_gas_key_with_function_call`: the order of the function-call key
+host, with the number of nonces converted to `u16` right after the key is read. -/
+def addGasKeyFunctionCallPlan (st : HostStore NearState) (args : List Value) (sir : Bool) :
+    FunctionCallPlan :=
+  let input := functionKeyInputs args
+  let keyCharges := [.ext "base"] ++ readSpan st input.publicKeyLen input.publicKeyPtr
+  match getMemOrReg st input.publicKeyPtr input.publicKeyLen with
+  | none => { charges := keyCharges, error := some (spanReadError input.publicKeyLen input.publicKeyPtr) }
+  | some publicKey =>
+    if (argU64 args 3).toNat ≥ 2 ^ 16 then { charges := keyCharges, error := some .integerOverflow }
+    else
+    let allowanceCharges := keyCharges ++ readMem 16
+    match readU128Mem st input.allowancePtr with
+    | none => { charges := allowanceCharges, error := some .memoryAccessViolation }
+    | some _ =>
+      let receiverCharges := allowanceCharges ++ readSpan st input.receiverLen input.receiverPtr
+      match getMemOrReg st input.receiverPtr input.receiverLen with
+      | none => { charges := receiverCharges, error := some (spanReadError input.receiverLen input.receiverPtr) }
+      | some receiver =>
+        let parsedCharges := receiverCharges ++ utf8 receiver.length
+        if (String.fromUTF8? ⟨receiver.toArray⟩).isNone then { charges := parsedCharges, error := some .badUTF8 }
+        else if !st.host.config.validAccountId receiver then { charges := parsedCharges, error := some .invalidAccountId }
+        else
+          let methodsCharges := parsedCharges ++ readSpan st input.methodsLen input.methodsPtr
+          match getMemOrReg st input.methodsPtr input.methodsLen with
+          | none => { charges := methodsCharges, error := some (spanReadError input.methodsLen input.methodsPtr) }
+          | some methods =>
+            if !methodNamesValid methods then { charges := methodsCharges, error := some .emptyMethodName }
+            else match functionCallTargetError st input.target with
+            | some error => { charges := methodsCharges, error := some error }
+            | none =>
+              { charges := methodsCharges ++ [.actionBase (·.addFunctionCallKeyBase) sir,
+                  .actionBytes (·.addFunctionCallKeyByte) (methodNamesGasBytes methods) sir] ++
+                  gasKeyAddCharges st sir (promiseReceiverLen st input.target)
+                    (gasKeyPublicKeyLen publicKey) (argU64 args 3).toNat
+                error := if serializedPublicKeyValid publicKey then none else some .invalidPublicKey }
+
+/-- `promise_batch_action_deploy_global_contract{,_by_account_id}`: the code is read and
+checked against `max_contract_size` before the target is looked up and the fees are charged. -/
+def deployGlobalContractPlan (st : HostStore NearState) (target : Nat) (len ptr : UInt64)
+    (sir : Bool) : FunctionCallPlan :=
+  let readCharges := [.ext "base"] ++ readSpan st len ptr
+  match getMemOrReg st ptr len with
+  | none => { charges := readCharges, error := some (spanReadError len ptr) }
+  | some code =>
+    match st.host.config.maxContractSize with
+    | some limit =>
+      if code.length > limit then
+        { charges := readCharges, error := some (.contractSizeExceeded code.length limit) }
+      else
+        match functionCallTargetError st target with
+        | some error => { charges := readCharges, error := some error }
+        | none => { charges := readCharges ++ [.actionBase (·.deployGlobalContractBase) sir,
+            .actionBytes (·.deployGlobalContractByte) code.length sir] }
+    | none =>
+      match functionCallTargetError st target with
+      | some error => { charges := readCharges, error := some error }
+      | none => { charges := readCharges ++ [.actionBase (·.deployGlobalContractBase) sir,
+          .actionBytes (·.deployGlobalContractByte) code.length sir] }
+
+/-- `promise_yield_create`: the method name (non-empty) and the arguments are read, the callback's
+gas is prepaid, the receipt with its one data dependency is paid for, and only then is the promise
+registered (which can exceed the promise limit), the yielded function call paid for and the data id
+written to its register. -/
+def yieldCreatePlan (st : HostStore NearState) (args : List Value) : FunctionCallPlan :=
+  let a := argU64 args
+  let methodCharges := [.ext "base", .ext "yield_create_base"] ++ readSpan st (a 0) (a 1)
+  match getMemOrReg st (a 1) (a 0) with
+  | none => { charges := methodCharges, error := some (spanReadError (a 0) (a 1)) }
+  | some method =>
+    if method.isEmpty then { charges := methodCharges, error := some .emptyMethodName }
+    else
+      let argCharges := methodCharges ++ readSpan st (a 2) (a 3)
+      match getMemOrReg st (a 3) (a 2) with
+      | none => { charges := argCharges, error := some (spanReadError (a 2) (a 3)) }
+      | some arguments =>
+        let bytes := method.length + arguments.length
+        let receiptCharges := argCharges ++
+          [.ext "yield_create_byte" bytes, .prepay (a 4).toNat, .newReceipt true [true]]
+        match promiseCapacityError st with
+        | some error => { charges := receiptCharges, error := some error }
+        | none => { charges := receiptCharges ++
+            [.actionBase (·.functionCallBase) true, .actionBytes (·.functionCallByte) bytes true] ++
+              writeReg dataIdLength }
+
+/-- `promise_yield_resume`: the payload length is charged as given, then the data id and the
+payload are read, the payload is limited and the data id must be 32 bytes. -/
+def yieldResumePlan (st : HostStore NearState) (args : List Value) : FunctionCallPlan :=
+  let a := argU64 args
+  let idCharges := [.ext "base", .ext "yield_resume_base", .ext "yield_resume_byte" (a 2).toNat]
+    ++ readSpan st (a 0) (a 1)
+  match getMemOrReg st (a 1) (a 0) with
+  | none => { charges := idCharges, error := some (spanReadError (a 0) (a 1)) }
+  | some dataId =>
+    let payloadCharges := idCharges ++ readSpan st (a 2) (a 3)
+    match getMemOrReg st (a 3) (a 2) with
+    | none => { charges := payloadCharges, error := some (spanReadError (a 2) (a 3)) }
+    | some payload =>
+      match st.host.config.maxYieldPayloadSize with
+      | some limit =>
+        if payload.length > limit then
+          { charges := payloadCharges, error := some (.yieldPayloadLength payload.length limit) }
+        else if dataId.length != 32 then { charges := payloadCharges, error := some .dataIdMalformed }
+        else { charges := payloadCharges }
+      | none =>
+        if dataId.length != 32 then { charges := payloadCharges, error := some .dataIdMalformed }
+        else { charges := payloadCharges }
 
 /-- Argument-dependent charge plan before validating promise handles. -/
 def chargesBeforeUnvalidated (name : String) (st : HostStore NearState) (args : List Value) : List Charge :=
@@ -451,32 +455,14 @@ def chargesBeforeUnvalidated (name : String) (st : HostStore NearState) (args : 
   | "input" => [base, .ext "write_register_base"]
   | "random_seed" => [base] ++ writeReg st.host.randomSeed.length
   | "account_balance" | "account_locked_balance" | "attached_deposit" => [base] ++ writeMem 16
-  -- nearcore reads and parses the account id before `validator_stake_base`.
   | "validator_stake" =>
-    let read := [base] ++ readSpan st (a 0) (a 1)
-    match getMemOrReg st (a 1) (a 0) with
-    | none => read
-    | some bytes =>
-      if (accountIdError st (a 0) (a 1)).isSome then read ++ utf8 bytes.length
-      else read ++ utf8 bytes.length ++ [.ext "validator_stake_base"] ++ writeMem 16
+    [base] ++ readSpan st (a 0) (a 1) ++ utf8 (spanLen st (a 0) (a 1)) ++ [.ext "validator_stake_base"] ++ writeMem 16
   | "validator_total_stake" => [base, .ext "validator_total_stake_base"] ++ writeMem 16
-  -- Hashes pay their own base (not `base`), read the input, then pay per byte
-  -- (per block for RIPEMD-160) and write the digest register (`logic.rs`).
-  | "sha256" | "keccak256" | "keccak512" | "ripemd160" =>
-    let (perInput, digest) : (Nat → Charge) × Nat := match name with
-      | "sha256" => (fun n => .ext "sha256_byte" n, 32)
-      | "keccak256" => (fun n => .ext "keccak256_byte" n, 32)
-      | "keccak512" => (fun n => .ext "keccak512_byte" n, 64)
-      | _ => (fun n => .ext "ripemd160_block" ((n + 8) / 64 + 1), 20)
-    [.ext (name ++ "_base")] ++ readSpan st (a 0) (a 1) ++
-      (match getMemOrReg st (a 1) (a 0) with
-       | some value => [perInput value.length] ++ writeReg digest
-       | none => [])
-  | "ecrecover" | "ed25519_verify" => ((cryptoPlan? name st args).map (·.charges)).getD []
-  | "log_utf8" | "log_utf16" => (logPlan name st args).charges
+  | "log_utf8" | "log_utf16" | "panic_utf8" | "abort" =>
+    match stringHostRead? name st args with
+    | some read => extCharges read.charges
+    | none => [base]
   | "panic" => [base]
-  | "panic_utf8" => [base] ++ readSpan st (a 0) (a 1) ++ utf8 (spanLen st (a 0) (a 1))
-  | "abort" => [base]
   | "value_return" =>
     let n := spanLen st (a 0) (a 1)
     let byte := st.host.fees.newDataReceiptByte
@@ -543,11 +529,24 @@ def chargesBeforeUnvalidated (name : String) (st : HostStore NearState) (args : 
     (globalContractPlan st false (a 0).toNat (a 1) (a 2) (sirOf st (promiseReceiver? st (a 0).toNat))).charges
   | "promise_batch_action_use_global_contract_by_account_id" =>
     (globalContractPlan st true (a 0).toNat (a 1) (a 2) (sirOf st (promiseReceiver? st (a 0).toNat))).charges
+  | "promise_batch_action_deploy_global_contract"
+  | "promise_batch_action_deploy_global_contract_by_account_id" =>
+    (deployGlobalContractPlan st (a 0).toNat (a 1) (a 2) (sirOf st (promiseReceiver? st (a 0).toNat))).charges
+  | "promise_batch_action_transfer_to_gas_key" => (transferToGasKeyPlan st args).charges
+  | "promise_batch_action_add_gas_key_with_full_access" => (addGasKeyFullAccessPlan st args).charges
+  | "promise_batch_action_add_gas_key_with_function_call" =>
+    (addGasKeyFunctionCallPlan st args (sirOf st (promiseReceiver? st (a 0).toNat))).charges
+  | "promise_yield_create" => (yieldCreatePlan st args).charges
+  | "promise_yield_resume" => (yieldResumePlan st args).charges
+  | "chain_id" => [base] ++ writeReg st.host.context.chainId.length
   | "promise_results_count" => [base]
   | "promise_result" => [base]
   | "promise_return" => [base, .ext "promise_return"]
   | "gas" => [.burn (a 0).toNat]
-  | _ => [base]
+  | _ =>
+    match cryptoEval name st args with
+    | some plan => extCharges plan.charges
+    | none => [base]
 
 /-- The storage adapter is reached only after input reads and length checks.
 Its old-value charge precedes the output-register operation, even if that traps. -/
@@ -659,11 +658,6 @@ theorem transferInputError_invalidAmount (st : HostStore NearState) (index amoun
     transferInputError st [.i64 index, .i64 amountPtr] = some .memoryAccessViolation := by
   simp only [transferInputError, h, Option.isNone_none, ite_true]
 
-/-- Hosts whose first argument pair is a value read before anything else is
-charged, so an unreadable value is nearcore's typed read error. -/
-def spanInputHost (name : String) : Bool :=
-  ["value_return", "sha256", "keccak256", "keccak512", "ripemd160"].contains name
-
 def invocationArgumentError (name : String) (st : HostStore NearState) (args : List Value) : Option HostError :=
   if let some plan := storageMutationPlan? name st args then plan.error
   else if name == "promise_and" then promiseJoinError st args
@@ -671,10 +665,16 @@ def invocationArgumentError (name : String) (st : HostStore NearState) (args : L
   else if name == "promise_batch_action_add_key_with_function_call" then (functionKeyPlan st (functionKeyInputs args) false).error
   else if let some byAccount := globalContractInputs? name then
     (globalContractPlan st byAccount (argU64 args 0).toNat (argU64 args 1) (argU64 args 2) false).error
-  else if name == "log_utf8" || name == "log_utf16" then (logPlan name st args).error
-  else if name == "validator_stake" then accountIdError st (argU64 args 0) (argU64 args 1)
-  else if let some plan := cryptoPlan? name st args then plan.error
-  else if spanInputHost name then
+  else if name == "promise_batch_action_deploy_global_contract" ||
+      name == "promise_batch_action_deploy_global_contract_by_account_id" then
+    (deployGlobalContractPlan st (argU64 args 0).toNat (argU64 args 1) (argU64 args 2) false).error
+  else if name == "promise_batch_action_transfer_to_gas_key" then (transferToGasKeyPlan st args).error
+  else if name == "promise_batch_action_add_gas_key_with_full_access" then (addGasKeyFullAccessPlan st args).error
+  else if name == "promise_batch_action_add_gas_key_with_function_call" then
+    (addGasKeyFunctionCallPlan st args false).error
+  else if name == "promise_yield_create" then (yieldCreatePlan st args).error
+  else if name == "promise_yield_resume" then (yieldResumePlan st args).error
+  else if name == "value_return" then
     if (getMemOrReg st (argU64 args 1) (argU64 args 0)).isNone then
       some (spanReadError (argU64 args 0) (argU64 args 1))
     else none
@@ -725,7 +725,13 @@ def chargesAfter (name : String) (before after : HostStore NearState) (args : Li
     match getPromiseResult? after.host.promiseResults (a 0).toNat with
     | some (.successful _) => [.ext "write_register_base"]
     | _ => []
-  | _ => []
+  | _ =>
+    -- A cryptographic host function pays for the register it wrote, if it wrote one.
+    if cryptoHostNames.contains name then
+      match after.host.registerWrite with
+      | some written => writeReg written
+      | none => []
+    else []
 
 /-- `storage_usage` after a storage host function: new records cost
 key + value + `num_extra_bytes_record`, overwrites the value difference. -/
@@ -785,6 +791,7 @@ def promiseDeposit? (name : String) (before : HostStore NearState) (args : List 
   | "promise_then" => amountAt (a 7)
   | "promise_batch_action_function_call" => amountAt (a 5)
   | "promise_batch_action_transfer" => amountAt (a 1)
+  | "promise_batch_action_transfer_to_gas_key" => amountAt (a 3)
   | _ => some 0
 
 def deductDeposit (name : String) (before after : HostStore NearState) (args : List Value) :
@@ -808,28 +815,35 @@ def panicUtf8Metered : NearHostFn NearState :=
     invoke := fun st args =>
       match args with
       | [.i64 len, .i64 ptr] =>
-        match getMemOrReg st ptr len with
-        | some bytes =>
-          match String.fromUTF8? ⟨bytes.toArray⟩ with
-          | some msg => trapWith st (.guestPanic msg)
-          | none => trapWith st .badUTF8
-        | none => trapWith st .memoryAccessViolation
+        match (panicUtf8Read st len ptr).result with
+        | .ok bytes => trapWith st (.guestPanic (utf8String bytes))
+        | .error error => trapWith st error
       | _ => trapWith st .memoryAccessViolation }
 
 def panicMetered : NearHostFn NearState :=
   { invoke := fun st _ => trapWith st (.guestPanic "explicit guest panic") }
 
+/-- `abort(msg_ptr, filename_ptr, line, col)`: logs `ABORT: <message>` and panics with the message. -/
 def abortMetered : NearHostFn NearState :=
   { params := [.i32, .i32, .i32, .i32], results := []
-    invoke := fun st _ => trapWith st (.guestPanic "abort") }
+    invoke := fun st args =>
+      match args with
+      | [.i32 msgPtr, .i32 filePtr, .i32 line, .i32 col] =>
+        match (abortRead st msgPtr filePtr line col).result with
+        | .ok message =>
+          trapWith { st with host := { st.host with logs := st.host.logs ++ [abortLogPrefix ++ message] } }
+            (.guestPanic (utf8String message))
+        | .error error => trapWith st error
+      | _ => trapWith st (.guestPanic "abort") }
 
-/-- The `gas(n)` import used by older metering schemes. -/
-def gasFn : NearHostFn NearState :=
+/-- The `gas(opcodes)` import used by older metering schemes: `opcodes` regular instructions
+(`gas_seen_from_wasm`). -/
+def gasFn (opCost : Nat) : NearHostFn NearState :=
   { params := [.i32], results := []
     invoke := fun st args =>
       match args with
       | [.i32 n] =>
-        let (g, e) := st.host.gas.burn n.toNat
+        let (g, e) := st.host.gas.burn (n.toNat * opCost)
         let st' := { st with host := { st.host with gas := g, gasProfile := { st.host.gasProfile with
           wasm := st.host.gasProfile.wasm + (g.burnt - st.host.gas.burnt) } } }
         match e with
@@ -850,16 +864,24 @@ def viewRestrictedHost (name : String) : Bool :=
    "promise_return", "promise_batch_action_deploy_global_contract",
    "promise_batch_action_deploy_global_contract_by_account_id",
    "promise_batch_action_use_global_contract",
-   "promise_batch_action_use_global_contract_by_account_id"].contains name
+   "promise_batch_action_use_global_contract_by_account_id",
+   "promise_batch_action_transfer_to_gas_key", "promise_batch_action_add_gas_key_with_full_access",
+   "promise_batch_action_add_gas_key_with_function_call"].contains name
 
 def deprecatedRuntimeHost (name : String) : Bool :=
   ["storage_iter_prefix", "storage_iter_range", "storage_iter_next"].contains name
 
 /-- Method bytes passed to the external receipt builder. The key ABI supplies
 CSV bytes: ASCII separators cannot split a UTF-8 multibyte sequence. -/
+def usesKeyMethodFields (name : String) : Bool :=
+  name == "promise_batch_action_add_key_with_function_call" ||
+    name == "promise_batch_action_add_gas_key_with_function_call"
+
 def actionMethodBytes? (name : String) (before : HostStore NearState) (args : List Value) : Option (List UInt8) :=
-  if name == "promise_batch_action_add_key_with_function_call" then
+  if usesKeyMethodFields name then
     getMemOrReg before (argU64 args 8) (argU64 args 7)
+  else if name == "promise_yield_create" then
+    getMemOrReg before (argU64 args 1) (argU64 args 0)
   else (functionCallInputs? name args).bind fun input => getMemOrReg before input.methodPtr input.methodLen
 
 /-- Runtime externals decode method names after fees/prepayment and balance
@@ -868,7 +890,7 @@ def actionMethodEncodingError (name : String) (before : HostStore NearState) (ar
   if before.host.config.validateActionMethodUtf8 then
     match actionMethodBytes? name before args with
     | some bytes =>
-      if name == "promise_batch_action_add_key_with_function_call" then
+      if usesKeyMethodFields name then
         if methodNameFieldsUtf8 bytes then none else some .invalidMethodName
       else if (String.fromUTF8? ⟨bytes.toArray⟩).isNone then some .invalidMethodName else none
     | none => none
@@ -1121,19 +1143,15 @@ def metered (extraBytes : Nat) (name : String) (fn : NearHostFn NearState) : Nea
         | some error => trapWith st1 error
         | none => invokeStorageCall extraBytes name fn st1 args }
 
--- nearcore divergence: curve, yield and global-deploy host
--- functions are rejected as execution issues instead of being executed.
-/-- These host operations require semantics not supplied by `VMContext`.
-Reject them on invocation instead of using the functional host's placeholder
-crypto, validator, or yield implementations. Merely importing one is allowed. -/
+/-- These host operations are linked but trap when called (`unsupported`).
+nearcore divergence: `promise_yield_create_with_id`, `promise_yield_resume_with_yield_id`,
+`promise_set_refund_to` and `promise_batch_action_state_init_by_account_id` are linked but trap
+when called, because the receipt forms they need (a refund target, deterministic state init)
+are outside the modelled receipts. The hashing, signature and curve host functions run on the
+cryptography `RuntimeConfig.hostCrypto` supplies and are rejected (`unsupported`) without it. -/
 def unsupportedRuntimeHost (name : String) : Bool :=
-  ["promise_yield_create", "promise_yield_resume",
-   "alt_bn128_g1_multiexp", "alt_bn128_g1_sum", "alt_bn128_pairing_check",
-   "bls12381_g1_multiexp", "bls12381_g2_multiexp", "bls12381_map_fp_to_g1",
-   "bls12381_map_fp2_to_g2", "bls12381_p1_decompress", "bls12381_p2_decompress",
-   "bls12381_p1_sum", "bls12381_p2_sum", "bls12381_pairing_check",
-   "promise_batch_action_deploy_global_contract",
-   "promise_batch_action_deploy_global_contract_by_account_id"].contains name
+  ["promise_yield_create_with_id", "promise_yield_resume_with_yield_id", "promise_set_refund_to",
+   "promise_batch_action_state_init_by_account_id"].contains name
 
 /-- The name a host is metered under. nearcore's weighted function call is the
 plain one plus a weight: same charges, checks and errors. -/
@@ -1154,7 +1172,7 @@ def meteredHostFns (cfg : RuntimeConfig) : List (ImportDecl × NearHostFn NearSt
     | "abort" => abortMetered
     | _ => fn
   (nearHostFns.map fun (decl, fn) => (decl, metered extra (meteringName decl.name) (swap decl fn)))
-    ++ [({ «module» := "env", name := "gas", params := [.i32], results := [] }, gasFn)]
+    ++ [({ «module» := "env", name := "gas", params := [.i32], results := [] }, gasFn cfg.wasm.regularOpCost)]
 
 /-- Resolve imports in declaration order, retaining the first unknown-import
 error. Structural recursion exposes the environment invariant to proofs. -/

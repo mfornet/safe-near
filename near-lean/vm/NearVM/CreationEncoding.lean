@@ -95,7 +95,7 @@ theorem promiseCreateFn_encoding : HostCreatesEncoding "promise_create" promiseC
          simp [creationAccountArgs, argU64]
        · simp only [List.mem_singleton, forall_eq]
          apply readFunctionCallAction_encoding _ _ _ _ _ _ _ _ _ _ hpolicy hmethod ?_ (by assumption)
-         simp [actionMethodBytes?, functionCallInputs?, functionCallInputs, argU64])
+         simp [actionMethodBytes?, usesKeyMethodFields, functionCallInputs?, functionCallInputs, argU64])
     | split)
 
 theorem promiseThenFn_encoding : HostCreatesEncoding "promise_then" promiseThenFn := by
@@ -110,7 +110,8 @@ theorem promiseThenFn_encoding : HostCreatesEncoding "promise_then" promiseThenF
          simp [creationAccountArgs, argU64]
        · simp only [List.mem_singleton, forall_eq]
          apply readFunctionCallAction_encoding _ _ _ _ _ _ _ _ _ _ hpolicy hmethod ?_ (by assumption)
-         simp [actionMethodBytes?, functionCallInputs?, functionCallInputs, argU64])
+         simp [actionMethodBytes?, usesKeyMethodFields, functionCallInputs?, functionCallInputs, argU64])
     | split)
+
 
 end Wasm.Near

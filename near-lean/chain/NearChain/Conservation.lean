@@ -7,7 +7,7 @@ open Wasm.Near
 inter-block pending receipts; this equality fixes the accounting boundary. -/
 theorem Snapshot.totalFunds_eq_runtime (cfg : RuntimeConfig) (s : Snapshot) :
     s.totalFunds cfg = s.state.totalFunds cfg + receiptsFunds cfg s.pending := by
-  simp only [Snapshot.totalFunds, Snapshot.inFlight, ChainState.totalFunds, ChainState.queuedFunds,
+  simp only [Snapshot.totalFunds, Snapshot.inFlight, ChainState.totalFunds, ChainState.queuedFunds, ChainState.yieldFunds,
     ChainState.postponedFunds, Assoc.mass, receiptsFunds, List.map_append, List.sum_append, List.map_map, Function.comp_def]
   omega
 

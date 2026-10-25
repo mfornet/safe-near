@@ -22,3 +22,6 @@ import NearNode.Primitives.Rand
 import NearNode.Primitives.Epoch
 import NearNode.Primitives.EpochSync
 import NearNode.Primitives.StateSync
+import NearNode.Primitives.Storage
+import NearNode.Primitives.TrieNode
+import NearNode.Primitives.Flat

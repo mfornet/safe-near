@@ -47,7 +47,8 @@ private def checkOwner (context : Context) (id : DataId) (receiver : AccountId) 
 def receiptBytes (context : Context) (codes : List (String × Bytes)) (value : Receipt) : Except String Bytes := do
   let some format := Assoc.lookup context.formats value.receiptId | throw "receipt action format is unavailable"
   match value.receipt with
-  | .data payload => checkOwner context payload.dataId value.receiverId
+  | .data payload => if payload.resumeDataId.isNone then checkOwner context payload.dataId value.receiverId
+  | .globalDistribution _ => pure ()
   | .action payload =>
     for id in payload.inputDataIds do checkOwner context id value.receiverId
     for output in payload.outputDataReceivers do checkOwner context output.dataId output.receiverId
@@ -58,9 +59,10 @@ Delegate actions are not represented; their additional prepaid send fees do not
 arise here. Data receipts carry zero congestion gas. This is not execution burn. -/
 def congestionGas (cfg : Wasm.Near.RuntimeConfig) (receipt : Receipt) : Nat :=
   match receipt.receipt with
-  | .data _ => 0
+  | .data _ | .globalDistribution _ => 0
   | .action payload =>
-    Fees.receiptGasBudget cfg receipt.receiverId payload.actions
+    -- A yield only waits at its account, so the congestion accounting does not see it.
+    if payload.yieldDataId.isSome then 0 else Fees.receiptGasBudget cfg receipt.receiverId payload.actions
 
 private def storedBytes (cfg : Option Wasm.Near.RuntimeConfig) (form : StorageForm)
     (receipt : Receipt) (bytes : Bytes) : Except String Bytes := do
@@ -104,6 +106,23 @@ def queues (state : ChainState) (codes : List (String × Bytes)) (context : Cont
   for (id, value) in state.receivedData do
     let identity ← dataIdentity context id
     entries := entries ++ [(← ownedKey 3 identity.receiver identity.hash, ← ReceiptEncoding.receivedData value)]
+  -- Yields: the timeout queue, the waiting receipts and their statuses.
+  match state.yieldIndices with
+  | none =>
+    unless state.yieldTimeouts.isEmpty do throw "yield timeouts without queue indices"
+  | some (first, next) =>
+    entries := entries ++ [([10], (← unsigned 8 first) ++ (← unsigned 8 next))]
+  for (index, timeout) in state.yieldTimeouts do
+    unless Wasm.Near.validAccountIdBytes timeout.account.toUTF8.toList do throw "invalid yield account"
+    unless timeout.dataId.length == 32 do throw "yield data id is not 32 bytes"
+    let account := (← unsigned 4 timeout.account.toUTF8.toList.length) ++ timeout.account.toUTF8.toList
+    entries := entries ++ [([11] ++ (← unsigned 8 index),
+      account ++ timeout.dataId ++ (← unsigned 8 timeout.expiresAt))]
+  for ((account, dataId), receipt) in state.yieldReceipts do
+    entries := entries ++ [(← ownedKey 12 account dataId, ← receiptBytes context codes receipt)]
+  for ((account, dataId), status) in state.yieldStatus do
+    entries := entries ++ [(← ownedKey 20 account dataId,
+      [(if status == YieldStatus.yielded then 0 else 1 : UInt8)])]
   match context.delayed with
   | none => unless state.delayed.isEmpty do throw "delayed queue context is unavailable"
   | some queue =>

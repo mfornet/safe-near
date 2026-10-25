@@ -31,13 +31,13 @@ theorem applyCharges_gasFloor (ns : NearState) (charges : List Charge)
     (h : GasFloor b prepaid maxBurnt ns) : GasFloor b prepaid maxBurnt (applyCharges ns charges).1 :=
   applyCharges_floor ns charges h
 
-theorem gasFn_gasFloor : HostPreservesGasFloor gasFn := by
+theorem gasFn_gasFloor (opCost : Nat) : HostPreservesGasFloor (gasFn opCost) := by
   intro b prepaid maxBurnt st args hwf
   unfold gasFn
   dsimp only
   split
   · rename_i n
-    have hl := GasCounter.deduct_floor n.toNat n.toNat hwf
+    have hl := GasCounter.deduct_floor (n.toNat * opCost) (n.toNat * opCost) hwf
     split <;> exact hl
   · exact hwf
 
@@ -117,7 +117,7 @@ theorem meteredHostFns_gasFloor (cfg : RuntimeConfig) (entry : ImportDecl × Nea
     (h : entry ∈ meteredHostFns cfg) : HostPreservesGasFloor entry.2 := by
   revert entry h
   simp only [meteredHostFns, List.forall_mem_append, List.forall_mem_map, List.forall_mem_singleton]
-  refine ⟨?_, gasFn_gasFloor⟩
+  refine ⟨?_, gasFn_gasFloor _⟩
   simp only [nearHostFns, List.forall_mem_cons]
   and_intros
   · apply metered_preserves_gasFloor; exact HostPreservesGas.floor inputFn_gas
@@ -159,19 +159,20 @@ theorem meteredHostFns_gasFloor (cfg : RuntimeConfig) (entry : ImportDecl × Nea
   · apply metered_preserves_gasFloor; exact HostPreservesGas.floor ripemd160Fn_gas
   · apply metered_preserves_gasFloor; exact HostPreservesGas.floor ecrecoverFn_gas
   · apply metered_preserves_gasFloor; exact HostPreservesGas.floor ed25519VerifyFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor p256VerifyFn_gas
   · apply metered_preserves_gasFloor; exact HostPreservesGas.floor randomSeedFn_gas
-  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- alt_bn128_g1_multiexp
-  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- alt_bn128_g1_sum
-  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- alt_bn128_pairing_check
-  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- bls12381_g1_multiexp
-  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- bls12381_g2_multiexp
-  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- bls12381_map_fp_to_g1
-  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- bls12381_map_fp2_to_g2
-  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- bls12381_p1_decompress
-  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- bls12381_p2_decompress
-  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- bls12381_p1_sum
-  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- bls12381_p2_sum
-  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- bls12381_pairing_check
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor altBn128G1MultiexpFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor altBn128G1SumFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor altBn128PairingCheckFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor bls12381G1MultiexpFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor bls12381G2MultiexpFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor bls12381MapFpToG1Fn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor bls12381MapFp2ToG2Fn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor bls12381P1DecompressFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor bls12381P2DecompressFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor bls12381P1SumFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor bls12381P2SumFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor bls12381PairingCheckFn_gas
   · apply metered_preserves_gasFloor; exact HostPreservesGas.floor promiseCreateFn_gas
   · apply metered_preserves_gasFloor; exact HostPreservesGas.floor promiseThenFn_gas
   · apply metered_preserves_gasFloor; exact HostPreservesGas.floor promiseAndFn_gas
@@ -187,15 +188,23 @@ theorem meteredHostFns_gasFloor (cfg : RuntimeConfig) (entry : ImportDecl × Nea
   · apply metered_preserves_gasFloor; exact HostPreservesGas.floor promiseBatchActionAddKeyWithFunctionCallFn_gas
   · apply metered_preserves_gasFloor; exact HostPreservesGas.floor promiseBatchActionDeleteKeyFn_gas
   · apply metered_preserves_gasFloor; exact HostPreservesGas.floor promiseBatchActionDeleteAccountFn_gas
-  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- promise_batch_action_deploy_global_contract
-  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- promise_batch_action_deploy_global_contract_by_account_id
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor promiseBatchActionDeployGlobalContractFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor promiseBatchActionDeployGlobalContractByAccountIdFn_gas
   · apply metered_preserves_gasFloor; exact HostPreservesGas.floor promiseBatchActionUseGlobalContractFn_gas
   · apply metered_preserves_gasFloor; exact HostPreservesGas.floor promiseBatchActionUseGlobalContractByAccountIdFn_gas
-  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- promise_yield_create
-  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- promise_yield_resume
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor promiseYieldCreateFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor promiseYieldResumeFn_gas
   · apply metered_preserves_gasFloor; exact HostPreservesGas.floor promiseResultsCountFn_gas
   · apply metered_preserves_gasFloor; exact HostPreservesGas.floor promiseResultFn_gas
   · apply metered_preserves_gasFloor; exact HostPreservesGas.floor promiseReturnFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor promiseBatchActionTransferToGasKeyFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor promiseBatchActionAddGasKeyWithFullAccessFn_gas
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor promiseBatchActionAddGasKeyWithFunctionCallFn_gas
+  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- promise_yield_create_with_id
+  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- promise_yield_resume_with_yield_id
+  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- promise_set_refund_to
+  · apply metered_preserves_gasFloor; intro b prepaid maxBurnt st args hwf; exact hwf -- promise_batch_action_state_init_by_account_id
+  · apply metered_preserves_gasFloor; exact HostPreservesGas.floor chainIdFn_gas
   · simp
 
 /-- Resolution cannot introduce a function outside the proved host registry. -/

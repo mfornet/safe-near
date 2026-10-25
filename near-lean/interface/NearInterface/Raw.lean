@@ -17,31 +17,24 @@ inductive PromiseResult where
   | failed
 deriving Inhabited, BEq
 
-/-- Cryptographic oracles for the VM's crypto host functions. Each is a named
-assumption: a host whose oracle is absent is an explicit unsupported-host
-issue, never a guessed result. The node and the conformance harness supply
-`NearCrypto`; contract verification states which oracles it trusts. -/
-structure HostCrypto where
-  sha256 : Option (List UInt8 → List UInt8) := none
-  keccak256 : Option (List UInt8 → List UInt8) := none
-  keccak512 : Option (List UInt8 → List UInt8) := none
-  ripemd160 : Option (List UInt8 → List UInt8) := none
-  /-- `ed25519Verify publicKey message signature` for a 32-byte key and a
-  64-byte signature; false when the key does not decompress. -/
-  ed25519Verify : Option (List UInt8 → List UInt8 → List UInt8 → Bool) := none
-  /-- `ecrecover hash signature v malleability`: the 64-byte raw public key, or
-  none when the signature values are invalid or recovery fails. -/
-  ecrecover : Option (List UInt8 → List UInt8 → Nat → Bool → Option (List UInt8)) := none
-deriving Inhabited
-
 /-- Function-call access-key allowance. `none` represents no allowance. -/
 abbrev Allowance := Option Nat
 
-/-- Access-key permission carried by promise batch add-key actions. -/
+/-- Access-key permission carried by promise batch add-key actions. The gas-key
+variants carry the number of nonce lanes; a new gas key starts with balance zero. -/
 inductive AccessKeyPermission where
   | fullAccess
   | functionCall (allowance : Allowance) (receiverId methodNames : List UInt8)
+  | gasKeyFullAccess (numNonces : Nat)
+  | gasKeyFunctionCall (numNonces : Nat) (allowance : Allowance) (receiverId methodNames : List UInt8)
 deriving Inhabited, BEq
+
+/-- `GlobalContractDeployMode`: the global contract is identified by the hash
+of its code or by the deploying account. -/
+inductive GlobalContractDeployMode where
+  | codeHash
+  | accountId
+deriving Inhabited, BEq, Repr
 
 /-- `GlobalContractIdentifier`: a 32-byte code hash, or the account that
 deployed the contract. -/
@@ -66,6 +59,8 @@ inductive PromiseAction where
   | deleteKey (publicKey : List UInt8)
   | deleteAccount (beneficiaryId : List UInt8)
   | useGlobalContract (contract : GlobalContractId)
+  | deployGlobalContract (code : List UInt8) (mode : GlobalContractDeployMode)
+  | transferToGasKey (publicKey : List UInt8) (amount : Nat)
 deriving Inhabited, BEq
 
 end Wasm
@@ -89,6 +84,9 @@ structure ReceiptSpec where
   receiverId : List UInt8
   actions : List PromiseAction
   dependencies : List Nat := []
+  /-- A `promise_yield_create` receipt: it waits for exactly one data id, generated
+  by the call and handed to the contract, which `promise_yield_resume` can supply. -/
+  yieldDataId : Option (List UInt8) := none
   deriving BEq, Inhabited
 
 /-- Each dependency refers to a receipt created earlier in this call. Repeated

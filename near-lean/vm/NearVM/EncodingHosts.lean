@@ -166,6 +166,11 @@ theorem meteredActionTransfer_encodingInvariant (extra : Nat) :
   meteredPromise_encodingInvariant extra "promise_batch_action_transfer" promiseBatchActionTransferFn
     promiseBatchActionTransferFn_encodingPolicy (meteredActionTransfer_success_encoding extra)
 
+theorem meteredActionTransferToGasKey_encodingInvariant (extra : Nat) :
+    NearHostFn.PreservesLive EncodingInvariant (metered extra "promise_batch_action_transfer_to_gas_key" promiseBatchActionTransferToGasKeyFn) :=
+  meteredPromise_encodingInvariant extra "promise_batch_action_transfer_to_gas_key" promiseBatchActionTransferToGasKeyFn
+    promiseBatchActionTransferToGasKeyFn_encodingPolicy (meteredActionTransferToGasKey_success_encoding extra)
+
 theorem meteredActionStake_encodingInvariant (extra : Nat) :
     NearHostFn.PreservesLive EncodingInvariant (metered extra "promise_batch_action_stake" promiseBatchActionStakeFn) :=
   meteredPromise_encodingInvariant extra "promise_batch_action_stake" promiseBatchActionStakeFn
@@ -176,10 +181,20 @@ theorem meteredActionAddKeyWithFullAccess_encodingInvariant (extra : Nat) :
   meteredPromise_encodingInvariant extra "promise_batch_action_add_key_with_full_access" promiseBatchActionAddKeyWithFullAccessFn
     promiseBatchActionAddKeyWithFullAccessFn_encodingPolicy (meteredActionAddKeyWithFullAccess_success_encoding extra)
 
+theorem meteredActionAddGasKeyWithFullAccess_encodingInvariant (extra : Nat) :
+    NearHostFn.PreservesLive EncodingInvariant (metered extra "promise_batch_action_add_gas_key_with_full_access" promiseBatchActionAddGasKeyWithFullAccessFn) :=
+  meteredPromise_encodingInvariant extra "promise_batch_action_add_gas_key_with_full_access" promiseBatchActionAddGasKeyWithFullAccessFn
+    promiseBatchActionAddGasKeyWithFullAccessFn_encodingPolicy (meteredActionAddGasKeyWithFullAccess_success_encoding extra)
+
 theorem meteredActionAddKeyWithFunctionCall_encodingInvariant (extra : Nat) :
     NearHostFn.PreservesLive EncodingInvariant (metered extra "promise_batch_action_add_key_with_function_call" promiseBatchActionAddKeyWithFunctionCallFn) :=
   meteredPromise_encodingInvariant extra "promise_batch_action_add_key_with_function_call" promiseBatchActionAddKeyWithFunctionCallFn
     promiseBatchActionAddKeyWithFunctionCallFn_encodingPolicy (meteredActionAddKeyWithFunctionCall_success_encoding extra)
+
+theorem meteredActionAddGasKeyWithFunctionCall_encodingInvariant (extra : Nat) :
+    NearHostFn.PreservesLive EncodingInvariant (metered extra "promise_batch_action_add_gas_key_with_function_call" promiseBatchActionAddGasKeyWithFunctionCallFn) :=
+  meteredPromise_encodingInvariant extra "promise_batch_action_add_gas_key_with_function_call" promiseBatchActionAddGasKeyWithFunctionCallFn
+    promiseBatchActionAddGasKeyWithFunctionCallFn_encodingPolicy (meteredActionAddGasKeyWithFunctionCall_success_encoding extra)
 
 theorem meteredActionDeleteKey_encodingInvariant (extra : Nat) :
     NearHostFn.PreservesLive EncodingInvariant (metered extra "promise_batch_action_delete_key" promiseBatchActionDeleteKeyFn) :=
@@ -196,9 +211,32 @@ theorem meteredActionUseGlobalContract_encodingInvariant (extra : Nat) :
   meteredPromise_encodingInvariant extra "promise_batch_action_use_global_contract" promiseBatchActionUseGlobalContractFn
     promiseBatchActionUseGlobalContractFn_encodingPolicy (meteredActionUseGlobalContract_success_encoding extra)
 
+theorem meteredActionDeployGlobalContract_encodingInvariant (extra : Nat) :
+    NearHostFn.PreservesLive EncodingInvariant (metered extra "promise_batch_action_deploy_global_contract" promiseBatchActionDeployGlobalContractFn) :=
+  meteredPromise_encodingInvariant extra "promise_batch_action_deploy_global_contract" promiseBatchActionDeployGlobalContractFn
+    promiseBatchActionDeployGlobalContractFn_encodingPolicy (meteredActionDeployGlobalContract_success_encoding extra)
+
 theorem meteredActionUseGlobalContractByAccountId_encodingInvariant (extra : Nat) :
     NearHostFn.PreservesLive EncodingInvariant (metered extra "promise_batch_action_use_global_contract_by_account_id" promiseBatchActionUseGlobalContractByAccountIdFn) :=
   meteredPromise_encodingInvariant extra "promise_batch_action_use_global_contract_by_account_id" promiseBatchActionUseGlobalContractByAccountIdFn
     promiseBatchActionUseGlobalContractByAccountIdFn_encodingPolicy (meteredActionUseGlobalContractByAccountId_success_encoding extra)
+
+
+
+
+theorem meteredActionDeployGlobalContractByAccountId_encodingInvariant (extra : Nat) :
+    NearHostFn.PreservesLive EncodingInvariant (metered extra "promise_batch_action_deploy_global_contract_by_account_id" promiseBatchActionDeployGlobalContractByAccountIdFn) :=
+  meteredPromise_encodingInvariant extra "promise_batch_action_deploy_global_contract_by_account_id" promiseBatchActionDeployGlobalContractByAccountIdFn
+    promiseBatchActionDeployGlobalContractByAccountIdFn_encodingPolicy (meteredActionDeployGlobalContractByAccountId_success_encoding extra)
+
+
+theorem meteredYieldCreate_encodingInvariant (extra : Nat) :
+    NearHostFn.PreservesLive EncodingInvariant (metered extra "promise_yield_create" promiseYieldCreateFn) :=
+  meteredPromise_encodingInvariant extra "promise_yield_create" promiseYieldCreateFn
+    promiseYieldCreateFn_encodingPolicy (meteredYieldCreate_success_encoding extra)
+
+theorem meteredYieldResume_encodingInvariant (extra : Nat) :
+    NearHostFn.PreservesLive EncodingInvariant (metered extra "promise_yield_resume" promiseYieldResumeFn) :=
+  meteredNeutral_encodingInvariant extra "promise_yield_resume" promiseYieldResumeFn promiseYieldResumeFn_encodingFrame
 
 end Wasm.Near

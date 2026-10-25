@@ -1,0 +1,23 @@
+[package]
+name = "native-trie-bench"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+# Not part of the node-conformance workspace: near-store is not published at the pinned release, so
+# this builds against the clean nearcore checkout at the revision in
+# `near-lean/runtime/reference.json` that `tools/localnet/build.py` downloads
+# (`tools/localnet/.nearcore/<revision>`). The lock file is nearcore's own.
+[workspace]
+
+[dependencies]
+near-store = { path = "../../localnet/.nearcore/44f7ae6cd7ef08bab604e20a473bf77e35d4c993/core/store" }
+near-primitives = { path = "../../localnet/.nearcore/44f7ae6cd7ef08bab604e20a473bf77e35d4c993/core/primitives" }
+near-crypto = { path = "../../localnet/.nearcore/44f7ae6cd7ef08bab604e20a473bf77e35d4c993/core/crypto" }
+
+[profile.release]
+opt-level = 3
+debug = 0
+lto = "off"
+codegen-units = 16
+incremental = false

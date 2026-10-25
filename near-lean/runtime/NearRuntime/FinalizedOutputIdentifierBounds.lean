@@ -74,6 +74,7 @@ theorem Receipt.forwardResult_idsBelow (receipt : Receipt) (target : ReceiptId) 
   split
   · cases hr : receipt.receipt with
     | data data => exact h
+    | globalDistribution g => exact h
     | action action =>
       intro id hid
       simp only [Receipt.liveIds, List.map_append, List.mem_cons, List.mem_append] at hid

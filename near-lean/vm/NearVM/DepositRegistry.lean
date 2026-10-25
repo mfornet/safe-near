@@ -10,7 +10,7 @@ theorem meteredHostFns_funding (cfg : RuntimeConfig) (entry : ImportDecl × Near
     (h : entry ∈ meteredHostFns cfg) : HostPreservesFunding entry.2 := by
   revert entry h
   simp only [meteredHostFns, List.forall_mem_append, List.forall_mem_map, List.forall_mem_singleton]
-  refine ⟨?_, HostCreatesNoDeposits.funding gasFn_noDeposits⟩
+  refine ⟨?_, HostCreatesNoDeposits.funding (gasFn_noDeposits _)⟩
   simp only [nearHostFns, List.forall_mem_cons]
   and_intros
   · apply metered_funding; exact inputFn_noDeposits
@@ -52,19 +52,20 @@ theorem meteredHostFns_funding (cfg : RuntimeConfig) (entry : ImportDecl × Near
   · apply metered_funding; exact ripemd160Fn_noDeposits
   · apply metered_funding; exact ecrecoverFn_noDeposits
   · apply metered_funding; exact ed25519VerifyFn_noDeposits
+  · apply metered_funding; exact p256VerifyFn_noDeposits
   · apply metered_funding; exact randomSeedFn_noDeposits
-  · apply metered_funding; intro st args; trivial -- alt_bn128_g1_multiexp
-  · apply metered_funding; intro st args; trivial -- alt_bn128_g1_sum
-  · apply metered_funding; intro st args; trivial -- alt_bn128_pairing_check
-  · apply metered_funding; intro st args; trivial -- bls12381_g1_multiexp
-  · apply metered_funding; intro st args; trivial -- bls12381_g2_multiexp
-  · apply metered_funding; intro st args; trivial -- bls12381_map_fp_to_g1
-  · apply metered_funding; intro st args; trivial -- bls12381_map_fp2_to_g2
-  · apply metered_funding; intro st args; trivial -- bls12381_p1_decompress
-  · apply metered_funding; intro st args; trivial -- bls12381_p2_decompress
-  · apply metered_funding; intro st args; trivial -- bls12381_p1_sum
-  · apply metered_funding; intro st args; trivial -- bls12381_p2_sum
-  · apply metered_funding; intro st args; trivial -- bls12381_pairing_check
+  · apply metered_funding; exact altBn128G1MultiexpFn_noDeposits
+  · apply metered_funding; exact altBn128G1SumFn_noDeposits
+  · apply metered_funding; exact altBn128PairingCheckFn_noDeposits
+  · apply metered_funding; exact bls12381G1MultiexpFn_noDeposits
+  · apply metered_funding; exact bls12381G2MultiexpFn_noDeposits
+  · apply metered_funding; exact bls12381MapFpToG1Fn_noDeposits
+  · apply metered_funding; exact bls12381MapFp2ToG2Fn_noDeposits
+  · apply metered_funding; exact bls12381P1DecompressFn_noDeposits
+  · apply metered_funding; exact bls12381P2DecompressFn_noDeposits
+  · apply metered_funding; exact bls12381P1SumFn_noDeposits
+  · apply metered_funding; exact bls12381P2SumFn_noDeposits
+  · apply metered_funding; exact bls12381PairingCheckFn_noDeposits
   · apply metered_funding; exact promiseCreateFn_deposits
   · apply metered_funding; exact promiseThenFn_deposits
   · apply metered_funding; exact promiseAndFn_noDeposits
@@ -80,15 +81,23 @@ theorem meteredHostFns_funding (cfg : RuntimeConfig) (entry : ImportDecl × Near
   · apply metered_funding; exact promiseBatchActionAddKeyWithFunctionCallFn_noDeposits
   · apply metered_funding; exact promiseBatchActionDeleteKeyFn_noDeposits
   · apply metered_funding; exact promiseBatchActionDeleteAccountFn_noDeposits
-  · apply metered_funding; intro st args; trivial -- promise_batch_action_deploy_global_contract
-  · apply metered_funding; intro st args; trivial -- promise_batch_action_deploy_global_contract_by_account_id
+  · apply metered_funding; exact promiseBatchActionDeployGlobalContractFn_noDeposits
+  · apply metered_funding; exact promiseBatchActionDeployGlobalContractByAccountIdFn_noDeposits
   · apply metered_funding; exact promiseBatchActionUseGlobalContractFn_noDeposits
   · apply metered_funding; exact promiseBatchActionUseGlobalContractByAccountIdFn_noDeposits
-  · apply metered_funding; intro st args; trivial -- promise_yield_create
-  · apply metered_funding; intro st args; trivial -- promise_yield_resume
+  · apply metered_funding; exact promiseYieldCreateFn_noDeposits
+  · apply metered_funding; exact promiseYieldResumeFn_noDeposits
   · apply metered_funding; exact promiseResultsCountFn_noDeposits
   · apply metered_funding; exact promiseResultFn_noDeposits
   · apply metered_funding; exact promiseReturnFn_noDeposits
+  · apply metered_funding; exact promiseBatchActionTransferToGasKeyFn_deposits
+  · apply metered_funding; exact promiseBatchActionAddGasKeyWithFullAccessFn_noDeposits
+  · apply metered_funding; exact promiseBatchActionAddGasKeyWithFunctionCallFn_noDeposits
+  · apply metered_funding; intro st args; trivial -- promise_yield_create_with_id
+  · apply metered_funding; intro st args; trivial -- promise_yield_resume_with_yield_id
+  · apply metered_funding; intro st args; trivial -- promise_set_refund_to
+  · apply metered_funding; intro st args; trivial -- promise_batch_action_state_init_by_account_id
+  · apply metered_funding; exact chainIdFn_noDeposits
   · simp
 
 /-- Resolution cannot introduce a function outside the proved host registry. -/

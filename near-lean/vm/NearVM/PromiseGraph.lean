@@ -73,7 +73,8 @@ def convertPromise (g : PromiseGraph) : NearPromise → Option PromiseGraph
   | .and indices => do
     let dependencies ← expandDependencies g.handles indices
     pure (g.addJoint dependencies)
-  | .yielded .. => none
+  | .yielded receiver actions dataId =>
+    some (g.addReceipt { receiverId := receiver, actions, yieldDataId := some dataId })
 
 inductive ConvertsPromise : PromiseGraph → NearPromise → PromiseGraph → Prop
   | batch (g : PromiseGraph) (account : List UInt8) (actions : List PromiseAction) :
@@ -85,6 +86,10 @@ inductive ConvertsPromise : PromiseGraph → NearPromise → PromiseGraph → Pr
   | joint (g : PromiseGraph) (indices dependencies : List Nat)
       (expands : ExpandsDependencies g.handles indices dependencies) :
       ConvertsPromise g (.and indices) (g.addJoint dependencies)
+  | yielded (g : PromiseGraph) (receiver : List UInt8) (actions : List PromiseAction)
+      (dataId : List UInt8) :
+      ConvertsPromise g (.yielded receiver actions dataId)
+        (g.addReceipt { receiverId := receiver, actions, yieldDataId := some dataId })
 
 theorem convertPromise_sound {g next : PromiseGraph} {p : NearPromise}
     (h : convertPromise g p = some next) : ConvertsPromise g p next := by
@@ -103,7 +108,10 @@ theorem convertPromise_sound {g next : PromiseGraph} {p : NearPromise}
     have heq := Option.some.inj h
     subst next
     exact .joint g indices dependencies ((expandDependencies_iff _ _ _).mp he)
-  | yielded => simp [convertPromise] at h
+  | yielded receiver actions dataId =>
+    simp only [convertPromise, Option.some.injEq] at h
+    subst next
+    exact .yielded g receiver actions dataId
 
 theorem convertPromise_complete {g next : PromiseGraph} {p : NearPromise}
     (h : ConvertsPromise g p next) : convertPromise g p = some next := by
@@ -111,6 +119,7 @@ theorem convertPromise_complete {g next : PromiseGraph} {p : NearPromise}
   | batch => rfl
   | callback _ _ _ _ lookup => simp [convertPromise, lookup]
   | joint _ _ expands => simp [convertPromise, (expandDependencies_iff _ _ _).mpr expands]
+  | yielded => rfl
 
 def convertPromisesFrom (g : PromiseGraph) : List NearPromise → Option PromiseGraph
   | [] => some g
@@ -216,6 +225,7 @@ theorem ConvertsPromise.preserves {g next : PromiseGraph} {p : NearPromise}
   | callback _ _ _ _ lookup =>
     exact hwf.addReceipt _ (hwf.2 _ (List.mem_of_getElem? lookup))
   | joint _ _ expands => exact hwf.addJoint _ (expands.bounded hwf)
+  | yielded => exact hwf.addReceipt _ (by simp [ReceiptSpec.ValidAt])
 
 theorem ConvertsPromises.preserves {g result : PromiseGraph} {ps : List NearPromise}
     (h : ConvertsPromises g ps result) (hwf : g.Valid) : result.Valid := by
@@ -256,7 +266,7 @@ theorem convertPromise_total (g : PromiseGraph) (p : NearPromise)
   | and indices =>
     obtain ⟨dependencies, expands⟩ := expandDependencies_total g.handles indices hwf
     exact ⟨_, .joint g indices dependencies expands⟩
-  | yielded => exact False.elim hwf
+  | yielded receiver actions dataId => exact ⟨_, .yielded g receiver actions dataId⟩
 
 theorem convertPromisesFrom_total (g : PromiseGraph) (ps : List NearPromise)
     (hwf : PromisesWellFormedFrom g.handles.length ps) :
@@ -295,6 +305,7 @@ theorem ConvertsPromise.rawWellFormed {g next : PromiseGraph} {p : NearPromise}
   | batch => trivial
   | callback _ _ _ _ lookup => exact (List.getElem?_eq_some_iff.mp lookup).1
   | joint _ _ expands => exact expands.indices_bounded
+  | yielded => trivial
 
 theorem ConvertsPromises.rawWellFormed {g result : PromiseGraph} {ps : List NearPromise}
     (h : ConvertsPromises g ps result) : PromisesWellFormedFrom g.handles.length ps := by

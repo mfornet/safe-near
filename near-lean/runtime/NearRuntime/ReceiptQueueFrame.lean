@@ -1,12 +1,27 @@
 import NearRuntime.QueuedFunds
+import NearRuntime.NewActionFunding
 
 namespace Near
 open Wasm Wasm.Near
 
-def ChainState.receiptQueues (st : ChainState) : List (ReceiptId × Receipt) × List Receipt :=
-  (st.postponed, st.delayed)
+def ChainState.receiptQueues (st : ChainState) :
+    List (ReceiptId × Receipt) × List Receipt × List ((AccountId × Bytes) × Receipt) :=
+  (st.postponed, st.delayed, st.yieldReceipts)
 
 def Exec.receiptQueues (exec : Exec) := exec.state.receiptQueues
+
+theorem ChainState.RoutingAdvance.receiptQueues {a b : ChainState} (h : a.RoutingAdvance b) :
+    b.receiptQueues = a.receiptQueues := by
+  unfold ChainState.receiptQueues
+  rw [h.1, h.2.2.2.2.1, h.2.2.2.2.2.2.2.1]
+
+theorem ChainState.receiptQueues_of_routing {a b : ChainState} (h : a.routingState = b.routingState) :
+    a.receiptQueues = b.receiptQueues := by
+  unfold ChainState.routingState at h
+  simp only [Prod.mk.injEq] at h
+  unfold ChainState.receiptQueues
+  rw [h.1, h.2.2.2.2.1, h.2.2.2.2.2.2.2.2.1]
+
 
 /-- An action operation cannot change the queues managed by receipt routing,
 even when it fails after tentative account/storage changes. -/
@@ -81,11 +96,29 @@ theorem queues_applyAction (c : ReceiptCtx) (isLast : Bool) (action : Action) :
     cases ha : before.state.account? c.receipt.receiverId <;>
       simp [-StateT.run_bind, applyAction, getAccount, getState, ha]
     repeat' (first | rfl | split)
-  | addKey pk key => rw [applyAddKey_run]; repeat' (first | rfl | split)
-  | deleteKey pk => rw [applyDeleteKey_run]; repeat' (first | rfl | split)
+  | addKey pk key =>
+    rw [applyAddKey_run]
+    repeat' (first | rfl | exact ChainState.receiptQueues_of_routing (addKeyMetadataState_routing _ _ _ _ _) | split)
+  | deleteKey pk =>
+    rw [applyDeleteKey_run]
+    repeat' (first | rfl | exact ChainState.receiptQueues_of_routing (deleteKeyMetadataState_routing _ _ _ _ _) | split)
   | deleteAccount beneficiary =>
-    rw [applyDeleteAccount_run]; dsimp only [deleteAccountFundedResult]; repeat' (first | rfl | split)
-  | useGlobalContract _ => rfl
+    rw [applyDeleteAccount_run]
+    repeat' (first | rfl | exact (deleteAccountFundedResult_advance _ _ _ _).receiptQueues | split)
+  | useGlobalContract contract => rw [applyUseGlobalContract_run]; repeat' (first | rfl | split)
+  | deployGlobalContract code mode =>
+    rw [applyDeployGlobalContract_run]
+    repeat' (first | rfl | exact ((ChainState.RoutingAdvance.of_routing (deployGlobalMoved_routing c _ _)).trans (ChainState.RoutingAdvance.freshId _)).receiptQueues | split)
+  | transferToGasKey pk deposit =>
+    rw [applyTransferToGasKey_run]
+    repeat' (first | rfl | exact ChainState.receiptQueues_of_routing (gasKeyDeposit_routing (by assumption)) | split)
+  | withdrawFromGasKey pk amount =>
+    rw [applyWithdrawFromGasKey_run]
+    repeat' (first | rfl | exact ChainState.receiptQueues_of_routing (gasKeyWithdrawal_routing (by assumption)) | split)
+  | delegate sender receiver inner nonce nonceIndex maxBlockHeight pk signature v2 =>
+    change ((applyDelegateAction c _).run.run before).2.receiptQueues = _
+    rw [applyDelegateAction_run]
+    repeat' (first | rfl | exact ((ChainState.RoutingAdvance.of_routing (delegateState_routing (by assumption))).trans (ChainState.RoutingAdvance.freshId _)).receiptQueues | split)
 
 theorem queues_burnGas (fee : Nat) : (burnGas fee).PreservesReceiptQueues := by intro before; rfl
 
@@ -192,8 +225,9 @@ theorem applyActionReceipt_receiptQueues (c : ReceiptCtx) (st : ChainState) :
 
 theorem applyActionReceipt_queuedFunds (c : ReceiptCtx) (st : ChainState) :
     (applyActionReceipt c st).state.queuedFunds c.cfg = st.queuedFunds c.cfg := by
-  have hf := congrArg (fun (queues : List (ReceiptId × Receipt) × List Receipt) =>
-    Assoc.mass (Fees.receiptFunds c.cfg) queues.1 + receiptsFunds c.cfg queues.2)
+  have hf := congrArg (fun (queues : List (ReceiptId × Receipt) × List Receipt × List ((AccountId × Bytes) × Receipt)) =>
+    Assoc.mass (Fees.receiptFunds c.cfg) queues.1 + receiptsFunds c.cfg queues.2.1 +
+      receiptsFunds c.cfg (queues.2.2.map (·.2)))
     (applyActionReceipt_receiptQueues c st)
   exact hf
 

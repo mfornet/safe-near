@@ -37,6 +37,18 @@ theorem functionCallBound_zero_left {operation : ExecM α} {next : α → ExecM 
 theorem functionCallBound_fee (isRefund : Bool) (fee : Nat) :
     (chargeReceiptFee isRefund fee).FunctionCallBound 0 := by intro before; exact Nat.le_refl _
 
+/-- A delegate action creates a receipt but burns no function-call gas itself. -/
+theorem applyAction_functionCallBound (c : ReceiptCtx) (isLast : Bool) (action : Action) :
+    (applyAction c isLast action).FunctionCallBound action.attachedGas := by
+  by_cases hd : ∃ s r a n i m k sig v, action = .delegate s r a n i m k sig v
+  · obtain ⟨s, r, a, n, i, m, k, sig, v, rfl⟩ := hd
+    intro before
+    change ((applyDelegateAction c _).run.run before).2.gasBurntForFunctionCall ≤ _
+    rw [applyDelegateAction_run]
+    repeat' (first | exact Nat.le_add_right _ _ | split)
+  · push Not at hd
+    exact functionCallBound_of_gasBound (applyAction_gasBound_plain c isLast action hd)
+
 theorem runReceiptAction_functionCallBound (c : ReceiptCtx) (onlyAction isLast : Bool) (action : Action) :
     (runReceiptAction c onlyAction isLast action).FunctionCallBound action.attachedGas := by
   unfold runReceiptAction
@@ -44,7 +56,7 @@ theorem runReceiptAction_functionCallBound (c : ReceiptCtx) (onlyAction isLast :
   intro _
   apply functionCallBound_zero_left (functionCallBound_of_gasBound (gasBound_checkReceiptAction c onlyAction action))
   intro _
-  exact functionCallBound_of_gasBound (applyAction_gasBound c isLast action)
+  exact applyAction_functionCallBound c isLast action
 
 theorem runReceiptActionAt_functionCallBound (c : ReceiptCtx) (onlyAction isLast : Bool)
     (action : Action) (index : Nat) :
@@ -168,7 +180,7 @@ theorem applyActionReceipt_refund_failed_conservation (c : ReceiptCtx) (st : Cha
 /-- Successful system finalization adds no monetary refunds, burn or reward; completion data has zero backing. -/
 theorem finalizeReceipt_refund_success_funds (c : ReceiptCtx) (st : ChainState) (raw : Exec)
     (hwf : raw.state.AccountsUnique) (hrefund : c.receipt.isRefund = true)
-    (hfc : raw.gasBurntForFunctionCall = 0) :
+    (hfc : raw.gasBurntForFunctionCall = 0) (hat : raw.actionTokensBurnt = 0) :
     let final := finalizeReceipt c st raw none
     final.totalFunds c.cfg = raw.totalFunds c.cfg ∧ final.tokensBurnt = 0 ∧
       final.otherTokensBurnt = 0 ∧ final.reward = 0 := by
@@ -180,7 +192,7 @@ theorem finalizeReceipt_refund_success_funds (c : ReceiptCtx) (st : ChainState) 
   let finished := rewarded.finishReceiptResult c none
   have hf : finalizeReceipt c st raw none =
       { finished with result := some (finished.result.getD (.successValue [])) } := by
-    simp [finalizeReceipt, hrefund, rollbackReceipt, base, created, settlement, rewarded, finished]
+    simp [finalizeReceipt, hrefund, rollbackReceipt, base, created, settlement, rewarded, finished, hat]
   have hz : rewarded.reward = 0 := creditReceiptReward_zero base c.cfg _ _ _ hfc
   have hb := creditReceiptReward_totalFunds c.cfg base c.receipt.receiverId
     settlement.burnPrice c.action.gasPrice hwf
@@ -208,9 +220,13 @@ theorem finalizeReceipt_refund_success_funds (c : ReceiptCtx) (st : ChainState) 
 
 theorem refundAllowance_accountsUnique (st : ChainState) (id : AccountId) (pk : PublicKey) (amount : Nat)
     (hwf : st.AccountsUnique) : (st.refundAllowance id pk amount).AccountsUnique := by
-  have ha := congrArg ChainState.accounts (ChainState.refundAllowance_frame st id pk amount)
-  change (st.refundAllowance id pk amount).accounts = st.accounts at ha
-  simpa only [ChainState.AccountsUnique, ha] using hwf
+  unfold ChainState.refundAllowance
+  split
+  · exact hwf
+  · rename_i key hk
+    split
+    · exact hwf
+    · exact hwf.setAccessKey _ _ _ (ChainState.account_of_accessKey hwf id pk key hk)
 
 /-- The successful transfer state, including best-effort current-key restoration. -/
 def refundTransferState (c : ReceiptCtx) (st : ChainState) (account : Account) (amount : Nat) : ChainState :=
@@ -234,7 +250,7 @@ theorem refundTransferState_totalBalance (c : ReceiptCtx) (st : ChainState) (acc
   unfold refundTransferState
   dsimp only
   split
-  · rw [ChainState.refundAllowance_totalBalance]
+  · rw [ChainState.refundAllowance_totalBalance _ _ _ _ (hwf.setAccount _ _)]
     omega
   · omega
 
@@ -317,7 +333,10 @@ theorem applyActionReceipt_refund_success_conservation (c : ReceiptCtx) (st : Ch
   have hfc : raw.gasBurntForFunctionCall = 0 := by
     change (runReceiptActions c st).1.gasBurntForFunctionCall = 0
     rw [hraw]
-  have hf := finalizeReceipt_refund_success_funds c st raw hu hrefund hfc
+  have hat : raw.actionTokensBurnt = 0 := by
+    change (runReceiptActions c st).1.actionTokensBurnt = 0
+    rw [hraw]
+  have hf := finalizeReceipt_refund_success_funds c st raw hu hrefund hfc hat
   have hb : raw.totalFunds c.cfg = st.totalBalance + amount := by
     change (runReceiptActions c st).1.totalFunds c.cfg = _
     rw [hraw]

@@ -61,8 +61,18 @@ inductive HostError
   | deprecated (methodName : String)
   | unsupported (methodName : String)
   | contractCodeHashMalformed
+  | dataIdMalformed
+  | yieldPayloadLength (length limit : Nat)
+  /-- `ECRecoverError`: the argument checks of `ecrecover`. -/
   | ecRecoverError (msg : String)
+  /-- `AltBn128InvalidInput`. -/
+  | altBn128InvalidInput (msg : String)
+  /-- `Ed25519VerifyInvalidInput`: a signature or key of the wrong length. -/
   | ed25519VerifyInvalidInput (msg : String)
+  /-- `P256VerifyInvalidInput`: a signature or key of the wrong length. -/
+  | p256VerifyInvalidInput (msg : String)
+  /-- `BLS12381InvalidInput`: an input whose length is not a multiple of the item size. -/
+  | bls12381InvalidInput (msg : String)
   deriving Repr, BEq, Inhabited
 
 def HostError.message : HostError → String
@@ -99,9 +109,14 @@ def HostError.message : HostError → String
   | .prohibitedInView m => s!"{m} is not allowed in view calls"
   | .deprecated m => s!"Attempted to call deprecated host function {m}"
   | .unsupported m => s!"Attempted to call unsupported host function {m}"
-  | .ecRecoverError msg => s!"ECDSA recover error: {msg}"
-  | .ed25519VerifyInvalidInput msg => s!"ED25519 signature verification error: {msg}"
   | .contractCodeHashMalformed => "contract code hash is malformed"
+  | .dataIdMalformed => "Malformed data id"
+  | .yieldPayloadLength l n => s!"The length of a yield payload {l} exceeds the limit {n}"
+  | .ecRecoverError msg => s!"ECDSA recover error: {msg}"
+  | .altBn128InvalidInput msg => s!"AltBn128 invalid input: {msg}"
+  | .ed25519VerifyInvalidInput msg => s!"ED25519 signature verification error: {msg}"
+  | .p256VerifyInvalidInput msg => s!"P256 signature verification error: {msg}"
+  | .bls12381InvalidInput msg => s!"BLS12-381 invalid input: {msg}"
 
 /-- Why a Wasm execution trapped (`near_vm_runner::logic::errors::WasmTrap`). -/
 inductive WasmTrap

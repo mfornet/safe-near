@@ -17,7 +17,9 @@ Writes ``audit/chain-replay-corpus.json``; exits 0 only if every chunk passes un
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ProcessPoolExecutor
 import json
+import os
 from pathlib import Path
 import sys
 import time
@@ -79,13 +81,19 @@ def main() -> None:
     parser.add_argument("--binary", type=Path, default=REGISTERED)
     parser.add_argument("--report", action="store_true", help="always exit 0")
     parser.add_argument("--audit", type=Path, default=AUDIT)
+    parser.add_argument("--jobs", type=int, default=min(4, os.cpu_count() or 1),
+                        help="chunks replayed at the same time (each is an independent Lean process)")
     parser.add_argument("chunks", nargs="*", help="restrict to these chunk names")
     arguments = parser.parse_args()
-    rows = []
-    for directory in corpus.chunk_dirs(arguments.corpus):
-        if arguments.chunks and directory.name not in arguments.chunks:
-            continue
-        rows.append(replay_chunk(directory, arguments.corpus, arguments.binary))
+    directories = [directory for directory in corpus.chunk_dirs(arguments.corpus)
+                   if not arguments.chunks or directory.name in arguments.chunks]
+    if arguments.jobs > 1 and len(directories) > 1:
+        # a few chunks take minutes: hand out the work one chunk at a time, keep the order of the corpus
+        with ProcessPoolExecutor(max_workers=arguments.jobs) as pool:
+            rows = list(pool.map(replay_chunk, directories, [arguments.corpus] * len(directories),
+                                 [arguments.binary] * len(directories), chunksize=1))
+    else:
+        rows = [replay_chunk(directory, arguments.corpus, arguments.binary) for directory in directories]
     summary = summarize(rows)
     arguments.audit.parent.mkdir(parents=True, exist_ok=True)
     arguments.audit.write_text(json.dumps({"corpus": str(arguments.corpus.relative_to(ROOT)) if arguments.corpus.is_relative_to(ROOT) else str(arguments.corpus),

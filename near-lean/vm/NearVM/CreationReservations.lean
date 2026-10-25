@@ -2,6 +2,17 @@ import NearVM.ActionReservations
 
 namespace Wasm.Near
 
+/-- The hosts that allocate a handle by creating a receipt are none of the action hosts
+with their own argument checks. -/
+theorem allocatesPromise_ne (name : String) (h : allocatesPromise name = true) :
+    name ≠ "promise_batch_action_deploy_global_contract" ∧
+    name ≠ "promise_batch_action_deploy_global_contract_by_account_id" ∧
+    name ≠ "promise_batch_action_transfer_to_gas_key" ∧
+    name ≠ "promise_batch_action_add_gas_key_with_full_access" ∧
+    name ≠ "promise_batch_action_add_gas_key_with_function_call" ∧
+    name ≠ "promise_yield_create" ∧ name ≠ "promise_yield_resume" := by
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;> intro he <;> subst he <;> simp [allocatesPromise] at h
+
 /-- Successful creation dispatch passes receiver/index validation and the
 allocation limit. These facts are derived from the actual pre-invocation guard. -/
 theorem preInvokeError_creation_checks (name : String) (st : HostStore NearState) (args : List Value)
@@ -16,21 +27,11 @@ theorem preInvokeError_creation_checks (name : String) (st : HostStore NearState
   have hr : name ≠ "storage_remove" := by
     intro he; subst name; simp [allocatesPromise] at halloc
   have hs : storageMutationPlan? name st args = none := by simp [storageMutationPlan?, hw, hr]
-  have hlog : (name == "log_utf8" || name == "log_utf16") = false := by
-    cases he : (name == "log_utf8" || name == "log_utf16")
-    · rfl
-    · simp only [Bool.or_eq_true, beq_iff_eq] at he
-      rcases he with rfl | rfl <;> simp [allocatesPromise] at halloc
-  have hvs : (name == "validator_stake") = false := by
-    cases he : name == "validator_stake"
+  obtain ⟨n1, n2, n3, n4, n5, n6, n7⟩ := allocatesPromise_ne name halloc
+  have hv : (name == "value_return") = false := by
+    cases he : name == "value_return"
     · rfl
     · simp only [beq_iff_eq] at he; subst name; simp [allocatesPromise] at halloc
-  have hv : spanInputHost name = false := by
-    cases he : spanInputHost name
-    · rfl
-    · simp only [spanInputHost, List.contains_cons, List.contains_nil, Bool.or_false, Bool.or_eq_true,
-        beq_iff_eq] at he
-      rcases he with rfl | rfl | rfl | rfl | rfl <;> simp [allocatesPromise] at halloc
   have hg : globalContractInputs? name = none := by
     simp only [allocatesPromise, List.contains_cons, List.contains_nil] at halloc
     simp only [globalContractInputs?]
@@ -39,25 +40,15 @@ theorem preInvokeError_creation_checks (name : String) (st : HostStore NearState
     · split
       · rename_i he; simp only [beq_iff_eq] at he; subst name; simp at halloc
       · rfl
-  have hcp : cryptoPlan? name st args = none := by
-    have hec : (name == "ecrecover") = false := by
-      cases he : name == "ecrecover"
-      · rfl
-      · simp only [beq_iff_eq] at he; subst name; simp [allocatesPromise] at halloc
-    have hed : (name == "ed25519_verify") = false := by
-      cases he : name == "ed25519_verify"
-      · rfl
-      · simp only [beq_iff_eq] at he; subst name; simp [allocatesPromise] at halloc
-    simp [cryptoPlan?, hec, hed]
   have hp : creationPrefixError name st args = none := by
     cases he : creationPrefixError name st args with
     | none => rfl
-    | some error => simp [preInvokeError, invocationArgumentError, hs, hjoin, htransfer, hkey, hg, hlog, hvs, hcp, hv, he] at h
+    | some error => simp [preInvokeError, invocationArgumentError, hs, hjoin, htransfer, hkey, hg, hv, he, n1, n2, n3, n4, n5, n6, n7] at h
   have hc : promiseCapacityError st = none := by
     cases he : promiseCapacityError st with
     | none => rfl
     | some error =>
-      simp [preInvokeError, invocationArgumentError, hs, hjoin, htransfer, hkey, hg, hlog, hvs, hcp, hv, hp, halloc, he] at h
+      simp [preInvokeError, invocationArgumentError, hs, hjoin, htransfer, hkey, hg, hp, halloc, hv, he, n1, n2, n3, n4, n5, n6, n7] at h
   refine ⟨?_, hp, hc⟩
   cases he : creationAccountError name st args with
   | none => rfl

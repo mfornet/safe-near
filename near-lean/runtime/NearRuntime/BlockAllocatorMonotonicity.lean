@@ -3,6 +3,14 @@ import NearRuntime.AllocatorMonotonicity
 namespace Near
 open Wasm.Near
 
+theorem processWithInstants_nextId_mono (cfg : RuntimeConfig) (ap : ApplyState) (decoder : Bytes → ContractCode)
+    (st : ChainState) (receipt : Receipt) :
+    st.nextId ≤ (processWithInstants cfg ap decoder st receipt).state.nextId :=
+  processWithInstants_state_predicate cfg ap decoder (fun s => st.nextId ≤ s.nextId)
+    (fun accounting before receipt hb =>
+      hb.trans (processReceipt_nextId_mono cfg { ap with storageAccounting := accounting } decoder before receipt))
+    st receipt (Nat.le_refl _)
+
 /-- Both actual block loops retain all ids allocated before the attempt. Early
 model issues return the initial state; gas-limit deferral does not allocate. -/
 theorem applyAttempt_nextId_mono (cfg : RuntimeConfig) (ap : ApplyState)
@@ -16,6 +24,8 @@ theorem applyAttempt_nextId_mono (cfg : RuntimeConfig) (ap : ApplyState)
     exact hb.trans (processReceipt_nextId_mono cfg { ap with storageAccounting := accounting } decoder before receipt)
   · intro before hb; exact hb
   · intro before receipt hb; exact hb
+  · intro before after hb hstep
+    exact hb.trans hstep.nextId_le
   · exact Nat.le_refl _
 
 /-- A public block application never rewinds the initial allocator, including

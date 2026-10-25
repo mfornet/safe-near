@@ -13,3 +13,9 @@ import NearCrypto.ModInv
 import NearCrypto.Shake
 import NearCrypto.MlDsa.Spec
 import NearCrypto.MlDsa.Impl
+import NearCrypto.Pairing.Spec
+import NearCrypto.Pairing.Impl
+import NearCrypto.Bn254
+import NearCrypto.Bls12381.HashToCurve
+import NearCrypto.Bls12381
+import NearCrypto.P256

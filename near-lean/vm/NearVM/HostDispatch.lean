@@ -121,6 +121,24 @@ theorem accountBalanceFn_preserves : HostPreservesPromises accountBalanceFn := b
   unfold accountBalanceFn
   host_dispatch_tac hwf
 
+theorem validatorStakeFn_preserves : HostPreservesPromises validatorStakeFn := by
+  intro st args hwf
+  unfold validatorStakeFn
+  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
+  repeat (first
+    | exact hwf
+    | exact writeRegisterResult_preserves _ _ _ _ _ hwf
+    | split)
+
+theorem validatorTotalStakeFn_preserves : HostPreservesPromises validatorTotalStakeFn := by
+  intro st args hwf
+  unfold validatorTotalStakeFn
+  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
+  repeat (first
+    | exact hwf
+    | exact writeRegisterResult_preserves _ _ _ _ _ hwf
+    | split)
+
 theorem accountLockedBalanceFn_preserves : HostPreservesPromises accountLockedBalanceFn := by
   intro st args hwf
   unfold accountLockedBalanceFn
@@ -141,45 +159,52 @@ theorem randomSeedFn_preserves : HostPreservesPromises randomSeedFn := by
   unfold randomSeedFn
   host_dispatch_tac hwf
 
-theorem ecrecoverFn_preserves : HostPreservesPromises ecrecoverFn := by
+theorem cryptoHostFn_preserves (name : String) (params results : List ValType) : HostPreservesPromises (cryptoHostFn name params results) := by
   intro st args hwf
-  unfold ecrecoverFn missingOracle
-  host_dispatch_tac hwf
+  unfold cryptoHostFn
+  try dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
+  repeat (first
+    | exact hwf
+    | exact writeRegisterResult_preserves _ _ _ _ _ hwf
+    | split)
 
-theorem ed25519VerifyFn_preserves : HostPreservesPromises ed25519VerifyFn := by
-  intro st args hwf
-  unfold ed25519VerifyFn missingOracle
-  host_dispatch_tac hwf
+theorem sha256Fn_preserves : HostPreservesPromises sha256Fn := cryptoHostFn_preserves _ _ _
 
-theorem validatorStakeFn_preserves : HostPreservesPromises validatorStakeFn := by
-  intro st args hwf
-  unfold validatorStakeFn
-  host_dispatch_tac hwf
+theorem keccak256Fn_preserves : HostPreservesPromises keccak256Fn := cryptoHostFn_preserves _ _ _
 
-theorem validatorTotalStakeFn_preserves : HostPreservesPromises validatorTotalStakeFn := by
-  intro st args hwf
-  unfold validatorTotalStakeFn
-  host_dispatch_tac hwf
+theorem keccak512Fn_preserves : HostPreservesPromises keccak512Fn := cryptoHostFn_preserves _ _ _
 
-theorem sha256Fn_preserves : HostPreservesPromises sha256Fn := by
-  intro st args hwf
-  unfold sha256Fn digestFn
-  host_dispatch_tac hwf
+theorem ripemd160Fn_preserves : HostPreservesPromises ripemd160Fn := cryptoHostFn_preserves _ _ _
 
-theorem keccak256Fn_preserves : HostPreservesPromises keccak256Fn := by
-  intro st args hwf
-  unfold keccak256Fn digestFn
-  host_dispatch_tac hwf
+theorem ecrecoverFn_preserves : HostPreservesPromises ecrecoverFn := cryptoHostFn_preserves _ _ _
 
-theorem keccak512Fn_preserves : HostPreservesPromises keccak512Fn := by
-  intro st args hwf
-  unfold keccak512Fn digestFn
-  host_dispatch_tac hwf
+theorem ed25519VerifyFn_preserves : HostPreservesPromises ed25519VerifyFn := cryptoHostFn_preserves _ _ _
 
-theorem ripemd160Fn_preserves : HostPreservesPromises ripemd160Fn := by
-  intro st args hwf
-  unfold ripemd160Fn digestFn
-  host_dispatch_tac hwf
+theorem p256VerifyFn_preserves : HostPreservesPromises p256VerifyFn := cryptoHostFn_preserves _ _ _
+
+theorem altBn128G1MultiexpFn_preserves : HostPreservesPromises altBn128G1MultiexpFn := cryptoHostFn_preserves _ _ _
+
+theorem altBn128G1SumFn_preserves : HostPreservesPromises altBn128G1SumFn := cryptoHostFn_preserves _ _ _
+
+theorem altBn128PairingCheckFn_preserves : HostPreservesPromises altBn128PairingCheckFn := cryptoHostFn_preserves _ _ _
+
+theorem bls12381P1SumFn_preserves : HostPreservesPromises bls12381P1SumFn := cryptoHostFn_preserves _ _ _
+
+theorem bls12381P2SumFn_preserves : HostPreservesPromises bls12381P2SumFn := cryptoHostFn_preserves _ _ _
+
+theorem bls12381G1MultiexpFn_preserves : HostPreservesPromises bls12381G1MultiexpFn := cryptoHostFn_preserves _ _ _
+
+theorem bls12381G2MultiexpFn_preserves : HostPreservesPromises bls12381G2MultiexpFn := cryptoHostFn_preserves _ _ _
+
+theorem bls12381MapFpToG1Fn_preserves : HostPreservesPromises bls12381MapFpToG1Fn := cryptoHostFn_preserves _ _ _
+
+theorem bls12381MapFp2ToG2Fn_preserves : HostPreservesPromises bls12381MapFp2ToG2Fn := cryptoHostFn_preserves _ _ _
+
+theorem bls12381P1DecompressFn_preserves : HostPreservesPromises bls12381P1DecompressFn := cryptoHostFn_preserves _ _ _
+
+theorem bls12381P2DecompressFn_preserves : HostPreservesPromises bls12381P2DecompressFn := cryptoHostFn_preserves _ _ _
+
+theorem bls12381PairingCheckFn_preserves : HostPreservesPromises bls12381PairingCheckFn := cryptoHostFn_preserves _ _ _
 
 theorem logUtf8Fn_preserves : HostPreservesPromises logUtf8Fn := by
   intro st args hwf
@@ -206,12 +231,13 @@ theorem abortMetered_preserves : HostPreservesPromises abortMetered := by
   unfold abortMetered
   host_dispatch_tac hwf
 
-theorem gasFn_preserves : HostPreservesPromises gasFn := by
+theorem gasFn_preserves (opCost : Nat) : HostPreservesPromises (gasFn opCost) := by
   intro st args hwf
   unfold gasFn
   host_dispatch_tac hwf
 
 set_option maxRecDepth 16384 in
+set_option maxHeartbeats 1600000 in
 /-- Every function published by the runtime's metered registry preserves
 creation-order validity, including rejected unsupported and deprecated calls. -/
 theorem meteredHostFns_preserves (cfg : RuntimeConfig) (entry : ImportDecl × NearHostFn NearState)
@@ -220,7 +246,7 @@ theorem meteredHostFns_preserves (cfg : RuntimeConfig) (entry : ImportDecl × Ne
   rcases h with ⟨⟨decl, fn⟩, hin, heq⟩ | heq
   · subst entry
     simp only [nearHostFns, List.mem_cons, List.not_mem_nil, or_false] at hin
-    rcases hin with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
+    rcases hin with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
     all_goals cases h
     all_goals first
       | (intro st args hwf; exact hwf)
@@ -245,6 +271,8 @@ theorem meteredHostFns_preserves (cfg : RuntimeConfig) (entry : ImportDecl × Ne
       | exact storageUsageFn_preserves
       | exact accountBalanceFn_preserves
       | exact accountLockedBalanceFn_preserves
+      | exact validatorStakeFn_preserves
+      | exact validatorTotalStakeFn_preserves
       | exact prepaidGasFn_preserves
       | exact usedGasFn_preserves
       | exact randomSeedFn_preserves
@@ -252,16 +280,27 @@ theorem meteredHostFns_preserves (cfg : RuntimeConfig) (entry : ImportDecl × Ne
       | exact keccak256Fn_preserves
       | exact keccak512Fn_preserves
       | exact ripemd160Fn_preserves
-      | exact validatorStakeFn_preserves
-      | exact validatorTotalStakeFn_preserves
       | exact ecrecoverFn_preserves
       | exact ed25519VerifyFn_preserves
+      | exact p256VerifyFn_preserves
+      | exact altBn128G1MultiexpFn_preserves
+      | exact altBn128G1SumFn_preserves
+      | exact altBn128PairingCheckFn_preserves
+      | exact bls12381P1SumFn_preserves
+      | exact bls12381P2SumFn_preserves
+      | exact bls12381G1MultiexpFn_preserves
+      | exact bls12381G2MultiexpFn_preserves
+      | exact bls12381MapFpToG1Fn_preserves
+      | exact bls12381MapFp2ToG2Fn_preserves
+      | exact bls12381P1DecompressFn_preserves
+      | exact bls12381P2DecompressFn_preserves
+      | exact bls12381PairingCheckFn_preserves
       | exact logUtf8Fn_preserves
       | exact logUtf16Fn_preserves
       | exact panicMetered_preserves
       | exact panicUtf8Metered_preserves
       | exact abortMetered_preserves
-      | exact gasFn_preserves
+      | exact gasFn_preserves _
       | exact promiseCreateFn_preserves
       | exact promiseThenFn_preserves
       | exact promiseAndFn_preserves
@@ -279,12 +318,20 @@ theorem meteredHostFns_preserves (cfg : RuntimeConfig) (entry : ImportDecl × Ne
       | exact promiseBatchActionDeleteAccountFn_preserves
       | exact promiseBatchActionUseGlobalContractFn_preserves
       | exact promiseBatchActionUseGlobalContractByAccountIdFn_preserves
+      | exact promiseBatchActionDeployGlobalContractFn_preserves
+      | exact promiseBatchActionDeployGlobalContractByAccountIdFn_preserves
+      | exact promiseBatchActionTransferToGasKeyFn_preserves
+      | exact promiseBatchActionAddGasKeyWithFullAccessFn_preserves
+      | exact promiseBatchActionAddGasKeyWithFunctionCallFn_preserves
+      | exact promiseYieldCreateFn_preserves
+      | exact promiseYieldResumeFn_preserves
+      | exact chainIdFn_preserves
       | exact valueReturnFn_preserves
       | exact promiseReturnFn_preserves
       | exact promiseResultsCountFn_preserves
       | exact promiseResultFn_preserves
   · subst entry
-    exact gasFn_preserves
+    exact gasFn_preserves _
 
 /-- Resolution cannot introduce a function outside the proved host registry. -/
 theorem resolveMeteredImports_preserves (cfg : RuntimeConfig) (imports : List ImportDecl)

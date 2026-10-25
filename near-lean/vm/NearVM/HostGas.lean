@@ -133,6 +133,16 @@ theorem accountLockedBalanceFn_gas : HostPreservesGas accountLockedBalanceFn := 
   unfold accountLockedBalanceFn
   host_gas_tac
 
+theorem validatorStakeFn_gas : HostPreservesGas validatorStakeFn := by
+  intro st args
+  unfold validatorStakeFn
+  host_gas_tac
+
+theorem validatorTotalStakeFn_gas : HostPreservesGas validatorTotalStakeFn := by
+  intro st args
+  unfold validatorTotalStakeFn
+  host_gas_tac
+
 theorem prepaidGasFn_gas : HostPreservesGas prepaidGasFn := by
   intro st args
   unfold prepaidGasFn
@@ -148,45 +158,59 @@ theorem randomSeedFn_gas : HostPreservesGas randomSeedFn := by
   unfold randomSeedFn
   host_gas_tac
 
-theorem ecrecoverFn_gas : HostPreservesGas ecrecoverFn := by
+theorem cryptoHostFn_gas (name : String) (params results : List ValType) : HostPreservesGas (cryptoHostFn name params results) := by
   intro st args
-  unfold ecrecoverFn missingOracle
-  host_gas_tac
+  unfold cryptoHostFn
+  dsimp only
+  repeat (first | rfl | exact writeRegisterResult_gas _ _ _ _ _ | split)
 
-theorem ed25519VerifyFn_gas : HostPreservesGas ed25519VerifyFn := by
-  intro st args
-  unfold ed25519VerifyFn missingOracle
-  host_gas_tac
+theorem sha256Fn_gas : HostPreservesGas sha256Fn := cryptoHostFn_gas _ _ _
 
-theorem validatorStakeFn_gas : HostPreservesGas validatorStakeFn := by
-  intro st args
-  unfold validatorStakeFn
-  host_gas_tac
+theorem keccak256Fn_gas : HostPreservesGas keccak256Fn := cryptoHostFn_gas _ _ _
 
-theorem validatorTotalStakeFn_gas : HostPreservesGas validatorTotalStakeFn := by
-  intro st args
-  unfold validatorTotalStakeFn
-  host_gas_tac
+theorem keccak512Fn_gas : HostPreservesGas keccak512Fn := cryptoHostFn_gas _ _ _
 
-theorem sha256Fn_gas : HostPreservesGas sha256Fn := by
-  intro st args
-  unfold sha256Fn digestFn
-  host_gas_tac
+theorem ripemd160Fn_gas : HostPreservesGas ripemd160Fn := cryptoHostFn_gas _ _ _
 
-theorem keccak256Fn_gas : HostPreservesGas keccak256Fn := by
-  intro st args
-  unfold keccak256Fn digestFn
-  host_gas_tac
+theorem ecrecoverFn_gas : HostPreservesGas ecrecoverFn := cryptoHostFn_gas _ _ _
 
-theorem keccak512Fn_gas : HostPreservesGas keccak512Fn := by
-  intro st args
-  unfold keccak512Fn digestFn
-  host_gas_tac
+theorem ed25519VerifyFn_gas : HostPreservesGas ed25519VerifyFn := cryptoHostFn_gas _ _ _
 
-theorem ripemd160Fn_gas : HostPreservesGas ripemd160Fn := by
+theorem p256VerifyFn_gas : HostPreservesGas p256VerifyFn := cryptoHostFn_gas _ _ _
+
+theorem altBn128G1MultiexpFn_gas : HostPreservesGas altBn128G1MultiexpFn := cryptoHostFn_gas _ _ _
+
+theorem altBn128G1SumFn_gas : HostPreservesGas altBn128G1SumFn := cryptoHostFn_gas _ _ _
+
+theorem altBn128PairingCheckFn_gas : HostPreservesGas altBn128PairingCheckFn := cryptoHostFn_gas _ _ _
+
+theorem bls12381P1SumFn_gas : HostPreservesGas bls12381P1SumFn := cryptoHostFn_gas _ _ _
+
+theorem bls12381P2SumFn_gas : HostPreservesGas bls12381P2SumFn := cryptoHostFn_gas _ _ _
+
+theorem bls12381G1MultiexpFn_gas : HostPreservesGas bls12381G1MultiexpFn := cryptoHostFn_gas _ _ _
+
+theorem bls12381G2MultiexpFn_gas : HostPreservesGas bls12381G2MultiexpFn := cryptoHostFn_gas _ _ _
+
+theorem bls12381MapFpToG1Fn_gas : HostPreservesGas bls12381MapFpToG1Fn := cryptoHostFn_gas _ _ _
+
+theorem bls12381MapFp2ToG2Fn_gas : HostPreservesGas bls12381MapFp2ToG2Fn := cryptoHostFn_gas _ _ _
+
+theorem bls12381P1DecompressFn_gas : HostPreservesGas bls12381P1DecompressFn := cryptoHostFn_gas _ _ _
+
+theorem bls12381P2DecompressFn_gas : HostPreservesGas bls12381P2DecompressFn := cryptoHostFn_gas _ _ _
+
+theorem bls12381PairingCheckFn_gas : HostPreservesGas bls12381PairingCheckFn := cryptoHostFn_gas _ _ _
+
+theorem chainIdFn_gas : HostPreservesGas chainIdFn := by
   intro st args
-  unfold ripemd160Fn digestFn
-  host_gas_tac
+  unfold chainIdFn contextRegisterFn
+  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
+    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
+    checkAccountId, checkPublicKey, NearState.setRegister, trapWith, appendPromise,
+    appendPromiseActionResult, createBatchPromiseResult, createCallbackPromiseResult,
+    NearState.selectReturnValue, NearState.selectReturnPromise]
+  repeat (first | rfl | exact writeRegisterResult_gas _ _ _ _ _ | split)
 
 theorem logUtf8Fn_gas : HostPreservesGas logUtf8Fn := by
   intro st args
@@ -263,6 +287,16 @@ theorem promiseBatchActionTransferFn_gas : HostPreservesGas promiseBatchActionTr
   unfold promiseBatchActionTransferFn
   host_gas_tac
 
+theorem promiseBatchActionTransferToGasKeyFn_gas : HostPreservesGas promiseBatchActionTransferToGasKeyFn := by
+  intro st args
+  unfold promiseBatchActionTransferToGasKeyFn
+  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
+    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
+    checkAccountId, checkPublicKey, NearState.setRegister, trapWith, appendPromise,
+    appendPromiseActionResult, createBatchPromiseResult, createCallbackPromiseResult,
+    NearState.selectReturnValue, NearState.selectReturnPromise]
+  repeat (first | rfl | exact writeRegisterResult_gas _ _ _ _ _ | split)
+
 theorem promiseBatchActionStakeFn_gas : HostPreservesGas promiseBatchActionStakeFn := by
   intro st args
   unfold promiseBatchActionStakeFn
@@ -273,10 +307,30 @@ theorem promiseBatchActionAddKeyWithFullAccessFn_gas : HostPreservesGas promiseB
   unfold promiseBatchActionAddKeyWithFullAccessFn
   host_gas_tac
 
+theorem promiseBatchActionAddGasKeyWithFullAccessFn_gas : HostPreservesGas promiseBatchActionAddGasKeyWithFullAccessFn := by
+  intro st args
+  unfold promiseBatchActionAddGasKeyWithFullAccessFn
+  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
+    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
+    checkAccountId, checkPublicKey, NearState.setRegister, trapWith, appendPromise,
+    appendPromiseActionResult, createBatchPromiseResult, createCallbackPromiseResult,
+    NearState.selectReturnValue, NearState.selectReturnPromise]
+  repeat (first | rfl | exact writeRegisterResult_gas _ _ _ _ _ | split)
+
 theorem promiseBatchActionAddKeyWithFunctionCallFn_gas : HostPreservesGas promiseBatchActionAddKeyWithFunctionCallFn := by
   intro st args
   unfold promiseBatchActionAddKeyWithFunctionCallFn
   host_gas_tac
+
+theorem promiseBatchActionAddGasKeyWithFunctionCallFn_gas : HostPreservesGas promiseBatchActionAddGasKeyWithFunctionCallFn := by
+  intro st args
+  unfold promiseBatchActionAddGasKeyWithFunctionCallFn
+  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
+    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
+    checkAccountId, checkPublicKey, NearState.setRegister, trapWith, appendPromise,
+    appendPromiseActionResult, createBatchPromiseResult, createCallbackPromiseResult,
+    NearState.selectReturnValue, NearState.selectReturnPromise]
+  repeat (first | rfl | exact writeRegisterResult_gas _ _ _ _ _ | split)
 
 theorem promiseBatchActionDeleteKeyFn_gas : HostPreservesGas promiseBatchActionDeleteKeyFn := by
   intro st args
@@ -293,10 +347,30 @@ theorem promiseBatchActionUseGlobalContractFn_gas : HostPreservesGas promiseBatc
   unfold promiseBatchActionUseGlobalContractFn useGlobalContractFn
   host_gas_tac
 
+theorem promiseBatchActionDeployGlobalContractFn_gas : HostPreservesGas promiseBatchActionDeployGlobalContractFn := by
+  intro st args
+  unfold promiseBatchActionDeployGlobalContractFn deployGlobalContractFn
+  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
+    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
+    checkAccountId, checkPublicKey, NearState.setRegister, trapWith, appendPromise,
+    appendPromiseActionResult, createBatchPromiseResult, createCallbackPromiseResult,
+    NearState.selectReturnValue, NearState.selectReturnPromise]
+  repeat (first | rfl | exact writeRegisterResult_gas _ _ _ _ _ | split)
+
 theorem promiseBatchActionUseGlobalContractByAccountIdFn_gas : HostPreservesGas promiseBatchActionUseGlobalContractByAccountIdFn := by
   intro st args
   unfold promiseBatchActionUseGlobalContractByAccountIdFn useGlobalContractFn
   host_gas_tac
+
+theorem promiseBatchActionDeployGlobalContractByAccountIdFn_gas : HostPreservesGas promiseBatchActionDeployGlobalContractByAccountIdFn := by
+  intro st args
+  unfold promiseBatchActionDeployGlobalContractByAccountIdFn deployGlobalContractFn
+  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
+    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
+    checkAccountId, checkPublicKey, NearState.setRegister, trapWith, appendPromise,
+    appendPromiseActionResult, createBatchPromiseResult, createCallbackPromiseResult,
+    NearState.selectReturnValue, NearState.selectReturnPromise]
+  repeat (first | rfl | exact writeRegisterResult_gas _ _ _ _ _ | split)
 
 theorem valueReturnFn_gas : HostPreservesGas valueReturnFn := by
   intro st args
@@ -317,5 +391,19 @@ theorem promiseResultFn_gas : HostPreservesGas promiseResultFn := by
   intro st args
   unfold promiseResultFn
   host_gas_tac
+
+
+theorem promiseYieldCreateFn_gas : HostPreservesGas promiseYieldCreateFn := by
+  intro st args
+  unfold promiseYieldCreateFn
+  dsimp only [disallowInView, appendPromise]
+  repeat (first | rfl | split)
+  all_goals first | trivial | (simp only [HostResult.Satisfies]; exact checkedSetRegister_gas ‹_›)
+
+theorem promiseYieldResumeFn_gas : HostPreservesGas promiseYieldResumeFn := by
+  intro st args
+  unfold promiseYieldResumeFn
+  dsimp only [disallowInView]
+  repeat (first | rfl | trivial | split)
 
 end Wasm.Near

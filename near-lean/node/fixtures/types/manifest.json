@@ -432,6 +432,26 @@
       "accept": 48,
       "reject": 46
     },
+    "FlatBlockInfo": {
+      "accept": 44,
+      "reject": 36
+    },
+    "FlatStateChanges": {
+      "accept": 23,
+      "reject": 37
+    },
+    "FlatStateDeltaMetadata": {
+      "accept": 54,
+      "reject": 37
+    },
+    "FlatStateValue": {
+      "accept": 52,
+      "reject": 66
+    },
+    "FlatStorageStatus": {
+      "accept": 34,
+      "reject": 55
+    },
     "FunctionCallError": {
       "accept": 29,
       "reject": 54
@@ -467,6 +487,10 @@
     "InvalidTxError": {
       "accept": 111,
       "reject": 116
+    },
+    "KeyForFlatStateDelta": {
+      "accept": 43,
+      "reject": 36
     },
     "LinkAllowance": {
       "accept": 30,
@@ -583,6 +607,18 @@
     "PublicKey": {
       "accept": 53,
       "reject": 75
+    },
+    "RawStateChange": {
+      "accept": 31,
+      "reject": 45
+    },
+    "RawStateChangesWithTrieKey": {
+      "accept": 68,
+      "reject": 52
+    },
+    "RawTrieNodeWithSize": {
+      "accept": 105,
+      "reject": 72
     },
     "Receipt": {
       "accept": 206,
@@ -720,6 +756,10 @@
       "accept": 29,
       "reject": 28
     },
+    "ShardUIdKey": {
+      "accept": 41,
+      "reject": 31
+    },
     "Signature": {
       "accept": 52,
       "reject": 75
@@ -824,6 +864,22 @@
       "accept": 52,
       "reject": 2
     },
+    "StateChangeCause": {
+      "accept": 17,
+      "reject": 36
+    },
+    "StateChangesForBlock": {
+      "accept": 37,
+      "reject": 37
+    },
+    "StateChangesForBlockRange": {
+      "accept": 9,
+      "reject": 21
+    },
+    "StateChangesForShard": {
+      "accept": 39,
+      "reject": 40
+    },
     "StateHeaderKey": {
       "accept": 30,
       "reject": 30
@@ -904,6 +960,10 @@
       "accept": 48,
       "reject": 52
     },
+    "TrieKey": {
+      "accept": 143,
+      "reject": 173
+    },
     "TrieQueueIndices": {
       "accept": 30,
       "reject": 31
@@ -951,6 +1011,10 @@
     "ValidatorWeight": {
       "accept": 6,
       "reject": 6
+    },
+    "ValueRef": {
+      "accept": 62,
+      "reject": 36
     },
     "VersionedPartialEncodedStateWitness": {
       "accept": 42,

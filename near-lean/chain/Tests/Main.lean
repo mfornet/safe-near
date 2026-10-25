@@ -314,13 +314,15 @@ def main (args : List String) : IO UInt32 := do
       ((settle cfg codeOf ap { s1 with state := { s1.state with postponed := [(100, pending)] } }
             1).stop ==
         .fuelExhausted)
+  -- A transaction signed by a gas key is a model limitation, which stops execution.
   let issueState :=
-    s1.state.setAccount "wrap.near"
-      { amount := 10 * oneNear, locked := oneNear, storageUsage := 182 }
+    (s1.state.setAccount "wrap.near"
+      { amount := 10 * oneNear, locked := oneNear, storageUsage := 182 }).setAccessKey "wrap.near"
+        (pkOf 3) { nonce := 1, permission := .gasKeyFullAccess 0 1 }
   let issueSnapshot : Snapshot := { state := issueState, pending := [pending] }
   let unsupportedTx : Transaction :=
     { signerId := "wrap.near", publicKey := pkOf 3, nonce := 2, receiverId := "wrap.near"
-      actions := [.stake 0 (0 :: 0x58 :: List.replicate 31 0x66)] }
+      actions := [.transfer 1] }
   let issueRun := runIsolated cfg codeOf ap issueSnapshot [unsupportedTx]
   check r "model issues stop isolated execution immediately"
       (issueRun.applies.length == 1 &&

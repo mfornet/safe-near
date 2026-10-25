@@ -14,10 +14,23 @@ def actionExecutionGas (fees : ActionFees) (ethEnabled : Bool) (receiver : List 
   | .addKey _ _ .fullAccess => fees.addFullAccessKey.execution
   | .addKey _ _ (.functionCall _ _ methods) =>
     fees.addFunctionCallKeyBase.execution + fees.addFunctionCallKeyByte.execution * methodNamesGasBytes methods
+  | .addKey pk _ (.gasKeyFullAccess nonces) =>
+    fees.addFullAccessKey.execution +
+      (fees.gasKeyNonceWriteBase.execution * nonces +
+        fees.gasKeyByte.execution * (accessKeyKeyLen receiver.length (gasKeyPublicKeyLen pk) + 2 + 8) * nonces)
+  | .addKey pk _ (.gasKeyFunctionCall nonces _ _ methods) =>
+    fees.addFunctionCallKeyBase.execution + fees.addFunctionCallKeyByte.execution * methodNamesGasBytes methods +
+      (fees.gasKeyNonceWriteBase.execution * nonces +
+        fees.gasKeyByte.execution * (accessKeyKeyLen receiver.length (gasKeyPublicKeyLen pk) + 2 + 8) * nonces)
   | .deleteKey _ => fees.deleteKey.execution
   | .deleteAccount _ => fees.deleteAccount.execution
   | .useGlobalContract id =>
     fees.useGlobalContractBase.execution + fees.useGlobalContractByte.execution * id.length
+  | .deployGlobalContract code _ =>
+    fees.deployGlobalContractBase.execution + fees.deployGlobalContractByte.execution * code.length
+  | .transferToGasKey pk _ =>
+    fees.gasKeyTransferBase.execution +
+      fees.gasKeyByte.execution * (accessKeyKeyLen receiver.length (gasKeyPublicKeyLen pk) + minGasKeyBorshLen)
 
 def receiptGasValue (fees : ActionFees) (ethEnabled : Bool) : ReceiptValuation := fun receiver actions =>
   fees.newActionReceipt.execution + (actions.map (actionExecutionGas fees ethEnabled receiver)).sum
@@ -67,7 +80,14 @@ theorem appendPromiseAction_gas (fees : ActionFees) (ethEnabled : Bool) (st : Ho
       simp only [promisesGas, promiseReceiver?, hg, Option.getD_some]
       omega
     | and dependencies => simp [hg] at h
-    | yielded => simp [hg] at h
+    | yielded account actions dataId =>
+      have hs : setPromise? st.host.promises index (.yielded account (actions ++ [action]) dataId) = some result := by
+        simpa only [hg] using h
+      have hv := setPromise_value (receiptGasValue fees ethEnabled) st.host.promises result index
+        (.yielded account actions dataId) (.yielded account (actions ++ [action]) dataId) hg hs
+      simp only [promiseValue, receiptGasValue_append] at hv
+      simp only [promisesGas, promiseReceiver?, hg, Option.getD_some]
+      omega
 
 theorem appendPromise_gas (fees : ActionFees) (ethEnabled : Bool) (st : HostStore NearState) (promise : NearPromise) :
     promisesGas fees ethEnabled (appendPromise st promise).host.promises =

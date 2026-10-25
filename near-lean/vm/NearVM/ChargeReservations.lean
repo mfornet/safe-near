@@ -10,6 +10,7 @@ def Charge.reservation (fees : ActionFees) : Charge → Nat
   | .actionBytes fee count _ => (fee fees).execution * count
   | .newReceipt .. => fees.newActionReceipt.execution
   | .prepay gas => gas
+  | .pay _ execution => execution
 
 @[simp] theorem applyCharge_fees (ns : NearState) (charge : Charge) :
     (applyCharge ns charge).1.fees = ns.fees := by
@@ -44,6 +45,9 @@ theorem applyCharge_success_reservation (ns : NearState) (charge : Charge)
   | prepay gas =>
     have h := GasCounter.deduct_success ns.gas 0 gas (Nat.zero_le _) hsuccess
     simpa only [applyCharge, GasCounter.prepay, Charge.reservation, Nat.sub_zero] using h.2.1
+  | pay burn execution =>
+    have h := GasCounter.deduct_success ns.gas burn (burn + execution) (Nat.le_add_right _ _) hsuccess
+    simpa only [applyCharge, GasCounter.payAction, Charge.reservation, Nat.add_sub_cancel_left] using h.2.1
 
 /-- A successful whole charge plan reserves its full sum, without an assumed
 counter equation. Failed prefixes are excluded explicitly. -/

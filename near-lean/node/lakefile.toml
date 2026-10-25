@@ -5,7 +5,7 @@
 # verification never builds it (`just node-isolation`).
 name = "NearNode"
 version = "0.1.0"
-defaultTargets = ["NearNode", "near-lean-node", "node-conformance-types"]
+defaultTargets = ["NearNode", "near-lean-node", "node-conformance-types", "node-conformance-network", "node-trie-tests", "node-store-tests", "node-net-tests", "node-handshake-tests", "node-state-roots", "node-chain-validate", "node-chain-apply"]
 packagesDir = "../.lake/packages"
 
 [[require]]
@@ -38,3 +38,46 @@ name = "NodeConformance"
 [[lean_exe]]
 name = "node-conformance-types"
 root = "NodeConformance.Types"
+
+# `lake exe node-conformance-network [DIR]`: the peer protocol against the nearcore network oracle fixtures.
+[[lean_exe]]
+name = "node-conformance-network"
+root = "NodeConformance.Network"
+
+# `lake exe node-trie-tests`: the trie `Impl` against `Spec` on seeded random entry sets and updates.
+[[lean_lib]]
+name = "NodeTests"
+
+[[lean_exe]]
+name = "node-trie-tests"
+root = "NodeTests.TrieTests"
+
+# `lake exe node-net-tests`: the framing and the transports (memory and libuv TCP) behind NearNode.Net.
+[[lean_exe]]
+name = "node-net-tests"
+root = "NodeTests.NetTests"
+
+# `lake exe node-handshake-tests`: both sides of the peer handshake against each other, in memory.
+[[lean_exe]]
+name = "node-handshake-tests"
+root = "NodeTests.HandshakeTests"
+
+# `lake exe node-state-roots DIR`: the state roots of the M3 corpus through the trie.
+[[lean_exe]]
+name = "node-state-roots"
+root = "NodeConformance.StateRoots"
+
+# `lake exe node-store-tests [CASES [CHUNKS]]`: the persistent store, crash recovery and restarts.
+[[lean_exe]]
+name = "node-store-tests"
+root = "NodeTests.StoreTests"
+
+# `lake exe node-chain-validate DIR`: the blocks of a localnet corpus through the chain validator.
+[[lean_exe]]
+name = "node-chain-validate"
+root = "NodeConformance.ChainValidate"
+
+# `lake exe node-chain-apply DIR`: a localnet chain run from genesis by the node (epochs, chunks, restart).
+[[lean_exe]]
+name = "node-chain-apply"
+root = "NodeConformance.ChainApply"

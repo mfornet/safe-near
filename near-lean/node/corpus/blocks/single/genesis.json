@@ -1,0 +1,57 @@
+{
+ "chainId": "safe-near-localnet-1s",
+ "epochLength": 30,
+ "numBlockProducerSeats": 1,
+ "numBlocksPerYear": 31536000,
+ "protocolRewardRate": [
+  1,
+  10
+ ],
+ "protocolTreasuryAccount": "near",
+ "protocolVersion": 86,
+ "records": [
+  {
+   "account": {
+    "amount": "950000000000000000000000000000000",
+    "codeHash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "id": "node0",
+    "locked": "50000000000000000000000000000000",
+    "storageUsage": 0,
+    "version": "V1"
+   }
+  },
+  {
+   "accessKey": {
+    "id": "node0",
+    "nonce": 0,
+    "publicKey": "005edad8e09c8a0569c66fcee79007935e65f5bab6df5bff201e71d7d0efe83472"
+   }
+  },
+  {
+   "account": {
+    "amount": "1000000000000000000000000000000000",
+    "codeHash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "id": "near",
+    "locked": "0",
+    "storageUsage": 0,
+    "version": "V1"
+   }
+  },
+  {
+   "accessKey": {
+    "id": "near",
+    "nonce": 0,
+    "publicKey": "003c39bb5bc39953c1d15db37ab8addf8b62a0e629bfb7f3b9cb88ec25dbb375ef"
+   }
+  }
+ ],
+ "shardLayout": "020000000001000000000000000000000001000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000",
+ "totalSupply": "2000000000000000000000000000000000",
+ "validators": [
+  {
+   "accountId": "node0",
+   "publicKey": "005edad8e09c8a0569c66fcee79007935e65f5bab6df5bff201e71d7d0efe83472",
+   "stake": "50000000000000000000000000000000"
+  }
+ ]
+}

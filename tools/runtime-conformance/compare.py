@@ -75,8 +75,7 @@ def compare_fixture(fixture_path, version):
                 "storageUsage": state["storageUsage"], "attachedDeposit": case.get("deposit", "0"),
                 "prepaidGas": case.get("gas", 100_000_000_000_000), "randomSeed": [0] * 32,
                 "view": case.get("view", False),
-                "outputDataReceivers": case.get("outputDataReceivers", []), "storage": state["storage"],
-                "validators": case.get("validators", fixture.get("validators", []))}
+                "outputDataReceivers": case.get("outputDataReceivers", []), "storage": state["storage"]}
             try:
                 expected = run_json(reference, request)
                 actual = run_json(lean, request)

@@ -50,6 +50,38 @@ class NodeFixtureTests(unittest.TestCase):
             self.assertEqual((accept, reject), (counts["accept"], counts["reject"]), name)
 
 
+class StorageFixtureTests(unittest.TestCase):
+    """The storage-layer fixtures (M4a): the on-trie bytes of a `TrieKey` agree with its Borsh form."""
+
+    # Borsh tag -> first byte of `TrieKey::to_vec`: the tag is the column, except two variants.
+    COLUMN = {tag: tag for tag in range(24)} | {8: 7, 21: 2}
+
+    def lines(self, name):
+        return [json.loads(l) for l in (FIXTURES / f"{name}.jsonl").read_text().splitlines()]
+
+    def test_trie_key_column_and_length(self):
+        seen = set()
+        for entry in self.lines("TrieKey"):
+            if entry.get("reject") or not entry["key"]:
+                continue
+            raw, key = bytes.fromhex(entry["borsh"]), bytes.fromhex(entry["key"])
+            seen.add(raw[0])
+            self.assertEqual(key[0], self.COLUMN[raw[0]], entry["name"])
+        self.assertEqual(seen, set(range(24)))
+
+    def test_value_ref_hash_is_the_second_field(self):
+        for entry in self.lines("ValueRef"):
+            if not entry.get("reject"):
+                self.assertEqual(entry["hash"], entry["borsh"][8:], entry["name"])
+
+    def test_node_hash_is_sha256_of_the_borsh(self):
+        import hashlib
+        for entry in self.lines("RawTrieNodeWithSize"):
+            if not entry.get("reject"):
+                digest = hashlib.sha256(bytes.fromhex(entry.get("canonical", entry["borsh"]))).hexdigest()
+                self.assertEqual(entry["hash"], digest, entry["name"])
+
+
 class SignatureRecordTests(unittest.TestCase):
     """`signatures.jsonl` records the keys of the oracle's ED25519 and SECP256K1 signatures per
     fixture line, and the ML-DSA-65 random bytes with the oracle's verdict."""

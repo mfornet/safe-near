@@ -1,6 +1,5 @@
 import NearVM
 import Wasm.Wat
-import NearCrypto
 
 open Lean Wasm Wasm.Near
 
@@ -33,21 +32,7 @@ structure Request where
   view : Bool
   outputDataReceivers : List String
   storage : List (List Nat × List Nat)
-  /-- The current epoch's validators and their stakes (decimal yoctoNEAR). -/
-  validators : List (String × String) := []
   deriving FromJson
-
-/-- The crypto oracles the replay supplies: `NearCrypto`, the pure-Lean
-primitives the node uses, so the comparison checks them through the VM. -/
-def nearCrypto : HostCrypto :=
-  let lift (f : ByteArray → ByteArray) (bytes : List UInt8) : List UInt8 := (f ⟨bytes.toArray⟩).toList
-  { sha256 := some (lift NearCrypto.sha256)
-    keccak256 := some (lift NearCrypto.keccak256)
-    keccak512 := some (lift NearCrypto.keccak512)
-    ripemd160 := some (lift NearCrypto.ripemd160)
-    ed25519Verify := some fun pk msg sig => NearCrypto.ed25519Verify ⟨pk.toArray⟩ ⟨msg.toArray⟩ ⟨sig.toArray⟩
-    ecrecover := some fun hash sig v malleability =>
-      (NearCrypto.ecrecover ⟨hash.toArray⟩ ⟨sig.toArray⟩ v malleability).map (·.toList) }
 
 def checkedBytes (values : List Nat) : Except String (List UInt8) :=
   values.mapM fun value =>
@@ -86,9 +71,7 @@ def inputOf (cfg : RuntimeConfig) (r : Request) :
     prepaidGas := r.prepaidGas
     randomSeed := ← checkedBytes r.randomSeed
     viewConfig := if r.view then some { maxGasBurnt := cfg.wasm.limits.maxGasBurnt } else none
-    outputDataReceivers := r.outputDataReceivers.map (·.toUTF8.toList)
-    validators := ← r.validators.mapM fun (id, stake) => do return (id.toUTF8.toList, ← checkedBalance stake)
-    crypto := nearCrypto }
+    outputDataReceivers := r.outputDataReceivers.map (·.toUTF8.toList) }
   pure (ctx, storage)
 
 def bytesJson (bytes : List UInt8) : Json := toJson (bytes.map UInt8.toNat)
@@ -99,6 +82,10 @@ def permissionJson : AccessKeyPermission → Json
   | .fullAccess => obj [kind "fullAccess"]
   | .functionCall allowance receiver methods => obj [kind "functionCall",
       ("allowance", toJson (allowance.map toString)),
+      ("receiverId", bytesJson receiver), ("methodNames", bytesJson methods)]
+  | .gasKeyFullAccess nonces => obj [kind "gasKeyFullAccess", ("numNonces", toJson nonces)]
+  | .gasKeyFunctionCall nonces allowance receiver methods => obj [kind "gasKeyFunctionCall",
+      ("numNonces", toJson nonces), ("allowance", toJson (allowance.map toString)),
       ("receiverId", bytesJson receiver), ("methodNames", bytesJson methods)]
 
 def actionJson : PromiseAction → Json
@@ -115,10 +102,15 @@ def actionJson : PromiseAction → Json
   | .deleteAccount beneficiary => obj [kind "deleteAccount", ("beneficiaryId", bytesJson beneficiary)]
   | .useGlobalContract (.codeHash hash) => obj [kind "useGlobalContract", ("codeHash", bytesJson hash)]
   | .useGlobalContract (.accountId id) => obj [kind "useGlobalContract", ("accountId", bytesJson id)]
+  | .deployGlobalContract code mode => obj [kind "deployGlobalContract", ("code", bytesJson code),
+      ("mode", toJson (match mode with | .codeHash => "codeHash" | .accountId => "accountId"))]
+  | .transferToGasKey pk amount => obj [kind "transferToGasKey", ("publicKey", bytesJson pk),
+      ("deposit", toJson (toString amount))]
 
 def receiptJson (receipt : ReceiptSpec) : Json := obj [
   ("receiverId", bytesJson receipt.receiverId),
   ("dependencies", toJson receipt.dependencies),
+  ("yieldDataId", toJson (receipt.yieldDataId.map bytesJson)),
   ("actions", toJson (receipt.actions.map actionJson))]
 
 def returnJson : ReturnData → Json
@@ -136,6 +128,7 @@ def outcomeJson (outcome : VMOutcome) : Json :=
     ("logs", toJson outcome.logs),
     ("storage", toJson (storage.map fun (k, v) => (k.map UInt8.toNat, v.map UInt8.toNat))),
     ("receipts", toJson (outcome.receipts.map receiptJson)),
+    ("resumes", toJson (outcome.resumes.map fun (dataId, payload) => obj [("dataId", bytesJson dataId), ("payload", bytesJson payload)])),
     ("aborted", toJson (outcome.aborted.map (·.message))),
     ("issue", toJson (outcome.issue?.map (·.message))),
     ("subsidizedAmount", toJson (toString outcome.subsidizedAmount)),

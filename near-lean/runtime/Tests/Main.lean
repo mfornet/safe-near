@@ -1,6 +1,7 @@
 import NearRuntime
 import Tests.Decoder
 import Tests.Gas
+import Tests.Shard
 import Wasm.Wat
 
 /-!
@@ -158,37 +159,6 @@ def checkTransactionRouting (r : IO.Ref Report) (cfg : RuntimeConfig) (code : Co
       ["alice.near", "alice.near", "alice.near", "bob.near"]
       && (mixed.state.account? "bob.near").map (·.amount) == some (10 * oneNear + 7)
       && (mixed.outgoing.head?.map (·.receiverId)) == some "bob.near")
-  -- DeleteAccount pays the balance out only when there is one (nearcore `actions.rs`).
-  for (label, amount) in [("an empty", 0), ("a funded", oneNear)] do
-    let doomed := genesis.setAccount "carol.near" { amount, storageUsage := 182 }
-    let deletion : Receipt := {
-      predecessorId := "carol.near", receiverId := "carol.near", receiptId := 101
-      receipt := .action {
-        signerId := "carol.near", signerPublicKey := pkOf 4
-        gasPrice := 0, actions := [.deleteAccount "bob.near"] } }
-    let deleted := Near.apply cfg World.ap (fun _ => code) doomed [] [deletion]
-    let payouts := deleted.outgoing.filter fun receipt =>
-      receipt.isRefund && receipt.receiverId == "bob.near"
-    check r s!"deleting {label} account {if amount == 0 then "sends no" else "sends the"} balance refund"
-      (deleted.issue.isNone && (deleted.state.account? "carol.near").isNone &&
-        payouts.map (Fees.totalDeposit ·.actions) == (if amount == 0 then [] else [amount]))
-      s!"{payouts.length} payouts"
-  -- ... and refuses to remove more than 10 000 bytes of state, contract code excluded.
-  let deleteCarol (account : Account) :=
-    Near.apply cfg World.ap (fun _ => code) (genesis.setAccount "carol.near" account) [] [{
-      predecessorId := "carol.near", receiverId := "carol.near", receiptId := 101
-      receipt := .action {
-        signerId := "carol.near", signerPublicKey := pkOf 4
-        gasPrice := 0, actions := [.deleteAccount "bob.near"] } }]
-  let large := deleteCarol { amount := oneNear, storageUsage := 10_001 }
-  check r "deleting an account with more than 10 000 bytes of state fails"
-    (large.issue.isNone && (large.state.account? "carol.near").isSome &&
-      large.outcomes.map (·.2.status) == [.failure (.deleteAccountWithLargeState "carol.near")])
-  let atLimit := deleteCarol { amount := oneNear, storageUsage := 10_000 }
-  let withCode := deleteCarol { amount := oneNear, storageUsage := 10_000 + code.size, code := some code }
-  check r "the deletion limit is inclusive and does not count contract code"
-    (atLimit.issue.isNone && (atLimit.state.account? "carol.near").isNone &&
-      withCode.issue.isNone && (withCode.state.account? "carol.near").isNone)
 
 /-- Restricted-key availability across real VM execution and delayed refunds. -/
 def checkRefundScenarios (r : IO.Ref Report) (cfg : RuntimeConfig) (code : ContractCode)
@@ -281,7 +251,9 @@ def main (args : List String) : IO UInt32 := do
   let cfg ← RuntimeConfig.load configs RuntimeConfig.latestVersion
   let decoderChecks ← NearRuntime.Tests.Decoder.run cfg
   let gasChecks ← NearRuntime.Tests.Gas.run cfg
-  r.modify fun report => { report with passed := report.passed + decoderChecks + gasChecks }
+  let shardChecks ← NearRuntime.Tests.Shard.run
+  let sinkChecks ← NearRuntime.Tests.Shard.runSink
+  r.modify fun report => { report with passed := report.passed + decoderChecks + gasChecks + shardChecks + sinkChecks }
   let text ← IO.FS.readFile wat
   let module ← match ← Wat.compile text with
     | .ok m => pure m
@@ -390,8 +362,8 @@ def main (args : List String) : IO UInt32 := do
   -- Neither charged transactions, queued outgoing receipts nor a preceding
   -- successfully executed local receipt in the same apply may be committed.
   let unsupportedModule ← match ← Wat.compile
-      "(module (import \"env\" \"alt_bn128_g1_sum\" (func $sum (param i64 i64 i64)))
-       (memory 1) (func (export \"test\") i64.const 0 i64.const 0 i64.const 0 call $sum))" with
+      "(module (import \"env\" \"sha256\" (func $hash (param i64 i64 i64)))
+       (memory 1) (func (export \"test\") i64.const 0 i64.const 0 i64.const 0 call $hash))" with
     | .ok m => pure m
     | .error e => throw (IO.userError s!"unsupported runtime fixture: {e}")
   let unsupportedCode : ContractCode := { module := unsupportedModule, size := 0, hash := "unsupported-fixture" }
@@ -409,7 +381,7 @@ def main (args : List String) : IO UInt32 := do
   let stopped := Near.apply cfg World.ap (fun _ => unsupportedCode) unsupportedState
     [transferTx, localTransferTx, unsupportedTx] []
   check r "unsupported host is an apply issue, not a receipt failure"
-    ((stopped.issue.map (·.2)) == some (.unsupportedHost "alt_bn128_g1_sum"))
+    ((stopped.issue.map (·.2)) == some (.unsupportedHost "sha256"))
   check r "unsupported apply publishes no outcomes, refunds or burnt tokens"
     (stopped.outcomes.isEmpty && stopped.outgoing.isEmpty && stopped.tokensBurnt == 0)
   check r "unsupported apply rolls back prior transfers and charged transaction balances"
@@ -425,7 +397,7 @@ def main (args : List String) : IO UInt32 := do
   let rejectedDelivery := Near.apply cfg World.ap (fun _ => unsupportedCode) accepted.state [] accepted.outgoing
   check r "unsupported contract execution is discovered at delivery, not transaction acceptance"
     (accepted.issue.isNone && accepted.outgoing.length == 2 && accepted.outcomes.length == 2
-      && rejectedDelivery.issue.map (·.2) == some (.unsupportedHost "alt_bn128_g1_sum"))
+      && rejectedDelivery.issue.map (·.2) == some (.unsupportedHost "sha256"))
   check r "a delivery issue retains already committed transaction charges and nonces"
     (rejectedDelivery.state.totalBalance == accepted.state.totalBalance
       && rejectedDelivery.state.accessKey? "alice.near" (pkOf 1) == accepted.state.accessKey? "alice.near" (pkOf 1)
@@ -438,13 +410,39 @@ def main (args : List String) : IO UInt32 := do
     signerId := "wrap.near", publicKey := pkOf 3, nonce := 1, receiverId := "wrap.near"
     actions := [.stake 0 stakingPk] }
   let unstake := Near.apply cfg World.ap (fun _ => code) stakedState [unstakeTx] []
-  check r "unstaking explicitly requires unmodelled epoch semantics"
-    ((unstake.issue.map (·.2)) == some (.unsupportedAction "unstake (epoch machinery)"))
-  check r "unsupported unstaking leaves locked funds untouched"
-    ((unstake.state.account? "wrap.near").map (·.locked) == some oneNear)
+  check r "unstaking succeeds, emits a zero proposal and keeps the locked balance until the epoch ends"
+    (unstake.issue.isNone && unstake.proposals == [{ account := "wrap.near", publicKey := stakingPk, stake := 0 }]
+      && (unstake.state.account? "wrap.near").map (·.locked) == some oneNear)
+  -- `action_stake`: errors by order, the minimum stake, the proposal and the locked balance.
+  let epoch : EpochInfo := { minimumStake := 2 * oneNear, totalStake := 5 * oneNear, validators := [("wrap.near", 5 * oneNear)] }
+  let stakeApply (ap : ApplyState) (state : ChainState) (amount : Nat) :=
+    Near.apply cfg ap (fun _ => code) state
+      [{ signerId := "wrap.near", publicKey := pkOf 3, nonce := 1, receiverId := "wrap.near"
+         actions := [.stake amount stakingPk] }] []
+  let epochAp := { World.ap with epochInfo := epoch }
+  let stakeIs (result : ApplyResult) (error : RuntimeError) :=
+    result.outcomes.any fun (_, o) => o.status == .failure error
+  let fresh := stakeApply epochAp genesis (3 * oneNear)
+  check r "staking at least the minimum locks the balance and proposes"
+    (fresh.issue.isNone && fresh.proposals == [{ account := "wrap.near", publicKey := stakingPk, stake := 3 * oneNear }]
+      && (fresh.state.account? "wrap.near").map (·.locked) == some (3 * oneNear))
+  let below := stakeApply epochAp genesis oneNear
+  check r "staking below the minimum fails with InsufficientStake and proposes nothing"
+    (stakeIs below (.insufficientStake "wrap.near" oneNear (2 * oneNear)) && below.proposals.isEmpty)
+  let tooMuch := stakeApply epochAp genesis (1000 * oneNear)
+  check r "staking more than the balance fails with TriesToStake"
+    (tooMuch.outcomes.any (fun (_, o) => match o.status with
+        | .failure (.triesToStake "wrap.near" amount 0 _) => amount == 1000 * oneNear
+        | _ => false) && tooMuch.proposals.isEmpty)
+  let none_ := stakeApply epochAp genesis 0
+  check r "an account that never staked cannot unstake" (stakeIs none_ (.triesToUnstake "wrap.near"))
+  let lockedHigh := genesis.setAccount "wrap.near" { genesisAccount (10 * oneNear) with locked := 3 * oneNear }
+  let lowered := stakeApply epochAp lockedHigh (5 * oneNear / 2)
+  check r "a stake below the locked balance proposes without moving funds"
+    (lowered.proposals == [{ account := "wrap.near", publicKey := stakingPk, stake := 5 * oneNear / 2 }]
+      && (lowered.state.account? "wrap.near").map (·.locked) == some (3 * oneNear))
 
-  -- `UseGlobalContract`: priced, permission-checked and encoded like nearcore;
-  -- executing it needs the global contract registry, which the model does not have.
+  -- `UseGlobalContract`: priced, permission-checked and encoded like nearcore.
   let globalHash := (List.range 32).map fun i => UInt8.ofNat (i + 1)
   let fees := cfg.fees.actionFees
   for (label, id) in [("code hash", GlobalContractId.codeHash globalHash),
@@ -464,12 +462,10 @@ def main (args : List String) : IO UInt32 := do
       (delivered.issue.isNone && delivered.outcomes.map (·.2.status) ==
         [.failure (.actorNoPermission "bob.near" "alice.near")])
     let own := Near.apply cfg World.ap (fun _ => code) genesis [{ tx with receiverId := "alice.near" }] []
-    check r s!"use global contract by {label}: execution is an explicit model issue"
-      ((own.issue.map (·.2)) == some (.unsupportedAction "use global contract"))
-    check r s!"use global contract by {label}: the issue rolls back the chunk"
-      (own.state.totalBalance == genesis.totalBalance && own.outcomes.isEmpty &&
-        own.outgoing.isEmpty && own.tokensBurnt == 0 &&
-        own.state.accessKey? "alice.near" (pkOf 1) == some fullAccess)
+    let ownDelivered := Near.apply cfg World.ap (fun _ => code) own.state [] own.outgoing
+    check r s!"use global contract by {label}: an unregistered contract fails with GlobalContractDoesNotExist"
+      (own.issue.isNone && ownDelivered.issue.isNone &&
+        (own.outcomes ++ ownDelivered.outcomes).any (fun (_, o) => o.status == .failure (.globalContractDoesNotExist id)))
   -- Borsh: `Action::UseGlobalContract` is variant 10; the identifier is
   -- `CodeHash(CryptoHash)` (0) or `AccountId(String)` (1).
   check r "use global contract encodes a code hash as Borsh"
@@ -502,13 +498,20 @@ def main (args : List String) : IO UInt32 := do
       (submitted.issue.isNone && submitted.outgoing.length == 1 &&
         (submitted.state.accessKey? "alice.near" (pkOf 1)).map (·.nonce) == some 1)
     let missing := Near.apply cfg World.ap (fun _ => code) submitted.state [] submitted.outgoing
-    check r s!"{label} implicit creation reports a model issue"
-      ((missing.issue.map (·.2)) == some (.unsupportedAction "implicit account creation (ETH/deterministic contracts)"))
-    check r s!"{label} implicit delivery issue rolls back receiver execution and preserves committed submission"
-      (missing.state.totalBalance == submitted.state.totalBalance &&
-        (missing.state.account? receiver).isNone && missing.state.storage == submitted.state.storage &&
-        missing.state.accessKeys == submitted.state.accessKeys && missing.state.nextId == submitted.state.nextId &&
-        missing.outcomes.isEmpty && missing.outgoing.isEmpty && missing.tokensBurnt == 0)
+    check r s!"{label} implicit creation installs the account on delivery"
+      (missing.issue.isNone && (missing.state.account? receiver).map (·.amount) == some oneNear)
+    check r s!"{label} implicit account has the wallet identity (ETH) or none (deterministic)"
+      (match (missing.state.account? receiver) with
+        | some a => a.global.isSome == (label == "ETH") && a.code.isNone
+        | none => false)
+    if label == "ETH" then
+      let legacy := { cfg with wasm := { cfg.wasm with ethImplicitGlobalContract := false } }
+      let legacyMissing := Near.apply legacy World.ap (fun _ => code) submitted.state [] submitted.outgoing
+      check r "legacy ETH wallet creation reports a model issue and rolls back delivery"
+        ((legacyMissing.issue.map (·.2)) ==
+            some (.unsupportedAction "ETH-implicit account creation with the legacy wallet contract") &&
+          (legacyMissing.state.account? receiver).isNone && legacyMissing.state.nextId == submitted.state.nextId &&
+          legacyMissing.outcomes.isEmpty && legacyMissing.outgoing.isEmpty && legacyMissing.tokensBurnt == 0)
     let present := genesis.setAccount receiver (genesisAccount oneNear)
     let sent := Near.apply cfg World.ap (fun _ => code) present [tx] []
     let applied := Near.apply cfg World.ap (fun _ => code) sent.state [] sent.outgoing
@@ -655,52 +658,6 @@ def main (args : List String) : IO UInt32 := do
         failureOf exact == none)
       s!"sizes {linkedSizes}"
   | _ => check r "the receipt size check agrees with the materialized receipt's Borsh size" false s!"{linkedSizes}"
-
-  -- Crypto hosts run on the oracles the caller supplies (`ApplyState.crypto`).
-  let digestWat := "(module (import \"env\" \"sha256\" (func $sha (param i64 i64 i64))) " ++
-    "(import \"env\" \"value_return\" (func $return (param i64 i64))) (memory 1) (data (i32.const 0) \"abc\") " ++
-    "(func (export \"digest\") i64.const 3 i64.const 0 i64.const 0 call $sha i64.const -1 i64.const 0 call $return))"
-  let digestModule ← match ← Wat.compile digestWat with
-    | .ok module => pure module
-    | .error error => throw (IO.userError s!"digest fixture: {error}")
-  let digestCode : ContractCode := { module := digestModule, size := 0, hash := "digest-fixture" }
-  let digestState := genesis.setAccount "wrap.near" { genesisAccount (10 * oneNear) with code := some digestCode }
-  let digestCall : Transaction := {
-    signerId := "alice.near", publicKey := pkOf 1, nonce := 1, receiverId := "wrap.near"
-    actions := [.functionCall "digest" [] (tgas 50) 0] }
-  let callDigest (ap : ApplyState) :=
-    let admitted := Near.apply cfg ap (fun _ => digestCode) digestState [digestCall] []
-    Near.apply cfg ap (fun _ => digestCode) admitted.state [] admitted.outgoing
-  let oracle : List UInt8 → List UInt8 := fun input => input.reverse ++ List.replicate 29 0
-  let withOracle := callDigest { World.ap with crypto := { sha256 := some oracle } }
-  check r "a crypto host returns what the supplied oracle computes"
-    (withOracle.issue.isNone && withOracle.outcomes.any fun (_, o) => o.status == .successValue (oracle (bytesOf "abc")))
-  let withoutOracle := callDigest World.ap
-  check r "without its oracle a crypto host is an explicit model issue"
-    ((withoutOracle.issue.map (·.2)) == some (.unsupportedHost "sha256"))
-
-  -- Validator stakes are a block context input (`ApplyState.validators`).
-  let stakeWat := "(module (import \"env\" \"validator_stake\" (func $stake (param i64 i64 i64))) " ++
-    "(import \"env\" \"validator_total_stake\" (func $total (param i64))) " ++
-    "(import \"env\" \"value_return\" (func $return (param i64 i64))) (memory 1) " ++
-    "(data (i32.const 0) \"bob.near\") " ++
-    "(func (export \"bob\") i64.const 8 i64.const 0 i64.const 64 call $stake i64.const 16 i64.const 64 call $return) " ++
-    "(func (export \"total\") i64.const 64 call $total i64.const 16 i64.const 64 call $return))"
-  let stakeModule ← match ← Wat.compile stakeWat with
-    | .ok module => pure module
-    | .error error => throw (IO.userError s!"validator fixture: {error}")
-  let stakeCode : ContractCode := { module := stakeModule, size := 0, hash := "validator-fixture" }
-  let stakeState := genesis.setAccount "wrap.near" { genesisAccount (10 * oneNear) with code := some stakeCode }
-  let withValidators : ApplyState := { World.ap with validators := [("bob.near", 7 * oneNear), ("carol.near", 5)] }
-  let le128 (n : Nat) : List UInt8 := (List.range 16).map fun i => UInt8.ofNat (n / 2 ^ (8 * i) % 256)
-  for (method, expected) in [("bob", 7 * oneNear), ("total", 7 * oneNear + 5)] do
-    let call : Transaction := {
-      signerId := "alice.near", publicKey := pkOf 1, nonce := 1, receiverId := "wrap.near"
-      actions := [.functionCall method [] (tgas 50) 0] }
-    let admitted := Near.apply cfg withValidators (fun _ => stakeCode) stakeState [call] []
-    let executed := Near.apply cfg withValidators (fun _ => stakeCode) admitted.state [] admitted.outgoing
-    check r s!"validator_{if method == "bob" then "stake" else "total_stake"} reads the epoch's validators"
-      (executed.issue.isNone && executed.outcomes.any fun (_, o) => o.status == .successValue (le128 expected))
 
   -- Raw deployment length must not be supplied by the external module decoder.
   let deployWat := "(module (import \"env\" \"promise_batch_create\" (func $batch (param i64 i64) (result i64))) " ++

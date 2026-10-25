@@ -24,13 +24,13 @@ theorem applyCharges_gasLimits (ns : NearState) (charges : List Charge)
   have hl := applyCharges_gas_limits ns charges
   exact ⟨hl.1.trans h.1, hl.2.trans h.2⟩
 
-theorem gasFn_gasLimits : HostPreservesGasLimits gasFn := by
+theorem gasFn_gasLimits (opCost : Nat) : HostPreservesGasLimits (gasFn opCost) := by
   intro prepaid maxBurnt st args hwf
   unfold gasFn
   dsimp only
   split
   · rename_i n
-    have hl := GasCounter.deduct_limits st.host.gas n.toNat n.toNat
+    have hl := GasCounter.deduct_limits st.host.gas (n.toNat * opCost) (n.toNat * opCost)
     split <;> exact ⟨hl.1.trans hwf.1, hl.2.trans hwf.2⟩
   · exact hwf
 
@@ -106,6 +106,7 @@ theorem metered_preserves_gasLimits (extra : Nat) (name : String) (fn : NearHost
           | some error => cases error <;> exact hwf2
 
 set_option maxRecDepth 16384 in
+set_option maxHeartbeats 1600000 in
 /-- Every published metered host preserves call gas limits, including
 unsupported/deprecated rejection paths and the explicit gas import. -/
 theorem meteredHostFns_gasLimits (cfg : RuntimeConfig) (entry : ImportDecl × NearHostFn NearState)
@@ -114,7 +115,7 @@ theorem meteredHostFns_gasLimits (cfg : RuntimeConfig) (entry : ImportDecl × Ne
   rcases h with ⟨⟨decl, fn⟩, hin, heq⟩ | heq
   · subst entry
     simp only [nearHostFns, List.mem_cons, List.not_mem_nil, or_false] at hin
-    rcases hin with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
+    rcases hin with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
     all_goals cases h
     all_goals first
       | (intro prepaid maxBurnt st args hwf; exact hwf)
@@ -139,6 +140,8 @@ theorem meteredHostFns_gasLimits (cfg : RuntimeConfig) (entry : ImportDecl × Ne
       | exact HostPreservesGas.limits storageUsageFn_gas
       | exact HostPreservesGas.limits accountBalanceFn_gas
       | exact HostPreservesGas.limits accountLockedBalanceFn_gas
+      | exact HostPreservesGas.limits validatorStakeFn_gas
+      | exact HostPreservesGas.limits validatorTotalStakeFn_gas
       | exact HostPreservesGas.limits prepaidGasFn_gas
       | exact HostPreservesGas.limits usedGasFn_gas
       | exact HostPreservesGas.limits randomSeedFn_gas
@@ -146,16 +149,27 @@ theorem meteredHostFns_gasLimits (cfg : RuntimeConfig) (entry : ImportDecl × Ne
       | exact HostPreservesGas.limits keccak256Fn_gas
       | exact HostPreservesGas.limits keccak512Fn_gas
       | exact HostPreservesGas.limits ripemd160Fn_gas
-      | exact HostPreservesGas.limits validatorStakeFn_gas
-      | exact HostPreservesGas.limits validatorTotalStakeFn_gas
       | exact HostPreservesGas.limits ecrecoverFn_gas
       | exact HostPreservesGas.limits ed25519VerifyFn_gas
+      | exact HostPreservesGas.limits p256VerifyFn_gas
+      | exact HostPreservesGas.limits altBn128G1MultiexpFn_gas
+      | exact HostPreservesGas.limits altBn128G1SumFn_gas
+      | exact HostPreservesGas.limits altBn128PairingCheckFn_gas
+      | exact HostPreservesGas.limits bls12381P1SumFn_gas
+      | exact HostPreservesGas.limits bls12381P2SumFn_gas
+      | exact HostPreservesGas.limits bls12381G1MultiexpFn_gas
+      | exact HostPreservesGas.limits bls12381G2MultiexpFn_gas
+      | exact HostPreservesGas.limits bls12381MapFpToG1Fn_gas
+      | exact HostPreservesGas.limits bls12381MapFp2ToG2Fn_gas
+      | exact HostPreservesGas.limits bls12381P1DecompressFn_gas
+      | exact HostPreservesGas.limits bls12381P2DecompressFn_gas
+      | exact HostPreservesGas.limits bls12381PairingCheckFn_gas
       | exact HostPreservesGas.limits logUtf8Fn_gas
       | exact HostPreservesGas.limits logUtf16Fn_gas
       | exact HostPreservesGas.limits panicMetered_gas
       | exact HostPreservesGas.limits panicUtf8Metered_gas
       | exact HostPreservesGas.limits abortMetered_gas
-      | exact gasFn_gasLimits
+      | exact gasFn_gasLimits _
       | exact HostPreservesGas.limits promiseCreateFn_gas
       | exact HostPreservesGas.limits promiseThenFn_gas
       | exact HostPreservesGas.limits promiseAndFn_gas
@@ -173,12 +187,20 @@ theorem meteredHostFns_gasLimits (cfg : RuntimeConfig) (entry : ImportDecl × Ne
       | exact HostPreservesGas.limits promiseBatchActionDeleteAccountFn_gas
       | exact HostPreservesGas.limits promiseBatchActionUseGlobalContractFn_gas
       | exact HostPreservesGas.limits promiseBatchActionUseGlobalContractByAccountIdFn_gas
+      | exact HostPreservesGas.limits promiseBatchActionDeployGlobalContractFn_gas
+      | exact HostPreservesGas.limits promiseBatchActionDeployGlobalContractByAccountIdFn_gas
+      | exact HostPreservesGas.limits promiseBatchActionTransferToGasKeyFn_gas
+      | exact HostPreservesGas.limits promiseBatchActionAddGasKeyWithFullAccessFn_gas
+      | exact HostPreservesGas.limits promiseBatchActionAddGasKeyWithFunctionCallFn_gas
+      | exact HostPreservesGas.limits promiseYieldCreateFn_gas
+      | exact HostPreservesGas.limits promiseYieldResumeFn_gas
+      | exact HostPreservesGas.limits chainIdFn_gas
       | exact HostPreservesGas.limits valueReturnFn_gas
       | exact HostPreservesGas.limits promiseReturnFn_gas
       | exact HostPreservesGas.limits promiseResultsCountFn_gas
       | exact HostPreservesGas.limits promiseResultFn_gas
   · subst entry
-    exact gasFn_gasLimits
+    exact gasFn_gasLimits _
 
 /-- Resolution cannot introduce a function outside the proved host registry. -/
 theorem resolveMeteredImports_gasLimits (cfg : RuntimeConfig) (imports : List ImportDecl)

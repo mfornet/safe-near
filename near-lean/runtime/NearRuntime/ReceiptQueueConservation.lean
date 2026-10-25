@@ -11,26 +11,56 @@ theorem processReceipt_delayed (cfg : RuntimeConfig) (ap : ApplyState) (decoder 
     (st : ChainState) (receipt : Receipt) : (processReceipt cfg ap decoder st receipt).state.delayed = st.delayed := by
   cases hr : receipt.receipt with
   | action action =>
-    cases he : (action.inputDataIds.filter fun id => !(Assoc.contains st.receivedData id)).isEmpty with
-    | false => rw [processReceipt_waiting cfg ap decoder st receipt action hr he]; rfl
-    | true => exact congrArg Prod.snd (processReceipt_ready_receiptQueues cfg ap decoder st receipt action hr he)
+    cases hy : action.yieldDataId with
+    | some dataId =>
+      rw [processReceipt_yield_unfold cfg ap decoder st receipt action dataId hr hy]
+      split <;> rfl
+    | none =>
+      cases he : (action.inputDataIds.filter fun id => !(Assoc.contains st.receivedData id)).isEmpty with
+      | false => rw [processReceipt_waiting cfg ap decoder st receipt action hr hy he]; rfl
+      | true => exact congrArg (fun q => q.2.1) (processReceipt_ready_receiptQueues cfg ap decoder st receipt action hr hy he)
   | data data =>
-    rw [processReceipt_data cfg ap decoder st receipt data hr]
-    cases hroute : Assoc.lookup st.postponedByData data.dataId with
-    | none => rfl
-    | some id =>
-      dsimp only
-      cases hpending : ((Assoc.lookup st.pendingDataCount id).getD 1 - 1 == 0) with
-      | false => simp only [Bool.false_eq_true, ite_false]; rfl
-      | true =>
-        simp only [ite_true]
-        cases hwaiting : Assoc.lookup st.postponed id with
-        | none => rfl
-        | some waiting =>
-          exact processReceipt_delayed cfg ap decoder
-            (releasePostponedState (receivePostponedDataState st data) id) waiting
+    cases hres : data.resumeDataId with
+    | none =>
+      rw [processReceipt_data cfg ap decoder st receipt data hr hres]
+      cases hroute : Assoc.lookup st.postponedByData data.dataId with
+      | none => rfl
+      | some id =>
+        dsimp only
+        cases hpending : ((Assoc.lookup st.pendingDataCount id).getD 1 - 1 == 0) with
+        | false => simp only [Bool.false_eq_true, ite_false]; rfl
+        | true =>
+          simp only [ite_true]
+          cases hwaiting : Assoc.lookup st.postponed id with
+          | none => rfl
+          | some waiting =>
+            exact processReceipt_delayed cfg ap decoder
+              (releasePostponedState (receivePostponedDataState st data) id) waiting
+    | some dataId =>
+      rw [processReceipt_resume cfg ap decoder st receipt data dataId hr hres]
+      split
+      · rfl
+      · split
+        · rename_i y _
+          split
+          · rename_i a _
+            exact congrArg (fun q => q.2.1) (runActionReceipt_receiptQueues cfg ap decoder
+              (resumeYieldState st (receipt.receiverId, dataId)) y a [data.promiseResult])
+          · rfl
+        · rfl
+  | globalDistribution g =>
+    rw [processReceipt_distribution cfg ap decoder st receipt g hr]
+    exact (processDistribution_advance cfg ap st receipt g).2.2.2.2.1
 termination_by st.postponed.length
 decreasing_by exact Assoc.erase_length_lt_of_lookup _ _ _ hwaiting
+
+theorem processWithInstants_delayed (cfg : RuntimeConfig) (ap : ApplyState) (decoder : Bytes → ContractCode)
+    (st : ChainState) (receipt : Receipt) :
+    (processWithInstants cfg ap decoder st receipt).state.delayed = st.delayed :=
+  processWithInstants_state_predicate cfg ap decoder (fun s => s.delayed = st.delayed)
+    (fun accounting before receipt hb =>
+      (processReceipt_delayed cfg { ap with storageAccounting := accounting } decoder before receipt).trans hb)
+    st receipt rfl
 
 def ApplyResult.ReceiptLedger (cfg : RuntimeConfig) (assets initialSubsidy : Nat) (result : ApplyResult) : Prop :=
   result.issue = none → result.state.totalFunds cfg + receiptsFunds cfg result.outgoing + result.tokensBurnt + initialSubsidy =
@@ -56,8 +86,48 @@ def ReceiptQueue.TerminalLedger (cfg : RuntimeConfig) (assets initialSubsidy : N
       receiptsFunds cfg pass.2.2.2.2.2.2.2.1 + receiptsFunds cfg pass.2.2.2.2.2.2.2.2.1 + initialSubsidy =
         assets + pass.2.2.2.2.2.1
 
-theorem receiptsFunds_cons (cfg : RuntimeConfig) (receipt : Receipt) (rest : List Receipt) :
-    receiptsFunds cfg (receipt :: rest) = Fees.receiptFunds cfg receipt + receiptsFunds cfg rest := rfl
+theorem resolveYieldTimeouts_funds (cfg : RuntimeConfig) (ap : ApplyState) (limit : Option Nat) (used fuel : Nat) :
+    ∀ (acc : ChainState × List Receipt × List ReceiptIdentityBirth),
+      (resolveYieldTimeouts ap limit used fuel acc).1.totalFunds cfg = acc.1.totalFunds cfg ∧
+      receiptsFunds cfg (resolveYieldTimeouts ap limit used fuel acc).2.1 = receiptsFunds cfg acc.2.1 := by
+  induction fuel with
+  | zero => intro acc; exact ⟨rfl, rfl⟩
+  | succ fuel ih =>
+    rintro ⟨st, receipts, births⟩
+    unfold resolveYieldTimeouts
+    dsimp only
+    split
+    · exact ⟨rfl, rfl⟩
+    · split
+      · split
+        · exact ⟨rfl, rfl⟩
+        · split
+          · exact ⟨rfl, rfl⟩
+          · split
+            · refine ⟨(ih _).1.trans rfl, (ih _).2.trans ?_⟩
+              simp [receiptsFunds, Fees.receiptFunds]
+            · exact ih _
+      · exact ⟨rfl, rfl⟩
+theorem resolveYieldTimeouts_delayed (ap : ApplyState) (limit : Option Nat) (used fuel : Nat) :
+    ∀ (acc : ChainState × List Receipt × List ReceiptIdentityBirth),
+      (resolveYieldTimeouts ap limit used fuel acc).1.delayed = acc.1.delayed := by
+  induction fuel with
+  | zero => intro acc; rfl
+  | succ fuel ih =>
+    rintro ⟨st, receipts, births⟩
+    unfold resolveYieldTimeouts
+    dsimp only
+    split
+    · rfl
+    · split
+      · split
+        · rfl
+        · split
+          · rfl
+          · split
+            · exact (ih _).trans rfl
+            · exact ih _
+      · rfl
 
 /-- Conservation across the actual indexed receipt loop, including both delayed
 buffers, transaction gas, callback resumption, refunds and rewards. The input
@@ -107,29 +177,29 @@ theorem applyReceiptQueue_conservation (cfg : RuntimeConfig) (ap : ApplyState) (
           dsimp only [receiptsFunds] at hl
           omega
       · simp only [hover, Bool.false_eq_true, ite_false]
-        cases hi : (processReceipt cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 head.1).issue with
+        cases hi : (processWithInstants cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 head.1).issue with
         | some issue => simp [ReceiptQueue.TerminalLedger, ApplyResult.ReceiptLedger]
         | none =>
           dsimp only
           have hshape := h.shapes head.1 (by simp)
           have hfresh := h.admission.disjoint head.1 (by simp)
-          have hfund := processReceipt_fundingInvariant cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 head.1
-            ⟨h.accounts, h.postponed⟩ hshape hi
-          have hadmit := h.admission.after_process cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 head.1 (rest.map Prod.fst)
-          have hdelay := (processReceipt_delayed cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 head.1).trans h.delayed
-          have hc := processReceipt_conservation cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 head.1 h.accounts h.postponed hfresh hshape hnew hratio hi
-          have hb := processReceipt_outcomeLoop_burn cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 head.1 pass.2.2.2.2.2.2.1 pass.2.2.2.2.2.2.2.2.2.1
-            h.postponed hshape hnew hratio
+          have hfund := processWithInstants_funding cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 head.1 h.accounts h.postponed hfresh
+            hshape hnew hratio hi
+          have hadmit := h.admission.after_processWithInstants cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 head.1 (rest.map Prod.fst)
+          have hdelay := (processWithInstants_delayed cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 head.1).trans h.delayed
+          have hc := hfund.2.2.2
+          have hb := processWithInstants_outcomeLoop_burn cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 head.1 pass.2.2.2.2.2.2.1 pass.2.2.2.2.2.2.2.2.2.1
+            hfund.2.2.1
           dsimp only [pure] at hb
-          have hledger : (processReceipt cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 head.1).state.totalFunds cfg +
-              receiptsFunds cfg (pass.2.2.2.1 ++ (processReceipt cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 head.1).receipts) +
-              ((forIn (processReceipt cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 head.1).outcomes
+          have hledger : (processWithInstants cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 head.1).state.totalFunds cfg +
+              receiptsFunds cfg (pass.2.2.2.1 ++ (processWithInstants cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 head.1).receipts) +
+              ((forIn (processWithInstants cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 head.1).outcomes
                 (pass.2.2.2.2.2.2.1, pass.2.2.2.2.2.2.2.2.2.1)
                 (fun entry ledger => .yield (ledger.1 + entry.2.tokensBurnt, ledger.2 + entry.2.gasBurnt)) : Id (Nat × Nat)).1 +
-                (processReceipt cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 head.1).otherTokensBurnt - (processReceipt cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 head.1).rewards) +
+                (processWithInstants cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 head.1).otherTokensBurnt - (processWithInstants cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 head.1).rewards) +
               receiptsFunds cfg pass.2.2.2.2.2.2.2.1 + receiptsFunds cfg pass.2.2.2.2.2.2.2.2.1 +
               receiptsFunds cfg (rest.map Prod.fst) + subsidy = assets +
-                (pass.2.2.2.2.2.1 + (processReceipt cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 head.1).subsidizedAmount) := by
+                (pass.2.2.2.2.2.1 + (processWithInstants cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 head.1).subsidizedAmount) := by
             rw [hb, receiptsFunds_append]
             have hl := h.ledger
             simp only [List.map_cons, receiptsFunds_cons] at hl
@@ -138,11 +208,11 @@ theorem applyReceiptQueue_conservation (cfg : RuntimeConfig) (ap : ApplyState) (
           cases hlimit : ap.gasLimit with
           | none =>
             simp only [hlimit] at hfund hdelay hadmit hledger
-            exact ⟨rfl, hfund.1, hfund.2, hdelay, hadmit, hscope, hledger⟩
+            exact ⟨rfl, hfund.1, hfund.2.1, hdelay, hadmit, hscope, hledger⟩
           | some limit =>
             simp only [hlimit] at hfund hdelay hadmit hledger
             dsimp only
-            split_ifs <;> exact ⟨rfl, hfund.1, hfund.2, hdelay, hadmit, hscope, hledger⟩
+            split_ifs <;> exact ⟨rfl, hfund.1, hfund.2.1, hdelay, hadmit, hscope, hledger⟩
     · intro pass h
       unfold ReceiptQueue.TerminalLedger
       rw [h.continuing]
@@ -153,10 +223,34 @@ theorem applyReceiptQueue_conservation (cfg : RuntimeConfig) (ap : ApplyState) (
     have hf := hfinal
     simp only [ReceiptQueue.TerminalLedger, he] at hf
     intro hsupported
-    dsimp only [assets, ChainState.totalFunds, ChainState.queuedFunds, ChainState.totalBalance, ChainState.postponedFunds] at hf ⊢
+    have htf := (resolveYieldTimeouts_funds cfg ap ap.gasLimit result.2.2.2.2.2.2.2.2.2.1
+      (result.2.1.yieldTimeouts.length + 1) (result.2.1, [], [])).1
+    have hrf := (resolveYieldTimeouts_funds cfg ap ap.gasLimit result.2.2.2.2.2.2.2.2.2.1
+      (result.2.1.yieldTimeouts.length + 1) (result.2.1, [], [])).2
+    have hdl := resolveYieldTimeouts_delayed ap ap.gasLimit result.2.2.2.2.2.2.2.2.2.1
+      (result.2.1.yieldTimeouts.length + 1) (result.2.1, [], [])
+    have h0 : receiptsFunds cfg ([] : List Receipt) = 0 := rfl
+    dsimp only at hrf
+    rw [h0] at hrf
+    dsimp only at hdl htf
+    have hset : ∀ (S : ChainState) (d : List Receipt),
+        ({ S with delayed := d } : ChainState).totalFunds cfg + receiptsFunds cfg S.delayed =
+          S.totalFunds cfg + receiptsFunds cfg d := by
+      intro S d
+      have h1 : ({ S with delayed := d } : ChainState).gasKeyFunds = S.gasKeyFunds := rfl
+      have h2 : ChainState.yieldFunds cfg ({ S with delayed := d } : ChainState) = ChainState.yieldFunds cfg S := rfl
+      simp only [ChainState.totalFunds, ChainState.queuedFunds, ChainState.totalBalance, ChainState.postponedFunds,
+        h1, h2]
+      omega
+    have hs := hset (resolveYieldTimeouts ap ap.gasLimit result.2.2.2.2.2.2.2.2.2.1
+      (result.2.1.yieldTimeouts.length + 1) (result.2.1, [], [])).1
+      (result.2.2.2.2.2.2.2.1 ++ result.2.2.2.2.2.2.2.2.1)
+    rw [hdl, hf.1, h0, receiptsFunds_append] at hs
+    dsimp only [assets]
     rw [receiptsFunds_append]
-    simp only [hf.1, receiptsFunds, List.map_nil, List.sum_nil, Nat.add_zero] at hf
-    dsimp only [receiptsFunds] at hf ⊢
+    have hf2 := hf.2
+    dsimp only [assets] at hf2
+    rw [hrf]
     omega
 
 end Near

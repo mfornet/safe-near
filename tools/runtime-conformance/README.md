@@ -79,11 +79,14 @@ charge, even when the method does not exist.
 output data receivers: nearcore reads and checks the length before burning
 the data receipt bytes. A case may set `outputDataReceivers`.
 
+Outcomes carry each receipt's `yieldDataId` and the successful
+`promise_yield_resume` payloads (`resumes`); the executor reads both from the
+mocked external. No fixture creates a yield yet: the mock's data ids are not
+the ones the model derives, so a yield case needs those ids normalized first.
+
 `logs.json` drives `log_utf8` and `log_utf16` into the number-of-logs limit,
 the per-message and running-total length limits, bad UTF-8 and UTF-16,
 out-of-bounds reads, a non-ASCII UTF-16 message and gas exhaustion mid-loop.
-NUL-terminated logs (`u64::MAX` length) are not compared: the model reads a
-register there.
 
 `prepare_*.json` (written by `gen_prepare_limits.py`, which keeps the large
 modules out of WAT) checks nearcore's `prepare_v3` limits at and one over
@@ -91,19 +94,6 @@ each protocol-86 limit (types, functions including imported ones, function
 body size, tables, table elements, locals) and the rejected imports (another
 module, globals, tables, memory): a no-op outcome with `PrepareError` and no
 gas. A module at the locals limit is left out: Wasmtime fails to compile it.
-
-The Lean replay supplies `NearCrypto` as the VM's crypto oracles (`HostCrypto`).
-`hashes.json` runs `sha256`, `keccak256`, `keccak512` and `ripemd160` on empty,
-short and multi-block inputs, a chain of digests read from registers, an
-out-of-bounds read, an invalid register and gas exhaustion. `signatures.json`
-runs `ed25519_verify` and `ecrecover` on valid and tampered signatures,
-nearcore's early false results, every length, `v` and flag error, out-of-bounds
-inputs and the recovered key. Digests, results, charges and errors match exactly.
-
-`validators.json` sets the epoch's validators (a request may set
-`validators`) and reads `validator_stake` for known and unknown accounts,
-`validator_total_stake`, and their bad UTF-8, invalid-id, out-of-bounds and
-invalid-register errors.
 
 `promise_graphs.json` checks exact ordered receipt dependencies and returned
 receipt identity for ordinary, nested, duplicate and empty joins. Failure cases
