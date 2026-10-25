@@ -25,11 +25,14 @@ private partial def Pipe.take (p : Pipe) (max timeoutMs : Nat) :
     IO (Except Closed (Option ByteArray)) := do
   let started ← IO.monoMsNow
   let rec loop : IO (Except Closed (Option ByteArray)) := do
-    let d ← p.data.get
-    if d.size > 0 then
-      let n := Nat.min max d.size
-      p.data.set (d.extract n d.size)
-      return .ok (some (d.extract 0 n))
+    let taken ←
+      p.data.modifyGet fun d =>
+          if d.size > 0 then
+            let n := Nat.min max d.size
+            (some (d.extract 0 n), d.extract n d.size)
+          else (none, d)
+    if let some b := taken then
+      return .ok (some b)
     if ← p.closed.get then
       return .error .eof
     if (← IO.monoMsNow) - started ≥ timeoutMs then

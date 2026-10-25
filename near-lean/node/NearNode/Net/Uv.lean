@@ -89,11 +89,14 @@ private partial def acceptLoop (server : Socket) (timeoutMs started : Nat) (dela
 /-- Takes from the inbox, polling until `timeoutMs` has passed. -/
 private partial def takeLoop (inbox : Inbox) (max timeoutMs started : Nat) (delay : UInt32) :
     IO (Except Closed (Option ByteArray)) := do
-  let d ← inbox.data.get
-  if d.size > 0 then
-    let n := Nat.min max d.size
-    inbox.data.set (d.extract n d.size)
-    return .ok (some (d.extract 0 n))
+  let taken ←
+    inbox.data.modifyGet fun d =>
+        if d.size > 0 then
+          let n := Nat.min max d.size
+          (some (d.extract 0 n), d.extract n d.size)
+        else (none, d)
+  if let some b := taken then
+    return .ok (some b)
   if let some why← inbox.ended.get then
     -- the reader may have appended just before it ended
     if (← inbox.data.get).size == 0 then
