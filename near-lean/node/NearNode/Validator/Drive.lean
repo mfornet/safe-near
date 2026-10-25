@@ -1,0 +1,366 @@
+import NearNode.Validator.Follow
+
+/-!
+# Driving the validator
+
+The loop body of a validator: blocks in, blocks applied, approvals out, blocks produced, and the
+dispatch of everything the peer sends.
+-/
+
+namespace Near.Node.Validator
+
+open Near.Node Near.Node.Chain Near.Node.Network Near.Node.Apply Near.Node.Borsh Near.Node.ReedSolomon
+
+private def lift {α : Type} (r : Result α) : Except String α :=
+  r.mapError fun e => s!"{e.kind} {e.detail}"
+
+/-! ### Applying blocks -/
+
+/-- Whether the bodies of all new chunks of `b` are in. -/
+def VState.bodiesReady (s : VState) (b : Block) : Bool :=
+  (newChunksOf b).all fun c => ((s.chunks[c.chunkHash.hash.bytes]?).bind (·.body)).isSome
+
+/-- Asks the peer for the chunks of `b` whose bodies are missing, at most every 1500 ms each. -/
+def Env.requestBodies (e : Env) (b : Block) : IO Unit := do
+  let now ← e.nowMs
+  for c in newChunksOf b do
+    let s ← e.get
+    let entry := s.chunks.getD c.chunkHash.hash.bytes {}
+    if entry.body.isNone && (entry.requestedAt == 0 || now - entry.requestedAt ≥ 1500) then
+      e.toPeer (.partialEncodedChunkRequest (chunkRequest c e.code.total))
+      e.state.modify fun s => s.withChunk c.chunkHash fun x => { x with requestedAt := max now 1, header := x.header.orElse fun _ => some c }
+
+/-- The state roots of a block's parent, which the application starts from. -/
+def rootsOf (s : VState) (layout : ShardLayout) (parent : CryptoHash) : Std.HashMap UInt64 CryptoHash :=
+  layout.shardIds.foldl
+    (fun m shard =>
+      match s.pr.extras[(parent.bytes, shard)]? with
+      | some (ChunkExtra.v5 x) => m.insert shard x.stateRoot
+      | _ => m)
+    {}
+
+/-- Applies `b`: its chunks, on the state its parent left. -/
+def Env.applyOne (e : Env) (b : Block) : IO Bool := do
+  let s ← e.get
+  let some v := b.header.view? | return false
+  let hash := b.header.hash
+  let started ← IO.monoMsNow
+  let layoutE : Except String ShardLayout := do
+    let epoch ← lift (s.st.epochIdFromPrevBlock v.prevHash)
+    pure (← lift (s.st.epoch epoch)).layout
+  match layoutE with
+  | .error m =>
+    e.failure.modify fun f => f.orElse fun _ => some s!"block {v.height}: {m}"
+    return false
+  | .ok layout =>
+    let pr0 := { s.pr with roots := rootsOf s layout v.prevHash }
+    let bodyOf (shard : UInt64) : Body :=
+      let empty : Body := { transactions := #[], claimedOutgoing := #[], claimedIncoming := #[] }
+      match b.chunks.find? (·.shardId == shard) with
+      | some c =>
+        match (s.chunks[c.chunkHash.hash.bytes]?).bind (·.body) with
+        | some body =>
+          { empty with transactions := body.transactions }
+        | none => empty
+      | none => empty
+    match ← (applyBlock none e.params s.st b bodyOf pr0).run with
+    | .error m =>
+      e.failure.modify fun f => f.orElse fun _ => some s!"block {v.height}: applying the chunks failed: {m}"
+      return false
+    | .ok (pr, reports, _) =>
+      e.state.modify fun s =>
+        let delivered := reports.foldl (fun m r => m.insert (hash.bytes, r.shard) r.incoming) s.deliveredAt
+        { s with
+          pr, applied := s.applied.insert hash.bytes v.height, pending := s.pending.filter (· != hash),
+          deliveredAt := delivered }
+      e.bump "blocksApplied"
+      if let some h := e.appliedLog then
+        let hex (b : ByteArray) : String :=
+          b.foldl (fun s x => s ++ String.ofList (Nat.toDigits 16 (x.toNat + 256)).tail) ""
+        let chunks :=
+          reports.toList.map fun r =>
+            match r.extra with
+            | .v5 x => s!"\{\"shard\":{r.shard},\"stateRoot\":\"{hex x.stateRoot.bytes}\",\"gasUsed\":{x.gasUsed}}"
+            | _ => s!"\{\"shard\":{r.shard}}"
+        h.putStrLn s!"\{\"height\":{v.height},\"hash\":\"{hex hash.bytes}\",\"chunks\":[{",".intercalate chunks}]}"
+        h.flush
+      let took := (← IO.monoMsNow) - started
+      if took > 400 then
+        e.log s!"block {v.height} took {took} ms to apply"
+      e.state.modify fun s => s.bump s!"applyMillis" |>.bump "applyMillisTotal" |> fun s => { s with stats := s.stats.insert "applyMillisTotal" (s.stats.getD "applyMillisTotal" 0 + took - 1) }
+      return true
+
+/-- After a block is applied: the Doomslug tip, the chunks to produce, the witnesses that waited. -/
+def Env.onApplied (e : Env) (b : Block) : IO Unit := do
+  let s ← e.get
+  let some v := b.header.view? | return
+  let hash := b.header.hash
+  if v.height > s.tipHeight then
+    let lastFinal : BlockHeight :=
+      if v.lastFinalBlock == CryptoHash.zero then s.st.config.genesisHeight
+      else ((s.st.block v.lastFinalBlock).toOption.map (·.view.height)).getD 0
+    let now ← e.nowMs
+    e.state.modify fun s =>
+      { s with ds := s.ds.setTip hash v.height lastFinal now, tip := hash, tipHeight := v.height }
+    e.produceChunks b
+  let s ← e.get
+  let (ready, waiting) := s.waitingWitnesses.partition fun w =>
+    match w with
+    | .v2 x => s.applied.contains x.chunkHeader.prevBlockHash.bytes
+  e.state.modify fun s => { s with waitingWitnesses := waiting }
+  for w in ready do
+    e.processWitness w
+
+/-- Applies every block that can be applied, in order. -/
+partial def Env.tryApply (e : Env) : IO Unit := do
+  if (← e.failure.get).isSome then
+    return
+  let s ← e.get
+  let candidates := s.pending.filterMap fun h => (s.blocks[h.bytes]?).bind fun b => b.header.view?.map (b, ·.height)
+  let sorted := candidates.qsort fun a b => a.2 < b.2
+  for (b, _) in sorted do
+    let some v := b.header.view? | continue
+    if s.applied.contains v.prevHash.bytes then
+      if s.bodiesReady b then
+        if ← e.applyOne b then
+          e.onApplied b
+          e.tryApply
+        return
+      else
+        e.requestBodies b
+
+/-! ### Receiving blocks -/
+
+/-- Validates a block from the peer or produced here, records it, and applies what can be applied. -/
+partial def Env.ingestBlock (e : Env) (b : Block) : IO Unit := do
+  let s ← e.get
+  let h := b.header.hash
+  let some v := b.header.view? | return
+  if s.blocks.contains h.bytes then
+    return
+  e.bump "BlockReceived"
+  match Epoch.processBlock e.setup s.st b with
+  | .error err =>
+    if err.kind == "Orphan" || err.kind == "DBNotFoundErr" then
+      e.state.modify fun s =>
+        let old := s.orphans.getD v.prevHash.bytes #[]
+        if old.any (·.header.hash == h) then s
+        else { s with orphans := s.orphans.insert v.prevHash.bytes (old.push b) }
+      e.outbox.modify (·.push (.blockRequest v.prevHash))
+      e.bump "BlockOrphan"
+    else
+      e.bump "BlockRejected"
+      e.log s!"block {v.height} rejected: {err.kind} {err.detail}"
+  | .ok (st', fin) =>
+    if let some f := fin then
+      let kicked := f.data.info.view.validatorKickout.map fun (a, r) =>
+        s!"{a.val}: {match r with | .notEnoughBlocks p x => s!"blocks {p}/{x}" | .notEnoughChunks p x => s!"chunks {p}/{x}" | .notEnoughChunkEndorsements p x => s!"endorsements {p}/{x}" | .notEnoughStake _ _ => "stake" | .unstaked => "unstaked" | .didNotGetASeat => "no seat" | _ => "other"}"
+      e.log s!"epoch finalized at block {v.height}: validators {f.data.info.view.validators.map (·.accountId.val)}, kicked out {kicked}"
+      e.log s!"epoch stats {f.summary.stats.map fun (a, t) => s!"{a.val} blocks {t.blockProduced}/{t.blockExpected} chunks {t.chunkProduced}/{t.chunkExpected} endorsements {t.endorsementProduced}/{t.endorsementExpected}"}; stakes {f.data.info.view.validators.map fun v => s!"{v.accountId.val}={v.stake.val}"}"
+    e.state.modify fun s =>
+      { s with
+        st := st', blocks := s.blocks.insert h.bytes b, pending := s.pending.push h,
+        latestKnown := max s.latestKnown v.height }
+    for c in newChunksOf b do
+      e.noteHeader c
+      e.state.modify fun s => s.withChunk c.chunkHash fun x => { x with verified := true }
+    -- chunks that came before their previous block
+    let s ← e.get
+    for (_, entry) in s.chunks.toList do
+      if let some ch := entry.header then
+        if ch.prevBlockHash == h then
+          discard <| e.refreshChunk ch.chunkHash
+    -- children that waited for this block
+    let children := (← e.get).orphans.getD h.bytes #[]
+    e.state.modify fun s => { s with orphans := s.orphans.erase h.bytes }
+    for c in children do
+      e.ingestBlock c
+    e.tryApply
+
+/-! ### Approvals -/
+
+/-- `resolve_skip_parent`: the block at `parent_height` on the chain of the head. -/
+def Env.skipParent (e : Env) (parentHeight : BlockHeight) : IO (Option CryptoHash) := do
+  let s ← e.get
+  pure ((ancestorAt s.st s.st.head parentHeight).toOption.map (·.hash))
+
+/-- `Client::collect_block_approval`. -/
+def Env.collectApproval (e : Env) (a : Approval) (fromPeer : Bool) : IO Unit := do
+  let s ← e.get
+  let parent? ←
+    match a.inner with
+    | .endorsement h => pure (some h)
+    | .skip ph => e.skipParent ph
+  let some parent := parent? | e.state.modify (fun s => { s with parkedApprovals := s.parkedApprovals.push a }); return
+  if !s.st.blockExists parent then
+    e.state.modify fun s => { s with parkedApprovals := s.parkedApprovals.push a }
+    return
+  let r : Except String (Option (Array ApprovalStake)) := do
+    let nextEpoch ← lift (s.st.epochIdFromPrevBlock parent)
+    if fromPeer then
+      let validatorEpoch ←
+        match s.st.validatorByAccount nextEpoch a.accountId with
+        | .ok _ => pure nextEpoch
+        | .error _ => lift (s.st.nextEpochIdFromPrevBlock parent)
+      let v ← lift (s.st.validatorByAccount validatorEpoch a.accountId)
+      unless verifySignature a.signature (Approval.getDataForSig a.inner a.targetHeight) v.publicKey do
+        throw "invalid approval signature"
+    let producer ← lift (s.st.blockProducer nextEpoch a.targetHeight)
+    if producer.accountId != e.me then
+      return none
+    let next ← lift (s.st.nextEpochIdFromPrevBlock parent)
+    some <$> lift (s.st.blockApprovers parent nextEpoch next)
+  match r with
+  | .error m => e.log s!"approval of {a.accountId.val} for {a.targetHeight} refused: {m}"
+  | .ok none => pure ()
+  | .ok (some stakes) =>
+    let now ← e.nowMs
+    e.state.modify fun s => { s with ds := s.ds.onApproval a stakes now }
+    e.bump "approvalsCollected"
+
+/-- `Client::send_block_approval`: to the producer of the target height. -/
+def Env.sendApproval (e : Env) (a : Approval) : IO Unit := do
+  let s ← e.get
+  match lift (s.st.epochIdFromPrevBlock s.tip) with
+  | .error m => e.log s!"approval: {m}"
+  | .ok epoch =>
+    let mut targets : Array AccountId := #[]
+    -- a skip may need the producer of the previous epoch too, while the epoch change is not final
+    match a.inner with
+    | .skip _ =>
+      let finalEpoch :=
+        (s.st.block s.tip).toOption.bind fun r =>
+          (s.st.block r.view.lastFinalBlock).toOption.map (·.info.epochId)
+      if let some fe := finalEpoch then
+        if fe != epoch then
+          if let .ok p := s.st.blockProducer fe a.targetHeight then
+            targets := targets.push p.accountId
+    | _ => pure ()
+    match s.st.blockProducer epoch a.targetHeight with
+    | .ok p => targets := targets.push p.accountId
+    | .error _ => pure ()
+    for t in targets do
+      if t == e.me then
+        e.collectApproval a false
+      else
+        e.toPeer (.blockApproval a)
+    e.bump "approvalsSent"
+
+/-- Approvals that waited for a block. -/
+def Env.retryParked (e : Env) : IO Unit := do
+  let s ← e.get
+  if s.parkedApprovals.isEmpty then
+    return
+  e.state.modify fun s => { s with parkedApprovals := #[] }
+  for a in s.parkedApprovals do
+    -- too old to matter once the tip is past its target
+    if a.targetHeight ≥ s.tipHeight then
+      e.collectApproval a true
+
+/-! ### Producing blocks -/
+
+/-- `Client::produce_block`, once Doomslug says the block for `height` is ready. -/
+def Env.produceBlock (e : Env) (height : BlockHeight) : IO Unit := do
+  let s ← e.get
+  match lift (s.st.epochIdFromPrevBlock s.tip) with
+  | .error m => e.log s!"produce block: {m}"
+  | .ok epoch =>
+    let chosen := s.inclusion.readyForInclusion epoch s.tip
+    let newChunks : Array (ShardId × NewChunk) :=
+      chosen.filterMap fun (shard, h) =>
+        (s.inclusion.headerAndEndorsements h).map fun (header, sigs) => (shard, ⟨header, sigs⟩)
+    let approvals := (s.ds.witness s.tip s.tipHeight height).map fun (a, ap, _) => (a, ap.signature)
+    let now ← wallNanos
+    match produceBlockOn s.st e.signer s.tip height approvals newChunks now with
+    | .error m => e.log s!"block {height} not produced: {m}"
+    | .ok blk =>
+      e.state.modify fun s => { s with latestKnown := max s.latestKnown height }
+      e.outbox.modify (·.push (.block blk))
+      e.bump "blocksProduced"
+      e.log s!"produced block {height} ({newChunks.size} new chunks, {approvals.size} approvals)"
+      e.ingestBlock blk
+
+/-- `handle_block_production`: the heights from the first unknown one to the largest with enough
+approvals, for which this node is the producer. -/
+def Env.tryProduceBlocks (e : Env) : IO Unit := do
+  let s ← e.get
+  match lift (s.st.epochIdFromPrevBlock s.tip) with
+  | .error _ => return
+  | .ok epoch =>
+    let hi := s.ds.largestThresholdHeight
+    let mut h := s.latestKnown + 1
+    while h ≤ hi do
+      let s ← e.get
+      match s.st.blockProducer epoch h with
+      | .ok p =>
+        if p.accountId == e.me then
+          let numShards := ((s.st.epoch epoch).toOption.map (·.layout.shardIds.size)).getD 1
+          let now ← e.nowMs
+          let (incl, readiness) :=
+            match s.inclusion.prepare s.tracker s.st s.tip with
+            | .ok i => i.readiness now epoch s.tip numShards
+            | .error _ => (s.inclusion, .notReady)
+          let (ds, ready) := s.ds.readyToProduce h readiness now
+          e.state.modify fun s => { s with ds, inclusion := incl }
+          if ready then
+            e.produceBlock h
+      | .error _ => pure ()
+      h := h + 1
+
+/-! ### Serving the peer -/
+
+/-- `process_partial_encoded_chunk_request`: the parts asked for that the node has. -/
+def Env.serveChunk (e : Env) (author : PeerId) (m : PartialEncodedChunkRequestMsg) : IO Unit := do
+  let s ← e.get
+  let some c := s.chunks[m.chunkHash.bytes]? | return
+  let parts := m.partOrds.filterMap fun o => c.parts[o]?
+  let shards := m.trackingShards.entries.map (·.1)
+  let receipts := c.receipts.filter fun r => shards.contains r.proof.toShardId
+  if parts.isEmpty && receipts.isEmpty then
+    return
+  let secs ← wallSeconds
+  e.outbox.modify (·.push (routedTo e.nodeKey author (.partialEncodedChunkResponse ⟨m.chunkHash, parts, receipts⟩) secs))
+  e.bump "chunkRequestsServed"
+
+/-- Parts the peer sent in answer to a request. -/
+def Env.onChunkResponse (e : Env) (r : PartialEncodedChunkResponseMsg) : IO Bool := do
+  let hash : ChunkHash := ⟨r.chunkHash⟩
+  e.bump "PartialEncodedChunkResponse"
+  e.state.modify fun s =>
+    s.withChunk hash fun x => (x.addParts e.code.total r.parts r.receipts).1
+  e.refreshChunk hash
+
+/-- A routed message addressed to this node. -/
+def Env.onRouted (e : Env) (m : RoutedMessage) : IO Unit := do
+  let changed ←
+    match m.body with
+    | .blockApproval a => do e.collectApproval a true; pure false
+    | .versionedPartialEncodedChunk c => e.onPartialChunk c
+    | .partialEncodedChunkForward f => e.onChunkForward f
+    | .partialEncodedChunkResponse r => e.onChunkResponse r
+    | .partialEncodedChunkRequest q => do e.serveChunk m.author q; pure false
+    | .versionedChunkEndorsement en => do e.onEndorsement en; pure false
+    | .partialEncodedStateWitness w | .partialEncodedStateWitnessForward w => do e.onWitnessPart w; pure false
+    | .versionedPartialEncodedStateWitness (.v1 w) | .versionedPartialEncodedStateWitnessForward (.v1 w) =>
+      do e.onWitnessPart w; pure false
+    | .chunkStateWitnessAck _ => do e.bump "ChunkStateWitnessAck"; pure false
+    | .forwardTx _ => do e.bump "ForwardTx"; pure false
+    | _ => do e.bump "OtherRouted"; pure false
+  if changed then
+    e.tryApply
+
+/-- One step: the timer, the production of blocks, the blocks that can be applied. -/
+def Env.tick (e : Env) : IO Unit := do
+  if (← e.failure.get).isSome then
+    return
+  let now ← e.nowMs
+  let s ← e.get
+  let (ds, approvals) := s.ds.processTimer now (some e.signer)
+  e.state.modify fun s => { s with ds }
+  for a in approvals do
+    e.sendApproval a
+  e.retryParked
+  e.tryApply
+  e.tryProduceBlocks
+
+end Near.Node.Validator

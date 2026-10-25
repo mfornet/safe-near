@@ -1,0 +1,3 @@
+{"case":"empty","data":2,"error":"EmptyShard","parity":1}
+{"case":"uneven","data":2,"error":"IncorrectShardSize","parity":1}
+{"case":"empty","data":1,"error":"EmptyShard","parity":1}

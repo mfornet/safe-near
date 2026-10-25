@@ -1,6 +1,7 @@
 import Lean.Data.Json
 import NodeConformance.Runner
 import NearNode.Chain
+import NearNode.Validator.Produce
 
 /-!
 `node-chain-validate DIR`: the blocks of a localnet through the Lean validator (M5a).
@@ -98,6 +99,10 @@ private structure Tally where
   derivedChecked : Nat := 0
   variants : Nat := 0
   variantsAgree : Nat := 0
+  /-- Blocks a validator reproduces from the same inputs, and those it could not try. -/
+  produced : Nat := 0
+  producedAgree : Nat := 0
+  producedSkipped : Nat := 0
   failures : Array String := #[]
 
 private def Tally.fail (t : Tally) (msg : String) : Tally :=
@@ -172,6 +177,29 @@ private def checkDerived (st : ChainState) (block : Block) (line : Json) :
     if got.map (fun (a, s) => (a.val, s.val)) != want then
       out := s!"chunk validators of shard {shard} differ" :: out
   return out.reverse
+
+/-- The block a validator would have produced from the inputs of `block`: its producer's key (a
+`neard localnet` key derives from the account name), the approvals and the new chunks with their
+endorsements as the block holds them, and the block's time. `none` when the key is not the producer's. -/
+private def reproduce (st : ChainState) (block : Block) : Except String (Option Block) := do
+  let v ← (block.header.view?).elim (throw "header version") pure
+  let producer ← st.blockProducer v.epochId v.height |>.mapError fun e => e.kind
+  let some signer := Validator.Signer.ofSeedText? producer.accountId.val producer.accountId.val
+    | return none
+  if signer.publicKey != producer.publicKey then
+    return none
+  let epochId ← st.epochIdFromPrevBlock v.prevHash |>.mapError fun e => e.kind
+  let nextEpochId ← st.nextEpochIdFromPrevBlock v.prevHash |>.mapError fun e => e.kind
+  let approvers ← st.blockApprovers v.prevHash epochId nextEpochId |>.mapError fun e => e.kind
+  let approvals : Array (AccountId × Signature) :=
+    (approvers.zip v.approvals).filterMap fun (a, sig) => sig.map (a.accountId, ·)
+  let endorsements := block.chunkEndorsements
+  let mut chunks : Array (ShardId × Validator.NewChunk) := #[]
+  for h : i in [0:block.chunks.size] do
+    let c := block.chunks[i]
+    if c.heightIncluded == v.height then
+      chunks := chunks.push (c.shardId, ⟨c, endorsements[i]?.getD #[]⟩)
+  some <$> Validator.produceBlockOn st signer v.prevHash v.height approvals chunks v.timestamp
 
 /-- Whether the verdict of a variant is nearcore's. -/
 private def sameVerdict (got : Result Unit) (expected : Json) : Bool × String :=
@@ -277,6 +305,18 @@ def main (args : List String) : IO UInt32 := do
           (do
             decode Block s!"block {height}" (← bytes line "block"))
     t := { t with blocks := t.blocks + 1 }
+    -- a validator in the producer's place makes the same block
+    match reproduce st block with
+    | .error e =>
+      t := t.fail s!"block {height}: reproducing failed: {e}"
+    | .ok none =>
+      t := { t with producedSkipped := t.producedSkipped + 1 }
+    | .ok (some b) =>
+      t := { t with produced := t.produced + 1 }
+      if Codec.encode b == Codec.encode block then
+        t := { t with producedAgree := t.producedAgree + 1 }
+      else
+        t := t.fail s!"block {height}: the reproduced block differs (hash {b.hash.bytes.size})"
     match acceptBlock st block with
     | .error e =>
       t := t.fail s!"block {height} rejected: {e.kind} {e.detail}"
@@ -293,7 +333,7 @@ def main (args : List String) : IO UInt32 := do
         t := t.fail s!"block {height}: derived check failed: {e}"
   let elapsed := (← IO.monoMsNow) - started
   IO.println
-      s!"{manifest.getObjValAs? String "chainId" |>.toOption.getD "?"}: blocks {t.accepted}/{t.blocks} accepted, derived values agree on {t.derivedChecked}, variants {t.variantsAgree}/{t.variants} agree ({elapsed} ms)"
+      s!"{manifest.getObjValAs? String "chainId" |>.toOption.getD "?"}: blocks {t.accepted}/{t.blocks} accepted, derived values agree on {t.derivedChecked}, variants {t.variantsAgree}/{t.variants} agree, reproduced {t.producedAgree}/{t.produced} ({t.producedSkipped} without the producer's key) ({elapsed} ms)"
   for f in t.failures.extract 0 40 do
     IO.println s!"  FAIL {f}"
   if t.failures.size > 40 then

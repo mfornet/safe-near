@@ -726,7 +726,8 @@ fn main() -> Result<()> {
     let mut variants_out = std::io::BufWriter::new(std::fs::File::create(args.out.join("variants.jsonl"))?);
     let mut count = 0usize;
     let mut kinds_seen = BTreeSet::new();
-    for &index in &bases {
+    // a chain of the genesis block alone has no block to vary (the `validator` topology starts there)
+    for &index in bases.iter().filter(|i| **i >= 1) {
         let base = &blocks[index];
         let prev = &blocks[index - 1];
         for kind in kinds() {

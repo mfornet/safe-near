@@ -95,6 +95,11 @@ def genesis_file(topology: str) -> dict:
         "numBlockProducerSeats": g["num_block_producer_seats"],
         "protocolRewardRate": g["protocol_reward_rate"], "protocolTreasuryAccount": g["protocol_treasury_account"],
         "numBlocksPerYear": g["num_blocks_per_year"], "totalSupply": g["total_supply"],
+        # only when they differ from the defaults, so the files of the earlier corpora do not change
+        **{key: g[snake] for key, snake, default in (
+            ("blockProducerKickoutThreshold", "block_producer_kickout_threshold", 90),
+            ("chunkProducerKickoutThreshold", "chunk_producer_kickout_threshold", 90),
+            ("chunkValidatorOnlyKickoutThreshold", "chunk_validator_only_kickout_threshold", 80)) if g[snake] != default},
         "validators": [{"accountId": v["account_id"], "publicKey": public_key(v["public_key"]), "stake": v["amount"]}
                        for v in g["validators"]],
         "shardLayout": shard_layout_v2(g["shard_layout"]).hex(), "records": records,
