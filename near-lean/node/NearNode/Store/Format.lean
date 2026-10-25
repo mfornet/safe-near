@@ -94,7 +94,8 @@ def id : Col → UInt8
 def all : List Col :=
   [.state, .flatState, .flatStateChanges, .flatStateDeltaMetadata, .flatStorageStatus, .blockMisc,
     .chunkExtra, .blockHeader, .block, .blockInfo, .epochInfo, .blockMerkleTree, .outgoingReceipts,
-    .incomingReceipts, .chunkBody, .outcome, .receipt, .txIndex, .delivered, .trieChanges, .stateChanges]
+    .incomingReceipts, .chunkBody, .outcome, .receipt, .txIndex, .delivered, .trieChanges,
+    .stateChanges]
 
 def ofId? (n : UInt8) : Option Col :=
   all.find? (·.id == n)

@@ -204,7 +204,21 @@ def receiptView : Receipt → Json
           a.refundTo true
       | .data d => dataReceiptView d false
       | .promiseResume d => dataReceiptView d true
-      | .globalContractDistribution _ => tagged "GlobalContractDistribution" Json.null
+      | .globalContractDistribution d =>
+        -- `ReceiptEnumView::GlobalContractDistribution`: the code appears as its hash, the nonce only in version 2
+        let view (id : GlobalContractIdentifier) (target : ShardId) (delivered : Array ShardId)
+          (code : ByteArray) (nonce : Option UInt64) : Json :=
+          tagged "GlobalContractDistribution"
+            (Json.mkObj
+              ([("id", globalIdView id), ("target_shard", jn target.toNat),
+                  ("already_delivered_shards", jarr (fun (s : ShardId) => jn s.toNat) delivered),
+                  ("code", jbytes (CryptoHash.hash code).bytes)] ++
+                match nonce with
+                | some n => [("nonce", jn n.toNat)]
+                | none => []))
+        match d with
+        | .v1 r => view r.id r.targetShard r.alreadyDeliveredShards r.code none
+        | .v2 r => view r.id r.targetShard r.alreadyDeliveredShards r.code (some r.nonce)
     Json.mkObj
       [("predecessor_id", jacc r.predecessorId), ("receiver_id", jacc r.receiverId),
         ("receipt_id", jhash r.receiptId), ("receipt", body), ("priority", jn 0)]

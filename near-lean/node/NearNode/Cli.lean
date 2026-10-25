@@ -109,12 +109,16 @@ def withHome (args : List String) : IO (List String) := do
         if let some port := (a.splitOn ":").getLast? then
           out := add "--listen" port out
       match cfg.getObjVal? "gc_num_epochs_to_keep" with
-      | .error _ => pure ()
+      | .error _ =>
+        pure ()
       | .ok v =>
         match v.getNat? with
         | .ok 0 =>
-          throw (IO.userError s!"{configFile}: gc_num_epochs_to_keep is 0, it must be greater than 0 (config validation of neard)")
-        | .ok n => out := add "--gc-epochs-to-keep" (toString (max 3 n)) out
+          throw
+              (IO.userError
+                s!"{configFile}: gc_num_epochs_to_keep is 0, it must be greater than 0 (config validation of neard)")
+        | .ok n =>
+          out := add "--gc-epochs-to-keep" (toString (max 3 n)) out
         | .error _ =>
           throw (IO.userError s!"{configFile}: gc_num_epochs_to_keep must be an unsigned integer")
       if (flagValue args "--boot").isNone then

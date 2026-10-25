@@ -92,7 +92,8 @@ def run (o : Options) : IO UInt32 := do
         IO.eprintln
             s!"[{((← IO.monoMsNow) - started) / 1000}.{(((← IO.monoMsNow) - started) % 1000) / 100}s] {msg}"
   log s!"validator {signer.accountId.val}, node {nodeKey.peerId.key.toText}"
-  log s!"garbage collection keeps {o.gcEpochs} epochs (gc_num_epochs_to_keep{if o.gcEpochs == 0 then ": nothing is collected" else ""})"
+  log
+      s!"garbage collection keeps {o.gcEpochs} epochs (gc_num_epochs_to_keep{if o.gcEpochs == 0 then ": nothing is collected" else ""})"
   let total := numTotalParts boot.genesis.setup.config.numBlockProducerSeats
   let code ← IO.ofExcept (chunkCode total |>.mapError IO.userError)
   let delays : Delays :=

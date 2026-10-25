@@ -294,8 +294,10 @@ private def ratioCompaction : IO Bool := do
         n := n + (← e.path.metadata).byteSize.toNat
     return n
   let write (s : Store) (round : Nat) : IO Unit := do
-    let ops := (Array.range 20).map fun i =>
-      Op.set .blockMisc s!"key{(round * 7 + i) % 200}".toUTF8 ⟨Array.replicate 100 (UInt8.ofNat round)⟩
+    let ops :=
+      (Array.range 20).map fun i =>
+        Op.set .blockMisc s!"key{(round * 7 + i) % 200}".toUTF8
+          ⟨Array.replicate 100 (UInt8.ofNat round)⟩
     discard <| s.commit ops
   -- without the rule
   let (plain, _) ← Store.open (dir / "plain")
@@ -320,7 +322,11 @@ private def ratioCompaction : IO Bool := do
   -- live data is 200 * (100 + 6) bytes: the files stay below about 3 times it plus the minimum log
   ok := ok && (← check (gens ≥ 5) s!"ratio: compacted {gens} times")
   ok := ok && (← check (worst < 3 * 22000 + 2 * 20000) s!"ratio: files at most {worst} bytes")
-  ok := ok && (← check (plainBytes > 5 * worst) s!"ratio: without the rule {plainBytes} bytes against {worst}")
+  ok :=
+    ok &&
+      (←
+        check (plainBytes > 5 * worst)
+            s!"ratio: without the rule {plainBytes} bytes against {worst}")
   s2.close
   IO.FS.removeDirAll dir
   return ok

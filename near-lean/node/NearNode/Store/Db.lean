@@ -257,8 +257,7 @@ def «open» (dir : System.FilePath) (opts : Options := {}) : IO (Store × Recov
           IO.FS.removeFile p
   let log ← IO.FS.Handle.mk lp .append
   let s : Store :=
-    { dir, opts, lock, tables := ← IO.mkRef t,
-      info := ← IO.mkRef ⟨gen, seq, log, pos, snapSize⟩,
+    { dir, opts, lock, tables := ← IO.mkRef t, info := ← IO.mkRef ⟨gen, seq, log, pos, snapSize⟩,
       poisoned := ← IO.mkRef false }
   return (s, ⟨gen, commits, torn⟩)
 
@@ -339,8 +338,10 @@ def commit (s : Store) (ops : Array Op) : IO UInt64 := do
       { m with
         seq, logSize := m.logSize + entry.size }
   let size := m.logSize + entry.size
-  if size > s.opts.logLimit
-      || (s.opts.minLog > 0 && size > s.opts.minLog && size * 100 > s.opts.logPercent * m.snapSize) then
+  if
+      size > s.opts.logLimit ||
+        (s.opts.minLog > 0 && size > s.opts.minLog &&
+          size * 100 > s.opts.logPercent * m.snapSize) then
     s.compact
   return seq
 

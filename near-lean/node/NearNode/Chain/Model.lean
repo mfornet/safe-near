@@ -58,8 +58,8 @@ def CodeCache.list (c : CodeCache) (b : ByteArray) : List UInt8 × CodeCache :=
 code in the trie in the same way (the `State` column stores the code under `sha256(code)` with a count, and garbage
 collection removes it when the last state that held it goes). Everything dropped here is a cache of work the node does again
 on the next use (`Model.code` decodes the bytes it meets), so pruning between two applications changes no result. -/
-def CodeCache.prune (c : CodeCache) (live : Std.HashSet ByteArray) (hashOfLabel : String → Option ByteArray) :
-    CodeCache :=
+def CodeCache.prune (c : CodeCache) (live : Std.HashSet ByteArray)
+    (hashOfLabel : String → Option ByteArray) : CodeCache :=
   let byLabel :=
     c.byLabel.fold
       (fun m label _ =>

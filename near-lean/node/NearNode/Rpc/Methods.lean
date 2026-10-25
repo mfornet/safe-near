@@ -318,7 +318,10 @@ def changesInBlock (c : Ctx) (params : Json) : IO R := do
     | none =>
       return .error (unknownStateChangesBlock s params)
     | some b =>
-      let shards := ((epochDataOf s b).map fun e => e.layout.shardIds.map (blockShardKey b.hash e.layout ·)).getD #[]
+      let shards :=
+        ((epochDataOf s b).map fun e =>
+              e.layout.shardIds.map (blockShardKey b.hash e.layout ·)).getD
+          #[]
       let mut keys : Array (ByteArray × Bool) := #[]
       for key in shards do
         if let some bytes := s.pr.tables.get .stateChanges key then

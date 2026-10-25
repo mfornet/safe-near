@@ -207,7 +207,8 @@ def Env.pruneCodes (e : Env) : IO Unit := do
     return
   let live : Std.HashSet ByteArray :=
     s.pr.tables.rc.fold
-      (fun acc k (d, n) => if n > 0 && k.size == 40 && d.size > 32 then acc.insert (k.extract 8 40) else acc)
+      (fun acc k (d, n) =>
+        if n > 0 && k.size == 40 && d.size > 32 then acc.insert (k.extract 8 40) else acc)
       {}
   let before := s.pr.cache.byLabel.size
   let cache := s.pr.cache.prune live fun l => (hashOfLabel? l).map fun b => ⟨b.toArray⟩

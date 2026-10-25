@@ -135,10 +135,14 @@ def trieEntries (src : NodeSource) (root : CryptoHash) :
       | some v => pure (k, v)
       | none => throw "trie value missing"
 
-/-- The entries that differ between the entries `old` and `new` of a shard: the new value, or `none` for an entry that is gone. -/
-def diffEntries (old new : Array (ByteArray × ByteArray)) : Array Change :=
-  let oldMap : Std.HashMap ByteArray ByteArray := old.foldl (fun m (k, v) => m.insert k v) {}
-  let newMap : Std.HashMap ByteArray ByteArray := new.foldl (fun m (k, v) => m.insert k v) {}
+/-- The entries of a shard by key. -/
+def entryMap (es : Array (ByteArray × ByteArray)) : Std.HashMap ByteArray ByteArray :=
+  es.foldl (fun m (k, v) => m.insert k v) {}
+
+/-- The entries that differ between the entries `old` and `new` of a shard (`oldMap` and `newMap` are the same by key): the new
+value, or `none` for an entry that is gone. -/
+def diffEntries (old new : Array (ByteArray × ByteArray))
+    (oldMap newMap : Std.HashMap ByteArray ByteArray) : Array Change :=
   Id.run do
     let mut changes : Array Change := #[]
     for (k, v) in new do
@@ -149,10 +153,17 @@ def diffEntries (old new : Array (ByteArray × ByteArray)) : Array Change :=
         changes := changes.push (k, none)
     return changes
 
-/-- The new root and changes that turn the entries `old` of the trie at `root` into `new`. -/
-def updateTrie (src : NodeSource) (root : CryptoHash) (old new : Array (ByteArray × ByteArray)) :
-    Except String TrieChanges := do
-  pure (← update src root (diffEntries old new)).changes
+/-- The accounts of an epoch's validator accounts update that `update_validator_accounts` writes if they exist. -/
+def validatorsWritten (update : Option Near.ValidatorAccountsUpdate) : List AccountId :=
+  match update with
+  | none => []
+  | some u =>
+    let stake := u.stakeInfo.map (·.1)
+    let treasury :=
+      match u.protocolTreasury with
+      | some t => if stake.contains t then [] else [t]
+      | none => []
+    (stake ++ treasury).map (⟨·⟩)
 
 /-! ### Receipts -/
 
@@ -436,9 +447,17 @@ def applyBlock (prof : Option Prof) (p : Params) (st : Near.Node.Chain.ChainStat
             timed prof "run/old-chunk" fun _ => runOldChunk p.cfg p.congestion ctx prepared
           let some (.v5 old) := prevExtra? | throw "no chunk extra before an old chunk"
           pure (entries, ChunkExtra.v5 old, #[], #[], #[])
-    let diff := diffEntries entries newEntries
-    let changes ← timed prof "trie-update" fun _ => do pure (← Near.Node.Trie.update src root diff).changes
-    let touched := touchedOf diff
+    let oldMap := entryMap entries
+    let newMap := entryMap newEntries
+    let diff := diffEntries entries newEntries oldMap newMap
+    let changes ←
+      timed prof "trie-update" fun _ => do
+          pure (← Near.Node.Trie.update src root diff).changes
+    let written :=
+      writtenKeys oldMap newMap (validatorsWritten ctx.update)
+        (if isNew then b.transactions else #[])
+        (outcomes.extract (if isNew then b.transactions.size else 0) outcomes.size)
+    let touched := touchedOf diff written
     let extra : ChunkExtra :=
       match extra with
       | .v5 e => .v5 { e with stateRoot := changes.newRoot }
