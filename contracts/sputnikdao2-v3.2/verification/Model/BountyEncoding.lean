@@ -1,20 +1,14 @@
 import Model.BountyStorage
+import NearSdk
 
 namespace SputnikDAO2
 
 abbrev BountyBytes := List UInt8
 
-def bountyLE : Nat → Nat → BountyBytes
-  | 0, _ => []
-  | width + 1, value =>
-      UInt8.ofNat (value % 256) :: bountyLE width (value / 256)
-
-def bountyFromLE : BountyBytes → Nat
-  | [] => 0
-  | byte :: rest => byte.toNat + 256 * bountyFromLE rest
+-- Little-endian integers and their parser come from the shared `NearSdk` library.
 
 def bountyBorshString (account : String) : BountyBytes :=
-  bountyLE 4 account.toUTF8.data.toList.length ++
+  NearSdk.Borsh.leBytes 4 account.toUTF8.data.toList.length ++
     account.toUTF8.data.toList
 
 -- StorageKeys is the pinned eight-variant enum in lib.rs, in declaration
@@ -23,7 +17,7 @@ def bountyClaimersKey (account : String) : BountyBytes :=
   5 :: bountyBorshString account
 
 def bountyCountKey (bountyId : Nat) : BountyBytes :=
-  6 :: bountyLE 8 bountyId
+  6 :: NearSdk.Borsh.leBytes 8 bountyId
 
 -- The other StorageKeys variants have single-byte tags 0,1,2,3,4,7.
 def otherDAOPrefixes : List UInt8 := [0, 1, 2, 3, 4, 7]
@@ -31,25 +25,17 @@ def otherDAOPrefixes : List UInt8 := [0, 1, 2, 3, 4, 7]
 -- BountyClaim is Borsh-serialized as u64 id, U64 start, U64 deadline, bool.
 -- `paidBond` is proof history and has no on-chain byte representation.
 def encodeStoredBountyClaim (claim : StoredBountyClaim) : BountyBytes :=
-  bountyLE 8 claim.bountyId ++
-    bountyLE 8 claim.start ++
-    bountyLE 8 claim.deadline ++
+  NearSdk.Borsh.leBytes 8 claim.bountyId ++
+    NearSdk.Borsh.leBytes 8 claim.start ++
+    NearSdk.Borsh.leBytes 8 claim.deadline ++
     [if claim.completed then 1 else 0]
 
 def encodeStoredBountyClaims (claims : List StoredBountyClaim) : BountyBytes :=
-  bountyLE 4 claims.length ++ claims.flatMap encodeStoredBountyClaim
+  NearSdk.Borsh.leBytes 4 claims.length ++ claims.flatMap encodeStoredBountyClaim
 
-def encodeBountyCount (count : Nat) : BountyBytes := bountyLE 4 count
+def encodeBountyCount (count : Nat) : BountyBytes := NearSdk.Borsh.leBytes 4 count
 
 abbrev BountyParser (α : Type) := BountyBytes → Option (α × BountyBytes)
-
-def bountyTake (width : Nat) : BountyParser BountyBytes := fun input =>
-  if width ≤ input.length then some (input.take width, input.drop width)
-  else none
-
-def bountyParseNat (width : Nat) : BountyParser Nat := fun input => do
-  let (bytes, rest) ← bountyTake width input
-  some (bountyFromLE bytes, rest)
 
 def bountyParseBool : BountyParser Bool
   | [] => none
@@ -69,14 +55,14 @@ def physicalBountyClaim (claim : StoredBountyClaim) : PhysicalBountyClaim :=
   ⟨claim.bountyId, claim.start, claim.deadline, claim.completed⟩
 
 def bountyParseClaim : BountyParser PhysicalBountyClaim := fun input => do
-  let (bountyId, rest) ← bountyParseNat 8 input
-  let (start, rest) ← bountyParseNat 8 rest
-  let (deadline, rest) ← bountyParseNat 8 rest
+  let (bountyId, rest) ← NearSdk.BorshParse.natural 8 input
+  let (start, rest) ← NearSdk.BorshParse.natural 8 rest
+  let (deadline, rest) ← NearSdk.BorshParse.natural 8 rest
   let (completed, rest) ← bountyParseBool rest
   some (⟨bountyId, start, deadline, completed⟩, rest)
 
 def bountyParseCount (input : BountyBytes) : Option Nat := do
-  let (count, rest) ← bountyParseNat 4 input
+  let (count, rest) ← NearSdk.BorshParse.natural 4 input
   if rest.isEmpty then some count else none
 
 def bountyParseClaimsN : Nat → BountyParser (List PhysicalBountyClaim)
@@ -88,7 +74,7 @@ def bountyParseClaimsN : Nat → BountyParser (List PhysicalBountyClaim)
 
 def bountyParseClaims (input : BountyBytes) :
     Option (List PhysicalBountyClaim) := do
-  let (count, rest) ← bountyParseNat 4 input
+  let (count, rest) ← NearSdk.BorshParse.natural 4 input
   if count * 25 > rest.length then none
   else do
     let (claims, tail) ← bountyParseClaimsN count rest

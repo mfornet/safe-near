@@ -12,21 +12,7 @@ structure Metadata where
   changelog : Option String
   deriving DecidableEq, Repr
 
-structure VectorHeader where
-  length : Nat
-  keyPrefix : Bytes
-  deriving DecidableEq, Repr
-
-structure SetHeader where
-  indexPrefix : Bytes
-  elements : VectorHeader
-  deriving DecidableEq, Repr
-
-structure MapHeader where
-  indexPrefix : Bytes
-  keys : VectorHeader
-  values : VectorHeader
-  deriving DecidableEq, Repr
+export NearSdk.Collections (VectorHeader SetHeader MapHeader)
 
 def initialSet : SetHeader := ⟨[100, 105], ⟨0, [100, 101]⟩⟩
 def initialMap : MapHeader := ⟨[109, 105], ⟨0, [109, 107]⟩, ⟨0, [109, 118]⟩⟩

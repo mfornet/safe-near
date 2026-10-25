@@ -76,7 +76,7 @@ theorem borsh_string_injective (left right : Account)
     (heq : borshString left = borshString right) : left = right := by
   have hbytes : left.toUTF8.data.toList = right.toUTF8.data.toList := by
     have hdrop := congrArg (List.drop 4) heq
-    simpa [borshString, borshBytes, List.drop_append, leBytes_length]
+    simpa [borshString, NearSdk.Borsh.bytes, NearSdk.Borsh.u32, List.drop_append, leBytes_length]
       using hdrop
   have hl := string_utf8_roundtrip left
   have hr := string_utf8_roundtrip right

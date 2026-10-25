@@ -3,7 +3,7 @@ import Model.ConfigPolicyEncoding
 namespace SputnikDAO2
 
 def parseWireString : BountyParser String := fun input => do
-  let (size, rest) ← bountyParseNat 4 input
+  let (size, rest) ← NearSdk.BorshParse.natural 4 input
   if size > rest.length then none
   else do
     let text ← String.fromUTF8? ⟨(rest.take size).toArray⟩
@@ -19,13 +19,13 @@ def parseWireVecN {α : Type} (parse : BountyParser α) :
 
 def parseWireVec {α : Type} (parse : BountyParser α) :
     BountyParser (List α) := fun input => do
-  let (count, rest) ← bountyParseNat 4 input
+  let (count, rest) ← NearSdk.BorshParse.natural 4 input
   parseWireVecN parse count rest
 
 def parseWireConfig : BountyParser WireConfig := fun input => do
   let (name, rest) ← parseWireString input
   let (purpose, rest) ← parseWireString rest
-  let (size, rest) ← bountyParseNat 4 rest
+  let (size, rest) ← NearSdk.BorshParse.natural 4 rest
   if size > rest.length then none
   else some (⟨name, purpose, rest.take size⟩, rest.drop size)
 
@@ -34,7 +34,7 @@ def parseWireRoleKind : BountyParser WireRoleKind
   | tag :: rest =>
       if tag == 0 then some (.everyone, rest)
       else if tag == 1 then do
-        let (minimum, tail) ← bountyParseNat 16 rest
+        let (minimum, tail) ← NearSdk.BorshParse.natural 16 rest
         some (.member minimum, tail)
       else if tag == 2 then do
         let (accounts, tail) ← parseWireVec parseWireString rest
@@ -52,18 +52,18 @@ def parseWireWeightOrRatio : BountyParser WireWeightOrRatio
   | [] => none
   | tag :: rest =>
       if tag == 0 then do
-        let (amount, tail) ← bountyParseNat 16 rest
+        let (amount, tail) ← NearSdk.BorshParse.natural 16 rest
         some (.weight amount, tail)
       else if tag == 1 then do
-        let (numerator, tail) ← bountyParseNat 8 rest
-        let (denominator, tail) ← bountyParseNat 8 tail
+        let (numerator, tail) ← NearSdk.BorshParse.natural 8 rest
+        let (denominator, tail) ← NearSdk.BorshParse.natural 8 tail
         if denominator == 0 then none
         else some (.ratio numerator denominator, tail)
       else none
 
 def parseWireVotePolicy : BountyParser WireVotePolicy := fun input => do
   let (weightKind, rest) ← parseWireWeightKind input
-  let (quorum, rest) ← bountyParseNat 16 rest
+  let (quorum, rest) ← NearSdk.BorshParse.natural 16 rest
   let (threshold, rest) ← parseWireWeightOrRatio rest
   some (⟨weightKind, quorum, threshold⟩, rest)
 
@@ -84,10 +84,10 @@ def parseWireRolePermission : BountyParser WireRolePermission :=
 def parseWirePolicy : BountyParser WirePolicy := fun input => do
   let (roles, rest) ← parseWireVec parseWireRolePermission input
   let (defaultVotePolicy, rest) ← parseWireVotePolicy rest
-  let (proposalBond, rest) ← bountyParseNat 16 rest
-  let (proposalPeriod, rest) ← bountyParseNat 8 rest
-  let (bountyBond, rest) ← bountyParseNat 16 rest
-  let (bountyForgivenessPeriod, rest) ← bountyParseNat 8 rest
+  let (proposalBond, rest) ← NearSdk.BorshParse.natural 16 rest
+  let (proposalPeriod, rest) ← NearSdk.BorshParse.natural 8 rest
+  let (bountyBond, rest) ← NearSdk.BorshParse.natural 16 rest
+  let (bountyForgivenessPeriod, rest) ← NearSdk.BorshParse.natural 8 rest
   some (⟨roles, defaultVotePolicy, proposalBond, proposalPeriod,
     bountyBond, bountyForgivenessPeriod⟩, rest)
 

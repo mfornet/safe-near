@@ -3,9 +3,7 @@ import Model.Borsh
 
 namespace SputnikFactory
 
-/-- SDK Vector uses raw little-endian indexes appended to its keyPrefix. -/
-def vectorKey (header : VectorHeader) (index : Nat) : Bytes :=
-  header.keyPrefix ++ leBytes 8 index
+export NearSdk.Collections (vectorKey)
 
 def vectorGet (header : VectorHeader) (index : Nat) : Tx (Option Bytes) := do
   if index ≥ header.length then pure none else

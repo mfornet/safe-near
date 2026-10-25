@@ -13,6 +13,7 @@ safe-near/
       vm/               -- Single contract call: metering and host functions
       runtime/          -- Transactions, receipts and account state
       chain/            -- Block execution and settlement
+      sdk/              -- near-sdk's Borsh and collection layouts, shared by contract projects
     contracts/
       CATALOG.md        -- List of contracts
       <name>/           -- One deployed binary (see SMART_CONTRACTS.md)
