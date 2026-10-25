@@ -1,6 +1,7 @@
 # NearSdk: near-sdk's storage and serialization layout, shared by the contract
 # verification projects (SAF-41): Borsh encoders and parsers, and the key and
-# header layouts of near-sdk's collections, with their round-trip lemmas.
+# header layouts of near-sdk's collections, with their round-trip lemmas; and
+# what a contract may assume of a NEP-141/NEP-145 contract it calls (SAF-42).
 #
 # Requires nothing, so any contract project can depend on it.
 name = "NearSdk"
