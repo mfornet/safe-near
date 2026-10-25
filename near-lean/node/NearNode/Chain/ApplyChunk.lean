@@ -123,12 +123,17 @@ def prepare (entries : Array (ByteArray × ByteArray)) (txs : Array SignedTransa
   let buffers ← Near.ShardSink.Buffers.ofEntries d.buffers
   -- Code a contract deploys from its own memory is in no input; the receipts the chunk's producer
   -- says it sent carry it, and the runtime must produce the same receipts.
-  let mut cache := conv.cache
+  let mut scratch := conv
   for raw in claimed do
     if let .ok r := Codec.decodeAll (α := Receipt) raw then
-      if let .ok (_, c) := (receipt r).run { conv with cache } then
-        cache := c.cache
-  let codes : ChainReplay.Catalogue := cache.toList.map (·.2)
+      if let .ok (_, c) := (receipt r).run scratch then
+        scratch :=
+          { scratch with
+            cache := c.cache, used := c.used }
+  let cache := scratch.cache
+  -- the catalogue holds the code this chunk uses, not every code seen so far: the encoders look
+  -- codes up by hash
+  let codes : ChainReplay.Catalogue := scratch.used.toList.filterMap (cache[·]?)
   let state := { d.state with nextId := conv.next }
   let ap : Near.ApplyState :=
     { blockHeight := ctx.height, blockTimestamp := ctx.timestamp, epochHeight := ctx.epochHeight,

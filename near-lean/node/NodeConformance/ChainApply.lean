@@ -390,6 +390,7 @@ def main (args : List String) : IO UInt32 := do
     if height.toUInt64 ≤ startHeight then
       continue
     pendingOps := #[]
+    let blockStarted ← IO.monoMsNow
     let block ←
       orThrow
           (do
@@ -510,6 +511,9 @@ def main (args : List String) : IO UInt32 := do
       if let some s := store? then
         if t.failures.isEmpty then
           discard <| s.commit (← orThrow (commitOps st block fin pendingOps))
+      let took := (← IO.monoMsNow) - blockStarted
+      if took > 60000 then
+        IO.eprintln s!"  block {height} took {took / 1000} s"
   if let some s := store? then
     s.close
   let elapsed := (← IO.monoMsNow) - started

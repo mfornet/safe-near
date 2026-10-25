@@ -707,9 +707,12 @@ Acceptance: the state roots of the M3 corpus and a restart test. `just node-stat
 
 ### M5 chain
 
-M5a (header and block validation) is done; M5b (the epoch manager's computation, chunk application in the chain, the
-chain store) is not. Acceptance of M5a: `just chain-validate-corpus` (sources: `near-lean/node/NearNode/Chain/`,
+M5a (header and block validation) and M5b (the epoch manager's computation, chunk application in the chain, the chain
+store) are done. Acceptance of M5a: `just chain-validate-corpus` (sources: `near-lean/node/NearNode/Chain/`,
 `NodeConformance/ChainValidate.lean`, `tools/localnet/{chain_exporter.rs,chain_corpus.py,chain_validate.py}`).
+Acceptance of M5b: `just chain-apply-corpus` (sources: `NearNode/Epoch/`, `NearNode/Chain/{Model,StateDecode,
+ApplyChunk,Apply,Genesis,Persist}.lean`, `NodeConformance/ChainApply.lean`, `tools/localnet/chain_apply.py`); its
+results are in the M5b bullets after the M5a ones.
 
 - **Corpus** (`near-lean/node/corpus/blocks/{single,sharded}`, 1.9 MB of gzip, budget 20 MB). The pinned `neard`
   databases of the M3 localnets read by `safe-near-chain-export` (an overlay on `state-viewer`, like the chunk exporter;
@@ -718,8 +721,9 @@ chain store) is not. Acceptance of M5a: `just chain-validate-corpus` (sources: `
   `blocks.jsonl` (every block from genesis to the head, 514 and 512, as Borsh `Block`, with what nearcore derived:
   `BlockInfo`, block merkle tree and root, block producer, the approvers `EpochManager` ordered with both stakes,
   chunk producers, chunk validator assignments, `ChunkExtra` per shard, whether the next block starts an epoch) and
-  `variants.jsonl`. Not exported in M5a: chunk bodies and parts (nothing validated here reads them). The healthy
-  localnets have no skipped heights and no missing chunk; 34 blocks per chain need approvals of the next epoch, and the
+  `variants.jsonl`. Not exported in M5a: chunk bodies and parts (nothing validated here reads them). The
+  localnets have no skipped heights, and every chunk is present except the chunk of shard 0 of the sharded chain in
+  heights 181 to 210 (found in M5b); 34 blocks per chain need approvals of the next epoch, and the
   sharded chain alternates two block producers.
 - **Invalid variants** (931 and 937, 39 kinds on 24 base blocks per chain: the first two blocks, epoch boundaries, and
   seeded picks). Each is built from a valid block, re-derived and **re-signed by the producer's key** (`validator_key.json`)
@@ -757,11 +761,60 @@ chain store) is not. Acceptance of M5a: `just chain-validate-corpus` (sources: `
   state-sync state (they depend on the node's final head, tracking and garbage collection, not on the block); the head
   is the accepted block of largest height; the `InvalidBlockHeight` bound uses it; `EarlyKickout` and dynamic
   resharding (nightly); resharding of `get_prev_chunk_headers`.
-- **For M5b.** Computing the next `EpochInfo` (`finalize_epoch`: proposals to validators, kickouts, rewards, the
-  samplers, `EpochSummary`, the aggregator) so that the given `epochs.jsonl` becomes a check; applying chunks to
-  produce `ChunkExtra` and the state roots (the corpus already carries nearcore's `ChunkExtra` per block and shard)
-  and the chunk-body checks; the chain store (M4 store) with heads and final head; skipped heights and missing chunks
-  need a chain that has them (the corpus has none), and a fork.
+- **M5b, epoch manager** (`NearNode/Epoch/{Config,Selection,Manager,Process}.lean`, `chain/epoch-manager` at the pin).
+  `EpochConfig` is `EpochConfig::genesis_test` filled with the genesis facts, which is what `EpochManager::new_arc_handle`
+  builds on a chain with no `epoch_configs` directory (the localnets; note `max_inflation_rate` is 1/40 there, not the
+  1/20 of `genesis.json`), `RewardParams` is `RewardCalculator::new`. `Aggregator.updateTail` is
+  `EpochInfoAggregator::update_tail` (block production including missed heights, chunk production, endorsement bits,
+  latest protocol version per producer, latest proposal per account); nearcore keeps the aggregator incrementally up to
+  the last final block and merges the rest at the epoch end, here it is the aggregate over the epoch's blocks at its last
+  block, the same on one chain. `collectBlocksInfo` (version vote and its threshold, `Unstaked`, the online ratio,
+  `compute_validators_to_reward_and_kickout`), `calculateReward` (U256/U512 as `Nat`), `proposalsToEpochInfo`
+  (`apply_epoch_update_to_proposals`, `select_validators` for chunk producers, block producers and chunk validators with the
+  stake threshold, `NotEnoughStake` kickouts, `assign_to_satisfy_shards`, `assign_to_balance_shards` with the
+  shard-assignment RNG, mandates, samplers, `EpochInfo::V5`), `finalizeEpoch`, `genesisEpochInfo`,
+  `computeStakeReturnInfo` and `validatorAccountsUpdate` (`NightshadeRuntime::process_state_update`). `processBlock` is
+  `acceptBlock` plus `finalizeEpoch` when the block ends its epoch, so the epochs of a chain are computed, not given.
+  Result: **19/19 `EpochInfo` on both chains equal to nearcore's, byte for byte** (rewards, minted amount, kickouts,
+  samplers, mandates; a changed inflation rate fails 3 of 19), the genesis epochs from the genesis validators, and the
+  `ValidatorAccountsUpdate` equal on every chunk row (148 and 288, the 12 epoch-start ones non-empty).
+- **M5b, chain apply** (`NearNode/Chain/{Model,StateDecode,ApplyChunk,Apply,Genesis}.lean`). `StateDecode` turns a shard's
+  trie entries into the runtime's model state and the `QueueEncoding.Context` (the inverse of `QueueEncoding.encode`, the
+  Lean twin of `lean_input.py`; every chunk's pre-state is re-encoded and must equal the trie's entries), `Model` converts
+  transactions, actions and receipts, `ApplyChunk` is `ChainReplay.Registered.run` for one block returning typed results,
+  `Apply.applyBlock` is what `postprocess_block` does: for each shard the incoming receipts (each new chunk's previous
+  chunk's outgoing receipts grouped by `receiver_shard_id` (global contract distributions by target shard), one proof per
+  new source chunk, shuffled with ChaCha20 seeded by the previous block hash, then the receipts delivered since the
+  shard's last chunk, newest block first), the `ApplyChunkBlockContext` from the block and its chunk headers (gas price of
+  the previous block, congestion info and bandwidth requests of the headers, `missed_chunks`), the epoch provider, the
+  update, the runtime, the trie update (`Trie.update` on the diff of entries) and the `ChunkExtra` V5 (outcome root from
+  `ExecutionOutcomeWithId::to_hashes`, whose partial status carries no failure details; balance burnt minus subsidized).
+  A chunk that is not new gets `apply_old_chunk`: the accounts update and the bandwidth scheduler, previous extra with
+  the new root. Checks per chunk: header `prev_state_root`, `prev_outgoing_receipts_root` of the previous chunk's
+  receipts, `tx_root` of the transactions, the incoming and outgoing receipts against nearcore's recorded ones, and the
+  `ChunkExtra` against the corpus. The genesis state is built from `genesis.json` (`GenesisStateApplier`, storage usage
+  recomputed) and its roots equal the genesis chunk headers'. Inputs the corpus lacks are taken from the M3 bundles
+  (`chunks.jsonl.gz`, see CORPUS.md section 12): the transactions of a chunk are the bundle's, a chunk without a bundle is
+  empty (the `tx_root` check proves it), and code a contract deploys from its own memory is found in the receipts the bundle
+  records as sent. No exporter change was needed.
+  **Found on the way:** the sharded chain does miss chunks (shard 0 in heights 181 to 210), contrary to the M5a note; the
+  node handles them, and the shuffle of receipt proofs only matched once old chunks were left out of it. No runtime bug
+  was found; `near-lean/{vm,runtime,interface}` are unchanged.
+- **M5b, chain store and restart** (`Chain/Persist.lean`, columns added to `Store/Format.lean`). One commit per block holds
+  the block, its header, `BlockInfo`, merkle tree, the `EpochInfo` of a finalized epoch, the trie nodes of every shard,
+  `ChunkExtra`, outgoing and incoming receipts and `HEAD`, `HEADER_HEAD`, `FINAL_HEAD`, `GENESIS_HASH`. `load` rebuilds the
+  chain state and progress; `chain-apply-corpus` runs every chain in two processes, the second continuing from what the first
+  stored at half the chain.
+- **M5b, result** (`just chain-apply-corpus`): both chains, from genesis to the head, **all agree**. Sharded: 19/19 epochs, 288/288 validator accounts updates, 2044/2044 `ChunkExtra` (511 blocks, four shards), 2044/2044 pre-state round trips, 288/288 incoming and 288/288 outgoing receipt lists. Single: 19/19, 148/148, 513/513, 513/513, 148/148, 148/148 (513 blocks). Each chain was applied in two processes with the store between them (stopped at height 256 and 255). Timing on one core: 54 min for the single-shard chain and 58 min for the sharded one, almost all in the burst blocks 214 to 217 (13 to 27 minutes each: 300 to 1200 Tgas of contract code in the Lean interpreter); the other blocks take about 0.5 s per chunk. The catalogue handed to the encoders must hold only the code a chunk uses (a catalogue of everything seen made block 218 take over 20 minutes).
+- **M5b, deferred and doubts.** A change of shard layout (`StickyResharding`, dynamic resharding, `EarlyKickout`, SPICE) is
+  rejected, not represented; the epoch config is the generated one, real networks load `epoch_configs`; `max_by_key` ties
+  of the version vote are not reproduced; only accounts and full access keys in the genesis; the incremental aggregator is
+  not kept; trie nodes are never garbage collected and flat storage is not updated by the node (M4's tests cover it);
+  chunk production, state witnesses and validation of the chunk body beyond its roots; forks and reorgs (one chain, no
+  rollback); the chain is run chunk by chunk with the shard state converted from the trie each time (about 0.5 s a block,
+  minutes for the burst chunks), performance is M10. `just chain-replay-test` has a failing test, 
+  `test_emitted_deployment_uses_the_catalogue_or_rejects_atomically`, at the base commit already: M3e made the replay decode
+  code a contract deploys from its own memory, and the test still expects an execution issue.
 
 ## Open points
 
