@@ -5,6 +5,7 @@ Two topologies, both at the protocol version of the pinned binary (86):
 
 * ``single``  : 1 validator, 1 shard
 * ``sharded`` : 2 validators, 4 shards (boundary accounts test1, test2, test3)
+* ``validator``: 2 validators, 1 shard; only ``node0`` is started as ``neard``, ``node1`` is for the Lean node
 
 ``init`` runs ``neard localnet`` and then pins everything that is random or
 clock-dependent in the generated configuration (chain id, genesis time, ports,
@@ -33,6 +34,10 @@ DATA = HERE / "data"
 TOPOLOGIES = {
     "single": {"validators": 1, "shards": 1, "chainId": "safe-near-localnet-1s", "basePort": 18100},
     "sharded": {"validators": 2, "shards": 4, "chainId": "safe-near-localnet-4s", "basePort": 18200},
+    # node0 is `neard`; node1 is the Lean node, which runs from node1's validator key (M8). Equal stakes: neither
+    # holds two thirds, so every approval, endorsement and block of the Lean node is needed for finality.
+    "validator": {"validators": 2, "shards": 1, "chainId": "test-chain-safe-near-validator", "basePort": 18300,
+                  "neard": [0], "noKickout": True},
 }
 GENESIS_TIME = "2026-01-01T00:00:00.000000000Z"
 EPOCH_LENGTH = 30
@@ -79,6 +84,19 @@ def init(topology: str) -> Path:
         genesis["genesis_time"] = GENESIS_TIME
         genesis["epoch_length"] = EPOCH_LENGTH
         genesis["transaction_validity_period"] = TRANSACTION_VALIDITY_PERIOD
+        if spec.get("noKickout"):
+            # With two validators of equal stake each missed block of one is a skipped height of the other; a node
+            # that is slow for a few seconds (a block of heavy contract calls in the interpreter) would be kicked
+            # out of the validator set at the end of the epoch, and the chain would no longer need it. The
+            # thresholds are genesis parameters (a percentage of the blocks, chunks and endorsements expected).
+            for key in ("block_producer_kickout_threshold", "chunk_producer_kickout_threshold",
+                        "chunk_validator_only_kickout_threshold"):
+                genesis[key] = 0
+            # neard takes the epoch config from the genesis only for a chain id that starts with `test-chain-`
+            # (otherwise it builds the fixed test config with the 90/90/80 thresholds, which kicked out a
+            # validator that missed 12 % of its blocks); the other genesis parameters it reads are the defaults of
+            # that test config, except the inflation rate, which the generated genesis sets to 1/20.
+            genesis["max_inflation_rate"] = [1, 40]
         (node / "genesis.json").write_text(json.dumps(genesis, indent=2) + "\n")
     return root
 
@@ -87,7 +105,7 @@ def start(topology: str) -> list[int]:
     spec = TOPOLOGIES[topology]
     root = home(topology)
     pids = []
-    for index in range(spec["validators"]):
+    for index in spec.get("neard", range(spec["validators"])):
         node = root / f"node{index}"
         log = (node / "neard.log").open("ab")
         env = dict(build.neard_environment(BIN), RUST_LOG="warn")

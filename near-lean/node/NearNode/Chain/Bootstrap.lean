@@ -111,7 +111,12 @@ def parseGenesis (j : Json) : Except String Genesis := do
     {
       config :=
         { epochLength := ← nat j "epochLength",
-          numBlockProducerSeats := ← nat j "numBlockProducerSeats", shardLayout := layout },
+          numBlockProducerSeats := ← nat j "numBlockProducerSeats", shardLayout := layout,
+          -- the kickout thresholds are genesis parameters (the corpus files predate them: the defaults)
+          blockProducerKickoutThreshold := (j.getObjValAs? Nat "blockProducerKickoutThreshold").toOption.getD 90,
+          chunkProducerKickoutThreshold := (j.getObjValAs? Nat "chunkProducerKickoutThreshold").toOption.getD 90,
+          chunkValidatorOnlyKickoutThreshold :=
+            (j.getObjValAs? Nat "chunkValidatorOnlyKickoutThreshold").toOption.getD 80 },
       reward :=
         { protocolRewardRate := ⟨← (← rate.getArrVal? 0).getNat?, ← (← rate.getArrVal? 1).getNat?⟩,
           protocolTreasuryAccount := ⟨← str j "protocolTreasuryAccount"⟩,
