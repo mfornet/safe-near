@@ -65,7 +65,7 @@ def validation_steps(root: Path, nearcore: Path) -> list[Step]:
         "staking-key-replay", "trie-replay", "--wfail")
     add("chain-build", "near-lean/chain", "lake", "build", "NearChain", "chain-tests", "chain-replay",
         "registered-replay", "state-encode", "receipt-encode", "transaction-replay", "receipt-replay", "--wfail")
-    add("sdk-build", "near-lean/sdk", "lake", "build", "NearSdk", "--wfail")
+    add("sdk-build", "near-lean/sdk", "lake", "build", "NearSdk", "ft-state-check", "--wfail")
     add("crypto-build", "near-lean/crypto", "lake", "build", "NearCrypto", "crypto-conformance",
         "crypto-differential", "--wfail")
     add("node-build", "near-lean/node", "lake", "build", "NearNode", "near-lean-node", "node-bench",
@@ -109,6 +109,7 @@ def validation_steps(root: Path, nearcore: Path) -> list[Step]:
     python("vm-dependencies", "tools/check_vm_dependencies.py", "--no-build")
     python("dependency-regressions", "tools/tests/check_vm_dependencies.py")
     python("node-isolation", "tools/check_node_isolation.py")
+    python("ft-state-check", "tools/tests/test_ft_state_check.py")
     python("verification-buildtime", "tools/verification_buildtime.py")
     python("audit-regressions", "tools/tests/check_axiom_audit.py")
     for package, report in [("near-lean/wasm", "wasm"), ("near-lean/wasm-logic", "wasm-logic"),
