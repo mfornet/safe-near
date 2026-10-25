@@ -19,3 +19,6 @@ import NearNode.Validator.Chunk
 import NearNode.Validator.Messages
 import NearNode.Validator.Witness
 import NearNode.Validator.Block
+import NearNode.Validator.Doomslug
+import NearNode.Validator.Inclusion
+import NearNode.Validator.Produce

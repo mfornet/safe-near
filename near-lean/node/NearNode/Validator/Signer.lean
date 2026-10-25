@@ -42,6 +42,16 @@ def ofSecret? (account : String) (secret : String) : Option Signer := do
   let pair ← base58Decode? body.toString
   pure ⟨⟨account⟩, key, pair.extract 0 32⟩
 
+/-- `InMemorySigner::from_seed` (`near-crypto` `test_utils.rs`): the seed text is cut or padded with
+spaces to 32 bytes and is the Ed25519 seed. `neard localnet` derives the key of an account from its name. -/
+def ofSeedText? (account : String) (seed : String) : Option Signer := do
+  guard (AccountId.isValid account)
+  let bytes := seed.toUTF8
+  let n := min 32 bytes.size
+  let padded := bytes.extract 0 n ++ ByteArray.mk (Array.replicate (32 - n) 32)
+  let key ← NodeKey.ofSeed? padded
+  pure ⟨⟨account⟩, key, padded⟩
+
 /-- `validator_key.json`: `account_id`, `public_key`, `secret_key`. -/
 def ofJson? (j : Lean.Json) : Option Signer := do
   let account ← (j.getObjValAs? String "account_id").toOption
