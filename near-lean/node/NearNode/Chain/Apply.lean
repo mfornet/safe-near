@@ -284,6 +284,10 @@ def applyBlock (p : Params) (st : Near.Node.Chain.ChainState) (block : Block) (b
       throw
           s!"shard {shard}: state root {hex root.bytes} but the chunk header says {hex expectedRoot.bytes}"
     let b := body shard
+    if isNew then
+      let (txRoot, _) := merklize b.transactions
+      unless txRoot == chunk.txRoot do
+        throw s!"shard {shard}: the transactions do not hash to the chunk's tx_root"
     let entries ← trieEntries src root
     -- the receipts of this block, then those delivered since the shard's previous chunk
     let mut delivered := incoming[(layout.getShardIndex shard).getD 0]!

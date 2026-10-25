@@ -64,12 +64,14 @@ chain-corpus-generate *options:
     python3 tools/localnet/chain_corpus.py pack
     python3 tools/localnet/chain_apply.py extras
 
-# M5b: a localnet chain run from genesis by the Lean node: every EpochInfo computed (not given) and equal to
-# nearcore's, the epoch-start validator account updates, and (as the stages land) every chunk applied with
-# the ChunkExtra compared and a restart from the store; exits 0 only when all agree.
+# M5b: each localnet chain run from genesis by the Lean node, in two processes with the store between them:
+# every EpochInfo computed (not given) and equal to nearcore's, the epoch-start validator account updates, every
+# chunk applied by the runtime on the trie state with its ChunkExtra, incoming and outgoing receipts equal to
+# nearcore's. Takes about an hour (the burst chunks run 300 Tgas in the Lean interpreter); `--no-restart` uses
+# one process, `--topologies single` one chain; exits 0 only when all agree.
 [positional-arguments]
 chain-apply-corpus *options: node-build
-    python3 tools/localnet/chain_apply.py run -- "$@"
+    python3 tools/localnet/chain_apply.py run "$@"
 
 # M4: the persistent store: unit tests, then a restart and kill-in-the-middle test on the corpus tries.
 node-store-tests: node-build

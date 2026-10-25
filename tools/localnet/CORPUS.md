@@ -286,3 +286,23 @@ python3 tools/localnet/chain_corpus.py check      # manifest hashes and internal
 
 The export is a deterministic function of the database (Ed25519 signatures, seeded choice of base blocks), so
 regenerating from the same database gives the same files; a new `just corpus-generate` run gives a different chain.
+
+## 12. Chain apply inputs (M5b)
+
+`just chain-apply-corpus` runs the Lean node over each block corpus: epochs computed, chunks applied, `ChunkExtra`
+compared (see the M5 section of `notes/design/NEAR_NODE.md`). Two files per topology are added to
+`near-lean/node/corpus/blocks/<topology>/` and to the manifest by `python3 tools/localnet/chain_apply.py extras`
+(run by `just chain-corpus-generate` after `pack`):
+
+* `genesis.json`: the localnet's genesis configuration without interpretation (validators, economics, the static shard
+  layout as Borsh, account and full access key records with hex keys), the only thing besides the blocks that the node
+  starts from;
+* `chunks.jsonl.gz`: one line per chunk of the M3 corpus, that is every chunk that carries a transaction or a receipt
+  and the first heights: the Borsh transactions (the chunk body), the incoming receipts nearcore delivered and the
+  outgoing receipts it recorded (compared, and the source of code a contract deploys from its own memory), and the
+  `ApplyState` context of the bundle. A chunk with no line is empty; the node checks the `tx_root` of every chunk
+  header against the transactions it has.
+
+`chain_apply.py run` unpacks a topology and starts `node-chain-apply` twice with `--store`: the first process stops at
+half the chain, the second continues from the store. `--no-restart` uses one process. Nothing in the files is computed
+by Lean or edited to agree with it.

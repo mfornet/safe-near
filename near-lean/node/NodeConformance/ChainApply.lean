@@ -6,13 +6,24 @@ import NearNode.Chain.Persist
 import ChainReplay.HostCrypto
 
 /-!
-`node-chain-apply DIR`: a localnet chain run by the Lean node from genesis (M5b).
+`node-chain-apply DIR [--store STORE] [--max-height H] [--configs DIR] [--no-apply] [--debug] [--chunks]`: a
+localnet chain run by the Lean node from genesis (M5b).
 
 `DIR` is one unpacked chain of the corpus (`tools/localnet/chain_apply.py` unpacks it): `meta.json`,
-`genesis.json`, `epochs.jsonl`, `blocks.jsonl` and `chunks.jsonl`. Nothing about epochs is given
-to the node: the genesis epochs are made from the genesis configuration, every later `EpochInfo`
-is computed when the last block of an epoch is accepted (`Epoch.processBlock`), and the
-`epochs.jsonl` file is only what the result is compared with, byte for byte.
+`genesis.json`, `epochs.jsonl`, `blocks.jsonl` and `chunks.jsonl`. The node is given the genesis
+configuration, the blocks and the bodies of the chunks (their transactions); everything else it computes:
+
+* the genesis epochs from the genesis validators, and every later `EpochInfo` when the last block of an
+  epoch is accepted (`Epoch.processBlock`); the epoch-start `ValidatorAccountsUpdate` of each chunk;
+* the genesis state of every shard, and for every block the incoming receipts of every shard, the context
+  of every chunk, the chunk itself through the runtime on the shard's trie (`Apply.applyBlock`), the new
+  trie and the `ChunkExtra`.
+
+`epochs.jsonl`, the `ChunkExtra` of each block in `blocks.jsonl`, and the transactions, incoming and
+outgoing receipts that nearcore recorded in `chunks.jsonl` are what the results are compared with, byte
+for byte. With `--store` every block is committed to the store (`Apply.commitOps`) and a store that
+already holds a chain is continued from its head, so that two runs, the first stopped by `--max-height`,
+are one chain with a restart in between. The exit code is 0 only when everything agrees.
 -/
 
 open Lean Near.Node Near.Node.Chain Near.Node.Epoch Near.Node.Apply Near.Node.Conformance
