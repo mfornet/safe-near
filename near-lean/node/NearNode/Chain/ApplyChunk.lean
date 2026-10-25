@@ -1,6 +1,7 @@
 import NearNode.Chain.StateDecode
 import NearNode.Trie
 import NearNode.Chain.Profile
+import NearNode.Chain.FastEngine
 import ChainReplay.ShardChunk
 import ChainReplay.DelegateSignature
 import ChainReplay.HostCrypto

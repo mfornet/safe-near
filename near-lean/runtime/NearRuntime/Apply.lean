@@ -7,6 +7,7 @@ import NearRuntime.TransactionSize
 import NearRuntime.NativeIdentity
 import NearRuntime.Base58
 import NearInterface.Boundary
+import NearRuntime.VmEngine
 
 /-!
 # `apply`
@@ -393,7 +394,7 @@ def Account.contractStorageUsage (a : Account) : Nat :=
   | none => (a.global.map Wasm.GlobalContractId.length).getD 0
 
 /-- Execute a function call and turn its promises into receipts. -/
-def applyFunctionCall (c : ReceiptCtx) (method : String) (args : Bytes) (gas deposit : Nat)
+def applyFunctionCall [VmEngine] (c : ReceiptCtx) (method : String) (args : Bytes) (gas deposit : Nat)
     (isLast : Bool) : ExecM Unit := do
   let account ← getAccount c.receipt.receiverId
   let st ← getState
@@ -401,7 +402,7 @@ def applyFunctionCall (c : ReceiptCtx) (method : String) (args : Bytes) (gas dep
     | throw (.functionCallError (.compilationError "CodeDoesNotExist"))
   if let some issue := code.decodeIssue then throw (.executionIssue issue)
   let ctx := functionCallContext c account args gas deposit isLast (← get).storageAccounting
-  let outcome := run c.cfg code.module code.size method ctx (st.contractStorage c.receipt.receiverId)
+  let outcome := VmEngine.run c.cfg code.module code.size method ctx (st.contractStorage c.receipt.receiverId)
   modify (·.recordVMOutcome outcome)
   match outcome.aborted with
   | some err => throw (.functionCallError err)
@@ -638,7 +639,7 @@ def specialImplicitAccount (c : ReceiptCtx) (id : AccountId) (deposit : Nat) :
     | .nearDeterministic => .ok (some { amount := deposit, storageUsage := c.cfg.fees.numBytesAccount })
     | _ => .ok none
 
-def applyAction (c : ReceiptCtx) (isLast : Bool) : Action → ExecM Unit
+def applyAction [VmEngine] (c : ReceiptCtx) (isLast : Bool) : Action → ExecM Unit
   | .createAccount => do
     let id := c.receipt.receiverId
     if (← getState).account? id |>.isSome then throw (.accountAlreadyExists id)
@@ -835,7 +836,7 @@ def chargeReceiptFee (isRefund : Bool) (fee : Nat) : ExecM Unit :=
   burnGas fee
 
 /-- One action's protocol fees, admission checks and body, in execution order. -/
-def runReceiptAction (c : ReceiptCtx) (onlyAction isLast : Bool) (act : Action) : ExecM Unit := do
+def runReceiptAction [VmEngine] (c : ReceiptCtx) (onlyAction isLast : Bool) (act : Action) : ExecM Unit := do
   chargeReceiptFee c.receipt.isRefund (Fees.exec c.cfg.fees.actionFees c.cfg.wasm.ethImplicitAccounts c.receipt.receiverId act)
   checkReceiptAction c onlyAction act
   applyAction c isLast act
@@ -867,7 +868,7 @@ def actionHashOf (c : ReceiptCtx) (index : Nat) : Option Bytes :=
 /-- Derivation is local to one call: later actions still start from the block
 seed, while non-VM actions need no random context. Invalid exact-mode context
 is a model issue and rolls back the chunk rather than failing a contract. -/
-def runReceiptActionAt (c : ReceiptCtx) (onlyAction isLast : Bool) (act : Action) (index : Nat) : ExecM Unit :=
+def runReceiptActionAt [VmEngine] (c : ReceiptCtx) (onlyAction isLast : Bool) (act : Action) (index : Nat) : ExecM Unit :=
   match act with
   | .functionCall .. =>
     match actionRandomSeed c index with
@@ -877,7 +878,7 @@ def runReceiptActionAt (c : ReceiptCtx) (onlyAction isLast : Bool) (act : Action
   | _ => runReceiptAction c onlyAction isLast act
 
 /-- Explicit ordered traversal, stopping at the first action error. -/
-def runReceiptActionList (c : ReceiptCtx) (onlyAction : Bool) : List Action → Nat → ExecM Unit
+def runReceiptActionList [VmEngine] (c : ReceiptCtx) (onlyAction : Bool) : List Action → Nat → ExecM Unit
   | [], _ => pure ()
   | act :: rest, index => do
     modify fun e => { e with failureIndex := some index }
@@ -885,14 +886,14 @@ def runReceiptActionList (c : ReceiptCtx) (onlyAction : Bool) : List Action → 
     runReceiptActionList c onlyAction rest (index + 1)
 
 /-- Complete action attempt, before receipt rollback and finalization. -/
-def receiptActionBody (c : ReceiptCtx) : ExecM Unit := do
+def receiptActionBody [VmEngine] (c : ReceiptCtx) : ExecM Unit := do
   chargeReceiptFee c.receipt.isRefund c.cfg.fees.actionFees.newActionReceipt.execution
   runReceiptActionList c (c.action.actions.length == 1) c.action.actions 0
   modify fun e => { e with failureIndex := none }
   checkStorageStake c.cfg c.receipt.receiverId
 
 /-- Run actions and the final storage-staking check, before rollback/refunds. -/
-def runReceiptActions (c : ReceiptCtx) (st0 : ChainState) : Exec × Option RuntimeError :=
+def runReceiptActions [VmEngine] (c : ReceiptCtx) (st0 : ChainState) : Exec × Option RuntimeError :=
   let exec0 : Exec := { state := st0, actorId := c.receipt.predecessorId, storageAccounting := c.ap.storageAccounting }
   match ((receiptActionBody c).run.run exec0) with
     | (.ok (), e) => (e, none)
@@ -1026,7 +1027,7 @@ def Exec.commitStorage (exec : Exec) : Exec :=
         (key, value) :: changes.filter (·.1 != key)) trie.committed, prospective := [] }) }
 
 /-- Execute and finalize the actual action receipt. -/
-def applyActionReceipt (c : ReceiptCtx) (st0 : ChainState) : Exec :=
+def applyActionReceipt [VmEngine] (c : ReceiptCtx) (st0 : ChainState) : Exec :=
   let (exec, failed) := runReceiptActions c st0
   (finalizeReceipt c st0 exec failed).commitStorage
 
@@ -1076,7 +1077,7 @@ def yieldsOf (st : ChainState) (account : AccountId) : List Bytes :=
   (st.yieldReceipts.filter (·.1.1 == account)).map (·.1.2) ++ (st.yieldStatus.filter (·.1.1 == account)).map (·.1.2)
 
 /-- An action receipt whose inputs have all arrived, executed with the given promise results. -/
-def runActionReceipt (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → ContractCode)
+def runActionReceipt [VmEngine] (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → ContractCode)
     (st : ChainState) (r : Receipt) (a : ActionReceipt) (results : List PromiseResult) : Processed :=
   let ctx : ReceiptCtx :=
     { cfg, ap, receipt := r, action := a, promiseResults := results, codeOf, vmYields := yieldsOf st r.receiverId }
@@ -1117,7 +1118,7 @@ def processDistribution (cfg : RuntimeConfig) (ap : ApplyState) (st : ChainState
 
 /-- One receipt: action receipts run (or wait for data), data receipts feed
 the receipt waiting for them. Returns the outcomes of everything that ran. -/
-def processReceipt (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → ContractCode)
+def processReceipt [VmEngine] (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → ContractCode)
     (st : ChainState) (r : Receipt) : Processed :=
   match r.receipt with
   | .action a =>
@@ -1216,7 +1217,7 @@ def Receipt.fundedShape (r : Receipt) : Bool :=
 and are not sent out (`process_receipt_and_instant_receipts`).
 nearcore divergence: an instant receipt outside `Receipt.fundedShape`, in practice one addressed to
 the `system` account, is reported as unsupported instead of executed. -/
-def processInstants (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → ContractCode) :
+def processInstants [VmEngine] (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → ContractCode) :
     Nat → Processed → List Receipt → Processed
   | _, acc, [] => acc
   | 0, acc, r :: _ =>
@@ -1232,7 +1233,7 @@ def processInstants (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → 
       (acc.append { p with receipts := p.receipts.filter fun x => !x.isInstant }) (rest ++ instant)
 
 /-- A receipt together with the instant receipts it creates. -/
-def processWithInstants (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → ContractCode)
+def processWithInstants [VmEngine] (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → ContractCode)
     (st : ChainState) (r : Receipt) : Processed :=
   let p := processReceipt cfg ap codeOf st r
   if p.issue.isSome then p else
@@ -1357,7 +1358,7 @@ def convertTransaction (cfg : RuntimeConfig) (ap : ApplyState) (st : ChainState)
 are local. Other transaction receipts are outgoing work for a later chunk.
 Local, delayed and incoming receipts execute in that order; receipts beyond
 the gas limit are delayed to the next apply. -/
-def applyAttempt (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → ContractCode)
+def applyAttempt [VmEngine] (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → ContractCode)
     (st : ChainState) (txs : List Transaction) (incoming : List Receipt) : ApplyResult := Id.run do
   let initial := st
   let mut st := st
@@ -1437,7 +1438,7 @@ def applyAttempt (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → Con
 
 /-- Commit a supported chunk. Model limitations invalidate the entire attempt:
 no fees, refunds, nonces, receipt consumption, or state changes are committed. -/
-def apply (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → ContractCode)
+def apply [VmEngine] (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → ContractCode)
     (st : ChainState) (txs : List Transaction) (incoming : List Receipt) : ApplyResult :=
   let result := applyAttempt cfg ap codeOf st txs incoming
   if result.issue.isSome then
