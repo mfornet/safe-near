@@ -1,4 +1,5 @@
 import NearNode.Chain.ApplyChunk
+import NearNode.Chain.Profile
 import NearNode.Epoch
 import NearNode.Trie
 import NearNode.Store
@@ -33,6 +34,9 @@ structure Params where
   congestion : Near.Congestion.Config
   protocol : Nat
   chainId : String
+  /-- Whether each chunk's pre-state is converted back and compared with the trie's entries (a test of
+  the conversion; the sync node leaves it off). -/
+  roundTrip : Bool := true
 
 /-- What the node knows about the chunks applied so far. -/
 structure Progress where
@@ -229,17 +233,22 @@ def schedulerInput (block : Block) (layout : ShardLayout) (prevHash : CryptoHash
 
 /-! ### Applying a block -/
 
+/-- A chain-state answer as a failure message. -/
+private def lifted (r : Near.Node.Chain.Result α) : AM α :=
+  ExceptT.mk (pure (r.mapError (·.kind)))
+
 /-- Apply the chunks of an accepted block. `body shard` is the chunk's body. Returns the progress,
 a report per shard and the store operations of the block. -/
-def applyBlock (p : Params) (st : Near.Node.Chain.ChainState) (block : Block) (body : UInt64 → Body)
-    (pr : Progress) : Except String (Progress × Array ShardReport × Array Store.Op) := do
+def applyBlock (prof : Option Prof) (p : Params) (st : Near.Node.Chain.ChainState) (block : Block)
+    (body : UInt64 → Body) (pr : Progress) : AM (Progress × Array ShardReport × Array Store.Op) :=
+  do
   let hash := block.header.hash
   let some v := block.header.view? | throw "header version"
-  let rec_ ← st.block hash |>.mapError (·.kind)
+  let rec_ ← lifted (st.block hash)
   let epochId := rec_.info.epochId
-  let epoch ← st.epoch epochId |>.mapError (·.kind)
+  let epoch ← lifted (st.epoch epochId)
   let layout := epoch.layout
-  let prevRec ← st.block v.prevHash |>.mapError (·.kind)
+  let prevRec ← lifted (st.block v.prevHash)
   -- what the previous chunk of each new chunk sent: the receipts of the block that included it
   let mut sent : Array (Option (Array ByteArray)) := #[]
   for index in [0:block.chunks.size] do
@@ -255,7 +264,7 @@ def applyBlock (p : Params) (st : Near.Node.Chain.ChainState) (block : Block) (b
     else
       sent := sent.push none
   let incoming ← incomingReceipts layout v.prevHash sent
-  let provider ← providerOf p st v.prevHash epochId |>.mapError (·.kind)
+  let provider ← lifted (providerOf p st v.prevHash epochId)
   let input ← schedulerInput block layout v.prevHash
   let mut pr := pr
   let mut reports : Array ShardReport := #[]
@@ -288,7 +297,7 @@ def applyBlock (p : Params) (st : Near.Node.Chain.ChainState) (block : Block) (b
       let (txRoot, _) := merklize b.transactions
       unless txRoot == chunk.txRoot do
         throw s!"shard {shard}: the transactions do not hash to the chunk's tx_root"
-    let entries ← trieEntries src root
+    let entries ← timed prof "trie-read" fun _ => trieEntries src root
     -- the receipts of this block, then those delivered since the shard's previous chunk
     let mut delivered := incoming[(layout.getShardIndex shard).getD 0]!
     if isNew then
@@ -298,20 +307,20 @@ def applyBlock (p : Params) (st : Near.Node.Chain.ChainState) (block : Block) (b
         if cur.view.height ≤ prevChunk.heightIncluded then
           break
         delivered := delivered ++ ((pr.incoming[(cur.hash.bytes, shard)]?).getD #[])
-        cur ← (st.block cur.view.prevHash |>.mapError (·.kind))
+        cur ← lifted (st.block cur.view.prevHash)
     let pending ←
       (if isNew then delivered else #[]).mapM fun r =>
           match Codec.decodeAll (α := Receipt) r with
           | .ok r => pure r
           | .error e => throw s!"receipt does not decode: {repr e}"
     let update ←
-      (Epoch.validatorAccountsUpdate p.setup st v.prevHash shard
+      lifted
+          (Epoch.validatorAccountsUpdate p.setup st v.prevHash shard
             (if isNew then chunk.prevValidatorProposals
             else
               match prevExtra? with
               | some (.v5 e) => e.validatorProposals
-              | _ => #[]) |>.mapError
-          (·.kind))
+              | _ => #[]))
     let ctx : ChunkContext :=
       { protocol := p.protocol, height := v.height.toNat, timestamp := v.timestamp.toNat,
         epochHeight := epoch.info.view.epochHeight, gasPrice := prevRec.view.nextGasPrice.val,
@@ -320,18 +329,30 @@ def applyBlock (p : Params) (st : Near.Node.Chain.ChainState) (block : Block) (b
         shardIds := layout.shardIds.toList.map (·.toNat), epochInfo := provider,
         update := update.map modelUpdate, scheduler := input }
     let (prepared, cache) ←
-      prepare entries (if isNew then b.transactions else #[]) pending
-          (if isNew then b.claimedOutgoing else #[]) ctx pr.cache
+      timed prof "decode-state" fun _ =>
+          prepare entries (if isNew then b.transactions else #[]) pending
+            (if isNew then b.claimedOutgoing else #[]) ctx pr.cache
     pr := { pr with cache }
-    let reencoded ← reencode p.cfg prepared
-    let originalMap : Std.HashMap (List UInt8) (List UInt8) :=
-      entries.foldl (fun m (k, v) => m.insert k.toList v.toList) {}
-    let roundTrip :=
-      reencoded.length == entries.size && reencoded.all fun (k, v) => originalMap[k]? == some v
+    let roundTrip ←
+      if p.roundTrip then
+        timed prof "round-trip" fun _ => do
+            let reencoded ← reencode p.cfg prepared
+            let originalMap : Std.HashMap (List UInt8) (List UInt8) :=
+              entries.foldl (fun m (k, v) => m.insert k.toList v.toList) {}
+            pure
+                (decide (reencoded.length = entries.size) &&
+                  reencoded.all fun (k, v) => originalMap[k]? == some v)
+      else
+        pure true
     let (newEntries, extra, outgoing, outcomes) ←
       if isNew then
         do
-          let result ← runChunk p.cfg p.congestion ctx prepared
+          let overlay ←
+            if ctx.update.isNone then
+              some <$> timed prof "trie-witness" fun _ => overlayOf src root entries
+            else
+              pure none
+          let result ← runChunk prof p.cfg p.congestion ctx prepared overlay
           let (outcomeRoot, _) := merklizeHashes (result.outcomes.map (·.leafHash))
           pure
               (result.entries,
@@ -343,10 +364,11 @@ def applyBlock (p : Params) (st : Near.Node.Chain.ChainState) (block : Block) (b
                 result.outgoing, result.outcomes)
       else
         do
-          let entries ← runOldChunk p.cfg p.congestion ctx prepared
+          let entries ←
+            timed prof "run/old-chunk" fun _ => runOldChunk p.cfg p.congestion ctx prepared
           let some (.v5 old) := prevExtra? | throw "no chunk extra before an old chunk"
           pure (entries, ChunkExtra.v5 old, #[], #[])
-    let changes ← updateTrie src root entries newEntries
+    let changes ← timed prof "trie-update" fun _ => updateTrie src root entries newEntries
     let extra : ChunkExtra :=
       match extra with
       | .v5 e => .v5 { e with stateRoot := changes.newRoot }

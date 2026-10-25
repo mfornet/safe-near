@@ -92,6 +92,8 @@ structure WorkerEnv where
   /-- The log of applied blocks. -/
   appliedLog : Option IO.FS.Handle
   log : String → IO Unit
+  /-- Stage timers, when asked for. -/
+  prof : Option Prof := none
 
 /-- Applies one block. -/
 def applyWork (env : WorkerEnv) (work : Work) : IO Unit := do
@@ -99,7 +101,10 @@ def applyWork (env : WorkerEnv) (work : Work) : IO Unit := do
   let height := work.block.header.view?.get!.height
   let empty : Body := { transactions := #[], claimedOutgoing := #[], claimedIncoming := #[] }
   let pr ← env.progress.get
-  match applyBlock env.params work.st work.block (fun s => (work.bodies[s]?).getD empty) pr with
+  let applied ←
+    (applyBlock env.prof env.params work.st work.block (fun s => (work.bodies[s]?).getD empty)
+          pr).run
+  match applied with
   | .error m =>
     env.shared.fail s!"block {height}: applying the chunks failed: {m}"
   | .ok (pr, reports, chunkOps) =>
