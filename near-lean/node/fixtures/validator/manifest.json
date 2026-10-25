@@ -1,0 +1,22 @@
+{
+  "crates": "near-primitives =0.37.4, reed-solomon-erasure =6.0.0",
+  "lines": {
+    "approval": 24,
+    "block": 40,
+    "chunk": 30,
+    "endorsement": 12,
+    "gf": 1,
+    "partial-witness": 10,
+    "rs-bytes": 77,
+    "rs-decode": 612,
+    "rs-encode": 64,
+    "rs-encode-error": 3,
+    "rs-new": 4,
+    "rs-part-length": 40,
+    "rs-parts": 256,
+    "rs-reconstruct": 228,
+    "witness-ack": 4,
+    "witness-parts": 32
+  },
+  "protocol_version": 86
+}

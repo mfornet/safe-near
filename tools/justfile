@@ -32,7 +32,7 @@ crypto-tests: crypto-build
 
 # Build the NEAR node (notes/design/NEAR_NODE.md) and its executables.
 node-build:
-    cd near-lean/node && lake build NearNode near-lean-node node-bench node-conformance-types node-conformance-network node-conformance-sync node-sync-tests node-trie-tests node-store-tests node-state-roots node-chain-validate node-chain-apply --wfail
+    cd near-lean/node && lake build NearNode near-lean-node node-bench node-conformance-types node-conformance-network node-conformance-sync node-conformance-validator node-sync-tests node-trie-tests node-store-tests node-state-roots node-chain-validate node-chain-apply node-validator-tests --wfail
 
 # M1: the Borsh codecs of every near-primitives type against the committed nearcore oracle fixtures.
 [positional-arguments]
@@ -51,10 +51,26 @@ node-conformance-network *options: node-build
 node-conformance-sync *options: node-build
     near-lean/node/.lake/build/bin/node-conformance-sync "$@"
 
+# M8b: the validator's building blocks (Reed-Solomon, chunk production, signed messages, witness parts, zstd frames)
+# against fixtures from the pinned crates (`just node-validator-oracle` writes them).
+node-conformance-validator *options: node-build
+    near-lean/node/.lake/build/bin/node-conformance-validator "$@"
+
+# M8b: regenerate near-lean/node/fixtures/validator with near-primitives and reed-solomon-erasure at the pin, then check that
+# the zstd crate decodes the frames the node writes (CI never builds this).
+node-validator-oracle:
+    cd tools/node-conformance && cargo run --release --locked --bin validator-fixtures -- ../../near-lean/node/fixtures/validator
+    near-lean/node/.lake/build/bin/node-conformance-validator --write-zstd
+    cd tools/node-conformance && cargo run --release --locked --bin validator-fixtures -- --verify-zstd ../../near-lean/node/fixtures/validator/zstd-stored.jsonl
+
 # M7: regenerate near-lean/node/fixtures/state-sync with nearcore's own zstd and near-store (needs the clean nearcore
 # checkout of `tools/localnet/build.py` and a Rust toolchain; CI never builds it).
 node-sync-oracle:
     cd tools/node-conformance/native-trie && cargo run --release --bin state_sync_oracle -- ../../../near-lean/node/fixtures/state-sync
+
+# M8c: Doomslug and the other state machines of a validator (the unit tests of doomslug.rs, ported).
+node-validator-tests: node-build
+    near-lean/node/.lake/build/bin/node-validator-tests
 
 # M7: header sync, the sync block and the refusal of changed headers and bodies, on the in-memory network.
 node-sync-tests: node-build
@@ -91,6 +107,13 @@ localnet-peer *options: node-build
 [positional-arguments]
 localnet-follow *options: node-build
     python3 tools/localnet/follow_accept.py "$@"
+
+# M8: the Lean node as a validator of a two-validator neard localnet that cannot finalize without it: blocks and chunks it
+# produces are accepted by neard, state roots agree, finality advances, and the chain stops when the node does. The options
+# include --duration SECONDS, --no-workload and --no-stall (see notes/design/NEAR_NODE.md, M8).
+[positional-arguments]
+localnet-validator *options: node-build
+    python3 tools/localnet/validator_accept.py "$@"
 
 # M5a: rebuild the block corpus from the localnet databases (needs `python3 tools/localnet/build.py --only
 # safe-near-chain-export` and the databases of `just corpus-generate`).

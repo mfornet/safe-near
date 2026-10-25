@@ -1,0 +1,4 @@
+{"data":0,"error":"TooFewDataShards","parity":1}
+{"data":1,"error":"TooFewParityShards","parity":0}
+{"data":200,"error":"TooManyShards","parity":100}
+{"data":256,"error":"TooManyShards","parity":1}
