@@ -402,12 +402,12 @@ def applyBlock (prof : Option Prof) (p : Params) (st : Near.Node.Chain.ChainStat
     let (newEntries, extra, outgoing, outcomes, yielded) ←
       if isNew then
         do
-          let overlay ←
-            if ctx.update.isNone then
-              some <$> timed prof "trie-witness" fun _ => overlayOf src root entries
-            else
-              pure none
-          let result ← runChunk prof p.cfg p.congestion ctx prepared overlay
+          let mut overlay : Option Near.TrieOverlay.State := none
+          if ctx.update.isNone then
+            let (o, cache) ← timed prof "trie-witness" fun _ => overlayOf src root entries pr.cache
+            pr := { pr with cache }
+            overlay := some o
+          let result ← runChunk prof p.cfg p.congestion ctx prepared overlay pr.cache
           let (outcomeRoot, _) := merklizeHashes (result.outcomes.map (·.leafHash))
           pure
               (result.entries,

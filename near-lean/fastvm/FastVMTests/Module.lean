@@ -25,7 +25,7 @@ def hostNames : Array String :=
     "value_return", "storage_write", "storage_read", "storage_has_key", "storage_remove",
     "used_gas", "prepaid_gas", "block_index", "block_timestamp", "epoch_height", "storage_usage",
     "account_balance", "attached_deposit", "random_seed", "current_account_id", "signer_account_id",
-    "predecessor_account_id", "panic", "panic_utf8", "abort", "gas", "promise_batch_create",
+    "predecessor_account_id", "panic", "panic_utf8", "gas", "promise_batch_create",
     "promise_batch_action_transfer", "promise_return", "promise_results_count",
     "validator_total_stake", "sha256", "keccak256"]
 

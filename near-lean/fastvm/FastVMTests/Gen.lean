@@ -324,7 +324,7 @@ partial def genCall (env : Env) (f : Nat) (t : ValType) : Gen (List Instr) := do
   for p in env.funcs[i]!.params do
     out := out ++ (← genExpr env (f / 2) p)
   return out ++ [.call i]
-partial def genHostCall (env : Env) (f : Nat) (t : ValType) : Gen (List Instr) := do
+partial def genHostCall (env : Env) (_f : Nat) (t : ValType) : Gen (List Instr) := do
   let cands := env.hosts.filter fun i => env.funcs[i]!.results == [t]
   if cands.isEmpty then
     return [← constOf t]

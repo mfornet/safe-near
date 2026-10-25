@@ -141,13 +141,25 @@ private def proposalsOf (proposals : List Near.ValidatorProposal) :
 /-- The trie of a shard's stored state as the runtime's storage accounting reads it
 (`TrieOverlay.start` builds the same from the entries; this reads the objects the node holds). -/
 def overlayOf (src : Near.Node.Trie.NodeSource) (root : CryptoHash)
-    (entries : Array (ByteArray × ByteArray)) : Except String Near.TrieOverlay.State := do
+    (entries : Array (ByteArray × ByteArray)) (cache : CodeCache) :
+    Except String (Near.TrieOverlay.State × CodeCache) := do
   let (usage, objects) ← Near.Node.Trie.objects src root
+  let mut c := cache
+  let mut es : Array (List UInt8 × List UInt8) := #[]
+  for (k, v) in entries do
+    let (l, c') := c.list v
+    c := c'
+    es := es.push (k.toList, l)
+  let mut witness : Array (List UInt8 × List UInt8) := #[]
+  for (h, b) in objects do
+    let (l, c') := c.list b
+    c := c'
+    witness := witness.push (h.bytes.toList, l)
   pure
-      { entries := entries.toList.map fun (k, v) => (k.toList, v.toList),
-        base :=
-          { root := root.bytes.toList, memoryUsage := usage.toNat,
-            witness := objects.toList.map fun (h, b) => (h.bytes.toList, b.toList) } }
+      ({ entries := es.toList,
+         base :=
+           { root := root.bytes.toList, memoryUsage := usage.toNat, witness := witness.toList } },
+        c)
 
 /-- Everything the runtime consumes for one chunk, converted. -/
 structure Prepared where
@@ -209,7 +221,7 @@ def prepare (entries : Array (ByteArray × ByteArray)) (txs : Array SignedTransa
   let cache := scratch.cache
   -- the catalogue holds the code this chunk uses, not every code seen so far: the encoders look
   -- codes up by hash
-  let codes : ChainReplay.Catalogue := scratch.used.toList.filterMap (cache[·]?)
+  let codes : ChainReplay.Catalogue := scratch.used.toList.filterMap (cache.byLabel[·]?)
   let state := { d.state with nextId := conv.next }
   let ap : Near.ApplyState :=
     { blockHeight := ctx.height, blockTimestamp := ctx.timestamp, epochHeight := ctx.epochHeight,
@@ -225,7 +237,8 @@ def prepare (entries : Array (ByteArray × ByteArray)) (txs : Array SignedTransa
 def reencode (cfg : Wasm.Near.RuntimeConfig) (p : Prepared) :
     Except String (List (List UInt8 × List UInt8)) := do
   let catalogue := p.codes.map fun c => (c.code.hash, c.bytes)
-  let entries ← Near.QueueEncoding.encode p.initial.state catalogue p.context (some cfg) digest
+  let entries ←
+    Near.QueueEncoding.encode p.initial.state catalogue p.context (some cfg) (digestFor catalogue)
   let shard ← p.shard.entries
   pure (entries ++ shard)
 
@@ -233,8 +246,9 @@ def reencode (cfg : Wasm.Near.RuntimeConfig) (p : Prepared) :
 name `run/...`. -/
 def runChunk (prof : Option Prof) (cfg : Wasm.Near.RuntimeConfig)
     (congestion : Near.Congestion.Config) (ctx : ChunkContext) (p : Prepared)
-    (overlay : Option Near.TrieOverlay.State) : AM ChunkResult := do
+    (overlay : Option Near.TrieOverlay.State) (cache : CodeCache := {}) : AM ChunkResult := do
   let catalogue := p.codes.map fun c => (c.code.hash, c.bytes)
+  let known := cache.lists.toArray
   let mut snapshot := p.initial
   if let some update := ctx.update then
     snapshot ←
@@ -248,7 +262,9 @@ def runChunk (prof : Option Prof) (cfg : Wasm.Near.RuntimeConfig)
         | some o => pure o
         | none => do
           Near.TrieOverlay.start
-              ((← Near.QueueEncoding.encode snapshot.state catalogue p.context (some cfg) digest) ++
+              ((←
+                  Near.QueueEncoding.encode snapshot.state catalogue p.context (some cfg)
+                      (digestFor catalogue)) ++
                 (← p.shard.entries))
   let inputs :=
     (p.block.txs.zip p.hashes).map fun (transaction, blockHash) =>
@@ -325,7 +341,7 @@ def runChunk (prof : Option Prof) (cfg : Wasm.Near.RuntimeConfig)
           p.shard (sent.map (·.2)) change
   let stateEntries ←
     timed prof "run/encode-state" fun _ =>
-        Near.QueueEncoding.encode next.state catalogue context (some cfg) digest
+        Near.QueueEncoding.encode next.state catalogue context (some cfg) (digestFor catalogue)
   let shardEntries ← timed prof "run/encode-shard" fun _ => outcome.state.entries
   timed prof "run/results" fun _ => do
       -- the outcomes with the native ids of their receipts
@@ -374,7 +390,8 @@ def runChunk (prof : Option Prof) (cfg : Wasm.Near.RuntimeConfig)
       pure
           {
             entries :=
-              (stateEntries ++ shardEntries).toArray.map fun (k, v) => (bytesOf k, bytesOf v),
+              (stateEntries ++ shardEntries).toArray.map fun (k, v) =>
+                (bytesOf k, CodeCache.bytesOf known v),
             outcomes, outgoing := outcome.outgoing.toArray.map bytesOf,
             gasBurnt := result.outcomes.foldl (fun s (_, o) => s + o.gasBurnt) 0,
             balanceBurnt := result.tokensBurnt - result.subsidizedAmount, proposals,
@@ -400,7 +417,8 @@ def runOldChunk (cfg : Wasm.Near.RuntimeConfig) (congestion : Near.Congestion.Co
   let scheduled :=
     Near.Bandwidth.schedule layout p.shard.scheduler params input.requests status
       input.prevBlockHash
-  let stateEntries ← Near.QueueEncoding.encode snapshot.state catalogue p.context (some cfg) digest
+  let stateEntries ←
+    Near.QueueEncoding.encode snapshot.state catalogue p.context (some cfg) (digestFor catalogue)
   let shardEntries ←
     ({ p.shard with scheduler := scheduled.state } : ChainReplay.ShardChunk.State).entries
   pure ((stateEntries ++ shardEntries).toArray.map fun (k, v) => (bytesOf k, bytesOf v))

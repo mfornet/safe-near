@@ -91,6 +91,7 @@ class Workload:
         self.actors: dict[str, Actor] = {}
         self.log: list[dict] = []
         self.contracts: dict[str, bytes] = {}
+        self.deploy_from_memory = True
 
     # --- plumbing -----------------------------------------------------------
     def key(self, label: str) -> nc.Key:
@@ -476,6 +477,8 @@ class Workload:
             (a, "est.node0", [self.fc("bls12381_p1_decompress_0_100", gas=300 * TGAS)]),
             (a, "est.node0", [self.fc("ecrecover_10k", gas=300 * TGAS)]),      # exhausts its gas
         ])
+        if not self.deploy_from_memory:
+            return
         # every host function in one call, with a deployed contract that is later deleted
         sanity = json.dumps({"contract_code": base64.b64encode(wasmgen.noop_contract()).decode(),
                              "method_name": "noop", "method_args": "", "validator_id": "node0"}).encode()
@@ -573,12 +576,16 @@ def main() -> None:
     parser.add_argument("--steady", type=float, default=0, help="seconds of light traffic after the scenarios; with "
                         "--no-scenarios only that")
     parser.add_argument("--period", type=float, default=1.0, help="seconds between rounds of --steady")
+    parser.add_argument("--no-deploy-from-memory", action="store_true", help="leave out the call that deploys "
+                        "contract code from the memory of a contract (`sanity_check`): a validator applying a block "
+                        "at the head cannot know the code bytes (they arrive with the next chunk)")
     parser.add_argument("--no-scenarios", action="store_true", help="run only what --steady or --inject name; the "
                         "accounts and contracts must exist already")
     parser.add_argument("--inject", nargs="*", default=[], help="scenarios of a running workload to run alone "
                         "(`lightburst`)")
     arguments = parser.parse_args()
     workload = Workload(Net(arguments.topology), arguments.seed)
+    workload.deploy_from_memory = not arguments.no_deploy_from_memory
     first = workload.net.height()
     try:
         if arguments.only:

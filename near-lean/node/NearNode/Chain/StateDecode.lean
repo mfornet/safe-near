@@ -178,7 +178,7 @@ def decodeState (entries : Array (ByteArray × ByteArray)) : M Decoded := do
     let model ← accountRow account
     let model :=
       match label? with
-      | some l => { model with code := (cache[l]?).map (·.code) }
+      | some l => { model with code := (cache.byLabel[l]?).map (·.code) }
       | none => model
     rows := rows ++ [(name, model)]
   let state : Near.ChainState :=

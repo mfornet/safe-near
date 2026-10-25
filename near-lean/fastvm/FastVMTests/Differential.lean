@@ -193,6 +193,54 @@ def runBench (cfg : RuntimeConfig) (n : UInt64) (specToo : Bool) : IO Unit := do
     let t2 ← IO.monoNanosNow
     IO.println s!"spec: {(t2 - t1) / 1000000} ms, same {outcomeKey a == outcomeKey b}"
 
+/-- The wNEAR contract of the VM's test suite: the calls of `vm-tests` threaded through one storage, each compared
+with the gas swept over a sample of limits. -/
+def runWNear (cfg : RuntimeConfig) (path : String) : IO Nat := do
+  let text ← IO.FS.readFile path
+  let code ← Wasm.Wat.compile! text
+  let counts ← IO.mkRef ({} : Counts)
+  let wrap := "wrap.near".toUTF8.toList
+  let alice := "alice.near".toUTF8.toList
+  let bob := "bob.near".toUTF8.toList
+  let oneNear := 10 ^ 24
+  let reg := 125 * 10 ^ 19
+  let call (pred : List UInt8) (input : String) (deposit : Nat) (gas : Nat) : VMContext :=
+    let c := ctxFor input.toUTF8.toList gas
+    { c with currentAccountId := wrap, signerAccountId := pred, predecessorAccountId := pred, attachedDeposit := deposit, accountBalance := 100 * oneNear }
+  let steps : List (String × List UInt8 × String × Nat) :=
+    [("near_deposit", alice, "{}", oneNear), ("storage_deposit", bob, "{}", 2 * reg),
+     ("ft_balance_of", bob, "{\"account_id\":\"alice.near\"}", 0),
+     ("ft_total_supply", bob, "{}", 0),
+     ("ft_transfer", alice, "{\"receiver_id\":\"bob.near\",\"amount\":\"5000\"}", 1),
+     ("ft_transfer_call", alice, "{\"receiver_id\":\"bob.near\",\"amount\":\"1000\",\"msg\":\"hi\"}", 1),
+     ("near_withdraw", alice, "{\"amount\":\"1000\"}", 1),
+     ("near_withdraw", alice, "{\"amount\":\"1000\"}", 0),
+     ("near_withdraw", alice, "{\"amount\":\"99999999999999999999999999\"}", 1),
+     ("near_deposit", alice, "{}", 0), ("no_such_method", alice, "{}", 0),
+     ("ft_resolve_transfer", wrap, "{\"sender_id\":\"alice.near\",\"receiver_id\":\"bob.near\",\"amount\":\"1000\"}", 0),
+     ("ft_resolve_transfer", alice, "{\"sender_id\":\"alice.near\",\"receiver_id\":\"bob.near\",\"amount\":\"1000\"}", 0),
+     ("storage_balance_of", bob, "{\"account_id\":\"bob.near\"}", 0)]
+  let mut storage : List (List UInt8 × List UInt8) := []
+  let mut bad := 0
+  for (method, pred, input, deposit) in steps do
+    let ctx := call pred input deposit (300 * 10 ^ 12)
+    let spec := Wasm.Near.run cfg code 200000 method ctx storage
+    let ok ← compareRun counts s!"wnear {method}" cfg code method ctx storage
+    if !ok then bad := bad + 1
+    -- the gas limits: every tenth of the burnt gas, and the points around them
+    let burnt := spec.burntGas
+    for k in [0:41] do
+      let p := burnt * k / 40
+      for q in [p - 1, p, p + 1] do
+        let ok ← compareRun counts s!"wnear {method} prepaid={q}" cfg code method (call pred input deposit q) storage
+        if !ok then bad := bad + 1
+        let ok ← compareRun counts s!"wnear {method} maxBurnt={q}" (withMaxBurnt cfg q) code method ctx storage
+        if !ok then bad := bad + 1
+    if spec.succeeded then storage := spec.storage
+  let c ← counts.get
+  IO.println s!"wnear: {c.runs} comparisons, {c.mismatches} mismatches"
+  return bad
+
 def parseArgs (args : List String) : List (String × String) :=
   let rec go : List String → List (String × String)
     | k :: v :: rest => if k.startsWith "--" then (k, v) :: go rest else go (v :: rest)
@@ -208,6 +256,8 @@ def main (args : List String) : IO UInt32 := do
   let exhaustive := (get "--exhaustive" "300").toNat!
   let samples := (get "--samples" "40").toNat!
   let cfg ← RuntimeConfig.load configs 86
+  if get "--wnear" "" != "" then
+    return (← runWNear cfg (get "--wnear" "")).toUInt32
   if get "--bench" "" != "" then
     runBench cfg (get "--bench" "0").toNat!.toUInt64 (get "--spec" "0" == "1")
     return 0
