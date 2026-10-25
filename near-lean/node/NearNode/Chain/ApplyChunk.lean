@@ -38,6 +38,65 @@ structure ChunkContext where
   /-- The scheduler's view of the network (`ChainReplay.ShardChunk.Input`). -/
   scheduler : ChainReplay.ShardChunk.Input
 
+/-- The failure of an outcome: the runtime's model says that the execution failed (and why, in its own words), and
+the outcome root only depends on that (`PartialExecutionStatus::Failure`). The `TxExecutionError` tree of nearcore
+(which action failed and with what) is not reproduced; this value stands for it and survives a round trip through
+Borsh, unlike `default` (whose account id is empty). -/
+def placeholderFailure : TxExecutionError :=
+  .actionError
+    ⟨none, .functionCallError (.executionError "the failure is not detailed by the node")⟩
+
+/-- The `TxExecutionError` of a failed receipt, for the errors of an action that nearcore's views render by value
+(`ActionError` with the failed action's index); `placeholderFailure` for the others, which the RPC marks as not rendered. -/
+def failureOf (index : Option Nat) (e : Near.RuntimeError) : TxExecutionError :=
+  let acc (a : Near.AccountId) : AccountId := ⟨a⟩
+  let key (k : Near.PublicKey) : Option PublicKey :=
+    match Codec.decodeAll (α := PublicKey) (ByteArray.mk k.toArray) with
+    | .ok p => some p
+    | .error _ => none
+  let kind? : Option ActionErrorKind :=
+    match e with
+    | .accountAlreadyExists id => some (.accountAlreadyExists (acc id))
+    | .accountDoesNotExist id => some (.accountDoesNotExist (acc id))
+    | .createAccountNotAllowed id p => some (.createAccountNotAllowed (acc id) (acc p))
+    | .createAccountOnlyByRegistrar id r p =>
+      some (.createAccountOnlyByRegistrar (acc id) (acc r) (acc p))
+    | .actorNoPermission id a => some (.actorNoPermission (acc id) (acc a))
+    | .deleteKeyDoesNotExist id k => (key k).map (.deleteKeyDoesNotExist (acc id) ·)
+    | .addKeyAlreadyExists id k => (key k).map (.addKeyAlreadyExists (acc id) ·)
+    | .deleteAccountStaking id => some (.deleteAccountStaking (acc id))
+    | .lackBalanceForState id n => some (.lackBalanceForState (acc id) ⟨n⟩)
+    | .triesToUnstake id => some (.triesToUnstake (acc id))
+    | .triesToStake id s l b => some (.triesToStake (acc id) ⟨s⟩ ⟨l⟩ ⟨b⟩)
+    | .insufficientStake id s m => some (.insufficientStake (acc id) ⟨s⟩ ⟨m⟩)
+    | .deleteAccountWithLargeState id => some (.deleteAccountWithLargeState (acc id))
+    | .onlyImplicitAccountCreationAllowed id => some (.onlyImplicitAccountCreationAllowed (acc id))
+    | .delegateActionInvalidSignature => some .delegateActionInvalidSignature
+    | .delegateActionSenderDoesNotMatchTxReceiver s r =>
+      some (.delegateActionSenderDoesNotMatchTxReceiver (acc s) (acc r))
+    | .delegateActionExpired => some .delegateActionExpired
+    | .delegateActionInvalidNonce d a => some (.delegateActionInvalidNonce d.toUInt64 a.toUInt64)
+    | .delegateActionNonceTooLarge d u => some (.delegateActionNonceTooLarge d.toUInt64 u.toUInt64)
+    | .functionCallError (.methodResolveError m) =>
+      some
+        (.functionCallError
+          (.methodResolveError
+            (match m with
+            | .methodEmptyName => .methodEmptyName
+            | .methodNotFound => .methodNotFound
+            | .methodInvalidSignature => .methodInvalidSignature)))
+    | .functionCallError (.hostError .badUTF16) =>
+      -- the model's text lacks the final full stop of `HostError::BadUTF16`
+      some (.functionCallError (.executionError "String encoding is bad UTF-16 sequence."))
+    | .functionCallError (.hostError h) =>
+      some (.functionCallError (.executionError (Wasm.Near.FunctionCallError.hostError h).message))
+    | .functionCallError (.wasmTrap t) =>
+      some (.functionCallError (.executionError (Wasm.Near.FunctionCallError.wasmTrap t).message))
+    | _ => none
+  match kind?, index with
+  | some k, some i => .actionError ⟨some i.toUInt64, k⟩
+  | _, _ => placeholderFailure
+
 /-- What applying a chunk produced. -/
 structure ChunkResult where
   /-- The entries of the shard after the chunk. -/
@@ -55,6 +114,9 @@ structure ChunkResult where
   schedulerHash : ByteArray
   /-- The hashes of the chunk's transactions, in order. -/
   txHashes : Array ByteArray
+  /-- The yielded receipts the chunk stored (`promise_yield_create`), which no chunk sends: the RPC serves
+  them as the receipts of the outcomes they get later. -/
+  yielded : Array ByteArray := #[]
 
 private def bytesOf (l : List UInt8) : ByteArray :=
   ⟨l.toArray⟩
@@ -248,6 +310,14 @@ def runChunk (prof : Option Prof) (cfg : Wasm.Near.RuntimeConfig)
           | _ =>
             throw "an appended delayed receipt must be stored with its metadata"
         pure change
+  -- the yielded receipts this chunk created (they are not in the outgoing receipts)
+  let yielded : Array ByteArray :=
+    ((next.state.yieldReceipts.filter fun (k, _) =>
+            (snapshot.state.yieldReceipts.find? (·.1 == k)).isNone).filterMap
+        fun (_, receipt) =>
+        match Near.QueueEncoding.receiptBytes context catalogue receipt with
+        | .ok b => some (bytesOf b)
+        | .error _ => none).toArray
   let outcome ←
     timed prof "run/scheduler" fun _ =>
         ChainReplay.ShardChunk.finish congestion ctx.scheduler block.ap.shardId block.ap.blockHeight
@@ -276,8 +346,8 @@ def runChunk (prof : Option Prof) (cfg : Wasm.Near.RuntimeConfig)
             pure (.successValue (bytesOf v))
           | .successReceiptId r =>
             pure (.successReceiptId (← native r))
-          | .failure _ =>
-            pure (.failure default)
+          | .failure e =>
+            pure (.failure (failureOf o.failureIndex e))
         outcomes :=
           outcomes.push
             { id := identity,
@@ -308,7 +378,7 @@ def runChunk (prof : Option Prof) (cfg : Wasm.Near.RuntimeConfig)
             gasBurnt := result.outcomes.foldl (fun s (_, o) => s + o.gasBurnt) 0,
             balanceBurnt := result.tokensBurnt - result.subsidizedAmount, proposals,
             congestion := info, requests, delayedCount := next.state.delayed.length,
-            schedulerHash := bytesOf outcome.schedulerHash, txHashes }
+            schedulerHash := bytesOf outcome.schedulerHash, txHashes, yielded }
 
 /-- A chunk that is not new (`apply_old_chunk`): no transaction or receipt is applied, but the
 epoch's validator accounts update and the bandwidth scheduler still run

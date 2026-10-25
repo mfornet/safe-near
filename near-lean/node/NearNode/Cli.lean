@@ -22,6 +22,8 @@ def usage : String :=
     "           [--lag-log FILE] [--reach-lag N] [--profile] [--save-state DIR]\n" ++
     "       near-lean-node validator --chain-dir DIR --node-key FILE --validator-key FILE --boot PEERID@IP:PORT\n" ++
     "           [--listen PORT] [--seconds N] [--report FILE] [--applied-log FILE] [--stop-file FILE] [--configs DIR] [--quiet]\n" ++
+    "           [--rpc-addr IP:PORT] [--genesis-config FILE] [--store DIR]\n" ++
+    "           [--home NEARD_HOME] [--log-format text|json]\n" ++
     "           [--delays ENDORSEMENT,BASE,CAP]"
 
 /-- The value after a flag. -/
@@ -81,7 +83,39 @@ def peerCommand (args : List String) : IO UInt32 := do
         appliedLog := flagValue args "--applied-log", report := flagValue args "--report",
         quiet := args.contains "--quiet" }
 
+/-- The flags a neard home directory stands for (`--home DIR`): `node_key.json`, `validator_key.json`,
+`genesis.json`, `data/` for the store and, from `config.json`, `rpc.addr`, `network.addr` (the listen port) and
+`network.boot_nodes`. A flag given on the command line wins. -/
+def withHome (args : List String) : IO (List String) := do
+  let some home := flagValue args "--home" | return args
+  let add (flag value : String) (acc : List String) : List String :=
+    if (flagValue args flag).isSome then acc else acc ++ [flag, value]
+  let mut out := args
+  out := add "--node-key" s!"{home}/node_key.json" out
+  out := add "--validator-key" s!"{home}/validator_key.json" out
+  out := add "--genesis-config" s!"{home}/genesis.json" out
+  out := add "--store" s!"{home}/data/lean-store" out
+  out := add "--chain-dir" s!"{home}/data/lean-chain" out
+  let configFile : System.FilePath := s!"{home}/config.json"
+  if ← configFile.pathExists then
+    match Lean.Json.parse (← IO.FS.readFile configFile) with
+    | .error e =>
+      throw (IO.userError s!"{configFile}: {e}")
+    | .ok cfg =>
+      if let .ok (.str a) := (cfg.getObjVal? "rpc" >>= (·.getObjVal? "addr")) then
+        out := add "--rpc-addr" a out
+      if let .ok (.str a) := (cfg.getObjVal? "network" >>= (·.getObjVal? "addr")) then
+        if let some port := (a.splitOn ":").getLast? then
+          out := add "--listen" port out
+      if (flagValue args "--boot").isNone then
+        if let .ok (.str b) := (cfg.getObjVal? "network" >>= (·.getObjVal? "boot_nodes")) then
+          for n in b.splitOn "," do
+            if n != "" then
+              out := out ++ ["--boot", n]
+  return out
+
 def validatorCommand (args : List String) : IO UInt32 := do
+  let args ← withHome args
   let some chainDir := flagValue args "--chain-dir" |
     IO.eprintln usage;
     return 2
@@ -94,13 +128,19 @@ def validatorCommand (args : List String) : IO UInt32 := do
   let some peer := (flagValues args "--boot").filterMap parsePeer |>.head? |
     IO.eprintln "--boot PEERID@IP:PORT is required"
     return 2
-  let delays := ((flagValue args "--delays").map fun t => (t.splitOn ",").filterMap String.toNat?).getD []
+  let delays :=
+    ((flagValue args "--delays").map fun t => (t.splitOn ",").filterMap String.toNat?).getD []
   let opts : Validator.Options :=
-    { chainDir, nodeKey, validatorKey, peer, configs := (flagValue args "--configs").getD "near-lean/vm/configs",
+    { chainDir, nodeKey, validatorKey, peer,
+      configs := (flagValue args "--configs").getD "near-lean/vm/configs",
       listen := (flagValue args "--listen").bind String.toNat? |>.map (·.toUInt16),
-      seconds := (flagValue args "--seconds").bind String.toNat?, report := flagValue args "--report",
-      appliedLog := flagValue args "--applied-log", stopFile := flagValue args "--stop-file", quiet := args.contains "--quiet",
-      endorsementDelay := delays.getD 0 600, baseDelay := delays.getD 1 2000, capDelay := delays.getD 2 6000 }
+      seconds := (flagValue args "--seconds").bind String.toNat?,
+      report := flagValue args "--report", appliedLog := flagValue args "--applied-log",
+      stopFile := flagValue args "--stop-file", quiet := args.contains "--quiet",
+      logFormat := (flagValue args "--log-format").getD "text",
+      rpcAddr := (flagValue args "--rpc-addr").bind Addr.parse?, store := flagValue args "--store",
+      genesisConfig := flagValue args "--genesis-config", endorsementDelay := delays.getD 0 600,
+      baseDelay := delays.getD 1 2000, capDelay := delays.getD 2 6000 }
   Validator.run opts
 
 def main (args : List String) : IO UInt32 := do

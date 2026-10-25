@@ -108,7 +108,7 @@ def start(topology: str) -> list[int]:
     for index in spec.get("neard", range(spec["validators"])):
         node = root / f"node{index}"
         log = (node / "neard.log").open("ab")
-        env = dict(build.neard_environment(BIN), RUST_LOG="warn")
+        env = dict(build.neard_environment(BIN), RUST_LOG=os.environ.get("NEARD_RUST_LOG", "warn"))
         process = subprocess.Popen([str(BIN / "neard"), "--home", str(node), "run"], stdout=log, stderr=log,
                                    env=env, start_new_session=True)
         (node / "neard.pid").write_text(str(process.pid))

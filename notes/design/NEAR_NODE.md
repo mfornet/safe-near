@@ -1210,6 +1210,102 @@ Produce,Wire,State,WitnessMake,Node,Endorse,Follow,Drive,Run}.lean`, the `valida
 - **Doubts.** The exporter binary was not rebuilt for the genesis-only chain fix (the harness works around it). The run
   is timing dependent: the Lean node missed a few chunks per epoch in every run, which is why the kickout bug showed.
 
+### M9 RPC and operability
+
+#### M9a, transaction pool (done)
+
+Gates: `just node-validator-tests` (the pool tests), `just localnet-validator` (which now needs transactions in Lean's
+chunks). Sources: `NearNode/Validator/{Pool,Prepare}.lean`, `Follow.lean` (`buildChunk`), `Drive.lean` (`processTx`,
+`dropIncluded`), reference `chain/pool/src/lib.rs`, `chain/client/src/{rpc_handler,chunk_producer}.rs`,
+`chain/chain/src/runtime/mod.rs` (`prepare_transactions_extra`), `chain/chain/src/store/utils.rs`.
+
+- **Pool.** One `Pool` per shard in `VState.pools`: groups by `(signer, public key)` keyed by `hash(borsh(pk) ++ seed ++ account)`,
+  visited round robin in key order after the last key used; duplicates by hash; the `transaction_pool_size_limit` (100 MB);
+  `remove` for the transactions a block includes; `prepare` is the loop of `prepare_transactions_extra` (gas limit
+  `process_tx_limit` of the shard's congestion, the 4 MiB `combined_transactions_size_limit`, the strict-nonce gap rule, the
+  reintroduction of the prepared transactions). Not ported: the time limit and the storage proof soft limit, the early
+  preparation job, the SPICE queue.
+- **Per transaction.** `Prepare.admit` follows `prepare_transactions_extra`: congestion of the receiving shard, validity period
+  (`check_transaction_validity_period`), the signer's account and key read from the trie of the previous block's state (the
+  node's own trie, no decoding of the shard) with the changes of the earlier transactions of the chunk in an overlay, and the
+  runtime's `convertTransaction` (what applying the chunk runs) for nonce, balance, allowance and storage stake. Entering the
+  pool (`process_tx_internal`): version, size, actions, signature, validity period and the same check at the tip.
+- **Forwarding.** A `ForwardTx` from the peer is processed as `is_forwarded`; a node that is a chunk producer of the shard
+  pools it. `forwardTx` sends to the chunk producers of the heights 1 to 3 and 7 after the tip (`tx_routing_height_horizon` 4).
+- **Not supported.** Gas-key transactions (the model has no gas keys) and ML-DSA keys are refused at the pool.
+- **Acceptance.** `validator_accept.py` reads every transaction of a Lean chunk from neard's `chunk` RPC, asks neard for
+  `EXPERIMENTAL_tx_status` and compares the outcome of the transaction and of each receipt (id, gas burnt, tokens burnt, executor,
+  status kind, receipt ids) with the outcomes the Lean node computed when it applied the block (`applied.jsonl`), failing if
+  there are none or any differ. Last run (100 s): 12 Lean chunks with 46 transactions, 276 outcomes checked, 276 equal; 154 block
+  hashes and 152 state roots equal.
+
+#### M9b, JSON-RPC server (done, except the points listed)
+
+`NearNode.Rpc.*`; reference `chain/jsonrpc/src/lib.rs`, `chain/jsonrpc-primitives`, `chain/client/src/view_client_actor.rs`.
+
+- **Server.** HTTP/1.1 over the node's own `Net` listener (keep-alive, chunked bodies, one task per connection, CORS), `POST /` JSON-RPC
+  2.0 and `GET /status`, `/health`, `/network_info`. Errors have the shape of `RpcError` (`REQUEST_VALIDATION_ERROR` /
+  `HANDLER_ERROR` / `INTERNAL_ERROR`, `cause`, `code`, `data`) and the HTTP status of `rpc_handler`.
+- **Methods.** `status`, `health`, `network_info`, `gas_price`, `block`, `chunk`, `query` (`view_account`, `view_code`,
+  `view_access_key`, `view_access_key_list`, `view_state`, `call_function` through the node's own `Wasm.Near.run` with a view
+  context), `tx` / `EXPERIMENTAL_tx_status` (outcomes with proofs, receipts, `wait_until`), `send_tx`, `broadcast_tx_async`,
+  `broadcast_tx_commit`, `validators` (current epoch from the aggregator, finished epochs from their blocks),
+  `EXPERIMENTAL_protocol_config`, `EXPERIMENTAL_genesis_config`.
+- **Transactions.** The RPC hands a transaction to the node's loop (`Env.txQueue`, drained by `tick`), which runs `processTx`
+  (the same entry as a forwarded transaction), so a transaction sent to the Lean node enters its pool, is forwarded to the chunk
+  producers and lands in a chunk.
+- **Data the RPC needs** is kept in `VState` (`canon` height index, `outcomes`, `txIndex`, `receiptsById`, yielded receipts) and in the
+  store (columns `chunkBody`, `outcome`, `receipt`, `txIndex`, `delivered`).
+- **Acceptance.** `just node-rpc-conformance` (`tools/localnet/rpc_conformance.py`): brings up neard (node0) and the Lean validator (node1),
+  runs the finite workload, sends one request set to both RPCs and compares the answers field by field, then sends transactions
+  through the Lean RPC, then kills the Lean validator and starts it again from its store. `serve` only brings the topology up,
+  `check` runs the request set against a topology that is up. Head-dependent requests are repeated until both nodes answered at the
+  same head. The result is written to `rpc-conformance.json` in the work directory.
+- **Normalisation (the whole list).** `status`: `version`, `rpc_addr`, `uptime_sec`, `validator_account_id`, `validator_public_key`,
+  `node_public_key`, `node_key`. `network_info`: peers and known producers compared as a count, traffic counters dropped. In every
+  response: the `gas_profile` and `contracts` members of an outcome's `metadata` are dropped (the `version` is compared: 1 for a
+  transaction, 4 for a receipt); and a `Failure` that the Lean node answers with the string `<unrendered failure>` (an error kind it
+  does not map) is taken as equal, and counted per group. Every other failure, rendered by the Lean node as nearcore does
+  (`ActionError` with the index and kind), is compared as it is. Kinds rendered: all account, key, stake and delegate-action kinds,
+  `FunctionCallError` for host errors, traps and `MethodResolveError`. Not rendered: compilation and link errors, gas-key errors,
+  `NewReceiptValidationError`, global-contract errors; no request of the set meets them.
+- **Last run** (one full `run`, 492 requests, 492 equal, no unrendered failures): block 79/79, chunk 64/64, `query` 114/114,
+  `tx` 150/150, `EXPERIMENTAL_tx_status` 37/37, `gas_price` 6/6, `validators` 4/4, protocol and genesis config 6/6, status,
+  health, network_info 3/3, errors 2/2. Transactions through the Lean RPC: `send_tx`, `broadcast_tx_async` and `broadcast_tx_commit`
+  one each, all three landed and `tx` at FINAL is equal on both nodes; 8 invalid transactions through `send_tx` and `broadcast_tx_async`
+  each, 16/16 same error. Restart: SIGKILL of the Lean validator at final height 353, restart from the store, caught up in 8.5 s, final
+  height 362 on both nodes afterwards, 5/5 requests equal after the restart.
+- **Not done.** `EXPERIMENTAL_changes`, `EXPERIMENTAL_changes_in_block` (needs the trie diff of each block kept per key kind),
+  `include_proof` of `view_state`, `view_gas_key_nonces` and the global-contract queries, `light_client_proof`, `next_light_client_block`,
+  `maintenance_windows`, `client_config`, `EXPERIMENTAL_receipt`. A request for any of them answers `METHOD_NOT_FOUND`. The gas profile and the
+  contracts list of an outcome's metadata are not computed.
+
+#### M9c, persistence and operation (done, except the points listed)
+
+- **Chain store.** The observer's store (blocks, `BlockInfo`, epochs, trie nodes, chunk extras, heads) plus the RPC data above is
+  committed with every applied block. `Validator.Persist.resume` rebuilds the `VState` from it.
+- **Safety state.** Committed before the act it guards: the largest approval target height (`LARGEST_TARGET_HEIGHT`, as
+  `save_largest_target_height`), the last block produced, the chunks produced per (height, shard) and the chunk endorsements. A
+  restarted validator never signs a second approval for a height nor produces a second block or chunk for a height.
+- **Flags.** `--home DIR` takes `node_key.json`, `validator_key.json`, `genesis.json`, `data/` and, from `config.json`, `rpc.addr`,
+  `network.addr` (listen port) and `network.boot_nodes`; a flag on the command line wins. `--log-format text|json` (one JSON object per
+  line: `ts`, `uptime_ms`, `level`, `target`, `msg`). `--rpc-addr`, `--genesis-config`, `--store` as before.
+- **Shutdown.** SIGTERM and SIGINT (libuv signal handles in `Net.Uv`) end the node like `--stop-file`: the loop leaves, the RPC server stops, the
+  store is closed, the report is written.
+- **Not done.** The `config.json` keys other than the three above are ignored; the logs are not per-target levels; there is no
+  `neard init`-compatible layout of `data/` (the store is the node's own format).
+
+#### The fork after a pause (M9 acceptance)
+
+`validator_accept.py` stops the Lean node for 12 s (SIGSTOP) and resumes it. On resume both validators have approvals for several target
+heights and each produces a block at every height it is producer of on the parent it has: neard produced five blocks 108 to 112 in
+12 ms on block 107 (debug logs of `chain`/`client`/`network`, `NEARD_RUST_LOG`), and in another run neard built 104 and 105 on 103
+while the Lean node, whose tip was still 103, built 107 on 103 with valid skip approvals; neard received that block, accepted it and
+made it its head. The fork choice then orphans the blocks that are not on the chosen chain, whichever node produced them. Nothing
+was rejected: every block the Lean node applied was held by neard. The check therefore asks what nearcore guarantees: a block of the Lean
+node that is off neard's canonical chain must be held by neard (`block` by hash), and is reported as an orphan; a block neard does not hold
+is a problem. Two runs on the final build: 0 orphans, and 4 orphans (107 to 110), both `ok`.
+
 ## Open points
 
 - Numeric performance target for M10, measured against nearcore (M2's and M4's are proposed above).

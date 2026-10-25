@@ -1,5 +1,6 @@
 import NearNode.Validator.Doomslug
 import NearNode.Validator.Messages
+import NearNode.Validator.Pool
 
 /-!
 `node-validator-tests`: the validator's state machines, with the unit tests of `doomslug.rs` ported
@@ -248,6 +249,113 @@ private def chunkWait (f : IO.Ref Nat) : IO Unit := do
   let (_, out) := ds2.processTimer 400 (some sa)
   check f "no endorsement for a height already approved" out.isEmpty
 
+/-! ### The transaction pool (`chain/pool` tests) -/
+
+private def keyOfIndex (i : Nat) : PublicKey :=
+  .ed25519 (CryptoHash.hash (ByteArray.mk #[i.toUInt8])).bytes
+
+private def txOf (signer : String) (key : Nat) (nonce : Nat) (strict : Bool := false) :
+    SignedTransaction :=
+  if strict then
+    ⟨.v1
+        { signerId := ⟨signer⟩, publicKey := keyOfIndex key, nonce := .nonce nonce.toUInt64,
+          receiverId := ⟨"other"⟩, blockHash := CryptoHash.zero, actions := #[],
+          nonceMode := .strict },
+      default⟩
+  else
+    ⟨.v0
+        { signerId := ⟨signer⟩, publicKey := keyOfIndex key, nonce := nonce.toUInt64,
+          receiverId := ⟨"other"⟩, blockHash := CryptoHash.zero, actions := #[] },
+      default⟩
+
+private def noncesOf (ts : Array SignedTransaction) : List (String × Nat) :=
+  ts.toList.map fun t => (t.transaction.signerId.val, t.transaction.nonceValue.toNat)
+
+private def poolTests (f : IO.Ref Nat) : IO Unit := do
+  -- insertion: duplicates are refused, the size limit is enforced, removal frees the space
+  let a1 := txOf "alice" 0 1
+  let a2 := txOf "alice" 0 2
+  let b1 := txOf "bob" 1 1
+  let (p, r) := ({ limit := none } : Pool).insert a1
+  check f "insert" (r == .success && p.count == 1)
+  let (p, r) := p.insert a1
+  check f "duplicate" (r == .duplicate && p.count == 1)
+  let (p, _) := p.insert a2
+  let (p, _) := p.insert b1
+  check f "three transactions" (p.count == 3 && p.size == a1.wireSize + a2.wireSize + b1.wireSize)
+  let (_, full) := ({ limit := some (a1.wireSize + 1) } : Pool).insert a1 |>.1.insert a2
+  check f "no space left" (full == .noSpaceLeft)
+  let p' := p.remove #[a1, b1]
+  check f "remove" (p'.count == 1 && p'.size == a2.wireSize && p'.groups.size == 1)
+  check f "removing what is not there changes nothing" ((p'.remove #[b1]).count == 1)
+  -- the same signer with two keys is two groups; the same key with a gas key index is another
+  let k1 := txOf "alice" 5 1
+  check f "group per key"
+      (p.groupKey a1 == p.groupKey a2 && p.groupKey a1 != p.groupKey k1 &&
+        p.groupKey a1 != p.groupKey b1)
+  -- prepare: one transaction from each group in turn; nonces within a group in order
+  let mut q : Pool := { limit := none }
+  for t in
+    #[txOf "alice" 0 3, txOf "alice" 0 1, txOf "alice" 0 2, txOf "bob" 1 2, txOf "bob" 1 1,
+      txOf "carol" 2 1] do
+    q := (q.insert t).1
+  let admitAll (n : Nat) (_ : SignedTransaction) : Except String (Nat × Nat) := .ok (n + 1, 10)
+  let prepared :=
+    q.prepare 0 1000000 1000000 SignedTransaction.wireSize (fun _ _ => none) (fun _ => true)
+      admitAll
+  check f "all prepared" (prepared.txs.size == 6 && prepared.limit == .noMoreTxsInPool)
+  let nonces := noncesOf prepared.txs
+  check f "per group nonces ascend"
+      (["alice", "bob", "carol"].all fun a =>
+        ((nonces.filter (·.1 == a)).map (·.2)) ==
+          (List.range ((nonces.filter (·.1 == a)).length)).map (· + 1))
+  -- round robin: no group yields twice before every group yielded once
+  check f "round robin" ((((nonces.take 3).map (·.1)).eraseDups).length == 3)
+  check f "prepared stay in the pool" (prepared.pool.count == 6)
+  -- the gas limit
+  let g :=
+    q.prepare 0 15 1000000 SignedTransaction.wireSize (fun _ _ => none) (fun _ => true) admitAll
+  check f "gas limit" (g.txs.size == 2 && g.limit == .gas && g.pool.count == 6)
+  -- the size limit
+  let one := a1.wireSize
+  let sz :=
+    q.prepare 0 1000000 (2 * one + 1) SignedTransaction.wireSize (fun _ _ => none) (fun _ => true)
+      admitAll
+  check f "size limit" (sz.txs.size == 2 && sz.limit == .size)
+  -- invalid transactions are taken out of the pool and not returned
+  let rejectBob (n : Nat) (t : SignedTransaction) : Except String (Nat × Nat) :=
+    if t.transaction.signerId.val == "bob" then .error "bob is broke" else .ok (n, 1)
+  let rj :=
+    q.prepare 0 1000000 1000000 SignedTransaction.wireSize (fun _ _ => none) (fun _ => true)
+      rejectBob
+  check f "rejected transactions" (rj.txs.size == 4 && rj.rejected.size == 2 && rj.pool.count == 4)
+  -- strict nonces: a gap leaves the transaction in the pool; an expired one is dropped
+  let mut s : Pool := { limit := none }
+  s := (s.insert (txOf "dave" 3 5 (strict := true))).1
+  let gap :=
+    s.prepare 0 1000000 1000000 SignedTransaction.wireSize (fun _ _ => some 2) (fun _ => true)
+      admitAll
+  check f "nonce gap waits" (gap.txs.isEmpty && gap.pool.count == 1)
+  let expired :=
+    s.prepare 0 1000000 1000000 SignedTransaction.wireSize (fun _ _ => some 2) (fun _ => false)
+      admitAll
+  check f "expired gap is dropped" (expired.txs.isEmpty && expired.pool.count == 0)
+  let fits :=
+    s.prepare 0 1000000 1000000 SignedTransaction.wireSize (fun _ _ => some 4) (fun _ => true)
+      admitAll
+  check f "no gap" (fits.txs.size == 1)
+  -- the iterator continues after the last used key
+  let mut r2 : Pool := { limit := none }
+  for t in #[txOf "a" 0 1, txOf "b" 1 1, txOf "c" 2 1] do
+    r2 := (r2.insert t).1
+  let first :=
+    r2.prepare 0 1 1000000 SignedTransaction.wireSize (fun _ _ => none) (fun _ => true) admitAll
+  let second :=
+    first.pool.prepare 0 1 1000000 SignedTransaction.wireSize (fun _ _ => none) (fun _ => true)
+      admitAll
+  check f "the next chunk starts after the last group used"
+      (first.txs.size == 1 && second.txs.size == 1 && first.txs[0]! != second.txs[0]!)
+
 def main : IO UInt32 := do
   let failures ← IO.mkRef 0
   basic failures
@@ -255,6 +363,7 @@ def main : IO UInt32 := do
   approvals failures
   onePerHeight failures
   chunkWait failures
+  poolTests failures
   let n ← checks.get
   let bad ← failures.get
   IO.println s!"{n} checks, {bad} failures"

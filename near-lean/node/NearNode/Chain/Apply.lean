@@ -88,6 +88,8 @@ structure ShardReport where
   /-- Whether the conversion of the pre-state encoded back to the trie's entries. -/
   roundTrip : Bool
   outcomes : Array ExecutionOutcomeWithId := #[]
+  /-- The yielded receipts the chunk stored, as Borsh receipts. -/
+  yielded : Array ByteArray := #[]
 
 /-! ### Chunk header fields -/
 
@@ -397,7 +399,7 @@ def applyBlock (prof : Option Prof) (p : Params) (st : Near.Node.Chain.ChainStat
                   reencoded.all fun (k, v) => originalMap[k]? == some v)
       else
         pure true
-    let (newEntries, extra, outgoing, outcomes) ←
+    let (newEntries, extra, outgoing, outcomes, yielded) ←
       if isNew then
         do
           let overlay ←
@@ -414,13 +416,13 @@ def applyBlock (prof : Option Prof) (p : Params) (st : Near.Node.Chain.ChainStat
                     gasUsed := result.gasBurnt.toUInt64, gasLimit := chunk.gasLimit,
                     balanceBurnt := ⟨result.balanceBurnt⟩, congestionInfo := result.congestion,
                     bandwidthRequests := result.requests, proposedSplit := none }),
-                result.outgoing, result.outcomes)
+                result.outgoing, result.outcomes, result.yielded)
       else
         do
           let entries ←
             timed prof "run/old-chunk" fun _ => runOldChunk p.cfg p.congestion ctx prepared
           let some (.v5 old) := prevExtra? | throw "no chunk extra before an old chunk"
-          pure (entries, ChunkExtra.v5 old, #[], #[])
+          pure (entries, ChunkExtra.v5 old, #[], #[], #[])
     let changes ← timed prof "trie-update" fun _ => updateTrie src root entries newEntries
     let extra : ChunkExtra :=
       match extra with
@@ -439,8 +441,8 @@ def applyBlock (prof : Option Prof) (p : Params) (st : Near.Node.Chain.ChainStat
         extras := pr.extras.insert (hash.bytes, shard) extra }
     reports :=
       reports.push
-        { shard, extra, incoming := if isNew then delivered else #[], outgoing, roundTrip,
-          outcomes }
+        { shard, extra, incoming := if isNew then delivered else #[], outgoing, roundTrip, outcomes,
+          yielded }
   -- what the block delivers to each shard stays until the shard has a chunk again
   for i in [0:layout.numShards.toNat] do
     let some shard := layout.getShardId i | throw "shard index out of range"
