@@ -1203,7 +1203,7 @@ Produce,Wire,State,WitnessMake,Node,Endorse,Follow,Drive,Run}.lean`, the `valida
   Three earlier runs after the fix (130 s) also passed; before it, three of the runs I watched were banned at an epoch boundary.
 - **Deferred.** Chunks are empty (no transaction pool, no `ForwardTx` use beyond receiving), no fork choice (the node
   follows one chain), no persistence (the node starts from the exported genesis corpus), no `ChunkContractAccesses`,
-  inline apply stalls the event loop for a few seconds on heavy blocks (block 75 took 7.5 s in one run), the witness is not
+  inline apply stalls the event loop for a few seconds on heavy blocks (block 75 took 7.5 s in one run; closed by H2), the witness is not
   really compressed (stored zstd frames), the signer is not constant time, and a witness from neard is checked by
   recomputing the node's own skeleton, not by replaying the transitions independently. Kickouts are off in the
   validator genesis, so the kickout path of a Lean validator is exercised only by the conformance corpora.
@@ -1398,7 +1398,7 @@ Quiet single-shard block: 140 ms before, 40 ms after (39.5 s for 1000 blocks inc
 `NearRuntime.StateEncoding` compares all keys pairwise, and the runtime is not touched here), `shard-start` (10 ms), `results` (7 ms).
 Inline application still blocks the event loop: the full burst (14 calls of 300 Tgas) stops the head for 30 s in the validator
 topology (neither validator can progress without the other), everything else is under a second; moving application off the network
-thread is not done (see below).
+thread was done afterwards (H2).
 
 #### M10d, soak (`just localnet-soak`)
 
@@ -1424,14 +1424,143 @@ Follow with `--lightburst`, default checks (600 s of following, the burst a minu
 reached the head after 8.3 s, peak lag 5, caught up 6.0 s after the burst (limit 240 s), 1000 state roots equal; four shards 7.3 s,
 peak 4, caught up in 5.9 s, 4001 state roots equal; no disconnect on either.
 
-**Not done, doubts.** The soak leaves out `sanity_check`, the call that deploys contract code from the memory of a contract
-(`workload.py --no-deploy-from-memory`): a validator that applies a block at the head cannot know the deployed bytes (a follower
-gets them from the next chunk), and the run stops with "code bytes absent from catalogue". That is a gap of M8, found here, not
-closed. The RSS slope is not flat: the node keeps the trie nodes of its history in memory (the store tables), so memory grows with
+**Not done, doubts.** (The soak used to leave out `sanity_check`, the call that deploys contract code from the memory of a
+contract; closed by H1 below.) (Closed by H3 below.) The RSS slope is not flat: the node keeps the trie nodes of its history in memory (the store tables), so memory grows with
 the chain (about 3 MB per 100 blocks of this workload); a longer soak needs garbage collection of old state. `encode-state` is still
 quadratic in the number of entries. The generator of the differential test covers the integer and control instructions and the
 host functions much better than floating point; the engine hands tables, references and `memory.init` back to the specification, so
 those are not exercised at all. No equivalence theorem was written; the differential tests are the evidence, as rule 2 allows.
+
+#### Hardening after M10 (SAF-8)
+
+##### H1, code a contract deploys from its own memory
+
+*Cause.* A function call can emit `DeployContract` with bytes it assembled in its memory. The runtime hands its decoder
+(`Bytes → ContractCode`) those bytes and keeps only the answer (module, size, hash); the encoders that write the outgoing
+receipt then look the bytes up in the chunk's catalogue by hash. The catalogue holds the code of the state and of the incoming
+receipts, and of the chunk's own `claimed` outgoing receipts, which a follower reads from the next chunk's body. A validator
+applying a block at the head has no next chunk, so the bytes were nowhere and the apply stopped with "code bytes absent from
+catalogue" (block 205 of the soak with the full workload, after the `sanity_check` call).
+
+*Fix* (`Chain/ApplyChunk.lean`, `stepLearning`; no runtime definition changed). The decoder is the only place that sees the bytes
+and a pure function can return nothing else, so the step runs with `learningCodeOf`: the catalogue's code for bytes it holds, and
+for bytes it does not hold a code whose `decodeIssue` carries them as hexadecimal text. A decode issue makes the runtime reject
+the whole attempt atomically (`Near.apply` returns the initial state with the issue), so nothing leaks: the node reads the bytes off
+the issue, decodes them as `Model.code` decodes the code of an incoming receipt (same label, same module, same decode issue for
+bytes that do not decode), adds the entry to the catalogue and the cache and runs the step again, now answering these bytes from
+the catalogue. Each rerun gets one distinct deployment further (at most 256 per chunk); a chunk without such a deployment runs
+once, as before. The outgoing receipt bytes, the state encoding and every other consumer of the catalogue then see the code.
+The cost is one extra run of the part of the chunk up to the deploying receipt per distinct code.
+
+*Evidence.* Before (main, `soak.py --duration 420`, full workload): `block 205: applying the chunks failed: code bytes absent from
+catalogue`, node exit. After: the same run passes the call (`sanity-check: ... SuccessValue` at block 212) and ends at block 603 with
+613 of 613 block hashes and 595 of 595 state roots equal to neard's. `soak.py` no longer passes `--no-deploy-from-memory` unless
+asked to (`--no-deploy-from-memory` is now an option of `soak.py`, off by default). `node-validator-tests` checks the hex text and
+the decoder.
+
+##### H2, applying off the event loop
+
+*Cause.* `Env.applyOne` ran `applyBlock` inline in the handler that received the block, so a block of heavy calls (13 to 14 s for
+four chunks of 300 Tgas each on the fast engine) kept the loop away from everything else: pings, approvals, RPC state, parts. The
+follower already applies on a worker thread (`Network/Apply.lean`); the validator did not.
+
+*Fix* (`Validator/Drive.lean`, following nearcore's split of the client actor from the apply pool). `Env.startApply` snapshots the
+chain state and the progress, collects the chunk bodies by shard, and runs `applyBlock` with `IO.asTask` on a dedicated thread; the
+`Applying` record (block, bodies, start time, task) is kept in `Env.applying`. `Env.tryApply`, called on every turn of the loop and
+whenever a block or chunk arrives, takes the result with `IO.hasFinished` and runs the rest of the former `applyOne` on the loop
+(`finishApply`: the new progress into the state, the commit, the applied log), then `onApplied` (Doomslug tip, chunk production,
+witnesses that waited) and starts the next block whose parent is applied, so blocks are still applied one after the other and
+only the loop thread writes the state. Nothing changes the tip but `onApplied`, so nothing is produced on an unapplied block.
+
+*Found by the first version: the stale tip.* With the loop free, the timers kept running on the tip while the block being applied
+was about to replace it. Two things followed in a run of the burst: the node sent `Skip(tip)` approvals for the heights above
+the block it was applying, and `tryProduceBlocks` produced blocks with the stale tip as parent (the approvals for it were the
+node's own and neard's skips), forking the chain at the block being applied: nine heavy blocks applied instead of four, `neard`
+holding none of the extra blocks at their heights, finality stuck for two minutes. In the inline version this could not happen
+because the tip moved before the loop looked at the timers. `Env.tipIsStale` is true while a block above the tip is being applied;
+then `tick` neither runs `processTimer` (no approval, no `largest_target_height` change) nor produces a block, and counts the turn
+(`turnsOnStaleTip`). The timers restart in `setTip` when the block is applied, as after any new head, so there is no burst of skip
+approvals afterwards. Approvals are still collected, parts forwarded and served, the RPC answered, transactions pooled.
+
+*Measure* (`Env.noteTurn`: the time between two turns of the loop, which waits at most 20 ms for a message; `loopMaxGapMs` and
+`loopStalls`, the turns of a second or more, are in the report). `soak.py --duration 330 --skip hostcalls wait`, the burst of 14
+calls of 300 Tgas, the same machine, the same workload:
+
+| | longest turn of the loop | turns of 1 s or more | heavy blocks | roots and hashes equal |
+|---|---|---|---|---|
+| inline (before) | 13016 ms | 4 | 193, 195, 197 (14.2, 14.1, 13.9 s), 199 (6.7 s) | 453 of 453 |
+| thread, tip held while a block is applied | 282 ms | 0 | 185, 187, 189 (12.9, 12.7, 13.8 s), 184, 191 (3.4, 3.3 s) | 448 of 448, no orphan |
+
+The application takes as long as before (the head still waits for the node: with equal stakes neither validator can go on without
+the other); what changed is that the loop is not away. A block of quiet traffic costs about 19 % more on the thread (89 ms against
+75 ms over 251 blocks: starting a thread, and the objects shared with the loop being reference counted atomically).
+`validator_accept.py`: ok, 527 of 527 outcomes equal, the stall test (12 s) stalls and resumes.
+
+##### H3, bounded memory: garbage collection
+
+*Cause.* The node kept everything it had ever applied. The trie nodes the updates replaced were never taken back (`trieDeleteOps`
+existed since M4 but nothing called it), and the blocks, their `BlockInfo` and merkle trees, the chunk extras, the receipts in and out,
+the chunk bodies, the outcomes and the RPC indexes stayed in `VState`, in the progress and in the store's tables. The census of a
+run (`VState.census`, logged every 100 heights) showed all of them growing with the height; a 15 minute soak without collection:
+1300 blocks, 10692 trie entries, RSS 150 to 211 MB, slope 193 MB per hour after the first two minutes.
+
+*Fix* (`Validator/Gc.lean`, `Store/Trie.lean`, `Chain/Apply.lean`; the reference is `chain/chain/src/garbage_collection.rs` at
+the pin). Every applied block keeps the reference changes of its chunks' tries in the new `TrieChanges` column (`DBCol::TrieChanges`:
+insertions and deletions as hash and count). `get_gc_stop_height_impl` is ported (`gcStopHeight`): the first height of the oldest of
+the last `gc_num_epochs_to_keep` epochs (default 5, `--gc-epochs-to-keep N`, 0 collects nothing). After each applied block
+`collectGarbage` collects the heights from the tail to that stop height, `gc_blocks_limit` (2) at a time and faster when far
+behind. For the canonical block `B` at a collected height it applies `B`'s trie deletions (`apply_deletions`: `rcAdd` with the
+negative counts, so a node a retained state still references survives) and drops the data of `B`'s parent; for any other block at the
+height (a fork, found by walking from the tip) it takes back its insertions (`revert_insertions`) and drops it. Dropping a block
+removes its entries in the store (block, header, `BlockInfo`, merkle tree, chunk extras, incoming and outgoing receipts, delivered
+receipts, trie changes, chunk bodies, outcomes, receipts and the transaction index) and the same in the chain state, the progress
+and the maps of the RPC. One pass is one store commit that also writes `TAIL`, and the same operations go to the progress'
+view of the tables, so a restart continues from the tail it finds. It runs between two applications only: an application works on a
+snapshot of the state and replaces the progress when it ends, which would undo a collection made meanwhile.
+
+Also: a witness stops keeping its parts once it is rebuilt (they were kept for ever), witnesses and produced chunks below the tail
+are forgotten, and the produced-chunk record read back at a restart had its pair in the order the running node does not use
+((height, shard) against (shard, height)), so a restarted node could have produced a chunk a second time: fixed.
+
+*Evidence* (census lines and `soak.py`; the one-hour result with the default window is in the acceptance table below).
+
+| run | window | blocks | trie entries at the end | RSS | slope after 120 s |
+|---|---|---|---|---|---|
+| no collection (the code before) | all | 1300 | 10692 | 150 to 211 MB | 193 MB/h |
+| `--gc-epochs-to-keep 2` | about 60 blocks | 1075 | 899 (stays between 700 and 900) | 148 to 174 MB, peak 198 | 54 MB/h over the 10 minutes |
+
+The retained chain state, maps and tables stay at the size of the window (`census: chain 53 blocks ... trie 864 entries` after 1000
+heights collected); roots and hashes are equal to neard's throughout (1052 of 1052). Forks: with the window at one epoch and the
+Lean node stopped for 12 s at different times (`validator_accept.py --gc-epochs 1 --stall-at N`) the collection took back 1, 4 and 2
+fork blocks in three of four runs (orphans 93; 104 to 107; 115, 117), all runs `ok`. Restart: `soak.py --gc-epochs 1 --restart-at 240`
+kills the node with SIGKILL after 305 blocks, 235 of which are collected, starts it from the store ("continuing from the store at
+height 305"), and ends with 916 of 916 roots equal, the lag bound kept, collection going on (379 heights).
+
+A node with a window of 5 epochs answers `block`, `tx` and the other RPC methods for the heights of the window only, as `neard`
+does; older ones are `UNKNOWN_BLOCK` (the RPC conformance run with a one-epoch window compares the old transactions of its
+workload against a `neard` that still holds them, which is why that run uses the default).
+
+*Not done.* Blocks that were accepted but never applied (a fork whose chunk bodies never came) are collected with the height but
+have no trie changes to take back; state parts, the state-transition data and the witness cache of nearcore do not exist here. The
+store's log still grows between compactions (55 MB per hour of this workload at the 64 MiB limit) and the compaction rewrites it
+from memory; a disk-resident tier is still not there. Contract code (`CodeCache.byLabel`) is not collected: it grows with the
+distinct contracts deployed, not with the height.
+
+##### Acceptance of the hardening (one run of each, on the final build)
+
+| Run | Result |
+|---|---|
+| `soak.py`, 3595 s, full workload (`sanity_check` included, no `--no-deploy-from-memory`), default window of 5 epochs | head 3 to 5768, final 5766; 5840 of 5840 block hashes and 5747 of 5747 state roots equal, no orphan; head minus final at most 10, no window without finality; lag at most 2 outside bursts, 1 inside (10 light bursts), median 0; no disconnect, RPC answered at all 714 samples; Lean produced 3406 blocks and 3381 chunks (659 transactions), 2381 witnesses of neard valid, 0 invalid; longest turn of the loop 157 ms; 5642 heights collected; **RSS 167.8 MB after warm-up to 180.8 MB, peak 211.4 MB, slope 11.6 MB/h** (111 MB/h before) |
+| `validator_accept.py` (1) | ok: 365 blocks applied, 363 same hash and 2 orphans neard holds, 361 of 361 roots, 537 of 537 outcomes equal, 129 transactions in 50 Lean chunks, 167 witnesses valid, stall test stalled and resumed |
+| `validator_accept.py` (2) | ok: 365 applied, 364 same hash and 1 orphan, 359 of 359 roots, 531 of 531 outcomes, 119 transactions in 42 chunks, 157 witnesses valid, stall test ok |
+| `follow_accept.py --lightburst --topologies single sharded` | single: head reached after 7.3 s, max lag 8, 1001 of 1001 roots, caught up after the burst; sharded: 7.2 s, max lag 6, 4003 of 4003 roots, caught up; no disconnect; `localnet-follow: all agree` |
+| `rpc_conformance.py run` | 491 of 491 requests equal (block 79, chunk 63, tx 150, query 114, ...); the three transactions through the Lean RPC landed; SIGKILL at final height 335, back in 8.5 s, final 343 on both |
+
+In the `validator_accept.py` runs the longest turn of the loop is the 12 s pause the test imposes with SIGSTOP; the outcomes
+check lists a few `408` answers of neard's `EXPERIMENTAL_tx_status` for transactions of the last blocks, which cannot be final
+once the Lean node (half the stake) has been stopped, and does not count them. `rpc_conformance.py` starts the Lean node with
+`--gc-epochs-to-keep 10000`, as `localnet.py` configures neard (`gc_num_epochs_to_keep`), because its requests ask for the first
+epochs; the node does not yet read that key from `config.json` (`--home`).
 
 ## Open points
 

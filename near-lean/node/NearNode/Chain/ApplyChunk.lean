@@ -118,6 +118,8 @@ structure ChunkResult where
   /-- The yielded receipts the chunk stored (`promise_yield_create`), which no chunk sends: the RPC serves
   them as the receipts of the outcomes they get later. -/
   yielded : Array ByteArray := #[]
+  /-- The code a contract deployed from its own memory in this chunk (`stepLearning`). -/
+  learned : Array ChainReplay.LoadedCode := #[]
 
 private def bytesOf (l : List UInt8) : ByteArray :=
   ⟨l.toArray⟩
@@ -160,6 +162,97 @@ def overlayOf (src : Near.Node.Trie.NodeSource) (root : CryptoHash)
          base :=
            { root := root.bytes.toList, memoryUsage := usage.toNat, witness := witness.toList } },
         c)
+
+/-! ### Code a contract deploys from its own memory
+
+A function call can emit `DeployContract` with bytes it assembled in its own memory. They are in no input
+of the chunk: not in the state, not in the incoming receipts, and the receipt that carries them is only
+produced by this very call. A follower has them from the next chunk (`claimed`), but a validator applying
+a block at the head does not. The runtime hands the decoder (`Bytes → ContractCode`) those bytes and keeps
+only its answer, so the decoder is the one place where they are visible, and a pure function has no other
+way out than the value it returns.
+
+The step therefore runs with a decoder that knows the catalogue and, for bytes it does not know, answers
+with a code that carries a model issue (the runtime then rejects the whole attempt atomically, `Near.apply`)
+whose text holds the bytes. The node reads them off the issue, adds them to the catalogue exactly as it adds
+the code of an incoming receipt (`Model.code`), and runs the step again; bytes already known are answered
+from the catalogue, so each run gets one deployment further. -/
+
+/-- Starts the text of the issue that hands bytes to the node. -/
+def undeclaredMarker : String :=
+  "safe-near undeclared contract code:"
+
+private def hexDigit (n : UInt8) : Char :=
+  if n < 10 then Char.ofNat (48 + n.toNat) else Char.ofNat (87 + n.toNat)
+
+/-- Lowercase hexadecimal text of bytes. -/
+def hexOfBytes (b : List UInt8) : String :=
+  b.foldl (fun (s : String) (x : UInt8) => (s.push (hexDigit (x >>> 4))).push (hexDigit (x &&& 15)))
+    ""
+
+private def hexValue? (c : Char) : Option UInt8 :=
+  if '0' ≤ c && c ≤ '9' then some (UInt8.ofNat (c.toNat - 48))
+  else if 'a' ≤ c && c ≤ 'f' then some (UInt8.ofNat (c.toNat - 87)) else none
+
+/-- The bytes of the hexadecimal digits that start `s` (up to the first other character). -/
+def bytesOfHexPrefix (s : String) : ByteArray :=
+  Id.run do
+    let mut out : ByteArray := ByteArray.empty
+    let mut high : Option UInt8 := none
+    for c in s.toList do
+      match hexValue? c with
+      | none =>
+        break
+      | some d =>
+        match high with
+        | none =>
+          high := some d
+        | some h =>
+          out := out.push (h <<< 4 ||| d)
+          high := none
+    return out
+
+/-- The decoder of a run that learns the code a contract deploys: the catalogue's code for bytes it holds, an
+issue that carries the bytes otherwise. -/
+def learningCodeOf (codes : ChainReplay.Catalogue) (blob : Near.Bytes) : Near.ContractCode :=
+  match codes.find? (·.bytes == blob) with
+  | some entry => entry.code
+  | none =>
+    { module := default, size := blob.length, hash := "",
+      decodeIssue := some (.interpreterError (undeclaredMarker ++ hexOfBytes blob)) }
+
+/-- The bytes an issue of `learningCodeOf` carries, if it is one. -/
+def undeclaredBytes? (message : String) : Option ByteArray :=
+  match message.splitOn undeclaredMarker with
+  | [_, rest] => some (bytesOfHexPrefix rest)
+  | _ => none
+
+/-- The most deployments of distinct code one chunk may make from contract memory. -/
+def maxLearnedCodes : Nat :=
+  256
+
+/-- `Near.step` with `learningCodeOf`: whenever the run stops at bytes it has not seen, they join the
+catalogue (and the cache) and the step runs again. Returns the catalogue it ended with and the codes it
+learned. -/
+def stepLearning [Near.VmEngine] (cfg : Wasm.Near.RuntimeConfig) (codes : ChainReplay.Catalogue)
+    (cache : CodeCache) (snapshot : Near.Snapshot) (block : Near.Block) :
+    Nat →
+      Except String
+        (ChainReplay.Catalogue × Array ChainReplay.LoadedCode × Near.Snapshot × Near.ApplyResult)
+  | 0 => throw "a chunk deploys too many contracts from contract memory"
+  | fuel + 1 =>
+    match Near.step cfg (learningCodeOf codes) snapshot block with
+    | .error e => throw s!"invalid receipt schedule: {repr e}"
+    | .ok (next, result) =>
+      match result.issue.bind (fun (_, issue) => undeclaredBytes? issue.message) with
+      | none => pure (codes, #[], next, result)
+      | some blob =>
+        match (code blob).run { cache } with
+        | .error e => throw e
+        | .ok (entry, conv) => do
+          let (codes', learned, next, result) ←
+            stepLearning cfg (codes ++ [entry]) conv.cache snapshot block fuel
+          pure (codes', #[entry] ++ learned, next, result)
 
 /-- Everything the runtime consumes for one chunk, converted. -/
 structure Prepared where
@@ -279,13 +372,13 @@ def runChunk (prof : Option Prof) (cfg : Wasm.Near.RuntimeConfig)
         { p.block.ap with
           nativeReceiptHashes := some admitted.context.receipts, storageAccounting := some trie,
           verifyDelegate := ChainReplay.DelegateSignature.verify catalogue } }
-  let (next, result) ←
+  let (codes, learned, next, result) ←
     timed prof "run/interpreter" fun _ =>
-        match Near.step cfg (ChainReplay.codeOf p.codes) snapshot block with
-        | .error e => throw s!"invalid receipt schedule: {repr e}"
-        | .ok r => pure r
+        stepLearning cfg p.codes cache snapshot block maxLearnedCodes
   if let some issue := result.issue then
     throw s!"model execution issue: {issue.2.message}"
+  -- the code the contracts of this chunk deployed from their memory is in the catalogue from here on
+  let catalogue := codes.map fun c => (c.code.hash, c.bytes)
   let context ←
     timed prof "run/observe-queues" fun _ =>
         Near.ReceiptRegistry.observeQueues cfg catalogue block.ap.blockHeight snapshot.state result
@@ -396,7 +489,7 @@ def runChunk (prof : Option Prof) (cfg : Wasm.Near.RuntimeConfig)
             gasBurnt := result.outcomes.foldl (fun s (_, o) => s + o.gasBurnt) 0,
             balanceBurnt := result.tokensBurnt - result.subsidizedAmount, proposals,
             congestion := info, requests, delayedCount := next.state.delayed.length,
-            schedulerHash := bytesOf outcome.schedulerHash, txHashes, yielded }
+            schedulerHash := bytesOf outcome.schedulerHash, txHashes, yielded, learned }
 
 /-- A chunk that is not new (`apply_old_chunk`): no transaction or receipt is applied, but the
 epoch's validator accounts update and the bandwidth scheduler still run

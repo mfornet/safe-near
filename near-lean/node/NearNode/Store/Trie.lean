@@ -35,6 +35,48 @@ def trieDeleteOps (shard : ByteArray) (c : TrieChanges) : Array Op :=
   c.deletions.map fun d =>
     Op.rcAdd .state (stateKey shard d.hash) ByteArray.empty (-(d.rc.toNat : Int))
 
+/-- The reference count changes of a chunk's trie as `DBCol::TrieChanges` keeps them for garbage collection: the
+insertions (to take back when the block is on a fork) and the deletions (to apply when the block is garbage
+collected on the canonical chain), as `u32` count, then hash and `u32` references each, little endian. The data of
+the inserted nodes is in the `State` column already. -/
+def changesBytes (c : TrieChanges) : ByteArray :=
+  let refs (xs : Array (CryptoHash × UInt32)) (d : ByteArray) : ByteArray :=
+    xs.foldl (fun d (h, n) => le32 (d ++ h.bytes) n.toNat) (le32 d xs.size)
+  refs (c.deletions.map fun x => (x.hash, x.rc))
+    (refs (c.insertions.map fun x => (x.hash, x.rc)) ByteArray.empty)
+
+/-- The references of `changesBytes`: insertions and deletions; `none` for bytes that are not that. -/
+def changesOfBytes? (b : ByteArray) :
+    Option (Array (CryptoHash × Nat) × Array (CryptoHash × Nat)) :=
+  let u32 (i : Nat) : Nat :=
+    (b.get! i).toNat + (b.get! (i + 1)).toNat * 256 + (b.get! (i + 2)).toNat * 65536 +
+      (b.get! (i + 3)).toNat * 16777216
+  let refs (i : Nat) : Option (Array (CryptoHash × Nat) × Nat) :=
+    if i + 4 > b.size then none
+    else
+      let n := u32 i
+      if i + 4 + 36 * n > b.size then none
+      else
+        some
+          ((Array.range n).map
+              (fun k => (⟨b.extract (i + 4 + 36 * k) (i + 36 + 36 * k)⟩, u32 (i + 36 + 36 * k))),
+            i + 4 + 36 * n)
+  match refs 0 with
+  | some (ins, next) =>
+    match refs next with
+    | some (del, stop) => if stop == b.size then some (ins, del) else none
+    | none => none
+  | none => none
+
+/-- What garbage collection does for a block on the canonical chain: the references the chunk's update removed
+(`ShardTries::apply_deletions`), once the states before it are no longer needed. -/
+def deleteOpsOfRefs (shard : ByteArray) (refs : Array (CryptoHash × Nat)) : Array Op :=
+  refs.map fun (h, n) => Op.rcAdd .state (stateKey shard h) ByteArray.empty (-(n : Int))
+
+/-- What it does for a block on a fork: the references its update added (`ShardTries::revert_insertions`). -/
+def revertOpsOfRefs (shard : ByteArray) (refs : Array (CryptoHash × Nat)) : Array Op :=
+  deleteOpsOfRefs shard refs
+
 /-- Both. -/
 def trieOps (shard : ByteArray) (c : TrieChanges) : Array Op :=
   trieInsertOps shard c ++ trieDeleteOps shard c

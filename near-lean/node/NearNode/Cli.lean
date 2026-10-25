@@ -24,7 +24,7 @@ def usage : String :=
     "           [--listen PORT] [--seconds N] [--report FILE] [--applied-log FILE] [--stop-file FILE] [--configs DIR] [--quiet]\n" ++
     "           [--rpc-addr IP:PORT] [--genesis-config FILE] [--store DIR]\n" ++
     "           [--home NEARD_HOME] [--log-format text|json]\n" ++
-    "           [--delays ENDORSEMENT,BASE,CAP]"
+    "           [--delays ENDORSEMENT,BASE,CAP] [--gc-epochs-to-keep N]"
 
 /-- The value after a flag. -/
 private def flagValue (args : List String) (flag : String) : Option String :=
@@ -136,8 +136,9 @@ def validatorCommand (args : List String) : IO UInt32 := do
       listen := (flagValue args "--listen").bind String.toNat? |>.map (·.toUInt16),
       seconds := (flagValue args "--seconds").bind String.toNat?,
       report := flagValue args "--report", appliedLog := flagValue args "--applied-log",
-      stopFile := flagValue args "--stop-file", quiet := args.contains "--quiet",
-      logFormat := (flagValue args "--log-format").getD "text",
+      stopFile := flagValue args "--stop-file",
+      gcEpochs := ((flagValue args "--gc-epochs-to-keep").bind String.toNat?).getD 5,
+      quiet := args.contains "--quiet", logFormat := (flagValue args "--log-format").getD "text",
       rpcAddr := (flagValue args "--rpc-addr").bind Addr.parse?, store := flagValue args "--store",
       genesisConfig := flagValue args "--genesis-config", endorsementDelay := delays.getD 0 600,
       baseDelay := delays.getD 1 2000, capDelay := delays.getD 2 6000 }

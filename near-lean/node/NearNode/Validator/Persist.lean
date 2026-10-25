@@ -34,6 +34,10 @@ def producedChunkKey (height shard : UInt64) : ByteArray :=
 def endorsedKey (chunk : ByteArray) : ByteArray :=
   "ENDORSED".toUTF8 ++ chunk
 
+/-- Where garbage collection has got to (`ChainStore::tail`). -/
+def tailKey : ByteArray :=
+  "TAIL".toUTF8
+
 def u64Bytes (x : UInt64) : ByteArray :=
   le64 ByteArray.empty x
 
@@ -103,9 +107,10 @@ def readSafety (t : Tables) : Safety :=
         out :=
           { out with
             producedChunks :=
+              -- stored as (height, shard); the running node asks for (shard, height)
               out.producedChunks.insert
-                (u64Of (k.extract chunkPrefix.size (chunkPrefix.size + 8)),
-                  u64Of (k.extract (chunkPrefix.size + 8) k.size)) }
+                (u64Of (k.extract (chunkPrefix.size + 8) k.size),
+                  u64Of (k.extract chunkPrefix.size (chunkPrefix.size + 8))) }
       else if
         k.size == endorsedPrefix.size + 32 && k.extract 0 endorsedPrefix.size == endorsedPrefix then
         out := { out with endorsed := out.endorsed.insert (k.extract endorsedPrefix.size k.size) }
@@ -185,7 +190,8 @@ def resume (config : Chain.Config) (t : Tables) (delays : Delays) (now : Nat) :
     { st, pr, blocks, applied, tip := st.head, tipHeight, ds,
       latestKnown := max latest safety.lastProducedBlock, chunks, bodies, deliveredAt, outcomes,
       receiptsById := receipts, txIndex, producedChunks := safety.producedChunks,
-      endorsed := safety.endorsed }
+      endorsed := safety.endorsed,
+      tail := ((t.get .blockMisc tailKey).map u64Of).getD st.config.genesisHeight }
   return some { state := { s with canon := s.canonWith st.head tipHeight }, safety }
 
 end Near.Node.Validator

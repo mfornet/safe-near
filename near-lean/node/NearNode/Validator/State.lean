@@ -97,6 +97,9 @@ structure VState where
   finalized : Std.HashMap ByteArray Epoch.Finalized := {}
   /-- The transaction pool of each shard the node produces chunks for. -/
   pools : Std.HashMap UInt64 Pool := {}
+  /-- The height up to which garbage collection has run: the data of the blocks below it is gone, and the state
+  of the block at this height is the oldest that is still complete (`ChainStore::tail`). -/
+  tail : BlockHeight := 0
   /-- Counters for the report. -/
   stats : Std.HashMap String Nat := {}
 
@@ -125,6 +128,18 @@ def VState.canonWith (s : VState) (hash : CryptoHash) (height : BlockHeight) :
       | .error _ =>
         break
     return canon
+
+/-- The sizes of what the validator holds, for the memory report: entry counts, and bytes where the entries are
+byte strings (the trie nodes and the columns of the store). -/
+def VState.census (s : VState) : String :=
+  let t := s.pr.tables
+  let bytes (m : Std.HashMap ByteArray ByteArray) : Nat :=
+    m.fold (fun a k v => a + k.size + v.size) 0
+  let cols :=
+    (List.range t.plain.size).filterMap fun i =>
+      if t.plain[i]!.size == 0 then none else some s!"{i}:{t.plain[i]!.size}/{bytes t.plain[i]!}"
+  let rcBytes := t.rc.fold (fun a k (d, _) => a + k.size + d.size) 0
+  s!"census: chain {s.st.blocks.size} blocks {s.blocks.size} applied {s.applied.size} chunks {s.chunks.size} bodies {s.bodies.size} delivered {s.deliveredAt.size} witnesses {s.witnesses.size} canon {s.canon.size} outcomes {s.outcomes.size} txIndex {s.txIndex.size} receipts {s.receiptsById.size} endorsed {s.endorsed.size} produced {s.producedChunks.size}; progress outgoing {s.pr.outgoing.size} extras {s.pr.extras.size} incoming {s.pr.incoming.size} codes {s.pr.cache.byLabel.size}; trie {t.rc.size} entries {rcBytes} bytes; columns {cols}"
 
 def VState.bump (s : VState) (name : String) : VState :=
   { s with stats := s.stats.insert name (s.stats.getD name 0 + 1) }
