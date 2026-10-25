@@ -1292,7 +1292,12 @@ chunks). Sources: `NearNode/Validator/{Pool,Prepare}.lean`, `Follow.lean` (`buil
   line: `ts`, `uptime_ms`, `level`, `target`, `msg`). `--rpc-addr`, `--genesis-config`, `--store` as before.
 - **Shutdown.** SIGTERM and SIGINT (libuv signal handles in `Net.Uv`) end the node like `--stop-file`: the loop leaves, the RPC server stops, the
   store is closed, the report is written.
-- **Not done.** The `config.json` keys other than the three above are ignored; the logs are not per-target levels; there is no
+- **`gc_num_epochs_to_keep` (SAF-8 F1).** `--home` also reads the flattened `GCConfig` key `gc_num_epochs_to_keep` of `config.json`,
+  as `ClientConfig::gc_num_epochs_to_keep` uses it: 0 is refused (neard's `config_validate.rs`: "gc config values should all be
+  greater than 0") and a smaller value than 3 is raised to `MIN_GC_NUM_EPOCHS_TO_KEEP` (3). `--gc-epochs-to-keep` on the command
+  line still wins and keeps its test meanings (1, 2 and 0). `rpc_conformance.py` no longer passes the flag: 492 of 492 requests
+  equal with the window read from `node1/config.json` (10000).
+- **Not done.** The `config.json` keys other than the four above are ignored; the logs are not per-target levels; there is no
   `neard init`-compatible layout of `data/` (the store is the node's own format).
 
 #### The fork after a pause (M9 acceptance)
@@ -1559,8 +1564,8 @@ distinct contracts deployed, not with the height.
 In the `validator_accept.py` runs the longest turn of the loop is the 12 s pause the test imposes with SIGSTOP; the outcomes
 check lists a few `408` answers of neard's `EXPERIMENTAL_tx_status` for transactions of the last blocks, which cannot be final
 once the Lean node (half the stake) has been stopped, and does not count them. `rpc_conformance.py` starts the Lean node with
-`--gc-epochs-to-keep 10000`, as `localnet.py` configures neard (`gc_num_epochs_to_keep`), because its requests ask for the first
-epochs; the node does not yet read that key from `config.json` (`--home`).
+`--home node1`, so it reads `gc_num_epochs_to_keep` (10000, which `localnet.py` writes for neard) from `config.json` like neard
+does, because its requests ask for the first epochs (F1 below).
 
 ## Open points
 

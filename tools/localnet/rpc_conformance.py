@@ -102,14 +102,15 @@ def wait_for(predicate, timeout, what, step=0.5):
     raise TimeoutError(f"{what} ({last})")
 
 
-# --gc-epochs-to-keep of the Lean node.  `localnet.py` gives neard `gc_num_epochs_to_keep = 10000` (the whole history is kept
-# for the exporter), and the requests ask for blocks and transactions of the first epochs, so the Lean node keeps them too;
-# the default window of 5 epochs would answer UNKNOWN_BLOCK where neard answers (that is what the collection is for).
-GC_EPOCHS: list[int] = [10_000]
+# --gc-epochs-to-keep of the Lean node, only when the command line asks for one (--gc-epochs).  By default the node reads
+# `gc_num_epochs_to_keep` from `node1/config.json` (--home), as neard does: `localnet.py` writes 10000 there (the whole history is
+# kept for the exporter), and the requests ask for blocks and transactions of the first epochs.
+GC_EPOCHS: list[int] = []
 
 
 def lean_extra(home: Path) -> list[str]:
-    return ["--rpc-addr", f"127.0.0.1:{localnet.rpc_port(TOPOLOGY, 1)}",
+    return ["--home", str(home / "node1"),
+            "--rpc-addr", f"127.0.0.1:{localnet.rpc_port(TOPOLOGY, 1)}",
             "--genesis-config", str(home / "node1/genesis.json"),
             "--store", str(localnet.DATA / "rpc-run/store")] + [x for n in GC_EPOCHS for x in ("--gc-epochs-to-keep", str(n))]
 

@@ -85,7 +85,8 @@ def peerCommand (args : List String) : IO UInt32 := do
 
 /-- The flags a neard home directory stands for (`--home DIR`): `node_key.json`, `validator_key.json`,
 `genesis.json`, `data/` for the store and, from `config.json`, `rpc.addr`, `network.addr` (the listen port) and
-`network.boot_nodes`. A flag given on the command line wins. -/
+`network.boot_nodes`, and `gc_num_epochs_to_keep` (a flattened `GCConfig` member of neard's `config.json`; neard rejects 0 and
+takes `max(3, value)`, `ClientConfig::gc_num_epochs_to_keep`, and so does this). A flag given on the command line wins. -/
 def withHome (args : List String) : IO (List String) := do
   let some home := flagValue args "--home" | return args
   let add (flag value : String) (acc : List String) : List String :=
@@ -107,6 +108,15 @@ def withHome (args : List String) : IO (List String) := do
       if let .ok (.str a) := (cfg.getObjVal? "network" >>= (·.getObjVal? "addr")) then
         if let some port := (a.splitOn ":").getLast? then
           out := add "--listen" port out
+      match cfg.getObjVal? "gc_num_epochs_to_keep" with
+      | .error _ => pure ()
+      | .ok v =>
+        match v.getNat? with
+        | .ok 0 =>
+          throw (IO.userError s!"{configFile}: gc_num_epochs_to_keep is 0, it must be greater than 0 (config validation of neard)")
+        | .ok n => out := add "--gc-epochs-to-keep" (toString (max 3 n)) out
+        | .error _ =>
+          throw (IO.userError s!"{configFile}: gc_num_epochs_to_keep must be an unsigned integer")
       if (flagValue args "--boot").isNone then
         if let .ok (.str b) := (cfg.getObjVal? "network" >>= (·.getObjVal? "boot_nodes")) then
           for n in b.splitOn "," do
