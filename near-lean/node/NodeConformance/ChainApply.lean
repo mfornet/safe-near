@@ -3,6 +3,7 @@ import NodeConformance.Runner
 import NearNode.Chain
 import NearNode.Epoch
 import NearNode.Chain.Persist
+import NearNode.Chain.Bootstrap
 import ChainReplay.HostCrypto
 
 /-!
@@ -27,86 +28,9 @@ are one chain with a restart in between. The exit code is 0 only when everything
 -/
 
 open Lean Near.Node Near.Node.Chain Near.Node.Epoch Near.Node.Apply Near.Node.Conformance
-  Near.Node.Borsh
+  Near.Node.Borsh Near.Node.Bootstrap
 
 namespace ChainApply
-
-def field (j : Json) (k : String) : Except String Json :=
-  j.getObjVal? k
-
-def str (j : Json) (k : String) : Except String String :=
-  j.getObjValAs? String k
-
-def nat (j : Json) (k : String) : Except String Nat :=
-  j.getObjValAs? Nat k
-
-def bytes (j : Json) (k : String) : Except String ByteArray := do
-  match ofHex (← str j k) with
-  | some b =>
-    pure b
-  | none =>
-    throw s!"{k} is not hex"
-
-def decode (α : Type) [Codec α] (what : String) (b : ByteArray) : Except String α :=
-  match Codec.decodeAll (α := α) b with
-  | .ok a => pure a
-  | .error e => throw s!"{what} does not decode: {repr e}"
-
-def lines (path : System.FilePath) : IO (Array Json) := do
-  let text ← IO.FS.readFile path
-  let mut out := #[]
-  for l in text.splitOn "\n" do
-    if l.trimAscii.isEmpty then
-      continue
-    match Json.parse l with
-    | .ok j =>
-      out := out.push j
-    | .error e =>
-      throw (IO.userError s!"{path}: {e}")
-  return out
-
-def orThrow (r : Except String α) : IO α :=
-  match r with
-  | .ok a => pure a
-  | .error e => throw (IO.userError e)
-
-def parseConfig (manifest : Json) : Except String Config := do
-  pure
-      { epochLength := (← nat manifest "epochLength").toUInt64,
-        genesisHeight := (← nat manifest "genesisHeight").toUInt64,
-        minGasPrice := ⟨(← str manifest "minGasPrice").toNat!⟩,
-        maxGasPrice := ⟨(← str manifest "maxGasPrice").toNat!⟩,
-        rateNumer := ← nat manifest "gasPriceAdjustmentRateNumer",
-        rateDenom := ← nat manifest "gasPriceAdjustmentRateDenom",
-        staticShardLayout := (manifest.getObjValAs? Bool "shardLayoutStatic").toOption.getD true }
-
-/-- The genesis configuration: the epoch manager's setup and the genesis validators. -/
-structure Genesis where
-  setup : Setup
-  validators : Array ValidatorStake
-  records : Array Json
-  chainId : String
-  totalSupply : Nat
-
-def parseGenesis (j : Json) : Except String Genesis := do
-  let layout ← decode ShardLayout "shard layout" (← bytes j "shardLayout")
-  let rate ← field j "protocolRewardRate"
-  let validators ←
-    (← (← field j "validators").getArr?).mapM fun v => do
-        let key ← decode PublicKey "validator key" (← bytes v "publicKey")
-        pure (ValidatorStake.v1 ⟨⟨← str v "accountId"⟩, key, ⟨(← str v "stake").toNat!⟩⟩)
-  let setup : Setup :=
-    {
-      config :=
-        { epochLength := ← nat j "epochLength",
-          numBlockProducerSeats := ← nat j "numBlockProducerSeats", shardLayout := layout },
-      reward :=
-        { protocolRewardRate := ⟨← (← rate.getArrVal? 0).getNat?, ← (← rate.getArrVal? 1).getNat?⟩,
-          protocolTreasuryAccount := ⟨← str j "protocolTreasuryAccount"⟩,
-          genesisProtocolVersion := (← nat j "protocolVersion").toUInt32 } }
-  pure
-      { setup, validators, records := (← (← field j "records").getArr?),
-        chainId := ← str j "chainId", totalSupply := (← str j "totalSupply").toNat! }
 
 /-- A checker's tally. -/
 structure Tally where
@@ -174,27 +98,6 @@ def sameUpdate (got : Option AccountsUpdate) (want : Json) : Except String Bool 
   | _, _ =>
     pure false
 
-/-- The account and access key records of the genesis. -/
-def parseRecords (records : Array Json) : Except String (Array GenesisAccount × Array GenesisKey) :=
-  do
-  let mut accounts : Array GenesisAccount := #[]
-  let mut keys : Array GenesisKey := #[]
-  for r in records do
-    match r.getObjVal? "account" with
-    | .ok a =>
-      accounts :=
-        accounts.push
-          { id := ⟨← str a "id"⟩, amount := (← str a "amount").toNat!,
-            locked := (← str a "locked").toNat! }
-    | .error _ =>
-      let k ← field r "accessKey"
-      keys :=
-        keys.push
-          { id := ⟨← str k "id"⟩,
-            publicKey := ← decode PublicKey "access key" (← bytes k "publicKey"),
-            nonce := ← nat k "nonce" }
-  pure (accounts, keys)
-
 /-- A chunk body of the corpus: transactions and the receipts nearcore recorded. -/
 def parseBody (row : Json) : Except String Body := do
   let list (k : String) : Except String (Array ByteArray) := do
@@ -232,66 +135,27 @@ def main (args : List String) : IO UInt32 := do
     IO.eprintln "usage: node-chain-apply DIR";
     return 2
   let dir : System.FilePath := dir
-  let manifest ← orThrow (Json.parse (← IO.FS.readFile (dir / "meta.json")))
-  let config ← orThrow (parseConfig manifest)
-  let genesisJson ← orThrow (Json.parse (← IO.FS.readFile (dir / "genesis.json")))
-  let genesis ← orThrow (parseGenesis genesisJson)
+  let configs : System.FilePath :=
+    ((args.dropWhile (· != "--configs")).tail.head?).getD "near-lean/vm/configs"
+  let boot ←
+    Boot.load (dir / "meta.json") (dir / "genesis.json") (dir / "blocks.jsonl") configs
+  let config := boot.config
+  let genesis := boot.genesis
+  let genesisHash := boot.genesisHash
+  let rec0 := boot.genesisRec
+  let genesisEpoch := boot.genesisEpoch
+  let gv := rec0.view
+  let params := boot.params
+  let blockLines ← lines (dir / "blocks.jsonl")
   let mut given : Std.HashMap ByteArray (ByteArray × ByteArray) := {}
   for j in ← lines (dir / "epochs.jsonl") do
     given :=
       given.insert (← orThrow (bytes j "epochId"))
         (← orThrow (bytes j "epochInfo"), ← orThrow (bytes j "shardLayout"))
-  let blockLines ← lines (dir / "blocks.jsonl")
-  let some genesisLine := blockLines[0]? |
-    IO.eprintln "no blocks";
-    return 1
-  let genesisBlock ←
-    orThrow
-        (do
-          decode Block "genesis" (← bytes genesisLine "block"))
-  let some gv := genesisBlock.header.view? |
-    IO.eprintln "genesis header version";
-    return 1
-  let genesisDerived ← orThrow (field genesisLine "derived")
-  let .v4 info ←
-    orThrow
-        (do
-          decode BlockInfo "genesis BlockInfo" (← bytes genesisDerived "blockInfo")) |
-    IO.eprintln "genesis BlockInfo is not V4";
-    return 1
-  let genesisTree ←
-    orThrow
-        (do
-          decode PartialMerkleTree "tree" (← bytes genesisDerived "blockMerkleTree"))
-  let genesisHash := genesisBlock.header.hash
-  let rec0 : BlockRec :=
-    { hash := genesisHash, header := genesisBlock.header, view := gv, chunks := genesisBlock.chunks,
-      info, tree := genesisTree }
-  let .v4 zeroInfo ←
-    orThrow
-        (do
-          decode BlockInfo "pre-genesis BlockInfo" (← bytes manifest "zeroHashBlockInfo")) |
-    IO.eprintln "pre-genesis BlockInfo is not V4";
-    return 1
-  let zeroRec : BlockRec :=
-    { hash := CryptoHash.zero, header := default, view := default, chunks := #[], info := zeroInfo,
-      tree := default }
-  let blocks : Std.HashMap ByteArray BlockRec :=
-    (({} : Std.HashMap ByteArray BlockRec).insert CryptoHash.zero.bytes zeroRec).insert
-      genesisHash.bytes rec0
   let mut t : Tally := {}
   -- what the genesis checks found, counted once: not when a stored chain is continued
   let mut g : Tally := {}
   -- the genesis epoch, computed from the genesis configuration, under both of its ids
-  let genesisEpoch ←
-    match genesisEpochInfo genesis.setup genesis.validators with
-    | .ok e =>
-      pure e
-    | .error e =>
-      IO.eprintln s!"genesis epoch: {e.kind} {e.detail}";
-      return 1
-  let mut epochs : Std.HashMap ByteArray EpochData := {}
-  epochs := (epochs.insert CryptoHash.zero.bytes genesisEpoch).insert genesisHash.bytes genesisEpoch
   for id in [CryptoHash.zero.bytes, genesisHash.bytes] do
     g := { g with epochs := g.epochs + 1 }
     match given[id]? with
@@ -303,51 +167,14 @@ def main (args : List String) : IO UInt32 := do
         g := g.fail s!"genesis epoch differs: {describeDifference genesisEpoch.info theirs}"
     | none =>
       g := g.fail "genesis epoch missing from the corpus"
-  let mut st : ChainState :=
-    { config, epochs, blocks, head := genesisHash, headHeight := gv.height, genesisHash,
-      genesisChunks := genesisBlock.chunks }
+  let mut st := boot.state
   -- the chunks nearcore applied: its `ValidatorAccountsUpdate` is the check of the rewards
   let chunkRows ← lines (dir / "chunks.jsonl")
   let mut rowsAt : Std.HashMap Nat (Array Json) := {}
   for r in chunkRows do
     let h ← orThrow (nat r "height")
     rowsAt := rowsAt.insert h ((rowsAt.getD h #[]).push r)
-  -- the genesis state of every shard
-  let (genesisAccounts, genesisKeys) ← orThrow (parseRecords genesis.records)
-  let (roots, genesisTrieOps) ←
-    orThrow (genesisTries genesisEpoch.layout genesisAccounts genesisKeys)
-  for c in genesisBlock.chunks do
-    match roots[c.shardId]? with
-    | some root =>
-      if root != c.prevStateRoot then
-        g :=
-          g.fail s!"genesis state root of shard {c.shardId} differs from the genesis chunk header"
-    | none =>
-      g := g.fail "genesis shard"
-  let configs : System.FilePath :=
-    ((args.dropWhile (· != "--configs")).tail.head?).getD "near-lean/vm/configs"
-  let protocol := genesis.setup.reward.genesisProtocolVersion.toNat
-  let runtimeConfig ← ChainReplay.HostCrypto.loadConfig configs protocol
-  let congestion ← Near.Congestion.Config.load configs protocol
-  let params : Params :=
-    { setup := genesis.setup, cfg := runtimeConfig, congestion, protocol,
-      chainId := genesis.chainId }
-  let mut progress : Progress := { roots, tables := genesisTrieOps.foldl Store.Tables.apply {} }
-  let mut genesisExtras : Array (ByteArray × ChunkExtra) := #[]
-  for c in genesisBlock.chunks do
-    let some root := roots[c.shardId]? | continue
-    let some congestionInfo := congestionOf c | continue
-    let extra : ChunkExtra :=
-      .v5
-        { stateRoot := root, outcomeRoot := CryptoHash.zero, validatorProposals := #[],
-          gasUsed := 0, gasLimit := c.gasLimit, balanceBurnt := ⟨0⟩, congestionInfo,
-          bandwidthRequests := .v1 ⟨#[]⟩, proposedSplit := none }
-    genesisExtras :=
-      genesisExtras.push (blockShardKey genesisHash genesisEpoch.layout c.shardId, extra)
-    progress :=
-      { progress with
-        outgoing := progress.outgoing.insert (genesisHash.bytes, c.shardId) #[],
-        extras := progress.extras.insert (genesisHash.bytes, c.shardId) extra }
+  let mut progress := boot.progress
   let bodies : Std.HashMap (Nat × UInt64) Body ←
     chunkRows.foldlM (init := {}) fun m r => do
         let h ← orThrow (nat r "height")
@@ -369,10 +196,7 @@ def main (args : List String) : IO UInt32 := do
       resumed := true
       IO.println s!"{genesis.chainId}: continuing from the store at height {startHeight}"
     | none =>
-      let ops :=
-        genesisOps genesisBlock rec0 zeroRec
-          #[(CryptoHash.zero.bytes, genesisEpoch), (genesisHash.bytes, genesisEpoch)] genesisTrieOps
-          genesisExtras
+      let ops := boot.ops
       discard <| s.commit ops
     store? := some s
   if !resumed then

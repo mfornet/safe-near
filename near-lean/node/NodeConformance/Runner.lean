@@ -44,18 +44,19 @@ structure Line where
   hashes : List (String × Option String)
 
 /-- Fields other than these are derived hashes. -/
-private def reserved : List String :=
-  ["type", "name", "borsh", "reject", "canonical"]
+private def reserved (key : String) : List String :=
+  ["type", "name", key, "reject", "canonical"]
 
-def parseLine (s : String) : Except String Line := do
+/-- Parses a line whose input is in the field `key` (`borsh`; `proto` for protobuf messages). -/
+def parseLine (s : String) (key : String := "borsh") : Except String Line := do
   let j ← Json.parse s
   let str (k : String) : Except String String := j.getObjValAs? String k
   let borsh ←
-    match ofHex (← str "borsh") with
+    match ofHex (← str key) with
     | some b =>
       pure b
     | none =>
-      throw "borsh is not hex"
+      throw s!"{key} is not hex"
   let canonical ←
     match j.getObjValAs? String "canonical" with
     | .ok c =>
@@ -69,7 +70,7 @@ def parseLine (s : String) : Except String Line := do
   let fields ← j.getObj?
   let hashes :=
     fields.toList.filterMap fun (k, v) =>
-      if reserved.contains k then none else some (k, v.getStr?.toOption)
+      if (reserved key).contains k then none else some (k, v.getStr?.toOption)
   pure
       { name := ← str "name", borsh, reject := (j.getObjValAs? Bool "reject").toOption.getD false,
         canonical, hashes }
