@@ -816,6 +816,75 @@ results are in the M5b bullets after the M5a ones.
   `test_emitted_deployment_uses_the_catalogue_or_rejects_atomically`, at the base commit already: M3e made the replay decode
   code a contract deploys from its own memory, and the test still expects an execution issue.
 
+### M6 network
+
+Acceptance: `just localnet-peer` (sources: `near-lean/node/NearNode/{Proto,Net,Network}/`, `NearNode/Chain/Bootstrap.lean`,
+`tools/localnet/{network_oracle.rs,peer_accept.py}`); the conformance gate is `just node-conformance-network`.
+
+- **Protobuf** (`Proto/Wire.lean`). A generic proto3 codec: varints (ten bytes, the tenth 0 or 1; a `uint32` has at most
+  five), tags, zigzag, fixed32/64, length-delimited, packed and unpacked repeated fields, groups (skipped as
+  `protobuf` 3.0.2 does), unknown fields (framing checked, content ignored), and `Schema`s that say which fields are
+  messages so the parser reads them as nearcore's does. Two quirks of the pinned parser are reproduced because the
+  oracle found them: a singular message or oneof member is *replaced* by a later occurrence (every occurrence is still
+  checked), and a nested message that claims more bytes than the input holds is read as far as the input goes
+  (the top-level stream has limit `u64::MAX`), so a message cut inside a nested message at a field boundary is
+  accepted. nearcore writes repeated `uint64` unpacked, fields in declaration order.
+- **Messages** (`Network/{Types,Message}.lean`). `PeerMessage` with all 25 variants of `network.proto`'s oneof
+  (`UpdateNonceResponse` decodes as a routing update), `Handshake` with `OwnedAccount`, `HandshakeFailure`,
+  `RoutingTableUpdate`, `SyncAccountsData`, `PeersRequest/Response`, headers and blocks, `Transaction`, the routed
+  message in both wire forms (`Routed` with the Borsh `RoutedMessageV1`, `RoutedV3` with a `TieredMessageBody`), the
+  routed bodies (every `RoutedMessageBody` variant, with the T1/T2 tags), state sync requests and responses, epoch
+  sync, snapshot hosts, optimistic blocks. Sources: `network_protocol/{network.proto,mod.rs,edge.rs,peer.rs,
+  proto_conv/*}`. `Edge` hash, `verify` and nonce rules, `PeerMessage::max_size` are checked too. Not modelled:
+  `TxStatusResponse` (an RPC view type, `FinalExecutionOutcomeView`); a message with that body does not decode.
+- **Oracle** (`tools/localnet/network_oracle.rs`). `near-network` keeps its types private, so `build.py` adds this file
+  to the crate as a module (plus one `pub mod` line in `src/lib.rs`, restored after the build) and a one-line binary
+  `safe-near-network-oracle`. It builds each variant around the M1 Borsh fixtures, writes nearcore's own
+  serialization and its `PeerMessage::deserialize` verdict on byte and field level mutations (extra and duplicated
+  fields, re-typed fields, groups, long varints, truncation). Fixtures: `near-lean/node/fixtures/network`, 15 files,
+  4373 inputs (1899 accepted, 2474 rejected; 3273 of them `PeerMessage`). Result: **`node-conformance-network`, 0
+  failures**; 180 000 further mutations (other seeds, not committed) also 0. `tools/tests/test_network_fixtures.py`.
+- **Net** (`Net.lean`, `Net/{Uv,Mem}.lean`). `Stream`, `Listener` and `Net` are all the node uses; `Framed` is
+  `stream.rs` (u32 LE length, 512 MiB, partial frames kept across timeouts). `Net/Uv.lean` is the only module that
+  imports `Std.Internal.UV.TCP` (Lean's libuv binding) and has no `@[extern]`: a reader task per connection and polling
+  with timeouts, because `cancelRecv` is documented as dangerous. `Net/Mem.lean` is the in-process network for tests.
+  `node-net-tests` runs the same checks on both. `tools/check_node_isolation.py` needed no change.
+- **Peer protocol.** `Network/Handshake.lean` is `process_handshake` and `handle_msg_connecting` as pure functions
+  (version range 83..86, genesis, target, nonce window of 20 minutes, owned account and 30 minute skew, the edge both
+  sign, `LastEdge` and `HandshakeFailure` answers and retries); `Peer.lean` runs them over a stream with the 20 s
+  handshake timeout; `Node.lean` is the loop of a ready `PeerActor`: routing table, snapshot hosts and accounts sync on
+  connect, `PeersRequest` and the latest block every minute (`READ_TIMEOUT` is two minutes), nonce refresh every ten
+  minutes, replies to `PeersRequest`, `SyncAccountsData`, `RequestUpdateNonce`, `BlockHeadersRequest`, `BlockRequest`
+  and `Ping`, edges and routed signatures verified with the M2 Ed25519 (invalid: close). `node-handshake-tests`: both
+  sides against each other in memory (valid, other genesis, bad signature, versions, stale nonce, wrong target,
+  `LastEdge`, owned accounts), 27 checks. **Found against neard:** an inbound connection without a
+  `sender_listen_port` is dropped (`validate_new_connection`: `peer_info.addr` is none), so the node announces one and
+  listens; `BlockRequest` is limited to 10 a second (`rate_limits/messages_limits.rs`), the driver sends 8.
+- **Sync** (`Network/{Driver,Apply,Run}.lean`). Headers after a locator, blocks by hash, each validated in order by
+  `Epoch.processBlock` (M5a), chunk bodies by routed `PartialEncodedChunkRequest` for all parts: the data parts are the
+  Borsh `TransactionReceipt` of the chunk (merkle paths checked against `encoded_merkle_root`, `tx_root` against the
+  transactions, no Reed-Solomon decoding needed because the peer has every part). A block is applied (M5b) when its own
+  bodies and its child's are in: the child's `prev_outgoing_receipts` are the receipts this chunk sent, which supply
+  the code a contract deploys from its own memory and are compared with what the Lean runtime produced; the child's
+  chunk headers carry the previous `ChunkExtra` (state root, outcome root, gas used, balance burnt, proposals,
+  congestion info, bandwidth requests) and are compared field by field. Validation runs on the connection thread,
+  application on its own thread with the store (`Chain/Persist`), so a heavy block delays application, not following.
+  The chain starts from `Chain/Bootstrap.lean` (extracted from `node-chain-apply`, which uses it): the genesis files of
+  the M5 corpus, whose genesis block and `BlockInfo` nearcore derived; deriving them from `genesis.json` is M7.
+- **Acceptance.** `just localnet-peer` starts the single-node localnet and its workload (without the `hostcalls`,
+  `burst` and `wait` scenarios: the Lean interpreter needs minutes per block of heavy calls; `--full-workload` runs
+  them), then the node with its own key, listening, dialing `neard`. Run of 614 s: one handshake, no disconnect,
+  `neard`'s `network_info` lists the node, 2 edges received and verified, 599 blocks validated (the node was never more
+  than 3 blocks behind the head during validation), 598 blocks / 598 chunks applied, 597 `ChunkExtra` equal to the next
+  chunk header's, 595 outgoing-receipt sets equal to the next chunk bodies', 597 state roots equal to `neard`'s over
+  RPC. Application (about one block a second in the interpreter) is slower than the localnet's block rate under
+  load, so the applied height trails the validated one; the harness reports the lag against `neard`'s head after the
+  drain (423 blocks at the end, because `neard` kept producing while the node drained).
+- **Deferred.** Tier 1 (account data is accepted, not verified or kept), routing beyond one peer (no forwarding,
+  no route-back cache, no peer store or connection pool), `TxStatusResponse`, fork choice and reorgs, header
+  validation before the block, Reed-Solomon reconstruction of chunks with missing parts, state sync (M7), the
+  genesis block from `genesis.json` (M7), IPv6 in `Net/Uv`, production of anything (M8).
+
 ## Open points
 
 - Numeric performance target for M10, measured against nearcore (M2's and M4's are proposed above).
