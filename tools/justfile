@@ -31,12 +31,36 @@ crypto-tests: crypto-build
 
 # Build the NEAR node (notes/design/NEAR_NODE.md) and its executables.
 node-build:
-    cd near-lean/node && lake build NearNode near-lean-node node-bench node-conformance-types --wfail
+    cd near-lean/node && lake build NearNode near-lean-node node-bench node-conformance-types node-trie-tests node-store-tests node-state-roots --wfail
 
 # M1: the Borsh codecs of every near-primitives type against the committed nearcore oracle fixtures.
 [positional-arguments]
 node-conformance-types *options: node-build
     near-lean/node/.lake/build/bin/node-conformance-types "$@"
+
+# M4: the trie Impl against the Spec (NearInterface.TrieConstruction) on seeded random entry sets and
+# updates; the optional argument is the number of cases.
+[positional-arguments]
+node-trie-tests *options: node-build
+    near-lean/node/.lake/build/bin/node-trie-tests "$@"
+
+# M4: the state roots of the 436 corpus chunks through the Lean trie, from the recorded `stateDiff` and
+# from Lean's own replay of each chunk (about 15 minutes on four cores; `--no-replay` skips the replay).
+[positional-arguments]
+node-state-roots *options: node-build
+    cd near-lean/chain && lake build registered-replay --wfail
+    python3 tools/localnet/state_roots.py "$@"
+
+# M4: the persistent store: unit tests, then a restart and kill-in-the-middle test on the corpus tries.
+node-store-tests: node-build
+    python3 tools/localnet/state_roots.py --no-replay --cases-only --work near-lean/node/.lake/state-roots-cases
+    near-lean/node/.lake/build/bin/node-store-tests near-lean/node/.lake/state-roots-cases
+
+# M4: the same trie workload with nearcore's own near-store (needs the pinned checkout in
+# tools/localnet/.nearcore, see `just corpus-build`); add --memtrie for the in-memory trie.
+[positional-arguments]
+node-trie-native-bench *options:
+    cd tools/node-conformance/native-trie && cargo run --release --bin native-trie-bench -- "$@"
 
 # Run the node benchmarks (`crypto/` and `sha256` for M2); options are --filter SUBSTRING and --out FILE.
 [positional-arguments]

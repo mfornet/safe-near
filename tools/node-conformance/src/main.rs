@@ -8,6 +8,7 @@ mod epoch_fam;
 mod fam;
 mod rng;
 mod sigs;
+mod storage_fam;
 mod sync_fam;
 mod stateless_fam;
 mod values;
@@ -55,6 +56,7 @@ fn main() {
     stateless_fam::stateless(&mut m, &out_dir);
     epoch_fam::epoch(&mut m, &out_dir);
     sync_fam::sync(&mut m, &out_dir);
+    storage_fam::storage(&mut m, &out_dir);
 
     m.write(&out_dir);
     sigs::write(&signatures);

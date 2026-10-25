@@ -1,5 +1,6 @@
 import NodeBench.Crypto
 import NodeBench.Harness
+import NodeBench.Trie
 import NearNode.Primitives
 
 /-!
@@ -252,6 +253,10 @@ def main (args : List String) : IO UInt32 := do
       let r ← measure b
       IO.eprintln s!"{r.name}: {r.nanosPerIteration} ns/iter"
       results := results.push r
+    if
+        o.filter.isEmpty || (o.filter.splitOn "trie/").length > 1 ||
+          (o.filter.splitOn "store/").length > 1 then
+      results := results ++ (← Near.Node.Bench.Trie.run o.filter)
     let json := (report results).pretty
     match o.out with
     | some path =>
