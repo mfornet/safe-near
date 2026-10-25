@@ -22,3 +22,11 @@ import NearNode.Validator.Block
 import NearNode.Validator.Doomslug
 import NearNode.Validator.Inclusion
 import NearNode.Validator.Produce
+import NearNode.Validator.Wire
+import NearNode.Validator.State
+import NearNode.Validator.WitnessMake
+import NearNode.Validator.Node
+import NearNode.Validator.Endorse
+import NearNode.Validator.Follow
+import NearNode.Validator.Drive
+import NearNode.Validator.Run

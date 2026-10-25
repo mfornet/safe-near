@@ -107,6 +107,13 @@ localnet-peer *options: node-build
 localnet-follow *options: node-build
     python3 tools/localnet/follow_accept.py "$@"
 
+# M8: the Lean node as a validator of a two-validator neard localnet that cannot finalize without it: blocks and chunks it
+# produces are accepted by neard, state roots agree, finality advances, and the chain stops when the node does. The options
+# include --duration SECONDS, --no-workload and --no-stall (see notes/design/NEAR_NODE.md, M8).
+[positional-arguments]
+localnet-validator *options: node-build
+    python3 tools/localnet/validator_accept.py "$@"
+
 # M5a: rebuild the block corpus from the localnet databases (needs `python3 tools/localnet/build.py --only
 # safe-near-chain-export` and the databases of `just corpus-generate`).
 [positional-arguments]

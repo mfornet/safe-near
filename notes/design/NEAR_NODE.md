@@ -1167,6 +1167,49 @@ run of the oracle writes the same bytes). The oracle links `near-primitives` `=0
 - **Not in M8b:** the witness itself (`ChunkStateWitness` from the chain), `AccountData` and routed message signing (the network oracle,
   M8c), the Doomslug state machine, the epoch queries.
 
+#### M8c and M8d, production paths and acceptance (done)
+
+Gates: `just node-validator-tests` (49 checks), `just localnet-validator`. Sources: `NearNode/Validator/{Doomslug,Inclusion,
+Produce,Wire,State,WitnessMake,Node,Endorse,Follow,Drive,Run}.lean`, the `validator` subcommand of `near-lean-node`,
+`tools/localnet/validator_accept.py`.
+
+- **What runs.** The node connects to neard, follows the chain, and as validator `node1` signs approvals, produces blocks
+  (`produceBlockOn` reproduces all 1024 corpus blocks) and chunks (one shard, empty chunks: there is no transaction pool),
+  distributes the partial chunks, creates the state witness (the full-trie base state, a superset of the recorded proof),
+  sends the witness parts, checks the witnesses of neard by recomputing its own skeleton, and sends endorsements. The
+  Doomslug timers and thresholds follow the reference; the node signs `AccountData` and routes messages by account.
+- **Topology.** Two validators of equal stake, one shard, epoch length 30; only `node0` is `neard`, `node1` is the Lean node.
+  Neither can finalize alone, so the run proves that neard needs the Lean node.
+- **Found: the kickout thresholds.** neard reads the epoch config from the genesis only for a chain id that starts with
+  `test-chain-` (`EpochManager::new_arc_handle`); otherwise it builds the fixed test config (thresholds 90/90/80). A
+  validator that missed 12 % of its blocks in an epoch was kicked out by neard while the Lean node (reading thresholds
+  of 0 from the genesis) kept it, and neard rejected the next block with `InvalidNextBPHash` and banned the peer. The
+  validator topology now uses the chain id `test-chain-safe-near-validator`, thresholds of 0 and the inflation rate 1/40
+  (the generated genesis says 1/20, the test config 1/40), so both sides read the same config. Other topologies keep the
+  default config, which the Lean `EpochConfig` defaults mirror.
+- **Acceptance (last run, 240 s, 11 epochs).**
+
+| Check | Result |
+|---|---|
+| Blocks produced by Lean, accepted into neard's chain | 181 (neard 159) |
+| New chunks by Lean in neard's chain | 187 (neard 152) |
+| Blocks applied by Lean with the same hash as neard | 340 of 340 |
+| Chunk state roots equal | 334 of 334 |
+| Head / final height | 345 / 343 |
+| Witnesses of neard checked valid, invalid | 152, 0 |
+| Disconnects, failures | 0, none (refused connections before neard listens are retries) |
+| Stall test: Lean stopped 12 s | head 333 -> 333 (neard alone cannot finalize), resumed to 345, final 331 -> 343 |
+
+  Three earlier runs after the fix (130 s) also passed; before it, three of the runs I watched were banned at an epoch boundary.
+- **Deferred.** Chunks are empty (no transaction pool, no `ForwardTx` use beyond receiving), no fork choice (the node
+  follows one chain), no persistence (the node starts from the exported genesis corpus), no `ChunkContractAccesses`,
+  inline apply stalls the event loop for a few seconds on heavy blocks (block 75 took 7.5 s in one run), the witness is not
+  really compressed (stored zstd frames), the signer is not constant time, and a witness from neard is checked by
+  recomputing the node's own skeleton, not by replaying the transitions independently. Kickouts are off in the
+  validator genesis, so the kickout path of a Lean validator is exercised only by the conformance corpora.
+- **Doubts.** The exporter binary was not rebuilt for the genesis-only chain fix (the harness works around it). The run
+  is timing dependent: the Lean node missed a few chunks per epoch in every run, which is why the kickout bug showed.
+
 ## Open points
 
 - Numeric performance target for M10, measured against nearcore (M2's and M4's are proposed above).
