@@ -178,7 +178,9 @@ class ChainReplayTests(unittest.TestCase):
             self.assertNotIn("child.alice.near", accounts(result["blocks"][-1]["state"]))
             self.assertFalse(any(owner == "child.alice.near" for (owner, _), _ in result["blocks"][-1]["state"]["accessKeys"]))
 
-    def test_emitted_deployment_uses_the_catalogue_or_rejects_atomically(self):
+    def test_emitted_deployment_outside_the_catalogue_is_decoded(self):
+        # A contract can deploy bytes no input names; the replay decodes them as it decodes the catalogue,
+        # so the run is the same with or without the deployed code listed.
         with tempfile.TemporaryDirectory() as directory:
             value = request()
             self.catalogue(value, directory)
@@ -188,14 +190,11 @@ class ChainReplayTests(unittest.TestCase):
             self.assertTrue(all(b["issue"] is None for b in known["blocks"]))
             self.assertEqual(accounts(known["blocks"][1]["state"])["alice.near"]["codeHash"], "empty")
             value["codes"] = value["codes"][:1]
-            missing = execute(value)
-            self.assertEqual(missing["stop"], "executionIssue")
-            self.assertEqual(missing["unrunBlocks"], 2)
-            self.assertEqual(missing["blocks"][0]["state"], value["initialState"])
-            self.assertEqual(missing["blocks"][0]["outcomes"], [])
-            self.assertEqual(missing["blocks"][0]["outgoingReceipts"], [])
-            self.assertEqual(missing["blocks"][0]["tokensBurnt"], "0")
-            self.assertIn("catalogue", missing["blocks"][0]["issue"]["message"])
+            decoded = execute(value)
+            self.assertEqual(decoded["stop"], known["stop"])
+            self.assertEqual([b["issue"] for b in decoded["blocks"]], [None] * 3)
+            self.assertEqual([b["outcomes"] for b in decoded["blocks"]], [b["outcomes"] for b in known["blocks"]])
+            self.assertEqual([b["tokensBurnt"] for b in decoded["blocks"]], [b["tokensBurnt"] for b in known["blocks"]])
 
     def test_unknown_signature_encoding_is_a_model_issue_without_charging(self):
         for earlier in [[], [tx([transfer()])]]:
