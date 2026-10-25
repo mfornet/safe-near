@@ -3,3 +3,7 @@ import NearNode.Borsh
 import NearNode.Primitives
 import NearNode.Trie
 import NearNode.Store
+import NearNode.Chain
+import NearNode.Epoch
+import NearNode.Chain.Genesis
+import NearNode.Chain.Persist

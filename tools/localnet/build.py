@@ -31,6 +31,8 @@ OVERLAYS = [
      "exporter.rs", "safe-near-corpus-export"),
     ("node-runtime", "runtime/runtime/Cargo.toml", "runtime/runtime/safe_near_corpus_check.rs",
      "checker.rs", "safe-near-corpus-check"),
+    ("state-viewer", "tools/state-viewer/Cargo.toml", "tools/state-viewer/safe_near_chain_export.rs",
+     "chain_exporter.rs", "safe-near-chain-export"),
 ]
 
 
@@ -40,6 +42,11 @@ def stanza(shim: str, name: str) -> bytes:
 name = "{name}"
 path = "{Path(shim).name}"
 '''.encode()
+
+
+def overlaid(original: bytes, overlays) -> bytes:
+    """The manifest `original` with the `[[bin]]` stanza of every overlay of that manifest."""
+    return original + b"".join(stanza(shim, name) for _, _, shim, _, name in overlays)
 
 # The pinned `release` profile uses fat LTO with one codegen unit, which needs
 # more RAM and time than the 4-core/15 GB budget allows and cannot share
@@ -88,8 +95,7 @@ def build(source: Path, revision: str, outdir: Path, with_adapters: bool, jobs: 
         originals = {m: prepare.git(source, "show", f"{revision}:{m}") for _, m, _, _, _ in OVERLAYS}
         # restore a previously interrupted overlay
         for _, manifest, shim, _, name in OVERLAYS:
-            if (source / manifest).read_bytes() == originals[manifest] + stanza(shim, name):
-                (source / manifest).write_bytes(originals[manifest])
+            (source / manifest).write_bytes(originals[manifest])
             (source / shim).unlink(missing_ok=True)
         changed = prepare.git(source, "status", "--porcelain").decode().strip()
         if changed:
@@ -120,9 +126,11 @@ def build(source: Path, revision: str, outdir: Path, with_adapters: bool, jobs: 
                 for package, manifest, shim, local, name in OVERLAYS:
                     body = (HERE / local).read_bytes()
                     adapters[name] = prepare.digest(body)
-                    (source / manifest).write_bytes(originals[manifest] + stanza(shim, name))
                     (source / shim).write_bytes(body)
                     adapter_packages.append((package, name))
+                for manifest in originals:
+                    (source / manifest).write_bytes(
+                        overlaid(originals[manifest], [o for o in OVERLAYS if o[1] == manifest]))
                 cargo_build(adapter_packages)
             finally:
                 for _, manifest, shim, _, _ in OVERLAYS:
@@ -155,6 +163,38 @@ def build(source: Path, revision: str, outdir: Path, with_adapters: bool, jobs: 
         return evidence
 
 
+def build_overlay(source: Path, revision: str, outdir: Path, name: str, jobs: str) -> None:
+    """Rebuild one overlay binary only (no neard, no contracts); used while developing an exporter."""
+    chosen = [o for o in OVERLAYS if o[4] == name]
+    with (source / ".git/safe-near-localnet.lock").open("a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        originals = {m: prepare.git(source, "show", f"{revision}:{m}") for _, m, _, _, _ in OVERLAYS}
+        for _, manifest, shim, _, _ in OVERLAYS:
+            (source / manifest).write_bytes(originals[manifest])
+            (source / shim).unlink(missing_ok=True)
+        channel = re.search(r'^channel\s*=\s*"(\d+\.\d+\.\d+)"',
+                            (source / "rust-toolchain.toml").read_text(), re.MULTILINE).group(1)
+        env = os.environ.copy()
+        env.update(PROFILE)
+        env["CARGO_BUILD_JOBS"] = jobs
+        env["CARGO_TARGET_DIR"] = str(HERE / "target")
+        env["SAFE_NEAR_REFERENCE_REVISION"] = revision
+        try:
+            for package, manifest, shim, local, binary in chosen:
+                (source / shim).write_bytes((HERE / local).read_bytes())
+                (source / manifest).write_bytes(overlaid(originals[manifest], chosen))
+            command = ["cargo", f"+{channel}", "build", "--release", "--locked"]
+            for package, _, _, _, binary in chosen:
+                command += ["-p", package, "--bin", binary]
+            subprocess.run(command, cwd=source, env=env, check=True)
+        finally:
+            for _, manifest, shim, _, _ in OVERLAYS:
+                (source / manifest).write_bytes(originals[manifest])
+                (source / shim).unlink(missing_ok=True)
+        outdir.mkdir(parents=True, exist_ok=True)
+        prepare.publish_binary(HERE / "target/release" / name, outdir / name)
+
+
 def main() -> None:
     pin = json.loads((ROOT / "near-lean/runtime/reference.json").read_text())
     revision = pin["revision"]
@@ -163,10 +203,14 @@ def main() -> None:
     parser.add_argument("--outdir", type=Path, default=HERE / "target/bin")
     parser.add_argument("--neard-only", action="store_true", help="skip the exporter and checker overlays")
     parser.add_argument("--jobs", default="4")
+    parser.add_argument("--only", help="build just this overlay binary (development)")
     a = parser.parse_args()
     source = (a.source or HERE / ".nearcore" / revision).resolve()
     if not source.exists():
         prepare.clone_source(source, pin["repository"], revision)
+    if a.only:
+        build_overlay(source, revision, a.outdir.resolve(), a.only, a.jobs)
+        return
     print(json.dumps(build(source, revision, a.outdir.resolve(), not a.neard_only, a.jobs), indent=2))
 
 

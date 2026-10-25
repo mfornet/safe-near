@@ -5,7 +5,7 @@
 # verification never builds it (`just node-isolation`).
 name = "NearNode"
 version = "0.1.0"
-defaultTargets = ["NearNode", "near-lean-node", "node-conformance-types", "node-trie-tests", "node-store-tests", "node-state-roots"]
+defaultTargets = ["NearNode", "near-lean-node", "node-conformance-types", "node-trie-tests", "node-store-tests", "node-state-roots", "node-chain-validate", "node-chain-apply"]
 packagesDir = "../.lake/packages"
 
 [[require]]
@@ -56,3 +56,13 @@ root = "NodeConformance.StateRoots"
 [[lean_exe]]
 name = "node-store-tests"
 root = "NodeTests.StoreTests"
+
+# `lake exe node-chain-validate DIR`: the blocks of a localnet corpus through the chain validator.
+[[lean_exe]]
+name = "node-chain-validate"
+root = "NodeConformance.ChainValidate"
+
+# `lake exe node-chain-apply DIR`: a localnet chain run from genesis by the node (epochs, chunks, restart).
+[[lean_exe]]
+name = "node-chain-apply"
+root = "NodeConformance.ChainApply"

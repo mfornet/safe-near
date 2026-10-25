@@ -34,6 +34,20 @@ inductive Col where
   | blockMisc
   /-- The post-state of a chunk (`DBCol::ChunkExtra`). -/
   | chunkExtra
+  /-- Block headers by block hash (`DBCol::BlockHeader`). -/
+  | blockHeader
+  /-- Blocks by block hash (`DBCol::Block`). -/
+  | block
+  /-- The epoch manager's `BlockInfo` by block hash (`DBCol::BlockInfo`). -/
+  | blockInfo
+  /-- `EpochInfo` and its shard layout by epoch id (`DBCol::EpochInfo`). -/
+  | epochInfo
+  /-- The block merkle tree after each block (`DBCol::BlockMerkleTree`). -/
+  | blockMerkleTree
+  /-- The receipts a chunk sent, by block hash and shard (`DBCol::OutgoingReceipts`). -/
+  | outgoingReceipts
+  /-- The receipts a block delivers to a shard, by block hash and shard (`DBCol::IncomingReceipts`). -/
+  | incomingReceipts
   deriving BEq, Inhabited, Repr
 
 namespace Col
@@ -46,10 +60,18 @@ def id : Col → UInt8
   | .flatStorageStatus => 4
   | .blockMisc => 5
   | .chunkExtra => 6
+  | .blockHeader => 7
+  | .block => 8
+  | .blockInfo => 9
+  | .epochInfo => 10
+  | .blockMerkleTree => 11
+  | .outgoingReceipts => 12
+  | .incomingReceipts => 13
 
 def all : List Col :=
   [.state, .flatState, .flatStateChanges, .flatStateDeltaMetadata, .flatStorageStatus, .blockMisc,
-    .chunkExtra]
+    .chunkExtra, .blockHeader, .block, .blockInfo, .epochInfo, .blockMerkleTree, .outgoingReceipts,
+    .incomingReceipts]
 
 def ofId? (n : UInt8) : Option Col :=
   all.find? (·.id == n)
