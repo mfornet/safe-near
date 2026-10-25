@@ -13,8 +13,19 @@ def kind (name : String) : String × Json :=
 def bytesJson (value : Near.Bytes) : Json :=
   toJson (value.map UInt8.toNat)
 
+def globalIdentifierJson : Wasm.GlobalContractId → Json
+  | .codeHash hash => obj [("codeHash", bytesJson hash)]
+  | .accountId id => obj [("accountId", bytesJson id)]
+
 def permissionJson : AccessKeyPermission → Json
   | .fullAccess => obj [kind "fullAccess"]
+  | .gasKeyFullAccess balance nonces =>
+    obj [kind "gasKeyFullAccess", ("balance", toJson (toString balance)), ("numNonces", toJson nonces)]
+  | .gasKeyFunctionCall balance nonces allowance receiver methods =>
+    obj
+      [kind "gasKeyFunctionCall", ("balance", toJson (toString balance)), ("numNonces", toJson nonces),
+        ("allowance", toJson (allowance.map toString)), ("receiverId", toJson receiver),
+        ("methodNames", toJson methods)]
   | .functionCall allowance receiver methods =>
     obj
       [kind "functionCall", ("allowance", toJson (allowance.map toString)),
@@ -23,7 +34,7 @@ def permissionJson : AccessKeyPermission → Json
 def keyJson (key : AccessKey) : Json :=
   obj [("nonce", toJson key.nonce), ("permission", permissionJson key.permission)]
 
-def actionJson : Action → Json
+partial def actionJson : Action → Json
   | .createAccount => obj [kind "createAccount"]
   | .deployContract code => obj [kind "deployContract", ("codeHash", toJson code.hash)]
   | .functionCall method args gas deposit =>
@@ -40,6 +51,20 @@ def actionJson : Action → Json
     obj [kind "useGlobalContract", ("codeHash", bytesJson hash)]
   | .useGlobalContract (.accountId id) =>
     obj [kind "useGlobalContract", ("accountId", bytesJson id)]
+  | .deployGlobalContract code mode =>
+    obj
+      [kind "deployGlobalContract", ("codeHash", toJson code.hash),
+        ("mode", toJson (match mode with | .codeHash => "codeHash" | .accountId => "accountId"))]
+  | .transferToGasKey pk deposit =>
+    obj [kind "transferToGasKey", ("publicKey", bytesJson pk), ("deposit", toJson (toString deposit))]
+  | .withdrawFromGasKey pk amount =>
+    obj [kind "withdrawFromGasKey", ("publicKey", bytesJson pk), ("amount", toJson (toString amount))]
+  | .delegate sender receiver inner nonce nonceIndex maxHeight pk signature v2 =>
+    obj
+      [kind "delegate", ("v2", toJson v2), ("senderId", toJson sender), ("receiverId", toJson receiver),
+        ("actions", toJson (inner.map actionJson)), ("nonce", toJson nonce),
+        ("nonceIndex", toJson nonceIndex), ("maxBlockHeight", toJson maxHeight),
+        ("publicKey", bytesJson pk), ("signature", bytesJson signature)]
 
 def receiptJson (r : Receipt) : Json :=
   obj
@@ -50,13 +75,20 @@ def receiptJson (r : Receipt) : Json :=
         | .data data =>
           obj
             [kind "data", ("dataId", toJson data.dataId),
-              ("data", toJson (data.data.map bytesJson))]
+              ("data", toJson (data.data.map bytesJson)),
+              ("resumeDataId", toJson (data.resumeDataId.map bytesJson))]
+        | .globalDistribution g =>
+          obj
+            [kind "globalDistribution", ("id", globalIdentifierJson g.id),
+              ("targetShard", toJson g.targetShard), ("alreadyDelivered", toJson g.alreadyDelivered),
+              ("codeHash", toJson g.code.hash), ("nonce", toJson g.nonce)]
         | .action action =>
           obj
             [kind "action", ("signerId", toJson action.signerId),
               ("signerPublicKey", bytesJson action.signerPublicKey),
               ("gasPrice", toJson (toString action.gasPrice)),
               ("inputDataIds", toJson action.inputDataIds),
+              ("yieldDataId", toJson (action.yieldDataId.map bytesJson)),
               ("outputDataReceivers",
                 toJson (action.outputDataReceivers.map fun d => (d.dataId, d.receiverId))),
               ("actions", toJson (action.actions.map actionJson))])]
@@ -64,7 +96,8 @@ def receiptJson (r : Receipt) : Json :=
 def accountJson (a : Account) : Json :=
   obj
     [("amount", toJson (toString a.amount)), ("locked", toJson (toString a.locked)),
-      ("storageUsage", toJson a.storageUsage), ("codeHash", toJson (a.code.map (·.hash)))]
+      ("storageUsage", toJson a.storageUsage), ("codeHash", toJson (a.code.map (·.hash))),
+      ("global", toJson (a.global.map globalIdentifierJson)), ("versionTwo", toJson a.versionTwo)]
 
 /-- Preserve association-list order as well as every represented state field.
 The shared code catalogue resolves each code label to its exact supplied module. -/
@@ -81,7 +114,22 @@ def stateJson (s : ChainState) : Json :=
       ("pendingDataCount", toJson s.pendingDataCount),
       ("postponedByData", toJson s.postponedByData),
       ("receivedData", toJson (s.receivedData.map fun (id, data) => (id, data.map bytesJson))),
-      ("delayed", toJson (s.delayed.map receiptJson)), ("nextId", toJson s.nextId)]
+      ("delayed", toJson (s.delayed.map receiptJson)), ("nextId", toJson s.nextId),
+      ("globalCode", toJson (s.globalCode.map fun (id, code) => (globalIdentifierJson id, code.hash))),
+      ("globalNonces", toJson (s.globalNonces.map fun (id, nonce) => (globalIdentifierJson id, nonce))),
+      ("gasKeyNonces",
+        toJson (s.gasKeyNonces.map fun ((id, pk, lane), nonce) => (id, bytesJson pk, lane, nonce))),
+      ("yieldIndices", toJson s.yieldIndices),
+      ("yieldTimeouts",
+        toJson
+          (s.yieldTimeouts.map fun (index, t) => (index, t.account, bytesJson t.dataId, t.expiresAt))),
+      ("yieldReceipts",
+        toJson (s.yieldReceipts.map fun ((id, dataId), r) => (id, bytesJson dataId, receiptJson r))),
+      ("yieldStatus",
+        toJson
+          (s.yieldStatus.map fun ((id, dataId), status) =>
+            (id, bytesJson dataId,
+              match status with | .yielded => "yielded" | .resumeInitiated => "resumeInitiated")))]
 
 def actionValidationErrorJson : ActionsValidationError → Json
   | .deleteActionMustBeFinal => obj [kind "DeleteActionMustBeFinal"]
@@ -116,6 +164,12 @@ def actionValidationErrorJson : ActionsValidationError → Json
     obj
       [kind "FunctionCallArgumentsLengthExceeded", ("length", toJson length),
         ("limit", toJson limit)]
+  | .delegateActionMustBeOnlyOne => obj [kind "DelegateActionMustBeOnlyOne"]
+  | .gasKeyFunctionCallAllowanceNotAllowed => obj [kind "GasKeyFunctionCallAllowanceNotAllowed"]
+  | .gasKeyInvalidNumNonces requested limit =>
+    obj [kind "GasKeyInvalidNumNonces", ("requested_nonces", toJson requested), ("limit", toJson limit)]
+  | .addGasKeyWithNonZeroBalance balance =>
+    obj [kind "AddGasKeyWithNonZeroBalance", ("balance", toJson (toString balance))]
 
 /-- Structured semantic error fields are independent of Lean's pretty printer. -/
 def runtimeErrorJson (executor : AccountId) : RuntimeError → Json
@@ -145,7 +199,9 @@ def runtimeErrorJson (executor : AccountId) : RuntimeError → Json
     obj
       [kind "triesToStake", ("accountId", toJson id), ("stake", toJson (toString stake)),
         ("locked", toJson (toString locked)), ("balance", toJson (toString balance))]
-  | .insufficientStake id => obj [kind "insufficientStake", ("accountId", toJson id)]
+  | .insufficientStake id stake minimum =>
+    obj [kind "insufficientStake", ("accountId", toJson id), ("stake", toJson stake),
+      ("minimumStake", toJson minimum)]
   | .functionCallError error =>
     let inner :=
       match error with
@@ -204,6 +260,32 @@ def runtimeErrorJson (executor : AccountId) : RuntimeError → Json
     obj [kind "contractSizeExceeded", ("size", toJson size), ("limit", toJson limit)]
   | .tooManyActions count limit =>
     obj [kind "tooManyActions", ("count", toJson count), ("limit", toJson limit)]
+  | .globalContractDoesNotExist identifier =>
+    obj [kind "globalContractDoesNotExist", ("identifier", globalIdentifierJson identifier)]
+  | .gasKeyDoesNotExist id pk =>
+    obj [kind "gasKeyDoesNotExist", ("accountId", toJson id), ("publicKey", bytesJson pk)]
+  | .insufficientGasKeyBalance id pk balance required =>
+    obj
+      [kind "insufficientGasKeyBalance", ("accountId", toJson id), ("publicKey", bytesJson pk),
+        ("balance", toJson (toString balance)), ("required", toJson (toString required))]
+  | .gasKeyBalanceTooHigh id pk balance =>
+    obj
+      [kind "gasKeyBalanceTooHigh", ("accountId", toJson id), ("publicKey", toJson (pk.map bytesJson)),
+        ("balance", toJson (toString balance))]
+  | .delegateActionInvalidSignature => obj [kind "delegateActionInvalidSignature"]
+  | .delegateActionSenderDoesNotMatchTxReceiver sender receiver =>
+    obj
+      [kind "delegateActionSenderDoesNotMatchTxReceiver", ("senderId", toJson sender),
+        ("receiverId", toJson receiver)]
+  | .delegateActionExpired => obj [kind "delegateActionExpired"]
+  | .delegateActionInvalidNonce nonce current =>
+    obj [kind "delegateActionInvalidNonce", ("delegateNonce", toJson nonce), ("akNonce", toJson current)]
+  | .delegateActionNonceTooLarge nonce upper =>
+    obj [kind "delegateActionNonceTooLarge", ("delegateNonce", toJson nonce), ("upperBound", toJson upper)]
+  | .delegateActionInvalidNonceIndex index nonces =>
+    obj [kind "delegateActionInvalidNonceIndex", ("nonceIndex", toJson index), ("numNonces", toJson nonces)]
+  | .delegateActionAccessKeyError reason =>
+    obj [kind "delegateActionAccessKeyError", ("reason", toJson reason)]
   | .executionIssue issue => obj [kind "executionIssue", ("message", toJson issue.message)]
 
 def statusJson (status : ExecutionStatus) (index : Option Nat := none)

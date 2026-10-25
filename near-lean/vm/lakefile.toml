@@ -38,4 +38,4 @@ root = "Conformance.Main"
 # Support modules for the VM scenario executable; kept out of NearVM's import closure.
 [[lean_lib]]
 name = "VMTests"
-roots = ["tests.TrieStorage"]
+roots = ["tests.TrieStorage", "tests.CryptoHosts", "tests.LogHosts"]

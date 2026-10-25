@@ -1,6 +1,22 @@
 {
-  "crates": "near-crypto =0.37.4, secp256k1 =0.27.0 (libsecp256k1 of secp256k1-sys 0.8.2), ed25519-dalek =2.2.0, curve25519-dalek =4.1.3, sha2 =0.10.9, sha3 =0.10.9, ripemd 0.1, blake2 0.10, aws-lc-rs =1.16.2 (aws-lc-sys 0.39.1, ML-DSA-65)",
+  "crates": "near-crypto =0.37.4, secp256k1 =0.27.0 (libsecp256k1 of secp256k1-sys 0.8.2), ed25519-dalek =2.2.0, curve25519-dalek =4.1.3, sha2 =0.10.9, sha3 =0.10.9, ripemd 0.1, blake2 0.10, aws-lc-rs =1.16.2 (aws-lc-sys 0.39.1, ML-DSA-65), near-vm-runner =0.37.4 (VMLogic host functions), zeropool-bn =0.5.11, blst =0.3.11, p256 =0.13.2, ecdsa 0.16.9",
   "files": {
+    "bls12381.jsonl": {
+      "g1_multiexp": 112,
+      "g2_multiexp": 120,
+      "map_fp2_to_g2": 99,
+      "map_fp_to_g1": 50,
+      "p1_decompress": 88,
+      "p1_sum": 109,
+      "p2_decompress": 88,
+      "p2_sum": 113,
+      "pairing_check": 104
+    },
+    "bn254.jsonl": {
+      "g1_multiexp": 110,
+      "g1_sum": 91,
+      "pairing_check": 135
+    },
     "ed25519.jsonl": {
       "keypair": 28,
       "keypair-check": 13,
@@ -17,6 +33,9 @@
       "secret": 39,
       "sign": 54,
       "verify": 282
+    },
+    "p256.jsonl": {
+      "verify": 215
     },
     "secp256k1.jsonl": {
       "ecrecover": 1478,
@@ -44,5 +63,5 @@
     }
   },
   "seed": "0x4e45415200000002",
-  "verifier": "near_crypto::Signature::verify -> ed25519_dalek::VerifyingKey::from_bytes + Verifier::verify (non-strict, no legacy_compatibility); SECP256K1: recovery id and r, s parsed by secp256k1::RecoverableSignature::from_compact, then secp256k1_ecdsa_verify (low s only); VM ecrecover: Secp256K1Signature::check_signature_values then recover; VRF: near_crypto::vrf; ML-DSA-65: near_crypto::Signature::verify -> aws_lc_rs UnparsedPublicKey(ML_DSA_65).verify (pure mode, empty context); keys: PqdsaKeyPair::from_seed / from_raw_private_key; signatures: ml_dsa_65_sign_internal with chosen randomness"
+  "verifier": "near_crypto::Signature::verify -> ed25519_dalek::VerifyingKey::from_bytes + Verifier::verify (non-strict, no legacy_compatibility); SECP256K1: recovery id and r, s parsed by secp256k1::RecoverableSignature::from_compact, then secp256k1_ecdsa_verify (low s only); VM ecrecover: Secp256K1Signature::check_signature_values then recover; VRF: near_crypto::vrf; ML-DSA-65: near_crypto::Signature::verify -> aws_lc_rs UnparsedPublicKey(ML_DSA_65).verify (pure mode, empty context); keys: PqdsaKeyPair::from_seed / from_raw_private_key; signatures: ml_dsa_65_sign_internal with chosen randomness; alt_bn128_*, bls12381_* and p256_verify: near_vm_runner::logic::VMLogic host functions run on a flat memory (free config; BLS with bls12381_not_in_group_fix off and on)"
 }

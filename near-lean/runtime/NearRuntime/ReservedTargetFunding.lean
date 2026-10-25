@@ -23,8 +23,8 @@ theorem applyAction_system_no_success (c : ReceiptCtx) (isLast : Bool) (action :
     simp [hreceiver, hn]
   | transfer amount =>
     rw [applyTransfer_run]
-    simp only [hreceiver, hn, implicitPublicKey_system]
-    split <;> simp
+    simp only [hreceiver, hn, specialImplicitAccount_system, implicitPublicKey_system]
+    intro he; cases he
   | stake amount pk =>
     simp [-StateT.run_bind, applyAction, getAccount, getState, hreceiver, hn]
   | addKey pk key =>
@@ -35,7 +35,43 @@ theorem applyAction_system_no_success (c : ReceiptCtx) (isLast : Bool) (action :
     rw [applyDeleteKey_run]
     simp only [hreceiver, hn]
     split <;> simp
-  | useGlobalContract _ => simp [applyAction]
+  | useGlobalContract contract =>
+    rw [applyUseGlobalContract_run]
+    simp only [hreceiver, hn]
+    split <;> simp
+  | deployGlobalContract code mode =>
+    rw [applyDeployGlobalContract_run]
+    simp [hreceiver, hn]
+  | transferToGasKey pk deposit =>
+    rw [applyTransferToGasKey_run]
+    split
+    · intro he; cases he
+    · rename_i moved hmoved
+      rw [hreceiver] at hmoved
+      have := gasKeyDeposit_account_isSome hmoved
+      rw [hn] at this
+      cases this
+  | withdrawFromGasKey pk amount =>
+    rw [applyWithdrawFromGasKey_run]
+    split
+    · intro he; cases he
+    · rename_i moved hmoved
+      have := (gasKeyWithdrawal_account hmoved).1
+      rw [hreceiver, hn] at this
+      cases this
+  | delegate sender receiver inner nonce nonceIndex maxBlockHeight pk signature v2 =>
+    change ((applyDelegateAction c _).run.run before).1 ≠ .ok ()
+    rw [applyDelegateAction_run]
+    split
+    · intro he; cases he
+    · rename_i hchecks
+      split
+      · intro he; cases he
+      · rename_i moved hmoved
+        obtain ⟨_, hsender⟩ := delegateChecks_inner hchecks
+        have := delegateState_account_isSome hmoved
+        rw [hsender, hreceiver, hn] at this
+        cases this
   | deleteAccount beneficiary =>
     rw [applyDeleteAccount_run]
     simp only [hreceiver, hn]

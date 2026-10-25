@@ -26,7 +26,7 @@ theorem emitFunctionCallData_receiptIds (receiver : AccountId) (bytes : Bytes) (
 def Receipt.dataDelivery (receipt : Receipt) : Option (DataId × AccountId × Option Bytes) :=
   match receipt.receipt with
   | .data data => some (data.dataId, receipt.receiverId, data.data)
-  | .action _ => none
+  | .action _ | .globalDistribution _ => none
 
 /-- The actual emitter preserves callback data ids, destination order and exact
 return bytes. Allocating envelope ids does not reallocate dependency ids. -/

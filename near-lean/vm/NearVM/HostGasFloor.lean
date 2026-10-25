@@ -31,13 +31,13 @@ theorem applyCharges_gasFloor (ns : NearState) (charges : List Charge)
     (h : GasFloor b prepaid maxBurnt ns) : GasFloor b prepaid maxBurnt (applyCharges ns charges).1 :=
   applyCharges_floor ns charges h
 
-theorem gasFn_gasFloor : HostPreservesGasFloor gasFn := by
+theorem gasFn_gasFloor (opCost : Nat) : HostPreservesGasFloor (gasFn opCost) := by
   intro b prepaid maxBurnt st args hwf
   unfold gasFn
   dsimp only
   split
   · rename_i n
-    have hl := GasCounter.deduct_floor n.toNat n.toNat hwf
+    have hl := GasCounter.deduct_floor (n.toNat * opCost) (n.toNat * opCost) hwf
     split <;> exact hl
   · exact hwf
 
@@ -113,6 +113,7 @@ theorem metered_preserves_gasFloor (extra : Nat) (name : String) (fn : NearHostF
           | some error => cases error <;> exact hwf2
 
 set_option maxRecDepth 16384 in
+set_option maxHeartbeats 1600000 in
 /-- Every published metered host keeps burnt gas at or above its floor. -/
 theorem meteredHostFns_gasFloor (cfg : RuntimeConfig) (entry : ImportDecl × NearHostFn NearState)
     (h : entry ∈ meteredHostFns cfg) : HostPreservesGasFloor entry.2 := by
@@ -120,7 +121,7 @@ theorem meteredHostFns_gasFloor (cfg : RuntimeConfig) (entry : ImportDecl × Nea
   rcases h with ⟨⟨decl, fn⟩, hin, heq⟩ | heq
   · subst entry
     simp only [nearHostFns, List.mem_cons, List.not_mem_nil, or_false] at hin
-    rcases hin with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
+    rcases hin with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
     all_goals cases h
     all_goals first
       | (intro b prepaid maxBurnt st args hwf; exact hwf)
@@ -145,15 +146,36 @@ theorem meteredHostFns_gasFloor (cfg : RuntimeConfig) (entry : ImportDecl × Nea
       | exact HostPreservesGas.floor storageUsageFn_gas
       | exact HostPreservesGas.floor accountBalanceFn_gas
       | exact HostPreservesGas.floor accountLockedBalanceFn_gas
+      | exact HostPreservesGas.floor validatorStakeFn_gas
+      | exact HostPreservesGas.floor validatorTotalStakeFn_gas
       | exact HostPreservesGas.floor prepaidGasFn_gas
       | exact HostPreservesGas.floor usedGasFn_gas
       | exact HostPreservesGas.floor randomSeedFn_gas
+      | exact HostPreservesGas.floor sha256Fn_gas
+      | exact HostPreservesGas.floor keccak256Fn_gas
+      | exact HostPreservesGas.floor keccak512Fn_gas
+      | exact HostPreservesGas.floor ripemd160Fn_gas
+      | exact HostPreservesGas.floor ecrecoverFn_gas
+      | exact HostPreservesGas.floor ed25519VerifyFn_gas
+      | exact HostPreservesGas.floor p256VerifyFn_gas
+      | exact HostPreservesGas.floor altBn128G1MultiexpFn_gas
+      | exact HostPreservesGas.floor altBn128G1SumFn_gas
+      | exact HostPreservesGas.floor altBn128PairingCheckFn_gas
+      | exact HostPreservesGas.floor bls12381P1SumFn_gas
+      | exact HostPreservesGas.floor bls12381P2SumFn_gas
+      | exact HostPreservesGas.floor bls12381G1MultiexpFn_gas
+      | exact HostPreservesGas.floor bls12381G2MultiexpFn_gas
+      | exact HostPreservesGas.floor bls12381MapFpToG1Fn_gas
+      | exact HostPreservesGas.floor bls12381MapFp2ToG2Fn_gas
+      | exact HostPreservesGas.floor bls12381P1DecompressFn_gas
+      | exact HostPreservesGas.floor bls12381P2DecompressFn_gas
+      | exact HostPreservesGas.floor bls12381PairingCheckFn_gas
       | exact HostPreservesGas.floor logUtf8Fn_gas
       | exact HostPreservesGas.floor logUtf16Fn_gas
       | exact HostPreservesGas.floor panicMetered_gas
       | exact HostPreservesGas.floor panicUtf8Metered_gas
       | exact HostPreservesGas.floor abortMetered_gas
-      | exact gasFn_gasFloor
+      | exact gasFn_gasFloor _
       | exact HostPreservesGas.floor promiseCreateFn_gas
       | exact HostPreservesGas.floor promiseThenFn_gas
       | exact HostPreservesGas.floor promiseAndFn_gas
@@ -171,12 +193,20 @@ theorem meteredHostFns_gasFloor (cfg : RuntimeConfig) (entry : ImportDecl × Nea
       | exact HostPreservesGas.floor promiseBatchActionDeleteAccountFn_gas
       | exact HostPreservesGas.floor promiseBatchActionUseGlobalContractFn_gas
       | exact HostPreservesGas.floor promiseBatchActionUseGlobalContractByAccountIdFn_gas
+      | exact HostPreservesGas.floor promiseBatchActionDeployGlobalContractFn_gas
+      | exact HostPreservesGas.floor promiseBatchActionDeployGlobalContractByAccountIdFn_gas
+      | exact HostPreservesGas.floor promiseBatchActionTransferToGasKeyFn_gas
+      | exact HostPreservesGas.floor promiseBatchActionAddGasKeyWithFullAccessFn_gas
+      | exact HostPreservesGas.floor promiseBatchActionAddGasKeyWithFunctionCallFn_gas
+      | exact HostPreservesGas.floor promiseYieldCreateFn_gas
+      | exact HostPreservesGas.floor promiseYieldResumeFn_gas
+      | exact HostPreservesGas.floor chainIdFn_gas
       | exact HostPreservesGas.floor valueReturnFn_gas
       | exact HostPreservesGas.floor promiseReturnFn_gas
       | exact HostPreservesGas.floor promiseResultsCountFn_gas
       | exact HostPreservesGas.floor promiseResultFn_gas
   · subst entry
-    exact gasFn_gasFloor
+    exact gasFn_gasFloor _
 
 /-- Resolution cannot introduce a function outside the proved host registry. -/
 theorem resolveMeteredImports_gasFloor (cfg : RuntimeConfig) (imports : List ImportDecl)

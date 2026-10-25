@@ -21,6 +21,10 @@ def batchActionInput? (name : String) (st : HostStore NearState) : List Value �
       some (index, .useGlobalContract (.codeHash bytes))
     else if name == "promise_batch_action_use_global_contract_by_account_id" then
       some (index, .useGlobalContract (.accountId bytes))
+    else if name == "promise_batch_action_deploy_global_contract" then
+      some (index, .deployGlobalContract bytes .codeHash)
+    else if name == "promise_batch_action_deploy_global_contract_by_account_id" then
+      some (index, .deployGlobalContract bytes .accountId)
     else none
   | [.i64 index, .i64 a, .i64 b, .i64 c] =>
     if name == "promise_batch_action_stake" then do
@@ -30,6 +34,13 @@ def batchActionInput? (name : String) (st : HostStore NearState) : List Value �
     else if name == "promise_batch_action_add_key_with_full_access" then do
       let pk ← getMemOrReg st b a
       some (index, .addKey pk c .fullAccess)
+    else if name == "promise_batch_action_add_gas_key_with_full_access" then do
+      let pk ← getMemOrReg st b a
+      some (index, .addKey pk 0 (.gasKeyFullAccess c.toNat))
+    else if name == "promise_batch_action_transfer_to_gas_key" then do
+      let pk ← getMemOrReg st b a
+      let amount ← readU128Mem st c
+      some (index, .transferToGasKey pk amount)
     else none
   | [.i64 index, .i64 ml, .i64 mp, .i64 al, .i64 ap, .i64 amount, .i64 gas] => do
     if name != "promise_batch_action_function_call" then none else
@@ -41,12 +52,17 @@ def batchActionInput? (name : String) (st : HostStore NearState) : List Value �
       some (index, action)
   | [.i64 index, .i64 kl, .i64 kp, .i64 nonce, .i64 allowancePtr,
       .i64 rl, .i64 rp, .i64 ml, .i64 mp] => do
-    if name != "promise_batch_action_add_key_with_function_call" then none else
+    if name != "promise_batch_action_add_key_with_function_call" &&
+        name != "promise_batch_action_add_gas_key_with_function_call" then none else
       let pk ← getMemOrReg st kp kl
       let allowance ← readU128Mem st allowancePtr
       let receiver ← getMemOrReg st rp rl
       let methods ← getMemOrReg st mp ml
-      some (index, .addKey pk nonce (.functionCall (functionCallAllowance allowance) receiver methods))
+      if name == "promise_batch_action_add_key_with_function_call" then
+        some (index, .addKey pk nonce (.functionCall (functionCallAllowance allowance) receiver methods))
+      else
+        some (index, .addKey pk 0
+          (.gasKeyFunctionCall nonce.toNat (functionCallAllowance allowance) receiver methods))
   | _ => none
 
 /-- The successful raw host creates exactly the action decoded from its ABI.
@@ -116,6 +132,15 @@ theorem promiseBatchActionTransferFn_gasObligation : HostAppendsGas "promise_bat
     | (apply appendPromiseActionResult_gas_input; simp_all [batchActionInput?])
     | split)
 
+theorem promiseBatchActionTransferToGasKeyFn_gasObligation : HostAppendsGas "promise_batch_action_transfer_to_gas_key" promiseBatchActionTransferToGasKeyFn := by
+  intro fees ethEnabled st args
+  unfold promiseBatchActionTransferToGasKeyFn
+  dsimp only [disallowInView, checkAccountId, checkPublicKey]
+  repeat (first
+    | trivial
+    | (apply appendPromiseActionResult_gas_input; simp_all [batchActionInput?])
+    | split)
+
 theorem promiseBatchActionStakeFn_gasObligation : HostAppendsGas "promise_batch_action_stake" promiseBatchActionStakeFn := by
   intro fees ethEnabled st args
   unfold promiseBatchActionStakeFn
@@ -134,9 +159,27 @@ theorem promiseBatchActionAddKeyWithFullAccessFn_gasObligation : HostAppendsGas 
     | (apply appendPromiseActionResult_gas_input; simp_all [batchActionInput?])
     | split)
 
+theorem promiseBatchActionAddGasKeyWithFullAccessFn_gasObligation : HostAppendsGas "promise_batch_action_add_gas_key_with_full_access" promiseBatchActionAddGasKeyWithFullAccessFn := by
+  intro fees ethEnabled st args
+  unfold promiseBatchActionAddGasKeyWithFullAccessFn
+  dsimp only [disallowInView, checkAccountId, checkPublicKey]
+  repeat (first
+    | trivial
+    | (apply appendPromiseActionResult_gas_input; simp_all [batchActionInput?])
+    | split)
+
 theorem promiseBatchActionAddKeyWithFunctionCallFn_gasObligation : HostAppendsGas "promise_batch_action_add_key_with_function_call" promiseBatchActionAddKeyWithFunctionCallFn := by
   intro fees ethEnabled st args
   unfold promiseBatchActionAddKeyWithFunctionCallFn
+  dsimp only [disallowInView, checkAccountId, checkPublicKey]
+  repeat (first
+    | trivial
+    | (apply appendPromiseActionResult_gas_input; simp_all [batchActionInput?])
+    | split)
+
+theorem promiseBatchActionAddGasKeyWithFunctionCallFn_gasObligation : HostAppendsGas "promise_batch_action_add_gas_key_with_function_call" promiseBatchActionAddGasKeyWithFunctionCallFn := by
+  intro fees ethEnabled st args
+  unfold promiseBatchActionAddGasKeyWithFunctionCallFn
   dsimp only [disallowInView, checkAccountId, checkPublicKey]
   repeat (first
     | trivial
@@ -170,9 +213,27 @@ theorem promiseBatchActionUseGlobalContractFn_gasObligation : HostAppendsGas "pr
     | (apply appendPromiseActionResult_gas_input; simp_all [batchActionInput?])
     | split)
 
+theorem promiseBatchActionDeployGlobalContractFn_gasObligation : HostAppendsGas "promise_batch_action_deploy_global_contract" promiseBatchActionDeployGlobalContractFn := by
+  intro fees ethEnabled st args
+  unfold promiseBatchActionDeployGlobalContractFn deployGlobalContractFn
+  dsimp only [disallowInView, checkAccountId, checkPublicKey]
+  repeat (first
+    | trivial
+    | (apply appendPromiseActionResult_gas_input; simp_all [batchActionInput?])
+    | split)
+
 theorem promiseBatchActionUseGlobalContractByAccountIdFn_gasObligation : HostAppendsGas "promise_batch_action_use_global_contract_by_account_id" promiseBatchActionUseGlobalContractByAccountIdFn := by
   intro fees ethEnabled st args
   unfold promiseBatchActionUseGlobalContractByAccountIdFn useGlobalContractFn
+  dsimp only [disallowInView, checkAccountId, checkPublicKey]
+  repeat (first
+    | trivial
+    | (apply appendPromiseActionResult_gas_input; simp_all [batchActionInput?])
+    | split)
+
+theorem promiseBatchActionDeployGlobalContractByAccountIdFn_gasObligation : HostAppendsGas "promise_batch_action_deploy_global_contract_by_account_id" promiseBatchActionDeployGlobalContractByAccountIdFn := by
+  intro fees ethEnabled st args
+  unfold promiseBatchActionDeployGlobalContractByAccountIdFn deployGlobalContractFn
   dsimp only [disallowInView, checkAccountId, checkPublicKey]
   repeat (first
     | trivial

@@ -95,6 +95,7 @@ theorem metered_preserves_selection (extra : Nat) (name : String) (fn : NearHost
           | some error => cases error <;> exact hwf2
 
 set_option maxRecDepth 16384 in
+set_option maxHeartbeats 1600000 in
 /-- Every function published by the runtime's metered registry preserves
 creation-order validity, including rejected unsupported and deprecated calls. -/
 theorem meteredHostFns_selection (cfg : RuntimeConfig) (entry : ImportDecl × NearHostFn NearState)
@@ -103,7 +104,7 @@ theorem meteredHostFns_selection (cfg : RuntimeConfig) (entry : ImportDecl × Ne
   rcases h with ⟨⟨decl, fn⟩, hin, heq⟩ | heq
   · subst entry
     simp only [nearHostFns, List.mem_cons, List.not_mem_nil, or_false] at hin
-    rcases hin with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
+    rcases hin with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
     all_goals cases h
     all_goals first
       | (intro st args hwf; exact hwf)
@@ -128,15 +129,36 @@ theorem meteredHostFns_selection (cfg : RuntimeConfig) (entry : ImportDecl × Ne
       | exact storageUsageFn_selection
       | exact accountBalanceFn_selection
       | exact accountLockedBalanceFn_selection
+      | exact validatorStakeFn_selection
+      | exact validatorTotalStakeFn_selection
       | exact prepaidGasFn_selection
       | exact usedGasFn_selection
       | exact randomSeedFn_selection
+      | exact sha256Fn_selection
+      | exact keccak256Fn_selection
+      | exact keccak512Fn_selection
+      | exact ripemd160Fn_selection
+      | exact ecrecoverFn_selection
+      | exact ed25519VerifyFn_selection
+      | exact p256VerifyFn_selection
+      | exact altBn128G1MultiexpFn_selection
+      | exact altBn128G1SumFn_selection
+      | exact altBn128PairingCheckFn_selection
+      | exact bls12381P1SumFn_selection
+      | exact bls12381P2SumFn_selection
+      | exact bls12381G1MultiexpFn_selection
+      | exact bls12381G2MultiexpFn_selection
+      | exact bls12381MapFpToG1Fn_selection
+      | exact bls12381MapFp2ToG2Fn_selection
+      | exact bls12381P1DecompressFn_selection
+      | exact bls12381P2DecompressFn_selection
+      | exact bls12381PairingCheckFn_selection
       | exact logUtf8Fn_selection
       | exact logUtf16Fn_selection
       | exact panicMetered_selection
       | exact panicUtf8Metered_selection
       | exact abortMetered_selection
-      | exact gasFn_selection
+      | exact gasFn_selection _
       | exact promiseCreateFn_selection
       | exact promiseThenFn_selection
       | exact promiseAndFn_selection
@@ -154,12 +176,20 @@ theorem meteredHostFns_selection (cfg : RuntimeConfig) (entry : ImportDecl × Ne
       | exact promiseBatchActionDeleteAccountFn_selection
       | exact promiseBatchActionUseGlobalContractFn_selection
       | exact promiseBatchActionUseGlobalContractByAccountIdFn_selection
+      | exact promiseBatchActionDeployGlobalContractFn_selection
+      | exact promiseBatchActionDeployGlobalContractByAccountIdFn_selection
+      | exact promiseBatchActionTransferToGasKeyFn_selection
+      | exact promiseBatchActionAddGasKeyWithFullAccessFn_selection
+      | exact promiseBatchActionAddGasKeyWithFunctionCallFn_selection
+      | exact promiseYieldCreateFn_selection
+      | exact promiseYieldResumeFn_selection
+      | exact chainIdFn_selection
       | exact valueReturnFn_selection
       | exact promiseReturnFn_selection
       | exact promiseResultsCountFn_selection
       | exact promiseResultFn_selection
   · subst entry
-    exact gasFn_selection
+    exact gasFn_selection _
 
 /-- Resolution cannot introduce a function outside the proved host registry. -/
 theorem resolveMeteredImports_selection (cfg : RuntimeConfig) (imports : List ImportDecl)

@@ -73,6 +73,7 @@ theorem Receipt.forwardResult_idsBelow (receipt : Receipt) (target : ReceiptId) 
   split
   · cases hr : receipt.receipt with
     | data data => exact h
+    | globalDistribution g => exact h
     | action action =>
       intro id hid
       simp only [Receipt.liveIds, List.map_append, List.mem_cons, List.mem_append] at hid
@@ -121,7 +122,7 @@ theorem finalizeReceipt_outputIds (c : ReceiptCtx) (st : ChainState) (raw : Exec
     (Fees.receiptGasBudget c.cfg c.receipt.receiverId c.action.actions) base.gasUsed base.gasBurnt
     ((st.account? c.receipt.receiverId).isNone && (base.state.account? c.receipt.receiverId).isSome && failed.isNone)
   let charged := { base with
-    tokensBurnt := if c.receipt.isRefund then 0 else settlement.tokensBurnt
+    tokensBurnt := (if c.receipt.isRefund then 0 else settlement.tokensBurnt) + base.actionTokensBurnt
     otherTokensBurnt := if c.receipt.isRefund && failed.isSome then Fees.totalDeposit c.action.actions else 0 }
   let depositRefund := if failed.isSome then Fees.totalDeposit c.action.actions else 0
   let gasRefund := if c.receipt.isRefund then 0 else settlement.refund

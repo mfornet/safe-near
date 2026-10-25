@@ -4,22 +4,22 @@ namespace Wasm.Near
 
 /-- Legacy instruction metering reserves no additional promise gas on success.
 Gas exhaustion traps and discards the speculative counter instead. -/
-theorem gasFn_reservationInvariant (fees : ActionFees) (ethEnabled : Bool) :
-    NearHostFn.PreservesLive (ReservationInvariant fees ethEnabled) gasFn := by
+theorem gasFn_reservationInvariant (fees : ActionFees) (ethEnabled : Bool) (opCost : Nat) :
+    NearHostFn.PreservesLive (ReservationInvariant fees ethEnabled) (gasFn opCost) := by
   intro st args h
   unfold gasFn
   dsimp only
   split
   · rename_i n
-    cases hc : st.host.gas.burn n.toNat with
+    cases hc : st.host.gas.burn (n.toNat * opCost) with
     | mk gas error =>
       cases error with
       | some error => trivial
       | none =>
-        have hp : (st.host.gas.burn n.toNat).1.promises = st.host.gas.promises := by
-          have hs : (st.host.gas.burn n.toNat).2 = none := by rw [hc]
+        have hp : (st.host.gas.burn (n.toNat * opCost)).1.promises = st.host.gas.promises := by
+          have hs : (st.host.gas.burn (n.toNat * opCost)).2 = none := by rw [hc]
           simpa only [GasCounter.burn, Nat.sub_self, Nat.add_zero] using
-            (GasCounter.deduct_success st.host.gas n.toNat n.toNat (Nat.le_refl _) hs).2.1
+            (GasCounter.deduct_success st.host.gas (n.toNat * opCost) (n.toNat * opCost) (Nat.le_refl _) hs).2.1
         rw [hc] at hp
         change ReservationInvariant fees ethEnabled _
         exact ⟨h.1, h.2.1, by
@@ -39,7 +39,7 @@ theorem meteredHostFns_reservationInvariant (fees : ActionFees) (ethEnabled : Bo
   rcases h with ⟨⟨decl, fn⟩, hin, heq⟩ | heq
   · subst entry
     simp only [nearHostFns, List.mem_cons, List.not_mem_nil, or_false] at hin
-    rcases hin with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
+    rcases hin with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
     · cases h
       apply meteredNeutral_reservationInvariant
       · decide
@@ -105,15 +105,13 @@ theorem meteredHostFns_reservationInvariant (fees : ActionFees) (ethEnabled : Bo
       · decide
       · exact logUtf8Fn_reservationView
     · cases h
-      apply metered_reservationInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      apply meteredNeutral_reservationInvariant
+      · decide
+      · exact sha256Fn_reservationView
     · cases h
-      apply metered_reservationInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      apply meteredNeutral_reservationInvariant
+      · decide
+      · exact keccak256Fn_reservationView
     · cases h
       apply meteredNeutral_reservationInvariant
       · decide
@@ -155,15 +153,13 @@ theorem meteredHostFns_reservationInvariant (fees : ActionFees) (ethEnabled : Bo
       · decide
       · exact usedGasFn_reservationView
     · cases h
-      apply metered_reservationInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      apply meteredNeutral_reservationInvariant
+      · decide
+      · exact validatorStakeFn_reservationView
     · cases h
-      apply metered_reservationInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      apply meteredNeutral_reservationInvariant
+      · decide
+      · exact validatorTotalStakeFn_reservationView
     · cases h
       apply meteredNeutral_reservationInvariant
       · decide
@@ -182,89 +178,77 @@ theorem meteredHostFns_reservationInvariant (fees : ActionFees) (ethEnabled : Bo
       intro st args hwf
       trivial
     · cases h
-      apply metered_reservationInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      apply meteredNeutral_reservationInvariant
+      · decide
+      · exact keccak512Fn_reservationView
     · cases h
-      apply metered_reservationInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      apply meteredNeutral_reservationInvariant
+      · decide
+      · exact ripemd160Fn_reservationView
     · cases h
-      apply metered_reservationInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      apply meteredNeutral_reservationInvariant
+      · decide
+      · exact ecrecoverFn_reservationView
     · cases h
-      apply metered_reservationInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      apply meteredNeutral_reservationInvariant
+      · decide
+      · exact ed25519VerifyFn_reservationView
+    · cases h
+      apply meteredNeutral_reservationInvariant
+      · decide
+      · exact p256VerifyFn_reservationView
     · cases h
       apply meteredNeutral_reservationInvariant
       · decide
       · exact randomSeedFn_reservationView
     · cases h
-      apply metered_reservationInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      apply meteredNeutral_reservationInvariant
+      · decide
+      · exact altBn128G1MultiexpFn_reservationView
     · cases h
-      apply metered_reservationInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      apply meteredNeutral_reservationInvariant
+      · decide
+      · exact altBn128G1SumFn_reservationView
     · cases h
-      apply metered_reservationInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      apply meteredNeutral_reservationInvariant
+      · decide
+      · exact altBn128PairingCheckFn_reservationView
     · cases h
-      apply metered_reservationInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      apply meteredNeutral_reservationInvariant
+      · decide
+      · exact bls12381G1MultiexpFn_reservationView
     · cases h
-      apply metered_reservationInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      apply meteredNeutral_reservationInvariant
+      · decide
+      · exact bls12381G2MultiexpFn_reservationView
     · cases h
-      apply metered_reservationInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      apply meteredNeutral_reservationInvariant
+      · decide
+      · exact bls12381MapFpToG1Fn_reservationView
     · cases h
-      apply metered_reservationInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      apply meteredNeutral_reservationInvariant
+      · decide
+      · exact bls12381MapFp2ToG2Fn_reservationView
     · cases h
-      apply metered_reservationInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      apply meteredNeutral_reservationInvariant
+      · decide
+      · exact bls12381P1DecompressFn_reservationView
     · cases h
-      apply metered_reservationInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      apply meteredNeutral_reservationInvariant
+      · decide
+      · exact bls12381P2DecompressFn_reservationView
     · cases h
-      apply metered_reservationInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      apply meteredNeutral_reservationInvariant
+      · decide
+      · exact bls12381P1SumFn_reservationView
     · cases h
-      apply metered_reservationInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      apply meteredNeutral_reservationInvariant
+      · decide
+      · exact bls12381P2SumFn_reservationView
     · cases h
-      apply metered_reservationInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      apply meteredNeutral_reservationInvariant
+      · decide
+      · exact bls12381PairingCheckFn_reservationView
     · cases h
       exact meteredCreate_reservationInvariant fees ethEnabled _
     · cases h
@@ -296,29 +280,17 @@ theorem meteredHostFns_reservationInvariant (fees : ActionFees) (ethEnabled : Bo
     · cases h
       exact meteredDeleteAccount_reservationInvariant fees ethEnabled _
     · cases h
-      apply metered_reservationInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      exact meteredDeployGlobalContract_reservationInvariant fees ethEnabled _
     · cases h
-      apply metered_reservationInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      exact meteredDeployGlobalContractByAccountId_reservationInvariant fees ethEnabled _
     · cases h
       exact meteredUseGlobalContract_reservationInvariant fees ethEnabled _
     · cases h
       exact meteredUseGlobalContractByAccountId_reservationInvariant fees ethEnabled _
     · cases h
-      apply metered_reservationInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      exact meteredYieldCreate_reservationInvariant fees ethEnabled _
     · cases h
-      apply metered_reservationInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      exact meteredYieldResume_reservationInvariant fees ethEnabled _
     · cases h
       apply meteredNeutral_reservationInvariant
       · decide
@@ -331,7 +303,37 @@ theorem meteredHostFns_reservationInvariant (fees : ActionFees) (ethEnabled : Bo
       apply meteredNeutral_reservationInvariant
       · decide
       · exact promiseReturnFn_reservationView
+    · cases h
+      exact meteredTransferToGasKey_reservationInvariant fees ethEnabled _
+    · cases h
+      exact meteredAddGasKeyFull_reservationInvariant fees ethEnabled _
+    · cases h
+      exact meteredAddGasKeyFunction_reservationInvariant fees ethEnabled _
+    · cases h
+      apply metered_reservationInvariant
+      intro st args hwf hs hguard _
+      simp (disch := decide) only [prepareStorageCall_other]
+      trivial
+    · cases h
+      apply metered_reservationInvariant
+      intro st args hwf hs hguard _
+      simp (disch := decide) only [prepareStorageCall_other]
+      trivial
+    · cases h
+      apply metered_reservationInvariant
+      intro st args hwf hs hguard _
+      simp (disch := decide) only [prepareStorageCall_other]
+      trivial
+    · cases h
+      apply metered_reservationInvariant
+      intro st args hwf hs hguard _
+      simp (disch := decide) only [prepareStorageCall_other]
+      trivial
+    · cases h
+      apply meteredNeutral_reservationInvariant
+      · decide
+      · exact chainIdFn_reservationView
   · subst entry
-    exact gasFn_reservationInvariant fees ethEnabled
+    exact gasFn_reservationInvariant fees ethEnabled _
 
 end Wasm.Near

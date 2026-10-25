@@ -4,14 +4,72 @@ namespace Near
 open Wasm.Near
 
 
+theorem resumeReceipts_nextId_le (account : AccountId) (resumes : List (Bytes × Bytes))
+    (initial : ChainState) (receipts : List Receipt) :
+    initial.nextId ≤ (resumeReceipts account resumes initial receipts).1.nextId := by
+  unfold resumeReceipts
+  suffices ∀ (items : List (Bytes × Bytes)) (acc : ChainState × List Receipt),
+      acc.1.nextId ≤ (items.foldl (fun (acc : ChainState × List Receipt) resume =>
+        (acc.1.freshId.2, acc.2 ++ [{
+          predecessorId := account
+          receiverId := account
+          receiptId := acc.1.freshId.1
+          receipt := .data { dataId := 0, data := some resume.2, resumeDataId := some resume.1 } }]))
+        acc).1.nextId from this resumes (initial, receipts)
+  intro items
+  induction items with
+  | nil => intro acc; exact Nat.le_refl _
+  | cons item rest ih =>
+    intro acc
+    rw [List.foldl_cons]
+    exact (Nat.le_add_right acc.1.nextId 1).trans (ih (acc.1.freshId.2, _))
+
+theorem yieldBookkeeping_nextId (c : ReceiptCtx) (outcome : VMOutcome) (initial : ChainState) :
+    (yieldBookkeeping c outcome initial).nextId = initial.nextId := by
+  unfold yieldBookkeeping
+  dsimp only
+  have h1 := foldl_frame (fun st : ChainState => st.nextId) (fun (st : ChainState) dataId =>
+    { st with
+      yieldTimeouts := st.yieldTimeouts ++ [((initial.yieldIndices.getD (0, 0)).2 +
+        ((outcome.receipts.filterMap (·.yieldDataId)).idxOf dataId),
+        { account := c.receipt.receiverId, dataId, expiresAt := c.ap.blockHeight + c.cfg.wasm.limits.yieldTimeoutLengthInBlocks })]
+      yieldStatus := Assoc.insert st.yieldStatus (c.receipt.receiverId, dataId) .yielded })
+    (by intros; rfl) (outcome.receipts.filterMap (·.yieldDataId)) initial
+  have h2 := foldl_frame (fun st : ChainState => st.nextId) (fun (st : ChainState) resume =>
+    { st with yieldStatus := Assoc.insert st.yieldStatus (c.receipt.receiverId, resume.1) .resumeInitiated })
+    (by intros; rfl) outcome.resumes
+    ((outcome.receipts.filterMap (·.yieldDataId)).foldl (fun (st : ChainState) dataId =>
+    { st with
+      yieldTimeouts := st.yieldTimeouts ++ [((initial.yieldIndices.getD (0, 0)).2 +
+        ((outcome.receipts.filterMap (·.yieldDataId)).idxOf dataId),
+        { account := c.receipt.receiverId, dataId, expiresAt := c.ap.blockHeight + c.cfg.wasm.limits.yieldTimeoutLengthInBlocks })]
+      yieldStatus := Assoc.insert st.yieldStatus (c.receipt.receiverId, dataId) .yielded }) initial)
+  split
+  · exact h2.trans h1
+  · exact h2.trans h1
+
+theorem functionCallYields_nextId_mono (c : ReceiptCtx) (outcome : VMOutcome) (effects : FunctionCallEffects) :
+    effects.state.nextId ≤ (functionCallYields c outcome effects).state.nextId := by
+  unfold functionCallYields
+  dsimp only
+  rw [yieldBookkeeping_nextId]
+  exact resumeReceipts_nextId_le _ _ _ _
+
+theorem functionCallYields_idsBelowNext (c : ReceiptCtx) (outcome : VMOutcome) (effects : FunctionCallEffects)
+    (h : effects.state.IdsBelowNext) : (functionCallYields c outcome effects).state.IdsBelowNext := by
+  apply h.of_frame
+  · have hf := congrArg ChainState.liveIds (functionCallYields_frame c outcome effects)
+    exact hf
+  · exact functionCallYields_nextId_mono c outcome effects
+
 theorem commitFunctionCall_idsBelowNext (exec : Exec) (c : ReceiptCtx) (account : Account)
     (outcome : VMOutcome) (isLast : Bool) (effects : FunctionCallEffects)
     (heffects : functionCallEffects c account outcome isLast exec.state = .ok effects)
     (h : exec.state.IdsBelowNext) :
     (exec.commitFunctionCall outcome effects).state.IdsBelowNext := by
-  change effects.state.IdsBelowNext
+  rw [show (exec.commitFunctionCall outcome effects).state = effects.state from rfl]
   rw [functionCallEffects_success c account outcome isLast exec.state effects heffects]
-  exact materializeFunctionCall_idsBelowNext c isLast outcome _ h
+  exact functionCallYields_idsBelowNext _ _ _ (materializeFunctionCall_idsBelowNext c isLast outcome _ h)
 
 theorem refundAllowance_idsBelowNext (st : ChainState) (receiver : AccountId) (pk : PublicKey) (amount : Nat)
     (h : st.IdsBelowNext) : (st.refundAllowance receiver pk amount).IdsBelowNext := by
@@ -27,6 +85,20 @@ theorem transferCreditState_idsBelowNext (c : ReceiptCtx) (st : ChainState) (acc
   · exact refundAllowance_idsBelowNext _ _ _ _ h
   · exact h
 
+theorem ChainState.IdsBelowNext.of_advance {st moved : ChainState} (h : st.IdsBelowNext)
+    (hr : st.RoutingAdvance moved) : moved.IdsBelowNext := by
+  obtain ⟨h1, h2, h3, h4, h5, _, _, h8, _, h10⟩ := hr
+  intro id hm
+  have hm' : id ∈ st.liveIds := by
+    simp only [ChainState.liveIds, h1, h2, h3, h4, h5, h8] at hm ⊢
+    exact hm
+  have := h id hm'
+  omega
+
+theorem ChainState.IdsBelowNext.of_routing {st moved : ChainState} (h : st.IdsBelowNext)
+    (hr : moved.routingState = st.routingState) : moved.IdsBelowNext :=
+  h.of_advance (ChainState.RoutingAdvance.of_routing hr)
+
 /-- Every raw action preserves the allocator bound, on failures as well as
 successes. Account changes do not alter routing references. -/
 theorem applyAction_idsBelowNext (c : ReceiptCtx) (isLast : Bool) (action : Action) (before : Exec)
@@ -41,7 +113,7 @@ theorem applyAction_idsBelowNext (c : ReceiptCtx) (isLast : Bool) (action : Acti
     | none => exact h
     | some account =>
       dsimp only
-      cases hc : account.code with
+      cases hc : resolveContract before.state account with
       | none => exact h
       | some code =>
         dsimp only
@@ -66,17 +138,35 @@ theorem applyAction_idsBelowNext (c : ReceiptCtx) (isLast : Bool) (action : Acti
     · exact transferCreditState_idsBelowNext _ _ _ _ h
     · split
       · exact h
+      · exact h
       · split <;> exact h
   | stake amount pk =>
     cases ha : before.state.account? c.receipt.receiverId <;>
       simp [-StateT.run_bind, applyAction, getAccount, getState, ha]
     repeat' (first | exact h | split)
-  | addKey pk key => rw [applyAddKey_run]; repeat' (first | exact h | split)
-  | deleteKey pk => rw [applyDeleteKey_run]; repeat' (first | exact h | split)
-  | useGlobalContract _ => exact h
+  | addKey pk key =>
+    rw [applyAddKey_run]
+    repeat' (first | exact h | exact h.of_routing (addKeyMetadataState_routing _ _ _ _ _) | split)
+  | deleteKey pk =>
+    rw [applyDeleteKey_run]
+    repeat' (first | exact h | exact h.of_routing (deleteKeyMetadataState_routing _ _ _ _ _) | split)
+  | useGlobalContract contract => rw [applyUseGlobalContract_run]; repeat' (first | exact h | split)
+  | deployGlobalContract code mode =>
+    rw [applyDeployGlobalContract_run]
+    repeat' (first | exact h | exact h.of_advance ((ChainState.RoutingAdvance.of_routing (deployGlobalMoved_routing c _ _)).trans (ChainState.RoutingAdvance.freshId _)) | split)
+  | transferToGasKey pk deposit =>
+    rw [applyTransferToGasKey_run]
+    repeat' (first | exact h | exact ChainState.IdsBelowNext.of_routing h (gasKeyDeposit_routing (by assumption)) | split)
+  | withdrawFromGasKey pk amount =>
+    rw [applyWithdrawFromGasKey_run]
+    repeat' (first | exact h | exact ChainState.IdsBelowNext.of_routing h (gasKeyWithdrawal_routing (by assumption)) | split)
+  | delegate sender receiver inner nonce nonceIndex maxBlockHeight pk signature v2 =>
+    change ((applyDelegateAction c _).run.run before).2.state.IdsBelowNext
+    rw [applyDelegateAction_run]
+    repeat' (first | exact h | exact h.of_advance ((ChainState.RoutingAdvance.of_routing (delegateState_routing (by assumption))).trans (ChainState.RoutingAdvance.freshId _)) | split)
   | deleteAccount beneficiary =>
     rw [applyDeleteAccount_run]
-    repeat' (first | exact h | exact h.freshId | split)
+    repeat' (first | exact h | exact h.freshId | exact h.of_advance (deleteAccountFundedResult_advance _ _ _ _) | split)
 
 /-- The invariant is required after failures as well as successes, so it can
 compose through arbitrary action sequences before receipt rollback. -/
@@ -139,23 +229,14 @@ theorem idBounds_runReceiptAction (c : ReceiptCtx) (onlyAction isLast : Bool) (a
 
 theorem idBounds_runReceiptActionAt (c : ReceiptCtx) (onlyAction isLast : Bool)
     (action : Action) (index : Nat) : (runReceiptActionAt c onlyAction isLast action index).PreservesIdBounds := by
-  cases action with
-  | createAccount  => exact idBounds_runReceiptAction c onlyAction isLast (.createAccount)
-  | deployContract code => exact idBounds_runReceiptAction c onlyAction isLast (.deployContract code)
-  | transfer amount => exact idBounds_runReceiptAction c onlyAction isLast (.transfer amount)
-  | stake amount pk => exact idBounds_runReceiptAction c onlyAction isLast (.stake amount pk)
-  | addKey pk key => exact idBounds_runReceiptAction c onlyAction isLast (.addKey pk key)
-  | deleteKey pk => exact idBounds_runReceiptAction c onlyAction isLast (.deleteKey pk)
-  | useGlobalContract contract => exact idBounds_runReceiptAction c onlyAction isLast (.useGlobalContract contract)
-  | deleteAccount beneficiary => exact idBounds_runReceiptAction c onlyAction isLast (.deleteAccount beneficiary)
-  | functionCall method args gas deposit =>
-    cases hs : actionRandomSeed c index with
+  unfold runReceiptActionAt
+  split
+  · cases hs : actionRandomSeed c index with
     | error error =>
-      simp only [runReceiptActionAt, hs]
       exact idBounds_throw _
     | ok seed =>
-      simp only [runReceiptActionAt, hs]
       exact idBounds_runReceiptAction _ _ _ _
+  · exact idBounds_runReceiptAction _ _ _ _
 
 theorem idBounds_failureIndex (index : Option Nat) :
     (modify fun e => { e with failureIndex := index } : ExecM Unit).PreservesIdBounds := by
@@ -236,7 +317,7 @@ theorem finalizeReceipt_idsBelowNext (c : ReceiptCtx) (st : ChainState) (raw : E
     (Fees.receiptGasBudget c.cfg c.receipt.receiverId c.action.actions) base.gasUsed base.gasBurnt
     ((st.account? c.receipt.receiverId).isNone && (base.state.account? c.receipt.receiverId).isSome && failed.isNone)
   let charged := { base with
-    tokensBurnt := if c.receipt.isRefund then 0 else settlement.tokensBurnt
+    tokensBurnt := (if c.receipt.isRefund then 0 else settlement.tokensBurnt) + base.actionTokensBurnt
     otherTokensBurnt := if c.receipt.isRefund && failed.isSome then Fees.totalDeposit c.action.actions else 0 }
   let depositRefund := if failed.isSome then Fees.totalDeposit c.action.actions else 0
   let gasRefund := if c.receipt.isRefund then 0 else settlement.refund

@@ -75,8 +75,8 @@ dependencies become `input_data_ids` / `output_data_receivers`, and a receipt
 whose data has not arrived is postponed until it has. `NearRuntime/Fees.lean`
 is `config.rs`: send and execution fees per action, transaction cost.
 
-Model limits such as interpreter fuel exhaustion, cryptographic operations,
-yield/resume, validator queries, staking and unstaking are reported as execution issues.
+Model limits such as interpreter fuel exhaustion and cryptographic operations are reported as
+execution issues; the epoch (validator stakes, minimum stake) is an input.
 An issue preserves the entire apply's input state and publishes no protocol
 outcomes or refunds. Actor checks protect administrative actions; implicit
 accounts use decoded Ed25519 public keys and block-derived initial key nonces.
@@ -303,7 +303,7 @@ limits. `NearRuntime.StakingKey` checks compressed Edwards25519 decoding and pri
 subgroup membership for staking keys, including native noncanonical encodings.
 The curve constants have kernel-checked identities; native differential corpora
 check the implementation, with full cryptographic refinement still unproved.
-Epoch-dependent staking execution remains an explicit model limitation.
+Staking follows `action_stake` with the epoch's minimum stake and validators supplied as input (`ApplyState.epochInfo`).
 `NearRuntime.TransactionSize` computes body/wire widths for ordinary-key V0/V1
 transactions. A source-derived flag includes signature bytes from protocol 85.
 `convertTransaction_size_bound` proves every successful public conversion fits

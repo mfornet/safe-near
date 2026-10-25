@@ -10,6 +10,7 @@ structure ChainState.RoutingIdsBelow (st : ChainState) (bound : Nat) : Prop wher
   routes : ∀ entry ∈ st.postponedByData, entry.1 < bound ∧ entry.2 < bound
   received : ∀ entry ∈ st.receivedData, entry.1 < bound
   delayed : ∀ receipt ∈ st.delayed, ∀ id ∈ receipt.liveIds, id < bound
+  yields : ∀ entry ∈ st.yieldReceipts, ∀ id ∈ entry.2.liveIds, id < bound
 
 theorem ChainState.idsBelowNext_iff (st : ChainState) : st.IdsBelowNext ↔ st.RoutingIdsBelow st.nextId := by
   constructor
@@ -19,30 +20,34 @@ theorem ChainState.idsBelowNext_iff (st : ChainState) : st.IdsBelowNext ↔ st.R
       constructor
       · apply h
         simp only [ChainState.liveIds, List.mem_append]
-        exact Or.inl (Or.inl (Or.inl (Or.inl (List.mem_flatMap.mpr ⟨entry, hm, by simp⟩))))
+        exact Or.inl (Or.inl (Or.inl (Or.inl (Or.inl (List.mem_flatMap.mpr ⟨entry, hm, by simp⟩)))))
       · intro id hid
         apply h
         simp only [ChainState.liveIds, List.mem_append]
-        exact Or.inl (Or.inl (Or.inl (Or.inl (List.mem_flatMap.mpr ⟨entry, hm, by simp [hid]⟩))))
+        exact Or.inl (Or.inl (Or.inl (Or.inl (Or.inl (List.mem_flatMap.mpr ⟨entry, hm, by simp [hid]⟩)))))
     · intro entry hm
       apply h
       simp only [ChainState.liveIds, List.mem_append]
-      exact Or.inl (Or.inl (Or.inl (Or.inr (List.mem_map.mpr ⟨entry, hm, rfl⟩))))
+      exact Or.inl (Or.inl (Or.inl (Or.inl (Or.inr (List.mem_map.mpr ⟨entry, hm, rfl⟩)))))
     · intro entry hm
       constructor <;> apply h <;> simp only [ChainState.liveIds, List.mem_append]
-      · exact Or.inl (Or.inl (Or.inr (List.mem_flatMap.mpr ⟨entry, hm, by simp⟩)))
-      · exact Or.inl (Or.inl (Or.inr (List.mem_flatMap.mpr ⟨entry, hm, by simp⟩)))
+      · exact Or.inl (Or.inl (Or.inl (Or.inr (List.mem_flatMap.mpr ⟨entry, hm, by simp⟩))))
+      · exact Or.inl (Or.inl (Or.inl (Or.inr (List.mem_flatMap.mpr ⟨entry, hm, by simp⟩))))
     · intro entry hm
       apply h
       simp only [ChainState.liveIds, List.mem_append]
-      exact Or.inl (Or.inr (List.mem_map.mpr ⟨entry, hm, rfl⟩))
+      exact Or.inl (Or.inl (Or.inr (List.mem_map.mpr ⟨entry, hm, rfl⟩)))
     · intro receipt hm id hid
       apply h
       simp only [ChainState.liveIds, List.mem_append]
-      exact Or.inr (List.mem_flatMap.mpr ⟨receipt, hm, hid⟩)
+      exact Or.inl (Or.inr (List.mem_flatMap.mpr ⟨receipt, hm, hid⟩))
+    · intro entry hm id hid
+      apply h
+      simp only [ChainState.liveIds, List.mem_append]
+      exact Or.inr (List.mem_flatMap.mpr ⟨entry, hm, hid⟩)
   · intro h id hm
     simp only [ChainState.liveIds, List.mem_append] at hm
-    rcases hm with (((hp | hn) | hr) | hd) | hdelayed
+    rcases hm with ((((hp | hn) | hr) | hd) | hdelayed) | hyield
     · obtain ⟨entry, he, hid⟩ := List.mem_flatMap.mp hp
       simp only [List.mem_cons] at hid
       rcases hid with rfl | hin
@@ -59,6 +64,8 @@ theorem ChainState.idsBelowNext_iff (st : ChainState) : st.IdsBelowNext ↔ st.R
       exact h.received entry he
     · obtain ⟨receipt, he, hid⟩ := List.mem_flatMap.mp hdelayed
       exact h.delayed receipt he id hid
+    · obtain ⟨entry, he, hid⟩ := List.mem_flatMap.mp hyield
+      exact h.yields entry he id hid
 
 theorem Assoc.forall_insert {κ α : Type} [BEq κ] (map : List (κ × α)) (key : κ) (value : α)
     (P : κ × α → Prop) (h : ∀ entry ∈ map, P entry) (hnew : P (key, value)) :
@@ -85,6 +92,7 @@ theorem releasePostponedState_idsBelowNext (st : ChainState) (id : ReceiptId) (h
   · exact h.routes
   · exact h.received
   · exact h.delayed
+  · exact h.yields
 
 /-- Data delivery adds its already allocated dependency id and erases a route. -/
 theorem receivePostponedDataState_idsBelowNext (st : ChainState) (data : DataReceipt)
@@ -97,6 +105,7 @@ theorem receivePostponedDataState_idsBelowNext (st : ChainState) (data : DataRec
   · exact Assoc.forall_erase st.postponedByData data.dataId _ h.routes
   · exact Assoc.forall_insert st.receivedData data.dataId data.data _ h.received hdata
   · exact h.delayed
+  · exact h.yields
 
 /-- List-loop preservation with the actual iteration-domain premise. -/
 theorem foldl_preserves_mem (P : β → Prop) (step : β → α → β) (items : List α)
@@ -132,5 +141,6 @@ theorem postponeActionState_idsBelowNext (st : ChainState) (receipt : Receipt) (
     · exact h.routes
   · exact h.received
   · exact h.delayed
+  · exact h.yields
 
 end Near

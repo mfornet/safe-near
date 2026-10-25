@@ -21,6 +21,15 @@ import NearRuntime.ReceiptFunding
 import NearRuntime.MixedFunding
 import NearRuntime.AllActionFunding
 import NearRuntime.ScopedRoutingFunding
+import NearRuntime.NewActionRun
+import NearRuntime.NewActionFunding
+import NearRuntime.InstantFunding
 import NearRuntime.Boundary
 import NearRuntime.BoundarySeam
 import NearRuntime.BoundaryResolution
+import NearRuntime.Wire
+import NearRuntime.ShardLayout
+import NearRuntime.ChaCha
+import NearRuntime.Congestion
+import NearRuntime.Bandwidth
+import NearRuntime.Epoch

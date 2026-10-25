@@ -1,6 +1,7 @@
 import NearRuntime
 import Tests.Decoder
 import Tests.Gas
+import Tests.Shard
 import Wasm.Wat
 
 /-!
@@ -250,7 +251,9 @@ def main (args : List String) : IO UInt32 := do
   let cfg ← RuntimeConfig.load configs RuntimeConfig.latestVersion
   let decoderChecks ← NearRuntime.Tests.Decoder.run cfg
   let gasChecks ← NearRuntime.Tests.Gas.run cfg
-  r.modify fun report => { report with passed := report.passed + decoderChecks + gasChecks }
+  let shardChecks ← NearRuntime.Tests.Shard.run
+  let sinkChecks ← NearRuntime.Tests.Shard.runSink
+  r.modify fun report => { report with passed := report.passed + decoderChecks + gasChecks + shardChecks + sinkChecks }
   let text ← IO.FS.readFile wat
   let module ← match ← Wat.compile text with
     | .ok m => pure m
@@ -407,10 +410,37 @@ def main (args : List String) : IO UInt32 := do
     signerId := "wrap.near", publicKey := pkOf 3, nonce := 1, receiverId := "wrap.near"
     actions := [.stake 0 stakingPk] }
   let unstake := Near.apply cfg World.ap (fun _ => code) stakedState [unstakeTx] []
-  check r "unstaking explicitly requires unmodelled epoch semantics"
-    ((unstake.issue.map (·.2)) == some (.unsupportedAction "unstake (epoch machinery)"))
-  check r "unsupported unstaking leaves locked funds untouched"
-    ((unstake.state.account? "wrap.near").map (·.locked) == some oneNear)
+  check r "unstaking succeeds, emits a zero proposal and keeps the locked balance until the epoch ends"
+    (unstake.issue.isNone && unstake.proposals == [{ account := "wrap.near", publicKey := stakingPk, stake := 0 }]
+      && (unstake.state.account? "wrap.near").map (·.locked) == some oneNear)
+  -- `action_stake`: errors by order, the minimum stake, the proposal and the locked balance.
+  let epoch : EpochInfo := { minimumStake := 2 * oneNear, totalStake := 5 * oneNear, validators := [("wrap.near", 5 * oneNear)] }
+  let stakeApply (ap : ApplyState) (state : ChainState) (amount : Nat) :=
+    Near.apply cfg ap (fun _ => code) state
+      [{ signerId := "wrap.near", publicKey := pkOf 3, nonce := 1, receiverId := "wrap.near"
+         actions := [.stake amount stakingPk] }] []
+  let epochAp := { World.ap with epochInfo := epoch }
+  let stakeIs (result : ApplyResult) (error : RuntimeError) :=
+    result.outcomes.any fun (_, o) => o.status == .failure error
+  let fresh := stakeApply epochAp genesis (3 * oneNear)
+  check r "staking at least the minimum locks the balance and proposes"
+    (fresh.issue.isNone && fresh.proposals == [{ account := "wrap.near", publicKey := stakingPk, stake := 3 * oneNear }]
+      && (fresh.state.account? "wrap.near").map (·.locked) == some (3 * oneNear))
+  let below := stakeApply epochAp genesis oneNear
+  check r "staking below the minimum fails with InsufficientStake and proposes nothing"
+    (stakeIs below (.insufficientStake "wrap.near" oneNear (2 * oneNear)) && below.proposals.isEmpty)
+  let tooMuch := stakeApply epochAp genesis (1000 * oneNear)
+  check r "staking more than the balance fails with TriesToStake"
+    (tooMuch.outcomes.any (fun (_, o) => match o.status with
+        | .failure (.triesToStake "wrap.near" amount 0 _) => amount == 1000 * oneNear
+        | _ => false) && tooMuch.proposals.isEmpty)
+  let none_ := stakeApply epochAp genesis 0
+  check r "an account that never staked cannot unstake" (stakeIs none_ (.triesToUnstake "wrap.near"))
+  let lockedHigh := genesis.setAccount "wrap.near" { genesisAccount (10 * oneNear) with locked := 3 * oneNear }
+  let lowered := stakeApply epochAp lockedHigh (5 * oneNear / 2)
+  check r "a stake below the locked balance proposes without moving funds"
+    (lowered.proposals == [{ account := "wrap.near", publicKey := stakingPk, stake := 5 * oneNear / 2 }]
+      && (lowered.state.account? "wrap.near").map (·.locked) == some (3 * oneNear))
 
   -- Fee classification and explicit unsupported implicit-creation semantics.
   let cfg69 ← RuntimeConfig.load configs 69
@@ -427,13 +457,20 @@ def main (args : List String) : IO UInt32 := do
       (submitted.issue.isNone && submitted.outgoing.length == 1 &&
         (submitted.state.accessKey? "alice.near" (pkOf 1)).map (·.nonce) == some 1)
     let missing := Near.apply cfg World.ap (fun _ => code) submitted.state [] submitted.outgoing
-    check r s!"{label} implicit creation reports a model issue"
-      ((missing.issue.map (·.2)) == some (.unsupportedAction "implicit account creation (ETH/deterministic contracts)"))
-    check r s!"{label} implicit delivery issue rolls back receiver execution and preserves committed submission"
-      (missing.state.totalBalance == submitted.state.totalBalance &&
-        (missing.state.account? receiver).isNone && missing.state.storage == submitted.state.storage &&
-        missing.state.accessKeys == submitted.state.accessKeys && missing.state.nextId == submitted.state.nextId &&
-        missing.outcomes.isEmpty && missing.outgoing.isEmpty && missing.tokensBurnt == 0)
+    check r s!"{label} implicit creation installs the account on delivery"
+      (missing.issue.isNone && (missing.state.account? receiver).map (·.amount) == some oneNear)
+    check r s!"{label} implicit account has the wallet identity (ETH) or none (deterministic)"
+      (match (missing.state.account? receiver) with
+        | some a => a.global.isSome == (label == "ETH") && a.code.isNone
+        | none => false)
+    if label == "ETH" then
+      let legacy := { cfg with wasm := { cfg.wasm with ethImplicitGlobalContract := false } }
+      let legacyMissing := Near.apply legacy World.ap (fun _ => code) submitted.state [] submitted.outgoing
+      check r "legacy ETH wallet creation reports a model issue and rolls back delivery"
+        ((legacyMissing.issue.map (·.2)) ==
+            some (.unsupportedAction "ETH-implicit account creation with the legacy wallet contract") &&
+          (legacyMissing.state.account? receiver).isNone && legacyMissing.state.nextId == submitted.state.nextId &&
+          legacyMissing.outcomes.isEmpty && legacyMissing.outgoing.isEmpty && legacyMissing.tokensBurnt == 0)
     let present := genesis.setAccount receiver (genesisAccount oneNear)
     let sent := Near.apply cfg World.ap (fun _ => code) present [tx] []
     let applied := Near.apply cfg World.ap (fun _ => code) sent.state [] sent.outgoing

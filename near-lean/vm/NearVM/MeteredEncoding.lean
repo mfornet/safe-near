@@ -77,10 +77,29 @@ theorem preInvokeError_creationAccount_valid (name : String) (st : HostStore Nea
   · simp [hg, creationAccountError, creationAccountArgs]
   by_cases hga : name = "promise_batch_action_use_global_contract_by_account_id"
   · simp [hga, creationAccountError, creationAccountArgs]
+  by_cases hd1 : name = "promise_batch_action_deploy_global_contract"
+  · simp [hd1, creationAccountError, creationAccountArgs]
+  by_cases hd2 : name = "promise_batch_action_deploy_global_contract_by_account_id"
+  · simp [hd2, creationAccountError, creationAccountArgs]
+  by_cases hk1 : name = "promise_batch_action_transfer_to_gas_key"
+  · simp [hk1, creationAccountError, creationAccountArgs]
+  by_cases hk2 : name = "promise_batch_action_add_gas_key_with_full_access"
+  · simp [hk2, creationAccountError, creationAccountArgs]
+  by_cases hk3 : name = "promise_batch_action_add_gas_key_with_function_call"
+  · simp [hk3, creationAccountError, creationAccountArgs]
+  by_cases hy1 : name = "promise_yield_create"
+  · simp [hy1, creationAccountError, creationAccountArgs]
+  by_cases hy2 : name = "promise_yield_resume"
+  · simp [hy2, creationAccountError, creationAccountArgs]
   have hgi : globalContractInputs? name = none := by
     simp [globalContractInputs?, beq_eq_false_iff_ne.mpr hg, beq_eq_false_iff_ne.mpr hga]
-  simp only [invocationArgumentError, hs, beq_eq_false_iff_ne.mpr hj,
-    beq_eq_false_iff_ne.mpr ht, beq_eq_false_iff_ne.mpr hk, Bool.false_eq_true, ite_false, hgi] at hi
+  have hinv : invocationArgumentError name st args = creationPrefixError name st args := by
+    simp only [invocationArgumentError, hs, beq_eq_false_iff_ne.mpr hj,
+      beq_eq_false_iff_ne.mpr ht, beq_eq_false_iff_ne.mpr hk, Bool.false_eq_true, ite_false, hgi,
+      beq_eq_false_iff_ne.mpr hd1, beq_eq_false_iff_ne.mpr hd2, beq_eq_false_iff_ne.mpr hk1,
+      beq_eq_false_iff_ne.mpr hk2, beq_eq_false_iff_ne.mpr hk3, beq_eq_false_iff_ne.mpr hy1,
+      beq_eq_false_iff_ne.mpr hy2, Bool.or_false]
+  rw [hinv] at hi
   cases he : creationAccountError name st args with
   | none => rfl
   | some error => simp [creationPrefixError, he] at hi
@@ -229,7 +248,7 @@ theorem promiseBatchActionFunctionCallFn_validated_encoding :
     | trivial
     | (apply appendPromiseActionResult_encoding _ _ _ _ h
        apply readFunctionCallAction_encoding _ _ _ _ _ _ _ _ _ _ hpolicy hmethod ?_ (by assumption)
-       simp [actionMethodBytes?, functionCallInputs?, functionCallInputs, argU64])
+       simp [actionMethodBytes?, usesKeyMethodFields, functionCallInputs?, functionCallInputs, argU64])
     | split)
 
 /-- The batch function-call host obtains its new method witness from the
@@ -243,7 +262,7 @@ theorem promiseBatchActionFunctionCallWeightFn_validated_encoding :
     | trivial
     | (apply appendPromiseActionResult_encoding _ _ _ _ h
        apply readFunctionCallAction_encoding _ _ _ _ _ _ _ _ _ _ hpolicy hmethod ?_ (by assumption)
-       simp [actionMethodBytes?, functionCallInputs?, functionCallInputs, argU64])
+       simp [actionMethodBytes?, usesKeyMethodFields, functionCallInputs?, functionCallInputs, argU64])
     | split)
 
 /-- The access-key host obtains per-field CSV witnesses from the actual
@@ -252,6 +271,21 @@ theorem promiseBatchActionAddKeyWithFunctionCallFn_validated_encoding :
     HostValidatedEncoding "promise_batch_action_add_key_with_function_call" promiseBatchActionAddKeyWithFunctionCallFn := by
   intro st args h hpolicy _ hmethod
   unfold promiseBatchActionAddKeyWithFunctionCallFn
+  dsimp only [disallowInView, checkAccountId, checkPublicKey]
+  repeat' (first
+    | trivial
+    | (apply appendPromiseActionResult_encoding _ _ _ _ h
+       apply actionMethodEncodingError_none_key_fields _ _ _ hpolicy ?_ hmethod
+       simpa only [actionMethodBytes?, argU64, List.getElem?_cons_zero, List.getElem?_cons_succ,
+         Option.getD_some] using (by assumption))
+    | split)
+
+/-- The access-key host obtains per-field CSV witnesses from the actual
+external guard, retaining multibyte names and the empty unrestricted CSV case. -/
+theorem promiseBatchActionAddGasKeyWithFunctionCallFn_validated_encoding :
+    HostValidatedEncoding "promise_batch_action_add_gas_key_with_function_call" promiseBatchActionAddGasKeyWithFunctionCallFn := by
+  intro st args h hpolicy _ hmethod
+  unfold promiseBatchActionAddGasKeyWithFunctionCallFn
   dsimp only [disallowInView, checkAccountId, checkPublicKey]
   repeat' (first
     | trivial
@@ -303,10 +337,45 @@ theorem meteredActionFunctionCallWeight_success_encoding (extra : Nat) (st : Hos
   metered_success_encoding extra "promise_batch_action_function_call" promiseBatchActionFunctionCallWeightFn
     promiseBatchActionFunctionCallWeightFn_validated_encoding st args values after h hpolicy hreturn
 
+theorem promiseYieldCreateFn_validated_encoding :
+    HostValidatedEncoding "promise_yield_create" promiseYieldCreateFn := by
+  intro st args h hpolicy _ hmethod
+  unfold promiseYieldCreateFn
+  dsimp only [disallowInView]
+  repeat' (first | trivial | split)
+  all_goals
+    have hs := checkedSetRegister_promises ‹checkedSetRegister? _ _ _ = _›
+    simp [actionMethodEncodingError, actionMethodBytes?, argU64, usesKeyMethodFields, *] at hmethod
+    simp only [HostResult.LiveSatisfies, appendPromise]
+    intro p hp
+    rcases List.mem_append.mp hp with hp | hp
+    · exact h p (hs ▸ hp)
+    · have := List.mem_singleton.mp hp
+      subst this
+      refine ⟨?_, ?_⟩
+      · simp_all [Option.isNone_iff_eq_none, Option.isSome_iff_ne_none]
+      · intro a ha
+        have := List.mem_singleton.mp ha
+        subst this
+        simpa [ActionMethodsUtf8, Option.isSome_iff_ne_none] using hmethod
+
+theorem meteredYieldCreate_success_encoding (extra : Nat) (st : HostStore NearState) (args values : List Value)
+    (after : HostStore NearState) (h : PromisesEncoding st.host.promises)
+    (hpolicy : st.host.config.validateActionMethodUtf8 = true)
+    (hreturn : (metered extra "promise_yield_create" promiseYieldCreateFn).invoke st args = .Return values after) :
+    PromisesEncoding after.host.promises :=
+  metered_success_encoding extra "promise_yield_create" promiseYieldCreateFn
+    promiseYieldCreateFn_validated_encoding st args values after h hpolicy hreturn
+
 theorem promiseBatchActionTransferFn_validated_encoding :
     HostValidatedEncoding "promise_batch_action_transfer" promiseBatchActionTransferFn := by
   intro st args h _ _ _
   exact promiseBatchActionTransferFn_preserves_encoding st args h
+
+theorem promiseBatchActionTransferToGasKeyFn_validated_encoding :
+    HostValidatedEncoding "promise_batch_action_transfer_to_gas_key" promiseBatchActionTransferToGasKeyFn := by
+  intro st args h _ _ _
+  exact promiseBatchActionTransferToGasKeyFn_preserves_encoding st args h
 
 theorem meteredActionTransfer_success_encoding (extra : Nat) (st : HostStore NearState) (args values : List Value)
     (after : HostStore NearState) (h : PromisesEncoding st.host.promises)
@@ -315,6 +384,14 @@ theorem meteredActionTransfer_success_encoding (extra : Nat) (st : HostStore Nea
     PromisesEncoding after.host.promises :=
   metered_success_encoding extra "promise_batch_action_transfer" promiseBatchActionTransferFn
     promiseBatchActionTransferFn_validated_encoding st args values after h hpolicy hreturn
+
+theorem meteredActionTransferToGasKey_success_encoding (extra : Nat) (st : HostStore NearState) (args values : List Value)
+    (after : HostStore NearState) (h : PromisesEncoding st.host.promises)
+    (hpolicy : st.host.config.validateActionMethodUtf8 = true)
+    (hreturn : (metered extra "promise_batch_action_transfer_to_gas_key" promiseBatchActionTransferToGasKeyFn).invoke st args = .Return values after) :
+    PromisesEncoding after.host.promises :=
+  metered_success_encoding extra "promise_batch_action_transfer_to_gas_key" promiseBatchActionTransferToGasKeyFn
+    promiseBatchActionTransferToGasKeyFn_validated_encoding st args values after h hpolicy hreturn
 
 theorem promiseBatchActionStakeFn_validated_encoding :
     HostValidatedEncoding "promise_batch_action_stake" promiseBatchActionStakeFn := by
@@ -334,6 +411,11 @@ theorem promiseBatchActionAddKeyWithFullAccessFn_validated_encoding :
   intro st args h _ _ _
   exact promiseBatchActionAddKeyWithFullAccessFn_preserves_encoding st args h
 
+theorem promiseBatchActionAddGasKeyWithFullAccessFn_validated_encoding :
+    HostValidatedEncoding "promise_batch_action_add_gas_key_with_full_access" promiseBatchActionAddGasKeyWithFullAccessFn := by
+  intro st args h _ _ _
+  exact promiseBatchActionAddGasKeyWithFullAccessFn_preserves_encoding st args h
+
 theorem meteredActionAddKeyWithFullAccess_success_encoding (extra : Nat) (st : HostStore NearState) (args values : List Value)
     (after : HostStore NearState) (h : PromisesEncoding st.host.promises)
     (hpolicy : st.host.config.validateActionMethodUtf8 = true)
@@ -342,6 +424,14 @@ theorem meteredActionAddKeyWithFullAccess_success_encoding (extra : Nat) (st : H
   metered_success_encoding extra "promise_batch_action_add_key_with_full_access" promiseBatchActionAddKeyWithFullAccessFn
     promiseBatchActionAddKeyWithFullAccessFn_validated_encoding st args values after h hpolicy hreturn
 
+theorem meteredActionAddGasKeyWithFullAccess_success_encoding (extra : Nat) (st : HostStore NearState) (args values : List Value)
+    (after : HostStore NearState) (h : PromisesEncoding st.host.promises)
+    (hpolicy : st.host.config.validateActionMethodUtf8 = true)
+    (hreturn : (metered extra "promise_batch_action_add_gas_key_with_full_access" promiseBatchActionAddGasKeyWithFullAccessFn).invoke st args = .Return values after) :
+    PromisesEncoding after.host.promises :=
+  metered_success_encoding extra "promise_batch_action_add_gas_key_with_full_access" promiseBatchActionAddGasKeyWithFullAccessFn
+    promiseBatchActionAddGasKeyWithFullAccessFn_validated_encoding st args values after h hpolicy hreturn
+
 theorem meteredActionAddKeyWithFunctionCall_success_encoding (extra : Nat) (st : HostStore NearState) (args values : List Value)
     (after : HostStore NearState) (h : PromisesEncoding st.host.promises)
     (hpolicy : st.host.config.validateActionMethodUtf8 = true)
@@ -349,6 +439,14 @@ theorem meteredActionAddKeyWithFunctionCall_success_encoding (extra : Nat) (st :
     PromisesEncoding after.host.promises :=
   metered_success_encoding extra "promise_batch_action_add_key_with_function_call" promiseBatchActionAddKeyWithFunctionCallFn
     promiseBatchActionAddKeyWithFunctionCallFn_validated_encoding st args values after h hpolicy hreturn
+
+theorem meteredActionAddGasKeyWithFunctionCall_success_encoding (extra : Nat) (st : HostStore NearState) (args values : List Value)
+    (after : HostStore NearState) (h : PromisesEncoding st.host.promises)
+    (hpolicy : st.host.config.validateActionMethodUtf8 = true)
+    (hreturn : (metered extra "promise_batch_action_add_gas_key_with_function_call" promiseBatchActionAddGasKeyWithFunctionCallFn).invoke st args = .Return values after) :
+    PromisesEncoding after.host.promises :=
+  metered_success_encoding extra "promise_batch_action_add_gas_key_with_function_call" promiseBatchActionAddGasKeyWithFunctionCallFn
+    promiseBatchActionAddGasKeyWithFunctionCallFn_validated_encoding st args values after h hpolicy hreturn
 
 theorem promiseBatchActionDeleteKeyFn_validated_encoding :
     HostValidatedEncoding "promise_batch_action_delete_key" promiseBatchActionDeleteKeyFn := by
@@ -373,10 +471,20 @@ theorem promiseBatchActionUseGlobalContractFn_validated_encoding :
   intro st args h _ _ _
   exact promiseBatchActionUseGlobalContractFn_preserves_encoding st args h
 
+theorem promiseBatchActionDeployGlobalContractFn_validated_encoding :
+    HostValidatedEncoding "promise_batch_action_deploy_global_contract" promiseBatchActionDeployGlobalContractFn := by
+  intro st args h _ _ _
+  exact promiseBatchActionDeployGlobalContractFn_preserves_encoding st args h
+
 theorem promiseBatchActionUseGlobalContractByAccountIdFn_validated_encoding :
     HostValidatedEncoding "promise_batch_action_use_global_contract_by_account_id" promiseBatchActionUseGlobalContractByAccountIdFn := by
   intro st args h _ _ _
   exact promiseBatchActionUseGlobalContractByAccountIdFn_preserves_encoding st args h
+
+theorem promiseBatchActionDeployGlobalContractByAccountIdFn_validated_encoding :
+    HostValidatedEncoding "promise_batch_action_deploy_global_contract_by_account_id" promiseBatchActionDeployGlobalContractByAccountIdFn := by
+  intro st args h _ _ _
+  exact promiseBatchActionDeployGlobalContractByAccountIdFn_preserves_encoding st args h
 
 theorem meteredActionDeleteAccount_success_encoding (extra : Nat) (st : HostStore NearState) (args values : List Value)
     (after : HostStore NearState) (h : PromisesEncoding st.host.promises)
@@ -394,6 +502,14 @@ theorem meteredActionUseGlobalContract_success_encoding (extra : Nat) (st : Host
   metered_success_encoding extra "promise_batch_action_use_global_contract" promiseBatchActionUseGlobalContractFn
     promiseBatchActionUseGlobalContractFn_validated_encoding st args values after h hpolicy hreturn
 
+theorem meteredActionDeployGlobalContract_success_encoding (extra : Nat) (st : HostStore NearState) (args values : List Value)
+    (after : HostStore NearState) (h : PromisesEncoding st.host.promises)
+    (hpolicy : st.host.config.validateActionMethodUtf8 = true)
+    (hreturn : (metered extra "promise_batch_action_deploy_global_contract" promiseBatchActionDeployGlobalContractFn).invoke st args = .Return values after) :
+    PromisesEncoding after.host.promises :=
+  metered_success_encoding extra "promise_batch_action_deploy_global_contract" promiseBatchActionDeployGlobalContractFn
+    promiseBatchActionDeployGlobalContractFn_validated_encoding st args values after h hpolicy hreturn
+
 theorem meteredActionUseGlobalContractByAccountId_success_encoding (extra : Nat) (st : HostStore NearState) (args values : List Value)
     (after : HostStore NearState) (h : PromisesEncoding st.host.promises)
     (hpolicy : st.host.config.validateActionMethodUtf8 = true)
@@ -401,5 +517,16 @@ theorem meteredActionUseGlobalContractByAccountId_success_encoding (extra : Nat)
     PromisesEncoding after.host.promises :=
   metered_success_encoding extra "promise_batch_action_use_global_contract_by_account_id" promiseBatchActionUseGlobalContractByAccountIdFn
     promiseBatchActionUseGlobalContractByAccountIdFn_validated_encoding st args values after h hpolicy hreturn
+
+
+
+
+theorem meteredActionDeployGlobalContractByAccountId_success_encoding (extra : Nat) (st : HostStore NearState) (args values : List Value)
+    (after : HostStore NearState) (h : PromisesEncoding st.host.promises)
+    (hpolicy : st.host.config.validateActionMethodUtf8 = true)
+    (hreturn : (metered extra "promise_batch_action_deploy_global_contract_by_account_id" promiseBatchActionDeployGlobalContractByAccountIdFn).invoke st args = .Return values after) :
+    PromisesEncoding after.host.promises :=
+  metered_success_encoding extra "promise_batch_action_deploy_global_contract_by_account_id" promiseBatchActionDeployGlobalContractByAccountIdFn
+    promiseBatchActionDeployGlobalContractByAccountIdFn_validated_encoding st args values after h hpolicy hreturn
 
 end Wasm.Near

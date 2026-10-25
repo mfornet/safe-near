@@ -1,4 +1,6 @@
 import NearVM.State
+import NearVM.CryptoHost
+import NearVM.LogRead
 
 /-!
 # NEAR host-function registry (`nearEnv`)
@@ -16,9 +18,10 @@ of imports is resolved by name/signature into the right positional order.
 
 ## Incremental strategy
 
-This functional host permits injected cryptographic and validator operations
-through `NearState`. Their defaults are placeholders, not NEAR semantics.
-`NearVM.run` uses the metered table, which explicitly rejects these operations
+The cryptographic host functions take their primitives from `NearState.crypto`
+(`HostCrypto`) and are reported as unsupported without it; the validator operations are
+injected through `NearState` and their defaults are placeholders, not NEAR semantics.
+`NearVM.run` uses the metered table, which explicitly rejects the validator operations
 and the unimplemented yield lifecycle on invocation. Use that entry point for
 runtime execution. This table alone does not account for gas or schedule
 promises; those responsibilities belong to the metered VM and receipt runtime.
@@ -34,10 +37,6 @@ namespace Near
 `2^128 - 1` are truncated modulo `2^128`, matching fixed-width writes. -/
 def leU128Bytes (n : Nat) : List UInt8 :=
   (List.range 16).map (fun i => UInt8.ofNat (n / 2 ^ (8 * i) % 256))
-
-def leBytesToNat : List UInt8 → Nat
-  | [] => 0
-  | b :: bs => b.toNat + 256 * leBytesToNat bs
 
 def readMemNat (st : HostStore NearState) (ptr : UInt64) (len : Nat) : Option Nat :=
   if ptr.toNat + len > memBytes st then
@@ -119,15 +118,16 @@ def disallowInView (name : String) (hf : NearHostFn NearState) : NearHostFn Near
       else
         hf.invoke st args }
 
-/-- Append a log payload. The reference model stores log data as raw bytes:
-`log_utf8`/`log_utf16` names describe the guest ABI, but UTF decoding is not
-part of functional correctness here. Optional config limits model the
-nearcore-style log length/count traps when proofs opt into them. -/
-def appendLogResult (name : String) (st : HostStore NearState)
-    (msg : List UInt8) : HostResult NearState :=
-  checkDataLimit name "log" st.host.config.maxLogLen msg.length st <| fun _ =>
-  checkDataLimit name "log count" st.host.config.maxNumberLogs (st.host.logs.length + 1) st <| fun _ =>
-    .Return [] { st with host := { st.host with logs := st.host.logs ++ [msg] } }
+/-- Append a decoded log message (UTF-8 bytes, from `NearVM.LogRead`), or fail with the error that
+read it: `BadUTF8`, `BadUTF16`, `TotalLogLengthExceeded`, `NumberOfLogsExceeded`, a memory
+violation. The `log_utf8`/`log_utf16` string reading, its limits and its gas live in `LogRead`, which
+follows nearcore's `get_utf8_string`/`get_utf16_string`/`checked_push_log`. Log limits apply when
+the configuration sets them (`maxLogLen` is `max_total_log_length`, over all messages). -/
+def appendLogResult (st : HostStore NearState) (r : Except HostError (List UInt8)) :
+    HostResult NearState :=
+  match r with
+  | .ok msg => .Return [] { st with host := { st.host with logs := st.host.logs ++ [msg] } }
+  | .error e => .Trap { st with host := { st.host with lastError := some e } } e.message
 
 def getPromise? : List NearPromise → Nat → Option NearPromise
   | [], _ => none
@@ -158,12 +158,15 @@ def appendPromiseAction? (ps : List NearPromise) (idx : Nat)
     setPromise? ps idx (.batch accountId (actions ++ [action]))
   | some (.callback base accountId actions) =>
     setPromise? ps idx (.callback base accountId (actions ++ [action]))
+  | some (.yielded accountId actions dataId) =>
+    setPromise? ps idx (.yielded accountId (actions ++ [action]) dataId)
   | _ => none
 
 /-- Number of actions already in promise `idx`: the index of the next one. -/
 def nextActionIndex (ps : List NearPromise) (idx : Nat) : Nat :=
   match getPromise? ps idx with
-  | some (.batch _ actions) | some (.callback _ _ actions) => actions.length
+  | some (.batch _ actions) | some (.callback _ _ actions) | some (.yielded _ actions _) =>
+    actions.length
   | _ => 0
 
 /-- nearcore's receipt manager records a gas weight only when it is positive. -/
@@ -189,7 +192,7 @@ def appendPromiseActionResult (_name : String) (st : HostStore NearState)
 
 def promiseYieldDataIdExists (dataId : List UInt8) : List NearPromise → Bool
   | [] => false
-  | (.yielded _ _ _ _ existing) :: ps => existing == dataId || promiseYieldDataIdExists dataId ps
+  | (.yielded _ _ existing) :: ps => existing == dataId || promiseYieldDataIdExists dataId ps
   | _ :: ps => promiseYieldDataIdExists dataId ps
 
 def readU64Array (st : HostStore NearState) (ptr : UInt64) : Nat → Option (List Nat)
@@ -472,6 +475,25 @@ def promiseBatchActionDeleteAccountFn : NearHostFn NearState :=
         | none => .Trap st "promise_batch_action_delete_account: invalid beneficiary"
       | _ => .Trap st "promise_batch_action_delete_account: bad args" }
 
+/-- Little-endian bytes of a `u64`. -/
+def leU64Bytes (n : Nat) : List UInt8 :=
+  (List.range 8).map (fun i => UInt8.ofNat (n / 2 ^ (8 * i) % 256))
+
+/-- `RuntimeExt::generate_data_id`: the next data id of this action is the hash of the
+action hash, the block height and the count of data ids generated so far. -/
+def nextDataIdOf (ns : NearState) : List UInt8 :=
+  _root_.Near.Sha256.hash (ns.actionHash ++ leU64Bytes ns.context.blockIndex.toNat
+    ++ leU64Bytes (promiseDataCount ns.promises).1)
+
+/-- Native data ids are 32 bytes. -/
+def dataIdLength : Nat := 32
+
+/-- `promise_yield_create(method_name_len, method_name_ptr, arguments_len, arguments_ptr,
+gas, gas_weight, register_id) -> promise_index`: a new receipt to the current account whose
+function call waits for a data id, which is written to `register_id`. The charges, the empty
+method name and the promise limit are checked by the metered layer.
+nearcore divergence: the executing account id must be valid UTF-8 and the call traps otherwise,
+which keeps the encoding of the yielded receipt total; nearcore never meets such an id. -/
 def promiseYieldCreateFn : NearHostFn NearState :=
   disallowInView "promise_yield_create" <|
   { params := [.i64, .i64, .i64, .i64, .i64, .i64, .i64], results := [.i64]
@@ -480,29 +502,123 @@ def promiseYieldCreateFn : NearHostFn NearState :=
           .i64 gas, .i64 weight, .i64 regId] =>
         match getMemOrReg st methodNamePtr methodNameLen, getMemOrReg st argsPtr argsLen with
         | some methodName, some callArgs =>
-          let dataId := st.host.yieldCreateToken methodName callArgs gas weight
+          let dataId := nextDataIdOf st.host
+          -- The receiver is the executing account, whose id the protocol keeps valid UTF-8;
+          -- checking it keeps the receipt encoding total.
+          if (String.fromUTF8? ⟨st.host.context.currentAccountId.toArray⟩).isNone then
+            .Trap st "promise_yield_create: invalid current account"
+          else
           match checkedSetRegister? st regId dataId with
           | some st' =>
             let idx := nextPromiseIdx st'
-            .Return [.i64 idx] (appendPromise st' (.yielded methodName callArgs gas weight dataId))
+            let promise : NearPromise :=
+              .yielded st.host.context.currentAccountId [.functionCall methodName callArgs 0 gas] dataId
+            let st'' := appendPromise st' promise
+            .Return [.i64 idx] { st'' with host := { st''.host with
+              gasWeights := addGasWeight st''.host.gasWeights idx.toNat 0 weight } }
           | none => .Trap st "promise_yield_create: register size exceeded"
         | _, _ => .Trap st "promise_yield_create: invalid input"
       | _ => .Trap st "promise_yield_create: bad args" }
 
+/-- `promise_yield_resume(data_id_len, data_id_ptr, payload_len, payload_ptr) -> u32`:
+1 and a resume receipt when the data id names a yield with a stored receipt or status
+(or created earlier in this call), 0 otherwise. The payload limit and the data id width
+are checked by the metered layer. -/
 def promiseYieldResumeFn : NearHostFn NearState :=
   disallowInView "promise_yield_resume" <|
-  { params := [.i64, .i64, .i64, .i64], results := [.i64]
+  { params := [.i64, .i64, .i64, .i64], results := [.i32]
     invoke := fun st args => match args with
       | [.i64 dataIdLen, .i64 dataIdPtr, .i64 payloadLen, .i64 payloadPtr] =>
         match getMemOrReg st dataIdPtr dataIdLen, getMemOrReg st payloadPtr payloadLen with
         | some dataId, some payload =>
-          if promiseYieldDataIdExists dataId st.host.promises then
-            .Return [.i64 1]
+          if st.host.existingYields.contains dataId || promiseYieldDataIdExists dataId st.host.promises then
+            .Return [.i32 1]
               { st with host := { st.host with yieldResumes := st.host.yieldResumes ++ [(dataId, payload)] } }
           else
-            .Return [.i64 0] st
+            .Return [.i32 0] st
         | _, _ => .Trap st "promise_yield_resume: invalid input"
       | _ => .Trap st "promise_yield_resume: bad args" }
+
+/-- `promise_batch_action_transfer_to_gas_key(promise_idx, public_key_len, public_key_ptr,
+amount_ptr)`. -/
+def promiseBatchActionTransferToGasKeyFn : NearHostFn NearState :=
+  disallowInView "promise_batch_action_transfer_to_gas_key" <|
+  { params := [.i64, .i64, .i64, .i64], results := []
+    invoke := fun st args => match args with
+      | [.i64 promiseIdx, .i64 pkLen, .i64 pkPtr, .i64 amountPtr] =>
+        match getMemOrReg st pkPtr pkLen, readU128Mem st amountPtr with
+        | some pk, some amount =>
+          checkPublicKey "promise_batch_action_transfer_to_gas_key" st pk <| fun _ =>
+            appendPromiseActionResult "promise_batch_action_transfer_to_gas_key" st promiseIdx
+              (.transferToGasKey pk amount)
+        | _, _ => .Trap st "promise_batch_action_transfer_to_gas_key: invalid input"
+      | _ => .Trap st "promise_batch_action_transfer_to_gas_key: bad args" }
+
+/-- `promise_batch_action_add_gas_key_with_full_access(promise_idx, public_key_len,
+public_key_ptr, num_nonces)`; the key starts with balance zero and nonce zero. -/
+def promiseBatchActionAddGasKeyWithFullAccessFn : NearHostFn NearState :=
+  disallowInView "promise_batch_action_add_gas_key_with_full_access" <|
+  { params := [.i64, .i64, .i64, .i64], results := []
+    invoke := fun st args => match args with
+      | [.i64 promiseIdx, .i64 pkLen, .i64 pkPtr, .i64 numNonces] =>
+        match getMemOrReg st pkPtr pkLen with
+        | some pk =>
+          checkPublicKey "promise_batch_action_add_gas_key_with_full_access" st pk <| fun _ =>
+            appendPromiseActionResult "promise_batch_action_add_gas_key_with_full_access" st promiseIdx
+              (.addKey pk 0 (.gasKeyFullAccess numNonces.toNat))
+        | none => .Trap st "promise_batch_action_add_gas_key_with_full_access: invalid public key"
+      | _ => .Trap st "promise_batch_action_add_gas_key_with_full_access: bad args" }
+
+/-- `promise_batch_action_add_gas_key_with_function_call`: as the ordinary function-call key
+with `num_nonces` nonce lanes in place of the nonce argument. -/
+def promiseBatchActionAddGasKeyWithFunctionCallFn : NearHostFn NearState :=
+  disallowInView "promise_batch_action_add_gas_key_with_function_call" <|
+  { params := [.i64, .i64, .i64, .i64, .i64, .i64, .i64, .i64, .i64], results := []
+    invoke := fun st args => match args with
+      | [.i64 promiseIdx, .i64 pkLen, .i64 pkPtr, .i64 numNonces, .i64 allowancePtr,
+          .i64 receiverLen, .i64 receiverPtr, .i64 methodsLen, .i64 methodsPtr] =>
+        match getMemOrReg st pkPtr pkLen, readU128Mem st allowancePtr,
+            getMemOrReg st receiverPtr receiverLen, getMemOrReg st methodsPtr methodsLen with
+        | some pk, some allowance, some receiverId, some methodNames =>
+          checkPublicKey "promise_batch_action_add_gas_key_with_function_call" st pk <| fun _ =>
+          checkAccountId "promise_batch_action_add_gas_key_with_function_call" st receiverId <| fun _ =>
+            if methodNamesValid methodNames then
+              appendPromiseActionResult "promise_batch_action_add_gas_key_with_function_call" st promiseIdx
+                (.addKey pk 0 (.gasKeyFunctionCall numNonces.toNat (functionCallAllowance allowance)
+                  receiverId methodNames))
+            else
+              .Trap { st with host := { st.host with lastError := some .emptyMethodName } } HostError.emptyMethodName.message
+        | _, _, _, _ => .Trap st "promise_batch_action_add_gas_key_with_function_call: invalid input"
+      | _ => .Trap st "promise_batch_action_add_gas_key_with_function_call: bad args" }
+
+/-- `promise_batch_action_deploy_global_contract{,_by_account_id}(promise_idx, code_len,
+code_ptr)`. The code size limit and the fees precede the call in the metered layer. -/
+def deployGlobalContractFn (name : String) (mode : GlobalContractDeployMode) : NearHostFn NearState :=
+  disallowInView name <|
+  { params := [.i64, .i64, .i64], results := []
+    invoke := fun st args => match args with
+      | [.i64 promiseIdx, .i64 len, .i64 ptr] =>
+        match getMemOrReg st ptr len with
+        | some code => appendPromiseActionResult name st promiseIdx (.deployGlobalContract code mode)
+        | none => .Trap st s!"{name}: invalid input"
+      | _ => .Trap st s!"{name}: bad args" }
+
+def promiseBatchActionDeployGlobalContractFn : NearHostFn NearState :=
+  deployGlobalContractFn "promise_batch_action_deploy_global_contract" .codeHash
+
+def promiseBatchActionDeployGlobalContractByAccountIdFn : NearHostFn NearState :=
+  deployGlobalContractFn "promise_batch_action_deploy_global_contract_by_account_id" .accountId
+
+def contextRegisterFn (name : String) (select : NearContext → List UInt8) : NearHostFn NearState :=
+  { params := [.i64], results := []
+    invoke := fun st args => match args with
+      | [.i64 regId] =>
+        writeRegisterResult name st regId (select st.host.context)
+      | _ => .Trap st s!"{name}: bad args" }
+
+/-- `chain_id(register_id)`. -/
+def chainIdFn : NearHostFn NearState :=
+  contextRegisterFn "chain_id" (·.chainId)
 
 def accountIdRegisterFn (name : String) (select : NearContext → List UInt8) : NearHostFn NearState :=
   { params := [.i64], results := []
@@ -666,29 +782,42 @@ def validatorStakeFn : NearHostFn NearState :=
 def validatorTotalStakeFn : NearHostFn NearState :=
   contextU128MemFn "validator_total_stake" (·.validatorTotalStake)
 
-/-! ## Crypto and math, modelled as pure host-state hooks -/
+/-! ## Cryptographic host functions -/
 
-def digestFn (name : String) (hash : NearState → List UInt8 → List UInt8) : NearHostFn NearState :=
-  { params := [.i64, .i64, .i64], results := []
-    invoke := fun st args => match args with
-      | [.i64 valueLen, .i64 valuePtr, .i64 regId] =>
-        match getMemOrReg st valuePtr valueLen with
-        | none => .Trap st s!"{name}: invalid input"
-        | some value =>
-          writeRegisterResult name st regId (hash st.host value)
-      | _ => .Trap st s!"{name}: bad args" }
+/-- A cryptographic host function: `cryptoEval` has already validated the arguments and paid for
+them (`Metered`), so this runs the primitive and writes its result. A register write is recorded
+in `registerWrite`, whose gas is charged once it is known. -/
+def cryptoHostFn (name : String) (params results : List ValType) : NearHostFn NearState :=
+  { params, results
+    invoke := fun st args =>
+      match cryptoEval name st args with
+      | none => .Trap st s!"{name}: not a cryptographic host function"
+      | some plan =>
+        match plan.error with
+        | some error =>
+          .Trap { st with host := { st.host with lastError := some error } } error.message
+        | none =>
+        match plan.compute () with
+        | .trap error =>
+          .Trap { st with host := { st.host with lastError := some error } } error.message
+        | .done results none =>
+          .Return results { st with host := { st.host with registerWrite := none } }
+        | .done results (some (register, data)) =>
+          if withinLimit st.host.config.maxRegisterLen data.length then
+            writeRegisterResult name
+              { st with host := { st.host with registerWrite := some data.length } }
+              register data results
+          else
+            .Trap { st with host := { st.host with lastError := some .memoryAccessViolation } }
+              HostError.memoryAccessViolation.message }
 
-def sha256Fn : NearHostFn NearState :=
-  digestFn "sha256" (·.sha256)
+def sha256Fn : NearHostFn NearState := cryptoHostFn "sha256" [.i64, .i64, .i64] []
 
-def keccak256Fn : NearHostFn NearState :=
-  digestFn "keccak256" (·.keccak256)
+def keccak256Fn : NearHostFn NearState := cryptoHostFn "keccak256" [.i64, .i64, .i64] []
 
-def keccak512Fn : NearHostFn NearState :=
-  digestFn "keccak512" (·.keccak512)
+def keccak512Fn : NearHostFn NearState := cryptoHostFn "keccak512" [.i64, .i64, .i64] []
 
-def ripemd160Fn : NearHostFn NearState :=
-  digestFn "ripemd160" (·.ripemd160)
+def ripemd160Fn : NearHostFn NearState := cryptoHostFn "ripemd160" [.i64, .i64, .i64] []
 
 def randomSeedFn : NearHostFn NearState :=
   { params := [.i64], results := []
@@ -698,98 +827,49 @@ def randomSeedFn : NearHostFn NearState :=
       | _ => .Trap st "random_seed: bad args" }
 
 def ecrecoverFn : NearHostFn NearState :=
-  { params := [.i64, .i64, .i64, .i64, .i64, .i64], results := [.i64]
-    invoke := fun st args => match args with
-      | [.i64 hashLen, .i64 hashPtr, .i64 sigLen, .i64 sigPtr, .i64 v, .i64 malleabilityFlag] =>
-        match getMemOrReg st hashPtr hashLen, getMemOrReg st sigPtr sigLen with
-        | some hash, some sig =>
-          match st.host.ecrecover hash sig v (malleabilityFlag != 0) with
-          | some pk =>
-            checkPublicKey "ecrecover" st pk <| fun _ =>
-              writeRegisterResult "ecrecover" st 0 pk [.i64 1]
-          | none => .Return [.i64 0] st
-        | _, _ => .Trap st "ecrecover: invalid input"
-      | _ => .Trap st "ecrecover: bad args" }
+  cryptoHostFn "ecrecover" [.i64, .i64, .i64, .i64, .i64, .i64, .i64] [.i64]
 
 def ed25519VerifyFn : NearHostFn NearState :=
-  { params := [.i64, .i64, .i64, .i64, .i64, .i64], results := [.i64]
-    invoke := fun st args => match args with
-      | [.i64 sigLen, .i64 sigPtr, .i64 msgLen, .i64 msgPtr, .i64 pkLen, .i64 pkPtr] =>
-        match getMemOrReg st sigPtr sigLen, getMemOrReg st msgPtr msgLen, getMemOrReg st pkPtr pkLen with
-        | some sig, some msg, some pk =>
-          checkPublicKey "ed25519_verify" st pk <| fun _ =>
-            .Return [.i64 (if st.host.ed25519Verify sig msg pk then 1 else 0)] st
-        | _, _, _ => .Trap st "ed25519_verify: invalid input"
-      | _ => .Trap st "ed25519_verify: bad args" }
+  cryptoHostFn "ed25519_verify" [.i64, .i64, .i64, .i64, .i64, .i64] [.i64]
 
-def mathRegisterFn (name : String) (op : NearState → List UInt8 → List UInt8) : NearHostFn NearState :=
-  { params := [.i64, .i64, .i64], results := []
-    invoke := fun st args => match args with
-      | [.i64 valueLen, .i64 valuePtr, .i64 regId] =>
-        match getMemOrReg st valuePtr valueLen with
-        | some value => writeRegisterResult name st regId (op st.host value)
-        | none => .Trap st s!"{name}: invalid input"
-      | _ => .Trap st s!"{name}: bad args" }
-
-def mathStatusRegisterFn (name : String)
-    (op : NearState → List UInt8 → UInt64 × List UInt8) : NearHostFn NearState :=
-  { params := [.i64, .i64, .i64], results := [.i64]
-    invoke := fun st args => match args with
-      | [.i64 valueLen, .i64 valuePtr, .i64 regId] =>
-        match getMemOrReg st valuePtr valueLen with
-        | some value =>
-          let (status, out) := op st.host value
-          if status == 0 then
-            writeRegisterResult name st regId out [.i64 status]
-          else
-            .Return [.i64 status] st
-        | none => .Trap st s!"{name}: invalid input"
-      | _ => .Trap st s!"{name}: bad args" }
-
-def mathStatusFn (name : String) (op : NearState → List UInt8 → UInt64) : NearHostFn NearState :=
-  { params := [.i64, .i64], results := [.i64]
-    invoke := fun st args => match args with
-      | [.i64 valueLen, .i64 valuePtr] =>
-        match getMemOrReg st valuePtr valueLen with
-        | some value => .Return [.i64 (op st.host value)] st
-        | none => .Trap st s!"{name}: invalid input"
-      | _ => .Trap st s!"{name}: bad args" }
+def p256VerifyFn : NearHostFn NearState :=
+  cryptoHostFn "p256_verify" [.i64, .i64, .i64, .i64, .i64, .i64] [.i64]
 
 def altBn128G1MultiexpFn : NearHostFn NearState :=
-  mathRegisterFn "alt_bn128_g1_multiexp" (·.altBn128G1Multiexp)
+  cryptoHostFn "alt_bn128_g1_multiexp" [.i64, .i64, .i64] []
 
 def altBn128G1SumFn : NearHostFn NearState :=
-  mathRegisterFn "alt_bn128_g1_sum" (·.altBn128G1Sum)
+  cryptoHostFn "alt_bn128_g1_sum" [.i64, .i64, .i64] []
 
 def altBn128PairingCheckFn : NearHostFn NearState :=
-  mathStatusFn "alt_bn128_pairing_check" (·.altBn128PairingCheck)
+  cryptoHostFn "alt_bn128_pairing_check" [.i64, .i64] [.i64]
 
 def bls12381G1MultiexpFn : NearHostFn NearState :=
-  mathStatusRegisterFn "bls12381_g1_multiexp" (·.bls12381G1Multiexp)
+  cryptoHostFn "bls12381_g1_multiexp" [.i64, .i64, .i64] [.i64]
 
 def bls12381G2MultiexpFn : NearHostFn NearState :=
-  mathStatusRegisterFn "bls12381_g2_multiexp" (·.bls12381G2Multiexp)
+  cryptoHostFn "bls12381_g2_multiexp" [.i64, .i64, .i64] [.i64]
 
 def bls12381MapFpToG1Fn : NearHostFn NearState :=
-  mathStatusRegisterFn "bls12381_map_fp_to_g1" (·.bls12381MapFpToG1)
+  cryptoHostFn "bls12381_map_fp_to_g1" [.i64, .i64, .i64] [.i64]
 
 def bls12381MapFp2ToG2Fn : NearHostFn NearState :=
-  mathStatusRegisterFn "bls12381_map_fp2_to_g2" (·.bls12381MapFp2ToG2)
+  cryptoHostFn "bls12381_map_fp2_to_g2" [.i64, .i64, .i64] [.i64]
 
 def bls12381P1DecompressFn : NearHostFn NearState :=
-  mathStatusRegisterFn "bls12381_p1_decompress" (·.bls12381P1Decompress)
+  cryptoHostFn "bls12381_p1_decompress" [.i64, .i64, .i64] [.i64]
 
 def bls12381P2DecompressFn : NearHostFn NearState :=
-  mathStatusRegisterFn "bls12381_p2_decompress" (·.bls12381P2Decompress)
+  cryptoHostFn "bls12381_p2_decompress" [.i64, .i64, .i64] [.i64]
 
 def bls12381P1SumFn : NearHostFn NearState :=
-  mathStatusRegisterFn "bls12381_p1_sum" (·.bls12381P1Sum)
+  cryptoHostFn "bls12381_p1_sum" [.i64, .i64, .i64] [.i64]
 
 def bls12381P2SumFn : NearHostFn NearState :=
-  mathStatusRegisterFn "bls12381_p2_sum" (·.bls12381P2Sum)
+  cryptoHostFn "bls12381_p2_sum" [.i64, .i64, .i64] [.i64]
 
 def bls12381PairingCheckFn : NearHostFn NearState :=
-  mathStatusFn "bls12381_pairing_check" (·.bls12381PairingCheck)
+  cryptoHostFn "bls12381_pairing_check" [.i64, .i64] [.i64]
 
 /-! ## Deprecated storage iterators -/
 
@@ -965,7 +1045,8 @@ def storageHasKeyFn : NearHostFn NearState :=
 def panicFn : NearHostFn NearState :=
   { invoke := fun st _ => .Trap st "explicit guest panic" }
 
-/-- `panic_utf8(len, ptr)`: always traps (message content not modelled). -/
+/-- `panic_utf8(len, ptr)`: always traps. The metered table replaces it with `panicUtf8Metered`,
+which reads and reports the message. -/
 def panicUtf8Fn : NearHostFn NearState :=
   { params := [.i64, .i64], results := []
     invoke := fun st _ => .Trap st "guest panic (utf8)" }
@@ -973,21 +1054,17 @@ def panicUtf8Fn : NearHostFn NearState :=
 def logUtf8Fn : NearHostFn NearState :=
   { params := [.i64, .i64], results := []
     invoke := fun st args => match args with
-      | [.i64 len, .i64 ptr] =>
-        match getMemOrReg st ptr len with
-        | none => .Trap st "log_utf8: invalid memory"
-        | some msg => appendLogResult "log_utf8" st msg
+      | [.i64 len, .i64 ptr] => appendLogResult st (logUtf8Read st len ptr).result
       | _ => .Trap st "log_utf8: bad args" }
 
 def logUtf16Fn : NearHostFn NearState :=
   { params := [.i64, .i64], results := []
     invoke := fun st args => match args with
-      | [.i64 len, .i64 ptr] =>
-        match getMemOrReg st ptr len with
-        | none => .Trap st "log_utf16: invalid memory"
-        | some msg => appendLogResult "log_utf16" st msg
+      | [.i64 len, .i64 ptr] => appendLogResult st (logUtf16Read st len ptr).result
       | _ => .Trap st "log_utf16: bad args" }
 
+/-- `abort`: always traps. The metered table replaces it with `abortMetered`, which logs the
+message. -/
 def abortFn : NearHostFn NearState :=
   { params := [.i32, .i32, .i32, .i32], results := []
     invoke := fun st _ => .Trap st "guest abort" }
@@ -1083,8 +1160,9 @@ def nearHostFns : List (ImportDecl × NearHostFn NearState) :=
   , (imp "storage_iter_next"      [.i64, .i64, .i64] [.i64], storageIterNextFn)
   , (imp "keccak512"        [.i64, .i64, .i64] [], keccak512Fn)
   , (imp "ripemd160"        [.i64, .i64, .i64] [], ripemd160Fn)
-  , (imp "ecrecover"        [.i64, .i64, .i64, .i64, .i64, .i64] [.i64], ecrecoverFn)
+  , (imp "ecrecover"        [.i64, .i64, .i64, .i64, .i64, .i64, .i64] [.i64], ecrecoverFn)
   , (imp "ed25519_verify"   [.i64, .i64, .i64, .i64, .i64, .i64] [.i64], ed25519VerifyFn)
+  , (imp "p256_verify"      [.i64, .i64, .i64, .i64, .i64, .i64] [.i64], p256VerifyFn)
   , (imp "random_seed"      [.i64] [], randomSeedFn)
   , (imp "alt_bn128_g1_multiexp" [.i64, .i64, .i64] [], altBn128G1MultiexpFn)
   , (imp "alt_bn128_g1_sum" [.i64, .i64, .i64] [], altBn128G1SumFn)
@@ -1124,20 +1202,40 @@ def nearHostFns : List (ImportDecl × NearHostFn NearState) :=
   , (imp "promise_batch_action_delete_account" [.i64, .i64, .i64] [],
       promiseBatchActionDeleteAccountFn)
   , (imp "promise_batch_action_deploy_global_contract" [.i64, .i64, .i64] [],
-      unsupported "promise_batch_action_deploy_global_contract" [.i64, .i64, .i64] [])
+      promiseBatchActionDeployGlobalContractFn)
   , (imp "promise_batch_action_deploy_global_contract_by_account_id" [.i64, .i64, .i64] [],
-      unsupported "promise_batch_action_deploy_global_contract_by_account_id" [.i64, .i64, .i64] [])
+      promiseBatchActionDeployGlobalContractByAccountIdFn)
+
   , (imp "promise_batch_action_use_global_contract" [.i64, .i64, .i64] [],
       promiseBatchActionUseGlobalContractFn)
   , (imp "promise_batch_action_use_global_contract_by_account_id" [.i64, .i64, .i64] [],
       promiseBatchActionUseGlobalContractByAccountIdFn)
   , (imp "promise_yield_create" [.i64, .i64, .i64, .i64, .i64, .i64, .i64] [.i64],
       promiseYieldCreateFn)
-  , (imp "promise_yield_resume" [.i64, .i64, .i64, .i64] [.i64],
+  , (imp "promise_yield_resume" [.i64, .i64, .i64, .i64] [.i32],
       promiseYieldResumeFn)
+
   , (imp "promise_results_count" [] [.i64], promiseResultsCountFn)
   , (imp "promise_result" [.i64, .i64] [.i64], promiseResultFn)
-  , (imp "promise_return" [.i64] [], promiseReturnFn) ]
+  , (imp "promise_return" [.i64] [], promiseReturnFn)
+  , (imp "promise_batch_action_transfer_to_gas_key" [.i64, .i64, .i64, .i64] [],
+      promiseBatchActionTransferToGasKeyFn)
+  , (imp "promise_batch_action_add_gas_key_with_full_access" [.i64, .i64, .i64, .i64] [],
+      promiseBatchActionAddGasKeyWithFullAccessFn)
+  , (imp "promise_batch_action_add_gas_key_with_function_call"
+      [.i64, .i64, .i64, .i64, .i64, .i64, .i64, .i64, .i64] [],
+      promiseBatchActionAddGasKeyWithFunctionCallFn)
+  , (imp "promise_yield_create_with_id"
+      [.i64, .i64, .i64, .i64, .i64, .i64, .i64, .i64, .i64] [.i64],
+      unsupported "promise_yield_create_with_id"
+        [.i64, .i64, .i64, .i64, .i64, .i64, .i64, .i64, .i64] [.i64])
+  , (imp "promise_yield_resume_with_yield_id" [.i64, .i64, .i64, .i64] [.i32],
+      unsupported "promise_yield_resume_with_yield_id" [.i64, .i64, .i64, .i64] [.i32])
+  , (imp "promise_set_refund_to" [.i64, .i64, .i64] [],
+      unsupported "promise_set_refund_to" [.i64, .i64, .i64] [])
+  , (imp "promise_batch_action_state_init_by_account_id" [.i64, .i64, .i64, .i64] [.i64],
+      unsupported "promise_batch_action_state_init_by_account_id" [.i64, .i64, .i64, .i64] [.i64])
+  , (imp "chain_id" [.i64] [], chainIdFn) ]
 
 /-- Import declarations, in canonical order. A NEAR contract module sets
 `imports := nearImports`. -/

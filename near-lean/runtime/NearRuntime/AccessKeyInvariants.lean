@@ -13,6 +13,7 @@ def AccessKeyAuthorizes (tx : Transaction) (key : AccessKey) (cost : Fees.TxCost
     ∃ method args gas, tx.actions = [.functionCall method args gas 0] ∧
       tx.receiverId = receiver ∧ (methods.isEmpty || methods.contains method) = true ∧
       ∀ amount, allowance = some amount → cost.total ≤ amount
+  | .gasKeyFullAccess .. | .gasKeyFunctionCall .. => False
 
 /-- Permission after charging the transaction's gas allowance. Unlimited keys
 remain unlimited; full-access permissions are unchanged. -/
@@ -21,6 +22,7 @@ def chargedPermission (permission : AccessKeyPermission) (cost : Fees.TxCost) : 
   | .fullAccess => .fullAccess
   | .functionCall allowance receiver methods =>
     .functionCall (allowance.map (· - cost.total)) receiver methods
+  | permission => permission
 
 /-- Successful access-key validation both authorizes this transaction and sets
 its nonce. Restricted keys can never authorize an attached deposit. -/
@@ -50,6 +52,7 @@ theorem validateTransactionAccessKey_authorizes (tx : Transaction) (key newKey :
             · cases h
               simp_all [AccessKeyAuthorizes, chargedPermission]
               tauto
-    · simp_all
+    all_goals simp [throw, throwThe, MonadExceptOf.throw] at h
+  all_goals simp [throw, throwThe, MonadExceptOf.throw] at h
 
 end Near

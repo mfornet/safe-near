@@ -88,7 +88,7 @@ theorem finalizeReceipt_freshIds (c : ReceiptCtx) (st : ChainState) (raw : Exec)
     (Fees.receiptGasBudget c.cfg c.receipt.receiverId c.action.actions) base.gasUsed base.gasBurnt
     ((st.account? c.receipt.receiverId).isNone && (base.state.account? c.receipt.receiverId).isSome && failed.isNone)
   let charged := { base with
-    tokensBurnt := if c.receipt.isRefund then 0 else settlement.tokensBurnt
+    tokensBurnt := (if c.receipt.isRefund then 0 else settlement.tokensBurnt) + base.actionTokensBurnt
     otherTokensBurnt := if c.receipt.isRefund && failed.isSome then Fees.totalDeposit c.action.actions else 0 }
   let depositRefund := if failed.isSome then Fees.totalDeposit c.action.actions else 0
   let gasRefund := if c.receipt.isRefund then 0 else settlement.refund
@@ -138,6 +138,22 @@ theorem applyActionReceipt_freshIds (c : ReceiptCtx) (st : ChainState) :
     (applyActionReceipt c st).FreshReceiptIds st.nextId :=
   finalizeReceipt_freshIds c st _ _ (runReceiptActions_freshIds c st) (runReceiptActions_nextId_mono c st)
 
+theorem processDistribution_freshIds (cfg : RuntimeConfig) (ap : ApplyState) (st : ChainState) (r : Receipt)
+    (g : GlobalDistribution) :
+    ReceiptList.FreshIds st.nextId (processDistribution cfg ap st r g).state.nextId
+      (processDistribution cfg ap st r g).receipts := by
+  unfold processDistribution
+  dsimp only
+  repeat' (first
+    | exact ReceiptList.FreshIds.empty _ _
+    | (constructor
+       · simp
+       · intro receipt hm
+         have he := List.mem_singleton.mp hm
+         subst receipt
+         exact ⟨Nat.le_refl _, Nat.lt_succ_self _⟩)
+    | split)
+
 /-- Public receipt outputs are collision-free and newly allocated, without any
 validity, financial-scope, input-bound or successful-execution assumption. -/
 theorem processReceipt_freshIds (cfg : RuntimeConfig) (ap : ApplyState) (decoder : Bytes → ContractCode)
@@ -146,33 +162,127 @@ theorem processReceipt_freshIds (cfg : RuntimeConfig) (ap : ApplyState) (decoder
       (processReceipt cfg ap decoder st receipt).receipts := by
   cases hr : receipt.receipt with
   | action action =>
-    cases he : (action.inputDataIds.filter fun id => !(Assoc.contains st.receivedData id)).isEmpty with
-    | false =>
-      rw [processReceipt_waiting cfg ap decoder st receipt action hr he]
-      exact ReceiptList.FreshIds.empty _ _
-    | true =>
-      rw [processReceipt_ready cfg ap decoder st receipt action hr he]
-      unfold processedOfExec
-      split
-      · exact ReceiptList.FreshIds.empty _ _
-      · exact applyActionReceipt_freshIds (readyActionContext cfg ap decoder st receipt action)
-          (consumeReceiptDataState st action)
-  | data data =>
-    rw [processReceipt_data cfg ap decoder st receipt data hr]
-    cases hroute : Assoc.lookup st.postponedByData data.dataId with
-    | none => exact ReceiptList.FreshIds.empty _ _
-    | some id =>
-      simp only
-      cases hpending : ((Assoc.lookup st.pendingDataCount id).getD 1 - 1 == 0) with
-      | false => simp only [Bool.false_eq_true, ite_false]; exact ReceiptList.FreshIds.empty _ _
+    cases hy : action.yieldDataId with
+    | some dataId =>
+      rw [processReceipt_yield_unfold cfg ap decoder st receipt action dataId hr hy]
+      split <;> exact ReceiptList.FreshIds.empty _ _
+    | none =>
+      cases he : (action.inputDataIds.filter fun id => !(Assoc.contains st.receivedData id)).isEmpty with
+      | false =>
+        rw [processReceipt_waiting cfg ap decoder st receipt action hr hy he]
+        exact ReceiptList.FreshIds.empty _ _
       | true =>
-        simp only [ite_true]
-        cases hwaiting : Assoc.lookup st.postponed id with
+        rw [processReceipt_ready cfg ap decoder st receipt action hr hy he]
+        unfold processedOfExec
+        split
+        · exact ReceiptList.FreshIds.empty _ _
+        · exact applyActionReceipt_freshIds (readyActionContext cfg ap decoder st receipt action)
+            (consumeReceiptDataState st action)
+  | data data =>
+    cases hres : data.resumeDataId with
+    | none =>
+      rw [processReceipt_data cfg ap decoder st receipt data hr hres]
+      cases hroute : Assoc.lookup st.postponedByData data.dataId with
+      | none => exact ReceiptList.FreshIds.empty _ _
+      | some id =>
+        simp only
+        cases hpending : ((Assoc.lookup st.pendingDataCount id).getD 1 - 1 == 0) with
+        | false => simp only [Bool.false_eq_true, ite_false]; exact ReceiptList.FreshIds.empty _ _
+        | true =>
+          simp only [ite_true]
+          cases hwaiting : Assoc.lookup st.postponed id with
+          | none => exact ReceiptList.FreshIds.empty _ _
+          | some waiting =>
+            exact processReceipt_freshIds cfg ap decoder
+              (releasePostponedState (receivePostponedDataState st data) id) waiting
+    | some dataId =>
+      rw [processReceipt_resume cfg ap decoder st receipt data dataId hr hres]
+      by_cases hmoot : (data.data.isNone &&
+          Assoc.lookup st.yieldStatus (receipt.receiverId, dataId) == some YieldStatus.resumeInitiated) = true
+      · simp only [hmoot, ite_true]; exact ReceiptList.FreshIds.empty _ _
+      · simp only [hmoot, Bool.false_eq_true, ite_false]
+        cases hy : Assoc.lookup st.yieldReceipts (receipt.receiverId, dataId) with
         | none => exact ReceiptList.FreshIds.empty _ _
-        | some waiting =>
-          exact processReceipt_freshIds cfg ap decoder
-            (releasePostponedState (receivePostponedDataState st data) id) waiting
+        | some y =>
+          dsimp only
+          cases hyr : y.receipt with
+          | action a =>
+            dsimp only
+            rw [runActionReceipt_eq]
+            unfold processedOfExec
+            split
+            · exact ReceiptList.FreshIds.empty _ _
+            · exact applyActionReceipt_freshIds
+                { cfg, ap, receipt := y, action := a, promiseResults := [data.promiseResult], codeOf := decoder
+                  vmYields := yieldsOf (resumeYieldState st (receipt.receiverId, dataId)) y.receiverId }
+                (resumeYieldState st (receipt.receiverId, dataId))
+          | data _ => dsimp only; exact ReceiptList.FreshIds.empty _ _
+          | globalDistribution _ => dsimp only; exact ReceiptList.FreshIds.empty _ _
+  | globalDistribution g =>
+    rw [processReceipt_distribution cfg ap decoder st receipt g hr]
+    exact processDistribution_freshIds cfg ap st receipt g
 termination_by st.postponed.length
 decreasing_by exact Assoc.erase_length_lt_of_lookup _ _ _ hwaiting
+
+theorem ReceiptList.FreshIds.subperm {lower upper : Nat} {E l : List Receipt}
+    (h : ReceiptList.FreshIds lower upper E) (hl : l.Subperm E) : ReceiptList.FreshIds lower upper l := by
+  constructor
+  · obtain ⟨l', hp, hs⟩ := hl
+    exact (hp.map (·.receiptId)).nodup_iff.mp ((hs.map (·.receiptId)).nodup h.unique)
+  · intro receipt hm
+    exact h.bounds receipt (hl.subset hm)
+
+/-- A receipt and the instant receipts it creates: the non-instant receipts sent out use distinct
+fresh ids from the interval the whole run consumed. -/
+theorem processWithInstants_freshIds (cfg : RuntimeConfig) (ap : ApplyState) (decoder : Bytes → ContractCode)
+    (st : ChainState) (receipt : Receipt) :
+    ReceiptList.FreshIds st.nextId (processWithInstants cfg ap decoder st receipt).state.nextId
+      (processWithInstants cfg ap decoder st receipt).receipts := by
+  have key := processWithInstants_induction cfg ap decoder
+    (fun acc pending => st.nextId ≤ acc.state.nextId ∧ ∃ E : List Receipt,
+      ReceiptList.FreshIds st.nextId acc.state.nextId E ∧ (acc.receipts ++ pending).Subperm E)
+    (fun p => ReceiptList.FreshIds st.nextId p.state.nextId p.receipts)
+    (fun st' _ => st' = st)
+    (by
+      intro acc h
+      obtain ⟨_, E, hE, hs⟩ := h
+      exact hE.subperm (by simpa using hs))
+    (by
+      intro acc pending issue _ h
+      obtain ⟨_, E, hE, hs⟩ := h
+      exact hE.subperm ((List.sublist_append_left _ _).subperm.trans hs))
+    (by
+      intro acc r rest h hs hi
+      obtain ⟨hlow, E, hE, hsub⟩ := h
+      have hn := processReceipt_nextId_mono cfg { ap with storageAccounting := acc.storageAccounting } decoder
+        acc.state r
+      have hf := processReceipt_freshIds cfg { ap with storageAccounting := acc.storageAccounting } decoder acc.state r
+      change st.nextId ≤ (instantStep cfg ap decoder acc r).state.nextId ∧ ∃ E' : List Receipt,
+        ReceiptList.FreshIds st.nextId (instantStep cfg ap decoder acc r).state.nextId E' ∧
+          ((instantAccumulate acc (instantStep cfg ap decoder acc r)).receipts ++
+            (rest ++ (instantStep cfg ap decoder acc r).receipts.filter Receipt.isInstant)).Subperm E'
+      refine ⟨hlow.trans hn, E ++ (instantStep cfg ap decoder acc r).receipts,
+        ReceiptList.FreshIds.append hE hf hlow hn, ?_⟩
+      have hperm : ((instantAccumulate acc (instantStep cfg ap decoder acc r)).receipts ++
+          (rest ++ (instantStep cfg ap decoder acc r).receipts.filter Receipt.isInstant)).Perm
+          ((acc.receipts ++ rest) ++ ((instantStep cfg ap decoder acc r).receipts.filter Receipt.isInstant ++
+            (instantStep cfg ap decoder acc r).receipts.filter fun x => !x.isInstant)) := by
+        simp only [instantAccumulate, Processed.append_receipts, List.append_assoc]
+        refine List.Perm.append_left _ ?_
+        refine (List.perm_append_comm_assoc _ _ _).trans ?_
+        exact List.Perm.append_left _ List.perm_append_comm
+      refine hperm.subperm.trans (List.Subperm.append ?_ ?_)
+      · exact ((List.Sublist.append_left (List.sublist_cons_self r rest) _).subperm).trans hsub
+      · exact (List.filter_append_perm _ _).subperm)
+    (by
+      rintro st' r' rfl hne
+      exact processReceipt_freshIds cfg ap decoder st' r')
+    (by
+      rintro st' r' rfl hi
+      have hn := processReceipt_nextId_mono cfg ap decoder st' r'
+      have hf := processReceipt_freshIds cfg ap decoder st' r'
+      refine ⟨hn, (processReceipt cfg ap decoder st' r').receipts, hf, ?_⟩
+      exact (List.perm_append_comm.trans (List.filter_append_perm Receipt.isInstant _)).subperm)
+  exact key st receipt rfl
 
 end Near

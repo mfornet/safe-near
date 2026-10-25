@@ -14,6 +14,15 @@
   {
    "type": "path",
    "scope": "",
+   "name": "NearCrypto",
+   "manifestFile": "lake-manifest.json",
+   "inherited": false,
+   "dir": "../crypto",
+   "configFile": "lakefile.toml"
+  },
+  {
+   "type": "path",
+   "scope": "",
    "name": "NearVM",
    "manifestFile": "lake-manifest.json",
    "inherited": true,

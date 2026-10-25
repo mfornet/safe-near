@@ -60,7 +60,7 @@ theorem functionKeyPromise_executionGas (cfg : RuntimeConfig) (decoder : Bytes �
     Fees.exec cfg.fees.actionFees cfg.wasm.ethImplicitAccounts receiver action + action.attachedGas =
       actionExecutionGas cfg.fees.actionFees cfg.wasm.ethImplicitAccounts (bytesOfString receiver)
         (.addKey pk nonce (.functionCall allowance keyReceiver methods)) := by
-  simp only [actionOfPromiseRaw, Fees.exec, Action.attachedGas, actionExecutionGas, Nat.add_zero]
+  simp only [actionOfPromiseRaw, Fees.exec, Fees.permissionExec, Action.attachedGas, actionExecutionGas, Nat.add_zero]
   rw [decodeMethodNames_billed_length methods hutf8]
   rfl
 
@@ -68,6 +68,7 @@ theorem functionKeyPromise_executionGas (cfg : RuntimeConfig) (decoder : Bytes �
 def PromiseActionMethodsUtf8 : PromiseAction → Prop
   | .functionCall method .. => (String.fromUTF8? ⟨method.toArray⟩).isSome = true
   | .addKey _ _ (.functionCall _ _ methods) => methodNameFieldsUtf8 methods = true
+  | .addKey _ _ (.gasKeyFunctionCall _ _ _ methods) => methodNameFieldsUtf8 methods = true
   | _ => True
 
 /-- All supported action variants share one gas bridge. The premises concern
@@ -87,13 +88,23 @@ theorem promiseAction_executionGas (cfg : RuntimeConfig) (decoder : Bytes → Co
     | fullAccess => rfl
     | functionCall allowance keyReceiver methods =>
       exact functionKeyPromise_executionGas cfg decoder receiver pk nonce allowance keyReceiver methods h
-  | _ => rfl
+    | gasKeyFullAccess nonces =>
+      simp [actionOfPromiseRaw, Fees.exec, Fees.permissionExec, Action.attachedGas, actionExecutionGas, Nat.add_assoc]
+    | gasKeyFunctionCall nonces allowance keyReceiver methods =>
+      have hm : methodNameFieldsUtf8 methods = true := h
+      simp only [actionOfPromiseRaw, Fees.exec, Fees.permissionExec, Action.attachedGas, actionExecutionGas, Nat.add_zero]
+      rw [decodeMethodNames_billed_length methods hm]
+      simp [methodNamesGasBytes]
+  | _ => first
+    | rfl
+    | simp [actionOfPromiseRaw, Fees.exec, Action.attachedGas, actionExecutionGas, Fees.gasKeyTransferExec]
 
 /-- These action variants have no method-list encoding obligation. Deployment
 uses actual byte length; transfers share the implicit-account fee calculation. -/
 def SimpleGasAction : PromiseAction → Prop
   | .functionCall .. => False
   | .addKey _ _ (.functionCall ..) => False
+  | .addKey _ _ (.gasKeyFunctionCall ..) => False
   | _ => True
 
 theorem simplePromise_executionGas (cfg : RuntimeConfig) (decoder : Bytes → ContractCode)
@@ -103,8 +114,12 @@ theorem simplePromise_executionGas (cfg : RuntimeConfig) (decoder : Bytes → Co
         actionExecutionGas cfg.fees.actionFees cfg.wasm.ethImplicitAccounts (bytesOfString receiver) action := by
   cases action <;> try contradiction
   case addKey pk nonce permission =>
-    cases permission <;> first | rfl | contradiction
-  all_goals rfl
+    cases permission <;> first
+      | contradiction
+      | simp [actionOfPromiseRaw, Fees.exec, Fees.permissionExec, Action.attachedGas, actionExecutionGas, Nat.add_assoc]
+  all_goals first
+    | rfl
+    | simp [actionOfPromiseRaw, Fees.exec, Action.attachedGas, actionExecutionGas, Fees.gasKeyTransferExec]
 
 /-- Summing the action bridge retains every execution/prepaid obligation. -/
 theorem promiseActions_executionGas (cfg : RuntimeConfig) (decoder : Bytes → ContractCode)
@@ -122,6 +137,42 @@ theorem promiseActions_executionGas (cfg : RuntimeConfig) (decoder : Bytes → C
     simp only [Fees.totalExec, Fees.totalPrepaid, List.map_cons, List.sum_cons]
     omega
 
+/-- Converted promise actions are never delegate actions, so they prepay nothing beyond their own fees. -/
+theorem actionOfPromiseRaw_prepaid (cfg : RuntimeConfig) (decoder : Bytes → ContractCode) (receiver : AccountId)
+    (action : PromiseAction) :
+    Fees.prepaidExec cfg.fees.actionFees cfg.wasm.ethImplicitAccounts receiver (actionOfPromiseRaw decoder action) =
+      Fees.exec cfg.fees.actionFees cfg.wasm.ethImplicitAccounts receiver (actionOfPromiseRaw decoder action) ∧
+    Fees.prepaidSend cfg.fees.actionFees cfg.wasm.ethImplicitAccounts (actionOfPromiseRaw decoder action) = 0 := by
+  cases action with
+  | addKey pk nonce permission => cases permission <;> exact ⟨rfl, rfl⟩
+  | _ => exact ⟨rfl, rfl⟩
+
+theorem receiptGasBudget_promise (cfg : RuntimeConfig) (decoder : Bytes → ContractCode) (receiver : AccountId)
+    (actions : List PromiseAction) :
+    Fees.receiptGasBudget cfg receiver (actions.map (actionOfPromiseRaw decoder)) =
+      cfg.fees.actionFees.newActionReceipt.execution +
+        Fees.totalExec cfg.fees.actionFees cfg.wasm.ethImplicitAccounts receiver (actions.map (actionOfPromiseRaw decoder)) +
+        Fees.totalPrepaid (actions.map (actionOfPromiseRaw decoder)) := by
+  have hs : Fees.totalPrepaidSend cfg.fees.actionFees cfg.wasm.ethImplicitAccounts (actions.map (actionOfPromiseRaw decoder)) = 0 := by
+    unfold Fees.totalPrepaidSend
+    rw [List.sum_eq_zero]
+    intro n hn
+    obtain ⟨a, ha, rfl⟩ := List.mem_map.mp hn
+    obtain ⟨b, _, rfl⟩ := List.mem_map.mp ha
+    exact (actionOfPromiseRaw_prepaid cfg decoder receiver b).2
+  have he : ((actions.map (actionOfPromiseRaw decoder)).map
+      (Fees.prepaidExec cfg.fees.actionFees cfg.wasm.ethImplicitAccounts receiver)).sum =
+      Fees.totalExec cfg.fees.actionFees cfg.wasm.ethImplicitAccounts receiver (actions.map (actionOfPromiseRaw decoder)) := by
+    unfold Fees.totalExec
+    congr 1
+    rw [List.map_map, List.map_map]
+    apply List.map_congr_left
+    intro b _
+    exact (actionOfPromiseRaw_prepaid cfg decoder receiver b).1
+  unfold Fees.receiptGasBudget
+  rw [hs, he]
+  omega
+
 /-- The runtime receipt budget and raw VM valuation agree, including the one
 receipt base, once actual action-method decoding is established. -/
 theorem promiseReceipt_gasBudget (cfg : RuntimeConfig) (decoder : Bytes → ContractCode)
@@ -130,7 +181,8 @@ theorem promiseReceipt_gasBudget (cfg : RuntimeConfig) (decoder : Bytes → Cont
     Fees.receiptGasBudget cfg receiver (actions.map (actionOfPromiseRaw decoder)) =
       receiptGasValue cfg.fees.actionFees cfg.wasm.ethImplicitAccounts (bytesOfString receiver) actions := by
   have he := promiseActions_executionGas cfg decoder receiver actions h
-  unfold Fees.receiptGasBudget receiptGasValue
+  rw [receiptGasBudget_promise]
+  unfold receiptGasValue
   omega
 
 /-- Encoding facts required for gas valuation; this is not full action validity. -/
@@ -282,7 +334,7 @@ theorem materialize_checked_run_funds (c : ReceiptCtx) (isLast : Bool) (initial 
       receiptsDeposits (Wasm.Near.run c.cfg code codeSize method ctx storage fuel).receipts +
         ((Wasm.Near.run c.cfg code codeSize method ctx storage fuel).usedGas -
           (Wasm.Near.run c.cfg code codeSize method ctx storage fuel).burntGas) * c.action.gasPrice := by
-  rw [materializeFunctionCall_success c isLast _ initial effects hmaterialized]
+  rw [materializeFunctionCall_success c isLast _ initial effects hmaterialized, functionCallYields_funds]
   exact materialize_run_funds c isLast initial code codeSize method ctx storage fuel hreceiver hsuccess hpolicy
 
 end Near

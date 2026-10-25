@@ -47,6 +47,17 @@ structure VMContext where
   storageReadsFromTrie : Bool := false
   /-- Accounts whose pending receipts wait for this call's result. -/
   outputDataReceivers : List Bytes := []
+  /-- Hash of the executing action (`create_action_hash_from_receipt_id`), from which the
+  data ids of this call derive; empty when the caller supplies no native identity. -/
+  actionHash : Bytes := []
+  /-- Native data ids of the current account's yields that have a receipt or status in state. -/
+  existingYields : List Bytes := []
+  /-- `chain_id` of the epoch provider. -/
+  chainId : Bytes := []
+  /-- `validator_stake`: the stake of an account in the current epoch (0 for a non-validator). -/
+  validatorStake : Bytes → Nat := fun _ => 0
+  /-- `validator_total_stake`: the sum of the current epoch's validator stakes. -/
+  validatorTotalStake : Nat := 0
   deriving Inhabited
 
 /-- Storage keys in byte order: the order the trie iterates them in, and one
@@ -81,7 +92,12 @@ def toNearState (cfg : RuntimeConfig) (ctx : VMContext)
       accountLockedBalance := ctx.accountLockedBalance
       attachedDeposit := ctx.attachedDeposit
       prepaidGas := UInt64.ofNat ctx.prepaidGas
-      usedGas := 0 }
+      usedGas := 0
+      chainId := ctx.chainId
+      validatorStake := ctx.validatorStake
+      validatorTotalStake := ctx.validatorTotalStake }
+    actionHash := ctx.actionHash
+    existingYields := ctx.existingYields
     storage := fun k => (storage.find? (·.1 == k)).map (·.2)
     storageKeys := sortedKeys storage
     storageAccounting := ctx.storageAccounting
@@ -100,8 +116,12 @@ def toNearState (cfg : RuntimeConfig) (ctx : VMContext)
       oneYoctoOnPromise := cfg.wasm.oneYoctoOnPromise
       ethImplicitAccounts := cfg.wasm.ethImplicitAccounts
       maxPromises := some cfg.wasm.limits.maxPromisesPerFunctionCallAction
+      maxContractSize := some cfg.wasm.limits.maxContractSize
+      maxYieldPayloadSize := some cfg.wasm.limits.maxYieldPayloadSize
       validAccountId := if cfg.wasm.limits.accountIdValidityRulesVersion == 2 then validAccountIdBytes
-        else fun _ => true }
+        else fun _ => true
+      blsVersion := if cfg.wasm.bls12381NotInGroupFix then 1 else 0 }
+    crypto := cfg.hostCrypto
     randomSeed := ctx.randomSeed
     gas := { prepaid := ctx.prepaidGas, maxBurnt := maxBurnt }
     extCosts := cfg.wasm.extCosts

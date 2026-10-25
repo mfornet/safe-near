@@ -3,13 +3,14 @@ import NearVM.EncodingHosts
 namespace Wasm.Near
 
 /-- Legacy gas metering changes no encoding field on a live return. -/
-theorem gasFn_encodingInvariant : NearHostFn.PreservesLive EncodingInvariant gasFn := by
+theorem gasFn_encodingInvariant (opCost : Nat) :
+    NearHostFn.PreservesLive EncodingInvariant (gasFn opCost) := by
   intro st args h
   unfold gasFn
   dsimp only
   split
   · rename_i n
-    cases hc : st.host.gas.burn n.toNat with
+    cases hc : st.host.gas.burn (n.toNat * opCost) with
     | mk gas error =>
       cases error with
       | some error => trivial
@@ -26,7 +27,7 @@ theorem meteredHostFns_encodingInvariant
   rcases h with ⟨⟨decl, fn⟩, hin, heq⟩ | heq
   · subst entry
     simp only [nearHostFns, List.mem_cons, List.not_mem_nil, or_false] at hin
-    rcases hin with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
+    rcases hin with h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h | h
     · cases h
       apply meteredNeutral_encodingInvariant
       · exact inputFn_encodingFrame
@@ -76,15 +77,11 @@ theorem meteredHostFns_encodingInvariant
       apply meteredNeutral_encodingInvariant
       · exact logUtf8Fn_encodingFrame
     · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      apply meteredNeutral_encodingInvariant
+      · exact sha256Fn_encodingFrame
     · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      apply meteredNeutral_encodingInvariant
+      · exact keccak256Fn_encodingFrame
     · cases h
       apply meteredNeutral_encodingInvariant
       · exact signerAccountPkFn_encodingFrame
@@ -116,15 +113,11 @@ theorem meteredHostFns_encodingInvariant
       apply meteredNeutral_encodingInvariant
       · exact usedGasFn_encodingFrame
     · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      apply meteredNeutral_encodingInvariant
+      · exact validatorStakeFn_encodingFrame
     · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      apply meteredNeutral_encodingInvariant
+      · exact validatorTotalStakeFn_encodingFrame
     · cases h
       apply meteredNeutral_encodingInvariant
       · exact logUtf16Fn_encodingFrame
@@ -141,88 +134,59 @@ theorem meteredHostFns_encodingInvariant
       intro st args hwf
       trivial
     · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      apply meteredNeutral_encodingInvariant
+      · exact keccak512Fn_encodingFrame
     · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      apply meteredNeutral_encodingInvariant
+      · exact ripemd160Fn_encodingFrame
     · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      apply meteredNeutral_encodingInvariant
+      · exact ecrecoverFn_encodingFrame
     · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      apply meteredNeutral_encodingInvariant
+      · exact ed25519VerifyFn_encodingFrame
+    · cases h
+      apply meteredNeutral_encodingInvariant
+      · exact p256VerifyFn_encodingFrame
     · cases h
       apply meteredNeutral_encodingInvariant
       · exact randomSeedFn_encodingFrame
     · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      apply meteredNeutral_encodingInvariant
+      · exact altBn128G1MultiexpFn_encodingFrame
     · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      apply meteredNeutral_encodingInvariant
+      · exact altBn128G1SumFn_encodingFrame
     · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      apply meteredNeutral_encodingInvariant
+      · exact altBn128PairingCheckFn_encodingFrame
     · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      apply meteredNeutral_encodingInvariant
+      · exact bls12381G1MultiexpFn_encodingFrame
     · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      apply meteredNeutral_encodingInvariant
+      · exact bls12381G2MultiexpFn_encodingFrame
     · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      apply meteredNeutral_encodingInvariant
+      · exact bls12381MapFpToG1Fn_encodingFrame
     · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      apply meteredNeutral_encodingInvariant
+      · exact bls12381MapFp2ToG2Fn_encodingFrame
     · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      apply meteredNeutral_encodingInvariant
+      · exact bls12381P1DecompressFn_encodingFrame
     · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      apply meteredNeutral_encodingInvariant
+      · exact bls12381P2DecompressFn_encodingFrame
     · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      apply meteredNeutral_encodingInvariant
+      · exact bls12381P1SumFn_encodingFrame
     · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      apply meteredNeutral_encodingInvariant
+      · exact bls12381P2SumFn_encodingFrame
     · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      apply meteredNeutral_encodingInvariant
+      · exact bls12381PairingCheckFn_encodingFrame
     · cases h
       exact meteredCreate_encodingInvariant _
     · cases h
@@ -254,29 +218,17 @@ theorem meteredHostFns_encodingInvariant
     · cases h
       exact meteredActionDeleteAccount_encodingInvariant _
     · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      exact meteredActionDeployGlobalContract_encodingInvariant _
     · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      exact meteredActionDeployGlobalContractByAccountId_encodingInvariant _
     · cases h
       exact meteredActionUseGlobalContract_encodingInvariant _
     · cases h
       exact meteredActionUseGlobalContractByAccountId_encodingInvariant _
     · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      exact meteredYieldCreate_encodingInvariant _
     · cases h
-      apply metered_raw_encodingInvariant
-      intro st args hwf hs hguard _
-      simp (disch := decide) only [prepareStorageCall_other]
-      trivial
+      exact meteredYieldResume_encodingInvariant _
     · cases h
       apply meteredNeutral_encodingInvariant
       · exact promiseResultsCountFn_encodingFrame
@@ -286,7 +238,36 @@ theorem meteredHostFns_encodingInvariant
     · cases h
       apply meteredNeutral_encodingInvariant
       · exact promiseReturnFn_encodingFrame
+    · cases h
+      exact meteredActionTransferToGasKey_encodingInvariant _
+    · cases h
+      exact meteredActionAddGasKeyWithFullAccess_encodingInvariant _
+    · cases h
+      exact meteredActionAddGasKeyWithFunctionCall_encodingInvariant _
+    · cases h
+      apply metered_raw_encodingInvariant
+      intro st args hwf hs hguard _
+      simp (disch := decide) only [prepareStorageCall_other]
+      trivial
+    · cases h
+      apply metered_raw_encodingInvariant
+      intro st args hwf hs hguard _
+      simp (disch := decide) only [prepareStorageCall_other]
+      trivial
+    · cases h
+      apply metered_raw_encodingInvariant
+      intro st args hwf hs hguard _
+      simp (disch := decide) only [prepareStorageCall_other]
+      trivial
+    · cases h
+      apply metered_raw_encodingInvariant
+      intro st args hwf hs hguard _
+      simp (disch := decide) only [prepareStorageCall_other]
+      trivial
+    · cases h
+      apply meteredNeutral_encodingInvariant
+      · exact chainIdFn_encodingFrame
   · subst entry
-    exact gasFn_encodingInvariant
+    exact gasFn_encodingInvariant _
 
 end Wasm.Near

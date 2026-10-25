@@ -96,7 +96,9 @@ class PeriodicCheckTests(unittest.TestCase):
 
 
 def git(root: Path, *args: str) -> str:
-    return subprocess.check_output(["git", "-c", "user.name=t", "-c", "user.email=t@t", *args],
+    # No detached auto-maintenance: it can still be writing to .git when tearDown removes it.
+    return subprocess.check_output(["git", "-c", "user.name=t", "-c", "user.email=t@t",
+                                    "-c", "maintenance.auto=false", "-c", "gc.auto=0", *args],
                                    cwd=root, text=True).strip()
 
 

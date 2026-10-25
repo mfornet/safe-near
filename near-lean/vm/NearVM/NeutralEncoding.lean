@@ -296,6 +296,30 @@ theorem accountLockedBalanceFn_encodingFrame : HostPreservesEncodingFrame accoun
     | trivial | rfl | exact writeRegisterResult_encodingFrame _ _ _ _ _
     | split)
 
+theorem validatorStakeFn_encodingFrame : HostPreservesEncodingFrame validatorStakeFn := by
+  intro st args
+  unfold validatorStakeFn
+  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
+    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
+    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
+    NearState.selectReturnValue, NearState.selectReturnPromise,
+    NearState.setStorage, NearState.removeStorage, NearState.invalidateIterators]
+  repeat' (first
+    | trivial | rfl | exact writeRegisterResult_encodingFrame _ _ _ _ _
+    | split)
+
+theorem validatorTotalStakeFn_encodingFrame : HostPreservesEncodingFrame validatorTotalStakeFn := by
+  intro st args
+  unfold validatorTotalStakeFn
+  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
+    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
+    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
+    NearState.selectReturnValue, NearState.selectReturnPromise,
+    NearState.setStorage, NearState.removeStorage, NearState.invalidateIterators]
+  repeat' (first
+    | trivial | rfl | exact writeRegisterResult_encodingFrame _ _ _ _ _
+    | split)
+
 theorem prepaidGasFn_encodingFrame : HostPreservesEncodingFrame prepaidGasFn := by
   intro st args
   unfold prepaidGasFn
@@ -343,6 +367,74 @@ theorem randomSeedFn_encodingFrame : HostPreservesEncodingFrame randomSeedFn := 
   repeat' (first
     | trivial | rfl | exact writeRegisterResult_encodingFrame _ _ _ _ _
     | split)
+
+theorem cryptoHostFn_encodingFrame (name : String) (params results : List ValType) : HostPreservesEncodingFrame (cryptoHostFn name params results) := by
+  intro st args
+  unfold cryptoHostFn
+  try dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
+    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
+    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
+    NearState.selectReturnValue, NearState.selectReturnPromise,
+    NearState.setStorage, NearState.removeStorage, NearState.invalidateIterators]
+  repeat' (first
+    | trivial | rfl | exact writeRegisterResult_encodingFrame _ _ _ _ _
+    | split)
+
+theorem sha256Fn_encodingFrame : HostPreservesEncodingFrame sha256Fn := cryptoHostFn_encodingFrame _ _ _
+
+theorem keccak256Fn_encodingFrame : HostPreservesEncodingFrame keccak256Fn := cryptoHostFn_encodingFrame _ _ _
+
+theorem keccak512Fn_encodingFrame : HostPreservesEncodingFrame keccak512Fn := cryptoHostFn_encodingFrame _ _ _
+
+theorem ripemd160Fn_encodingFrame : HostPreservesEncodingFrame ripemd160Fn := cryptoHostFn_encodingFrame _ _ _
+
+theorem ecrecoverFn_encodingFrame : HostPreservesEncodingFrame ecrecoverFn := cryptoHostFn_encodingFrame _ _ _
+
+theorem ed25519VerifyFn_encodingFrame : HostPreservesEncodingFrame ed25519VerifyFn := cryptoHostFn_encodingFrame _ _ _
+
+theorem p256VerifyFn_encodingFrame : HostPreservesEncodingFrame p256VerifyFn := cryptoHostFn_encodingFrame _ _ _
+
+theorem altBn128G1MultiexpFn_encodingFrame : HostPreservesEncodingFrame altBn128G1MultiexpFn := cryptoHostFn_encodingFrame _ _ _
+
+theorem altBn128G1SumFn_encodingFrame : HostPreservesEncodingFrame altBn128G1SumFn := cryptoHostFn_encodingFrame _ _ _
+
+theorem altBn128PairingCheckFn_encodingFrame : HostPreservesEncodingFrame altBn128PairingCheckFn := cryptoHostFn_encodingFrame _ _ _
+
+theorem bls12381P1SumFn_encodingFrame : HostPreservesEncodingFrame bls12381P1SumFn := cryptoHostFn_encodingFrame _ _ _
+
+theorem bls12381P2SumFn_encodingFrame : HostPreservesEncodingFrame bls12381P2SumFn := cryptoHostFn_encodingFrame _ _ _
+
+theorem bls12381G1MultiexpFn_encodingFrame : HostPreservesEncodingFrame bls12381G1MultiexpFn := cryptoHostFn_encodingFrame _ _ _
+
+theorem bls12381G2MultiexpFn_encodingFrame : HostPreservesEncodingFrame bls12381G2MultiexpFn := cryptoHostFn_encodingFrame _ _ _
+
+theorem bls12381MapFpToG1Fn_encodingFrame : HostPreservesEncodingFrame bls12381MapFpToG1Fn := cryptoHostFn_encodingFrame _ _ _
+
+theorem bls12381MapFp2ToG2Fn_encodingFrame : HostPreservesEncodingFrame bls12381MapFp2ToG2Fn := cryptoHostFn_encodingFrame _ _ _
+
+theorem bls12381P1DecompressFn_encodingFrame : HostPreservesEncodingFrame bls12381P1DecompressFn := cryptoHostFn_encodingFrame _ _ _
+
+theorem bls12381P2DecompressFn_encodingFrame : HostPreservesEncodingFrame bls12381P2DecompressFn := cryptoHostFn_encodingFrame _ _ _
+
+theorem bls12381PairingCheckFn_encodingFrame : HostPreservesEncodingFrame bls12381PairingCheckFn := cryptoHostFn_encodingFrame _ _ _
+
+theorem chainIdFn_encodingFrame : HostPreservesEncodingFrame chainIdFn := by
+  intro st args
+  unfold chainIdFn contextRegisterFn
+  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn,
+    contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit,
+    checkAccountId, checkPublicKey, NearState.setRegister, trapWith,
+    NearState.selectReturnValue, NearState.selectReturnPromise,
+    NearState.setStorage, NearState.removeStorage, NearState.invalidateIterators]
+  repeat' (first
+    | trivial | rfl | exact writeRegisterResult_encodingFrame _ _ _ _ _
+    | split)
+
+theorem promiseYieldResumeFn_encodingFrame : HostPreservesEncodingFrame promiseYieldResumeFn := by
+  intro st args
+  unfold promiseYieldResumeFn
+  dsimp only [disallowInView]
+  repeat' (first | trivial | rfl | split)
 
 theorem promiseResultsCountFn_encodingFrame : HostPreservesEncodingFrame promiseResultsCountFn := by
   intro st args
@@ -398,6 +490,8 @@ theorem panicUtf8Metered_encodingFrame : HostPreservesEncodingFrame panicUtf8Met
 
 theorem abortMetered_encodingFrame : HostPreservesEncodingFrame abortMetered := by
   intro st args
-  trivial
+  unfold abortMetered
+  dsimp only [trapWith]
+  repeat' (first | trivial | split)
 
 end Wasm.Near

@@ -1,4 +1,5 @@
 import NearRuntime.RoutingInvariants
+import NearRuntime.NewActionFunding
 
 namespace Near
 open Wasm.Near
@@ -29,6 +30,29 @@ theorem transferCreditState_account_ne (c : ReceiptCtx) (st : ChainState) (accou
     exact ChainState.account?_setAccount_ne _ _ _ _ hne
   · exact ChainState.account?_setAccount_ne _ _ _ _ hne
 
+theorem addKeyMetadataState_account_ne (c : ReceiptCtx) (st : ChainState) (account : Account) (pk : PublicKey)
+    (key : AccessKey) (x : AccountId) (hne : c.receipt.receiverId ≠ x) :
+    (addKeyMetadataState c st account pk key).account? x = st.account? x := by
+  unfold addKeyMetadataState
+  split
+  · change Assoc.lookup _ x = _
+    rw [(ChainState.foldl_setGasKeyNonce_frame _ _ _ _ _).1]
+    exact ChainState.account?_setAccount_ne _ _ _ _ hne
+  · exact ChainState.account?_setAccount_ne _ _ _ _ hne
+
+theorem deleteKeyMetadataState_account_ne (c : ReceiptCtx) (st : ChainState) (account : Account) (pk : PublicKey)
+    (key : AccessKey) (x : AccountId) (hne : c.receipt.receiverId ≠ x) :
+    (deleteKeyMetadataState c st account pk key).account? x = st.account? x := by
+  unfold deleteKeyMetadataState
+  split <;> exact ChainState.account?_setAccount_ne _ _ _ _ hne
+
+theorem deleteAccountFundedResult_account_ne (c : ReceiptCtx) (before : Exec) (account : Account)
+    (beneficiary : AccountId) (x : AccountId) (hne : c.receipt.receiverId ≠ x) :
+    (deleteAccountFundedResult c before account beneficiary).state.account? x = before.state.account? x := by
+  unfold deleteAccountFundedResult
+  dsimp only
+  split <;> exact ChainState.account?_removeAccount_ne _ _ _ hne
+
 /-- Exact local account isolation on all raw action outcomes, including errors
 with tentative changes. This does not claim isolation from emitted future receipts. -/
 theorem applyAction_account_ne (c : ReceiptCtx) (isLast : Bool) (action : Action) (before : Exec)
@@ -51,17 +75,32 @@ theorem applyAction_account_ne (c : ReceiptCtx) (isLast : Bool) (action : Action
       exact ChainState.account?_setAccount_ne _ _ _ _ hne | split)
   | stake amount pk =>
     cases ha : before.state.account? c.receipt.receiverId <;>
-      simp [-StateT.run_bind, applyAction, getAccount, getState, ha]
-    repeat' (first | rfl | split)
+      simp [-StateT.run_bind, applyAction, getAccount, getState, putAccount, modifyState, ha]
+    repeat' (first | rfl | exact ChainState.account?_setAccount_ne _ _ _ _ hne | split)
   | addKey pk key =>
     rw [applyAddKey_run]
-    repeat' (first | rfl | exact ChainState.account?_setAccount_ne _ _ _ _ hne | split)
+    repeat' (first | rfl | exact addKeyMetadataState_account_ne _ _ _ _ _ _ hne | split)
   | deleteKey pk =>
     rw [applyDeleteKey_run]
+    repeat' (first | rfl | exact deleteKeyMetadataState_account_ne _ _ _ _ _ _ hne | split)
+  | useGlobalContract contract =>
+    rw [applyUseGlobalContract_run]
     repeat' (first | rfl | exact ChainState.account?_setAccount_ne _ _ _ _ hne | split)
-  | useGlobalContract _ => rfl
+  | deployGlobalContract code mode =>
+    rw [applyDeployGlobalContract_run]
+    repeat' (first | rfl | exact deployGlobalResult_account_ne _ _ _ _ _ hne | split)
+  | transferToGasKey pk deposit =>
+    rw [applyTransferToGasKey_run]
+    repeat' (first | rfl | exact gasKeyDeposit_account (by assumption) _ | split)
+  | withdrawFromGasKey pk amount =>
+    rw [applyWithdrawFromGasKey_run]
+    repeat' (first | rfl | exact (gasKeyWithdrawal_account (by assumption)).2 _ hne | split)
   | deleteAccount beneficiary =>
     rw [applyDeleteAccount_run]
-    repeat' (first | rfl | exact ChainState.account?_removeAccount_ne _ _ _ hne | split)
+    repeat' (first | rfl | exact deleteAccountFundedResult_account_ne _ _ _ _ _ hne | split)
+  | delegate sender receiver inner nonce nonceIndex maxBlockHeight pk signature v2 =>
+    change ((applyDelegateAction c _).run.run before).2.state.account? id = _
+    rw [applyDelegateAction_run]
+    repeat' (first | rfl | (have h := delegateState_account (by assumption) id; exact h) | split)
 
 end Near

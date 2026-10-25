@@ -35,6 +35,8 @@ structure VMOutcome where
   /-- Attempted sponsored deposits, retained as diagnostics on VM failure. -/
   subsidizedAmount : Nat := 0
   gasProfile : GasProfile := {}
+  /-- `promise_yield_resume` payloads, in call order: (data id, payload). -/
+  resumes : List (List UInt8 × List UInt8) := []
   deriving Inhabited
 
 def VMOutcome.succeeded (o : VMOutcome) : Bool := o.aborted.isNone
@@ -44,7 +46,7 @@ def VMOutcome.issue? (o : VMOutcome) : Option ExecutionIssue :=
   o.aborted.bind FunctionCallError.issue?
 
 /-- Supported handle creation order: callbacks and joints refer only to earlier
-handles. Yielded promises remain explicitly unsupported by the metered VM. -/
+handles. Yielded promises wait for their own data and refer to no handle. -/
 def promisesValidFrom (index : Nat) : List NearPromise → Bool
   | [] => true
   | p :: ps =>
@@ -52,14 +54,14 @@ def promisesValidFrom (index : Nat) : List NearPromise → Bool
       | .batch _ _ => true
       | .callback base _ _ => base < index
       | .and dependencies => dependencies.all (· < index)
-      | .yielded .. => false
+      | .yielded .. => true
     valid && promisesValidFrom (index + 1) ps
 
 def PromiseWellFormedAt (index : Nat) : NearPromise → Prop
   | .batch _ _ => True
   | .callback base _ _ => base < index
   | .and dependencies => ∀ dependency ∈ dependencies, dependency < index
-  | .yielded .. => False
+  | .yielded .. => True
 
 def PromisesWellFormedFrom (index : Nat) : List NearPromise → Prop
   | [] => True

@@ -78,6 +78,31 @@ theorem promiseBatchActionTransferFn_deposits :
       · trivial
     · trivial
 
+theorem promiseDeposit_transferToGasKey (st : HostStore NearState) (index keyLen keyPtr amountPtr : UInt64) :
+    promiseDeposit? "promise_batch_action_transfer_to_gas_key" st
+      [.i64 index, .i64 keyLen, .i64 keyPtr, .i64 amountPtr] = readU128Mem st amountPtr := rfl
+
+theorem promiseBatchActionTransferToGasKeyFn_deposits :
+    HostCreatesDeposits "promise_batch_action_transfer_to_gas_key" promiseBatchActionTransferToGasKeyFn := by
+  intro st args
+  unfold promiseBatchActionTransferToGasKeyFn
+  dsimp only [disallowInView]
+  split
+  · trivial
+  · split
+    · rename_i index keyLen keyPtr amountPtr
+      rw [promiseDeposit_transferToGasKey]
+      split
+      · rename_i pk amount hpk hread
+        dsimp only [checkPublicKey]
+        split
+        · simpa only [hread, Option.getD_some, PromiseAction.deposit] using
+            appendPromiseActionResult_deposits "promise_batch_action_transfer_to_gas_key" st index
+              (.transferToGasKey pk amount)
+        · trivial
+      · trivial
+    · trivial
+
 theorem promiseBatchActionFunctionCallFn_deposits :
     HostCreatesDeposits "promise_batch_action_function_call" promiseBatchActionFunctionCallFn := by
   intro st args

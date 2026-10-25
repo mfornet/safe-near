@@ -14,7 +14,7 @@ theorem actionMethodEncodingError_invalid (name : String) (before : HostStore Ne
     (hinput : actionMethodBytes? name before args = some bytes)
     (hutf8 : String.fromUTF8? ⟨bytes.toArray⟩ = none) :
     actionMethodEncodingError name before args = some .invalidMethodName := by
-  by_cases hn : name == "promise_batch_action_add_key_with_function_call"
+  by_cases hn : usesKeyMethodFields name = true
   · have hb : methodNameFieldsUtf8 bytes = false := by
       cases he : methodNameFieldsUtf8 bytes with
       | false => rfl
@@ -32,7 +32,7 @@ theorem actionMethodEncodingError_none_utf8 (name : String) (before : HostStore 
     (hinput : actionMethodBytes? name before args = some bytes)
     (h : actionMethodEncodingError name before args = none) :
     ∃ decoded, String.fromUTF8? ⟨bytes.toArray⟩ = some decoded := by
-  by_cases hn : name == "promise_batch_action_add_key_with_function_call"
+  by_cases hn : usesKeyMethodFields name = true
   · have hb : methodNameFieldsUtf8 bytes = true := by
       cases he : methodNameFieldsUtf8 bytes with
       | false => simp [actionMethodEncodingError, hpolicy, hinput, hn, he] at h
@@ -49,7 +49,7 @@ theorem actionMethodEncodingError_none_key_fields (before : HostStore NearState)
     (h : actionMethodEncodingError "promise_batch_action_add_key_with_function_call" before args = none) :
     methodNameFieldsUtf8 bytes = true := by
   cases he : methodNameFieldsUtf8 bytes with
-  | false => simp [actionMethodEncodingError, hpolicy, hinput, he] at h
+  | false => simp [actionMethodEncodingError, usesKeyMethodFields, hpolicy, hinput, he] at h
   | true => rfl
 
 /-- Fees and prepaid gas are checked before runtime external decoding. -/

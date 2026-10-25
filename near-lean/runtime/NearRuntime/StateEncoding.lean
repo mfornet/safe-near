@@ -45,18 +45,63 @@ def publicKey (key : PublicKey) : Except String Bytes :=
       (key.head? == some 1 && key.length == 65) then pure key
   else throw "unsupported public key encoding"
 
+private def gasKeyInfo (balance nonces : Nat) : Except String Bytes := do
+  return (← unsigned 16 balance) ++ (← unsigned 2 nonces)
+
+private def functionCallPermission (allowance : Option Nat) (receiver : String) (methods : List String) :
+    Except String Bytes := do
+  let allowance ← match allowance with
+    | none => pure [0]
+    | some amount => (fun encoded => [1] ++ encoded) <$> unsigned 16 amount
+  let count ← unsigned 4 methods.length
+  let names ← methods.mapM string
+  -- Native FunctionCallPermission.receiver_id is String, not AccountId.
+  return allowance ++ (← string receiver) ++ count ++ names.flatten
+
 def accessKey (key : AccessKey) : Except String Bytes := do
   let nonce ← unsigned 8 key.nonce
   match key.permission with
   | .fullAccess => return nonce ++ [1]
   | .functionCall allowance receiver methods =>
-    let allowance ← match allowance with
-      | none => pure [0]
-      | some amount => (fun encoded => [1] ++ encoded) <$> unsigned 16 amount
-    let count ← unsigned 4 methods.length
-    let names ← methods.mapM string
-    -- Native FunctionCallPermission.receiver_id is String, not AccountId.
-    return nonce ++ [0] ++ allowance ++ (← string receiver) ++ count ++ names.flatten
+    return nonce ++ [0] ++ (← functionCallPermission allowance receiver methods)
+  | .gasKeyFunctionCall balance nonces allowance receiver methods =>
+    return nonce ++ [2] ++ (← gasKeyInfo balance nonces) ++ (← functionCallPermission allowance receiver methods)
+  | .gasKeyFullAccess balance nonces => return nonce ++ [3] ++ (← gasKeyInfo balance nonces)
+
+/-- `GlobalContractCodeIdentifier`, the tail of the global contract column keys. -/
+def globalIdentifier : Wasm.GlobalContractId → Except String Bytes
+  | .codeHash hash => do
+    unless hash.length == 32 do throw "global code hash is not 32 bytes"
+    return [0] ++ hash
+  | .accountId id => do
+    unless Wasm.Near.validAccountIdBytes id do throw "invalid global contract account id"
+    return [1] ++ (← vector id)
+
+/-- The contract an account points at (`AccountContract`): the hash of its own code, or the global
+identifier. -/
+def accountContract (local? : Option Bytes) (account : Account) : Except String Bytes :=
+  match account.global with
+  | some (.codeHash hash) => do
+    unless hash.length == 32 do throw "global code hash is not 32 bytes"
+    return [2] ++ hash
+  | some (.accountId id) => do
+    unless Wasm.Near.validAccountIdBytes id do throw "invalid global contract account id"
+    return [3] ++ (← vector id)
+  | none =>
+    match local? with
+    | some bytes => pure ([1] ++ Sha256.hash bytes)
+    | none => pure [0]
+
+/-- `Account`: V1 unless the account ever pointed at a global contract (`AccountV2`, behind the
+`u128::MAX` sentinel). -/
+def accountValue (local? : Option Bytes) (account : Account) : Except String Bytes := do
+  let amount ← unsigned 16 account.amount
+  let locked ← unsigned 16 account.locked
+  let storage ← unsigned 8 account.storageUsage
+  if account.versionTwo || account.global.isSome then
+    return List.replicate 16 255 ++ [0] ++ amount ++ locked ++ storage ++ (← accountContract local? account)
+  else
+    return amount ++ locked ++ (local?.elim (List.replicate 32 0) Sha256.hash) ++ storage
 
 private def unique [BEq α] (name : String) (values : List α) : Except String Unit := do
   unless values.eraseDups.length == values.length do throw s!"duplicate {name}"
@@ -81,15 +126,23 @@ def encode (state : ChainState) (codes : List (String × Bytes)) : Except String
       let some bytes := Assoc.lookup codes code.hash | throw "code bytes absent from catalogue"
       unless bytes.length == code.size do throw "code size disagrees with catalogue bytes"
       return bytes
-    let hash := code.elim (List.replicate 32 0) Sha256.hash
-    let value := (← unsigned 16 account.amount) ++ (← unsigned 16 account.locked) ++ hash ++
-      (← unsigned 8 account.storageUsage)
-    entries := entries ++ [([0] ++ id, value)]
+    entries := entries ++ [([0] ++ id, ← accountValue code account)]
     if let some bytes := code then entries := entries ++ [([1] ++ id, bytes)]
   for ((id, pk), key) in state.accessKeys do
     unless Assoc.contains state.accounts id do throw "access key account is absent"
     let id ← accountId id
     entries := entries ++ [([2] ++ id ++ [2] ++ (← publicKey pk), ← accessKey key)]
+  for ((id, pk, lane), nonce) in state.gasKeyNonces do
+    let some key := Assoc.lookup state.accessKeys (id, pk) | throw "gas key nonce has no key"
+    unless key.permission.gasKeyInfo?.isSome do throw "gas key nonce of an ordinary key"
+    let id ← accountId id
+    entries := entries ++ [([2] ++ id ++ [2] ++ (← publicKey pk) ++ (← unsigned 2 lane), ← unsigned 8 nonce)]
+  for (identifier, code) in state.globalCode do
+    let some bytes := Assoc.lookup codes code.hash | throw "global code bytes absent from catalogue"
+    unless bytes.length == code.size do throw "global code size disagrees with catalogue bytes"
+    entries := entries ++ [([18] ++ (← globalIdentifier identifier), bytes)]
+  for (identifier, nonce) in state.globalNonces do
+    entries := entries ++ [([19] ++ (← globalIdentifier identifier), ← unsigned 8 nonce)]
   for (id, rows) in state.storage do
     unless Assoc.contains state.accounts id do throw "storage account is absent"
     let id ← accountId id

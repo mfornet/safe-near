@@ -16,16 +16,25 @@ KEY = nc.Key.derive("lean-input")
 PK = "ed25519:" + nc.b58encode(KEY.public)
 
 
+# ShardLayout::V2 with one shard (id 0): no boundaries, shard_ids [0], both index maps {0: 0}, no split history, version 0
+SINGLE_LAYOUT = (bytes([2]) + (0).to_bytes(4, "little") + (1).to_bytes(4, "little") + bytes(8)
+                 + (1).to_bytes(4, "little") + bytes(16) + (1).to_bytes(4, "little") + bytes(16)
+                 + bytes([0, 0]) + bytes(4)).hex()
+
+
 def tx_bundle(actions=None, receipts=(), entries=None, shards=1):
     block_hash = bytes(range(32))
     raw = nc.transaction("alice.near", KEY, 5, "bob.near", block_hash, [nc.transfer(7)])
     view = {"signer_id": "alice.near", "receiver_id": "bob.near", "public_key": PK, "nonce": 5,
             "actions": actions or [{"Transfer": {"deposit": "7"}}]}
     return {
-        "formatVersion": 1, "meta": {"height": 9, "shardId": 0},
+        "formatVersion": 1, "meta": {"height": 9, "shardId": 0, "chainId": "safe-near-localnet-1s"},
         "context": {"currentProtocolVersion": 86, "validatorAccountsUpdate": None, "blockHeight": 9,
+                    "epochInfo": {"chainId": "safe-near-localnet-1s", "minimumStake": "50", "totalStake": "300",
+                                  "validators": [["alice.near", "100"], ["v.near", "200"]]},
                     "blockTimestamp": 5, "epochHeight": 1, "gasPrice": "100", "gasLimit": 10**15,
-                    "randomSeed": "ab" * 32, "bandwidthRequests": "0100000000000000000000000000000000",
+                    "randomSeed": "ab" * 32, "bandwidthRequests": "00000000", "prevBlockHash": "cd" * 32,
+                    "shardLayout": SINGLE_LAYOUT,
                     "congestionInfo": [[i, "00" * 43, 0] for i in range(shards)]},
         "preState": {"root": "00" * 32, "entries": entries or []},
         "inputs": {"transactions": [{"borsh": raw.hex(), "valid": True, "hash": nc.transaction_hash(raw).hex(), "view": view,
@@ -60,7 +69,9 @@ class Parsing(unittest.TestCase):
         self.assertEqual(li.receipt_format(header + b"\x01"), ("data", False))
         self.assertEqual(li.receipt_format(header + b"\x05" + nc.string("s.near") + b"\x00"), ("v2", False))
         self.assertEqual(li.receipt_format(header + b"\x05" + nc.string("s.near") + b"\x01"), ("v2", True))
-        self.assertEqual(li.receipt_format(header + b"\x03")[0], "tag 3")
+        self.assertEqual(li.receipt_format(header + b"\x03")[0], "resume")
+        self.assertEqual(li.receipt_format(header + b"\x04")[0], "distribution")
+        self.assertEqual(li.receipt_format(header + b"\x09")[0], "tag 9")
 
     def test_public_keys(self):
         self.assertEqual(li.public_key(PK), [0] + list(KEY.public))
@@ -73,26 +84,29 @@ class Blockers(unittest.TestCase):
         self.assertEqual(li.blockers(tx_bundle()), [])
 
     def test_each_unrepresented_feature_is_named(self):
-        bundle = tx_bundle(actions=[{"Delegate": {}}, {"TransferToGasKey": {}}, "CreateAccount"], shards=4)
-        bundle["preState"]["entries"] = [["0a", "00"], ["0f", "00"], ["12", "00"]]
-        bundle["context"]["validatorAccountsUpdate"] = {}
+        bundle = tx_bundle(actions=[{"DeterministicStateInit": {}}, "CreateAccount"], shards=4)
+        bundle["preState"]["entries"] = [["0a", "00"], ["0f", "00"], ["0d", "00"], ["16", "00"]]
         bundle["inputs"]["transactions"][0]["valid"] = False
         found = li.blockers(bundle)
-        for text in ["multi-shard layout", "pre-state column promise-yield-indices", "pre-state column global-contract-code",
-                     "action Delegate", "action TransferToGasKey", "epoch boundary", "transaction rejected"]:
+        for text in ["pre-state column yield-id-to-data-id",
+                     "action DeterministicStateInit", "transaction rejected"]:
             self.assertTrue(any(text in reason for reason in found), (text, found))
-        self.assertFalse(any("bandwidth" in reason for reason in found))      # column 15 is the modelled scheduler
+        self.assertFalse(any("bandwidth" in reason or "buffered" in reason for reason in found))   # modelled columns
         self.assertEqual(found, list(dict.fromkeys(found)))
 
     def test_model_actions(self):
         self.assertEqual(li.model_action_blockers(["Transfer", "FunctionCall"]), [])
-        self.assertEqual(li.model_action_blockers(["Transfer", "UseGlobalContract"]), ["action UseGlobalContract"])
+        self.assertEqual(li.model_action_blockers(["Transfer", "UseGlobalContract", "Delegate", "TransferToGasKey"]), [])
+        self.assertEqual(li.model_action_blockers(["Transfer", "DeterministicStateInit"]),
+                         ["action DeterministicStateInit"])
 
-    def test_host_functions_that_need_the_epoch(self):
+    def test_the_epoch_is_modelled(self):
         bundle = tx_bundle()
+        bundle["context"]["validatorAccountsUpdate"] = {"stakeInfo": {}, "validatorRewards": {}, "lastProposals": {},
+                                                        "protocolTreasuryAccountId": "near"}
         bundle["expected"]["outcomes"] = [{"view": {"metadata": {"gas_profile": [
             {"cost_category": "WASM_HOST_COST", "cost": "VALIDATOR_STAKE_BASE", "gas_used": "1"}]}}}]
-        self.assertTrue(any("validator_stake" in reason for reason in li.blockers(bundle)))
+        self.assertEqual(li.blockers(bundle), [])
 
 
 class Conversion(unittest.TestCase):
@@ -104,23 +118,47 @@ class Conversion(unittest.TestCase):
         bundle = tx_bundle()
         request = self.convert(bundle)
         self.assertEqual(request["initialState"]["accounts"],
-                         [["alice.near", {"amount": "1000", "locked": "0", "storageUsage": 182, "codeHash": None}]])
+                         [["alice.near", {"amount": "1000", "locked": "0", "storageUsage": 182, "codeHash": None,
+                           "global": None, "versionTwo": False}]])
         self.assertEqual(request["initialState"]["accessKeys"][0][0], ["alice.near", [0] + list(KEY.public)])
         tx = request["blocks"][0]["transactions"][0]
         self.assertEqual((tx["signerId"], tx["receiverId"], tx["nonce"]), ("alice.near", "bob.near", 5))
         self.assertEqual(tx["actions"], [{"kind": "transfer", "deposit": "7"}])
         self.assertEqual(request["transactionBlockHashes"], [[list(range(32))]])
         self.assertEqual(request["blocks"][0]["randomSeed"], [0xAB] * 32)
+        self.assertEqual(request["blocks"][0]["epochInfo"], {"minimumStake": "50", "totalStake": "300",
+                         "validators": {"alice.near": "100", "v.near": "200"}})
+        self.assertIsNone(request["blocks"][0]["validatorAccountsUpdate"])
+        bundle["context"]["validatorAccountsUpdate"] = {
+            "stakeInfo": {"v.near": "9"}, "validatorRewards": {"v.near": "2", "near": "1"},
+            "lastProposals": {}, "protocolTreasuryAccountId": "near"}
+        update = self.convert(bundle)["blocks"][0]["validatorAccountsUpdate"]
+        self.assertEqual(update, {"stakeInfo": {"v.near": "9"}, "validatorRewards": {"v.near": "2", "near": "1"},
+                                  "lastProposals": {}, "protocolTreasuryAccountId": "near"})
         self.assertIsNone(request["blocks"][0]["incomingIndices"])
         self.assertNotIn("initialScheduler", request)
 
     def test_scheduler_state_is_read_from_column_15(self):
         value = bytes([0]) + (1).to_bytes(4, "little") + bytes(16) + (123).to_bytes(8, "little") + bytes(range(32))
         bundle = tx_bundle(entries=[["0f", value.hex()]])
-        self.assertEqual(self.convert(bundle)["initialScheduler"], {"allowance": 123, "sanity": list(range(32))})
-        bundle = tx_bundle(entries=[["0f", "00"]])
+        self.assertEqual(self.convert(bundle)["initialScheduler"], {"raw": list(value)})
+
+    def test_shard_context_reaches_lean(self):
+        request = self.convert(tx_bundle(entries=[["0d", "00"], ["0e0000", "ff"], ["10", "00"], ["11", "00"]]))
+        scheduler = request["schedulerInputs"][0]
+        self.assertEqual(bytes(scheduler["shardLayout"]).hex(), SINGLE_LAYOUT)
+        self.assertEqual(scheduler["prevBlockHash"], [0xCD] * 32)
+        self.assertEqual(request["blocks"][0]["shardIds"], [0])
+        self.assertEqual([bytes(key)[0] for key, _ in request["initialBuffers"]], [13, 14, 16, 17])
+
+    def test_layout_shard_ids_keep_the_layout_order(self):
+        self.assertEqual(li.layout_shard_ids(SINGLE_LAYOUT), [0])
+        shards = [3, 1, 0, 2]
+        raw = (bytes([2]) + (3).to_bytes(4, "little") + b"".join(nc.string(name) for name in ["test1", "test2", "test3"])
+               + (4).to_bytes(4, "little") + b"".join(i.to_bytes(8, "little") for i in shards))
+        self.assertEqual(li.layout_shard_ids(raw.hex()), shards)
         with self.assertRaises(li.Unsupported):
-            self.convert(bundle)
+            li.layout_shard_ids("03")
 
     def test_incoming_receipts_get_model_identities(self):
         header = nc.string("x.near") + nc.string("alice.near") + bytes(range(32))
@@ -143,14 +181,51 @@ class Conversion(unittest.TestCase):
         self.assertEqual({row["receiverId"] for row in context["dataIds"]}, {"alice.near", "y.near"})
         self.assertEqual(request["initialState"]["nextId"], 4)
 
+    def test_postponed_and_delayed_receipts_become_model_state(self):
+        payload = {"signer_id": "x.near", "signer_public_key": PK, "gas_price": "10",
+                   "output_data_receivers": [], "refund_to": None, "actions": [{"Transfer": {"deposit": "3"}}]}
+        data_id, receipt_id = nc.b58encode(bytes([2]) * 32), nc.b58encode(bytes([5]) * 32)
+        postponed = {"predecessor_id": "x.near", "receiver_id": "alice.near", "receipt_id": receipt_id,
+                     "receipt": {"ActionV2": dict(payload, input_data_ids=[data_id])}}
+        delayed = {"predecessor_id": "x.near", "receiver_id": "bob.near", "receipt_id": nc.b58encode(bytes([6]) * 32),
+                   "receipt": {"Action": dict(payload, input_data_ids=[])}}
+        header = lambda rid, to, tag: nc.string("x.near") + nc.string(to) + rid + tag
+        postponed_raw = header(bytes([5]) * 32, "alice.near", b"\x05") + nc.string("x.near") + b"\x00"
+        delayed_raw = header(bytes([6]) * 32, "bob.near", b"\x00") + nc.string("x.near")
+        stored = b"\xff\xff\x01" + delayed_raw + (11).to_bytes(8, "little") + (22).to_bytes(8, "little")
+        rows = decoded()
+        rows["preState"] += [
+            {"key": "06" + "aa", "record": {"PostponedReceipt": postponed}},
+            {"key": "04" + "bb", "record": {"PostponedReceiptId": {"account_id": "alice.near", "data_id": data_id,
+                                                                    "receipt_id": receipt_id}}},
+            {"key": "05" + "cc", "record": {"PendingDataCount": {"account_id": "alice.near", "count": 1,
+                                                                 "receipt_id": receipt_id}}},
+            {"key": "07" + "00" * 8, "queueIndex": 4, "record": {"DelayedReceipt": delayed}}]
+        header_value = (4).to_bytes(8, "little") + (5).to_bytes(8, "little")
+        bundle = tx_bundle(entries=[["06aa", postponed_raw.hex()], ["07", header_value.hex()],
+                                    ["07" + "00" * 8, stored.hex()]])
+        request = self.convert(bundle, rows)
+        state = request["initialState"]
+        self.assertEqual([row[0] for row in state["postponed"]], [state["pendingDataCount"][0][0]])
+        self.assertEqual(state["pendingDataCount"][0][1], 1)
+        self.assertEqual(state["postponedByData"][0][1], state["pendingDataCount"][0][0])
+        self.assertEqual(len(state["delayed"]), 1)
+        context = request["queueContext"]
+        self.assertEqual(context["delayed"], {"firstIndex": 4, "forms": [{"kind": "storedV1", "gas": 11, "size": 22}]})
+        formats = dict((rid, fmt) for rid, fmt in context["actionFormats"])
+        self.assertEqual(formats[state["pendingDataCount"][0][0]], "v2")
+        self.assertEqual(formats[state["delayed"][0]["receiptId"]], "legacy")
+
+    def test_delayed_forms(self):
+        self.assertEqual(li.delayed_form(b"abc"), (b"abc", {"kind": "receipt"}))
+        self.assertEqual(li.delayed_form(b"\xff\xff\x00abc" + bytes([1]) + bytes(7) + bytes([2]) + bytes(7)),
+                         (b"abc", {"kind": "storedV0", "gas": 1, "size": 2}))
+        with self.assertRaises(li.Unsupported):
+            li.delayed_form(b"\xff\xff\x07abc" + bytes(16))
+
     def test_unknown_state_is_reported_not_dropped(self):
         rows = decoded()
-        rows["preState"].append({"key": "06", "record": {"PostponedReceipt": {}}})
-        with self.assertRaises(li.Unsupported) as caught:
-            self.convert(tx_bundle(), rows)
-        self.assertIn("PostponedReceipt", caught.exception.reasons[0])
-        rows = decoded()
-        rows["preState"][0]["record"]["Account"]["account"]["global_contract_hash"] = None
+        rows["preState"][0]["record"]["Account"]["account"]["mystery_field"] = 1
         with self.assertRaises(li.Unsupported):
             self.convert(tx_bundle(), rows)
 

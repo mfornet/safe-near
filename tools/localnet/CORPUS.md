@@ -196,29 +196,33 @@ before selection, reproduce bit for bit.
 `replay_corpus.py` handles each chunk in three steps, `lean_input.py` holds the code:
 
 1. **Blockers.** Features the Lean input format or model cannot express are listed, not approximated:
-   a multi-shard layout (the chunk model assumes the single-shard reference layout), pre-state columns outside
-   the state model, actions outside the model's eight (or `UseGlobalContract`, which the runtime reports as an
-   unsupported execution), receipt kinds other than action and data, an epoch-start validator update, the host
-   functions `validator_stake` and `validator_total_stake`, accounts that use a global contract, an invalid
+   pre-state columns outside the state model, actions outside the model's eight (or `UseGlobalContract`, which the runtime reports as an
+   unsupported execution), receipt kinds other than action and data, accounts that use a global contract, an invalid
    transaction, a gas-key nonce. The first becomes the `unsupported` reason; all are kept in the audit file.
 2. **Conversion and input fidelity.** The decoded pre-state becomes the model state (accounts, access keys, contract
    storage, code catalogue by hash), the transactions and incoming receipts become model values with model ids and a
-   `queueContext` binding them to their native hashes, and the scheduler state in column 15 becomes
-   `initialScheduler`. Lean must then re-encode the converted state to **the bundle's pre-state entries,
+   `queueContext` binding them to their native hashes, the epoch (`context.epochInfo`: minimum stake, each
+   validator's stake, the total) and, at an epoch's first chunk, `context.validatorAccountsUpdate` go into the block, the scheduler state in column 15 becomes
+   `initialScheduler` (raw), the outgoing buffer columns 13/14/16/17 become `initialBuffers` (Lean decodes them), and
+   the shard layout, previous block hash, congestion info of all shards and previous bandwidth requests go into
+   `schedulerInputs`. Lean must then re-encode the converted state to **the bundle's pre-state entries,
    byte for byte**, and re-hash every transaction to the recorded hash; otherwise the chunk is `unsupported: pre-state
    not reproduced ...`, naming the first differing key's column.
 3. **Replay and comparison.** The chunk runs through `registered-replay`, which derives native receipt and data
    hashes and the action-derived random seeds itself. Compared, in this order and against `expected` only: each
    outcome's id, executor, status (kind, value or receipt id), logs, receipt ids, gas burnt, tokens burnt; the
-   outgoing receipts as Borsh bytes; total tokens burnt and subsidized amount against `balanceStats`; and the
+   outgoing receipts as Borsh bytes (buffered ones that now fit, then new ones, in order); total tokens burnt and
+   subsidized amount against `balanceStats`; the chunk's validator proposals (Borsh `Vec<ValidatorStake>`, deduplicated as
+   `Runtime::apply` does), the chunk's own `CongestionInfo`, bandwidth requests, scheduler state
+   hash and delayed receipt count; and the
    **complete post-state**, the pre-state entries with `stateDiff` applied, against Lean's encoding of its state
    (key by key, so the root agrees when nothing differs). A model execution issue is a `fail`. Failure detail
    compares the status kind, not the error text.
 
 `audit/chain-replay-corpus.json` holds, per chunk, `pass`, `fail` with the first differing field, or `unsupported`
 with the first reason, plus all blockers, tags and seconds; `--report` always exits 0.
-Not compared yet: gas profiles, `computeUsage`, state changes in Borsh, the outcome root and validator proposals
-(the model has no epoch), the exact failure error variants.
+Not compared yet: gas profiles, `computeUsage`, state changes in Borsh, the outcome root, the exact failure error
+variants.
 
 ## 9. Regenerating everything
 
@@ -232,29 +236,31 @@ just chain-replay-corpus-report
 python3 -m unittest discover -s tools/tests -p 'test_corpus.py' -v      # format checks, no neard needed
 ```
 
-## 10. Current result (M3a)
+## 10. Current result (M3d)
 
-`just chain-replay-corpus-report`, 436 chunks, about 2 minutes:
+`just chain-replay-corpus-report`, 436 chunks, about 15 minutes on four cores (`--jobs`, default `min(4, cpus)`):
 
 ```
-  pass         70
-  fail         18
-  unsupported  348
+  pass         426
+  fail         10
+  unsupported  0
 by first reason (unsupported / fail):
-    288  multi-shard layout (the chunk model assumes the single-shard reference layout)
-     26  pre-state column promise-yield-indices
-     24  pre-state column global-contract-code
-     13  model execution issue: Unsupported host semantics: env.promise_batch_action_transfer_to_gas_key
-      3  epoch boundary: validator accounts update (rewards, stake return)
-      3  pre-state callback or delayed-queue record PostponedReceiptId
-      2  host function validator_stake (needs the epoch's validator set)
-      2  model execution issue: Unsupported action semantics: unstake (epoch machinery)
-      2  model execution issue: Unsupported host semantics: env.ecrecover
-      1  action DeployGlobalContract
-      1  model execution issue: Unsupported action semantics: stake (epoch machinery)
-      1  pre-state column global-contract-nonce
+      5  model execution issue: Unsupported host semantics: env.ecrecover
+      4  model execution issue: Unsupported host semantics: sha256
+      1  model execution issue: Unsupported host semantics: ripemd160
 ```
 
-The 70 passing chunks include account creation, transfers, key changes, deployments, contract calls with storage
-reads, writes and removals (so trie-node gas), logs, callbacks and system refunds. The failures are all runtime
-limitations the model reports itself: an unsupported host function, or the epoch machinery behind `Stake`.
+M3a measured 70 pass, M3b 129, M3c 405. M3c closed the multi-shard layout (scheduler, congestion info, forwarding and
+buffering of outgoing receipts, bandwidth requests) and the converter gap (pre-state postponed receipts, their
+data ids and pending counts, received data, delayed receipts with their stored forms). M3d closed the staking and
+epoch chunks: `Stake`/`Unstake` with their validator proposals (compared), `validator_stake` and
+`validator_total_stake` from `context.epochInfo`, and the 12 epoch-start chunks, where `context.validatorAccountsUpdate`
+(rewards, stake return, treasury) is applied before the chunk runs.
+
+What remains:
+
+* M3e (crypto hosts): `ecrecover` (5), `sha256` (4) and `ripemd160` (1). The four `sha256`/`ripemd160` chunks of
+  `h48` and `h205` also call `validator_stake`, whose gas is then checked only up to the crypto host.
+
+Bandwidth requests are empty in every corpus chunk, so the request grants and the random tie breaks of the
+scheduler are covered by unit tests with values from the Rust crates (`runtime-tests`), not by replay.

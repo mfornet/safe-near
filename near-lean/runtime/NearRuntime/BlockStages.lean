@@ -52,7 +52,7 @@ def applyReceiptQueue (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes â†
       else
         newlyDelayed := newlyDelayed ++ [receipt]
     else
-      let processed := processReceipt cfg { ap with storageAccounting } codeOf st receipt
+      let processed := processWithInstants cfg { ap with storageAccounting } codeOf st receipt
       storageAccounting := processed.storageAccounting
       if let some issue := processed.issue then
         return { state := initial, outgoing := [], outcomes := [], tokensBurnt := 0, issue := some issue }
@@ -64,12 +64,20 @@ def applyReceiptQueue (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes â†
       for (_, outcome) in processed.outcomes do
         gasUsed := gasUsed + outcome.gasBurnt
         tokensBurnt := tokensBurnt + outcome.tokensBurnt
+      gasUsed := gasUsed + processed.extraCompute
       tokensBurnt := tokensBurnt + processed.otherTokensBurnt - processed.rewards
       if let some limit := ap.gasLimit then
         if gasUsed â‰¥ limit then overLimit := true
+  -- Yields that timed out wake up with a resume receipt, after all incoming receipts.
+  let (stTimed, timeoutReceipts, timeoutBirths) := resolveYieldTimeouts ap ap.gasLimit gasUsed
+    (st.yieldTimeouts.length + 1) (st, [], [])
+  st := stTimed
+  outgoing := outgoing ++ timeoutReceipts
+  identityBirths := identityBirths ++ timeoutBirths
   return {
     state := { st with delayed := retainedDelayed ++ newlyDelayed }, outgoing, outcomes, tokensBurnt, subsidizedAmount, identityBirths
     storageAccounting
+    proposals := outcomes.flatMap (Â·.2.proposals)
     delayedConsumed := initial.delayed.length - retainedDelayed.length, delayedAppended := newlyDelayed.length }
 
 /-- Every public field, including queue metadata and identity births, agrees

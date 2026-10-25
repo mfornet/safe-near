@@ -171,7 +171,7 @@ theorem runReceiptActions_success_funded_of_body (c : ReceiptCtx) (st : ChainSta
     (hsuccess : (runReceiptActions c st).2 = none) :
     let raw := (runReceiptActions c st).1
     raw.state.AccountsUnique ∧
-      raw.totalFunds c.cfg + raw.gasBurnt * c.action.gasPrice =
+      raw.totalFunds c.cfg + raw.gasBurnt * c.action.gasPrice + raw.actionTokensBurnt =
         st.totalBalance + Fees.totalDeposit c.action.actions + raw.subsidizedAmount + raw.gasUsed * c.action.gasPrice := by
   cases hr : (receiptActionBody c).run.run { state := st, actorId := c.receipt.predecessorId, storageAccounting := c.ap.storageAccounting } with
   | mk result raw =>
@@ -189,7 +189,7 @@ theorem runReceiptActions_success_funded (c : ReceiptCtx) (st : ChainState)
     (hsuccess : (runReceiptActions c st).2 = none) :
     let raw := (runReceiptActions c st).1
     raw.state.AccountsUnique ∧
-      raw.totalFunds c.cfg + raw.gasBurnt * c.action.gasPrice =
+      raw.totalFunds c.cfg + raw.gasBurnt * c.action.gasPrice + raw.actionTokensBurnt =
         st.totalBalance + Fees.totalDeposit c.action.actions + raw.subsidizedAmount + raw.gasUsed * c.action.gasPrice :=
   runReceiptActions_success_funded_of_body c st hwf (funded_receiptActionBody c hreceiver hactions) hsuccess
 

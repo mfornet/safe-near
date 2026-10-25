@@ -3,6 +3,7 @@ import NearVM.Error
 import NearVM.Gas
 import NearVM.TrieOverlay
 import NearInterface.Raw
+import NearInterface.HostCrypto
 
 /-!
 # NEAR host state (`α := NearState`)
@@ -73,6 +74,8 @@ structure NearContext where
   usedGas              : UInt64 := 0
   validatorStake       : List UInt8 → Nat := fun _ => 0
   validatorTotalStake  : Nat := 0
+  /-- `chain_id`: the chain's name, as the epoch provider reports it. -/
+  chainId              : List UInt8 := []
 deriving Inhabited
 
 /-- Optional NEAR host limits. `none` means the reference model leaves that
@@ -87,12 +90,19 @@ structure NearConfig where
   ethImplicitAccounts : Bool := false
   maxRegisterLen     : Option Nat := none
   maxReturnLen       : Option Nat := none
+  /-- `max_total_log_length`: the bytes of all log messages (UTF-8, after decoding). -/
   maxLogLen          : Option Nat := none
   maxNumberLogs      : Option Nat := none
   maxStorageKeyLen   : Option Nat := none
   maxStorageValueLen : Option Nat := none
   maxInputDataDependencies : Option Nat := none
   maxPromises : Option Nat := none
+  /-- `max_contract_size`, checked by the global contract deployment hosts. -/
+  maxContractSize : Option Nat := none
+  /-- `max_yield_payload_size`, checked by `promise_yield_resume`. -/
+  maxYieldPayloadSize : Option Nat := none
+  /-- The behaviour version of the `bls12381_*` host functions (`1` with NEP-488). -/
+  blsVersion : Nat := 0
   validAccountId     : List UInt8 → Bool := fun _ => true
   validPublicKey     : List UInt8 → Bool := fun _ => true
 deriving Inhabited
@@ -105,8 +115,22 @@ inductive NearPromise where
   | batch (accountId : List UInt8) (actions : List PromiseAction)
   | callback (base : Nat) (accountId : List UInt8) (actions : List PromiseAction)
   | and (dependencies : List Nat)
-  | yielded (methodName args : List UInt8) (gas weight : UInt64) (dataId : List UInt8)
+  /-- `promise_yield_create`: a receipt to the creating account that waits for the data
+  identified by `dataId` (derived from the action, block height and data counter). Its
+  first action is the yielded function call; further actions may be appended. -/
+  | yielded (receiverId : List UInt8) (actions : List PromiseAction) (dataId : List UInt8)
 deriving Inhabited, BEq
+
+/-- The number of data ids a call has generated after creating `ps`, with the
+number of receipts each handle waits for (nearcore's `generate_data_id` counter).
+A callback generates one id per receipt it waits for; a yield generates one. -/
+def promiseDataCount (ps : List NearPromise) : Nat × List Nat :=
+  ps.foldl (fun (count, lens) p =>
+    match p with
+    | .batch .. => (count, lens ++ [1])
+    | .callback base .. => (count + (lens[base]?.getD 0), lens ++ [1])
+    | .and dependencies => (count, lens ++ [(dependencies.map fun d => lens[d]?.getD 0).sum])
+    | .yielded .. => (count + 1, lens ++ [1])) (0, [])
 
 /-- Snapshot iterator over finite storage keys. The primary storage model
 remains a function; this is the finite witness needed by deprecated NEAR
@@ -150,11 +174,11 @@ structure NearState where
   returnedPromise : Option Nat := none
   /-- Successful `promise_yield_resume` payloads, newest last. -/
   yieldResumes : List (List UInt8 × List UInt8) := []
+  /-- Hash of the executing action: the ancestor of every data id this call generates. -/
+  actionHash : List UInt8 := []
+  /-- Data ids of the current account's yields that have a stored receipt or status. -/
+  existingYields : List (List UInt8) := []
   config     : NearConfig := {}
-  sha256     : List UInt8 → List UInt8 := fun _ => []
-  keccak256  : List UInt8 → List UInt8 := fun _ => []
-  keccak512  : List UInt8 → List UInt8 := fun _ => []
-  ripemd160  : List UInt8 → List UInt8 := fun _ => []
   randomSeed : List UInt8 := []
   /-- Gas counter of this execution; charged by the metered host functions
   (`NearVM.Metered`) and by the step loop (`NearVM.Run`). -/
@@ -170,24 +194,14 @@ structure NearState where
   /-- The structured error behind the last host trap, read by the runner. -/
   lastError  : Option Near.HostError := none
   lastExecutionIssue : Option Near.ExecutionIssue := none
-  ecrecover  : List UInt8 → List UInt8 → UInt64 → Bool → Option (List UInt8) :=
-    fun _ _ _ _ => none
-  ed25519Verify : List UInt8 → List UInt8 → List UInt8 → Bool :=
-    fun _ _ _ => false
   yieldCreateToken : List UInt8 → List UInt8 → UInt64 → UInt64 → List UInt8 :=
     fun _ _ _ _ => []
-  altBn128G1Multiexp : List UInt8 → List UInt8 := fun _ => []
-  altBn128G1Sum : List UInt8 → List UInt8 := fun _ => []
-  altBn128PairingCheck : List UInt8 → UInt64 := fun _ => 0
-  bls12381G1Multiexp : List UInt8 → UInt64 × List UInt8 := fun _ => (1, [])
-  bls12381G2Multiexp : List UInt8 → UInt64 × List UInt8 := fun _ => (1, [])
-  bls12381MapFpToG1 : List UInt8 → UInt64 × List UInt8 := fun _ => (1, [])
-  bls12381MapFp2ToG2 : List UInt8 → UInt64 × List UInt8 := fun _ => (1, [])
-  bls12381P1Decompress : List UInt8 → UInt64 × List UInt8 := fun _ => (1, [])
-  bls12381P2Decompress : List UInt8 → UInt64 × List UInt8 := fun _ => (1, [])
-  bls12381P1Sum : List UInt8 → UInt64 × List UInt8 := fun _ => (1, [])
-  bls12381P2Sum : List UInt8 → UInt64 × List UInt8 := fun _ => (1, [])
-  bls12381PairingCheck : List UInt8 → UInt64 := fun _ => 0
+  /-- The cryptography of the hashing and signature host functions; without it they are
+  reported as unsupported (`HostCrypto`). -/
+  crypto : Option Near.HostCrypto := none
+  /-- The bytes the cryptographic host function that just ran wrote to a register, if any: its
+  write-register gas is charged afterwards, once it is known whether it wrote. -/
+  registerWrite : Option Nat := none
 deriving Inhabited
 
 namespace NearState

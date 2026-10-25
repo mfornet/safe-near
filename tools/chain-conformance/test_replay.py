@@ -16,14 +16,17 @@ PK = [0] + [1] * 32
 
 
 def account(amount, code=None):
-    return {"amount": str(amount), "locked": "0", "codeHash": code, "storageUsage": 182}
+    return {"amount": str(amount), "locked": "0", "codeHash": code, "global": None,
+            "versionTwo": False, "storageUsage": 182}
 
 
 def empty_state():
     return {"accounts": [["alice.near", account(100 * ONE)], ["bob.near", account(10 * ONE)]],
             "accessKeys": [[["alice.near", PK], {"nonce": 0, "permission": {"kind": "fullAccess"}}]],
             "storage": [], "postponed": [], "pendingDataCount": [], "postponedByData": [],
-            "receivedData": [], "delayed": [], "nextId": 1}
+            "receivedData": [], "delayed": [], "nextId": 1, "globalCode": [], "globalNonces": [],
+            "gasKeyNonces": [], "yieldIndices": None, "yieldTimeouts": [], "yieldReceipts": [],
+            "yieldStatus": []}
 
 
 def block(transactions=(), incoming=None, height=7):
@@ -53,7 +56,7 @@ def receipt(payload, identifier=20):
 def action_receipt(actions, identifier=20):
     return receipt({"kind": "action", "signerId": "alice.near", "signerPublicKey": PK,
                     "gasPrice": "100000000", "outputDataReceivers": [[41, "alice.near"]],
-                    "inputDataIds": [40], "actions": actions}, identifier)
+                    "inputDataIds": [40], "actions": actions, "yieldDataId": None}, identifier)
 
 
 def request():
@@ -142,8 +145,8 @@ class ChainReplayTests(unittest.TestCase):
                            "kind": "functionCall", "allowance": "123", "receiverId": "bob.near", "methodNames": ["x"]}}},
                        {"kind": "deleteKey", "publicKey": PK}, {"kind": "deleteAccount", "beneficiaryId": "alice.near"}]
             action = action_receipt(actions)
-            failed = receipt({"kind": "data", "dataId": 43, "data": None}, 22)
-            empty = receipt({"kind": "data", "dataId": 44, "data": []}, 23)
+            failed = receipt({"kind": "data", "dataId": 43, "data": None, "resumeDataId": None}, 22)
+            empty = receipt({"kind": "data", "dataId": 44, "data": [], "resumeDataId": None}, 23)
             state = value["initialState"]
             state["accounts"][0][1].update(codeHash="replay", locked="345")
             state["accessKeys"].append([["bob.near", [0] + [2] * 32], {"nonce": 8, "permission": {
@@ -175,7 +178,9 @@ class ChainReplayTests(unittest.TestCase):
             self.assertNotIn("child.alice.near", accounts(result["blocks"][-1]["state"]))
             self.assertFalse(any(owner == "child.alice.near" for (owner, _), _ in result["blocks"][-1]["state"]["accessKeys"]))
 
-    def test_emitted_deployment_uses_the_catalogue_or_rejects_atomically(self):
+    def test_emitted_deployment_outside_the_catalogue_is_decoded(self):
+        # A contract can deploy bytes no input names; the replay decodes them as it decodes the catalogue,
+        # so the run is the same with or without the deployed code listed.
         with tempfile.TemporaryDirectory() as directory:
             value = request()
             self.catalogue(value, directory)
@@ -185,14 +190,11 @@ class ChainReplayTests(unittest.TestCase):
             self.assertTrue(all(b["issue"] is None for b in known["blocks"]))
             self.assertEqual(accounts(known["blocks"][1]["state"])["alice.near"]["codeHash"], "empty")
             value["codes"] = value["codes"][:1]
-            missing = execute(value)
-            self.assertEqual(missing["stop"], "executionIssue")
-            self.assertEqual(missing["unrunBlocks"], 2)
-            self.assertEqual(missing["blocks"][0]["state"], value["initialState"])
-            self.assertEqual(missing["blocks"][0]["outcomes"], [])
-            self.assertEqual(missing["blocks"][0]["outgoingReceipts"], [])
-            self.assertEqual(missing["blocks"][0]["tokensBurnt"], "0")
-            self.assertIn("catalogue", missing["blocks"][0]["issue"]["message"])
+            decoded = execute(value)
+            self.assertEqual(decoded["stop"], known["stop"])
+            self.assertEqual([b["issue"] for b in decoded["blocks"]], [None] * 3)
+            self.assertEqual([b["outcomes"] for b in decoded["blocks"]], [b["outcomes"] for b in known["blocks"]])
+            self.assertEqual([b["tokensBurnt"] for b in decoded["blocks"]], [b["tokensBurnt"] for b in known["blocks"]])
 
     def test_unknown_signature_encoding_is_a_model_issue_without_charging(self):
         for earlier in [[], [tx([transfer()])]]:

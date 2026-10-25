@@ -25,6 +25,28 @@ abbrev TransactionLoop := Option ApplyResult × ChainState × List (ReceiptId ×
 abbrev ReceiptLoop := Option ApplyResult × ChainState × List (ReceiptId × ExecutionOutcome) ×
   List Receipt × List ReceiptIdentityBirth × Nat × Nat × List Receipt × List Receipt × Nat × Bool × Option TrieOverlay.State
 
+/-- A state predicate preserved by every receipt is preserved by a receipt and the instant
+receipts it creates. -/
+theorem processWithInstants_state_predicate (cfg : RuntimeConfig) (ap : ApplyState)
+    (decoder : Bytes → ContractCode) (P : ChainState → Prop)
+    (hreceipt : ∀ accounting before receipt, P before →
+      P (processReceipt cfg { ap with storageAccounting := accounting } decoder before receipt).state)
+    (st : ChainState) (receipt : Receipt) (h : P st) :
+    P (processWithInstants cfg ap decoder st receipt).state := by
+  have key := processWithInstants_induction cfg ap decoder
+    (fun acc _ => P acc.state) (fun p => P p.state) (fun st' _ => P st')
+    (fun _ h => h) (fun _ _ _ _ h => h)
+    (by
+      intro acc r' rest h _ _
+      exact hreceipt acc.storageAccounting acc.state r' h)
+    (by
+      intro st' r' hs _
+      exact hreceipt ap.storageAccounting st' r' hs)
+    (by
+      intro st' r' hs _
+      exact hreceipt ap.storageAccounting st' r' hs)
+  exact key st receipt h
+
 /-- State predicates closed under the scheduler updates survive both real loops,
 including atomic early exits and final assembly of retained/new delayed work. -/
 theorem applyAttempt_state_predicate (cfg : RuntimeConfig) (ap : ApplyState)
@@ -35,6 +57,7 @@ theorem applyAttempt_state_predicate (cfg : RuntimeConfig) (ap : ApplyState)
       P (processReceipt cfg { ap with storageAccounting := accounting } decoder before receipt).state)
     (hclear : ∀ before, P before → P { before with delayed := [] })
     (hdelay : ∀ before receipt, P before → P { before with delayed := before.delayed ++ [receipt] })
+    (htimeout : ∀ before after, P before → before.TimeoutStep after → P after)
     (st : ChainState) (txs : List Transaction) (incoming : List Receipt) (h : P st) :
     P (applyAttempt cfg ap decoder st txs incoming).state := by
   have happend (before : ChainState) (receipts : List Receipt) (hb : P before) :
@@ -85,13 +108,14 @@ theorem applyAttempt_state_predicate (cfg : RuntimeConfig) (ap : ApplyState)
         · simp only [hover, ite_true]
           split_ifs <;> exact ⟨hs.1, by intro returned he; contradiction⟩
         · simp only [hover, Bool.false_eq_true, ite_false]
-          cases hi : (processReceipt cfg { ap with storageAccounting := state.2.2.2.2.2.2.2.2.2.2.2 } decoder state.2.1 entry.1).issue with
+          cases hi : (processWithInstants cfg { ap with storageAccounting := state.2.2.2.2.2.2.2.2.2.2.2 } decoder state.2.1 entry.1).issue with
           | some issue =>
             simp only
             exact ⟨hs.1, by intro returned he; cases he; exact h⟩
           | none =>
             simp only
-            have hp := hreceipt state.2.2.2.2.2.2.2.2.2.2.2 state.2.1 entry.1 hs.1
+            have hp := processWithInstants_state_predicate cfg { ap with storageAccounting := state.2.2.2.2.2.2.2.2.2.2.2 }
+              decoder P (fun accounting before receipt hb => hreceipt accounting before receipt hb) state.2.1 entry.1 hs.1
             cases hl : ap.gasLimit with
             | none =>
               simp only [hl] at hp
@@ -103,7 +127,7 @@ theorem applyAttempt_state_predicate (cfg : RuntimeConfig) (ap : ApplyState)
     split
     · rename_i returned he
       exact hresult.2 returned he
-    · exact hdelays _ _ hresult.1
+    · exact hdelays _ _ (htimeout _ _ hresult.1 (resolveYieldTimeouts_spec ap _ _ _ _ _ _).1)
 
 /-- An absent synthetic actor stays absent through the actual transaction,
 receipt and gas-limit loops, including an early model-issue exit. -/
@@ -116,6 +140,10 @@ theorem applyAttempt_systemAbsent (cfg : RuntimeConfig) (ap : ApplyState)
   · intro accounting; exact processReceipt_systemAbsent cfg { ap with storageAccounting := accounting } decoder
   · intro before hb; exact hb
   · intro before receipt hb; exact hb
+  · intro before after hb hstep
+    unfold ChainState.SystemAccountAbsent ChainState.account? at hb ⊢
+    rw [hstep.accounts]
+    exact hb
   · exact h
 
 theorem apply_systemAbsent (cfg : RuntimeConfig) (ap : ApplyState)

@@ -83,6 +83,10 @@ def permissionJson : AccessKeyPermission → Json
   | .functionCall allowance receiver methods => obj [kind "functionCall",
       ("allowance", toJson (allowance.map toString)),
       ("receiverId", bytesJson receiver), ("methodNames", bytesJson methods)]
+  | .gasKeyFullAccess nonces => obj [kind "gasKeyFullAccess", ("numNonces", toJson nonces)]
+  | .gasKeyFunctionCall nonces allowance receiver methods => obj [kind "gasKeyFunctionCall",
+      ("numNonces", toJson nonces), ("allowance", toJson (allowance.map toString)),
+      ("receiverId", bytesJson receiver), ("methodNames", bytesJson methods)]
 
 def actionJson : PromiseAction → Json
   | .createAccount => obj [kind "createAccount"]
@@ -98,10 +102,15 @@ def actionJson : PromiseAction → Json
   | .deleteAccount beneficiary => obj [kind "deleteAccount", ("beneficiaryId", bytesJson beneficiary)]
   | .useGlobalContract (.codeHash hash) => obj [kind "useGlobalContract", ("codeHash", bytesJson hash)]
   | .useGlobalContract (.accountId id) => obj [kind "useGlobalContract", ("accountId", bytesJson id)]
+  | .deployGlobalContract code mode => obj [kind "deployGlobalContract", ("code", bytesJson code),
+      ("mode", toJson (match mode with | .codeHash => "codeHash" | .accountId => "accountId"))]
+  | .transferToGasKey pk amount => obj [kind "transferToGasKey", ("publicKey", bytesJson pk),
+      ("deposit", toJson (toString amount))]
 
 def receiptJson (receipt : ReceiptSpec) : Json := obj [
   ("receiverId", bytesJson receipt.receiverId),
   ("dependencies", toJson receipt.dependencies),
+  ("yieldDataId", toJson (receipt.yieldDataId.map bytesJson)),
   ("actions", toJson (receipt.actions.map actionJson))]
 
 def returnJson : ReturnData → Json
@@ -119,6 +128,7 @@ def outcomeJson (outcome : VMOutcome) : Json :=
     ("logs", toJson outcome.logs),
     ("storage", toJson (storage.map fun (k, v) => (k.map UInt8.toNat, v.map UInt8.toNat))),
     ("receipts", toJson (outcome.receipts.map receiptJson)),
+    ("resumes", toJson (outcome.resumes.map fun (dataId, payload) => obj [("dataId", bytesJson dataId), ("payload", bytesJson payload)])),
     ("aborted", toJson (outcome.aborted.map (·.message))),
     ("issue", toJson (outcome.issue?.map (·.message))),
     ("subsidizedAmount", toJson (toString outcome.subsidizedAmount)),

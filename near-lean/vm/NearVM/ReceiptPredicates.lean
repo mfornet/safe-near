@@ -5,11 +5,11 @@ namespace Wasm.Near
 /-- A property of the receiver and ordered actions of a materialized receipt. -/
 abbrev ReceiptPredicate := List UInt8 → List PromiseAction → Prop
 
-/-- Joins create no receipt. Yielded promises still require successful conversion;
-this predicate does not assert that unsupported conversion succeeds. -/
+/-- Joins create no receipt; every other handle is a receipt whose actions must satisfy it. -/
 def PromiseSatisfies (property : ReceiptPredicate) : NearPromise → Prop
-  | .batch receiver actions | .callback _ receiver actions => property receiver actions
-  | .and _ | .yielded .. => True
+  | .batch receiver actions | .callback _ receiver actions | .yielded receiver actions _ =>
+    property receiver actions
+  | .and _ => True
 
 private def violationValue (property : ReceiptPredicate) [DecidableRel property] : ReceiptValuation :=
   fun receiver actions => if property receiver actions then 0 else 1

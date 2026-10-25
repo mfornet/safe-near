@@ -12,6 +12,7 @@ Nothing here edits an expected value to agree with Lean; ``replay`` only reads `
 from __future__ import annotations
 
 import base64
+import copy
 import hashlib
 import json
 from pathlib import Path
@@ -30,19 +31,16 @@ CONFIG_DIR = ROOT / "near-lean/vm/configs"
 EMPTY_CODE_HASH = "1" * 32
 
 # columns of the raw trie the Lean state model has a place for
-MODEL_COLUMNS = {0, 1, 2, 3, 4, 5, 6, 7, 9}
+MODEL_COLUMNS = {0, 1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 18, 19, 20}
 SCHEDULER_COLUMN = 15
+# the outgoing buffers: indices, receipts, and the receipt group metadata (13, 14, 16, 17) are decoded by Lean itself
+BUFFER_COLUMNS = {13, 14, 16, 17}
 UNREPRESENTED_ACTIONS = {
-    "Delegate": "action Delegate (meta transaction)",
-    "DelegateV2": "action DelegateV2 (meta transaction with gas keys)",
-    "DeployGlobalContract": "action DeployGlobalContract",
-    "UseGlobalContract": "action UseGlobalContract",
     "DeterministicStateInit": "action DeterministicStateInit",
-    "TransferToGasKey": "action TransferToGasKey",
-    "WithdrawFromGasKey": "action WithdrawFromGasKey",
 }
-HOSTS_NEEDING_EPOCH = {"validator_stake": "host function validator_stake (needs the epoch's validator set)",
-                       "validator_total_stake": "host function validator_total_stake (needs the epoch's validator set)"}
+# the action views that are spelled differently in the RPC view and in the typed receipt
+ACTION_ALIASES = {"DeployGlobalContractByAccountId": "DeployGlobalContract",
+                  "UseGlobalContractByAccountId": "UseGlobalContract"}
 
 
 class Unsupported(Exception):
@@ -82,6 +80,18 @@ def public_key(text: str) -> list[int]:
     return [prefix] + list(b58(body))
 
 
+def layout_shard_ids(layout_hex: str) -> list[int]:
+    """Shard ids of a Borsh ``ShardLayout::V2`` in layout order (Lean parses and checks the rest)."""
+    raw = bytes.fromhex(layout_hex)
+    if raw[0] != 2:
+        raise Unsupported([f"shard layout version {raw[0]}"])
+    at = 5
+    for _ in range(int.from_bytes(raw[1:5], "little")):
+        at += 4 + int.from_bytes(raw[at:at + 4], "little")
+    count = int.from_bytes(raw[at:at + 4], "little")
+    return [int.from_bytes(raw[at + 4 + 8 * i:at + 12 + 8 * i], "little") for i in range(count)]
+
+
 def view_action_kinds(actions) -> list[str]:
     return corpus.action_kinds(actions)
 
@@ -91,10 +101,8 @@ def blockers(bundle: dict) -> list[str]:
     """Features of this chunk the Lean model cannot express, most fundamental first."""
     found: list[str] = []
     context, inputs, expected = bundle["context"], bundle["inputs"], bundle["expected"]
-    if len(context["congestionInfo"]) > 1:
-        found.append("multi-shard layout (the chunk model assumes the single-shard reference layout)")
     for number in sorted({column(key) for key, _ in bundle["preState"]["entries"]}):
-        if number not in MODEL_COLUMNS and number != SCHEDULER_COLUMN:
+        if number not in MODEL_COLUMNS and number != SCHEDULER_COLUMN and number not in BUFFER_COLUMNS:
             found.append(f"pre-state column {column_name(number)}")
     kinds: list[str] = []
     for row in inputs["transactions"]:
@@ -107,7 +115,7 @@ def blockers(bundle: dict) -> list[str]:
     for view in inputs["incomingReceiptViews"]:
         payload = view["receipt"]
         kind = next(iter(payload))
-        if kind not in ("Action", "Data"):
+        if kind not in ("Action", "Data", "GlobalContractDistribution"):
             found.append(f"receipt kind {kind}")
         if kind == "ActionV2" or (kind == "Action" and False):
             found.append("receipt kind ActionV2 (refund_to)")
@@ -116,13 +124,6 @@ def blockers(bundle: dict) -> list[str]:
     for kind in dict.fromkeys(kinds):
         if kind in UNREPRESENTED_ACTIONS:
             found.append(UNREPRESENTED_ACTIONS[kind])
-    if context["validatorAccountsUpdate"] is not None:
-        found.append("epoch boundary: validator accounts update (rewards, stake return)")
-    for outcome in expected["outcomes"]:
-        for entry in (outcome["view"].get("metadata") or {}).get("gas_profile") or []:
-            host = corpus.host_function(entry["cost"]) if entry.get("cost_category") == "WASM_HOST_COST" else None
-            if host in HOSTS_NEEDING_EPOCH:
-                found.append(HOSTS_NEEDING_EPOCH[host])
     return list(dict.fromkeys(found))
 
 
@@ -133,7 +134,8 @@ import import_snapshot as importer  # noqa: E402  (action and access-key views -
 from compare_fixture import PublicKeys  # noqa: E402
 
 MODEL_ACTIONS = {"CreateAccount", "DeployContract", "FunctionCall", "Transfer", "Stake", "AddKey", "DeleteKey",
-                 "DeleteAccount"}
+                 "DeleteAccount", "Delegate", "DelegateV2", "DeployGlobalContract", "DeployGlobalContractByAccountId",
+                 "UseGlobalContract", "UseGlobalContractByAccountId", "TransferToGasKey", "WithdrawFromGasKey"}
 
 
 def model_action_blockers(kinds: list[str]) -> list[str]:
@@ -159,9 +161,15 @@ def receipt_format(raw: bytes) -> tuple[str, bool]:
         return "legacy", False
     if tag == 1:
         return "data", False
+    if tag == 3:
+        return "resume", False
+    if tag == 4:
+        return "distribution", False
     if tag == 5:
         _, after = read_string(raw, at + 1)
         return "v2", raw[after] == 1
+    if tag == 6:
+        return "yield", False
     return f"tag {tag}", False
 
 
@@ -179,6 +187,80 @@ def transaction_block_hash(raw: bytes) -> list[int]:
     return list(raw[at:at + 32])
 
 
+
+def delayed_form(raw: bytes) -> tuple[bytes, dict]:
+    """The receipt bytes of a delayed queue entry and how it was stored (``StateStoredReceipt`` or plain)."""
+    if raw[:2] == b"\xff\xff":
+        version = raw[2]
+        if version not in (0, 1):
+            raise Unsupported([f"state-stored receipt version {version}"])
+        return raw[3:-16], {"kind": f"storedV{version}", "gas": int.from_bytes(raw[-16:-8], "little"),
+                            "size": int.from_bytes(raw[-8:], "little")}
+    return raw, {"kind": "receipt"}
+
+
+def received_payload(data) -> list[int] | None:
+    """``ReceivedData.data`` of a decoded record: absent, or the bytes."""
+    if data is None:
+        return None
+    return list(base64.b64decode(data)) if isinstance(data, str) else list(data)
+
+
+class Reader:
+    """A cursor over Borsh bytes."""
+
+    def __init__(self, raw: bytes):
+        self.raw, self.at = raw, 0
+
+    def take(self, n: int) -> bytes:
+        if self.at + n > len(self.raw):
+            raise Unsupported(["truncated Borsh record"])
+        chunk = self.raw[self.at:self.at + n]
+        self.at += n
+        return chunk
+
+    def uint(self, width: int) -> int:
+        return int.from_bytes(self.take(width), "little")
+
+    def string(self) -> str:
+        return self.take(self.uint(4)).decode()
+
+    def vector(self) -> bytes:
+        return self.take(self.uint(4))
+
+    def public_key(self) -> list[int]:
+        tag = self.take(1)[0]
+        if tag not in (0, 1):
+            raise Unsupported([f"public key type {tag}"])
+        return [tag] + list(self.take(32 if tag == 0 else 64))
+
+    def done(self) -> bool:
+        return self.at == len(self.raw)
+
+
+def global_identifier_json(identifier: dict) -> dict:
+    """The model's global contract identifier from the typed form ``{"hash": ...}`` / ``{"account_id": ...}``."""
+    if "hash" in identifier:
+        return {"codeHash": list(b58(identifier["hash"]))}
+    name = identifier.get("account_id", identifier.get("accountId"))
+    if name is None:
+        raise Unsupported([f"global contract identifier {identifier}"])
+    return {"accountId": list(name.encode())}
+
+
+def signature_bytes(text: str) -> list[int]:
+    kind, body = text.split(":", 1)
+    prefix = {"ed25519": 0, "secp256k1": 1}.get(kind)
+    if prefix is None:
+        raise Unsupported([f"signature type {kind}"])
+    return [prefix] + list(b58(body))
+
+
+def nested(*items):
+    """A tuple as Lean's JSON codec reads it: a pair whose second component is the rest, nested."""
+    return list(items) if len(items) <= 2 else [items[0], nested(*items[1:])]
+
+
 class Converter:
     """One bundle -> one registered-replay request; fills ``codes`` on disk under ``workdir``."""
 
@@ -191,6 +273,7 @@ class Converter:
         self.data_ids: dict[str, int] = {}
         self.data_receivers: dict[str, str] = {}
         self.reasons: list[str] = []
+        self.yield_formats: list = []
 
     def fresh(self, table: dict, name: str) -> int:
         if name not in table:
@@ -198,21 +281,95 @@ class Converter:
             self.next_id += 1
         return table[name]
 
+    def code_label(self, blob: bytes) -> str:
+        label = nc.b58encode(hashlib.sha256(blob).digest())
+        self.codes[label] = blob
+        return label
+
+    def access_key(self, raw: dict) -> dict:
+        permission = raw["permission"]
+        if isinstance(permission, dict):
+            name, body = next(iter(permission.items()))
+            if name == "GasKeyFullAccess":
+                return {"nonce": raw["nonce"], "permission": {"kind": "gasKeyFullAccess", "balance": body["balance"],
+                                                              "numNonces": body["num_nonces"]}}
+            if name == "GasKeyFunctionCall":
+                info, call = (body["gas_key_info"], body["function_call"]) if isinstance(body, dict) else body
+                return {"nonce": raw["nonce"], "permission": {
+                    "kind": "gasKeyFunctionCall", "balance": info["balance"], "numNonces": info["num_nonces"],
+                    "allowance": call["allowance"], "receiverId": call["receiver_id"],
+                    "methodNames": call["method_names"]}}
+        return importer.access_key(raw)
+
     def action(self, view) -> dict:
+        if isinstance(view, dict) and len(view) == 1:
+            name, data = next(iter(view.items()))
+            name = ACTION_ALIASES.get(name, name)
+            if name == "DeployGlobalContract":
+                label = self.code_label(base64.b64decode(data["code"]))
+                mode = data.get("deploy_mode") or ("AccountId" if next(iter(view)) == "DeployGlobalContractByAccountId" else "CodeHash")
+                return {"kind": "deployGlobalContract", "codeHash": label,
+                        "mode": {"CodeHash": "codeHash", "AccountId": "accountId"}[mode]}
+            if name == "UseGlobalContract":
+                if "contract_identifier" in data:
+                    identifier = data["contract_identifier"]
+                elif "code_hash" in data:
+                    identifier = {"hash": data["code_hash"]}
+                else:
+                    identifier = {"account_id": data["account_id"]}
+                return {"kind": "useGlobalContract", **global_identifier_json(identifier)}
+            if name == "TransferToGasKey":
+                return {"kind": "transferToGasKey", "publicKey": list(self.keys[data["public_key"]]),
+                        "deposit": data["deposit"]}
+            if name == "WithdrawFromGasKey":
+                return {"kind": "withdrawFromGasKey", "publicKey": list(self.keys[data["public_key"]]),
+                        "amount": data["amount"]}
+            if name in ("Delegate", "DelegateV2"):
+                return self.delegate(name, data)
+            if name == "AddKey":
+                return {"kind": "addKey", "publicKey": list(self.keys[data["public_key"]]),
+                        "accessKey": self.access_key(data["access_key"])}
         return importer.action(view, self.keys, self.codes)
+
+    def delegate(self, name: str, data: dict) -> dict:
+        body = data["delegate_action"]
+        v2 = name == "DelegateV2"
+        if v2:
+            body = body["V2"]
+        nonce, index = body["nonce"], None
+        if isinstance(nonce, dict):
+            if "GasKeyNonce" in nonce:
+                nonce, index = nonce["GasKeyNonce"]["nonce"], nonce["GasKeyNonce"]["nonce_index"]
+            else:
+                nonce = nonce["Nonce"]["nonce"]
+        return {"kind": "delegate", "v2": v2, "senderId": body["sender_id"], "receiverId": body["receiver_id"],
+                "actions": [self.action(a) for a in body["actions"]], "nonce": nonce, "nonceIndex": index,
+                "maxBlockHeight": body["max_block_height"], "publicKey": list(self.keys[body["public_key"]]),
+                "signature": signature_bytes(data["signature"])}
 
     def model_receipt(self, view: dict, typed: dict, raw: bytes) -> tuple[dict, str]:
         kind, refund = receipt_format(raw)
         payload = view["receipt"]
         variant = next(iter(payload))
-        if kind == "data":
+        if kind == "resume":
             data = payload["Data"]
-            if data.get("is_promise_resume"):
-                raise Unsupported(["receipt kind PromiseResume"])
+            body = {"kind": "data", "dataId": 0, "resumeDataId": list(b58(data["data_id"])),
+                    "data": None if data["data"] is None else list(base64.b64decode(data["data"]))}
+        elif kind == "data":
+            data = payload["Data"]
             identifier = self.fresh(self.data_ids, data["data_id"])
             self.data_receivers[data["data_id"]] = view["receiver_id"]
             body = {"kind": "data", "dataId": identifier,
                     "data": None if data["data"] is None else list(base64.b64decode(data["data"]))}
+        elif kind == "distribution":
+            distribution = next(iter(typed["receipt"]["GlobalContractDistribution"].values()))
+            if "code" not in distribution:       # the versioned wrapper: {"V2": {...}}
+                distribution = next(iter(distribution.values()))
+            body = {"kind": "globalDistribution", "id": global_identifier_json(distribution["id"]),
+                    "targetShard": distribution["target_shard"],
+                    "alreadyDelivered": distribution["already_delivered_shards"],
+                    "codeHash": self.code_label(base64.b64decode(distribution["code"])),
+                    "nonce": distribution.get("nonce", 0)}
         elif kind in ("legacy", "v2") and variant == "Action":
             if refund:
                 raise Unsupported(["receipt with an explicit refund_to"])
@@ -235,9 +392,162 @@ class Converter:
         return {"predecessorId": view["predecessor_id"], "receiverId": view["receiver_id"], "receiptId": identifier,
                 "receipt": body}, kind
 
+    # --- columns the state view leaves undecoded: read straight from the raw trie entries -----------------------
+    def state_receipt(self, record: dict, raw: bytes) -> dict:
+        """A receipt stored in the shard (postponed or delayed) as the model's receipt JSON."""
+        name, payload = next(iter(record["receipt"].items()))
+        if name in ("Action", "ActionV2"):
+            variant = "Action"
+        elif name == "Data":
+            variant = name
+            if isinstance(payload.get("data"), list):                    # the typed form lists the bytes
+                payload = dict(payload, data=base64.b64encode(bytes(payload["data"])).decode())
+        else:
+            variant = name
+        view = {"predecessor_id": record["predecessor_id"], "receiver_id": record["receiver_id"],
+                "receipt_id": record["receipt_id"], "receipt": {variant: payload}}
+        receipt, kind = self.model_receipt(view, {"receipt": record["receipt"]}, raw)
+        self.yield_formats.append([receipt["receiptId"], kind if kind in ("legacy", "v2") else "legacy"])
+        return receipt
+
+    def raw_action(self, reader: Reader) -> dict:
+        tag = reader.take(1)[0]
+        if tag == 0:
+            return {"kind": "createAccount"}
+        if tag == 1:
+            return {"kind": "deployContract", "codeHash": self.code_label(reader.vector())}
+        if tag == 2:
+            return {"kind": "functionCall", "methodName": reader.string(), "args": list(reader.vector()),
+                    "gas": reader.uint(8), "deposit": str(reader.uint(16))}
+        if tag == 3:
+            return {"kind": "transfer", "deposit": str(reader.uint(16))}
+        if tag == 4:
+            return {"kind": "stake", "stake": str(reader.uint(16)), "publicKey": reader.public_key()}
+        if tag == 5:
+            key = reader.public_key()
+            return {"kind": "addKey", "publicKey": key, "accessKey": self.raw_access_key(reader)}
+        if tag == 6:
+            return {"kind": "deleteKey", "publicKey": reader.public_key()}
+        if tag == 7:
+            return {"kind": "deleteAccount", "beneficiaryId": reader.string()}
+        raise Unsupported([f"stored receipt action tag {tag}"])
+
+    def raw_access_key(self, reader: Reader) -> dict:
+        nonce, tag = reader.uint(8), reader.take(1)[0]
+
+        def call() -> dict:
+            allowance = None if reader.take(1)[0] == 0 else str(reader.uint(16))
+            receiver = reader.string()
+            methods = [reader.string() for _ in range(reader.uint(4))]
+            return {"allowance": allowance, "receiverId": receiver, "methodNames": methods}
+
+        if tag == 1:
+            return {"nonce": nonce, "permission": {"kind": "fullAccess"}}
+        if tag == 0:
+            return {"nonce": nonce, "permission": {"kind": "functionCall", **call()}}
+        balance, nonces = str(reader.uint(16)), reader.uint(2)
+        if tag == 3:
+            return {"nonce": nonce, "permission": {"kind": "gasKeyFullAccess", "balance": balance, "numNonces": nonces}}
+        return {"nonce": nonce, "permission": {"kind": "gasKeyFunctionCall", "balance": balance, "numNonces": nonces,
+                                               **call()}}
+
+    def add_outgoing_codes(self) -> None:
+        """Code a contract deploys from its own memory appears in no input, only in the expected outgoing
+        receipts. The catalogue maps code hashes to bytes for the encoders, keyed by those exact bytes, so Lean
+        must still produce them itself (the outgoing receipt bytes are compared)."""
+        scratch = copy.deepcopy(self)       # decoding actions may register keys and ids; keep only the codes
+        for raw_hex in self.bundle["expected"]["outgoingReceipts"]:
+            reader = Reader(bytes.fromhex(raw_hex))
+            reader.string(), reader.string(), reader.take(32)
+            tag = reader.take(1)[0]
+            if tag not in (0, 5):           # Action and ActionV2 carry actions; the rest carry no code to deploy
+                continue
+            reader.string()
+            if tag == 5 and reader.take(1)[0] == 1:
+                reader.string()
+            reader.public_key(), reader.uint(16)
+            for _ in range(reader.uint(4)):
+                reader.take(32), reader.string()
+            for _ in range(reader.uint(4)):
+                reader.take(32)
+            try:
+                for _ in range(reader.uint(4)):
+                    scratch.raw_action(reader)
+            except Unsupported:             # an action the model does not encode carries no catalogue code
+                continue
+        self.codes.update(scratch.codes)
+
+    def raw_receipt(self, raw: bytes) -> dict:
+        """A stored ``PromiseYield`` receipt, as the model's receipt JSON."""
+        reader = Reader(raw)
+        predecessor, receiver = reader.string(), reader.string()
+        receipt_id = reader.take(32)
+        tag = reader.take(1)[0]
+        if tag not in (2, 6):
+            raise Unsupported([f"stored receipt kind {tag}"])
+        signer = reader.string()
+        if tag == 6 and reader.take(1)[0] == 1:
+            raise Unsupported(["stored receipt with an explicit refund_to"])
+        signer_key, price = reader.public_key(), reader.uint(16)
+        outputs = []
+        for _ in range(reader.uint(4)):
+            data_id, to = nc.b58encode(reader.take(32)), reader.string()
+            self.data_receivers[data_id] = to
+            outputs.append([self.fresh(self.data_ids, data_id), to])
+        inputs = [reader.take(32) for _ in range(reader.uint(4))]
+        actions = [self.raw_action(reader) for _ in range(reader.uint(4))]
+        if len(inputs) != 1 or not reader.done():
+            raise Unsupported(["stored yield receipt with an unexpected shape"])
+        identifier = self.fresh(self.receipt_ids, nc.b58encode(receipt_id))
+        self.yield_formats.append([identifier, "v2" if tag == 6 else "legacy"])
+        return {"predecessorId": predecessor, "receiverId": receiver, "receiptId": identifier,
+                "receipt": {"kind": "action", "signerId": signer, "signerPublicKey": signer_key,
+                            "gasPrice": str(price), "inputDataIds": [], "outputDataReceivers": outputs,
+                            "yieldDataId": list(inputs[0]), "actions": actions}}
+
+    def raw_columns(self) -> dict:
+        """The yield queue and the global contract tables, decoded from their raw trie entries."""
+        found = {"globalCode": [], "globalNonces": [], "yieldIndices": None, "yieldTimeouts": [],
+                 "yieldReceipts": [], "yieldStatus": []}
+
+        def identifier(reader: Reader) -> dict:
+            tag = reader.take(1)[0]
+            if tag == 0:
+                return {"codeHash": list(reader.take(32))}
+            return {"accountId": list(reader.vector())}
+
+        def owned(key: bytes) -> tuple[str, list[int]]:
+            name, _, data_id = key[1:].partition(b",")
+            return name.decode(), list(data_id)
+
+        for key_hex, value_hex in self.bundle["preState"]["entries"]:
+            key, value = bytes.fromhex(key_hex), bytes.fromhex(value_hex)
+            number = key[0]
+            if number == 10:
+                found["yieldIndices"] = [int.from_bytes(value[:8], "little"), int.from_bytes(value[8:16], "little")]
+            elif number == 11:
+                reader = Reader(value)
+                found["yieldTimeouts"].append(nested(int.from_bytes(key[1:9], "little"), reader.string(),
+                                                     list(reader.take(32)), reader.uint(8)))
+            elif number == 12:
+                account, data_id = owned(key)
+                found["yieldReceipts"].append(nested(account, data_id, self.raw_receipt(value)))
+            elif number == 18:
+                reader = Reader(key[1:])
+                ident = identifier(reader)
+                found["globalCode"].append([ident, self.code_label(value)])
+            elif number == 19:
+                found["globalNonces"].append([identifier(Reader(key[1:])), int.from_bytes(value, "little")])
+            elif number == 20:
+                account, data_id = owned(key)
+                found["yieldStatus"].append(nested(account, data_id, ["yielded", "resumeInitiated"][value[0]]))
+        return found
+
     def state(self) -> tuple[dict, dict | None, dict]:
         """Model state from the decoded pre-state records; also the delayed-queue header and the scheduler."""
-        accounts, keys, storage, contracts = [], [], {}, {}
+        accounts, keys, storage, contracts, gas_nonces = [], [], {}, {}, []
+        postponed, counts, by_data, received, delayed_rows = [], [], [], [], []
+        raw_entries = {key: value for key, value in self.bundle["preState"]["entries"]}
         for row in self.decoded["preState"]:
             if "decodeError" in row:
                 raise Unsupported([f"pre-state record that upstream cannot decode ({row['decodeError']})"])
@@ -246,14 +556,25 @@ class Converter:
             kind, value = next(iter(row["record"].items()))
             if kind == "Account":
                 account = value["account"]
-                extra = set(account) - {"amount", "locked", "code_hash", "storage_usage", "version"}
-                if extra or account.get("version") != "V1":
-                    raise Unsupported([f"account with fields {sorted(extra) or account.get('version')} (global contract use)"])
+                extra = set(account) - {"amount", "locked", "code_hash", "storage_usage", "version",
+                                        "global_contract_hash", "global_contract_account_id"}
+                if extra:
+                    raise Unsupported([f"account with fields {sorted(extra)}"])
+                global_contract = None
+                if account.get("global_contract_hash"):
+                    global_contract = {"codeHash": list(b58(account["global_contract_hash"]))}
+                elif account.get("global_contract_account_id"):
+                    global_contract = {"accountId": list(account["global_contract_account_id"].encode())}
                 accounts.append([value["account_id"], {"amount": account["amount"], "locked": account["locked"],
                                                        "storageUsage": account["storage_usage"],
-                                                       "codeHash": None if account["code_hash"] == EMPTY_CODE_HASH else account["code_hash"]}])
+                                                       "codeHash": None if account["code_hash"] == EMPTY_CODE_HASH else account["code_hash"],
+                                                       "global": global_contract,
+                                                       "versionTwo": account.get("version") == "V2"}])
             elif kind == "AccessKey":
-                keys.append([[value["account_id"], list(self.keys[value["public_key"]])], importer.access_key(value["access_key"])])
+                keys.append([[value["account_id"], list(self.keys[value["public_key"]])], self.access_key(value["access_key"])])
+            elif kind == "GasKeyNonce":
+                gas_nonces.append(nested(value["account_id"], list(self.keys[value["public_key"]]), value["index"],
+                                         value["nonce"]))
             elif kind == "Data":
                 storage.setdefault(value["account_id"], []).append(
                     [list(base64.b64decode(value["data_key"])), list(base64.b64decode(value["value"]))])
@@ -262,8 +583,20 @@ class Converter:
                 label = nc.b58encode(hashlib.sha256(blob).digest())
                 self.codes[label] = blob
                 contracts[value["account_id"]] = label
-            elif kind in ("PostponedReceipt", "PostponedReceiptId", "PendingDataCount", "ReceivedData", "DelayedReceipt"):
-                raise Unsupported([f"pre-state callback or delayed-queue record {kind}"])
+            elif kind == "PostponedReceipt":
+                receipt = self.state_receipt(value, bytes.fromhex(raw_entries[row["key"]]))
+                postponed.append([receipt["receiptId"], receipt])
+            elif kind == "PostponedReceiptId":
+                self.data_receivers[value["data_id"]] = value["account_id"]
+                by_data.append([self.fresh(self.data_ids, value["data_id"]),
+                                self.fresh(self.receipt_ids, value["receipt_id"])])
+            elif kind == "PendingDataCount":
+                counts.append([self.fresh(self.receipt_ids, value["receipt_id"]), value["count"]])
+            elif kind == "ReceivedData":
+                self.data_receivers[value["data_id"]] = value["account_id"]
+                received.append([self.fresh(self.data_ids, value["data_id"]), received_payload(value["data"])])
+            elif kind == "DelayedReceipt":
+                delayed_rows.append((row["queueIndex"], row["key"], value))
             else:
                 raise Unsupported([f"pre-state record {kind}"])
         for identifier, account in accounts:
@@ -272,24 +605,30 @@ class Converter:
                 raise Unsupported(["account code hash without a matching contract record"])
         state = {"accounts": accounts, "accessKeys": keys,
                  "storage": [[name, sorted(rows)] for name, rows in sorted(storage.items())],
-                 "postponed": [], "pendingDataCount": [], "postponedByData": [], "receivedData": [], "delayed": [],
-                 "nextId": 1}
-        entries = {key: value for key, value in self.bundle["preState"]["entries"]}
+                 "postponed": postponed, "pendingDataCount": counts, "postponedByData": by_data,
+                 "receivedData": received, "delayed": [],
+                 "nextId": 1, "gasKeyNonces": gas_nonces, **self.raw_columns()}
+        entries = raw_entries
         header = entries.get("07")
         delayed = None
         if header is not None:
             raw = bytes.fromhex(header)
             first, last = int.from_bytes(raw[:8], "little"), int.from_bytes(raw[8:16], "little")
-            if first != last or len(raw) != 16:
-                raise Unsupported(["pre-state delayed receipt queue"])
-            delayed = {"firstIndex": first, "forms": []}
+            if len(raw) != 16 or [index for index, _, _ in sorted(delayed_rows)] != list(range(first, last)):
+                raise Unsupported(["pre-state delayed receipt queue header disagrees with its entries"])
+            forms = []
+            for index, key, record in sorted(delayed_rows):
+                body, form = delayed_form(bytes.fromhex(entries[key]))
+                receipt = self.state_receipt(record, body)
+                state["delayed"].append(receipt)
+                forms.append(form)
+            delayed = {"firstIndex": first, "forms": forms}
+        elif delayed_rows:
+            raise Unsupported(["delayed receipts without a queue header"])
         scheduler = None
         value = entries.get("0f")
         if value is not None:
-            raw = bytes.fromhex(value)
-            if len(raw) != 61 or raw[0] != 0 or int.from_bytes(raw[1:5], "little") != 1:
-                raise Unsupported(["bandwidth scheduler state with more than one link"])
-            scheduler = {"allowance": int.from_bytes(raw[21:29], "little"), "sanity": list(raw[29:61])}
+            scheduler = {"raw": list(bytes.fromhex(value))}
         return state, delayed, scheduler
 
     def build(self) -> dict:
@@ -309,13 +648,13 @@ class Converter:
         for view, typed, raw in zip(inputs["incomingReceiptViews"], inputs["incomingReceiptTyped"], inputs["incomingReceipts"]):
             receipt, kind = self.model_receipt(view, typed, bytes.fromhex(raw))
             pending.append(receipt)
-            if kind in ("legacy", "v2"):
-                formats.append([receipt["receiptId"], kind])
+            formats.append([receipt["receiptId"], kind if kind in ("legacy", "v2") else "legacy"])
         state["nextId"] = self.next_id
         registry = {"receiptIds": [[identifier, list(b58(name))] for name, identifier in self.receipt_ids.items()],
                     "dataIds": [{"id": identifier, "hash": list(b58(name)), "receiverId": self.data_receivers[name]}
                                 for name, identifier in self.data_ids.items()],
-                    "actionFormats": formats, "delayed": delayed}
+                    "actionFormats": formats + self.yield_formats, "delayed": delayed}
+        self.add_outgoing_codes()
         catalogue = []
         (self.workdir / "codes").mkdir(parents=True, exist_ok=True)
         for label, blob in sorted(self.codes.items()):
@@ -328,15 +667,40 @@ class Converter:
             "blocks": [{"blockHeight": context["blockHeight"], "blockTimestamp": context["blockTimestamp"],
                         "epochHeight": context["epochHeight"], "gasPrice": context["gasPrice"],
                         "gasLimit": context["gasLimit"], "randomSeed": list(bytes.fromhex(context["randomSeed"])),
-                        "transactions": transactions, "incomingIndices": None}],
+                        "transactions": transactions, "incomingIndices": None,
+                        "chainId": bundle["meta"]["chainId"], "shardId": bundle["meta"]["shardId"],
+                        "shardIds": layout_shard_ids(context["shardLayout"]),
+                        "epochInfo": epoch_info(context["epochInfo"]),
+                        "validatorAccountsUpdate": validator_update(context["validatorAccountsUpdate"])}],
             "transactionBlockHashes": [hashes], "queueContext": registry,
             "schedulerInputs": [{"congestionInfo": [[shard, list(bytes.fromhex(info)), missed]
                                                     for shard, info, missed in context["congestionInfo"]],
-                                 "bandwidthRequests": list(bytes.fromhex(context["bandwidthRequests"]))}],
+                                 "bandwidthRequests": list(bytes.fromhex(context["bandwidthRequests"])),
+                                 "shardLayout": list(bytes.fromhex(context["shardLayout"])),
+                                 "prevBlockHash": list(bytes.fromhex(context["prevBlockHash"]))}],
         }
         if scheduler is not None:
             request["initialScheduler"] = scheduler
+        buffers = [[list(bytes.fromhex(key)), list(bytes.fromhex(value))]
+                   for key, value in bundle["preState"]["entries"] if column(key) in BUFFER_COLUMNS]
+        if buffers:
+            request["initialBuffers"] = buffers
         return request
+
+
+def epoch_info(info: dict) -> dict:
+    """What `EpochInfoProvider` answers: minimum stake, total stake and each validator's stake."""
+    return {"minimumStake": info["minimumStake"], "totalStake": info["totalStake"],
+            "validators": {name: stake for name, stake in info["validators"]}}
+
+
+def validator_update(update: dict | None) -> dict | None:
+    """The epoch-start `ValidatorAccountsUpdate` of the shard (None outside an epoch's first chunk)."""
+    if update is None:
+        return None
+    return {"stakeInfo": update["stakeInfo"], "validatorRewards": update["validatorRewards"],
+            "lastProposals": update["lastProposals"],
+            "protocolTreasuryAccountId": update["protocolTreasuryAccountId"]}
 
 
 def run_lean(binary: Path, request: dict, workdir: Path) -> dict:
@@ -448,6 +812,14 @@ def compare(bundle: dict, request: dict, answer: dict, extra: list[str]) -> None
         raise Mismatch("balanceStats.burnt", extra)
     if int(trace["execution"]["subsidizedAmount"]) != int(stats["subsidized"]):
         raise Mismatch("balanceStats.subsidized", extra)
+    published = {"validatorProposals": bytes(trace["validatorProposals"]).hex(),
+                 "congestionInfo": bytes(trace["congestionInfo"]).hex(),
+                 "bandwidthRequests": bytes(trace["bandwidthRequests"]).hex(),
+                 "bandwidthSchedulerStateHash": bytes(trace["schedulerStateHash"]).hex(),
+                 "delayedReceiptsCount": trace["delayedReceiptsCount"]}
+    for name, value in published.items():
+        if expected[name] != value:
+            raise Mismatch(name, extra)
     difference = first_state_difference(expected_post_state(bundle), entry_map(trace["chunkEntries"]), "postState")
     if difference:
         raise Mismatch(difference, extra)

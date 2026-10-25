@@ -451,6 +451,83 @@ theorem meteredFunctionKey_reservationInvariant (fees : ActionFees) (ethEnabled 
   simp only [prechargedStore_getMemOrReg, prechargedStore_targetError, prechargedStore_config]
   repeat' (first | rfl | split)
 
+@[simp] theorem prechargedStore_deployGlobalContractPlan_error (name : String) (st : HostStore NearState)
+    (args : List Value) (target : Nat) (len ptr : UInt64) (sir : Bool) :
+    (deployGlobalContractPlan (prechargedStore name st args) target len ptr sir).error =
+      (deployGlobalContractPlan st target len ptr sir).error := by
+  unfold deployGlobalContractPlan
+  simp only [prechargedStore_getMemOrReg, prechargedStore_targetError, prechargedStore_config]
+  repeat' (first | rfl | split)
+
+@[simp] theorem prechargedStore_transferToGasKeyPlan_error (name : String) (st : HostStore NearState)
+    (args : List Value) (planArgs : List Value) :
+    (transferToGasKeyPlan (prechargedStore name st args) planArgs).error =
+      (transferToGasKeyPlan st planArgs).error := by
+  unfold transferToGasKeyPlan
+  simp only [prechargedStore_getMemOrReg, prechargedStore_readU128Mem, prechargedStore_targetError]
+  repeat' (first | rfl | split)
+
+@[simp] theorem prechargedStore_addGasKeyFullAccessPlan_error (name : String) (st : HostStore NearState)
+    (args : List Value) (planArgs : List Value) :
+    (addGasKeyFullAccessPlan (prechargedStore name st args) planArgs).error =
+      (addGasKeyFullAccessPlan st planArgs).error := by
+  unfold addGasKeyFullAccessPlan
+  simp only [prechargedStore_getMemOrReg, prechargedStore_targetError]
+  repeat' (first | rfl | split)
+
+@[simp] theorem prechargedStore_addGasKeyFunctionCallPlan_error (name : String) (st : HostStore NearState)
+    (args : List Value) (planArgs : List Value) (sir : Bool) :
+    (addGasKeyFunctionCallPlan (prechargedStore name st args) planArgs sir).error =
+      (addGasKeyFunctionCallPlan st planArgs sir).error := by
+  unfold addGasKeyFunctionCallPlan
+  simp only [prechargedStore_getMemOrReg, prechargedStore_readU128Mem, prechargedStore_targetError,
+    prechargedStore_config]
+  repeat' (first | rfl | split)
+
+@[simp] theorem prechargedStore_yieldCreatePlan_error (name : String) (st : HostStore NearState)
+    (args : List Value) (planArgs : List Value) :
+    (yieldCreatePlan (prechargedStore name st args) planArgs).error =
+      (yieldCreatePlan st planArgs).error := by
+  unfold yieldCreatePlan
+  simp only [prechargedStore_getMemOrReg, promiseCapacityError, prechargedStore_config, prechargedStore_promises]
+  repeat' (first | rfl | split)
+
+@[simp] theorem prechargedStore_yieldResumePlan_error (name : String) (st : HostStore NearState)
+    (args : List Value) (planArgs : List Value) :
+    (yieldResumePlan (prechargedStore name st args) planArgs).error =
+      (yieldResumePlan st planArgs).error := by
+  unfold yieldResumePlan
+  simp only [prechargedStore_getMemOrReg, prechargedStore_config]
+  repeat' (first | rfl | split)
+
+theorem prechargedTransferToGasKey_reservationInvariant (fees : ActionFees) (ethEnabled : Bool)
+    (st : HostStore NearState) (args : List Value)
+    (h : ReservationInvariant fees ethEnabled st.host)
+    (hsuccess : (applyCharges st.host (chargesBefore "promise_batch_action_transfer_to_gas_key" st args)).2 = none)
+    (hguard : preInvokeError "promise_batch_action_transfer_to_gas_key"
+      (prechargedStore "promise_batch_action_transfer_to_gas_key" st args) args = none) :
+    HostResult.LiveSatisfies (ReservationInvariant fees ethEnabled)
+      (promiseBatchActionTransferToGasKeyFn.invoke (prechargedStore "promise_batch_action_transfer_to_gas_key" st args) args) := by
+  have he := preInvokeError_transferToGasKey_valid hguard
+  rw [prechargedStore_transferToGasKeyPlan_error] at he
+  obtain ⟨pk, amount, hm, ha, hreserved⟩ := chargesBefore_transferToGasKey_reservation st args he
+  unfold promiseBatchActionTransferToGasKeyFn
+  dsimp only [disallowInView, checkPublicKey]
+  repeat' (first
+    | trivial
+    | (apply appendPrechargedAction_reservationInvariant fees ethEnabled _ st _ _ _ h hsuccess
+       intro _
+       simp_all [argU64])
+    | split)
+
+theorem meteredTransferToGasKey_reservationInvariant (fees : ActionFees) (ethEnabled : Bool) (extra : Nat) :
+    NearHostFn.PreservesLive (ReservationInvariant fees ethEnabled)
+      (metered extra "promise_batch_action_transfer_to_gas_key" promiseBatchActionTransferToGasKeyFn) := by
+  apply metered_reservationInvariant
+  intro st args h hs hg _
+  simp (disch := decide) only [prepareStorageCall_other]
+  exact prechargedTransferToGasKey_reservationInvariant fees ethEnabled st args h hs hg
+
 theorem prechargedUseGlobalContract_reservationInvariant (fees : ActionFees) (ethEnabled : Bool)
     (st : HostStore NearState) (args : List Value)
     (h : ReservationInvariant fees ethEnabled st.host)
@@ -475,6 +552,30 @@ theorem prechargedUseGlobalContract_reservationInvariant (fees : ActionFees) (et
        simp_all [argU64])
     | split)
 
+theorem prechargedDeployGlobalContract_reservationInvariant (fees : ActionFees) (ethEnabled : Bool)
+    (st : HostStore NearState) (args : List Value)
+    (h : ReservationInvariant fees ethEnabled st.host)
+    (hsuccess : (applyCharges st.host (chargesBefore "promise_batch_action_deploy_global_contract" st args)).2 = none)
+    (hguard : preInvokeError "promise_batch_action_deploy_global_contract" (prechargedStore "promise_batch_action_deploy_global_contract" st args) args = none) :
+    HostResult.LiveSatisfies (ReservationInvariant fees ethEnabled)
+      (promiseBatchActionDeployGlobalContractFn.invoke (prechargedStore "promise_batch_action_deploy_global_contract" st args) args) := by
+  have he := preInvokeError_deployGlobalContract_valid "promise_batch_action_deploy_global_contract" (Or.inl rfl) hguard
+  rw [prechargedStore_deployGlobalContractPlan_error] at he
+  have he' : (deployGlobalContractPlan st (argU64 args 0).toNat (argU64 args 1) (argU64 args 2)
+      (sirOf st (promiseReceiver? st (argU64 args 0).toNat))).error = none := by
+    rw [deployGlobalContractPlan_error_sir st _ _ _ _ false]
+    exact he
+  obtain ⟨code, hm, hreserved⟩ := chargesBefore_deployGlobalContract_reservation "promise_batch_action_deploy_global_contract" .codeHash
+    (Or.inl rfl) st args he'
+  unfold promiseBatchActionDeployGlobalContractFn deployGlobalContractFn
+  dsimp only [disallowInView]
+  repeat' (first
+    | trivial
+    | (apply appendPrechargedAction_reservationInvariant fees ethEnabled _ st _ _ _ h hsuccess
+       intro _
+       simp_all [argU64])
+    | split)
+
 theorem meteredUseGlobalContract_reservationInvariant (fees : ActionFees) (ethEnabled : Bool) (extra : Nat) :
     NearHostFn.PreservesLive (ReservationInvariant fees ethEnabled)
       (metered extra "promise_batch_action_use_global_contract" promiseBatchActionUseGlobalContractFn) := by
@@ -482,6 +583,14 @@ theorem meteredUseGlobalContract_reservationInvariant (fees : ActionFees) (ethEn
   intro st args h hs hg _
   simp (disch := decide) only [prepareStorageCall_other]
   exact prechargedUseGlobalContract_reservationInvariant fees ethEnabled st args h hs hg
+
+theorem meteredDeployGlobalContract_reservationInvariant (fees : ActionFees) (ethEnabled : Bool) (extra : Nat) :
+    NearHostFn.PreservesLive (ReservationInvariant fees ethEnabled)
+      (metered extra "promise_batch_action_deploy_global_contract" promiseBatchActionDeployGlobalContractFn) := by
+  apply metered_reservationInvariant
+  intro st args h hs hg _
+  simp (disch := decide) only [prepareStorageCall_other]
+  exact prechargedDeployGlobalContract_reservationInvariant fees ethEnabled st args h hs hg
 
 theorem prechargedUseGlobalContractByAccountId_reservationInvariant (fees : ActionFees) (ethEnabled : Bool)
     (st : HostStore NearState) (args : List Value)
@@ -507,6 +616,30 @@ theorem prechargedUseGlobalContractByAccountId_reservationInvariant (fees : Acti
        simp_all [argU64])
     | split)
 
+theorem prechargedDeployGlobalContractByAccountId_reservationInvariant (fees : ActionFees) (ethEnabled : Bool)
+    (st : HostStore NearState) (args : List Value)
+    (h : ReservationInvariant fees ethEnabled st.host)
+    (hsuccess : (applyCharges st.host (chargesBefore "promise_batch_action_deploy_global_contract_by_account_id" st args)).2 = none)
+    (hguard : preInvokeError "promise_batch_action_deploy_global_contract_by_account_id" (prechargedStore "promise_batch_action_deploy_global_contract_by_account_id" st args) args = none) :
+    HostResult.LiveSatisfies (ReservationInvariant fees ethEnabled)
+      (promiseBatchActionDeployGlobalContractByAccountIdFn.invoke (prechargedStore "promise_batch_action_deploy_global_contract_by_account_id" st args) args) := by
+  have he := preInvokeError_deployGlobalContract_valid "promise_batch_action_deploy_global_contract_by_account_id" (Or.inr rfl) hguard
+  rw [prechargedStore_deployGlobalContractPlan_error] at he
+  have he' : (deployGlobalContractPlan st (argU64 args 0).toNat (argU64 args 1) (argU64 args 2)
+      (sirOf st (promiseReceiver? st (argU64 args 0).toNat))).error = none := by
+    rw [deployGlobalContractPlan_error_sir st _ _ _ _ false]
+    exact he
+  obtain ⟨code, hm, hreserved⟩ := chargesBefore_deployGlobalContract_reservation "promise_batch_action_deploy_global_contract_by_account_id" .accountId
+    (Or.inr rfl) st args he'
+  unfold promiseBatchActionDeployGlobalContractByAccountIdFn deployGlobalContractFn
+  dsimp only [disallowInView]
+  repeat' (first
+    | trivial
+    | (apply appendPrechargedAction_reservationInvariant fees ethEnabled _ st _ _ _ h hsuccess
+       intro _
+       simp_all [argU64])
+    | split)
+
 theorem meteredUseGlobalContractByAccountId_reservationInvariant (fees : ActionFees) (ethEnabled : Bool) (extra : Nat) :
     NearHostFn.PreservesLive (ReservationInvariant fees ethEnabled)
       (metered extra "promise_batch_action_use_global_contract_by_account_id" promiseBatchActionUseGlobalContractByAccountIdFn) := by
@@ -514,5 +647,134 @@ theorem meteredUseGlobalContractByAccountId_reservationInvariant (fees : ActionF
   intro st args h hs hg _
   simp (disch := decide) only [prepareStorageCall_other]
   exact prechargedUseGlobalContractByAccountId_reservationInvariant fees ethEnabled st args h hs hg
+
+
+
+
+theorem meteredDeployGlobalContractByAccountId_reservationInvariant (fees : ActionFees) (ethEnabled : Bool) (extra : Nat) :
+    NearHostFn.PreservesLive (ReservationInvariant fees ethEnabled)
+      (metered extra "promise_batch_action_deploy_global_contract_by_account_id" promiseBatchActionDeployGlobalContractByAccountIdFn) := by
+  apply metered_reservationInvariant
+  intro st args h hs hg _
+  simp (disch := decide) only [prepareStorageCall_other]
+  exact prechargedDeployGlobalContractByAccountId_reservationInvariant fees ethEnabled st args h hs hg
+
+
+theorem prechargedAddGasKeyFull_reservationInvariant (fees : ActionFees) (ethEnabled : Bool)
+    (st : HostStore NearState) (args : List Value)
+    (h : ReservationInvariant fees ethEnabled st.host)
+    (hsuccess : (applyCharges st.host (chargesBefore "promise_batch_action_add_gas_key_with_full_access" st args)).2 = none)
+    (hguard : preInvokeError "promise_batch_action_add_gas_key_with_full_access"
+      (prechargedStore "promise_batch_action_add_gas_key_with_full_access" st args) args = none) :
+    HostResult.LiveSatisfies (ReservationInvariant fees ethEnabled)
+      (promiseBatchActionAddGasKeyWithFullAccessFn.invoke
+        (prechargedStore "promise_batch_action_add_gas_key_with_full_access" st args) args) := by
+  have he := preInvokeError_addGasKeyFull_valid hguard
+  rw [prechargedStore_addGasKeyFullAccessPlan_error] at he
+  obtain ⟨pk, hm, hreserved⟩ := chargesBefore_addGasKeyFull_reservation st args he
+  unfold promiseBatchActionAddGasKeyWithFullAccessFn
+  dsimp only [disallowInView, checkPublicKey]
+  repeat' (first
+    | trivial
+    | (apply appendPrechargedAction_reservationInvariant fees ethEnabled _ st _ _ _ h hsuccess
+       intro _
+       simp_all [argU64])
+    | split)
+
+theorem meteredAddGasKeyFull_reservationInvariant (fees : ActionFees) (ethEnabled : Bool) (extra : Nat) :
+    NearHostFn.PreservesLive (ReservationInvariant fees ethEnabled)
+      (metered extra "promise_batch_action_add_gas_key_with_full_access" promiseBatchActionAddGasKeyWithFullAccessFn) := by
+  apply metered_reservationInvariant
+  intro st args h hs hg _
+  simp (disch := decide) only [prepareStorageCall_other]
+  exact prechargedAddGasKeyFull_reservationInvariant fees ethEnabled st args h hs hg
+
+theorem prechargedAddGasKeyFunction_reservationInvariant (fees : ActionFees) (ethEnabled : Bool)
+    (st : HostStore NearState) (args : List Value)
+    (h : ReservationInvariant fees ethEnabled st.host)
+    (hsuccess : (applyCharges st.host (chargesBefore "promise_batch_action_add_gas_key_with_function_call" st args)).2 = none)
+    (hguard : preInvokeError "promise_batch_action_add_gas_key_with_function_call"
+      (prechargedStore "promise_batch_action_add_gas_key_with_function_call" st args) args = none) :
+    HostResult.LiveSatisfies (ReservationInvariant fees ethEnabled)
+      (promiseBatchActionAddGasKeyWithFunctionCallFn.invoke
+        (prechargedStore "promise_batch_action_add_gas_key_with_function_call" st args) args) := by
+  have he := preInvokeError_addGasKeyFunction_valid hguard
+  rw [prechargedStore_addGasKeyFunctionCallPlan_error] at he
+  have he' : (addGasKeyFunctionCallPlan st args
+      (sirOf st (promiseReceiver? st (argU64 args 0).toNat))).error = none := by
+    rw [addGasKeyFunctionCallPlan_error_sir st _ _ false]
+    exact he
+  obtain ⟨pk, allowance, receiver, methods, hp, ha, hr, hmt, hreserved⟩ :=
+    chargesBefore_addGasKeyFunction_reservation st args he'
+  unfold promiseBatchActionAddGasKeyWithFunctionCallFn
+  dsimp only [disallowInView, checkPublicKey, checkAccountId]
+  repeat' (first
+    | trivial
+    | (apply appendPrechargedAction_reservationInvariant fees ethEnabled _ st _ _ _ h hsuccess
+       intro _
+       simp_all [argU64])
+    | split)
+
+theorem meteredAddGasKeyFunction_reservationInvariant (fees : ActionFees) (ethEnabled : Bool) (extra : Nat) :
+    NearHostFn.PreservesLive (ReservationInvariant fees ethEnabled)
+      (metered extra "promise_batch_action_add_gas_key_with_function_call" promiseBatchActionAddGasKeyWithFunctionCallFn) := by
+  apply metered_reservationInvariant
+  intro st args h hs hg _
+  simp (disch := decide) only [prepareStorageCall_other]
+  exact prechargedAddGasKeyFunction_reservationInvariant fees ethEnabled st args h hs hg
+
+/-- The reservation invariant reads only the fees, the ETH flag, the promises and their gas. -/
+theorem reservationInvariant_of_view {fees : ActionFees} {ethEnabled : Bool} {a b : NearState}
+    (hv : reservationView a = reservationView b) (h : ReservationInvariant fees ethEnabled b) :
+    ReservationInvariant fees ethEnabled a := by
+  simp only [reservationView, reservationFrame, Prod.mk.injEq] at hv
+  obtain ⟨⟨hf, he, hp⟩, hg⟩ := hv
+  obtain ⟨h1, h2, h3⟩ := h
+  refine ⟨hf.trans h1, he.trans h2, ?_⟩
+  unfold GasBacked at h3 ⊢
+  rw [hg, hp]
+  exact h3
+
+/-- A zero-reservation plan leaves the invariant intact. -/
+theorem prechargedStore_reservationInvariant_zero (fees : ActionFees) (ethEnabled : Bool) (name : String)
+    (st : HostStore NearState) (args : List Value)
+    (h : ReservationInvariant fees ethEnabled st.host)
+    (hsuccess : (applyCharges st.host (chargesBefore name st args)).2 = none)
+    (hzero : ((chargesBefore name st args).map (fun charge => charge.reservation st.host.fees)).sum = 0) :
+    ReservationInvariant fees ethEnabled (prechargedStore name st args).host := by
+  have hg := prechargedStore_reservation name st args hsuccess
+  rw [hzero, Nat.add_zero] at hg
+  have hf := prechargedStore_frame name st args
+  have hfees := congrArg Prod.fst hf
+  have heth := congrArg (fun frame => frame.2.1) hf
+  have hpromises := congrArg (fun frame => frame.2.2) hf
+  change (prechargedStore name st args).host.fees = st.host.fees at hfees
+  change (prechargedStore name st args).host.config.ethImplicitAccounts = st.host.config.ethImplicitAccounts at heth
+  change (prechargedStore name st args).host.promises = st.host.promises at hpromises
+  obtain ⟨h1, h2, h3⟩ := h
+  refine ⟨hfees.trans h1, heth.trans h2, ?_⟩
+  unfold GasBacked at h3 ⊢
+  rw [hg, hpromises]
+  exact h3
+
+theorem prechargedYieldResume_reservationInvariant (fees : ActionFees) (ethEnabled : Bool)
+    (st : HostStore NearState) (args : List Value)
+    (h : ReservationInvariant fees ethEnabled st.host)
+    (hsuccess : (applyCharges st.host (chargesBefore "promise_yield_resume" st args)).2 = none) :
+    HostResult.LiveSatisfies (ReservationInvariant fees ethEnabled)
+      (promiseYieldResumeFn.invoke (prechargedStore "promise_yield_resume" st args) args) := by
+  have hp := prechargedStore_reservationInvariant_zero fees ethEnabled _ st args h hsuccess
+    (chargesBefore_yieldResume_reservation st args)
+  unfold promiseYieldResumeFn
+  dsimp only [disallowInView]
+  repeat' (first | trivial | exact hp | split)
+
+theorem meteredYieldResume_reservationInvariant (fees : ActionFees) (ethEnabled : Bool) (extra : Nat) :
+    NearHostFn.PreservesLive (ReservationInvariant fees ethEnabled)
+      (metered extra "promise_yield_resume" promiseYieldResumeFn) := by
+  apply metered_reservationInvariant
+  intro st args h hs _ _
+  simp (disch := decide) only [prepareStorageCall_other]
+  exact prechargedYieldResume_reservationInvariant fees ethEnabled st args h hs
 
 end Wasm.Near

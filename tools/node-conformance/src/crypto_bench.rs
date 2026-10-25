@@ -18,12 +18,15 @@ use sha3::{Keccak256, Keccak512, Shake256};
 use std::hint::black_box;
 use std::time::Instant;
 
+mod crypto_bench_vm;
+mod crypto_vm;
+
 fn input(n: usize, seed: usize) -> Vec<u8> {
     (0..n).map(|i| (i * 31 + seed) as u8).collect()
 }
 
 /// Mean nanoseconds per call of `f`, after a warm-up, over at least 0.3 s.
-fn measure(mut f: impl FnMut(usize) -> u64) -> u64 {
+pub(crate) fn measure(mut f: impl FnMut(usize) -> u64) -> u64 {
     let mut acc = 0u64;
     for i in 0..20 {
         acc ^= f(i);
@@ -40,11 +43,16 @@ fn measure(mut f: impl FnMut(usize) -> u64) -> u64 {
     start.elapsed().as_nanos() as u64 / iterations
 }
 
-fn report(name: &str, nanos: u64) {
+pub(crate) fn report(name: &str, nanos: u64) {
     println!("{{\"name\":\"{name}\",\"nanosPerIteration\":{nanos}}}");
 }
 
 fn main() {
+    // `crypto-bench curves` runs only the pairing-friendly curves and P-256
+    if std::env::args().nth(1).as_deref() == Some("curves") {
+        crypto_bench_vm::curves();
+        return;
+    }
     for (label, size) in [("64B", 64usize), ("1KiB", 1024), ("64KiB", 65536)] {
         let mut data = input(size, 3);
         report(&format!("sha256/{label}"), measure(|i| {
@@ -197,4 +205,5 @@ fn main() {
         vrf_input[0] = i as u8;
         vrf_key.public_key().is_vrf_valid(&black_box(&vrf_input).to_vec(), &value, &proof) as u64
     }));
+    crypto_bench_vm::curves();
 }
