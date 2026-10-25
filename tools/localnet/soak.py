@@ -104,9 +104,24 @@ class Soak:
         self.applied_offset = 0
         self.pending: list[dict] = []
         self.stop = threading.Event()
+        self.restarts = 0
+        self.pauses: list[float] = []     # when the Lean node was restarted: its catching up is not held to the lag bound
+
+    def restart(self, home: Path, binary: Path, extra: list[str], duration: int) -> subprocess.Popen:
+        """SIGKILL of the Lean node, and a start from its store eight seconds later (the applied-blocks log of the
+        new process starts over, so the checker reads it from the beginning)."""
+        self.check_blocks()
+        os.killpg(self.lean.pid, signal.SIGKILL)
+        self.lean.wait()
+        time.sleep(8)
+        self.lean = va.start_lean(home, self.work, duration, binary, extra, log_name="lean-restart.log")
+        self.applied_offset = 0
+        self.restarts += 1
+        self.pauses.append(time.time())
+        return self.lean
 
     def in_burst(self, t: float) -> bool:
-        return any(b <= t <= b + self.options.burst_window for b in self.bursts)
+        return any(b <= t <= b + self.options.burst_window for b in self.bursts + self.pauses)
 
     def sample(self) -> None:
         now = time.time()
@@ -123,7 +138,8 @@ class Soak:
             lean_rpc("gas_price", [None])
             lean_rpc("query", {"request_type": "view_account", "finality": "final", "account_id": "test1.node0"})
         except Exception as error:      # noqa: BLE001
-            self.rpc_failures.append(f"t={row['t']}: {str(error)[:120]}")
+            if not any(p <= now <= p + 90 for p in self.pauses):
+                self.rpc_failures.append(f"t={row['t']}: {str(error)[:120]}")
             row["rpcError"] = True
         row["rssKb"] = rss_kb(self.lean.pid)
         row["storeBytes"] = tree_bytes(self.store)
@@ -244,7 +260,7 @@ def summarize(options: argparse.Namespace, soak: Soak, report: dict) -> dict:
         "durationSeconds": duration, "samples": len(samples), "bursts": len(soak.bursts),
         "blocksCompared": soak.compared["blocks"], "blockHashesEqual": soak.compared["hashEqual"],
         "stateRootsCompared": soak.compared["roots"], "stateRootsEqual": soak.compared["rootsEqual"],
-        "orphansHeldByNeard": soak.compared["orphans"],
+        "orphansHeldByNeard": soak.compared["orphans"], "restarts": soak.restarts,
         "problems": soak.compared["problems"][:10],
         "neardHeadStart": both[0]["neardHead"] if both else None, "neardHeadEnd": both[-1]["neardHead"] if both else None,
         "finalHeightEnd": finals[-1][1] if finals else None, "maxHeadMinusFinal": final_lag,
@@ -292,6 +308,10 @@ def main() -> None:
     parser.add_argument("--period", type=float, default=1.0, help="seconds between rounds of light traffic")
     parser.add_argument("--no-full-workload", dest="full_workload", action="store_false",
                         help="leave out the host function calls, the 14 heavy calls and the yield wait")
+    parser.add_argument("--restart-at", type=int, default=0,
+                        help="SIGKILL the Lean node this many seconds in and start it again from its store")
+    parser.add_argument("--gc-epochs", type=int, default=None,
+                        help="--gc-epochs-to-keep of the Lean node (default: its own, 5; 0 collects nothing)")
     parser.add_argument("--verbose", action="store_true", help="let the Lean node log (lean.log in the work directory)")
     parser.add_argument("--skip", nargs="*", default=[], help="more scenarios of workload.py to leave out")
     parser.add_argument("--no-deploy-from-memory", action="store_true",
@@ -303,7 +323,8 @@ def main() -> None:
     home = va.prepare(work)
     store = work / "store"
     localnet.start(TOPOLOGY)
-    extra = ["--rpc-addr", f"{LEAN_RPC[0]}:{LEAN_RPC[1]}", "--store", str(store)] + ([] if options.verbose else ["--quiet"])
+    extra = ["--rpc-addr", f"{LEAN_RPC[0]}:{LEAN_RPC[1]}", "--store", str(store)] + ([] if options.verbose else ["--quiet"]) \
+        + (["--gc-epochs-to-keep", str(options.gc_epochs)] if options.gc_epochs is not None else [])
     lean = va.start_lean(home, work, options.duration + 600, options.binary, extra)
     soak = Soak(options, lean, store, work)
     result: dict = {"ok": False}
@@ -313,6 +334,8 @@ def main() -> None:
         thread = workload_thread(options, soak, work)
         next_check = 0.0
         while time.time() - soak.started < options.duration:
+            if options.restart_at and soak.restarts == 0 and time.time() - soak.started >= options.restart_at:
+                lean = soak.restart(home, options.binary, extra, options.duration + 600)
             soak.sample()
             if time.time() >= next_check:
                 soak.check_blocks()

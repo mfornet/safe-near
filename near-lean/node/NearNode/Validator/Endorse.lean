@@ -139,7 +139,13 @@ def Env.onWitnessPart (e : Env) (w : PartialEncodedStateWitness) : IO Unit := do
   | .error m =>
     e.log s!"witness: {m}"
   | .ok z =>
-    e.state.modify fun s => { s with witnesses := s.witnesses.insert k { entry with done := true } }
+    -- the parts are not needed any more
+    e.state.modify fun s =>
+        { s with
+          witnesses :=
+            s.witnesses.insert k
+              { entry with
+                done := true, parts := {} } }
     match Zstd.decompress z (64 * 1024 * 1024) with
     | .error m =>
       e.log s!"witness: zstd: {m}"

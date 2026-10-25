@@ -102,10 +102,13 @@ def wait_for(predicate, timeout, what, step=0.5):
     raise TimeoutError(f"{what} ({last})")
 
 
+GC_EPOCHS: list[int] = []     # --gc-epochs-to-keep for the Lean node, when --gc-epochs is given
+
+
 def lean_extra(home: Path) -> list[str]:
     return ["--rpc-addr", f"127.0.0.1:{localnet.rpc_port(TOPOLOGY, 1)}",
             "--genesis-config", str(home / "node1/genesis.json"),
-            "--store", str(localnet.DATA / "rpc-run/store")]
+            "--store", str(localnet.DATA / "rpc-run/store")] + [x for n in GC_EPOCHS for x in ("--gc-epochs-to-keep", str(n))]
 
 
 def bring_up(work: Path, binary: Path, workload: bool):
@@ -621,7 +624,10 @@ def main() -> None:
     parser.add_argument("--binary", type=Path, default=va.BINARY)
     parser.add_argument("--work", type=Path, default=localnet.DATA / "rpc-run")
     parser.add_argument("--no-workload", action="store_true")
+    parser.add_argument("--gc-epochs", type=int, default=None, help="--gc-epochs-to-keep of the Lean node (default: its own)")
     options = parser.parse_args()
+    if options.gc_epochs is not None:
+        GC_EPOCHS.append(options.gc_epochs)
     options.work.mkdir(parents=True, exist_ok=True)
     (options.work / "serve-stop").unlink(missing_ok=True)
     if options.mode == "serve":

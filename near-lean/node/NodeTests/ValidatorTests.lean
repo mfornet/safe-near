@@ -2,6 +2,7 @@ import NearNode.Chain.ApplyChunk
 import NearNode.Validator.Doomslug
 import NearNode.Validator.Messages
 import NearNode.Validator.Pool
+import NearNode.Store.Trie
 
 /-!
 `node-validator-tests`: the validator's state machines, with the unit tests of `doomslug.rs` ported
@@ -60,6 +61,36 @@ private def learnedCode (f : IO.Ref Nat) : IO Unit := do
   let known := Near.Node.Apply.learningCodeOf [entry] blob
   check f "known bytes are answered from the catalogue"
       (known.decodeIssue.isNone && known.hash == "known")
+
+/-- The reference count changes that garbage collection reads back from `DBCol::TrieChanges`. -/
+private def trieChangesRecord (f : IO.Ref Nat) : IO Unit := do
+  let c : Near.Node.Trie.TrieChanges :=
+    { oldRoot := hashOf 1, newRoot := hashOf 2,
+      insertions := #[⟨hashOf 1, ByteArray.mk #[1, 2, 3], 3⟩, ⟨hashOf 3, ByteArray.empty, 1⟩],
+      deletions := #[⟨hashOf 2, 5⟩, ⟨hashOf 1, 70000⟩] }
+  let bytes := Near.Node.Store.changesBytes c
+  check f "the changes take 8 + 36 per reference bytes" (bytes.size == 8 + 36 * 4)
+  match Near.Node.Store.changesOfBytes? bytes with
+  | some (ins, del) =>
+    check f "insertions read back" (ins == #[(hashOf 1, 3), (hashOf 3, 1)])
+    check f "deletions read back" (del == #[(hashOf 2, 5), (hashOf 1, 70000)])
+  | none =>
+    check f "the changes read back" false
+  check f "a cut record is refused"
+      ((Near.Node.Store.changesOfBytes? (bytes.extract 0 (bytes.size - 1))).isNone)
+  check f "a record with a tail is refused"
+      ((Near.Node.Store.changesOfBytes? (bytes.push 0)).isNone)
+  check f "the empty record"
+      ((Near.Node.Store.changesOfBytes?
+          (Near.Node.Store.changesBytes
+            { oldRoot := hashOf 1, newRoot := hashOf 1, insertions := #[],
+              deletions := #[] })).isSome)
+  -- taking back a deletion is a negative reference on the node of the shard
+  let ops := Near.Node.Store.deleteOpsOfRefs (ByteArray.mk #[9]) #[(hashOf 2, 5)]
+  check f "deletions are negative references"
+      (match ops[0]? with
+      | some (Near.Node.Store.Op.rcAdd Near.Node.Store.Col.state _ _ n) => n == -5
+      | _ => false)
 
 /-- `test_endorsements_and_skips_basic`. -/
 private def basic (f : IO.Ref Nat) : IO Unit := do
@@ -383,6 +414,7 @@ private def poolTests (f : IO.Ref Nat) : IO Unit := do
 def main : IO UInt32 := do
   let failures ← IO.mkRef 0
   learnedCode failures
+  trieChangesRecord failures
   basic failures
   delayValues failures
   approvals failures

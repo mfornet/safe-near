@@ -41,6 +41,8 @@ structure Options where
   genesisConfig : Option System.FilePath := none
   /-- The directory of the chain store (`data/` of a neard home); none: nothing is kept across a restart. -/
   store : Option System.FilePath := none
+  /-- `gc_num_epochs_to_keep` (0: collect nothing). -/
+  gcEpochs : Nat := 5
   /-- `min_block_production_delay`, `max_block_production_delay`, `max_block_wait_delay`, in ms. -/
   endorsementDelay : Nat := 600
   baseDelay : Nat := 2000
@@ -131,7 +133,8 @@ def run (o : Options) : IO UInt32 := do
           (match o.appliedLog with
             | some f => some <$> IO.FS.Handle.mk f .write
             | none => pure none),
-      nowMs := IO.monoMsNow, applying := ← IO.mkRef none, lastTurn := ← IO.mkRef 0 }
+      nowMs := IO.monoMsNow, gcEpochs := o.gcEpochs, applying := ← IO.mkRef none,
+      lastTurn := ← IO.mkRef 0 }
   let stop ← IO.mkRef false
   let connected ← IO.mkRef false
   let rpcStop ← IO.mkRef false

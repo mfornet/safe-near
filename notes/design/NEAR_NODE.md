@@ -1496,6 +1496,56 @@ the other); what changed is that the loop is not away. A block of quiet traffic 
 75 ms over 251 blocks: starting a thread, and the objects shared with the loop being reference counted atomically).
 `validator_accept.py`: ok, 527 of 527 outcomes equal, the stall test (12 s) stalls and resumes.
 
+##### H3, bounded memory: garbage collection
+
+*Cause.* The node kept everything it had ever applied. The trie nodes the updates replaced were never taken back (`trieDeleteOps`
+existed since M4 but nothing called it), and the blocks, their `BlockInfo` and merkle trees, the chunk extras, the receipts in and out,
+the chunk bodies, the outcomes and the RPC indexes stayed in `VState`, in the progress and in the store's tables. The census of a
+run (`VState.census`, logged every 100 heights) showed all of them growing with the height; a 15 minute soak without collection:
+1300 blocks, 10692 trie entries, RSS 150 to 211 MB, slope 193 MB per hour after the first two minutes.
+
+*Fix* (`Validator/Gc.lean`, `Store/Trie.lean`, `Chain/Apply.lean`; the reference is `chain/chain/src/garbage_collection.rs` at
+the pin). Every applied block keeps the reference changes of its chunks' tries in the new `TrieChanges` column (`DBCol::TrieChanges`:
+insertions and deletions as hash and count). `get_gc_stop_height_impl` is ported (`gcStopHeight`): the first height of the oldest of
+the last `gc_num_epochs_to_keep` epochs (default 5, `--gc-epochs-to-keep N`, 0 collects nothing). After each applied block
+`collectGarbage` collects the heights from the tail to that stop height, `gc_blocks_limit` (2) at a time and faster when far
+behind. For the canonical block `B` at a collected height it applies `B`'s trie deletions (`apply_deletions`: `rcAdd` with the
+negative counts, so a node a retained state still references survives) and drops the data of `B`'s parent; for any other block at the
+height (a fork, found by walking from the tip) it takes back its insertions (`revert_insertions`) and drops it. Dropping a block
+removes its entries in the store (block, header, `BlockInfo`, merkle tree, chunk extras, incoming and outgoing receipts, delivered
+receipts, trie changes, chunk bodies, outcomes, receipts and the transaction index) and the same in the chain state, the progress
+and the maps of the RPC. One pass is one store commit that also writes `TAIL`, and the same operations go to the progress'
+view of the tables, so a restart continues from the tail it finds. It runs between two applications only: an application works on a
+snapshot of the state and replaces the progress when it ends, which would undo a collection made meanwhile.
+
+Also: a witness stops keeping its parts once it is rebuilt (they were kept for ever), witnesses and produced chunks below the tail
+are forgotten, and the produced-chunk record read back at a restart had its pair in the order the running node does not use
+((height, shard) against (shard, height)), so a restarted node could have produced a chunk a second time: fixed.
+
+*Evidence* (census lines and `soak.py`; the one-hour result with the default window is in the acceptance table below).
+
+| run | window | blocks | trie entries at the end | RSS | slope after 120 s |
+|---|---|---|---|---|---|
+| no collection (the code before) | all | 1300 | 10692 | 150 to 211 MB | 193 MB/h |
+| `--gc-epochs-to-keep 2` | about 60 blocks | 1075 | 899 (stays between 700 and 900) | 148 to 174 MB, peak 198 | 54 MB/h over the 10 minutes |
+
+The retained chain state, maps and tables stay at the size of the window (`census: chain 53 blocks ... trie 864 entries` after 1000
+heights collected); roots and hashes are equal to neard's throughout (1052 of 1052). Forks: with the window at one epoch and the
+Lean node stopped for 12 s at different times (`validator_accept.py --gc-epochs 1 --stall-at N`) the collection took back 1, 4 and 2
+fork blocks in three of four runs (orphans 93; 104 to 107; 115, 117), all runs `ok`. Restart: `soak.py --gc-epochs 1 --restart-at 240`
+kills the node with SIGKILL after 305 blocks, 235 of which are collected, starts it from the store ("continuing from the store at
+height 305"), and ends with 916 of 916 roots equal, the lag bound kept, collection going on (379 heights).
+
+A node with a window of 5 epochs answers `block`, `tx` and the other RPC methods for the heights of the window only, as `neard`
+does; older ones are `UNKNOWN_BLOCK` (the RPC conformance run with a one-epoch window compares the old transactions of its
+workload against a `neard` that still holds them, which is why that run uses the default).
+
+*Not done.* Blocks that were accepted but never applied (a fork whose chunk bodies never came) are collected with the height but
+have no trie changes to take back; state parts, the state-transition data and the witness cache of nearcore do not exist here. The
+store's log still grows between compactions (55 MB per hour of this workload at the 64 MiB limit) and the compaction rewrites it
+from memory; a disk-resident tier is still not there. Contract code (`CodeCache.byLabel`) is not collected: it grows with the
+distinct contracts deployed, not with the height.
+
 ## Open points
 
 - Numeric performance target for M10, measured against nearcore: set and met in M10a above (M2's and M4's are proposed above).

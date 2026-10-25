@@ -1,5 +1,6 @@
 import Lean.Data.Json
 import NearNode.Validator.Follow
+import NearNode.Validator.Gc
 import NearNode.Validator.Persist
 
 /-!
@@ -192,6 +193,12 @@ def Env.onApplied (e : Env) (b : Block) : IO Unit := do
   let hash := b.header.hash
   if v.height % 100 == 0 then
     e.log s.census
+    if let some store := e.store then
+      let t ← store.tables.get
+      let cols :=
+        (List.range t.plain.size).filterMap fun i =>
+          if t.plain[i]!.size == 0 then none else some s!"{i}:{t.plain[i]!.size}"
+      e.log s!"census of the store: trie {t.rc.size} entries; columns {cols}"
   if v.height > s.tipHeight then
     let lastFinal : BlockHeight :=
       if v.lastFinalBlock == CryptoHash.zero then s.st.config.genesisHeight
@@ -224,6 +231,8 @@ partial def Env.tryApply (e : Env) : IO Unit := do
     e.applying.set none
     if ← e.finishApply a then
       e.onApplied a.block
+      -- between two applications: the next one starts on the state this leaves
+      e.collectGarbage
     else
       return
   let s ← e.get

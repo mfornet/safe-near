@@ -68,6 +68,8 @@ structure Env where
   log : String → IO Unit
   /-- Milliseconds on the monotonic clock. -/
   nowMs : IO Nat
+  /-- `gc_num_epochs_to_keep`: the epochs of blocks and state kept; 0: nothing is collected. -/
+  gcEpochs : Nat := 5
   /-- The block being applied, if any. At most one: a block is applied on the state its parent left. -/
   applying : IO.Ref (Option Applying)
   /-- When the previous turn of the loop began, to measure how long the loop is away (0: none yet). -/

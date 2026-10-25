@@ -58,6 +58,9 @@ inductive Col where
   | txIndex
   /-- The receipts a chunk applied at a block and shard, in order, by block hash and shard. -/
   | delivered
+  /-- The reference count changes of the trie of one chunk, by block hash and `ShardUId`
+  (`DBCol::TrieChanges`): what garbage collection takes back (`Store/Trie.lean`). -/
+  | trieChanges
   deriving BEq, Inhabited, Repr
 
 namespace Col
@@ -82,11 +85,12 @@ def id : Col → UInt8
   | .receipt => 16
   | .txIndex => 17
   | .delivered => 18
+  | .trieChanges => 19
 
 def all : List Col :=
   [.state, .flatState, .flatStateChanges, .flatStateDeltaMetadata, .flatStorageStatus, .blockMisc,
     .chunkExtra, .blockHeader, .block, .blockInfo, .epochInfo, .blockMerkleTree, .outgoingReceipts,
-    .incomingReceipts, .chunkBody, .outcome, .receipt, .txIndex, .delivered]
+    .incomingReceipts, .chunkBody, .outcome, .receipt, .txIndex, .delivered, .trieChanges]
 
 def ofId? (n : UInt8) : Option Col :=
   all.find? (·.id == n)

@@ -438,7 +438,8 @@ def applyBlock (prof : Option Prof) (p : Params) (st : Near.Node.Chain.ChainStat
     let shardOps : Array Store.Op :=
       Store.trieInsertOps (shardKey layout shard) changes ++
         #[.set .chunkExtra (blockShardKey hash layout shard) (Codec.encode extra),
-          .set .outgoingReceipts (blockShardKey hash layout shard) (Codec.encode outgoing)]
+          .set .outgoingReceipts (blockShardKey hash layout shard) (Codec.encode outgoing),
+          .set .trieChanges (blockShardKey hash layout shard) (Store.changesBytes changes)]
     ops := ops ++ shardOps
     pr :=
       { pr with

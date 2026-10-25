@@ -97,6 +97,9 @@ structure VState where
   finalized : Std.HashMap ByteArray Epoch.Finalized := {}
   /-- The transaction pool of each shard the node produces chunks for. -/
   pools : Std.HashMap UInt64 Pool := {}
+  /-- The height up to which garbage collection has run: the data of the blocks below it is gone, and the state
+  of the block at this height is the oldest that is still complete (`ChainStore::tail`). -/
+  tail : BlockHeight := 0
   /-- Counters for the report. -/
   stats : Std.HashMap String Nat := {}
 

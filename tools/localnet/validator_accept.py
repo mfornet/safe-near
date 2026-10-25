@@ -307,19 +307,26 @@ def main() -> None:
     parser.add_argument("--work", type=Path, default=localnet.DATA / "validator-run")
     parser.add_argument("--no-workload", action="store_true")
     parser.add_argument("--no-stall", action="store_true")
+    parser.add_argument("--stall-at", type=int, default=None,
+                        help="seconds after which the Lean node is stopped (default: 30 s before the end)")
+    parser.add_argument("--gc-epochs", type=int, default=None, help="--gc-epochs-to-keep of the Lean node (default: its own)")
     options = parser.parse_args()
     home = prepare(options.work)
     localnet.start(TOPOLOGY)
-    lean = start_lean(home, options.work, options.duration + 120, options.binary)
+    lean = start_lean(home, options.work, options.duration + 120, options.binary,
+                      ["--gc-epochs-to-keep", str(options.gc_epochs)] if options.gc_epochs is not None else None)
     workload = None
     stall = None
     try:
         wait_for(lambda: head_height() >= 3, 120, "the chain did not start")
         if not options.no_workload:
             workload = start_workload(options.work, options.duration)
-        time.sleep(max(0, options.duration - (0 if options.no_stall else 30)))
+        at = options.stall_at if options.stall_at is not None else max(0, options.duration - 30)
+        time.sleep(max(0, options.duration - (0 if options.no_stall else 30)) if options.stall_at is None else at)
         if not options.no_stall:
             stall = stall_test(lean)
+            if options.stall_at is not None:
+                time.sleep(max(0, options.duration - at - 30))
         head, final = head_height(), final_height()
         (options.work / "stop").write_text("stop")
         lean.wait(timeout=60)
