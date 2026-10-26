@@ -433,6 +433,65 @@ def build_requests(chain: Chain) -> list[Request]:
     add("EXPERIMENTAL_changes_in_block", "EXPERIMENTAL_changes_in_block", {}, note="no reference")
     add("EXPERIMENTAL_changes_in_block", "EXPERIMENTAL_changes_in_block", [at_height], note="not a map")
     add("EXPERIMENTAL_changes_in_block", "EXPERIMENTAL_changes_in_block", None, note="no parameters")
+    # EXPERIMENTAL_changes: the values, with their causes, of the keys each block touched, for every changes_type
+    touched: dict[int, list[tuple[str, str]]] = {}
+    for h in sorted(chain.blocks):
+        status, reply = NEARD.call("EXPERIMENTAL_changes_in_block", {"block_id": h})
+        if status == 200 and "result" in reply:
+            touched[h] = [(c["type"], c["account_id"]) for c in reply["result"]["changes"]]
+    group = "EXPERIMENTAL_changes"
+
+    def accounts_of(h: int, kind: str) -> list[str]:
+        return sorted({a for t, a in touched.get(h, []) if t == kind})
+    for h in sorted(touched):
+        by = {"account_touched": "account_changes", "contract_code_touched": "contract_code_changes",
+              "access_key_touched": "all_access_key_changes"}
+        for kind, changes_type in by.items():
+            ids = accounts_of(h, kind)
+            if ids:
+                add(group, "EXPERIMENTAL_changes", {"block_id": h, "changes_type": changes_type, "account_ids": ids})
+        ids = accounts_of(h, "data_touched")
+        if ids:
+            add(group, "EXPERIMENTAL_changes", {"block_id": h, "changes_type": "data_changes", "account_ids": ids, "key_prefix_base64": ""})
+            add(group, "EXPERIMENTAL_changes", {"block_id": h, "changes_type": "data_changes", "account_ids": ids[:1], "key_prefix_base64": b64(b"key")},
+                note="a prefix of the keys")
+        ids = accounts_of(h, "access_key_touched")
+        keys = [{"account_id": a, "public_key": k} for a in ids for k in chain.keys.get(a, [])[:3]]
+        if keys:
+            add(group, "EXPERIMENTAL_changes", {"block_id": h, "changes_type": "single_access_key_changes", "keys": keys})
+    hash_heights = sorted(touched)[:: max(1, len(touched) // 12)]
+    for h in hash_heights:
+        ids = sorted({a for _, a in touched[h]})
+        add(group, "EXPERIMENTAL_changes", {"block_id": chain.blocks[h]["header"]["hash"], "changes_type": "account_changes", "account_ids": ids},
+            note="by hash, every account the block touched")
+        add(group, "changes", {"block_id": h, "changes_type": "data_changes", "account_ids": ids, "key_prefix_base64": ""}, note="the other name")
+    for finality in ("final", "optimistic", "near-final"):
+        add(group, "EXPERIMENTAL_changes", {"finality": finality, "changes_type": "account_changes", "account_ids": chain.accounts}, head=True)
+    add(group, "EXPERIMENTAL_changes", {"sync_checkpoint": "genesis", "changes_type": "account_changes", "account_ids": ["near", "node0"]})
+    add(group, "EXPERIMENTAL_changes", {"block_id": at_height, "changes_type": "account_changes", "account_ids": []}, note="no account")
+    add(group, "EXPERIMENTAL_changes", {"block_id": at_height, "changes_type": "account_changes", "account_ids": ["nosuch.node0", "node0"]},
+        note="an account that is not there")
+    add(group, "EXPERIMENTAL_changes", {"block_id": at_height, "changes_type": "account_changes", "account_ids": ["node0", "node0"]},
+        note="the same account twice")
+    # the errors
+    add(group, "EXPERIMENTAL_changes", {"block_id": 10 ** 9, "changes_type": "account_changes", "account_ids": ["node0"]}, note="unknown block")
+    add(group, "EXPERIMENTAL_changes", {"block_id": "11111111111111111111111111111111", "changes_type": "account_changes", "account_ids": ["node0"]}, note="unknown hash")
+    add(group, "EXPERIMENTAL_changes", {"block_id": "abc", "changes_type": "account_changes", "account_ids": ["node0"]}, note="malformed hash")
+    add(group, "EXPERIMENTAL_changes", {"changes_type": "account_changes", "account_ids": ["node0"]}, note="no block reference")
+    add(group, "EXPERIMENTAL_changes", {"block_id": at_height}, note="no changes_type")
+    add(group, "EXPERIMENTAL_changes", {"block_id": at_height, "changes_type": "nosuch", "account_ids": []}, note="unknown changes_type")
+    add(group, "EXPERIMENTAL_changes", {"block_id": at_height, "changes_type": 5, "account_ids": []}, note="changes_type is not a string")
+    add(group, "EXPERIMENTAL_changes", {"block_id": at_height, "changes_type": "account_changes"}, note="no account_ids")
+    add(group, "EXPERIMENTAL_changes", {"block_id": at_height, "changes_type": "account_changes", "account_ids": "node0"}, note="account_ids is not a list")
+    add(group, "EXPERIMENTAL_changes", {"block_id": at_height, "changes_type": "account_changes", "account_ids": ["Not Valid"]}, note="invalid account id")
+    add(group, "EXPERIMENTAL_changes", {"block_id": at_height, "changes_type": "single_access_key_changes"}, note="no keys")
+    add(group, "EXPERIMENTAL_changes", {"block_id": at_height, "changes_type": "single_access_key_changes", "keys": [{"account_id": "node0", "public_key": "bad"}]}, note="bad key")
+    add(group, "EXPERIMENTAL_changes", {"block_id": at_height, "changes_type": "single_access_key_changes", "keys": [{"account_id": "node0", "public_key": "foo:xyz"}]}, note="unknown key type")
+    add(group, "EXPERIMENTAL_changes", {"block_id": at_height, "changes_type": "data_changes", "account_ids": ["node0"]}, note="no key_prefix_base64")
+    add(group, "EXPERIMENTAL_changes", {"block_id": at_height, "changes_type": "data_changes", "account_ids": ["node0"], "key_prefix_base64": "!!"}, note="not base64")
+    add(group, "EXPERIMENTAL_changes", {}, note="no parameters")
+    add(group, "EXPERIMENTAL_changes", [at_height], note="not a map")
+    add(group, "EXPERIMENTAL_changes", None, note="null")
     # validators and configuration
     add("validators", "validators", [None], head=True)
     add("validators", "validators", {"epoch_id": chain.at["header"]["epoch_id"]}, note="an epoch that is over or the current one")

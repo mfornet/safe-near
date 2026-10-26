@@ -1728,6 +1728,24 @@ compares them.
   after the receipt instead of before it reported 3 misses (an implicit account created by a transfer, a deleted account's 30 data keys): the
   warning is what found it.
 
+##### R2, the state change log with causes: `EXPERIMENTAL_changes` for every `changes_type`
+
+- *Runtime.* Nothing new: R1's `ExecutionOutcome.changes` already carries `{ cause, key, value }` for every commit, in the order of
+  `Runtime::apply`; R2 reads it.
+- *Node.* The record of a block and shard in the `StateChanges` column is now what nearcore keeps: the Borsh
+  `Vec<RawStateChangesWithTrieKey>` of the exposed kinds, for each trie key the chunk's commits touched the `(cause, value)` list in the
+  order of the commits (`Chain/StateChanges.lean`: `rawChanges`, `causeOf`, `valueBytes`). The runtime's logical receipt ids are mapped to
+  native hashes through the chunk's `context.receipts` and `txHashes`; values are encoded as the trie stores them (account with its code
+  hash and storage usage, access key, gas key nonce as 8 bytes LE, code bytes, data). The record stays in the store for the GC window.
+  `changes_in_block` lists the kinds of the keys of the record (`StateChangesKinds::from_changes`: gas key nonce rows are not a kind).
+- *RPC.* `EXPERIMENTAL_changes` (and `changes`) for `account_changes`, `single_access_key_changes`, `all_access_key_changes`,
+  `contract_code_changes` and `data_changes` (with `key_prefix_base64`), rendered as `StateChangeWithCauseView` (`StateChanges::from_changes`,
+  gas key nonce updates appearing among the access key changes). `single_gas_key_changes` does not exist at protocol 86. Request parsing
+  reproduces serde's messages, including a `changes_type` given as the index of the variant (0 to 4).
+- *Harness.* `rpc_conformance.py` asks for each kind of change at every block that touched it (by height and by hash), `finality`,
+  `sync_checkpoint`, key prefixes, unknown accounts and the malformed requests. *Result* (`rpc_conformance.py run`): 1101 of 1101 requests
+  equal, 0 known gaps, 0 other differences.
+
 ## Open points
 
 - Numeric performance target for M10, measured against nearcore: set and met in M10a above (M2's and M4's are proposed above).

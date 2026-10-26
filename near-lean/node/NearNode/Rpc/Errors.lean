@@ -165,13 +165,35 @@ def parseU64 (j : Json) : Except String Nat :=
   | .ok n => pure n
   | .error _ => throw "invalid type: expected an unsigned integer"
 
+/-- serde's words for a JSON value found where another type was expected (`Unexpected`). -/
+def serdeFound : Json → String
+  | .null => "null"
+  | .bool b => s!"boolean `{b}`"
+  | .num n => s!"integer `{n}`"
+  | .str s => s!"string {stringDebug s}"
+  | .arr _ => "sequence"
+  | .obj _ => "map"
+
+/-- A public key from its text (`PublicKey::from_str`): `ed25519:` and `secp256k1:` followed by the base58 of the key, a text with no
+prefix being an Ed25519 key. -/
 def parseKey (j : Json) : Except String PublicKey :=
   match j with
   | .str s =>
-    match PublicKey.parse? s with
-    | some k => pure k
-    | none => throw s!"invalid value: \"{s}\", expected a public key"
-  | _ => throw "invalid type: expected a public key string"
+    let (kind, body) :=
+      match s.splitOn ":" with
+      | [] | [_] => ("ed25519", s)
+      | k :: rest => (k, ":".intercalate rest)
+    let decode (size : Nat) (mk : ByteArray → PublicKey) : Except String PublicKey :=
+      match base58Decode? body with
+      | none => throw s!"invalid value: {stringDebug s}, expected a public key"
+      | some b =>
+        if b.size == size then pure (mk b)
+        else throw s!"invalid key length: expected the input of {size} bytes, but {b.size} was given"
+    match kind with
+    | "ed25519" => decode 32 .ed25519
+    | "secp256k1" => decode 64 .secp256k1
+    | other => throw s!"unknown key type '{other}'"
+  | _ => throw s!"invalid type: {serdeFound j}, expected a string"
 
 def failParse {α : Type} (msg : String) : Except RpcError α :=
   .error (RpcError.parse s!"Failed parsing args: {msg}")

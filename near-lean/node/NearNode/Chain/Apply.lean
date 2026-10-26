@@ -441,19 +441,19 @@ def applyBlock (prof : Option Prof) (p : Params) (st : Near.Node.Chain.ChainStat
     let changes ←
       timed prof "trie-update" fun _ => do
           pure (← Near.Node.Trie.update src root diff).changes
-    -- the keys the chunk's commits touched: the runtime's log, and any entry that differs and the log did not list
-    let (touched, missed) := touchedOf diff (logKeys changeLog)
+    -- the chunk's commits as `RawStateChangesWithTrieKey`; an entry that differs and the log did not list is a fault of the log
+    let missed := missedKeys diff changeLog
     if !missed.isEmpty then
       let describe (k : ByteArray) : String :=
         match TrieKey.parse? k with
-        | some t => (match t with
-          | .account a => s!"account {a.val}"
-          | .contractCode a => s!"code {a.val}"
-          | .accessKey a _ => s!"access key {a.val}"
-          | .contractData a d => s!"data {a.val} {hex d}"
-          | _ => "other")
+        | some (.account a) => s!"account {a.val}"
+        | some (.contractCode a) => s!"code {a.val}"
+        | some (.accessKey a _) => s!"access key {a.val}"
+        | some (.contractData a d) => s!"data {a.val} {hex d}"
+        | some _ => "other"
         | none => "unparsed"
-      IO.eprintln s!"warning: the state change log of shard {shard} at {v.height} missed {missed.size} changed key(s): {(missed.toList.take 6).map describe}"
+      IO.eprintln
+        s!"warning: the state change log of shard {shard} at {v.height} missed {missed.size} changed key(s): {(missed.toList.take 6).map describe}"
     let extra : ChunkExtra :=
       match extra with
       | .v5 e => .v5 { e with stateRoot := changes.newRoot }
@@ -463,8 +463,8 @@ def applyBlock (prof : Option Prof) (p : Params) (st : Near.Node.Chain.ChainStat
         #[.set .chunkExtra (blockShardKey hash layout shard) (Codec.encode extra),
           .set .outgoingReceipts (blockShardKey hash layout shard) (Codec.encode outgoing),
           .set .trieChanges (blockShardKey hash layout shard) (Store.changesBytes changes)] ++
-        (if touched.isEmpty then #[]
-        else #[.set .stateChanges (blockShardKey hash layout shard) (touchedBytes touched)])
+        (if changeLog.isEmpty then #[]
+        else #[.set .stateChanges (blockShardKey hash layout shard) (Near.Node.Chain.stateChangesBytes changeLog)])
     ops := ops ++ shardOps
     pr :=
       { pr with

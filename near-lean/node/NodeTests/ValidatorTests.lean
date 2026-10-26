@@ -90,26 +90,42 @@ private def codePruning (f : IO.Ref Nat) : IO Unit := do
     let all := cache.prune (live.insert (hash (blob 1)) |>.insert (hash (blob 3))) hashOfLabel
     check f "everything referenced, everything kept" (all.byLabel.size == 3 && all.labels.size == 3)
 
-/-- The keys of the runtime's change log: a write of the value the key held and a removal of an absent key are there, the last
-value of a key decides whether it is gone, and an entry that differs without being logged is added and counted. -/
-private def logKeysTest (f : IO.Ref Nat) : IO Unit := do
-  let acct (a : String) : ByteArray := Near.Node.TrieKey.toVec (.account ⟨a⟩)
-  let change (key : Near.ChangeKey) (value : Option Near.ChangeValue) : Near.StateChange :=
-    { cause := .validatorAccountsUpdate, key, value }
+/-- The record of a block and shard: the runtime's log grouped by trie key, a key's changes in the order of the commits with their
+causes and values as the trie stores them, the keys in the order of the raw keys, and the record read back as it was written. -/
+private def stateChangesRecord (f : IO.Ref Nat) : IO Unit := do
+  let change (cause : Near.ChangeCause) (key : Near.ChangeKey) (value : Option Near.ChangeValue) :
+      Near.StateChange :=
+    { cause, key, value }
   let log : List Near.StateChange :=
-    [change (.account "aa") (some (.account default)), change (.data "ft" [1, 2]) none,
-      change (.data "ft" [1, 2]) (some (.data [3])), change (.data "ft" [9]) none,
-      change (.accessKey "aa" (0 :: List.replicate 32 7)) none, change (.contractCode "bb") none]
-  let keys := Near.Node.Chain.logKeys log
-  check f "each logged key of the four kinds once" (keys.size == 5)
-  let data (k : List UInt8) : ByteArray := Near.Node.TrieKey.toVec (.contractData ⟨"ft"⟩ ⟨k.toArray⟩)
-  check f "the last value of a key decides whether it is gone"
-      (keys.contains (data [1, 2], false) && keys.contains (data [9], true))
-  let (touched, missed) :=
-    Near.Node.Chain.touchedOf #[(acct "cc", some ⟨#[1]⟩), (acct "aa", none)] keys
-  check f "an entry the log missed is listed and counted" (missed.size == 1 && touched.size == 6)
-  check f "the touched keys are sorted and not repeated"
-      (touched.map (·.1) == (touched.map (·.1)).qsort Near.Node.Chain.keyLt)
+    [change (.receiptProcessing 7) (.data "ft" [1]) (some (.data [9])),
+      change (.transaction 0) (.account "aa") (some (.account { amount := 5, storageUsage := 100 })),
+      change (.gasReward 7) (.account "aa") (some (.account { amount := 6, storageUsage := 100 })),
+      change (.receiptProcessing 8) (.data "ft" [1]) none,
+      change .validatorAccountsUpdate (.accessKey "aa" (0 :: List.replicate 32 7)) none]
+  let cause := Near.Node.Chain.causeOf #[(hashOf 1).bytes] fun id => pure (hashOf (10 + id))
+  let value := Near.Node.Chain.valueBytes [] (fun _ => none) fun b => b
+  match Near.Node.Chain.rawChanges log cause value with
+  | .error e =>
+    check f s!"the log to records: {e}" false
+  | .ok records =>
+    check f "one record per key, in the order of the raw keys"
+        (records.size == 3 && records.map (·.trieKey) ==
+          #[.account ⟨"aa"⟩, .accessKey ⟨"aa"⟩ (.ed25519 ⟨(List.replicate 32 7).toArray.map UInt8.ofNat⟩),
+            .contractData ⟨"ft"⟩ ⟨#[1]⟩])
+    check f "a key's changes keep the order of the commits, with their causes"
+        (records.map (·.changes.map (·.cause)) ==
+          #[#[.transactionProcessing (hashOf 1), .actionReceiptGasReward (hashOf 17)],
+            #[.validatorAccountsUpdate],
+            #[.receiptProcessing (hashOf 17), .receiptProcessing (hashOf 18)]])
+    check f "a removal has no data and a write the bytes of its value"
+        (records[2]!.changes.map (·.data) == #[some ⟨#[9]⟩, none])
+    check f "the record reads back as written"
+        (Near.Node.Chain.stateChangesOfBytes? (Near.Node.Chain.stateChangesBytes records) == some records)
+    -- the entries of the kinds that differ and are in no record
+    let acct (a : String) : ByteArray := Near.Node.TrieKey.toVec (.account ⟨a⟩)
+    check f "an entry that differs and is in no record is reported, one that is in a record is not"
+        (Near.Node.Chain.missedKeys #[(acct "aa", none), (acct "cc", some ⟨#[1]⟩)] records ==
+          #[acct "cc"])
 
 /-- The reference count changes that garbage collection reads back from `DBCol::TrieChanges`. -/
 private def trieChangesRecord (f : IO.Ref Nat) : IO Unit := do
@@ -464,7 +480,7 @@ def main : IO UInt32 := do
   let failures ← IO.mkRef 0
   learnedCode failures
   codePruning failures
-  logKeysTest failures
+  stateChangesRecord failures
   trieChangesRecord failures
   basic failures
   delayValues failures
