@@ -23,6 +23,18 @@ when the named declaration passes the checks below.
 `just sorries <contract>` lists what is still open. Automation and exploratory
 tools are fine during development, as long as the result passes these checks.
 
+## Before proving a refinement
+
+Stress the statement before trying to prove it. Differential scenarios run
+the deployed binary on near-lean and the model on the same timelines of
+receipts, and check every step against `Refines`. A discrepancy means the
+model or the statement is wrong, and finding one costs seconds instead of a
+failed proof. The `refinement-stress` skill (`.claude/skills/refinement-stress`)
+runs such a round. wNEAR's harness is in
+`contracts/w-near/verification/Differential` and `scenarios/`; its first
+rounds fixed five model gaps (`scenarios/README.md`). Passing scenarios
+build trust; they prove nothing.
+
 ## Open
 
 - A stricter final check with Comparator is proposed but not set up yet.

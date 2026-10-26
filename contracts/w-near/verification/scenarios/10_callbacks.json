@@ -1,0 +1,127 @@
+[
+  {
+    "name": "callbacks: two transfer-calls resolved in reverse order, receiver spends in between",
+    "state": {"accounts": {"alice.near": "1000", "bob.near": "0", "carol.near": "0"}},
+    "blocks": [
+      {"receipts": [
+        {"label": "t1", "call": {"from": "alice.near", "method": "ft_transfer_call", "args": {"receiver_id": "bob.near", "amount": "100", "msg": "first"}, "deposit": "1"}, "expect": "ok"},
+        {"label": "t2", "call": {"from": "alice.near", "method": "ft_transfer_call", "args": {"receiver_id": "bob.near", "amount": "200", "memo": "second", "msg": "second"}, "deposit": "1"}, "expect": "ok"}
+      ]},
+      {"height": 5, "receipts": [
+        {"label": "bob-spends", "call": {"from": "bob.near", "method": "ft_transfer", "args": {"receiver_id": "carol.near", "amount": "250"}, "deposit": "1"}, "expect": "ok"}
+      ]},
+      {"height": 9, "receipts": [
+        {"label": "r2", "deliver": "t2#1", "results": [{"ok": "\"200\""}], "expect": "ok"},
+        {"label": "r1", "deliver": "t1#1", "results": ["failed"], "expect": "ok"}
+      ]},
+      {"receipts": [
+        {"label": "check", "call": {"method": "ft_total_supply"}, "expect": "ok"}
+      ]}
+    ]
+  },
+  {
+    "name": "callbacks: receiver force-unregisters before the refund",
+    "state": {"accounts": {"alice.near": "1000", "bob.near": "0"}},
+    "blocks": [
+      {"receipts": [
+        {"label": "t", "call": {"from": "alice.near", "method": "ft_transfer_call", "args": {"receiver_id": "bob.near", "amount": "600", "msg": ""}, "deposit": "1"}, "expect": "ok"},
+        {"label": "bob-leaves", "call": {"from": "bob.near", "method": "storage_unregister", "args": {"force": true}, "deposit": "1"}, "expect": "ok"}
+      ]},
+      {"height": 30, "receipts": [
+        {"label": "r", "deliver": "t#1", "results": [{"ok": "\"600\""}], "expect": "ok"}
+      ]}
+    ]
+  },
+  {
+    "name": "callbacks: sender force-unregisters, refund is burnt",
+    "state": {"accounts": {"alice.near": "1000", "bob.near": "5"}},
+    "blocks": [
+      {"receipts": [
+        {"label": "t", "call": {"from": "alice.near", "method": "ft_transfer_call", "args": {"receiver_id": "bob.near", "amount": "600", "msg": ""}, "deposit": "1"}, "expect": "ok"},
+        {"label": "alice-leaves", "call": {"from": "alice.near", "method": "storage_unregister", "args": {"force": true}, "deposit": "1"}, "expect": "ok"}
+      ]},
+      {"receipts": [
+        {"label": "r", "deliver": "t#1", "results": [{"ok": "\"7\""}], "expect": "ok"},
+        {"label": "supply", "call": {"method": "ft_total_supply"}, "expect": "ok"}
+      ]}
+    ]
+  },
+  {
+    "name": "callbacks: sender leaves and re-registers before the refund",
+    "state": {"accounts": {"alice.near": "1000", "bob.near": "0"}},
+    "blocks": [
+      {"receipts": [
+        {"label": "t", "call": {"from": "alice.near", "method": "ft_transfer_call", "args": {"receiver_id": "bob.near", "amount": "1000", "msg": ""}, "deposit": "1"}, "expect": "ok"},
+        {"label": "alice-leaves", "call": {"from": "alice.near", "method": "storage_unregister", "args": {}, "deposit": "1"}, "expect": "ok"},
+        {"label": "alice-returns", "call": {"from": "alice.near", "method": "storage_deposit", "args": {}, "deposit": "2000000000000000000000"}, "expect": "ok"}
+      ]},
+      {"receipts": [
+        {"label": "r", "deliver": "t#1", "results": [{"ok": "\"99999999999999999999\""}], "expect": "ok"},
+        {"label": "alice-balance", "call": {"method": "ft_balance_of", "args": {"account_id": "alice.near"}}, "expect": "ok"}
+      ]}
+    ]
+  },
+  {
+    "name": "callbacks: replayed and forged resolutions",
+    "state": {"accounts": {"alice.near": "1000", "bob.near": "0"}},
+    "blocks": [
+      {"receipts": [
+        {"label": "t", "call": {"from": "alice.near", "method": "ft_transfer_call", "args": {"receiver_id": "bob.near", "amount": "100", "msg": ""}, "deposit": "1"}, "expect": "ok"}
+      ]},
+      {"receipts": [
+        {"label": "r", "deliver": "t#1", "results": [{"ok": "\"40\""}], "expect": "ok"},
+        {"label": "replay", "call": {"from": "wrap.near", "method": "ft_resolve_transfer", "args": {"sender_id": "alice.near", "receiver_id": "bob.near", "amount": "100"}, "gas": "5000000000000", "results": [{"ok": "\"40\""}]}, "expect": "ok"},
+        {"label": "forged-by-bob", "call": {"from": "bob.near", "method": "ft_resolve_transfer", "args": {"sender_id": "bob.near", "receiver_id": "alice.near", "amount": "100"}, "results": ["failed"]}, "expect": "panic:is private"},
+        {"label": "with-deposit", "call": {"from": "wrap.near", "method": "ft_resolve_transfer", "args": {"sender_id": "alice.near", "receiver_id": "bob.near", "amount": "100"}, "deposit": "1", "results": ["failed"]}, "expect": "panic:doesn't accept deposit"},
+        {"label": "unregistered-parties", "call": {"from": "wrap.near", "method": "ft_resolve_transfer", "args": {"sender_id": "zed.near", "receiver_id": "yan.near", "amount": "5"}, "results": ["failed"]}, "expect": "ok"},
+        {"label": "receiver-is-sender", "call": {"from": "wrap.near", "method": "ft_resolve_transfer", "args": {"sender_id": "alice.near", "receiver_id": "alice.near", "amount": "50"}, "results": ["failed"]}, "expect": "ok"}
+      ]}
+    ]
+  },
+  {
+    "name": "callbacks: every promise-result shape",
+    "state": {"accounts": {"alice.near": "1000", "bob.near": "1000"}},
+    "blocks": [
+      {"receipts": [
+        {"label": "none", "call": {"from": "wrap.near", "method": "ft_resolve_transfer", "args": {"sender_id": "alice.near", "receiver_id": "bob.near", "amount": "10"}}, "expect": "other"},
+        {"label": "not-ready", "call": {"from": "wrap.near", "method": "ft_resolve_transfer", "args": {"sender_id": "alice.near", "receiver_id": "bob.near", "amount": "10"}, "results": ["notReady"]}, "expect": "panic:unreachable"},
+        {"label": "capped", "call": {"from": "wrap.near", "method": "ft_resolve_transfer", "args": {"sender_id": "alice.near", "receiver_id": "bob.near", "amount": "10"}, "results": [{"ok": "\"1000000\""}]}, "expect": "ok"},
+        {"label": "u128-max", "call": {"from": "wrap.near", "method": "ft_resolve_transfer", "args": {"sender_id": "alice.near", "receiver_id": "bob.near", "amount": "10"}, "results": [{"ok": "\"340282366920938463463374607431768211455\""}]}, "expect": "ok"},
+        {"label": "empty-success", "call": {"from": "wrap.near", "method": "ft_resolve_transfer", "args": {"sender_id": "alice.near", "receiver_id": "bob.near", "amount": "10"}, "results": [{"ok": ""}]}, "expect": "ok"},
+        {"label": "nested-json", "call": {"from": "wrap.near", "method": "ft_resolve_transfer", "args": {"sender_id": "alice.near", "receiver_id": "bob.near", "amount": "10"}, "results": [{"ok": "[\"3\"]"}]}, "expect": "ok"},
+        {"label": "deep-json", "call": {"from": "wrap.near", "method": "ft_resolve_transfer", "args": {"sender_id": "alice.near", "receiver_id": "bob.near", "amount": "10"}, "results": [{"ok": [{"repeat": "[", "times": 200}, {"repeat": "]", "times": 200}]}]}, "expect": "ok"},
+        {"label": "lone-surrogate", "call": {"from": "wrap.near", "method": "ft_resolve_transfer", "args": {"sender_id": "alice.near", "receiver_id": "bob.near", "amount": "10"}, "results": [{"ok": "\"\\ud800\""}]}, "expect": "ok"},
+        {"label": "bom", "call": {"from": "wrap.near", "method": "ft_resolve_transfer", "args": {"sender_id": "alice.near", "receiver_id": "bob.near", "amount": "10"}, "results": [{"okHex": "efbbbf223122"}]}, "expect": "ok"},
+        {"label": "failed-then-success", "call": {"from": "wrap.near", "method": "ft_resolve_transfer", "args": {"sender_id": "alice.near", "receiver_id": "bob.near", "amount": "10"}, "results": ["failed", {"ok": "\"0\""}]}, "expect": "ok"},
+        {"label": "zero-amount", "call": {"from": "wrap.near", "method": "ft_resolve_transfer", "args": {"sender_id": "alice.near", "receiver_id": "bob.near", "amount": "0"}, "results": ["failed"]}, "expect": "ok"}
+      ]}
+    ]
+  },
+  {
+    "name": "callbacks: transfer-call to the contract itself",
+    "description": "ft_on_transfer lands on wrap.near, which does not export it.",
+    "state": {"accounts": {"alice.near": "1000", "wrap.near": "0"}},
+    "blocks": [
+      {"receipts": [
+        {"label": "t", "call": {"from": "alice.near", "method": "ft_transfer_call", "args": {"receiver_id": "wrap.near", "amount": "10", "msg": "x"}, "deposit": "1"}, "expect": "ok"}
+      ]},
+      {"receipts": [
+        {"label": "on-transfer", "deliver": "t#0", "expect": "methodNotFound"},
+        {"label": "r", "deliver": "t#1", "results": ["failed"], "expect": "ok"}
+      ]}
+    ]
+  },
+  {
+    "name": "callbacks: withdrawal payout to the contract itself arrives as a credit",
+    "state": {"accounts": {"wrap.near": "1000000"}},
+    "blocks": [
+      {"receipts": [
+        {"label": "w", "call": {"from": "wrap.near", "method": "near_withdraw", "args": {"amount": "1000000"}, "deposit": "1"}, "expect": "ok"}
+      ]},
+      {"height": 50, "receipts": [
+        {"label": "payout", "deliver": "w#0"},
+        {"label": "supply", "call": {"method": "ft_total_supply"}, "expect": "ok"}
+      ]}
+    ]
+  }
+]

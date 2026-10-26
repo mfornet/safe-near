@@ -1,0 +1,94 @@
+[
+  {
+    "name": "resources: u128 edges of balances and supply",
+    "state": {"accounts": {"alice.near": "340282366920938463463374607431768211445", "bob.near": "0"}},
+    "account": {"balance": "1000000000000000000000000"},
+    "blocks": [{"receipts": [
+      {"label": "balance-overflow", "call": {"from": "alice.near", "method": "near_deposit", "deposit": "100"}, "expect": "panic:Balance overflow"},
+      {"label": "supply-overflow", "call": {"from": "bob.near", "method": "near_deposit", "deposit": "100"}, "expect": "panic:Total supply overflow"},
+      {"label": "transfer-max", "call": {"from": "alice.near", "method": "ft_transfer", "deposit": "1", "args": {"receiver_id": "bob.near", "amount": "340282366920938463463374607431768211445"}}, "expect": "ok"},
+      {"label": "withdraw-all", "call": {"from": "bob.near", "method": "near_withdraw", "deposit": "1", "args": {"amount": "340282366920938463463374607431768211445"}}, "expect": "balanceExceeded"}
+    ]}]
+  },
+  {
+    "name": "resources: withdrawal of u128::MAX overflows amount + 1",
+    "state": {"accounts": {"alice.near": "340282366920938463463374607431768211455"}},
+    "blocks": [{"receipts": [
+      {"label": "withdraw-max", "call": {"from": "alice.near", "method": "near_withdraw", "deposit": "1", "args": {"amount": "340282366920938463463374607431768211455"}}, "expect": "panic:attempt to add with overflow"}
+    ]}]
+  },
+  {
+    "name": "resources: contract balance cannot pay the promises",
+    "state": {"accounts": {"alice.near": "1000", "bob.near": "0"}},
+    "account": {"balance": "0", "overhead": 0},
+    "blocks": [{"receipts": [
+      {"label": "unregister-pays-fee", "call": {"from": "bob.near", "method": "storage_unregister", "deposit": "1", "args": {}}, "expect": "balanceExceeded"},
+      {"label": "withdraw-1000", "call": {"from": "alice.near", "method": "near_withdraw", "deposit": "1", "args": {"amount": "1000"}}, "expect": "balanceExceeded"},
+      {"label": "refund-already-registered", "call": {"from": "alice.near", "method": "storage_deposit", "deposit": "5", "args": {}}, "expect": "ok"},
+      {"label": "withdraw-0", "call": {"from": "alice.near", "method": "near_withdraw", "deposit": "1", "args": {"amount": "0"}}, "expect": "ok"}
+    ]}]
+  },
+  {
+    "name": "resources: zero-balance exemption at 770 bytes of storage",
+    "description": "An account with at most 770 bytes of storage pays no stake. new() writes a 74-byte STATE record, each registration 71 bytes for a 10-byte id.",
+    "state": null,
+    "account": {"balance": "0", "overhead": 0},
+    "blocks": [{"receipts": [
+      {"label": "init", "call": {"from": "wrap.near", "method": "new"}, "expect": "ok"},
+      {"label": "reg-a", "call": {"from": "aaaaa.near", "method": "storage_deposit", "deposit": "1250000000000000000000", "args": {}}, "expect": "ok"},
+      {"label": "reg-b", "call": {"from": "bbbbb.near", "method": "storage_deposit", "deposit": "1250000000000000000000", "args": {}}, "expect": "ok"},
+      {"label": "reg-c", "call": {"from": "ccccc.near", "method": "storage_deposit", "deposit": "1250000000000000000000", "args": {}}, "expect": "ok"},
+      {"label": "reg-d", "call": {"from": "ddddd.near", "method": "storage_deposit", "deposit": "1250000000000000000000", "args": {}}, "expect": "ok"},
+      {"label": "reg-e", "call": {"from": "eeeee.near", "method": "storage_deposit", "deposit": "1250000000000000000000", "args": {}}, "expect": "ok"},
+      {"label": "reg-f", "call": {"from": "fffff.near", "method": "storage_deposit", "deposit": "1250000000000000000000", "args": {}}, "expect": "ok"},
+      {"label": "reg-g", "call": {"from": "ggggg.near", "method": "storage_deposit", "deposit": "1250000000000000000000", "args": {}}, "expect": "ok"},
+      {"label": "reg-h", "call": {"from": "hhhhh.near", "method": "storage_deposit", "deposit": "1250000000000000000000", "args": {}}, "expect": "ok"},
+      {"label": "reg-i-long", "call": {"from": "iiiiiiiiiiii.near", "method": "storage_deposit", "deposit": "1250000000000000000000", "args": {}}},
+      {"label": "reg-j", "call": {"from": "jjjjj.near", "method": "storage_deposit", "deposit": "1250000000000000000000", "args": {}}},
+      {"label": "reg-k", "call": {"from": "kkkkk.near", "method": "storage_deposit", "deposit": "1250000000000000000000", "args": {}}}
+    ]}]
+  },
+  {
+    "name": "resources: locked balance covers the stake, the liquid one pays promises",
+    "state": {"accounts": {"alice.near": "100000000000000000000000"}},
+    "account": {"balance": "1", "locked": "1000000000000000000000000000", "overhead": 100000},
+    "blocks": [{"receipts": [
+      {"label": "register-bob", "call": {"from": "alice.near", "method": "storage_deposit", "deposit": "1250000000000000000000", "args": {"account_id": "bob.near"}}, "expect": "ok"},
+      {"label": "withdraw-1", "call": {"from": "alice.near", "method": "near_withdraw", "deposit": "1", "args": {"amount": "1"}}, "expect": "ok"},
+      {"label": "withdraw-more-than-liquid", "call": {"from": "alice.near", "method": "near_withdraw", "deposit": "1", "args": {"amount": "10000000000000000000000"}}, "expect": "balanceExceeded"}
+    ]}]
+  },
+  {
+    "name": "resources: stake deficit even for views when usage is huge",
+    "state": {"accounts": {"alice.near": "1000"}},
+    "account": {"balance": "1000000000000000000000000", "overhead": 18445744073709540000},
+    "blocks": [{"receipts": [
+      {"label": "view", "call": {"method": "ft_total_supply"}, "expect": "lackBalanceForState"},
+      {"label": "view-with-deposit", "call": {"method": "ft_total_supply", "deposit": "5"}, "expect": "lackBalanceForState"},
+      {"label": "failing-call", "call": {"method": "storage_withdraw", "deposit": "2", "args": {}}, "expect": "panic"}
+    ]}]
+  },
+  {
+    "name": "resources: balance near u128::MAX",
+    "state": {"accounts": {"alice.near": "1000"}},
+    "account": {"balance": "340282366920938463463374607431768211454"},
+    "blocks": [{"receipts": [
+      {"label": "deposit-1", "call": {"from": "alice.near", "method": "near_deposit", "deposit": "1"}, "expect": "ok"},
+      {"label": "view-with-deposit", "call": {"method": "ft_total_supply", "deposit": "0"}, "expect": "ok"}
+    ]}]
+  },
+  {
+    "name": "resources: deposits on views and non-payable methods",
+    "state": {"accounts": {"alice.near": "1000"}},
+    "blocks": [{"receipts": [
+      {"label": "view-deposit", "call": {"method": "ft_balance_of", "deposit": "77", "args": {"account_id": "alice.near"}}, "expect": "ok"},
+      {"label": "metadata-deposit", "call": {"method": "ft_metadata", "deposit": "1"}, "expect": "ok"},
+      {"label": "new-deposit", "call": {"from": "wrap.near", "method": "new", "deposit": "1"}, "expect": "panic:doesn't accept deposit"},
+      {"label": "deposit-zero", "call": {"method": "near_deposit"}, "expect": "panic:Requires positive attached deposit"},
+      {"label": "deposit-too-small", "call": {"from": "zoe.near", "method": "near_deposit", "deposit": "1249999999999999999999"}, "expect": "panic:ERR_DEPOSIT_TOO_SMALL"},
+      {"label": "deposit-exact-fee", "call": {"from": "zoe.near", "method": "near_deposit", "deposit": "1250000000000000000000"}, "expect": "ok"},
+      {"label": "two-yocto", "call": {"method": "ft_transfer", "deposit": "2", "args": {"receiver_id": "zoe.near", "amount": "1"}}, "expect": "panic:Requires attached deposit of exactly 1 yoctoNEAR"},
+      {"label": "self-deposit", "call": {"from": "wrap.near", "method": "near_deposit", "deposit": "2000000000000000000000"}, "expect": "ok"}
+    ]}]
+  }
+]

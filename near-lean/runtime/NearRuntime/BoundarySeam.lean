@@ -224,13 +224,6 @@ theorem Corresponds.vmContext {c : ReceiptCtx} {seed : Bytes} {account : Account
     h.deposit h.gas h.seed h.trie (by simpa using h.outputs) h.actionHash h.yields h.chain h.validatorStake h.validatorTotalStake
     h.storageProofSize
 
-/-- The boundary's reading of a receipt failure. -/
-def runtimeFailure : RuntimeError → Failure
-  | .functionCallError error => failureOf error
-  | .executionIssue issue => .executionIssue issue.message
-  | .lackBalanceForState _ deficit => .lackBalanceForState deficit
-  | error => .other (repr error).pretty
-
 theorem account?_withoutIds (st : ChainState) (id : AccountId) :
     st.withoutIds.account? id = st.account? id := rfl
 

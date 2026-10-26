@@ -419,6 +419,13 @@ statement, the instance, the model extensions, re-proved specs and tests.
   (`nearRuntime_not_exported`). The module's lack of a start function and its
   exported functions are hypotheses the adapter tests check, like decoding
   itself: the kernel cannot decode the 185 KB binary within 15 GB.
+  Before the proof, `just wnear-scenarios` (`contracts/w-near/verification/scenarios`)
+  checks the statement along timelines of receipts with delayed callbacks.
+  It fixed five model gaps: log limits (`ModelFailure.logLimit`), UTF-8 in
+  ignored JSON strings, the validation of the receipts a call creates
+  (`ModelFailure.receiptInvalid`, reported at the boundary with nearcore's
+  messages), and in `gasBound` the fees of a transfer to an implicit account
+  and the bytes of the promise result a callback parses.
 
 ### linkdrop
 
