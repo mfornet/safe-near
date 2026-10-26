@@ -21,7 +21,7 @@ def sigs : Array FuncType :=
 
 /-- Host functions that are cheap to call with arbitrary arguments and observable in the outcome. -/
 def hostNames : Array String :=
-  #["input", "register_len", "read_register", "write_register", "log_utf8", "log_utf16",
+  #["input", "register_len", "read_register", "write_register", "log_utf8", "log_utf16", "abort",
     "value_return", "storage_write", "storage_read", "storage_has_key", "storage_remove",
     "used_gas", "prepaid_gas", "block_index", "block_timestamp", "epoch_height", "storage_usage",
     "account_balance", "attached_deposit", "random_seed", "current_account_id", "signer_account_id",

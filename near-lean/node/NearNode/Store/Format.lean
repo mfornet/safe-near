@@ -61,6 +61,9 @@ inductive Col where
   /-- The reference count changes of the trie of one chunk, by block hash and `ShardUId`
   (`DBCol::TrieChanges`): what garbage collection takes back (`Store/Trie.lean`). -/
   | trieChanges
+  /-- The trie keys of the account, access key, contract code and contract data kinds that a chunk changed, by block hash
+  and `ShardUId` (the per-block part of nearcore's `DBCol::StateChanges`; see `Chain/StateChanges.lean`). -/
+  | stateChanges
   deriving BEq, Inhabited, Repr
 
 namespace Col
@@ -86,11 +89,13 @@ def id : Col → UInt8
   | .txIndex => 17
   | .delivered => 18
   | .trieChanges => 19
+  | .stateChanges => 20
 
 def all : List Col :=
   [.state, .flatState, .flatStateChanges, .flatStateDeltaMetadata, .flatStorageStatus, .blockMisc,
     .chunkExtra, .blockHeader, .block, .blockInfo, .epochInfo, .blockMerkleTree, .outgoingReceipts,
-    .incomingReceipts, .chunkBody, .outcome, .receipt, .txIndex, .delivered, .trieChanges]
+    .incomingReceipts, .chunkBody, .outcome, .receipt, .txIndex, .delivered, .trieChanges,
+    .stateChanges]
 
 def ofId? (n : UInt8) : Option Col :=
   all.find? (·.id == n)

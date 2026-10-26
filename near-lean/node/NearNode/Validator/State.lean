@@ -139,7 +139,7 @@ def VState.census (s : VState) : String :=
     (List.range t.plain.size).filterMap fun i =>
       if t.plain[i]!.size == 0 then none else some s!"{i}:{t.plain[i]!.size}/{bytes t.plain[i]!}"
   let rcBytes := t.rc.fold (fun a k (d, _) => a + k.size + d.size) 0
-  s!"census: chain {s.st.blocks.size} blocks {s.blocks.size} applied {s.applied.size} chunks {s.chunks.size} bodies {s.bodies.size} delivered {s.deliveredAt.size} witnesses {s.witnesses.size} canon {s.canon.size} outcomes {s.outcomes.size} txIndex {s.txIndex.size} receipts {s.receiptsById.size} endorsed {s.endorsed.size} produced {s.producedChunks.size}; progress outgoing {s.pr.outgoing.size} extras {s.pr.extras.size} incoming {s.pr.incoming.size} codes {s.pr.cache.byLabel.size}; trie {t.rc.size} entries {rcBytes} bytes; columns {cols}"
+  s!"census: chain {s.st.blocks.size} blocks {s.blocks.size} applied {s.applied.size} chunks {s.chunks.size} bodies {s.bodies.size} delivered {s.deliveredAt.size} witnesses {s.witnesses.size} canon {s.canon.size} outcomes {s.outcomes.size} txIndex {s.txIndex.size} receipts {s.receiptsById.size} endorsed {s.endorsed.size} produced {s.producedChunks.size}; progress outgoing {s.pr.outgoing.size} extras {s.pr.extras.size} incoming {s.pr.incoming.size} codes {s.pr.cache.byLabel.size}/{s.pr.cache.labels.size}/{s.pr.cache.lists.size}; trie {t.rc.size} entries {rcBytes} bytes; columns {cols}"
 
 def VState.bump (s : VState) (name : String) : VState :=
   { s with stats := s.stats.insert name (s.stats.getD name 0 + 1) }

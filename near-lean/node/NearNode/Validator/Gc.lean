@@ -95,7 +95,8 @@ def VState.dropBlock (s : VState) (r : BlockRec) : Array Op × VState :=
         ops :=
           ops ++
             #[.delete .chunkExtra key, .delete .outgoingReceipts key, .delete .incomingReceipts key,
-              .delete .trieChanges key, .delete .delivered (deliveredKey hash shard)]
+              .delete .trieChanges key, .delete .stateChanges key,
+              .delete .delivered (deliveredKey hash shard)]
         s :=
           { s with
             pr :=
@@ -195,5 +196,23 @@ def Env.collectGarbage (e : Env) : IO Unit := do
       e.bump "gcHeights"
       done := done + 1
       height := height + 1
+
+/-- Drops the contract code the retained tries no longer reference from the code cache (`CodeCache.prune`). A code is
+referenced while a `State` entry of some shard holds a value of its hash with a positive count; garbage collection takes
+those counts back with the blocks. The scan of the entries is done when the cache has doubled since the last pruning.
+Between two applications only, like `collectGarbage`: an application replaces the progress, cache included. -/
+def Env.pruneCodes (e : Env) : IO Unit := do
+  let s ← e.get
+  if s.pr.cache.byLabel.size < s.pr.cache.pruneAt then
+    return
+  let live : Std.HashSet ByteArray :=
+    s.pr.tables.rc.fold
+      (fun acc k (d, n) =>
+        if n > 0 && k.size == 40 && d.size > 32 then acc.insert (k.extract 8 40) else acc)
+      {}
+  let before := s.pr.cache.byLabel.size
+  let cache := s.pr.cache.prune live fun l => (hashOfLabel? l).map fun b => ⟨b.toArray⟩
+  e.state.set { s with pr := { s.pr with cache } }
+  e.bumpBy "codesPruned" (before - cache.byLabel.size)
 
 end Near.Node.Validator

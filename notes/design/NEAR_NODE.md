@@ -1275,8 +1275,7 @@ chunks). Sources: `NearNode/Validator/{Pool,Prepare}.lean`, `Follow.lean` (`buil
   one each, all three landed and `tx` at FINAL is equal on both nodes; 8 invalid transactions through `send_tx` and `broadcast_tx_async`
   each, 16/16 same error. Restart: SIGKILL of the Lean validator at final height 353, restart from the store, caught up in 8.5 s, final
   height 362 on both nodes afterwards, 5/5 requests equal after the restart.
-- **Not done.** `EXPERIMENTAL_changes`, `EXPERIMENTAL_changes_in_block` (needs the trie diff of each block kept per key kind),
-  `include_proof` of `view_state`, `view_gas_key_nonces` and the global-contract queries, `light_client_proof`, `next_light_client_block`,
+- **Not done.** `EXPERIMENTAL_changes` (needs a change log with causes; F3 below), `include_proof` of `view_state`, `view_gas_key_nonces` and the global-contract queries, `light_client_proof`, `next_light_client_block`,
   `maintenance_windows`, `client_config`, `EXPERIMENTAL_receipt`. A request for any of them answers `METHOD_NOT_FOUND`. The gas profile and the
   contracts list of an outcome's metadata are not computed.
 
@@ -1292,7 +1291,12 @@ chunks). Sources: `NearNode/Validator/{Pool,Prepare}.lean`, `Follow.lean` (`buil
   line: `ts`, `uptime_ms`, `level`, `target`, `msg`). `--rpc-addr`, `--genesis-config`, `--store` as before.
 - **Shutdown.** SIGTERM and SIGINT (libuv signal handles in `Net.Uv`) end the node like `--stop-file`: the loop leaves, the RPC server stops, the
   store is closed, the report is written.
-- **Not done.** The `config.json` keys other than the three above are ignored; the logs are not per-target levels; there is no
+- **`gc_num_epochs_to_keep` (SAF-8 F1).** `--home` also reads the flattened `GCConfig` key `gc_num_epochs_to_keep` of `config.json`,
+  as `ClientConfig::gc_num_epochs_to_keep` uses it: 0 is refused (neard's `config_validate.rs`: "gc config values should all be
+  greater than 0") and a smaller value than 3 is raised to `MIN_GC_NUM_EPOCHS_TO_KEEP` (3). `--gc-epochs-to-keep` on the command
+  line still wins and keeps its test meanings (1, 2 and 0). `rpc_conformance.py` no longer passes the flag: 492 of 492 requests
+  equal with the window read from `node1/config.json` (10000).
+- **Not done.** The `config.json` keys other than the four above are ignored; the logs are not per-target levels; there is no
   `neard init`-compatible layout of `data/` (the store is the node's own format).
 
 #### The fork after a pause (M9 acceptance)
@@ -1544,7 +1548,7 @@ workload against a `neard` that still holds them, which is why that run uses the
 have no trie changes to take back; state parts, the state-transition data and the witness cache of nearcore do not exist here. The
 store's log still grows between compactions (55 MB per hour of this workload at the 64 MiB limit) and the compaction rewrites it
 from memory; a disk-resident tier is still not there. Contract code (`CodeCache.byLabel`) is not collected: it grows with the
-distinct contracts deployed, not with the height.
+distinct contracts deployed, not with the height. (Both closed by F2 below, except the disk-resident tier.)
 
 ##### Acceptance of the hardening (one run of each, on the final build)
 
@@ -1559,8 +1563,125 @@ distinct contracts deployed, not with the height.
 In the `validator_accept.py` runs the longest turn of the loop is the 12 s pause the test imposes with SIGSTOP; the outcomes
 check lists a few `408` answers of neard's `EXPERIMENTAL_tx_status` for transactions of the last blocks, which cannot be final
 once the Lean node (half the stake) has been stopped, and does not count them. `rpc_conformance.py` starts the Lean node with
-`--gc-epochs-to-keep 10000`, as `localnet.py` configures neard (`gc_num_epochs_to_keep`), because its requests ask for the first
-epochs; the node does not yet read that key from `config.json` (`--home`).
+`--home node1`, so it reads `gc_num_epochs_to_keep` (10000, which `localnet.py` writes for neard) from `config.json` like neard
+does, because its requests ask for the first epochs (F1 below).
+
+##### Follow-ups after the hardening (SAF-8 F1 to F5)
+
+Branch `claude/saf-8-node-followups`. F1 is described under M9c (`gc_num_epochs_to_keep` from `config.json`). Reference for F3:
+`core/store/src/trie/update.rs`, `core/primitives/src/types.rs` (`StateChangesKinds`), `runtime/runtime/src/{lib,verifier}.rs`,
+`core/store/src/utils/mod.rs` (`remove_account`), `chain/jsonrpc/src/lib.rs`.
+
+###### F2, bounded files and bounded code cache
+
+*Store log.* H3 left the store's log growing between the 64 MiB compactions (55 MB an hour of the soak workload). `Options.minLog` and
+`logPercent` add a second rule: when the log is longer than `minLog` bytes and longer than `logPercent` percent of the last snapshot,
+the next commit compacts. `Options.node` (what the node opens its store with) is 4 MiB and 100 %, so the files stay within a constant
+factor of the live data: the snapshot, a log of at most the same size, and the next snapshot while it is written. The store keeps the
+snapshot's size in its `info` (`snapSize`); the cap of 64 MiB still applies. `node-store-tests` (`ratioCompaction`): the same 200 keys
+are overwritten 3000 times; without the rule the files grow with the commits, with it they stay below three times the live data plus
+the minimum log, the store compacts at least five times, and a restart finds the same content and generation.
+
+*Code cache.* `CodeCache.byLabel` (and `labels`, `lists`) grew with the number of distinct contracts ever deployed. `CodeCache.prune`
+keeps a code only while a `State` entry with a positive count holds a value of its hash, which is how nearcore holds contract code in
+the trie (the `State` column stores it under `sha256(code)`, and garbage collection takes the count back with the last state that held
+it). `Env.pruneCodes` runs after garbage collection, between two applications (an application replaces the progress, cache included),
+and only when the cache has doubled since the last pruning (at least 32 entries), so the scan of the `State` counts is amortised.
+Everything dropped is a cache of work that `Model.code` does again on the next use, so pruning changes no result. The counter
+`codesPruned` is in the node's report. Test: `node-validator-tests` (`codePruning`).
+
+###### F3, state changes by kind (`EXPERIMENTAL_changes_in_block`, `block_effects`)
+
+nearcore keeps in `DBCol::StateChanges` one `RawStateChangesWithTrieKey` (the key and a list of `(cause, value)`) for every trie key
+that a block's chunks passed to `TrieUpdate::set` or `remove`, and `EXPERIMENTAL_changes_in_block` lists the kind of each account,
+contract code, access key and contract data key (`StateChangesKinds::from_changes`, one entry per key, in key order, whatever the
+cause). The Lean runtime returns the state after a chunk, not a log of the writes, so the node keeps what it can know.
+
+- *Storage.* New column `stateChanges` (id 20), one record per block and `ShardUId` (the key of `TrieChanges`), written with the
+  block's other operations and deleted with the block by garbage collection: the raw keys of the four kinds and whether the entry
+  is gone. `Chain/StateChanges.lean`. The RPC reads the records of all shards of the block, sorts the keys as RocksDB would, and
+  answers with `account_touched`, `access_key_touched`, `data_touched` and `contract_code_touched`. A block outside the window is
+  `UNKNOWN_BLOCK`, as everywhere else.
+- *What differs.* The keys whose entry differs between the pre-state and the post-state of the chunk (`diffEntries`, the same
+  list the trie update uses).
+- *Written without a change, derived as nearcore writes them* (`writtenKeys`): (1) `update_validator_accounts`: `set_account` for
+  every account of `stake_info` that exists in the shard and for the protocol treasury when it is not one of them, so the first block
+  of every epoch, and block 1, list the validators and the treasury though the values may not change; (2) `verify_and_charge_tx_ephemeral`:
+  the signer's account and access key for every transaction of the chunk; (3) `apply_action_receipt`: `set_account` of the receiver
+  after the actions of a receipt that succeeded and left its account in place (a failing receipt rolls its writes back, so only
+  successful outcomes count, and only when the account exists before and after the chunk); (4) `remove_account` removes `Account`
+  and `ContractCode` whether or not the account had code, so a deleted account lists a code key.
+- *What it cannot know, and keeps as a diff.* The VM returns the final state of the contract, not its writes. A `storage_write` of the
+  value the key held, a `storage_remove` of a key that is not there, a write that a later write of the same chunk restores, and an
+  account created and deleted in one chunk are listed by neard and not by the node. In the live data the gap is one key: the `ft`
+  contract of the workload removes a 64-byte key of `a` (block 54: neard lists it with the value `None`, and the node's diff has
+  no entry, so the key was absent before the chunk, or created and removed in it). The harness classifies a request as a *known gap* only when the Lean list equals neard's list
+  with extra `data_touched` entries removed; any other difference stays a failure. Known gaps are reported separately and are not counted
+  as equal (`rpc_conformance.py`: `known_gaps` in the table, the `GAP` lines name the block and the account, `rpc-conformance.json`
+  lists them).
+- *Found with a live neard.* The first version (the diff alone) matched 290 of 304 `changes_in_block` requests. The 14 others, read
+  with `EXPERIMENTAL_changes` (which gives the cause of each change) on a neard kept running: block 1 and the epoch starts (validator
+  accounts update, 3 and 4 keys, `near`, the validators and a staker whose value did not change), blocks where a receipt wrote the receiver's
+  account back unchanged next to a new access key (cause `receipt_processing`), the code key of a deleted account (`remove_account`), and the
+  `ft` data key. After the derivation: 299 of 304 equal and the 5 known gaps, with no other difference.
+- *Also fixed on the way.* The chunk view rendered a `GlobalContractDistribution` receipt as `null`; it now renders
+  `ReceiptEnumView::GlobalContractDistribution` (the hash of the code, the nonce only for version 2). A run whose sampled chunk held
+  such a receipt had shown the difference.
+- *Result* (`rpc_conformance.py run`, final build): **783 of 789 requests equal, 6 known gaps, 0 other differences**. The 6 gaps are
+  `EXPERIMENTAL_changes_in_block` of blocks 54, 60, 65, 71, 73 and block 54 again by hash, each with one `data_touched` of `ft.node0`
+  that neard lists and the node does not. 291 of the 297 `changes_in_block` requests (every block of the run by height, a sample by hash,
+  `final`, `optimistic`, `near-final`, `block_effects`, the error cases) are equal.
+- *Deferred: `EXPERIMENTAL_changes`.* It returns the values with their causes (transaction hash, receipt hash, `action_receipt_gas_reward`,
+  `validator_accounts_update`, ...), several per key in the order they happened. That needs a change log in the runtime (each write with
+  the cause that led to it), which the model does not have and which is not added here. It answers `METHOD_NOT_FOUND`.
+
+###### F4, gas profile of outcomes: not done
+
+The metadata of an outcome (`gas_profile`, and the list of contracts) is not computed and the conformance harness removes both from
+the comparison. The runtime's `ExecutionOutcome` has no profile and the VM's profile lacks the split by action (`ActionCosts`) that
+nearcore's `ProfileDataV3` carries, so filling it needs a change in `near-lean/runtime` and `near-lean/vm`, which this work does not
+change. Left as it is.
+
+###### F5, `utf16Units` without recursion
+
+`Wasm.Near.utf16Units` (the host's decoding of `log_utf16` and `abort` messages) recursed once per code unit and overflowed the native
+stack at around a million units (3 M units: the process aborts, in either engine). It is now `utf16UnitsLoop` with an accumulator
+(tail recursive, a loop in compiled code), and the recursive definition stays as `utf16UnitsOld`, the specification, with
+`utf16UnitsLoop_eq_old` and `utf16Units_eq_old` proving the two equal on every input (axioms: `propext`, `Quot.sound`). It is the only
+change in `near-lean/vm`: no other definition, statement or proof moved, and `LogRead.lean` (the one user) is untouched. With 10 M
+units the new function runs. Builds with `--wfail`: `near-lean/{vm,runtime,chain,fastvm,node}`, and `contracts/w-near/verification`
+(`Model`, `Spec`, `runtime-adapter-tests` pass with `--wfail`; `Proofs` builds, with the one `sorry` it already has,
+`refines_wnear_exported`; it is the only package of `contracts/*` that requires the runtime). `vm-tests`: 193 passed. The differential
+generator calls `abort` again: `fastvm-differential`, 200 programs, 42037 outcome comparisons, **0 mismatches**.
+`near-lean/vm/NearVM/Utf.lean` is not reformatted: the formatter would rewrite definitions that F5 does not touch, and the rule for
+shared packages is that F5 is the only change.
+
+###### Acceptance of the follow-ups (one run of each, on the final build)
+
+| Run | Result |
+|---|---|
+| `rpc_conformance.py run` | **783 of 789 requests equal, 6 known gaps (the `data_touched` of F3), 0 other differences**; block 78/78, chunk 65/65, `tx` 150/150, `EXPERIMENTAL_tx_status` 37/37, `EXPERIMENTAL_changes_in_block` 291 equal + 6 gaps of 297; the three transactions through the Lean RPC landed; SIGKILL at final height 329, back in 8.5 s, final 338 on both |
+| `validator_accept.py` | ok: 365 blocks applied, 364 same hash and 1 orphan (348), 360 of 360 state roots, 512 of 512 outcomes equal (3 `408` answers of `EXPERIMENTAL_tx_status` for transactions of the last blocks, not counted), 113 transactions in 41 Lean chunks, 155 witnesses valid, stall test (12 s) stalled and resumed |
+| `soak.py --duration 2400`, full workload | `localnet-soak: all agree`: head 3 to 3835, final 3833; 3892 of 3892 block hashes and 3825 of 3825 state roots equal, no orphan, 6 light bursts; head minus final at most 10; lag at most 2 outside bursts, 1 inside, median 0; no disconnect, the RPC answered at every sample; **RSS 163.9 MB at the start, 158.1 MB at the end, peak 194.2 MB, slope 8.4 MB/h; store 21 KB at the start, 2.1 MB at the end, between 1.4 and 6.7 MB after the first window** |
+
+The soak series from `soak.json` (mean and maximum RSS and the range of the store size over each five minutes, with the head at the end of the window):
+
+| seconds | RSS mean / max (MB) | store min .. max (MB) | head |
+|---|---|---|---|
+| 0 | 156.4 / 194.2 | 0.02 .. 4.05 | 411 |
+| 300 | 166.3 / 182.0 | 1.68 .. 6.67 | 906 |
+| 600 | 160.7 / 186.1 | 1.45 .. 5.85 | 1390 |
+| 900 | 163.4 / 186.1 | 2.10 .. 5.34 | 1882 |
+| 1200 | 162.7 / 186.2 | 1.43 .. 5.55 | 2365 |
+| 1500 | 165.7 / 186.2 | 1.69 .. 5.61 | 2857 |
+| 1800 | 163.0 / 186.3 | 1.50 .. 5.83 | 3341 |
+| 2100 | 164.8 / 185.7 | 1.49 .. 5.65 | 3835 |
+
+Both are flat after the first minutes: the store falls back at each compaction (the sawtooth between 1.4 and 6 MB) where H3's soak
+grew by 32 MB an hour (55 MB an hour of log before F2), and the RSS stays at 160 to 166 MB. The window is 40 minutes, not the hour
+of H3 (the slope of 8.4 MB/h is the harness's fit after its warm-up of 600 s, against 11.6 MB/h in H3's hour).
+One first start of `validator_accept.py` failed at "neard did not start": the driver script had removed the topology directory
+while the previous run was shutting down; nothing of the node ran. The result above is the one complete run.
 
 ## Open points
 

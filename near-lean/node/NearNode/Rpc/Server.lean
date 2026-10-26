@@ -85,6 +85,8 @@ def dispatch (srv : Server) (method : String) (params : Json) : IO R := do
     validators c params
   | "EXPERIMENTAL_genesis_config" | "genesis_config" =>
     return .ok (genesisConfig c)
+  | "EXPERIMENTAL_changes_in_block" | "block_effects" =>
+    changesInBlock c params
   | "EXPERIMENTAL_protocol_config" =>
     protocolConfig c params
   | _ =>
