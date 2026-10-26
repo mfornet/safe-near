@@ -97,6 +97,14 @@ class Analysis(unittest.TestCase):
     def test_a_chain_that_does_not_stop_without_the_lean_node_fails(self):
         self.assertFalse(self.result(stall={"stalled": False, "resumed": True})["ok"])
 
+    def test_a_multi_shard_run_with_roots_on_one_shard_only_fails(self):
+        self.assertTrue(self.result()["ok"])
+        (self.directory / "applied.jsonl").write_text("\n".join(applied_line(h) for h in (1, 2, 3)) + "\n")
+        r = va.analyse(self.directory, {"disconnects": [], "failure": None, "handshakes": 1}, self.stall, self.rows,
+                       head=40, final=38, require_txs=False, shards=4)
+        self.assertFalse(r["multiShardOk"])
+        self.assertFalse(r["ok"])
+
     def test_finality_that_stays_behind_fails(self):
         (self.directory / "applied.jsonl").write_text(applied_line(1) + "\n")
         r = va.analyse(self.directory, {"disconnects": [], "failure": None}, self.stall, self.rows, head=100, final=3)

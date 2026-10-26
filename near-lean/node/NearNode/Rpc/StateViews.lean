@@ -22,19 +22,30 @@ structure StateAt where
   root : CryptoHash
   src : NodeSource
 
-/-- The state of the shard of `account` after `block`. -/
-def stateAt (s : VState) (block : BlockRec) (account : AccountId) : Except String StateAt := do
+/-- The state of `shard` after `block`. -/
+def stateAtShard (s : VState) (block : BlockRec) (pick : ShardLayout → Option ShardId) :
+    Except String StateAt := do
   let epoch ←
     match s.st.epoch block.view.epochId with
     | .ok e =>
       pure e
     | .error e =>
       throw s!"{e.kind}"
-  let some shard := epoch.layout.accountIdToShardId account | throw "no shard for the account"
+  let some shard := pick epoch.layout | throw "no shard for the account"
   let some (.v5 x) := s.pr.extras[(block.hash.bytes, shard)]? | throw "no chunk extra for the block"
   pure
       { block, shard, root := x.stateRoot,
         src := s.pr.tables.nodeSource (shardKey epoch.layout shard) }
+
+/-- The state of the shard of `account` after `block`. -/
+def stateAt (s : VState) (block : BlockRec) (account : AccountId) : Except String StateAt :=
+  stateAtShard s block (·.accountIdToShardId account)
+
+/-- The state a global contract is read from: the first shard of the layout, as `query_shard_uid` takes it
+("for global contract queries we can use any shard_id, so just take the first one"); the code is replicated to every
+shard by the distribution receipts. -/
+def stateAtFirstShard (s : VState) (block : BlockRec) : Except String StateAt :=
+  stateAtShard s block (·.shardIds[0]?)
 
 def StateAt.get (v : StateAt) (key : TrieKey) : Except String (Option ByteArray) := do
   let (r, _) ← Trie.get v.src v.root (TrieKey.toVec key)

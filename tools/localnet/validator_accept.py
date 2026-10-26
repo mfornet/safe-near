@@ -33,9 +33,17 @@ import localnet
 import nearcodec as nc
 
 ROOT = chain_corpus.ROOT
-TOPOLOGY = "validator"
+TOPOLOGY = "validator"      # set by ``set_topology`` (``--topology``)
 BINARY = ROOT / "near-lean/node/.lake/build/bin/near-lean-node"
 CORPUS_META = chain_corpus.DEFAULT_CORPUS / "single/meta.json"
+
+
+def set_topology(name: str) -> None:
+    """Selects the topology of the run (``validator`` or ``validator-sharded``) for this module."""
+    global TOPOLOGY
+    if name not in localnet.TOPOLOGIES or not localnet.TOPOLOGIES[name].get("neard"):
+        raise SystemExit(f"{name} is not a validator topology")
+    TOPOLOGY = name
 
 
 def rpc(method: str, params, index: int = 0, timeout: float = 10):
@@ -181,6 +189,19 @@ def chain_rows(last: int) -> list[dict]:
     return rows
 
 
+def shard_layout() -> tuple[list[str], dict[int, int]]:
+    """The boundary accounts and the shard id of each index of the topology's (static, V2) shard layout."""
+    layout = json.loads((localnet.home(TOPOLOGY) / "node0/genesis.json").read_text())["shard_layout"]["V2"]
+    return layout["boundary_accounts"], {int(k): v for k, v in layout["index_to_id_map"].items()}
+
+
+def shard_of(account: str) -> int:
+    """``account_id_to_shard_id`` of the static layout."""
+    import bisect
+    boundaries, ids = shard_layout()
+    return ids[bisect.bisect_right(boundaries, account)]
+
+
 def neard_status_text(status) -> str:
     """The status of an outcome as the Lean node's applied log writes it."""
     if isinstance(status, dict):
@@ -208,6 +229,7 @@ def outcome_comparison(applied: list[dict], rows: list[dict]) -> dict:
             for tx_hash, signer in c["txs"]:
                 wanted.append((c["author"] == "node1", tx_hash, signer, r["height"]))
     checked = equal = 0
+    cross_checked = cross_equal = 0
     problems = []
     by_lean = [w for w in wanted if w[0]]
     by_neard = [w for w in wanted if not w[0]]
@@ -221,6 +243,8 @@ def outcome_comparison(applied: list[dict], rows: list[dict]) -> dict:
         theirs = [status["transaction_outcome"]] + status.get("receipts_outcome", [])
         for o in theirs:
             checked += 1
+            # a receipt that ran on another shard than its transaction's signer: it crossed shards
+            cross = shard_of(o["outcome"]["executor_id"]) != shard_of(signer)
             oid = nc.b58decode(o["id"]).hex()
             mine = lean_outcomes.get(oid)
             if mine is None:
@@ -231,16 +255,19 @@ def outcome_comparison(applied: list[dict], rows: list[dict]) -> dict:
                     "status": neard_status_text(out["status"]),
                     "receipts": [nc.b58decode(r).hex() for r in out["receipt_ids"]]}
             have = {k: mine[k] for k in want}
+            cross_checked += cross
             if want == have:
                 equal += 1
+                cross_equal += cross
             else:
                 problems.append(f"height {height} {o['id']}: neard {want} Lean {have}")
     return {"leanTransactions": len(by_lean), "neardTransactionsChecked": min(len(by_neard), 40),
-            "outcomesChecked": checked, "outcomesEqual": equal, "problems": problems[:10]}
+            "outcomesChecked": checked, "outcomesEqual": equal,
+            "crossShardOutcomesChecked": cross_checked, "crossShardOutcomesEqual": cross_equal, "problems": problems[:10]}
 
 
 def analyse(work: Path, report: dict, stall: dict | None, rows: list[dict], head: int, final: int,
-            require_txs: bool = True, known=None) -> dict:
+            require_txs: bool = True, known=None, shards: int = 1) -> dict:
     """``known(hash_hex)`` tells whether neard holds the block with that hash (also off its canonical chain).  After a pause
     both producers can build on the same parent at different heights (nearcore does it too: a block per height whose
     approvals are ready), and the fork choice orphans some blocks.  What is guaranteed is that every block the Lean node
@@ -253,8 +280,18 @@ def analyse(work: Path, report: dict, stall: dict | None, rows: list[dict], head
     result["blocksByNeard"] = sum(1 for r in rows if r["author"] != lean)
     result["chunksByLean"] = sum(1 for r in rows for c in r["chunks"] if c["new"] and c["author"] == lean)
     result["chunksByNeard"] = sum(1 for r in rows for c in r["chunks"] if c["new"] and c["author"] != lean)
+    by_shard: dict[int, dict] = {}
+    for r in rows:
+        for c in r["chunks"]:
+            if c["new"]:
+                entry = by_shard.setdefault(c["shard"], {"lean": 0, "neard": 0, "leanTransactions": 0})
+                entry["lean" if c["author"] == lean else "neard"] += 1
+                if c["author"] == lean:
+                    entry["leanTransactions"] += len(c["txs"])
+    result["chunksByShard"] = {str(k): by_shard[k] for k in sorted(by_shard)}
     # the Lean node's chain is neard's chain, block by block, with the same state roots
     same_hash = same_root = checked_root = 0
+    roots_by_shard: dict[int, list[int]] = {}      # shard -> [checked, equal]
     problems = []
     orphans = []
     lean_hashes = {}
@@ -275,10 +312,13 @@ def analyse(work: Path, report: dict, stall: dict | None, rows: list[dict], head
             for chunk, report_chunk in zip(nxt["chunks"], row["chunks"]):
                 if chunk["new"]:
                     checked_root += 1
+                    roots_by_shard.setdefault(chunk["shard"], [0, 0])[0] += 1
                     if nc.b58decode(chunk["prevStateRoot"]).hex() == report_chunk["stateRoot"]:
                         same_root += 1
+                        roots_by_shard[chunk["shard"]][1] += 1
                     else:
                         problems.append(f"height {row['height']} shard {chunk['shard']}: state root differs")
+    result["stateRootsByShard"] = {str(k): {"checked": v[0], "equal": v[1]} for k, v in sorted(roots_by_shard.items())}
     result.update(blocksApplied=len(applied), sameHash=same_hash, orphans=orphans, stateRootsChecked=checked_root, stateRootsEqual=same_root,
                   problems=problems[:10], disconnects=[d for d in report.get("disconnects", []) if "connection refused" not in d], failure=report.get("failure"),
                   leanStats=report.get("stats", {}), stall=stall)
@@ -296,12 +336,20 @@ def analyse(work: Path, report: dict, stall: dict | None, rows: list[dict], head
                                    and result["outcomes"]["outcomesChecked"] > 0
                                    and result["outcomes"]["outcomesChecked"] == result["outcomes"]["outcomesEqual"]))
           and (stall is None or (stall["stalled"] and stall["resumed"])))
+    # on several shards: every shard has its roots checked and equal, and the Lean node produced chunks on more than one
+    if shards > 1:
+        shard_ok = (len(roots_by_shard) == shards and all(v[0] > 0 and v[0] == v[1] for v in roots_by_shard.values())
+                    and sum(1 for v in by_shard.values() if v["lean"] > 0) >= 2
+                    and (not require_txs or result["outcomes"]["crossShardOutcomesChecked"] > 0))
+        result["multiShardOk"] = shard_ok
+        ok = ok and shard_ok
     result["ok"] = ok
     return result
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--topology", default="validator", choices=["validator", "validator-sharded"])
     parser.add_argument("--duration", type=int, default=240, help="seconds to run")
     parser.add_argument("--binary", type=Path, default=BINARY)
     parser.add_argument("--work", type=Path, default=localnet.DATA / "validator-run")
@@ -311,6 +359,7 @@ def main() -> None:
                         help="seconds after which the Lean node is stopped (default: 30 s before the end)")
     parser.add_argument("--gc-epochs", type=int, default=None, help="--gc-epochs-to-keep of the Lean node (default: its own)")
     options = parser.parse_args()
+    set_topology(options.topology)
     home = prepare(options.work)
     localnet.start(TOPOLOGY)
     lean = start_lean(home, options.work, options.duration + 120, options.binary,
@@ -332,7 +381,8 @@ def main() -> None:
         lean.wait(timeout=60)
         rows = chain_rows(head_height())   # the chain went on while the Lean node was stopping
         report = json.loads((options.work / "report.json").read_text()) if (options.work / "report.json").exists() else {}
-        result = analyse(options.work, report, stall, rows, head, final, require_txs=not options.no_workload, known=neard_holds)
+        result = analyse(options.work, report, stall, rows, head, final, require_txs=not options.no_workload, known=neard_holds,
+                         shards=len(shard_layout()[1]))
         print(json.dumps(result, indent=1))
         (options.work / "result.json").write_text(json.dumps(result, indent=1) + "\n")
         sys.exit(0 if result["ok"] else 1)

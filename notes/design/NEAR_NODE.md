@@ -1791,6 +1791,76 @@ from scratch at `bee7dd6`: 893 s.
 | `vm-tests` | 193 passed, 0 failed |
 | `registered-replay-fast` (`replay_corpus.py`) | 436 pass, 0 fail, 0 unsupported |
 
+#### V1 and V2: the validator on four shards, global contracts (SAF-8)
+
+Sources: `tools/localnet/{localnet,validator_accept,soak,rpc_conformance,workload}.py`, `NearNode/Rpc/{Query,StateViews,Views}.lean`,
+`NearNode/Chain/ApplyChunk.lean`, `NearNode/Validator/Drive.lean`.
+
+##### V1, the validator topology on four shards
+
+- **Topology.** `validator-sharded` (`localnet.py`): `neard localnet -v 2 -s 4` as `sharded` (boundary accounts `test1`, `test2`,
+  `test3`, shard ids 3, 1, 0, 2 in layout order), chain id `test-chain-safe-near-validator-4s` (so `neard` reads the epoch config
+  from the genesis, as for `validator`), kickout thresholds 0, inflation 1/40; only `node0` runs as `neard`, `node1`'s keys are the
+  Lean node's. Two validators of equal stake: neither holds two thirds, so `neard` cannot finalize, produce an endorsed chunk
+  or approve a block alone. `validator_accept.py`, `soak.py` and `rpc_conformance.py` take `--topology validator|validator-sharded`.
+- **What had to change in the node: almost nothing.** The M8 code was already written per shard (`produceChunks` walks the
+  layout's shards and asks `chunkProducerAfter` for each; `distributeChunk`, `distributeWitness` and the endorsements are per
+  chunk; `Inclusion` waits for every shard; `Apply.applyBlock` applies all shards with the bandwidth scheduler and the congestion
+  control of M3c, and builds each shard's incoming receipts with their proofs from the previous chunks). The first run on the new
+  topology was accepted by `neard`, and the acceptance now fails unless this holds per shard (below). The one change that
+  follows nearcore more exactly: an applied block's transactions leave the pool *before* the next chunks are prepared
+  (`reconcile_transaction_pool` runs before `produce_chunks` in `on_block_accepted_with_optional_chunk_produce`); the node did it
+  after, so every included transaction was prepared once more and dropped as an invalid nonce (`txsRejected` counted them; it is
+  now 0). The chunk content was the same.
+- **Assignment.** `get_chunk_producer_info_db`/`chunkProducerAfter` and `get_chunk_validator_assignments` are the M1c samplers,
+  checked against nearcore at 46 heights; with two validators, one of them produces the chunk of a shard for a stretch of heights and
+  both validate (one shard's producer endorses its own chunk). On the run below the Lean node produced new chunks on all four shards
+  (the producers of shards 0 and 3 were mostly the Lean node, those of 1 and 2 mostly `neard`, changing with the epochs).
+- **Tracking.** The node tracks every shard (it applies all of them, as the M8 decision says), which is a superset of the shards
+  nearcore requires a validator to track; `neard` tracks its assigned shards. Hence the node validates a witness by comparing with its own
+  execution rather than by re-executing on the recorded partial trie, and `ChunkExtra` of every shard is at hand for chunk
+  production. Not done: a node that tracks only the shards it is assigned, with state sync at epoch changes and witness-only
+  validation of the others.
+- **Acceptance** (`validator_accept.py --topology validator-sharded`, besides the single-shard criteria): the Lean node produced new
+  chunks on at least two shards, every shard has state roots checked and all equal, and at least one receipt outcome executed on
+  another shard than its transaction's signer (a cross-shard receipt, with its proof, applied by `neard` and by the Lean node) is
+  equal on both sides.
+
+##### V2, global contracts
+
+- **Workload.** `workload.py` `global_contracts` (it existed with three rounds; now twelve): `DeployGlobalContract` by code hash
+  (from two shards) and by account id, users of both kinds on each of the four shards, calls (also across shards and through
+  promises), an update of a by-account deployment (a new code and nonce reach every shard; users call the new code), switches
+  (local to global by hash, global to global by account, global to local), the failures (`UseGlobalContract` of a hash and of an
+  account that were never deployed: `GlobalContractDoesNotExist`; a deployment the account cannot pay: `LackBalanceForState`), a
+  deployment of code that exists, and the deletion of an account that uses one.
+- **RPC** (`neard` 2.13.4 serves both at protocol 86: `QueryRequest::ViewGlobalContractCode { code_hash }` and
+  `ViewGlobalContractCodeByAccountId { account_id }`, answered from the first shard of the layout, `query_shard_uid`):
+  `view_global_contract_code`, `view_global_contract_code_by_account_id` (`code_base64`, `hash`; the hash of the code for the by-account
+  form), `NO_GLOBAL_CONTRACT_CODE` for code never distributed (`identifier` as `{hash}` or `{account_id}` and the Rust `Debug` text,
+  `AccountId(AccountId("x"))`), and `view_code` of an account that uses a global contract (it was `NO_CONTRACT_CODE`; now the shared
+  code, as `view_account_contract_code` resolves it). `GlobalContractDoesNotExist` is rendered in failures (it was
+  `<unrendered failure>`).
+- **Conformance.** 1602 requests on the single-shard topology (1725 on four shards), all equal, 0 known gaps, including 40 `call_function`, 133 `view_code`,
+  96 + 95 global code queries and the state changes of every block; the run fails if the answers of `neard` do not contain the global
+  cases (`metadata.contracts` entries `global_hash` and `global_account_id`, the four actions, `GlobalContractDoesNotExist`, and on
+  several shards `GlobalContractDistribution` receipts) or if any failure is unrendered.
+
+##### Acceptance of V1 and V2 (one run of each, on the final build)
+
+| Run | Result |
+| --- | --- |
+| `validator_accept.py --topology validator-sharded --duration 520` (1) | ok: 799 blocks applied, 799 same hash (2 orphans neard holds), 3154 of 3154 state roots equal (shard 0: 766, 1: 796, 2: 796, 3: 796); Lean produced new chunks on all four shards (619, 149, 179, 649) and 471 blocks; 677 of 677 outcomes equal, 126 of them receipts that ran on another shard than the signer's; 173 transactions in 128 Lean chunks; 1570 witnesses of `neard` valid; stall test: head 784 -> 784 while stopped, 803 after, final 782 -> 801 |
+| the same (2) | ok: 798 applied, 798 same hash, 3150 of 3150 roots, 688 of 688 outcomes (128 cross-shard), 1566 witnesses valid, stall test ok |
+| `validator_accept.py --duration 360` (single shard) | ok: 559 applied, 559 same hash, 557 of 557 roots, 659 of 659 outcomes, 156 transactions in 56 Lean chunks, stall test ok |
+| `soak.py --topology validator-sharded --duration 1800` (full workload, global contracts included) | all nine checks ok: 2802 blocks compared, 2802 hashes equal, 11046 of 11046 state roots equal over four shards, head 3 to 2779, final 2777, head minus final at most 13, no window without finality, lag at most 2 outside bursts and 1 inside (4 light bursts), median 0, no disconnect, RPC answered at every sample, longest turn of the loop 567 ms, 5526 witnesses valid, RSS 182 MB to 201 MB (peak 229 MB; the slope of 45 MB/h is a 30 minute estimate) |
+| `rpc_conformance.py run` (single shard) | 1602 of 1602 requests equal, 0 known gaps, 0 other differences; restart from the store: caught up in seconds, final height equal afterwards |
+| `rpc_conformance.py run --topology validator-sharded` | 1725 of 1725 equal, 0 known gaps, a `GlobalContractDistribution` receipt among the answers |
+| `follow_accept.py --lightburst` | single: head reached after 2.2 s, max lag 8, 1015 of 1015 roots, caught up after the burst; sharded: 7.3 s, max lag 5, 4006 of 4006 roots, caught up; no disconnect; `localnet-follow: all agree` |
+
+Not run: `fastvm-differential`, `vm-tests`, `registered-replay-fast`, the unit and conformance gates of the packages (nothing under
+`near-lean/{vm,runtime,chain,fastvm,wasm,interface,crypto}` or `contracts/` changed), and any soak longer than 30 minutes.
+
 ## Open points
 
 - Numeric performance target for M10, measured against nearcore: set and met in M10a above (M2's and M4's are proposed above).

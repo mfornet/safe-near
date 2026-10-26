@@ -418,29 +418,90 @@ class Workload:
         ])
 
     def global_contracts(self):
+        """Global contracts (V2): `DeployGlobalContract` by code hash and by account id, `UseGlobalContract` of both,
+        from accounts of every shard of the four-shard layout (the boundary accounts are test1, test2, test3, so
+        ``g*.node0`` is in the first shard, ``test1g`` in the second, ``test2g`` in the third, ``test3g`` in the
+        fourth), calls of the shared code, an update of a by-account deployment (a new nonce is distributed to every
+        shard and the users see the new code), a switch between local, by-hash and by-account code, the failures
+        (a contract that was never deployed, an account that cannot pay the storage) and the deletion of an account
+        that uses one."""
         t = self.actors
-        a, t1 = t["a.node0"], t["test1.node0"]
+        a, t1, t2, t3 = t["a.node0"], t["test1.node0"], t["test2.node0"], t["test3.node0"]
         rs = self.contracts_by_name["rs"]
+        ft = self.contracts_by_name["ft"]
+        host = self.contracts_by_name["host"]
         code_hash = hashlib.sha256(rs).digest()
-        for name in ["g1.node0", "g2.node0"]:
+        host_hash = hashlib.sha256(host).digest()
+        names = ["g1.node0", "g2.node0", "test1g.node0", "test2g.node0", "test3g.node0", "poor.node0"]
+        for name in names:
             self.actor(name)
         root = self.root
-        def create(name, use):
-            return (root, name, [nc.create_account(), nc.transfer(100 * NEAR),
-                                 nc.add_key(self.actors[name].key.pk, nc.access_key_full()), use])
+        def create(name, use=None, amount=100):
+            actions = [nc.create_account(), nc.transfer(amount * NEAR),
+                       nc.add_key(self.actors[name].key.pk, nc.access_key_full())]
+            return (root, name, actions + ([use] if use else []))
         self.round("global-deploy", [
             (a, "a.node0", [nc.deploy_global_contract(rs, by_account=False)]),
             (t1, "test1.node0", [nc.deploy_global_contract(rs, by_account=True)]),
+            (t2, "test2.node0", [nc.deploy_global_contract(host, by_account=False)]),
         ])
         self.round("global-use", [
             create("g1.node0", nc.use_global_contract_by_hash(code_hash)),
             create("g2.node0", nc.use_global_contract_by_account("test1.node0")),
+            create("test1g.node0", nc.use_global_contract_by_hash(host_hash)),
+            create("test2g.node0", nc.use_global_contract_by_account("test1.node0")),
+            create("test3g.node0", nc.use_global_contract_by_hash(code_hash)),
         ])
+        g1, g2, g31, g32, g33 = (self.actors[n] for n in names[:5])
+        u64 = lambda *values: b"".join(v.to_bytes(8, "little") for v in values)
         self.round("global-call", [
-            (self.actors["g1.node0"], "g1.node0", [self.fc("log_something")]),
-            (self.actors["g2.node0"], "g2.node0", [self.fc("write_key_value", b"global" + (1).to_bytes(8, "little"))]),
+            (g1, "g1.node0", [self.fc("log_something")]),
+            (g2, "g2.node0", [self.fc("write_key_value", b"global" + u64(1))]),
             (a, "g1.node0", [self.fc("ext_account_id")]),
+            (g31, "test1g.node0", [self.fc("ext_account_id")]),
+            (g32, "test2g.node0", [self.fc("write_key_value", b"global" + u64(2))]),
+            (g33, "test3g.node0", [self.fc("sum_n", u64(1000))]),
+            # calls across shards between accounts that run shared code
+            (g1, "test2g.node0", [self.fc("log_something")]),
+            (g33, "g2.node0", [self.fc("sum_with_input", u64(5, 6))]),
         ])
+        self.round("global-promise", [
+            (g1, "g1.node0", [self.fc("call_promise", json.dumps([
+                {"create": {"account_id": "test3g.node0", "method_name": "log_something", "arguments": {},
+                            "amount": "0", "gas": 20 * TGAS}, "id": 0},
+                {"then": {"promise_index": 0, "account_id": "test2g.node0", "method_name": "log_something",
+                          "arguments": {}, "amount": "0", "gas": 20 * TGAS}, "id": 1}]).encode(), gas=150 * TGAS)]),
+        ])
+        # the by-account deployment is updated: another code, a new nonce, distributed to every shard
+        self.round("global-update", [(t1, "test1.node0", [nc.deploy_global_contract(ft, by_account=True)])])
+        self.wait_blocks(3)
+        self.round("global-after-update", [
+            (g2, "g2.node0", [self.fc("new_default_meta", json.dumps({"owner_id": "g2.node0", "total_supply": "1000"}).encode())]),
+            (g32, "test2g.node0", [self.fc("new_default_meta", json.dumps({"owner_id": "test2g.node0", "total_supply": "5"}).encode())]),
+            (g33, "g2.node0", [self.fc("ft_total_supply")]),
+            (g1, "g1.node0", [self.fc("log_something")]),           # by hash: unchanged
+        ])
+        # switches: local -> global, global -> global, global -> local
+        self.round("global-switch", [
+            (t3, "test3.node0", [nc.use_global_contract_by_hash(host_hash)]),       # its local code goes
+            (g1, "g1.node0", [nc.use_global_contract_by_account("test1.node0")]),
+            (g33, "test3g.node0", [nc.deploy_contract(rs)]),
+        ])
+        self.round("global-after-switch", [
+            (a, "test3.node0", [self.fc("ext_account_id")]),
+            (a, "g1.node0", [self.fc("ft_total_supply")]),
+            (a, "test3g.node0", [self.fc("ext_account_id")]),
+        ])
+        # the failures
+        missing = hashlib.sha256(b"never deployed").digest()
+        self.round("global-failures", [
+            (a, "a.node0", [nc.use_global_contract_by_hash(missing)]),
+            (a, "test2.node0", [nc.use_global_contract_by_account("nobody.node0")]),
+            (a, "a.node0", [nc.deploy_global_contract(rs, by_account=False)]),     # the same code again
+        ])
+        self.round("global-poor", [create("poor.node0", amount=2)])
+        self.round("global-poor-2", [(self.actors["poor.node0"], "poor.node0", [nc.deploy_global_contract(ft, by_account=True)])])
+        self.round("global-delete", [(g32, "test2g.node0", [nc.delete_account("a.node0")])])
 
     def gas_keys(self):
         a = self.actors["a.node0"]
