@@ -376,7 +376,7 @@ def tracking_report(work: Path, applied: list[dict], shards: int, roots_by_shard
     for i, line in enumerate(log):
         if "state sync: state of shards" in line:
             text = line.split("state of shards ", 1)[1].split(" installed", 1)[0]
-            installs.append((i, [int(x) for x in text.strip("[]").split(",") if x.strip()]))
+            installs.append((i, [int(x) for x in text.strip("#[] ").split(",") if x.strip()]))
         elif "produced the chunk of shard " in line:
             produced.append((i, int(line.split("produced the chunk of shard ", 1)[1].split(" ", 1)[0])))
     synced_then_produced = [shards_ for i, shards_ in installs
