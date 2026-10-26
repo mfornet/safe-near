@@ -77,6 +77,12 @@ structure WasmConfig where
   /-- `global_contract_host_fns`: the global-contract host functions are
   linked (protocol 78 on); before, importing one fails to link. -/
   globalContractHostFns : Bool := false
+  /-- `chain_id_host_fn`, `p256_verify_host_fn`, `gas_key_host_fns`, `yield_with_id_host_fns`: whether
+  these host functions are linked (protocol 85 on); before, importing one fails to link. -/
+  chainIdHostFn : Bool := false
+  p256VerifyHostFn : Bool := false
+  gasKeyHostFns : Bool := false
+  yieldWithIdHostFns : Bool := false
   limits : LimitConfig
   deriving Inhabited
 
@@ -295,6 +301,7 @@ def ofJson (j : Json) : Except String RuntimeConfig := do
   -- them in `runtime_configs/77.yaml`; the host functions that charge them are
   -- enabled from 78 (`global_contract_host_fns`) and no later version changes them.
   let hostFns := ((field wasm "global_contract_host_fns").toOption.bind (·.getBool?.toOption)).getD false
+  let wasmFlag (k : String) : Bool := ((field wasm k).toOption.bind (·.getBool?.toOption)).getD false
   let disabled : Fee :=
     { sendSir := 999_999_999_999_999, sendNotSir := 999_999_999_999_999, execution := 999_999_999_999_999 }
   let useGlobalBase : Fee := if hostFns then
@@ -397,6 +404,10 @@ def ofJson (j : Json) : Except String RuntimeConfig := do
       bls12381NotInGroupFix :=
         ((field wasm "bls12381_not_in_group_fix").toOption.bind (·.getBool?.toOption)).getD false
       globalContractHostFns := hostFns
+      chainIdHostFn := wasmFlag "chain_id_host_fn"
+      p256VerifyHostFn := wasmFlag "p256_verify_host_fn"
+      gasKeyHostFns := wasmFlag "gas_key_host_fns"
+      yieldWithIdHostFns := wasmFlag "yield_with_id_host_fns"
       limits := ← limits (← field wasm "limit_config") }
     accountCreation := {
       minAllowedTopLevelAccountLength := ← nat acc "min_allowed_top_level_account_length"
