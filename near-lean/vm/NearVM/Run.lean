@@ -243,13 +243,20 @@ def outcomeOfExecution (ctx : VMContext) (storage : List (List UInt8 × List UIn
           usedGas := ns.gas.used + distributed.2
           distributedGas := distributed.2 }
 
-/-- A host function nearcore does not link at this protocol version
-(`imports.rs`: `#[global_contract_host_fns]`). The other gated imports are
-not in the host table, so they are unsupported-host issues. -/
+/-- A host function nearcore does not link at this protocol version (`imports.rs`: the
+`#[global_contract_host_fns]`, `#[chain_id_host_fn]`, `#[p256_verify_host_fn]`,
+`#[gas_key_host_fns]` and `#[yield_with_id_host_fns]` imports). Importing one fails to link. -/
 def disabledHost (cfg : RuntimeConfig) (name : String) : Bool :=
-  !cfg.wasm.globalContractHostFns &&
+  (!cfg.wasm.globalContractHostFns &&
     ["promise_batch_action_deploy_global_contract", "promise_batch_action_deploy_global_contract_by_account_id",
-     "promise_batch_action_use_global_contract", "promise_batch_action_use_global_contract_by_account_id"].contains name
+     "promise_batch_action_use_global_contract", "promise_batch_action_use_global_contract_by_account_id"].contains name) ||
+  (!cfg.wasm.chainIdHostFn && name == "chain_id") ||
+  (!cfg.wasm.p256VerifyHostFn && name == "p256_verify") ||
+  (!cfg.wasm.gasKeyHostFns &&
+    ["promise_batch_action_transfer_to_gas_key", "promise_batch_action_add_gas_key_with_full_access",
+     "promise_batch_action_add_gas_key_with_function_call"].contains name) ||
+  (!cfg.wasm.yieldWithIdHostFns &&
+    ["promise_yield_create_with_id", "promise_yield_resume_with_yield_id"].contains name)
 
 /-- nearcore's `prepare_v3` limits, checked in its section order: types,
 imports (`env` functions only, counted as functions), tables and their

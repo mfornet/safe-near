@@ -194,3 +194,8 @@ adapter tests that external seam; it is not a trie-backed/full Runtime oracle.
 Actual Lean receipt execution always uses strict validation, as does a default
 public `VMContext`. Opaque VM outputs must not be treated as validated runtime
 actions.
+
+`host_gates_v84.json` and `host_gates_v86.json` import `chain_id`, `p256_verify` and a gas key
+host, which nearcore links only from protocol 85: at v84 every call fails to link (only the
+loading gas burnt), at v86 the module links. The v86 `chain_id` result itself is not compared:
+the mocked external reports a chain id the Lean replay is not given.
