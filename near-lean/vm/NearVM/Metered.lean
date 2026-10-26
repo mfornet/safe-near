@@ -742,12 +742,19 @@ def updateStorageUsage (extraBytes : Nat) (name : String) (before after : HostSt
     let old := (before.host.storage key).map List.length
     let new := (after.host.storage key).map List.length
     let usage := after.host.context.storageUsage.toNat
-    let usage' := match old, new with
+    let usage' :=
+      match old, new with
       | none, some n => usage + key.length + n + extraBytes
       | some o, some n => usage + n - o
       | some o, none => usage - (key.length + o + extraBytes)
       | none, none => usage
-    { after with host := { after.host with context := { after.host.context with storageUsage := UInt64.ofNat usage' } } }
+    { after with
+      host :=
+        { after.host with
+          context := { after.host.context with storageUsage := UInt64.ofNat usage' }
+          storageLog :=
+            { key, existed := (before.host.storage key).isSome, value := after.host.storage key } ::
+              after.host.storageLog } }
   match name with
   | "storage_write" | "storage_remove" =>
     match getMemOrReg before (a 1) (a 0) with

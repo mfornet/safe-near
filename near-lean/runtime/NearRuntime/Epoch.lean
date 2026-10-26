@@ -1,4 +1,5 @@
 import NearRuntime.State
+import NearRuntime.ChangeLog
 
 /-! The epoch-boundary step of `Runtime::apply`: `Runtime::update_validator_accounts`
 (`runtime/runtime/src/lib.rs`). In the first chunk of an epoch, before any transaction or
@@ -66,6 +67,18 @@ def apply (u : ValidatorAccountsUpdate) (st : ChainState) : Except String ChainS
     let some reward := lookup u.validatorRewards id
       | throw s!"Validator reward for the protocol treasury account {id} is not found"
     return st.setAccount id { account with amount := account.amount + reward }
+
+/-- Observational: the `ValidatorAccountsUpdate` commit of `apply` (`ChangeLog.lean`). `update_validator_accounts`
+writes (`set_account`) every account of `stake_info` that exists in the shard, and the protocol treasury unless
+it is one of them; the writes are there whether or not the values changed. `before` and `after` are the shard's
+state around `apply`. -/
+def changes (u : ValidatorAccountsUpdate) (before after : ChainState) : List StateChange :=
+  commitKeys .validatorAccountsUpdate after
+    ((u.stakeInfo.filter fun entry => (before.account? entry.1).isSome).map
+        (fun entry => ChangeKey.account entry.1) ++
+      (match u.protocolTreasury with
+      | some id => if u.stakeInfo.any (·.1 == id) then [] else [ChangeKey.account id]
+      | none => []))
 
 end ValidatorAccountsUpdate
 end Near

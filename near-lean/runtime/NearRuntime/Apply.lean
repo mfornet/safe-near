@@ -7,6 +7,8 @@ import NearRuntime.TransactionSize
 import NearRuntime.NativeIdentity
 import NearRuntime.Base58
 import NearInterface.Boundary
+import NearRuntime.VmEngine
+import NearRuntime.ChangeLog
 
 /-!
 # `apply`
@@ -66,6 +68,12 @@ structure ApplyResult where
   The state is the input state and the protocol observations are empty. -/
   issue : Option (ReceiptId × ExecutionIssue) := none
 
+/-- Observational: the commits of the chunk that touch an account, access key, contract code or contract data
+key, in the order `Runtime::apply` makes them (`ChangeLog.lean`): those of each outcome, which are in the order
+of the transactions and receipts. Computed from what the chunk did; nothing reads it back. -/
+def ApplyResult.changes (r : ApplyResult) : List StateChange :=
+  r.outcomes.flatMap (·.2.changes)
+
 /-! ## Execution monad -/
 
 /-- State threaded through one receipt: the chain state, the receipts and
@@ -103,6 +111,10 @@ structure Exec where
   actionCompute : Nat := 0
   /-- The receipt's compute usage, set when it is finalized (`receiptComputeUsage`). -/
   computeUsage : Nat := 0
+  /-- Observational: the `storage_write` / `storage_remove` calls of the receipt's contract calls. -/
+  dataWrites : List StorageWrite := []
+  /-- Observational: the gas the receipt's contract calls burnt, by cost. -/
+  profile : GasProfileSplit := {}
   deriving Inhabited
 
 abbrev ExecM := ExceptT RuntimeError (StateM Exec)
@@ -242,6 +254,11 @@ def Exec.recordVMOutcome (exec : Exec) (outcome : VMOutcome) : Exec :=
     storageAccounting := outcome.storageAccounting
     logs := exec.logs ++ outcome.logs
     gasBurntForFunctionCall := exec.gasBurntForFunctionCall + outcome.burntGas
+    dataWrites := exec.dataWrites ++ outcome.storageWrites
+    profile :=
+      exec.profile.merge
+        { actions := outcome.actionProfile, ext := outcome.gasProfile.ext,
+          wasm := outcome.gasProfile.wasm }
     gasBurnt := exec.gasBurnt + outcome.burntGas
     gasUsed := exec.gasUsed + outcome.burntGas + (outcome.usedGas - outcome.burntGas)
     vmProfiles := exec.vmProfiles ++ [outcome.gasProfile] }
@@ -436,7 +453,7 @@ def Account.contractStorageUsage (a : Account) : Nat :=
   | none => (a.global.map Wasm.GlobalContractId.length).getD 0
 
 /-- Execute a function call and turn its promises into receipts. -/
-def applyFunctionCall (c : ReceiptCtx) (method : String) (args : Bytes) (gas deposit : Nat)
+def applyFunctionCall [VmEngine] (c : ReceiptCtx) (method : String) (args : Bytes) (gas deposit : Nat)
     (isLast : Bool) : ExecM Unit := do
   let account ← getAccount c.receipt.receiverId
   let st ← getState
@@ -444,7 +461,7 @@ def applyFunctionCall (c : ReceiptCtx) (method : String) (args : Bytes) (gas dep
     | throw (.functionCallError (.compilationError "CodeDoesNotExist"))
   if let some issue := code.decodeIssue then throw (.executionIssue issue)
   let ctx := functionCallContext c account args gas deposit isLast (← get).storageAccounting
-  let outcome := run c.cfg code.module code.size method ctx (st.contractStorage c.receipt.receiverId)
+  let outcome := VmEngine.run c.cfg code.module code.size method ctx (st.contractStorage c.receipt.receiverId)
   modify (·.recordVMOutcome outcome)
   match outcome.aborted with
   | some err => throw (.functionCallError err)
@@ -690,7 +707,7 @@ def specialImplicitAccount (c : ReceiptCtx) (id : AccountId) (deposit : Nat) :
     | .nearDeterministic => .ok (some { amount := deposit, storageUsage := c.cfg.fees.numBytesAccount })
     | _ => .ok none
 
-def applyAction (c : ReceiptCtx) (isLast : Bool) : Action → ExecM Unit
+def applyAction [VmEngine] (c : ReceiptCtx) (isLast : Bool) : Action → ExecM Unit
   | .createAccount => do
     let id := c.receipt.receiverId
     if (← getState).account? id |>.isSome then throw (.accountAlreadyExists id)
@@ -888,7 +905,7 @@ def chargeReceiptFee (isRefund : Bool) (fee : Nat) : ExecM Unit :=
   burnGas fee
 
 /-- One action's protocol fees, admission checks and body, in execution order. -/
-def runReceiptAction (c : ReceiptCtx) (onlyAction isLast : Bool) (act : Action) : ExecM Unit := do
+def runReceiptAction [VmEngine] (c : ReceiptCtx) (onlyAction isLast : Bool) (act : Action) : ExecM Unit := do
   chargeReceiptFee c.receipt.isRefund (Fees.exec c.cfg.fees.actionFees c.cfg.wasm.ethImplicitAccounts c.receipt.receiverId act)
   checkReceiptAction c onlyAction act
   applyAction c isLast act
@@ -920,7 +937,7 @@ def actionHashOf (c : ReceiptCtx) (index : Nat) : Option Bytes :=
 /-- Derivation is local to one call: later actions still start from the block
 seed, while non-VM actions need no random context. Invalid exact-mode context
 is a model issue and rolls back the chunk rather than failing a contract. -/
-def runReceiptActionAt (c : ReceiptCtx) (onlyAction isLast : Bool) (act : Action) (index : Nat) : ExecM Unit :=
+def runReceiptActionAt [VmEngine] (c : ReceiptCtx) (onlyAction isLast : Bool) (act : Action) (index : Nat) : ExecM Unit :=
   match act with
   | .functionCall .. =>
     match actionRandomSeed c index with
@@ -930,7 +947,7 @@ def runReceiptActionAt (c : ReceiptCtx) (onlyAction isLast : Bool) (act : Action
   | _ => runReceiptAction c onlyAction isLast act
 
 /-- Explicit ordered traversal, stopping at the first action error. -/
-def runReceiptActionList (c : ReceiptCtx) (onlyAction : Bool) : List Action → Nat → ExecM Unit
+def runReceiptActionList [VmEngine] (c : ReceiptCtx) (onlyAction : Bool) : List Action → Nat → ExecM Unit
   | [], _ => pure ()
   | act :: rest, index => do
     modify fun e => { e with failureIndex := some index }
@@ -938,14 +955,14 @@ def runReceiptActionList (c : ReceiptCtx) (onlyAction : Bool) : List Action → 
     runReceiptActionList c onlyAction rest (index + 1)
 
 /-- Complete action attempt, before receipt rollback and finalization. -/
-def receiptActionBody (c : ReceiptCtx) : ExecM Unit := do
+def receiptActionBody [VmEngine] (c : ReceiptCtx) : ExecM Unit := do
   chargeReceiptFee c.receipt.isRefund c.cfg.fees.actionFees.newActionReceipt.execution
   runReceiptActionList c (c.action.actions.length == 1) c.action.actions 0
   modify fun e => { e with failureIndex := none }
   checkStorageStake c.cfg c.receipt.receiverId
 
 /-- Run actions and the final storage-staking check, before rollback/refunds. -/
-def runReceiptActions (c : ReceiptCtx) (st0 : ChainState) : Exec × Option RuntimeError :=
+def runReceiptActions [VmEngine] (c : ReceiptCtx) (st0 : ChainState) : Exec × Option RuntimeError :=
   let exec0 : Exec := { state := st0, actorId := c.receipt.predecessorId, storageAccounting := c.ap.storageAccounting }
   match ((receiptActionBody c).run.run exec0) with
     | (.ok (), e) => (e, none)
@@ -1098,9 +1115,34 @@ def Exec.commitStorage (exec : Exec) : Exec :=
         (key, value) :: changes.filter (·.1 != key)) trie.committed, prospective := [] }) }
 
 /-- Execute and finalize the actual action receipt. -/
-def applyActionReceipt (c : ReceiptCtx) (st0 : ChainState) : Exec :=
+def applyActionReceipt [VmEngine] (c : ReceiptCtx) (st0 : ChainState) : Exec :=
   let (exec, failed) := runReceiptActions c st0
   (finalizeReceipt c st0 exec failed).commitStorage
+
+/-- Observational: the commits of a receipt that touch an exposed key (`ChangeLog.lean`). `pre` is the
+state before the receipt and `e` its result. A receipt that failed rolled back and committed nothing;
+one that succeeded committed what its actions wrote, and then the reward for its function calls
+(`creditReceiptReward` added it to the account, so the account of the first commit is without it). -/
+def receiptChanges (pre : ChainState) (receipt : Receipt) (e : Exec) : List StateChange :=
+  match receipt.receipt with
+  | .action action =>
+    let receiver := receipt.receiverId
+    let failed :=
+      match e.result with
+      | some (.failure _) => true
+      | _ => false
+    let beforeReward : ChainState :=
+      match e.state.account? receiver with
+      | some a =>
+        if e.reward > 0 then e.state.setAccount receiver { a with amount := a.amount - e.reward }
+        else e.state
+      | none => e.state
+    (if failed then []
+      else
+        receiptCommit receipt.receiptId receiver receipt.isGasRefund action.signerPublicKey pre
+          beforeReward action.actions e.dataWrites) ++
+      rewardCommit receipt.receiptId receiver e.reward e.state
+  | _ => []
 
 /-- Outcome of an executed receipt. -/
 def outcomeOf (r : Receipt) (e : Exec) : ExecutionOutcome :=
@@ -1116,7 +1158,8 @@ def outcomeOf (r : Receipt) (e : Exec) : ExecutionOutcome :=
     gasBurnt := e.gasBurnt
     computeUsage := e.computeUsage
     tokensBurnt := e.tokensBurnt
-    proposals := e.proposals }
+    proposals := e.proposals
+    profile := e.profile }
 
 /-- Result of processing one receipt: state, new receipts, outcomes, and the
 yocto paid to contracts as gas reward (which are not burnt). -/
@@ -1132,7 +1175,42 @@ structure Processed where
   /-- Compute that is not gas: applying a global contract distribution. -/
   extraCompute : Nat := 0
   issue : Option (ReceiptId × ExecutionIssue) := none
+  /-- Observational: each action receipt that ran, with its result, for the change log (`processedChanges`). -/
+  execs : List (Receipt × Exec) := []
   deriving Inhabited
+
+/-- Observational: the commits of each action receipt a `Processed` ran, by receipt id. The first started from
+`pre`, each later one (an instant receipt) from the state the one before left. -/
+def processedChanges (pre : ChainState) (p : Processed) : List (ReceiptId × List StateChange) :=
+  (p.execs.foldl
+      (fun (acc : ChainState × List (ReceiptId × List StateChange)) (receipt, e) =>
+        (e.state, acc.2 ++ [(receipt.receiptId, receiptChanges acc.1 receipt e)]))
+      (pre, [])).2
+
+/-- Observational: the contract of the receiver before each action of each receipt a `Processed` ran, by receipt id
+(`receiptContracts`). -/
+def processedContracts (pre : ChainState) (p : Processed) : List (ReceiptId × List ContractRef) :=
+  (p.execs.foldl
+      (fun (acc : ChainState × List (ReceiptId × List ContractRef)) (receipt, e) =>
+        (e.state,
+          acc.2 ++
+            [(receipt.receiptId,
+                match receipt.receipt with
+                | .action action =>
+                  receiptContracts acc.1 e.state receipt.receiverId action.actions e.failureIndex
+                | _ => [])]))
+      (pre, [])).2
+
+/-- The outcomes of a `Processed`, each with the commits of its receipt (`ExecutionOutcome.changes`) and the
+contracts its actions found (`ExecutionOutcome.contracts`). -/
+def outcomesWithChanges (pre : ChainState) (p : Processed) : List (ReceiptId × ExecutionOutcome) :=
+  let changes := processedChanges pre p
+  let contracts := processedContracts pre p
+  p.outcomes.map fun (id, o) =>
+    (id,
+      { o with
+        changes := ((changes.find? (·.1 == id)).map (·.2)).getD []
+        contracts := ((contracts.find? (·.1 == id)).map (·.2)).getD [] })
 
 /-- Whether a receipt runs in the chunk that creates it instead of travelling as an outgoing
 receipt (`Receipt::is_instant_receipt`): a yield, or a lone account deletion with no inputs. -/
@@ -1149,7 +1227,7 @@ def yieldsOf (st : ChainState) (account : AccountId) : List Bytes :=
   (st.yieldReceipts.filter (·.1.1 == account)).map (·.1.2) ++ (st.yieldStatus.filter (·.1.1 == account)).map (·.1.2)
 
 /-- An action receipt whose inputs have all arrived, executed with the given promise results. -/
-def runActionReceipt (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → ContractCode)
+def runActionReceipt [VmEngine] (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → ContractCode)
     (st : ChainState) (r : Receipt) (a : ActionReceipt) (results : List PromiseResult) : Processed :=
   let ctx : ReceiptCtx :=
     { cfg, ap, receipt := r, action := a, promiseResults := results, codeOf, vmYields := yieldsOf st r.receiverId }
@@ -1163,7 +1241,8 @@ def runActionReceipt (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes →
     { storageAccounting := e.storageAccounting, state := e.state, receipts := e.newReceipts,
       identityBirths := [{ parent := r.receiptId, children := e.newReceipts.map (·.receiptId), vmActions := e.vmIdentityBirths }],
       outcomes := [(r.receiptId, outcomeOf r e)],
-      rewards := e.reward, otherTokensBurnt := e.otherTokensBurnt, subsidizedAmount := e.subsidizedAmount }
+      rewards := e.reward, otherTokensBurnt := e.otherTokensBurnt, subsidizedAmount := e.subsidizedAmount
+      execs := [(r, e)] }
 
 /-- `apply_global_contract_distribution_receipt`: register the code unless a newer distribution
 already did, then pass the receipt on to the next shard that has not seen it. -/
@@ -1190,7 +1269,7 @@ def processDistribution (cfg : RuntimeConfig) (ap : ApplyState) (st : ChainState
 
 /-- One receipt: action receipts run (or wait for data), data receipts feed
 the receipt waiting for them. Returns the outcomes of everything that ran. -/
-def processReceipt (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → ContractCode)
+def processReceipt [VmEngine] (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → ContractCode)
     (st : ChainState) (r : Receipt) : Processed :=
   match r.receipt with
   | .action a =>
@@ -1271,7 +1350,8 @@ def Processed.append (p q : Processed) : Processed :=
     rewards := p.rewards + q.rewards
     otherTokensBurnt := p.otherTokensBurnt + q.otherTokensBurnt
     extraCompute := p.extraCompute + q.extraCompute
-    issue := p.issue.orElse fun _ => q.issue }
+    issue := p.issue.orElse fun _ => q.issue
+    execs := p.execs ++ q.execs }
 
 /-- The receipt shapes the funding theory covers: a system refund is one transfer, every other
 receipt names neither the system account as receiver nor as signer. -/
@@ -1289,7 +1369,7 @@ def Receipt.fundedShape (r : Receipt) : Bool :=
 and are not sent out (`process_receipt_and_instant_receipts`).
 nearcore divergence: an instant receipt outside `Receipt.fundedShape`, in practice one addressed to
 the `system` account, is reported as unsupported instead of executed. -/
-def processInstants (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → ContractCode) :
+def processInstants [VmEngine] (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → ContractCode) :
     Nat → Processed → List Receipt → Processed
   | _, acc, [] => acc
   | 0, acc, r :: _ =>
@@ -1305,7 +1385,7 @@ def processInstants (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → 
       (acc.append { p with receipts := p.receipts.filter fun x => !x.isInstant }) (rest ++ instant)
 
 /-- A receipt together with the instant receipts it creates. -/
-def processWithInstants (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → ContractCode)
+def processWithInstants [VmEngine] (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → ContractCode)
     (st : ChainState) (r : Receipt) : Processed :=
   let p := processReceipt cfg ap codeOf st r
   if p.issue.isSome then p else
@@ -1486,7 +1566,7 @@ theorem mem_chunkTransactions {cfg : RuntimeConfig} {tx : Transaction} {txs : Li
 are local. Other transaction receipts are outgoing work for a later chunk.
 Local, delayed and incoming receipts execute in that order; receipts beyond
 the gas limit are delayed to the next apply. -/
-def applyAttempt (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → ContractCode)
+def applyAttempt [VmEngine] (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → ContractCode)
     (st : ChainState) (txs : List Transaction) (incoming : List Receipt) : ApplyResult := Id.run do
   let initial := st
   let mut st := st
@@ -1513,7 +1593,8 @@ def applyAttempt (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → Con
           receiptIds := [r.receiptId]
           gasBurnt := cost.gasBurnt
           computeUsage := cost.gasBurnt
-          tokensBurnt := cost.gasBurnt * ap.gasPrice }
+          tokensBurnt := cost.gasBurnt * ap.gasPrice
+          changes := transactionCommit (txIndex - 1) tx.signerId tx.publicKey st' }
       outcomes := outcomes ++ [(0, o)]
     | .error e =>
       if let some issue := e.issue? then
@@ -1540,6 +1621,7 @@ def applyAttempt (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → Con
       else
         newlyDelayed := newlyDelayed ++ [r]
     else
+      let pre := st
       let p := processWithInstants cfg { ap with storageAccounting } codeOf st r
       storageAccounting := p.storageAccounting
       if let some issue := p.issue then
@@ -1548,7 +1630,7 @@ def applyAttempt (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → Con
       subsidizedAmount := subsidizedAmount + p.subsidizedAmount
       st := p.state
       outgoing := outgoing ++ p.receipts
-      outcomes := outcomes ++ p.outcomes
+      outcomes := outcomes ++ outcomesWithChanges pre p
       for (_, o) in p.outcomes do
         compute := compute + o.computeUsage
         tokensBurnt := tokensBurnt + o.tokensBurnt
@@ -1570,7 +1652,7 @@ def applyAttempt (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → Con
 
 /-- Commit a supported chunk. Model limitations invalidate the entire attempt:
 no fees, refunds, nonces, receipt consumption, or state changes are committed. -/
-def apply (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → ContractCode)
+def apply [VmEngine] (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes → ContractCode)
     (st : ChainState) (txs : List Transaction) (incoming : List Receipt) : ApplyResult :=
   let result := applyAttempt cfg ap codeOf st txs incoming
   if result.issue.isSome then

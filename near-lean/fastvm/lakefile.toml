@@ -1,0 +1,40 @@
+# NearFastVM: a fast pure-Lean execution engine for the NEAR VM (notes/design/NEAR_NODE.md, M10).
+#
+# The Wasm interpreter of `Wasm.Exec` plus the metering of `NearVM.Run` is the specification (and what contract
+# verification uses). This package is the `Impl` of that pair: function bodies are compiled to a flat
+# instruction array with resolved branches and run on an unboxed value stack, charging gas as `runMetered`
+# does. It is node-only: nothing in `Wasm` or `NearVM` imports it (`just node-isolation`).
+name = "NearFastVM"
+version = "0.1.0"
+defaultTargets = ["NearFastVM", "fastvm-differential", "registered-replay-fast"]
+packagesDir = "../.lake/packages"
+
+[[require]]
+name = "NearVM"
+path = "../vm"
+
+# Only `FastReplay` (the replay of the chain corpus with the fast engine) needs the chain; `NearFastVM` does not.
+[[require]]
+name = "NearChain"
+path = "../chain"
+
+[[lean_lib]]
+name = "NearFastVM"
+
+# Support modules of the differential test; kept out of NearFastVM's import closure.
+[[lean_lib]]
+name = "FastVMTests"
+
+# `lake exe fastvm-differential`: the fast engine against the specification on fixtures, edge cases and random
+# modules, with the gas limit swept over every point of a run.
+[[lean_exe]]
+name = "fastvm-differential"
+root = "FastVMTests.Differential"
+
+# `registered-replay` with the fast engine: the same request, the same answer (`tools/localnet/replay_corpus.py --binary`).
+[[lean_lib]]
+name = "FastReplay"
+
+[[lean_exe]]
+name = "registered-replay-fast"
+root = "FastReplay.RegisteredFast"

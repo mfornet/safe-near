@@ -27,27 +27,32 @@ theorem applyCharge_success_reservation (ns : NearState) (charge : Charge)
     simpa only [applyCharge, GasCounter.burn, Charge.reservation, Nat.sub_self, Nat.add_zero] using h.2.1
   | burn gas =>
     have h := GasCounter.deduct_success ns.gas gas gas (Nat.le_refl _) hsuccess
-    simpa only [applyCharge, GasCounter.burn, Charge.reservation, Nat.sub_self, Nat.add_zero] using h.2.1
+    simpa only [applyCharge, NearState.profileAction, GasCounter.burn, Charge.reservation, Nat.sub_self,
+      Nat.add_zero] using h.2.1
   | actionBase fee sir =>
     have h := GasCounter.deduct_success ns.gas ((fee ns.fees).send sir)
       ((fee ns.fees).send sir + (fee ns.fees).execution) (Nat.le_add_right _ _) hsuccess
-    simpa only [applyCharge, GasCounter.payAction, Charge.reservation, Nat.add_sub_cancel_left] using h.2.1
+    simpa only [applyCharge, NearState.profileAction, GasCounter.payAction, Charge.reservation,
+      Nat.add_sub_cancel_left] using h.2.1
   | actionBytes fee count sir =>
     have h := GasCounter.deduct_success ns.gas ((fee ns.fees).send sir * count)
       ((fee ns.fees).send sir * count + (fee ns.fees).execution * count) (Nat.le_add_right _ _) hsuccess
-    simpa only [applyCharge, GasCounter.payAction, Charge.reservation, Nat.add_sub_cancel_left] using h.2.1
+    simpa only [applyCharge, NearState.profileAction, GasCounter.payAction, Charge.reservation,
+      Nat.add_sub_cancel_left] using h.2.1
   | newReceipt sir deps =>
     let burnt := ns.fees.newActionReceipt.send sir +
       (deps.map fun same => ns.fees.newDataReceiptBase.send same + ns.fees.newDataReceiptBase.execution).sum
     have h := GasCounter.deduct_success ns.gas burnt (burnt + ns.fees.newActionReceipt.execution)
       (Nat.le_add_right _ _) hsuccess
-    simpa only [applyCharge, GasCounter.payAction, Charge.reservation, Nat.add_sub_cancel_left] using h.2.1
+    simpa only [applyCharge, NearState.profileAction, GasCounter.payAction, Charge.reservation,
+      Nat.add_sub_cancel_left] using h.2.1
   | prepay gas =>
     have h := GasCounter.deduct_success ns.gas 0 gas (Nat.zero_le _) hsuccess
     simpa only [applyCharge, GasCounter.prepay, Charge.reservation, Nat.sub_zero] using h.2.1
   | pay burn execution =>
     have h := GasCounter.deduct_success ns.gas burn (burn + execution) (Nat.le_add_right _ _) hsuccess
-    simpa only [applyCharge, GasCounter.payAction, Charge.reservation, Nat.add_sub_cancel_left] using h.2.1
+    simpa only [applyCharge, NearState.profileAction, GasCounter.payAction, Charge.reservation,
+      Nat.add_sub_cancel_left] using h.2.1
 
 /-- A successful whole charge plan reserves its full sum, without an assumed
 counter equation. Failed prefixes are excluded explicitly. -/
