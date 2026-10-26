@@ -156,7 +156,6 @@ def normalise(method: str, response):
         if result is not None:
             strip(result, path.split("."))
     if result is not None:
-        drop_profiles(result)
         if method == "network_info":
             result["active_peers"] = len(result.get("active_peers", []))
             result["known_producers"] = len(result.get("known_producers", []))
@@ -165,20 +164,6 @@ def normalise(method: str, response):
 
 UNRENDERED = "<unrendered failure>"
 UNRENDERED_KINDS: collections.Counter = collections.Counter()
-
-
-def drop_profiles(value):
-    """The gas profile and the contracts list of the outcome metadata are not computed by the Lean runtime (the metadata
-    ``version`` is compared)."""
-    if isinstance(value, dict):
-        if "version" in value and "gas_profile" in value:
-            value.pop("gas_profile", None)
-            value.pop("contracts", None)
-        for item in value.values():
-            drop_profiles(item)
-    elif isinstance(value, list):
-        for item in value:
-            drop_profiles(item)
 
 
 def unify_unrendered(a, b) -> int:
@@ -227,56 +212,6 @@ class Request:
         self.group, self.method, self.params, self.head, self.note = group, method, params, head, note
 
 
-CHANGES_IN_BLOCK = ("EXPERIMENTAL_changes_in_block", "block_effects")
-
-
-def known_gap(method: str, nn, nl) -> list[str] | None:
-    """The one difference the Lean node cannot avoid in ``EXPERIMENTAL_changes_in_block``: neard lists every contract data
-    key a call wrote (``TrieUpdate::set`` and ``remove`` record each call), including a write of the value the key held and
-    a removal of a key that is not there, and the Lean VM returns the final state of the contract, not a log of its writes.
-    Returns the extra entries of neard (``data_touched`` of an account, each) when that is the only difference, else None.
-    The kinds of account, access key and code are not in this category: the node derives their unchanged writes."""
-    if method not in CHANGES_IN_BLOCK:
-        return None
-    try:
-        a, b = nn["result"]["changes"], nl["result"]["changes"]
-    except (KeyError, TypeError):
-        return None
-    if nn["result"].get("block_hash") != nl["result"].get("block_hash"):
-        return None
-
-    def runs(items):
-        out = []
-        for item in items:
-            key = json.dumps(item, sort_keys=True)
-            if out and out[-1][0] == key:
-                out[-1][1] += 1
-            else:
-                out.append([key, 1])
-        return out
-    ra, rb = runs(a), runs(b)
-    extra = []
-    i = j = 0
-    while i < len(ra):
-        if j < len(rb) and ra[i][0] == rb[j][0]:
-            if ra[i][1] < rb[j][1]:
-                return None
-            if ra[i][1] > rb[j][1]:
-                if json.loads(ra[i][0]).get("type") != "data_touched":
-                    return None
-                extra += [ra[i][0]] * (ra[i][1] - rb[j][1])
-            i += 1
-            j += 1
-        elif json.loads(ra[i][0]).get("type") == "data_touched":
-            extra += [ra[i][0]] * ra[i][1]
-            i += 1
-        else:
-            return None
-    if j != len(rb):
-        return None
-    return [json.loads(e)["account_id"] for e in extra]
-
-
 def heads() -> tuple:
     return (NEARD.call("status", [])[1]["result"]["sync_info"]["latest_block_hash"],
             LEAN.call("status", [])[1]["result"]["sync_info"]["latest_block_hash"])
@@ -301,9 +236,8 @@ def compare(request: Request, attempts: int = 12) -> dict:
     problems = diff(nn, nl)
     if sn != sl:
         problems.insert(0, f"HTTP status {sn} != {sl}")
-    gap = known_gap(request.method, nn, nl) if problems and sn == sl else None
     return {"request": request, "equal": not problems, "diff": problems, "status": sn, "ok": isinstance(rn, dict) and "result" in rn,
-            "unrendered": unrendered, "known_gap": gap}
+            "unrendered": unrendered}
 
 
 # --------------------------------------------------------------------------------------------------------------------
@@ -484,6 +418,65 @@ def build_requests(chain: Chain) -> list[Request]:
     add("EXPERIMENTAL_changes_in_block", "EXPERIMENTAL_changes_in_block", {}, note="no reference")
     add("EXPERIMENTAL_changes_in_block", "EXPERIMENTAL_changes_in_block", [at_height], note="not a map")
     add("EXPERIMENTAL_changes_in_block", "EXPERIMENTAL_changes_in_block", None, note="no parameters")
+    # EXPERIMENTAL_changes: the values, with their causes, of the keys each block touched, for every changes_type
+    touched: dict[int, list[tuple[str, str]]] = {}
+    for h in sorted(chain.blocks):
+        status, reply = NEARD.call("EXPERIMENTAL_changes_in_block", {"block_id": h})
+        if status == 200 and "result" in reply:
+            touched[h] = [(c["type"], c["account_id"]) for c in reply["result"]["changes"]]
+    group = "EXPERIMENTAL_changes"
+
+    def accounts_of(h: int, kind: str) -> list[str]:
+        return sorted({a for t, a in touched.get(h, []) if t == kind})
+    for h in sorted(touched):
+        by = {"account_touched": "account_changes", "contract_code_touched": "contract_code_changes",
+              "access_key_touched": "all_access_key_changes"}
+        for kind, changes_type in by.items():
+            ids = accounts_of(h, kind)
+            if ids:
+                add(group, "EXPERIMENTAL_changes", {"block_id": h, "changes_type": changes_type, "account_ids": ids})
+        ids = accounts_of(h, "data_touched")
+        if ids:
+            add(group, "EXPERIMENTAL_changes", {"block_id": h, "changes_type": "data_changes", "account_ids": ids, "key_prefix_base64": ""})
+            add(group, "EXPERIMENTAL_changes", {"block_id": h, "changes_type": "data_changes", "account_ids": ids[:1], "key_prefix_base64": b64(b"key")},
+                note="a prefix of the keys")
+        ids = accounts_of(h, "access_key_touched")
+        keys = [{"account_id": a, "public_key": k} for a in ids for k in chain.keys.get(a, [])[:3]]
+        if keys:
+            add(group, "EXPERIMENTAL_changes", {"block_id": h, "changes_type": "single_access_key_changes", "keys": keys})
+    hash_heights = sorted(touched)[:: max(1, len(touched) // 12)]
+    for h in hash_heights:
+        ids = sorted({a for _, a in touched[h]})
+        add(group, "EXPERIMENTAL_changes", {"block_id": chain.blocks[h]["header"]["hash"], "changes_type": "account_changes", "account_ids": ids},
+            note="by hash, every account the block touched")
+        add(group, "changes", {"block_id": h, "changes_type": "data_changes", "account_ids": ids, "key_prefix_base64": ""}, note="the other name")
+    for finality in ("final", "optimistic", "near-final"):
+        add(group, "EXPERIMENTAL_changes", {"finality": finality, "changes_type": "account_changes", "account_ids": chain.accounts}, head=True)
+    add(group, "EXPERIMENTAL_changes", {"sync_checkpoint": "genesis", "changes_type": "account_changes", "account_ids": ["near", "node0"]})
+    add(group, "EXPERIMENTAL_changes", {"block_id": at_height, "changes_type": "account_changes", "account_ids": []}, note="no account")
+    add(group, "EXPERIMENTAL_changes", {"block_id": at_height, "changes_type": "account_changes", "account_ids": ["nosuch.node0", "node0"]},
+        note="an account that is not there")
+    add(group, "EXPERIMENTAL_changes", {"block_id": at_height, "changes_type": "account_changes", "account_ids": ["node0", "node0"]},
+        note="the same account twice")
+    # the errors
+    add(group, "EXPERIMENTAL_changes", {"block_id": 10 ** 9, "changes_type": "account_changes", "account_ids": ["node0"]}, note="unknown block")
+    add(group, "EXPERIMENTAL_changes", {"block_id": "11111111111111111111111111111111", "changes_type": "account_changes", "account_ids": ["node0"]}, note="unknown hash")
+    add(group, "EXPERIMENTAL_changes", {"block_id": "abc", "changes_type": "account_changes", "account_ids": ["node0"]}, note="malformed hash")
+    add(group, "EXPERIMENTAL_changes", {"changes_type": "account_changes", "account_ids": ["node0"]}, note="no block reference")
+    add(group, "EXPERIMENTAL_changes", {"block_id": at_height}, note="no changes_type")
+    add(group, "EXPERIMENTAL_changes", {"block_id": at_height, "changes_type": "nosuch", "account_ids": []}, note="unknown changes_type")
+    add(group, "EXPERIMENTAL_changes", {"block_id": at_height, "changes_type": 5, "account_ids": []}, note="changes_type is not a string")
+    add(group, "EXPERIMENTAL_changes", {"block_id": at_height, "changes_type": "account_changes"}, note="no account_ids")
+    add(group, "EXPERIMENTAL_changes", {"block_id": at_height, "changes_type": "account_changes", "account_ids": "node0"}, note="account_ids is not a list")
+    add(group, "EXPERIMENTAL_changes", {"block_id": at_height, "changes_type": "account_changes", "account_ids": ["Not Valid"]}, note="invalid account id")
+    add(group, "EXPERIMENTAL_changes", {"block_id": at_height, "changes_type": "single_access_key_changes"}, note="no keys")
+    add(group, "EXPERIMENTAL_changes", {"block_id": at_height, "changes_type": "single_access_key_changes", "keys": [{"account_id": "node0", "public_key": "bad"}]}, note="bad key")
+    add(group, "EXPERIMENTAL_changes", {"block_id": at_height, "changes_type": "single_access_key_changes", "keys": [{"account_id": "node0", "public_key": "foo:xyz"}]}, note="unknown key type")
+    add(group, "EXPERIMENTAL_changes", {"block_id": at_height, "changes_type": "data_changes", "account_ids": ["node0"]}, note="no key_prefix_base64")
+    add(group, "EXPERIMENTAL_changes", {"block_id": at_height, "changes_type": "data_changes", "account_ids": ["node0"], "key_prefix_base64": "!!"}, note="not base64")
+    add(group, "EXPERIMENTAL_changes", {}, note="no parameters")
+    add(group, "EXPERIMENTAL_changes", [at_height], note="not a map")
+    add(group, "EXPERIMENTAL_changes", None, note="null")
     # validators and configuration
     add("validators", "validators", [None], head=True)
     add("validators", "validators", {"epoch_id": chain.at["header"]["epoch_id"]}, note="an epoch that is over or the current one")
@@ -506,10 +499,7 @@ def exercise(requests: list[Request], verbose: bool = True) -> list[dict]:
     for request in requests:
         result = compare(request)
         results.append(result)
-        if verbose and result.get("known_gap"):
-            print(f"GAP {request.method} {json.dumps(request.params)[:100]}: neard lists {len(result['known_gap'])} data key(s) "
-                  f"of {sorted(set(result['known_gap']))} that the Lean node cannot see")
-        elif verbose and not result["equal"]:
+        if verbose and not result["equal"]:
             print(f"DIFF {request.group} {request.method} {json.dumps(request.params)[:140]} {request.note}")
             for line in result["diff"][:6]:
                 print("     ", line)
@@ -520,8 +510,7 @@ def summary(results: list[dict]) -> dict:
     table: dict[str, dict] = {}
     for result in results:
         group = result["request"].group
-        row = table.setdefault(group, {"requests": 0, "equal": 0, "known_gaps": 0, "errors": 0, "stale": 0, "unrendered_failures": 0})
-        row["known_gaps"] += 1 if result.get("known_gap") else 0
+        row = table.setdefault(group, {"requests": 0, "equal": 0, "errors": 0, "stale": 0, "unrendered_failures": 0})
         row["unrendered_failures"] += result.get("unrendered", 0)
         row["requests"] += 1
         row["equal"] += 1 if result["equal"] else 0
@@ -659,17 +648,13 @@ def run(options) -> int:
         print("unrendered failures at the Lean node (neard's payload):", dict(UNRENDERED_KINDS))
         total = len(results)
         equal = sum(1 for r in results if r["equal"])
-        gaps = [r for r in results if r.get("known_gap")]
-        print(f"{equal}/{total} requests equal, {len(gaps)} known gaps (neard lists contract data keys that were written with "
-              f"their old value or removed while absent; the Lean node has no log of the VM's writes), "
-              f"{total - equal - len(gaps)} other differences")
+        print(f"{equal}/{total} requests equal, 0 known gaps, {total - equal} other differences")
         (options.work / "rpc-conformance.json").write_text(json.dumps(
             {"table": table, "restart": restart, "requests": total, "equal": equal,
-             "known_gaps": [{"params": r["request"].params, "extra_data_touched": r["known_gap"]} for r in gaps],
              "diffs": [{"group": r["request"].group, "method": r["request"].method, "note": r["request"].note,
-                        "diff": r["diff"][:6]} for r in results if not r["equal"] and not r.get("known_gap")],
+                        "diff": r["diff"][:6]} for r in results if not r["equal"]],
              "normalisation": NORMALISATION}, indent=1))
-        code = 0 if equal + len(gaps) == total else 1
+        code = 0 if equal == total else 1
     finally:
         for process in (load, lean):
             if process and process.poll() is None:
@@ -718,7 +703,7 @@ def main() -> None:
         results = exercise(requests)
         for group, row in sorted(summary(results).items()):
             print(f"{group:32} {row}")
-        sys.exit(0 if all(r["equal"] or r.get("known_gap") for r in results) else 1)
+        sys.exit(0 if all(r["equal"] for r in results) else 1)
     else:
         sys.exit(run(options))
 

@@ -138,11 +138,11 @@ partial def recursiveOutcomes (s : VState) (id : CryptoHash) (acc : Array Found)
     let acc := acc.push o
     o.outcome.outcome.receiptIds.foldl (fun acc r => recursiveOutcomes s r acc fuel) acc
 
-/-- A transaction's outcome has the metadata version 1, a receipt's the version 3 (`ExecutionMetadata::V3`). -/
-def outcomeWithIdView (version : Nat) (o : OutcomeRec) : Json :=
+/-- The outcome with its id and proof; the metadata is that of the outcome (version 1 for a transaction, 4 for a receipt). -/
+def outcomeWithIdView (o : OutcomeRec) : Json :=
   Json.mkObj
     [("proof", merklePathView o.proof), ("block_hash", jhash o.block), ("id", jhash o.outcome.id),
-      ("outcome", outcomeView o.outcome.outcome version)]
+      ("outcome", outcomeView o.outcome.outcome)]
 
 /-- `get_execution_status`. -/
 def finalStatus (txHash : CryptoHash) (outcomes : Array Found) : Json :=
@@ -232,8 +232,8 @@ def txStatus (s : VState) (hash : CryptoHash) (withReceipts : Bool) : Option (Js
       let body :=
         Json.mkObj
           ([("status", finalStatus hash all), ("transaction", signedTransactionView tx),
-              ("transaction_outcome", outcomeWithIdView 1 txOutcome),
-              ("receipts_outcome", jarr (outcomeWithIdView 4) receipts)] ++
+              ("transaction_outcome", outcomeWithIdView txOutcome),
+              ("receipts_outcome", jarr outcomeWithIdView receipts)] ++
             receiptViews ++
             [("final_execution_status", Json.str status.name)])
       let _ := blockHash

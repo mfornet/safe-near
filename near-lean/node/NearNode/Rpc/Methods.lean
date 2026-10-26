@@ -291,17 +291,30 @@ def chunk (c : Ctx) (params : Json) : IO R := do
                     (Json.str
                       s!"Chunk Missing (unavailable on the node): ChunkHash(`{base58Encode header.chunkHash.hash.bytes}`) \n Cause: Unknown"))
 
-/-! ### EXPERIMENTAL_changes_in_block -/
+/-! ### EXPERIMENTAL_changes_in_block, EXPERIMENTAL_changes -/
 
 /-- `RpcStateChangesError::UnknownBlock` as `HandlerError`: the cause and the data are both `{"info": {}, "name": "UNKNOWN_BLOCK"}`. -/
 private def unknownStateChangesBlock (s : VState) (params : Json) : RpcError :=
   let cause := Json.mkObj [("info", Json.mkObj []), ("name", "UNKNOWN_BLOCK")]
   RpcError.handler "UNKNOWN_BLOCK" (some (Json.mkObj [])) cause (unknownBlockStatus s params)
 
+/-- Every committed change of the block's chunks, over all shards, in the order of the raw trie keys (the keys of the
+`StateChanges` column are `block hash ++ raw key`). -/
+def blockChanges (s : VState) (b : BlockRec) : Array RawStateChangesWithTrieKey :=
+  let shards :=
+    ((epochDataOf s b).map fun e => e.layout.shardIds.map (blockShardKey b.hash e.layout ·)).getD #[]
+  let all :=
+    shards.foldl
+      (fun acc key =>
+        match s.pr.tables.get .stateChanges key with
+        | some bytes => acc ++ (stateChangesOfBytes? bytes).getD #[]
+        | none => acc)
+      (#[] : Array RawStateChangesWithTrieKey)
+  (all.map fun r => (TrieKey.toVec r.trieKey, r)).qsort (fun a b => keyLt a.1 b.1) |>.map (·.2)
+
 /-- `EXPERIMENTAL_changes_in_block` / `block_effects` (`changes_in_block`, `GetStateChangesInBlock`,
 `ChainStore::get_state_changes_in_block`): one entry for every trie key of the account, contract code, access key and contract data
-kinds that the block's chunks changed, in key order. The node keeps the keys whose entry differs between the pre-state and the
-post-state of a chunk (`Chain/StateChanges.lean`). -/
+kinds that the block's chunks committed, in key order (`StateChangesKinds::from_changes`). -/
 def changesInBlock (c : Ctx) (params : Json) : IO R := do
   let s ← c.env.get
   let ref : Except String BlockRef :=
@@ -318,18 +331,9 @@ def changesInBlock (c : Ctx) (params : Json) : IO R := do
     | none =>
       return .error (unknownStateChangesBlock s params)
     | some b =>
-      let shards :=
-        ((epochDataOf s b).map fun e =>
-              e.layout.shardIds.map (blockShardKey b.hash e.layout ·)).getD
-          #[]
-      let mut keys : Array (ByteArray × Bool) := #[]
-      for key in shards do
-        if let some bytes := s.pr.tables.get .stateChanges key then
-          keys := keys ++ (touchedOfBytes? bytes).getD #[]
-      let sorted := keys.qsort fun a b => keyLt a.1 b.1
       let changes :=
-        sorted.filterMap fun (k, _) =>
-          (kindOfKey? k).map fun (kind, account) =>
+        (blockChanges s b).filterMap fun r =>
+          (kindOfTrieKey? r.trieKey).map fun (kind, account) =>
             Json.mkObj
               [("type",
                   match kind with
@@ -338,6 +342,203 @@ def changesInBlock (c : Ctx) (params : Json) : IO R := do
                   | .data => "data_touched"
                   | .contractCode => "contract_code_touched"),
                 ("account_id", jacc account)]
+      return .ok (Json.mkObj [("block_hash", jhash b.hash), ("changes", Json.arr changes)])
+
+/-- `StateChangesRequestView`. -/
+inductive ChangesRequest where
+  | account (ids : Array AccountId)
+  | singleAccessKey (keys : Array (AccountId × PublicKey))
+  | allAccessKeys (ids : Array AccountId)
+  | contractCode (ids : Array AccountId)
+  | data (ids : Array AccountId) (prefix_ : ByteArray)
+
+private def accountList (o : Json) : Except String (Array AccountId) :=
+  match field? o "account_ids" with
+  | none => throw "missing field `account_ids`"
+  | some (.arr xs) => xs.mapM parseAccount
+  | some j => throw s!"invalid type: {serdeFound j}, expected a sequence"
+
+private def keyList (o : Json) : Except String (Array (AccountId × PublicKey)) :=
+  match field? o "keys" with
+  | none => throw "missing field `keys`"
+  | some (.arr xs) =>
+    xs.mapM fun x =>
+      match x with
+      | .obj _ => do
+        let some a := field? x "account_id" | throw "missing field `account_id`"
+        let some k := field? x "public_key" | throw "missing field `public_key`"
+        pure (← parseAccount a, ← parseKey k)
+      | j => throw s!"invalid type: {serdeFound j}, expected struct AccountWithPublicKey"
+  | some j => throw s!"invalid type: {serdeFound j}, expected a sequence"
+
+/-- The `changes_type` of a request (`StateChangesRequestView`, tagged by `changes_type`). -/
+def parseChangesRequest (o : Json) : Except String ChangesRequest := do
+  let some t := field? o "changes_type" | throw "missing field `changes_type`"
+  let variants := #["account_changes", "single_access_key_changes", "all_access_key_changes", "contract_code_changes", "data_changes"]
+  -- serde reads a variant from its name or from its index
+  let t ←
+    match t with
+    | .num n =>
+      if n.exponent == 0 && n.mantissa ≥ 0 then
+        match variants[n.mantissa.toNat]? with
+        | some name => pure (Json.str name)
+        | none => throw s!"invalid value: integer `{n.mantissa}`, expected variant index 0 <= i < {variants.size}"
+      else throw s!"invalid type: {serdeFound t}, expected variant identifier"
+    | .str _ => pure t
+    | j => throw s!"invalid type: {serdeFound j}, expected variant identifier"
+  match t with
+  | .str "account_changes" => .account <$> accountList o
+  | .str "single_access_key_changes" => .singleAccessKey <$> keyList o
+  | .str "all_access_key_changes" => .allAccessKeys <$> accountList o
+  | .str "contract_code_changes" => .contractCode <$> accountList o
+  | .str "data_changes" =>
+    let ids ← accountList o
+    match field? o "key_prefix_base64" with
+    | some (.str p) => pure (.data ids (← base64Decode p))
+    | some j => throw s!"invalid type: {serdeFound j}, expected a string"
+    | none => throw "missing field `key_prefix_base64`"
+  | .str other =>
+    throw
+      s!"unknown variant `{other}`, expected one of `account_changes`, `single_access_key_changes`, `all_access_key_changes`, `contract_code_changes`, `data_changes`"
+  | _ => throw "unreachable"
+
+/-- `StateChangeCauseView`. -/
+def causeView : StateChangeCause → Json
+  | .notWritableToDisk => Json.mkObj [("type", "not_writable_to_disk")]
+  | .initialState => Json.mkObj [("type", "initial_state")]
+  | .transactionProcessing h => Json.mkObj [("type", "transaction_processing"), ("tx_hash", jhash h)]
+  | .actionReceiptProcessingStarted h =>
+    Json.mkObj [("type", "action_receipt_processing_started"), ("receipt_hash", jhash h)]
+  | .actionReceiptGasReward h =>
+    Json.mkObj [("type", "action_receipt_gas_reward"), ("receipt_hash", jhash h)]
+  | .receiptProcessing h => Json.mkObj [("type", "receipt_processing"), ("receipt_hash", jhash h)]
+  | .postponedReceipt h => Json.mkObj [("type", "postponed_receipt"), ("receipt_hash", jhash h)]
+  | .updatedDelayedReceipts => Json.mkObj [("type", "updated_delayed_receipts")]
+  | .validatorAccountsUpdate => Json.mkObj [("type", "validator_accounts_update")]
+  | .migration => Json.mkObj [("type", "migration")]
+  | .unusedReshardingV2 | .bandwidthSchedulerStateUpdate =>
+    Json.mkObj [("type", "bandwidth_scheduler_state_update")]
+
+private def handleKey : PublicKeyHandle → PublicKey
+  | .ed25519 k => .ed25519 k
+  | .secp256k1 k => .secp256k1 k
+  | .mldsa65 k => .mldsa65 k
+
+/-- The object of a change: the `account_id` and the fields of `view` (`#[serde(flatten)]` of an `AccountView`). -/
+private def withFields (base : List (String × Json)) (view : Json) : Json :=
+  match view with
+  | .obj kvs => Json.mkObj (base ++ kvs.toList)
+  | _ => Json.mkObj base
+
+/-- `StateChangeWithCauseView` of one committed change of a key (`StateChanges::from_changes`): `none` for a key the RPC does not
+serve, a deletion of a gas key nonce (only its deletion together with the key is possible, and it is not reported) or a value that
+does not decode. -/
+def changeView (key : TrieKey) (c : RawStateChange) : Option Json :=
+  let wrap (type : String) (change : Json) : Json :=
+    Json.mkObj [("cause", causeView c.cause), ("type", type), ("change", change)]
+  match key with
+  | .account a =>
+    match c.data with
+    | some d =>
+      match Codec.decodeAll (α := Account) d with
+      | .ok acc => some (wrap "account_update" (withFields [("account_id", jacc a)] (accountView acc)))
+      | .error _ => none
+    | none => some (wrap "account_deletion" (Json.mkObj [("account_id", jacc a)]))
+  | .accessKey a h =>
+    match c.data with
+    | some d =>
+      match Codec.decodeAll (α := AccessKey) d with
+      | .ok k =>
+        some
+          (wrap "access_key_update"
+            (Json.mkObj
+              [("account_id", jacc a), ("public_key", jkey (handleKey h)), ("access_key", accessKeyView k)]))
+      | .error _ => none
+    | none =>
+      some
+        (wrap "access_key_deletion"
+          (Json.mkObj [("account_id", jacc a), ("public_key", jkey (handleKey h))]))
+  | .gasKeyNonce a h i =>
+    match c.data with
+    | some d =>
+      match Codec.decodeAll (α := UInt64) d with
+      | .ok n =>
+        some
+          (wrap "gas_key_nonce_update"
+            (Json.mkObj
+              [("account_id", jacc a), ("public_key", jkey (handleKey h)), ("index", jn i.toNat),
+                ("nonce", jn n.toNat)]))
+      | .error _ => none
+    | none => none
+  | .contractData a k =>
+    match c.data with
+    | some v =>
+      some
+        (wrap "data_update"
+          (Json.mkObj [("account_id", jacc a), ("key_base64", base64Encode k), ("value_base64", base64Encode v)]))
+    | none =>
+      some (wrap "data_deletion" (Json.mkObj [("account_id", jacc a), ("key_base64", base64Encode k)]))
+  | .contractCode a =>
+    match c.data with
+    | some v =>
+      some (wrap "contract_code_update" (Json.mkObj [("account_id", jacc a), ("code_base64", base64Encode v)]))
+    | none => some (wrap "contract_code_deletion" (Json.mkObj [("account_id", jacc a)]))
+  | _ => none
+
+/-- Whether `p` is a prefix of `k`. -/
+private def hasPrefix (k p : ByteArray) : Bool :=
+  k.size ≥ p.size && k.extract 0 p.size == p
+
+/-- `ChainStore::get_state_changes`: for each member of the request in order, the changes of the keys it selects, key by key in key
+order and each key's changes in the order of the commits. -/
+def selectChanges (records : Array RawStateChangesWithTrieKey) (req : ChangesRequest) : Array Json :=
+  let keyed := records.map fun r => (TrieKey.toVec r.trieKey, r)
+  let render (rs : Array (ByteArray × RawStateChangesWithTrieKey)) : Array Json :=
+    rs.foldl
+      (fun acc (_, r) => acc ++ r.changes.filterMap (changeView r.trieKey))
+      #[]
+  let exact (k : ByteArray) := render (keyed.filter fun (rk, _) => rk == k)
+  let byPrefix (p : ByteArray) := render (keyed.filter fun (rk, _) => hasPrefix rk p)
+  let accessPrefix (a : AccountId) : ByteArray :=
+    (TrieKey.toVec (.accessKey a (.ed25519 (ByteArray.mk (Array.replicate 32 0))))).extract 0
+      (a.val.toUTF8.size + 2)
+  match req with
+  | .account ids => ids.foldl (fun acc a => acc ++ exact (TrieKey.toVec (.account a))) #[]
+  | .contractCode ids => ids.foldl (fun acc a => acc ++ exact (TrieKey.toVec (.contractCode a))) #[]
+  | .allAccessKeys ids => ids.foldl (fun acc a => acc ++ byPrefix (accessPrefix a)) #[]
+  | .singleAccessKey keys =>
+    keys.foldl
+      (fun acc (a, pk) =>
+        match handleOfKey pk with
+        | some h => acc ++ byPrefix (TrieKey.toVec (.accessKey a h))
+        | none => acc)
+      #[]
+  | .data ids p =>
+    ids.foldl
+      (fun acc a => acc ++ byPrefix (TrieKey.toVec (.contractData a ByteArray.empty) ++ p))
+      #[]
+
+/-- `EXPERIMENTAL_changes` / `changes` (`changes_in_block_by_type`, `GetStateChanges`): the values of the account, access key, contract
+code and contract data keys that the block's chunks committed, each with the cause of the commit. -/
+def changesByType (c : Ctx) (params : Json) : IO R := do
+  let s ← c.env.get
+  let parsed : Except String (BlockRef × ChangesRequest) :=
+    match params with
+    | .obj _ => do
+      let r ← parseBlockRef params (flattened := true)
+      pure (r, ← parseChangesRequest params)
+    | .null => throw "invalid type: null, expected struct RpcStateChangesInBlockByTypeRequest"
+    | .arr _ => throw "invalid type: sequence, expected struct RpcStateChangesInBlockByTypeRequest"
+    | _ => throw "invalid type, expected struct RpcStateChangesInBlockByTypeRequest"
+  match liftParse parsed with
+  | .error e =>
+    return .error e
+  | .ok (r, req) =>
+    match resolve s r with
+    | none =>
+      return .error (unknownStateChangesBlock s params)
+    | some b =>
+      let changes := selectChanges (blockChanges s b) req
       return .ok (Json.mkObj [("block_hash", jhash b.hash), ("changes", Json.arr changes)])
 
 /-! ### Genesis and protocol configuration -/

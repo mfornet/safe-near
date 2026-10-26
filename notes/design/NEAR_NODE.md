@@ -1635,7 +1635,7 @@ cause). The Lean runtime returns the state after a chunk, not a log of the write
   `validator_accounts_update`, ...), several per key in the order they happened. That needs a change log in the runtime (each write with
   the cause that led to it), which the model does not have and which is not added here. It answers `METHOD_NOT_FOUND`.
 
-###### F4, gas profile of outcomes: not done
+###### F4, gas profile of outcomes: not done here (done in R3 below)
 
 The metadata of an outcome (`gas_profile`, and the list of contracts) is not computed and the conformance harness removes both from
 the comparison. The runtime's `ExecutionOutcome` has no profile and the VM's profile lacks the split by action (`ActionCosts`) that
@@ -1682,6 +1682,114 @@ grew by 32 MB an hour (55 MB an hour of log before F2), and the RSS stays at 160
 of H3 (the slope of 8.4 MB/h is the harness's fit after its warm-up of 600 s, against 11.6 MB/h in H3's hour).
 One first start of `validator_accept.py` failed at "neard did not start": the driver script had removed the topology directory
 while the previous run was shutting down; nothing of the node ran. The result above is the one complete run.
+
+#### Logs from the VM and the runtime (SAF-8 R1 to R3)
+
+Branch `claude/saf-8-node-runtime-logs`. F3 and F4 above left three gaps that need something the VM and the runtime do not return: the
+keys a contract wrote without changing them (`changes_in_block`), the values with their causes (`EXPERIMENTAL_changes`) and the gas
+profile of an outcome. They are closed by **output fields that are observational only**: each has a default; it is computed beside the
+existing results from what the call or the receipt did; nothing in `near-lean/vm` or `near-lean/runtime` reads it back, so no existing
+field, definition behaviour or theorem statement moved. Where a proof broke only because a structure gained a field it was fixed
+mechanically (listed per item). The fast engine produces the same fields (it runs the same host functions), and its differential test
+compares them.
+
+##### R1, the storage-write log: the 6 gaps of `changes_in_block` are closed
+
+- *VM.* `Wasm.StorageWrite { key, existed, value }` (the key, whether it held a value just before, the value after, `none` for a removal),
+  `NearState.storageLog` (newest first), written by `updateStorageUsage`, the post-processing that every `storage_write` and `storage_remove`
+  passes on success (so a write of the value the key held and a removal of a key that is absent are logged, as `RuntimeExt::storage_set` and
+  `storage_remove` hand each call to `TrieUpdate`), and `VMOutcome.storageWrites` (call order; empty for a failed call, whose storage is
+  restored). Changed definitions: `updateStorageUsage` (one more field in the state it returns), `outcomeOfExecution` and
+  `VMOutcome.graphIssue` (one more field each).
+- *Runtime.* `ExecutionOutcome.changes`, the commits that a transaction or a receipt made to the exposed kinds of trie key (account,
+  access key, gas key nonce, contract code, contract data), each `{ cause, key, value }`, `ApplyResult.changes` gathering them in the order
+  `Runtime::apply` makes them. `ChangeLog.lean` derives them as nearcore commits them: `TransactionProcessing` (the signer's key and account),
+  `ReceiptProcessing` of a receipt that succeeded (a receipt that fails rolls back: no commit) with the receiver's account, the keys its
+  actions wrote (`actionKeys`: deploy, add and delete key with the nonce rows of a gas key, implicit account creation, allowance refunds,
+  `UseGlobalContract` removing local code, gas key funding and withdrawal, the delegate's nonce, and for `DeleteAccount` everything
+  `remove_account` removes: the account, the code, every access key, nonce row and data key) and the VM's storage calls, then
+  `ActionReceiptGasReward` (the receiver's account with the reward, when positive), and `ValidatorAccountsUpdate` (`Epoch.lean`). The value
+  of a commit is what the state holds for the key at that point; a key written twice before a commit is one entry (`TrieUpdate::commit`).
+  `ActionReceiptProcessingStarted`, `PostponedReceipt`, `UpdatedDelayedReceipts`, `Migration` and the bandwidth scheduler commit only
+  keys that `StateChangesExt::from_changes` drops (received data, postponed receipts, queues), so they have no entry.
+  Added: `Exec.dataWrites`, `Processed.execs` (each receipt that ran, with its result), `ExecutionOutcome.changes`,
+  `ApplyResult.changes` (a function of the outcomes), and the functions of `ChangeLog.lean`; changed: `Exec.recordVMOutcome` (one more
+  field), `runActionReceipt` / `processedExecOutput` (one more field), `Processed.append`, `applyAttempt` (the outcomes of a receipt
+  and of a transaction carry their commits).
+- *Node.* The record of a block and shard (`stateChanges` column) is the set of keys the log lists, with whether the last value is a removal;
+  `changes_in_block` lists their kinds. Any entry that differs between the pre-state and the post-state and that the log did not list is still
+  listed and reported on stderr (`warning: the state change log of shard ... missed ...`): the entries are authoritative, and a miss is a bug of
+  the derivation. The `writtenKeys` derivation of F3 (from transactions and outcomes) is gone.
+- *Mechanical proof fixes.* `ProcessedFunding.lean` (`processedExecOutput`, the definition the proofs compare `runActionReceipt` with, sets
+  the new `execs` field), `BlockStages.lean` (the mirror of the loops of `applyAttempt`: the transaction outcome carries its commit and the
+  outcomes of a receipt come from `outcomesWithChanges`); nothing else in `near-lean/{vm,runtime}` changed. No theorem statement changed.
+- *Result* (`rpc_conformance.py run`): 788 of 788 requests equal, **0 known gaps** (the category is gone from the harness), 296 of 296
+  `EXPERIMENTAL_changes_in_block` requests equal; no `missed` warning in the node's log. A first run with the derivation reading the state
+  after the receipt instead of before it reported 3 misses (an implicit account created by a transfer, a deleted account's 30 data keys): the
+  warning is what found it.
+
+##### R2, the state change log with causes: `EXPERIMENTAL_changes` for every `changes_type`
+
+- *Runtime.* Nothing new: R1's `ExecutionOutcome.changes` already carries `{ cause, key, value }` for every commit, in the order of
+  `Runtime::apply`; R2 reads it.
+- *Node.* The record of a block and shard in the `StateChanges` column is now what nearcore keeps: the Borsh
+  `Vec<RawStateChangesWithTrieKey>` of the exposed kinds, for each trie key the chunk's commits touched the `(cause, value)` list in the
+  order of the commits (`Chain/StateChanges.lean`: `rawChanges`, `causeOf`, `valueBytes`). The runtime's logical receipt ids are mapped to
+  native hashes through the chunk's `context.receipts` and `txHashes`; values are encoded as the trie stores them (account with its code
+  hash and storage usage, access key, gas key nonce as 8 bytes LE, code bytes, data). The record stays in the store for the GC window.
+  `changes_in_block` lists the kinds of the keys of the record (`StateChangesKinds::from_changes`: gas key nonce rows are not a kind).
+- *RPC.* `EXPERIMENTAL_changes` (and `changes`) for `account_changes`, `single_access_key_changes`, `all_access_key_changes`,
+  `contract_code_changes` and `data_changes` (with `key_prefix_base64`), rendered as `StateChangeWithCauseView` (`StateChanges::from_changes`,
+  gas key nonce updates appearing among the access key changes). `single_gas_key_changes` does not exist at protocol 86. Request parsing
+  reproduces serde's messages, including a `changes_type` given as the index of the variant (0 to 4).
+- *Harness.* `rpc_conformance.py` asks for each kind of change at every block that touched it (by height and by hash), `finality`,
+  `sync_checkpoint`, key prefixes, unknown accounts and the malformed requests. *Result* (`rpc_conformance.py run`): 1101 of 1101 requests
+  equal, 0 known gaps, 0 other differences.
+
+##### R3, the gas profile of outcomes: `metadata.gas_profile` and `contracts` as nearcore renders them
+
+- *VM.* `NearState.actionProfile` (name and burnt gas of each `ActionCosts` entry) and `VMOutcome.actionProfile`; `gasProfile.actionBurnt`
+  is their sum, which the fastvm differential test checks on every run. `applyCharge` adds the gas a charge burnt to the entry the
+  charge pays: a charge names its fee by a selector (`ActionFees -> Fee`), and `costProbe` (a fee table whose entry number k has the send
+  fee 2^k) reads the selector's answer to tell the entry without changing how charges are written (`actionCostName`: `transfer` when
+  the selector includes the transfer fee, as nearcore profiles the whole payment of a transfer under it). `newReceipt` is profiled under
+  `new_action_receipt` (nearcore pays the data receipts' base fees together with it), `burn` under `new_data_receipt_byte`, `pay` under
+  `gas_key_byte`. Added: `actionCostNames`, `costProbe`, `actionCostName`, `addActionCost`, `NearState.profileAction`; changed:
+  `applyCharge` (each branch also updates the profile; the gas counter and every field it set before are as they were), `outcomeOfExecution`
+  and `graphIssue` (one more field each). The host function costs and the Wasm gas were already in `VMOutcome.gasProfile`.
+- *Runtime.* `GasProfileSplit` (action costs, host function costs, Wasm gas) and `ContractRef`; `ExecutionOutcome.profile` is the sum of the
+  profiles of the receipt's VM calls (nearcore profiles only what the VM burnt: the fees of non-VM actions are not in `gas_profile`, which
+  is `[]` for such a receipt, as the localnet shows), and `ExecutionOutcome.contracts` the contract of the receiver before each action
+  (`receiptContracts`: an account that does not exist yet has none, a deploy, `UseGlobalContract` or a deletion changes it for the actions
+  after it, an action after the failed one gets none). Added: `Exec.profile`, `processedContracts`, `Account.contractRef`,
+  `receiptContracts`; changed: `Exec.recordVMOutcome`, `outcomeOf`, `outcomesWithChanges` (one more field each).
+- *Node.* `Chain/GasProfile.lean` turns the split into `ProfileDataV3` (the arrays indexed by the `ActionCosts` and `ExtCosts`
+  discriminants) and the contracts into `AccountContract`; a transaction's outcome has `ExecutionMetadata::V1`, a receipt's `V4`, and
+  the metadata is stored with the outcome (it is not part of the outcome hash). `Rpc/Views.lean` renders it from the stored metadata:
+  `gas_profile` is `null` for `V1`, otherwise the costs that burnt gas as `{ cost_category, cost, gas_used }` (`ACTION_COST`, then
+  `WASM_HOST_COST` with `WASM_INSTRUCTION`, each sorted by name), `contracts` only for `V4` (`null`, `{"local": hash}`,
+  `{"global_hash": hash}`, `{"global_account_id": id}`).
+- *Mechanical proof fixes.* `ChargeReservations.lean`: the five `simpa only [applyCharge, ...]` calls of
+  `applyCharge_success_reservation` gained `NearState.profileAction` in their simp set (`applyCharge` now wraps the state in it). No theorem
+  statement changed.
+- *Result* (`rpc_conformance.py run`): all requests equal, 0 known gaps; the `gas_profile` and `contracts` normalisation of the harness is
+  gone, so every outcome of the run (`tx`, `EXPERIMENTAL_tx_status`, the legacy form) compares the profile of each receipt.
+
+##### Acceptance of R1 to R3 (one run of each, on the final build)
+
+`--wfail` builds of `near-lean/{vm,runtime,chain,fastvm,node}` and of `contracts/w-near/verification` (`Model`, `Spec`, `runtime-adapter-tests`);
+`Proofs` builds without `--wfail`, with the one `sorry` it already has. Cold build of `Model`, `Spec` and `runtime-adapter-tests` (build
+directory removed, packages built): 70 s and 39 s before (commit `bee7dd6`), 47 s and 40 s after; the whole `NearRuntime` (with `NearVM`)
+from scratch at `bee7dd6`: 893 s.
+
+| Run | Result |
+| --- | --- |
+| `rpc_conformance.py run` | 1094 of 1094 requests equal, 0 known gaps, 0 other differences |
+| `validator_accept.py` | `ok: true`, 449 of 449 outcomes equal, finality advanced after the stall |
+| `soak.py --duration 1800` (full workload) | all nine checks ok, 2843 blocks applied |
+| `fastvm-differential` | 200 programs, 42037 comparisons, 0 mismatches; storage probe as expected; wNEAR 3458 comparisons, 0 mismatches |
+| `vm-tests` | 193 passed, 0 failed |
+| `registered-replay-fast` (`replay_corpus.py`) | 436 pass, 0 fail, 0 unsupported |
 
 ## Open points
 
