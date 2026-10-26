@@ -195,7 +195,7 @@ theorem applyReceiptQueue_conservation (cfg : RuntimeConfig) (ap : ApplyState) (
               receiptsFunds cfg (pass.2.2.2.1 ++ (processWithInstants cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 head.1).receipts) +
               ((forIn (processWithInstants cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 head.1).outcomes
                 (pass.2.2.2.2.2.2.1, pass.2.2.2.2.2.2.2.2.2.1)
-                (fun entry ledger => .yield (ledger.1 + entry.2.tokensBurnt, ledger.2 + entry.2.gasBurnt)) : Id (Nat × Nat)).1 +
+                (fun entry ledger => .yield (ledger.1 + entry.2.tokensBurnt, ledger.2 + entry.2.computeUsage)) : Id (Nat × Nat)).1 +
                 (processWithInstants cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 head.1).otherTokensBurnt - (processWithInstants cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 head.1).rewards) +
               receiptsFunds cfg pass.2.2.2.2.2.2.2.1 + receiptsFunds cfg pass.2.2.2.2.2.2.2.2.1 +
               receiptsFunds cfg (rest.map Prod.fst) + subsidy = assets +

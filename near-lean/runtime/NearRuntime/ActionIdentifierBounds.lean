@@ -319,7 +319,7 @@ theorem finalizeReceipt_idsBelowNext (c : ReceiptCtx) (st : ChainState) (raw : E
     (fun e _ _ _ h => Exec.addGasRefund_idsBelowNext e _ _ _ h)
     (fun e _ _ h => Exec.creditReceiptReward_idsBelowNext e _ _ _ _ h)
     (fun e h => Exec.finishReceiptResult_idsBelowNext e c failed h)
-    (fun _ _ h => h)
+    (fun _ _ _ h => h)
   cases failed <;> first | exact hraw | exact hinitial
 
 theorem applyActionReceipt_idsBelowNext (c : ReceiptCtx) (st : ChainState) (h : st.IdsBelowNext) :

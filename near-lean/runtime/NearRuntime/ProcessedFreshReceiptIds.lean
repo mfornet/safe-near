@@ -96,7 +96,7 @@ theorem finalizeReceipt_freshIds (c : ReceiptCtx) (st : ChainState) (raw : Exec)
       by rw [Exec.creditReceiptReward_nextId]; exact h.2⟩)
     (fun e h => ⟨Exec.finishReceiptResult_freshIds e c failed _ h.1 h.2,
       h.2.trans (Exec.finishReceiptResult_nextId_mono e c failed)⟩)
-    (fun _ _ h => h)).1
+    (fun _ _ _ h => h)).1
   cases failed with
   | none => exact ⟨hraw, hmono⟩
   | some error => exact ⟨ReceiptList.FreshIds.empty _ _, Nat.le_refl _⟩

@@ -737,6 +737,56 @@ def main (args : List String) : IO UInt32 := do
   check r "deploy + new: outcome is a success"
     ((latestOutcome w fun o => o.executorId == "wrap.near" && o.logs.isEmpty).map (·.status.isSuccess) == some true)
 
+  -- Compute (`compute_usage`): deploy's execution fee and the host storage costs have compute
+  -- costs above their gas; the transaction's send fees do not.
+  let fees := cfg.fees.actionFees
+  let computeFees := cfg.computeActionFees
+  let deployExtra := (computeFees.deployContractBase.execution - fees.deployContractBase.execution) +
+    code.size * (computeFees.deployContractByte.execution - fees.deployContractByte.execution)
+  check r "compute: v86 charges deploy at 20 Tgas of compute plus 250 Ggas per 1000 bytes"
+    (computeFees.deployContractBase.execution == 20_000_000_000_000 &&
+      computeFees.deployContractByte.execution == 250_000_000)
+  check r "compute: a host cost scales by its compute-to-gas ratio, per call"
+    (cfg.vmComputeUsage { ext := [("storage_write_base", 2 * cfg.wasm.extCosts.cost "storage_write_base"),
+        ("base", 3 * cfg.wasm.extCosts.cost "base")], actionBurnt := 5, wasm := 7 } ==
+      2 * 200_000_000_000 + 3 * cfg.wasm.extCosts.cost "base" + 12)
+  check r "compute: the transaction outcome uses compute equal to its gas"
+    (w.outcomes.any fun (_, o) => o.executorId == "wrap.near" && o.status matches .successReceiptId _ &&
+      o.computeUsage == o.gasBurnt && o.gasBurnt > 0)
+  check r "compute: deploy + new uses the deploy compute and the storage write compute beyond its gas"
+    (w.outcomes.any fun (_, o) => o.executorId == "wrap.near" && o.computeUsage > o.gasBurnt + deployExtra)
+    s!"{w.outcomes.map fun (_, o) => (o.executorId, o.gasBurnt, o.computeUsage)}"
+  check r "compute: a refund receipt uses compute equal to its gas"
+    (w.outcomes.any fun (_, o) => o.executorId == "wrap.near" && o.tokensBurnt == 0 && o.gasBurnt > 0 &&
+      o.computeUsage == o.gasBurnt)
+
+  -- `total.compute` decides delaying: two local deploys whose gas fits 30 Tgas but whose compute
+  -- (about 70 Tgas each) does not; the second waits in the delayed queue.
+  let deployTx (nonce : Nat) : Transaction := {
+    signerId := "alice.near", publicKey := pkOf 1, nonce, receiverId := "alice.near"
+    actions := [.deployContract code] }
+  let twoDeploys := Near.apply cfg { World.ap with gasLimit := some (tgas 30) } (fun _ => code) genesis
+    [deployTx 1, deployTx 2] []
+  let deployOutcomes := twoDeploys.outcomes.filter fun (_, o) => o.computeUsage > o.gasBurnt
+  check r "compute: a deploy whose compute reaches the limit delays the next receipt, though its gas fits"
+    (twoDeploys.issue.isNone && deployOutcomes.length == 1 && twoDeploys.state.delayed.length == 1 &&
+      deployOutcomes.all fun (_, o) => o.gasBurnt < tgas 15 && o.computeUsage ≥ tgas 30)
+    s!"{twoDeploys.outcomes.map fun (_, o) => (o.gasBurnt, o.computeUsage)} delayed {twoDeploys.state.delayed.length}"
+
+  -- Deleting a gas key removes its nonce rows: compute without gas (`storage_removes_compute`).
+  let gasKey : AccessKey := { nonce := 0, permission := .gasKeyFullAccess 0 3 }
+  let gasKeyState := (List.range 3).foldl (fun st lane => st.setGasKeyNonce "alice.near" (pkOf 5) lane 0)
+    (genesis.setAccessKey "alice.near" (pkOf 5) gasKey)
+  let deleteGasKey := Near.apply cfg World.ap (fun _ => code) gasKeyState
+    [{ signerId := "alice.near", publicKey := pkOf 1, nonce := 1, receiverId := "alice.near"
+       actions := [.deleteKey (pkOf 5)] }] []
+  let nonceCompute := cfg.storageRemovesCompute 3 (3 * gasKeyNonceKeyLen "alice.near" (pkOf 5)) 24
+  check r "compute: deleting a gas key adds the compute of removing its three nonces"
+    (deleteGasKey.issue.isNone && (deleteGasKey.state.accessKey? "alice.near" (pkOf 5)).isNone &&
+      deleteGasKey.outcomes.any fun (_, o) => o.status.isSuccess && o.executorId == "alice.near" &&
+        !(o.status matches .successReceiptId _) && o.computeUsage == o.gasBurnt + nonceCompute)
+    s!"{deleteGasKey.outcomes.map fun (_, o) => (o.gasBurnt, o.computeUsage)} expected extra {nonceCompute}"
+
   -- alice wraps 1 NEAR
   let aliceBefore := (w.account "alice.near").amount
   let wrapBefore := (w.account "wrap.near").amount

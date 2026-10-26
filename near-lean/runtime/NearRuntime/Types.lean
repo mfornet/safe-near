@@ -429,6 +429,8 @@ structure ExecutionOutcome where
   logs : List String := []
   receiptIds : List ReceiptId := []
   gasBurnt : Nat := 0
+  /-- `compute_usage`: what the outcome takes of the chunk's compute limit. -/
+  computeUsage : Nat := 0
   tokensBurnt : Nat := 0
   /-- The validator proposals of the receipt's successful `Stake` actions. -/
   proposals : List ValidatorProposal := []

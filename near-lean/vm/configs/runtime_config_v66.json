@@ -332,5 +332,16 @@
     "global_contract_storage_amount_per_byte": "999999999999999999999999999",
     "include_deploy_global_contract_outcome_burnt_storage": false,
     "yield_with_id": false
+  },
+  "compute_costs": {
+    "action_execution": {},
+    "action_send": {},
+    "ext": {
+      "storage_has_key_base": 200000000000,
+      "storage_read_base": 200000000000,
+      "storage_remove_base": 200000000000,
+      "storage_write_base": 200000000000,
+      "touching_trie_node": 110000000000
+    }
   }
 }

@@ -312,7 +312,7 @@ def outcomeJson (pair : ReceiptId × ExecutionOutcome) : Json :=
           [("executorId", toJson outcome.executorId),
             ("status", statusJson outcome.status outcome.failureIndex outcome.executorId),
             ("logs", toJson outcome.logs), ("receiptIds", toJson outcome.receiptIds),
-            ("gasBurnt", toJson outcome.gasBurnt),
+            ("gasBurnt", toJson outcome.gasBurnt), ("computeUsage", toJson outcome.computeUsage),
             ("tokensBurnt", toJson (toString outcome.tokensBurnt))])]
 
 def snapshotFields (s : Snapshot) : List (String × Json) :=
