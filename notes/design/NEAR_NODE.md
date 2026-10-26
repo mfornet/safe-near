@@ -1775,6 +1775,22 @@ compares them.
 - *Result* (`rpc_conformance.py run`): all requests equal, 0 known gaps; the `gas_profile` and `contracts` normalisation of the harness is
   gone, so every outcome of the run (`tx`, `EXPERIMENTAL_tx_status`, the legacy form) compares the profile of each receipt.
 
+##### Acceptance of R1 to R3 (one run of each, on the final build)
+
+`--wfail` builds of `near-lean/{vm,runtime,chain,fastvm,node}` and of `contracts/w-near/verification` (`Model`, `Spec`, `runtime-adapter-tests`);
+`Proofs` builds without `--wfail`, with the one `sorry` it already has. Cold build of `Model`, `Spec` and `runtime-adapter-tests` (build
+directory removed, packages built): 70 s and 39 s before (commit `bee7dd6`), 47 s and 40 s after; the whole `NearRuntime` (with `NearVM`)
+from scratch at `bee7dd6`: 893 s.
+
+| Run | Result |
+| --- | --- |
+| `rpc_conformance.py run` | 1094 of 1094 requests equal, 0 known gaps, 0 other differences |
+| `validator_accept.py` | `ok: true`, 449 of 449 outcomes equal, finality advanced after the stall |
+| `soak.py --duration 1800` (full workload) | all nine checks ok, 2843 blocks applied |
+| `fastvm-differential` | 200 programs, 42037 comparisons, 0 mismatches; storage probe as expected; wNEAR 3458 comparisons, 0 mismatches |
+| `vm-tests` | 193 passed, 0 failed |
+| `registered-replay-fast` (`replay_corpus.py`) | 436 pass, 0 fail, 0 unsupported |
+
 ## Open points
 
 - Numeric performance target for M10, measured against nearcore: set and met in M10a above (M2's and M4's are proposed above).
