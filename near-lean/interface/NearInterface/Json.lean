@@ -17,8 +17,10 @@ Acceptance, as serde_json does it and as checked on `contract.wasm`:
 * RFC 8259 syntax with whitespace `' ' '\t' '\n' '\r'` around values and
   nothing after the top-level value; no trailing commas, no leading zeros.
 * Strings: no raw control characters, the escapes `\" \\ \/ \b \f \n \r \t`
-  and `\uXXXX`; surrogates only as a well-formed pair; the raw bytes must be
-  UTF-8.
+  and `\uXXXX`; surrogates only as a well-formed pair. The raw bytes must be
+  UTF-8 where serde reads a string (a typed field, a struct's keys); in an
+  ignored value serde only scans strings, keys included, and does not check
+  their UTF-8 (`invalidStr`, `none` keys).
 * Numbers are syntax only: no range check, since none of the typed fields we
   decode is a JSON number and ignored values are only scanned.
 * No nesting limit: ignored values are skipped iteratively (checked to 129
@@ -35,9 +37,12 @@ inductive Value
   /-- A JSON number, kept as its text. -/
   | number (text : String)
   | str (s : String)
+  /-- A string whose bytes are not UTF-8: no decoder accepts it, but it can be ignored. -/
+  | invalidStr
   | arr (elements : List Value)
-  /-- Members in input order, duplicates included. -/
-  | obj (members : List (String × Value))
+  /-- Members in input order, duplicates included; a key is `none` when its
+  bytes are not UTF-8. -/
+  | obj (members : List (Option String × Value))
   deriving Repr, Inhabited
 
 def isWhitespace (b : UInt8) : Bool := b == 0x20 || b == 0x09 || b == 0x0A || b == 0x0D
@@ -77,11 +82,12 @@ def unicodeEscape (bs : Bytes) : Option (Char × Bytes) := do
   else if n.isValidChar then pure (Char.ofNat n, rest)
   else none
 
-/-- The body of a string, after its opening quote. `acc` holds the UTF-8 bytes
-decoded so far, in reverse. -/
-def stringBody : Bytes → Bytes → Option (String × Bytes)
+/-- The body of a string, after its opening quote: the string (`none` when its
+bytes are not UTF-8) and the rest. `acc` holds the bytes decoded so far, in
+reverse. -/
+def stringBody : Bytes → Bytes → Option (Option String × Bytes)
   | [], _ => none
-  | 0x22 :: rest, acc => (String.fromUTF8? ⟨acc.reverse.toArray⟩).map (·, rest)
+  | 0x22 :: rest, acc => some (String.fromUTF8? ⟨acc.reverse.toArray⟩, rest)
   | 0x5C :: e :: rest, acc =>
     let simple (b : UInt8) := stringBody rest (b :: acc)
     match e with
@@ -137,7 +143,8 @@ def value : Nat → Bytes → Option (Value × Bytes)
     | 0x6E :: 0x75 :: 0x6C :: 0x6C :: rest => some (.null, rest)
     | 0x74 :: 0x72 :: 0x75 :: 0x65 :: rest => some (.bool true, rest)
     | 0x66 :: 0x61 :: 0x6C :: 0x73 :: 0x65 :: rest => some (.bool false, rest)
-    | 0x22 :: rest => (stringBody rest []).map fun (s, rest) => (.str s, rest)
+    | 0x22 :: rest => (stringBody rest []).map fun (s, rest) =>
+      ((match s with | some s => .str s | none => .invalidStr), rest)
     | 0x5B :: rest =>
       match skipWhitespace rest with
       | 0x5D :: rest => some (.arr [], rest)
@@ -160,7 +167,8 @@ def elements : Nat → Bytes → List Value → Option (List Value × Bytes)
     | _ => none
 
 /-- Object members after `{` (or after a `,`), up to the closing `}`. -/
-def members : Nat → Bytes → List (String × Value) → Option (List (String × Value) × Bytes)
+def members : Nat → Bytes → List (Option String × Value) →
+    Option (List (Option String × Value) × Bytes)
   | 0, _, _ => none
   | fuel + 1, bs, acc => do
     let (key, rest) ← match skipWhitespace bs with
@@ -186,12 +194,12 @@ def parse (bs : Bytes) : Option Value :=
 /-! ## serde's derived `Deserialize` and near-sdk's scalar wrappers -/
 
 /-- A derived `Deserialize` for a struct with fields `names`: from an object
-(each known field at most once, unknown fields ignored; an absent field is
-`none`) or from an array of exactly one element per field, in order. -/
+(keys UTF-8, each known field at most once, unknown fields ignored; an absent
+field is `none`) or from an array of exactly one element per field, in order. -/
 def structFields (names : List String) : Value → Option (List (Option Value))
   | .obj ms =>
-    if names.all fun n => (ms.filter (·.1 == n)).length ≤ 1 then
-      some (names.map fun n => (ms.find? (·.1 == n)).map (·.2))
+    if ms.all (·.1.isSome) && names.all fun n => (ms.filter (·.1 == some n)).length ≤ 1 then
+      some (names.map fun n => (ms.find? (·.1 == some n)).map (·.2))
     else none
   | .arr vs => if vs.length == names.length then some (vs.map some) else none
   | _ => none

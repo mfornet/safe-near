@@ -4,6 +4,7 @@ import NearInterface.Config
 import NearInterface.TrieOverlay
 import NearInterface.Boundary
 import NearInterface.Model
+import NearInterface.ReceiptValidation
 import NearInterface.Refines
 import NearInterface.Json
 import NearInterface.HostCrypto

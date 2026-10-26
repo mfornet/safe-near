@@ -1,0 +1,29 @@
+[
+  {
+    "name": "lifecycle: init, wrap, register, transfer, transfer_call, resolve, unwrap",
+    "description": "The happy path across blocks; checks the runner itself.",
+    "state": null,
+    "blocks": [
+      {"receipts": [
+        {"label": "init", "call": {"from": "wrap.near", "method": "new"}, "expect": "ok"},
+        {"label": "init-again", "call": {"from": "wrap.near", "method": "new"}, "expect": "panic:already been initialized"}
+      ]},
+      {"receipts": [
+        {"label": "wrap-alice", "call": {"from": "alice.near", "method": "near_deposit", "deposit": "5000000000000000000000000"}, "expect": "ok"},
+        {"label": "register-bob", "call": {"from": "alice.near", "method": "storage_deposit", "args": {"account_id": "bob.near"}, "deposit": "1250000000000000000000"}, "expect": "ok"},
+        {"label": "pay-bob", "call": {"from": "alice.near", "method": "ft_transfer", "args": {"receiver_id": "bob.near", "amount": "1000"}, "deposit": "1"}, "expect": "ok"}
+      ]},
+      {"height": 10, "receipts": [
+        {"label": "tc", "call": {"from": "alice.near", "method": "ft_transfer_call", "args": {"receiver_id": "bob.near", "amount": "700", "msg": "hello"}, "deposit": "1"}, "expect": "ok"}
+      ]},
+      {"height": 20, "receipts": [
+        {"label": "resolve", "deliver": "tc#1", "results": [{"ok": "\"300\""}], "expect": "ok"}
+      ]},
+      {"receipts": [
+        {"label": "views", "call": {"method": "ft_balance_of", "args": {"account_id": "bob.near"}}, "expect": "ok"},
+        {"label": "unwrap", "call": {"from": "alice.near", "method": "near_withdraw", "args": {"amount": "1000000000000000000000000"}, "deposit": "1"}, "expect": "ok"},
+        {"label": "unwrap-arrives-back-never", "credit": "0"}
+      ]}
+    ]
+  }
+]

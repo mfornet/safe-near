@@ -1,0 +1,1996 @@
+[
+ {
+  "name": "gas: every method at bound on an adversarial trie (48 neighbours)",
+  "state": {
+   "accounts": {
+    "alice.near": "1000000000000000000000000",
+    "bob.near": "1000000000000000000000000",
+    "0lice.near": "0",
+    "0ob.near": "0",
+    "a0ice.near": "0",
+    "al0ce.near": "0",
+    "ali0e.near": "0",
+    "alic0.near": "0",
+    "alice.0ear": "0",
+    "alice.n0ar": "0",
+    "alice.ne0r": "0",
+    "alice.nea0": "0",
+    "alice.neaq": "0",
+    "alice.neaz": "0",
+    "alice.neqr": "0",
+    "alice.nezr": "0",
+    "alice.nqar": "0",
+    "alice.nzar": "0",
+    "alice.qear": "0",
+    "alice.zear": "0",
+    "alicq.near": "0",
+    "alicz.near": "0",
+    "aliqe.near": "0",
+    "alize.near": "0",
+    "alqce.near": "0",
+    "alzce.near": "0",
+    "aqice.near": "0",
+    "azice.near": "0",
+    "b0b.near": "0",
+    "bo0.near": "0",
+    "bob.0ear": "0",
+    "bob.n0ar": "0",
+    "bob.ne0r": "0",
+    "bob.nea0": "0",
+    "bob.neaq": "0",
+    "bob.neaz": "0",
+    "bob.neqr": "0",
+    "bob.nezr": "0",
+    "bob.nqar": "0",
+    "bob.nzar": "0",
+    "bob.qear": "0",
+    "bob.zear": "0",
+    "boq.near": "0",
+    "boz.near": "0",
+    "bqb.near": "0",
+    "bzb.near": "0",
+    "qlice.near": "0",
+    "qob.near": "0",
+    "zlice.near": "0",
+    "zob.near": "0"
+   }
+  },
+  "trie": [
+   {
+    "account": "0rap.near",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "qrap.near",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "zrap.near",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "w0ap.near",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wqap.near",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wzap.near",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wr0p.near",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrqp.near",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrzp.near",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wra0.near",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wraq.near",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wraz.near",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.0ear",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.qear",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.zear",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.n0ar",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.nqar",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.nzar",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.ne0r",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.neqr",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.nezr",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.nea0",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.neaq",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.neaz",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.near0",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.nea",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.near.a",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.neas",
+    "key": "a\n\u0000\u0000\u0000alice.near",
+    "value": "v"
+   }
+  ],
+  "blocks": [
+   {
+    "receipts": [
+     {
+      "label": "near_deposit@bound",
+      "call": {
+       "from": "alice.near",
+       "method": "near_deposit",
+       "deposit": "1000000000000000000000000",
+       "gas": "bound"
+      },
+      "probe": true
+     },
+     {
+      "label": "near_deposit-new@bound",
+      "call": {
+       "from": "carl.near",
+       "method": "near_deposit",
+       "deposit": "1000000000000000000000000",
+       "gas": "bound"
+      },
+      "probe": true
+     },
+     {
+      "label": "ft_transfer@bound",
+      "call": {
+       "from": "alice.near",
+       "method": "ft_transfer",
+       "args": {
+        "receiver_id": "bob.near",
+        "amount": "1",
+        "memo": "m"
+       },
+       "deposit": "1",
+       "gas": "bound"
+      },
+      "probe": true
+     },
+     {
+      "label": "ft_transfer_call@bound",
+      "call": {
+       "from": "alice.near",
+       "method": "ft_transfer_call",
+       "args": {
+        "receiver_id": "bob.near",
+        "amount": "1",
+        "msg": ""
+       },
+       "deposit": "1",
+       "gas": "bound"
+      },
+      "probe": true
+     },
+     {
+      "label": "near_withdraw@bound",
+      "call": {
+       "from": "alice.near",
+       "method": "near_withdraw",
+       "args": {
+        "amount": "1"
+       },
+       "deposit": "1",
+       "gas": "bound"
+      },
+      "probe": true
+     },
+     {
+      "label": "storage_deposit@bound",
+      "call": {
+       "from": "alice.near",
+       "method": "storage_deposit",
+       "args": {
+        "account_id": "0lice.nearx"
+       },
+       "deposit": "1250000000000000000005",
+       "gas": "bound"
+      },
+      "probe": true
+     },
+     {
+      "label": "storage_deposit-registered@bound",
+      "call": {
+       "from": "alice.near",
+       "method": "storage_deposit",
+       "args": {
+        "account_id": "0ob.near"
+       },
+       "deposit": "7",
+       "gas": "bound"
+      },
+      "probe": true
+     },
+     {
+      "label": "storage_unregister@bound",
+      "call": {
+       "from": "a0ice.near",
+       "method": "storage_unregister",
+       "args": {},
+       "deposit": "1",
+       "gas": "bound"
+      },
+      "probe": true
+     },
+     {
+      "label": "storage_withdraw@bound",
+      "call": {
+       "from": "alice.near",
+       "method": "storage_withdraw",
+       "args": {
+        "amount": "0"
+       },
+       "deposit": "1",
+       "gas": "bound"
+      },
+      "probe": true
+     },
+     {
+      "label": "ft_balance_of@bound",
+      "call": {
+       "from": "alice.near",
+       "method": "ft_balance_of",
+       "args": {
+        "account_id": "bob.near"
+       },
+       "gas": "bound"
+      },
+      "probe": true
+     },
+     {
+      "label": "storage_balance_of@bound",
+      "call": {
+       "from": "alice.near",
+       "method": "storage_balance_of",
+       "args": {
+        "account_id": "al0ce.near"
+       },
+       "gas": "bound"
+      },
+      "probe": true
+     },
+     {
+      "label": "ft_total_supply@bound",
+      "call": {
+       "from": "alice.near",
+       "method": "ft_total_supply",
+       "gas": "bound"
+      },
+      "probe": true
+     },
+     {
+      "label": "ft_metadata@bound",
+      "call": {
+       "from": "alice.near",
+       "method": "ft_metadata",
+       "gas": "bound"
+      },
+      "probe": true
+     },
+     {
+      "label": "new@bound",
+      "call": {
+       "from": "wrap.near",
+       "method": "new",
+       "gas": "bound"
+      },
+      "probe": true
+     },
+     {
+      "label": "ft_resolve_transfer-failed@bound",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "bound",
+       "results": [
+        "failed"
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "ft_resolve_transfer-value@bound",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "bound",
+       "results": [
+        {
+         "ok": "\"3\""
+        }
+       ]
+      },
+      "probe": true
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "gas: every method at bound-1 on an adversarial trie (48 neighbours)",
+  "state": {
+   "accounts": {
+    "alice.near": "1000000000000000000000000",
+    "bob.near": "1000000000000000000000000",
+    "0lice.near": "0",
+    "0ob.near": "0",
+    "a0ice.near": "0",
+    "al0ce.near": "0",
+    "ali0e.near": "0",
+    "alic0.near": "0",
+    "alice.0ear": "0",
+    "alice.n0ar": "0",
+    "alice.ne0r": "0",
+    "alice.nea0": "0",
+    "alice.neaq": "0",
+    "alice.neaz": "0",
+    "alice.neqr": "0",
+    "alice.nezr": "0",
+    "alice.nqar": "0",
+    "alice.nzar": "0",
+    "alice.qear": "0",
+    "alice.zear": "0",
+    "alicq.near": "0",
+    "alicz.near": "0",
+    "aliqe.near": "0",
+    "alize.near": "0",
+    "alqce.near": "0",
+    "alzce.near": "0",
+    "aqice.near": "0",
+    "azice.near": "0",
+    "b0b.near": "0",
+    "bo0.near": "0",
+    "bob.0ear": "0",
+    "bob.n0ar": "0",
+    "bob.ne0r": "0",
+    "bob.nea0": "0",
+    "bob.neaq": "0",
+    "bob.neaz": "0",
+    "bob.neqr": "0",
+    "bob.nezr": "0",
+    "bob.nqar": "0",
+    "bob.nzar": "0",
+    "bob.qear": "0",
+    "bob.zear": "0",
+    "boq.near": "0",
+    "boz.near": "0",
+    "bqb.near": "0",
+    "bzb.near": "0",
+    "qlice.near": "0",
+    "qob.near": "0",
+    "zlice.near": "0",
+    "zob.near": "0"
+   }
+  },
+  "trie": [
+   {
+    "account": "0rap.near",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "qrap.near",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "zrap.near",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "w0ap.near",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wqap.near",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wzap.near",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wr0p.near",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrqp.near",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrzp.near",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wra0.near",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wraq.near",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wraz.near",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.0ear",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.qear",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.zear",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.n0ar",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.nqar",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.nzar",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.ne0r",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.neqr",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.nezr",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.nea0",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.neaq",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.neaz",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.near0",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.nea",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.near.a",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.neas",
+    "key": "a\n\u0000\u0000\u0000alice.near",
+    "value": "v"
+   }
+  ],
+  "blocks": [
+   {
+    "receipts": [
+     {
+      "label": "near_deposit@bound-1",
+      "call": {
+       "from": "alice.near",
+       "method": "near_deposit",
+       "deposit": "1000000000000000000000000",
+       "gas": "bound-1"
+      },
+      "probe": true
+     },
+     {
+      "label": "near_deposit-new@bound-1",
+      "call": {
+       "from": "carl.near",
+       "method": "near_deposit",
+       "deposit": "1000000000000000000000000",
+       "gas": "bound-1"
+      },
+      "probe": true
+     },
+     {
+      "label": "ft_transfer@bound-1",
+      "call": {
+       "from": "alice.near",
+       "method": "ft_transfer",
+       "args": {
+        "receiver_id": "bob.near",
+        "amount": "1",
+        "memo": "m"
+       },
+       "deposit": "1",
+       "gas": "bound-1"
+      },
+      "probe": true
+     },
+     {
+      "label": "ft_transfer_call@bound-1",
+      "call": {
+       "from": "alice.near",
+       "method": "ft_transfer_call",
+       "args": {
+        "receiver_id": "bob.near",
+        "amount": "1",
+        "msg": ""
+       },
+       "deposit": "1",
+       "gas": "bound-1"
+      },
+      "probe": true
+     },
+     {
+      "label": "near_withdraw@bound-1",
+      "call": {
+       "from": "alice.near",
+       "method": "near_withdraw",
+       "args": {
+        "amount": "1"
+       },
+       "deposit": "1",
+       "gas": "bound-1"
+      },
+      "probe": true
+     },
+     {
+      "label": "storage_deposit@bound-1",
+      "call": {
+       "from": "alice.near",
+       "method": "storage_deposit",
+       "args": {
+        "account_id": "0lice.nearx"
+       },
+       "deposit": "1250000000000000000005",
+       "gas": "bound-1"
+      },
+      "probe": true
+     },
+     {
+      "label": "storage_deposit-registered@bound-1",
+      "call": {
+       "from": "alice.near",
+       "method": "storage_deposit",
+       "args": {
+        "account_id": "0ob.near"
+       },
+       "deposit": "7",
+       "gas": "bound-1"
+      },
+      "probe": true
+     },
+     {
+      "label": "storage_unregister@bound-1",
+      "call": {
+       "from": "a0ice.near",
+       "method": "storage_unregister",
+       "args": {},
+       "deposit": "1",
+       "gas": "bound-1"
+      },
+      "probe": true
+     },
+     {
+      "label": "storage_withdraw@bound-1",
+      "call": {
+       "from": "alice.near",
+       "method": "storage_withdraw",
+       "args": {
+        "amount": "0"
+       },
+       "deposit": "1",
+       "gas": "bound-1"
+      },
+      "probe": true
+     },
+     {
+      "label": "ft_balance_of@bound-1",
+      "call": {
+       "from": "alice.near",
+       "method": "ft_balance_of",
+       "args": {
+        "account_id": "bob.near"
+       },
+       "gas": "bound-1"
+      },
+      "probe": true
+     },
+     {
+      "label": "storage_balance_of@bound-1",
+      "call": {
+       "from": "alice.near",
+       "method": "storage_balance_of",
+       "args": {
+        "account_id": "al0ce.near"
+       },
+       "gas": "bound-1"
+      },
+      "probe": true
+     },
+     {
+      "label": "ft_total_supply@bound-1",
+      "call": {
+       "from": "alice.near",
+       "method": "ft_total_supply",
+       "gas": "bound-1"
+      },
+      "probe": true
+     },
+     {
+      "label": "ft_metadata@bound-1",
+      "call": {
+       "from": "alice.near",
+       "method": "ft_metadata",
+       "gas": "bound-1"
+      },
+      "probe": true
+     },
+     {
+      "label": "new@bound-1",
+      "call": {
+       "from": "wrap.near",
+       "method": "new",
+       "gas": "bound-1"
+      },
+      "probe": true
+     },
+     {
+      "label": "ft_resolve_transfer-failed@bound-1",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "bound-1",
+       "results": [
+        "failed"
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "ft_resolve_transfer-value@bound-1",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "bound-1",
+       "results": [
+        {
+         "ok": "\"3\""
+        }
+       ]
+      },
+      "probe": true
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "gas: repeated transfers at the bound, warm and cold cache",
+  "state": {
+   "accounts": {
+    "alice.near": "1000000000000000000000000",
+    "bob.near": "1000000000000000000000000",
+    "0lice.near": "0",
+    "0ob.near": "0",
+    "a0ice.near": "0",
+    "al0ce.near": "0",
+    "ali0e.near": "0",
+    "alic0.near": "0",
+    "alice.0ear": "0",
+    "alice.n0ar": "0",
+    "alice.ne0r": "0",
+    "alice.nea0": "0",
+    "alice.neaq": "0",
+    "alice.neaz": "0",
+    "alice.neqr": "0",
+    "alice.nezr": "0",
+    "alice.nqar": "0",
+    "alice.nzar": "0",
+    "alice.qear": "0",
+    "alice.zear": "0",
+    "alicq.near": "0",
+    "alicz.near": "0",
+    "aliqe.near": "0",
+    "alize.near": "0",
+    "alqce.near": "0",
+    "alzce.near": "0",
+    "aqice.near": "0",
+    "azice.near": "0",
+    "b0b.near": "0",
+    "bo0.near": "0",
+    "bob.0ear": "0",
+    "bob.n0ar": "0",
+    "bob.ne0r": "0",
+    "bob.nea0": "0",
+    "bob.neaq": "0",
+    "bob.neaz": "0",
+    "bob.neqr": "0",
+    "bob.nezr": "0",
+    "bob.nqar": "0",
+    "bob.nzar": "0",
+    "bob.qear": "0",
+    "bob.zear": "0",
+    "boq.near": "0",
+    "boz.near": "0",
+    "bqb.near": "0",
+    "bzb.near": "0",
+    "qlice.near": "0",
+    "qob.near": "0",
+    "zlice.near": "0",
+    "zob.near": "0"
+   }
+  },
+  "trie": [
+   {
+    "account": "0rap.near",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "qrap.near",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "zrap.near",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "w0ap.near",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wqap.near",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wzap.near",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wr0p.near",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrqp.near",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrzp.near",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wra0.near",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wraq.near",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wraz.near",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.0ear",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.qear",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.zear",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.n0ar",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.nqar",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.nzar",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.ne0r",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.neqr",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.nezr",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.nea0",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.neaq",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.neaz",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.near0",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.nea",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.near.a",
+    "key": "STATE",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+   },
+   {
+    "account": "wrap.neas",
+    "key": "a\n\u0000\u0000\u0000alice.near",
+    "value": "v"
+   }
+  ],
+  "blocks": [
+   {
+    "receipts": [
+     {
+      "label": "warm-0",
+      "call": {
+       "from": "alice.near",
+       "method": "ft_transfer",
+       "args": {
+        "receiver_id": "bob.near",
+        "amount": "1"
+       },
+       "deposit": "1",
+       "gas": "bound"
+      },
+      "expect": "ok"
+     },
+     {
+      "label": "warm-1",
+      "call": {
+       "from": "alice.near",
+       "method": "ft_transfer",
+       "args": {
+        "receiver_id": "bob.near",
+        "amount": "1"
+       },
+       "deposit": "1",
+       "gas": "bound"
+      },
+      "expect": "ok"
+     },
+     {
+      "label": "warm-2",
+      "call": {
+       "from": "alice.near",
+       "method": "ft_transfer",
+       "args": {
+        "receiver_id": "bob.near",
+        "amount": "1"
+       },
+       "deposit": "1",
+       "gas": "bound"
+      },
+      "expect": "ok"
+     },
+     {
+      "label": "warm-3",
+      "call": {
+       "from": "alice.near",
+       "method": "ft_transfer",
+       "args": {
+        "receiver_id": "bob.near",
+        "amount": "1"
+       },
+       "deposit": "1",
+       "gas": "bound"
+      },
+      "expect": "ok"
+     },
+     {
+      "label": "warm-4",
+      "call": {
+       "from": "alice.near",
+       "method": "ft_transfer",
+       "args": {
+        "receiver_id": "bob.near",
+        "amount": "1"
+       },
+       "deposit": "1",
+       "gas": "bound"
+      },
+      "expect": "ok"
+     }
+    ]
+   },
+   {
+    "receipts": [
+     {
+      "label": "cold",
+      "call": {
+       "from": "alice.near",
+       "method": "ft_transfer",
+       "args": {
+        "receiver_id": "bob.near",
+        "amount": "1"
+       },
+       "deposit": "1",
+       "gas": "bound"
+      },
+      "expect": "ok"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "gas: long arguments at and around the bound",
+  "state": {
+   "accounts": {
+    "alice.near": "1000000000000000000000000",
+    "bob.near": "0"
+   }
+  },
+  "blocks": [
+   {
+    "receipts": [
+     {
+      "label": "tc-msg-1000@bound",
+      "call": {
+       "from": "alice.near",
+       "method": "ft_transfer_call",
+       "deposit": "1",
+       "gas": "bound",
+       "argsText": [
+        "{\"receiver_id\":\"bob.near\",\"amount\":\"1\",\"msg\":\"",
+        {
+         "repeat": "m",
+         "times": 1000
+        },
+        "\"}"
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "tc-msg-1000@300000000000000",
+      "call": {
+       "from": "alice.near",
+       "method": "ft_transfer_call",
+       "deposit": "1",
+       "gas": "300000000000000",
+       "argsText": [
+        "{\"receiver_id\":\"bob.near\",\"amount\":\"1\",\"msg\":\"",
+        {
+         "repeat": "m",
+         "times": 1000
+        },
+        "\"}"
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "tc-msg-1000@1000000000000000",
+      "call": {
+       "from": "alice.near",
+       "method": "ft_transfer_call",
+       "deposit": "1",
+       "gas": "1000000000000000",
+       "argsText": [
+        "{\"receiver_id\":\"bob.near\",\"amount\":\"1\",\"msg\":\"",
+        {
+         "repeat": "m",
+         "times": 1000
+        },
+        "\"}"
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "tc-msg-30000@bound",
+      "call": {
+       "from": "alice.near",
+       "method": "ft_transfer_call",
+       "deposit": "1",
+       "gas": "bound",
+       "argsText": [
+        "{\"receiver_id\":\"bob.near\",\"amount\":\"1\",\"msg\":\"",
+        {
+         "repeat": "m",
+         "times": 30000
+        },
+        "\"}"
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "tc-msg-30000@300000000000000",
+      "call": {
+       "from": "alice.near",
+       "method": "ft_transfer_call",
+       "deposit": "1",
+       "gas": "300000000000000",
+       "argsText": [
+        "{\"receiver_id\":\"bob.near\",\"amount\":\"1\",\"msg\":\"",
+        {
+         "repeat": "m",
+         "times": 30000
+        },
+        "\"}"
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "tc-msg-30000@1000000000000000",
+      "call": {
+       "from": "alice.near",
+       "method": "ft_transfer_call",
+       "deposit": "1",
+       "gas": "1000000000000000",
+       "argsText": [
+        "{\"receiver_id\":\"bob.near\",\"amount\":\"1\",\"msg\":\"",
+        {
+         "repeat": "m",
+         "times": 30000
+        },
+        "\"}"
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "tc-msg-60000@300000000000000",
+      "call": {
+       "from": "alice.near",
+       "method": "ft_transfer_call",
+       "deposit": "1",
+       "gas": "300000000000000",
+       "argsText": [
+        "{\"receiver_id\":\"bob.near\",\"amount\":\"1\",\"msg\":\"",
+        {
+         "repeat": "m",
+         "times": 60000
+        },
+        "\"}"
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "tc-msg-60000@1000000000000000",
+      "call": {
+       "from": "alice.near",
+       "method": "ft_transfer_call",
+       "deposit": "1",
+       "gas": "1000000000000000",
+       "argsText": [
+        "{\"receiver_id\":\"bob.near\",\"amount\":\"1\",\"msg\":\"",
+        {
+         "repeat": "m",
+         "times": 60000
+        },
+        "\"}"
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "transfer-ignored-string-10000@bound",
+      "call": {
+       "from": "alice.near",
+       "method": "ft_transfer",
+       "deposit": "1",
+       "gas": "bound",
+       "argsText": [
+        "{\"receiver_id\":\"bob.near\",\"amount\":\"1\",\"x\":\"",
+        {
+         "repeat": "p",
+         "times": 10000
+        },
+        "\"}"
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "transfer-ignored-array-10000@bound",
+      "call": {
+       "from": "alice.near",
+       "method": "ft_transfer",
+       "deposit": "1",
+       "gas": "bound",
+       "argsText": [
+        "{\"receiver_id\":\"bob.near\",\"amount\":\"1\",\"x\":[",
+        {
+         "repeat": "1,",
+         "times": 5000
+        },
+        "1]}"
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "transfer-ignored-escapes-10000@bound",
+      "call": {
+       "from": "alice.near",
+       "method": "ft_transfer",
+       "deposit": "1",
+       "gas": "bound",
+       "argsText": [
+        "{\"receiver_id\":\"bob.near\",\"amount\":\"1\",\"x\":\"",
+        {
+         "repeat": "\\u00e9",
+         "times": 1666
+        },
+        "\"}"
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "transfer-amount-zeros-10000@bound",
+      "call": {
+       "from": "alice.near",
+       "method": "ft_transfer",
+       "deposit": "1",
+       "gas": "bound",
+       "argsText": [
+        "{\"receiver_id\":\"bob.near\",\"amount\":\"",
+        {
+         "repeat": "0",
+         "times": 10000
+        },
+        "1\"}"
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "transfer-whitespace-10000@bound",
+      "call": {
+       "from": "alice.near",
+       "method": "ft_transfer",
+       "deposit": "1",
+       "gas": "bound",
+       "argsText": [
+        {
+         "repeat": " ",
+         "times": 10000
+        },
+        "{\"receiver_id\":\"bob.near\",\"amount\":\"1\"}"
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "deposit-unread-args-10000@bound",
+      "call": {
+       "from": "alice.near",
+       "method": "near_deposit",
+       "deposit": "1000000000000000000000000",
+       "gas": "bound",
+       "argsText": [
+        {
+         "repeat": "z",
+         "times": 10000
+        }
+       ]
+      },
+      "probe": true
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "gas: large promise results in ft_resolve_transfer",
+  "state": {
+   "accounts": {
+    "alice.near": "100",
+    "bob.near": "100"
+   }
+  },
+  "blocks": [
+   {
+    "receipts": [
+     {
+      "label": "resolve-digits-1000@bound",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "bound",
+       "results": [
+        {
+         "ok": [
+          "\"",
+          {
+           "repeat": "1",
+           "times": 1000
+          },
+          "\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-digits-1000@5000000000000",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "5000000000000",
+       "results": [
+        {
+         "ok": [
+          "\"",
+          {
+           "repeat": "1",
+           "times": 1000
+          },
+          "\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-garbage-1000@bound",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "bound",
+       "results": [
+        {
+         "ok": [
+          {
+           "repeat": "x",
+           "times": 1000
+          }
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-garbage-1000@5000000000000",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "5000000000000",
+       "results": [
+        {
+         "ok": [
+          {
+           "repeat": "x",
+           "times": 1000
+          }
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-zeros-1000@bound",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "bound",
+       "results": [
+        {
+         "ok": [
+          "\"",
+          {
+           "repeat": "0",
+           "times": 1000
+          },
+          "7\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-zeros-1000@5000000000000",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "5000000000000",
+       "results": [
+        {
+         "ok": [
+          "\"",
+          {
+           "repeat": "0",
+           "times": 1000
+          },
+          "7\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-plus-zeros-1000@bound",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "bound",
+       "results": [
+        {
+         "ok": [
+          "\"+",
+          {
+           "repeat": "0",
+           "times": 1000
+          },
+          "7\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-plus-zeros-1000@5000000000000",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "5000000000000",
+       "results": [
+        {
+         "ok": [
+          "\"+",
+          {
+           "repeat": "0",
+           "times": 1000
+          },
+          "7\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-escaped-zeros-1000@bound",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "bound",
+       "results": [
+        {
+         "ok": [
+          "\"",
+          {
+           "repeat": "\\u0030",
+           "times": 166
+          },
+          "7\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-escaped-zeros-1000@5000000000000",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "5000000000000",
+       "results": [
+        {
+         "ok": [
+          "\"",
+          {
+           "repeat": "\\u0030",
+           "times": 166
+          },
+          "7\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-whitespace-1000@bound",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "bound",
+       "results": [
+        {
+         "ok": [
+          {
+           "repeat": " ",
+           "times": 1000
+          },
+          "\"7\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-whitespace-1000@5000000000000",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "5000000000000",
+       "results": [
+        {
+         "ok": [
+          {
+           "repeat": " ",
+           "times": 1000
+          },
+          "\"7\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-digits-20000@bound",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "bound",
+       "results": [
+        {
+         "ok": [
+          "\"",
+          {
+           "repeat": "1",
+           "times": 20000
+          },
+          "\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-digits-20000@5000000000000",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "5000000000000",
+       "results": [
+        {
+         "ok": [
+          "\"",
+          {
+           "repeat": "1",
+           "times": 20000
+          },
+          "\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-garbage-20000@bound",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "bound",
+       "results": [
+        {
+         "ok": [
+          {
+           "repeat": "x",
+           "times": 20000
+          }
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-garbage-20000@5000000000000",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "5000000000000",
+       "results": [
+        {
+         "ok": [
+          {
+           "repeat": "x",
+           "times": 20000
+          }
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-zeros-20000@bound",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "bound",
+       "results": [
+        {
+         "ok": [
+          "\"",
+          {
+           "repeat": "0",
+           "times": 20000
+          },
+          "7\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-zeros-20000@5000000000000",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "5000000000000",
+       "results": [
+        {
+         "ok": [
+          "\"",
+          {
+           "repeat": "0",
+           "times": 20000
+          },
+          "7\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-plus-zeros-20000@bound",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "bound",
+       "results": [
+        {
+         "ok": [
+          "\"+",
+          {
+           "repeat": "0",
+           "times": 20000
+          },
+          "7\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-plus-zeros-20000@5000000000000",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "5000000000000",
+       "results": [
+        {
+         "ok": [
+          "\"+",
+          {
+           "repeat": "0",
+           "times": 20000
+          },
+          "7\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-escaped-zeros-20000@bound",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "bound",
+       "results": [
+        {
+         "ok": [
+          "\"",
+          {
+           "repeat": "\\u0030",
+           "times": 3333
+          },
+          "7\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-escaped-zeros-20000@5000000000000",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "5000000000000",
+       "results": [
+        {
+         "ok": [
+          "\"",
+          {
+           "repeat": "\\u0030",
+           "times": 3333
+          },
+          "7\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-whitespace-20000@bound",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "bound",
+       "results": [
+        {
+         "ok": [
+          {
+           "repeat": " ",
+           "times": 20000
+          },
+          "\"7\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-whitespace-20000@5000000000000",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "5000000000000",
+       "results": [
+        {
+         "ok": [
+          {
+           "repeat": " ",
+           "times": 20000
+          },
+          "\"7\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     }
+    ]
+   }
+  ]
+ }
+]

@@ -1,4 +1,5 @@
 import NearInterface.Boundary
+import NearInterface.Error
 
 /-!
 # Contract models
@@ -22,6 +23,12 @@ inductive ModelFailure (Panic : Type)
   | balanceExceeded
   /-- The receipt's storage-stake check fails on the post-state. -/
   | lackBalanceForState (deficit : Balance)
+  /-- A log exceeds the protocol's limits on the number or total length of
+  logs (`logLimitError`). -/
+  | logLimit (error : HostError)
+  /-- The runtime rejects a receipt the call created
+  (`ReceiptValidation.callReceiptsError`), with nearcore's message. -/
+  | receiptInvalid (message : String)
 
 /-- A successful call. -/
 structure Outcome (State Ret Promise : Type) where
@@ -42,6 +49,25 @@ def StepResult.logs {Panic State Ret Promise : Type} :
     StepResult Panic State Ret Promise → List String
   | .ok o => o.logs
   | .error f => f.logs
+
+/-- The host error the VM raises when a call emits `logs` in this order, and
+the logs kept before it: `log_utf8` first checks the number of logs
+(`check_can_add_a_log_message`), then that the total length in bytes stays
+within `max_total_log_length`. A model's logs are the binary's only while they
+fit these protocol limits. -/
+def logLimitError (cfg : RuntimeConfig) (logs : List String) : Option (HostError × List String) :=
+  go 0 [] logs
+where
+  go (total : Nat) (kept : List String) : List String → Option (HostError × List String)
+    | [] => none
+    | l :: ls =>
+      let limits := cfg.wasm.limits
+      if limits.maxNumberLogs ≤ kept.length then
+        some (.numberOfLogsExceeded limits.maxNumberLogs, kept.reverse)
+      else if limits.maxTotalLogLength < total + l.utf8ByteSize then
+        some (.totalLogLengthExceeded (min (total + l.utf8ByteSize) (2 ^ 64 - 1))
+          limits.maxTotalLogLength, kept.reverse)
+      else go (total + l.utf8ByteSize) (l :: kept) ls
 
 structure ContractModel where
   State : Type
@@ -85,6 +111,8 @@ def ModelFailure.toFailure : ModelFailure M.Panic → Failure
   | .panic p => M.panicFailure p
   | .balanceExceeded => .balanceExceeded
   | .lackBalanceForState deficit => .lackBalanceForState deficit
+  | .logLimit error => .other error.message
+  | .receiptInvalid message => .other message
 
 end ContractModel
 

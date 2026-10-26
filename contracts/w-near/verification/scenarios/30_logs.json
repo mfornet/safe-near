@@ -1,0 +1,24 @@
+[
+  {
+    "name": "logs: memo up to and beyond the total log length limit",
+    "description": "Logs total at most max_total_log_length = 16384 bytes. The transfer log is 38 bytes and 'Memo: ' 6, so a 16340-byte memo is exactly at the limit.",
+    "state": {"accounts": {"alice.near": "1000", "bob.near": "0"}},
+    "blocks": [{"receipts": [
+      {"probe": true, "label": "memo-16339", "call": {"method": "ft_transfer", "deposit": "1", "argsText": ["{\"receiver_id\":\"bob.near\",\"amount\":\"1\",\"memo\":\"", {"repeat": "m", "times": 16339}, "\"}"]}, "expect": "ok"},
+      {"probe": true, "label": "memo-16340", "call": {"method": "ft_transfer", "deposit": "1", "argsText": ["{\"receiver_id\":\"bob.near\",\"amount\":\"1\",\"memo\":\"", {"repeat": "m", "times": 16340}, "\"}"]}},
+      {"probe": true, "label": "memo-16341", "call": {"method": "ft_transfer", "deposit": "1", "argsText": ["{\"receiver_id\":\"bob.near\",\"amount\":\"1\",\"memo\":\"", {"repeat": "m", "times": 16341}, "\"}"]}},
+      {"probe": true, "label": "memo-40000", "call": {"method": "ft_transfer", "deposit": "1", "argsText": ["{\"receiver_id\":\"bob.near\",\"amount\":\"1\",\"memo\":\"", {"repeat": "m", "times": 40000}, "\"}"]}}
+    ]}]
+  },
+  {
+    "name": "logs: long memo on a transfer-call, and multibyte memos",
+    "state": {"accounts": {"alice.near": "1000", "bob.near": "0"}},
+    "blocks": [{"receipts": [
+      {"probe": true, "label": "tc-memo-20000", "call": {"method": "ft_transfer_call", "deposit": "1", "argsText": ["{\"receiver_id\":\"bob.near\",\"amount\":\"1\",\"msg\":\"\",\"memo\":\"", {"repeat": "m", "times": 20000}, "\"}"]}},
+      {"probe": true, "label": "tc-memo-too-little-gas", "call": {"method": "ft_transfer_call", "deposit": "1", "gas": "29000000000000", "argsText": ["{\"receiver_id\":\"bob.near\",\"amount\":\"1\",\"msg\":\"\",\"memo\":\"", {"repeat": "m", "times": 20000}, "\"}"]}},
+      {"probe": true, "label": "memo-multibyte-at-limit", "call": {"method": "ft_transfer", "deposit": "1", "argsText": ["{\"receiver_id\":\"bob.near\",\"amount\":\"1\",\"memo\":\"", {"repeat": "é", "times": 8170}, "\"}"]}},
+      {"probe": true, "label": "memo-multibyte-over", "call": {"method": "ft_transfer", "deposit": "1", "argsText": ["{\"receiver_id\":\"bob.near\",\"amount\":\"1\",\"memo\":\"", {"repeat": "é", "times": 8171}, "\"}"]}},
+      {"probe": true, "label": "memo-escaped-nul", "call": {"method": "ft_transfer", "deposit": "1", "argsText": "{\"receiver_id\":\"bob.near\",\"amount\":\"1\",\"memo\":\"a\\u0000b\"}"}, "expect": "ok"}
+    ]}]
+  }
+]

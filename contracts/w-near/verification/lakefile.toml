@@ -46,3 +46,12 @@ name = "Proofs"
 [[lean_exe]]
 name = "runtime-adapter-tests"
 root = "RuntimeTests.Main"
+
+# Differential scenarios (`Differential/`, `scenarios/`): timelines of receipts run
+# on the binary and on the model, checked against `Refines` at every step.
+[[lean_lib]]
+name = "Differential"
+
+[[lean_exe]]
+name = "wnear-scenarios"
+root = "Differential.Main"

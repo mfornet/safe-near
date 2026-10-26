@@ -60,7 +60,7 @@ open NearInterface in
 the transfer and the storage stake of the new state paid, `near_withdraw`
 succeeds at the boundary with the same state, promise, return and log. -/
 @[blueprint "spec:withdraw-available-boundary"
-  (statement := /-- Under the hypotheses of \cref{spec:withdraw-available} for the context's predecessor and deposit, if the account's balance plus the deposit covers the transfer of $a + 1$ yoctoNEAR and the storage stake of the resulting state is paid, then the call \texttt{near\_withdraw}$(a)$ succeeds at the function-call boundary with the resulting state, the transfer, receipt index 0 as return, and the withdrawal log. -/)]
+  (statement := /-- Under the hypotheses of \cref{spec:withdraw-available} for the context's predecessor and deposit, if the account's balance plus the deposit covers the transfer of $a + 1$ yoctoNEAR, the storage stake of the resulting state is paid, the withdrawal log fits the protocol's log limits and the runtime accepts the payout receipt, then the call \texttt{near\_withdraw}$(a)$ succeeds at the function-call boundary with the resulting state, the transfer, receipt index 0 as return, and the withdrawal log. -/)]
 def WithdrawAvailableAtBoundary : Prop :=
   ∀ (cfg : Config) (s : State) (ctx : Context) (amount : Nat),
     let a := AccountId.ofNear ctx.predecessor
@@ -68,6 +68,9 @@ def WithdrawAvailableAtBoundary : Prop :=
     Inv cfg s → a ∈ s.registered → amount ≤ s.balance a → ctx.attached = 1 →
     amount + 1 < u128Bound → amount ≤ ctx.balance →
     stakeDeficit ctx.protocol (usageAfter ctx (some s) s') (ctx.balance - amount) ctx.locked = 0 →
+    logLimitError ctx.protocol [s!"Withdraw {amount} NEAR from {a}"] = none →
+    ReceiptValidation.callReceiptsError ctx.protocol ctx.current ctx.signer ctx.signerPk
+      (encodeReceipts [.transfer a (amount + 1)]) = none →
     contractStep ctx (some s) (.nearWithdraw amount) =
       .ok { state := s', promises := [.transfer a (amount + 1)], ret := .promise 0,
             logs := [s!"Withdraw {amount} NEAR from {a}"] }
@@ -77,7 +80,7 @@ open NearInterface in
 model, and at the boundary it succeeds exactly when the account pays the
 storage stake of the new state. -/
 @[blueprint "spec:deposit-available-boundary"
-  (statement := /-- Under the hypotheses of \cref{spec:deposit-available} for the context's predecessor and deposit, \texttt{near\_deposit} succeeds in the model with the properties stated there, and at the function-call boundary it has the same outcome unless the account cannot pay the storage stake of the new state, in which case it fails with that deficit. -/)]
+  (statement := /-- Under the hypotheses of \cref{spec:deposit-available} for the context's predecessor and deposit, \texttt{near\_deposit} succeeds in the model with the properties stated there, and at the function-call boundary, when its log fits the protocol's log limits, it has the same outcome unless the account cannot pay the storage stake of the new state, in which case it fails with that deficit. -/)]
 def DepositAvailableAtBoundary : Prop :=
   ∀ (cfg : Config) (s : State) (ctx : Context),
     let env := Env.ofContext ctx
@@ -91,6 +94,7 @@ def DepositAvailableAtBoundary : Prop :=
       o.promises = [] ∧
       let deficit := stakeDeficit ctx.protocol (usageAfter ctx (some s) o.state)
         (ctx.balance + ctx.attached) ctx.locked
+      logLimitError ctx.protocol o.logs = none →
       contractStep ctx (some s) .nearDeposit =
         if 0 < deficit then .error { failure := .lackBalanceForState deficit, logs := o.logs }
         else .ok { state := o.state, ret := o.ret, logs := o.logs, promises := [] }

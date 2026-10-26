@@ -1,0 +1,69 @@
+[
+  {
+    "name": "arguments: serde_json's recursion limit inside an ignored field",
+    "description": "serde_json 1.0.60 stops at 128 nested levels, ignored values included. The top-level object is one level.",
+    "state": {"accounts": {"alice.near": "1000", "bob.near": "0"}},
+    "blocks": [{"receipts": [
+      {"probe": true, "label": "depth-126", "call": {"method": "ft_transfer", "deposit": "1", "argsText": ["{\"receiver_id\":\"bob.near\",\"amount\":\"1\",\"x\":", {"repeat": "[", "times": 126}, {"repeat": "]", "times": 126}, "}"]}, "expect": "ok"},
+      {"probe": true, "label": "depth-127", "call": {"method": "ft_transfer", "deposit": "1", "argsText": ["{\"receiver_id\":\"bob.near\",\"amount\":\"1\",\"x\":", {"repeat": "[", "times": 127}, {"repeat": "]", "times": 127}, "}"]}},
+      {"probe": true, "label": "depth-128", "call": {"method": "ft_transfer", "deposit": "1", "argsText": ["{\"receiver_id\":\"bob.near\",\"amount\":\"1\",\"x\":", {"repeat": "[", "times": 128}, {"repeat": "]", "times": 128}, "}"]}},
+      {"probe": true, "label": "depth-200", "call": {"method": "ft_transfer", "deposit": "1", "argsText": ["{\"receiver_id\":\"bob.near\",\"amount\":\"1\",\"x\":", {"repeat": "{\"a\":", "times": 200}, "1", {"repeat": "}", "times": 200}, "}"]}}
+    ]}]
+  },
+  {
+    "name": "arguments: ignored strings are not validated like parsed ones",
+    "description": "serde_json skips an unknown field's string without decoding it: escapes and UTF-8 are not checked the way a parsed string is.",
+    "state": {"accounts": {"alice.near": "1000", "bob.near": "0"}},
+    "blocks": [{"receipts": [
+      {"probe": true, "label": "lone-surrogate-ignored", "call": {"method": "ft_transfer", "deposit": "1", "argsText": "{\"receiver_id\":\"bob.near\",\"amount\":\"1\",\"x\":\"\\ud800\"}"}},
+      {"probe": true, "label": "trailing-surrogate-ignored", "call": {"method": "ft_transfer", "deposit": "1", "argsText": "{\"receiver_id\":\"bob.near\",\"amount\":\"1\",\"x\":\"\\udc00x\"}"}},
+      {"probe": true, "label": "invalid-utf8-ignored", "call": {"method": "ft_transfer", "deposit": "1", "argsHex": "7b2272656365697665725f6964223a22626f622e6e656172222c22616d6f756e74223a2231222c2278223a22ff227d"}},
+      {"probe": true, "label": "invalid-utf8-memo", "call": {"method": "ft_transfer", "deposit": "1", "argsHex": "7b2272656365697665725f6964223a22626f622e6e656172222c22616d6f756e74223a2231222c226d656d6f223a22ff227d"}, "expect": "fail"},
+      {"probe": true, "label": "lone-surrogate-memo", "call": {"method": "ft_transfer", "deposit": "1", "argsText": "{\"receiver_id\":\"bob.near\",\"amount\":\"1\",\"memo\":\"\\ud800\"}"}, "expect": "fail"},
+      {"probe": true, "label": "invalid-utf8-key", "call": {"method": "ft_transfer", "deposit": "1", "argsHex": "7b2272656365697665725f6964223a22626f622e6e656172222c22616d6f756e74223a2231222c22ff223a317d"}},
+      {"probe": true, "label": "surrogate-key", "call": {"method": "ft_transfer", "deposit": "1", "argsText": "{\"receiver_id\":\"bob.near\",\"amount\":\"1\",\"\\ud800\":1}"}},
+      {"probe": true, "label": "bad-escape-ignored", "call": {"method": "ft_transfer", "deposit": "1", "argsText": "{\"receiver_id\":\"bob.near\",\"amount\":\"1\",\"x\":\"\\q\"}"}},
+      {"probe": true, "label": "control-char-ignored", "call": {"method": "ft_transfer", "deposit": "1", "argsHex": "7b2272656365697665725f6964223a22626f622e6e656172222c22616d6f756e74223a2231222c2278223a2201227d"}}
+    ]}]
+  },
+  {
+    "name": "arguments: numbers in ignored and typed positions",
+    "state": {"accounts": {"alice.near": "1000", "bob.near": "0"}},
+    "blocks": [{"receipts": [
+      {"probe": true, "label": "huge-exponent", "call": {"method": "ft_transfer", "deposit": "1", "argsText": "{\"receiver_id\":\"bob.near\",\"amount\":\"1\",\"x\":1e400}"}},
+      {"probe": true, "label": "huge-integer", "call": {"method": "ft_transfer", "deposit": "1", "argsText": ["{\"receiver_id\":\"bob.near\",\"amount\":\"1\",\"x\":", {"repeat": "9", "times": 400}, "}"]}},
+      {"probe": true, "label": "negative-zero", "call": {"method": "ft_transfer", "deposit": "1", "argsText": "{\"receiver_id\":\"bob.near\",\"amount\":\"1\",\"x\":-0.0e-0}"}},
+      {"probe": true, "label": "leading-zero-ignored", "call": {"method": "ft_transfer", "deposit": "1", "argsText": "{\"receiver_id\":\"bob.near\",\"amount\":\"1\",\"x\":012}"}, "expect": "fail"},
+      {"probe": true, "label": "amount-number", "call": {"method": "ft_transfer", "deposit": "1", "argsText": "{\"receiver_id\":\"bob.near\",\"amount\":1}"}, "expect": "fail"},
+      {"probe": true, "label": "amount-plus", "call": {"method": "ft_transfer", "deposit": "1", "args": {"receiver_id": "bob.near", "amount": "+1"}}, "expect": "ok"},
+      {"probe": true, "label": "amount-many-zeros", "call": {"method": "ft_transfer", "deposit": "1", "argsText": ["{\"receiver_id\":\"bob.near\",\"amount\":\"", {"repeat": "0", "times": 300}, "1\"}"]}},
+      {"probe": true, "label": "amount-u128-max", "call": {"method": "ft_transfer", "deposit": "1", "args": {"receiver_id": "bob.near", "amount": "340282366920938463463374607431768211455"}}, "expect": "panic"},
+      {"probe": true, "label": "amount-escaped-digits", "call": {"method": "ft_transfer", "deposit": "1", "argsText": "{\"receiver_id\":\"bob.near\",\"amount\":\"\\u0031\\u0030\"}"}, "expect": "ok"}
+    ]}]
+  },
+  {
+    "name": "arguments: account ids, options and shapes",
+    "state": {"accounts": {"alice.near": "1000", "bob.near": "0"}},
+    "blocks": [{"receipts": [
+      {"probe": true, "label": "receiver-uppercase", "call": {"method": "ft_transfer", "deposit": "1", "args": {"receiver_id": "Bob.near", "amount": "1"}}, "expect": "fail"},
+      {"probe": true, "label": "receiver-65-chars", "call": {"method": "ft_transfer", "deposit": "1", "args": {"receiver_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "amount": "1"}}, "expect": "fail"},
+      {"probe": true, "label": "receiver-64-chars-unregistered", "call": {"method": "ft_transfer", "deposit": "1", "args": {"receiver_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "amount": "1"}}, "expect": "panic:is not registered"},
+      {"probe": true, "label": "receiver-escaped", "call": {"method": "ft_transfer", "deposit": "1", "argsText": "{\"receiver_id\":\"bob\\u002enear\",\"amount\":\"1\"}"}, "expect": "ok"},
+      {"probe": true, "label": "receiver-escaped-solidus", "call": {"method": "ft_transfer", "deposit": "1", "argsText": "{\"receiver_id\":\"bob\\/near\",\"amount\":\"1\"}"}, "expect": "fail"},
+      {"probe": true, "label": "memo-wrong-type", "call": {"method": "ft_transfer", "deposit": "1", "argsText": "{\"receiver_id\":\"bob.near\",\"amount\":\"1\",\"memo\":5}"}, "expect": "fail"},
+      {"probe": true, "label": "memo-null", "call": {"method": "ft_transfer", "deposit": "1", "argsText": "{\"receiver_id\":\"bob.near\",\"amount\":\"1\",\"memo\":null}"}, "expect": "ok"},
+      {"probe": true, "label": "array-form-extra", "call": {"method": "ft_transfer", "deposit": "1", "argsText": "[\"bob.near\",\"1\",null,null]"}, "expect": "fail"},
+      {"probe": true, "label": "duplicate-ignored", "call": {"method": "ft_transfer", "deposit": "1", "argsText": "{\"x\":1,\"receiver_id\":\"bob.near\",\"x\":2,\"amount\":\"1\"}"}, "expect": "ok"},
+      {"probe": true, "label": "duplicate-memo", "call": {"method": "ft_transfer", "deposit": "1", "argsText": "{\"receiver_id\":\"bob.near\",\"amount\":\"1\",\"memo\":null,\"memo\":\"a\"}"}, "expect": "fail"},
+      {"probe": true, "label": "registration-only-string", "call": {"method": "storage_deposit", "deposit": "1250000000000000000000", "argsText": "{\"account_id\":\"carol.near\",\"registration_only\":\"true\"}"}, "expect": "fail"},
+      {"probe": true, "label": "storage-deposit-array", "call": {"method": "storage_deposit", "deposit": "1250000000000000000000", "argsText": "[\"carol.near\",true]"}, "expect": "ok"},
+      {"probe": true, "label": "unregister-force-null", "call": {"from": "carol.near", "method": "storage_unregister", "deposit": "1", "argsText": "{\"force\":null}"}, "expect": "ok"},
+      {"probe": true, "label": "withdraw-amount-null", "call": {"from": "bob.near", "method": "storage_withdraw", "deposit": "1", "argsText": "{\"amount\":null}"}, "expect": "ok"},
+      {"probe": true, "label": "whitespace-everywhere", "call": {"method": "ft_transfer", "deposit": "1", "argsText": " \t\n\r{ \"receiver_id\" : \"bob.near\" , \"amount\" : \"1\" } \n"}, "expect": "ok"},
+      {"probe": true, "label": "form-feed", "call": {"method": "ft_transfer", "deposit": "1", "argsText": "\f{\"receiver_id\":\"bob.near\",\"amount\":\"1\"}"}, "expect": "fail"},
+      {"probe": true, "label": "bom", "call": {"method": "ft_transfer", "deposit": "1", "argsHex": "efbbbf7b2272656365697665725f6964223a22626f622e6e656172222c22616d6f756e74223a2231227d"}, "expect": "fail"},
+      {"probe": true, "label": "empty-object-no-arg-method", "call": {"method": "ft_total_supply", "argsHex": "ff00"}, "expect": "ok"},
+      {"probe": true, "label": "views-ignore-args", "call": {"method": "storage_balance_bounds", "argsText": ["[", {"repeat": "[", "times": 500}]}, "expect": "ok"}
+    ]}]
+  }
+]
