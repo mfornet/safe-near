@@ -57,8 +57,8 @@ jobs:
           build-args: NearChain chain-tests chain-replay registered-replay --wfail
           use-mathlib-cache: true
 
-      # The near-sdk layout library the contract projects share (no dependencies).
-      # After lean-action, which installs elan and with it `lake`.
+      # The near-sdk layout library the contract projects share. After lean-action, which
+      # installs Lean.
       - name: Build the sdk package
         working-directory: near-lean/sdk
         run: lake build NearSdk --wfail
