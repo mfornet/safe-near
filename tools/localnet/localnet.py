@@ -42,6 +42,14 @@ TOPOLOGIES = {
     # accounts test1, test2, test3), two validators of equal stake, node1 is the Lean node.
     "validator-sharded": {"validators": 2, "shards": 4, "chainId": "test-chain-safe-near-validator-4s",
                           "basePort": 18400, "neard": [0], "noKickout": True},
+    # the same, and the Lean node tracks only what a validator must: ``tracked_shards_config`` of its home is NoShards, the
+    # default of nearcore (``neard localnet`` writes AllShards), so it applies the shards it is a chunk producer of, replays
+    # the witnesses of the others and state-syncs the shards it will produce next epoch.  The genesis shuffles the shard
+    # assignment of the chunk producers every epoch (``shuffle_shard_assignment_for_chunk_producers``), so the two
+    # validators swap shards and the Lean node has something to sync at the epoch changes.
+    "validator-sharded-tracking": {"validators": 2, "shards": 4, "chainId": "test-chain-safe-near-validator-4s-tracking",
+                                   "basePort": 18500, "neard": [0], "noKickout": True, "shuffleShards": True,
+                                   "leanTracked": "NoShards"},
 }
 GENESIS_TIME = "2026-01-01T00:00:00.000000000Z"
 EPOCH_LENGTH = 30
@@ -82,6 +90,8 @@ def init(topology: str) -> Path:
         config["network"]["boot_nodes"] = "" if index == 0 else f"{boot_key}@127.0.0.1:{network_port(topology, 0)}"
         # Keep the whole history: the exporter reads it after the run.
         config["gc_num_epochs_to_keep"] = 10_000   # GCConfig is flattened into config.json
+        if index == 1 and spec.get("leanTracked"):
+            config["tracked_shards_config"] = spec["leanTracked"]
         (node / "config.json").write_text(json.dumps(config, indent=2, sort_keys=True) + "\n")
         genesis = json.loads((node / "genesis.json").read_text())
         genesis["chain_id"] = spec["chainId"]
@@ -101,6 +111,8 @@ def init(topology: str) -> Path:
             # validator that missed 12 % of its blocks); the other genesis parameters it reads are the defaults of
             # that test config, except the inflation rate, which the generated genesis sets to 1/20.
             genesis["max_inflation_rate"] = [1, 40]
+        if spec.get("shuffleShards"):
+            genesis["shuffle_shard_assignment_for_chunk_producers"] = True
         (node / "genesis.json").write_text(json.dumps(genesis, indent=2) + "\n")
     return root
 

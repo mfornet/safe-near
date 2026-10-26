@@ -112,9 +112,13 @@ def parseGenesis (j : Json) : Except String Genesis := do
       config :=
         { epochLength := ← nat j "epochLength",
           numBlockProducerSeats := ← nat j "numBlockProducerSeats", shardLayout := layout,
+          shuffleShardAssignmentForChunkProducers :=
+            (j.getObjValAs? Bool "shuffleShardAssignmentForChunkProducers").toOption.getD false,
           -- the kickout thresholds are genesis parameters (the corpus files predate them: the defaults)
-          blockProducerKickoutThreshold := (j.getObjValAs? Nat "blockProducerKickoutThreshold").toOption.getD 90,
-          chunkProducerKickoutThreshold := (j.getObjValAs? Nat "chunkProducerKickoutThreshold").toOption.getD 90,
+          blockProducerKickoutThreshold :=
+            (j.getObjValAs? Nat "blockProducerKickoutThreshold").toOption.getD 90,
+          chunkProducerKickoutThreshold :=
+            (j.getObjValAs? Nat "chunkProducerKickoutThreshold").toOption.getD 90,
           chunkValidatorOnlyKickoutThreshold :=
             (j.getObjValAs? Nat "chunkValidatorOnlyKickoutThreshold").toOption.getD 80 },
       reward :=
@@ -173,25 +177,39 @@ def Boot.load (metaFile genesisFile blocksFile configs : System.FilePath) : IO B
   let config ← orThrow (parseConfig metaJson)
   let genesisJson ← orThrow (Json.parse (← IO.FS.readFile genesisFile))
   let genesis ← orThrow (parseGenesis genesisJson)
-  let first ← do
+  let first ←
+    do
       let h ← IO.FS.Handle.mk blocksFile .read
       pure (← h.getLine)
   let genesisLine ← orThrow (Json.parse first)
-  let genesisBlock ← orThrow (do decode Block "genesis" (← bytes genesisLine "block"))
+  let genesisBlock ←
+    orThrow
+        (do
+          decode Block "genesis" (← bytes genesisLine "block"))
   let some gv := genesisBlock.header.view? | throw (IO.userError "genesis header version")
   let genesisDerived ← orThrow (field genesisLine "derived")
   let .v4 info ←
-    orThrow (do decode BlockInfo "genesis BlockInfo" (← bytes genesisDerived "blockInfo"))
-    | throw (IO.userError "genesis BlockInfo is not V4")
+    orThrow
+        (do
+          decode BlockInfo "genesis BlockInfo"
+              (←
+                bytes genesisDerived
+                    "blockInfo")) | throw (IO.userError "genesis BlockInfo is not V4")
   let genesisTree ←
-    orThrow (do decode PartialMerkleTree "tree" (← bytes genesisDerived "blockMerkleTree"))
+    orThrow
+        (do
+          decode PartialMerkleTree "tree" (← bytes genesisDerived "blockMerkleTree"))
   let genesisHash := genesisBlock.header.hash
   let rec0 : BlockRec :=
     { hash := genesisHash, header := genesisBlock.header, view := gv, chunks := genesisBlock.chunks,
       info, tree := genesisTree }
   let .v4 zeroInfo ←
-    orThrow (do decode BlockInfo "pre-genesis BlockInfo" (← bytes metaJson "zeroHashBlockInfo"))
-    | throw (IO.userError "pre-genesis BlockInfo is not V4")
+    orThrow
+        (do
+          decode BlockInfo "pre-genesis BlockInfo"
+              (←
+                bytes metaJson
+                    "zeroHashBlockInfo")) | throw (IO.userError "pre-genesis BlockInfo is not V4")
   let zeroRec : BlockRec :=
     { hash := CryptoHash.zero, header := default, view := default, chunks := #[], info := zeroInfo,
       tree := default }
@@ -200,8 +218,10 @@ def Boot.load (metaFile genesisFile blocksFile configs : System.FilePath) : IO B
       genesisHash.bytes rec0
   let genesisEpoch ←
     match genesisEpochInfo genesis.setup genesis.validators with
-    | .ok e => pure e
-    | .error e => throw (IO.userError s!"genesis epoch: {e.kind} {e.detail}")
+    | .ok e =>
+      pure e
+    | .error e =>
+      throw (IO.userError s!"genesis epoch: {e.kind} {e.detail}")
   let epochs : Std.HashMap ByteArray EpochData :=
     ((({} : Std.HashMap ByteArray EpochData).insert CryptoHash.zero.bytes genesisEpoch).insert
       genesisHash.bytes genesisEpoch)
@@ -215,8 +235,11 @@ def Boot.load (metaFile genesisFile blocksFile configs : System.FilePath) : IO B
     match roots[c.shardId]? with
     | some root =>
       if root != c.prevStateRoot then
-        throw (IO.userError s!"genesis state root of shard {c.shardId} differs from the genesis chunk header")
-    | none => throw (IO.userError "genesis shard")
+        throw
+            (IO.userError
+              s!"genesis state root of shard {c.shardId} differs from the genesis chunk header")
+    | none =>
+      throw (IO.userError "genesis shard")
   let protocol := genesis.setup.reward.genesisProtocolVersion.toNat
   let runtimeConfig ← ChainReplay.HostCrypto.loadConfig configs protocol
   let congestion ← Near.Congestion.Config.load configs protocol
@@ -244,7 +267,7 @@ def Boot.load (metaFile genesisFile blocksFile configs : System.FilePath) : IO B
       #[(CryptoHash.zero.bytes, genesisEpoch), (genesisHash.bytes, genesisEpoch)] genesisTrieOps
       genesisExtras
   pure
-      { metaJson, config, genesis, genesisBlock, genesisRec := rec0, zeroRec, genesisEpoch, state := st,
-        progress, ops, params, genesisLine, genesisHash }
+      { metaJson, config, genesis, genesisBlock, genesisRec := rec0, zeroRec, genesisEpoch,
+        state := st, progress, ops, params, genesisLine, genesisHash }
 
 end Near.Node.Bootstrap

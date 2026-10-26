@@ -287,11 +287,11 @@ def contextOf (conv : Conv) (delayed : Option Near.QueueEncoding.Delayed) :
 
 /-- Convert a chunk's inputs. `pending` are the incoming receipts in apply order. -/
 def prepare (entries : Array (ByteArray × ByteArray)) (txs : Array SignedTransaction)
-    (pending : Array Receipt) (claimed : Array ByteArray) (ctx : ChunkContext) (cache : CodeCache) :
-    Except String (Prepared × CodeCache) := do
+    (pending : Array Receipt) (claimed : Array ByteArray) (ctx : ChunkContext) (cache : CodeCache)
+    (proved : Bool := false) : Except String (Prepared × CodeCache) := do
   let (result, conv) ←
     (do
-            let d ← decodeState entries
+            let d ← decodeState entries proved
             let mut transactions : List Near.Transaction := []
             let mut hashes : List (List UInt8) := []
             for t in txs do

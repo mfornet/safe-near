@@ -53,6 +53,29 @@ structure OutcomeRec where
   outcome : ExecutionOutcomeWithId
   deriving Inhabited
 
+/-- The state sync of the shards the node tracks next epoch and not now (`StateSyncInfo`, `StateSync` of
+`chain/client/src/sync/state`): started with the first block of an epoch, ended when the shards have caught up with the
+chain. While it lasts the blocks are applied in the `NotCaughtUp` mode. -/
+structure SyncJob where
+  /-- The epoch whose blocks are applied without the shards being synced. -/
+  epoch : EpochId
+  firstBlock : CryptoHash
+  shards : Array UInt64
+  startedMs : Nat
+  /-- The block whose state is synced; known once the chain has two new chunks of every shard in the epoch and the
+  block is final. -/
+  syncHash : Option CryptoHash := none
+  headers : Std.HashMap UInt64 ShardStart := {}
+  headerSent : Std.HashMap UInt64 Nat := {}
+  /-- The parts that passed validation, by shard and index: the references they add. -/
+  parts : Std.HashMap (UInt64 × UInt64) (Array (CryptoHash × ByteArray × UInt32)) := {}
+  partSent : Std.HashMap (UInt64 × UInt64) Nat := {}
+  partBytes : Nat := 0
+  refused : Nat := 0
+  /-- When the state of every shard was complete, and the chunks since were being applied to it. -/
+  syncedAt : Option Nat := none
+  deriving Inhabited
+
 /-- Everything the validator keeps. -/
 structure VState where
   st : CS
@@ -100,6 +123,15 @@ structure VState where
   /-- The height up to which garbage collection has run: the data of the blocks below it is gone, and the state
   of the block at this height is the oldest that is still complete (`ChainStore::tail`). -/
   tail : BlockHeight := 0
+  /-- Witnesses that wait for contract code, with the label of the code they lack (`PartialWitnessTracker`). -/
+  waitingCode : Array (ChunkStateWitness × String) := #[]
+  /-- The code hashes already asked for. -/
+  codeRequested : Std.HashSet ByteArray := {}
+  /-- The state sync in progress, if the node will track shards next epoch that it does not track now. -/
+  syncJob : Option SyncJob := none
+  /-- The hashes of the contract code fetched to replay witnesses (kept in the code cache though no state of the node
+  holds them). -/
+  keepCodes : Std.HashSet ByteArray := {}
   /-- Counters for the report. -/
   stats : Std.HashMap String Nat := {}
 

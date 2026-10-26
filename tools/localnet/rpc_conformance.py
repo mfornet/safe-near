@@ -788,7 +788,7 @@ def serve(options) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("mode", choices=["serve", "run", "check"], nargs="?", default="run")
-    parser.add_argument("--topology", default="validator", choices=["validator", "validator-sharded"])
+    parser.add_argument("--topology", default="validator", choices=sorted(t for t, spec in localnet.TOPOLOGIES.items() if spec.get("neard")))
     parser.add_argument("--binary", type=Path, default=va.BINARY)
     parser.add_argument("--work", type=Path, default=localnet.DATA / "rpc-run")
     parser.add_argument("--no-workload", action="store_true")

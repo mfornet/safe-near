@@ -1,4 +1,5 @@
 import NearNode.Chain.StateChanges
+import NearNode.Chain.ShardTracker
 import NearNode.Chain.ApplyChunk
 import NearNode.Validator.Doomslug
 import NearNode.Validator.Messages
@@ -94,11 +95,11 @@ private def codePruning (f : IO.Ref Nat) : IO Unit := do
 causes and values as the trie stores them, the keys in the order of the raw keys, and the record read back as it was written. -/
 private def stateChangesRecord (f : IO.Ref Nat) : IO Unit := do
   let change (cause : Near.ChangeCause) (key : Near.ChangeKey) (value : Option Near.ChangeValue) :
-      Near.StateChange :=
-    { cause, key, value }
+    Near.StateChange := { cause, key, value }
   let log : List Near.StateChange :=
     [change (.receiptProcessing 7) (.data "ft" [1]) (some (.data [9])),
-      change (.transaction 0) (.account "aa") (some (.account { amount := 5, storageUsage := 100 })),
+      change (.transaction 0) (.account "aa")
+        (some (.account { amount := 5, storageUsage := 100 })),
       change (.gasReward 7) (.account "aa") (some (.account { amount := 6, storageUsage := 100 })),
       change (.receiptProcessing 8) (.data "ft" [1]) none,
       change .validatorAccountsUpdate (.accessKey "aa" (0 :: List.replicate 32 7)) none]
@@ -109,9 +110,11 @@ private def stateChangesRecord (f : IO.Ref Nat) : IO Unit := do
     check f s!"the log to records: {e}" false
   | .ok records =>
     check f "one record per key, in the order of the raw keys"
-        (records.size == 3 && records.map (·.trieKey) ==
-          #[.account ⟨"aa"⟩, .accessKey ⟨"aa"⟩ (.ed25519 ⟨(List.replicate 32 7).toArray.map UInt8.ofNat⟩),
-            .contractData ⟨"ft"⟩ ⟨#[1]⟩])
+        (records.size == 3 &&
+          records.map (·.trieKey) ==
+            #[.account ⟨"aa"⟩,
+              .accessKey ⟨"aa"⟩ (.ed25519 ⟨(List.replicate 32 7).toArray.map UInt8.ofNat⟩),
+              .contractData ⟨"ft"⟩ ⟨#[1]⟩])
     check f "a key's changes keep the order of the commits, with their causes"
         (records.map (·.changes.map (·.cause)) ==
           #[#[.transactionProcessing (hashOf 1), .actionReceiptGasReward (hashOf 17)],
@@ -120,7 +123,8 @@ private def stateChangesRecord (f : IO.Ref Nat) : IO Unit := do
     check f "a removal has no data and a write the bytes of its value"
         (records[2]!.changes.map (·.data) == #[some ⟨#[9]⟩, none])
     check f "the record reads back as written"
-        (Near.Node.Chain.stateChangesOfBytes? (Near.Node.Chain.stateChangesBytes records) == some records)
+        (Near.Node.Chain.stateChangesOfBytes? (Near.Node.Chain.stateChangesBytes records) ==
+          some records)
     -- the entries of the kinds that differ and are in no record
     let acct (a : String) : ByteArray := Near.Node.TrieKey.toVec (.account ⟨a⟩)
     check f "an entry that differs and is in no record is reported, one that is in a record is not"
@@ -476,8 +480,82 @@ private def poolTests (f : IO.Ref Nat) : IO Unit := do
   check f "the next chunk starts after the last group used"
       (first.txs.size == 1 && second.txs.size == 1 && first.txs[0]! != second.txs[0]!)
 
+private instance : BEq (Except String TrackedShardsConfig) where
+  beq a b := a.toOption == b.toOption
+
+/-- `tracked_shards_config` of `config.json` and the decisions of `ShardTracker` that do not read the chain. -/
+private def trackingTests (f : IO.Ref Nat) : IO Unit := do
+  let parse (text : String) : Except String TrackedShardsConfig :=
+    match Lean.Json.parse text with
+    | .ok j => TrackedShardsConfig.ofConfig j
+    | .error e => .error e
+  check f "no member: NoShards (nearcore's default of a validator)" (parse "{}" == .ok .noShards)
+  check f "AllShards" (parse "{\"tracked_shards_config\": \"AllShards\"}" == .ok .allShards)
+  check f "NoShards" (parse "{\"tracked_shards_config\": \"NoShards\"}" == .ok .noShards)
+  check f "Shards, uid strings"
+      (parse "{\"tracked_shards_config\": {\"Shards\": [\"s0.v3\", \"s5.v2\"]}}" ==
+        .ok (.shards #[(3, 0), (2, 5)]))
+  check f "Shards, uid maps"
+      (parse "{\"tracked_shards_config\": {\"Shards\": [{\"version\": 1, \"shard_id\": 2}]}}" ==
+        .ok (.shards #[(1, 2)]))
+  check f "Accounts"
+      (parse "{\"tracked_shards_config\": {\"Accounts\": [\"a.near\", \"b.near\"]}}" ==
+        .ok (.accounts #[⟨"a.near"⟩, ⟨"b.near"⟩]))
+  check f "Schedule"
+      (parse "{\"tracked_shards_config\": {\"Schedule\": [[0, 1], [2]]}}" ==
+        .ok (.schedule #[#[0, 1], #[2]]))
+  check f "ShadowValidator"
+      (parse "{\"tracked_shards_config\": {\"ShadowValidator\": \"v.near\"}}" ==
+        .ok (.shadowValidator ⟨"v.near"⟩))
+  check f "an unknown variant is refused"
+      (parse "{\"tracked_shards_config\": \"Some\"}" matches .error _)
+  check f "two variants are refused"
+      (parse "{\"tracked_shards_config\": {\"Accounts\": [], \"Shards\": []}}" matches .error _)
+  -- the deprecated members, in order of priority
+  check f "deprecated tracked_shards, non-empty: all shards whatever it lists"
+      (parse "{\"tracked_shards\": [0]}" == .ok .allShards)
+  check f "deprecated tracked_shards, empty: falls through"
+      (parse "{\"tracked_shards\": [], \"tracked_accounts\": [\"a.near\"]}" ==
+        .ok (.accounts #[⟨"a.near"⟩]))
+  check f "deprecated schedule before shadow validator"
+      (parse "{\"tracked_shard_schedule\": [[1]], \"tracked_shadow_validator\": \"v.near\"}" ==
+        .ok (.schedule #[#[1]]))
+  check f "deprecated shadow validator before accounts"
+      (parse "{\"tracked_shadow_validator\": \"v.near\", \"tracked_accounts\": [\"a.near\"]}" ==
+        .ok (.shadowValidator ⟨"v.near"⟩))
+  check f "the new member wins over the deprecated ones"
+      (parse "{\"tracked_shards_config\": \"NoShards\", \"tracked_shards\": [0]}" == .ok .noShards)
+  check f "null member is absent" (parse "{\"tracked_shards_config\": null}" == .ok .noShards)
+  check f "the flag takes the keywords"
+      (TrackedShardsConfig.ofFlag "all" == .ok .allShards &&
+        TrackedShardsConfig.ofFlag "none" == .ok .noShards)
+  check f "the flag takes JSON"
+      (TrackedShardsConfig.ofFlag "{\"Accounts\": [\"a.near\"]}" == .ok (.accounts #[⟨"a.near"⟩]))
+  -- `should_apply_chunk`: (this epoch, next epoch, previous epoch)
+  let table (mode : ApplyMode) : List Bool :=
+    [false, true].flatMap fun a =>
+      [false, true].flatMap fun b =>
+        [false, true].map fun c => ShardTracker.shouldApplyOf mode a b c
+  -- order: (this, next, prev) = FFF FFT FTF FTT TFF TFT TTF TTT
+  check f "NotCaughtUp: this || (next && prev)"
+      (table .notCaughtUp == [false, false, false, true, true, true, true, true])
+  check f "IsCaughtUp: this || next"
+      (table .isCaughtUp == [false, false, true, true, true, true, true, true])
+  check f "CatchingUp: !this && next && !prev"
+      (table .catchingUp == [false, false, true, false, false, false, false, false])
+  check f "a chunk is applied once: NotCaughtUp plus CatchingUp is IsCaughtUp"
+      ([false, true].all fun a =>
+        [false, true].all fun b =>
+          [false, true].all fun c =>
+            (ShardTracker.shouldApplyOf .notCaughtUp a b c ||
+                  ShardTracker.shouldApplyOf .catchingUp a b c) ==
+                ShardTracker.shouldApplyOf .isCaughtUp a b c &&
+              !(ShardTracker.shouldApplyOf .notCaughtUp a b c &&
+                  ShardTracker.shouldApplyOf .catchingUp a b c))
+
 def main : IO UInt32 := do
   let failures ← IO.mkRef 0
+  trackingTests failures
   learnedCode failures
   codePruning failures
   stateChangesRecord failures

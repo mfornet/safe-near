@@ -209,7 +209,7 @@ def Env.pruneCodes (e : Env) : IO Unit := do
     s.pr.tables.rc.fold
       (fun acc k (d, n) =>
         if n > 0 && k.size == 40 && d.size > 32 then acc.insert (k.extract 8 40) else acc)
-      {}
+      s.keepCodes
   let before := s.pr.cache.byLabel.size
   let cache := s.pr.cache.prune live fun l => (hashOfLabel? l).map fun b => ⟨b.toArray⟩
   e.state.set { s with pr := { s.pr with cache } }
