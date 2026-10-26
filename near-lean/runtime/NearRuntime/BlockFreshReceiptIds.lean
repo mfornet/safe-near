@@ -63,7 +63,7 @@ theorem applyAttempt_freshIds (cfg : RuntimeConfig) (ap : ApplyState)
     (applyAttempt cfg ap decoder st txs incoming).FreshReceiptIds st.nextId := by
   unfold applyAttempt
   dsimp only [Id.run, bind, pure]
-  generalize ht : (forIn txs _ _ : Id TransactionLoop) = txResult
+  generalize ht : (forIn (chunkTransactions cfg txs) _ _ : Id TransactionLoop) = txResult
   have htx : TransactionLoop.FreshInvariant st.nextId txResult := by
     rw [← ht]
     apply forIn_id_preserves _ _ _ (TransactionLoop.FreshInvariant st.nextId)
@@ -122,7 +122,8 @@ theorem applyAttempt_freshIds (cfg : RuntimeConfig) (ap : ApplyState)
             cases hl : ap.gasLimit with
             | none =>
               simp only [hl] at hn hout
-              exact ⟨h.counter.trans hn, hout, by intro returned he; contradiction⟩
+              dsimp only
+              split_ifs <;> exact ⟨h.counter.trans hn, hout, by intro returned he; contradiction⟩
             | some limit =>
               simp only [hl] at hn hout
               dsimp only
@@ -130,7 +131,7 @@ theorem applyAttempt_freshIds (cfg : RuntimeConfig) (ap : ApplyState)
     split
     · rename_i returned he
       exact hresult.returned returned he
-    · exact timeouts_freshIds ap ap.gasLimit _ _ st.nextId _ _ hresult.counter hresult.outgoing
+    · exact timeouts_freshIds ap _ _ _ st.nextId _ _ hresult.counter hresult.outgoing
 
 /-- A public block's outgoing envelope ids are distinct and allocated no earlier
 than the initial counter, on supported and rejected attempts alike. -/

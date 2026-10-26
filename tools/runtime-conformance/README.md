@@ -63,6 +63,38 @@ contract panic; the regression compares its exact error and gas. The
 sender/receiver unregisters before refund resolution. These are controlled VM
 call sequences on shared storage, not an independent receipt scheduler oracle.
 
+`global_contract.json` (v86) and `global_contract_v78.json` (the first version
+with `global_contract_host_fns`) compare `promise_batch_action_use_global_contract`
+and its `_by_account_id` variant: both identifiers, malformed hashes,
+out-of-bounds reads, invalid, over-long and non-UTF-8 account ids (accepted at
+v78, rejected by v86's account id rules), invalid promise indices, view calls,
+rollback on panic and fee exhaustion. The fees come from nearcore's `77.yaml`
+(the config view omits them); these comparisons confirm them exactly.
+`global_contract_v73.json` checks that before v78 nearcore does not link these
+hosts: importing one fails with "unknown or invalid import" after the loading
+charge, even when the method does not exist.
+
+`value_return.json` returns values below, at and one byte over
+`max_length_returned_data`, and from out-of-bounds memory, with and without
+output data receivers: nearcore reads and checks the length before burning
+the data receipt bytes. A case may set `outputDataReceivers`.
+
+Outcomes carry each receipt's `yieldDataId` and the successful
+`promise_yield_resume` payloads (`resumes`); the executor reads both from the
+mocked external. No fixture creates a yield yet: the mock's data ids are not
+the ones the model derives, so a yield case needs those ids normalized first.
+
+`logs.json` drives `log_utf8` and `log_utf16` into the number-of-logs limit,
+the per-message and running-total length limits, bad UTF-8 and UTF-16,
+out-of-bounds reads, a non-ASCII UTF-16 message and gas exhaustion mid-loop.
+
+`prepare_*.json` (written by `gen_prepare_limits.py`, which keeps the large
+modules out of WAT) checks nearcore's `prepare_v3` limits at and one over
+each protocol-86 limit (types, functions including imported ones, function
+body size, tables, table elements, locals) and the rejected imports (another
+module, globals, tables, memory): a no-op outcome with `PrepareError` and no
+gas. A module at the locals limit is left out: Wasmtime fails to compile it.
+
 `promise_graphs.json` checks exact ordered receipt dependencies and returned
 receipt identity for ordinary, nested, duplicate and empty joins. Failure cases
 cover joint return/action restrictions, nonexistent handles, view calls and

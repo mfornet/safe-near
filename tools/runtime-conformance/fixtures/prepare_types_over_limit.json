@@ -1,0 +1,14 @@
+{
+  "code": "tools/runtime-conformance/fixtures/prepare_types_over_limit.wasm",
+  "sha256": "8d38719b8fa94046259e26f15e96d23606c571260c24da3531e7fe56f1a3e38c",
+  "protocolVersion": 86,
+  "initialBalance": "100000000000000000000000000",
+  "storage": [],
+  "calls": [
+    {
+      "name": "prepare: types_over_limit",
+      "method": "f",
+      "args": {}
+    }
+  ]
+}

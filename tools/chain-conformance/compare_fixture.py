@@ -307,6 +307,9 @@ class Projection:
                     details = dict(kind="functionCallError", error=dict(kind="executionError", message=payload))
                 elif category == "MethodResolveError" and isinstance(payload, str) and payload in {"MethodNotFound", "MethodEmptyName", "MethodInvalidSignature"}:
                     details = dict(kind="functionCallError", error=dict(kind="methodResolveError", error=payload))
+                elif category == "CompilationError" and isinstance(payload, dict) and list(payload) == ["PrepareError"] \
+                        and isinstance(payload["PrepareError"], str):
+                    details = dict(kind="functionCallError", error=dict(kind="compilationError", prepareError=payload["PrepareError"]))
                 elif category == "CompilationError" and isinstance(payload, dict) and list(payload) == ["CodeDoesNotExist"]:
                     account = payload["CodeDoesNotExist"]
                     if isinstance(account, dict) and set(account) == {"account_id"} and account["account_id"] == executor:

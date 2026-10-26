@@ -195,7 +195,7 @@ theorem applyReceiptQueue_conservation (cfg : RuntimeConfig) (ap : ApplyState) (
               receiptsFunds cfg (pass.2.2.2.1 ++ (processWithInstants cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 head.1).receipts) +
               ((forIn (processWithInstants cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 head.1).outcomes
                 (pass.2.2.2.2.2.2.1, pass.2.2.2.2.2.2.2.2.2.1)
-                (fun entry ledger => .yield (ledger.1 + entry.2.tokensBurnt, ledger.2 + entry.2.gasBurnt)) : Id (Nat × Nat)).1 +
+                (fun entry ledger => .yield (ledger.1 + entry.2.tokensBurnt, ledger.2 + entry.2.computeUsage)) : Id (Nat × Nat)).1 +
                 (processWithInstants cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 head.1).otherTokensBurnt - (processWithInstants cfg { ap with storageAccounting := pass.2.2.2.2.2.2.2.2.2.2.2 } decoder pass.2.1 head.1).rewards) +
               receiptsFunds cfg pass.2.2.2.2.2.2.2.1 + receiptsFunds cfg pass.2.2.2.2.2.2.2.2.1 +
               receiptsFunds cfg (rest.map Prod.fst) + subsidy = assets +
@@ -208,7 +208,8 @@ theorem applyReceiptQueue_conservation (cfg : RuntimeConfig) (ap : ApplyState) (
           cases hlimit : ap.gasLimit with
           | none =>
             simp only [hlimit] at hfund hdelay hadmit hledger
-            exact ⟨rfl, hfund.1, hfund.2.1, hdelay, hadmit, hscope, hledger⟩
+            dsimp only
+            split_ifs <;> exact ⟨rfl, hfund.1, hfund.2.1, hdelay, hadmit, hscope, hledger⟩
           | some limit =>
             simp only [hlimit] at hfund hdelay hadmit hledger
             dsimp only
@@ -223,11 +224,11 @@ theorem applyReceiptQueue_conservation (cfg : RuntimeConfig) (ap : ApplyState) (
     have hf := hfinal
     simp only [ReceiptQueue.TerminalLedger, he] at hf
     intro hsupported
-    have htf := (resolveYieldTimeouts_funds cfg ap ap.gasLimit result.2.2.2.2.2.2.2.2.2.1
+    have htf := (resolveYieldTimeouts_funds cfg ap (if storageProofFull cfg ap result.2.2.2.2.2.2.2.2.2.2.2 then some 0 else ap.gasLimit) result.2.2.2.2.2.2.2.2.2.1
       (result.2.1.yieldTimeouts.length + 1) (result.2.1, [], [])).1
-    have hrf := (resolveYieldTimeouts_funds cfg ap ap.gasLimit result.2.2.2.2.2.2.2.2.2.1
+    have hrf := (resolveYieldTimeouts_funds cfg ap (if storageProofFull cfg ap result.2.2.2.2.2.2.2.2.2.2.2 then some 0 else ap.gasLimit) result.2.2.2.2.2.2.2.2.2.1
       (result.2.1.yieldTimeouts.length + 1) (result.2.1, [], [])).2
-    have hdl := resolveYieldTimeouts_delayed ap ap.gasLimit result.2.2.2.2.2.2.2.2.2.1
+    have hdl := resolveYieldTimeouts_delayed ap (if storageProofFull cfg ap result.2.2.2.2.2.2.2.2.2.2.2 then some 0 else ap.gasLimit) result.2.2.2.2.2.2.2.2.2.1
       (result.2.1.yieldTimeouts.length + 1) (result.2.1, [], [])
     have h0 : receiptsFunds cfg ([] : List Receipt) = 0 := rfl
     dsimp only at hrf
@@ -242,7 +243,7 @@ theorem applyReceiptQueue_conservation (cfg : RuntimeConfig) (ap : ApplyState) (
       simp only [ChainState.totalFunds, ChainState.queuedFunds, ChainState.totalBalance, ChainState.postponedFunds,
         h1, h2]
       omega
-    have hs := hset (resolveYieldTimeouts ap ap.gasLimit result.2.2.2.2.2.2.2.2.2.1
+    have hs := hset (resolveYieldTimeouts ap (if storageProofFull cfg ap result.2.2.2.2.2.2.2.2.2.2.2 then some 0 else ap.gasLimit) result.2.2.2.2.2.2.2.2.2.1
       (result.2.1.yieldTimeouts.length + 1) (result.2.1, [], [])).1
       (result.2.2.2.2.2.2.2.1 ++ result.2.2.2.2.2.2.2.2.1)
     rw [hdl, hf.1, h0, receiptsFunds_append] at hs

@@ -1,4 +1,5 @@
 import NearNode.Validator.Node
+import NearNode.Validator.Persist
 
 /-!
 # Endorsements and state witnesses received
@@ -13,7 +14,8 @@ import NearNode.Validator.Node
 
 namespace Near.Node.Validator
 
-open Near.Node Near.Node.Chain Near.Node.Network Near.Node.Apply Near.Node.Borsh Near.Node.ReedSolomon
+open Near.Node Near.Node.Chain Near.Node.Network Near.Node.Apply Near.Node.Borsh
+  Near.Node.ReedSolomon
 
 private def lift {α : Type} (r : Result α) : Except String α :=
   r.mapError fun e => s!"{e.kind} {e.detail}"
@@ -40,9 +42,11 @@ def Env.endorse (e : Env) (header : ShardChunkHeader) : IO Unit := do
   let s ← e.get
   if s.endorsed.contains header.chunkHash.hash.bytes then
     return
+  e.commit #[.set .blockMisc (endorsedKey header.chunkHash.hash.bytes) ByteArray.empty]
   e.state.modify fun s => { s with endorsed := s.endorsed.insert header.chunkHash.hash.bytes }
   match lift (s.st.epochIdFromPrevBlock header.prevBlockHash) with
-  | .error m => e.log s!"endorse: {m}"
+  | .error m =>
+    e.log s!"endorse: {m}"
   | .ok epoch =>
     let en := newChunkEndorsement e.signer epoch header
     for account in endorsementTargets s.st epoch header.heightCreated do
@@ -80,8 +84,11 @@ def Env.onWitnessPart (e : Env) (w : PartialEncodedStateWitness) : IO Unit := do
     return
   let assignments ←
     match lift (s.st.chunkValidatorAssignments key.epochId key.shardId key.heightCreated) with
-    | .ok a => pure a
-    | .error m => e.log s!"witness part: {m}"; return
+    | .ok a =>
+      pure a
+    | .error m =>
+      e.log s!"witness part: {m}";
+      return
   if !assignments.any (·.1 == e.me) then
     return
   if w.inner.partOrd.toNat ≥ assignments.size then
@@ -89,8 +96,11 @@ def Env.onWitnessPart (e : Env) (w : PartialEncodedStateWitness) : IO Unit := do
     return
   let producer ←
     match lift (s.st.chunkProducer key.epochId key.heightCreated key.shardId) with
-    | .ok p => pure p
-    | .error m => e.log s!"witness part: {m}"; return
+    | .ok p =>
+      pure p
+    | .error m =>
+      e.log s!"witness part: {m}";
+      return
   if !verifySignature w.signature (Codec.encode w.inner) producer.publicKey then
     e.log "witness part: invalid signature"
     return
@@ -102,34 +112,47 @@ def Env.onWitnessPart (e : Env) (w : PartialEncodedStateWitness) : IO Unit := do
   let n := assignments.size
   let enc ←
     match Encoder.new n witnessRatio with
-    | .ok enc => pure enc
-    | .error m => e.log s!"witness part: {m}"; return
+    | .ok enc =>
+      pure enc
+    | .error m =>
+      e.log s!"witness part: {m}";
+      return
   e.state.modify fun s => { s with witnesses := s.witnesses.insert k entry }
   if entry.parts.size < enc.dataParts then
     return
   -- enough parts: rebuild the compressed witness
   let compressed : Except String ByteArray :=
     match enc.code with
-    | some code =>
-      do
-        let present := (Array.range n).map fun i => entry.parts[i.toUInt64]?
-        let bytes ← decodeBytes code present entry.encodedLength
-        match Codec.decodeAll (α := EncodedChunkStateWitness) bytes with
-        | .ok x => pure x.bytes
-        | .error err => throw s!"the encoded witness does not decode: {repr err}"
+    | some code => do
+      let present := (Array.range n).map fun i => entry.parts[i.toUInt64]?
+      let bytes ← decodeBytes code present entry.encodedLength
+      match Codec.decodeAll (α := EncodedChunkStateWitness) bytes with
+      | .ok x =>
+        pure x.bytes
+      | .error err =>
+        throw s!"the encoded witness does not decode: {repr err}"
     | none =>
       match entry.parts[(0 : UInt64)]? with
       | some p => pure p
       | none => throw "the part is missing"
   match compressed with
-  | .error m => e.log s!"witness: {m}"
+  | .error m =>
+    e.log s!"witness: {m}"
   | .ok z =>
-    e.state.modify fun s => { s with witnesses := s.witnesses.insert k { entry with done := true } }
+    -- the parts are not needed any more
+    e.state.modify fun s =>
+        { s with
+          witnesses :=
+            s.witnesses.insert k
+              { entry with
+                done := true, parts := {} } }
     match Zstd.decompress z (64 * 1024 * 1024) with
-    | .error m => e.log s!"witness: zstd: {m}"
+    | .error m =>
+      e.log s!"witness: zstd: {m}"
     | .ok raw =>
       match Codec.decodeAll (α := ChunkStateWitness) raw with
-      | .error err => e.log s!"witness does not decode: {repr err}"
+      | .error err =>
+        e.log s!"witness does not decode: {repr err}"
       | .ok witness =>
         -- the acknowledgement to the chunk producer
         if producer.accountId != e.me then

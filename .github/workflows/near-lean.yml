@@ -1,0 +1,63 @@
+name: near-lean
+
+# Builds the chain package, which builds every package below it (interface,
+# vm, runtime, crypto, wasm), on every change to them. Nothing else builds
+# these packages automatically, so a broken `main` used to go unnoticed until
+# the periodic check (SAF-50). Tests, conformance and audits stay in the
+# periodic check. Build outputs are cached, so a typical change rebuilds only
+# the modules it touches; a cold build takes much longer.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "near-lean/**"
+      - "!near-lean/wasm-logic/**"
+      - "lean-toolchain"
+      - ".github/workflows/near-lean.yml"
+  pull_request:
+    paths:
+      - "near-lean/**"
+      - "!near-lean/wasm-logic/**"
+      - "lean-toolchain"
+      - ".github/workflows/near-lean.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: near-lean-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build the chain package and everything below it
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/cache@v5
+        with:
+          path: near-lean/.lake/packages
+          key: near-lean-packages-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'near-lean/*/lake-manifest.json') }}
+
+      # The newest build of any earlier commit; Lake rebuilds what changed.
+      - uses: actions/cache@v5
+        with:
+          path: near-lean/*/.lake/build
+          key: near-lean-build-${{ runner.os }}-${{ hashFiles('lean-toolchain') }}-${{ github.sha }}
+          restore-keys: near-lean-build-${{ runner.os }}-${{ hashFiles('lean-toolchain') }}-
+
+      # The libraries, the tests and the replay executables (ChainReplay), whose missing case
+      # broke `main` in the 2026-10-23 check.
+      # The near-sdk layout library the contract projects share (no dependencies).
+      - name: Build the sdk package
+        working-directory: near-lean/sdk
+        run: lake build NearSdk --wfail
+
+      - uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: near-lean/chain
+          build-args: NearChain chain-tests chain-replay registered-replay --wfail
+          use-mathlib-cache: true

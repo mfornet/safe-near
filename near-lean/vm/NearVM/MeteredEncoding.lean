@@ -91,6 +91,8 @@ theorem preInvokeError_creationAccount_valid (name : String) (st : HostStore Nea
   · simp [hy1, creationAccountError, creationAccountArgs]
   by_cases hy2 : name = "promise_yield_resume"
   · simp [hy2, creationAccountError, creationAccountArgs]
+  by_cases hv : name = "value_return"
+  · simp [hv, creationAccountError, creationAccountArgs]
   have hgi : globalContractInputs? name = none := by
     simp [globalContractInputs?, beq_eq_false_iff_ne.mpr hg, beq_eq_false_iff_ne.mpr hga]
   have hinv : invocationArgumentError name st args = creationPrefixError name st args := by
@@ -98,7 +100,7 @@ theorem preInvokeError_creationAccount_valid (name : String) (st : HostStore Nea
       beq_eq_false_iff_ne.mpr ht, beq_eq_false_iff_ne.mpr hk, Bool.false_eq_true, ite_false, hgi,
       beq_eq_false_iff_ne.mpr hd1, beq_eq_false_iff_ne.mpr hd2, beq_eq_false_iff_ne.mpr hk1,
       beq_eq_false_iff_ne.mpr hk2, beq_eq_false_iff_ne.mpr hk3, beq_eq_false_iff_ne.mpr hy1,
-      beq_eq_false_iff_ne.mpr hy2, Bool.or_false]
+      beq_eq_false_iff_ne.mpr hy2, beq_eq_false_iff_ne.mpr hv, Bool.or_false]
   rw [hinv] at hi
   cases he : creationAccountError name st args with
   | none => rfl

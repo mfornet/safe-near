@@ -217,14 +217,16 @@ def outcomeOfExecution (ctx : VMContext) (storage : List (List UInt8 × List UIn
     { balance := ctx.accountBalance, storageUsage := ctx.storageUsage, returnData := .none,
       burntGas := ns.gas.burnt, usedGas := ns.gas.burnt, logs := logsOf ns, storage := storage,
       receipts := [], aborted := some e, gasProfile := ns.gasProfile,
-      subsidizedAmount := ns.subsidizedAmount, storageAccounting := ns.storageAccounting }
+      subsidizedAmount := ns.subsidizedAmount, storageAccounting := ns.storageAccounting,
+      actionProfile := ns.actionProfile }
   | none =>
     let outcome : VMOutcome := {
       balance := ns.context.accountBalance, storageUsage := ns.context.storageUsage.toNat
       returnData := .none, burntGas := ns.gas.burnt, usedGas := ns.gas.used
       logs := logsOf ns, storage := finalStorage ns, receipts := [], aborted := none
       gasProfile := ns.gasProfile, subsidizedAmount := ns.subsidizedAmount,
-      storageAccounting := ns.storageAccounting }
+      storageAccounting := ns.storageAccounting, storageWrites := ns.storageLog.reverse,
+      actionProfile := ns.actionProfile }
     match convertPromises ns.promises with
     | none => outcome.graphIssue ctx.accountBalance ctx.storageUsage storage
     | some graph =>
@@ -240,6 +242,43 @@ def outcomeOfExecution (ctx : VMContext) (storage : List (List UInt8 × List UIn
           receipts := distributed.1
           usedGas := ns.gas.used + distributed.2
           distributedGas := distributed.2 }
+
+/-- A host function nearcore does not link at this protocol version
+(`imports.rs`: `#[global_contract_host_fns]`). The other gated imports are
+not in the host table, so they are unsupported-host issues. -/
+def disabledHost (cfg : RuntimeConfig) (name : String) : Bool :=
+  !cfg.wasm.globalContractHostFns &&
+    ["promise_batch_action_deploy_global_contract", "promise_batch_action_deploy_global_contract_by_account_id",
+     "promise_batch_action_use_global_contract", "promise_batch_action_use_global_contract_by_account_id"].contains name
+
+/-- nearcore's `prepare_v3` limits, checked in its section order: types,
+imports (`env` functions only, counted as functions), tables and their
+initial size, defined functions, then each body's size and locals.
+nearcore divergence: nearcore interleaves these with validation, so a module
+that is both invalid and over a limit may report the other error first. -/
+def prepareLimitError (limits : LimitConfig) (code : Module) : Option PrepareError := Id.run do
+  let within (limit : Option Nat) (n : Nat) := limit.all (n ≤ ·)
+  if !within limits.maxTypesPerContract code.types.size then return some .tooManyTypes
+  let mut functions := 0
+  for imp in code.imports do
+    if imp.module != "env" then return some .instantiate
+    match imp.desc with
+    | .func _ =>
+      functions := functions + 1
+      if !within limits.maxFunctionsNumberPerContract functions then return some .tooManyFunctions
+    | .table _ | .global _ => return some .instantiate
+    | .mem _ => return some .memory
+  if !within limits.maxTablesPerContract code.tables.size then return some .tooManyTables
+  if code.tables.any (fun table => !within limits.maxElementsPerContractTable table.type.limits.min) then
+    return some .tooManyTableElements
+  if !within limits.maxFunctionsNumberPerContract (functions + code.funcs.size) then
+    return some .tooManyFunctions
+  let mut locals := 0
+  for fn in code.funcs do
+    if !within limits.maxFunctionBodySize fn.bodySize then return some .functionBodyTooLarge
+    locals := locals + fn.locals.length
+    if !within limits.maxLocalsPerContract locals then return some .tooManyLocals
+  return none
 
 /-- nearcore replaces the contract's memory declaration during preparation. -/
 def prepareMemory (cfg : RuntimeConfig) (code : Module) : Module :=
@@ -259,6 +298,10 @@ def runAttempt (cfg : RuntimeConfig) (code : Module) (codeSize : Nat) (method : 
   if method.isEmpty then
     VMOutcome.failedBefore ctx storage 0 (.methodResolveError .methodEmptyName)
   else
+  -- A module nearcore cannot prepare yields a no-op outcome: nothing is burnt.
+  match prepareLimitError cfg.wasm.limits code with
+  | some e => VMOutcome.failedBefore ctx storage 0 (.prepareError e)
+  | none =>
   let host0 := ctx.toNearState cfg storage
   -- contract loading
   let (host1, loadErr) := applyCharges host0 (loadingCharges codeSize)
@@ -277,6 +320,11 @@ def runAttempt (cfg : RuntimeConfig) (code : Module) (codeSize : Nat) (method : 
   if code.start.isSome then
     VMOutcome.failedBefore ctx storage gas1.burnt
       (.executionIssue (.interpreterError "start function")) host1.gasProfile
+  else
+  -- nearcore links a gated host only when its protocol feature is on, and links
+  -- before it looks the method up.
+  if code.importDecls.any (fun decl => decl.module == "env" && disabledHost cfg decl.name) then
+    VMOutcome.failedBefore ctx storage gas1.burnt (.linkError "unknown or invalid import") host1.gasProfile
   else
   -- Legacy protocols discard the loading charge on method-resolution failure,
   -- but loading exhaustion still takes precedence over an absent export.
@@ -387,42 +435,47 @@ theorem runAttempt_cases (cfg : RuntimeConfig) (code : Module) (codeSize : Nat) 
   split
   · left
     exact ⟨_, _, 0, _, _, rfl, Nat.zero_le _, rfl⟩
-  · cases hload : applyCharges (ctx.toNearState cfg storage) (loadingCharges codeSize) with
-    | mk host1 loadErr =>
-      dsimp only
-      cases loadErr with
-      | some e => left; exact ⟨host1, some e, _, _, _, rfl, Nat.le_refl _, rfl⟩
-      | none =>
+  · split
+    · left
+      exact ⟨_, _, 0, _, _, rfl, Nat.zero_le _, rfl⟩
+    · cases hload : applyCharges (ctx.toNearState cfg storage) (loadingCharges codeSize) with
+      | mk host1 loadErr =>
         dsimp only
-        have hle : (if cfg.wasm.fixContractLoadingCost then host1.gas.burnt else 0) ≤
-            host1.gas.burnt := by
+        cases loadErr with
+        | some e => left; exact ⟨host1, some e, _, _, _, rfl, Nat.le_refl _, rfl⟩
+        | none =>
+          dsimp only
+          have hle : (if cfg.wasm.fixContractLoadingCost then host1.gas.burnt else 0) ≤
+              host1.gas.burnt := by
+            split
+            · exact Nat.le_refl _
+            · exact Nat.zero_le _
           split
-          · exact Nat.le_refl _
-          · exact Nat.zero_le _
-        split
-        · left; exact ⟨host1, none, _, _, _, rfl, Nat.le_refl _, rfl⟩
-        · split
           · left; exact ⟨host1, none, _, _, _, rfl, Nat.le_refl _, rfl⟩
           · split
-            · left; exact ⟨host1, none, _, _, _, rfl, hle, rfl⟩
+            · left; exact ⟨host1, none, _, _, _, rfl, Nat.le_refl _, rfl⟩
             · split
-              · left; exact ⟨host1, none, _, _, _, rfl, hle, rfl⟩
+              · left; exact ⟨host1, none, _, _, _, rfl, Nat.le_refl _, rfl⟩
               · split
                 · left; exact ⟨host1, none, _, _, _, rfl, hle, rfl⟩
                 · split
-                  · left; exact ⟨host1, none, _, _, _, rfl, Nat.le_refl _, rfl⟩
-                  · rename_i env hresolve
-                    cases halloc : env.allocate (Store.empty host1) with
-                    | mk store imports =>
-                      dsimp only
-                      split
+                  · left; exact ⟨host1, none, _, _, _, rfl, hle, rfl⟩
+                  · split
+                    · left; exact ⟨host1, none, _, _, _, rfl, hle, rfl⟩
+                    · split
                       · left; exact ⟨host1, none, _, _, _, rfl, Nat.le_refl _, rfl⟩
-                      · rename_i result store' inst hinst
-                        split
-                        · left; exact ⟨host1, none, _, _, _, rfl, Nat.le_refl _, rfl⟩
-                        · rename_i c hstart
-                          right
-                          exact ⟨host1, env, store, imports, _, store', inst, _, c, rfl, hresolve,
-                            halloc, hinst, hstart, rfl⟩
+                      · rename_i env hresolve
+                        cases halloc : env.allocate (Store.empty host1) with
+                        | mk store imports =>
+                          dsimp only
+                          split
+                          · left; exact ⟨host1, none, _, _, _, rfl, Nat.le_refl _, rfl⟩
+                          · rename_i result store' inst hinst
+                            split
+                            · left; exact ⟨host1, none, _, _, _, rfl, Nat.le_refl _, rfl⟩
+                            · rename_i c hstart
+                              right
+                              exact ⟨host1, env, store, imports, _, store', inst, _, c, rfl, hresolve,
+                                halloc, hinst, hstart, rfl⟩
 
 end Wasm.Near

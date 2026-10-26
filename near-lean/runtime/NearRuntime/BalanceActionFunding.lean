@@ -200,6 +200,7 @@ def deleteAccountFundedResult (c : ReceiptCtx) (before : Exec) (account : Accoun
     state := refund.2.removeAccount id
     storageAccounting := stageContractStorageRemoval id (refund.2.contractStorage id) before.storageAccounting }
   let burned := cleared.burnAction (before.state.gasKeyBalances id)
+    (nonceRemovalCompute c.cfg ((before.state.gasKeyNonces.filter (·.1.1 == id)).map fun ((id, pk, _), _) => (id, pk)))
   let acted : Exec := { burned with actorId := c.receipt.predecessorId }
   if account.amount > 0 then { acted with newReceipts := acted.newReceipts ++ [refund.1] } else acted
 

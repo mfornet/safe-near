@@ -1,0 +1,14 @@
+{
+  "code": "tools/runtime-conformance/fixtures/prepare_import_global.wasm",
+  "sha256": "ed699874dc2bcb4b7ba24fa36069350b42e05569ec07459ef52bd182aa6f8796",
+  "protocolVersion": 86,
+  "initialBalance": "100000000000000000000000000",
+  "storage": [],
+  "calls": [
+    {
+      "name": "prepare: import_global",
+      "method": "f",
+      "args": {}
+    }
+  ]
+}

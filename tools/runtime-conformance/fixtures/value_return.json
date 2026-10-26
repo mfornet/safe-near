@@ -1,0 +1,65 @@
+{
+  "code": "tools/runtime-conformance/fixtures/value_return.wasm",
+  "sha256": "3564661354507d0374fe679fae49182934a2b98c37ad95506fcca060f3fa190e",
+  "protocolVersion": 86,
+  "initialBalance": "100000000000000000000000000",
+  "storage": [],
+  "calls": [
+    {
+      "name": "value_return: small, no receivers",
+      "method": "small",
+      "args": {}
+    },
+    {
+      "name": "value_return: oob, no receivers",
+      "method": "oob",
+      "args": {}
+    },
+    {
+      "name": "value_return: at_limit, no receivers",
+      "method": "at_limit",
+      "args": {}
+    },
+    {
+      "name": "value_return: over_limit, no receivers",
+      "method": "over_limit",
+      "args": {}
+    },
+    {
+      "name": "value_return: small, two receivers",
+      "method": "small",
+      "args": {},
+      "outputDataReceivers": [
+        "bob.near",
+        "wrap.near"
+      ]
+    },
+    {
+      "name": "value_return: oob, two receivers",
+      "method": "oob",
+      "args": {},
+      "outputDataReceivers": [
+        "bob.near",
+        "wrap.near"
+      ]
+    },
+    {
+      "name": "value_return: at_limit, two receivers",
+      "method": "at_limit",
+      "args": {},
+      "outputDataReceivers": [
+        "bob.near",
+        "wrap.near"
+      ]
+    },
+    {
+      "name": "value_return: over_limit, two receivers",
+      "method": "over_limit",
+      "args": {},
+      "outputDataReceivers": [
+        "bob.near",
+        "wrap.near"
+      ]
+    }
+  ]
+}

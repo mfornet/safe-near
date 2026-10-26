@@ -16,6 +16,11 @@ path = "../chain"
 name = "NearCrypto"
 path = "../crypto"
 
+# The fast VM engine the node applies chunks with (notes/design/NEAR_NODE.md, M10).
+[[require]]
+name = "NearFastVM"
+path = "../fastvm"
+
 [[lean_lib]]
 name = "NearNode"
 

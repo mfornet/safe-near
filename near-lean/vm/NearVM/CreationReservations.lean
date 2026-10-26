@@ -28,6 +28,10 @@ theorem preInvokeError_creation_checks (name : String) (st : HostStore NearState
     intro he; subst name; simp [allocatesPromise] at halloc
   have hs : storageMutationPlan? name st args = none := by simp [storageMutationPlan?, hw, hr]
   obtain ⟨n1, n2, n3, n4, n5, n6, n7⟩ := allocatesPromise_ne name halloc
+  have hv : (name == "value_return") = false := by
+    cases he : name == "value_return"
+    · rfl
+    · simp only [beq_iff_eq] at he; subst name; simp [allocatesPromise] at halloc
   have hg : globalContractInputs? name = none := by
     simp only [allocatesPromise, List.contains_cons, List.contains_nil] at halloc
     simp only [globalContractInputs?]
@@ -39,12 +43,12 @@ theorem preInvokeError_creation_checks (name : String) (st : HostStore NearState
   have hp : creationPrefixError name st args = none := by
     cases he : creationPrefixError name st args with
     | none => rfl
-    | some error => simp [preInvokeError, invocationArgumentError, hs, hjoin, htransfer, hkey, hg, he, n1, n2, n3, n4, n5, n6, n7] at h
+    | some error => simp [preInvokeError, invocationArgumentError, hs, hjoin, htransfer, hkey, hg, hv, he, n1, n2, n3, n4, n5, n6, n7] at h
   have hc : promiseCapacityError st = none := by
     cases he : promiseCapacityError st with
     | none => rfl
     | some error =>
-      simp [preInvokeError, invocationArgumentError, hs, hjoin, htransfer, hkey, hg, hp, halloc, he, n1, n2, n3, n4, n5, n6, n7] at h
+      simp [preInvokeError, invocationArgumentError, hs, hjoin, htransfer, hkey, hg, hp, halloc, hv, he, n1, n2, n3, n4, n5, n6, n7] at h
   refine ⟨?_, hp, hc⟩
   cases he : creationAccountError name st args with
   | none => rfl
