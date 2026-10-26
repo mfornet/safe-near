@@ -1,0 +1,14 @@
+{
+  "code": "tools/runtime-conformance/fixtures/prepare_import_table.wasm",
+  "sha256": "acd49e42edc24129a632a4f306402135291d2a2d9ee5045019ad106e57984005",
+  "protocolVersion": 86,
+  "initialBalance": "100000000000000000000000000",
+  "storage": [],
+  "calls": [
+    {
+      "name": "prepare: import_table",
+      "method": "f",
+      "args": {}
+    }
+  ]
+}

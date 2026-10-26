@@ -1,0 +1,14 @@
+{
+  "code": "tools/runtime-conformance/fixtures/prepare_table_elements_over_limit.wasm",
+  "sha256": "0130074177cc923873cd45f3ac1efd2601ddb6f7791f8908a48d84af9fc98ee9",
+  "protocolVersion": 86,
+  "initialBalance": "100000000000000000000000000",
+  "storage": [],
+  "calls": [
+    {
+      "name": "prepare: table_elements_over_limit",
+      "method": "f",
+      "args": {}
+    }
+  ]
+}

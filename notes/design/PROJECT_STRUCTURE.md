@@ -2,7 +2,7 @@
 
 ```text
 safe-near/
-    notes/              -- Design notes and TODO
+    notes/              -- Design notes, TODO and finished plans (history/)
     tools/              -- Conformance, snapshots, audits and Lean quality tools
     reports/periodic/   -- Periodic check ledger (reports are in Linear)
     lean-toolchain      -- Lean version shared by every package
@@ -20,4 +20,6 @@ safe-near/
         verification/   -- Lean project: Model/, Spec/, Proofs/, blueprint/
 ```
 
-Generated blueprint HTML goes to `verification/blueprint/web/`.
+Generated blueprint HTML goes to `verification/blueprint/web/`. Contracts
+without a leanblueprint yet keep a hand-written proof index in
+`verification/blueprint/README.md` instead (see PROVING.md).

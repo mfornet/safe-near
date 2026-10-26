@@ -134,7 +134,9 @@ theorem finalizeReceipt_refund_failure_funds (c : ReceiptCtx) (st : ChainState) 
   let rewarded := base.creditReceiptReward c.cfg c.receipt.receiverId settlement.burnPrice c.action.gasPrice
   let data := rewarded.addFailureData c.receipt.receiverId c.action.outputDataReceivers
   have hf : finalizeReceipt c st raw (some err) =
-      { data with result := some (data.result.getD (.successValue [])) } := by
+      { data with
+        result := some (data.result.getD (.successValue []))
+        computeUsage := receiptComputeUsage c.cfg c.receipt data } := by
     simp [finalizeReceipt, hrefund, hpred, rollbackReceipt, Exec.finishReceiptResult, Exec.deliverResult, base, settlement, data, rewarded]
   have hz : rewarded.reward = 0 := creditReceiptReward_zero base c.cfg _ _ _ hfc
   have hb := creditReceiptReward_totalFunds c.cfg base c.receipt.receiverId
@@ -191,7 +193,9 @@ theorem finalizeReceipt_refund_success_funds (c : ReceiptCtx) (st : ChainState) 
   let rewarded := base.creditReceiptReward c.cfg c.receipt.receiverId settlement.burnPrice c.action.gasPrice
   let finished := rewarded.finishReceiptResult c none
   have hf : finalizeReceipt c st raw none =
-      { finished with result := some (finished.result.getD (.successValue [])) } := by
+      { finished with
+        result := some (finished.result.getD (.successValue []))
+        computeUsage := receiptComputeUsage c.cfg c.receipt finished } := by
     simp [finalizeReceipt, hrefund, rollbackReceipt, base, created, settlement, rewarded, finished, hat]
   have hz : rewarded.reward = 0 := creditReceiptReward_zero base c.cfg _ _ _ hfc
   have hb := creditReceiptReward_totalFunds c.cfg base c.receipt.receiverId

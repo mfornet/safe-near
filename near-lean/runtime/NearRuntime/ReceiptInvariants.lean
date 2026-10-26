@@ -175,8 +175,9 @@ def Exec.finalizationTrace (exec : Exec) : Nat × Nat × Nat × List String × N
   unfold Exec.creditReceiptReward
   split <;> rfl
 
-@[simp] theorem setResult_trace (exec : Exec) (result : Option ExecutionStatus) :
-    ({ exec with result := result } : Exec).finalizationTrace = exec.finalizationTrace := rfl
+@[simp] theorem setResult_trace (exec : Exec) (result : Option ExecutionStatus) (compute : Nat) :
+    ({ exec with result := result, computeUsage := compute } : Exec).finalizationTrace =
+      exec.finalizationTrace := rfl
 
 @[simp] theorem addBalanceRefund_result (exec : Exec) (receiver : AccountId) (amount : Nat) :
     (exec.addBalanceRefund receiver amount).result = exec.result := rfl
@@ -314,7 +315,9 @@ theorem finalizeReceipt_failure_funds (c : ReceiptCtx) (st : ChainState) (raw : 
   let rewarded := gas.creditReceiptReward c.cfg c.receipt.receiverId settlement.burnPrice c.action.gasPrice
   let data := rewarded.addFailureData c.receipt.receiverId c.action.outputDataReceivers
   have hf : finalizeReceipt c st raw (some err) =
-      { data with result := some (data.result.getD (.successValue [])) } := by
+      { data with
+        result := some (data.result.getD (.successValue []))
+        computeUsage := receiptComputeUsage c.cfg c.receipt data } := by
     simp [finalizeReceipt, Exec.finishReceiptResult, Exec.deliverResult, hrefund, rollbackReceipt, hpred, hsigner,
       base, deposit, gas, settlement, data, rewarded]
   dsimp only

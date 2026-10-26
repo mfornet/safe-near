@@ -7,7 +7,8 @@ sign extension, saturating truncation, floats with canonical NaNs, reference
 types and bulk memory. Multi-value is implemented for the spec testsuite and
 switched off in the NEAR feature set. SIMD, threads, tail calls, multi-memory,
 memory64, exceptions, GC and function references are rejected as unsupported,
-distinct from malformed.
+distinct from malformed. Why, and the feature table against nearcore's
+`features.rs`, are in the [rewrite plan](../history/wasm_runtime_rewrite.md).
 
 ## Shape
 

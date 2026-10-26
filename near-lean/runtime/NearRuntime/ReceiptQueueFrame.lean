@@ -202,8 +202,8 @@ theorem runReceiptActions_receiptQueues (c : ReceiptCtx) (st : ChainState) :
   unfold Exec.creditReceiptReward
   split <;> rfl
 
-@[simp] theorem setResult_receiptQueues (exec : Exec) (result : Option ExecutionStatus) :
-    ({ exec with result } : Exec).receiptQueues = exec.receiptQueues := rfl
+@[simp] theorem setResult_receiptQueues (exec : Exec) (result : Option ExecutionStatus) (compute : Nat) :
+    ({ exec with result, computeUsage := compute } : Exec).receiptQueues = exec.receiptQueues := rfl
 
 @[simp] theorem ite_receiptQueues (p : Prop) [Decidable p] (yes no : Exec) :
     (if p then yes else no).receiptQueues = if p then yes.receiptQueues else no.receiptQueues := by split <;> rfl

@@ -29,7 +29,7 @@ from check_lean_toolchains import repository_files  # noqa: E402
 NODE = Path("near-lean/node")
 CRYPTO = Path("near-lean/crypto")
 # Packages the node builds on. Contract verification must not pay for them.
-NODE_ONLY = {NODE, Path("near-lean/chain")}
+NODE_ONLY = {NODE, Path("near-lean/chain"), Path("near-lean/fastvm")}
 NATIVE_ATTRIBUTE = re.compile(r"(@\[|attribute\s*\[)[^\]]*\b(extern|implemented_by)\b")
 NATIVE_LAKE = re.compile(r"\b(extern_lib|moreLinkArgs|moreLeancArgs)\b")
 

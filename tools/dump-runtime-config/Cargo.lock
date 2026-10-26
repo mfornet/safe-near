@@ -298,6 +298,7 @@ dependencies = [
  "near-primitives-core",
  "serde",
  "serde_json",
+ "strum",
 ]
 
 [[package]]

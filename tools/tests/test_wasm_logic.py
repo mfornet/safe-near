@@ -10,14 +10,25 @@ matches the code, a dependency beyond the Wasm level.
 
 import importlib.util
 from pathlib import Path
+import os
 import re
 import subprocess
 import sys
+import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 PKG = ROOT / "near-lean/wasm-logic"
 SRC = PKG / "WasmLogic"
+
+# A stand-in wasm-tools: prints the given version; `parse` copies the committed .wasm.
+FAKE_WASM_TOOLS = """#!/usr/bin/env bash
+case "$1" in
+    --version) echo "$FAKE_VERSION" ;;
+    parse) cp "${2%.wat}.wasm" "$4" ;;
+    validate) ;;
+esac
+"""
 
 # (directory, .wasm base name, Lean namespace, definition) of every example compiled from .wat.
 EXAMPLES = [
@@ -115,6 +126,27 @@ class WasmLogicTests(unittest.TestCase):
             self.assertEqual(path.read_text().count(old), 1, f"mutant {desc!r} no longer applies")
         for path, old, _ in mutation.STUBS:
             self.assertEqual(path.read_text().count(old), 1, f"stub for {path.name} no longer applies")
+
+    def check_wasm_bytes(self, version):
+        """Run scripts/check-wasm-bytes.sh with a wasm-tools that reports `version`."""
+        with tempfile.TemporaryDirectory() as bin_dir:
+            fake = Path(bin_dir) / "wasm-tools"
+            fake.write_text(FAKE_WASM_TOOLS)
+            fake.chmod(0o755)
+            env = {**os.environ, "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
+                   "FAKE_VERSION": version}
+            return subprocess.run(["bash", PKG / "scripts/check-wasm-bytes.sh"], env=env,
+                                  capture_output=True, text=True)
+
+    def test_wasm_tools_version_check(self):
+        # 1.251.0 prints a build suffix (87597ef); a different version must still fail.
+        for version in ["wasm-tools 1.251.0", "wasm-tools 1.251.0 (a1a178a02 2026-05-28)"]:
+            result = self.check_wasm_bytes(version)
+            self.assertEqual(result.returncode, 0, f"{version!r} rejected: {result.stderr}")
+        for version in ["wasm-tools 1.250.0", "wasm-tools 1.251.01", "wasm-tools 1.251.0-rc1", ""]:
+            result = self.check_wasm_bytes(version)
+            self.assertEqual(result.returncode, 1, f"{version!r} accepted")
+            self.assertIn("need wasm-tools 1.251.0", result.stderr)
 
     def test_notice_carries_iris_wasm_licence(self):
         notice = (PKG / "NOTICE").read_text()

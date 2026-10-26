@@ -31,6 +31,8 @@ sorries contract: (_check contract)
 
 # Build the web blueprint of one contract (contracts/<name>/verification/blueprint/web/).
 blueprint contract: (_check contract)
+    @test -d contracts/{{ contract }}/verification/blueprint/src || \
+        { echo "contracts/{{ contract }} has no leanblueprint (see its blueprint/README.md)"; exit 1; }
     cd contracts/{{ contract }}/verification && just blueprint-web
 
 # (Served by the launchd agent com.safe-near.blueprint from ~/Library/Application Support/safe-near/blueprint.)
@@ -42,7 +44,7 @@ publish-blueprint contract: (blueprint contract)
 
 # Build near-lean: the Wasm interpreter, the boundary interface, the VM, the runtime, the chain layer, the crypto package and the node.
 near-build:
-    @for d in near-lean/wasm near-lean/interface near-lean/vm near-lean/runtime near-lean/chain near-lean/crypto near-lean/node; do \
+    @for d in near-lean/wasm near-lean/interface near-lean/vm near-lean/runtime near-lean/chain near-lean/crypto near-lean/fastvm near-lean/node; do \
         echo "== $d"; (cd "$d" && lake build); \
     done
 

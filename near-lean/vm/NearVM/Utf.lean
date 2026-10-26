@@ -57,11 +57,39 @@ def encodeUtf8 (cp : Nat) : List UInt8 :=
 def utf8String (bytes : List UInt8) : String :=
   (String.fromUTF8? ⟨bytes.toArray⟩).getD ""
 
-/-- Little-endian 16-bit code units; `none` for an odd number of bytes. -/
-def utf16Units : List UInt8 → Option (List Nat)
+/-- Little-endian 16-bit code units; `none` for an odd number of bytes.
+
+This is the specification: it recurses once per code unit, so it overflows the native stack for inputs of about a million
+units. `utf16Units` below is the function the VM runs, a loop with the same results (`utf16Units_eq_old`). -/
+def utf16UnitsOld : List UInt8 → Option (List Nat)
   | [] => some []
   | [_] => none
-  | lo :: hi :: rest => (utf16Units rest).map fun units => (lo.toNat + 256 * hi.toNat) :: units
+  | lo :: hi :: rest => (utf16UnitsOld rest).map fun units => (lo.toNat + 256 * hi.toNat) :: units
+
+/-- The loop of `utf16Units`: the units read so far, newest first. -/
+def utf16UnitsLoop : List UInt8 → List Nat → Option (List Nat)
+  | [], acc => some acc.reverse
+  | [_], _ => none
+  | lo :: hi :: rest, acc => utf16UnitsLoop rest ((lo.toNat + 256 * hi.toNat) :: acc)
+
+/-- Little-endian 16-bit code units; `none` for an odd number of bytes. Tail recursive, so it runs in constant stack
+whatever the length. -/
+def utf16Units (bytes : List UInt8) : Option (List Nat) :=
+  utf16UnitsLoop bytes []
+
+theorem utf16UnitsLoop_eq_old :
+    ∀ (bytes : List UInt8) (acc : List Nat),
+      utf16UnitsLoop bytes acc = (utf16UnitsOld bytes).map (acc.reverse ++ ·)
+  | [], acc => by simp [utf16UnitsLoop, utf16UnitsOld]
+  | [_], acc => by simp [utf16UnitsLoop, utf16UnitsOld]
+  | lo :: hi :: rest, acc => by
+    rw [utf16UnitsLoop, utf16UnitsLoop_eq_old rest, utf16UnitsOld]
+    cases utf16UnitsOld rest <;> simp
+
+/-- The loop returns what the recursive specification returns, for every input. -/
+theorem utf16Units_eq_old (bytes : List UInt8) : utf16Units bytes = utf16UnitsOld bytes := by
+  rw [utf16Units, utf16UnitsLoop_eq_old]
+  cases utf16UnitsOld bytes <;> simp
 
 /-- `char::decode_utf16` collected into a `String`, as UTF-8 bytes: `none` on an unpaired
 surrogate. -/

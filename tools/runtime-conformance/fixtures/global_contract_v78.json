@@ -1,0 +1,82 @@
+{
+  "code": "tools/runtime-conformance/fixtures/global_contract.wasm",
+  "sha256": "00daef740f3fe2b9b2a281e4b2fcd27525b336898656c914374e49fe875aafe8",
+  "protocolVersion": 78,
+  "initialBalance": "100000000000000000000000000",
+  "storage": [],
+  "calls": [
+    {
+      "name": "global_contract v78: hash",
+      "method": "hash",
+      "args": {}
+    },
+    {
+      "name": "global_contract v78: hash_short",
+      "method": "hash_short",
+      "args": {}
+    },
+    {
+      "name": "global_contract v78: hash_long",
+      "method": "hash_long",
+      "args": {}
+    },
+    {
+      "name": "global_contract v78: hash_oob",
+      "method": "hash_oob",
+      "args": {}
+    },
+    {
+      "name": "global_contract v78: account",
+      "method": "account",
+      "args": {}
+    },
+    {
+      "name": "global_contract v78: account_invalid",
+      "method": "account_invalid",
+      "args": {}
+    },
+    {
+      "name": "global_contract v78: account_too_long",
+      "method": "account_too_long",
+      "args": {}
+    },
+    {
+      "name": "global_contract v78: account_utf8",
+      "method": "account_utf8",
+      "args": {}
+    },
+    {
+      "name": "global_contract v78: target_invalid",
+      "method": "target_invalid",
+      "args": {}
+    },
+    {
+      "name": "global_contract v78: transfer_then_hash",
+      "method": "transfer_then_hash",
+      "args": {}
+    },
+    {
+      "name": "global_contract v78: hash_then_panic",
+      "method": "hash_then_panic",
+      "args": {}
+    },
+    {
+      "name": "global_contract v78: hash prohibited in view",
+      "method": "hash",
+      "args": {},
+      "view": true
+    },
+    {
+      "name": "global_contract v78: account prohibited in view",
+      "method": "account",
+      "args": {},
+      "view": true
+    },
+    {
+      "name": "global_contract v78: fees exhaust the gas",
+      "method": "transfer_then_hash",
+      "args": {},
+      "gas": 500000000000
+    }
+  ]
+}

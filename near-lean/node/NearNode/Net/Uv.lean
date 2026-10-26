@@ -1,4 +1,5 @@
 import Std.Internal.UV.TCP
+import Std.Internal.UV.Signal
 import Std.Net
 import NearNode.Net
 
@@ -159,5 +160,11 @@ def net : Net where
                 let peer ← sock.getPeerName
                 stream sock (ofSocketAddress peer)
           close := pure () }
+
+/-- Runs `action` when the process receives the signal `signum` (once). -/
+def onSignal (signum : Int32) (action : IO Unit) : IO Unit := do
+  let signal ← Std.Internal.UV.Signal.mk signum false
+  let promise ← signal.next
+  discard <| IO.mapTask (fun _ => action) promise.result!
 
 end Near.Node.Net.Uv

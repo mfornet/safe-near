@@ -1,6 +1,7 @@
 # Check every repository-owned Lake package against the root Lean version.
 check-toolchains:
     python3 tools/check_lean_toolchains.py
+    python3 tools/check_nearcore_pin.py
 
 # Check the compiled VM import graph for legacy interpreter and proof API dependencies.
 vm-dependencies:
@@ -113,6 +114,36 @@ localnet-follow *options: node-build
 [positional-arguments]
 localnet-validator *options: node-build
     python3 tools/localnet/validator_accept.py "$@"
+
+# M10b: the fast VM engine (near-lean/fastvm) against the specification: random modules with the gas limits swept over
+# every point of short runs and a sample of long ones, and the wNEAR contract of the VM's own test suite (needs
+# `wasm-tools`). Options (for the random modules): --programs N, --seed N, --exhaustive N, --samples N.
+[positional-arguments]
+fastvm-differential *options:
+    cd near-lean/fastvm && lake build fastvm-differential registered-replay-fast --wfail
+    cd near-lean/fastvm && ./.lake/build/bin/fastvm-differential --configs ../vm/configs "$@"
+    cd near-lean/fastvm && ./.lake/build/bin/fastvm-differential --configs ../vm/configs --probes 1
+    cd near-lean/fastvm && ./.lake/build/bin/fastvm-differential --configs ../vm/configs --wnear ../vm/tests/fixtures/w_near.wat
+
+# M10b: the 436 chunks of the M3 corpus replayed with the fast VM engine; all must pass, as with `chain-replay-corpus`.
+chain-replay-corpus-fast:
+    cd near-lean/fastvm && lake build registered-replay-fast --wfail
+    python3 tools/localnet/replay_corpus.py --binary "$PWD/near-lean/fastvm/.lake/build/bin/registered-replay-fast" --audit audit/chain-replay-corpus-fast.json
+
+# M10: the validator topology of localnet-validator under the full workload for a long window (default 3600 s), with
+# a light burst every five minutes: state roots and hashes equal, finality advancing, lag bounded outside bursts, no
+# disconnect, the Lean RPC answering, resident memory and store size sampled (slope reported). Options include
+# --duration SECONDS, --burst-period SECONDS and --no-full-workload (see notes/design/NEAR_NODE.md, M10).
+[positional-arguments]
+localnet-soak *options: node-build
+    python3 tools/localnet/soak.py "$@"
+
+# M9b: the JSON-RPC conformance run: the same requests to neard and to the Lean node, field by field; transactions sent
+# through the Lean RPC; a restart of the Lean validator. Options: `serve` (bring the topology up for manual use), `check`
+# (run the request set against a topology that is up). See notes/design/NEAR_NODE.md, M9b.
+[positional-arguments]
+node-rpc-conformance *options: node-build
+    python3 tools/localnet/rpc_conformance.py "$@"
 
 # M5a: rebuild the block corpus from the localnet databases (needs `python3 tools/localnet/build.py --only
 # safe-near-chain-export` and the databases of `just corpus-generate`).

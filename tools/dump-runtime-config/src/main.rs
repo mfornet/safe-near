@@ -12,13 +12,14 @@ use std::path::Path;
 use std::process::ExitCode;
 
 use near_parameters::view::RuntimeConfigView;
-use near_parameters::{ActionCosts, RuntimeConfig, RuntimeConfigStore};
+use near_parameters::{ActionCosts, ExtCosts, RuntimeConfig, RuntimeConfigStore};
 use near_primitives_core::types::ProtocolVersion;
 use near_primitives_core::version::{
     ProtocolFeature, PROD_GENESIS_PROTOCOL_VERSION, PROTOCOL_VERSION,
 };
 use serde::Serialize;
-use serde_json::{json, Value};
+use serde_json::{json, Map, Value};
+use strum::IntoEnumIterator;
 
 #[derive(Serialize)]
 struct ConfigDump {
@@ -30,6 +31,34 @@ struct ConfigDump {
     runtime_admission: Value,
     // Global-contract and gas-key execution parameters, also omitted by the view.
     runtime_extra: Value,
+    // Compute costs where they differ from the gas cost (the view has gas only).
+    compute_costs: Value,
+}
+
+/// `{ext: {cost: compute}, action_execution: {cost: compute}, action_send: {cost: compute}}`,
+/// listing only the parameters whose compute cost is not their gas cost.
+fn compute_json(config: &RuntimeConfig) -> Value {
+    let ext_costs = &config.wasm_config.ext_costs;
+    let mut ext = Map::new();
+    for cost in ExtCosts::iter() {
+        if ext_costs.compute_cost(cost) != ext_costs.gas_cost(cost).as_gas() {
+            ext.insert(cost.to_string(), json!(ext_costs.compute_cost(cost)));
+        }
+    }
+    let mut execution = Map::new();
+    let mut send = Map::new();
+    for cost in ActionCosts::iter() {
+        let fee = config.fees.fee(cost);
+        if fee.execution.compute() != fee.execution.gas().as_gas() {
+            execution.insert(cost.to_string(), json!(fee.execution.compute()));
+        }
+        for component in [&fee.send_sir, &fee.send_not_sir] {
+            if component.compute() != component.gas().as_gas() {
+                send.insert(cost.to_string(), json!(component.compute()));
+            }
+        }
+    }
+    json!({"ext": ext, "action_execution": execution, "action_send": send})
 }
 
 fn fee_json(config: &RuntimeConfig, cost: ActionCosts) -> Value {
@@ -49,6 +78,7 @@ fn config_json(store: &RuntimeConfigStore, version: ProtocolVersion) -> String {
     let view = RuntimeConfigView::from(config.clone());
     let dump = ConfigDump {
         view,
+        compute_costs: compute_json(config),
         runtime_finance: json!({
             "account_cost_increase": ProtocolFeature::AccountCostIncrease.enabled(version),
             "gas_refund_penalty": [config.fees.gas_refund_penalty.numer(), config.fees.gas_refund_penalty.denom()],
@@ -58,6 +88,7 @@ fn config_json(store: &RuntimeConfigStore, version: ProtocolVersion) -> String {
             "strict_nonce": ProtocolFeature::StrictNonce.enabled(version),
             "v1_transactions": ProtocolFeature::GasKeys.enabled(version),
             "transaction_size_includes_signature": ProtocolFeature::PostQuantumSignatures.enabled(version),
+            "unique_chunk_transactions": ProtocolFeature::UniqueChunkTransactions.enabled(version),
         }),
         runtime_extra: json!({
             "action_fees": {
@@ -86,6 +117,8 @@ fn config_json(store: &RuntimeConfigStore, version: ProtocolVersion) -> String {
             "delegate_v2": ProtocolFeature::DelegateV2.enabled(version),
             "yield_with_id": ProtocolFeature::YieldWithId.enabled(version),
             "eth_implicit_global_contract": ProtocolFeature::EthImplicitGlobalContract.enabled(version),
+            "enforce_per_receipt_storage_proof_limit":
+                ProtocolFeature::EnforcePerReceiptStorageProofLimit.enabled(version),
         }),
     };
     serde_json::to_string_pretty(&dump).expect("runtime configuration serialization cannot fail")

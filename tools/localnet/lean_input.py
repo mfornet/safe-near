@@ -756,7 +756,7 @@ def expected_outcomes(bundle: dict) -> list[dict]:
             shown = [str(status)]
         rows.append({"id": outcome["id"], "executor": view["executor_id"], "status": shown, "logs": view["logs"],
                      "receiptIds": [b58(r).hex() for r in view["receipt_ids"]], "gasBurnt": view["gas_burnt"],
-                     "tokensBurnt": int(view["tokens_burnt"])})
+                     "computeUsage": outcome["computeUsage"], "tokensBurnt": int(view["tokens_burnt"])})
     return rows
 
 
@@ -776,7 +776,8 @@ def lean_outcomes(trace: dict, request: dict) -> list[dict]:
         identifier = transaction_hashes[index] if index < len(transaction_hashes) else native.get(row["id"], f"model {row['id']}")
         rows.append({"id": identifier, "executor": outcome["executorId"], "status": shown, "logs": outcome["logs"],
                      "receiptIds": [native.get(r, f"model {r}") for r in outcome["receiptIds"]],
-                     "gasBurnt": outcome["gasBurnt"], "tokensBurnt": int(outcome["tokensBurnt"])})
+                     "gasBurnt": outcome["gasBurnt"], "computeUsage": outcome["computeUsage"],
+                     "tokensBurnt": int(outcome["tokensBurnt"])})
     return rows
 
 
@@ -798,7 +799,7 @@ def compare(bundle: dict, request: dict, answer: dict, extra: list[str]) -> None
     if len(want) != len(got):
         raise Mismatch(f"outcomes (count {len(want)} != {len(got)})", extra)
     for index, (left, right) in enumerate(zip(want, got)):
-        for field in ("id", "executor", "status", "logs", "receiptIds", "gasBurnt", "tokensBurnt"):
+        for field in ("id", "executor", "status", "logs", "receiptIds", "gasBurnt", "computeUsage", "tokensBurnt"):
             if left[field] != right[field]:
                 raise Mismatch(f"outcomes[{index}].{field}", extra)
     outgoing = [bytes(row["bytes"]).hex() for row in trace["outgoingBytes"]]
