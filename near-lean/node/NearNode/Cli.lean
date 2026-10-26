@@ -2,6 +2,7 @@ import NearNode
 import NearNode.Net.Uv
 import NearNode.Network.Run
 import NearNode.Validator.Run
+import NearNode.Chain.ShardTracker
 
 /-!
 `near-lean-node`: the node executable.
@@ -23,7 +24,7 @@ def usage : String :=
     "       near-lean-node validator --chain-dir DIR --node-key FILE --validator-key FILE --boot PEERID@IP:PORT\n" ++
     "           [--listen PORT] [--seconds N] [--report FILE] [--applied-log FILE] [--stop-file FILE] [--configs DIR] [--quiet]\n" ++
     "           [--rpc-addr IP:PORT] [--genesis-config FILE] [--store DIR]\n" ++
-    "           [--home NEARD_HOME] [--log-format text|json]\n" ++
+    "           [--home NEARD_HOME] [--log-format text|json] [--tracked-shards JSON|all|none]\n" ++
     "           [--delays ENDORSEMENT,BASE,CAP] [--gc-epochs-to-keep N]"
 
 /-- The value after a flag. -/
@@ -128,8 +129,8 @@ def withHome (args : List String) : IO (List String) := do
               out := out ++ ["--boot", n]
   return out
 
-def validatorCommand (args : List String) : IO UInt32 := do
-  let args ← withHome args
+def validatorCommand (origArgs : List String) : IO UInt32 := do
+  let args ← withHome origArgs
   let some chainDir := flagValue args "--chain-dir" |
     IO.eprintln usage;
     return 2
@@ -144,8 +145,37 @@ def validatorCommand (args : List String) : IO UInt32 := do
     return 2
   let delays :=
     ((flagValue args "--delays").map fun t => (t.splitOn ",").filterMap String.toNat?).getD []
+  -- `tracked_shards_config`: the flag, else the `config.json` of the home, else what nearcore defaults to (`NoShards`:
+  -- the shards a validator is a chunk producer of, and nothing else)
+  let tracked : Chain.TrackedShardsConfig ←
+    match flagValue args "--tracked-shards" with
+    | some text =>
+      match Chain.TrackedShardsConfig.ofFlag text with
+      | .ok c =>
+        pure c
+      | .error e =>
+        throw (IO.userError e)
+    | none =>
+      match flagValue origArgs "--home" with
+      | none =>
+        pure .noShards
+      | some home =>
+        let configFile : System.FilePath := s!"{home}/config.json"
+        if ← configFile.pathExists then
+          match Lean.Json.parse (← IO.FS.readFile configFile) with
+          | .error e =>
+            throw (IO.userError s!"{configFile}: {e}")
+          | .ok cfg =>
+            match Chain.TrackedShardsConfig.ofConfig cfg with
+            | .ok c =>
+              pure c
+            | .error e =>
+              throw (IO.userError s!"{configFile}: {e}")
+        else
+          pure .noShards
   let opts : Validator.Options :=
-    { chainDir, nodeKey, validatorKey, peer,
+    { chainDir, nodeKey, validatorKey, peer, tracked,
+      replayAll := args.contains "--replay-all-witnesses",
       configs := (flagValue args "--configs").getD "near-lean/vm/configs",
       listen := (flagValue args "--listen").bind String.toNat? |>.map (·.toUInt16),
       seconds := (flagValue args "--seconds").bind String.toNat?,

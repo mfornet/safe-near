@@ -1,6 +1,8 @@
 import NearNode.Validator.State
 import NearNode.Validator.Prepare
 import NearNode.Validator.WitnessMake
+import NearNode.Validator.Replay
+import NearNode.Chain.ShardTracker
 import NearNode.Validator.Wire
 import NearNode.Validator.Witness
 import NearNode.Validator.Messages
@@ -43,6 +45,13 @@ structure Applying where
   startedMs : Nat
   task : Task (Except IO.Error (Except String (Progress × Array ShardReport × Array Store.Op)))
 
+/-- A state witness being replayed on a thread of its own (`Replay.replayWitness`). -/
+structure Replaying where
+  witness : ChunkStateWitness
+  startedMs : Nat
+  /-- Whether the node holds the shard (it then compares the replay with its own execution too). -/
+  task : Task (Except IO.Error (Except String Replayed))
+
 /-- What the validator needs besides its state. -/
 structure Env where
   signer : Signer
@@ -74,6 +83,12 @@ structure Env where
   applying : IO.Ref (Option Applying)
   /-- When the previous turn of the loop began, to measure how long the loop is away (0: none yet). -/
   lastTurn : IO.Ref Nat
+  /-- The shards the node tracks (`tracked_shards_config` and, as a validator, the shards it is a chunk producer of). -/
+  tracker : ShardTracker := {}
+  /-- Replay every witness, also those of shards the node holds (otherwise only the others are replayed). -/
+  replayAll : Bool := false
+  /-- The witnesses being replayed. -/
+  replays : IO.Ref (Array Replaying)
 
 def Env.me (e : Env) : AccountId :=
   e.signer.accountId

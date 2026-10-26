@@ -265,6 +265,19 @@ def schedulerInput (block : Block) (layout : ShardLayout) (prevHash : CryptoHash
         requests := ← Near.Bandwidth.blockRequestsOfBorsh (Codec.encode sortedRequests).toList,
         prevBlockHash := prevHash.bytes.toList }
 
+/-- The context of the chunk of `chunk.shardId` in the block with header view `v`, whose previous block is `prevRec`
+(`ApplyChunkBlockContext` and `ApplyState` of `NightshadeRuntime::process_state_update`). -/
+def chunkContext (p : Params) (v : HeaderView) (epoch : Near.Node.Chain.EpochData)
+    (prevRec : BlockRec) (chunk : ShardChunkHeader) (layout : ShardLayout)
+    (provider : Near.EpochInfo) (update : Option Epoch.AccountsUpdate)
+    (input : ChainReplay.ShardChunk.Input) : ChunkContext :=
+  { protocol := p.protocol, height := v.height.toNat, timestamp := v.timestamp.toNat,
+    epochHeight := epoch.info.view.epochHeight, gasPrice := prevRec.view.nextGasPrice.val,
+    gasLimit := chunk.gasLimit.toNat, randomSeed := v.randomValue.bytes.toList,
+    chainId := p.chainId, shardId := chunk.shardId.toNat,
+    shardIds := layout.shardIds.toList.map (·.toNat), epochInfo := provider,
+    update := update.map modelUpdate, scheduler := input }
+
 /-! ### Applying a block -/
 
 /-- A chain-state answer as a failure message. -/
@@ -381,13 +394,7 @@ def applyBlock (prof : Option Prof) (p : Params) (st : Near.Node.Chain.ChainStat
               match prevExtra? with
               | some (.v5 e) => e.validatorProposals
               | _ => #[]))
-    let ctx : ChunkContext :=
-      { protocol := p.protocol, height := v.height.toNat, timestamp := v.timestamp.toNat,
-        epochHeight := epoch.info.view.epochHeight, gasPrice := prevRec.view.nextGasPrice.val,
-        gasLimit := chunk.gasLimit.toNat, randomSeed := v.randomValue.bytes.toList,
-        chainId := p.chainId, shardId := shard.toNat,
-        shardIds := layout.shardIds.toList.map (·.toNat), epochInfo := provider,
-        update := update.map modelUpdate, scheduler := input }
+    let ctx := chunkContext p v epoch prevRec chunk layout provider update input
     let (prepared, cache) ←
       timed prof "decode-state" fun _ =>
           prepare entries (if isNew then b.transactions else #[]) pending
@@ -453,7 +460,7 @@ def applyBlock (prof : Option Prof) (p : Params) (st : Near.Node.Chain.ChainStat
         | some _ => "other"
         | none => "unparsed"
       IO.eprintln
-        s!"warning: the state change log of shard {shard} at {v.height} missed {missed.size} changed key(s): {(missed.toList.take 6).map describe}"
+          s!"warning: the state change log of shard {shard} at {v.height} missed {missed.size} changed key(s): {(missed.toList.take 6).map describe}"
     let extra : ChunkExtra :=
       match extra with
       | .v5 e => .v5 { e with stateRoot := changes.newRoot }
@@ -464,7 +471,9 @@ def applyBlock (prof : Option Prof) (p : Params) (st : Near.Node.Chain.ChainStat
           .set .outgoingReceipts (blockShardKey hash layout shard) (Codec.encode outgoing),
           .set .trieChanges (blockShardKey hash layout shard) (Store.changesBytes changes)] ++
         (if changeLog.isEmpty then #[]
-        else #[.set .stateChanges (blockShardKey hash layout shard) (Near.Node.Chain.stateChangesBytes changeLog)])
+        else
+          #[.set .stateChanges (blockShardKey hash layout shard)
+              (Near.Node.Chain.stateChangesBytes changeLog)])
     ops := ops ++ shardOps
     pr :=
       { pr with

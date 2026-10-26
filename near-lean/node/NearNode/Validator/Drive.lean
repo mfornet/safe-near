@@ -673,6 +673,7 @@ def Env.tick (e : Env) : IO Unit := do
     return
   e.noteTurn
   e.drainTxQueue
+  e.pollReplays
   e.tryApply
   let stale ← e.tipIsStale
   if stale then

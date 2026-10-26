@@ -1,6 +1,7 @@
 import Lean.Data.Json
 import NearNode.Net.Uv
 import NearNode.Chain.Bootstrap
+import NearNode.Chain.ShardTracker
 import NearNode.Network.Run
 import NearNode.Validator.Drive
 import NearNode.Rpc.Server
@@ -41,6 +42,10 @@ structure Options where
   genesisConfig : Option System.FilePath := none
   /-- The directory of the chain store (`data/` of a neard home); none: nothing is kept across a restart. -/
   store : Option System.FilePath := none
+  /-- Replay every witness, also those of the shards the node holds (a test of the replay). -/
+  replayAll : Bool := false
+  /-- `tracked_shards_config` (nearcore's default for a validator: `NoShards`, i.e. the shards it produces chunks for). -/
+  tracked : TrackedShardsConfig := .noShards
   /-- `gc_num_epochs_to_keep` (0: collect nothing). -/
   gcEpochs : Nat := 5
   /-- `min_block_production_delay`, `max_block_production_delay`, `max_block_wait_delay`, in ms. -/
@@ -92,6 +97,7 @@ def run (o : Options) : IO UInt32 := do
         IO.eprintln
             s!"[{((← IO.monoMsNow) - started) / 1000}.{(((← IO.monoMsNow) - started) % 1000) / 100}s] {msg}"
   log s!"validator {signer.accountId.val}, node {nodeKey.peerId.key.toText}"
+  log s!"tracked_shards_config {o.tracked.describe}"
   log
       s!"garbage collection keeps {o.gcEpochs} epochs (gc_num_epochs_to_keep{if o.gcEpochs == 0 then ": nothing is collected" else ""})"
   let total := numTotalParts boot.genesis.setup.config.numBlockProducerSeats
@@ -136,7 +142,8 @@ def run (o : Options) : IO UInt32 := do
             | some f => some <$> IO.FS.Handle.mk f .write
             | none => pure none),
       nowMs := IO.monoMsNow, gcEpochs := o.gcEpochs, applying := ← IO.mkRef none,
-      lastTurn := ← IO.mkRef 0 }
+      replays := ← IO.mkRef #[], tracker := { config := o.tracked, me := some signer.accountId },
+      replayAll := o.replayAll, lastTurn := ← IO.mkRef 0 }
   let stop ← IO.mkRef false
   let connected ← IO.mkRef false
   let rpcStop ← IO.mkRef false

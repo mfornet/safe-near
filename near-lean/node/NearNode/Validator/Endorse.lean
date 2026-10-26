@@ -56,7 +56,61 @@ def Env.endorse (e : Env) (header : ShardChunkHeader) : IO Unit := do
         e.toPeer (.versionedChunkEndorsement en)
     e.bump "endorsementsSent"
 
-/-- The witness, once rebuilt: acknowledged and checked as soon as its previous block is applied. -/
+/-- Starts the replay of a witness on a thread of its own: the chunk validation of a shard whose state the node does not
+hold uses nothing but the witness and the chain's headers. -/
+def Env.startReplay (e : Env) (w : ChunkStateWitness) : IO Unit := do
+  let .v2 v := w
+  let s ← e.get
+  let re : ReplayEnv :=
+    { st := s.st, params := e.params, blockOf := fun h => s.blocks[h.bytes]?,
+      genesisExtra := fun shard => s.pr.extras[(s.st.genesisHash.bytes, shard)]?,
+      cache := s.pr.cache, validityPeriod := e.validityPeriod, code := e.code }
+  let started ← e.nowMs
+  let task ← IO.asTask (replayWitness re v).run Task.Priority.dedicated
+  e.replays.modify (·.push { witness := w, startedMs := started, task })
+
+/-- Takes up the replays that have finished: a valid witness is endorsed. -/
+def Env.pollReplays (e : Env) : IO Unit := do
+  let running ← e.replays.get
+  if running.isEmpty then
+    return
+  let mut keep : Array Replaying := #[]
+  for r in running do
+    unless ← IO.hasFinished r.task do
+      keep := keep.push r
+      continue
+    let .v2 v := r.witness
+    let header := v.chunkHeader
+    let took := (← e.nowMs) - r.startedMs
+    let outcome : Except String Replayed :=
+      match r.task.get with
+      | .ok o => o
+      | .error err => .error s!"the thread failed: {err}"
+    match outcome with
+    | .ok replayed =>
+      e.bump "witnessesValid"
+      e.bump "witnessesReplayed"
+      e.bumpBy "replayMillis" took
+      -- the compiled code the replay decoded stays for the next one
+      e.state.modify fun s =>
+          { s with
+            pr :=
+              { s.pr with
+                cache :=
+                  { s.pr.cache with
+                    byLabel :=
+                      replayed.cache.byLabel.fold
+                        (fun m k x => if m.contains k then m else m.insert k x)
+                        s.pr.cache.byLabel } } }
+      e.endorse header
+    | .error m =>
+      e.bump "witnessesInvalid"
+      e.log
+          s!"state witness of shard {header.shardId} at height {header.heightCreated} refused by replay: {m}"
+  e.replays.set keep
+
+/-- The witness, once rebuilt: acknowledged and checked as soon as its previous block is applied. A shard whose state
+the node holds is checked against its own execution of the same blocks; every other shard is replayed from the witness. -/
 def Env.processWitness (e : Env) (w : ChunkStateWitness) : IO Unit := do
   let .v2 v := w
   let s ← e.get
@@ -66,13 +120,26 @@ def Env.processWitness (e : Env) (w : ChunkStateWitness) : IO Unit := do
   if !s.applied.contains header.prevBlockHash.bytes then
     e.state.modify fun s => { s with waitingWitnesses := s.waitingWitnesses.push w }
     return
-  match checkWitness s e.code w with
-  | .ok () =>
-    e.bump "witnessesValid"
-    e.endorse header
-  | .error m =>
-    e.bump "witnessesInvalid"
-    e.log s!"state witness of shard {header.shardId} at height {header.heightCreated} refused: {m}"
+  let holds := s.pr.extras.contains (header.prevBlockHash.bytes, header.shardId)
+  if holds && !e.replayAll then
+    match checkWitness s e.code w with
+    | .ok () =>
+      e.bump "witnessesValid"
+      e.endorse header
+    | .error m =>
+      e.bump "witnessesInvalid"
+      e.log
+          s!"state witness of shard {header.shardId} at height {header.heightCreated} refused: {m}"
+  else
+    if holds then
+      -- the node's own execution is the reference: a replay that disagrees is the replay's fault
+      match checkWitness s e.code w with
+      | .ok () =>
+        pure ()
+      | .error m =>
+        e.log
+            s!"state witness of shard {header.shardId} at height {header.heightCreated}: own check: {m}"
+    e.startReplay w
 
 /-- A part of a state witness (`handle_partial_encoded_state_witness` and its forward). -/
 def Env.onWitnessPart (e : Env) (w : PartialEncodedStateWitness) : IO Unit := do

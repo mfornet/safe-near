@@ -13,6 +13,7 @@ import NearNode.Net.Uv
 import NearNode.Network
 import NearNode.Chain.Genesis
 import NearNode.Chain.Persist
+import NearNode.Chain.ShardTracker
 import NearNode.Validator.ReedSolomon
 import NearNode.Validator.Signer
 import NearNode.Validator.Chunk
@@ -27,6 +28,7 @@ import NearNode.Validator.Pool
 import NearNode.Validator.Prepare
 import NearNode.Validator.State
 import NearNode.Validator.WitnessMake
+import NearNode.Validator.Replay
 import NearNode.Validator.Node
 import NearNode.Validator.Endorse
 import NearNode.Validator.Follow

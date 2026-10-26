@@ -123,6 +123,10 @@ def start_lean(home: Path, work: Path, seconds: int, binary: Path, extra: list[s
                "--boot", f"{boot_key}@127.0.0.1:{port}", "--listen", str(localnet.network_port(TOPOLOGY, 1)),
                "--seconds", str(seconds), "--report", str(work / "report.json"),
                "--applied-log", str(work / "applied.jsonl"), "--stop-file", str(work / "stop"), "--configs", str(ROOT / "near-lean/vm/configs")]
+    # the tracked_shards_config of the Lean node's home (nearcore's `neard localnet` writes AllShards), as a validator would read it
+    config = json.loads((home / "node1/config.json").read_text())
+    if "tracked_shards_config" in config and "--tracked-shards" not in (extra or []):
+        command += ["--tracked-shards", json.dumps(config["tracked_shards_config"])]
     command += extra or []
     log = (work / log_name).open("a" if log_name != "lean.log" else "w")
     return subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, cwd=ROOT, start_new_session=True)
@@ -358,12 +362,13 @@ def main() -> None:
     parser.add_argument("--stall-at", type=int, default=None,
                         help="seconds after which the Lean node is stopped (default: 30 s before the end)")
     parser.add_argument("--gc-epochs", type=int, default=None, help="--gc-epochs-to-keep of the Lean node (default: its own)")
+    parser.add_argument("--lean-arg", action="append", default=[], help="an extra argument for the Lean node (repeatable)")
     options = parser.parse_args()
     set_topology(options.topology)
     home = prepare(options.work)
     localnet.start(TOPOLOGY)
     lean = start_lean(home, options.work, options.duration + 120, options.binary,
-                      ["--gc-epochs-to-keep", str(options.gc_epochs)] if options.gc_epochs is not None else None)
+                      (["--gc-epochs-to-keep", str(options.gc_epochs)] if options.gc_epochs is not None else []) + options.lean_arg)
     workload = None
     stall = None
     try:

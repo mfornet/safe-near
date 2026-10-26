@@ -41,8 +41,12 @@ private def globalCodeId : GlobalContractCodeIdentifier → Wasm.GlobalContractI
 private def le (b : ByteArray) : Nat :=
   b.toList.foldr (fun x acc => acc * 256 + x.toNat) 0
 
-/-- Decode the complete entries of a shard (in any order; trie order gives a stable numbering). -/
-def decodeState (entries : Array (ByteArray × ByteArray)) : M Decoded := do
+/-- Decode the complete entries of a shard (in any order; trie order gives a stable numbering).
+
+With `proved` the entries are what a state witness proves (`Trie::from_recorded_storage`): the nodes and values a
+chunk read, without the contract code (`ExcludeContractCodeFromStateWitness`). An account whose code is not among the
+entries has it from the cache, by the hash its record names; code that the cache lacks is an error that says which. -/
+def decodeState (entries : Array (ByteArray × ByteArray)) (proved : Bool := false) : M Decoded := do
   let mut accounts : Array (String × Account) := #[]
   let mut keys : List ((String × List UInt8) × Near.AccessKey) := []
   let mut gasNonces : List ((String × List UInt8 × Nat) × Nat) := []
@@ -173,7 +177,14 @@ def decodeState (entries : Array (ByteArray × ByteArray)) : M Decoded := do
       | .v2 .. => none
     let label? := hash?.map fun h => Near.StateEncoding.base58 h.bytes.toList
     unless contracts[name]? == label? do
-      fail "account code hash without a matching contract record"
+      match proved, contracts[name]?, label? with
+      | true, none, some l =>
+        -- the code is not in the witness: the node has it by hash, or must ask for it
+        unless (← get).cache.byLabel.contains l do
+          fail s!"missing contract code {l}"
+        modify fun st => { st with used := if st.used.contains l then st.used else st.used.push l }
+      | _, _, _ =>
+        fail "account code hash without a matching contract record"
     let cache := (← get).cache
     let model ← accountRow account
     let model :=
