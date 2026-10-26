@@ -129,6 +129,7 @@ A file holds one scenario object or an array of them.
 | `10_callbacks.json` | Transfer-call interleavings: reverse resolution order, receiver spending or unregistering before the refund, sender unregistering (burn) or re-registering, replayed and forged resolutions, every promise-result shape, `ft_on_transfer` landing on the contract itself, a payout to the contract itself |
 | `20_arguments.json` | serde_json acceptance as the binary sees it: nesting depth in ignored values, UTF-8 and escapes in ignored and parsed strings, numbers, account ids, options, array forms, whitespace, BOM |
 | `30_logs.json` | Memos at, and one byte past, the total log length limit, including multibyte ones |
+| `35_receipts.json` | Validation of the receipts a transfer-call creates: no gas for `ft_on_transfer` at exactly 30 Tgas, more than the total prepaid gas limit above 1030 Tgas |
 | `40_gas.json` (generated) | Every method at `bound` and `bound-1` on a trie whose keys share prefixes with the touched ones; warm and cold cache; long arguments (ignored strings, arrays, escapes, whitespace, leading zeros); promise results up to 20 KB in the costliest shapes |
 | `50_resources.json` | `u128` edges of balances, supply and the contract balance; balance exceeded; the 770-byte zero-balance exemption; locked balance; huge storage usage; deposits on views |
 | `60_random.json` (generated) | Seeded random interleavings of every method across 7 accounts, two of them 64 characters long; delayed callbacks with random results |
@@ -136,13 +137,13 @@ A file holds one scenario object or an array of them.
 
 ## Findings
 
-The first round found four gaps in the model. All four are now fixed in
-the model, and the scenarios that found them pass.
+The first round found four gaps in the model, and a fifth appeared after
+merging `main`. All five are now fixed in the model, and the scenarios that
+found them pass.
 
 1. **Log limits.** A memo longer than 16340 bytes pushes the logs past
-   `max_total_log_length`. The binary then fails with
-   `The length of a total log is N but the limit is 16384`, while the model
-   succeeded.
+   `max_total_log_length`. The binary then fails with a log-limit host error,
+   while the model succeeded.
    - **Fix:** a generic `NearInterface.logLimitError`, a new
      `ModelFailure.logLimit`, and the check in `contractStep`. Logs come
      before promises in every method, so this check precedes the balance
@@ -175,3 +176,21 @@ the model, and the scenarios that found them pass.
    - **Consequence:** the 5 Tgas the transfer-call gives its callback is
      below this bound, as it already was. For callbacks, `Refines` only ever
      promises "matches or runs out of gas with no effects".
+5. **Receipt validation.** `main` added nearcore's validation of the
+   receipts a call creates at the boundary (`checkVMReceipts`, reported as
+   `NewReceiptValidationError`). `ft_transfer_call` with exactly 30 Tgas
+   prepaid gives `ft_on_transfer` zero gas. With more than 1030 Tgas it gives
+   `ft_on_transfer` more than `max_total_prepaid_gas`. In both cases the
+   binary fails, where the model succeeded.
+   - **Fix:** the interface's `ReceiptValidation.callReceiptsError` checks a
+     call's function-call and transfer receipts, and returns nearcore's
+     message. `contractStep` applies it after the balance check, as
+     `ModelFailure.receiptInvalid`.
+   - **Boundary:** the runtime now reports these errors with the same
+     messages, through one `runtimeFailure` that `observe` and the seam
+     share, instead of the `repr` of the error.
+   - **Consequence:** `WithdrawAvailableAtBoundary` and its corollaries also
+     assume the runtime accepts the payout receipt.
+   - **Unreachable limits:** the argument and receipt size limits cannot be
+     reached by wNEAR. `ft_transfer_call` forwards all but 30 Tgas, so a
+     `msg` near 4 MB runs out of gas before its receipt exists.

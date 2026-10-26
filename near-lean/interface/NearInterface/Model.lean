@@ -26,6 +26,9 @@ inductive ModelFailure (Panic : Type)
   /-- A log exceeds the protocol's limits on the number or total length of
   logs (`logLimitError`). -/
   | logLimit (error : HostError)
+  /-- The runtime rejects a receipt the call created
+  (`ReceiptValidation.callReceiptsError`), with nearcore's message. -/
+  | receiptInvalid (message : String)
 
 /-- A successful call. -/
 structure Outcome (State Ret Promise : Type) where
@@ -109,6 +112,7 @@ def ModelFailure.toFailure : ModelFailure M.Panic → Failure
   | .balanceExceeded => .balanceExceeded
   | .lackBalanceForState deficit => .lackBalanceForState deficit
   | .logLimit error => .other error.message
+  | .receiptInvalid message => .other message
 
 end ContractModel
 

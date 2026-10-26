@@ -1,5 +1,6 @@
 import NearRuntime.Apply
 import NearInterface.Refines
+import NearInterface.ReceiptValidation
 import NearVM.Fuel
 import NearVM.StorageListing
 
@@ -127,6 +128,51 @@ def failureOf (error : FunctionCallError) : Failure :=
     | .methodResolveError .methodNotFound => .methodNotFound
     | error => .other error.message
 
+open NearInterface.ReceiptValidation in
+/-- nearcore's `Display` of an action validation error. A public key is
+printed in hex (nearcore prints `ed25519:` and base58). -/
+def _root_.Near.ActionsValidationError.message : ActionsValidationError → String
+  | .deleteActionMustBeFinal => "The delete action must be the last action in transaction"
+  | .totalPrepaidGasExceeded total limit => totalPrepaidGasExceeded total limit
+  | .totalNumberOfActionsExceeded count limit => totalNumberOfActionsExceeded count limit
+  | .totalNumberOfDeployActionsExceeded count limit =>
+    s!"The total number of deploy actions {count} exceeds the per-receipt limit {limit}"
+  | .addKeyMethodNamesNumberOfBytesExceeded total limit =>
+    s!"The total number of bytes in allowed method names {total} exceeds the maximum allowed number {limit} in a AddKey action"
+  | .addKeyMethodNameLengthExceeded length limit =>
+    s!"The length of some method name {length} exceeds the maximum allowed length {limit} in a AddKey action"
+  | .integerOverflow => integerOverflow
+  | .invalidAccountId id => s!"Invalid account ID `{id}`"
+  | .contractSizeExceeded size limit =>
+    s!"The length of the contract size {size} exceeds the maximum allowed size {limit} in a DeployContract action"
+  | .functionCallMethodNameLengthExceeded length limit => methodNameLengthExceeded length limit
+  | .functionCallArgumentsLengthExceeded length limit => argumentsLengthExceeded length limit
+  | .functionCallZeroAttachedGas => zeroAttachedGas
+  | .unsuitableStakingKey key =>
+    s!"The staking key must be ristretto compatible ED25519 key. {String.join (key.map fun b => String.ofList [Nat.digitChar (b.toNat / 16), Nat.digitChar (b.toNat % 16)])} is provided instead."
+  | .delegateActionMustBeOnlyOne => "The actions can contain the ony one DelegateAction"
+  | .gasKeyFunctionCallAllowanceNotAllowed =>
+    "Gas keys with FunctionCall permission cannot have an allowance set"
+  | .gasKeyInvalidNumNonces requested limit =>
+    s!"gas key requested invalid number of nonces: {requested} (must be between 1 and {limit})"
+  | .addGasKeyWithNonZeroBalance balance =>
+    s!"Adding a gas key with non-zero balance is not allowed: balance = {balance}"
+
+open NearInterface.ReceiptValidation in
+def _root_.Near.ReceiptValidationError.message : ReceiptValidationError → String
+  | .receiptSizeExceeded size limit => receiptSizeExceeded size limit
+  | .actionsValidation error => error.message
+
+/-- The boundary's reading of a receipt failure. A receipt the call created
+that the runtime rejects reports nearcore's `NewReceiptValidationError` message. -/
+def runtimeFailure : RuntimeError → Failure
+  | .functionCallError error => failureOf error
+  | .executionIssue issue => .executionIssue issue.message
+  | .lackBalanceForState _ deficit => .lackBalanceForState deficit
+  | .newReceiptValidationError error =>
+    .other (NearInterface.ReceiptValidation.newReceiptInvalid error.message)
+  | error => .other (repr error).pretty
+
 /-- Project a VM outcome onto the boundary, applying the storage-stake check
 to the post-state. A failure, the VM's or the stake check's, rolls back
 storage, balance, usage, receipts and the trie's prospective writes, and
@@ -146,7 +192,7 @@ def observe (ctx : Context) (storage : List (Bytes × Bytes)) (outcome : VMOutco
     | some issue => failed (.executionIssue issue.message)
     | none =>
     match receiptError with
-    | some error => failed (.other (repr error).pretty)
+    | some error => failed (runtimeFailure error)
     | none =>
       let deficit := stakeDeficit ctx.protocol outcome.storageUsage outcome.balance ctx.locked
       if deficit > 0 then failed (.lackBalanceForState deficit)

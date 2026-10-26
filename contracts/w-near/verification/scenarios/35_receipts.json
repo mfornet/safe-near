@@ -1,0 +1,17 @@
+[
+  {
+    "name": "receipts: validation of the receipts a transfer-call creates",
+    "description": "ft_on_transfer gets the prepaid gas minus 30 Tgas: none at exactly 30 Tgas, more than max_total_prepaid_gas (1000 Tgas) above 1030 Tgas. The runtime rejects such receipts after the call succeeded.",
+    "state": {"accounts": {"alice.near": "1000", "bob.near": "0"}},
+    "blocks": [{"receipts": [
+      {"probe": true, "label": "zero-gas", "call": {"method": "ft_transfer_call", "deposit": "1", "gas": "30000000000000", "args": {"receiver_id": "bob.near", "amount": "1", "msg": ""}}, "expect": "other:has to be a positive number"},
+      {"probe": true, "label": "one-gas", "call": {"method": "ft_transfer_call", "deposit": "1", "gas": "30000000000001", "args": {"receiver_id": "bob.near", "amount": "1", "msg": ""}}, "expect": "ok"},
+      {"probe": true, "label": "at-max-prepaid", "call": {"method": "ft_transfer_call", "deposit": "1", "gas": "1030000000000000", "args": {"receiver_id": "bob.near", "amount": "1", "msg": ""}}, "expect": "ok"},
+      {"probe": true, "label": "above-max-prepaid", "call": {"method": "ft_transfer_call", "deposit": "1", "gas": "1030000000000001", "args": {"receiver_id": "bob.near", "amount": "1", "msg": ""}}, "expect": "other:exceeds the limit"},
+      {"probe": true, "label": "huge-prepaid", "call": {"method": "ft_transfer_call", "deposit": "1", "gas": "18446744073709551615", "args": {"receiver_id": "bob.near", "amount": "1", "msg": ""}}},
+      {"probe": true, "label": "zero-gas-long-memo-fits", "call": {"method": "ft_transfer_call", "deposit": "1", "gas": "30000000000000", "argsText": ["{\"receiver_id\":\"bob.near\",\"amount\":\"1\",\"msg\":\"\",\"memo\":\"", {"repeat": "m", "times": 16000}, "\"}"]}, "expect": "other:has to be a positive number"},
+      {"probe": true, "label": "zero-gas-memo-over-log-limit", "call": {"method": "ft_transfer_call", "deposit": "1", "gas": "30000000000000", "argsText": ["{\"receiver_id\":\"bob.near\",\"amount\":\"1\",\"msg\":\"\",\"memo\":\"", {"repeat": "m", "times": 17000}, "\"}"]}, "expect": "other:exceeds the limit 16384"},
+      {"probe": true, "label": "zero-gas-implicit-sender", "call": {"from": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "method": "ft_transfer_call", "deposit": "1", "gas": "30000000000000", "args": {"receiver_id": "bob.near", "amount": "1", "msg": ""}}, "expect": "panic:is not registered"}
+    ]}]
+  }
+]

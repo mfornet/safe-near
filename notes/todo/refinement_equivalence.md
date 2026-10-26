@@ -421,9 +421,11 @@ statement, the instance, the model extensions, re-proved specs and tests.
   itself: the kernel cannot decode the 185 KB binary within 15 GB.
   Before the proof, `just wnear-scenarios` (`contracts/w-near/verification/scenarios`)
   checks the statement along timelines of receipts with delayed callbacks.
-  Its first round fixed four model gaps: log limits (`ModelFailure.logLimit`),
-  UTF-8 in ignored JSON strings, and in `gasBound` the fees of a transfer to
-  an implicit account and the bytes of the promise result a callback parses.
+  It fixed five model gaps: log limits (`ModelFailure.logLimit`), UTF-8 in
+  ignored JSON strings, the validation of the receipts a call creates
+  (`ModelFailure.receiptInvalid`, reported at the boundary with nearcore's
+  messages), and in `gasBound` the fees of a transfer to an implicit account
+  and the bytes of the promise result a callback parses.
 
 ### linkdrop
 

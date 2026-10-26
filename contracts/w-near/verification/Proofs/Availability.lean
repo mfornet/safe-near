@@ -71,7 +71,7 @@ theorem deposit_available : DepositAvailable := by
 @[blueprint "thm:withdraw-available-boundary"
   (statement := /-- \cref{spec:withdraw-available-boundary} holds. -/)]
 theorem withdraw_available_at_boundary : WithdrawAvailableAtBoundary := by
-  intro cfg s ctx amount a s' hs hreg hamt hdep hbound hbal hrent hlog
+  intro cfg s ctx amount a s' hs hreg hamt hdep hbound hbal hrent hlog hreceipts
   have h := withdraw_available cfg s (Env.ofContext ctx) amount hs hreg hamt hdep hbound
   rw [step_nearWithdraw] at h
   unfold contractStep
@@ -86,6 +86,9 @@ theorem withdraw_available_at_boundary : WithdrawAvailableAtBoundary := by
     rw [hdep] at hlt
     exact absurd hlt (Nat.not_lt.mpr (Nat.add_le_add_right hbal 1))
   · split
+    · rename_i hsome
+      exact absurd (hsome.symm.trans hreceipts) (by simp)
+    split
     · rename_i hpos
       change 0 < NearInterface.stakeDeficit ctx.protocol (usageAfter ctx (some s) s')
         (ctx.balance + ctx.attached - (amount + 1)) ctx.locked at hpos
@@ -131,6 +134,8 @@ theorem withdraw_available_binary {R : RuntimeInterface} {protocol : Wasm.Near.R
         totalSupply := s.totalSupply - amount }) (ctx.balance - amount) ctx.locked = 0)
     (hlog : logLimitError ctx.protocol
       [s!"Withdraw {amount} NEAR from {AccountId.ofNear ctx.predecessor}"] = none)
+    (hreceipts : ReceiptValidation.callReceiptsError ctx.protocol ctx.current ctx.signer ctx.signerPk
+      (encodeReceipts [.transfer (AccountId.ofNear ctx.predecessor) (amount + 1)]) = none)
     (hgas : gasBound ctx (.nearWithdraw amount) ≤ ctx.gasLimit) :
     (R.exec code (encode s) ctx).outcome = .ok (.receiptIndex 0) ∧
       (R.exec code (encode s) ctx).storage =
@@ -140,7 +145,7 @@ theorem withdraw_available_binary {R : RuntimeInterface} {protocol : Wasm.Near.R
   have hrep : (wnear cfg).Represents (encode s) (some s) := ⟨hs, rfl⟩
   have hm := href.transfer (c := (Call.nearWithdraw amount : Call)) hrep hwf hprot hparse hgas
   change Matches (wnear cfg) ctx (encode s) _ (contractStep ctx (some s) (.nearWithdraw amount)) at hm
-  rw [withdraw_available_at_boundary cfg s ctx amount hs hreg hamt hdep hbound hbal hrent hlog] at hm
+  rw [withdraw_available_at_boundary cfg s ctx amount hs hreg hamt hdep hbound hbal hrent hlog hreceipts] at hm
   exact ⟨hm.1, hm.2.1⟩
 
 end WNear

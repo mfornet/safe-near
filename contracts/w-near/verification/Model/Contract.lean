@@ -1,6 +1,7 @@
 import Model.Args
 import Model.Storage
 import NearInterface.Model
+import NearInterface.ReceiptValidation
 
 /-!
 # wNEAR at the function-call boundary
@@ -11,7 +12,8 @@ What `NearInterface.ContractModel` needs beyond the method semantics of
 * `contractStep`: `step` read through `Env.ofContext`, followed by the
   runtime's checks: the logs against the protocol's limits (`logLimit`), and
   on a successful call promise deposits the liquid balance cannot pay
-  (`balanceExceeded`) and the receipt's storage-stake check on the post-state
+  (`balanceExceeded`), the validation of the receipts it created
+  (`receiptInvalid`) and the receipt's storage-stake check on the post-state
   (`lackBalanceForState`);
 * the exact bytes of return values (`encodeRet`) and of the receipts the
   promises become (`encodeReceipts`), as serde_json and near-sdk 3.1.0 write
@@ -118,8 +120,10 @@ def stepLogs : Except Panic Outcome → List String
 
 /-- `step` on the context, then the runtime's checks: the logs against the
 protocol's limits, then on a success the promises' deposits against the liquid
-balance (the deposit included), and the storage stake of the account's new
-usage. A log that exceeds the limits fails the call where it is emitted, before
+balance (the deposit included), the validation of the receipts the call
+created (a transfer-call with exactly 30 Tgas gives `ft_on_transfer` no gas,
+and a long `msg` can exceed the argument and receipt size limits), and the
+storage stake of the account's new usage. A log that exceeds the limits fails the call where it is emitted, before
 a later panic or promise: every method logs before it creates promises. -/
 def contractStep (ctx : Context) (st : Option State) (c : Call) : Result :=
   let r := step (Config.ofRuntime ctx.protocol) st (Env.ofContext ctx) c
@@ -131,7 +135,10 @@ def contractStep (ctx : Context) (st : Option State) (c : Call) : Result :=
   | .ok o =>
     let available := ctx.balance + ctx.attached
     if available < o.nearOut then .error { failure := .balanceExceeded, logs := o.logs }
-    else
+    else match NearInterface.ReceiptValidation.callReceiptsError ctx.protocol ctx.current ctx.signer
+        ctx.signerPk (encodeReceipts o.promises) with
+    | some message => .error { failure := .receiptInvalid message, logs := o.logs }
+    | none =>
       let deficit := stakeDeficit ctx.protocol (usageAfter ctx st o.state) (available - o.nearOut)
         ctx.locked
       if 0 < deficit then .error { failure := .lackBalanceForState deficit, logs := o.logs }

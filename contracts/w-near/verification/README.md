@@ -138,8 +138,9 @@ What the model adds to `step` for this (`Model/Interface.lean`,
   by the runtime's checks: the logs against the protocol's limits on their
   number and total length (`logLimit`, at the log that exceeds them), then
   on a success promise deposits against the liquid balance
-  (`balanceExceeded`) and the storage stake of the new state
-  (`lackBalanceForState`).
+  (`balanceExceeded`), the runtime's validation of the receipts the call
+  created (`receiptInvalid`, with nearcore's message) and the storage stake
+  of the new state (`lackBalanceForState`).
 - **Outputs.** Return values and receipts are compared as bytes, in the field
   order and escaping serde_json and near-sdk's `ext_contract` produce.
 - **Gas.** `gasBound` is measured compute and per-argument-byte constants with
@@ -160,10 +161,10 @@ longer key prefixes with the accounts a transfer touches.
 same along timelines: an initial world and blocks of receipts, with delayed
 callbacks, their promise results and the chunk's trie cache written in the
 scenario, every receipt checked against the three clauses of `Refines`.
-Its first round found and fixed four gaps in the model (log limits, UTF-8
-in ignored JSON strings, and two missing terms in `gasBound`: transfer fees
-to implicit accounts and the promise result a callback parses); see
-`scenarios/README.md`.
+It found and fixed five gaps in the model (log limits, UTF-8 in ignored
+JSON strings, the runtime's validation of the receipts a call creates, and
+two missing terms in `gasBound`: transfer fees to implicit accounts and the
+promise result a callback parses); see `scenarios/README.md`.
 `withdraw_available_binary` shows what the statement buys: under it,
 `WithdrawAvailableAtBoundary` is a fact about the binary's execution.
 
