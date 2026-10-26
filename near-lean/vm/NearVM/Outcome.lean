@@ -37,6 +37,9 @@ structure VMOutcome where
   gasProfile : GasProfile := {}
   /-- `promise_yield_resume` payloads, in call order: (data id, payload). -/
   resumes : List (List UInt8 × List UInt8) := []
+  /-- The `storage_write` / `storage_remove` calls of a successful run, in call order. Observational: it
+  does not feed `storage`, the gas or any decision. A failed call made no effective writes: empty. -/
+  storageWrites : List StorageWrite := []
   deriving Inhabited
 
 def VMOutcome.succeeded (o : VMOutcome) : Bool := o.aborted.isNone
@@ -87,7 +90,7 @@ def VMOutcome.graphIssue (balance usage : Nat) (storage : List (List UInt8 × Li
     (o : VMOutcome) : VMOutcome :=
   { o with
     balance := balance, storageUsage := usage, storage := storage, receipts := [], returnData := .none
-    usedGas := o.burntGas, distributedGas := 0
+    usedGas := o.burntGas, distributedGas := 0, storageWrites := []
     aborted := some (.executionIssue (.interpreterError "invalid receipt dependency graph")) }
 
 def VMOutcome.checkReceipts (balance usage : Nat) (storage : List (List UInt8 × List UInt8))

@@ -171,6 +171,52 @@ def runProbes1 (cfg : RuntimeConfig) : IO Nat := do
       bad := bad + 1
   return bad
 
+/-- A module whose `main` calls `storage_write` and `storage_remove` on the keys of its data segment
+(`k1`, `zz`) with the values of its data segment (`v1`): the first write creates, the second rewrites the same
+value, the first removal removes, the second and the one of `zz` find nothing. -/
+def storageProbeModule : Module :=
+  let discard : Instr := .i64_const 0xFFFFFFFFFFFFFFFF
+  let write (key value : Nat) : List Instr :=
+    [.i64_const 2, .i64_const key.toUInt64, .i64_const 2, .i64_const value.toUInt64, discard,
+      .call 0, .drop]
+  let remove (key : Nat) : List Instr :=
+    [.i64_const 2, .i64_const key.toUInt64, discard, .call 1, .drop]
+  { types :=
+      #[{ params := [.i64, .i64, .i64, .i64, .i64], results := [.i64] },
+        { params := [.i64, .i64, .i64], results := [.i64] }, { params := [], results := [] }],
+    imports :=
+      #[{ «module» := "env", name := "storage_write", desc := .func 0 },
+        { «module» := "env", name := "storage_remove", desc := .func 1 }],
+    funcs :=
+      #[{ type := 2, locals := [],
+          body := write 0 2 ++ write 0 2 ++ remove 0 ++ remove 0 ++ remove 4 ++ write 4 2 }],
+    mems := #[{ type := { limits := { min := 1, max := none } } }],
+    datas := #[{ init := "k1v1zz".toUTF8, mode := .active 0 [.i32_const 0] }],
+    exports := #[{ name := "main", desc := .func 2 }] }
+
+/-- The storage log of the probe, against the log it must produce and between the two engines. -/
+def runStorageProbe (cfg : RuntimeConfig) : IO Nat := do
+  let counts ← IO.mkRef ({} : Counts)
+  let ctx := ctxFor [] 200_000_000_000_000
+  let ok ← compareRun counts "probe storage log" cfg storageProbeModule "main" ctx []
+  let key (s : String) : List UInt8 := s.toUTF8.toList
+  let expected : List StorageWrite :=
+    [{ key := key "k1", existed := false, value := some (key "v1") },
+      { key := key "k1", existed := true, value := some (key "v1") },
+      { key := key "k1", existed := true, value := none },
+      { key := key "k1", existed := false, value := none },
+      { key := key "zz", existed := false, value := none },
+      { key := key "zz", existed := false, value := some (key "v1") }]
+  let mut bad := if ok then 0 else 1
+  for (name, outcome) in
+      [("spec", Wasm.Near.run cfg storageProbeModule 1000 "main" ctx []),
+        ("fast", NearFastVM.run cfg storageProbeModule 1000 "main" ctx [])] do
+    if outcome.aborted.isSome || outcome.storageWrites != expected then
+      IO.println s!"storage probe, {name}: aborted {(outcome.aborted.map (·.message))}, log {repr outcome.storageWrites}"
+      bad := bad + 1
+  IO.println s!"storage probe: {if bad == 0 then "log as expected in both engines" else "FAILED"}"
+  return bad
+
 def benchBody (n : UInt64) : List Instr :=
   [.i64_const n, .local_set 0,
     .block .empty
@@ -262,7 +308,7 @@ def main (args : List String) : IO UInt32 := do
     runBench cfg (get "--bench" "0").toNat!.toUInt64 (get "--spec" "0" == "1")
     return 0
   if get "--probes" "" == "1" then
-    return ((← runProbes cfg) + (← runProbes1 cfg)).toUInt32
+    return ((← runProbes cfg) + (← runProbes1 cfg) + (← runStorageProbe cfg)).toUInt32
   let counts ← IO.mkRef ({} : Counts)
   let hosts := meteredHostFns cfg
   for i in [0:programs] do

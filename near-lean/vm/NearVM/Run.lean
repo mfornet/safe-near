@@ -224,7 +224,7 @@ def outcomeOfExecution (ctx : VMContext) (storage : List (List UInt8 × List UIn
       returnData := .none, burntGas := ns.gas.burnt, usedGas := ns.gas.used
       logs := logsOf ns, storage := finalStorage ns, receipts := [], aborted := none
       gasProfile := ns.gasProfile, subsidizedAmount := ns.subsidizedAmount,
-      storageAccounting := ns.storageAccounting }
+      storageAccounting := ns.storageAccounting, storageWrites := ns.storageLog.reverse }
     match convertPromises ns.promises with
     | none => outcome.graphIssue ctx.accountBalance ctx.storageUsage storage
     | some graph =>

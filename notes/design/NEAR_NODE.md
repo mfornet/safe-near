@@ -1683,6 +1683,51 @@ of H3 (the slope of 8.4 MB/h is the harness's fit after its warm-up of 600 s, ag
 One first start of `validator_accept.py` failed at "neard did not start": the driver script had removed the topology directory
 while the previous run was shutting down; nothing of the node ran. The result above is the one complete run.
 
+#### Logs from the VM and the runtime (SAF-8 R1 to R3)
+
+Branch `claude/saf-8-node-runtime-logs`. F3 and F4 above left three gaps that need something the VM and the runtime do not return: the
+keys a contract wrote without changing them (`changes_in_block`), the values with their causes (`EXPERIMENTAL_changes`) and the gas
+profile of an outcome. They are closed by **output fields that are observational only**: each has a default; it is computed beside the
+existing results from what the call or the receipt did; nothing in `near-lean/vm` or `near-lean/runtime` reads it back, so no existing
+field, definition behaviour or theorem statement moved. Where a proof broke only because a structure gained a field it was fixed
+mechanically (listed per item). The fast engine produces the same fields (it runs the same host functions), and its differential test
+compares them.
+
+##### R1, the storage-write log: the 6 gaps of `changes_in_block` are closed
+
+- *VM.* `Wasm.StorageWrite { key, existed, value }` (the key, whether it held a value just before, the value after, `none` for a removal),
+  `NearState.storageLog` (newest first), written by `updateStorageUsage`, the post-processing that every `storage_write` and `storage_remove`
+  passes on success (so a write of the value the key held and a removal of a key that is absent are logged, as `RuntimeExt::storage_set` and
+  `storage_remove` hand each call to `TrieUpdate`), and `VMOutcome.storageWrites` (call order; empty for a failed call, whose storage is
+  restored). Changed definitions: `updateStorageUsage` (one more field in the state it returns), `outcomeOfExecution` and
+  `VMOutcome.graphIssue` (one more field each).
+- *Runtime.* `ExecutionOutcome.changes`, the commits that a transaction or a receipt made to the exposed kinds of trie key (account,
+  access key, gas key nonce, contract code, contract data), each `{ cause, key, value }`, `ApplyResult.changes` gathering them in the order
+  `Runtime::apply` makes them. `ChangeLog.lean` derives them as nearcore commits them: `TransactionProcessing` (the signer's key and account),
+  `ReceiptProcessing` of a receipt that succeeded (a receipt that fails rolls back: no commit) with the receiver's account, the keys its
+  actions wrote (`actionKeys`: deploy, add and delete key with the nonce rows of a gas key, implicit account creation, allowance refunds,
+  `UseGlobalContract` removing local code, gas key funding and withdrawal, the delegate's nonce, and for `DeleteAccount` everything
+  `remove_account` removes: the account, the code, every access key, nonce row and data key) and the VM's storage calls, then
+  `ActionReceiptGasReward` (the receiver's account with the reward, when positive), and `ValidatorAccountsUpdate` (`Epoch.lean`). The value
+  of a commit is what the state holds for the key at that point; a key written twice before a commit is one entry (`TrieUpdate::commit`).
+  `ActionReceiptProcessingStarted`, `PostponedReceipt`, `UpdatedDelayedReceipts`, `Migration` and the bandwidth scheduler commit only
+  keys that `StateChangesExt::from_changes` drops (received data, postponed receipts, queues), so they have no entry.
+  Added: `Exec.dataWrites`, `Processed.execs` (each receipt that ran, with its result), `ExecutionOutcome.changes`,
+  `ApplyResult.changes` (a function of the outcomes), and the functions of `ChangeLog.lean`; changed: `Exec.recordVMOutcome` (one more
+  field), `runActionReceipt` / `processedExecOutput` (one more field), `Processed.append`, `applyAttempt` (the outcomes of a receipt
+  and of a transaction carry their commits).
+- *Node.* The record of a block and shard (`stateChanges` column) is the set of keys the log lists, with whether the last value is a removal;
+  `changes_in_block` lists their kinds. Any entry that differs between the pre-state and the post-state and that the log did not list is still
+  listed and reported on stderr (`warning: the state change log of shard ... missed ...`): the entries are authoritative, and a miss is a bug of
+  the derivation. The `writtenKeys` derivation of F3 (from transactions and outcomes) is gone.
+- *Mechanical proof fixes.* `ProcessedFunding.lean` (`processedExecOutput`, the definition the proofs compare `runActionReceipt` with, sets
+  the new `execs` field), `BlockStages.lean` (the mirror of the loops of `applyAttempt`: the transaction outcome carries its commit and the
+  outcomes of a receipt come from `outcomesWithChanges`); nothing else in `near-lean/{vm,runtime}` changed. No theorem statement changed.
+- *Result* (`rpc_conformance.py run`): 788 of 788 requests equal, **0 known gaps** (the category is gone from the harness), 296 of 296
+  `EXPERIMENTAL_changes_in_block` requests equal; no `missed` warning in the node's log. A first run with the derivation reading the state
+  after the receipt instead of before it reported 3 misses (an implicit account created by a transfer, a deleted account's 30 data keys): the
+  warning is what found it.
+
 ## Open points
 
 - Numeric performance target for M10, measured against nearcore: set and met in M10a above (M2's and M4's are proposed above).

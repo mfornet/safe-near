@@ -120,6 +120,9 @@ structure ChunkResult where
   yielded : Array ByteArray := #[]
   /-- The code a contract deployed from its own memory in this chunk (`stepLearning`). -/
   learned : Array ChainReplay.LoadedCode := #[]
+  /-- The commits of the chunk that touch an account, access key, contract code or contract data key, in the order
+  `Runtime::apply` makes them: the epoch's validator accounts update, then what `Near.apply` logged. -/
+  changes : List Near.StateChange := []
 
 private def bytesOf (l : List UInt8) : ByteArray :=
   ⟨l.toArray⟩
@@ -343,10 +346,13 @@ def runChunk (prof : Option Prof) (cfg : Wasm.Near.RuntimeConfig)
   let catalogue := p.codes.map fun c => (c.code.hash, c.bytes)
   let known := cache.lists.toArray
   let mut snapshot := p.initial
+  let mut updateChanges : List Near.StateChange := []
   if let some update := ctx.update then
+    let before := snapshot.state
     snapshot ←
       timed prof "run/accounts-update" fun _ => do
           pure { snapshot with state := ← update.apply snapshot.state }
+    updateChanges := update.changes before snapshot.state
   -- the trie of the state the chunk starts from: the node's own when the state is the one it stores
   -- (not after the epoch's accounts update), otherwise built from the encoded state
   let trie ←
@@ -489,19 +495,24 @@ def runChunk (prof : Option Prof) (cfg : Wasm.Near.RuntimeConfig)
             gasBurnt := result.outcomes.foldl (fun s (_, o) => s + o.gasBurnt) 0,
             balanceBurnt := result.tokensBurnt - result.subsidizedAmount, proposals,
             congestion := info, requests, delayedCount := next.state.delayed.length,
-            schedulerHash := bytesOf outcome.schedulerHash, txHashes, yielded, learned }
+            schedulerHash := bytesOf outcome.schedulerHash, txHashes, yielded, learned,
+            changes := updateChanges ++ result.changes }
 
 /-- A chunk that is not new (`apply_old_chunk`): no transaction or receipt is applied, but the
 epoch's validator accounts update and the bandwidth scheduler still run
 (`Runtime::apply` with `is_new_chunk = false`). Returns the entries of the shard afterwards. -/
 def runOldChunk (cfg : Wasm.Near.RuntimeConfig) (congestion : Near.Congestion.Config)
-    (ctx : ChunkContext) (p : Prepared) : Except String (Array (ByteArray × ByteArray)) := do
+    (ctx : ChunkContext) (p : Prepared) :
+    Except String (Array (ByteArray × ByteArray) × List Near.StateChange) := do
   let catalogue := p.codes.map fun c => (c.code.hash, c.bytes)
   let mut snapshot := p.initial
   unless snapshot.pending.isEmpty && p.block.txs.isEmpty do
     throw "an old chunk applies no transactions or receipts"
+  let mut updateChanges : List Near.StateChange := []
   if let some update := ctx.update then
+    let before := snapshot.state
     snapshot := { snapshot with state := ← update.apply snapshot.state }
+    updateChanges := update.changes before snapshot.state
   let input := ctx.scheduler
   let layout := input.layout
   let params := Near.Bandwidth.Params.protocol layout.numShards congestion.maxReceiptSize
@@ -514,6 +525,6 @@ def runOldChunk (cfg : Wasm.Near.RuntimeConfig) (congestion : Near.Congestion.Co
     Near.QueueEncoding.encode snapshot.state catalogue p.context (some cfg) (digestFor catalogue)
   let shardEntries ←
     ({ p.shard with scheduler := scheduled.state } : ChainReplay.ShardChunk.State).entries
-  pure ((stateEntries ++ shardEntries).toArray.map fun (k, v) => (bytesOf k, bytesOf v))
+  pure ((stateEntries ++ shardEntries).toArray.map fun (k, v) => (bytesOf k, bytesOf v), updateChanges)
 
 end Near.Node.Apply

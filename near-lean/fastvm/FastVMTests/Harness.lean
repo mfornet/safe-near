@@ -97,11 +97,17 @@ def outcomeKey (outcome : VMOutcome) : String :=
         ("aborted", toJson (outcome.aborted.map (·.message))),
         ("abortedKind", toJson (outcome.aborted.map fun e => (repr e).pretty)),
         ("subsidizedAmount", toJson (toString outcome.subsidizedAmount)),
+        ("storageWrites",
+          toJson
+            (outcome.storageWrites.map fun w =>
+              obj
+                [("key", bytesJson w.key), ("existed", toJson w.existed),
+                  ("value", toJson (w.value.map bytesJson))])),
         ("gasProfile",
           obj
             [("ext", toJson (outcome.gasProfile.ext.map fun (name, gas) => s!"{name}={gas}")),
               ("actionBurnt", toJson outcome.gasProfile.actionBurnt),
-              ("wasm", toJson outcome.gasProfile.wasm)])]).compress
+              ("wasm", toJson outcome.gasProfile.wasm))]).compress
 
 /-! ## Machines -/
 
@@ -143,6 +149,8 @@ def machineDiff (spec fast : Machine × Option FunctionCallError) : Option Strin
     else
       if (repr s1.host.gasProfile).pretty != (repr s2.host.gasProfile).pretty then
         some "gas profile"
+      else if s1.host.storageLog != s2.host.storageLog then
+        some "storage log"
       else
         if s1.mems.size != s2.mems.size then some "memory count"
         else

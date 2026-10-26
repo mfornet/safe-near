@@ -339,6 +339,48 @@ structure ValidatorProposal where
   stake : Nat
   deriving Inhabited, Repr, BEq
 
+/-! ### The state change log
+
+nearcore records every `TrieUpdate::set` and `remove` with the cause of the commit that made it final; the state
+change RPC serves the exposed kinds. The runtime's log of them (`ChangeLog.lean`) is observational: computed from what
+a receipt did, never read back by `apply`. -/
+
+/-- A trie key of the kinds the state change RPC serves. -/
+inductive ChangeKey
+  | account (id : AccountId)
+  | accessKey (id : AccountId) (publicKey : PublicKey)
+  | gasKeyNonce (id : AccountId) (publicKey : PublicKey) (lane : Nat)
+  | contractCode (id : AccountId)
+  | data (id : AccountId) (key : Bytes)
+  deriving BEq, Hashable, Repr, Inhabited
+
+/-- The value a commit left under a key. A removal is `none` in `StateChange.value`. -/
+inductive ChangeValue
+  | account (a : Account)
+  | accessKey (k : AccessKey)
+  | nonce (n : Nat)
+  /-- The code the account holds; the bytes are the caller's (the model names code by its hash). -/
+  | code (c : ContractCode)
+  | data (v : Bytes)
+  deriving Inhabited
+
+/-- The `StateChangeCause` of a commit, with the logical ids the runtime knows: the position of the
+transaction in the chunk and the id of the receipt. -/
+inductive ChangeCause
+  | transaction (index : Nat)
+  | receiptProcessing (receipt : ReceiptId)
+  | gasReward (receipt : ReceiptId)
+  | validatorAccountsUpdate
+  deriving BEq, Repr, Inhabited
+
+/-- One committed write. -/
+structure StateChange where
+  cause : ChangeCause
+  key : ChangeKey
+  /-- `none`: the key was removed. -/
+  value : Option ChangeValue
+  deriving Inhabited
+
 structure ExecutionOutcome where
   /-- Failed receipt action, absent for transaction errors and final storage checks. -/
   failureIndex : Option Nat := none
@@ -350,6 +392,9 @@ structure ExecutionOutcome where
   tokensBurnt : Nat := 0
   /-- The validator proposals of the receipt's successful `Stake` actions. -/
   proposals : List ValidatorProposal := []
+  /-- Observational: the commits this transaction or receipt made to the exposed kinds of trie key, in order
+  (`ChangeLog.lean`). Nothing reads it back. -/
+  changes : List StateChange := []
   deriving Inhabited
 
 end Near

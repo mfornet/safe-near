@@ -153,18 +153,6 @@ def diffEntries (old new : Array (ByteArray × ByteArray))
         changes := changes.push (k, none)
     return changes
 
-/-- The accounts of an epoch's validator accounts update that `update_validator_accounts` writes if they exist. -/
-def validatorsWritten (update : Option Near.ValidatorAccountsUpdate) : List AccountId :=
-  match update with
-  | none => []
-  | some u =>
-    let stake := u.stakeInfo.map (·.1)
-    let treasury :=
-      match u.protocolTreasury with
-      | some t => if stake.contains t then [] else [t]
-      | none => []
-    (stake ++ treasury).map (⟨·⟩)
-
 /-! ### Receipts -/
 
 /-- `Receipt::receiver_shard_id`: the shard of the receiver, or the target shard of a global
@@ -416,7 +404,7 @@ def applyBlock (prof : Option Prof) (p : Params) (st : Near.Node.Chain.ChainStat
                   reencoded.all fun (k, v) => originalMap[k]? == some v)
       else
         pure true
-    let (newEntries, extra, outgoing, outcomes, yielded) ←
+    let (newEntries, extra, outgoing, outcomes, yielded, changeLog) ←
       if isNew then
         do
           let mut overlay : Option Near.TrieOverlay.State := none
@@ -440,24 +428,32 @@ def applyBlock (prof : Option Prof) (p : Params) (st : Near.Node.Chain.ChainStat
                     gasUsed := result.gasBurnt.toUInt64, gasLimit := chunk.gasLimit,
                     balanceBurnt := ⟨result.balanceBurnt⟩, congestionInfo := result.congestion,
                     bandwidthRequests := result.requests, proposedSplit := none }),
-                result.outgoing, result.outcomes, result.yielded)
+                result.outgoing, result.outcomes, result.yielded, result.changes)
       else
         do
-          let entries ←
+          let (entries, changeLog) ←
             timed prof "run/old-chunk" fun _ => runOldChunk p.cfg p.congestion ctx prepared
           let some (.v5 old) := prevExtra? | throw "no chunk extra before an old chunk"
-          pure (entries, ChunkExtra.v5 old, #[], #[], #[])
+          pure (entries, ChunkExtra.v5 old, #[], #[], #[], changeLog)
     let oldMap := entryMap entries
     let newMap := entryMap newEntries
     let diff := diffEntries entries newEntries oldMap newMap
     let changes ←
       timed prof "trie-update" fun _ => do
           pure (← Near.Node.Trie.update src root diff).changes
-    let written :=
-      writtenKeys oldMap newMap (validatorsWritten ctx.update)
-        (if isNew then b.transactions else #[])
-        (outcomes.extract (if isNew then b.transactions.size else 0) outcomes.size)
-    let touched := touchedOf diff written
+    -- the keys the chunk's commits touched: the runtime's log, and any entry that differs and the log did not list
+    let (touched, missed) := touchedOf diff (logKeys changeLog)
+    if !missed.isEmpty then
+      let describe (k : ByteArray) : String :=
+        match TrieKey.parse? k with
+        | some t => (match t with
+          | .account a => s!"account {a.val}"
+          | .contractCode a => s!"code {a.val}"
+          | .accessKey a _ => s!"access key {a.val}"
+          | .contractData a d => s!"data {a.val} {hex d}"
+          | _ => "other")
+        | none => "unparsed"
+      IO.eprintln s!"warning: the state change log of shard {shard} at {v.height} missed {missed.size} changed key(s): {(missed.toList.take 6).map describe}"
     let extra : ChunkExtra :=
       match extra with
       | .v5 e => .v5 { e with stateRoot := changes.newRoot }

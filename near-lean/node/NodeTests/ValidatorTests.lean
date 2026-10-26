@@ -90,24 +90,26 @@ private def codePruning (f : IO.Ref Nat) : IO Unit := do
     let all := cache.prune (live.insert (hash (blob 1)) |>.insert (hash (blob 3))) hashOfLabel
     check f "everything referenced, everything kept" (all.byLabel.size == 3 && all.labels.size == 3)
 
-/-- The keys nearcore records as written although their entries are the same: the validator accounts update, and the code key of a
-deleted account. -/
-private def writtenKeysTest (f : IO.Ref Nat) : IO Unit := do
+/-- The keys of the runtime's change log: a write of the value the key held and a removal of an absent key are there, the last
+value of a key decides whether it is gone, and an entry that differs without being logged is added and counted. -/
+private def logKeysTest (f : IO.Ref Nat) : IO Unit := do
   let acct (a : String) : ByteArray := Near.Node.TrieKey.toVec (.account ⟨a⟩)
-  let code (a : String) : ByteArray := Near.Node.TrieKey.toVec (.contractCode ⟨a⟩)
-  let pre : Std.HashMap ByteArray ByteArray :=
-    ({} : Std.HashMap ByteArray ByteArray).insert (acct "aa") ⟨#[1]⟩ |>.insert (acct "bb") ⟨#[2]⟩
-  let post : Std.HashMap ByteArray ByteArray :=
-    ({} : Std.HashMap ByteArray ByteArray).insert (acct "aa") ⟨#[1]⟩
-  -- "cc" is a validator that is not in the shard's state, and so is not written
-  let w := Near.Node.Chain.writtenKeys pre post [⟨"aa"⟩, ⟨"cc"⟩] #[] #[]
-  check f "a validator that exists is written, one that does not is not"
-      (w.contains (acct "aa") && !w.contains (acct "cc"))
-  check f "a deleted account removes its code key, whether or not it had code"
-      (w.contains (code "bb") && !w.contains (code "aa"))
-  let touched := Near.Node.Chain.touchedOf #[(acct "bb", none)] w
+  let change (key : Near.ChangeKey) (value : Option Near.ChangeValue) : Near.StateChange :=
+    { cause := .validatorAccountsUpdate, key, value }
+  let log : List Near.StateChange :=
+    [change (.account "aa") (some (.account default)), change (.data "ft" [1, 2]) none,
+      change (.data "ft" [1, 2]) (some (.data [3])), change (.data "ft" [9]) none,
+      change (.accessKey "aa" (0 :: List.replicate 32 7)) none, change (.contractCode "bb") none]
+  let keys := Near.Node.Chain.logKeys log
+  check f "each logged key of the four kinds once" (keys.size == 5)
+  let data (k : List UInt8) : ByteArray := Near.Node.TrieKey.toVec (.contractData ⟨"ft"⟩ ⟨k.toArray⟩)
+  check f "the last value of a key decides whether it is gone"
+      (keys.contains (data [1, 2], false) && keys.contains (data [9], true))
+  let (touched, missed) :=
+    Near.Node.Chain.touchedOf #[(acct "cc", some ⟨#[1]⟩), (acct "aa", none)] keys
+  check f "an entry the log missed is listed and counted" (missed.size == 1 && touched.size == 6)
   check f "the touched keys are sorted and not repeated"
-      (touched.size == 3 && touched.map (·.1) == (touched.map (·.1)).qsort Near.Node.Chain.keyLt)
+      (touched.map (·.1) == (touched.map (·.1)).qsort Near.Node.Chain.keyLt)
 
 /-- The reference count changes that garbage collection reads back from `DBCol::TrieChanges`. -/
 private def trieChangesRecord (f : IO.Ref Nat) : IO Unit := do
@@ -462,7 +464,7 @@ def main : IO UInt32 := do
   let failures ← IO.mkRef 0
   learnedCode failures
   codePruning failures
-  writtenKeysTest failures
+  logKeysTest failures
   trieChangesRecord failures
   basic failures
   delayValues failures

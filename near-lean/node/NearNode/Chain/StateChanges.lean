@@ -3,6 +3,7 @@ import NearNode.Primitives.Storage
 import NearNode.Primitives.Transaction
 import NearNode.Store.Format
 import NearNode.Trie.Update
+import NearRuntime.ChangeLog
 
 /-!
 # The trie keys a block changed, by key kind
@@ -56,67 +57,45 @@ def keyHandleOf : PublicKey → Option PublicKeyHandle
   | .secp256k1 k => some (.secp256k1 k)
   | .mldsa65 _ => none
 
-/-- The signer and key of a transaction. -/
-def transactionSigner (t : SignedTransaction) : AccountId × PublicKey :=
-  match t.transaction with
-  | .v0 t => (t.signerId, t.publicKey)
-  | .v1 t => (t.signerId, t.publicKey)
+/-- The trie key a key of the runtime's change log stands for (`none` for a key family the node does not
+store, such as an ML-DSA key). -/
+def rawKeyOf? (k : Near.ChangeKey) : Option ByteArray :=
+  let handle (pk : Near.PublicKey) : Option PublicKeyHandle :=
+    match Codec.decodeAll (α := PublicKey) (ByteArray.mk pk.toArray) with
+    | .ok p => keyHandleOf p
+    | .error _ => none
+  match k with
+  | .account id => some (TrieKey.toVec (.account ⟨id⟩))
+  | .contractCode id => some (TrieKey.toVec (.contractCode ⟨id⟩))
+  | .accessKey id pk => (handle pk).map fun h => TrieKey.toVec (.accessKey ⟨id⟩ h)
+  | .gasKeyNonce id pk lane => (handle pk).map fun h => TrieKey.toVec (.gasKeyNonce ⟨id⟩ h lane.toUInt16)
+  | .data id key => some (TrieKey.toVec (.contractData ⟨id⟩ (ByteArray.mk key.toArray)))
 
-/-- The writes of a chunk that leave an entry as it was, which nearcore records and a comparison of the entries cannot see
-(`TrieUpdate::set` and `remove` record every call, whatever the old value). What the node can tell from the chunk's inputs and
-outcomes, each as nearcore does it:
+/-- The keys of the four kinds that a chunk's change log lists (`Near.ApplyResult.changes`, and the validator accounts
+update's), each once, with whether its last value is a removal. The log is what the runtime did, commit by commit: it
+lists a write of the value the key held and a removal of a key that is not there, which a comparison of the entries
+before and after cannot see. -/
+def logKeys (changes : List Near.StateChange) : Array (ByteArray × Bool) :=
+  let last : Std.HashMap ByteArray Bool :=
+    changes.foldl
+      (fun m c =>
+        match rawKeyOf? c.key with
+        | some k => m.insert k c.value.isNone
+        | none => m)
+      {}
+  last.toArray.filter fun (k, _) => (kindOfKey? k).isSome
 
-* `update_validator_accounts` (`runtime/runtime/src/lib.rs`): `set_account` for every account of `stake_info` that exists, and
-  for the protocol treasury if it is not one of them;
-* `verify_and_charge_tx_ephemeral` (`verifier.rs`): `set_access_key` and `set_account` for the signer of every transaction;
-* `apply_action_receipt`: `set_account` of the receiver after the actions of a receipt that succeeded and left its account
-  in place (a receipt that fails rolls its writes back; the account of a receipt that deleted it is gone);
-* `remove_account` (`core/store/src/utils/mod.rs`): removes `Account` and `ContractCode` whether or not the account had code,
-  then its access keys and data, which exist and so differ.
-
-What it cannot see: a contract's `storage_write` of the value the key held, or `storage_remove` of a key that is not there, a
-key written and then restored by a later write of the same chunk, and an account created and deleted in one chunk. The VM
-returns no log of its writes. `pre` and `post` are the entries before and after; the result is the raw keys. -/
-def writtenKeys (pre post : Std.HashMap ByteArray ByteArray) (validators : List AccountId)
-    (txs : Array SignedTransaction) (receipts : Array ExecutionOutcomeWithId) : Array ByteArray :=
-  Id.run do
-    let mut keys : Array ByteArray := #[]
-    for a in validators do
-      let k := TrieKey.toVec (.account a)
-      if pre.contains k then
-        keys := keys.push k
-    for t in txs do
-      let (signer, pk) := transactionSigner t
-      keys := keys.push (TrieKey.toVec (.account signer))
-      if let some h := keyHandleOf pk then
-        keys := keys.push (TrieKey.toVec (.accessKey signer h))
-    for r in receipts do
-      let ok :=
-        match r.outcome.status with
-        | .successValue _ | .successReceiptId _ => true
-        | _ => false
-      if ok then
-        let k := TrieKey.toVec (.account r.outcome.executorId)
-        if pre.contains k && post.contains k then
-          keys := keys.push k
-    for (k, _) in pre do
-      if !post.contains k then
-        if let some (.account a) := TrieKey.parse? k then
-          keys := keys.push (TrieKey.toVec (.contractCode a))
-    return keys
-
-/-- The raw keys among `changes` (the entries that differ, `none` for an entry that is gone) and `written` (the keys the chunk
-wrote without changing them) that are of the four kinds, sorted by key bytes, with whether the entry is gone. -/
-def touchedOf (changes : Array (ByteArray × Option ByteArray)) (written : Array ByteArray := #[]) :
-    Array (ByteArray × Bool) :=
-  let kept := changes.filterMap fun (k, v) => (kindOfKey? k).map fun _ => (k, v.isNone)
-  let seen : Std.HashSet ByteArray := kept.foldl (fun s (k, _) => s.insert k) {}
-  let extra :=
-    (written.filter fun k => (kindOfKey? k).isSome).foldl
-      (fun (acc : Array (ByteArray × Bool) × Std.HashSet ByteArray) k =>
-        if acc.2.contains k then acc else (acc.1.push (k, false), acc.2.insert k))
-      (#[], seen)
-  (kept ++ extra.1).qsort fun a b => keyLt a.1 b.1
+/-- The raw keys among `changes` (the entries that differ, `none` for an entry that is gone) and the keys of the
+chunk's change log that are of the four kinds, sorted by key bytes, with whether the entry is gone, and the entries that
+differ without being in the log (a fault of the log: the entries of the post-state are authoritative, so such a key is
+listed all the same). -/
+def touchedOf (changes : Array (ByteArray × Option ByteArray)) (logged : Array (ByteArray × Bool)) :
+    Array (ByteArray × Bool) × Array ByteArray :=
+  let seen : Std.HashSet ByteArray := logged.foldl (fun s (k, _) => s.insert k) {}
+  let missed :=
+    changes.filterMap fun (k, v) =>
+      if (kindOfKey? k).isSome && !seen.contains k then some (k, v.isNone) else none
+  ((logged ++ missed).qsort fun a b => keyLt a.1 b.1, missed.map (·.1))
 
 /-- The record of a block and shard. -/
 def touchedBytes (touched : Array (ByteArray × Bool)) : ByteArray :=
