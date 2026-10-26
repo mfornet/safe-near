@@ -255,17 +255,17 @@ def dispatch (s : State) (env : Env) : Call → M Outcome
 
 /-- One execution of the contract. `st = none` is an account whose contract
 state (`STATE` key) does not exist yet. The prologue is what
-`#[near_bindgen]` generates around every method (near-sdk-core 3.1.0):
-deposit check for non-payable, non-view methods; predecessor check for
-`#[private]` methods; `state_exists` check for `#[init]`; `PanicOnDefault`
-for everything else. -/
+`#[near_bindgen]` generates around every method (near-sdk-core 3.1.0,
+`method_wrapper`), in its order: predecessor check for `#[private]` methods;
+deposit check for non-payable, non-view methods; `state_exists` check for
+`#[init]`; `PanicOnDefault` for everything else. -/
 @[blueprint "def:step"
-  (statement := /-- One execution of the contract on an optional state (absent before \texttt{new}): panic if a non-payable mutating method received a deposit, if a private method was not called by the contract itself, if \texttt{new} finds a state or any other method finds none; otherwise run the method. -/)]
+  (statement := /-- One execution of the contract on an optional state (absent before \texttt{new}): panic if a private method was not called by the contract itself, if a non-payable mutating method received a deposit, if \texttt{new} finds a state or any other method finds none; otherwise run the method. -/)]
 def step (cfg : Config) (st : Option State) (env : Env) (call : Call) : M Outcome := do
-  if !call.isPayable && !call.isView then
-    require (env.attachedDeposit = 0) (.depositNotAccepted call.methodName)
   if call.isPrivate then
     require (env.predecessor = env.currentAccount) (.privateMethod call.methodName)
+  if !call.isPayable && !call.isView then
+    require (env.attachedDeposit = 0) (.depositNotAccepted call.methodName)
   match call, st with
   | .new, none => pure (new cfg)
   | .new, some _ => throw .alreadyInitialized
