@@ -38,6 +38,10 @@ TOPOLOGIES = {
     # holds two thirds, so every approval, endorsement and block of the Lean node is needed for finality.
     "validator": {"validators": 2, "shards": 1, "chainId": "test-chain-safe-near-validator", "basePort": 18300,
                   "neard": [0], "noKickout": True},
+    # the validator topology on the four shards of ``sharded`` (V1): the layout of ``neard localnet -s 4`` (boundary
+    # accounts test1, test2, test3), two validators of equal stake, node1 is the Lean node.
+    "validator-sharded": {"validators": 2, "shards": 4, "chainId": "test-chain-safe-near-validator-4s",
+                          "basePort": 18400, "neard": [0], "noKickout": True},
 }
 GENESIS_TIME = "2026-01-01T00:00:00.000000000Z"
 EPOCH_LENGTH = 30

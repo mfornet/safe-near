@@ -33,9 +33,17 @@ import localnet
 import nearcodec as nc
 
 ROOT = chain_corpus.ROOT
-TOPOLOGY = "validator"
+TOPOLOGY = "validator"      # set by ``set_topology`` (``--topology``)
 BINARY = ROOT / "near-lean/node/.lake/build/bin/near-lean-node"
 CORPUS_META = chain_corpus.DEFAULT_CORPUS / "single/meta.json"
+
+
+def set_topology(name: str) -> None:
+    """Selects the topology of the run (``validator`` or ``validator-sharded``) for this module."""
+    global TOPOLOGY
+    if name not in localnet.TOPOLOGIES or not localnet.TOPOLOGIES[name].get("neard"):
+        raise SystemExit(f"{name} is not a validator topology")
+    TOPOLOGY = name
 
 
 def rpc(method: str, params, index: int = 0, timeout: float = 10):
@@ -302,6 +310,7 @@ def analyse(work: Path, report: dict, stall: dict | None, rows: list[dict], head
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--topology", default="validator", choices=["validator", "validator-sharded"])
     parser.add_argument("--duration", type=int, default=240, help="seconds to run")
     parser.add_argument("--binary", type=Path, default=BINARY)
     parser.add_argument("--work", type=Path, default=localnet.DATA / "validator-run")
@@ -311,6 +320,7 @@ def main() -> None:
                         help="seconds after which the Lean node is stopped (default: 30 s before the end)")
     parser.add_argument("--gc-epochs", type=int, default=None, help="--gc-epochs-to-keep of the Lean node (default: its own)")
     options = parser.parse_args()
+    set_topology(options.topology)
     home = prepare(options.work)
     localnet.start(TOPOLOGY)
     lean = start_lean(home, options.work, options.duration + 120, options.binary,
