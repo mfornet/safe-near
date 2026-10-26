@@ -1,0 +1,17 @@
+# NearSdk: near-sdk's storage and serialization layout, shared by the contract
+# verification projects (SAF-41): Borsh encoders and parsers, and the key and
+# header layouts of near-sdk's collections, with their round-trip lemmas; and
+# what a contract may assume of a NEP-141/NEP-145 contract it calls (SAF-42).
+#
+# Requires nothing, so any contract project can depend on it.
+name = "NearSdk"
+version = "0.1.0"
+defaultTargets = ["NearSdk", "ft-state-check"]
+
+[[lean_lib]]
+name = "NearSdk"
+
+# `ft-state-check <storage.json>`: decode a FungibleToken's raw storage and check its invariant.
+[[lean_exe]]
+name = "ft-state-check"
+root = "NearSdk.FtStateCheck"

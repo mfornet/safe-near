@@ -1,0 +1,80 @@
+{
+  "code": "tools/runtime-conformance/fixtures/logs.wasm",
+  "sha256": "b3f422938e9d1352987644ca8ff3181e9757b929d8c8115b04479f7b9f5d8119",
+  "protocolVersion": 86,
+  "initialBalance": "100000000000000000000000000",
+  "storage": [],
+  "calls": [
+    {
+      "name": "logs: hello",
+      "method": "hello",
+      "args": {}
+    },
+    {
+      "name": "logs: many",
+      "method": "many",
+      "args": {}
+    },
+    {
+      "name": "logs: running_total",
+      "method": "running_total",
+      "args": {}
+    },
+    {
+      "name": "logs: too_long",
+      "method": "too_long",
+      "args": {}
+    },
+    {
+      "name": "logs: at_limit",
+      "method": "at_limit",
+      "args": {}
+    },
+    {
+      "name": "logs: bad_utf8",
+      "method": "bad_utf8",
+      "args": {}
+    },
+    {
+      "name": "logs: oob",
+      "method": "oob",
+      "args": {}
+    },
+    {
+      "name": "logs: utf16",
+      "method": "utf16",
+      "args": {}
+    },
+    {
+      "name": "logs: utf16_non_ascii",
+      "method": "utf16_non_ascii",
+      "args": {}
+    },
+    {
+      "name": "logs: utf16_odd",
+      "method": "utf16_odd",
+      "args": {}
+    },
+    {
+      "name": "logs: utf16_surrogate",
+      "method": "utf16_surrogate",
+      "args": {}
+    },
+    {
+      "name": "logs: utf16_oob",
+      "method": "utf16_oob",
+      "args": {}
+    },
+    {
+      "name": "logs: utf16_running_total",
+      "method": "utf16_running_total",
+      "args": {}
+    },
+    {
+      "name": "logs: running_total runs out of gas",
+      "method": "running_total",
+      "args": {},
+      "gas": 20000000000
+    }
+  ]
+}

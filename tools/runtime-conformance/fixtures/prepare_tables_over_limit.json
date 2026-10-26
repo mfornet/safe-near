@@ -1,0 +1,14 @@
+{
+  "code": "tools/runtime-conformance/fixtures/prepare_tables_over_limit.wasm",
+  "sha256": "bc89e37f768014b84c6df43e9e0cbf9ec299ea368ab232c3fc9d17ed9db80332",
+  "protocolVersion": 86,
+  "initialBalance": "100000000000000000000000000",
+  "storage": [],
+  "calls": [
+    {
+      "name": "prepare: tables_over_limit",
+      "method": "f",
+      "args": {}
+    }
+  ]
+}

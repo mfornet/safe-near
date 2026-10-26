@@ -3,6 +3,15 @@
  "packagesDir": "../../../near-lean/.lake/packages",
  "packages": [
   {
+   "type": "path",
+   "scope": "",
+   "name": "NearSdk",
+   "manifestFile": "lake-manifest.json",
+   "inherited": false,
+   "dir": "../../../near-lean/sdk",
+   "configFile": "lakefile.toml"
+  },
+  {
    "url": "https://github.com/hanwenzhu/LeanArchitect.git",
    "type": "git",
    "subDir": null,

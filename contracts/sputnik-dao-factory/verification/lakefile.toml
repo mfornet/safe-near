@@ -2,6 +2,11 @@ name = "SputnikFactoryVerification"
 version = "0.1.0"
 defaultTargets = ["Model", "Spec", "Proofs"]
 
+# Borsh and near-sdk collection layouts shared with the other contract projects.
+[[require]]
+name = "NearSdk"
+path = "../../../near-lean/sdk"
+
 [[lean_lib]]
 name = "Model"
 

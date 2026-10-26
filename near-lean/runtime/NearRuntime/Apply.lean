@@ -105,6 +105,12 @@ structure Exec where
   proposals : List ValidatorProposal := []
   result : Option ExecutionStatus := none
   failureIndex : Option Nat := none
+  /-- The gas profile of each VM call, in order; their compute is rounded per call. -/
+  vmProfiles : List GasProfile := []
+  /-- Compute the actions used without gas (removing gas key nonces); kept on failure. -/
+  actionCompute : Nat := 0
+  /-- The receipt's compute usage, set when it is finalized (`receiptComputeUsage`). -/
+  computeUsage : Nat := 0
   /-- Observational: the `storage_write` / `storage_remove` calls of the receipt's contract calls. -/
   dataWrites : List StorageWrite := []
   /-- Observational: the gas the receipt's contract calls burnt, by cost. -/
@@ -212,6 +218,23 @@ structure ReceiptCtx where
   /-- Decoder for code deployed by contracts (not available in Lean yet). -/
   codeOf : Bytes → ContractCode
 
+/-- `check_proof_size_limit_exceed`: the chunk's recorded storage proof (a trusted input) has
+passed `main_storage_proof_size_soft_limit`, so the chunk takes no more receipts or timeouts. -/
+def storageProofFull (cfg : RuntimeConfig) (ap : ApplyState) (trie : Option TrieOverlay.State) : Bool :=
+  match ap.storageProofSize, trie with
+  | some size, some trie => size trie > cfg.mainStorageProofSizeSoftLimit
+  | _, _ => false
+
+/-- The receipt's own recorded storage proof, as the VM checks it against
+`per_receipt_storage_proof_size_limit`: the growth of the chunk's proof since the receipt started
+(`EnforcePerReceiptStorageProofLimit`), or before that feature since the call started. -/
+def receiptStorageProofSize (c : ReceiptCtx) (callStart : Option TrieOverlay.State) :
+    Option (TrieOverlay.State → Nat) :=
+  c.ap.storageProofSize.map fun size =>
+    let start := if c.cfg.enforcePerReceiptStorageProofLimit then c.ap.storageAccounting else callStart
+    let base := (start.map size).getD 0
+    fun trie => size trie - base
+
 /-- Exact VM context used by a receipt function-call action. -/
 def functionCallContext (c : ReceiptCtx) (account : Account) (args : Bytes) (gas deposit : Nat)
     (isLast : Bool) (storageAccounting : Option TrieOverlay.State := none) : VMContext :=
@@ -234,6 +257,7 @@ def functionCallContext (c : ReceiptCtx) (account : Account) (args : Bytes) (gas
     prepaidGas := gas
     randomSeed := c.vmRandomSeed.getD c.ap.randomSeed
     storageAccounting
+    storageProofSize := receiptStorageProofSize c storageAccounting
     chargeStorageValueAccess := true
     outputDataReceivers := if isLast then c.action.outputDataReceivers.map fun d => bytesOfString d.receiverId else []
     actionHash := c.vmActionHash.getD []
@@ -254,7 +278,8 @@ def Exec.recordVMOutcome (exec : Exec) (outcome : VMOutcome) : Exec :=
         { actions := outcome.actionProfile, ext := outcome.gasProfile.ext,
           wasm := outcome.gasProfile.wasm }
     gasBurnt := exec.gasBurnt + outcome.burntGas
-    gasUsed := exec.gasUsed + outcome.burntGas + (outcome.usedGas - outcome.burntGas) }
+    gasUsed := exec.gasUsed + outcome.burntGas + (outcome.usedGas - outcome.burntGas)
+    vmProfiles := exec.vmProfiles ++ [outcome.gasProfile] }
 
 structure FunctionCallEffects where
   state : ChainState
@@ -359,10 +384,42 @@ def validateFunctionCallActions (c : ReceiptCtx) (outcome : VMOutcome) : Except 
     let _ ← spec.actions.mapM (actionOfPromise c.codeOf)
   pure ()
 
+/-- The receivers of the data receipt `k` produces: each later receipt that
+depends on it, once per dependency edge, in creation order (as
+`materializeFunctionCallRaw` links them). -/
+def vmReceiptOutputs (specs : List ReceiptSpec) (k : Nat) : List AccountId :=
+  specs.flatMap fun spec => (spec.dependencies.filter (· == k)).map fun _ => stringOfBytes spec.receiverId
+
+/-- The Borsh size of the action receipt a promise becomes (`Receipt.newBorshSize`
+of the materialized receipt; ids and the gas price have fixed widths). -/
+def vmReceiptSize (predecessor signer : AccountId) (signerKey : PublicKey) (outputs : List AccountId)
+    (spec : ReceiptSpec) (actions : List Action) : Nat :=
+  4 + predecessor.utf8ByteSize + 4 + (stringOfBytes spec.receiverId).utf8ByteSize + 32 + 1 + 4 +
+    signer.utf8ByteSize + 1 + signerKey.length + 16 + 4 + (outputs.map fun o => 32 + 4 + o.utf8ByteSize).sum +
+    4 + 32 * (spec.dependencies.length + if spec.yieldDataId.isSome then 1 else 0) +
+    4 + (actions.map Action.borshSize).sum
+
+/-- `validate_receipt(NewReceipt)` on each receipt a function call creates, in
+order: its Borsh size, then its actions as `validate_actions` checks them.
+The VM already validates the account ids, dependency counts and returned data. -/
+def checkVMReceipts (cfg : RuntimeConfig) (codeOf : Bytes → ContractCode) (predecessor signer : AccountId)
+    (signerKey : PublicKey) (specs : List ReceiptSpec) : Except ReceiptValidationError Unit := do
+  for (spec, k) in specs.zipIdx do
+    let actions := spec.actions.map (actionOfPromiseRaw codeOf)
+    let size := vmReceiptSize predecessor signer signerKey (vmReceiptOutputs specs k) spec actions
+    if size > cfg.wasm.limits.maxReceiptSize then
+      throw (.receiptSizeExceeded size cfg.wasm.limits.maxReceiptSize)
+    match validateTransactionActions cfg actions with
+    | .error e => throw (.actionsValidation e)
+    | .ok () => pure ()
+
 def materializeFunctionCall (c : ReceiptCtx) (isLast : Bool) (outcome : VMOutcome)
     (initial : ChainState) : Except RuntimeError FunctionCallEffects := do
   validateFunctionCallActions c outcome
-  return functionCallYields c outcome (materializeFunctionCallRaw c isLast outcome initial)
+  match checkVMReceipts c.cfg c.codeOf c.receipt.receiverId c.action.signerId c.action.signerPublicKey
+      outcome.receipts with
+  | .error error => throw (.newReceiptValidationError error)
+  | .ok () => return functionCallYields c outcome (materializeFunctionCallRaw c isLast outcome initial)
 
 /-- A successful checked construction is exactly the pure stage, with no fallback actions. -/
 theorem materializeFunctionCall_success (c : ReceiptCtx) (isLast : Bool) (outcome : VMOutcome)
@@ -372,7 +429,11 @@ theorem materializeFunctionCall_success (c : ReceiptCtx) (isLast : Bool) (outcom
   unfold materializeFunctionCall at h
   cases hv : validateFunctionCallActions c outcome with
   | error error => simp [hv, bind, Except.bind] at h
-  | ok accepted => cases accepted; simpa [hv, bind, pure, Except.bind, Except.pure] using h.symm
+  | ok accepted =>
+    cases hn : checkVMReceipts c.cfg c.codeOf c.receipt.receiverId c.action.signerId c.action.signerPublicKey
+        outcome.receipts with
+    | error error => simp [hv, hn, bind, Except.bind, throw, throwThe, MonadExceptOf.throw] at h
+    | ok checked => cases accepted; cases checked; simpa [hv, hn, bind, pure, Except.bind, Except.pure] using h.symm
 
 /-- Commit successful VM effects; the gas/log record is updated separately. -/
 def Exec.commitFunctionCall (exec : Exec) (outcome : VMOutcome) (effects : FunctionCallEffects) : Exec :=
@@ -477,8 +538,17 @@ def gasKeyWithdrawal (st : ChainState) (id : AccountId) (pk : PublicKey) (amount
   | some a => return st.setAccount id { a with amount := a.amount + amount }
   | none => throw (.accountDoesNotExist id)
 
-def Exec.burnAction (exec : Exec) (amount : Nat) : Exec :=
-  { exec with actionTokensBurnt := exec.actionTokensBurnt + amount }
+def Exec.burnAction (exec : Exec) (amount : Nat) (compute : Nat := 0) : Exec :=
+  { exec with actionTokensBurnt := exec.actionTokensBurnt + amount, actionCompute := exec.actionCompute + compute }
+
+/-- The length of a `TrieKey::GasKeyNonce` row's key: access-key column, account, separator,
+public key and the nonce index. -/
+def gasKeyNonceKeyLen (id : AccountId) (pk : PublicKey) : Nat := 1 + id.utf8ByteSize + 1 + pk.length + 2
+
+/-- The compute of removing the given gas key nonce rows (8-byte values), as
+`storage_removes_compute`. -/
+def nonceRemovalCompute (cfg : RuntimeConfig) (rows : List (AccountId × PublicKey)) : Nat :=
+  cfg.storageRemovesCompute rows.length ((rows.map fun (id, pk) => gasKeyNonceKeyLen id pk).sum) (8 * rows.length)
 
 /-- `validate_delegate_action_key`: the delegate's key, nonce and permission. It returns the
 nonce lane of a gas key (`none` for an ordinary key). -/
@@ -738,7 +808,7 @@ def applyAction [VmEngine] (c : ReceiptCtx) (isLast : Bool) : Action → ExecM U
     match key.permission.gasKeyInfo? with
     | some (balance, nonces) =>
       if balance > maxGasKeyBalanceToBurn then throw (.gasKeyBalanceTooHigh id (some pk) balance)
-      modify (·.burnAction balance)
+      modify (·.burnAction balance (nonceRemovalCompute c.cfg (List.replicate nonces (id, pk))))
       putAccount id { a with storageUsage := a.storageUsage - gasKeyStorageCost extra pk key nonces }
       modifyState fun st => (st.removeAccessKey id pk).removeGasKeyNonces id pk
     | none =>
@@ -760,7 +830,8 @@ def applyAction [VmEngine] (c : ReceiptCtx) (isLast : Bool) : Action → ExecM U
     modify fun exec => { exec with
       state := st'.removeAccount id
       storageAccounting := stageContractStorageRemoval id (st'.contractStorage id) exec.storageAccounting }
-    modify (·.burnAction gasKeys)
+    modify (·.burnAction gasKeys
+      (nonceRemovalCompute c.cfg ((st.gasKeyNonces.filter (·.1.1 == id)).map fun ((id, pk, _), _) => (id, pk))))
     modify fun e => { e with actorId := c.receipt.predecessorId }
     if a.amount > 0 then emit r
   | .useGlobalContract contract => do
@@ -1007,6 +1078,23 @@ def Exec.finishReceiptResult (exec : Exec) (c : ReceiptCtx) (failed : Option Run
       { exec with result := none } else exec
   exec.deliverResult c.receipt.receiverId c.action.outputDataReceivers
 
+/-- The compute a receipt used (`ActionReceiptResult::compute_usage`): its burnt gas, with the
+receipt's execution fee, the execution fee of each action it charged (up to the failed one) and
+each VM call's host costs counted at their compute cost instead, plus the compute its actions
+used without gas. -/
+def receiptComputeUsage (cfg : RuntimeConfig) (r : Receipt) (e : Exec) : Nat :=
+  let gas := cfg.fees.actionFees
+  let compute := cfg.computeActionFees
+  let eth := cfg.wasm.ethImplicitAccounts
+  let charged := match e.failureIndex with
+    | some index => r.actions.take (index + 1)
+    | none => r.actions
+  let actions : Int := (compute.newActionReceipt.execution : Int) - gas.newActionReceipt.execution +
+    (charged.map fun act =>
+      (Fees.exec compute eth r.receiverId act : Int) - Fees.exec gas eth r.receiverId act).sum
+  let calls : Int := (e.vmProfiles.map fun p => (cfg.vmComputeUsage p : Int) - p.total).sum
+  (e.gasBurnt + e.actionCompute + actions + calls).toNat
+
 /-- Finalize a receipt attempt: rollback, settlement, refunds, reward and data. -/
 def finalizeReceipt (c : ReceiptCtx) (st0 : ChainState) (exec : Exec) (failed : Option RuntimeError) : Exec :=
   let receiver := c.receipt.receiverId
@@ -1032,7 +1120,9 @@ def finalizeReceipt (c : ReceiptCtx) (st0 : ChainState) (exec : Exec) (failed : 
     else exec
   let exec := exec.creditReceiptReward c.cfg receiver settlement.burnPrice c.action.gasPrice
   let exec := exec.finishReceiptResult c failed
-  { exec with result := some (exec.result.getD (.successValue [])) }
+  { exec with
+    result := some (exec.result.getD (.successValue []))
+    computeUsage := receiptComputeUsage c.cfg c.receipt exec }
 
 
 /-- Publish successful receipt writes without rebuilding the chunk base trie.
@@ -1084,6 +1174,7 @@ def outcomeOf (r : Receipt) (e : Exec) : ExecutionOutcome :=
       | .action _ => some receipt.receiptId
       | .data _ | .globalDistribution _ => none)
     gasBurnt := e.gasBurnt
+    computeUsage := e.computeUsage
     tokensBurnt := e.tokensBurnt
     proposals := e.proposals
     profile := e.profile }
@@ -1430,6 +1521,62 @@ def convertTransaction (cfg : RuntimeConfig) (ap : ApplyState) (st : ChainState)
   | .error error => throw (.actionsValidation error)
   | .ok () => convertTransactionCore cfg ap st tx
 
+/-- Same transaction, hence the same hash: the model's transactions carry no
+signature, and a deployment's code is identified by its hash and size. -/
+def Action.identical : Action → Action → Bool
+  | .createAccount, .createAccount => true
+  | .deployContract a, .deployContract b => a.hash == b.hash && a.size == b.size
+  | .functionCall m a g d, .functionCall m' a' g' d' => m == m' && a == a' && g == g' && d == d'
+  | .transfer d, .transfer d' => d == d'
+  | .stake s k, .stake s' k' => s == s' && k == k'
+  | .addKey k a, .addKey k' a' => k == k' && a == a'
+  | .deleteKey k, .deleteKey k' => k == k'
+  | .deleteAccount b, .deleteAccount b' => b == b'
+  | .useGlobalContract c, .useGlobalContract c' => c == c'
+  | _, _ => false
+
+def Transaction.identical (a b : Transaction) : Bool :=
+  a.version == b.version && a.signerId == b.signerId && a.publicKey == b.publicKey &&
+    a.nonce == b.nonce && a.nonceMode == b.nonceMode && a.receiverId == b.receiverId &&
+    a.actions.length == b.actions.length && (a.actions.zip b.actions).all fun (x, y) => x.identical y
+
+/-- `UniqueChunkTransactions`: every repeat of an earlier transaction is skipped,
+with no outcome. -/
+def uniqueTransactions (txs : List Transaction) : List Transaction :=
+  txs.foldl (fun kept tx => if kept.any (·.identical tx) then kept else kept ++ [tx]) []
+
+/-- The transactions a chunk processes, in order. -/
+def chunkTransactions (cfg : RuntimeConfig) (txs : List Transaction) : List Transaction :=
+  if cfg.uniqueChunkTransactions then uniqueTransactions txs else txs
+
+theorem mem_uniqueTransactions {tx : Transaction} {txs : List Transaction}
+    (h : tx ∈ uniqueTransactions txs) : tx ∈ txs := by
+  suffices ∀ (kept : List Transaction),
+      tx ∈ txs.foldl (fun kept tx => if kept.any (·.identical tx) then kept else kept ++ [tx]) kept →
+      tx ∈ kept ∨ tx ∈ txs by
+    simpa using this [] h
+  clear h
+  induction txs with
+  | nil => intro kept h; exact .inl h
+  | cons head rest ih =>
+    intro kept h
+    rcases ih _ h with hk | hr
+    · dsimp only at hk
+      split at hk
+      · exact .inl hk
+      · rcases List.mem_append.mp hk with hk | hk
+        · exact .inl hk
+        · exact .inr (List.mem_cons.mpr (.inl (List.mem_singleton.mp hk)))
+    · exact .inr (List.mem_cons_of_mem _ hr)
+
+/-- Every transaction a chunk processes is one it was given. -/
+theorem mem_chunkTransactions {cfg : RuntimeConfig} {tx : Transaction} {txs : List Transaction}
+    (h : tx ∈ chunkTransactions cfg txs) : tx ∈ txs := by
+  unfold chunkTransactions at h
+  split at h
+  · exact mem_uniqueTransactions h
+  · exact h
+
 -- nearcore divergence: one shard; no congestion-control buffering, bandwidth scheduler,
 -- epoch validator-account updates or incoming-receipt validation (`Runtime::apply`,
 -- `process_receipts`). Instant receipts and yield timeouts are modelled.
@@ -1448,7 +1595,7 @@ def applyAttempt [VmEngine] (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : By
   let mut subsidizedAmount := 0
   let mut tokensBurnt := 0
   let mut txIndex := 0
-  for tx in txs do
+  for tx in chunkTransactions cfg txs do
     txIndex := txIndex + 1
     match convertTransaction cfg ap st tx with
     | .ok (st', r, cost) =>
@@ -1463,6 +1610,7 @@ def applyAttempt [VmEngine] (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : By
           status := .successReceiptId r.receiptId
           receiptIds := [r.receiptId]
           gasBurnt := cost.gasBurnt
+          computeUsage := cost.gasBurnt
           tokensBurnt := cost.gasBurnt * ap.gasPrice
           changes := transactionCommit (txIndex - 1) tx.signerId tx.publicKey st' }
       outcomes := outcomes ++ [(0, o)]
@@ -1476,8 +1624,10 @@ def applyAttempt [VmEngine] (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : By
   st := { st with delayed := [] }
   let mut retainedDelayed : List Receipt := []
   let mut newlyDelayed : List Receipt := []
-  let mut gasUsed := outcomes.foldl (fun total pair => total + pair.2.gasBurnt) 0
-  let mut overLimit := ap.gasLimit.any (gasUsed ≥ ·)
+  -- `total.compute`: the chunk stops taking receipts once their compute reaches the gas limit.
+  -- It also stops once the chunk's recorded storage proof passes its soft limit (`storageProofFull`).
+  let mut compute := outcomes.foldl (fun total pair => total + pair.2.computeUsage) 0
+  let mut overLimit := ap.gasLimit.any (compute ≥ ·) || storageProofFull cfg ap ap.storageAccounting
   let mut storageAccounting := ap.storageAccounting
   for (r, position) in queue.zipIdx do
     if overLimit then
@@ -1499,14 +1649,16 @@ def applyAttempt [VmEngine] (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : By
       outgoing := outgoing ++ p.receipts
       outcomes := outcomes ++ outcomesWithChanges pre p
       for (_, o) in p.outcomes do
-        gasUsed := gasUsed + o.gasBurnt
+        compute := compute + o.computeUsage
         tokensBurnt := tokensBurnt + o.tokensBurnt
-      gasUsed := gasUsed + p.extraCompute
+      compute := compute + p.extraCompute
       tokensBurnt := tokensBurnt + p.otherTokensBurnt - p.rewards
       if let some limit := ap.gasLimit then
-        if gasUsed ≥ limit then overLimit := true
+        if compute ≥ limit then overLimit := true
+      if storageProofFull cfg ap storageAccounting then overLimit := true
   -- Yields that timed out wake up with a resume receipt, after all incoming receipts.
-  let (stTimed, timeoutReceipts, timeoutBirths) := resolveYieldTimeouts ap ap.gasLimit gasUsed
+  let (stTimed, timeoutReceipts, timeoutBirths) := resolveYieldTimeouts ap
+    (if storageProofFull cfg ap storageAccounting then some 0 else ap.gasLimit) compute
     (st.yieldTimeouts.length + 1) (st, [], [])
   st := stTimed
   outgoing := outgoing ++ timeoutReceipts

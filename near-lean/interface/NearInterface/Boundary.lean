@@ -107,6 +107,9 @@ structure Context where
   validatorStake : Bytes → Nat := fun _ => 0
   /-- `validator_total_stake`: the current epoch's total validator stake. -/
   validatorTotalStake : Nat := 0
+  /-- The receipt's recorded storage proof once the trie reaches a given state, which the
+  per-receipt proof limit checks (a trusted input; absent, it is not checked). -/
+  storageProofSize : Option (Near.TrieOverlay.State → Nat) := none
 
 /-- Records stored under `account` in a trie view (`TrieKey::ContractData`). -/
 def contractData (trie : Near.TrieOverlay.State) (account : Bytes) : RawStorage :=

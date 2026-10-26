@@ -210,7 +210,7 @@ before selection, reproduce bit for bit.
    not reproduced ...`, naming the first differing key's column.
 3. **Replay and comparison.** The chunk runs through `registered-replay`, which derives native receipt and data
    hashes and the action-derived random seeds itself. Compared, in this order and against `expected` only: each
-   outcome's id, executor, status (kind, value or receipt id), logs, receipt ids, gas burnt, tokens burnt; the
+   outcome's id, executor, status (kind, value or receipt id), logs, receipt ids, gas burnt, compute usage, tokens burnt; the
    outgoing receipts as Borsh bytes (buffered ones that now fit, then new ones, in order); total tokens burnt and
    subsidized amount against `balanceStats`; the chunk's validator proposals (Borsh `Vec<ValidatorStake>`, deduplicated as
    `Runtime::apply` does), the chunk's own `CongestionInfo`, bandwidth requests, scheduler state
@@ -221,7 +221,7 @@ before selection, reproduce bit for bit.
 
 `audit/chain-replay-corpus.json` holds, per chunk, `pass`, `fail` with the first differing field, or `unsupported`
 with the first reason, plus all blockers, tags and seconds; `--report` always exits 0.
-Not compared yet: gas profiles, `computeUsage`, state changes in Borsh, the outcome root, the exact failure error
+Not compared yet: gas profiles, state changes in Borsh, the outcome root, the exact failure error
 variants.
 
 ## 8b. State roots (M4)

@@ -263,6 +263,14 @@ inductive ActionsValidationError
   | addGasKeyWithNonZeroBalance (balance : Nat)
   deriving Repr, BEq, Inhabited
 
+/-- `ReceiptValidationError` for the receipts a function call creates (the
+represented subset: the VM already validates account ids, dependency counts
+and returned data). -/
+inductive ReceiptValidationError
+  | receiptSizeExceeded (size limit : Nat)
+  | actionsValidation (error : ActionsValidationError)
+  deriving Repr, BEq, Inhabited
+
 /-- Receipt and transaction failures, preserving stateless action error categories. -/
 inductive RuntimeError
   | actionsValidation (error : ActionsValidationError)
@@ -309,6 +317,8 @@ inductive RuntimeError
   | delegateActionAccessKeyError (reason : String)
   | contractSizeExceeded (size limit : Nat)
   | tooManyActions (count limit : Nat)
+  /-- A receipt the function call created fails `validate_receipt(NewReceipt)`. -/
+  | newReceiptValidationError (error : ReceiptValidationError)
   | executionIssue (issue : Wasm.Near.ExecutionIssue)
   deriving Repr, BEq, Inhabited
 
@@ -419,6 +429,8 @@ structure ExecutionOutcome where
   logs : List String := []
   receiptIds : List ReceiptId := []
   gasBurnt : Nat := 0
+  /-- `compute_usage`: what the outcome takes of the chunk's compute limit. -/
+  computeUsage : Nat := 0
   tokensBurnt : Nat := 0
   /-- The validator proposals of the receipt's successful `Stake` actions. -/
   proposals : List ValidatorProposal := []

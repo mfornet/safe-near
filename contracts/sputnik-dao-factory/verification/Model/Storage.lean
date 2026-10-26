@@ -1,4 +1,5 @@
 import Std
+import NearSdk
 
 /-! Pinned factory storage primitives. These retain the shared raw-key namespace
 rather than postulating disjoint logical code and DAO maps. Full exported-method
@@ -6,18 +7,12 @@ semantics and SDK entry guards are added separately; helpers here are the exact
 internal operations after their callers' guards. -/
 namespace SputnikFactory
 
-abbrev Bytes := List UInt8
+export NearSdk.Borsh (Bytes leBytes leBytes_length)
 abbrev Raw := List (Bytes × Bytes)
 abbrev Account := String
 abbrev Hash := { bytes : Bytes // bytes.length = 32 }
 
-def leBytes : Nat → Nat → Bytes
-  | 0, _ => []
-  | w + 1, n => UInt8.ofNat (n % 256) :: leBytes w (n / 256)
-
-def borshBytes (bs : Bytes) : Bytes := leBytes 4 bs.length ++ bs
-
-def borshString (text : String) : Bytes := borshBytes text.toUTF8.data.toList
+def borshString (text : String) : Bytes := NearSdk.Borsh.bytes text.toUTF8.data.toList
 
 def codeKey (hash : Hash) : Bytes := hash.val
 

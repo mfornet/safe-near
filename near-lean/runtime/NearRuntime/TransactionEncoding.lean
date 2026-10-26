@@ -6,14 +6,12 @@ are explicit original inputs: receipt identity cannot be recovered from a model
 counter, nonce or execution block height alone. -/
 namespace Near.TransactionEncoding
 
-private def unsigned (width value : Nat) : Except String Bytes := do
-  unless value < 2 ^ (8 * width) do throw s!"integer exceeds u{8 * width}"
-  return (List.range width).map fun i => UInt8.ofNat (value / 2 ^ (8 * i) % 256)
+open EncodingPrimitives
 
 private def account (id : AccountId) : Except String Bytes := do
   let bytes := id.toUTF8.toList
   unless Wasm.Near.validAccountIdBytes bytes do throw "invalid transaction account id"
-  return (← unsigned 4 bytes.length) ++ bytes
+  vector bytes
 
 /-- V0 is untagged. V1 adds the transaction tag, ordinary nonce tag and trailing
 nonce mode. Signature bytes are not part of the signed transaction hash. -/

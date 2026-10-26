@@ -31,6 +31,8 @@ sorries contract: (_check contract)
 
 # Build the web blueprint of one contract (contracts/<name>/verification/blueprint/web/).
 blueprint contract: (_check contract)
+    @test -d contracts/{{ contract }}/verification/blueprint/src || \
+        { echo "contracts/{{ contract }} has no leanblueprint (see its blueprint/README.md)"; exit 1; }
     cd contracts/{{ contract }}/verification && just blueprint-web
 
 # (Served by the launchd agent com.safe-near.blueprint from ~/Library/Application Support/safe-near/blueprint.)

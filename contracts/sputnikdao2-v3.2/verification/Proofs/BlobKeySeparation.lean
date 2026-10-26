@@ -5,15 +5,15 @@ namespace SputnikDAO2
 
 theorem dao_proposal_key_length (id : Nat) :
     (daoProposalEntryKey id).length = 9 := by
-  simp [daoProposalEntryKey, bountyLE_length]
+  simp [daoProposalEntryKey]
 
 theorem dao_bounty_key_length (id : Nat) :
     (daoBountyEntryKey id).length = 9 := by
-  simp [daoBountyEntryKey, bountyLE_length]
+  simp [daoBountyEntryKey]
 
 theorem dao_bounty_count_key_length (id : Nat) :
     (bountyCountKey id).length = 9 := by
-  simp [bountyCountKey, bountyLE_length]
+  simp [bountyCountKey]
 
 theorem dao_blob_owner_key_length (digest : BountyBytes) :
     (daoBlobOwnerKey digest).length = digest.length + 1 := by
@@ -31,7 +31,7 @@ theorem dao_account_key_length (account : String) :
     (bountyClaimersKey account).length =
       account.toUTF8.data.toList.length + 5 := by
   simp [delegationKey, bountyClaimersKey,
-    bountyBorshString, bountyLE_length]
+    bountyBorshString]
   omega
 
 theorem raw_blob_key_avoids_fixed_collection_keys

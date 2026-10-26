@@ -44,6 +44,10 @@ structure VMContext where
   /-- Full chunk trie, including other accounts and runtime metadata. Callers retain
   the returned cache across calls; receipt commit/rollback is their responsibility. -/
   storageAccounting : Option _root_.Near.TrieOverlay.State := none
+  /-- Trusted input: the receipt's recorded storage proof (its upper bound, counted as nearcore's
+  `RecordedStorageCounter` counts it) once the trie overlay has reached a given state. Supplied
+  by the node from its trie recorder; absent, the per-receipt proof limit is not checked. -/
+  storageProofSize : Option (_root_.Near.TrieOverlay.State → Nat) := none
   storageReadsFromTrie : Bool := false
   /-- Accounts whose pending receipts wait for this call's result. -/
   outputDataReceivers : List Bytes := []
@@ -101,6 +105,7 @@ def toNearState (cfg : RuntimeConfig) (ctx : VMContext)
     storage := fun k => (storage.find? (·.1 == k)).map (·.2)
     storageKeys := sortedKeys storage
     storageAccounting := ctx.storageAccounting
+    storageProofSize := ctx.storageProofSize
     storageReadsFromTrie := ctx.storageReadsFromTrie
     promiseResults := ctx.promiseResults
     config := {
@@ -118,6 +123,7 @@ def toNearState (cfg : RuntimeConfig) (ctx : VMContext)
       maxPromises := some cfg.wasm.limits.maxPromisesPerFunctionCallAction
       maxContractSize := some cfg.wasm.limits.maxContractSize
       maxYieldPayloadSize := some cfg.wasm.limits.maxYieldPayloadSize
+      maxStorageProofSize := cfg.wasm.limits.perReceiptStorageProofSizeLimit
       validAccountId := if cfg.wasm.limits.accountIdValidityRulesVersion == 2 then validAccountIdBytes
         else fun _ => true
       blsVersion := if cfg.wasm.bls12381NotInGroupFix then 1 else 0 }

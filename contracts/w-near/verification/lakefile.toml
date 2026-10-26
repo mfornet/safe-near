@@ -24,6 +24,11 @@ rev = "v4.34.1"
 name = "NearRuntime"
 path = "../../../near-lean/runtime"
 
+# Borsh and near-sdk collection layouts shared with the other contract projects.
+[[require]]
+name = "NearSdk"
+path = "../../../near-lean/sdk"
+
 [[require]]
 name = "LeanArchitect"
 git = "https://github.com/hanwenzhu/LeanArchitect.git"

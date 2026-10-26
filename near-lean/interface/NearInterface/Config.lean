@@ -44,6 +44,17 @@ structure LimitConfig where
   yieldTimeoutLengthInBlocks : Nat := 200
   /-- `max_yield_payload_size`: bytes `promise_yield_resume` accepts. -/
   maxYieldPayloadSize : Nat := 1024
+  /-- `prepare_v3` limits; `none` when the protocol version does not set one. -/
+  maxFunctionsNumberPerContract : Option Nat := none
+  maxLocalsPerContract : Option Nat := none
+  maxFunctionBodySize : Option Nat := none
+  maxTablesPerContract : Option Nat := none
+  maxElementsPerContractTable : Option Nat := none
+  maxTypesPerContract : Option Nat := none
+  /-- `max_receipt_size`, checked on the receipts a function call creates. -/
+  maxReceiptSize : Nat := 2 ^ 32 - 1
+  /-- `per_receipt_storage_proof_size_limit`: the storage proof one receipt may record. -/
+  perReceiptStorageProofSizeLimit : Nat := 2 ^ 32 - 1
   deriving Repr, Inhabited
 
 /-- `near_parameters::vm::Config`. -/
@@ -63,6 +74,15 @@ structure WasmConfig where
   /-- `bls12381_not_in_group_fix` (NEP-488): `bls12381_p1_sum` and `bls12381_p1_decompress` accept
   the points of order 3 with abscissa zero. -/
   bls12381NotInGroupFix : Bool := false
+  /-- `global_contract_host_fns`: the global-contract host functions are
+  linked (protocol 78 on); before, importing one fails to link. -/
+  globalContractHostFns : Bool := false
+  /-- `chain_id_host_fn`, `p256_verify_host_fn`, `gas_key_host_fns`, `yield_with_id_host_fns`: whether
+  these host functions are linked (protocol 85 on); before, importing one fails to link. -/
+  chainIdHostFn : Bool := false
+  p256VerifyHostFn : Bool := false
+  gasKeyHostFns : Bool := false
+  yieldWithIdHostFns : Bool := false
   limits : LimitConfig
   deriving Inhabited
 
@@ -87,6 +107,8 @@ structure RuntimeConfig where
   strictNonceEnabled : Bool := false
   v1TransactionsEnabled : Bool := false
   transactionSizeIncludesSignature : Bool := false
+  /-- `UniqueChunkTransactions`: a repeated transaction in a chunk is skipped. -/
+  uniqueChunkTransactions : Bool := false
   accountCostIncrease : Bool := true
   minGasPurchasePrice : Nat := 0
   accountCreationCharge : Nat := 0
@@ -104,6 +126,16 @@ structure RuntimeConfig where
   fixDeleteAccountGlobalContractStorageUsage : Bool := false
   /-- `FixDelegateActionDepositWithFunctionCallError`. -/
   fixDelegateActionDepositWithFunctionCallError : Bool := false
+  /-- `EnforcePerReceiptStorageProofLimit`: a receipt's proof counts from the receipt's start, not
+  from the function call's. -/
+  enforcePerReceiptStorageProofLimit : Bool := false
+  /-- `main_storage_proof_size_soft_limit`: the chunk takes no more receipts past this proof size. -/
+  mainStorageProofSizeSoftLimit : Nat := 2 ^ 32 - 1
+  /-- `compute_costs.ext`: the `ExtCosts` whose compute cost differs from their gas cost. -/
+  extCompute : List (String × Nat) := []
+  /-- `compute_costs.action_execution`: the action execution fees whose compute cost differs from
+  their gas cost. Send fees always have compute equal to gas (the parser rejects other configs). -/
+  actionExecutionCompute : List (String × Nat) := []
   fees : FeesConfig
   wasm : WasmConfig
   accountCreation : AccountCreationConfig
@@ -112,6 +144,33 @@ structure RuntimeConfig where
   deriving Inhabited
 
 namespace RuntimeConfig
+
+/-- The action fees with each execution fee at its compute cost (`FeeComponent::compute`). -/
+def computeActionFees (cfg : RuntimeConfig) : ActionFees :=
+  cfg.actionExecutionCompute.foldl (fun fees (name, compute) => (fees.setExecution name compute).getD fees)
+    cfg.fees.actionFees
+
+/-- The compute cost of the `ExtCosts` named `name`: its override, else its gas cost. -/
+def extComputeCost (cfg : RuntimeConfig) (name : String) : Nat :=
+  (cfg.extCompute.lookup name).getD (cfg.wasm.extCosts.cost name)
+
+/-- `storage_removes_compute`: the compute of `count` storage removals of `keyBytes` key bytes
+and `valueBytes` value bytes in all, which the runtime charges without gas. -/
+def storageRemovesCompute (cfg : RuntimeConfig) (count keyBytes valueBytes : Nat) : Nat :=
+  cfg.extComputeCost "storage_remove_base" * count + cfg.extComputeCost "storage_remove_key_byte" * keyBytes +
+    cfg.extComputeCost "storage_remove_ret_value_byte" * valueBytes
+
+/-- `ProfileDataV3::total_compute_usage` of one VM call: each host cost's burnt gas scaled by
+its compute-to-gas ratio (rounded down per cost), plus the action and Wasm gas, whose
+compute equals their gas. -/
+def vmComputeUsage (cfg : RuntimeConfig) (profile : GasProfile) : Nat :=
+  let ext := profile.ext.foldl (fun total (name, gas) =>
+    total + match cfg.extCompute.lookup name with
+      | some compute =>
+        let unit := cfg.wasm.extCosts.cost name
+        if unit == 0 then gas else gas * compute / unit
+      | none => gas) 0
+  ext + profile.actionBurnt + profile.wasm
 
 private def field (j : Json) (k : String) : Except String Json :=
   match j.getObjVal? k with
@@ -123,6 +182,15 @@ private def nat (j : Json) (k : String) : Except String Nat := do
   match v.getNat? with
   | .ok n => pure n
   | .error _ => .error s!"key {k} is not a natural number"
+
+/-- An optional natural number: absent or `null` is `none`. -/
+private def optNat (j : Json) (k : String) : Except String (Option Nat) :=
+  match j.getObjVal? k with
+  | .error _ | .ok .null => .ok none
+  | .ok v =>
+    match v.getNat? with
+    | .ok n => .ok (some n)
+    | .error _ => .error s!"key {k} is not a natural number"
 
 /-- Decimal string holding a `u128`. -/
 private def natString (j : Json) (k : String) : Except String Nat := do
@@ -173,7 +241,15 @@ private def limits (j : Json) : Except String LimitConfig := do
     registersMemoryLimit := ← nat j "registers_memory_limit"
     accountIdValidityRulesVersion := ← nat j "account_id_validity_rules_version"
     yieldTimeoutLengthInBlocks := (nat j "yield_timeout_length_in_blocks").toOption.getD 200
-    maxYieldPayloadSize := (nat j "max_yield_payload_size").toOption.getD 1024 }
+    maxYieldPayloadSize := (nat j "max_yield_payload_size").toOption.getD 1024
+    maxFunctionsNumberPerContract := ← optNat j "max_functions_number_per_contract"
+    maxLocalsPerContract := ← optNat j "max_locals_per_contract"
+    maxFunctionBodySize := ← optNat j "max_function_body_size"
+    maxTablesPerContract := ← optNat j "max_tables_per_contract"
+    maxElementsPerContractTable := ← optNat j "max_elements_per_contract_table"
+    maxTypesPerContract := ← optNat j "max_types_per_contract"
+    maxReceiptSize := ← nat j "max_receipt_size"
+    perReceiptStorageProofSizeLimit := ← nat j "per_receipt_storage_proof_size_limit" }
 
 private def extCosts (j : Json) : Except String ExtCosts := do
   match j with
@@ -186,6 +262,31 @@ private def extCosts (j : Json) : Except String ExtCosts := do
     let arr := table.toArray
     pure { lookup := fun name => (arr.find? (·.1 == name)).map (·.2) |>.getD 0 }
   | _ => .error "ext_costs is not an object"
+
+private def natTable (j : Json) (what : String) : Except String (List (String × Nat)) := do
+  match j with
+  | .obj kvs =>
+    kvs.toArray.toList.mapM fun (k, v) => do
+      match v.getNat? with
+      | .ok n => pure (k, n)
+      | .error _ => throw s!"{what} {k} is not a natural number"
+  | _ => throw s!"{what} is not an object"
+
+/-- `compute_costs`: compute costs that differ from gas. Absent (configs dumped before it
+existed) means none. An unknown action name or a send-fee override is rejected: the model
+would otherwise charge it as gas. -/
+private def computeCosts (j : Json) (fees : ActionFees) :
+    Except String (List (String × Nat) × List (String × Nat)) := do
+  match field j "compute_costs" with
+  | .error _ => pure ([], [])
+  | .ok costs =>
+    let ext ← natTable (← field costs "ext") "ext compute cost"
+    let execution ← natTable (← field costs "action_execution") "action execution compute cost"
+    let send ← natTable (← field costs "action_send") "action send compute cost"
+    unless send.isEmpty do throw "action send fees with a compute cost other than gas are not modeled"
+    for (name, n) in execution do
+      if (fees.setExecution name n).isNone then throw s!"unknown action cost {name}"
+    pure (ext, execution)
 
 /-- Parse nearcore's `RuntimeConfigView` JSON. -/
 def ofJson (j : Json) : Except String RuntimeConfig := do
@@ -200,6 +301,7 @@ def ofJson (j : Json) : Except String RuntimeConfig := do
   -- them in `runtime_configs/77.yaml`; the host functions that charge them are
   -- enabled from 78 (`global_contract_host_fns`) and no later version changes them.
   let hostFns := ((field wasm "global_contract_host_fns").toOption.bind (·.getBool?.toOption)).getD false
+  let wasmFlag (k : String) : Bool := ((field wasm k).toOption.bind (·.getBool?.toOption)).getD false
   let disabled : Fee :=
     { sendSir := 999_999_999_999_999, sendNotSir := 999_999_999_999_999, execution := 999_999_999_999_999 }
   let useGlobalBase : Fee := if hostFns then
@@ -258,10 +360,12 @@ def ofJson (j : Json) : Except String RuntimeConfig := do
     gasKeyByte
     gasKeyNonceWriteBase }
   let finance ← field j "runtime_finance"
+  let (computeExt, computeExecution) ← computeCosts j actionFees
   pure {
     strictNonceEnabled := ← (← field (← field j "runtime_admission") "strict_nonce").getBool?
     v1TransactionsEnabled := ← (← field (← field j "runtime_admission") "v1_transactions").getBool?
     transactionSizeIncludesSignature := ← (← field (← field j "runtime_admission") "transaction_size_includes_signature").getBool?
+    uniqueChunkTransactions := ← (← field (← field j "runtime_admission") "unique_chunk_transactions").getBool?
     accountCostIncrease := ← (← field finance "account_cost_increase").getBool?
     minGasPurchasePrice := ← natString j "min_gas_purchase_price"
     accountCreationCharge := ← natString j "account_creation_charge"
@@ -273,6 +377,12 @@ def ofJson (j : Json) : Except String RuntimeConfig := do
     globalContractDistributionNonce := extraFlag "global_contract_distribution_nonce"
     fixDeleteAccountGlobalContractStorageUsage := extraFlag "fix_delete_account_global_contract_storage_usage"
     fixDelegateActionDepositWithFunctionCallError := extraFlag "fix_delegate_action_deposit_with_function_call_error"
+    enforcePerReceiptStorageProofLimit := extraFlag "enforce_per_receipt_storage_proof_limit"
+    mainStorageProofSizeSoftLimit :=
+      ((field j "witness_config").toOption.bind (fun w => (nat w "main_storage_proof_size_soft_limit").toOption)).getD
+        (2 ^ 32 - 1)
+    extCompute := computeExt
+    actionExecutionCompute := computeExecution
     fees := {
       actionFees
       gasRefundPenalty := ← ratio finance "gas_refund_penalty"
@@ -293,6 +403,11 @@ def ofJson (j : Json) : Except String RuntimeConfig := do
       ethImplicitGlobalContract := ((field wasm "eth_implicit_global_contract").toOption.bind (·.getBool?.toOption)).getD false
       bls12381NotInGroupFix :=
         ((field wasm "bls12381_not_in_group_fix").toOption.bind (·.getBool?.toOption)).getD false
+      globalContractHostFns := hostFns
+      chainIdHostFn := wasmFlag "chain_id_host_fn"
+      p256VerifyHostFn := wasmFlag "p256_verify_host_fn"
+      gasKeyHostFns := wasmFlag "gas_key_host_fns"
+      yieldWithIdHostFns := wasmFlag "yield_with_id_host_fns"
       limits := ← limits (← field wasm "limit_config") }
     accountCreation := {
       minAllowedTopLevelAccountLength := ← nat acc "min_allowed_top_level_account_length"
