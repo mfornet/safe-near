@@ -42,7 +42,11 @@ near-sdk-core 3.1.0 and near-contract-standards 3.1.0):
 - View methods (`&self`) have no attached-deposit check; non-payable mutating
   methods panic with `Method <name> doesn't accept deposit`.
 - `ft_resolve_transfer` is `#[private]`; `new` is `#[init]` and the contract
-  is `PanicOnDefault`.
+  is `PanicOnDefault`. The wrapper checks, in order: the predecessor of a
+  `#[private]` method, the deposit, the arguments, then the state.
+- A method that returns a `Promise` passes `null` to `value_return` before
+  the promise replaces it as the result; data receipts to the result's
+  receivers pay for those bytes.
 - `storage_byte_cost()` is the constant `10^19`, not a host call.
 - `ft_transfer_call` computes `prepaid_gas - 30 TGas` with overflow checks on.
 - `ft_resolve_transfer` parses the receiver's return value as a JSON `U128`;

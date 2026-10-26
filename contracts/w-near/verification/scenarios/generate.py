@@ -134,16 +134,34 @@ def long_input_scenarios(arg_sizes, msg_sizes, result_sizes, suffix=""):
     return out
 
 
-def random_scenario(seed, steps=120):
+ETH_IMPLICIT = "0x" + "ab" * 20
+DETERMINISTIC = "0s" + "cd" * 20
+
+
+def random_scenario(seed, steps=120, wide=False):
     """A random interleaving: calls from a small set of accounts, transfer-calls
-    whose callbacks are delivered later in random order with random results."""
+    whose callbacks are delivered later in random order with random results.
+
+    `wide` adds ETH-implicit and deterministic callers, a 64-character contract
+    account, receivers of the call's result (`outputDataReceivers`), forged
+    resolutions with deposits and transfer-calls at the 30 Tgas edge. Without
+    it, a seed generates what it always did."""
     rnd = random.Random(seed)
-    people = ["alice.near", "bob.near", "carol.near", "dave.near", "wrap.near",
-              "a" * 64, "x.near"]
+    contract = "w" * 64 if wide and seed % 2 == 0 else "wrap.near"
+    people = ["alice.near", "bob.near", "carol.near", "dave.near", contract,
+              "a" * 64, "x.near"] + ([ETH_IMPLICIT, DETERMINISTIC] if wide else [])
     amounts = lambda: rnd.choice(["0", "1", "7", "100", str(10**21), str(10**24), "340282366920938463463374607431768211455"])
     blocks, pending, height = [], [], 0
-    receipts = [rx("init", call("wrap.near", "new"))]
+    receipts = [rx("init", call(contract, "new"))]
     n = 0
+
+    def outputs():
+        """Receivers of the result: usually none, sometimes many."""
+        if not wide or rnd.random() < 0.6:
+            return {}
+        n = rnd.choice([1, 2, 30, 1024])
+        return {"outputDataReceivers": [{"repeat": rnd.choice([contract, "bob.near", ETH_IMPLICIT]), "times": n}]}
+
     while n < steps:
         n += 1
         kind = rnd.random()
@@ -154,25 +172,29 @@ def random_scenario(seed, steps=120):
             ref = pending.pop(rnd.randrange(len(pending)))
             res = rnd.choice([["failed"], [{"ok": f"\"{rnd.choice(['0', '1', '5', '1000000'])}\""}],
                               [{"ok": "garbage"}], ["notReady"], [{"ok": "\"3\""}, "failed"]])
-            receipts.append({"label": label, "deliver": ref, "results": res, "optional": True})
+            receipts.append({"label": label, "deliver": ref, "results": res, "optional": True, **outputs()})
+        elif wide and kind < 0.25:
+            receipts.append(rx(label, call(p, "ft_resolve_transfer", {"sender_id": q, "receiver_id": rnd.choice(people), "amount": amounts()},
+                                           deposit=rnd.choice([0, 0, 1]), results=rnd.choice([["failed"], [{"ok": "\"2\""}], []]), **outputs())))
         elif kind < 0.35:
-            receipts.append(rx(label, call(p, "near_deposit", deposit=rnd.choice([1, FEE - 1, FEE, FEE + 1, 10**24]))))
+            receipts.append(rx(label, call(p, "near_deposit", deposit=rnd.choice([1, FEE - 1, FEE, FEE + 1, 10**24]), **outputs())))
         elif kind < 0.45:
             receipts.append(rx(label, call(p, "storage_deposit", {"account_id": q} if rnd.random() < 0.5 else {},
-                                           deposit=rnd.choice([0, 1, FEE, 3 * FEE]))))
+                                           deposit=rnd.choice([0, 1, FEE, 3 * FEE]), **outputs())))
         elif kind < 0.6:
             receipts.append(rx(label, call(p, "ft_transfer", {"receiver_id": q, "amount": amounts()}, deposit=rnd.choice([1, 1, 1, 0, 2]))))
         elif kind < 0.75:
             receipts.append(rx(label, call(p, "ft_transfer_call", {"receiver_id": q, "amount": amounts(), "msg": "m"},
-                                           deposit=1, gas=rnd.choice(["300000000000000", "30000000000000", "bound", "bound-1"]))))
+                                           deposit=1, gas=rnd.choice(["300000000000000", "30000000000000", "bound", "bound-1"]
+                                                                    + (["30000000000001", "1000000000000000"] if wide else [])), **outputs())))
             pending.append(f"{label}#1")
         elif kind < 0.85:
-            receipts.append(rx(label, call(p, "near_withdraw", {"amount": amounts()}, deposit=1)))
+            receipts.append(rx(label, call(p, "near_withdraw", {"amount": amounts()}, deposit=1, **outputs())))
         elif kind < 0.93:
-            receipts.append(rx(label, call(p, "storage_unregister", {"force": rnd.random() < 0.5}, deposit=1)))
+            receipts.append(rx(label, call(p, "storage_unregister", {"force": rnd.random() < 0.5}, deposit=1, **outputs())))
         else:
             receipts.append(rx(label, call(p, rnd.choice(["ft_total_supply", "ft_balance_of", "storage_balance_of"]),
-                                           {"account_id": q})))
+                                           {"account_id": q}, **outputs())))
         if rnd.random() < 0.25:
             height += rnd.choice([1, 1, 2, 10, 100])
             blocks.append({"height": height + 1, "receipts": receipts})
@@ -180,10 +202,14 @@ def random_scenario(seed, steps=120):
             receipts = []
     if receipts:
         blocks.append({"height": height + 1, "receipts": receipts})
-    return {"name": f"random interleaving, seed {seed}",
+    return {"name": f"random interleaving{', wide' if wide else ''}, seed {seed}",
+            **({"contract": contract} if wide else {}),
             "description": "Generated by generate.py. A delivery is optional: the transfer-call it resolves may have failed.",
             "state": None, "account": {"balance": str(10**25)}, "blocks": blocks}
 
+
+# Seeds of `random_scenario(wide=True)` kept as regressions and for breadth.
+WIDE_SEEDS = [1, 2, 3, 4]
 
 if __name__ == "__main__":
     (HERE / "40_gas.json").write_text(json.dumps(
@@ -193,3 +219,4 @@ if __name__ == "__main__":
     (HERE / "slow" / "40_gas_large.json").write_text(json.dumps(
         long_input_scenarios([1000000, 4000000], [200000], [100000, 1000000, 4194304], " (large)"), indent=1) + "\n")
     (HERE / "60_random.json").write_text(json.dumps([random_scenario(s) for s in range(1, 9)], indent=1) + "\n")
+    (HERE / "61_random_wide.json").write_text(json.dumps([random_scenario(s, wide=True) for s in WIDE_SEEDS], indent=1) + "\n")

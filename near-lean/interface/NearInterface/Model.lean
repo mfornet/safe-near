@@ -69,6 +69,17 @@ where
           limits.maxTotalLogLength, kept.reverse)
       else go (total + l.utf8ByteSize) (l :: kept) ls
 
+/-- Gas `value_return` burns for a value of `bytes` bytes: the data receipts
+that carry it to the call's `output_data_receivers` pay `new_data_receipt_byte`
+per byte and per receiver, its send fee (same shard when the receiver is the
+contract itself) and its execution fee. Their base fee was paid by the call
+that created the dependency. Nothing bounds the number of receivers in the
+context, so a model's gas bound needs this term. -/
+def returnDataGas (ctx : Context) (bytes : Nat) : Gas :=
+  let fee := ctx.protocol.fees.actionFees.newDataReceiptByte
+  (ctx.outputDataReceivers.map fun r =>
+    (fee.send (decide (r = ctx.current)) + fee.execution) * bytes).sum
+
 structure ContractModel where
   State : Type
   Call : Type

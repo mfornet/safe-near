@@ -8,7 +8,7 @@ lake exe wnear-scenarios [-v] [path ...]
 ```
 
 Each path is a scenario file or a directory of them (default `scenarios/`;
-`scenarios/slow/` runs only when named). `--only text` runs the scenarios whose
+`scenarios/slow/` and `scenarios/open/` run only when named). `--only text` runs the scenarios whose
 name contains `text`; `-v` prints every receipt.
 A file holds one scenario object or an array of them. Exits nonzero when a
 scenario finds a discrepancy or is itself broken.
@@ -18,14 +18,15 @@ open Lean Scenario WNear WNear.Scenarios
 
 def configDir : System.FilePath := "../../../near-lean/vm/configs"
 
-/-- The scenario files under `p`. Subdirectories named `slow` are skipped
-unless named explicitly. -/
+/-- The scenario files under `p`. Subdirectories named `slow` (megabyte
+inputs) and `open` (open findings, which fail by design) are skipped unless
+named explicitly. -/
 partial def scenarioFiles (p : System.FilePath) : IO (Array System.FilePath) := do
   if ← p.isDir then
     let entries ← p.readDir
     let mut out := #[]
     for e in entries.qsort (·.fileName < ·.fileName) do
-      if e.fileName == "slow" then continue
+      if e.fileName == "slow" || e.fileName == "open" then continue
       out := out ++ (← scenarioFiles e.path)
     pure out
   else if p.extension == some "json" then pure #[p]
