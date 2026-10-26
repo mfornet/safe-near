@@ -37,6 +37,11 @@ rev = "v4.34.0"
 [[lean_lib]]
 name = "Model"
 
+# The deployed binary in the kernel: its bytes, each function's body as decoded,
+# and the module (milestone M0 of notes/todo/wnear_refinement_proof.md).
+[[lean_lib]]
+name = "Binary"
+
 [[lean_lib]]
 name = "Spec"
 

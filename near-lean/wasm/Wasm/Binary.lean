@@ -14,6 +14,12 @@ feature outside our scope with `DecodeError.unsupported`. Validation
 The parser is a function from the input and a position to a result and the
 next position. Every loop is bounded by a count read from the input or by the
 number of bytes left, so the decoder is total.
+
+The input is read through a function, `Input.read`, rather than a
+`ByteArray`. `decode` reads from the bytes it is given; proofs that let the
+kernel run the decoder supply a function the kernel evaluates in a few steps
+per byte (`ByteArray` indexing walks a list from the start, which makes
+kernel decoding quadratic in the size of the input).
 -/
 
 namespace Wasm.Binary
@@ -29,10 +35,16 @@ def DecodeError.message : DecodeError → String
   | .malformed pos msg => s!"malformed at byte {pos}: {msg}"
   | .unsupported pos feature => s!"unsupported feature at byte {pos}: {feature}"
 
-/-- The bytes being decoded and the end of the region a parser may read. -/
+/-- The bytes being decoded (`read i` for `i < size`) and the end of the
+region a parser may read. -/
 structure Input where
-  bytes : ByteArray
+  read : Nat → UInt8
+  size : Nat
   limit : Nat
+
+/-- The input of a whole byte array. -/
+def Input.ofBytes (bytes : ByteArray) : Input :=
+  { read := fun i => bytes[i]?.getD 0, size := bytes.size, limit := bytes.size }
 
 def Parser (α : Type) := Input → Nat → Except DecodeError (α × Nat)
 
@@ -59,17 +71,17 @@ instance : Monad Parser where
 @[inline] def atEnd : Parser Bool := fun input pos => .ok (decide (pos ≥ input.limit), pos)
 
 @[inline] def byte : Parser UInt8 := fun input pos =>
-  if h : pos < input.limit ∧ pos < input.bytes.size then .ok (input.bytes[pos], pos + 1)
+  if pos < input.limit ∧ pos < input.size then .ok (input.read pos, pos + 1)
   else .error (.malformed pos "unexpected end")
 
 @[inline] def peek? : Parser (Option UInt8) := fun input pos =>
-  if h : pos < input.limit ∧ pos < input.bytes.size then .ok (some input.bytes[pos], pos)
+  if pos < input.limit ∧ pos < input.size then .ok (some (input.read pos), pos)
   else .ok (none, pos)
 
 /-- Read `n` raw bytes. -/
 def bytes (n : Nat) : Parser ByteArray := fun input pos =>
-  if pos + n ≤ input.limit ∧ pos + n ≤ input.bytes.size then
-    .ok (input.bytes.extract pos (pos + n), pos + n)
+  if pos + n ≤ input.limit ∧ pos + n ≤ input.size then
+    .ok (⟨Array.ofFn (n := n) fun i => input.read (pos + i)⟩, pos + n)
   else .error (.malformed pos "unexpected end")
 
 /-- Run `p` on exactly the next `n` bytes: it may not read past them and must
@@ -87,12 +99,14 @@ def sized (n : Nat) (p : Parser α) : Parser α := fun input pos =>
 /-- Skip to the end of the current region. -/
 def skipToLimit : Parser Unit := fun input _ => .ok ((), input.limit)
 
-/-- Repeat `p` exactly `n` times. -/
-def count (n : Nat) (p : Parser α) : Parser (Array α) := do
-  let mut out : Array α := Array.mkEmpty n
-  for _ in [0:n] do
-    out := out.push (← p)
-  return out
+/-- Repeat `p` exactly `n` times. Written as structural recursion, so that
+proofs about a long repetition can go one element at a time. -/
+def count (n : Nat) (p : Parser α) : Parser (Array α) := go n (Array.mkEmpty n)
+where
+  /-- `k` more elements after `acc`. -/
+  go : Nat → Array α → Parser (Array α)
+    | 0, acc => pure acc
+    | k + 1, acc => do go k (acc.push (← p))
 
 /-! ## LEB128 -/
 
@@ -624,10 +638,14 @@ def module : Parser Module := do
 
 end Parser
 
-/-- Decode a complete module from the bytes of a `.wasm` file. -/
-def decode (input : ByteArray) : Except DecodeError Module :=
-  match Parser.module { bytes := input, limit := input.size } 0 with
+/-- Decode a complete module from an input that starts at position 0. -/
+def decodeInput (input : Input) : Except DecodeError Module :=
+  match Parser.module input 0 with
   | .ok (m, _) => .ok m
   | .error e => .error e
+
+/-- Decode a complete module from the bytes of a `.wasm` file. -/
+def decode (input : ByteArray) : Except DecodeError Module :=
+  decodeInput (.ofBytes input)
 
 end Wasm.Binary
