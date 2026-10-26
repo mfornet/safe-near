@@ -528,9 +528,9 @@ def data : Parser Data := do
   let n ← u32
   return { init := ← bytes n, mode }
 
-/-- A code entry: its locals and body, without the type index the function
-section holds. -/
-def code : Parser (List ValType × Expr) := do
+/-- A code entry: its byte size, locals and body, without the type index the
+function section holds. -/
+def code : Parser (Nat × List ValType × Expr) := do
   let size ← u32
   sized size do
     let groups ← vec do
@@ -539,7 +539,7 @@ def code : Parser (List ValType × Expr) := do
     let total := groups.foldl (fun acc (n, _) => acc + n) 0
     if total ≥ (1 <<< 32) then fail "too many locals"
     let locals := groups.toList.flatMap fun (n, t) => List.replicate n t
-    return (locals, ← expr)
+    return (size, locals, ← expr)
 
 /-- Section ids in the order the specification requires. -/
 def sectionRank : UInt8 → Option Nat
@@ -551,7 +551,7 @@ def sectionRank : UInt8 → Option Nat
 structure Sections where
   module : Module := {}
   funcTypes : Array Nat := #[]
-  codes : Array (List ValType × Expr) := #[]
+  codes : Array (Nat × List ValType × Expr) := #[]
   dataCount : Option Nat := none
   lastRank : Nat := 0
 
@@ -617,8 +617,8 @@ def module : Parser Module := do
     if n != s.module.datas.size then
       fail "data count and data section have inconsistent lengths"
   else
-    if s.codes.any (fun (_, body) => anyUsesDataIndex body) then fail "data count section required"
-  let funcs := s.funcTypes.zipWith (fun type (locals, body) => { type, locals, body : Func })
+    if s.codes.any (fun (_, _, body) => anyUsesDataIndex body) then fail "data count section required"
+  let funcs := s.funcTypes.zipWith (fun type (bodySize, locals, body) => { type, locals, body, bodySize : Func })
     s.codes
   return { s.module with funcs }
 

@@ -2,50 +2,38 @@ import NearVM.ReturnSelection
 
 namespace Wasm.Near
 
+/-- Unfold a register/context host and close each branch from `hwf`. -/
+local macro "host_selection_tac" hwf:ident : tactic => `(tactic| (
+    dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
+    repeat (first
+      | exact $hwf
+      | exact writeRegisterResult_selection _ _ _ _ _ $hwf
+      | split)))
+
 theorem inputFn_selection : HostPreservesSelection inputFn := by
   intro st args hwf
   unfold inputFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_selection _ _ _ _ _ hwf
-    | split)
+  host_selection_tac hwf
 
 theorem readRegisterFn_selection : HostPreservesSelection readRegisterFn := by
   intro st args hwf
   unfold readRegisterFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_selection _ _ _ _ _ hwf
-    | split)
+  host_selection_tac hwf
 
 theorem registerLenFn_selection : HostPreservesSelection registerLenFn := by
   intro st args hwf
   unfold registerLenFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_selection _ _ _ _ _ hwf
-    | split)
+  host_selection_tac hwf
 
 theorem writeRegisterFn_selection : HostPreservesSelection writeRegisterFn := by
   intro st args hwf
   unfold writeRegisterFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_selection _ _ _ _ _ hwf
-    | split)
+  host_selection_tac hwf
 
 theorem storageWriteFn_selection : HostPreservesSelection storageWriteFn := by
   intro st args hwf
   unfold storageWriteFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_selection _ _ _ _ _ hwf
-    | split)
+  host_selection_tac hwf
   all_goals
     simp_all only [HostResult.Satisfies, NearState.setStorage,
       NearState.invalidateIterators]
@@ -56,20 +44,12 @@ theorem storageWriteFn_selection : HostPreservesSelection storageWriteFn := by
 theorem storageReadFn_selection : HostPreservesSelection storageReadFn := by
   intro st args hwf
   unfold storageReadFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_selection _ _ _ _ _ hwf
-    | split)
+  host_selection_tac hwf
 
 theorem storageRemoveFn_selection : HostPreservesSelection storageRemoveFn := by
   intro st args hwf
   unfold storageRemoveFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_selection _ _ _ _ _ hwf
-    | split)
+  host_selection_tac hwf
   all_goals
     simp_all only [HostResult.Satisfies, NearState.removeStorage,
       NearState.invalidateIterators]
@@ -80,110 +60,62 @@ theorem storageRemoveFn_selection : HostPreservesSelection storageRemoveFn := by
 theorem storageHasKeyFn_selection : HostPreservesSelection storageHasKeyFn := by
   intro st args hwf
   unfold storageHasKeyFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_selection _ _ _ _ _ hwf
-    | split)
+  host_selection_tac hwf
 
 theorem currentAccountIdFn_selection : HostPreservesSelection currentAccountIdFn := by
   intro st args hwf
   unfold currentAccountIdFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_selection _ _ _ _ _ hwf
-    | split)
+  host_selection_tac hwf
 
 theorem predecessorAccountIdFn_selection : HostPreservesSelection predecessorAccountIdFn := by
   intro st args hwf
   unfold predecessorAccountIdFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_selection _ _ _ _ _ hwf
-    | split)
+  host_selection_tac hwf
 
 theorem signerAccountIdFn_selection : HostPreservesSelection signerAccountIdFn := by
   intro st args hwf
   unfold signerAccountIdFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_selection _ _ _ _ _ hwf
-    | split)
+  host_selection_tac hwf
 
 theorem signerAccountPkFn_selection : HostPreservesSelection signerAccountPkFn := by
   intro st args hwf
   unfold signerAccountPkFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_selection _ _ _ _ _ hwf
-    | split)
+  host_selection_tac hwf
 
 theorem attachedDepositFn_selection : HostPreservesSelection attachedDepositFn := by
   intro st args hwf
   unfold attachedDepositFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_selection _ _ _ _ _ hwf
-    | split)
+  host_selection_tac hwf
 
 theorem blockIndexFn_selection : HostPreservesSelection blockIndexFn := by
   intro st args hwf
   unfold blockIndexFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_selection _ _ _ _ _ hwf
-    | split)
+  host_selection_tac hwf
 
 theorem blockTimestampFn_selection : HostPreservesSelection blockTimestampFn := by
   intro st args hwf
   unfold blockTimestampFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_selection _ _ _ _ _ hwf
-    | split)
+  host_selection_tac hwf
 
 theorem epochHeightFn_selection : HostPreservesSelection epochHeightFn := by
   intro st args hwf
   unfold epochHeightFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_selection _ _ _ _ _ hwf
-    | split)
+  host_selection_tac hwf
 
 theorem storageUsageFn_selection : HostPreservesSelection storageUsageFn := by
   intro st args hwf
   unfold storageUsageFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_selection _ _ _ _ _ hwf
-    | split)
+  host_selection_tac hwf
 
 theorem accountBalanceFn_selection : HostPreservesSelection accountBalanceFn := by
   intro st args hwf
   unfold accountBalanceFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_selection _ _ _ _ _ hwf
-    | split)
+  host_selection_tac hwf
 
 theorem accountLockedBalanceFn_selection : HostPreservesSelection accountLockedBalanceFn := by
   intro st args hwf
   unfold accountLockedBalanceFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_selection _ _ _ _ _ hwf
-    | split)
+  host_selection_tac hwf
 
 theorem validatorStakeFn_selection : HostPreservesSelection validatorStakeFn := by
   intro st args hwf
@@ -206,29 +138,17 @@ theorem validatorTotalStakeFn_selection : HostPreservesSelection validatorTotalS
 theorem prepaidGasFn_selection : HostPreservesSelection prepaidGasFn := by
   intro st args hwf
   unfold prepaidGasFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_selection _ _ _ _ _ hwf
-    | split)
+  host_selection_tac hwf
 
 theorem usedGasFn_selection : HostPreservesSelection usedGasFn := by
   intro st args hwf
   unfold usedGasFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_selection _ _ _ _ _ hwf
-    | split)
+  host_selection_tac hwf
 
 theorem randomSeedFn_selection : HostPreservesSelection randomSeedFn := by
   intro st args hwf
   unfold randomSeedFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_selection _ _ _ _ _ hwf
-    | split)
+  host_selection_tac hwf
 
 theorem cryptoHostFn_selection (name : String) (params results : List ValType) : HostPreservesSelection (cryptoHostFn name params results) := by
   intro st args hwf
@@ -289,206 +209,105 @@ theorem chainIdFn_selection : HostPreservesSelection chainIdFn := by
 theorem logUtf8Fn_selection : HostPreservesSelection logUtf8Fn := by
   intro st args hwf
   unfold logUtf8Fn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_selection _ _ _ _ _ hwf
-    | split)
+  host_selection_tac hwf
 
 theorem logUtf16Fn_selection : HostPreservesSelection logUtf16Fn := by
   intro st args hwf
   unfold logUtf16Fn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_selection _ _ _ _ _ hwf
-    | split)
+  host_selection_tac hwf
 
 theorem panicMetered_selection : HostPreservesSelection panicMetered := by
   intro st args hwf
   unfold panicMetered
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_selection _ _ _ _ _ hwf
-    | split)
+  host_selection_tac hwf
 
 theorem panicUtf8Metered_selection : HostPreservesSelection panicUtf8Metered := by
   intro st args hwf
   unfold panicUtf8Metered
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_selection _ _ _ _ _ hwf
-    | split)
+  host_selection_tac hwf
 
 theorem abortMetered_selection : HostPreservesSelection abortMetered := by
   intro st args hwf
   unfold abortMetered
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_selection _ _ _ _ _ hwf
-    | split)
+  host_selection_tac hwf
 
 theorem gasFn_selection (opCost : Nat) : HostPreservesSelection (gasFn opCost) := by
   intro st args hwf
   unfold gasFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_selection _ _ _ _ _ hwf
-    | split)
+  host_selection_tac hwf
+
+/-- Close each branch of a promise host from `hwf`. -/
+local macro "promise_selection_tac" hwf:ident : tactic => `(tactic| (
+    dsimp only
+    repeat (first
+      | exact $hwf
+      | exact appendPromise_selection _ _ $hwf
+      | exact appendPromiseActionResult_selection _ _ _ _ $hwf
+      | exact createBatchPromiseResult_selection _ _ _ $hwf
+      | exact createCallbackPromiseResult_selection _ _ _ _ $hwf
+      | apply checkAccountId_selection _ _ _ _ $hwf
+      | apply checkPublicKey_selection _ _ _ _ $hwf
+      | split)))
 
 theorem promiseCreateFn_selection : HostPreservesSelection promiseCreateFn := by
   unfold promiseCreateFn
   apply disallowInView_selection
   intro st args hwf
-  dsimp only
-  repeat (first
-    | exact hwf
-    | exact appendPromise_selection _ _ hwf
-    | exact appendPromiseActionResult_selection _ _ _ _ hwf
-    | exact createBatchPromiseResult_selection _ _ _ hwf
-    | exact createCallbackPromiseResult_selection _ _ _ _ hwf
-    | apply checkAccountId_selection _ _ _ _ hwf
-    | apply checkPublicKey_selection _ _ _ _ hwf
-    | split)
+  promise_selection_tac hwf
 
 theorem promiseThenFn_selection : HostPreservesSelection promiseThenFn := by
   unfold promiseThenFn
   apply disallowInView_selection
   intro st args hwf
-  dsimp only
-  repeat (first
-    | exact hwf
-    | exact appendPromise_selection _ _ hwf
-    | exact appendPromiseActionResult_selection _ _ _ _ hwf
-    | exact createBatchPromiseResult_selection _ _ _ hwf
-    | exact createCallbackPromiseResult_selection _ _ _ _ hwf
-    | apply checkAccountId_selection _ _ _ _ hwf
-    | apply checkPublicKey_selection _ _ _ _ hwf
-    | split)
+  promise_selection_tac hwf
 
 theorem promiseAndFn_selection : HostPreservesSelection promiseAndFn := by
   unfold promiseAndFn
   apply disallowInView_selection
   intro st args hwf
-  dsimp only
-  repeat (first
-    | exact hwf
-    | exact appendPromise_selection _ _ hwf
-    | exact appendPromiseActionResult_selection _ _ _ _ hwf
-    | exact createBatchPromiseResult_selection _ _ _ hwf
-    | exact createCallbackPromiseResult_selection _ _ _ _ hwf
-    | apply checkAccountId_selection _ _ _ _ hwf
-    | apply checkPublicKey_selection _ _ _ _ hwf
-    | split)
+  promise_selection_tac hwf
 
 theorem promiseBatchCreateFn_selection : HostPreservesSelection promiseBatchCreateFn := by
   unfold promiseBatchCreateFn
   apply disallowInView_selection
   intro st args hwf
-  dsimp only
-  repeat (first
-    | exact hwf
-    | exact appendPromise_selection _ _ hwf
-    | exact appendPromiseActionResult_selection _ _ _ _ hwf
-    | exact createBatchPromiseResult_selection _ _ _ hwf
-    | exact createCallbackPromiseResult_selection _ _ _ _ hwf
-    | apply checkAccountId_selection _ _ _ _ hwf
-    | apply checkPublicKey_selection _ _ _ _ hwf
-    | split)
+  promise_selection_tac hwf
 
 theorem promiseBatchThenFn_selection : HostPreservesSelection promiseBatchThenFn := by
   unfold promiseBatchThenFn
   apply disallowInView_selection
   intro st args hwf
-  dsimp only
-  repeat (first
-    | exact hwf
-    | exact appendPromise_selection _ _ hwf
-    | exact appendPromiseActionResult_selection _ _ _ _ hwf
-    | exact createBatchPromiseResult_selection _ _ _ hwf
-    | exact createCallbackPromiseResult_selection _ _ _ _ hwf
-    | apply checkAccountId_selection _ _ _ _ hwf
-    | apply checkPublicKey_selection _ _ _ _ hwf
-    | split)
+  promise_selection_tac hwf
 
 theorem promiseBatchActionCreateAccountFn_selection : HostPreservesSelection promiseBatchActionCreateAccountFn := by
   unfold promiseBatchActionCreateAccountFn
   apply disallowInView_selection
   intro st args hwf
-  dsimp only
-  repeat (first
-    | exact hwf
-    | exact appendPromise_selection _ _ hwf
-    | exact appendPromiseActionResult_selection _ _ _ _ hwf
-    | exact createBatchPromiseResult_selection _ _ _ hwf
-    | exact createCallbackPromiseResult_selection _ _ _ _ hwf
-    | apply checkAccountId_selection _ _ _ _ hwf
-    | apply checkPublicKey_selection _ _ _ _ hwf
-    | split)
+  promise_selection_tac hwf
 
 theorem promiseBatchActionDeployContractFn_selection : HostPreservesSelection promiseBatchActionDeployContractFn := by
   unfold promiseBatchActionDeployContractFn
   apply disallowInView_selection
   intro st args hwf
-  dsimp only
-  repeat (first
-    | exact hwf
-    | exact appendPromise_selection _ _ hwf
-    | exact appendPromiseActionResult_selection _ _ _ _ hwf
-    | exact createBatchPromiseResult_selection _ _ _ hwf
-    | exact createCallbackPromiseResult_selection _ _ _ _ hwf
-    | apply checkAccountId_selection _ _ _ _ hwf
-    | apply checkPublicKey_selection _ _ _ _ hwf
-    | split)
+  promise_selection_tac hwf
 
 theorem promiseBatchActionFunctionCallFn_selection : HostPreservesSelection promiseBatchActionFunctionCallFn := by
   unfold promiseBatchActionFunctionCallFn
   apply disallowInView_selection
   intro st args hwf
-  dsimp only
-  repeat (first
-    | exact hwf
-    | exact appendPromise_selection _ _ hwf
-    | exact appendPromiseActionResult_selection _ _ _ _ hwf
-    | exact createBatchPromiseResult_selection _ _ _ hwf
-    | exact createCallbackPromiseResult_selection _ _ _ _ hwf
-    | apply checkAccountId_selection _ _ _ _ hwf
-    | apply checkPublicKey_selection _ _ _ _ hwf
-    | split)
+  promise_selection_tac hwf
 
 theorem promiseBatchActionFunctionCallWeightFn_selection : HostPreservesSelection promiseBatchActionFunctionCallWeightFn := by
   unfold promiseBatchActionFunctionCallWeightFn
   apply disallowInView_selection
   intro st args hwf
-  dsimp only
-  repeat (first
-    | exact hwf
-    | exact appendPromise_selection _ _ hwf
-    | exact appendPromiseActionResult_selection _ _ _ _ hwf
-    | exact createBatchPromiseResult_selection _ _ _ hwf
-    | exact createCallbackPromiseResult_selection _ _ _ _ hwf
-    | apply checkAccountId_selection _ _ _ _ hwf
-    | apply checkPublicKey_selection _ _ _ _ hwf
-    | split)
+  promise_selection_tac hwf
 
 theorem promiseBatchActionTransferFn_selection : HostPreservesSelection promiseBatchActionTransferFn := by
   unfold promiseBatchActionTransferFn
   apply disallowInView_selection
   intro st args hwf
-  dsimp only
-  repeat (first
-    | exact hwf
-    | exact appendPromise_selection _ _ hwf
-    | exact appendPromiseActionResult_selection _ _ _ _ hwf
-    | exact createBatchPromiseResult_selection _ _ _ hwf
-    | exact createCallbackPromiseResult_selection _ _ _ _ hwf
-    | apply checkAccountId_selection _ _ _ _ hwf
-    | apply checkPublicKey_selection _ _ _ _ hwf
-    | split)
+  promise_selection_tac hwf
 
 theorem promiseBatchActionTransferToGasKeyFn_selection : HostPreservesSelection promiseBatchActionTransferToGasKeyFn := by
   unfold promiseBatchActionTransferToGasKeyFn
@@ -509,31 +328,13 @@ theorem promiseBatchActionStakeFn_selection : HostPreservesSelection promiseBatc
   unfold promiseBatchActionStakeFn
   apply disallowInView_selection
   intro st args hwf
-  dsimp only
-  repeat (first
-    | exact hwf
-    | exact appendPromise_selection _ _ hwf
-    | exact appendPromiseActionResult_selection _ _ _ _ hwf
-    | exact createBatchPromiseResult_selection _ _ _ hwf
-    | exact createCallbackPromiseResult_selection _ _ _ _ hwf
-    | apply checkAccountId_selection _ _ _ _ hwf
-    | apply checkPublicKey_selection _ _ _ _ hwf
-    | split)
+  promise_selection_tac hwf
 
 theorem promiseBatchActionAddKeyWithFullAccessFn_selection : HostPreservesSelection promiseBatchActionAddKeyWithFullAccessFn := by
   unfold promiseBatchActionAddKeyWithFullAccessFn
   apply disallowInView_selection
   intro st args hwf
-  dsimp only
-  repeat (first
-    | exact hwf
-    | exact appendPromise_selection _ _ hwf
-    | exact appendPromiseActionResult_selection _ _ _ _ hwf
-    | exact createBatchPromiseResult_selection _ _ _ hwf
-    | exact createCallbackPromiseResult_selection _ _ _ _ hwf
-    | apply checkAccountId_selection _ _ _ _ hwf
-    | apply checkPublicKey_selection _ _ _ _ hwf
-    | split)
+  promise_selection_tac hwf
 
 theorem promiseBatchActionAddGasKeyWithFullAccessFn_selection : HostPreservesSelection promiseBatchActionAddGasKeyWithFullAccessFn := by
   unfold promiseBatchActionAddGasKeyWithFullAccessFn
@@ -554,16 +355,7 @@ theorem promiseBatchActionAddKeyWithFunctionCallFn_selection : HostPreservesSele
   unfold promiseBatchActionAddKeyWithFunctionCallFn
   apply disallowInView_selection
   intro st args hwf
-  dsimp only
-  repeat (first
-    | exact hwf
-    | exact appendPromise_selection _ _ hwf
-    | exact appendPromiseActionResult_selection _ _ _ _ hwf
-    | exact createBatchPromiseResult_selection _ _ _ hwf
-    | exact createCallbackPromiseResult_selection _ _ _ _ hwf
-    | apply checkAccountId_selection _ _ _ _ hwf
-    | apply checkPublicKey_selection _ _ _ _ hwf
-    | split)
+  promise_selection_tac hwf
 
 theorem promiseBatchActionAddGasKeyWithFunctionCallFn_selection : HostPreservesSelection promiseBatchActionAddGasKeyWithFunctionCallFn := by
   unfold promiseBatchActionAddGasKeyWithFunctionCallFn
@@ -584,46 +376,19 @@ theorem promiseBatchActionDeleteKeyFn_selection : HostPreservesSelection promise
   unfold promiseBatchActionDeleteKeyFn
   apply disallowInView_selection
   intro st args hwf
-  dsimp only
-  repeat (first
-    | exact hwf
-    | exact appendPromise_selection _ _ hwf
-    | exact appendPromiseActionResult_selection _ _ _ _ hwf
-    | exact createBatchPromiseResult_selection _ _ _ hwf
-    | exact createCallbackPromiseResult_selection _ _ _ _ hwf
-    | apply checkAccountId_selection _ _ _ _ hwf
-    | apply checkPublicKey_selection _ _ _ _ hwf
-    | split)
+  promise_selection_tac hwf
 
 theorem promiseBatchActionDeleteAccountFn_selection : HostPreservesSelection promiseBatchActionDeleteAccountFn := by
   unfold promiseBatchActionDeleteAccountFn
   apply disallowInView_selection
   intro st args hwf
-  dsimp only
-  repeat (first
-    | exact hwf
-    | exact appendPromise_selection _ _ hwf
-    | exact appendPromiseActionResult_selection _ _ _ _ hwf
-    | exact createBatchPromiseResult_selection _ _ _ hwf
-    | exact createCallbackPromiseResult_selection _ _ _ _ hwf
-    | apply checkAccountId_selection _ _ _ _ hwf
-    | apply checkPublicKey_selection _ _ _ _ hwf
-    | split)
+  promise_selection_tac hwf
 
 theorem promiseBatchActionUseGlobalContractFn_selection : HostPreservesSelection promiseBatchActionUseGlobalContractFn := by
   unfold promiseBatchActionUseGlobalContractFn useGlobalContractFn
   apply disallowInView_selection
   intro st args hwf
-  dsimp only
-  repeat (first
-    | exact hwf
-    | exact appendPromise_selection _ _ hwf
-    | exact appendPromiseActionResult_selection _ _ _ _ hwf
-    | exact createBatchPromiseResult_selection _ _ _ hwf
-    | exact createCallbackPromiseResult_selection _ _ _ _ hwf
-    | apply checkAccountId_selection _ _ _ _ hwf
-    | apply checkPublicKey_selection _ _ _ _ hwf
-    | split)
+  promise_selection_tac hwf
 
 theorem promiseBatchActionDeployGlobalContractFn_selection : HostPreservesSelection promiseBatchActionDeployGlobalContractFn := by
   unfold promiseBatchActionDeployGlobalContractFn deployGlobalContractFn
@@ -644,16 +409,7 @@ theorem promiseBatchActionUseGlobalContractByAccountIdFn_selection : HostPreserv
   unfold promiseBatchActionUseGlobalContractByAccountIdFn useGlobalContractFn
   apply disallowInView_selection
   intro st args hwf
-  dsimp only
-  repeat (first
-    | exact hwf
-    | exact appendPromise_selection _ _ hwf
-    | exact appendPromiseActionResult_selection _ _ _ _ hwf
-    | exact createBatchPromiseResult_selection _ _ _ hwf
-    | exact createCallbackPromiseResult_selection _ _ _ _ hwf
-    | apply checkAccountId_selection _ _ _ _ hwf
-    | apply checkPublicKey_selection _ _ _ _ hwf
-    | split)
+  promise_selection_tac hwf
 
 theorem promiseBatchActionDeployGlobalContractByAccountIdFn_selection : HostPreservesSelection promiseBatchActionDeployGlobalContractByAccountIdFn := by
   unfold promiseBatchActionDeployGlobalContractByAccountIdFn deployGlobalContractFn

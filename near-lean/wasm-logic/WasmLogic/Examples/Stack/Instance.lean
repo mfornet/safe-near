@@ -13,13 +13,13 @@ namespace WasmLogic.Examples.Stack
 
 open Wasm Iris Iris.BI Iris.ProgramLogic WasmLogic
 
-def newStackFn : Func := { type := 0, locals := [i32t], body := new_stack }
-def isEmptyFn : Func := { type := 1, locals := [], body := is_empty }
-def isFullFn : Func := { type := 1, locals := [], body := is_full }
-def lengthFn : Func := { type := 1, locals := [], body := length_stack }
-def popFn : Func := { type := 1, locals := [i32t], body := pop }
-def pushFn : Func := { type := 2, locals := [i32t], body := push }
-def mapFn : Func := { type := 2, locals := [i32t, i32t], body := stack_map }
+def newStackFn : Func := { type := 0, locals := [i32t], body := new_stack, bodySize := 35 }
+def isEmptyFn : Func := { type := 1, locals := [], body := is_empty, bodySize := 27 }
+def isFullFn : Func := { type := 1, locals := [], body := is_full, bodySize := 39 }
+def lengthFn : Func := { type := 1, locals := [], body := length_stack, bodySize := 30 }
+def popFn : Func := { type := 1, locals := [i32t], body := pop, bodySize := 53 }
+def pushFn : Func := { type := 2, locals := [i32t], body := push, bodySize := 67 }
+def mapFn : Func := { type := 2, locals := [i32t, i32t], body := stack_map, bodySize := 67 }
 
 def stackInst : ModuleInst :=
   { types := stackTypes, funcAddrs := #[0, 1, 2, 3, 4, 5, 6], tableAddrs := #[0], memAddrs := #[0],

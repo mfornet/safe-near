@@ -83,12 +83,18 @@ def writeRegisterResult (name : String) (st : HostStore NearState) (regId : UInt
   | some st' => .Return results st'
   | none     => .Trap st s!"{name}: register size exceeded"
 
+/-- Continue when `n` is within `limit`; otherwise trap, recording nearcore's
+error for `(n, limit)` when one is given. -/
 def checkDataLimit (name label : String) (limit : Option Nat) (n : Nat)
-    (st : HostStore NearState) (next : Unit → HostResult NearState) : HostResult NearState :=
+    (st : HostStore NearState) (next : Unit → HostResult NearState)
+    (error : Option (Nat → Nat → HostError) := none) : HostResult NearState :=
   if withinLimit limit n then
     next ()
   else
-    .Trap st s!"{name}: {label} size exceeded"
+    match error with
+    | some mk => .Trap { st with host := { st.host with lastError := some (mk n (limit.getD 0)) } }
+        s!"{name}: {label} size exceeded"
+    | none => .Trap st s!"{name}: {label} size exceeded"
 
 def checkAccountId (name : String) (st : HostStore NearState) (accountId : List UInt8)
     (next : Unit → HostResult NearState) : HostResult NearState :=
@@ -717,8 +723,9 @@ def valueReturnFn : NearHostFn NearState :=
         match getMemOrReg st valPtr valLen with
         | none   => .Trap st "value_return: invalid register"
         | some v =>
-          checkDataLimit "value_return" "return" st.host.config.maxReturnLen v.length st <|
-            fun _ => .Return [] { st with host := st.host.selectReturnValue v }
+          checkDataLimit "value_return" "return" st.host.config.maxReturnLen v.length st
+            (fun _ => .Return [] { st with host := st.host.selectReturnValue v })
+            (some .returnedValueLengthExceeded)
       | _ => .Trap st "value_return: bad args" }
 
 /-! ## Context and economics -/

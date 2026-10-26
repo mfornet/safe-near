@@ -6,7 +6,12 @@
 # Requires nothing, so any contract project can depend on it.
 name = "NearSdk"
 version = "0.1.0"
-defaultTargets = ["NearSdk"]
+defaultTargets = ["NearSdk", "ft-state-check"]
 
 [[lean_lib]]
 name = "NearSdk"
+
+# `ft-state-check <storage.json>`: decode a FungibleToken's raw storage and check its invariant.
+[[lean_exe]]
+name = "ft-state-check"
+root = "NearSdk.FtStateCheck"

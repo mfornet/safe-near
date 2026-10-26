@@ -165,7 +165,6 @@ theorem evalMemOp_move {store : Store H} {inst : ModuleInst} {stack : Array Valu
   repeat' split at h
   all_goals first | (cases h; done) | (cases h; exact Or.inl ⟨rfl, rfl⟩)
 
-set_option maxHeartbeats 4000000 in
 /-- Every instruction continues on, into one of its own bodies, or to a label. -/
 theorem instr_move (store : Store H) (inst : ModuleInst) (locals stack : Array Value)
     (labels : List Label) (i : Instr) (rest : List Instr) {stack' : Array Value}
@@ -334,7 +333,6 @@ theorem Fits.pop {S : Nat} {frame : CallFrame} {label : Label} {labels : List La
   simp only [CallFrame.measure, hcode, hl, labelsWeight, codeSize, Label.weight] at hmeasure ⊢
   omega
 
-set_option maxHeartbeats 4000000 in
 /-- A call returns to the instruction's continuation. -/
 theorem instr_call_rest (store : Store H) (inst : ModuleInst) (locals stack : Array Value)
     (labels : List Label) (i : Instr) (rest : List Instr) {stack' : Array Value} {addr : Nat}

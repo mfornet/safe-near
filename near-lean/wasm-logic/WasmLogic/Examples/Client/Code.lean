@@ -37,9 +37,9 @@ def clientTypes : Array FuncType :=
   #[{ params := [], results := [] }, { params := [], results := [i32t] },
     { params := [i32t], results := [i32t] }, { params := [i32t, i32t], results := [] }]
 
-def mainFunc : Func := { type := 0, locals := [i32t], body := main }
+def mainFunc : Func := { type := 0, locals := [i32t], body := main, bodySize := 48 }
 
-def squareFunc : Func := { type := 2, locals := [], body := square }
+def squareFunc : Func := { type := 2, locals := [], body := square, bodySize := 7 }
 
 /-- The global `answer`: a mutable `i32`, initially 0. -/
 def answerType : GlobalType := { type := i32t, mutable := true }

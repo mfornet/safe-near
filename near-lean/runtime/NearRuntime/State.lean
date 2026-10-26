@@ -177,6 +177,10 @@ def EpochInfo.stake (info : EpochInfo) (bytes : Bytes) : Nat :=
 structure ApplyState where
   /-- Independently constructed complete chunk trie and fresh accounting cache. -/
   storageAccounting : Option TrieOverlay.State := none
+  /-- Trusted input: the chunk's recorded storage proof (`recorded_storage_size_upper_bound`) once
+  the trie overlay has reached a given state, supplied by the node from its trie recorder.
+  Absent, neither storage proof limit is checked (`storageProofFull`, `functionCallContext`). -/
+  storageProofSize : Option (TrieOverlay.State → Nat) := none
   /-- On-chain application starts at height one; height zero rejects all nonces. -/
   blockHeight : Nat := 1
   blockTimestamp : Nat := 0

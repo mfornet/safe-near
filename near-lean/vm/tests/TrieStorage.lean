@@ -123,4 +123,24 @@ def check (cfg : RuntimeConfig) (check : String → Bool → IO Unit) : IO Unit 
     (o.succeeded && (cache o).isEmpty && cost o "storage_large_read_overhead_base" ==
       cfg.wasm.extCosts.cost "storage_large_read_overhead_base" &&
       cost o "storage_large_read_overhead_byte" == 4001 * cfg.wasm.extCosts.cost "storage_large_read_overhead_byte")
+  -- `per_receipt_storage_proof_size_limit`, against a trusted proof size: here 1000 bytes per
+  -- trie node or value the call has seen, with a 1500-byte limit.
+  check "v86 limits a receipt's storage proof to 4 MB" (cfg.wasm.limits.perReceiptStorageProofSizeLimit == 4_000_000)
+  check "proof limits print as nearcore's ByteSize"
+    (byteSizeString 4_000_000 == "4.0 MB" && byteSizeString 1500 == "1.5 KB" && byteSizeString 999 == "999 B")
+  let small := { cfg with wasm := { cfg.wasm with limits := { cfg.wasm.limits with
+    perReceiptStorageProofSizeLimit := 1500 } } }
+  let sized := { context trie with storageProofSize := some fun t => 1000 * t.accounting.seen.length }
+  for method in ["write", "remove"] do
+    let o := run small code 0 method sized storage
+    check s!"trie {method}: a proof past the per-receipt limit fails with RecordedStorageExceeded"
+      (o.aborted == some (.hostError (.recordedStorageExceeded 1500)) && (cache o).length == 2 &&
+        ((o.aborted.map (·.message)) == some
+          "Size of the recorded trie storage proof has exceeded the allowed limit (1.5 KB)"))
+  let read := run small code 0 "read" sized storage
+  check "a flat read within the proof limit succeeds" (read.succeeded && (cache read).length == 1)
+  let write := run cfg code 0 "write" sized storage
+  check "the same write within the v86 limit succeeds" write.succeeded
+  let unchecked := run small code 0 "write" (context trie) storage
+  check "without a proof size input the limit is not checked" unchecked.succeeded
 end TrieStorage

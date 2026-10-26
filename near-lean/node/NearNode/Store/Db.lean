@@ -40,8 +40,19 @@ namespace Near.Node.Store
 structure Options where
   /-- Compact when the log grows beyond this many bytes. -/
   logLimit : Nat := 64 * 1024 * 1024
+  /-- Compact by ratio as well: when the log is longer than `minLog` bytes and longer than `logPercent` percent of the
+  last snapshot (the live data as of the last compaction or opening), so the files stay within a constant factor of
+  the live data whatever its size. 0: only `logLimit` applies. -/
+  minLog : Nat := 0
+  logPercent : Nat := 100
   /-- Run `sync` after each commit and snapshot (see the module comment). -/
   sync : Bool := false
+
+/-- What the node opens its store with: besides the 64 MiB cap, compaction when the log is above 4 MiB and as long as the last
+snapshot, so that the files stay within a constant factor of the live data (the snapshot, a log of the same size at most,
+and the next snapshot while it is written) however long the node runs. -/
+def Options.node : Options :=
+  { minLog := 4 * 1024 * 1024, logPercent := 100 }
 
 /-- The state that changes with each commit. -/
 structure Info where
@@ -49,6 +60,8 @@ structure Info where
   seq : UInt64
   log : IO.FS.Handle
   logSize : Nat
+  /-- Bytes of the snapshot of this generation (0: generation 0 has none). -/
+  snapSize : Nat := 0
 
 structure Store where
   dir : System.FilePath
@@ -214,6 +227,11 @@ def «open» (dir : System.FilePath) (opts : Options := {}) : IO (Store × Recov
   let mut commits := 0
   let mut torn := 0
   let lp := logPath dir gen
+  let snapSize ←
+    if base.isSome then
+      pure (← (snapshotPath dir gen).metadata).byteSize.toNat
+    else
+      pure 0
   if ← lp.pathExists then
     let log ← IO.FS.readBinFile lp
     let mut go := true
@@ -239,7 +257,7 @@ def «open» (dir : System.FilePath) (opts : Options := {}) : IO (Store × Recov
           IO.FS.removeFile p
   let log ← IO.FS.Handle.mk lp .append
   let s : Store :=
-    { dir, opts, lock, tables := ← IO.mkRef t, info := ← IO.mkRef ⟨gen, seq, log, pos⟩,
+    { dir, opts, lock, tables := ← IO.mkRef t, info := ← IO.mkRef ⟨gen, seq, log, pos, snapSize⟩,
       poisoned := ← IO.mkRef false }
   return (s, ⟨gen, commits, torn⟩)
 
@@ -286,9 +304,10 @@ def compactUntil (s : Store) (stage : Stage) : IO Unit := do
   let lp := logPath s.dir g
   discard <| IO.FS.Handle.mk lp .write
   let log ← IO.FS.Handle.mk lp .append
+  let snapSize := (← (snapshotPath s.dir g).metadata).byteSize.toNat
   s.info.set
       { m with
-        gen := g, log, logSize := 0 }
+        gen := g, log, logSize := 0, snapSize }
   if stage == .logStarted then
     return
   for p in [snapshotPath s.dir m.gen, logPath s.dir m.gen] do
@@ -318,7 +337,11 @@ def commit (s : Store) (ops : Array Op) : IO UInt64 := do
   s.info.set
       { m with
         seq, logSize := m.logSize + entry.size }
-  if m.logSize + entry.size > s.opts.logLimit then
+  let size := m.logSize + entry.size
+  if
+      size > s.opts.logLimit ||
+        (s.opts.minLog > 0 && size > s.opts.minLog &&
+          size * 100 > s.opts.logPercent * m.snapSize) then
     s.compact
   return seq
 

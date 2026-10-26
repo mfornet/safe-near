@@ -37,7 +37,7 @@ theorem prechargedStore_creation_guard (name : String) (st : HostStore NearState
     prechargedStore_globalContractPlan_error, prechargedStore_deployGlobalContractPlan_error,
     prechargedStore_transferToGasKeyPlan_error, prechargedStore_addGasKeyFullAccessPlan_error,
     prechargedStore_addGasKeyFunctionCallPlan_error, prechargedStore_yieldCreatePlan_error,
-    prechargedStore_yieldResumePlan_error]
+    prechargedStore_yieldResumePlan_error, prechargedStore_getMemOrReg]
 
 /-- A new raw promise consumes the gas reserved by its public charge plan.
 The concrete creator proofs below discharge the plan equality from ABI reads. -/

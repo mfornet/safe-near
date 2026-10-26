@@ -1,0 +1,14 @@
+{
+  "code": "tools/runtime-conformance/fixtures/prepare_body_at_limit.wasm",
+  "sha256": "ac03137406d825653ef6aa9fa341106f98c63dd673f283873fe17da0babb2774",
+  "protocolVersion": 86,
+  "initialBalance": "100000000000000000000000000",
+  "storage": [],
+  "calls": [
+    {
+      "name": "prepare: body_at_limit",
+      "method": "f",
+      "args": {}
+    }
+  ]
+}

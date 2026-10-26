@@ -32,7 +32,7 @@ def probeTypes : Array FuncType :=
   #[{ params := [], results := [] }, { params := [], results := [i32t] },
     { params := [i32t], results := [i32t] }, { params := [i32t, i32t], results := [] }]
 
-def mainFunc : Func := { type := 0, locals := [i32t], body := main }
+def mainFunc : Func := { type := 0, locals := [i32t], body := main, bodySize := 57 }
 
 def answerType : GlobalType := { type := i32t, mutable := true }
 

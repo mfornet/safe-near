@@ -1,0 +1,14 @@
+{
+  "code": "tools/runtime-conformance/fixtures/prepare_functions_over_limit.wasm",
+  "sha256": "c642d8f3341c5537840dc749d3a7e6ef022abaea8d75d410ac5e0cd72441c480",
+  "protocolVersion": 86,
+  "initialBalance": "100000000000000000000000000",
+  "storage": [],
+  "calls": [
+    {
+      "name": "prepare: functions_over_limit",
+      "method": "f",
+      "args": {}
+    }
+  ]
+}

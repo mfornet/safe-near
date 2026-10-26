@@ -228,6 +228,9 @@ structure Func where
   type : Nat
   locals : List ValType
   body : Expr
+  /-- Byte size of the binary code entry (locals and expression), which
+  embedders such as nearcore limit; 0 when not decoded from a binary. -/
+  bodySize : Nat := 0
 deriving Repr, Inhabited
 
 structure Table where

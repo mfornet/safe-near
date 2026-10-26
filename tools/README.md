@@ -10,7 +10,7 @@ core axiom audits, formatter integration checks and contract builds.
 | `just chain-replay-test` | Exercise trusted JSON block replay and complete-state continuation |
 | `just audit-all` | Audit all core packages |
 | `just check` | Run the combined repository checks |
-| `just check-toolchains` | Check every owned Lake package against the root `lean-toolchain` |
+| `just check-toolchains` | Check every owned Lake package against the root `lean-toolchain`, and every hardcoded nearcore revision against `near-lean/runtime/reference.json` |
 | `just vm-dependencies` | Check Lean's actual VM import closure for legacy interpreters and proof APIs |
 | `just lean-lint` | Check all owned Lean files with pinned Mathlib text-based style linters |
 | `just lean-format [files...]` | Apply validated syntax formatting to handwritten package sources |
@@ -34,6 +34,15 @@ core axiom audits, formatter integration checks and contract builds.
 | `just chain-import-test` | Check native state encoding, captured-state imports and deterministic signing |
 | `just chain-reference-test [options...]` | Exercise the native reference's chunk boundaries and complete raw-state replay |
 
+## Tool tests
+
+`tools/tests/test_*.py` are offline: `just tools-test` and CI's repository job
+run them with `unittest discover`, which only picks up `test_*` files.
+`tools/tests/check_*.py` build Lean fixtures or need the Mathlib cache, so CI
+skips them on purpose. They run in the periodic plan and through `just
+vm-dependencies`, `just audit-all` and `just check`. Keep a test that needs no
+Lean in a `test_*` file.
+
 ## Lean quality
 
 `lean-toolchain` at the repository root is the canonical release pin. Each
@@ -42,7 +51,12 @@ repository-owned Lake package also carries that pin so it works independently.
 including newly added local files. Submodules and ignored build dependencies
 are outside its scope. When upgrading Lean, update all pins together.
 
-The Lean quality workflow runs the pin check and the offline tool tests on
+`near-lean/runtime/reference.json` is the canonical nearcore pin.
+`check_nearcore_pin.py` requires the same revision in workflow checkouts of
+`near/nearcore`, in the native reference adapters (`tools/runtime-*-reference/`)
+and in pinned nearcore source links. When moving the pin, update them together.
+
+The Lean quality workflow runs both pin checks and the offline tool tests on
 every push; the source-style and formatter integration checks run only when
 the workflow is dispatched by hand. The text-style driver uses the Mathlib
 revision in the VM package's committed Lake manifest. It checks line endings, trailing whitespace,

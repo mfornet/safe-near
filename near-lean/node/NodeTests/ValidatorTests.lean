@@ -1,5 +1,9 @@
+import NearNode.Chain.StateChanges
+import NearNode.Chain.ApplyChunk
 import NearNode.Validator.Doomslug
 import NearNode.Validator.Messages
+import NearNode.Validator.Pool
+import NearNode.Store.Trie
 
 /-!
 `node-validator-tests`: the validator's state machines, with the unit tests of `doomslug.rs` ported
@@ -35,6 +39,123 @@ private def stakeOf (name : String) (this next : Nat) : ApprovalStake :=
 
 private def delays : Delays :=
   { endorsement := 400, base := 1000, cap := 3000 }
+
+/-- The decoder that lets a validator learn code a contract deploys from its own memory: the bytes it does not
+know travel in the text of an issue and come out unchanged; the bytes it knows are answered from the catalogue. -/
+private def learnedCode (f : IO.Ref Nat) : IO Unit := do
+  let all : List UInt8 := (List.range 256).map (·.toUInt8)
+  let text := Near.Node.Apply.hexOfBytes all
+  check f "hex text of all byte values" (text.length == 512 && text.take 6 == "000102")
+  check f "hex round trip" ((Near.Node.Apply.bytesOfHexPrefix text).toList == all)
+  check f "hex stops at the first other character"
+      ((Near.Node.Apply.bytesOfHexPrefix "00ff zz01").toList == [0, 255])
+  let blob : List UInt8 := [0, 97, 115, 109, 1, 0, 0, 0, 255]
+  let unknown := Near.Node.Apply.learningCodeOf [] blob
+  let message := (unknown.decodeIssue.map (·.message)).getD ""
+  check f "unknown bytes carry an issue" unknown.decodeIssue.isSome
+  check f "the issue hands the bytes back"
+      ((Near.Node.Apply.undeclaredBytes? message).map (·.toList) == some blob)
+  check f "an ordinary issue hands nothing back"
+      ((Near.Node.Apply.undeclaredBytes? "Interpreter error: out of fuel").isNone)
+  let entry : ChainReplay.LoadedCode :=
+    { bytes := blob, code := { module := default, size := blob.length, hash := "known" } }
+  let known := Near.Node.Apply.learningCodeOf [entry] blob
+  check f "known bytes are answered from the catalogue"
+      (known.decodeIssue.isNone && known.hash == "known")
+
+/-- The code cache forgets the contract code that no retained state references, and nothing else. -/
+private def codePruning (f : IO.Ref Nat) : IO Unit := do
+  let blob (i : Nat) : ByteArray := ⟨(Array.range 3000).map fun j => (i * 31 + j).toUInt8⟩
+  let blobs := [blob 1, blob 2, blob 3]
+  match ((blobs.mapM Near.Node.Apply.code).run {} : Except String _) with
+  | .error e =>
+    check f s!"code decoding: {e}" false
+  | .ok (_, conv) =>
+    let cache := conv.cache
+    check f "three codes cached"
+        (cache.byLabel.size == 3 && cache.labels.size == 3 && cache.lists.size == 3)
+    let hash (b : ByteArray) : ByteArray := NearCrypto.sha256 b
+    let hashOfLabel (l : String) : Option ByteArray :=
+      (Near.Node.Apply.hashOfLabel? l).map fun b => ⟨b.toArray⟩
+    let live : Std.HashSet ByteArray := ({} : Std.HashSet ByteArray).insert (hash (blob 2))
+    let pruned := cache.prune live hashOfLabel
+    check f "only the referenced code stays"
+        (pruned.byLabel.size == 1 && pruned.labels.size == 1 && pruned.lists.size == 1 &&
+          pruned.labels.contains (blob 2) &&
+          pruned.lists.contains (blob 2))
+    check f "the next prune waits for the cache to double" (pruned.pruneAt == 32)
+    let none := cache.prune {} hashOfLabel
+    check f "nothing referenced, nothing kept"
+        (none.byLabel.size == 0 && none.labels.size == 0 && none.lists.size == 0)
+    let all := cache.prune (live.insert (hash (blob 1)) |>.insert (hash (blob 3))) hashOfLabel
+    check f "everything referenced, everything kept" (all.byLabel.size == 3 && all.labels.size == 3)
+
+/-- The record of a block and shard: the runtime's log grouped by trie key, a key's changes in the order of the commits with their
+causes and values as the trie stores them, the keys in the order of the raw keys, and the record read back as it was written. -/
+private def stateChangesRecord (f : IO.Ref Nat) : IO Unit := do
+  let change (cause : Near.ChangeCause) (key : Near.ChangeKey) (value : Option Near.ChangeValue) :
+      Near.StateChange :=
+    { cause, key, value }
+  let log : List Near.StateChange :=
+    [change (.receiptProcessing 7) (.data "ft" [1]) (some (.data [9])),
+      change (.transaction 0) (.account "aa") (some (.account { amount := 5, storageUsage := 100 })),
+      change (.gasReward 7) (.account "aa") (some (.account { amount := 6, storageUsage := 100 })),
+      change (.receiptProcessing 8) (.data "ft" [1]) none,
+      change .validatorAccountsUpdate (.accessKey "aa" (0 :: List.replicate 32 7)) none]
+  let cause := Near.Node.Chain.causeOf #[(hashOf 1).bytes] fun id => pure (hashOf (10 + id))
+  let value := Near.Node.Chain.valueBytes [] (fun _ => none) fun b => b
+  match Near.Node.Chain.rawChanges log cause value with
+  | .error e =>
+    check f s!"the log to records: {e}" false
+  | .ok records =>
+    check f "one record per key, in the order of the raw keys"
+        (records.size == 3 && records.map (·.trieKey) ==
+          #[.account ⟨"aa"⟩, .accessKey ⟨"aa"⟩ (.ed25519 ⟨(List.replicate 32 7).toArray.map UInt8.ofNat⟩),
+            .contractData ⟨"ft"⟩ ⟨#[1]⟩])
+    check f "a key's changes keep the order of the commits, with their causes"
+        (records.map (·.changes.map (·.cause)) ==
+          #[#[.transactionProcessing (hashOf 1), .actionReceiptGasReward (hashOf 17)],
+            #[.validatorAccountsUpdate],
+            #[.receiptProcessing (hashOf 17), .receiptProcessing (hashOf 18)]])
+    check f "a removal has no data and a write the bytes of its value"
+        (records[2]!.changes.map (·.data) == #[some ⟨#[9]⟩, none])
+    check f "the record reads back as written"
+        (Near.Node.Chain.stateChangesOfBytes? (Near.Node.Chain.stateChangesBytes records) == some records)
+    -- the entries of the kinds that differ and are in no record
+    let acct (a : String) : ByteArray := Near.Node.TrieKey.toVec (.account ⟨a⟩)
+    check f "an entry that differs and is in no record is reported, one that is in a record is not"
+        (Near.Node.Chain.missedKeys #[(acct "aa", none), (acct "cc", some ⟨#[1]⟩)] records ==
+          #[acct "cc"])
+
+/-- The reference count changes that garbage collection reads back from `DBCol::TrieChanges`. -/
+private def trieChangesRecord (f : IO.Ref Nat) : IO Unit := do
+  let c : Near.Node.Trie.TrieChanges :=
+    { oldRoot := hashOf 1, newRoot := hashOf 2,
+      insertions := #[⟨hashOf 1, ByteArray.mk #[1, 2, 3], 3⟩, ⟨hashOf 3, ByteArray.empty, 1⟩],
+      deletions := #[⟨hashOf 2, 5⟩, ⟨hashOf 1, 70000⟩] }
+  let bytes := Near.Node.Store.changesBytes c
+  check f "the changes take 8 + 36 per reference bytes" (bytes.size == 8 + 36 * 4)
+  match Near.Node.Store.changesOfBytes? bytes with
+  | some (ins, del) =>
+    check f "insertions read back" (ins == #[(hashOf 1, 3), (hashOf 3, 1)])
+    check f "deletions read back" (del == #[(hashOf 2, 5), (hashOf 1, 70000)])
+  | none =>
+    check f "the changes read back" false
+  check f "a cut record is refused"
+      ((Near.Node.Store.changesOfBytes? (bytes.extract 0 (bytes.size - 1))).isNone)
+  check f "a record with a tail is refused"
+      ((Near.Node.Store.changesOfBytes? (bytes.push 0)).isNone)
+  check f "the empty record"
+      ((Near.Node.Store.changesOfBytes?
+          (Near.Node.Store.changesBytes
+            { oldRoot := hashOf 1, newRoot := hashOf 1, insertions := #[],
+              deletions := #[] })).isSome)
+  -- taking back a deletion is a negative reference on the node of the shard
+  let ops := Near.Node.Store.deleteOpsOfRefs (ByteArray.mk #[9]) #[(hashOf 2, 5)]
+  check f "deletions are negative references"
+      (match ops[0]? with
+      | some (Near.Node.Store.Op.rcAdd Near.Node.Store.Col.state _ _ n) => n == -5
+      | _ => false)
 
 /-- `test_endorsements_and_skips_basic`. -/
 private def basic (f : IO.Ref Nat) : IO Unit := do
@@ -248,13 +369,125 @@ private def chunkWait (f : IO.Ref Nat) : IO Unit := do
   let (_, out) := ds2.processTimer 400 (some sa)
   check f "no endorsement for a height already approved" out.isEmpty
 
+/-! ### The transaction pool (`chain/pool` tests) -/
+
+private def keyOfIndex (i : Nat) : PublicKey :=
+  .ed25519 (CryptoHash.hash (ByteArray.mk #[i.toUInt8])).bytes
+
+private def txOf (signer : String) (key : Nat) (nonce : Nat) (strict : Bool := false) :
+    SignedTransaction :=
+  if strict then
+    ⟨.v1
+        { signerId := ⟨signer⟩, publicKey := keyOfIndex key, nonce := .nonce nonce.toUInt64,
+          receiverId := ⟨"other"⟩, blockHash := CryptoHash.zero, actions := #[],
+          nonceMode := .strict },
+      default⟩
+  else
+    ⟨.v0
+        { signerId := ⟨signer⟩, publicKey := keyOfIndex key, nonce := nonce.toUInt64,
+          receiverId := ⟨"other"⟩, blockHash := CryptoHash.zero, actions := #[] },
+      default⟩
+
+private def noncesOf (ts : Array SignedTransaction) : List (String × Nat) :=
+  ts.toList.map fun t => (t.transaction.signerId.val, t.transaction.nonceValue.toNat)
+
+private def poolTests (f : IO.Ref Nat) : IO Unit := do
+  -- insertion: duplicates are refused, the size limit is enforced, removal frees the space
+  let a1 := txOf "alice" 0 1
+  let a2 := txOf "alice" 0 2
+  let b1 := txOf "bob" 1 1
+  let (p, r) := ({ limit := none } : Pool).insert a1
+  check f "insert" (r == .success && p.count == 1)
+  let (p, r) := p.insert a1
+  check f "duplicate" (r == .duplicate && p.count == 1)
+  let (p, _) := p.insert a2
+  let (p, _) := p.insert b1
+  check f "three transactions" (p.count == 3 && p.size == a1.wireSize + a2.wireSize + b1.wireSize)
+  let (_, full) := ({ limit := some (a1.wireSize + 1) } : Pool).insert a1 |>.1.insert a2
+  check f "no space left" (full == .noSpaceLeft)
+  let p' := p.remove #[a1, b1]
+  check f "remove" (p'.count == 1 && p'.size == a2.wireSize && p'.groups.size == 1)
+  check f "removing what is not there changes nothing" ((p'.remove #[b1]).count == 1)
+  -- the same signer with two keys is two groups; the same key with a gas key index is another
+  let k1 := txOf "alice" 5 1
+  check f "group per key"
+      (p.groupKey a1 == p.groupKey a2 && p.groupKey a1 != p.groupKey k1 &&
+        p.groupKey a1 != p.groupKey b1)
+  -- prepare: one transaction from each group in turn; nonces within a group in order
+  let mut q : Pool := { limit := none }
+  for t in
+    #[txOf "alice" 0 3, txOf "alice" 0 1, txOf "alice" 0 2, txOf "bob" 1 2, txOf "bob" 1 1,
+      txOf "carol" 2 1] do
+    q := (q.insert t).1
+  let admitAll (n : Nat) (_ : SignedTransaction) : Except String (Nat × Nat) := .ok (n + 1, 10)
+  let prepared :=
+    q.prepare 0 1000000 1000000 SignedTransaction.wireSize (fun _ _ => none) (fun _ => true)
+      admitAll
+  check f "all prepared" (prepared.txs.size == 6 && prepared.limit == .noMoreTxsInPool)
+  let nonces := noncesOf prepared.txs
+  check f "per group nonces ascend"
+      (["alice", "bob", "carol"].all fun a =>
+        ((nonces.filter (·.1 == a)).map (·.2)) ==
+          (List.range ((nonces.filter (·.1 == a)).length)).map (· + 1))
+  -- round robin: no group yields twice before every group yielded once
+  check f "round robin" ((((nonces.take 3).map (·.1)).eraseDups).length == 3)
+  check f "prepared stay in the pool" (prepared.pool.count == 6)
+  -- the gas limit
+  let g :=
+    q.prepare 0 15 1000000 SignedTransaction.wireSize (fun _ _ => none) (fun _ => true) admitAll
+  check f "gas limit" (g.txs.size == 2 && g.limit == .gas && g.pool.count == 6)
+  -- the size limit
+  let one := a1.wireSize
+  let sz :=
+    q.prepare 0 1000000 (2 * one + 1) SignedTransaction.wireSize (fun _ _ => none) (fun _ => true)
+      admitAll
+  check f "size limit" (sz.txs.size == 2 && sz.limit == .size)
+  -- invalid transactions are taken out of the pool and not returned
+  let rejectBob (n : Nat) (t : SignedTransaction) : Except String (Nat × Nat) :=
+    if t.transaction.signerId.val == "bob" then .error "bob is broke" else .ok (n, 1)
+  let rj :=
+    q.prepare 0 1000000 1000000 SignedTransaction.wireSize (fun _ _ => none) (fun _ => true)
+      rejectBob
+  check f "rejected transactions" (rj.txs.size == 4 && rj.rejected.size == 2 && rj.pool.count == 4)
+  -- strict nonces: a gap leaves the transaction in the pool; an expired one is dropped
+  let mut s : Pool := { limit := none }
+  s := (s.insert (txOf "dave" 3 5 (strict := true))).1
+  let gap :=
+    s.prepare 0 1000000 1000000 SignedTransaction.wireSize (fun _ _ => some 2) (fun _ => true)
+      admitAll
+  check f "nonce gap waits" (gap.txs.isEmpty && gap.pool.count == 1)
+  let expired :=
+    s.prepare 0 1000000 1000000 SignedTransaction.wireSize (fun _ _ => some 2) (fun _ => false)
+      admitAll
+  check f "expired gap is dropped" (expired.txs.isEmpty && expired.pool.count == 0)
+  let fits :=
+    s.prepare 0 1000000 1000000 SignedTransaction.wireSize (fun _ _ => some 4) (fun _ => true)
+      admitAll
+  check f "no gap" (fits.txs.size == 1)
+  -- the iterator continues after the last used key
+  let mut r2 : Pool := { limit := none }
+  for t in #[txOf "a" 0 1, txOf "b" 1 1, txOf "c" 2 1] do
+    r2 := (r2.insert t).1
+  let first :=
+    r2.prepare 0 1 1000000 SignedTransaction.wireSize (fun _ _ => none) (fun _ => true) admitAll
+  let second :=
+    first.pool.prepare 0 1 1000000 SignedTransaction.wireSize (fun _ _ => none) (fun _ => true)
+      admitAll
+  check f "the next chunk starts after the last group used"
+      (first.txs.size == 1 && second.txs.size == 1 && first.txs[0]! != second.txs[0]!)
+
 def main : IO UInt32 := do
   let failures ← IO.mkRef 0
+  learnedCode failures
+  codePruning failures
+  stateChangesRecord failures
+  trieChangesRecord failures
   basic failures
   delayValues failures
   approvals failures
   onePerHeight failures
   chunkWait failures
+  poolTests failures
   let n ← checks.get
   let bad ← failures.get
   IO.println s!"{n} checks, {bad} failures"

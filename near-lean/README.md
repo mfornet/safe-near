@@ -12,10 +12,11 @@ one toolchain (`lean-toolchain`) and one `packagesDir` (`.lake/packages`).
 | `runtime/` | `Runtime::apply` | Accounts, access keys, receipts, actions, fees, refunds |
 | `chain/` | the "trustless manipulator" | Blocks, reachable states, explicit run completion, measured burnt gas |
 | `crypto/` | `near-crypto`, `sha2`, `sha3`, `ripemd` | Hashes, edwards25519 and Ed25519 in pure Lean, each with a `Spec` and a fast `Impl` ([NEAR_NODE.md](../notes/design/NEAR_NODE.md)) |
+| `fastvm/` | wasmer / near-vm | The fast `Impl` of the VM for the node (compiled flat code, unboxed stack); `vm/` stays the specification ([NEAR_NODE.md](../notes/design/NEAR_NODE.md), M10) |
 | `node/` | `neard` | A full validator node, in progress ([NEAR_NODE.md](../notes/design/NEAR_NODE.md)) |
 
 ```
-just near-build     # from the repository root: build wasm, vm, runtime, chain, crypto, node
+just near-build     # from the repository root: build wasm, vm, runtime, chain, crypto, fastvm, node
 just near-test      # run the three scenario suites on the real wNEAR binary
 just near-configs   # regenerate vm/configs from nearcore (needs cargo)
 ```
