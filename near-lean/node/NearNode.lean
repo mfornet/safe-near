@@ -34,6 +34,9 @@ import NearNode.Validator.Endorse
 import NearNode.Validator.Follow
 import NearNode.Validator.Persist
 import NearNode.Validator.Gc
+import NearNode.Validator.Contracts
+import NearNode.Validator.Tracking
+import NearNode.Validator.Sync
 import NearNode.Validator.Drive
 import NearNode.Validator.Run
 import NearNode.Rpc.Base64

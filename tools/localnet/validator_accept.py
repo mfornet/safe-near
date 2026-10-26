@@ -218,7 +218,7 @@ def neard_status_text(status) -> str:
     return "unknown"
 
 
-def outcome_comparison(applied: list[dict], rows: list[dict]) -> dict:
+def outcome_comparison(applied: list[dict], rows: list[dict], tracking: bool = False) -> dict:
     """Every transaction of a chunk the Lean node produced (and a sample of neard's): the outcomes of the
     transaction and of its receipts, from neard's ``EXPERIMENTAL_tx_status``, against those the Lean node
     computed when it applied the blocks."""
@@ -234,6 +234,7 @@ def outcome_comparison(applied: list[dict], rows: list[dict]) -> dict:
                 wanted.append((c["author"] == "node1", tx_hash, signer, r["height"]))
     checked = equal = 0
     cross_checked = cross_equal = 0
+    skipped = 0
     problems = []
     by_lean = [w for w in wanted if w[0]]
     by_neard = [w for w in wanted if not w[0]]
@@ -246,11 +247,14 @@ def outcome_comparison(applied: list[dict], rows: list[dict]) -> dict:
             continue
         theirs = [status["transaction_outcome"]] + status.get("receipts_outcome", [])
         for o in theirs:
-            checked += 1
             # a receipt that ran on another shard than its transaction's signer: it crossed shards
             cross = shard_of(o["outcome"]["executor_id"]) != shard_of(signer)
             oid = nc.b58decode(o["id"]).hex()
             mine = lean_outcomes.get(oid)
+            if mine is None and tracking:
+                skipped += 1        # it ran on a shard the Lean node does not track
+                continue
+            checked += 1
             if mine is None:
                 problems.append(f"height {height} {o['id']}: no outcome in the Lean node's log")
                 continue
@@ -267,11 +271,11 @@ def outcome_comparison(applied: list[dict], rows: list[dict]) -> dict:
                 problems.append(f"height {height} {o['id']}: neard {want} Lean {have}")
     return {"leanTransactions": len(by_lean), "neardTransactionsChecked": min(len(by_neard), 40),
             "outcomesChecked": checked, "outcomesEqual": equal,
-            "crossShardOutcomesChecked": cross_checked, "crossShardOutcomesEqual": cross_equal, "problems": problems[:10]}
+            "outcomesOnUntrackedShards": skipped, "crossShardOutcomesChecked": cross_checked, "crossShardOutcomesEqual": cross_equal, "problems": problems[:10]}
 
 
 def analyse(work: Path, report: dict, stall: dict | None, rows: list[dict], head: int, final: int,
-            require_txs: bool = True, known=None, shards: int = 1) -> dict:
+            require_txs: bool = True, known=None, shards: int = 1, tracking: bool = False) -> dict:
     """``known(hash_hex)`` tells whether neard holds the block with that hash (also off its canonical chain).  After a pause
     both producers can build on the same parent at different heights (nearcore does it too: a block per height whose
     approvals are ready), and the fork choice orphans some blocks.  What is guaranteed is that every block the Lean node
@@ -313,8 +317,11 @@ def analyse(work: Path, report: dict, stall: dict | None, rows: list[dict], head
         same_hash += 1
         nxt = by_height.get(row["height"] + 1)
         if nxt:
-            for chunk, report_chunk in zip(nxt["chunks"], row["chunks"]):
-                if chunk["new"]:
+            by_shard_report = {c["shard"]: c for c in row["chunks"]}
+            for chunk in nxt["chunks"]:
+                report_chunk = by_shard_report.get(chunk["shard"])
+                # a node that tracks some shards applies only those: the others have no root to compare
+                if chunk["new"] and report_chunk is not None:
                     checked_root += 1
                     roots_by_shard.setdefault(chunk["shard"], [0, 0])[0] += 1
                     if nc.b58decode(chunk["prevStateRoot"]).hex() == report_chunk["stateRoot"]:
@@ -330,7 +337,7 @@ def analyse(work: Path, report: dict, stall: dict | None, rows: list[dict], head
                       if c["new"] and c["author"] == lean and c["txs"]]
     result["leanChunksWithTransactions"] = len(lean_tx_chunks)
     result["leanTransactionsIncluded"] = sum(len(c["txs"]) for _, c in lean_tx_chunks)
-    result["outcomes"] = outcome_comparison(applied, rows)
+    result["outcomes"] = outcome_comparison(applied, rows, tracking)
     # neard's blocks signed by the Lean node verify on neard's side by being in its chain; finality moved
     result["finalityAdvanced"] = final > 5 and head - final < 20
     ok = (result["blocksByLean"] > 0 and result["chunksByLean"] > 0 and not problems and not result["failure"]
@@ -342,18 +349,60 @@ def analyse(work: Path, report: dict, stall: dict | None, rows: list[dict], head
           and (stall is None or (stall["stalled"] and stall["resumed"])))
     # on several shards: every shard has its roots checked and equal, and the Lean node produced chunks on more than one
     if shards > 1:
-        shard_ok = (len(roots_by_shard) == shards and all(v[0] > 0 and v[0] == v[1] for v in roots_by_shard.values())
+        shard_ok = ((len(roots_by_shard) == shards or tracking) and all(v[0] > 0 and v[0] == v[1] for v in roots_by_shard.values())
                     and sum(1 for v in by_shard.values() if v["lean"] > 0) >= 2
                     and (not require_txs or result["outcomes"]["crossShardOutcomesChecked"] > 0))
         result["multiShardOk"] = shard_ok
         ok = ok and shard_ok
+    if tracking:
+        tracked = tracking_report(work, applied, shards, roots_by_shard)
+        result["tracking"] = tracked
+        ok = ok and tracked["ok"]
     result["ok"] = ok
+    return result
+
+
+def tracking_report(work: Path, applied: list[dict], shards: int, roots_by_shard: dict) -> dict:
+    """What the Lean node of the tracking topology must show: it applied only some shards in some blocks, replayed the
+    witnesses of the shards it does not hold, state-synced shards of the next epoch and produced chunks for them, and
+    its state roots on every shard it tracked are neard's."""
+    per_row = [len(row["chunks"]) for row in applied]
+    histogram: dict[str, int] = {}
+    for n in per_row:
+        histogram[str(n)] = histogram.get(str(n), 0) + 1
+    log = (work / "lean.log").read_text().splitlines()
+    installs = []       # (line index, shards)
+    produced = []       # (line index, shard)
+    for i, line in enumerate(log):
+        if "state sync: state of shards" in line:
+            text = line.split("state of shards ", 1)[1].split(" installed", 1)[0]
+            installs.append((i, [int(x) for x in text.strip("[]").split(",") if x.strip()]))
+        elif "produced the chunk of shard " in line:
+            produced.append((i, int(line.split("produced the chunk of shard ", 1)[1].split(" ", 1)[0])))
+    synced_then_produced = [shards_ for i, shards_ in installs
+                            if any(j > i and shard in shards_ for j, shard in produced)]
+    stats = {}
+    report_file = work / "report.json"
+    if report_file.exists():
+        stats = json.loads(report_file.read_text()).get("stats", {})
+    result = {
+        "rowsByShardCount": histogram,
+        "rowsWithFewerShardsThanTheLayout": sum(1 for n in per_row if n < shards),
+        "shardsWithRootsChecked": sorted(int(k) for k in roots_by_shard),
+        "stateSyncs": len(installs), "syncedShards": [sorted(x) for _, x in installs],
+        "stateSyncsFollowedByChunksOfTheSyncedShard": len(synced_then_produced),
+        "witnessesReplayed": stats.get("witnessesReplayed", 0), "witnessesInvalid": stats.get("witnessesInvalid", 0),
+        "contractCodeRequests": stats.get("contractCodeRequests", 0),
+    }
+    result["ok"] = (result["rowsWithFewerShardsThanTheLayout"] > 0 and len(roots_by_shard) >= 2
+                    and result["stateSyncs"] >= 1 and result["stateSyncsFollowedByChunksOfTheSyncedShard"] >= 1
+                    and result["witnessesReplayed"] > 0 and result["witnessesInvalid"] == 0)
     return result
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--topology", default="validator", choices=["validator", "validator-sharded"])
+    parser.add_argument("--topology", default="validator", choices=sorted(t for t, spec in localnet.TOPOLOGIES.items() if spec.get("neard")))
     parser.add_argument("--duration", type=int, default=240, help="seconds to run")
     parser.add_argument("--binary", type=Path, default=BINARY)
     parser.add_argument("--work", type=Path, default=localnet.DATA / "validator-run")
@@ -386,8 +435,9 @@ def main() -> None:
         lean.wait(timeout=60)
         rows = chain_rows(head_height())   # the chain went on while the Lean node was stopping
         report = json.loads((options.work / "report.json").read_text()) if (options.work / "report.json").exists() else {}
+        tracking = localnet.TOPOLOGIES[TOPOLOGY].get("leanTracked") not in (None, "AllShards")
         result = analyse(options.work, report, stall, rows, head, final, require_txs=not options.no_workload, known=neard_holds,
-                         shards=len(shard_layout()[1]))
+                         shards=len(shard_layout()[1]), tracking=tracking)
         print(json.dumps(result, indent=1))
         (options.work / "result.json").write_text(json.dumps(result, indent=1) + "\n")
         sys.exit(0 if result["ok"] else 1)

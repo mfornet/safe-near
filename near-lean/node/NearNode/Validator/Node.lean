@@ -52,6 +52,16 @@ structure Replaying where
   /-- Whether the node holds the shard (it then compares the replay with its own execution too). -/
   task : Task (Except IO.Error (Except String Replayed))
 
+/-- The chunks of the shards just synced being applied to the blocks since (`catchup_blocks_step`), on a thread of
+their own. -/
+structure CatchingUp where
+  startedMs : Nat
+  starts : Std.HashMap UInt64 ShardStart
+  task :
+    Task
+      (Except IO.Error
+        (Except String (Progress × Array (Block × Array ShardReport × Array Store.Op))))
+
 /-- What the validator needs besides its state. -/
 structure Env where
   signer : Signer
@@ -89,6 +99,12 @@ structure Env where
   replayAll : Bool := false
   /-- The witnesses being replayed. -/
   replays : IO.Ref (Array Replaying)
+  /-- The catch-up of the shards just synced, if any. -/
+  catchingUp : IO.Ref (Option CatchingUp)
+  /-- State sync responses the peer sent on a Tier 3 connection, taken up by the loop. -/
+  stateInbox : IO.Ref (Array StateResponseInfo)
+  /-- The address the peer reaches this node at with its answers to state requests. -/
+  syncAddr : SocketAddr := .v4 (ByteArray.mk #[127, 0, 0, 1]) 0
 
 def Env.me (e : Env) : AccountId :=
   e.signer.accountId

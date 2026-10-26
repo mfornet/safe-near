@@ -1,4 +1,5 @@
 import NearNode.Validator.Node
+import NearNode.Validator.Contracts
 import NearNode.Validator.Persist
 
 /-!
@@ -104,10 +105,40 @@ def Env.pollReplays (e : Env) : IO Unit := do
                         s.pr.cache.byLabel } } }
       e.endorse header
     | .error m =>
-      e.bump "witnessesInvalid"
-      e.log
-          s!"state witness of shard {header.shardId} at height {header.heightCreated} refused by replay: {m}"
+      if m.startsWith "missing contract code " then
+        -- the witness waits for the code, which a chunk producer of the shard sends on request
+        let label := (m.drop 22).toString.trimAscii.toString
+        e.bump "witnessesWaitingForCode"
+        e.state.modify fun s => { s with waitingCode := s.waitingCode.push (r.witness, label) }
+        let s ← e.get
+        let key : ChunkProductionKey := ⟨header.shardId, v.epochId, header.heightCreated⟩
+        let main? : Option MainTransitionKey := do
+          let epoch ← (s.st.epochIdFromPrevBlock header.prevBlockHash).toOption
+          let layout := (← (s.st.epoch epoch).toOption).layout
+          let index ← layout.getShardIndex header.shardId
+          let (_, sources) ← (blockRange s.st header.prevBlockHash index).toOption
+          let last ← sources[0]?
+          pure ⟨last.hash, header.shardId⟩
+        match hashOfLabel? label, main? with
+        | some h, some main =>
+          e.requestCode key #[CryptoHash.mk (ByteArray.mk h.toArray)] main
+        | _, _ =>
+          e.log s!"contract code {label}: cannot name the request"
+      else
+        e.bump "witnessesInvalid"
+        e.log
+            s!"state witness of shard {header.shardId} at height {header.heightCreated} refused by replay: {m}"
   e.replays.set keep
+
+/-- The witnesses that waited for contract code the cache holds now are replayed again. -/
+def Env.retryWaitingCode (e : Env) : IO Unit := do
+  let s ← e.get
+  let (ready, waiting) :=
+    s.waitingCode.partition fun (_, label) => s.pr.cache.byLabel.contains label
+  unless ready.isEmpty do
+    e.state.modify fun s => { s with waitingCode := waiting }
+    for (w, _) in ready do
+      e.startReplay w
 
 /-- The witness, once rebuilt: acknowledged and checked as soon as its previous block is applied. A shard whose state
 the node holds is checked against its own execution of the same blocks; every other shard is replayed from the witness. -/

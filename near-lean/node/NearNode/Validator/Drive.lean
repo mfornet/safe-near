@@ -1,5 +1,6 @@
 import Lean.Data.Json
 import NearNode.Validator.Follow
+import NearNode.Validator.Sync
 import NearNode.Validator.Gc
 import NearNode.Validator.Persist
 
@@ -19,23 +20,6 @@ private def lift {α : Type} (r : Result α) : Except String α :=
   r.mapError fun e => s!"{e.kind} {e.detail}"
 
 /-! ### Applying blocks -/
-
-/-- Whether the bodies of all new chunks of `b` are in. -/
-def VState.bodiesReady (s : VState) (b : Block) : Bool :=
-  (newChunksOf b).all fun c => ((s.chunks[c.chunkHash.hash.bytes]?).bind (·.body)).isSome
-
-/-- Asks the peer for the chunks of `b` whose bodies are missing, at most every 1500 ms each. -/
-def Env.requestBodies (e : Env) (b : Block) : IO Unit := do
-  let now ← e.nowMs
-  for c in newChunksOf b do
-    let s ← e.get
-    let entry := s.chunks.getD c.chunkHash.hash.bytes {}
-    if entry.body.isNone && (entry.requestedAt == 0 || now - entry.requestedAt ≥ 1500) then
-      e.toPeer (.partialEncodedChunkRequest (chunkRequest c e.code.total))
-      e.state.modify fun s =>
-          s.withChunk c.chunkHash fun x =>
-            { x with
-              requestedAt := max now 1, header := x.header.orElse fun _ => some c }
 
 /-- The state roots of a block's parent, which the application starts from. -/
 def rootsOf (s : VState) (layout : ShardLayout) (parent : CryptoHash) :
@@ -59,6 +43,7 @@ on the event loop, so everything else the node does (answering the peer, collect
 forwarding parts, the Doomslug timers) goes on, and nothing is produced on a block that is not applied, because the
 tip only moves when `finishApply` and `onApplied` run. Returns false when it cannot start. -/
 def Env.startApply (e : Env) (b : Block) : IO Bool := do
+  e.ensureSyncJob b
   let s ← e.get
   let some v := b.header.view? | return false
   let started ← IO.monoMsNow
@@ -71,14 +56,21 @@ def Env.startApply (e : Env) (b : Block) : IO Bool := do
     return false
   | .ok layout =>
     let pr0 := { s.pr with roots := rootsOf s layout v.prevHash }
+    -- the chunks of the shards the node tracks are applied; for the others the receipts proofs say what was sent
+    let tracked := e.shardsToApply s v.prevHash
+    let targets := e.bodyShards s.st v.prevHash
     let bodies : Std.HashMap UInt64 Body :=
       b.chunks.foldl
         (fun m c =>
-          match (s.chunks[c.chunkHash.hash.bytes]?).bind (·.body) with
-          | some body => m.insert c.shardId { emptyBody with transactions := body.transactions }
-          | none => m)
+          if c.isNewChunk v.height then
+            let body := (s.chunks[c.chunkHash.hash.bytes]?).bind (·.body)
+            m.insert c.shardId
+              { emptyBody with
+                transactions := (body.map (·.transactions)).getD #[],
+                proofs := s.chunkProofs c targets }
+          else m)
         {}
-    let params := e.params
+    let params := { e.params with tracked := some tracked }
     let st := s.st
     let task ←
       IO.asTask ((applyBlock none params st b (fun shard => bodies.getD shard emptyBody) pr0).run)
@@ -123,47 +115,7 @@ def Env.finishApply (e : Env) (a : Applying) : IO Bool := do
         { s with
           outcomes := s2.outcomes, txIndex := s2.txIndex, receiptsById := s2.receiptsById,
           finalized := s.finalized.erase hash.bytes }
-    if let some h := e.appliedLog then
-      let hex (b : ByteArray) : String :=
-        b.foldl (fun s x => s ++ String.ofList (Nat.toDigits 16 (x.toNat + 256)).tail) ""
-      let outcomeJson (o : ExecutionOutcomeWithId) : Lean.Json :=
-        Lean.Json.mkObj
-          [("id", Lean.Json.str (hex o.id.bytes)),
-            ("executor", Lean.Json.str o.outcome.executorId.val),
-            ("gasBurnt", Lean.Json.num (Lean.JsonNumber.fromNat o.outcome.gasBurnt.toNat)),
-            ("tokensBurnt", Lean.Json.str (toString o.outcome.tokensBurnt.val)),
-            ("status",
-              Lean.Json.str
-                (match o.outcome.status with
-                | .successValue v => s!"value:{hex v}"
-                | .successReceiptId r => s!"receipt:{hex r.bytes}"
-                | .failure _ => "failure"
-                | .unknown => "unknown")),
-            ("receipts",
-              Lean.Json.arr (o.outcome.receiptIds.map fun r => Lean.Json.str (hex r.bytes)))]
-      let chunks :=
-        reports.toList.map fun r =>
-          let isNew := (b.chunks.find? (·.shardId == r.shard)).any (·.isNewChunk v.height)
-          let txs :=
-            if isNew then
-              (bodyOf r.shard).transactions.map fun t => Lean.Json.str (hex t.hash.bytes)
-            else #[]
-          let base : List (String × Lean.Json) :=
-            [("shard", Lean.Json.num (Lean.JsonNumber.fromNat r.shard.toNat)),
-              ("txs", Lean.Json.arr txs), ("outcomes", Lean.Json.arr (r.outcomes.map outcomeJson))]
-          match r.extra with
-          | .v5 x =>
-            Lean.Json.mkObj
-              (base ++
-                [("stateRoot", Lean.Json.str (hex x.stateRoot.bytes)),
-                  ("gasUsed", Lean.Json.num (Lean.JsonNumber.fromNat x.gasUsed.toNat))])
-          | _ => Lean.Json.mkObj base
-      h.putStrLn
-          (Lean.Json.mkObj
-              [("height", Lean.Json.num (Lean.JsonNumber.fromNat v.height.toNat)),
-                ("hash", Lean.Json.str (hex hash.bytes)),
-                ("chunks", Lean.Json.arr chunks.toArray)]).compress
-      h.flush
+    e.writeAppliedLog b reports bodyOf
     let took := (← IO.monoMsNow) - a.startedMs
     if took > 400 then
       e.log s!"block {v.height} took {took} ms to apply"
@@ -240,13 +192,16 @@ partial def Env.tryApply (e : Env) : IO Unit := do
     else
       return
   let s ← e.get
+  -- the chunks of the synced shards are being caught up: the next block waits for them
+  if s.syncJob.any (·.syncedAt.isSome) then
+    return
   let candidates :=
     s.pending.filterMap fun h => (s.blocks[h.bytes]?).bind fun b => b.header.view?.map (b, ·.height)
   let sorted := candidates.qsort fun a b => a.2 < b.2
   for (b, _) in sorted do
     let some v := b.header.view? | continue
     if s.applied.contains v.prevHash.bytes then
-      if s.bodiesReady b then
+      if e.bodiesReady s b then
         discard <| e.startApply b
         return
       else
@@ -607,6 +562,15 @@ def Env.onRouted (e : Env) (m : RoutedMessage) : IO Unit := do
       do
         e.onWitnessPart w;
         pure false
+    | .chunkContractAccesses a =>
+      do
+        e.onContractAccesses a;
+        pure false
+    | .contractCodeResponse r =>
+      do
+        if ← e.onContractCode r then
+          e.retryWaitingCode
+        pure false
     | .chunkStateWitnessAck _ =>
       do
         e.bump "ChunkStateWitnessAck";
@@ -674,6 +638,7 @@ def Env.tick (e : Env) : IO Unit := do
   e.noteTurn
   e.drainTxQueue
   e.pollReplays
+  e.stepSync
   e.tryApply
   let stale ← e.tipIsStale
   if stale then

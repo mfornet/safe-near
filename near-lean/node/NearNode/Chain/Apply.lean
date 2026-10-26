@@ -32,6 +32,10 @@ structure Body where
   (the corpus does not have it) they are the outgoing receipts of the previous chunk as this node
   applied it. -/
   prevOutgoing : Option (Array ByteArray) := none
+  /-- The receipts the chunk's predecessor sent to the shards the node tracks, by receiving shard, from the receipt
+  proofs of the partial chunk (`PartialEncodedChunk::prev_outgoing_receipts`): all a node that does not apply the
+  chunk's shard has of what that chunk's predecessor sent. -/
+  proofs : Option (Array (UInt64 × Array ByteArray)) := none
 
 /-- The parameters of the chain. -/
 structure Params where
@@ -199,13 +203,32 @@ def receiptHashes (layout : ShardLayout) (groups : Array (Array ByteArray)) :
     out := out.push (CryptoHash.hashBorsh (id, receipts))
   return out
 
+/-- What the previous chunk of a new chunk sent: all of it, or the part addressed to some shards (the proofs of the
+partial chunk). -/
+inductive SentReceipts where
+  | full (receipts : Array ByteArray)
+  | toShards (groups : Array (UInt64 × Array ByteArray))
+
+/-- The receipts of one chunk grouped by receiving shard in index order; the shards a partial chunk has no proof for
+are empty. -/
+def SentReceipts.byShard (layout : ShardLayout) :
+    SentReceipts → Except String (Array (Array ByteArray))
+  | .full r => groupByShard layout r
+  | .toShards gs => do
+    let mut groups : Array (Array ByteArray) := Array.replicate layout.numShards.toNat #[]
+    for (shard, rs) in gs do
+      let some index :=
+        layout.getShardIndex shard | throw "receipt proof for a shard not in the layout"
+      groups := groups.set! index rs
+    return groups
+
 /-- The receipts every shard is delivered by a block (`collect_incoming_receipts_from_chunks`): each
 new chunk contributes the receipts its previous chunk sent, grouped by receiving shard, and the
 contributions to a shard are shuffled with the previous block's hash as the seed. `sent` has an entry
 for every chunk of the block (index order) and `none` for a chunk that is not new. -/
 def incomingReceipts (layout : ShardLayout) (prevHash : CryptoHash)
-    (sent : Array (Option (Array ByteArray))) : Except String (Array (Array ByteArray)) := do
-  let grouped ← sent.filterMapM fun s => s.mapM (groupByShard layout)
+    (sent : Array (Option SentReceipts)) : Except String (Array (Array ByteArray)) := do
+  let grouped ← sent.filterMapM fun s => s.mapM (·.byShard layout)
   let mut result : Array (Array ByteArray) := #[]
   for target in [0:layout.numShards.toNat] do
     let proofs : Array (Array ByteArray) := grouped.map (·[target]!)
@@ -297,21 +320,25 @@ def applyBlock (prof : Option Prof) (p : Params) (st : Near.Node.Chain.ChainStat
   let layout := epoch.layout
   let prevRec ← lifted (st.block v.prevHash)
   -- what the previous chunk of each new chunk sent: the receipts of the block that included it
-  let mut sent : Array (Option (Array ByteArray)) := #[]
+  let mut sent : Array (Option SentReceipts) := #[]
   for index in [0:block.chunks.size] do
     let c := block.chunks[index]!
     if c.isNewChunk v.height then
       match (body c.shardId).prevOutgoing with
       | some r =>
-        sent := sent.push (some r)
+        sent := sent.push (some (.full r))
       | none =>
         let some prevChunk := prevRec.chunks[index]? | throw "previous chunk missing"
         let included ← blockAtHeight st prevRec prevChunk.heightIncluded
         match pr.outgoing[(included.hash.bytes, c.shardId)]? with
         | some r =>
-          sent := sent.push (some r)
+          sent := sent.push (some (.full r))
         | none =>
-          throw s!"no outgoing receipts of shard {c.shardId} at height {prevChunk.heightIncluded}"
+          match (body c.shardId).proofs with
+          | some groups =>
+            sent := sent.push (some (.toShards groups))
+          | none =>
+            throw s!"no outgoing receipts of shard {c.shardId} at height {prevChunk.heightIncluded}"
     else
       sent := sent.push none
   let incoming ← incomingReceipts layout v.prevHash sent
@@ -325,7 +352,7 @@ def applyBlock (prof : Option Prof) (p : Params) (st : Near.Node.Chain.ChainStat
     let shard := chunk.shardId
     let isNew := chunk.isNewChunk v.height
     -- the receipts of the previous chunks must hash to the root the chunk header commits to
-    if let some own := sent[index]! then
+    if let some (.full own) := sent[index]! then
       let groups ← groupByShard layout own
       let (root, _) := merklize (← receiptHashes layout groups)
       unless root == chunk.prevOutgoingReceiptsRoot do
@@ -488,6 +515,13 @@ def applyBlock (prof : Option Prof) (p : Params) (st : Near.Node.Chain.ChainStat
   -- what the block delivers to each shard stays until the shard has a chunk again
   for i in [0:layout.numShards.toNat] do
     let some shard := layout.getShardId i | throw "shard index out of range"
+    -- a partial chunk says nothing of the shards it has no proof for
+    let known :=
+      sent.all fun
+        | some (.toShards gs) => gs.any (·.1 == shard)
+        | _ => true
+    unless known do
+      continue
     let op : Store.Op :=
       .set .incomingReceipts (blockShardKey hash layout shard) (Codec.encode incoming[i]!)
     ops := ops.push op
