@@ -267,7 +267,7 @@ def outcome_comparison(applied: list[dict], rows: list[dict]) -> dict:
 
 
 def analyse(work: Path, report: dict, stall: dict | None, rows: list[dict], head: int, final: int,
-            require_txs: bool = True, known=None) -> dict:
+            require_txs: bool = True, known=None, shards: int = 1) -> dict:
     """``known(hash_hex)`` tells whether neard holds the block with that hash (also off its canonical chain).  After a pause
     both producers can build on the same parent at different heights (nearcore does it too: a block per height whose
     approvals are ready), and the fork choice orphans some blocks.  What is guaranteed is that every block the Lean node
@@ -337,7 +337,6 @@ def analyse(work: Path, report: dict, stall: dict | None, rows: list[dict], head
                                    and result["outcomes"]["outcomesChecked"] == result["outcomes"]["outcomesEqual"]))
           and (stall is None or (stall["stalled"] and stall["resumed"])))
     # on several shards: every shard has its roots checked and equal, and the Lean node produced chunks on more than one
-    shards = len(shard_layout()[1])
     if shards > 1:
         shard_ok = (len(roots_by_shard) == shards and all(v[0] > 0 and v[0] == v[1] for v in roots_by_shard.values())
                     and sum(1 for v in by_shard.values() if v["lean"] > 0) >= 2
@@ -382,7 +381,8 @@ def main() -> None:
         lean.wait(timeout=60)
         rows = chain_rows(head_height())   # the chain went on while the Lean node was stopping
         report = json.loads((options.work / "report.json").read_text()) if (options.work / "report.json").exists() else {}
-        result = analyse(options.work, report, stall, rows, head, final, require_txs=not options.no_workload, known=neard_holds)
+        result = analyse(options.work, report, stall, rows, head, final, require_txs=not options.no_workload, known=neard_holds,
+                         shards=len(shard_layout()[1]))
         print(json.dumps(result, indent=1))
         (options.work / "result.json").write_text(json.dumps(result, indent=1) + "\n")
         sys.exit(0 if result["ok"] else 1)
