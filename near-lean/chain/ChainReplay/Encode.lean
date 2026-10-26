@@ -173,8 +173,12 @@ def actionValidationErrorJson : ActionsValidationError → Json
 
 /-- Structured semantic error fields are independent of Lean's pretty printer. -/
 def runtimeErrorJson (executor : AccountId) : RuntimeError → Json
-  | .actionsValidation error =>
-    obj [kind "actionsValidation", ("error", actionValidationErrorJson error)]
+  | .actionsValidation error => obj [kind "actionsValidation", ("error", actionValidationErrorJson error)]
+  | .newReceiptValidationError (.actionsValidation error) =>
+    obj [kind "newReceiptValidationError", ("error", obj [kind "actionsValidation", ("error", actionValidationErrorJson error)])]
+  | .newReceiptValidationError (.receiptSizeExceeded size limit) =>
+    obj [kind "newReceiptValidationError", ("error", obj [kind "receiptSizeExceeded",
+      ("size", toJson size), ("limit", toJson limit)])]
   | .accountAlreadyExists id => obj [kind "accountAlreadyExists", ("accountId", toJson id)]
   | .accountDoesNotExist id => obj [kind "accountDoesNotExist", ("accountId", toJson id)]
   | .createAccountNotAllowed id predecessor =>
@@ -218,6 +222,7 @@ def runtimeErrorJson (executor : AccountId) : RuntimeError → Json
       | .linkError _ | .hostError _ | .wasmTrap _ =>
         obj [kind "executionError", ("message", toJson error.message)]
       | .internal message => obj [kind "internal", ("message", toJson message)]
+      | .prepareError e => obj [kind "compilationError", ("prepareError", toJson e.name)]
       | .executionIssue issue => obj [kind "executionIssue", ("message", toJson issue.message)]
     obj [kind "functionCallError", ("error", inner)]
   | .deleteActionMustBeFinal => obj [kind "deleteActionMustBeFinal"]

@@ -44,6 +44,15 @@ structure LimitConfig where
   yieldTimeoutLengthInBlocks : Nat := 200
   /-- `max_yield_payload_size`: bytes `promise_yield_resume` accepts. -/
   maxYieldPayloadSize : Nat := 1024
+  /-- `prepare_v3` limits; `none` when the protocol version does not set one. -/
+  maxFunctionsNumberPerContract : Option Nat := none
+  maxLocalsPerContract : Option Nat := none
+  maxFunctionBodySize : Option Nat := none
+  maxTablesPerContract : Option Nat := none
+  maxElementsPerContractTable : Option Nat := none
+  maxTypesPerContract : Option Nat := none
+  /-- `max_receipt_size`, checked on the receipts a function call creates. -/
+  maxReceiptSize : Nat := 2 ^ 32 - 1
   deriving Repr, Inhabited
 
 /-- `near_parameters::vm::Config`. -/
@@ -63,6 +72,9 @@ structure WasmConfig where
   /-- `bls12381_not_in_group_fix` (NEP-488): `bls12381_p1_sum` and `bls12381_p1_decompress` accept
   the points of order 3 with abscissa zero. -/
   bls12381NotInGroupFix : Bool := false
+  /-- `global_contract_host_fns`: the global-contract host functions are
+  linked (protocol 78 on); before, importing one fails to link. -/
+  globalContractHostFns : Bool := false
   limits : LimitConfig
   deriving Inhabited
 
@@ -87,6 +99,8 @@ structure RuntimeConfig where
   strictNonceEnabled : Bool := false
   v1TransactionsEnabled : Bool := false
   transactionSizeIncludesSignature : Bool := false
+  /-- `UniqueChunkTransactions`: a repeated transaction in a chunk is skipped. -/
+  uniqueChunkTransactions : Bool := false
   accountCostIncrease : Bool := true
   minGasPurchasePrice : Nat := 0
   accountCreationCharge : Nat := 0
@@ -123,6 +137,15 @@ private def nat (j : Json) (k : String) : Except String Nat := do
   match v.getNat? with
   | .ok n => pure n
   | .error _ => .error s!"key {k} is not a natural number"
+
+/-- An optional natural number: absent or `null` is `none`. -/
+private def optNat (j : Json) (k : String) : Except String (Option Nat) :=
+  match j.getObjVal? k with
+  | .error _ | .ok .null => .ok none
+  | .ok v =>
+    match v.getNat? with
+    | .ok n => .ok (some n)
+    | .error _ => .error s!"key {k} is not a natural number"
 
 /-- Decimal string holding a `u128`. -/
 private def natString (j : Json) (k : String) : Except String Nat := do
@@ -173,7 +196,14 @@ private def limits (j : Json) : Except String LimitConfig := do
     registersMemoryLimit := ← nat j "registers_memory_limit"
     accountIdValidityRulesVersion := ← nat j "account_id_validity_rules_version"
     yieldTimeoutLengthInBlocks := (nat j "yield_timeout_length_in_blocks").toOption.getD 200
-    maxYieldPayloadSize := (nat j "max_yield_payload_size").toOption.getD 1024 }
+    maxYieldPayloadSize := (nat j "max_yield_payload_size").toOption.getD 1024
+    maxFunctionsNumberPerContract := ← optNat j "max_functions_number_per_contract"
+    maxLocalsPerContract := ← optNat j "max_locals_per_contract"
+    maxFunctionBodySize := ← optNat j "max_function_body_size"
+    maxTablesPerContract := ← optNat j "max_tables_per_contract"
+    maxElementsPerContractTable := ← optNat j "max_elements_per_contract_table"
+    maxTypesPerContract := ← optNat j "max_types_per_contract"
+    maxReceiptSize := ← nat j "max_receipt_size" }
 
 private def extCosts (j : Json) : Except String ExtCosts := do
   match j with
@@ -262,6 +292,7 @@ def ofJson (j : Json) : Except String RuntimeConfig := do
     strictNonceEnabled := ← (← field (← field j "runtime_admission") "strict_nonce").getBool?
     v1TransactionsEnabled := ← (← field (← field j "runtime_admission") "v1_transactions").getBool?
     transactionSizeIncludesSignature := ← (← field (← field j "runtime_admission") "transaction_size_includes_signature").getBool?
+    uniqueChunkTransactions := ← (← field (← field j "runtime_admission") "unique_chunk_transactions").getBool?
     accountCostIncrease := ← (← field finance "account_cost_increase").getBool?
     minGasPurchasePrice := ← natString j "min_gas_purchase_price"
     accountCreationCharge := ← natString j "account_creation_charge"
@@ -293,6 +324,7 @@ def ofJson (j : Json) : Except String RuntimeConfig := do
       ethImplicitGlobalContract := ((field wasm "eth_implicit_global_contract").toOption.bind (·.getBool?.toOption)).getD false
       bls12381NotInGroupFix :=
         ((field wasm "bls12381_not_in_group_fix").toOption.bind (·.getBool?.toOption)).getD false
+      globalContractHostFns := hostFns
       limits := ← limits (← field wasm "limit_config") }
     accountCreation := {
       minAllowedTopLevelAccountLength := ← nat acc "min_allowed_top_level_account_length"

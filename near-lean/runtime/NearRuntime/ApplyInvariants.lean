@@ -72,7 +72,7 @@ theorem applyAttempt_state_predicate (cfg : RuntimeConfig) (ap : ApplyState)
     simpa only [List.nil_append] using happend { before with delayed := [] } receipts (hclear before hb)
   unfold applyAttempt
   dsimp only [Id.run, bind, pure]
-  generalize ht : (forIn txs _ _ : Id TransactionLoop) = txResult
+  generalize ht : (forIn (chunkTransactions cfg txs) _ _ : Id TransactionLoop) = txResult
   have hconverted : P txResult.2.1 ∧ (∀ returned, txResult.1 = some returned → P returned.state) := by
     rw [← ht]
     apply forIn_id_preserves _ _ _

@@ -1,0 +1,14 @@
+{
+  "code": "tools/runtime-conformance/fixtures/prepare_body_over_limit.wasm",
+  "sha256": "f1054669eff1db28fd54f56173acb62b110ac32c7e68b45941b9e365d465eec1",
+  "protocolVersion": 86,
+  "initialBalance": "100000000000000000000000000",
+  "storage": [],
+  "calls": [
+    {
+      "name": "prepare: body_over_limit",
+      "method": "f",
+      "args": {}
+    }
+  ]
+}

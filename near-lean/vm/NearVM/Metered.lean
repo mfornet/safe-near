@@ -469,7 +469,12 @@ def chargesBeforeUnvalidated (name : String) (st : HostStore NearState) (args : 
     let dataGas := (st.host.outputDataReceivers.map fun r =>
       let sir := r == st.host.context.currentAccountId
       byte.send sir * n + byte.execution * n).sum
-    [base] ++ readSpan st (a 0) (a 1) ++ [.burn dataGas]
+    -- nearcore reads the value and checks its length before burning the data
+    -- receipt bytes.
+    [base] ++ readSpan st (a 0) (a 1) ++
+      (match getMemOrReg st (a 1) (a 0) with
+       | some value => if withinLimit st.host.config.maxReturnLen value.length then [.burn dataGas] else []
+       | none => [])
   | "storage_read" =>
     let k := spanLen st (a 0) (a 1)
     [base, .ext "storage_read_base"] ++ readSpan st (a 0) (a 1) ++ [.ext "storage_read_key_byte" k]
@@ -669,6 +674,10 @@ def invocationArgumentError (name : String) (st : HostStore NearState) (args : L
     (addGasKeyFunctionCallPlan st args false).error
   else if name == "promise_yield_create" then (yieldCreatePlan st args).error
   else if name == "promise_yield_resume" then (yieldResumePlan st args).error
+  else if name == "value_return" then
+    if (getMemOrReg st (argU64 args 1) (argU64 args 0)).isNone then
+      some (spanReadError (argU64 args 0) (argU64 args 1))
+    else none
   else creationPrefixError name st args
 
 def preInvokeError (name : String) (st : HostStore NearState) (args : List Value) : Option HostError :=
@@ -1027,7 +1036,8 @@ theorem gas_ite {P : GasCounter → Prop} {c : Prop} [Decidable c]
   · simp only [h, ↓reduceIte]; exact ha h
   · simp only [h, ↓reduceIte]; exact hb h
 
-set_option maxHeartbeats 0 in
+-- Needs about 500k heartbeats (2026-10-24); the bound leaves twice that.
+set_option maxHeartbeats 1000000 in
 /-- The storage phase changes gas only by billing charges, so any property of
 the counter that billing preserves holds after it. -/
 theorem prepareStorageCallAux_gas (P : GasCounter → Prop) (name : String)

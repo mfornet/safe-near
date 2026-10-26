@@ -1,5 +1,8 @@
 # Wasm runtime rewrite: replacing the Talos interpreter
 
+History: the finished plan, kept for its rationale. The runtime as it is today
+is described in [WASM_RUNTIME.md](../design/WASM_RUNTIME.md).
+
 Status: phases 1 to 3 done on 2026-10-23: the runtime lives in `near-lean/wasm`,
 `NearVM` runs on it with its proofs intact, and the Talos packages are gone.
 Phase 4 (the Iris layer) is in `near-lean/wasm-logic`: language instance,

@@ -1,0 +1,14 @@
+{
+  "code": "tools/runtime-conformance/fixtures/prepare_imported_functions_over_limit.wasm",
+  "sha256": "8238a89a85384406d1cf37e37da5254f400bd8e89510a885f0971ce49efe0cc3",
+  "protocolVersion": 86,
+  "initialBalance": "100000000000000000000000000",
+  "storage": [],
+  "calls": [
+    {
+      "name": "prepare: imported_functions_over_limit",
+      "method": "f",
+      "args": {}
+    }
+  ]
+}

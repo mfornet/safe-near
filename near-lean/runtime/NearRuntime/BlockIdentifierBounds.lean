@@ -156,7 +156,7 @@ theorem applyAttempt_identifier_bounds (cfg : RuntimeConfig) (ap : ApplyState)
   have hempty (bound : Nat) : ReceiptList.IdsBelow bound [] := by intro receipt hm; contradiction
   unfold applyAttempt
   dsimp only [Id.run, bind, pure]
-  generalize ht : (forIn txs _ _ : Id TransactionLoop) = txResult
+  generalize ht : (forIn (chunkTransactions cfg txs) _ _ : Id TransactionLoop) = txResult
   have htx : TransactionLoop.IdentifierInvariant st.nextId txResult := by
     rw [← ht]
     apply forIn_id_preserves _ _ _ (TransactionLoop.IdentifierInvariant st.nextId)

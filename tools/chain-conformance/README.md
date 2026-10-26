@@ -349,7 +349,7 @@ explicit carried chunk congestion inputs and complete origins in
 the represented runtime.
 
 `just chain-trie-test` compares native `near_store::Trie` traversal with
-`NearRuntime.TrieAccounting`. Build the source oracle first, as above. For an
+`Near.TrieAccounting` (`near-lean/interface/NearInterface/TrieAccounting.lean`). Build the source oracle first, as above. For an
 individual request:
 
 ```sh

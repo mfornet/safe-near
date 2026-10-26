@@ -58,6 +58,7 @@ fn config_json(store: &RuntimeConfigStore, version: ProtocolVersion) -> String {
             "strict_nonce": ProtocolFeature::StrictNonce.enabled(version),
             "v1_transactions": ProtocolFeature::GasKeys.enabled(version),
             "transaction_size_includes_signature": ProtocolFeature::PostQuantumSignatures.enabled(version),
+            "unique_chunk_transactions": ProtocolFeature::UniqueChunkTransactions.enabled(version),
         }),
         runtime_extra: json!({
             "action_fees": {

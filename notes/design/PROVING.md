@@ -7,6 +7,12 @@ and [leanblueprint](https://github.com/PatrickMassot/leanblueprint) link prose,
 statements and proofs. Build with `just blueprint w-near`. The blueprint must
 show open obligations as open: stating a property is not proving it.
 
+Only w-near has a leanblueprint so far. The `blueprint/` folders of
+`sputnik-dao-factory` and `sputnikdao2-v3.2` hold a hand-written proof index
+(`blueprint/README.md`: statement, evidence, status) and `just blueprint`
+does not build them. The same rule applies: an index row is `proved` only
+when the named declaration passes the checks below.
+
 ## What counts as proved
 
 - Checked by the Lean kernel.

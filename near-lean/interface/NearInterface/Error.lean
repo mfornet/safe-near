@@ -77,7 +77,7 @@ inductive HostError
 
 def HostError.message : HostError → String
   | .badUTF8 => "String encoding is bad UTF-8 sequence."
-  | .badUTF16 => "String encoding is bad UTF-16 sequence"
+  | .badUTF16 => "String encoding is bad UTF-16 sequence."
   | .gasExceeded => "Exceeded the prepaid gas."
   | .gasLimitExceeded => "Exceeded the maximum amount of gas allowed to burn per contract."
   | .balanceExceeded => "Exceeded the account balance."
@@ -102,8 +102,8 @@ def HostError.message : HostError → String
   | .contractSizeExceeded n l => s!"The size of a contract code in DeployContract action {n} exceeds the limit {l}"
   | .keyLengthExceeded n l => s!"The length of a storage key {n} exceeds the limit {l}"
   | .valueLengthExceeded n l => s!"The length of a storage value {n} exceeds the limit {l}"
-  | .totalLogLengthExceeded n l => s!"The length of a total log is {n} but the limit is {l}"
-  | .numberOfLogsExceeded l => s!"The number of logs exceeds the limit {l}"
+  | .totalLogLengthExceeded n l => s!"The length of a log message {n} exceeds the limit {l}"
+  | .numberOfLogsExceeded l => s!"The number of logs will exceed the limit {l}"
   | .numberPromisesExceeded n l => s!"The number of promises within a FunctionCall {n} exceeds the limit {l}"
   | .numberInputDataDependenciesExceeded n l => s!"The number of input data dependencies {n} exceeds the limit {l}"
   | .prohibitedInView m => s!"{m} is not allowed in view calls"
@@ -149,6 +149,41 @@ inductive MethodResolveError
   | methodInvalidSignature
   deriving Repr, BEq, Inhabited
 
+/-- `near_vm_runner::logic::errors::PrepareError`: the module was rejected
+before instantiation. -/
+inductive PrepareError
+  | instantiate
+  | memory
+  | tooManyFunctions
+  | tooManyLocals
+  | tooManyTables
+  | tooManyTableElements
+  | functionBodyTooLarge
+  | tooManyTypes
+  deriving Repr, BEq, Inhabited
+
+/-- nearcore's `Display` text. -/
+def PrepareError.message : PrepareError → String
+  | .instantiate => "Error happened during instantiation."
+  | .memory => "Error creating memory."
+  | .tooManyFunctions => "Too many functions in contract."
+  | .tooManyLocals => "Too many locals declared in the contract."
+  | .tooManyTables => "Too many tables declared in the contract."
+  | .tooManyTableElements => "Too many table elements declared in the contract."
+  | .functionBodyTooLarge => "A function body in the contract exceeds the size limit."
+  | .tooManyTypes => "Too many type-section entries declared in the contract."
+
+/-- The variant name nearcore serializes. -/
+def PrepareError.name : PrepareError → String
+  | .instantiate => "Instantiate"
+  | .memory => "Memory"
+  | .tooManyFunctions => "TooManyFunctions"
+  | .tooManyLocals => "TooManyLocals"
+  | .tooManyTables => "TooManyTables"
+  | .tooManyTableElements => "TooManyTableElements"
+  | .functionBodyTooLarge => "FunctionBodyTooLarge"
+  | .tooManyTypes => "TooManyTypes"
+
 /-- `near_vm_runner::logic::errors::FunctionCallError`. -/
 inductive FunctionCallError
   | compilationError (msg : String)
@@ -161,17 +196,20 @@ inductive FunctionCallError
   | internal (msg : String)
   /-- Execution stopped without establishing a protocol outcome. -/
   | executionIssue (issue : ExecutionIssue)
+  /-- `CompilationError::PrepareError`. -/
+  | prepareError (e : PrepareError)
   deriving Repr, BEq, Inhabited
 
 def FunctionCallError.message : FunctionCallError → String
   | .compilationError m => s!"CompilationError({m})"
-  | .linkError m => s!"LinkError({m})"
+  | .linkError m => m
   | .methodResolveError .methodEmptyName => "MethodEmptyName"
   | .methodResolveError .methodNotFound => "MethodNotFound"
   | .methodResolveError .methodInvalidSignature => "MethodInvalidSignature"
   | .wasmTrap t => s!"WebAssembly trap: {t.message}"
   | .hostError e => e.message
   | .internal m => s!"Internal({m})"
+  | .prepareError e => s!"PrepareError: {e.message}"
   | .executionIssue issue => issue.message
 
 /-- Model limitations must be propagated separately from protocol failures.

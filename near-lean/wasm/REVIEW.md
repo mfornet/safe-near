@@ -576,7 +576,7 @@ Talos text. Clean.
 ## README and doc comments: provenance statements
 
 - `README.md` L3-6 says the package is "built on iris-lean … Phase 4 of
-  notes/todo/wasm_runtime_rewrite.md". It makes no clean-room claim and does not mention Talos
+  notes/history/wasm_runtime_rewrite.md". It makes no clean-room claim and does not mention Talos
   or the removed `iris-wasm` layer. The notes file (L5-6, L317-321) describes Phase 4 as
   "Iris `Language` instance over `Step`, `WasmHeap` points-to, instruction rules, adequacy back
   to `Terminates`"; the README correctly says points-to assertions "are not here yet" (L15-17),
@@ -630,7 +630,7 @@ Qualifications, actionable:
    different nesting and operand order). Not a copy and not actionable under the rule, but if
    the author prefers the package to share no program shape with the Talos corpus, swap the
    example for one Talos did not have.
-4. `notes/todo/wasm_runtime_rewrite.md` L5-6 and L317-321 describe Phase 4 as including
+4. `notes/history/wasm_runtime_rewrite.md` L5-6 and L317-321 describe Phase 4 as including
    `WasmHeap` points-to and instruction rules; the README correctly says those are not
    present. Align the notes with what landed.
 

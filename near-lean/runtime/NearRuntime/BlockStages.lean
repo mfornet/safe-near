@@ -87,7 +87,7 @@ with the actual executable attempt. No alternate execution semantics is used. -/
 theorem applyAttempt_eq_stages (cfg : RuntimeConfig) (ap : ApplyState) (decoder : Bytes → ContractCode)
     (st : ChainState) (txs : List Transaction) (incoming : List Receipt) :
     applyAttempt cfg ap decoder st txs incoming =
-      let converted := convertTransactions cfg ap st txs
+      let converted := convertTransactions cfg ap st (chunkTransactions cfg txs)
       match converted.1 with
       | some result => result
       | none => applyReceiptQueue cfg ap decoder st { converted.2.1 with delayed := [] } converted.2.2.1
@@ -96,8 +96,8 @@ theorem applyAttempt_eq_stages (cfg : RuntimeConfig) (ap : ApplyState) (decoder 
           converted.2.2.2.2.1.length (converted.2.2.2.2.1.length + converted.2.1.delayed.length) := by
   unfold applyAttempt
   dsimp only [Id.run, bind, pure]
-  generalize ht : (forIn txs _ _ : Id TransactionLoop) = converted
-  have heq : converted = convertTransactions cfg ap st txs := by
+  generalize ht : (forIn (chunkTransactions cfg txs) _ _ : Id TransactionLoop) = converted
+  have heq : converted = convertTransactions cfg ap st (chunkTransactions cfg txs) := by
     rw [← ht]
     unfold convertTransactions
     dsimp only [Id.run]

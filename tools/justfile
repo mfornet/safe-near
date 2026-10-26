@@ -1,6 +1,7 @@
 # Check every repository-owned Lake package against the root Lean version.
 check-toolchains:
     python3 tools/check_lean_toolchains.py
+    python3 tools/check_nearcore_pin.py
 
 # Check the compiled VM import graph for legacy interpreter and proof API dependencies.
 vm-dependencies:

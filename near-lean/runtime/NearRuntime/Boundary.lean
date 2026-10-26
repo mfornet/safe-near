@@ -130,7 +130,7 @@ to the post-state. A failure, the VM's or the stake check's, rolls back
 storage, balance, usage, receipts and the trie's prospective writes, and
 keeps burnt gas, logs and cache warming (`rollbackReceipt`). -/
 def observe (ctx : Context) (storage : List (Bytes × Bytes)) (outcome : VMOutcome)
-    (issue : Option ExecutionIssue) : Observation :=
+    (issue : Option ExecutionIssue) (receiptError : Option RuntimeError := none) : Observation :=
   let trie := outcome.storageAccounting.getD ctx.trie
   let failed (failure : Failure) : Observation :=
     { outcome := .error failure, storage := storage.toFinset, balance := ctx.balance,
@@ -142,6 +142,9 @@ def observe (ctx : Context) (storage : List (Bytes × Bytes)) (outcome : VMOutco
   | none =>
     match issue with
     | some issue => failed (.executionIssue issue.message)
+    | none =>
+    match receiptError with
+    | some error => failed (.other (repr error).pretty)
     | none =>
       let deficit := stakeDeficit ctx.protocol outcome.storageUsage outcome.balance ctx.locked
       if deficit > 0 then failed (.lackBalanceForState deficit)
@@ -163,6 +166,9 @@ def execOn (code : Code) (storage : List (Bytes × Bytes)) (ctx : Context) : Obs
     let outcome := run ctx.protocol code.code.module code.code.size ctx.method (toVMContext ctx)
       storage
     observe ctx storage outcome (actionsIssue? code.codeOf outcome.receipts)
+      (match checkVMReceipts ctx.protocol code.codeOf ctx.current ctx.signer ctx.signerPk outcome.receipts with
+       | .error error => some (.newReceiptValidationError error)
+       | .ok () => none)
 
 /-- near-lean, seen through one function-call action. The VM reads storage
 from a list; `RawStorage` is a set, so the instance picks a listing. That the
@@ -176,26 +182,28 @@ noncomputable def nearRuntime : RuntimeInterface where
 
 /-- Every failure rolls back storage, balance, usage and receipts. -/
 theorem observe_rolledBack (ctx : Context) (storage : List (Bytes × Bytes)) (outcome : VMOutcome)
-    (issue : Option ExecutionIssue) {failure : Failure}
-    (h : (observe ctx storage outcome issue).outcome = .error failure) :
-    NearInterface.RolledBack ctx storage.toFinset (observe ctx storage outcome issue) := by
+    (issue : Option ExecutionIssue) (receiptError : Option RuntimeError) {failure : Failure}
+    (h : (observe ctx storage outcome issue receiptError).outcome = .error failure) :
+    NearInterface.RolledBack ctx storage.toFinset (observe ctx storage outcome issue receiptError) := by
   revert h
   unfold observe
   split
   · intro _; exact ⟨⟨_, rfl⟩, rfl, rfl, rfl, rfl⟩
   · split
     · intro _; exact ⟨⟨_, rfl⟩, rfl, rfl, rfl, rfl⟩
-    · dsimp only
-      split
+    · split
       · intro _; exact ⟨⟨_, rfl⟩, rfl, rfl, rfl, rfl⟩
-      · intro h; cases h
+      · dsimp only
+        split
+        · intro _; exact ⟨⟨_, rfl⟩, rfl, rfl, rfl, rfl⟩
+        · intro h; cases h
 
 theorem execOn_rolledBack (code : Code) (storage : List (Bytes × Bytes)) (ctx : Context)
     {failure : Failure} (h : (execOn code storage ctx).outcome = .error failure) :
     NearInterface.RolledBack ctx storage.toFinset (execOn code storage ctx) := by
   revert h
   unfold execOn
-  cases code.code.decodeIssue <;> dsimp only <;> exact observe_rolledBack _ _ _ _
+  cases code.code.decodeIssue <;> dsimp only <;> exact observe_rolledBack _ _ _ _ _
 
 /-- Every failed execution of the instance leaves the account as it was. -/
 theorem nearRuntime_failure_rolledBack (code : Code) (raw : RawStorage) (ctx : Context)
@@ -224,8 +232,9 @@ same records give the same observation, so `nearRuntime` depends on the
 storage only as a set. -/
 
 theorem observe_echo (ctx : Context) {s₁ s₂ : List (Bytes × Bytes)} (hs : s₁.toFinset = s₂.toFinset)
-    {o₁ o₂ : VMOutcome} (h : EchoRel o₁ o₂) (issue : Option ExecutionIssue) :
-    observe ctx s₁ o₁ issue = observe ctx s₂ o₂ issue := by
+    {o₁ o₂ : VMOutcome} (h : EchoRel o₁ o₂) (issue : Option ExecutionIssue)
+    (receiptError : Option RuntimeError := none) :
+    observe ctx s₁ o₁ issue receiptError = observe ctx s₂ o₂ issue receiptError := by
   obtain ⟨hf, hst⟩ := h
   have field {β : Type} (f : VMOutcome → β) (hf' : ∀ o : VMOutcome, f { o with storage := [] } = f o) :
       f o₁ = f o₂ := by
@@ -261,7 +270,7 @@ theorem execOn_perm (code : Code) {s₁ s₂ : List (Bytes × Bytes)} (h : s₁.
       simpa using this
     dsimp only
     rw [hrec]
-    exact observe_echo ctx hs hrun _
+    exact observe_echo ctx hs hrun _ _
 
 /-- `nearRuntime` computes, on any listing of the storage, what the boundary
 computes on that listing. -/

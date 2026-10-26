@@ -9,50 +9,38 @@ their rejection path; this does not validate their functional placeholders.
 
 namespace Wasm.Near
 
+/-- Unfold a register/context host and close each branch from `hwf`. -/
+local macro "host_dispatch_tac" hwf:ident : tactic => `(tactic| (
+    dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
+    repeat (first
+      | exact $hwf
+      | exact writeRegisterResult_preserves _ _ _ _ _ $hwf
+      | split)))
+
 theorem inputFn_preserves : HostPreservesPromises inputFn := by
   intro st args hwf
   unfold inputFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_preserves _ _ _ _ _ hwf
-    | split)
+  host_dispatch_tac hwf
 
 theorem readRegisterFn_preserves : HostPreservesPromises readRegisterFn := by
   intro st args hwf
   unfold readRegisterFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_preserves _ _ _ _ _ hwf
-    | split)
+  host_dispatch_tac hwf
 
 theorem registerLenFn_preserves : HostPreservesPromises registerLenFn := by
   intro st args hwf
   unfold registerLenFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_preserves _ _ _ _ _ hwf
-    | split)
+  host_dispatch_tac hwf
 
 theorem writeRegisterFn_preserves : HostPreservesPromises writeRegisterFn := by
   intro st args hwf
   unfold writeRegisterFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_preserves _ _ _ _ _ hwf
-    | split)
+  host_dispatch_tac hwf
 
 theorem storageWriteFn_preserves : HostPreservesPromises storageWriteFn := by
   intro st args hwf
   unfold storageWriteFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_preserves _ _ _ _ _ hwf
-    | split)
+  host_dispatch_tac hwf
   all_goals
     simp_all only [HostResult.Satisfies, NearState.setStorage,
       NearState.invalidateIterators]
@@ -64,20 +52,12 @@ theorem storageWriteFn_preserves : HostPreservesPromises storageWriteFn := by
 theorem storageReadFn_preserves : HostPreservesPromises storageReadFn := by
   intro st args hwf
   unfold storageReadFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_preserves _ _ _ _ _ hwf
-    | split)
+  host_dispatch_tac hwf
 
 theorem storageRemoveFn_preserves : HostPreservesPromises storageRemoveFn := by
   intro st args hwf
   unfold storageRemoveFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_preserves _ _ _ _ _ hwf
-    | split)
+  host_dispatch_tac hwf
   all_goals
     simp_all only [HostResult.Satisfies, NearState.removeStorage,
       NearState.invalidateIterators]
@@ -89,101 +69,57 @@ theorem storageRemoveFn_preserves : HostPreservesPromises storageRemoveFn := by
 theorem storageHasKeyFn_preserves : HostPreservesPromises storageHasKeyFn := by
   intro st args hwf
   unfold storageHasKeyFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_preserves _ _ _ _ _ hwf
-    | split)
+  host_dispatch_tac hwf
 
 theorem currentAccountIdFn_preserves : HostPreservesPromises currentAccountIdFn := by
   intro st args hwf
   unfold currentAccountIdFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_preserves _ _ _ _ _ hwf
-    | split)
+  host_dispatch_tac hwf
 
 theorem predecessorAccountIdFn_preserves : HostPreservesPromises predecessorAccountIdFn := by
   intro st args hwf
   unfold predecessorAccountIdFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_preserves _ _ _ _ _ hwf
-    | split)
+  host_dispatch_tac hwf
 
 theorem signerAccountIdFn_preserves : HostPreservesPromises signerAccountIdFn := by
   intro st args hwf
   unfold signerAccountIdFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_preserves _ _ _ _ _ hwf
-    | split)
+  host_dispatch_tac hwf
 
 theorem signerAccountPkFn_preserves : HostPreservesPromises signerAccountPkFn := by
   intro st args hwf
   unfold signerAccountPkFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_preserves _ _ _ _ _ hwf
-    | split)
+  host_dispatch_tac hwf
 
 theorem attachedDepositFn_preserves : HostPreservesPromises attachedDepositFn := by
   intro st args hwf
   unfold attachedDepositFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_preserves _ _ _ _ _ hwf
-    | split)
+  host_dispatch_tac hwf
 
 theorem blockIndexFn_preserves : HostPreservesPromises blockIndexFn := by
   intro st args hwf
   unfold blockIndexFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_preserves _ _ _ _ _ hwf
-    | split)
+  host_dispatch_tac hwf
 
 theorem blockTimestampFn_preserves : HostPreservesPromises blockTimestampFn := by
   intro st args hwf
   unfold blockTimestampFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_preserves _ _ _ _ _ hwf
-    | split)
+  host_dispatch_tac hwf
 
 theorem epochHeightFn_preserves : HostPreservesPromises epochHeightFn := by
   intro st args hwf
   unfold epochHeightFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_preserves _ _ _ _ _ hwf
-    | split)
+  host_dispatch_tac hwf
 
 theorem storageUsageFn_preserves : HostPreservesPromises storageUsageFn := by
   intro st args hwf
   unfold storageUsageFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_preserves _ _ _ _ _ hwf
-    | split)
+  host_dispatch_tac hwf
 
 theorem accountBalanceFn_preserves : HostPreservesPromises accountBalanceFn := by
   intro st args hwf
   unfold accountBalanceFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_preserves _ _ _ _ _ hwf
-    | split)
+  host_dispatch_tac hwf
 
 theorem validatorStakeFn_preserves : HostPreservesPromises validatorStakeFn := by
   intro st args hwf
@@ -206,38 +142,22 @@ theorem validatorTotalStakeFn_preserves : HostPreservesPromises validatorTotalSt
 theorem accountLockedBalanceFn_preserves : HostPreservesPromises accountLockedBalanceFn := by
   intro st args hwf
   unfold accountLockedBalanceFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_preserves _ _ _ _ _ hwf
-    | split)
+  host_dispatch_tac hwf
 
 theorem prepaidGasFn_preserves : HostPreservesPromises prepaidGasFn := by
   intro st args hwf
   unfold prepaidGasFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_preserves _ _ _ _ _ hwf
-    | split)
+  host_dispatch_tac hwf
 
 theorem usedGasFn_preserves : HostPreservesPromises usedGasFn := by
   intro st args hwf
   unfold usedGasFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_preserves _ _ _ _ _ hwf
-    | split)
+  host_dispatch_tac hwf
 
 theorem randomSeedFn_preserves : HostPreservesPromises randomSeedFn := by
   intro st args hwf
   unfold randomSeedFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_preserves _ _ _ _ _ hwf
-    | split)
+  host_dispatch_tac hwf
 
 theorem cryptoHostFn_preserves (name : String) (params results : List ValType) : HostPreservesPromises (cryptoHostFn name params results) := by
   intro st args hwf
@@ -289,56 +209,32 @@ theorem bls12381PairingCheckFn_preserves : HostPreservesPromises bls12381Pairing
 theorem logUtf8Fn_preserves : HostPreservesPromises logUtf8Fn := by
   intro st args hwf
   unfold logUtf8Fn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_preserves _ _ _ _ _ hwf
-    | split)
+  host_dispatch_tac hwf
 
 theorem logUtf16Fn_preserves : HostPreservesPromises logUtf16Fn := by
   intro st args hwf
   unfold logUtf16Fn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_preserves _ _ _ _ _ hwf
-    | split)
+  host_dispatch_tac hwf
 
 theorem panicMetered_preserves : HostPreservesPromises panicMetered := by
   intro st args hwf
   unfold panicMetered
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_preserves _ _ _ _ _ hwf
-    | split)
+  host_dispatch_tac hwf
 
 theorem panicUtf8Metered_preserves : HostPreservesPromises panicUtf8Metered := by
   intro st args hwf
   unfold panicUtf8Metered
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_preserves _ _ _ _ _ hwf
-    | split)
+  host_dispatch_tac hwf
 
 theorem abortMetered_preserves : HostPreservesPromises abortMetered := by
   intro st args hwf
   unfold abortMetered
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_preserves _ _ _ _ _ hwf
-    | split)
+  host_dispatch_tac hwf
 
 theorem gasFn_preserves (opCost : Nat) : HostPreservesPromises (gasFn opCost) := by
   intro st args hwf
   unfold gasFn
-  dsimp only [disallowInView, accountIdRegisterFn, publicKeyRegisterFn, contextU64Fn, contextU128MemFn, writeU128, writeMemBytes, appendLogResult, checkDataLimit, checkAccountId, checkPublicKey, NearState.setRegister, trapWith]
-  repeat (first
-    | exact hwf
-    | exact writeRegisterResult_preserves _ _ _ _ _ hwf
-    | split)
+  host_dispatch_tac hwf
 
 set_option maxRecDepth 16384 in
 set_option maxHeartbeats 1600000 in

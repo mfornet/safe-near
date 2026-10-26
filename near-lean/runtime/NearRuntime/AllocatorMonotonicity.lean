@@ -1,4 +1,5 @@
 import NearRuntime.ProcessorIdentifierBounds
+import NearRuntime.FinalizeStages
 
 namespace Near
 open Wasm.Near
@@ -227,40 +228,14 @@ past the receipt's initial counter. -/
 theorem finalizeReceipt_nextId_mono (c : ReceiptCtx) (st : ChainState) (raw : Exec) (failed : Option RuntimeError)
     (hraw : st.nextId ≤ raw.state.nextId) :
     st.nextId ≤ (finalizeReceipt c st raw failed).state.nextId := by
-  let base := rollbackReceipt st raw failed
-  let settlement := Fees.settleGas c.cfg c.action.gasPrice c.ap.gasPrice
-    (Fees.receiptGasBudget c.cfg c.receipt.receiverId c.action.actions) base.gasUsed base.gasBurnt
-    ((st.account? c.receipt.receiverId).isNone && (base.state.account? c.receipt.receiverId).isSome && failed.isNone)
-  let charged := { base with
-    tokensBurnt := (if c.receipt.isRefund then 0 else settlement.tokensBurnt) + base.actionTokensBurnt
-    otherTokensBurnt := if c.receipt.isRefund && failed.isSome then Fees.totalDeposit c.action.actions else 0 }
-  let depositRefund := if failed.isSome then Fees.totalDeposit c.action.actions else 0
-  let gasRefund := if c.receipt.isRefund then 0 else settlement.refund
-  let balance := if depositRefund > 0 && c.receipt.predecessorId != systemAccount then
-    charged.addBalanceRefund c.receipt.predecessorId depositRefund else charged
-  let gas := if gasRefund > 0 && c.action.signerId != systemAccount then
-    balance.addGasRefund c.action.signerId c.action.signerPublicKey gasRefund else balance
-  let rewarded := gas.creditReceiptReward c.cfg c.receipt.receiverId settlement.burnPrice c.action.gasPrice
-  let finished := rewarded.finishReceiptResult c failed
-  have hbase : st.nextId ≤ base.state.nextId := by
-    cases failed <;> first | exact hraw | exact Nat.le_refl _
-  have hcharged : st.nextId ≤ charged.state.nextId := hbase
-  have hbalance : st.nextId ≤ balance.state.nextId := by
-    dsimp only [balance]
-    split
-    · exact hcharged.trans (Exec.addBalanceRefund_nextId_mono charged _ _)
-    · exact hcharged
-  have hgas : st.nextId ≤ gas.state.nextId := by
-    dsimp only [gas]
-    split
-    · exact hbalance.trans (Exec.addGasRefund_nextId_mono balance _ _ _)
-    · exact hbalance
-  have hrewarded : st.nextId ≤ rewarded.state.nextId := by
-    rw [Exec.creditReceiptReward_nextId]
-    exact hgas
-  have hfinished : st.nextId ≤ finished.state.nextId := by
-    exact hrewarded.trans (Exec.finishReceiptResult_nextId_mono rewarded c failed)
-  exact hfinished
+  refine finalizeReceipt_stages (fun e => st.nextId ≤ e.state.nextId) c st raw failed ?_
+    (fun _ _ _ h => h)
+    (fun e _ _ h => h.trans (Exec.addBalanceRefund_nextId_mono e _ _))
+    (fun e _ _ _ h => h.trans (Exec.addGasRefund_nextId_mono e _ _ _))
+    (fun e _ _ h => by rw [Exec.creditReceiptReward_nextId]; exact h)
+    (fun e h => h.trans (Exec.finishReceiptResult_nextId_mono e c failed))
+    (fun _ _ h => h)
+  cases failed <;> first | exact hraw | exact Nat.le_refl _
 
 theorem applyActionReceipt_nextId_mono (c : ReceiptCtx) (st : ChainState) :
     st.nextId ≤ (applyActionReceipt c st).state.nextId :=

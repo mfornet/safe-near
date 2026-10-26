@@ -75,7 +75,6 @@ theorem storeNat_store {store : Store H} {inst : ModuleInst} {arg : MemArg} {add
       subst h
       exact ⟨setMemOf_host _ _ _, setMemOf_funcs _ _ _⟩
 
-set_option maxHeartbeats 4000000 in
 /-- Instructions never touch the host state nor the function instances. -/
 theorem instr_store (store : Store H) (inst : ModuleInst) (locals stack : Array Value)
     (labels : List Label) (i : Instr) (rest : List Instr) :

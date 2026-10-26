@@ -158,18 +158,42 @@ fn action_json(action: &MockAction) -> Result<(u64, Value)> {
     })
 }
 
-fn normalize_receipts(actions: &[MockAction]) -> Result<(Vec<Value>, HashMap<u64, usize>)> {
+/// Receipts in creation order, their action-log indices, and the yields resumed
+/// (`submit_promise_resume_data` calls that found their yield), oldest first.
+fn normalize_receipts(
+    actions: &[MockAction],
+) -> Result<(Vec<Value>, HashMap<u64, usize>, Vec<Value>)> {
     let mut indices = HashMap::new();
     let mut receipts = Vec::new();
+    let mut resumes = Vec::new();
     for (i, action) in actions.iter().enumerate() {
-        if let MockAction::CreateReceipt { receiver_id, .. } = action {
-            indices.insert(i as u64, receipts.len());
-            receipts.push(
-                json!({"receiverId":receiver_id.as_bytes(), "dependencies":[], "actions":[]}),
-            );
+        match action {
+            MockAction::CreateReceipt { receiver_id, .. } => {
+                indices.insert(i as u64, receipts.len());
+                receipts.push(json!({"receiverId":receiver_id.as_bytes(), "dependencies":[],
+                    "actions":[], "yieldDataId":null}));
+            }
+            MockAction::YieldCreate { receiver_id, data_id, .. } => {
+                indices.insert(i as u64, receipts.len());
+                receipts.push(json!({"receiverId":receiver_id.as_bytes(), "dependencies":[],
+                    "actions":[], "yieldDataId":data_id.as_bytes()}));
+            }
+            _ => {}
         }
     }
     for (i, action) in actions.iter().enumerate() {
+        if let MockAction::YieldCreate { .. } = action {
+            continue;
+        }
+        if let MockAction::YieldResume { data_id, data } = action {
+            let found = actions[..i].iter().any(|a| {
+                matches!(a, MockAction::YieldCreate { data_id: created, .. } if created == data_id)
+            });
+            if found {
+                resumes.push(json!({"dataId":data_id.as_bytes(), "payload":data}));
+            }
+            continue;
+        }
         if let MockAction::CreateReceipt {
             receipt_indices, ..
         } = action
@@ -195,7 +219,7 @@ fn normalize_receipts(actions: &[MockAction]) -> Result<(Vec<Value>, HashMap<u64
                 .push(normalized);
         }
     }
-    Ok((receipts, indices))
+    Ok((receipts, indices, resumes))
 }
 
 fn execute(request: Request) -> Result<Value> {
@@ -276,8 +300,8 @@ fn execute(request: Request) -> Result<Value> {
     // The normalized seam includes rollback, as NearVM.run does. Failed VM
     // balance/storage fields are ignored by nearcore's receipt executor.
     let failed = outcome.aborted.is_some();
-    let (receipts, indices) = if failed {
-        (vec![], HashMap::new())
+    let (receipts, indices, resumes) = if failed {
+        (vec![], HashMap::new(), vec![])
     } else {
         normalize_receipts(&ext.inner.action_log)?
     };
@@ -312,7 +336,7 @@ fn execute(request: Request) -> Result<Value> {
         "gasBurnt":outcome.burnt_gas.as_gas(),
         "gasUsed":if failed { outcome.burnt_gas.as_gas() } else { outcome.used_gas.as_gas() },
         "logs":outcome.logs, "storage":storage, "receipts":receipts,
-        "aborted":outcome.aborted.map(|e|e.to_string()), "issue":null,
+        "resumes":resumes, "aborted":outcome.aborted.map(|e|e.to_string()), "issue":null,
         "subsidizedAmount":outcome.subsidized_amount.as_yoctonear().to_string(),
         "gasProfile": {"ext":ext_profile, "actionBurnt":outcome.profile.action_gas().as_gas(),
             "wasm":outcome.profile.wasm_gas.as_gas()}

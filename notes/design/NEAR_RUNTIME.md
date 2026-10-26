@@ -29,6 +29,7 @@ looks for simplifications that are neither marked nor listed.
 
 | Where | What differs from nearcore | Why |
 |---|---|---|
+| `vm/NearVM/Run.lean` `prepareLimitError` | `prepare_v3` limits are checked before validation rather than interleaved with it, and also at older versions whose non-Wasmtime engines used `prepare_v2` | A module both invalid and over a limit may report the other error; the oracle runs Wasmtime (`prepare_v3`) at every version |
 | `runtime/NearRuntime/Types.lean` `ReceiptId`/`DataId` | Ids are `freshId` counters, not hashes; tx outcomes use id 0 | Identity is abstract; native hashes are bound by `NativeIdentity` when needed |
 | `runtime/NearRuntime/Types.lean` `Action` | No DeterministicStateInit action | Not yet modeled; inputs with it cannot be expressed |
 | `runtime/NearRuntime/Types.lean` `ReceiptEnum` | No ActionV2 `refund_to` receipts; refunds go to the predecessor | Not yet modeled |
