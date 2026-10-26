@@ -208,6 +208,9 @@ def Env.onApplied (e : Env) (b : Block) : IO Unit := do
         { s with
           ds := s.ds.setTip hash v.height lastFinal now, tip := hash, tipHeight := v.height,
           canon := s.canonWith hash v.height }
+    -- `reconcile_transaction_pool` runs before `produce_chunks`: the transactions the block includes are no longer in the
+    -- pool when the next chunks are prepared
+    e.dropIncluded b
     e.produceChunks b
   e.dropIncluded b
   let s ← e.get
