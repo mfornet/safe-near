@@ -33,7 +33,8 @@ function references are rejected as `unsupported`, distinct from `malformed`.
 | Module | Spec section | Status |
 |---|---|---|
 | `Wasm/Syntax.lean` | 2 Structure | the AST, NEAR feature set plus multi-value |
-| `Wasm/Binary.lean` | 5 Binary format | decoder; `malformed` and `unsupported` are distinct errors |
+| `Wasm/Binary.lean` | 5 Binary format | decoder; `malformed` and `unsupported` are distinct errors; reads its input through a function (`Input.read`) |
+| `Wasm/ByteSource.lean`, `Wasm/BinaryReads.lean` | | bytes the kernel reads in a few steps, so proofs can run the decoder on a large binary; lemmas that put decoded pieces together (`Reads`, `count_of_reads`, `body_eq`) |
 | `Wasm/Validate.lean` | 3 Validation | type checker with `Features`; `Features.nearcore` is what nearcore accepts |
 | `Wasm/Value.lean`, `Wasm/Numeric.lean` | 4.3 Numerics | values as bit patterns; integer ops on `UInt32`/`UInt64`, float ops through `Float32`/`Float` with canonical NaNs |
 | `Wasm/Memory.lean`, `Wasm/Store.lean` | 4.2 Runtime structure | paged memory, the store, host functions and host modules |
@@ -43,6 +44,7 @@ function references are rejected as `unsupported`, distinct from `malformed`.
 | `Wasm/LinkInvariant.lean` | | instantiation keeps the host state and adds no host function |
 | `Wasm/Bytes.lean`, `Wasm/Wat.lean` | | byte-array and UTF-8 facts; `wasm-tools`-backed WAT compilation for tests |
 | `Wasm/Host/Spectest.lean` | | the testsuite's `spectest` module |
+| `WasmEmbed/` | | out of `Wasm`'s import closure: `byte_source%`, `#embed_wasm_code`, `#embed_wasm_sections` and `kernel_rfl`, which embed a binary and state what it decodes to, for the kernel to check |
 | `Testsuite/` | | runs every command kind; `testsuite_out_of_scope.txt` lists whole files outside scope |
 | `Cli/` | | `lake exe wasm decode FILE.wasm`, `lake exe wasm validate FILE.wasm` |
 

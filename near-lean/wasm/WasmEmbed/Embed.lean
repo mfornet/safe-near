@@ -90,6 +90,16 @@ def sourceExpr (bytes : ByteArray) : Lean.Expr :=
 elab "byte_source%" path:str : term => do
   return sourceExpr (← IO.FS.readBinFile path.getString)
 
+/-- `kernel_rfl` closes an equation by `Eq.refl`, checked by the kernel
+alone: the elaborator does not try to evaluate either side first. -/
+elab "kernel_rfl" : tactic => Tactic.withMainContext do
+  let goal ← Tactic.getMainGoal
+  let tgt ← instantiateMVars (← goal.getType)
+  let some (ty, lhs, _) := tgt.eq? | throwError "kernel_rfl: the goal is not an equation"
+  let pf := mkApp2 (mkConst ``Eq.refl [← getLevel ty]) ty lhs
+  let name ← withOptions (Elab.async.set · false) do mkAuxLemma [] tgt pf
+  goal.assign (mkConst name [])
+
 /-! ## Code entries
 
 `#embed_wasm_code src "file.wasm" a b` decodes the file when it is
@@ -102,9 +112,20 @@ elaborated and, for each code entry `k` in `[a, b)`, adds
   `src.input` limited to the end of the code section, as the decoder reads
   the section (`Parser.sized`);
 
-and `codes_<a>_<b>`, the list of these entries, with `reads_<a>_<b>`, that
-`Parser.code` reads them one after another (`Parser.Reads`), from the
-position of entry `a` to the end of entry `b - 1`.
+and, for the range:
+
+* `codes_<a>_<b>`, the list of these entries, and `reads_<a>_<b>`, that
+  `Parser.code` reads them one after another (`Parser.Reads`), from the
+  position of entry `a` to the end of entry `b - 1`;
+* `funcTypes_<a>_<b>` (their types, from the function section) and
+  `funcs_<a>_<b>` (the functions), with `zip_<a>_<b>`, that the decoder
+  assembles exactly these functions from them (`entryFunc`);
+* `noData_<a>_<b>`: no body uses a data index (`memory.init`,
+  `data.drop`), which the decoder checks when there is no data count
+  section.
+
+The theorems about a range are checked in their own declarations, so that
+the kernel's work on one range does not accumulate with the next.
 
 Nothing here is trusted: each theorem is proved by `Eq.refl` and the kernel
 checks it by running the decoder on `src`. `src` must be the byte source of
@@ -193,6 +214,21 @@ open Command in
     elabCommand (← `($(docOf s!"Code entries {first} to {last - 1} decode one after another."):docComment
       theorem $name : Wasm.Binary.Parser.Reads Wasm.Binary.Parser.code
         { ($src).input with limit := $stopAll } $list $pos $stop := $proof))
+    let range := s!"{first}_{last}"
+    let types := mkIdent (Name.mkSimple s!"funcTypes_{range}")
+    let fs := mkIdent (Name.mkSimple s!"funcs_{range}")
+    let typeLits := ((List.range' first (last - first)).map fun k =>
+      Syntax.mkNumLit (toString m.funcs[k]!.type)).toArray
+    elabCommand (← `($(docOf s!"The types of functions {imported + first} to {imported + last - 1}."):docComment
+      def $types : List Nat := [$typeLits,*]))
+    elabCommand (← `($(docOf s!"Functions {imported + first} to {imported + last - 1}."):docComment
+      noncomputable def $fs : List Wasm.Func := [$(fIds.toArray),*]))
+    elabCommand (← `($(docOf s!"The decoder assembles functions {imported + first} to {imported + last - 1} from their types and entries."):docComment
+      theorem $(mkIdent (Name.mkSimple s!"zip_{range}")) :
+        List.zipWith Wasm.Binary.Parser.entryFunc $types $list = $fs := by kernel_rfl))
+    elabCommand (← `($(docOf s!"No body among code entries {first} to {last - 1} uses a data index."):docComment
+      theorem $(mkIdent (Name.mkSimple s!"noData_{range}")) :
+        (List.any $list fun e => Wasm.Binary.Parser.anyUsesDataIndex e.2.2) = false := by kernel_rfl))
 
 /-! ## The other sections
 
@@ -226,15 +262,5 @@ open Command in
   add "globals" (toTypeExpr (Array Global)) (toExpr m.globals) "The global section, as decoded."
   add "exports" (toTypeExpr (Array Export)) (toExpr m.exports) "The export section, as decoded."
   add "elems" (toTypeExpr (Array Elem)) (toExpr m.elems) "The element section, as decoded."
-
-/-- `kernel_rfl` closes an equation by `Eq.refl`, checked by the kernel
-alone: the elaborator does not try to evaluate either side first. -/
-elab "kernel_rfl" : tactic => Tactic.withMainContext do
-  let goal ← Tactic.getMainGoal
-  let tgt ← instantiateMVars (← goal.getType)
-  let some (ty, lhs, _) := tgt.eq? | throwError "kernel_rfl: the goal is not an equation"
-  let pf := mkApp2 (mkConst ``Eq.refl [← getLevel ty]) ty lhs
-  let name ← withOptions (Elab.async.set · false) do mkAuxLemma [] tgt pf
-  goal.assign (mkConst name [])
 
 end Wasm.Embed

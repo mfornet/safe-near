@@ -1,6 +1,7 @@
 import Wasm.Syntax
 import Wasm.Binary
 import Wasm.ByteSource
+import Wasm.BinaryReads
 import Wasm.Validate
 import Wasm.Value
 import Wasm.Numeric

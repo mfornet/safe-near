@@ -91,4 +91,15 @@ theorem oneSection_code {s : Sections} {input : Input} {pos q size : Nat}
   change (if q + size = q + size then Except.ok (_, q + size) else _) = _
   simp
 
+/-- The module, from the result of the section loop. -/
+theorem body_eq {input : Input} {pos pos' : Nat} {s : Sections}
+    (hs : sections (input.limit - pos) {} input pos = .ok (s, pos'))
+    (hsize : s.funcTypes.size = s.codes.size) (hcount : s.dataCount = none)
+    (hdata : (s.codes.any fun e => anyUsesDataIndex e.2.2) = false) :
+    body input pos = .ok ({ s.module with funcs := s.funcTypes.zipWith entryFunc s.codes }, pos') := by
+  unfold body
+  rw [bind_ok (p := fun input pos => sections (input.limit - pos) {} input pos) hs]
+  simp only [hsize, bne_self_eq_false, Bool.false_eq_true, ↓reduceIte, hcount, hdata]
+  rfl
+
 end Wasm.Binary.Parser

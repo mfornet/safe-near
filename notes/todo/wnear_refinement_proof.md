@@ -230,6 +230,30 @@ whose structure does not split cleanly by section; data segment size.
 *Exit:* `hstart` and `hexports` are proved; one function's body is a
 kernel-checked literal.
 
+*Status.* Decoding is done: `Binary.decode_wNearBytes` proves in the kernel
+what `contract.wasm` decodes to, and `hstart` and `hexports` are gone from
+`refines_wnear`. Names and the call graph are still to do. What we learnt:
+
+- Kernel decoding from a `ByteArray` is quadratic: each byte read walks a
+  list from the start. The decoder now reads through a function
+  (`Input.read`), and proofs supply a `Wasm.ByteSource`, chunks at the
+  leaves of a tree. A 4.7 KB entry went from failing at 62 GB to 15 s.
+- The kernel's cache grows with all the work one declaration does and is
+  freed between declarations. Every heavy check is split into per-range
+  declarations (22 part files), and the pieces are combined by lemmas
+  (`Parser.Reads`, `count_of_reads`, `body_eq`, `List.zipWith_append`).
+  One declaration for the whole module took 20 GB; the split takes at
+  most 5 GB per file.
+- Equations between large terms must match syntactically. Letting the
+  elaborator unfold a 907-element list to compare it took minutes; each
+  list is now defined in the shape its proof produces.
+- **Trust.** `wNearBytes` is the content of `contract.wasm` because the
+  elaborator `byte_source%` read it from the file, as `file_hex%` did
+  before; the kernel cannot check a 185 KB literal against a hex string
+  (deep recursion). The adapter tests check the embedded bytes against the
+  file. This is the one link from the statement to the file, and it is the
+  same kind of link as before.
+
 ### M1. The internal-function harness
 
 Section 5.1, with checkers for a handful of library functions (`memcpy`, an

@@ -1,5 +1,6 @@
 import Spec.Contract
 import Spec.Exports
+import Binary.Bytes
 import NearRuntime.Boundary
 
 /-!
@@ -162,10 +163,9 @@ def main : IO Unit := do
   let module ← match Wasm.Binary.decode contractBytes with
     | .ok m => pure m
     | .error error => throw (IO.userError error.message)
-  -- The facts `refines_wnear` takes about the decoded module.
-  check "the binary has no start function" module.start.isNone
-  check "the binary exports exactly the decoded methods as functions"
-    (funcExportNames module == exportedMethods)
+  -- `refines_wnear` is about `Binary.wNearBytes`, which `Binary/Bytes.lean` reads from the
+  -- file when it is elaborated: check that it holds the file's bytes.
+  check "the embedded binary is contract.wasm" (WNear.Binary.wNearBytes == contractBytes)
   let code : Near.Boundary.Code :=
     { code := { module, size := contractBytes.size, hash := "" }, codeOf := fun _ => default }
   let cmp := fun name snap c => compare name cfg protocol code snap c

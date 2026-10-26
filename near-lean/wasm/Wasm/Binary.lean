@@ -619,11 +619,19 @@ def anyUsesDataIndex : List Instr → Bool
   | i :: rest => usesDataIndex i || anyUsesDataIndex rest
 end
 
-def module : Parser Module := do
+/-- The magic number and the version. -/
+def header : Parser Unit := do
   let magic ← bytes 4
   if magic.toList != [0x00, 0x61, 0x73, 0x6D] then fail "magic header not detected"
   let version ← bytes 4
   if version.toList != [0x01, 0x00, 0x00, 0x00] then fail "unknown binary version"
+
+/-- A function from its type index (function section) and its code entry. -/
+def entryFunc (type : Nat) : Nat × List ValType × Expr → Func
+  | (bodySize, locals, body) => { type, locals, body, bodySize }
+
+/-- The sections after the header, assembled into a module. -/
+def body : Parser Module := do
   let s ← fun input pos => sections (input.limit - pos) {} input pos
   if s.funcTypes.size != s.codes.size then
     fail "function and code section have inconsistent lengths"
@@ -631,10 +639,12 @@ def module : Parser Module := do
     if n != s.module.datas.size then
       fail "data count and data section have inconsistent lengths"
   else
-    if s.codes.any (fun (_, _, body) => anyUsesDataIndex body) then fail "data count section required"
-  let funcs := s.funcTypes.zipWith (fun type (bodySize, locals, body) => { type, locals, body, bodySize : Func })
-    s.codes
-  return { s.module with funcs }
+    if s.codes.any (fun e => anyUsesDataIndex e.2.2) then fail "data count section required"
+  return { s.module with funcs := s.funcTypes.zipWith entryFunc s.codes }
+
+def module : Parser Module := do
+  header
+  body
 
 end Parser
 
