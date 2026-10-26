@@ -1,0 +1,14 @@
+{
+  "code": "tools/runtime-conformance/fixtures/prepare_import_other_module.wasm",
+  "sha256": "d7b7faf8cc2d514010e48e13f1522560707d3b1e7421a9518a190f8fa631ac18",
+  "protocolVersion": 86,
+  "initialBalance": "100000000000000000000000000",
+  "storage": [],
+  "calls": [
+    {
+      "name": "prepare: import_other_module",
+      "method": "f",
+      "args": {}
+    }
+  ]
+}

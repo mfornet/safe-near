@@ -113,55 +113,43 @@ def HostPreservesEncoding (name : String) (fn : NearHostFn NearState) : Prop :=
     (∀ index action, batchActionInput? name st args = some (index, action) → ActionMethodsUtf8 action) →
     HostResult.LiveSatisfies (fun ns => PromisesEncoding ns.promises) (fn.invoke st args)
 
+/-- Close each branch of a batch action host: the appended action encodes its input. -/
+local macro "action_input_encoding_tac" h:ident hnew:ident : tactic => `(tactic| (
+    dsimp only [disallowInView, checkAccountId, checkPublicKey]
+    repeat (first
+      | trivial
+      | (apply appendPromiseActionResult_encoding _ _ _ _ $h; apply $hnew; simp_all [batchActionInput?])
+      | split)))
+
 theorem promiseBatchActionCreateAccountFn_encoding :
     HostPreservesEncoding "promise_batch_action_create_account" promiseBatchActionCreateAccountFn := by
   intro st args h hnew
   unfold promiseBatchActionCreateAccountFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey]
-  repeat (first
-    | trivial
-    | (apply appendPromiseActionResult_encoding _ _ _ _ h; apply hnew; simp_all [batchActionInput?])
-    | split)
+  action_input_encoding_tac h hnew
 
 theorem promiseBatchActionDeployContractFn_encoding :
     HostPreservesEncoding "promise_batch_action_deploy_contract" promiseBatchActionDeployContractFn := by
   intro st args h hnew
   unfold promiseBatchActionDeployContractFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey]
-  repeat (first
-    | trivial
-    | (apply appendPromiseActionResult_encoding _ _ _ _ h; apply hnew; simp_all [batchActionInput?])
-    | split)
+  action_input_encoding_tac h hnew
 
 theorem promiseBatchActionFunctionCallFn_encoding :
     HostPreservesEncoding "promise_batch_action_function_call" promiseBatchActionFunctionCallFn := by
   intro st args h hnew
   unfold promiseBatchActionFunctionCallFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey]
-  repeat (first
-    | trivial
-    | (apply appendPromiseActionResult_encoding _ _ _ _ h; apply hnew; simp_all [batchActionInput?])
-    | split)
+  action_input_encoding_tac h hnew
 
 theorem promiseBatchActionFunctionCallWeightFn_encoding :
     HostPreservesEncoding "promise_batch_action_function_call" promiseBatchActionFunctionCallWeightFn := by
   intro st args h hnew
   unfold promiseBatchActionFunctionCallWeightFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey]
-  repeat (first
-    | trivial
-    | (apply appendPromiseActionResult_encoding _ _ _ _ h; apply hnew; simp_all [batchActionInput?])
-    | split)
+  action_input_encoding_tac h hnew
 
 theorem promiseBatchActionTransferFn_encoding :
     HostPreservesEncoding "promise_batch_action_transfer" promiseBatchActionTransferFn := by
   intro st args h hnew
   unfold promiseBatchActionTransferFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey]
-  repeat (first
-    | trivial
-    | (apply appendPromiseActionResult_encoding _ _ _ _ h; apply hnew; simp_all [batchActionInput?])
-    | split)
+  action_input_encoding_tac h hnew
 
 theorem promiseBatchActionTransferToGasKeyFn_encoding :
     HostPreservesEncoding "promise_batch_action_transfer_to_gas_key" promiseBatchActionTransferToGasKeyFn := by
@@ -177,21 +165,13 @@ theorem promiseBatchActionStakeFn_encoding :
     HostPreservesEncoding "promise_batch_action_stake" promiseBatchActionStakeFn := by
   intro st args h hnew
   unfold promiseBatchActionStakeFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey]
-  repeat (first
-    | trivial
-    | (apply appendPromiseActionResult_encoding _ _ _ _ h; apply hnew; simp_all [batchActionInput?])
-    | split)
+  action_input_encoding_tac h hnew
 
 theorem promiseBatchActionAddKeyWithFullAccessFn_encoding :
     HostPreservesEncoding "promise_batch_action_add_key_with_full_access" promiseBatchActionAddKeyWithFullAccessFn := by
   intro st args h hnew
   unfold promiseBatchActionAddKeyWithFullAccessFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey]
-  repeat (first
-    | trivial
-    | (apply appendPromiseActionResult_encoding _ _ _ _ h; apply hnew; simp_all [batchActionInput?])
-    | split)
+  action_input_encoding_tac h hnew
 
 theorem promiseBatchActionAddGasKeyWithFullAccessFn_encoding :
     HostPreservesEncoding "promise_batch_action_add_gas_key_with_full_access" promiseBatchActionAddGasKeyWithFullAccessFn := by
@@ -207,11 +187,7 @@ theorem promiseBatchActionAddKeyWithFunctionCallFn_encoding :
     HostPreservesEncoding "promise_batch_action_add_key_with_function_call" promiseBatchActionAddKeyWithFunctionCallFn := by
   intro st args h hnew
   unfold promiseBatchActionAddKeyWithFunctionCallFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey]
-  repeat (first
-    | trivial
-    | (apply appendPromiseActionResult_encoding _ _ _ _ h; apply hnew; simp_all [batchActionInput?])
-    | split)
+  action_input_encoding_tac h hnew
 
 theorem promiseBatchActionAddGasKeyWithFunctionCallFn_encoding :
     HostPreservesEncoding "promise_batch_action_add_gas_key_with_function_call" promiseBatchActionAddGasKeyWithFunctionCallFn := by
@@ -227,31 +203,19 @@ theorem promiseBatchActionDeleteKeyFn_encoding :
     HostPreservesEncoding "promise_batch_action_delete_key" promiseBatchActionDeleteKeyFn := by
   intro st args h hnew
   unfold promiseBatchActionDeleteKeyFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey]
-  repeat (first
-    | trivial
-    | (apply appendPromiseActionResult_encoding _ _ _ _ h; apply hnew; simp_all [batchActionInput?])
-    | split)
+  action_input_encoding_tac h hnew
 
 theorem promiseBatchActionDeleteAccountFn_encoding :
     HostPreservesEncoding "promise_batch_action_delete_account" promiseBatchActionDeleteAccountFn := by
   intro st args h hnew
   unfold promiseBatchActionDeleteAccountFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey]
-  repeat (first
-    | trivial
-    | (apply appendPromiseActionResult_encoding _ _ _ _ h; apply hnew; simp_all [batchActionInput?])
-    | split)
+  action_input_encoding_tac h hnew
 
 theorem promiseBatchActionUseGlobalContractFn_encoding :
     HostPreservesEncoding "promise_batch_action_use_global_contract" promiseBatchActionUseGlobalContractFn := by
   intro st args h hnew
   unfold promiseBatchActionUseGlobalContractFn useGlobalContractFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey]
-  repeat (first
-    | trivial
-    | (apply appendPromiseActionResult_encoding _ _ _ _ h; apply hnew; simp_all [batchActionInput?])
-    | split)
+  action_input_encoding_tac h hnew
 
 theorem promiseBatchActionDeployGlobalContractFn_encoding :
     HostPreservesEncoding "promise_batch_action_deploy_global_contract" promiseBatchActionDeployGlobalContractFn := by
@@ -267,11 +231,15 @@ theorem promiseBatchActionUseGlobalContractByAccountIdFn_encoding :
     HostPreservesEncoding "promise_batch_action_use_global_contract_by_account_id" promiseBatchActionUseGlobalContractByAccountIdFn := by
   intro st args h hnew
   unfold promiseBatchActionUseGlobalContractByAccountIdFn useGlobalContractFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey]
-  repeat (first
-    | trivial
-    | (apply appendPromiseActionResult_encoding _ _ _ _ h; apply hnew; simp_all [batchActionInput?])
-    | split)
+  action_input_encoding_tac h hnew
+
+/-- Close each branch of a batch action host: the appended action encodes. -/
+local macro "action_encoding_tac" h:ident : tactic => `(tactic| (
+    dsimp only [disallowInView, checkAccountId, checkPublicKey]
+    repeat (first
+      | trivial
+      | (apply appendPromiseActionResult_encoding _ _ _ _ $h; trivial)
+      | split)))
 
 theorem promiseBatchActionDeployGlobalContractByAccountIdFn_encoding :
     HostPreservesEncoding "promise_batch_action_deploy_global_contract_by_account_id" promiseBatchActionDeployGlobalContractByAccountIdFn := by
@@ -289,11 +257,7 @@ theorem promiseBatchActionCreateAccountFn_preserves_encoding (st : HostStore Nea
     HostResult.LiveSatisfies (fun ns => PromisesEncoding ns.promises)
       (promiseBatchActionCreateAccountFn.invoke st args) := by
   unfold promiseBatchActionCreateAccountFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey]
-  repeat (first
-    | trivial
-    | (apply appendPromiseActionResult_encoding _ _ _ _ h; trivial)
-    | split)
+  action_encoding_tac h
 
 /-- This action introduces no method-decoding obligation. -/
 theorem promiseBatchActionDeployContractFn_preserves_encoding (st : HostStore NearState) (args : List Value)
@@ -301,11 +265,7 @@ theorem promiseBatchActionDeployContractFn_preserves_encoding (st : HostStore Ne
     HostResult.LiveSatisfies (fun ns => PromisesEncoding ns.promises)
       (promiseBatchActionDeployContractFn.invoke st args) := by
   unfold promiseBatchActionDeployContractFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey]
-  repeat (first
-    | trivial
-    | (apply appendPromiseActionResult_encoding _ _ _ _ h; trivial)
-    | split)
+  action_encoding_tac h
 
 /-- This action introduces no method-decoding obligation. -/
 theorem promiseBatchActionTransferFn_preserves_encoding (st : HostStore NearState) (args : List Value)
@@ -313,11 +273,7 @@ theorem promiseBatchActionTransferFn_preserves_encoding (st : HostStore NearStat
     HostResult.LiveSatisfies (fun ns => PromisesEncoding ns.promises)
       (promiseBatchActionTransferFn.invoke st args) := by
   unfold promiseBatchActionTransferFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey]
-  repeat (first
-    | trivial
-    | (apply appendPromiseActionResult_encoding _ _ _ _ h; trivial)
-    | split)
+  action_encoding_tac h
 
 /-- This action introduces no method-decoding obligation. -/
 theorem promiseBatchActionTransferToGasKeyFn_preserves_encoding (st : HostStore NearState) (args : List Value)
@@ -337,11 +293,7 @@ theorem promiseBatchActionStakeFn_preserves_encoding (st : HostStore NearState) 
     HostResult.LiveSatisfies (fun ns => PromisesEncoding ns.promises)
       (promiseBatchActionStakeFn.invoke st args) := by
   unfold promiseBatchActionStakeFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey]
-  repeat (first
-    | trivial
-    | (apply appendPromiseActionResult_encoding _ _ _ _ h; trivial)
-    | split)
+  action_encoding_tac h
 
 /-- This action introduces no method-decoding obligation. -/
 theorem promiseBatchActionAddKeyWithFullAccessFn_preserves_encoding (st : HostStore NearState) (args : List Value)
@@ -349,11 +301,7 @@ theorem promiseBatchActionAddKeyWithFullAccessFn_preserves_encoding (st : HostSt
     HostResult.LiveSatisfies (fun ns => PromisesEncoding ns.promises)
       (promiseBatchActionAddKeyWithFullAccessFn.invoke st args) := by
   unfold promiseBatchActionAddKeyWithFullAccessFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey]
-  repeat (first
-    | trivial
-    | (apply appendPromiseActionResult_encoding _ _ _ _ h; trivial)
-    | split)
+  action_encoding_tac h
 
 /-- This action introduces no method-decoding obligation. -/
 theorem promiseBatchActionAddGasKeyWithFullAccessFn_preserves_encoding (st : HostStore NearState) (args : List Value)
@@ -373,11 +321,7 @@ theorem promiseBatchActionDeleteKeyFn_preserves_encoding (st : HostStore NearSta
     HostResult.LiveSatisfies (fun ns => PromisesEncoding ns.promises)
       (promiseBatchActionDeleteKeyFn.invoke st args) := by
   unfold promiseBatchActionDeleteKeyFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey]
-  repeat (first
-    | trivial
-    | (apply appendPromiseActionResult_encoding _ _ _ _ h; trivial)
-    | split)
+  action_encoding_tac h
 
 /-- This action introduces no method-decoding obligation. -/
 theorem promiseBatchActionDeleteAccountFn_preserves_encoding (st : HostStore NearState) (args : List Value)
@@ -385,11 +329,7 @@ theorem promiseBatchActionDeleteAccountFn_preserves_encoding (st : HostStore Nea
     HostResult.LiveSatisfies (fun ns => PromisesEncoding ns.promises)
       (promiseBatchActionDeleteAccountFn.invoke st args) := by
   unfold promiseBatchActionDeleteAccountFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey]
-  repeat (first
-    | trivial
-    | (apply appendPromiseActionResult_encoding _ _ _ _ h; trivial)
-    | split)
+  action_encoding_tac h
 
 /-- This action introduces no method-decoding obligation. -/
 theorem promiseBatchActionUseGlobalContractFn_preserves_encoding (st : HostStore NearState) (args : List Value)
@@ -397,11 +337,7 @@ theorem promiseBatchActionUseGlobalContractFn_preserves_encoding (st : HostStore
     HostResult.LiveSatisfies (fun ns => PromisesEncoding ns.promises)
       (promiseBatchActionUseGlobalContractFn.invoke st args) := by
   unfold promiseBatchActionUseGlobalContractFn useGlobalContractFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey]
-  repeat (first
-    | trivial
-    | (apply appendPromiseActionResult_encoding _ _ _ _ h; trivial)
-    | split)
+  action_encoding_tac h
 
 /-- This action introduces no method-decoding obligation. -/
 theorem promiseBatchActionDeployGlobalContractFn_preserves_encoding (st : HostStore NearState) (args : List Value)
@@ -421,11 +357,7 @@ theorem promiseBatchActionUseGlobalContractByAccountIdFn_preserves_encoding (st 
     HostResult.LiveSatisfies (fun ns => PromisesEncoding ns.promises)
       (promiseBatchActionUseGlobalContractByAccountIdFn.invoke st args) := by
   unfold promiseBatchActionUseGlobalContractByAccountIdFn useGlobalContractFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey]
-  repeat (first
-    | trivial
-    | (apply appendPromiseActionResult_encoding _ _ _ _ h; trivial)
-    | split)
+  action_encoding_tac h
 
 
 

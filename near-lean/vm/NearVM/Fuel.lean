@@ -374,7 +374,7 @@ theorem runAttempt_fuel_independent (cfg : RuntimeConfig) (code : Module) (codeS
   unfold runAttempt
   dsimp only
   repeat' (first | rfl | split)
-  rename_i _ _ hload _ valid hvalid _ _ entry _ _ sig _ _ _ env hresolve _ store inst hinst _ c hstart
+  rename_i _ _ hload _ valid hvalid _ _ entry _ _ sig _ _ _ _ env hresolve _ store inst hinst _ c hstart
   set host1 := (applyCharges (VMContext.toNearState cfg ctx storage) (loadingCharges codeSize)).1
   have halloc : env.allocate (Store.empty host1) =
       ((env.allocate (Store.empty host1)).1, (env.allocate (Store.empty host1)).2) := rfl

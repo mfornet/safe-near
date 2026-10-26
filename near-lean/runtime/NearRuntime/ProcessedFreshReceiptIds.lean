@@ -1,4 +1,5 @@
 import NearRuntime.FreshReceiptIds
+import NearRuntime.FinalizeStages
 
 namespace Near
 open Wasm.Near
@@ -83,56 +84,22 @@ the final list; success retains the collision-free speculative output interval. 
 theorem finalizeReceipt_freshIds (c : ReceiptCtx) (st : ChainState) (raw : Exec) (failed : Option RuntimeError)
     (hraw : raw.FreshReceiptIds st.nextId) (hmono : st.nextId ≤ raw.state.nextId) :
     (finalizeReceipt c st raw failed).FreshReceiptIds st.nextId := by
-  let base := rollbackReceipt st raw failed
-  let settlement := Fees.settleGas c.cfg c.action.gasPrice c.ap.gasPrice
-    (Fees.receiptGasBudget c.cfg c.receipt.receiverId c.action.actions) base.gasUsed base.gasBurnt
-    ((st.account? c.receipt.receiverId).isNone && (base.state.account? c.receipt.receiverId).isSome && failed.isNone)
-  let charged := { base with
-    tokensBurnt := (if c.receipt.isRefund then 0 else settlement.tokensBurnt) + base.actionTokensBurnt
-    otherTokensBurnt := if c.receipt.isRefund && failed.isSome then Fees.totalDeposit c.action.actions else 0 }
-  let depositRefund := if failed.isSome then Fees.totalDeposit c.action.actions else 0
-  let gasRefund := if c.receipt.isRefund then 0 else settlement.refund
-  let balance := if depositRefund > 0 && c.receipt.predecessorId != systemAccount then
-    charged.addBalanceRefund c.receipt.predecessorId depositRefund else charged
-  let gas := if gasRefund > 0 && c.action.signerId != systemAccount then
-    balance.addGasRefund c.action.signerId c.action.signerPublicKey gasRefund else balance
-  let rewarded := gas.creditReceiptReward c.cfg c.receipt.receiverId settlement.burnPrice c.action.gasPrice
-  let finished := rewarded.finishReceiptResult c failed
-  have hbase : base.FreshReceiptIds st.nextId := by
-    cases failed with
-    | none => exact hraw
-    | some error => exact ReceiptList.FreshIds.empty _ _
-  have hnbase : st.nextId ≤ base.state.nextId := by
-    cases failed <;> first | exact hmono | exact Nat.le_refl _
-  have hcharged : charged.FreshReceiptIds st.nextId := hbase
-  have hbalance : balance.FreshReceiptIds st.nextId := by
-    dsimp only [balance]
-    split
-    · exact Exec.addBalanceRefund_freshIds charged _ _ _ hcharged hnbase
-    · exact hcharged
-  have hnbalance : st.nextId ≤ balance.state.nextId := by
-    dsimp only [balance]
-    split
-    · exact hnbase.trans (Exec.addBalanceRefund_nextId_mono charged _ _)
-    · exact hnbase
-  have hgas : gas.FreshReceiptIds st.nextId := by
-    dsimp only [gas]
-    split
-    · exact Exec.addGasRefund_freshIds balance _ _ _ _ hbalance hnbalance
-    · exact hbalance
-  have hngas : st.nextId ≤ gas.state.nextId := by
-    dsimp only [gas]
-    split
-    · exact hnbalance.trans (Exec.addGasRefund_nextId_mono balance _ _ _)
-    · exact hnbalance
-  have hrewarded : rewarded.FreshReceiptIds st.nextId :=
-    Exec.creditReceiptReward_freshIds gas _ _ _ _ _ hgas
-  have hnrewarded : st.nextId ≤ rewarded.state.nextId := by
-    rw [Exec.creditReceiptReward_nextId]
-    exact hngas
-  have hfinished : finished.FreshReceiptIds st.nextId := by
-    exact Exec.finishReceiptResult_freshIds rewarded c failed _ hrewarded hnrewarded
-  exact hfinished
+  -- Each stage allocates above the counter, which never moves back.
+  refine (finalizeReceipt_stages (fun e => e.FreshReceiptIds st.nextId ∧ st.nextId ≤ e.state.nextId)
+    c st raw failed ?_
+    (fun _ _ _ h => h)
+    (fun e _ _ h => ⟨Exec.addBalanceRefund_freshIds e _ _ _ h.1 h.2,
+      h.2.trans (Exec.addBalanceRefund_nextId_mono e _ _)⟩)
+    (fun e _ _ _ h => ⟨Exec.addGasRefund_freshIds e _ _ _ _ h.1 h.2,
+      h.2.trans (Exec.addGasRefund_nextId_mono e _ _ _)⟩)
+    (fun e _ _ h => ⟨Exec.creditReceiptReward_freshIds e _ _ _ _ _ h.1,
+      by rw [Exec.creditReceiptReward_nextId]; exact h.2⟩)
+    (fun e h => ⟨Exec.finishReceiptResult_freshIds e c failed _ h.1 h.2,
+      h.2.trans (Exec.finishReceiptResult_nextId_mono e c failed)⟩)
+    (fun _ _ _ h => h)).1
+  cases failed with
+  | none => exact ⟨hraw, hmono⟩
+  | some error => exact ⟨ReceiptList.FreshIds.empty _ _, Nat.le_refl _⟩
 
 theorem applyActionReceipt_freshIds (c : ReceiptCtx) (st : ChainState) :
     (applyActionReceipt c st).FreshReceiptIds st.nextId :=

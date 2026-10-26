@@ -1,4 +1,5 @@
 import NearNode.Chain.ApplyChunk
+import NearNode.Chain.StateChanges
 import NearNode.Chain.Profile
 import NearNode.Epoch
 import NearNode.Trie
@@ -88,6 +89,8 @@ structure ShardReport where
   /-- Whether the conversion of the pre-state encoded back to the trie's entries. -/
   roundTrip : Bool
   outcomes : Array ExecutionOutcomeWithId := #[]
+  /-- The yielded receipts the chunk stored, as Borsh receipts. -/
+  yielded : Array ByteArray := #[]
 
 /-! ### Chunk header fields -/
 
@@ -132,19 +135,23 @@ def trieEntries (src : NodeSource) (root : CryptoHash) :
       | some v => pure (k, v)
       | none => throw "trie value missing"
 
-/-- The new root and changes that turn the entries `old` of the trie at `root` into `new`. -/
-def updateTrie (src : NodeSource) (root : CryptoHash) (old new : Array (ByteArray × ByteArray)) :
-    Except String TrieChanges := do
-  let oldMap : Std.HashMap ByteArray ByteArray := old.foldl (fun m (k, v) => m.insert k v) {}
-  let newMap : Std.HashMap ByteArray ByteArray := new.foldl (fun m (k, v) => m.insert k v) {}
-  let mut changes : Array Change := #[]
-  for (k, v) in new do
-    if oldMap[k]? != some v then
-      changes := changes.push (k, some v)
-  for (k, _) in old do
-    if !newMap.contains k then
-      changes := changes.push (k, none)
-  pure (← update src root changes).changes
+/-- The entries of a shard by key. -/
+def entryMap (es : Array (ByteArray × ByteArray)) : Std.HashMap ByteArray ByteArray :=
+  es.foldl (fun m (k, v) => m.insert k v) {}
+
+/-- The entries that differ between the entries `old` and `new` of a shard (`oldMap` and `newMap` are the same by key): the new
+value, or `none` for an entry that is gone. -/
+def diffEntries (old new : Array (ByteArray × ByteArray))
+    (oldMap newMap : Std.HashMap ByteArray ByteArray) : Array Change :=
+  Id.run do
+    let mut changes : Array Change := #[]
+    for (k, v) in new do
+      if oldMap[k]? != some v then
+        changes := changes.push (k, some v)
+    for (k, _) in old do
+      if !newMap.contains k then
+        changes := changes.push (k, none)
+    return changes
 
 /-! ### Receipts -/
 
@@ -397,15 +404,22 @@ def applyBlock (prof : Option Prof) (p : Params) (st : Near.Node.Chain.ChainStat
                   reencoded.all fun (k, v) => originalMap[k]? == some v)
       else
         pure true
-    let (newEntries, extra, outgoing, outcomes) ←
+    let (newEntries, extra, outgoing, outcomes, yielded, changeLog) ←
       if isNew then
         do
-          let overlay ←
-            if ctx.update.isNone then
-              some <$> timed prof "trie-witness" fun _ => overlayOf src root entries
-            else
-              pure none
-          let result ← runChunk prof p.cfg p.congestion ctx prepared overlay
+          let mut overlay : Option Near.TrieOverlay.State := none
+          if ctx.update.isNone then
+            let (o, cache) ← timed prof "trie-witness" fun _ => overlayOf src root entries pr.cache
+            pr := { pr with cache }
+            overlay := some o
+          let result ← runChunk prof p.cfg p.congestion ctx prepared overlay pr.cache
+          -- the next chunks meet the code this one's contracts deployed from their memory in the state
+          pr :=
+            { pr with
+              cache :=
+                { pr.cache with
+                  byLabel :=
+                    result.learned.foldl (fun m e => m.insert e.code.hash e) pr.cache.byLabel } }
           let (outcomeRoot, _) := merklizeHashes (result.outcomes.map (·.leafHash))
           pure
               (result.entries,
@@ -414,14 +428,32 @@ def applyBlock (prof : Option Prof) (p : Params) (st : Near.Node.Chain.ChainStat
                     gasUsed := result.gasBurnt.toUInt64, gasLimit := chunk.gasLimit,
                     balanceBurnt := ⟨result.balanceBurnt⟩, congestionInfo := result.congestion,
                     bandwidthRequests := result.requests, proposedSplit := none }),
-                result.outgoing, result.outcomes)
+                result.outgoing, result.outcomes, result.yielded, result.changes)
       else
         do
-          let entries ←
+          let (entries, changeLog) ←
             timed prof "run/old-chunk" fun _ => runOldChunk p.cfg p.congestion ctx prepared
           let some (.v5 old) := prevExtra? | throw "no chunk extra before an old chunk"
-          pure (entries, ChunkExtra.v5 old, #[], #[])
-    let changes ← timed prof "trie-update" fun _ => updateTrie src root entries newEntries
+          pure (entries, ChunkExtra.v5 old, #[], #[], #[], changeLog)
+    let oldMap := entryMap entries
+    let newMap := entryMap newEntries
+    let diff := diffEntries entries newEntries oldMap newMap
+    let changes ←
+      timed prof "trie-update" fun _ => do
+          pure (← Near.Node.Trie.update src root diff).changes
+    -- the chunk's commits as `RawStateChangesWithTrieKey`; an entry that differs and the log did not list is a fault of the log
+    let missed := missedKeys diff changeLog
+    if !missed.isEmpty then
+      let describe (k : ByteArray) : String :=
+        match TrieKey.parse? k with
+        | some (.account a) => s!"account {a.val}"
+        | some (.contractCode a) => s!"code {a.val}"
+        | some (.accessKey a _) => s!"access key {a.val}"
+        | some (.contractData a d) => s!"data {a.val} {hex d}"
+        | some _ => "other"
+        | none => "unparsed"
+      IO.eprintln
+        s!"warning: the state change log of shard {shard} at {v.height} missed {missed.size} changed key(s): {(missed.toList.take 6).map describe}"
     let extra : ChunkExtra :=
       match extra with
       | .v5 e => .v5 { e with stateRoot := changes.newRoot }
@@ -429,7 +461,10 @@ def applyBlock (prof : Option Prof) (p : Params) (st : Near.Node.Chain.ChainStat
     let shardOps : Array Store.Op :=
       Store.trieInsertOps (shardKey layout shard) changes ++
         #[.set .chunkExtra (blockShardKey hash layout shard) (Codec.encode extra),
-          .set .outgoingReceipts (blockShardKey hash layout shard) (Codec.encode outgoing)]
+          .set .outgoingReceipts (blockShardKey hash layout shard) (Codec.encode outgoing),
+          .set .trieChanges (blockShardKey hash layout shard) (Store.changesBytes changes)] ++
+        (if changeLog.isEmpty then #[]
+        else #[.set .stateChanges (blockShardKey hash layout shard) (Near.Node.Chain.stateChangesBytes changeLog)])
     ops := ops ++ shardOps
     pr :=
       { pr with
@@ -439,8 +474,8 @@ def applyBlock (prof : Option Prof) (p : Params) (st : Near.Node.Chain.ChainStat
         extras := pr.extras.insert (hash.bytes, shard) extra }
     reports :=
       reports.push
-        { shard, extra, incoming := if isNew then delivered else #[], outgoing, roundTrip,
-          outcomes }
+        { shard, extra, incoming := if isNew then delivered else #[], outgoing, roundTrip, outcomes,
+          yielded }
   -- what the block delivers to each shard stays until the shard has a chunk again
   for i in [0:layout.numShards.toNat] do
     let some shard := layout.getShardId i | throw "shard index out of range"

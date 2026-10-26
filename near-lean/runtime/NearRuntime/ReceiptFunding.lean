@@ -50,7 +50,9 @@ theorem finalizeReceipt_success_funds (c : ReceiptCtx) (st : ChainState) (raw : 
   let rewarded := gas.creditReceiptReward c.cfg c.receipt.receiverId settlement.burnPrice c.action.gasPrice
   let finished := rewarded.finishReceiptResult c none
   have hf : finalizeReceipt c st raw none =
-      { finished with result := some (finished.result.getD (.successValue [])) } := by
+      { finished with
+        result := some (finished.result.getD (.successValue []))
+        computeUsage := receiptComputeUsage c.cfg c.receipt finished } := by
     simp [finalizeReceipt, rollbackReceipt, hrefund, hsigner, base, gas, settlement, rewarded, finished, successSettlement]
   rw [hf]
   change finished.totalFunds c.cfg = raw.totalFunds c.cfg + (successSettlement c st raw).refund + finished.reward

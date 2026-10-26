@@ -25,6 +25,7 @@ class NodeIsolationTests(unittest.TestCase):
         self.package("near-lean/vm", [])
         self.package("near-lean/runtime", ["../vm"])
         self.package("near-lean/chain", ["../runtime"])
+        self.package("near-lean/fastvm", ["../vm", "../chain"])
         self.package("near-lean/crypto", [])
         self.package("near-lean/node", ["../chain", "../crypto"])
         self.write("near-lean/node/NearNode/Protocol.lean", PROTOCOL)
@@ -47,6 +48,11 @@ class NodeIsolationTests(unittest.TestCase):
         self.package("near-lean/vm", ["../chain"])
         errors = isolation.check(self.root)
         self.assertIn("contracts/c/verification: contract verification depends on near-lean/chain", errors)
+
+    def test_contract_reaching_fast_engine_fails(self):
+        self.package("near-lean/runtime", ["../vm", "../fastvm"])
+        errors = isolation.check(self.root)
+        self.assertIn("contracts/c/verification: contract verification depends on near-lean/fastvm", errors)
 
     def test_only_node_may_require_node(self):
         self.package("near-lean/tool", ["../node"])

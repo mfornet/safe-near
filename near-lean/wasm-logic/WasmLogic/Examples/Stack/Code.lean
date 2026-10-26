@@ -88,13 +88,13 @@ def stackTypes : Array FuncType :=
 def stackModule : Module :=
   { types := stackTypes,
     funcs := #[
-      { type := 0, locals := [i32t], body := new_stack },
-      { type := 1, locals := [], body := is_empty },
-      { type := 1, locals := [], body := is_full },
-      { type := 1, locals := [i32t], body := pop },
-      { type := 2, locals := [i32t], body := push },
-      { type := 2, locals := [i32t, i32t], body := stack_map },
-      { type := 1, locals := [], body := length_stack }],
+      { type := 0, locals := [i32t], body := new_stack, bodySize := 35 },
+      { type := 1, locals := [], body := is_empty, bodySize := 27 },
+      { type := 1, locals := [], body := is_full, bodySize := 39 },
+      { type := 1, locals := [i32t], body := pop, bodySize := 53 },
+      { type := 2, locals := [i32t], body := push, bodySize := 67 },
+      { type := 2, locals := [i32t, i32t], body := stack_map, bodySize := 67 },
+      { type := 1, locals := [], body := length_stack, bodySize := 30 }],
     tables := #[{ type := { elem := .funcref, limits := { min := 1, max := none } } }],
     mems := #[{ type := { limits := { min := 0, max := none } } }],
     exports := #[

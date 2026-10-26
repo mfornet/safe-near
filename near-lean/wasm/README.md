@@ -3,8 +3,9 @@
 A WebAssembly runtime in Lean 4, written from the
 [core specification](https://webassembly.github.io/spec/core/) and driven by
 the official spec testsuite. It replaced the AGPL-licensed Talos interpreter;
-the plan and the design are in
-[notes/todo/wasm_runtime_rewrite.md](../../notes/todo/wasm_runtime_rewrite.md).
+the design is in [notes/design/WASM_RUNTIME.md](../../notes/design/WASM_RUNTIME.md)
+and the rewrite plan, kept for the record, in
+[notes/history/wasm_runtime_rewrite.md](../../notes/history/wasm_runtime_rewrite.md).
 
 ## Clean-room rule
 

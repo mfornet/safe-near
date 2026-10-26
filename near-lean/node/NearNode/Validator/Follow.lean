@@ -1,4 +1,6 @@
 import NearNode.Validator.Endorse
+import NearNode.Validator.Prepare
+import NearNode.Validator.Persist
 
 /-!
 # Following the chain and producing chunks
@@ -11,7 +13,8 @@ witnesses.
 
 namespace Near.Node.Validator
 
-open Near.Node Near.Node.Chain Near.Node.Network Near.Node.Apply Near.Node.Borsh Near.Node.ReedSolomon
+open Near.Node Near.Node.Chain Near.Node.Network Near.Node.Apply Near.Node.Borsh
+  Near.Node.ReedSolomon
 
 private def lift {α : Type} (r : Result α) : Except String α :=
   r.mapError fun e => s!"{e.kind} {e.detail}"
@@ -44,20 +47,26 @@ def Env.distributeChunk (e : Env) (epoch : EpochId) (nextEpoch : EpochId) (p : P
     match partOwner s.st epoch ord with
     | .ok a =>
       match owners.findIdx? (·.1 == a) with
-      | some i => owners := owners.modify i fun (a, os) => (a, os.push ord.toUInt64)
-      | none => owners := owners.push (a, #[ord.toUInt64])
-    | .error err => e.log s!"part owner: {err.kind}"
+      | some i =>
+        owners := owners.modify i fun (a, os) => (a, os.push ord.toUInt64)
+      | none =>
+        owners := owners.push (a, #[ord.toUInt64])
+    | .error err =>
+      e.log s!"part owner: {err.kind}"
   match s.st.blockProducersOrdered nextEpoch with
   | .ok bps =>
     for v in bps do
       if !owners.any (·.1 == v.accountId) then
         owners := owners.push (v.accountId, #[])
-  | .error _ => pure ()
+  | .error _ =>
+    pure ()
   for (dest, ords) in owners do
     if dest != e.me then
       match partialEncodedChunk p.encoded ords proofs p.paths with
-      | .ok msg => e.toPeer (.versionedPartialEncodedChunk msg)
-      | .error err => e.log s!"partial chunk: {err}"
+      | .ok msg =>
+        e.toPeer (.versionedPartialEncodedChunk msg)
+      | .error err =>
+        e.log s!"partial chunk: {err}"
 
 /-- The state witness of the chunk to its validators; the node endorses its own chunk at once. -/
 def Env.distributeWitness (e : Env) (header : ShardChunkHeader) (txs : Array SignedTransaction) :
@@ -65,15 +74,18 @@ def Env.distributeWitness (e : Env) (header : ShardChunkHeader) (txs : Array Sig
   let s ← e.get
   let started ← e.nowMs
   match chunkValidatorsOf s.st header.prevBlockHash header.shardId header.heightCreated with
-  | .error err => e.log s!"witness: {err.kind}"
+  | .error err =>
+    e.log s!"witness: {err.kind}"
   | .ok (epoch, assignments) =>
     let validators := assignments.map (·.1)
     match createWitness s header txs with
-    | .error m => e.log s!"witness of shard {header.shardId}: {m}"
+    | .error m =>
+      e.log s!"witness of shard {header.shardId}: {m}"
     | .ok w =>
       let encoded := encodeWitness w
       match witnessParts e.signer epoch header encoded validators with
-      | .error m => e.log s!"witness parts: {m}"
+      | .error m =>
+        e.log s!"witness parts: {m}"
       | .ok parts =>
         for (account, part) in parts do
           if account != e.me then
@@ -82,7 +94,19 @@ def Env.distributeWitness (e : Env) (header : ShardChunkHeader) (txs : Array Sig
           e.endorse header
         e.bump "witnessesSent"
         let took := (← e.nowMs) - started
-        e.log s!"witness of shard {header.shardId} height {header.heightCreated}: {encoded.bytes.size} bytes, {parts.size} parts, {took} ms"
+        e.log
+            s!"witness of shard {header.shardId} height {header.heightCreated}: {encoded.bytes.size} bytes, {parts.size} parts, {took} ms"
+
+/-- The context for the transactions of `shard` on top of the applied block `prev`. -/
+def Env.txContext (e : Env) (s : VState) (prev : CryptoHash) (shard : ShardId) :
+    Except String Context := do
+  let rec_ ← lift (s.st.block prev)
+  let epoch ← lift (s.st.epochIdFromPrevBlock prev)
+  let layout := (← lift (s.st.epoch epoch)).layout
+  let some (.v5 x) := s.pr.extras[(prev.bytes, shard)]? | throw "no chunk extra"
+  pure
+      { st := s.st, pr := s.pr, params := e.params, prev := rec_, layout, shard,
+        root := x.stateRoot, validityPeriod := e.validityPeriod }
 
 /-- What producing a chunk gives, before it is stored and sent. -/
 structure ProducedChunk where
@@ -92,9 +116,14 @@ structure ProducedChunk where
   proofs : Array ReceiptProof
   txs : Array SignedTransaction
   outgoing : Array Receipt
+  /-- The pool of the shard after the transactions were taken. -/
+  pool : Pool
+  rejected : Array (SignedTransaction × String) := #[]
+  limit : Pool.Limit := .noMoreTxsInPool
 
 /-- `produce_chunk_internal`: the chunk of `shard` on top of the applied block `b`. -/
-def Env.buildChunk (e : Env) (s : VState) (b : Block) (shard : ShardId) : Except String ProducedChunk := do
+def Env.buildChunk (e : Env) (s : VState) (b : Block) (shard : ShardId) :
+    Except String ProducedChunk := do
   let some v := b.header.view? | throw "header version"
   let rec_ ← lift (s.st.block b.header.hash)
   let epoch ← lift (s.st.epochIdFromPrevBlock b.header.hash)
@@ -107,23 +136,31 @@ def Env.buildChunk (e : Env) (s : VState) (b : Block) (shard : ShardId) : Except
   let included ← lift (ancestorAt s.st b.header.hash prevChunk.heightIncluded)
   let outgoing ← decodeReceipts (s.pr.outgoing.getD (included.hash.bytes, shard) #[])
   let (root, proofs) ← receiptProofs layout shard outgoing
-  let txs : Array SignedTransaction := #[]
+  let ctx : Context :=
+    { st := s.st, pr := s.pr, params := e.params, prev := rec_, layout, shard, root := x.stateRoot,
+      validityPeriod := e.validityPeriod }
+  let prepared := prepareChunk ctx (s.pools.getD shard ({} : Pool))
+  let txs := prepared.txs
   let inputs : ChunkInputs :=
-    { prevBlockHash := b.header.hash, prevStateRoot := x.stateRoot, prevOutcomeRoot := x.outcomeRoot,
-      height := v.height + 1, shardId := shard, prevGasUsed := x.gasUsed, gasLimit := x.gasLimit,
-      prevBalanceBurnt := x.balanceBurnt, prevValidatorProposals := x.validatorProposals,
-      transactions := txs, outgoingReceipts := outgoing, outgoingReceiptsRoot := root,
-      txRoot := (merklize txs).1, congestionInfo := x.congestionInfo,
-      bandwidthRequests := x.bandwidthRequests, proposedSplit := x.proposedSplit }
+    { prevBlockHash := b.header.hash, prevStateRoot := x.stateRoot,
+      prevOutcomeRoot := x.outcomeRoot, height := v.height + 1, shardId := shard,
+      prevGasUsed := x.gasUsed, gasLimit := x.gasLimit, prevBalanceBurnt := x.balanceBurnt,
+      prevValidatorProposals := x.validatorProposals, transactions := txs,
+      outgoingReceipts := outgoing, outgoingReceiptsRoot := root, txRoot := (merklize txs).1,
+      congestionInfo := x.congestionInfo, bandwidthRequests := x.bandwidthRequests,
+      proposedSplit := x.proposedSplit }
   let produced ← produceChunk e.signer epochData.info.protocolVersion.toNat e.code inputs
-  pure { produced, epoch, nextEpoch, proofs, txs, outgoing }
+  pure
+      { produced, epoch, nextEpoch, proofs, txs, outgoing, pool := prepared.pool,
+        rejected := prepared.rejected, limit := prepared.limit }
 
 /-- Produces, stores and sends the chunk of `shard` at the height after `b`. -/
 def Env.produceChunk (e : Env) (b : Block) (shard : ShardId) : IO Unit := do
   let s ← e.get
   let some v := b.header.view? | return
   match e.buildChunk s b shard with
-  | .error m => e.log s!"chunk of shard {shard} at height {v.height + 1}: {m}"
+  | .error m =>
+    e.log s!"chunk of shard {shard} at height {v.height + 1}: {m}"
   | .ok c =>
     let header := c.produced.encoded.header
     let parts : Std.HashMap UInt64 PartialEncodedChunkPart :=
@@ -131,19 +168,30 @@ def Env.produceChunk (e : Env) (b : Block) (shard : ShardId) : IO Unit := do
         (fun m ((p, path), i) =>
           match p with
           | some part => m.insert i.toUInt64 ⟨i.toUInt64, part, path⟩
-          | none => m) {}
+          | none => m)
+        {}
     let body : TransactionReceipt := ⟨c.txs, c.outgoing⟩
     let now ← e.nowMs
+    e.commit #[.set .blockMisc (producedChunkKey (v.height + 1) shard) ByteArray.empty]
     e.state.modify fun s =>
-      let s :=
-        s.withChunk header.chunkHash fun x =>
-          { x with header := some header, parts, receipts := c.proofs, body := some body, verified := true }
-      { s with
-        bodies := s.bodies.insert header.chunkHash.hash.bytes body,
-        producedChunks := s.producedChunks.insert (shard, v.height + 1),
-        inclusion := s.inclusion.markReady header e.me now }
+        let s :=
+          s.withChunk header.chunkHash fun x =>
+            { x with
+              header := some header, parts, receipts := c.proofs, body := some body,
+              verified := true }
+        { s with
+          bodies := s.bodies.insert header.chunkHash.hash.bytes body,
+          pools := s.pools.insert shard c.pool,
+          producedChunks := s.producedChunks.insert (shard, v.height + 1),
+          inclusion := s.inclusion.markReady header e.me now }
     e.bump "chunksProduced"
-    e.log s!"produced the chunk of shard {shard} at height {v.height + 1} ({c.produced.encoded.content.parts.size} parts, {c.txs.size} transactions)"
+    e.bumpBy "txsInChunks" c.txs.size
+    e.bumpBy "txsRejected" c.rejected.size
+    if let some (t, why) := c.rejected[0]? then
+      e.log
+          s!"{c.rejected.size} transactions left the pool as invalid, the first {base58Encode t.hash.bytes}: {why}"
+    e.log
+        s!"produced the chunk of shard {shard} at height {v.height + 1} ({c.produced.encoded.content.parts.size} parts, {c.txs.size} transactions)"
     e.distributeChunk c.epoch c.nextEpoch c.produced c.proofs
     e.distributeWitness header c.txs
 
@@ -152,16 +200,19 @@ def Env.produceChunks (e : Env) (b : Block) : IO Unit := do
   let s ← e.get
   let some v := b.header.view? | return
   match lift (s.st.epochIdFromPrevBlock b.header.hash) with
-  | .error m => e.log s!"produce chunks: {m}"
+  | .error m =>
+    e.log s!"produce chunks: {m}"
   | .ok epoch =>
     match lift (s.st.epoch epoch) with
-    | .error m => e.log s!"produce chunks: {m}"
+    | .error m =>
+      e.log s!"produce chunks: {m}"
     | .ok data =>
       for shard in data.layout.shardIds do
         match s.st.chunkProducerAfter b.header.hash shard with
         | .ok p =>
           if p.accountId == e.me && !s.producedChunks.contains (shard, v.height + 1) then
             e.produceChunk b shard
-        | .error _ => pure ()
+        | .error _ =>
+          pure ()
 
 end Near.Node.Validator

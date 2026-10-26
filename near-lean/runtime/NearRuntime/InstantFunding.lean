@@ -223,7 +223,7 @@ theorem processWithInstants_outcomeLoop_burn (cfg : RuntimeConfig) (ap : ApplySt
       (processWithInstants cfg ap decoder st receipt).grossTokensBurnt) :
     let p := processWithInstants cfg ap decoder st receipt
     (forIn p.outcomes (prior, gas) (fun entry ledger =>
-      pure (.yield (ledger.1 + entry.2.tokensBurnt, ledger.2 + entry.2.gasBurnt))) : Id (Nat × Nat)).1 +
+      pure (.yield (ledger.1 + entry.2.tokensBurnt, ledger.2 + entry.2.computeUsage))) : Id (Nat × Nat)).1 +
         p.otherTokensBurnt - p.rewards = prior + p.netTokensBurnt := by
   dsimp only
   rw [forIn_outcomes_tokensBurnt]

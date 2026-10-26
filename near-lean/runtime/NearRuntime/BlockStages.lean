@@ -13,8 +13,9 @@ def convertTransactions (cfg : RuntimeConfig) (ap : ApplyState) (initial : Chain
     | .ok (next, receipt, cost) =>
       let outcome : ExecutionOutcome := {
         executorId := tx.signerId, status := .successReceiptId receipt.receiptId
-        receiptIds := [receipt.receiptId], gasBurnt := cost.gasBurnt
-        tokensBurnt := cost.gasBurnt * ap.gasPrice }
+        receiptIds := [receipt.receiptId], gasBurnt := cost.gasBurnt, computeUsage := cost.gasBurnt
+        tokensBurnt := cost.gasBurnt * ap.gasPrice
+        changes := transactionCommit pass.2.2.2.2.2.2 tx.signerId tx.publicKey next }
       if tx.signerId == tx.receiverId then
         .yield (none, next, pass.2.2.1 ++ [(0, outcome)], pass.2.2.2.1,
           pass.2.2.2.2.1 ++ [receipt], pass.2.2.2.2.2.1 + cost.gasBurnt * ap.gasPrice, pass.2.2.2.2.2.2 + 1)
@@ -42,8 +43,10 @@ def applyReceiptQueue (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes �
   let mut tokensBurnt := tokensBurnt
   let mut retainedDelayed : List Receipt := []
   let mut newlyDelayed : List Receipt := []
-  let mut gasUsed := outcomes.foldl (fun total pair => total + pair.2.gasBurnt) 0
-  let mut overLimit := ap.gasLimit.any (gasUsed ≥ ·)
+  -- `total.compute`: the chunk stops taking receipts once their compute reaches the gas limit.
+  -- It also stops once the chunk's recorded storage proof passes its soft limit (`storageProofFull`).
+  let mut compute := outcomes.foldl (fun total pair => total + pair.2.computeUsage) 0
+  let mut overLimit := ap.gasLimit.any (compute ≥ ·) || storageProofFull cfg ap ap.storageAccounting
   let mut storageAccounting := ap.storageAccounting
   for (receipt, position) in queue.zipIdx do
     if overLimit then
@@ -52,6 +55,7 @@ def applyReceiptQueue (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes �
       else
         newlyDelayed := newlyDelayed ++ [receipt]
     else
+      let pre := st
       let processed := processWithInstants cfg { ap with storageAccounting } codeOf st receipt
       storageAccounting := processed.storageAccounting
       if let some issue := processed.issue then
@@ -60,16 +64,18 @@ def applyReceiptQueue (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes �
       subsidizedAmount := subsidizedAmount + processed.subsidizedAmount
       st := processed.state
       outgoing := outgoing ++ processed.receipts
-      outcomes := outcomes ++ processed.outcomes
+      outcomes := outcomes ++ outcomesWithChanges pre processed
       for (_, outcome) in processed.outcomes do
-        gasUsed := gasUsed + outcome.gasBurnt
+        compute := compute + outcome.computeUsage
         tokensBurnt := tokensBurnt + outcome.tokensBurnt
-      gasUsed := gasUsed + processed.extraCompute
+      compute := compute + processed.extraCompute
       tokensBurnt := tokensBurnt + processed.otherTokensBurnt - processed.rewards
       if let some limit := ap.gasLimit then
-        if gasUsed ≥ limit then overLimit := true
+        if compute ≥ limit then overLimit := true
+      if storageProofFull cfg ap storageAccounting then overLimit := true
   -- Yields that timed out wake up with a resume receipt, after all incoming receipts.
-  let (stTimed, timeoutReceipts, timeoutBirths) := resolveYieldTimeouts ap ap.gasLimit gasUsed
+  let (stTimed, timeoutReceipts, timeoutBirths) := resolveYieldTimeouts ap
+    (if storageProofFull cfg ap storageAccounting then some 0 else ap.gasLimit) compute
     (st.yieldTimeouts.length + 1) (st, [], [])
   st := stTimed
   outgoing := outgoing ++ timeoutReceipts
@@ -85,7 +91,7 @@ with the actual executable attempt. No alternate execution semantics is used. -/
 theorem applyAttempt_eq_stages (cfg : RuntimeConfig) (ap : ApplyState) (decoder : Bytes → ContractCode)
     (st : ChainState) (txs : List Transaction) (incoming : List Receipt) :
     applyAttempt cfg ap decoder st txs incoming =
-      let converted := convertTransactions cfg ap st txs
+      let converted := convertTransactions cfg ap st (chunkTransactions cfg txs)
       match converted.1 with
       | some result => result
       | none => applyReceiptQueue cfg ap decoder st { converted.2.1 with delayed := [] } converted.2.2.1
@@ -94,8 +100,8 @@ theorem applyAttempt_eq_stages (cfg : RuntimeConfig) (ap : ApplyState) (decoder 
           converted.2.2.2.2.1.length (converted.2.2.2.2.1.length + converted.2.1.delayed.length) := by
   unfold applyAttempt
   dsimp only [Id.run, bind, pure]
-  generalize ht : (forIn txs _ _ : Id TransactionLoop) = converted
-  have heq : converted = convertTransactions cfg ap st txs := by
+  generalize ht : (forIn (chunkTransactions cfg txs) _ _ : Id TransactionLoop) = converted
+  have heq : converted = convertTransactions cfg ap st (chunkTransactions cfg txs) := by
     rw [← ht]
     unfold convertTransactions
     dsimp only [Id.run]
