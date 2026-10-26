@@ -216,6 +216,9 @@ structure NearState where
   /-- Observational log of the storage writes and removals (`StorageWrite`), newest first (the outcome lists them in
   call order). Written by the storage host functions' post-processing; nothing reads it but the outcome. -/
   storageLog : List StorageWrite := []
+  /-- Observational: the gas burnt for each `ActionCosts` entry (by its name), as nearcore's `ProfileDataV3` splits
+  the action costs. `gasProfile.actionBurnt` is their sum; nothing reads it but the outcome. -/
+  actionProfile : List (String × Nat) := []
 deriving Inhabited
 
 namespace NearState

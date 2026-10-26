@@ -1635,7 +1635,7 @@ cause). The Lean runtime returns the state after a chunk, not a log of the write
   `validator_accounts_update`, ...), several per key in the order they happened. That needs a change log in the runtime (each write with
   the cause that led to it), which the model does not have and which is not added here. It answers `METHOD_NOT_FOUND`.
 
-###### F4, gas profile of outcomes: not done
+###### F4, gas profile of outcomes: not done here (done in R3 below)
 
 The metadata of an outcome (`gas_profile`, and the list of contracts) is not computed and the conformance harness removes both from
 the comparison. The runtime's `ExecutionOutcome` has no profile and the VM's profile lacks the split by action (`ActionCosts`) that
@@ -1745,6 +1745,35 @@ compares them.
 - *Harness.* `rpc_conformance.py` asks for each kind of change at every block that touched it (by height and by hash), `finality`,
   `sync_checkpoint`, key prefixes, unknown accounts and the malformed requests. *Result* (`rpc_conformance.py run`): 1101 of 1101 requests
   equal, 0 known gaps, 0 other differences.
+
+##### R3, the gas profile of outcomes: `metadata.gas_profile` and `contracts` as nearcore renders them
+
+- *VM.* `NearState.actionProfile` (name and burnt gas of each `ActionCosts` entry) and `VMOutcome.actionProfile`; `gasProfile.actionBurnt`
+  is their sum, which the fastvm differential test checks on every run. `applyCharge` adds the gas a charge burnt to the entry the
+  charge pays: a charge names its fee by a selector (`ActionFees -> Fee`), and `costProbe` (a fee table whose entry number k has the send
+  fee 2^k) reads the selector's answer to tell the entry without changing how charges are written (`actionCostName`: `transfer` when
+  the selector includes the transfer fee, as nearcore profiles the whole payment of a transfer under it). `newReceipt` is profiled under
+  `new_action_receipt` (nearcore pays the data receipts' base fees together with it), `burn` under `new_data_receipt_byte`, `pay` under
+  `gas_key_byte`. Added: `actionCostNames`, `costProbe`, `actionCostName`, `addActionCost`, `NearState.profileAction`; changed:
+  `applyCharge` (each branch also updates the profile; the gas counter and every field it set before are as they were), `outcomeOfExecution`
+  and `graphIssue` (one more field each). The host function costs and the Wasm gas were already in `VMOutcome.gasProfile`.
+- *Runtime.* `GasProfileSplit` (action costs, host function costs, Wasm gas) and `ContractRef`; `ExecutionOutcome.profile` is the sum of the
+  profiles of the receipt's VM calls (nearcore profiles only what the VM burnt: the fees of non-VM actions are not in `gas_profile`, which
+  is `[]` for such a receipt, as the localnet shows), and `ExecutionOutcome.contracts` the contract of the receiver before each action
+  (`receiptContracts`: an account that does not exist yet has none, a deploy, `UseGlobalContract` or a deletion changes it for the actions
+  after it, an action after the failed one gets none). Added: `Exec.profile`, `processedContracts`, `Account.contractRef`,
+  `receiptContracts`; changed: `Exec.recordVMOutcome`, `outcomeOf`, `outcomesWithChanges` (one more field each).
+- *Node.* `Chain/GasProfile.lean` turns the split into `ProfileDataV3` (the arrays indexed by the `ActionCosts` and `ExtCosts`
+  discriminants) and the contracts into `AccountContract`; a transaction's outcome has `ExecutionMetadata::V1`, a receipt's `V4`, and
+  the metadata is stored with the outcome (it is not part of the outcome hash). `Rpc/Views.lean` renders it from the stored metadata:
+  `gas_profile` is `null` for `V1`, otherwise the costs that burnt gas as `{ cost_category, cost, gas_used }` (`ACTION_COST`, then
+  `WASM_HOST_COST` with `WASM_INSTRUCTION`, each sorted by name), `contracts` only for `V4` (`null`, `{"local": hash}`,
+  `{"global_hash": hash}`, `{"global_account_id": id}`).
+- *Mechanical proof fixes.* `ChargeReservations.lean`: the five `simpa only [applyCharge, ...]` calls of
+  `applyCharge_success_reservation` gained `NearState.profileAction` in their simp set (`applyCharge` now wraps the state in it). No theorem
+  statement changed.
+- *Result* (`rpc_conformance.py run`): all requests equal, 0 known gaps; the `gas_profile` and `contracts` normalisation of the harness is
+  gone, so every outcome of the run (`tx`, `EXPERIMENTAL_tx_status`, the legacy form) compares the profile of each receipt.
 
 ## Open points
 

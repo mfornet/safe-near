@@ -156,7 +156,6 @@ def normalise(method: str, response):
         if result is not None:
             strip(result, path.split("."))
     if result is not None:
-        drop_profiles(result)
         if method == "network_info":
             result["active_peers"] = len(result.get("active_peers", []))
             result["known_producers"] = len(result.get("known_producers", []))
@@ -165,20 +164,6 @@ def normalise(method: str, response):
 
 UNRENDERED = "<unrendered failure>"
 UNRENDERED_KINDS: collections.Counter = collections.Counter()
-
-
-def drop_profiles(value):
-    """The gas profile and the contracts list of the outcome metadata are not computed by the Lean runtime (the metadata
-    ``version`` is compared)."""
-    if isinstance(value, dict):
-        if "version" in value and "gas_profile" in value:
-            value.pop("gas_profile", None)
-            value.pop("contracts", None)
-        for item in value.values():
-            drop_profiles(item)
-    elif isinstance(value, list):
-        for item in value:
-            drop_profiles(item)
 
 
 def unify_unrendered(a, b) -> int:

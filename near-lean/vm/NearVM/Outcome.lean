@@ -40,6 +40,9 @@ structure VMOutcome where
   /-- The `storage_write` / `storage_remove` calls of a successful run, in call order. Observational: it
   does not feed `storage`, the gas or any decision. A failed call made no effective writes: empty. -/
   storageWrites : List StorageWrite := []
+  /-- The gas burnt for each `ActionCosts` entry, by name (nearcore's `actions_profile`). Observational: their sum is
+  `gasProfile.actionBurnt`, which it splits; the `ext` entries of `gasProfile` are the host function costs. -/
+  actionProfile : List (String × Nat) := []
   deriving Inhabited
 
 def VMOutcome.succeeded (o : VMOutcome) : Bool := o.aborted.isNone

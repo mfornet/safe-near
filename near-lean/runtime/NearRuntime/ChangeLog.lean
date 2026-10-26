@@ -178,4 +178,42 @@ def rewardCommit (receipt : ReceiptId) (receiver : AccountId) (reward : Nat) (st
     commitKeys (.gasReward receipt) st [.account receiver]
   else []
 
+/-- The contract an account holds, as `AccountContract` names it. -/
+def Account.contractRef (a : Account) : ContractRef :=
+  match a.code with
+  | some c => .local c.hash
+  | none =>
+    match a.global with
+    | some g => .global g
+    | none => .none
+
+/-- Observational: for each action of a receipt, the contract of the receiver just before the action ran
+(`current_contract` of each `ActionResult`, `ExecutionMetadata::V4`). `AccountContract::None` stands for an account
+that does not exist yet. An action after the one that failed did not run and gets `None`. `pre` is the state before
+the receipt and `post` the one it left (it names the contract of an implicit account a transfer created). -/
+def receiptContracts (pre post : ChainState) (receiver : AccountId) (actions : List Action)
+    (failureIndex : Option Nat) : List ContractRef :=
+  let limit := (failureIndex.map (· + 1)).getD actions.length
+  let init : Bool × ContractRef :=
+    match pre.account? receiver with
+    | some a => (true, a.contractRef)
+    | none => (false, .none)
+  let (_, shown) :=
+    (actions.take limit).foldl
+      (fun (acc : (Bool × ContractRef) × List ContractRef) a =>
+        let ((exists_, contract), out) := acc
+        let next : Bool × ContractRef :=
+          match a with
+          | .createAccount => (true, .none)
+          | .deployContract code => (exists_, .local code.hash)
+          | .useGlobalContract id => (exists_, .global id)
+          | .deleteAccount _ => (false, .none)
+          | .transfer _ =>
+            if exists_ then (exists_, contract)
+            else (true, ((post.account? receiver).map Account.contractRef).getD .none)
+          | _ => (exists_, contract)
+        (next, out ++ [if exists_ then contract else .none]))
+      (init, [])
+  shown ++ List.replicate (actions.length - shown.length) .none
+
 end Near

@@ -3,6 +3,7 @@ import NearNode.Network.Keys
 import NearNode.Primitives.TransactionAccess
 import NearNode.Chain.State
 import NearNode.Chain.Types
+import NearNode.Chain.GasProfile
 import NearNode.Rpc.Base64
 
 /-!
@@ -305,7 +306,43 @@ def failureView : TxExecutionError → Json
       tagged "ActionError" (Json.mkObj [("index", jn i.toNat), ("kind", actionErrorKindJson k)])
   | _ => Json.str "<unrendered failure>"
 
-def outcomeView (o : ExecutionOutcome) (version : Nat := 1) : Json :=
+/-- `AccountContract` as the metadata of an outcome lists it (`none` is `null`). -/
+def contractView : AccountContract → Json
+  | .none => Json.null
+  | .local h => Json.mkObj [("local", jhash h)]
+  | .global h => Json.mkObj [("global_hash", jhash h)]
+  | .globalByAccount id => Json.mkObj [("global_account_id", jacc id)]
+
+/-- The `gas_profile` of `ExecutionMetadataView`: each cost that burnt gas as `{ cost_category, cost, gas_used }`, the action costs
+before the host function costs, each by name; the Wasm instructions are `WASM_INSTRUCTION` of the host function category. -/
+def gasProfileView (p : ProfileDataV3) : Json :=
+  let entries (category : String) (names : Array String) (gas : Array UInt64) :
+    Array (String × String × Nat) :=
+    (names.zipIdx.filterMap fun (name, i) =>
+      let g := (gas[i]?).getD 0
+      if g == 0 then none else some (category, name.toUpper, g.toNat))
+  let wasm :=
+    if p.wasmGas == 0 then #[] else #[("WASM_HOST_COST", "WASM_INSTRUCTION", p.wasmGas.toNat)]
+  let byName (xs : Array (String × String × Nat)) := xs.qsort fun a b => a.2.1 < b.2.1
+  let all :=
+    byName (entries "ACTION_COST" actionCostNames p.actionsProfile) ++
+      byName (entries "WASM_HOST_COST" extCostNames p.wasmExtProfile ++ wasm)
+  Json.arr <|
+    all.map fun (category, name, gas) =>
+      Json.mkObj
+        [("cost_category", category), ("cost", name), ("gas_used", Json.str (toString gas))]
+
+/-- `ExecutionMetadataView`: `gas_profile` is `null` for the first version and `contracts` is that of the fourth. -/
+def metadataView : ExecutionMetadata → Json
+  | .v1 => Json.mkObj [("version", jn 1), ("gas_profile", Json.null)]
+  | .v2 _ => Json.mkObj [("version", jn 2), ("gas_profile", Json.null)]
+  | .v3 p => Json.mkObj [("version", jn 3), ("gas_profile", gasProfileView p)]
+  | .v4 m =>
+    Json.mkObj
+      [("version", jn 4), ("gas_profile", gasProfileView m.profile),
+        ("contracts", jarr contractView m.contracts)]
+
+def outcomeView (o : ExecutionOutcome) : Json :=
   let status : Json :=
     match o.status with
     | .unknown => Json.str "Unknown"
@@ -315,9 +352,6 @@ def outcomeView (o : ExecutionOutcome) (version : Nat := 1) : Json :=
   Json.mkObj
     [("logs", jarr Json.str o.logs), ("receipt_ids", jarr jhash o.receiptIds),
       ("gas_burnt", jn o.gasBurnt.toNat), ("tokens_burnt", jbal o.tokensBurnt),
-      ("executor_id", jacc o.executorId), ("status", status),
-      ("metadata",
-        Json.mkObj
-          [("version", jn version), ("gas_profile", Json.arr #[]), ("contracts", Json.arr #[])])]
+      ("executor_id", jacc o.executorId), ("status", status), ("metadata", metadataView o.metadata)]
 
 end Near.Node.Rpc

@@ -45,6 +45,12 @@ def compareRun (counts : IO.Ref Counts) (label : String) (cfg : RuntimeConfig) (
   counts.modify fun c => { c with runs := c.runs + 1 }
   let a := outcomeKey spec
   let b := outcomeKey fast
+  -- the split of the action costs adds up to the burnt gas it splits
+  for (who, o) in [("spec", spec), ("fast", fast)] do
+    if (o.actionProfile.map (·.2)).sum != o.gasProfile.actionBurnt then
+      counts.modify fun c => { c with mismatches := c.mismatches + 1 }
+      IO.println s!"MISMATCH {label}: the {who} action profile {o.actionProfile} does not add up to {o.gasProfile.actionBurnt}"
+      return false
   if a == b then
     return true
   counts.modify fun c => { c with mismatches := c.mismatches + 1 }

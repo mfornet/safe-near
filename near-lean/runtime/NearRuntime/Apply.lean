@@ -107,6 +107,8 @@ structure Exec where
   failureIndex : Option Nat := none
   /-- Observational: the `storage_write` / `storage_remove` calls of the receipt's contract calls. -/
   dataWrites : List StorageWrite := []
+  /-- Observational: the gas the receipt's contract calls burnt, by cost. -/
+  profile : GasProfileSplit := {}
   deriving Inhabited
 
 abbrev ExecM := ExceptT RuntimeError (StateM Exec)
@@ -247,6 +249,10 @@ def Exec.recordVMOutcome (exec : Exec) (outcome : VMOutcome) : Exec :=
     logs := exec.logs ++ outcome.logs
     gasBurntForFunctionCall := exec.gasBurntForFunctionCall + outcome.burntGas
     dataWrites := exec.dataWrites ++ outcome.storageWrites
+    profile :=
+      exec.profile.merge
+        { actions := outcome.actionProfile, ext := outcome.gasProfile.ext,
+          wasm := outcome.gasProfile.wasm }
     gasBurnt := exec.gasBurnt + outcome.burntGas
     gasUsed := exec.gasUsed + outcome.burntGas + (outcome.usedGas - outcome.burntGas) }
 
@@ -1079,7 +1085,8 @@ def outcomeOf (r : Receipt) (e : Exec) : ExecutionOutcome :=
       | .data _ | .globalDistribution _ => none)
     gasBurnt := e.gasBurnt
     tokensBurnt := e.tokensBurnt
-    proposals := e.proposals }
+    proposals := e.proposals
+    profile := e.profile }
 
 /-- Result of processing one receipt: state, new receipts, outcomes, and the
 yocto paid to contracts as gas reward (which are not burnt). -/
@@ -1107,11 +1114,30 @@ def processedChanges (pre : ChainState) (p : Processed) : List (ReceiptId × Lis
         (e.state, acc.2 ++ [(receipt.receiptId, receiptChanges acc.1 receipt e)]))
       (pre, [])).2
 
-/-- The outcomes of a `Processed`, each with the commits of its receipt (`ExecutionOutcome.changes`). -/
+/-- Observational: the contract of the receiver before each action of each receipt a `Processed` ran, by receipt id
+(`receiptContracts`). -/
+def processedContracts (pre : ChainState) (p : Processed) : List (ReceiptId × List ContractRef) :=
+  (p.execs.foldl
+      (fun (acc : ChainState × List (ReceiptId × List ContractRef)) (receipt, e) =>
+        (e.state,
+          acc.2 ++
+            [(receipt.receiptId,
+                match receipt.receipt with
+                | .action action =>
+                  receiptContracts acc.1 e.state receipt.receiverId action.actions e.failureIndex
+                | _ => [])]))
+      (pre, [])).2
+
+/-- The outcomes of a `Processed`, each with the commits of its receipt (`ExecutionOutcome.changes`) and the
+contracts its actions found (`ExecutionOutcome.contracts`). -/
 def outcomesWithChanges (pre : ChainState) (p : Processed) : List (ReceiptId × ExecutionOutcome) :=
   let changes := processedChanges pre p
+  let contracts := processedContracts pre p
   p.outcomes.map fun (id, o) =>
-    (id, { o with changes := ((changes.find? (·.1 == id)).map (·.2)).getD [] })
+    (id,
+      { o with
+        changes := ((changes.find? (·.1 == id)).map (·.2)).getD []
+        contracts := ((contracts.find? (·.1 == id)).map (·.2)).getD [] })
 
 /-- Whether a receipt runs in the chunk that creates it instead of travelling as an outgoing
 receipt (`Receipt::is_instant_receipt`): a yield, or a lone account deletion with no inputs. -/

@@ -339,6 +339,36 @@ structure ValidatorProposal where
   stake : Nat
   deriving Inhabited, Repr, BEq
 
+/-- Observational: the gas a receipt burnt, split as nearcore's `ProfileDataV3` splits it (`metadata.gas_profile`):
+per `ActionCosts` entry and per `ExtCosts` entry (by their names), and the rest, burnt by Wasm instructions. It is the
+sum of the profiles of the receipt's VM calls; the runtime's own fees are not in it. Nothing reads it back. -/
+structure GasProfileSplit where
+  actions : List (String × Nat) := []
+  ext : List (String × Nat) := []
+  wasm : Nat := 0
+  deriving Inhabited, BEq, Repr
+
+/-- Add the gas per name of `other` to `table`. -/
+def GasProfileSplit.mergeTable (table other : List (String × Nat)) : List (String × Nat) :=
+  other.foldl
+    (fun acc (name, gas) =>
+      match acc.find? (·.1 == name) with
+      | some (_, previous) => acc.map fun e => if e.1 == name then (name, previous + gas) else e
+      | none => acc ++ [(name, gas)])
+    table
+
+def GasProfileSplit.merge (a b : GasProfileSplit) : GasProfileSplit :=
+  { actions := GasProfileSplit.mergeTable a.actions b.actions
+    ext := GasProfileSplit.mergeTable a.ext b.ext
+    wasm := a.wasm + b.wasm }
+
+/-- Observational: the contract of an account as `AccountContract` names it (`metadata.contracts`). -/
+inductive ContractRef
+  | none
+  | local (hash : String)
+  | global (id : Wasm.GlobalContractId)
+  deriving BEq, Repr, Inhabited
+
 /-! ### The state change log
 
 nearcore records every `TrieUpdate::set` and `remove` with the cause of the commit that made it final; the state
@@ -395,6 +425,11 @@ structure ExecutionOutcome where
   /-- Observational: the commits this transaction or receipt made to the exposed kinds of trie key, in order
   (`ChangeLog.lean`). Nothing reads it back. -/
   changes : List StateChange := []
+  /-- Observational: the gas the receipt's VM calls burnt, by cost (`GasProfileSplit`). -/
+  profile : GasProfileSplit := {}
+  /-- Observational: for each action of a receipt, the contract of the receiver just before it ran
+  (`ExecutionMetadata::V4`'s `contracts`); empty for a transaction. -/
+  contracts : List ContractRef := []
   deriving Inhabited
 
 end Near

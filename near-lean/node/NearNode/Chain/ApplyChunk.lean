@@ -2,6 +2,7 @@ import NearNode.Chain.StateDecode
 import NearNode.Trie
 import NearNode.Chain.Profile
 import NearNode.Chain.StateChanges
+import NearNode.Chain.GasProfile
 import NearNode.Chain.FastEngine
 import ChainReplay.ShardChunk
 import ChainReplay.DelegateSignature
@@ -465,13 +466,14 @@ def runChunk (prof : Option Prof) (cfg : Wasm.Near.RuntimeConfig)
             pure (.successReceiptId (← native r))
           | .failure e =>
             pure (.failure (failureOf o.failureIndex e))
+        let metadata ← Near.Node.Chain.metadataOf hashOfLabel? (index < txHashes.size) o
         outcomes :=
           outcomes.push
             { id := identity,
               outcome :=
                 { logs := o.logs.toArray, receiptIds := (← o.receiptIds.mapM native).toArray,
                   gasBurnt := o.gasBurnt.toUInt64, tokensBurnt := ⟨o.tokensBurnt⟩,
-                  executorId := ⟨o.executorId⟩, status, metadata := default } }
+                  executorId := ⟨o.executorId⟩, status, metadata } }
       let info ←
         match Codec.decodeAll (α := CongestionInfo) (bytesOf outcome.info.toBorsh) with
         | .ok i =>
