@@ -3,36 +3,21 @@ import Model.BountyEncoding
 namespace SputnikDAO2
 
 theorem bountyLE_length (width value : Nat) :
-    (bountyLE width value).length = width := by
-  induction width generalizing value with
-  | zero => rfl
-  | succ width ih => simp [bountyLE, ih]
+    (NearSdk.Borsh.leBytes width value).length = width :=
+  NearSdk.Borsh.leBytes_length width value
 
 theorem bountyFromLE_bountyLE (width value : Nat)
     (hbound : value < 256 ^ width) :
-    bountyFromLE (bountyLE width value) = value := by
-  induction width generalizing value with
-  | zero =>
-      have hzero : value = 0 := by simpa using hbound
-      simp [hzero, bountyLE, bountyFromLE]
-  | succ width ih =>
-      have hdiv : value / 256 < 256 ^ width := by
-        rw [Nat.pow_succ] at hbound
-        omega
-      simp only [bountyLE, bountyFromLE, UInt8.toNat_ofNat',
-        ih _ hdiv]
-      have hmod : value % 256 < 256 := Nat.mod_lt _ (by decide)
-      change value % 256 % 256 + 256 * (value / 256) = value
-      rw [Nat.mod_eq_of_lt hmod]
-      omega
+    NearSdk.Borsh.fromLE (NearSdk.Borsh.leBytes width value) = value :=
+  NearSdk.Borsh.fromLE_leBytes width value hbound
 
 theorem bounty_count_key_injective_bounded (left right : Nat)
     (hleft : left < 256 ^ 8) (hright : right < 256 ^ 8)
     (heq : bountyCountKey left = bountyCountKey right) :
     left = right := by
-  have hbytes : bountyLE 8 left = bountyLE 8 right := by
+  have hbytes : NearSdk.Borsh.leBytes 8 left = NearSdk.Borsh.leBytes 8 right := by
     simpa [bountyCountKey] using heq
-  have hparsed := congrArg bountyFromLE hbytes
+  have hparsed := congrArg NearSdk.Borsh.fromLE hbytes
   simpa [bountyFromLE_bountyLE, hleft, hright] using hparsed
 
 theorem bounty_claimers_key_injective (left right : String)
@@ -85,7 +70,7 @@ theorem bounty_count_key_disjoint_from_other_prefix
 
 theorem encoded_claim_length (claim : StoredBountyClaim) :
     (encodeStoredBountyClaim claim).length = 25 := by
-  simp [encodeStoredBountyClaim, bountyLE_length]
+  simp [encodeStoredBountyClaim]
 
 theorem encoded_claim_physical_fields_injective_bounded
     (left right : StoredBountyClaim)
@@ -101,19 +86,19 @@ theorem encoded_claim_physical_fields_injective_bounded
       left.start = right.start ∧
       left.deadline = right.deadline ∧
       left.completed = right.completed := by
-  have hidBytes : bountyLE 8 left.bountyId =
-      bountyLE 8 right.bountyId := by
+  have hidBytes : NearSdk.Borsh.leBytes 8 left.bountyId =
+      NearSdk.Borsh.leBytes 8 right.bountyId := by
     have htake := congrArg (List.take 8) heq
     simpa [encodeStoredBountyClaim, bountyLE_length,
       List.take_append] using htake
-  have hstartBytes : bountyLE 8 left.start =
-      bountyLE 8 right.start := by
+  have hstartBytes : NearSdk.Borsh.leBytes 8 left.start =
+      NearSdk.Borsh.leBytes 8 right.start := by
     have htake := congrArg (fun bytes =>
       (bytes.drop 8).take 8) heq
     simpa [encodeStoredBountyClaim, bountyLE_length,
       List.drop_append, List.take_append] using htake
-  have hdeadlineBytes : bountyLE 8 left.deadline =
-      bountyLE 8 right.deadline := by
+  have hdeadlineBytes : NearSdk.Borsh.leBytes 8 left.deadline =
+      NearSdk.Borsh.leBytes 8 right.deadline := by
     have htake := congrArg (fun bytes =>
       ((bytes.drop 8).drop 8).take 8) heq
     simpa [encodeStoredBountyClaim, bountyLE_length,
@@ -125,9 +110,9 @@ theorem encoded_claim_physical_fields_injective_bounded
       ((bytes.drop 8).drop 8).drop 8) heq
     simpa [encodeStoredBountyClaim, bountyLE_length,
       List.drop_append] using hdrop
-  have hid := congrArg bountyFromLE hidBytes
-  have hstart := congrArg bountyFromLE hstartBytes
-  have hdeadline := congrArg bountyFromLE hdeadlineBytes
+  have hid := congrArg NearSdk.Borsh.fromLE hidBytes
+  have hstart := congrArg NearSdk.Borsh.fromLE hstartBytes
+  have hdeadline := congrArg NearSdk.Borsh.fromLE hdeadlineBytes
   refine ⟨?_, ?_, ?_, ?_⟩
   · simpa [bountyFromLE_bountyLE, hleftId, hrightId] using hid
   · simpa [bountyFromLE_bountyLE, hleftStart, hrightStart] using hstart
@@ -139,9 +124,9 @@ theorem encoded_claim_physical_fields_injective_bounded
 theorem encoded_claims_length (claims : List StoredBountyClaim) :
     (encodeStoredBountyClaims claims).length = 4 + 25 * claims.length := by
   induction claims with
-  | nil => simp [encodeStoredBountyClaims, bountyLE_length]
+  | nil => simp [encodeStoredBountyClaims]
   | cons claim rest ih =>
-      simp [encodeStoredBountyClaims, bountyLE_length,
+      simp [encodeStoredBountyClaims,
         encoded_claim_length] at ih ⊢
       omega
 
@@ -163,13 +148,13 @@ theorem ghost_paid_bond_is_not_serialized
 
 theorem encoded_count_length (count : Nat) :
     (encodeBountyCount count).length = 4 := by
-  simp [encodeBountyCount, bountyLE_length]
+  simp [encodeBountyCount]
 
 theorem bounty_parse_nat_encoded (width value : Nat)
     (rest : BountyBytes) (hbound : value < 256 ^ width) :
-    bountyParseNat width (bountyLE width value ++ rest) =
+    NearSdk.BorshParse.natural width (NearSdk.Borsh.leBytes width value ++ rest) =
       some (value, rest) := by
-  simp [bountyParseNat, bountyTake, bountyLE_length,
+  simp [NearSdk.BorshParse.natural, NearSdk.BorshParse.take,
     bountyFromLE_bountyLE, hbound]
 
 theorem bounty_parse_claim_encoded (claim : StoredBountyClaim)
@@ -253,7 +238,7 @@ theorem bounty_parse_claims_rejects_trailing_byte
     hprefix, hrecords, hbody, Nat.mul_comm, List.append_assoc]
 
 theorem bounty_parse_claims_rejects_truncated_record :
-    bountyParseClaims (bountyLE 4 1) = none := by
+    bountyParseClaims (NearSdk.Borsh.leBytes 4 1) = none := by
   decide
 
 -- Exact vectors consumed by oracle/bounty_borsh_test.rs. The native test

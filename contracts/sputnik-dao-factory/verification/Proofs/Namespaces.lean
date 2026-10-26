@@ -3,14 +3,9 @@ import Model.Collections
 
 namespace SputnikFactory
 
-@[simp] theorem leBytes_length (width n : Nat) : (leBytes width n).length = width := by
-  induction width generalizing n with
-  | zero => rfl
-  | succ width ih => simp [leBytes, ih]
-
 theorem dao_index_key_length (account : Account) :
     (daoIndexKey account).length = 6 + account.toUTF8.data.toList.length := by
-  simp [daoIndexKey, borshString, borshBytes]
+  simp [daoIndexKey, borshString, NearSdk.Borsh.bytes, NearSdk.Borsh.u32]
   omega
 
 theorem dao_element_key_length (index : Nat) : (daoElementKey index).length = 10 := by

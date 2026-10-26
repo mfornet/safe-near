@@ -1,6 +1,7 @@
 name: Lean quality
 
-# Automatic CI uses Python only; Lean/native suites run locally during periodic checks.
+# Python-only repository checks. The near-lean workflow builds the Lean packages
+# on changes to them; tests, audits and native suites run in the periodic check.
 on:
   push:
     branches: [main]
@@ -28,6 +29,7 @@ jobs:
         run: |
           python3 tools/check_lean_toolchains.py
           python3 tools/check_node_isolation.py
+          python3 tools/check_nearcore_pin.py
           python3 -m unittest discover -s tools/tests -v
           python3 -m unittest discover -s tools/runtime-conformance -p 'test_*.py' -v
 

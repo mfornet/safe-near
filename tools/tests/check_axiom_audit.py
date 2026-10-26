@@ -1,4 +1,9 @@
-"""Real-Lean regression for package-local axiom audit artifact selection."""
+"""Real-Lean regression for package-local axiom audit artifact selection.
+
+Needs `lake`, so it is named check_* and runs in the periodic plan and
+`just audit-all`, not in CI's `unittest discover`; the offline policy tests
+are in test_axiom_audit.py.
+"""
 
 import importlib.util
 import json
@@ -14,40 +19,6 @@ SPEC.loader.exec_module(AUDIT)
 
 
 class AxiomAuditArtifactTests(unittest.TestCase):
-    def test_cli_rejects_missing_or_ambiguous_open_module_policy(self):
-        with tempfile.TemporaryDirectory(prefix="safe-near-audit-policy-") as directory:
-            report = Path(directory) / "report.json"
-            base = ["python3", str(ROOT / "tools/axiom-audit.py"),
-                    str(ROOT / "near-lean/wasm"), "--report", str(report), "--no-build"]
-            for options, message in [
-                (["--allow-sorry-module", "Wasm.DoesNotExist"], "allowed sorry module is absent"),
-                (["--allow-sorry", "--allow-sorry-module", "Wasm.Exec"], "cannot be combined"),
-            ]:
-                with self.subTest(options=options):
-                    result = subprocess.run(base + options, cwd=ROOT, text=True, capture_output=True)
-                    self.assertEqual(result.returncode, 2)
-                    self.assertIn(message, result.stderr)
-                    self.assertFalse(report.exists())
-
-    def test_named_open_modules_do_not_exempt_other_modules_or_compiler_axioms(self):
-        open_proof = dict(module="Open", declaration="unfinished", axioms=["sorryAx"])
-        other = dict(module="Other", declaration="regression", axioms=["sorryAx"])
-        native = dict(module="Open", declaration="native", axioms=["Lean.ofReduceBool"])
-        violations = [open_proof, other, native]
-        self.assertEqual(AUDIT.failing_violations(violations, False, [], ["Open"]), [other, native])
-        self.assertEqual(AUDIT.failing_violations(violations, False, ["Open"], ["Open"]), violations)
-
-    def test_completed_modules_cannot_use_the_open_proof_exception(self):
-        complete = dict(module="Finished", declaration="finished", axioms=["sorryAx"])
-        open_proof = dict(module="Open", declaration="unfinished", axioms=["sorryAx"])
-        compiler = dict(module="Open", declaration="native", axioms=["Lean.ofReduceBool"])
-        mixed = dict(module="Open", declaration="mixed", axioms=["sorryAx", "custom"])
-        violations = [complete, open_proof, compiler, mixed]
-        self.assertEqual(AUDIT.failing_violations(violations, True, ["Finished"]),
-                         [complete, compiler, mixed])
-        self.assertEqual(AUDIT.failing_violations(violations, False, []), violations)
-        self.assertEqual(AUDIT.failing_violations(violations, True, []), [compiler, mixed])
-
     def test_audit_uses_local_module_and_rejects_missing_local_artifact(self):
         with tempfile.TemporaryDirectory(prefix="safe-near-axiom-fixture-") as directory:
             root = Path(directory)

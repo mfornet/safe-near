@@ -1,3 +1,5 @@
+"""Lean fixture regressions for check_vm_dependencies.py; needs `lake` (see tools/README.md)."""
+
 import json
 from pathlib import Path
 import subprocess

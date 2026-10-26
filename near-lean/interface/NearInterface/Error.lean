@@ -55,6 +55,8 @@ inductive HostError
   | valueLengthExceeded (length limit : Nat)
   | totalLogLengthExceeded (length limit : Nat)
   | numberOfLogsExceeded (limit : Nat)
+  /-- `RecordedStorageExceeded`: the receipt's recorded storage proof passed its limit. -/
+  | recordedStorageExceeded (limit : Nat)
   | numberPromisesExceeded (numberOfPromises limit : Nat)
   | numberInputDataDependenciesExceeded (dependencies limit : Nat)
   | prohibitedInView (methodName : String)
@@ -75,9 +77,22 @@ inductive HostError
   | bls12381InvalidInput (msg : String)
   deriving Repr, BEq, Inhabited
 
+/-- `bytesize` 1.3.3's `Display` (decimal units, one decimal place), as nearcore prints a `ByteSize`.
+The unit is chosen by `log₁₀₂₄`, as that crate does. -/
+def byteSizeString (bytes : Nat) : String :=
+  if bytes < 1000 then s!"{bytes} B" else
+  let exp := Id.run do
+    let mut e := 0
+    while 1024 ^ (e + 1) ≤ bytes do e := e + 1
+    return max e 1
+  let unit := 1000 ^ exp
+  let tenths := (bytes * 10 + unit / 2) / unit
+  let letter := (("KMGTPE".toList)[exp - 1]?).getD '?'
+  s!"{tenths / 10}.{tenths % 10} {letter}B"
+
 def HostError.message : HostError → String
   | .badUTF8 => "String encoding is bad UTF-8 sequence."
-  | .badUTF16 => "String encoding is bad UTF-16 sequence"
+  | .badUTF16 => "String encoding is bad UTF-16 sequence."
   | .gasExceeded => "Exceeded the prepaid gas."
   | .gasLimitExceeded => "Exceeded the maximum amount of gas allowed to burn per contract."
   | .balanceExceeded => "Exceeded the account balance."
@@ -102,8 +117,10 @@ def HostError.message : HostError → String
   | .contractSizeExceeded n l => s!"The size of a contract code in DeployContract action {n} exceeds the limit {l}"
   | .keyLengthExceeded n l => s!"The length of a storage key {n} exceeds the limit {l}"
   | .valueLengthExceeded n l => s!"The length of a storage value {n} exceeds the limit {l}"
-  | .totalLogLengthExceeded n l => s!"The length of a total log is {n} but the limit is {l}"
-  | .numberOfLogsExceeded l => s!"The number of logs exceeds the limit {l}"
+  | .totalLogLengthExceeded n l => s!"The length of a log message {n} exceeds the limit {l}"
+  | .numberOfLogsExceeded l => s!"The number of logs will exceed the limit {l}"
+  | .recordedStorageExceeded l =>
+    s!"Size of the recorded trie storage proof has exceeded the allowed limit ({byteSizeString l})"
   | .numberPromisesExceeded n l => s!"The number of promises within a FunctionCall {n} exceeds the limit {l}"
   | .numberInputDataDependenciesExceeded n l => s!"The number of input data dependencies {n} exceeds the limit {l}"
   | .prohibitedInView m => s!"{m} is not allowed in view calls"
@@ -149,6 +166,41 @@ inductive MethodResolveError
   | methodInvalidSignature
   deriving Repr, BEq, Inhabited
 
+/-- `near_vm_runner::logic::errors::PrepareError`: the module was rejected
+before instantiation. -/
+inductive PrepareError
+  | instantiate
+  | memory
+  | tooManyFunctions
+  | tooManyLocals
+  | tooManyTables
+  | tooManyTableElements
+  | functionBodyTooLarge
+  | tooManyTypes
+  deriving Repr, BEq, Inhabited
+
+/-- nearcore's `Display` text. -/
+def PrepareError.message : PrepareError → String
+  | .instantiate => "Error happened during instantiation."
+  | .memory => "Error creating memory."
+  | .tooManyFunctions => "Too many functions in contract."
+  | .tooManyLocals => "Too many locals declared in the contract."
+  | .tooManyTables => "Too many tables declared in the contract."
+  | .tooManyTableElements => "Too many table elements declared in the contract."
+  | .functionBodyTooLarge => "A function body in the contract exceeds the size limit."
+  | .tooManyTypes => "Too many type-section entries declared in the contract."
+
+/-- The variant name nearcore serializes. -/
+def PrepareError.name : PrepareError → String
+  | .instantiate => "Instantiate"
+  | .memory => "Memory"
+  | .tooManyFunctions => "TooManyFunctions"
+  | .tooManyLocals => "TooManyLocals"
+  | .tooManyTables => "TooManyTables"
+  | .tooManyTableElements => "TooManyTableElements"
+  | .functionBodyTooLarge => "FunctionBodyTooLarge"
+  | .tooManyTypes => "TooManyTypes"
+
 /-- `near_vm_runner::logic::errors::FunctionCallError`. -/
 inductive FunctionCallError
   | compilationError (msg : String)
@@ -161,17 +213,20 @@ inductive FunctionCallError
   | internal (msg : String)
   /-- Execution stopped without establishing a protocol outcome. -/
   | executionIssue (issue : ExecutionIssue)
+  /-- `CompilationError::PrepareError`. -/
+  | prepareError (e : PrepareError)
   deriving Repr, BEq, Inhabited
 
 def FunctionCallError.message : FunctionCallError → String
   | .compilationError m => s!"CompilationError({m})"
-  | .linkError m => s!"LinkError({m})"
+  | .linkError m => m
   | .methodResolveError .methodEmptyName => "MethodEmptyName"
   | .methodResolveError .methodNotFound => "MethodNotFound"
   | .methodResolveError .methodInvalidSignature => "MethodInvalidSignature"
   | .wasmTrap t => s!"WebAssembly trap: {t.message}"
   | .hostError e => e.message
   | .internal m => s!"Internal({m})"
+  | .prepareError e => s!"PrepareError: {e.message}"
   | .executionIssue issue => issue.message
 
 /-- Model limitations must be propagated separately from protocol failures.

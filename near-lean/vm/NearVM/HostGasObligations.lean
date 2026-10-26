@@ -87,50 +87,38 @@ theorem appendPromiseActionResult_gas_input {weight : UInt64} (fees : ActionFees
   · exact ⟨index, action, hinput, appendPromiseAction_gas fees ethEnabled st _ _ _ (by assumption)⟩
   · trivial
 
+/-- Close each branch of a batch action host: the action's gas comes from its input. -/
+local macro "action_gas_input_tac" : tactic => `(tactic| (
+    dsimp only [disallowInView, checkAccountId, checkPublicKey]
+    repeat (first
+      | trivial
+      | (apply appendPromiseActionResult_gas_input; simp_all [batchActionInput?])
+      | split)))
+
 theorem promiseBatchActionCreateAccountFn_gasObligation : HostAppendsGas "promise_batch_action_create_account" promiseBatchActionCreateAccountFn := by
   intro fees ethEnabled st args
   unfold promiseBatchActionCreateAccountFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey]
-  repeat (first
-    | trivial
-    | (apply appendPromiseActionResult_gas_input; simp_all [batchActionInput?])
-    | split)
+  action_gas_input_tac
 
 theorem promiseBatchActionDeployContractFn_gasObligation : HostAppendsGas "promise_batch_action_deploy_contract" promiseBatchActionDeployContractFn := by
   intro fees ethEnabled st args
   unfold promiseBatchActionDeployContractFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey]
-  repeat (first
-    | trivial
-    | (apply appendPromiseActionResult_gas_input; simp_all [batchActionInput?])
-    | split)
+  action_gas_input_tac
 
 theorem promiseBatchActionFunctionCallFn_gasObligation : HostAppendsGas "promise_batch_action_function_call" promiseBatchActionFunctionCallFn := by
   intro fees ethEnabled st args
   unfold promiseBatchActionFunctionCallFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey]
-  repeat (first
-    | trivial
-    | (apply appendPromiseActionResult_gas_input; simp_all [batchActionInput?])
-    | split)
+  action_gas_input_tac
 
 theorem promiseBatchActionFunctionCallWeightFn_gasObligation : HostAppendsGas "promise_batch_action_function_call" promiseBatchActionFunctionCallWeightFn := by
   intro fees ethEnabled st args
   unfold promiseBatchActionFunctionCallWeightFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey]
-  repeat (first
-    | trivial
-    | (apply appendPromiseActionResult_gas_input; simp_all [batchActionInput?])
-    | split)
+  action_gas_input_tac
 
 theorem promiseBatchActionTransferFn_gasObligation : HostAppendsGas "promise_batch_action_transfer" promiseBatchActionTransferFn := by
   intro fees ethEnabled st args
   unfold promiseBatchActionTransferFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey]
-  repeat (first
-    | trivial
-    | (apply appendPromiseActionResult_gas_input; simp_all [batchActionInput?])
-    | split)
+  action_gas_input_tac
 
 theorem promiseBatchActionTransferToGasKeyFn_gasObligation : HostAppendsGas "promise_batch_action_transfer_to_gas_key" promiseBatchActionTransferToGasKeyFn := by
   intro fees ethEnabled st args
@@ -144,20 +132,12 @@ theorem promiseBatchActionTransferToGasKeyFn_gasObligation : HostAppendsGas "pro
 theorem promiseBatchActionStakeFn_gasObligation : HostAppendsGas "promise_batch_action_stake" promiseBatchActionStakeFn := by
   intro fees ethEnabled st args
   unfold promiseBatchActionStakeFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey]
-  repeat (first
-    | trivial
-    | (apply appendPromiseActionResult_gas_input; simp_all [batchActionInput?])
-    | split)
+  action_gas_input_tac
 
 theorem promiseBatchActionAddKeyWithFullAccessFn_gasObligation : HostAppendsGas "promise_batch_action_add_key_with_full_access" promiseBatchActionAddKeyWithFullAccessFn := by
   intro fees ethEnabled st args
   unfold promiseBatchActionAddKeyWithFullAccessFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey]
-  repeat (first
-    | trivial
-    | (apply appendPromiseActionResult_gas_input; simp_all [batchActionInput?])
-    | split)
+  action_gas_input_tac
 
 theorem promiseBatchActionAddGasKeyWithFullAccessFn_gasObligation : HostAppendsGas "promise_batch_action_add_gas_key_with_full_access" promiseBatchActionAddGasKeyWithFullAccessFn := by
   intro fees ethEnabled st args
@@ -171,11 +151,7 @@ theorem promiseBatchActionAddGasKeyWithFullAccessFn_gasObligation : HostAppendsG
 theorem promiseBatchActionAddKeyWithFunctionCallFn_gasObligation : HostAppendsGas "promise_batch_action_add_key_with_function_call" promiseBatchActionAddKeyWithFunctionCallFn := by
   intro fees ethEnabled st args
   unfold promiseBatchActionAddKeyWithFunctionCallFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey]
-  repeat (first
-    | trivial
-    | (apply appendPromiseActionResult_gas_input; simp_all [batchActionInput?])
-    | split)
+  action_gas_input_tac
 
 theorem promiseBatchActionAddGasKeyWithFunctionCallFn_gasObligation : HostAppendsGas "promise_batch_action_add_gas_key_with_function_call" promiseBatchActionAddGasKeyWithFunctionCallFn := by
   intro fees ethEnabled st args
@@ -189,29 +165,17 @@ theorem promiseBatchActionAddGasKeyWithFunctionCallFn_gasObligation : HostAppend
 theorem promiseBatchActionDeleteKeyFn_gasObligation : HostAppendsGas "promise_batch_action_delete_key" promiseBatchActionDeleteKeyFn := by
   intro fees ethEnabled st args
   unfold promiseBatchActionDeleteKeyFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey]
-  repeat (first
-    | trivial
-    | (apply appendPromiseActionResult_gas_input; simp_all [batchActionInput?])
-    | split)
+  action_gas_input_tac
 
 theorem promiseBatchActionDeleteAccountFn_gasObligation : HostAppendsGas "promise_batch_action_delete_account" promiseBatchActionDeleteAccountFn := by
   intro fees ethEnabled st args
   unfold promiseBatchActionDeleteAccountFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey]
-  repeat (first
-    | trivial
-    | (apply appendPromiseActionResult_gas_input; simp_all [batchActionInput?])
-    | split)
+  action_gas_input_tac
 
 theorem promiseBatchActionUseGlobalContractFn_gasObligation : HostAppendsGas "promise_batch_action_use_global_contract" promiseBatchActionUseGlobalContractFn := by
   intro fees ethEnabled st args
   unfold promiseBatchActionUseGlobalContractFn useGlobalContractFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey]
-  repeat (first
-    | trivial
-    | (apply appendPromiseActionResult_gas_input; simp_all [batchActionInput?])
-    | split)
+  action_gas_input_tac
 
 theorem promiseBatchActionDeployGlobalContractFn_gasObligation : HostAppendsGas "promise_batch_action_deploy_global_contract" promiseBatchActionDeployGlobalContractFn := by
   intro fees ethEnabled st args
@@ -225,11 +189,7 @@ theorem promiseBatchActionDeployGlobalContractFn_gasObligation : HostAppendsGas 
 theorem promiseBatchActionUseGlobalContractByAccountIdFn_gasObligation : HostAppendsGas "promise_batch_action_use_global_contract_by_account_id" promiseBatchActionUseGlobalContractByAccountIdFn := by
   intro fees ethEnabled st args
   unfold promiseBatchActionUseGlobalContractByAccountIdFn useGlobalContractFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey]
-  repeat (first
-    | trivial
-    | (apply appendPromiseActionResult_gas_input; simp_all [batchActionInput?])
-    | split)
+  action_gas_input_tac
 
 theorem promiseBatchActionDeployGlobalContractByAccountIdFn_gasObligation : HostAppendsGas "promise_batch_action_deploy_global_contract_by_account_id" promiseBatchActionDeployGlobalContractByAccountIdFn := by
   intro fees ethEnabled st args
@@ -283,49 +243,37 @@ theorem appendPromise_gas_input (fees : ActionFees) (ethEnabled : Bool)
     HostResultCreatesGas fees ethEnabled name st args (.Return values (appendPromise st promise)) :=
   ⟨promise, hinput, appendPromise_gas fees ethEnabled st promise⟩
 
+/-- Close each branch of a promise creation host: the call's gas comes from its input. -/
+local macro "promise_gas_input_tac" : tactic => `(tactic| (
+    dsimp only [disallowInView, createBatchPromiseResult, createCallbackPromiseResult, checkAccountId]
+    repeat (first
+      | trivial
+      | (apply appendPromise_gas_input; simp_all [promiseInput?])
+      | split)))
+
 theorem promiseCreateFn_gasObligation : HostCreatesGas "promise_create" promiseCreateFn := by
   intro fees ethEnabled st args
   unfold promiseCreateFn
-  dsimp only [disallowInView, createBatchPromiseResult, createCallbackPromiseResult, checkAccountId]
-  repeat (first
-    | trivial
-    | (apply appendPromise_gas_input; simp_all [promiseInput?])
-    | split)
+  promise_gas_input_tac
 
 theorem promiseThenFn_gasObligation : HostCreatesGas "promise_then" promiseThenFn := by
   intro fees ethEnabled st args
   unfold promiseThenFn
-  dsimp only [disallowInView, createBatchPromiseResult, createCallbackPromiseResult, checkAccountId]
-  repeat (first
-    | trivial
-    | (apply appendPromise_gas_input; simp_all [promiseInput?])
-    | split)
+  promise_gas_input_tac
 
 theorem promiseBatchCreateFn_gasObligation : HostCreatesGas "promise_batch_create" promiseBatchCreateFn := by
   intro fees ethEnabled st args
   unfold promiseBatchCreateFn
-  dsimp only [disallowInView, createBatchPromiseResult, createCallbackPromiseResult, checkAccountId]
-  repeat (first
-    | trivial
-    | (apply appendPromise_gas_input; simp_all [promiseInput?])
-    | split)
+  promise_gas_input_tac
 
 theorem promiseBatchThenFn_gasObligation : HostCreatesGas "promise_batch_then" promiseBatchThenFn := by
   intro fees ethEnabled st args
   unfold promiseBatchThenFn
-  dsimp only [disallowInView, createBatchPromiseResult, createCallbackPromiseResult, checkAccountId]
-  repeat (first
-    | trivial
-    | (apply appendPromise_gas_input; simp_all [promiseInput?])
-    | split)
+  promise_gas_input_tac
 
 theorem promiseAndFn_gasObligation : HostCreatesGas "promise_and" promiseAndFn := by
   intro fees ethEnabled st args
   unfold promiseAndFn
-  dsimp only [disallowInView, createBatchPromiseResult, createCallbackPromiseResult, checkAccountId]
-  repeat (first
-    | trivial
-    | (apply appendPromise_gas_input; simp_all [promiseInput?])
-    | split)
+  promise_gas_input_tac
 
 end Wasm.Near

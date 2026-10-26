@@ -1,0 +1,14 @@
+{
+  "code": "tools/runtime-conformance/fixtures/prepare_locals_over_limit.wasm",
+  "sha256": "573b0bcbbb676fb461b85992a3f28635ec214050443a97bceeb3b78dd6f6ca42",
+  "protocolVersion": 86,
+  "initialBalance": "100000000000000000000000000",
+  "storage": [],
+  "calls": [
+    {
+      "name": "prepare: locals_over_limit",
+      "method": "f",
+      "args": {}
+    }
+  ]
+}

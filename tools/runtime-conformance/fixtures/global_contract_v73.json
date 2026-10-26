@@ -1,0 +1,29 @@
+{
+  "code": "tools/runtime-conformance/fixtures/global_contract.wasm",
+  "sha256": "00daef740f3fe2b9b2a281e4b2fcd27525b336898656c914374e49fe875aafe8",
+  "protocolVersion": 73,
+  "initialBalance": "100000000000000000000000000",
+  "storage": [],
+  "calls": [
+    {
+      "name": "global_contract v73: hash",
+      "method": "hash",
+      "args": {}
+    },
+    {
+      "name": "global_contract v73: account",
+      "method": "account",
+      "args": {}
+    },
+    {
+      "name": "global_contract v73: transfer_then_hash",
+      "method": "transfer_then_hash",
+      "args": {}
+    },
+    {
+      "name": "global_contract v73: missing method",
+      "method": "absent",
+      "args": {}
+    }
+  ]
+}

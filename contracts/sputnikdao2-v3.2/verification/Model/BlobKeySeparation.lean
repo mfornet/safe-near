@@ -9,10 +9,10 @@ This model is byte-level; it does not assume SHA-256 has or lacks preimages
 for any particular storage key. -/
 
 def daoProposalEntryKey (id : Nat) : BountyBytes :=
-  3 :: bountyLE 8 id
+  3 :: NearSdk.Borsh.leBytes 8 id
 
 def daoBountyEntryKey (id : Nat) : BountyBytes :=
-  4 :: bountyLE 8 id
+  4 :: NearSdk.Borsh.leBytes 8 id
 
 def daoBlobOwnerKey (digest : BountyBytes) : BountyBytes :=
   7 :: digest

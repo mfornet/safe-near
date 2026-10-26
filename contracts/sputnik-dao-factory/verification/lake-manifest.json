@@ -1,6 +1,13 @@
 {"version": "1.2.0",
  "packagesDir": ".lake/packages",
- "packages": [],
+ "packages":
+ [{"type": "path",
+   "scope": "",
+   "name": "NearSdk",
+   "manifestFile": "lake-manifest.json",
+   "inherited": false,
+   "dir": "../../../near-lean/sdk",
+   "configFile": "lakefile.toml"}],
  "name": "SputnikFactoryVerification",
  "lakeDir": ".lake",
  "fixedToolchain": false}

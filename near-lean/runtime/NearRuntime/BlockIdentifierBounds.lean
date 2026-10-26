@@ -156,7 +156,7 @@ theorem applyAttempt_identifier_bounds (cfg : RuntimeConfig) (ap : ApplyState)
   have hempty (bound : Nat) : ReceiptList.IdsBelow bound [] := by intro receipt hm; contradiction
   unfold applyAttempt
   dsimp only [Id.run, bind, pure]
-  generalize ht : (forIn txs _ _ : Id TransactionLoop) = txResult
+  generalize ht : (forIn (chunkTransactions cfg txs) _ _ : Id TransactionLoop) = txResult
   have htx : TransactionLoop.IdentifierInvariant st.nextId txResult := by
     rw [← ht]
     apply forIn_id_preserves _ _ _ (TransactionLoop.IdentifierInvariant st.nextId)
@@ -234,7 +234,8 @@ theorem applyAttempt_identifier_bounds (cfg : RuntimeConfig) (ap : ApplyState)
             cases hl : ap.gasLimit with
             | none =>
               simp only [hl] at hp hn hout
-              exact ⟨hp.1, hout, h.queued.mono hn, h.retained.mono hn, h.appended.mono hn,
+              dsimp only
+              split_ifs <;> exact ⟨hp.1, hout, h.queued.mono hn, h.retained.mono hn, h.appended.mono hn,
                 by intro returned he; contradiction⟩
             | some limit =>
               simp only [hl] at hp hn hout
@@ -244,7 +245,7 @@ theorem applyAttempt_identifier_bounds (cfg : RuntimeConfig) (ap : ApplyState)
     split
     · rename_i returned he
       exact hresult.returned returned he
-    · exact timeouts_identifier_bounds ap ap.gasLimit _ _ result.2.1 _ _ _ hresult.state hresult.outgoing
+    · exact timeouts_identifier_bounds ap _ _ _ result.2.1 _ _ _ hresult.state hresult.outgoing
         hresult.retained hresult.appended
 
 /-- The public atomic apply boundary preserves state and outgoing identifier

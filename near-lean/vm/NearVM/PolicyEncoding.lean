@@ -85,68 +85,56 @@ theorem metered_encodingPolicy (extra : Nat) (name : String) (fn : NearHostFn Ne
                 (prechargedStore name st args).host.config.validateActionMethodUtf8) _ at hr
             simpa only [prechargedStore_config] using hr
 
+/-- Unfold a promise host and close each branch: the policy fields are unchanged. -/
+local macro "policy_encoding_tac" : tactic => `(tactic| (
+    dsimp only [disallowInView, checkAccountId, checkPublicKey, appendPromise,
+      appendPromiseActionResult, createBatchPromiseResult, createCallbackPromiseResult]
+    repeat' (first | trivial | rfl | split)))
+
 theorem promiseCreateFn_encodingPolicy : HostPreservesEncodingPolicy promiseCreateFn := by
   intro st args
   unfold promiseCreateFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey, appendPromise,
-    appendPromiseActionResult, createBatchPromiseResult, createCallbackPromiseResult]
-  repeat' (first | trivial | rfl | split)
+  policy_encoding_tac
 
 theorem promiseThenFn_encodingPolicy : HostPreservesEncodingPolicy promiseThenFn := by
   intro st args
   unfold promiseThenFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey, appendPromise,
-    appendPromiseActionResult, createBatchPromiseResult, createCallbackPromiseResult]
-  repeat' (first | trivial | rfl | split)
+  policy_encoding_tac
 
 theorem promiseAndFn_encodingPolicy : HostPreservesEncodingPolicy promiseAndFn := by
   intro st args
   unfold promiseAndFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey, appendPromise,
-    appendPromiseActionResult, createBatchPromiseResult, createCallbackPromiseResult]
-  repeat' (first | trivial | rfl | split)
+  policy_encoding_tac
 
 theorem promiseBatchCreateFn_encodingPolicy : HostPreservesEncodingPolicy promiseBatchCreateFn := by
   intro st args
   unfold promiseBatchCreateFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey, appendPromise,
-    appendPromiseActionResult, createBatchPromiseResult, createCallbackPromiseResult]
-  repeat' (first | trivial | rfl | split)
+  policy_encoding_tac
 
 theorem promiseBatchThenFn_encodingPolicy : HostPreservesEncodingPolicy promiseBatchThenFn := by
   intro st args
   unfold promiseBatchThenFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey, appendPromise,
-    appendPromiseActionResult, createBatchPromiseResult, createCallbackPromiseResult]
-  repeat' (first | trivial | rfl | split)
+  policy_encoding_tac
 
 theorem promiseBatchActionCreateAccountFn_encodingPolicy : HostPreservesEncodingPolicy promiseBatchActionCreateAccountFn := by
   intro st args
   unfold promiseBatchActionCreateAccountFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey, appendPromise,
-    appendPromiseActionResult, createBatchPromiseResult, createCallbackPromiseResult]
-  repeat' (first | trivial | rfl | split)
+  policy_encoding_tac
 
 theorem promiseBatchActionDeployContractFn_encodingPolicy : HostPreservesEncodingPolicy promiseBatchActionDeployContractFn := by
   intro st args
   unfold promiseBatchActionDeployContractFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey, appendPromise,
-    appendPromiseActionResult, createBatchPromiseResult, createCallbackPromiseResult]
-  repeat' (first | trivial | rfl | split)
+  policy_encoding_tac
 
 theorem promiseBatchActionFunctionCallFn_encodingPolicy : HostPreservesEncodingPolicy promiseBatchActionFunctionCallFn := by
   intro st args
   unfold promiseBatchActionFunctionCallFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey, appendPromise,
-    appendPromiseActionResult, createBatchPromiseResult, createCallbackPromiseResult]
-  repeat' (first | trivial | rfl | split)
+  policy_encoding_tac
 
 theorem promiseBatchActionFunctionCallWeightFn_encodingPolicy : HostPreservesEncodingPolicy promiseBatchActionFunctionCallWeightFn := by
   intro st args
   unfold promiseBatchActionFunctionCallWeightFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey, appendPromise,
-    appendPromiseActionResult, createBatchPromiseResult, createCallbackPromiseResult]
-  repeat' (first | trivial | rfl | split)
+  policy_encoding_tac
 
 theorem promiseYieldCreateFn_encodingPolicy : HostPreservesEncodingPolicy promiseYieldCreateFn := by
   intro st args
@@ -165,9 +153,7 @@ theorem promiseYieldCreateFn_encodingPolicy : HostPreservesEncodingPolicy promis
 theorem promiseBatchActionTransferFn_encodingPolicy : HostPreservesEncodingPolicy promiseBatchActionTransferFn := by
   intro st args
   unfold promiseBatchActionTransferFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey, appendPromise,
-    appendPromiseActionResult, createBatchPromiseResult, createCallbackPromiseResult]
-  repeat' (first | trivial | rfl | split)
+  policy_encoding_tac
 
 theorem promiseBatchActionTransferToGasKeyFn_encodingPolicy : HostPreservesEncodingPolicy promiseBatchActionTransferToGasKeyFn := by
   intro st args
@@ -179,16 +165,12 @@ theorem promiseBatchActionTransferToGasKeyFn_encodingPolicy : HostPreservesEncod
 theorem promiseBatchActionStakeFn_encodingPolicy : HostPreservesEncodingPolicy promiseBatchActionStakeFn := by
   intro st args
   unfold promiseBatchActionStakeFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey, appendPromise,
-    appendPromiseActionResult, createBatchPromiseResult, createCallbackPromiseResult]
-  repeat' (first | trivial | rfl | split)
+  policy_encoding_tac
 
 theorem promiseBatchActionAddKeyWithFullAccessFn_encodingPolicy : HostPreservesEncodingPolicy promiseBatchActionAddKeyWithFullAccessFn := by
   intro st args
   unfold promiseBatchActionAddKeyWithFullAccessFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey, appendPromise,
-    appendPromiseActionResult, createBatchPromiseResult, createCallbackPromiseResult]
-  repeat' (first | trivial | rfl | split)
+  policy_encoding_tac
 
 theorem promiseBatchActionAddGasKeyWithFullAccessFn_encodingPolicy : HostPreservesEncodingPolicy promiseBatchActionAddGasKeyWithFullAccessFn := by
   intro st args
@@ -200,9 +182,7 @@ theorem promiseBatchActionAddGasKeyWithFullAccessFn_encodingPolicy : HostPreserv
 theorem promiseBatchActionAddKeyWithFunctionCallFn_encodingPolicy : HostPreservesEncodingPolicy promiseBatchActionAddKeyWithFunctionCallFn := by
   intro st args
   unfold promiseBatchActionAddKeyWithFunctionCallFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey, appendPromise,
-    appendPromiseActionResult, createBatchPromiseResult, createCallbackPromiseResult]
-  repeat' (first | trivial | rfl | split)
+  policy_encoding_tac
 
 theorem promiseBatchActionAddGasKeyWithFunctionCallFn_encodingPolicy : HostPreservesEncodingPolicy promiseBatchActionAddGasKeyWithFunctionCallFn := by
   intro st args
@@ -214,23 +194,17 @@ theorem promiseBatchActionAddGasKeyWithFunctionCallFn_encodingPolicy : HostPrese
 theorem promiseBatchActionDeleteKeyFn_encodingPolicy : HostPreservesEncodingPolicy promiseBatchActionDeleteKeyFn := by
   intro st args
   unfold promiseBatchActionDeleteKeyFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey, appendPromise,
-    appendPromiseActionResult, createBatchPromiseResult, createCallbackPromiseResult]
-  repeat' (first | trivial | rfl | split)
+  policy_encoding_tac
 
 theorem promiseBatchActionDeleteAccountFn_encodingPolicy : HostPreservesEncodingPolicy promiseBatchActionDeleteAccountFn := by
   intro st args
   unfold promiseBatchActionDeleteAccountFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey, appendPromise,
-    appendPromiseActionResult, createBatchPromiseResult, createCallbackPromiseResult]
-  repeat' (first | trivial | rfl | split)
+  policy_encoding_tac
 
 theorem promiseBatchActionUseGlobalContractFn_encodingPolicy : HostPreservesEncodingPolicy promiseBatchActionUseGlobalContractFn := by
   intro st args
   unfold promiseBatchActionUseGlobalContractFn useGlobalContractFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey, appendPromise,
-    appendPromiseActionResult, createBatchPromiseResult, createCallbackPromiseResult]
-  repeat' (first | trivial | rfl | split)
+  policy_encoding_tac
 
 theorem promiseBatchActionDeployGlobalContractFn_encodingPolicy : HostPreservesEncodingPolicy promiseBatchActionDeployGlobalContractFn := by
   intro st args
@@ -242,9 +216,7 @@ theorem promiseBatchActionDeployGlobalContractFn_encodingPolicy : HostPreservesE
 theorem promiseBatchActionUseGlobalContractByAccountIdFn_encodingPolicy : HostPreservesEncodingPolicy promiseBatchActionUseGlobalContractByAccountIdFn := by
   intro st args
   unfold promiseBatchActionUseGlobalContractByAccountIdFn useGlobalContractFn
-  dsimp only [disallowInView, checkAccountId, checkPublicKey, appendPromise,
-    appendPromiseActionResult, createBatchPromiseResult, createCallbackPromiseResult]
-  repeat' (first | trivial | rfl | split)
+  policy_encoding_tac
 
 
 

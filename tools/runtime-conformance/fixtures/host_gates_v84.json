@@ -1,0 +1,19 @@
+{
+  "code": "tools/runtime-conformance/fixtures/host_gates.wasm",
+  "sha256": "59ac006e99880d7ff2e1a4cd6f9f6324654accb649d5e92e0967ac23ec88b735",
+  "protocolVersion": 84,
+  "initialBalance": "100000000000000000000000000",
+  "storage": [],
+  "calls": [
+    {
+      "name": "host_gates v84: chain",
+      "method": "chain",
+      "args": {}
+    },
+    {
+      "name": "host_gates v84: noop",
+      "method": "noop",
+      "args": {}
+    }
+  ]
+}

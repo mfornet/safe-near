@@ -27,10 +27,10 @@ theorem parse_wire_config_encoded (config : WireConfig)
   rcases hfits with ⟨hname, hpurpose, hmetadata⟩
   have hnameParse := parse_wire_string_encoded config.name
     (bountyBorshString config.purpose ++
-      bountyLE 4 config.metadata.length ++ config.metadata ++ rest)
+      NearSdk.Borsh.leBytes 4 config.metadata.length ++ config.metadata ++ rest)
     hname
   have hpurposeParse := parse_wire_string_encoded config.purpose
-    (bountyLE 4 config.metadata.length ++ config.metadata ++ rest)
+    (NearSdk.Borsh.leBytes 4 config.metadata.length ++ config.metadata ++ rest)
     hpurpose
   have hmetadataParse := bounty_parse_nat_encoded 4
     config.metadata.length (config.metadata ++ rest) hmetadata
@@ -97,7 +97,7 @@ theorem parse_wire_threshold_encoded (threshold : WireWeightOrRatio)
   cases threshold with
   | weight amount =>
       change (do
-        let (read, tail) ← bountyParseNat 16 (bountyLE 16 amount ++ rest)
+        let (read, tail) ← NearSdk.BorshParse.natural 16 (NearSdk.Borsh.leBytes 16 amount ++ rest)
         some (WireWeightOrRatio.weight read, tail)) =
           some (WireWeightOrRatio.weight amount, rest)
       rw [bounty_parse_nat_encoded 16 amount rest hfits]
@@ -105,7 +105,7 @@ theorem parse_wire_threshold_encoded (threshold : WireWeightOrRatio)
   | ratio numerator denominator =>
       rcases hfits with ⟨hnum, hdenpos, hden⟩
       have hnumParse := bounty_parse_nat_encoded 8 numerator
-        (bountyLE 8 denominator ++ rest) hnum
+        (NearSdk.Borsh.leBytes 8 denominator ++ rest) hnum
       have hdenParse := bounty_parse_nat_encoded 8 denominator rest hden
       simp [parseWireWeightOrRatio, encodeWireWeightOrRatio,
         List.append_assoc, hnumParse, hdenParse, Nat.ne_of_gt hdenpos]
@@ -118,7 +118,7 @@ theorem parse_wire_role_kind_encoded (kind : WireRoleKind)
   | everyone => rfl
   | member minimum =>
       change (do
-        let (read, tail) ← bountyParseNat 16 (bountyLE 16 minimum ++ rest)
+        let (read, tail) ← NearSdk.BorshParse.natural 16 (NearSdk.Borsh.leBytes 16 minimum ++ rest)
         some (WireRoleKind.member read, tail)) =
           some (WireRoleKind.member minimum, rest)
       rw [bounty_parse_nat_encoded 16 minimum rest hfits]
@@ -138,7 +138,7 @@ theorem parse_wire_vote_policy_encoded (policy : WireVotePolicy)
       some (policy, rest) := by
   rcases hfits with ⟨hquorum, hthreshold⟩
   have hkind := parse_wire_weight_kind_encoded policy.weightKind
-    (bountyLE 16 policy.quorum ++
+    (NearSdk.Borsh.leBytes 16 policy.quorum ++
       encodeWireWeightOrRatio policy.threshold ++ rest)
   have hquorumParse := bounty_parse_nat_encoded 16 policy.quorum
     (encodeWireWeightOrRatio policy.threshold ++ rest) hquorum
@@ -208,34 +208,34 @@ theorem parse_wire_policy_encoded (policy : WirePolicy)
   have hrolesParse := parse_wire_vec_encoded encodeWireRolePermission
     parseWireRolePermission policy.roles
     (encodeWireVotePolicy policy.defaultVotePolicy ++
-      bountyLE 16 policy.proposalBond ++
-      bountyLE 8 policy.proposalPeriod ++
-      bountyLE 16 policy.bountyBond ++
-      bountyLE 8 policy.bountyForgivenessPeriod ++ rest)
+      NearSdk.Borsh.leBytes 16 policy.proposalBond ++
+      NearSdk.Borsh.leBytes 8 policy.proposalPeriod ++
+      NearSdk.Borsh.leBytes 16 policy.bountyBond ++
+      NearSdk.Borsh.leBytes 8 policy.bountyForgivenessPeriod ++ rest)
     hlen (by
       intro role hmem tail
       exact parse_wire_role_encoded role tail (hroles role hmem))
   have hdefaultParse := parse_wire_vote_policy_encoded
     policy.defaultVotePolicy
-    (bountyLE 16 policy.proposalBond ++
-      bountyLE 8 policy.proposalPeriod ++
-      bountyLE 16 policy.bountyBond ++
-      bountyLE 8 policy.bountyForgivenessPeriod ++ rest)
+    (NearSdk.Borsh.leBytes 16 policy.proposalBond ++
+      NearSdk.Borsh.leBytes 8 policy.proposalPeriod ++
+      NearSdk.Borsh.leBytes 16 policy.bountyBond ++
+      NearSdk.Borsh.leBytes 8 policy.bountyForgivenessPeriod ++ rest)
     hdefault
   have hproposalBondParse := bounty_parse_nat_encoded 16
     policy.proposalBond
-    (bountyLE 8 policy.proposalPeriod ++
-      bountyLE 16 policy.bountyBond ++
-      bountyLE 8 policy.bountyForgivenessPeriod ++ rest)
+    (NearSdk.Borsh.leBytes 8 policy.proposalPeriod ++
+      NearSdk.Borsh.leBytes 16 policy.bountyBond ++
+      NearSdk.Borsh.leBytes 8 policy.bountyForgivenessPeriod ++ rest)
     hproposalBond
   have hproposalPeriodParse := bounty_parse_nat_encoded 8
     policy.proposalPeriod
-    (bountyLE 16 policy.bountyBond ++
-      bountyLE 8 policy.bountyForgivenessPeriod ++ rest)
+    (NearSdk.Borsh.leBytes 16 policy.bountyBond ++
+      NearSdk.Borsh.leBytes 8 policy.bountyForgivenessPeriod ++ rest)
     hproposalPeriod
   have hbountyBondParse := bounty_parse_nat_encoded 16
     policy.bountyBond
-    (bountyLE 8 policy.bountyForgivenessPeriod ++ rest)
+    (NearSdk.Borsh.leBytes 8 policy.bountyForgivenessPeriod ++ rest)
     hbountyBond
   have hforgivenessParse := bounty_parse_nat_encoded 8
     policy.bountyForgivenessPeriod rest hforgiveness

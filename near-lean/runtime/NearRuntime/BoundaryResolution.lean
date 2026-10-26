@@ -37,7 +37,7 @@ theorem execOn_not_exported (code : Code) (storage : List (Bytes × Bytes)) (ctx
     rfl
   refine ⟨?_, ?_⟩
   · rw [hobs]
-    exact observe_rolledBack _ _ _ _ (by rw [← hobs]; exact hout)
+    exact observe_rolledBack _ _ _ _ _ (by rw [← hobs]; exact hout)
   · intro msg h
     rw [hout] at h
     exact failureOf_not_issue hi msg (Except.error.inj h)

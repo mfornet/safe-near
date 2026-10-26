@@ -7,7 +7,7 @@ their one-byte storage prefixes (as length-prefixed vectors). Their values
 live at separate trie keys. This does not serialize the complete trie or prove
 the Wasm wrapper. -/
 
-def rootHandle (tag : UInt8) : BountyBytes := bountyLE 4 1 ++ [tag]
+def rootHandle (tag : UInt8) : BountyBytes := NearSdk.Borsh.leBytes 4 1 ++ [tag]
 
 def rootStakingBytes : Option String → BountyBytes
   | none => [0]
@@ -36,9 +36,9 @@ structure RootActionLog where
 
 def rootActionLogBytes (log : RootActionLog) : BountyBytes :=
   bountyBorshString log.accountId ++
-  bountyLE 8 log.proposalId ++
+  NearSdk.Borsh.leBytes 8 log.proposalId ++
   [rootActionTag log.action] ++
-  bountyLE 8 log.blockHeight
+  NearSdk.Borsh.leBytes 8 log.blockHeight
 
 structure RootStateScalars where
   lockedAmount : Nat
@@ -71,30 +71,30 @@ def validRootScalarWidths (state : RootStateScalars) : Prop :=
 
 def rootBeforeProposal (state : RootStateScalars) : BountyBytes :=
   rootHandle 0 ++ rootHandle 1 ++
-  bountyLE 16 state.lockedAmount ++
+  NearSdk.Borsh.leBytes 16 state.lockedAmount ++
   rootStakingBytes state.stakingId ++
-  bountyLE 16 state.totalDelegationAmount ++
+  NearSdk.Borsh.leBytes 16 state.totalDelegationAmount ++
   rootHandle 2
 
 def rootBeforeBounty (state : RootStateScalars) : BountyBytes :=
-  rootBeforeProposal state ++ bountyLE 8 state.lastProposalId ++ rootHandle 3
+  rootBeforeProposal state ++ NearSdk.Borsh.leBytes 8 state.lastProposalId ++ rootHandle 3
 
 def rootAfterBounty (state : RootStateScalars) : BountyBytes :=
   rootHandle 4 ++
   rootHandle 5 ++ rootHandle 6 ++ rootHandle 7 ++
-  bountyLE 4 state.actionsLog.length ++
+  NearSdk.Borsh.leBytes 4 state.actionsLog.length ++
   state.actionsLog.flatMap rootActionLogBytes
 
 def rootStateScalarBytes (state : RootStateScalars) : BountyBytes :=
   rootBeforeBounty state ++
-  bountyLE 8 state.lastBountyId ++ rootAfterBounty state
+  NearSdk.Borsh.leBytes 8 state.lastBountyId ++ rootAfterBounty state
 
 -- ContractV1 has the identical ordered fields through `blobs` but no
 -- `actions_log` field. This is the migration's root-wire compatibility
 -- condition, independent of the separate policy and collection trie keys.
 def rootStateV1Bytes (state : RootStateScalars) : BountyBytes :=
   rootBeforeBounty state ++
-  bountyLE 8 state.lastBountyId ++
+  NearSdk.Borsh.leBytes 8 state.lastBountyId ++
   rootHandle 4 ++ rootHandle 5 ++ rootHandle 6 ++ rootHandle 7
 
 def rootStateBytes (lastProposalId lastBountyId : Nat) : BountyBytes :=

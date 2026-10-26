@@ -29,6 +29,24 @@ def Action.borshSizeList : List Action → Nat
   | a :: rest => a.borshSize + Action.borshSizeList rest
 end
 
+/-- Borsh size of a receipt a function call creates: V0 receipt header, the
+ActionV2 tag with `refund_to = None`, as `ReceiptEncoding` writes VM receipts. -/
+def Receipt.newBorshSize (receipt : Receipt) : Nat :=
+  let header := 4 + receipt.predecessorId.utf8ByteSize + 4 + receipt.receiverId.utf8ByteSize + 32
+  match receipt.receipt with
+  | .data payload => header + 1 + 32 + (match payload.data with | none => 1 | some bytes => 1 + 4 + bytes.length)
+  | .action action =>
+    -- A yield waits for exactly its own data id.
+    let inputs := if action.yieldDataId.isSome then 1 else action.inputDataIds.length
+    header + 1 + 4 + action.signerId.utf8ByteSize + 1 + action.signerPublicKey.length + 16 +
+      4 + (action.outputDataReceivers.map fun r => 32 + 4 + r.receiverId.utf8ByteSize).sum +
+      4 + 32 * inputs + 4 + (action.actions.map Action.borshSize).sum
+  | .globalDistribution payload =>
+    let id := match payload.id with
+      | .codeHash hash => 1 + hash.length
+      | .accountId id => 1 + 4 + id.length
+    header + 2 + id + 8 + 4 + 8 * payload.alreadyDelivered.length + 4 + payload.code.size + 8
+
 /-- V0 has no transaction tag. Ordinary-key V1 adds transaction/nonce tags and nonce mode.
 Block hashes have fixed 32-byte encoding and nonce values have fixed 8-byte encoding. -/
 def Transaction.bodySize (tx : Transaction) : Nat :=

@@ -1,4 +1,5 @@
 import NearRuntime.RoutingIdentifierBounds
+import NearRuntime.FinalizeStages
 
 namespace Near
 open Wasm.Near
@@ -312,39 +313,14 @@ operations changes old routing references or moves the counter backwards. -/
 theorem finalizeReceipt_idsBelowNext (c : ReceiptCtx) (st : ChainState) (raw : Exec) (failed : Option RuntimeError)
     (hinitial : st.IdsBelowNext) (hraw : raw.state.IdsBelowNext) :
     (finalizeReceipt c st raw failed).state.IdsBelowNext := by
-  let base := rollbackReceipt st raw failed
-  let settlement := Fees.settleGas c.cfg c.action.gasPrice c.ap.gasPrice
-    (Fees.receiptGasBudget c.cfg c.receipt.receiverId c.action.actions) base.gasUsed base.gasBurnt
-    ((st.account? c.receipt.receiverId).isNone && (base.state.account? c.receipt.receiverId).isSome && failed.isNone)
-  let charged := { base with
-    tokensBurnt := (if c.receipt.isRefund then 0 else settlement.tokensBurnt) + base.actionTokensBurnt
-    otherTokensBurnt := if c.receipt.isRefund && failed.isSome then Fees.totalDeposit c.action.actions else 0 }
-  let depositRefund := if failed.isSome then Fees.totalDeposit c.action.actions else 0
-  let gasRefund := if c.receipt.isRefund then 0 else settlement.refund
-  let balance := if depositRefund > 0 && c.receipt.predecessorId != systemAccount then
-    charged.addBalanceRefund c.receipt.predecessorId depositRefund else charged
-  let gas := if gasRefund > 0 && c.action.signerId != systemAccount then
-    balance.addGasRefund c.action.signerId c.action.signerPublicKey gasRefund else balance
-  let rewarded := gas.creditReceiptReward c.cfg c.receipt.receiverId settlement.burnPrice c.action.gasPrice
-  let finished := rewarded.finishReceiptResult c failed
-  have hbase : base.state.IdsBelowNext := by
-    cases failed <;> first | exact hraw | exact hinitial
-  have hcharged : charged.state.IdsBelowNext := hbase
-  have hbalance : balance.state.IdsBelowNext := by
-    dsimp only [balance]
-    split
-    · exact Exec.addBalanceRefund_idsBelowNext charged _ _ hcharged
-    · exact hcharged
-  have hgas : gas.state.IdsBelowNext := by
-    dsimp only [gas]
-    split
-    · exact Exec.addGasRefund_idsBelowNext balance _ _ _ hbalance
-    · exact hbalance
-  have hrewarded : rewarded.state.IdsBelowNext :=
-    Exec.creditReceiptReward_idsBelowNext gas _ _ _ _ hgas
-  have hfinished : finished.state.IdsBelowNext := by
-    exact Exec.finishReceiptResult_idsBelowNext rewarded c failed hrewarded
-  exact hfinished
+  refine finalizeReceipt_stages (fun e => e.state.IdsBelowNext) c st raw failed ?_
+    (fun _ _ _ h => h)
+    (fun e _ _ h => Exec.addBalanceRefund_idsBelowNext e _ _ h)
+    (fun e _ _ _ h => Exec.addGasRefund_idsBelowNext e _ _ _ h)
+    (fun e _ _ h => Exec.creditReceiptReward_idsBelowNext e _ _ _ _ h)
+    (fun e h => Exec.finishReceiptResult_idsBelowNext e c failed h)
+    (fun _ _ _ h => h)
+  cases failed <;> first | exact hraw | exact hinitial
 
 theorem applyActionReceipt_idsBelowNext (c : ReceiptCtx) (st : ChainState) (h : st.IdsBelowNext) :
     (applyActionReceipt c st).state.IdsBelowNext :=

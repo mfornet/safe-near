@@ -175,14 +175,14 @@ theorem processReceipt_burn_accumulate (cfg : RuntimeConfig) (ap : ApplyState)
 reported gross token burn. Gas accumulation does not affect this projection. -/
 theorem forIn_outcomes_tokensBurnt (outcomes : List (ReceiptId × ExecutionOutcome)) (prior gas : Nat) :
     (forIn outcomes (prior, gas) (fun entry ledger =>
-      pure (.yield (ledger.1 + entry.2.tokensBurnt, ledger.2 + entry.2.gasBurnt))) : Id (Nat × Nat)).1 =
+      pure (.yield (ledger.1 + entry.2.tokensBurnt, ledger.2 + entry.2.computeUsage))) : Id (Nat × Nat)).1 =
       prior + (outcomes.map (fun entry => entry.2.tokensBurnt)).sum := by
   induction outcomes generalizing prior gas with
   | nil => simp
   | cons entry rest ih =>
     rw [List.forIn_cons]
     dsimp only [bind, pure]
-    have hrest := ih (prior + entry.2.tokensBurnt) (gas + entry.2.gasBurnt)
+    have hrest := ih (prior + entry.2.tokensBurnt) (gas + entry.2.computeUsage)
     dsimp only [pure] at hrest
     rw [hrest]
     simp only [List.map_cons, List.sum_cons]
@@ -197,7 +197,7 @@ theorem processReceipt_outcomeLoop_burn (cfg : RuntimeConfig) (ap : ApplyState)
     (hratio : cfg.fees.burntGasReward.1 ≤ cfg.fees.burntGasReward.2) :
     let p := processReceipt cfg ap decoder st receipt
     (forIn p.outcomes (prior, gas) (fun entry ledger =>
-      pure (.yield (ledger.1 + entry.2.tokensBurnt, ledger.2 + entry.2.gasBurnt))) : Id (Nat × Nat)).1 +
+      pure (.yield (ledger.1 + entry.2.tokensBurnt, ledger.2 + entry.2.computeUsage))) : Id (Nat × Nat)).1 +
         p.otherTokensBurnt - p.rewards = prior + p.netTokensBurnt := by
   dsimp only
   rw [forIn_outcomes_tokensBurnt]
@@ -216,7 +216,7 @@ theorem processReceipt_ledger_conservation (cfg : RuntimeConfig) (ap : ApplyStat
     let p := processReceipt cfg ap decoder st receipt
     p.totalFunds cfg +
       ((forIn p.outcomes (prior, gas) (fun entry ledger =>
-        pure (.yield (ledger.1 + entry.2.tokensBurnt, ledger.2 + entry.2.gasBurnt))) : Id (Nat × Nat)).1 +
+        pure (.yield (ledger.1 + entry.2.tokensBurnt, ledger.2 + entry.2.computeUsage))) : Id (Nat × Nat)).1 +
           p.otherTokensBurnt - p.rewards) =
       st.totalFunds cfg + Fees.receiptFunds cfg receipt + p.subsidizedAmount + prior := by
   have hc := processReceipt_conservation cfg ap decoder st receipt hwf hpost hfresh hshape hnew hratio hsupported
