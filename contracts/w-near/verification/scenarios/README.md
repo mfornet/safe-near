@@ -242,7 +242,7 @@ model, now fixed, and one in the statement, still open.
    contract that touches storage. On a real chain one wNEAR call records at
    most three short trie paths, far below 4 MB. The fix belongs in the shared
    statement, in `Context.WF` or a hypothesis, and is not made here.
-   `open/storage_proof_size.json` shows it.
+   `open/storage_proof_size.json` shows it. Filed as SAF-67.
 
 Not found, with what was tried: the limits in `limit_config` that wNEAR can reach
 (log length, receipt validation) were already covered. Number of logs (at most 2
