@@ -8,7 +8,7 @@ the encoder does not infer that order from a hash table. -/
 
 def encodeBorshVec {α : Type} (encode : α → BountyBytes)
     (entries : List α) : BountyBytes :=
-  bountyLE 4 entries.length ++ entries.flatMap encode
+  NearSdk.Borsh.leBytes 4 entries.length ++ entries.flatMap encode
 
 structure WireConfig where
   name : String
@@ -19,7 +19,7 @@ structure WireConfig where
 def encodeWireConfig (config : WireConfig) : BountyBytes :=
   bountyBorshString config.name ++
   bountyBorshString config.purpose ++
-  bountyLE 4 config.metadata.length ++ config.metadata
+  NearSdk.Borsh.leBytes 4 config.metadata.length ++ config.metadata
 
 inductive WireRoleKind where
   | everyone
@@ -29,7 +29,7 @@ inductive WireRoleKind where
 
 def encodeWireRoleKind : WireRoleKind → BountyBytes
   | .everyone => [0]
-  | .member minimum => 1 :: bountyLE 16 minimum
+  | .member minimum => 1 :: NearSdk.Borsh.leBytes 16 minimum
   | .group accounts => 2 :: encodeBorshVec bountyBorshString accounts
 
 inductive WireWeightKind where
@@ -46,9 +46,9 @@ inductive WireWeightOrRatio where
   deriving Repr, DecidableEq
 
 def encodeWireWeightOrRatio : WireWeightOrRatio → BountyBytes
-  | .weight amount => 0 :: bountyLE 16 amount
+  | .weight amount => 0 :: NearSdk.Borsh.leBytes 16 amount
   | .ratio numerator denominator =>
-      1 :: (bountyLE 8 numerator ++ bountyLE 8 denominator)
+      1 :: (NearSdk.Borsh.leBytes 8 numerator ++ NearSdk.Borsh.leBytes 8 denominator)
 
 structure WireVotePolicy where
   weightKind : WireWeightKind
@@ -58,7 +58,7 @@ structure WireVotePolicy where
 
 def encodeWireVotePolicy (policy : WireVotePolicy) : BountyBytes :=
   encodeWireWeightKind policy.weightKind ++
-  bountyLE 16 policy.quorum ++
+  NearSdk.Borsh.leBytes 16 policy.quorum ++
   encodeWireWeightOrRatio policy.threshold
 
 structure WireRolePermission where
@@ -88,10 +88,10 @@ structure WirePolicy where
 def encodeWirePolicy (policy : WirePolicy) : BountyBytes :=
   encodeBorshVec encodeWireRolePermission policy.roles ++
   encodeWireVotePolicy policy.defaultVotePolicy ++
-  bountyLE 16 policy.proposalBond ++
-  bountyLE 8 policy.proposalPeriod ++
-  bountyLE 16 policy.bountyBond ++
-  bountyLE 8 policy.bountyForgivenessPeriod
+  NearSdk.Borsh.leBytes 16 policy.proposalBond ++
+  NearSdk.Borsh.leBytes 8 policy.proposalPeriod ++
+  NearSdk.Borsh.leBytes 16 policy.bountyBond ++
+  NearSdk.Borsh.leBytes 8 policy.bountyForgivenessPeriod
 
 inductive WireVersionedPolicy where
   | default (council : List String)

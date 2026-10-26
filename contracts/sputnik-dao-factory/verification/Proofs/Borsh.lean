@@ -3,93 +3,9 @@ import Proofs.Namespaces
 
 namespace SputnikFactory
 
-theorem fromLE_leBytes (width n : Nat) (h : n < 256 ^ width) :
-    Borsh.fromLE (leBytes width n) = n := by
-  induction width generalizing n with
-  | zero =>
-    have hn : n = 0 := by simpa using h
-    simp [hn, Borsh.fromLE, leBytes]
-  | succ width ih =>
-    have hdiv : n / 256 < 256 ^ width := by
-      rw [Nat.pow_succ] at h
-      omega
-    simp only [leBytes, Borsh.fromLE, UInt8.toNat_ofNat', ih _ hdiv]
-    have hm : n % 256 < 256 := Nat.mod_lt _ (by decide)
-    change n % 256 % 256 + 256 * (n / 256) = n
-    rw [Nat.mod_eq_of_lt hm]
-    omega
-
-theorem borsh_take_append (width : Nat) (bytes rest : Bytes)
-    (h : bytes.length = width) :
-    Borsh.take width (bytes ++ rest) = some (bytes, rest) := by
-  simp [Borsh.take, h]
-
-theorem natural_encode (width n : Nat) (rest : Bytes) (h : n < 256 ^ width) :
-    Borsh.natural width (leBytes width n ++ rest) = some (n, rest) := by
-  simp [Borsh.natural, borsh_take_append, fromLE_leBytes, h]
-
-theorem exact_natural_encode (width n : Nat) (h : n < 256 ^ width) :
-    Borsh.exact (Borsh.natural width) (leBytes width n) = some n := by
-  have hdecode := natural_encode width n [] h
-  simpa [Borsh.exact] using congrArg
-    (fun result => result.bind fun parsed =>
-      if parsed.2 = [] then some parsed.1 else none) hdecode
-
-theorem bytes_encode (bytes rest : Bytes) (h : bytes.length < 256 ^ 4) :
-    Borsh.bytes (borshBytes bytes ++ rest) = some (bytes, rest) := by
-  simp [Borsh.bytes, borshBytes, List.append_assoc,
-    natural_encode, borsh_take_append, h]
-
-theorem vector_encode (header : VectorHeader) (rest : Bytes)
-    (hlen : header.length < 256 ^ 8)
-    (hprefix : header.keyPrefix.length < 256 ^ 4) :
-    Borsh.vector (Borsh.encodeVector header ++ rest) = some (header, rest) := by
-  cases header with
-  | mk length keyPrefix =>
-    simp [Borsh.vector, Borsh.encodeVector, natural_encode,
-      bytes_encode, hlen, hprefix, List.append_assoc]
-
-theorem set_encode (header : SetHeader) (rest : Bytes)
-    (hindex : header.indexPrefix.length < 256 ^ 4)
-    (hlen : header.elements.length < 256 ^ 8)
-    (hprefix : header.elements.keyPrefix.length < 256 ^ 4) :
-    Borsh.setHeader (Borsh.encodeSet header ++ rest) = some (header, rest) := by
-  cases header with
-  | mk indexPrefix elements =>
-    simp [Borsh.setHeader, Borsh.encodeSet, List.append_assoc,
-      bytes_encode, vector_encode, hindex, hlen, hprefix]
-
-theorem map_encode (header : MapHeader) (rest : Bytes)
-    (hindex : header.indexPrefix.length < 256 ^ 4)
-    (hkeys : header.keys.length < 256 ^ 8)
-    (hkeyPrefix : header.keys.keyPrefix.length < 256 ^ 4)
-    (hvalues : header.values.length < 256 ^ 8)
-    (hvaluePrefix : header.values.keyPrefix.length < 256 ^ 4) :
-    Borsh.mapHeader (Borsh.encodeMap header ++ rest) = some (header, rest) := by
-  cases header with
-  | mk indexPrefix keys values =>
-    simp [Borsh.mapHeader, Borsh.encodeMap, List.append_assoc,
-      bytes_encode, vector_encode, hindex, hkeys, hkeyPrefix, hvalues, hvaluePrefix]
-
-theorem exact_set_encode (header : SetHeader)
-    (hindex : header.indexPrefix.length < 256 ^ 4)
-    (hlen : header.elements.length < 256 ^ 8)
-    (hprefix : header.elements.keyPrefix.length < 256 ^ 4) :
-    Borsh.exact Borsh.setHeader (Borsh.encodeSet header) = some header := by
-  have h := set_encode header [] hindex hlen hprefix
-  simp only [List.append_nil] at h
-  simp [Borsh.exact, h]
-
-theorem exact_map_encode (header : MapHeader)
-    (hindex : header.indexPrefix.length < 256 ^ 4)
-    (hkeys : header.keys.length < 256 ^ 8)
-    (hkeyPrefix : header.keys.keyPrefix.length < 256 ^ 4)
-    (hvalues : header.values.length < 256 ^ 8)
-    (hvaluePrefix : header.values.keyPrefix.length < 256 ^ 4) :
-    Borsh.exact Borsh.mapHeader (Borsh.encodeMap header) = some header := by
-  have h := map_encode header [] hindex hkeys hkeyPrefix hvalues hvaluePrefix
-  simp only [List.append_nil] at h
-  simp [Borsh.exact, h]
+export NearSdk.Borsh (fromLE_leBytes)
+export NearSdk.BorshParse (borsh_take_append natural_encode exact_natural_encode bytes_encode)
+export NearSdk.Collections (vector_encode set_encode map_encode exact_set_encode exact_map_encode)
 
 theorem string_utf8_roundtrip (value : String) :
     String.fromUTF8? ⟨value.toUTF8.data.toList.toArray⟩ = some value := by

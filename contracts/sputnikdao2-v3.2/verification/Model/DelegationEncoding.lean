@@ -9,10 +9,10 @@ def delegationKey (account : String) : BountyBytes :=
   2 :: bountyBorshString account
 
 def encodeDelegationBalance (amount : Nat) : BountyBytes :=
-  bountyLE 16 amount
+  NearSdk.Borsh.leBytes 16 amount
 
 def parseDelegationBalance (input : BountyBytes) : Option Nat := do
-  let (amount, rest) ← bountyParseNat 16 input
+  let (amount, rest) ← NearSdk.BorshParse.natural 16 input
   if rest.isEmpty then some amount else none
 
 abbrev DelegationRawTrie := BountyRawTrie

@@ -51,6 +51,11 @@ jobs:
 
       # The libraries, the tests and the replay executables (ChainReplay), whose missing case
       # broke `main` in the 2026-10-23 check.
+      # The near-sdk layout library the contract projects share (no dependencies).
+      - name: Build the sdk package
+        working-directory: near-lean/sdk
+        run: lake build NearSdk --wfail
+
       - uses: leanprover/lean-action@v1
         with:
           lake-package-directory: near-lean/chain

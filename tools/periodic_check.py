@@ -66,6 +66,7 @@ def validation_steps(root: Path, nearcore: Path) -> list[Step]:
         "staking-key-replay", "trie-replay", "--wfail")
     add("chain-build", "near-lean/chain", "lake", "build", "NearChain", "chain-tests", "chain-replay",
         "registered-replay", "state-encode", "receipt-encode", "transaction-replay", "receipt-replay", "--wfail")
+    add("sdk-build", "near-lean/sdk", "lake", "build", "NearSdk", "--wfail")
     add("crypto-build", "near-lean/crypto", "lake", "build", "NearCrypto", "crypto-conformance",
         "crypto-differential", "--wfail")
     add("node-build", "near-lean/node", "lake", "build", "NearNode", "near-lean-node", "node-bench",
@@ -114,7 +115,7 @@ def validation_steps(root: Path, nearcore: Path) -> list[Step]:
     for package, report in [("near-lean/wasm", "wasm"), ("near-lean/wasm-logic", "wasm-logic"),
                             ("near-lean/interface", "interface"), ("near-lean/vm", "vm"),
                             ("near-lean/runtime", "runtime"), ("near-lean/chain", "chain"),
-                            ("near-lean/crypto", "crypto")]:
+                            ("near-lean/crypto", "crypto"), ("near-lean/sdk", "sdk")]:
         python(f"audit-{report}", "tools/axiom-audit.py", package, "--no-build", "--report", f"audit/{report}.json")
     for contract, report in adapter_contracts:
         python(f"audit-{report}", "tools/axiom-audit.py", f"contracts/{contract}/verification", "--no-build",
