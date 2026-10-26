@@ -88,6 +88,14 @@ class Node:
 NEARD, LEAN = Node("neard", 0), Node("lean", 1)
 
 
+def set_topology(name: str) -> None:
+    """Selects the topology (``validator`` or ``validator-sharded``) for this module and ``validator_accept``."""
+    global TOPOLOGY, NEARD, LEAN
+    va.set_topology(name)
+    TOPOLOGY = name
+    NEARD, LEAN = Node("neard", 0), Node("lean", 1)
+
+
 def wait_for(predicate, timeout, what, step=0.5):
     deadline = time.time() + timeout
     last = None
@@ -217,6 +225,28 @@ def heads() -> tuple:
             LEAN.call("status", [])[1]["result"]["sync_info"]["latest_block_hash"])
 
 
+COVERAGE: collections.Counter = collections.Counter()
+
+
+def note_coverage(response) -> None:
+    """What the answers of ``neard`` contain, so that a run cannot pass without having met the cases it is meant to compare:
+    the kinds of contract an outcome's metadata lists (``local``, ``global_hash``, ``global_account_id``), global contract
+    actions and global-contract failures."""
+    if isinstance(response, dict):
+        for key, value in response.items():
+            if key == "contracts" and isinstance(value, list):
+                for entry in value:
+                    if isinstance(entry, dict):
+                        COVERAGE["metadata.contracts." + next(iter(entry), "?")] += 1
+            elif key in ("DeployGlobalContract", "DeployGlobalContractByAccountId", "UseGlobalContract", "UseGlobalContractByAccountId",
+                         "GlobalContractDistribution", "GlobalContractDoesNotExist", "LackBalanceForState"):
+                COVERAGE[key] += 1
+            note_coverage(value)
+    elif isinstance(response, list):
+        for value in response:
+            note_coverage(value)
+
+
 def compare(request: Request, attempts: int = 12) -> dict:
     """Sends the request to both nodes.  A request that depends on the head is repeated until both nodes answered
     at the same head (their heads are read before and after)."""
@@ -231,6 +261,8 @@ def compare(request: Request, attempts: int = 12) -> dict:
         break
     else:
         return {"request": request, "equal": False, "stale": True, "diff": ["the nodes never answered at the same head"]}
+    if request.method in ("tx", "EXPERIMENTAL_tx_status", "block", "chunk", "EXPERIMENTAL_changes_in_block"):
+        note_coverage(rn)
     nn, nl = normalise(request.method, rn), normalise(request.method, rl)
     unrendered = unify_unrendered(nn, nl)
     problems = diff(nn, nl)
@@ -276,15 +308,32 @@ class Chain:
         # a block that is final on both nodes, at which the state is compared
         self.at = self.blocks[self.final["height"] - 2] if (self.final["height"] - 2) in self.blocks else self.blocks[self.final["height"]]
         self.contracts = {}
+        self.globals: dict[str, dict] = {}         # accounts that use a global contract -> how
         self.keys = {}
         for account in self.accounts:
             status, reply = NEARD.call("query", {"request_type": "view_account", "block_id": self.at["header"]["hash"], "account_id": account})
             if status == 200 and "result" in reply and "code_hash" in reply["result"]:
                 if reply["result"]["code_hash"] != "1" * 32:
                     self.contracts[account] = reply["result"]["code_hash"]
+                if reply["result"].get("global_contract_hash") or reply["result"].get("global_contract_account_id"):
+                    self.globals[account] = {k: reply["result"][k] for k in ("global_contract_hash", "global_contract_account_id")
+                                             if reply["result"].get(k)}
             status, reply = NEARD.call("query", {"request_type": "view_access_key_list", "block_id": self.at["header"]["hash"], "account_id": account})
             if status == 200 and "result" in reply and "keys" in reply["result"]:
                 self.keys[account] = [k["public_key"] for k in reply["result"]["keys"]]
+
+    def global_deployments(self) -> tuple[list[int], dict[str, list[str]], list[str]]:
+        """The heights of the transactions that deploy a global contract, the code hash of each deployed code (read from the
+        accounts that use it) and the accounts that deployed by account id."""
+        heights, deployers = [], []
+        for tx in self.txs:
+            kinds = [next(iter(a)) if isinstance(a, dict) else a for a in tx["actions"]]
+            if any(k in ("DeployGlobalContract", "DeployGlobalContractByAccountId") for k in kinds):
+                heights.append(tx["height"])
+                if "DeployGlobalContractByAccountId" in kinds:
+                    deployers.append(tx["signer_id"])
+        hashes = sorted({v["global_contract_hash"] for v in self.globals.values() if "global_contract_hash" in v})
+        return sorted(set(heights)), {"hashes": hashes}, sorted(set(deployers) | {v["global_contract_account_id"] for v in self.globals.values() if "global_contract_account_id" in v})
 
     def heights_with(self, predicate, limit):
         found = []
@@ -336,8 +385,10 @@ def build_requests(chain: Chain) -> list[Request]:
     add("block", "block", None, note="no parameters")
     # chunk
     chunk_blocks = [h for h in heights if h in chain.blocks and chain.blocks[h]["chunks"]]
+    shard_ids = sorted(va.shard_layout()[1].values())
     for h in chunk_blocks[:30]:
-        add("chunk", "chunk", {"block_id": h, "shard_id": 0})
+        for shard_id in shard_ids:
+            add("chunk", "chunk", {"block_id": h, "shard_id": shard_id})
     for chunk_hash in list(chain.chunks)[:: max(1, len(chain.chunks) // 25)]:
         add("chunk", "chunk", {"chunk_id": chunk_hash})
     some_chunk = next(iter(chain.chunks))
@@ -393,6 +444,48 @@ def build_requests(chain: Chain) -> list[Request]:
                 add("query/call_function", "query", {"request_type": "call_function", "block_id": at, "account_id": account, "method_name": method, "args_base64": b64(args)})
     add("query/call_function", "query", {"request_type": "call_function", "block_id": at, "account_id": "node0", "method_name": "x", "args_base64": ""}, note="no contract")
     add("query/call_function", "query", {"request_type": "call_function", "block_id": at, "account_id": "nosuch.node0", "method_name": "x", "args_base64": ""}, note="unknown account")
+    # global contracts: the accounts that use one (by hash and by account id), the code itself, and the errors
+    for account in chain.globals:
+        add("query/view_code(global)", "query", {"request_type": "view_code", "block_id": at, "account_id": account})
+        add("query/view_state(global)", "query", {"request_type": "view_state", "block_id": at, "account_id": account, "prefix_base64": ""})
+        add("query/view_code(global)", "query", {"request_type": "view_code", "finality": "final", "account_id": account}, head=True)
+        for method, args in (("log_something", b""), ("ext_account_id", b""), ("ext_account_balance", b""), ("sum_n", u64le(500)),
+                             ("read_value", u64le(0)), ("ft_total_supply", b""), ("ft_metadata", b"{}"), ("nosuch", b"")):
+            add("query/call_function(global)", "query", {"request_type": "call_function", "block_id": at, "account_id": account,
+                                                          "method_name": method, "args_base64": b64(args)})
+    deploy_heights, found, deployers = chain.global_deployments()
+    for code_hash in found["hashes"]:
+        add("query/view_global_contract_code", "query", {"request_type": "view_global_contract_code", "block_id": at, "code_hash": code_hash})
+        add("query/view_global_contract_code", "query", {"request_type": "view_global_contract_code", "finality": "final", "code_hash": code_hash}, head=True)
+        add("query/view_global_contract_code", "query", {"request_type": "view_global_contract_code", "finality": "optimistic", "code_hash": code_hash}, head=True)
+        add("query/view_global_contract_code", "query", {"request_type": "view_global_contract_code", "block_id": chain.blocks[chain.head - 2]["header"]["hash"],
+                                                         "code_hash": code_hash}, note="by block hash")
+    for account in deployers + ["a.node0", "node0", "nosuch.node0"]:
+        add("query/view_global_contract_code_by_account_id", "query", {"request_type": "view_global_contract_code_by_account_id", "block_id": at,
+                                                                       "account_id": account}, note="" if account in deployers else "never deployed by account id")
+        add("query/view_global_contract_code_by_account_id", "query", {"request_type": "view_global_contract_code_by_account_id", "finality": "final",
+                                                                       "account_id": account}, head=True)
+    # the code of every height around a deployment: the distribution reaches the shards a few blocks later
+    for height in sorted({h + d for h in deploy_heights for d in range(0, 10)}):
+        if height in chain.blocks:
+            for account in deployers:
+                add("query/view_global_contract_code_by_account_id", "query", {"request_type": "view_global_contract_code_by_account_id",
+                                                                               "block_id": height, "account_id": account}, note="around a deployment")
+            for code_hash in found["hashes"]:
+                add("query/view_global_contract_code", "query", {"request_type": "view_global_contract_code", "block_id": height,
+                                                                 "code_hash": code_hash}, note="around a deployment")
+            for account in list(chain.globals)[:3]:
+                add("query/view_code(global)", "query", {"request_type": "view_code", "block_id": height, "account_id": account},
+                    note="around a deployment")
+    add("query/view_global_contract_code", "query", {"request_type": "view_global_contract_code", "block_id": at, "code_hash": "11111111111111111111111111111111"}, note="never deployed")
+    add("query/view_global_contract_code", "query", {"request_type": "view_global_contract_code", "block_id": at}, note="no code_hash")
+    add("query/view_global_contract_code", "query", {"request_type": "view_global_contract_code", "block_id": at, "code_hash": "abc"}, note="malformed hash")
+    add("query/view_global_contract_code", "query", {"request_type": "view_global_contract_code", "block_id": at, "code_hash": 5}, note="hash is not a string")
+    add("query/view_global_contract_code", "query", {"request_type": "view_global_contract_code", "block_id": 10 ** 9, "code_hash": "11111111111111111111111111111111"}, note="unknown block")
+    add("query/view_global_contract_code", "query", {"request_type": "view_global_contract_code", "code_hash": "11111111111111111111111111111111"}, note="no block reference")
+    add("query/view_global_contract_code_by_account_id", "query", {"request_type": "view_global_contract_code_by_account_id", "block_id": at}, note="no account_id")
+    add("query/view_global_contract_code_by_account_id", "query", {"request_type": "view_global_contract_code_by_account_id", "block_id": at, "account_id": "Not An Account"}, note="invalid account id")
+    add("query/view_global_contract_code_by_account_id", "query", {"request_type": "view_global_contract_code_by_account_id", "block_id": 10 ** 9, "account_id": "node0"}, note="unknown block")
     # transactions: every transaction of the chain
     for tx in chain.txs:
         add("tx", "tx", {"tx_hash": tx["hash"], "sender_account_id": tx["signer_id"], "wait_until": "FINAL"})
@@ -646,15 +739,25 @@ def run(options) -> int:
             print(f"{group:32} {row}")
         print("restart:", restart)
         print("unrendered failures at the Lean node (neard's payload):", dict(UNRENDERED_KINDS))
+        print("coverage of the answers of neard:", dict(sorted(COVERAGE.items())))
+        # the global-contract cases must have been met, or the run proves nothing about them
+        required = ("metadata.contracts.global_hash", "metadata.contracts.global_account_id", "DeployGlobalContract",
+                    "DeployGlobalContractByAccountId", "UseGlobalContract", "UseGlobalContractByAccountId",
+                    "GlobalContractDoesNotExist") + (("GlobalContractDistribution",) if len(va.shard_layout()[1]) > 1 else ())
+        missing = [k for k in required if not COVERAGE[k]]
+        if missing:
+            print("NOT COVERED (the workload did not produce them):", missing)
+        if UNRENDERED_KINDS:
+            print("UNRENDERED failures remain:", sum(UNRENDERED_KINDS.values()))
         total = len(results)
         equal = sum(1 for r in results if r["equal"])
-        print(f"{equal}/{total} requests equal, 0 known gaps, {total - equal} other differences")
+        print(f"{equal}/{total} requests equal, {sum(UNRENDERED_KINDS.values())} known gaps, {total - equal} other differences")
         (options.work / "rpc-conformance.json").write_text(json.dumps(
             {"table": table, "restart": restart, "requests": total, "equal": equal,
              "diffs": [{"group": r["request"].group, "method": r["request"].method, "note": r["request"].note,
                         "diff": r["diff"][:6]} for r in results if not r["equal"]],
              "normalisation": NORMALISATION}, indent=1))
-        code = 0 if equal == total else 1
+        code = 0 if equal == total and not missing and not UNRENDERED_KINDS else 1
     finally:
         for process in (load, lean):
             if process and process.poll() is None:
@@ -685,11 +788,13 @@ def serve(options) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("mode", choices=["serve", "run", "check"], nargs="?", default="run")
+    parser.add_argument("--topology", default="validator", choices=["validator", "validator-sharded"])
     parser.add_argument("--binary", type=Path, default=va.BINARY)
     parser.add_argument("--work", type=Path, default=localnet.DATA / "rpc-run")
     parser.add_argument("--no-workload", action="store_true")
     parser.add_argument("--gc-epochs", type=int, default=None, help="--gc-epochs-to-keep of the Lean node (default: its own)")
     options = parser.parse_args()
+    set_topology(options.topology)
     if options.gc_epochs is not None:
         GC_EPOCHS[:] = [options.gc_epochs]
     options.work.mkdir(parents=True, exist_ok=True)

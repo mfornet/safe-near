@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Soak of the validator (M10): `just localnet-soak`.
 
-The topology of `just localnet-validator` (two validators of equal stake, one shard; node0 is `neard`, node1 the Lean
+The topology of `just localnet-validator` (two validators of equal stake, one shard, or with `--topology validator-sharded` four; node0 is `neard`, node1 the Lean
 node, so the chain cannot finalize without the Lean node) with the full workload on it for a long window: the
 scenarios of ``workload.py`` once (host function calls, the 14 calls of 300 Tgas, the wait for a yield to time
 out), then light traffic all the time and, every ``--burst-period`` seconds, a light burst (ten calls that each
@@ -43,7 +43,6 @@ import localnet
 import nearcodec as nc
 import validator_accept as va
 
-TOPOLOGY = va.TOPOLOGY
 HERE = Path(__file__).resolve().parent
 LEAN_RPC = ("127.0.0.1", 18399)
 
@@ -208,20 +207,20 @@ def workload_thread(options: argparse.Namespace, soak: Soak, work: Path) -> thre
         skip = ([] if options.full_workload else ["hostcalls", "burst", "wait"]) + options.skip
         # the scenarios once, then light traffic until the end
         leave_out = ["--no-deploy-from-memory"] if options.no_deploy_from_memory else []
-        scenario = subprocess.Popen([python, script, TOPOLOGY, *leave_out, "--skip"] + skip,
+        scenario = subprocess.Popen([python, script, va.TOPOLOGY, *leave_out, "--skip"] + skip,
                                     stdout=(work / "workload.log").open("w"), stderr=subprocess.STDOUT, cwd=HERE)
         steady_left = options.duration + 600
         deadline = soak.started + options.duration
         while scenario.poll() is None and not soak.stop.is_set():
             time.sleep(1)
-        steady = subprocess.Popen([python, script, TOPOLOGY, "--no-scenarios", "--steady", str(steady_left),
+        steady = subprocess.Popen([python, script, va.TOPOLOGY, "--no-scenarios", "--steady", str(steady_left),
                                    "--period", str(options.period)], stdout=(work / "steady.log").open("w"),
                                   stderr=subprocess.STDOUT, cwd=HERE)
         next_burst = time.time() + options.burst_period
         while not soak.stop.is_set() and time.time() < deadline:
             if time.time() >= next_burst:
                 soak.bursts.append(time.time())
-                burst = subprocess.Popen([python, script, TOPOLOGY, "--no-scenarios", "--inject", "lightburst"],
+                burst = subprocess.Popen([python, script, va.TOPOLOGY, "--no-scenarios", "--inject", "lightburst"],
                                          stdout=(work / "burst.log").open("a"), stderr=subprocess.STDOUT, cwd=HERE)
                 try:
                     burst.wait(timeout=300)
@@ -297,6 +296,8 @@ def summarize(options: argparse.Namespace, soak: Soak, report: dict) -> dict:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--topology", default="validator", choices=["validator", "validator-sharded"],
+                        help="validator: one shard; validator-sharded: the four shards of `sharded`")
     parser.add_argument("--duration", type=int, default=3600, help="seconds of soak")
     parser.add_argument("--sample", type=float, default=5.0, help="seconds between samples")
     parser.add_argument("--burst-period", type=int, default=300, help="seconds between light bursts")
@@ -319,10 +320,11 @@ def main() -> None:
     parser.add_argument("--binary", type=Path, default=va.BINARY)
     parser.add_argument("--work", type=Path, default=localnet.DATA / "soak-run")
     options = parser.parse_args()
+    va.set_topology(options.topology)
     work = options.work
     home = va.prepare(work)
     store = work / "store"
-    localnet.start(TOPOLOGY)
+    localnet.start(va.TOPOLOGY)
     extra = ["--rpc-addr", f"{LEAN_RPC[0]}:{LEAN_RPC[1]}", "--store", str(store)] + ([] if options.verbose else ["--quiet"]) \
         + (["--gc-epochs-to-keep", str(options.gc_epochs)] if options.gc_epochs is not None else [])
     lean = va.start_lean(home, work, options.duration + 600, options.binary, extra)
@@ -363,7 +365,7 @@ def main() -> None:
             os.killpg(lean.pid, signal.SIGKILL)
         except ProcessLookupError:
             pass
-        localnet.stop(TOPOLOGY)
+        localnet.stop(va.TOPOLOGY)
     sys.exit(0 if result["ok"] else 1)
 
 

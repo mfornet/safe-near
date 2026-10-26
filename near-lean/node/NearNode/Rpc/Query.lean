@@ -72,6 +72,8 @@ inductive QueryRequest where
   | accessKey (a : AccountId) (k : PublicKey)
   | accessKeys (a : AccountId)
   | call (a : AccountId) (method : String) (args : ByteArray)
+  /-- `ViewGlobalContractCode` and `ViewGlobalContractCodeByAccountId`. -/
+  | globalCode (id : GlobalContractIdentifier)
 
 private def b64Field (o : Json) (k : String) : Except String ByteArray :=
   match field? o k with
@@ -124,6 +126,15 @@ def parseRequest (o : Json) : Except String QueryRequest := do
     let a ← accountField o
     let some (.str m) := field? o "method_name" | throw "missing field `method_name`"
     pure (.call a m (← b64Field o "args_base64"))
+  | "view_global_contract_code" =>
+    let some h := field? o "code_hash" | throw "missing field `code_hash`"
+    match h with
+    | .str _ =>
+      pure (.globalCode (.codeHash (← parseHash h)))
+    | _ =>
+      throw s!"invalid type: {serdeFound h}, expected base58-encoded 256-bit hash"
+  | "view_global_contract_code_by_account_id" =>
+    pure (.globalCode (.accountId (← accountField o)))
   | other =>
     throw
         s!"unknown variant `{other}`, expected one of `view_account`, `view_code`, `view_state`, `view_access_key`, `view_access_key_list`, `view_gas_key_nonces`, `call_function`, `view_global_contract_code`, `view_global_contract_code_by_account_id`"
@@ -249,11 +260,13 @@ def query (c : Ctx) (params : Json) : IO R := do
     return .error e
   | .ok (ref, req) =>
     let some b := resolve s ref | return .error (queryUnknownBlock s params ref)
-    let account : AccountId :=
+    let viewOf : Except String StateAt :=
       match req with
-      | .account a | .code a | .state a .. | .accessKey a _ | .accessKeys a | .call a .. => a
+      | .account a | .code a | .state a .. | .accessKey a _ | .accessKeys a | .call a .. =>
+        stateAt s b a
+      | .globalCode _ => stateAtFirstShard s b
     let view ←
-      match stateAt s b account with
+      match viewOf with
       | .ok v =>
         pure v
       | .error m =>
@@ -278,17 +291,57 @@ def query (c : Ctx) (params : Json) : IO R := do
       | .ok none =>
         return .error (unknownAccount b a)
       | .ok (some acc) =>
-        match acc.localHash, view.get (.contractCode a) with
-        | some h, .ok (some code) =>
-          return withBlock b [("code_base64", jbytes code), ("hash", jhash h)]
-        | _, .error m =>
+        let noCode : RpcError :=
+          RpcError.handler "NO_CONTRACT_CODE"
+            (some (Json.mkObj ([("contract_account_id", jacc a)] ++ blockInfo b)))
+            (Json.str s!"Contract code for contract ID #{a.val} has never been observed on the node")
+        -- `view_account_contract_code`: the code the account holds, or the global contract it uses
+        let found : Except String (Option (ByteArray × CryptoHash)) :=
+          match acc with
+          | .v2 _ _ _ (.global h) =>
+            (view.get (.globalContractCode (.codeHash h))).map fun c => c.map (·, h)
+          | .v2 _ _ _ (.globalByAccount id) =>
+            (view.get (.globalContractCode (.accountId id))).map fun c =>
+              c.map fun code => (code, CryptoHash.hash code)
+          | _ =>
+            match acc.localHash with
+            | some h => (view.get (.contractCode a)).map fun c => c.map (·, h)
+            | none => pure none
+        match found with
+        | .error m =>
           return .error (internalError m)
-        | _, _ =>
-          return .error
-              (RpcError.handler "NO_CONTRACT_CODE"
-                (some (Json.mkObj ([("contract_account_id", jacc a)] ++ blockInfo b)))
-                (Json.str
-                  s!"Contract code for contract ID #{a.val} has never been observed on the node"))
+        | .ok (some (code, h)) =>
+          return withBlock b [("code_base64", jbytes code), ("hash", jhash h)]
+        | .ok none =>
+          return .error noCode
+    | .globalCode id =>
+      let key : GlobalContractCodeIdentifier :=
+        match id with
+        | .codeHash h => .codeHash h
+        | .accountId a => .accountId a
+      match view.get (.globalContractCode key) with
+      | .error m =>
+        return .error (internalError m)
+      | .ok (some code) =>
+        let h : CryptoHash :=
+          match id with
+          | .codeHash h => h
+          | .accountId _ => CryptoHash.hash code
+        return withBlock b [("code_base64", jbytes code), ("hash", jhash h)]
+      | .ok none =>
+        let (key, debug) : String × String :=
+          match id with
+          | .codeHash h => ("hash", s!"CodeHash({base58Encode h.bytes})")
+          | .accountId a => ("account_id", s!"AccountId(AccountId({stringDebug a.val}))")
+        let idJson : Json :=
+          match id with
+          | .codeHash h => Json.mkObj [(key, jhash h)]
+          | .accountId a => Json.mkObj [(key, jacc a)]
+        return .error
+            (RpcError.handler "NO_GLOBAL_CONTRACT_CODE"
+              (some (Json.mkObj ([("identifier", idJson)] ++ blockInfo b)))
+              (Json.str
+                s!"Global contract code with identifier {debug} has never been observed on the node"))
     | .accessKey a k =>
       match view.accessKey a k with
       | .error m =>

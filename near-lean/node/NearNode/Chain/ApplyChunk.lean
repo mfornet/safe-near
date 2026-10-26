@@ -80,6 +80,11 @@ def failureOf (index : Option Nat) (e : Near.RuntimeError) : TxExecutionError :=
     | .delegateActionExpired => some .delegateActionExpired
     | .delegateActionInvalidNonce d a => some (.delegateActionInvalidNonce d.toUInt64 a.toUInt64)
     | .delegateActionNonceTooLarge d u => some (.delegateActionNonceTooLarge d.toUInt64 u.toUInt64)
+    | .globalContractDoesNotExist (.codeHash h) =>
+      some (.globalContractDoesNotExist (.codeHash ⟨ByteArray.mk h.toArray⟩))
+    | .globalContractDoesNotExist (.accountId a) =>
+      (String.fromUTF8? (ByteArray.mk a.toArray)).map fun id =>
+        .globalContractDoesNotExist (.accountId ⟨id⟩)
     | .functionCallError (.methodResolveError m) =>
       some
         (.functionCallError

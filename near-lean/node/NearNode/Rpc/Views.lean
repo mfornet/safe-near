@@ -291,6 +291,8 @@ def actionErrorKindJson : ActionErrorKind → Json
   | .delegateActionNonceTooLarge d u =>
     tagged "DelegateActionNonceTooLarge"
       (Json.mkObj [("delegate_nonce", jn d.toNat), ("upper_bound", jn u.toNat)])
+  | .globalContractDoesNotExist id =>
+    tagged "GlobalContractDoesNotExist" (Json.mkObj [("identifier", globalIdView id)])
   | _ => Json.str "<unrendered action error>"
 
 /-- The failure of an outcome. The kinds `actionErrorKindJson` does not render, and the errors the node does not
