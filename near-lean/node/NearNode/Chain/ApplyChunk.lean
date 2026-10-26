@@ -496,7 +496,7 @@ def runChunk (prof : Option Prof) (cfg : Wasm.Near.RuntimeConfig)
       let proposals ← proposalsOf (Near.uniqueProposals result.proposals)
       let changes ←
         Chain.rawChanges (updateChanges ++ result.changes) (Chain.causeOf txHashes native)
-          (Chain.valueBytes catalogue hashOfLabel? (digestFor catalogue))
+            (Chain.valueBytes catalogue hashOfLabel? (digestFor catalogue))
       pure
           {
             entries :=
@@ -537,7 +537,7 @@ def runOldChunk (cfg : Wasm.Near.RuntimeConfig) (congestion : Near.Congestion.Co
     ({ p.shard with scheduler := scheduled.state } : ChainReplay.ShardChunk.State).entries
   let changes ←
     Chain.rawChanges updateChanges (Chain.causeOf #[] fun _ => throw "an old chunk runs no receipt")
-      (Chain.valueBytes catalogue hashOfLabel? (digestFor catalogue))
+        (Chain.valueBytes catalogue hashOfLabel? (digestFor catalogue))
   pure ((stateEntries ++ shardEntries).toArray.map fun (k, v) => (bytesOf k, bytesOf v), changes)
 
 end Near.Node.Apply

@@ -294,7 +294,8 @@ def query (c : Ctx) (params : Json) : IO R := do
         let noCode : RpcError :=
           RpcError.handler "NO_CONTRACT_CODE"
             (some (Json.mkObj ([("contract_account_id", jacc a)] ++ blockInfo b)))
-            (Json.str s!"Contract code for contract ID #{a.val} has never been observed on the node")
+            (Json.str
+              s!"Contract code for contract ID #{a.val} has never been observed on the node")
         -- `view_account_contract_code`: the code the account holds, or the global contract it uses
         let found : Except String (Option (ByteArray × CryptoHash)) :=
           match acc with
