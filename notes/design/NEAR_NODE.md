@@ -1841,10 +1841,25 @@ Sources: `tools/localnet/{localnet,validator_accept,soak,rpc_conformance,workloa
   `AccountId(AccountId("x"))`), and `view_code` of an account that uses a global contract (it was `NO_CONTRACT_CODE`; now the shared
   code, as `view_account_contract_code` resolves it). `GlobalContractDoesNotExist` is rendered in failures (it was
   `<unrendered failure>`).
-- **Conformance.** 1601 requests on the single-shard topology, all equal, 0 known gaps, including 40 `call_function`, 133 `view_code`,
+- **Conformance.** 1602 requests on the single-shard topology (1725 on four shards), all equal, 0 known gaps, including 40 `call_function`, 133 `view_code`,
   96 + 95 global code queries and the state changes of every block; the run fails if the answers of `neard` do not contain the global
   cases (`metadata.contracts` entries `global_hash` and `global_account_id`, the four actions, `GlobalContractDoesNotExist`, and on
   several shards `GlobalContractDistribution` receipts) or if any failure is unrendered.
+
+##### Acceptance of V1 and V2 (one run of each, on the final build)
+
+| Run | Result |
+| --- | --- |
+| `validator_accept.py --topology validator-sharded --duration 520` (1) | ok: 799 blocks applied, 799 same hash (2 orphans neard holds), 3154 of 3154 state roots equal (shard 0: 766, 1: 796, 2: 796, 3: 796); Lean produced new chunks on all four shards (619, 149, 179, 649) and 471 blocks; 677 of 677 outcomes equal, 126 of them receipts that ran on another shard than the signer's; 173 transactions in 128 Lean chunks; 1570 witnesses of `neard` valid; stall test: head 784 -> 784 while stopped, 803 after, final 782 -> 801 |
+| the same (2) | ok: 798 applied, 798 same hash, 3150 of 3150 roots, 688 of 688 outcomes (128 cross-shard), 1566 witnesses valid, stall test ok |
+| `validator_accept.py --duration 360` (single shard) | ok: 559 applied, 559 same hash, 557 of 557 roots, 659 of 659 outcomes, 156 transactions in 56 Lean chunks, stall test ok |
+| `soak.py --topology validator-sharded --duration 1800` (full workload, global contracts included) | all nine checks ok: 2802 blocks compared, 2802 hashes equal, 11046 of 11046 state roots equal over four shards, head 3 to 2779, final 2777, head minus final at most 13, no window without finality, lag at most 2 outside bursts and 1 inside (4 light bursts), median 0, no disconnect, RPC answered at every sample, longest turn of the loop 567 ms, 5526 witnesses valid, RSS 182 MB to 201 MB (peak 229 MB; the slope of 45 MB/h is a 30 minute estimate) |
+| `rpc_conformance.py run` (single shard) | 1602 of 1602 requests equal, 0 known gaps, 0 other differences; restart from the store: caught up in seconds, final height equal afterwards |
+| `rpc_conformance.py run --topology validator-sharded` | 1725 of 1725 equal, 0 known gaps, a `GlobalContractDistribution` receipt among the answers |
+| `follow_accept.py --lightburst` | single: head reached after 2.2 s, max lag 8, 1015 of 1015 roots, caught up after the burst; sharded: 7.3 s, max lag 5, 4006 of 4006 roots, caught up; no disconnect; `localnet-follow: all agree` |
+
+Not run: `fastvm-differential`, `vm-tests`, `registered-replay-fast`, the unit and conformance gates of the packages (nothing under
+`near-lean/{vm,runtime,chain,fastvm,wasm,interface,crypto}` or `contracts/` changed), and any soak longer than 30 minutes.
 
 ## Open points
 
