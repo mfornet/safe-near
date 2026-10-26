@@ -68,3 +68,19 @@ Offline regression tests:
 ```sh
 python3 -m unittest discover -s tools/tests -v
 ```
+
+## Checking a fungible token's invariant
+
+`ft_state_check.py` decodes one account's storage, from a snapshot or a corpus chunk, as a
+near-contract-standards `FungibleToken` and checks its invariant with the Lean
+`ft-state-check` (near-lean/sdk): balances and supply fit a `u128`, and the balances sum to
+the total supply.
+
+```sh
+(cd near-lean/sdk && lake build ft-state-check)
+python3 tools/ft_state_check.py snapshot /tmp/near-fixture.json some-token.near
+python3 tools/ft_state_check.py chunk near-lean/chain/corpus/chunks/sharded-h00000066-s3 ft.node0
+```
+
+The snapshot must hold the complete storage, so `wrap.near` needs a capture from a node with a
+higher state-view limit (see above).
