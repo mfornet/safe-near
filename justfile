@@ -56,6 +56,10 @@ near-test:
 runtime-adapter-test:
     cd contracts/w-near/verification && lake build runtime-adapter-tests && ./.lake/build/bin/runtime-adapter-tests
 
+# Run the wNEAR differential scenarios: timelines of receipts on the binary and on the model, checked against `Refines`.
+wnear-scenarios *args:
+    cd contracts/w-near/verification && lake build wnear-scenarios && ./.lake/build/bin/wnear-scenarios {{ args }}
+
 # Audit every wNEAR model/spec/proof declaration, including transitive axioms.
 wnear-audit:
     cd contracts/w-near/verification && lake build Model Spec Proofs runtime-adapter-tests

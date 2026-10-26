@@ -128,19 +128,24 @@ What the model adds to `step` for this (`Model/Interface.lean`,
   `serde_json::from_slice::<U128>`.
 - **Arguments.** `Call.decode` reads JSON as serde_json 1.0.60 and the derived
   `Deserialize` accept it (`NearInterface.Json`): object or exact-length array
-  form, duplicate known fields rejected, unknown fields ignored, escapes and
+  form, duplicate known fields rejected, unknown fields ignored (their
+  strings are only scanned: UTF-8 is not checked there), escapes and
   surrogates as serde handles them. Methods without parameters never read
   their input. `Parses` is the graph of `Call.decode`, hence functional.
 - **Failures.** Every panic site carries the data its message depends on, and
   `Panic.message` is the exact text the binary reports, source location
-  included; `Panic.logs` are the logs emitted before it. A successful `step` is
-  followed by the runtime's checks: promise deposits against the liquid balance
+  included; `Panic.logs` are the logs emitted before it. `step` is followed
+  by the runtime's checks: the logs against the protocol's limits on their
+  number and total length (`logLimit`, at the log that exceeds them), then
+  on a success promise deposits against the liquid balance
   (`balanceExceeded`) and the storage stake of the new state
   (`lackBalanceForState`).
 - **Outputs.** Return values and receipts are compared as bytes, in the field
   order and escaping serde_json and near-sdk's `ext_contract` produce.
 - **Gas.** `gasBound` is measured compute and per-argument-byte constants with
-  margin, the gas a call attaches to its receipts and the fees they reserve,
+  margin, the gas a call attaches to its receipts and the fees they reserve
+  (a transfer's for the costliest receiver, a NEAR-implicit account it creates),
+  the bytes of the arguments and of the promise result a callback parses,
   and a worst-case trie term: every node of the longest possible key path,
   cold, for each distinct key a call touches. That the bound holds is part of
   the obligation; it is not proved.
@@ -151,6 +156,14 @@ callback result shape, every panic, malformed and non-canonical arguments,
 unknown methods, balance exceeded, lack of balance for state, out of gas below
 the bound, and an adversarial state whose registered accounts share ever
 longer key prefixes with the accounts a transfer touches.
+`just wnear-scenarios` (`scenarios/`, runner in `Differential/`) does the
+same along timelines: an initial world and blocks of receipts, with delayed
+callbacks, their promise results and the chunk's trie cache written in the
+scenario, every receipt checked against the three clauses of `Refines`.
+Its first round found and fixed four gaps in the model (log limits, UTF-8
+in ignored JSON strings, and two missing terms in `gasBound`: transfer fees
+to implicit accounts and the promise result a callback parses); see
+`scenarios/README.md`.
 `withdraw_available_binary` shows what the statement buys: under it,
 `WithdrawAvailableAtBoundary` is a fact about the binary's execution.
 

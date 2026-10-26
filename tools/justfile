@@ -245,7 +245,7 @@ periodic-check nearcore:
     python3 tools/periodic_check.py --nearcore {{quote(nearcore)}}
 
 # Run all executable suites: NEAR scenarios, official Wasm tests and strict VM conformance.
-test-all: check-toolchains tools-test near-test chain-replay-test runtime-adapter-test wasm-test near-conformance crypto-tests node-conformance-types
+test-all: check-toolchains tools-test near-test chain-replay-test runtime-adapter-test wnear-scenarios wasm-test near-conformance crypto-tests node-conformance-types
 
 # Audit all core Lean packages.
 audit-all:

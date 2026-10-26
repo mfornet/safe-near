@@ -8,10 +8,11 @@ import NearInterface.Model
 What `NearInterface.ContractModel` needs beyond the method semantics of
 `Model/Methods.lean`, all in the raw space of the protocol:
 
-* `contractStep`: `step` read through `Env.ofContext`, followed by the two
-  resource checks the runtime makes on a successful call: promise deposits the
-  liquid balance cannot pay (`balanceExceeded`) and the receipt's storage-stake
-  check on the post-state (`lackBalanceForState`);
+* `contractStep`: `step` read through `Env.ofContext`, followed by the
+  runtime's checks: the logs against the protocol's limits (`logLimit`), and
+  on a successful call promise deposits the liquid balance cannot pay
+  (`balanceExceeded`) and the receipt's storage-stake check on the post-state
+  (`lackBalanceForState`);
 * the exact bytes of return values (`encodeRet`) and of the receipts the
   promises become (`encodeReceipts`), as serde_json and near-sdk 3.1.0 write
   them;
@@ -110,11 +111,22 @@ def usageAfter (ctx : Context) (st : Option State) (s' : State) : Nat :=
 /-- A failed call: the failure and the logs emitted before it. -/
 abbrev Result := NearInterface.StepResult Panic State Ret Promise
 
-/-- `step` on the context, then the runtime's resource checks on a success:
-the promises' deposits against the liquid balance (the deposit included), and
-the storage stake of the account's new usage. -/
+/-- The logs a step emits, up to its panic when it panics. -/
+def stepLogs : Except Panic Outcome → List String
+  | .error p => p.logs
+  | .ok o => o.logs
+
+/-- `step` on the context, then the runtime's checks: the logs against the
+protocol's limits, then on a success the promises' deposits against the liquid
+balance (the deposit included), and the storage stake of the account's new
+usage. A log that exceeds the limits fails the call where it is emitted, before
+a later panic or promise: every method logs before it creates promises. -/
 def contractStep (ctx : Context) (st : Option State) (c : Call) : Result :=
-  match step (Config.ofRuntime ctx.protocol) st (Env.ofContext ctx) c with
+  let r := step (Config.ofRuntime ctx.protocol) st (Env.ofContext ctx) c
+  match NearInterface.logLimitError ctx.protocol (stepLogs r) with
+  | some (e, kept) => .error { failure := .logLimit e, logs := kept }
+  | none =>
+  match r with
   | .error p => .error { failure := .panic p, logs := p.logs }
   | .ok o =>
     let available := ctx.balance + ctx.attached
@@ -137,7 +149,9 @@ def Panic.failure (p : Panic) : NearInterface.Failure :=
 `gasBound` bounds `usedGas`: gas burnt plus the gas reserved for the receipts
 a call creates. Measured on `contract.wasm` without trie accounting, every
 method burns at most 0.85 Tgas on short arguments, and each argument byte
-costs at most 157 Mgas (`ft_transfer_call` with a long `msg`). Storage
+costs at most 157 Mgas (`ft_transfer_call` with a long `msg`). Each byte of
+the promise result `ft_resolve_transfer` parses costs at most 245 Mgas (a
+`U128` string of leading zeros). Storage
 accesses are charged per trie node on the key's path: the bound pays every
 node of the longest possible path cold for each distinct key a call touches
 (the `STATE` record and at most two accounts), and cached for every access.
@@ -146,10 +160,19 @@ tests on adversarial tries. -/
 
 /-- Wasm execution and host calls other than storage, with short arguments. -/
 def computeGas : Nat := 4 * 10 ^ 12
-/-- Per byte of the arguments of a method that reads them. -/
+/-- Per byte of the arguments of a method that reads them, or of the promise
+result a callback parses. -/
 def argumentByteGas : Nat := 400 * 10 ^ 6
-/-- Execution fees a transfer receipt reserves (measured: 223 Ggas). -/
-def transferReceiptGas : Nat := 5 * 10 ^ 11
+/-- Fees of a transfer receipt the call creates, for the costliest receiver: a
+NEAR-implicit account (64 hex characters), which the transfer creates with a
+full-access key (`transferFees`). Each fee is counted with its larger send fee
+and its execution fee. Under protocol 86 creating the account alone reserves
+7.2 Tgas; a named receiver costs 223 Ggas. -/
+def transferReceiptGas (ctx : Context) : Nat :=
+  let fees := ctx.protocol.fees.actionFees
+  let worst (f : Wasm.Near.Fee) := max f.sendSir f.sendNotSir + f.execution
+  worst fees.newActionReceipt + worst fees.transfer + worst fees.createAccount +
+    worst fees.addFullAccessKey
 /-- Execution fees a function-call receipt reserves, short arguments
 (measured: at most 0.9 Tgas). Argument bytes are paid by `argumentByteGas`. -/
 def callReceiptGas : Nat := 2 * 10 ^ 12
@@ -176,19 +199,29 @@ def Call.readsArguments : Call → Bool
   | .storageMinimumBalance => false
   | _ => true
 
+/-- Bytes of the promise result the call reads: `ft_resolve_transfer` reads
+and parses the first one (`callbackResultOf`). -/
+def Call.resultBytes (ctx : Context) : Call → Nat
+  | .ftResolveTransfer .. =>
+    match ctx.promiseResults.head? with
+    | some (.successful data) => data.length
+    | _ => 0
+  | _ => 0
+
 /-- Gas the call attaches to the receipts it creates. -/
 def Call.attachedGas (ctx : Context) : Call → Nat
   | .ftTransferCall .. => ctx.prepaidGas - gasForFtTransferCall + gasForResolveTransfer
   | _ => 0
 
 /-- Execution fees of the receipts the call may create. -/
-def Call.receiptGas : Call → Nat
-  | .nearWithdraw _ | .storageDeposit .. | .storageUnregister _ => transferReceiptGas
+def Call.receiptGas (ctx : Context) : Call → Nat
+  | .nearWithdraw _ | .storageDeposit .. | .storageUnregister _ => transferReceiptGas ctx
   | .ftTransferCall .. => 2 * callReceiptGas
   | _ => 0
 
 def gasBound (ctx : Context) (c : Call) : Nat :=
-  c.attachedGas ctx + c.receiptGas + computeGas +
-    (if c.readsArguments then argumentByteGas * ctx.args.length else 0) + trieGas ctx
+  c.attachedGas ctx + c.receiptGas ctx + computeGas +
+    (if c.readsArguments then argumentByteGas * ctx.args.length else 0) +
+    argumentByteGas * c.resultBytes ctx + trieGas ctx
 
 end WNear

@@ -163,6 +163,8 @@ theorem withdraw_available_wasm (cfg : Config) (code : Wasm.Module)
       { s.setBalance (AccountId.ofNear ctx.predecessor)
           (s.balance (AccountId.ofNear ctx.predecessor) - amount) with
         totalSupply := s.totalSupply - amount }) (ctx.balance - amount) ctx.locked = 0)
+    (hlog : logLimitError ctx.protocol
+      [s!"Withdraw {amount} NEAR from {AccountId.ofNear ctx.predecessor}"] = none)
     (hgas : gasBound ctx (.nearWithdraw amount) ≤ ctx.gasLimit) :
     let r := Near.Boundary.nearRuntime.exec
       { code := { module := code, size := wNearBytes.size, hash := "" }, codeOf } (encode s) ctx
@@ -172,6 +174,6 @@ theorem withdraw_available_wasm (cfg : Config) (code : Wasm.Module)
             (s.balance (AccountId.ofNear ctx.predecessor) - amount) with
           totalSupply := s.totalSupply - amount } :=
   withdraw_available_binary (refines_wnear cfg code codeOf protocol hcfg hcode hprotocol hstart hexports)
-    hs hwf hprot hparse hreg hamt hdep hbound hbal hrent hgas
+    hs hwf hprot hparse hreg hamt hdep hbound hbal hrent hlog hgas
 
 end WNear

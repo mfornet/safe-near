@@ -1,0 +1,1196 @@
+[
+ {
+  "name": "gas: long arguments at and around the bound (large)",
+  "state": {
+   "accounts": {
+    "alice.near": "1000000000000000000000000",
+    "bob.near": "0"
+   }
+  },
+  "blocks": [
+   {
+    "receipts": [
+     {
+      "label": "tc-msg-200000@300000000000000",
+      "call": {
+       "from": "alice.near",
+       "method": "ft_transfer_call",
+       "deposit": "1",
+       "gas": "300000000000000",
+       "argsText": [
+        "{\"receiver_id\":\"bob.near\",\"amount\":\"1\",\"msg\":\"",
+        {
+         "repeat": "m",
+         "times": 200000
+        },
+        "\"}"
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "tc-msg-200000@1000000000000000",
+      "call": {
+       "from": "alice.near",
+       "method": "ft_transfer_call",
+       "deposit": "1",
+       "gas": "1000000000000000",
+       "argsText": [
+        "{\"receiver_id\":\"bob.near\",\"amount\":\"1\",\"msg\":\"",
+        {
+         "repeat": "m",
+         "times": 200000
+        },
+        "\"}"
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "transfer-ignored-string-1000000@bound",
+      "call": {
+       "from": "alice.near",
+       "method": "ft_transfer",
+       "deposit": "1",
+       "gas": "bound",
+       "argsText": [
+        "{\"receiver_id\":\"bob.near\",\"amount\":\"1\",\"x\":\"",
+        {
+         "repeat": "p",
+         "times": 1000000
+        },
+        "\"}"
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "transfer-ignored-array-1000000@bound",
+      "call": {
+       "from": "alice.near",
+       "method": "ft_transfer",
+       "deposit": "1",
+       "gas": "bound",
+       "argsText": [
+        "{\"receiver_id\":\"bob.near\",\"amount\":\"1\",\"x\":[",
+        {
+         "repeat": "1,",
+         "times": 500000
+        },
+        "1]}"
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "transfer-ignored-escapes-1000000@bound",
+      "call": {
+       "from": "alice.near",
+       "method": "ft_transfer",
+       "deposit": "1",
+       "gas": "bound",
+       "argsText": [
+        "{\"receiver_id\":\"bob.near\",\"amount\":\"1\",\"x\":\"",
+        {
+         "repeat": "\\u00e9",
+         "times": 166666
+        },
+        "\"}"
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "transfer-amount-zeros-1000000@bound",
+      "call": {
+       "from": "alice.near",
+       "method": "ft_transfer",
+       "deposit": "1",
+       "gas": "bound",
+       "argsText": [
+        "{\"receiver_id\":\"bob.near\",\"amount\":\"",
+        {
+         "repeat": "0",
+         "times": 1000000
+        },
+        "1\"}"
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "transfer-whitespace-1000000@bound",
+      "call": {
+       "from": "alice.near",
+       "method": "ft_transfer",
+       "deposit": "1",
+       "gas": "bound",
+       "argsText": [
+        {
+         "repeat": " ",
+         "times": 1000000
+        },
+        "{\"receiver_id\":\"bob.near\",\"amount\":\"1\"}"
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "deposit-unread-args-1000000@bound",
+      "call": {
+       "from": "alice.near",
+       "method": "near_deposit",
+       "deposit": "1000000000000000000000000",
+       "gas": "bound",
+       "argsText": [
+        {
+         "repeat": "z",
+         "times": 1000000
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "transfer-ignored-string-4000000@bound",
+      "call": {
+       "from": "alice.near",
+       "method": "ft_transfer",
+       "deposit": "1",
+       "gas": "bound",
+       "argsText": [
+        "{\"receiver_id\":\"bob.near\",\"amount\":\"1\",\"x\":\"",
+        {
+         "repeat": "p",
+         "times": 4000000
+        },
+        "\"}"
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "transfer-ignored-array-4000000@bound",
+      "call": {
+       "from": "alice.near",
+       "method": "ft_transfer",
+       "deposit": "1",
+       "gas": "bound",
+       "argsText": [
+        "{\"receiver_id\":\"bob.near\",\"amount\":\"1\",\"x\":[",
+        {
+         "repeat": "1,",
+         "times": 2000000
+        },
+        "1]}"
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "transfer-ignored-escapes-4000000@bound",
+      "call": {
+       "from": "alice.near",
+       "method": "ft_transfer",
+       "deposit": "1",
+       "gas": "bound",
+       "argsText": [
+        "{\"receiver_id\":\"bob.near\",\"amount\":\"1\",\"x\":\"",
+        {
+         "repeat": "\\u00e9",
+         "times": 666666
+        },
+        "\"}"
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "transfer-amount-zeros-4000000@bound",
+      "call": {
+       "from": "alice.near",
+       "method": "ft_transfer",
+       "deposit": "1",
+       "gas": "bound",
+       "argsText": [
+        "{\"receiver_id\":\"bob.near\",\"amount\":\"",
+        {
+         "repeat": "0",
+         "times": 4000000
+        },
+        "1\"}"
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "transfer-whitespace-4000000@bound",
+      "call": {
+       "from": "alice.near",
+       "method": "ft_transfer",
+       "deposit": "1",
+       "gas": "bound",
+       "argsText": [
+        {
+         "repeat": " ",
+         "times": 4000000
+        },
+        "{\"receiver_id\":\"bob.near\",\"amount\":\"1\"}"
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "deposit-unread-args-4000000@bound",
+      "call": {
+       "from": "alice.near",
+       "method": "near_deposit",
+       "deposit": "1000000000000000000000000",
+       "gas": "bound",
+       "argsText": [
+        {
+         "repeat": "z",
+         "times": 4000000
+        }
+       ]
+      },
+      "probe": true
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "name": "gas: large promise results in ft_resolve_transfer (large)",
+  "state": {
+   "accounts": {
+    "alice.near": "100",
+    "bob.near": "100"
+   }
+  },
+  "blocks": [
+   {
+    "receipts": [
+     {
+      "label": "resolve-digits-100000@bound",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "bound",
+       "results": [
+        {
+         "ok": [
+          "\"",
+          {
+           "repeat": "1",
+           "times": 100000
+          },
+          "\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-digits-100000@5000000000000",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "5000000000000",
+       "results": [
+        {
+         "ok": [
+          "\"",
+          {
+           "repeat": "1",
+           "times": 100000
+          },
+          "\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-garbage-100000@bound",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "bound",
+       "results": [
+        {
+         "ok": [
+          {
+           "repeat": "x",
+           "times": 100000
+          }
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-garbage-100000@5000000000000",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "5000000000000",
+       "results": [
+        {
+         "ok": [
+          {
+           "repeat": "x",
+           "times": 100000
+          }
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-zeros-100000@bound",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "bound",
+       "results": [
+        {
+         "ok": [
+          "\"",
+          {
+           "repeat": "0",
+           "times": 100000
+          },
+          "7\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-zeros-100000@5000000000000",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "5000000000000",
+       "results": [
+        {
+         "ok": [
+          "\"",
+          {
+           "repeat": "0",
+           "times": 100000
+          },
+          "7\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-plus-zeros-100000@bound",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "bound",
+       "results": [
+        {
+         "ok": [
+          "\"+",
+          {
+           "repeat": "0",
+           "times": 100000
+          },
+          "7\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-plus-zeros-100000@5000000000000",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "5000000000000",
+       "results": [
+        {
+         "ok": [
+          "\"+",
+          {
+           "repeat": "0",
+           "times": 100000
+          },
+          "7\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-escaped-zeros-100000@bound",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "bound",
+       "results": [
+        {
+         "ok": [
+          "\"",
+          {
+           "repeat": "\\u0030",
+           "times": 16666
+          },
+          "7\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-escaped-zeros-100000@5000000000000",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "5000000000000",
+       "results": [
+        {
+         "ok": [
+          "\"",
+          {
+           "repeat": "\\u0030",
+           "times": 16666
+          },
+          "7\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-whitespace-100000@bound",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "bound",
+       "results": [
+        {
+         "ok": [
+          {
+           "repeat": " ",
+           "times": 100000
+          },
+          "\"7\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-whitespace-100000@5000000000000",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "5000000000000",
+       "results": [
+        {
+         "ok": [
+          {
+           "repeat": " ",
+           "times": 100000
+          },
+          "\"7\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-digits-1000000@bound",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "bound",
+       "results": [
+        {
+         "ok": [
+          "\"",
+          {
+           "repeat": "1",
+           "times": 1000000
+          },
+          "\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-digits-1000000@5000000000000",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "5000000000000",
+       "results": [
+        {
+         "ok": [
+          "\"",
+          {
+           "repeat": "1",
+           "times": 1000000
+          },
+          "\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-garbage-1000000@bound",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "bound",
+       "results": [
+        {
+         "ok": [
+          {
+           "repeat": "x",
+           "times": 1000000
+          }
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-garbage-1000000@5000000000000",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "5000000000000",
+       "results": [
+        {
+         "ok": [
+          {
+           "repeat": "x",
+           "times": 1000000
+          }
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-zeros-1000000@bound",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "bound",
+       "results": [
+        {
+         "ok": [
+          "\"",
+          {
+           "repeat": "0",
+           "times": 1000000
+          },
+          "7\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-zeros-1000000@5000000000000",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "5000000000000",
+       "results": [
+        {
+         "ok": [
+          "\"",
+          {
+           "repeat": "0",
+           "times": 1000000
+          },
+          "7\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-plus-zeros-1000000@bound",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "bound",
+       "results": [
+        {
+         "ok": [
+          "\"+",
+          {
+           "repeat": "0",
+           "times": 1000000
+          },
+          "7\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-plus-zeros-1000000@5000000000000",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "5000000000000",
+       "results": [
+        {
+         "ok": [
+          "\"+",
+          {
+           "repeat": "0",
+           "times": 1000000
+          },
+          "7\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-escaped-zeros-1000000@bound",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "bound",
+       "results": [
+        {
+         "ok": [
+          "\"",
+          {
+           "repeat": "\\u0030",
+           "times": 166666
+          },
+          "7\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-escaped-zeros-1000000@5000000000000",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "5000000000000",
+       "results": [
+        {
+         "ok": [
+          "\"",
+          {
+           "repeat": "\\u0030",
+           "times": 166666
+          },
+          "7\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-whitespace-1000000@bound",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "bound",
+       "results": [
+        {
+         "ok": [
+          {
+           "repeat": " ",
+           "times": 1000000
+          },
+          "\"7\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-whitespace-1000000@5000000000000",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "5000000000000",
+       "results": [
+        {
+         "ok": [
+          {
+           "repeat": " ",
+           "times": 1000000
+          },
+          "\"7\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-digits-4194304@bound",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "bound",
+       "results": [
+        {
+         "ok": [
+          "\"",
+          {
+           "repeat": "1",
+           "times": 4194304
+          },
+          "\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-digits-4194304@5000000000000",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "5000000000000",
+       "results": [
+        {
+         "ok": [
+          "\"",
+          {
+           "repeat": "1",
+           "times": 4194304
+          },
+          "\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-garbage-4194304@bound",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "bound",
+       "results": [
+        {
+         "ok": [
+          {
+           "repeat": "x",
+           "times": 4194304
+          }
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-garbage-4194304@5000000000000",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "5000000000000",
+       "results": [
+        {
+         "ok": [
+          {
+           "repeat": "x",
+           "times": 4194304
+          }
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-zeros-4194304@bound",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "bound",
+       "results": [
+        {
+         "ok": [
+          "\"",
+          {
+           "repeat": "0",
+           "times": 4194304
+          },
+          "7\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-zeros-4194304@5000000000000",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "5000000000000",
+       "results": [
+        {
+         "ok": [
+          "\"",
+          {
+           "repeat": "0",
+           "times": 4194304
+          },
+          "7\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-plus-zeros-4194304@bound",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "bound",
+       "results": [
+        {
+         "ok": [
+          "\"+",
+          {
+           "repeat": "0",
+           "times": 4194304
+          },
+          "7\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-plus-zeros-4194304@5000000000000",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "5000000000000",
+       "results": [
+        {
+         "ok": [
+          "\"+",
+          {
+           "repeat": "0",
+           "times": 4194304
+          },
+          "7\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-escaped-zeros-4194304@bound",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "bound",
+       "results": [
+        {
+         "ok": [
+          "\"",
+          {
+           "repeat": "\\u0030",
+           "times": 699050
+          },
+          "7\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-escaped-zeros-4194304@5000000000000",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "5000000000000",
+       "results": [
+        {
+         "ok": [
+          "\"",
+          {
+           "repeat": "\\u0030",
+           "times": 699050
+          },
+          "7\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-whitespace-4194304@bound",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "bound",
+       "results": [
+        {
+         "ok": [
+          {
+           "repeat": " ",
+           "times": 4194304
+          },
+          "\"7\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     },
+     {
+      "label": "resolve-whitespace-4194304@5000000000000",
+      "call": {
+       "from": "wrap.near",
+       "method": "ft_resolve_transfer",
+       "args": {
+        "sender_id": "alice.near",
+        "receiver_id": "bob.near",
+        "amount": "10"
+       },
+       "gas": "5000000000000",
+       "results": [
+        {
+         "ok": [
+          {
+           "repeat": " ",
+           "times": 4194304
+          },
+          "\"7\""
+         ]
+        }
+       ]
+      },
+      "probe": true
+     }
+    ]
+   }
+  ]
+ }
+]
