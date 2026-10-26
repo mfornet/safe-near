@@ -1,5 +1,6 @@
 import NearSdk.Nep141
 import NearSdk.Nep145
+import NearSdk.Nep141Compose
 import Proofs.StateLemmas
 
 /-!
@@ -191,5 +192,20 @@ theorem storageDeposit_nep145 {s : State} {env : Env} {account : Option AccountI
     · simp [State.storageView, Nep145.View.registered, State.storageBalanceOf, State.register,
         State.storageMin]
     · simp [State.storageView, State.storageBalanceOf, State.register, State.storageMin, ha]
+
+/-- A vault that takes wNEAR through `ft_transfer_call`: wNEAR's own transfer and resolution, with
+the vault keeping `kept` tokens, leave the vault's wNEAR balance up by exactly what it credited the
+sender, the composition of `Nep141.transferCall_vault` with wNEAR's conformance. -/
+theorem wnear_transferCall_vault {s₀ s₁ : State} {sender vault : AccountId} {amount kept used : Nat}
+    {memo : Option String} {logs : List String} {o : Outcome} (vaultBefore : Nep141.Vault AccountId)
+    (htransfer : s₀.transfer sender vault amount memo = .ok (s₁, logs)) (hkept : kept ≤ amount)
+    (hresolve : resolveRefund s₁ sender vault amount (amount - kept) = .ok o)
+    (hret : o.ret = .u128 used) :
+    (vaultBefore.onTransfer sender kept).credited sender = vaultBefore.credited sender + kept ∧
+    o.state.balanceOf vault = s₀.balanceOf vault + kept := by
+  have ht := transfer_nep141 htransfer
+  have hr := resolveRefund_nep141 (Ne.symm ht.distinct) (Nat.sub_le _ _) hresolve hret
+  obtain ⟨hcredit, hvault, -⟩ := Nep141.transferCall_vault vaultBefore ht hkept hr
+  exact ⟨hcredit, hvault⟩
 
 end WNear
