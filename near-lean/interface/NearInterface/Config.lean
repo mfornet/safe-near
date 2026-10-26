@@ -53,6 +53,8 @@ structure LimitConfig where
   maxTypesPerContract : Option Nat := none
   /-- `max_receipt_size`, checked on the receipts a function call creates. -/
   maxReceiptSize : Nat := 2 ^ 32 - 1
+  /-- `per_receipt_storage_proof_size_limit`: the storage proof one receipt may record. -/
+  perReceiptStorageProofSizeLimit : Nat := 2 ^ 32 - 1
   deriving Repr, Inhabited
 
 /-- `near_parameters::vm::Config`. -/
@@ -118,6 +120,11 @@ structure RuntimeConfig where
   fixDeleteAccountGlobalContractStorageUsage : Bool := false
   /-- `FixDelegateActionDepositWithFunctionCallError`. -/
   fixDelegateActionDepositWithFunctionCallError : Bool := false
+  /-- `EnforcePerReceiptStorageProofLimit`: a receipt's proof counts from the receipt's start, not
+  from the function call's. -/
+  enforcePerReceiptStorageProofLimit : Bool := false
+  /-- `main_storage_proof_size_soft_limit`: the chunk takes no more receipts past this proof size. -/
+  mainStorageProofSizeSoftLimit : Nat := 2 ^ 32 - 1
   /-- `compute_costs.ext`: the `ExtCosts` whose compute cost differs from their gas cost. -/
   extCompute : List (String × Nat) := []
   /-- `compute_costs.action_execution`: the action execution fees whose compute cost differs from
@@ -235,7 +242,8 @@ private def limits (j : Json) : Except String LimitConfig := do
     maxTablesPerContract := ← optNat j "max_tables_per_contract"
     maxElementsPerContractTable := ← optNat j "max_elements_per_contract_table"
     maxTypesPerContract := ← optNat j "max_types_per_contract"
-    maxReceiptSize := ← nat j "max_receipt_size" }
+    maxReceiptSize := ← nat j "max_receipt_size"
+    perReceiptStorageProofSizeLimit := ← nat j "per_receipt_storage_proof_size_limit" }
 
 private def extCosts (j : Json) : Except String ExtCosts := do
   match j with
@@ -362,6 +370,10 @@ def ofJson (j : Json) : Except String RuntimeConfig := do
     globalContractDistributionNonce := extraFlag "global_contract_distribution_nonce"
     fixDeleteAccountGlobalContractStorageUsage := extraFlag "fix_delete_account_global_contract_storage_usage"
     fixDelegateActionDepositWithFunctionCallError := extraFlag "fix_delegate_action_deposit_with_function_call_error"
+    enforcePerReceiptStorageProofLimit := extraFlag "enforce_per_receipt_storage_proof_limit"
+    mainStorageProofSizeSoftLimit :=
+      ((field j "witness_config").toOption.bind (fun w => (nat w "main_storage_proof_size_soft_limit").toOption)).getD
+        (2 ^ 32 - 1)
     extCompute := computeExt
     actionExecutionCompute := computeExecution
     fees := {

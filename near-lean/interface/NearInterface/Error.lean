@@ -55,6 +55,8 @@ inductive HostError
   | valueLengthExceeded (length limit : Nat)
   | totalLogLengthExceeded (length limit : Nat)
   | numberOfLogsExceeded (limit : Nat)
+  /-- `RecordedStorageExceeded`: the receipt's recorded storage proof passed its limit. -/
+  | recordedStorageExceeded (limit : Nat)
   | numberPromisesExceeded (numberOfPromises limit : Nat)
   | numberInputDataDependenciesExceeded (dependencies limit : Nat)
   | prohibitedInView (methodName : String)
@@ -74,6 +76,19 @@ inductive HostError
   /-- `BLS12381InvalidInput`: an input whose length is not a multiple of the item size. -/
   | bls12381InvalidInput (msg : String)
   deriving Repr, BEq, Inhabited
+
+/-- `bytesize` 1.3.3's `Display` (decimal units, one decimal place), as nearcore prints a `ByteSize`.
+The unit is chosen by `log₁₀₂₄`, as that crate does. -/
+def byteSizeString (bytes : Nat) : String :=
+  if bytes < 1000 then s!"{bytes} B" else
+  let exp := Id.run do
+    let mut e := 0
+    while 1024 ^ (e + 1) ≤ bytes do e := e + 1
+    return max e 1
+  let unit := 1000 ^ exp
+  let tenths := (bytes * 10 + unit / 2) / unit
+  let letter := (("KMGTPE".toList)[exp - 1]?).getD '?'
+  s!"{tenths / 10}.{tenths % 10} {letter}B"
 
 def HostError.message : HostError → String
   | .badUTF8 => "String encoding is bad UTF-8 sequence."
@@ -104,6 +119,8 @@ def HostError.message : HostError → String
   | .valueLengthExceeded n l => s!"The length of a storage value {n} exceeds the limit {l}"
   | .totalLogLengthExceeded n l => s!"The length of a log message {n} exceeds the limit {l}"
   | .numberOfLogsExceeded l => s!"The number of logs will exceed the limit {l}"
+  | .recordedStorageExceeded l =>
+    s!"Size of the recorded trie storage proof has exceeded the allowed limit ({byteSizeString l})"
   | .numberPromisesExceeded n l => s!"The number of promises within a FunctionCall {n} exceeds the limit {l}"
   | .numberInputDataDependenciesExceeded n l => s!"The number of input data dependencies {n} exceeds the limit {l}"
   | .prohibitedInView m => s!"{m} is not allowed in view calls"

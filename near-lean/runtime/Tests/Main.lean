@@ -147,6 +147,32 @@ def checkTransactionRouting (r : IO.Ref Report) (cfg : RuntimeConfig) (code : Co
     (limitedLocal.outcomes.length == 1 && limitedLocal.state.delayed.length == 1 &&
       limitedLocal.outgoing.isEmpty && limitedLocal.outcomes.all fun (_, o) =>
         match o.status with | .successReceiptId _ => true | _ => false)
+  -- `main_storage_proof_size_soft_limit` (4 MB at v86), against a trusted chunk proof size.
+  let emptyTrie := match TrieOverlay.start [] with | .ok t => some t | .error _ => none
+  let proofAp (size : Nat) : ApplyState :=
+    { World.ap with storageAccounting := emptyTrie, storageProofSize := some fun _ => size }
+  let proofFull := Near.apply cfg (proofAp 4_000_001) (fun _ => code) genesis [{ tx with receiverId := "alice.near" }] []
+  let proofRoom := Near.apply cfg (proofAp 4_000_000) (fun _ => code) genesis [{ tx with receiverId := "alice.near" }] []
+  check r "a chunk whose storage proof passed the soft limit delays its local receipts"
+    (emptyTrie.isSome && cfg.mainStorageProofSizeSoftLimit == 4_000_000 && proofFull.issue.isNone &&
+      proofFull.state.delayed.length == 1 && proofFull.outcomes.length == 1)
+  check r "a chunk at the soft limit still executes them"
+    (proofRoom.issue.isNone && proofRoom.state.delayed.isEmpty && proofRoom.outcomes.length == 2)
+  -- `storage_proof_size_before_receipt`: from v86 the VM counts the receipt's whole proof growth.
+  let proofAction : ActionReceipt := { signerId := "alice.near", signerPublicKey := pkOf 1, gasPrice := 0, actions := [] }
+  let proofReceipt : Receipt :=
+    { predecessorId := "alice.near", receiverId := "bob.near", receiptId := 0, receipt := .action proofAction }
+  let proofCtx (c : RuntimeConfig) (start call : Nat) : ReceiptCtx :=
+    let size : TrieOverlay.State → Nat := fun t => if t.prospective.isEmpty then start else call
+    let ap : ApplyState := { World.ap with storageAccounting := emptyTrie, storageProofSize := some size }
+    { cfg := c, ap, receipt := proofReceipt, action := proofAction, promiseResults := [], codeOf := fun _ => code }
+  let callTrie := emptyTrie.map (·.set [1] [2])
+  let growth (c : RuntimeConfig) := (receiptStorageProofSize (proofCtx c 100 700) callTrie).map
+    fun size => (callTrie.map size).getD 0
+  check r "the VM's proof counts from the receipt's start at v86, from the call's start before"
+    (cfg.enforcePerReceiptStorageProofLimit && growth cfg == some 600 &&
+      growth { cfg with enforcePerReceiptStorageProofLimit := false } == some 0)
+
   let incoming : Receipt := {
     predecessorId := "carol.near", receiverId := "bob.near", receiptId := 100
     receipt := .action {

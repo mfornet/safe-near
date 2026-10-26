@@ -117,6 +117,8 @@ fn config_json(store: &RuntimeConfigStore, version: ProtocolVersion) -> String {
             "delegate_v2": ProtocolFeature::DelegateV2.enabled(version),
             "yield_with_id": ProtocolFeature::YieldWithId.enabled(version),
             "eth_implicit_global_contract": ProtocolFeature::EthImplicitGlobalContract.enabled(version),
+            "enforce_per_receipt_storage_proof_limit":
+                ProtocolFeature::EnforcePerReceiptStorageProofLimit.enabled(version),
         }),
     };
     serde_json::to_string_pretty(&dump).expect("runtime configuration serialization cannot fail")
