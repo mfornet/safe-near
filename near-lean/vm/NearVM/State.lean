@@ -142,6 +142,17 @@ structure StorageIterator where
   pos     : Nat := 0
 deriving Inhabited, BEq
 
+/-- One `storage_write` or `storage_remove` of a call, as the contract made it. Observational: it
+records what `RuntimeExt` hands to the trie update (which notes every call, even a write of the value
+the key held or a removal of a key that is absent), and no host function or gas rule reads it. -/
+structure StorageWrite where
+  key : List UInt8
+  /-- Whether the key held a value just before the call. -/
+  existed : Bool
+  /-- The value after the call: `none` for a removal. -/
+  value : Option (List UInt8)
+deriving Inhabited, BEq, Repr
+
 /-- The NEAR host state threaded as `HostStore.host`. -/
 structure NearState where
   /-- Storage trie projection: `key ↦ value`, `none` when absent. -/
@@ -206,6 +217,12 @@ structure NearState where
   /-- The bytes the cryptographic host function that just ran wrote to a register, if any: its
   write-register gas is charged afterwards, once it is known whether it wrote. -/
   registerWrite : Option Nat := none
+  /-- Observational log of the storage writes and removals (`StorageWrite`), newest first (the outcome lists them in
+  call order). Written by the storage host functions' post-processing; nothing reads it but the outcome. -/
+  storageLog : List StorageWrite := []
+  /-- Observational: the gas burnt for each `ActionCosts` entry (by its name), as nearcore's `ProfileDataV3` splits
+  the action costs. `gasProfile.actionBurnt` is their sum; nothing reads it but the outcome. -/
+  actionProfile : List (String × Nat) := []
 deriving Inhabited
 
 namespace NearState

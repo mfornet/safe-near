@@ -38,7 +38,7 @@ structure Block where
 /-- Invalid delivery schedules are rejected before applying transactions.
 Supported blocks retain deferred receipts before their newly outgoing work.
 Runtime-delayed and postponed queues remain governed by `Near.apply`. -/
-def step (cfg : RuntimeConfig) (codeOf : CodeTable) (s : Snapshot) (b : Block) :
+def step [VmEngine] (cfg : RuntimeConfig) (codeOf : CodeTable) (s : Snapshot) (b : Block) :
     Except ScheduleError (Snapshot × ApplyResult) :=
   match b.receipts.resolve s.pending with
   | .error error => .error error

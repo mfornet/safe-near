@@ -115,7 +115,7 @@ def run (o : Options) : IO UInt32 := do
     log "a node that syncs state does not keep a store: it syncs again after a restart"
   if o.apply && o.mode == .blocks then
     if let some dir := o.store then
-      let (s, _) ← Store.Store.open dir
+      let (s, _) ← Store.Store.open dir Store.Options.node
       match ← orThrow (Near.Node.Apply.load boot.config (← s.view)) with
       | some (st0, pr0) =>
         st := st0

@@ -14,7 +14,8 @@ def convertTransactions (cfg : RuntimeConfig) (ap : ApplyState) (initial : Chain
       let outcome : ExecutionOutcome := {
         executorId := tx.signerId, status := .successReceiptId receipt.receiptId
         receiptIds := [receipt.receiptId], gasBurnt := cost.gasBurnt, computeUsage := cost.gasBurnt
-        tokensBurnt := cost.gasBurnt * ap.gasPrice }
+        tokensBurnt := cost.gasBurnt * ap.gasPrice
+        changes := transactionCommit pass.2.2.2.2.2.2 tx.signerId tx.publicKey next }
       if tx.signerId == tx.receiverId then
         .yield (none, next, pass.2.2.1 ++ [(0, outcome)], pass.2.2.2.1,
           pass.2.2.2.2.1 ++ [receipt], pass.2.2.2.2.2.1 + cost.gasBurnt * ap.gasPrice, pass.2.2.2.2.2.2 + 1)
@@ -54,6 +55,7 @@ def applyReceiptQueue (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes â†
       else
         newlyDelayed := newlyDelayed ++ [receipt]
     else
+      let pre := st
       let processed := processWithInstants cfg { ap with storageAccounting } codeOf st receipt
       storageAccounting := processed.storageAccounting
       if let some issue := processed.issue then
@@ -62,7 +64,7 @@ def applyReceiptQueue (cfg : RuntimeConfig) (ap : ApplyState) (codeOf : Bytes â†
       subsidizedAmount := subsidizedAmount + processed.subsidizedAmount
       st := processed.state
       outgoing := outgoing ++ processed.receipts
-      outcomes := outcomes ++ processed.outcomes
+      outcomes := outcomes ++ outcomesWithChanges pre processed
       for (_, outcome) in processed.outcomes do
         compute := compute + outcome.computeUsage
         tokensBurnt := tokensBurnt + outcome.tokensBurnt
