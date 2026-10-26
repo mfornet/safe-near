@@ -15,7 +15,7 @@ import validator_accept as va  # noqa: E402
 def row(height, author, root="a" * 40, new=True, shard=0):
     return {"height": height, "hash": nc.b58encode(bytes([height % 256]) * 32), "author": author,
             "chunks": [{"shard": shard, "new": new, "author": author, "prevStateRoot": nc.b58encode(bytes.fromhex(root + "0" * 24)),
-                        "hash": "h"}], "approvals": 2, "lastFinal": ""}
+                        "hash": "h", "txs": []}], "approvals": 2, "lastFinal": ""}
 
 
 def applied_line(height, root="a" * 40):
@@ -42,12 +42,24 @@ class Analysis(unittest.TestCase):
         self.rows = [row(1, "node0"), row(2, "node1"), row(3, "node1"), row(4, "node0")]
         self.stall = {"stalled": True, "resumed": True}
 
-    def result(self, applied=None, report=None, stall=None, rows=None):
+    def result(self, applied=None, report=None, stall=None, rows=None, require_txs=False, known=None):
         applied = applied if applied is not None else [applied_line(h) for h in (1, 2, 3)]
         (self.directory / "applied.jsonl").write_text("\n".join(applied) + "\n")
         report = {"disconnects": [], "failure": None, "handshakes": 1} if report is None else report
         return va.analyse(self.directory, report, stall if stall is not None else self.stall,
-                          rows if rows is not None else self.rows, head=40, final=38)
+                          rows if rows is not None else self.rows, head=40, final=38, require_txs=require_txs, known=known)
+
+    def test_a_run_without_lean_chunks_with_transactions_fails_when_they_are_required(self):
+        r = self.result(require_txs=True)
+        self.assertFalse(r["ok"], r)
+
+    def test_a_block_off_neards_chain_is_an_orphan_when_neard_holds_it(self):
+        applied = [applied_line(h) for h in (1, 2, 3)] + [applied_line(9)]
+        self.assertFalse(self.result(applied=applied)["ok"])
+        r = self.result(applied=applied, known=lambda h: True)
+        self.assertTrue(r["ok"], r)
+        self.assertEqual(r["orphans"], [9])
+        self.assertFalse(self.result(applied=applied, known=lambda h: False)["ok"])
 
     def test_agreement_passes(self):
         r = self.result()

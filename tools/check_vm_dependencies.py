@@ -28,7 +28,7 @@ run_cmd do
   -- design's open point on crypto host functions is settled.
   let forbidden := names.filter fun name =>
     ["Interpreter", "CodeLib", "NearRuntime", "NearChain", "ChainReplay", "NearNode", "NodeBench",
-     "NearCrypto"].any
+     "NearCrypto", "NearFastVM"].any
       fun root => name == root || name.startsWith (root ++ ".")
   let relevant := names.filter fun name =>
     name == "NearVM" || name.startsWith "NearVM." || name.startsWith "Wasm."

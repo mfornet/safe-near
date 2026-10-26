@@ -42,7 +42,8 @@ def processedExecOutput (receipt : Receipt) (exec : Exec) : Processed :=
     outcomes := [(receipt.receiptId, outcomeOf receipt exec)]
     rewards := exec.reward
     otherTokensBurnt := exec.otherTokensBurnt
-    subsidizedAmount := exec.subsidizedAmount }
+    subsidizedAmount := exec.subsidizedAmount
+    execs := [(receipt, exec)] }
 
 def processedOfExec (fallback : ChainState) (receipt : Receipt) (exec : Exec) : Processed :=
   match exec.routingIssue with

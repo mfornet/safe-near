@@ -4,6 +4,7 @@ import NearNode.Validator.Inclusion
 import NearNode.Validator.Produce
 import NearNode.Validator.Chunk
 import NearNode.Validator.ReedSolomon
+import NearNode.Validator.Pool
 
 /-!
 # The state of a running validator
@@ -14,9 +15,11 @@ which chunks of the store are complete, who owns a part of a chunk, which blocks
 
 namespace Near.Node.Validator
 
-abbrev CS := Near.Node.Chain.ChainState
+abbrev CS :=
+  Near.Node.Chain.ChainState
 
-open Near.Node Near.Node.Chain Near.Node.Network Near.Node.Apply Near.Node.Borsh Near.Node.ReedSolomon
+open Near.Node Near.Node.Chain Near.Node.Network Near.Node.Apply Near.Node.Borsh
+  Near.Node.ReedSolomon
 
 /-- A chunk as the node assembles it from parts. -/
 structure ChunkEntry where
@@ -39,6 +42,15 @@ structure WitnessEntry where
   encodedLength : Nat := 0
   header : Option ShardChunkHeader := none
   done : Bool := false
+  deriving Inhabited
+
+/-- An execution outcome as the store keeps it (`ExecutionOutcomeWithProof` and the block it was produced
+in): the path of its leaf in the outcome tree of the shard's chunk. -/
+structure OutcomeRec where
+  block : CryptoHash
+  shard : UInt64
+  proof : Array MerklePathItem
+  outcome : ExecutionOutcomeWithId
   deriving Inhabited
 
 /-- Everything the validator keeps. -/
@@ -73,8 +85,61 @@ structure VState where
   producedChunks : Std.HashSet (UInt64 × UInt64) := {}
   /-- Approvals whose parent block is not known yet. -/
   parkedApprovals : Array Approval := #[]
+  /-- The applied blocks of the chain of the tip, by height. -/
+  canon : Std.HashMap UInt64 ByteArray := {}
+  /-- Execution outcomes by transaction hash or receipt id. -/
+  outcomes : Std.HashMap ByteArray OutcomeRec := {}
+  /-- The applied transactions by hash: the block and the chunk that included them. -/
+  txIndex : Std.HashMap ByteArray (CryptoHash × ChunkHash) := {}
+  /-- The receipts of the chunks applied, by receipt id (`DBCol::Receipts`). -/
+  receiptsById : Std.HashMap ByteArray Receipt := {}
+  /-- Epochs the accepted blocks finalized, until the block is applied and stored. -/
+  finalized : Std.HashMap ByteArray Epoch.Finalized := {}
+  /-- The transaction pool of each shard the node produces chunks for. -/
+  pools : Std.HashMap UInt64 Pool := {}
+  /-- The height up to which garbage collection has run: the data of the blocks below it is gone, and the state
+  of the block at this height is the oldest that is still complete (`ChainStore::tail`). -/
+  tail : BlockHeight := 0
   /-- Counters for the report. -/
   stats : Std.HashMap String Nat := {}
+
+/-- The height index after `hash` at `height` became the tip: the heights above are dropped and the
+chain is followed back until it meets the index again. -/
+def VState.canonWith (s : VState) (hash : CryptoHash) (height : BlockHeight) :
+    Std.HashMap UInt64 ByteArray :=
+  Id.run do
+    let mut canon := s.canon
+    -- a block that is not above the old tip replaced a fork
+    if height ≤ s.tipHeight then
+      for h in [height.toNat:s.tipHeight.toNat + 1] do
+        canon := canon.erase h.toUInt64
+    let mut cur := hash
+    let mut h := height
+    for _ in [0:100000] do
+      if canon[h]? == some cur.bytes then
+        break
+      canon := canon.insert h cur.bytes
+      match s.st.block cur with
+      | .ok r =>
+        if h == 0 || r.view.prevHash == CryptoHash.zero then
+          break
+        cur := r.view.prevHash
+        h := r.view.prevHeight
+      | .error _ =>
+        break
+    return canon
+
+/-- The sizes of what the validator holds, for the memory report: entry counts, and bytes where the entries are
+byte strings (the trie nodes and the columns of the store). -/
+def VState.census (s : VState) : String :=
+  let t := s.pr.tables
+  let bytes (m : Std.HashMap ByteArray ByteArray) : Nat :=
+    m.fold (fun a k v => a + k.size + v.size) 0
+  let cols :=
+    (List.range t.plain.size).filterMap fun i =>
+      if t.plain[i]!.size == 0 then none else some s!"{i}:{t.plain[i]!.size}/{bytes t.plain[i]!}"
+  let rcBytes := t.rc.fold (fun a k (d, _) => a + k.size + d.size) 0
+  s!"census: chain {s.st.blocks.size} blocks {s.blocks.size} applied {s.applied.size} chunks {s.chunks.size} bodies {s.bodies.size} delivered {s.deliveredAt.size} witnesses {s.witnesses.size} canon {s.canon.size} outcomes {s.outcomes.size} txIndex {s.txIndex.size} receipts {s.receiptsById.size} endorsed {s.endorsed.size} produced {s.producedChunks.size}; progress outgoing {s.pr.outgoing.size} extras {s.pr.extras.size} incoming {s.pr.incoming.size} codes {s.pr.cache.byLabel.size}/{s.pr.cache.labels.size}/{s.pr.cache.lists.size}; trie {t.rc.size} entries {rcBytes} bytes; columns {cols}"
 
 def VState.bump (s : VState) (name : String) : VState :=
   { s with stats := s.stats.insert name (s.stats.getD name 0 + 1) }
@@ -99,8 +164,11 @@ def endorsementTargets (st : CS) (epoch : EpochId) (height : BlockHeight) : Arra
     let mut out : Array AccountId := #[]
     for i in [0:5] do
       match st.blockProducer epoch (height + i.toUInt64) with
-      | .ok v => if !out.contains v.accountId then out := out.push v.accountId
-      | .error _ => break
+      | .ok v =>
+        if !out.contains v.accountId then
+          out := out.push v.accountId
+      | .error _ =>
+        break
     return out
 
 /-- The block at `height` on the chain that ends at `from`. -/
@@ -119,16 +187,18 @@ def chunkCode (total : Nat) : Except String Code :=
   Code.new (Network.numDataParts total) (total - Network.numDataParts total)
 
 /-- Rebuilds the body of a chunk from the parts present: reconstructs the missing data parts. -/
-def assembleBody (code : Code) (h : ShardChunkHeader) (parts : Std.HashMap UInt64 PartialEncodedChunkPart) :
-    Except String TransactionReceipt := do
+def assembleBody (code : Code) (h : ShardChunkHeader)
+    (parts : Std.HashMap UInt64 PartialEncodedChunkPart) : Except String TransactionReceipt := do
   let total := code.total
   let present : Array (Option ByteArray) :=
     (Array.range total).map fun i => (parts[i.toUInt64]?).map (·.part)
   let len := h.encodedLength.toNat
   let bytes ← decodeBytes code present len
   match Codec.decodeAll (α := TransactionReceipt) bytes with
-  | .ok b => pure b
-  | .error e => throw s!"the chunk body does not decode: {repr e}"
+  | .ok b =>
+    pure b
+  | .error e =>
+    throw s!"the chunk body does not decode: {repr e}"
 
 /-- `validate_chunk_with_encoded_merkle_root`: the body re-encoded gives the header's root and length. -/
 def checkEncoding (code : Code) (h : ShardChunkHeader) (body : TransactionReceipt) : Bool :=

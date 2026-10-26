@@ -27,6 +27,54 @@ inductive Charge
   execution cost it obliges, when neither is a plain per-byte multiple of one fee. -/
   | pay (burn execution : Nat)
 
+/-- `near_parameters::ActionCosts` by name, in the order of `ActionFees`' fields. -/
+def actionCostNames : List String :=
+  ["create_account", "delete_account", "deploy_contract_base", "deploy_contract_byte",
+    "function_call_base", "function_call_byte", "transfer", "stake", "add_full_access_key",
+    "add_function_call_key_base", "add_function_call_key_byte", "delete_key", "new_action_receipt",
+    "new_data_receipt_base", "new_data_receipt_byte", "delegate", "use_global_contract_base",
+    "use_global_contract_byte", "deploy_global_contract_base", "deploy_global_contract_byte",
+    "gas_key_transfer_base", "gas_key_byte", "gas_key_nonce_write_base"]
+
+/-- A fee table in which entry number `k` carries `2 ^ k` as its send fee. A charge names the entry it pays by a selector
+(`ActionFees → Fee`), possibly a sum of entries (a transfer to an implicit account also pays for the account and its
+key); reading the selector's answer in this table tells which `ActionCosts` entries it stands for, without changing how
+charges are written. -/
+def costProbe : ActionFees :=
+  { createAccount := { sendSir := 1 }, deleteAccount := { sendSir := 2 },
+    deployContractBase := { sendSir := 4 }, deployContractByte := { sendSir := 8 },
+    functionCallBase := { sendSir := 16 }, functionCallByte := { sendSir := 32 },
+    transfer := { sendSir := 64 }, stake := { sendSir := 128 },
+    addFullAccessKey := { sendSir := 256 }, addFunctionCallKeyBase := { sendSir := 512 },
+    addFunctionCallKeyByte := { sendSir := 1024 }, deleteKey := { sendSir := 2048 },
+    newActionReceipt := { sendSir := 4096 }, newDataReceiptBase := { sendSir := 8192 },
+    newDataReceiptByte := { sendSir := 16384 }, delegate := { sendSir := 32768 },
+    useGlobalContractBase := { sendSir := 65536 }, useGlobalContractByte := { sendSir := 131072 },
+    deployGlobalContractBase := { sendSir := 262144 },
+    deployGlobalContractByte := { sendSir := 524288 }, gasKeyTransferBase := { sendSir := 1048576 },
+    gasKeyByte := { sendSir := 2097152 }, gasKeyNonceWriteBase := { sendSir := 4194304 } }
+
+/-- The `ActionCosts` name a fee selector stands for: `transfer` when the selector includes the transfer fee (nearcore
+profiles the whole payment of a transfer under it), otherwise its first entry. -/
+def actionCostName (fee : ActionFees → Fee) : String :=
+  let v := (fee costProbe).sendSir
+  if v.testBit 6 then "transfer"
+  else (actionCostNames.zipIdx.find? fun (_, k) => v.testBit k).elim "unknown" (·.1)
+
+/-- Observational: add `amount` burnt gas to the profile of the action cost `name` (nothing for zero). -/
+def addActionCost (profile : List (String × Nat)) (name : String) (amount : Nat) :
+    List (String × Nat) :=
+  if amount == 0 then profile
+  else
+    let previous := ((profile.find? (·.1 == name)).map (·.2)).getD 0
+    (name, previous + amount) :: profile.filter (·.1 != name)
+
+/-- Observational: the state with `amount` burnt gas added to the profile of the action cost `name`. Only the profile
+changes, so the gas counter and everything else are as they were. -/
+def _root_.Wasm.NearState.profileAction (ns : NearState) (name : String) (amount : Nat) :
+    NearState :=
+  { ns with actionProfile := addActionCost ns.actionProfile name amount }
+
 def applyCharge (ns : NearState) : Charge → NearState × Option HostError
   | .ext name times =>
     let (g, e) := ns.gas.burn (ns.extCosts.cost name * times)
@@ -35,29 +83,35 @@ def applyCharge (ns : NearState) : Charge → NearState × Option HostError
       e)
   | .burn n =>
     let (g, e) := ns.gas.burn n
-    ({ ns with
-        gas := g,
-        gasProfile :=
-          { ns.gasProfile with
-            actionBurnt := ns.gasProfile.actionBurnt + (g.burnt - ns.gas.burnt) } },
+    (({ ns with
+            gas := g,
+            gasProfile :=
+              { ns.gasProfile with
+                actionBurnt :=
+                  ns.gasProfile.actionBurnt + (g.burnt - ns.gas.burnt) } }).profileAction
+        "new_data_receipt_byte" (g.burnt - ns.gas.burnt),
       e)
   | .actionBase fee sir =>
     let f := fee ns.fees
     let (g, e) := ns.gas.payAction (f.send sir) f.execution
-    ({ ns with
-        gas := g,
-        gasProfile :=
-          { ns.gasProfile with
-            actionBurnt := ns.gasProfile.actionBurnt + (g.burnt - ns.gas.burnt) } },
+    (({ ns with
+            gas := g,
+            gasProfile :=
+              { ns.gasProfile with
+                actionBurnt :=
+                  ns.gasProfile.actionBurnt + (g.burnt - ns.gas.burnt) } }).profileAction
+        (actionCostName fee) (g.burnt - ns.gas.burnt),
       e)
   | .actionBytes fee n sir =>
     let f := fee ns.fees
     let (g, e) := ns.gas.payAction (f.send sir * n) (f.execution * n)
-    ({ ns with
-        gas := g,
-        gasProfile :=
-          { ns.gasProfile with
-            actionBurnt := ns.gasProfile.actionBurnt + (g.burnt - ns.gas.burnt) } },
+    (({ ns with
+            gas := g,
+            gasProfile :=
+              { ns.gasProfile with
+                actionBurnt :=
+                  ns.gasProfile.actionBurnt + (g.burnt - ns.gas.burnt) } }).profileAction
+        (actionCostName fee) (g.burnt - ns.gas.burnt),
       e)
   | .newReceipt sir depsSir =>
     let a := ns.fees.newActionReceipt
@@ -67,22 +121,28 @@ def applyCharge (ns : NearState) : Charge → NearState × Option HostError
     let burn := a.send sir + (depsSir.map fun s => d.send s + d.execution).sum
     let use := a.execution
     let (g, e) := ns.gas.payAction burn use
-    ({ ns with
-        gas := g,
-        gasProfile :=
-          { ns.gasProfile with
-            actionBurnt := ns.gasProfile.actionBurnt + (g.burnt - ns.gas.burnt) } },
+    -- nearcore pays the data receipts' base fees together with the action receipt's and profiles them under it
+    (({ ns with
+            gas := g,
+            gasProfile :=
+              { ns.gasProfile with
+                actionBurnt :=
+                  ns.gasProfile.actionBurnt + (g.burnt - ns.gas.burnt) } }).profileAction
+        "new_action_receipt" (g.burnt - ns.gas.burnt),
       e)
   | .prepay n =>
     let (g, e) := ns.gas.prepay n
     ({ ns with gas := g }, e)
   | .pay burn execution =>
     let (g, e) := ns.gas.payAction burn execution
-    ({ ns with
-        gas := g,
-        gasProfile :=
-          { ns.gasProfile with
-            actionBurnt := ns.gasProfile.actionBurnt + (g.burnt - ns.gas.burnt) } },
+    -- the only send fee paid this way is `gas_key_byte`; the execution-only payment of the nonce rows burns nothing
+    (({ ns with
+            gas := g,
+            gasProfile :=
+              { ns.gasProfile with
+                actionBurnt :=
+                  ns.gasProfile.actionBurnt + (g.burnt - ns.gas.burnt) } }).profileAction
+        "gas_key_byte" (g.burnt - ns.gas.burnt),
       e)
 
 def applyCharges (ns : NearState) : List Charge → NearState × Option HostError

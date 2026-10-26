@@ -13,7 +13,7 @@ column is compacted) is kept and reads as absent.
 namespace Near.Node.Store
 
 structure Tables where
-  plain : Array (Std.HashMap ByteArray ByteArray) := Array.replicate 16 {}
+  plain : Array (Std.HashMap ByteArray ByteArray) := Array.replicate 24 {}
   rc : Std.HashMap ByteArray (ByteArray × Int) := {}
 
 namespace Tables
