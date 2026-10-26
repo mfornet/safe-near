@@ -37,11 +37,13 @@ class Comparison(unittest.TestCase):
         self.assertEqual(rc.unify_unrendered(a, b), 1)
         self.assertEqual(rc.diff(a, b), [])
 
-    def test_the_gas_profile_is_dropped_and_the_version_is_compared(self):
+    def test_the_outcome_metadata_is_compared_in_full(self):
         left = {"result": {"metadata": {"version": 4, "gas_profile": [1], "contracts": [None]}}}
-        right = {"result": {"metadata": {"version": 4, "gas_profile": [], "contracts": []}}}
+        right = {"result": {"metadata": {"version": 4, "gas_profile": [1], "contracts": [None]}}}
         self.assertEqual(rc.diff(rc.normalise("tx", left), rc.normalise("tx", right)), [])
-        right["result"]["metadata"]["version"] = 3
+        right["result"]["metadata"].update(gas_profile=[], contracts=[])
+        self.assertEqual(len(rc.diff(rc.normalise("tx", left), rc.normalise("tx", right))), 2)
+        right["result"]["metadata"].update(version=3, gas_profile=[1], contracts=[None])
         self.assertEqual(len(rc.diff(rc.normalise("tx", left), rc.normalise("tx", right))), 1)
 
     def test_the_peers_of_network_info_are_compared_as_a_count(self):
