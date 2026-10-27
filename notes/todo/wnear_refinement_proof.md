@@ -661,26 +661,58 @@ first automation.
 
 *Exit:* one exported method's `Refines` clauses proved with no `sorry`.
 
-Verified next deployed-code targets (2026-10-27, read-only inspection; no
-semantic contract is yet claimed proved): `ft_total_supply` exports function
+Verified deployed-code targets (2026-10-27): `ft_total_supply` exports function
 296, whose direct callees are 522, 520, 219, 155, 414, 96, 158, 779, 545,
 and 68 twice. Function 414 calls only 566. Function 566 has type
 `[i32, i64, i64] → []` and six instructions: store argument 2 at output+8,
 then argument 1 at output. It has no calls or global accesses. Its next
-contract should own a writable 16-byte output region, specify both
-little-endian stores and the outside-memory frame, normal void completion,
-and exact gas/residual credits. Validate it with the internal-function
-harness before the semantic proof. Existing captures cover only 951–954 and
-310, so 566/414/779 have no captured contracts yet.
+contract now owns a writable 16-byte output region and specifies both
+little-endian stores, the outside-memory frame, normal void completion,
+and exact body gas/residual credits. `Binary.StorePair` kernel-checks its
+actual decoded body and signature. `Proofs.StorePair` proves the active-body
+contract with arbitrary operand prefixes, caller frames and continuations;
+its terminal specialization takes seven transitions, including free leave.
+`NearVM.MeteredMemoryRules` supplies the bounds-based metered store rule.
+`Proofs.StorePairEntry.invoke` composes actual `Exec.startWasm` activation
+and `runInitialized`: with the installed typed-function/module/memory
+lookups, in-bounds memory and sufficient credits, it returns void normally,
+charges exactly 17 regular-operation units, retains residual/promise gas,
+and preserves the body contract's memory and host frame. These are local
+callee premises; no whole deployed-module instantiation theorem or complete
+exported-method refinement is claimed.
 
-The first needed logic rule is an in-bounds metered `i64.store` with a memory
-frame; current metered rules cover constants/locals and existing memory rules
-are unmetered. After 566, compose 414's stack window and call. Function 779
+The executable contract was validated before the semantic proof: 936 valid
+calls pass, including 16 captured calls and unaligned, cross-page, boundary,
+bit-pattern and random cases. Every call costs 17 regular-operation units
+(11 activation plus six body instructions), or 13,986,852 gas under the
+harness configuration. Three executed out-of-bounds probes fail as expected.
+Six malformed-argument cases check contract preconditions only: raw
+`Exec.startWasm` assumes caller-validated argument shape and may panic on
+malformed locals. The complete builtin harness also passes: memcpy 713,
+memset 153, bcmp 120, multi3 3258 and allocator 301 calls.
+
+Next compose 414's stack window and call. Function 779
 has sequential loads/stores, so its contract must retain aliasing semantics
 unless a caller-supported separation premise excludes overlap. The state-read
 path uses `STATE` at address 1049788; SDK vtable dispatch, Borsh decoding,
 JSON formatting and `value_return` remain real obligations of the top-level
 getter.
+
+The immediate caller now has executable validation too. `Binary.StorePairCaller`
+checks f414's actual 29-instruction body, two declared locals and sole call to
+566. `Harness.StorePairCaller` passes 315 calls (314 generated plus one captured
+from `ft_total_supply`) at exactly 57 operation units: own activation 11,
+own body 29, nested activation 11 and nested body six. Output, source and the
+16-byte shadow-stack slot may overlap; the postcondition follows the actual
+snapshot-to-scratch-to-output sequence. All globals, including the stack
+pointer, are restored. Four executed memory/stack failures and five malformed
+argument prechecks behave as expected. The full integrated harness passes.
+These checks validate the intended caller contract; its semantic composition
+proof is still open.
+
+The deployed-leaf checkpoint's strict transitive audit includes 134 modules,
+5442 declarations and 3924 theorems with zero violations. LSP verification of
+all entry/body code facts and contracts uses only the standard axiom basis.
 
 Actual `__multi3` (global index 954, local function 906, type index 8) is
 another validated builtin frontier: 60 straight-line instructions, no calls

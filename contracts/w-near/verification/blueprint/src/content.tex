@@ -290,7 +290,17 @@ about the pinned JSON were not replaced by unchecked computation or new axioms.
 M2 still requires a faithful recorder input contract, reserved-zero node
 exclusion and kernel-certified protocol facts before unrestricted
 \texttt{Refines}. All-resource canonical pointwise assembly is checked.
-The deployed \texttt{refines\_wnear\_exported} proof remains open. The
+The deployed \texttt{refines\_wnear\_exported} proof remains open.
+The first deployed leaf, function 566 on the total-supply path, now has a
+kernel-checked active-body contract linked to its actual decoded binary:
+two little-endian word stores, exact 16-byte footprint, preserved caller
+frames and six ordinary instruction charges. Its harness passes 936 valid
+calls, including 16 captures, with 11 additional activation units. The entry
+bridge composes actual typed activation and the runner, proving exact total
+cost of 17 units and normal void completion. Its immediate caller, function
+414, is harness-validated on 315 calls with alias-aware scratch/output
+framing and exact 57-unit cost; its semantic composition proof remains open.
+The
 detailed frontier is recorded in \texttt{notes/todo/wnear\_refinement\_proof.md}.
 Run \texttt{just wnear-skeleton} for the executable checks and
 \texttt{just wnear-proofsize-probe} for the open SAF-67 counterexample.
