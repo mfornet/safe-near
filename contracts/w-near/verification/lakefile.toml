@@ -42,6 +42,7 @@ name = "Model"
 [[lean_lib]]
 name = "Binary"
 roots = ["Binary.Module"]
+globs = ["Binary.+"]
 
 [[lean_lib]]
 name = "Spec"
@@ -67,6 +68,7 @@ root = "Differential.Main"
 [[lean_lib]]
 name = "Harness"
 roots = ["Harness.Builtins"]
+globs = ["Harness.+"]
 
 [[lean_exe]]
 name = "wnear-harness"
@@ -76,6 +78,7 @@ root = "Harness.Main"
 [[lean_lib]]
 name = "Skeleton"
 roots = ["Skeleton.Model", "Skeleton.Instantiation"]
+globs = ["Skeleton.+"]
 
 [[lean_exe]]
 name = "wnear-skeleton"
