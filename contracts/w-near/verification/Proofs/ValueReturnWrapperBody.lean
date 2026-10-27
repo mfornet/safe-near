@@ -1,6 +1,7 @@
 import Proofs.ValueReturnSlice
 import Proofs.ValueReturnOuter
 import Proofs.ValueReturnOuterState
+import Proofs.ValueReturnOuterFinalState
 import NearVM.MeteredWasmCall
 import Proofs.ValueReturnDispatchGas
 import Proofs.StorePairAddresses
@@ -334,5 +335,95 @@ theorem outerEntry_credits (cfg : WasmConfig) (s : Store NearState) (rest : Nat)
   have ha := GasCounter.burn_credits (chargedStore prepared op).host.gas (10 * op)
     (237 * op + f + (4 * op + rest)) (hop.2.2.2.mono (by omega))
   exact ha.2.2.2
+
+/-- Only the depth bound of primitive Ready depends on the saved callers. -/
+theorem outerReady_callers (cfg : WasmConfig) (extra : Nat) (s : Store NearState)
+    (limits : ExecLimits) (leaf : CallFrame) (callers callers' : List CallFrame)
+    (p : ValueReturnOuterBody.Layout) (hlen : callers'.length = callers.length)
+    (hr : ValueReturnOuterBody.Ready cfg extra s limits leaf callers p) :
+    ValueReturnOuterBody.Ready cfg extra s limits leaf callers' p := by
+  exact {hr with depth := by rw [hlen]; exact hr.depth}
+
+def entered545 (s : Store NearState) (op : Nat) : Store NearState :=
+  chargedStore (chargedStore s op) (10 * op)
+def leaf545 (inst : Nat) (pointer length : UInt32) : CallFrame :=
+  WNear.Proofs.StorePair.voidFrame #[.i32 pointer, .i32 length, .i32 0] inst
+def calledStore (cfg : WasmConfig) (s : Store NearState) (sp pointer length : UInt32)
+    (memory : Memory) (p : ValueReturnOuterBody.Layout) : Store NearState :=
+  completeStore cfg (entered545 s cfg.regularOpCost) sp pointer length p.globalIndex p.memoryIndex memory p
+
+def callFee (cfg : WasmConfig) (s : Store NearState) (sp pointer length : UInt32)
+    (memory : Memory) (p : ValueReturnOuterBody.Layout) : Nat :=
+  fee cfg (entered545 s cfg.regularOpCost) sp pointer length p.globalIndex p.memoryIndex memory p
+
+/-- A single structural resource record for the actual returning545 call.
+Every field is a loader lookup, memory predicate or primitive Ready fact on
+an explicitly computed phase. No guest execution result is assumed. -/
+structure Resources (cfg : WasmConfig) (extra : Nat) (s : Store NearState) (limits : ExecLimits)
+    (frame : CallFrame) (sp pointer length : UInt32) (memory : Memory) (p : ValueReturnOuterBody.Layout) : Prop where
+  module : s.modules[frame.inst]? = some p.mi
+  functionIndex : p.mi.funcAddrs[545]? = some 545
+  function : s.funcs[545]? = some (.wasm WNear.Binary.ValueReturnWrapper.signature frame.inst WNear.Binary.ValueReturnWrapper.function)
+  outerIndex : p.mi.funcAddrs[456]? = some 456
+  outerFunction : s.funcs[456]? = some (.wasm WNear.Binary.ValueReturnOuter.signature frame.inst WNear.Binary.ValueReturnOuter.function)
+  globalIndex : p.mi.globalAddrs[0]? = some p.globalIndex
+  global : s.globals[p.globalIndex]? = some {p.global with value := .i32 sp}
+  memoryIndex : p.mi.memAddrs[0]? = some p.memoryIndex
+  memoryLookup : s.mems[p.memoryIndex]? = some memory
+  memoryWf : memory.wf
+  scratchBound : (sp - 16).toNat + 16 ≤ memory.byteSize
+  outerSp : p.sp = sp - 16
+  outerInterface : p.interface = 1055020
+  outerSlice : p.slice = sp - 16 + 8
+  outerMemory : p.memory = sliceMemory memory (sp - 16) pointer length
+  outer : ValueReturnOuterBody.Ready cfg extra
+    (outerEntry (entered545 s cfg.regularOpCost) cfg.regularOpCost p.globalIndex p.memoryIndex sp pointer length memory)
+    limits (outerLeaf (leaf545 frame.inst pointer length) [] sp)
+    [preparedFrame (leaf545 frame.inst pointer length) sp, frame] p
+
+/-- All computation before the terminal host call is internal Wasm work.
+Its receipt-byte pricing uses the original guest-visible fee context. -/
+theorem fee_eq (cfg : WasmConfig) (s : Store NearState) (sp pointer length : UInt32)
+    (globalIndex memoryIndex : Nat) (memory : Memory) (p : ValueReturnOuterBody.Layout) :
+    fee cfg s sp pointer length globalIndex memoryIndex memory p = ValueReturnHost.cost s.host p.len.toNat := by
+  simp only [fee, outerEntry, preparedStore, reserved, sliceStore, WNear.Proofs.ValueReturnWrapper.lengthStore,
+    ValueReturnOuterBody.dispatchBefore, ValueReturnOuterBody.status, ValueReturnOuterBody.low,
+    ValueReturnOuterBody.high, ValueReturnOuterBody.acquired, ValueReturnOuterBody.arguments,
+    ValueReturnOuterBody.looked, ValueReturnOuterBody.lookupBefore, ValueReturnOuterBody.reserved,
+    ValueReturnOuter.nonnullAfter, ValueReturnOuter.nonnullEntry,
+    ValueReturnThreadLocal.indirectAfter, ValueReturnThreadLocal.indirectEntered,
+    ValueReturnThreadLocal.lookupAfter, ValueReturnThreadLocal.callAfter, ValueReturnThreadLocal.entered,
+    ValueReturnAcquire.calledAcquireStore, ValueReturnAcquire.acquireStore, ValueReturnAcquire.acquireEntryStore,
+    ValueReturnAcquire.reserved, ValueReturnAcquire.recordStore, ValueReturnAcquire.guardStore,
+    ValueReturnAcquire.calledIncrementStore, ValueReturnAcquire.incrementStore, ValueReturnAcquire.incrementEntryStore,
+    ValueReturnBorrowCounters.calledSwapStore, ValueReturnBorrowCounters.swapStore, ValueReturnBorrowCounters.swapEntryStore,
+    ValueReturnHost.cost, ValueReturnHost.dataCost, paid, chargedStore, setGlobal, storeI32, chargeHost]
+
+theorem callFee_eq (cfg : WasmConfig) (s : Store NearState) (sp pointer length : UInt32)
+    (memory : Memory) (p : ValueReturnOuterBody.Layout) :
+    callFee cfg s sp pointer length memory p = ValueReturnHost.cost s.host p.len.toNat := by
+  rw [callFee, fee_eq]
+  rfl
+
+/-- Actual456 phase framing discharges the epilogue's code lookup. -/
+theorem Resources.afterModule (cfg : WasmConfig) (extra : Nat) (s : Store NearState) (limits : ExecLimits)
+    (frame : CallFrame) (sp pointer length : UInt32) (memory : Memory) (p : ValueReturnOuterBody.Layout)
+    (hr : Resources cfg extra s limits frame sp pointer length memory p) :
+    (afterOuter cfg (entered545 s cfg.regularOpCost) sp pointer length p.globalIndex p.memoryIndex memory p).modules[frame.inst]? = some p.mi := by
+  have h := (ValueReturnOuterBody.finalStore_code cfg
+    (outerEntry (entered545 s cfg.regularOpCost) cfg.regularOpCost p.globalIndex p.memoryIndex sp pointer length memory)
+    p frame.inst extra hr.outer.code).module
+  simpa only [afterOuter] using h
+
+/-- Actual456 cleanup restores its incoming global; no post-state lookup is
+part of Resources. -/
+theorem Resources.afterGlobal (cfg : WasmConfig) (extra : Nat) (s : Store NearState) (limits : ExecLimits)
+    (frame : CallFrame) (sp pointer length : UInt32) (memory : Memory) (p : ValueReturnOuterBody.Layout)
+    (hr : Resources cfg extra s limits frame sp pointer length memory p) :
+    (afterOuter cfg (entered545 s cfg.regularOpCost) sp pointer length p.globalIndex p.memoryIndex memory p).globals[p.globalIndex]? = some p.global := by
+  have h := ValueReturnOuterBody.finalStore_global cfg
+    (outerEntry (entered545 s cfg.regularOpCost) cfg.regularOpCost p.globalIndex p.memoryIndex sp pointer length memory)
+    p hr.outer.global hr.outer.sp
+  simpa only [afterOuter] using h
 
 end WNear.Proofs.ValueReturnWrapperBody
