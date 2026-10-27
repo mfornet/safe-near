@@ -1,4 +1,5 @@
 import NearLogic.Charges
+import NearLogic.Call
 
 /-!
 # `value_return`, metered
@@ -87,5 +88,99 @@ theorem valueReturn_ok (extra : Nat) (st : HostStore NearState) (len ptr : UInt6
   · exact hch.used
   · exact hch.maxBurnt
   · exact hch.prepaid
+
+/-- The data receipt bytes `value_return` burns for `n` bytes. -/
+def valueReturnDataGas (h : NearState) (n : Nat) : Nat :=
+  (h.outputDataReceivers.map fun r =>
+    let sir := r == h.context.currentAccountId
+    h.fees.newDataReceiptByte.send sir * n + h.fees.newDataReceiptByte.execution * n).sum
+
+/-- The charges of `value_return` of `n` bytes in memory, within the return limit. -/
+def valueReturnChargeList (h : NearState) (n : Nat) : List Charge :=
+  [.ext "base", .ext "read_memory_base", .ext "read_memory_byte" n, .burn (valueReturnDataGas h n)]
+
+/-- The gas `value_return` of `n` bytes uses. -/
+def valueReturnUse (h : NearState) (n : Nat) : Nat := chargesUse h (valueReturnChargeList h n)
+
+theorem valueReturnCharges_eq (st : HostStore NearState) (len ptr : UInt64) (hlen : len ≠ u64Max)
+    (hin : ptr.toNat + len.toNat ≤ st.mem.size * 65536)
+    (hlim : withinLimit st.host.config.maxReturnLen len.toNat = true) :
+    valueReturnCharges st len ptr = valueReturnChargeList st.host len.toNat := by
+  have hs : storageMutationPlan? "value_return" st [.i64 len, .i64 ptr] = none := by
+    simp [storageMutationPlan?]
+  have hget : getMemOrReg st ptr len = some (st.mem.readList ptr.toNat len.toNat) := by
+    simp only [getMemOrReg, hlen, ite_false]
+    rw [if_neg (by omega)]
+  have hpre : "value_return".startsWith "promise_batch_action_" = false := by decide
+  simp only [valueReturnCharges, chargesBefore, hs, creationAccountArgs, argU64, hpre]
+  simp [chargesBeforeUnvalidated, argU64, spanLen, hlen, readSpan, hget, Memory.readList_length, hlim,
+    valueReturnChargeList, valueReturnDataGas]
+
+/-- A field that erasure keeps is equal on hosts equal up to gas. -/
+theorem erase_field {α : Type} {h h' : NearState} (he : erase h = erase h') (f : NearState → α)
+    (hf : ∀ x, f (erase x) = f x) : f h = f h' := by
+  rw [← hf h, ← hf h', he]
+
+/-- The fee tables and the fields charges read survive erasure. -/
+theorem chargesUse_erase {h h' : NearState} (he : erase h = erase h') (cs : List Charge) :
+    chargesUse h cs = chargesUse h' cs := by
+  have hf : h.fees = h'.fees := erase_field he NearState.fees fun _ => rfl
+  have hx : h.extCosts = h'.extCosts := erase_field he NearState.extCosts fun _ => rfl
+  unfold chargesUse
+  congr 1
+  exact List.map_congr_left fun c _ => chargeUse_congr (ns' := h) (ns := h') hf hx c
+
+theorem valueReturnUse_erase {h h' : NearState} (he : erase h = erase h') (n : Nat) :
+    valueReturnUse h n = valueReturnUse h' n := by
+  have hr : h.outputDataReceivers = h'.outputDataReceivers :=
+    erase_field he NearState.outputDataReceivers fun _ => rfl
+  have hc : h.context.currentAccountId = h'.context.currentAccountId :=
+    erase_field he (fun x : NearState => x.context.currentAccountId) fun _ => rfl
+  have hf : h.fees = h'.fees := erase_field he NearState.fees fun _ => rfl
+  have hd : valueReturnDataGas h n = valueReturnDataGas h' n := by
+    simp [valueReturnDataGas, hr, hc, hf]
+  unfold valueReturnUse valueReturnChargeList
+  rw [hd]
+  exact chargesUse_erase he _
+
+theorem readList_eq_map (m : Memory) (addr len : Nat) :
+    m.readList addr len = (List.range len).map fun i => m.read8 (addr + i) := by
+  unfold Memory.readList; rfl
+
+theorem readList_eq {m : Memory} {addr : Nat} {bs : List UInt8}
+    (h : ∀ k, k < bs.length → m.read8 (addr + k) = bs[k]!) : m.readList addr bs.length = bs := by
+  rw [readList_eq_map]
+  apply List.ext_getElem?
+  intro k
+  by_cases hk : k < bs.length
+  · simp [hk, h k hk]
+  · simp [hk, List.getElem?_eq_none (Nat.le_of_not_lt hk)]
+
+/-- `value_return` of the `len` bytes `bs` at `ptr`, as a read contract. -/
+theorem valueReturn_readContract (extra : Nat) (h : NearState) (len ptr : UInt64) (bs : List UInt8)
+    {C : Nat} (hlen : len ≠ u64Max) (hbs : bs.length = len.toNat)
+    (hlim : withinLimit h.config.maxReturnLen len.toNat = true) (hpos : 0 < len.toNat) :
+    ReadContract (metered extra "value_return" valueReturnFn).toHostFn h (h.selectReturnValue bs)
+      [.i64 len, .i64 ptr] [] ptr.toNat bs (valueReturnUse h len.toNat) C := by
+  intro host mem hwf he hrd hu hmb hpp
+  have hin : ptr.toNat + len.toNat ≤ mem.size * 65536 := by
+    have := (hrd (len.toNat - 1) (by omega)).1
+    unfold Memory.byteSize at this
+    show _ ≤ mem.pages.size * 65536
+    unfold pageSize at this
+    omega
+  have hlim' : withinLimit host.config.maxReturnLen len.toNat = true := by
+    rw [show host.config = h.config from erase_field he NearState.config fun _ => rfl]; exact hlim
+  have hcs := valueReturnCharges_eq { mem, host } len ptr hlen hin hlim'
+  obtain ⟨host', hinv, her, hused, hmb', hpp'⟩ := valueReturn_ok extra { mem, host } len ptr hlen hin hlim'
+    (C := C) (by rw [hcs]; rw [← valueReturnUse_erase he] at hu; exact hu) hmb hpp
+  have hread : mem.readList ptr.toNat len.toNat = bs := by
+    rw [← hbs]; exact readList_eq fun k hk => (hrd k hk).2
+  refine ⟨host', ?_, ?_, ?_, hmb', hpp'⟩
+  · simp only [NearHostFn.toHostFn, Option.getD_some, hinv]
+  · rw [her, hread, erase_selectReturnValue, he]
+  · rw [hused, hcs, show chargesUse host (valueReturnChargeList host len.toNat) = valueReturnUse host len.toNat
+      from rfl, valueReturnUse_erase he]
+    exact Nat.le_refl _
 
 end NearLogic
