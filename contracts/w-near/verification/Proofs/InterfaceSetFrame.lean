@@ -116,4 +116,14 @@ theorem branched_code (s : Store NearState) (op : Nat) (p : Layout) (inst : Nat)
 theorem finalStore_code (s : Store NearState) (op : Nat) (p : Layout) (inst : Nat) (h : Code s p inst) :
     Code (finalStore s op p) p inst := code_of_fields s _ p inst h (final_fields s op p)
 
+theorem acquire_code (s : Store NearState) (op gi mi : Nat) (sp out cell : UInt32) (memory : Memory)
+    (p : Layout) (inst : Nat) (h : Code s p inst) :
+    Code (InterfaceBorrow.calledAcquireStore s op gi mi sp out cell memory) p inst :=
+  code_of_fields s _ p inst h (acquire_fields s op gi mi sp out cell memory)
+
+theorem install_code (s : Store NearState) (op index : Nat) (scratch receiver vtable : UInt32)
+    (m0 m1 m2 : Memory) (p : Layout) (inst : Nat) (h : Code s p inst) :
+    Code (InterfaceSetInstallTail.after s op index scratch receiver vtable m0 m1 m2) p inst :=
+  code_of_fields s _ p inst h (install_fields s op index scratch receiver vtable m0 m1 m2)
+
 end WNear.Proofs.InterfaceSetPhases

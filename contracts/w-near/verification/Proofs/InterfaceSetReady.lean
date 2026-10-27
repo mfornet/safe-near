@@ -150,4 +150,20 @@ theorem installed_global (s : Store NearState) (op : Nat) (p : Layout)
   rw [installed, install_globals]
   exact acquired_global s op p hg
 
+theorem calledAcquireStore_globals (s : Store NearState) (op gi mi : Nat) (sp out cell : UInt32)
+    (memory : Memory) (global : GlobalInst) (hg : s.globals[gi]? = some global) (hv : global.value = .i32 sp) :
+    (InterfaceBorrow.calledAcquireStore s op gi mi sp out cell memory).globals = s.globals :=
+  acquire_globals s op gi mi sp out cell memory global hg hv
+
+theorem installTail_globals (s : Store NearState) (op index : Nat) (scratch receiver vtable : UInt32)
+    (m0 m1 m2 : Memory) :
+    (InterfaceSetInstallTail.after s op index scratch receiver vtable m0 m1 m2).globals = s.globals :=
+  install_globals s op index scratch receiver vtable m0 m1 m2
+
+theorem twoWordsStore_memory (s : Store NearState) (op index firstOffset secondOffset : Nat)
+    (address first second : UInt32) (memory : Memory) (hm : s.mems[index]? = some memory) :
+    (InterfaceSetBody.twoWordsStore s op index firstOffset secondOffset address first second memory).mems[index]? =
+      some (writeI32 (writeI32 memory (address.toNat + firstOffset) first) (address.toNat + secondOffset) second) :=
+  twoWords_memory s op index firstOffset secondOffset address first second memory hm
+
 end WNear.Proofs.InterfaceSetPhases
