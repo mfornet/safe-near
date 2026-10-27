@@ -73,4 +73,67 @@ theorem wp_restore (cfg : WasmConfig) (fuel rest : Nat) (s : Store NearState)
   rw [gas] at h
   simpa only [Nat.add_assoc, Nat.reduceAdd, WNear.Binary.InterfaceLazy.restore, List.cons_append, List.nil_append] using h
 
+def finalStore (s : Store NearState) (op index : Nat) (scratch : UInt32) :=
+  paid (setGlobal (paid (paid (paid s op 4) op 3) op 4) index (.i32 (scratch + 48))) op 1
+
+/-- Complete actual thirteen-step normal tail: publish cell+4, skip the old
+empty state, restore the wrapping shadow stack, and leave the result on stack. -/
+theorem wp_finish (cfg : WasmConfig) (fuel rest : Nat) (s : Store NearState)
+    (limits : ExecLimits) (stack : Array Value) (frame : CallFrame) (callers : List CallFrame)
+    (code : List Instr) (cell scratch : UInt32) (mi : ModuleInst) (index : Nat)
+    (global : GlobalInst) (post : Post)
+    (hcell : frame.locals[0]? = some (.i32 cell))
+    (hs : frame.locals[2]? = some (.i32 scratch)) (hz : frame.locals[1]? = some (.i32 0))
+    (hn : 3 ≤ frame.locals.size)
+    (hm : s.modules[frame.inst]? = some mi) (hi : mi.globalAddrs[0]? = some index)
+    (hg : s.globals[index]? = some global)
+    (hc : s.host.gas.Credits (12 * cfg.regularOpCost + rest))
+    (hnext : WP cfg fuel (.next (atCode (finalStore s cfg.regularOpCost index scratch)
+      limits (stack.push (.i32 (cell + 4)))
+      {frame with locals := frame.locals.set! 0 (.i32 (cell + 4))} callers code)) rest post) :
+    WP cfg (fuel + 13) (.next (atCode s limits stack frame callers
+      ((WNear.Binary.InterfaceLazy.result ++ WNear.Binary.InterfaceLazy.guard ++
+        WNear.Binary.InterfaceLazy.restore) ++ code))) (12 * cfg.regularOpCost + rest) post := by
+  let op := cfg.regularOpCost
+  let updated := {frame with locals := frame.locals.set! 0 (.i32 (cell + 4))}
+  let prepared := paid s op 4
+  let guarded := paid prepared op 3
+  have h0 : 0 < frame.locals.size := by omega
+  have hr : updated.locals[0]? = some (.i32 (cell + 4)) := by
+    simp only [updated, Array.set!_eq_setIfInBounds, Array.getElem?_setIfInBounds_self_of_lt h0]
+  have hs' : updated.locals[2]? = some (.i32 scratch) := by
+    simpa only [updated, Array.set!_eq_setIfInBounds, Array.getElem?_setIfInBounds_ne (by decide : 0 ≠ 2)] using hs
+  have hz' : updated.locals[1]? = some (.i32 0) := by
+    simpa only [updated, Array.set!_eq_setIfInBounds, Array.getElem?_setIfInBounds_ne (by decide : 0 ≠ 1)] using hz
+  have hm' : guarded.modules[updated.inst]? = some mi := by
+    simpa only [guarded, prepared, paid, chargedStore, updated] using hm
+  have hg' : guarded.globals[index]? = some global := by
+    simpa only [guarded, prepared, paid, chargedStore] using hg
+  have cp : prepared.host.gas.Credits (8 * op + rest) := paid_credits s op 4 _ (hc.mono (by dsimp [op]; omega))
+  have cg : guarded.host.gas.Credits (5 * op + rest) := paid_credits prepared op 3 _ (cp.mono (by omega))
+  have finalNext : WP cfg fuel (.next (atCode
+      (paid (setGlobal (paid guarded cfg.regularOpCost 4) index (.i32 (scratch + 48))) cfg.regularOpCost 1)
+      limits (stack.push (.i32 (cell + 4))) updated callers code)) rest post := by
+    simpa only [finalStore, guarded, prepared, op, updated] using hnext
+  have restored := wp_restore cfg fuel rest guarded limits stack updated callers code scratch (cell + 4) mi index global post
+    hs' hr hm' hi hg' cg finalNext
+  have guardedNext : WP cfg (fuel + 5) (.next (atCode (paid prepared cfg.regularOpCost 3)
+      limits stack updated callers (WNear.Binary.InterfaceLazy.restore ++ code))) (5 * cfg.regularOpCost + rest) post := by
+    simpa only [guarded, op] using restored
+  have guardCredits : prepared.host.gas.Credits (3 * cfg.regularOpCost + (5 * cfg.regularOpCost + rest)) := by
+    simpa only [op, show 3 * cfg.regularOpCost + (5 * cfg.regularOpCost + rest) = 8 * cfg.regularOpCost + rest by omega] using cp
+  have guardRule := wp_guard cfg (fuel + 5) (5 * cfg.regularOpCost + rest) prepared limits stack updated callers
+    (WNear.Binary.InterfaceLazy.restore ++ code) post hz' guardCredits guardedNext
+  have resultNext : WP cfg (fuel + 9) (.next (atCode (paid s cfg.regularOpCost 4) limits stack updated callers
+      ((WNear.Binary.InterfaceLazy.guard ++ WNear.Binary.InterfaceLazy.restore) ++ code)))
+      (8 * cfg.regularOpCost + rest) post := by
+    simpa only [Nat.add_assoc, Nat.reduceAdd, List.append_assoc,
+      show 3 * cfg.regularOpCost + (5 * cfg.regularOpCost + rest) = 8 * cfg.regularOpCost + rest by omega,
+      prepared, op] using guardRule
+  have rule := wp_result cfg (fuel + 9) (8 * cfg.regularOpCost + rest) s limits stack frame callers _ cell post hcell
+    (hc.mono (by omega)) resultNext
+  have gas : 4 * cfg.regularOpCost + (8 * cfg.regularOpCost + rest) = 12 * cfg.regularOpCost + rest := by omega
+  rw [gas] at rule
+  simpa only [Nat.add_assoc, Nat.reduceAdd, List.append_assoc] using rule
+
 end WNear.Proofs.InterfaceLazyFinish
