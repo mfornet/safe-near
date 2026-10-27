@@ -152,4 +152,14 @@ theorem storageInput_lastExecutionIssue (cfg : RuntimeConfig) (ctx : VMContext) 
   have h := congrArg NearState.lastExecutionIssue (storageInput_view cfg ctx raw)
   exact h
 
+theorem storageInput_fees (cfg : RuntimeConfig) (ctx : VMContext) (raw : Storage) :
+    (storageInput cfg ctx raw).host.fees = cfg.fees.actionFees := by
+  have h := congrArg NearState.fees (storageInput_view cfg ctx raw)
+  exact h
+
+theorem storageInput_outputDataReceivers (cfg : RuntimeConfig) (ctx : VMContext) (raw : Storage) :
+    (storageInput cfg ctx raw).host.outputDataReceivers = ctx.outputDataReceivers := by
+  have h := congrArg NearState.outputDataReceivers (storageInput_view cfg ctx raw)
+  exact h
+
 end WNear.Skeleton
