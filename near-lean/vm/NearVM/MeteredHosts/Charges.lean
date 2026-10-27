@@ -67,4 +67,38 @@ theorem applyCharges_credits (ns : NearState) (charges : List Charge) (rest : Na
     rw [ht.2.1, hc.2.1, hc.2.2.2.1]
     simp [burnSum, Nat.add_assoc]
 
+/-- A burn-only charge changes exactly the gas counter and diagnostic profiles. -/
+theorem applyCharge_frame (ns : NearState) (charge : Charge) (hburn : BurnsOnly charge) :
+    { (applyCharge ns charge).1 with
+      gas := ns.gas
+      gasProfile := ns.gasProfile
+      actionProfile := ns.actionProfile } = ns := by
+  cases charge <;> simp only [BurnsOnly] at hburn
+  case ext => rfl
+  case burn => rfl
+  all_goals contradiction
+
+/-- Both successful and failing burn lists preserve all functional host state. -/
+theorem applyCharges_frame (ns : NearState) (charges : List Charge)
+    (hburn : ∀ charge ∈ charges, BurnsOnly charge) :
+    { (applyCharges ns charges).1 with
+      gas := ns.gas
+      gasProfile := ns.gasProfile
+      actionProfile := ns.actionProfile } = ns := by
+  induction charges generalizing ns with
+  | nil => rfl
+  | cons charge charges ih =>
+    have hc := applyCharge_frame ns charge (hburn charge (by simp))
+    have ht := ih (applyCharge ns charge).1 (fun c h => hburn c (by simp [h]))
+    unfold applyCharges
+    cases hp : applyCharge ns charge with
+    | mk next error =>
+      rw [hp] at hc ht
+      cases error with
+      | some error => exact hc
+      | none =>
+        have hrestore := congrArg (fun after : NearState =>
+          { after with gas := ns.gas, gasProfile := ns.gasProfile, actionProfile := ns.actionProfile }) ht
+        exact hrestore.trans hc
+
 end Wasm.Near.MeteredHosts
