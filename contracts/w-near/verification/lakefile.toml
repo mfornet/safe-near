@@ -69,3 +69,11 @@ name = "Harness"
 [[lean_exe]]
 name = "wnear-harness"
 root = "Harness.Main"
+
+# M2: a tiny effectful module validating the metered refinement bridge.
+[[lean_lib]]
+name = "Skeleton"
+
+[[lean_exe]]
+name = "wnear-skeleton"
+root = "Skeleton.Main"

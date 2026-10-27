@@ -66,6 +66,10 @@ wnear-scenarios *args:
 wnear-harness *args:
     cd contracts/w-near/verification && lake build wnear-harness && ./.lake/build/bin/wnear-harness {{ args }}
 
+# Validate the M2 effectful walking skeleton, including gas-budget edges.
+wnear-skeleton:
+    cd contracts/w-near/verification && lake build wnear-skeleton && ./.lake/build/bin/wnear-skeleton
+
 # Audit every wNEAR model/spec/proof declaration, including transitive axioms.
 wnear-audit:
     cd contracts/w-near/verification && lake build Model Spec Proofs Differential runtime-adapter-tests
