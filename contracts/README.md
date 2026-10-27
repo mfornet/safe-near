@@ -26,6 +26,9 @@ Two contracts built from the same repository at different commits get two
 submodules (two folders). This duplicates clones but keeps every entry
 independent, as described in `notes/design/SMART_CONTRACTS.md`.
 
+`contract.wasm` is redistributed under the upstream project's licence, not this
+repository's; [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md) lists them.
+
 ## contract.toml
 
 ```toml

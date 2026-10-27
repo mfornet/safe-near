@@ -86,9 +86,8 @@ The detailed acceptance criteria live in each Linear issue.
   local packages to a fresh directory (sharing built mathlib), builds it, and
   fails if it is more than 5% slower than this machine's entry in
   `tools/verification-buildtime/baseline.json`. Record an entry with
-  `--record`. The baseline builds `Model Spec`, because `Proofs.Refinement`
-  still imports the removed Talos decoder; switch to the default targets once
-  that is ported.
+  `--record`. The baseline builds `Model Spec`; recording one for the default
+  targets, which include `Proofs.Refinement`, is open.
 
 `just node-bench [--filter S] [--out FILE]` runs the benchmarks and prints a
 JSON report (the crypto ones are described under M2 below). The Rust oracle

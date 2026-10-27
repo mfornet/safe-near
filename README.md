@@ -61,3 +61,9 @@ refinement open), `sputnik-dao-factory` and `sputnikdao2-v3.2` (both in
 progress). The sequential expansion is tracked in
 [contracts/VERIFICATION.md](contracts/VERIFICATION.md); `linkdrop` is queued
 again, and near-lean already runs its binary.
+
+## License
+
+Apache License 2.0, see [LICENSE](LICENSE). Contract binaries and other
+third-party material keep their own licences; see
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
