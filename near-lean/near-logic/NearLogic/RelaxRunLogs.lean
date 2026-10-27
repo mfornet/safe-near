@@ -336,4 +336,20 @@ theorem runMetered_relaxL (cfg : WasmConfig) (p0 m0 p m : Nat) (hp : p0 ≤ p) (
               cases hs : Exec.step c1 <;> rw [hs] at h <;> simp_all [chargeWasm, chargeConfig, StepResult.store]
             · exact chargeWasm_liveInvariant (fun ns cost h => h) _ _ hlives
 
+theorem fnMono_logs {fn : NearHostFn NearState} (h : FnMono fn) (L : List (List UInt8)) :
+    Exec.HostFn.Preserves (fun x => L <+: x.logs) fn.toHostFn := by
+  intro host mem args hL
+  rw [toHostFn_call_host]
+  exact hL.trans (h { mem := mem.getD (Memory.new 0 none), host } args).1
+
+theorem fnMono_live {fn : NearHostFn NearState} (h : FnMono fn) (I : Option ExecutionIssue) :
+    Exec.HostFn.PreservesLive (fun x => x.lastExecutionIssue = I) fn.toHostFn := by
+  apply NearHostFn.PreservesLive.toHostFn
+  intro st args hI
+  have := (h st args).2
+  revert this
+  cases fn.invoke st args with
+  | Return vals st' => intro h'; exact (h' vals st' rfl).trans hI
+  | Trap st' msg => intro _; trivial
+
 end NearLogic
