@@ -25,6 +25,11 @@ name = "NearRuntime"
 path = "../../../near-lean/runtime"
 
 # Borsh and near-sdk collection layouts shared with the other contract projects.
+# The metered separation logic (layer L1) and the generic bridge to `Refines`.
+[[require]]
+name = "NearLogic"
+path = "../../../near-lean/near-logic"
+
 [[require]]
 name = "NearSdk"
 path = "../../../near-lean/sdk"
