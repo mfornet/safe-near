@@ -347,23 +347,26 @@ that removes the risk of getting stuck on the glue at the end.
 | Overlay lookup/view consistency | `NearInterface/TrieOverlayLookup.lean` | Kernel checked under unique overlay keys; on-disk base agreement remains separate |
 | Actual input-size failure through receipt observation and its symbolic gas bound | `Skeleton/{Costs,FailureExecution}.lean`, `NearRuntime/InitialCredits.lean` | Kernel checked; exact/smaller-budget cost checks pass |
 | Trie compact-path and leaf serialization | `NearInterface/{TrieEncoding,TrieSerialization}.lean` | Kernel checked against actual parsers, with explicit byte widths |
-| Extension/branch parsing, construction and traversal | `NearInterface/{TrieExtension,TrieBranch,TrieBitmap,TrieConstructionBranch,TrieBranchLookup}.lean` | Kernel checked against actual parsers/branch loop and actual child/reference/value/missing lookup composition; recursive child equations remain local |
+| Extension/branch parsing, construction and traversal | `NearInterface/{TrieExtension,TrieBranch,TrieBitmap,TrieConstructionBranch,TrieBranchLookup,TrieBranchConstructionLookup,TrieWitnessTransfer}.lean` | Kernel checked against actual parsers/branch loop and actual child/reference/value/missing lookup composition; isolated child walk transfers through actual parent witness segments with explicit alias/ancestor safety |
 | Actual singleton construction and reads | `NearInterface/TrieLeaf.lean` | Kernel checked; lookup keeps the unresolved nonzero-root premise explicit |
 | Metered overlay/empty-base writes and resource frames | `NearVM/MeteredHosts/{StorageOverlay,StorageEmpty,StorageFrame}.lean` | Kernel checked from initial credits and local resources, with no assumed primitive outcomes |
 | Storage representation and usage | `NearInterface/StorageUsage.lean`, `NearVM/StorageRepresentation.lean`, `Skeleton/StorageResources.lean` | Kernel checked through initialized storage entry and computed final storage |
 | Actual pure/input/output/storage machine budget compatibility | `NearVM/{MeteredPureBudget,MeteredHostBudget,MeteredOutputBudget,MeteredStorageBudget}.lean` | Kernel checked direct storage step and metered advance; paid-state primitive readiness and whole-run invariant assembly remain |
+| Concrete phase control and prefix logs | `Skeleton/BudgetSimulation.lean` | All fifteen opcodes and administrative leave dispatched; actual control/stack/installed-host invariant closed; every actual runner prefix preserves shape and log prefix; guest context unchanged by auxiliary internal gas enlargement |
 | Isolated native recorder arithmetic and necessary history | `NearInterface/{TrieRecorder,TrieRecordingHistory}.lean` | Kernel checked; no runtime/WF integration or recorder-fidelity claim |
 | Actual empty-base receipt success | `Skeleton/{EmptyStorage,EmptySuccess}.lean` | Kernel checked through actual `execOn` and independent model step from original WF/representation/credits/limits; empty base, absent key, proof check, usage room and stake remain explicit |
 | Final output fields and actual receipt success | `Skeleton/{FinalState,SuccessObservation,SuccessExecution}.lean` | Kernel checked through default-fuel public execution and `Matches` for the independent model step, conditional on local storage/resources/representation |
 | Original-budget storage reservation | `Skeleton/StorageCredits.lean` | Kernel checked; empty storage frontier now uses original total credits without a second intermediate gas premise |
 | Storage budget replay | `NearVM/MeteredHosts/{StorageBudget,StoragePrepareBudget,StorageMeteredBudget}.lean` | Kernel checked through the complete non-view metered wrapper, including ordinary validation and gas stops; accepted primitive trie/proof facts supplied at low paid state only |
-| Key/value length failures through receipt observation | `NearVM/MeteredHosts/StorageFailure.lean`, `Skeleton/{StorageFailure,StorageValueFailure}.lean` | Kernel checked exact eight-instruction prefix, startup/default public run, structured failure, gas and model matching; no trie/proof premise |
-| Log-count rejection after storage | `Skeleton/LogFailure.lean` | Kernel checked twelve-instruction prefix through public receipt/model matching; existing local storage frontier/frame remain explicit |
+| Key/value length failures through receipt observation | `NearVM/MeteredHosts/StorageFailure.lean`, `Skeleton/{StorageFailure,StorageValueFailure,StorageFailureGas}.lean` | Kernel checked exact eight-instruction prefix, startup/default public run, structured failure, model matching and actual execOn used-gas bounds under the shared original-data cost; no trie/proof premise |
+| All deterministic resource failures | `Skeleton/{LogFailure,LogLengthFailure,ReturnLengthFailure,FailureCosts,EmptyFailures}.lean` | Kernel checked public receipt/model matching; all resource branches and both stake outcomes assembled for empty base under one original-context cost, with no acceptance-limit or local storage callback premise |
+| Invalid methods | `Skeleton/InvalidMethod.lean` | Complete unparsed-input rollback and no-interpreter-limitation clause for the exact RuntimeInterface, with no context/gas hypotheses |
+| Actual external trie charges | `NearVM/MeteredHosts/TrieCost.lean` | Kernel checked original-key bounds for successful reference lookup (2n+1 touches), value dereference (one touch), and their actual metered charges using original prices |
 | Storage-stake acceptance/rejection | `Skeleton/EmptyStakeFailure.lean` | Kernel checked positive-deficit rollback with saved log and matching for both zero/positive cases on the empty-base slice |
 | Trie access-count bounds | `NearInterface/TrieWalkCost.lean` | Kernel checked actual parser rejects empty extensions; successful lookup touches at most twice byte key length plus terminal node and optional value, with no witness-shape premise |
 | Original-context sufficient-gas matching | `Skeleton/SuccessCost.lean` | Exact loading/opcode/four-host cost includes return-data receipt fees; original gasLimit gives credits, matching and used-gas bound without a stake/read-width premise |
 | Symbolic empty-storage cost and total success gas | `Skeleton/{EmptyCost,SuccessGas}.lean` | Original-cost-table formula and used-gas bound with retained credits, loading, activation and receipt observation kernel checked; universal model bound remains open |
-| Universal model gas bound, other deterministic failures and `Refines` | — | Open; SAF-67 also requires statement repair |
+| Universal model gas bound, remaining used-gas bounds and `Refines` | — | Open; SAF-67 also requires statement repair |
 
 The walking module uses `input`, `storage_write`, `log_utf8` and
 `value_return` through the actual NEAR metered runtime and receipt boundary.
@@ -378,8 +381,8 @@ canonical-trie lookup/dereference agreement with raw storage; instantiate
 remaining on-disk storage cases; derive a symbolic cost
 including trie charges and establish its resource conditions. Finish the
 remaining successful VM/receipt storage and resource instantiations, then prove
-deterministic resource failures and local step compatibility for the remaining hosts and
-machine instructions before assembling `Refines`. The counter-level simulation
+the remaining used-gas bounds and the functional simulation invariant before
+assembling `Refines`. The counter-level simulation
 may relax prepaid and burn limits, but immutable `NearContext.prepaidGas` seen
 by guest code must stay fixed. Host compatibility is a premise to discharge,
 not an implicit generic monotonicity assumption.
@@ -409,8 +412,40 @@ storage frontier/frame. `EmptyStakeFailure` handles both storage-stake outcomes.
 `SuccessCost` derives a context-only sufficient cost (including each return-data
 receiver) and matches/bounds the empty-base receipt directly from gasLimit; its
 read-width check follows from gas coverage and WF, and no zero-deficit premise
-is needed. These results do not yet supply a universal
-model gas function or the whole-run low-gas alternatives.
+is needed. Its upper-bound variant reserves the storage/output prefix even when
+the return-length check rejects. `EmptyFailures` consequently derives actual
+empty-base log-count and log-length rejection directly from original WF,
+limits and gas coverage, retaining proof-size acceptance but no local storage
+callback, return acceptance, usage-room or stake premise. `ReturnLengthFailure`
+proves the final host rejection through public receipt matching, retaining the
+saved log. `FailureCosts` bounds all three pre-storage rejection budgets by the
+same original-data cost, without WF or trie assumptions.
+`StorageFailureGas` additionally bounds actual receipt gas for key and value
+rejection, including loading and activation. The combined
+`execOn_empty_matches_modelStep_allLimits` matches every resource-limit and
+stake branch under that one sufficient-gas bound, with original WF,
+representation, preparation, empty base/absent key, usage room and proof-size
+acceptance explicit. This combined theorem supplies matching, not yet the
+all-branches used-gas bound. `InvalidMethod`
+closes the complete unparsed-input clause without WF or gas hypotheses.
+`TrieBranchConstructionLookup` connects actual branch construction to lookup;
+`TrieWitnessTransfer` transfers an isolated child traversal through its actual
+parent witness segment, with compatible aliases and ancestor safety explicit.
+Canonical construction has not yet discharged those safety conditions.
+`TrieCost` lifts successful lookup/dereference access bounds to the actual
+cumulative counters and metered charges: at most 2n+1 reference-node touches
+and one value touch, billed at no more than the larger original node price.
+`BudgetSimulation` dispatches every actual body position, proves a closed
+control/stack/installed-metadata invariant and log monotonicity for all actual
+fuel prefixes. Enlarging internal counter limits preserves the complete guest
+context. The functional invariant is still open: nonview/fresh issue markers,
+prepared memory, input register, untouched pre-write trie and original
+representation must be maintained together to derive storage readiness at the
+actual low paid state. These facts must then instantiate StepSimulation and
+connect a funded high run, startup and receipt rollback. Neither the control
+invariant nor per-prefix log theorem claims whole-run budget simulation.
+These results do not yet supply a universal model gas function or the whole-run
+low-gas alternatives.
 
 A substantive premise correction was necessary: old `Context.WF` admitted
 duplicate overlay keys and therefore actual `executionIssue` counterexamples
@@ -464,14 +499,15 @@ pins this observed limitation explicitly. Register-size limits are enforced.
 This does not affect the default configuration's one-register example, but
 must not be described as nearcore conformance for arbitrary register limits.
 
-Validation for this increment (2026-10-27): 79 proof modules were checked
-transitively for axioms (3894 declarations, 2811 theorems, zero violations); the
-walking-skeleton checks pass; all five existing builtin harness contracts
-pass; all 211 adapter checks and all 51 differential scenarios pass. The web
-blueprint builds after giving Binary, Harness and Skeleton explicit library
-roots. The full wNEAR audit covers 97 modules, 5440 declarations and 2813
-theorems, permitting only the original refinement module's open proof and its
-two dependent theorems.
+Validation for this checkpoint (2026-10-27): 89 proof modules were checked
+transitively for axioms (4244 declarations, 3075 theorems, zero violations).
+Standard Lake builds, the walking-skeleton checks, and blueprint
+extraction/rendering pass. The full wNEAR audit covers 104 modules, 5678
+declarations and 2995 theorems, permitting exactly the original refinement
+module's open proof and its two dependent theorems. The unchanged earlier
+operational baseline has all five builtin harness contracts, 211 adapter checks
+and 51 differential scenarios passing; these were not rerun for this proof-only
+checkpoint.
 
 During the latest increment the original host checkout and its shared Git/cache
 paths disappeared. Source work and pushes were preserved using isolated Git

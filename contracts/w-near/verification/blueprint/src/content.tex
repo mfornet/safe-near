@@ -191,8 +191,15 @@ premise correction is recorded in the misstatement log.
 The actual input-size, key-length and value-length failures now match the
 independent model through public receipt execution with exact billing and
 residual credits. The key/value branches use no trie or proof-size premise.
-The log-count rejection after a completed storage write is checked through
-actual execution using the existing local storage frontier and resource frame.
+Log-count and log-length rejection after a completed storage write are checked
+through actual public execution. On an empty base, their local storage frontier
+is derived from original WF and a context-only gas bound, without return-length,
+usage-room or stake premises. Returned-data rejection also matches the model,
+retaining the saved log. All resource-limit branches and both final stake
+outcomes are assembled for an empty base under the same original-data gas
+bound, retaining usage room and proof-size acceptance. Invalid methods satisfy
+the complete rollback and
+no-interpreter-limitation clause without context or gas hypotheses.
 
 Trie compact paths, leaf/extension/branch decoding, generated bitmaps, actual
 branch construction from child equations and branch lookup composition are
@@ -200,13 +207,21 @@ kernel checked. Successful lookup access counts are bounded by twice the byte
 key length plus one terminal node and an optional value dereference. The
 actual decoder rejects empty extension paths, so this bound needs no extra
 witness-shape premise. General canonical lookup correctness remains open;
-singleton lookup retains its explicit nonzero-root obligation.
+singleton lookup retains its explicit nonzero-root obligation. Isolated child
+walks now transfer through actual constructed parent witness segments, with
+compatible aliases and ancestor safety explicit. Successful reference lookup
+and dereference also have original-key gas bounds for the cumulative counters
+used by the actual storage host.
 
 Actual machine budget compatibility now includes the direct storage call and
 metered advance alongside input/log/return and pure instructions. Storage
 readiness is supplied only at the actual low paid state, while continuing
-outcomes preserve issue freshness and every outcome preserves logs. Whole-run
-phase invariants and derivation of readiness from canonical storage remain open.
+outcomes preserve issue freshness and every outcome preserves logs. The
+concrete control/stack/installed-host invariant is closed across all
+fifteen opcodes and administrative leave, and every actual runner prefix
+preserves its log prefix. Auxiliary gas enlargement leaves the whole guest
+context unchanged. The functional readiness/freshness invariant and whole-run
+simulation assembly remain open.
 
 The empty-base specialization derives storage postconditions from original
 context data and matches the model for both storage-stake acceptance and
