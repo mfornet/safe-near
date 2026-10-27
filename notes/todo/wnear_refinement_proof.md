@@ -791,6 +791,48 @@ refinement-dependent declarations. The later budget/call-site adapters passed
 MCP diagnostics/trust checks and focused builds; those two checkpoint audit
 counts precede their addition.
 
+`Proofs.TotalSupplyFrontier` integrates those three actual call-site proofs:
+`RemainingCalls` contains exactly eight open execution contracts, and helper
+resources contain installed code, local memory/global bounds, accepted tag
+and concrete post-store equations. `invoke` and `gas_bounds` use this reduced
+frontier; no three hidden callee-execution callbacks are included in resources.
+
+`Binary.PreparedValidation` now proves actual prepared-module validation is
+identical to original-module validation whenever initial pages ≤ maximum
+pages ≤ 65536. It kernel-checks the original single memory declaration and
+uses the generic structural invariance proof; success still requires the
+original whole-module validation certificate. No 907-body reduction result
+was accepted.
+
+The terminal trait implementation f260, reached below the SDK's value-return
+wrapper, now has a checked actual host-backed contract. Its three instructions
+forward the two i64 arguments to deployed import20; actual resolution,
+allocation and linking derive that import's metered `value_return` descriptor
+and address. `Proofs.LoadedValueReturn.invoke` discharges both Wasm-method and
+host-table lookups from the installed-code invariant. Exact root cost is
+14 ordinary units plus the original host's base, memory-read and data-receipt
+fees. The proof derives host execution from a fixed in-bounds span, return
+length limit and credits, clears an earlier promise return, preserves all
+memory and frames functional resources. Register-sentinel lengths are excluded.
+`Proofs.ValueReturnValidation` is a reproducible executable check: 12 calls,
+including seven captures and five fixtures with both same-account and other
+return-data receivers, all match returned bytes and an independent exact-gas
+formula. The `ft_total_supply` capture returns 26 bytes at exactly 2984984553
+gas. This does not discharge f545/f456's thread-local, RefCell, vtable dispatch
+and cleanup; the eight-wrapper-call frontier remains explicit.
+
+The final M3 assembly/host checkpoint's strict transitive audit covers all
+173 proof/support modules: 6953 declarations, 5140 theorems, zero violations. The
+full working-tree audit covers 165 modules, 7415 declarations and 4317 theorems,
+with exactly the three original refinement-dependent `sorryAx` declarations
+tolerated and no other violations; its normal Lake build passes 1316 targets.
+The focused final builds and Lean LSP diagnostics/trust checks pass for the
+entry, actual local-call adapters, reduced frontier, original-store budget,
+prepared-validation transport and loaded host-backed leaf. Blueprint
+extraction/rendering passes (1451 targets). The integrated nine-contract
+harness and the separate 12-case host-dispatch validation both pass; no
+operational behavior changed.
+
 The preceding three-callee checkpoint's strict transitive audit includes 147 modules,
 5814 declarations and 4246 theorems with zero violations. LSP verification of
 all entry/body code facts and contracts uses only the standard axiom basis.

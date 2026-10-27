@@ -316,7 +316,16 @@ the budget is 74 ordinary units plus all local call budgets. These remaining
 contracts and representation obligations are explicit, so exported-method
 refinement remains open. Actual import resolution and successful linking now
 derive installed code lookups; validation and instantiation success remain
-conditions.
+conditions. Three actual local-call adapters reduce the getter's remaining
+execution-contract frontier from eleven sites to eight, retaining structural
+helper resources and the original-store gas bound.
+Prepared memory limits preserve the actual whole validator result under
+explicit page inequalities; original-module validation still needs its own
+certificate. The terminal trait implementation f260 now derives its actual
+metered value-return host call, with exact base/read/data-receipt fees and
+normal return. Its loaded-code bridge derives both the method and host
+lookups; twelve executable cases, including seven captures, match exact return
+bytes and gas. The outer SDK RefCell/vtable path remains open.
 The
 detailed frontier is recorded in \texttt{notes/todo/wnear\_refinement\_proof.md}.
 Run \texttt{just wnear-skeleton} for the executable checks and
