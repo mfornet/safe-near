@@ -106,4 +106,50 @@ theorem storageInput_config (cfg : RuntimeConfig) (ctx : VMContext) (raw : Stora
   have hf := congrArg NearState.config (storageInput_view cfg ctx raw)
   exact hf
 
+/-- The startup/input prefix preserves the original logs. -/
+theorem storageInput_logs (cfg : RuntimeConfig) (ctx : VMContext) (raw : Storage) :
+    (storageInput cfg ctx raw).host.logs = (ctx.toNearState cfg raw).logs := by
+  have h := congrArg (fun host : NearState => host.logs) (storageInput_view cfg ctx raw)
+  exact h
+
+/-- The startup/input prefix preserves the original promises. -/
+theorem storageInput_promises (cfg : RuntimeConfig) (ctx : VMContext) (raw : Storage) :
+    (storageInput cfg ctx raw).host.promises = (ctx.toNearState cfg raw).promises := by
+  have h := congrArg (fun host : NearState => host.promises) (storageInput_view cfg ctx raw)
+  exact h
+
+/-- The startup/input prefix preserves the original extCosts. -/
+theorem storageInput_extCosts (cfg : RuntimeConfig) (ctx : VMContext) (raw : Storage) :
+    (storageInput cfg ctx raw).host.extCosts = (ctx.toNearState cfg raw).extCosts := by
+  have h := congrArg (fun host : NearState => host.extCosts) (storageInput_view cfg ctx raw)
+  exact h
+
+/-- The startup/input prefix preserves the original balance. -/
+theorem storageInput_balance (cfg : RuntimeConfig) (ctx : VMContext) (raw : Storage) :
+    (storageInput cfg ctx raw).host.context.accountBalance = (ctx.toNearState cfg raw).context.accountBalance := by
+  have h := congrArg (fun host : NearState => host.context.accountBalance) (storageInput_view cfg ctx raw)
+  exact h
+
+/-- The startup/input prefix preserves the original usage. -/
+theorem storageInput_usage (cfg : RuntimeConfig) (ctx : VMContext) (raw : Storage) :
+    (storageInput cfg ctx raw).host.context.storageUsage = (ctx.toNearState cfg raw).context.storageUsage := by
+  have h := congrArg (fun host : NearState => host.context.storageUsage) (storageInput_view cfg ctx raw)
+  exact h
+
+/-- The startup/input prefix preserves the original storageProofSize. -/
+theorem storageInput_storageProofSize (cfg : RuntimeConfig) (ctx : VMContext) (raw : Storage) :
+    (storageInput cfg ctx raw).host.storageProofSize = (ctx.toNearState cfg raw).storageProofSize := by
+  have h := congrArg (fun host : NearState => host.storageProofSize) (storageInput_view cfg ctx raw)
+  exact h
+
+theorem storageInput_lastError (cfg : RuntimeConfig) (ctx : VMContext) (raw : Storage) :
+    (storageInput cfg ctx raw).host.lastError = (ctx.toNearState cfg raw).lastError := by
+  have h := congrArg NearState.lastError (storageInput_view cfg ctx raw)
+  exact h
+
+theorem storageInput_lastExecutionIssue (cfg : RuntimeConfig) (ctx : VMContext) (raw : Storage) :
+    (storageInput cfg ctx raw).host.lastExecutionIssue = (ctx.toNearState cfg raw).lastExecutionIssue := by
+  have h := congrArg NearState.lastExecutionIssue (storageInput_view cfg ctx raw)
+  exact h
+
 end WNear.Skeleton
