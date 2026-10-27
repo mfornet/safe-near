@@ -385,6 +385,25 @@ one-less-fuel failure, and entire sequential memory pages and maximum.
 Both explicit getter vector-drop captures satisfy the accepted conditions;
 98 other captures remain outside these selected contracts.
 
+The state-read path now has complete actual f498 present-tag/copy semantics:
+27 ordinary units/18 local-call steps, with the high-word read following the
+low-word write even when spans overlap. Actual register hosts derive length
+or sentinel and whole-register copying, with exact five-charge copy fees,
+byte readback, memory frames and retained gas credits. Their f241/f240
+forwarders cost13/15 ordinary units plus actual host fees and take4/5 steps.
+Canonical storage-read contracts derive both success and absence, preserving
+the actual lookup, proof check, value-read and register-write billing order.
+Original canonical representation, nonzero nodes, limits and recorded-proof
+conditions remain explicit. The typed f284 forwarder costs17 ordinary units
+plus the canonical fee and takes6 steps; no host-outcome premise is used.
+Serializer helpers472/365/321 have actual local contracts, and the typed
+353→901 prefix reaches the real decimal902 call with original U128 words
+at31 ordinary units/13 steps. Decimal902, formatter engine872, allocation and
+SDK state-wrapper composition remain open; the getter still has two whole
+call obligations. Separate checks include26 result-copy captures,86 register
+forwarder captures and76 canonical storage replays from19 captured inputs,
+including both accounting modes and explicit absent-key fixtures.
+
 Successful loading derives the actual indirect table targets and static
 memory words selecting them, with table and data frames for later writes.
 Static validator sections and a first per-function certificate are checked;

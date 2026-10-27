@@ -1216,12 +1216,55 @@ frontier was checked. Independent review reconciles every nested call cost,
 active-step count and depth-eight premise. No new sorry, native certificates,
 custom axioms, operational runtime changes, model changes or WF changes.
 
-Next concrete proof targets are the valid-result sequential copy f498 on the
-219→548 state path and the six-instruction formatter-pair store f472 on
-96→385. Host-facing state work still needs semantic contracts for
-register_len/read_register/storage_read; the larger serialization path still
-contains the actual U128 decimal formatter. These are future obligations,
-not supplied execution assumptions or completed refinement claims.
+The following state-read and serializer checkpoint discharges actual pieces
+of both remaining whole-call obligations. `StateReadResult` proves the f498
+present-tag guard and sequential twelve-byte copy, then `StateReadResultCall`
+its complete typed local call: 27 ordinary units/18 steps. The high word is
+read from the memory after the low eight-byte write, retaining arbitrary
+aliasing and actual wrapped high addresses. Exact memory/code/functional-host,
+gas and residual-credit frames follow from those operations.
+
+`MeteredHosts.RegisterRead` derives the actual register_len length/sentinel
+and whole-register read_register semantics, exact pre-call charges and
+residual credits. `MemoryListRules` proves byte-level writeList readback,
+well-formedness, unchanged size/max and the outside-interval frame; register
+copying has five external charges, including memory writes. Typed installed
+host WPs and resource transport use original memory/register data, rather
+than assumed host outcomes. The actual f241/f240 guest forwarders cost
+13 ordinary units plus base/4 local steps and 15 units plus the full copy
+fee/5 local steps. Their root activation charges include i64 parameter widths.
+
+`MeteredHosts.StorageRead` derives canonical successful and missing reads
+from original WF/representation/nonzero-node/accounting/key/span/limit
+resources. The actual order is lookup charges, recorded-proof check on the
+looked-up trie, referenced-value charges and dereference, raw register update,
+then register-write charges. Success returns one and missing returns zero;
+misses leave all registers unchanged. Exact burnt gas, unchanged promise
+reservations and residual credits are proved at both node-accounting modes.
+The recorded-proof condition remains explicit and does not resolve SAF-67 or
+the reserved-zero-node gap. `MeteredStorageReadRules` composes the real
+installed host opcode. Actual f284's complete typed local forwarder costs
+17 ordinary units plus the computed canonical read fee/6 steps; resource
+frames derive its target register bytes and unchanged memory/code arrays.
+
+Serializer helpers now have actual typed local contracts: f472 pair-store
+17 units/8 steps; f365's accepted guard 22 units/15 steps; positive f321 drop
+319 units/230 steps through the prior concrete allocator proof. Actual
+table index92 resolves to f353. The typed f353→901 prefix reaches the real
+f902 call with the original U128 words at 31 units/13 steps, without assuming
+f902 execution. This is a prefix theorem, not a complete formatter call.
+Full serialization still needs allocation, the f872 formatter engine and
+the f902 decimal algorithm. State-read219 still needs its SDK wrappers,
+register materialization/allocation and state representation composition.
+The getter therefore retains exactly two whole-call obligations, 219 and96.
+
+Separate checks cover 26 f498 captures; 43 each of f240/f241; serializer
+f472/f365/f321 at 8/9/111 captures; and getter formatter-prefix captures.
+Storage-read tests replay 19 captured inputs with fresh canonical accounting
+at both node-billing modes plus explicit empty-storage absence fixtures:
+38 hits and38 misses, exact pure-plan fees, registers, whole memory and fuel.
+These augmented replays are distinct from unchanged captured-state checks;
+none enlarge the integrated nine-contract harness baseline.
 
 ### M4. The Rust runtime layer
 
