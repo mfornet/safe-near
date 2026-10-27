@@ -53,7 +53,7 @@ def instSkel : ModuleInst :=
     exports := #[("get", .func 1), ("memory", .mem 0)] }
 
 /-- The memory after the data segment. -/
-def dataMem : Memory := ((Memory.new 1024 (some 2048)).writeBytes 0 ⟨okBytes.toArray⟩).get!
+@[irreducible] def dataMem : Memory := ((Memory.new 1024 (some 2048)).writeBytes 0 ⟨okBytes.toArray⟩).get!
 
 /-- The instantiated store, from the host `h`. -/
 def storeSkel (extra : Nat) (h : NearState) : Store NearState :=
@@ -68,7 +68,7 @@ theorem instantiate_skel (extra : Nat) (h : NearState) (vm : ValidModule) (hvm :
       vm [.func 0] = .ok (storeSkel extra h, instSkel) := by
   obtain ⟨m', hw, -⟩ := writeBytes_spec (Memory.new_wf 1024 (some 2048)) (addr := 0)
     (bytes := ⟨okBytes.toArray⟩) (by simp [Memory.new_byteSize, okBytes, pageSize, ByteArray.size])
-  have hd : dataMem = m' := by simp [dataMem, hw]
+  have hd : dataMem = m' := by unfold dataMem; rw [hw]; rfl
   have ht : (metered extra "value_return" valueReturnFn).toHostFn.type =
       { params := [.i64, .i64], results := [] } := rfl
   unfold Link.instantiateModule
