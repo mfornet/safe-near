@@ -1,4 +1,4 @@
-import Harness.TotalSupply
+import Harness.BalanceOf
 
 /-!
 # `wnear-harness`: stress the function contracts
@@ -366,6 +366,44 @@ def toVecInputs (h : Harness) (base : Store NearState) (r : Rng) :
     out := out ++ [{ label := s!"{n} ({k})", store := s, args := [i32 1000, i32 2000], ghost := true }]
   pure (out, [])
 
+def valueReturnInputs (h : Harness) (base : Store NearState) (r : Rng) :
+    Except String (List (Input Bool) × List (Input Bool)) := do
+  let mut r := r
+  let mut out : List (Input Bool) := []
+  for k in [0:30] do
+    let (n, r1) := r.nat 0 200
+    let (bs, r2) := r1.bytes n
+    r := r2
+    let s ← put h base [(3000, bs)]
+    out := out ++ [{ label := s!"{n} bytes ({k})", store := s, args := [i32 3000, i32 n], ghost := true }]
+  pure (out, [])
+
+def envInputInputs (h : Harness) (base : Store NearState) (r : Rng) :
+    Except String (List (Input Bool) × List (Input Bool)) := do
+  let mut r := r
+  let mut out : List (Input Bool) := []
+  for k in [0:30] do
+    let (n, r1) := r.nat 0 300
+    let (bs, r2) := r1.bytes n
+    r := r2
+    let s : Store NearState :=
+      { base with host := { base.host with context := { base.host.context with input := bs } } }
+    out := out ++ [{ label := s!"{n} bytes ({k})", store := s, args := [i32 1000], ghost := true }]
+  pure (out, [])
+
+def optionExpectInputs (h : Harness) (base : Store NearState) (r : Rng) :
+    Except String (List (Input Bool) × List (Input Bool)) := do
+  let mut r := r
+  let mut out : List (Input Bool) := []
+  for k in [0:30] do
+    let (bs, r1) := r.bytes 12
+    let (none?, r2) := r1.nat 0 3
+    r := r2
+    let bs := if none? == 0 then bs.set 0 0 |>.set 1 0 |>.set 2 0 |>.set 3 0 else bs.set 0 1
+    let s ← put h base [(4000, bs)]
+    out := out ++ [{ label := s!"random {k}", store := s, args := [i32 1000, i32 4000, i32 1049036], ghost := true }]
+  pure (out, [])
+
 /-! ## Call sites -/
 
 def account (s : String) : List UInt8 := s.toUTF8.toList
@@ -438,8 +476,11 @@ def main (args : List String) : IO UInt32 := do
   let h ← orThrow (Harness.load protocol module internalContext [])
   let captured ← captureAll protocol module bytes.size
     [memcpy.func, memset.func, bcmp.func, multi3.func, alloc.func, vecDeref.func, stateOrPanic.func,
-      u128From.func, ftTotalSupply.func, resultExpect.func, stateRead.func, toVecU128.func]
+      u128From.func, ftTotalSupply.func, resultExpect.func, stateRead.func, toVecU128.func,
+      valueReturn.func, envInput.func, optionExpect.func]
   let sites (f : Nat) := captured.getD f #[]
+  -- A fresh store after the method prologue: the environment is set up.
+  let envBase ← orThrow (prologue h h.store)
   let results := [
     ← stress h memcpy (memcpyInputs h) (sites memcpy.func) verbose,
     ← stress h memset (memsetInputs h) (sites memset.func) verbose,
@@ -460,5 +501,8 @@ def main (args : List String) : IO UInt32 := do
         (sites stateRead.func) verbose,
     ← stress h toVecU128
         (toVecInputs h (((sites stateRead.func)[0]?.map (·.2.store)).getD h.store))
-        (sites toVecU128.func) verbose]
+        (sites toVecU128.func) verbose,
+    ← stress h valueReturn (valueReturnInputs h envBase) (sites valueReturn.func) verbose,
+    ← stress h envInput (envInputInputs h envBase) (sites envInput.func) verbose,
+    ← stress h optionExpect (optionExpectInputs h envBase) (sites optionExpect.func) verbose]
   pure (if results.all id then 0 else 1)

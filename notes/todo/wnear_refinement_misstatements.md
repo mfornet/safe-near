@@ -97,6 +97,19 @@ tends to come back in another place.
   predicate (M4/M5) before covering the error path.
 - **Test added:** a probe with a garbage error.
 
+### 6. `Option<Vec<u8>>::expect`'s activation, again
+
+- **Statement:** `Harness.optionExpect.cost`: 24 `regular_op_cost` on `Some`.
+- **Truth:** 25: three `i32` parameters are 12 bytes, so the activation is
+  `(64 + 12 + 7) / 8 = 10`, not 9.
+- **Caught by:** harness (every `Some` input burnt 25).
+- **Root cause:** entry 1's: the activation estimated rather than computed.
+  The rounding makes 8 bytes of parameters (9) and 12 bytes (10) differ.
+- **Sweep:** every activation in `Harness/*.lean` recomputed from the
+  formula; all others match, and the harness reports each as exact.
+  Costs are now written with the parameter bytes in their comment.
+- **Test added:** the existing cost check; no new input needed.
+
 ## Agent results
 
 Success and failure per task type and model (section 11.2 of the plan), used
