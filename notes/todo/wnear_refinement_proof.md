@@ -435,6 +435,8 @@ catches so far came from this path (misstatement log, 3 to 5).
   The storage phase (`storageAux_rel`) is walked in step with tactics
   that keep the raised host folded as `relax H` (`bill_step`, `csplit`).
 
+*Done since: the below-the-bound case with logs (`method_below`, any method of the binary), and the metered instruction rules (pure, memory, globals, control flow, Wasm calls with `MFunSpec`). Missing: `memory.grow`, tables, bulk memory.*
+
 *Next: the below-the-bound case with logs.* For the skeleton,
 `QuietHost` (no logs, no execution issue) carried the out-of-gas case.
 wNEAR logs, so the lower run's final logs must be shown to be a prefix of
