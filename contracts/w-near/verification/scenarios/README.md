@@ -14,7 +14,8 @@ just wnear-scenarios -v scenarios/10_callbacks.json
 just wnear-scenarios --only "reverse order"
 just wnear-scenarios scenarios/slow        # megabyte inputs: minutes each
 just wnear-scenarios scenarios/open        # open findings: they fail by design
-python3 scenarios/generate.py              # regenerate 40_gas.json, 60_random.json, 61_random_wide.json, slow/
+python3 scenarios/generate.py              # regenerate the generated files (see the table below)
+python3 scenarios/generate.py fuzz 1 500 DIR   # fresh argument-fuzz seeds, for a scratch run
 ```
 
 The runner is `Differential/` (contract-independent `Runner.lean`, the wNEAR
@@ -99,7 +100,8 @@ A file holds one scenario object or an array of them.
         "results": [],                 // promise results the call sees
         "outputDataReceivers": ["bob.near", {"repeat": "x.near", "times": 1024}],
         //   receivers of the call's result (default none); also on a deliver
-        "storageProofSize": 0},        // a constant recorded storage proof (default: unchecked)
+        "storageProofSize": 0,         // a constant recorded storage proof (default: unchecked)
+        "signerPk": "00ff"},           // the signer's public key as hex, or hex parts with "repeat" (default empty)
        "expect": "ok"},
       {"label": "r", "deliver": "t#1", "results": [{"ok": "\"3\""}]},
       {"credit": "100"},
@@ -109,6 +111,8 @@ A file holds one scenario object or an array of them.
 }
 ```
 
+- **`gas: "bound?"`** (or `"bound-1?"`) is `bound` when the input is a call and
+  300 Tgas when it is not, for generated inputs that may not parse.
 - **`gas: "bound"`** is the least prepaid gas for which the model's bound fits
   the call's gas limit. It is the boundary where `Refines` starts promising
   `Matches`. The bound can depend on the prepaid gas, which `ft_transfer_call`
@@ -137,8 +141,10 @@ A file holds one scenario object or an array of them.
 | `15_wrapper.json` | The `#[near_bindgen]` wrapper's order: private check, deposit check, arguments, state; on an initialised and an uninitialised contract |
 | `20_arguments.json` | serde_json acceptance as the binary sees it: nesting depth in ignored values, UTF-8 and escapes in ignored and parsed strings, numbers, account ids, options, array forms, whitespace, BOM |
 | `25_arguments_more.json` | Escaped and duplicate keys, the array form with missing, null and extra elements, `U128` strings at `from_str_radix`'s edges, 1- and 2-byte account ids, overlong and surrogate UTF-8 in typed and ignored strings, malformed numbers and literals, empty and `null` input |
+| `26_arguments_fuzz.json` (generated) | Seeded random argument bytes for the nine methods with parameters, and random results for `ft_resolve_transfer`: escaped, duplicate and unknown keys, nested ignored values, the array form with missing and extra elements, odd whitespace, malformed escapes and UTF-8, one corrupted byte; half at `bound` or `bound-1` |
 | `30_logs.json` | Memos at, and one byte past, the total log length limit, including multibyte ones |
 | `35_receipts.json` | Validation of the receipts a transfer-call creates: no gas for `ft_on_transfer` at exactly 30 Tgas, more than the total prepaid gas limit above 1030 Tgas |
+| `37_signer_key.json` (generated) | Signer keys that put each receipt a call creates one byte under, at and over `max_receipt_size`: the payouts of `near_withdraw`, `storage_deposit` and `storage_unregister` with a 10- and a 64-byte signer, and both receipts of a transfer-call |
 | `40_gas.json` (generated) | Every method at `bound` and `bound-1` on a trie whose keys share prefixes with the touched ones; warm and cold cache; long arguments (ignored strings, arrays, escapes, whitespace, leading zeros); promise results up to 20 KB in the costliest shapes |
 | `45_output_data.json` | `value_return` with 1, 100 and 1024 receivers of the result, on the contract and elsewhere, for every value-returning method at `bound`, below it and at 300 Tgas; a transfer-call at its success edge; a second promise result of 200 KB that is never read |
 | `50_resources.json` | `u128` edges of balances, supply and the contract balance; balance exceeded; the 770-byte zero-balance exemption; locked balance; huge storage usage; deposits on views |
@@ -250,3 +256,31 @@ per call), promises per call (2), actions per receipt (1), data dependencies (1)
 storage key length (69 bytes), returned data (under 200 bytes) and register size
 (the input, at most 4 MB) cannot be reached. Every account kind as the receiver
 of a payout, and three contract names, stay within the bound.
+
+The third round (the `refinement-stress` skill) found no discrepancy. It tried
+two surfaces that the earlier rounds had not reached:
+
+- **The signer's key and the receipt size.** `Context.WF` does not bound
+  `signerPk`, and every receipt a call creates carries it, so a long key
+  reaches `max_receipt_size` on any call that creates a receipt.
+  `37_signer_key.json` puts each receipt one byte under, at and over the limit.
+  `ReceiptValidation.receiptSize` and near-lean's `vmReceiptSize` agree to the
+  byte, including the case where only the transfer-call's callback receipt is
+  too large and its size is the one reported. On a real chain the key has at
+  most 65 bytes.
+- **Random arguments.** `26_arguments_fuzz.json` keeps two seeds. 1200 fresh
+  seeds were run in a scratch directory, 180 000 probes in all: half at 300
+  Tgas, half at `bound` or `bound-1`. About 60% of the inputs are well-formed
+  JSON, a third of the inputs are no calls, and the calls reach every method's
+  success and panic paths. Below the transfer-call, the bound is far above the
+  gas used (at most 11% on short arguments), so `bound-1` never ran out of gas.
+  Only the transfer-call, which forwards almost all of its gas, sits near its
+  bound.
+
+serde_json 1.0.60's `ignore_value` and `ignore_escape` and the
+near-sdk 3.1.0 and near-contract-standards 3.1.0 sources were read against
+the model again. The trie part of `gasBound` was checked against a path of
+maximal depth, on paper: a lookup touches at most one node per nibble of the
+key, one more, and the value, one touch more than the `trieNodes` the bound pays
+per path. The bound pays 11 paths (3 cold, 8 cached; under protocol 86 both
+cost 2.28 Ggas) for at most 8 storage operations, which covers it.
