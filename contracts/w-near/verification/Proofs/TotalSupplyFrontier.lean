@@ -1,8 +1,9 @@
 import Proofs.TotalSupplyCallees
+import Proofs.UnwrapStateCallees
 import Proofs.TotalSupplyBudget
 
-/-! Actual ft_total_supply frontier after discharging f414, f158 and f779.
-Only the eight named remaining callees carry execution contracts; the proved
+/-! Actual ft_total_supply frontier after discharging f155, f414, f158 and f779.
+Only the seven named remaining callees carry execution contracts; the proved
 helpers require structural resources and equalities to their concrete effects. -/
 namespace WNear.Proofs.TotalSupplyFrontier
 open Wasm Wasm.Near Wasm.Near.MeteredLogic
@@ -10,7 +11,7 @@ open WNear.Proofs.TotalSupply
 open WNear.Proofs.TotalSupplyCallees
 set_option maxHeartbeats 800000
 
-/-- The eight local call contracts still unproved on the deployed wrapper path.
+/-- The seven local call contracts still unproved on the deployed wrapper path.
 The two occurrences of Vec.drop remain distinct call-site obligations. -/
 structure RemainingCalls (cfg : WasmConfig) (limits : ExecLimits)
     (scratch pointer length : UInt32) (before after : Fin 11 → Store NearState)
@@ -21,8 +22,6 @@ structure RemainingCalls (cfg : WasmConfig) (limits : ExecLimits)
     (before 1) (after 1) (cost 1) (steps 1)
   readState : CalleeContract cfg limits (StorePair.voidFrame #[.i32 scratch] 0) 219 [.i32 (scratch + 72)]
     (before 2) (after 2) (cost 2) (steps 2)
-  unwrapState : CalleeContract cfg limits (StorePair.voidFrame #[.i32 scratch] 0) 155
-    [.i32 (scratch + 32), .i32 (scratch + 72)] (before 3) (after 3) (cost 3) (steps 3)
   serialize : CalleeContract cfg limits (StorePair.voidFrame #[.i32 scratch] 0) 96
     [.i32 (scratch + 72), .i32 (scratch + 112)] (before 5) (after 5) (cost 5) (steps 5)
   returnValue : CalleeContract cfg limits (StorePair.voidFrame #[.i32 scratch] 0) 545 [.i32 pointer, .i32 length]
@@ -31,6 +30,25 @@ structure RemainingCalls (cfg : WasmConfig) (limits : ExecLimits)
     (before 9) (after 9) (cost 9) (steps 9)
   dropStateVector : CalleeContract cfg limits (StorePair.voidFrame #[.i32 scratch] 0) 68 [.i32 (scratch + 56)]
     (before 10) (after 10) (cost 10) (steps 10)
+
+/-- The accepted f155 site performs the actual forty-byte copy; no copy
+execution contract is supplied. The nonzero tag is a representation premise. -/
+structure UnwrapResources (cfg : RuntimeConfig) (host : NearState) (limits : ExecLimits)
+    (before after : Store NearState) (scratch : UInt32) where
+  module : ModuleInst
+  memoryIndex : Nat
+  memory : Memory
+  installed : LoadedCallees.Installed cfg host before module
+  memoryIndex_eq : module.memAddrs[0]? = some memoryIndex
+  memory_eq : before.mems[memoryIndex]? = some memory
+  memory_wf : memory.wf
+  memory_width : memory.byteSize ≤ 2 ^ 32
+  source_bound : (scratch + 72).toNat + 40 ≤ memory.byteSize
+  output_bound : (scratch + 32).toNat + 40 ≤ memory.byteSize
+  present_tag : readI32 memory ((scratch + 72).toNat + 24) ≠ 0
+  depth : 2 < limits.maxCallDepth
+  after_eq : after = UnwrapStateCallees.callAfter before cfg.wasm.regularOpCost memoryIndex
+    (scratch + 32) (scratch + 72) memory
 
 /-- The f414 site reads the decoded object's U128 into scratch+16. These are
 actual installed-code and native-memory facts, with its exact computed poststore. -/
@@ -97,10 +115,13 @@ structure PackResources (cfg : RuntimeConfig) (host : NearState) (limits : ExecL
   depth : 1 < limits.maxCallDepth
   after_eq : after = packedAfter before cfg.wasm.regularOpCost memoryIndex (scratch + 8) (scratch + 128) memory
 
-/-- Structural resources for precisely the three proved helper call sites.
+/-- Structural resources for precisely the four proved helper call sites.
 Their costs include the caller opcode and their fuel includes the free leave. -/
 structure HelperResources (cfg : RuntimeConfig) (host : NearState) (limits : ExecLimits)
     (before after : Fin 11 → Store NearState) (scratch : UInt32) (cost steps : Fin 11 → Nat) where
+  unwrap : UnwrapResources cfg host limits (before 3) (after 3) scratch
+  cost_unwrap : cost 3 = 754 * cfg.wasm.regularOpCost
+  steps_unwrap : steps 3 = 702
   supply : SupplyResources cfg host limits (before 4) (after 4) scratch
   expect : ExpectResources cfg host limits (before 6) (after 6) scratch
   pack : PackResources cfg host limits (before 7) (after 7) scratch
@@ -111,14 +132,21 @@ structure HelperResources (cfg : RuntimeConfig) (host : NearState) (limits : Exe
   cost_pack : cost 7 = 18 * cfg.wasm.regularOpCost
   steps_pack : steps 7 = 10
 
-/-- Assemble the actual eleven-call wrapper interface from only eight local
-execution contracts and the three kernel-proved helper implementations. -/
+/-- Assemble the actual eleven-call wrapper interface from only seven local
+execution contracts and the four kernel-proved helper implementations. -/
 theorem assemble (cfg : RuntimeConfig) (host : NearState) (limits : ExecLimits)
     (scratch pointer length : UInt32) (before after : Fin 11 → Store NearState) (cost steps : Fin 11 → Nat)
     (remaining : RemainingCalls cfg.wasm limits scratch pointer length before after cost steps)
     (resources : HelperResources cfg host limits before after scratch cost steps) :
     CallObligations cfg.wasm limits (StorePair.voidFrame #[.i32 scratch] 0)
       scratch pointer length before after cost steps := by
+  let u := resources.unwrap
+  have unwrap := UnwrapStateCallees.unwrapState_installed cfg host limits (StorePair.voidFrame #[.i32 scratch] 0)
+    (before 3) (scratch + 32) (scratch + 72) u.module u.memoryIndex u.memory u.installed rfl
+    u.memoryIndex_eq u.memory_eq u.memory_wf u.memory_width u.source_bound u.output_bound u.present_tag u.depth
+  have h3 : CalleeContract cfg.wasm limits (StorePair.voidFrame #[.i32 scratch] 0) 155
+      [.i32 (scratch + 32), .i32 (scratch + 72)] (before 3) (after 3) (cost 3) (steps 3) := by
+    simpa only [u.after_eq, resources.cost_unwrap, resources.steps_unwrap] using unwrap
   let s := resources.supply
   have supply := readSupply_installed cfg host limits (StorePair.voidFrame #[.i32 scratch] 0)
     (before 4) scratch (scratch + 16) (scratch + 32) s.module s.globalIndex s.memoryIndex s.global s.memory
@@ -142,10 +170,10 @@ theorem assemble (cfg : RuntimeConfig) (host : NearState) (limits : ExecLimits)
   have h7 : CalleeContract cfg.wasm limits (StorePair.voidFrame #[.i32 scratch] 0) 779
       [.i32 (scratch + 8), .i32 (scratch + 128)] (before 7) (after 7) (cost 7) (steps 7) := by
     simpa only [p.after_eq, resources.cost_pack, resources.steps_pack] using pack
-  exact ⟨remaining.panicHook, remaining.installInterface, remaining.readState, remaining.unwrapState,
+  exact ⟨remaining.panicHook, remaining.installInterface, remaining.readState, h3,
     h4, remaining.serialize, h6, h7, remaining.returnValue, remaining.dropReturnVector, remaining.dropStateVector⟩
 
-/-- Actual loaded export execution now exposes only the eight remaining local
+/-- Actual loaded export execution now exposes only the seven remaining local
 callee contracts. Helper resources contain no call or method execution callback. -/
 theorem invoke (cfg : RuntimeConfig) (host : NearState) (rest : Nat) (s final : Store NearState)
     (limits : ExecLimits) (before after : Fin 11 → Store NearState) (cost steps : Fin 11 → Nat)
