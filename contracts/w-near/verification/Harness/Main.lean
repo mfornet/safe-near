@@ -236,6 +236,16 @@ def vecDerefInputs (h : Harness) (r : Rng) : Except String (List (Input Unit) ×
     { label := "the length's slot over the pointer", store := s, args := [i32 96, i32 100], ghost := () }
   pure (out ++ [harmless], [probe])
 
+/-- Every method's prologue: `setup_panic_hook` (522), then
+`set_blockchain_interface` (520) with near-sdk's zero-sized interface and
+its vtable. Its postcondition is the ghost "environment set up". -/
+def prologue (h : Harness) (s : Store NearState) : Except String (Store NearState) := do
+  let r1 := h.call s 522 []
+  if let some e := ended r1 then throw s!"setup_panic_hook: {e}"
+  let r2 := h.call r1.after 520 [i32 1, i32 1050188]
+  if let some e := ended r2 then throw s!"set_blockchain_interface: {e}"
+  pure r2.after
+
 /-- `base` is a store from inside a method, where the environment is set up. -/
 def stateInputs (h : Harness) (base : Store NearState) (r : Rng) :
     Except String (List (Input Bool) × List (Input Bool)) := do
@@ -248,6 +258,13 @@ def stateInputs (h : Harness) (base : Store NearState) (r : Rng) :
   let none0 := bs0.set 24 0 |>.set 25 0 |>.set 26 0 |>.set 27 0
   let s0 ← put h base [(200, none0)]
   out := out ++ [{ label := "not initialized", store := s0, args := [i32 1000, i32 200], ghost := true }]
+  -- The same from a fresh store after the method's prologue: the ghost is
+  -- the prologue's postcondition.
+  let fresh ← prologue h h.store
+  let s1 ← put h fresh [(200, none0)]
+  let afterPrologue : Input Bool :=
+    { label := "not initialized, after the prologue", store := s1, args := [i32 1000, i32 200], ghost := true }
+  out := out ++ [afterPrologue]
   for k in [0:50] do
     let (opt, r1) := r.nat 0 (top - 40)
     let (dst, r2) := r1.nat 0 (top - 40)
