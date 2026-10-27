@@ -34,3 +34,4 @@ import NearLogic.Rules.CallWasm
 import NearLogic.Rules.Control
 import NearLogic.CallWrite
 import NearLogic.Hosts.Registers
+import NearLogic.Trie

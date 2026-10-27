@@ -452,6 +452,8 @@ the raised run's. The plan:
 3. Then `runMetered_relax`'s gas case gives: the lower final logs are a
    prefix of the raised final logs, and no execution issue.
 
+The storage trie (`NearLogic/Trie.lean`, `storage_lookup`): on a canonical trie a lookup finds exactly the stored value, without error, keeps the data, and touches at most 2·|key| + 1 nodes. It assumes that no witness node hashes to the all-zero hash, which `walk` treats as the empty trie. That is a SHA-256 preimage fact: it can't be proved, so like SAF-67 it must become an assumption on the context (a `Context.WF` field or a hypothesis of `Refines`). Still left on this path: linking `entries.find?` to the VM host's `storage` through `trie_storage` and `toNearState`.
+
 The remaining open point on this path is SAF-67 (`Context.WF` does not
 constrain `storageProofSize`). Until it is decided, every storage-touching
 method's `Refines` is false as stated.
