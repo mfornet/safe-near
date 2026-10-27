@@ -352,4 +352,48 @@ theorem fnMono_live {fn : NearHostFn NearState} (h : FnMono fn) (I : Option Exec
   | Return vals st' => intro h'; exact (h' vals st' rfl).trans hI
   | Trap st' msg => intro _; trivial
 
+/-- **A method run under raised limits, with logs**: the entry charge, then
+the metered loop. -/
+theorem runInitialized_relaxL (cfg : WasmConfig) (p0 m0 p m : Nat) (hp : p0 ≤ p) (hm : m0 ≤ m)
+    (I : Option ExecutionIssue) (fuel : Nat) (c : Config NearState)
+    (hgl : Exec.ConfigHostInvariant (GasLimits p0 m0) c) (hf : StoreRelaxFnsL c.store) (hmono : StoreLogsMono c.store)
+    (hlive : Exec.ConfigLiveInvariant (fun h => h.lastExecutionIssue = I) c) :
+    let lo := runInitialized cfg fuel (.next c)
+    let hi := runInitialized cfg fuel (.next { c with store := relaxStore c.store p m })
+    (GasEnd lo ∧ lo.1.host.logs <+: hi.1.host.logs ∧
+        ((∃ vs s, hi.1 = .done vs s) → lo.1.host.lastExecutionIssue = I)) ∨
+      hi = (lo.1.relax p m, lo.2) := by
+  intro lo hi
+  have hlim : c.store.host.gas.prepaid ≤ p ∧ c.store.host.gas.maxBurnt ≤ m := by
+    have := hgl.2; exact ⟨this.1 ▸ hp, this.2 ▸ hm⟩
+  have hcharge : ∀ (ns : NearState) (cost : Nat), GasLimits p0 m0 ns → GasLimits p0 m0 (chargeHost ns cost).1 :=
+    fun ns cost h => by
+      have hl := chargeHost_gas_limits ns cost
+      exact ⟨hl.1.trans h.1, hl.2.trans h.2⟩
+  have hentry : entryCost cfg (.next { c with store := relaxStore c.store p m }) = entryCost cfg (.next c) := rfl
+  have hhi := runMetered_logs cfg fuel
+    (chargeWasm (.next { c with store := relaxStore c.store p m }) (entryCost cfg (.next c))).1 hmono
+  simp only [lo, hi, runInitialized]
+  rw [hentry]
+
+  cases hent : (chargeWasm (.next c) (entryCost cfg (.next c))).2 with
+  | some e =>
+    left
+    simp only
+    have hw := chargeWasm_logs (.next c) (entryCost cfg (.next c))
+    have hw' := chargeWasm_logs (.next { c with store := relaxStore c.store p m }) (entryCost cfg (.next c))
+    refine ⟨Or.inl ⟨e, rfl, chargeWasm_error _ _ hent⟩, ?_, fun _ => by rw [hw.2]; exact hlive.2⟩
+    rw [hw.1]
+    split
+    · rw [hw'.1]; exact List.prefix_refl _
+    · exact (by rw [hw'.1] at hhi; exact hhi)
+  | none =>
+    rw [show (StepResult.next { c with store := relaxStore c.store p m }) = (StepResult.next c).relax p m from rfl,
+      chargeWasm_relax (.next c) _ p m hlim.1 hlim.2 hent]
+    simp only
+    have hr := runMetered_relaxL cfg p0 m0 p m hp hm I fuel (chargeWasm (.next c) (entryCost cfg (.next c))).1
+      (chargeWasm_hostInvariant hcharge _ _ hgl) hf hmono
+      (chargeWasm_liveInvariant (fun ns cost h => h) _ _ hlive)
+    exact hr
+
 end NearLogic
