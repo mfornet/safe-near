@@ -26,8 +26,10 @@ open Wasm Wasm.Near WasmLogic Iris Iris.BI Iris.Std Iris.Std.PartialMap Iris.Pro
 /-- The location of the gas counter and profile. -/
 abbrev gasLoc : Loc := (10, 0, 0)
 
-/-- The host state without its gas counter and profile. -/
-def erase (h : NearState) : NearState := { h with gas := {}, gasProfile := {} }
+/-- The host state without its gas counter, its profile, and the copy of
+`used` that metered host functions keep in the context. -/
+def erase (h : NearState) : NearState :=
+  { h with gas := {}, gasProfile := {}, context := { h.context with usedGas := 0 } }
 
 /-- The gas cell: a host state holding only a counter and a profile. -/
 def gasCellOf (g : Near.GasCounter) (p : Near.GasProfile) : Cell NearState :=

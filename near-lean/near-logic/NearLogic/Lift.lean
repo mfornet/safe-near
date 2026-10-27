@@ -304,4 +304,220 @@ theorem mwp_lift_plain (cfg : WasmConfig) (lim : ExecLimits) (t : Thread)
 
 end Lifting
 
+/-! ## Host calls -/
+
+@[simp] theorem charged_zero (h : NearState) : charged h 0 = h := by
+  simp [charged]
+
+/-- The metered step when both charges fit, whatever the step does to the host. -/
+theorem mnext_gen (cfg : WasmConfig) (lim : ExecLimits) (t : Thread) (ms : MStore) {C : Nat}
+    (h1 : ms.store.host.gas.used + nextInstructionGas cfg { store := ms.store, thread := t, limits := lim } ≤ C)
+    (h2 : C ≤ ms.store.host.gas.maxBurnt) (h3 : C ≤ ms.store.host.gas.prepaid)
+    (r1 : (Exec.step { store := preStore cfg lim t ms.store, thread := t, limits := lim }).store.host.gas.used +
+      frameTransitionGas cfg { store := preStore cfg lim t ms.store, thread := t, limits := lim }
+        (Exec.step { store := preStore cfg lim t ms.store, thread := t, limits := lim }) ≤ C)
+    (r2 : C ≤ (Exec.step { store := preStore cfg lim t ms.store, thread := t, limits := lim }).store.host.gas.maxBurnt)
+    (r3 : C ≤ (Exec.step { store := preStore cfg lim t ms.store, thread := t, limits := lim }).store.host.gas.prepaid) :
+    mnext ms cfg lim t =
+      (ofMachine cfg lim (Exec.step { store := preStore cfg lim t ms.store, thread := t, limits := lim }),
+        ⟨{ (Exec.step { store := preStore cfg lim t ms.store, thread := t, limits := lim }).store with
+            host := charged (Exec.step { store := preStore cfg lim t ms.store, thread := t, limits := lim }).store.host
+              (frameTransitionGas cfg { store := preStore cfg lim t ms.store, thread := t, limits := lim }
+                (Exec.step { store := preStore cfg lim t ms.store, thread := t, limits := lim })) }⟩) := by
+  have hc1 : chargeConfig { store := ms.store, thread := t, limits := lim }
+      (nextInstructionGas cfg { store := ms.store, thread := t, limits := lim }) =
+      ({ store := preStore cfg lim t ms.store, thread := t, limits := lim }, none) := by
+    unfold chargeConfig
+    rw [chargeHost_ok (C := C) h1 h2 h3]
+    rfl
+  unfold mnext
+  simp only
+  rw [hc1]
+  simp only
+  rw [chargeWasm_ok (C := C) r1 r2 r3]
+  simp only [ofMachine_withHost, withHost_store]
+
+section Host
+
+variable {GF : BundledGFunctors} [ι : WasmGS NearState GF]
+variable {s : Stuckness} {E : CoPset} {Φ : Ending → IProp GF}
+
+/-- A step that calls a host function: from the host `h` (gas aside) it
+leaves the host `h'`, touches the plain cells `P` as `Q`, enters no frame,
+and the host function charges at most `kh` gas. It costs the instruction's
+charge `k` and `kh`. Its facts are about `Exec.step` from any store with the
+cells, the host and room for `kh` more gas. -/
+theorem mwp_lift_host (cfg : WasmConfig) (lim : ExecLimits) (t : Thread)
+    (Rd P Q : List (Loc × Cell NearState)) (h h' : NearState) (e' : MCode) (k kh C R : Nat)
+    (hRd : ∀ p ∈ Rd, isPlain p.1) (hPp : ∀ p ∈ P, isPlain p.1) (hQp : ∀ p ∈ Q, isPlain p.1)
+    (hP : (P.map (·.1)).Nodup) (hQ : (Q.map (·.1)).Nodup)
+    (hk : ∀ σ : Store NearState, nextInstructionGas cfg { store := σ, thread := t, limits := lim } = k)
+    (hstep : ∀ σ : Store NearState, (∀ p ∈ Rd, lookup σ p.1 = some p.2) →
+      (∀ p ∈ P, lookup σ p.1 = some p.2) → erase σ.host = erase h →
+      σ.host.gas.used + kh ≤ C → C ≤ σ.host.gas.maxBurnt → C ≤ σ.host.gas.prepaid →
+      frameTransitionGas cfg { store := σ, thread := t, limits := lim }
+          (Exec.step { store := σ, thread := t, limits := lim }) = 0 ∧
+        ofMachine cfg lim (Exec.step { store := σ, thread := t, limits := lim }) = e' ∧
+        erase (Exec.step { store := σ, thread := t, limits := lim }).store.host = erase h' ∧
+        (Exec.step { store := σ, thread := t, limits := lim }).store.host.gas.used ≤ σ.host.gas.used + kh ∧
+        (Exec.step { store := σ, thread := t, limits := lim }).store.host.gas.maxBurnt = σ.host.gas.maxBurnt ∧
+        (Exec.step { store := σ, thread := t, limits := lim }).store.host.gas.prepaid = σ.host.gas.prepaid ∧
+        ∀ l, isPlain l → lookup (Exec.step { store := σ, thread := t, limits := lim }).store l =
+          (Q.lookup l).or (if (P.lookup l).isSome then none else lookup σ l))
+    (hfresh : ∀ σ : Store NearState, (∀ p ∈ Rd, lookup σ p.1 = some p.2) →
+      (∀ p ∈ P, lookup σ p.1 = some p.2) →
+      ∀ l, (Q.lookup l).isSome → P.lookup l = none → lookup σ l = none) :
+    credits C (k + kh + R) ∗ mhostPt h ∗ seeList Rd ∗ ([∗list] p ∈ P, p.1 ↦ₛ p.2) ∗
+      ▷ (mhostPt h' -∗ ([∗list] p ∈ Q, p.1 ↦ₛ p.2) -∗ credits C R -∗ WP e' @ s; E {{ Φ }})
+      ⊢ WP (MCode.running cfg lim t) @ s; E {{ Φ }} := by
+  iintro ⟨Hc, Hh, HRd, HP, Hwp⟩
+  iunfold credits at Hc
+  icases Hc with ⟨%g, %p, Hg, %hg⟩
+  obtain ⟨-, hgk, hC1, hC2⟩ := hg
+  let pre (ms : MStore) := preStore cfg lim t ms.store
+  let r (ms : MStore) := Exec.step { store := pre ms, thread := t, limits := lim }
+  let P' := (gasLoc, gasCellOf g p) :: (Loc.host, Cell.host (erase h)) :: P
+  let Q' (ms : MStore) := (gasLoc, gasCellOf (r ms).store.host.gas (r ms).store.host.gasProfile) ::
+    (Loc.host, Cell.host (erase h')) :: Q
+  have hnot : ∀ (xs : List (Loc × Cell NearState)), (∀ q ∈ xs, isPlain q.1) →
+      gasLoc ∉ xs.map (·.1) ∧ Loc.host ∉ xs.map (·.1) := by
+    intro xs hx
+    constructor <;>
+    · intro hm
+      obtain ⟨q, hq, he⟩ := List.mem_map.mp hm
+      have := hx q hq
+      rw [he] at this
+      unfold isPlain at this
+      simp at this
+  have hgh : gasLoc ≠ Loc.host := by decide
+  have hnd : ∀ (c1 c2 : Cell NearState) (xs : List (Loc × Cell NearState)), (∀ q ∈ xs, isPlain q.1) →
+      (xs.map (·.1)).Nodup → (((gasLoc, c1) :: (Loc.host, c2) :: xs).map (·.1)).Nodup := by
+    intro c1 c2 xs hx hn
+    simp only [List.map_cons, List.nodup_cons, List.mem_cons, not_or]
+    exact ⟨⟨hgh, (hnot xs hx).1⟩, (hnot xs hx).2, hn⟩
+  have hfacts : ∀ ms : MStore, (∀ q ∈ Rd, mlookup ms q.1 = some q.2) →
+      (∀ q ∈ P', mlookup ms q.1 = some q.2) →
+      ms.store.host.gas = g ∧ ms.store.host.gasProfile = p ∧ erase ms.store.host = erase h ∧
+      (∀ q ∈ Rd, lookup (pre ms) q.1 = some q.2) ∧ (∀ q ∈ P, lookup (pre ms) q.1 = some q.2) := by
+    intro ms hR hPs
+    have hgas := hPs _ List.mem_cons_self
+    rw [mlookup, if_pos rfl, Option.some.injEq] at hgas
+    obtain ⟨h1, h2⟩ := gasCellOf_inj hgas
+    have hh : mlookup ms Loc.host = some (Cell.host (erase h)) :=
+      hPs _ (List.mem_cons_of_mem _ List.mem_cons_self)
+    rw [mlookup, if_neg (show Loc.host ≠ gasLoc by decide), if_pos rfl, Option.some.injEq,
+      Cell.host.injEq] at hh
+    refine ⟨h1, h2, hh, fun q hq => ?_, fun q hq => ?_⟩
+    · rw [show pre ms = chargedStore ms.store _ from rfl, lookup_chargedStore_plain _ _ (hRd q hq),
+        ← mlookup_plain ms (hRd q hq)]
+      exact hR q hq
+    · rw [show pre ms = chargedStore ms.store _ from rfl, lookup_chargedStore_plain _ _ (hPp q hq),
+        ← mlookup_plain ms (hPp q hq)]
+      exact hPs q (List.mem_cons_of_mem _ (List.mem_cons_of_mem _ hq))
+  -- The step's facts, on the store the instruction runs on.
+  have hrun : ∀ ms : MStore, (∀ q ∈ Rd, mlookup ms q.1 = some q.2) →
+      (∀ q ∈ P', mlookup ms q.1 = some q.2) →
+      frameTransitionGas cfg { store := pre ms, thread := t, limits := lim } (r ms) = 0 ∧
+        ofMachine cfg lim (r ms) = e' ∧ erase (r ms).store.host = erase h' ∧
+        (r ms).store.host.gas.used ≤ g.used + k + kh ∧
+        (r ms).store.host.gas.maxBurnt = g.maxBurnt ∧ (r ms).store.host.gas.prepaid = g.prepaid ∧
+        ∀ l, isPlain l → lookup (r ms).store l =
+          (Q.lookup l).or (if (P.lookup l).isSome then none else lookup (pre ms) l) := by
+    intro ms hR hPs
+    obtain ⟨hgas, -, hh, hR', hP''⟩ := hfacts ms hR hPs
+    have hpre : (pre ms).host = charged ms.store.host k := by
+      show charged ms.store.host _ = _
+      rw [hk]
+    have hu : (pre ms).host.gas.used = g.used + k := by rw [hpre, charged_gas_used, hgas]
+    have hmb : (pre ms).host.gas.maxBurnt = g.maxBurnt := by rw [hpre, ← hgas]; rfl
+    have hpp : (pre ms).host.gas.prepaid = g.prepaid := by rw [hpre, ← hgas]; rfl
+    obtain ⟨h0, he, hh', hle, hmb', hpp', hpl⟩ := hstep (pre ms) hR' hP''
+      (by rw [hpre, erase_charged]; exact hh) (by rw [hu]; omega) (by rw [hmb]; exact hC1)
+      (by rw [hpp]; exact hC2)
+    exact ⟨h0, he, hh', by rw [hu] at hle; exact hle, by rw [hmb', hmb], by rw [hpp', hpp], hpl⟩
+  iapply mwp_lift_dep cfg lim t Rd P' Q' (fun _ => e')
+    (hnd _ _ P hPp hP) (fun ms => hnd _ _ Q hQp hQ)
+  · intro ms hR hPs
+    obtain ⟨hgas, -, hh, -, -⟩ := hfacts ms hR hPs
+    obtain ⟨h0, he, hh', hle, hmb, hpp, hpl⟩ := hrun ms hR hPs
+    have r1 : (r ms).store.host.gas.used +
+        frameTransitionGas cfg { store := pre ms, thread := t, limits := lim } (r ms) ≤ C := by
+      rw [h0]; omega
+    have r2 : C ≤ (r ms).store.host.gas.maxBurnt := by rw [hmb]; exact hC1
+    have r3 : C ≤ (r ms).store.host.gas.prepaid := by rw [hpp]; exact hC2
+    rw [mnext_gen cfg lim t ms (C := C) (by rw [hk, hgas]; omega) (by rw [hgas]; exact hC1)
+      (by rw [hgas]; exact hC2) r1 r2 r3]
+    refine ⟨he, fun l => ?_⟩
+    have h0' : frameTransitionGas cfg { store := preStore cfg lim t ms.store, thread := t, limits := lim }
+        (Exec.step { store := preStore cfg lim t ms.store, thread := t, limits := lim }) = 0 := h0
+    rw [h0', charged_zero]
+    have hQnone : ∀ l, ¬ isPlain l → Q.lookup l = none := by
+      intro l hl
+      cases hq : Q.lookup l with
+      | none => rfl
+      | some c => exact absurd (hQp (l, c) (mem_of_lookup hq)) hl
+    have hPnone : ∀ l, ¬ isPlain l → P.lookup l = none := by
+      intro l hl
+      cases hq : P.lookup l with
+      | none => rfl
+      | some c => exact absurd (hPp (l, c) (mem_of_lookup hq)) hl
+    by_cases hg : l = gasLoc
+    · subst hg
+      simp only [mlookup, ↓reduceIte, Q', lookup_cons_pair, Option.some_or]
+      rfl
+    by_cases hh2 : l = Loc.host
+    · subst hh2
+      simp only [mlookup, Q', P', lookup_cons_pair, if_neg hg, ↓reduceIte, Option.some_or]
+      rw [hh']
+    by_cases hp : isPlain l
+    · simp only [mlookup, Q', P', lookup_cons_pair, if_neg hg, if_neg hh2]
+      rw [hpl l hp, show pre ms = chargedStore ms.store _ from rfl, lookup_chargedStore_plain _ _ hp]
+    · simp only [mlookup, Q', P', lookup_cons_pair, if_neg hg, if_neg hh2, hQnone _ hp, hPnone _ hp,
+        Option.none_or, Option.isSome_none, Bool.false_eq_true, ite_false]
+      rw [lookup_other _ hp hh2, lookup_other _ hp hh2]
+  · intro ms hR hPs l hl hnone
+    obtain ⟨-, -, -, hR', hP''⟩ := hfacts ms hR hPs
+    have hgl : l ≠ gasLoc := by
+      intro he; subst he; simp [P', lookup_cons_pair] at hnone
+    have hhl : l ≠ Loc.host := by
+      intro he; subst he; simp [P', lookup_cons_pair] at hnone
+    simp only [Q', lookup_cons_pair, if_neg hgl, if_neg hhl] at hl
+    simp only [P', lookup_cons_pair, if_neg hgl, if_neg hhl] at hnone
+    have hpl : isPlain l := by
+      obtain ⟨c, hc⟩ := Option.isSome_iff_exists.mp hl
+      exact hQp (l, c) (mem_of_lookup hc)
+    rw [mlookup_plain ms hpl, ← lookup_chargedStore_plain ms.store
+      (nextInstructionGas cfg { store := ms.store, thread := t, limits := lim }) hpl]
+    exact hfresh (pre ms) hR' hP'' l hl hnone
+  isplitl [HRd]
+  · iexact HRd
+  isplitl [Hg Hh HP]
+  · iapply BigSepL.bigSepL_cons.2
+    isplitl [Hg]
+    · iunfold gasPt at Hg
+      iexact Hg
+    iapply BigSepL.bigSepL_cons.2
+    isplitl [Hh]
+    · iunfold mhostPt at Hh
+      iexact Hh
+    · iexact HP
+  inext
+  iintro %ms %⟨hR, hPs⟩ HQ
+  obtain ⟨-, -, hle, hmb, hpp, -⟩ := (hrun ms hR hPs).2
+  icases (BigSepL.bigSepL_cons.1 : _ ⊢ _ ∗ _) $$ HQ with ⟨Hg, HQ⟩
+  icases (BigSepL.bigSepL_cons.1 : _ ⊢ _ ∗ _) $$ HQ with ⟨Hh, HQ⟩
+  iapply Hwp $$ [Hh] HQ
+  · iunfold mhostPt
+    iexact Hh
+  iunfold credits
+  iexists (r ms).store.host.gas, (r ms).store.host.gasProfile
+  isplitl [Hg]
+  · iunfold gasPt
+    iexact Hg
+  · ipureintro
+    simp only [Near.GasCounter.used] at hgk hle ⊢
+    refine ⟨by omega, by omega, by rw [hmb]; exact hC1, by rw [hpp]; exact hC2⟩
+
+end Host
+
 end NearLogic
