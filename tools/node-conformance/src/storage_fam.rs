@@ -5,6 +5,9 @@
 //! their definitions are copied from `core/store/src/trie/raw_node.rs` at the pinned revision
 //! (Borsh layout, including the `Children` bitmap encoding). The Lean side also checks every
 //! node hash against real trie roots of the M3 corpus, which nearcore produced.
+//!
+//! The copied sections (marked below) are from nearcore (https://github.com/near/nearcore),
+//! licensed MIT OR Apache-2.0; see THIRD_PARTY_NOTICES.md.
 use crate::fam::{hex, Fam, Manifest};
 use crate::rng::G;
 use crate::SEED;
