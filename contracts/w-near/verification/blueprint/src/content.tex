@@ -190,11 +190,21 @@ premise correction is recorded in the misstatement log.
 
 The actual early input-size rejection now matches the model at the receipt
 boundary with a proved symbolic gas bound. Trie compact-path round trips and
-leaf decoding, actual singleton reads, overlay and empty-base storage writes,
+leaf/extension/branch decoding, generated bitmap correctness, actual singleton
+reads, overlay and empty-base storage writes,
 resource frames and raw-storage usage/representation are kernel checked.
 Singleton lookup retains the explicit nonzero-root obligation. Local budget
 compatibility is checked for constants, drop, administrative return and actual
-input/log/return calls; storage and run-invariant assembly remain open.
+input/log/return calls. Storage replay covers successful fresh/replacement
+preparation, raw calls and post-billing gas stops; preparation failures and
+run-invariant assembly remain open. The empty-base storage frontier is
+instantiated at the walking method's actual storage entry, retaining the
+explicit proof-size check. Final-output and success-observation helpers
+derive exact functional fields from local storage postconditions. The actual
+public execution now matches the independent successful model step from these
+local storage and resource conditions; original total gas credits imply the
+intermediate storage reservation. This remains a conditional success branch,
+not the universal gas bound or low-gas refinement clause.
 
 The current statement also has the separately documented SAF-67 gap: an
 arbitrary recorded-proof-size input is accepted by context WF. A canonical

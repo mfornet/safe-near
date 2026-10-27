@@ -347,11 +347,16 @@ that removes the risk of getting stuck on the glue at the end.
 | Overlay lookup/view consistency | `NearInterface/TrieOverlayLookup.lean` | Kernel checked under unique overlay keys; on-disk base agreement remains separate |
 | Actual input-size failure through receipt observation and its symbolic gas bound | `Skeleton/{Costs,FailureExecution}.lean`, `NearRuntime/InitialCredits.lean` | Kernel checked; exact/smaller-budget cost checks pass |
 | Trie compact-path and leaf serialization | `NearInterface/{TrieEncoding,TrieSerialization}.lean` | Kernel checked against actual parsers, with explicit byte widths |
+| Extension/branch parsing and generated bitmaps | `NearInterface/{TrieExtension,TrieBranch,TrieBitmap}.lean` | Kernel checked against actual parsers; recursive constructor correspondence remains open |
 | Actual singleton construction and reads | `NearInterface/TrieLeaf.lean` | Kernel checked; lookup keeps the unresolved nonzero-root premise explicit |
 | Metered overlay/empty-base writes and resource frames | `NearVM/MeteredHosts/{StorageOverlay,StorageEmpty,StorageFrame}.lean` | Kernel checked from initial credits and local resources, with no assumed primitive outcomes |
 | Storage representation and usage | `NearInterface/StorageUsage.lean`, `NearVM/StorageRepresentation.lean`, `Skeleton/StorageResources.lean` | Kernel checked through initialized storage entry and computed final storage |
 | Actual pure/input/output machine budget compatibility | `NearVM/{MeteredPureBudget,MeteredHostBudget,MeteredOutputBudget}.lean` | Kernel checked; storage and whole-run invariant assembly remain |
 | Isolated native recorder arithmetic and necessary history | `NearInterface/{TrieRecorder,TrieRecordingHistory}.lean` | Kernel checked; no runtime/WF integration or recorder-fidelity claim |
+| Actual empty-base storage frontier | `Skeleton/EmptyStorage.lean` | Kernel checked from original WF/listing, empty base, absent overlay key, local credits and explicit proof-size check |
+| Final output fields and actual receipt success | `Skeleton/{FinalState,SuccessObservation,SuccessExecution}.lean` | Kernel checked through default-fuel public execution and `Matches` for the independent model step, conditional on local storage/resources/representation |
+| Original-budget storage reservation | `Skeleton/StorageCredits.lean` | Kernel checked; empty storage frontier now uses original total credits without a second intermediate gas premise |
+| Storage budget replay | `NearVM/MeteredHosts/StorageBudget.lean` | Kernel checked preplans, raw write, fresh/replacement successful preparation and complete post-call replay; inner preparation failures remain open |
 | Whole effectful gas bound, other deterministic failures and `Refines` | — | Open; SAF-67 also requires statement repair |
 
 The walking module uses `input`, `storage_write`, `log_utf8` and
@@ -365,9 +370,9 @@ constitute a universal refinement proof.
 **Frontier:** repair the recorded-proof-size input contract and discharge nonempty
 canonical-trie lookup/dereference agreement with raw storage; instantiate
 remaining on-disk storage cases; derive a symbolic cost
-including trie charges and establish its resource conditions. Connect the
-successful VM outcome to the receipt boundary, then prove deterministic
-resource failures and local step compatibility for the remaining hosts and
+including trie charges and establish its resource conditions. Finish the
+remaining successful VM/receipt storage and resource instantiations, then prove
+deterministic resource failures and local step compatibility for the remaining hosts and
 machine instructions before assembling `Refines`. The counter-level simulation
 may relax prepaid and burn limits, but immutable `NearContext.prepaidGas` seen
 by guest code must stay fixed. Host compatibility is a premise to discharge,
@@ -380,6 +385,13 @@ pipeline to the prepared body; `Success` composes all fifteen opcodes and the
 four actual hosts, leaving storage's local invocation/gas evidence explicit. `Execution` now
 connects this to actual VM success, with the post-storage empty-promise
 invariant explicit. `Fuel` discharges the default interpreter fuel requirement.
+`SuccessExecution` now proves the actual public `execOn` success branch matches
+the independent model step, using local storage, representation, accounting and
+resource conditions. `StorageCredits` derives the exact reservation at the
+storage call from original total credits. `EmptyStorage` instantiates that
+frontier on a globally empty canonical base with no selected overlay key,
+retaining the explicit proof-size check. These results do not yet prove the
+universal model gas bound or low-gas alternatives.
 
 A substantive premise correction was necessary: old `Context.WF` admitted
 duplicate overlay keys and therefore actual `executionIssue` counterexamples
@@ -426,19 +438,19 @@ hashes are nonzero, or a reviewed change to construction that enforces the
 reserved sentinel. No concrete SHA256 preimage or runtime counterexample is
 known. A cryptographic assumption is not silently added, and arbitrary
 zero-valued *value* hashes are not a problem for direct dereference. This
-obligation remains open alongside serialization, traversal and witness proofs.
+obligation remains open alongside recursive construction, traversal and witness proofs.
 
 The runtime currently does not enforce `maxNumberRegisters`; the skeleton
 pins this observed limitation explicitly. Register-size limits are enforced.
 This does not affect the default configuration's one-register example, but
 must not be described as nearcore conformance for arbitrary register limits.
 
-Validation for this increment (2026-10-27): 55 proof modules were checked
-transitively for axioms (3060 declarations, 2196 theorems, zero violations); the
+Validation for this increment (2026-10-27): 64 proof modules were checked
+transitively for axioms (3265 declarations, 2325 theorems, zero violations); the
 walking-skeleton checks pass; all five existing builtin harness contracts
 pass; all 211 adapter checks and all 51 differential scenarios pass. The web
 blueprint builds after giving Binary, Harness and Skeleton explicit library
-roots. The full wNEAR audit covers 84 modules, 5033 declarations and 2477
+roots. The full wNEAR audit covers 89 modules, 5156 declarations and 2577
 theorems, permitting only the original refinement module's open proof and its
 two dependent theorems.
 
