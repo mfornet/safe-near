@@ -1140,6 +1140,16 @@ fields. Each allocator helper excludes four nonzero-allocation captures;
 these cases are not claimed by its zero-size theorem. The integrated harness
 baseline remains unchanged.
 
+Final audits for the four-call panic checkpoint: strict transitive coverage
+of 328 modules, 11849 declarations and 8846 theorems with zero violations;
+full working-tree coverage of 311 modules, 11974 declarations and 7768 theorems,
+with exactly the original three refinement-dependent `sorryAx` declarations.
+The full source build passes 1471 jobs; blueprint extraction/rendering passes
+1496 jobs, and the rendered current four-call frontier was checked. Principal
+new allocator, hook, memory and frontier theorems pass Lean LSP MCP standard-
+axiom verification. No runtime, model or WF changes are included; the full
+refinement goal remains open.
+
 ### M4. The Rust runtime layer
 
 The shadow stack, wee_alloc (its free lists and growing memory through
