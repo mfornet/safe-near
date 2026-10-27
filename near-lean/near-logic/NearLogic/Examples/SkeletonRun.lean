@@ -194,7 +194,7 @@ theorem get_vmOutcome (cfg : RuntimeConfig) (size : Nat) (ctx : VMContext)
     (hC2 : Cg ≤ (ctx.toNearState cfg storage).gas.prepaid) :
     let o := run cfg skelModule size "get" ctx storage
     o.aborted = none ∧ o.returnData = .value okBytes ∧ o.receipts = [] ∧ o.usedGas ≤ Cg ∧
-      o.logs = [] ∧ o.balance = ctx.accountBalance + ctx.attachedDeposit ∧
+      o.burntGas ≤ o.usedGas ∧ o.distributedGas = 0 ∧ o.logs = [] ∧ o.balance = ctx.accountBalance + ctx.attachedDeposit ∧
       o.storageUsage = ctx.storageUsage % 2 ^ 64 ∧
       o.storage = finalStorage (ctx.toNearState cfg storage) := by
   set h0 := ctx.toNearState cfg storage
@@ -238,12 +238,13 @@ theorem get_vmOutcome (cfg : RuntimeConfig) (size : Nat) (ctx : VMContext)
   have husage : σ.store.host.context.storageUsage = UInt64.ofNat ctx.storageUsage :=
     hf (fun x => x.context.storageUsage) fun _ => rfl
   have hstore : finalStorage σ.store.host = finalStorage h0 := hf finalStorage fun _ => rfl
-  obtain ⟨ha, hrec, hret', husd, -, -, hb, hu, hl, hs⟩ :=
+  obtain ⟨ha, hrec, hret', husd, hbrn, hdist, hb, hu, hl, hs⟩ :=
     outcomeOfExecution_noPromises ctx storage [] σ.store hp hr hw
   simp only [run]
   rw [hrun, hdone]
   rw [checkReceipts_noReceipts _ _ _ _ hrec (by rw [hret']; intro i; simp [hrd])]
-  refine ⟨ha, by rw [hret']; simp [hrd], hrec, by rw [husd]; exact hused, by rw [hl, logsOf, hlogs]; rfl,
+  refine ⟨ha, by rw [hret']; simp [hrd], hrec, by rw [husd]; exact hused,
+    by rw [hbrn, husd]; simp [Near.GasCounter.used], hdist, by rw [hl, logsOf, hlogs]; rfl,
     by rw [hb, hbal], by rw [hu, husage]; simp, by rw [hs, hstore]⟩
 
 end NearLogic.Skeleton
