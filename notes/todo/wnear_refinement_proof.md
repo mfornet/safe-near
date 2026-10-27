@@ -1243,7 +1243,7 @@ misses leave all registers unchanged. Exact burnt gas, unchanged promise
 reservations and residual credits are proved at both node-accounting modes.
 The recorded-proof condition remains explicit and does not resolve SAF-67 or
 the reserved-zero-node gap. `MeteredStorageReadRules` composes the real
-installed host opcode. Actual f284's complete typed local forwarder costs
+installed host opcode. The accepted-hit f284 typed local forwarder costs
 17 ordinary units plus the computed canonical read fee/6 steps; resource
 frames derive its target register bytes and unchanged memory/code arrays.
 
@@ -1265,6 +1265,31 @@ at both node-billing modes plus explicit empty-storage absence fixtures:
 38 hits and38 misses, exact pure-plan fees, registers, whole memory and fuel.
 These augmented replays are distinct from unchanged captured-state checks;
 none enlarge the integrated nine-contract harness baseline.
+
+Final audits for the state/serializer checkpoint: strict transitive coverage
+426 modules / 14393 declarations / 10752 theorems, zero violations. Full
+working-tree coverage 392 modules / 14028 declarations / 9317 theorems,
+with exactly the three original `Proofs.Refinement` declarations using
+`sorryAx` and no others. Full source build passes 1567 jobs; blueprint
+extraction/rendering passes 1511 jobs and the rendered scope was checked.
+Principal proofs pass Lean LSP MCP standard-axiom checks; the transitive audit
+also covers result projections whose per-theorem MCP check was inconclusive.
+Independent review found no defect in charge ordering, aliasing or resource
+scope. No runtime, model, WF, custom-axiom or native-certificate changes.
+GitHub Actions did not start its latest jobs because the account has a
+payment or spending-limit issue. Locally, the chain/library/replay build
+passes 2154 jobs with `--wfail`, and the SDK build passes. Repository pin,
+isolation and umbrella gates and four conformance-tool tests pass. The
+281-test tooling run skipped15; its sole initial Git-discovery failure
+passes when rerun with this checkout's recovered source metadata.
+
+Next state targets are the accepted f432 guard and SDK dispatchers459/440/435,
+which can reuse the proved interface lookup/borrow/release and host forwarders.
+The larger shared allocation obligation is actual positive malloc581, with
+layout leaves751/684 and wrappers for serializer128-byte allocation and
+state29-byte zeroed allocation. Allocation nonzero/range facts must be
+derived from original heap data. Full219 also includes f161 deserialization;
+full96 includes the general U128 decimal algorithm and formatter writer.
 
 ### M4. The Rust runtime layer
 
