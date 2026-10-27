@@ -224,4 +224,12 @@ theorem wp_indirect_lookup (cfg : WasmConfig) (fuel rest : Nat) (s : Store NearS
   rw [budget] at result
   simpa only [List.append_nil, Nat.add_assoc, Nat.reduceAdd] using result
 
+theorem indirectAfter_credits (s : Store NearState) (op rest : Nat)
+    (hc : s.host.gas.Credits (29 * op + rest)) : (indirectAfter s op).host.gas.Credits rest := by
+  have h0 : s.host.gas.Credits (op + (8 * op + (20 * op + rest))) := hc.mono (by omega)
+  have h1 := WNear.Proofs.StorePair.charged_credits s op _ h0
+  have h2 := WNear.Proofs.StorePair.charged_credits (chargedStore s op) (8 * op) _ h1
+  have hp := paid_credits (indirectEntered s op) op 2 (18 * op + rest) (h2.mono (by omega))
+  exact callAfter_credits _ op rest hp
+
 end WNear.Proofs.ValueReturnThreadLocal
