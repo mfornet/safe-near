@@ -6,7 +6,7 @@ import Proofs.StateDispatchHosts
 import Proofs.StateDispatchBorrow
 
 
-/-! Original resources and deterministic accepted phases of deployed f440. -/
+/-! Original resources and deterministic accepted phases of deployed f459. -/
 namespace WNear.Proofs.StateDispatchStorage
 open Wasm Wasm.Near MeteredLogic MeteredHosts
 open StorePairCaller (paid paid_credits)

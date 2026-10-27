@@ -1,6 +1,6 @@
 import Binary.StateDispatch
 
-/-! Actual f435 initialized register-length dispatch instruction decomposition. -/
+/-! Actual f435 initialized read-register dispatch instruction decomposition. -/
 namespace WNear.Binary.StateDispatchRead
 open Wasm
 

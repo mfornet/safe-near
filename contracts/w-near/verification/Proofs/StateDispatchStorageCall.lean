@@ -75,7 +75,7 @@ theorem final_credits (cfg : WasmConfig) (s : Store NearState) (p : Layout)
     (checked_credits cfg s p ctx key value rest hc)
 
 /-- Complete actual f459 call: twelve-unit activation, initialized lookup and
-borrow, register_len dispatch, release, accepted f432, and normal return. -/
+borrow, storage_read dispatch, release, accepted f432, and normal return. -/
 theorem wp_call (cfg : WasmConfig) (extra fuel rest : Nat) (s : Store NearState)
     (limits : ExecLimits) (base : List Value) (frame : CallFrame) (callers : List CallFrame)
     (code : List Instr) (p : Layout) (address : Nat)

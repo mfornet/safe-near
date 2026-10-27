@@ -3,7 +3,7 @@ import Proofs.StateDispatchStorageTail
 import Proofs.StateDispatchStorageBorrow
 import Proofs.StateDispatchStorageHost
 
-/-! Complete actual initialized register-length dispatcher f459. -/
+/-! Complete actual initialized storage-read dispatcher f459. -/
 namespace WNear.Proofs.StateDispatchStorage
 open Wasm Wasm.Near MeteredLogic
 open StorePairCaller (paid paid_credits)
