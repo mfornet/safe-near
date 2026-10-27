@@ -1,5 +1,6 @@
 import Harness.TotalSupply
 import Model.Args
+import Model.State
 
 /-!
 # Contracts on `ft_balance_of`'s path
@@ -172,6 +173,34 @@ def fromSliceBalanceOf : Contract Bool where
         if bs != a.val.toUTF8.toList then some s!"parses another account than {a.val}" else none
     | _ => if ok then some "accepts what the model rejects" else none
   -- No claim yet: the gas per argument byte is stated with M6.
+  cost _ _ := 10 ^ 18
+  ghostOf _ _ := some true
+
+/-! ## `Contract::storage_minimum_balance` (230)
+
+`storage_minimum_balance(out, contract)`: the `u128` minimum, the
+`account_storage_usage` (the `u64` at `contract + 16`) times the storage
+price per byte, through `storage_balance_bounds` (418), whose checked
+multiplication never overflows here (`u64` times `10^19`). The model's
+`State.storageMin`. -/
+
+def storageMinimum : Contract Bool where
+  name := "Contract::storage_minimum_balance"
+  func := 230
+  pre h i :=
+    let (out, contract) := (u32Arg i.args 0, u32Arg i.args 1)
+    if !i.ghost then some "the environment is not set up"
+    else if out + 16 > h.memSize i.store || contract + 40 > h.memSize i.store then some "beyond memory"
+    else none
+  footprint _ i := [(u32Arg i.args 0, 16)]
+  stack := 1024
+  post h i r :=
+    let (out, contract) := (u32Arg i.args 0, u32Arg i.args 1)
+    (ended r).or <|
+    let expected := h.readNat r.before (contract + 16) 8 * WNear.storagePricePerByte
+    if h.readNat r.after out 16 != expected then
+      some s!"minimum {h.readNat r.after out 16}, expected {expected}" else none
+  -- No claim yet: `storage_byte_cost` goes through the environment.
   cost _ _ := 10 ^ 18
   ghostOf _ _ := some true
 
