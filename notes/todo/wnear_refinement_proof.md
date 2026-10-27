@@ -1034,6 +1034,62 @@ and rendering pass after 1488 jobs, and the rendered six-call frontier was
 checked. All new principal contracts pass Lean LSP MCP standard-axiom checks.
 The full refinement goal remains open; no runtime, model or WF changes are made.
 
+The following composition checkpoint closes actual first interface installation.
+`InterfaceBorrowAcquireTail` and `InterfaceBorrowAcquire` compose real f441:
+59 ordinary units/45 active steps and 71 units/47 steps as a full local call,
+including actual f492/f672 exclusive acquisition, record writes and restore16.
+Small generic store/continuation lemmas avoid expanding the whole concrete
+state during kernel checking; they do not assume successful guest execution.
+
+`InterfaceLazyComplete` proves the entire deployed f467 old-status-zero body:
+70 units/63 active steps, including reserve48, the actual f564 indirect
+initializer, sequential payload/status/old-record writes and normal return
+preparation. `InterfaceLazyCall` adds typed call entry/return: 82 units/65 steps.
+`ValueReturnLazyLookup` proves the actual lazy 565→468→467→564 chain from the
+real status load, through the early return: 111 units/79 steps as an indirect
+call. Its exact final memory, restored global array and code/table frames are
+derived in `ValueReturnLazyFrame`; no post-call array lookup is supplied.
+`InterfaceLazyNative` derives the lazy bounds and empty-old-state condition
+from initial well-formed, width-bounded memory, cell/scratch spans, separation
+and initial status zero. `InterfaceLazyReadback` derives final status one,
+zero counter/receiver words, well-formedness and unchanged memory size/max.
+It retains the untouched scratch word used for the third interface word.
+
+`InterfaceSetCore` proves the complete actual 125-step/180-unit suffix using
+an arbitrary post-lookup heap. `InterfaceSetLazyBody` composes setup, actual
+lazy lookup and that suffix: 304 units/219 active steps; the full typed f463
+call is 315 units/221 steps. The initialized alternative remains separately
+proved at 222 units/155 active steps and 233 units/157 call steps. The real
+f520 wrapper is now proved in `InterfaceInstallCall`: 318 units/224 active
+steps and 328 units/226 steps for the complete local call. Its resources
+contain original structural conditions and native/data predicates on the exact
+sequential memory, without a callee-run or computed-array oracle.
+
+`TotalSupplyInterfaceFrontier` supplies this actual f520 call alongside the
+five previous implementations. The getter now has exactly **five remaining
+local execution contracts**: panic hook522, state read219, serialization96,
+and the two vector-drop68 sites. Actual entry/body/return and original-store
+gas bounds remain checked through this five-call interface. Installed-code,
+scalar/native/representation resources and whole-module validation remain
+explicit; no complete exported-method refinement is claimed. An independent
+review of full441, lazy lookup and both setter paths found no semantic defect
+and reconciled the proof counts with the captured gas/fuel boundaries.
+`InterfaceSetLazyNative` additionally derives initial saved-memory status and
+lazy lookup bounds, plus post-lookup well-formedness, size and zero counter/
+receiver words. Full `InterfaceSetLazyState.Bounds` still retains the later
+record-copy and release-pointer data predicates; this constructor is not
+claimed to discharge every setter obligation.
+
+Final audits for the five-call checkpoint: strict transitive coverage of
+294 modules, 10991 declarations and 8229 theorems with zero violations; full
+working-tree coverage of 277 modules, 11074 declarations and 7109 theorems,
+with exactly the original three refinement-dependent `sorryAx` declarations.
+The full source build passes 1437 jobs. Blueprint extraction/rendering passes
+after 1488 jobs, and the rendered current five-call frontier was checked.
+Principal new call, memory and frontier theorems pass Lean LSP MCP standard-
+axiom verification. No runtime, model or WF changes are included; the full
+refinement goal remains open.
+
 ### M4. The Rust runtime layer
 
 The shadow stack, wee_alloc (its free lists and growing memory through

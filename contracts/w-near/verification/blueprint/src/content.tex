@@ -332,31 +332,30 @@ The accepted state unwrap f155 executes its actual forty-byte forward loop:
 state-unwrap site; decoded U128 data is derived through
 the actual unwrap, supply copy and serializer-input writes. Native bounds,
 representation facts and remaining SDK/runtime call contracts remain explicit.
-The complete accepted outer SDK path is now checked: actual initialized
+The complete accepted outer SDK path is checked through actual initialized
 thread-local lookup, acquisition, dispatch, release, status check and SP
-restoration. The actual f456 body costs 237 ordinary units plus host fees
-and takes 159 active steps. The full f545 local call costs 278 ordinary units
-plus the original host fee and takes 182 steps. Its integration in
-\texttt{TotalSupplyReturnFrontier} reduces the getter to six remaining local
-execution contracts: panic hook, interface setup, state read, serialization
-and two vector drops. Layout, native bounds and representation obligations
-remain explicit. Original payload-byte preservation is proved under explicit
-counter/scratch span disjointness; operational contracts retain arbitrary
-aliasing. Successful loading derives both indirect table targets and the
-static memory words selecting them, with table and data frames for later
-writes. Static validator
-sections and a first per-function certificate are checked separately;
-whole-prelude and whole-module validation are still open.
-The first interface installation takes the lazy status-zero branch, so the
-six-call frontier is retained. Its actual initializer table106 selects f564;
-the full indirect call is checked at thirteen units and five steps. It zeros
-exactly eight bytes and preserves the following scratch word. The lazy payload,
-status, old-record save and normal exit phases are checked separately, as are
-the empty-record guard and setter prefix/copy/install phases. A separate suite of sixty captured calls validates lazy lookup and installation
-gas/fuel boundaries and
-receiver/vtable effects. The actual setter release, status, block-exit, check and restore32 tail is checked at seventy-one units and forty-seven steps, including
-its real exclusive-release and status-check calls. Whole lazy-path composition
-remains open.
+restoration. The actual f456 body costs237 ordinary units plus host fees
+and takes159 active steps; the full545 local call costs278 units plus the
+original host fee and takes182 steps. Original payload-byte preservation
+requires explicit counter/scratch span disjointness; operational contracts
+retain arbitrary aliasing.
+
+The complete actual first-installation chain is also composed: exclusive
+acquisition441, lazy lookup565/468/467/564, setter463 and wrapper520.
+The complete520 local call costs328 ordinary units and takes226 steps.
+\texttt{TotalSupplyInterfaceFrontier} reduces the getter to five remaining
+local execution contracts: panic hook522, state read219, serialization96 and
+two vector drops68. Native/data predicates on exact sequential memory and
+installed-code/representation resources remain explicit. Lazy initialization's
+status/counter/receiver readbacks follow from initial native spans, separation
+and status zero; its following scratch word retains its actual initial value.
+
+Successful loading derives the actual indirect table targets and static
+memory words selecting them, with table and data frames for later writes.
+Static validator sections and a first per-function certificate are checked;
+whole-prelude and whole-module validation remain open. Separate captured lazy
+lookup and installation checks retain exact gas/fuel boundaries and
+receiver/vtable effects. No complete exported-method refinement is claimed.
 The
 detailed frontier is recorded in \texttt{notes/todo/wnear\_refinement\_proof.md}.
 Run \texttt{just wnear-skeleton} for the executable checks and
