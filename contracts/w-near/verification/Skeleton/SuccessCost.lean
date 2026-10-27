@@ -1,6 +1,7 @@
 import Skeleton.EmptyCost
 import Skeleton.EmptySuccess
 import Skeleton.SuccessGas
+import Skeleton.EmptyStakeFailure
 
 /-!
 # Original-data cost of the successful empty-base method
@@ -165,7 +166,24 @@ theorem emptyCredits_of_gasLimit (ctx : NearInterface.Context) (raw : Storage) (
   rw [executionBudget_empty_eq ctx raw rest hpages hkey hvalue hreturn]
   exact hgas
 
-/-- The sufficient-gas clause for the original-data empty-base success slice:
+/-- Sufficient original gas already entails the log decoder's checked-cost
+width; no extra protocol arithmetic premise is necessary. -/
+theorem saveEmptyCost_read_room (ctx : NearInterface.Context) (raw : NearInterface.RawStorage)
+    (hwf : ctx.WF raw) (hgas : saveEmptyCost ctx ≤ ctx.gasLimit) :
+    ctx.protocol.wasm.extCosts.cost "read_memory_byte" * 5 < 2 ^ 64 := by
+  have hlog : ctx.protocol.wasm.extCosts.cost "read_memory_byte" * 5 ≤
+      burnSum ctx.protocol.wasm.extCosts savedCharges := by
+    simp only [savedCharges, savedReadCharges, extCharges, ext1, burnSum, burnCost,
+      List.map_cons, List.map_nil, List.sum_cons, List.sum_nil, Nat.mul_one]
+    omega
+  have hcost : burnSum ctx.protocol.wasm.extCosts savedCharges ≤ saveEmptyCost ctx := by
+    unfold saveEmptyCost
+    dsimp only
+    omega
+  have hlimit : ctx.gasLimit ≤ ctx.prepaidGas := Nat.min_le_left _ _
+  exact Nat.lt_of_le_of_lt (hlog.trans (hcost.trans (hgas.trans hlimit))) hwf.prepaidGas_lt
+
+/-- The sufficient-gas clause for the original-data accepted-input empty-base slice:
 actual receipt/model matching and a context-only used-gas bound. This leaves
 all nonempty-base, deterministic-failure and low-gas clauses separate. -/
 theorem execOn_empty_matches_and_gas
@@ -174,15 +192,10 @@ theorem execOn_empty_matches_and_gas
     (hwf : ctx.WF storage.toFinset)
     (hrepresented : (model gasBound).Represents storage.toFinset st)
     (hmethod : ctx.method = "save") (hp : PreparationLimits ctx.protocol) (hm : ModelSaveLimits ctx)
-    (hread : ctx.protocol.wasm.extCosts.cost "read_memory_byte" * 5 < 2 ^ 64)
     (hentries : ctx.trie.entries = [])
     (hselected : Near.TrieOverlay.selected ctx.trie
       (Near.TrieOverlay.contractKey ctx.current.bytes "k".toUTF8.toList) = none)
     (hroom : ctx.storageUsage + 1 + ctx.args.length + ctx.protocol.fees.numExtraBytesRecord < 2 ^ 64)
-    (hstake : NearInterface.stakeDeficit ctx.protocol
-      (ctx.storageUsage - NearInterface.storageUsageOf ctx.protocol storage.toFinset +
-        NearInterface.storageUsageOf ctx.protocol (savedStorage storage ctx.args).toFinset)
-      (ctx.balance + ctx.attached) ctx.locked = 0)
     (hgas : saveEmptyCost ctx ≤ ctx.gasLimit)
     (hproof : recordedStorageError (emptyPaid ctx storage)
       (ctx.trie.set (Near.TrieOverlay.contractKey (emptyPaid ctx storage).context.currentAccountId
@@ -190,6 +203,7 @@ theorem execOn_empty_matches_and_gas
     NearInterface.Matches (model gasBound) ctx storage.toFinset (Near.Boundary.execOn code storage ctx)
       ((model gasBound).step ctx st ()) ∧
     (Near.Boundary.execOn code storage ctx).usedGas ≤ saveEmptyCost ctx := by
+  have hread := saveEmptyCost_read_room ctx storage.toFinset hwf hgas
   have hc := emptyCredits_of_gasLimit ctx storage 0 hp.positive hm.key hm.value hm.returned
     (by simpa only [Nat.add_zero] using hgas)
   have hr := emptyAfter_resources ctx storage 0 hwf hp hm hread hentries hselected hc hproof
@@ -197,7 +211,7 @@ theorem execOn_empty_matches_and_gas
     (emptyCost ctx storage) 0 0 hmethod hp hr (emptyAfter_promises ctx storage)
   rw [executionBudget_empty_eq ctx storage 0 hp.positive hm.key hm.value hm.returned] at hg
   simp only [Nat.add_zero] at hg
-  exact ⟨execOn_empty_matches_modelStep gasBound ctx storage st 0 hwf hrepresented hmethod hp hm
-    hread hentries hselected hroom hstake hc hproof, hg⟩
+  exact ⟨execOn_empty_matches_modelStep_allStake gasBound ctx storage st 0 hwf hrepresented hmethod hp hm
+    hread hentries hselected hroom hc hproof, hg⟩
 
 end WNear.Skeleton
