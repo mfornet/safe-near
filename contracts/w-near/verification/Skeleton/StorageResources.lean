@@ -85,6 +85,21 @@ theorem storageInput_accounting (cfg : RuntimeConfig) (ctx : VMContext) (raw : S
     (storageInput cfg ctx raw).host.storageAccounting = ctx.storageAccounting := by
   exact congrArg NearState.storageAccounting (storageInput_view cfg ctx raw)
 
+theorem storageInput_storage (cfg : RuntimeConfig) (ctx : VMContext) (raw : Storage) :
+    (storageInput cfg ctx raw).host.storage = (ctx.toNearState cfg raw).storage := by
+  have h := congrArg NearState.storage (storageInput_view cfg ctx raw)
+  exact h
+
+theorem storageInput_storageKeys (cfg : RuntimeConfig) (ctx : VMContext) (raw : Storage) :
+    (storageInput cfg ctx raw).host.storageKeys = (ctx.toNearState cfg raw).storageKeys := by
+  have h := congrArg NearState.storageKeys (storageInput_view cfg ctx raw)
+  exact h
+
+/-- The storage ABI sees the action's original view mode. -/
+theorem storageInput_isView (cfg : RuntimeConfig) (ctx : VMContext) (raw : Storage) :
+    (storageInput cfg ctx raw).host.context.isView = ctx.isView := by
+  exact congrArg (fun host : NearState => host.context.isView) (storageInput_view cfg ctx raw)
+
 /-- The original protocol's host limits remain installed at storage entry. -/
 theorem storageInput_config (cfg : RuntimeConfig) (ctx : VMContext) (raw : Storage) :
     (storageInput cfg ctx raw).host.config = (ctx.toNearState cfg raw).config := by
