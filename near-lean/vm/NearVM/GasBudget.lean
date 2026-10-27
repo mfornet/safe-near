@@ -1,23 +1,25 @@
 import NearVM.GasCredits
 
 /-!
-# Comparing burn budgets without changing guest-visible prepaid gas
+# Comparing metering budgets
 
 The first component of the low-budget simulation: every successful charge
-under a smaller burn limit succeeds with the same counters under a larger
-limit. This does not assert that arbitrary host functions are insensitive
-to the limit; lifting it to `runMetered` requires that separate property.
+under smaller metering limits succeeds with the same accounting under larger
+limits. Guest-visible `prepaid_gas` lives separately in `NearContext`; a
+machine simulation must keep that context fixed even when relaxing these
+internal counter limits. This file does not assert that arbitrary host
+functions are insensitive to either limit.
 -/
 namespace Wasm.Near.GasCounter
 
-/-- Equal accounting and prepaid gas, with a possibly smaller burn limit. -/
+/-- Equal accounting with possibly smaller prepaid and burn limits. -/
 structure Below (small large : GasCounter) : Prop where
   burnt : small.burnt = large.burnt
   promises : small.promises = large.promises
-  prepaid : small.prepaid = large.prepaid
+  prepaid : small.prepaid ≤ large.prepaid
   limit : small.maxBurnt ≤ large.maxBurnt
 
-/-- A successful charge can be replayed at a larger burn limit. Promise
+/-- A successful charge can be replayed at larger metering limits. Promise
 reservations are included; no ordering assumption on `burn` and `use` is needed. -/
 theorem Below.deduct {small large : GasCounter} (h : Below small large)
     (burn use : Nat) (hok : (small.deduct burn use).2 = none) :
@@ -47,6 +49,13 @@ theorem Below.prepay {small large : GasCounter} (h : Below small large)
     (cost : Nat) (hok : (small.prepay cost).2 = none) :
     (large.prepay cost).2 = none ∧ Below (small.prepay cost).1 (large.prepay cost).1 :=
   h.deduct 0 cost hok
+
+/-- Relaxing the metering limits leaves the accounting untouched. This
+constructor deliberately says nothing about guest-visible call context. -/
+theorem below_withLimits (g : GasCounter) (prepaid burnLimit : Nat)
+    (hp : g.prepaid ≤ prepaid) (hb : g.maxBurnt ≤ burnLimit) :
+    Below g { g with prepaid := prepaid, maxBurnt := burnLimit } :=
+  ⟨rfl, rfl, hp, hb⟩
 
 /-- The charge where replay stops is a protocol gas failure, never an
 interpreter error or some other host error. -/

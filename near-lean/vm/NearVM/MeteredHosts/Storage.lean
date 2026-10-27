@@ -1,4 +1,4 @@
-import NearVM.Host
+import NearVM.Metered
 import NearVM.GasCredits
 
 /-!
@@ -52,5 +52,34 @@ theorem written_credits {st : HostStore NearState} (key value : List UInt8) {cre
 theorem written_other (st : HostStore NearState) (key value other : List UInt8)
     (h : other ≠ key) : (written st key value).host.storage other = st.host.storage other := by
   simp [written, NearState.setStorage, NearState.invalidateIterators, h]
+
+/-- Storage usage before conversion to the ABI's `u64`. -/
+def writeUsage (extra : Nat) (st : HostStore NearState) (key value : List UInt8) : Nat :=
+  match st.host.storage key with
+  | none => st.host.context.storageUsage.toNat + key.length + value.length + extra
+  | some old => st.host.context.storageUsage.toNat + value.length - old.length
+
+/-- The usage update is exact, with the ABI's wrapping made explicit. -/
+theorem storageWrite_usage (extra : Nat) (st : HostStore NearState)
+    (keyLen keyPtr valueLen valuePtr : UInt64) (key value : List UInt8)
+    (hkey : getMemOrReg st keyPtr keyLen = some key) :
+    (updateStorageUsage extra "storage_write" st (written st key value)
+      [.i64 keyLen, .i64 keyPtr, .i64 valueLen, .i64 valuePtr, .i64 u64Max]).host.context.storageUsage =
+        UInt64.ofNat (writeUsage extra st key value) := by
+  simp only [updateStorageUsage, argU64, List.getElem?_cons_zero,
+    List.getElem?_cons_succ, hkey, written_here, Option.map_some]
+  cases h : st.host.storage key <;> simp [writeUsage, h, written, NearState.setStorage,
+    NearState.invalidateIterators]
+
+/-- The numeric usage agreed by the model follows once overflow is excluded. -/
+theorem storageWrite_usage_toNat (extra : Nat) (st : HostStore NearState)
+    (keyLen keyPtr valueLen valuePtr : UInt64) (key value : List UInt8)
+    (hkey : getMemOrReg st keyPtr keyLen = some key)
+    (hroom : writeUsage extra st key value < 2 ^ 64) :
+    (updateStorageUsage extra "storage_write" st (written st key value)
+      [.i64 keyLen, .i64 keyPtr, .i64 valueLen, .i64 valuePtr, .i64 u64Max]).host.context.storageUsage.toNat =
+        writeUsage extra st key value := by
+  rw [storageWrite_usage extra st keyLen keyPtr valueLen valuePtr key value hkey]
+  exact UInt64.toNat_ofNat_of_lt' hroom
 
 end Wasm.Near.MeteredHosts
