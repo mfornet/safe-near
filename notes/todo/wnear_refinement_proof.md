@@ -1150,6 +1150,45 @@ new allocator, hook, memory and frontier theorems pass Lean LSP MCP standard-
 axiom verification. No runtime, model or WF changes are included; the full
 refinement goal remains open.
 
+The following vector-deallocation checkpoint follows both explicit getter
+vector drops into the real wee_alloc previous-free coalescing path.
+`DeallocateAlign` proves actual f568 checked ceiling division, including both
+overflow guards and the nonzero denominator: 18 ordinary units/20 body steps,
+29 units/21 local-call steps. Actual f570 composes its real f568 call:
+41 units/25 local-call steps. Initial numeric bounds imply both guards, and
+the returned result is `(a + 3) / 4`; the computed result is then actually
+discarded by the deallocator. No arithmetic failure or call execution is
+supplied as a semantic callback.
+
+`DeallocateListSize` proves actual f576: 25 units/17 local-call steps, with
+the header-size result and unsigned underflow guard derived from a native
+initial header bound. `DeallocateListBody` and `DeallocateListCall` execute
+actual f575 when both neighbor links are nonzero and the first link flag is
+clear: 61 ordinary units/65 body steps and 72 units/67 local-call steps.
+Both neighbor stores and the final low-bit clears use their actual sequential
+memory snapshots, retaining arbitrary aliasing. Exact code/global/functional
+host frames, memory lookups, gas, promise credits and residual credits follow
+from those operations. `DeallocateListReadback` separately derives the final
+zero byte from native flag and explicit separation hypotheses; it does not
+claim that original-word readbacks survive arbitrary overlapping writes.
+
+The empty-capacity f68 path is separately proved at 37 units/14 local-call
+steps through the real empty f778 destructor and f747 branch. Positive-capacity
+prefixes execute the actual typed f68→747→777→311→237 entries; their metadata
+and native vector reads refer to the deployed code. Both explicit getter drop
+captures have positive capacity and therefore require the concrete allocator
+path, rather than the empty alternative.
+
+`DeallocateValidation` checks every current `DeallocateCore.Native` data field
+for its accepted captures, then compares exact gas, exact and one-less fuel,
+whole sequential memory pages/max, restored SP and selected functional host
+fields. It accepts 1589 captures across six functions: 28 f68, 124 f582,
+124 f575, 531 f576, 385 f570 and 397 f568; 98 other captures are outside the
+selected contracts. Both explicit `ft_total_supply` vector-drop sites satisfy
+all checked native conditions. This separate suite does not enlarge the
+integrated nine-contract harness baseline. Non-previous-free deallocator
+paths and other unlink flag/link branches remain outside these contracts.
+
 ### M4. The Rust runtime layer
 
 The shadow stack, wee_alloc (its free lists and growing memory through
