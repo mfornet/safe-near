@@ -11,3 +11,4 @@ import NearLogic.Outcome
 import NearLogic.Examples.SkeletonModule
 import NearLogic.Examples.SkeletonRun
 import NearLogic.Examples.SkeletonRefines
+import NearLogic.Relax
