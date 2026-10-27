@@ -196,15 +196,21 @@ resource frames and raw-storage usage/representation are kernel checked.
 Singleton lookup retains the explicit nonzero-root obligation. Local budget
 compatibility is checked for constants, drop, administrative return and actual
 input/log/return calls. Storage replay covers successful fresh/replacement
-preparation, raw calls and post-billing gas stops; preparation failures and
-run-invariant assembly remain open. The empty-base storage frontier is
+preparation, raw calls and post-billing gas stops; the full non-view wrapper includes its inner gas stops and ordinary validation
+errors. Successful trie lookup/dereference and proof acceptance remain explicit;
+other trie/proof rejection and run-invariant assembly remain open. The empty-base storage frontier is
 instantiated at the walking method's actual storage entry, retaining the
 explicit proof-size check. Final-output and success-observation helpers
 derive exact functional fields from local storage postconditions. The actual
 public execution now matches the independent successful model step from these
 local storage and resource conditions; original total gas credits imply the
 intermediate storage reservation. This remains a conditional success branch,
-not the universal gas bound or low-gas refinement clause.
+not the universal gas bound or low-gas refinement clause. The empty-base
+specialization derives its postconditions from original context data, and the
+actual key-length rejection now matches the independent model without trie or
+proof-size premises. A symbolic empty-storage cost and a total successful
+execution gas bound (loading, activation and residual credits included) are
+kernel checked; receipt observation retains that bound even on later failures.
 
 The current statement also has the separately documented SAF-67 gap: an
 arbitrary recorded-proof-size input is accepted by context WF. A canonical
