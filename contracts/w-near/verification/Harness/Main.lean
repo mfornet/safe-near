@@ -1,5 +1,6 @@
 import Harness.Builtins
 import Harness.StorePair
+import Harness.StorePairCaller
 import Wasm.Binary
 
 /-!
@@ -282,13 +283,14 @@ def stress (h : Harness) (c : Contract α) (gen : Rng → Except String (List (I
 def main (args : List String) : IO UInt32 := do
   let verbose := args.contains "-v"
   let pairOnly := args.contains "--store-pair-only"
+  let callerOnly := args.contains "--store-pair-caller-only"
   let protocol ← RuntimeConfig.load "../../../near-lean/vm/configs" RuntimeConfig.latestVersion
   let bytes ← IO.FS.readBinFile "../contract.wasm"
   let module ← match Wasm.Binary.decode bytes with
     | .ok m => pure m
     | .error e => throw (IO.userError e.message)
   let h ← orThrow (Harness.load protocol module internalContext [])
-  let captured ← captureAll protocol module bytes.size (if pairOnly then [storePair.func] else [memcpy.func, memset.func, bcmp.func, multi3.func, alloc.func, storePair.func])
+  let captured ← captureAll protocol module bytes.size (if pairOnly || callerOnly then [storePair.func, storePairCaller.func] else [memcpy.func, memset.func, bcmp.func, multi3.func, alloc.func, storePair.func, storePairCaller.func])
   let sites (f : Nat) := captured.getD f #[]
   let pairSites := (sites storePair.func).filter (fun (method, _) => method == "ft_total_supply")
   if pairSites.isEmpty then throw (IO.userError "f566: ft_total_supply produced no captured call")
@@ -305,11 +307,28 @@ def main (args : List String) : IO UInt32 := do
     if (storePair.pre h i).isNone then throw (IO.userError s!"f566 malformed precondition accepted: {i.label}")
   let sample := h.call h.store storePair.func [i32 3, i64 1, i64 2]
   IO.println s!"f566 measured gas={sample.gas}, regular_op_cost={protocol.wasm.regularOpCost}, measured units={sample.gas / protocol.wasm.regularOpCost}; 6 malformed argument prechecks, 3 executable memory probes"
-  let pairResult ← stress h storePair (fun _ => storePairInputs h) (sites storePair.func) verbose
-  let results ← if pairOnly then pure [pairResult] else pure [
+  let pairResult ← if callerOnly then pure true else stress h storePair (fun _ => storePairInputs h) (sites storePair.func) verbose
+  let callerResult ← if pairOnly then pure true else do
+    let capturedCaller := (sites storePairCaller.func).filter (fun (method, _) => method == "ft_total_supply")
+    if capturedCaller.isEmpty then throw (IO.userError "f414: no ft_total_supply caller capture")
+    if !(capturedCaller.any fun (_, e) => h.readNat e.store (u32Arg e.args 1) 16 != 0) then
+      throw (IO.userError "f414: captured source has no nonzero supply")
+    for i in storePairCallerTypeProbes h do
+      if (storePairCaller.pre h i).isNone then throw (IO.userError s!"f414 malformed precondition accepted: {i.label}")
+    for (_, e) in capturedCaller do
+      let measured := h.call e.store storePairCaller.func e.args
+      IO.println s!"f414 measured gas={measured.gas}, measured units={measured.gas / protocol.wasm.regularOpCost}; 5 ABI prechecks, 4 executable memory/stack probes"
+      IO.println s!"f414 ft_total_supply capture: out={u32Arg e.args 0}, src={u32Arg e.args 1}, sp={h.stackPointer e.store}, supply={h.readNat e.store (u32Arg e.args 1) 16}"
+    match h.store.funcs[h.inst.funcAddrs[storePairCaller.func]!]? with
+    | some (.wasm ty _ code) =>
+      IO.println s!"f414: type={repr ty}, locals={repr code.locals}, actual body instructions={code.body.length}"
+      if code.body.length != 29 then throw (IO.userError "f414: unexpected actual body length")
+    | _ => throw (IO.userError "f414 is not a Wasm function")
+    stress h storePairCaller (fun _ => storePairCallerInputs h) (sites storePairCaller.func) verbose
+  let results ← if pairOnly || callerOnly then pure [pairResult, callerResult] else pure [
     ← stress h memcpy (memcpyInputs h) (sites memcpy.func) verbose,
     ← stress h memset (memsetInputs h) (sites memset.func) verbose,
     ← stress h bcmp (bcmpInputs h) (sites bcmp.func) verbose,
     ← stress h multi3 (multi3Inputs h) (sites multi3.func) verbose,
-    ← stress h alloc (allocInputs h) (sites alloc.func) verbose, pairResult]
+    ← stress h alloc (allocInputs h) (sites alloc.func) verbose, pairResult, callerResult]
   pure (if results.all id then 0 else 1)
