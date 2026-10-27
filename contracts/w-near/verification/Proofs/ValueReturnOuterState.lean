@@ -165,15 +165,10 @@ structure Ready (cfg : WasmConfig) (extra : Nat) (s : Store NearState) (limits :
   elementRead : readI32 (lowMemory p) (p.vtable.toNat + 92) = p.returnElement
   lengthRead : ValueReturnDispatch.packed32 (lowMemory p) (p.slice.toNat + 4) = p.len
   pointerRead : ValueReturnDispatch.packed32 (lowMemory p) p.slice.toNat = p.ptr
-  fixedLength : p.len ≠ u64Max
   returnBound : p.ptr.toNat + p.len.toNat ≤ (lowMemory p).byteSize
   returnLimit : withinLimit (dispatchBefore s cfg.regularOpCost p).host.config.maxReturnLen p.len.toNat = true
   cleanupRecordBound : ((scratch p + 8) ||| 4).toNat + 4 ≤ (lowMemory p).byteSize
   counterBound : (counter p).toNat + 4 ≤ (lowMemory p).byteSize
-  acquiredMemoryLookup : (acquired s cfg.regularOpCost p).mems[p.memoryIndex]? = some (acquiredMemory p)
-  highMemoryLookup : (high s cfg.regularOpCost p).mems[p.memoryIndex]? = some (highMemory p)
-  lowMemoryLookup : (low s cfg.regularOpCost p).mems[p.memoryIndex]? = some (lowMemory p)
-  dispatchMemoryLookup : (dispatchBefore s cfg.regularOpCost p).mems[p.memoryIndex]? = some (lowMemory p)
   depth : callers.length + 3 < limits.maxCallDepth
 
 attribute [local irreducible] writeI32 storeI32 acquired high low acquiredMemory highMemory lowMemory

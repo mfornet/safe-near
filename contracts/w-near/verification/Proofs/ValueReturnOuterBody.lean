@@ -1,3 +1,4 @@
+import Proofs.ValueReturnOuterReady
 import Proofs.ValueReturnOuterState
 
 namespace WNear.Proofs.ValueReturnOuterBody
