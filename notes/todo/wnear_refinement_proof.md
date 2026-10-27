@@ -735,7 +735,63 @@ the memory's 32-bit size bound, valid stack/output/source ranges and sufficient
 call depth/credits stay explicit. `Memory.wf` alone does not imply that size
 bound. This is a local callee contract, not a whole-module instantiation proof.
 
-The deployed-callee checkpoint's strict transitive audit includes 147 modules,
+The accepted branch of deployed f158 (`Result::expect`) is now validated and
+proved through actual entry and normal return. Its discriminant must differ
+from one; the panic branch is outside this contract. The first copy reads eight
+bytes at source+4 into output, then the final word is read at source+12 from
+the updated memory and written at output+8. Source/output may overlap. The
+stack pointer is restored modulo 2^32 with no lower-bound premise: this branch
+never accesses its scratch slot. Its cost is exactly 36 operation units
+(10 activation and 26 paid body instructions); the block instruction is free.
+The integrated harness now passes nine contracts on 3429 checked inputs,
+including 1007 captures. All 3128 non-allocator cases have exact gas, and 301
+allocator cases meet their bound. The f158 subset contains 222 calls,
+including overlapping outputs and wrapping stack pointers.
+
+`Proofs.TotalSupply` now composes all 76 actual f296 instructions under eleven
+named local callee contracts, explicit computed scalar-store boundaries and
+structural memory/global/local invariants. `wp_body` admits an arbitrary code
+continuation; `run_return` derives normal root return to the concrete final
+store. No whole-body success equation or pure-instruction execution callback
+is assumed. `Proofs.TotalSupplyEntry.invoke` adds actual typed initialization
+and nine activation units: the total budget is 74 ordinary units plus the
+sum of the eleven complete local call budgets. These local callee and
+representation obligations remain open; this conditional body theorem does
+not establish exported-method refinement.
+
+`Binary.ImportLayout` proves actual metered resolution succeeds for all 48
+imports and arbitrary configurations. `Wasm.LinkFunctionLookup`, host allocation
+and `Binary.InstalledCallees` derive the concrete installed function addresses
+and module slot from successful validation/linking. `Proofs.LoadedCallees`
+connects these facts to all four proved callee invocation contracts and the
+conditional getter invocation. Its installed-code invariant survives changes
+to memory, globals and host while functions/modules are retained. Prepared
+module validation and successful instantiation remain explicit; no whole-module
+validation certificate has been established. An expensive direct candidate
+was canceled and removed without accepting its result. The reusable checked
+`Wasm.ValidateMemoryInvariant` instead proves actual instruction/body and
+constant-expression validation is unchanged when memory counts agree, and
+checks configurable memory limits from explicit page inequalities.
+
+`Proofs.TotalSupplyCallees` now constructs the actual local call contracts for
+three of the eleven sites: f414 (58 units, 38 steps including nested f566),
+f158 accepted branch (37 units, 29 steps), and f779 (18 units, 10 steps).
+These costs include the caller's opcode, unlike their root invocation costs.
+They derive actual call, activation, body and free caller return, with installed
+code corollaries. The eight remaining wrapper call sites still need contracts.
+`Proofs.TotalSupplyBudget` derives burnt/used-gas bounds from the original store
+and residual credits for the conditional complete getter, and carries the
+local model-return/storage effects through its concrete final epilogue.
+
+The loader/body checkpoint has a strict transitive audit of 162 modules,
+6605 declarations and 4900 theorems with zero violations. The normal Lake
+committed-source audit at that checkpoint includes 155 modules, 7126
+declarations and 4126 theorems, tolerating exactly the original three
+refinement-dependent declarations. The later budget/call-site adapters passed
+MCP diagnostics/trust checks and focused builds; those two checkpoint audit
+counts precede their addition.
+
+The preceding three-callee checkpoint's strict transitive audit includes 147 modules,
 5814 declarations and 4246 theorems with zero violations. LSP verification of
 all entry/body code facts and contracts uses only the standard axiom basis.
 The full working-tree audit covers 144 modules, 6634 declarations

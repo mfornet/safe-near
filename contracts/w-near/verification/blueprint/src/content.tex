@@ -305,8 +305,18 @@ installed resources, bounds and sufficient credits remain explicit.
 The second deployed leaf, function 779, now has an entry-inclusive contract
 with exact 17-unit cost and an eight-byte output footprint. Its second load
 reads memory after its first store, so the proof retains overlapping-pointer
-behavior. The integrated harness passes eight contracts on 3207 checked
-inputs, including 1000 captured calls.
+behavior. The accepted branch of function 158 now also has an entry-inclusive contract
+at exactly 36 units, retaining sequential aliasing and wrapping stack-pointer
+restoration; the panic branch remains excluded. The integrated harness passes
+nine contracts on 3429 inputs, including 1007 captured calls.
+The actual total-supply wrapper body now composes all 76 instructions and
+normal root return under eleven named local callee contracts, computed scalar
+boundaries and structural bounds. Its entry bridge adds nine activation units;
+the budget is 74 ordinary units plus all local call budgets. These remaining
+contracts and representation obligations are explicit, so exported-method
+refinement remains open. Actual import resolution and successful linking now
+derive installed code lookups; validation and instantiation success remain
+conditions.
 The
 detailed frontier is recorded in \texttt{notes/todo/wnear\_refinement\_proof.md}.
 Run \texttt{just wnear-skeleton} for the executable checks and
