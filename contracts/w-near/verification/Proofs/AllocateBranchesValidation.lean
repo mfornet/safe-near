@@ -18,6 +18,14 @@ def flaggedMemory (memory : Memory) (head words : UInt32) : Memory := Id.run do
   m := writeI32 m header.toNat (readI32 m header.toNat |||1)
   return m
 
+/-- Original-data split conditions, with no spare end backlink on flags-two. -/
+def nativeSplit (memory : Memory) (head words : UInt32) (flags spare : Nat) : Bool :=
+  decide memory.wf && decide (head≠0) && decide (0<words.toNat) &&
+  decide (head.toNat+80+words.toNat*4≤(Allocate.endWord memory head).toNat) &&
+  decide ((Allocate.endWord memory head).toNat+spare≤memory.byteSize) &&
+  decide (readI32 memory head.toNat &&& 3=UInt32.ofNat flags) &&
+  decide (readI32 memory (head.toNat+8) &&& 1=0)
+
 def validate : IO Unit := do
   let protocol ← RuntimeConfig.load "../../../near-lean/vm/configs" RuntimeConfig.latestVersion
   let bytes ← IO.FS.readBinFile "../contract.wasm"
@@ -47,6 +55,15 @@ def validate : IO Unit := do
     let steps := if isEmpty then 24 else if isFlagged then 239 else if hop then 295 else 236
     if u32Arg entry.args 1 != 1 then throw (IO.userError "unexpected getter580 alignment")
     if !isEmpty && flags != 0 && flags != 2 then throw (IO.userError "unexpected getter580 flags")
+    if root+4>memory.byteSize || u32Arg entry.args 4+20>memory.byteSize then
+      throw (IO.userError "getter580 original root/vtable bound mismatch")
+    if !isEmpty && !nativeSplit before head words (if isFlagged then 2 else 0) (if isFlagged then 0 else 8) then
+      throw (IO.userError "getter580 original split Native conditions failed")
+    if hop then
+      let nextSep := root+4≤head.toNat || head.toNat+12≤root
+      let vtable := u32Arg entry.args 4
+      let vtableSep := root+4≤vtable+16 || vtable+20≤root
+      if !(nextSep && vtableSep) then throw (IO.userError "getter580 skip original root separation mismatch")
     let result := h.call entry.store 580 entry.args
     if returnsU32 result != some pointer then throw (IO.userError "getter580 pointer mismatch")
     if result.gas != op h gas then throw (IO.userError "getter580 exact gas mismatch")
