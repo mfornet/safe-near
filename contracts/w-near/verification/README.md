@@ -11,6 +11,7 @@ The layout follows `notes/design/PROJECT_STRUCTURE.md`:
 | `Model/` | `Model` | The model: state, host context, every method as a Lean function, on-chain layout |
 | `Spec/` | `Spec` | Properties to prove, one `def ... : Prop` each |
 | `Proofs/` | `Proofs` | Completed model proofs; deployed refinement remains open |
+| `Binary/` | `Binary` | The deployed binary in the kernel: its bytes, every function as decoded, and the module (`decode_wNearBytes`) |
 | `blueprint/` | | Lean blueprint (`notes/design/PROVING.md`), fed by `@[blueprint]` annotations via LeanArchitect |
 
 ```
@@ -169,6 +170,18 @@ It found and fixed five gaps in the model (log limits, UTF-8 in ignored
 JSON strings, the runtime's validation of the receipts a call creates, and
 two missing terms in `gasBound`: transfer fees to implicit accounts and the
 promise result a callback parses); see `scenarios/README.md`.
+`Binary/` decodes `contract.wasm` in the kernel, so the statement assumes
+nothing about the module. `Binary/Bytes.lean` embeds the file as a
+`Wasm.ByteSource` (chunks the kernel reads in a few steps; a `ByteArray`
+costs a list walk per byte, which put kernel decoding out of reach), and the
+adapter tests check that the embedded bytes are the file's.
+`Binary/Code/Part*.lean` decode the 907 code entries, `f48` to `f954`, each
+with `code_f<i>`, in 22 ranges checked in parallel (about 80 s of wall time,
+4.4 GB at most per file); `Binary/Module.lean` puts the sections together
+into `decode_wNearBytes : decode wNearBytes = .ok wNearModule`. The absence of
+a start function and the exported functions are theorems about
+`wNearModule`. `Binary/functions.tsv` gives each function's Rust name and the
+exported methods that can reach it (`tools/wasm_names.py`).
 `withdraw_available_binary` shows what the statement buys: under it,
 `WithdrawAvailableAtBoundary` is a fact about the binary's execution.
 

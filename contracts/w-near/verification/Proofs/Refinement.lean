@@ -1,5 +1,6 @@
 import Spec.Contract
 import Spec.Exports
+import Binary.Module
 import Proofs.Availability
 import NearRuntime.BoundaryResolution
 import Lean
@@ -14,11 +15,11 @@ receipt's storage-stake check. This file pins the deployed binary and the
 protocol configuration, so that `refines_wnear` below is a closed statement
 about `contract.wasm` under that configuration.
 
-The binary is embedded as a hex string, read when this file is elaborated.
-Decoding it in the kernel exceeds the available memory, so the decoded module
-and two facts about it (no start function; the exported functions) are
-hypotheses, which the adapter tests (`just runtime-adapter-test`) check on the
-binary.
+The binary is `Binary.wNearBytes`, the bytes of `../contract.wasm` read when
+`Binary/Bytes.lean` is elaborated (the adapter tests check that they are the
+file's). `Binary.decode_wNearBytes` proves in the kernel what they decode
+to, so the facts the statement needs about the module (no start function;
+the exported functions) are theorems here, not hypotheses.
 
 The protocol configuration is pinned the same way: the JSON of the latest
 config in `near-lean/vm/configs`, the one the adapter tests run on, is
@@ -35,34 +36,13 @@ tolerates `sorryAx` in this module alone.
 namespace WNear
 
 open NearInterface
-
-open Lean Elab Term in
-/-- The bytes of a file, as a hex string literal, read when this file is
-elaborated. Paths are relative to the package root. -/
-elab "file_hex%" path:str : term => do
-  let bytes ← IO.FS.readBinFile path.getString
-  let hex := String.join (bytes.toList.map fun b =>
-    String.ofList [Nat.digitChar (b.toNat / 16), Nat.digitChar (b.toNat % 16)])
-  return mkStrLit hex
+open Binary (wNearBytes wNearModule decode_wNearBytes)
 
 open Lean Elab Term in
 /-- The text of a file, as a string literal, read when this file is
 elaborated. Paths are relative to the package root. -/
 elab "file_text%" path:str : term => do
   return mkStrLit (← IO.FS.readFile path.getString)
-
-/-- Bytes from a lowercase hex string. -/
-def bytesOfHex (s : String) : ByteArray :=
-  let digit (c : Char) : Nat := if c.isDigit then c.toNat - '0'.toNat else c.toNat - 'a'.toNat + 10
-  let rec go : List Char → List UInt8
-    | a :: b :: rest => UInt8.ofNat (digit a * 16 + digit b) :: go rest
-    | _ => []
-  ⟨(go s.toList).toArray⟩
-
-/-- `contract.wasm`, as deployed. -/
-def wNearHex : String := file_hex% "../contract.wasm"
-
-def wNearBytes : ByteArray := bytesOfHex wNearHex
 
 /-- The protocol version the statement is pinned to. -/
 def wNearProtocolVersion : Nat := 86
@@ -73,6 +53,18 @@ example : wNearProtocolVersion = Wasm.Near.RuntimeConfig.latestVersion := rfl
 
 /-- `runtime_config_v86.json`, nearcore's `RuntimeConfigView` at version 86. -/
 def wNearProtocolJson : String := file_text% "../../../near-lean/vm/configs/runtime_config_v86.json"
+
+/-- The module the binary decodes to. -/
+theorem code_eq {code : Wasm.Module} (hcode : Wasm.Binary.decode wNearBytes = .ok code) :
+    code = wNearModule := by
+  rw [decode_wNearBytes] at hcode
+  exact (Except.ok.inj hcode).symm
+
+/-- The binary has no start function. -/
+theorem start_wNearModule : wNearModule.start = none := rfl
+
+/-- The binary exports exactly the methods `Call.decode` knows, as functions. -/
+theorem exports_wNearModule : funcExportNames wNearModule = exportedMethods := by decide +kernel
 
 theorem exportFunc_none {m : Wasm.Module} {name : String} (h : name ∉ funcExportNames m) :
     m.exportFunc? name = none := by
@@ -126,11 +118,12 @@ ones (`refines_wnear_exported`). -/
 theorem refines_wnear (cfg : Config) (code : Wasm.Module) (codeOf : List UInt8 → Near.ContractCode)
     (protocol : Wasm.Near.RuntimeConfig)
     (hcfg : cfg.WF) (hcode : Wasm.Binary.decode wNearBytes = .ok code)
-    (hprotocol : Wasm.Near.RuntimeConfig.parse wNearProtocolJson = .ok protocol)
-    (hstart : code.start = none) (hexports : funcExportNames code = exportedMethods) :
+    (hprotocol : Wasm.Near.RuntimeConfig.parse wNearProtocolJson = .ok protocol) :
     Refines Near.Boundary.nearRuntime protocol
       { code := { module := code, size := wNearBytes.size, hash := "" }, codeOf } (wnear cfg) := by
   intro raw st ctx hrep hwf hprot
+  have hstart : code.start = none := code_eq hcode ▸ start_wNearModule
+  have hexports : funcExportNames code = exportedMethods := code_eq hcode ▸ exports_wNearModule
   by_cases hmethod : ctx.method ∈ exportedMethods
   · exact refines_wnear_exported cfg code codeOf protocol hcfg hcode hprotocol raw st ctx hrep hwf
       hprot hmethod
@@ -153,7 +146,6 @@ theorem withdraw_available_wasm (cfg : Config) (code : Wasm.Module)
     (codeOf : List UInt8 → Near.ContractCode) (protocol : Wasm.Near.RuntimeConfig)
     (hcfg : cfg.WF) (hcode : Wasm.Binary.decode wNearBytes = .ok code)
     (hprotocol : Wasm.Near.RuntimeConfig.parse wNearProtocolJson = .ok protocol)
-    (hstart : code.start = none) (hexports : funcExportNames code = exportedMethods)
     {s : State} {ctx : Context} {amount : Nat}
     (hs : Inv cfg s) (hwf : ctx.WF (encode s)) (hprot : ctx.protocol = protocol)
     (hparse : Parses ctx.method ctx.args (.nearWithdraw amount))
@@ -176,7 +168,7 @@ theorem withdraw_available_wasm (cfg : Config) (code : Wasm.Module)
         encode { s.setBalance (AccountId.ofNear ctx.predecessor)
             (s.balance (AccountId.ofNear ctx.predecessor) - amount) with
           totalSupply := s.totalSupply - amount } :=
-  withdraw_available_binary (refines_wnear cfg code codeOf protocol hcfg hcode hprotocol hstart hexports)
+  withdraw_available_binary (refines_wnear cfg code codeOf protocol hcfg hcode hprotocol)
     hs hwf hprot hparse hreg hamt hdep hbound hbal hrent hlog hreceipts hgas
 
 end WNear

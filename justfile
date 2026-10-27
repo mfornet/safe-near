@@ -62,6 +62,10 @@ runtime-adapter-test:
 wnear-scenarios *args:
     cd contracts/w-near/verification && lake build wnear-scenarios && ./.lake/build/bin/wnear-scenarios {{ args }}
 
+# Stress the wNEAR function contracts: run single functions of the binary and check each contract.
+wnear-harness *args:
+    cd contracts/w-near/verification && lake build wnear-harness && ./.lake/build/bin/wnear-harness {{ args }}
+
 # Audit every wNEAR model/spec/proof declaration, including transitive axioms.
 wnear-audit:
     cd contracts/w-near/verification && lake build Model Spec Proofs Differential runtime-adapter-tests

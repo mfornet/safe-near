@@ -18,15 +18,17 @@ echo "work dir: $WORK"
 git clone -q "$HERE/source" "$REPO"
 git -C "$REPO" checkout -q "$COMMIT"
 git -C "$REPO" remote set-url origin "$UPSTREAM"
-# SAFE_NEAR_IMAGE / SAFE_NEAR_TOOLCHAIN can override the pinned image and rustup toolchain for experiments.
+# SAFE_NEAR_IMAGE / SAFE_NEAR_TOOLCHAIN can override the pinned image and rustup toolchain for experiments;
+# SAFE_NEAR_RUSTFLAGS the flags (unset `-s` to keep the name section, as tools/wasm_names.py needs).
 IMAGE="${SAFE_NEAR_IMAGE:-rust:1.51.0}"
 TOOLCHAIN="${SAFE_NEAR_TOOLCHAIN-}"
 SETUP="rustup target add wasm32-unknown-unknown"
+RUSTFLAGS_VALUE="${SAFE_NEAR_RUSTFLAGS--C link-arg=-s}"
 if [ -n "$TOOLCHAIN" ]; then SETUP="rustup toolchain install $TOOLCHAIN && rustup default $TOOLCHAIN && $SETUP"; fi
 # CARGO_NET_GIT_FETCH_WITH_CLI: libgit2 in old images can no longer fetch the crates.io index from GitHub.
 docker run --rm --platform "${SAFE_NEAR_PLATFORM:-linux/amd64}" \
   -v "$REPO:/host" -w /host/w-near \
-  -e RUSTFLAGS='-C link-arg=-s' \
+  -e RUSTFLAGS="$RUSTFLAGS_VALUE" \
   -e CARGO_NET_GIT_FETCH_WITH_CLI=true \
   "$IMAGE" bash -c "$SETUP && cargo build --target wasm32-unknown-unknown --release"
 cp "$REPO/w-near/target/wasm32-unknown-unknown/release/w_near.wasm" "$BUILD/contract.wasm"

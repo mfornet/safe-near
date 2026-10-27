@@ -16,6 +16,12 @@ name = "Wasm"
 name = "testsuite"
 root = "Testsuite.Main"
 
+# Elaborators that embed a binary for kernel proofs (`byte_source%`, `ToExpr`
+# for the module syntax), kept out of `Wasm`'s import closure.
+[[lean_lib]]
+name = "WasmEmbed"
+roots = ["WasmEmbed.Embed"]
+
 # Library half of the driver, kept out of `Wasm`'s import closure.
 [[lean_lib]]
 name = "Testsuite"
