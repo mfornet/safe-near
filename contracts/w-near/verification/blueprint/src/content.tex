@@ -209,7 +209,12 @@ actual decoder rejects empty extension paths, so this bound needs no extra
 witness-shape premise. General canonical lookup correctness remains open;
 singleton lookup retains its explicit nonzero-root obligation. Isolated child
 walks now transfer through actual constructed parent witness segments, with
-compatible aliases and ancestor safety explicit. Successful reference lookup
+compatible aliases and ancestor safety explicit. Actual construction collision
+validation discharges binding compatibility; deduplicated lookup retains the
+exact result/accounting at its smaller default fuel. Actual recursive
+construction also produces a ranked node certificate with serialized bindings
+and descendant bounds; decoded traversal must still follow that certificate,
+and reserved-zero roots remain explicit. Successful reference lookup
 and dereference also have original-key gas bounds for the cumulative counters
 used by the actual storage host.
 
@@ -220,15 +225,19 @@ outcomes preserve issue freshness and every outcome preserves logs. The
 concrete control/stack/installed-host invariant is closed across all
 fifteen opcodes and administrative leave, and every actual runner prefix
 preserves its log prefix. Auxiliary gas enlargement leaves the whole guest
-context unchanged. The functional readiness/freshness invariant and whole-run
-simulation assembly remain open.
+context unchanged. The functional invariant now closes across error-free continuing steps and
+derives storage readiness from original empty-base WF and proof acceptance.
+Concrete whole-body simulation yields matching or a protocol gas failure with
+prefix logs and excludes fuel exhaustion. Funded high-run model adequacy,
+loading/activation and receipt rollback assembly remain open.
 
 The empty-base specialization derives storage postconditions from original
 context data and matches the model for both storage-stake acceptance and
 rejection. Its context-only cost includes loading, 23 regular operations,
 ordered storage/input/log charges and per-receiver return-data byte fees.
-Original gas-limit coverage supplies credits, model matching and a used-gas
-bound; the log decoder's width check follows from WF and this coverage. The
+Original gas-limit coverage now supplies matching and a used-gas bound for
+every resource-limit branch and either stake outcome through the exact
+finite-set runtime interface; the log decoder's width check follows from WF and this coverage. The
 proof-size check and usage room remain explicit, and the universal model gas
 function and low-gas refinement clause remain open.
 
