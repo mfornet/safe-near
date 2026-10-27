@@ -175,13 +175,24 @@ The kernel has checked gas-credit spending and composition, rules for
 constants and locals, an exact symbolic constant-return execution, host
 billing lists, and contracts for input and output hosts. The storage-write
 functional core and storage-usage arithmetic are checked separately from
-the still-open metered trie phase. Boundary adequacy covers success, VM
-abort, receipt validation and storage-stake failure.
+local trie lookup, dereference and accounting obligations. Boundary adequacy
+covers success, VM abort, receipt validation and storage-stake failure.
+Prepared-memory validation, exact key/log reads, actual startup and entry
+activation are checked. The fifteen-opcode success body composes input, log
+and return contracts with one explicit local storage frontier.
 
-M2 remains open: the effectful method needs a universal metered contract,
-a proved gas bound, the below-bound execution-prefix theorem and assembly
-of \texttt{Refines}. The deployed \texttt{refines\_wnear\_exported} proof
-remains open as well. The detailed frontier is recorded in
+The original context premise admitted duplicate overlay keys whose view and
+lookup disagree. Kernel-backed counterexamples reach an execution issue in
+both the skeleton and deployed wNEAR. The corrected premise adds uniqueness
+within each overlay, with preservation proofs for actual runtime operations;
+prospective writes may still override committed writes. This substantive
+premise correction is recorded in the misstatement log.
+
+M2 remains open: canonical-trie correctness, a universal storage contract,
+a proved gas bound, deterministic failure branches, local compatibility for
+the below-bound run theorem and assembly of \texttt{Refines} remain. The
+deployed \texttt{refines\_wnear\_exported} proof remains open as well.
+The detailed frontier is recorded in
 \texttt{notes/todo/wnear\_refinement\_proof.md}; run
 \texttt{just wnear-skeleton} for the executable checks.
 

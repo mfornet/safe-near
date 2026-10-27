@@ -328,17 +328,22 @@ that removes the risk of getting stuck on the glue at the end.
 | Piece | Evidence | Status |
 |---|---|---|
 | Gas credits, spending and residual frames | `NearVM/GasCredits.lean` | Kernel checked |
-| Replay of successful charges at larger counter limits | `NearVM/GasBudget.lean` | Kernel checked; not a whole-run prefix theorem |
+| Replay of successful charges at larger counter limits | `NearVM/GasBudget.lean` | Kernel checked; lifted to runs by `MeteredPrefix` under local step compatibility |
 | Actual metered-machine WP, charging, composition and error exits | `NearVM/MeteredLogic.lean` | Kernel checked; no separation frame rule yet |
 | Constants, locals and a symbolic constant-return program | `NearVM/MeteredRules.lean` | Kernel checked, including exact gas and memory preservation |
 | Direct host calls and a symbolic metered `input` caller | `NearVM/MeteredCall.lean` | Kernel checked, including opcode and host costs |
 | Boundary success, abort, receipt and stake-failure adequacy | `NearRuntime/Refinement.lean` | Kernel checked; assembly retains the method/low-gas premises |
 | Host burn-list credits and storage-write functional core | `NearVM/MeteredHosts/{Charges,Storage}.lean` | Kernel checked; trie/metered storage contract remains open |
-| Metered input and output hosts | `NearVM/MeteredHosts/{Input,Output}.lean` | Kernel checked; log-read premise still refers to the paid store |
+| Metered input and output hosts | `NearVM/MeteredHosts/{Input,Output}.lean` | Kernel checked; concrete `Skeleton/Output` discharges fixed log reads from original memory |
 | Effectful walking module and independent resource-aware model | `Skeleton/{Module,Model}.lean` | Syntax/model facts and checker-to-`Matches` equivalence kernel checked |
-| Walking-module validation, linking and initialization | `Skeleton/Instantiation.lean` | Kernel checked for the original module; runtime-prepared memory remains open |
+| Walking-module validation, linking and initialization | `Skeleton/Instantiation.lean` | Kernel checked for original and prepared memory (`Prepared`, `Memory`) |
 | Walking-module executions | `just wnear-skeleton` | Validated on creation, replacement, binary/long inputs, gas and resource limits |
-| Whole effectful method, gas bound, below-bound simulation and `Refines` | — | Open |
+| Actual loading and entry activation | `Skeleton/Startup.lean` | Kernel checked; exact loading charges and eight-operation activation |
+| Whole successful body | `Skeleton/{Body,Calls,Success}.lean` | Kernel checked; local storage frontier and explicit resources remain |
+| Trie-write metered phases | `NearVM/MeteredHosts/StorageMetered.lean` | Kernel checked from local lookup/dereference/accounting/proof-size obligations |
+| Below-bound run lifting and input-host compatibility | `NearVM/MeteredPrefix.lean`, `MeteredHosts/Budget.lean` | Kernel checked; remaining host and machine compatibility open |
+| Reachable overlay representation | `NearInterface/TrieOverlayInvariant.lean`, `Skeleton/OverlayProbe.lean` | Old context premise refuted; corrected uniqueness invariant preserved by actual operations |
+| Whole effectful gas bound, deterministic failure branches and `Refines` | — | Open |
 
 The walking module uses `input`, `storage_write`, `log_utf8` and
 `value_return` through the actual NEAR metered runtime and receipt boundary.
@@ -348,21 +353,38 @@ exact deterministic resource failures, invalid methods, storage-stake rollback,
 and log prefixes. Neither those tests nor a parameterized `ContractModel`
 constitute a universal refinement proof.
 
-**Frontier:** finish the metered trie-storage contract and make the output
-contracts usable from fixed memory bytes; connect the four hosts through the
-Wasm call rule and runtime-prepared instantiation; derive a symbolic cost including
-trie charges; prove the execution-prefix relation with guest-visible context
-fixed; assemble the effectful `Refines` theorem. The counter-level simulation
-may relax prepaid and burn limits, but the immutable `NearContext.prepaidGas`
-seen by guest code must stay fixed. An arbitrary host callback can inspect
-counter limits, so host insensitivity is a real premise to discharge, not an
-implicit generic monotonicity assumption.
+**Frontier:** discharge canonical-trie lookup/dereference agreement with raw
+storage; instantiate the local metered storage phase; derive a symbolic cost
+including trie charges and establish its resource conditions. Connect the
+successful body to startup and the receipt boundary, then prove deterministic
+resource failures and local step compatibility for the remaining hosts and
+machine instructions before assembling `Refines`. The counter-level simulation
+may relax prepaid and burn limits, but immutable `NearContext.prepaidGas` seen
+by guest code must stay fixed. Host compatibility is a premise to discharge,
+not an implicit generic monotonicity assumption.
 
-The current instantiation theorem initializes the original one-page module.
-The runtime prepares its memory declaration using `initialMemoryPages` and
-`maxMemoryPages`, so the theorem must be lifted to that prepared module before
-it can discharge the actual boundary initialization obligation. `dataMemory`
-keeps the zero-filled memory symbolic rather than reducing whole pages.
+Prepared validation and instantiation now cover arbitrary positive configured
+memory sizes within the Wasm limit. `Memory` proves the exact key/log byte reads
+without expanding zero-filled pages. `Startup` connects the actual `runAttempt`
+pipeline to the prepared body; `Success` composes all fifteen opcodes and the
+four actual hosts, leaving storage's local invocation/gas evidence explicit.
+
+A substantive premise correction was necessary: old `Context.WF` admitted
+duplicate overlay keys and therefore actual `executionIssue` counterexamples
+on both the skeleton and deployed wNEAR. The corrected premise requires unique
+keys within each overlay, an invariant of runtime construction and operations.
+See misstatement 5 for kernel/executable evidence and the scope of the repair.
+
+**Open canonical-trie obligation:** `TrieAccounting.walk` treats the all-zero
+hash as the empty subtree at every depth. `TrieConstruction.finish` does not
+reject that digest for a nonempty encoded node; witness deduplication rejects
+conflicting payloads but does not establish nonzero node hashes. Thus the
+intended build/lookup theorem needs a proof that all reachable nonempty node
+hashes are nonzero, or a reviewed change to construction that enforces the
+reserved sentinel. No concrete SHA256 preimage or runtime counterexample is
+known. A cryptographic assumption is not silently added, and arbitrary
+zero-valued *value* hashes are not a problem for direct dereference. This
+obligation remains open alongside serialization, traversal and witness proofs.
 
 The runtime currently does not enforce `maxNumberRegisters`; the skeleton
 pins this observed limitation explicitly. Register-size limits are enforced.

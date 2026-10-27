@@ -66,9 +66,10 @@ wnear-scenarios *args:
 wnear-harness *args:
     cd contracts/w-near/verification && lake build wnear-harness && ./.lake/build/bin/wnear-harness {{ args }}
 
-# Validate the M2 effectful walking skeleton, including gas-budget edges.
+# Validate the M2 walking skeleton, budget edges and malformed-overlay regression.
 wnear-skeleton:
     cd contracts/w-near/verification && lake build wnear-skeleton && ./.lake/build/bin/wnear-skeleton
+    cd contracts/w-near/verification && lake env lean --run Skeleton/OverlayProbe.lean
 
 # Audit every wNEAR model/spec/proof declaration, including transitive axioms.
 wnear-audit:
