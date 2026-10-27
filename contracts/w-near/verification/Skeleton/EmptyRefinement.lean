@@ -1,10 +1,12 @@
 import Skeleton.FundedObservation
+import Skeleton.FundedInputFailures
+import Skeleton.FundedOutputFailures
 import Skeleton.EmptyBounded
 import Skeleton.InvalidMethod
 import Skeleton.ModelSafety
 
 /-! Pointwise assembly of the actual refinement clauses. This is explicitly
-restricted to accepted resources and the empty-base/native-width/proof scope;
+restricted to the empty-base/native-width/proof scope;
 it does not narrow `Refines` or the shared context predicate. -/
 namespace WNear.Skeleton
 open Wasm Wasm.Near NearInterface MeteredHosts
@@ -20,14 +22,51 @@ theorem emptyPaid_recordedStorageError (ctx : Context) (raw : Storage)
     storageInput_storageProofSize]
   rfl
 
+/-- No resource limit must accept: the ordered input, storage, log and
+return branches all have the model-or-gas alternative at arbitrary gas. -/
+theorem execOn_empty_allLimits_matches_or_gas
+    (gasBound : Context → Option Storage → Unit → Nat)
+    (ctx : Context) (raw : Storage) (st : Option Storage)
+    (hmethod : ctx.method = "save") (hwf : ctx.WF raw.toFinset)
+    (hrepresented : (model gasBound).Represents raw.toFinset st)
+    (hp : PreparationLimits ctx.protocol)
+    (hread : ctx.protocol.wasm.extCosts.cost "read_memory_byte" * 5 < 2 ^ 64)
+    (hentries : ctx.trie.entries = [])
+    (hselected : Near.TrieOverlay.selected ctx.trie
+      (Near.TrieOverlay.contractKey ctx.current.bytes "k".toUTF8.toList) = none)
+    (hroom : ctx.storageUsage + 1 + ctx.args.length + ctx.protocol.fees.numExtraBytesRecord < 2 ^ 64)
+    (hproof : recordedStorageError (origin ctx raw)
+      (ctx.trie.set (Near.TrieOverlay.contractKey ctx.current.bytes "k".toUTF8.toList) ctx.args) = none) :
+    Matches (model gasBound) ctx raw.toFinset (Near.Boundary.execOn code raw ctx)
+      ((model gasBound).step ctx st ()) ∨
+    ((Near.Boundary.execOn code raw ctx).outcome = .error .outOfGas ∧
+      RolledBack ctx raw.toFinset (Near.Boundary.execOn code raw ctx) ∧
+      (Near.Boundary.execOn code raw ctx).logs <+: ((model gasBound).step ctx st ()).logs) := by
+  by_cases hpre : FundedInputFailures.PreStorageRejected ctx
+  · exact FundedInputFailures.execOn_matches_or_gas gasBound ctx raw st hmethod hwf hp hpre
+      hentries hselected hproof
+  have hn := hpre
+  unfold FundedInputFailures.PreStorageRejected at hn
+  have hi : ctx.args.length ≤ ctx.protocol.wasm.limits.maxRegisterSize := by omega
+  have hk : 1 ≤ ctx.protocol.wasm.limits.maxLengthStorageKey := by omega
+  have hv : ctx.args.length ≤ ctx.protocol.wasm.limits.maxLengthStorageValue := by omega
+  by_cases hout : ctx.protocol.wasm.limits.maxNumberLogs = 0 ∨
+      ctx.protocol.wasm.limits.maxTotalLogLength < 5 ∨
+      ctx.protocol.wasm.limits.maxLengthReturnedData < ctx.args.length
+  · exact FundedOutputFailures.output_matches_or_gas gasBound ctx raw st hmethod hwf hp hi hk hv
+      hout hread hentries hselected hproof
+  have hm : ModelSaveLimits ctx := ⟨hi, hk, hv, by omega, by omega, by omega⟩
+  exact FundedObservation.execOn_matches_or_gas gasBound ctx raw st hmethod hwf hrepresented hp hm
+    hread hentries hselected hroom hproof
+
 /-- The exact finite-set runtime has model agreement or the rollback/log-prefix
-alternative for any gas amount on the stated accepted-resource slice. -/
+alternative for any gas amount on the stated empty-base slice, for every resource-limit branch. -/
 theorem nearRuntime_empty_matches_or_gas
     (gasBound : Context → Option Storage → Unit → Nat)
     (ctx : Context) (raw : RawStorage) (st : Option Storage)
     (hmethod : ctx.method = "save") (hwf : ctx.WF raw)
     (hrepresented : (model gasBound).Represents raw st)
-    (hp : PreparationLimits ctx.protocol) (hm : ModelSaveLimits ctx)
+    (hp : PreparationLimits ctx.protocol)
     (hread : ctx.protocol.wasm.extCosts.cost "read_memory_byte" * 5 < 2 ^ 64)
     (hentries : ctx.trie.entries = [])
     (hselected : Near.TrieOverlay.selected ctx.trie
@@ -40,10 +79,10 @@ theorem nearRuntime_empty_matches_or_gas
     ((Near.Boundary.nearRuntime.exec code raw ctx).outcome = .error .outOfGas ∧
       RolledBack ctx raw (Near.Boundary.nearRuntime.exec code raw ctx) ∧
       (Near.Boundary.nearRuntime.exec code raw ctx).logs <+: ((model gasBound).step ctx st ()).logs) := by
-  have h := FundedObservation.execOn_matches_or_gas gasBound ctx raw.toList st hmethod
+  have h := execOn_empty_allLimits_matches_or_gas gasBound ctx raw.toList st hmethod
     (by simpa only [Finset.toList_toFinset] using hwf)
     (by simpa only [Finset.toList_toFinset] using hrepresented)
-    hp hm hread hentries hselected hroom hproof
+    hp hread hentries hselected hroom hproof
   simpa only [Near.Boundary.nearRuntime, Finset.toList_toFinset] using h
 
 /-- All clauses appearing in `Refines`, at one context/storage point under
@@ -51,7 +90,7 @@ explicit slice assumptions. The unrestricted `Refines` theorem remains open. -/
 theorem nearRuntime_empty_refinement_clauses
     (ctx : Context) (raw : RawStorage) (st : Option Storage)
     (hwf : ctx.WF raw) (hrepresented : sufficientGasModel.Represents raw st)
-    (hp : PreparationLimits ctx.protocol) (hm : ModelSaveLimits ctx)
+    (hp : PreparationLimits ctx.protocol)
     (hread : ctx.protocol.wasm.extCosts.cost "read_memory_byte" * 5 < 2 ^ 64)
     (hentries : ctx.trie.entries = [])
     (hselected : Near.TrieOverlay.selected ctx.trie
@@ -71,7 +110,7 @@ theorem nearRuntime_empty_refinement_clauses
   dsimp only
   by_cases hmethod : ctx.method = "save"
   · have halt := nearRuntime_empty_matches_or_gas (fun ctx _ _ => saveEmptyCost ctx)
-      ctx raw st hmethod hwf hrepresented hp hm hread hentries hselected hroom hproof
+      ctx raw st hmethod hwf hrepresented hp hread hentries hselected hroom hproof
     have hpaid : recordedStorageError (emptyPaid ctx raw.toList)
         (ctx.trie.set (Near.TrieOverlay.contractKey (emptyPaid ctx raw.toList).context.currentAccountId
           "k".toUTF8.toList) ctx.args) = none := by
