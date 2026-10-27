@@ -51,6 +51,12 @@ and Semantics @ Aarhus University) and follows
 Details and the full MIT text are in
 [near-lean/wasm-logic/NOTICE](near-lean/wasm-logic/NOTICE).
 
+## lean-lsp-mcp skill
+
+`.claude/skills/lean-lsp-mcp/SKILL.md` is adapted from the README of
+[lean-lsp-mcp](https://github.com/oOo0oOo/lean-lsp-mcp) (MIT, Copyright (c)
+Oliver Dressler).
+
 ## Submodules and dependencies
 
 Not copied into this repository, listed for reference:
