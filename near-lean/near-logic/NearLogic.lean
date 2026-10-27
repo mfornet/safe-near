@@ -23,3 +23,5 @@ import NearLogic.Hosts.RelaxFns
 import NearLogic.Hosts.PanicRelax
 import NearLogic.Hosts.HostFnsRelax
 import NearLogic.Hosts.StorageRelax
+import NearLogic.Hosts.StorageFnsRelax
+import NearLogic.Hosts.StorageHostsRelax

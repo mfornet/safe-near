@@ -47,6 +47,11 @@ name = "Model"
 [[lean_lib]]
 name = "Binary"
 
+# The bridge from the binary to `Refines` (layer L2, wNEAR part): facts about runs
+# of `contract.wasm` in the metered logic.
+[[lean_lib]]
+name = "Bridge"
+
 [[lean_lib]]
 name = "Spec"
 
