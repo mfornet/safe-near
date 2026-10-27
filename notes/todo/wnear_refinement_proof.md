@@ -345,7 +345,14 @@ that removes the risk of getting stuck on the glue at the end.
 | Below-bound run lifting and input/return host compatibility | `NearVM/MeteredPrefix.lean`, `MeteredHosts/{Budget,ReturnBudget}.lean` | Kernel checked; logging, storage and machine compatibility open |
 | Reachable overlay representation | `NearInterface/TrieOverlayInvariant.lean`, `NearRuntime/TrieOverlayInvariant.lean`, `Skeleton/OverlayProbe.lean` | Old context premise refuted; corrected uniqueness invariant preserved by actual operations |
 | Overlay lookup/view consistency | `NearInterface/TrieOverlayLookup.lean` | Kernel checked under unique overlay keys; on-disk base agreement remains separate |
-| Whole effectful gas bound, deterministic failure branches and `Refines` | — | Open |
+| Actual input-size failure through receipt observation and its symbolic gas bound | `Skeleton/{Costs,FailureExecution}.lean`, `NearRuntime/InitialCredits.lean` | Kernel checked; exact/smaller-budget cost checks pass |
+| Trie compact-path and leaf serialization | `NearInterface/{TrieEncoding,TrieSerialization}.lean` | Kernel checked against actual parsers, with explicit byte widths |
+| Actual singleton construction and reads | `NearInterface/TrieLeaf.lean` | Kernel checked; lookup keeps the unresolved nonzero-root premise explicit |
+| Metered overlay/empty-base writes and resource frames | `NearVM/MeteredHosts/{StorageOverlay,StorageEmpty,StorageFrame}.lean` | Kernel checked from initial credits and local resources, with no assumed primitive outcomes |
+| Storage representation and usage | `NearInterface/StorageUsage.lean`, `NearVM/StorageRepresentation.lean`, `Skeleton/StorageResources.lean` | Kernel checked through initialized storage entry and computed final storage |
+| Actual pure/input/output machine budget compatibility | `NearVM/{MeteredPureBudget,MeteredHostBudget,MeteredOutputBudget}.lean` | Kernel checked; storage and whole-run invariant assembly remain |
+| Isolated native recorder arithmetic and necessary history | `NearInterface/{TrieRecorder,TrieRecordingHistory}.lean` | Kernel checked; no runtime/WF integration or recorder-fidelity claim |
+| Whole effectful gas bound, other deterministic failures and `Refines` | — | Open; SAF-67 also requires statement repair |
 
 The walking module uses `input`, `storage_write`, `log_utf8` and
 `value_return` through the actual NEAR metered runtime and receipt boundary.
@@ -355,8 +362,9 @@ exact deterministic resource failures, invalid methods, storage-stake rollback,
 and log prefixes. Neither those tests nor a parameterized `ContractModel`
 constitute a universal refinement proof.
 
-**Frontier:** discharge canonical-trie lookup/dereference agreement with raw
-storage; instantiate the local metered storage phase; derive a symbolic cost
+**Frontier:** repair the recorded-proof-size input contract and discharge nonempty
+canonical-trie lookup/dereference agreement with raw storage; instantiate
+remaining on-disk storage cases; derive a symbolic cost
 including trie charges and establish its resource conditions. Connect the
 successful VM outcome to the receipt boundary, then prove deterministic
 resource failures and local step compatibility for the remaining hosts and
@@ -379,6 +387,36 @@ on both the skeleton and deployed wNEAR. The corrected premise requires unique
 keys within each overlay, an invariant of runtime construction and operations.
 See misstatement 5 for kernel/executable evidence and the scope of the repair.
 
+**Open shared statement repair (SAF-67):** the current WF predicate admits
+an arbitrary recorded-proof-size function. `ProofSizeProbe` proves a current-WF
+canonical empty context and conditional non-refinement; executing deployed
+`new` reports the proof-limit error while the model succeeds with ample gas.
+See misstatement 6 and `just wnear-proofsize-probe`. This is independent of
+canonical trie correctness and must be repaired before full refinement.
+
+The reviewed native model requires a finite hash-to-first-object map, removal
+count, code-byte contribution and receipt baseline. Its upper bound is object
+bytes plus 2000 per removal plus code bytes. Distinct recording is idempotent;
+removal is counted every time, including repeated tombstones. These are the
+pinned [recorder](https://github.com/near/nearcore/blob/44f7ae6cd7ef08bab604e20a473bf77e35d4c993/core/store/src/trie/trie_recording.rs#L102)
+and [removal](https://github.com/near/nearcore/blob/44f7ae6cd7ef08bab604e20a473bf77e35d4c993/core/store/src/trie/update.rs#L154)
+behaviors. The VM consumes this upper bound relative to its receipt snapshot
+([RuntimeExt](https://github.com/near/nearcore/blob/44f7ae6cd7ef08bab604e20a473bf77e35d4c993/runtime/runtime/src/ext.rs#L297)).
+Current overlay state alone loses repeated-removal history, so a function of
+that state cannot encode the faithful recorder generally.
+
+The recommended repair is explicit recorder state and a fidelity relation,
+then a wNEAR footprint proof. It needs valid full-trie key domains, serialized
+node/value bounds, code/prefix contributions and bounded accesses/removals;
+"three short paths" is not a proof under current WF. The alternative is to
+make the high-level model predict legitimate proof-limit failures in order.
+`TrieRecorder` now proves isolated object/removal/code/snapshot arithmetic and
+finite event-budget bounds. `TrieRecordingHistory` proves no state-only removal
+counter can represent every removal on current overlays. Runtime fidelity,
+native overflow conditions and integration remain open.
+The user preference is pending. No unchecked global size bound, forced
+unchecked recorder mode or weakened failure alternative has been applied.
+
 **Open canonical-trie obligation:** `TrieAccounting.walk` treats the all-zero
 hash as the empty subtree at every depth. `TrieConstruction.finish` does not
 reject that digest for a nonempty encoded node; witness deduplication rejects
@@ -395,12 +433,12 @@ pins this observed limitation explicitly. Register-size limits are enforced.
 This does not affect the default configuration's one-register example, but
 must not be described as nearcore conformance for arbitrary register limits.
 
-Validation for this increment (2026-10-27): 34 proof modules were checked
-transitively for axioms (2132 declarations, 1547 theorems, zero violations); the
+Validation for this increment (2026-10-27): 55 proof modules were checked
+transitively for axioms (3060 declarations, 2196 theorems, zero violations); the
 walking-skeleton checks pass; all five existing builtin harness contracts
 pass; all 211 adapter checks and all 51 differential scenarios pass. The web
 blueprint builds after giving Binary, Harness and Skeleton explicit library
-roots. The full wNEAR audit covers 80 modules, 4867 declarations and 2354
+roots. The full wNEAR audit covers 84 modules, 5033 declarations and 2477
 theorems, permitting only the original refinement module's open proof and its
 two dependent theorems.
 

@@ -62,3 +62,19 @@ to the refinement premise, not a proof of the old statement.
 instructions, both fixed input charges, an exact trap state and untouched
 storage/logs/registers. Classification as the expected guest panic uses
 explicit fresh error-marker premises.
+
+`FailureExecution.lean` now lifts input rejection through loading, activation,
+the public VM runner and the receipt boundary. It proves model matching and
+a symbolic used-gas bound from the actual initial gas limits. `Costs.lean`
+shares that expression with executable checks at three lengths, its exact
+budget and one unit below.
+
+`StorageResources.lean` proves the storage host sees the prepared memory,
+original raw records and register-zero input after actual startup/input effects.
+
+`ProofSizeProbe.lean` reproduces the separately documented SAF-67 statement gap:
+a canonical, unique-overlay context satisfying current WF supplies an arbitrary
+oversized proof oracle; deployed wNEAR `new` fails while the model succeeds.
+WF and conditional non-refinement are kernel proved; the deployed outcome is
+executable-checked. Run `just wnear-proofsize-probe`. This remains open and
+prevents a full refinement claim.
