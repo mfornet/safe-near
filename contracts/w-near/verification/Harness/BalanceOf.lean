@@ -1,6 +1,7 @@
 import Harness.TotalSupply
 import Model.Args
 import Model.State
+import Model.Contract
 
 /-!
 # Contracts on `ft_balance_of`'s path
@@ -110,6 +111,9 @@ the Borsh `String`; absent, it is zero. -/
 
 def leNat (bs : List UInt8) : Nat := bs.foldr (fun b acc => acc * 256 + b.toNat) 0
 
+/-- The four little-endian bytes of `n`. -/
+def leBytes32 (n : Nat) : List UInt8 := (List.range 4).map fun i => UInt8.ofNat (n / 256 ^ i)
+
 /-- The storage key of the account at `account`, under the contract at `contract`. -/
 def balanceKey (h : Harness) (s : Store NearState) (contract account : Nat) : List UInt8 :=
   let pre := h.read s (h.readNat s (contract + 24) 4) (h.readNat s (contract + 32) 4)
@@ -201,6 +205,43 @@ def storageMinimum : Contract Bool where
     if h.readNat r.after out 16 != expected then
       some s!"minimum {h.readNat r.after out 16}, expected {expected}" else none
   -- No claim yet: `storage_byte_cost` goes through the environment.
+  cost _ _ := 10 ^ 18
+  ghostOf _ _ := some true
+
+/-! ## `Contract::ft_metadata` (308), through its serializer (102)
+
+`ft_metadata(out, contract)`: the `FungibleTokenMetadata` at `out`. Its
+in-memory layout is checked through the method's own serializer: a
+`Vec::with_capacity(128)` (94) at 8000, a serializer pointing at it at
+8100, then `serialize` (102), which returns 0 and leaves in the `Vec`
+exactly the model's JSON of `metadata`. -/
+
+def ftMetadata : Contract Bool where
+  name := "Contract::ft_metadata, serialized"
+  func := 308
+  pre h i :=
+    let (out, contract) := (u32Arg i.args 0, u32Arg i.args 1)
+    if !i.ghost then some "the environment is not set up"
+    else if out + 128 > h.memSize i.store || contract + 40 > h.memSize i.store then some "beyond memory"
+    else none
+  footprint _ i := [(u32Arg i.args 0, 128), (heapBase, 2 ^ 32 - heapBase), (freeListHead, 4)]
+  stack := 1024
+  grows := true
+  post h i r :=
+    (ended r).or <|
+    let v := h.call r.after 94 [i32 8000, i32 128]
+    match ended v, h.write v.after 8100 (leBytes32 8000) with
+    | some e, _ => some s!"with_capacity: {e}"
+    | _, .error e => some e
+    | none, .ok s =>
+      let ser := h.call s 102 [i32 (u32Arg i.args 0), i32 8100]
+      match ended ser, returnsU32 ser with
+      | some e, _ => some s!"serialize: {e}"
+      | none, some 0 =>
+        let json := h.read ser.after (h.readNat ser.after 8000 4) (h.readNat ser.after 8008 4)
+        let expected := (WNear.Ret.metadata WNear.metadata).json.toUTF8.toList
+        if json != expected then some s!"serializes to {String.fromUTF8! ⟨json.toArray⟩}" else none
+      | none, _ => some "serialize failed"
   cost _ _ := 10 ^ 18
   ghostOf _ _ := some true
 

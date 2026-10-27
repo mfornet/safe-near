@@ -460,6 +460,10 @@ def storageMinimumInputs (h : Harness) (base : Store NearState) (r : Rng) :
     out := out ++ [{ label := s!"usage {n} ({k})", store := s, args := [i32 1000, i32 6000], ghost := true }]
   pure (out, [])
 
+def ftMetadataInputs (h : Harness) (base : Store NearState) (_ : Rng) :
+    Except String (List (Input Bool) × List (Input Bool)) :=
+  pure ([{ label := "the contract", store := base, args := [i32 1000, i32 6000], ghost := true }], [])
+
 /-! ## Call sites -/
 
 def account (s : String) : List UInt8 := s.toUTF8.toList
@@ -536,7 +540,7 @@ def main (args : List String) : IO UInt32 := do
     [memcpy.func, memset.func, bcmp.func, multi3.func, alloc.func, vecDeref.func, stateOrPanic.func,
       u128From.func, ftTotalSupply.func, resultExpect.func, stateRead.func, toVecU128.func,
       valueReturn.func, envInput.func, optionExpect.func, balanceOf.func, fromSliceBalanceOf.func,
-      storageMinimum.func]
+      storageMinimum.func, ftMetadata.func]
   let sites (f : Nat) := captured.getD f #[]
   -- A fresh store after the method prologue: the environment is set up.
   let envBase ← orThrow (prologue h h.store)
@@ -566,5 +570,6 @@ def main (args : List String) : IO UInt32 := do
     ← stress h optionExpect (optionExpectInputs h envBase) (sites optionExpect.func) verbose,
     ← stress h balanceOf (balanceInputs h envBase) (sites balanceOf.func) verbose,
     ← stress h fromSliceBalanceOf (fromSliceInputs h envBase) (sites fromSliceBalanceOf.func) verbose,
-    ← stress h storageMinimum (storageMinimumInputs h envBase) (sites storageMinimum.func) verbose]
+    ← stress h storageMinimum (storageMinimumInputs h envBase) (sites storageMinimum.func) verbose,
+    ← stress h ftMetadata (ftMetadataInputs h envBase) (sites ftMetadata.func) verbose]
   pure (if results.all id then 0 else 1)
