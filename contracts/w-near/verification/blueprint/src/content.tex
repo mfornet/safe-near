@@ -399,7 +399,13 @@ plus the canonical fee and takes6 steps; no host-outcome premise is used.
 Serializer helpers472/365/321 have actual local contracts, and the typed
 353→901 prefix reaches the real decimal902 call with original U128 words
 at31 ordinary units/13 steps. Decimal902, formatter engine872, allocation and
-SDK state-wrapper composition remain open; the getter still has two whole
+SDK state-wrapper composition remain open. Actual multiplication helper954
+has a complete60-instruction execution contract and81-unit/62-step typed
+call, with exact low-first word stores, readback, footprint and resource
+frames. Kernel UInt algebra identifies the low word with the original low-word
+product modulo64 bits. Identifying the high carry word with the full128-bit
+product remains a separate arithmetic obligation; exact general formulas for
+both addition carries and the implemented high word are now proved. The getter still has two whole
 call obligations. Separate checks include26 result-copy captures,86 register
 forwarder captures and76 canonical storage replays from19 captured inputs,
 including both accounting modes and explicit absent-key fixtures.
@@ -407,13 +413,23 @@ including both accounting modes and explicit absent-key fixtures.
 The allocation frontier now includes actual alignment-one layout leaves 751/684
 and their scratch wrappers 752/685, at 44/78 ordinary units and 36/61 local
 steps. Exact sequential memory and gas frames preserve possible output/scratch
-overlap. The leaf yields the pair(size,1); packed-copy word readback for the
-wrapper remains a separate representation obligation. Actual 572/574 arithmetic
+overlap. Both the leaf and the wrapper's actual packed64 copy yield the
+pair(size,1), with word readback proved from the sequential stores. Actual 572/574 arithmetic
 helpers and the table-resolved 578 callback are checked. The selected positive
 580 split path has real header-fit, split-write, final-commit and tagged-link
 pieces, plus a 35-unit/35-step composition of all five scalar fit guards.
 Guard outcomes and the nonzero pointer follow from original header bounds.
-Whole 580/581, loop/link composition and the 29-byte growth branch remain open.
+The actual53-unit/55-step split control sequence now composes both backlink
+guards, all23 pointer writes and the13-label exit; original heap intervals
+derive its computed-memory readbacks and bounds.
+The full innermost successful split path now composes actual578/572/574 calls,
+all fit guards, initialization, backlink writes and commit at176 ordinary
+units/155 steps. The actual full580 body on the direct-fitting alignment-one
+branch now composes original initialization, both loop entries, candidate
+scaling and size helpers, the split path and return pointer at258 ordinary
+units/235 steps. Its full typed local call costs274 units/237 steps, including
+the15-unit activation and normal one-value return. Other580 traversal branches, whole581 and the29-byte growth
+branch remain open.
 
 SDK dispatch now has a generic 114-unit/77-step initialized lookup and shared
 borrow-acquisition prefix, with code, functional-host and memory-shape frames.
@@ -421,8 +437,24 @@ Actual 432 accepted return and the complete accepted 440 body are proved from
 original resources. The 440 body composes actual lookup, acquisition, host
 read, release and return at 241 ordinary units/162 steps plus the host base
 fee; the full typed local call costs 254 units/164 steps, with its actual
-12-unit activation. This advances state-wrapper composition while retaining the two whole
-getter call obligations 219 and 96.
+12-unit activation. The initialized accepted-hit storage dispatcher459 now
+composes its actual canonical storage host, release and return at261 ordinary
+units plus the actual storage fee/169 typed-call steps. The initialized
+register-copy dispatcher435 costs249 ordinary units plus the real copy
+fee/161 typed-call steps, including its11-unit activation. Its sequential
+memory result includes copying the register and then decrementing the counter
+reread after that copy; arbitrary payload/counter aliasing is retained.
+The actual524 option wrapper around440 costs290 ordinary units plus the host
+base fee/191 typed-call steps. Both option words and stack restoration are
+proved. Original stack and counter separation derive its register-id readback;
+the general execution contract retains the register actually read from memory.
+These contracts retain original installed-code, initialized-state, accepted
+count, selected-record and explicit sequential-memory bounds. Whole state
+read219 and serialization96 remain open.
+The actual523 post-copy tail is proved at19 units/19 steps, preserving its
+high32-bit store before the low64-bit load/store, real branch exit and48-byte
+stack restoration. Whole523/548 still require positive allocation, zero-fill
+952 and their enclosing control composition.
 
 Successful loading derives the actual indirect table targets and static
 memory words selecting them, with table and data frames for later writes.
