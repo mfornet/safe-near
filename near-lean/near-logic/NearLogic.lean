@@ -17,3 +17,6 @@ import NearLogic.RelaxStep
 import NearLogic.RelaxRun
 import NearLogic.Examples.SkeletonBelow
 import NearLogic.Examples.SkeletonComplete
+import NearLogic.Hosts.MeteredRelax
+import NearLogic.Hosts.FinishRelax
+import NearLogic.Hosts.RelaxFns
