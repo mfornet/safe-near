@@ -1,4 +1,5 @@
 import Skeleton.StorageResources
+import Skeleton.StorageCredits
 import Skeleton.Memory
 import NearVM.MeteredHosts.StorageEmpty
 import NearVM.MeteredHosts.StorageFrame
@@ -280,6 +281,30 @@ theorem empty_storageFrontier (ctx : NearInterface.Context) (storage : Storage)
     (executionStore ctx.protocol (Near.Boundary.toVMContext ctx) storage)
     (emptyBefore ctx storage) (emptyAfter ctx storage) (emptyCost ctx storage) rest rfl
     hm.1 hm.2.1 hm.2.2.2.2 hm.2.2.1
+
+/-- The original total budget supplies the storage reservation, so callers
+need no independent credits premise at this intermediate machine state. -/
+theorem empty_storageFrontier_of_initialCredits (ctx : NearInterface.Context) (storage : Storage)
+    (raw : NearInterface.RawStorage) (rest : Nat)
+    (hwf : ctx.WF raw) (hs : storage.toFinset = raw)
+    (hpages : 0 < ctx.protocol.wasm.limits.initialMemoryPages)
+    (hkeyLimit : 1 ≤ ctx.protocol.wasm.limits.maxLengthStorageKey)
+    (hvalueLimit : ctx.args.length ≤ ctx.protocol.wasm.limits.maxLengthStorageValue)
+    (hentries : ctx.trie.entries = [])
+    (hselected : Near.TrieOverlay.selected ctx.trie
+      (Near.TrieOverlay.contractKey ctx.current.bytes "k".toUTF8.toList) = none)
+    (hcredits : ((Near.Boundary.toVMContext ctx).toNearState ctx.protocol storage).gas.Credits
+      (executionBudget ctx.protocol (Near.Boundary.toVMContext ctx) storage
+        (emptyAfter ctx storage) (emptyCost ctx storage) rest))
+    (hproof : recordedStorageError (emptyPaid ctx storage)
+      (ctx.trie.set (Near.TrieOverlay.contractKey (emptyPaid ctx storage).context.currentAccountId
+        "k".toUTF8.toList) ctx.args) = none) :
+    StorageFrontier ctx.protocol (executionStore ctx.protocol (Near.Boundary.toVMContext ctx) storage)
+      (emptyAfter ctx storage) (emptyCost ctx storage) rest 0 := by
+  apply empty_storageFrontier ctx storage raw rest hwf hs hpages hkeyLimit hvalueLimit
+    hentries hselected _ hproof
+  exact storageInput_credits ctx.protocol (Near.Boundary.toVMContext ctx) storage
+    (emptyAfter ctx storage) (emptyCost ctx storage) rest hcredits
 
 /-- The startup/input prefix preserves finite raw-storage representation,
 including key coverage needed by VM outcome extraction. -/

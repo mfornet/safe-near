@@ -135,7 +135,7 @@ theorem executionFinal_logs (cfg : RuntimeConfig) (ctx : VMContext)
     successReturnBefore, chargedMany_logs, successLogAfter, saved_logs,
     inputBefore, chargedStore, chargeHost, successLogBefore]
 
-private theorem distributeGas_no_handles (unused : Nat) (weights : List (Nat × Nat × Nat))
+theorem distributeGas_no_handles (unused : Nat) (weights : List (Nat × Nat × Nat))
     (receipts : List ReceiptSpec) : distributeGas unused [] weights receipts = (receipts, 0) := by
   unfold distributeGas
   dsimp only
