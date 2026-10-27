@@ -556,16 +556,17 @@ This does not affect the default configuration's one-register example, but
 must not be described as nearcore conformance for arbitrary register limits.
 
 Validation for this checkpoint (2026-10-27): 107 proof modules were checked
-transitively for axioms (4943 declarations, 3550 theorems, zero violations).
+transitively for axioms (4965 declarations, 3568 theorems, zero violations).
 Standard Lake builds, the walking-skeleton checks, and blueprint
-extraction/rendering pass. The full wNEAR audit covers 113 modules, 5947
-declarations and 3195 theorems, permitting exactly the original refinement
+extraction/rendering pass. The full wNEAR audit covers 113 modules, 5969
+declarations and 3213 theorems, permitting exactly the original refinement
 module's open proof and its two dependent theorems. After merging latest main (including the Lean LSP skill and new stress
 cases), all 56 differential scenarios pass. The earlier unchanged operational
 baseline has all five builtin harness contracts and 211 adapter checks passing;
 those two suites were not rerun. Lean LSP MCP diagnostics and axiom verification
 pass for the startup, checked receipt replay and canonical reference lookup
-theorems. These audit totals precede the final funded-observation increment.
+theorems, including the final funded-observation lower-gas theorem. Both audits
+include that final increment.
 
 During the latest increment the original host checkout and its shared Git/cache
 paths disappeared. Source work and pushes were preserved using isolated Git
