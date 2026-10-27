@@ -1,4 +1,4 @@
-import Wasm
+import Wasm.Exec
 
 /-!
 # Lemmas about linear memory

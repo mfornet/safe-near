@@ -27,6 +27,14 @@ distinct from malformed. Why, and the feature table against nearcore's
   with the pinned `wasm-tools` at run time (`Wasm.Wat.compile`).
 - Floats are bit patterns operated on through Lean's `Float32` / `Float`; those
   operations are opaque to the kernel and covered by the testsuite.
+- Memory is written in place. A definition that reads a value out of a
+  structure and writes it back while the structure is still referenced makes
+  Lean copy it: `step`, a store instruction and `NearVM.runMetered` each copied
+  a 64 KiB page on every memory store. Each has an `…InPlace` variant written
+  so the value is unshared, and an `@[csimp]` theorem proving it equal to the
+  definition, so compiled code runs the variant while proofs keep the
+  definition. Unlike `implemented_by`, which the repository forbids, the
+  kernel checks the replacement.
 
 ## Testing
 

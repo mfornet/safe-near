@@ -1,4 +1,6 @@
-import Wasm
+import Wasm.Link
+import Wasm.Host.Spectest
+import Wasm.Wat
 import Lean.Data.Json
 
 /-!

@@ -1,4 +1,5 @@
 import Differential.WNear
+import Wasm.Binary
 
 /-!
 # `wnear-scenarios`: run scenario files against the binary and the model

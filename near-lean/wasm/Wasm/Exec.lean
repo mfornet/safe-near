@@ -152,6 +152,53 @@ def storeNat (store : Store H) (inst : ModuleInst) (arg : MemArg) (addr : UInt32
   let mem ← mem.writeNat (addr.toNat + arg.offset) len v
   return store.setMemOf inst mem
 
+/-- A memory store as an instruction effect: `k` continues with the written
+store; out of bounds traps with the store unchanged. -/
+def storeEffect (store : Store H) (inst : ModuleInst) (arg : MemArg) (addr : UInt32) (len : Nat)
+    (v : Nat) (k : Store H → Effect H) : Effect H :=
+  match storeNat store inst arg addr len v with
+  | none => .trap store .outOfBoundsMemoryAccess
+  | some store => k store
+
+/-- `storeEffect` as it runs. `storeEffect` keeps the store for the trap
+while it writes, so every store instruction copied a whole memory page. This
+decides first and then writes the memory in place: `Array.modify` hands it
+over unshared. -/
+def storeEffectInPlace (store : Store H) (inst : ModuleInst) (arg : MemArg) (addr : UInt32)
+    (len : Nat) (v : Nat) (k : Store H → Effect H) : Effect H :=
+  match inst.memAddrs[0]? with
+  | none => .trap store .outOfBoundsMemoryAccess
+  | some a =>
+    match store.mems[a]? with
+    | none => .trap store .outOfBoundsMemoryAccess
+    | some mem =>
+      let at_ := addr.toNat + arg.offset
+      if mem.inBounds at_ len then
+        k { store with mems := store.mems.modify a fun mem =>
+          (List.range len).foldl (fun m i => m.write8 (at_ + i) (UInt8.ofNat (v >>> (8 * i)))) mem }
+      else .trap store .outOfBoundsMemoryAccess
+
+@[csimp] theorem storeEffect_eq_inPlace : @storeEffect = @storeEffectInPlace := by
+  funext H store inst arg addr len v k
+  unfold storeEffect storeEffectInPlace storeNat Store.memOf Store.setMemOf Memory.writeNat
+  cases ha : inst.memAddrs[0]? with
+  | none => simp
+  | some a =>
+    cases hm : store.mems[a]? with
+    | none => simp [hm]
+    | some mem =>
+      have hlt : a < store.mems.size := (Array.getElem?_eq_some_iff.mp hm).1
+      have hget : store.mems[a] = mem := (Array.getElem?_eq_some_iff.mp hm).2
+      by_cases hb : mem.inBounds (addr.toNat + arg.offset) len
+      · simp [hm, hb]
+        congr 2
+        apply Array.ext
+        · simp
+        · intro i h₁ h₂
+          rw [Array.getElem_setIfInBounds (by simpa using h₁), Array.getElem_modify]
+          split <;> simp_all
+      · simp [hm, hb]
+
 def tableOf (store : Store H) (inst : ModuleInst) (t : Nat) : Option (Nat × TableInst) := do
   let addr ← inst.tableAddrs[t]?
   let table ← store.tables[addr]?
@@ -353,9 +400,7 @@ def instr (store : Store H) (inst : ModuleInst) (locals : Array Value) (stack : 
       | .i32 n | .f32 n => n.toNat
       | .i64 n | .f64 n => n.toNat
       | .ref _ => 0
-    match storeNat store inst arg (i32 addr) len raw with
-    | none => .trap store .outOfBoundsMemoryAccess
-    | some store => cont store stack
+    storeEffect store inst arg (i32 addr) len raw (cont · stack)
   | .memory_size =>
     match store.memOf inst with
     | some mem => cont store (stack.push (.i32 (UInt32.ofNat mem.size)))
@@ -533,6 +578,61 @@ def step (c : Config H) : StepResult H :=
         enter { c with store := eff.store } stack ({ frame with code := rest } :: frames) addr
       | .return stack => leave c eff.store stack frame frames
       | .trap reason => .trap reason eff.store
+
+/-- `enter` reads only the store and the limits of its configuration. -/
+theorem enter_congr {c c' : Config H} (hs : c.store = c'.store) (hl : c.limits = c'.limits)
+    (stack : Array Value) (frames : List CallFrame) (addr : Nat) :
+    enter c stack frames addr = enter c' stack frames addr := by
+  rcases c with ⟨_, _, _⟩; rcases c' with ⟨_, _, _⟩
+  cases hs; cases hl; rfl
+
+/-- `leave` reads only the limits of its configuration. -/
+theorem leave_congr {c c' : Config H} (hl : c.limits = c'.limits) (store : Store H)
+    (stack : Array Value) (frame : CallFrame) (frames : List CallFrame) :
+    leave c store stack frame frames = leave c' store stack frame frames := by
+  rcases c with ⟨_, _, _⟩; rcases c' with ⟨_, _, _⟩
+  cases hl; rfl
+
+/-- `step` as it runs. `step` keeps its configuration alive while the
+instruction executes (it rebuilds the result from it), so the store and the
+operand stack are shared and every memory store or stack push copied them.
+Taking the configuration apart first leaves them unshared. -/
+def stepInPlace : Config H → StepResult H
+  | ⟨store, ⟨stack, frames⟩, limits⟩ =>
+    match frames with
+    | [] => .done stack.toList store
+    | frame :: frames =>
+      match frame.code, frame.labels with
+      | [], [] => leave ⟨store, ⟨#[], []⟩, limits⟩ store stack frame frames
+      | [], label :: labels =>
+        .next ⟨store, ⟨stack, { frame with labels := labels, code := label.rest } :: frames⟩, limits⟩
+      | i :: rest, labels =>
+        let inst := store.modules[frame.inst]!
+        let eff := instr store inst frame.locals stack labels i rest
+        match eff.kind with
+        | .continue stack labels code locals =>
+          let frame := { frame with labels := labels, code := code, locals := locals }
+          .next ⟨eff.store, ⟨stack, frame :: frames⟩, limits⟩
+        | .call stack addr rest =>
+          enter ⟨eff.store, ⟨#[], []⟩, limits⟩ stack ({ frame with code := rest } :: frames) addr
+        | .return stack => leave ⟨eff.store, ⟨#[], []⟩, limits⟩ eff.store stack frame frames
+        | .trap reason => .trap reason eff.store
+
+@[csimp] theorem step_eq_inPlace : @step = @stepInPlace := by
+  funext H c
+  rcases c with ⟨store, ⟨stack, frames⟩, limits⟩
+  unfold step stepInPlace
+  rcases frames with _ | ⟨frame, frames⟩
+  · rfl
+  · simp only
+    split
+    · exact leave_congr rfl _ _ _ _
+    · rfl
+    · split
+      · rfl
+      · exact enter_congr rfl rfl _ _ _
+      · exact leave_congr rfl _ _ _ _
+      · rfl
 
 /-- Run up to `fuel` steps. -/
 inductive RunResult (H : Type) where

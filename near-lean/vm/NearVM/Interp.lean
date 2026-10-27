@@ -1,4 +1,4 @@
-import Wasm
+import Wasm.Link
 import Wasm.Bytes
 
 /-!

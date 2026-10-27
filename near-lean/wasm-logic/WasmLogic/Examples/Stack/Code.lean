@@ -1,5 +1,6 @@
 import WasmLogic.Tactic
 import WasmLogic.Examples.Stack.Bytes
+import Wasm.Binary
 
 /-!
 # The stack module of Iris-Wasm

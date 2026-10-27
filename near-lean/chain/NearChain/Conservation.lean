@@ -1,4 +1,5 @@
 import NearChain.PostponedOwnership
+import NearRuntime.BlockConservation
 
 namespace Near
 open Wasm.Near

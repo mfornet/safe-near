@@ -3,7 +3,7 @@ import NearVM.Metered
 import NearVM.Context
 import NearVM.PromiseGraph
 import NearVM.GasDistribution
-import Wasm.Fuel
+import Wasm.CodeSize
 
 /-!
 # `run`: one function call
@@ -158,6 +158,47 @@ def runMetered (cfg : WasmConfig) : Nat → Machine → Machine × Option Functi
       | some error => (charged'.1, some (.hostError error))
       | none => runMetered cfg fuel charged'.1
   | _ + 1, m => (m, none)
+
+/-- `runMetered` as it runs. `runMetered` reads the configuration before a
+step after the step (for the call depth), so the step ran on a shared store
+and copied memory pages; this reads the depth first. -/
+def runMeteredInPlace (cfg : WasmConfig) : Nat → Machine → Machine × Option FunctionCallError
+  | 0, .next c => (.next c, some (.executionIssue .fuelExhausted))
+  | 0, m => (m, none)
+  | fuel + 1, .next c =>
+    let charged := chargeConfig c (nextInstructionGas cfg c)
+    match charged.2 with
+    | some error => (.next charged.1, some (.hostError error))
+    | none =>
+      let depth := charged.1.callDepth
+      let next := Exec.step charged.1
+      let gas := match next with
+        | .next next => if next.callDepth > depth then activationGas cfg.regularOpCost next.locals else 0
+        | _ => 0
+      let charged' := chargeWasm next gas
+      match charged'.2 with
+      | some error => (charged'.1, some (.hostError error))
+      | none => runMeteredInPlace cfg fuel charged'.1
+  | _ + 1, m => (m, none)
+
+@[csimp] theorem runMetered_eq_inPlace : @runMetered = @runMeteredInPlace := by
+  funext cfg fuel m
+  induction fuel generalizing m with
+  | zero => cases m <;> rfl
+  | succ fuel ih =>
+    cases m with
+    | next c =>
+      simp only [runMetered, runMeteredInPlace, frameTransitionGas]
+      generalize chargeConfig c (nextInstructionGas cfg c) = charged
+      rcases charged with ⟨c, _ | error⟩
+      · simp only
+        generalize chargeWasm _ _ = charged
+        rcases charged with ⟨m, _ | error⟩
+        · exact ih m
+        · rfl
+      · rfl
+    | done => rfl
+    | trap => rfl
 
 /-- Fuel exhaustion is an interpreter limit, not protocol gas exhaustion. -/
 @[simp] theorem runMetered_zero (cfg : WasmConfig) (c : Config NearState) :

@@ -1,5 +1,6 @@
 import NearChain.Step
-import NearRuntime
+import NearRuntime.ReservedActorInvariant
+import NearRuntime.ApplyInvariants
 
 namespace Near
 open Wasm.Near

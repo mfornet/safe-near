@@ -3,6 +3,10 @@ check-toolchains:
     python3 tools/check_lean_toolchains.py
     python3 tools/check_nearcore_pin.py
 
+# Check that no module imports a whole package (Wasm, NearVM, NearRuntime, NearChain) and so builds its proofs.
+umbrella-imports:
+    python3 tools/check_umbrella_imports.py
+
 # Check the compiled VM import graph for legacy interpreter and proof API dependencies.
 vm-dependencies:
     python3 tools/check_vm_dependencies.py
@@ -231,7 +235,7 @@ tools-test:
     python3 -m unittest discover -s tools/runtime-conformance -p 'test_*.py' -v
 
 # The inexpensive automatic CI gate: no Lean downloads or native builds.
-ci-check: check-toolchains node-isolation tools-test
+ci-check: check-toolchains node-isolation umbrella-imports tools-test
 
 # List the periodic-check sections with changes since their last check (see reports/periodic/LEDGER.json).
 periodic-due:

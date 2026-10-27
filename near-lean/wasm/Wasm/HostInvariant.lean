@@ -80,7 +80,7 @@ theorem instr_store (store : Store H) (inst : ModuleInst) (locals stack : Array 
     (labels : List Label) (i : Instr) (rest : List Instr) :
     (instr store inst locals stack labels i rest).store.host = store.host ∧
     (instr store inst locals stack labels i rest).store.funcs = store.funcs := by
-  unfold instr
+  unfold instr storeEffect
   cases i <;> dsimp only <;> (repeat' split) <;>
     first
     | (simp_all [branch_store, evalMemOp_store, setTable_host, setMemOf_host, setTable_funcs,

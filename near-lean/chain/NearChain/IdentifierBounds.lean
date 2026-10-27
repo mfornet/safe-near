@@ -1,4 +1,5 @@
 import NearChain.AllocatorMonotonicity
+import NearRuntime.BlockIdentifierBounds
 
 namespace Near
 open Wasm.Near

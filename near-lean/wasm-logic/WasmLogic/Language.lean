@@ -1,4 +1,5 @@
-import Wasm
+import Wasm.Link
+import Wasm.HostInvariant
 import Iris.ProgramLogic.Language
 
 /-!

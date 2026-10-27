@@ -1,4 +1,6 @@
-import NearVM
+import NearInterface.Error
+import NearInterface.Raw
+import Wasm.Syntax
 
 /-!
 # Runtime types

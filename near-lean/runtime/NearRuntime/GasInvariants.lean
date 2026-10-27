@@ -1,5 +1,6 @@
 import NearRuntime.Apply
 import NearRuntime.NewActionRun
+import NearVM.OutcomeGas
 
 namespace Near
 open Wasm.Near

@@ -1,7 +1,8 @@
 import NearNode.Primitives
 import NearCrypto.Sha256
-import NearRuntime
+import NearRuntime.Apply
 import ChainReplay.Wire
+import NearRuntime.ReceiptEncoding
 
 /-!
 # From the chain's data to the runtime's model

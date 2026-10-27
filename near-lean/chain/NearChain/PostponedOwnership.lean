@@ -1,4 +1,6 @@
 import NearChain.ReceiptIdUniqueness
+import NearRuntime.PostponedOwnership
+import NearRuntime.BlockStatePreservation
 
 namespace Near
 open Wasm.Near

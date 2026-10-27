@@ -1,5 +1,6 @@
 import Mathlib.Tactic.Linarith
 import NearRuntime.State
+import NearVM.Metered
 
 /-!
 # Fees

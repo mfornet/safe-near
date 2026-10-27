@@ -1,8 +1,9 @@
-import NearRuntime
+import NearRuntime.Apply
 import Tests.Decoder
 import Tests.Gas
 import Tests.Shard
 import Wasm.Wat
+import NearRuntime.ReceiptEncoding
 
 /-!
 # Runtime scenario tests

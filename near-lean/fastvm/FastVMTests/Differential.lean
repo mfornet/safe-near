@@ -1,4 +1,5 @@
 import FastVMTests.Module
+import Wasm.Wat
 
 /-!
 # `fastvm-differential`

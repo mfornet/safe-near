@@ -4,6 +4,7 @@ import ChainReplay.DelegateSignature
 import ChainReplay.QueueContext
 import ChainReplay.ShardChunk
 import NearRuntime.TransactionRegistry
+import NearRuntime.ReceiptRegistry
 
 /-! Execute the existing chain transition and register identities at their
 observed births. Original transaction block hashes are explicit inputs;

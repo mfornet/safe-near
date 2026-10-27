@@ -1,4 +1,5 @@
 import NearRuntime.MaterializeInvariants
+import NearVM.OutcomeFunding
 
 namespace Near
 open Wasm Wasm.Near

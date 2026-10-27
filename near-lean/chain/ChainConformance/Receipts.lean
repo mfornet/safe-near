@@ -1,6 +1,6 @@
 import ChainReplay.HostCrypto
 import NearChain.Step
-import Wasm
+import Wasm.Binary
 
 /-! Replay the shared full-receipt scenarios through the public chain step.
 The delivery selector is a test input; it is not a shard-network implementation. -/

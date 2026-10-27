@@ -1,6 +1,7 @@
-import NearChain
+import NearChain.History
 import NearRuntime.Epoch
-import Wasm
+import Wasm.Binary
+import NearRuntime.StateEncoding
 
 /-! JSON transport for the trusted chain manipulator. This preserves every
 represented state/receipt field. Code hashes name an externally verified code

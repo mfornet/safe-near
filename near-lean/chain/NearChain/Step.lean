@@ -1,4 +1,4 @@
-import NearRuntime
+import NearRuntime.Apply
 import NearChain.Schedule
 
 /-!

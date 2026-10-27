@@ -1,4 +1,4 @@
-import Wasm
+import Wasm.Exec
 import WasmLogic.MemoryLemmas
 import Iris.Std.HeapInstances
 import Iris.Std.PartialMap
