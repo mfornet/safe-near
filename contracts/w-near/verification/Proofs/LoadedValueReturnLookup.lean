@@ -51,6 +51,19 @@ theorem installed_lookup (cfg : RuntimeConfig) (original : NearState) (s : Store
   rw [ht]
   exact loaded_lookup cfg original loaded inst hl
 
+/-- Both SDK dispatch sites use the same actual initialized table. -/
+theorem installed_lookup_pair (cfg : RuntimeConfig) (original : NearState) (s : Store NearState)
+    (inst : ModuleInst) (h : LoadedValueReturnTable.Installed cfg original s inst) :
+    ∃ address table, inst.tableAddrs[0]? = some address ∧ s.tables[address]? = some table ∧
+      table.elems[116]? = some (.func 565) ∧ table.elems[58]? = some (.func 260) := by
+  obtain ⟨a, t, ha, ht, h116⟩ := installed_lookup cfg original s inst h
+  obtain ⟨b, u, hb, hu, h58⟩ := LoadedValueReturnTable.installed_lookup cfg original s inst h
+  have hab : a = b := Option.some.inj (ha.symm.trans hb)
+  subst b
+  have htu : t = u := Option.some.inj (ht.symm.trans hu)
+  subst u
+  exact ⟨a, t, ha, ht, h116, h58⟩
+
 theorem wp_indirect_lookup (cfg : RuntimeConfig) (original : NearState) (fuel rest : Nat) (s : Store NearState)
     (limits : ExecLimits) (base : List Value) (frame : CallFrame) (callers : List CallFrame)
     (code : List Instr) (mi : ModuleInst) (index : Nat) (memory : Memory) (post : Post)
