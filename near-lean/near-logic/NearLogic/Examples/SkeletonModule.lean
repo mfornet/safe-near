@@ -80,4 +80,57 @@ theorem instantiate_skel (extra : Nat) (h : NearState) (vm : ValidModule) (hvm :
     FuncInst.type, ht, Exec.i32, hw, storeSkel, instSkel, hd]
   done
 
+/-- The configuration `get` starts in, from the host after loading. -/
+def startSkel (extra : Nat) (h : NearState) : Config NearState :=
+  { store := storeSkel extra h, thread := entryThread ⟨#[], 0, instSkel⟩ 0 body, limits := execLimits }
+
+/-- What `runAttempt` does with the module's `get`: loading fails before
+anything runs, or the method runs from the instantiated store. -/
+theorem runAttempt_skel (cfg : RuntimeConfig) (size : Nat) (ctx : VMContext)
+    (storage : List (List UInt8 × List UInt8)) (fuel : Nat)
+    (hlimit : prepareLimitError cfg.wasm.limits skelModule = none)
+    (hmin : cfg.wasm.limits.initialMemoryPages = 1024) (hmax : cfg.wasm.limits.maxMemoryPages = 2048) :
+    (∃ e, (applyCharges (ctx.toNearState cfg storage) (loadingCharges size)).2 = some e ∧
+      runAttempt cfg skelModule size "get" ctx storage fuel =
+        VMOutcome.failedBefore ctx storage
+          (applyCharges (ctx.toNearState cfg storage) (loadingCharges size)).1.gas.burnt (.hostError e)
+          (applyCharges (ctx.toNearState cfg storage) (loadingCharges size)).1.gasProfile) ∨
+    ((applyCharges (ctx.toNearState cfg storage) (loadingCharges size)).2 = none ∧
+      runAttempt cfg skelModule size "get" ctx storage fuel =
+        outcomeOfExecution ctx storage
+          (runInitialized cfg.wasm fuel (.next (startSkel cfg.fees.numExtraBytesRecord
+            (applyCharges (ctx.toNearState cfg storage) (loadingCharges size)).1))).1
+          (runInitialized cfg.wasm fuel (.next (startSkel cfg.fees.numExtraBytesRecord
+            (applyCharges (ctx.toNearState cfg storage) (loadingCharges size)).1))).2) := by
+  obtain ⟨vm, hv, hvm⟩ := validate_skel
+  generalize hl : applyCharges (ctx.toNearState cfg storage) (loadingCharges size) = l
+  obtain ⟨host1, err⟩ := l
+  cases err with
+  | some e =>
+    left
+    refine ⟨e, rfl, ?_⟩
+    simp [runAttempt, hlimit, hl]
+  | none =>
+    right
+    refine ⟨rfl, ?_⟩
+    have hdis : (prepareMemory cfg skelModule).importDecls.any
+        (fun decl => decl.module == "env" && disabledHost cfg decl.name) = false := by
+      rw [prepare_skel cfg hmin hmax]
+      simp [skelPrepared, skelModule, Module.importDecls, Module.importedFuncTypes, disabledHost]
+    have halloc : (HostEnv.allocate (Store.empty host1)
+        { funcs := [metered cfg.fees.numExtraBytesRecord "value_return" valueReturnFn] }) =
+        ({ funcs := #[.host (metered cfg.fees.numExtraBytesRecord "value_return" valueReturnFn).toHostFn],
+           host := host1 }, [.func 0]) := rfl
+    simp only [runAttempt, hlimit, hl]
+    rw [prepare_skel cfg hmin hmax] at hdis ⊢
+    have hres : resolveMetered cfg skelPrepared =
+        .ok { funcs := [metered cfg.fees.numExtraBytesRecord "value_return" valueReturnFn] } := rfl
+    have hexp : skelPrepared.exportFunc? "get" = some 1 := rfl
+    have hft : skelPrepared.funcType? 1 = some { params := [], results := [] } := rfl
+    have hstart : Exec.startWasm (storeSkel cfg.fees.numExtraBytesRecord host1) execLimits
+        instSkel.funcAddrs[1]! [] = some (startSkel cfg.fees.numExtraBytesRecord host1) := rfl
+    rw [hv]
+    simp only [hdis, hres, hexp, hft, halloc, instantiate_skel _ host1 vm hvm, hstart]
+    rfl
+
 end NearLogic.Skeleton
