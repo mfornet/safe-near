@@ -1111,6 +1111,16 @@ initial values. `PanicHookNative` therefore derives all computed-memory guard
 conditions for the following hook setter from original code/data, a stack below
 the hook globals, and initial initialization/lock/old-vtable words zero.
 
+`PanicHookSet` proves the actual first-hook f822 body, including its four
+entered empty blocks, initial-flag and old-lock guards, four sequential
+lock/vtable/receiver/unlock writes, old-vtable guard and explicit return:
+31 ordinary units/35 active steps. Generic opaque pre-store capsules bound
+kernel conversion without assuming a guest execution result. `PanicHookReadback`
+derives exact installed receiver/vtable words, cleared lock, preserved
+initialization word, well-formedness and unchanged memory size/max from
+those real writes. The initialization-slow and old-hook-drop branches remain
+outside this first-install contract.
+
 The separate `PanicHookValidation` suite checks 60 accepted captures across
 503/508/509/522/822, including exact root gas and fuel, one-less-fuel failure,
 restored SP, output words, installed hook words and unchanged functional host

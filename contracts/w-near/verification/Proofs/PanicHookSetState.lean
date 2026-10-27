@@ -134,4 +134,26 @@ theorem after_credits (s : Store NearState) (op index rest : Nat) (memory : Memo
   rw [after_host]
   exact paid_credits s op 31 rest hc
 
+/-- The complete memory array differs only at the designated slot. -/
+theorem after_mems (s : Store NearState) (op index : Nat) (memory : Memory) (receiver vtable : UInt32) :
+    (after s op index memory receiver vtable).mems = s.mems.set! index (finalMemory memory receiver vtable) := by
+  simp only [after,guarded,unlocked,receiverStored,receiverLoaded,vtableStored,vtableLoaded,
+    lockPassed,locked,lockLoaded,init,stored,storeI32,paid,chargedStore,
+    Array.set!_eq_setIfInBounds,Array.setIfInBounds_setIfInBounds,finalMemory]
+
+/-- The last store installs the complete sequential memory at the original index. -/
+theorem after_memory (s : Store NearState) (op index : Nat) (memory : Memory) (receiver vtable : UInt32)
+    (hm : s.mems[index]? = some memory) :
+    (after s op index memory receiver vtable).mems[index]? = some (finalMemory memory receiver vtable) := by
+  rw [after_mems,Array.set!_eq_setIfInBounds]
+  exact Array.getElem?_setIfInBounds_self_of_lt (Array.getElem?_eq_some_iff.mp hm).1
+
+/-- Exact charged opcode cost and unchanged reserved gas. -/
+theorem after_gas (s : Store NearState) (op index rest : Nat) (memory : Memory) (receiver vtable : UInt32)
+    (hc : s.host.gas.Credits (31 * op + rest)) :
+    (after s op index memory receiver vtable).host.gas.burnt = s.host.gas.burnt + 31 * op ∧
+    (after s op index memory receiver vtable).host.gas.promises = s.host.gas.promises := by
+  rw [after_host]
+  exact paid_gas s op 31 rest hc
+
 end WNear.Proofs.PanicHookSet
