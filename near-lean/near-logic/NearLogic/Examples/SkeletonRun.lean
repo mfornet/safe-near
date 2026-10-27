@@ -1,4 +1,5 @@
 import NearLogic.Examples.SkeletonModule
+import NearLogic.Outcome
 
 /-!
 # The skeleton's `get`, run
@@ -126,5 +127,123 @@ theorem get_fuel (cfg : RuntimeConfig) (ctx : VMContext) (storage : List (List U
     exact Nat.mul_le_mul_left _ (Nat.add_le_add_right (this ▸ hb) 1)
   apply runInitialized_enough_fuel hpos hinv
   exact Nat.le_trans (Nat.mul_le_mul_left _ (Nat.add_le_add_right hspan 1)) hfuel
+
+/-- `runMetered` reports nothing, a failed charge, or fuel exhaustion. -/
+theorem runMetered_err (cfg : WasmConfig) (fuel : Nat) (m : Machine) :
+    (runMetered cfg fuel m).2 = none ∨ (∃ e, (runMetered cfg fuel m).2 = some (.hostError e)) ∨
+      (runMetered cfg fuel m).2 = some (.executionIssue .fuelExhausted) := by
+  induction fuel generalizing m with
+  | zero => cases m <;> simp [runMetered]
+  | succ fuel ih =>
+    cases m with
+    | done vs s => rw [runMetered_done]; simp
+    | trap r s => rw [runMetered_trapped]; simp
+    | next c =>
+      unfold runMetered
+      cases h1 : (chargeConfig c (nextInstructionGas cfg c)).2 with
+      | some e => simp [h1]
+      | none =>
+        simp only [h1]
+        cases h2 : (chargeWasm (Exec.step (chargeConfig c (nextInstructionGas cfg c)).1)
+            (frameTransitionGas cfg (chargeConfig c (nextInstructionGas cfg c)).1
+              (Exec.step (chargeConfig c (nextInstructionGas cfg c)).1))).2 with
+        | some e => simp [h2]
+        | none => simp only [h2]; exact ih _
+
+theorem runInitialized_err (cfg : WasmConfig) (fuel : Nat) (m : Machine) :
+    (runInitialized cfg fuel m).2 = none ∨ (∃ e, (runInitialized cfg fuel m).2 = some (.hostError e)) ∨
+      (runInitialized cfg fuel m).2 = some (.executionIssue .fuelExhausted) := by
+  unfold runInitialized
+  cases h : (chargeWasm m (entryCost cfg m)).2 with
+  | some e => simp [h]
+  | none => simp only [h]; exact runMetered_err cfg fuel _
+
+/-- A run that ended with values, and did not exhaust its fuel, is done. -/
+theorem done_of_values {cfg : WasmConfig} {r : Machine × Option FunctionCallError} {vs : List Value} {σ : MStore}
+    (herr : r.2 = none ∨ (∃ e, r.2 = some (.hostError e)) ∨ r.2 = some (.executionIssue .fuelExhausted))
+    (hfuel : r.2 ≠ some (.executionIssue .fuelExhausted))
+    (h : resultCode cfg r = (.finished (.values vs), σ)) : r = (.done vs σ.store, none) := by
+  obtain ⟨m, err⟩ := r
+  simp only at herr hfuel
+  rcases herr with rfl | ⟨e, rfl⟩ | rfl
+  · cases m with
+    | next c => simp [resultCode] at h
+    | done vs' s => simp only [resultCode, Prod.mk.injEq, MCode.finished.injEq, Ending.values.injEq] at h
+                    obtain ⟨rfl, rfl⟩ := h; rfl
+    | trap r s => simp [resultCode] at h
+  · simp [resultCode] at h
+  · exact absurd rfl hfuel
+
+/-- The gas `get` uses after loading: its entry activation, three
+instructions and `value_return`. -/
+def getCost (cfg : WasmConfig) (h : NearState) : Nat :=
+  8 * cfg.regularOpCost + (3 * cfg.regularOpCost + valueReturnUse h 4)
+
+/-- `run` on `get`, with room for loading and `get` within `Cg`: no abort,
+`"ok"` returned, no receipts, at most `Cg` used, and the account's balance,
+usage, logs and storage as the context has them. -/
+theorem get_vmOutcome (cfg : RuntimeConfig) (size : Nat) (ctx : VMContext)
+    (storage : List (List UInt8 × List UInt8)) (Cg : Nat)
+    (hpos : 0 < minOpCost cfg.wasm) (hlimit : prepareLimitError cfg.wasm.limits skelModule = none)
+    (hmin : cfg.wasm.limits.initialMemoryPages = 1024) (hmax : cfg.wasm.limits.maxMemoryPages = 2048)
+    (hret : withinLimit (ctx.toNearState cfg storage).config.maxReturnLen 4 = true)
+    (hgas : (ctx.toNearState cfg storage).gas.used +
+      chargesUse (ctx.toNearState cfg storage) (loadingCharges size) +
+        getCost cfg.wasm (ctx.toNearState cfg storage) ≤ Cg)
+    (hC1 : Cg ≤ (ctx.toNearState cfg storage).gas.maxBurnt)
+    (hC2 : Cg ≤ (ctx.toNearState cfg storage).gas.prepaid) :
+    let o := run cfg skelModule size "get" ctx storage
+    o.aborted = none ∧ o.returnData = .value okBytes ∧ o.receipts = [] ∧ o.usedGas ≤ Cg ∧
+      o.logs = [] ∧ o.balance = ctx.accountBalance + ctx.attachedDeposit ∧
+      o.storageUsage = ctx.storageUsage % 2 ^ 64 ∧
+      o.storage = finalStorage (ctx.toNearState cfg storage) := by
+  set h0 := ctx.toNearState cfg storage
+  obtain ⟨hok, hch⟩ := applyCharges_ok h0 (loadingCharges size) (C := Cg) (by omega) hC1 hC2
+  set h1 := (applyCharges h0 (loadingCharges size)).1
+  have hfuel := get_fuel cfg ctx storage size hpos (Nat.le_refl (fuelFor cfg skelModule ctx))
+  have hrun : runAttempt cfg skelModule size "get" ctx storage =
+      outcomeOfExecution ctx storage
+        (runInitialized cfg.wasm (fuelFor cfg skelModule ctx) (.next (startSkel cfg.fees.numExtraBytesRecord h1))).1
+        (runInitialized cfg.wasm (fuelFor cfg skelModule ctx) (.next (startSkel cfg.fees.numExtraBytesRecord h1))).2 := by
+    rcases runAttempt_skel cfg size ctx storage (fuelFor cfg skelModule ctx) hlimit hmin hmax with
+      ⟨e, he, -⟩ | ⟨-, h⟩
+    · rw [hok] at he; cases he
+    · exact h
+  have hends := get_run cfg.wasm (fuelFor cfg skelModule ctx) cfg.fees.numExtraBytesRecord h1 Cg
+    (by rw [show h1.config = h0.config from hch.config]; exact hret)
+    (by unfold getCost at hgas
+        have : valueReturnUse h1 4 = valueReturnUse h0 4 := valueReturnUse_erase hch.erase 4
+        rw [hch.used, this]; omega)
+    (by rw [hch.maxBurnt]; exact hC1) (by rw [hch.prepaid]; exact hC2)
+  obtain ⟨e, σ, hrc⟩ := runInitialized_finished _ _ _ hfuel
+  rw [hrc] at hends
+  obtain ⟨rfl, hhost, hused⟩ := hends
+  have hdone := done_of_values (runInitialized_err _ _ _) hfuel hrc
+  -- The final host is the initial one, with "ok" returned, up to gas.
+  have hf : ∀ {α : Type} (f : NearState → α), (∀ x, f (erase x) = f x) →
+      f σ.store.host = f (h0.selectReturnValue okBytes) := by
+    intro α f hfe
+    rw [erase_field hhost f hfe]
+    have h1e : erase ((charged h1 (8 * cfg.wasm.regularOpCost)).selectReturnValue okBytes) =
+        erase (h0.selectReturnValue okBytes) := by
+      rw [erase_selectReturnValue, erase_selectReturnValue, erase_charged, hch.erase]
+    exact erase_field h1e f hfe
+  have hp : σ.store.host.promises = [] := hf NearState.promises fun _ => rfl
+  have hr : σ.store.host.returnedPromise = none := hf NearState.returnedPromise fun _ => rfl
+  have hw : σ.store.host.gasWeights = [] := hf NearState.gasWeights fun _ => rfl
+  have hrd : σ.store.host.returnData = some okBytes := hf NearState.returnData fun _ => rfl
+  have hlogs : σ.store.host.logs = [] := hf NearState.logs fun _ => rfl
+  have hbal : σ.store.host.context.accountBalance = ctx.accountBalance + ctx.attachedDeposit :=
+    hf (fun x => x.context.accountBalance) fun _ => rfl
+  have husage : σ.store.host.context.storageUsage = UInt64.ofNat ctx.storageUsage :=
+    hf (fun x => x.context.storageUsage) fun _ => rfl
+  have hstore : finalStorage σ.store.host = finalStorage h0 := hf finalStorage fun _ => rfl
+  obtain ⟨ha, hrec, hret', husd, -, -, hb, hu, hl, hs⟩ :=
+    outcomeOfExecution_noPromises ctx storage [] σ.store hp hr hw
+  simp only [run]
+  rw [hrun, hdone]
+  rw [checkReceipts_noReceipts _ _ _ _ hrec (by rw [hret']; intro i; simp [hrd])]
+  refine ⟨ha, by rw [hret']; simp [hrd], hrec, by rw [husd]; exact hused, by rw [hl, logsOf, hlogs]; rfl,
+    by rw [hb, hbal], by rw [hu, husage]; simp, by rw [hs, hstore]⟩
 
 end NearLogic.Skeleton
