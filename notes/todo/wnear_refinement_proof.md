@@ -1189,6 +1189,23 @@ all checked native conditions. This separate suite does not enlarge the
 integrated nine-contract harness baseline. Non-previous-free deallocator
 paths and other unlink flag/link branches remain outside these contracts.
 
+`DeallocateCoreBody` now proves the complete actual previous-free f582 body
+through real f570/f568 alignment, f576 size checks and f575 unlink calls:
+218 ordinary units/188 active steps. Its full typed local call costs
+231 units/190 steps. `VectorDropPositive237Call` composes that actual allocator
+at 246 units/196 local-call steps; the complete positive f68 chain through
+778/747/777/311/237/582 costs 319 units/230 steps. Pure original code/vector
+header facts and explicit sequential heap-native conditions remain premises;
+no successful execution or computed post-array lookup is supplied as a callback.
+
+`TotalSupplyVectorFrontier` discharges both explicit getter drop sites with
+these real f68 contracts. Exactly **two local execution contracts remain**:
+state read219 and serialization96. The getter assembly, public invocation and
+original-store gas-bound corollaries retain their original structural, native,
+loading and representation premises. Full exported-method refinement remains
+open. All four frontier theorems passed Lean LSP MCP diagnostics and standard
+axiom verification; the focused final build passed 1025 jobs.
+
 ### M4. The Rust runtime layer
 
 The shadow stack, wee_alloc (its free lists and growing memory through

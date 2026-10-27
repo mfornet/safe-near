@@ -345,9 +345,9 @@ acquisition441, lazy lookup565/468/467/564, setter463 and wrapper520.
 The complete520 local call costs328 ordinary units and takes226 steps.
 The complete panic-hook setup522 composes zero-size allocation503/508/509
 and actual first-hook replacement822: its local call costs140 ordinary units
-and takes104 steps. \texttt{TotalSupplyPanicFrontier} reduces the getter to
-four remaining local execution contracts: state read219, serialization96 and
-two vector drops68. Native/data predicates on exact sequential memory and
+and takes104 steps. \texttt{TotalSupplyVectorFrontier} also supplies both
+actual vector drops68, leaving two local execution contracts: state read219
+and serialization96. Native/data predicates on exact sequential memory and
 installed-code/representation resources remain explicit. Lazy initialization's
 status/counter/receiver readbacks follow from initial native spans, separation
 and status zero; its following scratch word retains its actual initial value.
@@ -364,6 +364,26 @@ cleared lock and preserved initialization word follow from the actual writes.
 A separate suite checks60 accepted captures across503/508/509/522/822 with
 exact root gas and fuel and one-less-fuel failure. Nonzero allocator paths
 remain outside the accepted contracts.
+
+The deployed heap-size checks568/570 and header-size helper576 now have
+complete typed call proofs. Initial numeric bounds imply the overflow checks;
+570 returns the actual ceiling division by four. The full two-link unlink575
+path executes both sequential neighbor writes and final low-bit clears:
+72 ordinary units/67 local-call steps. Exact memory, code, globals, functional
+host, gas and promise frames follow from those writes. Operational contracts
+retain aliasing; original-word and final-zero-byte readbacks have explicit
+separation and flag hypotheses.
+The complete previous-free coalescing582 body executes its real570/568,
+575 and576 calls:218 ordinary units/188 steps, or231 units/190 steps for
+the full local call. Actual237 costs246 units/196 local-call steps.
+The full positive-capacity68 call composes778/747/777/311/237/582:
+319 ordinary units/230 steps. Original code and heap data conditions remain
+explicit; these contracts contain no successful-execution callbacks.
+A separate suite checks1589 accepted captures across68/582/575/576/570/568,
+including every current allocator native condition, exact gas and fuel,
+one-less-fuel failure, and entire sequential memory pages and maximum.
+Both explicit getter vector-drop captures satisfy the accepted conditions;
+98 other captures remain outside these selected contracts.
 
 Successful loading derives the actual indirect table targets and static
 memory words selecting them, with table and data frames for later writes.
