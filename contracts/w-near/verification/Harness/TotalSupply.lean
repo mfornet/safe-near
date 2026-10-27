@@ -208,4 +208,39 @@ def stateRead : Contract Bool where
   cost _ _ := 10 ^ 18
   ghostOf _ _ := some true
 
+/-! ## `serde_json::to_vec` of a `U128` (96)
+
+`to_vec(out, value)`: the `Result<Vec<u8>, Error>` of serializing the
+`U128` at `value`, in the 16 bytes at `out`: `Ok` (tag word not 1) with the
+`Vec` `(ptr, cap, len)` at `out + 4` holding the JSON string of the decimal
+digits, quotes included, as near-sdk's `U128` serializes. -/
+
+def jsonU128 (n : Nat) : List UInt8 := ("\"" ++ toString n ++ "\"").toUTF8.toList
+
+def toVecU128 : Contract Bool where
+  name := "serde_json::to_vec::<U128>"
+  func := 96
+  pre h i :=
+    let (out, value) := (u32Arg i.args 0, u32Arg i.args 1)
+    if !i.ghost then some "the environment is not set up"
+    else if out + 16 > h.memSize i.store || value + 16 > h.memSize i.store then some "beyond memory"
+    else none
+  footprint _ i := [(u32Arg i.args 0, 16), (heapBase, 2 ^ 32 - heapBase), (freeListHead, 4)]
+  stack := 1024
+  grows := true
+  post h i r :=
+    let (out, value) := (u32Arg i.args 0, u32Arg i.args 1)
+    (ended r).or <|
+    let expected := jsonU128 (h.readNat r.before value 16)
+    if h.readNat r.after out 4 == 1 then some "Err"
+    else
+      let ptr := h.readNat r.after (out + 4) 4
+      let len := h.readNat r.after (out + 12) 4
+      if len != expected.length then some s!"length {len}, expected {expected.length}"
+      else if h.read r.after ptr len != expected then some "wrong bytes"
+      else none
+  -- No claim yet: formatting through `core::fmt` is stated with M5.
+  cost _ _ := 10 ^ 18
+  ghostOf _ _ := some true
+
 end WNear.Testing

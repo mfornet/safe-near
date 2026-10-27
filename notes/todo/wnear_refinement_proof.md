@@ -415,10 +415,12 @@ Stated and passing the harness: 779, 155, 566 (`U128::from`, under 414),
 414 and 158 with exact costs; 219 with the state's representation
 (`total_supply : u128` at 0, `account_storage_usage : u64` at 16, the
 `LookupMap` prefix as a `Vec` at 24, whose pointer is `Option`'s niche),
-its cost left to M7. Open on this path: 520 and 522 (the environment,
-global state: the ghost "environment set up" of the contracts above is
-their postcondition) and 96 (`to_vec` of a `U128`: the JSON string of a
-`u128`, through `core::fmt`, the largest piece). Three of the harness's
+its cost left to M7; 96 (`to_vec` of a `U128`: `Ok` with the JSON string
+of the decimal digits, checked on border values up to `2^128 - 1`), its
+cost left to M5 (`core::fmt`). Open on this path: 520 and 522 (the
+environment, global state: the ghost "environment set up" of the
+contracts above is their postcondition), then the method's own contract,
+whose postcondition is the model's step. Three of the harness's
 catches so far came from this path (misstatement log, 3 to 5).
 
 ### M4. The Rust runtime layer

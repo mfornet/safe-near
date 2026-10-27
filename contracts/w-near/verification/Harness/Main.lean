@@ -333,6 +333,22 @@ def stateReadInputs (h : Harness) (base : Store NearState) (r : Rng) :
   let bad : Input Bool := { label := "a state that does not decode", store := withStorage base stateKey (some [1, 2, 3]), args := [i32 1000], ghost := true }
   pure (out, [bad])
 
+def toVecInputs (h : Harness) (base : Store NearState) (r : Rng) :
+    Except String (List (Input Bool) × List (Input Bool)) := do
+  let mut r := r
+  let mut out : List (Input Bool) := []
+  let border := [0, 1, 9, 10, 10 ^ 24, 2 ^ 64 - 1, 2 ^ 64, 2 ^ 128 - 1]
+  let mut randoms := []
+  for _ in [0:30] do
+    let (bits, r1) := r.nat 0 128
+    let (n, r2) := r1.nat 0 (2 ^ bits - 1)
+    r := r2
+    randoms := randoms ++ [n]
+  for (n, k) in (border ++ randoms).zipIdx do
+    let s ← put h base [(2000, leBytes n 16)]
+    out := out ++ [{ label := s!"{n} ({k})", store := s, args := [i32 1000, i32 2000], ghost := true }]
+  pure (out, [])
+
 /-! ## Call sites -/
 
 def account (s : String) : List UInt8 := s.toUTF8.toList
@@ -405,7 +421,7 @@ def main (args : List String) : IO UInt32 := do
   let h ← orThrow (Harness.load protocol module internalContext [])
   let captured ← captureAll protocol module bytes.size
     [memcpy.func, memset.func, bcmp.func, multi3.func, alloc.func, vecDeref.func, stateOrPanic.func,
-      u128From.func, ftTotalSupply.func, resultExpect.func, stateRead.func]
+      u128From.func, ftTotalSupply.func, resultExpect.func, stateRead.func, toVecU128.func]
   let sites (f : Nat) := captured.getD f #[]
   let results := [
     ← stress h memcpy (memcpyInputs h) (sites memcpy.func) verbose,
@@ -424,5 +440,8 @@ def main (args : List String) : IO UInt32 := do
         (sites resultExpect.func) verbose,
     ← stress h stateRead
         (stateReadInputs h (((sites stateRead.func)[0]?.map (·.2.store)).getD h.store))
-        (sites stateRead.func) verbose]
+        (sites stateRead.func) verbose,
+    ← stress h toVecU128
+        (toVecInputs h (((sites stateRead.func)[0]?.map (·.2.store)).getD h.store))
+        (sites toVecU128.func) verbose]
   pure (if results.all id then 0 else 1)
