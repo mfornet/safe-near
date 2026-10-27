@@ -612,7 +612,7 @@ pins this observed limitation explicitly. Register-size limits are enforced.
 This does not affect the default configuration's one-register example, but
 must not be described as nearcore conformance for arbitrary register limits.
 
-Validation for this checkpoint (2026-10-27): 130 proof modules were checked
+Validation for the walking-method checkpoint (2026-10-27): 130 proof modules were checked
 transitively for axioms (5336 declarations, 3836 theorems, zero violations).
 Standard Lake builds, the walking-skeleton checks, and blueprint
 extraction/rendering pass. The full wNEAR audit covers 129 modules, 6244
@@ -665,7 +665,7 @@ Verified deployed-code targets (2026-10-27): `ft_total_supply` exports function
 296, whose direct callees are 522, 520, 219, 155, 414, 96, 158, 779, 545,
 and 68 twice. Function 414 calls only 566. Function 566 has type
 `[i32, i64, i64] → []` and six instructions: store argument 2 at output+8,
-then argument 1 at output. It has no calls or global accesses. Its next
+then argument 1 at output. It has no calls or global accesses. Its
 contract now owns a writable 16-byte output region and specifies both
 little-endian stores, the outside-memory frame, normal void completion,
 and exact body gas/residual credits. `Binary.StorePair` kernel-checks its
@@ -689,7 +689,7 @@ harness configuration. Three executed out-of-bounds probes fail as expected.
 Six malformed-argument cases check contract preconditions only: raw
 `Exec.startWasm` assumes caller-validated argument shape and may panic on
 malformed locals. The complete builtin harness also passes: memcpy 713,
-memset 153, bcmp 120, multi3 3258 and allocator 301 calls.
+memset 153, bcmp 120, multi3 258 and allocator 301 calls.
 
 Next compose 414's stack window and call. Function 779
 has sequential loads/stores, so its contract must retain aliasing semantics
@@ -697,6 +697,23 @@ unless a caller-supported separation premise excludes overlap. The state-read
 path uses `STATE` at address 1049788; SDK vtable dispatch, Borsh decoding,
 JSON formatting and `value_return` remain real obligations of the top-level
 getter.
+
+`Binary.PackWords` pins f779's actual eight instructions. Its first load reads
+source+8 and writes output+4; its second load reads source from the updated
+memory and then writes output. `Harness.PackWords` validates that sequential
+meaning over 411 cases, including 226 captured calls and three calls from
+`ft_total_supply`, at exactly 17 operation units (nine activation plus eight
+body). The final integrated harness passes all eight contracts, 3207 checked
+inputs and 1000 captured calls. All 2906 non-allocator cases have exact gas;
+the 301 allocator cases meet their conservative bound.
+`Proofs.PackWords` now proves the actual body with arbitrary operand prefixes,
+caller frames and continuations, followed by normal void completion at fuel
+nine. Its memory contract retains the sequential overlap behavior and an exact
+eight-byte footprint. `Proofs.PackWordsEntry.invoke` composes actual typed
+activation and execution at exactly 17 operation units, with residual/promise
+gas and the functional store/host frame preserved. Installed typed-function,
+module and memory lookups, writable bounds and credits remain explicit local
+callee premises. No exported-method refinement is claimed by these leaves.
 
 The immediate caller now has executable validation too. `Binary.StorePairCaller`
 checks f414's actual 29-instruction body, two declared locals and sole call to
@@ -710,9 +727,19 @@ argument prechecks behave as expected. The full integrated harness passes.
 These checks validate the intended caller contract; its semantic composition
 proof is still open.
 
-The deployed-leaf checkpoint's strict transitive audit includes 134 modules,
-5442 declarations and 3924 theorems with zero violations. LSP verification of
+The deployed-leaf checkpoint's strict transitive audit includes 145 modules,
+5710 declarations and 4145 theorems with zero violations. LSP verification of
 all entry/body code facts and contracts uses only the standard axiom basis.
+The full audit of committed sources covers 142 modules, 6526 declarations
+and 3636 theorems, permitting exactly the original three refinement-dependent
+`sorryAx` declarations. Normal Lake builds pass (1287 targets in this audit).
+In-progress caller instruction composition is outside that committed-source
+checkpoint.
+The reusable rules now include actual direct Wasm call/return, entry activation,
+local tee, global access, wrapping i32 arithmetic and bounds-derived i32/i64
+loads and stores. The caller-state module separately proves the intended
+46-unit body charges, global restoration and sequential memory footprint;
+these state-effect facts do not assume or establish body execution.
 
 Actual `__multi3` (global index 954, local function 906, type index 8) is
 another validated builtin frontier: 60 straight-line instructions, no calls

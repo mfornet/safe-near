@@ -300,6 +300,11 @@ bridge composes actual typed activation and the runner, proving exact total
 cost of 17 units and normal void completion. Its immediate caller, function
 414, is harness-validated on 315 calls with alias-aware scratch/output
 framing and exact 57-unit cost; its semantic composition proof remains open.
+The second deployed leaf, function 779, now has an entry-inclusive contract
+with exact 17-unit cost and an eight-byte output footprint. Its second load
+reads memory after its first store, so the proof retains overlapping-pointer
+behavior. The integrated harness passes eight contracts on 3207 checked
+inputs, including 1000 captured calls.
 The
 detailed frontier is recorded in \texttt{notes/todo/wnear\_refinement\_proof.md}.
 Run \texttt{just wnear-skeleton} for the executable checks and
