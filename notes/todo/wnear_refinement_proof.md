@@ -415,6 +415,45 @@ contracts above is their postcondition), then the method's own contract,
 whose postcondition is the model's step. Three of the harness's
 catches so far came from this path (misstatement log, 3 to 5).
 
+*Done for every method (PR #40, no `sorry`):*
+
+- **The binary loads** (`Binary/Valid*.lean`, `Link.lean`,
+  `Instance.lean`, `Run.lean`). Under v86's memory limits the prepared
+  module validates: the kernel checks the 907 bodies in 22 files after
+  `Validate.module` was split into `moduleContext` and `funcOk`. Its 48
+  imports resolve to `wHosts`. It instantiates to the explicit store
+  `wStore`, with config and host symbolic, by `kernel_rfl_all`.
+  `Link.instantiateModuleOf` takes the module directly. The data segment
+  is given by structural recursion (`dataInitK`), because the kernel
+  cannot unfold `Array.ofFn` at 26 KB. `runAttempt_wnear`: on an exported
+  method, loading fails for gas, or the method runs from `startW`.
+- **Every host under raised gas limits** (`NearLogic/Hosts/*Relax.lean`,
+  `Bridge/Hosts.lean`, `storeRelaxFns_wStore`). The metered wrapper
+  reduces `RelaxFn` to the call after its charges (`metered_relax`). The
+  charges before the call and the argument check ignore the limits for
+  every imported name. `finishMeteredCall` commutes with raising them.
+  The storage phase (`storageAux_rel`) is walked in step with tactics
+  that keep the raised host folded as `relax H` (`bill_step`, `csplit`).
+
+*Next: the below-the-bound case with logs.* For the skeleton,
+`QuietHost` (no logs, no execution issue) carried the out-of-gas case.
+wNEAR logs, so the lower run's final logs must be shown to be a prefix of
+the raised run's. The plan:
+1. Per host (`HostMono`): the logs only grow, and an execution issue is
+   only ever recorded together with a trap. Then a running machine has no
+   execution issue, and along a run the logs only grow (`runMetered_mono`).
+2. Strengthen `GasTrap`/`GasTrapResult`: the lower trap's logs are a
+   prefix of the raised call's result logs, and its execution issue is
+   the input's. A charge failing before the call keeps the input logs; a
+   failure in `finishMeteredCall` keeps the logs the call produced, which
+   the raised call returns too.
+3. Then `runMetered_relax`'s gas case gives: the lower final logs are a
+   prefix of the raised final logs, and no execution issue.
+
+The remaining open point on this path is SAF-67 (`Context.WF` does not
+constrain `storageProofSize`). Until it is decided, every storage-touching
+method's `Refines` is false as stated.
+
 ### M4. The Rust runtime layer
 
 The shadow stack, wee_alloc (its free lists and growing memory through
