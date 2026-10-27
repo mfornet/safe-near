@@ -86,4 +86,73 @@ def stateOrPanic : Contract Bool where
   -- Call sites run inside a method, after its setup.
   ghostOf _ _ := some true
 
+/-! ## `U128::from` (566) and `FungibleToken::ft_total_supply` (414) -/
+
+/-- `from(out, lo, hi)`: the `u128` `lo + 2^64 hi` in the 16 bytes at `out`. -/
+def u128From : Contract Unit where
+  name := "U128::from"
+  func := 566
+  pre h i := if u32Arg i.args 0 + 16 > h.memSize i.store then some "beyond memory" else none
+  footprint _ i := [(u32Arg i.args 0, 16)]
+  post h i r :=
+    (ended r).or <|
+    if h.readNat r.after (u32Arg i.args 0) 16 != u64Arg i.args 1 + 2 ^ 64 * u64Arg i.args 2 then
+      some "wrong value" else none
+  -- Activation 11 (an i32 and two i64 parameters); 6 instructions.
+  cost h _ := op h 17
+  ghostOf _ _ := some ()
+
+/-- `ft_total_supply(out, ft)`: the `u128` total supply, the first field of
+the `FungibleToken` at `ft`, in the 16 bytes at `out`. -/
+def ftTotalSupply : Contract Unit where
+  name := "FungibleToken::ft_total_supply"
+  func := 414
+  pre h i :=
+    let (out, ft) := (u32Arg i.args 0, u32Arg i.args 1)
+    if out + 16 > h.memSize i.store || ft + 16 > h.memSize i.store then some "beyond memory" else none
+  footprint _ i := [(u32Arg i.args 0, 16)]
+  stack := 16
+  post h i r :=
+    (ended r).or <|
+    if h.readNat r.after (u32Arg i.args 0) 16 != h.readNat r.before (u32Arg i.args 1) 16 then
+      some "wrong total supply" else none
+  -- Activation 11; the frame 5 and its release 4; the two loads 7; the call 1
+  -- and `U128::from` 17; the copy 3 + 6 + 3.
+  cost h _ := op h 57
+  ghostOf _ _ := some ()
+
+/-! ## `Result::expect` (158)
+
+`expect(out, res, loc)` on a `Result` whose tag is the word at `res`: `Ok`
+(tag not 1) copies the 12 payload bytes at `res + 4` to `out`; `Err` panics
+through `unwrap_failed`, which formats the error value. The contract is for
+`Ok` only: on `ft_total_supply`'s path `expect` follows `to_vec` of a
+`U128`, which never fails, and an `Err` needs the error's representation
+(misstatement log, 5). The ghost is the environment, as for `stateOrPanic`. -/
+
+def resultExpect : Contract Bool where
+  name := "Result::expect"
+  func := 158
+  pre h i :=
+    let (out, res) := (u32Arg i.args 0, u32Arg i.args 1)
+    if !i.ghost then some "the environment is not set up"
+    else if out + 12 > h.memSize i.store || res + 16 > h.memSize i.store then some "beyond memory"
+    else if h.readNat i.store res 4 == 1 then some "an Err"
+    else if overlap out 8 (res + 12) 4 then some "out overlaps the payload's last word"
+    else none
+  footprint _ i := [(u32Arg i.args 0, 12)]
+  stack := 64
+  post h i r :=
+    let (out, res) := (u32Arg i.args 0, u32Arg i.args 1)
+    if h.readNat r.before res 4 == 1 then
+      match r.ending with
+      | .trapped (.hostError (.guestPanic _)) => none
+      | e => some s!"Err: {e.describe}"
+    else
+      (ended r).or <|
+      if h.read r.after out 12 != h.read r.before (res + 4) 12 then some "payload not copied" else none
+  -- Ok: activation 10; the frame 5 and its release 4; the tag test 5; the copy 4 + 8.
+  cost h i := if h.readNat i.store (u32Arg i.args 1) 4 == 1 then 10 ^ 18 else op h 36
+  ghostOf _ _ := some true
+
 end WNear.Testing

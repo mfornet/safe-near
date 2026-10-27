@@ -262,6 +262,55 @@ def stateInputs (h : Harness) (base : Store NearState) (r : Rng) :
     { label := "not initialized, environment not set up", store := p0, args := [i32 1000, i32 200], ghost := false }
   pure (out, [probe])
 
+def u128FromInputs (h : Harness) (r : Rng) : Except String (List (Input Unit) × List (Input Unit)) := do
+  let top := h.memSize h.store
+  let mut r := r
+  let mut out := []
+  for k in [0:50] do
+    let (dst, r1) := r.nat 0 (top - 16)
+    let (lo, r2) := r1.nat 0 (2 ^ 64 - 1)
+    let (hi, r3) := r2.nat 0 (2 ^ 64 - 1)
+    r := r3
+    out := out ++ [{ label := s!"random {k}", store := h.store, args := [i32 dst, i64 lo, i64 hi], ghost := () }]
+  let pargs := [i32 (top - 8), i64 1, i64 1]
+  let probe : Input Unit := { label := "beyond memory", store := h.store, args := pargs, ghost := () }
+  pure (out, [probe])
+
+def ftTotalSupplyInputs (h : Harness) (r : Rng) : Except String (List (Input Unit) × List (Input Unit)) := do
+  let top := h.memSize h.store
+  let mut r := r
+  let mut out := []
+  for k in [0:50] do
+    let (ft, r1) := r.nat 0 (top - 16)
+    let (dst, r2) := r1.nat 0 (top - 16)
+    let (bs, r3) := r2.bytes 16
+    r := r3
+    let s ← put h h.store [(ft, bs)]
+    out := out ++ [{ label := s!"random {k}", store := s, args := [i32 dst, i32 ft], ghost := () }]
+  pure (out, [])
+
+def expectInputs (h : Harness) (base : Store NearState) (r : Rng) :
+    Except String (List (Input Bool) × List (Input Bool)) := do
+  let top := h.memSize base
+  let mut r := r
+  let mut out : List (Input Bool) := []
+  let mut probes : List (Input Bool) := []
+  for k in [0:50] do
+    let (res, r1) := r.nat 0 (top - 16)
+    let (dst, r2) := r1.nat 0 (top - 12)
+    let (bs, r3) := r2.bytes 16
+    let (err, r4) := r3.nat 0 3
+    r := r4
+    if overlap dst 8 (res + 12) 4 then continue
+    let bs := if err == 0 then bs.set 0 1 |>.set 1 0 |>.set 2 0 |>.set 3 0 else bs.set 0 0
+    let s ← put h base [(res, bs)]
+    let i : Input Bool := { label := s!"random {k}", store := s, args := [i32 dst, i32 res, i32 1049036], ghost := true }
+    -- One garbage error is enough to show the clause is needed.
+    if err == 0 then
+      if probes.isEmpty then probes := [{ i with label := s!"Err with a garbage error {k}" }]
+    else out := out ++ [i]
+  pure (out, probes)
+
 /-! ## Call sites -/
 
 def account (s : String) : List UInt8 := s.toUTF8.toList
@@ -333,7 +382,8 @@ def main (args : List String) : IO UInt32 := do
     | .error e => throw (IO.userError e.message)
   let h ← orThrow (Harness.load protocol module internalContext [])
   let captured ← captureAll protocol module bytes.size
-    [memcpy.func, memset.func, bcmp.func, multi3.func, alloc.func, vecDeref.func, stateOrPanic.func]
+    [memcpy.func, memset.func, bcmp.func, multi3.func, alloc.func, vecDeref.func, stateOrPanic.func,
+      u128From.func, ftTotalSupply.func, resultExpect.func]
   let sites (f : Nat) := captured.getD f #[]
   let results := [
     ← stress h memcpy (memcpyInputs h) (sites memcpy.func) verbose,
@@ -344,5 +394,10 @@ def main (args : List String) : IO UInt32 := do
     ← stress h vecDeref (vecDerefInputs h) (sites vecDeref.func) verbose,
     ← stress h stateOrPanic
         (stateInputs h (((sites stateOrPanic.func)[0]?.map (·.2.store)).getD h.store))
-        (sites stateOrPanic.func) verbose]
+        (sites stateOrPanic.func) verbose,
+    ← stress h u128From (u128FromInputs h) (sites u128From.func) verbose,
+    ← stress h ftTotalSupply (ftTotalSupplyInputs h) (sites ftTotalSupply.func) verbose,
+    ← stress h resultExpect
+        (expectInputs h (((sites stateOrPanic.func)[0]?.map (·.2.store)).getD h.store))
+        (sites resultExpect.func) verbose]
   pure (if results.all id then 0 else 1)

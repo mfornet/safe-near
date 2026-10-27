@@ -82,6 +82,21 @@ tends to come back in another place.
 - **Test added:** the generated inputs start from a store captured inside a
   method; the probe from the fresh store must fail.
 
+### 5. `Result::expect` on `Err` needs the error's representation
+
+- **Statement:** `Harness.resultExpect`: on `Err`, the call panics.
+- **Truth:** `unwrap_failed` formats the error value through its `Debug`
+  impl, which follows the pointer in the payload; with arbitrary bytes the
+  call traps out of bounds instead.
+- **Caught by:** harness (generated `Err` inputs trapped).
+- **Root cause:** the `Err` payload was treated as opaque bytes, but its
+  meaning depends on the error type `E`.
+- **Sweep:** the contract now covers `Ok` only, which is all
+  `ft_total_supply`'s path reaches (`to_vec` of a `U128` never fails); every
+  later contract with a generic payload states its representation
+  predicate (M4/M5) before covering the error path.
+- **Test added:** a probe with a garbage error.
+
 ## Agent results
 
 Success and failure per task type and model (section 11.2 of the plan), used
