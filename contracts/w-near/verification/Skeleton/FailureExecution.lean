@@ -2,7 +2,9 @@ import Skeleton.Execution
 import Skeleton.InputFailure
 import Skeleton.Fuel
 import Skeleton.Model
+import Skeleton.Costs
 import NearRuntime.Refinement
+import NearRuntime.InitialCredits
 
 /-!
 # Early input failure through actual VM startup
@@ -152,5 +154,101 @@ theorem execOn_matches_input_too_long
   rw [hmethod, hr]
   apply Near.Boundary.observe_matches_abort
   exact ⟨.hostError (.guestPanic "input: register size exceeded"), hf.1, rfl, hf.2.1⟩
+
+private theorem executionActive_extCosts (cfg : RuntimeConfig) (ctx : VMContext) (raw : Storage) :
+    (executionActive cfg ctx raw).extCosts = cfg.wasm.extCosts := by
+  have hf := congrArg NearState.extCosts
+    (MeteredHosts.applyCharges_frame (ctx.toNearState cfg raw) (loadingCharges 0) loading_burnsOnly)
+  simpa only [executionActive, executionLoaded, chargeHost, VMContext.toNearState] using hf
+
+theorem inputFailureAttemptBudget_eq (cfg : RuntimeConfig) (ctx : VMContext) (raw : Storage)
+    (rest : Nat) : inputFailureAttemptBudget cfg ctx raw rest = inputFailureCost cfg + rest := by
+  simp only [inputFailureAttemptBudget, inputFailureBudget, MeteredHosts.Input.cost,
+    executionStore, initialized_host, executionActive_extCosts, VMContext.toNearState,
+    loadingCharges, MeteredHosts.burnSum, MeteredHosts.burnCost, List.map_cons, List.map_nil,
+    List.sum_cons, List.sum_nil, Nat.mul_zero, Nat.mul_one, Nat.zero_add, Nat.add_zero, inputFailureCost]
+  omega
+
+/-- The concrete failure bound directly supplies the boundary's initial gas
+credits. Both prepaid and burn limits remain represented in `gasLimit`. -/
+theorem execOn_matches_input_too_long_of_gasLimit
+    (gasBound : NearInterface.Context → Option Storage → Unit → Nat)
+    (ctx : NearInterface.Context) (raw : Storage) (st : Option Storage)
+    (hmethod : ctx.method = "save") (hprepare : PreparationLimits ctx.protocol)
+    (hinput : ctx.protocol.wasm.limits.maxRegisterSize < ctx.args.length)
+    (hgas : inputFailureCost ctx.protocol ≤ ctx.gasLimit) :
+    NearInterface.Matches (model gasBound) ctx raw.toFinset
+      (Near.Boundary.execOn code raw ctx) (modelStep ctx st ()) := by
+  apply execOn_matches_input_too_long gasBound ctx raw st 0 hmethod hprepare hinput
+  apply (Near.Boundary.initial_credits_iff ctx raw _).mpr
+  simpa only [inputFailureAttemptBudget_eq, Nat.add_zero] using hgas
+
+/-- The early failure's burnt gas is bounded together with its functional
+contract, including loading and activation, rather than by a measured run. -/
+theorem inputFailureOutcome_burnt_le (cfg : RuntimeConfig) (ctx : VMContext) (raw : Storage)
+    (rest : Nat) (hinput : cfg.wasm.limits.maxRegisterSize < ctx.input.length)
+    (hcredits : (ctx.toNearState cfg raw).gas.Credits (inputFailureAttemptBudget cfg ctx raw rest)) :
+    (inputFailureOutcome cfg ctx raw).burntGas ≤ inputFailureCost cfg + rest := by
+  let budget := inputFailureBudget cfg.wasm (executionStore cfg ctx raw) rest
+  have hl := MeteredHosts.applyCharges_credits (ctx.toNearState cfg raw) (loadingCharges 0)
+    (8 * cfg.wasm.regularOpCost + budget) loading_burnsOnly hcredits
+  have hload : (executionLoaded cfg ctx raw).gas.burnt =
+      MeteredHosts.burnSum cfg.wasm.extCosts (loadingCharges 0) := by
+    simpa only [executionLoaded, VMContext.toNearState, Nat.zero_add] using hl.2.1
+  have ha := GasCounter.burn_credits (executionLoaded cfg ctx raw).gas
+    (8 * cfg.wasm.regularOpCost) budget (by simpa only [executionLoaded] using hl.2.2.2.2)
+  have hactive : (executionActive cfg ctx raw).gas.burnt =
+      (executionLoaded cfg ctx raw).gas.burnt + 8 * cfg.wasm.regularOpCost := by
+    simpa only [executionActive, chargeHost] using ha.2.1
+  have hi : (executionActive cfg ctx raw).gas.Credits budget := by
+    simpa only [executionActive, chargeHost] using ha.2.2.2
+  have hlimit : withinLimit (executionStore cfg ctx raw).host.config.maxRegisterLen
+      (executionStore cfg ctx raw).host.context.input.length = false := by
+    simp only [executionStore, initialized_host, executionActive_config, executionActive_input]
+    simp [VMContext.toNearState, withinLimit, Nat.not_le_of_gt hinput]
+  have hw := wp_save_input_too_long cfg (executionStore cfg ctx raw) execLimits rest
+    (by rfl) (by rfl) hlimit hi
+  obtain ⟨_, hp, _⟩ := hw.result
+  have hb := hw.burnt_le
+  rw [hp.2.1] at hb
+  simp only [StepResult.host, atCode, executionStore, initialized_host] at hb
+  have he := inputFailure_error cfg.wasm (executionStore cfg ctx raw)
+    (executionActive_fresh cfg ctx raw).1 (executionActive_fresh cfg ctx raw).2.1
+  have htotal := inputFailureAttemptBudget_eq cfg ctx raw rest
+  change MeteredHosts.burnSum cfg.wasm.extCosts (loadingCharges 0) +
+    (8 * cfg.wasm.regularOpCost + budget) = inputFailureCost cfg + rest at htotal
+  simp only [inputFailureOutcome, outcomeOfExecution, StepResult.host, he]
+  change (inputFailureStore cfg.wasm (executionStore cfg ctx raw)).host.gas.burnt ≤ _
+  change (inputFailureStore cfg.wasm (executionStore cfg ctx raw)).host.gas.burnt ≤
+    (executionActive cfg ctx raw).gas.burnt + budget at hb
+  omega
+
+/-- The receipt-level failure branch satisfies both model matching and its
+symbolic used-gas bound, whenever the two actual gas limits cover that cost. -/
+theorem execOn_input_failure_bounded
+    (gasBound : NearInterface.Context → Option Storage → Unit → Nat)
+    (ctx : NearInterface.Context) (raw : Storage) (st : Option Storage)
+    (hmethod : ctx.method = "save") (hprepare : PreparationLimits ctx.protocol)
+    (hinput : ctx.protocol.wasm.limits.maxRegisterSize < ctx.args.length)
+    (hgas : inputFailureCost ctx.protocol ≤ ctx.gasLimit) :
+    NearInterface.Matches (model gasBound) ctx raw.toFinset
+      (Near.Boundary.execOn code raw ctx) (modelStep ctx st ()) ∧
+    (Near.Boundary.execOn code raw ctx).usedGas ≤ inputFailureCost ctx.protocol := by
+  constructor
+  · exact execOn_matches_input_too_long_of_gasLimit gasBound ctx raw st hmethod hprepare hinput hgas
+  · have hc : ((Near.Boundary.toVMContext ctx).toNearState ctx.protocol raw).gas.Credits
+        (inputFailureAttemptBudget ctx.protocol (Near.Boundary.toVMContext ctx) raw 0) := by
+      apply (Near.Boundary.initial_credits_iff ctx raw _).mpr
+      simpa only [inputFailureAttemptBudget_eq, Nat.add_zero] using hgas
+    have hr := run_save_input_too_long_public ctx.protocol (Near.Boundary.toVMContext ctx) raw
+      0 hprepare hinput hc
+    have hb := inputFailureOutcome_burnt_le ctx.protocol (Near.Boundary.toVMContext ctx) raw 0 hinput hc
+    have hf := inputFailureOutcome_fields ctx.protocol (Near.Boundary.toVMContext ctx) raw
+    unfold Near.Boundary.execOn
+    simp only [show code.code.decodeIssue = none by rfl]
+    change (Near.Boundary.observe ctx raw
+      (run ctx.protocol module 0 ctx.method (Near.Boundary.toVMContext ctx) raw) _ _).usedGas ≤ _
+    rw [hmethod, hr]
+    simpa only [Near.Boundary.observe, hf.1, Nat.add_zero] using hb
 
 end WNear.Skeleton

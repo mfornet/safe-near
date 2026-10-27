@@ -1,4 +1,5 @@
 import Skeleton.Model
+import Skeleton.Costs
 
 /-!
 # Executable M2 validation
@@ -123,6 +124,33 @@ private def validateLimits (cfg : RuntimeConfig) : IO Unit := do
     check s!"{label}: expected log prefix" (r.logs == logs)
     IO.println s!"ok: forced {label} limit: {repr r.outcome}"
 
+/-- The proved early-failure cost is checked independently of input length,
+with exact and insufficient burn budgets while prepaid gas stays fixed. -/
+private def validateInputFailureCost (cfg : RuntimeConfig) : IO Unit := do
+  let limited := { cfg with wasm := { cfg.wasm with
+    limits := { cfg.wasm.limits with maxRegisterSize := 1 } } }
+  let cost := inputFailureCost limited
+  for size in [2, 5, 4096] do
+    let ctx ← context limited [] (List.replicate size 97)
+    let result := Near.Boundary.execOn code [] ctx
+    check s!"input failure/{size}: exact symbolic cost" (result.burntGas == cost && result.usedGas == cost)
+    check s!"input failure/{size}: independent model" (modelCheck ctx [] result)
+    check s!"input failure/{size}: rollback and no logs" (rolledBack ctx [] result && result.logs.isEmpty)
+    let exact := { ctx with protocol := { limited with wasm := { limited.wasm with
+      limits := { limited.wasm.limits with maxGasBurnt := cost } } } }
+    let atCost := Near.Boundary.execOn code [] exact
+    check s!"input failure/{size}: exact budget retains panic"
+      (match atCost.outcome with
+        | .error (.panic msg) => msg == "input: register size exceeded"
+        | _ => false)
+    let small := { exact with protocol := { exact.protocol with wasm := { exact.protocol.wasm with
+      limits := { exact.protocol.wasm.limits with maxGasBurnt := cost - 1 } } } }
+    let below := Near.Boundary.execOn code [] small
+    check s!"input failure/{size}: smaller budget gas failure"
+      ((match below.outcome with | .error .outOfGas => true | _ => false) &&
+        rolledBack small [] below && below.logs.isEmpty)
+  IO.println s!"ok: input-size failure symbolic cost {cost}: three lengths, exact/smaller burn budgets"
+
 /-- This pins an observed interpreter limitation, not a nearcore behavior. -/
 private def validateKnownLimitGap (cfg : RuntimeConfig) : IO Unit := do
   let limited := { cfg with wasm := { cfg.wasm with
@@ -150,5 +178,7 @@ def main : IO Unit := do
   WNear.Skeleton.validate cfg "replace/grow" [(b "k", b "x"), (b "other", b "retained")] (b "a longer value")
 
   WNear.Skeleton.validateLimits cfg
+
+  WNear.Skeleton.validateInputFailureCost cfg
 
   WNear.Skeleton.validateKnownLimitGap cfg
