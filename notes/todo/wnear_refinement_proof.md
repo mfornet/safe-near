@@ -379,7 +379,8 @@ that removes the risk of getting stuck on the glue at the end.
 | Trie access-count bounds | `NearInterface/TrieWalkCost.lean` | Kernel checked actual parser rejects empty extensions; successful lookup touches at most twice byte key length plus terminal node and optional value, with no witness-shape premise |
 | Original-context sufficient-gas matching | `Skeleton/SuccessCost.lean` | Exact loading/opcode/four-host cost includes return-data receipt fees; original gasLimit gives credits, matching and used-gas bound without a stake/read-width premise |
 | Symbolic empty-storage cost and total success gas | `Skeleton/{EmptyCost,SuccessGas}.lean` | Original-cost-table formula and used-gas bound with retained credits, loading, activation and receipt observation kernel checked; universal model bound remains open |
-| Unrestricted `Refines` and canonical all-resource assembly | — | Open; general canonical accepted-resource and empty-base all-resource pointwise clauses checked; node/proof/native/pin obligations and SAF-67 remain |
+| General canonical all-resource refinement | `Skeleton/{CanonicalInputFailures,CanonicalOutputFailures,CanonicalFailureBounded,CanonicalArithmetic,CanonicalAllLimits}.lean` | Every pointwise refinement clause for arbitrary canonical storage and all resource/stake branches; no per-call prospective usage-room or accepting-limit premise; static protocol growth/read bounds, preparation, node exclusion and actual proof acceptance explicit |
+| Unrestricted `Refines` | — | Open; all-resource general canonical pointwise clauses now checked; node/proof/protocol certificate obligations and SAF-67 remain |
 
 The walking module uses `input`, `storage_write`, `log_utf8` and
 `value_return` through the actual NEAR metered runtime and receipt boundary.
@@ -389,17 +390,15 @@ exact deterministic resource failures, invalid methods, storage-stake rollback,
 and log prefixes. Neither those tests nor a parameterized `ContractModel`
 constitute a universal refinement proof.
 
-**Frontier:** extend the general canonical accepted-resource result to every
-resource-rejection branch, then discharge the explicit native/read-cost and
-preparation premises for the pinned protocol. Repair the recorded-proof-size
-input contract (SAF-67) and resolve reserved-zero node exclusion without a
-silently added cryptographic or WF assumption. General canonical raw agreement,
-full metered storage, context-only gas bounds, funded-reference model adequacy,
-startup/body/receipt replay and all pointwise refinement clauses are checked for
-accepted-resource calls. Empty-base calls already cover every resource branch.
-The immutable guest context, including `NearContext.prepaidGas`, stays fixed
-when auxiliary internal gas limits are enlarged. Deployed wNEAR method proofs
-and unrestricted `Refines` remain beyond these checked walking-module slices.
+**Frontier:** certify the preparation, read-cost and growth bounds for the
+pinned protocol; repair the recorded-proof-size input contract (SAF-67); resolve
+reserved-zero node exclusion without an added cryptographic or WF assumption.
+Actual canonical raw agreement, complete metered writes, context-only gas
+bounds, fixed-context funded references, body/receipt replay and every pointwise
+refinement clause now cover all resource branches over general canonical
+storage. Native write room is derived from shared WF and a protocol-only growth
+bound exactly where value validation accepts. Deployed wNEAR method contracts
+(M3) and unrestricted `Refines` remain beyond this walking-module result.
 
 Prepared validation and instantiation now cover arbitrary positive configured
 memory sizes within the Wasm limit. `Memory` proves the exact key/log byte reads
@@ -445,8 +444,8 @@ resource and stake branch. Its finite-set bridge is the actual RuntimeInterface;
 `sufficientGasModel` chooses the proved cost as its gas field and supplies the
 exact sufficient-gas implication for this explicitly restricted slice. The
 lower-gas alternative is now assembled below. The canonical cost bound and
-accepted-resource result are checked below; all-resource canonical assembly
-remains open.
+all-resource pointwise result are checked below; unrestricted refinement
+still needs the explicit node, proof and protocol obligations discharged.
 `ModelSafety` proves matched model branches cannot report interpreter limitations.
 `InvalidMethod`
 closes the complete unparsed-input clause without WF or gas hypotheses.
@@ -542,13 +541,23 @@ and used gas at most `saveCost`, including startup. `CanonicalRefinement` assemb
 every pointwise `Refines` clause for the exact finite-set runtime on this
 accepted-resource canonical slice.
 
-This general result retains explicit `NonzeroNodes`, preparation, native usage
-and read-cost room, and recorded-proof acceptance on the **actual fetched plan's
-staged write**, including warmed accounting/cache state. The arbitrary proof
-observer is not assumed invariant under reads. General canonical resource-rejection
-branches still need their high-reference/model and gas-bound assembly; the
-empty-base theorem already covers all such branches. Shared WF and operational
-runtime behavior were not changed to make these premises true.
+`CanonicalInputFailures`, `CanonicalOutputFailures` and
+`CanonicalFailureBounded` now extend actual funded-model agreement and the
+original gas bound across every resource rejection on general canonical storage.
+`CanonicalAllLimits.nearRuntime_refinement_clauses` assembles every pointwise
+`Refines` clause without an accepting-resource, empty-base or selected-key
+premise. `CanonicalArithmetic.GrowthRoom` is the protocol-only inequality
+`1 + maxLengthStorageValue + numExtraBytesRecord ≤ maxGasBurnt`.
+Shared WF and this inequality derive native usage room only in the final
+accepted-value branch, so huge inputs rejected earlier need no prospective
+write-room assumption.
+
+The strongest result retains explicit `NonzeroNodes`, preparation, protocol
+read-cost/growth bounds and recorded-proof acceptance on the **actual fetched
+plan's staged write**, including warmed accounting/cache state. The arbitrary
+proof observer is not assumed invariant under reads. Shared WF and operational
+runtime behavior were not changed to make these premises true; the protocol
+inequalities were not claimed as kernel-certified facts of the opaque JSON pin.
 
 A substantive premise correction was necessary: old `Context.WF` admitted
 duplicate overlay keys and therefore actual `executionIssue` counterexamples
@@ -603,18 +612,19 @@ pins this observed limitation explicitly. Register-size limits are enforced.
 This does not affect the default configuration's one-register example, but
 must not be described as nearcore conformance for arbitrary register limits.
 
-Validation for this checkpoint (2026-10-27): 125 proof modules were checked
-transitively for axioms (5323 declarations, 3835 theorems, zero violations).
+Validation for this checkpoint (2026-10-27): 130 proof modules were checked
+transitively for axioms (5336 declarations, 3836 theorems, zero violations).
 Standard Lake builds, the walking-skeleton checks, and blueprint
-extraction/rendering pass. The full wNEAR audit covers 124 modules, 6156
-declarations and 3367 theorems, permitting exactly the original refinement
+extraction/rendering pass. The full wNEAR audit covers 129 modules, 6244
+declarations and 3443 theorems, permitting exactly the original refinement
 module's open proof and its two dependent theorems. After merging latest main (including the Lean LSP skill and new stress
 cases), all 56 differential scenarios pass. The earlier unchanged operational
 baseline has all five builtin harness contracts and 211 adapter checks passing;
 those two suites were not rerun. Lean LSP MCP diagnostics and axiom verification
 pass for the startup, checked receipt replay and canonical reference lookup
 theorems, including general canonical metered/body execution, model
-observations, original-context gas bounds and pointwise refinement clauses.
+observations, original-context gas bounds and all-resource canonical pointwise
+refinement clauses, with protocol growth replacing per-call write room.
 Both audits include this increment. The 56-scenario result is
 from the preceding synced-main checkpoint; no runtime behavior changed here.
 
@@ -650,6 +660,37 @@ the contract shape of 3.2, the first representation predicates and the
 first automation.
 
 *Exit:* one exported method's `Refines` clauses proved with no `sorry`.
+
+Verified next deployed-code targets (2026-10-27, read-only inspection; no
+semantic contract is yet claimed proved): `ft_total_supply` exports function
+296, whose direct callees are 522, 520, 219, 155, 414, 96, 158, 779, 545,
+and 68 twice. Function 414 calls only 566. Function 566 has type
+`[i32, i64, i64] → []` and six instructions: store argument 2 at output+8,
+then argument 1 at output. It has no calls or global accesses. Its next
+contract should own a writable 16-byte output region, specify both
+little-endian stores and the outside-memory frame, normal void completion,
+and exact gas/residual credits. Validate it with the internal-function
+harness before the semantic proof. Existing captures cover only 951–954 and
+310, so 566/414/779 have no captured contracts yet.
+
+The first needed logic rule is an in-bounds metered `i64.store` with a memory
+frame; current metered rules cover constants/locals and existing memory rules
+are unmetered. After 566, compose 414's stack window and call. Function 779
+has sequential loads/stores, so its contract must retain aliasing semantics
+unless a caller-supported separation premise excludes overlap. The state-read
+path uses `STATE` at address 1049788; SDK vtable dispatch, Borsh decoding,
+JSON formatting and `value_return` remain real obligations of the top-level
+getter.
+
+Actual `__multi3` (global index 954, local function 906, type index 8) is
+another validated builtin frontier: 60 straight-line instructions, no calls
+or loops, two i64 stores. The existing harness checks its modulo-2^128 product
+contract and 80 regular-operation units (20 activation + 60 body; caller call
+opcode separate). Kernel proof is still required: first symbolic execution,
+footprint and exact gas, then the 32-bit limb/carry arithmetic connecting
+its stored words to multiplication. These are executable/code facts and
+proof targets, not a completed metered function contract.
+
 
 ### M4. The Rust runtime layer
 
