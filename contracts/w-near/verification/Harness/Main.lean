@@ -1,4 +1,5 @@
 import Harness.Builtins
+import Harness.StorePair
 import Wasm.Binary
 
 /-!
@@ -280,18 +281,35 @@ def stress (h : Harness) (c : Contract α) (gen : Rng → Except String (List (I
 
 def main (args : List String) : IO UInt32 := do
   let verbose := args.contains "-v"
+  let pairOnly := args.contains "--store-pair-only"
   let protocol ← RuntimeConfig.load "../../../near-lean/vm/configs" RuntimeConfig.latestVersion
   let bytes ← IO.FS.readBinFile "../contract.wasm"
   let module ← match Wasm.Binary.decode bytes with
     | .ok m => pure m
     | .error e => throw (IO.userError e.message)
   let h ← orThrow (Harness.load protocol module internalContext [])
-  let captured ← captureAll protocol module bytes.size [memcpy.func, memset.func, bcmp.func, multi3.func, alloc.func]
+  let captured ← captureAll protocol module bytes.size (if pairOnly then [storePair.func] else [memcpy.func, memset.func, bcmp.func, multi3.func, alloc.func, storePair.func])
   let sites (f : Nat) := captured.getD f #[]
-  let results := [
+  let pairSites := (sites storePair.func).filter (fun (method, _) => method == "ft_total_supply")
+  if pairSites.isEmpty then throw (IO.userError "f566: ft_total_supply produced no captured call")
+  if !(pairSites.any fun (_, e) => u64Arg e.args 1 != 0 || u64Arg e.args 2 != 0) then
+    throw (IO.userError "f566: ft_total_supply capture has no representative nonzero supply")
+  for (_, e) in pairSites do
+    IO.println s!"f566 ft_total_supply capture: out={u32Arg e.args 0}, low={u64Arg e.args 1}, high={u64Arg e.args 2}"
+  match h.store.funcs[h.inst.funcAddrs[storePair.func]!]? with
+  | some (.wasm ty _ code) =>
+    IO.println s!"f566: type={repr ty}, locals={code.locals.length}, actual body instructions={code.body.length}, activation units={activationGas 1 #[.i32 0, .i64 0, .i64 0]}"
+    if code.body.length != 6 || !code.locals.isEmpty then throw (IO.userError "f566: unexpected actual body shape")
+  | _ => throw (IO.userError "f566 is not a Wasm function")
+  for i in storePairTypeProbes h do
+    if (storePair.pre h i).isNone then throw (IO.userError s!"f566 malformed precondition accepted: {i.label}")
+  let sample := h.call h.store storePair.func [i32 3, i64 1, i64 2]
+  IO.println s!"f566 measured gas={sample.gas}, regular_op_cost={protocol.wasm.regularOpCost}, measured units={sample.gas / protocol.wasm.regularOpCost}; 6 malformed argument prechecks, 3 executable memory probes"
+  let pairResult ← stress h storePair (fun _ => storePairInputs h) (sites storePair.func) verbose
+  let results ← if pairOnly then pure [pairResult] else pure [
     ← stress h memcpy (memcpyInputs h) (sites memcpy.func) verbose,
     ← stress h memset (memsetInputs h) (sites memset.func) verbose,
     ← stress h bcmp (bcmpInputs h) (sites bcmp.func) verbose,
     ← stress h multi3 (multi3Inputs h) (sites multi3.func) verbose,
-    ← stress h alloc (allocInputs h) (sites alloc.func) verbose]
+    ← stress h alloc (allocInputs h) (sites alloc.func) verbose, pairResult]
   pure (if results.all id then 0 else 1)
