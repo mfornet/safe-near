@@ -1,6 +1,7 @@
 import Harness.Builtins
 import Harness.StorePair
 import Harness.StorePairCaller
+import Harness.PackWords
 import Wasm.Binary
 
 /-!
@@ -280,8 +281,27 @@ def stress (h : Harness) (c : Contract α) (gen : Rng → Except String (List (I
       | none => t := t.add (c.check h i) (captured := true)
   report c.name c.func t verbose
 
+/-- Validate actual f779 metadata and exported-path call sites before stress tests. -/
+def checkPackWords (h : Harness) (captured : Array (String × Entry)) (verbose : Bool) : IO Bool := do
+  let sites := captured.filter (fun (method, _) => method == "ft_total_supply")
+  if sites.isEmpty then throw (IO.userError "f779: no ft_total_supply capture")
+  for i in packWordsTypeProbes h do
+    if (packWords.pre h i).isNone then
+      throw (IO.userError s!"f779 malformed precondition accepted: {i.label}")
+  match h.store.funcs[h.inst.funcAddrs[packWords.func]!]? with
+  | some (.wasm ty _ code) =>
+    IO.println s!"f779: type={repr ty}, locals={code.locals.length}, actual body instructions={code.body.length}, activation units={activationGas 1 #[.i32 0, .i32 0]}"
+    if code.body.length != 8 || !code.locals.isEmpty then
+      throw (IO.userError "f779: unexpected actual body shape")
+  | _ => throw (IO.userError "f779 is not a Wasm function")
+  for (_, e) in sites do
+    let measured := h.call e.store packWords.func e.args
+    IO.println s!"f779 ft_total_supply capture: out={u32Arg e.args 0}, src={u32Arg e.args 1}, measured units={measured.gas / h.cfg.wasm.regularOpCost}"
+  stress h packWords (fun _ => packWordsInputs h) captured verbose
+
 def main (args : List String) : IO UInt32 := do
   let verbose := args.contains "-v"
+  let packOnly := args.contains "--pack-words-only"
   let pairOnly := args.contains "--store-pair-only"
   let callerOnly := args.contains "--store-pair-caller-only"
   let protocol ← RuntimeConfig.load "../../../near-lean/vm/configs" RuntimeConfig.latestVersion
@@ -290,8 +310,11 @@ def main (args : List String) : IO UInt32 := do
     | .ok m => pure m
     | .error e => throw (IO.userError e.message)
   let h ← orThrow (Harness.load protocol module internalContext [])
-  let captured ← captureAll protocol module bytes.size (if pairOnly || callerOnly then [storePair.func, storePairCaller.func] else [memcpy.func, memset.func, bcmp.func, multi3.func, alloc.func, storePair.func, storePairCaller.func])
+  let captured ← captureAll protocol module bytes.size (if packOnly then [packWords.func] else if pairOnly || callerOnly then [storePair.func, storePairCaller.func] else [memcpy.func, memset.func, bcmp.func, multi3.func, alloc.func, storePair.func, storePairCaller.func, packWords.func])
   let sites (f : Nat) := captured.getD f #[]
+  if packOnly then
+    return if ← checkPackWords h (sites packWords.func) verbose then 0 else 1
+  let packResult ← if pairOnly || callerOnly then pure true else checkPackWords h (sites packWords.func) verbose
   let pairSites := (sites storePair.func).filter (fun (method, _) => method == "ft_total_supply")
   if pairSites.isEmpty then throw (IO.userError "f566: ft_total_supply produced no captured call")
   if !(pairSites.any fun (_, e) => u64Arg e.args 1 != 0 || u64Arg e.args 2 != 0) then
@@ -330,5 +353,5 @@ def main (args : List String) : IO UInt32 := do
     ← stress h memset (memsetInputs h) (sites memset.func) verbose,
     ← stress h bcmp (bcmpInputs h) (sites bcmp.func) verbose,
     ← stress h multi3 (multi3Inputs h) (sites multi3.func) verbose,
-    ← stress h alloc (allocInputs h) (sites alloc.func) verbose, pairResult, callerResult]
+    ← stress h alloc (allocInputs h) (sites alloc.func) verbose, pairResult, callerResult, packResult]
   pure (if results.all id then 0 else 1)
