@@ -60,3 +60,12 @@ name = "Differential"
 [[lean_exe]]
 name = "wnear-scenarios"
 root = "Differential.Main"
+
+# The internal-function harness (milestone M1 of notes/todo/wnear_refinement_proof.md):
+# runs one function of the binary from a prepared store and checks its contract.
+[[lean_lib]]
+name = "Harness"
+
+[[lean_exe]]
+name = "wnear-harness"
+root = "Harness.Main"

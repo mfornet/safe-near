@@ -270,6 +270,42 @@ allocation, a u128 operation) to fix its interface.
 *Exit:* a contract can be stated and stressed in both directions before
 anyone proves it.
 
+*Status: done.* `just wnear-harness` (`contracts/w-near/verification/Harness/`).
+`Harness.load` instantiates the binary as `runAttempt` does, `Harness.call`
+runs one function by its Wasm index from a prepared store with
+`runInitialized`'s charging, and `Harness.capture` records the store and
+arguments at every entry into chosen functions while a method runs (the
+`call` and `call_indirect` targets, resolved through the table). A
+`Contract α` (`Harness/Contract.lean`) gives `pre`, `footprint`, `post`,
+`cost`, a stack window and ghost data `α`; `Contract.check` also checks that
+nothing outside the footprint changed, every global is restored, the host
+state changed only in gas, and the burnt gas is at most `cost`. Each
+contract gets border and random inputs (which must satisfy `pre`), inputs
+captured from twelve method calls (which must satisfy `pre`: otherwise it is
+too strong for a caller) and probes outside `pre` (on which a check must
+fail: each clause is needed).
+
+First contracts (`Harness/Builtins.lean`): `memcpy`, `memset`, `bcmp`,
+`__multi3`, with costs that match the burnt gas exactly on every input, and
+`__rust_alloc` with live allocations as ghost (result aligned, in the heap,
+disjoint from every live block, no live block changed). Its cost is
+provisional and loose (up to 9x): fixed work plus a bound per free cell, to
+be replaced in M4. What we learnt:
+
+- Costs can be stated exactly, from a count of the body under
+  `runMetered`'s rules (activation, one per instruction, one more per loop
+  back-edge, nothing for `block`). The harness caught two miscounts
+  (misstatement log, 1 and 2), so every cost is stated from a count and
+  checked, never from a guess.
+- `memcpy`'s forward loop is also right for overlapping ranges with
+  `dst < src`; the contract still requires disjoint ranges, which is what
+  Rust's callers guarantee.
+- `bcmp` stops at the first difference, so it reads past memory's end
+  without trapping when an earlier pair differs; its precondition asks for
+  both ranges in memory all the same.
+- The prepared memory is the protocol's initial size (1024 pages), not the
+  binary's 17.
+
 ### M2. Walking skeleton
 
 The whole chain from a contract to `Refines`, on a tiny test module with
