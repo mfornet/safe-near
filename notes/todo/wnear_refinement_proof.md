@@ -857,6 +857,63 @@ its stored words to multiplication. These are executable/code facts and
 proof targets, not a completed metered function contract.
 
 
+Latest M3 checkpoint: the actual accepted f155 `unwrapState` call is now
+proved through its real f951 byte-copy loop, typed result and final drop.
+The positive-count f951 call costs `(18*n + 17)` operation units and takes
+`17*n + 12` steps, including caller opcode, activation and return; at forty
+bytes this is 737 units / 692 steps. Root invocation costs 736 units and
+requires exactly 691 steps. f155's complete local call costs 754 units /
+702 steps (root 753 / 701). All source/output aliasing follows sequential
+forward reads/writes. Native bounds, width, nonzero state tag, installed code
+and depth remain structural premises. The executable unwrap suite passes 244
+inputs including an initialized getter capture, five ABI prechecks and three
+executed failure probes; exact fuel-boundary probes pass for both functions.
+
+`TotalSupplyFrontier` now integrates four actual helpers and contains exactly
+seven remaining local execution contracts: panic hook 522, interface setup 520,
+state read 219, serialization 96, value return 545 and two vector drops 68. Its
+helper resources contain no execution callbacks. Actual entry/body/return and
+original-store gas bounds remain proved under that reduced interface.
+`UnwrapStateCopy{State,Memory,Gas,Effects}` prove residual credits, exact loop
+burn/reservations, unchanged caller/resource frames, the sequential memory
+footprint and original-word preservation for disjoint ranges.
+`UnwrapStateEffects` and `TotalSupplyRepresentation` derive the unwrapped,
+copied and serializer-input U128 representations from the actual memory
+operations, including wrapping pointer arithmetic.
+
+The actual ten-instruction f456 dispatch fragment is now composed through
+its real table call, f260 host method and saved-caller return: 24 ordinary
+units plus concrete host fees, fourteen steps. Its seven captured-state tests
+pass exact bytes, gas, memory and caller stack/frame checks. The loaded-code
+bridge derives both Wasm/host descriptors and the original type vector;
+table entry and memory-layout facts remain explicit. Kernel facts pin the
+actual data word at vtable 1050188+92 to table index 58 and the active element
+entry to f260; these are source facts, not an instantiation success theorem.
+
+The real f430 nonnull path, f433 zero-status cleanup, f672 word swap and
+f431 release through its nested f672 call now have normal-path proofs.
+They retain resource frames and exact ordinary charges; f433 restores any
+wrapping stack pointer. Reproducible validation covers 1262 captures across
+six borrow helpers plus eight boundary fixtures. f429/f494 acquisition,
+thread-local entry and the enclosing f456/f545 assembly remain open.
+
+`Wasm.ValidateCertificate` factors the actual validator into static prelude
+and per-function checks with kernel-checked composition. f566 has the first
+bounded actual function-check certificate. Static type/import/function-table,
+initializer and export checks are now certified independently of function
+bodies and data payloads in `Binary.ValidationPrelude`. Whole-prelude assembly and the remaining 906 body
+certificates remain open. A resource-heavy assembly candidate was removed;
+its result is not accepted as a validation certificate.
+
+This checkpoint uses the synced Lean LSP MCP skill for proof iteration.
+The final strict transitive audit covers 204 modules, 7942 declarations and
+5876 theorems with zero axiom violations. The normal Lake build passes 1347
+jobs; blueprint extraction and rendering pass after 1468 build jobs.
+The full working-tree audit covers 190 modules, 8286 declarations
+and 4981 theorems, with exactly the original three refinement-dependent
+`sorryAx` declarations and no additional violations. All new principal proofs
+use only standard axioms; no operational runtime/model/WF changes are included.
+
 ### M4. The Rust runtime layer
 
 The shadow stack, wee_alloc (its free lists and growing memory through
