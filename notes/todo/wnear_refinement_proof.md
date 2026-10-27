@@ -333,7 +333,7 @@ that removes the risk of getting stuck on the glue at the end.
 | Constants, locals and a symbolic constant-return program | `NearVM/MeteredRules.lean` | Kernel checked, including exact gas and memory preservation |
 | Direct host calls and a symbolic metered `input` caller | `NearVM/MeteredCall.lean` | Kernel checked, including opcode and host costs |
 | Boundary success, abort, receipt and stake-failure adequacy | `NearRuntime/Refinement.lean` | Kernel checked; assembly retains the method/low-gas premises |
-| Host burn-list credits and storage-write functional core | `NearVM/MeteredHosts/{Charges,Storage}.lean` | Kernel checked; trie/metered storage contract remains open |
+| Host burn-list credits and storage-write functional core | `NearVM/MeteredHosts/{Charges,Storage}.lean` | Kernel checked; full canonical metered contract assembled below under explicit node/proof premises |
 | Metered input and output hosts | `NearVM/MeteredHosts/{Input,Output}.lean` | Kernel checked; concrete `Skeleton/Output` discharges fixed log reads from original memory |
 | Effectful walking module and independent resource-aware model | `Skeleton/{Module,Model}.lean` | Syntax/model facts and checker-to-`Matches` equivalence kernel checked |
 | Walking-module validation, linking and initialization | `Skeleton/Instantiation.lean` | Kernel checked for original and prepared memory (`Prepared`, `Memory`) |
@@ -342,7 +342,7 @@ that removes the risk of getting stuck on the glue at the end.
 | Host-trap call rule and early register-size rejection | `NearVM/MeteredTrap.lean`, `Skeleton/InputFailure.lean` | Kernel checked; exact trap state, gas, resources and fresh-marker classification |
 | Whole successful body | `Skeleton/{Body,Calls,Success}.lean` | Kernel checked; local storage frontier and explicit resources remain |
 | Trie-write metered phases | `NearVM/MeteredHosts/StorageMetered.lean` | Kernel checked from local lookup/dereference/accounting/proof-size obligations |
-| Below-bound run lifting and input/return host compatibility | `NearVM/MeteredPrefix.lean`, `MeteredHosts/{Budget,ReturnBudget}.lean` | Kernel checked; logging, storage and machine compatibility open |
+| Below-bound run lifting and input/return host compatibility | `NearVM/MeteredPrefix.lean`, `MeteredHosts/{Budget,ReturnBudget}.lean` | Kernel checked; logging, storage and machine compatibility assembled below |
 | Reachable overlay representation | `NearInterface/TrieOverlayInvariant.lean`, `NearRuntime/TrieOverlayInvariant.lean`, `Skeleton/OverlayProbe.lean` | Old context premise refuted; corrected uniqueness invariant preserved by actual operations |
 | Overlay lookup/view consistency | `NearInterface/TrieOverlayLookup.lean` | Kernel checked under unique overlay keys; on-disk base agreement remains separate |
 | Actual input-size failure through receipt observation and its symbolic gas bound | `Skeleton/{Costs,FailureExecution}.lean`, `NearRuntime/InitialCredits.lean` | Kernel checked; exact/smaller-budget cost checks pass |
@@ -351,7 +351,7 @@ that removes the risk of getting stuck on the glue at the end.
 | Actual singleton construction and reads | `NearInterface/TrieLeaf.lean` | Kernel checked; lookup keeps the unresolved nonzero-root premise explicit |
 | Metered overlay/empty-base writes and resource frames | `NearVM/MeteredHosts/{StorageOverlay,StorageEmpty,StorageFrame}.lean` | Kernel checked from initial credits and local resources, with no assumed primitive outcomes |
 | Storage representation and usage | `NearInterface/StorageUsage.lean`, `NearVM/StorageRepresentation.lean`, `Skeleton/StorageResources.lean` | Kernel checked through initialized storage entry and computed final storage |
-| Actual pure/input/output/storage machine budget compatibility | `NearVM/{MeteredPureBudget,MeteredHostBudget,MeteredOutputBudget,MeteredStorageBudget}.lean` | Kernel checked direct storage step and metered advance; empty-base readiness/body invariant instantiated below; general canonical storage remains open |
+| Actual pure/input/output/storage machine budget compatibility | `NearVM/{MeteredPureBudget,MeteredHostBudget,MeteredOutputBudget,MeteredStorageBudget}.lean` | Kernel checked direct storage step and metered advance; general canonical readiness/body and receipt assembly instantiated below under explicit node/proof premises |
 | Functional invariant and whole-body gas simulation | `Skeleton/FunctionalInvariant.lean` | Actual continuing resources close; storage readiness derives from original empty-base WF and proof check; concrete StepSimulation and run lifting prove matched-or-gas/prefix with no fuel error, holding guest context fixed; startup and checked-receipt replay assembled below |
 | Concrete phase control and prefix logs | `Skeleton/BudgetSimulation.lean` | All fifteen opcodes and administrative leave dispatched; actual control/stack/installed-host invariant closed; every actual runner prefix preserves shape and log prefix; guest context unchanged by auxiliary internal gas enlargement |
 | Isolated native recorder arithmetic and necessary history | `NearInterface/{TrieRecorder,TrieRecordingHistory}.lean` | Kernel checked; no runtime/WF integration or recorder-fidelity claim |
@@ -371,12 +371,15 @@ that removes the risk of getting stuck on the glue at the end.
 | Model-level lower-gas alternative, accepted resources | `Skeleton/{FundedEmpty,FundedObservation}.lean` | Actual funded reference matches model for either stake outcome; actual execOn matches or returns out-of-gas with rollback and model-log prefix for arbitrary original gas, on the explicit accepted-resource empty-base slice |
 | All-resource pointwise refinement clauses | `Skeleton/{FundedInputFailures,FundedOutputFailures,EmptyRefinement}.lean` | Sufficient-gas matching/bound, arbitrary-gas model-or-gas with rollback/model-log prefix, no execution issue and invalid-call rollback assembled for exact RuntimeInterface, with empty-base/native/proof assumptions explicit |
 | Canonical overlay reads | `NearInterface/TrieCanonicalLookup.lean` | Actual canonical getReference/dereference agree with materialized view; base callback eliminated under canonical build, unique overlays and explicit nonzero-node certificate |
+| Canonical raw storage and usage | `NearInterface/TrieCanonicalStorage.lean`, `NearVM/MeteredHosts/StorageModelUsage.lean` | Actual canonical reads agree with raw storage; arbitrary fresh/replacement post-state storage and usage agree with finite model |
+| General canonical metered write and original costs | `NearInterface/TrieCanonicalCost.lean`, `NearVM/MeteredHosts/{StorageCanonical,StorageCanonicalCost}.lean` | Actual reference/dereference plan derives complete metered write, gas/residual/usage/promises; original-context access, evicted-byte and replacement-register bounds; explicit nonzero nodes/proof check |
+| General canonical body, budget and receipt refinement | `Skeleton/{CanonicalBody,CanonicalCost,CanonicalObservation,CanonicalReady,CanonicalSimulation,CanonicalReceiptSimulation,CanonicalBounded,CanonicalRefinement}.lean` | Accepted-resource calls over arbitrary canonical storage satisfy every pointwise refinement clause, with context-only gas bound, arbitrary original gas, both cell/stake outcomes, and no empty-base/selected-key premise; nonzero/proof/native/preparation remain explicit |
 | Actual external trie charges | `NearVM/MeteredHosts/TrieCost.lean` | Kernel checked original-key bounds for successful reference lookup (2n+1 touches), value dereference (one touch), and their actual metered charges using original prices |
 | Storage-stake acceptance/rejection | `Skeleton/EmptyStakeFailure.lean` | Kernel checked positive-deficit rollback with saved log and matching for both zero/positive cases on the empty-base slice |
 | Trie access-count bounds | `NearInterface/TrieWalkCost.lean` | Kernel checked actual parser rejects empty extensions; successful lookup touches at most twice byte key length plus terminal node and optional value, with no witness-shape premise |
 | Original-context sufficient-gas matching | `Skeleton/SuccessCost.lean` | Exact loading/opcode/four-host cost includes return-data receipt fees; original gasLimit gives credits, matching and used-gas bound without a stake/read-width premise |
 | Symbolic empty-storage cost and total success gas | `Skeleton/{EmptyCost,SuccessGas}.lean` | Original-cost-table formula and used-gas bound with retained credits, loading, activation and receipt observation kernel checked; universal model bound remains open |
-| Universal model gas bound and unrestricted `Refines` | — | Open; pointwise empty-base refinement clauses now checked, SAF-67 also requires statement repair |
+| Unrestricted `Refines` and canonical all-resource assembly | — | Open; general canonical accepted-resource and empty-base all-resource pointwise clauses checked; node/proof/native/pin obligations and SAF-67 remain |
 
 The walking module uses `input`, `storage_write`, `log_utf8` and
 `value_return` through the actual NEAR metered runtime and receipt boundary.
@@ -386,18 +389,17 @@ exact deterministic resource failures, invalid methods, storage-stake rollback,
 and log prefixes. Neither those tests nor a parameterized `ContractModel`
 constitute a universal refinement proof.
 
-**Frontier:** repair the recorded-proof-size input contract and discharge nonempty
-canonical-trie lookup/dereference agreement with raw storage; instantiate
-remaining on-disk storage cases; derive a symbolic cost
-including trie charges and establish its resource conditions. Finish the
-remaining nonempty VM/receipt storage instantiations. For the empty-base slice,
-fund an auxiliary body with only internal counter limits enlarged, prove its
-model adequacy, connect both starts through loading/activation, and transport
-the body matched-or-gas result through receipt observation and rollback before
-assembling `Refines`. The checked counter-level simulation
-may relax prepaid and burn limits, but immutable `NearContext.prepaidGas` seen
-by guest code must stay fixed. Host compatibility is a premise to discharge,
-not an implicit generic monotonicity assumption.
+**Frontier:** extend the general canonical accepted-resource result to every
+resource-rejection branch, then discharge the explicit native/read-cost and
+preparation premises for the pinned protocol. Repair the recorded-proof-size
+input contract (SAF-67) and resolve reserved-zero node exclusion without a
+silently added cryptographic or WF assumption. General canonical raw agreement,
+full metered storage, context-only gas bounds, funded-reference model adequacy,
+startup/body/receipt replay and all pointwise refinement clauses are checked for
+accepted-resource calls. Empty-base calls already cover every resource branch.
+The immutable guest context, including `NearContext.prepaidGas`, stays fixed
+when auxiliary internal gas limits are enlarged. Deployed wNEAR method proofs
+and unrestricted `Refines` remain beyond these checked walking-module slices.
 
 Prepared validation and instantiation now cover arbitrary positive configured
 memory sizes within the Wasm limit. `Memory` proves the exact key/log byte reads
@@ -442,8 +444,9 @@ used-gas bounds, and `EmptyBounded` assembles matching plus that bound for every
 resource and stake branch. Its finite-set bridge is the actual RuntimeInterface;
 `sufficientGasModel` chooses the proved cost as its gas field and supplies the
 exact sufficient-gas implication for this explicitly restricted slice. The
-lower-gas alternative is now assembled below; the universal nonempty-trie gas
-function remains open.
+lower-gas alternative is now assembled below. The canonical cost bound and
+accepted-resource result are checked below; all-resource canonical assembly
+remains open.
 `ModelSafety` proves matched model branches cannot report interpreter limitations.
 `InvalidMethod`
 closes the complete unparsed-input clause without WF or gas hypotheses.
@@ -516,7 +519,36 @@ these branches, so no resource limit is assumed to accept. This is the
 empty-base slice, with original WF/representation, preparation, native usage
 room, read-cost width, absent key and recorded-proof acceptance explicit. The arithmetic premise must eventually
 follow from certified pinned-protocol facts independent of the low context's
-gas. The universal nonempty-trie gas function and recorder repair also remain open.
+gas. Canonical all-resource assembly and recorder repair also remain open.
+
+The canonical specialization now removes both the empty-base and selected-key
+restrictions for accepted-resource calls. `TrieCanonicalStorage` derives exact
+raw-list presence and dereferenced bytes from original WF and canonical reads.
+`StorageCanonical` computes the actual ordered lookup/dereference plan and proves
+both preparation and complete metered writes for fresh and replacing cells.
+`TrieCanonicalCost` bounds cumulative node/value accesses; `StorageCanonicalCost`
+bounds phase charges and the replacement register bill by original-context data.
+`StorageModelUsage` proves final raw storage and model usage for both cell branches.
+
+`CanonicalBody` derives the actual storage frontier and full sixteen-step body WP
+from those facts. `CanonicalCost.saveCost` adds original-account/key node charges,
+evicted-byte charges and replacement-register charges to `saveEmptyCost`; it
+reads no execution, cache or old value. `CanonicalObservation` proves the actual
+funded reference matches the model for either stake outcome. `CanonicalReady`,
+`CanonicalSimulation` and `CanonicalReceiptSimulation` derive arbitrary-gas
+whole-body and actual public receipt replay without empty-base assumptions.
+`CanonicalBounded` proves sufficient original gas gives actual model matching
+and used gas at most `saveCost`, including startup. `CanonicalRefinement` assembles
+every pointwise `Refines` clause for the exact finite-set runtime on this
+accepted-resource canonical slice.
+
+This general result retains explicit `NonzeroNodes`, preparation, native usage
+and read-cost room, and recorded-proof acceptance on the **actual fetched plan's
+staged write**, including warmed accounting/cache state. The arbitrary proof
+observer is not assumed invariant under reads. General canonical resource-rejection
+branches still need their high-reference/model and gas-bound assembly; the
+empty-base theorem already covers all such branches. Shared WF and operational
+runtime behavior were not changed to make these premises true.
 
 A substantive premise correction was necessary: old `Context.WF` admitted
 duplicate overlay keys and therefore actual `executionIssue` counterexamples
@@ -571,18 +603,19 @@ pins this observed limitation explicitly. Register-size limits are enforced.
 This does not affect the default configuration's one-register example, but
 must not be described as nearcore conformance for arbitrary register limits.
 
-Validation for this checkpoint (2026-10-27): 112 proof modules were checked
-transitively for axioms (5079 declarations, 3662 theorems, zero violations).
+Validation for this checkpoint (2026-10-27): 125 proof modules were checked
+transitively for axioms (5323 declarations, 3835 theorems, zero violations).
 Standard Lake builds, the walking-skeleton checks, and blueprint
-extraction/rendering pass. The full wNEAR audit covers 116 modules, 6066
-declarations and 3303 theorems, permitting exactly the original refinement
+extraction/rendering pass. The full wNEAR audit covers 124 modules, 6156
+declarations and 3367 theorems, permitting exactly the original refinement
 module's open proof and its two dependent theorems. After merging latest main (including the Lean LSP skill and new stress
 cases), all 56 differential scenarios pass. The earlier unchanged operational
 baseline has all five builtin harness contracts and 211 adapter checks passing;
 those two suites were not rerun. Lean LSP MCP diagnostics and axiom verification
 pass for the startup, checked receipt replay and canonical reference lookup
-theorems, including all-resource pointwise refinement and full canonical
-overlay reads. Both audits include this increment. The 56-scenario result is
+theorems, including general canonical metered/body execution, model
+observations, original-context gas bounds and pointwise refinement clauses.
+Both audits include this increment. The 56-scenario result is
 from the preceding synced-main checkpoint; no runtime behavior changed here.
 
 During the latest increment the original host checkout and its shared Git/cache

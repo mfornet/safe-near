@@ -256,6 +256,20 @@ proof-size check and usage room remain explicit. The low-gas clause is now
 checked for the same empty-base slice with an explicit read-cost width
 premise. The universal nonempty-trie model gas function remains open.
 
+The canonical specialization now removes the empty-base and selected-key
+conditions for accepted-resource calls. Actual canonical reads establish raw
+storage agreement; the computed ordered lookup/dereference plan supplies the
+complete metered storage write for fresh and replacing cells. Node/value access,
+evicted-byte and replacement-register bills have original-context bounds. A
+full body WP and funded-reference model adequacy cover both stake outcomes.
+Actual canonical readiness, body simulation and public receipt replay close the
+arbitrary-gas alternative. Sufficient original gas gives model matching and
+used gas bounded by the same original-data canonical cost, including startup.
+Every pointwise refinement clause is assembled for this accepted-resource slice.
+Nonzero-node evidence, preparation, native-width room and proof acceptance on
+the actual fetched plan's staged write remain explicit. General canonical
+resource rejections still need high-reference/model and gas-bound assembly.
+
 The current statement also has the separately documented SAF-67 gap: an
 arbitrary recorded-proof-size input is accepted by context WF. A canonical
 empty-context probe makes deployed wNEAR new fail for the proof limit while
@@ -270,8 +284,8 @@ an empty-object parse cannot be certified by kernel reduction. Numeric facts
 about the pinned JSON were not replaced by unchecked computation or new axioms.
 
 M2 remains open: faithful recorder input, reserved-zero node exclusion,
-protocol certificates and the full nonempty-trie storage contract and gas
-bound must be closed before unrestricted \texttt{Refines}.
+protocol certificates and canonical resource-rejection assembly must be
+closed before unrestricted \texttt{Refines}.
 The deployed \texttt{refines\_wnear\_exported} proof remains open. The
 detailed frontier is recorded in \texttt{notes/todo/wnear\_refinement\_proof.md}.
 Run \texttt{just wnear-skeleton} for the executable checks and
