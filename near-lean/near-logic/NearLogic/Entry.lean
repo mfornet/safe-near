@@ -28,7 +28,7 @@ def entryCtx (arity : Nat) : Ctx :=
 whatever credits are left, or trapping. -/
 def entryPost {GF : BundledGFunctors} [WasmGS NearState GF] (Cg arity : Nat) (Ψ : Ending → IProp GF) :
     Post NearState GF where
-  normal vs _ := iprop(⌜vs.length = arity⌝ ∗ (∃ R, credits Cg R) ∗ Ψ (.values vs))
+  normal vs _ := iprop(⌜vs.length = arity⌝ ∗ ∃ R, credits Cg R ∗ (credits Cg R -∗ Ψ (.values vs)))
   trap := iprop(∀ r, Ψ (.trap r))
 
 section Entry
@@ -47,8 +47,8 @@ theorem step_leave (σ : Store NearState) (lim : ExecLimits) (f : Frame) (arity 
 is done with the values on its stack. -/
 theorem mwp_leave_entry (cfg : WasmConfig) (lim : ExecLimits) (f : Frame) (arity : Nat) (vs : List Value)
     (Cg : Nat) (Ψ : Ending → IProp GF) (hv : vs.length = arity) :
-    (∃ R, credits Cg R) ∗ ▷ Ψ (.values vs) ⊢ mwpT cfg lim ((entryCtx arity).thread f vs (entryCtx arity).labels (entryCtx arity).rest) Ψ := by
-  iintro ⟨⟨%R, Hc⟩, HΨ⟩
+    (∃ R, credits Cg R ∗ ▷ (credits Cg R -∗ Ψ (.values vs))) ⊢ mwpT cfg lim ((entryCtx arity).thread f vs (entryCtx arity).labels (entryCtx arity).rest) Ψ := by
+  iintro ⟨%R, Hc, HΨ⟩
   iapply mwp_lift_plain cfg lim ((entryCtx arity).thread f vs (entryCtx arity).labels (entryCtx arity).rest) [] [] (fun _ => [])
     (fun _ => .finished (.values vs)) 0 Cg R (by simp) (by simp) (by simp) (by simp) (by simp)
   · intro σ _ _
@@ -64,9 +64,9 @@ theorem mwp_leave_entry (cfg : WasmConfig) (lim : ExecLimits) (f : Frame) (arity
   isplitl []
   · iapply BigSepL.bigSepL_nil.2; iempintro
   inext
-  iintro %_ %_ _ _
+  iintro %_ %_ _ Hc
   iapply mwp_finished
-  iexact HΨ
+  iapply HΨ $$ Hc
 
 /-- A method's body, proved as a fragment at depth 0, is a `WP` of the
 thread that runs it. -/
@@ -84,8 +84,9 @@ theorem mwp_entry (cfg : WasmConfig) (lim : ExecLimits) (f : Frame) (arity : Nat
   iunfold mKont
   simp only [entryPost]
   isplit
-  · iintro %vs %l ⟨%hv, Hc, HΨ⟩
+  · iintro %vs %l ⟨%hv, %R, Hc, HΨ⟩
     iapply mwp_leave_entry cfg lim (f.withLocals l) arity vs Cg Ψ hv
+    iexists R
     isplitl [Hc]
     · iexact Hc
     · inext
