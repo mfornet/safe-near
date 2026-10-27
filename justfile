@@ -71,6 +71,10 @@ wnear-skeleton:
     cd contracts/w-near/verification && lake build wnear-skeleton && ./.lake/build/bin/wnear-skeleton
     cd contracts/w-near/verification && lake env lean --run Skeleton/OverlayProbe.lean
 
+# Reproduce the open SAF-67 recorded-proof-size refinement counterexample.
+wnear-proofsize-probe:
+    cd contracts/w-near/verification && lake env lean --run Skeleton/ProofSizeProbe.lean
+
 # Audit every wNEAR model/spec/proof declaration, including transitive axioms.
 wnear-audit:
     python3 tools/axiom-audit.py contracts/w-near/verification --allow-sorry-module Proofs.Refinement --report audit/wnear.json

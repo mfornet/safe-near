@@ -112,6 +112,37 @@ tends to come back in another place.
   of runtime-constructible contexts; it is a substantive premise correction,
   not a proof of the old, false statement.
 
+### 6. The recorded-proof-size oracle still falsifies the statement (SAF-67)
+
+- **Statement:** under current `Context.WF` and protocol 86, every parsed
+  wNEAR call matches the model with sufficient gas, or matches/fails for gas
+  with insufficient gas.
+- **Truth:** `storageProofSize` is an arbitrary trusted function. WF puts no
+  constraint on it. A constant over the 4 MB receipt limit makes the first
+  storage access fail with the recorded-proof-size error, which the model
+  does not predict. This is independent of the repaired overlay invariant.
+- **Prior evidence:** `scenarios/README.md` item 8 and
+  `scenarios/open/storage_proof_size.json` already record SAF-67. The latter
+  is deliberately outside the passing 51-scenario suite.
+- **Current evidence:** `Skeleton/ProofSizeProbe.lean` kernel-proves current
+  WF for a canonical empty base, unique overlays and empty raw storage, model
+  success and conditional non-refinement. Actual deployed `new` produces the
+  exact proof-size failure, burns 263258218488 gas and rolls back effects;
+  its model bound 7686760000000 fits the supplied 300000000000000 gas.
+  The whole deployed outcome is executable-checked and remains an explicit
+  hypothesis of the kernel non-refinement theorem.
+- **Root cause:** the shared input contract admits unverified recorder data.
+  A sufficient-gas proof cannot imply that an independent arbitrary oracle
+  returns a small proof. The wrong statement is not repaired by setting the
+  oracle to `none` or postulating that every call always stays below the limit.
+- **Repair frontier:** tie recorder data to actual recorded trie objects and
+  prove the method's access footprint fits the limit, or make the high-level
+  model predict legitimate proof-limit failures in execution order. This is
+  a substantive shared-boundary/model decision; no narrowing premise or
+  runtime behavior change has been applied at this checkpoint.
+- **Regression:** `just wnear-proofsize-probe` reproduces the current gap.
+  Full refinement cannot be marked complete while it persists.
+
 ## Agent results
 
 Success and failure per task type and model (section 11.2 of the plan), used
