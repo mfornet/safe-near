@@ -22,23 +22,11 @@ def skelModule : Module where
   datas := #[{ init := ⟨okBytes.toArray⟩, mode := .active 0 [.i32_const 0] }]
   exports := #[{ name := "get", desc := .func 1 }, { name := "memory", desc := .mem 0 }]
 
-/-- The `value_return` import. -/
-def valueReturnDecl : ImportDecl :=
-  { «module» := "env", name := "value_return", params := [.i64, .i64], results := [] }
-
-theorem nearHostFns_find_valueReturn :
-    nearHostFns.find? (fun p => importMatches p.1 valueReturnDecl) = nearHostFns[4]? := by
-  sorry
-
-theorem nearHostFns_four : (nearHostFns[4]?).map Prod.snd = some valueReturnFn := rfl
-
-theorem nearHostFns_four_name : (nearHostFns[4]?).map (·.1.name) = some "value_return" := rfl
-
 /-- The metered `value_return` the module is linked with. -/
 theorem resolve_skel (cfg : RuntimeConfig) :
     resolveMetered cfg (prepareMemory cfg skelModule) =
       .ok { funcs := [metered cfg.fees.numExtraBytesRecord "value_return" valueReturnFn] } := by
-  sorry
+  rfl
 
 /-- The module as nearcore prepares it under the v86 memory limits. -/
 def skelPrepared : Module :=
