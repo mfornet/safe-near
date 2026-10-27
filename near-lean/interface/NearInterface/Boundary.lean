@@ -2,7 +2,7 @@ import Mathlib.Algebra.BigOperators.Group.Finset.Basic
 import NearInterface.Raw
 import NearInterface.AccountId
 import NearInterface.Config
-import NearInterface.TrieOverlay
+import NearInterface.TrieOverlayInvariant
 
 /-!
 # The function-call action boundary
@@ -119,8 +119,9 @@ def contractData (trie : Near.TrieOverlay.State) (account : Bytes) : RawStorage 
 
 /-- What the runtime guarantees about every context it builds: nearcore's
 integer widths, storage usage that counts the contract records and leaves
-room for one call's growth, and a canonical trie holding the same records.
-None of it depends on the call or on the contract. -/
+room for one call's growth, and a canonical trie whose overlays have unique
+keys and hold the same records. None of it depends on the call or on the
+contract. -/
 structure Context.WF (ctx : Context) (raw : RawStorage) : Prop where
   balance_lt : ctx.balance + ctx.attached < 2 ^ 128
   locked_lt : ctx.locked < 2 ^ 128
@@ -135,6 +136,9 @@ structure Context.WF (ctx : Context) (raw : RawStorage) : Prop where
   /-- Every instruction costs gas: the per-operation and linear base costs are positive. -/
   opCost_pos : 0 < ctx.protocol.wasm.regularOpCost ∧ 0 < ctx.protocol.wasm.linearOpBaseCost
   trie_canonical : Near.TrieConstruction.build ctx.trie.entries = .ok ctx.trie.base
+  /-- Each overlay is a map. Duplicate keys would make `view` and reference
+  lookup disagree even with a canonical base and matching raw records. -/
+  trie_changes_unique : ctx.trie.UniqueChanges
   trie_storage : contractData ctx.trie ctx.current.bytes = raw
   /-- Contract storage holds one value per key. -/
   raw_keys_unique : ∀ k v v', (k, v) ∈ raw → (k, v') ∈ raw → v = v'

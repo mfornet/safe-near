@@ -7,7 +7,9 @@ import Wasm.Binary
 A canonical empty base and duplicate prospective entries expose a discrepancy
 between `State.view` (last duplicate wins) and `getReference` (first wins).
 The executable pins protocol 86 and runs both the walking module and the
-deployed wNEAR binary, without modifying the runtime or its well-formedness.
+deployed wNEAR binary. Both malformed tries are now excluded by
+`Context.WF.trie_changes_unique`; the historical positive-WF regression is
+preserved in commit a65583a.
 -/
 namespace WNear.Skeleton.OverlayProbe
 open Wasm Wasm.Near NearInterface
@@ -101,33 +103,54 @@ theorem state_storage_empty (account : NearInterface.AccountId) :
     contractData (stateTrie account) account.bytes = ∅ := by
   simp [contractData, state_view_empty]
 
-/-- The current `WF` accepts the inconsistent duplicate overlay for every
-valid account, under just the explicitly checked numeric protocol bounds. -/
-theorem context_wf (cfg : RuntimeConfig) (account : NearInterface.AccountId)
-    (hroom : 1000 + storageUsageOf cfg raw + cfg.wasm.limits.maxGasBurnt < 2 ^ 64)
-    (hop : 0 < cfg.wasm.regularOpCost ∧ 0 < cfg.wasm.linearOpBaseCost) :
-    (context cfg account).WF raw := by
-  refine ⟨(by change 100 * 10^24 + 0 < 2 ^ 128; decide),
-    (by change 0 < 2 ^ 128; decide), (by change 300 * 10^12 < 2 ^ 64; decide),
-    (by change 1 < 2 ^ 64; decide), (by change 0 < 2 ^ 64; decide),
-    (by change 1 < 2 ^ 64; decide), ?_, hroom, hop, canonical account, storage_actual account, ?_⟩
-  · exact Nat.le_add_left _ _
-  · intro k v v' hv hv'
-    simp only [raw, Finset.mem_singleton] at hv hv'
-    exact (Prod.mk.inj (hv.trans hv'.symm)).2
+/-- Equal raw records and a canonical base are insufficient: the prospective
+overlay repeats a key, which the corrected invariant excludes. -/
+theorem trie_not_unique (account : NearInterface.AccountId) :
+    ¬ (trie account).UniqueChanges := by
+  simp [Near.TrieOverlay.State.UniqueChanges, trie]
 
-theorem new_context_wf (cfg : RuntimeConfig) (account : NearInterface.AccountId)
-    (hroom : 1000 + cfg.wasm.limits.maxGasBurnt < 2 ^ 64)
-    (hop : 0 < cfg.wasm.regularOpCost ∧ 0 < cfg.wasm.linearOpBaseCost) :
-    (newContext cfg account).WF ∅ := by
-  refine ⟨(by change 100 * 10^24 + 0 < 2 ^ 128; decide),
-    (by change 0 < 2 ^ 128; decide), (by change 300 * 10^12 < 2 ^ 64; decide),
-    (by change 1 < 2 ^ 64; decide), (by change 0 < 2 ^ 64; decide),
-    (by change 1 < 2 ^ 64; decide), ?_, hroom, hop, ?_, state_storage_empty account, ?_⟩
-  · simp [storageUsageOf]
-  · rfl
-  · intro k v v' hv
-    simp at hv
+theorem state_trie_not_unique (account : NearInterface.AccountId) :
+    ¬ (stateTrie account).UniqueChanges := by
+  simp [Near.TrieOverlay.State.UniqueChanges, stateTrie]
+
+/-- Kernel regression: the skeleton's duplicate-overlay counterexample is
+outside the corrected refinement domain, for every protocol and raw storage. -/
+theorem context_not_wf (cfg : RuntimeConfig) (account : NearInterface.AccountId) (raw : RawStorage) :
+    ¬ (context cfg account).WF raw := by
+  intro h
+  exact trie_not_unique account h.trie_changes_unique
+
+/-- The deployed wNEAR `new` counterexample is excluded by the same invariant. -/
+theorem new_context_not_wf (cfg : RuntimeConfig) (account : NearInterface.AccountId) (raw : RawStorage) :
+    ¬ (newContext cfg account).WF raw := by
+  intro h
+  exact state_trie_not_unique account h.trie_changes_unique
+
+/-- Committed overlays are maps too; duplicates there reproduce the same
+representation defect even when the prospective overlay is empty. -/
+def committedTrie (account : NearInterface.AccountId) : Near.TrieOverlay.State :=
+  { entries := [], base := emptyBase, prospective := [],
+    committed := [(rawKey account, some wrong), (rawKey account, some actual)] }
+
+theorem committed_trie_not_unique (account : NearInterface.AccountId) :
+    ¬ (committedTrie account).UniqueChanges := by
+  simp [Near.TrieOverlay.State.UniqueChanges, committedTrie]
+
+theorem committed_context_not_wf (cfg : RuntimeConfig) (account : NearInterface.AccountId)
+    (raw : RawStorage) :
+    ¬ ({ context cfg account with trie := committedTrie account } : Context).WF raw := by
+  intro h
+  exact committed_trie_not_unique account h.trie_changes_unique
+
+/-- Updating a key already present in the committed overlay is valid: the
+prospective entry deliberately takes precedence across the two maps. -/
+def crossOverlayTrie (account : NearInterface.AccountId) : Near.TrieOverlay.State :=
+  { entries := [], base := emptyBase,
+    prospective := [(rawKey account, some actual)], committed := [(rawKey account, some wrong)] }
+
+theorem cross_overlay_unique (account : NearInterface.AccountId) :
+    (crossOverlayTrie account).UniqueChanges := by
+  simp [Near.TrieOverlay.State.UniqueChanges, crossOverlayTrie]
 
 private def check (label : String) (ok : Bool) : IO Unit :=
   unless ok do throw (IO.userError s!"FAIL: {label}")
@@ -148,6 +171,8 @@ def run : IO Unit := do
   check "WF storage-usage room" (decide (1000 + storageUsageOf cfg raw + cfg.wasm.limits.maxGasBurnt < 2 ^ 64))
   check "WF positive operation charges" (decide (0 < cfg.wasm.regularOpCost ∧ 0 < cfg.wasm.linearOpBaseCost))
   check "WF skeleton trie_storage" (decide (contractData ctx.trie account.bytes = raw))
+  check "corrected WF rejects skeleton duplicate overlay"
+    (!decide ((ctx.trie.prospective.map Prod.fst).Nodup ∧ (ctx.trie.committed.map Prod.fst).Nodup))
   let result := Near.Boundary.execOn code storage ctx
   IO.println s!"skeleton, protocol 86: {repr result.outcome}; burnt={result.burntGas}; logs={repr result.logs}"
   check "duplicate overlay causes skeleton executionIssue" (mismatch result)
@@ -155,6 +180,8 @@ def run : IO Unit := do
   let newCtx := newContext cfg account
   check "WF wNEAR trie_storage" (decide (contractData newCtx.trie account.bytes = ∅))
   check "WF wNEAR storage-usage room" (decide (1000 + cfg.wasm.limits.maxGasBurnt < 2 ^ 64))
+  check "corrected WF rejects wNEAR duplicate overlay"
+    (!decide ((newCtx.trie.prospective.map Prod.fst).Nodup ∧ (newCtx.trie.committed.map Prod.fst).Nodup))
   let binary ← IO.FS.readBinFile "../contract.wasm"
   let module ← match Wasm.Binary.decode binary with
     | .ok module => pure module
@@ -165,7 +192,7 @@ def run : IO Unit := do
   IO.println s!"deployed wNEAR new, protocol 86: {repr actualRun.outcome}; burnt={actualRun.burntGas}; logs={repr actualRun.logs}"
   check "duplicate overlay causes deployed wNEAR executionIssue" (mismatch actualRun)
   check "wNEAR failure rolls back storage" (decide (actualRun.storage = ∅))
-  IO.println "confirmed runtime counterexamples; no runtime or model definitions changed"
+  IO.println "confirmed malformed-overlay executionIssues; corrected Context.WF excludes both samples"
 
 end WNear.Skeleton.OverlayProbe
 

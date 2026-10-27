@@ -80,6 +80,38 @@ tends to come back in another place.
   storage, and check that a late failure restores storage, balance, usage
   and receipts while retaining the emitted log.
 
+### 5. Canonical trie data alone does not make overlays well formed
+
+- **Statement:** `Context.WF` guaranteed that trie reference lookup agreed
+  with the raw contract storage used by the model.
+- **Truth:** the old predicate allowed duplicate keys within either overlay.
+  `State.view` folds updates left to right (last duplicate wins), whereas
+  reference lookup searches from the front (first duplicate wins). A canonical
+  base and agreement between the view and raw storage did not exclude this.
+- **Caught by:** a kernel-backed counterexample in `Skeleton/OverlayProbe.lean`
+  (commit `a65583a` proves every old `Context.WF` clause uniformly, with only
+  numeric bounds checked for protocol 86). Actual execution of both skeleton
+  `save` and the deployed wNEAR `new` reports `executionIssue` from the storage
+  accounting mismatch. The wNEAR example has empty raw storage, so it also
+  represents the model's uninitialized state.
+- **Root cause:** list representations of update maps lacked their uniqueness
+  invariant at the refinement boundary. Base-trie canonicity says nothing
+  about prospective or committed overlays.
+- **Sweep:** inspected every overlay mutation in interface, VM and runtime.
+  `start` creates empty maps; set/remove filter the old key before prepending;
+  commit uses the same operation; rollback, reads, cache changes and checkpoint
+  preserve uniqueness. Cross-overlay disjointness is deliberately not required:
+  a prospective write may override a committed write.
+- **Correction:** add `trie_changes_unique` to `Context.WF`, backed by
+  `NearInterface/TrieOverlayInvariant.lean` preservation proofs for actual
+  constructors and operations. The differential hypothesis checker rejects
+  duplicate overlays too. Runtime lookup and view semantics are unchanged.
+- **Regression evidence:** retain the executable mismatches outside the corrected
+  premise, prove the duplicate contexts fail corrected `Context.WF`, and run
+  the existing scenario and skeleton suites. This repairs the intended scope
+  of runtime-constructible contexts; it is a substantive premise correction,
+  not a proof of the old, false statement.
+
 ## Agent results
 
 Success and failure per task type and model (section 11.2 of the plan), used

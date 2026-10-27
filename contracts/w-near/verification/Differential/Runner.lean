@@ -376,7 +376,10 @@ def checkHypotheses (M : ExecModel) (ctx : Context) (raw : RawStorage) (st : Opt
   (if storageUsageOf ctx.protocol raw ≤ ctx.storageUsage then []
     else ["storage usage does not count the contract records"]) ++
   (if ctx.storageUsage + ctx.protocol.wasm.limits.maxGasBurnt < 2 ^ 64 then []
-    else ["storage usage leaves no room"])
+    else ["storage usage leaves no room"]) ++
+  (if (ctx.trie.prospective.map Prod.fst).Nodup ∧
+      (ctx.trie.committed.map Prod.fst).Nodup then []
+    else ["trie overlay contains duplicate keys"])
 
 /-- Run one call; return the observation and whether the input was a call. -/
 def runCall (M : ExecModel) (env : Env) (w : World M) (label : String) (c : CallInput)
