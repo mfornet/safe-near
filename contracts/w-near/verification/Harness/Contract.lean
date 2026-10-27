@@ -81,6 +81,9 @@ variable {α : Type} (c : Contract α) (h : Harness)
 
 /-- The checks that do not depend on the postcondition. -/
 def frame (i : Input α) (r : Run) : List String := Id.run do
+  -- A trap aborts the call and the receipt rolls back: only the postcondition
+  -- says which traps are allowed.
+  if let .trapped _ := r.ending then return []
   let mut out := []
   let sp := h.stackPointer i.store
   let allowed := (sp - c.stack, c.stack) :: c.footprint h i

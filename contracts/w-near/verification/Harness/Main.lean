@@ -1,4 +1,4 @@
-import Harness.Builtins
+import Harness.TotalSupply
 
 /-!
 # `wnear-harness`: stress the function contracts
@@ -215,6 +215,53 @@ def allocInputs (h : Harness) (r : Rng) : Except String (List (Input (List (Nat 
     [{ label := "zero-sized", store := h.store, args := [i32 0, i32 8], ghost := [] }]
   pure (out, probes)
 
+def vecDerefInputs (h : Harness) (r : Rng) : Except String (List (Input Unit) × List (Input Unit)) := do
+  let top := h.memSize h.store
+  let mut r := r
+  let mut out := []
+  for k in [0:100] do
+    let (vec, r1) := r.nat 0 (top - 12)
+    let (dst, r2) := r1.nat 0 (top - 8)
+    let (bs, r3) := r2.bytes 12
+    r := r3
+    if overlap (dst + 4) 4 vec 4 then continue
+    let s ← put h h.store [(vec, bs)]
+    out := out ++ [{ label := s!"random {k}", store := s, args := [i32 dst, i32 vec], ghost := () }]
+  let (bs, _) := r.bytes 12
+  let s ← put h h.store [(100, bs.set 8 77)]
+  let s' ← put h h.store [(100, bs)]
+  let harmless : Input Unit :=
+    { label := "out over the capacity and length", store := s', args := [i32 104, i32 100], ghost := () }
+  let probe : Input Unit :=
+    { label := "the length's slot over the pointer", store := s, args := [i32 96, i32 100], ghost := () }
+  pure (out ++ [harmless], [probe])
+
+/-- `base` is a store from inside a method, where the environment is set up. -/
+def stateInputs (h : Harness) (base : Store NearState) (r : Rng) :
+    Except String (List (Input Bool) × List (Input Bool)) := do
+  let top := h.memSize base
+  let mut r := r
+  let mut out := []
+  -- An absent state: tag word zero.
+  let (bs0, r0) := r.bytes 40
+  r := r0
+  let none0 := bs0.set 24 0 |>.set 25 0 |>.set 26 0 |>.set 27 0
+  let s0 ← put h base [(200, none0)]
+  out := out ++ [{ label := "not initialized", store := s0, args := [i32 1000, i32 200], ghost := true }]
+  for k in [0:50] do
+    let (opt, r1) := r.nat 0 (top - 40)
+    let (dst, r2) := r1.nat 0 (top - 40)
+    let (bs, r3) := r2.bytes 40
+    r := r3
+    if overlap dst 40 opt 40 then continue
+    let bs := bs.set 24 1
+    let s ← put h base [(opt, bs)]
+    out := out ++ [{ label := s!"random {k}", store := s, args := [i32 dst, i32 opt], ghost := true }]
+  let p0 ← put h h.store [(200, none0)]
+  let probe : Input Bool :=
+    { label := "not initialized, environment not set up", store := p0, args := [i32 1000, i32 200], ghost := false }
+  pure (out, [probe])
+
 /-! ## Call sites -/
 
 def account (s : String) : List UInt8 := s.toUTF8.toList
@@ -285,12 +332,17 @@ def main (args : List String) : IO UInt32 := do
     | .ok m => pure m
     | .error e => throw (IO.userError e.message)
   let h ← orThrow (Harness.load protocol module internalContext [])
-  let captured ← captureAll protocol module bytes.size [memcpy.func, memset.func, bcmp.func, multi3.func, alloc.func]
+  let captured ← captureAll protocol module bytes.size
+    [memcpy.func, memset.func, bcmp.func, multi3.func, alloc.func, vecDeref.func, stateOrPanic.func]
   let sites (f : Nat) := captured.getD f #[]
   let results := [
     ← stress h memcpy (memcpyInputs h) (sites memcpy.func) verbose,
     ← stress h memset (memsetInputs h) (sites memset.func) verbose,
     ← stress h bcmp (bcmpInputs h) (sites bcmp.func) verbose,
     ← stress h multi3 (multi3Inputs h) (sites multi3.func) verbose,
-    ← stress h alloc (allocInputs h) (sites alloc.func) verbose]
+    ← stress h alloc (allocInputs h) (sites alloc.func) verbose,
+    ← stress h vecDeref (vecDerefInputs h) (sites vecDeref.func) verbose,
+    ← stress h stateOrPanic
+        (stateInputs h (((sites stateOrPanic.func)[0]?.map (·.2.store)).getD h.store))
+        (sites stateOrPanic.func) verbose]
   pure (if results.all id then 0 else 1)

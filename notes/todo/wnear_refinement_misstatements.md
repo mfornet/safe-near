@@ -50,6 +50,38 @@ tends to come back in another place.
 - **Test added:** the bcmp inputs with equal ranges and with differences at
   the first and last pair.
 
+### 3. `Vec::deref`'s precondition: overlap too strong
+
+- **Statement:** `Harness.vecDeref.pre` required the 8 output bytes not to
+  overlap the 12 bytes of the `Vec`.
+- **Truth:** the function writes the length (from `vec + 8`) to `out + 4`
+  before it reads the pointer (at `vec`); only that slot over the pointer
+  word goes wrong. Overlapping the capacity or the length is harmless.
+- **Caught by:** harness (the probe outside the precondition passed).
+- **Root cause:** the clause was written from the usual "no aliasing" rule
+  instead of from the order of the loads and stores in the body.
+- **Sweep:** `memcpy` (forward copy: harmless for `dst < src`, noted at M1),
+  `stateOrPanic` (one `memcpy`, same rule): no other clause stated from the
+  rule rather than the body.
+- **Test added:** an input with `out` over the capacity and length (passes),
+  and the probe with the length's slot over the pointer (fails).
+
+### 4. The not-initialized panic needs the environment
+
+- **Statement:** `Harness.stateOrPanic`: with the state absent, the call
+  panics with "The contract is not initialized", from any store.
+- **Truth:** `env::panic` reaches the host through the blockchain interface
+  that `set_blockchain_interface` installs at the start of every method;
+  from a fresh store, Rust's `unwrap` on `None` traps with `unreachable`.
+- **Caught by:** harness (the generated input trapped differently).
+- **Root cause:** near-sdk's environment is global state that the method's
+  prologue sets up; the contract left that precondition implicit.
+- **Sweep:** every contract whose function can reach `env::*` (any host
+  access, any panic) needs the same ghost precondition; the method
+  contracts of M3 onward state it once, from the prologue, for all callees.
+- **Test added:** the generated inputs start from a store captured inside a
+  method; the probe from the fresh store must fail.
+
 ## Agent results
 
 Success and failure per task type and model (section 11.2 of the plan), used
