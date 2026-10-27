@@ -135,6 +135,22 @@ theorem applyCharges_gas_config (ns : NearState) (cs : List Charge) :
       | some e => simp only [applyCharges, hc]; exact this
       | none => simp only [applyCharges, hc]; rw [ih, this]
 
+/-- A charge changes only the gas cell, whether it succeeds or not. -/
+theorem applyCharge_erase (ns : NearState) (c : Charge) : erase (applyCharge ns c).1 = erase ns := by
+  cases c <;> rfl
+
+theorem applyCharges_erase (ns : NearState) (cs : List Charge) : erase (applyCharges ns cs).1 = erase ns := by
+  induction cs generalizing ns with
+  | nil => rfl
+  | cons c cs ih =>
+    cases hc : applyCharge ns c with
+    | mk ns' e =>
+      have := applyCharge_erase ns c
+      rw [hc] at this
+      cases e with
+      | some e => simp only [applyCharges, hc]; exact this
+      | none => simp only [applyCharges, hc]; rw [ih, this]
+
 /-- A gas error: what a failed charge reports. -/
 def isGasError (e : HostError) : Prop := e = .gasExceeded ∨ e = .gasLimitExceeded
 

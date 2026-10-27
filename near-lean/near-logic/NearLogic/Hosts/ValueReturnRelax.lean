@@ -131,6 +131,56 @@ theorem valueReturn_relax (extra : Nat) (st : HostStore NearState) (len ptr : UI
       rw [haft, haft]
       all_goals rfl
 
+/-- What a host call keeps: the limits, no execution issue, no logs. -/
+def QuietHost (p0 m0 : Nat) (h : NearState) : Prop :=
+  h.gas.prepaid = p0 ∧ h.gas.maxBurnt = m0 ∧ h.lastExecutionIssue = none ∧ h.logs = []
+
+theorem quietHost_of_erase {p0 m0 : Nat} {h h' : NearState} (hq : QuietHost p0 m0 h) (he : erase h' = erase h)
+    (hp : h'.gas.prepaid = h.gas.prepaid) (hm : h'.gas.maxBurnt = h.gas.maxBurnt) : QuietHost p0 m0 h' :=
+  ⟨hp.trans hq.1, hm.trans hq.2.1, (erase_field he NearState.lastExecutionIssue fun _ => rfl).trans hq.2.2.1,
+    (erase_field he NearState.logs fun _ => rfl).trans hq.2.2.2⟩
+
+/-- The host of a host result. -/
+def resultHost : HostResult NearState → NearState
+  | .Return _ st => st.host
+  | .Trap st _ => st.host
+
+/-- Metered `value_return`, called with anything, keeps the limits, records no
+execution issue and logs nothing. -/
+theorem valueReturn_quiet (extra : Nat) (st : HostStore NearState) (args : List Value) {p0 m0 : Nat}
+    (hq : QuietHost p0 m0 st.host) :
+    QuietHost p0 m0 (resultHost ((metered extra "value_return" valueReturnFn).invoke st args)) := by
+  have hdep : deprecatedRuntimeHost "value_return" = false := by decide
+  have hview : viewRestrictedHost "value_return" = false := by decide
+  have hother : ["storage_read", "storage_has_key", "storage_write", "storage_remove"].contains
+      "value_return" = false := by decide
+  have he := applyCharges_erase st.host (chargesBefore "value_return" st args)
+  have hl := applyCharges_gas_limits st.host (chargesBefore "value_return" st args)
+  simp only [metered, hdep, hview, Bool.and_false, Bool.false_eq_true, ite_false]
+  generalize applyCharges st.host (chargesBefore "value_return" st args) = ac at he hl
+  obtain ⟨ns, err⟩ := ac
+  simp only at he hl
+  -- The host after the charges, with the used gas copied into the context.
+  have hq1 : QuietHost p0 m0 { ns with context := { ns.context with usedGas := UInt64.ofNat ns.gas.used } } :=
+    quietHost_of_erase hq (by rw [← he]; rfl) hl.1 hl.2
+  cases err with
+  | some e => exact ⟨hq1.1, hq1.2.1, hq1.2.2.1, hq1.2.2.2⟩
+  | none =>
+    simp only
+    split
+    · exact ⟨hq1.1, hq1.2.1, hq1.2.2.1, hq1.2.2.2⟩
+    · simp only [invokeStorageCall, prepareStorageCall_other _ _ _ hother, finishMeteredCall_valueReturn]
+      unfold valueReturnFn
+      dsimp only
+      split
+      · split
+        · exact hq1
+        · unfold checkDataLimit
+          split
+          · exact ⟨hq1.1, hq1.2.1, hq1.2.2.1, hq1.2.2.2⟩
+          · split <;> exact ⟨hq1.1, hq1.2.1, hq1.2.2.1, hq1.2.2.2⟩
+      · exact hq1
+
 /-- Metered `value_return` with any arguments, under raised limits: it fails a
 charge (a gas error), or it gives the same result with those limits. -/
 theorem meteredValueReturn_relax (extra : Nat) (st : HostStore NearState) (args : List Value) (p m : Nat)
