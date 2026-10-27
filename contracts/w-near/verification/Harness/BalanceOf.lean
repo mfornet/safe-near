@@ -245,4 +245,41 @@ def ftMetadata : Contract Bool where
   cost _ _ := 10 ^ 18
   ghostOf _ _ := some true
 
+/-! ## `FungibleToken::storage_balance_bounds` (418), through its serializer (108)
+
+`storage_balance_bounds(out, ft)`: the bounds `{min, max}` at `out`,
+checked as `ft_metadata` is: serialized by `StorageBalanceBounds::serialize`
+(108) into a fresh `Vec`, they are the model's JSON of
+`storageBalanceBounds`, both bounds the usage at `ft + 16` times the price
+per byte. -/
+
+def storageBounds : Contract Bool where
+  name := "FungibleToken::storage_balance_bounds, serialized"
+  func := 418
+  pre h i :=
+    let (out, ft) := (u32Arg i.args 0, u32Arg i.args 1)
+    if !i.ghost then some "the environment is not set up"
+    else if out + 64 > h.memSize i.store || ft + 40 > h.memSize i.store then some "beyond memory"
+    else none
+  footprint _ i := [(u32Arg i.args 0, 64)]
+  stack := 1024
+  post h i r :=
+    (ended r).or <|
+    let v := h.call r.after 94 [i32 8000, i32 128]
+    match ended v, h.write v.after 8100 (leBytes32 8000) with
+    | some e, _ => some s!"with_capacity: {e}"
+    | _, .error e => some e
+    | none, .ok s =>
+      let ser := h.call s 108 [i32 (u32Arg i.args 0), i32 8100]
+      match ended ser, returnsU32 ser with
+      | some e, _ => some s!"serialize: {e}"
+      | none, some 0 =>
+        let json := h.read ser.after (h.readNat ser.after 8000 4) (h.readNat ser.after 8008 4)
+        let m := h.readNat r.before (u32Arg i.args 1 + 16) 8 * WNear.storagePricePerByte
+        let expected := (WNear.Ret.storageBalanceBounds { min := m, max := some m }).json.toUTF8.toList
+        if json != expected then some s!"serializes to {String.fromUTF8! ⟨json.toArray⟩}" else none
+      | none, _ => some "serialize failed"
+  cost _ _ := 10 ^ 18
+  ghostOf _ _ := some true
+
 end WNear.Testing

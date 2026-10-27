@@ -464,6 +464,15 @@ def ftMetadataInputs (h : Harness) (base : Store NearState) (_ : Rng) :
     Except String (List (Input Bool) × List (Input Bool)) :=
   pure ([{ label := "the contract", store := base, args := [i32 1000, i32 6000], ghost := true }], [])
 
+def storageBoundsInputs (h : Harness) (base : Store NearState) (r : Rng) :
+    Except String (List (Input Bool) × List (Input Bool)) := do
+  let mut r := r
+  let mut out : List (Input Bool) := []
+  for (n, k) in ([0, 1, 125, 2 ^ 64 - 1] ++ (List.range 10).map (· * 1234567)).zipIdx do
+    let s ← put h base [(6000 + 16, leBytes n 8)]
+    out := out ++ [{ label := s!"usage {n} ({k})", store := s, args := [i32 1000, i32 6000], ghost := true }]
+  pure (out, [])
+
 /-! ## Call sites -/
 
 def account (s : String) : List UInt8 := s.toUTF8.toList
@@ -540,7 +549,7 @@ def main (args : List String) : IO UInt32 := do
     [memcpy.func, memset.func, bcmp.func, multi3.func, alloc.func, vecDeref.func, stateOrPanic.func,
       u128From.func, ftTotalSupply.func, resultExpect.func, stateRead.func, toVecU128.func,
       valueReturn.func, envInput.func, optionExpect.func, balanceOf.func, fromSliceBalanceOf.func,
-      storageMinimum.func, ftMetadata.func]
+      storageMinimum.func, ftMetadata.func, storageBounds.func]
   let sites (f : Nat) := captured.getD f #[]
   -- A fresh store after the method prologue: the environment is set up.
   let envBase ← orThrow (prologue h h.store)
@@ -571,5 +580,6 @@ def main (args : List String) : IO UInt32 := do
     ← stress h balanceOf (balanceInputs h envBase) (sites balanceOf.func) verbose,
     ← stress h fromSliceBalanceOf (fromSliceInputs h envBase) (sites fromSliceBalanceOf.func) verbose,
     ← stress h storageMinimum (storageMinimumInputs h envBase) (sites storageMinimum.func) verbose,
-    ← stress h ftMetadata (ftMetadataInputs h envBase) (sites ftMetadata.func) verbose]
+    ← stress h ftMetadata (ftMetadataInputs h envBase) (sites ftMetadata.func) verbose,
+    ← stress h storageBounds (storageBoundsInputs h envBase) (sites storageBounds.func) verbose]
   pure (if results.all id then 0 else 1)
