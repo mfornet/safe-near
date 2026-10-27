@@ -1,7 +1,7 @@
 import Proofs.AllocateFlaggedResult
 import Proofs.AllocateSearchEnter
 
-/-! Actual complete f580 body on its nonempty, unflagged, directly-fitting
+/-! Actual complete f580 body on its nonempty, flags-two, directly-fitting
 alignment-one branch. All heap facts refer to the original free-list metadata. -/
 namespace WNear.Proofs.AllocateFlagged
 open Wasm Wasm.Near MeteredLogic

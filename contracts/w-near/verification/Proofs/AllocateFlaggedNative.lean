@@ -17,14 +17,14 @@ structure Native (p : Layout) : Prop where
   rootBound : p.root.toNat+4≤p.memory.byteSize
   headNonzero : head p≠0
   split : Allocate.SplitNative p.memory (head p) p.words
-  endBound : (finish p).toNat+8≤p.memory.byteSize
+  endBound : (finish p).toNat≤p.memory.byteSize
   headFlags : readI32 p.memory (head p).toNat &&& 3 = 2
   candidateFlag : readI32 p.memory ((head p).toNat+8) &&& 1 = 0
   vtableBound : p.vtable.toNat+20≤p.memory.byteSize
 
 theorem intervals (p : Layout) (hn : Native p) :
     (head p).toNat+72≤(header p).toNat ∧ (header p).toNat+12≤(finish p).toNat ∧
-    (finish p).toNat+8≤p.memory.byteSize := by
+    (finish p).toNat≤p.memory.byteSize := by
   have ptr := Allocate.split_pointer_toNat p.memory (head p) p.words hn.split
   have hdr := Allocate.split_header_toNat p.memory (head p) p.words hn.split
   have room := hn.split.room

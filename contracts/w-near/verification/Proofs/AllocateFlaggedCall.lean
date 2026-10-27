@@ -35,7 +35,7 @@ theorem searchFrame_shape (frame : CallFrame) (p : Layout) :
   simp only [searchFrame,searchedFrame,initialFrame,finalFrame,mutateFrame,Allocate.resultFrame,controlFrame,backlinkFrame,endReadFrame,AllocateSearch.endSelectedFrame,
     splitFrame,Allocate.arithmeticFrame,Allocate.callbackFrame,Allocate.fitFrame,candidateFrame,unitsFrame,prepareFrame,and_self]
 
-/-- The real function activation, full235-step body, and normal one-value
+/-- The real function activation, full238-step body, and normal one-value
 return. All code/native premises concern the original state. -/
 theorem wp_call (cfg : WasmConfig) (fuel rest : Nat) (s : Store NearState)
     (limits : ExecLimits) (base : List Value) (frame : CallFrame) (callers : List CallFrame)
