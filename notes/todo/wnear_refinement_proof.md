@@ -352,7 +352,7 @@ that removes the risk of getting stuck on the glue at the end.
 | Metered overlay/empty-base writes and resource frames | `NearVM/MeteredHosts/{StorageOverlay,StorageEmpty,StorageFrame}.lean` | Kernel checked from initial credits and local resources, with no assumed primitive outcomes |
 | Storage representation and usage | `NearInterface/StorageUsage.lean`, `NearVM/StorageRepresentation.lean`, `Skeleton/StorageResources.lean` | Kernel checked through initialized storage entry and computed final storage |
 | Actual pure/input/output/storage machine budget compatibility | `NearVM/{MeteredPureBudget,MeteredHostBudget,MeteredOutputBudget,MeteredStorageBudget}.lean` | Kernel checked direct storage step and metered advance; empty-base readiness/body invariant instantiated below; general canonical storage remains open |
-| Functional invariant and whole-body gas simulation | `Skeleton/FunctionalInvariant.lean` | Actual continuing resources close; storage readiness derives from original empty-base WF and proof check; concrete StepSimulation and run lifting prove matched-or-gas/prefix with no fuel error, holding guest context fixed; startup/high adequacy/boundary assembly remain |
+| Functional invariant and whole-body gas simulation | `Skeleton/FunctionalInvariant.lean` | Actual continuing resources close; storage readiness derives from original empty-base WF and proof check; concrete StepSimulation and run lifting prove matched-or-gas/prefix with no fuel error, holding guest context fixed; startup and checked-receipt replay assembled below |
 | Concrete phase control and prefix logs | `Skeleton/BudgetSimulation.lean` | All fifteen opcodes and administrative leave dispatched; actual control/stack/installed-host invariant closed; every actual runner prefix preserves shape and log prefix; guest context unchanged by auxiliary internal gas enlargement |
 | Isolated native recorder arithmetic and necessary history | `NearInterface/{TrieRecorder,TrieRecordingHistory}.lean` | Kernel checked; no runtime/WF integration or recorder-fidelity claim |
 | Actual empty-base receipt success | `Skeleton/{EmptyStorage,EmptySuccess}.lean` | Kernel checked through actual `execOn` and independent model step from original WF/representation/credits/limits; empty base, absent key, proof check, usage room and stake remain explicit |
@@ -365,7 +365,9 @@ that removes the risk of getting stuck on the glue at the end.
 | Body fuel and exact phase progress | `Skeleton/Progress.lean` | Every continuing error-free transition advances exactly one source suffix; sixteen body transitions suffice independently of gas/trie success; actual activation wrapper retains the bound |
 | Invalid methods | `Skeleton/InvalidMethod.lean` | Complete unparsed-input rollback and no-interpreter-limitation clause for the exact RuntimeInterface, with no context/gas hypotheses |
 | Actual build collision validation and dedup traversal | `NearInterface/{TrieConstructionInvariant,TrieWitnessFuel}.lean` | Successful actual build derives raw/final witness consistency and fetch preservation; lookup transfers with exact result/accounting at the smaller final default fuel |
-| Node-only ancestor ranks | `NearInterface/{TrieNodeRank,TrieConstructionRanks}.lean` | Actual successful recursive construction produces a node certificate with serialized binding/rank bounds and ancestor exclusion; arbitrary value objects need not be excluded; decoded traversal must still follow this certificate |
+| Node-only ancestor ranks | `NearInterface/{TrieNodeRank,TrieConstructionRanks}.lean` | Actual successful recursive construction produces a node certificate with serialized binding/rank bounds and ancestor exclusion; arbitrary value objects need not be excluded; decoded traversal follows this certificate in TrieRankedLookup |
+| Actual canonical reference lookup | `NearInterface/{TrieRankedLookup,TrieReadableConstruction,TrieEntryLookup}.lean` | Actual public reference-only lookup agrees with original byte entries, using recursive decode certificates and deduplicated witness fuel; nonzero node hashes remain explicit |
+| Startup and checked receipt budget replay | `Skeleton/{StartupSimulation,ReceiptSimulation}.lean`, `NearRuntime/BudgetObservation.lean` | Actual execOn matches an auxiliary reference or stops for gas with rollback and prefix logs; original preparation/empty-base/proof acceptance remain explicit |
 | Actual external trie charges | `NearVM/MeteredHosts/TrieCost.lean` | Kernel checked original-key bounds for successful reference lookup (2n+1 touches), value dereference (one touch), and their actual metered charges using original prices |
 | Storage-stake acceptance/rejection | `Skeleton/EmptyStakeFailure.lean` | Kernel checked positive-deficit rollback with saved log and matching for both zero/positive cases on the empty-base slice |
 | Trie access-count bounds | `NearInterface/TrieWalkCost.lean` | Kernel checked actual parser rejects empty extensions; successful lookup touches at most twice byte key length plus terminal node and optional value, with no witness-shape premise |
@@ -453,8 +455,12 @@ excluded. `TrieConstructionRanks` now proves that successful actual recursive
 construction produces the ranked node certificate, including every selected
 child from the actual branch loop. Every certified descendant has an actual
 serialized binding and a bounded rank, with transport through final witness
-deduplication. The lookup proof must still connect its decoded path to this
-certificate; reserved-zero roots remain separate.
+deduplication. The decoded traversal is now connected to that certificate by
+`TrieRankedLookup`. `TrieReadableConstruction` derives its readable tree from
+actual constructor success, and `TrieEntryLookup` proves reference-only public
+lookup agrees with the original byte-key entries. These proofs cover all
+recursive node shapes and deduplicated witness fuel. Reserved-zero node roots
+remain an explicit premise; value dereferencing remains separate.
 `TrieCost` lifts successful lookup/dereference access bounds to the actual
 cumulative counters and metered charges: at most 2n+1 reference-node touches
 and one value touch, billed at no more than the larger original node price.
@@ -474,16 +480,22 @@ immediately. Concrete `stepSimulation`, `runSimulation` and initialized-machine
 comparison now give a whole-body matched-or-gas alternative with prefix logs
 and no fuel error, allowing only internal counter limits to differ.
 
-This is not yet receipt-level lower-gas refinement: a funded auxiliary body must
-be proved model-correct with its guest context fixed, loading/activation must
-connect both body starts, and the boundary must expose matched results or gas
-rollback/log prefixes. The universal nonempty-trie gas function, pinned protocol
-facts and recorder repair also remain open. For the auxiliary high body,
-checked host arithmetic needs bounds independent of the low context's attached
-gas: `saveEmptyCost_read_room` currently uses sufficient original gas and
-cannot discharge that obligation in the lower-gas branch. Prove the needed
-pinned-protocol width facts (or retain explicit generic arithmetic premises)
-rather than changing the guest context or silently assuming cost coverage.
+`StartupSimulation` now connects actual loading and activation to the body
+simulation, including startup gas failures and the structural fuel bound.
+`NearRuntime.BudgetObservation` transports matching and gas failures through
+actual receipt checks and observation. `ReceiptSimulation.execOn_replay` therefore
+proves that actual `execOn` equals its funded reference observation, or returns
+out-of-gas with rollback and logs prefixing that reference observation. It needs
+no sufficient-gas premise on the original execution.
+
+This is not yet model-level lower-gas refinement. `FundedEmpty` proves the funded
+body succeeds with the original guest context fixed, under explicit resource
+acceptance and protocol arithmetic room; `FundedObservation` connects its computed
+final store and storage representation to existing execution lemmas. The funded
+checked observation still needs usage/stake and all resource-failure branches to
+match the model. The arithmetic premise must eventually follow from certified
+pinned-protocol facts independent of the low context's attached gas. The universal
+nonempty-trie gas function and recorder repair also remain open.
 
 A substantive premise correction was necessary: old `Context.WF` admitted
 duplicate overlay keys and therefore actual `executionIssue` counterexamples
@@ -530,22 +542,25 @@ hashes are nonzero, or a reviewed change to construction that enforces the
 reserved sentinel. No concrete SHA256 preimage or runtime counterexample is
 known. A cryptographic assumption is not silently added, and arbitrary
 zero-valued *value* hashes are not a problem for direct dereference. This
-obligation remains open alongside recursive construction, traversal and witness proofs.
+reserved-zero obligation remains open; recursive reference construction, traversal
+and witness proofs are now checked subject to it.
 
 The runtime currently does not enforce `maxNumberRegisters`; the skeleton
 pins this observed limitation explicitly. Register-size limits are enforced.
 This does not affect the default configuration's one-register example, but
 must not be described as nearcore conformance for arbitrary register limits.
 
-Validation for this checkpoint (2026-10-27): 99 proof modules were checked
-transitively for axioms (4618 declarations, 3335 theorems, zero violations).
+Validation for this checkpoint (2026-10-27): 107 proof modules were checked
+transitively for axioms (4943 declarations, 3550 theorems, zero violations).
 Standard Lake builds, the walking-skeleton checks, and blueprint
-extraction/rendering pass. The full wNEAR audit covers 109 modules, 5874
-declarations and 3150 theorems, permitting exactly the original refinement
-module's open proof and its two dependent theorems. The unchanged earlier
-operational baseline has all five builtin harness contracts, 211 adapter checks
-and 51 differential scenarios passing; these were not rerun for this proof-only
-checkpoint.
+extraction/rendering pass. The full wNEAR audit covers 113 modules, 5947
+declarations and 3195 theorems, permitting exactly the original refinement
+module's open proof and its two dependent theorems. After merging latest main (including the Lean LSP skill and new stress
+cases), all 56 differential scenarios pass. The earlier unchanged operational
+baseline has all five builtin harness contracts and 211 adapter checks passing;
+those two suites were not rerun. Lean LSP MCP diagnostics and axiom verification
+pass for the startup, checked receipt replay and canonical reference lookup
+theorems. These audit totals precede the final funded-observation increment.
 
 During the latest increment the original host checkout and its shared Git/cache
 paths disappeared. Source work and pushes were preserved using isolated Git

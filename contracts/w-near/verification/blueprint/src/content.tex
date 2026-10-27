@@ -206,15 +206,16 @@ branch construction from child equations and branch lookup composition are
 kernel checked. Successful lookup access counts are bounded by twice the byte
 key length plus one terminal node and an optional value dereference. The
 actual decoder rejects empty extension paths, so this bound needs no extra
-witness-shape premise. General canonical lookup correctness remains open;
-singleton lookup retains its explicit nonzero-root obligation. Isolated child
+witness-shape premise. Canonical reference lookup now agrees with original byte-key entries under
+an explicit nonzero-node obligation; value dereferencing remains separate. Isolated child
 walks now transfer through actual constructed parent witness segments, with
 compatible aliases and ancestor safety explicit. Actual construction collision
 validation discharges binding compatibility; deduplicated lookup retains the
 exact result/accounting at its smaller default fuel. Actual recursive
 construction also produces a ranked node certificate with serialized bindings
-and descendant bounds; decoded traversal must still follow that certificate,
-and reserved-zero roots remain explicit. Successful reference lookup
+and descendant bounds. The actual decoded traversal follows this certificate
+through every recursive node shape and final witness deduplication; reserved-zero
+node roots remain explicit. Successful reference lookup
 and dereference also have original-key gas bounds for the cumulative counters
 used by the actual storage host.
 
@@ -228,8 +229,12 @@ preserves its log prefix. Auxiliary gas enlargement leaves the whole guest
 context unchanged. The functional invariant now closes across error-free continuing steps and
 derives storage readiness from original empty-base WF and proof acceptance.
 Concrete whole-body simulation yields matching or a protocol gas failure with
-prefix logs and excludes fuel exhaustion. Funded high-run model adequacy,
-loading/activation and receipt rollback assembly remain open.
+prefix logs and excludes fuel exhaustion. Actual loading and activation now
+connect this simulation to the entry point. Receipt checks preserve matching
+and gas rollback with prefix logs, giving actual receipt replay against an
+auxiliary reference. The funded body succeeds with its original guest context
+fixed under explicit arithmetic and resource premises. Its checked observation
+still needs model adequacy, including usage/stake and resource-failure branches.
 
 The empty-base specialization derives storage postconditions from original
 context data and matches the model for both storage-stake acceptance and
