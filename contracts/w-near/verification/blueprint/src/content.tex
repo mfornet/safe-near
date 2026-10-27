@@ -402,10 +402,10 @@ at31 ordinary units/13 steps. Decimal902, formatter engine872, allocation and
 SDK state-wrapper composition remain open. Actual multiplication helper954
 has a complete60-instruction execution contract and81-unit/62-step typed
 call, with exact low-first word stores, readback, footprint and resource
-frames. Kernel UInt algebra identifies the low word with the original low-word
-product modulo64 bits. Identifying the high carry word with the full128-bit
-product remains a separate arithmetic obligation; exact general formulas for
-both addition carries and the implemented high word are now proved. The getter still has two whole
+frames. Kernel UInt and natural arithmetic now identify both stored words with
+the product of the two general128-bit inputs modulo $2^{128}$, including both
+addition carries. This unrestricted arithmetic identity is connected to actual
+post-call memory readback under the original output bounds. The getter still has two whole
 call obligations. Separate checks include26 result-copy captures,86 register
 forwarder captures and76 canonical storage replays from19 captured inputs,
 including both accounting modes and explicit absent-key fixtures.
@@ -428,8 +428,35 @@ units/155 steps. The actual full580 body on the direct-fitting alignment-one
 branch now composes original initialization, both loop entries, candidate
 scaling and size helpers, the split path and return pointer at258 ordinary
 units/235 steps. Its full typed local call costs274 units/237 steps, including
-the15-unit activation and normal one-value return. Other580 traversal branches, whole581 and the29-byte growth
-branch remain open.
+the15-unit activation and normal one-value return. The complete positive581
+wrapper on this branch costs346 units/297 body steps or358 units/299 typed-call
+steps. It composes rounding, the actual580 call, the sequential post-search
+head update and original SP restoration. Requested payload bounds follow from
+original heap intervals and checked rounding; memory, installed code, globals,
+functional host, exact burnt gas, promise gas and residual credits are proved.
+Independent deployed captures for sizes1 and24 agree on357 root gas units/298
+steps, complete memory, returned pointer and stack restoration; two other
+getter captures remain outside this branch. Other580 traversal branches,
+other581 alignment/retry branches and the29-byte growth branch remain open.
+
+Actual952 has a symbolic byte-fill contract for arbitrary values and counts.
+The positive typed call costs $13n+17$ units/$12n+12$ steps; the empty call
+costs15 units/7 steps and has a separate typed rule requiring no memory,
+memory-index, well-formedness or address-bound premises. Every byte in the bounded span becomes the low input
+byte, and all outside bytes and other memories are preserved. The final pointer
+increment may wrap after the last store. Exact memory shape, code/global and
+functional-host frames, gas and residual credits follow from original
+resources; no execution or post-memory lookup oracle is supplied.
+The actual153 allocation-and-zero-fill wrapper now composes the real581 call,
+derived nonzero guard, symbolic952 call and normal pointer return on the same
+positive alignment-one/direct-fit branch. Its typed call costs $13n+397$
+units/$12n+326$ steps. Exact zeroed payload bytes, allocated-memory-relative
+outside frames, memory shape, restored code/globals, functional host and gas
+follow from original resources. Independent replays from captured581 input
+stores for sizes1 and24 match the complete153 result, cost and fuel; these are
+separate from the actual getter153 capture, which requests29 bytes and executes
+growth followed by a flags-two search. That real growth/retry branch and the
+one-candidate skip in the128-word search remain open.
 
 SDK dispatch now has a generic 114-unit/77-step initialized lookup and shared
 borrow-acquisition prefix, with code, functional-host and memory-shape frames.
