@@ -98,4 +98,46 @@ def optionExpect : Contract Bool where
   cost h i := if h.readNat i.store (u32Arg i.args 1) 4 == 0 then 10 ^ 18 else op h 25
   ghostOf _ _ := some true
 
+/-! ## `Contract::ft_balance_of` (293)
+
+`ft_balance_of(out, contract, account)`: the `u128` balance of the
+`AccountId` (a `String` `(ptr, cap, len)` at `account`, taken by value and
+dropped) in the 16 bytes at `out`. The balance is the storage value at
+the `LookupMap` key, the prefix (the `Vec` at `contract + 24`) followed by
+the Borsh `String`; absent, it is zero. -/
+
+def leNat (bs : List UInt8) : Nat := bs.foldr (fun b acc => acc * 256 + b.toNat) 0
+
+/-- The storage key of the account at `account`, under the contract at `contract`. -/
+def balanceKey (h : Harness) (s : Store NearState) (contract account : Nat) : List UInt8 :=
+  let pre := h.read s (h.readNat s (contract + 24) 4) (h.readNat s (contract + 32) 4)
+  let len := h.readNat s (account + 8) 4
+  pre ++ (List.range 4).map (fun i => UInt8.ofNat (len / 256 ^ i)) ++ h.read s (h.readNat s account 4) len
+
+def balanceOf : Contract Bool where
+  name := "Contract::ft_balance_of"
+  func := 293
+  pre h i :=
+    let (out, contract, account) := (u32Arg i.args 0, u32Arg i.args 1, u32Arg i.args 2)
+    if !i.ghost then some "the environment is not set up"
+    else if out + 16 > h.memSize i.store || contract + 40 > h.memSize i.store ||
+        account + 12 > h.memSize i.store then some "beyond memory"
+    else match i.store.host.storage (balanceKey h i.store contract account) with
+      | some v => if v.length != 16 then some "the balance does not decode" else none
+      | none => none
+  footprint _ i := [(u32Arg i.args 0, 16), (heapBase, 2 ^ 32 - heapBase), (freeListHead, 4)]
+  stack := 1024
+  grows := true
+  post h i r :=
+    let (out, contract, account) := (u32Arg i.args 0, u32Arg i.args 1, u32Arg i.args 2)
+    (ended r).or <|
+    let expected := match i.store.host.storage (balanceKey h i.store contract account) with
+      | some v => leNat v
+      | none => 0
+    if h.readNat r.after out 16 != expected then
+      some s!"balance {h.readNat r.after out 16}, expected {expected}" else none
+  -- No claim yet: the storage host costs are stated with M7.
+  cost _ _ := 10 ^ 18
+  ghostOf _ _ := some true
+
 end WNear.Testing

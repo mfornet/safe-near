@@ -404,6 +404,27 @@ def optionExpectInputs (h : Harness) (base : Store NearState) (r : Rng) :
     out := out ++ [{ label := s!"random {k}", store := s, args := [i32 1000, i32 4000, i32 1049036], ghost := true }]
   pure (out, [])
 
+/-- A contract struct at 6000 with the prefix `"a"` (at 6100), and an
+account id `String` whose buffer is a real heap allocation, at 6200. -/
+def balanceInputs (h : Harness) (base : Store NearState) (r : Rng) :
+    Except String (List (Input Bool) × List (Input Bool)) := do
+  let mut r := r
+  let mut out : List (Input Bool) := []
+  for k in [0:30] do
+    let (n, r1) := r.nat 2 20
+    let (name, r2) := r1.bytes n
+    let (present, r3) := r2.nat 0 2
+    let (bal, r4) := r3.nat 0 (2 ^ 128 - 1)
+    r := r4
+    let alloc := h.call base 310 [i32 n, i32 1]
+    let some buf := returnsU32 alloc | throw "alloc failed"
+    let s ← put h alloc.after [(6100, [97]), (6000 + 24, leBytes 6100 4 ++ leBytes 1 4 ++ leBytes 1 4),
+      (buf, name), (6200, leBytes buf 4 ++ leBytes n 4 ++ leBytes n 4)]
+    let key := [97] ++ leBytes n 4 ++ name
+    let s := if present == 0 then s else withStorage s key (some (leBytes bal 16))
+    out := out ++ [{ label := s!"random {k}", store := s, args := [i32 1000, i32 6000, i32 6200], ghost := true }]
+  pure (out, [])
+
 /-! ## Call sites -/
 
 def account (s : String) : List UInt8 := s.toUTF8.toList
@@ -477,7 +498,7 @@ def main (args : List String) : IO UInt32 := do
   let captured ← captureAll protocol module bytes.size
     [memcpy.func, memset.func, bcmp.func, multi3.func, alloc.func, vecDeref.func, stateOrPanic.func,
       u128From.func, ftTotalSupply.func, resultExpect.func, stateRead.func, toVecU128.func,
-      valueReturn.func, envInput.func, optionExpect.func]
+      valueReturn.func, envInput.func, optionExpect.func, balanceOf.func]
   let sites (f : Nat) := captured.getD f #[]
   -- A fresh store after the method prologue: the environment is set up.
   let envBase ← orThrow (prologue h h.store)
@@ -504,5 +525,6 @@ def main (args : List String) : IO UInt32 := do
         (sites toVecU128.func) verbose,
     ← stress h valueReturn (valueReturnInputs h envBase) (sites valueReturn.func) verbose,
     ← stress h envInput (envInputInputs h envBase) (sites envInput.func) verbose,
-    ← stress h optionExpect (optionExpectInputs h envBase) (sites optionExpect.func) verbose]
+    ← stress h optionExpect (optionExpectInputs h envBase) (sites optionExpect.func) verbose,
+    ← stress h balanceOf (balanceInputs h envBase) (sites balanceOf.func) verbose]
   pure (if results.all id then 0 else 1)
