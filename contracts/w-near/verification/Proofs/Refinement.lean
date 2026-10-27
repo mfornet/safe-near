@@ -3,6 +3,7 @@ import Spec.Exports
 import Proofs.Availability
 import NearRuntime.BoundaryResolution
 import Lean
+import Wasm.Binary
 
 /-!
 # The refinement obligation (open)

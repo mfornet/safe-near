@@ -1,4 +1,5 @@
 import NearVM.Interp
+import Wasm.LinkInvariant
 
 /-!
 # Host-state invariants through execution

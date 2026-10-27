@@ -1,4 +1,4 @@
-import NearRuntime
+import NearRuntime.Apply
 import Wasm.Wat
 
 /-! Decoder failures at the external code boundary must never become ordinary

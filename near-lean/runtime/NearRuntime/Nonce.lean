@@ -1,4 +1,5 @@
 import NearRuntime.Types
+import NearVM.Config
 
 namespace Near
 

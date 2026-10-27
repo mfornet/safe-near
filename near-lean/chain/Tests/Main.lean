@@ -1,4 +1,4 @@
-import NearChain
+import NearChain.History
 import Wasm.Wat
 
 /-!

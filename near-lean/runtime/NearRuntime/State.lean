@@ -1,4 +1,6 @@
 import NearRuntime.Types
+import NearVM.TrieOverlay
+import NearVM.Config
 
 /-!
 # Chain state

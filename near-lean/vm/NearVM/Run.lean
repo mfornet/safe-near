@@ -3,7 +3,7 @@ import NearVM.Metered
 import NearVM.Context
 import NearVM.PromiseGraph
 import NearVM.GasDistribution
-import Wasm.Fuel
+import Wasm.CodeSize
 
 /-!
 # `run`: one function call

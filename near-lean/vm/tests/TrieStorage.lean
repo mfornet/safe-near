@@ -1,4 +1,4 @@
-import NearVM
+import NearVM.Run
 import Wasm.Wat
 
 /-! Execute actual Wasm storage hosts against a canonical one-leaf trie. These

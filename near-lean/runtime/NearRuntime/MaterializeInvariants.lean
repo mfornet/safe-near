@@ -1,4 +1,5 @@
 import NearRuntime.ReceiptInvariants
+import NearVM.PromiseAccounting
 
 namespace Near
 open Wasm Wasm.Near

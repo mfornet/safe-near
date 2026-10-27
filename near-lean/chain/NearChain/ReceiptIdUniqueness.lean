@@ -1,4 +1,5 @@
 import NearChain.IdentifierBounds
+import NearRuntime.BlockFreshReceiptIds
 
 namespace Near
 open Wasm.Near

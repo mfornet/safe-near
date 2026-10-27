@@ -1,6 +1,6 @@
 import NearFastVM.Ops
 import NearFastVM.Mem
-import NearVM
+import NearVM.Run
 
 /-!
 # The flat instruction stream

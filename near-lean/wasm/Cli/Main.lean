@@ -1,4 +1,5 @@
-import Wasm
+import Wasm.Binary
+import Wasm.Validate
 
 /-!
 # `wasm`: command-line front end

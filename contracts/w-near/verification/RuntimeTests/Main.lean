@@ -1,6 +1,7 @@
 import Spec.Contract
 import Spec.Exports
 import NearRuntime.Boundary
+import Wasm.Binary
 
 /-!
 # Adapter regressions: the binary against the model, on the boundary

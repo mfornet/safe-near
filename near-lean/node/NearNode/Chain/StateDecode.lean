@@ -1,4 +1,5 @@
 import NearNode.Chain.Model
+import NearRuntime.QueueEncoding
 
 /-!
 # A shard's trie entries as the runtime's state

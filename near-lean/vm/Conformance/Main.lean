@@ -1,4 +1,4 @@
-import NearVM
+import NearVM.Run
 import Wasm.Wat
 
 open Lean Wasm Wasm.Near

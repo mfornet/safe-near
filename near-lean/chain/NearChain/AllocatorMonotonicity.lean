@@ -1,4 +1,5 @@
 import NearChain.ReservedActorInvariant
+import NearRuntime.BlockAllocatorMonotonicity
 
 namespace Near
 open Wasm.Near

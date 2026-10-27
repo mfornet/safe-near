@@ -2,6 +2,7 @@ import NearRuntime.FunctionCallInvariants
 import NearVM.PromiseGas
 import NearVM.OutcomeEncoding
 import Wasm.Bytes
+import NearVM.OutcomeReservations
 
 namespace Near
 

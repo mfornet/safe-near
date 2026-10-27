@@ -56,6 +56,14 @@ are outside its scope. When upgrading Lean, update all pins together.
 `near/nearcore`, in the native reference adapters (`tools/runtime-*-reference/`)
 and in pinned nearcore source links. When moving the pin, update them together.
 
+`Wasm`, `NearVM`, `NearRuntime` and `NearChain` are umbrella modules that list
+a package's executable code together with every theorem about it.
+`check_umbrella_imports.py` (`just umbrella-imports`, part of `ci-check`)
+rejects any other repository module that imports one of them: a test
+executable or a contract project that did so built the whole proof corpus of
+the package before running anything. Import the modules you use; a proof
+imports the proof modules it cites.
+
 The Lean quality workflow runs both pin checks and the offline tool tests on
 every push; the source-style and formatter integration checks run only when
 the workflow is dispatched by hand. The text-style driver uses the Mathlib

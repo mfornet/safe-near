@@ -1,4 +1,5 @@
 import Wasm.HostInvariant
+import Wasm.CodeSize
 
 /-!
 # How far the machine can run without executing an instruction
@@ -20,18 +21,7 @@ namespace Wasm.Exec
 
 /-! ## The measure -/
 
-mutual
-/-- Size of an instruction: one, plus its nested bodies. -/
-def instrSize : Instr → Nat
-  | .block _ body => codeSize body + 2
-  | .loop _ body => codeSize body + 2
-  | .«if» _ thenBody elseBody => codeSize thenBody + codeSize elseBody + 2
-  | _ => 1
-
-def codeSize : List Instr → Nat
-  | [] => 1
-  | i :: rest => instrSize i + codeSize rest
-end
+/-! `instrSize` and `codeSize` are in `Wasm.CodeSize`. -/
 
 def _root_.Wasm.Label.weight (label : Label) : Nat := codeSize label.rest + 1
 

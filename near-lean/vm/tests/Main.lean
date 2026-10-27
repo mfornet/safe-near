@@ -1,4 +1,4 @@
-import NearVM
+import NearVM.Run
 import tests.TrieStorage
 import tests.CryptoHosts
 import tests.LogHosts
