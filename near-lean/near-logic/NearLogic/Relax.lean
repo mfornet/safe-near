@@ -115,6 +115,45 @@ theorem applyCharges_relax (ns : NearState) (cs : List Charge) (p m : Nat) (hp :
         rw [hc] at hl1 hl2
         exact ih ns' (by rw [hl1]; exact hp) (by rw [hl2]; exact hm) h
 
+/-- A host store with raised limits. -/
+def relaxSt (st : HostStore NearState) (p m : Nat) : HostStore NearState := { st with host := relax st.host p m }
+
+/-- A gas error: what a failed charge reports. -/
+def isGasError (e : HostError) : Prop := e = .gasExceeded ∨ e = .gasLimitExceeded
+
+theorem deduct_error (g : Near.GasCounter) (burn use : Nat) {e : HostError}
+    (h : (g.deduct burn use).2 = some e) : isGasError e := by
+  unfold Near.GasCounter.deduct at h
+  dsimp only at h
+  split at h
+  · cases h
+  · simp only [Option.some.injEq] at h
+    subst h
+    unfold isGasError
+    split <;> simp
+
+theorem applyCharge_error (ns : NearState) (c : Charge) {e : HostError}
+    (h : (applyCharge ns c).2 = some e) : isGasError e := by
+  cases c <;> simp only [applyCharge, Near.GasCounter.burn, Near.GasCounter.prepay,
+    Near.GasCounter.payAction] at h <;> exact deduct_error _ _ _ h
+
+/-- Every failed charge is a gas error. -/
+theorem applyCharges_error (ns : NearState) (cs : List Charge) {e : HostError}
+    (h : (applyCharges ns cs).2 = some e) : isGasError e := by
+  induction cs generalizing ns with
+  | nil => cases h
+  | cons c cs ih =>
+    cases hc : applyCharge ns c with
+    | mk ns' e' =>
+      cases e' with
+      | some e'' =>
+        simp [applyCharges, hc] at h
+        subst h
+        exact applyCharge_error ns c (by rw [hc])
+      | none =>
+        simp only [applyCharges, hc] at h
+        exact ih ns' h
+
 end Charges
 
 end NearLogic
