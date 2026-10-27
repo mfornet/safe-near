@@ -368,6 +368,7 @@ that removes the risk of getting stuck on the glue at the end.
 | Node-only ancestor ranks | `NearInterface/{TrieNodeRank,TrieConstructionRanks}.lean` | Actual successful recursive construction produces a node certificate with serialized binding/rank bounds and ancestor exclusion; arbitrary value objects need not be excluded; decoded traversal follows this certificate in TrieRankedLookup |
 | Actual canonical reference lookup | `NearInterface/{TrieRankedLookup,TrieReadableConstruction,TrieEntryLookup}.lean` | Actual public reference-only lookup agrees with original byte entries, using recursive decode certificates and deduplicated witness fuel; nonzero node hashes remain explicit |
 | Startup and checked receipt budget replay | `Skeleton/{StartupSimulation,ReceiptSimulation}.lean`, `NearRuntime/BudgetObservation.lean` | Actual execOn matches an auxiliary reference or stops for gas with rollback and prefix logs; original preparation/empty-base/proof acceptance remain explicit |
+| Model-level lower-gas alternative, accepted resources | `Skeleton/{FundedEmpty,FundedObservation}.lean` | Actual funded reference matches model for either stake outcome; actual execOn matches or returns out-of-gas with rollback and model-log prefix for arbitrary original gas, on the explicit accepted-resource empty-base slice |
 | Actual external trie charges | `NearVM/MeteredHosts/TrieCost.lean` | Kernel checked original-key bounds for successful reference lookup (2n+1 touches), value dereference (one touch), and their actual metered charges using original prices |
 | Storage-stake acceptance/rejection | `Skeleton/EmptyStakeFailure.lean` | Kernel checked positive-deficit rollback with saved log and matching for both zero/positive cases on the empty-base slice |
 | Trie access-count bounds | `NearInterface/TrieWalkCost.lean` | Kernel checked actual parser rejects empty extensions; successful lookup touches at most twice byte key length plus terminal node and optional value, with no witness-shape premise |
@@ -488,14 +489,18 @@ proves that actual `execOn` equals its funded reference observation, or returns
 out-of-gas with rollback and logs prefixing that reference observation. It needs
 no sufficient-gas premise on the original execution.
 
-This is not yet model-level lower-gas refinement. `FundedEmpty` proves the funded
-body succeeds with the original guest context fixed, under explicit resource
-acceptance and protocol arithmetic room; `FundedObservation` connects its computed
-final store and storage representation to existing execution lemmas. The funded
-checked observation still needs usage/stake and all resource-failure branches to
-match the model. The arithmetic premise must eventually follow from certified
-pinned-protocol facts independent of the low context's attached gas. The universal
-nonempty-trie gas function and recorder repair also remain open.
+`FundedEmpty` proves the funded body succeeds with the original guest context
+fixed, under explicit resource acceptance and protocol arithmetic room.
+`FundedObservation` now derives final storage representation and usage, proves
+its actual checked reference matches the independent model for both stake
+outcomes, and combines the two: `execOn_matches_or_gas` proves actual execution
+matches the model or returns out-of-gas with rollback and a prefix of the model's
+logs, for any original gas budget. This is the accepted-resource empty-base
+slice, with original WF/representation, preparation, native usage room, read-cost
+width, absent key and recorded-proof acceptance explicit. Lower-gas assembly for
+resource-rejection branches remains open. The arithmetic premise must eventually
+follow from certified pinned-protocol facts independent of the low context's
+gas. The universal nonempty-trie gas function and recorder repair also remain open.
 
 A substantive premise correction was necessary: old `Context.WF` admitted
 duplicate overlay keys and therefore actual `executionIssue` counterexamples

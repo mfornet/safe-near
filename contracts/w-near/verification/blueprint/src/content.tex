@@ -234,7 +234,10 @@ connect this simulation to the entry point. Receipt checks preserve matching
 and gas rollback with prefix logs, giving actual receipt replay against an
 auxiliary reference. The funded body succeeds with its original guest context
 fixed under explicit arithmetic and resource premises. Its checked observation
-still needs model adequacy, including usage/stake and resource-failure branches.
+now matches the model for both stake outcomes. Combining these gives actual
+execution matching or gas rollback with a prefix of the model logs, for arbitrary
+original gas on the accepted-resource empty-base slice. Resource-rejection
+branches still need the same lower-gas assembly.
 
 The empty-base specialization derives storage postconditions from original
 context data and matches the model for both storage-stake acceptance and
