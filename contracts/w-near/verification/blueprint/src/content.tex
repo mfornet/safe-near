@@ -298,8 +298,10 @@ frames and six ordinary instruction charges. Its harness passes 936 valid
 calls, including 16 captures, with 11 additional activation units. The entry
 bridge composes actual typed activation and the runner, proving exact total
 cost of 17 units and normal void completion. Its immediate caller, function
-414, is harness-validated on 315 calls with alias-aware scratch/output
-framing and exact 57-unit cost; its semantic composition proof remains open.
+414, now has a complete local invocation proof with alias-aware scratch/output
+framing, restored globals and exact 57-unit cost, validated on 315 calls.
+The proof derives the nested call and both frame leaves from actual semantics;
+installed resources, bounds and sufficient credits remain explicit.
 The second deployed leaf, function 779, now has an entry-inclusive contract
 with exact 17-unit cost and an eight-byte output footprint. Its second load
 reads memory after its first store, so the proof retains overlapping-pointer
