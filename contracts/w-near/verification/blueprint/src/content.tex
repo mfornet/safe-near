@@ -436,8 +436,21 @@ original heap intervals and checked rounding; memory, installed code, globals,
 functional host, exact burnt gas, promise gas and residual credits are proved.
 Independent deployed captures for sizes1 and24 agree on357 root gas units/298
 steps, complete memory, returned pointer and stack restoration; two other
-getter captures remain outside this branch. Other580 traversal branches,
-other581 alignment/retry branches and the29-byte growth branch remain open.
+getter captures remain outside this581 branch. The empty580 call now has a
+complete37-unit/25-step typed contract, with no candidate metadata or memory
+writes. The flags-two split has a complete278-unit/240-step typed contract;
+its180-unit/158-step split skips the end backlink, transfers bit2 from the old
+head to the new header, and requires only end-at-or-before-memory bounds.
+The one-short-candidate path composes a71-unit/59-step hop with the actual
+direct split at345 units/296 typed-call steps. All three branches have exact
+computed memory, code/global, functional-host, burnt/promise/residual frames.
+All five actual getter580 captures independently match exact whole memory,
+SP, pointer, gas, steps and one-less-fuel exhaustion. The skipped allocation
+requests128 bytes, represented by32 words. Other581 alignment/retry branches
+and the29-byte growth execution composition remain open. A checked pure
+bridge already derives all flags-two retry native facts from original growth
+data and the actual sequential record relinking; it supplies no future-memory
+lookup or assumed execution outcome.
 
 Actual952 has a symbolic byte-fill contract for arbitrary values and counts.
 The positive typed call costs $13n+17$ units/$12n+12$ steps; the empty call
@@ -455,8 +468,25 @@ outside frames, memory shape, restored code/globals, functional host and gas
 follow from original resources. Independent replays from captured581 input
 stores for sizes1 and24 match the complete153 result, cost and fuel; these are
 separate from the actual getter153 capture, which requests29 bytes and executes
-growth followed by a flags-two search. That real growth/retry branch and the
-one-candidate skip in the128-word search remain open.
+growth followed by a flags-two search. The real581 growth/retry composition
+remains open; the one-candidate580 skip is now proved as described above.
+
+Successful577 components now include requested-word scaling, all29 sizing
+guards/operations, checked page ceiling569, the real memory-growth operation,
+old-page width checking,573 page-to-byte conversion,574 minimum checking,
+and sequential fresh-header/result-record writes with explicit return.
+The memory-growth WP charges exactly the linear base plus the per-page fee
+and returns the original page count. Original deterministic memory API data
+derive grown-memory shape and all write bounds. Exact phase accounting totals
+166 ordinary operation units plus that symbolic fee over136 body steps.
+The complete typed577 call is now proved at178 ordinary units plus the exact
+fee/137 steps, including its11-unit activation, caller opcode and explicit
+return. Exact final memory, result-record readback, code/globals, functional
+host, burnt/promise/residual gas follow from original resources.
+The actual getter577 capture independently matches177 root
+ordinary units plus the exact fee/136 steps, growth from1024 to1025 pages,
+complete sequential memory, SP and one-less-fuel exhaustion. No failure or
+fallback-growth contract is asserted.
 
 SDK dispatch now has a generic 114-unit/77-step initialized lookup and shared
 borrow-acquisition prefix, with code, functional-host and memory-shape frames.
