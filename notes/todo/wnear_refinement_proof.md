@@ -338,11 +338,13 @@ that removes the risk of getting stuck on the glue at the end.
 | Effectful walking module and independent resource-aware model | `Skeleton/{Module,Model}.lean` | Syntax/model facts and checker-to-`Matches` equivalence kernel checked |
 | Walking-module validation, linking and initialization | `Skeleton/Instantiation.lean` | Kernel checked for original and prepared memory (`Prepared`, `Memory`) |
 | Walking-module executions | `just wnear-skeleton` | Validated on creation, replacement, binary/long inputs, gas and resource limits |
-| Actual loading and entry activation | `Skeleton/Startup.lean` | Kernel checked; exact loading charges and eight-operation activation |
+| Actual loading and entry activation | `Skeleton/{Startup,Execution,Fuel}.lean` | Kernel checked; actual VM success conditional on local storage/resources; default fuel sufficient |
+| Host-trap call rule and early register-size rejection | `NearVM/MeteredTrap.lean`, `Skeleton/InputFailure.lean` | Kernel checked; exact trap state, gas, resources and fresh-marker classification |
 | Whole successful body | `Skeleton/{Body,Calls,Success}.lean` | Kernel checked; local storage frontier and explicit resources remain |
 | Trie-write metered phases | `NearVM/MeteredHosts/StorageMetered.lean` | Kernel checked from local lookup/dereference/accounting/proof-size obligations |
-| Below-bound run lifting and input-host compatibility | `NearVM/MeteredPrefix.lean`, `MeteredHosts/Budget.lean` | Kernel checked; remaining host and machine compatibility open |
-| Reachable overlay representation | `NearInterface/TrieOverlayInvariant.lean`, `Skeleton/OverlayProbe.lean` | Old context premise refuted; corrected uniqueness invariant preserved by actual operations |
+| Below-bound run lifting and input/return host compatibility | `NearVM/MeteredPrefix.lean`, `MeteredHosts/{Budget,ReturnBudget}.lean` | Kernel checked; logging, storage and machine compatibility open |
+| Reachable overlay representation | `NearInterface/TrieOverlayInvariant.lean`, `NearRuntime/TrieOverlayInvariant.lean`, `Skeleton/OverlayProbe.lean` | Old context premise refuted; corrected uniqueness invariant preserved by actual operations |
+| Overlay lookup/view consistency | `NearInterface/TrieOverlayLookup.lean` | Kernel checked under unique overlay keys; on-disk base agreement remains separate |
 | Whole effectful gas bound, deterministic failure branches and `Refines` | — | Open |
 
 The walking module uses `input`, `storage_write`, `log_utf8` and
@@ -356,7 +358,7 @@ constitute a universal refinement proof.
 **Frontier:** discharge canonical-trie lookup/dereference agreement with raw
 storage; instantiate the local metered storage phase; derive a symbolic cost
 including trie charges and establish its resource conditions. Connect the
-successful body to startup and the receipt boundary, then prove deterministic
+successful VM outcome to the receipt boundary, then prove deterministic
 resource failures and local step compatibility for the remaining hosts and
 machine instructions before assembling `Refines`. The counter-level simulation
 may relax prepaid and burn limits, but immutable `NearContext.prepaidGas` seen
@@ -367,7 +369,9 @@ Prepared validation and instantiation now cover arbitrary positive configured
 memory sizes within the Wasm limit. `Memory` proves the exact key/log byte reads
 without expanding zero-filled pages. `Startup` connects the actual `runAttempt`
 pipeline to the prepared body; `Success` composes all fifteen opcodes and the
-four actual hosts, leaving storage's local invocation/gas evidence explicit.
+four actual hosts, leaving storage's local invocation/gas evidence explicit. `Execution` now
+connects this to actual VM success, with the post-storage empty-promise
+invariant explicit. `Fuel` discharges the default interpreter fuel requirement.
 
 A substantive premise correction was necessary: old `Context.WF` admitted
 duplicate overlay keys and therefore actual `executionIssue` counterexamples
@@ -391,13 +395,14 @@ pins this observed limitation explicitly. Register-size limits are enforced.
 This does not affect the default configuration's one-register example, but
 must not be described as nearcore conformance for arbitrary register limits.
 
-Validation for this increment (2026-10-27): all 13 new proof modules were
-checked transitively for axioms (1020 declarations, no violations); the
+Validation for this increment (2026-10-27): 34 proof modules were checked
+transitively for axioms (2132 declarations, 1547 theorems, zero violations); the
 walking-skeleton checks pass; all five existing builtin harness contracts
 pass; all 211 adapter checks and all 51 differential scenarios pass. The web
 blueprint builds after giving Binary, Harness and Skeleton explicit library
-roots. The wNEAR audit still permits only the original refinement module's
-open proof and its two dependent theorems.
+roots. The full wNEAR audit covers 80 modules, 4867 declarations and 2354
+theorems, permitting only the original refinement module's open proof and its
+two dependent theorems.
 
 ### M3. The first method, top-down
 

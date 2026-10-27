@@ -33,7 +33,8 @@ data write remains symbolic and is proved for every positive memory page count.
 memory bounds. `Memory.lean` proves the key and log bytes at their fixed
 addresses. `Startup.lean` connects actual loading and entry activation to the
 method body. `Body`, `Calls`, and `Success` compose all fifteen opcodes, input,
-log and return contracts; one local metered storage frontier remains.
+log and return contracts; one local metered storage frontier remains. `Execution` connects this to actual
+VM success; `Fuel` proves the default interpreter fuel is sufficient.
 
 Kernel-checked facts currently cover the export, signature, absence of start,
 model parse functionality, installation of the new key-value pair,
@@ -56,3 +57,8 @@ proofs in commit `a65583a`). Corrected `Context.WF` requires unique keys in
 each overlay, with preservation proofs for actual runtime operations; the
 probe now proves these malformed contexts are excluded. This is a correction
 to the refinement premise, not a proof of the old statement.
+
+`InputFailure.lean` proves the actual early register-size rejection: two
+instructions, both fixed input charges, an exact trap state and untouched
+storage/logs/registers. Classification as the expected guest panic uses
+explicit fresh error-marker premises.
