@@ -8,3 +8,4 @@ import NearLogic.Method
 import NearLogic.Examples.Skeleton
 import NearLogic.Instantiate
 import NearLogic.Outcome
+import NearLogic.Examples.SkeletonModule
