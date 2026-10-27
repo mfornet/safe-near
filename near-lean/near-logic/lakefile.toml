@@ -1,0 +1,20 @@
+# NearLogic: a separation logic over NEAR's metered machine (milestone M2 of
+# notes/todo/wnear_refinement_proof.md, layer L1). The machine of
+# `Wasm.Near.runMetered`, with its gas charges, as an iris-lean language;
+# the heap, assertions and rule shapes of WasmLogic (../wasm-logic), and gas
+# credits for every step.
+name = "NearLogic"
+version = "0.1.0"
+defaultTargets = ["NearLogic"]
+packagesDir = "../.lake/packages"
+
+[[require]]
+name = "WasmLogic"
+path = "../wasm-logic"
+
+[[require]]
+name = "NearVM"
+path = "../vm"
+
+[[lean_lib]]
+name = "NearLogic"
