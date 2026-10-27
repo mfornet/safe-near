@@ -124,6 +124,34 @@ def readUtf8String (st : HostStore NearState) (len ptr : UInt64) : StringRead :=
     | .error e => ⟨acc, .error e⟩
     | .ok buf => finish acc buf
 
+/-- A complete fixed-length UTF-8 read contract, including the exact charge
+plan. Clients can project either the decoded bytes or the cost without
+unfolding the private memory-view helper. -/
+theorem readUtf8String_fixed (st : HostStore NearState) (len ptr : UInt64)
+    (bytes : List UInt8) (hlen : len ≠ u64Max)
+    (hspace : len.toNat ≤ logSpace st)
+    (hcost : st.host.extCosts.cost "read_memory_byte" * len.toNat < 2 ^ 64)
+    (hbound : ptr.toNat + len.toNat ≤ memorySize st)
+    (hbytes : st.mem.readList ptr.toNat len.toNat = bytes)
+    (hutf : validUtf8 bytes = true) :
+    readUtf8String st len ptr =
+      ⟨[ext1 "utf8_decoding_base", ext1 "read_memory_base",
+        ext1 "read_memory_byte" len.toNat, ext1 "utf8_decoding_byte" bytes.length], .ok bytes⟩ := by
+  simp [readUtf8String, hlen, Nat.not_lt_of_ge hspace, viewCharges,
+    payPerOverflows, Nat.not_le_of_lt hcost, Nat.not_lt_of_ge hbound, hbytes, hutf]
+
+/-- The decoded-result projection of the complete fixed-length contract. -/
+theorem readUtf8String_fixed_ok (st : HostStore NearState) (len ptr : UInt64)
+    (bytes : List UInt8) (hlen : len ≠ u64Max)
+    (hspace : len.toNat ≤ logSpace st)
+    (hcost : st.host.extCosts.cost "read_memory_byte" * len.toNat < 2 ^ 64)
+    (hbound : ptr.toNat + len.toNat ≤ memorySize st)
+    (hbytes : st.mem.readList ptr.toNat len.toNat = bytes)
+    (hutf : validUtf8 bytes = true) :
+    (readUtf8String st len ptr).result = .ok bytes :=
+  congrArg StringRead.result
+    (readUtf8String_fixed st len ptr bytes hlen hspace hcost hbound hbytes hutf)
+
 /-- `get_utf16_string(len, ptr)`, after the caller paid for the call: UTF-16LE to UTF-8. -/
 def readUtf16String (st : HostStore NearState) (len ptr : UInt64) : StringRead :=
   let head := [ext1 "utf16_decoding_base"]
