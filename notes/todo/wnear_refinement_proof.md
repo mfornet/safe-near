@@ -454,6 +454,8 @@ the raised run's. The plan:
 
 The storage trie (`NearLogic/Trie.lean`, `storage_lookup`): on a canonical trie a lookup finds exactly the stored value, without error, keeps the data, and touches at most 2·|key| + 1 nodes. It assumes that no witness node hashes to the all-zero hash, which `walk` treats as the empty trie. That is a SHA-256 preimage fact: it can't be proved, so like SAF-67 it must become an assumption on the context (a `Context.WF` field or a hypothesis of `Refines`). Still left on this path: linking `entries.find?` to the VM host's `storage` through `trie_storage` and `toNearState`.
 
+The allocator (M4, `Bridge/Functions/Alloc*.lean`): the heap invariant `heapInv` is designed and its bottom layer proved: the leaves, the `__rust_alloc`/`__rust_dealloc` entry shims, a metered `memory.grow` rule and `new_cell_for_free_list` (577). Not done yet: `alloc_first_fit` (580), `WeeAlloc::alloc` (581), `dealloc` (582), `Neighbors::remove` (575). Finding: wee_alloc 0.4.5's first-fit walk unlinks every free cell it passes. Such cells come back only by merging, so one walk takes at most 2F iterations, and an allocation that misses grows memory and succeeds.
+
 The remaining open point on this path is SAF-67 (`Context.WF` does not
 constrain `storageProofSize`). Until it is decided, every storage-touching
 method's `Refines` is false as stated.
