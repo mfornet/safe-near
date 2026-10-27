@@ -118,6 +118,23 @@ theorem applyCharges_relax (ns : NearState) (cs : List Charge) (p m : Nat) (hp :
 /-- A host store with raised limits. -/
 def relaxSt (st : HostStore NearState) (p m : Nat) : HostStore NearState := { st with host := relax st.host p m }
 
+theorem applyCharge_config (ns : NearState) (c : Charge) : (applyCharge ns c).1.config = ns.config := by
+  cases c <;> rfl
+
+/-- Charges never change the host's config. -/
+theorem applyCharges_gas_config (ns : NearState) (cs : List Charge) :
+    (applyCharges ns cs).1.config = ns.config := by
+  induction cs generalizing ns with
+  | nil => rfl
+  | cons c cs ih =>
+    cases hc : applyCharge ns c with
+    | mk ns' e =>
+      have := applyCharge_config ns c
+      rw [hc] at this
+      cases e with
+      | some e => simp only [applyCharges, hc]; exact this
+      | none => simp only [applyCharges, hc]; rw [ih, this]
+
 /-- A gas error: what a failed charge reports. -/
 def isGasError (e : HostError) : Prop := e = .gasExceeded ∨ e = .gasLimitExceeded
 
