@@ -89,6 +89,34 @@ Each layer only uses the contracts of the layer below.
 | L5 Methods | One contract per exported method, whose postcondition is the model's `step` and whose gas cost is `gasBound` | wNEAR verification |
 | L6 Assembly | `refines_wnear_exported` from L5 and L2 | `Proofs/Refinement.lean` |
 
+### 3.0 The metered logic (L1) — **Decided**
+
+`near-lean/near-logic` (NearLogic). Recorded here so that the design is
+not re-derived:
+
+- **The machine.** The language's step is `mnext`, one step of
+  `Wasm.Near.runMetered`: the instruction's charge, `Exec.step`, the
+  activation charge of a frame it enters. `runMetered_steps` makes a run a
+  sequence of these steps, and `runMetered_ending` reads adequacy back on
+  how the run ends. A failed charge is an ending (`Ending.gas`), which
+  proofs make impossible by holding credits.
+- **The heap.** WasmLogic's locations and cells, with the host split: the
+  host cell (`Loc.host`) holds the host with its gas counter, profile and
+  `context.usedGas` erased (`erase`); `gasLoc` holds the counter and the
+  profile. The state is `MStore`, a structure around the store, so that its
+  state interpretation is not WasmLogic's (iris-lean keys state
+  interpretations on the state type). Assertions, `Frame`, `Ctx` and `Post`
+  are WasmLogic's.
+- **Gas credits.** `credits C n` owns the gas cell and says `used + n ≤ C`,
+  with the ceiling `C` below both limits. Credits are threaded, not split:
+  a rule takes `credits C (cost + R)` and returns `credits C R`. The
+  ceiling is where the method's gas bound enters: a method proved from
+  `credits gasBound (gasBound - used₀)` uses at most `gasBound`.
+- **Lifting.** `mwp_lift_plain` takes a step that leaves the host alone
+  from facts about `Exec.step` only, so WasmLogic's side conditions are
+  reused unchanged; `mwp_lift_host` takes a host call, which owns the host
+  cell and pays the host function's own charges.
+
 ### 3.1 How the `Refines` clauses come out of a contract — **Open, to validate in M2**
 
 The intended route, which the walking skeleton (M2) must confirm:
