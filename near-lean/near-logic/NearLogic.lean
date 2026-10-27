@@ -6,3 +6,5 @@ import NearLogic.Entry
 import NearLogic.Rules.Pure
 import NearLogic.Method
 import NearLogic.Examples.Skeleton
+import NearLogic.Instantiate
+import NearLogic.Outcome

@@ -18,3 +18,9 @@ path = "../vm"
 
 [[lean_lib]]
 name = "NearLogic"
+
+# The boundary (`Near.Boundary.execOn`) and `Refines`, for the walking
+# skeleton's closed refinement proof.
+[[require]]
+name = "NearRuntime"
+path = "../runtime"
