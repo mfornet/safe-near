@@ -44,6 +44,19 @@ theorem returnCost_of_register (cfg : WasmConfig) (store : Store NearState) (byt
   rw [returnCost, returnCharges, returnPlan_of_register _ bytes hregister hlimit]
   simp [burnSum, burnCost, valueReturnCost, inputBefore, chargedStore, chargeHost, Nat.add_assoc]
 
+/-- Oversized returns omit data-receipt charges, so the accepted-return
+formula also bounds the rejected-length case. -/
+theorem returnCost_of_register_le (cfg : WasmConfig) (store : Store NearState) (bytes : Near.Bytes)
+    (hregister : store.host.registers 0 = some bytes) :
+    returnCost cfg store ≤ valueReturnCost store.host.extCosts store.host.fees
+      store.host.outputDataReceivers store.host.context.currentAccountId bytes.length := by
+  cases hl : withinLimit store.host.config.maxReturnLen bytes.length with
+  | true => exact Nat.le_of_eq (returnCost_of_register cfg store bytes hregister hl)
+  | false =>
+    simp [returnCost, returnCharges, chargesBefore, storageMutationPlan?, chargesBeforeUnvalidated,
+      creationAccountArgs, argU64, getMemOrReg, readSpan, hregister, hl,
+      burnSum, burnCost, valueReturnCost, inputBefore, chargedStore, chargeHost, Nat.add_assoc]
+
 private def costView (host : NearState) :=
   (host.extCosts, host.fees, host.outputDataReceivers, host.context.currentAccountId,
     host.registers 0, host.config.maxReturnLen)
@@ -93,6 +106,24 @@ theorem successReturn_cost (cfg : RuntimeConfig) (store : Store NearState)
   rw [returnCost_of_register cfg.wasm (successReturnBefore cfg store storage) bytes (hreg.trans hregister)]
   · rw [hext, hfees, hreceivers, hcurrent]
   · simpa only [hlen] using hlimit
+
+/-- No return-length acceptance premise is needed for the suffix bound. -/
+theorem successReturn_cost_le (cfg : RuntimeConfig) (store : Store NearState)
+    (storage : HostStore NearState) (bytes : Near.Bytes)
+    (hregister : storage.host.registers 0 = some bytes) :
+    returnCost cfg.wasm (successReturnBefore cfg store storage) ≤
+      valueReturnCost storage.host.extCosts storage.host.fees storage.host.outputDataReceivers
+        storage.host.context.currentAccountId bytes.length := by
+  have hf := successReturn_costView cfg store storage
+  have hext := congrArg (fun fields => fields.1) hf
+  have hfees := congrArg (fun fields => fields.2.1) hf
+  have hreceivers := congrArg (fun fields => fields.2.2.1) hf
+  have hcurrent := congrArg (fun fields => fields.2.2.2.1) hf
+  have hreg := congrArg (fun fields => fields.2.2.2.2.1) hf
+  dsimp only [costView] at hext hfees hreceivers hcurrent hreg
+  have h := returnCost_of_register_le cfg.wasm (successReturnBefore cfg store storage)
+    bytes (hreg.trans hregister)
+  simpa only [hext, hfees, hreceivers, hcurrent] using h
 
 /-- A context-only sufficient-success cost for the empty-base specialization.
 The receipt receivers and same-account fee tests are original inputs. -/
@@ -151,6 +182,42 @@ theorem executionBudget_empty_eq (ctx : NearInterface.Context) (raw : Storage) (
   rw [executionBudget_eq, hi, hl, hr, emptyCost_eq ctx raw hpages hkey hvalue]
   rfl
 
+/-- The original-data bound also covers rejected return lengths. -/
+theorem executionBudget_empty_le (ctx : NearInterface.Context) (raw : Storage) (rest : Nat)
+    (hpages : 0 < ctx.protocol.wasm.limits.initialMemoryPages)
+    (hkey : 1 ≤ ctx.protocol.wasm.limits.maxLengthStorageKey)
+    (hvalue : ctx.args.length ≤ ctx.protocol.wasm.limits.maxLengthStorageValue) :
+    executionBudget ctx.protocol (Near.Boundary.toVMContext ctx) raw
+      (emptyAfter ctx raw) (emptyCost ctx raw) rest ≤ saveEmptyCost ctx + rest := by
+  have hf := emptyAfter_frame ctx raw
+  have hext := emptyAfter_extCosts ctx raw
+  have hfees := (StorageFrame.Frame.fees hf).trans
+    (storageInput_fees ctx.protocol (Near.Boundary.toVMContext ctx) raw)
+  have ho := congrArg NearState.outputDataReceivers hf.2
+  have hreceivers : (emptyAfter ctx raw).host.outputDataReceivers =
+      (Near.Boundary.toVMContext ctx).outputDataReceivers :=
+    ho.trans (storageInput_outputDataReceivers ctx.protocol (Near.Boundary.toVMContext ctx) raw)
+  have hcurrent := (StorageFrame.Frame.currentAccountId hf).trans (storageInput_represents ctx raw).1
+  have hregister := (congrFun (StorageFrame.Frame.registers hf) 0).trans
+    (storageInput_register ctx.protocol (Near.Boundary.toVMContext ctx) raw)
+  have hr := successReturn_cost_le ctx.protocol
+    (executionStore ctx.protocol (Near.Boundary.toVMContext ctx) raw) (emptyAfter ctx raw)
+    ctx.args hregister
+  rw [hext, hfees, hreceivers, hcurrent] at hr
+  have hi : Input.cost (successInputBefore ctx.protocol
+      (executionStore ctx.protocol (Near.Boundary.toVMContext ctx) raw)).host =
+      ctx.protocol.wasm.extCosts.cost "base" + ctx.protocol.wasm.extCosts.cost "write_register_base" := by
+    change Input.cost (executionActive ctx.protocol (Near.Boundary.toVMContext ctx) raw) = _
+    simp only [Input.cost, active_extCosts]
+  have hl : (successLogBefore ctx.protocol
+      (executionStore ctx.protocol (Near.Boundary.toVMContext ctx) raw) (emptyAfter ctx raw)).host.extCosts =
+      ctx.protocol.wasm.extCosts := by
+    exact hext
+  rw [executionBudget_eq, hi, hl, emptyCost_eq ctx raw hpages hkey hvalue]
+  unfold saveEmptyCost
+  dsimp only [VMContext.toNearState]
+  omega
+
 /-- A bound on the original gas limit supplies all initial credits for the
 computed empty-success budget, without an intermediate-state assumption. -/
 theorem emptyCredits_of_gasLimit (ctx : NearInterface.Context) (raw : Storage) (rest : Nat)
@@ -165,6 +232,18 @@ theorem emptyCredits_of_gasLimit (ctx : NearInterface.Context) (raw : Storage) (
   apply (Near.Boundary.initial_credits_iff ctx raw _).mpr
   rw [executionBudget_empty_eq ctx raw rest hpages hkey hvalue hreturn]
   exact hgas
+
+/-- Reserve the storage/output prefix even if the return limit rejects. -/
+theorem emptyCredits_of_gasLimit_allReturn (ctx : NearInterface.Context) (raw : Storage) (rest : Nat)
+    (hpages : 0 < ctx.protocol.wasm.limits.initialMemoryPages)
+    (hkey : 1 ≤ ctx.protocol.wasm.limits.maxLengthStorageKey)
+    (hvalue : ctx.args.length ≤ ctx.protocol.wasm.limits.maxLengthStorageValue)
+    (hgas : saveEmptyCost ctx + rest ≤ ctx.gasLimit) :
+    ((Near.Boundary.toVMContext ctx).toNearState ctx.protocol raw).gas.Credits
+      (executionBudget ctx.protocol (Near.Boundary.toVMContext ctx) raw
+        (emptyAfter ctx raw) (emptyCost ctx raw) rest) := by
+  apply (Near.Boundary.initial_credits_iff ctx raw _).mpr
+  exact (executionBudget_empty_le ctx raw rest hpages hkey hvalue).trans hgas
 
 /-- Sufficient original gas already entails the log decoder's checked-cost
 width; no extra protocol arithmetic premise is necessary. -/
