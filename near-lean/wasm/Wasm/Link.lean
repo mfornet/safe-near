@@ -264,11 +264,10 @@ def indexed (xs : Array α) : List (Nat × α) := (List.range xs.size).zip xs.to
 
 /-! ## Instantiation -/
 
-/-- Instantiate a validated module given its imports, in order, without
-running its start function. -/
-def instantiateModule (store : Store H) (vm : ValidModule) (imports : List ExternVal) :
+/-- Instantiate a module given its imports, in order, without running its
+start function. -/
+def instantiateModuleOf (store : Store H) (m : Module) (imports : List ExternVal) :
     Except (LinkError H) (Store H × ModuleInst) :=
-  let m := vm.module
   if imports.length != m.imports.size then
     .error (.internal s!"expected {m.imports.size} imports, got {imports.length}")
   else
@@ -303,6 +302,12 @@ def instantiateModule (store : Store H) (vm : ValidModule) (imports : List Exter
   match initDatas store inst (indexed m.datas) with
   | .error e => .error e
   | .ok store => .ok (store, inst)
+
+/-- Instantiate a validated module given its imports, in order, without
+running its start function. -/
+def instantiateModule (store : Store H) (vm : ValidModule) (imports : List ExternVal) :
+    Except (LinkError H) (Store H × ModuleInst) :=
+  instantiateModuleOf store vm.module imports
 
 /-- Run the start function to completion. -/
 def runStart (store : Store H) (limits : ExecLimits) (fuel : Nat) (m : Module) (inst : ModuleInst) :

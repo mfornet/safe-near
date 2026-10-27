@@ -71,7 +71,7 @@ theorem instantiate_skel (extra : Nat) (h : NearState) (vm : ValidModule) (hvm :
   have hd : dataMem = m' := by unfold dataMem; rw [hw]; rfl
   have ht : (metered extra "value_return" valueReturnFn).toHostFn.type =
       { params := [.i64, .i64], results := [] } := rfl
-  unfold Link.instantiateModule
+  unfold Link.instantiateModule Link.instantiateModuleOf
   rw [hvm]
   simp [skelPrepared, skelModule, Link.checkImports, Link.checkImport, Link.importAddrs, Store.allocModule,
     Link.allocFuncs, Store.allocFunc, Link.allocTables, Link.allocMems, Store.allocMem, Link.allocGlobals,
