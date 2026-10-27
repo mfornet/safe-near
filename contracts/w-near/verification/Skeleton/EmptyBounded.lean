@@ -9,7 +9,8 @@ Every model resource-limit branch, including either final storage-stake
 outcome, agrees with actual public execution and uses at most the original
 `saveEmptyCost`. The finite-set theorem uses the precise `nearRuntime`
 interface. Empty canonical base, no selected key, native usage room and the
-recorded-proof check remain explicit. Lower-gas executions remain open.
+recorded-proof check remain explicit. `Skeleton.EmptyRefinement` assembles
+the lower-gas alternative and the remaining pointwise refinement clauses.
 -/
 namespace WNear.Skeleton
 open Wasm Wasm.Near Wasm.Near.MeteredLogic NearInterface
