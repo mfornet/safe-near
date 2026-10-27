@@ -1,4 +1,5 @@
 import Harness.TotalSupply
+import Model.Args
 
 /-!
 # Contracts on `ft_balance_of`'s path
@@ -137,6 +138,40 @@ def balanceOf : Contract Bool where
     if h.readNat r.after out 16 != expected then
       some s!"balance {h.readNat r.after out 16}, expected {expected}" else none
   -- No claim yet: the storage host costs are stated with M7.
+  cost _ _ := 10 ^ 18
+  ghostOf _ _ := some true
+
+/-! ## `serde_json::from_slice` of `ft_balance_of`'s arguments (65)
+
+`from_slice(out, ptr, len)`: the `Result` of parsing the `len` bytes at
+`ptr` as `{"account_id": AccountId}`, in the 16 bytes at `out`: `Err` (tag
+word 1), or `Ok` with the account id `String` `(ptr, cap, len)` at
+`out + 4`. It accepts exactly the inputs the model's `Call.decode` does,
+with the same account: the binary's side of `Parses` for this method. -/
+
+def fromSliceBalanceOf : Contract Bool where
+  name := "serde_json::from_slice::<ft_balance_of args>"
+  func := 65
+  pre h i :=
+    let (out, ptr, len) := (u32Arg i.args 0, u32Arg i.args 1, u32Arg i.args 2)
+    if !i.ghost then some "the environment is not set up"
+    else if out + 16 > h.memSize i.store || ptr + len > h.memSize i.store then some "beyond memory"
+    else none
+  footprint _ i := [(u32Arg i.args 0, 16), (heapBase, 2 ^ 32 - heapBase), (freeListHead, 4)]
+  stack := 4096
+  grows := true
+  post h i r :=
+    let (out, ptr, len) := (u32Arg i.args 0, u32Arg i.args 1, u32Arg i.args 2)
+    (ended r).or <|
+    let ok := h.readNat r.after out 4 != 1
+    match WNear.Call.decode "ft_balance_of" (h.read r.before ptr len) with
+    | some (.ftBalanceOf a) =>
+      if !ok then some s!"rejects what the model parses as {a.val}"
+      else
+        let bs := h.read r.after (h.readNat r.after (out + 4) 4) (h.readNat r.after (out + 12) 4)
+        if bs != a.val.toUTF8.toList then some s!"parses another account than {a.val}" else none
+    | _ => if ok then some "accepts what the model rejects" else none
+  -- No claim yet: the gas per argument byte is stated with M6.
   cost _ _ := 10 ^ 18
   ghostOf _ _ := some true
 

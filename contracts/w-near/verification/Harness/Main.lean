@@ -425,6 +425,26 @@ def balanceInputs (h : Harness) (base : Store NearState) (r : Rng) :
     out := out ++ [{ label := s!"random {k}", store := s, args := [i32 1000, i32 6000, i32 6200], ghost := true }]
   pure (out, [])
 
+/-- Border-case arguments of `ft_balance_of`, as JSON. -/
+def balanceOfArgs : List String := [
+  "{\"account_id\":\"bob.near\"}", " { \"account_id\" : \"bob.near\" } ", "{\"\\u0061ccount_id\":\"bob.near\"}",
+  "{\"account_id\":\"b\\u006fb.near\"}", "[\"bob.near\"]", "{\"account_id\":\"bob.near\",\"x\":1}",
+  "{\"account_id\":\"bob.near\",\"account_id\":\"bob.near\"}", "{\"account_id\":\"A\"}",
+  "{\"account_id\":\"a\"}", "{\"account_id\":1}", "{}", "", "garbage", "{\"account_id\":\"bob.near\"",
+  "{\"account_id\":\"bob.near\"} x", "{\"account_id\":\"\"}", "{\"account_id\":null}",
+  "{\"account_id\":\"alice.near\\u0000\"}", "{\"x\":{\"y\":[1,2,{\"z\":\"w\"}]},\"account_id\":\"carol.near\"}",
+  "[\"bob.near\",1]", "{\"account_id\":\"" ++ String.ofList (List.replicate 64 'a') ++ "\"}",
+  "{\"account_id\":\"" ++ String.ofList (List.replicate 65 'a') ++ "\"}"]
+
+def fromSliceInputs (h : Harness) (base : Store NearState) (_ : Rng) :
+    Except String (List (Input Bool) × List (Input Bool)) := do
+  let mut out : List (Input Bool) := []
+  let cases : List (List UInt8) := balanceOfArgs.map (fun s : String => s.toUTF8.toList) ++ [[255, 254]]
+  for (j, k) in cases.zipIdx do
+    let s ← put h base [(7000, j)]
+    out := out ++ [{ label := s!"case {k}", store := s, args := [i32 1000, i32 7000, i32 j.length], ghost := true }]
+  pure (out, [])
+
 /-! ## Call sites -/
 
 def account (s : String) : List UInt8 := s.toUTF8.toList
@@ -498,7 +518,7 @@ def main (args : List String) : IO UInt32 := do
   let captured ← captureAll protocol module bytes.size
     [memcpy.func, memset.func, bcmp.func, multi3.func, alloc.func, vecDeref.func, stateOrPanic.func,
       u128From.func, ftTotalSupply.func, resultExpect.func, stateRead.func, toVecU128.func,
-      valueReturn.func, envInput.func, optionExpect.func, balanceOf.func]
+      valueReturn.func, envInput.func, optionExpect.func, balanceOf.func, fromSliceBalanceOf.func]
   let sites (f : Nat) := captured.getD f #[]
   -- A fresh store after the method prologue: the environment is set up.
   let envBase ← orThrow (prologue h h.store)
@@ -526,5 +546,6 @@ def main (args : List String) : IO UInt32 := do
     ← stress h valueReturn (valueReturnInputs h envBase) (sites valueReturn.func) verbose,
     ← stress h envInput (envInputInputs h envBase) (sites envInput.func) verbose,
     ← stress h optionExpect (optionExpectInputs h envBase) (sites optionExpect.func) verbose,
-    ← stress h balanceOf (balanceInputs h envBase) (sites balanceOf.func) verbose]
+    ← stress h balanceOf (balanceInputs h envBase) (sites balanceOf.func) verbose,
+    ← stress h fromSliceBalanceOf (fromSliceInputs h envBase) (sites fromSliceBalanceOf.func) verbose]
   pure (if results.all id then 0 else 1)
