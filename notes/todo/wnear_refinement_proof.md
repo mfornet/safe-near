@@ -1121,6 +1121,18 @@ initialization word, well-formedness and unchanged memory size/max from
 those real writes. The initialization-slow and old-hook-drop branches remain
 outside this first-install contract.
 
+`PanicHookBody` adds the actual typed f822 invocation (42 units/36 steps)
+to the real f503 call, composing f522's complete body: 131 units/102 active
+steps. `PanicHookCall` adds f522's opcode, activation and normal leave:
+140 ordinary units/104 local-call steps, with exact gas and promise credits.
+`TotalSupplyPanicFrontier` supplies this actual call alongside the six earlier
+implementations. The getter now has **four remaining local execution
+contracts**: state read219, serialization96 and the two vector-drop68 sites.
+The public invocation and original-store gas bounds retain installed-code,
+scalar/native/representation resources and whole-module validation premises.
+An independent review found no functional or accounting defect in this
+composition; no complete exported-method refinement is claimed.
+
 The separate `PanicHookValidation` suite checks 60 accepted captures across
 503/508/509/522/822, including exact root gas and fuel, one-less-fuel failure,
 restored SP, output words, installed hook words and unchanged functional host

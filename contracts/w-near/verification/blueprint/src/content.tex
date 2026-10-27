@@ -343,8 +343,10 @@ retain arbitrary aliasing.
 The complete actual first-installation chain is also composed: exclusive
 acquisition441, lazy lookup565/468/467/564, setter463 and wrapper520.
 The complete520 local call costs328 ordinary units and takes226 steps.
-\texttt{TotalSupplyInterfaceFrontier} reduces the getter to five remaining
-local execution contracts: panic hook522, state read219, serialization96 and
+The complete panic-hook setup522 composes zero-size allocation503/508/509
+and actual first-hook replacement822: its local call costs140 ordinary units
+and takes104 steps. \texttt{TotalSupplyPanicFrontier} reduces the getter to
+four remaining local execution contracts: state read219, serialization96 and
 two vector drops68. Native/data predicates on exact sequential memory and
 installed-code/representation resources remain explicit. Lazy initialization's
 status/counter/receiver readbacks follow from initial native spans, separation
@@ -356,6 +358,9 @@ call costs are respectively22/56/86 ordinary units and16/41/63 steps.
 The pointer one returned by503 is derived from the actual writes; the low
 word survives scratch/output overlap. Initial native stack bounds also imply
 that words above the stack, including the panic guards, are preserved.
+The hook setter executes all four lock/vtable/receiver/unlock writes and its
+explicit return:42 ordinary units/36 local-call steps. Exact installed words,
+cleared lock and preserved initialization word follow from the actual writes.
 A separate suite checks60 accepted captures across503/508/509/522/822 with
 exact root gas and fuel and one-less-fuel failure. Nonzero allocator paths
 remain outside the accepted contracts.
