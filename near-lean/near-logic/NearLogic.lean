@@ -31,3 +31,4 @@ import NearLogic.Hosts.RelaxLogs
 import NearLogic.RelaxRunLogs
 import NearLogic.Rules.Memory
 import NearLogic.Rules.CallWasm
+import NearLogic.Rules.Control
