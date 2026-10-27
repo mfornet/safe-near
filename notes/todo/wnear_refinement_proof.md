@@ -1090,6 +1090,34 @@ Principal new call, memory and frontier theorems pass Lean LSP MCP standard-
 axiom verification. No runtime, model or WF changes are included; the full
 refinement goal remains open.
 
+The next panic-setup checkpoint proves the accepted zero-size allocator path.
+`PanicAllocateZero` executes actual f509, including the nested blocks and
+zero-size branch: 11 ordinary units/14 active steps; its typed local call is
+22 units/16 steps. The nonzero allocator branches are outside this contract.
+`PanicAllocateBody` and `PanicAllocateCall` compose actual f508 reserve16,
+argument preparation, f509 invocation, sequential two-word copy and SP restore:
+45 units/39 active steps and 56 units/41 local-call steps. The second source
+word is read after the first target write; the execution contract retains
+arbitrary aliasing.
+
+`PanicAllocatePointerBody` and `PanicAllocatePointerCall` compose actual f503:
+75 units/61 active steps and 86 units/63 local-call steps. The returned pointer
+one is derived from the actual memory writes, so the real nonzero guard skips
+the failing allocation branch. `PanicAllocateNative` proves that the low
+result word survives the adjacent high write without requiring scratch/output
+separation. `PanicAllocatePointerNative` derives the nested spans from original
+SP at least32 and SP within memory; static words above that SP retain their
+initial values. `PanicHookNative` therefore derives all computed-memory guard
+conditions for the following hook setter from original code/data, a stack below
+the hook globals, and initial initialization/lock/old-vtable words zero.
+
+The separate `PanicHookValidation` suite checks 60 accepted captures across
+503/508/509/522/822, including exact root gas and fuel, one-less-fuel failure,
+restored SP, output words, installed hook words and unchanged functional host
+fields. Each allocator helper excludes four nonzero-allocation captures;
+these cases are not claimed by its zero-size theorem. The integrated harness
+baseline remains unchanged.
+
 ### M4. The Rust runtime layer
 
 The shadow stack, wee_alloc (its free lists and growing memory through
