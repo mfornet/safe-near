@@ -9,6 +9,7 @@ contracts describe a single returning call, never the whole method. -/
 namespace WNear.Proofs.TotalSupply
 open Wasm Wasm.Near MeteredLogic
 open WNear.Proofs.StorePairCaller (paid paid_credits)
+open WNear.Proofs.StorePair (voidFrame wp_finish_void)
 set_option maxHeartbeats 800000
 set_option maxRecDepth 10000
 
@@ -605,5 +606,405 @@ def entryCost (cfg : WasmConfig) (cost : Fin 11 → Nat) : Nat :=
 /-- Structural body fuel excludes the final free wrapper leave. Every call
 budget must separately count its call opcode, callee body and normal leave. -/
 def bodySteps (steps : Fin 11 → Nat) : Nat := 65 + ((List.finRange 11).map steps).sum
+
+/-- Exact residual credits of the serializer-input's two actual writes. -/
+theorem copyStore_credits (s : Store NearState) (op index : Nat) (scratch : UInt32)
+    (memory : Memory) (rest : Nat) (h : s.host.gas.Credits (10 * op + rest)) :
+    (copyStore s op index scratch memory).host.gas.Credits rest := by
+  change (paid (copyHighStore s op index scratch memory) op 4).host.gas.Credits rest
+  apply paid_credits
+  change (paid s op 6).host.gas.Credits (4 * op + rest)
+  apply paid_credits
+  exact h.mono (by omega)
+
+/-- Finite sums in the exact eleven-call budget reduce without any runtime evaluation. -/
+theorem eleven_sum (f : Fin 11 → Nat) :
+    ((List.finRange 11).map f).sum =
+      f 0 + (f 1 + (f 2 + (f 3 + (f 4 + (f 5 + (f 6 + (f 7 + (f 8 + (f 9 + (f 10 + 0)))))))))) := rfl
+
+theorem ten_six (op rest : Nat) : 10 * op + (6 * op + rest) = 16 * op + rest := by omega
+
+theorem bodyFuel_decomposition (fuel : Nat) (steps : Fin 11 → Nat) :
+    ((((((((((((((((((((((((fuel + 4) + steps 10) + 3) + steps 9) + 3) + steps 8) + 4) + steps 7) + 6) + steps 6) + 7) + steps 5) + 6) + 10) + steps 4) + 6) + steps 3) + 6) + steps 2) + 3) + steps 1) + 2) + steps 0) + 5) = fuel + bodySteps steps := by
+  simp only [bodySteps, eleven_sum]
+  omega
+
+/-- Actual 76-instruction wrapper composition. The only execution contracts
+assumed are the eleven named local callees. All scalar groups, intermediate
+credits, memory reads/writes and stack-pointer restoration are derived here.
+The final continuation starts after the concrete body, before its free leave. -/
+theorem wp_body (cfg : WasmConfig) (fuel rest : Nat) (initial final : Store NearState)
+    (limits : ExecLimits) (frame : CallFrame) (code : List Instr) (post : Post)
+    (before after : Fin 11 → Store NearState) (cost steps : Fin 11 → Nat)
+    (mi : ModuleInst) (globalIndex memoryIndex : Nat) (sp scratch pointer length : UInt32)
+    (originalGlobal finalGlobal : GlobalInst) (copyMemory sliceMemory : Memory)
+    (hcalls : CallObligations cfg limits {frame with locals := frame.locals.set! 0 (.i32 scratch)}
+      scratch pointer length before after cost steps)
+    (hboundaries : ScalarBoundaries cfg initial final before after scratch globalIndex memoryIndex copyMemory)
+    (hinv : BoundaryInvariants initial after frame mi globalIndex memoryIndex sp scratch pointer length
+      originalGlobal finalGlobal copyMemory sliceMemory)
+    (hc : initial.host.gas.Credits (bodyCost cfg cost + rest))
+    (hnext : WP cfg fuel (.next (atCode final limits #[]
+      {frame with locals := frame.locals.set! 0 (.i32 scratch)} [] code)) rest post) :
+    WP cfg (fuel + bodySteps steps) (.next (atCode initial limits #[] frame []
+      (WNear.Binary.TotalSupply.body ++ code))) (bodyCost cfg cost + rest) post := by
+  let op := cfg.regularOpCost
+  let activeFrame : CallFrame := {frame with locals := frame.locals.set! 0 (.i32 scratch)}
+  have hlocal : activeFrame.locals[0]? = some (.i32 scratch) := by
+    simp [activeFrame, hinv.local_capacity]
+  let g10 := 4 * op + rest
+  let f10 := fuel + 4
+  let g9 := 3 * op + (cost 10 + g10)
+  let f9 := (f10 + steps 10) + 3
+  let g8 := 3 * op + (cost 9 + g9)
+  let f8 := (f9 + steps 9) + 3
+  let g7 := 4 * op + (cost 8 + g8)
+  let f7 := (f8 + steps 8) + 4
+  let g6 := 6 * op + (cost 7 + g7)
+  let f6 := (f7 + steps 7) + 6
+  let g5 := 7 * op + (cost 6 + g6)
+  let f5 := (f6 + steps 6) + 7
+  let g4 := 16 * op + (cost 5 + g5)
+  let f4 := ((f5 + steps 5) + 6) + 10
+  let g3 := 6 * op + (cost 4 + g4)
+  let f3 := (f4 + steps 4) + 6
+  let g2 := 6 * op + (cost 3 + g3)
+  let f2 := (f3 + steps 3) + 6
+  let g1 := 3 * op + (cost 2 + g2)
+  let f1 := (f2 + steps 2) + 3
+  let g0 := 2 * op + (cost 1 + g1)
+  let f0 := (f1 + steps 1) + 2
+  have hbudget : 5 * op + (cost 0 + g0) = bodyCost cfg cost + rest := by
+    clear hcalls hboundaries hinv hc hnext hlocal
+    simp only [bodyCost, eleven_sum]
+    dsimp [g0, g1, g2, g3, g4, g5, g6, g7, g8, g9, g10, op]
+    omega
+  have initialCredit : initial.host.gas.Credits (5 * op + (cost 0 + g0)) := by
+    rw [hbudget]; exact hc
+  have c0 : (before 0).host.gas.Credits (cost 0 + g0) := by
+    rw [hboundaries.prologue]
+    apply paid_credits
+    exact initialCredit
+  have a0 := hcalls.panicHook.credits g0 c0
+  have c1 : (before 1).host.gas.Credits (cost 1 + g1) := by
+    rw [hboundaries.interfaceArgs]
+    apply paid_credits
+    exact a0.mono (by dsimp [g0]; omega)
+  have a1 := hcalls.installInterface.credits g1 c1
+  have c2 : (before 2).host.gas.Credits (cost 2 + g2) := by
+    rw [hboundaries.stateArgs]
+    apply paid_credits
+    exact a1.mono (by dsimp [g1]; omega)
+  have a2 := hcalls.readState.credits g2 c2
+  have c3 : (before 3).host.gas.Credits (cost 3 + g3) := by
+    rw [hboundaries.unwrapArgs]
+    apply paid_credits
+    apply paid_credits
+    exact a2.mono (by dsimp [g2]; omega)
+  have a3 := hcalls.unwrapState.credits g3 c3
+  have c4 : (before 4).host.gas.Credits (cost 4 + g4) := by
+    rw [hboundaries.supplyArgs]
+    apply paid_credits
+    apply paid_credits
+    exact a3.mono (by dsimp [g3]; omega)
+  have a4 := hcalls.readSupply.credits g4 c4
+  have c5 : (before 5).host.gas.Credits (cost 5 + g5) := by
+    rw [hboundaries.serializeArgs]
+    apply paid_credits
+    apply paid_credits
+    apply copyStore_credits
+    exact a4.mono (by dsimp [g4]; omega)
+  have a5 := hcalls.serialize.credits g5 c5
+  have c6 : (before 6).host.gas.Credits (cost 6 + g6) := by
+    rw [hboundaries.expectArgs]
+    apply WNear.Proofs.StorePair.charged_credits
+    apply paid_credits
+    apply paid_credits
+    exact a5.mono (by dsimp [g5]; omega)
+  have a6 := hcalls.expectSerialization.credits g6 c6
+  have c7 : (before 7).host.gas.Credits (cost 7 + g7) := by
+    rw [hboundaries.sliceArgs]
+    apply paid_credits
+    apply paid_credits
+    exact a6.mono (by dsimp [g6]; omega)
+  have a7 := hcalls.vectorSlice.credits g7 c7
+  have c8 : (before 8).host.gas.Credits (cost 8 + g8) := by
+    rw [hboundaries.returnArgs]
+    apply paid_credits
+    exact a7.mono (by dsimp [g7]; omega)
+  have a8 := hcalls.returnValue.credits g8 c8
+  have c9 : (before 9).host.gas.Credits (cost 9 + g9) := by
+    rw [hboundaries.dropReturnArgs]
+    apply paid_credits
+    exact a8.mono (by dsimp [g8]; omega)
+  have a9 := hcalls.dropReturnVector.credits g9 c9
+  have c10 : (before 10).host.gas.Credits (cost 10 + g10) := by
+    rw [hboundaries.dropStateArgs]
+    apply paid_credits
+    exact a9.mono (by dsimp [g9]; omega)
+  have a10 := hcalls.dropStateVector.credits g10 c10
+  let code10 : List Instr := [.local_get 0, .i32_const 144, .i32_binop .add, .global_set 0] ++ code
+  let code9 : List Instr := [.local_get 0, .i32_const 56, .i32_binop .add] ++ (.call 68 :: code10)
+  let code8 : List Instr := [.local_get 0, .i32_const 128, .i32_binop .add] ++ (.call 68 :: code9)
+  let code7 : List Instr := [.local_get 0, .load .i32 none {align := 2, offset := 8}, .local_get 0, .load .i32 none {align := 2, offset := 12}] ++ (.call 545 :: code8)
+  let code6 : List Instr := [.local_get 0, .i32_const 8, .i32_binop .add, .local_get 0, .i32_const 128, .i32_binop .add] ++ (.call 779 :: code7)
+  let code5 : List Instr := [.local_get 0, .i32_const 128, .i32_binop .add, .local_get 0, .i32_const 72, .i32_binop .add, .i32_const 1050984] ++ (.call 158 :: code6)
+  let code4 : List Instr := [.local_get 0, .local_get 0, .i32_const 24, .i32_binop .add, .load .i64 none {align := 3, offset := 0}, .store .i64 none {align := 3, offset := 120}, .local_get 0, .local_get 0, .load .i64 none {align := 3, offset := 16}, .store .i64 none {align := 3, offset := 112}, .local_get 0, .i32_const 72, .i32_binop .add, .local_get 0, .i32_const 112, .i32_binop .add] ++ (.call 96 :: code5)
+  let code3 : List Instr := [.local_get 0, .i32_const 16, .i32_binop .add, .local_get 0, .i32_const 32, .i32_binop .add] ++ (.call 414 :: code4)
+  let code2 : List Instr := [.local_get 0, .i32_const 32, .i32_binop .add, .local_get 0, .i32_const 72, .i32_binop .add] ++ (.call 155 :: code3)
+  let code1 : List Instr := [.local_get 0, .i32_const 72, .i32_binop .add] ++ (.call 219 :: code2)
+  let code0 : List Instr := [.i32_const 1, .i32_const 1050188] ++ (.call 520 :: code1)
+  have hfinal : WP cfg fuel (.next (atCode
+      (setGlobal (paid (after 10) cfg.regularOpCost 4) globalIndex (.i32 (scratch + 144)))
+      limits #[] activeFrame [] code)) rest post := by
+    simpa only [← hboundaries.restored] using hnext
+  have restoreRule := wp_restore cfg fuel rest (after 10) limits #[] activeFrame [] code
+    mi globalIndex finalGlobal scratch post
+  have restoreLocal := restoreRule hlocal
+  have restoreEnv := restoreLocal hinv.module_cleanup hinv.global_index hinv.global_cleanup
+  have h10 := restoreEnv a10 hfinal
+  have call10 := hcalls.dropStateVector.wp f10 g10 code10 post c10 h10
+  rw [hboundaries.dropStateArgs] at call10
+  have argRule9 := wp_pointer cfg (f10 + steps 10) (cost 10 + g10)
+    (after 9) limits #[] activeFrame [] (.call 68 :: code10) scratch 56 post
+  have argLocal9 := argRule9 hlocal
+  have h9 := argLocal9 a9 call10
+  have call9 := hcalls.dropReturnVector.wp f9 g9 code9 post c9 h9
+  rw [hboundaries.dropReturnArgs] at call9
+  have argRule8 := wp_pointer cfg (f9 + steps 9) (cost 9 + g9)
+    (after 8) limits #[] activeFrame [] (.call 68 :: code9) scratch 128 post
+  have argLocal8 := argRule8 hlocal
+  have h8 := argLocal8 a8 call9
+  have call8 := hcalls.returnValue.wp f8 g8 code8 post c8 h8
+  rw [hboundaries.returnArgs] at call8
+  rw [← hinv.slice_pointer, ← hinv.slice_length] at call8
+  have argRule7 := wp_return_arguments cfg (f8 + steps 8) (cost 8 + g8)
+    (after 7) limits #[] activeFrame [] (.call 545 :: code8) scratch mi memoryIndex sliceMemory post
+  have argLocal7 := argRule7 hlocal
+  have argEnv7 := argLocal7 hinv.module_slice hinv.memory_index hinv.memory_slice
+  have argBounds7 := argEnv7 hinv.slice_span
+  have h7 := argBounds7 a7 call8
+  have call7 := hcalls.vectorSlice.wp f7 g7 code7 post c7 h7
+  rw [hboundaries.sliceArgs] at call7
+  have argRule6 := wp_pointers cfg (f7 + steps 7) (cost 7 + g7)
+    (after 6) limits #[] activeFrame [] (.call 779 :: code7) scratch 8 128 post
+  have argLocal6 := argRule6 hlocal
+  have h6 := argLocal6 a6 call7
+  have call6 := hcalls.expectSerialization.wp f6 g6 code6 post c6 h6
+  rw [hboundaries.expectArgs] at call6
+  have argRule5 := wp_expect_arguments cfg (f6 + steps 6) (cost 6 + g6)
+    (after 5) limits #[] activeFrame [] (.call 158 :: code6) scratch post
+  have argLocal5 := argRule5 hlocal
+  have h5 := argLocal5 a5 call6
+  have call5 := hcalls.serialize.wp f5 g5 code5 post c5 h5
+  rw [hboundaries.serializeArgs] at call5
+  let copied := copyStore (after 4) cfg.regularOpCost memoryIndex scratch copyMemory
+  have copiedCredit : copied.host.gas.Credits (6 * cfg.regularOpCost + (cost 5 + g5)) := by
+    apply copyStore_credits
+    exact a4.mono (by dsimp [g4, op]; omega)
+  have pointerRule4 := wp_pointers cfg (f5 + steps 5) (cost 5 + g5)
+    copied limits #[] activeFrame [] (.call 96 :: code5) scratch 72 112 post
+  have pointerLocal4 := pointerRule4 hlocal
+  have pointers4 := pointerLocal4 copiedCredit call5
+  have copyRule4 := wp_copy_pair cfg ((f5 + steps 5) + 6) (6 * cfg.regularOpCost + (cost 5 + g5))
+    (after 4) limits #[] activeFrame []
+    ([.local_get 0, .i32_const 72, .i32_binop .add,
+      .local_get 0, .i32_const 112, .i32_binop .add] ++ (.call 96 :: code5))
+    scratch mi memoryIndex copyMemory post
+  have copyLocal4 := copyRule4 hlocal
+  have copyEnv4 := copyLocal4 hinv.module_copy hinv.memory_index hinv.memory_copy hinv.copy_wf
+  have copyBounds4 := copyEnv4 hinv.copy_high_read hinv.copy_span
+  have copyCredit4 : (after 4).host.gas.Credits
+      (10 * cfg.regularOpCost + (6 * cfg.regularOpCost + (cost 5 + g5))) := a4.mono (by dsimp [g4, op]; omega)
+  have h4 := copyBounds4 copyCredit4 pointers4
+  have copyGas4 : 10 * cfg.regularOpCost + (6 * cfg.regularOpCost + (cost 5 + g5)) = g4 := by
+    dsimp [g4, op]
+    exact ten_six _ _
+  rw [copyGas4] at h4
+  have call4 := hcalls.readSupply.wp f4 g4 code4 post c4 h4
+  rw [hboundaries.supplyArgs] at call4
+  have argRule3 := wp_pointers cfg (f4 + steps 4) (cost 4 + g4)
+    (after 3) limits #[] activeFrame [] (.call 414 :: code4) scratch 16 32 post
+  have argLocal3 := argRule3 hlocal
+  have h3 := argLocal3 a3 call4
+  have call3 := hcalls.unwrapState.wp f3 g3 code3 post c3 h3
+  rw [hboundaries.unwrapArgs] at call3
+  have argRule2 := wp_pointers cfg (f3 + steps 3) (cost 3 + g3)
+    (after 2) limits #[] activeFrame [] (.call 155 :: code3) scratch 32 72 post
+  have argLocal2 := argRule2 hlocal
+  have h2 := argLocal2 a2 call3
+  have call2 := hcalls.readState.wp f2 g2 code2 post c2 h2
+  rw [hboundaries.stateArgs] at call2
+  have argRule1 := wp_pointer cfg (f2 + steps 2) (cost 2 + g2)
+    (after 1) limits #[] activeFrame [] (.call 219 :: code2) scratch 72 post
+  have argLocal1 := argRule1 hlocal
+  have h1 := argLocal1 a1 call2
+  have call1 := hcalls.installInterface.wp f1 g1 code1 post c1 h1
+  rw [hboundaries.interfaceArgs] at call1
+  have argRule0 := wp_interface_arguments cfg (f1 + steps 1) (cost 1 + g1)
+    (after 0) limits #[] activeFrame [] (.call 520 :: code1) post
+  have h0 := argRule0 a0 call1
+  have call0 := hcalls.panicHook.wp f0 g0 code0 post c0 h0
+  have prologueNext : WP cfg (f0 + steps 0) (.next (atCode
+      (setGlobal (paid initial cfg.regularOpCost 5) globalIndex (.i32 (sp - 144))) limits #[]
+      {frame with locals := frame.locals.set! 0 (.i32 (sp - 144))} [] (.call 522 :: code0)))
+      (cost 0 + g0) post := by
+    simpa only [hboundaries.prologue, hinv.scratch_eq] using call0
+  have prologueRule := wp_prologue cfg (f0 + steps 0) (cost 0 + g0) initial limits #[] frame []
+    (.call 522 :: code0) mi globalIndex originalGlobal sp post
+  have prologueEnv := prologueRule hinv.module_initial hinv.global_index hinv.global_initial hinv.original_sp
+  have whole := prologueEnv initialCredit prologueNext
+  have hfuel : (f0 + steps 0) + 5 = fuel + bodySteps steps := by
+    dsimp [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10]
+    exact bodyFuel_decomposition fuel steps
+  rw [hfuel, hbudget] at whole
+  simpa only [code0, code1, code2, code3, code4, code5, code6, code7, code8, code9, code10,
+    WNear.Binary.TotalSupply.body, List.cons_append, List.nil_append, List.append_assoc] using whole
+
+/-- Residual credits at the concrete restored store follow from the same
+initial budget and local callee credit clauses; no execution premise is needed. -/
+theorem final_credits (cfg : WasmConfig) (rest : Nat) (initial final : Store NearState)
+    (limits : ExecLimits) (frame : CallFrame) (before after : Fin 11 → Store NearState)
+    (cost steps : Fin 11 → Nat) (scratch pointer length : UInt32)
+    (globalIndex memoryIndex : Nat) (copyMemory : Memory)
+    (hcalls : CallObligations cfg limits frame scratch pointer length before after cost steps)
+    (hboundaries : ScalarBoundaries cfg initial final before after scratch globalIndex memoryIndex copyMemory)
+    (hc : initial.host.gas.Credits (bodyCost cfg cost + rest)) : final.host.gas.Credits rest := by
+  let op := cfg.regularOpCost
+  let g10 := 4 * op + rest
+  let g9 := 3 * op + (cost 10 + g10)
+  let g8 := 3 * op + (cost 9 + g9)
+  let g7 := 4 * op + (cost 8 + g8)
+  let g6 := 6 * op + (cost 7 + g7)
+  let g5 := 7 * op + (cost 6 + g6)
+  let g4 := 16 * op + (cost 5 + g5)
+  let g3 := 6 * op + (cost 4 + g4)
+  let g2 := 6 * op + (cost 3 + g3)
+  let g1 := 3 * op + (cost 2 + g2)
+  let g0 := 2 * op + (cost 1 + g1)
+  have hbudget : 5 * op + (cost 0 + g0) = bodyCost cfg cost + rest := by
+    clear hcalls hboundaries hc
+    simp only [bodyCost, eleven_sum]
+    dsimp [g0, g1, g2, g3, g4, g5, g6, g7, g8, g9, g10, op]
+    omega
+  have initialCredit : initial.host.gas.Credits (5 * op + (cost 0 + g0)) := by
+    rw [hbudget]; exact hc
+  have c0 : (before 0).host.gas.Credits (cost 0 + g0) := by
+    rw [hboundaries.prologue]
+    apply paid_credits
+    exact initialCredit
+  have a0 := hcalls.panicHook.credits g0 c0
+  have c1 : (before 1).host.gas.Credits (cost 1 + g1) := by
+    rw [hboundaries.interfaceArgs]
+    apply paid_credits
+    exact a0.mono (by dsimp [g0]; omega)
+  have a1 := hcalls.installInterface.credits g1 c1
+  have c2 : (before 2).host.gas.Credits (cost 2 + g2) := by
+    rw [hboundaries.stateArgs]
+    apply paid_credits
+    exact a1.mono (by dsimp [g1]; omega)
+  have a2 := hcalls.readState.credits g2 c2
+  have c3 : (before 3).host.gas.Credits (cost 3 + g3) := by
+    rw [hboundaries.unwrapArgs]
+    apply paid_credits
+    apply paid_credits
+    exact a2.mono (by dsimp [g2]; omega)
+  have a3 := hcalls.unwrapState.credits g3 c3
+  have c4 : (before 4).host.gas.Credits (cost 4 + g4) := by
+    rw [hboundaries.supplyArgs]
+    apply paid_credits
+    apply paid_credits
+    exact a3.mono (by dsimp [g3]; omega)
+  have a4 := hcalls.readSupply.credits g4 c4
+  have c5 : (before 5).host.gas.Credits (cost 5 + g5) := by
+    rw [hboundaries.serializeArgs]
+    apply paid_credits
+    apply paid_credits
+    apply copyStore_credits
+    exact a4.mono (by dsimp [g4]; omega)
+  have a5 := hcalls.serialize.credits g5 c5
+  have c6 : (before 6).host.gas.Credits (cost 6 + g6) := by
+    rw [hboundaries.expectArgs]
+    apply WNear.Proofs.StorePair.charged_credits
+    apply paid_credits
+    apply paid_credits
+    exact a5.mono (by dsimp [g5]; omega)
+  have a6 := hcalls.expectSerialization.credits g6 c6
+  have c7 : (before 7).host.gas.Credits (cost 7 + g7) := by
+    rw [hboundaries.sliceArgs]
+    apply paid_credits
+    apply paid_credits
+    exact a6.mono (by dsimp [g6]; omega)
+  have a7 := hcalls.vectorSlice.credits g7 c7
+  have c8 : (before 8).host.gas.Credits (cost 8 + g8) := by
+    rw [hboundaries.returnArgs]
+    apply paid_credits
+    exact a7.mono (by dsimp [g7]; omega)
+  have a8 := hcalls.returnValue.credits g8 c8
+  have c9 : (before 9).host.gas.Credits (cost 9 + g9) := by
+    rw [hboundaries.dropReturnArgs]
+    apply paid_credits
+    exact a8.mono (by dsimp [g8]; omega)
+  have a9 := hcalls.dropReturnVector.credits g9 c9
+  have c10 : (before 10).host.gas.Credits (cost 10 + g10) := by
+    rw [hboundaries.dropStateArgs]
+    apply paid_credits
+    exact a9.mono (by dsimp [g9]; omega)
+  have a10 := hcalls.dropStateVector.credits g10 c10
+  rw [hboundaries.restored]
+  apply paid_credits
+  exact a10
+
+/-- The actual root frame returns void after the complete body and its final
+free leave. Callee proofs remain exactly the named local obligations. -/
+theorem wp_return (cfg : WasmConfig) (rest : Nat) (initial final : Store NearState)
+    (limits : ExecLimits) (inst : Nat) (before after : Fin 11 → Store NearState)
+    (cost steps : Fin 11 → Nat) (mi : ModuleInst) (globalIndex memoryIndex : Nat)
+    (sp scratch pointer length : UInt32) (originalGlobal finalGlobal : GlobalInst) (copyMemory sliceMemory : Memory)
+    (hcalls : CallObligations cfg limits (voidFrame #[.i32 scratch] inst)
+      scratch pointer length before after cost steps)
+    (hboundaries : ScalarBoundaries cfg initial final before after scratch globalIndex memoryIndex copyMemory)
+    (hinv : BoundaryInvariants initial after (voidFrame #[.i32 0] inst) mi globalIndex memoryIndex
+      sp scratch pointer length originalGlobal finalGlobal copyMemory sliceMemory)
+    (hc : initial.host.gas.Credits (bodyCost cfg cost + rest)) :
+    WP cfg (1 + bodySteps steps) (.next (atCode initial limits #[] (voidFrame #[.i32 0] inst) []
+      WNear.Binary.TotalSupply.body)) (bodyCost cfg cost + rest)
+      (fun remaining outcome error => remaining = rest ∧ outcome = .done [] final ∧ error = none) := by
+  let post : Post := fun remaining outcome error => remaining = rest ∧ outcome = .done [] final ∧ error = none
+  have hfinal := final_credits cfg rest initial final limits (voidFrame #[.i32 scratch] inst)
+    before after cost steps scratch pointer length globalIndex memoryIndex copyMemory hcalls hboundaries hc
+  have finish := wp_finish_void cfg 0 rest final limits #[.i32 scratch] inst post hfinal ⟨rfl, rfl, rfl⟩
+  have hcalls' : CallObligations cfg limits
+      {voidFrame #[.i32 0] inst with locals := #[.i32 0].set! 0 (.i32 scratch)}
+      scratch pointer length before after cost steps := by
+    simpa [voidFrame, Array.set!] using hcalls
+  have continuation : WP cfg 1 (.next (atCode final limits #[]
+      {voidFrame #[.i32 0] inst with locals := #[.i32 0].set! 0 (.i32 scratch)} [] [])) rest post := by
+    simpa [voidFrame, Array.set!] using finish
+  have rule := wp_body cfg 1 rest initial final limits (voidFrame #[.i32 0] inst) [] post
+    before after cost steps mi globalIndex memoryIndex sp scratch pointer length originalGlobal finalGlobal copyMemory sliceMemory
+  have localCalls := rule hcalls' hboundaries hinv
+  have result := localCalls hc continuation
+  simpa only [List.append_nil] using result
+
+/-- Actual metered execution of the root body returns the concrete final store.
+The budget counts65pureopcodes and eleven complete local calls; the free root
+leave adds one fuel step, while entry activation is separate. -/
+theorem run_return (cfg : WasmConfig) (rest : Nat) (initial final : Store NearState)
+    (limits : ExecLimits) (inst : Nat) (before after : Fin 11 → Store NearState)
+    (cost steps : Fin 11 → Nat) (mi : ModuleInst) (globalIndex memoryIndex : Nat)
+    (sp scratch pointer length : UInt32) (originalGlobal finalGlobal : GlobalInst) (copyMemory sliceMemory : Memory)
+    (hcalls : CallObligations cfg limits (voidFrame #[.i32 scratch] inst)
+      scratch pointer length before after cost steps)
+    (hboundaries : ScalarBoundaries cfg initial final before after scratch globalIndex memoryIndex copyMemory)
+    (hinv : BoundaryInvariants initial after (voidFrame #[.i32 0] inst) mi globalIndex memoryIndex
+      sp scratch pointer length originalGlobal finalGlobal copyMemory sliceMemory)
+    (hc : initial.host.gas.Credits (bodyCost cfg cost + rest)) :
+    runMetered cfg (1 + bodySteps steps) (.next (atCode initial limits #[] (voidFrame #[.i32 0] inst) []
+      WNear.Binary.TotalSupply.body)) = (.done [] final, none) := by
+  have h := wp_return cfg rest initial final limits inst before after cost steps mi globalIndex memoryIndex
+    sp scratch pointer length originalGlobal finalGlobal copyMemory sliceMemory hcalls hboundaries hinv hc
+  obtain ⟨_, hp, _⟩ := h.result
+  exact Prod.ext hp.2.1 hp.2.2
 
 end WNear.Proofs.TotalSupply
