@@ -62,4 +62,38 @@ theorem finished_usage_model (cfg : RuntimeConfig) (before : HostStore NearState
     key value paid hkey hcharge (writeUsage_lt _ _ _ _ hroom)]
   exact writeUsage_model cfg before raw hrep husage key value
 
+/-- The successful computed final host represents the model write, including
+support coverage, after the actual post-charge equality. -/
+theorem finished_represents (extra : Nat) (before : HostStore NearState)
+    (raw : RawStorage) (hrep : Represents before.host raw)
+    (keyLen keyPtr valueLen valuePtr : UInt64) (key value : Bytes) (paid : NearState)
+    (hcharge : applyCharges (written before key value).host (postCharges before key) = (paid, none)) :
+    Represents (finished extra before keyLen keyPtr valueLen valuePtr key value paid).host
+      (rawWrite raw key value) := by
+  have hp := ((hrep.setStorage key value).invalidateIterators).applyCharges
+    (postCharges before key) (postCharges_burnsOnly before key)
+  change Represents (applyCharges (written before key value).host (postCharges before key)).1
+    (rawWrite raw key value) at hp
+  rw [hcharge] at hp
+  exact hp.updateStorageUsage extra "storage_write" before before.mem (args keyLen keyPtr valueLen valuePtr)
+
+/-- Exact finite output storage and non-wrapping usage agree simultaneously
+with the model, for arbitrary initial storage and both old-cell branches. -/
+theorem finished_model (cfg : RuntimeConfig) (before : HostStore NearState)
+    (raw : RawStorage) (hrep : Represents before.host raw)
+    (husage : storageUsageOf cfg raw ≤ before.host.context.storageUsage.toNat)
+    (keyLen keyPtr valueLen valuePtr : UInt64) (key value : Bytes) (paid : NearState)
+    (hkey : getMemOrReg before keyPtr keyLen = some key)
+    (hcharge : applyCharges (written before key value).host (postCharges before key) = (paid, none))
+    (hroom : before.host.context.storageUsage.toNat + key.length + value.length +
+      cfg.fees.numExtraBytesRecord < 2 ^ 64) :
+    let result := finished cfg.fees.numExtraBytesRecord before keyLen keyPtr valueLen valuePtr key value paid
+    (finalStorage result.host).toFinset = rawWrite raw key value ∧
+    result.host.context.storageUsage.toNat =
+      before.host.context.storageUsage.toNat - storageUsageOf cfg raw +
+        storageUsageOf cfg (rawWrite raw key value) := by
+  exact ⟨(finished_represents cfg.fees.numExtraBytesRecord before raw hrep keyLen keyPtr valueLen valuePtr
+    key value paid hcharge).finalStorage,
+    finished_usage_model cfg before raw hrep husage keyLen keyPtr valueLen valuePtr key value paid hkey hcharge hroom⟩
+
 end Wasm.Near.MeteredHosts.StorageModelUsage
