@@ -147,4 +147,95 @@ theorem get_any (cfg : RuntimeConfig) (fuel : Nat) (h1 : NearState)
         have : erase s.host = erase σ.store.host := by rw [← hs]; rfl
         rw [this, hhost, erase_selectReturnValue, erase_selectReturnValue, erase_charged, erase_relax]
 
+/-! ## The VM outcome -/
+
+/-- A gas failure, as the VM reports it: aborted with a gas error, nothing
+returned, no receipts and no logs. -/
+def GasFailure (o : VMOutcome) : Prop :=
+  ∃ e, isGasError e ∧ o.aborted = some (.hostError e) ∧ o.returnData = .none ∧ o.receipts = [] ∧ o.logs = []
+
+theorem outcome_gasEnd (ctx : VMContext) (storage : List (List UInt8 × List UInt8))
+    (r : Machine × Option FunctionCallError) (hg : GasEnd r)
+    (hi : r.1.host.lastExecutionIssue = none) (hl : r.1.host.logs = []) :
+    GasFailure (outcomeOfExecution ctx storage r.1 r.2) := by
+  obtain ⟨m, err⟩ := r
+  rcases hg with ⟨e, he, hge⟩ | ⟨hn, reason, s, e, hm, hle, hge⟩
+  · simp only at he hi hl
+    subst he
+    exact ⟨e, hge, rfl, rfl, rfl, by simp [outcomeOfExecution, logsOf, hl]⟩
+  · simp only at hn hm hi hl
+    subst hn hm
+    have ht : trapError reason s.host = .hostError e := by
+      simp only [StepResult.host] at hi
+      simp [trapError, hi, hle]
+    have hs : (StepResult.trap reason s).host = s.host := rfl
+    rw [hs] at hl
+    refine ⟨e, hge, ?_, rfl, rfl, ?_⟩
+    · simp [outcomeOfExecution, hs, ht]
+    · simp [outcomeOfExecution, hs, ht, logsOf, hl]
+
+theorem gasFailure_checkReceipts {o : VMOutcome} (h : GasFailure o) (balance usage : Nat)
+    (storage : List (List UInt8 × List UInt8)) : GasFailure (o.checkReceipts balance usage storage) := by
+  obtain ⟨e, he, ha, hrd, hr, hl⟩ := h
+  rw [checkReceipts_noReceipts o balance usage storage hr (by rw [hrd]; intro i; simp)]
+  exact ⟨e, he, ha, hrd, hr, hl⟩
+
+/-- **`get` under any gas, at the VM.** The call fails for gas, or it
+returns `"ok"` with the effects it has with enough gas. -/
+theorem get_vm_any (cfg : RuntimeConfig) (size : Nat) (ctx : VMContext)
+    (storage : List (List UInt8 × List UInt8))
+    (hpos : 0 < minOpCost cfg.wasm) (hlimit : prepareLimitError cfg.wasm.limits skelModule = none)
+    (hmin : cfg.wasm.limits.initialMemoryPages = 1024) (hmax : cfg.wasm.limits.maxMemoryPages = 2048)
+    (hret : withinLimit (ctx.toNearState cfg storage).config.maxReturnLen 4 = true) :
+    let o := run cfg skelModule size "get" ctx storage
+    GasFailure o ∨
+      (o.aborted = none ∧ o.returnData = .value okBytes ∧ o.receipts = [] ∧ o.distributedGas = 0 ∧
+        o.logs = [] ∧ o.balance = ctx.accountBalance + ctx.attachedDeposit ∧
+        o.storageUsage = ctx.storageUsage % 2 ^ 64 ∧ o.storage = finalStorage (ctx.toNearState cfg storage)) := by
+  set h0 := ctx.toNearState cfg storage
+  set h1 := (applyCharges h0 (loadingCharges size)).1
+  have he1 : erase h1 = erase h0 := applyCharges_erase h0 (loadingCharges size)
+  simp only [run]
+  rcases runAttempt_skel cfg size ctx storage (fuelFor cfg skelModule ctx) hlimit hmin hmax with
+    ⟨e, he, hrun⟩ | ⟨-, hrun⟩
+  · left
+    rw [hrun]
+    apply gasFailure_checkReceipts
+    exact ⟨e, applyCharges_error h0 _ he, rfl, rfl, rfl, rfl⟩
+  have hq : QuietHost h1.gas.prepaid h1.gas.maxBurnt h1 :=
+    ⟨rfl, rfl, erase_field he1 NearState.lastExecutionIssue (fun _ => rfl),
+      erase_field he1 NearState.logs (fun _ => rfl)⟩
+  have hlim : withinLimit h1.config.maxReturnLen 4 = true := by
+    rw [erase_field he1 NearState.config (fun _ => rfl)]; exact hret
+  have hfuel := get_fuel cfg ctx storage size hpos (Nat.le_refl (fuelFor cfg skelModule ctx))
+  rw [hrun]
+  rcases get_any cfg (fuelFor cfg skelModule ctx) h1 hq hlim hfuel with ⟨hg, hqA⟩ | ⟨s, hs, hhost⟩
+  · left
+    apply gasFailure_checkReceipts
+    exact outcome_gasEnd ctx storage _ hg hqA.2.2.1 hqA.2.2.2
+  · right
+    rw [hs]
+    have hf : ∀ {α : Type} (f : NearState → α), (∀ x, f (erase x) = f x) →
+        f s.host = f (h0.selectReturnValue okBytes) := by
+      intro α f hfe
+      rw [erase_field hhost f hfe]
+      have h1e : erase (h1.selectReturnValue okBytes) = erase (h0.selectReturnValue okBytes) := by
+        rw [erase_selectReturnValue, erase_selectReturnValue, he1]
+      exact erase_field h1e f hfe
+    have hp : s.host.promises = [] := hf NearState.promises fun _ => rfl
+    have hr : s.host.returnedPromise = none := hf NearState.returnedPromise fun _ => rfl
+    have hw : s.host.gasWeights = [] := hf NearState.gasWeights fun _ => rfl
+    have hrd : s.host.returnData = some okBytes := hf NearState.returnData fun _ => rfl
+    have hlogs : s.host.logs = [] := hf NearState.logs fun _ => rfl
+    have hbal : s.host.context.accountBalance = ctx.accountBalance + ctx.attachedDeposit :=
+      hf (fun x => x.context.accountBalance) fun _ => rfl
+    have husage : s.host.context.storageUsage = UInt64.ofNat ctx.storageUsage :=
+      hf (fun x => x.context.storageUsage) fun _ => rfl
+    have hstore : finalStorage s.host = finalStorage h0 := hf finalStorage fun _ => rfl
+    obtain ⟨ha, hrec, hret', -, -, hdist, hb, hu, hl, hst⟩ :=
+      outcomeOfExecution_noPromises ctx storage [] s hp hr hw
+    rw [checkReceipts_noReceipts _ _ _ _ hrec (by rw [hret']; intro i; simp [hrd])]
+    exact ⟨ha, by rw [hret']; simp [hrd], hrec, hdist, by rw [hl, logsOf, hlogs]; rfl,
+      by rw [hb, hbal], by rw [hu, husage]; simp, by rw [hst, hstore]⟩
+
 end NearLogic.Skeleton

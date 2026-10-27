@@ -351,51 +351,43 @@ storage-stake check after the run; how host aborts appear in `Post`.
 *Exit:* a closed `Refines` proof for the test module. This is the milestone
 that removes the risk of getting stuck on the glue at the end.
 
-*Status: in progress* (`near-lean/near-logic`, PR #40). Done, with no
-`sorry`: the metered language, both lifting lemmas, gas credits, host
-charges, fragments and their structural rules, the pure rules, host calls
-that read memory (`mwpi_call_host_ro`), `value_return`'s contract with exact
-gas, the entry function, adequacy with final cells, and the test module's
-method (`Examples/Skeleton.lean`, `get_adequate`: from a store holding its
-instance, import and data, it ends with `"ok"` returned and at most the
-ceiling used). Left:
+*Status: done* (`near-lean/near-logic`, PR #40), with no `sorry` and only
+the standard axioms. `Examples/SkeletonComplete.lean`, `skel_refines`:
 
-1. **Instantiation facts.** That the store `runAttempt` instantiates holds
-   what `get_adequate` assumes, from `runAttempt_cases`. Memory contents
-   must come from lemmas about `Memory.writeBytes`, not evaluation: the
-   prepared memory has `initialMemoryPages` pages, symbolic in the config,
-   and for wNEAR 1024 pages with a 26 KB data segment, far beyond what the
-   kernel can evaluate.
-2. **The boundary.** From how the run ends to `Observation` and `Matches`:
-   `outcomeOfExecution` with no promises, `checkReceipts`, `observe` and the
-   storage-stake check, against a two-line model of the test module.
-3. **Below the bound.** A run whose gas limits are lower follows the run
-   with relaxed limits (same context, same observable `prepaid_gas`) until
-   its first failed charge. The design, layer by layer:
-   - *Instructions* (done: `NearLogic/Relax.lean`, `instr_withHost`):
-     `Exec.instr` carries any host along unchanged.
-   - *Steps*: `Exec.step` on stores whose hosts are related, given that
-     every host function in the store is related to itself; a host call
-     is the only step that looks at the host.
-   - *Charges*: `applyCharges` on related counters (same `burnt` and
-     `promises`, lower limits on the left) succeeds on the right whenever
-     it succeeds on the left, with related results; when it fails on the
-     left, the left run ends with a gas error.
-   - *Host functions*: inner functions never read or write the gas
-     counter (`GasOblivious`: run on another counter, the same result with
-     that counter), one lemma per function after one per shared helper,
-     so that the case splits on both sides line up; the metered wrapper
-     relates through the charges, `prepareStorageCall` and
-     `finishMeteredCall`. NearVM's `meteredHostFns_gasLimits` is the
-     template for the whole-table statement. Mechanical: a candidate for
-     a Sonnet agent once the first few functions fix the tactic.
-   - *Runs*: by induction on `runMetered`, the left run's result is the
-     right run's with lower limits, or a gas failure whose logs are a
-     prefix of the right run's final logs.
-4. **The protocol config.** The test module is stated for any config with
-   hypotheses on the fields it uses; wNEAR's statement fixes v86 through
-   `RuntimeConfig.parse`, which the kernel cannot evaluate as is (to settle
-   by M9, as M0 settled the binary).
+    Refines Near.Boundary.nearRuntime protocol (skelCode size codeOf) (skelModel size)
+
+for any protocol with the limits the module needs (`SkelProtocol`: a
+positive op cost, no prepare-limit error, 1024/2048 memory pages, room to
+return 4 bytes), any code size and any `codeOf`. The test module is
+smaller than planned: `get` returns `"ok"` through `value_return`, with no
+storage write or log; those host functions come with M4 and M7. The chain:
+
+- the metered language, both lifting lemmas, gas credits, host charges,
+  fragments and their structural rules, the pure rules, host calls that
+  read memory, `value_return`'s contract with exact gas, the entry
+  function, adequacy with final cells (`get_adequate`);
+- instantiation (`SkeletonModule.lean`): validation by `kernel_rfl`, the
+  instantiated store from `Memory.writeBytes` lemmas, the data memory kept
+  irreducible so nothing evaluates its pages;
+- the run and the boundary (`SkeletonRun.lean`, `SkeletonRefines.lean`):
+  `outcomeOfExecution` with no promises, `checkReceipts`, `observe` and the
+  stake check, giving the enough-gas clause (`get_enough`);
+- below the bound (`Relax.lean`, `RelaxStep.lean`, `RelaxRun.lean`,
+  `Hosts/ValueReturnRelax.lean`, `SkeletonBelow.lean`): instructions carry
+  any host (`instr_withHost`); charges under raised limits succeed with the
+  same result; `value_return` respects raised limits (`RelaxFn`); a step
+  and a run with raised limits follow the lower run unless it ends with a
+  gas failure (`runMetered_relax`), with the host's limits, issue and logs
+  kept along the way (`QuietHost`); so `get` under any gas fails for gas
+  with no logs, or ends as with enough gas (`get_any`, `get_vm_any`);
+- the other methods: not exported (`nearRuntime_not_exported`).
+
+What carries over to wNEAR: `runMetered_relax` is generic; each host
+function needs its `RelaxFn` lemma (the metered wrapper's part is shared
+with `value_return`'s), and `QuietHost` becomes "the logs so far are a
+prefix of the final ones" once `log_utf8` is linked. The protocol config
+is still a hypothesis; wNEAR's statement fixes v86 through
+`RuntimeConfig.parse`, to settle by M9.
 
 ### M3. The first method, top-down
 
