@@ -316,6 +316,10 @@ structure CallInput where
   attached : Nat
   gas : GasSpec
   results : List PromiseResult
+  /-- Receivers of the call's result (`output_data_receivers`). -/
+  outputs : List AccountId := []
+  /-- A constant recorded storage proof (`Context.storageProofSize`), when set. -/
+  proofSize : Option Nat := none
 
 def RolledBackB (ctx : Context) (raw : RawStorage) (r : Observation) : Bool :=
   (match r.outcome with | .error _ => true | .ok _ => false) && decide (r.storage = raw) &&
@@ -382,10 +386,11 @@ def runCall (M : ExecModel) (env : Env) (w : World M) (label : String) (c : Call
   let mkCtx (gas : Nat) : Context :=
     { method := c.method, args := c.args, current := env.contract, predecessor := c.predecessor,
       signer := c.signer, signerPk := [], attached := c.attached, prepaidGas := gas,
-      promiseResults := c.results, outputDataReceivers := [], balance := w.balance,
+      promiseResults := c.results, outputDataReceivers := c.outputs, balance := w.balance,
       locked := w.locked, storageUsage := w.usage, blockHeight := w.height,
       timestamp := w.timestamp, epochHeight := 1, randomSeed := List.replicate 32 0,
-      trie := w.trie, protocol := env.protocol }
+      trie := w.trie, protocol := env.protocol,
+      storageProofSize := c.proofSize.map fun n _ => n }
   let call := M.decode c.method c.args
   let gas ← match c.gas, call with
     | .exact g, _ => pure g
@@ -460,6 +465,19 @@ def runCall (M : ExecModel) (env : Env) (w : World M) (label : String) (c : Call
 
 /-! ## Scenarios -/
 
+/-- `outputDataReceivers`: account ids, each a string or `{"repeat": id, "times": n}`. -/
+def outputsOf (j : Json) : Except String (List AccountId) :=
+  match field? j "outputDataReceivers" with
+  | none => pure []
+  | some v => do
+    let arr ← v.getArr?
+    let parts ← arr.toList.mapM fun p => match p with
+      | .str s => do pure [← accountOf s]
+      | p => do
+        let a ← accountOf (← strD p "repeat" "")
+        pure (List.replicate (← natD p "times" 1) a)
+    pure parts.flatten
+
 def callInputOf (j : Json) (signerDefault : Option AccountId) : Except String CallInput := do
   let fromS ← strD j "from" "alice.near"
   let predecessor ← accountOf fromS
@@ -470,7 +488,10 @@ def callInputOf (j : Json) (signerDefault : Option AccountId) : Except String Ca
   pure { method := ← strD j "method" "", args := ← argsOf j, predecessor, signer,
          attached := ← natD j "deposit" 0,
          gas := ← (match field? j "gas" with | some g => gasSpecOf g | none => pure (.exact (300 * 10 ^ 12))),
-         results := (← resultsOf j).getD [] }
+         results := (← resultsOf j).getD [], outputs := ← outputsOf j,
+         proofSize := ← (match field? j "storageProofSize" with
+           | some v => (some ·) <$> natOf v
+           | none => pure none) }
 
 /-- A delivered receipt as a call: its action, by the contract, under the
 original signer. Transfers to the contract are credits. -/
@@ -498,7 +519,7 @@ def deliver (M : ExecModel) (env : Env) (w : World M) (label ref : String) (j : 
       | none => pure (.exact gas.toNat)
     let (w, _) ← runCall M env { w with pending := keep } label
       { method, args, predecessor := env.contract, signer := p.signer, attached := deposit,
-        gas := gasSpec, results := results.getD [] } expect
+        gas := gasSpec, results := results.getD [], outputs := ← liftScenario (outputsOf j) } expect
     pure w
   | _ => scenarioError s!"{label}: only single-action receipts can be delivered"
 

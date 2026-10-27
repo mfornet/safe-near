@@ -162,7 +162,8 @@ the promise result `ft_resolve_transfer` parses costs at most 245 Mgas (a
 accesses are charged per trie node on the key's path: the bound pays every
 node of the longest possible path cold for each distinct key a call touches
 (the `STATE` record and at most two accounts), and cached for every access.
-That the bound holds is an obligation of `Refines`, checked by the adapter
+The value a call returns travels to each receiver of its result in a data
+receipt, paid per byte when it is returned (`returnDataGas`). That the bound holds is an obligation of `Refines`, checked by the adapter
 tests on adversarial tries. -/
 
 /-- Wasm execution and host calls other than storage, with short arguments. -/
@@ -215,6 +216,21 @@ def Call.resultBytes (ctx : Context) : Call → Nat
     | _ => 0
   | _ => 0
 
+/-- Longest value the `#[near_bindgen]` wrapper passes to `value_return`.
+Unit methods return nothing. A returned `Promise` is serialised as unit
+(`null`) before the promise replaces it as the call's result. -/
+def Call.returnBytes : Call → Nat
+  | .new | .nearDeposit | .ftTransfer .. => 0
+  | .nearWithdraw _ | .ftTransferCall .. => "null".utf8ByteSize
+  | .storageUnregister _ => "false".utf8ByteSize
+  | .ftMetadata => (Ret.metadata metadata).json.utf8ByteSize
+  | .storageBalanceBounds =>
+    (Ret.storageBalanceBounds { min := u128Bound - 1, max := some (u128Bound - 1) }).json.utf8ByteSize
+  | .storageDeposit .. | .storageWithdraw _ | .storageBalanceOf _ =>
+    (Ret.storageBalance { total := u128Bound - 1, available := 0 }).json.utf8ByteSize
+  | .ftResolveTransfer .. | .ftTotalSupply | .ftBalanceOf _ | .storageMinimumBalance =>
+    (Ret.u128 (u128Bound - 1)).json.utf8ByteSize
+
 /-- Gas the call attaches to the receipts it creates. -/
 def Call.attachedGas (ctx : Context) : Call → Nat
   | .ftTransferCall .. => ctx.prepaidGas - gasForFtTransferCall + gasForResolveTransfer
@@ -229,6 +245,7 @@ def Call.receiptGas (ctx : Context) : Call → Nat
 def gasBound (ctx : Context) (c : Call) : Nat :=
   c.attachedGas ctx + c.receiptGas ctx + computeGas +
     (if c.readsArguments then argumentByteGas * ctx.args.length else 0) +
-    argumentByteGas * c.resultBytes ctx + trieGas ctx
+    argumentByteGas * c.resultBytes ctx + trieGas ctx +
+    NearInterface.returnDataGas ctx c.returnBytes
 
 end WNear

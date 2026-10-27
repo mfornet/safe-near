@@ -296,7 +296,7 @@ def summarize(options: argparse.Namespace, soak: Soak, report: dict) -> dict:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--topology", default="validator", choices=["validator", "validator-sharded"],
+    parser.add_argument("--topology", default="validator", choices=sorted(t for t, spec in localnet.TOPOLOGIES.items() if spec.get("neard")),
                         help="validator: one shard; validator-sharded: the four shards of `sharded`")
     parser.add_argument("--duration", type=int, default=3600, help="seconds of soak")
     parser.add_argument("--sample", type=float, default=5.0, help="seconds between samples")

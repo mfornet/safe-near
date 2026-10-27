@@ -1,6 +1,7 @@
 import Lean.Data.Json
 import NearNode.Net.Uv
 import NearNode.Chain.Bootstrap
+import NearNode.Chain.ShardTracker
 import NearNode.Network.Run
 import NearNode.Validator.Drive
 import NearNode.Rpc.Server
@@ -41,6 +42,10 @@ structure Options where
   genesisConfig : Option System.FilePath := none
   /-- The directory of the chain store (`data/` of a neard home); none: nothing is kept across a restart. -/
   store : Option System.FilePath := none
+  /-- Replay every witness, also those of the shards the node holds (a test of the replay). -/
+  replayAll : Bool := false
+  /-- `tracked_shards_config` (nearcore's default for a validator: `NoShards`, i.e. the shards it produces chunks for). -/
+  tracked : TrackedShardsConfig := .noShards
   /-- `gc_num_epochs_to_keep` (0: collect nothing). -/
   gcEpochs : Nat := 5
   /-- `min_block_production_delay`, `max_block_production_delay`, `max_block_wait_delay`, in ms. -/
@@ -92,6 +97,7 @@ def run (o : Options) : IO UInt32 := do
         IO.eprintln
             s!"[{((← IO.monoMsNow) - started) / 1000}.{(((← IO.monoMsNow) - started) % 1000) / 100}s] {msg}"
   log s!"validator {signer.accountId.val}, node {nodeKey.peerId.key.toText}"
+  log s!"tracked_shards_config {o.tracked.describe}"
   log
       s!"garbage collection keeps {o.gcEpochs} epochs (gc_num_epochs_to_keep{if o.gcEpochs == 0 then ": nothing is collected" else ""})"
   let total := numTotalParts boot.genesis.setup.config.numBlockProducerSeats
@@ -136,6 +142,9 @@ def run (o : Options) : IO UInt32 := do
             | some f => some <$> IO.FS.Handle.mk f .write
             | none => pure none),
       nowMs := IO.monoMsNow, gcEpochs := o.gcEpochs, applying := ← IO.mkRef none,
+      replays := ← IO.mkRef #[], catchingUp := ← IO.mkRef none, stateInbox := ← IO.mkRef #[],
+      syncAddr := .v4 (ByteArray.mk #[127, 0, 0, 1]) (o.listen.getD 0),
+      tracker := { config := o.tracked, me := some signer.accountId }, replayAll := o.replayAll,
       lastTurn := ← IO.mkRef 0 }
   let stop ← IO.mkRef false
   let connected ← IO.mkRef false
@@ -207,7 +216,7 @@ def run (o : Options) : IO UInt32 := do
       stop.set true
   let hooks : Hooks :=
     { tick, onHeaders := fun _ => pure (), onBlock := env.ingestBlock, onRouted := env.onRouted
-      onStateResponse := fun _ => pure ()
+      onStateResponse := fun i => env.stateInbox.modify (·.push i)
       latestBlock := do
         let s ← env.get
         pure (s.blocks[s.tip.bytes]?)
@@ -219,6 +228,37 @@ def run (o : Options) : IO UInt32 := do
         let n (k : String) := s.stats.getD k 0
         pure
             s!"tip {s.tipHeight} (head {s.st.headHeight}) applied {n "blocksApplied"} pending {s.pending.size} produced {n "blocksProduced"} blocks, {n "chunksProduced"} chunks; approvals sent {n "approvalsSent"} collected {n "approvalsCollected"}; endorsements sent {n "endorsementsSent"}; witnesses sent {n "witnessesSent"} valid {n "witnessesValid"} invalid {n "witnessesInvalid"}" }
+  -- the listener: the peer answers state requests on a connection it opens to this address
+  let listener ←
+    match o.listen with
+    | some port =>
+      let l ← Uv.net.listen ⟨ByteArray.mk #[0, 0, 0, 0], port⟩
+      log s!"listening on {l.addr}"
+      let t ←
+        IO.asTask (prio := Task.Priority.dedicated) do
+            while !(← stop.get) do
+              if let some conn← l.accept 250 then
+                discard <|
+                    IO.asTask (prio := Task.Priority.dedicated) do
+                      let ob ← IO.mkRef #[]
+                      let env' := { netEnv with outbox := ob }
+                      match
+                        ←
+                          handshakeInbound cfg systemClock conn (fun _ => none)
+                              (← env.get).tipHeight with
+                      | .error e =>
+                        log s!"inbound handshake failed: {e.describe}"
+                        conn.close
+                      | .ok link =>
+                        let serve : Hooks :=
+                          { hooks with
+                            tick := pure (), onHeaders := fun _ => pure (),
+                            onBlock := fun _ => pure (), onRouted := fun _ => pure (),
+                            status := pure "" }
+                        discard <| runLink env' serve link
+      pure (some t)
+    | none =>
+      pure none
   let (peerId, addr) := o.peer
   while !(← stop.get) do
     try
@@ -247,6 +287,8 @@ def run (o : Options) : IO UInt32 := do
       IO.sleep 1000
   log "stopping: closing the RPC server and the store"
   rpcStop.set true
+  if let some t := listener then
+    discard <| IO.wait t
   if let some store := store? then
     store.close
   -- the report
