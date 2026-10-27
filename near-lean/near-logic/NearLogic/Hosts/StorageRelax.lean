@@ -141,4 +141,52 @@ theorem storageAux_rel (name : String) (before : HostStore NearState) (args : Li
     | (bill_step; try relax_norm; try simp only [fold_store] at *)
     | (csplit; try relax_norm; try simp only [fold_store] at *))
 
+/-- `prepareStorageCall` under raised limits: a failed bill, or the same
+result with the limits raised. -/
+theorem prepareStorageCall_relax (name : String) (before : HostStore NearState) (args : List Value) (p m : Nat)
+    (hp : before.host.gas.prepaid ≤ p) (hm : before.host.gas.maxBurnt ≤ m) :
+    (∃ e, (prepareStorageCall name before args).2 = some (.hostError e) ∧ isGasError e) ∨
+      prepareStorageCall name (relaxSt before p m) args =
+        (relaxSt (prepareStorageCall name before args).1 p m, (prepareStorageCall name before args).2) := by
+  rcases storageAux_rel name before args p m hp hm with ⟨e, he, hg⟩ | hr
+  · exact Or.inl ⟨e, he, hg⟩
+  · right
+    unfold prepareStorageCall
+    rw [hr]
+    rfl
+
+theorem prepareStorageCall_limits (name : String) (before : HostStore NearState) (args : List Value) :
+    (prepareStorageCall name before args).1.host.gas.prepaid = before.host.gas.prepaid ∧
+      (prepareStorageCall name before args).1.host.gas.maxBurnt = before.host.gas.maxBurnt := ⟨rfl, rfl⟩
+
+/-- The call of a storage host respects raised limits when its functional
+part commutes with raising them and keeps them. -/
+theorem invokeRelax_storage (extra : Nat) (name : String) (fn : NearHostFn NearState)
+    (hfn : ∀ st args p m, fn.invoke (relaxSt st p m) args = (fn.invoke st args).relax p m)
+    (hkeep : ∀ st args vals st2, fn.invoke st args = .Return vals st2 →
+      st2.host.gas.prepaid = st.host.gas.prepaid ∧ st2.host.gas.maxBurnt = st.host.gas.maxBurnt) :
+    InvokeRelax extra name fn := by
+  intro st args p m hp hm
+  have hl := prepareStorageCall_limits name st args
+  rcases prepareStorageCall_relax name st args p m hp hm with ⟨e, he, hg⟩ | hr
+  · left
+    refine ⟨(prepareStorageCall name st args).1, e, ?_, hg⟩
+    simp only [invokeStorageCall]
+    rw [he]
+  · simp only [invokeStorageCall]
+    rw [hr]
+    generalize prepareStorageCall name st args = r at hl ⊢
+    obtain ⟨after, err⟩ := r
+    simp only at hl ⊢
+    cases err with
+    | none =>
+      simp only
+      rw [hfn]
+      exact finishMeteredCall_relax extra name after args _ p m fun vals st2 h => by
+        obtain ⟨h1, h2⟩ := hkeep after args vals st2 h
+        exact ⟨by rw [h1, hl.1]; exact hp, by rw [h2, hl.2]; exact hm⟩
+    | some err =>
+      right
+      cases err <;> rfl
+
 end NearLogic
