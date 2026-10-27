@@ -1283,13 +1283,71 @@ isolation and umbrella gates and four conformance-tool tests pass. The
 281-test tooling run skipped15; its sole initial Git-discovery failure
 passes when rerun with this checkout's recovered source metadata.
 
-Next state targets are the accepted f432 guard and SDK dispatchers459/440/435,
-which can reuse the proved interface lookup/borrow/release and host forwarders.
-The larger shared allocation obligation is actual positive malloc581, with
-layout leaves751/684 and wrappers for serializer128-byte allocation and
-state29-byte zeroed allocation. Allocation nonzero/range facts must be
-derived from original heap data. Full219 also includes f161 deserialization;
-full96 includes the general U128 decimal algorithm and formatter writer.
+The allocation/SDK checkpoint proves further actual deployed-code pieces.
+`MeteredWordRules` supplies typed scalar word/unary/conversion rules, and
+`MeteredLabelRules` handles a taken branch over arbitrary intervening labels.
+Actual f572 checks the original word bound and shifts by two (19 ordinary
+units/12 local steps); f574 checks the original minimum size (17/9); the real
+type13 indirect callback to f578 returns 16 (11/3). These proofs use ordinary
+kernel arithmetic and standard axioms.
+
+Layout leaves f751/f684 execute the normal alignment-one path, including
+actual size reads before either output write: 44 units/36 local steps.
+Wrappers f752/f685 execute their actual scratch setup, nested layout call,
+64-bit copy and stack restoration: 78 units/61 local steps. Exact computed
+memory, code, globals and gas frames retain arbitrary output/scratch overlap.
+The leaf's output pair is proved `(size,1)`; explicit pair readback after the
+wrapper's packed copy remains a separate representation lemma.
+
+The actual f581 alignment/save prefix is checked at 47 units/31 steps.
+Positive allocation f580 has a thirteen-op header fit guard, twelve-op split
+initialization, ten-op header commit and eight-op tagged back-link store.
+The actual indirect callback and f572 call cost 35 units/20 steps and derive 64.
+All five split arithmetic/overflow guards are composed at 35 units/35 steps,
+with their outcomes derived from the original `SplitNative` header interval.
+No callee execution callback or future-memory lookup is assumed. Split and
+tagged-link execution uses the current sequential memory, including reads
+after earlier clears; preservation of an original header or a global heap
+invariant is a separate framing obligation. A separate validation checks the
+selected positive f580 branches at 273 units/236 fuel (words1/6) and 344/295
+(words32, including a skipped candidate), with exact
+whole memory and the computed nonzero pointer. Whole f580/f581 composition,
+loop traversal/link controls and the 29-byte memory-growth branch remain open.
+
+SDK prefix code now executes actual lookup565/468 and acquire429/494/672 at
+114 ordinary units/77 steps, parameterized by the real scratch-local slot and
+panic location. Its code, memory-shape, functional-host and exact gas frames
+are proved from original resources. Actual f432 accepted return costs 26
+units/17 local steps; its guard constrains the low32 bits of the status.
+The record-copy/selection/nonzero call in f440 costs 28 units/21 steps. Its
+register-length dispatch, release and return tail costs 99 units/64 steps plus
+the host base fee. The complete accepted f440 body composes these actual stages
+at 241 ordinary units/162 steps plus the original host base fee, with standard axioms only.
+Its complete typed local-call adapter costs 254 ordinary units/164 steps
+plus the original base fee, including actual activation at 12 units.
+Readiness is required on the original store and canonical leaf/caller frame;
+charge transport derives the entered resources. No callee execution outcome
+is supplied. The fallback path and state-presence/decoder correctness remain
+outside this initialized accepted branch.
+
+Remaining state targets include SDK dispatchers459/435 and their callers.
+Whole 219 still includes positive zeroed allocation, register materialization
+and f161 deserialization. Whole 96 includes positive serializer allocation,
+the general U128 decimal algorithm and formatter writer. Nonzero allocation
+and payload-range claims must continue to follow from original heap data.
+
+The allocation/SDK strict transitive audit covers 486 modules / 15890
+declarations / 11818 theorems with zero violations. The full working-tree
+audit covers 450 modules / 15566 declarations / 10425 theorems and exactly
+the three original `Proofs.Refinement` declarations depending on `sorryAx`:
+`WNear.withdraw_available_wasm`, `WNear.refines_wnear` and
+`WNear.refines_wnear_exported`. No other violations occur. The full source build
+passes 1626 jobs; blueprint extraction/rendering passes 1529 jobs and the
+rendered dispatcher counts and remaining two-call frontier were checked.
+Principal proofs pass Lean LSP MCP standard-axiom checks. Independent reviews
+found no defect in deployed-code correspondence, activation/gas/fuel counts,
+sequential aliasing or original-resource scope. No runtime, model, WF,
+custom-axiom or native-certificate changes are included.
 
 ### M4. The Rust runtime layer
 
