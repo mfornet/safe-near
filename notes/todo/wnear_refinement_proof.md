@@ -371,10 +371,27 @@ ceiling used). Left:
    storage-stake check, against a two-line model of the test module.
 3. **Below the bound.** A run whose gas limits are lower follows the run
    with relaxed limits (same context, same observable `prepaid_gas`) until
-   its first failed charge. Needs every metered host function to commute
-   with relaxing the limits; NearVM already proves, over the whole host
-   table, that host functions preserve the limits
-   (`meteredHostFns_gasLimits`), which is the template.
+   its first failed charge. The design, layer by layer:
+   - *Instructions* (done: `NearLogic/Relax.lean`, `instr_withHost`):
+     `Exec.instr` carries any host along unchanged.
+   - *Steps*: `Exec.step` on stores whose hosts are related, given that
+     every host function in the store is related to itself; a host call
+     is the only step that looks at the host.
+   - *Charges*: `applyCharges` on related counters (same `burnt` and
+     `promises`, lower limits on the left) succeeds on the right whenever
+     it succeeds on the left, with related results; when it fails on the
+     left, the left run ends with a gas error.
+   - *Host functions*: inner functions never read or write the gas
+     counter (`GasOblivious`: run on another counter, the same result with
+     that counter), one lemma per function after one per shared helper,
+     so that the case splits on both sides line up; the metered wrapper
+     relates through the charges, `prepareStorageCall` and
+     `finishMeteredCall`. NearVM's `meteredHostFns_gasLimits` is the
+     template for the whole-table statement. Mechanical: a candidate for
+     a Sonnet agent once the first few functions fix the tactic.
+   - *Runs*: by induction on `runMetered`, the left run's result is the
+     right run's with lower limits, or a gas failure whose logs are a
+     prefix of the right run's final logs.
 4. **The protocol config.** The test module is stated for any config with
    hypotheses on the fields it uses; wNEAR's statement fixes v86 through
    `RuntimeConfig.parse`, which the kernel cannot evaluate as is (to settle
