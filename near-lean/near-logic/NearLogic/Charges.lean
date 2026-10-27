@@ -43,6 +43,7 @@ structure ChargedTo (ns ns' : NearState) (n : Nat) : Prop where
   erase : erase ns' = erase ns
   fees : ns'.fees = ns.fees
   extCosts : ns'.extCosts = ns.extCosts
+  config : ns'.config = ns.config
 
 theorem applyCharge_ok (ns : NearState) (c : Charge) {C : Nat} (h1 : ns.gas.used + chargeUse ns c ≤ C)
     (h2 : C ≤ ns.gas.maxBurnt) (h3 : C ≤ ns.gas.prepaid) :
@@ -51,37 +52,37 @@ theorem applyCharge_ok (ns : NearState) (c : Charge) {C : Nat} (h1 : ns.gas.used
   | ext name times =>
     simp only [chargeUse] at h1
     simp only [applyCharge, Near.GasCounter.burn, deduct_ok (Nat.le_refl _) h1 h2 h3]
-    refine ⟨by first | rfl | trivial, ⟨?_, rfl, rfl, rfl, rfl, rfl⟩⟩
+    refine ⟨by first | rfl | trivial, ⟨?_, rfl, rfl, rfl, rfl, rfl, rfl⟩⟩
     simp [chargeUse, Near.GasCounter.used]; omega
   | burn n =>
     simp only [chargeUse] at h1
     simp only [applyCharge, Near.GasCounter.burn, deduct_ok (Nat.le_refl _) h1 h2 h3]
-    refine ⟨by first | rfl | trivial, ⟨?_, rfl, rfl, rfl, rfl, rfl⟩⟩
+    refine ⟨by first | rfl | trivial, ⟨?_, rfl, rfl, rfl, rfl, rfl, rfl⟩⟩
     simp [chargeUse, NearState.profileAction, Near.GasCounter.used]; omega
   | actionBase fee sir =>
     simp only [chargeUse] at h1
     simp only [applyCharge, Near.GasCounter.payAction, deduct_ok (Nat.le_add_right _ _) h1 h2 h3]
-    refine ⟨by first | rfl | trivial, ⟨?_, rfl, rfl, rfl, rfl, rfl⟩⟩
+    refine ⟨by first | rfl | trivial, ⟨?_, rfl, rfl, rfl, rfl, rfl, rfl⟩⟩
     simp [chargeUse, NearState.profileAction, Near.GasCounter.used]; omega
   | actionBytes fee n sir =>
     simp only [chargeUse] at h1
     simp only [applyCharge, Near.GasCounter.payAction, deduct_ok (Nat.le_add_right _ _) h1 h2 h3]
-    refine ⟨by first | rfl | trivial, ⟨?_, rfl, rfl, rfl, rfl, rfl⟩⟩
+    refine ⟨by first | rfl | trivial, ⟨?_, rfl, rfl, rfl, rfl, rfl, rfl⟩⟩
     simp [chargeUse, NearState.profileAction, Near.GasCounter.used]; omega
   | newReceipt sir depsSir =>
     simp only [chargeUse] at h1
     simp only [applyCharge, Near.GasCounter.payAction, deduct_ok (Nat.le_add_right _ _) h1 h2 h3]
-    refine ⟨by first | rfl | trivial, ⟨?_, rfl, rfl, rfl, rfl, rfl⟩⟩
+    refine ⟨by first | rfl | trivial, ⟨?_, rfl, rfl, rfl, rfl, rfl, rfl⟩⟩
     simp [chargeUse, NearState.profileAction, Near.GasCounter.used]; omega
   | prepay n =>
     simp only [chargeUse] at h1
     simp only [applyCharge, Near.GasCounter.prepay, deduct_ok (Nat.zero_le _) (by simpa using h1) h2 h3]
-    refine ⟨by first | rfl | trivial, ⟨?_, rfl, rfl, rfl, rfl, rfl⟩⟩
+    refine ⟨by first | rfl | trivial, ⟨?_, rfl, rfl, rfl, rfl, rfl, rfl⟩⟩
     simp [chargeUse, Near.GasCounter.used]; omega
   | pay burn execution =>
     simp only [chargeUse] at h1
     simp only [applyCharge, Near.GasCounter.payAction, deduct_ok (Nat.le_add_right _ _) h1 h2 h3]
-    refine ⟨by first | rfl | trivial, ⟨?_, rfl, rfl, rfl, rfl, rfl⟩⟩
+    refine ⟨by first | rfl | trivial, ⟨?_, rfl, rfl, rfl, rfl, rfl, rfl⟩⟩
     simp [chargeUse, NearState.profileAction, Near.GasCounter.used]; omega
 
 theorem chargeUse_congr {ns ns' : NearState} (hf : ns'.fees = ns.fees) (he : ns'.extCosts = ns.extCosts)
@@ -93,7 +94,7 @@ theorem applyCharges_ok (ns : NearState) (cs : List Charge) {C : Nat}
     (h1 : ns.gas.used + chargesUse ns cs ≤ C) (h2 : C ≤ ns.gas.maxBurnt) (h3 : C ≤ ns.gas.prepaid) :
     (applyCharges ns cs).2 = none ∧ ChargedTo ns (applyCharges ns cs).1 (chargesUse ns cs) := by
   induction cs generalizing ns with
-  | nil => exact ⟨rfl, ⟨by simp [chargesUse, applyCharges], rfl, rfl, rfl, rfl, rfl⟩⟩
+  | nil => exact ⟨rfl, ⟨by simp [chargesUse, applyCharges], rfl, rfl, rfl, rfl, rfl, rfl⟩⟩
   | cons c cs ih =>
     simp only [chargesUse, List.map_cons, List.sum_cons] at h1
     obtain ⟨he, hc⟩ := applyCharge_ok ns c (C := C) (by omega) h2 h3
@@ -107,12 +108,13 @@ theorem applyCharges_ok (ns : NearState) (cs : List Charge) {C : Nat}
     simp only [applyCharges]
     rw [show applyCharge ns c = ((applyCharge ns c).1, none) by rw [← he]]
     simp only
-    refine ⟨he', ⟨?_, ?_, ?_, ?_, ?_, ?_⟩⟩
+    refine ⟨he', ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩⟩
     · rw [hc'.used, hcs, hc.used]; simp [chargesUse]; omega
     · rw [hc'.maxBurnt, hc.maxBurnt]
     · rw [hc'.prepaid, hc.prepaid]
     · rw [hc'.erase, hc.erase]
     · rw [hc'.fees, hc.fees]
     · rw [hc'.extCosts, hc.extCosts]
+    · rw [hc'.config, hc.config]
 
 end NearLogic
