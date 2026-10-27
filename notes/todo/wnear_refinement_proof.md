@@ -857,7 +857,7 @@ its stored words to multiplication. These are executable/code facts and
 proof targets, not a completed metered function contract.
 
 
-Latest M3 checkpoint: the actual accepted f155 `unwrapState` call is now
+Earlier M3 checkpoint: the actual accepted f155 `unwrapState` call is now
 proved through its real f951 byte-copy loop, typed result and final drop.
 The positive-count f951 call costs `(18*n + 17)` operation units and takes
 `17*n + 12` steps, including caller opcode, activation and return; at forty
@@ -913,6 +913,74 @@ The full working-tree audit covers 190 modules, 8286 declarations
 and 4981 theorems, with exactly the original three refinement-dependent
 `sorryAx` declarations and no additional violations. All new principal proofs
 use only standard axioms; no operational runtime/model/WF changes are included.
+
+The next M3 stage connects one decoded supply premise through all three
+actual unwrap/copy/serializer-input boundaries (`TotalSupplyDataFlow`). The
+actual initialized thread-local lookup is proved through f565 and f468,
+including its type-1 indirect entry: 29 ordinary units and fifteen steps as
+an indirect call. f468 returns its pointer+4 only after its actual status-one
+load and comparison; the lazy f467 route remains outside this contract.
+Captured validation checks 178 initialized calls each for f468/f565, exact
+17/28 root operation units and 10/14 root steps. Twelve lazy captures per
+function are counted separately, not included as accepted cases.
+
+Actual f494 increment and f429 acquisition now include their real nested
+f672 swap, signed guard and panic-skipping branch. The complete f429 local
+call costs 72 units and 47 steps; sequential counter/borrow-record writes,
+exact residual/promise credits and stack restoration are checked. Generic
+select, bitwise-or and two-block exit rules support outer composition.
+Successful loading derives both slot116→f565 and slot58→f260 in the same
+actual initialized table. A table-preserving loaded-code invariant is
+required after guest execution; code-only installation cannot imply table
+contents. The f545 scalar slice setup now executes its actual six-instruction two-store
+sequence and four argument instructions, and its actual memory writes establish
+both zero-extended dispatch words and the complete outside-byte frame.
+
+Separate whole-path capture checks cover seven f456 calls and seven f545
+calls. They check exact returned bytes, gas, fuel boundaries, unchanged
+storage usage, no returned promise and restored SP: f456 root247 ordinary
+units plus host fees/160 steps; f545 root277 plus host fees/181 steps.
+The accepted f456 body is now kernel-proved through the actual full chain:
+237 ordinary units plus the concrete host fee, 159 active steps, and exact
+residual credits. The two free block entries, typed nested returns, branch
+out of both blocks, f433 status check and SP restoration are included.
+`ValueReturnOuterPrefix`, `ValueReturnOuterBody`, `ValueReturnOuterDispatchTail`
+and `ValueReturnOuterCall` split the computation into cached kernel theorems;
+no callee execution callback remains in this accepted body. Actual local f456 entry and typed return are also proved: 248 ordinary
+units plus the original host fee, 161 steps. The full f545 call now executes
+its actual prefix, this actual f456 call and its epilogue: 278 ordinary units
+plus `ValueReturnHost.cost` of the original host and dispatch length,
+182 steps. `ValueReturnWrapperCall.calleeContract` has only initial heap/code
+resources and layout ties, with no assumed post-store module/global lookup.
+
+`TotalSupplyReturnFrontier` integrates the actual full f545 call. The getter
+now has exactly six remaining local execution contracts: panic hook522,
+interface setup520, state read219, serialization96, and the two vector drops68.
+Five helper implementations are supplied internally (155/414/158/779/545).
+Actual exported entry/body/return and original-store gas bounds remain checked
+under the six-call interface and explicit scalar/representation resources.
+Five redundant readiness fields (four computed memory lookups and the u64
+sentinel inequality) were removed and replaced with derived lemmas.
+
+`LinkDataLookup` and `LoadedValueReturnData` derive the two initialized memory
+words (1050280→58, 1055020→116) from successful loading, retaining the 26 KB
+initializer symbolically. Code-frame lemmas preserve the loaded table facts
+through the known memory/host phases. `ValueReturnOuterLayout` derives the
+actual borrow record and selected pointer and retains words outside the
+counter/scratch footprint. Full payload equality with the original input is
+proved in `ValueReturnPayloadFrame` under explicit span disjointness from
+both scratch regions and the counter. The operational postcondition always
+uses actual dispatch memory; original payload equality is not assumed under
+arbitrary aliasing.
+
+Final audits for the six-call checkpoint: strict transitive coverage of
+241 modules, 9180 declarations and 6821 theorems with zero violations; full
+working-tree coverage of 224 modules, 9373 declarations and 5811 theorems,
+tolerating exactly the original three refinement-dependent `sorryAx`
+declarations. The normal Lake build passes 1384 jobs and blueprint extraction/
+rendering passes after 1478 build jobs. Principal new contracts, composition,
+loader and frame theorems pass Lean LSP MCP verification with standard axioms.
+No operational runtime, model or WF changes are included.
 
 ### M4. The Rust runtime layer
 

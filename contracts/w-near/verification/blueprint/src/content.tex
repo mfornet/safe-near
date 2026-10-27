@@ -328,12 +328,23 @@ lookups; twelve executable cases, including seven captures, match exact return
 bytes and gas. The actual f456 dispatch fragment now also reaches the metered host and saved
 caller through its real indirect call, at 24 ordinary units plus host fees.
 The accepted state unwrap f155 executes its actual forty-byte forward loop:
-754 units and 702 steps as a local call. Its integration reduces the getter's
-remaining call-site contracts to seven; decoded U128 data is derived through
+754 units and 702 steps as a local call. Its integration closes the getter's
+state-unwrap site; decoded U128 data is derived through
 the actual unwrap, supply copy and serializer-input writes. Native bounds,
-representation facts and the seven SDK/runtime call contracts remain explicit.
-Normal borrow checks, cleanup, word swap and nested release are checked;
-acquisition and the complete outer SDK path remain open. Static validator
+representation facts and remaining SDK/runtime call contracts remain explicit.
+The complete accepted outer SDK path is now checked: actual initialized
+thread-local lookup, acquisition, dispatch, release, status check and SP
+restoration. The actual f456 body costs 237 ordinary units plus host fees
+and takes 159 active steps. The full f545 local call costs 278 ordinary units
+plus the original host fee and takes 182 steps. Its integration in
+\texttt{TotalSupplyReturnFrontier} reduces the getter to six remaining local
+execution contracts: panic hook, interface setup, state read, serialization
+and two vector drops. Layout, native bounds and representation obligations
+remain explicit. Original payload-byte preservation is proved under explicit
+counter/scratch span disjointness; operational contracts retain arbitrary
+aliasing. Successful loading derives both indirect table targets and the
+static memory words selecting them, with table and data frames for later
+writes. Static validator
 sections and a first per-function certificate are checked separately;
 whole-prelude and whole-module validation are still open.
 The
