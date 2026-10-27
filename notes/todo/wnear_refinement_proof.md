@@ -366,15 +366,17 @@ that removes the risk of getting stuck on the glue at the end.
 | Invalid methods | `Skeleton/InvalidMethod.lean` | Complete unparsed-input rollback and no-interpreter-limitation clause for the exact RuntimeInterface, with no context/gas hypotheses |
 | Actual build collision validation and dedup traversal | `NearInterface/{TrieConstructionInvariant,TrieWitnessFuel}.lean` | Successful actual build derives raw/final witness consistency and fetch preservation; lookup transfers with exact result/accounting at the smaller final default fuel |
 | Node-only ancestor ranks | `NearInterface/{TrieNodeRank,TrieConstructionRanks}.lean` | Actual successful recursive construction produces a node certificate with serialized binding/rank bounds and ancestor exclusion; arbitrary value objects need not be excluded; decoded traversal follows this certificate in TrieRankedLookup |
-| Actual canonical reference lookup | `NearInterface/{TrieRankedLookup,TrieReadableConstruction,TrieEntryLookup}.lean` | Actual public reference-only lookup agrees with original byte entries, using recursive decode certificates and deduplicated witness fuel; nonzero node hashes remain explicit |
+| Actual canonical reference lookup | `NearInterface/{TrieRankedLookup,TrieReadableConstruction,TrieEntryLookup,TrieEntryDereference}.lean` | Actual public reference and full value lookup agree with original byte entries, using recursive decode certificates, retained value objects and deduplicated witness fuel; nonzero node hashes remain explicit |
 | Startup and checked receipt budget replay | `Skeleton/{StartupSimulation,ReceiptSimulation}.lean`, `NearRuntime/BudgetObservation.lean` | Actual execOn matches an auxiliary reference or stops for gas with rollback and prefix logs; original preparation/empty-base/proof acceptance remain explicit |
 | Model-level lower-gas alternative, accepted resources | `Skeleton/{FundedEmpty,FundedObservation}.lean` | Actual funded reference matches model for either stake outcome; actual execOn matches or returns out-of-gas with rollback and model-log prefix for arbitrary original gas, on the explicit accepted-resource empty-base slice |
+| All-resource pointwise refinement clauses | `Skeleton/{FundedInputFailures,FundedOutputFailures,EmptyRefinement}.lean` | Sufficient-gas matching/bound, arbitrary-gas model-or-gas with rollback/model-log prefix, no execution issue and invalid-call rollback assembled for exact RuntimeInterface, with empty-base/native/proof assumptions explicit |
+| Canonical overlay reads | `NearInterface/TrieCanonicalLookup.lean` | Actual canonical getReference/dereference agree with materialized view; base callback eliminated under canonical build, unique overlays and explicit nonzero-node certificate |
 | Actual external trie charges | `NearVM/MeteredHosts/TrieCost.lean` | Kernel checked original-key bounds for successful reference lookup (2n+1 touches), value dereference (one touch), and their actual metered charges using original prices |
 | Storage-stake acceptance/rejection | `Skeleton/EmptyStakeFailure.lean` | Kernel checked positive-deficit rollback with saved log and matching for both zero/positive cases on the empty-base slice |
 | Trie access-count bounds | `NearInterface/TrieWalkCost.lean` | Kernel checked actual parser rejects empty extensions; successful lookup touches at most twice byte key length plus terminal node and optional value, with no witness-shape premise |
 | Original-context sufficient-gas matching | `Skeleton/SuccessCost.lean` | Exact loading/opcode/four-host cost includes return-data receipt fees; original gasLimit gives credits, matching and used-gas bound without a stake/read-width premise |
 | Symbolic empty-storage cost and total success gas | `Skeleton/{EmptyCost,SuccessGas}.lean` | Original-cost-table formula and used-gas bound with retained credits, loading, activation and receipt observation kernel checked; universal model bound remains open |
-| Universal model gas bound, receipt-level lower-gas clause and `Refines` | — | Open; SAF-67 also requires statement repair |
+| Universal model gas bound and unrestricted `Refines` | — | Open; pointwise empty-base refinement clauses now checked, SAF-67 also requires statement repair |
 
 The walking module uses `input`, `storage_write`, `log_utf8` and
 `value_return` through the actual NEAR metered runtime and receipt boundary.
@@ -440,7 +442,8 @@ used-gas bounds, and `EmptyBounded` assembles matching plus that bound for every
 resource and stake branch. Its finite-set bridge is the actual RuntimeInterface;
 `sufficientGasModel` chooses the proved cost as its gas field and supplies the
 exact sufficient-gas implication for this explicitly restricted slice. The
-lower-gas alternative and universal nonempty-trie gas function are still open.
+lower-gas alternative is now assembled below; the universal nonempty-trie gas
+function remains open.
 `ModelSafety` proves matched model branches cannot report interpreter limitations.
 `InvalidMethod`
 closes the complete unparsed-input clause without WF or gas hypotheses.
@@ -461,7 +464,14 @@ deduplication. The decoded traversal is now connected to that certificate by
 actual constructor success, and `TrieEntryLookup` proves reference-only public
 lookup agrees with the original byte-key entries. These proofs cover all
 recursive node shapes and deduplicated witness fuel. Reserved-zero node roots
-remain an explicit premise; value dereferencing remains separate.
+remain an explicit premise. `TrieEntryDereference` now retains original value
+objects through actual recursion and collision-checked deduplication, derives
+exact fetches, and proves full public lookup returns original byte-key values.
+Value hashes need no nonzero premise. `TrieCanonicalLookup` connects these
+constructor results to actual overlay reference/dereference operations and
+materialized-view bytes, eliminating the base-lookup correctness callback.
+Canonical build, unique overlays and explicit nonzero-node evidence suffice;
+the shared WF predicate is unchanged.
 `TrieCost` lifts successful lookup/dereference access bounds to the actual
 cumulative counters and metered charges: at most 2n+1 reference-node touches
 and one value touch, billed at no more than the larger original node price.
@@ -495,10 +505,16 @@ fixed, under explicit resource acceptance and protocol arithmetic room.
 its actual checked reference matches the independent model for both stake
 outcomes, and combines the two: `execOn_matches_or_gas` proves actual execution
 matches the model or returns out-of-gas with rollback and a prefix of the model's
-logs, for any original gas budget. This is the accepted-resource empty-base
-slice, with original WF/representation, preparation, native usage room, read-cost
-width, absent key and recorded-proof acceptance explicit. Lower-gas assembly for
-resource-rejection branches remains open. The arithmetic premise must eventually
+logs, for any original gas budget. `EmptyRefinement` transports this to the
+exact finite-set runtime and assembles every clause appearing in `Refines` at
+a context/storage point, including no interpreter limitation and invalid-call
+rollback. It also derives the equivalence between original and storage-paid
+recorded-proof checks. `FundedInputFailures` and `FundedOutputFailures` now
+derive actual funded input/key/value and log-count/log-length/return-length
+rejections with the same original guest context. `EmptyRefinement` combines
+these branches, so no resource limit is assumed to accept. This is the
+empty-base slice, with original WF/representation, preparation, native usage
+room, read-cost width, absent key and recorded-proof acceptance explicit. The arithmetic premise must eventually
 follow from certified pinned-protocol facts independent of the low context's
 gas. The universal nonempty-trie gas function and recorder repair also remain open.
 
@@ -555,18 +571,19 @@ pins this observed limitation explicitly. Register-size limits are enforced.
 This does not affect the default configuration's one-register example, but
 must not be described as nearcore conformance for arbitrary register limits.
 
-Validation for this checkpoint (2026-10-27): 107 proof modules were checked
-transitively for axioms (4965 declarations, 3568 theorems, zero violations).
+Validation for this checkpoint (2026-10-27): 112 proof modules were checked
+transitively for axioms (5079 declarations, 3662 theorems, zero violations).
 Standard Lake builds, the walking-skeleton checks, and blueprint
-extraction/rendering pass. The full wNEAR audit covers 113 modules, 5969
-declarations and 3213 theorems, permitting exactly the original refinement
+extraction/rendering pass. The full wNEAR audit covers 116 modules, 6066
+declarations and 3303 theorems, permitting exactly the original refinement
 module's open proof and its two dependent theorems. After merging latest main (including the Lean LSP skill and new stress
 cases), all 56 differential scenarios pass. The earlier unchanged operational
 baseline has all five builtin harness contracts and 211 adapter checks passing;
 those two suites were not rerun. Lean LSP MCP diagnostics and axiom verification
 pass for the startup, checked receipt replay and canonical reference lookup
-theorems, including the final funded-observation lower-gas theorem. Both audits
-include that final increment.
+theorems, including all-resource pointwise refinement and full canonical
+overlay reads. Both audits include this increment. The 56-scenario result is
+from the preceding synced-main checkpoint; no runtime behavior changed here.
 
 During the latest increment the original host checkout and its shared Git/cache
 paths disappeared. Source work and pushes were preserved using isolated Git

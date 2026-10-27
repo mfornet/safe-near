@@ -207,7 +207,10 @@ kernel checked. Successful lookup access counts are bounded by twice the byte
 key length plus one terminal node and an optional value dereference. The
 actual decoder rejects empty extension paths, so this bound needs no extra
 witness-shape premise. Canonical reference lookup now agrees with original byte-key entries under
-an explicit nonzero-node obligation; value dereferencing remains separate. Isolated child
+an explicit nonzero-node obligation. Full value dereferencing now returns
+original byte-key values after actual collision checks and deduplication.
+Canonical overlay reads agree with their materialized view, eliminating the
+base-lookup callback while keeping nonzero-node evidence explicit. Isolated child
 walks now transfer through actual constructed parent witness segments, with
 compatible aliases and ancestor safety explicit. Actual construction collision
 validation discharges binding compatibility; deduplicated lookup retains the
@@ -236,8 +239,11 @@ auxiliary reference. The funded body succeeds with its original guest context
 fixed under explicit arithmetic and resource premises. Its checked observation
 now matches the model for both stake outcomes. Combining these gives actual
 execution matching or gas rollback with a prefix of the model logs, for arbitrary
-original gas on the accepted-resource empty-base slice. Resource-rejection
-branches still need the same lower-gas assembly.
+original gas on the empty-base slice. Funded input/key/value and output
+rejections now cover every resource-limit branch with the original guest
+context fixed. The exact finite-set runtime has every pointwise refinement
+clause under the explicit preparation, arithmetic and recorded-proof scope;
+no resource limit is assumed to accept.
 
 The empty-base specialization derives storage postconditions from original
 context data and matches the model for both storage-stake acceptance and
@@ -246,8 +252,9 @@ ordered storage/input/log charges and per-receiver return-data byte fees.
 Original gas-limit coverage now supplies matching and a used-gas bound for
 every resource-limit branch and either stake outcome through the exact
 finite-set runtime interface; the log decoder's width check follows from WF and this coverage. The
-proof-size check and usage room remain explicit, and the universal model gas
-function and low-gas refinement clause remain open.
+proof-size check and usage room remain explicit. The low-gas clause is now
+checked for the same empty-base slice with an explicit read-cost width
+premise. The universal nonempty-trie model gas function remains open.
 
 The current statement also has the separately documented SAF-67 gap: an
 arbitrary recorded-proof-size input is accepted by context WF. A canonical
@@ -262,9 +269,9 @@ used by the configuration loader contains opaque partial definitions, so even
 an empty-object parse cannot be certified by kernel reduction. Numeric facts
 about the pinned JSON were not replaced by unchecked computation or new axioms.
 
-M2 remains open: faithful recorder input, nonempty canonical-trie correctness,
-the full storage contract and gas bound, other deterministic failures and
-whole-run simulation must be closed before assembly of \texttt{Refines}.
+M2 remains open: faithful recorder input, reserved-zero node exclusion,
+protocol certificates and the full nonempty-trie storage contract and gas
+bound must be closed before unrestricted \texttt{Refines}.
 The deployed \texttt{refines\_wnear\_exported} proof remains open. The
 detailed frontier is recorded in \texttt{notes/todo/wnear\_refinement\_proof.md}.
 Run \texttt{just wnear-skeleton} for the executable checks and
