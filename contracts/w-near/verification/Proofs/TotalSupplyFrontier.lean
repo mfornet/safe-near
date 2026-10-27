@@ -192,7 +192,7 @@ theorem invoke (cfg : RuntimeConfig) (host : NearState) (rest : Nat) (s final : 
   exact LoadedCallees.totalSupply cfg host rest s final limits before after cost steps mi globalIndex memoryIndex
     sp scratch pointer length originalGlobal finalGlobal copyMemory sliceMemory hload calls hboundaries hinv hgas
 
-/-- Original-store gas bounds for the same eight-call frontier, including
+/-- Original-store gas bounds for the same seven-call frontier, including
 activation and the three concrete helper implementations. -/
 theorem gas_bounds (cfg : RuntimeConfig) (host : NearState) (rest : Nat) (s final : Store NearState)
     (limits : ExecLimits) (before after : Fin 11 → Store NearState) (cost steps : Fin 11 → Nat)

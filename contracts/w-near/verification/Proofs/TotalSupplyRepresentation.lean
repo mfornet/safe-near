@@ -1,4 +1,5 @@
 import Proofs.TotalSupplyFrontier
+import Proofs.UnwrapStateEffects
 import Proofs.StorePairReadback
 
 /-! Actual memory effects establish the model U128 representation at the
@@ -152,5 +153,19 @@ theorem serializer_input (s : Store NearState) (op index : Nat) (scratch : UInt3
       U128At result (scratch + 112).toNat value :=
   ⟨serializerMemory memory scratch, copyStore_memory s op index scratch memory hmemory,
     serializer_u128 memory scratch value hwf hwidth hspan hv⟩
+
+/-- At the actual getter call site, the unwrapped supply is derived from the
+SDK-decoded source representation and the complete proved f155 effect. -/
+theorem unwrapped_supply (cfg : RuntimeConfig) (host : NearState) (limits : ExecLimits)
+    (before after : Store NearState) (scratch : UInt32) (value : Nat)
+    (r : TotalSupplyFrontier.UnwrapResources cfg host limits before after scratch)
+    (hv : U128At r.memory (scratch + 72).toNat value) :
+    ∃ result, after.mems[r.memoryIndex]? = some result ∧ U128At result (scratch + 32).toNat value := by
+  have h := UnwrapStateEffects.callAfter_u128 before cfg.wasm.regularOpCost r.memoryIndex
+    (scratch + 32) (scratch + 72) r.memory value r.memory_eq r.memory_wf r.memory_width
+    r.source_bound r.output_bound (UnwrapStateEffects.getter_disjoint scratch) hv
+  obtain ⟨result, hm, hu⟩ := h
+  refine ⟨result, ?_, hu⟩
+  exact (congrArg (fun store : Store NearState => store.mems[r.memoryIndex]?) r.after_eq).trans hm
 
 end WNear.Proofs.TotalSupplyRepresentation
