@@ -29,3 +29,4 @@ import NearLogic.Hosts.Mono
 import NearLogic.Hosts.MonoFns
 import NearLogic.Hosts.RelaxLogs
 import NearLogic.RelaxRunLogs
+import NearLogic.Rules.Memory
