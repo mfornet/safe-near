@@ -26,6 +26,11 @@ The explicit `runtime-known-limit-gap` regression records that the interpreter
 currently accepts `maxNumberRegisters = 0`; it is not a nearcore differential
 validation. Register **size** limits are enforced and separately tested.
 
+`Instantiation.lean` proves validation, real host resolution, import checks and
+initialization of the original one-page module from arbitrary host state. The
+data write remains symbolic and is proved for every positive memory page count.
+The runtime-prepared memory declaration still needs its own instantiation lemma.
+
 Kernel-checked facts currently cover the export, signature, absence of start,
 model parse functionality, installation of the new key-value pair,
 preservation of every unrelated pair, and equivalence of the executable
@@ -34,7 +39,7 @@ these files.
 
 M2 is **open**. Remaining obligations are a universal metered contract for the
 method (including dynamic trie and host costs), a proved gas-bound expression,
-a below-bound execution-prefix theorem, module validation/instantiation facts,
+a below-bound execution-prefix theorem, runtime-prepared instantiation and fixed-address byte-read facts,
 and assembly of all `Refines` clauses for arbitrary well-formed contexts and
 represented states. The concrete contexts use canonical tries and valid account
 IDs; their complete `Context.WF` propositions are not yet formally discharged. The scenarios validate proposed statements; they do not

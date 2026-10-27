@@ -323,6 +323,60 @@ storage-stake check after the run; how host aborts appear in `Post`.
 *Exit:* a closed `Refines` proof for the test module. This is the milestone
 that removes the risk of getting stuck on the glue at the end.
 
+*Status: in progress (continuation in PR #39).* The current pieces are:
+
+| Piece | Evidence | Status |
+|---|---|---|
+| Gas credits, spending and residual frames | `NearVM/GasCredits.lean` | Kernel checked |
+| Replay of successful charges at larger counter limits | `NearVM/GasBudget.lean` | Kernel checked; not a whole-run prefix theorem |
+| Actual metered-machine WP, charging, composition and error exits | `NearVM/MeteredLogic.lean` | Kernel checked; no separation frame rule yet |
+| Constants, locals and a symbolic constant-return program | `NearVM/MeteredRules.lean` | Kernel checked, including exact gas and memory preservation |
+| Direct host calls and a symbolic metered `input` caller | `NearVM/MeteredCall.lean` | Kernel checked, including opcode and host costs |
+| Boundary success, abort, receipt and stake-failure adequacy | `NearRuntime/Refinement.lean` | Kernel checked; assembly retains the method/low-gas premises |
+| Host burn-list credits and storage-write functional core | `NearVM/MeteredHosts/{Charges,Storage}.lean` | Kernel checked; trie/metered storage contract remains open |
+| Metered input and output hosts | `NearVM/MeteredHosts/{Input,Output}.lean` | Kernel checked; log-read premise still refers to the paid store |
+| Effectful walking module and independent resource-aware model | `Skeleton/{Module,Model}.lean` | Syntax/model facts and checker-to-`Matches` equivalence kernel checked |
+| Walking-module validation, linking and initialization | `Skeleton/Instantiation.lean` | Kernel checked for the original module; runtime-prepared memory remains open |
+| Walking-module executions | `just wnear-skeleton` | Validated on creation, replacement, binary/long inputs, gas and resource limits |
+| Whole effectful method, gas bound, below-bound simulation and `Refines` | — | Open |
+
+The walking module uses `input`, `storage_write`, `log_utf8` and
+`value_return` through the actual NEAR metered runtime and receipt boundary.
+The harness tests both kinds of budget edges: varying the burn cap with
+prepaid gas fixed, and varying prepaid gas with the protocol fixed. It checks
+exact deterministic resource failures, invalid methods, storage-stake rollback,
+and log prefixes. Neither those tests nor a parameterized `ContractModel`
+constitute a universal refinement proof.
+
+**Frontier:** finish the metered trie-storage contract and make the output
+contracts usable from fixed memory bytes; connect the four hosts through the
+Wasm call rule and runtime-prepared instantiation; derive a symbolic cost including
+trie charges; prove the execution-prefix relation with guest-visible context
+fixed; assemble the effectful `Refines` theorem. The counter-level simulation
+may relax prepaid and burn limits, but the immutable `NearContext.prepaidGas`
+seen by guest code must stay fixed. An arbitrary host callback can inspect
+counter limits, so host insensitivity is a real premise to discharge, not an
+implicit generic monotonicity assumption.
+
+The current instantiation theorem initializes the original one-page module.
+The runtime prepares its memory declaration using `initialMemoryPages` and
+`maxMemoryPages`, so the theorem must be lifted to that prepared module before
+it can discharge the actual boundary initialization obligation. `dataMemory`
+keeps the zero-filled memory symbolic rather than reducing whole pages.
+
+The runtime currently does not enforce `maxNumberRegisters`; the skeleton
+pins this observed limitation explicitly. Register-size limits are enforced.
+This does not affect the default configuration's one-register example, but
+must not be described as nearcore conformance for arbitrary register limits.
+
+Validation for this increment (2026-10-27): all 13 new proof modules were
+checked transitively for axioms (1020 declarations, no violations); the
+walking-skeleton checks pass; all five existing builtin harness contracts
+pass; all 211 adapter checks and all 51 differential scenarios pass. The web
+blueprint builds after giving Binary, Harness and Skeleton explicit library
+roots. The wNEAR audit still permits only the original refinement module's
+open proof and its two dependent theorems.
+
 ### M3. The first method, top-down
 
 `ft_total_supply`, or another small view: its contract, proved from sorried

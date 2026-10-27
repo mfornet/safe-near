@@ -50,6 +50,36 @@ tends to come back in another place.
 - **Test added:** the bcmp inputs with equal ranges and with differences at
   the first and last pair.
 
+### 3. A credit cannot mean only burnt gas
+
+- **Statement:** the first M2 draft conserved burnt gas plus residual credits exactly.
+- **Truth:** promise prepayment consumes prepaid capacity without burning gas.
+  `Pays` must bound both burnt and used increases, and require the residual
+  credits to fit both final limits.
+- **Caught by:** design review before callers used the draft.
+- **Root cause:** treating all gas consumption as instruction burn.
+- **Sweep:** `GasCredits.prepay_credits`, `Pays.trans` and `WP.result` now
+  include promise reservations. Boundary adequacy distinguishes committed
+  `usedGas - distributedGas` from failed execution's burnt gas.
+- **Regression evidence:** kernel-checked `prepay_credits` covers arbitrary
+  initial promise reservations and residual credit frames.
+
+### 4. Zero balance does not always force a storage-stake failure
+
+- **Statement:** the initial M2 skeleton test expected zero balance to force
+  a late storage-stake failure after writing a short value.
+- **Truth:** `stakeDeficit` exempts accounts using at most 770 bytes
+  (NEP-448). The test must include account/code storage overhead to exercise
+  the intended failing branch.
+- **Caught by:** the effectful skeleton's runtime validation.
+- **Root cause:** counting contract records but forgetting the storage-stake
+  exemption and total account storage usage.
+- **Sweep:** the shared `stakeDeficit` and wNEAR model already include the
+  exemption; no model or runtime correction is needed.
+- **Test added:** skeleton contexts include 1000 bytes of existing account
+  storage, and check that a late failure restores storage, balance, usage
+  and receipts while retaining the emitted log.
+
 ## Agent results
 
 Success and failure per task type and model (section 11.2 of the plan), used
@@ -58,3 +88,8 @@ to move task types to a cheaper or stronger model.
 | Task type | Model | Succeeded | Failed | Notes |
 |---|---|---|---|---|
 | Harness design and first checkers (M1) | Opus | 1 | 0 | Two cost miscounts, caught by the harness itself |
+| Initial metered contracts (M2) | Codex, inherited model | 1 | 0 | Closed WP/charging proofs; full instruction and host logic remains open |
+| Boundary adequacy (M2) | Codex, inherited model | 1 | 0 | Closed observation and assembly rules; low-budget premise remains open |
+| Effectful skeleton validation/model (M2) | Codex, inherited model | 1 | 0 | Exact failures, two budget directions, closed checker equivalence; universal refinement open |
+| Host contracts and direct-call composition (M2) | Codex, inherited model | 2 | 0 | Metered input/output, exact gas and residual frames; storage trie phase open |
+| Skeleton linking/instantiation (M2) | Codex, inherited model | 1 | 0 | Original module closed; runtime-prepared memory remains open |

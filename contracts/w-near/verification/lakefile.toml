@@ -41,6 +41,7 @@ name = "Model"
 # and the module (milestone M0 of notes/todo/wnear_refinement_proof.md).
 [[lean_lib]]
 name = "Binary"
+roots = ["Binary.Module"]
 
 [[lean_lib]]
 name = "Spec"
@@ -65,6 +66,7 @@ root = "Differential.Main"
 # runs one function of the binary from a prepared store and checks its contract.
 [[lean_lib]]
 name = "Harness"
+roots = ["Harness.Builtins"]
 
 [[lean_exe]]
 name = "wnear-harness"
@@ -73,6 +75,7 @@ root = "Harness.Main"
 # M2: a tiny effectful module validating the metered refinement bridge.
 [[lean_lib]]
 name = "Skeleton"
+roots = ["Skeleton.Model", "Skeleton.Instantiation"]
 
 [[lean_exe]]
 name = "wnear-skeleton"
