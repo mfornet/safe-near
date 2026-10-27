@@ -1,1 +1,1 @@
-import NearLogic.Lift
+import NearLogic.Adequacy
