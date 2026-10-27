@@ -29,15 +29,15 @@ abbrev gasLoc : Loc := (10, 0, 0)
 /-- The host state without its gas counter, its profile, and the copy of
 `used` that metered host functions keep in the context. -/
 def erase (h : NearState) : NearState :=
-  { h with gas := {}, gasProfile := {}, context := { h.context with usedGas := 0 } }
+  { h with gas := {}, gasProfile := {}, actionProfile := [], context := { h.context with usedGas := 0 } }
 
-/-- The gas cell: a host state holding only a counter and a profile. -/
-def gasCellOf (g : Near.GasCounter) (p : Near.GasProfile) : Cell NearState :=
-  .host { (default : NearState) with gas := g, gasProfile := p }
+/-- The gas cell: a host state holding only a counter and the two profiles. -/
+def gasCellOf (g : Near.GasCounter) (p : Near.GasProfile) (a : List (String × Nat)) : Cell NearState :=
+  .host { (default : NearState) with gas := g, gasProfile := p, actionProfile := a }
 
 /-- What a location holds in the metered view of a store. -/
 def mlookup (σ : MStore) (l : Loc) : Option (Cell NearState) :=
-  if l = gasLoc then some (gasCellOf σ.store.host.gas σ.store.host.gasProfile)
+  if l = gasLoc then some (gasCellOf σ.store.host.gas σ.store.host.gasProfile σ.store.host.actionProfile)
   else if l = Loc.host then some (.host (erase σ.store.host))
   else lookup σ.store l
 
@@ -90,22 +90,23 @@ section Assertions
 
 variable {GF : BundledGFunctors} [ι : WasmGS NearState GF]
 
-/-- The gas counter and profile. -/
-def gasPt (g : Near.GasCounter) (p : Near.GasProfile) : IProp GF := gasLoc ↦ₛ gasCellOf g p
+/-- The gas counter and profiles. -/
+def gasPt (g : Near.GasCounter) (p : Near.GasProfile) (a : List (String × Nat)) : IProp GF :=
+  gasLoc ↦ₛ gasCellOf g p a
 
 /-- `n` gas can be used, and `used` stays within `C`, itself within both
 limits. -/
 def credits (C n : Nat) : IProp GF :=
-  iprop(∃ (g : Near.GasCounter) (p : Near.GasProfile),
-    gasPt g p ∗ ⌜g.burnt ≤ g.used ∧ g.used + n ≤ C ∧ C ≤ g.maxBurnt ∧ C ≤ g.prepaid⌝)
+  iprop(∃ (g : Near.GasCounter) (p : Near.GasProfile) (a : List (String × Nat)),
+    gasPt g p a ∗ ⌜g.burnt ≤ g.used ∧ g.used + n ≤ C ∧ C ≤ g.maxBurnt ∧ C ≤ g.prepaid⌝)
 
 /-- The host state, gas erased. -/
 def mhostPt (h : NearState) : IProp GF := Loc.host ↦ₛ (.host (erase h) : Cell NearState)
 
 theorem credits_mono {C n m : Nat} (h : m ≤ n) : credits (GF := GF) C n ⊢ credits C m := by
   unfold credits
-  iintro ⟨%g, %p, Hg, %hg⟩
-  iexists g, p
+  iintro ⟨%g, %p, %a, Hg, %hg⟩
+  iexists g, p, a
   isplitl [Hg]
   · iexact Hg
   · ipureintro; omega

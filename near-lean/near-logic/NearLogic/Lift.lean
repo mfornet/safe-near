@@ -51,11 +51,11 @@ theorem nextInstructionGas_store (cfg : WasmConfig) (s s' : Store NearState) (t 
     nextInstructionGas cfg { store := s, thread := t, limits := lim } =
       nextInstructionGas cfg { store := s', thread := t, limits := lim } := rfl
 
-theorem gasCellOf_inj {g g' : Near.GasCounter} {p p' : Near.GasProfile}
-    (h : gasCellOf g p = gasCellOf g' p') : g = g' ∧ p = p' := by
+theorem gasCellOf_inj {g g' : Near.GasCounter} {p p' : Near.GasProfile} {a a' : List (String × Nat)}
+    (h : gasCellOf g p a = gasCellOf g' p' a') : g = g' ∧ p = p' ∧ a = a' := by
   unfold gasCellOf at h
   cases h
-  exact ⟨rfl, rfl⟩
+  exact ⟨rfl, rfl, rfl⟩
 
 /-- The locations that are neither plain, the host nor the gas cell hold nothing. -/
 theorem lookup_other (σ : Store NearState) {l : Loc} (hp : ¬ isPlain l) (hh : l ≠ Loc.host) :
@@ -183,13 +183,13 @@ theorem mwp_lift_plain (cfg : WasmConfig) (lim : ExecLimits) (t : Thread)
       ⊢ WP (MCode.running cfg lim t) @ s; E {{ Φ }} := by
   iintro ⟨Hc, HRd, HP, Hwp⟩
   iunfold credits at Hc
-  icases Hc with ⟨%g, %p, Hg, %hg⟩
+  icases Hc with ⟨%g, %p, %a, Hg, %hg⟩
   obtain ⟨-, hk, hC1, hC2⟩ := hg
   -- The store the step runs on, and the cells around it.
   let pre (ms : MStore) := preStore cfg lim t ms.store
-  let P' := (gasLoc, gasCellOf g p) :: P
+  let P' := (gasLoc, gasCellOf g p a) :: P
   let Q' (ms : MStore) := (gasLoc, gasCellOf { g with burnt := g.burnt + k }
-    { p with wasm := p.wasm + k }) :: Q (pre ms)
+    { p with wasm := p.wasm + k } a) :: Q (pre ms)
   have hnotP : gasLoc ∉ P.map (·.1) := by
     intro h
     obtain ⟨q, hq, he⟩ := List.mem_map.mp h
@@ -206,13 +206,13 @@ theorem mwp_lift_plain (cfg : WasmConfig) (lim : ExecLimits) (t : Thread)
     simp at this
   -- Facts of a store holding the cells.
   have hfacts : ∀ ms : MStore, (∀ q ∈ Rd, mlookup ms q.1 = some q.2) → (∀ q ∈ P', mlookup ms q.1 = some q.2) →
-      ms.store.host.gas = g ∧ ms.store.host.gasProfile = p ∧
+      ms.store.host.gas = g ∧ ms.store.host.gasProfile = p ∧ ms.store.host.actionProfile = a ∧
       (∀ q ∈ Rd, lookup (pre ms) q.1 = some q.2) ∧ (∀ q ∈ P, lookup (pre ms) q.1 = some q.2) := by
     intro ms hR hPs
     have hgas := hPs _ List.mem_cons_self
     rw [mlookup, if_pos rfl, Option.some.injEq] at hgas
-    obtain ⟨h1, h2⟩ := gasCellOf_inj hgas
-    refine ⟨h1, h2, fun q hq => ?_, fun q hq => ?_⟩
+    obtain ⟨h1, h2, h3⟩ := gasCellOf_inj hgas
+    refine ⟨h1, h2, h3, fun q hq => ?_, fun q hq => ?_⟩
     · rw [show pre ms = chargedStore ms.store _ from rfl, lookup_chargedStore_plain _ _ (hRd q hq),
         ← mlookup_plain ms (hRd q hq)]
       exact hR q hq
@@ -222,7 +222,7 @@ theorem mwp_lift_plain (cfg : WasmConfig) (lim : ExecLimits) (t : Thread)
   iapply mwp_lift_dep cfg lim t Rd P' Q' (fun ms => e' (pre ms))
     (List.nodup_cons.mpr ⟨hnotP, hP⟩) (fun ms => List.nodup_cons.mpr ⟨hnotQ _, hQ _⟩)
   · intro ms hR hPs
-    obtain ⟨hgas, hprof, hR', hP''⟩ := hfacts ms hR hPs
+    obtain ⟨hgas, hprof, hact, hR', hP''⟩ := hfacts ms hR hPs
     obtain ⟨hcost, he, hhost, hplain⟩ := hstep (pre ms) hR' hP''
     have hpre : nextInstructionGas cfg { store := pre ms, thread := t, limits := lim } =
         nextInstructionGas cfg { store := ms.store, thread := t, limits := lim } := rfl
@@ -253,7 +253,7 @@ theorem mwp_lift_plain (cfg : WasmConfig) (lim : ExecLimits) (t : Thread)
     by_cases hg : l = gasLoc
     · subst hg
       simp only [mlookup, ↓reduceIte, Q', lookup_cons_pair, Option.some_or]
-      rw [← hgas, ← hprof]
+      rw [← hgas, ← hprof, ← hact]
       rfl
     by_cases hh : l = Loc.host
     · subst hh
@@ -269,7 +269,7 @@ theorem mwp_lift_plain (cfg : WasmConfig) (lim : ExecLimits) (t : Thread)
         Option.none_or, Option.isSome_none, Bool.false_eq_true, ite_false]
       rw [lookup_other _ hp hh, lookup_other _ hp hh]
   · intro ms hR hPs l hl hnone
-    obtain ⟨-, -, hR', hP''⟩ := hfacts ms hR hPs
+    obtain ⟨-, -, -, hR', hP''⟩ := hfacts ms hR hPs
     have hgl : l ≠ gasLoc := by
       intro he; subst he; simp [P', lookup_cons_pair] at hnone
     simp only [Q', lookup_cons_pair, if_neg hgl] at hl
@@ -290,11 +290,11 @@ theorem mwp_lift_plain (cfg : WasmConfig) (lim : ExecLimits) (t : Thread)
     · iexact HP
   inext
   iintro %ms %⟨hR, hPs⟩ HQ
-  obtain ⟨hgas, hprof, hR', hP''⟩ := hfacts ms hR hPs
+  obtain ⟨hgas, hprof, -, hR', hP''⟩ := hfacts ms hR hPs
   icases (BigSepL.bigSepL_cons.1 : _ ⊢ _ ∗ _) $$ HQ with ⟨Hg, HQ⟩
   iapply Hwp $$ %(pre ms) %⟨hR', hP''⟩ HQ
   iunfold credits
-  iexists { g with burnt := g.burnt + k }, { p with wasm := p.wasm + k }
+  iexists { g with burnt := g.burnt + k }, { p with wasm := p.wasm + k }, a
   isplitl [Hg]
   · iunfold gasPt
     iexact Hg
@@ -372,12 +372,13 @@ theorem mwp_lift_host (cfg : WasmConfig) (lim : ExecLimits) (t : Thread)
       ⊢ WP (MCode.running cfg lim t) @ s; E {{ Φ }} := by
   iintro ⟨Hc, Hh, HRd, HP, Hwp⟩
   iunfold credits at Hc
-  icases Hc with ⟨%g, %p, Hg, %hg⟩
+  icases Hc with ⟨%g, %p, %a, Hg, %hg⟩
   obtain ⟨-, hgk, hC1, hC2⟩ := hg
   let pre (ms : MStore) := preStore cfg lim t ms.store
   let r (ms : MStore) := Exec.step { store := pre ms, thread := t, limits := lim }
-  let P' := (gasLoc, gasCellOf g p) :: (Loc.host, Cell.host (erase h)) :: P
-  let Q' (ms : MStore) := (gasLoc, gasCellOf (r ms).store.host.gas (r ms).store.host.gasProfile) ::
+  let P' := (gasLoc, gasCellOf g p a) :: (Loc.host, Cell.host (erase h)) :: P
+  let Q' (ms : MStore) := (gasLoc, gasCellOf (r ms).store.host.gas (r ms).store.host.gasProfile
+    (r ms).store.host.actionProfile) ::
     (Loc.host, Cell.host (erase h')) :: Q
   have hnot : ∀ (xs : List (Loc × Cell NearState)), (∀ q ∈ xs, isPlain q.1) →
       gasLoc ∉ xs.map (·.1) ∧ Loc.host ∉ xs.map (·.1) := by
@@ -402,7 +403,7 @@ theorem mwp_lift_host (cfg : WasmConfig) (lim : ExecLimits) (t : Thread)
     intro ms hR hPs
     have hgas := hPs _ List.mem_cons_self
     rw [mlookup, if_pos rfl, Option.some.injEq] at hgas
-    obtain ⟨h1, h2⟩ := gasCellOf_inj hgas
+    obtain ⟨h1, h2, -⟩ := gasCellOf_inj hgas
     have hh : mlookup ms Loc.host = some (Cell.host (erase h)) :=
       hPs _ (List.mem_cons_of_mem _ List.mem_cons_self)
     rw [mlookup, if_neg (show Loc.host ≠ gasLoc by decide), if_pos rfl, Option.some.injEq,
@@ -510,7 +511,7 @@ theorem mwp_lift_host (cfg : WasmConfig) (lim : ExecLimits) (t : Thread)
   · iunfold mhostPt
     iexact Hh
   iunfold credits
-  iexists (r ms).store.host.gas, (r ms).store.host.gasProfile
+  iexists (r ms).store.host.gas, (r ms).store.host.gasProfile, (r ms).store.host.actionProfile
   isplitl [Hg]
   · iunfold gasPt
     iexact Hg
