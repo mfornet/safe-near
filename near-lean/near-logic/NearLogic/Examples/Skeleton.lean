@@ -89,29 +89,28 @@ theorem body_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (f : Frame) (e
 
 /-! ## The whole thread -/
 
-/-- What `get` leaves: no values, `"ok"` as the return data, and at most
-`Cg` gas used. -/
-def GetEnds (Cg : Nat) (v : Ending) (σ' : MStore) : Prop :=
-  v = .values [] ∧ σ'.store.host.returnData = some okBytes ∧ σ'.store.host.gas.used ≤ Cg
+/-- What `get` leaves, from the host `h0`: no values, the host `h0` with
+`"ok"` as the return data (gas aside), and at most `Cg` gas used. -/
+def GetEnds (Cg : Nat) (h0 : NearState) (v : Ending) (σ' : MStore) : Prop :=
+  v = .values [] ∧ erase σ'.store.host = erase (h0.selectReturnValue okBytes) ∧
+    σ'.store.host.gas.used ≤ Cg
 
 /-- The cells `get` hands back: the host, and the gas counter within `Cg`. -/
-def getCells (Cg : Nat) (cs : List (Loc × Cell NearState)) : Prop :=
-  ∃ (h : NearState) (g : Near.GasCounter) (p : Near.GasProfile) (a : List (String × Nat)),
-    cs = [(Loc.host, .host (erase h)), (gasLoc, gasCellOf g p a)] ∧
-      h.returnData = some okBytes ∧ g.used ≤ Cg
+def getCells (Cg : Nat) (h0 : NearState) (cs : List (Loc × Cell NearState)) : Prop :=
+  ∃ (g : Near.GasCounter) (p : Near.GasProfile) (a : List (String × Nat)),
+    cs = [(Loc.host, .host (erase (h0.selectReturnValue okBytes))), (gasLoc, gasCellOf g p a)] ∧
+      g.used ≤ Cg
 
-theorem getCells_ends {Cg : Nat} {σ' : MStore} {cs : List (Loc × Cell NearState)} (hc : getCells Cg cs)
-    (hl : ∀ p ∈ cs, mlookup σ' p.1 = some p.2) :
-    σ'.store.host.returnData = some okBytes ∧ σ'.store.host.gas.used ≤ Cg := by
-  obtain ⟨h, g, p, a, rfl, hr, hg⟩ := hc
+theorem getCells_ends {Cg : Nat} {h0 : NearState} {σ' : MStore} {cs : List (Loc × Cell NearState)}
+    (hc : getCells Cg h0 cs) (hl : ∀ p ∈ cs, mlookup σ' p.1 = some p.2) :
+    erase σ'.store.host = erase (h0.selectReturnValue okBytes) ∧ σ'.store.host.gas.used ≤ Cg := by
+  obtain ⟨g, p, a, rfl, hg⟩ := hc
   have h1 := hl _ List.mem_cons_self
   have h2 := hl _ (List.mem_cons_of_mem _ List.mem_cons_self)
   simp only [mlookup, show Loc.host ≠ gasLoc by decide, ite_false, ite_true, Option.some.injEq,
     Cell.host.injEq] at h1 h2
   obtain ⟨hg', -, -⟩ := gasCellOf_inj h2
-  have hrd : σ'.store.host.returnData = h.returnData :=
-    erase_field h1 NearState.returnData fun _ => rfl
-  exact ⟨hrd.trans hr, hg' ▸ hg⟩
+  exact ⟨h1, hg' ▸ hg⟩
 
 /-- `get`, run as the only frame from a store that holds its instance, the
 `value_return` import, a memory with `"ok"` at address 0, and room for its
@@ -127,10 +126,10 @@ theorem get_adequate (cfg : WasmConfig) (lim : ExecLimits) (extra : Nat) (σ : S
     (hgas : σ.host.gas.used + (3 * cfg.regularOpCost + valueReturnUse σ.host 4) ≤ Cg)
     (hC1 : Cg ≤ σ.host.gas.maxBurnt) (hC2 : Cg ≤ σ.host.gas.prepaid) :
     adequate .MaybeStuck (MCode.running cfg lim (entryThread ⟨locals, inst, mi⟩ 0 body)) ⟨σ⟩
-      (GetEnds Cg) := by
+      (GetEnds Cg σ.host) := by
   have had := mwp_adequacy_cells (GF' := WasmLogic.GF NearState)
     (MCode.running cfg lim (entryThread ⟨locals, inst, mi⟩ 0 body)) ⟨σ⟩ (fun v => v = .values [])
-    (fun _ cs => getCells Cg cs) ?_
+    (fun _ cs => getCells Cg σ.host cs) ?_
   · refine ⟨fun t2 σ2 v2 hr => ?_, fun t2 σ2 e2 hs hr hm => had.adequate_not_stuck t2 σ2 e2 hs hr hm⟩
     obtain ⟨hv, cs, hc, hl⟩ := had.adequate_result t2 σ2 v2 hr
     exact ⟨hv, getCells_ends hc hl⟩
@@ -181,7 +180,7 @@ theorem get_adequate (cfg : WasmConfig) (lim : ExecLimits) (extra : Nat) (σ : S
         simp [hmem, hwf, this.1, this.2]
       · cases this
   let Ψ : Ending → IProp (WasmLogic.GF NearState) := fun v =>
-    iprop(⌜v = .values []⌝ ∗ mcellsSat (fun cs => getCells Cg cs))
+    iprop(⌜v = .values []⌝ ∗ mcellsSat (fun cs => getCells Cg σ.host cs))
   show _ ⊢ WP _ @ _; _ {{ Ψ }}
   iintro Hcells
   ihave Hxs := ownCells_take (mheapOf ⟨σ⟩) xs hnd hget $$ Hcells
@@ -240,7 +239,7 @@ theorem get_adequate (cfg : WasmConfig) (lim : ExecLimits) (extra : Nat) (σ : S
   iexists [(Loc.host, Cell.host (erase (σ.host.selectReturnValue okBytes))), (gasLoc, gasCellOf g p a')]
   isplitr
   · ipureintro
-    refine ⟨⟨_, g, p, a', rfl, rfl, by omega⟩, by simp only [List.map_cons, List.map_nil]; decide⟩
+    refine ⟨⟨g, p, a', rfl, by omega⟩, by simp only [List.map_cons, List.map_nil]; decide⟩
   iapply BigSepL.bigSepL_cons.2
   isplitl [Hh]
   · iunfold mhostPt at Hh
