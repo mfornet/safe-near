@@ -1206,6 +1206,23 @@ loading and representation premises. Full exported-method refinement remains
 open. All four frontier theorems passed Lean LSP MCP diagnostics and standard
 axiom verification; the focused final build passed 1025 jobs.
 
+Final audits for the two-call vector checkpoint: strict transitive coverage
+387 modules / 13400 declarations / 10026 theorems, zero violations. Full
+working-tree coverage 368 modules / 13541 declarations / 8965 theorems,
+with exactly the original three `Proofs.Refinement` declarations using
+`sorryAx` and no other violations. Full source build passes 1530 jobs;
+blueprint extraction/rendering passes 1505 jobs, and its rendered two-call
+frontier was checked. Independent review reconciles every nested call cost,
+active-step count and depth-eight premise. No new sorry, native certificates,
+custom axioms, operational runtime changes, model changes or WF changes.
+
+Next concrete proof targets are the valid-result sequential copy f498 on the
+219→548 state path and the six-instruction formatter-pair store f472 on
+96→385. Host-facing state work still needs semantic contracts for
+register_len/read_register/storage_read; the larger serialization path still
+contains the actual U128 decimal formatter. These are future obligations,
+not supplied execution assumptions or completed refinement claims.
+
 ### M4. The Rust runtime layer
 
 The shadow stack, wee_alloc (its free lists and growing memory through
