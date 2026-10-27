@@ -936,7 +936,7 @@ chunk; prospective updates bypass it. Cache warming survives every gas failure.
 Reads bill lookup nodes before value bytes, then dereference with a free gas
 counter. Mutations bill old-value bytes before dereference, then disk/cache totals.
 Remove stages its update before that final charge; write stages it afterwards. -/
-private def prepareStorageCallAux (name : String) (before : HostStore NearState) (args : List Value) :
+def prepareStorageCallAux (name : String) (before : HostStore NearState) (args : List Value) :
     HostStore NearState × Option FunctionCallError := Id.run do
   unless ["storage_read", "storage_has_key", "storage_write", "storage_remove"].contains name do
     return (before, none)

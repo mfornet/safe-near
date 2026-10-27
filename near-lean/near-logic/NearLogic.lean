@@ -20,3 +20,5 @@ import NearLogic.Examples.SkeletonComplete
 import NearLogic.Hosts.MeteredRelax
 import NearLogic.Hosts.FinishRelax
 import NearLogic.Hosts.RelaxFns
+import NearLogic.Hosts.PanicRelax
+import NearLogic.Hosts.HostFnsRelax
