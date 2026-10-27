@@ -347,6 +347,16 @@ static memory words selecting them, with table and data frames for later
 writes. Static validator
 sections and a first per-function certificate are checked separately;
 whole-prelude and whole-module validation are still open.
+The first interface installation takes the lazy status-zero branch, so the
+six-call frontier is retained. Its actual initializer table106 selects f564;
+the full indirect call is checked at thirteen units and five steps. It zeros
+exactly eight bytes and preserves the following scratch word. The lazy payload,
+status, old-record save and normal exit phases are checked separately, as are
+the empty-record guard and setter prefix/copy/install phases. A separate suite of sixty captured calls validates lazy lookup and installation
+gas/fuel boundaries and
+receiver/vtable effects. The actual setter release, status, block-exit, check and restore32 tail is checked at seventy-one units and forty-seven steps, including
+its real exclusive-release and status-check calls. Whole lazy-path composition
+remains open.
 The
 detailed frontier is recorded in \texttt{notes/todo/wnear\_refinement\_proof.md}.
 Run \texttt{just wnear-skeleton} for the executable checks and

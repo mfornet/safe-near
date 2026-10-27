@@ -982,6 +982,58 @@ rendering passes after 1478 build jobs. Principal new contracts, composition,
 loader and frame theorems pass Lean LSP MCP verification with standard axioms.
 No operational runtime, model or WF changes are included.
 
+The next interface-installation checkpoint keeps the frontier at six contracts.
+Captured first calls to f520/f463 have thread-local status zero, so the existing
+status-one lookup contract cannot close this actual installation site. A separate
+60-capture suite checks all twelve lazy calls each to f463, f467, f468, f520 and
+f565, including installed receiver/vtable, initialized status, released counter,
+exact gas and the one-less-fuel failure boundary. Root costs/steps are respectively
+314/220, 81/64, 99/74, 327/225 and 110/78. These executable checks do not constitute
+a complete lazy-path theorem or enlarge the integrated nine-contract harness.
+
+`InterfaceInitialize` proves the actual type-0 table106 call to f564: thirteen
+ordinary units and five steps, including activation and typed return. Successful
+loading supplies the actual table entry and descriptor. The initializer writes
+exactly eight zero bytes; the following scratch word remains its original value.
+`InterfaceLazyBody`, `InterfaceLazySaved` and `InterfaceLazyFinish` prove the actual
+f467 payload exchanges, status publication, sequential old-record writes and
+complete thirteen-step result/old-status-zero/restore48 tail. Bounds and real
+sequential reads remain explicit, retaining aliasing and wrapping arithmetic.
+`InterfaceLazyPrefix` closes the two real argument loads and the actual
+initializer call at fifteen units/seven steps, with derived memory, resource
+and residual-credit facts. Full f467 composition and the lazy f468/f565 caller
+adapters remain to assemble.
+
+`InterfaceStack` generalizes the existing reserve/restore rules to any wrapping
+UInt32 allocation amount. `InterfaceInstall` proves the real f464 empty-record
+guard, its fourteen-unit/seven-step full local call, and exact adjacent
+receiver/vtable writes. The nonempty-record drop branch still calls unproved
+f465. `InterfaceSetBody`, `InterfaceSetPrefix` and `InterfaceSetInstallTail` prove
+the setter's scalar stores, reserve32/save-arguments prefix and complete
+23-step/thirty-unit borrow-copy/guard/install capsule. These are deployed
+instruction proofs, with semantic continuations only after each complete phase;
+no guest-execution callbacks or new axioms are introduced.
+`InterfaceSetReleaseTail` closes its actual 47-step/seventy-one-unit release,
+status-reset, two-block exit, f433 check and restore32 tail, including real
+f442/f672 calls. `InterfaceBorrowState` proves the full exclusive release call
+at thirty-six units/nineteen steps. `InterfaceBorrow` closes actual f492
+exclusive acquisition through f672 at thirty-nine units/twenty-four steps as a
+local call, plus f441's zero-counter/nonzero-pointer guard and sequential
+record writes. Complete f441 composition remains open; its unverified trial
+was withdrawn from project sources. Separate captured checks cover twelve f441,
+twenty-three f442 and twenty-three f492 calls at their exact root costs.
+An independent review of the lazy phases found no discrepancy in instruction
+order, wrapping arithmetic, aliasing or the scope of the empty-status guard.
+
+Final audits for the interface-phase checkpoint: strict transitive coverage of
+264 modules, 10086 declarations and 7529 theorems with zero violations; full
+working-tree coverage of 247 modules, 10201 declarations and 6441 theorems,
+with exactly the same three original refinement-dependent `sorryAx`
+declarations. The full source build passes 1407 jobs; blueprint extraction
+and rendering pass after 1488 jobs, and the rendered six-call frontier was
+checked. All new principal contracts pass Lean LSP MCP standard-axiom checks.
+The full refinement goal remains open; no runtime, model or WF changes are made.
+
 ### M4. The Rust runtime layer
 
 The shadow stack, wee_alloc (its free lists and growing memory through
