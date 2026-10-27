@@ -48,9 +48,12 @@ theorem's hypotheses hold.
 ## Steps
 
 1. **Start clean.** Work on a branch from `origin/main`; the result is a PR.
-   - **Build cache:** in a fresh worktree, clone the main checkout's
-     `near-lean/.lake`, `near-lean/*/.lake` and the contract's `.lake` with
-     `cp -Rc` first. A cold Mathlib build takes hours.
+   - **Build cache:** in a fresh worktree, run `lake exe cache get` in
+     `near-lean/chain`, as CI does. From the contract's package it refuses
+     with a dependency mismatch, yet exits 0. Mathlib then comes from the
+     cache, and building near-lean and the harness takes about 6 minutes.
+     Cloning the main checkout's `.lake` directories with `cp -Rc` also works,
+     but only when they are up to date for the commit you start from.
    - **Baseline:** run the existing scenarios. They must pass before you add
      any. A failure on a fresh `main` is a finding in itself: runtime changes
      surface there. One round found a gap that a runtime change on `main` had
