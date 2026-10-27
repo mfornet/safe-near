@@ -1,5 +1,7 @@
 import NearLogic.Outcome
 import Wasm.HostInvariant
+import NearLogic.Charges
+import NearVM.GasInvariants
 
 /-!
 # Instructions carry the host along
@@ -59,5 +61,60 @@ theorem instr_withHost (σ : Store H) (h : H) (inst : ModuleInst) (locals stack 
       evalMemOp_withHost, Store.memOf, Store.setMemOf, setTable, tableOf, loadNat, storeNat_withHost,
       Option.bind_eq_some_iff])
   all_goals (try (repeat' split)) <;> (try simp_all [Effect.withHost, Option.bind_eq_some_iff])
+
+/-! ## Charges under raised limits -/
+
+section Charges
+
+open Wasm.Near
+
+/-- The host with its gas limits raised to `p` (prepaid) and `m` (burn limit). -/
+def relax (h : NearState) (p m : Nat) : NearState :=
+  { h with gas := { h.gas with prepaid := p, maxBurnt := m } }
+
+theorem deduct_relax (g : Near.GasCounter) (burn use p m : Nat) (hp : g.prepaid ≤ p) (hm : g.maxBurnt ≤ m)
+    (h : (g.deduct burn use).2 = none) :
+    ({ g with prepaid := p, maxBurnt := m } : Near.GasCounter).deduct burn use =
+      ({ (g.deduct burn use).1 with prepaid := p, maxBurnt := m }, none) := by
+  unfold Near.GasCounter.deduct at h ⊢
+  by_cases hc : g.burnt + burn ≤ g.maxBurnt ∧ g.burnt + burn + (g.promises + (use - burn)) ≤ g.prepaid
+  · have hc' : g.burnt + burn ≤ m ∧ g.burnt + burn + (g.promises + (use - burn)) ≤ p := by omega
+    simp only [hc', and_self, ite_true, hc]
+  · simp only [hc, ite_false] at h
+    cases h
+
+theorem applyCharge_relax (ns : NearState) (c : Charge) (p m : Nat) (hp : ns.gas.prepaid ≤ p)
+    (hm : ns.gas.maxBurnt ≤ m) (h : (applyCharge ns c).2 = none) :
+    applyCharge (relax ns p m) c = (relax (applyCharge ns c).1 p m, none) := by
+  cases c <;> simp only [applyCharge, relax, Near.GasCounter.burn, Near.GasCounter.prepay,
+    Near.GasCounter.payAction] at h ⊢ <;>
+    rw [deduct_relax _ _ _ p m hp hm h] <;> rfl
+
+theorem applyCharge_limits (ns : NearState) (c : Charge) :
+    (applyCharge ns c).1.gas.prepaid = ns.gas.prepaid ∧ (applyCharge ns c).1.gas.maxBurnt = ns.gas.maxBurnt :=
+  applyCharge_gas_limits ns c
+
+/-- Charges that succeed under the lower limits succeed under the raised ones,
+with the same result. -/
+theorem applyCharges_relax (ns : NearState) (cs : List Charge) (p m : Nat) (hp : ns.gas.prepaid ≤ p)
+    (hm : ns.gas.maxBurnt ≤ m) (h : (applyCharges ns cs).2 = none) :
+    applyCharges (relax ns p m) cs = (relax (applyCharges ns cs).1 p m, none) := by
+  induction cs generalizing ns with
+  | nil => rfl
+  | cons c cs ih =>
+    obtain ⟨hl1, hl2⟩ := applyCharge_limits ns c
+    cases hc : applyCharge ns c with
+    | mk ns' e =>
+      cases e with
+      | some e => simp [applyCharges, hc] at h
+      | none =>
+        have hc2 : (applyCharge ns c).2 = none := by rw [hc]
+        simp only [applyCharges, hc] at h ⊢
+        rw [applyCharge_relax ns c p m hp hm hc2, hc]
+        simp only
+        rw [hc] at hl1 hl2
+        exact ih ns' (by rw [hl1]; exact hp) (by rw [hl2]; exact hm) h
+
+end Charges
 
 end NearLogic
