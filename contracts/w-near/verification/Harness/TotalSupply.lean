@@ -155,4 +155,57 @@ def resultExpect : Contract Bool where
   cost h i := if h.readNat i.store (u32Arg i.args 1) 4 == 1 then 10 ^ 18 else op h 36
   ghostOf _ _ := some true
 
+/-! ## `env::state_read` (219)
+
+`state_read(out)`: the `Option<Contract>` decoded from the storage value at
+key `"STATE"`, in the 40 bytes at `out`. The layout, from 155 and 414:
+`total_supply : u128` at 0, `account_storage_usage : u64` at 16, and the
+`LookupMap` prefix as a `Vec<u8>` `(ptr, cap, len)` at 24, whose pointer
+word is `Option`'s niche: zero for `None`. The Borsh encoding is the
+prefix (`u32` length, bytes), the supply, the usage. -/
+
+def stateKey : List UInt8 := "STATE".toUTF8.toList
+
+/-- The Borsh decoding of the state: prefix, supply, usage. -/
+def decodeState (bs : List UInt8) : Option (List UInt8 × Nat × Nat) :=
+  let le (xs : List UInt8) := xs.foldr (fun b acc => acc * 256 + b.toNat) 0
+  if bs.length < 4 then none else
+  let n := le (bs.take 4)
+  let rest := bs.drop 4
+  if rest.length != n + 24 then none else
+  some (rest.take n, le ((rest.drop n).take 16), le ((rest.drop (n + 16)).take 8))
+
+def stateRead : Contract Bool where
+  name := "env::state_read"
+  func := 219
+  pre h i :=
+    if !i.ghost then some "the environment is not set up"
+    else if u32Arg i.args 0 + 40 > h.memSize i.store then some "beyond memory"
+    else match i.store.host.storage stateKey with
+      | some bs => if (decodeState bs).isNone then some "the state does not decode" else none
+      | none => none
+  -- The heap (the decoded prefix and the value read), and the result.
+  footprint _ i := [(u32Arg i.args 0, 40), (heapBase, 2 ^ 32 - heapBase), (freeListHead, 4)]
+  stack := 1024
+  grows := true
+  post h i r :=
+    let out := u32Arg i.args 0
+    (ended r).or <|
+    match i.store.host.storage stateKey with
+    | none => if h.readNat r.after (out + 24) 4 != 0 then some "absent state is not None" else none
+    | some bs =>
+      match decodeState bs with
+      | none => some "precondition"
+      | some (pre, supply, usage) =>
+        let ptr := h.readNat r.after (out + 24) 4
+        if ptr == 0 then some "present state is None"
+        else if h.readNat r.after out 16 != supply then some "wrong total supply"
+        else if h.readNat r.after (out + 16) 8 != usage then some "wrong storage usage"
+        else if h.readNat r.after (out + 32) 4 != pre.length then some "wrong prefix length"
+        else if h.read r.after ptr pre.length != pre then some "wrong prefix"
+        else none
+  -- No claim yet: the storage host costs are stated with M7.
+  cost _ _ := 10 ^ 18
+  ghostOf _ _ := some true
+
 end WNear.Testing

@@ -311,6 +311,28 @@ def expectInputs (h : Harness) (base : Store NearState) (r : Rng) :
     else out := out ++ [i]
   pure (out, probes)
 
+/-- `base` with `v` (or nothing) stored at `key`. -/
+def withStorage (base : Store NearState) (key : List UInt8) (v : Option (List UInt8)) : Store NearState :=
+  { base with host := { base.host with storage := fun k => if k == key then v else base.host.storage k } }
+
+def leBytes (n len : Nat) : List UInt8 := (List.range len).map fun i => UInt8.ofNat (n / 256 ^ i)
+
+def stateReadInputs (h : Harness) (base : Store NearState) (r : Rng) :
+    Except String (List (Input Bool) × List (Input Bool)) := do
+  let mut r := r
+  let absent : Input Bool := { label := "absent", store := withStorage base stateKey none, args := [i32 1000], ghost := true }
+  let mut out : List (Input Bool) := [absent]
+  for k in [0:30] do
+    let (n, r1) := r.nat 0 10
+    let (pre, r2) := r1.bytes n
+    let (supply, r3) := r2.nat 0 (2 ^ 128 - 1)
+    let (usage, r4) := r3.nat 0 (2 ^ 64 - 1)
+    r := r4
+    let v := leBytes n 4 ++ pre ++ leBytes supply 16 ++ leBytes usage 8
+    out := out ++ [{ label := s!"random {k}", store := withStorage base stateKey (some v), args := [i32 1000], ghost := true }]
+  let bad : Input Bool := { label := "a state that does not decode", store := withStorage base stateKey (some [1, 2, 3]), args := [i32 1000], ghost := true }
+  pure (out, [bad])
+
 /-! ## Call sites -/
 
 def account (s : String) : List UInt8 := s.toUTF8.toList
@@ -383,7 +405,7 @@ def main (args : List String) : IO UInt32 := do
   let h ← orThrow (Harness.load protocol module internalContext [])
   let captured ← captureAll protocol module bytes.size
     [memcpy.func, memset.func, bcmp.func, multi3.func, alloc.func, vecDeref.func, stateOrPanic.func,
-      u128From.func, ftTotalSupply.func, resultExpect.func]
+      u128From.func, ftTotalSupply.func, resultExpect.func, stateRead.func]
   let sites (f : Nat) := captured.getD f #[]
   let results := [
     ← stress h memcpy (memcpyInputs h) (sites memcpy.func) verbose,
@@ -399,5 +421,8 @@ def main (args : List String) : IO UInt32 := do
     ← stress h ftTotalSupply (ftTotalSupplyInputs h) (sites ftTotalSupply.func) verbose,
     ← stress h resultExpect
         (expectInputs h (((sites stateOrPanic.func)[0]?.map (·.2.store)).getD h.store))
-        (sites resultExpect.func) verbose]
+        (sites resultExpect.func) verbose,
+    ← stress h stateRead
+        (stateReadInputs h (((sites stateRead.func)[0]?.map (·.2.store)).getD h.store))
+        (sites stateRead.func) verbose]
   pure (if results.all id then 0 else 1)

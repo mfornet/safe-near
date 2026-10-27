@@ -406,6 +406,21 @@ first automation.
 
 *Exit:* one exported method's `Refines` clauses proved with no `sorry`.
 
+*Status: contracts being stated and stressed* (`Harness/TotalSupply.lean`).
+`ft_total_supply` (296) calls, in order: `setup_panic_hook` (522),
+`set_blockchain_interface` (520), `state_read` (219),
+`unwrap_or_default` (155), the `FungibleToken` getter (414),
+`serde_json::to_vec` (96), `Result::expect` (158) and `Vec::deref` (779).
+Stated and passing the harness: 779, 155, 566 (`U128::from`, under 414),
+414 and 158 with exact costs; 219 with the state's representation
+(`total_supply : u128` at 0, `account_storage_usage : u64` at 16, the
+`LookupMap` prefix as a `Vec` at 24, whose pointer is `Option`'s niche),
+its cost left to M7. Open on this path: 520 and 522 (the environment,
+global state: the ghost "environment set up" of the contracts above is
+their postcondition) and 96 (`to_vec` of a `U128`: the JSON string of a
+`u128`, through `core::fmt`, the largest piece). Three of the harness's
+catches so far came from this path (misstatement log, 3 to 5).
+
 ### M4. The Rust runtime layer
 
 The shadow stack, wee_alloc (its free lists and growing memory through
