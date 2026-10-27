@@ -2,6 +2,7 @@ import Harness.Builtins
 import Harness.StorePair
 import Harness.StorePairCaller
 import Harness.PackWords
+import Harness.ExpectResult
 import Wasm.Binary
 
 /-!
@@ -299,8 +300,34 @@ def checkPackWords (h : Harness) (captured : Array (String × Entry)) (verbose :
     IO.println s!"f779 ft_total_supply capture: out={u32Arg e.args 0}, src={u32Arg e.args 1}, measured units={measured.gas / h.cfg.wasm.regularOpCost}"
   stress h packWords (fun _ => packWordsInputs h) captured verbose
 
+/-- Capture and validate the accepted f158 branch; panic-tag entries remain
+explicitly outside this branch contract and are counted separately. -/
+def checkExpectResult (h : Harness) (captured : Array (String × Entry)) (verbose : Bool) : IO Bool := do
+  let sites := captured.filter (fun (method, _) => method == "ft_total_supply")
+  if sites.isEmpty then throw (IO.userError "f158: no ft_total_supply capture")
+  if sites.any (fun (_, e) => (expectResult.ghostOf h e).isNone) then
+    throw (IO.userError "f158: ft_total_supply reached the excluded panic branch")
+  for i in expectResultTypeProbes h do
+    if (expectResult.pre h i).isNone then throw (IO.userError s!"f158 malformed ABI accepted: {i.label}")
+  let rejectedStore ← orThrow (h.write h.store 128 [1, 0, 0, 0])
+  let rejected : Input Unit :=
+    { label := "panic discriminant", store := rejectedStore, args := [i32 0, i32 128, i32 0], ghost := () }
+  if (expectResult.pre h rejected).isNone then throw (IO.userError "f158 accepted panic discriminant")
+  let excluded := captured.filter (fun (_, e) => (expectResult.ghostOf h e).isNone)
+  IO.println s!"f158 accepted-branch scope: {excluded.size} panic-tag captures excluded; 6 ABI prechecks and panic-tag precheck"
+  match h.store.funcs[h.inst.funcAddrs[expectResult.func]!]? with
+  | some (.wasm ty _ code) =>
+    IO.println s!"f158: type={repr ty}, locals={repr code.locals}, top-level body instructions={code.body.length}, activation units={activationGas 1 #[.i32 0, .i32 0, .i32 0, .i32 0]}"
+    if code.body.length != 22 || code.locals != [.num .i32] then throw (IO.userError "f158: unexpected actual body shape")
+  | _ => throw (IO.userError "f158 is not a Wasm function")
+  for (_, e) in sites do
+    let measured := h.call e.store expectResult.func e.args
+    IO.println s!"f158 ft_total_supply capture: out={u32Arg e.args 0}, src={u32Arg e.args 1}, tag={h.readNat e.store (u32Arg e.args 1) 4}, measured units={measured.gas / h.cfg.wasm.regularOpCost}"
+  stress h expectResult (fun _ => expectResultInputs h) captured verbose
+
 def main (args : List String) : IO UInt32 := do
   let verbose := args.contains "-v"
+  let expectOnly := args.contains "--expect-result-only"
   let packOnly := args.contains "--pack-words-only"
   let pairOnly := args.contains "--store-pair-only"
   let callerOnly := args.contains "--store-pair-caller-only"
@@ -310,8 +337,11 @@ def main (args : List String) : IO UInt32 := do
     | .ok m => pure m
     | .error e => throw (IO.userError e.message)
   let h ← orThrow (Harness.load protocol module internalContext [])
-  let captured ← captureAll protocol module bytes.size (if packOnly then [packWords.func] else if pairOnly || callerOnly then [storePair.func, storePairCaller.func] else [memcpy.func, memset.func, bcmp.func, multi3.func, alloc.func, storePair.func, storePairCaller.func, packWords.func])
+  let captured ← captureAll protocol module bytes.size (if expectOnly then [expectResult.func] else if packOnly then [packWords.func] else if pairOnly || callerOnly then [storePair.func, storePairCaller.func] else [memcpy.func, memset.func, bcmp.func, multi3.func, alloc.func, storePair.func, storePairCaller.func, packWords.func, expectResult.func])
   let sites (f : Nat) := captured.getD f #[]
+  if expectOnly then
+    return if ← checkExpectResult h (sites expectResult.func) verbose then 0 else 1
+  let expectResultPass ← if pairOnly || callerOnly || packOnly then pure true else checkExpectResult h (sites expectResult.func) verbose
   if packOnly then
     return if ← checkPackWords h (sites packWords.func) verbose then 0 else 1
   let packResult ← if pairOnly || callerOnly then pure true else checkPackWords h (sites packWords.func) verbose
@@ -353,5 +383,5 @@ def main (args : List String) : IO UInt32 := do
     ← stress h memset (memsetInputs h) (sites memset.func) verbose,
     ← stress h bcmp (bcmpInputs h) (sites bcmp.func) verbose,
     ← stress h multi3 (multi3Inputs h) (sites multi3.func) verbose,
-    ← stress h alloc (allocInputs h) (sites alloc.func) verbose, pairResult, callerResult, packResult]
+    ← stress h alloc (allocInputs h) (sites alloc.func) verbose, pairResult, callerResult, packResult, expectResultPass]
   pure (if results.all id then 0 else 1)
