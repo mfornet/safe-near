@@ -351,6 +351,35 @@ storage-stake check after the run; how host aborts appear in `Post`.
 *Exit:* a closed `Refines` proof for the test module. This is the milestone
 that removes the risk of getting stuck on the glue at the end.
 
+*Status: in progress* (`near-lean/near-logic`, PR #40). Done, with no
+`sorry`: the metered language, both lifting lemmas, gas credits, host
+charges, fragments and their structural rules, the pure rules, host calls
+that read memory (`mwpi_call_host_ro`), `value_return`'s contract with exact
+gas, the entry function, adequacy with final cells, and the test module's
+method (`Examples/Skeleton.lean`, `get_adequate`: from a store holding its
+instance, import and data, it ends with `"ok"` returned and at most the
+ceiling used). Left:
+
+1. **Instantiation facts.** That the store `runAttempt` instantiates holds
+   what `get_adequate` assumes, from `runAttempt_cases`. Memory contents
+   must come from lemmas about `Memory.writeBytes`, not evaluation: the
+   prepared memory has `initialMemoryPages` pages, symbolic in the config,
+   and for wNEAR 1024 pages with a 26 KB data segment, far beyond what the
+   kernel can evaluate.
+2. **The boundary.** From how the run ends to `Observation` and `Matches`:
+   `outcomeOfExecution` with no promises, `checkReceipts`, `observe` and the
+   storage-stake check, against a two-line model of the test module.
+3. **Below the bound.** A run whose gas limits are lower follows the run
+   with relaxed limits (same context, same observable `prepaid_gas`) until
+   its first failed charge. Needs every metered host function to commute
+   with relaxing the limits; NearVM already proves, over the whole host
+   table, that host functions preserve the limits
+   (`meteredHostFns_gasLimits`), which is the template.
+4. **The protocol config.** The test module is stated for any config with
+   hypotheses on the fields it uses; wNEAR's statement fixes v86 through
+   `RuntimeConfig.parse`, which the kernel cannot evaluate as is (to settle
+   by M9, as M0 settled the binary).
+
 ### M3. The first method, top-down
 
 `ft_total_supply`, or another small view: its contract, proved from sorried
