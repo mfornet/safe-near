@@ -60,8 +60,19 @@ theorem valueReturn_relax (extra : Nat) (st : HostStore NearState) (len ptr : UI
       have hgm : ∀ s' : HostStore NearState, s'.mem = st.mem →
           getMemOrReg s' ptr len = some (st.mem.readList ptr.toNat len.toNat) := fun s' h => by
         rw [getMemOrReg_mem (s := st) (s' := s') hlen h, hget]
-      -- Open: both sides run `preInvokeError_valueReturn` and `valueReturn_after` on the same
-      -- memory; the rewrite does not match the stores `simp` leaves (to finish with lean_goal).
-      sorry
+      have hpre : ∀ s' : HostStore NearState, s'.mem = st.mem →
+          preInvokeError "value_return" s' [.i64 len, .i64 ptr] = none := fun s' h =>
+        preInvokeError_valueReturn s' len ptr (by rw [hgm s' h]; rfl)
+      rw [hpre, hpre]
+      rotate_left
+      · rfl
+      · rfl
+      simp only
+      have haft : ∀ s' : HostStore NearState, s'.mem = st.mem → s'.host.config = ns.config →
+          invokeStorageCall extra "value_return" valueReturnFn s' [.i64 len, .i64 ptr] =
+            .Return [] { s' with host := s'.host.selectReturnValue (st.mem.readList ptr.toNat len.toNat) } :=
+        fun s' h hc => valueReturn_after extra s' len ptr _ (hgm s' h) (by rw [hc]; exact hv)
+      rw [haft, haft]
+      all_goals first | rfl | (simp only [relax]; rfl) | simp
 
 end NearLogic
