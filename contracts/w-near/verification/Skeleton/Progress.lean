@@ -255,4 +255,31 @@ theorem runInitialized_not_fuel (cfg : RuntimeConfig) (limits : ExecLimits) (fue
     exact run_not_fuel cfg limits fuel _ (shape_charge cfg limits m _ hm)
       (by simpa only [rank_charge] using hbound)
 
+/-- A charge error is one of the two protocol gas errors. -/
+theorem chargeWasm_error_gas (m : Machine) (cost : Nat) (error : HostError)
+    (h : (chargeWasm m cost).2 = some error) : GasError error := by
+  cases m <;> exact (GasCounter.deduct_error_is_gas _ cost cost h).elim Or.inr Or.inl
+
+/-- Every stopped runner error can use the gas alternative immediately, so
+functional invariants need only be closed on error-free continuing steps. -/
+theorem advance_error_gas (cfg : WasmConfig) (m : Machine)
+    (h : (advance cfg m).2 ≠ none) : GasFailure (advance cfg m) := by
+  cases m with
+  | done values store => simp [advance] at h
+  | trap reason store => simp [advance] at h
+  | next c =>
+    cases he : (chargeConfig c (nextInstructionGas cfg c)).2 with
+    | some error =>
+      have hg : GasError error :=
+        (GasCounter.deduct_error_is_gas c.store.host.gas _ _ he).elim Or.inr Or.inl
+      exact ⟨error, hg, Or.inl (by simp [advance, he])⟩
+    | none =>
+      cases hf : (chargeWasm (Exec.step (chargeConfig c (nextInstructionGas cfg c)).1)
+          (frameTransitionGas cfg (chargeConfig c (nextInstructionGas cfg c)).1
+            (Exec.step (chargeConfig c (nextInstructionGas cfg c)).1))).2 with
+      | none => simp [advance, he, hf] at h
+      | some error =>
+        have hg := chargeWasm_error_gas (Exec.step (chargeConfig c (nextInstructionGas cfg c)).1) _ error hf
+        exact ⟨error, hg, Or.inl (by simp [advance, he, hf])⟩
+
 end WNear.Skeleton.Progress
