@@ -188,29 +188,34 @@ within each overlay, with preservation proofs for actual runtime operations;
 prospective writes may still override committed writes. This substantive
 premise correction is recorded in the misstatement log.
 
-The actual early input-size rejection now matches the model at the receipt
-boundary with a proved symbolic gas bound. Trie compact-path round trips and
-leaf/extension/branch decoding, generated bitmap correctness, actual singleton
-reads, overlay and empty-base storage writes,
-resource frames and raw-storage usage/representation are kernel checked.
-Singleton lookup retains the explicit nonzero-root obligation. Local budget
-compatibility is checked for constants, drop, administrative return and actual
-input/log/return calls. Storage replay covers successful fresh/replacement
-preparation, raw calls and post-billing gas stops; the full non-view wrapper includes its inner gas stops and ordinary validation
-errors. Successful trie lookup/dereference and proof acceptance remain explicit;
-other trie/proof rejection and run-invariant assembly remain open. The empty-base storage frontier is
-instantiated at the walking method's actual storage entry, retaining the
-explicit proof-size check. Final-output and success-observation helpers
-derive exact functional fields from local storage postconditions. The actual
-public execution now matches the independent successful model step from these
-local storage and resource conditions; original total gas credits imply the
-intermediate storage reservation. This remains a conditional success branch,
-not the universal gas bound or low-gas refinement clause. The empty-base
-specialization derives its postconditions from original context data, and the
-actual key-length rejection now matches the independent model without trie or
-proof-size premises. A symbolic empty-storage cost and a total successful
-execution gas bound (loading, activation and residual credits included) are
-kernel checked; receipt observation retains that bound even on later failures.
+The actual input-size, key-length and value-length failures now match the
+independent model through public receipt execution with exact billing and
+residual credits. The key/value branches use no trie or proof-size premise.
+The log-count rejection after a completed storage write is checked through
+actual execution using the existing local storage frontier and resource frame.
+
+Trie compact paths, leaf/extension/branch decoding, generated bitmaps, actual
+branch construction from child equations and branch lookup composition are
+kernel checked. Successful lookup access counts are bounded by twice the byte
+key length plus one terminal node and an optional value dereference. The
+actual decoder rejects empty extension paths, so this bound needs no extra
+witness-shape premise. General canonical lookup correctness remains open;
+singleton lookup retains its explicit nonzero-root obligation.
+
+Actual machine budget compatibility now includes the direct storage call and
+metered advance alongside input/log/return and pure instructions. Storage
+readiness is supplied only at the actual low paid state, while continuing
+outcomes preserve issue freshness and every outcome preserves logs. Whole-run
+phase invariants and derivation of readiness from canonical storage remain open.
+
+The empty-base specialization derives storage postconditions from original
+context data and matches the model for both storage-stake acceptance and
+rejection. Its context-only cost includes loading, 23 regular operations,
+ordered storage/input/log charges and per-receiver return-data byte fees.
+Original gas-limit coverage supplies credits, model matching and a used-gas
+bound; the log decoder's width check follows from WF and this coverage. The
+proof-size check and usage room remain explicit, and the universal model gas
+function and low-gas refinement clause remain open.
 
 The current statement also has the separately documented SAF-67 gap: an
 arbitrary recorded-proof-size input is accepted by context WF. A canonical
@@ -219,6 +224,11 @@ the model succeeds with ample gas. WF and conditional non-refinement are
 kernel proved; the deployed outcome is executable-checked. A faithful recorder
 requires explicit object/removal/code history and a receipt baseline; no
 unproved universal size bound has been added to WF.
+
+The pinned protocol also needs a kernel certificate interface: the JSON parser
+used by the configuration loader contains opaque partial definitions, so even
+an empty-object parse cannot be certified by kernel reduction. Numeric facts
+about the pinned JSON were not replaced by unchecked computation or new axioms.
 
 M2 remains open: faithful recorder input, nonempty canonical-trie correctness,
 the full storage contract and gas bound, other deterministic failures and

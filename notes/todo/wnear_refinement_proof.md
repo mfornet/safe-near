@@ -347,17 +347,21 @@ that removes the risk of getting stuck on the glue at the end.
 | Overlay lookup/view consistency | `NearInterface/TrieOverlayLookup.lean` | Kernel checked under unique overlay keys; on-disk base agreement remains separate |
 | Actual input-size failure through receipt observation and its symbolic gas bound | `Skeleton/{Costs,FailureExecution}.lean`, `NearRuntime/InitialCredits.lean` | Kernel checked; exact/smaller-budget cost checks pass |
 | Trie compact-path and leaf serialization | `NearInterface/{TrieEncoding,TrieSerialization}.lean` | Kernel checked against actual parsers, with explicit byte widths |
-| Extension/branch parsing, generated bitmaps and actual branch construction | `NearInterface/{TrieExtension,TrieBranch,TrieBitmap,TrieConstructionBranch}.lean` | Kernel checked against actual parsers and branch loop; recursive child equations remain local obligations |
+| Extension/branch parsing, construction and traversal | `NearInterface/{TrieExtension,TrieBranch,TrieBitmap,TrieConstructionBranch,TrieBranchLookup}.lean` | Kernel checked against actual parsers/branch loop and actual child/reference/value/missing lookup composition; recursive child equations remain local |
 | Actual singleton construction and reads | `NearInterface/TrieLeaf.lean` | Kernel checked; lookup keeps the unresolved nonzero-root premise explicit |
 | Metered overlay/empty-base writes and resource frames | `NearVM/MeteredHosts/{StorageOverlay,StorageEmpty,StorageFrame}.lean` | Kernel checked from initial credits and local resources, with no assumed primitive outcomes |
 | Storage representation and usage | `NearInterface/StorageUsage.lean`, `NearVM/StorageRepresentation.lean`, `Skeleton/StorageResources.lean` | Kernel checked through initialized storage entry and computed final storage |
-| Actual pure/input/output machine budget compatibility | `NearVM/{MeteredPureBudget,MeteredHostBudget,MeteredOutputBudget}.lean` | Kernel checked; storage and whole-run invariant assembly remain |
+| Actual pure/input/output/storage machine budget compatibility | `NearVM/{MeteredPureBudget,MeteredHostBudget,MeteredOutputBudget,MeteredStorageBudget}.lean` | Kernel checked direct storage step and metered advance; paid-state primitive readiness and whole-run invariant assembly remain |
 | Isolated native recorder arithmetic and necessary history | `NearInterface/{TrieRecorder,TrieRecordingHistory}.lean` | Kernel checked; no runtime/WF integration or recorder-fidelity claim |
 | Actual empty-base receipt success | `Skeleton/{EmptyStorage,EmptySuccess}.lean` | Kernel checked through actual `execOn` and independent model step from original WF/representation/credits/limits; empty base, absent key, proof check, usage room and stake remain explicit |
 | Final output fields and actual receipt success | `Skeleton/{FinalState,SuccessObservation,SuccessExecution}.lean` | Kernel checked through default-fuel public execution and `Matches` for the independent model step, conditional on local storage/resources/representation |
 | Original-budget storage reservation | `Skeleton/StorageCredits.lean` | Kernel checked; empty storage frontier now uses original total credits without a second intermediate gas premise |
 | Storage budget replay | `NearVM/MeteredHosts/{StorageBudget,StoragePrepareBudget,StorageMeteredBudget}.lean` | Kernel checked through the complete non-view metered wrapper, including ordinary validation and gas stops; accepted primitive trie/proof facts supplied at low paid state only |
-| Key-length failure through receipt observation | `NearVM/MeteredHosts/StorageFailure.lean`, `Skeleton/StorageFailure.lean` | Kernel checked exact eight-instruction prefix, startup/default public run, structured failure and model matching; no trie/proof premise |
+| Key/value length failures through receipt observation | `NearVM/MeteredHosts/StorageFailure.lean`, `Skeleton/{StorageFailure,StorageValueFailure}.lean` | Kernel checked exact eight-instruction prefix, startup/default public run, structured failure, gas and model matching; no trie/proof premise |
+| Log-count rejection after storage | `Skeleton/LogFailure.lean` | Kernel checked twelve-instruction prefix through public receipt/model matching; existing local storage frontier/frame remain explicit |
+| Storage-stake acceptance/rejection | `Skeleton/EmptyStakeFailure.lean` | Kernel checked positive-deficit rollback with saved log and matching for both zero/positive cases on the empty-base slice |
+| Trie access-count bounds | `NearInterface/TrieWalkCost.lean` | Kernel checked actual parser rejects empty extensions; successful lookup touches at most twice byte key length plus terminal node and optional value, with no witness-shape premise |
+| Original-context sufficient-gas matching | `Skeleton/SuccessCost.lean` | Exact loading/opcode/four-host cost includes return-data receipt fees; original gasLimit gives credits, matching and used-gas bound without a stake/read-width premise |
 | Symbolic empty-storage cost and total success gas | `Skeleton/{EmptyCost,SuccessGas}.lean` | Original-cost-table formula and used-gas bound with retained credits, loading, activation and receipt observation kernel checked; universal model bound remains open |
 | Universal model gas bound, other deterministic failures and `Refines` | — | Open; SAF-67 also requires statement repair |
 
@@ -399,8 +403,13 @@ postconditions and proves receipt/model matching for that original-data slice.
 than the total execution budget, retaining residual credits; the observation
 bound includes later boundary failures. `StorageFailure` closes the independent
 key-length model failure with loading plus sixteen regular opcodes and exact
-pre-value-read host charges. The value-length host rejection is checked, but
-its whole-method lift remains open. These results do not yet supply a universal
+pre-value-read host charges. The value-length failure is now also lifted through actual public execution.
+`LogFailure` proves count rejection after the completed write using the local
+storage frontier/frame. `EmptyStakeFailure` handles both storage-stake outcomes.
+`SuccessCost` derives a context-only sufficient cost (including each return-data
+receiver) and matches/bounds the empty-base receipt directly from gasLimit; its
+read-width check follows from gas coverage and WF, and no zero-deficit premise
+is needed. These results do not yet supply a universal
 model gas function or the whole-run low-gas alternatives.
 
 A substantive premise correction was necessary: old `Context.WF` admitted
@@ -455,12 +464,12 @@ pins this observed limitation explicitly. Register-size limits are enforced.
 This does not affect the default configuration's one-register example, but
 must not be described as nearcore conformance for arbitrary register limits.
 
-Validation for this increment (2026-10-27): 72 proof modules were checked
-transitively for axioms (3605 declarations, 2585 theorems, zero violations); the
+Validation for this increment (2026-10-27): 79 proof modules were checked
+transitively for axioms (3894 declarations, 2811 theorems, zero violations); the
 walking-skeleton checks pass; all five existing builtin harness contracts
 pass; all 211 adapter checks and all 51 differential scenarios pass. The web
 blueprint builds after giving Binary, Harness and Skeleton explicit library
-roots. The full wNEAR audit covers 93 modules, 5256 declarations and 2658
+roots. The full wNEAR audit covers 97 modules, 5440 declarations and 2813
 theorems, permitting only the original refinement module's open proof and its
 two dependent theorems.
 
@@ -469,9 +478,24 @@ paths disappeared. Source work and pushes were preserved using isolated Git
 metadata for the same PR branch. New modules were compiled directly by the
 pinned Lean version using cached dependencies whose revisions all match the
 package manifests; transitive audits use the unchanged `axiom-audit.py` script
-generator with that explicit dependency path. Normal Lake wrapper reruns await
-checkout registration/cache repair. The existing walking executable and the
-malformed-overlay probe were rerun successfully; no operational code changed.
+generator with that explicit dependency path. The worktree cache link has since been redirected to that verified cache,
+and standard Lake builds, skeleton checks and blueprint extraction/rendering
+run again. Git registration remains broken; only source discovery uses isolated
+Git metadata, while dependency Git operations inherit their normal environment.
+The full audit uses the unchanged audit generator and normal Lake execution.
+No operational code changed.
+
+**Kernel protocol-pin obstruction:** `RuntimeConfig.parse` calls
+`Lean.Json.parse`, whose `anyCore`, `objectCore` and string parser are opaque
+`partial def` declarations in Lean 4.34.1. Even the closed proposition
+`(Lean.Json.parse "{}").map (fun _ => true) = .ok true` fails kernel reduction.
+Thus numeric facts about `wNearProtocolJson` cannot simply be certified by
+`decide +kernel`; increasing heartbeats does not help. The relevant width
+property `1 + maxLengthStorageValue + numExtraBytesRecord ≤ maxGasBurnt` is
+arithmetically true for the native pinned JSON, but no kernel certificate was
+claimed. A verified parser/certificate interface or a reviewed protocol pin
+repair remains necessary; no compiler-trusted reduction or extra axiom was
+introduced. Existing conditional protocols/resources remain explicit.
 
 ### M3. The first method, top-down
 
