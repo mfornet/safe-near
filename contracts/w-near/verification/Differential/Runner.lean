@@ -202,22 +202,28 @@ def resultsOf (j : Json) : Except String (Option (List PromiseResult)) :=
     let arr ← v.getArr?
     pure (some (← arr.toList.mapM resultOf))
 
-/-- How much gas to attach: an amount, or the model's bound shifted by `±n`. -/
+/-- How much gas to attach: an amount, or the model's bound shifted by `±n`.
+A trailing `?` (`"bound-1?"`) falls back to 300 Tgas when the input is no
+call, for generated inputs that may not parse. -/
 inductive GasSpec
   | exact (g : Nat)
-  | bound (delta : Int)
+  | bound (delta : Int) (lenient : Bool := false)
+
+/-- The shift of `bound`, `bound-n` or `bound+n`. -/
+def boundShift? (s : String) : Option Int :=
+  if s == "bound" then some 0
+  else if s.startsWith "bound-" then (s.drop 6).toString.toNat?.map fun n => -(n : Int)
+  else if s.startsWith "bound+" then (s.drop 6).toString.toNat?.map fun n => (n : Int)
+  else none
 
 def gasSpecOf (j : Json) : Except String GasSpec :=
   match j with
   | .str s =>
-    if s == "bound" then pure (.bound 0)
-    else if s.startsWith "bound-" then
-      match (s.drop 6).toString.toNat? with
-      | some n => pure (.bound (-(n : Int)))
-      | none => throw s!"bad gas {s}"
-    else if s.startsWith "bound+" then
-      match (s.drop 6).toString.toNat? with
-      | some n => pure (.bound n)
+    let lenient := s.endsWith "?"
+    let s' := if lenient then (s.dropEnd 1).toString else s
+    if s'.startsWith "bound" then
+      match boundShift? s' with
+      | some d => pure (.bound d lenient)
       | none => throw s!"bad gas {s}"
     else (.exact ·) <$> natOf j
   | _ => (.exact ·) <$> natOf j
@@ -264,6 +270,7 @@ def Expect.holds (e : Expect) (decoded : Bool) (o : Except Failure ReturnData) :
 structure Pending where
   receipt : RawReceipt
   signer : AccountId
+  signerPk : RawBytes := []
 
 structure World (M : ExecModel) where
   trie : Near.TrieOverlay.State
@@ -320,6 +327,8 @@ structure CallInput where
   outputs : List AccountId := []
   /-- A constant recorded storage proof (`Context.storageProofSize`), when set. -/
   proofSize : Option Nat := none
+  /-- The signer's public key (`Context.signerPk`); default empty. -/
+  signerPk : RawBytes := []
 
 def RolledBackB (ctx : Context) (raw : RawStorage) (r : Observation) : Bool :=
   (match r.outcome with | .error _ => true | .ok _ => false) && decide (r.storage = raw) &&
@@ -388,7 +397,7 @@ def runCall (M : ExecModel) (env : Env) (w : World M) (label : String) (c : Call
   let raw := storage.toFinset
   let mkCtx (gas : Nat) : Context :=
     { method := c.method, args := c.args, current := env.contract, predecessor := c.predecessor,
-      signer := c.signer, signerPk := [], attached := c.attached, prepaidGas := gas,
+      signer := c.signer, signerPk := c.signerPk, attached := c.attached, prepaidGas := gas,
       promiseResults := c.results, outputDataReceivers := c.outputs, balance := w.balance,
       locked := w.locked, storageUsage := w.usage, blockHeight := w.height,
       timestamp := w.timestamp, epochHeight := 1, randomSeed := List.replicate 32 0,
@@ -397,7 +406,7 @@ def runCall (M : ExecModel) (env : Env) (w : World M) (label : String) (c : Call
   let call := M.decode c.method c.args
   let gas ← match c.gas, call with
     | .exact g, _ => pure g
-    | .bound d, some call =>
+    | .bound d _, some call =>
       -- The bound may depend on the prepaid gas (gas the call forwards): the
       -- least prepaid gas whose bound fits its limit, by bisection.
       let fits (g : Nat) := decide (M.gas (mkCtx g) w.model call ≤ (mkCtx g).gasLimit)
@@ -413,7 +422,8 @@ def runCall (M : ExecModel) (env : Env) (w : World M) (label : String) (c : Call
       unless fits top do scenarioError s!"{label}: no prepaid gas fits the model's bound"
       let b := if fits 0 then 0 else least 0 top 64
       pure (Int.toNat (b + d))
-    | .bound _, none => scenarioError s!"{label}: gas \"bound\" needs an input that is a call"
+    | .bound _ true, none => pure (300 * 10 ^ 12)
+    | .bound _ false, none => scenarioError s!"{label}: gas \"bound\" needs an input that is a call"
   let ctx := mkCtx gas
   let hyps := checkHypotheses M ctx raw w.model
   unless hyps.isEmpty do scenarioError s!"{label}: hypothesis of Refines violated: {hyps}"
@@ -460,7 +470,8 @@ def runCall (M : ExecModel) (env : Env) (w : World M) (label : String) (c : Call
   | .ok _, some call =>
     match M.step ctx w.model call with
     | .ok o =>
-      let pending := r.receipts.zipIdx.map fun (x, i) => (s!"{label}#{i}", { receipt := x, signer := c.signer })
+      let pending := r.receipts.zipIdx.map fun (x, i) =>
+        (s!"{label}#{i}", { receipt := x, signer := c.signer, signerPk := c.signerPk })
       pure ({ w with trie := committed, model := some o.state, balance := r.balance,
                      usage := r.storageUsage, pending := w.pending ++ pending }, r)
     | .error _ => scenarioError s!"{label}: unreachable (matched a model failure with a success)"
@@ -494,7 +505,10 @@ def callInputOf (j : Json) (signerDefault : Option AccountId) : Except String Ca
          results := (← resultsOf j).getD [], outputs := ← outputsOf j,
          proofSize := ← (match field? j "storageProofSize" with
            | some v => (some ·) <$> natOf v
-           | none => pure none) }
+           | none => pure none),
+         signerPk := ← (match field? j "signerPk" with
+           | some v => do ofHex (← textOf v)
+           | none => pure []) }
 
 /-- A delivered receipt as a call: its action, by the contract, under the
 original signer. Transfers to the contract are credits. -/
@@ -521,7 +535,8 @@ def deliver (M : ExecModel) (env : Env) (w : World M) (label ref : String) (j : 
       | some g => liftScenario (gasSpecOf g)
       | none => pure (.exact gas.toNat)
     let (w, _) ← runCall M env { w with pending := keep } label
-      { method, args, predecessor := env.contract, signer := p.signer, attached := deposit,
+      { method, args, predecessor := env.contract, signer := p.signer, signerPk := p.signerPk,
+        attached := deposit,
         gas := gasSpec, results := results.getD [], outputs := ← liftScenario (outputsOf j) } expect
     pure w
   | _ => scenarioError s!"{label}: only single-action receipts can be delivered"
