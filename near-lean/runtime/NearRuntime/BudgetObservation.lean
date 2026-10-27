@@ -194,6 +194,17 @@ theorem observeChecked_logs (codeOf : Bytes → ContractCode) (ctx : Context)
   unfold VMOutcome.checkReceipts
   split <;> rfl
 
+/-- A valid actual protocol-gas outcome survives public receipt checking. -/
+theorem observeChecked_protocolGas (codeOf : Bytes → ContractCode) (ctx : Context)
+    (raw : List (Bytes × Bytes)) (outcome : VMOutcome) (error : HostError) (logs : List String)
+    (hgas : GasError error) (habort : outcome.aborted = some (.hostError error))
+    (hvalid : outcome.receiptsValid = true) (hlogs : outcome.logs <+: logs) :
+    let observed := observeChecked codeOf ctx raw outcome
+    observed.outcome = .error .outOfGas ∧ RolledBack ctx raw.toFinset observed ∧ observed.logs <+: logs := by
+  unfold observeChecked
+  rw [VMOutcome.checkReceipts, hvalid]
+  exact observe_outOfGas habort (failureOf_gasError hgas) hlogs
+
 /-- Both alternatives of the actual body relation lift through every public
 receipt check. The matching branch has exact observations, including gas. -/
 theorem observeChecked_matchesOrGas (codeOf : Bytes → ContractCode) (ctx : Context)
@@ -203,11 +214,15 @@ theorem observeChecked_matchesOrGas (codeOf : Bytes → ContractCode) (ctx : Con
       observeChecked codeOf ctx raw (outcomeOfExecution (toVMContext ctx) raw high.1 high.2) ∨
     (let observed := observeChecked codeOf ctx raw (outcomeOfExecution (toVMContext ctx) raw low.1 low.2)
      observed.outcome = .error .outOfGas ∧ RolledBack ctx raw.toFinset observed ∧
-       observed.logs <+: logsOf high.1.host) := by
+       observed.logs <+: (observeChecked codeOf ctx raw
+         (outcomeOfExecution (toVMContext ctx) raw high.1 high.2)).logs) := by
   rcases h with ⟨hstate, he⟩ | ⟨hgas, hl⟩
   · left
     rw [he]
     exact observeChecked_ofExecution_below codeOf ctx raw hstate.state high.2
-  · exact Or.inr (observeChecked_gasFailure codeOf ctx raw low high.1 hgas hl)
+  · right
+    have hg := observeChecked_gasFailure codeOf ctx raw low high.1 hgas hl
+    refine ⟨hg.1, hg.2.1, ?_⟩
+    simpa only [observeChecked_logs, outcomeOfExecution_logs] using hg.2.2
 
 end Near.Boundary
