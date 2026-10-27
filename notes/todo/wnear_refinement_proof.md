@@ -230,9 +230,17 @@ whose structure does not split cleanly by section; data segment size.
 *Exit:* `hstart` and `hexports` are proved; one function's body is a
 kernel-checked literal.
 
-*Status.* Decoding is done: `Binary.decode_wNearBytes` proves in the kernel
-what `contract.wasm` decodes to, and `hstart` and `hexports` are gone from
-`refines_wnear`. Names and the call graph are still to do. What we learnt:
+*Status: done.* `Binary.decode_wNearBytes` proves in the kernel what
+`contract.wasm` decodes to, and `hstart` and `hexports` are gone from
+`refines_wnear`. `Binary/functions.tsv` names every function, from a rebuild
+without `-s` whose non-custom sections are byte-identical to the deployed
+binary (`tools/wasm_names.py`, `SAFE_NEAR_RUSTFLAGS="" contracts/w-near/build.sh`),
+and lists the exported methods that can reach each one (`call_indirect`
+resolved to the table entries of its type). This over-approximates: even
+`ft_total_supply` reaches 457 functions, mostly through the panic path's
+`core::fmt`. Of the reached code, about 43 KB is `core`, 44 KB `serde_json`,
+21 KB `std` and `alloc`, 18 KB near-sdk and near-contract-standards, and
+3.8 KB the contract itself. What we learnt:
 
 - Kernel decoding from a `ByteArray` is quadratic: each byte read walks a
   list from the start. The decoder now reads through a function

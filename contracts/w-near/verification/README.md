@@ -176,7 +176,8 @@ with `code_f<i>`, in 22 ranges checked in parallel (about 80 s of wall time,
 4.4 GB at most per file); `Binary/Module.lean` puts the sections together
 into `decode_wNearBytes : decode wNearBytes = .ok wNearModule`. The absence of
 a start function and the exported functions are theorems about
-`wNearModule`.
+`wNearModule`. `Binary/functions.tsv` gives each function's Rust name and the
+exported methods that can reach it (`tools/wasm_names.py`).
 `withdraw_available_binary` shows what the statement buys: under it,
 `WithdrawAvailableAtBoundary` is a fact about the binary's execution.
 
