@@ -161,7 +161,7 @@ theorem instr_move (store : Store H) (inst : ModuleInst) (locals stack : Array V
     {labels' : List Label} {code : List Instr} {locals' : Array Value}
     (h : (instr store inst locals stack labels i rest).kind = .continue stack' labels' code locals') :
     Move labels i rest labels' code := by
-  unfold instr at h
+  unfold instr storeEffect at h
   cases i <;> dsimp only at h <;> (repeat' split at h) <;>
     first
     | (cases h; done)
@@ -328,7 +328,7 @@ theorem instr_call_rest (store : Store H) (inst : ModuleInst) (locals stack : Ar
     (labels : List Label) (i : Instr) (rest : List Instr) {stack' : Array Value} {addr : Nat}
     {rest' : List Instr}
     (h : (instr store inst locals stack labels i rest).kind = .call stack' addr rest') : rest' = rest := by
-  unfold instr at h
+  unfold instr storeEffect at h
   cases i <;> dsimp only at h <;> (repeat' split at h) <;>
     first
     | (cases h; done)

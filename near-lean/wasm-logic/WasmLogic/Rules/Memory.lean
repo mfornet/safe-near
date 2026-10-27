@@ -293,7 +293,7 @@ theorem wpi_store (t : NumType) (bits : Option Nat) (arg : MemArg) (a : UInt32) 
         simp [Exec.storeNat, memOf_eq hn hmem, Memory.writeNat_eq hb, Store.setMemOf, hn, g]
       rw [hlen] at hstore
       cases bits <;> cases v <;>
-        simp_all [Exec.instr, Exec.i32, storeWidth, storeRaw])
+        simp_all [Exec.instr, Exec.storeEffect, Exec.i32, storeWidth, storeRaw])
     (by
       intro σ _ _ _ l hq hp
       rw [lookup_byteCells] at hq hp

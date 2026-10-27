@@ -83,10 +83,10 @@ unification never unfolds a byte loop; proofs go through lemmas. -/
   unfold readList
   simp
 
-/-- Write a list of bytes; out-of-bounds bytes are dropped. -/
+/-- Write a list of bytes; out-of-bounds bytes are dropped. Walks the list
+once: indexing it at every address made a write quadratic in its length. -/
 @[irreducible] def writeList (m : Memory) (addr : Nat) (data : List UInt8) : Memory :=
-  (List.range data.length).foldl
-    (fun m i => if addr + i < m.byteSize then m.write8 (addr + i) data[i]! else m) m
+  (data.foldl (fun (m, a) b => (if a < m.byteSize then m.write8 a b else m, a + 1)) (m, addr)).1
 
 /-- `memory.fill`: bounds are checked before anything is written. -/
 def fill (m : Memory) (addr len : Nat) (b : UInt8) : Option Memory :=
