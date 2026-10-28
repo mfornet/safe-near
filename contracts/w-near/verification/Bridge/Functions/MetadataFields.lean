@@ -567,4 +567,242 @@ theorem f381_rest (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
 
 end Str
 
+/-! ## An `Option` field holding `None` (103, 104) -/
+
+section None
+
+variable {GF : BundledGFunctors} [WasmGS NearState GF]
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 16000000 in
+/-- **A struct's later field, an `Option<String>` holding `None`** (103, the state `Rest`): `,` (at
+1048759), the key `"ds"`, `:` (at 1048760), `null`; the null pointer at `v`. -/
+theorem f103_none (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
+    (htype : type.results.length = 1) (inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (n g ta : Nat)
+    (hm : IfaceMod mi A n g ta) (hd : d + 12 < lim.maxCallDepth) (Cg : Nat) (gt : GlobalType)
+    (s c ser p k v vec ptr cap : UInt32) (ds w et : List UInt8) (lo : Nat)
+    (hs : 64 ≤ s.toNat) (hc : c.toNat + 8 ≤ 2 ^ 32)
+    (hds : ds.length = k.toNat) (hk0 : 0 < k.toNat) (hkey : EscZero lo et ds) (hp : p.toNat + k.toNat ≤ 2 ^ 32)
+    (hroom : w.length + 1 + (k.toNat + 2) + 1 + 4 ≤ cap.toNat) (hser : ser.toNat + 4 ≤ 2 ^ 32) :
+    mfCode inst mi A
+      ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f103 Cg
+        (fun args => iprop(⌜args = [.i32 c, .i32 p, .i32 k, .i32 v]⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗
+          stk n (s.toNat - 64) 64 ∗ n ↦[i32][ c.toNat ] ser ∗ n ↦[wms][ c.toNat + 4 ] [2] ∗
+          n ↦[wms][ 1048759 ] [44] ∗ n ↦[wms][ 1048760 ] [58] ∗ n ↦[wms][ 1048754 ] nullStr ∗
+          keyInT n ser vec ptr cap w lo et p ds ∗ n ↦[i32][ v.toNat ] 0))
+        (fun _ => 600 * cfg.regularOpCost + 2 * (MemCpy.cost 1 * cfg.regularOpCost) +
+          MemCpy.cost 4 * cfg.regularOpCost + cost383 k.toNat * cfg.regularOpCost)
+        (fun _ rs => iprop(⌜rs = [.i32 0]⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗
+          stk n (s.toNat - 64) 64 ∗ n ↦[i32][ c.toNat ] ser ∗ n ↦[wms][ c.toNat + 4 ] [2] ∗
+          n ↦[wms][ 1048759 ] [44] ∗ n ↦[wms][ 1048760 ] [58] ∗ n ↦[wms][ 1048754 ] nullStr ∗
+          keyInT n ser vec ptr cap (w ++ [44] ++ ([34] ++ ds ++ [34]) ++ [58] ++ nullStr) lo et p ds ∗
+          n ↦[i32][ v.toNat ] 0)) := by
+  iintro #Hk
+  iunfold mfCode at Hk
+  icases Hk with ⟨#Hsc, -, -, #H173, #H176, #H159, -, -, #H99, #H98, -, -, #H174, -⟩
+  ihave #Happ : VecAppend.appCode inst mi A $$ []
+  · iunfold serCode, escCode at Hsc; icases Hsc with ⟨⟨#H, -⟩, -⟩; iexact H
+  ihave #Hi : inst ↪[inst] mi $$ []
+  · iunfold VecAppend.appCode at Happ; icases Happ with ⟨-, -, -, -, -, -, #Hi⟩; iexact Hi
+  have hlt := s.toNat_lt
+  have e16 : (s - 16).toNat = s.toNat - 16 := by
+    rw [UInt32.toNat_sub_of_le] <;> simp [UInt32.le_iff_toNat_le]; omega
+  have S173 := keyRest_tab (GF := GF) cfg lim (d + 1) types[15]! rfl inst mi A n g ta hm (by omega) Cg 98 176 159
+    1048759 (by decide) (by decide) (by decide) 44 gt (s - 16) c ser vec ptr cap p k w ds (by omega) hc hds hk0 lo et
+    hkey hser (by omega) hp (by decide)
+  rw [← f173_eq, ← f176_eq, ← f98_eq, ← f159_eq] at S173
+  ihave #S173 := S173 $$ [Hsc H98 H176 H159]
+  · iframe Hsc H98 H176 H159
+  have S99 := piece_out (GF := GF) cfg lim (d + 1) types[0]! rfl inst mi A n g ta hm (by omega) Cg 98 (by decide)
+    1048760 gt (s - 16) ser vec ptr cap (w ++ [44] ++ ([34] ++ ds ++ [34])) 58 (by omega) hser (by simp; omega)
+    (by decide)
+  rw [← f99_eq, ← f98_eq] at S99
+  ihave #S99 := S99 $$ [Happ H98]
+  · iframe Happ H98
+  ihave #S174 := f174_null (GF := GF) cfg lim (d + 1) types[32]! rfl inst mi A n g ta hm (by omega) Cg gt (s - 16)
+    ser vec ptr cap (w ++ [44] ++ ([34] ++ ds ++ [34]) ++ [58]) (by omega) hser (by simp; omega) $$ [Happ H98]
+  · iframe Happ H98
+  have hn := hm.mem
+  have hg := hm.glob
+  have ha173 := hm.funcs 173 (by decide)
+  have ha99 := hm.funcs 99 (by decide)
+  have ha174 := hm.funcs 174 (by decide)
+  have t15 : types[15]!.params.length = 3 := by rfl
+  have t32 : types[32]!.params.length = 1 := by rfl
+  have t0 : types[0]!.params.length = 1 := by rfl
+  generalize cost383 k.toNat * cfg.regularOpCost = C
+  generalize hM : MemCpy.cost 1 * cfg.regularOpCost = M
+  generalize hM4 : MemCpy.cost 4 * cfg.regularOpCost = M4
+  iapply MFunSpec_intro
+  imodintro
+  iintro %args %R HP Hc
+  icases HP with ⟨%hargs, Hg, Hs, Hcs, Hst, Hcom, Hcol, Hnull, HK, Hv⟩
+  subst hargs
+  iunfold keyInT at HK
+  icases HK with ⟨Hq, He, Hser, Ho, Hds⟩
+  icases stk_split n (s.toNat - 64) 48 16 $$ Hs with ⟨Hs48, Hfr⟩
+  ihave Hs48 := stk_addr (show s.toNat - 64 = (s - 16).toNat - 48 by omega) $$ Hs48
+  simp only [f103]
+  mstep [Hg]; mstep; mstep; mstep; mstep [Hg]
+  repeat mstep
+  -- the key
+  mcall S173 using [Hg Hs48 Hcs Hst Hcom Hq He Hser Ho Hds]
+  · iframe Hg Hs48 Hcs Hst Hcom
+    iunfold keyInT
+    iframe Hq He Hser Ho Hds
+  icases HQ with ⟨%hrs, Hg, Hs48, Hcs, Hst, Hcom, HK⟩
+  subst hrs
+  iunfold keyInT at HK
+  icases HK with ⟨Hq, He, Hser, Ho, Hds⟩
+  repeat mstep
+  mstep [Hcs]
+  repeat mstep
+  -- `:`
+  icases stk_split n ((s - 16).toNat - 48) 32 16 $$ Hs48 with ⟨Hs32, Hs16⟩
+  ihave Hs16 := stk_addr (show (s - 16).toNat - 48 + 32 = (s - 16).toNat - 16 by omega) $$ Hs16
+  mcall S99 using [Hg Hs16 Hser Ho Hcol]
+  · iframe Hg Hs16 Hser Ho Hcol
+  icases HQ with ⟨%hrs, Hg, Hs16, Hser, Ho, Hcol⟩
+  subst hrs
+  repeat mstep
+  mstep [Hcs]
+  repeat mstep
+  mstep [Hv]
+  repeat mstep
+  -- `null`
+  mcall S174 using [Hg Hs16 Hser Ho Hnull]
+  · iframe Hg Hs16 Hser Ho Hnull
+  icases HQ with ⟨%hrs, Hg, Hs16, Hser, Ho, Hnull⟩
+  subst hrs
+  repeat mstep
+  rw [show s - 16 + 16 = s by simp]
+  mstep [Hg]
+  repeat mstep
+  mstep_post
+  mcredits R
+  iframe Hc Hg Hcs Hst Hcom Hcol Hnull Hv
+  isplitr
+  · ipureintro; simp [htype]
+  isplitl [Hs32 Hs16 Hfr]
+  · ihave Hs16 := stk_addr (show (s - 16).toNat - 16 = (s - 16).toNat - 48 + 32 by omega) $$ Hs16
+    ihave Hs48 := stk_join n ((s - 16).toNat - 48) 32 16 $$ [Hs32 Hs16]
+    · iframe Hs32 Hs16
+    ihave Hs48 := stk_addr (show (s - 16).toNat - 48 = s.toNat - 64 by omega) $$ Hs48
+    iapply stk_join n (s.toNat - 64) 48 16
+    iframe Hs48 Hfr
+  iunfold keyInT
+  iframe Hq He Hser Hds
+  iapply outV_eq (by simp) $$ Ho
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 16000000 in
+/-- **A struct's later field, an `Option<Base64VecU8>` holding `None`** (104, the state `Rest`): as
+`f103_none`, without a frame. -/
+theorem f104_none (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
+    (htype : type.results.length = 1) (inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (n g ta : Nat)
+    (hm : IfaceMod mi A n g ta) (hd : d + 12 < lim.maxCallDepth) (Cg : Nat) (gt : GlobalType)
+    (s c ser p k v vec ptr cap : UInt32) (ds w et : List UInt8) (lo : Nat)
+    (hs : 48 ≤ s.toNat) (hc : c.toNat + 8 ≤ 2 ^ 32)
+    (hds : ds.length = k.toNat) (hk0 : 0 < k.toNat) (hkey : EscZero lo et ds) (hp : p.toNat + k.toNat ≤ 2 ^ 32)
+    (hroom : w.length + 1 + (k.toNat + 2) + 1 + 4 ≤ cap.toNat) (hser : ser.toNat + 4 ≤ 2 ^ 32) :
+    mfCode inst mi A
+      ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f104 Cg
+        (fun args => iprop(⌜args = [.i32 c, .i32 p, .i32 k, .i32 v]⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗
+          stk n (s.toNat - 48) 48 ∗ n ↦[i32][ c.toNat ] ser ∗ n ↦[wms][ c.toNat + 4 ] [2] ∗
+          n ↦[wms][ 1048759 ] [44] ∗ n ↦[wms][ 1048760 ] [58] ∗ n ↦[wms][ 1048754 ] nullStr ∗
+          keyInT n ser vec ptr cap w lo et p ds ∗ n ↦[i32][ v.toNat ] 0))
+        (fun _ => 600 * cfg.regularOpCost + 2 * (MemCpy.cost 1 * cfg.regularOpCost) +
+          MemCpy.cost 4 * cfg.regularOpCost + cost383 k.toNat * cfg.regularOpCost)
+        (fun _ rs => iprop(⌜rs = [.i32 0]⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗
+          stk n (s.toNat - 48) 48 ∗ n ↦[i32][ c.toNat ] ser ∗ n ↦[wms][ c.toNat + 4 ] [2] ∗
+          n ↦[wms][ 1048759 ] [44] ∗ n ↦[wms][ 1048760 ] [58] ∗ n ↦[wms][ 1048754 ] nullStr ∗
+          keyInT n ser vec ptr cap (w ++ [44] ++ ([34] ++ ds ++ [34]) ++ [58] ++ nullStr) lo et p ds ∗
+          n ↦[i32][ v.toNat ] 0)) := by
+  iintro #Hk
+  iunfold mfCode at Hk
+  icases Hk with ⟨#Hsc, -, -, #H173, #H176, #H159, -, -, #H99, #H98, -, -, #H174, -⟩
+  ihave #Happ : VecAppend.appCode inst mi A $$ []
+  · iunfold serCode, escCode at Hsc; icases Hsc with ⟨⟨#H, -⟩, -⟩; iexact H
+  ihave #Hi : inst ↪[inst] mi $$ []
+  · iunfold VecAppend.appCode at Happ; icases Happ with ⟨-, -, -, -, -, -, #Hi⟩; iexact Hi
+  have hlt := s.toNat_lt
+  have S173 := keyRest_tab (GF := GF) cfg lim (d + 1) types[15]! rfl inst mi A n g ta hm (by omega) Cg 98 176 159
+    1048759 (by decide) (by decide) (by decide) 44 gt s c ser vec ptr cap p k w ds (by omega) hc hds hk0 lo et
+    hkey hser (by omega) hp (by decide)
+  rw [← f173_eq, ← f176_eq, ← f98_eq, ← f159_eq] at S173
+  ihave #S173 := S173 $$ [Hsc H98 H176 H159]
+  · iframe Hsc H98 H176 H159
+  have S99 := piece_out (GF := GF) cfg lim (d + 1) types[0]! rfl inst mi A n g ta hm (by omega) Cg 98 (by decide)
+    1048760 gt s ser vec ptr cap (w ++ [44] ++ ([34] ++ ds ++ [34])) 58 (by omega) hser (by simp; omega)
+    (by decide)
+  rw [← f99_eq, ← f98_eq] at S99
+  ihave #S99 := S99 $$ [Happ H98]
+  · iframe Happ H98
+  ihave #S174 := f174_null (GF := GF) cfg lim (d + 1) types[32]! rfl inst mi A n g ta hm (by omega) Cg gt s
+    ser vec ptr cap (w ++ [44] ++ ([34] ++ ds ++ [34]) ++ [58]) (by omega) hser (by simp; omega) $$ [Happ H98]
+  · iframe Happ H98
+  have hn := hm.mem
+  have ha173 := hm.funcs 173 (by decide)
+  have ha99 := hm.funcs 99 (by decide)
+  have ha174 := hm.funcs 174 (by decide)
+  have t15 : types[15]!.params.length = 3 := by rfl
+  have t32 : types[32]!.params.length = 1 := by rfl
+  have t0 : types[0]!.params.length = 1 := by rfl
+  generalize cost383 k.toNat * cfg.regularOpCost = C
+  generalize hM : MemCpy.cost 1 * cfg.regularOpCost = M
+  generalize hM4 : MemCpy.cost 4 * cfg.regularOpCost = M4
+  iapply MFunSpec_intro
+  imodintro
+  iintro %args %R HP Hc
+  icases HP with ⟨%hargs, Hg, Hs, Hcs, Hst, Hcom, Hcol, Hnull, HK, Hv⟩
+  subst hargs
+  iunfold keyInT at HK
+  icases HK with ⟨Hq, He, Hser, Ho, Hds⟩
+  simp only [f104]
+  repeat mstep
+  -- the key
+  mcall S173 using [Hg Hs Hcs Hst Hcom Hq He Hser Ho Hds]
+  · iframe Hg Hs Hcs Hst Hcom
+    iunfold keyInT
+    iframe Hq He Hser Ho Hds
+  icases HQ with ⟨%hrs, Hg, Hs, Hcs, Hst, Hcom, HK⟩
+  subst hrs
+  iunfold keyInT at HK
+  icases HK with ⟨Hq, He, Hser, Ho, Hds⟩
+  repeat mstep
+  mstep [Hcs]
+  repeat mstep
+  -- `:`
+  icases stk_split n (s.toNat - 48) 32 16 $$ Hs with ⟨Hs32, Hs16⟩
+  ihave Hs16 := stk_addr (show s.toNat - 48 + 32 = s.toNat - 16 by omega) $$ Hs16
+  mcall S99 using [Hg Hs16 Hser Ho Hcol]
+  · iframe Hg Hs16 Hser Ho Hcol
+  icases HQ with ⟨%hrs, Hg, Hs16, Hser, Ho, Hcol⟩
+  subst hrs
+  repeat mstep
+  mstep [Hcs]
+  repeat mstep
+  mstep [Hv]
+  repeat mstep
+  -- `null`
+  mcall S174 using [Hg Hs16 Hser Ho Hnull]
+  · iframe Hg Hs16 Hser Ho Hnull
+  icases HQ with ⟨%hrs, Hg, Hs16, Hser, Ho, Hnull⟩
+  subst hrs
+  repeat mstep
+  mstep_post
+  mcredits R
+  iframe Hc Hg Hcs Hst Hcom Hcol Hnull Hv
+  isplitr
+  · ipureintro; simp [htype]
+  isplitl [Hs32 Hs16]
+  · ihave Hs16 := stk_addr (show s.toNat - 16 = s.toNat - 48 + 32 by omega) $$ Hs16
+    iapply stk_join n (s.toNat - 48) 32 16
+    iframe Hs32 Hs16
+  iunfold keyInT
+  iframe Hq He Hser Hds
+  iapply outV_eq (by simp) $$ Ho
+
+end None
+
 end WNear.Binary.MetadataFields
