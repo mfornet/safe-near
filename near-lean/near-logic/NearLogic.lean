@@ -38,5 +38,6 @@ import NearLogic.Trie
 import NearLogic.CallPred
 import NearLogic.CallTrap
 import NearLogic.Hosts.StorageRead
+import NearLogic.Hosts.PanicUtf8
 import NearLogic.Tactic.Step
 import NearLogic.Tactic.Control
