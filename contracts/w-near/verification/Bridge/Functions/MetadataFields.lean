@@ -44,6 +44,65 @@ open WNear.Binary.SerdeStruct (outV outV_eq keyInT keyFirst_tab keyRest_tab str_
 /-- `null`, at 1048754. -/
 def nullStr : List UInt8 := [110, 117, 108, 108]
 
+/-! ## The keys, the `ESCAPE` entries and the JSON -/
+
+/-- The keys, in field order, at 1048761 .. 1048810: `spec`, `name`, `symbol`, `icon`,
+`reference`, `reference_hash`, `decimals`. -/
+def keySpec : List UInt8 := [115, 112, 101, 99]
+def keyName : List UInt8 := [110, 97, 109, 101]
+def keySymbol : List UInt8 := [115, 121, 109, 98, 111, 108]
+def keyIcon : List UInt8 := [105, 99, 111, 110]
+def keyReference : List UInt8 := [114, 101, 102, 101, 114, 101, 110, 99, 101]
+def keyReferenceHash : List UInt8 := [114, 101, 102, 101, 114, 101, 110, 99, 101, 95, 104, 97, 115, 104]
+def keyDecimals : List UInt8 := [100, 101, 99, 105, 109, 97, 108, 115]
+
+/-- The 49 bytes of the keys. -/
+def metaKeys : List UInt8 :=
+  keySpec ++ keyName ++ keySymbol ++ keyIcon ++ keyReference ++ keyReferenceHash ++ keyDecimals
+
+/-- `ESCAPE` from `' '` (32) to 127, at 1061840: zero but for `"` (34) and `\` (92). -/
+def escT : List UInt8 :=
+  List.replicate 2 0 ++ [34] ++ List.replicate 57 0 ++ [92] ++ List.replicate 35 0
+
+theorem escT_length : escT.length = 96 := rfl
+
+set_option maxRecDepth 100000 in
+theorem escT_zero : ∀ i < 96, i ≠ 2 → i ≠ 60 → escT[i]? = some 0 := by decide
+
+/-- Printable ASCII but `"` and `\` land on zero entries of `escT`. -/
+theorem escZero_of (ds : List UInt8) (h : ∀ b ∈ ds, 32 ≤ b.toNat ∧ b.toNat < 128 ∧ b.toNat ≠ 34 ∧ b.toNat ≠ 92) :
+    EscZero 32 escT ds := by
+  intro b hb
+  obtain ⟨h1, h2, h3, h4⟩ := h b hb
+  exact ⟨h1, by rw [escT_length]; omega, escT_zero (b.toNat - 32) (by omega) (by omega) (by omega)⟩
+
+set_option maxRecDepth 100000 in
+theorem escT_keys : EscZero 32 escT keySpec ∧ EscZero 32 escT keyName ∧ EscZero 32 escT keySymbol ∧
+    EscZero 32 escT keyIcon ∧ EscZero 32 escT keyReference ∧ EscZero 32 escT keyReferenceHash ∧
+    EscZero 32 escT keyDecimals :=
+  ⟨escZero_of _ (by decide), escZero_of _ (by decide), escZero_of _ (by decide), escZero_of _ (by decide),
+    escZero_of _ (by decide), escZero_of _ (by decide), escZero_of _ (by decide)⟩
+
+set_option maxRecDepth 100000 in
+theorem escT_values : EscZero 32 escT MetadataGetter.specStr ∧ EscZero 32 escT MetadataGetter.nameStr ∧
+    EscZero 32 escT MetadataGetter.symbolStr :=
+  ⟨escZero_of _ (by decide), escZero_of _ (by decide), escZero_of _ (by decide)⟩
+
+/-- The JSON `ft_metadata` returns: the struct serializer's pieces in field order. -/
+def metaJson : List UInt8 :=
+  [123] ++ SerdeStruct.jstr keySpec ++ [58] ++ SerdeStruct.jstr MetadataGetter.specStr ++
+    [44] ++ SerdeStruct.jstr keyName ++ [58] ++ SerdeStruct.jstr MetadataGetter.nameStr ++
+    [44] ++ SerdeStruct.jstr keySymbol ++ [58] ++ SerdeStruct.jstr MetadataGetter.symbolStr ++
+    [44] ++ SerdeStruct.jstr keyIcon ++ [58] ++ nullStr ++
+    [44] ++ SerdeStruct.jstr keyReference ++ [58] ++ nullStr ++
+    [44] ++ SerdeStruct.jstr keyReferenceHash ++ [58] ++ nullStr ++
+    [44] ++ SerdeStruct.jstr keyDecimals ++ [58] ++ FmtDigits.padDigits 2 24 ++ [125]
+
+set_option maxRecDepth 100000 in
+/-- 138 bytes: more than the 128 the `Vec` of `ft_metadata` (309) is created with, so the
+serializer's `write_all` reallocates it (at the contents of the key `decimals`). -/
+theorem metaJson_length : metaJson.length = 138 := by rfl
+
 section Code
 
 variable {GF : BundledGFunctors} [WasmGS NearState GF]
