@@ -231,6 +231,8 @@ structure CostsV86 (p : RuntimeConfig) : Prop where
   storageReadBase : p.wasm.extCosts.cost "storage_read_base" ≤ 56356845749
   storageReadKeyByte : p.wasm.extCosts.cost "storage_read_key_byte" ≤ 30952533
   storageReadValueByte : p.wasm.extCosts.cost "storage_read_value_byte" ≤ 5611004
+  utf8DecodingBase : p.wasm.extCosts.cost "utf8_decoding_base" ≤ 3111779061
+  utf8DecodingByte : p.wasm.extCosts.cost "utf8_decoding_byte" ≤ 291580479
 
 open NearInterface FtTotalSupply FtTotalSupplyMethod in
 theorem hbound_wnear (cfg : WNear.Config) (ctx : Context) (raw : RawStorage) (st : Option WNear.State)

@@ -19,11 +19,13 @@ namespace WNear.Binary.FtTotalSupplyMethod
 
 open Wasm Wasm.Near NearLogic NearInterface WNear.Binary FtTotalSupply
 
-/-- Protocol 86's limits on storage keys, registers and returned data, as lower bounds. -/
+/-- Protocol 86's limits on storage keys, registers, returned data and the total log length, as
+lower bounds. -/
 structure LimitsV86 (p : RuntimeConfig) : Prop where
   storageKey : 2048 ≤ p.wasm.limits.maxLengthStorageKey
   register : 104857600 ≤ p.wasm.limits.maxRegisterSize
   returned : 4194304 ≤ p.wasm.limits.maxLengthReturnedData
+  totalLog : 16384 ≤ p.wasm.limits.maxTotalLogLength
 
 /-- A host recording the context's proof, within the per-receipt limit, has the room
 `ProofRoom` leaves. -/
