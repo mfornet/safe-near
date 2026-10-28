@@ -163,11 +163,18 @@ readback is unconditional; original payload semantics use the precise source
 and final-length-write separations. Independent replays cover47 actual calls
 and462 generated size, boundary, seeded overlapping-copy and output-alias
 cases, with exact whole memory/max, SP, gas/fuel and one-less-fuel exhaustion.
-The actual316 pre-allocation prefix is composed through five real helper
-calls at183 ordinary units/149 steps, from original data/code only. Its actual
-allocation domain after those writes is derived from original heap data and
-explicit descriptor separations. Whole315/316 and161/162/425 decoding,
-serialization and exported refinement remain open. These
+The complete accepted316 typed call now composes those helpers, actual374,
+the final slice drop, all four branch-label exits, output stores, and64-byte
+stack restoration:18n+920 ordinary units over17n+727 steps at caller depth+11.
+Original data, installed code, heap geometry and explicit descriptor
+separations derive every intermediate Native, selector and readback condition.
+Exact sequential memory, whole code/global restoration, functional host,
+residual credits and gas are proved. The result tag is zero under precisely
+the tag-word/slice-descriptor separation, since the descriptor is written last.
+Independent replay checks20 actual315/316 captures and384 generated size,
+remaining-length and output-alias cases against whole memory/max, SP, gas,
+exact fuel and one-less-fuel exhaustion. The complete315 theorem and161/162/425
+decoding, serialization and exported refinement remain open. These
 contracts do not discharge the existing representation/protocol premises or
 change the model, runtime semantics, or WF definition.
 

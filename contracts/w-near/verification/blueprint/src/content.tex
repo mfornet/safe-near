@@ -582,12 +582,18 @@ separations. Independent replays cover47 actual calls and462 generated size,
 boundary, output-alias and seeded overlapping-copy cases, matching whole
 memory/max, SP, exact gas/fuel and one-less-fuel exhaustion.
 
-The actual316 prefix through five real helper calls is composed for183
-ordinary units over149 steps, stopping immediately before374. All byte,
-code, global and branch conditions follow from original inputs. The allocation
-domain after those writes is reconstructed from original heap data and
-explicit descriptor separations. The whole315/316 and161/162/425 composition
-remain open.
+The complete accepted316 typed call composes the real helper calls,374,
+final slice drop, four-label branch exit, output stores,64-byte stack
+restoration and normal return: \(18n+920\) ordinary units over
+\(17n+727\) steps at caller depth11. Original memory, installed arrays,
+heap geometry and descriptor separations derive every intermediate Native,
+selector and readback condition. Exact sequential memory, restored globals,
+functional host, code frames, gas and residual credits are proved. Final tag
+zero uses precisely the tag-word/slice-descriptor separation, since the
+descriptor is written last. Independent replay covers20 actual315/316 calls
+and384 generated size, remaining-length and output-alias cases, checking
+whole memory/max, SP, gas, exact fuel and one-less-fuel exhaustion.
+The complete315 theorem and161/162/425 composition remain open.
 
 Successful577 components now include requested-word scaling, all29 sizing
 guards/operations, checked page ceiling569, the real memory-growth operation,
