@@ -523,7 +523,7 @@ steps, at depth11. Original stack bounds are64 bytes for686 and96 for687;
 original output bounds are8 and12 bytes respectively. Canonical pointer,
 capacity and length readback permits output/source aliases. Both actual29-byte
 getter captures match complete sequential memory, SP, record, cost, fuel and
-one-less-fuel exhaustion. Higher523/548/read219 composition and complete900/903
+one-less-fuel exhaustion. Higher548/read219 composition and complete900/903
 decimal formatting remain open.
 
 Successful577 components now include requested-word scaling, all29 sizing
@@ -563,10 +563,29 @@ the general execution contract retains the register actually read from memory.
 These contracts retain original installed-code, initialized-state, accepted
 count, selected-record and explicit sequential-memory bounds. Whole state
 read219 and serialization96 remain open.
-The actual523 post-copy tail is proved at19 units/19 steps, preserving its
-high32-bit store before the low64-bit load/store, real branch exit and48-byte
-stack restoration. Whole523/548 still require positive allocation, zero-fill
-952 and their enclosing control composition.
+The complete523 positive-present-register path now composes the real524
+length query,687 growing vector allocation,435 register copy, two sequential
+result copies, branch exit,48-byte stack restoration and normal typed return.
+For $n$ register bytes, its typed budget is $13n+1511$ ordinary units plus exactly
+one growth fee, the length host base fee, and the register-copy fee; its typed
+step count is $12n+1127$, with caller depth12. Original conditions include
+$0<n<2^{31}$, a144-byte stack lower bound with16-byte alignment, an empty
+allocator head and successful original growth capacity. Exact footprints and
+size/max transport derive every callee-native condition and selector from
+original data; no future readiness, lookup or execution outcome is assumed.
+The final high32-bit write precedes the low64-bit source read. Exact sequential
+memory permits arbitrary aliases. Canonical pointer/capacity/length readback
+requires only separation between that first four-byte write and the subsequent
+eight-byte source read. The fresh payload retains every original register byte,
+including across borrow-counter release and final output writes. Host frames
+retain action profiling and all functional state except the explicit \texttt{gas}, \texttt{gasProfile}, and synchronized
+\texttt{context.usedGas} observers. No runtime or model
+semantics changes are made.
+The actual29-byte getter523 capture independently matches complete memory/max,
+SP, void return, output record and zero counter,1887 root ordinary units plus
+5959494903 in fees,1474 steps and one-less-fuel exhaustion. Whole548 remains
+open; its498 result helper is already proved. The219 Borsh decoder chain
+161/162/425 and serialization96 remain open.
 
 Successful loading derives the actual indirect table targets and static
 memory words selecting them, with table and data frames for later writes.

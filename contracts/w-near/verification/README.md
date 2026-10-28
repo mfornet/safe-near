@@ -124,6 +124,19 @@ receipt bytes, failure with its exact message) and uses at most that much gas;
 with less, it agrees or fails for gas with no effects; input that is no call
 fails with no effects; no execution reports an interpreter limitation.
 
+The current deployed getter proof composes the actual `ft_total_supply` body
+through typed entry and return, with nine local call sites discharged. Its two
+whole-execution obligations remain state read219 and serialization96. The
+positive present-register path of523 now has a complete typed contract through
+524/687/435 from original native/code/register resources: `13n+1511` ordinary
+units plus growth and host fees, over `12n+1127` steps. It proves exact sequential
+memory, SP and code frames, original register payload bytes, and canonical
+pointer/capacity/length under the precise final-copy separation. Host frames
+retain the actual `context.usedGas` synchronization. Whole548, accepted Borsh
+decoding161/162/425, serialization and exported refinement remain open. These
+contracts do not discharge the existing representation/protocol premises or
+change the model, runtime semantics, or WF definition.
+
 What the model adds to `step` for this (`Model/Interface.lean`,
 `Model/Args.lean`, `Model/Contract.lean`):
 
