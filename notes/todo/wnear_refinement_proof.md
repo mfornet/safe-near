@@ -8,6 +8,22 @@ amount of gas, with every hypothesis discharged by the kernel.
 Items marked **Decided** are not re-opened without discussing first. Items
 marked **Open** are for whoever reaches them to settle and record here.
 
+## Current checkpoint: original state-reader allocation domain
+
+The growth remainder now survives the complete storage548 endpoint. Original
+219 Native conditions, state WF and canonical header bytes derive both the
+actual161 decoder Native and the actual374 allocation Native after storage
+and packing. Original installed code and preserved callback words derive the
+prepared decoder Code. No future Native or successful execution is an input.
+The complete219 execution theorem still needs accepted-domain and release
+composition; whole219 and serialization96 remain the two local-call obligations.
+
+Independent219 replay checks3 accepted captures (one getter),7 outside the
+selected present29/growth/output domain and90 generated cases. Whole memory/max,
+SP, functional observations, register/counter,8294 root ordinary units plus
+actual storage/register/growth fees,7140 steps and one-less fuel agree. Replay
+is validation, not a completed219 proof.
+
 ## Why this is doable
 
 This is the largest formalization in the project, and it is large for one
