@@ -39,7 +39,7 @@ theorem post_field {α : Type} (f : NearState → α) (hf : ∀ x, f (erase x) =
     (hsel : ∀ x b, f (x.selectReturnValue b) = f x) (hreg : ∀ x i v, f (x.setRegister i v) = f x)
     (hacc : ∀ x a, f { x with storageAccounting := a } = f x)
     {S : WNear.State} {h0 e : NearState} (hp : post S h0 e) : f e = f h0 := by
-  obtain ⟨st, h1, -, ⟨s2, -, he⟩, rfl⟩ := hp
+  obtain ⟨st, h1, -, ⟨s2, -, -, he⟩, rfl⟩ := hp
   rw [hf, hsel, erase_field he f hf]
   unfold storageReadRegs
   split
@@ -191,6 +191,7 @@ theorem cost_le_gen (rc : RuntimeConfig) (h : NearState) (S : WNear.State)
   have a := cM309 rc.wasm h S
   have b := c161 rc.wasm
   have d := c687 rc.wasm
+  have e := readNodes_mul_le h (Near.TrieOverlay.contractKey h.context.currentAccountId StateRead.stateKey)
   rw [← StateRead.stateKey_eq] at hv
   simp only [cost219, storageReadUse, StorageReadWrap.costS, ReadRegister.costRest,
     registerLenUse, readRegisterUse, valueReturnUse, hv, StateReadModel.header_length, storageReadPhaseUse,
