@@ -46,14 +46,14 @@ theorem Snapshot.ready {p : StateDispatchRead.Layout} {bytes : List UInt8} {regi
     rw [hn.counterZero]
     rfl
   refine {
-    code := hcode , prefixReady := ?_ , registerLocal := h1 , pointerLocal := h2 , localSize := hs , 
-    highBound := ?_ , lowBound := ?_ , selectBound := ?_ , selectedNonzero := ?_ , cellBound := ?_ , 
-    registerBound := ?_ , pointerBound := ?_ , vtableBound := ?_ , registerValue := ?_ , payloadBound := payload , 
+    code := hcode , prefixReady := ?_ , registerLocal := h1 , pointerLocal := h2 , localSize := hs ,
+    highBound := ?_ , lowBound := ?_ , selectBound := ?_ , selectedNonzero := ?_ , cellBound := ?_ ,
+    registerBound := ?_ , pointerBound := ?_ , vtableBound := ?_ , registerValue := ?_ , payloadBound := payload ,
     releaseBound := ?_ , counterBound := ?_}
   · refine {
-      code := hcode.prefixCode , interfaceLocal := h0 , localSize := by omega , slotNe := by decide , 
-      memory := hm , global := hg , sp := hv , memoryWf := hn.wf , interfaceBound := ?_ , interfaceRead := ?_ , 
-      threadBound := by omega , threadStatus := hn.threadStatus , cellBound := by omega , 
+      code := hcode.prefixCode , interfaceLocal := h0 , localSize := by omega , slotNe := by decide ,
+      memory := hm , global := hg , sp := hv , memoryWf := hn.wf , interfaceBound := ?_ , interfaceRead := ?_ ,
+      threadBound := by omega , threadStatus := hn.threadStatus , cellBound := by omega ,
       acquireOutBound := ?_ , countAccepted := accepted , depth := hd}
     · rw [hn.interface];exact hn.interfaceBound
     · rw [hn.interface];exact hn.interfaceRead
