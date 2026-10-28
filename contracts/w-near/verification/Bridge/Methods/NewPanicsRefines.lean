@@ -1,5 +1,6 @@
 import Bridge.Methods.NewPanics
 import Bridge.Methods.FtTotalSupplyUninitRefines
+import Bridge.Methods.NearDepositGas
 
 /-!
 # `new` (290) refines the model on its two panics
@@ -183,7 +184,7 @@ theorem hbound_init (cfg : WNear.Config) (ctx : Context) (raw : RawStorage) (st 
   rw [gas_new, loading_eq]
   simp only [costInit, costInit290, attachedDepositUse, attachedDepositChargeList, panicUtf8Use, panicUtf8Charges,
     storageHasKeyUse, storageHasKeyBeforeCharges, chargesUse, chargeUse, List.map, List.sum_cons, List.sum_nil,
-    hx'] at htrie ⊢
+    hx', NearDepositGas.readNodes_boundary, Nat.zero_mul] at htrie ⊢
   simp only [WNear.computeGas]
   have := hc.regularOp; have := hc.base; have := hc.loadingBase; have := hc.readMemoryBase
   have := hc.readMemoryByte; have := hc.writeMemoryBase; have := hc.writeMemoryByte
