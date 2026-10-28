@@ -132,8 +132,16 @@ positive present-register path of523 now has a complete typed contract through
 units plus growth and host fees, over `12n+1127` steps. It proves exact sequential
 memory, SP and code frames, original register payload bytes, and canonical
 pointer/capacity/length under the precise final-copy separation. Host frames
-retain the actual `context.usedGas` synchronization. Whole548, accepted Borsh
-decoding161/162/425, serialization and exported refinement remain open. These
+retain the actual `context.usedGas` synchronization. The positive canonical-storage
+path of548 now composes459/523/498 through a complete typed call, at
+`13n+1848` ordinary units plus exact storage/register/growth fees over
+`12n+1358` steps. Original memory, code, canonical storage-hit data and native
+resources derive every callee domain; exact sequential memory, original payload
+bytes, full code/global frames and conditional length readback are proved.
+Independent29-byte replays in both accounting modes match whole memory,
+2,224 root ordinary units and1,705 steps, with one-less-fuel exhaustion.
+Accepted Borsh decoding161/162/425, serialization and exported refinement
+remain open. These
 contracts do not discharge the existing representation/protocol premises or
 change the model, runtime semantics, or WF definition.
 
