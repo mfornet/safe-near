@@ -146,8 +146,18 @@ explicitly:168/151 ordinary units over134/118 typed-call steps. Original
 bounds and installed code suffice. Output semantics retain aliases; canonical
 U128 and updated-slice readback use only their precise later-write separations.
 The model's29-byte header is connected to actual548 payload reads at offsets5
-and21. Accepted decoding161/162/425, the prefix-vector path, serialization and
-exported refinement remain open. These
+and21. The prefix word765 and record764 leaves are complete at26/16 ordinary
+units over21/8 typed-call steps. The positive nonzeroing raw allocation chain
+767→769→770→310 is complete on the direct-fit branch:585/447/413 ordinary
+units over470/355/330 typed-call steps, with caller depth+8/+7/+6. Original
+memory, code and heap geometry derive every nested callee condition. Exact
+sequential memory, cached pointer/length readback, restored globals and
+functional host frames permit caller-output aliases. Independent replays cover
+230 actual raw calls and160 generated alias/boundary cases, plus20 actual
+prefix-leaf calls and32 generated unsigned/boundary cases; whole memory,
+gas, SP, exact fuel and one-less-fuel exhaustion agree.
+Accepted decoding161/162/425, the whole prefix-vector315/316 path and373/374
+allocation/copy wrappers, serialization and exported refinement remain open. These
 contracts do not discharge the existing representation/protocol premises or
 change the model, runtime semantics, or WF definition.
 

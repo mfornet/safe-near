@@ -556,8 +556,22 @@ prefix byte97, total supply at payload offset5 and usage at offset21 after548.
 Independent scalar checks cover28/10 captures and144 generated cases each,
 including descriptor/source/output aliases, unaligned and cross-page spans,
 exact root gas167/150 units,133/117 steps and one-less-fuel exhaustion.
-The prefix-vector315/316 allocation/copy and whole161/162/425 composition
-remain open.
+The prefix leaves764/765 now have complete16/26-unit,8/21-step typed
+contracts: an exact zero/length record and the original little-endian word
+packed with zero status. The positive flag-zero direct-fit767 raw allocation
+path composes actual752/751 layout and769/770/310/236/581 calls. Its typed
+budget is585 ordinary units over470 steps at caller depth8;769 and770 cost447
+and413 units over355 and330 steps at depths7 and6. Every nested domain and
+code fact is derived from original memory, code and stack/heap geometry.
+Sequential memory retains the real high-length/low-pointer record order and
+769's intervening low copy before high reload. Both words are cached before
+767's caller writes, so its final pointer/length readback allows arbitrary
+output aliases. Code arrays, globals, functional host and exact credits are
+framed. Independent replays check230 actual raw calls and160 generated alias
+and boundary cases, plus20 actual prefix-leaf calls and32 generated unsigned
+and boundary cases: whole memory/max, SP, exact gas/fuel and one-less-fuel
+exhaustion agree. The whole373/374 allocation/copy wrappers, prefix-vector315/316
+and whole161/162/425 composition remain open.
 
 Successful577 components now include requested-word scaling, all29 sizing
 guards/operations, checked page ceiling569, the real memory-growth operation,
