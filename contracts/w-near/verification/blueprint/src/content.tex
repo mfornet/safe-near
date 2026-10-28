@@ -507,8 +507,24 @@ captures of236/310/689/690 independently match whole memory, return values,
 SP, gas, fuel and one-less-fuel exhaustion.
 Packed unsigned16-bit load and store rules now cover the actual900 formatting
 instructions with two-byte bounds, exact little-endian writes, low16-bit
-readback, and arbitrary stack/caller prefixes. Complete900/903 decimal
-formatting and higher686/687/read219 composition remain open.
+readback, and arbitrary stack/caller prefixes.
+The accepted686 vector allocator now composes the actual685/684 layout
+setup,690 allocation/copy, cached record writes, SP restoration and explicit
+return. Its positive-size, signed-size-bounded, zeroed-flag-one typed contract
+costs $13n+871$ ordinary units plus one growth fee/$12n+689$ steps, at caller
+depth10. Original memory, stack, empty-head, capacity and static-word separation
+facts derive690's native conditions and callback lookup across every setup
+write. The685 footprint and memory-growth size/max transport yield a canonical
+pure grown witness; no computed callee-native or future lookup is assumed.
+The687 low-byte-zero branch now composes686, caches its eight-byte result before
+both destination writes, writes the length, restores SP and returns normally.
+Its typed contract costs $13n+911$ ordinary units plus one growth fee/$12n+721$
+steps, at depth11. Original stack bounds are64 bytes for686 and96 for687;
+original output bounds are8 and12 bytes respectively. Canonical pointer,
+capacity and length readback permits output/source aliases. Both actual29-byte
+getter captures match complete sequential memory, SP, record, cost, fuel and
+one-less-fuel exhaustion. Higher523/548/read219 composition and complete900/903
+decimal formatting remain open.
 
 Successful577 components now include requested-word scaling, all29 sizing
 guards/operations, checked page ceiling569, the real memory-growth operation,
