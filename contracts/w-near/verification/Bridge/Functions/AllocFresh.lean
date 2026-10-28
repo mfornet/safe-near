@@ -35,9 +35,9 @@ resources (`pre581` / `res581`). This file packs it into the heap invariant.
 { ⌜args = [size, align]⌝ ∗ g_sp ↦ sp ∗ 581's 3 stack words ∗ vt (min_cell_size's slot)
   ∗ heapInv n maxP len live 0 }
 __rust_alloc(size, align)                      cost 15 + 15 + 630 + grow(P)
-{ ∃ p, rs = [p] ∗ g_sp ↦ sp ∗ 3 stack words (any) ∗ vt ∗ allocOut n maxP len E live size p }
+{ ∃ p, rs = [p] ∗ g_sp ↦ sp ∗ 3 stack words (any) ∗ vt ∗ allocOut n maxP len E live size al p }
 
-allocOut … p =  (p ≠ 0 ∗ heapInv n maxP E ((p, size) :: live) 1 ∗ block n p size)
+allocOut … p =  (p ≠ 0 ∗ p % al = 0 ∗ heapInv n maxP E ((p, size) :: live) 1 ∗ block n p size)
               ∨ (p = 0 ∗ ∃ len', (len' = len ∨ len' = E) ∗ heapInv n maxP len' live 0)
 ```
 
@@ -45,14 +45,13 @@ allocOut … p =  (p ≠ 0 ∗ heapInv n maxP E ((p, size) :: live) 1 ∗ block 
 `heapInv_mono`). `p = 0` happens when memory.grow fails (`len' = len`) or when 580 does not
 use the fresh cell (`len' = E`, AllocFirstFit's finding 5).
 
-## Not done here
+A block is aligned: `p % align = 0` (from `post1`: `aligned` for the whole cell, `aN` for a
+split).
 
-* `p % align = 0` is not stated (the raw `post1` has it: `aligned` / `aN`).
-* Alloc on a one-cell free list (`F = 1` after a split, `f580_one`): a variant of
-  `f581_fresh` that calls `f580_one` first (and falls back to the fresh path when it
-  unlinks), and its packing — the whole case updates a listed cell in place, the split case
-  inserts the new cell right after the listed one (sorted position, by `disj`) and updates
-  its next neighbour's `prev` (owned in that neighbour's `cellRes`).
+## Elsewhere
+
+Alloc on a one-cell free list (`F = 1`), with the memory's limit seen by `memory.grow`, is
+`AllocSeq.f310_spec_seq` (it also covers `F = 0`, at a higher cost bound: 910 against 630).
 -/
 
 namespace WNear.Binary.AllocFresh
@@ -406,8 +405,8 @@ theorem pack_fail (n maxP len : Nat) (live : List (Nat × Nat)) :
 allocations `live`, when the memory may have grown to `E`: a block `p ≠ 0` lent (the heap
 grown, its free list at most the split remainder), or `0` with the heap valid (unchanged,
 or grown with the fresh chunk leaked). -/
-def allocOut (n maxP len E : Nat) (live : List (Nat × Nat)) (size : Nat) (p : UInt32) : IProp GF :=
-  iprop((⌜p ≠ 0⌝ ∗ heapInv n maxP E ((p.toNat, size) :: live) 1 ∗ block n p.toNat size) ∨
+def allocOut (n maxP len E : Nat) (live : List (Nat × Nat)) (size : Nat) (al p : UInt32) : IProp GF :=
+  iprop((⌜p ≠ 0 ∧ p.toNat % al.toNat = 0⌝ ∗ heapInv n maxP E ((p.toNat, size) :: live) 1 ∗ block n p.toNat size) ∨
     (⌜p = 0⌝ ∗ ∃ len', ⌜len' = len ∨ len' = E⌝ ∗ heapInv n maxP len' live 0))
 
 section Pack
@@ -510,7 +509,7 @@ theorem pack_grown (w al : UInt32) (k : Nat) (hal : al.toNat = 2 ^ k) {size : Na
     frameH (GF := GF) n maxP len live ∗ n ↦[wmlength] E ∗ n ↦[i32][ len + 4 ] 0 ∗
       (∃ rest : List UInt8, ⌜rest.length = E - len - 12⌝ ∗
         post1 n w al 1074896 (UInt32.ofNat len) (UInt32.ofNat E) 0 true rest 1057464 idx ta a578 [] [.i32 p])
-      ⊢ vt n 1057464 idx ta a578 ∗ allocOut n maxP len E live size p := by
+      ⊢ vt n 1057464 idx ta a578 ∗ allocOut n maxP len E live size al p := by
   iintro ⟨Hf, Hl, H4, %rest, %hrl, Hp⟩
   iunfold post1 at Hp
   icases Hp with ⟨%r, %hrs, Hvt, Hc⟩
@@ -534,7 +533,7 @@ theorem pack_grown (w al : UInt32) (k : Nat) (hal : al.toNat = 2 ^ k) {size : Na
     iapply pack_U hl0 hE hE4 hE32 rest (by omega)
     iframe Hf Hl H4 Hs H0 H8 Hd
   · -- taken whole
-    obtain ⟨hp, hfit, -, -⟩ := hW
+    obtain ⟨hp, hfit, -, hali⟩ := hW
     have hpn : p.toNat = len + 8 := by
       rw [hp, UInt32.toNat_add, hcN, show (8 : UInt32).toNat = 8 from rfl]; omega
     have hfit' : 4 * w.toNat ≤ E - len - 8 := by
@@ -545,7 +544,9 @@ theorem pack_grown (w al : UInt32) (k : Nat) (hal : al.toNat = 2 ^ k) {size : Na
     ihave Hd := memBytes_addr (b := len + 12) (by omega) $$ Hd
     ileft
     isplitr
-    · ipureintro; intro h; rw [h] at hpn; simp at hpn
+    · ipureintro
+      refine ⟨fun h => by rw [h] at hpn; simp at hpn, ?_⟩
+      unfold aligned at hali; rw [hcN] at hali; rw [hpn]; exact hali
     rw [hpn]
     iapply pack_W hl0 hE hE4 hE32 rest (by omega) hs0 (by omega)
     iframe Hf Hl H4 Hs H0 H8 Hd
@@ -568,7 +569,9 @@ theorem pack_grown (w al : UInt32) (k : Nat) (hal : al.toNat = 2 ^ k) {size : Na
     icases HB with ⟨%bs, %hbs, HB⟩
     ileft
     isplitr
-    · ipureintro; intro h; rw [h] at hcs'; simp at hcs'
+    · ipureintro
+      refine ⟨fun h => by rw [h] at hcs'; simp at hcs', ?_⟩
+      rw [hp]; unfold aN; exact Nat.sub_mod_eq_zero_of_mod_eq (Nat.mod_mod _ _).symm
     have key := pack_S (GF := GF) (n := n) (maxP := maxP) (live := live) hl0 hE hE4 hE32 (m := p.toNat - 8)
       (size := size) (by omega) (by omega) hs0 (by omega) (by omega)
       (rest.take (p.toNat - 8 - (UInt32.ofNat len).toNat - 12)) (by simp; omega) bs (by rw [hbs, hEN]; omega)
@@ -639,7 +642,7 @@ theorem f310_spec_fresh (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : 
           (∃ b1 b2 b4 : List UInt8, ⌜b1.length = 4 ∧ b2.length = 4 ∧ b4.length = 4⌝ ∗
             n ↦[wms][ sp.toNat - 16 ] b1 ∗ n ↦[wms][ sp.toNat - 12 ] b2 ∗ n ↦[wms][ sp.toNat - 4 ] b4) ∗
           vt n 1057464 idx ta (A 578) ∗
-          allocOut n maxP len (len + (cellPages (wordsOf size) al).toNat * 65536) live size.toNat p)) := by
+          allocOut n maxP len (len + (cellPages (wordsOf size) al).toNat * 65536) live size.toNat al p)) := by
   have hW : (wordsOf size).toNat = (size.toNat + 3) / 4 := by
     simp only [wordsOf, UInt32.toNat_ofNat']; omega
   have hal20 : al.toNat < 2 ^ 20 := by rw [hal]; exact Nat.pow_lt_pow_right (by omega) hk
@@ -672,7 +675,7 @@ theorem f310_spec_fresh (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : 
         (∃ b1 b2 b4 : List UInt8, ⌜b1.length = 4 ∧ b2.length = 4 ∧ b4.length = 4⌝ ∗
           n ↦[wms][ sp.toNat - 16 ] b1 ∗ n ↦[wms][ sp.toNat - 12 ] b2 ∗ n ↦[wms][ sp.toNat - 4 ] b4) ∗
         vt n 1057464 idx ta (A 578) ∗
-        allocOut n maxP len (len + CP.toNat * 65536) live size.toNat p) := by
+        allocOut n maxP len (len + CP.toNat * 65536) live size.toNat al p) := by
     intro args rs
     iintro ⟨Hfr, %p, %hrs, HR⟩
     iexists p

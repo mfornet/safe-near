@@ -19,7 +19,12 @@ is proved so far is in
 * `AllocDealloc.lean`: `dealloc` (582) and `__rust_dealloc` (311) against `heapInv`;
 * `AllocFirstFit.lean`: `alloc_first_fit` (580) on lists of at most one cell;
 * `AllocAlloc.lean`: `alloc` (581) and `__rust_alloc` (310) on an empty list, raw;
-* `AllocFresh.lean`: the latter packed into `heapInv` (`f310_spec_fresh`).
+* `AllocFresh.lean`: the latter packed into `heapInv` (`f310_spec_fresh`);
+* `AllocLimit.lean`: `memory.grow` holding the memory's limit, and 577 with it;
+* `AllocGen.lean`: 581/310 for any first walk, limit-aware (`f310_gen`);
+* `AllocSeqModel.lean`, `AllocSeqPack.lean`, `AllocSeq.lean`: alloc on `heapInv … 1`
+  (`f310_spec_seq`: every sequence of allocations without frees) and with room
+  (`f310_spec_room`: `p ≠ 0`).
 
 ## 1. The code, as it is in the binary
 
@@ -155,7 +160,10 @@ __rust_dealloc(p, size, align)
 
 Proved: dealloc for every `F` (`AllocDealloc.f311_spec`, `D₀ = 224`); alloc
 for `F = 0` (`AllocFresh.f310_spec_fresh`: `E' = E`, `len' ∈ {len, E}`,
-`A₀ = 630`).
+`A₀ = 630`) and for `F ≤ 1` (`AllocSeq.f310_spec_seq`: the result again `F = 1`,
+`len' ∈ {len, E}`, `p % align = 0`, `A₀ = 910`, a failure saying why: the limit, or
+a fresh cell misaligned for `align > 8`); `AllocSeq.f310_spec_room`: no failure
+when `E / 65536 ≤ maxP` and `align ≤ 8`.
 
 *Why alloc's postcondition holds.* Each walk step keeps (1)–(6) with the
 walked prefix dropped from the list (it stays as leaked free cells); a split
@@ -191,23 +199,19 @@ happens only for an allocation that did not fit, and grows at most
 grows at most `N + (S + 528 N) / 65536` pages, far below the room left for
 the inputs wNEAR accepts. Each method's proof discharges this from its own
 allocation bound (`heapInv` records `len`, so the bound is a pure fact
-available at every call). The current alloc spec does not yet exclude the
-`p = 0` branches: that needs a `memory.grow` rule that sees the limit.
+available at every call). `AllocSeq.f310_spec_room` excludes the `p = 0`
+branches given that room (`AllocLimit.mwpi_memory_grow_lim` sees the limit).
 
 ## 4. What is proved, what remains
 
 Proved (no `sorry`): the leaves, the wrappers, `memory.grow`, 577, 575,
 dealloc (582/311) against this invariant, 580 on lists of at most one cell
 without merges, 581/310 on an empty list (`AllocAlloc`) and its packing into
-this invariant (`AllocFresh`). Remaining:
+this invariant (`AllocFresh`), alloc on `heapInv … 1` (`AllocSeq`: every
+sequence of allocations without frees, limit-aware). Remaining:
 
-* alloc on a one-cell list (`F = 1`, the state after a split, `f580_one`):
-  581's path with `f580_one` first (whole / split of a listed cell: an
-  in-place update, or a new cell inserted after `c` with its next
-  neighbour's `prev` updated; unlinked: then the fresh path), and its
-  packing; that covers every sequence of allocations without frees;
-* 580's general walk (`F ≥ 1`, merges), with the loop invariant designed in
-  `AllocFirstFit`.
+* 580's general walk (`F ≥ 2`, merges: the lists dealloc leaves), with the
+  loop invariant designed in `AllocFirstFit`.
 -/
 
 namespace WNear.Binary.AllocInv
