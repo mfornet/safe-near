@@ -546,6 +546,47 @@ by layer, with their sizes and roles, and which other methods' parsers share the
   (673) is proved with it. The loop keeps
   `accountIdFormat true bs = accountIdFormat prev (bs.drop k)`, and `byte_cases` `decide`s
   over all 256 bytes the five ways a byte goes through the four tests.
+* `from_utf8` (927) on ASCII input, `Bridge/Functions/FromUtf8.lean` (`f927_spec_ascii`):
+  `Ok(&str)`, `(0, p, len)` at `out`, at `cost927 len = 100 + 100·len`. All three ASCII paths are
+  proved: the unaligned step, the word loop and the byte loop.
+  * `Utf8.utf8Ok` is Rust's validator on lists, one character at a time. The main loop's invariant
+    `inv927` is already the general one, `utf8Ok bs = utf8Ok (bs.drop i)`, and the result
+    `res927` is `Ok` exactly when `utf8Ok bs`. Only the non-ASCII branch (the width table at
+    1071704, then the second-byte ranges) is left; it is excluded today by the hypothesis that every
+    byte is below `0x80`.
+  * The inner loops are entered at an ASCII byte not yet read. Their invariant `invA` holds `100`
+    per byte after the current one, plus `F` at the entry byte or `O` past it. The larger `O` pays
+    for an exit back to the main loop, which can only happen past the entry byte.
+  * `word_ascii`: a passing word test (`(w0 | w1) & 0x80808080 = 0`) means eight ASCII bytes.
+    The proof goes through `Nat.testBit` on bits 7, 15, 23 and 31.
+* `parse_str` (646), the plain case, `Bridge/Functions/ParseStr.lean`:
+  * `f646_spec_plain`. From the index `i`, the input holds a body of ASCII bytes with no escape,
+    then `"`, and the scratch is empty. The result is `Ok(Reference::Borrowed(ptr + i,
+    body.length))`, with the reader at `i + body.length + 1`. It costs
+    `200 + 30·body.length + cost648 body.length`, about `130` per byte, with an 80-byte stack.
+  * Below it: `f583_spec` (the range index) and `f648_spec_ascii` (`as_str`).
+  * The ESCAPE table is `escTable`, which `escData_segment` reads off the data segment.
+  * `plain_model` is the model side. On the same input, `stringBody` decodes the string whose bytes
+    are `body` and leaves the same rest.
+  * The outer loop runs once, since its back edge follows an escape, so its invariant is just the
+    state at entry.
+  * Not yet proved: escapes, non-ASCII bytes, the reject paths (647/657 build an error box through
+    the allocator), and the copied result (scratch non-empty: 613, 728).
+
+*Tactics notes from this round.*
+
+* `mstep` does not cover `select`. Use `FromUtf8.mwpi_select'`, which gives
+  `if c = 0 then b else a`.
+* Credits must be `k * c + X` with a literal `k`, so rewrite and `generalize` the per-byte part
+  before stepping.
+* When an `mcall`'s cost is `(m + cost f) * c`, state `(m + cost f) * c = m * c + K` beforehand,
+  because `omega` treats products as atoms.
+* After `simp only [Post.mloop]` unfolds an outer loop's post, later goals carry the structure
+  literal. `dsimp only` reduces its `.br 0` and `.normal` projections.
+* Tactic macros (`local macro`, `hygiene false`) save repetition (`tail927`, `body10`, `word11`).
+  In a context with contradictory hypotheses, though, an unreachable exit branch inside a macro
+  failed with "type mismatch: Type / Prop". The fix is a variant macro (`after10x`) that closes
+  that branch with `exfalso; omega`.
 
 *Plan for the rest of `FromTraitContract`, bottom-up.*
 
