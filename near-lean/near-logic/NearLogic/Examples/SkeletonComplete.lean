@@ -89,10 +89,10 @@ theorem skel_refines (size : Nat) (codeOf : Near.Bytes → Near.ContractCode) (p
         · have := hmt.1; rw [h] at this; cases this
       · rw [h] at ho; cases ho
     · intro c _
-      refine ⟨fun hgas => get_enough size codeOf raw st ctx hp hrep hwf hm hgas, ?_⟩
+      refine ⟨fun hgas _ => get_enough size codeOf raw st ctx hp hrep hwf hm hgas, ?_⟩
       rcases hb with hmt | ⟨ho, hrb, hl⟩
       · exact Or.inl hmt
-      · exact Or.inr ⟨ho, hrb, by rw [hl]; exact List.nil_prefix⟩
+      · exact Or.inr ⟨Or.inl ho, hrb, by rw [hl]; exact List.nil_prefix⟩
     · intro hn
       exact absurd ⟨(), hm⟩ hn
   · refine ⟨(Near.Boundary.nearRuntime_not_exported _ raw ctx rfl rfl (exportFunc_skel hm)).2,

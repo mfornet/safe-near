@@ -36,6 +36,7 @@ def skelModel (size : Nat) : ContractModel where
     if d > 0 then .error { failure := .lackBalanceForState d, logs := [] }
     else .ok { state := (), ret := (), logs := [], promises := [] }
   gas ctx _ _ := chargesUse (hostOf ctx) (loadingCharges size) + getCost ctx.protocol.wasm (hostOf ctx)
+  proofBound _ _ _ := 0
 
 /-- The skeleton as the boundary runs it. -/
 def skelCode (size : Nat) (codeOf : Near.Bytes → Near.ContractCode) : Near.Boundary.Code :=
