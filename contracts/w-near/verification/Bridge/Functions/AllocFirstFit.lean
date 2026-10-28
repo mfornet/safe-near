@@ -56,7 +56,7 @@ With `H` the heap model at entry, `ℓ = H.freeList`, the walk keeps, at the hea
 
 * `slot ↦ l1`, `l1 = ℓ'.headD 0` for a suffix `ℓ'` of `ℓ` **after merges**, i.e. a model
   `H'` with `H'.freeList = ℓ'`, `H'.cells` = `H.cells` with the merged cells removed and
-  their predecessors grown, `WfFix H' live (ℓ'.length)` minus nothing: the walked-past
+  their predecessors grown, `HeapModel.wf H' live (ℓ'.length)` minus nothing: the walked-past
   prefix is *leaked* (free cells not listed), which `wf` allows (clause 6);
 * `[∗list] c ∈ H'.cells, cellRes n live c` and the rest of `heapInv`'s resources except the
   head word (581 holds the head in a stack slot during the walk);
@@ -70,6 +70,9 @@ invariant must own *all* headers (it does, `cellRes`). The unlink step needs the
 `next_free` to be the next list cell: see the gap below.
 
 ## Invariant findings (AllocInv's `HeapModel.wf`)
+
+Findings 1–4 are now folded into AllocInv's `HeapModel.wf` (`nf_lo`, `+ 12`, `Lives`,
+`next_al`); they are kept here as the record of why.
 
 1. **`next_free` bit 1** (clause 3). 580 unlinks a cell with `*slot := c.next_free` *raw*
    (only `CAN_MERGE`, bit 0, is known clear there), and the next iteration dereferences it;

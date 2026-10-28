@@ -19,37 +19,37 @@ dealloc(&ALLOC, ptr, size, align)        (582; `align` unused)
   ALLOC := head (A, B) or c (C)
 ```
 
-## The invariant: `AllocInv.heapInv` does not support `dealloc`; `heapInvFix` does
+## The invariant: `AllocInv.heapInv`
 
-`heapInvFix` is `AllocInv.heapInv` over `WfFix`, which is `HeapModel.wf` regrouped
-(`Geo` = clauses (1)–(2), `Lists` = (3)–(4) verbatim, `Lives` = (5)) with three changes:
+The proofs are against AllocInv's `heapInv n maxP len live F` / `HeapModel.wf`, into which
+the fixes found here were folded (they were first stated here as `WfFix`/`heapInvFix`):
 
-* **clause (5) is wrong in `HeapModel.wf`**: `(p, s) ∈ live ↔ ∃ c, allocated ∧ p = c.addr + 8 ∧
-  s ≤ c.size` puts *every* `(c.addr + 8, s)` with `s ≤ c.size` in `live` (at least 17
-  entries per allocated cell). After `dealloc` erases the one `(ptr, size)` the other
-  entries of the freed cell stay in `live` with no allocated cell, so
-  `heapInv n (live.erase (p, size)) _` is unprovable (and `alloc`'s `(p, size) :: live`
-  likewise). `Lives` replaces it by: every `(p, s) ∈ live` has `0 < s` and an allocated
-  cell with `p = c.addr + 8`, `s ≤ c.size`; every allocated cell has some `(c.addr + 8, s)`
-  in `live`; and `(live.map Prod.fst).Nodup` (instead of `live.Nodup`), so `cellRes`'s
-  `∃ s` is the client's `size`;
-* `0 < s` (part of the above): `dealloc` returns early on `size = 0` without freeing, so a
-  zero-size live entry could not be erased (`alloc` only lends `0 < size`);
-* **`next_al : c.next % 4 = 0` is added to clause (1)**: `wf` only aligns `c.addr`, so the
-  last cell of a chunk (whose `next` is the chunk end) could have an unaligned `next`, and
-  then `word0 & !3 ≠ next` (575's `prev.next := c.word0 & !3`, 576's size) and the
-  `NEXT_CELL_IS_INVALID` bit could not be read off the header.
+* **clause (5)**: the old `(p, s) ∈ live ↔ ∃ c, allocated ∧ p = c.addr + 8 ∧ s ≤ c.size` put
+  *every* `(c.addr + 8, s)` with `s ≤ c.size` in `live`, so `heapInv n (live.erase (p, size)) _`
+  was unprovable; it is now `Lives` (every entry has `0 < s` and an allocated cell, every
+  allocated cell an entry, `(live.map Prod.fst).Nodup`). `0 < s`: `dealloc` returns early on
+  `size = 0` without freeing;
+* **`next_al : c.next % 4 = 0`**: without it the last cell of a chunk could have an unaligned
+  `next`, and then `word0 & !3 ≠ next` (575, 576) and `NEXT_CELL_IS_INVALID` could not be read
+  off the header.
 
-Nothing else was missing: clause (4) is exactly what rules out a listed next neighbour
-with `CAN_MERGE` pointing at the cell being freed (case B) and makes case A's `m.prev`
-change harmless; the three cases are proved from `WfFix` in `wf_caseC`, `wf_caseB`,
-`wf_caseA1` (`c` last) and `wf_caseA2`. Case B links `c` into the list only when `m` is
-listed (`listB`); if `m` is a leaked free cell, `c` is leaked too.
+The other changes of the unified invariant (`c.addr + 12 ≤ c.next` instead of `+ 24`,
+`nf_lo : nextFree % 4 < 2`, `disj`, the length `len` as a parameter instead of
+`len ≤ maxP · 65536`) are kept by the three cases: `+ 12` is all they use (a free cell's
+`next_free` word), case C writes the head (a cell address), case B writes `m.next_free & !3`
+and `c | CAN_MERGE`, case A's merged cell keeps `p`'s `next_free`, and its end is `c`'s
+(`disj_merge`); the memory length does not change.
+
+Clause (4) is exactly what rules out a listed next neighbour with `CAN_MERGE` pointing at the
+cell being freed (case B) and makes case A's `m.prev` change harmless; the three cases are
+proved from `HeapModel.wf` in `wf_caseC`, `wf_caseB`, `wf_caseA1` (`c` last) and `wf_caseA2`.
+Case B links `c` into the list only when `m` is listed (`listB`); if `m` is a leaked free
+cell, `c` is leaked too.
 
 ## The specs
 
-* `f582_spec`: `{⌜(ptr, size) ∈ live⌝ ∗ heapInvFix n maxP live F ∗ block n ptr size}`
-  `dealloc(&ALLOC, ptr, size, align)` `{heapInvFix n maxP (live.erase (ptr, size)) (F + 1)}`,
+* `f582_spec`: `{⌜(ptr, size) ∈ live⌝ ∗ heapInv n maxP len live F ∗ block n ptr size}`
+  `dealloc(&ALLOC, ptr, size, align)` `{heapInv n maxP len (live.erase (ptr, size)) (F + 1)}`,
   cost `D₀ = 224 regular_op_cost`s (an upper bound, with 575 counted at its bound 61: the
   paths cost C 123–134, B 139–145, A 218 (`c` not last) / 224 (`c` last)), calls to 570
   (→ 568), 576, 575 and their activations included.
@@ -69,61 +69,6 @@ namespace WNear.Binary.AllocDealloc
 open Wasm Wasm.Near WasmLogic NearLogic Iris Iris.BI Iris.ProgramLogic
 open WNear.Binary.AllocInv WNear.Binary.AllocLeaves WNear.Binary.AllocRemove WNear.Binary.AllocNewCell
 open WNear.Binary.U128From (memBytes_split memBytes_join)
-
-/-! ## The corrected invariant -/
-
-/-- Clauses (1)–(2): the cells' geometry. -/
-structure Geo (H : HeapModel) : Prop where
-  bounds : ∀ c ∈ H.cells, H.mem0 ≤ c.addr ∧ c.addr + 24 ≤ c.next ∧ c.next ≤ H.len ∧ c.addr % 4 = 0
-  /-- New: `next` is word-aligned also for the last cell of a chunk. -/
-  next_al : ∀ c ∈ H.cells, c.next % 4 = 0
-  sorted : (H.cells.map (·.addr)).Pairwise (· < ·)
-  next_nb : ∀ c ∈ H.cells, c.last = false → ∃ d ∈ H.cells, d.addr = c.next ∧ d.prev = c.addr
-  prev_nb : ∀ c ∈ H.cells, c.prev ≠ 0 → ∃ d ∈ H.cells, d.addr = c.prev ∧ d.next = c.addr ∧ d.last = false
-  first : ∀ c ∈ H.cells, c.prev = 0 → c.addr % 65536 = 0
-
-/-- Clauses (3)–(4): the free list, as in `HeapModel.wf`. -/
-structure Lists (H : HeapModel) (F : Nat) : Prop where
-  fl_nodup : H.freeList.Nodup
-  fl_len : H.freeList.length ≤ F
-  fl_free : ∀ a ∈ H.freeList, ∃ c, H.cellAt a = some c ∧ c.allocated = false
-  fl_link : ∀ i (h : i < H.freeList.length), ∃ c, H.cellAt H.freeList[i] = some c ∧
-    c.nextFree / 4 * 4 = H.freeList.getD (i + 1) 0
-  fl_merge : ∀ i (h : i < H.freeList.length), ∀ c, H.cellAt H.freeList[i] = some c → c.nextFree % 2 = 1 →
-    ∃ d, H.freeList[i + 1]? = some d.addr ∧ H.cellAt d.addr = some d ∧ d.allocated = false ∧
-      c.prev = d.addr
-
-/-- Clause (5), corrected. -/
-structure Lives (H : HeapModel) (live : List (Nat × Nat)) : Prop where
-  /-- Every live allocation is an allocated cell's data, of a positive size no larger
-  than the cell's, ... -/
-  live_cell : ∀ p s, (p, s) ∈ live → 0 < s ∧ ∃ c ∈ H.cells, c.allocated = true ∧ p = c.addr + 8 ∧ s ≤ c.size
-  /-- ... every allocated cell is lent, ... -/
-  cell_live : ∀ c ∈ H.cells, c.allocated = true → ∃ s, (c.addr + 8, s) ∈ live
-  /-- ... and once. -/
-  live_nodup : (live.map Prod.fst).Nodup
-
-/-- `HeapModel.wf`, corrected (see the module doc). -/
-structure WfFix (H : HeapModel) (live : List (Nat × Nat)) (F : Nat) : Prop where
-  mem0_al : H.mem0 % 65536 = 0
-  len_al : H.len % 65536 = 0
-  mem0_le : H.mem0 ≤ H.len
-  len_lt : H.len < 2 ^ 32
-  geo : Geo H
-  lists : Lists H F
-  lives : Lives H live
-
-section Res
-
-variable {GF : BundledGFunctors} [WasmGS NearState GF]
-
-/-- `heapInv` over the corrected `WfFix`. -/
-def heapInvFix (n maxP : Nat) (live : List (Nat × Nat)) (F : Nat) : IProp GF :=
-  iprop(∃ H : HeapModel, ⌜WfFix H live F ∧ H.len ≤ maxP * 65536⌝ ∗
-    n ↦[wms][ headAddr ] bytes32 (UInt32.ofNat H.head) ∗ n ↦[wmlength] H.len ∗
-    n ↪[wmlimit] some maxP ∗ [∗list] c ∈ H.cells, cellRes n live c)
-
-end Res
 
 /-! ## Lists of cells -/
 
@@ -255,6 +200,25 @@ theorem geo_map {H H' : HeapModel} (hg : Geo H) (f : CellM → CellM) (h0 : H'.m
   · intro z hz hp; obtain ⟨x, hx, rfl⟩ := hmem z hz
     obtain ⟨e1, e2, e3, e4⟩ := hf x hx
     rw [e1]; exact hg.first x hx (e3 ▸ hp)
+  · intro x hx y hy hxy
+    obtain ⟨x0, hx0, rfl⟩ := hmem x hx
+    obtain ⟨y0, hy0, rfl⟩ := hmem y hy
+    have := hf x0 hx0; have := hf y0 hy0; have := hg.disj x0 hx0 y0 hy0 (by omega); omega
+
+/-- Non-overlap after a merge of `c` into its previous neighbour `p`: every new cell has an
+old one at its address, other than `c`, with the same end, or it is `p` grown to `c`'s end. -/
+theorem disj_merge {H : HeapModel} {L : List CellM} (hg : Geo H) {c p : CellM} (hc : c ∈ H.cells)
+    (hp : p ∈ H.cells) (hpn : p.next = c.addr)
+    (h : ∀ z' ∈ L, ∃ z ∈ H.cells, z.addr = z'.addr ∧ z.addr ≠ c.addr ∧
+      (z'.next = z.next ∨ (z = p ∧ z'.next = c.next))) :
+    ∀ x ∈ L, ∀ y ∈ L, x.addr < y.addr → x.next ≤ y.addr := by
+  intro x hx y hy hxy
+  obtain ⟨ox, hox, e1, -, e3⟩ := h x hx
+  obtain ⟨oy, hoy, f1, f2, -⟩ := h y hy
+  rcases e3 with e3 | ⟨rfl, e3⟩
+  · have := hg.disj ox hox oy hoy (by omega); omega
+  · have := hg.disj ox hox oy hoy (by omega)
+    have := hg.disj c hc oy hoy (by omega); omega
 
 /-! ## The live allocations after freeing one -/
 
@@ -305,7 +269,7 @@ theorem lists_of_q {H : HeapModel} {F : Nat} (h1 : H.freeList.Nodup) (h2 : H.fre
   · intro i hi c hc hm
     exact h5 i _ (List.getElem?_eq_getElem hi) c hc hm
 
-theorem Lists.link_q {H : HeapModel} {F : Nat} (hw : Lists H F) :
+theorem _root_.WNear.Binary.AllocInv.Lists.link_q {H : HeapModel} {F : Nat} (hw : Lists H F) :
     ∀ j a, H.freeList[j]? = some a → ∃ c, H.cellAt a = some c ∧
       c.nextFree / 4 * 4 = (H.freeList[j + 1]?).getD 0 := by
   intro j a hj
@@ -313,7 +277,7 @@ theorem Lists.link_q {H : HeapModel} {F : Nat} (hw : Lists H F) :
   obtain ⟨c, hc, he⟩ := hw.fl_link j hlt
   exact ⟨c, hc, by rw [he, List.getD_eq_getElem?_getD]⟩
 
-theorem Lists.merge_q {H : HeapModel} {F : Nat} (hw : Lists H F) :
+theorem _root_.WNear.Binary.AllocInv.Lists.merge_q {H : HeapModel} {F : Nat} (hw : Lists H F) :
     ∀ j a, H.freeList[j]? = some a → ∀ c, H.cellAt a = some c → c.nextFree % 2 = 1 →
       ∃ d, H.freeList[j + 1]? = some d.addr ∧ H.cellAt d.addr = some d ∧ d.allocated = false ∧
         c.prev = d.addr := by
@@ -571,11 +535,11 @@ theorem mem_erase_iff' {L : List CellM} (hnd : (L.map CellM.addr).Nodup) {c z : 
 
 section Cases
 
-variable {H : HeapModel} {live : List (Nat × Nat)} {F : Nat} (hw : WfFix H live F)
+variable {H : HeapModel} {live : List (Nat × Nat)} {F : Nat} (hw : HeapModel.wf H live F)
   {c : CellM} (hc : c ∈ H.cells) (hca : c.allocated = true) {s : Nat} (hs : (c.addr + 8, s) ∈ live)
 include hw hc hca
 
-theorem WfFix.nodup : (H.cells.map CellM.addr).Nodup := nodup_of_sorted hw.geo.sorted
+theorem _root_.WNear.Binary.AllocInv.HeapModel.wf.nodup : (H.cells.map CellM.addr).Nodup := nodup_of_sorted hw.geo.sorted
 
 theorem not_listed : c.addr ∉ H.freeList := by
   intro h
@@ -601,14 +565,19 @@ def modelC (H : HeapModel) (c : CellM) : HeapModel :=
   { H with cells := H.cells.map (upd c.addr (cellC H c)), freeList := c.addr :: H.freeList }
 
 include hs in
-theorem wf_caseC : WfFix (modelC H c) (live.erase (c.addr + 8, s)) (F + 1) := by
+theorem wf_caseC : HeapModel.wf (modelC H c) (live.erase (c.addr + 8, s)) (F + 1) := by
   have hnd := hw.nodup hc hca
   have hex : ∃ x ∈ H.cells, x.addr = c.addr := ⟨c, hc, rfl⟩
   have hmem := fun z => mem_map_upd (L := H.cells) (z := z) (a := c.addr) (y := cellC H c) rfl hex
   have hnd' : ((H.cells.map (upd c.addr (cellC H c))).map CellM.addr).Nodup := by
     rw [addrs_map_upd (a := c.addr) (y := cellC H c) rfl]; exact hnd
   have hcn := not_listed hw hc hca
-  refine ⟨hw.mem0_al, hw.len_al, hw.mem0_le, hw.len_lt, ?_, ?_, ?_⟩
+  refine ⟨hw.mem0_al, hw.len_al, hw.mem0_le, hw.len_lt, ?_, ?_, ?_, ?_⟩
+  rotate_left 3
+  · intro z hz
+    rcases (hmem z).mp hz with rfl | ⟨hz, -⟩
+    · have := head_al hw hc hca; simp only [cellC]; omega
+    · exact hw.nf_lo z hz
   · apply geo_map (H' := modelC H c) hw.geo (upd c.addr (cellC H c)) rfl rfl rfl
     intro x hx
     unfold upd; split
@@ -651,7 +620,7 @@ theorem modelB_head (H : HeapModel) (c m : CellM) : (modelB H c m).head = H.head
 include hs in
 theorem wf_caseB {m : CellM} (hm : m ∈ H.cells) (hmaddr : m.addr = c.next) (hlast : c.last = false)
     (hmprev : m.prev = c.addr) (hmf : m.allocated = false) :
-    WfFix (modelB H c m) (live.erase (c.addr + 8, s)) (F + 1) := by
+    HeapModel.wf (modelB H c m) (live.erase (c.addr + 8, s)) (F + 1) := by
   have hnd := hw.nodup hc hca
   have hcm : c.addr ≠ m.addr := by have := (hw.geo.bounds c hc).2.1; omega
   have hmem1 := fun z => mem_map_upd (L := H.cells) (z := z) (a := c.addr) (y := cellB c m) rfl ⟨c, hc, rfl⟩
@@ -671,7 +640,13 @@ theorem wf_caseB {m : CellM} (hm : m ∈ H.cells) (hmaddr : m.addr = c.next) (hl
     fun x hx h1 h2 => (hmem x).mpr (Or.inr ⟨Or.inr ⟨hx, h1⟩, h2⟩)
   have hc'm : cellB c m ∈ (modelB H c m).cells := (hmem _).mpr (Or.inr ⟨Or.inl rfl, hcm⟩)
   have hm'm : nbrB c m ∈ (modelB H c m).cells := (hmem _).mpr (Or.inl rfl)
-  refine ⟨hw.mem0_al, hw.len_al, hw.mem0_le, hw.len_lt, ?_, ?_, ?_⟩
+  refine ⟨hw.mem0_al, hw.len_al, hw.mem0_le, hw.len_lt, ?_, ?_, ?_, ?_⟩
+  rotate_left 3
+  · intro z hz
+    rcases (hmem z).mp hz with rfl | ⟨rfl | ⟨hz, -⟩, -⟩
+    · have := (hw.geo.bounds c hc).2.2.2; simp only [nbrB]; omega
+    · simp only [cellB]; generalize m.nextFree % 2 ^ 32 = t; omega
+    · exact hw.nf_lo z hz
   · apply geo_map (H' := modelB H c m) hw.geo (upd m.addr (nbrB c m) ∘ upd c.addr (cellB c m)) rfl rfl
       (List.map_map)
     intro x hx
@@ -742,7 +717,7 @@ include hs in
 theorem wf_caseA2 {p m : CellM} (hp : p ∈ H.cells) (hpa : p.addr = c.prev) (hp0 : c.prev ≠ 0)
     (hpf : p.allocated = false) (hm : m ∈ H.cells) (hmaddr : m.addr = c.next) (hlast : c.last = false)
     (hmprev : m.prev = c.addr) :
-    WfFix (modelA2 H c p m) (live.erase (c.addr + 8, s)) (F + 1) := by
+    HeapModel.wf (modelA2 H c p m) (live.erase (c.addr + 8, s)) (F + 1) := by
   have hnd := hw.nodup hc hca
   obtain ⟨hpn, hpl⟩ := prev_facts hw hc hca hp hpa hp0
   have bc := hw.geo.bounds c hc
@@ -782,7 +757,13 @@ theorem wf_caseA2 {p m : CellM} (hp : p ∈ H.cells) (hpa : p.addr = c.prev) (hp
   have U := fun {x y : CellM} (hx : x ∈ H.cells) (hy : y ∈ H.cells) (e : x.addr = y.addr) =>
     mem_unique hnd hx hy e
   have hcn := not_listed hw hc hca
-  refine ⟨hw.mem0_al, hw.len_al, hw.mem0_le, hw.len_lt, ⟨?_, ?_, ?_, ?_, ?_, ?_⟩, ?_, ?_⟩
+  refine ⟨hw.mem0_al, hw.len_al, hw.mem0_le, hw.len_lt, ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩, ?_, ?_, ?_⟩
+  rotate_left 9
+  · intro z hz
+    rcases (hmem z).mp hz with rfl | rfl | ⟨hz, -⟩
+    · exact hw.nf_lo m hm
+    · exact hw.nf_lo p hp
+    · exact hw.nf_lo z hz
   · intro z hz
     rcases (hmem z).mp hz with rfl | rfl | ⟨hz, -⟩
     · exact bm
@@ -835,6 +816,12 @@ theorem wf_caseA2 {p m : CellM} (hp : p ∈ H.cells) (hpa : p.addr = c.prev) (hp
     · exact absurd (hpa.symm.trans (hz0 : p.addr = 0)) hp0
     · exact hw.geo.first p hp hz0
     · exact hw.geo.first z hz hz0
+  · apply disj_merge hw.geo hc hp hpn
+    intro z hz
+    rcases (hmem z).mp hz with rfl | rfl | ⟨hz, z1, -, -⟩
+    · exact ⟨m, hm, rfl, a2, Or.inl rfl⟩
+    · exact ⟨p, hp, rfl, a1, Or.inr ⟨rfl, rfl⟩⟩
+    · exact ⟨z, hz, rfl, z1, Or.inl rfl⟩
   · apply lists_same (F' := F + 1) hw.lists _ hnd hnd' (Nat.le_succ F)
     intro x hx hxl
     have hxc : x.addr ≠ c.addr := fun e => hcn (e ▸ hxl)
@@ -866,7 +853,7 @@ theorem wf_caseA2 {p m : CellM} (hp : p ∈ H.cells) (hpa : p.addr = c.prev) (hp
 include hs in
 theorem wf_caseA1 {p : CellM} (hp : p ∈ H.cells) (hpa : p.addr = c.prev) (hp0 : c.prev ≠ 0)
     (hpf : p.allocated = false) (hlast : c.last = true) :
-    WfFix (modelA1 H c p) (live.erase (c.addr + 8, s)) (F + 1) := by
+    HeapModel.wf (modelA1 H c p) (live.erase (c.addr + 8, s)) (F + 1) := by
   have hnd := hw.nodup hc hca
   obtain ⟨hpn, hpl⟩ := prev_facts hw hc hca hp hpa hp0
   have bc := hw.geo.bounds c hc
@@ -897,7 +884,12 @@ theorem wf_caseA1 {p : CellM} (hp : p ∈ H.cells) (hpa : p.addr = c.prev) (hp0 
   have U := fun {x y : CellM} (hx : x ∈ H.cells) (hy : y ∈ H.cells) (e : x.addr = y.addr) =>
     mem_unique hnd hx hy e
   have hcn := not_listed hw hc hca
-  refine ⟨hw.mem0_al, hw.len_al, hw.mem0_le, hw.len_lt, ⟨?_, ?_, ?_, ?_, ?_, ?_⟩, ?_, ?_⟩
+  refine ⟨hw.mem0_al, hw.len_al, hw.mem0_le, hw.len_lt, ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩, ?_, ?_, ?_⟩
+  rotate_left 9
+  · intro z hz
+    rcases (hmem z).mp hz with rfl | ⟨hz, -⟩
+    · exact hw.nf_lo p hp
+    · exact hw.nf_lo z hz
   · intro z hz
     rcases (hmem z).mp hz with rfl | ⟨hz, -⟩
     · simp only [cellA]; refine ⟨bp.1, by omega, bc.2.2.1, bp.2.2.2⟩
@@ -936,6 +928,11 @@ theorem wf_caseA1 {p : CellM} (hp : p ∈ H.cells) (hpa : p.addr = c.prev) (hp0 
     rcases (hmem z).mp hz with rfl | ⟨hz, -⟩
     · exact hw.geo.first p hp hz0
     · exact hw.geo.first z hz hz0
+  · apply disj_merge hw.geo hc hp hpn
+    intro z hz
+    rcases (hmem z).mp hz with rfl | ⟨hz, z1, -⟩
+    · exact ⟨p, hp, rfl, a1, Or.inr ⟨rfl, rfl⟩⟩
+    · exact ⟨z, hz, rfl, z1, Or.inl rfl⟩
   · apply lists_same (F' := F + 1) hw.lists _ hnd hnd' (Nat.le_succ F)
     intro x hx hxl
     have hxc : x.addr ≠ c.addr := fun e => hcn (e ▸ hxl)
@@ -1041,22 +1038,22 @@ theorem cellRes_free_intro {n : Nat} {live : List (Nat × Nat)} (x : CellM) (h :
 
 /-- Case C, push. -/
 theorem finC {n maxP F s : Nat} {H : HeapModel} {live : List (Nat × Nat)} {c : CellM}
-    (hw : WfFix H live F) (hc : c ∈ H.cells) (hca : c.allocated = true) (hs : (c.addr + 8, s) ∈ live)
-    (hmax : H.len ≤ maxP * 65536) (w0 : UInt32)
+    (hw : HeapModel.wf H live F) (hc : c ∈ H.cells) (hca : c.allocated = true) (hs : (c.addr + 8, s) ∈ live)
+    (w0 : UInt32)
     (hw0 : w0 = UInt32.ofNat (c.next + if c.last = true then 2 else 0)) (dr : List UInt8)
     (hdr : dr.length = c.size - 4) :
     n ↦[i32][ 1074896 ] UInt32.ofNat c.addr ∗ n ↦[wmlength] H.len ∗ n ↪[wmlimit] some maxP ∗
       ([∗list] y ∈ H.cells.erase c, cellRes n live y) ∗
       n ↦[i32][ c.addr ] w0 ∗ n ↦[i32][ c.addr + 4 ] UInt32.ofNat c.prev ∗
       n ↦[i32][ c.addr + 8 ] UInt32.ofNat H.head ∗ n ↦[wms][ c.addr + 8 + 4 ] dr
-      ⊢ heapInvFix (GF := GF) n maxP (live.erase (c.addr + 8, s)) (F + 1) := by
+      ⊢ heapInv (GF := GF) n maxP H.len (live.erase (c.addr + 8, s)) (F + 1) := by
   have hnd := hw.nodup hc hca
   have bc := hw.geo.bounds c hc
   iintro ⟨Hh, Hl, Hm, Hrest, Hw0, Hw1, Hnf, Hdr⟩
-  iunfold heapInvFix
+  iunfold heapInv
   iexists modelC H c
   isplitr
-  · ipureintro; exact ⟨wf_caseC hw hc hca hs, hmax⟩
+  · ipureintro; exact ⟨wf_caseC hw hc hca hs, rfl⟩
   have hhd : (modelC H c).head = c.addr := rfl
   rw [hhd, show headAddr = 1074896 from rfl, show (modelC H c).len = H.len from rfl,
     show (modelC H c).cells = H.cells.map (upd c.addr (cellC H c)) from rfl]
@@ -1088,8 +1085,8 @@ theorem rest_erase {n : Nat} {H : HeapModel} {live : List (Nat × Nat)} {c : Cel
 
 /-- Case B, link after the free next neighbour `m`. -/
 theorem finB {n maxP F s : Nat} {H : HeapModel} {live : List (Nat × Nat)} {c m : CellM}
-    (hw : WfFix H live F) (hc : c ∈ H.cells) (hca : c.allocated = true) (hs : (c.addr + 8, s) ∈ live)
-    (hmax : H.len ≤ maxP * 65536) (hm : m ∈ H.cells) (hmaddr : m.addr = c.next)
+    (hw : HeapModel.wf H live F) (hc : c ∈ H.cells) (hca : c.allocated = true) (hs : (c.addr + 8, s) ∈ live)
+    (hm : m ∈ H.cells) (hmaddr : m.addr = c.next)
     (hlast : c.last = false) (hmprev : m.prev = c.addr) (hmf : m.allocated = false)
     (w0 nf mnf : UInt32) (hw0 : w0 = UInt32.ofNat (c.next + if c.last = true then 2 else 0))
     (hnf : nf = UInt32.ofNat (m.nextFree % 2 ^ 32 / 4 * 4)) (hmnf : mnf = UInt32.ofNat (c.addr + 1))
@@ -1100,15 +1097,15 @@ theorem finB {n maxP F s : Nat} {H : HeapModel} {live : List (Nat × Nat)} {c m 
       n ↦[i32][ c.addr + 8 ] nf ∗ n ↦[wms][ c.addr + 8 + 4 ] dr ∗
       n ↦[i32][ m.addr ] UInt32.ofNat m.word0 ∗ n ↦[i32][ m.addr + 4 ] UInt32.ofNat m.prev ∗
       n ↦[i32][ m.addr + 8 ] mnf ∗ n ↦[wms][ m.addr + 12 ] mbs
-      ⊢ heapInvFix (GF := GF) n maxP (live.erase (c.addr + 8, s)) (F + 1) := by
+      ⊢ heapInv (GF := GF) n maxP H.len (live.erase (c.addr + 8, s)) (F + 1) := by
   have hnd := hw.nodup hc hca
   have bc := hw.geo.bounds c hc
   have hcm : m.addr ≠ c.addr := by omega
   iintro ⟨Hh, Hl, Hm, Hrest, Hw0, Hw1, Hnf, Hdr, Hm0, Hm1, Hmnf, Hmbs⟩
-  iunfold heapInvFix
+  iunfold heapInv
   iexists modelB H c m
   isplitr
-  · ipureintro; exact ⟨wf_caseB hw hc hca hs hm hmaddr hlast hmprev hmf, hmax⟩
+  · ipureintro; exact ⟨wf_caseB hw hc hca hs hm hmaddr hlast hmprev hmf, rfl⟩
   rw [modelB_head hw hc hca, show headAddr = 1074896 from rfl, show (modelB H c m).len = H.len from rfl,
     show (modelB H c m).cells = (H.cells.map (upd c.addr (cellB c m))).map (upd m.addr (nbrB c m)) from rfl]
   iframe Hh Hl Hm
@@ -1170,7 +1167,7 @@ theorem cellData_nbr (n : Nat) (live : List (Nat × Nat)) {a s : Nat} (x y : Cel
 /-- Case A, merge into the free previous neighbour `p`: the bytes from `p`'s data to `c`'s
 end become `p`'s data. -/
 theorem finA_cell {n : Nat} {live : List (Nat × Nat)} {c p : CellM}
-    (bc : c.addr + 24 ≤ c.next) (hpn : p.next = c.addr) (bp : p.addr + 24 ≤ p.next)
+    (bc : c.addr + 12 ≤ c.next) (hpn : p.next = c.addr) (bp : p.addr + 12 ≤ p.next)
     (hpf : p.allocated = false) (wp : UInt32) (hwp : wp = UInt32.ofNat (c.next + if c.last = true then 2 else 0))
     (pbs : List UInt8) (hpbs : pbs.length + 4 = p.size) (wc0 wc1 wd : UInt32) (dr : List UInt8)
     (hdr : dr.length = c.size - 4) :
@@ -1201,8 +1198,8 @@ theorem finA_cell {n : Nat} {live : List (Nat × Nat)} {c p : CellM}
 
 /-- Case A with a next neighbour `m` (now `p`'s). -/
 theorem finA2 {n maxP F s : Nat} {H : HeapModel} {live : List (Nat × Nat)} {c p m : CellM}
-    (hw : WfFix H live F) (hc : c ∈ H.cells) (hca : c.allocated = true) (hs : (c.addr + 8, s) ∈ live)
-    (hmax : H.len ≤ maxP * 65536) (hp : p ∈ H.cells) (hpa : p.addr = c.prev) (hp0 : c.prev ≠ 0)
+    (hw : HeapModel.wf H live F) (hc : c ∈ H.cells) (hca : c.allocated = true) (hs : (c.addr + 8, s) ∈ live)
+    (hp : p ∈ H.cells) (hpa : p.addr = c.prev) (hp0 : c.prev ≠ 0)
     (hpf : p.allocated = false) (hm : m ∈ H.cells) (hmaddr : m.addr = c.next)
     (hlast : c.last = false) (hmprev : m.prev = c.addr)
     (wp : UInt32) (hwp : wp = UInt32.ofNat (c.next + if c.last = true then 2 else 0))
@@ -1215,7 +1212,7 @@ theorem finA2 {n maxP F s : Nat} {H : HeapModel} {live : List (Nat × Nat)} {c p
       n ↦[i32][ c.addr ] wc0 ∗ n ↦[i32][ c.addr + 4 ] wc1 ∗ n ↦[i32][ c.addr + 8 ] wd ∗
       n ↦[wms][ c.addr + 8 + 4 ] dr ∗
       n ↦[i32][ m.addr ] UInt32.ofNat m.word0 ∗ n ↦[i32][ m.addr + 4 ] wm1 ∗ cellData n live m
-      ⊢ heapInvFix (GF := GF) n maxP (live.erase (c.addr + 8, s)) (F + 1) := by
+      ⊢ heapInv (GF := GF) n maxP H.len (live.erase (c.addr + 8, s)) (F + 1) := by
   have hnd := hw.nodup hc hca
   obtain ⟨hpn, hpl⟩ := prev_facts hw hc hca hp hpa hp0
   have bc := hw.geo.bounds c hc
@@ -1224,10 +1221,10 @@ theorem finA2 {n maxP F s : Nat} {H : HeapModel} {live : List (Nat × Nat)} {c p
   have a2 : m.addr ≠ c.addr := by omega
   have a3 : m.addr ≠ p.addr := by omega
   iintro ⟨Hh, Hl, Hm, Hrest, Hp0, Hp1, Hpnf, Hpbs, Hc0, Hc1, Hd, Hdr, Hm0, Hm1, Hmd⟩
-  iunfold heapInvFix
+  iunfold heapInv
   iexists modelA2 H c p m
   isplitr
-  · ipureintro; exact ⟨wf_caseA2 hw hc hca hs hp hpa hp0 hpf hm hmaddr hlast hmprev, hmax⟩
+  · ipureintro; exact ⟨wf_caseA2 hw hc hca hs hp hpa hp0 hpf hm hmaddr hlast hmprev, rfl⟩
   rw [show (modelA2 H c p m).head = H.head from rfl, show headAddr = 1074896 from rfl,
     show (modelA2 H c p m).len = H.len from rfl,
     show (modelA2 H c p m).cells =
@@ -1264,8 +1261,8 @@ theorem finA2 {n maxP F s : Nat} {H : HeapModel} {live : List (Nat × Nat)} {c p
 
 /-- Case A, `c` the last cell of its chunk. -/
 theorem finA1 {n maxP F s : Nat} {H : HeapModel} {live : List (Nat × Nat)} {c p : CellM}
-    (hw : WfFix H live F) (hc : c ∈ H.cells) (hca : c.allocated = true) (hs : (c.addr + 8, s) ∈ live)
-    (hmax : H.len ≤ maxP * 65536) (hp : p ∈ H.cells) (hpa : p.addr = c.prev) (hp0 : c.prev ≠ 0)
+    (hw : HeapModel.wf H live F) (hc : c ∈ H.cells) (hca : c.allocated = true) (hs : (c.addr + 8, s) ∈ live)
+    (hp : p ∈ H.cells) (hpa : p.addr = c.prev) (hp0 : c.prev ≠ 0)
     (hpf : p.allocated = false) (hlast : c.last = true)
     (wp : UInt32) (hwp : wp = UInt32.ofNat (c.next + if c.last = true then 2 else 0))
     (pbs : List UInt8) (hpbs : pbs.length + 4 = p.size) (wc0 wc1 wd : UInt32) (dr : List UInt8)
@@ -1276,17 +1273,17 @@ theorem finA1 {n maxP F s : Nat} {H : HeapModel} {live : List (Nat × Nat)} {c p
       n ↦[i32][ p.addr + 8 ] UInt32.ofNat p.nextFree ∗ n ↦[wms][ p.addr + 12 ] pbs ∗
       n ↦[i32][ c.addr ] wc0 ∗ n ↦[i32][ c.addr + 4 ] wc1 ∗ n ↦[i32][ c.addr + 8 ] wd ∗
       n ↦[wms][ c.addr + 8 + 4 ] dr
-      ⊢ heapInvFix (GF := GF) n maxP (live.erase (c.addr + 8, s)) (F + 1) := by
+      ⊢ heapInv (GF := GF) n maxP H.len (live.erase (c.addr + 8, s)) (F + 1) := by
   have hnd := hw.nodup hc hca
   obtain ⟨hpn, hpl⟩ := prev_facts hw hc hca hp hpa hp0
   have bc := hw.geo.bounds c hc
   have bp := hw.geo.bounds p hp
   have a1 : p.addr ≠ c.addr := by omega
   iintro ⟨Hh, Hl, Hm, Hrest, Hp0, Hp1, Hpnf, Hpbs, Hc0, Hc1, Hd, Hdr⟩
-  iunfold heapInvFix
+  iunfold heapInv
   iexists modelA1 H c p
   isplitr
-  · ipureintro; exact ⟨wf_caseA1 hw hc hca hs hp hpa hp0 hpf hlast, hmax⟩
+  · ipureintro; exact ⟨wf_caseA1 hw hc hca hs hp hpa hp0 hpf hlast, rfl⟩
   rw [show (modelA1 H c p).head = H.head from rfl, show headAddr = 1074896 from rfl,
     show (modelA1 H c p).len = H.len from rfl,
     show (modelA1 H c p).cells = (H.cells.erase c).map (upd p.addr (cellA p c)) from rfl]
@@ -1439,23 +1436,24 @@ theorem f582_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
     (hp568 : ty568.params.length = 2) (hr568 : ty568.results.length = 1)
     (hp576 : ty576.params.length = 1) (hr576 : ty576.results.length = 1)
     (hp575 : ty575.params.length = 1) (hr575 : ty575.results.length = 0)
-    (hd : d + 2 < lim.maxCallDepth) (Cg maxP : Nat) (live : List (Nat × Nat)) (F : Nat)
+    (hd : d + 2 < lim.maxCallDepth) (Cg maxP len : Nat) (live : List (Nat × Nat)) (F : Nat)
     (ptr size align : UInt32) :
     a570 ↪[wf] FuncInst.wasm ty570 inst f570 ∗ a568 ↪[wf] FuncInst.wasm ty568 inst f568 ∗
       a576 ↪[wf] FuncInst.wasm ty576 inst f576 ∗ a575 ↪[wf] FuncInst.wasm ty575 inst f575 ∗
       inst ↪[inst] mi
       ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f582 Cg
         (fun args => iprop(⌜args = [.i32 1074896, .i32 ptr, .i32 size, .i32 align]⌝ ∗
-          ⌜(ptr.toNat, size.toNat) ∈ live⌝ ∗ heapInvFix n maxP live F ∗ block n ptr.toNat size.toNat))
+          ⌜(ptr.toNat, size.toNat) ∈ live⌝ ∗ heapInv n maxP len live F ∗ block n ptr.toNat size.toNat))
         (fun _ => 224 * cfg.regularOpCost)
-        (fun _ rs => iprop(⌜rs = []⌝ ∗ heapInvFix n maxP (live.erase (ptr.toNat, size.toNat)) (F + 1))) := by
+        (fun _ rs => iprop(⌜rs = []⌝ ∗ heapInv n maxP len (live.erase (ptr.toNat, size.toNat)) (F + 1))) := by
   iintro ⟨#H570, #H568, #H576, #H575, #Hi⟩
   iapply MFunSpec_intro
   imodintro
   iintro %args %R ⟨%hargs, %hlive, Hinv, Hblk⟩ Hc
   subst hargs
-  iunfold heapInvFix at Hinv
-  icases Hinv with ⟨%H, %⟨hw, hmax⟩, Hh, Hl, Hm, Hcells⟩
+  iunfold heapInv at Hinv
+  icases Hinv with ⟨%H, %⟨hw, hHlen⟩, Hh, Hl, Hm, Hcells⟩
+  subst hHlen
   obtain ⟨hpos, c, hc, hca, hpc, hsz⟩ := hw.lives.live_cell _ _ hlive
   have hnd := hw.nodup hc hca
   have bc := hw.geo.bounds c hc
@@ -1471,7 +1469,7 @@ theorem f582_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
   ihave Hdata := memBytes_join n (c.addr + 8) size.toNat bb bs hbb $$ [Hb Hslack]
   · iframe Hb Hslack
   have hdl : (bb ++ bs).length = c.size := by simp [hbb, hs2]; omega
-  have hcs : 16 ≤ c.size := by unfold CellM.size; omega
+  have hcs : 4 ≤ c.size := by unfold CellM.size; omega
   icases memBytes_split n (c.addr + 8) 4 (bb ++ bs) (by omega) $$ Hdata with ⟨Hd4, Hdr⟩
   have hd4l : ((bb ++ bs).take 4).length = 4 := by rw [List.length_take]; omega
   have hdrl : ((bb ++ bs).drop 4).length = c.size - 4 := by rw [List.length_drop]; omega
@@ -1546,7 +1544,7 @@ theorem f582_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
       mcredits R
       iframe Hc
       isplitr; · ipureintro; trivial
-      iapply finC hw hc hca hs1 hmax (UInt32.ofNat (c.next + 2)) (by simp only [hl, ↓reduceIte]) dr hdrl
+      iapply finC hw hc hca hs1 (UInt32.ofNat (c.next + 2)) (by simp only [hl, ↓reduceIte]) dr hdrl
       iframe Hh Hl Hm Hrest Hw0 Hw1 Hd4 Hdr
     · have hl' : c.last = false := by simpa using hl
       simp only [hl', Bool.false_eq_true, ↓reduceIte, Nat.add_zero]
@@ -1580,7 +1578,7 @@ theorem f582_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
         mcredits R
         iframe Hc
         isplitr; · ipureintro; trivial
-        iapply finB hw hc hca hs1 hmax hm hmaddr hl' hmprev hmf (UInt32.ofNat c.next)
+        iapply finB hw hc hca hs1 hm hmaddr hl' hmprev hmf (UInt32.ofNat c.next)
           (UInt32.ofNat m.nextFree &&& 4294967292) (UInt32.ofNat c.addr ||| 1)
           (by simp only [hl', Bool.false_eq_true, ↓reduceIte, Nat.add_zero]) (mask4_nf _)
           (or1_ofNat _ bc.2.2.2 (by omega)) dr hdrl mbs hmbs
@@ -1604,7 +1602,7 @@ theorem f582_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
         mcredits R
         iframe Hc
         isplitr; · ipureintro; trivial
-        iapply finC hw hc hca hs1 hmax (UInt32.ofNat c.next)
+        iapply finC hw hc hca hs1 (UInt32.ofNat c.next)
           (by simp only [hl', Bool.false_eq_true, ↓reduceIte, Nat.add_zero]) dr hdrl
         iframe Hh Hl Hm Hrest Hw0 Hw1 Hd4 Hdr
   · mstep_not_taken with (apply bool_eqz_zero; rw [ofNat_toNat_lt _ hprev4.2]; exact hp0)
@@ -1669,7 +1667,7 @@ theorem f582_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
         mcredits R
         iframe Hc
         isplitr; · ipureintro; trivial
-        iapply finA1 hw hc hca hs1 hmax hp hpa hp0 hpf hl (UInt32.ofNat (c.next + 2))
+        iapply finA1 hw hc hca hs1 hp hpa hp0 hpf hl (UInt32.ofNat (c.next + 2))
           (by simp only [hl, ↓reduceIte]) pbs hpbs (UInt32.ofNat 2) (UInt32.ofNat c.prev &&& 3) 0 dr hdrl
         iframe Hh Hl Hm Hrest Hp0 Hp1 Hpnf Hpbs Hw0 Hw1 Hd4 Hdr
       · have hl' : c.last = false := by simpa using hl
@@ -1722,7 +1720,7 @@ theorem f582_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
         iframe Hc
         isplitr; · ipureintro; trivial
         ihave Hm1 := memBytes_at (n := n) (a := c.next + 4) (b := m.addr + 4) (by omega) rfl $$ Hm1
-        iapply finA2 hw hc hca hs1 hmax hp hpa hp0 hpf hm hmaddr hl' hmprev (UInt32.ofNat c.next)
+        iapply finA2 hw hc hca hs1 hp hpa hp0 hpf hm hmaddr hl' hmprev (UInt32.ofNat c.next)
           (by simp only [hl', Bool.false_eq_true, ↓reduceIte, Nat.add_zero]) pbs hpbs 0
           (UInt32.ofNat c.prev &&& 3) 0 dr hdrl (UInt32.ofNat c.prev) (by rw [hpa])
         iframe Hh Hl Hm Hrest Hp0 Hp1 Hpnf Hpbs Hw0 Hw1 Hd4 Hdr Hm0 Hm1 Hmd
@@ -1761,7 +1759,7 @@ theorem f582_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
         mcredits R
         iframe Hc
         isplitr; · ipureintro; trivial
-        iapply finC hw hc hca hs1 hmax (UInt32.ofNat (c.next + 2)) (by simp only [hl, ↓reduceIte]) dr hdrl
+        iapply finC hw hc hca hs1 (UInt32.ofNat (c.next + 2)) (by simp only [hl, ↓reduceIte]) dr hdrl
         iframe Hh Hl Hm Hrest Hw0 Hw1 Hd4 Hdr
       · have hl' : c.last = false := by simpa using hl
         simp only [hl', Bool.false_eq_true, ↓reduceIte, Nat.add_zero]
@@ -1795,7 +1793,7 @@ theorem f582_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
           mcredits R
           iframe Hc
           isplitr; · ipureintro; trivial
-          iapply finB hw hc hca hs1 hmax hm hmaddr hl' hmprev hmf (UInt32.ofNat c.next)
+          iapply finB hw hc hca hs1 hm hmaddr hl' hmprev hmf (UInt32.ofNat c.next)
             (UInt32.ofNat m.nextFree &&& 4294967292) (UInt32.ofNat c.addr ||| 1)
             (by simp only [hl', Bool.false_eq_true, ↓reduceIte, Nat.add_zero]) (mask4_nf _)
             (or1_ofNat _ bc.2.2.2 (by omega)) dr hdrl mbs hmbs
@@ -1819,7 +1817,7 @@ theorem f582_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
           mcredits R
           iframe Hc
           isplitr; · ipureintro; trivial
-          iapply finC hw hc hca hs1 hmax (UInt32.ofNat c.next)
+          iapply finC hw hc hca hs1 (UInt32.ofNat c.next)
             (by simp only [hl', Bool.false_eq_true, ↓reduceIte, Nat.add_zero]) dr hdrl
           iframe Hh Hl Hm Hrest Hw0 Hw1 Hd4 Hdr
 end Spec
@@ -1866,7 +1864,7 @@ theorem f311_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
     (hp568 : ty568.params.length = 2) (hr568 : ty568.results.length = 1)
     (hp576 : ty576.params.length = 1) (hr576 : ty576.results.length = 1)
     (hp575 : ty575.params.length = 1) (hr575 : ty575.results.length = 0)
-    (hd : d + 4 < lim.maxCallDepth) (Cg maxP : Nat) (live : List (Nat × Nat)) (F : Nat)
+    (hd : d + 4 < lim.maxCallDepth) (Cg maxP len : Nat) (live : List (Nat × Nat)) (F : Nat)
     (ptr size align : UInt32) :
     a237 ↪[wf] FuncInst.wasm ty237 inst f237 ∗ a582 ↪[wf] FuncInst.wasm ty582 inst f582 ∗
       a570 ↪[wf] FuncInst.wasm ty570 inst f570 ∗ a568 ↪[wf] FuncInst.wasm ty568 inst f568 ∗
@@ -1874,13 +1872,13 @@ theorem f311_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
       inst ↪[inst] mi
       ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f311 Cg
         (fun args => iprop(⌜args = [.i32 ptr, .i32 size, .i32 align]⌝ ∗
-          ⌜(ptr.toNat, size.toNat) ∈ live⌝ ∗ heapInvFix n maxP live F ∗ block n ptr.toNat size.toNat))
+          ⌜(ptr.toNat, size.toNat) ∈ live⌝ ∗ heapInv n maxP len live F ∗ block n ptr.toNat size.toNat))
         (fun _ => 256 * cfg.regularOpCost)
-        (fun _ rs => iprop(⌜rs = []⌝ ∗ heapInvFix n maxP (live.erase (ptr.toNat, size.toNat)) (F + 1))) := by
+        (fun _ rs => iprop(⌜rs = []⌝ ∗ heapInv n maxP len (live.erase (ptr.toNat, size.toNat)) (F + 1))) := by
   iintro ⟨#H237, #H582, #H570, #H568, #H576, #H575, #Hi⟩
   ihave #S582 := f582_spec (GF := GF) cfg lim (d + 2) ty582 hr582 inst mi n hn a570 a568 a576 a575
     h570 h568 h576 h575 ty570 ty568 ty576 ty575 hp570 hr570 hp568 hr568 hp576 hr576 hp575 hr575
-    (by omega) Cg maxP live F ptr size align $$ [H570 H568 H576 H575 Hi]
+    (by omega) Cg maxP len live F ptr size align $$ [H570 H568 H576 H575 Hi]
   · iframe H570 H568 H576 H575 Hi
   ihave #S237 := AllocWrap.f237_spec (GF := GF) cfg lim (d + 1) ty237 hr237 inst mi a582 h582 ty582
     hp582 hr582 (by omega) Cg _ _ _ ptr size align $$ [H582 Hi S582]

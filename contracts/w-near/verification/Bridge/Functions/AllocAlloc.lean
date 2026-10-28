@@ -18,7 +18,7 @@ alloc(&ALLOC, size, align)                                     (581; 16-byte fra
 
 ## What is proved
 
-* `f581_fresh`: 581 on an **empty** free list (`ALLOC = 0`, i.e. `heapInv`'s `F = 0`;
+* `f581_fresh`: 581 on an **empty** free list (`ALLOC = 0`, i.e. `heapInv … 0`;
   every method's first allocation, and every allocation after a walk emptied the list),
   `1 ≤ size < 2^28`, `align = 2^k` (`k < 20`), a page-aligned memory length `len > 0`
   with room for the new chunk below `2^32` (`hroom`), the shadow stack's 16 bytes:
@@ -34,15 +34,11 @@ alloc(&ALLOC, size, align)                                     (581; 16-byte fra
 * `f310_fresh`: the same for `__rust_alloc(size, align)` through `AllocWrap`
   (`f310_of_f236`, `f236_spec`): cost `15 + 15 + 630` plus the grow charge.
 
-## What is not done
+## What is not done here
 
-* Packing into the heap invariant: `heapInvFix n maxP live 0 ⊢ pre581` (ALLOC = 0 is the
-  `freeList = []` model's head) and `res581 p ⊢ heapInvFix n maxP ((p, size) :: live) 1 ∗
-  block p size ∨ p = 0 ∗ heapInvFix n maxP live 0`: a model-level lemma appending the chunk
-  `[len, len + P·65536)` (one free cell, or a free remainder + an allocated cell, or one
-  allocated cell) to `H.cells`. With `WfFix` as `AllocDealloc` states it, the split case
-  needs its clause `c.addr + 24 ≤ c.next` for the new allocated cell, which fails for
-  `size ≤ 12` (AllocFirstFit's finding 2): the clause must be weakened to `+ 12` first.
+* Packing into the heap invariant is in `AllocFresh` (`f310_spec_fresh`): `heapInv n maxP len
+  live 0` gives `pre581`, and `res581` gives back `heapInv` with the fresh chunk appended to
+  the cells (`wf_freshU/W/S`; the split case needed AllocInv's `c.addr + 12 ≤ c.next`).
 * Nonempty free lists (`F ≥ 1`): 580's general walk (loop invariants designed in
   AllocFirstFit's header; `f580_one` covers the one-cell list without merges).
 -/

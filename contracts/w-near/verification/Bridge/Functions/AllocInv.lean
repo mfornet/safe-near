@@ -14,7 +14,12 @@ is proved so far is in
   specs of 581/582 (cost `+30` / `+32`);
 * `AllocGrow.lean`: the metered rule for `memory.grow`
   (`mwpi_memory_grow_either`);
-* `AllocNewCell.lean`: `new_cell_for_free_list` (577), the fresh chunk.
+* `AllocNewCell.lean`: `new_cell_for_free_list` (577), the fresh chunk;
+* `AllocRemove.lean`: `Neighbors::remove` (575);
+* `AllocDealloc.lean`: `dealloc` (582) and `__rust_dealloc` (311) against `heapInv`;
+* `AllocFirstFit.lean`: `alloc_first_fit` (580) on lists of at most one cell;
+* `AllocAlloc.lean`: `alloc` (581) and `__rust_alloc` (310) on an empty list, raw;
+* `AllocFresh.lean`: the latter packed into `heapInv` (`f310_spec_fresh`).
 
 ## 1. The code, as it is in the binary
 
@@ -72,14 +77,20 @@ marked free and:
 
 ## 2. `HeapInv`
 
-`HeapInv n live F` (below, `heapInv`) is parametrised by a *Lean-level*
-list `live` of the live allocations `(ptr, size)` — as the harness's
-`__rust_alloc` contract (`Harness/Builtins.lean`) — and by `F`, an upper
-bound on the length of the free list. No ghost state is needed: the method
-proofs are sequential and thread `live` and `F` as values; `dealloc` asks
-`(ptr, size) ∈ live` as a pure premise.
+`heapInv n maxP len live F` is parametrised by the memory's length `len`, by
+a *Lean-level* list `live` of the live allocations `(ptr, size)` — as the
+harness's `__rust_alloc` contract (`Harness/Builtins.lean`) — and by `F`, an
+upper bound on the length of the free list. No ghost state is needed: the
+method proofs are sequential and thread `len`, `live` and `F` as values;
+`dealloc` asks `(ptr, size) ∈ live` as a pure premise.
 
-`heapInv n live F` owns:
+`len` is a parameter (not bounded by `maxP` inside the invariant): the
+`memory.grow` rule 577 is proved with (`wpi_memory_grow_either`) does not see
+the limit, so after a grow nothing relates the new length to `maxP`; the
+caller tracks `len` exactly (alloc's spec says what it becomes) and gives
+each allocation its room (`len + pages · 65536 + 65536 ≤ 2^32`).
+
+`heapInv n maxP len live F` owns:
 
 * the head word `1074896 ↦ head`;
 * the memory's length `n ↦[wmlength] len` (only wee_alloc grows memory, and
@@ -91,44 +102,60 @@ proofs are sequential and thread `live` and `F` as values; `dealloc` asks
   `size` up to `next`).
 
 and states the pure facts of a `HeapModel` (`chunks`, their cells,
-`free list`), `HeapModel.wf`:
+`free list`), `HeapModel.wf` (a structure: `Geo` = (1)–(2), `Lists` =
+(3)–(4), `Lives` = (5), `nf_lo`):
 
-1. chunks are disjoint, page-aligned, and tile `[mem0, len)` where `mem0` is
-   the memory length at instantiation (so `len` is a multiple of 65536 and,
-   under `maxP`, `len ≤ 2048 * 65536 < 2^32`: no address arithmetic of 576,
-   577 or 580 overflows, so none of their `panic` branches (853) is taken);
-2. within a chunk, cells are consecutive (`c.next` is the next cell, or the
-   end with bit 1), each `prev` is the previous cell (0 for the first),
-   every cell has at least 16 data bytes;
+1. `mem0` and `len` page-aligned, `mem0 ≤ len < 2^32`; every cell lies in
+   `[mem0, len)`, word-aligned (`addr` and `next`, the latter also for the
+   last cell of a chunk, whose `next` is the chunk end), with at least 4
+   data bytes (`addr + 12 ≤ next`: a free cell's `next_free` word; a split
+   lends cells of `4 · words` bytes, so `+ 24` would fail for small
+   allocations); cells sorted by address and **disjoint** (`disj`: a cell
+   ends before any cell above it starts — not derivable from the rest, and
+   needed to insert a split cell in the middle of the list);
+2. within a chunk, cells are consecutive (`c.next` is the next cell unless
+   `c` is last), each `prev` is the previous cell, 0 only for the first,
+   whose address is page-aligned;
 3. the free list `head, f₁, …, f_k` is a list of *distinct free* cells,
-   linked by `next_free & !3`, ending in 0, `k ≤ F`;
+   linked by `next_free & !3`, ending in 0, `k ≤ F`; every cell's
+   `next_free` has bit 1 clear (`nf_lo : nextFree % 4 < 2`: 580 unlinks a
+   cell with the *raw* `next_free`, only `CAN_MERGE` cleared);
 4. a list cell with `CAN_MERGE` is followed in the list by its previous
    neighbour, which is free (so the merge in 580 finds a free neighbour, and
    `unchecked_unwrap` holds);
-5. `live` is exactly the allocated cells, each `(c + 8, size)` with
-   `size ≤ c.next - c - 8` and `c + 8` aligned as requested;
+5. (`Lives`) every `(p, s) ∈ live` has `0 < s` and an allocated cell with
+   `p = c + 8`, `s ≤ c.size`; every allocated cell has an entry; and
+   `(live.map Prod.fst).Nodup` — one entry per cell, so `cellRes`'s slack is
+   the client's `size`. (An earlier `↔` form forced every `(c + 8, s)` with
+   `s ≤ size` into `live`, which no alloc or dealloc could re-establish;
+   `0 < s` because dealloc returns early on `size = 0`.)
 6. free cells not in the list ("leaked") are allowed.
 
 At method entry the instance is fresh: `head = 0`, no chunk, `len = mem0`,
-so `heapInv n [] 0` holds (`heapInv_init`).
+so `heapInv n maxP len [] 0` holds (`heapInv_init`).
 
 ## 3. The specs
 
-`Block n p size := n ↦[wms][ p ] bs` with `bs.length = size` (any bytes).
+`block n p size := n ↦[wms][ p ] bs` with `bs.length = size` (any bytes).
 
 ```
-__rust_alloc(size, align)            -- 0 < size, align a power of 2, size + align ≤ 2^31
-  { heapInv n live F ∗ g_sp ↦ sp ∗ 16 bytes of shadow stack below sp }
+__rust_alloc(size, align)        -- 1 ≤ size < 2^28, align = 2^k ≤ 2^19, 0 < len page-aligned,
+                                 -- E := len + cellPages(words, align) · 65536, E + 65536 ≤ 2^32
+  { heapInv n maxP len live F ∗ g_sp ↦ sp ∗ shadow stack ∗ min_cell_size's vtable slot }
   returns p, with the stack restored and
-  { p ≠ 0 ∗ ⌜p % align = 0⌝ ∗ heapInv n ((p, size) :: live) (max F 1) ∗ Block n p size
-    ∨ p = 0 ∗ heapInv n live 0 }                  -- memory.grow failed
+  { p ≠ 0 ∗ heapInv n maxP E' ((p, size) :: live) (max F 1) ∗ block n p size
+    ∨ p = 0 ∗ heapInv n maxP len' live 0 }
   cost ≤ 30 + A₀ + A₁ * F + linearOpBaseCost + linearOpUnitCost * cellPages(words, align)
 
 __rust_dealloc(p, size, align)
-  { heapInv n live F ∗ ⌜(p, size) ∈ live⌝ ∗ Block n p size }
-  { heapInv n (live.erase (p, size)) (F + 1) }
+  { heapInv n maxP len live F ∗ ⌜(p, size) ∈ live⌝ ∗ block n p size }
+  { heapInv n maxP len (live.erase (p, size)) (F + 1) }
   cost ≤ 32 + D₀
 ```
+
+Proved: dealloc for every `F` (`AllocDealloc.f311_spec`, `D₀ = 224`); alloc
+for `F = 0` (`AllocFresh.f310_spec_fresh`: `E' = E`, `len' ∈ {len, E}`,
+`A₀ = 630`).
 
 *Why alloc's postcondition holds.* Each walk step keeps (1)–(6) with the
 walked prefix dropped from the list (it stays as leaked free cells); a split
@@ -139,8 +166,9 @@ to the clients), and lends `[p, p + size)` from the free cell's data, which
 the invariant owned; merging (575) removes a cell from its chunk's
 neighbour list and gives its header and data to the free previous cell
 (clause 4 is exactly the premise that makes this sound). On the grow path
-the fresh chunk is `[len, len + k·65536)`, appended to the tiling (clause 1)
-and pushed; the second walk takes it.
+the fresh chunk is `[len, len + k·65536)`, appended to the cells
+(`AllocFresh.wf_freshU/W/S`) and pushed; the second walk takes it (or, see
+AllocFirstFit's finding 5, unlinks it: `p = 0` with the memory grown).
 
 *Gas.* Every iteration of 580's outer loop pops (or returns) one list cell
 and every iteration of its inner merge loop removes one list cell, so the
@@ -163,22 +191,23 @@ happens only for an allocation that did not fit, and grows at most
 grows at most `N + (S + 528 N) / 65536` pages, far below the room left for
 the inputs wNEAR accepts. Each method's proof discharges this from its own
 allocation bound (`heapInv` records `len`, so the bound is a pure fact
-available at every call).
+available at every call). The current alloc spec does not yet exclude the
+`p = 0` branches: that needs a `memory.grow` rule that sees the limit.
 
 ## 4. What is proved, what remains
 
-Proved (no `sorry`): the leaves, the wrappers, `memory.grow`, and 577 (both
-the success and the failure branch). Remaining, bottom-up:
+Proved (no `sorry`): the leaves, the wrappers, `memory.grow`, 577, 575,
+dealloc (582/311) against this invariant, 580 on lists of at most one cell
+without merges, 581/310 on an empty list (`AllocAlloc`) and its packing into
+this invariant (`AllocFresh`). Remaining:
 
-* 575 `Neighbors::remove` (straight-line, four conditional header updates);
-* 582 `dealloc`'s three cases from (1)–(6) (straight-line, calls 570, 576,
-  575);
-* 580 `alloc_first_fit` (690 instructions, two nested loops, one
-  `call_indirect` to the policy's `min_cell_size`): loop invariant = clauses
-  (1)–(6) for the remaining list plus the leaked prefix, and credits
-  `A₁ * (remaining list cells)`;
-* 581 from 580 and 577; then `__rust_alloc`/`__rust_dealloc` by
-  `AllocWrap`.
+* alloc on a one-cell list (`F = 1`, the state after a split, `f580_one`):
+  581's path with `f580_one` first (whole / split of a listed cell: an
+  in-place update, or a new cell inserted after `c` with its next
+  neighbour's `prev` updated; unlinked: then the fresh path), and its
+  packing; that covers every sequence of allocations without frees;
+* 580's general walk (`F ≥ 1`, merges), with the loop invariant designed in
+  `AllocFirstFit`.
 -/
 
 namespace WNear.Binary.AllocInv
@@ -228,31 +257,57 @@ def cellAt (H : HeapModel) (a : Nat) : Option CellM := H.cells.find? (·.addr ==
 /-- The head word: the first cell of the free list, or 0. -/
 def head (H : HeapModel) : Nat := H.freeList.headD 0
 
-/-- Clauses (1)–(6) of the design, for the live allocations `live` and the
-bound `F` on the free list. -/
-def wf (H : HeapModel) (live : List (Nat × Nat)) (F : Nat) : Prop :=
-  -- (1) the chunks tile `[mem0, len)`: cells are consecutive, page-aligned chunk starts
-  H.mem0 % 65536 = 0 ∧ H.len % 65536 = 0 ∧ H.mem0 ≤ H.len ∧ H.len < 2 ^ 32 ∧
-  (∀ c ∈ H.cells, H.mem0 ≤ c.addr ∧ c.addr + 24 ≤ c.next ∧ c.next ≤ H.len ∧ c.addr % 4 = 0) ∧
-  (H.cells.map (·.addr)).Pairwise (· < ·) ∧
-  -- (2) neighbours: `next`/`prev` link consecutive cells of a chunk
-  (∀ c ∈ H.cells, c.last = false → ∃ d ∈ H.cells, d.addr = c.next ∧ d.prev = c.addr) ∧
-  (∀ c ∈ H.cells, c.prev ≠ 0 → ∃ d ∈ H.cells, d.addr = c.prev ∧ d.next = c.addr ∧ d.last = false) ∧
-  (∀ c ∈ H.cells, c.prev = 0 → c.addr % 65536 = 0) ∧
-  -- (3) the free list: distinct free cells, linked by `next_free`, at most `F`
-  H.freeList.Nodup ∧ H.freeList.length ≤ F ∧
-  (∀ a ∈ H.freeList, ∃ c, H.cellAt a = some c ∧ c.allocated = false) ∧
-  (∀ i (h : i < H.freeList.length), ∃ c, H.cellAt H.freeList[i] = some c ∧
-    c.nextFree / 4 * 4 = H.freeList.getD (i + 1) 0) ∧
-  -- (4) `CAN_MERGE`: followed in the list by its free previous neighbour
-  (∀ i (h : i < H.freeList.length), ∀ c, H.cellAt H.freeList[i] = some c → c.nextFree % 2 = 1 →
-    ∃ d, H.freeList[i + 1]? = some d.addr ∧ H.cellAt d.addr = some d ∧ d.allocated = false ∧
-      c.prev = d.addr) ∧
-  -- (5) the live allocations are the allocated cells
-  (∀ p s, (p, s) ∈ live ↔ ∃ c ∈ H.cells, c.allocated = true ∧ p = c.addr + 8 ∧ s ≤ c.size) ∧
-  live.Nodup
-
 end HeapModel
+
+/-- Clauses (1)–(2): the cells' geometry. -/
+structure Geo (H : HeapModel) : Prop where
+  /-- Every cell has at least the 4 data bytes of a free cell's `next_free` word
+  (`+ 12`, not `+ 16` data bytes: a split lends cells of `4 · words ≥ 4` bytes). -/
+  bounds : ∀ c ∈ H.cells, H.mem0 ≤ c.addr ∧ c.addr + 12 ≤ c.next ∧ c.next ≤ H.len ∧ c.addr % 4 = 0
+  /-- `next` is word-aligned also for the last cell of a chunk (the chunk end). -/
+  next_al : ∀ c ∈ H.cells, c.next % 4 = 0
+  sorted : (H.cells.map (·.addr)).Pairwise (· < ·)
+  next_nb : ∀ c ∈ H.cells, c.last = false → ∃ d ∈ H.cells, d.addr = c.next ∧ d.prev = c.addr
+  prev_nb : ∀ c ∈ H.cells, c.prev ≠ 0 → ∃ d ∈ H.cells, d.addr = c.prev ∧ d.next = c.addr ∧ d.last = false
+  first : ∀ c ∈ H.cells, c.prev = 0 → c.addr % 65536 = 0
+  /-- Cells do not overlap: a cell ends before any cell above it starts. -/
+  disj : ∀ c ∈ H.cells, ∀ d ∈ H.cells, c.addr < d.addr → c.next ≤ d.addr
+
+/-- Clauses (3)–(4): the free list: distinct free cells, linked by `next_free`, at most
+`F`; a list cell with `CAN_MERGE` is followed by its free previous neighbour. -/
+structure Lists (H : HeapModel) (F : Nat) : Prop where
+  fl_nodup : H.freeList.Nodup
+  fl_len : H.freeList.length ≤ F
+  fl_free : ∀ a ∈ H.freeList, ∃ c, H.cellAt a = some c ∧ c.allocated = false
+  fl_link : ∀ i (h : i < H.freeList.length), ∃ c, H.cellAt H.freeList[i] = some c ∧
+    c.nextFree / 4 * 4 = H.freeList.getD (i + 1) 0
+  fl_merge : ∀ i (h : i < H.freeList.length), ∀ c, H.cellAt H.freeList[i] = some c → c.nextFree % 2 = 1 →
+    ∃ d, H.freeList[i + 1]? = some d.addr ∧ H.cellAt d.addr = some d ∧ d.allocated = false ∧
+      c.prev = d.addr
+
+/-- Clause (5): the live allocations are the allocated cells, one entry each. -/
+structure Lives (H : HeapModel) (live : List (Nat × Nat)) : Prop where
+  /-- Every live allocation is an allocated cell's data, of a positive size no larger
+  than the cell's, ... -/
+  live_cell : ∀ p s, (p, s) ∈ live → 0 < s ∧ ∃ c ∈ H.cells, c.allocated = true ∧ p = c.addr + 8 ∧ s ≤ c.size
+  /-- ... every allocated cell is lent, ... -/
+  cell_live : ∀ c ∈ H.cells, c.allocated = true → ∃ s, (c.addr + 8, s) ∈ live
+  /-- ... and once. -/
+  live_nodup : (live.map Prod.fst).Nodup
+
+/-- Clauses (1)–(6) of the design (clause (6), leaked free cells, is the absence of a
+constraint), for the live allocations `live` and the bound `F` on the free list. -/
+structure HeapModel.wf (H : HeapModel) (live : List (Nat × Nat)) (F : Nat) : Prop where
+  mem0_al : H.mem0 % 65536 = 0
+  len_al : H.len % 65536 = 0
+  mem0_le : H.mem0 ≤ H.len
+  len_lt : H.len < 2 ^ 32
+  geo : Geo H
+  lists : Lists H F
+  lives : Lives H live
+  /-- `next_free` never has bit 1 (`NEXT_CELL_IS_INVALID`) set: 580 unlinks with the raw
+  word, so only `CAN_MERGE` may be set. -/
+  nf_lo : ∀ c ∈ H.cells, c.nextFree % 4 < 2
 
 section Res
 
@@ -270,11 +325,11 @@ def cellRes (n : Nat) (live : List (Nat × Nat)) (c : CellM) : IProp GF :=
       ∃ bs, ⌜bs.length + 4 = c.size⌝ ∗ n ↦[wms][ c.addr + 8 ] bytes32 (UInt32.ofNat c.nextFree) ∗
         n ↦[wms][ c.addr + 12 ] bs)
 
-/-- `HeapInv n live F`: the allocator's state, with the live allocations
-`live` and at most `F` cells in the free list; `maxP` the memory's limit in
-pages. -/
-def heapInv (n maxP : Nat) (live : List (Nat × Nat)) (F : Nat) : IProp GF :=
-  iprop(∃ H : HeapModel, ⌜H.wf live F ∧ H.len ≤ maxP * 65536⌝ ∗
+/-- `HeapInv n maxP len live F`: the allocator's state, with the live allocations
+`live`, at most `F` cells in the free list and the memory's length `len`; `maxP` the
+memory's limit in pages. -/
+def heapInv (n maxP len : Nat) (live : List (Nat × Nat)) (F : Nat) : IProp GF :=
+  iprop(∃ H : HeapModel, ⌜H.wf live F ∧ H.len = len⌝ ∗
     n ↦[wms][ headAddr ] bytes32 (UInt32.ofNat H.head) ∗ n ↦[wmlength] H.len ∗
     n ↪[wmlimit] some maxP ∗ [∗list] c ∈ H.cells, cellRes n live c)
 
@@ -283,25 +338,24 @@ def block (n p size : Nat) : IProp GF :=
   iprop(∃ bs : List UInt8, ⌜bs.length = size⌝ ∗ n ↦[wms][ p ] bs)
 
 /-- At instantiation: the head is 0 and there is no chunk. -/
-theorem heapInv_init (n maxP len : Nat) (h1 : len % 65536 = 0) (h2 : len ≤ maxP * 65536)
-    (h3 : len < 2 ^ 32) :
+theorem heapInv_init (n maxP len : Nat) (h1 : len % 65536 = 0) (h3 : len < 2 ^ 32) :
     n ↦[wms][ headAddr ] bytes32 0 ∗ n ↦[wmlength] len ∗ n ↪[wmlimit] some maxP
-      ⊢ heapInv (GF := GF) n maxP [] 0 := by
+      ⊢ heapInv (GF := GF) n maxP len [] 0 := by
   iintro ⟨Hh, Hl, Hm⟩
   iunfold heapInv
   iexists { mem0 := len, len := len, cells := [], freeList := [] }
   isplitr
   · ipureintro
-    refine ⟨⟨h1, h1, Nat.le_refl len, h3, by simp, by simp, by simp, by simp, by simp, by simp,
-      by simp, by simp, by simp, by simp, by simp, by simp⟩, h2⟩
+    refine ⟨⟨h1, h1, Nat.le_refl len, h3, ⟨by simp, by simp, by simp, by simp, by simp, by simp, by simp⟩,
+      ⟨by simp, by simp, by simp, by simp, by simp⟩, ⟨by simp, by simp, by simp⟩, by simp⟩, rfl⟩
   simp only [HeapModel.head, List.headD_nil]
   iframe Hh Hl Hm
   iapply BigSepL.bigSepL_nil.2
   iempintro
 
 /-- A larger bound on the free list is still a bound. -/
-theorem heapInv_mono (n maxP : Nat) (live : List (Nat × Nat)) (F F' : Nat) (h : F ≤ F') :
-    heapInv (GF := GF) n maxP live F ⊢ heapInv n maxP live F' := by
+theorem heapInv_mono (n maxP len : Nat) (live : List (Nat × Nat)) (F F' : Nat) (h : F ≤ F') :
+    heapInv (GF := GF) n maxP len live F ⊢ heapInv n maxP len live F' := by
   iintro H
   iunfold heapInv at H
   icases H with ⟨%M, %⟨hwf, hlen⟩, Hh, Hl, Hm, Hc⟩
@@ -309,8 +363,7 @@ theorem heapInv_mono (n maxP : Nat) (live : List (Nat × Nat)) (F F' : Nat) (h :
   iexists M
   isplitr
   · ipureintro
-    obtain ⟨a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16⟩ := hwf
-    exact ⟨⟨a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, by omega, a12, a13, a14, a15, a16⟩, hlen⟩
+    exact ⟨{ hwf with lists := { hwf.lists with fl_len := Nat.le_trans hwf.lists.fl_len h } }, hlen⟩
   iframe Hh Hl Hm Hc
 
 end Res
