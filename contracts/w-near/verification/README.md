@@ -181,7 +181,14 @@ the precise original child-tag/slice-descriptor separation. Canonical copied
 payload bytes in the316 endpoint follow from explicit original source/heap,
 root-word and final-output separations; exact operational memory needs none
 of those additional payload conditions. Whole161/162/425 decoding,
-serialization and exported refinement remain open. These
+serialization and exported refinement remain open. For425, every accepted
+scalar instruction segment is proved, and original input conditions derive
+the actual315/372/371 call domains, installed code, memory snapshots, globals
+and gas resources. Whole425 composition is still open. Independent replay
+already checks10 actual calls and192 generated alias/size/remaining-length
+cases against whole memory/max, SP, gas and exact/one-less fuel; this validates
+the expected typed budget18n+1449 units/17n+1172 steps without supplying an
+execution theorem. These
 contracts do not discharge the existing representation/protocol premises or
 change the model, runtime semantics, or WF definition.
 
