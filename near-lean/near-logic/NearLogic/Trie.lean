@@ -1539,4 +1539,24 @@ theorem getReference_prospective {s : State} {k k' : Bytes} {ov : Option Bytes} 
   unfold getReference overlay
   simp only [h, Option.map_some, Option.orElse_some]
   cases ov <;> rfl
+
+/-- The value the overlay `s` holds under the raw key `k`, as `getReference` reads it: a
+prospective change, else a committed one, else the base entries. -/
+def viewVal (s : State) (k : Bytes) : Option Bytes :=
+  match (s.prospective.find? (·.1 == k)).map Prod.snd with
+  | some ov => ov
+  | none =>
+    match (s.committed.find? (·.1 == k)).map Prod.snd with
+    | some ov => ov
+    | none => (s.entries.find? (·.1 == k)).map (·.2)
+
+/-- With no pending change of `k`, the overlay reads the base entries. -/
+theorem viewVal_base {s : State} {k : Bytes} (hp : ∀ e ∈ s.prospective, e.1 ≠ k)
+    (hc : ∀ e ∈ s.committed, e.1 ≠ k) : viewVal s k = (s.entries.find? (·.1 == k)).map (·.2) := by
+  have h1 : s.prospective.find? (·.1 == k) = none :=
+    List.find?_eq_none.2 fun e he => by simpa using hp e he
+  have h2 : s.committed.find? (·.1 == k) = none :=
+    List.find?_eq_none.2 fun e he => by simpa using hc e he
+  simp [viewVal, h1, h2]
+
 end NearLogic
