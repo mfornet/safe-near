@@ -31,7 +31,7 @@ Here, on `heapInv … F` (any `F`, `AllocWalk581.f581_spec_walk`) with room unde
 * `f714_spec`, `f716_spec`: `finish_grow` and `grow_amortized` on a nonempty buffer
   (`growCap`: `max (2 · cap) (len + k)`, at least 8);
 * `f715_grow` … `f345_grow`: the append chain when the bytes do not fit (`VecAppend`'s room chain
-  with the grow), on `growPre2`/`growPost2`: 80 bytes of stack.
+  with the grow), on `growPre`/`growPost`: 80 bytes of stack.
 -/
 
 namespace WNear.Binary.VecGrow
@@ -683,5 +683,474 @@ theorem f716_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
   iexact Ho
 
 end L714
+
+/-! ## The append chain when the bytes do not fit -/
+
+section Chain
+
+variable {GF : BundledGFunctors} [WasmGS NearState GF]
+
+/-- The code of the append chain with the grow (persistent). -/
+def waCode (n maxP inst : Nat) (mi : ModuleInst) (A : Nat → Nat) : IProp GF :=
+  iprop(growCode n maxP inst mi A ∗ VecAppend.appCode inst mi A)
+
+instance (n maxP inst : Nat) (mi : ModuleInst) (A : Nat → Nat) :
+    Persistent (waCode (GF := GF) n maxP inst mi A) := by
+  unfold waCode; infer_instance
+
+/-- The cost of the grow below `reserve` (715): `grow_amortized` and the realloc. -/
+def costGrow (cfg : WasmConfig) (F : Nat) (cap c : UInt32) : Nat :=
+  340 * cfg.regularOpCost + cost154 cfg F cap c
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 4000000 in
+/-- `reserve(out, vec, len, k)` (715) without room: `grow_amortized` (716). -/
+theorem f715_grow (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
+    (htype : type.results = []) (inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (n g ta : Nat)
+    (hm : IfaceMod mi A n g ta) (hd : d + 10 < lim.maxCallDepth) (Cg : Nat)
+    (gt : GlobalType) (s out vec len k ptr cap : UInt32) (idx : UInt32) (maxP hl : Nat)
+    (live : List (Nat × Nat)) (F : Nat) (bs ob : List UInt8) (hs : 64 ≤ s.toNat) (hob : ob.length = 4)
+    (hout : out.toNat + 4 ≤ 2 ^ 32) (hvec : vec.toNat + 8 ≤ 2 ^ 32) (hptr : ptr ≠ 0) (hcap : 0 < cap.toNat)
+    (hcap2 : cap.toNat < 2 ^ 27) (hlen : len.toNat ≤ cap.toNat) (hgrow : cap.toNat < len.toNat + k.toNat)
+    (hlk : len.toNat + k.toNat < 2 ^ 28) (hbs : bs.length = cap.toNat)
+    (hlive : (ptr.toNat, cap.toNat) ∈ live) (hr : roomFor hl maxP (growCap cap (len + k))) :
+    growCode n maxP inst mi A
+      ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f715 Cg
+        (pre716 n g gt s out vec len k ptr cap idx ta (A 578) maxP hl live F bs ob)
+        (fun _ => costGrow cfg F cap (growCap cap (len + k)))
+        (post716 n g gt s out vec len k ptr cap idx ta (A 578) maxP hl live F bs) := by
+  iintro #Hk
+  ihave #S716 := f716_spec (GF := GF) cfg lim (d + 1) types[45]! rfl inst mi A n g ta hm (by omega) Cg gt s out vec
+    len k ptr cap idx maxP hl live F bs ob hs hob hout hvec hptr hcap hcap2 hlk hbs hlive hr $$ Hk
+  iunfold growCode at Hk
+  icases Hk with ⟨#HR, -, #H716⟩
+  iunfold reallocCode at HR
+  icases HR with ⟨#H, -⟩
+  iunfold code310 at H
+  icases H with ⟨-, -, -, -, -, -, -, -, -, -, -, -, -, -, #Hi⟩
+  have hn := hm.mem
+  have ha716 := hm.funcs 716 (by decide)
+  have t45 : types[45]!.params.length = 4 := by rfl
+  have hge : Numeric.bool (Numeric.irelop32 IRelOp.ge_u (cap - len) k) = 0 := by
+    have : (cap - len).toNat = cap.toNat - len.toNat := by
+      rw [UInt32.toNat_sub_of_le]; simp [UInt32.le_iff_toNat_le]; omega
+    simp [Numeric.irelop32, Numeric.bool, UInt32.le_iff_toNat_le, this]; omega
+  unfold costGrow
+  generalize hK : cost154 cfg F cap (growCap cap (len + k)) = K
+  iapply MFunSpec_intro
+  imodintro
+  iintro %args %R HP Hc
+  iunfold pre716 at HP
+  icases HP with ⟨%hargs, Hg, Hs, Hvt, Hinv, Hp, Hcap, Hbs, Ho⟩
+  subst hargs
+  simp only [f715]
+  repeat mstep
+  mstep [Hcap]
+  repeat mstep
+  mcall S716 using [Hg Hs Hvt Hinv Hp Hcap Hbs Ho]
+  · iunfold pre716
+    iframe Hg Hs Hvt Hinv Hp Hcap Hbs Ho
+    ipureintro; rfl
+  repeat mstep
+  mcredits R
+  iframe Hc
+  iunfold post716 at HQ
+  icases HQ with ⟨%hrs, HQ⟩
+  subst hrs
+  rw [htype]
+  iunfold post716
+  isplitr
+  · ipureintro; rfl
+  iexact HQ
+
+/-- `do_reserve_and_handle` (712) and `reserve` (698) without room: the precondition. -/
+def pre712g (n g : Nat) (gt : GlobalType) (s vec ptr cap len : UInt32) (idx : UInt32) (ta a578 maxP hl : Nat)
+    (live : List (Nat × Nat)) (F : Nat) (bs : List UInt8) : IProp GF :=
+  iprop(g ↦[wg] ⟨gt, .i32 s⟩ ∗ stk n (s.toNat - 80) 80 ∗ vt n 1057464 idx ta a578 ∗
+    heapInv n maxP hl live F ∗ n ↦[i32][ vec.toNat ] ptr ∗ n ↦[i32][ vec.toNat + 4 ] cap ∗
+    n ↦[i32][ vec.toNat + 8 ] len ∗ n ↦[wms][ ptr.toNat ] bs)
+
+/-- … and the postcondition: the buffer reallocated at `q` with the capacity `c`. -/
+def post712g (n g : Nat) (gt : GlobalType) (s vec ptr cap len c : UInt32) (idx : UInt32) (ta a578 maxP hl : Nat)
+    (live : List (Nat × Nat)) (F : Nat) (bs : List UInt8) : IProp GF :=
+  iprop(∃ q : UInt32, g ↦[wg] ⟨gt, .i32 s⟩ ∗ stk n (s.toNat - 80) 80 ∗ vt n 1057464 idx ta a578 ∗
+    n ↦[i32][ vec.toNat ] q ∗ n ↦[i32][ vec.toNat + 4 ] c ∗ n ↦[i32][ vec.toNat + 8 ] len ∗
+    reallocated n maxP hl live F ptr cap c q bs)
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 4000000 in
+/-- `do_reserve_and_handle(vec, len, k)` (712) without room: `reserve` (715) grows, `Ok`. -/
+theorem f712_grow (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
+    (htype : type.results = []) (inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (n g ta : Nat)
+    (hm : IfaceMod mi A n g ta) (hd : d + 11 < lim.maxCallDepth) (Cg : Nat)
+    (gt : GlobalType) (s vec len k ptr cap : UInt32) (idx : UInt32) (maxP hl : Nat)
+    (live : List (Nat × Nat)) (F : Nat) (bs : List UInt8) (hs : 80 ≤ s.toNat)
+    (hvec : vec.toNat + 12 ≤ 2 ^ 32) (hptr : ptr ≠ 0) (hcap : 0 < cap.toNat)
+    (hcap2 : cap.toNat < 2 ^ 27) (hlen : len.toNat ≤ cap.toNat) (hgrow : cap.toNat < len.toNat + k.toNat)
+    (hlk : len.toNat + k.toNat < 2 ^ 28) (hbs : bs.length = cap.toNat)
+    (hlive : (ptr.toNat, cap.toNat) ∈ live) (hr : roomFor hl maxP (growCap cap (len + k))) :
+    waCode n maxP inst mi A
+      ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f712 Cg
+        (fun args => iprop(⌜args = [.i32 vec, .i32 len, .i32 k]⌝ ∗
+          pre712g n g gt s vec ptr cap len idx ta (A 578) maxP hl live F bs))
+        (fun _ => 40 * cfg.regularOpCost + costGrow cfg F cap (growCap cap (len + k)))
+        (fun _ rs => iprop(⌜rs = []⌝ ∗
+          post712g n g gt s vec ptr cap len (growCap cap (len + k)) idx ta (A 578) maxP hl live F bs)) := by
+  iintro #Hk
+  iunfold waCode at Hk
+  icases Hk with ⟨#HG, #Happ⟩
+  iunfold VecAppend.appCode at Happ
+  icases Happ with ⟨#H715, -, -, -, -, -, #Hi⟩
+  have hn := hm.mem
+  have hg := hm.glob
+  have ha715 := hm.funcs 715 (by decide)
+  have t45 : types[45]!.params.length = 4 := by rfl
+  have hlt := s.toNat_lt
+  have h16 : (s - 16).toNat = s.toNat - 16 := by
+    rw [UInt32.toNat_sub_of_le] <;> simp [UInt32.le_iff_toNat_le]; omega
+  iapply MFunSpec_intro
+  imodintro
+  iintro %args %R HP Hc
+  icases HP with ⟨%hargs, HP⟩
+  iunfold pre712g at HP
+  icases HP with ⟨Hg, Hs, Hvt, Hinv, Hp, Hcap, Hlen, Hbs⟩
+  subst hargs
+  icases stk_split n (s.toNat - 80) 64 16 $$ Hs with ⟨Lo, Hs⟩
+  icases stk_split n (s.toNat - 80 + 64) 4 12 $$ Hs with ⟨O, U⟩
+  iunfold stk at O
+  icases O with ⟨%ob, %hob, O⟩
+  ihave O := memBytes_addr (show s.toNat - 80 + 64 = (s - 16).toNat by omega) $$ O
+  generalize hK : costGrow cfg F cap (growCap cap (len + k)) = K
+  have S715 := f715_grow (GF := GF) cfg lim (d + 1) types[45]! rfl inst mi A n g ta hm (by omega) Cg gt (s - 16)
+    (s - 16) vec len k ptr cap idx maxP hl live F bs ob (by omega) hob (by omega) (by omega) hptr hcap hcap2 hlen
+    hgrow hlk hbs hlive hr
+  rw [hK] at S715
+  simp only [f712]
+  mstep [Hg]; mstep; mstep; mstep; mstep [Hg]
+  repeat mstep
+  mcall S715 using [Hg Lo Hvt Hinv Hp Hcap Hbs O]
+  · iunfold pre716
+    ihave Lo := stk_addr (show s.toNat - 80 = (s - 16).toNat - 64 by omega) $$ Lo
+    iframe Hg Lo Hvt Hinv Hp Hcap Hbs O
+    ipureintro; rfl
+  iunfold post716 at HQ
+  icases HQ with ⟨%hrs, %q, Hg, Lo, Hvt, Hp, Hcap, O, HA⟩
+  subst hrs
+  mcredits (20 * cfg.regularOpCost + R)
+  repeat mstep
+  mstep [O]
+  repeat mstep
+  mstep [Hg]
+  rw [show s - 16 + 16 = s by simp]
+  repeat mstep
+  mcredits R
+  iframe Hc
+  isplitr
+  · ipureintro; simp [htype]
+  iunfold post712g
+  iexists q
+  iframe Hg Hvt Hp Hcap Hlen HA
+  ihave Lo := stk_addr (show (s - 16).toNat - 64 = s.toNat - 80 by omega) $$ Lo
+  ihave O := stk_word n _ 0 $$ O
+  ihave O := stk_addr (show (s - 16).toNat = s.toNat - 80 + 64 by omega) $$ O
+  ihave O := stk_join n (s.toNat - 80 + 64) 4 12 $$ [O U]
+  · iframe O U
+  iapply stk_join n (s.toNat - 80) 64 16
+  iframe Lo O
+
+
+
+/-- `reserve(vec, k)` (698) without room: `do_reserve_and_handle(vec, len, k)` (712). -/
+theorem f698_grow (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
+    (htype : type.results = []) (inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (n g ta : Nat)
+    (hm : IfaceMod mi A n g ta) (hd : d + 12 < lim.maxCallDepth) (Cg : Nat)
+    (gt : GlobalType) (s vec len k ptr cap : UInt32) (idx : UInt32) (maxP hl : Nat)
+    (live : List (Nat × Nat)) (F : Nat) (bs : List UInt8) (hs : 80 ≤ s.toNat)
+    (hvec : vec.toNat + 12 ≤ 2 ^ 32) (hptr : ptr ≠ 0) (hcap : 0 < cap.toNat)
+    (hcap2 : cap.toNat < 2 ^ 27) (hlen : len.toNat ≤ cap.toNat) (hgrow : cap.toNat < len.toNat + k.toNat)
+    (hlk : len.toNat + k.toNat < 2 ^ 28) (hbs : bs.length = cap.toNat)
+    (hlive : (ptr.toNat, cap.toNat) ∈ live) (hr : roomFor hl maxP (growCap cap (len + k))) :
+    waCode n maxP inst mi A
+      ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f698 Cg
+        (fun args => iprop(⌜args = [.i32 vec, .i32 k]⌝ ∗
+          pre712g n g gt s vec ptr cap len idx ta (A 578) maxP hl live F bs))
+        (fun _ => 60 * cfg.regularOpCost + costGrow cfg F cap (growCap cap (len + k)))
+        (fun _ rs => iprop(⌜rs = []⌝ ∗
+          post712g n g gt s vec ptr cap len (growCap cap (len + k)) idx ta (A 578) maxP hl live F bs)) := by
+  iintro #Hk
+  ihave #S712 := f712_grow (GF := GF) cfg lim (d + 1) types[31]! rfl inst mi A n g ta hm (by omega) Cg gt s vec
+    len k ptr cap idx maxP hl live F bs hs hvec hptr hcap hcap2 hlen hgrow hlk hbs hlive hr $$ Hk
+  iunfold waCode at Hk
+  icases Hk with ⟨-, #Happ⟩
+  iunfold VecAppend.appCode at Happ
+  icases Happ with ⟨-, #H712, -, -, -, -, #Hi⟩
+  have hn := hm.mem
+  have ha712 := hm.funcs 712 (by decide)
+  have t31 : types[31]!.params.length = 3 := by rfl
+  generalize hK : costGrow cfg F cap (growCap cap (len + k)) = K
+  iapply MFunSpec_intro
+  imodintro
+  iintro %args %R HP Hc
+  icases HP with ⟨%hargs, HP⟩
+  subst hargs
+  iunfold pre712g at HP
+  icases HP with ⟨Hg, Hs, Hvt, Hinv, Hp, Hcap, Hlen, Hbs⟩
+  simp only [f698]
+  repeat mstep
+  mstep [Hlen]
+  repeat mstep
+  mcall S712 using [Hg Hs Hvt Hinv Hp Hcap Hlen Hbs]
+  · iunfold pre712g
+    iframe Hg Hs Hvt Hinv Hp Hcap Hlen Hbs
+  icases HQ with ⟨%hrs, HQ⟩
+  subst hrs
+  mcredits R
+  iframe Hc HQ
+  ipureintro; simp [htype]
+
+/-- The heap after the buffer `(ptr, cap)` was reallocated at `q` with the capacity `c`. -/
+def grownV (n maxP hl : Nat) (live : List (Nat × Nat)) (F : Nat) (ptr cap c q : UInt32) : IProp GF :=
+  iprop(⌜q ≠ 0 ∧ q.toNat + c.toNat < 2 ^ 32⌝ ∗
+    ∃ hl', ⌜hl' = hl ∨ hl' = grownLen hl c⌝ ∗
+      heapInv n maxP hl' ((q.toNat, c.toNat) :: live.erase (ptr.toNat, cap.toNat)) (max F 1 + 1))
+
+/-- `spec_extend` (697) and above without room: the `Vec` `(ptr, cap, |w|)` at `vec` holding `w`
+then `rest`, live; the `k` bytes `sb` at `p`. -/
+def growPre (n g : Nat) (gt : GlobalType) (s vec ptr cap p : UInt32) (idx : UInt32) (ta a578 maxP hl : Nat)
+    (live : List (Nat × Nat)) (F : Nat) (w rest sb : List UInt8) : IProp GF :=
+  iprop(g ↦[wg] ⟨gt, .i32 s⟩ ∗ stk n (s.toNat - 80) 80 ∗ vt n 1057464 idx ta a578 ∗
+    heapInv n maxP hl live F ∗ n ↦[i32][ vec.toNat ] ptr ∗ n ↦[i32][ vec.toNat + 4 ] cap ∗
+    n ↦[i32][ vec.toNat + 8 ] UInt32.ofNat w.length ∗ n ↦[wms][ ptr.toNat ] (w ++ rest) ∗ n ↦[wms][ p.toNat ] sb)
+
+/-- … after: `sb` appended in the buffer reallocated at `q` with the capacity `c`. -/
+def growPost (n g : Nat) (gt : GlobalType) (s vec ptr cap c p : UInt32) (idx : UInt32) (ta a578 maxP hl : Nat)
+    (live : List (Nat × Nat)) (F : Nat) (w sb : List UInt8) : IProp GF :=
+  iprop(∃ q : UInt32, g ↦[wg] ⟨gt, .i32 s⟩ ∗ stk n (s.toNat - 80) 80 ∗ vt n 1057464 idx ta a578 ∗
+    n ↦[i32][ vec.toNat ] q ∗ n ↦[i32][ vec.toNat + 4 ] c ∗
+    n ↦[i32][ vec.toNat + 8 ] UInt32.ofNat (w ++ sb).length ∗ n ↦[wms][ q.toNat ] (w ++ sb) ∗
+    (∃ tail : List UInt8, ⌜(w ++ sb).length + tail.length = c.toNat⌝ ∗
+      n ↦[wms][ q.toNat + (w ++ sb).length ] tail) ∗
+    grownV n maxP hl live F ptr cap c q ∗ n ↦[wms][ p.toNat ] sb)
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 8000000 in
+/-- `spec_extend(vec, p, p + k)` (697) without room: `reserve` (698) grows the buffer, then the
+copy (951). -/
+theorem f697_grow (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
+    (htype : type.results = []) (inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (n g ta : Nat)
+    (hm : IfaceMod mi A n g ta) (hd : d + 13 < lim.maxCallDepth) (Cg : Nat)
+    (gt : GlobalType) (s vec ptr cap p k : UInt32) (idx : UInt32) (maxP hl : Nat)
+    (live : List (Nat × Nat)) (F : Nat) (w rest sb : List UInt8) (hs : 80 ≤ s.toNat)
+    (hvec : vec.toNat + 12 ≤ 2 ^ 32) (hptr : ptr ≠ 0) (hcap : 0 < cap.toNat) (hcap2 : cap.toNat < 2 ^ 27)
+    (hwr : w.length + rest.length = cap.toNat) (hsb : sb.length = k.toNat)
+    (hgrow : cap.toNat < w.length + k.toNat) (hlk : w.length + k.toNat < 2 ^ 28)
+    (hp : p.toNat + k.toNat ≤ 2 ^ 32)
+    (hlive : (ptr.toNat, cap.toNat) ∈ live) (hr : roomFor hl maxP (growCap cap (UInt32.ofNat w.length + k))) :
+    waCode n maxP inst mi A
+      ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f697 Cg
+        (fun args => iprop(⌜args = [.i32 vec, .i32 p, .i32 (p + k)]⌝ ∗
+          growPre n g gt s vec ptr cap p idx ta (A 578) maxP hl live F w rest sb))
+        (fun _ => 130 * cfg.regularOpCost + MemCpy.cost k.toNat * cfg.regularOpCost +
+          costGrow cfg F cap (growCap cap (UInt32.ofNat w.length + k)))
+        (fun _ rs => iprop(⌜rs = []⌝ ∗ growPost n g gt s vec ptr cap (growCap cap (UInt32.ofNat w.length + k)) p
+          idx ta (A 578) maxP hl live F w sb)) := by
+  have hwl : (UInt32.ofNat w.length).toNat = w.length := by
+    simp only [UInt32.toNat_ofNat']; omega
+  iintro #Hk
+  ihave #S698 := f698_grow (GF := GF) cfg lim (d + 1) types[14]! rfl inst mi A n g ta hm (by omega) Cg gt s vec
+    (UInt32.ofNat w.length) k ptr cap idx maxP hl live F (w ++ rest) hs hvec hptr hcap hcap2 (by omega)
+    (by omega) (by omega) (by simp; omega) hlive hr $$ Hk
+  iunfold waCode at Hk
+  icases Hk with ⟨-, #Happ⟩
+  iunfold VecAppend.appCode at Happ
+  icases Happ with ⟨-, -, #H698, -, -, #H951, #Hi⟩
+  have hn := hm.mem
+  have ha698 := hm.funcs 698 (by decide)
+  have ha951 := hm.funcs 951 (by decide)
+  have t14 : types[14]!.params.length = 2 := by rfl
+  have t15 : types[15]!.params.length = 3 := by rfl
+  have hc := growCap_toNat cap (UInt32.ofNat w.length + k) (by omega)
+  have hwk : (UInt32.ofNat w.length + k).toNat = w.length + k.toNat := by
+    rw [UInt32.toNat_add, hwl]; omega
+  rw [hwk] at hc
+  generalize hC : growCap cap (UInt32.ofNat w.length + k) = c at hc
+  generalize hM : MemCpy.cost k.toNat * cfg.regularOpCost = M
+  generalize hK : costGrow cfg F cap c = K
+  iapply MFunSpec_intro
+  imodintro
+  iintro %args %R HP Hc
+  icases HP with ⟨%hargs, HP⟩
+  subst hargs
+  iunfold growPre at HP
+  icases HP with ⟨Hg, Hs, Hvt, Hinv, Hp, Hcap, Hlen, Hbs, Hsb⟩
+  simp only [f697]
+  repeat mstep
+  rw [add_sub_left]
+  mcall S698 using [Hg Hs Hvt Hinv Hp Hcap Hlen Hbs]
+  · iunfold pre712g
+    iframe Hg Hs Hvt Hinv Hp Hcap Hlen Hbs
+  icases HQ with ⟨%hrs, HQ⟩
+  subst hrs
+  iunfold post712g at HQ
+  icases HQ with ⟨%q, Hg, Hs, Hvt, Hp, Hcap, Hlen, HA⟩
+  iunfold reallocated at HA
+  icases HA with ⟨%⟨hq0, hqb⟩, HH, Hq, %junk, %hjunk, Hj⟩
+  mcredits (40 * cfg.regularOpCost + M + R)
+  -- the buffer: `w`, then `rest ++ junk`, of which the first `k` bytes are overwritten
+  icases splitB (a := q.toNat) (b := q.toNat + w.length) w rest rfl $$ Hq with ⟨Hw, Hr⟩
+  ihave Hr := joinB (a := q.toNat + w.length) (b := q.toNat + cap.toNat) rest junk (by omega) $$ [Hr Hj]
+  · iframe Hr Hj
+  icases U128From.memBytes_split n (q.toNat + w.length) k.toNat (rest ++ junk) (by simp; omega) $$ Hr
+    with ⟨Ho, Ht⟩
+  have hql : (q + UInt32.ofNat w.length).toNat = q.toNat + w.length := by
+    rw [UInt32.toNat_add, hwl]; omega
+  have S951 : ⊢ MFunSpec (GF := GF) cfg lim (d + 1) types[15]! inst mi f951 Cg
+      (MemCpy.pre n (q + UInt32.ofNat w.length) p k ((rest ++ junk).take k.toNat) sb) (fun _ => M)
+      (MemCpy.post n (q + UInt32.ofNat w.length) p sb) := by
+    rw [← hM]
+    exact MemCpy.f951_spec cfg lim (d + 1) types[15]! (by rfl) inst mi n hn Cg (q + UInt32.ofNat w.length) p k
+      ((rest ++ junk).take k.toNat) sb (by simp; omega) hsb (by omega) hp
+  repeat mstep
+  mstep [Hp]
+  repeat mstep
+  mstep [Hlen]
+  repeat mstep
+  ihave Ho := memBytes_addr (show q.toNat + w.length = (q + UInt32.ofNat w.length).toNat by omega) $$ Ho
+  mcall S951 using [Ho Hsb]
+  · iunfold MemCpy.pre
+    iframe Ho Hsb
+    ipureintro; rfl
+  iunfold MemCpy.post at HQ
+  icases HQ with ⟨%hrs, Ho, Hsb⟩
+  subst hrs
+  repeat mstep
+  mstep [Hlen]
+  repeat mstep
+  mstep [Hlen]
+  mcredits R
+  iframe Hc
+  isplitr
+  · ipureintro; simp [htype]
+  iunfold growPost
+  iexists q
+  iframe Hg Hs Hvt Hp Hcap Hsb
+  isplitl [Hlen]
+  · iapply (show (n ↦[i32][ vec.toNat + 8 ] (UInt32.ofNat w.length + k) : IProp GF) ⊢
+        n ↦[i32][ vec.toNat + 8 ] UInt32.ofNat (w ++ sb).length by
+      rw [show UInt32.ofNat w.length + k = UInt32.ofNat (w ++ sb).length by
+        apply UInt32.toNat_inj.mp; rw [UInt32.toNat_add, hwl]; simp only [UInt32.toNat_ofNat', List.length_append]
+        omega]) $$ Hlen
+  ihave Ho := memBytes_addr (show (q + UInt32.ofNat w.length).toNat = q.toNat + w.length by omega) $$ Ho
+  isplitl [Hw Ho]
+  · iapply joinB (a := q.toNat) (b := q.toNat + w.length) w sb rfl
+    iframe Hw Ho
+  isplitl [Ht]
+  · iexists (rest ++ junk).drop k.toNat
+    isplitr
+    · ipureintro; simp; omega
+    iapply memBytes_addr (show q.toNat + w.length + k.toNat = q.toNat + (w ++ sb).length by simp; omega) $$ Ht
+  iunfold grownV
+  iframe HH
+  ipureintro; exact ⟨hq0, hqb⟩
+
+
+
+/-- `extend_from_slice(vec, p, k)` (711) without room. -/
+theorem f711_grow (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
+    (htype : type.results = []) (inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (n g ta : Nat)
+    (hm : IfaceMod mi A n g ta) (hd : d + 14 < lim.maxCallDepth) (Cg : Nat)
+    (gt : GlobalType) (s vec ptr cap p k : UInt32) (idx : UInt32) (maxP hl : Nat)
+    (live : List (Nat × Nat)) (F : Nat) (w rest sb : List UInt8) (hs : 80 ≤ s.toNat)
+    (hvec : vec.toNat + 12 ≤ 2 ^ 32) (hptr : ptr ≠ 0) (hcap : 0 < cap.toNat) (hcap2 : cap.toNat < 2 ^ 27)
+    (hwr : w.length + rest.length = cap.toNat) (hsb : sb.length = k.toNat)
+    (hgrow : cap.toNat < w.length + k.toNat) (hlk : w.length + k.toNat < 2 ^ 28)
+    (hp : p.toNat + k.toNat ≤ 2 ^ 32)
+    (hlive : (ptr.toNat, cap.toNat) ∈ live) (hr : roomFor hl maxP (growCap cap (UInt32.ofNat w.length + k))) :
+    waCode n maxP inst mi A
+      ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f711 Cg
+        (fun args => iprop(⌜args = [.i32 vec, .i32 p, .i32 k]⌝ ∗
+          growPre n g gt s vec ptr cap p idx ta (A 578) maxP hl live F w rest sb))
+        (fun _ => 150 * cfg.regularOpCost + MemCpy.cost k.toNat * cfg.regularOpCost +
+          costGrow cfg F cap (growCap cap (UInt32.ofNat w.length + k)))
+        (fun _ rs => iprop(⌜rs = []⌝ ∗ growPost n g gt s vec ptr cap (growCap cap (UInt32.ofNat w.length + k)) p
+          idx ta (A 578) maxP hl live F w sb)) := by
+  iintro #Hk
+  ihave #S697 := f697_grow (GF := GF) cfg lim (d + 1) types[31]! rfl inst mi A n g ta hm (by omega) Cg gt s vec
+    ptr cap p k idx maxP hl live F w rest sb hs hvec hptr hcap hcap2 hwr hsb hgrow hlk hp hlive hr $$ Hk
+  iunfold waCode at Hk
+  icases Hk with ⟨-, #Happ⟩
+  iunfold VecAppend.appCode at Happ
+  icases Happ with ⟨-, -, -, #H697, -, -, #Hi⟩
+  have ha697 := hm.funcs 697 (by decide)
+  have t31 : types[31]!.params.length = 3 := by rfl
+  generalize hM : MemCpy.cost k.toNat * cfg.regularOpCost = M
+  generalize hK : costGrow cfg F cap (growCap cap (UInt32.ofNat w.length + k)) = K
+  iapply MFunSpec_intro
+  imodintro
+  iintro %args %R HP Hc
+  icases HP with ⟨%hargs, HP⟩
+  subst hargs
+  simp only [f711]
+  repeat mstep
+  mcall S697 using [HP]
+  · iframe HP
+  icases HQ with ⟨%hrs, HQ⟩
+  subst hrs
+  mcredits R
+  iframe Hc HQ
+  ipureintro; simp [htype]
+
+/-- **`write_all(ser, p, k)`** (345) without room: `*ser = vec`, the buffer reallocated
+(`growCap`), the `k` bytes `sb` at `p` appended. -/
+theorem f345_grow (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
+    (htype : type.results = []) (inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (n g ta : Nat)
+    (hm : IfaceMod mi A n g ta) (hd : d + 15 < lim.maxCallDepth) (Cg : Nat)
+    (gt : GlobalType) (s ser vec ptr cap p k : UInt32) (idx : UInt32) (maxP hl : Nat)
+    (live : List (Nat × Nat)) (F : Nat) (w rest sb : List UInt8) (hs : 80 ≤ s.toNat)
+    (hser : ser.toNat + 4 ≤ 2 ^ 32)
+    (hvec : vec.toNat + 12 ≤ 2 ^ 32) (hptr : ptr ≠ 0) (hcap : 0 < cap.toNat) (hcap2 : cap.toNat < 2 ^ 27)
+    (hwr : w.length + rest.length = cap.toNat) (hsb : sb.length = k.toNat)
+    (hgrow : cap.toNat < w.length + k.toNat) (hlk : w.length + k.toNat < 2 ^ 28)
+    (hp : p.toNat + k.toNat ≤ 2 ^ 32)
+    (hlive : (ptr.toNat, cap.toNat) ∈ live) (hr : roomFor hl maxP (growCap cap (UInt32.ofNat w.length + k))) :
+    waCode n maxP inst mi A
+      ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f345 Cg
+        (fun args => iprop(⌜args = [.i32 ser, .i32 p, .i32 k]⌝ ∗ n ↦[i32][ ser.toNat ] vec ∗
+          growPre n g gt s vec ptr cap p idx ta (A 578) maxP hl live F w rest sb))
+        (fun _ => 170 * cfg.regularOpCost + MemCpy.cost k.toNat * cfg.regularOpCost +
+          costGrow cfg F cap (growCap cap (UInt32.ofNat w.length + k)))
+        (fun _ rs => iprop(⌜rs = []⌝ ∗ n ↦[i32][ ser.toNat ] vec ∗
+          growPost n g gt s vec ptr cap (growCap cap (UInt32.ofNat w.length + k)) p
+            idx ta (A 578) maxP hl live F w sb)) := by
+  iintro #Hk
+  ihave #S711 := f711_grow (GF := GF) cfg lim (d + 1) types[31]! rfl inst mi A n g ta hm (by omega) Cg gt s vec
+    ptr cap p k idx maxP hl live F w rest sb hs hvec hptr hcap hcap2 hwr hsb hgrow hlk hp hlive hr $$ Hk
+  iunfold waCode at Hk
+  icases Hk with ⟨-, #Happ⟩
+  iunfold VecAppend.appCode at Happ
+  icases Happ with ⟨-, -, -, -, #H711, -, #Hi⟩
+  have hn := hm.mem
+  have ha711 := hm.funcs 711 (by decide)
+  have t31 : types[31]!.params.length = 3 := by rfl
+  generalize hM : MemCpy.cost k.toNat * cfg.regularOpCost = M
+  generalize hK : costGrow cfg F cap (growCap cap (UInt32.ofNat w.length + k)) = K
+  iapply MFunSpec_intro
+  imodintro
+  iintro %args %R HP Hc
+  icases HP with ⟨%hargs, Hser, HP⟩
+  subst hargs
+  simp only [f345]
+  repeat mstep
+  mstep [Hser]
+  repeat mstep
+  mcall S711 using [HP]
+  · iframe HP
+  icases HQ with ⟨%hrs, HQ⟩
+  subst hrs
+  mcredits R
+  iframe Hc Hser HQ
+  ipureintro; simp [htype]
+
+end Chain
 
 end WNear.Binary.VecGrow
