@@ -180,15 +180,22 @@ Its operational contract keeps arbitrary caller-output aliases and uses only
 the precise original child-tag/slice-descriptor separation. Canonical copied
 payload bytes in the316 endpoint follow from explicit original source/heap,
 root-word and final-output separations; exact operational memory needs none
-of those additional payload conditions. Whole161/162/425 decoding,
-serialization and exported refinement remain open. For425, every accepted
-scalar instruction segment is proved, and original input conditions derive
-the actual315/372/371 call domains, installed code, memory snapshots, globals
-and gas resources. Whole425 composition is still open. Independent replay
-already checks10 actual calls and192 generated alias/size/remaining-length
-cases against whole memory/max, SP, gas and exact/one-less fuel; this validates
-the expected typed budget18n+1449 units/17n+1172 steps without supplying an
-execution theorem. These
+of those additional payload conditions. The complete accepted425 typed call now composes actual315/372/371, every
+scalar operation, four block entries, the final branch,96-byte stack
+restoration and normal return:18n+1449 ordinary units over17n+1172 steps,
+at caller depth+13. All domains, code, tags, memory, globals and gas resources
+follow from original inputs. Exact sequential memory retains aliases and all
+output values are cached before caller writes. Independent replay checks10
+actual calls and192 generated alias/size/remaining-length cases against whole
+memory/max, SP, gas and exact/one-less fuel. Independent source/control review
+found no instruction, alias, label, activation, domain or ledger defect.
+The complete final record is connected to the original29-byte model header:
+tag0, U128 supply, storage usage and the allocated one-byte accounts-prefix
+vector. Original heap/source/root/output separations support that semantic
+agreement; the operational theorem keeps its broader alias domain. Under
+explicit output/descriptor separation, the original29-byte header consumes
+all input and leaves length zero. Whole161/162 decoding, read219,
+serialization96 and exported refinement remain open. These
 contracts do not discharge the existing representation/protocol premises or
 change the model, runtime semantics, or WF definition.
 
