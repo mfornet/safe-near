@@ -36,6 +36,7 @@ import NearLogic.CallWrite
 import NearLogic.Hosts.Registers
 import NearLogic.Trie
 import NearLogic.CallPred
+import NearLogic.CallTrap
 import NearLogic.Hosts.StorageRead
 import NearLogic.Tactic.Step
 import NearLogic.Tactic.Control

@@ -469,6 +469,85 @@ theorem mwpi_call_spec (i a : Nat) (type : FuncType) (inst : Nat) (mi : ModuleIn
     iexfalso
     iexact HF
 
+/-! ## Function specifications that may trap -/
+
+/-- `MFunSpec` for a function that may trap: on a trap it holds `T args`. -/
+def MFunSpecT (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType) (inst : Nat)
+    (mi : ModuleInst) (code : Func) (Cg : Nat) (P : List Value → IProp GF) (K : List Value → Nat)
+    (Q : List Value → List Value → IProp GF) (T : List Value → IProp GF) : IProp GF :=
+  iprop(□ ∀ args R, P args -∗ credits Cg (K args + R) -∗
+    mwpInvoke cfg lim d type inst mi code args
+      { ret := fun rs => iprop(credits Cg R ∗ Q args rs), trap := T args })
+
+theorem MFunSpecT_intro (type : FuncType) (inst : Nat) (mi : ModuleInst) (code : Func) (Cg : Nat)
+    (P : List Value → IProp GF) (K : List Value → Nat) (Q : List Value → List Value → IProp GF)
+    (T : List Value → IProp GF) :
+    (□ ∀ args R, P args -∗ credits Cg (K args + R) -∗
+      mwpi cfg lim d ⟨entryLocals code args, inst, mi⟩ [] code.body
+        (Post.mfunc cfg Cg type.results.length
+          { ret := fun rs => iprop(credits Cg R ∗ Q args rs), trap := T args }))
+      ⊢ MFunSpecT cfg lim d type inst mi code Cg P K Q T := by
+  unfold MFunSpecT
+  iintro #H
+  imodintro
+  iintro %args %R HP Hc
+  iapply mwpInvoke_intro
+  iapply H $$ %args %R HP Hc
+
+/-- A function that never traps meets any trap postcondition. -/
+theorem MFunSpec.toT (type : FuncType) (inst : Nat) (mi : ModuleInst) (code : Func) (Cg : Nat)
+    (P : List Value → IProp GF) (K : List Value → Nat) (Q : List Value → List Value → IProp GF)
+    (T : List Value → IProp GF) :
+    MFunSpec cfg lim d type inst mi code Cg P K Q ⊢ MFunSpecT cfg lim d type inst mi code Cg P K Q T := by
+  unfold MFunSpec MFunSpecT
+  iintro #H
+  imodintro
+  iintro %args %R HP Hc
+  iapply mwpInvoke_wand
+  isplitl [HP Hc]
+  · iapply H $$ %args %R HP Hc
+  isplit
+  · iintro %rs Hr
+    iexact Hr
+  · iintro HF
+    iexfalso
+    iexact HF
+
+/-- A call to a function that may trap: the caller continues on a return, and
+ends with its own `trap` on the callee's. -/
+theorem mwpi_call_specT (i a : Nat) (type : FuncType) (inst : Nat) (mi : ModuleInst) (code : Func)
+    (vs₀ args : List Value) {Cg R : Nat} (P : List Value → IProp GF) (K : List Value → Nat)
+    (Q : List Value → List Value → IProp GF) (T : List Value → IProp GF) (ha : f.mi.funcAddrs[i]? = some a)
+    (hlen : args.length = type.params.length) (hd : d + 1 < lim.maxCallDepth) :
+    credits Cg (cfg.regularOpCost + activationGas cfg.regularOpCost (entryLocals code args) +
+        (K args + R)) ∗
+      a ↪[wf] FuncInst.wasm type inst code ∗ inst ↪[inst] mi ∗
+      MFunSpecT cfg lim (d + 1) type inst mi code Cg P K Q T ∗ P args ∗
+      ▷ ((∀ rs, credits Cg R -∗ Q args rs -∗ Φ.normal (vs₀ ++ rs) f) ∧ (T args -∗ Φ.trap))
+      ⊢ mwpi cfg lim d f (vs₀ ++ args) [.call i] Φ := by
+  iintro ⟨Hc, #Hf, #Hi, Hs, HP, HΦ⟩
+  iapply mwpi_call i a type inst mi code vs₀ args ha hlen hd
+  isplitl [Hc]
+  · iexact Hc
+  isplitr
+  · iexact Hf
+  isplitr
+  · iexact Hi
+  inext
+  iintro Hc
+  iapply mwpInvoke_wand
+  isplitl [HP Hc Hs]
+  · iunfold MFunSpecT at Hs
+    icases Hs with #Hs
+    iapply Hs $$ %args %R HP Hc
+  isplit
+  · iintro %rs ⟨Hc, HQ⟩
+    icases HΦ with ⟨HΦ, -⟩
+    iapply HΦ $$ %rs Hc HQ
+  · iintro HT
+    icases HΦ with ⟨-, HΦ⟩
+    iapply HΦ $$ HT
+
 end Rules
 
 end NearLogic
