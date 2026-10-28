@@ -1,8 +1,9 @@
 import Bridge.Functions.StorageWrite
+import Bridge.Functions.StateRead
 import NearLogic.Hosts.StorageHasKey
 
 /-!
-# `env::storage_has_key` through the blockchain interface (551, 436 and 286)
+# `env::storage_has_key` through the blockchain interface (551, 436 and 286), `env::state_exists` (552)
 
 ```wat
 ;; 551 storage_has_key(key_ptr, key_len) -> bool
@@ -25,6 +26,8 @@ sp += 16;  v as bool
 * `f551_spec`: `env::storage_has_key(key) -> bool`: the slice on a 16-byte frame, 436, the
   result `v ∈ {0, 1}` as an `i32`. `f551_spec_host` with `storageHasKey_readContract`: the host
   ends as `StorageHasKeyPost`.
+* `f552_spec`: `env::state_exists()`: 551 on the key `"STATE"` at 1056468 (the data segment
+  holds it there, `stateKey_data552`). `f552_spec_host` with `storageHasKey_readContract`.
 -/
 
 namespace WNear.Binary.StorageHasKey
@@ -530,5 +533,116 @@ theorem f551_spec_host (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : F
   exact f551_spec cfg lim d type htype inst mi e A n g ta mx hm hd Cg gt s kp kl hs hal key h _ _ hv _ hc
 
 end Spec
+
+/-! ## `env::state_exists` (552)
+
+```wat
+;; 552 state_exists() -> bool
+i32.const 1056468  i32.const 5  call 551          ;; storage_has_key(b"STATE")
+```
+
+The key `"STATE"` is a second copy in the data segment, at 1056468 (`stateKey_data552`).
+-/
+
+/-- `"STATE"` is in the data segment at 1056468 too. -/
+theorem stateKey_data552 :
+    (List.range 5).map (fun k => wNearSource.read (159306 + (1056468 - 1048576) + k)) =
+      StateRead.stateKey := by
+  decide
+
+section StateExists
+
+variable {GF : BundledGFunctors} [WasmGS NearState GF]
+
+open WNear.Binary.VecFromElem (stk)
+
+def pre552 (n g ta : Nat) (A : Nat → Nat) (gt : GlobalType) (s : UInt32) (h : NearState)
+    (args : List Value) : IProp GF :=
+  iprop(⌜args = []⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗ iface n ta A ∗ hslot n ta A ∗
+    stk n (s.toNat - 32) 32 ∗ n ↦[wms][ 1056468 ] StateRead.stateKey ∗ mhostPt h)
+
+def post552 (n g ta : Nat) (A : Nat → Nat) (gt : GlobalType) (s : UInt32) (Q : NearState → Prop)
+    (v : UInt64) (_args rs : List Value) : IProp GF :=
+  iprop(⌜rs = [.i32 v.toUInt32]⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗ iface n ta A ∗ hslot n ta A ∗
+    stk n (s.toNat - 32) 32 ∗ n ↦[wms][ 1056468 ] StateRead.stateKey ∗ (∃ h', ⌜Q h'⌝ ∗ mhostPt h'))
+
+set_option maxHeartbeats 1000000 in
+/-- **`env::state_exists()`** (function 552 of `contract.wasm`): `storage_has_key(b"STATE")`
+(551) on the key in the data segment at 1056468, for a read contract `hc` of the host returning
+`v ∈ {0, 1}`. -/
+theorem f552_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
+    (htype : type.results.length = 1) (inst : Nat) (mi : ModuleInst) (e : Nat) (A : Nat → Nat)
+    (n g ta : Nat) (mx : Option Nat) (hm : IfaceMod mi A n g ta) (hd : d + 5 < lim.maxCallDepth)
+    (Cg : Nat) (gt : GlobalType) (s : UInt32) (hs : 32 ≤ s.toNat) (hal : s.toNat % 8 = 0)
+    (h : NearState) (Q : NearState → Prop) (v : UInt64) (hv : v = 0 ∨ v = 1) (kh : Nat)
+    (hc : ReadContractP (metered e "storage_has_key" storageHasKeyFn).toHostFn h Q
+      [.i64 5, .i64 1056468] [.i64 v] 1056468 StateRead.stateKey kh Cg) :
+    ifaceCode e inst mi A n mx ∗ hCode e inst A ∗ A 436 ↪[wf] FuncInst.wasm types[30]! inst f436 ∗
+      A 551 ↪[wf] FuncInst.wasm types[13]! inst f551
+      ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f552 Cg (pre552 n g ta A gt s h)
+        (fun _ => 14 * cfg.regularOpCost + (44 * cfg.regularOpCost + (248 * cfg.regularOpCost + kh)))
+        (post552 n g ta A gt s Q v) := by
+  iintro ⟨#Hcode, #Hw, #F436, #F551⟩
+  iapply MFunSpec_intro
+  imodintro
+  iintro %args %R HP Hc
+  iunfold pre552 at HP
+  icases HP with ⟨%hargs, Hg, HI, HW, Hs, Hk, Hhost⟩
+  subst hargs
+  have ha551 := hm.funcs 551 (by decide)
+  have t13 : types[13]!.params.length = 2 := by rfl
+  ihave #Hi : inst ↪[inst] mi $$ []
+  · iunfold ifaceCode at Hcode
+    icases Hcode with ⟨-, -, -, -, -, -, -, -, -, -, -, -, -, -, -, -, #Hi⟩
+    iexact Hi
+  simp only [f552]
+  mstep; mstep
+  mcall (f551_spec cfg lim (d + 1) types[13]! (by rfl) inst mi e A n g ta mx hm (by omega) Cg gt s
+      1056468 5 hs hal StateRead.stateKey h Q v hv kh (by exact hc)) using [Hg HI HW Hs Hk Hhost]
+  · iunfold pre551
+    simp only [UInt32.reduceToNat]
+    iframe Hg HI HW Hs Hk Hhost
+  iunfold post551 at HQ
+  icases HQ with ⟨%hrs, Hg, HI, HW, Hs, Hk, Hhost⟩
+  subst hrs
+  mpay with simp [htype]
+  mcredits R
+  iframe Hc
+  iunfold post552
+  iframe Hg HI HW Hs Hk Hhost
+  ipureintro; simp [htype]
+
+open Near.TrieAccounting Near.TrieConstruction Near.TrieOverlay in
+/-- `f552_spec` with the host's `storageHasKey_readContract`: the host ends in some `h'` with
+`StorageHasKeyPost h stateKey st`, the result is whether `STATE` has a value, the gas
+`storageHasKeyUse h stateKey 5`. -/
+theorem f552_spec_host (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
+    (htype : type.results.length = 1) (inst : Nat) (mi : ModuleInst) (e : Nat) (A : Nat → Nat)
+    (n g ta : Nat) (mx : Option Nat) (hm : IfaceMod mi A n g ta) (hd : d + 5 < lim.maxCallDepth)
+    (Cg : Nat) (gt : GlobalType) (s : UInt32) (hs : 32 ≤ s.toNat) (hal : s.toNat % 8 = 0)
+    (h : NearState) (st : Near.TrieOverlay.State) {b : Nat}
+    (hacc : h.storageAccounting = some st)
+    (hlim : withinLimit h.config.maxStorageKeyLen 5 = true)
+    (hb : build st.entries = .ok st.base) (hz : zeroHash ∉ st.base.witness.map Prod.fst)
+    (hlink : h.storage StateRead.stateKey = viewVal st (contractKey h.context.currentAccountId StateRead.stateKey))
+    (hproof : ProofBudget h st b)
+    (hbud : lookupProofBound (contractKey h.context.currentAccountId StateRead.stateKey) ≤ b) :
+    ifaceCode e inst mi A n mx ∗ hCode e inst A ∗ A 436 ↪[wf] FuncInst.wasm types[30]! inst f436 ∗
+      A 551 ↪[wf] FuncInst.wasm types[13]! inst f551
+      ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f552 Cg (pre552 n g ta A gt s h)
+        (fun _ => 14 * cfg.regularOpCost + (44 * cfg.regularOpCost +
+          (248 * cfg.regularOpCost + storageHasKeyUse h StateRead.stateKey 5)))
+        (post552 n g ta A gt s (StorageHasKeyPost h StateRead.stateKey st)
+          (StorageRead.foundU64 (h.storage StateRead.stateKey))) := by
+  have hc := storageHasKey_readContract (C := Cg) e h 5 1056468 StateRead.stateKey st (by decide) (by rfl) (by decide)
+    hacc hlim hb hz hlink hproof hbud
+  simp only [UInt64.reduceToNat] at hc
+  rw [StorageRead.storageReadResult_eq] at hc
+  have hv : StorageRead.foundU64 (h.storage StateRead.stateKey) = 0 ∨ StorageRead.foundU64 (h.storage StateRead.stateKey) = 1 := by
+    unfold StorageRead.foundU64; split <;> simp
+  exact f552_spec cfg lim d type htype inst mi e A n g ta mx hm hd Cg gt s hs hal h _ _ hv _ hc
+
+end StateExists
+
 
 end WNear.Binary.StorageHasKey
