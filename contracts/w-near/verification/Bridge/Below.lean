@@ -31,7 +31,9 @@ theorem method_below (cfg : RuntimeConfig) (fuel : Nat) (h : NearState) {i : Nat
     let lo := runInitialized cfg.wasm fuel (.next (startW cfg h i))
     let hi := runInitialized cfg.wasm fuel (.next (startW cfg (relax h C C) i))
     (GasEnd lo ∧ lo.1.host.logs <+: hi.1.host.logs ∧
-        ((∃ vs s, hi.1 = .done vs s) → lo.1.host.lastExecutionIssue = h.lastExecutionIssue)) ∨
+        ((∃ vs s, hi.1 = .done vs s) → lo.1.host.lastExecutionIssue = h.lastExecutionIssue) ∧
+        (∀ rs ss, hi.1 = .trap rs ss → ss.host.lastExecutionIssue = h.lastExecutionIssue →
+          lo.1.host.lastExecutionIssue = h.lastExecutionIssue)) ∨
       hi = (lo.1.relax C C, lo.2) := by
   intro lo hi
   rw [show hi = runInitialized cfg.wasm fuel

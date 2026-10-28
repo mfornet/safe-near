@@ -129,7 +129,7 @@ theorem method_vm_anyR (cfg : RuntimeConfig) (size : Nat) (method : String) (ctx
   have hb := method_below cfg (F0 + wFuel cfg.wasm C) hl h1 h2 C (by omega) (by omega)
   simp only at hb
   rw [hlo, hs'] at hb
-  rcases hb with ⟨hge, hlg, hiss⟩ | hrel
+  rcases hb with ⟨hge, hlg, hiss, -⟩ | hrel
   · left
     apply gasFailureUpTo_checkReceipts
     have hi : (runInitialized cfg.wasm F0 (.next (startW cfg hl i))).1.host.lastExecutionIssue = none := by

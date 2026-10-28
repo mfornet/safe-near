@@ -203,6 +203,18 @@ theorem runMetered_succ_trap (cfg : WasmConfig) (fuel : Nat) (c : Config NearSta
     rw [show (chargeWasm (StepResult.trap reason s) _).1 = .trap reason _ from rfl, runMetered_trapped]
     simp
 
+/-- A step that traps ends the run in a trap whose host keeps the step's execution issue. -/
+theorem runMetered_succ_trap_issue (cfg : WasmConfig) (fuel : Nat) (c : Config NearState)
+    (h1 : (chargeConfig c (nextInstructionGas cfg c)).2 = none) {reason : Trap} {s : Store NearState}
+    (hs : Exec.step (chargeConfig c (nextInstructionGas cfg c)).1 = .trap reason s) :
+    ∃ s', (runMetered cfg (fuel + 1) (.next c)).1 = .trap reason s' ∧
+      s'.host.lastExecutionIssue = s.host.lastExecutionIssue := by
+  simp only [runMetered, h1, hs]
+  split
+  · exact ⟨_, rfl, (chargeWasm_logs (.trap reason s) _).2⟩
+  · rw [show (chargeWasm (StepResult.trap reason s) _).1 = .trap reason _ from rfl, runMetered_trapped]
+    exact ⟨_, rfl, (chargeWasm_logs (.trap reason s) _).2⟩
+
 /-- **Runs under raised limits, with logs.** The run with raised limits ends
 as the lower run, up to the limits; or the lower run ends with a gas
 failure whose logs are a prefix of the raised run's, and which keeps the
@@ -214,6 +226,8 @@ theorem runMetered_relaxL (cfg : WasmConfig) (p0 m0 p m : Nat) (hp : p0 ≤ p) (
       (GasEnd (runMetered cfg fuel r) ∧
           (runMetered cfg fuel r).1.host.logs <+: (runMetered cfg fuel (r.relax p m)).1.host.logs ∧
           ((∃ vs s, (runMetered cfg fuel (r.relax p m)).1 = .done vs s) →
+            (runMetered cfg fuel r).1.host.lastExecutionIssue = I) ∧
+          (∀ rs ss, (runMetered cfg fuel (r.relax p m)).1 = .trap rs ss → ss.host.lastExecutionIssue = I →
             (runMetered cfg fuel r).1.host.lastExecutionIssue = I)) ∨
         runMetered cfg fuel (r.relax p m) = ((runMetered cfg fuel r).1.relax p m, (runMetered cfg fuel r).2) := by
   have hcharge : ∀ (ns : NearState) (cost : Nat), GasLimits p0 m0 ns → GasLimits p0 m0 (chargeHost ns cost).1 :=
@@ -241,7 +255,7 @@ theorem runMetered_relaxL (cfg : WasmConfig) (p0 m0 p m : Nat) (hp : p0 ≤ p) (
         have hR := runMetered_logs cfg (fuel + 1) ((StepResult.next c).relax p m) hmr
         unfold runMetered
         simp only [h1]
-        exact ⟨Or.inl ⟨e, rfl, chargeHost_error _ _ h1⟩, hR, fun _ => hlive.2⟩
+        exact ⟨Or.inl ⟨e, rfl, chargeHost_error _ _ h1⟩, hR, fun _ => hlive.2, fun _ _ _ _ => hlive.2⟩
       | none =>
         have h1r : (chargeConfig { c with store := relaxStore c.store p m }
             (nextInstructionGas cfg { c with store := relaxStore c.store p m })).2 = none := by
@@ -254,9 +268,11 @@ theorem runMetered_relaxL (cfg : WasmConfig) (p0 m0 p m : Nat) (hp : p0 ≤ p) (
         have hRstep := runMetered_succ_logs cfg fuel _ hmr h1r
         have hRtrap := fun {reason} {s} (h : Exec.step _ = StepResult.trap reason s) =>
           runMetered_succ_trap cfg fuel { c with store := relaxStore c.store p m } h1r (reason := reason) (s := s) h
+        have hRtrapI := fun {reason} {s} (h : Exec.step _ = StepResult.trap reason s) =>
+          runMetered_succ_trap_issue cfg fuel { c with store := relaxStore c.store p m } h1r (reason := reason) (s := s) h
         rw [hc1r, show (StepResult.next { c with store := relaxStore c.store p m }) = (StepResult.next c).relax p m
-          from rfl] at hRstep hRtrap
-        generalize hRR : runMetered cfg (fuel + 1) ((StepResult.next c).relax p m) = RR at hRstep hRtrap ⊢
+          from rfl] at hRstep hRtrap hRtrapI
+        generalize hRR : runMetered cfg (fuel + 1) ((StepResult.next c).relax p m) = RR at hRstep hRtrap hRtrapI ⊢
         set c1 := (chargeConfig c (nextInstructionGas cfg c)).1 with hc1
         have hinv1 : Exec.ConfigHostInvariant (GasLimits p0 m0) c1 := chargeConfig_hostInvariant hcharge c _ hinv
         have hlive1 : Exec.ConfigLiveInvariant (fun h => h.lastExecutionIssue = I) c1 := ⟨hlive.1, hlive.2⟩
@@ -282,16 +298,18 @@ theorem runMetered_relaxL (cfg : WasmConfig) (p0 m0 p m : Nat) (hp : p0 ≤ p) (
           cases h2 : (chargeWasm (StepResult.trap reason s) (frameTransitionGas cfg c1 (.trap reason s))).2 with
           | some e' =>
             simp only [h2]
-            refine ⟨Or.inl ⟨e', rfl, chargeWasm_error _ _ h2⟩, ?_, fun _ => ?_⟩
+            refine ⟨Or.inl ⟨e', rfl, chargeWasm_error _ _ h2⟩, ?_, fun _ => ?_, fun _ _ _ _ => ?_⟩
             · rw [hr.1]; exact hfin
+            · rw [hr.2]; exact hiss'
             · rw [hr.2]; exact hiss'
           | none =>
             simp only [h2]
             have hgs : GasStep (chargeWasm (StepResult.trap reason s) (frameTransitionGas cfg c1 (.trap reason s))).1 :=
               gasStep_chargeWasm _ ⟨reason, s, e, rfl, hle, hge⟩
             rw [runMetered_gasStep cfg fuel hgs]
-            refine ⟨Or.inr ⟨rfl, hgs⟩, ?_, fun _ => ?_⟩
+            refine ⟨Or.inr ⟨rfl, hgs⟩, ?_, fun _ => ?_, fun _ _ _ _ => ?_⟩
             · rw [hr.1]; exact hfin
+            · rw [hr.2]; exact hiss'
             · rw [hr.2]; exact hiss'
         · cases h2 : (chargeWasm (Exec.step c1) (frameTransitionGas cfg c1 (Exec.step c1))).2 with
           | some e =>
@@ -299,8 +317,8 @@ theorem runMetered_relaxL (cfg : WasmConfig) (p0 m0 p m : Nat) (hp : p0 ≤ p) (
             unfold runMetered
             simp only [h1, ← hc1, h2]
             have hw := chargeWasm_logs (Exec.step c1) (frameTransitionGas cfg c1 (Exec.step c1))
-            rw [hst] at hRstep hRtrap
-            refine ⟨Or.inl ⟨e, rfl, chargeWasm_error _ _ h2⟩, ?_, fun hdone => ?_⟩
+            rw [hst] at hRstep hRtrap hRtrapI
+            refine ⟨Or.inl ⟨e, rfl, chargeWasm_error _ _ h2⟩, ?_, fun hdone => ?_, fun rs ss htr hss => ?_⟩
             · rw [hw.1, stepResult_host]
               have : ((Exec.step c1).relax p m).store.host.logs = (Exec.step c1).store.host.logs := by
                 cases Exec.step c1 <;> rfl
@@ -312,6 +330,18 @@ theorem runMetered_relaxL (cfg : WasmConfig) (p0 m0 p m : Nat) (hp : p0 ≤ p) (
               | next c' => intro _ hl; exact hl
               | done vs' s' => intro _ hl; exact hl
               | trap reason s' => intro hRtrap _; exact absurd hdone (hRtrap rfl)
+            · rw [hw.2]
+              cases hsc : Exec.step c1 with
+              | next c' => have hl := hlives.live; rw [hsc] at hl; exact hl
+              | done vs' s' => have hl := hlives.live; rw [hsc] at hl; exact hl
+              | trap reason' s' =>
+                rw [hsc] at hRtrapI
+                obtain ⟨s'', hrt, his⟩ := hRtrapI rfl
+                rw [htr] at hrt
+                simp only [StepResult.trap.injEq] at hrt
+                obtain ⟨-, rfl⟩ := hrt
+                rw [his] at hss
+                exact hss
           | none =>
             subst hRR
             unfold runMetered
@@ -361,7 +391,8 @@ theorem runInitialized_relaxL (cfg : WasmConfig) (p0 m0 p m : Nat) (hp : p0 ≤ 
     let lo := runInitialized cfg fuel (.next c)
     let hi := runInitialized cfg fuel (.next { c with store := relaxStore c.store p m })
     (GasEnd lo ∧ lo.1.host.logs <+: hi.1.host.logs ∧
-        ((∃ vs s, hi.1 = .done vs s) → lo.1.host.lastExecutionIssue = I)) ∨
+        ((∃ vs s, hi.1 = .done vs s) → lo.1.host.lastExecutionIssue = I) ∧
+        (∀ rs ss, hi.1 = .trap rs ss → ss.host.lastExecutionIssue = I → lo.1.host.lastExecutionIssue = I)) ∨
       hi = (lo.1.relax p m, lo.2) := by
   intro lo hi
   have hlim : c.store.host.gas.prepaid ≤ p ∧ c.store.host.gas.maxBurnt ≤ m := by
@@ -382,7 +413,8 @@ theorem runInitialized_relaxL (cfg : WasmConfig) (p0 m0 p m : Nat) (hp : p0 ≤ 
     simp only
     have hw := chargeWasm_logs (.next c) (entryCost cfg (.next c))
     have hw' := chargeWasm_logs (.next { c with store := relaxStore c.store p m }) (entryCost cfg (.next c))
-    refine ⟨Or.inl ⟨e, rfl, chargeWasm_error _ _ hent⟩, ?_, fun _ => by rw [hw.2]; exact hlive.2⟩
+    refine ⟨Or.inl ⟨e, rfl, chargeWasm_error _ _ hent⟩, ?_, fun _ => by rw [hw.2]; exact hlive.2,
+      fun _ _ _ _ => by rw [hw.2]; exact hlive.2⟩
     rw [hw.1]
     split
     · rw [hw'.1]; exact List.prefix_refl _
