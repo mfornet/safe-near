@@ -104,6 +104,10 @@ structure ContractModel where
   step : Context → Option State → Call → StepResult Panic State Ret Promise
   /-- An upper bound on `usedGas`: burnt gas plus gas attached to promises. -/
   gas : Context → Option State → Call → Gas
+  /-- An upper bound on the storage proof the call records
+  (`Near.TrieOverlay.ProofReach`): the bytes its storage operations may add to
+  the receipt's recorded proof. -/
+  proofBound : Context → Option State → Call → Nat
 
 namespace ContractModel
 

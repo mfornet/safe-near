@@ -55,6 +55,7 @@ def model (protocol : Wasm.Near.RuntimeConfig) : ExecModel where
   decode := Call.decode
   step := contractStep
   gas ctx _ c := gasBound ctx c
+  proofBound ctx _ _ := proofBound ctx
   encodeState := encode
   encodeRet := encodeRet
   encodeReceipts _ := encodeReceipts

@@ -3,6 +3,7 @@ import NearInterface.Raw
 import NearInterface.AccountId
 import NearInterface.Config
 import NearInterface.TrieOverlay
+import NearInterface.StorageProof
 
 /-!
 # The function-call action boundary
@@ -138,6 +139,16 @@ structure Context.WF (ctx : Context) (raw : RawStorage) : Prop where
   trie_storage : contractData ctx.trie ctx.current.bytes = raw
   /-- Contract storage holds one value per key. -/
   raw_keys_unique : ∀ k v v', (k, v) ∈ raw → (k, v') ∈ raw → v = v'
+  /-- The trusted recorded-proof size grows only by what the call's storage
+  operations record (`Near.TrieOverlay.ProofReach`), as nearcore's recorder does. -/
+  proof_growth : ∀ size, ctx.storageProofSize = some size → ∀ t c,
+    Near.TrieOverlay.ProofReach ctx.trie t c → size t ≤ size ctx.trie + c
+
+/-- The receipt's recorded storage proof has room for `b` more bytes under
+`per_receipt_storage_proof_size_limit`; always, when the proof is not recorded. -/
+def Context.ProofRoom (ctx : Context) (b : Nat) : Prop :=
+  ∀ size, ctx.storageProofSize = some size →
+    size ctx.trie + b ≤ ctx.protocol.wasm.limits.perReceiptStorageProofSizeLimit
 
 /-- The most gas the call can use: its prepaid gas, capped by the per-call burn limit. -/
 def Context.gasLimit (ctx : Context) : Gas :=
@@ -150,6 +161,9 @@ inductive Failure
   /-- `HostError::GuestPanic`: the message the contract passed to `panic_utf8`. -/
   | panic (msg : String)
   | outOfGas
+  /-- The receipt's recorded storage proof passed
+  `per_receipt_storage_proof_size_limit` (`HostError::RecordedStorageExceeded`). -/
+  | storageProofExceeded
   | balanceExceeded
   | lackBalanceForState (deficit : Balance)
   | methodNotFound

@@ -124,6 +124,7 @@ def failureOf (error : FunctionCallError) : Failure :=
     match error with
     | .hostError (.guestPanic msg) => .panic msg
     | .hostError .gasExceeded | .hostError .gasLimitExceeded => .outOfGas
+    | .hostError (.recordedStorageExceeded _) => .storageProofExceeded
     | .hostError .balanceExceeded => .balanceExceeded
     | .methodResolveError .methodNotFound => .methodNotFound
     | error => .other error.message

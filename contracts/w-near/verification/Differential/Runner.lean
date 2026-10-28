@@ -54,6 +54,8 @@ structure ExecModel where
   decode : String → RawBytes → Option Call
   step : Context → Option State → Call → StepResult Panic State Ret Promise
   gas : Context → Option State → Call → Gas
+  /-- The model's bound on the storage proof the call records. -/
+  proofBound : Context → Option State → Call → Nat
   encodeState : State → RawStorage
   encodeRet : Ret → ReturnData
   encodeReceipts : Gas → List Promise → List RawReceipt
@@ -231,7 +233,7 @@ def gasSpecOf (j : Json) : Except String GasSpec :=
 /-- What a receipt is expected to do. It makes a scenario fail when it no
 longer exercises the path it was written for; it is not part of `Refines`. -/
 inductive Expect
-  | ok | fail | noCall | outOfGas | balanceExceeded | lackBalanceForState | methodNotFound
+  | ok | fail | noCall | outOfGas | storageProofExceeded | balanceExceeded | lackBalanceForState | methodNotFound
   | panic (sub : String)
   | other (sub : String)
 
@@ -241,6 +243,7 @@ def expectOf (s : String) : Except String Expect :=
   | "fail" => pure .fail
   | "noCall" => pure .noCall
   | "outOfGas" => pure .outOfGas
+  | "storageProofExceeded" => pure .storageProofExceeded
   | "balanceExceeded" => pure .balanceExceeded
   | "lackBalanceForState" => pure .lackBalanceForState
   | "methodNotFound" => pure .methodNotFound
@@ -257,6 +260,7 @@ def Expect.holds (e : Expect) (decoded : Bool) (o : Except Failure ReturnData) :
   | .fail, .error _ => true
   | .noCall, .error _ => !decoded
   | .outOfGas, .error .outOfGas => true
+  | .storageProofExceeded, .error .storageProofExceeded => true
   | .balanceExceeded, .error .balanceExceeded => true
   | .lackBalanceForState, .error (.lackBalanceForState _) => true
   | .methodNotFound, .error .methodNotFound => true
@@ -439,15 +443,20 @@ def runCall (M : ExecModel) (env : Env) (w : World M) (label : String) (c : Call
     let res := M.step ctx w.model call
     let bound := M.gas ctx w.model call
     let why := matchesWhy M ctx raw r res
-    if bound ≤ ctx.gasLimit then
+    -- `Context.ProofRoom` for the model's proof bound.
+    let room := match ctx.storageProofSize with
+      | none => true
+      | some size => decide (size ctx.trie + M.proofBound ctx w.model call ≤
+          ctx.protocol.wasm.limits.perReceiptStorageProofSizeLimit)
+    if bound ≤ ctx.gasLimit && room then
       problems := problems ++ why
       unless r.usedGas ≤ bound do
         problems := problems ++ [s!"used gas {r.usedGas} exceeds the model's bound {bound}"]
     else
-      let oog := (match r.outcome with | .error .outOfGas => true | _ => false) &&
+      let oog := (match r.outcome with | .error .outOfGas | .error .storageProofExceeded => true | _ => false) &&
         RolledBackB ctx raw r && r.logs.isPrefixOf res.logs
       unless why.isEmpty || oog do
-        problems := problems ++ ["below the bound: neither Matches nor an out-of-gas failure with no effects"] ++ why
+        problems := problems ++ ["below the bound: neither Matches nor a resource failure (gas or recorded proof) with no effects"] ++ why
     unless problems.isEmpty do
       problems := problems ++ [s!"model: {M.callName call} → {stepResultName M res}"]
     info := s!"{M.callName call} → {showOutcome r.outcome}, used {tgas r.usedGas} of bound {tgas bound}"
