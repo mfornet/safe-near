@@ -1,5 +1,6 @@
 import NearLogic.Hosts.Registers
 import NearLogic.Trie
+import NearInterface.StorageProof
 import NearLogic.CallPred
 
 /-!
@@ -89,25 +90,45 @@ def storageReadPhaseUse (h : NearState) (rawKey : List UInt8) (val : Option (Lis
   (2 * rawKey.length + 1) * trieNodeMax h +
     ((val.map fun v => chargesUse h (storageReadValueCharges v.length)).getD 0)
 
-/-- No proof-size limit is ever exceeded. -/
-def ProofSizeOk (h : NearState) : Prop :=
-  ∀ size, h.storageProofSize = some size → ∀ t, size t ≤ h.config.maxStorageProofSize
+/-- The recorded proof has room for `b` more bytes from the overlay `s` (SAF-67):
+every overlay the VM's operations reach from `s` while recording at most `b`
+bytes keeps the proof within the limit. `Context.WF.proof_growth` and
+`Context.ProofRoom` give it for the context's trie. -/
+def ProofBudget (h : NearState) (s : State) (b : Nat) : Prop :=
+  ∀ size, h.storageProofSize = some size → ∀ t c, ProofReach s t c → c ≤ b →
+    size t ≤ h.config.maxStorageProofSize
 
-theorem recordedStorageError_none {h : NearState} (hp : ProofSizeOk h) (t : State) :
-    recordedStorageError h t = none := by
+theorem ProofBudget.congr {h h' : NearState} {s : State} {b : Nat} (hp : ProofBudget h s b)
+    (hs : h'.storageProofSize = h.storageProofSize) (hc : h'.config = h.config) : ProofBudget h' s b := by
+  intro size hsz t c hr hcb
+  rw [hc]
+  rw [hs] at hsz
+  exact hp size hsz t c hr hcb
+
+/-- One operation spends its share of the budget. -/
+theorem ProofBudget.step {h : NearState} {s t : State} {a b : Nat} (hp : ProofBudget h s b)
+    (hst : ProofStep s t a) (hab : a ≤ b) : ProofBudget h t (b - a) := by
+  intro size hsz u c hr hcb
+  exact hp size hsz u (a + c) (.step hst hr) (by omega)
+
+theorem ProofBudget.mono {h : NearState} {s : State} {a b : Nat} (hp : ProofBudget h s b) (hab : a ≤ b) :
+    ProofBudget h s a := fun size hsz t c hr hca => hp size hsz t c hr (Nat.le_trans hca hab)
+
+/-- Within the budget, the VM's check after an operation passes. -/
+theorem recordedStorageError_none {h : NearState} {s t : State} {a b : Nat} (hp : ProofBudget h s b)
+    (hst : ProofStep s t a) (hab : a ≤ b) : recordedStorageError h t = none := by
   unfold recordedStorageError
   cases hs : h.storageProofSize with
   | none => rfl
   | some size =>
     simp only
-    rw [if_neg (Nat.not_lt.mpr (hp size hs t))]
-
+    rw [if_neg (Nat.not_lt.mpr (hp size hs t (a + 0) (.step hst (.refl t)) (by omega)))]
 /-! ## The storage phase -/
 
 /-- The storage phase of `storage_read` over a canonical trie succeeds: it only moves
 the accounting and burns at most `storageReadPhaseUse`, as `ext` charges. -/
 theorem prepareStorageCallAux_read (before : HostStore NearState) (len ptr r : UInt64)
-    (key rawKey : List UInt8) (s : State) {C : Nat}
+    (key rawKey : List UInt8) (s : State) {C b : Nat}
     (hraw : rawKey = contractKey before.host.context.currentAccountId key)
     (hacc : before.host.storageAccounting = some s)
     (hkey : getMemOrReg before ptr len = some key)
@@ -115,7 +136,7 @@ theorem prepareStorageCallAux_read (before : HostStore NearState) (len ptr r : U
     (hb : build s.entries = .ok s.base) (hz : zeroHash ∉ s.base.witness.map Prod.fst)
     (hp : ∀ e ∈ s.prospective, e.1 ≠ rawKey) (hc : ∀ e ∈ s.committed, e.1 ≠ rawKey)
     (hlink : before.host.storage key = (s.entries.find? (·.1 == rawKey)).map (·.2))
-    (hproof : ProofSizeOk before.host)
+    (hproof : ProofBudget before.host s b) (hbud : lookupProofBound rawKey ≤ b)
     (h1 : before.host.gas.used + storageReadPhaseUse before.host rawKey (before.host.storage key) ≤ C)
     (h2 : C ≤ before.host.gas.maxBurnt) (h3 : C ≤ before.host.gas.prepaid) :
     ∃ after s'', prepareStorageCallAux "storage_read" before [.i64 len, .i64 ptr, .i64 r] = (after, none) ∧
@@ -163,14 +184,12 @@ theorem prepareStorageCallAux_read (before : HostStore NearState) (len ptr r : U
     obtain ⟨ns1, err1⟩ := A
     simp only at ok1 ch1 pr1
     subst ok1
-    have hpr1 : ProofSizeOk ns1 := by
-      have e := ch1.erase
+    have hrec : recordedStorageError ns1 s' = none := by
       have ha : ns1.storageProofSize = before.host.storageProofSize :=
-        erase_field e NearState.storageProofSize fun _ => rfl
-      have hb : ns1.config = before.host.config := ch1.config
-      intro size hs t; rw [hb]; rw [ha] at hs; exact hproof size hs t
+        erase_field ch1.erase NearState.storageProofSize fun _ => rfl
+      exact recordedStorageError_none (hproof.congr ha ch1.config) (.lookup hget) hbud
     simp only [Option.map_none, Option.isSome_none, Bool.false_eq_true, ite_false,
-      recordedStorageError_none hpr1 s']
+      hrec]
     have hu1 : ns1.gas.used = before.host.gas.used +
         chargesUse ns0 [Charge.ext "touching_trie_node" d, Charge.ext "read_cached_trie_node" m] := ch1.used
     have hp1 : ns1.gas.promises = before.host.gas.promises := pr1
@@ -284,7 +303,7 @@ def phaseHost (h : NearState) (s2 : State) (b : Nat) (p : Near.GasProfile) : Nea
 accounting (same data), the burnt gas (within `storageReadPhaseUse`) and the
 gas profile change. -/
 theorem prepareStorageCall_read (before : HostStore NearState) (len ptr r : UInt64)
-    (key rawKey : List UInt8) (s : State) {C : Nat}
+    (key rawKey : List UInt8) (s : State) {C b : Nat}
     (hraw : rawKey = contractKey before.host.context.currentAccountId key)
     (hacc : before.host.storageAccounting = some s)
     (hkey : getMemOrReg before ptr len = some key)
@@ -292,14 +311,14 @@ theorem prepareStorageCall_read (before : HostStore NearState) (len ptr r : UInt
     (hb : build s.entries = .ok s.base) (hz : zeroHash ∉ s.base.witness.map Prod.fst)
     (hp : ∀ e ∈ s.prospective, e.1 ≠ rawKey) (hc : ∀ e ∈ s.committed, e.1 ≠ rawKey)
     (hlink : before.host.storage key = (s.entries.find? (·.1 == rawKey)).map (·.2))
-    (hproof : ProofSizeOk before.host)
+    (hproof : ProofBudget before.host s b) (hbud : lookupProofBound rawKey ≤ b)
     (h1 : before.host.gas.used + storageReadPhaseUse before.host rawKey (before.host.storage key) ≤ C)
     (h2 : C ≤ before.host.gas.maxBurnt) (h3 : C ≤ before.host.gas.prepaid) :
     ∃ s2 b p, prepareStorageCall "storage_read" before [.i64 len, .i64 ptr, .i64 r] =
         ({ before with host := phaseHost before.host s2 b p }, none) ∧ SameData s s2 ∧
       b ≤ before.host.gas.burnt + storageReadPhaseUse before.host rawKey (before.host.storage key) := by
   obtain ⟨after, s2, haux, hsa, hsd, hb', -⟩ :=
-    prepareStorageCallAux_read before len ptr r key rawKey s hraw hacc hkey hlim hb hz hp hc hlink hproof
+    prepareStorageCallAux_read before len ptr r key rawKey s hraw hacc hkey hlim hb hz hp hc hlink hproof hbud
       h1 h2 h3
   refine ⟨s2, after.host.gas.burnt, after.host.gasProfile, ?_, hsd, hb'⟩
   simp only [prepareStorageCall, haux, hsa, Option.isNone_none, ite_true, phaseHost]
@@ -372,7 +391,7 @@ def storageReadUse (h : NearState) (key : List UInt8) (n : Nat) : Nat :=
 /-- The metered call on a store: the charges before, the storage phase, the host
 function and the charges after all succeed within the credits. -/
 theorem storageRead_ok (extra : Nat) (st : HostStore NearState) (len ptr r : UInt64) (key : List UInt8)
-    (s : State) {C : Nat} (hlen : len ≠ u64Max)
+    (s : State) {C b : Nat} (hlen : len ≠ u64Max)
     (hkey : getMemOrReg st ptr len = some key)
     (hacc : st.host.storageAccounting = some s)
     (hlim : withinLimit st.host.config.maxStorageKeyLen key.length = true)
@@ -381,7 +400,8 @@ theorem storageRead_ok (extra : Nat) (st : HostStore NearState) (len ptr r : UIn
     (hc : ∀ e ∈ s.committed, e.1 ≠ contractKey st.host.context.currentAccountId key)
     (hlink : st.host.storage key =
       (s.entries.find? (·.1 == contractKey st.host.context.currentAccountId key)).map (·.2))
-    (hproof : ProofSizeOk st.host)
+    (hproof : ProofBudget st.host s b)
+    (hbud : lookupProofBound (contractKey st.host.context.currentAccountId key) ≤ b)
     (hreg : ∀ v, st.host.storage key = some v → r ≠ u64Max →
       withinLimit st.host.config.maxRegisterLen v.length = true)
     (h1 : st.host.gas.used + storageReadUse st.host key len.toNat ≤ C)
@@ -429,7 +449,7 @@ theorem storageRead_ok (extra : Nat) (st : HostStore NearState) (len ptr r : UIn
   obtain ⟨s2, b, p, hpre, hsd, hbb⟩ := prepareStorageCall_read { mem := st.mem, host := afterCharges ns }
     len ptr r key (contractKey st.host.context.currentAccountId key) s (C := C) (by rw [fid])
     (by rw [fsa]; exact hacc) hkey1 (by rw [fcfg]; exact hlim) hb hz hp hc
-    (by rw [fsto]; exact hlink) (by intro size hs t; rw [fcfg]; rw [fpsz] at hs; exact hproof size hs t)
+    (by rw [fsto]; exact hlink) (hproof.congr fpsz fcfg) hbud
     (by rw [hphase, hgas1, hch.used]; omega) (by rw [hgas1, hch.maxBurnt]; exact h2)
     (by rw [hgas1, hch.prepaid]; exact h3)
   rw [hphase] at hbb
@@ -501,14 +521,14 @@ linked to its `storage` (`hlink`), the call returns `1` (and sets register `r`
 to the value) or `0`, leaves the host as `StorageReadPost`, and uses at most
 `storageReadUse` gas. -/
 theorem storageRead_readContract (extra : Nat) (h : NearState) (len ptr r : UInt64) (key : List UInt8)
-    (s : State) {C : Nat} (hlen : len ≠ u64Max) (hkl : key.length = len.toNat) (hpos : 0 < len.toNat)
+    (s : State) {C b : Nat} (hlen : len ≠ u64Max) (hkl : key.length = len.toNat) (hpos : 0 < len.toNat)
     (hacc : h.storageAccounting = some s)
     (hlim : withinLimit h.config.maxStorageKeyLen key.length = true)
     (hb : build s.entries = .ok s.base) (hz : zeroHash ∉ s.base.witness.map Prod.fst)
     (hp : ∀ e ∈ s.prospective, e.1 ≠ contractKey h.context.currentAccountId key)
     (hc : ∀ e ∈ s.committed, e.1 ≠ contractKey h.context.currentAccountId key)
     (hlink : h.storage key = (s.entries.find? (·.1 == contractKey h.context.currentAccountId key)).map (·.2))
-    (hproof : ProofSizeOk h)
+    (hproof : ProofBudget h s b) (hbud : lookupProofBound (contractKey h.context.currentAccountId key) ≤ b)
     (hreg : ∀ v, h.storage key = some v → r ≠ u64Max → withinLimit h.config.maxRegisterLen v.length = true) :
     ReadContractP (metered extra "storage_read" storageReadFn).toHostFn h (StorageReadPost h key r s)
       [.i64 len, .i64 ptr, .i64 r] (storageReadResult (h.storage key)) ptr.toNat key
@@ -535,8 +555,7 @@ theorem storageRead_readContract (extra : Nat) (h : NearState) (len ptr r : UInt
   obtain ⟨host', hinv, hq, hused, hmb', hpp'⟩ := storageRead_ok extra { mem, host } len ptr r key s (C := C)
     hlen hkey (by rw [fsa]; exact hacc) (by rw [fcfg]; exact hlim) hb hz (by rw [fid]; exact hp)
     (by rw [fid]; exact hc) (by rw [fsto, fid]; exact hlink)
-    (by intro size hs t; show size t ≤ host.config.maxStorageProofSize; rw [fcfg]; rw [fpsz] at hs;
-        exact hproof size hs t)
+    (hproof.congr fpsz fcfg) (by rw [fid]; exact hbud)
     (by rw [fsto, fcfg]; exact hreg) hu hmb hpp
   refine ⟨host', ?_, storageReadPost_erase he hq, hused, hmb', hpp'⟩
   simp only [NearHostFn.toHostFn, Option.getD_some, hinv]

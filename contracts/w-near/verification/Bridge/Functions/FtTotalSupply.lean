@@ -41,7 +41,7 @@ storage at `STATE` is the model's `header s`: the method ends with the host
   `AllocTwo.f310_spec_two`); `Methods/FtTotalSupplyRefines.lean` uses it.
 * The storage premises of `storage_read` (`f548_spec_host`), as hypotheses: the accounting
   state, the trie link and canonical trie (`hlink`, `hb`), no witness hashing to zero (`hz`),
-  `ProofSizeOk h` (SAF-67), no pending writes to `STATE`, the key and register limits.
+  room in the recorded proof for the lookup (`ProofBudget`, SAF-67), no pending writes to `STATE`, the key and register limits.
 * `withinLimit h.config.maxReturnLen` of the JSON's length.
 
 The proof is split into three segments (`segA`, `segB`, `segC`) so that each proof term stays
@@ -708,7 +708,7 @@ theorem segB (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (e inst : Nat) (mi 
     (hcm : ∀ x ∈ st.committed, x.1 ≠ contractKey h.context.currentAccountId WNear.stateKey)
     (hlink : h.storage WNear.stateKey =
       (st.entries.find? (·.1 == contractKey h.context.currentAccountId WNear.stateKey)).map (·.2))
-    (hproof : ProofSizeOk h) (hreg : withinLimit h.config.maxRegisterLen 29 = true)
+    (hproof : ProofBudget h st (lookupProofBound (contractKey h.context.currentAccountId WNear.stateKey))) (hreg : withinLimit h.config.maxRegisterLen 29 = true)
     (rest : List Instr) (Φ : Post NearState GF) :
     codeB e inst mi A n maxP ∗
       credits Cg (864 * cfg.regularOpCost + cost219 cfg h S + (cost96 cfg (loOf S) (hiOf S) + x96) + R) ∗
@@ -909,7 +909,7 @@ open Near.TrieAccounting Near.TrieConstruction Near.TrieOverlay in
 /-- What `ft_total_supply` needs of the host `h` (the storage premises of `storage_read`,
 `f548_spec_host`, kept as hypotheses): `STATE` holds the model's `header S`; the accounting
 state `st`, its trie canonical and linked to the storage, no witness hashing to zero, no pending
-write to `STATE`, `ProofSizeOk` (SAF-67); the key, register and return limits. -/
+write to `STATE`, room in the recorded proof for the lookup (`ProofBudget`, SAF-67); the key, register and return limits. -/
 structure ReadOk (h : NearState) (S : WNear.State) (st : Near.TrieOverlay.State) : Prop where
   value : h.storage WNear.stateKey = some (WNear.header S)
   acc : h.storageAccounting = some st
@@ -920,7 +920,7 @@ structure ReadOk (h : NearState) (S : WNear.State) (st : Near.TrieOverlay.State)
   committed : ∀ x ∈ st.committed, x.1 ≠ contractKey h.context.currentAccountId WNear.stateKey
   link : h.storage WNear.stateKey =
     (st.entries.find? (·.1 == contractKey h.context.currentAccountId WNear.stateKey)).map (·.2)
-  proof : ProofSizeOk h
+  proof : ProofBudget h st (lookupProofBound (contractKey h.context.currentAccountId WNear.stateKey))
   regLen : withinLimit h.config.maxRegisterLen 29 = true
   retLen : withinLimit h.config.maxReturnLen (supplyJson S).length = true
 

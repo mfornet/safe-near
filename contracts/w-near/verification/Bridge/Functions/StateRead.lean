@@ -220,7 +220,7 @@ theorem f219_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
     (hcm : ∀ x ∈ st.committed, x.1 ≠ contractKey h.context.currentAccountId stateKey)
     (hlink : h.storage stateKey =
       (st.entries.find? (·.1 == contractKey h.context.currentAccountId stateKey)).map (·.2))
-    (hproof : ProofSizeOk h)
+    (hproof : ProofBudget h st (lookupProofBound (contractKey h.context.currentAccountId stateKey)))
     (hreg : withinLimit h.config.maxRegisterLen (stateBytes hd4 pre b0 b1 c0).length = true) :
     stateCode e inst mi A n maxP mx
       ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f219 Cg

@@ -76,7 +76,7 @@ theorem f219_spec_len (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : Fu
     (hcm : ∀ x ∈ st.committed, x.1 ≠ contractKey h.context.currentAccountId StateRead.stateKey)
     (hlink : h.storage StateRead.stateKey =
       (st.entries.find? (·.1 == contractKey h.context.currentAccountId StateRead.stateKey)).map (·.2))
-    (hproof : ProofSizeOk h)
+    (hproof : ProofBudget h st (lookupProofBound (contractKey h.context.currentAccountId StateRead.stateKey)))
     (hreg : withinLimit h.config.maxRegisterLen (stateBytes hd4 pre b0 b1 c0).length = true) :
     stateCode e inst mi A n maxP mx
       ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f219 Cg
@@ -343,7 +343,7 @@ theorem f219_spec_model_len (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (typ
     (hcm : ∀ x ∈ st.committed, x.1 ≠ contractKey h.context.currentAccountId WNear.stateKey)
     (hlink : h.storage WNear.stateKey =
       (st.entries.find? (·.1 == contractKey h.context.currentAccountId WNear.stateKey)).map (·.2))
-    (hproof : ProofSizeOk h)
+    (hproof : ProofBudget h st (lookupProofBound (contractKey h.context.currentAccountId WNear.stateKey)))
     (hreg : withinLimit h.config.maxRegisterLen 29 = true) :
     stateCode e inst mi A n maxP mx
       ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f219 Cg
@@ -353,7 +353,7 @@ theorem f219_spec_model_len (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (typ
             costS cfg h (some (WNear.header s))) +
           cost161 cfg 1 + 726 * cfg.regularOpCost + 334 * cfg.regularOpCost)
         (postModelL n g ta A gt sp out idx maxP len live s h (StorageReadPost h StateRead.stateKey 0 st)) := by
-  rw [← stateKey_eq] at hv hp hcm hlink
+  rw [← stateKey_eq] at hv hp hcm hlink hproof
   have hl := header_length s
   have e := f219_spec_len (GF := GF) cfg lim d type htype inst mi e A n g ta mx hm hd Cg gt sp out hs hal hout idx
     maxP len live ob hob h (WNear.Borsh.u32 WNear.accountsPrefix.length) WNear.accountsPrefix
