@@ -536,7 +536,7 @@ and canonical length needs only the actual low-write/high-source separation.
 Every original storage byte survives in the fresh allocation. Full code and
 global arrays are preserved. Independent29-byte replays in both accounting
 modes match whole memory,2224 root ordinary units and1705 steps, including
-one-less-fuel exhaustion. Accepted Borsh161/162/425 decoding, whole read219
+one-less-fuel exhaustion. Accepted Borsh161 decoding, whole read219
 composition and complete900/903 decimal formatting remain open.
 The actual Borsh fixed-width leaves694/710 now have complete34/26-unit,
 27/19-step typed calls, including their unaligned, sequential packed writes
@@ -614,7 +614,17 @@ including supply, storage usage and the allocated one-byte accounts-prefix
 vector. Original heap/source/root/output separations support semantic byte
 agreement; these are additional conditions, not execution oracles. The valid
 29-byte header leaves an empty remaining slice under precise output/descriptor
-separation. Whole161/162 decoding,219,96 and exported refinement remain open.
+separation. The complete accepted162 wrapper now executes425, both actual
+36-byte forward copies, the packed \texttt{i64.store32}, two block entries,
+accepted branch and96-byte stack restoration. Its typed budget is
+\(18n+2847\) ordinary units over \(17n+2480\) steps at caller depth14.
+Exact memory preserves sequential alias behavior and the four trailing padding
+bytes. Supply, usage, exhausted input and allocated prefix bytes follow from
+original header data and explicit semantic separations. Independent replay
+checks10 actual calls (one getter) and192 generated cases against whole memory,
+SP, gas and exact/one-less fuel. Original161 input bounds and the actual two
+descriptor stores already derive the prepared162 native domain.
+Whole161 decoding,219,96 and exported refinement remain open.
 
 Successful577 components now include requested-word scaling, all29 sizing
 guards/operations, checked page ceiling569, the real memory-growth operation,
@@ -673,9 +683,9 @@ retain action profiling and all functional state except the explicit \texttt{gas
 semantics changes are made.
 The actual29-byte getter523 capture independently matches complete memory/max,
 SP, void return, output record and zero counter,1887 root ordinary units plus
-5959494903 in fees,1474 steps and one-less-fuel exhaustion. Whole548 remains
-open; its498 result helper is already proved. The219 Borsh decoder chain
-161/162/425 and serialization96 remain open.
+5959494903 in fees,1474 steps and one-less-fuel exhaustion. The complete548
+wrapper is proved as described above. Within the219 decoder chain, whole161
+and serialization96 remain open; complete162/425 are proved.
 
 Successful loading derives the actual indirect table targets and static
 memory words selecting them, with table and data frames for later writes.
