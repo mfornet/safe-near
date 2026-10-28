@@ -366,4 +366,303 @@ theorem segM309 (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (e inst : Nat) (
 
 end SegM2
 
+
+/-! ## Segment C -/
+
+section SegC
+
+variable {GF : BundledGFunctors} [WasmGS NearState GF]
+
+/-- The code of segment C (persistent): `ft_total_supply`'s and the drop of a `None` (147). -/
+def codeC309 (e inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (n : Nat) (mx : Option Nat) : IProp GF :=
+  iprop(codeC e inst mi A n mx ∗ A 147 ↪[wf] FuncInst.wasm types[0]! inst f147)
+
+instance (e inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (n : Nat) (mx : Option Nat) :
+    Persistent (codeC309 (GF := GF) e inst mi A n mx) := by
+  unfold codeC309; infer_instance
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 32000000 in
+/-- Segment C (`bodyC309`): `expect` (158), `deref` (779), `value_return` (545) of the JSON `bs`,
+then the drops: the `Vec` `(q, 256)`, the three `String`s, the two `None`s (147), the third `None`
+skipped, the prefix's `Vec` `(p, 1)`; the heap's blocks all freed. -/
+theorem segC309 (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (e inst : Nat) (mi : ModuleInst) (A : Nat → Nat)
+    (n g ta : Nat) (mx : Option Nat) (hm : IfaceMod mi A n g ta) (hd : d + 8 < lim.maxCallDepth)
+    (Cg R : Nat) (gt : GlobalType) (s : UInt32) (hs : 1024 ≤ s.toNat) (hal : s.toNat % 8 = 0)
+    (q L p ps pn py : UInt32) (bs rest : List UInt8) (hbs : bs.length = L.toNat) (hpos : 0 < L.toNat)
+    (hrest : bs.length + rest.length = 256) (maxP hl F : Nat) (h1 : NearState)
+    (hlim : withinLimit h1.config.maxReturnLen L.toNat = true) (loc x1 x2 : UInt32) (Φ : Post NearState GF) :
+    codeC309 e inst mi A n mx ∗ credits Cg (3000 * cfg.regularOpCost + valueReturnUse h1 L.toNat + R) ∗
+      g ↦[wg] ⟨gt, .i32 (s - 160)⟩ ∗ ifaceR n ta A ∗ stk n (s.toNat - 240) 80 ∗ stk n (s.toNat - 160) 8 ∗
+      n ↦[i32][ s.toNat - 32 ] 0 ∗ n ↦[i32][ s.toNat - 28 ] q ∗ n ↦[i32][ s.toNat - 24 ] 256 ∗
+      n ↦[i32][ s.toNat - 20 ] L ∗ stk n (s.toNat - 16) 12 ∗
+      n ↦[i32][ s.toNat - 128 ] p ∗ n ↦[i32][ s.toNat - 124 ] 1 ∗ n ↦[i32][ s.toNat - 120 ] 1 ∗
+      metaOut n (s.toNat - 112) ps pn py ∗ n ↦[wms][ ps.toNat ] specStr ∗ n ↦[wms][ pn.toNat ] nameStr ∗
+      n ↦[wms][ py.toNat ] symbolStr ∗
+      n ↦[wms][ q.toNat ] (bs ++ rest) ∗ n ↦[wms][ p.toNat ] WNear.accountsPrefix ∗
+      heapInv n maxP hl [(q.toNat, 256), (py.toNat, 5), (pn.toNat, 27), (ps.toNat, 8), (p.toNat, 1)] F ∗
+      mhostPt h1 ∗
+      (credits Cg R -∗ g ↦[wg] ⟨gt, .i32 s⟩ -∗ mhostPt (h1.selectReturnValue bs) -∗
+        Φ.normal [] ⟨#[.i32 (s - 160), .i32 x1, .i32 x2], inst, mi⟩)
+      ⊢ mwpi cfg lim d ⟨#[.i32 (s - 160), .i32 x1, .i32 x2], inst, mi⟩ [] (bodyC309) Φ := by
+  iintro ⟨#Hk, Hc, Hg, HI, L2, F0, R0, R4, R8, R12, F144, V0, V4, V8, HMO, Hps, Hpn, Hpy, Hq, Hp, Hinv, Hh, W⟩
+  ihave #Hk' := Hk
+  iunfold codeC309 at Hk'
+  icases Hk' with ⟨#HC, #F147⟩
+  iunfold codeC at HC
+  icases HC with ⟨#HIC, #Hdr, #F456, #F158, #F779, #F545, #F68⟩
+  ihave #Hi : inst ↪[inst] mi $$ []
+  · iunfold dropCode at Hdr; icases Hdr with ⟨#Hi, -⟩; iexact Hi
+  have hn := hm.mem
+  have hg := hm.glob
+  have ha158 := hm.funcs 158 (by decide)
+  have ha779 := hm.funcs 779 (by decide)
+  have ha545 := hm.funcs 545 (by decide)
+  have ha68 := hm.funcs 68 (by decide)
+  have ha147 := hm.funcs 147 (by decide)
+  have t31 : types[31]!.params.length = 3 := rfl
+  have t14 : types[14]!.params.length = 2 := rfl
+  have t0 : types[0]!.params.length = 1 := rfl
+  have hlt := s.toNat_lt
+  have e0 : (s - 160).toNat = s.toNat - 160 := by rw [tsub _ _ (by simp; omega)]; simp
+  have e1 : (s - 160 - 16).toNat = s.toNat - 176 := by rw [tsub _ _ (by simp [e0]; omega), e0]; simp; omega
+  have e2 : (s - 160 - 16 - 16).toNat = s.toNat - 192 := by rw [tsub _ _ (by simp [e1]; omega), e1]; simp; omega
+  have a144 : (s - 160 + 144).toNat = s.toNat - 16 := by simp [UInt32.toNat_add, e0]; omega
+  have a128 : (s - 160 + 128).toNat = s.toNat - 32 := by simp [UInt32.toNat_add, e0]; omega
+  have a32 : (s - 160 + 8 + 24).toNat = s.toNat - 128 := by simp [UInt32.toNat_add, e0]; omega
+  have a48 : (s - 160 + 48).toNat = s.toNat - 112 := by simp [UInt32.toNat_add, e0]; omega
+  have a60 : (s - 160 + 60).toNat = s.toNat - 100 := by simp [UInt32.toNat_add, e0]; omega
+  have a72 : (s - 160 + 48 + 24).toNat = s.toNat - 88 := by simp [UInt32.toNat_add, e0]; omega
+  have a84 : (s - 160 + 84).toNat = s.toNat - 76 := by simp [UInt32.toNat_add, e0]; omega
+  have a96 : (s - 160 + 96).toNat = s.toNat - 64 := by simp [UInt32.toNat_add, e0]; omega
+  have hLb : L.toNat ≤ 256 := by omega
+  have hq := q.toNat_lt
+  simp only [bodyC309]
+  -- expect(sp0 + 144, sp0 + 128, loc)
+  ihave PL := join64' (a := s.toNat - 28) (b := s.toNat - 24) q 256 (by omega) $$ [R4 R8]
+  · iframe R4 R8
+  ihave PL := joinB (a := s.toNat - 28) (b := s.toNat - 20) (bytes32 q ++ bytes32 256) (bytes32 L)
+    (by simp; omega) $$ [PL R12]
+  · iframe PL R12
+  icases stk_bytes' $$ F144 with ⟨%ob, %hob, F144⟩
+  mstep; mstep; mstep; mstep; mstep; mstep; mstep
+  mcall (ResultExpect.f158_spec cfg lim (d + 1) types[31]! rfl inst mi n g hn hg Cg ⟨gt, .i32 (s - 160)⟩
+      (s - 160) (s - 160 + 144) (s - 160 + 128) 1051320 rfl (by omega) (by omega) (bytes32 0)
+      (bytes32 q ++ bytes32 256 ++ bytes32 L) ob (by simp) (by simp) hob (by simp [decodeLE_bytes32]))
+    using [Hg R0 PL F144]
+  · iunfold ResultExpect.pre
+    ihave R0 := memBytes_addr (b := (s - 160 + 128).toNat) (by omega) $$ R0
+    ihave PL := memBytes_addr (b := (s - 160 + 128).toNat + 4) (by omega) $$ PL
+    ihave F144 := memBytes_addr (b := (s - 160 + 144).toNat) (by omega) $$ F144
+    iframe Hg R0 PL F144
+    ipureintro; rfl
+  iunfold ResultExpect.post at HQ
+  icases HQ with ⟨%hrs, Hg, R0, PL, V144⟩
+  subst hrs
+  -- deref(sp0, sp0 + 144)
+  icases stk_bytes' $$ F0 with ⟨%o0, %ho0, F0⟩
+  mstep; mstep; mstep; mstep
+  mcall (VecDeref.f779_spec cfg lim (d + 1) types[14]! rfl inst mi n hn Cg (s - 160) (s - 160 + 144) o0
+      (bytes32 q ++ bytes32 256 ++ bytes32 L) ho0 (by simp)) using [F0 V144]
+  · iunfold VecDeref.pre
+    ihave F0 := memBytes_addr (b := (s - 160).toNat) (by omega) $$ F0
+    iframe F0 V144
+    ipureintro; rfl
+  iunfold VecDeref.post at HQ
+  icases HQ with ⟨%hrs, O0, V144⟩
+  subst hrs
+  have hvb : (bytes32 q ++ (bytes32 256 ++ bytes32 L)).take 4 ++ (bytes32 q ++ (bytes32 256 ++ bytes32 L)).drop 8 =
+      bytes32 q ++ bytes32 L := by
+    simp [List.take_append, List.drop_append, bytes32_length]
+  rw [hvb]
+  icases split64' (a := (s - 160).toNat) (b := (s - 160).toNat + 4) q L (by omega) $$ O0 with ⟨O0, O4⟩
+  mstep; mstep [O0]; mstep; mstep [O4]
+  -- value_return(q, L)
+  icases stkSp 48 32 rfl $$ L2 with ⟨L48, L2⟩
+  icases stkSp 4 28 rfl $$ L2 with ⟨X48, L2⟩
+  icases stkSp 4 24 rfl $$ L2 with ⟨X52, L2⟩
+  icases stkSp 4 20 rfl $$ L2 with ⟨X56, L2⟩
+  icases stkSp 4 16 rfl $$ L2 with ⟨X60, L2⟩
+  icases stkSp 8 8 rfl $$ L2 with ⟨Y64, L2⟩
+  icases stkSp 4 4 rfl $$ L2 with ⟨X72, X76⟩
+  icases stk4_word $$ X48 with ⟨%x48, X48⟩
+  icases stk4_word $$ X52 with ⟨%x52, X52⟩
+  icases stk4_word $$ X56 with ⟨%x56, X56⟩
+  icases stk4_word $$ X60 with ⟨%x60, X60⟩
+  icases stk4_word $$ X72 with ⟨%x72, X72⟩
+  icases stk4_word $$ X76 with ⟨%x76, X76⟩
+  ihave HI := iface_of_ifaceR n ta A $$ HI
+  icases HI with ⟨HI, HS12⟩
+  icases splitB (a := q.toNat) (b := q.toNat + bs.length) bs rest rfl $$ Hq with ⟨Hb, Hr⟩
+  ihave #S545 := ValueReturn.f545_spec cfg lim (d + 1) types[14]! rfl inst mi e A n g ta mx hm (by omega) Cg
+    ⟨gt, .i32 (s - 160)⟩ (s - 160) rfl (by omega) (by omega) h1 q L bs hbs hlim hpos x72 x76 x48 x52 x56 x60
+    $$ []
+  · iframe F456 HIC
+  mcall S545 using [Hg HI X72 X76 X48 X52 X56 X60 Hb Hh]
+  · iunfold ValueReturn.pre, frame4
+    ihave X72 := memBytes_addr (b := (s - 160 - 16).toNat + 8) (by omega) $$ X72
+    ihave X76 := memBytes_addr (b := (s - 160 - 16).toNat + 12) (by omega) $$ X76
+    ihave X48 := memBytes_addr (b := (s - 160 - 16 - 16).toNat) (by omega) $$ X48
+    ihave X52 := memBytes_addr (b := (s - 160 - 16 - 16).toNat + 4) (by omega) $$ X52
+    ihave X56 := memBytes_addr (b := (s - 160 - 16 - 16).toNat + 8) (by omega) $$ X56
+    ihave X60 := memBytes_addr (b := (s - 160 - 16 - 16).toNat + 12) (by omega) $$ X60
+    iframe Hg HI X72 X76 X48 X52 X56 X60 Hb Hh
+    ipureintro; rfl
+  iunfold ValueReturn.post at HQ
+  icases HQ with ⟨%hrs, Hg, HI, X72, X76, HF4, Hb, Hh⟩
+  subst hrs
+  mcredits (1900 * cfg.regularOpCost + R)
+  -- drop the JSON `Vec` (q, 256, L)
+  ihave V144 := memBytes_addr (b := s.toNat - 16) (by omega) $$ V144
+  icases splitB (a := s.toNat - 16) (b := s.toNat - 12) (bytes32 q) (bytes32 256 ++ bytes32 L) (by simp; omega)
+    $$ V144 with ⟨V144, V148⟩
+  icases split64' (a := s.toNat - 12) (b := s.toNat - 8) 256 L (by omega) $$ V148 with ⟨V148, V152⟩
+  mstep; mstep; mstep
+  mcall (f68_spec cfg lim (d + 1) types[0]! rfl inst mi A n g ta hm (by omega) Cg maxP hl
+      [(q.toNat, 256), (py.toNat, 5), (pn.toNat, 27), (ps.toNat, 8), (p.toNat, 1)] F (s - 160 + 144) q 256 L
+      (by decide) (by omega))
+    using [V144 V148 V152 Hinv Hb Hr]
+  · iunfold pre747
+    ihave V144 := memBytes_addr (b := (s - 160 + 144).toNat) (by omega) $$ V144
+    ihave V148 := memBytes_addr (b := (s - 160 + 144).toNat + 4) (by omega) $$ V148
+    ihave V152 := memBytes_addr (b := (s - 160 + 144).toNat + 8) (by omega) $$ V152
+    ihave Hq := joinB (a := q.toNat) (b := q.toNat + bs.length) bs rest rfl $$ [Hb Hr]
+    · iframe Hb Hr
+    iframe V144 V148 V152 Hinv
+    isplitr
+    · ipureintro; rfl
+    isplitr
+    · ipureintro; simp
+    iunfold block
+    iexists bs ++ rest
+    iframe Hq
+    ipureintro; simp; omega
+  iunfold post747 at HQ
+  icases HQ with ⟨%hrs, -, -, -, Hinv⟩
+  subst hrs
+  have hl1 : [(q.toNat, 256), (py.toNat, 5), (pn.toNat, 27), (ps.toNat, 8), (p.toNat, 1)].erase
+      (q.toNat, (256 : UInt32).toNat) = [(py.toNat, 5), (pn.toNat, 27), (ps.toNat, 8), (p.toNat, 1)] := by simp
+  rw [hl1]
+  iunfold metaOut at HMO
+  icases HMO with ⟨O0, O4, O8, O12, O16, O20, O24, O28, O32, O36, -, O48, -, O60, -, -, -⟩
+  -- drop `spec` (ps, 8, 8)
+  mstep; mstep; mstep
+  mcall (f68_spec cfg lim (d + 1) types[0]! rfl inst mi A n g ta hm (by omega) Cg maxP hl
+      [(py.toNat, 5), (pn.toNat, 27), (ps.toNat, 8), (p.toNat, 1)] (F + 1) (s - 160 + 48) ps 8 8 (by decide)
+      (by omega))
+    using [O0 O4 O8 Hinv Hps]
+  · iunfold pre747
+    ihave O0 := memBytes_addr (b := (s - 160 + 48).toNat) (by omega) $$ O0
+    ihave O4 := memBytes_addr (b := (s - 160 + 48).toNat + 4) (by omega) $$ O4
+    ihave O8 := memBytes_addr (b := (s - 160 + 48).toNat + 8) (by omega) $$ O8
+    iframe O0 O4 O8 Hinv
+    isplitr
+    · ipureintro; rfl
+    isplitr
+    · ipureintro; simp
+    iunfold block
+    iexists specStr
+    iframe Hps
+    ipureintro; rfl
+  iunfold post747 at HQ
+  icases HQ with ⟨%hrs, -, -, -, Hinv⟩
+  subst hrs
+  have hl2 : [(py.toNat, 5), (pn.toNat, 27), (ps.toNat, 8), (p.toNat, 1)].erase (ps.toNat, (8 : UInt32).toNat) =
+      [(py.toNat, 5), (pn.toNat, 27), (p.toNat, 1)] := by simp
+  rw [hl2]
+  -- drop `name` (pn, 27, 27)
+  mstep; mstep; mstep
+  mcall (f68_spec cfg lim (d + 1) types[0]! rfl inst mi A n g ta hm (by omega) Cg maxP hl
+      [(py.toNat, 5), (pn.toNat, 27), (p.toNat, 1)] (F + 1 + 1) (s - 160 + 60) pn 27 27 (by decide)
+      (by omega))
+    using [O12 O16 O20 Hinv Hpn]
+  · iunfold pre747
+    ihave O12 := memBytes_addr (b := (s - 160 + 60).toNat) (by omega) $$ O12
+    ihave O16 := memBytes_addr (b := (s - 160 + 60).toNat + 4) (by omega) $$ O16
+    ihave O20 := memBytes_addr (b := (s - 160 + 60).toNat + 8) (by omega) $$ O20
+    iframe O12 O16 O20 Hinv
+    isplitr
+    · ipureintro; rfl
+    isplitr
+    · ipureintro; simp
+    iunfold block
+    iexists nameStr
+    iframe Hpn
+    ipureintro; rfl
+  iunfold post747 at HQ
+  icases HQ with ⟨%hrs, -, -, -, Hinv⟩
+  subst hrs
+  have hl3 : [(py.toNat, 5), (pn.toNat, 27), (p.toNat, 1)].erase (pn.toNat, (27 : UInt32).toNat) =
+      [(py.toNat, 5), (p.toNat, 1)] := by simp
+  rw [hl3]
+  -- drop `symbol` (py, 5, 5)
+  mstep; mstep; mstep; mstep; mstep
+  mcall (f68_spec cfg lim (d + 1) types[0]! rfl inst mi A n g ta hm (by omega) Cg maxP hl
+      [(py.toNat, 5), (p.toNat, 1)] (F + 1 + 1 + 1) (s - 160 + 48 + 24) py 5 5 (by decide) (by omega))
+    using [O24 O28 O32 Hinv Hpy]
+  · iunfold pre747
+    ihave O24 := memBytes_addr (b := (s - 160 + 48 + 24).toNat) (by omega) $$ O24
+    ihave O28 := memBytes_addr (b := (s - 160 + 48 + 24).toNat + 4) (by omega) $$ O28
+    ihave O32 := memBytes_addr (b := (s - 160 + 48 + 24).toNat + 8) (by omega) $$ O32
+    iframe O24 O28 O32 Hinv
+    isplitr
+    · ipureintro; rfl
+    isplitr
+    · ipureintro; simp
+    iunfold block
+    iexists symbolStr
+    iframe Hpy
+    ipureintro; rfl
+  iunfold post747 at HQ
+  icases HQ with ⟨%hrs, -, -, -, Hinv⟩
+  subst hrs
+  have hl4 : [(py.toNat, 5), (p.toNat, 1)].erase (py.toNat, (5 : UInt32).toNat) = [(p.toNat, 1)] := by simp
+  rw [hl4]
+  -- the two `None`s (147), the third skipped
+  mstep; mstep; mstep
+  mcall (MetadataFields.f147_none cfg lim (d + 1) types[0]! rfl inst mi n hn Cg (s - 160 + 84)) using [O36]
+  · isplitr
+    · ipureintro; trivial
+    iapply memBytes_addr (by omega) $$ O36
+  icases HQ with ⟨%hrs, O36⟩
+  subst hrs
+  mstep; mstep; mstep
+  mcall (MetadataFields.f147_none cfg lim (d + 1) types[0]! rfl inst mi n hn Cg (s - 160 + 96)) using [O48]
+  · isplitr
+    · ipureintro; trivial
+    iapply memBytes_addr (by omega) $$ O48
+  icases HQ with ⟨%hrs, O48⟩
+  subst hrs
+  ihave O60 := memBytes_addr (b := (s - 160).toNat + 108) (by omega) $$ O60
+  repeat mstep
+  mstep [O60]
+  repeat mstep
+  -- drop the prefix's `Vec` (p, 1, 1)
+  mcall (f68_spec cfg lim (d + 1) types[0]! rfl inst mi A n g ta hm (by omega) Cg maxP hl
+      [(p.toNat, 1)] (F + 1 + 1 + 1 + 1) (s - 160 + 8 + 24) p 1 1 (by decide) (by omega))
+    using [V0 V4 V8 Hinv Hp]
+  · iunfold pre747
+    ihave V0 := memBytes_addr (b := (s - 160 + 8 + 24).toNat) (by omega) $$ V0
+    ihave V4 := memBytes_addr (b := (s - 160 + 8 + 24).toNat + 4) (by omega) $$ V4
+    ihave V8 := memBytes_addr (b := (s - 160 + 8 + 24).toNat + 8) (by omega) $$ V8
+    iframe V0 V4 V8 Hinv
+    isplitr
+    · ipureintro; rfl
+    isplitr
+    · ipureintro; simp
+    iunfold block
+    iexists WNear.accountsPrefix
+    iframe Hp
+    ipureintro; rw [StateReadModel.accountsPrefix_length]; rfl
+  iunfold post747 at HQ
+  icases HQ with ⟨%hrs, -⟩
+  subst hrs
+  -- the epilogue
+  mstep; mstep; mstep; mstep [Hg]
+  rw [show s - 160 + 160 = s by simp]
+  mcredits R
+  iapply W $$ Hc Hg Hh
+
+end SegC
+
 end WNear.Binary.FtMetadataBody
