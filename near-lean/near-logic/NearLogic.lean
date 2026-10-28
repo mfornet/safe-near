@@ -45,3 +45,4 @@ import NearLogic.CallPred2
 import NearLogic.Hosts.StorageWrite
 import NearLogic.Hosts.StorageHasKey
 import NearLogic.Hosts.LogUtf8
+import NearLogic.Hosts.Context
