@@ -777,6 +777,131 @@ theorem f519_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
   iapply StateWrite.stkL (n := n) (show (s - 16).toNat - 80 = s.toNat - 96 by omega) (by rfl)
   iexact Y
 
+/-! ## The storage key `prefix ++ key` (392) -/
+
+/-- The code of 392 (persistent). -/
+def code392 (n maxP inst : Nat) (mi : ModuleInst) (A : Nat → Nat) : IProp GF :=
+  iprop(code519 n maxP inst mi A ∗ A 519 ↪[wf] FuncInst.wasm types[39]! inst f519 ∗
+    A 779 ↪[wf] FuncInst.wasm types[14]! inst f779)
+
+instance (n maxP inst : Nat) (mi : ModuleInst) (A : Nat → Nat) : Persistent (code392 (GF := GF) n maxP inst mi A) := by
+  unfold code392; infer_instance
+
+/-- The map's prefix `Vec` `(pp, pc, pl)` at `m`. -/
+def prefixAt (n : Nat) (m pp pc pl : UInt32) : IProp GF :=
+  iprop(n ↦[wms][ m.toNat ] (bytes32 pp ++ (bytes32 pc ++ bytes32 pl)))
+
+def pre392 (n g : Nat) (gt : GlobalType) (s out m pp pc pl kp kl : UInt32) (idx : UInt32) (ta a578 maxP len : Nat)
+    (live : List (Nat × Nat)) (F : Nat) (pre key ob : List UInt8) (args : List Value) : IProp GF :=
+  iprop(⌜args = [.i32 out, .i32 m, .i32 kp, .i32 kl]⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗
+    stk n (s.toNat - 112) 112 ∗ vt n 1057464 idx ta a578 ∗ heapInv n maxP len live F ∗
+    prefixAt n m pp pc pl ∗ n ↦[wms][ pp.toNat ] pre ∗ n ↦[wms][ kp.toNat ] key ∗ n ↦[wms][ out.toNat ] ob)
+
+/-- The storage key `pre ++ key` in a fresh `Vec` `(q, pl + kl, pl + kl)` at `out`. -/
+def post392 (n g : Nat) (gt : GlobalType) (s out m pp pc pl kp kl : UInt32) (idx : UInt32) (ta a578 maxP len : Nat)
+    (live : List (Nat × Nat)) (F : Nat) (pre key : List UInt8) (_args rs : List Value) : IProp GF :=
+  iprop(⌜rs = []⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗ stk n (s.toNat - 112) 112 ∗ vt n 1057464 idx ta a578 ∗
+    prefixAt n m pp pc pl ∗ n ↦[wms][ pp.toNat ] pre ∗ n ↦[wms][ kp.toNat ] key ∗
+    ∃ q : UInt32, ⌜q ≠ 0 ∧ q.toNat + (pl + kl).toNat < 2 ^ 32⌝ ∗ grown n maxP len live F q (pl + kl) ∗
+      n ↦[i32][ out.toNat ] q ∗ n ↦[i32][ out.toNat + 4 ] (pl + kl) ∗ n ↦[i32][ out.toNat + 8 ] (pl + kl) ∗
+      n ↦[wms][ q.toNat ] (pre ++ key))
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 8000000 in
+/-- **The storage key of a `LookupMap` entry** (392): the map's prefix (779) and the key's bytes
+concatenated (519). -/
+theorem f392_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
+    (htype : type.results = []) (inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (n g ta : Nat)
+    (hm : IfaceMod mi A n g ta) (hd : d + 14 < lim.maxCallDepth) (Cg : Nat)
+    (gt : GlobalType) (s out m pp pc pl kp kl : UInt32) (idx : UInt32) (maxP len : Nat)
+    (live : List (Nat × Nat)) (F : Nat) (hF : okG F) (pre key ob : List UInt8)
+    (hs : 112 ≤ s.toNat) (hob : ob.length = 12) (hpre : pre.length = pl.toNat) (hkey : key.length = kl.toNat)
+    (hl : pl.toNat + kl.toNat < 2 ^ 28) (hl0 : 0 < pl.toNat + kl.toNat) (hout : out.toNat + 12 ≤ 2 ^ 32)
+    (hpp : pp.toNat + pl.toNat ≤ 2 ^ 32) (hkp : kp.toNat + kl.toNat ≤ 2 ^ 32)
+    (hr : roomFor len maxP (pl + kl)) :
+    code392 n maxP inst mi A
+      ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f392 Cg
+        (pre392 n g gt s out m pp pc pl kp kl idx ta (A 578) maxP len live F pre key ob)
+        (fun _ => 100 * cfg.regularOpCost + cost510 cfg F pl kl)
+        (post392 n g gt s out m pp pc pl kp kl idx ta (A 578) maxP len live F pre key) := by
+  iintro #Hk
+  iunfold code392 at Hk
+  icases Hk with ⟨#H519c, #H519, #H779⟩
+  ihave #Hi : inst ↪[inst] mi $$ []
+  · iunfold code519, code510, appCode at H519c; icases H519c with ⟨⟨-, ⟨-, -, -, -, -, -, #H⟩, -⟩, -⟩; iexact H
+  have hn := hm.mem
+  have hg := hm.glob
+  have ha519 := hm.funcs 519 (by decide)
+  have ha779 := hm.funcs 779 (by decide)
+  have t39 : types[39]!.params.length = 5 := by rfl
+  have t14 : types[14]!.params.length = 2 := by rfl
+  have hlt := s.toNat_lt
+  have h16 : (s - 16).toNat = s.toNat - 16 := by
+    rw [UInt32.toNat_sub_of_le] <;> simp [UInt32.le_iff_toNat_le]; omega
+  have e8 : (s - 16 + 8).toNat = s.toNat - 8 := by simp [UInt32.toNat_add, h16]; omega
+  generalize hK : cost510 cfg F pl kl = K
+  iapply MFunSpec_intro
+  imodintro
+  iintro %args %R HP Hc
+  iunfold pre392 at HP
+  icases HP with ⟨%hargs, Hg, Hs, Hvt, Hinv, Hm, Hp, Hkey, Ho⟩
+  subst hargs
+  iunfold prefixAt at Hm
+  icases stk_split n (s.toNat - 112) 96 16 $$ Hs with ⟨Lo, Fr⟩
+  rw [show s.toNat - 112 + 96 = s.toNat - 16 by omega]
+  icases stk_split n (s.toNat - 16) 8 8 $$ Fr with ⟨F0, F8⟩
+  iunfold stk at F8
+  icases F8 with ⟨%fb, %hfb, F8⟩
+  ihave F8 := memBytes_addr (show s.toNat - 16 + 8 = (s - 16 + 8).toNat by omega) $$ F8
+  simp only [f392]
+  mstep [Hg]; mstep; mstep; mstep; mstep [Hg]
+  mstep; mstep; mstep; mstep
+  mcall (VecDeref.f779_spec cfg lim (d + 1) types[14]! rfl inst mi n hn Cg (s - 16 + 8) m fb
+      (bytes32 pp ++ (bytes32 pc ++ bytes32 pl)) hfb (by simp [bytes32])) using [F8 Hm]
+  · iunfold VecDeref.pre
+    iframe F8 Hm
+    ipureintro; rfl
+  iunfold VecDeref.post at HQ
+  icases HQ with ⟨%hrs, F8, Hm⟩
+  subst hrs
+  have hpl : (bytes32 pp ++ (bytes32 pc ++ bytes32 pl)).take 4 ++ (bytes32 pp ++ (bytes32 pc ++ bytes32 pl)).drop 8 =
+      bytes32 pp ++ bytes32 pl := by
+    have l4 : ∀ x : UInt32, (bytes32 x).length = 4 := fun x => by simp [bytes32]
+    rw [List.take_left' (l4 pp), ← List.append_assoc, List.drop_left' (by simp [l4])]
+  rw [hpl]
+  ihave F8 := KeyGet.split64 n (s - 16 + 8).toNat pp pl $$ F8
+  icases F8 with ⟨P0, P4⟩
+  mstep; mstep; mstep [P0]; mstep; mstep [P4]; mstep; mstep
+  mcall (f519_spec cfg lim (d + 1) types[39]! (by rfl) inst mi A n g ta hm (by omega) Cg gt (s - 16) out pp pl kp kl
+      idx maxP len live F hF pre key ob (by omega) hob hpre hkey hl hl0 hout hpp hkp hr)
+      using [Hg Lo Hvt Hinv Hp Hkey Ho] with (rw [hK]; mstep_norm_full; omega)
+  · iunfold pre519
+    ihave Lo := stk_addr (show s.toNat - 112 = (s - 16).toNat - 96 by omega) $$ Lo
+    iframe Hg Lo Hvt Hinv Hp Hkey Ho
+    ipureintro; rfl
+  rw [hK]
+  iunfold post519 at HQ
+  icases HQ with ⟨%hrs, Hg, Lo, Hvt, Hp, Hkey, HQ⟩
+  subst hrs
+  mstep; mstep; mstep; mstep [Hg]
+  rw [show s - 16 + 16 = s by simp]
+  mcredits R
+  iframe Hc
+  iunfold post392, prefixAt
+  isplitr
+  · ipureintro; simp [htype]
+  iframe Hg Hvt Hm Hp Hkey HQ
+  ihave P0 := stk_word n _ _ $$ P0
+  ihave P4 := stk_word n _ _ $$ P4
+  ihave X := StateWrite.stkJ (n := n) (show (s - 16 + 8).toNat + 4 = (s - 16 + 8).toNat + 4 by rfl) $$ [P0 P4]
+  · iframe P0 P4
+  ihave X := StateWrite.stkJ (n := n) (show (s - 16 + 8).toNat = s.toNat - 16 + 8 by omega) $$ [F0 X]
+  · iframe F0 X
+  ihave Y := StateWrite.stkJ (n := n) (show s.toNat - 16 = (s - 16).toNat - 96 + 96 by omega) $$ [Lo X]
+  · iframe Lo X
+  iapply StateWrite.stkL (n := n) (show (s - 16).toNat - 96 = s.toNat - 112 by omega) (by rfl)
+  iexact Y
+
 end Spec
 
 end WNear.Binary.LookupMapLeaves
