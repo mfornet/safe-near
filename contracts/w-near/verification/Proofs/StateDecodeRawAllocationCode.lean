@@ -22,7 +22,7 @@ theorem actual_positive_code (s : Store NearState) (inst : Nat) (p : Layout)
            memoryIndex := hc.search.memoryIndex
            tableIndex := hc.search.tableIndex
            table := hc.search.table
-           callbackElement := ?_ 
+           callbackElement := ?_
            callbackType := hc.search.callbackType
            callbackFunction := hc.search.callbackFunction
            unitsIndex := hc.search.unitsIndex
