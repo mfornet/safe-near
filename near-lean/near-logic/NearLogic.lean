@@ -47,3 +47,4 @@ import NearLogic.Hosts.StorageHasKey
 import NearLogic.Hosts.LogUtf8
 import NearLogic.Hosts.Context
 import NearLogic.Hosts.StorageRemove
+import NearLogic.Hosts.EnvGetters

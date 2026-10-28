@@ -1,5 +1,6 @@
 import NearLogic.CallWrite
 import NearLogic.Hosts.Registers
+import NearLogic.Hosts.Context
 
 /-!
 # Context getters, metered: `storage_usage` and `attached_deposit`
@@ -11,10 +12,7 @@ both), and the gas of the contract is its `chargesUse`.
 * `storageUsage_readContract`: `storage_usage()` reads no memory, returns
   `h.context.storageUsage`, the host unchanged but for gas
   (`storageUsageUse h`, the `base` charge).
-* `attachedDeposit_rwContract`: `attached_deposit(ptr)` outside a view call
-  writes the deposit as 16 little-endian bytes (`leU128Bytes`) over the 16
-  bytes at `ptr`, the host unchanged but for gas (`attachedDepositUse h`:
-  `base` and the 16-byte memory write).
+* `attached_deposit(ptr)`: `attachedDeposit_rwContract` in `Hosts/Context.lean`.
 -/
 
 namespace NearLogic
@@ -26,14 +24,6 @@ theorem chargesBefore_storageUsage (st : HostStore NearState) :
   have hs : storageMutationPlan? "storage_usage" st [] = none := by simp [storageMutationPlan?]
   have hpre : "storage_usage".startsWith "promise_batch_action_" = false := by decide
   simp [chargesBefore, hs, creationAccountArgs, argU64, hpre, chargesBeforeUnvalidated, cryptoEval]
-
-theorem chargesBefore_attachedDeposit (st : HostStore NearState) (ptr : UInt64) :
-    chargesBefore "attached_deposit" st [.i64 ptr] =
-      [.ext "base", .ext "write_memory_base", .ext "write_memory_byte" 16] := by
-  have hs : storageMutationPlan? "attached_deposit" st [.i64 ptr] = none := by
-    simp [storageMutationPlan?]
-  have hpre : "attached_deposit".startsWith "promise_batch_action_" = false := by decide
-  simp [chargesBefore, hs, creationAccountArgs, argU64, hpre, chargesBeforeUnvalidated, writeMem]
 
 /-- The two context getters. -/
 def EnvGetterHost (name : String) : Prop :=
@@ -117,58 +107,5 @@ theorem storageUsage_readContract (extra : Nat) (h : NearState) (ptr : Nat) {C :
     show _ ≤ host.gas.used + storageUsageUse h
     rw [← huse]; exact Nat.le_refl _
 
-/-! ## `attached_deposit` -/
-
-/-- The charges of `attached_deposit`: `base` and a 16-byte memory write. -/
-def attachedDepositChargeList : List Charge :=
-  [.ext "base", .ext "write_memory_base", .ext "write_memory_byte" 16]
-
-/-- The gas `attached_deposit` uses. -/
-def attachedDepositUse (h : NearState) : Nat := chargesUse h attachedDepositChargeList
-
-/-- `attached_deposit(ptr)` outside a view call: replaces the 16 bytes `old`
-at `ptr` by the attached deposit's 16 little-endian bytes, returns nothing, and
-leaves the host as it was but for gas. -/
-theorem attachedDeposit_rwContract (extra : Nat) (h : NearState) (ptr : UInt64) (old : List UInt8)
-    {C : Nat} (hold : old.length = 16) (hview : h.context.isView = false) :
-    RWContract (metered extra "attached_deposit" attachedDepositFn).toHostFn h h
-      [.i64 ptr] [] ptr.toNat old (leU128Bytes h.context.attachedDeposit) (attachedDepositUse h) C := by
-  intro host mem hwf he hrd hu hmb hpp
-  have hcs : chargesBefore "attached_deposit" { mem, host } [.i64 ptr] = attachedDepositChargeList :=
-    chargesBefore_attachedDeposit _ _
-  have huse : attachedDepositUse host = attachedDepositUse h := chargesUse_erase he _
-  have hview' : host.context.isView = false := by
-    rw [erase_field he (fun x : NearState => x.context.isView) fun _ => rfl]; exact hview
-  have hv : (host.context.isView && viewRestrictedHost "attached_deposit") = false := by
-    rw [hview', Bool.false_and]
-  obtain ⟨ns, hch, hinv⟩ := metered_envGetters extra (name := "attached_deposit") (Or.inr rfl)
-    attachedDepositFn { mem, host } [.i64 ptr] (C := C) hv
-    (by rw [hcs]; rw [← huse] at hu; exact hu) hmb hpp
-  have hens : erase ns = erase h := hch.erase.trans he
-  have hdep : ns.context.attachedDeposit = h.context.attachedDeposit :=
-    erase_field hens (fun x : NearState => x.context.attachedDeposit) fun _ => rfl
-  have hview'' : ns.context.isView = false := by
-    rw [erase_field hens (fun x : NearState => x.context.isView) fun _ => rfl]; exact hview
-  have hlen : (leU128Bytes h.context.attachedDeposit).length = 16 := by simp [leU128Bytes]
-  have hin : ptr.toNat + 16 ≤ mem.byteSize := by
-    have := (hrd 15 (by omega)).1
-    omega
-  have hin' : ¬ ptr.toNat + (leU128Bytes h.context.attachedDeposit).length > mem.size * 65536 := by
-    rw [hlen]
-    unfold Memory.byteSize at hin
-    show ¬ _ > mem.pages.size * 65536
-    unfold pageSize at hin
-    omega
-  refine ⟨afterCharges ns, mem.writeList ptr.toNat (leU128Bytes h.context.attachedDeposit), ?_,
-    writeList_spec hwf (by rw [hlen]; exact hin), ?_, ?_, hch.maxBurnt, hch.prepaid⟩
-  · simp only [NearHostFn.toHostFn, Option.getD_some, hinv]
-    simp only [attachedDepositFn, disallowInView, contextU128MemFn, writeU128, writeMemBytes,
-      afterCharges, hview'', hdep, memBytes, hin', Bool.false_eq_true, ite_false]
-    rw [finish_envGetters extra (Or.inr rfl)]
-  · rw [erase_afterCharges, hch.erase, he]
-  · show ns.gas.used ≤ _
-    rw [hch.used, hcs]
-    show _ ≤ host.gas.used + attachedDepositUse h
-    rw [← huse]; exact Nat.le_refl _
 
 end NearLogic

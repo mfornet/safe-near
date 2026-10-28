@@ -996,7 +996,7 @@ theorem f529_spec_host (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : F
   have hlt := s.toNat_lt
   have h16 : (s - 16).toNat = s.toNat - 16 := by
     rw [UInt32.toNat_sub_of_le] <;> simp [UInt32.le_iff_toNat_le]; omega
-  have hc := attachedDeposit_rwContract (C := Cg) e h (s - 16).toUInt64 zeros16 (by simp [zeros16]) hview
+  have hc := attachedDeposit_rwContract (C := Cg) e h (s - 16).toUInt64 zeros16 hview (by simp [zeros16])
   rw [UInt32.toNat_toUInt64, h16, leU128Bytes_eq] at hc
   exact f529_spec cfg lim d type htype inst mi e A n g ta mx hm hd Cg gt s hs hal out ob0 ob8 hob0 hob8
     h h (depLo h) (depHi h) _ hc
