@@ -77,7 +77,7 @@ grammar function.
 |---|---|---|
 | 228 | 528 | `deserialize_struct`. Steps: `parse_whitespace`; on `{`, decrement the depth (`RecursionLimitExceeded` at 0), then the inlined derived `visit_map` loop; on `[`, the same with `visit_seq`; on anything else, `peek_invalid_type` (340). After the visitor comes `end_map` (90) or `end_seq` (91), then `fix_position` (326) on errors. |
 | 193 | 265 | `MapAccess::next_key_seed`: whitespace, then `}` (end), `,` (only after the first key), or `"`. A key is `parse_str` (646) into the scratch, after `Vec::clear` (82), and goes to the field visitor 194. |
-| 194 | 8 | `__FieldVisitor::visit_str`: the key equals `account_id` (10 bytes at 1051092, compared by 754 → 755 → `bcmp` 953) to give field 0; otherwise `__ignore` |
+| 194 | 8 | `__FieldVisitor::visit_str`: the key equals `account_id` (10 bytes at 1051092, compared by 754 → 755 → `bcmp` 953) to give field 0; otherwise `__ignore`. 953, 755, 754 and 194 are proved (`SerdeKey`). |
 | 205 | 19 | `next_value_seed` of the known field: `parse_object_colon` (89), then `ValidAccountId::deserialize` (169) |
 | 201 | 12 | `next_value_seed` of an unknown field: 89, then `ignore_value` (81) |
 | 214 | 225 | `SeqAccess::next_element_seed` (the array form `["<a>"]`): 169 |
@@ -110,7 +110,7 @@ grammar function.
 | 380 | 177 | `deserialize_str`. Steps: whitespace; on `"`, eat it, clear the scratch (343) and `parse_str` (646), then `StringVisitor::visit_str` (633); on anything else, `peek_invalid_type` (340). |
 | 633 | 28 | `visit_str`, then `to_owned` (618): `RawVec::allocate_in` (626, through 624/625/310 to the allocator), then `memcpy` (951) |
 | 502 | 72 | `TryFrom<String>`: `is_valid_account_id` (554); on false, a `Box<dyn Error>` from `&str` (693 → 811) and the `String` dropped (479) |
-| 554 | 102 | `is_valid_account_id`: the length in 2..=64, `[a-z0-9]` runs separated by single `-`, `_` or `.`, and no separator at either end |
+| 554 | 102 | `is_valid_account_id`: the length in 2..=64, `[a-z0-9]` runs separated by single `-`, `_` or `.`, and no separator at either end. Proved, with 673 (`AccountIdValid.f554_spec`). |
 
 ### Ignored values
 

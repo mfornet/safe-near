@@ -541,6 +541,11 @@ by layer, with their sizes and roles, and which other methods' parsers share the
   * `ft_balance_of`'s field visitor (194). It returns field 0 exactly on
     `BalanceOfArgs.keyBytes`, which `keyData_segment` shows sit at 1051092, and has a
     constant cost.
+* The account-id validator, `Bridge/Functions/AccountIdValid.lean`: `is_valid_account_id`
+  (554) returns 1 exactly when `validAccountIdBytes bs`, at `100 + 60·len`, and `into_iter`
+  (673) is proved with it. The loop keeps
+  `accountIdFormat true bs = accountIdFormat prev (bs.drop k)`, and `byte_cases` `decide`s
+  over all 256 bytes the five ways a byte goes through the four tests.
 
 *Plan for the rest of `FromTraitContract`, bottom-up.*
 
@@ -574,9 +579,7 @@ by layer, with their sizes and roles, and which other methods' parsers share the
    * `deserialize_str` (380): whitespace, then `"`, then `parse_str`, then `visit_str` (633
      → 618 → 626 `allocate_in` with the allocator, then `memcpy`). The `String` it returns
      lies in a fresh block.
-   * `is_valid_account_id` (554) against `validAccountIdBytes`. The loop's invariant is
-     `accountIdFormat true bs = accountIdFormat prev (bs.drop k)`, and each byte's class is
-     `decide`d as in `SerdeRead`.
+   * `is_valid_account_id` (554) is done.
    * `TryFrom` (502); and 169 with the `Err` path, which drops the `String` (479) and
      formats the error through 130/387.
 4. **Ignored values: `ignore_value` (81).**
