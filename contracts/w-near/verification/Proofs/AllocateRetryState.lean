@@ -75,6 +75,7 @@ structure Native (p : Layout) : Prop where
   wordsPositive : 0<(words p).toNat
   room : 80+(words p).toNat*4≤(AllocateGrowth.delta (growthLayout p)).toNat*65536
   vtableBound : 1057464+20≤p.memory.byteSize
+  callbackSep : (scratch p).toNat+16≤1057464+16 ∨ 1057464+20≤(scratch p).toNat
 
 structure Code (s : Store NearState) (inst : Nat) (p : Layout) : Prop where
   originalCode : AllocatePositive.Code s inst p.toLayout
