@@ -14,7 +14,7 @@ concurrency:
 jobs:
   build:
     name: Build, smoke test, and check testsuite_report.txt
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, fv01]
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -59,7 +59,7 @@ jobs:
 
   near-runtime:
     name: VM, runtime and chain scenarios and axiom audits
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, fv01]
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
@@ -114,7 +114,7 @@ jobs:
 
   runtime-conformance:
     name: Exact VM comparison with pinned nearcore
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, fv01]
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5
@@ -138,16 +138,16 @@ jobs:
           tool: wasm-tools@1.251.0
       - name: Verify all generated runtime configuration tables
         run: |
-          cargo run --locked --release --manifest-path tools/dump-runtime-config/Cargo.toml -- /tmp/safe-near-runtime-configs
-          python3 tools/check_runtime_configs.py /tmp/safe-near-runtime-configs
+          cargo run --locked --release --manifest-path tools/dump-runtime-config/Cargo.toml -- $RUNNER_TEMP/safe-near-runtime-configs
+          python3 tools/check_runtime_configs.py $RUNNER_TEMP/safe-near-runtime-configs
       - name: Verify chain replay and storage input Wasm fixtures
         run: |
-          wasm-tools parse tools/chain-conformance/fixtures/replay.wat -o /tmp/safe-near-replay.wasm
-          cmp tools/chain-conformance/fixtures/replay.wasm /tmp/safe-near-replay.wasm
-          wasm-tools parse tools/chain-conformance/fixtures/stateful.wat -o /tmp/safe-near-stateful.wasm
-          cmp tools/chain-conformance/fixtures/stateful.wasm /tmp/safe-near-stateful.wasm
-          wasm-tools parse tools/runtime-conformance/fixtures/storage_inputs.wat -o /tmp/safe-near-storage-inputs.wasm
-          cmp tools/runtime-conformance/fixtures/storage_inputs.wasm /tmp/safe-near-storage-inputs.wasm
+          wasm-tools parse tools/chain-conformance/fixtures/replay.wat -o $RUNNER_TEMP/safe-near-replay.wasm
+          cmp tools/chain-conformance/fixtures/replay.wasm $RUNNER_TEMP/safe-near-replay.wasm
+          wasm-tools parse tools/chain-conformance/fixtures/stateful.wat -o $RUNNER_TEMP/safe-near-stateful.wasm
+          cmp tools/chain-conformance/fixtures/stateful.wasm $RUNNER_TEMP/safe-near-stateful.wasm
+          wasm-tools parse tools/runtime-conformance/fixtures/storage_inputs.wat -o $RUNNER_TEMP/safe-near-storage-inputs.wasm
+          cmp tools/runtime-conformance/fixtures/storage_inputs.wasm $RUNNER_TEMP/safe-near-storage-inputs.wasm
       - name: Compare all VM observations
         run: |
           python3 -m unittest discover -s tools/runtime-conformance

@@ -15,7 +15,7 @@ concurrency:
 jobs:
   native-reference:
     name: Build pinned Runtime::apply and verify raw-state replay
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, fv01]
     timeout-minutes: 60
     env:
       CARGO_BUILD_JOBS: "2"
@@ -51,7 +51,7 @@ jobs:
   financial-regression:
     name: Financial comparison and snapshot import
     needs: native-reference
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, fv01]
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
