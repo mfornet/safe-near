@@ -2,6 +2,7 @@ import Proofs.StateReadRegisterOuterPhases
 import Proofs.StateReadRegisterOuterLengthResult
 import Proofs.StateReadRegisterOuterVectorNative
 import Proofs.AllocateVectorOuterResult
+import Proofs.StateDispatchReadCallFrame
 import Proofs.StateDispatchLengthOuterFrame
 import Proofs.StateReadRegisterOuterReadFinalFrame
 
@@ -16,10 +17,22 @@ private def fields (s : Store NearState) := (s.funcs,s.modules,s.tables)
 private theorem fields_paid (s : Store NearState) (op n : Nat) : fields (paid s op n)=fields s := by
   induction n with |zero=>rfl |succ n ih=>exact ih
 private theorem fields_charge (s : Store NearState) (cost : Nat) : fields (chargedStore s cost)=fields s := rfl
+private theorem fields_store32 (s : Store NearState) (i a : Nat) (m : Memory) (v : UInt32) : fields (storeI32 s i a m v)=fields s := rfl
+private theorem fields_store64 (s : Store NearState) (i a : Nat) (m : Memory) (v : UInt64) : fields (storeI64 s i a m v)=fields s := rfl
+private theorem fields_global (s : Store NearState) (i : Nat) (v : Value) : fields (setGlobal s i v)=fields s := rfl
+private theorem fields_copied (s : Store NearState) (op i : Nat) (m : Memory) (out sp : UInt32) :
+    fields (copied s op i m out sp)=fields s := by
+  simp only [copied,copyLow,copyHigh,fields_store64,fields_store32,fields_paid]
+private theorem globals_copied (s : Store NearState) (op i : Nat) (m : Memory) (out sp : UInt32) :
+    (copied s op i m out sp).globals=s.globals := by
+  have gp : ∀ t : Store NearState, ∀ op n, (paid t op n).globals=t.globals := by
+    intro t op n;induction n with |zero=>rfl |succ n ih=>exact ih
+  simp only [copied,copyLow,copyHigh,storeI32_globals,storeI64_globals,gp]
 private theorem mems_paid (s : Store NearState) (op n : Nat) : (paid s op n).mems=s.mems := by
   induction n with |zero=>rfl |succ n ih=>exact ih
 private theorem mems_charge (s : Store NearState) (cost : Nat) : (chargedStore s cost).mems=s.mems := rfl
 private theorem mems_global (s : Store NearState) (index : Nat) (value : Value) : (setGlobal s index value).mems=s.mems := rfl
+private theorem globals_charge (s : Store NearState) (cost : Nat) : (chargedStore s cost).globals=s.globals := rfl
 private theorem globals_paid (s : Store NearState) (op n : Nat) : (paid s op n).globals=s.globals := by
   induction n with |zero=>rfl |succ n ih=>exact ih
 private theorem fields_pack (s t : Store NearState)
@@ -142,4 +155,38 @@ theorem after_memory (cfg : WasmConfig) (s : Store NearState) (p : Layout)
     (after cfg s p).mems[p.memoryIndex]?=some (copiedMemory p) := by
   rw [after,mems_global,mems_paid,branched,mems_charge]
   exact copyDone_memory cfg s p hm
+theorem readDone_fields (cfg : WasmConfig) (s : Store NearState) (p : Layout) :
+    (readDone cfg s p).funcs=s.funcs ∧ (readDone cfg s p).modules=s.modules ∧ (readDone cfg s p).tables=s.tables := by
+  have c := StateDispatchRead.callAfter_fields cfg (readArguments cfg s p) (readLayout p) p.bytes
+  have a := readArguments_fields cfg s p
+  unfold readDone
+  exact ⟨c.1.trans a.1,c.2.1.trans a.2.1,c.2.2.trans a.2.2⟩
+
+theorem readDone_globals (cfg : WasmConfig) (s : Store NearState) (p : Layout)
+    (hn : Native p) (ha : p.allocator=1074896) (hg : s.globals[p.globalIndex]?=some p.global523) :
+    (readDone cfg s p).globals=(setGlobal s p.globalIndex (.i32 (scratch p))).globals := by
+  have gg := readArguments_global cfg s p hn ha hg
+  have rg : (readArguments cfg s p).globals[(readLayout p).globalIndex]?=some (readLayout p).global := gg
+  have call := StateDispatchRead.callAfter_globals cfg (readArguments cfg s p) (readLayout p) p.bytes rg rfl
+  unfold readDone
+  rw [call,readArguments,globals_paid]
+  exact allocated_globals cfg s p hn ha hg
+
+theorem after_fields (cfg : WasmConfig) (s : Store NearState) (p : Layout) :
+    (after cfg s p).funcs=s.funcs ∧ (after cfg s p).modules=s.modules ∧ (after cfg s p).tables=s.tables := by
+  have tail : fields (after cfg s p)=fields (readDone cfg s p) := by
+    rw [after,fields_global,fields_paid,branched,fields_charge,copyDone,fields_copied]
+  exact fields_unpack s _ (tail.trans (fields_pack _ _ (readDone_fields cfg s p)))
+
+theorem after_globals (cfg : WasmConfig) (s : Store NearState) (p : Layout)
+    (hn : Native p) (ha : p.allocator=1074896) (hg : s.globals[p.globalIndex]?=some p.global523)
+    (hv : p.global523.value=.i32 p.sp523) : (after cfg s p).globals=s.globals := by
+  have tail : (copyDone cfg s p).globals=(readDone cfg s p).globals := by
+    unfold copyDone
+    exact globals_copied _ _ _ _ _ _
+  have restore := StorePairCaller.setGlobal_restore s p.globalIndex (.i32 (scratch p)) p.global523 hg
+  unfold after
+  simp only [setGlobal,globals_paid]
+  rw [show (branched cfg s p).globals=(copyDone cfg s p).globals from by rw [branched,globals_charge],tail,readDone_globals cfg s p hn ha hg]
+  simpa only [setGlobal,hv] using restore
 end WNear.Proofs.StateReadRegisterOuter
