@@ -599,4 +599,107 @@ theorem body3G (cfg : WasmConfig) (lim : ExecLimits) (d : Nat)
 
 end Body
 
+/-! ## The walk -/
+
+section Walk
+
+variable {GF : BundledGFunctors} [WasmGS NearState GF]
+
+set_option maxHeartbeats 16000000 in
+set_option maxRecDepth 200000 in
+/-- **`alloc_first_fit` (580) on any free list.** From the slot holding the head of a model `H`
+(`H.wf live F`) and its cells: `0` with the slot emptied and every listed cell unlinked (`zW`), or
+a block `r ≠ 0` (aligned, `size ≤ 4 · w` bytes) lent, the slot holding the new list's head (`wW`),
+at `walkCost cfg F = 320 · F + 330` `regular_op_cost`s. -/
+theorem f580_walk (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
+    (htype : type.results.length = 1) (inst : Nat) (mi : ModuleInst) (n : Nat)
+    (hn : mi.memAddrs[0]? = some n) (a572 a575 a576 a574 a578 ta : Nat)
+    (h572 : mi.funcAddrs[572]? = some a572) (h575 : mi.funcAddrs[575]? = some a575)
+    (h576 : mi.funcAddrs[576]? = some a576)
+    (h574 : mi.funcAddrs[574]? = some a574) (hta : mi.tableAddrs[0]? = some ta)
+    (ty572 ty575 ty576 ty574 : FuncType)
+    (hp572 : ty572.params.length = 1) (hr572 : ty572.results.length = 1)
+    (hp575 : ty575.params.length = 1) (hr575 : ty575.results.length = 0)
+    (hp576 : ty576.params.length = 1) (hr576 : ty576.results.length = 1)
+    (hp574 : ty574.params.length = 1) (hr574 : ty574.results.length = 0)
+    (hty578 : (mi.types[13]!).params.length = 2) (hrt578 : (mi.types[13]!).results.length = 1)
+    (hd : d + 1 < lim.maxCallDepth) (Cg : Nat)
+    (w al slot idx : UInt32) (k : Nat) (hal : al.toNat = 2 ^ k) (hk : k ≤ 20)
+    (hw1 : 1 ≤ w.toNat) (hw2 : w.toNat < 2 ^ 28)
+    (maxP len : Nat) (live : List (Nat × Nat)) (F size : Nat) (hs0 : 0 < size) (hsw : size ≤ 4 * w.toNat)
+    (H : HeapModel) (hw : H.wf live F) (hl : H.len = len) :
+    code7 (GF := GF) inst mi a572 a576 a574 a578 ty572 ty576 ty574 ∗ code575 inst mi a575 a576 ty575 ty576 ∗
+      n ↪[wmlimit] some maxP
+      ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f580 Cg
+        (fun args => iprop(⌜args = [.i32 w, .i32 al, .i32 slot, .i32 1057464, .i32 1057464]⌝ ∗
+          n ↦[i32][ slot.toNat ] UInt32.ofNat H.head ∗ ([∗list] c ∈ H.cells, cellRes n live c) ∗
+          vt n 1057464 idx ta a578))
+        (fun _ => walkCost cfg F)
+        (walkQ n slot.toNat idx ta a578 (zW n live F len) (wW n live F len size al idx ta a578)) := by
+  iintro ⟨#Hk, #Hk5, #Hm⟩
+  iapply MFunSpec_intro
+  imodintro
+  iintro %args %R ⟨%hargs, Hs, Hcs, Hvt⟩ Hc
+  subst hargs
+  have hal0 : al ≠ 0 := by intro h; subst h; have := @Nat.one_le_two_pow k; simp at hal; omega
+  have hL : wc cfg H.freeList.length ≤ wc cfg F := wc_mono cfg hw.lists.fl_len
+  rw [htype]
+  simp only [f580, walkCost]
+  mstep; mstep; mstep; mstep; mstep; mstep; mstep; mstep; mstep; mstep; mstep; mstep; mstep
+  mstep
+  mstep [Hs]
+  mstep
+  mstep
+  mstep
+  rw [flag_zero al hal0]
+  iapply mwpi_cons
+  mcredits (cfg.regularOpCost + (wc cfg H.freeList.length + 310 * cfg.regularOpCost + R))
+  iapply WNear.Binary.MemCpy.mwpi_loop0 (Cg := Cg) (R := wc cfg H.freeList.length + 310 * cfg.regularOpCost + R)
+    .empty _ (inv3 cfg Cg R inst mi n live F len w al slot idx ta a578) rfl
+  isplitr
+  swap
+  · isplitl [Hc]; · iexact Hc
+    inext; iintro Hc
+    simp only [inv3]
+    isplitr; · ipureintro; trivial
+    iexists H, 0, 0, 0, 0, 0
+    isplitr; · ipureintro; rfl
+    iframe Hc
+    iunfold stW
+    iframe Hs Hcs Hvt
+    ipureintro; exact ⟨hw, hl⟩
+  imodintro
+  iintro %X %l HI
+  iunfold inv3 at HI
+  icases HI with ⟨%hX, %H', %m9, %m10, %m11, %m12, %m13, %hg, Hc, Hst⟩
+  subst hX
+  rw [hg]
+  by_cases hne : H'.freeList = []
+  · ---------------------------------------------------------------- the list exhausted
+    have h0 : UInt32.ofNat H'.head = 0 := by simp only [HeapModel.head, hne, List.headD_nil]; rfl
+    iunfold stW at Hst
+    icases Hst with ⟨%⟨hw', hl'⟩, Hs, Hcs, Hvt⟩
+    rw [h0]
+    iapply (exit0 cfg lim d _ inst mi Cg R w al slot 1057464 1057464 m9 m10 m11 m12 m13)
+    isplitl [Hc]; · mcredits (10 * cfg.regularOpCost + R); iexact Hc
+    iintro %g Hc
+    mstep_post
+    iframe Hc
+    iunfold walkQ
+    iexists 0
+    isplitr; · ipureintro; rfl
+    ileft
+    isplitr; · ipureintro; rfl
+    iframe Hs Hvt
+    iunfold zW
+    iexists H'
+    iframe Hcs
+    ipureintro; exact ⟨hw', hl', hne⟩
+  · iapply (body3G cfg lim d inst mi n hn a572 a575 a576 a574 a578 ta h572 h575 h576 h574 hta
+      ty572 ty575 ty576 ty574 hp572 hr572 hp575 hr575 hp576 hr576 hp574 hr574 hty578 hrt578 hd Cg R
+      w al slot idx k hal hk hw1 hw2 maxP len live F size hs0 hsw _ H' hne m9 m10 m11 m12 m13)
+    iframe Hk Hk5 Hm Hc Hst
+
+end Walk
+
 end WNear.Binary.AllocWalk
