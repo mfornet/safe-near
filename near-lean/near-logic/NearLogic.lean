@@ -43,3 +43,4 @@ import NearLogic.Tactic.Step
 import NearLogic.Tactic.Control
 import NearLogic.CallPred2
 import NearLogic.Hosts.StorageWrite
+import NearLogic.Hosts.StorageHasKey
