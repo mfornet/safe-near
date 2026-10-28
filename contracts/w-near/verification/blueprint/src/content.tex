@@ -486,6 +486,29 @@ growth/retry typed costs are respectively $13n+655$ and $13n+671$ ordinary
 units plus one growth fee, over $12n+523$ and $12n+529$ steps; their required
 call depths are6 and7 above the caller. All these wrappers preserve the
 original SP, installed code and functional host.
+The actual nonzeroing236/310 forwarding functions now also compose581's
+successful growth/retry contract, at616 and632 ordinary typed-call units plus
+one growth fee, over496 and502 steps. Their direct-fit and one-short-candidate
+contracts retain the exact sequential allocator result without a zero-fill:
+direct-fit typed costs are371/304 and387/310 units/steps; one-short-candidate
+costs are442/363 and458/369.
+The actual689 positive-size, alignment-one, zeroed-flag-one record allocator
+now composes313 and writes size at output offset4 followed by the pointer at
+offset0. Its typed call costs $13n+698$ ordinary units plus one growth fee,
+over $12n+549$ steps, with depth8 above the caller. Record output may alias
+the allocated memory; the final memory records both writes in their real order.
+The enclosing690 wrapper reserves16 stack bytes, calls689, reads and copies
+two32-bit words sequentially, then restores SP. Its high-word source is read
+after the low-word destination write. Exact sequential readback needs no
+separation; canonical original high-word readback requires only that specific
+four-byte write/read separation. Typed690 costs $13n+732$ ordinary units plus
+one fee/$12n+574$ steps, with depth9 above the caller. All eight actual getter
+captures of236/310/689/690 independently match whole memory, return values,
+SP, gas, fuel and one-less-fuel exhaustion.
+Packed unsigned16-bit load and store rules now cover the actual900 formatting
+instructions with two-byte bounds, exact little-endian writes, low16-bit
+readback, and arbitrary stack/caller prefixes. Complete900/903 decimal
+formatting and higher686/687/read219 composition remain open.
 
 Successful577 components now include requested-word scaling, all29 sizing
 guards/operations, checked page ceiling569, the real memory-growth operation,
