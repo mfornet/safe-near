@@ -41,3 +41,5 @@ import NearLogic.Hosts.StorageRead
 import NearLogic.Hosts.PanicUtf8
 import NearLogic.Tactic.Step
 import NearLogic.Tactic.Control
+import NearLogic.CallPred2
+import NearLogic.Hosts.StorageWrite
