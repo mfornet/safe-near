@@ -16,10 +16,11 @@ segment `dataInitK` and zeros elsewhere.
   vtable words, `to_string`'s data, the `LocalKey` word, the allocator's policy vtable word, the
   quote, `ESCAPE` and digit tables, and the zeroed statics after the data segment (the heap head,
   `BLOCKCHAIN_INTERFACE`, the panic hook); and for the panic path (`PanicStr`), the vtable word of
-  `panic_utf8` and `PanicOnDefault`'s message (`staticsRes` drops them).
+  `panic_utf8` and `PanicOnDefault`'s message.
 * `tableRes`: the table entries `ft_total_supply` uses, and the `panic_utf8` trampoline's.
-* `staticsRes`: `FtTotalSupply.statics` from the memory, the table, the memory length and limit
-  (`heapInv_init`).
+* `staticsResP`: `FtTotalSupply.statics` from the memory, the table, the memory length and limit
+  (`heapInv_init`), with the panic path's cells (`panicSlot`, the message); `staticsRes` drops
+  them.
 
 The cells of the store themselves (`startCells`) are taken in `StartCells.lean`.
 -/
@@ -276,20 +277,28 @@ def tableRes (ta : Nat) : IProp GF :=
     ta ↦[wt][ 60 ] Ref.func 262)
 
 set_option maxRecDepth 100000 in
-/-- **The statics of `ft_total_supply`** from the instantiated memory (`MemImage`), its length
-`len` and limit 2048, and the table: the 736 bytes of stack below 1048576 and
-`FtTotalSupply.statics` with the addresses of `wInst` (`A = id`), the default hook (`old = 0`),
-the interface not set up (`k3 = 0`), wee_alloc's vtable index 123, `to_string`'s pieces at
-1051836, and the empty heap (`heapInv_init`). -/
-theorem staticsRes {m : Memory} {L : Nat} (hm : MemImage m L) (n ta len : Nat) (hl1 : len % 65536 = 0) (hl0 : 0 < len)
-    (hl2 : len < 2 ^ 32) :
+/-- **The statics of `ft_total_supply`, with the panic path's** from the instantiated memory
+(`MemImage`), its length `len` and limit 2048, and the table: the 736 bytes of stack below
+1048576, `FtTotalSupply.statics` with the addresses of `wInst` (`A = id`), the default hook
+(`old = 0`), the interface not set up (`k3 = 0`), wee_alloc's vtable index 123, `to_string`'s
+pieces at 1051836, and the empty heap (`heapInv_init`); and the `panic_utf8` vtable slot
+(`panicSlot`) and `PanicOnDefault`'s message. -/
+theorem staticsResP {m : Memory} {L : Nat} (hm : MemImage m L) (n ta len : Nat) (hl1 : len % 65536 = 0)
+    (hl0 : 0 < len) (hl2 : len < 2 ^ 32) :
     memR (GF := GF) m n 0 L ∗ n ↦[wmlength] len ∗ n ↪[wmlimit] some 2048 ∗ tableRes ta ⊢
-      stk n 1047840 736 ∗ FtTotalSupply.statics n ta id 0 0 123 1051836 2048 len := by
+      stk n 1047840 736 ∗ FtTotalSupply.statics n ta id 0 0 123 1051836 2048 len ∗
+        (PanicStr.panicSlot n ta id ∗ n ↦[wms][ 1050868 ] PanicStr.notInit) := by
   refine (sep_mono_left (memRes0 hm n)).trans ?_
-  iintro ⟨⟨STK, KEY, V12, V16, V92, -, V188, -, Q, ⟨TS0, TS4⟩, LK, VT, ESC, T157, LUT, HEAD, ⟨B0, B4, B8, B12⟩,
-    ⟨K0, K4, K8, K12⟩, -⟩, HL, #HM, HT⟩
+  iintro ⟨⟨STK, KEY, V12, V16, V92, V100, V188, MSG, Q, ⟨TS0, TS4⟩, LK, VT, ESC, T157, LUT, HEAD,
+    ⟨B0, B4, B8, B12⟩, ⟨K0, K4, K8, K12⟩, -⟩, HL, #HM, HT⟩
   iunfold tableRes at HT
-  icases HT with ⟨T116, T106, T39, T58, T82, T38, T123, T157', T92, -⟩
+  icases HT with ⟨T116, T106, T39, T58, T82, T38, T123, T157', T92, T60⟩
+  ihave HP : PanicStr.panicSlot (GF := GF) n ta id $$ [V100 T60]
+  · iapply PanicStr.panicSlot_of n ta id
+    isplitl [V100]
+    · iexact V100
+    · simp only [id]; iexact T60
+  iframe HP MSG
   ihave HEAD := memBytes_addr (a := 1074896) (b := AllocInv.headAddr) rfl $$ HEAD
   ihave Hinv := AllocInv.heapInv_init n 2048 len hl1 hl0 hl2 $$ [HEAD HL]
   · iframe HEAD HL HM
@@ -312,6 +321,13 @@ theorem staticsRes {m : Memory} {L : Nat} (hm : MemImage m L) (n ta len : Nat) (
   simp only [id]
   iframe STK K12 K0 K4 K8 LK T116 T106 B0 B4 B8 B12 V16 T39 V92 T58 V188 T82 V12 T38 VT T123 Hinv KEY TS0 TS4
     T157 T157' T92 Q ESC LUT
+
+/-- **The statics of `ft_total_supply`** (`staticsResP`, the panic path's dropped). -/
+theorem staticsRes {m : Memory} {L : Nat} (hm : MemImage m L) (n ta len : Nat) (hl1 : len % 65536 = 0) (hl0 : 0 < len)
+    (hl2 : len < 2 ^ 32) :
+    memR (GF := GF) m n 0 L ∗ n ↦[wmlength] len ∗ n ↪[wmlimit] some 2048 ∗ tableRes ta ⊢
+      stk n 1047840 736 ∗ FtTotalSupply.statics n ta id 0 0 123 1051836 2048 len :=
+  (staticsResP hm n ta len hl1 hl0 hl2).trans (sep_mono_right sep_elim_left)
 
 end Mem
 
