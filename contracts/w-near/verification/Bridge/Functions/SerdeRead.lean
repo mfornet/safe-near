@@ -237,24 +237,24 @@ theorem optByte_some (b : UInt8) :
 theorem optByte_byte (b : UInt8) : (optByte (some b) >>> (16 % 64)).toUInt32 &&& 255 = b.toUInt32 := by
   revert b; exact uint8_forall (by decide +kernel)
 
-/-- A whitespace byte passes 339.s range check `b - 9 ≤ 23`. -/
+/-- A whitespace byte passes 339's range check `b - 9 ≤ 23`. -/
 theorem ws_range (b : UInt8) (h : NearInterface.Json.isWhitespace b = true) :
     Numeric.bool (Numeric.irelop32 IRelOp.gt_u (b.toUInt32 + 4294967287) 23) = 0 := by
   revert b h; exact uint8_forall (by decide +kernel)
 
-/-- A whitespace byte has its bit in 339.s mask `0x800013` (bits 0, 1, 4, 23: `\t \n \r ' '`). -/
+/-- A whitespace byte has its bit in 339's mask `0x800013` (bits 0, 1, 4, 23: `\t \n \r ' '`). -/
 theorem ws_bit (b : UInt8) (h : NearInterface.Json.isWhitespace b = true) :
     Numeric.bool ((1 : UInt32) <<< ((b.toUInt32 + 4294967287) % 32) &&& 8388627 == 0) = 0 := by
   revert b h; exact uint8_forall (by decide +kernel)
 
-/-- A byte that is not whitespace fails 339.s range check or its mask. -/
+/-- A byte that is not whitespace fails 339's range check or its mask. -/
 theorem nws_cases (b : UInt8) (h : NearInterface.Json.isWhitespace b = false) :
     Numeric.bool (Numeric.irelop32 IRelOp.gt_u (b.toUInt32 + 4294967287) 23) = 1 ∨
       (Numeric.bool (Numeric.irelop32 IRelOp.gt_u (b.toUInt32 + 4294967287) 23) = 0 ∧
         Numeric.bool ((1 : UInt32) <<< ((b.toUInt32 + 4294967287) % 32) &&& 8388627 == 0) = 1) := by
   revert b h; exact uint8_forall (by decide +kernel)
 
-/-- 339.s result on `Some b`: the byte and the `Some` bit kept. -/
+/-- 339's result on `Some b`: the byte and the `Some` bit kept. -/
 theorem optByte_keep (b : UInt8) :
     (optByte (some b) &&& 256 ||| optByte (some b) &&& 18446744069431296000 ||| 0) = optByte (some b) := by
   revert b; exact uint8_forall (by decide +kernel)

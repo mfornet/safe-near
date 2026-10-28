@@ -11,15 +11,15 @@ A struct's field visitor compares the key's bytes with each field name:
 ;;                                      first difference k
 ;; 755 <[u8] as SlicePartialEq>::equal(a, la, b, lb) -> i32   la = lb && bcmp(a, b, la) == 0
 ;; 754 <[A] as PartialEq<[B]>>::eq      755
-;; 194 __FieldVisitor::visit_str(out?, p, k) -> i64 (ft_balance_of)
+;; 194 __FieldVisitor::visit_str(p, k) -> i64 (ft_balance_of)
 ;;                                      eq(p, k, "account_id" @ 1051092, 10) ? 0 : 256
 ```
 
 * `f953_spec`: `bcmp` on two separately owned ranges of the same length: a result that is `0`
   exactly when the bytes are equal; `cost953 len`.
 * `f755_spec`, `f754_spec`: slice equality, `1` exactly when the slices are equal; the cost is
-  bounded by the second slice.s length (`bcmp` runs only when the lengths agree), so a field
-  visitor.s cost does not depend on the key.
+  bounded by the second slice's length (`bcmp` runs only when the lengths agree), so a field
+  visitor's cost does not depend on the key.
 * `f194_spec`: `ft_balance_of`'s field visitor: field 0 (`account_id`, the `i64` 0) on the key
   `account_id`, `__ignore` (the `i64` 256) on any other key, with the 10 bytes at 1051092
   (`WNear.BalanceOfArgs.keyBytes`, `keyData_segment`) owned; `cost194` regular_op_costs.

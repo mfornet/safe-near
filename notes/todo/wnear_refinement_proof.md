@@ -518,6 +518,97 @@ against `Call.decode`, stack `S`, cost `K0 + K1·len`, heap room), with `f65_con
 allocate and free: they need the allocator on any free list (M4), as does the rest of 297
 (`LookupMap::get`, 293/415, after the parser's frees).
 
+*The parser, mapped:* `notes/todo/wnear_m6_parser_map.md` lists the 202 functions below 66
+by layer, with their sizes and roles, and which other methods' parsers share them.
+
+* 137 functions are common to all nine argument parsers.
+* `storage_balance_of`'s 52/222/191 are 66/228/193, instruction for instruction.
+* The model and serde_json 1.0.60 were checked against each other on every acceptance
+  point (whitespace, the two struct forms, duplicate and unknown fields, keys, escapes,
+  surrogates, UTF-8, numbers, depth, trailing data). No disagreement was found.
+
+*Proved since (no `sorry`):*
+
+* The reader over the slice, `Bridge/Functions/SerdeRead.lean`. The input model is
+  `rd n de ptr bs i`, the `SliceRead` at `de` over `bs` at position `i`. Proved:
+  * `peek` (332), `eat_char` (333), `next_char` (324), `SliceRead::next` (637) and
+    `peek_or_null` (329);
+  * `parse_whitespace` (339), which skips `wsLen (bs.drop i)` bytes at `100 + 96·w`. Its
+    link to the model is `skipWhitespace_eq`, which says the model drops the same bytes.
+* Key matching, `Bridge/Functions/SerdeKey.lean`. Proved:
+  * `bcmp` (953), whose result is 0 exactly when the bytes are equal;
+  * slice equality (755/754), whose cost depends only on the second, known length;
+  * `ft_balance_of`'s field visitor (194). It returns field 0 exactly on
+    `BalanceOfArgs.keyBytes`, which `keyData_segment` shows sit at 1051092, and has a
+    constant cost.
+
+*Plan for the rest of `FromTraitContract`, bottom-up.*
+
+1. **The rejection side needs no tight cost.** `Refines` asks only `RolledBack` for input
+   that is not a call, and `method_vm_any` turns a run that runs out of gas into a gas
+   failure. A reject path therefore needs a spec that ends in `Err` (then 881's panic) with
+   *some* finite cost, say polynomial in `len`. The tight `K0 + K1·len` is needed only on
+   the accepting path.
+   * Plan to split `FromTraitContract` into an accepting contract with the tight cost and a
+     rejecting contract with a loose one.
+   * Error constructors can then be specified once, generically: they return a boxed
+     `Error`, the heap invariant is kept, the cost is at most `E0 + E1·len`, and the output
+     says nothing more. This applies to 322/325 (`position_of_index` is linear), 340, 642
+     and 643 (`format!` through `core::fmt::write` 872 and the vtables of M5), and the
+     drops 92/341/151.
+2. **Strings: `parse_str` (646) against `stringBody`.** Prove the spec in this order:
+   * (a) the plain case: no escape, so the `Borrowed` slice, with `as_str` on bytes known to
+     be UTF-8;
+   * (b) escapes (649, 653, 605 and the scratch appends 613/614) against `unicodeEscape` and
+     the simple escapes;
+   * (c) the reject cases: a control byte, EOF, a bad escape, invalid UTF-8.
+
+   `from_utf8` (927, 443 instructions) is the hardest leaf. Do its ASCII fast path first,
+   which is enough for keys and account ids, then the general validator against
+   `String.fromUTF8?`. The general one is needed because the model accepts any UTF-8 key
+   for an unknown field.
+
+   `ignore_str` (650) and `ignore_escape` (652) are the same scan without UTF-8. Their spec
+   is acceptance and the rest, as `stringBody` gives them, ignoring its first component.
+3. **The value: `ValidAccountId`.**
+   * `deserialize_str` (380): whitespace, then `"`, then `parse_str`, then `visit_str` (633
+     → 618 → 626 `allocate_in` with the allocator, then `memcpy`). The `String` it returns
+     lies in a fresh block.
+   * `is_valid_account_id` (554) against `validAccountIdBytes`. The loop's invariant is
+     `accountIdFormat true bs = accountIdFormat prev (bs.drop k)`, and each byte's class is
+     `decide`d as in `SerdeRead`.
+   * `TryFrom` (502); and 169 with the `Err` path, which drops the `String` (479) and
+     formats the error through 130/387.
+4. **Ignored values: `ignore_value` (81).**
+   * First a pure Lean lemma. Define the iterative machine 81 implements, with an explicit
+     stack of `[`/`{` frames, and prove it accepts exactly what `NearInterface.Json.value`
+     accepts, with the same rest. The model is recursive, through `value`, `elements` and
+     `members`.
+   * Then the Wasm proof against the machine. The frame stack lives in the scratch `Vec`
+     (84 push, 85 pop, growth 698/712–716), and it needs heap room of one byte per open
+     bracket.
+   * The numbers 83/86/87 go against `number`.
+5. **The struct: `deserialize_struct` (228).**
+   * Again first a pure Lean lemma. Define serde's struct machine: `{` or `[`; then
+     `next_key_seed`, the field visitor, `next_value_seed`, a seen flag, `duplicate_field`
+     and `missing_field`; then `end_map` or `end_seq`. Prove it agrees with
+     `(parse bs).bind (structFields ["account_id"])` followed by `required account`. It must
+     agree on acceptance and on the account, up to the trailing whitespace that `end` (320)
+     checks. This lemma is the formal form of the "no discrepancy" check above.
+   * Then the Wasm proofs of 193, 205/201, 89, 90/91, 214 and 228 against the machine. The
+     loop invariant holds the `Option<ValidAccountId>` read so far: a lent heap block, or
+     none.
+   * The depth byte goes 128 → 127, and `RecursionLimitExceeded` is unreachable.
+6. **66 itself:** 634, then 228, then 320, then the drop of the scratch (68, a no-op when
+   its capacity is 0, else `dealloc`). This proves `FromTraitContract`'s accepting half with
+   `K1` read off the per-byte costs. Those are 96 per whitespace byte so far, and the string
+   scan is about 30 per byte, so `K1 ≤ 480` looks comfortable. The rejecting half comes from
+   step 1.
+7. **The other methods.** Steps 1–4 are shared by every parser. Step 5 is one instance per
+   struct; state it generically over the field list and the field visitor, so that 222,
+   221, 224, 229 etc. come from the same proof. `U128` adds `u128::from_str_radix` (871,
+   with `__multi3`). `bool` adds 167, then 323. `Option` adds 168–172.
+
 ### M7. State and storage
 
 Borsh encoding of the state, `LookupMap` keys, near-sdk's `env` wrappers
