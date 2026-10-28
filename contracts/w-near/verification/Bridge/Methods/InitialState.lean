@@ -1,4 +1,5 @@
 import Bridge.Functions.FtTotalSupply
+import Bridge.Functions.PanicStr
 import NearLogic.Instantiate
 
 /-!
@@ -14,8 +15,9 @@ segment `dataInitK` and zeros elsewhere.
   cells `ft_total_supply` owns: the 736 bytes of stack below 1048576, `"STATE"`, the interface's
   vtable words, `to_string`'s data, the `LocalKey` word, the allocator's policy vtable word, the
   quote, `ESCAPE` and digit tables, and the zeroed statics after the data segment (the heap head,
-  `BLOCKCHAIN_INTERFACE`, the panic hook).
-* `tableRes`: the table entries `ft_total_supply` uses.
+  `BLOCKCHAIN_INTERFACE`, the panic hook); and for the panic path (`PanicStr`), the vtable word of
+  `panic_utf8` and `PanicOnDefault`'s message (`staticsRes` drops them).
+* `tableRes`: the table entries `ft_total_supply` uses, and the `panic_utf8` trampoline's.
 * `staticsRes`: `FtTotalSupply.statics` from the memory, the table, the memory length and limit
   (`heapInv_init`).
 
@@ -93,8 +95,11 @@ noncomputable def seg (a len : Nat) : List UInt8 :=
 theorem seg_v12 : seg 1050200 4 = dataWord (1050188 + 12) := by rw [dataWord_eq _ (by decide)]; rfl
 theorem seg_v16 : seg 1050204 4 = dataWord (1050188 + 16) := by rw [dataWord_eq _ (by decide)]; rfl
 theorem seg_v92 : seg 1050280 4 = dataWord (1050188 + 92) := by rw [dataWord_eq _ (by decide)]; rfl
+theorem seg_v100 : seg 1050288 4 = dataWord (1050188 + 100) := by rw [dataWord_eq _ (by decide)]; rfl
 theorem seg_v188 : seg 1050376 4 = dataWord (1050188 + 188) := by rw [dataWord_eq _ (by decide)]; rfl
 theorem seg_key : seg 1049788 5 = StateRead.stateKey := StateRead.stateKey_data
+/-- `PanicOnDefault`'s message. -/
+theorem seg_notInit : seg 1050868 31 = PanicStr.notInit := PanicStr.notInit_data
 theorem seg_quote : seg 1051817 1 = [34] := by decide
 /-- `to_string`'s `fmt::Arguments` pieces pointer and count. -/
 theorem seg_ts : seg 1051836 8 = bytes32 1051836 ++ bytes32 0 := by decide
@@ -209,13 +214,14 @@ theorem memRes0 {m : Memory} {L : Nat} (hm : MemImage m L) (n : Nat) :
     memR (GF := GF) m n 0 L ⊢
       stk n 1047840 736 ∗ (n ↦[wms][ 1049788 ] StateRead.stateKey ∗
       (n ↦[wms][ 1050188 + 12 ] dataWord (1050188 + 12) ∗ (n ↦[wms][ 1050188 + 16 ] dataWord (1050188 + 16) ∗
-      (n ↦[wms][ 1050188 + 92 ] dataWord (1050188 + 92) ∗ (n ↦[wms][ 1050188 + 188 ] dataWord (1050188 + 188) ∗
+      (n ↦[wms][ 1050188 + 92 ] dataWord (1050188 + 92) ∗ (n ↦[wms][ 1050188 + 100 ] dataWord (1050188 + 100) ∗
+      (n ↦[wms][ 1050188 + 188 ] dataWord (1050188 + 188) ∗ (n ↦[wms][ 1050868 ] PanicStr.notInit ∗
       (n ↦[wms][ 1051817 ] [34] ∗ ((n ↦[i32][ 1051836 ] 1051836 ∗ n ↦[i32][ 1051836 + 4 ] 0) ∗
       (n ↦[i32][ 1055020 ] 116 ∗ (n ↦[i32][ 1057480 ] 123 ∗ (n ↦[wms][ 1061856 ] SerializeStr.esc ∗
       (n ↦[i32][ 1065416 ] 157 ∗ (n ↦[wms][ 1070974 ] FmtDigits.lut ∗ (n ↦[i32][ 1074896 ] 0 ∗
       ((n ↦[i32][ 1074900 ] 0 ∗ n ↦[i32][ 1074900 + 4 ] 0 ∗ n ↦[i32][ 1074900 + 8 ] 0 ∗ n ↦[i32][ 1074900 + 12 ] 0) ∗
       ((n ↦[i32][ 1074920 ] 0 ∗ n ↦[i32][ 1074920 + 4 ] 0 ∗ n ↦[i32][ 1074920 + 8 ] 0 ∗
-        n ↦[i32][ 1074920 + 12 ] 0) ∗ True))))))))))))))) := by
+        n ↦[i32][ 1074920 + 12 ] 0) ∗ True))))))))))))))))) := by
   have hL := hm.1
   refine cut n 0 L 1047840 736 (by omega) (by omega)
     ((memR_zero hm n 1047840 736 (Or.inr (by decide)) (by omega)).trans (zero_stk n 1047840 736)) ?_
@@ -227,8 +233,12 @@ theorem memRes0 {m : Memory} {L : Nat} (hm : MemImage m L) (n : Nat) :
     seg_v16 rfl) ?_
   refine cut n _ _ 1050280 4 (by omega) (by omega) (conv_data hm n 1050280 4 (by decide) (by decide) (by omega)
     seg_v92 rfl) ?_
+  refine cut n _ _ 1050288 4 (by omega) (by omega) (conv_data hm n 1050288 4 (by decide) (by decide) (by omega)
+    seg_v100 rfl) ?_
   refine cut n _ _ 1050376 4 (by omega) (by omega) (conv_data hm n 1050376 4 (by decide) (by decide) (by omega)
     seg_v188 rfl) ?_
+  refine cut n _ _ 1050868 31 (by omega) (by omega) (conv_data hm n 1050868 31 (by decide) (by decide) (by omega)
+    seg_notInit rfl) ?_
   refine cut n _ _ 1051817 1 (by omega) (by omega) (conv_data hm n 1051817 1 (by decide) (by decide) (by omega)
     seg_quote rfl) ?_
   refine cut n _ _ 1051836 8 (by omega) (by omega) ((conv_data hm n 1051836 8 (by decide) (by decide) (by omega)
@@ -257,11 +267,13 @@ theorem tablePt_addr {ta i j : Nat} {r : Ref} (h : i = j) : ta ↦[wt][ i ] r �
 /-- The table entries `ft_total_supply` reaches through `call_indirect`: the interface's accessor
 and initialiser (116, 106), the trampolines of `register_len`, `value_return`, `storage_read` and
 `read_register` (39, 58, 82, 38), wee_alloc's `min_cell_size` (123), `u128`'s `Display::fmt` (157)
-and the `fmt::Write` adapter's `write_str` (92). -/
+and the `fmt::Write` adapter's `write_str` (92); and the trampoline of `panic_utf8` (60), for the
+panic path (`PanicStr`). -/
 def tableRes (ta : Nat) : IProp GF :=
   iprop(ta ↦[wt][ 116 ] Ref.func 565 ∗ ta ↦[wt][ 106 ] Ref.func 564 ∗ ta ↦[wt][ 39 ] Ref.func 241 ∗
     ta ↦[wt][ 58 ] Ref.func 260 ∗ ta ↦[wt][ 82 ] Ref.func 284 ∗ ta ↦[wt][ 38 ] Ref.func 240 ∗
-    ta ↦[wt][ 123 ] Ref.func 578 ∗ ta ↦[wt][ 157 ] Ref.func 759 ∗ ta ↦[wt][ 92 ] Ref.func 353)
+    ta ↦[wt][ 123 ] Ref.func 578 ∗ ta ↦[wt][ 157 ] Ref.func 759 ∗ ta ↦[wt][ 92 ] Ref.func 353 ∗
+    ta ↦[wt][ 60 ] Ref.func 262)
 
 set_option maxRecDepth 100000 in
 /-- **The statics of `ft_total_supply`** from the instantiated memory (`MemImage`), its length
@@ -274,10 +286,10 @@ theorem staticsRes {m : Memory} {L : Nat} (hm : MemImage m L) (n ta len : Nat) (
     memR (GF := GF) m n 0 L ∗ n ↦[wmlength] len ∗ n ↪[wmlimit] some 2048 ∗ tableRes ta ⊢
       stk n 1047840 736 ∗ FtTotalSupply.statics n ta id 0 0 123 1051836 2048 len := by
   refine (sep_mono_left (memRes0 hm n)).trans ?_
-  iintro ⟨⟨STK, KEY, V12, V16, V92, V188, Q, ⟨TS0, TS4⟩, LK, VT, ESC, T157, LUT, HEAD, ⟨B0, B4, B8, B12⟩,
+  iintro ⟨⟨STK, KEY, V12, V16, V92, -, V188, -, Q, ⟨TS0, TS4⟩, LK, VT, ESC, T157, LUT, HEAD, ⟨B0, B4, B8, B12⟩,
     ⟨K0, K4, K8, K12⟩, -⟩, HL, #HM, HT⟩
   iunfold tableRes at HT
-  icases HT with ⟨T116, T106, T39, T58, T82, T38, T123, T157', T92⟩
+  icases HT with ⟨T116, T106, T39, T58, T82, T38, T123, T157', T92, -⟩
   ihave HEAD := memBytes_addr (a := 1074896) (b := AllocInv.headAddr) rfl $$ HEAD
   ihave Hinv := AllocInv.heapInv_init n 2048 len hl1 hl0 hl2 $$ [HEAD HL]
   · iframe HEAD HL HM

@@ -10,7 +10,7 @@ the memory's limit and length, the stack pointer global, the host (gas erased) a
 counter, the 215 table entries, the 955 functions and every byte of the memory. `startCells`
 takes them out of the ownership adequacy gives (`ownCells (mheapOf ⟨wStore cfg h⟩)`), and
 `startSplit` separates them, the memory as one `memR` (term mode: the proof mode is never run
-on the memory's byte list). `tableOf`: the entries `ft_total_supply` uses (`tableRes`).
+on the memory's byte list). `tableOf`: the entries `ft_total_supply` and the panic path use (`tableRes`).
 `persistList`: read-only cells (functions) made persistent.
 -/
 
@@ -180,7 +180,7 @@ theorem bigSepL_sublist {A : Type} {Φ : A → IProp GF} {l₁ l₂ : List A} (h
 set_option maxRecDepth 100000 in
 /-- The table entries `ft_total_supply` uses. -/
 theorem tableOf : ([∗list] p ∈ tabCells, p.1 ↦ₛ p.2) ⊢ tableRes (GF := GF) 0 := by
-  have hs : (([38, 39, 58, 82, 92, 106, 116, 123, 157] : List Nat).map fun i =>
+  have hs : (([38, 39, 58, 60, 82, 92, 106, 116, 123, 157] : List Nat).map fun i =>
       ((Loc.tableElem 0 i, .ref wTable.elems[i]!) : Loc × Cell NearState)).Sublist tabCells :=
     List.Sublist.map _ (by decide)
   refine (bigSepL_sublist (Φ := fun p : Loc × Cell NearState => iprop(p.1 ↦ₛ p.2)) hs).trans ?_
@@ -192,6 +192,7 @@ theorem tableOf : ([∗list] p ∈ tabCells, p.1 ↦ₛ p.2) ⊢ tableRes (GF :=
   icases BigSepL.bigSepL_cons.1 $$ H with ⟨H38, H⟩
   icases BigSepL.bigSepL_cons.1 $$ H with ⟨H39, H⟩
   icases BigSepL.bigSepL_cons.1 $$ H with ⟨H58, H⟩
+  icases BigSepL.bigSepL_cons.1 $$ H with ⟨H60, H⟩
   icases BigSepL.bigSepL_cons.1 $$ H with ⟨H82, H⟩
   icases BigSepL.bigSepL_cons.1 $$ H with ⟨H92, H⟩
   icases BigSepL.bigSepL_cons.1 $$ H with ⟨H106, H⟩
@@ -201,6 +202,7 @@ theorem tableOf : ([∗list] p ∈ tabCells, p.1 ↦ₛ p.2) ⊢ tableRes (GF :=
   ihave H38 := e 38 (Ref.func 240) rfl $$ H38
   ihave H39 := e 39 (Ref.func 241) rfl $$ H39
   ihave H58 := e 58 (Ref.func 260) rfl $$ H58
+  ihave H60 := e 60 (Ref.func 262) rfl $$ H60
   ihave H82 := e 82 (Ref.func 284) rfl $$ H82
   ihave H92 := e 92 (Ref.func 353) rfl $$ H92
   ihave H106 := e 106 (Ref.func 564) rfl $$ H106
@@ -208,7 +210,7 @@ theorem tableOf : ([∗list] p ∈ tabCells, p.1 ↦ₛ p.2) ⊢ tableRes (GF :=
   ihave H123 := e 123 (Ref.func 578) rfl $$ H123
   ihave H157 := e 157 (Ref.func 759) rfl $$ H157
   iunfold tableRes
-  iframe H38 H39 H58 H82 H92 H106 H116 H123 H157
+  iframe H38 H39 H58 H82 H92 H106 H116 H123 H157 H60
 
 /-- Read-only cells made persistent. -/
 theorem persistList (l : List (Loc × Cell NearState)) :
