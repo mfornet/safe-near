@@ -505,6 +505,17 @@ skipping ignored values (depth limit 128) and its stack usage; UTF-8 and
 escapes; numbers; duplicate and unknown fields; the gas cost per argument
 byte.
 
+*Status (`ft_balance_of`, 297):* proved, no `sorry`: `env::input` (527, through 458 and
+the trampoline 246; `EnvInput.lean`), the prologue's leaves `Option::expect` (157),
+`SliceRead::new` (644), `Deserializer::new` (634), and `from_slice` (65) from any
+specification of `from_trait` (66) (`ArgsLeaves.lean`); on the model's side, the canonical
+input `{"account_id":"<a>"}` decodes to `ftBalanceOf a` (`BalanceOfArgs.lean`). Stated, not
+proved: the parser's contract in both directions, `FromSliceSpec.FromTraitContract` (66
+against `Call.decode`, stack `S`, cost `K0 + K1·len`, heap room), with `f65_contract` at
+297's call site. Below 66 are 78/228 and about 200 functions (14 000 instructions), which
+allocate and free: they need the allocator on any free list (M4), as does the rest of 297
+(`LookupMap::get`, 293/415, after the parser's frees).
+
 ### M7. State and storage
 
 Borsh encoding of the state, `LookupMap` keys, near-sdk's `env` wrappers
