@@ -29,7 +29,7 @@ variable {GF : BundledGFunctors} [WasmGS NearState GF]
 
 /-- A plain allocation of `c > 0` bytes, opened: the block's bytes, in bounds. -/
 theorem heapAfter_open {n maxP len : Nat} {live : List (Nat × Nat)} {c p : UInt32} (hc : 0 < c.toNat) :
-    heapAfter (GF := GF) n maxP len live false c p ⊢
+    heapAfter (GF := GF) n maxP len live 1 false c p ⊢
       ∃ bs : List UInt8, ⌜bs.length = c.toNat ∧ p.toNat + c.toNat ≤ 2 ^ 32⌝ ∗ n ↦[wms][ p.toNat ] bs ∗
         ∃ len', ⌜p ≠ 0 ∧ (len' = len ∨ len' = grownLen len c)⌝ ∗
           heapInv n maxP len' ((p.toNat, c.toNat) :: live) 1 := by
@@ -104,7 +104,7 @@ theorem f374_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
     iexact H
   ihave #H951 : A 951 ↪[wf] FuncInst.wasm types[15]! inst f951 $$ []
   · iunfold vecCode2 at Hv
-    icases Hv with ⟨-, -, -, -, -, -, -, -, -, -, -, -, -, -, -, #H⟩
+    icases Hv with ⟨-, -, -, -, -, -, -, -, -, -, -, -, -, -, -, #H, -⟩
     iexact H
   ihave #S373 := f373_spec (GF := GF) cfg lim (d + 1) types[14]! (by rfl) inst mi A n g ta hm (by omega) Cg
     gt s out c idx maxP len live ob hob hs hc28 (fun _ => hr) $$ Hv

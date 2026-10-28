@@ -32,6 +32,7 @@ open WNear.Binary.U128From (u128Bytes)
 open WNear.Binary.FmtDisplay (fmtCode)
 open WNear.Binary.FmtSink (sinkCode strGrown grown)
 open WNear.Binary.FmtGrow (newCap)
+open WNear.Binary.VecWithCap (okF)
 open WNear.Binary.AllocFirstFit (vt)
 open WNear.Binary.VecFromElem (stk stk_split stk_join stk_word stk_intro stk_addr roomFor)
 open WNear.Binary.AllocNewCell (memBytes_addr)
@@ -137,7 +138,7 @@ theorem f385_gen (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
     (hm : IfaceMod mi A n g ta) (hd : d + 25 < lim.maxCallDepth) (Cg : Nat) (gt : GlobalType)
     (s v ser ptr0 aidx : UInt32) (maxP hl : Nat) (live : List (Nat × Nat)) (lo hi : UInt64)
     (hs : 400 ≤ s.toNat) (hv : v.toNat + 16 ≤ 2 ^ 32) (hr : roomFor hl maxP (newCap 0 (kOf (val lo hi))))
-    (P Q : IProp GF) (K : Nat) :
+    (P Q : IProp GF) (K : Nat) (F : Nat := 1) (hF : okF F := by exact Or.inl rfl) :
     tsCode n maxP inst mi A ∗
       (□ ∀ q : UInt32, ⌜q ≠ 0 ∧ q.toNat + (newCap 0 (kOf (val lo hi))).toNat < 2 ^ 32⌝ -∗
         MFunSpec cfg lim (d + 1) types[15]! inst mi f383 Cg
@@ -148,12 +149,12 @@ theorem f385_gen (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
             stk n ((s - 64).toNat - 336) 336 ∗ n ↦[wms][ q.toNat ] decDigits (val lo hi) ∗ Q)))
       ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f385 Cg
         (fun args => iprop(⌜args = [.i32 v, .i32 ser]⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗ stk n (s.toNat - 400) 400 ∗
-          tsData n ta ptr0 (A 759) (A 353) ∗ vt n 1057464 aidx ta (A 578) ∗ heapInv n maxP hl live 1 ∗
+          tsData n ta ptr0 (A 759) (A 353) ∗ vt n 1057464 aidx ta (A 578) ∗ heapInv n maxP hl live F ∗
           n ↦[wms][ v.toNat ] u128Bytes lo hi ∗ n ↦[wms][ 1070974 ] lut ∗ P))
         (fun _ => 1000 * cfg.regularOpCost + cost746 cfg lo hi + K)
         (fun _ rs => iprop(⌜rs = [.i32 0]⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗ stk n (s.toNat - 400) 400 ∗
           tsData n ta ptr0 (A 759) (A 353) ∗ vt n 1057464 aidx ta (A 578) ∗
-          (∃ hl', heapInv n maxP hl' live 2) ∗
+          (∃ hl', heapInv n maxP hl' live (F + 1)) ∗
           n ↦[wms][ v.toNat ] u128Bytes lo hi ∗ n ↦[wms][ 1070974 ] lut ∗ Q)) := by
   iintro ⟨#Hk, #S383⟩
   have hn := hm.mem
@@ -242,7 +243,7 @@ theorem f385_gen (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
   icases HD with ⟨D0, D4, D12, T157, T92⟩
   mcall (f746_u128 cfg lim (d + 1) types[13]! rfl inst mi A n g ta hm (by omega) Cg gt (s - 64) (s - 64 + 32)
       (s - 64 + 16) aidx (s - 64 + 56) (s - 64 + 28) v ptr0 junk hjunk maxP hl live lo hi (by omega)
-      (by rw [h32]; omega) (by rw [h16]; omega) (by rw [h56]; omega) (by rw [h28]; omega) hv hr)
+      (by rw [h32]; omega) (by rw [h16]; omega) (by rw [h56]; omega) (by rw [h28]; omega) hv hr (F := F) (hF := hF))
     using [Hg Hb1 Hb2 O32 A4 A8 O48 O52 O44 D0 D4 D12 T157 T92 G0 G4 Hvt Hh V0 V4 O24 O28 Hv Hl]
   · iframe Hg
     isplitl [Hb2]; · iapply stk_addr (show s.toNat - 400 + 304 = (s - 64).toNat - 32 by omega) $$ Hb2
@@ -340,7 +341,7 @@ theorem f385_gen (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
     with ⟨W4, W8⟩
   simp only [hb32]
   mcall (SerdeLeaves.f321_spec cfg lim (d + 1) types[0]! rfl inst mi A n g ta hm (by omega) Cg maxP hl'
-      ((q.toNat, (newCap 0 (kOf (val lo hi))).toNat) :: live) 1 (s - 64 + 16) q (newCap 0 (kOf (val lo hi)))
+      ((q.toNat, (newCap 0 (kOf (val lo hi))).toNat) :: live) F (s - 64 + 16) q (newCap 0 (kOf (val lo hi)))
       (kOf (val lo hi)) (fun h => by rw [h] at hk; simp at hk) (by rw [h16]; omega)) using [W0 W4 W8 Hh Hblk]
   · iunfold pre747
     isplitr; · ipureintro; rfl
@@ -448,16 +449,17 @@ theorem f385_u128 (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
     (s v ser ptr0 aidx ovec optr : UInt32) (ob : List UInt8) (maxP hl : Nat) (live : List (Nat × Nat))
     (lo hi : UInt64) (hs : 400 ≤ s.toNat) (hv : v.toNat + 16 ≤ 2 ^ 32)
     (hr : roomFor hl maxP (newCap 0 (kOf (val lo hi)))) (hob : ob.length = 128)
-    (hser : ser.toNat + 4 ≤ 2 ^ 32) (hovec : ovec.toNat + 12 ≤ 2 ^ 32) (hoptr : optr.toNat + 128 < 2 ^ 32) :
+    (hser : ser.toNat + 4 ≤ 2 ^ 32) (hovec : ovec.toNat + 12 ≤ 2 ^ 32) (hoptr : optr.toNat + 128 < 2 ^ 32)
+    (F : Nat := 1) (hF : okF F := by exact Or.inl rfl) :
     tsCode n maxP inst mi A ∗ serCode inst mi A
       ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f385 Cg
         (fun args => iprop(⌜args = [.i32 v, .i32 ser]⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗ stk n (s.toNat - 400) 400 ∗
-          tsData n ta ptr0 (A 759) (A 353) ∗ vt n 1057464 aidx ta (A 578) ∗ heapInv n maxP hl live 1 ∗
+          tsData n ta ptr0 (A 759) (A 353) ∗ vt n 1057464 aidx ta (A 578) ∗ heapInv n maxP hl live F ∗
           n ↦[wms][ v.toNat ] u128Bytes lo hi ∗ n ↦[wms][ 1070974 ] lut ∗ serIn n ser ovec optr ob))
         (fun _ => cost385 cfg lo hi)
         (fun _ rs => iprop(⌜rs = [.i32 0]⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗ stk n (s.toNat - 400) 400 ∗
           tsData n ta ptr0 (A 759) (A 353) ∗ vt n 1057464 aidx ta (A 578) ∗
-          (∃ hl', heapInv n maxP hl' live 2) ∗
+          (∃ hl', heapInv n maxP hl' live (F + 1)) ∗
           n ↦[wms][ v.toNat ] u128Bytes lo hi ∗ n ↦[wms][ 1070974 ] lut ∗
           serOut n ser ovec optr ob (kOf (val lo hi)) (decDigits (val lo hi)))) := by
   iintro ⟨#Hk, #Hs⟩
@@ -469,7 +471,7 @@ theorem f385_u128 (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
   have hL2 := FmtDigits.decDigits_length_pos (val lo hi)
   have hk := newCap_ge (kOf (val lo hi))
   iunfold cost385
-  iapply f385_gen cfg lim d type htype inst mi A n g ta hm hd Cg gt s v ser ptr0 aidx maxP hl live lo hi hs hv hr
+  iapply f385_gen cfg lim d type htype inst mi A n g ta hm hd Cg gt s v ser ptr0 aidx maxP hl live lo hi hs hv hr (F := F) (hF := hF)
   iframe Hk
   imodintro
   iintro %q %⟨hq0, hqc⟩

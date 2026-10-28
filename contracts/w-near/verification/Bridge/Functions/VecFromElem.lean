@@ -288,10 +288,10 @@ def content (n : Nat) (z : Bool) (p size : Nat) : IProp GF :=
 
 /-- The heap after `alloc_impl(size, 1, z)`: `size = 0` returns the dangling pointer 1 and
 leaves the heap; otherwise a block `p ≠ 0`, `(p, size)` live. -/
-def heapAfter (n maxP len : Nat) (live : List (Nat × Nat)) (z : Bool) (size p : UInt32) : IProp GF :=
+def heapAfter (n maxP len : Nat) (live : List (Nat × Nat)) (F : Nat) (z : Bool) (size p : UInt32) : IProp GF :=
   iprop(∃ len', ⌜(size.toNat = 0 ∧ p = 1 ∧ len' = len) ∨
       (0 < size.toNat ∧ p ≠ 0 ∧ (len' = len ∨ len' = grownLen len size))⌝ ∗
-    heapInv n maxP len' (if size.toNat = 0 then live else (p.toNat, size.toNat) :: live) 1 ∗
+    heapInv n maxP len' (if size.toNat = 0 then live else (p.toNat, size.toNat) :: live) F ∗
     content n z p.toNat size.toNat)
 
 /-- The allocator's cost: `__rust_alloc_zeroed` or `__rust_alloc`. -/
@@ -389,7 +389,7 @@ def pre689 (n g : Nat) (gt : GlobalType) (s out size : UInt32) (z : Bool) (idx :
 def post689 (n g : Nat) (gt : GlobalType) (s out size : UInt32) (z : Bool) (idx : UInt32) (ta a578 maxP len : Nat)
     (live : List (Nat × Nat)) (_args rs : List Value) : IProp GF :=
   iprop(⌜rs = []⌝ ∗ ∃ p : UInt32, g ↦[wg] ⟨gt, .i32 s⟩ ∗ stk n (s.toNat - 16) 16 ∗ vt n 1057464 idx ta a578 ∗
-    n ↦[i32][ out.toNat ] p ∗ n ↦[i32][ out.toNat + 4 ] size ∗ heapAfter n maxP len live z size p)
+    n ↦[i32][ out.toNat ] p ∗ n ↦[i32][ out.toNat + 4 ] size ∗ heapAfter n maxP len live 1 z size p)
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 2000000 in
@@ -546,15 +546,15 @@ theorem stk_addr {n a b k : Nat} (h : a = b) : stk (GF := GF) n a k ⊢ stk n b 
   subst h; exact .rfl
 
 def pre68x (n g : Nat) (gt : GlobalType) (s out size : UInt32) (idx : UInt32) (ta a578 maxP len : Nat)
-    (live : List (Nat × Nat)) (ob : List UInt8) (args : List Value) : IProp GF :=
+    (live : List (Nat × Nat)) (F : Nat) (ob : List UInt8) (args : List Value) : IProp GF :=
   iprop(⌜args = [.i32 out, .i32 size, .i32 1]⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗
-    stk n (s.toNat - 32) 32 ∗ vt n 1057464 idx ta a578 ∗ heapInv n maxP len live 1 ∗
+    stk n (s.toNat - 32) 32 ∗ vt n 1057464 idx ta a578 ∗ heapInv n maxP len live F ∗
     n ↦[wms][ out.toNat ] ob)
 
 def post68x (n g : Nat) (gt : GlobalType) (s out size : UInt32) (z : Bool) (idx : UInt32) (ta a578 maxP len : Nat)
-    (live : List (Nat × Nat)) (_args rs : List Value) : IProp GF :=
+    (live : List (Nat × Nat)) (F : Nat) (_args rs : List Value) : IProp GF :=
   iprop(⌜rs = []⌝ ∗ ∃ p : UInt32, g ↦[wg] ⟨gt, .i32 s⟩ ∗ stk n (s.toNat - 32) 32 ∗ vt n 1057464 idx ta a578 ∗
-    n ↦[i32][ out.toNat ] p ∗ n ↦[i32][ out.toNat + 4 ] size ∗ heapAfter n maxP len live z size p)
+    n ↦[i32][ out.toNat ] p ∗ n ↦[i32][ out.toNat + 4 ] size ∗ heapAfter n maxP len live F z size p)
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 2000000 in
@@ -568,9 +568,9 @@ theorem f690_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
     (hsize2 : size.toNat < 2 ^ 28) (hr : 0 < size.toNat → roomFor len maxP size) :
     vecCode n maxP inst mi A
       ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f690 Cg
-        (pre68x n g gt s out size idx ta (A 578) maxP len live ob)
+        (pre68x n g gt s out size idx ta (A 578) maxP len live 1 ob)
         (fun _ => 35 * cfg.regularOpCost + (27 * cfg.regularOpCost + costAlloc cfg true size))
-        (post68x n g gt s out size true idx ta (A 578) maxP len live) := by
+        (post68x n g gt s out size true idx ta (A 578) maxP len live 1) := by
   iintro #Hv
   ihave #Hi : inst ↪[inst] mi $$ []
   · iunfold vecCode, allocCode at Hv
@@ -651,9 +651,9 @@ theorem f688_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
     (hsize2 : size.toNat < 2 ^ 28) (hr : 0 < size.toNat → roomFor len maxP size) :
     vecCode n maxP inst mi A
       ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f688 Cg
-        (pre68x n g gt s out size idx ta (A 578) maxP len live ob)
+        (pre68x n g gt s out size idx ta (A 578) maxP len live 1 ob)
         (fun _ => 35 * cfg.regularOpCost + (27 * cfg.regularOpCost + costAlloc cfg false size))
-        (post68x n g gt s out size false idx ta (A 578) maxP len live) := by
+        (post68x n g gt s out size false idx ta (A 578) maxP len live 1) := by
   iintro #Hv
   ihave #Hi : inst ↪[inst] mi $$ []
   · iunfold vecCode, allocCode at Hv
@@ -738,8 +738,8 @@ theorem les_neg1 (c : UInt32) (h : c.toNat < 2 ^ 31) :
   simp [Numeric.irelop32, Numeric.bool, UInt32.toIntS, h']
   omega
 
-theorem heapAfter_ne {n maxP len : Nat} {live : List (Nat × Nat)} {z : Bool} {size p : UInt32} :
-    heapAfter (GF := GF) n maxP len live z size p ⊢ ⌜p ≠ 0⌝ ∗ heapAfter n maxP len live z size p := by
+theorem heapAfter_ne {n maxP len : Nat} {live : List (Nat × Nat)} {F : Nat} {z : Bool} {size p : UInt32} :
+    heapAfter (GF := GF) n maxP len live F z size p ⊢ ⌜p ≠ 0⌝ ∗ heapAfter n maxP len live F z size p := by
   iintro H
   iunfold heapAfter at H
   icases H with ⟨%len', %h, H1, H2⟩
@@ -795,7 +795,7 @@ def pre686 (n g : Nat) (gt : GlobalType) (s out c : UInt32) (z : Bool) (idx : UI
 def post686 (n g : Nat) (gt : GlobalType) (s out c : UInt32) (z : Bool) (idx : UInt32) (ta a578 maxP len : Nat)
     (live : List (Nat × Nat)) (_args rs : List Value) : IProp GF :=
   iprop(⌜rs = []⌝ ∗ ∃ p : UInt32, g ↦[wg] ⟨gt, .i32 s⟩ ∗ stk n (s.toNat - 64) 64 ∗ vt n 1057464 idx ta a578 ∗
-    n ↦[i32][ out.toNat ] p ∗ n ↦[i32][ out.toNat + 4 ] c ∗ heapAfter n maxP len live z c p)
+    n ↦[i32][ out.toNat ] p ∗ n ↦[i32][ out.toNat + 4 ] c ∗ heapAfter n maxP len live 1 z c p)
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 4000000 in
@@ -1003,7 +1003,7 @@ def post681 (n g : Nat) (gt : GlobalType) (s out c : UInt32) (idx : UInt32) (ta 
     (live : List (Nat × Nat)) (_args rs : List Value) : IProp GF :=
   iprop(⌜rs = []⌝ ∗ ∃ p : UInt32, g ↦[wg] ⟨gt, .i32 s⟩ ∗ stk n (s.toNat - 80) 80 ∗ vt n 1057464 idx ta a578 ∗
     n ↦[i32][ out.toNat ] p ∗ n ↦[i32][ out.toNat + 4 ] c ∗ n ↦[i32][ out.toNat + 8 ] 0 ∗
-    heapAfter n maxP len live false c p)
+    heapAfter n maxP len live 1 false c p)
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 2000000 in
@@ -1123,7 +1123,7 @@ def vecAfter (n maxP len : Nat) (live : List (Nat × Nat)) (size p : UInt32) (b 
     n ↦[wms][ p.toNat ] List.replicate size.toNat b)
 
 theorem heapAfter_true {n maxP len : Nat} {live : List (Nat × Nat)} {size p : UInt32} :
-    heapAfter (GF := GF) n maxP len live true size p ⊢ vecAfter n maxP len live size p 0 := by
+    heapAfter (GF := GF) n maxP len live 1 true size p ⊢ vecAfter n maxP len live size p 0 := by
   iintro H
   iunfold heapAfter, content at H
   icases H with ⟨%len', %h, H1, H2⟩
@@ -1135,7 +1135,7 @@ theorem heapAfter_true {n maxP len : Nat} {live : List (Nat × Nat)} {size p : U
 
 /-- A plain allocation, opened for `memset`. -/
 theorem heapAfter_false {n maxP len : Nat} {live : List (Nat × Nat)} {size p : UInt32} (b : UInt8) :
-    heapAfter (GF := GF) n maxP len live false size p ⊢
+    heapAfter (GF := GF) n maxP len live 1 false size p ⊢
       ∃ bs : List UInt8, ⌜bs.length = size.toNat ∧ p.toNat + size.toNat ≤ 2 ^ 32⌝ ∗ n ↦[wms][ p.toNat ] bs ∗
         (n ↦[wms][ p.toNat ] List.replicate size.toNat b -∗ vecAfter n maxP len live size p b) := by
   iintro H

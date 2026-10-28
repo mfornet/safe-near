@@ -13,7 +13,8 @@ import Mathlib.Tactic.IntervalCases
 ```
 
 `f96_spec`: on a `u128` `lo + 2^64 hi` at `value`, `Ok` (tag 0) with the `Vec` `(q, 128, k + 2)`
-whose first `k + 2` bytes are `"` ++ the decimal digits ++ `"` (`k` digits). The harness's
+whose first `k + 2` bytes are `"` ++ the decimal digits ++ `"` (`k` digits), from `heapInv … F`
+(`F ∈ {1, 2}`, default 1) to `heapInv … (F + 1)` (`to_string`'s buffer freed). The harness's
 `toVecU128` asks exactly this (`jsonU128`); `json_bytes` relates its bytes to `decDigits`.
 -/
 
@@ -30,7 +31,7 @@ open WNear.Binary.FmtGrow (newCap)
 open WNear.Binary.AllocFirstFit (vt)
 open WNear.Binary.VecFromElem (stk stk_split stk_join stk_word stk_intro stk_addr roomFor costAlloc grownLen)
 open WNear.Binary.AllocNewCell (memBytes_addr)
-open WNear.Binary.VecWithCap (vecCode2 pre373 post373)
+open WNear.Binary.VecWithCap (okF vecCode2 pre373 post373)
 open WNear.Binary.FmtString (kOf)
 open WNear.Binary.SerializeStr (esc serCode cost383)
 open WNear.Binary.ToString (tsCode tsData serIn serOut cost385 f385_u128 hb32 w2)
@@ -134,12 +135,13 @@ theorem f96_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
     (s out v ptr0 aidx : UInt32) (ob : List UInt8) (maxP hl : Nat) (live : List (Nat × Nat))
     (lo hi : UInt64) (hs : 416 ≤ s.toNat) (hob : ob.length = 16) (hout : out.toNat + 16 ≤ 2 ^ 32)
     (hv : v.toNat + 16 ≤ 2 ^ 32) (hr1 : roomFor hl maxP 128)
-    (hr2 : ∀ hl1, hl1 = hl ∨ hl1 = grownLen hl 128 → roomFor hl1 maxP (newCap 0 (kOf (val lo hi)))) :
+    (hr2 : ∀ hl1, hl1 = hl ∨ hl1 = grownLen hl 128 → roomFor hl1 maxP (newCap 0 (kOf (val lo hi))))
+    (F : Nat := 1) (hF : okF F := by exact Or.inl rfl) :
     tvCode n maxP inst mi A
       ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f96 Cg
         (fun args => iprop(⌜args = [.i32 out, .i32 v]⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗ stk n (s.toNat - 416) 416 ∗
           n ↦[wms][ out.toNat ] ob ∗ n ↦[wms][ v.toNat ] u128Bytes lo hi ∗ tvData n ta ptr0 (A 759) (A 353) ∗
-          vt n 1057464 aidx ta (A 578) ∗ heapInv n maxP hl live 1))
+          vt n 1057464 aidx ta (A 578) ∗ heapInv n maxP hl live F))
         (fun _ => cost96 cfg lo hi)
         (fun _ rs => iprop(⌜rs = []⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗ stk n (s.toNat - 416) 416 ∗
           n ↦[wms][ v.toNat ] u128Bytes lo hi ∗ tvData n ta ptr0 (A 759) (A 353) ∗ vt n 1057464 aidx ta (A 578) ∗
@@ -147,7 +149,7 @@ theorem f96_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
             n ↦[i32][ out.toNat ] 0 ∗ n ↦[i32][ out.toNat + 4 ] q ∗ n ↦[i32][ out.toNat + 8 ] 128 ∗
             n ↦[i32][ out.toNat + 12 ] (0 + kOf (val lo hi) + 2) ∗
             n ↦[wms][ q.toNat ] (([34] ++ decDigits (val lo hi) ++ [34]) ++ rest) ∗
-            ∃ hl', heapInv n maxP hl' ((q.toNat, 128) :: live) 2)) := by
+            ∃ hl', heapInv n maxP hl' ((q.toNat, 128) :: live) (F + 1))) := by
   iintro #Hk
   iunfold tvCode at Hk
   icases Hk with ⟨#Hts, #Hser, #Hv2, #H94, #H385⟩
@@ -181,7 +183,7 @@ theorem f96_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
   mstep [Hg]; mstep; mstep; mstep; mstep [Hg]
   repeat mstep
   mcall (SerdeLeaves.f94_spec cfg lim (d + 1) types[14]! rfl inst mi A n g ta hm (by omega) Cg gt (s - 16) (s - 16)
-      128 aidx maxP hl live s0 hs0 (by omega) (by decide) (fun _ => hr1)) using [Hg Hb2 Hvt Hh S0]
+      128 aidx maxP hl live s0 hs0 (by omega) (by decide) (fun _ => hr1) (F := F) (hF := hF)) using [Hg Hb2 Hvt Hh S0]
   · iunfold pre373
     iframe Hg Hvt Hh S0
     isplitr [Hb2]; · ipureintro; rfl
@@ -203,7 +205,7 @@ theorem f96_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
   repeat mstep
   mcall (f385_u128 cfg lim (d + 1) types[13]! rfl inst mi A n g ta hm (by omega) Cg gt (s - 16) v (s - 16 + 12)
       ptr0 aidx (s - 16) q bs maxP hl1 ((q.toNat, 128) :: live) lo hi (by omega) hv (hr2 hl1 hhl1) hbs
-      (by omega) (by omega) (by simpa using hqb))
+      (by omega) (by omega) (by simpa using hqb) (F := F) (hF := hF))
     using [Hg Hb1 Hb2 HD Hvt Hh Hv Hl Hqt Hesc S12 V0 V4 V8 Hq]
   · iframe Hg HD Hvt Hh Hv Hl
     isplitl [Hb1 Hb2]

@@ -42,7 +42,7 @@ open WNear.Binary.AllocNewCell (memBytes_addr)
 open WNear.Binary.AllocZeroed (allocCode)
 open WNear.Binary.VecFromElem (stk stk_split stk_join stk_word roomFor heapAfter costAlloc grownLen content
   heapAfter_ne stk_addr)
-open WNear.Binary.VecWithCap (vecCode2)
+open WNear.Binary.VecWithCap (vecCode2 okF)
 open WNear.Binary.FmtGrow (newCap pre776 post776 f776_spec)
 
 /-! ## The code -/
@@ -72,8 +72,8 @@ section Heap
 variable {GF : BundledGFunctors} [WasmGS NearState GF]
 
 /-- The heap after `grow_amortized` allocated `cap` bytes at `q`. -/
-def grown (n maxP hl : Nat) (live : List (Nat × Nat)) (q cap : UInt32) : IProp GF :=
-  iprop(∃ hl', ⌜hl' = hl ∨ hl' = grownLen hl cap⌝ ∗ heapInv n maxP hl' ((q.toNat, cap.toNat) :: live) 1)
+def grown (n maxP hl : Nat) (live : List (Nat × Nat)) (F : Nat) (q cap : UInt32) : IProp GF :=
+  iprop(∃ hl', ⌜hl' = hl ∨ hl' = grownLen hl cap⌝ ∗ heapInv n maxP hl' ((q.toNat, cap.toNat) :: live) F)
 
 /-- A live block ends below `2^32`. -/
 theorem heapInv_bound {n maxP len F : Nat} {live : List (Nat × Nat)} {p s : Nat} (h : (p, s) ∈ live) :
@@ -94,9 +94,9 @@ theorem heapInv_bound {n maxP len F : Nat} {live : List (Nat × Nat)} {p s : Nat
   ipureintro; exact ⟨hw, hl⟩
 
 /-- `heapAfter` of a nonzero size: the block, its bound, and `grown`. -/
-theorem heapAfter_grown {n maxP hl : Nat} {live : List (Nat × Nat)} {q cap : UInt32} (hc : 0 < cap.toNat) :
-    heapAfter (GF := GF) n maxP hl live false cap q ⊢
-      ⌜q ≠ 0 ∧ q.toNat + cap.toNat < 2 ^ 32⌝ ∗ block n q.toNat cap.toNat ∗ grown n maxP hl live q cap := by
+theorem heapAfter_grown {n maxP hl : Nat} {live : List (Nat × Nat)} {F : Nat} {q cap : UInt32} (hc : 0 < cap.toNat) :
+    heapAfter (GF := GF) n maxP hl live F false cap q ⊢
+      ⌜q ≠ 0 ∧ q.toNat + cap.toNat < 2 ^ 32⌝ ∗ block n q.toNat cap.toNat ∗ grown n maxP hl live F q cap := by
   iintro H
   iunfold heapAfter at H
   icases H with ⟨%hl', %h, Hinv, Hb⟩
@@ -172,20 +172,20 @@ theorem f775_grow (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
     (gt : GlobalType) (s out vec k p0 : UInt32) (idx : UInt32) (maxP hl : Nat)
     (live : List (Nat × Nat)) (ob : List UInt8) (hob : ob.length = 4) (hs : 96 ≤ s.toNat)
     (hvec : vec.toNat + 8 ≤ 2 ^ 32) (hout : out.toNat + 4 ≤ 2 ^ 32) (hk0 : 0 < k.toNat)
-    (hk : k.toNat < 2 ^ 28) (hr : roomFor hl maxP (newCap 0 k)) :
+    (hk : k.toNat < 2 ^ 28) (hr : roomFor hl maxP (newCap 0 k)) (F : Nat := 1) (hF : okF F := by exact Or.inl rfl) :
     vecCode2 n maxP inst mi A ∗ A 772 ↪[wf] FuncInst.wasm types[39]! inst f772 ∗
       A 776 ↪[wf] FuncInst.wasm types[45]! inst f776
       ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f775 Cg
-        (pre776 n g gt s out vec 0 k p0 idx ta (A 578) maxP hl live ob)
+        (pre776 n g gt s out vec 0 k p0 idx ta (A 578) maxP hl live F ob)
         (fun _ => 325 * cfg.regularOpCost + costAlloc cfg false (newCap 0 k))
-        (post776 n g gt s out vec 0 k idx ta (A 578) maxP hl live) := by
+        (post776 n g gt s out vec 0 k idx ta (A 578) maxP hl live F) := by
   iintro ⟨#Hv, #H772, #H776⟩
   ihave #Hi : inst ↪[inst] mi $$ []
   · iunfold vecCode2, allocCode at Hv
     icases Hv with ⟨⟨-, -, -, -, -, -, -, -, -, -, -, #Hi⟩, -⟩
     iexact Hi
   ihave #S776 := f776_spec (GF := GF) cfg lim (d + 1) types[45]! (by rfl) inst mi A n g ta hm (by omega) Cg
-    gt s out vec 0 k p0 idx maxP hl live ob hob hs hvec hout (by simp; omega) hr $$ [Hv H772]
+    gt s out vec 0 k p0 idx maxP hl live ob hob hs hvec hout (by simp; omega) hr (F := F) (hF := hF) $$ [Hv H772]
   · iframe Hv H772
   have hn := hm.mem
   have ha776 := hm.funcs 776 (by decide)
@@ -247,9 +247,9 @@ section L768
 variable {GF : BundledGFunctors} [WasmGS NearState GF]
 
 /-- The `RawVec`'s words in the grow case after the growth: `ptr = q`, `cap`. -/
-def rawGrown (n maxP hl : Nat) (live : List (Nat × Nat)) (vec k : UInt32) : IProp GF :=
+def rawGrown (n maxP hl : Nat) (live : List (Nat × Nat)) (F : Nat) (vec k : UInt32) : IProp GF :=
   iprop(∃ q : UInt32, n ↦[i32][ vec.toNat ] q ∗ n ↦[i32][ vec.toNat + 4 ] newCap 0 k ∗
-    heapAfter n maxP hl live false (newCap 0 k) q)
+    heapAfter n maxP hl live F false (newCap 0 k) q)
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 4000000 in
@@ -322,15 +322,15 @@ theorem f768_grow (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
     (gt : GlobalType) (s vec k p0 : UInt32) (idx : UInt32) (maxP hl : Nat)
     (live : List (Nat × Nat)) (hs : 112 ≤ s.toNat)
     (hvec : vec.toNat + 8 ≤ 2 ^ 32) (hk0 : 0 < k.toNat)
-    (hk : k.toNat < 2 ^ 28) (hr : roomFor hl maxP (newCap 0 k)) :
+    (hk : k.toNat < 2 ^ 28) (hr : roomFor hl maxP (newCap 0 k)) (F : Nat := 1) (hF : okF F := by exact Or.inl rfl) :
     sinkCode n maxP inst mi A
       ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f768 Cg
         (fun args => iprop(⌜args = [.i32 vec, .i32 0, .i32 k]⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗
-          stk n (s.toNat - 112) 112 ∗ vt n 1057464 idx ta (A 578) ∗ heapInv n maxP hl live 1 ∗
+          stk n (s.toNat - 112) 112 ∗ vt n 1057464 idx ta (A 578) ∗ heapInv n maxP hl live F ∗
           n ↦[i32][ vec.toNat ] p0 ∗ n ↦[i32][ vec.toNat + 4 ] 0))
         (fun _ => 366 * cfg.regularOpCost + costAlloc cfg false (newCap 0 k))
         (fun _ rs => iprop(⌜rs = []⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗ stk n (s.toNat - 112) 112 ∗
-          vt n 1057464 idx ta (A 578) ∗ rawGrown n maxP hl live vec k)) := by
+          vt n 1057464 idx ta (A 578) ∗ rawGrown n maxP hl live F vec k)) := by
   iintro #Hk
   iunfold sinkCode at Hk
   icases Hk with ⟨#Hv, #H772, #H776, #H775, #H773, -⟩
@@ -359,7 +359,7 @@ theorem f768_grow (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
   ihave O := memBytes_addr (show s.toNat - 112 + 96 = (s - 16).toNat by omega) $$ O
   ihave X := stk_addr (show s.toNat - 112 = (s - 16).toNat - 96 by omega) $$ X
   ihave #S775 := f775_grow (GF := GF) cfg lim (d + 1) types[45]! (by rfl) inst mi A n g ta hm (by omega) Cg
-    gt (s - 16) (s - 16) vec k p0 idx maxP hl live ob hob (by omega) hvec (by omega) hk0 hk hr $$ [Hv H772 H776]
+    gt (s - 16) (s - 16) vec k p0 idx maxP hl live ob hob (by omega) hvec (by omega) hk0 hk hr (F := F) (hF := hF) $$ [Hv H772 H776]
   · iframe Hv H772 H776
   simp only [f768]
   mstep [Hg]; mstep; mstep; mstep; mstep [Hg]
@@ -442,18 +442,18 @@ theorem f735_grow (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
     (gt : GlobalType) (s vec k p0 : UInt32) (idx : UInt32) (maxP hl : Nat)
     (live : List (Nat × Nat)) (hs : 112 ≤ s.toNat)
     (hvec : vec.toNat + 12 ≤ 2 ^ 32) (hk0 : 0 < k.toNat)
-    (hk : k.toNat < 2 ^ 28) (hr : roomFor hl maxP (newCap 0 k)) :
+    (hk : k.toNat < 2 ^ 28) (hr : roomFor hl maxP (newCap 0 k)) (F : Nat := 1) (hF : okF F := by exact Or.inl rfl) :
     sinkCode n maxP inst mi A
       ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f735 Cg
         (fun args => iprop(⌜args = [.i32 vec, .i32 k]⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗
-          stk n (s.toNat - 112) 112 ∗ vt n 1057464 idx ta (A 578) ∗ heapInv n maxP hl live 1 ∗
+          stk n (s.toNat - 112) 112 ∗ vt n 1057464 idx ta (A 578) ∗ heapInv n maxP hl live F ∗
           n ↦[i32][ vec.toNat ] p0 ∗ n ↦[i32][ vec.toNat + 4 ] 0 ∗ n ↦[i32][ vec.toNat + 8 ] 0))
         (fun _ => 381 * cfg.regularOpCost + costAlloc cfg false (newCap 0 k))
         (fun _ rs => iprop(⌜rs = []⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗ stk n (s.toNat - 112) 112 ∗
-          vt n 1057464 idx ta (A 578) ∗ rawGrown n maxP hl live vec k ∗ n ↦[i32][ vec.toNat + 8 ] 0)) := by
+          vt n 1057464 idx ta (A 578) ∗ rawGrown n maxP hl live F vec k ∗ n ↦[i32][ vec.toNat + 8 ] 0)) := by
   iintro #Hk
   ihave #S768 := f768_grow (GF := GF) cfg lim (d + 1) types[31]! (by rfl) inst mi A n g ta hm (by omega) Cg
-    gt s vec k p0 idx maxP hl live hs (by omega) hk0 hk hr $$ Hk
+    gt s vec k p0 idx maxP hl live hs (by omega) hk0 hk hr (F := F) (hF := hF) $$ Hk
   iunfold sinkCode at Hk
   icases Hk with ⟨#Hv, -, -, -, -, #H768, -⟩
   ihave #Hi : inst ↪[inst] mi $$ []
@@ -503,23 +503,23 @@ def roomPost (n g : Nat) (gt : GlobalType) (s vec ptr cap len p k : UInt32) (sb 
 
 /-- Grow: the empty `String` at `vec`, the heap. -/
 def growPre (n g : Nat) (gt : GlobalType) (s vec p0 p : UInt32) (idx : UInt32) (ta a578 maxP hl : Nat)
-    (live : List (Nat × Nat)) (sb : List UInt8) : IProp GF :=
+    (live : List (Nat × Nat)) (F : Nat) (sb : List UInt8) : IProp GF :=
   iprop(g ↦[wg] ⟨gt, .i32 s⟩ ∗ stk n (s.toNat - 112) 112 ∗ vt n 1057464 idx ta a578 ∗
-    heapInv n maxP hl live 1 ∗ n ↦[i32][ vec.toNat ] p0 ∗ n ↦[i32][ vec.toNat + 4 ] 0 ∗
+    heapInv n maxP hl live F ∗ n ↦[i32][ vec.toNat ] p0 ∗ n ↦[i32][ vec.toNat + 4 ] 0 ∗
     n ↦[i32][ vec.toNat + 8 ] 0 ∗ n ↦[wms][ p.toNat ] sb)
 
 /-- The grown `String` at `vec` holding `sb` (`k` bytes): the block `q` of `newCap 0 k` bytes,
 `sb` then spare bytes, live in the heap. -/
-def strGrown (n maxP hl : Nat) (live : List (Nat × Nat)) (vec k : UInt32) (sb : List UInt8) : IProp GF :=
+def strGrown (n maxP hl : Nat) (live : List (Nat × Nat)) (F : Nat) (vec k : UInt32) (sb : List UInt8) : IProp GF :=
   iprop(∃ q : UInt32, ⌜q ≠ 0 ∧ q.toNat + (newCap 0 k).toNat < 2 ^ 32⌝ ∗ n ↦[i32][ vec.toNat ] q ∗
     n ↦[i32][ vec.toNat + 4 ] newCap 0 k ∗ n ↦[i32][ vec.toNat + 8 ] k ∗ n ↦[wms][ q.toNat ] sb ∗
     (∃ rest : List UInt8, ⌜rest.length = (newCap 0 k).toNat - k.toNat⌝ ∗ n ↦[wms][ q.toNat + k.toNat ] rest) ∗
-    grown n maxP hl live q (newCap 0 k))
+    grown n maxP hl live F q (newCap 0 k))
 
 def growPost (n g : Nat) (gt : GlobalType) (s vec p k : UInt32) (idx : UInt32) (ta a578 maxP hl : Nat)
-    (live : List (Nat × Nat)) (sb : List UInt8) : IProp GF :=
+    (live : List (Nat × Nat)) (F : Nat) (sb : List UInt8) : IProp GF :=
   iprop(g ↦[wg] ⟨gt, .i32 s⟩ ∗ stk n (s.toNat - 112) 112 ∗ vt n 1057464 idx ta a578 ∗
-    strGrown n maxP hl live vec k sb ∗ n ↦[wms][ p.toNat ] sb)
+    strGrown n maxP hl live F vec k sb ∗ n ↦[wms][ p.toNat ] sb)
 
 theorem add_sub_left (p k : UInt32) : p + k - p = k := by
   apply UInt32.toNat_inj.mp
@@ -553,7 +553,7 @@ theorem f734_room (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
     iexact Hi
   ihave #H951 : A 951 ↪[wf] FuncInst.wasm types[15]! inst f951 $$ []
   · iunfold vecCode2 at Hv
-    icases Hv with ⟨-, -, -, -, -, -, -, -, -, -, -, -, -, -, -, #H⟩
+    icases Hv with ⟨-, -, -, -, -, -, -, -, -, -, -, -, -, -, -, #H, -⟩
     iexact H
   have hn := hm.mem
   have ha735 := hm.funcs 735 (by decide)
@@ -616,17 +616,17 @@ theorem f734_grow (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
     (gt : GlobalType) (s vec p0 p k : UInt32) (idx : UInt32) (maxP hl : Nat)
     (live : List (Nat × Nat)) (sb : List UInt8) (hs : 112 ≤ s.toNat) (hsb : sb.length = k.toNat)
     (hvec : vec.toNat + 12 ≤ 2 ^ 32) (hk0 : 0 < k.toNat) (hk : k.toNat < 2 ^ 28)
-    (hp : p.toNat + k.toNat ≤ 2 ^ 32) (hr : roomFor hl maxP (newCap 0 k)) :
+    (hp : p.toNat + k.toNat ≤ 2 ^ 32) (hr : roomFor hl maxP (newCap 0 k)) (F : Nat := 1) (hF : okF F := by exact Or.inl rfl) :
     sinkCode n maxP inst mi A
       ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f734 Cg
         (fun args => iprop(⌜args = [.i32 vec, .i32 p, .i32 (p + k)]⌝ ∗
-          growPre n g gt s vec p0 p idx ta (A 578) maxP hl live sb))
+          growPre n g gt s vec p0 p idx ta (A 578) maxP hl live F sb))
         (fun _ => 421 * cfg.regularOpCost + costAlloc cfg false (newCap 0 k) +
           MemCpy.cost k.toNat * cfg.regularOpCost)
-        (fun _ rs => iprop(⌜rs = []⌝ ∗ growPost n g gt s vec p k idx ta (A 578) maxP hl live sb)) := by
+        (fun _ rs => iprop(⌜rs = []⌝ ∗ growPost n g gt s vec p k idx ta (A 578) maxP hl live F sb)) := by
   iintro #Hk
   ihave #S735 := f735_grow (GF := GF) cfg lim (d + 1) types[14]! (by rfl) inst mi A n g ta hm (by omega) Cg
-    gt s vec k p0 idx maxP hl live hs hvec hk0 hk hr $$ Hk
+    gt s vec k p0 idx maxP hl live hs hvec hk0 hk hr (F := F) (hF := hF) $$ Hk
   iunfold sinkCode at Hk
   icases Hk with ⟨#Hv, -, -, -, -, -, #H735, -⟩
   ihave #Hi : inst ↪[inst] mi $$ []
@@ -635,7 +635,7 @@ theorem f734_grow (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
     iexact Hi
   ihave #H951 : A 951 ↪[wf] FuncInst.wasm types[15]! inst f951 $$ []
   · iunfold vecCode2 at Hv
-    icases Hv with ⟨-, -, -, -, -, -, -, -, -, -, -, -, -, -, -, #H⟩
+    icases Hv with ⟨-, -, -, -, -, -, -, -, -, -, -, -, -, -, -, #H, -⟩
     iexact H
   have hn := hm.mem
   have ha735 := hm.funcs 735 (by decide)
@@ -753,17 +753,17 @@ theorem f757_grow (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
     (gt : GlobalType) (s vec p0 p k : UInt32) (idx : UInt32) (maxP hl : Nat)
     (live : List (Nat × Nat)) (sb : List UInt8) (hs : 112 ≤ s.toNat) (hsb : sb.length = k.toNat)
     (hvec : vec.toNat + 12 ≤ 2 ^ 32) (hk0 : 0 < k.toNat) (hk : k.toNat < 2 ^ 28)
-    (hp : p.toNat + k.toNat ≤ 2 ^ 32) (hr : roomFor hl maxP (newCap 0 k)) :
+    (hp : p.toNat + k.toNat ≤ 2 ^ 32) (hr : roomFor hl maxP (newCap 0 k)) (F : Nat := 1) (hF : okF F := by exact Or.inl rfl) :
     sinkCode n maxP inst mi A
       ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f757 Cg
         (fun args => iprop(⌜args = [.i32 vec, .i32 p, .i32 k]⌝ ∗
-          growPre n g gt s vec p0 p idx ta (A 578) maxP hl live sb))
+          growPre n g gt s vec p0 p idx ta (A 578) maxP hl live F sb))
         (fun _ => 437 * cfg.regularOpCost + costAlloc cfg false (newCap 0 k) +
           MemCpy.cost k.toNat * cfg.regularOpCost)
-        (fun _ rs => iprop(⌜rs = []⌝ ∗ growPost n g gt s vec p k idx ta (A 578) maxP hl live sb)) := by
+        (fun _ rs => iprop(⌜rs = []⌝ ∗ growPost n g gt s vec p k idx ta (A 578) maxP hl live F sb)) := by
   iintro #Hk
   ihave #S734 := f734_grow (GF := GF) cfg lim (d + 1) types[31]! (by rfl) inst mi A n g ta hm (by omega) Cg
-    gt s vec p0 p k idx maxP hl live sb hs hsb hvec hk0 hk hp hr $$ Hk
+    gt s vec p0 p k idx maxP hl live sb hs hsb hvec hk0 hk hp hr (F := F) (hF := hF) $$ Hk
   iunfold sinkCode at Hk
   icases Hk with ⟨#Hv, -, -, -, -, -, -, #H734, -⟩
   ihave #Hi : inst ↪[inst] mi $$ []
@@ -848,18 +848,18 @@ theorem f759_grow (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
     (gt : GlobalType) (s dd vec p0 p k : UInt32) (idx : UInt32) (maxP hl : Nat)
     (live : List (Nat × Nat)) (sb : List UInt8) (hs : 112 ≤ s.toNat) (hsb : sb.length = k.toNat)
     (hdd : dd.toNat + 4 ≤ 2 ^ 32) (hvec : vec.toNat + 12 ≤ 2 ^ 32) (hk0 : 0 < k.toNat)
-    (hk : k.toNat < 2 ^ 28) (hp : p.toNat + k.toNat ≤ 2 ^ 32) (hr : roomFor hl maxP (newCap 0 k)) :
+    (hk : k.toNat < 2 ^ 28) (hp : p.toNat + k.toNat ≤ 2 ^ 32) (hr : roomFor hl maxP (newCap 0 k)) (F : Nat := 1) (hF : okF F := by exact Or.inl rfl) :
     sinkCode n maxP inst mi A
       ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f759 Cg
         (fun args => iprop(⌜args = [.i32 dd, .i32 p, .i32 k]⌝ ∗ n ↦[i32][ dd.toNat ] vec ∗
-          growPre n g gt s vec p0 p idx ta (A 578) maxP hl live sb))
+          growPre n g gt s vec p0 p idx ta (A 578) maxP hl live F sb))
         (fun _ => 453 * cfg.regularOpCost + costAlloc cfg false (newCap 0 k) +
           MemCpy.cost k.toNat * cfg.regularOpCost)
         (fun _ rs => iprop(⌜rs = [.i32 0]⌝ ∗ n ↦[i32][ dd.toNat ] vec ∗
-          growPost n g gt s vec p k idx ta (A 578) maxP hl live sb)) := by
+          growPost n g gt s vec p k idx ta (A 578) maxP hl live F sb)) := by
   iintro #Hk
   ihave #S757 := f757_grow (GF := GF) cfg lim (d + 1) types[31]! (by rfl) inst mi A n g ta hm (by omega) Cg
-    gt s vec p0 p k idx maxP hl live sb hs hsb hvec hk0 hk hp hr $$ Hk
+    gt s vec p0 p k idx maxP hl live sb hs hsb hvec hk0 hk hp hr (F := F) (hF := hF) $$ Hk
   iunfold sinkCode at Hk
   icases Hk with ⟨#Hv, -, -, -, -, -, -, -, #H757⟩
   ihave #Hi : inst ↪[inst] mi $$ []

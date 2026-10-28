@@ -572,7 +572,7 @@ theorem wf_caseC : HeapModel.wf (modelC H c) (live.erase (c.addr + 8, s)) (F + 1
   have hnd' : ((H.cells.map (upd c.addr (cellC H c))).map CellM.addr).Nodup := by
     rw [addrs_map_upd (a := c.addr) (y := cellC H c) rfl]; exact hnd
   have hcn := not_listed hw hc hca
-  refine ⟨hw.mem0_al, hw.len_al, hw.mem0_le, hw.len_lt, ?_, ?_, ?_, ?_⟩
+  refine ⟨hw.mem0_al, hw.mem0_pos, hw.len_al, hw.mem0_le, hw.len_lt, ?_, ?_, ?_, ?_⟩
   rotate_left 3
   · intro z hz
     rcases (hmem z).mp hz with rfl | ⟨hz, -⟩
@@ -640,7 +640,7 @@ theorem wf_caseB {m : CellM} (hm : m ∈ H.cells) (hmaddr : m.addr = c.next) (hl
     fun x hx h1 h2 => (hmem x).mpr (Or.inr ⟨Or.inr ⟨hx, h1⟩, h2⟩)
   have hc'm : cellB c m ∈ (modelB H c m).cells := (hmem _).mpr (Or.inr ⟨Or.inl rfl, hcm⟩)
   have hm'm : nbrB c m ∈ (modelB H c m).cells := (hmem _).mpr (Or.inl rfl)
-  refine ⟨hw.mem0_al, hw.len_al, hw.mem0_le, hw.len_lt, ?_, ?_, ?_, ?_⟩
+  refine ⟨hw.mem0_al, hw.mem0_pos, hw.len_al, hw.mem0_le, hw.len_lt, ?_, ?_, ?_, ?_⟩
   rotate_left 3
   · intro z hz
     rcases (hmem z).mp hz with rfl | ⟨rfl | ⟨hz, -⟩, -⟩
@@ -757,7 +757,7 @@ theorem wf_caseA2 {p m : CellM} (hp : p ∈ H.cells) (hpa : p.addr = c.prev) (hp
   have U := fun {x y : CellM} (hx : x ∈ H.cells) (hy : y ∈ H.cells) (e : x.addr = y.addr) =>
     mem_unique hnd hx hy e
   have hcn := not_listed hw hc hca
-  refine ⟨hw.mem0_al, hw.len_al, hw.mem0_le, hw.len_lt, ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩, ?_, ?_, ?_⟩
+  refine ⟨hw.mem0_al, hw.mem0_pos, hw.len_al, hw.mem0_le, hw.len_lt, ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩, ?_, ?_, ?_⟩
   rotate_left 9
   · intro z hz
     rcases (hmem z).mp hz with rfl | rfl | ⟨hz, -⟩
@@ -884,7 +884,7 @@ theorem wf_caseA1 {p : CellM} (hp : p ∈ H.cells) (hpa : p.addr = c.prev) (hp0 
   have U := fun {x y : CellM} (hx : x ∈ H.cells) (hy : y ∈ H.cells) (e : x.addr = y.addr) =>
     mem_unique hnd hx hy e
   have hcn := not_listed hw hc hca
-  refine ⟨hw.mem0_al, hw.len_al, hw.mem0_le, hw.len_lt, ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩, ?_, ?_, ?_⟩
+  refine ⟨hw.mem0_al, hw.mem0_pos, hw.len_al, hw.mem0_le, hw.len_lt, ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩, ?_, ?_, ?_⟩
   rotate_left 9
   · intro z hz
     rcases (hmem z).mp hz with rfl | ⟨hz, -⟩

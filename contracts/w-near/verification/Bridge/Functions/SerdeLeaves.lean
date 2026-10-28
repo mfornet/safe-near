@@ -32,7 +32,7 @@ open WNear.Binary.AllocNewCell (memBytes_addr)
 open WNear.Binary.AllocZeroed (allocCode)
 open WNear.Binary.VecFromElem (stk stk_split stk_join stk_word stk_addr roomFor heapAfter costAlloc
   ofNat_decode_pair storeBytes_pair64)
-open WNear.Binary.VecWithCap (vecCode2 pre767 post767 f767_spec pre373 post373)
+open WNear.Binary.VecWithCap (okF vecCode2 pre767 post767 f767_spec pre373 post373)
 open WNear.Binary.DropVec (dropCode pre747 post747 f747_spec f778_spec)
 
 section Spec
@@ -144,12 +144,13 @@ theorem f94_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
     (hm : IfaceMod mi A n g ta) (hd : d + 10 < lim.maxCallDepth) (Cg : Nat)
     (gt : GlobalType) (s out c : UInt32) (idx : UInt32) (maxP len : Nat)
     (live : List (Nat × Nat)) (ob : List UInt8) (hob : ob.length = 12) (hs : 80 ≤ s.toNat)
-    (hc28 : c.toNat < 2 ^ 28) (hr : 0 < c.toNat → roomFor len maxP c) :
+    (hc28 : c.toNat < 2 ^ 28) (hr : 0 < c.toNat → roomFor len maxP c)
+    (F : Nat := 1) (hF : okF F := by exact Or.inl rfl) :
     vecCode2 n maxP inst mi A
       ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f94 Cg
-        (pre373 n g gt s out c idx ta (A 578) maxP len live ob)
+        (pre373 n g gt s out c idx ta (A 578) maxP len live F ob)
         (fun _ => 35 * cfg.regularOpCost + (203 * cfg.regularOpCost + costAlloc cfg false c))
-        (post373 n g gt s out c idx ta (A 578) maxP len live) := by
+        (post373 n g gt s out c idx ta (A 578) maxP len live F) := by
   iintro #Hv
   ihave #Hi : inst ↪[inst] mi $$ []
   · iunfold vecCode2, allocCode at Hv
@@ -185,7 +186,7 @@ theorem f94_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
   mstep [Hg]; mstep; mstep; mstep; mstep [Hg]
   mstep; mstep; mstep; mstep; mstep
   mcall (f767_spec cfg lim (d + 1) types[31]! (by rfl) inst mi A n g ta hm (by omega) Cg gt (s - 16)
-      (s - 16 + 8) c false idx maxP len live zb hzb (by omega) hc28 hr) using [Hg X Hvt Hinv Z]
+      (s - 16 + 8) c false idx maxP len live zb hzb (by omega) hc28 hr (F := F) (hF := hF) (hFz := fun h => by cases h)) using [Hg X Hvt Hinv Z]
   · iunfold pre767
     ihave X := stk_addr (show s.toNat - 80 = (s - 16).toNat - 64 by omega) $$ X
     ihave Z := memBytes_addr (show s.toNat - 80 + 64 + 8 = (s - 16 + 8).toNat by omega) $$ Z

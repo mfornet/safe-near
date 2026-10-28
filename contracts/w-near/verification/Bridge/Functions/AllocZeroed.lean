@@ -116,7 +116,7 @@ theorem f581_spec_seq (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : Fu
   · ------------------------------------------------------------------ empty list
     have hw0 : HeapModel.wf { H with freeList := [] } live 0 := by
       have hg' := hw.geo; have hv' := hw.lives
-      exact ⟨hw.mem0_al, hw.len_al, hw.mem0_le, hw.len_lt, ⟨hg'.bounds, hg'.next_al, hg'.sorted, hg'.next_nb,
+      exact ⟨hw.mem0_al, hw.mem0_pos, hw.len_al, hw.mem0_le, hw.len_lt, ⟨hg'.bounds, hg'.next_al, hg'.sorted, hg'.next_nb,
         hg'.prev_nb, hg'.first, hg'.disj⟩, AllocFresh.lists_nil rfl, ⟨hv'.live_cell, hv'.cell_live,
         hv'.live_nodup⟩, hw.nf_lo⟩
     iapply (MFunSpec_frame (Fr := frameH n maxP len live)

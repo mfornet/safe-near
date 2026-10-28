@@ -68,7 +68,7 @@ def skipM (H : HeapModel) (b : Nat) : HeapModel := { H with freeList := [b] }
 theorem wf_skip {H : HeapModel} {live : List (Nat × Nat)} {F : Nat} (hw : H.wf live F) {b : Nat} {cb : CellM}
     (hcb : H.cellAt b = some cb) (hcbf : cb.allocated = false) (hnf : cb.nextFree = 0) :
     (skipM H b).wf live 1 :=
-  ⟨hw.mem0_al, hw.len_al, hw.mem0_le, hw.len_lt,
+  ⟨hw.mem0_al, hw.mem0_pos, hw.len_al, hw.mem0_le, hw.len_lt,
     ⟨hw.geo.bounds, hw.geo.next_al, hw.geo.sorted, hw.geo.next_nb, hw.geo.prev_nb, hw.geo.first, hw.geo.disj⟩,
     lists_one (H := skipM H b) rfl hcb hcbf hnf,
     ⟨hw.lives.live_cell, hw.lives.cell_live, hw.lives.live_nodup⟩, hw.nf_lo⟩
@@ -96,7 +96,7 @@ theorem wf_whole2 {H : HeapModel} {live : List (Nat × Nat)} {F : Nat} (hw : H.w
     · rcases List.mem_cons.mp h1 with rfl | h2
       · exact absurd hcba.symm hbc
       · exact List.mem_append_right _ (List.mem_cons_of_mem _ h2)
-  exact ⟨h.mem0_al, h.len_al, h.mem0_le, h.len_lt,
+  exact ⟨h.mem0_al, h.mem0_pos, h.len_al, h.mem0_le, h.len_lt,
     ⟨h.geo.bounds, h.geo.next_al, h.geo.sorted, h.geo.next_nb, h.geo.prev_nb, h.geo.first, h.geo.disj⟩,
     lists_one (H := modelW2 H s t c b) rfl hcb' hcbf hnf,
     ⟨h.lives.live_cell, h.lives.cell_live, h.lives.live_nodup⟩, h.nf_lo⟩
@@ -331,7 +331,7 @@ theorem wf_split2 (hcf : c.allocated = false)
       · have := side w' hw'' hwc'; simp only [nS] at hxy ⊢; omega
       · simp only [cS, nS] at hxy; omega
       · omega
-  refine ⟨hw.mem0_al, hw.len_al, hw.mem0_le, hw.len_lt, hg', ?_, ?_, ?_⟩
+  refine ⟨hw.mem0_al, hw.mem0_pos, hw.len_al, hw.mem0_le, hw.len_lt, hg', ?_, ?_, ?_⟩
   · have hnd' := nodup_of_sorted hg'.sorted
     apply lists_same (H := H) hw.lists _ hnd hnd' (le_refl F)
     intro x hx hxl
@@ -402,7 +402,7 @@ theorem wf_star {H : HeapModel} {live : List (Nat × Nat)} {F : Nat} (hw : H.wf 
     intro x hx; unfold upd; split
     · rename_i e; obtain rfl := mem_unique hnd hx hca e; exact ⟨rfl, rfl, rfl, rfl⟩
     · exact ⟨rfl, rfl, rfl, rfl⟩
-  refine ⟨hw.mem0_al, hw.len_al, hw.mem0_le, hw.len_lt, hg', ?_, ?_, ?_⟩
+  refine ⟨hw.mem0_al, hw.mem0_pos, hw.len_al, hw.mem0_le, hw.len_lt, hg', ?_, ?_, ?_⟩
   · apply lists_one (H := starM H ca cb.addr) rfl _ hcbf hnf
     exact (cellAt_iff' (nodup_of_sorted hg'.sorted)).mpr ⟨hold cb hcb hab, rfl⟩
   · have hs0 : 0 < ca.size := by unfold CellM.size; omega

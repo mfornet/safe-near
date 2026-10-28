@@ -137,7 +137,7 @@ theorem startRes_gen {m : Memory} {L : Nat} (hm : MemImage m L) (cfg : RuntimeCo
   imod pointsTo_persist _ _ $$ Hm with #Hm
   imod persistList _ $$ HF with #HF
   ihave HT := tableOf $$ HT
-  ihave HS := staticsRes hm 0 0 memLen (by decide) (by decide) $$ [HM HL HT]
+  ihave HS := staticsRes hm 0 0 memLen (by decide) (by decide) (by decide) $$ [HM HL HT]
   · iframe HM HL HT
     iunfold memLimit
     iexact Hm

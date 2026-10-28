@@ -36,9 +36,9 @@ storage at `STATE` is the model's `header s`: the method ends with the host
 
 * `ToVecAfterFree cfg lim x96`: `serde_json::to_vec::<U128>` (96) as `ToVec.f96_spec` states it,
   but from the heap `state_read` leaves, whose free list holds two cells (`heapInv … 2`), at an
-  extra cost `x96`. `f96_spec` is proved on `heapInv … 1`: wee_alloc's first-fit walk over a
-  list of more than one cell (`AllocFirstFit`, "the general walk") is not proved yet. The
-  postcondition's heap is `heapInv … F'` for some `F'`.
+  extra cost `x96`. The postcondition's heap is `heapInv … F'` for some `F'`. Discharged with
+  `x96 = 0` by `ToVecTwo.toVecAfterFree_zero` (`f96_spec` at `F = 2`, through
+  `AllocTwo.f310_spec_two`); `Methods/FtTotalSupplyRefines.lean` uses it.
 * The storage premises of `storage_read` (`f548_spec_host`), as hypotheses: the accounting
   state, the trie link and canonical trie (`hlink`, `hb`), no witness hashing to zero (`hz`),
   `ProofSizeOk h` (SAF-67), no pending writes to `STATE`, the key and register limits.
@@ -636,10 +636,11 @@ def cost219 (cfg : WasmConfig) (h : NearState) (S : WNear.State) : Nat :=
       StorageReadWrap.costS cfg h (some (WNear.header S))) +
     BorshContract.cost161 cfg 1 + 726 * cfg.regularOpCost + 334 * cfg.regularOpCost
 
-/-- **Assumed** (the allocator's general walk, not proved yet): `serde_json::to_vec::<U128>` (96)
+/-- `serde_json::to_vec::<U128>` (96)
 as `ToVec.f96_spec` states it, but from a heap whose free list may hold two cells
 (`heapInv … 2`, what `state_read` leaves after freeing the value's buffer), at an extra cost
-`x96` (the walk's extra iterations); the heap after it is `heapInv … F'` for some `F'`. -/
+`x96`; the heap after it is `heapInv … F'` for some `F'`. Proved for `x96 = 0`:
+`ToVecTwo.toVecAfterFree_zero`. -/
 def ToVecAfterFree (cfg : WasmConfig) (lim : ExecLimits) (x96 : Nat) : Prop :=
   ∀ {GF : BundledGFunctors} [WasmGS NearState GF] (d : Nat) (type : FuncType), type.results = [] →
     ∀ (inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (n g ta : Nat), IfaceMod mi A n g ta →

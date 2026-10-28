@@ -29,8 +29,8 @@ writes `m.prev := (m.prev & 3) | (a.prev & !3) = 0`; `m` is not page-aligned, so
 for every model that keeps the lent `m`: no `heapInv` holds after the call. So no specification
 `heapInv … 2 → heapInv …` of `__rust_alloc` exists, and `FtTotalSupply.ToVecAfterFree` (whose
 precondition is `heapInv … 2`) is not provable as stated. `f310_two_model` takes the model with
-`hdeg` (no such list); `0 < mem0` in `HeapModel.wf` (true of every real heap: `mem0` is the
-initial memory length) would imply it.
+`hdeg` (no such list). `HeapModel.wf` now has `mem0_pos : 0 < mem0` (true of every real heap: `mem0` is the
+initial memory length), which implies it: `AllocTwoHeap.f310_spec_two` is the heap-level spec.
 -/
 
 namespace WNear.Binary.AllocTwo
@@ -1106,7 +1106,7 @@ theorem f310_two_model (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : F
   -- a listed cell at address 0: the walk sees the list cut there
   by_cases ha0 : ca.addr = 0
   · have hw0 : HeapModel.wf { H with freeList := [] } live 1 :=
-      ⟨hw.mem0_al, hw.len_al, hw.mem0_le, hw.len_lt,
+      ⟨hw.mem0_al, hw.mem0_pos, hw.len_al, hw.mem0_le, hw.len_lt,
         ⟨hw.geo.bounds, hw.geo.next_al, hw.geo.sorted, hw.geo.next_nb, hw.geo.prev_nb, hw.geo.first, hw.geo.disj⟩,
         WNear.Binary.AllocFresh.lists_nil rfl, ⟨hw.lives.live_cell, hw.lives.cell_live, hw.lives.live_nodup⟩, hw.nf_lo⟩
     have e : ∀ args, preX (GF := GF) n g gt sp o1 o2 o4 idx ta (A 578) maxP live size al H args =
@@ -1122,7 +1122,7 @@ theorem f310_two_model (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : F
       have := hdeg ca.addr ca (by rw [hfl, hb0]) hcaat
       rcases hcanf with h | ⟨h, -⟩ <;> omega
     have hw1 : HeapModel.wf { H with freeList := [ca.addr] } live 1 :=
-      ⟨hw.mem0_al, hw.len_al, hw.mem0_le, hw.len_lt,
+      ⟨hw.mem0_al, hw.mem0_pos, hw.len_al, hw.mem0_le, hw.len_lt,
         ⟨hw.geo.bounds, hw.geo.next_al, hw.geo.sorted, hw.geo.next_nb, hw.geo.prev_nb, hw.geo.first, hw.geo.disj⟩,
         WNear.Binary.AllocFresh.lists_one (H := { H with freeList := [ca.addr] }) rfl hcaat hcaf hnf0,
         ⟨hw.lives.live_cell, hw.lives.cell_live, hw.lives.live_nodup⟩, hw.nf_lo⟩

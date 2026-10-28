@@ -24,7 +24,8 @@ is proved so far is in
 * `AllocGen.lean`: 581/310 for any first walk, limit-aware (`f310_gen`);
 * `AllocSeqModel.lean`, `AllocSeqPack.lean`, `AllocSeq.lean`: alloc on `heapInv … 1`
   (`f310_spec_seq`: every sequence of allocations without frees) and with room
-  (`f310_spec_room`: `p ≠ 0`).
+  (`f310_spec_room`: `p ≠ 0`);
+* `AllocTwoSeq.lean`, `AllocTwoHeap.lean`: alloc on `heapInv … 2` with room (`f310_spec_two`).
 
 ## 1. The code, as it is in the binary
 
@@ -110,7 +111,7 @@ and states the pure facts of a `HeapModel` (`chunks`, their cells,
 `free list`), `HeapModel.wf` (a structure: `Geo` = (1)–(2), `Lists` =
 (3)–(4), `Lives` = (5), `nf_lo`):
 
-1. `mem0` and `len` page-aligned, `mem0 ≤ len < 2^32`; every cell lies in
+1. `mem0` and `len` page-aligned, `0 < mem0 ≤ len < 2^32`; every cell lies in
    `[mem0, len)`, word-aligned (`addr` and `next`, the latter also for the
    last cell of a chunk, whose `next` is the chunk end), with at least 4
    data bytes (`addr + 12 ≤ next`: a free cell's `next_free` word; a split
@@ -303,6 +304,9 @@ structure Lives (H : HeapModel) (live : List (Nat × Nat)) : Prop where
 constraint), for the live allocations `live` and the bound `F` on the free list. -/
 structure HeapModel.wf (H : HeapModel) (live : List (Nat × Nat)) (F : Nat) : Prop where
   mem0_al : H.mem0 % 65536 = 0
+  /-- `mem0` is the memory length at instantiation, positive for every real heap: no cell at
+  address 0 (so a listed cell is never confused with the list's end, `AllocTwoSeq`). -/
+  mem0_pos : 0 < H.mem0
   len_al : H.len % 65536 = 0
   mem0_le : H.mem0 ≤ H.len
   len_lt : H.len < 2 ^ 32
@@ -342,7 +346,7 @@ def block (n p size : Nat) : IProp GF :=
   iprop(∃ bs : List UInt8, ⌜bs.length = size⌝ ∗ n ↦[wms][ p ] bs)
 
 /-- At instantiation: the head is 0 and there is no chunk. -/
-theorem heapInv_init (n maxP len : Nat) (h1 : len % 65536 = 0) (h3 : len < 2 ^ 32) :
+theorem heapInv_init (n maxP len : Nat) (h1 : len % 65536 = 0) (h0 : 0 < len) (h3 : len < 2 ^ 32) :
     n ↦[wms][ headAddr ] bytes32 0 ∗ n ↦[wmlength] len ∗ n ↪[wmlimit] some maxP
       ⊢ heapInv (GF := GF) n maxP len [] 0 := by
   iintro ⟨Hh, Hl, Hm⟩
@@ -350,7 +354,7 @@ theorem heapInv_init (n maxP len : Nat) (h1 : len % 65536 = 0) (h3 : len < 2 ^ 3
   iexists { mem0 := len, len := len, cells := [], freeList := [] }
   isplitr
   · ipureintro
-    refine ⟨⟨h1, h1, Nat.le_refl len, h3, ⟨by simp, by simp, by simp, by simp, by simp, by simp, by simp⟩,
+    refine ⟨⟨h1, h0, h1, Nat.le_refl len, h3, ⟨by simp, by simp, by simp, by simp, by simp, by simp, by simp⟩,
       ⟨by simp, by simp, by simp, by simp, by simp⟩, ⟨by simp, by simp, by simp⟩, by simp⟩, rfl⟩
   simp only [HeapModel.head, List.headD_nil]
   iframe Hh Hl Hm

@@ -212,7 +212,7 @@ theorem below (c : CellM) (hc : c ∈ H.cells) : c.addr < len := by
 theorem wf_freshU (hfl : H.freeList = []) (hE1 : len + 12 ≤ E) :
     HeapModel.wf { H with len := E, cells := H.cells ++ [newCell len E 0 true false] } live F := by
   have hlal : len % 65536 = 0 := hl ▸ hw.len_al
-  refine ⟨hw.mem0_al, hE2, ?_, hE3, ?_, lists_nil hfl, ?_, ?_⟩
+  refine ⟨hw.mem0_al, hw.mem0_pos, hE2, ?_, hE3, ?_, lists_nil hfl, ?_, ?_⟩
   · have := hw.mem0_le; show H.mem0 ≤ E; omega
   · exact geo_append hw.geo (geo_one len E false hlal hE1 (by omega)) (by simp; omega)
       (by have := hw.mem0_le; simp; omega) (by simp; omega) rfl rfl rfl
@@ -231,7 +231,7 @@ theorem wf_freshW (hfl : H.freeList = []) {s : Nat} (hs0 : 0 < s) (hs : len + 8 
     HeapModel.wf { H with len := E, cells := H.cells ++ [newCell len E 0 true true] }
       ((len + 8, s) :: live) F := by
   have hlal : len % 65536 = 0 := hl ▸ hw.len_al
-  refine ⟨hw.mem0_al, hE2, ?_, hE3, ?_, lists_nil hfl, ?_, ?_⟩
+  refine ⟨hw.mem0_al, hw.mem0_pos, hE2, ?_, hE3, ?_, lists_nil hfl, ?_, ?_⟩
   · have := hw.mem0_le; show H.mem0 ≤ E; omega
   · exact geo_append hw.geo (geo_one len E true hlal hE1 (by omega)) (by simp; omega)
       (by have := hw.mem0_le; simp; omega) (by simp; omega) rfl rfl rfl
@@ -255,7 +255,7 @@ theorem wf_freshS (hfl : H.freeList = []) {m s : Nat} (hm1 : len + 12 ≤ m) (hm
   have hg : Geo { H with len := E, cells := H.cells ++ [newCell len m 0 false false, newCell m E len true true], freeList := [len] } :=
     geo_append hw.geo (geo_two len m E hlal ha0 hm1 hE1 hm2 (by omega)) (by simp; omega)
       (by have := hw.mem0_le; simp; omega) (by simp; omega) rfl rfl rfl
-  refine ⟨hw.mem0_al, hE2, ?_, hE3, hg, ?_, ?_, ?_⟩
+  refine ⟨hw.mem0_al, hw.mem0_pos, hE2, ?_, hE3, hg, ?_, ?_, ?_⟩
   · have := hw.mem0_le; show H.mem0 ≤ E; omega
   · apply lists_one (c := newCell len m 0 false false) rfl _ rfl rfl
     exact (cellAt_iff (nodup_of_sorted hg.sorted)).mpr ⟨by simp, rfl⟩

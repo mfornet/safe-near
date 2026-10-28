@@ -269,7 +269,7 @@ set_option maxRecDepth 100000 in
 `FtTotalSupply.statics` with the addresses of `wInst` (`A = id`), the default hook (`old = 0`),
 the interface not set up (`k3 = 0`), wee_alloc's vtable index 123, `to_string`'s pieces at
 1051836, and the empty heap (`heapInv_init`). -/
-theorem staticsRes {m : Memory} {L : Nat} (hm : MemImage m L) (n ta len : Nat) (hl1 : len % 65536 = 0)
+theorem staticsRes {m : Memory} {L : Nat} (hm : MemImage m L) (n ta len : Nat) (hl1 : len % 65536 = 0) (hl0 : 0 < len)
     (hl2 : len < 2 ^ 32) :
     memR (GF := GF) m n 0 L ∗ n ↦[wmlength] len ∗ n ↪[wmlimit] some 2048 ∗ tableRes ta ⊢
       stk n 1047840 736 ∗ FtTotalSupply.statics n ta id 0 0 123 1051836 2048 len := by
@@ -279,7 +279,7 @@ theorem staticsRes {m : Memory} {L : Nat} (hm : MemImage m L) (n ta len : Nat) (
   iunfold tableRes at HT
   icases HT with ⟨T116, T106, T39, T58, T82, T38, T123, T157', T92⟩
   ihave HEAD := memBytes_addr (a := 1074896) (b := AllocInv.headAddr) rfl $$ HEAD
-  ihave Hinv := AllocInv.heapInv_init n 2048 len hl1 hl2 $$ [HEAD HL]
+  ihave Hinv := AllocInv.heapInv_init n 2048 len hl1 hl0 hl2 $$ [HEAD HL]
   · iframe HEAD HL HM
   ihave Hinv := AllocInv.heapInv_mono n 2048 len [] 0 1 (by decide) $$ Hinv
   iunfold FtTotalSupply.statics, FtTotalSupply.vtab, SetupPanicHook.hookCells,

@@ -145,7 +145,7 @@ theorem wf_whole {H : HeapModel} {live : List (Nat × Nat)} {F : Nat} (hw : H.wf
     rw [e1, e2]; simp [upd]
   have hmem : ∀ z, z ∈ (modelW H s t c).cells ↔ z ∈ s ∨ z = cW c ∨ z ∈ t := by
     intro z; show z ∈ s ++ cW c :: t ↔ _; rw [List.mem_append, List.mem_cons]
-  refine ⟨hw.mem0_al, hw.len_al, hw.mem0_le, hw.len_lt, ?_, lists_nil rfl, ?_, ?_⟩
+  refine ⟨hw.mem0_al, hw.mem0_pos, hw.len_al, hw.mem0_le, hw.len_lt, ?_, lists_nil rfl, ?_, ?_⟩
   · refine geo_map hg (upd c.addr (cW c)) rfl rfl hmap ?_
     intro x hx
     unfold upd; split
@@ -418,7 +418,7 @@ theorem wf_split (hfl : H.freeList = [c.addr]) (hcf : c.allocated = false) (hnf 
       · have := side w' hw'' hwc'; simp only [nS] at hxy ⊢; omega
       · simp only [cS, nS] at hxy; omega
       · omega
-  refine ⟨hw.mem0_al, hw.len_al, hw.mem0_le, hw.len_lt, hg', ?_, ?_, ?_⟩
+  refine ⟨hw.mem0_al, hw.mem0_pos, hw.len_al, hw.mem0_le, hw.len_lt, hg', ?_, ?_, ?_⟩
   · apply lists_one (H := modelS H s t c m d) (c := cS c m) (by exact hfl) _ hcf hnf
     exact (cellAt_iff' (nodup_of_sorted hg'.sorted)).mpr ⟨hcS, rfl⟩
   · apply lives_gen hw.lives hnS rfl rfl hs0 (by simp only [nS, CellM.size]; omega)

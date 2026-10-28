@@ -384,7 +384,7 @@ theorem restoreO (bs : List UInt8) (hbs : bs.length + 4 = c.size) :
   isplitr
   · ipureintro
     have hg' := hw.geo; have hv' := hw.lives
-    exact ⟨⟨hw.mem0_al, hw.len_al, hw.mem0_le, hw.len_lt, ⟨hg'.bounds, hg'.next_al, hg'.sorted, hg'.next_nb,
+    exact ⟨⟨hw.mem0_al, hw.mem0_pos, hw.len_al, hw.mem0_le, hw.len_lt, ⟨hg'.bounds, hg'.next_al, hg'.sorted, hg'.next_nb,
       hg'.prev_nb, hg'.first, hg'.disj⟩, AllocFresh.lists_nil rfl, ⟨hv'.live_cell, hv'.cell_live, hv'.live_nodup⟩,
       hw.nf_lo⟩, hl, rfl⟩
   iframe Hm
