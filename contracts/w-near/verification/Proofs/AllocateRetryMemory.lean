@@ -77,59 +77,79 @@ theorem growth_reads (p : AllocateGrowth.Layout) (hn : AllocateGrowth.Native p) 
   have frame := fun address ha => record_read_above (AllocateGrowth.committedMemory p) p.record (AllocateGrowth.header p) address shape.1 bound ha
   exact ⟨(frame _ below).trans fresh.1,(frame _ (by omega)).trans fresh.2.1,(frame _ (by omega)).trans fresh.2.2⟩
 
-/-- The actual two f581 link writes use the saved old root, then the fresh
-head obtained before either write. No simultaneous-copy interpretation is used. -/
+/-- The retained new-head operand is the first store's address. -/
 def relinkMemory (memory : Memory) (record head : UInt32) :=
-  writeI32 (writeI32 memory (record.toNat+8) (readI32 memory (record.toNat+12)))
+  writeI32 (writeI32 memory (head.toNat+8) (readI32 memory (record.toNat+12)))
     (record.toNat+12) head
 
 theorem relink_spec (memory : Memory) (record head : UInt32)
-    (hw : memory.wf) (hb : record.toNat+16≤memory.byteSize) :
+    (hw : memory.wf) (hb : record.toNat+16≤memory.byteSize) (hh : head.toNat+12≤memory.byteSize) :
     (relinkMemory memory record head).wf ∧
     (relinkMemory memory record head).byteSize=memory.byteSize ∧
     (relinkMemory memory record head).max=memory.max ∧
     readI32 (relinkMemory memory record head) (record.toNat+12)=head := by
-  have first := writeI32_spec memory (record.toNat+8) (readI32 memory (record.toNat+12)) hw (by omega)
-  have second := writeI32_spec (writeI32 memory (record.toNat+8) (readI32 memory (record.toNat+12))) (record.toNat+12) head first.1 (by rw [first.2.1];omega)
+  have first := writeI32_spec memory (head.toNat+8) (readI32 memory (record.toNat+12)) hw (by omega)
+  have second := writeI32_spec (writeI32 memory (head.toNat+8) (readI32 memory (record.toNat+12))) (record.toNat+12) head first.1 (by rw [first.2.1];omega)
   exact ⟨second.1,second.2.1.trans first.2.1,second.2.2.1.trans first.2.2.1,
     PanicAllocateReadback.read_write_self _ _ _ first.1 (by rw [first.2.1];omega)⟩
 
-theorem relink_read_above (memory : Memory) (record head : UInt32) (address : Nat)
-    (hw : memory.wf) (hb : record.toNat+16≤memory.byteSize)
-    (ha : record.toNat+16≤address) :
-    readI32 (relinkMemory memory record head) address=readI32 memory address := by
-  have first := writeI32_spec memory (record.toNat+8) (readI32 memory (record.toNat+12)) hw (by omega)
-  have a := PanicAllocateReadback.read_write_frame (writeI32 memory (record.toNat+8) (readI32 memory (record.toNat+12)))
-    address (record.toNat+12) head first.1 (by rw [first.2.1];omega) (by omega)
-  have b := PanicAllocateReadback.read_write_frame memory address (record.toNat+8) (readI32 memory (record.toNat+12)) hw (by omega) (by omega)
-  exact a.trans b
+theorem relink_head_reads (memory : Memory) (record head : UInt32)
+    (hw : memory.wf) (hb : record.toNat+16≤head.toNat) (hh : head.toNat+12≤memory.byteSize) :
+    readI32 (relinkMemory memory record head) head.toNat=readI32 memory head.toNat ∧
+    readI32 (relinkMemory memory record head) (head.toNat+8)=readI32 memory (record.toNat+12) := by
+  have first := writeI32_spec memory (head.toNat+8) (readI32 memory (record.toNat+12)) hw (by omega)
+  have frame := fun address (ha : record.toNat+16≤address) =>
+    PanicAllocateReadback.read_write_frame (writeI32 memory (head.toNat+8) (readI32 memory (record.toNat+12)))
+      address (record.toNat+12) head first.1 (by rw [first.2.1];omega) (by omega)
+  have low := PanicAllocateReadback.read_write_frame memory head.toNat (head.toNat+8) (readI32 memory (record.toNat+12)) hw (by omega) (by omega)
+  have high := PanicAllocateReadback.read_write_self memory (head.toNat+8) (readI32 memory (record.toNat+12)) hw (by omega)
+  exact ⟨(frame _ hb).trans low,(frame _ (by omega)).trans high⟩
 
-/-- Memory presented to the retry search, computed solely from the original
-successful growth layout and the two actual f581 writes. -/
 def retryMemory (p : AllocateGrowth.Layout) :=
   relinkMemory (AllocateGrowth.finalMemory p) p.record (AllocateGrowth.header p)
 
-theorem retry_reads (p : AllocateGrowth.Layout) (hn : AllocateGrowth.Native p)
+theorem growth_header_nat (p : AllocateGrowth.Layout) (hn : AllocateGrowth.Native p) :
+    (AllocateGrowth.header p).toNat=p.memory.byteSize := by
+  have oldNat : (AllocateGrowth.oldPages p).toNat=p.memory.size := by
+    simp only [AllocateGrowth.oldPages]
+    apply Nat.mod_eq_of_lt
+    have hp := hn.oldPagesBound
+    omega
+  rw [AllocateGrowth.header,AllocateGrowth.pageBytes_toNat _ (by rw [oldNat];exact hn.oldPagesBound),oldNat]
+  rfl
+
+/-- Growth and its result record retain the original saved-root word. -/
+theorem growth_saved_root (p : AllocateGrowth.Layout) (hn : AllocateGrowth.Native p)
     (hb : p.record.toNat+16≤p.memory.byteSize) :
+    readI32 (AllocateGrowth.finalMemory p) (p.record.toNat+12)=readI32 p.memory (p.record.toNat+12) := by
+  have grow := hn.grown_spec p
+  have fresh := AllocateGrowth.freshMemory_spec p.grown (AllocateGrowth.header p) (AllocateGrowth.blockBytes p) grow.1 grow.2.2.1
+  have freshBound : p.record.toNat+8≤(AllocateGrowth.committedMemory p).byteSize := by
+    change p.record.toNat+8≤(AllocateGrowth.freshMemory _ _ _).byteSize
+    rw [fresh.2.1];exact grow.2.2.2
+  have record := record_read_above (AllocateGrowth.committedMemory p) p.record (AllocateGrowth.header p) (p.record.toNat+12) fresh.1 freshBound (by omega)
+  apply record.trans
+  apply LoadedValueReturnData.readI32_frame
+  intro i hi
+  simp only [AllocateGrowth.committedMemory]
+  rw [fresh.2.2.2 _ (Or.inl (by rw [growth_header_nat p hn];omega))]
+  rw [(Memory.grow_spec hn.wf hn.grow).2.2.2.2]
+  rw [ite_eq_left (by omega)]
+
+theorem retry_reads (p : AllocateGrowth.Layout) (hn : AllocateGrowth.Native p)
+    (hb : p.record.toNat+16≤p.memory.byteSize)
+    (he : readI32 p.memory (p.record.toNat+12)=0) :
     readI32 (retryMemory p) (p.record.toNat+12)=AllocateGrowth.header p ∧
     readI32 (retryMemory p) (AllocateGrowth.header p).toNat=
       ((AllocateGrowth.header p+AllocateGrowth.blockBytes p)|||2) ∧
     readI32 (retryMemory p) ((AllocateGrowth.header p).toNat+8)=0 := by
   have shape := AllocateGrowth.finalMemory_spec p hn
+  have grow := hn.grown_spec p
   have bound : p.record.toNat+16≤(AllocateGrowth.finalMemory p).byteSize := by rw [shape.2.1];omega
-  have below : p.record.toNat+16≤(AllocateGrowth.header p).toNat := by
-    have h := growth_record_below p hn
-    have old : (AllocateGrowth.header p).toNat=p.memory.byteSize := by
-      have oldNat : (AllocateGrowth.oldPages p).toNat=p.memory.size := by
-        simp only [AllocateGrowth.oldPages]
-        apply Nat.mod_eq_of_lt
-        have hp := hn.oldPagesBound
-        omega
-      rw [AllocateGrowth.header,AllocateGrowth.pageBytes_toNat _ (by rw [oldNat];exact hn.oldPagesBound),oldNat]
-      rfl
-    rw [old];exact hb
+  have headerBound : (AllocateGrowth.header p).toNat+12≤(AllocateGrowth.finalMemory p).byteSize := by rw [shape.2.1,←grow.2.1];exact grow.2.2.1
+  have below : p.record.toNat+16≤(AllocateGrowth.header p).toNat := by rw [growth_header_nat p hn];exact hb
   have reads := growth_reads p hn
-  have frame := fun address ha => relink_read_above (AllocateGrowth.finalMemory p) p.record (AllocateGrowth.header p) address shape.1 bound ha
-  exact ⟨(relink_spec _ _ _ shape.1 bound).2.2.2,(frame _ below).trans reads.1,(frame _ (by omega)).trans reads.2.2⟩
-
+  have frame := relink_head_reads (AllocateGrowth.finalMemory p) p.record (AllocateGrowth.header p) shape.1 below headerBound
+  exact ⟨(relink_spec _ _ _ shape.1 bound headerBound).2.2.2,frame.1.trans reads.1,
+    frame.2.trans ((growth_saved_root p hn hb).trans he)⟩
 end WNear.Proofs.AllocateRetry

@@ -38,7 +38,7 @@ private theorem tagged_masks (x : UInt32) (h : x&&&3=0) :
 flags-two second search. Its end may equal the grown memory boundary. -/
 theorem retry_native (template : AllocateSearch.Layout) (p : AllocateGrowth.Layout)
     (hn : AllocateGrowth.Native p)
-    (hb : p.record.toNat+16≤p.memory.byteSize) (hw : p.memory.byteSize≤2^32)
+    (hb : p.record.toNat+16≤p.memory.byteSize) (he : readI32 p.memory (p.record.toNat+12)=0) (hw : p.memory.byteSize≤2^32)
     (hp : 0<p.memory.size) (hpages : p.memory.size+(AllocateGrowth.delta p).toNat<65536)
     (hwords : 0<p.words.toNat)
     (hroom : 80+p.words.toNat*4≤(AllocateGrowth.delta p).toNat*65536)
@@ -70,10 +70,10 @@ theorem retry_native (template : AllocateSearch.Layout) (p : AllocateGrowth.Layo
     simp only [UInt32.toNat_ofNat,Nat.reducePow,Nat.reduceMod]
     apply Nat.mod_eq_of_lt
     omega
-  have reads := retry_reads p hn hb
+  have reads := retry_reads p hn hb he
   have originalShape := AllocateGrowth.finalMemory_spec p hn
   have recordBound : p.record.toNat+16≤(AllocateGrowth.finalMemory p).byteSize := by rw [originalShape.2.1];omega
-  have shape := relink_spec (AllocateGrowth.finalMemory p) p.record (AllocateGrowth.header p) originalShape.1 recordBound
+  have shape := relink_spec (AllocateGrowth.finalMemory p) p.record (AllocateGrowth.header p) originalShape.1 recordBound (by rw [originalShape.2.1,←(hn.grown_spec p).2.1];exact (hn.grown_spec p).2.2.1)
   have size : q.memory.byteSize=(p.memory.size+(AllocateGrowth.delta p).toNat)*65536 := by
     simp only [q,retryLayout]
     rw [retryMemory,shape.2.1,originalShape.2.1]
