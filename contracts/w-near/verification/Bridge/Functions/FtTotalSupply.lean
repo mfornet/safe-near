@@ -41,7 +41,7 @@ storage at `STATE` is the model's `header s`: the method ends with the host
   `AllocTwo.f310_spec_two`); `Methods/FtTotalSupplyRefines.lean` uses it.
 * The storage premises of `storage_read` (`f548_spec_host`), as hypotheses: the accounting
   state, the trie link and canonical trie (`hlink`, `hb`), no witness hashing to zero (`hz`),
-  room in the recorded proof for the lookup (`ProofBudget`, SAF-67), no pending writes to `STATE`, the key and register limits.
+  room in the recorded proof for the lookup (`ProofBudget`, SAF-67), the link through the overlay's view, the key and register limits.
 * `withinLimit h.config.maxReturnLen` of the JSON's length.
 
 The proof is split into three segments (`segA`, `segB`, `segC`) so that each proof term stays
@@ -704,10 +704,7 @@ theorem segB (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (e inst : Nat) (mi 
     (st : Near.TrieOverlay.State) (hacc : h.storageAccounting = some st)
     (hlim : withinLimit h.config.maxStorageKeyLen 5 = true)
     (hb : build st.entries = .ok st.base) (hz : zeroHash ∉ st.base.witness.map Prod.fst)
-    (hp : ∀ x ∈ st.prospective, x.1 ≠ contractKey h.context.currentAccountId WNear.stateKey)
-    (hcm : ∀ x ∈ st.committed, x.1 ≠ contractKey h.context.currentAccountId WNear.stateKey)
-    (hlink : h.storage WNear.stateKey =
-      (st.entries.find? (·.1 == contractKey h.context.currentAccountId WNear.stateKey)).map (·.2))
+    (hlink : h.storage WNear.stateKey = viewVal st (contractKey h.context.currentAccountId WNear.stateKey))
     (hproof : ProofBudget h st (lookupProofBound (contractKey h.context.currentAccountId WNear.stateKey))) (hreg : withinLimit h.config.maxRegisterLen 29 = true)
     (rest : List Instr) (Φ : Post NearState GF) :
     codeB e inst mi A n maxP ∗
@@ -762,7 +759,7 @@ theorem segB (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (e inst : Nat) (mi 
         intro l hl
         rw [grownLen_small _ _ (by decide)] at hl
         exact roomFor_of len maxP l 1 (by decide) ⟨r1, r2, r3, r4⟩ (by omega) (by omega) (by omega))
-      st hacc hlim hb hz hp hcm hlink hproof hreg)
+      st hacc hlim hb hz hlink hproof hreg)
     using [Hg HI Lo Hvt Hinv F72 Hkey Hh]
   · iunfold pre219
     ihave Lo := stkA (b := (s - 144).toNat - 592) (by omega) $$ Lo
@@ -908,18 +905,15 @@ noncomputable def cost296 (cfg : WasmConfig) (h : NearState) (S : WNear.State) (
 open Near.TrieAccounting Near.TrieConstruction Near.TrieOverlay in
 /-- What `ft_total_supply` needs of the host `h` (the storage premises of `storage_read`,
 `f548_spec_host`, kept as hypotheses): `STATE` holds the model's `header S`; the accounting
-state `st`, its trie canonical and linked to the storage, no witness hashing to zero, no pending
-write to `STATE`, room in the recorded proof for the lookup (`ProofBudget`, SAF-67); the key, register and return limits. -/
+state `st`, its trie canonical and linked to the storage through the overlay's view (`viewVal`), no
+witness hashing to zero, room in the recorded proof for the lookup (`ProofBudget`, SAF-67); the key, register and return limits. -/
 structure ReadOk (h : NearState) (S : WNear.State) (st : Near.TrieOverlay.State) : Prop where
   value : h.storage WNear.stateKey = some (WNear.header S)
   acc : h.storageAccounting = some st
   keyLen : withinLimit h.config.maxStorageKeyLen 5 = true
   trie : build st.entries = .ok st.base
   zero : zeroHash ∉ st.base.witness.map Prod.fst
-  prospective : ∀ x ∈ st.prospective, x.1 ≠ contractKey h.context.currentAccountId WNear.stateKey
-  committed : ∀ x ∈ st.committed, x.1 ≠ contractKey h.context.currentAccountId WNear.stateKey
-  link : h.storage WNear.stateKey =
-    (st.entries.find? (·.1 == contractKey h.context.currentAccountId WNear.stateKey)).map (·.2)
+  link : h.storage WNear.stateKey = viewVal st (contractKey h.context.currentAccountId WNear.stateKey)
   proof : ProofBudget h st (lookupProofBound (contractKey h.context.currentAccountId WNear.stateKey))
   regLen : withinLimit h.config.maxRegisterLen 29 = true
   retLen : withinLimit h.config.maxReturnLen (supplyJson S).length = true
@@ -986,7 +980,7 @@ theorem body296 (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (e inst : Nat) (
   icases Hk with ⟨#KA, #KB, #KC⟩
   iunfold statics at HS
   icases HS with ⟨HH, Hkey, T116, T106, HB, HV, Hvt, Hinv, HsK, HT⟩
-  obtain ⟨hv, hacc, hlim, hb, hz, hp, hcm, hlink, hproof, hreg, hret⟩ := hr
+  obtain ⟨hv, hacc, hlim, hb, hz, hlink, hproof, hreg, hret⟩ := hr
   have hlt := s.toNat_lt
   icases stkSp 512 224 rfl $$ Stk with ⟨Lo512, Stk⟩
   icases stkSp 80 144 rfl $$ Stk with ⟨L2, Stk⟩
@@ -1020,7 +1014,7 @@ theorem body296 (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (e inst : Nat) (
     iframe Lo512 L2
   iapply segB cfg lim d e inst mi A n g ta hm hd x96 H96 Cg
     (1010 * cfg.regularOpCost + valueReturnUse h ((0 : UInt32) + kOf (val (loOf S) (hiOf S)) + 2).toNat + R)
-    gt s hs hal idx ptr0 maxP len hroom h S hv st hacc hlim hb hz hp hcm hlink hproof hreg bodyC Φ
+    gt s hs hal idx ptr0 maxP len hroom h S hv st hacc hlim hb hz hlink hproof hreg bodyC Φ
   ihave F16 := stkA (b := s.toNat - 128) (by omega) $$ F16
   ihave F32 := stkA (b := s.toNat - 112) (by omega) $$ F32
   ihave F72 := stkA (b := s.toNat - 72) (by omega) $$ F72

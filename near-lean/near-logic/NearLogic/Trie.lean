@@ -1559,4 +1559,64 @@ theorem viewVal_base {s : State} {k : Bytes} (hp : ∀ e ∈ s.prospective, e.1 
     List.find?_eq_none.2 fun e he => by simpa using hc e he
   simp [viewVal, h1, h2]
 
+theorem getReference_overlay {s : State} {k : Bytes} {ov : Option Bytes} (b : Bool)
+    (h : overlay s k = some ov) : getReference s k b = .ok (s, ov.map .memory) := by
+  unfold getReference
+  rw [h]
+  cases ov <;> rfl
+
+theorem viewVal_overlay {s : State} {k : Bytes} {ov : Option Bytes} (h : overlay s k = some ov) :
+    viewVal s k = ov := by
+  unfold overlay at h
+  unfold viewVal
+  cases hp : (s.prospective.find? (·.1 == k)).map Prod.snd with
+  | some ov' => rw [hp] at h; simp only [Option.orElse_some, Option.some.injEq] at h; exact h
+  | none =>
+    rw [hp] at h
+    simp only [Option.orElse_none] at h
+    simp only [h]
+
+theorem overlay_none_free {s : State} {k : Bytes} (h : overlay s k = none) :
+    (∀ e ∈ s.prospective, e.1 ≠ k) ∧ (∀ e ∈ s.committed, e.1 ≠ k) := by
+  unfold overlay at h
+  cases hp : s.prospective.find? (·.1 == k) with
+  | some e => rw [hp] at h; simp at h
+  | none =>
+    rw [hp] at h
+    simp only [Option.map_none, Option.orElse_none, Option.map_eq_none_iff] at h
+    refine ⟨fun e he => by simpa using List.find?_eq_none.1 hp e he,
+      fun e he => by simpa using List.find?_eq_none.1 h e he⟩
+
+/-- **The lookup of `storage_read`, through the overlay.** A pending change is read from the
+overlay without touching the trie; otherwise `storage_lookup`. Either way the pointer is present
+exactly when `viewVal` holds a value, it dereferences to that value, and the lookup touches at
+most `2·|k| + 1` nodes. -/
+theorem storage_lookup_view {s : State} {k : Bytes} (b : Bool)
+    (hb : build s.entries = .ok s.base) (hz : zeroHash ∉ s.base.witness.map Prod.fst) :
+    ∃ s' p, getReference s k b = .ok (s', p) ∧ SameData s s' ∧
+      (∃ d m, s'.accounting.disk = s.accounting.disk + d ∧ s'.accounting.mem = s.accounting.mem + m ∧
+        d + m ≤ 2 * k.length + 1) ∧
+      p.isSome = (viewVal s k).isSome ∧
+      ∀ v, viewVal s k = some v → ∃ ptr s'', p = some ptr ∧ ptr.reference.2 = refOf v ∧
+        Near.TrieOverlay.dereference s' ptr = .ok (s'', v) ∧ SameData s' s'' := by
+  cases ho : overlay s k with
+  | some ov =>
+    refine ⟨s, ov.map .memory, getReference_overlay b ho, ⟨rfl, rfl, rfl, rfl⟩,
+      ⟨0, 0, rfl, rfl, by omega⟩, ?_, ?_⟩
+    · rw [viewVal_overlay ho]
+      cases ov <;> rfl
+    · intro v hv
+      rw [viewVal_overlay ho] at hv
+      subst hv
+      exact ⟨.memory v, s, rfl, rfl, rfl, ⟨rfl, rfl, rfl, rfl⟩⟩
+  | none =>
+    obtain ⟨hp, hc⟩ := overlay_none_free ho
+    obtain ⟨s', hget, hsd, hdm, -, hder⟩ := storage_lookup b hb hz hp hc
+    rw [viewVal_base hp hc]
+    refine ⟨s', _, hget, hsd, hdm, ?_, ?_⟩
+    · cases (s.entries.find? (·.1 == k)).map (·.2) <;> rfl
+    · intro v hv
+      obtain ⟨s'', hd, hsd2, -⟩ := hder v hv
+      exact ⟨.trie s.base.root (refOf v), s'', by rw [hv]; rfl, rfl, hd, hsd2⟩
+
 end NearLogic

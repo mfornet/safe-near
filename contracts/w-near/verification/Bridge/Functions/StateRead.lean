@@ -216,10 +216,7 @@ theorem f219_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
     (hacc : h.storageAccounting = some st)
     (hlim : withinLimit h.config.maxStorageKeyLen stateKey.length = true)
     (hb : build st.entries = .ok st.base) (hz : zeroHash ∉ st.base.witness.map Prod.fst)
-    (hp : ∀ x ∈ st.prospective, x.1 ≠ contractKey h.context.currentAccountId stateKey)
-    (hcm : ∀ x ∈ st.committed, x.1 ≠ contractKey h.context.currentAccountId stateKey)
-    (hlink : h.storage stateKey =
-      (st.entries.find? (·.1 == contractKey h.context.currentAccountId stateKey)).map (·.2))
+    (hlink : h.storage stateKey = viewVal st (contractKey h.context.currentAccountId stateKey))
     (hproof : ProofBudget h st (lookupProofBound (contractKey h.context.currentAccountId stateKey)))
     (hreg : withinLimit h.config.maxRegisterLen (stateBytes hd4 pre b0 b1 c0).length = true) :
     stateCode e inst mi A n maxP mx
@@ -285,7 +282,7 @@ theorem f219_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
   simp only [f219]
   mstep [Hg]; mstep; mstep; mstep; mstep [Hg]
   mstep; mstep; mstep; mstep; mstep
-  have S := S548 f8 hf8 h st rfl (by decide) hacc hlim hb hz hp hcm hlink hproof (fun v' hv' => by
+  have S := S548 f8 hf8 h st rfl (by decide) hacc hlim hb hz hlink hproof (fun v' hv' => by
       rw [hv] at hv'; cases hv'; exact hreg) hok
   rw [hv] at S
   mcall S using [Hg HI LoB Hvt Hinv F8 Hk Hhost]

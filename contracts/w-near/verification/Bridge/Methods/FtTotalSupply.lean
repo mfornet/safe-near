@@ -17,7 +17,7 @@ import Spec.Contract
 * `ftTotalSupply_refines`: `method_refines_callR` for a call to `ft_total_supply`.
 
 Assumed (hypotheses): `ToVecAfterFree` (`to_vec` on a two-cell free list), the storage premises
-(`ReadOk`: the recorded proof's room for the lookup (`ProofBudget`), the trie link, no zero-hash witness, no pending write), and,
+(`ReadOk`: the recorded proof's room for the lookup (`ProofBudget`), the link through the overlay's view, no zero-hash witness), and,
 for `Refines`, that the model's step agrees with every final host (`hag`).
 -/
 
@@ -340,8 +340,8 @@ open NearInterface ContractModel in
 `ftTotalSupply_runs`, against the model's step. Hypotheses not discharged here: `H96` (`to_vec`
 on a two-cell free list: the allocator's general walk), `hpre` (the host reads the model state
 `S`: `ReadOk`, with the recorded proof's room for the lookup (`ProofBudget`) when the context has
-room for the model's bound, the trie link and canonical trie, no zero-hash witness, no pending
-write to `STATE`, the key/register/return limits), `hpreP` (the same of the host recording no
+room for the model's bound, the link through the overlay's view and canonical trie, no zero-hash witness,
+the key/register/return limits), `hpreP` (the same of the host recording no
 proof), `hag`, `hagP` (the model's step agrees with every final host: the return data
 `supplyJson S`, storage, balance, usage, logs),
 `hbound` (the gas bound covers loading and `cost`). -/

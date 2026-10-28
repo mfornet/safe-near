@@ -84,10 +84,7 @@ theorem f219_spec_model (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : 
     (hacc : h.storageAccounting = some st)
     (hlim : withinLimit h.config.maxStorageKeyLen 5 = true)
     (hb : build st.entries = .ok st.base) (hz : zeroHash ∉ st.base.witness.map Prod.fst)
-    (hp : ∀ x ∈ st.prospective, x.1 ≠ contractKey h.context.currentAccountId WNear.stateKey)
-    (hcm : ∀ x ∈ st.committed, x.1 ≠ contractKey h.context.currentAccountId WNear.stateKey)
-    (hlink : h.storage WNear.stateKey =
-      (st.entries.find? (·.1 == contractKey h.context.currentAccountId WNear.stateKey)).map (·.2))
+    (hlink : h.storage WNear.stateKey = viewVal st (contractKey h.context.currentAccountId WNear.stateKey))
     (hproof : ProofBudget h st (lookupProofBound (contractKey h.context.currentAccountId WNear.stateKey)))
     (hreg : withinLimit h.config.maxRegisterLen 29 = true) :
     stateCode e inst mi A n maxP mx
@@ -98,7 +95,7 @@ theorem f219_spec_model (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : 
             costS cfg h (some (WNear.header s))) +
           cost161 cfg 1 + 726 * cfg.regularOpCost + 334 * cfg.regularOpCost)
         (postModel n g ta A gt sp out idx maxP len live s h (StorageReadPost h StateRead.stateKey 0 st)) := by
-  rw [← stateKey_eq] at hv hp hcm hlink hproof
+  rw [← stateKey_eq] at hv hlink hproof
   have hl := header_length s
   have e := f219_spec (GF := GF) cfg lim d type htype inst mi e A n g ta mx hm hd Cg gt sp out hs hal hout idx
     maxP len live ob hob h (WNear.Borsh.u32 WNear.accountsPrefix.length) WNear.accountsPrefix
@@ -107,7 +104,7 @@ theorem f219_spec_model (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : 
     (by simp [NearSdk.Borsh.u128]) (by simp [NearSdk.Borsh.u128]) (by simp [NearSdk.Borsh.u64])
     decode_u32_prefix (by rw [accountsPrefix_length]; decide) (by rw [← header_eq]; exact hv)
     (by rw [← header_eq, hl]; decide) (by rw [← header_eq, hl]; exact hroom1)
-    (by rw [← header_eq, hl, accountsPrefix_length]; exact hroom2) st hacc hlim hb hz hp hcm hlink hproof
+    (by rw [← header_eq, hl, accountsPrefix_length]; exact hroom2) st hacc hlim hb hz hlink hproof
     (by rw [← header_eq, hl]; exact hreg)
   rw [← header_eq, accountsPrefix_length] at e
   have hpost : post219 (GF := GF) n g ta A gt sp out idx maxP len live WNear.accountsPrefix

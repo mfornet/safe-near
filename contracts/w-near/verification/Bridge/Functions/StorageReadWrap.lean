@@ -411,9 +411,7 @@ theorem f548_spec_host (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : F
     (hacc : h.storageAccounting = some st)
     (hlim : withinLimit h.config.maxStorageKeyLen key.length = true)
     (hb : build st.entries = .ok st.base) (hz : zeroHash ∉ st.base.witness.map Prod.fst)
-    (hp : ∀ x ∈ st.prospective, x.1 ≠ contractKey h.context.currentAccountId key)
-    (hcm : ∀ x ∈ st.committed, x.1 ≠ contractKey h.context.currentAccountId key)
-    (hlink : h.storage key = (st.entries.find? (·.1 == contractKey h.context.currentAccountId key)).map (·.2))
+    (hlink : h.storage key = viewVal st (contractKey h.context.currentAccountId key))
     (hproof : ProofBudget h st (lookupProofBound (contractKey h.context.currentAccountId key)))
     (hreg : ∀ v, h.storage key = some v → withinLimit h.config.maxRegisterLen v.length = true)
     (hok : RegOk maxP len (h.storage key)) :
@@ -431,7 +429,7 @@ theorem f548_spec_host (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : F
     omega
   have hc := storageRead_readContract (C := Cg) e h (UInt64.ofNat kl.toNat) (UInt64.ofNat kp.toNat) 0 key st
     hlen (by rw [ValueReturn.toNat_ofNat32]; exact hkl) (by rw [ValueReturn.toNat_ofNat32]; exact hpos) hacc hlim
-    hb hz hp hcm hlink hproof (Nat.le_refl _) (fun v hv _ => hreg v hv)
+    hb hz hlink hproof (Nat.le_refl _) (fun v hv _ => hreg v hv)
   rw [ValueReturn.toNat_ofNat32, ValueReturn.toNat_ofNat32] at hc
   exact f548_spec cfg lim d type htype inst mi e A n g ta mx hm hd Cg gt s out kp kl hs hal hout key idx maxP len
     live ob hob h _ _ hc (storageReadPost_ok h key st) hok
