@@ -19,10 +19,9 @@ local.get 0  local.get 1  i32.const 40  call 951  drop   ;; memcpy(out, opt, 40)
 `f155_spec` is its `MFunSpec` when the word is nonzero, through
 `MemCpy.f951_spec`: 744 `regular_op_cost`s (6 instructions, the call 1, the
 activation of `memcpy` 10 and its 726, the `drop` 1); with the activation 9,
-paid by the caller, the harness's 753 (`stateOrPanic`). The `None` path is
-not covered: it needs a spec of 156 and of `env::panic` (521), which reaches
-the host through the blockchain interface installed by
-`set_blockchain_interface` (`LocalKey::with`, 448), ending in a trap.
+paid by the caller, the harness's 753 (`stateOrPanic`). The `None` path, a
+trap through `Contract::default` (156), is `f155_spec_none`
+(`UnwrapOrDefaultNone.lean`).
 -/
 
 namespace WNear.Binary.UnwrapOrDefault

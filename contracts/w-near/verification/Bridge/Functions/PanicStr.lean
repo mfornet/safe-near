@@ -35,9 +35,9 @@ the trampoline 262; `panic_utf8` is import 22. `Interface.iface` does not own th
 `panicSlot` holds it, and `panicCode` the trampoline's and the host's code.
 
 None of these functions returns: each spec is an `MFunSpecT` whose normal postcondition is
-`False` and whose trap postcondition is `panicked h bs`, a host that differs from `h` (up to
-gas) only in its last error, `GuestPanic (utf8String bs)`. Everything else is dropped on the
-trap.
+`False` and whose trap postcondition is `panicked Cg h bs`, a host that differs from `h` (up to
+gas) only in its last error, `GuestPanic (utf8String bs)`, and the gas counter, still within
+`Cg` (what bounds the gas a run that panics uses). Everything else is dropped on the trap.
 
 * `f262_spec`: the trampoline: 3 `regular_op_cost`s and `panicUtf8Use h len`.
 * `f448_spec`: `LocalKey::with` on the installed interface: 168 and `panicUtf8Use h len`.
@@ -121,10 +121,10 @@ theorem panicSlot_of (n ta : Nat) (A : Nat → Nat) :
   iframe H T
 
 /-- **The host panicked** with the message `bs`: up to gas, `h` with the last error
-`GuestPanic (utf8String bs)`. -/
-def panicked (h : NearState) (bs : List UInt8) : IProp GF :=
+`GuestPanic (utf8String bs)`; and the gas counter, its use still within `Cg`. -/
+def panicked (Cg : Nat) (h : NearState) (bs : List UInt8) : IProp GF :=
   iprop(∃ h', ⌜erase h' = erase { h with lastError := some (.guestPanic (utf8String bs)) }⌝ ∗
-    mhostPt h')
+    mhostPt h' ∗ ∃ R, credits Cg R)
 
 end Res
 
@@ -137,13 +137,14 @@ variable {cfg : WasmConfig} {lim : ExecLimits} {d : Nat} {f : Frame} {Φ : Post 
   {Cg K : Nat}
 
 /-- `mwpi_call_host_trap` on a stack holding just the arguments, the credits any `K`
-covering the call and the host's gas. -/
+covering the call and the host's gas; the trap keeps the credits left. -/
 theorem mwpi_call_host_trap' (i a n ptr : Nat) (fn : HostFn NearState) (h : NearState)
     (Q : NearState → Prop) (mx : Option Nat) (bs : List UInt8) (args : List Value) (r : Trap)
     {kh : Nat} (ha : f.mi.funcAddrs[i]? = some a) (hn : f.mi.memAddrs[0]? = some n)
     (hlen : args.length = fn.type.params.length) (hc : TrapContractP fn h Q args r ptr bs kh Cg) :
     credits Cg K ∗ ⌜cfg.regularOpCost + kh ≤ K⌝ ∗ a ↪[wf] FuncInst.host fn ∗ n ↪[wmlimit] mx ∗
-      mhostPt h ∗ n ↦[wms][ ptr ] bs ∗ ▷ (∀ h', ⌜Q h'⌝ -∗ mhostPt h' -∗ Φ.trap)
+      mhostPt h ∗ n ↦[wms][ ptr ] bs ∗
+      ▷ (∀ h', ⌜Q h'⌝ -∗ mhostPt h' -∗ (∃ R, credits Cg R) -∗ Φ.trap)
       ⊢ mwpi cfg lim d f args [.call i] Φ := by
   iintro ⟨Hc, %hK, Hf, Hm, Hh, Hb, H⟩
   have r := mwpi_call_host_trap (cfg := cfg) (lim := lim) (d := d) (f := f) (Φ := Φ)
@@ -153,8 +154,10 @@ theorem mwpi_call_host_trap' (i a n ptr : Nat) (fn : HostFn NearState) (h : Near
   rw [show cfg.regularOpCost + kh + (K - (cfg.regularOpCost + kh)) = K by omega]
   iframe Hc Hf Hm Hh Hb
   inext
-  iintro %h' %hq Hh - -
+  iintro %h' %hq Hh - Hc
   iapply H $$ %h' %hq Hh
+  iexists _
+  iexact Hc
 
 def trampPre (n : Nat) (h : NearState) (dp : UInt32) (len ptr : UInt64) (bs : List UInt8)
     (args : List Value) : IProp GF :=
@@ -172,7 +175,7 @@ theorem f262_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
     a22 ↪[wf] FuncInst.host (metered e "panic_utf8" panicUtf8Metered).toHostFn ∗ n ↪[wmlimit] mx
       ⊢ MFunSpecT (GF := GF) cfg lim d type inst mi f262 Cg (trampPre n h dp len ptr bs)
         (fun _ => 3 * cfg.regularOpCost + panicUtf8Use h len.toNat) (fun _ _ => iprop(False))
-        (fun _ => panicked h bs) := by
+        (fun _ => panicked Cg h bs) := by
   iintro ⟨#Hh, #Hm⟩
   iapply MFunSpecT_intro
   imodintro
@@ -188,11 +191,11 @@ theorem f262_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
   isplitr
   · ipureintro; mstep_norm_full; omega
   inext
-  iintro %h' %hq Hhost
+  iintro %h' %hq Hhost Hc
   simp only [Post.mfunc]
   iunfold panicked
   iexists h'
-  iframe Hhost
+  iframe Hhost Hc
   ipureintro; exact hq
 
 end Tramp
@@ -306,7 +309,7 @@ theorem f448_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
       ⊢ MFunSpecT (GF := GF) cfg lim d type inst mi f448 Cg
         (withPre n g ta A gi sp cp ptr len bs w0 w4 w8 w12 h)
         (fun _ => 168 * cfg.regularOpCost + panicUtf8Use h len.toNat) (fun _ _ => iprop(False))
-        (fun _ => panicked h bs) := by
+        (fun _ => panicked Cg h bs) := by
   iintro ⟨#Hcode, #Hpc⟩
   iunfold ifaceCode at Hcode
   icases Hcode with ⟨#F565, #F468, #F429, #F494, #F672, #F430, #F431, #F432, #F433, #F241, #F260, #F284,
@@ -486,7 +489,7 @@ theorem f521_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
       ⊢ MFunSpecT (GF := GF) cfg lim d type inst mi f521 Cg
         (pre n g ta A gi sp ptr len bs c0 c4 w0 w4 w8 w12 h)
         (fun _ => 194 * cfg.regularOpCost + panicUtf8Use h len.toNat) (fun _ _ => iprop(False))
-        (fun _ => panicked h bs) := by
+        (fun _ => panicked Cg h bs) := by
   iintro ⟨#F448, #Hcode, #Hpc⟩
   ihave #Hi : inst ↪[inst] mi $$ []
   · iunfold panicCode at Hpc
@@ -553,9 +556,10 @@ section Default
 variable {GF : BundledGFunctors} [WasmGS NearState GF]
 
 /-- The host panicked with `"The contract is not initialized"`. -/
-theorem panicked_notInit (h : NearState) :
-    panicked (GF := GF) h notInit = iprop(∃ h', ⌜erase h' = erase { h with
-      lastError := some (.guestPanic "The contract is not initialized") }⌝ ∗ mhostPt h') := by
+theorem panicked_notInit (Cg : Nat) (h : NearState) :
+    panicked (GF := GF) Cg h notInit = iprop(∃ h', ⌜erase h' = erase { h with
+      lastError := some (.guestPanic "The contract is not initialized") }⌝ ∗ mhostPt h' ∗
+      ∃ R, credits Cg R) := by
   unfold panicked; rw [notInit_utf8String]
 
 /-- The `self` pointer (unused); the stack pointer, the interface and the `panic_utf8` slot,
@@ -580,7 +584,7 @@ theorem f156_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
       ⊢ MFunSpecT (GF := GF) cfg lim d type inst mi f156 Cg
         (defaultPre n g ta A gi sp self c0 c4 w0 w4 w8 w12 h)
         (fun _ => 207 * cfg.regularOpCost + panicUtf8Use h 31) (fun _ _ => iprop(False))
-        (fun _ => panicked h notInit) := by
+        (fun _ => panicked Cg h notInit) := by
   iintro ⟨#F521, #F448, #Hcode, #Hpc⟩
   ihave #Hi : inst ↪[inst] mi $$ []
   · iunfold panicCode at Hpc
