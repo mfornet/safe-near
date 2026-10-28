@@ -1,4 +1,5 @@
 import Bridge.Functions.StorageReadWrap
+import Bridge.Functions.MemSet
 
 /-!
 # The leaves of a method's argument prologue (M6)
@@ -29,6 +30,8 @@ sp += 16
 * `f157_spec`: `Option::<Vec<u8>>::expect` on `Some`: the three words copied (as 498,
   `StorageReadWrap.f498_spec`, with the message fixed).
 * `f644_spec`: `SliceRead::new`: the slice and the index 0.
+* `f634_spec`: `Deserializer::new` (66's first call): the `SliceRead` moved in, the empty scratch
+  `Vec` `(1, 0, 0)` and the depth 128 (`deserializer`); 23 `regular_op_cost`s.
 * `f65_of_66`: `from_slice` from any specification of `from_trait` (66) on the `SliceRead`
   644 builds, in a 16-byte frame: 66's pre- and postcondition, with 16 more bytes of stack
   and 45 more `regular_op_cost`s (its 13 instructions, 644 and its activation, 66's activation).
@@ -215,5 +218,63 @@ theorem f65_of_66 (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
   iexact R
 
 end L65
+
+/-! ## `Deserializer::new` (634) -/
+
+section L634
+
+variable {GF : BundledGFunctors} [WasmGS NearState GF]
+
+/-- The `Deserializer` at `out` over the `SliceRead` `(ptr, len, idx)`: the read, the empty
+scratch `Vec` `(1, 0, 0)` (its pointer and capacity one `i64`, `1`) and the depth 128. -/
+def deserializer (n : Nat) (out ptr len idx : UInt32) : IProp GF :=
+  iprop(sliceRead n out ptr len idx ∗ n ↦[wms][ out.toNat + 12 ] storeBytes (.i64 1) 8 ∗
+    n ↦[i32][ out.toNat + 20 ] 0 ∗ n ↦[wms][ out.toNat + 24 ] [128])
+
+/-- **`Deserializer::new(read)`** (634): the `SliceRead` at `rd` moved into a fresh
+`Deserializer` at `out`. -/
+theorem f634_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
+    (htype : type.results = []) (inst : Nat) (mi : ModuleInst) (n : Nat)
+    (hn : mi.memAddrs[0]? = some n) (Cg : Nat) (out rd ptr len idx : UInt32)
+    (o0 o8 o12 o20 o24 : List UInt8) (h0 : o0.length = 8) (h8 : o8.length = 4) (h12 : o12.length = 8)
+    (h20 : o20.length = 4) (h24 : o24.length = 1) (hout : out.toNat + 25 ≤ 2 ^ 32)
+    (hrd : rd.toNat + 12 ≤ 2 ^ 32) :
+    ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f634 Cg
+        (fun args => iprop(⌜args = [.i32 out, .i32 rd]⌝ ∗ sliceRead n rd ptr len idx ∗
+          n ↦[wms][ out.toNat ] o0 ∗ n ↦[wms][ out.toNat + 8 ] o8 ∗ n ↦[wms][ out.toNat + 12 ] o12 ∗
+          n ↦[wms][ out.toNat + 20 ] o20 ∗ n ↦[wms][ out.toNat + 24 ] o24))
+        (fun _ => 23 * cfg.regularOpCost)
+        (fun _ rs => iprop(⌜rs = []⌝ ∗ sliceRead n rd ptr len idx ∗ deserializer n out ptr len idx)) := by
+  iapply MFunSpec_intro
+  imodintro
+  iintro %args %R HP Hc
+  icases HP with ⟨%hargs, Hrd, O0, O8, O12, O20, O24⟩
+  subst hargs
+  iunfold sliceRead at Hrd
+  icases Hrd with ⟨R0, R4, R8⟩
+  simp only [f634]
+  mstep; mstep; mstep [O24]
+  rw [MemSet.storeBytes_i32_1]
+  mstep; mstep; mstep [O12]
+  mstep; mstep
+  ihave R := KeyGet.join64 n rd.toNat ptr len $$ [R0 R4]
+  · iframe R0 R4
+  mstep [R]
+  rw [VecFromElem.ofNat_decode_pair]
+  mstep [O0]
+  rw [VecFromElem.storeBytes_pair64]
+  mstep; mstep; mstep; mstep; mstep [O20]
+  mstep; mstep; mstep; mstep; mstep; mstep; mstep [R8]; mstep [O8]
+  mcredits R
+  iframe Hc
+  iunfold deserializer, sliceRead
+  ihave R := KeyGet.split64 n rd.toNat ptr len $$ R
+  icases R with ⟨R0, R4⟩
+  ihave O0 := KeyGet.split64 n out.toNat ptr len $$ O0
+  icases O0 with ⟨O0, O4⟩
+  simp only [show MemSet.byteOf 128 = 128 from rfl]
+  iframe R0 R4 R8 O0 O4 O8 O12 O20 O24
+
+end L634
 
 end WNear.Binary.ArgsLeaves
