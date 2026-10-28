@@ -156,8 +156,18 @@ functional host frames permit caller-output aliases. Independent replays cover
 230 actual raw calls and160 generated alias/boundary cases, plus20 actual
 prefix-leaf calls and32 generated unsigned/boundary cases; whole memory,
 gas, SP, exact fuel and one-less-fuel exhaustion agree.
-Accepted decoding161/162/425, the whole prefix-vector315/316 path and373/374
-allocation/copy wrappers, serialization and exported refinement remain open. These
+The enclosing vector373 and allocation/copy374 calls are now complete at620
+ordinary units/495 steps and18n+658 units/17n+519 steps, at caller depth+9/+10.
+The real951 copy retains sequential source/output overlap, and final length
+readback is unconditional; original payload semantics use the precise source
+and final-length-write separations. Independent replays cover47 actual calls
+and462 generated size, boundary, seeded overlapping-copy and output-alias
+cases, with exact whole memory/max, SP, gas/fuel and one-less-fuel exhaustion.
+The actual316 pre-allocation prefix is composed through five real helper
+calls at183 ordinary units/149 steps, from original data/code only. Its actual
+allocation domain after those writes is derived from original heap data and
+explicit descriptor separations. Whole315/316 and161/162/425 decoding,
+serialization and exported refinement remain open. These
 contracts do not discharge the existing representation/protocol premises or
 change the model, runtime semantics, or WF definition.
 

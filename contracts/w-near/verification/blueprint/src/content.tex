@@ -570,8 +570,24 @@ output aliases. Code arrays, globals, functional host and exact credits are
 framed. Independent replays check230 actual raw calls and160 generated alias
 and boundary cases, plus20 actual prefix-leaf calls and32 generated unsigned
 and boundary cases: whole memory/max, SP, exact gas/fuel and one-less-fuel
-exhaustion agree. The whole373/374 allocation/copy wrappers, prefix-vector315/316
-and whole161/162/425 composition remain open.
+exhaustion agree.
+
+The complete373 vector constructor costs620 ordinary units over495 typed-call
+steps at caller depth9. Actual374 composes373 and the real951 forward-byte
+loop, then writes the final length: $18n+658$ ordinary units over $17n+519$
+steps at caller depth10. Its exact sequential memory permits source/output
+and copy overlap. Final length readback is unconditional; original payload
+readback retains the necessary original-source and final-length-word
+separations. Independent replays cover47 actual calls and462 generated size,
+boundary, output-alias and seeded overlapping-copy cases, matching whole
+memory/max, SP, exact gas/fuel and one-less-fuel exhaustion.
+
+The actual316 prefix through five real helper calls is composed for183
+ordinary units over149 steps, stopping immediately before374. All byte,
+code, global and branch conditions follow from original inputs. The allocation
+domain after those writes is reconstructed from original heap data and
+explicit descriptor separations. The whole315/316 and161/162/425 composition
+remain open.
 
 Successful577 components now include requested-word scaling, all29 sizing
 guards/operations, checked page ceiling569, the real memory-growth operation,

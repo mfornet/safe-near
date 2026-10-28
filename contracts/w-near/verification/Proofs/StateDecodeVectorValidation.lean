@@ -46,26 +46,42 @@ private def expectedRaw (h : Harness) (index : Nat) (entry : Entry) : Option Mem
           memory:=writeI32 memory (out.toNat+4) len
       return memory
 
-private def check (h : Harness) (entry : Entry) : IO Bool := do
+private def expectedVector (h : Harness) (entry : Entry) : Option Memory := do
   let sp:=h.stackPointer entry.store
   let out:=UInt32.ofNat (u32Arg entry.args 0)
   let size:=UInt32.ofNat (u32Arg entry.args 1)
-  if sp<80 ||out.toNat+12>h.memSize entry.store then return false
-  let child:Entry:={
-    store:=h.setGlobal entry.store 0 (.i32 (UInt32.ofNat (sp-16))),
-    args:=[.i32 (UInt32.ofNat (sp-8)),.i32 size,.i32 0]}
-  let some memory:=expectedRaw h 767 child | return false
-  let packed:=readI64 memory (sp-8)
-  let expected:=writeI64 (writeI32 memory (out.toNat+8) 0) out.toNat packed
-  let result:=h.call entry.store 373 entry.args
+  if sp<80 ||out.toNat+12>h.memSize entry.store then none else do
+    let child:Entry:={
+      store:=h.setGlobal entry.store 0 (.i32 (UInt32.ofNat (sp-16))),
+      args:=[.i32 (UInt32.ofNat (sp-8)),.i32 size,.i32 0]}
+    let memory ←expectedRaw h 767 child
+    let packed:=readI64 memory (sp-8)
+    return writeI64 (writeI32 memory (out.toNat+8) 0) out.toNat packed
+
+private def check (h : Harness) (index : Nat) (entry : Entry) : IO Bool := do
+  let out:=u32Arg entry.args 0
+  let size:=u32Arg entry.args (if index==373 then 1 else 2)
+  let vector:Entry:={entry with args:=[.i32 (UInt32.ofNat out),.i32 (UInt32.ofNat size)]}
+  let some initial:=expectedVector h vector | return false
+  let mut expected:=initial
+  if index==374 then
+    let source:=u32Arg entry.args 1
+    let dest:=(readI32 initial out).toNat
+    if source+size>initial.byteSize ||dest+size>initial.byteSize then return false
+    -- The actual951 loop reads each byte from the current memory.
+    for i in [0:size] do expected:=writeByte expected (dest+i) (UInt32.ofNat (expected.read8 (source+i)).toNat)
+    expected:=writeI32 expected (out+8) (UInt32.ofNat size)
+  let result:=h.call entry.store index entry.args
   match result.ending with
   | .returned []=>pure ()
-  | _=>throw (IO.userError "f373 did not return void")
+  | _=>throw (IO.userError s!"f{index} did not return void")
   if (h.mem result.after).pages != expected.pages ||(h.mem result.after).max != expected.max then
-    throw (IO.userError "f373 whole sequential memory/max mismatch")
-  if h.global result.after 0 != h.global entry.store 0 then throw (IO.userError "f373 SP mismatch")
-  if result.gas != op h 619 then throw (IO.userError s!"f373 gas got{result.gas/(op h 1)},expected619")
-  RegisterHostValidation.fuelBoundary h 373 494 entry
+    throw (IO.userError s!"f{index} whole sequential memory/max mismatch")
+  if h.global result.after 0 != h.global entry.store 0 then throw (IO.userError s!"f{index} SP mismatch")
+  let units:=if index==373 then 619 else 18*size+657
+  let steps:=if index==373 then 494 else 17*size+518
+  if result.gas != op h units then throw (IO.userError s!"f{index} gas got{result.gas/(op h 1)},expected{units}")
+  RegisterHostValidation.fuelBoundary h index steps entry
   return true
 
 def validate : IO Unit := do
@@ -73,25 +89,41 @@ def validate : IO Unit := do
   let bytes ← IO.FS.readBinFile "../contract.wasm"
   let module ← orThrow ((Wasm.Binary.decode bytes).mapError Wasm.Binary.DecodeError.message)
   let h ← orThrow (Harness.load protocol module internalContext [])
-  let seen ← captureAll protocol module bytes.size [373]
-  let mut captures:=0
-  let mut getter:=0
-  let mut outside:=0
-  let mut fixture:Option Entry:=none
-  for (method,entry) in seen.getD 373 #[] do
-    if ←check h entry then
-      captures:=captures+1
-      if method=="ft_total_supply" then getter:=getter+1;fixture:=some entry
-    else outside:=outside+1
-  let some entry:=fixture | throw (IO.userError "f373 lacks direct getter capture")
-  let sp:=h.stackPointer entry.store
-  let head:=(readI32 (h.mem entry.store) 1074896).toNat
-  let mut generated:=0
-  for size in [1,2,3,4,5,16,24,128] do
-    for out in [0,sp-80,sp-64,sp-48,sp-8,sp+1,head,65535,h.memSize entry.store-12,u32Arg entry.args 0] do
-      let args:=entry.args.set 0 (.i32 (UInt32.ofNat out)) |>.set 1 (.i32 (UInt32.ofNat size))
-      if !(←check h {entry with args}) then throw (IO.userError "generated f373 outside direct geometry")
-      generated:=generated+1
-  IO.println s!"PASS f373: {captures} direct captures ({getter} getter,{outside} outside),{generated} generated aliases/boundaries; whole memory/max/SP,619root gas/494steps/one-less"
+  let seen ← captureAll protocol module bytes.size [373,374]
+  for index in [373,374] do
+    let mut captures:=0
+    let mut getter:=0
+    let mut outside:=0
+    let mut fixture:Option Entry:=none
+    for (method,entry) in seen.getD index #[] do
+      if ←check h index entry then
+        captures:=captures+1
+        if method=="ft_total_supply" then getter:=getter+1;fixture:=some entry
+      else outside:=outside+1
+    let some entry:=fixture | throw (IO.userError s!"f{index} lacks direct getter capture")
+    let sp:=h.stackPointer entry.store
+    let head:=(readI32 (h.mem entry.store) 1074896).toNat
+    let mut generated:=0
+    for size in [1,2,3,4,5,16,24,128] do
+      for out in [0,sp-80,sp-64,sp-48,sp-8,sp+1,head,65535,h.memSize entry.store-12,u32Arg entry.args 0] do
+        let sources:=if index==373 then [0] else [u32Arg entry.args 1,sp-64,head,h.memSize entry.store-size]
+        for source in sources do
+          if index==374 &&source+size>h.memSize entry.store then continue
+          let args:=if index==373 then [.i32 (UInt32.ofNat out),.i32 (UInt32.ofNat size)]
+            else [.i32 (UInt32.ofNat out),.i32 (UInt32.ofNat source),.i32 (UInt32.ofNat size)]
+          if !(←check h index {entry with args}) then throw (IO.userError s!"generated f{index} outside direct geometry")
+          generated:=generated+1
+    if index==374 then
+      for size in [1,2,3,4,5,16,24,128] do
+        let normal:Entry:={entry with args:=[.i32 (UInt32.ofNat (u32Arg entry.args 0)),.i32 (UInt32.ofNat size)]}
+        let some memory:=expectedVector h normal | throw (IO.userError "cannot derive generated allocation destination")
+        let dest:=(readI32 memory (u32Arg entry.args 0)).toNat
+        let seeded:Entry:={entry with store:=h.setMem entry.store ((h.mem entry.store).writeList dest ((List.range size).map (fun i=>UInt8.ofNat (17*i+1))))}
+        for out in [dest-8,dest,dest+1] do
+          for source in [dest-1,dest,dest+1] do
+            let args:=[Value.i32 (UInt32.ofNat out),.i32 (UInt32.ofNat source),.i32 (UInt32.ofNat size)]
+            if !(←check h index {seeded with args}) then throw (IO.userError "generated overlapping copy outside original bounds")
+            generated:=generated+1
+    IO.println s!"PASS f{index}: {captures} direct captures ({getter} getter,{outside} outside),{generated} generated aliases/boundaries; whole memory/max/SP/exactgas/fuel/one-less"
 #eval validate
 end WNear.Proofs.StateDecodeVectorValidation
