@@ -41,7 +41,7 @@ theorem outcome_panic (ctx : VMContext) (storage : List (List UInt8 × List UInt
     (s : Store NearState) {m : String} (hp : PanicHost m (erase s.host)) :
     let o := (outcomeOfExecution ctx storage (.trap r s) none).checkReceipts ctx.accountBalance
       ctx.storageUsage storage
-    PanicOutcome o m s.host ∧ o.usedGas = s.host.gas.burnt := by
+    PanicOutcome o m s.host ∧ o.burntGas = s.host.gas.burnt := by
   obtain ⟨he, hi⟩ := hp
   have he' : s.host.lastError = some (.guestPanic m) := he
   have hi' : s.host.lastExecutionIssue = none := hi
@@ -70,7 +70,7 @@ theorem method_vmOutcomeP (cfg : RuntimeConfig) (size : Nat) (method : String) (
     (hC1 : Cg ≤ (ctx.toNearState cfg storage).gas.maxBurnt)
     (hC2 : Cg ≤ (ctx.toNearState cfg storage).gas.prepaid) :
     let o := run cfg wNearModule size method ctx storage
-    ∃ e, Post (erase (ctx.toNearState cfg storage)) e ∧ PanicOutcome o m e ∧ o.usedGas ≤ Cg := by
+    ∃ e, Post (erase (ctx.toNearState cfg storage)) e ∧ PanicOutcome o m e ∧ o.burntGas ≤ Cg := by
   set h0 := ctx.toNearState cfg storage
   obtain ⟨hok, hch⟩ := applyCharges_ok h0 (loadingCharges size) (C := Cg) (by omega) hC1 hC2
   set hl := (applyCharges h0 (loadingCharges size)).1
@@ -175,5 +175,117 @@ theorem method_vm_anyP (cfg : RuntimeConfig) (size : Nat) (method : String) (ctx
       obtain ⟨hpo, -⟩ := outcome_panic ctx storage r s hpp
       obtain ⟨a1, a2, a3, a4⟩ := hpo
       exact ⟨a1, a2, a3, by rw [a4, hs]; rfl⟩
+
+/-! ## The boundary -/
+
+/-- A model step agreeing with a panic `m` from the host `e`: a failure that is that panic,
+with `e`'s logs. -/
+def AgreesPanic (M : ContractModel) (m : String) (e : NearState)
+    (res : StepResult M.Panic M.State M.Ret M.Promise) : Prop :=
+  ∃ f, res = .error f ∧ ModelFailure.toFailure M f.failure = .panic m ∧ f.logs = logsOf e
+
+/-- A panic is observed as `Failure.panic`, rolled back, with the host's logs. -/
+theorem observe_panic (M : ContractModel) (ctx : Context) (raw : RawStorage)
+    (codeOf : List UInt8 → Near.ContractCode) (o : VMOutcome) (m : String) (e : NearState)
+    (ho : PanicOutcome o m e) (res : StepResult M.Panic M.State M.Ret M.Promise)
+    (hag : AgreesPanic M m e res) :
+    let r := observeW ctx raw codeOf o
+    Matches M ctx raw r res ∧ r.usedGas = o.burntGas ∧ ∀ msg, r.outcome ≠ .error (.executionIssue msg) := by
+  obtain ⟨ha, -, -, hl⟩ := ho
+  obtain ⟨f, rfl, hf, hfl⟩ := hag
+  have hout : (observeW ctx raw codeOf o).outcome = .error (.panic m) := by
+    simp only [observeW, Near.Boundary.observe, ha]
+    rfl
+  refine ⟨⟨by rw [hout, hf], ?_, ?_, ?_, ?_, ?_⟩, ?_, ?_⟩
+  · simp only [observeW, Near.Boundary.observe, ha]
+    exact Finset.toList_toFinset raw
+  · simp only [observeW, Near.Boundary.observe, ha]
+  · simp only [observeW, Near.Boundary.observe, ha]
+  · simp only [observeW, Near.Boundary.observe, ha]
+    rw [hl, hfl]
+  · simp only [observeW, Near.Boundary.observe, ha]
+  · simp only [observeW, Near.Boundary.observe, ha]
+  · intro msg h
+    rw [hout] at h
+    cases h
+
+/-- **The boundary for a method that panics**: no execution issue; with the host's
+precondition and enough gas, the model's failing step, using at most `Cg`; under any gas and
+any recorded proof, that step or a resource failure that rolls back with a prefix of its logs. -/
+theorem method_boundaryP (M : ContractModel) (size : Nat) (codeOf : List UInt8 → Near.ContractCode)
+    (raw : RawStorage) (ctx : Context) {i : Nat} (Pre : NearState → Prop) (cost : NearState → Nat)
+    (Post : NearState → NearState → Prop) (m : String) (hp : WProtocol ctx.protocol) (hwf : ctx.WF raw)
+    (hname : ctx.method.isEmpty = false) (hexp : wNearModule.exportFunc? ctx.method = some i)
+    (hft : wNearModule.funcType? i = some { params := [], results := [] }) (h1 : 48 ≤ i) (h2 : i < 955)
+    (hspec : MethodPanicsR ctx.protocol i Pre cost Post) (hpreP : Pre (eraseP (hostOf ctx raw)))
+    (hend : ∀ e, Post (erase (hostOf ctx raw)) e → PanicHost m e)
+    (hendP : ∀ e, Post (eraseP (hostOf ctx raw)) e → PanicHost m e)
+    (res : StepResult M.Panic M.State M.Ret M.Promise)
+    (hag : ∀ e, Post (erase (hostOf ctx raw)) e → AgreesPanic M m e res)
+    (hagP : ∀ e, Post (eraseP (hostOf ctx raw)) e → AgreesPanic M m e res) (Cg : Nat) :
+    let r := Near.Boundary.nearRuntime.exec (wCode size codeOf) raw ctx
+    (∀ msg, r.outcome ≠ .error (.executionIssue msg)) ∧
+    (Pre (erase (hostOf ctx raw)) →
+      chargesUse (hostOf ctx raw) (loadingCharges size) + cost (erase (hostOf ctx raw)) ≤ Cg →
+      Cg ≤ ctx.gasLimit → Matches M ctx raw r res ∧ r.usedGas ≤ Cg) ∧
+    (Matches M ctx raw r res ∨
+      (ResourceFailure r ∧ RolledBack ctx raw r ∧ r.logs <+: res.logs)) := by
+  have hpos : 0 < minOpCost ctx.protocol.wasm := Nat.lt_min.mpr hwf.opCost_pos
+  simp only [execOn_wCode]
+  obtain ⟨e0, hpost0, hany⟩ := method_vm_anyP ctx.protocol size ctx.method (Near.Boundary.toVMContext ctx)
+    raw.toList Pre cost Post m hpos hp.limit hp.pagesMin hp.pagesMax hname hexp hft h1 h2 hspec hpreP hendP
+  have hlogs : res.logs = logsOf e0 := by
+    obtain ⟨f, rfl, -, hfl⟩ := hagP e0 hpost0
+    exact hfl
+  refine ⟨?_, ?_, ?_⟩
+  · rcases hany with hg | he
+    · exact (observe_gasFailure ctx raw codeOf _ _ hg).2.2.2
+    · exact (observe_panic M ctx raw codeOf _ m e0 he res (hagP e0 hpost0)).2.2
+  · intro hpre hgas hlim
+    have hused0 : (hostOf ctx raw).gas.used = 0 := rfl
+    have hmb : (hostOf ctx raw).gas.maxBurnt = ctx.protocol.wasm.limits.maxGasBurnt := rfl
+    have hpp : (hostOf ctx raw).gas.prepaid = ctx.prepaidGas := rfl
+    obtain ⟨e1, hpost1, heff, hu⟩ := method_vmOutcomeP ctx.protocol size ctx.method
+      (Near.Boundary.toVMContext ctx) raw.toList Pre cost Post m Cg hpos hp.limit hp.pagesMin hp.pagesMax hname
+      hexp hft h1 h2 hspec hpre hend
+      (by show 0 + chargesUse (hostOf ctx raw) (loadingCharges size) + cost (erase (hostOf ctx raw)) ≤ Cg; omega)
+      (by show Cg ≤ (hostOf ctx raw).gas.maxBurnt; rw [hmb]; exact Nat.le_trans hlim (Nat.min_le_right _ _))
+      (by show Cg ≤ (hostOf ctx raw).gas.prepaid; rw [hpp]; exact Nat.le_trans hlim (Nat.min_le_left _ _))
+    obtain ⟨hm, hug, -⟩ := observe_panic M ctx raw codeOf _ m e1 heff res (hag e1 hpost1)
+    refine ⟨hm, ?_⟩
+    rw [hug]
+    exact hu
+  · rcases hany with hg | he
+    · right
+      obtain ⟨ho, hrb, hl, -⟩ := observe_gasFailure ctx raw codeOf _ _ hg
+      exact ⟨ho, hrb, by rw [hlogs]; exact hl⟩
+    · left
+      exact (observe_panic M ctx raw codeOf _ m e0 he res (hagP e0 hpost0)).1
+
+/-- **The clauses of `Refines` for a call to a method that panics.** -/
+theorem method_refines_callP (M : ContractModel) (size : Nat) (codeOf : List UInt8 → Near.ContractCode)
+    (raw : RawStorage) (st : Option M.State) (ctx : Context) (c : M.Call) {i : Nat}
+    (Pre : NearState → Prop) (cost : NearState → Nat) (Post : NearState → NearState → Prop) (m : String)
+    (hp : WProtocol ctx.protocol) (hwf : ctx.WF raw)
+    (hname : ctx.method.isEmpty = false) (hexp : wNearModule.exportFunc? ctx.method = some i)
+    (hft : wNearModule.funcType? i = some { params := [], results := [] }) (h1 : 48 ≤ i) (h2 : i < 955)
+    (hspec : MethodPanicsR ctx.protocol i Pre cost Post)
+    (hpre : ctx.ProofRoom (M.proofBound ctx st c) → Pre (erase (hostOf ctx raw)))
+    (hpreP : Pre (eraseP (hostOf ctx raw)))
+    (hend : ∀ e, Post (erase (hostOf ctx raw)) e → PanicHost m e)
+    (hendP : ∀ e, Post (eraseP (hostOf ctx raw)) e → PanicHost m e)
+    (hag : ∀ e, Post (erase (hostOf ctx raw)) e → AgreesPanic M m e (M.step ctx st c))
+    (hagP : ∀ e, Post (eraseP (hostOf ctx raw)) e → AgreesPanic M m e (M.step ctx st c))
+    (hbound : chargesUse (hostOf ctx raw) (loadingCharges size) + cost (erase (hostOf ctx raw)) ≤ M.gas ctx st c) :
+    let r := Near.Boundary.nearRuntime.exec (wCode size codeOf) raw ctx
+    let res := M.step ctx st c
+    (∀ msg, r.outcome ≠ .error (.executionIssue msg)) ∧
+    (M.gas ctx st c ≤ ctx.gasLimit → ctx.ProofRoom (M.proofBound ctx st c) →
+      Matches M ctx raw r res ∧ r.usedGas ≤ M.gas ctx st c) ∧
+    (Matches M ctx raw r res ∨
+      (ResourceFailure r ∧ RolledBack ctx raw r ∧ r.logs <+: res.logs)) := by
+  obtain ⟨hni, hen, hany⟩ := method_boundaryP M size codeOf raw ctx Pre cost Post m hp hwf hname hexp hft h1 h2
+    hspec hpreP hend hendP (M.step ctx st c) hag hagP (M.gas ctx st c)
+  exact ⟨hni, fun hgas hroom => hen (hpre hroom) hbound hgas, hany⟩
 
 end WNear.Binary
