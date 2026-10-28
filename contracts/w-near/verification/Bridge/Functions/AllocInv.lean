@@ -26,6 +26,9 @@ is proved so far is in
   (`f310_spec_seq`: every sequence of allocations without frees) and with room
   (`f310_spec_room`: `p ≠ 0`);
 * `AllocTwoSeq.lean`, `AllocTwoHeap.lean`: alloc on `heapInv … 2` with room (`f310_spec_two`).
+* `AllocWalkModel.lean`, `AllocWalkRes.lean`, `AllocWalk.lean`: 580 on a free list of any length
+  (`f580_walk`, the walk as a loop invariant over the model);
+* `AllocWalkGen.lean`, `AllocWalkHeap.lean`: alloc on `heapInv … F`, any `F`, with room (`f310_spec_walk`).
 
 ## 1. The code, as it is in the binary
 
@@ -165,6 +168,8 @@ for `F = 0` (`AllocFresh.f310_spec_fresh`: `E' = E`, `len' ∈ {len, E}`,
 `len' ∈ {len, E}`, `p % align = 0`, `A₀ = 910`, a failure saying why: the limit, or
 a fresh cell misaligned for `align > 8`); `AllocSeq.f310_spec_room`: no failure
 when `E / 65536 ≤ maxP` and `align ≤ 8`.
+For any `F` (`AllocWalkHeap.f310_spec_walk`, with room and `align ≤ 8`): the result `max F 1`,
+`len' ∈ {len, E}`, `A₀ = 940`, `A₁ = 320`.
 
 *Why alloc's postcondition holds.* Each walk step keeps (1)–(6) with the
 walked prefix dropped from the list (it stays as leaked free cells); a split
@@ -209,10 +214,9 @@ Proved (no `sorry`): the leaves, the wrappers, `memory.grow`, 577, 575,
 dealloc (582/311) against this invariant, 580 on lists of at most one cell
 without merges, 581/310 on an empty list (`AllocAlloc`) and its packing into
 this invariant (`AllocFresh`), alloc on `heapInv … 1` (`AllocSeq`: every
-sequence of allocations without frees, limit-aware). Remaining:
-
-* 580's general walk (`F ≥ 2`, merges: the lists dealloc leaves), with the
-  loop invariant designed in `AllocFirstFit`.
+sequence of allocations without frees, limit-aware), and 580's general walk with
+581/310 on `heapInv … F` for every `F` (`AllocWalk.f580_walk`, `AllocWalkHeap.f310_spec_walk`;
+the invariant needed no new field).
 -/
 
 namespace WNear.Binary.AllocInv
