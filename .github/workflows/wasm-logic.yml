@@ -39,7 +39,7 @@ concurrency:
 jobs:
   logic:
     name: Build and check the logic, examples and client
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, fv01]
     # iris-lean compiles from source on a cold cache.
     timeout-minutes: 45
     steps:
