@@ -91,16 +91,16 @@ grammar function.
 
 ### Strings
 
-| fn | size | role |
-|---|---|---|
-| 646 | 317 | `SliceRead::parse_str`. It scans while `ESCAPE[b] = 0` (the table at 1062392: nonzero exactly for `0x00..0x1F`, `"` and `\`). On `"` with an empty scratch, the result is the borrowed slice (583); with a non-empty scratch, the rest is appended (613). On `\`, the slice so far is appended, then `parse_escape` (649). On a control byte, `ControlCharacterWhileParsingString`. On EOF, `EofWhileParsingString` (647). The result goes through `as_str` (648). |
-| 648 | 39 | `as_str`: `from_utf8` (927), else `InvalidUnicodeCodePoint` (657) |
-| 927 | 443 | `core::str::from_utf8`, with its word-at-a-time ASCII fast path |
+| fn | size | role | status |
+|---|---|---|---|
+| 646 | 317 | `SliceRead::parse_str`. It scans while `ESCAPE[b] = 0` (the table at 1062392: nonzero exactly for `0x00..0x1F`, `"` and `\`). On `"` with an empty scratch, the result is the borrowed slice (583); with a non-empty scratch, the rest is appended (613). On `\`, the slice so far is appended, then `parse_escape` (649). On a control byte, `ControlCharacterWhileParsingString`. On EOF, `EofWhileParsingString` (647). The result goes through `as_str` (648). | plain case proved (`ParseStr.f646_spec_plain`, ASCII, no escape, scratch empty; `plain_model`) |
+| 648 | 39 | `as_str`: `from_utf8` (927), else `InvalidUnicodeCodePoint` (657) | proved on ASCII bytes (`ParseStr.f648_spec_ascii`) |
+| 927 | 443 | `core::str::from_utf8`, with its word-at-a-time ASCII fast path | proved on ASCII bytes (`FromUtf8.f927_spec_ascii`, `100 + 100·len`); the non-ASCII branch against `Utf8.utf8Ok` left |
 | 649 | 401 | `parse_escape`: the simple escapes are pushed (614); `\u` goes through `decode_hex_escape` (653, 162) and the surrogate pair logic, then `encode_utf8` (605, 109) and an append (613) |
 | 650 | 106 | `ignore_str` (ignored values): the same scan, without UTF-8 validation |
 | 652 | 267 | `ignore_escape`: validates the escape without decoding it |
 | 82, 343 | 3 | `Vec::clear` of the scratch (674 `truncate`) |
-| 583 | 33 | `<Range as SliceIndex>::index` (panics 855/864 never reached) |
+| 583 | 33 | `<Range as SliceIndex>::index` (panics 855/864 never reached) | proved (`ParseStr.f583_spec`, 20) |
 
 ### The value: `ValidAccountId`
 
