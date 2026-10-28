@@ -396,6 +396,65 @@ theorem f100_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
     (bytes32 L ++ pre ++ (b0 ++ b1)) c0 (by simp [bytes32, hpre, hb0, hb1]; omega)
   iframe AB WoC
 
+/-- The code of 164 (persistent). -/
+def ser164Code (inst : Nat) (mi : ModuleInst) (A : Nat → Nat) : IProp GF :=
+  iprop(ftSerCode inst mi A ∗ A 100 ↪[wf] FuncInst.wasm types[30]! inst f100)
+
+instance (inst : Nat) (mi : ModuleInst) (A : Nat → Nat) : Persistent (ser164Code (GF := GF) inst mi A) := by
+  unfold ser164Code; infer_instance
+
+set_option maxHeartbeats 4000000 in
+/-- **`<Contract as BorshSerialize>::serialize`** (164): 100 on its `FungibleToken`, `Ok` (3). -/
+theorem f164_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
+    (htype : type.results.length = 1) (inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (n g ta : Nat)
+    (hm : IfaceMod mi A n g ta) (hd : d + 8 < lim.maxCallDepth) (Cg : Nat)
+    (gt : GlobalType) (s ft w p L wp wc wl : UInt32) (b0 b1 c0 pre ob : List UInt8) (hs : 48 ≤ s.toNat)
+    (hal : s.toNat % 8 = 0) (hb0 : b0.length = 8) (hb1 : b1.length = 8) (hc0 : c0.length = 8)
+    (hpre : pre.length = L.toNat) (hob : ob.length = 4 + L.toNat + 24)
+    (hft : ft.toNat + 36 ≤ 2 ^ 32) (hw : w.toNat + 12 ≤ 2 ^ 32)
+    (hroom : wl.toNat + 4 + L.toNat + 24 ≤ wc.toNat)
+    (hwp : wp.toNat + wc.toNat < 2 ^ 32) (hp : p.toNat + L.toNat ≤ 2 ^ 32) :
+    ser164Code inst mi A
+      ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f164 Cg (pre100 n g gt s ft w p L wp wc wl b0 b1 c0 pre ob)
+        (fun _ => 30 * cfg.regularOpCost + (800 * cfg.regularOpCost + cost48 cfg L))
+        (post100 n g gt s ft w p L wp wc wl b0 b1 c0 pre) := by
+  iintro #Hk
+  ihave #Hf : ftSerCode inst mi A $$ []
+  · iunfold ser164Code at Hk; icases Hk with ⟨#H, -⟩; iexact H
+  ihave #H100 : A 100 ↪[wf] FuncInst.wasm types[30]! inst f100 $$ []
+  · iunfold ser164Code at Hk; icases Hk with ⟨-, #H⟩; iexact H
+  ihave #Hi : inst ↪[inst] mi $$ []
+  · iunfold ftSerCode, serCode, appCode at Hf; icases Hf with ⟨⟨⟨-, -, -, -, -, -, #H⟩, -⟩, -⟩; iexact H
+  have hn := hm.mem
+  have ha100 := hm.funcs 100 (by decide)
+  have t30 : types[30]!.params.length = 2 := by rfl
+  generalize hK : 800 * cfg.regularOpCost + cost48 cfg L = K
+  iapply MFunSpec_intro
+  imodintro
+  iintro %args %R HP Hc
+  iunfold pre100 at HP
+  icases HP with ⟨%hargs, HP⟩
+  subst hargs
+  simp only [f164]
+  mstep; mstep; mstep; mstep
+  mcall (f100_spec cfg lim (d + 1) types[30]! (by rfl) inst mi A n g ta hm (by omega) Cg gt s ft w p L wp wc wl
+      b0 b1 c0 pre ob hs hal hb0 hb1 hc0 hpre hob hft hw hroom hwp hp) using [HP]
+      with (rw [hK]; mstep_norm_full; omega)
+  · iunfold pre100
+    iframe HP
+    ipureintro; rfl
+  rw [hK]
+  iunfold post100 at HQ
+  icases HQ with ⟨%hrs, HQ⟩
+  subst hrs
+  repeat mstep
+  mcredits R
+  iframe Hc
+  iunfold post100
+  simp only [List.append_assoc]
+  iframe HQ
+  ipureintro; simp [htype]
+
 end Spec
 
 end WNear.Binary.BorshSer
