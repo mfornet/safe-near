@@ -173,8 +173,15 @@ residual credits and gas are proved. The result tag is zero under precisely
 the tag-word/slice-descriptor separation, since the descriptor is written last.
 Independent replay checks20 actual315/316 captures and384 generated size,
 remaining-length and output-alias cases against whole memory/max, SP, gas,
-exact fuel and one-less-fuel exhaustion. The complete315 theorem and161/162/425
-decoding, serialization and exported refinement remain open. These
+exact fuel and one-less-fuel exhaustion. The complete315 result wrapper now composes316 and its actual accepted branch,
+caching both vector fields before caller writes, restoring16 stack bytes and
+returning normally:18n+972 ordinary units over17n+771 steps at caller depth+12.
+Its operational contract keeps arbitrary caller-output aliases and uses only
+the precise original child-tag/slice-descriptor separation. Canonical copied
+payload bytes in the316 endpoint follow from explicit original source/heap,
+root-word and final-output separations; exact operational memory needs none
+of those additional payload conditions. Whole161/162/425 decoding,
+serialization and exported refinement remain open. These
 contracts do not discharge the existing representation/protocol premises or
 change the model, runtime semantics, or WF definition.
 

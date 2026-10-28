@@ -593,7 +593,14 @@ zero uses precisely the tag-word/slice-descriptor separation, since the
 descriptor is written last. Independent replay covers20 actual315/316 calls
 and384 generated size, remaining-length and output-alias cases, checking
 whole memory/max, SP, gas, exact fuel and one-less-fuel exhaustion.
-The complete315 theorem and161/162/425 composition remain open.
+The complete315 typed wrapper now uses actual316, caches both result fields
+before caller writes, takes its accepted branch, restores16 stack bytes and
+returns normally: \(18n+972\) ordinary units over \(17n+771\) steps at
+caller depth12. Its operational result allows caller-output aliases and uses
+the precise original child-tag/slice-descriptor separation. Original payload
+bytes reach316's final allocated buffer under explicit original source/heap,
+root-word and final-output separations; these are additional semantic
+conditions, not execution oracles. The161/162/425 composition remains open.
 
 Successful577 components now include requested-word scaling, all29 sizing
 guards/operations, checked page ceiling569, the real memory-growth operation,
