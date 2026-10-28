@@ -8,8 +8,8 @@ import Batteries.Tactic.OpenPrivate
 is the one the trie overlay holds under the raw `ContractData` key (`viewVal`). The change lists
 must hold one change per key: `State.view` applies them in list order (a later change wins),
 while `viewVal` takes the first. With `prospective = [(k, some a), (k, some b)]` the view holds
-`b` under `k` and `viewVal` reads `a`. `TrieOverlay.insert` keeps one change per key, but
-`Context.WF` does not say so, hence the `Nodup` hypotheses.
+`b` under `k` and `viewVal` reads `a`. `TrieOverlay.insert` keeps one change per key, which
+`Context.WF` assumes (`prospective_unique`, `committed_unique`).
 -/
 
 namespace WNear.Binary
@@ -92,12 +92,10 @@ theorem mem_contractData {trie : Near.TrieOverlay.State} {account key v : Bytes}
     · simp
 
 /-- The initial host reads the trie overlay's view of the contract's records. -/
-theorem hostOf_storage_view (ctx : Context) (raw : RawStorage) (hwf : ctx.WF raw)
-    (hp : (ctx.trie.prospective.map Prod.fst).Nodup)
-    (hc : (ctx.trie.committed.map Prod.fst).Nodup) (key : List UInt8) :
+theorem hostOf_storage_view (ctx : Context) (raw : RawStorage) (hwf : ctx.WF raw) (key : List UInt8) :
     (hostOf ctx raw).storage key =
       viewVal ctx.trie (Near.TrieOverlay.contractKey (hostOf ctx raw).context.currentAccountId key) := by
-  rw [← view_find?_eq_viewVal _ hp hc]
+  rw [← view_find?_eq_viewVal _ hwf.prospective_unique hwf.committed_unique]
   show (raw.toList.find? (·.1 == key)).map (·.2) =
     (ctx.trie.view.find? (·.1 == Near.TrieOverlay.contractKey ctx.current.bytes key)).map (·.2)
   have hmem : ∀ v, (key, v) ∈ raw ↔
