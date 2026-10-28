@@ -63,6 +63,11 @@ def validate : IO Unit := do
     let some (Value.i64 register) := entry.args[1]? | throw (IO.userError "register ID missing")
     let some contents := entry.store.host.registers register.toNat | throw (IO.userError "expected present register")
     let size := UInt32.ofNat contents.length
+    let vtable := readI32 memory 1074912
+    if !decide memory.wf ||memory.byteSize>2^32 ||sp.toNat>memory.byteSize ||out.toNat+12>memory.byteSize ||
+        sp.toNat>1074896 ||sp.toNat>1057480 ||sp.toNat>1055020 ||1074916>memory.byteSize ||
+        readI32 memory 1074908==0 ||sp.toNat>vtable.toNat ||vtable.toNat+20>1074896 ||vtable.toNat+20>memory.byteSize then
+      throw (IO.userError "original register wrapper memory/output/static/vtable bounds failed")
     if contents.length==0 ||contents.length≥2^31 ||sp.toNat<144 ||sp.toNat%16 != 0 ||
         readI32 memory 1074904 != 0 ||readI32 memory 1074900 != 1 ||readI32 memory 1074896 != 0 then
       throw (IO.userError "original register wrapper selected-domain predicates failed")
@@ -73,6 +78,10 @@ def validate : IO Unit := do
     let looked := writeI64 (writeI64 lengthReleased ((scratch+8).toNat+8) (UInt64.ofNat contents.length))
       (scratch+8).toNat 1
     let (vector,pointer,delta) ← orThrow (expected686 looked (scratch-32) (scratch-32+8) size)
+    let words := DeallocateAlign.quotient size 4
+    if memory.size==0 ||delta==0 ||delta.toNat≥65536 ||memory.size+delta.toNat≥65536 ||
+        80+words.toNat*4>delta.toNat*65536 then
+      throw (IO.userError "register wrapper original allocation growth/room predicates failed")
     let cached := readI64 vector (scratch-32+8).toNat
     let allocated := writeI64 (writeI32 vector ((scratch+32).toNat+8) size) (scratch+32).toNat cached
     let readBorrowed := borrowed allocated scratch
