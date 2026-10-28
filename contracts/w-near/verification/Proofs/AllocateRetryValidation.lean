@@ -41,12 +41,23 @@ def validate : IO Unit := do
       let size := UInt32.ofNat (u32Arg entry.args 1)
       let memory := h.mem entry.store
       let sp := UInt32.ofNat (h.stackPointer entry.store)
-      if size != 29 || u32Arg entry.args 2 != 1 || readI32 memory allocator.toNat != 0 then
+      if size != 29 || u32Arg entry.args 2 != 1 then
         outside := outside+1
         continue
       if !decide memory.wf || memory.byteSize>2^32 || sp.toNat<16 || sp.toNat>memory.byteSize ||
           allocator.toNat+4>memory.byteSize then throw (IO.userError "retry original native memory/stack bounds failed")
+      let scratch := (sp-16).toNat
+      if readI32 memory allocator.toNat != 0 || size.toNat+4≥2^32 then
+        throw (IO.userError "retry original empty head/rounding predicate failed")
+      if !(scratch+16≤1057464+16 || 1057464+20≤scratch) || 1057464+20>memory.byteSize then
+        throw (IO.userError "retry original scratch/callback-word separation failed")
       let (allocated,pointer,delta) ← orThrow (expected memory allocator sp size)
+      let words := DeallocateAlign.quotient size 4
+      let requested := AllocateGrowth.paddedSize (words <<< (2:UInt32)) 1
+      if memory.size==0 || memory.size≥65536 || memory.size+delta.toNat≥65536 ||
+          words==0 || delta==0 || delta.toNat≥65536 || requested.toNat+65536≥2^32 ||
+          80+words.toNat*4>delta.toNat*65536 then
+        throw (IO.userError "retry original growth/page/word/room Native predicate failed")
       let wanted := if target==153 then ZeroFill.filledMemory allocated pointer 0 size.toNat else allocated
       let result := h.call entry.store target entry.args
       if returnsU32 result != some pointer.toNat then throw (IO.userError s!"actual{target} retry pointer mismatch")
