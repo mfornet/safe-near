@@ -37,6 +37,7 @@ def wnear (cfg : Config) : ContractModel where
   panicFailure := Panic.failure
   step := contractStep
   gas ctx _ c := gasBound ctx c
+  proofBound ctx _ _ := proofBound ctx
 
 theorem wnear_parsesFunctional (cfg : Config) : (wnear cfg).ParsesFunctional :=
   fun _ _ _ _ h h' => Parses.functional h h'

@@ -13,7 +13,7 @@ just wnear-scenarios                       # every file here except slow/
 just wnear-scenarios -v scenarios/10_callbacks.json
 just wnear-scenarios --only "reverse order"
 just wnear-scenarios scenarios/slow        # megabyte inputs: minutes each
-just wnear-scenarios scenarios/open        # open findings: they fail by design
+just wnear-scenarios scenarios/open        # open findings (none at the moment): they fail by design
 python3 scenarios/generate.py              # regenerate the generated files (see the table below)
 python3 scenarios/generate.py fuzz 1 500 DIR   # fresh argument-fuzz seeds, for a scratch run
 ```
@@ -153,7 +153,7 @@ A file holds one scenario object or an array of them.
 | `61_random_wide.json` (generated) | Seeded random interleavings with ETH-implicit and deterministic callers, a 64-character contract account on even seeds, receivers of results on calls and deliveries, forged resolutions with deposits, transfer-calls at 30 Tgas + 1 and 1000 Tgas |
 | `70_accounts.json` | Payouts, refunds and transfer-calls for ETH-implicit, deterministic and NEAR-implicit accounts at the bound; contracts named with 64 characters, `0x` + 40 hex, and as a sub-account |
 | `slow/40_gas_large.json` (generated) | Arguments of 1 to 4 MB, promise results of 100 KB to 4 MB |
-| `open/storage_proof_size.json` | Fails by design: finding 8, a gap in `Context.WF` |
+| `45_storage_proof.json` | The recorded storage proof as a budget (finding 8, SAF-67): within the model's `proofBound` the call is the model's; past the limit, a rolled-back `storageProofExceeded` |
 
 ## Findings
 
@@ -216,7 +216,7 @@ found them pass.
      `msg` near 4 MB runs out of gas before its receipt exists.
 
 The second round (the `refinement-stress` skill) found two more gaps in the
-model, now fixed, and one in the statement, still open.
+model, now fixed, and one in the statement, fixed since (SAF-67).
 
 6. **Wrapper order.** near-sdk-core 3.1.0's `method_wrapper` checks the
    predecessor of a `#[private]` method before the deposit. The model checked
@@ -247,8 +247,11 @@ model, now fixed, and one in the statement, still open.
    allowed limit", which no model predicts. So `Refines` is false for every
    contract that touches storage. On a real chain one wNEAR call records at
    most three short trie paths, far below 4 MB. The fix belongs in the shared
-   statement, in `Context.WF` or a hypothesis, and is not made here.
-   `open/storage_proof_size.json` shows it. Filed as SAF-67.
+   statement. Filed as SAF-67 and fixed there: the recorded proof is a
+   resource of the context, like gas (`Context.ProofRoom`, the model's
+   `proofBound`, `Context.WF.proof_growth`), and exhausting it is a
+   rolled-back `storageProofExceeded`. `45_storage_proof.json` checks both
+   sides.
 
 Not found, with what was tried: the limits in `limit_config` that wNEAR can reach
 (log length, receipt validation) were already covered. Number of logs (at most 2

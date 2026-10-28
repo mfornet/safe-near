@@ -11,9 +11,11 @@ context is one the runtime builds (`Context.WF`), and that it carries
 `protocol`. Gas costs and limits are protocol parameters, so a model's gas
 bound and its panic-free paths hold for given configurations, not for all.
 
-* With at least `M.gas` gas, the execution is the model's, and uses at most
-  that much gas.
-* With less, it is the model's or an out-of-gas failure that rolls back.
+* With at least `M.gas` gas, and room for `M.proofBound` more bytes in the
+  receipt's recorded storage proof, the execution is the model's, and uses at
+  most that much gas.
+* With less of either, it is the model's or a failure for gas or for the
+  recorded proof (`ResourceFailure`) that rolls back.
 * An input that is no call fails with no effects.
 * No execution reports an interpreter limitation.
 
@@ -51,6 +53,11 @@ def RolledBack (ctx : Context) (raw : RawStorage) (r : Observation) : Prop :=
   (∃ f, r.outcome = .error f) ∧ r.storage = raw ∧ r.balance = ctx.balance ∧
     r.storageUsage = ctx.storageUsage ∧ r.receipts = []
 
+/-- A failure the context's resources explain: the call ran out of gas, or the
+receipt's recorded storage proof passed its limit. Both roll back. -/
+def ResourceFailure (r : Observation) : Prop :=
+  r.outcome = .error .outOfGas ∨ r.outcome = .error .storageProofExceeded
+
 def Refines (R : RuntimeInterface) (protocol : RuntimeConfig) (code : R.Code) (M : ContractModel) :
     Prop :=
   ∀ raw st ctx, M.Represents raw st → ctx.WF raw → ctx.protocol = protocol →
@@ -59,10 +66,10 @@ def Refines (R : RuntimeInterface) (protocol : RuntimeConfig) (code : R.Code) (M
     -- valid calls
     (∀ c, M.Parses ctx.method ctx.args c →
       let res := M.step ctx st c
-      (M.gas ctx st c ≤ ctx.gasLimit →
+      (M.gas ctx st c ≤ ctx.gasLimit → ctx.ProofRoom (M.proofBound ctx st c) →
         Matches M ctx raw r res ∧ r.usedGas ≤ M.gas ctx st c) ∧
       (Matches M ctx raw r res ∨
-        (r.outcome = .error .outOfGas ∧ RolledBack ctx raw r ∧ r.logs <+: res.logs))) ∧
+        (ResourceFailure r ∧ RolledBack ctx raw r ∧ r.logs <+: res.logs))) ∧
     -- everything that is not a call fails with no effects
     ((¬ ∃ c, M.Parses ctx.method ctx.args c) → RolledBack ctx raw r)
 
@@ -71,19 +78,21 @@ namespace Refines
 variable {R : RuntimeInterface} {protocol : RuntimeConfig} {code : R.Code} {M : ContractModel}
   {raw : RawStorage} {st : Option M.State} {ctx : Context}
 
-/-- With enough gas, a property of the model step is a property of the binary. -/
+/-- With enough gas and proof room, a property of the model step is a property of the binary. -/
 theorem transfer (h : Refines R protocol code M) (hrep : M.Represents raw st) (hwf : ctx.WF raw)
     (hprot : ctx.protocol = protocol)
-    {c : M.Call} (hparse : M.Parses ctx.method ctx.args c) (hgas : M.gas ctx st c ≤ ctx.gasLimit) :
+    {c : M.Call} (hparse : M.Parses ctx.method ctx.args c) (hgas : M.gas ctx st c ≤ ctx.gasLimit)
+    (hproof : ctx.ProofRoom (M.proofBound ctx st c)) :
     Matches M ctx raw (R.exec code raw ctx) (M.step ctx st c) :=
-  (((h raw st ctx hrep hwf hprot).2.1 c hparse).1 hgas).1
+  (((h raw st ctx hrep hwf hprot).2.1 c hparse).1 hgas hproof).1
 
-/-- With enough gas, the binary uses no more than the model's bound. -/
+/-- With enough gas and proof room, the binary uses no more than the model's gas bound. -/
 theorem gas_bound (h : Refines R protocol code M) (hrep : M.Represents raw st) (hwf : ctx.WF raw)
     (hprot : ctx.protocol = protocol)
-    {c : M.Call} (hparse : M.Parses ctx.method ctx.args c) (hgas : M.gas ctx st c ≤ ctx.gasLimit) :
+    {c : M.Call} (hparse : M.Parses ctx.method ctx.args c) (hgas : M.gas ctx st c ≤ ctx.gasLimit)
+    (hproof : ctx.ProofRoom (M.proofBound ctx st c)) :
     (R.exec code raw ctx).usedGas ≤ M.gas ctx st c :=
-  (((h raw st ctx hrep hwf hprot).2.1 c hparse).1 hgas).2
+  (((h raw st ctx hrep hwf hprot).2.1 c hparse).1 hgas hproof).2
 
 /-- Input that is no call never changes storage, balance or receipts. -/
 theorem invalid_input (h : Refines R protocol code M) (hrep : M.Represents raw st) (hwf : ctx.WF raw)

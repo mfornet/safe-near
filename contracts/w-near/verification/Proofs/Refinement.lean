@@ -100,10 +100,10 @@ theorem refines_wnear_exported (cfg : Config) (code : Wasm.Module) (codeOf : Lis
     (∀ msg, r.outcome ≠ .error (.executionIssue msg)) ∧
     (∀ c, (wnear cfg).Parses ctx.method ctx.args c →
       let res := (wnear cfg).step ctx st c
-      ((wnear cfg).gas ctx st c ≤ ctx.gasLimit →
+      ((wnear cfg).gas ctx st c ≤ ctx.gasLimit → ctx.ProofRoom ((wnear cfg).proofBound ctx st c) →
         Matches (wnear cfg) ctx raw r res ∧ r.usedGas ≤ (wnear cfg).gas ctx st c) ∧
       (Matches (wnear cfg) ctx raw r res ∨
-        (r.outcome = .error .outOfGas ∧ RolledBack ctx raw r ∧ r.logs <+: res.logs))) ∧
+        (ResourceFailure r ∧ RolledBack ctx raw r ∧ r.logs <+: res.logs))) ∧
     ((¬ ∃ c, (wnear cfg).Parses ctx.method ctx.args c) → RolledBack ctx raw r) := by
   sorry
 
@@ -160,7 +160,8 @@ theorem withdraw_available_wasm (cfg : Config) (code : Wasm.Module)
       [s!"Withdraw {amount} NEAR from {AccountId.ofNear ctx.predecessor}"] = none)
     (hreceipts : ReceiptValidation.callReceiptsError ctx.protocol ctx.current ctx.signer ctx.signerPk
       (encodeReceipts [.transfer (AccountId.ofNear ctx.predecessor) (amount + 1)]) = none)
-    (hgas : gasBound ctx (.nearWithdraw amount) ≤ ctx.gasLimit) :
+    (hgas : gasBound ctx (.nearWithdraw amount) ≤ ctx.gasLimit)
+    (hproof : ctx.ProofRoom (proofBound ctx)) :
     let r := Near.Boundary.nearRuntime.exec
       { code := { module := code, size := wNearBytes.size, hash := "" }, codeOf } (encode s) ctx
     r.outcome = .ok (.receiptIndex 0) ∧
@@ -169,6 +170,6 @@ theorem withdraw_available_wasm (cfg : Config) (code : Wasm.Module)
             (s.balance (AccountId.ofNear ctx.predecessor) - amount) with
           totalSupply := s.totalSupply - amount } :=
   withdraw_available_binary (refines_wnear cfg code codeOf protocol hcfg hcode hprotocol)
-    hs hwf hprot hparse hreg hamt hdep hbound hbal hrent hlog hreceipts hgas
+    hs hwf hprot hparse hreg hamt hdep hbound hbal hrent hlog hreceipts hgas hproof
 
 end WNear

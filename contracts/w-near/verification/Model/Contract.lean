@@ -248,4 +248,21 @@ def gasBound (ctx : Context) (c : Call) : Nat :=
     argumentByteGas * c.resultBytes ctx + trieGas ctx +
     NearInterface.returnDataGas ctx c.returnBytes
 
+/-- Longest value a call's storage operations read or evict: the `STATE`
+record (29 bytes: the `LookupMap` prefix `"a"` as a Borsh string, `total_supply`
+and `account_storage_usage`). Balances are 16 bytes. -/
+def maxStorageValueBytes : Nat := 29
+/-- Contract-data removals any call makes: `storage_unregister` removes the
+account's balance entry. -/
+def storageRemovals : Nat := 1
+
+/-- An upper bound on the storage proof one call records
+(`Near.TrieOverlay.ProofReach`): each of the `storageAccesses` storage host
+calls looks up a key along at most the longest path of this contract's keys and
+reads at most the longest value, and each removal adds its charge. About 1.6 MB
+for the longest account ids, against v86's 4 MB per-receipt limit. -/
+def proofBound (ctx : Context) : Nat :=
+  storageAccesses * (Near.TrieOverlay.lookupProofBoundLen (2 + ctx.current.bytes.length + maxStorageKeyBytes) +
+    maxStorageValueBytes) + storageRemovals * Near.TrieOverlay.removalProofCharge
+
 end WNear
