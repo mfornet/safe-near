@@ -15,7 +15,10 @@ The growth remainder now survives the complete storage548 endpoint. Original
 actual161 decoder Native and the actual374 allocation Native after storage
 and packing. Original installed code and preserved callback words derive the
 prepared decoder Code. No future Native or successful execution is an input.
-The complete219 execution theorem still needs accepted-domain and release
+The complete161 accepted domain is also derived from these original inputs.
+Individual219 call/guard capsules, exact post-storage ordinary gas/credits, all
+phase code/global frames, sequential memory endpoints and the explicit-return
+tail are proved. The complete219 execution theorem still needs release heap
 composition; whole219 and serialization96 remain the two local-call obligations.
 
 Independent219 replay checks3 accepted captures (one getter),7 outside the
