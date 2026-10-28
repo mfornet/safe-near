@@ -554,6 +554,10 @@ by layer, with their sizes and roles, and which other methods' parsers share the
     `res927` is `Ok` exactly when `utf8Ok bs`. Only the non-ASCII branch (the width table at
     1071704, then the second-byte ranges) is left; it is excluded today by the hypothesis that every
     byte is below `0x80`.
+  * `Utf8.utf8Ok_iff_isValidUTF8`: `utf8Ok` is exactly UTF-8 validity in Lean's sense
+    (`ByteArray.IsValidUTF8`). So `fromUTF8?_isSome` holds: the model's `String.fromUTF8?`
+    succeeds exactly when `utf8Ok`, and once the non-ASCII branch is proved, 927 accepts exactly
+    what `stringBody` accepts.
   * The inner loops are entered at an ASCII byte not yet read. Their invariant `invA` holds `100`
     per byte after the current one, plus `F` at the entry byte or `O` past it. The larger `O` pays
     for an exit back to the main loop, which can only happen past the entry byte.
