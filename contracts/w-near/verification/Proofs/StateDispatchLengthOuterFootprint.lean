@@ -64,6 +64,35 @@ open Wasm Wasm.Near MeteredLogic
 set_option maxRecDepth 16384
 attribute [local irreducible] readI32 readI64 writeI32 writeI64 inputMemory
 
+theorem outputMemory_footprint (p : Layout) (value : UInt64) (hw : p.memory.wf)
+    (hm : p.inner.memory=inputMemory p)
+    (hi : (scratch p).toNat+16≤p.memory.byteSize)
+    (hs : (StateDispatchLength.scratch p.inner).toNat+16≤p.memory.byteSize)
+    (hc : 1074904+4≤p.memory.byteSize)
+    (hr : (StateDispatchLength.counter p.inner).toNat+4≤p.memory.byteSize)
+    (ho : p.out.toNat+16≤p.memory.byteSize) :
+    (StateDispatchLengthOuterTail.finalMemory (StateDispatchLength.finalMemory p.inner) p.out value).wf ∧ (StateDispatchLengthOuterTail.finalMemory (StateDispatchLength.finalMemory p.inner) p.out value).byteSize=p.memory.byteSize ∧
+    (StateDispatchLengthOuterTail.finalMemory (StateDispatchLength.finalMemory p.inner) p.out value).max=p.memory.max ∧
+    ∀ j, (j<(scratch p).toNat ∨ (scratch p).toNat+16≤j) →
+      (j<(StateDispatchLength.scratch p.inner).toNat ∨ (StateDispatchLength.scratch p.inner).toNat+16≤j) →
+      (j<1074904 ∨ 1074904+4≤j) →
+      (j<(StateDispatchLength.counter p.inner).toNat ∨ (StateDispatchLength.counter p.inner).toNat+4≤j) →
+      (j<p.out.toNat ∨ p.out.toNat+16≤j) →
+      (StateDispatchLengthOuterTail.finalMemory (StateDispatchLength.finalMemory p.inner) p.out value).read8 j=p.memory.read8 j := by
+  have inp := writeI64_spec p.memory ((scratch p).toNat+8) p.register hw (by omega)
+  have iw : p.inner.memory.wf := by rw [hm];unfold inputMemory;exact inp.1
+  have ib : p.inner.memory.byteSize=p.memory.byteSize := by rw [hm];unfold inputMemory;exact inp.2.1
+  have im : p.inner.memory.max=p.memory.max := by rw [hm];unfold inputMemory;exact inp.2.2.1
+  have fin := StateDispatchLength.finalMemory_footprint p.inner iw
+    (by rw [ib];exact hc) (by rw [ib];exact hs) (by rw [ib];exact hr)
+  have out := StateDispatchLengthOuterTail.finalMemory_spec (StateDispatchLength.finalMemory p.inner)
+    p.out value fin.1 (by rw [fin.2.1,ib];exact ho)
+  refine ⟨out.1,out.2.1.trans (fin.2.1.trans ib),out.2.2.1.trans (fin.2.2.1.trans im),?_⟩
+  intro j hj hs hc hr ho
+  rw [out.2.2.2.2.2 j ho,fin.2.2.2 j hs hc hr,hm]
+  unfold inputMemory
+  rw [inp.2.2.2 j,ite_eq_right (by omega)]
+
 theorem resultMemory_footprint (s : Store NearState) (p : Layout) (hw : p.memory.wf)
     (hm : p.inner.memory=inputMemory p)
     (hi : (scratch p).toNat+16≤p.memory.byteSize)
@@ -78,20 +107,7 @@ theorem resultMemory_footprint (s : Store NearState) (p : Layout) (hw : p.memory
       (j<1074904 ∨ 1074904+4≤j) →
       (j<(StateDispatchLength.counter p.inner).toNat ∨ (StateDispatchLength.counter p.inner).toNat+4≤j) →
       (j<p.out.toNat ∨ p.out.toNat+16≤j) →
-      (resultMemory s p).read8 j=p.memory.read8 j := by
-  have inp := writeI64_spec p.memory ((scratch p).toNat+8) p.register hw (by omega)
-  have iw : p.inner.memory.wf := by rw [hm];unfold inputMemory;exact inp.1
-  have ib : p.inner.memory.byteSize=p.memory.byteSize := by rw [hm];unfold inputMemory;exact inp.2.1
-  have im : p.inner.memory.max=p.memory.max := by rw [hm];unfold inputMemory;exact inp.2.2.1
-  have fin := StateDispatchLength.finalMemory_footprint p.inner iw
-    (by rw [ib];exact hc) (by rw [ib];exact hs) (by rw [ib];exact hr)
-  have out := StateDispatchLengthOuterTail.finalMemory_spec (StateDispatchLength.finalMemory p.inner)
-    p.out (resultValue s p) fin.1 (by rw [fin.2.1,ib];exact ho)
-  refine ⟨out.1,out.2.1.trans (fin.2.1.trans ib),out.2.2.1.trans (fin.2.2.1.trans im),?_⟩
-  intro j hj hs hc hr ho
-  change (StateDispatchLengthOuterTail.finalMemory _ _ _).read8 j=_
-  rw [out.2.2.2.2.2 j ho,fin.2.2.2 j hs hc hr,hm]
-  unfold inputMemory
-  rw [inp.2.2.2 j,ite_eq_right (by omega)]
+      (resultMemory s p).read8 j=p.memory.read8 j :=
+  outputMemory_footprint p (resultValue s p) hw hm hi hs hc hr ho
 
 end WNear.Proofs.StateDispatchLengthOuter
