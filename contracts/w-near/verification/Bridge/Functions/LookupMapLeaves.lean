@@ -655,6 +655,128 @@ theorem f510_two (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
   iframe O8 Q1 Q2 Hc
   ipureintro; rfl
 
+/-! ## `[a, b].concat()` (519) -/
+
+/-- The code of 519 (persistent). -/
+def code519 (n maxP inst : Nat) (mi : ModuleInst) (A : Nat → Nat) : IProp GF :=
+  iprop(code510 n maxP inst mi A ∗ A 510 ↪[wf] FuncInst.wasm types[31]! inst f510)
+
+instance (n maxP inst : Nat) (mi : ModuleInst) (A : Nat → Nat) : Persistent (code519 (GF := GF) n maxP inst mi A) := by
+  unfold code519; infer_instance
+
+def pre519 (n g : Nat) (gt : GlobalType) (s out p1 l1 p2 l2 : UInt32) (idx : UInt32) (ta a578 maxP len : Nat)
+    (live : List (Nat × Nat)) (F : Nat) (b1 b2 ob : List UInt8) (args : List Value) : IProp GF :=
+  iprop(⌜args = [.i32 out, .i32 p1, .i32 l1, .i32 p2, .i32 l2]⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗
+    stk n (s.toNat - 96) 96 ∗ vt n 1057464 idx ta a578 ∗ heapInv n maxP len live F ∗
+    n ↦[wms][ p1.toNat ] b1 ∗ n ↦[wms][ p2.toNat ] b2 ∗ n ↦[wms][ out.toNat ] ob)
+
+/-- The `Vec` `(q, l1 + l2, l1 + l2)` at `out` holding `b1 ++ b2`, a fresh live block. -/
+def post519 (n g : Nat) (gt : GlobalType) (s out p1 l1 p2 l2 : UInt32) (idx : UInt32) (ta a578 maxP len : Nat)
+    (live : List (Nat × Nat)) (F : Nat) (b1 b2 : List UInt8) (_args rs : List Value) : IProp GF :=
+  iprop(⌜rs = []⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗ stk n (s.toNat - 96) 96 ∗ vt n 1057464 idx ta a578 ∗
+    n ↦[wms][ p1.toNat ] b1 ∗ n ↦[wms][ p2.toNat ] b2 ∗
+    ∃ q : UInt32, ⌜q ≠ 0 ∧ q.toNat + (l1 + l2).toNat < 2 ^ 32⌝ ∗ grown n maxP len live F q (l1 + l2) ∗
+      n ↦[i32][ out.toNat ] q ∗ n ↦[i32][ out.toNat + 4 ] (l1 + l2) ∗ n ↦[i32][ out.toNat + 8 ] (l1 + l2) ∗
+      n ↦[wms][ q.toNat ] (b1 ++ b2))
+
+/-- The cost of 510 on slices of `l1` and `l2` bytes. -/
+def cost510 (cfg : WasmConfig) (F : Nat) (l1 l2 : UInt32) : Nat :=
+  1000 * cfg.regularOpCost + costAllocF cfg F (l1 + l2) +
+    MemCpy.cost l1.toNat * cfg.regularOpCost + MemCpy.cost l2.toNat * cfg.regularOpCost
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 8000000 in
+/-- **`[a, b].concat()`** (519): the two slices on a 16-byte frame, 510. -/
+theorem f519_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
+    (htype : type.results = []) (inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (n g ta : Nat)
+    (hm : IfaceMod mi A n g ta) (hd : d + 13 < lim.maxCallDepth) (Cg : Nat)
+    (gt : GlobalType) (s out p1 l1 p2 l2 : UInt32) (idx : UInt32) (maxP len : Nat)
+    (live : List (Nat × Nat)) (F : Nat) (hF : okG F) (b1 b2 ob : List UInt8)
+    (hs : 96 ≤ s.toNat) (hob : ob.length = 12) (hb1 : b1.length = l1.toNat) (hb2 : b2.length = l2.toNat)
+    (hl : l1.toNat + l2.toNat < 2 ^ 28) (hl0 : 0 < l1.toNat + l2.toNat) (hout : out.toNat + 12 ≤ 2 ^ 32)
+    (hp1 : p1.toNat + l1.toNat ≤ 2 ^ 32) (hp2 : p2.toNat + l2.toNat ≤ 2 ^ 32)
+    (hr : roomFor len maxP (l1 + l2)) :
+    code519 n maxP inst mi A
+      ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f519 Cg
+        (pre519 n g gt s out p1 l1 p2 l2 idx ta (A 578) maxP len live F b1 b2 ob)
+        (fun _ => 40 * cfg.regularOpCost + cost510 cfg F l1 l2)
+        (post519 n g gt s out p1 l1 p2 l2 idx ta (A 578) maxP len live F b1 b2) := by
+  iintro #Hk
+  iunfold code519 at Hk
+  icases Hk with ⟨#H510c, #H510⟩
+  ihave #Hi : inst ↪[inst] mi $$ []
+  · iunfold code510, appCode at H510c; icases H510c with ⟨-, ⟨-, -, -, -, -, -, #H⟩, -⟩; iexact H
+  have hn := hm.mem
+  have hg := hm.glob
+  have ha510 := hm.funcs 510 (by decide)
+  have t31 : types[31]!.params.length = 3 := by rfl
+  have hlt := s.toNat_lt
+  have h16 : (s - 16).toNat = s.toNat - 16 := by
+    rw [UInt32.toNat_sub_of_le] <;> simp [UInt32.le_iff_toNat_le]; omega
+  generalize hK : cost510 cfg F l1 l2 = K
+  iapply MFunSpec_intro
+  imodintro
+  iintro %args %R HP Hc
+  iunfold pre519 at HP
+  icases HP with ⟨%hargs, Hg, Hs, Hvt, Hinv, B1, B2, Ho⟩
+  subst hargs
+  icases stk_split n (s.toNat - 96) 80 16 $$ Hs with ⟨Lo, Fr⟩
+  rw [show s.toNat - 96 + 80 = s.toNat - 16 by omega]
+  icases VecFromElem.stk_split n (s.toNat - 16) 4 12 $$ Fr with ⟨F0, Fr⟩
+  icases VecFromElem.stk_split n (s.toNat - 16 + 4) 4 8 $$ Fr with ⟨F4, Fr⟩
+  icases VecFromElem.stk_split n (s.toNat - 16 + 4 + 4) 4 4 $$ Fr with ⟨F8, F12⟩
+  icases ReadRegister.stk4_word n _ $$ F0 with ⟨%w0, F0⟩
+  icases ReadRegister.stk4_word n _ $$ F4 with ⟨%w4, F4⟩
+  icases ReadRegister.stk4_word n _ $$ F8 with ⟨%w8, F8⟩
+  icases ReadRegister.stk4_word n _ $$ F12 with ⟨%w12, F12⟩
+  ihave F0 := memBytes_addr (show s.toNat - 16 = (s - 16).toNat by omega) $$ F0
+  ihave F4 := memBytes_addr (show s.toNat - 16 + 4 = (s - 16).toNat + 4 by omega) $$ F4
+  ihave F8 := memBytes_addr (show s.toNat - 16 + 4 + 4 = (s - 16).toNat + 8 by omega) $$ F8
+  ihave F12 := memBytes_addr (show s.toNat - 16 + 4 + 4 + 4 = (s - 16).toNat + 12 by omega) $$ F12
+  simp only [f519]
+  mstep [Hg]; mstep; mstep; mstep; mstep [Hg]
+  mstep; mstep; mstep; mstep; mstep [F12]
+  mstep; mstep; mstep [F8]
+  mstep; mstep; mstep [F4]
+  mstep; mstep; mstep [F0]
+  mstep; mstep; mstep
+  mcall (f510_two cfg lim (d + 1) types[31]! (by rfl) inst mi A n g ta hm (by omega) Cg gt (s - 16) out (s - 16)
+      p1 l1 p2 l2 idx maxP len live F hF b1 b2 ob (by omega) hob hb1 hb2 hl hl0 (by omega) hout hp1 hp2 hr)
+      using [Hg Lo Hvt Hinv F0 F4 F8 F12 B1 B2 Ho] with (rw [← hK]; unfold cost510; mstep_norm_full; omega)
+  · iunfold pre510, slices2
+    ihave Lo := stk_addr (show s.toNat - 96 = (s - 16).toNat - 80 by omega) $$ Lo
+    iframe Hg Lo Hvt Hinv F0 F4 F8 F12 B1 B2 Ho
+    ipureintro; rfl
+  iunfold post510 at HQ
+  icases HQ with ⟨%hrs, Hg, Lo, Hvt, HS, B1, B2, HQ⟩
+  subst hrs
+  rw [show 1000 * cfg.regularOpCost + costAllocF cfg F (l1 + l2) + MemCpy.cost l1.toNat * cfg.regularOpCost +
+    MemCpy.cost l2.toNat * cfg.regularOpCost = K by rw [← hK]; rfl]
+  mstep; mstep; mstep; mstep [Hg]
+  rw [show s - 16 + 16 = s by simp]
+  mcredits R
+  iframe Hc
+  iunfold post519
+  isplitr
+  · ipureintro; simp [htype]
+  iframe Hg Hvt B1 B2 HQ
+  iunfold slices2 at HS
+  icases HS with ⟨F0, F4, F8, F12⟩
+  ihave F0 := stk_word n _ _ $$ F0
+  ihave F4 := stk_word n _ _ $$ F4
+  ihave F8 := stk_word n _ _ $$ F8
+  ihave F12 := stk_word n _ _ $$ F12
+  ihave X := StateWrite.stkJ (n := n) (show (s - 16).toNat + 4 = (s - 16).toNat + 4 by rfl) $$ [F0 F4]
+  · iframe F0 F4
+  ihave X := StateWrite.stkJ (n := n) (show (s - 16).toNat + 8 = (s - 16).toNat + (4 + 4) by rfl) $$ [X F8]
+  · iframe X F8
+  ihave X := StateWrite.stkJ (n := n) (show (s - 16).toNat + 12 = (s - 16).toNat + (4 + 4 + 4) by rfl) $$ [X F12]
+  · iframe X F12
+  ihave Y := StateWrite.stkJ (n := n) (show (s - 16).toNat = (s - 16).toNat - 80 + 80 by omega) $$ [Lo X]
+  · iframe Lo X
+  iapply StateWrite.stkL (n := n) (show (s - 16).toNat - 80 = s.toNat - 96 by omega) (by rfl)
+  iexact Y
+
 end Spec
 
 end WNear.Binary.LookupMapLeaves
