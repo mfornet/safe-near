@@ -403,6 +403,258 @@ theorem f495_two (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
   iframe Hc HS
   ipureintro; simp [htype]
 
+/-! ## `[&[u8]]::concat` of two slices (510) -/
+
+open WNear.Binary.VecAppend (appCode f711_room)
+open WNear.Binary.FmtSink (roomPre roomPost grown heapAfter_grown)
+open WNear.Binary.AllocInv (heapInv)
+
+/-- The code of 510 (persistent). -/
+def code510 (n maxP inst : Nat) (mi : ModuleInst) (A : Nat → Nat) : IProp GF :=
+  iprop(vecCode2 n maxP inst mi A ∗ appCode inst mi A ∗ A 426 ↪[wf] FuncInst.wasm types[15]! inst f426 ∗
+    A 495 ↪[wf] FuncInst.wasm types[13]! inst f495 ∗ A 505 ↪[wf] FuncInst.wasm types[14]! inst f505)
+
+instance (n maxP inst : Nat) (mi : ModuleInst) (A : Nat → Nat) : Persistent (code510 (GF := GF) n maxP inst mi A) := by
+  unfold code510; infer_instance
+
+def pre510 (n g : Nat) (gt : GlobalType) (s out a p1 l1 p2 l2 : UInt32) (idx : UInt32) (ta a578 maxP len : Nat)
+    (live : List (Nat × Nat)) (F : Nat) (b1 b2 ob : List UInt8) (args : List Value) : IProp GF :=
+  iprop(⌜args = [.i32 out, .i32 a, .i32 2]⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗ stk n (s.toNat - 80) 80 ∗
+    vt n 1057464 idx ta a578 ∗ heapInv n maxP len live F ∗ slices2 n a p1 l1 p2 l2 ∗
+    n ↦[wms][ p1.toNat ] b1 ∗ n ↦[wms][ p2.toNat ] b2 ∗ n ↦[wms][ out.toNat ] ob)
+
+/-- The `Vec` `(q, l1 + l2, l1 + l2)` at `out` holding `b1 ++ b2`, a fresh live block. -/
+def post510 (n g : Nat) (gt : GlobalType) (s out a p1 l1 p2 l2 : UInt32) (idx : UInt32) (ta a578 maxP len : Nat)
+    (live : List (Nat × Nat)) (F : Nat) (b1 b2 : List UInt8) (_args rs : List Value) : IProp GF :=
+  iprop(⌜rs = []⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗ stk n (s.toNat - 80) 80 ∗ vt n 1057464 idx ta a578 ∗
+    slices2 n a p1 l1 p2 l2 ∗ n ↦[wms][ p1.toNat ] b1 ∗ n ↦[wms][ p2.toNat ] b2 ∗
+    ∃ q : UInt32, ⌜q ≠ 0 ∧ q.toNat + (l1 + l2).toNat < 2 ^ 32⌝ ∗ grown n maxP len live F q (l1 + l2) ∗
+      n ↦[i32][ out.toNat ] q ∗ n ↦[i32][ out.toNat + 4 ] (l1 + l2) ∗ n ↦[i32][ out.toNat + 8 ] (l1 + l2) ∗
+      n ↦[wms][ q.toNat ] (b1 ++ b2))
+
+/-- The loop invariant of 510: before the first slice, the second, or none left. -/
+def inv510 (n g inst : Nat) (mi : ModuleInst) (Cg R c₀ M1 M2 : Nat) (gt : GlobalType) (s out a p1 l1 p2 l2 q : UInt32)
+    (b1 b2 bs : List UInt8) (Fr : IProp GF) : List Value → Frame → IProp GF := fun X f =>
+  iprop(⌜X = []⌝ ∗ Fr ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗ stk n (s.toNat - 16) 16 ∗ slices2 n a p1 l1 p2 l2 ∗
+    n ↦[wms][ p1.toNat ] b1 ∗ n ↦[wms][ p2.toNat ] b2 ∗ n ↦[i32][ out.toNat ] q ∗
+    n ↦[i32][ out.toNat + 4 ] (l1 + l2) ∗
+    ((⌜f = ⟨#[.i32 out, .i32 a, .i32 16], inst, mi⟩⌝ ∗ n ↦[i32][ out.toNat + 8 ] 0 ∗
+        n ↦[wms][ q.toNat ] (bs.take l1.toNat) ∗
+        n ↦[wms][ q.toNat + l1.toNat ] (bs.drop l1.toNat) ∗ credits Cg (400 * c₀ + M1 + M2 + R)) ∨
+     (⌜f = ⟨#[.i32 out, .i32 (a + 8), .i32 8], inst, mi⟩⌝ ∗ n ↦[i32][ out.toNat + 8 ] (0 + l1) ∗
+        n ↦[wms][ q.toNat ] b1 ∗ n ↦[wms][ q.toNat + l1.toNat ] (bs.drop l1.toNat) ∗ credits Cg (250 * c₀ + M2 + R)) ∨
+     (⌜f = ⟨#[.i32 out, .i32 (a + 16), .i32 0], inst, mi⟩⌝ ∗ n ↦[i32][ out.toNat + 8 ] (0 + l1 + l2) ∗
+        n ↦[wms][ q.toNat ] b1 ∗ n ↦[wms][ q.toNat + l1.toNat ] b2 ∗ credits Cg (100 * c₀ + R))))
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 16000000 in
+/-- **`[&[u8]]::concat`** (510) of the two slices at `a`: a fresh `Vec` with capacity `l1 + l2`
+(505), each slice appended (711). -/
+theorem f510_two (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
+    (htype : type.results = []) (inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (n g ta : Nat)
+    (hm : IfaceMod mi A n g ta) (hd : d + 12 < lim.maxCallDepth) (Cg : Nat)
+    (gt : GlobalType) (s out a p1 l1 p2 l2 : UInt32) (idx : UInt32) (maxP len : Nat)
+    (live : List (Nat × Nat)) (F : Nat) (hF : okG F) (b1 b2 ob : List UInt8)
+    (hs : 80 ≤ s.toNat) (hob : ob.length = 12) (hb1 : b1.length = l1.toNat) (hb2 : b2.length = l2.toNat)
+    (hl : l1.toNat + l2.toNat < 2 ^ 28) (hl0 : 0 < l1.toNat + l2.toNat)
+    (ha : a.toNat + 16 < 2 ^ 32) (hout : out.toNat + 12 ≤ 2 ^ 32)
+    (hp1 : p1.toNat + l1.toNat ≤ 2 ^ 32) (hp2 : p2.toNat + l2.toNat ≤ 2 ^ 32)
+    (hr : roomFor len maxP (l1 + l2)) :
+    code510 n maxP inst mi A
+      ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f510 Cg
+        (pre510 n g gt s out a p1 l1 p2 l2 idx ta (A 578) maxP len live F b1 b2 ob)
+        (fun _ => 1000 * cfg.regularOpCost + costAllocF cfg F (l1 + l2) +
+          MemCpy.cost l1.toNat * cfg.regularOpCost + MemCpy.cost l2.toNat * cfg.regularOpCost)
+        (post510 n g gt s out a p1 l1 p2 l2 idx ta (A 578) maxP len live F b1 b2) := by
+  iintro #Hk
+  iunfold code510 at Hk
+  icases Hk with ⟨#Hv, #Ha, #H426, #H495, #H505⟩
+  ihave #Hi : inst ↪[inst] mi $$ []
+  · iunfold appCode at Ha; icases Ha with ⟨-, -, -, -, -, -, #H⟩; iexact H
+  ihave #H711 : A 711 ↪[wf] FuncInst.wasm types[31]! inst f711 $$ []
+  · iunfold appCode at Ha; icases Ha with ⟨-, -, -, -, #H, -, -⟩; iexact H
+  have hn := hm.mem
+  have hg := hm.glob
+  have ha495 := hm.funcs 495 (by decide)
+  have ha505 := hm.funcs 505 (by decide)
+  have ha711 := hm.funcs 711 (by decide)
+  have t13 : types[13]!.params.length = 2 := by rfl
+  have t14 : types[14]!.params.length = 2 := by rfl
+  have t31 : types[31]!.params.length = 3 := by rfl
+  have hlt := s.toNat_lt
+  have h8 : (a + 8).toNat = a.toNat + 8 := by simp [UInt32.toNat_add]; omega
+  have h16 : (a + 16).toNat = a.toNat + 16 := by simp [UInt32.toNat_add]; omega
+  have hT : (l1 + l2).toNat = l1.toNat + l2.toNat := by rw [UInt32.toNat_add]; omega
+  generalize hM1 : MemCpy.cost l1.toNat * cfg.regularOpCost = M1
+  generalize hM2 : MemCpy.cost l2.toNat * cfg.regularOpCost = M2
+  generalize hKA : costAllocF cfg F (l1 + l2) = KA
+  iapply MFunSpec_intro
+  imodintro
+  iintro %args %R HP Hc
+  iunfold pre510 at HP
+  icases HP with ⟨%hargs, Hg, Hs, Hvt, Hinv, HS, B1, B2, Ho⟩
+  subst hargs
+  simp only [f510]
+  mstep; mstep; mstep; mstep; mstep; mstep; mstep; mstep
+  rw [show (2 : UInt32) <<< (3 % 32) = 16 from rfl]
+  mcall (f495_two cfg lim (d + 1) types[13]! (by rfl) inst mi A n g ta hm (by omega) Cg a p1 l1 p2 l2 ha (by omega))
+    using [HS]
+  · iframe HS
+  icases HQ with ⟨%hrs, HS⟩
+  subst hrs
+  mcall (f505_spec cfg lim (d + 1) types[14]! (by rfl) inst mi A n g ta hm (by omega) Cg gt s out (l1 + l2) idx
+      maxP len live ob hob hs (by omega) (fun _ => hr) F hF) using [Hg Hs Hvt Hinv Ho]
+  · iunfold pre373
+    iframe Hg Hs Hvt Hinv Ho
+    ipureintro; rfl
+  iunfold post373 at HQ
+  icases HQ with ⟨%hrs, %q, Hg, Hs, Hvt, O0, O4, O8, HA⟩
+  subst hrs
+  rw [hKA]
+  icases heapAfter_grown (by omega) $$ HA with ⟨%⟨hq0, hqb⟩, Hblk, Hgr⟩
+  iunfold AllocInv.block at Hblk
+  icases Hblk with ⟨%bs, %hbs, Hblk⟩
+  ihave Hblk := U128From.memBytes_split n q.toNat l1.toNat bs (by omega) $$ Hblk
+  icases Hblk with ⟨Q1, Q2⟩
+  icases stk_split n (s.toNat - 80) 64 16 $$ Hs with ⟨Lo, Hs⟩
+  rw [show s.toNat - 80 + 64 = s.toNat - 16 by omega]
+  have hc0 : (0 : UInt32).toNat = 0 := rfl
+  have hX1 : (11 + (115 + MemCpy.cost l1.toNat)) * cfg.regularOpCost = 126 * cfg.regularOpCost + M1 := by
+    rw [← hM1, Nat.add_mul, Nat.add_mul]; omega
+  have hX2 : (11 + (115 + MemCpy.cost l2.toNat)) * cfg.regularOpCost = 126 * cfg.regularOpCost + M2 := by
+    rw [← hM2, Nat.add_mul, Nat.add_mul]; omega
+  have hl1 : (0 + l1).toNat = l1.toNat := by simp
+  have hl12 : (0 + l1 + l2).toNat = l1.toNat + l2.toNat := by simp [hT]
+  have hbt : (bs.take l1.toNat).length = l1.toNat := by simp; omega
+  have hbd : (bs.drop l1.toNat).length = l2.toNat := by simp; omega
+  iapply mwpi_loop0 (Cg := Cg) (R := 400 * cfg.regularOpCost + M1 + M2 + R)
+    (I := inv510 n g inst mi Cg R cfg.regularOpCost M1 M2 gt s out a p1 l1 p2 l2 q b1 b2 bs
+      iprop(stk n (s.toNat - 80) 64 ∗ vt n 1057464 idx ta (A 578) ∗ grown n maxP len live F q (l1 + l2))) _ _ _ rfl
+  isplitr
+  · imodintro
+    iintro %X %l HI
+    iunfold inv510 at HI
+    icases HI with ⟨%hX, Fr, Hg, Hs, HS, B1, B2, O0, O4, HI⟩
+    subst hX
+    iunfold slices2 at HS
+    icases HS with ⟨S0, S4, S8, S12⟩
+    icases HI with (⟨%hf, O8, Q1, Q2, Hc⟩ | ⟨%hf, O8, Q1, Q2, Hc⟩ | ⟨%hf, O8, Q1, Q2, Hc⟩)
+    · rw [hf]
+      mstep; mstep; mstep
+      mstep; mstep; mstep [S0]; mstep; mstep [S4]
+      mcall (f711_room (GF := GF) cfg lim (d + 1) types[31]! (by rfl) inst mi A n g ta hm (by omega) Cg
+          gt s out q (l1 + l2) 0 p1 l1 (bs.take l1.toNat) b1 (by omega) hbt hb1 (by omega)
+          (by rw [hc0, hT]; omega) (by omega) hp1) using [Hg Hs O0 O4 O8 Q1 B1]
+          with (mstep_norm_full; rw [hX1]; omega)
+      · iunfold roomPre
+        simp only [hc0, Nat.add_zero]
+        iframe Hg Hs O0 O4 O8 Q1 B1
+      icases HQ with ⟨%hrs, HQ⟩
+      subst hrs
+      rw [show (7 + (11 + (115 + MemCpy.cost l1.toNat))) * cfg.regularOpCost = 133 * cfg.regularOpCost + M1 by
+        rw [← hM1]; simp only [Nat.add_mul]; omega]
+      iunfold roomPost at HQ
+      icases HQ with ⟨Hg, Hs, O0, O4, O8, Q1, B1⟩
+      mstep; mstep; mstep; mstep; mstep; mstep; mstep; mstep; mstep
+      simp only [Post.mloop]
+      iapply pure_pay_intro'
+      isplitl [Hc]
+      · iexact Hc
+      isplitr
+      · ipureintro; exact ⟨by simp, by omega⟩
+      inext
+      iintro Hc
+      iunfold inv510
+      isplitr
+      · ipureintro; rfl
+      iunfold slices2
+      iframe Fr Hg Hs S0 S4 S8 S12 B1 B2 O0 O4
+      iright; ileft
+      iframe O8 Q1 Q2
+      isplitr
+      · ipureintro; simp
+      iapply credits_le
+      iframe Hc
+      ipureintro; omega
+    · rw [hf]
+      ihave S8 := memBytes_addr (show a.toNat + 8 = (a + 8).toNat by omega) $$ S8
+      ihave S12 := memBytes_addr (show a.toNat + 12 = (a + 8).toNat + 4 by omega) $$ S12
+      mstep; mstep; mstep
+      mstep; mstep; mstep [S8]; mstep; mstep [S12]
+      ihave Q2 := memBytes_addr (show q.toNat + l1.toNat = q.toNat + (0 + l1).toNat by rw [hl1]) $$ Q2
+      mcall (f711_room (GF := GF) cfg lim (d + 1) types[31]! (by rfl) inst mi A n g ta hm (by omega) Cg
+          gt s out q (l1 + l2) (0 + l1) p2 l2 (bs.drop l1.toNat) b2 (by omega) hbd hb2 (by omega)
+          (by rw [hl1, hT] <;> omega) (by omega) hp2) using [Hg Hs O0 O4 O8 Q2 B2]
+          with (mstep_norm_full; rw [hX2]; omega)
+      · iunfold roomPre
+        iframe Hg Hs O0 O4 O8 Q2 B2
+      icases HQ with ⟨%hrs, HQ⟩
+      subst hrs
+      rw [show (7 + (11 + (115 + MemCpy.cost l2.toNat))) * cfg.regularOpCost = 133 * cfg.regularOpCost + M2 by
+        rw [← hM2]; simp only [Nat.add_mul]; omega]
+      iunfold roomPost at HQ
+      icases HQ with ⟨Hg, Hs, O0, O4, O8, Q2, B2⟩
+      mstep; mstep; mstep; mstep; mstep; mstep; mstep; mstep; mstep
+      simp only [Post.mloop]
+      iapply pure_pay_intro'
+      isplitl [Hc]
+      · iexact Hc
+      isplitr
+      · ipureintro; exact ⟨by simp, by omega⟩
+      inext
+      iintro Hc
+      iunfold inv510
+      isplitr
+      · ipureintro; rfl
+      ihave S8 := memBytes_addr (show (a + 8).toNat = a.toNat + 8 by omega) $$ S8
+      ihave S12 := memBytes_addr (show (a + 8).toNat + 4 = a.toNat + 12 by omega) $$ S12
+      ihave Q2 := memBytes_addr (show q.toNat + (0 + l1).toNat = q.toNat + l1.toNat by rw [hl1]) $$ Q2
+      iunfold slices2
+      iframe Fr Hg Hs S0 S4 S8 S12 B1 B2 O0 O4
+      iright; iright
+      iframe O8 Q1 Q2
+      isplitr
+      · ipureintro; simp [UInt32.add_assoc]
+      iapply credits_le
+      iframe Hc
+      ipureintro; omega
+    · rw [hf]
+      mstep; mstep; mstep; mstep
+      rw [show (0 : UInt32) + l1 + l2 = l1 + l2 by simp]
+      simp only [Post.mloop]
+      mpay
+      mcredits R
+      iframe Hc
+      iunfold post510
+      isplitr
+      · ipureintro; simp [htype]
+      icases Fr with ⟨Lo, Hvt, Hgr⟩
+      iunfold slices2
+      iframe Hg Hvt S0 S4 S8 S12 B1 B2
+      isplitl [Lo Hs]
+      · ihave X := stk_join n (s.toNat - 80) 64 16 $$ [Lo Hs]
+        · rw [show s.toNat - 80 + 64 = s.toNat - 16 by omega]; iframe Lo Hs
+        iexact X
+      iexists q
+      iframe Hgr O0 O4 O8
+      isplitr
+      · ipureintro; exact ⟨hq0, hqb⟩
+      iapply BorshFT.joinB (n := n) (a := q.toNat) (b := q.toNat + l1.toNat) b1 b2 (by omega)
+      iframe Q1 Q2
+  isplitl [Hc]
+  · iapply credits_le
+    iframe Hc
+    ipureintro; omega
+  inext
+  iintro Hc
+  iunfold inv510
+  isplitr
+  · ipureintro; rfl
+  iframe Lo Hvt Hgr Hg Hs HS B1 B2 O0 O4
+  ileft
+  iframe O8 Q1 Q2 Hc
+  ipureintro; rfl
+
 end Spec
 
 end WNear.Binary.LookupMapLeaves
