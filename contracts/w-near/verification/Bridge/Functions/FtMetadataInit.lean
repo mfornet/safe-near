@@ -665,4 +665,103 @@ theorem segC309 (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (e inst : Nat) (
 
 end SegC
 
+
+/-! ## The body on an initialized contract -/
+
+/-- The cost of `ft_metadata` (309), activation excluded: segment A's 477 `regular_op_cost`s, the
+middle segment's `costM309`, segment C's 3000 and `value_return`'s gas for the 138 bytes. -/
+noncomputable def cost309 (cfg : WasmConfig) (h : NearState) (S : WNear.State) : Nat :=
+  477 * cfg.regularOpCost + costM309 cfg h S + 3000 * cfg.regularOpCost + valueReturnUse h 138
+
+section Body
+
+variable {GF : BundledGFunctors} [WasmGS NearState GF]
+
+/-- The code `ft_metadata` runs (persistent). -/
+def code309 (e inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (n maxP : Nat) : IProp GF :=
+  iprop(codeA inst mi A ∗ codeM309 e inst mi A n maxP ∗ codeC309 e inst mi A n (some maxP))
+
+instance (e inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (n maxP : Nat) :
+    Persistent (code309 (GF := GF) e inst mi A n maxP) := by
+  unfold code309; infer_instance
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 16000000 in
+/-- **The body of `ft_metadata`** (309), from its entry frame: with the statics, 1024 bytes of stack
+below the stack pointer `s` and the host `h` reading the model state `S`, it falls through with
+the stack pointer restored and the host `h1.selectReturnValue metaJson`, `h1` the host after
+`storage_read`. -/
+theorem body309 (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (e inst : Nat) (mi : ModuleInst)
+    (A : Nat → Nat) (n g ta : Nat) (hm : IfaceMod mi A n g ta) (hd : d + 30 < lim.maxCallDepth)
+    (Cg R : Nat) (gt : GlobalType) (s : UInt32) (hs : 1024 ≤ s.toNat)
+    (hal : s.toNat % 8 = 0) (old k3 idx ptr0 : UInt32) (maxP len : Nat) (hroom : HeapRoom8 len maxP)
+    (h : NearState) (S : WNear.State) (st : Near.TrieOverlay.State) (hr : U128View.ReadOkV h S st metaJson)
+    (Φ : Post NearState GF) :
+    code309 e inst mi A n maxP ∗ credits Cg (cost309 cfg h S + R) ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗
+      stk n (s.toNat - 1024) 1024 ∗ statics309 n ta A old k3 idx ptr0 maxP len ∗ mhostPt h ∗
+      (∀ h1, ⌜StorageReadPost h StateRead.stateKey 0 st h1⌝ -∗ credits Cg R -∗ g ↦[wg] ⟨gt, .i32 s⟩ -∗
+        mhostPt (h1.selectReturnValue metaJson) -∗ Φ.normal [] ⟨#[.i32 (s - 160), .i32 0, .i32 0], inst, mi⟩)
+      ⊢ mwpi cfg lim d ⟨#[.i32 0, .i32 0, .i32 0], inst, mi⟩ [] f309.body Φ := by
+  iintro ⟨#Hk, Hc, Hg, Stk, HS, Hh, W⟩
+  iunfold code309 at Hk
+  icases Hk with ⟨#KA, #KM, #KC⟩
+  iunfold statics309 at HS
+  icases HS with ⟨HS, HD⟩
+  iunfold statics at HS
+  icases HS with ⟨HH, Hkey, T116, T106, HBI, HV, Hvt, Hinv, HsK, HT⟩
+  iunfold ToVec.tvData at HT
+  icases HT with ⟨-, Hq, He, -⟩
+  obtain ⟨hv, hacc, hlim, hb, hz, hlink, hproof, hreg, hret⟩ := hr
+  have hlt := s.toNat_lt
+  icases stkSp 272 752 rfl $$ Stk with ⟨-, Stk⟩
+  icases stkSp 512 240 rfl $$ Stk with ⟨Lo512, Stk⟩
+  icases stkSp 80 160 rfl $$ Stk with ⟨L2, Stk⟩
+  icases stkSp 8 152 rfl $$ Stk with ⟨F0, Stk⟩
+  icases stkSp 40 112 rfl $$ Stk with ⟨F8, Stk⟩
+  icases stkSp 76 36 rfl $$ Stk with ⟨F48, Stk⟩
+  icases stkSp 4 32 rfl $$ Stk with ⟨-, Stk⟩
+  icases stkSp 16 16 rfl $$ Stk with ⟨F128, Stk⟩
+  icases stkSp 12 4 rfl $$ Stk with ⟨F144, -⟩
+  rw [f309_body]
+  iapply segA309 cfg lim d inst mi A n g ta hm (by omega) Cg
+    (costM309 cfg h S + (3000 * cfg.regularOpCost + valueReturnUse h 138 + R))
+    gt s (by omega) hal old k3 ((bodyB309 ++ bodyM309) ++ bodyC309) Φ
+  ihave L2 := stkA (b := s.toNat - 240) (by omega) $$ L2
+  iframe KA Hg L2 HH Hkey T116 T106 HBI HV
+  isplitl [Hc]
+  · iapply credits_mono (by unfold cost309; omega) $$ Hc
+  iintro Hc Hg L2 HI
+  ihave L2 := stkA (b := s.toNat - 1024 + 272 + 512) (by omega) $$ L2
+  ihave Lo := stkJ (a := s.toNat - 1024 + 272) (b := s.toNat - 1024 + 272 + 512) (k1 := 512) (k2 := 80) (k := 592)
+    rfl rfl $$ [Lo512 L2]
+  · iframe Lo512 L2
+  ihave Lo := stkA (b := s.toNat - 752) (by omega) $$ Lo
+  iapply segM309 cfg lim d e inst mi A n g ta hm hd Cg
+    (3000 * cfg.regularOpCost + valueReturnUse h 138 + R) gt s hs hal idx maxP len hroom
+    h S hv st hacc hlim hb hz hlink hproof hreg bodyC309 Φ
+  ihave F8 := stkA (b := s.toNat - 152) (by omega) $$ F8
+  ihave F48 := stkA (b := s.toNat - 112) (by omega) $$ F48
+  ihave F128 := stkA (b := s.toNat - 32) (by omega) $$ F128
+  ihave F144 := stkA (b := s.toNat - 16) (by omega) $$ F144
+  iframe KM Hc Hg HI Lo F8 F48 F128 F144 Hvt Hinv HsK Hh
+  isplitl [HD Hq He]
+  · iunfold dataM309; iframe HD Hq He
+  iintro %q %p %ps %pn %py %rst %hl %F %h1 %⟨hq1, hrst, hqb⟩ Hc Hg HI Lo R0 R4 R8 R12 V P0 P4 P8 HMO Hps Hpn Hpy
+    Hqj Hp Hinv Hh
+  obtain ⟨hcfg, hvru⟩ := storageReadPost_config hq1
+  icases stkSp 512 80 rfl $$ Lo with ⟨-, L2⟩
+  ihave L2 := stkA (b := s.toNat - 240) (by omega) $$ L2
+  ihave F0 := stkA (b := s.toNat - 160) (by omega) $$ F0
+  have h138 : (UInt32.ofNat 138).toNat = 138 := rfl
+  iapply segC309 cfg lim d e inst mi A n g ta (some maxP) hm (by omega) Cg R gt s hs hal q
+    (UInt32.ofNat 138) p ps pn py metaJson rst (by rw [h138, metaJson_length]) (by decide) hrst maxP hl F h1
+    (by rw [hcfg, h138, ← metaJson_length]; exact hret) 1051320 0 0 Φ
+  iframe KC Hg HI L2 F0 R0 R4 R8 R12 V P0 P4 P8 HMO Hps Hpn Hpy Hqj Hp Hinv Hh
+  isplitl [Hc]
+  · rw [hvru, h138]; iexact Hc
+  iintro Hc Hg Hh
+  iapply W $$ %h1 %hq1 Hc Hg Hh
+
+end Body
+
 end WNear.Binary.FtMetadataBody
