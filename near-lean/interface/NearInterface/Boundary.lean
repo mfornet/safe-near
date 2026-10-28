@@ -137,6 +137,9 @@ structure Context.WF (ctx : Context) (raw : RawStorage) : Prop where
   opCost_pos : 0 < ctx.protocol.wasm.regularOpCost ∧ 0 < ctx.protocol.wasm.linearOpBaseCost
   trie_canonical : Near.TrieConstruction.build ctx.trie.entries = .ok ctx.trie.base
   trie_storage : contractData ctx.trie ctx.current.bytes = raw
+  /-- No object of the trie's witness hashes to all zeros, which the trie walk
+  reads as the empty trie. A fact about SHA-256 preimages, assumed. -/
+  trie_no_zero_hash : List.replicate 32 0 ∉ ctx.trie.base.witness.map Prod.fst
   /-- Contract storage holds one value per key. -/
   raw_keys_unique : ∀ k v v', (k, v) ∈ raw → (k, v') ∈ raw → v = v'
   /-- The trusted recorded-proof size grows only by what the call's storage

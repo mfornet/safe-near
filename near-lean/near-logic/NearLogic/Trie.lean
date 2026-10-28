@@ -68,7 +68,8 @@ visit consumes at least one nibble of the `2·|k|`-nibble key or ends the walk.
 `walk` treats the hash `List.replicate 32 0` as the empty trie. If some
 object's SHA-256 were all zeros the walk would stop early, so the theorems
 assume `zeroHash ∉ s.base.witness.map Prod.fst`. This is a statement about
-SHA-256 preimages, not provable here, but decidable for any concrete state.
+SHA-256 preimages, not provable here, but decidable for any concrete state; for
+a call's trie it is `Context.WF.trie_no_zero_hash`.
 
 Not covered: relating `s.entries.find? (·.1 == contractKey account key)` to
 the VM host's `storage key` (that is `Context.WF.trie_storage` plus
