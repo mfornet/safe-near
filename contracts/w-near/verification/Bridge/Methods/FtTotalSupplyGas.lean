@@ -88,7 +88,7 @@ theorem c161 : BorshContract.cost161 cfg 1 ≤ 5572 * c + L := by
   simp only [BorshContract.cost161, BorshFT.cost425, BorshVec.cost374, show MemCpy.cost (1 : UInt32).toNat = 24 by rfl]
   omega
 
-theorem c353 (lo hi : UInt64) : FmtString.cost353 cfg lo hi ≤ 4105 * c + L := by
+theorem c353 {F : Nat} (hF : F ≤ 2) (lo hi : UInt64) : FmtString.cost353 cfg F lo hi ≤ 4105 * c + L := by
   have hk := FmtString.kOf_toNat lo hi
   have hd := FmtString.decDigits_le lo hi
   have hp := pages_newCap ⟨(FmtString.kOf (FmtU128.val lo hi)).toNat, by omega⟩
@@ -97,7 +97,7 @@ theorem c353 (lo hi : UInt64) : FmtString.cost353 cfg lo hi ≤ 4105 * c + L := 
   have h2 := Nat.mul_le_mul_right c (fmt_le lo hi)
   have h3 := Nat.mul_le_mul_right c (memcpy_le (FmtString.kOf (FmtU128.val lo hi)).toNat)
   have h4 := act759 c
-  simp only [FmtString.cost353, FmtString.costGrow]
+  simp only [FmtString.cost353, FmtString.costGrow, VecWithCap.costAllocF_le2 cfg hF]
   have h5 : (18 * (FmtString.kOf (FmtU128.val lo hi)).toNat + 6) * c ≤ 708 * c :=
     Nat.mul_le_mul_right _ (by omega)
   omega
@@ -105,7 +105,7 @@ theorem c353 (lo hi : UInt64) : FmtString.cost353 cfg lo hi ≤ 4105 * c + L := 
 theorem c96 (lo hi : UInt64) : ToVec.cost96 cfg lo hi ≤ 9515 * c + 2 * L := by
   have hk := FmtString.kOf_toNat lo hi
   have hd := FmtString.decDigits_le lo hi
-  have a := c353 cfg lo hi
+  have a := c353 cfg (F := 1) (by decide) lo hi
   have b := cAllocF cfg 128 pages_fixed.2.2
   have h1 := act872 c
   have h2 := act759 c
@@ -115,7 +115,7 @@ theorem c96 (lo hi : UInt64) : ToVec.cost96 cfg lo hi ≤ 9515 * c + 2 * L := by
     have := memcpy_le (FmtString.kOf (FmtU128.val lo hi)).toNat
     simp only [SerializeStr.cost383, SerializeStr.cost344, show MemCpy.cost 1 = 24 by rfl]
     omega
-  simp only [ToVec.cost96, ToString.cost385, FmtString.cost746, FmtString.cost872,
+  simp only [ToVec.cost96, ToVec.cost96F, VecWithCap.costAllocF_le2 cfg (show 1 ≤ 2 by decide), ToString.cost385, FmtString.cost746, FmtString.cost872,
     show MemCpy.cost 0 = 4 by rfl]
   omega
 

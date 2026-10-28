@@ -21,8 +21,8 @@ theorem toVecAfterFree_zero (cfg : WasmConfig) (lim : ExecLimits) : FtTotalSuppl
   intro GF _ d type htype inst mi A n g ta hm hd Cg gt s out v ptr0 aidx ob maxP hl live lo hi hs hob hout hv
     hr1 hr2
   refine (ToVec.f96_spec cfg lim d type htype inst mi A n g ta hm hd Cg gt s out v ptr0 aidx ob maxP hl live
-    lo hi hs hob hout hv hr1 hr2 (F := 2) (hF := Or.inr rfl)).trans ?_
-  refine (MFunSpec_cost (fun _ => Nat.le_add_right _ 0)).trans ?_
+    lo hi hs hob hout hv hr1 hr2 (F := 2) (hF := by decide)).trans ?_
+  refine (MFunSpec_cost (fun _ => (ToVec.cost96F_le2 cfg (by decide) lo hi).le.trans (Nat.le_add_right _ 0))).trans ?_
   refine MFunSpec_frame iprop(emp) (fun args => ?_) (fun args rs => ?_)
   · iintro H
     iframe H

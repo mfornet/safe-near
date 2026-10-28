@@ -29,7 +29,7 @@ Two cases, each a spec of every function of the chain:
   (`grown`), the `k` bytes copied to `q`, the rest of the block spare; 112 bytes of stack.
 
 Costs (`regular_op_cost`s, activation excluded, `mc = MemCpy.cost k`):
-759 `138 + mc` (room) and `453 + mc` plus the allocator's `costAlloc` (grow).
+759 `138 + mc` (room) and `453 + mc` plus the allocator's `costAllocF cfg F` (grow, on `heapInv … F`, any `F ≥ 1`).
 -/
 
 namespace WNear.Binary.FmtSink
@@ -42,7 +42,7 @@ open WNear.Binary.AllocNewCell (memBytes_addr)
 open WNear.Binary.AllocZeroed (allocCode)
 open WNear.Binary.VecFromElem (stk stk_split stk_join stk_word roomFor heapAfter costAlloc grownLen content
   heapAfter_ne stk_addr)
-open WNear.Binary.VecWithCap (vecCode2 okF)
+open WNear.Binary.VecWithCap (vecCode2 okG costAllocF)
 open WNear.Binary.FmtGrow (newCap pre776 post776 f776_spec)
 
 /-! ## The code -/
@@ -172,12 +172,12 @@ theorem f775_grow (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
     (gt : GlobalType) (s out vec k p0 : UInt32) (idx : UInt32) (maxP hl : Nat)
     (live : List (Nat × Nat)) (ob : List UInt8) (hob : ob.length = 4) (hs : 96 ≤ s.toNat)
     (hvec : vec.toNat + 8 ≤ 2 ^ 32) (hout : out.toNat + 4 ≤ 2 ^ 32) (hk0 : 0 < k.toNat)
-    (hk : k.toNat < 2 ^ 28) (hr : roomFor hl maxP (newCap 0 k)) (F : Nat := 1) (hF : okF F := by exact Or.inl rfl) :
+    (hk : k.toNat < 2 ^ 28) (hr : roomFor hl maxP (newCap 0 k)) (F : Nat := 1) (hF : okG F := by decide) :
     vecCode2 n maxP inst mi A ∗ A 772 ↪[wf] FuncInst.wasm types[39]! inst f772 ∗
       A 776 ↪[wf] FuncInst.wasm types[45]! inst f776
       ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f775 Cg
         (pre776 n g gt s out vec 0 k p0 idx ta (A 578) maxP hl live F ob)
-        (fun _ => 325 * cfg.regularOpCost + costAlloc cfg false (newCap 0 k))
+        (fun _ => 325 * cfg.regularOpCost + costAllocF cfg F (newCap 0 k))
         (post776 n g gt s out vec 0 k idx ta (A 578) maxP hl live F) := by
   iintro ⟨#Hv, #H772, #H776⟩
   ihave #Hi : inst ↪[inst] mi $$ []
@@ -322,13 +322,13 @@ theorem f768_grow (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
     (gt : GlobalType) (s vec k p0 : UInt32) (idx : UInt32) (maxP hl : Nat)
     (live : List (Nat × Nat)) (hs : 112 ≤ s.toNat)
     (hvec : vec.toNat + 8 ≤ 2 ^ 32) (hk0 : 0 < k.toNat)
-    (hk : k.toNat < 2 ^ 28) (hr : roomFor hl maxP (newCap 0 k)) (F : Nat := 1) (hF : okF F := by exact Or.inl rfl) :
+    (hk : k.toNat < 2 ^ 28) (hr : roomFor hl maxP (newCap 0 k)) (F : Nat := 1) (hF : okG F := by decide) :
     sinkCode n maxP inst mi A
       ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f768 Cg
         (fun args => iprop(⌜args = [.i32 vec, .i32 0, .i32 k]⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗
           stk n (s.toNat - 112) 112 ∗ vt n 1057464 idx ta (A 578) ∗ heapInv n maxP hl live F ∗
           n ↦[i32][ vec.toNat ] p0 ∗ n ↦[i32][ vec.toNat + 4 ] 0))
-        (fun _ => 366 * cfg.regularOpCost + costAlloc cfg false (newCap 0 k))
+        (fun _ => 366 * cfg.regularOpCost + costAllocF cfg F (newCap 0 k))
         (fun _ rs => iprop(⌜rs = []⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗ stk n (s.toNat - 112) 112 ∗
           vt n 1057464 idx ta (A 578) ∗ rawGrown n maxP hl live F vec k)) := by
   iintro #Hk
@@ -442,13 +442,13 @@ theorem f735_grow (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
     (gt : GlobalType) (s vec k p0 : UInt32) (idx : UInt32) (maxP hl : Nat)
     (live : List (Nat × Nat)) (hs : 112 ≤ s.toNat)
     (hvec : vec.toNat + 12 ≤ 2 ^ 32) (hk0 : 0 < k.toNat)
-    (hk : k.toNat < 2 ^ 28) (hr : roomFor hl maxP (newCap 0 k)) (F : Nat := 1) (hF : okF F := by exact Or.inl rfl) :
+    (hk : k.toNat < 2 ^ 28) (hr : roomFor hl maxP (newCap 0 k)) (F : Nat := 1) (hF : okG F := by decide) :
     sinkCode n maxP inst mi A
       ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f735 Cg
         (fun args => iprop(⌜args = [.i32 vec, .i32 k]⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗
           stk n (s.toNat - 112) 112 ∗ vt n 1057464 idx ta (A 578) ∗ heapInv n maxP hl live F ∗
           n ↦[i32][ vec.toNat ] p0 ∗ n ↦[i32][ vec.toNat + 4 ] 0 ∗ n ↦[i32][ vec.toNat + 8 ] 0))
-        (fun _ => 381 * cfg.regularOpCost + costAlloc cfg false (newCap 0 k))
+        (fun _ => 381 * cfg.regularOpCost + costAllocF cfg F (newCap 0 k))
         (fun _ rs => iprop(⌜rs = []⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗ stk n (s.toNat - 112) 112 ∗
           vt n 1057464 idx ta (A 578) ∗ rawGrown n maxP hl live F vec k ∗ n ↦[i32][ vec.toNat + 8 ] 0)) := by
   iintro #Hk
@@ -616,12 +616,12 @@ theorem f734_grow (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
     (gt : GlobalType) (s vec p0 p k : UInt32) (idx : UInt32) (maxP hl : Nat)
     (live : List (Nat × Nat)) (sb : List UInt8) (hs : 112 ≤ s.toNat) (hsb : sb.length = k.toNat)
     (hvec : vec.toNat + 12 ≤ 2 ^ 32) (hk0 : 0 < k.toNat) (hk : k.toNat < 2 ^ 28)
-    (hp : p.toNat + k.toNat ≤ 2 ^ 32) (hr : roomFor hl maxP (newCap 0 k)) (F : Nat := 1) (hF : okF F := by exact Or.inl rfl) :
+    (hp : p.toNat + k.toNat ≤ 2 ^ 32) (hr : roomFor hl maxP (newCap 0 k)) (F : Nat := 1) (hF : okG F := by decide) :
     sinkCode n maxP inst mi A
       ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f734 Cg
         (fun args => iprop(⌜args = [.i32 vec, .i32 p, .i32 (p + k)]⌝ ∗
           growPre n g gt s vec p0 p idx ta (A 578) maxP hl live F sb))
-        (fun _ => 421 * cfg.regularOpCost + costAlloc cfg false (newCap 0 k) +
+        (fun _ => 421 * cfg.regularOpCost + costAllocF cfg F (newCap 0 k) +
           MemCpy.cost k.toNat * cfg.regularOpCost)
         (fun _ rs => iprop(⌜rs = []⌝ ∗ growPost n g gt s vec p k idx ta (A 578) maxP hl live F sb)) := by
   iintro #Hk
@@ -753,12 +753,12 @@ theorem f757_grow (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
     (gt : GlobalType) (s vec p0 p k : UInt32) (idx : UInt32) (maxP hl : Nat)
     (live : List (Nat × Nat)) (sb : List UInt8) (hs : 112 ≤ s.toNat) (hsb : sb.length = k.toNat)
     (hvec : vec.toNat + 12 ≤ 2 ^ 32) (hk0 : 0 < k.toNat) (hk : k.toNat < 2 ^ 28)
-    (hp : p.toNat + k.toNat ≤ 2 ^ 32) (hr : roomFor hl maxP (newCap 0 k)) (F : Nat := 1) (hF : okF F := by exact Or.inl rfl) :
+    (hp : p.toNat + k.toNat ≤ 2 ^ 32) (hr : roomFor hl maxP (newCap 0 k)) (F : Nat := 1) (hF : okG F := by decide) :
     sinkCode n maxP inst mi A
       ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f757 Cg
         (fun args => iprop(⌜args = [.i32 vec, .i32 p, .i32 k]⌝ ∗
           growPre n g gt s vec p0 p idx ta (A 578) maxP hl live F sb))
-        (fun _ => 437 * cfg.regularOpCost + costAlloc cfg false (newCap 0 k) +
+        (fun _ => 437 * cfg.regularOpCost + costAllocF cfg F (newCap 0 k) +
           MemCpy.cost k.toNat * cfg.regularOpCost)
         (fun _ rs => iprop(⌜rs = []⌝ ∗ growPost n g gt s vec p k idx ta (A 578) maxP hl live F sb)) := by
   iintro #Hk
@@ -773,7 +773,7 @@ theorem f757_grow (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
   have ha734 := hm.funcs 734 (by decide)
   have t31 : types[31]!.params.length = 3 := by rfl
   generalize hM : MemCpy.cost k.toNat * cfg.regularOpCost = M
-  generalize hA : costAlloc cfg false (newCap 0 k) = CA
+  generalize hA : costAllocF cfg F (newCap 0 k) = CA
   iapply MFunSpec_intro
   imodintro
   iintro %args %R HP Hc
@@ -848,12 +848,12 @@ theorem f759_grow (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
     (gt : GlobalType) (s dd vec p0 p k : UInt32) (idx : UInt32) (maxP hl : Nat)
     (live : List (Nat × Nat)) (sb : List UInt8) (hs : 112 ≤ s.toNat) (hsb : sb.length = k.toNat)
     (hdd : dd.toNat + 4 ≤ 2 ^ 32) (hvec : vec.toNat + 12 ≤ 2 ^ 32) (hk0 : 0 < k.toNat)
-    (hk : k.toNat < 2 ^ 28) (hp : p.toNat + k.toNat ≤ 2 ^ 32) (hr : roomFor hl maxP (newCap 0 k)) (F : Nat := 1) (hF : okF F := by exact Or.inl rfl) :
+    (hk : k.toNat < 2 ^ 28) (hp : p.toNat + k.toNat ≤ 2 ^ 32) (hr : roomFor hl maxP (newCap 0 k)) (F : Nat := 1) (hF : okG F := by decide) :
     sinkCode n maxP inst mi A
       ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f759 Cg
         (fun args => iprop(⌜args = [.i32 dd, .i32 p, .i32 k]⌝ ∗ n ↦[i32][ dd.toNat ] vec ∗
           growPre n g gt s vec p0 p idx ta (A 578) maxP hl live F sb))
-        (fun _ => 453 * cfg.regularOpCost + costAlloc cfg false (newCap 0 k) +
+        (fun _ => 453 * cfg.regularOpCost + costAllocF cfg F (newCap 0 k) +
           MemCpy.cost k.toNat * cfg.regularOpCost)
         (fun _ rs => iprop(⌜rs = [.i32 0]⌝ ∗ n ↦[i32][ dd.toNat ] vec ∗
           growPost n g gt s vec p k idx ta (A 578) maxP hl live F sb)) := by
@@ -870,7 +870,7 @@ theorem f759_grow (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
   have ha757 := hm.funcs 757 (by decide)
   have t31 : types[31]!.params.length = 3 := by rfl
   generalize hM : MemCpy.cost k.toNat * cfg.regularOpCost = M
-  generalize hA : costAlloc cfg false (newCap 0 k) = CA
+  generalize hA : costAllocF cfg F (newCap 0 k) = CA
   iapply MFunSpec_intro
   imodintro
   iintro %args %R HP Hc

@@ -1,5 +1,6 @@
 import Bridge.Functions.VecFromElem
 import Bridge.Functions.AllocTwoHeap
+import Bridge.Functions.AllocWalkHeap
 
 /-!
 # `Vec::<u8>::with_capacity` (373) and the `RawVec` allocation below it (Borsh's copy)
@@ -20,10 +21,13 @@ calls (and the panic locations, on paths not taken):
 The proofs are VecFromElem.lean's, renamed; the code they run is `vecCode2`.
 
 *The free-list bound `F`.* The non-zeroed path (770 → 769 → 767 → 373) is stated on
-`heapInv … F` for `F ∈ {1, 2}` (`okF`, an optional argument defaulting to `F = 1`): `F = 1`
-through `AllocSeq.f310_spec_room`, `F = 2` (the heap `state_read` leaves) through
-`AllocTwo.f310_spec_two` (`f310_roomF`); the allocation keeps the bound. The zeroed path
-(`__rust_alloc_zeroed`, 774) stays on `F = 1`.
+`heapInv … F` for any `F ≥ 1` (`okG`, an optional argument defaulting to `F = 1`), at the
+allocator's cost `costAllocF cfg F size` (`f310_roomG`): for `F ≤ 2` it is `costAlloc cfg false size`
+(`costAllocF_le2`; `F = 1` through `AllocSeq.f310_spec_room`, `F = 2`, the heap `state_read`
+leaves, through `AllocTwo.f310_spec_two`: `f310_roomF`), above it the general walk's
+`AllocWalk.cost310W cfg F size 1` (`AllocWalk.f310_spec_walk`, `970 + 320 · F` `regular_op_cost`s
+and the grow). The allocation keeps the bound. The zeroed path (`__rust_alloc_zeroed`, 774) stays
+on `F = 1`; 770 and 767 charge `costAllocG cfg z F size` (`costAlloc` for `z`).
 -/
 
 namespace WNear.Binary.VecWithCap
@@ -252,6 +256,76 @@ theorem f310_roomF (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncT
     iunfold AllocTwo.code310
     iframe H0 H236 H581 H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H575 H11
 
+/-- The free-list bounds the general walk allocates on: any `F ≥ 1`. -/
+abbrev okG (F : Nat) : Prop := 1 ≤ F
+
+theorem okG_of_okF {F : Nat} (h : okF F) : okG F := by
+  unfold okG; rcases h with rfl | rfl <;> decide
+
+/-- `__rust_alloc(size, 1)`'s cost on `heapInv … F`: `costAlloc` for `F ≤ 2`, the general walk's
+`AllocWalk.cost310W` above. -/
+def costAllocF (cfg : WasmConfig) (F : Nat) (size : UInt32) : Nat :=
+  if F ≤ 2 then costAlloc cfg false size else AllocWalk.cost310W cfg F size 1
+
+theorem costAllocF_le2 (cfg : WasmConfig) {F : Nat} (h : F ≤ 2) (size : UInt32) :
+    costAllocF cfg F size = costAlloc cfg false size := by
+  simp [costAllocF, h]
+
+/-- The allocator's cost in `alloc_impl` (770): `__rust_alloc_zeroed` (`z`, on `F = 1`) or
+`__rust_alloc` on `heapInv … F`. -/
+def costAllocG (cfg : WasmConfig) (z : Bool) (F : Nat) (size : UInt32) : Nat :=
+  if z then costAlloc cfg true size else costAllocF cfg F size
+
+theorem costAllocG_le2 (cfg : WasmConfig) (z : Bool) {F : Nat} (h : F ≤ 2) (size : UInt32) :
+    costAllocG cfg z F size = costAlloc cfg z size := by
+  cases z <;> simp [costAllocG, costAllocF_le2 cfg h, costAlloc]
+
+/-- `f310_roomF` for any `F ≥ 1`: a block, the bound `F` kept, at `costAllocF cfg F size`. -/
+theorem f310_roomG (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
+    (htype : type.results.length = 1) (inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (n g ta : Nat)
+    (hm : IfaceMod mi A n g ta) (hd : d + 5 < lim.maxCallDepth) (Cg : Nat)
+    (gt : GlobalType) (sp size idx : UInt32) (maxP len : Nat) (live : List (Nat × Nat)) (F : Nat)
+    (o1 o2 o4 : List UInt8) (hsp : 16 ≤ sp.toNat)
+    (hsize : 1 ≤ size.toNat) (hsize2 : size.toNat < 2 ^ 28)
+    (ho1 : o1.length = 4) (ho2 : o2.length = 4) (ho4 : o4.length = 4) (hr : roomFor len maxP size)
+    (hF : okG F) :
+    allocCode n maxP inst mi A ∗ A 236 ↪[wf] FuncInst.wasm types[13]! inst f236 ∗
+      A 581 ↪[wf] FuncInst.wasm types[15]! inst f581 ∗ A 575 ↪[wf] FuncInst.wasm types[0]! inst f575
+      ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f310 Cg
+        (fun args => iprop(⌜args = [.i32 size, .i32 1]⌝ ∗ g ↦[wg] ⟨gt, .i32 sp⟩ ∗
+          n ↦[wms][ sp.toNat - 16 ] o1 ∗ n ↦[wms][ sp.toNat - 12 ] o2 ∗ n ↦[wms][ sp.toNat - 4 ] o4 ∗
+          vt n 1057464 idx ta (A 578) ∗ heapInv n maxP len live F))
+        (fun _ => costAllocF cfg F size)
+        (fun _ rs => iprop(∃ p : UInt32, ⌜rs = [.i32 p] ∧ p ≠ 0 ∧ p.toNat % (1 : UInt32).toNat = 0⌝ ∗
+          g ↦[wg] ⟨gt, .i32 sp⟩ ∗
+          (∃ b1 b2 b4 : List UInt8, ⌜b1.length = 4 ∧ b2.length = 4 ∧ b4.length = 4⌝ ∗
+            n ↦[wms][ sp.toNat - 16 ] b1 ∗ n ↦[wms][ sp.toNat - 12 ] b2 ∗ n ↦[wms][ sp.toNat - 4 ] b4) ∗
+          vt n 1057464 idx ta (A 578) ∗
+          ∃ len', ⌜len' = len ∨ len' = len + (cellPages (wordsOf size) 1).toNat * 65536⌝ ∗
+            heapInv n maxP len' ((p.toNat, size.toNat) :: live) F ∗ block n p.toNat size.toNat)) := by
+  unfold okG at hF
+  by_cases h2 : F ≤ 2
+  · rw [show (fun _ : List Value => costAllocF cfg F size) = (fun _ => 15 * cfg.regularOpCost +
+        (15 * cfg.regularOpCost + (910 * cfg.regularOpCost + cfg.linearOpBaseCost +
+          cfg.linearOpUnitCost * (cellPages (wordsOf size) 1).toNat))) from by
+      funext _; rw [costAllocF_le2 cfg h2]; rfl]
+    exact f310_roomF cfg lim d type htype inst mi A n g ta hm hd Cg gt sp size idx maxP len live F o1 o2 o4 hsp
+      hsize hsize2 ho1 ho2 ho4 hr (by unfold okF; omega)
+  · obtain ⟨hlen0, hlen1, hroom, hmax⟩ := hr
+    rw [show (fun _ : List Value => costAllocF cfg F size) = (fun _ => AllocWalk.cost310W cfg F size 1) from by
+      funext _; simp [costAllocF, h2]]
+    have hmx : max F 1 = F := Nat.max_eq_left hF
+    iintro ⟨#Hc, #H236, #H581, #H575⟩
+    iunfold allocCode at Hc
+    icases Hc with ⟨#H0, #H1, #H2, #H3, #H4, #H5, #H6, #H7, #H8, #H9, #H10, #H11⟩
+    have key := AllocWalk.f310_spec_walk (GF := GF) cfg lim d type htype inst mi A n g ta hm hd Cg gt sp size 1 idx 0
+      maxP len live F o1 o2 o4 hsp rfl (by decide) hsize hsize2 hlen0 hlen1 ho1 ho2 ho4 hroom hmax
+    rw [hmx] at key
+    iapply key
+    iunfold AllocTwo.code310
+    iframe H0 H236 H581 H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H575 H11
+
+
 /-- Room for an allocation of `size` bytes (align 1) on a heap of length `len`, under the
 limit `maxP`. -/
 def pre770 (n g : Nat) (gt : GlobalType) (s out size : UInt32) (z : Bool) (idx : UInt32) (ta a578 maxP len : Nat)
@@ -275,11 +349,11 @@ theorem f770_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
     (gt : GlobalType) (s out size : UInt32) (z : Bool) (idx : UInt32) (maxP len : Nat)
     (live : List (Nat × Nat)) (ob : List UInt8) (hob : ob.length = 8) (hs : 16 ≤ s.toNat)
     (hsize2 : size.toNat < 2 ^ 28) (hr : 0 < size.toNat → roomFor len maxP size)
-    (F : Nat := 1) (hF : okF F := by exact Or.inl rfl) (hFz : z = true → F = 1 := by exact fun _ => rfl) :
+    (F : Nat := 1) (hF : okG F := by decide) (hFz : z = true → F = 1 := by exact fun _ => rfl) :
     vecCode2 n maxP inst mi A
       ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f770 Cg
         (pre770 n g gt s out size z idx ta (A 578) maxP len live F ob)
-        (fun _ => 27 * cfg.regularOpCost + costAlloc cfg z size)
+        (fun _ => 27 * cfg.regularOpCost + costAllocG cfg z F size)
         (post770 n g gt s out size z idx ta (A 578) maxP len live F) := by
   iintro #Hv
   ihave #H575 : A 575 ↪[wf] FuncInst.wasm types[0]! inst f575 $$ []
@@ -343,11 +417,11 @@ theorem f770_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
     icases stk_open581 n s hs $$ Hs with ⟨%o1, %o2, %o4, %⟨h1, h2, h4⟩, O1, O2, O4, W8⟩
     cases z
     · -------------------------------------------------------------- __rust_alloc
-      simp only [Bool.false_eq_true, ite_false, costAlloc, cost581]
+      simp only [Bool.false_eq_true, ite_false, costAllocG]
       mstep; mstep; mstep; mstep
       mstep; mstep; mstep; mstep
       mstep; mstep
-      mcall (f310_roomF cfg lim (d + 1) types[13]! (by rfl) inst mi A n g ta hm (by omega) Cg gt s size idx maxP
+      mcall (f310_roomG cfg lim (d + 1) types[13]! (by rfl) inst mi A n g ta hm (by omega) Cg gt s size idx maxP
           len live F o1 o2 o4 hs hpos hsize2 h1 h2 h4 hroom hF) using [Hg O1 O2 O4 Hvt Hinv]
       · iframe Hg O1 O2 O4 Hvt Hinv
       icases HQ with ⟨%p, %⟨hrs, hp0, -⟩, Hg, HO, Hvt, %len', %hl', Hinv, Hb⟩
@@ -376,7 +450,7 @@ theorem f770_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
       iexact Hb
     · -------------------------------------------------------------- __rust_alloc_zeroed
       obtain rfl : F = 1 := hFz rfl
-      simp only [ite_true, costAlloc]
+      simp only [ite_true, costAllocG, costAlloc]
       mstep; mstep; mstep; mstep
       mstep; mstep; mstep; mstep
       mstep; mstep
@@ -471,6 +545,7 @@ theorem f774_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
   simp only [f774]
   mstep [Hg]; mstep; mstep; mstep; mstep [Hg]
   mstep; mstep; mstep; mstep; mstep; mstep
+  have hG : costAllocG cfg true 1 size = costAlloc cfg true size := by simp [costAllocG]
   mcall (f770_spec cfg lim (d + 1) types[45]! (by rfl) inst mi A n g ta hm (by omega) Cg gt (s - 16)
       (s - 16 + 8) size true idx maxP len live zb hzb (by omega) hsize2 hr) using [Hg X Hvt Hinv Z]
   · iunfold pre770
@@ -515,11 +590,11 @@ theorem f769_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
     (gt : GlobalType) (s out size : UInt32) (idx : UInt32) (maxP len : Nat)
     (live : List (Nat × Nat)) (ob : List UInt8) (hob : ob.length = 8) (hs : 32 ≤ s.toNat)
     (hsize2 : size.toNat < 2 ^ 28) (hr : 0 < size.toNat → roomFor len maxP size)
-    (F : Nat := 1) (hF : okF F := by exact Or.inl rfl) :
+    (F : Nat := 1) (hF : okG F := by decide) :
     vecCode2 n maxP inst mi A
       ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f769 Cg
         (pre68x n g gt s out size idx ta (A 578) maxP len live F ob)
-        (fun _ => 35 * cfg.regularOpCost + (27 * cfg.regularOpCost + costAlloc cfg false size))
+        (fun _ => 35 * cfg.regularOpCost + (27 * cfg.regularOpCost + costAllocF cfg F size))
         (post68x n g gt s out size false idx ta (A 578) maxP len live F) := by
   iintro #Hv
   ihave #Hi : inst ↪[inst] mi $$ []
@@ -555,6 +630,7 @@ theorem f769_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
   simp only [f769]
   mstep [Hg]; mstep; mstep; mstep; mstep [Hg]
   mstep; mstep; mstep; mstep; mstep; mstep
+  have hG : costAllocG cfg false F size = costAllocF cfg F size := by simp [costAllocG]
   mcall (f770_spec cfg lim (d + 1) types[45]! (by rfl) inst mi A n g ta hm (by omega) Cg gt (s - 16)
       (s - 16 + 8) size false idx maxP len live zb hzb (by omega) hsize2 hr (F := F) (hF := hF)
       (hFz := fun h => by cases h)) using [Hg X Hvt Hinv Z]
@@ -622,11 +698,11 @@ theorem f767_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
     (gt : GlobalType) (s out c : UInt32) (z : Bool) (idx : UInt32) (maxP len : Nat)
     (live : List (Nat × Nat)) (ob : List UInt8) (hob : ob.length = 8) (hs : 64 ≤ s.toNat)
     (hc28 : c.toNat < 2 ^ 28) (hr : 0 < c.toNat → roomFor len maxP c)
-    (F : Nat := 1) (hF : okF F := by exact Or.inl rfl) (hFz : z = true → F = 1 := by exact fun _ => rfl) :
+    (F : Nat := 1) (hF : okG F := by decide) (hFz : z = true → F = 1 := by exact fun _ => rfl) :
     vecCode2 n maxP inst mi A
       ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f767 Cg
         (pre767 n g gt s out c z idx ta (A 578) maxP len live F ob)
-        (fun _ => 203 * cfg.regularOpCost + costAlloc cfg z c)
+        (fun _ => 203 * cfg.regularOpCost + costAllocG cfg z F c)
         (post767 n g gt s out c z idx ta (A 578) maxP len live F) := by
   iintro #Hv
   ihave #Hi : inst ↪[inst] mi $$ []
@@ -695,7 +771,7 @@ theorem f767_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
   mstep; mstep
   cases z
   · -------------------------------------------------------------- init = false
-    simp only [Bool.false_eq_true, ite_false]
+    simp only [Bool.false_eq_true, ite_false, costAllocG]
     iunfold stk at Z16
     icases Z16 with ⟨%zb, %hzb, Z⟩
     mstep; mstep; mstep
@@ -748,7 +824,7 @@ theorem f767_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
     iexact L
   · -------------------------------------------------------------- init = true
     obtain rfl : F = 1 := hFz rfl
-    simp only [ite_true]
+    simp only [ite_true, costAllocG]
     iunfold stk at Z8
     icases Z8 with ⟨%zb, %hzb, Z⟩
     mstep; mstep; mstep
@@ -831,11 +907,11 @@ theorem f373_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
     (gt : GlobalType) (s out c : UInt32) (idx : UInt32) (maxP len : Nat)
     (live : List (Nat × Nat)) (ob : List UInt8) (hob : ob.length = 12) (hs : 80 ≤ s.toNat)
     (hc28 : c.toNat < 2 ^ 28) (hr : 0 < c.toNat → roomFor len maxP c)
-    (F : Nat := 1) (hF : okF F := by exact Or.inl rfl) :
+    (F : Nat := 1) (hF : okG F := by decide) :
     vecCode2 n maxP inst mi A
       ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f373 Cg
         (pre373 n g gt s out c idx ta (A 578) maxP len live F ob)
-        (fun _ => 35 * cfg.regularOpCost + (203 * cfg.regularOpCost + costAlloc cfg false c))
+        (fun _ => 35 * cfg.regularOpCost + (203 * cfg.regularOpCost + costAllocF cfg F c))
         (post373 n g gt s out c idx ta (A 578) maxP len live F) := by
   iintro #Hv
   ihave #Hi : inst ↪[inst] mi $$ []
@@ -871,6 +947,7 @@ theorem f373_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
   simp only [f373]
   mstep [Hg]; mstep; mstep; mstep; mstep [Hg]
   mstep; mstep; mstep; mstep; mstep
+  have hG : costAllocG cfg false F c = costAllocF cfg F c := by simp [costAllocG]
   mcall (f767_spec cfg lim (d + 1) types[31]! (by rfl) inst mi A n g ta hm (by omega) Cg gt (s - 16)
       (s - 16 + 8) c false idx maxP len live zb hzb (by omega) hc28 hr (F := F) (hF := hF) (hFz := fun h => by cases h)) using [Hg X Hvt Hinv Z]
   · iunfold pre767

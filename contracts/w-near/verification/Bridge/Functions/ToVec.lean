@@ -31,7 +31,7 @@ open WNear.Binary.FmtGrow (newCap)
 open WNear.Binary.AllocFirstFit (vt)
 open WNear.Binary.VecFromElem (stk stk_split stk_join stk_word stk_intro stk_addr roomFor costAlloc grownLen)
 open WNear.Binary.AllocNewCell (memBytes_addr)
-open WNear.Binary.VecWithCap (okF vecCode2 pre373 post373)
+open WNear.Binary.VecWithCap (okG costAllocF vecCode2 pre373 post373)
 open WNear.Binary.FmtString (kOf)
 open WNear.Binary.SerializeStr (esc serCode cost383)
 open WNear.Binary.ToString (tsCode tsData serIn serOut cost385 f385_u128 hb32 w2)
@@ -121,8 +121,16 @@ def tvData (n ta : Nat) (ptr0 : UInt32) (a759 a353 : Nat) : IProp GF :=
     n ↦[wms][ 1070974 ] lut)
 
 /-- The cost of `to_vec::<U128>` (96), activation excluded. -/
-noncomputable def cost96 (cfg : WasmConfig) (lo hi : UInt64) : Nat :=
-  400 * cfg.regularOpCost + costAlloc cfg false 128 + cost385 cfg lo hi
+noncomputable def cost96F (cfg : WasmConfig) (F : Nat) (lo hi : UInt64) : Nat :=
+  400 * cfg.regularOpCost + costAllocF cfg F 128 + cost385 cfg F lo hi
+
+/-- `cost96F` on `heapInv … 1` (the same for `F ≤ 2`, `cost96F_le2`). -/
+noncomputable def cost96 (cfg : WasmConfig) (lo hi : UInt64) : Nat := cost96F cfg 1 lo hi
+
+theorem cost96F_le2 (cfg : WasmConfig) {F : Nat} (h : F ≤ 2) (lo hi : UInt64) :
+    cost96F cfg F lo hi = cost96 cfg lo hi := by
+  simp only [cost96, cost96F, cost385, FmtString.cost746, FmtString.cost872, FmtString.cost353,
+    FmtString.costGrow, VecWithCap.costAllocF_le2 cfg h, VecWithCap.costAllocF_le2 cfg (show 1 ≤ 2 by decide)]
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 8000000 in
@@ -136,13 +144,13 @@ theorem f96_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
     (lo hi : UInt64) (hs : 416 ≤ s.toNat) (hob : ob.length = 16) (hout : out.toNat + 16 ≤ 2 ^ 32)
     (hv : v.toNat + 16 ≤ 2 ^ 32) (hr1 : roomFor hl maxP 128)
     (hr2 : ∀ hl1, hl1 = hl ∨ hl1 = grownLen hl 128 → roomFor hl1 maxP (newCap 0 (kOf (val lo hi))))
-    (F : Nat := 1) (hF : okF F := by exact Or.inl rfl) :
+    (F : Nat := 1) (hF : okG F := by decide) :
     tvCode n maxP inst mi A
       ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f96 Cg
         (fun args => iprop(⌜args = [.i32 out, .i32 v]⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗ stk n (s.toNat - 416) 416 ∗
           n ↦[wms][ out.toNat ] ob ∗ n ↦[wms][ v.toNat ] u128Bytes lo hi ∗ tvData n ta ptr0 (A 759) (A 353) ∗
           vt n 1057464 aidx ta (A 578) ∗ heapInv n maxP hl live F))
-        (fun _ => cost96 cfg lo hi)
+        (fun _ => cost96F cfg F lo hi)
         (fun _ rs => iprop(⌜rs = []⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗ stk n (s.toNat - 416) 416 ∗
           n ↦[wms][ v.toNat ] u128Bytes lo hi ∗ tvData n ta ptr0 (A 759) (A 353) ∗ vt n 1057464 aidx ta (A 578) ∗
           ∃ q : UInt32, ∃ rest : List UInt8, ⌜rest.length = 128 - ((kOf (val lo hi)).toNat + 2)⌝ ∗
@@ -166,7 +174,7 @@ theorem f96_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
   have ha385 := hm.funcs 385 (by decide)
   have t14 : types[14]!.params.length = 2 := by rfl
   have t13 : types[13]!.params.length = 2 := by rfl
-  unfold cost96
+  unfold cost96F
   iapply MFunSpec_intro
   imodintro
   iintro %args %R HP Hc

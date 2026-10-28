@@ -34,7 +34,7 @@ open WNear.Binary.AllocNewCell (memBytes_addr)
 open WNear.Binary.AllocZeroed (allocCode)
 open WNear.Binary.VecFromElem (stk stk_split stk_join stk_word roomFor heapAfter costAlloc pre68x post68x
   heapAfter_ne stk_addr)
-open WNear.Binary.VecWithCap (okF vecCode2 f769_spec f752_spec pre752 post752)
+open WNear.Binary.VecWithCap (okG costAllocF vecCode2 f769_spec f752_spec pre752 post752)
 
 /-! ## `finish_grow` (772) -/
 
@@ -66,11 +66,11 @@ theorem f772_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
     (live : List (Nat × Nat)) (ob : List UInt8) (hob : ob.length = 12) (hout : out.toNat + 12 ≤ 2 ^ 32)
     (hs : 48 ≤ s.toNat)
     (hsize1 : 0 < size.toNat) (hsize2 : size.toNat < 2 ^ 28) (hr : roomFor len maxP size)
-    (F : Nat := 1) (hF : okF F := by exact Or.inl rfl) :
+    (F : Nat := 1) (hF : okG F := by decide) :
     vecCode2 n maxP inst mi A
       ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f772 Cg
         (pre772 n g gt s out size cur x idx ta (A 578) maxP len live F ob)
-        (fun _ => 123 * cfg.regularOpCost + costAlloc cfg false size)
+        (fun _ => 123 * cfg.regularOpCost + costAllocF cfg F size)
         (post772 n g gt s out size cur idx ta (A 578) maxP len live F) := by
   iintro #Hv
   ihave #Hi : inst ↪[inst] mi $$ []
@@ -219,11 +219,11 @@ theorem f776_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
     (gt : GlobalType) (s out vec len k p0 : UInt32) (idx : UInt32) (maxP hl : Nat)
     (live : List (Nat × Nat)) (ob : List UInt8) (hob : ob.length = 4) (hs : 96 ≤ s.toNat)
     (hvec : vec.toNat + 8 ≤ 2 ^ 32) (hout : out.toNat + 4 ≤ 2 ^ 32) (hk : len.toNat + k.toNat < 2 ^ 28)
-    (hr : roomFor hl maxP (newCap len k)) (F : Nat := 1) (hF : okF F := by exact Or.inl rfl) :
+    (hr : roomFor hl maxP (newCap len k)) (F : Nat := 1) (hF : okG F := by decide) :
     vecCode2 n maxP inst mi A ∗ A 772 ↪[wf] FuncInst.wasm types[39]! inst f772
       ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f776 Cg
         (pre776 n g gt s out vec len k p0 idx ta (A 578) maxP hl live F ob)
-        (fun _ => 301 * cfg.regularOpCost + costAlloc cfg false (newCap len k))
+        (fun _ => 301 * cfg.regularOpCost + costAllocF cfg F (newCap len k))
         (post776 n g gt s out vec len k idx ta (A 578) maxP hl live F) := by
   iintro ⟨#Hv, #H772⟩
   ihave #Hi : inst ↪[inst] mi $$ []

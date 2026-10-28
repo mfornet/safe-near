@@ -32,7 +32,7 @@ open WNear.Binary.U128From (u128Bytes)
 open WNear.Binary.FmtDisplay (fmtCode)
 open WNear.Binary.FmtSink (sinkCode strGrown grown)
 open WNear.Binary.FmtGrow (newCap)
-open WNear.Binary.VecWithCap (okF)
+open WNear.Binary.VecWithCap (okG costAllocF)
 open WNear.Binary.AllocFirstFit (vt)
 open WNear.Binary.VecFromElem (stk stk_split stk_join stk_word stk_intro stk_addr roomFor)
 open WNear.Binary.AllocNewCell (memBytes_addr)
@@ -138,7 +138,7 @@ theorem f385_gen (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
     (hm : IfaceMod mi A n g ta) (hd : d + 25 < lim.maxCallDepth) (Cg : Nat) (gt : GlobalType)
     (s v ser ptr0 aidx : UInt32) (maxP hl : Nat) (live : List (Nat × Nat)) (lo hi : UInt64)
     (hs : 400 ≤ s.toNat) (hv : v.toNat + 16 ≤ 2 ^ 32) (hr : roomFor hl maxP (newCap 0 (kOf (val lo hi))))
-    (P Q : IProp GF) (K : Nat) (F : Nat := 1) (hF : okF F := by exact Or.inl rfl) :
+    (P Q : IProp GF) (K : Nat) (F : Nat := 1) (hF : okG F := by decide) :
     tsCode n maxP inst mi A ∗
       (□ ∀ q : UInt32, ⌜q ≠ 0 ∧ q.toNat + (newCap 0 (kOf (val lo hi))).toNat < 2 ^ 32⌝ -∗
         MFunSpec cfg lim (d + 1) types[15]! inst mi f383 Cg
@@ -151,7 +151,7 @@ theorem f385_gen (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
         (fun args => iprop(⌜args = [.i32 v, .i32 ser]⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗ stk n (s.toNat - 400) 400 ∗
           tsData n ta ptr0 (A 759) (A 353) ∗ vt n 1057464 aidx ta (A 578) ∗ heapInv n maxP hl live F ∗
           n ↦[wms][ v.toNat ] u128Bytes lo hi ∗ n ↦[wms][ 1070974 ] lut ∗ P))
-        (fun _ => 1000 * cfg.regularOpCost + cost746 cfg lo hi + K)
+        (fun _ => 1000 * cfg.regularOpCost + cost746 cfg F lo hi + K)
         (fun _ rs => iprop(⌜rs = [.i32 0]⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗ stk n (s.toNat - 400) 400 ∗
           tsData n ta ptr0 (A 759) (A 353) ∗ vt n 1057464 aidx ta (A 578) ∗
           (∃ hl', heapInv n maxP hl' live (F + 1)) ∗
@@ -435,8 +435,8 @@ def serOut (n : Nat) (ser ovec optr : UInt32) (ob : List UInt8) (k : UInt32) (ds
     n ↦[wms][ optr.toNat ] (([34] ++ ds ++ [34]) ++ ob.drop (k.toNat + 2)))
 
 /-- The cost of `<U128 as Serialize>::serialize` (385), activation excluded. -/
-noncomputable def cost385 (cfg : WasmConfig) (lo hi : UInt64) : Nat :=
-  1000 * cfg.regularOpCost + cost746 cfg lo hi + cost383 (kOf (val lo hi)).toNat * cfg.regularOpCost
+noncomputable def cost385 (cfg : WasmConfig) (F : Nat) (lo hi : UInt64) : Nat :=
+  1000 * cfg.regularOpCost + cost746 cfg F lo hi + cost383 (kOf (val lo hi)).toNat * cfg.regularOpCost
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 8000000 in
@@ -450,13 +450,13 @@ theorem f385_u128 (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
     (lo hi : UInt64) (hs : 400 ≤ s.toNat) (hv : v.toNat + 16 ≤ 2 ^ 32)
     (hr : roomFor hl maxP (newCap 0 (kOf (val lo hi)))) (hob : ob.length = 128)
     (hser : ser.toNat + 4 ≤ 2 ^ 32) (hovec : ovec.toNat + 12 ≤ 2 ^ 32) (hoptr : optr.toNat + 128 < 2 ^ 32)
-    (F : Nat := 1) (hF : okF F := by exact Or.inl rfl) :
+    (F : Nat := 1) (hF : okG F := by decide) :
     tsCode n maxP inst mi A ∗ serCode inst mi A
       ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f385 Cg
         (fun args => iprop(⌜args = [.i32 v, .i32 ser]⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗ stk n (s.toNat - 400) 400 ∗
           tsData n ta ptr0 (A 759) (A 353) ∗ vt n 1057464 aidx ta (A 578) ∗ heapInv n maxP hl live F ∗
           n ↦[wms][ v.toNat ] u128Bytes lo hi ∗ n ↦[wms][ 1070974 ] lut ∗ serIn n ser ovec optr ob))
-        (fun _ => cost385 cfg lo hi)
+        (fun _ => cost385 cfg F lo hi)
         (fun _ rs => iprop(⌜rs = [.i32 0]⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗ stk n (s.toNat - 400) 400 ∗
           tsData n ta ptr0 (A 759) (A 353) ∗ vt n 1057464 aidx ta (A 578) ∗
           (∃ hl', heapInv n maxP hl' live (F + 1)) ∗

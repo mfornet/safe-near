@@ -20,7 +20,7 @@ open WNear.Binary.FmtPad (fmtr)
 open WNear.Binary.FmtU128 (sinkSpec)
 open WNear.Binary.FmtSink (sinkCode roomPre roomPost growPre growPost strGrown f759_room f759_grow)
 open WNear.Binary.FmtGrow (newCap)
-open WNear.Binary.VecWithCap (okF)
+open WNear.Binary.VecWithCap (okG costAllocF)
 open WNear.Binary.AllocFirstFit (vt)
 open WNear.Binary.VecFromElem (stk stk_split stk_join stk_word stk_intro stk_addr roomFor costAlloc)
 open WNear.Binary.AllocNewCell (memBytes_addr)
@@ -43,8 +43,8 @@ def skPost (n maxP hl : Nat) (live : List (Nat × Nat)) (F : Nat) (ta a578 : Nat
     strGrown n maxP hl live F vec k ds)
 
 /-- The sink's cost on `k` bytes. -/
-def costGrow (cfg : WasmConfig) (k : UInt32) : Nat :=
-  453 * cfg.regularOpCost + costAlloc cfg false (newCap 0 k) + MemCpy.cost k.toNat * cfg.regularOpCost
+def costGrow (cfg : WasmConfig) (F : Nat) (k : UInt32) : Nat :=
+  453 * cfg.regularOpCost + costAllocF cfg F (newCap 0 k) + MemCpy.cost k.toNat * cfg.regularOpCost
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 4000000 in
@@ -54,11 +54,11 @@ theorem sink_grow (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (inst : Nat) (
     (gt : GlobalType) (s c dd vec idx : UInt32) (maxP hl : Nat) (live : List (Nat × Nat))
     (ds : List UInt8) (hs : 112 ≤ s.toNat) (hs2 : s.toNat + 144 ≤ 2 ^ 32) (hc : c.toNat < 39)
     (hds : ds.length = 39 - c.toNat) (hdd : dd.toNat + 4 ≤ 2 ^ 32) (hvec : vec.toNat + 12 ≤ 2 ^ 32)
-    (hr : roomFor hl maxP (newCap 0 (39 - c))) (F : Nat := 1) (hF : okF F := by exact Or.inl rfl) :
+    (hr : roomFor hl maxP (newCap 0 (39 - c))) (F : Nat := 1) (hF : okG F := by decide) :
     sinkCode n maxP inst mi A
       ⊢ sinkSpec (GF := GF) cfg lim d inst mi n g gt s c dd f759 ds
           (skPre n maxP hl live F ta (A 578) s dd vec idx)
-          (skPost n maxP hl live F ta (A 578) s dd vec idx (39 - c) ds) (costGrow cfg (39 - c)) Cg := by
+          (skPost n maxP hl live F ta (A 578) s dd vec idx (39 - c) ds) (costGrow cfg F (39 - c)) Cg := by
   iintro #Hk
   iunfold sinkSpec
   imodintro
@@ -202,9 +202,9 @@ theorem piece_room (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (inst : Nat) 
   iexact Hk
 
 /-- The cost of `<&u128 as Display>::fmt` (353) into the empty `String`. -/
-noncomputable def cost353 (cfg : WasmConfig) (lo hi : UInt64) : Nat :=
+noncomputable def cost353 (cfg : WasmConfig) (F : Nat) (lo hi : UInt64) : Nat :=
   14 * cfg.regularOpCost + (23 * cfg.regularOpCost + (FmtU128.cost lo hi * cfg.regularOpCost +
-    activationGas cfg.regularOpCost (entryLocals f759 [.i32 0, .i32 0, .i32 0]) + costGrow cfg (kOf (val lo hi))))
+    activationGas cfg.regularOpCost (entryLocals f759 [.i32 0, .i32 0, .i32 0]) + costGrow cfg F (kOf (val lo hi))))
 
 theorem stk_256_144 (n a : Nat) :
     stk (GF := GF) n a 256 ⊣⊢ stk n a 112 ∗ stk n (a + 112) 144 :=
@@ -219,12 +219,12 @@ theorem arg_353 (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (inst : Nat) (mi
     (gt : GlobalType) (sp dd vec aidx vp p : UInt32) (maxP hl : Nat) (live : List (Nat × Nat))
     (lo hi : UInt64) (hsp : 256 ≤ sp.toNat) (hsp2 : sp.toNat + 48 ≤ 2 ^ 32) (hdd : dd.toNat + 4 ≤ 2 ^ 32)
     (hvec : vec.toNat + 12 ≤ 2 ^ 32) (hvp : vp.toNat + 4 ≤ 2 ^ 32) (hp : p.toNat + 16 ≤ 2 ^ 32)
-    (hr : roomFor hl maxP (newCap 0 (kOf (val lo hi)))) (F : Nat := 1) (hF : okF F := by exact Or.inl rfl) :
+    (hr : roomFor hl maxP (newCap 0 (kOf (val lo hi)))) (F : Nat := 1) (hF : okG F := by decide) :
     fmtCode inst mi A (A 759) f759 ∗ A 901 ↪[wf] FuncInst.wasm types[13]! inst f901 ∗ sinkCode n maxP inst mi A
       ⊢ MFunSpec (GF := GF) cfg lim d types[13]! inst mi f353 Cg
         (fun args => iprop(⌜args = [.i32 vp, .i32 (sp + 8)]⌝ ∗ g ↦[wg] ⟨gt, .i32 sp⟩ ∗
           fmtr n ta (sp + 8) dd 1065404 157 (A 759) ∗ wIn n maxP hl live F ta (A 578) sp dd vec aidx vp p lo hi))
-        (fun _ => cost353 cfg lo hi)
+        (fun _ => cost353 cfg F lo hi)
         (fun _ rs => iprop(⌜rs = [.i32 0]⌝ ∗ g ↦[wg] ⟨gt, .i32 sp⟩ ∗
           fmtr n ta (sp + 8) dd 1065404 157 (A 759) ∗ wOut n maxP hl live F ta (A 578) sp dd vec aidx vp p lo hi)) := by
   iintro ⟨#Hfc, #H901, #Hsc⟩
@@ -242,7 +242,7 @@ theorem arg_353 (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (inst : Nat) (mi
     (sp + 8) dd 1065404 157 hvp hp (by omega) (by rw [UInt32.toNat_add]; simp; omega) (by decide) (A 759) f759
     (skPre n maxP hl live F ta (A 578) (sp - 144) dd vec aidx)
     (skPost n maxP hl live F ta (A 578) (sp - 144) dd vec aidx (kOf (val lo hi)) (decDigits (val lo hi)))
-    (costGrow cfg (kOf (val lo hi))) $$ [Hfc H901 Sw]
+    (costGrow cfg F (kOf (val lo hi))) $$ [Hfc H901 Sw]
   · iframe Hfc H901; unfold kOf; iexact Sw
   iunfold cost353
   iapply AllocFresh.MFunSpec_frame (Fr := iprop(True)) ?_ ?_ $$ S353
@@ -278,10 +278,10 @@ theorem arg_353 (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (inst : Nat) (mi
     iapply stk_addr (show sp.toNat - 144 = sp.toNat - 256 + 112 by omega) $$ Hs2
 
 /-- The cost of `core::fmt::write` (872) formatting the `u128` into the empty `String`. -/
-noncomputable def cost872 (cfg : WasmConfig) (lo hi : UInt64) : Nat :=
+noncomputable def cost872 (cfg : WasmConfig) (F : Nat) (lo hi : UInt64) : Nat :=
   100 * cfg.regularOpCost + activationGas cfg.regularOpCost (entryLocals f759 [.i32 0, .i32 0, .i32 0]) +
     (138 * cfg.regularOpCost + MemCpy.cost 0 * cfg.regularOpCost) +
-    activationGas cfg.regularOpCost (entryLocals f353 [.i32 0, .i32 0]) + cost353 cfg lo hi
+    activationGas cfg.regularOpCost (entryLocals f353 [.i32 0, .i32 0]) + cost353 cfg F lo hi
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 4000000 in
@@ -293,7 +293,7 @@ theorem f872_u128 (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
     (s dd vec aidx ar argp vp p ptr0 : UInt32) (maxP hl : Nat) (live : List (Nat × Nat))
     (lo hi : UInt64) (hs : 304 ≤ s.toNat) (hdd : dd.toNat + 4 ≤ 2 ^ 32) (hvec : vec.toNat + 12 ≤ 2 ^ 32)
     (har : ar.toNat + 24 ≤ 2 ^ 32) (hargp : argp.toNat + 8 ≤ 2 ^ 32) (hvp : vp.toNat + 4 ≤ 2 ^ 32)
-    (hp : p.toNat + 16 ≤ 2 ^ 32) (hr : roomFor hl maxP (newCap 0 (kOf (val lo hi)))) (F : Nat := 1) (hF : okF F := by exact Or.inl rfl) :
+    (hp : p.toNat + 16 ≤ 2 ^ 32) (hr : roomFor hl maxP (newCap 0 (kOf (val lo hi)))) (F : Nat := 1) (hF : okG F := by decide) :
     fmtCode inst mi A (A 759) f759 ∗ A 901 ↪[wf] FuncInst.wasm types[13]! inst f901 ∗
       A 353 ↪[wf] FuncInst.wasm types[13]! inst f353 ∗ sinkCode n maxP inst mi A
       ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f872 Cg
@@ -302,7 +302,7 @@ theorem f872_u128 (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
           pieceArg n ta 1051836 ptr0 0 argp vp 92 (A 353) ∗
           n ↦[i32][ (1065404 : UInt32).toNat + 12 ] 157 ∗ ta ↦[wt][ (157 : UInt32).toNat ] Ref.func (A 759) ∗
           wIn n maxP hl live F ta (A 578) (s - 48) dd vec aidx vp p lo hi))
-        (fun _ => cost872 cfg lo hi)
+        (fun _ => cost872 cfg F lo hi)
         (fun _ rs => iprop(⌜rs = [.i32 0]⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗
           stk n (s.toNat - 48) 48 ∗ argsAt n ar 1051836 argp ∗
           pieceArg n ta 1051836 ptr0 0 argp vp 92 (A 353) ∗
@@ -325,7 +325,7 @@ theorem f872_u128 (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
     (wIn n maxP hl live F ta (A 578) (s - 48) dd vec aidx vp p lo hi)
     (wIn n maxP hl live F ta (A 578) (s - 48) dd vec aidx vp p lo hi)
     (wOut n maxP hl live F ta (A 578) (s - 48) dd vec aidx vp p lo hi)
-    (138 * cfg.regularOpCost + MemCpy.cost 0 * cfg.regularOpCost) (cost353 cfg lo hi)
+    (138 * cfg.regularOpCost + MemCpy.cost 0 * cfg.regularOpCost) (cost353 cfg F lo hi)
   iframe Hi Ha H353 Sa Sb
 
 /-- What `Write::write_fmt` (746 at `s`) needs besides its frame and the `Arguments`: the 304
@@ -352,9 +352,9 @@ theorem stk_304 (n a : Nat) :
   ⟨stk_split n a 256 48, stk_join n a 256 48⟩
 
 /-- The cost of `Write::write_fmt` (746) formatting the `u128` into the empty `String`. -/
-noncomputable def cost746 (cfg : WasmConfig) (lo hi : UInt64) : Nat :=
+noncomputable def cost746 (cfg : WasmConfig) (F : Nat) (lo hi : UInt64) : Nat :=
   60 * cfg.regularOpCost + activationGas cfg.regularOpCost (entryLocals f872 [.i32 0, .i32 0, .i32 0]) +
-    cost872 cfg lo hi
+    cost872 cfg F lo hi
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 4000000 in
@@ -367,7 +367,7 @@ theorem f746_u128 (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
     (maxP hl : Nat) (live : List (Nat × Nat)) (lo hi : UInt64) (hs : 336 ≤ s.toNat)
     (hap : ap.toNat + 24 ≤ 2 ^ 32) (hvec : vec.toNat + 12 ≤ 2 ^ 32)
     (hargp : argp.toNat + 8 ≤ 2 ^ 32) (hvp : vp.toNat + 4 ≤ 2 ^ 32)
-    (hp : p.toNat + 16 ≤ 2 ^ 32) (hr : roomFor hl maxP (newCap 0 (kOf (val lo hi)))) (F : Nat := 1) (hF : okF F := by exact Or.inl rfl) :
+    (hp : p.toNat + 16 ≤ 2 ^ 32) (hr : roomFor hl maxP (newCap 0 (kOf (val lo hi)))) (F : Nat := 1) (hF : okG F := by decide) :
     fmtCode inst mi A (A 759) f759 ∗ A 901 ↪[wf] FuncInst.wasm types[13]! inst f901 ∗
       A 353 ↪[wf] FuncInst.wasm types[13]! inst f353 ∗ A 872 ↪[wf] FuncInst.wasm types[15]! inst f872 ∗
       sinkCode n maxP inst mi A
@@ -375,7 +375,7 @@ theorem f746_u128 (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
         (fun args => iprop(⌜args = [.i32 vec, .i32 ap]⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗
           stk n (s.toNat - 32) 32 ∗ argsAt n ap 1051836 argp ∗ n ↦[wms][ ap.toNat + 12 ] junk ∗
           fIn n maxP hl live F ta (A 578) (A 353) (A 759) s argp vp p ptr0 vec aidx lo hi))
-        (fun _ => cost746 cfg lo hi)
+        (fun _ => cost746 cfg F lo hi)
         (fun _ rs => iprop(⌜rs = [.i32 0]⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗
           stk n (s.toNat - 32) 32 ∗ argsAt n ap 1051836 argp ∗ n ↦[wms][ ap.toNat + 12 ] junk ∗
           fOut n maxP hl live F ta (A 578) (A 353) (A 759) s argp vp p ptr0 vec aidx lo hi)) := by

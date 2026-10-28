@@ -125,6 +125,7 @@ theorem f374_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
       ⊢ MFunSpec (GF := GF) cfg lim (d + 1) types[15]! inst mi f951 Cg (MemCpy.pre n dst src c bs sb)
         (fun _ => M) (MemCpy.post n dst src sb) := fun dst bs h1 h2 => by
     rw [← hM]; exact MemCpy.f951_spec cfg lim (d + 1) types[15]! (by rfl) inst mi n hn Cg dst src c bs sb h1 hsb h2 hsrc
+  have hG : VecWithCap.costAllocF cfg 1 c = costAlloc cfg false c := VecWithCap.costAllocF_le2 cfg (by decide) c
   simp only [f374]
   mstep; mstep
   mcall S373 using [Hg Hs Hvt Hinv Ho]
