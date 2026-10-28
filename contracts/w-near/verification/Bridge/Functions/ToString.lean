@@ -34,7 +34,7 @@ open WNear.Binary.FmtSink (sinkCode strGrown grown)
 open WNear.Binary.FmtGrow (newCap)
 open WNear.Binary.VecWithCap (okG costAllocF)
 open WNear.Binary.AllocFirstFit (vt)
-open WNear.Binary.VecFromElem (stk stk_split stk_join stk_word stk_intro stk_addr roomFor)
+open WNear.Binary.VecFromElem (stk stk_split stk_join stk_word stk_intro stk_addr roomFor grownLen)
 open WNear.Binary.AllocNewCell (memBytes_addr)
 open WNear.Binary.DropVec (dropCode pre747 post747)
 open WNear.Binary.FmtWrite (argsAt pieceArg)
@@ -154,7 +154,7 @@ theorem f385_gen (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
         (fun _ => 1000 * cfg.regularOpCost + cost746 cfg F lo hi + K)
         (fun _ rs => iprop(⌜rs = [.i32 0]⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗ stk n (s.toNat - 400) 400 ∗
           tsData n ta ptr0 (A 759) (A 353) ∗ vt n 1057464 aidx ta (A 578) ∗
-          (∃ hl', heapInv n maxP hl' live (F + 1)) ∗
+          (∃ hl', ⌜hl' = hl ∨ hl' = grownLen hl (newCap 0 (kOf (val lo hi)))⌝ ∗ heapInv n maxP hl' live (F + 1)) ∗
           n ↦[wms][ v.toNat ] u128Bytes lo hi ∗ n ↦[wms][ 1070974 ] lut ∗ Q)) := by
   iintro ⟨#Hk, #S383⟩
   have hn := hm.mem
@@ -396,6 +396,7 @@ theorem f385_gen (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
     isplitl [T157]; · iapply tbl_addr (by first | rfl | simp) $$ T157
     iapply tbl_addr (by first | rfl | simp) $$ T92
   iexists hl'
+  isplitr; · ipureintro; exact hhl
   simp only [List.erase_cons_head]
   iexact Hh
 
@@ -459,7 +460,7 @@ theorem f385_u128 (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
         (fun _ => cost385 cfg F lo hi)
         (fun _ rs => iprop(⌜rs = [.i32 0]⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗ stk n (s.toNat - 400) 400 ∗
           tsData n ta ptr0 (A 759) (A 353) ∗ vt n 1057464 aidx ta (A 578) ∗
-          (∃ hl', heapInv n maxP hl' live (F + 1)) ∗
+          (∃ hl', ⌜hl' = hl ∨ hl' = grownLen hl (newCap 0 (kOf (val lo hi)))⌝ ∗ heapInv n maxP hl' live (F + 1)) ∗
           n ↦[wms][ v.toNat ] u128Bytes lo hi ∗ n ↦[wms][ 1070974 ] lut ∗
           serOut n ser ovec optr ob (kOf (val lo hi)) (decDigits (val lo hi)))) := by
   iintro ⟨#Hk, #Hs⟩

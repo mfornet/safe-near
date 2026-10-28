@@ -264,6 +264,8 @@ theorem f96_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
     iapply memBytes_addr (by omega) $$ S12
   isplitl [HD Hqt Hesc Hl]
   · iunfold tvData; iframe HD Hqt Hesc Hl
+  ihave Hh : (∃ hl', heapInv n maxP hl' ((q.toNat, 128) :: live) (F + 1)) $$ [Hh]
+  · icases Hh with ⟨%hl', -, Hh⟩; iexists hl'; iexact Hh
   iexists q
   iexists bs.drop ((kOf (val lo hi)).toNat + 2)
   iframe O0 O4 O8 Hq Hh

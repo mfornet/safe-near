@@ -2,7 +2,7 @@ import Bridge.Functions.VecAppend
 import Bridge.Functions.ResultExpect
 
 /-!
-# `serialize_str` (383) of decimal digits (M5)
+# `serialize_str` (383) of strings that need no escaping (M5)
 
 `U128::serialize` (385) writes the decimal digits of the `u128` (a `String`) into the output
 `Vec<u8>` (capacity 128, never grown) as a JSON string:
@@ -21,6 +21,12 @@ zero `ESCAPE` entries of `'0'..'9'` at 1061856 (`esc_data`). Stack: 48 bytes bel
 frame 32, the append chain's 16). Costs (`regular_op_cost`s, activation excluded, `mc = MemCpy.cost`):
 346 `265 + 32 k + mc k`; 344 `cost344 k = 600 + 32 k + 2 mc 1 + mc k` (exact); 383
 `cost383 k = cost344 k + 44`.
+
+The specifications are stated for any string whose bytes lie in a chunk of `ESCAPE` that is all
+zero: `m` entries from `1061808 + lo`, owned as `List.replicate m 0` (`InRange lo m`;
+`f346_esc`, `f344_esc`, `f383_esc`). `f346_digits`, `f344_digits` and `f383_digits` are the
+digits' case (`lo = 48`, `m = 10`, `esc` at 1061856); struct keys use the lowercase letters
+(`lo = 97`, `m = 26`, `SerdeStruct`).
 -/
 
 namespace WNear.Binary.SerializeStr
@@ -153,6 +159,13 @@ theorem quote_data : wNearSource.read (159306 + (1051817 - 1048576)) = 34 := by 
 /-- Every byte an ASCII digit. -/
 def AllDigits (ds : List UInt8) : Prop := ∀ b ∈ ds, 48 ≤ b.toNat ∧ b.toNat ≤ 57
 
+/-- Every byte in `[lo, lo + m)`: its `ESCAPE` entry at `1061808 + b` inside a chunk of `m` entries
+from `1061808 + lo`. -/
+def InRange (lo m : Nat) (ds : List UInt8) : Prop := ∀ b ∈ ds, lo ≤ b.toNat ∧ b.toNat < lo + m
+
+theorem inRange_of_digits {ds : List UInt8} (h : AllDigits ds) : InRange 48 10 ds :=
+  fun b hb => ⟨(h b hb).1, by have := (h b hb).2; omega⟩
+
 section L346
 
 variable {GF : BundledGFunctors} [WasmGS NearState GF]
@@ -191,19 +204,19 @@ def frIn (inst : Nat) (mi : ModuleInst) (ser ser1 p k sp j x13 x14 x15 : UInt32)
     .i32 0, .i32 (p + k), .i32 p, .i32 k, .i32 j, .i32 x13, .i32 x14, .i32 x15, .i32 0], inst, mi⟩
 
 /-- The scan's invariant: `j` bytes scanned, credits for the `k - j` iterations left and the end `E`. -/
-def invIn (n inst : Nat) (mi : ModuleInst) (Cg c₀ E R : Nat) (ser ser1 p k sp : UInt32) (ds : List UInt8)
+def invIn (n inst : Nat) (mi : ModuleInst) (Cg c₀ E R : Nat) (ser ser1 p k sp : UInt32) (ea : Nat) (et : List UInt8) (ds : List UInt8)
     (P : IProp GF) : List Value → Frame → IProp GF := fun X fr =>
   iprop(∃ (j : Nat) (jj x13 x14 x15 : UInt32), ⌜X = [] ∧ fr = frIn inst mi ser ser1 p k sp jj x13 x14 x15 ∧
       j ≤ k.toNat ∧ jj.toNat = j⌝ ∗
-    credits Cg (32 * (k.toNat - j) * c₀ + E + R) ∗ n ↦[wms][ 1061856 ] esc ∗ n ↦[wms][ p.toNat ] ds ∗ P)
+    credits Cg (32 * (k.toNat - j) * c₀ + E + R) ∗ n ↦[wms][ ea ] et ∗ n ↦[wms][ p.toNat ] ds ∗ P)
 
 /-- The outer loop's invariant: its entry. -/
-def invOut (n inst : Nat) (mi : ModuleInst) (Cg c₀ E R : Nat) (ser ser1 p k sp : UInt32) (ds : List UInt8)
+def invOut (n inst : Nat) (mi : ModuleInst) (Cg c₀ E R : Nat) (ser ser1 p k sp : UInt32) (ea : Nat) (et : List UInt8) (ds : List UInt8)
     (P : IProp GF) : List Value → Frame → IProp GF := fun X fr =>
   iprop(⌜X = [] ∧ fr = ⟨#[.i32 ser, .i32 ser1, .i32 p, .i32 k, .i32 sp, .i32 (p + 4294967295),
       .i32 (k ^^^ 4294967295), .i32 0, .i32 0, .i32 (p + k), .i32 p, .i32 0, .i32 0, .i32 0, .i32 0, .i32 0,
       .i32 0], inst, mi⟩⌝ ∗
-    credits Cg (32 * k.toNat * c₀ + E + R) ∗ n ↦[wms][ 1061856 ] esc ∗ n ↦[wms][ p.toNat ] ds ∗ P)
+    credits Cg (32 * k.toNat * c₀ + E + R) ∗ n ↦[wms][ ea ] et ∗ n ↦[wms][ p.toNat ] ds ∗ P)
 
 
 /-- The code 346 runs (persistent). -/
@@ -221,22 +234,22 @@ set_option maxHeartbeats 8000000 in
 /-- **`format_escaped_str_contents(ser, ser1, p, k)`** (346) on `k > 0` ASCII digits `ds` at `p`: no
 byte needs escaping (`ESCAPE[b] = 0`), the scan runs to the end and the whole slice is written with
 `write_all` (345) into the `Vec` behind `*ser`; `Ok` (the `i64` 3). -/
-theorem f346_digits (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
+theorem f346_esc (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
     (htype : type.results.length = 1) (inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (n g ta : Nat)
     (hm : IfaceMod mi A n g ta) (hd : d + 6 < lim.maxCallDepth) (Cg : Nat)
     (gt : GlobalType) (s ser ser1 vec ptr cap len p k : UInt32) (ob ds : List UInt8) (hs : 48 ≤ s.toNat)
-    (hob : ob.length = k.toNat) (hds : ds.length = k.toNat) (hk0 : 0 < k.toNat) (hdig : AllDigits ds)
+    (hob : ob.length = k.toNat) (hds : ds.length = k.toNat) (hk0 : 0 < k.toNat) (lo m : Nat) (hdig : InRange lo m ds)
     (hser : ser.toNat + 4 ≤ 2 ^ 32) (hvec : vec.toNat + 12 ≤ 2 ^ 32) (hroom : len.toNat + k.toNat ≤ cap.toNat)
     (hptr : ptr.toNat + cap.toNat < 2 ^ 32) (hp : p.toNat + k.toNat ≤ 2 ^ 32) :
     escCode inst mi A
       ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f346 Cg
         (fun args => iprop(⌜args = [.i32 ser, .i32 ser1, .i32 p, .i32 k]⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗
-          stk n (s.toNat - 48) 48 ∗ n ↦[wms][ 1061856 ] esc ∗ n ↦[i32][ ser.toNat ] vec ∗
+          stk n (s.toNat - 48) 48 ∗ n ↦[wms][ 1061808 + lo ] List.replicate m 0 ∗ n ↦[i32][ ser.toNat ] vec ∗
           n ↦[i32][ vec.toNat ] ptr ∗ n ↦[i32][ vec.toNat + 4 ] cap ∗ n ↦[i32][ vec.toNat + 8 ] len ∗
           n ↦[wms][ ptr.toNat + len.toNat ] ob ∗ n ↦[wms][ p.toNat ] ds))
         (fun _ => (265 + 32 * k.toNat) * cfg.regularOpCost + MemCpy.cost k.toNat * cfg.regularOpCost)
         (fun _ rs => iprop(⌜rs = [.i64 3]⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗
-          stk n (s.toNat - 48) 48 ∗ n ↦[wms][ 1061856 ] esc ∗ n ↦[i32][ ser.toNat ] vec ∗
+          stk n (s.toNat - 48) 48 ∗ n ↦[wms][ 1061808 + lo ] List.replicate m 0 ∗ n ↦[i32][ ser.toNat ] vec ∗
           n ↦[i32][ vec.toNat ] ptr ∗ n ↦[i32][ vec.toNat + 4 ] cap ∗ n ↦[i32][ vec.toNat + 8 ] (len + k) ∗
           n ↦[wms][ ptr.toNat + len.toNat ] ds ∗ n ↦[wms][ p.toNat ] ds)) := by
   iintro #Hk
@@ -303,7 +316,7 @@ theorem f346_digits (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : Func
   -- the outer loop, entered once
   iapply MemCpy.mwpi_loop0 (Cg := Cg)
     (R := 32 * k.toNat * cfg.regularOpCost + (187 * cfg.regularOpCost + M) + R)
-    (I := invOut n inst mi Cg cfg.regularOpCost (187 * cfg.regularOpCost + M) R ser ser1 p k (s - 32) ds
+    (I := invOut n inst mi Cg cfg.regularOpCost (187 * cfg.regularOpCost + M) R ser ser1 p k (s - 32) (1061808 + lo) (List.replicate m 0) ds
       iprop(g ↦[wg] ⟨gt, .i32 (s - 32)⟩ ∗ stk n (s.toNat - 48) 16 ∗ stk n (s.toNat - 48 + 16 + 12) 4 ∗
         stk n (s.toNat - 48 + 16 + 12 + 4 + 12) 4 ∗
         n ↦[i32][ (s - 32 + 16).toNat ] p ∗ n ↦[i32][ (s - 32 + 16).toNat + 4 ] (p + k) ∗
@@ -326,7 +339,7 @@ theorem f346_digits (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : Func
     iapply mwpi_cons
     iapply MemCpy.mwpi_loop0 (Cg := Cg)
       (R := L + (180 * cfg.regularOpCost + M) + R)
-      (I := invIn n inst mi Cg cfg.regularOpCost (180 * cfg.regularOpCost + M) R ser ser1 p k (s - 32) ds
+      (I := invIn n inst mi Cg cfg.regularOpCost (180 * cfg.regularOpCost + M) R ser ser1 p k (s - 32) (1061808 + lo) (List.replicate m 0) ds
         iprop(g ↦[wg] ⟨gt, .i32 (s - 32)⟩ ∗ stk n (s.toNat - 48) 16 ∗ stk n (s.toNat - 48 + 16 + 12) 4 ∗
           stk n (s.toNat - 48 + 16 + 12 + 4 + 12) 4 ∗
           n ↦[i32][ (s - 32 + 16).toNat ] p ∗ n ↦[i32][ (s - 32 + 16).toNat + 4 ] (p + k) ∗
@@ -353,10 +366,10 @@ theorem f346_digits (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : Func
         obtain ⟨b, hbj⟩ : ∃ b, ds[j] = b := ⟨_, rfl⟩
         rw [hbj] at hb
         rw [hbj]
-        ihave He := MemCpy.memBytes_pick n 1061856 (b.toNat - 48) esc (by simp [esc]; omega) $$ He
+        ihave He := MemCpy.memBytes_pick n (1061808 + lo) (b.toNat - lo) (List.replicate m 0) (by simp; omega) $$ He
         icases He with ⟨He1, Hek, He2⟩
-        have hesc : esc[b.toNat - 48]'(by simp [esc]; omega) = 0 := by
-          unfold esc; simp only [List.getElem_replicate]
+        have hesc : (List.replicate m (0 : UInt8))[b.toNat - lo]'(by simp; omega) = 0 := by
+          simp only [List.getElem_replicate]
         have hc1 : Numeric.bool (Numeric.irelop32 IRelOp.eq k jj) = 0 := by
           simp [Numeric.bool, Numeric.irelop32]; exact fun h => hne h.symm
         have hkl := k.toNat_lt
@@ -370,7 +383,8 @@ theorem f346_digits (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : Func
         repeat mstep
         mstep [Hdk] with (simp [UInt32.toNat_add]; omega)
         repeat mstep
-        mstep [Hek] with (simp [UInt32.toNat_add, Memory.decodeLE]; omega)
+        have hb8 := b.toNat_lt
+        mstep [Hek] with (simp [UInt32.toNat_add, Memory.decodeLE, Bool.false_eq_true]; omega)
         repeat mstep
         simp only [Post.mloop]
         iapply pure_pay_intro'
@@ -383,13 +397,14 @@ theorem f346_digits (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : Func
         ihave Hds := MemCpy.memBytes_unpick n p.toNat j (List.take j ds) b (List.drop (j + 1) ds)
           (by simp; omega) $$ [Hd1 Hdk Hd2]
         · iframe Hd1 Hdk Hd2
-        ihave He := MemCpy.memBytes_unpick n 1061856 (b.toNat - 48) (List.take (b.toNat - 48) esc) 0
-          (List.drop (b.toNat - 48 + 1) esc) (by simp [esc]; omega) $$ [He1 Hek He2]
+        ihave He := MemCpy.memBytes_unpick n (1061808 + lo) (b.toNat - lo) (List.take (b.toNat - lo) (List.replicate m 0)) 0
+          (List.drop (b.toNat - lo + 1) (List.replicate m 0)) (by simp; omega) $$ [He1 Hek He2]
         · iframe He1 Hek He2
         have eds : List.take j ds ++ b :: List.drop (j + 1) ds = ds := by
           rw [← hbj]; simp
-        have ees : List.take (b.toNat - 48) esc ++ 0 :: List.drop (b.toNat - 48 + 1) esc = esc := by
-          rw [← hesc]; simp
+        have ees : List.take (b.toNat - lo) (List.replicate m 0) ++ 0 :: List.drop (b.toNat - lo + 1) (List.replicate m 0) = List.replicate m (0 : UInt8) := by
+          rw [List.take_replicate, List.drop_replicate, ← List.replicate_succ, List.replicate_append_replicate]
+          congr 1; omega
         rw [eds, ees]
         iunfold invIn
         iexists j + 1
@@ -506,24 +521,24 @@ set_option maxRecDepth 100000 in
 set_option maxHeartbeats 8000000 in
 /-- **`format_escaped_str(ser, ser1, p, k)`** (344) on `k` decimal digits `ds`: `"`, the digits,
 `"` appended to the `Vec` behind `*ser`. -/
-theorem f344_digits (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
+theorem f344_esc (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
     (htype : type.results.length = 1) (inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (n g ta : Nat)
     (hm : IfaceMod mi A n g ta) (hd : d + 7 < lim.maxCallDepth) (Cg : Nat)
     (gt : GlobalType) (s ser ser1 vec ptr cap len p k : UInt32) (ob ds : List UInt8) (hs : 48 ≤ s.toNat)
-    (hob : ob.length = k.toNat + 2) (hds : ds.length = k.toNat) (hk0 : 0 < k.toNat) (hdig : AllDigits ds)
+    (hob : ob.length = k.toNat + 2) (hds : ds.length = k.toNat) (hk0 : 0 < k.toNat) (lo m : Nat) (hdig : InRange lo m ds)
     (hser : ser.toNat + 4 ≤ 2 ^ 32) (hvec : vec.toNat + 12 ≤ 2 ^ 32)
     (hroom : len.toNat + k.toNat + 2 ≤ cap.toNat)
     (hptr : ptr.toNat + cap.toNat < 2 ^ 32) (hp : p.toNat + k.toNat ≤ 2 ^ 32) :
     serCode inst mi A
       ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f344 Cg
         (fun args => iprop(⌜args = [.i32 ser, .i32 ser1, .i32 p, .i32 k]⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗
-          stk n (s.toNat - 48) 48 ∗ n ↦[wms][ 1051817 ] [34] ∗ n ↦[wms][ 1061856 ] esc ∗
+          stk n (s.toNat - 48) 48 ∗ n ↦[wms][ 1051817 ] [34] ∗ n ↦[wms][ 1061808 + lo ] List.replicate m 0 ∗
           n ↦[i32][ ser.toNat ] vec ∗
           n ↦[i32][ vec.toNat ] ptr ∗ n ↦[i32][ vec.toNat + 4 ] cap ∗ n ↦[i32][ vec.toNat + 8 ] len ∗
           n ↦[wms][ ptr.toNat + len.toNat ] ob ∗ n ↦[wms][ p.toNat ] ds))
         (fun _ => cost344 k.toNat * cfg.regularOpCost)
         (fun _ rs => iprop(⌜rs = [.i64 3]⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗
-          stk n (s.toNat - 48) 48 ∗ n ↦[wms][ 1051817 ] [34] ∗ n ↦[wms][ 1061856 ] esc ∗
+          stk n (s.toNat - 48) 48 ∗ n ↦[wms][ 1051817 ] [34] ∗ n ↦[wms][ 1061808 + lo ] List.replicate m 0 ∗
           n ↦[i32][ ser.toNat ] vec ∗
           n ↦[i32][ vec.toNat ] ptr ∗ n ↦[i32][ vec.toNat + 4 ] cap ∗ n ↦[i32][ vec.toNat + 8 ] (len + k + 2) ∗
           n ↦[wms][ ptr.toNat + len.toNat ] ([34] ++ ds ++ [34]) ∗ n ↦[wms][ p.toNat ] ds)) := by
@@ -549,9 +564,9 @@ theorem f344_digits (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : Func
     (by omega) Cg gt s ser vec ptr cap len 1051817 1 [o0] [34] h16 (by simp) (by simp)
     hser hvec (by simp; omega) hptr (by simp) $$ [He]
   · iunfold escCode at He; icases He with ⟨#H, -⟩; iexact H
-  ihave #S2 := f346_digits (GF := GF) cfg lim (d + 1) types[48]! (by rfl) inst mi A n g ta hm
+  ihave #S2 := f346_esc (GF := GF) cfg lim (d + 1) types[48]! (by rfl) inst mi A n g ta hm
     (by omega) Cg gt s ser ser vec ptr cap (len + 1) p k mid ds hs hmid hds hk0
-    hdig hser hvec (by omega) hptr hp $$ [He]
+    lo m hdig hser hvec (by omega) hptr hp $$ [He]
   · iexact He
   ihave #S3 := VecAppend.f345_room (GF := GF) cfg lim (d + 1) types[31]! (by rfl) inst mi A n g ta hm
     (by omega) Cg gt s ser vec ptr cap (len + 1 + k) 1051817 1 [o2] [34] h16
@@ -649,30 +664,30 @@ set_option maxHeartbeats 8000000 in
 /-- **`serialize_str(ser, p, k)`** (383) on `0 < k` ASCII decimal digits `ds` at `p`, into the
 `Vec<u8>` `(ptr, cap, len)` behind `*ser` with room for `k + 2` bytes: the JSON string
 `"` ++ `ds` ++ `"` appended, `Ok` (0). -/
-theorem f383_digits (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
+theorem f383_esc (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
     (htype : type.results.length = 1) (inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (n g ta : Nat)
     (hm : IfaceMod mi A n g ta) (hd : d + 8 < lim.maxCallDepth) (Cg : Nat)
     (gt : GlobalType) (s ser vec ptr cap len p k : UInt32) (ob ds : List UInt8) (hs : 48 ≤ s.toNat)
-    (hob : ob.length = k.toNat + 2) (hds : ds.length = k.toNat) (hk0 : 0 < k.toNat) (hdig : AllDigits ds)
+    (hob : ob.length = k.toNat + 2) (hds : ds.length = k.toNat) (hk0 : 0 < k.toNat) (lo m : Nat) (hdig : InRange lo m ds)
     (hser : ser.toNat + 4 ≤ 2 ^ 32) (hvec : vec.toNat + 12 ≤ 2 ^ 32)
     (hroom : len.toNat + k.toNat + 2 ≤ cap.toNat)
     (hptr : ptr.toNat + cap.toNat < 2 ^ 32) (hp : p.toNat + k.toNat ≤ 2 ^ 32) :
     serCode inst mi A
       ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f383 Cg
         (fun args => iprop(⌜args = [.i32 ser, .i32 p, .i32 k]⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗
-          stk n (s.toNat - 48) 48 ∗ n ↦[wms][ 1051817 ] [34] ∗ n ↦[wms][ 1061856 ] esc ∗
+          stk n (s.toNat - 48) 48 ∗ n ↦[wms][ 1051817 ] [34] ∗ n ↦[wms][ 1061808 + lo ] List.replicate m 0 ∗
           n ↦[i32][ ser.toNat ] vec ∗
           n ↦[i32][ vec.toNat ] ptr ∗ n ↦[i32][ vec.toNat + 4 ] cap ∗ n ↦[i32][ vec.toNat + 8 ] len ∗
           n ↦[wms][ ptr.toNat + len.toNat ] ob ∗ n ↦[wms][ p.toNat ] ds))
         (fun _ => cost383 k.toNat * cfg.regularOpCost)
         (fun _ rs => iprop(⌜rs = [.i32 0]⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗
-          stk n (s.toNat - 48) 48 ∗ n ↦[wms][ 1051817 ] [34] ∗ n ↦[wms][ 1061856 ] esc ∗
+          stk n (s.toNat - 48) 48 ∗ n ↦[wms][ 1051817 ] [34] ∗ n ↦[wms][ 1061808 + lo ] List.replicate m 0 ∗
           n ↦[i32][ ser.toNat ] vec ∗
           n ↦[i32][ vec.toNat ] ptr ∗ n ↦[i32][ vec.toNat + 4 ] cap ∗ n ↦[i32][ vec.toNat + 8 ] (len + k + 2) ∗
           n ↦[wms][ ptr.toNat + len.toNat ] ([34] ++ ds ++ [34]) ∗ n ↦[wms][ p.toNat ] ds)) := by
   iintro #Hk
-  ihave #S344 := f344_digits (GF := GF) cfg lim (d + 1) types[48]! (by rfl) inst mi A n g ta hm (by omega) Cg
-    gt s ser ser vec ptr cap len p k ob ds hs hob hds hk0 hdig hser hvec hroom hptr hp $$ Hk
+  ihave #S344 := f344_esc (GF := GF) cfg lim (d + 1) types[48]! (by rfl) inst mi A n g ta hm (by omega) Cg
+    gt s ser ser vec ptr cap len p k ob ds hs hob hds hk0 lo m hdig hser hvec hroom hptr hp $$ Hk
   iunfold serCode at Hk
   icases Hk with ⟨#He, -, #H344, #H367⟩
   iunfold escCode at He
@@ -708,5 +723,85 @@ theorem f383_digits (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : Func
   ipureintro; simp [htype]
 
 end L383
+
+/-! ## On decimal digits (the `ESCAPE` entries of `'0'..'9'`, `esc` at 1061856) -/
+
+section Digits
+
+variable {GF : BundledGFunctors} [WasmGS NearState GF]
+
+/-- `f346_esc` on decimal digits. -/
+theorem f346_digits (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
+    (htype : type.results.length = 1) (inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (n g ta : Nat)
+    (hm : IfaceMod mi A n g ta) (hd : d + 6 < lim.maxCallDepth) (Cg : Nat)
+    (gt : GlobalType) (s ser ser1 vec ptr cap len p k : UInt32) (ob ds : List UInt8) (hs : 48 ≤ s.toNat)
+    (hob : ob.length = k.toNat) (hds : ds.length = k.toNat) (hk0 : 0 < k.toNat) (hdig : AllDigits ds)
+    (hser : ser.toNat + 4 ≤ 2 ^ 32) (hvec : vec.toNat + 12 ≤ 2 ^ 32) (hroom : len.toNat + k.toNat ≤ cap.toNat)
+    (hptr : ptr.toNat + cap.toNat < 2 ^ 32) (hp : p.toNat + k.toNat ≤ 2 ^ 32) :
+    escCode inst mi A
+      ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f346 Cg
+        (fun args => iprop(⌜args = [.i32 ser, .i32 ser1, .i32 p, .i32 k]⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗
+          stk n (s.toNat - 48) 48 ∗ n ↦[wms][ 1061856 ] esc ∗ n ↦[i32][ ser.toNat ] vec ∗
+          n ↦[i32][ vec.toNat ] ptr ∗ n ↦[i32][ vec.toNat + 4 ] cap ∗ n ↦[i32][ vec.toNat + 8 ] len ∗
+          n ↦[wms][ ptr.toNat + len.toNat ] ob ∗ n ↦[wms][ p.toNat ] ds))
+        (fun _ => (265 + 32 * k.toNat) * cfg.regularOpCost + MemCpy.cost k.toNat * cfg.regularOpCost)
+        (fun _ rs => iprop(⌜rs = [.i64 3]⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗
+          stk n (s.toNat - 48) 48 ∗ n ↦[wms][ 1061856 ] esc ∗ n ↦[i32][ ser.toNat ] vec ∗
+          n ↦[i32][ vec.toNat ] ptr ∗ n ↦[i32][ vec.toNat + 4 ] cap ∗ n ↦[i32][ vec.toNat + 8 ] (len + k) ∗
+          n ↦[wms][ ptr.toNat + len.toNat ] ds ∗ n ↦[wms][ p.toNat ] ds)) :=
+  f346_esc cfg lim d type htype inst mi A n g ta hm hd Cg gt s ser ser1 vec ptr cap len p k ob ds hs hob hds hk0 48 10
+    (inRange_of_digits hdig) hser hvec hroom hptr hp
+
+/-- `f344_esc` on decimal digits. -/
+theorem f344_digits (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
+    (htype : type.results.length = 1) (inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (n g ta : Nat)
+    (hm : IfaceMod mi A n g ta) (hd : d + 7 < lim.maxCallDepth) (Cg : Nat)
+    (gt : GlobalType) (s ser ser1 vec ptr cap len p k : UInt32) (ob ds : List UInt8) (hs : 48 ≤ s.toNat)
+    (hob : ob.length = k.toNat + 2) (hds : ds.length = k.toNat) (hk0 : 0 < k.toNat) (hdig : AllDigits ds)
+    (hser : ser.toNat + 4 ≤ 2 ^ 32) (hvec : vec.toNat + 12 ≤ 2 ^ 32)
+    (hroom : len.toNat + k.toNat + 2 ≤ cap.toNat)
+    (hptr : ptr.toNat + cap.toNat < 2 ^ 32) (hp : p.toNat + k.toNat ≤ 2 ^ 32) :
+    serCode inst mi A
+      ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f344 Cg
+        (fun args => iprop(⌜args = [.i32 ser, .i32 ser1, .i32 p, .i32 k]⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗
+          stk n (s.toNat - 48) 48 ∗ n ↦[wms][ 1051817 ] [34] ∗ n ↦[wms][ 1061856 ] esc ∗
+          n ↦[i32][ ser.toNat ] vec ∗
+          n ↦[i32][ vec.toNat ] ptr ∗ n ↦[i32][ vec.toNat + 4 ] cap ∗ n ↦[i32][ vec.toNat + 8 ] len ∗
+          n ↦[wms][ ptr.toNat + len.toNat ] ob ∗ n ↦[wms][ p.toNat ] ds))
+        (fun _ => cost344 k.toNat * cfg.regularOpCost)
+        (fun _ rs => iprop(⌜rs = [.i64 3]⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗
+          stk n (s.toNat - 48) 48 ∗ n ↦[wms][ 1051817 ] [34] ∗ n ↦[wms][ 1061856 ] esc ∗
+          n ↦[i32][ ser.toNat ] vec ∗
+          n ↦[i32][ vec.toNat ] ptr ∗ n ↦[i32][ vec.toNat + 4 ] cap ∗ n ↦[i32][ vec.toNat + 8 ] (len + k + 2) ∗
+          n ↦[wms][ ptr.toNat + len.toNat ] ([34] ++ ds ++ [34]) ∗ n ↦[wms][ p.toNat ] ds)) :=
+  f344_esc cfg lim d type htype inst mi A n g ta hm hd Cg gt s ser ser1 vec ptr cap len p k ob ds hs hob hds hk0 48 10
+    (inRange_of_digits hdig) hser hvec hroom hptr hp
+
+/-- `f383_esc` on decimal digits. -/
+theorem f383_digits (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
+    (htype : type.results.length = 1) (inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (n g ta : Nat)
+    (hm : IfaceMod mi A n g ta) (hd : d + 8 < lim.maxCallDepth) (Cg : Nat)
+    (gt : GlobalType) (s ser vec ptr cap len p k : UInt32) (ob ds : List UInt8) (hs : 48 ≤ s.toNat)
+    (hob : ob.length = k.toNat + 2) (hds : ds.length = k.toNat) (hk0 : 0 < k.toNat) (hdig : AllDigits ds)
+    (hser : ser.toNat + 4 ≤ 2 ^ 32) (hvec : vec.toNat + 12 ≤ 2 ^ 32)
+    (hroom : len.toNat + k.toNat + 2 ≤ cap.toNat)
+    (hptr : ptr.toNat + cap.toNat < 2 ^ 32) (hp : p.toNat + k.toNat ≤ 2 ^ 32) :
+    serCode inst mi A
+      ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f383 Cg
+        (fun args => iprop(⌜args = [.i32 ser, .i32 p, .i32 k]⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗
+          stk n (s.toNat - 48) 48 ∗ n ↦[wms][ 1051817 ] [34] ∗ n ↦[wms][ 1061856 ] esc ∗
+          n ↦[i32][ ser.toNat ] vec ∗
+          n ↦[i32][ vec.toNat ] ptr ∗ n ↦[i32][ vec.toNat + 4 ] cap ∗ n ↦[i32][ vec.toNat + 8 ] len ∗
+          n ↦[wms][ ptr.toNat + len.toNat ] ob ∗ n ↦[wms][ p.toNat ] ds))
+        (fun _ => cost383 k.toNat * cfg.regularOpCost)
+        (fun _ rs => iprop(⌜rs = [.i32 0]⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗
+          stk n (s.toNat - 48) 48 ∗ n ↦[wms][ 1051817 ] [34] ∗ n ↦[wms][ 1061856 ] esc ∗
+          n ↦[i32][ ser.toNat ] vec ∗
+          n ↦[i32][ vec.toNat ] ptr ∗ n ↦[i32][ vec.toNat + 4 ] cap ∗ n ↦[i32][ vec.toNat + 8 ] (len + k + 2) ∗
+          n ↦[wms][ ptr.toNat + len.toNat ] ([34] ++ ds ++ [34]) ∗ n ↦[wms][ p.toNat ] ds)) :=
+  f383_esc cfg lim d type htype inst mi A n g ta hm hd Cg gt s ser vec ptr cap len p k ob ds hs hob hds hk0 48 10
+    (inRange_of_digits hdig) hser hvec hroom hptr hp
+
+end Digits
 
 end WNear.Binary.SerializeStr

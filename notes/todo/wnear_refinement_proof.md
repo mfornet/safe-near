@@ -531,6 +531,8 @@ The remaining 14 methods, roughly in order of size: the views; `new`,
 `ft_transfer_call` and `ft_resolve_transfer` (promises, prepaid gas
 arithmetic, promise results). A `refinement-stress` round before each.
 
+*`storage_balance_bounds` (306) is done* (`storageBalanceBounds_refines_all`, `Bridge/Methods/StorageBalanceBoundsRefines.lean`, standard axioms only; on an uninitialized contract the `PanicOnDefault` panic). It returns `{"min":"N","max":"N"}` through `serde_json`'s struct serializer (108), proved on a generic output `Vec` (`SerdeStruct.outV`) with reusable pieces: `write_all` (`wa_out`), one-byte punctuation (`piece_out`, `pieceFn`), strings in a zero chunk of `ESCAPE` (`str_out`, `SerializeStr.f383_esc`), the first and later keys of a struct (`keyFirst_out`, `keyRest_out`, `keyFn`), a `U128` value into a non-empty `Vec` (`f385_out`), the `U128` and `Option<U128>` fields (`f384_first`, `f109_some`), the struct end (`f106_end`). The second `to_string` allocates on a free list of three cells (`costAllocF cfg 3`). The body (`StorageBalanceBoundsBody`: a 128-byte frame) copies `FtTotalSupply.segA`, `U128View.segCG` and `segBNoneG` for its offsets. Left: the code size, `CostsV86` and `LimitsV86` (M9).
+
 ### M9. Closing
 
 `refines_wnear_exported` assembled; `hcode` and `hprotocol` discharged;
