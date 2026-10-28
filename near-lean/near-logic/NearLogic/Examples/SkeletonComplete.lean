@@ -33,7 +33,7 @@ theorem get_boundary (size : Nat) (codeOf : Near.Bytes → Near.ContractCode) (r
     (hrep : (skelModel size).Represents raw st) (hwf : ctx.WF raw) (hm : ctx.method = "get") :
     let r := Near.Boundary.execOn (skelCode size codeOf) raw.toList ctx
     Matches (skelModel size) ctx raw r ((skelModel size).step ctx st ()) ∨
-      (r.outcome = .error .outOfGas ∧ RolledBack ctx raw r ∧ r.logs = []) := by
+      (ResourceFailure r ∧ RolledBack ctx raw r ∧ r.logs = []) := by
   have hraw := raw_empty hrep
   subst hraw
   have hlist : (∅ : RawStorage).toList = [] := Finset.toList_empty
@@ -43,11 +43,15 @@ theorem get_boundary (size : Nat) (codeOf : Near.Bytes → Near.ContractCode) (r
     (by simp [VMContext.toNearState, withinLimit, hp.ret]) with
     ⟨e, hge, ha, -, hrec, hl⟩ | ⟨ha, hrd, hrec, hdist, hl, hb, hsu, hs⟩
   · right
-    have hobs : (Near.Boundary.execOn (skelCode size codeOf) [] ctx).outcome = .error .outOfGas := by
-      simp only [Near.Boundary.execOn, skelCode, hm, Near.Boundary.observe, ha]
-      rcases hge with rfl | rfl <;> rfl
+    have hobs : ResourceFailure (Near.Boundary.execOn (skelCode size codeOf) [] ctx) := by
+      simp only [ResourceFailure, Near.Boundary.execOn, skelCode, hm, Near.Boundary.observe, ha]
+      rcases hge with rfl | rfl | ⟨n, rfl⟩
+      · exact Or.inl rfl
+      · exact Or.inl rfl
+      · exact Or.inr rfl
     refine ⟨hobs, ?_, ?_⟩
-    · have := Near.Boundary.execOn_rolledBack (skelCode size codeOf) [] ctx hobs
+    · have := hobs.elim (Near.Boundary.execOn_rolledBack (skelCode size codeOf) [] ctx)
+        (Near.Boundary.execOn_rolledBack (skelCode size codeOf) [] ctx)
       simpa using this
     · simp only [Near.Boundary.execOn, skelCode, hm, Near.Boundary.observe, ha]
       exact hl
@@ -87,12 +91,12 @@ theorem skel_refines (size : Nat) (codeOf : Near.Bytes → Near.ContractCode) (p
         split at hmt
         · have := hmt.1; rw [h] at this; cases this
         · have := hmt.1; rw [h] at this; cases this
-      · rw [h] at ho; cases ho
+      · rcases ho with ho | ho <;> rw [h] at ho <;> cases ho
     · intro c _
       refine ⟨fun hgas _ => get_enough size codeOf raw st ctx hp hrep hwf hm hgas, ?_⟩
       rcases hb with hmt | ⟨ho, hrb, hl⟩
       · exact Or.inl hmt
-      · exact Or.inr ⟨Or.inl ho, hrb, by rw [hl]; exact List.nil_prefix⟩
+      · exact Or.inr ⟨ho, hrb, by rw [hl]; exact List.nil_prefix⟩
     · intro hn
       exact absurd ⟨(), hm⟩ hn
   · refine ⟨(Near.Boundary.nearRuntime_not_exported _ raw ctx rfl rfl (exportFunc_skel hm)).2,

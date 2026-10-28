@@ -19,16 +19,19 @@ open NearInterface ContractModel in
 theorem ftTotalSupply_refines_v86' (cfg : WNear.Config) (size : Nat) (codeOf : List UInt8 → Near.ContractCode)
     (raw : RawStorage) (st : Option WNear.State) (ctx : Context) (S : WNear.State)
     (hp : WProtocol ctx.protocol) (hwf : ctx.WF raw) (hrep : (WNear.wnear cfg).Represents raw st)
-    (hm : ctx.method = "ft_total_supply") (hpre : pre S (erase (hostOf ctx raw)))
+    (hm : ctx.method = "ft_total_supply")
+    (hpre : ctx.ProofRoom ((WNear.wnear cfg).proofBound ctx st .ftTotalSupply) → pre S (erase (hostOf ctx raw)))
+    (hpreP : pre S (eraseP (hostOf ctx raw)))
     (hc : CostsV86 ctx.protocol) (hsize : size ≤ 185625) :
     let r := Near.Boundary.nearRuntime.exec (wCode size codeOf) raw ctx
     let res := (WNear.wnear cfg).step ctx st .ftTotalSupply
     (∀ msg, r.outcome ≠ .error (.executionIssue msg)) ∧
     ((WNear.wnear cfg).gas ctx st .ftTotalSupply ≤ ctx.gasLimit →
+      ctx.ProofRoom ((WNear.wnear cfg).proofBound ctx st .ftTotalSupply) →
       Matches (WNear.wnear cfg) ctx raw r res ∧ r.usedGas ≤ (WNear.wnear cfg).gas ctx st .ftTotalSupply) ∧
     (Matches (WNear.wnear cfg) ctx raw r res ∨
-      (r.outcome = .error .outOfGas ∧ RolledBack ctx raw r ∧ r.logs <+: res.logs)) :=
+      (ResourceFailure r ∧ RolledBack ctx raw r ∧ r.logs <+: res.logs)) :=
   ftTotalSupply_refines_v86 cfg size codeOf raw st ctx S 0
-    (ToVecTwo.toVecAfterFree_zero ctx.protocol.wasm execLimits) hp hwf hrep hm hpre hc hsize (Nat.zero_le _)
+    (ToVecTwo.toVecAfterFree_zero ctx.protocol.wasm execLimits) hp hwf hrep hm hpre hpreP hc hsize (Nat.zero_le _)
 
 end WNear.Binary.FtTotalSupplyMethod

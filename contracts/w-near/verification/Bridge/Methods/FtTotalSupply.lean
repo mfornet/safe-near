@@ -339,34 +339,46 @@ open NearInterface ContractModel in
 /-- **The clauses of `Refines` for a call to `ft_total_supply`** (function 296), from
 `ftTotalSupply_runs`, against the model's step. Hypotheses not discharged here: `H96` (`to_vec`
 on a two-cell free list: the allocator's general walk), `hpre` (the host reads the model state
-`S`: `ReadOk`, with the recorded proof's room for the lookup (`ProofBudget`), the trie link and canonical trie, no zero-hash
-witness, no pending write to `STATE`, the key/register/return limits), `hag` (the model's step
-agrees with every final host: the return data `supplyJson S`, storage, balance, usage, logs),
+`S`: `ReadOk`, with the recorded proof's room for the lookup (`ProofBudget`) when the context has
+room for the model's bound, the trie link and canonical trie, no zero-hash witness, no pending
+write to `STATE`, the key/register/return limits), `hpreP` (the same of the host recording no
+proof), `hag`, `hagP` (the model's step agrees with every final host: the return data
+`supplyJson S`, storage, balance, usage, logs),
 `hbound` (the gas bound covers loading and `cost`). -/
 theorem ftTotalSupply_refines (M : ContractModel) (size : Nat) (codeOf : List UInt8 → Near.ContractCode)
     (raw : RawStorage) (st : Option M.State) (ctx : Context) (c : M.Call) (S : WNear.State) (x96 : Nat)
     (H96 : ToVecAfterFree ctx.protocol.wasm execLimits x96) (hp : WProtocol ctx.protocol) (hwf : ctx.WF raw)
-    (hm : ctx.method = "ft_total_supply") (hpre : pre S (erase (hostOf ctx raw)))
+    (hm : ctx.method = "ft_total_supply")
+    (hpre : ctx.ProofRoom (M.proofBound ctx st c) → pre S (erase (hostOf ctx raw)))
+    (hpreP : pre S (eraseP (hostOf ctx raw)))
     (hag : ∀ e, post S (erase (hostOf ctx raw)) e → AgreesWith M ctx raw e (M.step ctx st c))
+    (hagP : ∀ e, post S (eraseP (hostOf ctx raw)) e → AgreesWith M ctx raw e (M.step ctx st c))
     (hbound : chargesUse (hostOf ctx raw) (loadingCharges size) + cost ctx.protocol S x96 (erase (hostOf ctx raw)) ≤
       M.gas ctx st c) :
     let r := Near.Boundary.nearRuntime.exec (wCode size codeOf) raw ctx
     let res := M.step ctx st c
     (∀ msg, r.outcome ≠ .error (.executionIssue msg)) ∧
-    (M.gas ctx st c ≤ ctx.gasLimit → Matches M ctx raw r res ∧ r.usedGas ≤ M.gas ctx st c) ∧
+    (M.gas ctx st c ≤ ctx.gasLimit → ctx.ProofRoom (M.proofBound ctx st c) →
+      Matches M ctx raw r res ∧ r.usedGas ≤ M.gas ctx st c) ∧
     (Matches M ctx raw r res ∨
-      (r.outcome = .error .outOfGas ∧ RolledBack ctx raw r ∧ r.logs <+: res.logs)) :=
+      (ResourceFailure r ∧ RolledBack ctx raw r ∧ r.logs <+: res.logs)) :=
   method_refines_callR M size codeOf raw st ctx c (pre S) (cost ctx.protocol S x96) (post S) hp hwf
     (by rw [hm]; decide) (by rw [hm]; exact export_296) funcType_296 (by decide) (by decide)
-    (ftTotalSupply_runs ctx.protocol S x96 H96) hpre (fun _ he => post_noPromises he ⟨rfl, rfl, rfl⟩) hag hbound
+    (ftTotalSupply_runs ctx.protocol S x96 H96) hpre hpreP
+    (fun e he => post_noPromises (e := erase (hostOf ctx raw)) he ⟨rfl, rfl, rfl⟩)
+    (fun e he => post_noPromises (e := eraseP (hostOf ctx raw)) he ⟨rfl, rfl, rfl⟩) hag hagP hbound
 
 open NearInterface ContractModel in
 /-- `ftTotalSupply_refines` for the wNEAR model's step `(wnear cfg).step ctx st .ftTotalSupply`. -/
 theorem ftTotalSupply_refines_wnear (cfg : WNear.Config) (size : Nat) (codeOf : List UInt8 → Near.ContractCode)
     (raw : RawStorage) (st : Option WNear.State) (ctx : Context) (S : WNear.State) (x96 : Nat)
     (H96 : ToVecAfterFree ctx.protocol.wasm execLimits x96) (hp : WProtocol ctx.protocol) (hwf : ctx.WF raw)
-    (hm : ctx.method = "ft_total_supply") (hpre : pre S (erase (hostOf ctx raw)))
+    (hm : ctx.method = "ft_total_supply")
+    (hpre : ctx.ProofRoom ((WNear.wnear cfg).proofBound ctx st .ftTotalSupply) → pre S (erase (hostOf ctx raw)))
+    (hpreP : pre S (eraseP (hostOf ctx raw)))
     (hag : ∀ e, post S (erase (hostOf ctx raw)) e →
+      AgreesWith (WNear.wnear cfg) ctx raw e ((WNear.wnear cfg).step ctx st .ftTotalSupply))
+    (hagP : ∀ e, post S (eraseP (hostOf ctx raw)) e →
       AgreesWith (WNear.wnear cfg) ctx raw e ((WNear.wnear cfg).step ctx st .ftTotalSupply))
     (hbound : chargesUse (hostOf ctx raw) (loadingCharges size) + cost ctx.protocol S x96 (erase (hostOf ctx raw)) ≤
       (WNear.wnear cfg).gas ctx st .ftTotalSupply) :
@@ -374,9 +386,11 @@ theorem ftTotalSupply_refines_wnear (cfg : WNear.Config) (size : Nat) (codeOf : 
     let res := (WNear.wnear cfg).step ctx st .ftTotalSupply
     (∀ msg, r.outcome ≠ .error (.executionIssue msg)) ∧
     ((WNear.wnear cfg).gas ctx st .ftTotalSupply ≤ ctx.gasLimit →
+      ctx.ProofRoom ((WNear.wnear cfg).proofBound ctx st .ftTotalSupply) →
       Matches (WNear.wnear cfg) ctx raw r res ∧ r.usedGas ≤ (WNear.wnear cfg).gas ctx st .ftTotalSupply) ∧
     (Matches (WNear.wnear cfg) ctx raw r res ∨
-      (r.outcome = .error .outOfGas ∧ RolledBack ctx raw r ∧ r.logs <+: res.logs)) :=
-  ftTotalSupply_refines (WNear.wnear cfg) size codeOf raw st ctx .ftTotalSupply S x96 H96 hp hwf hm hpre hag hbound
+      (ResourceFailure r ∧ RolledBack ctx raw r ∧ r.logs <+: res.logs)) :=
+  ftTotalSupply_refines (WNear.wnear cfg) size codeOf raw st ctx .ftTotalSupply S x96 H96 hp hwf hm hpre hpreP
+    hag hagP hbound
 
 end WNear.Binary.FtTotalSupplyMethod

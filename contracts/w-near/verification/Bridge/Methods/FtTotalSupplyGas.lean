@@ -234,12 +234,12 @@ structure CostsV86 (p : RuntimeConfig) : Prop where
 
 open NearInterface FtTotalSupply FtTotalSupplyMethod in
 theorem hbound_wnear (cfg : WNear.Config) (ctx : Context) (raw : RawStorage) (st : Option WNear.State)
-    (S : WNear.State) (x96 size : Nat) (hpre : pre S (erase (hostOf ctx raw))) (hc : CostsV86 ctx.protocol)
+    (S : WNear.State) (x96 size : Nat)
+    (hval : (hostOf ctx raw).storage WNear.stateKey = some (WNear.header S)) (hc : CostsV86 ctx.protocol)
     (hsize : size ≤ 185625) (hx : x96 ≤ 3 * 10 ^ 12) :
     chargesUse (hostOf ctx raw) (loadingCharges size) + FtTotalSupplyMethod.cost ctx.protocol S x96 (erase (hostOf ctx raw)) ≤
       (WNear.wnear cfg).gas ctx st .ftTotalSupply := by
-  obtain ⟨rs, hr⟩ := hpre
-  have hcost := cost_le ctx.protocol (erase (hostOf ctx raw)) S x96 hr.value
+  have hcost := cost_le ctx.protocol (erase (hostOf ctx raw)) S x96 hval
   have htrie := trie_le ctx raw
   have hn := supplyJson_length S
   have hdata := dataGas_le ctx raw _ hn
@@ -270,22 +270,27 @@ open NearInterface ContractModel in
 /-- **`ft_total_supply` refines the model** (the clauses of `Refines` for a call to it), with the
 model's side discharged: `hag` from `Represents` (`hag_wnear`), `hbound` from the protocol-86 cost
 parameters (`hbound_wnear`). Left: `H96` (`to_vec` on a two-cell free list, and its extra cost
-`x96 ≤ 3·10^12`), `hpre` (the host reads `S`: the storage premises of `storage_read`), the code
-size, and `CostsV86`. -/
+`x96 ≤ 3·10^12`), `hpre` (the host reads `S`: the storage premises of `storage_read`, with room in
+the recorded proof when the context has room for the model's bound), `hpreP` (the same of the host
+recording no proof), the code size, and `CostsV86`. -/
 theorem ftTotalSupply_refines_v86 (cfg : WNear.Config) (size : Nat) (codeOf : List UInt8 → Near.ContractCode)
     (raw : RawStorage) (st : Option WNear.State) (ctx : Context) (S : WNear.State) (x96 : Nat)
     (H96 : FtTotalSupply.ToVecAfterFree ctx.protocol.wasm execLimits x96) (hp : WProtocol ctx.protocol)
     (hwf : ctx.WF raw) (hrep : (WNear.wnear cfg).Represents raw st)
-    (hm : ctx.method = "ft_total_supply") (hpre : pre S (erase (hostOf ctx raw)))
-    (hc : CostsV86 ctx.protocol) (hsize : size ≤ 185625) (hx : x96 ≤ 3 * 10 ^ 12) :
+    (hm : ctx.method = "ft_total_supply")
+    (hpre : ctx.ProofRoom ((WNear.wnear cfg).proofBound ctx st .ftTotalSupply) → pre S (erase (hostOf ctx raw)))
+    (hpreP : pre S (eraseP (hostOf ctx raw))) (hc : CostsV86 ctx.protocol) (hsize : size ≤ 185625) (hx : x96 ≤ 3 * 10 ^ 12) :
     let r := Near.Boundary.nearRuntime.exec (wCode size codeOf) raw ctx
     let res := (WNear.wnear cfg).step ctx st .ftTotalSupply
     (∀ msg, r.outcome ≠ .error (.executionIssue msg)) ∧
     ((WNear.wnear cfg).gas ctx st .ftTotalSupply ≤ ctx.gasLimit →
+      ctx.ProofRoom ((WNear.wnear cfg).proofBound ctx st .ftTotalSupply) →
       Matches (WNear.wnear cfg) ctx raw r res ∧ r.usedGas ≤ (WNear.wnear cfg).gas ctx st .ftTotalSupply) ∧
     (Matches (WNear.wnear cfg) ctx raw r res ∨
-      (r.outcome = .error .outOfGas ∧ RolledBack ctx raw r ∧ r.logs <+: res.logs)) :=
-  ftTotalSupply_refines_wnear cfg size codeOf raw st ctx S x96 H96 hp hwf hm hpre
-    (hag_wnear cfg ctx raw st S hrep hwf hpre) (hbound_wnear cfg ctx raw st S x96 size hpre hc hsize hx)
+      (ResourceFailure r ∧ RolledBack ctx raw r ∧ r.logs <+: res.logs)) :=
+  have hval : (hostOf ctx raw).storage WNear.stateKey = some (WNear.header S) := hpreP.choose_spec.value
+  ftTotalSupply_refines_wnear cfg size codeOf raw st ctx S x96 H96 hp hwf hm hpre hpreP
+    (hag_wnear cfg ctx raw st S hrep hwf hval _ rfl) (hag_wnear cfg ctx raw st S hrep hwf hval _ rfl)
+    (hbound_wnear cfg ctx raw st S x96 size hval hc hsize hx)
 
 end WNear.Binary.FtTotalSupplyMethod

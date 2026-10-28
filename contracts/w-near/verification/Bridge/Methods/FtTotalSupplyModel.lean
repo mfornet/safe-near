@@ -201,17 +201,18 @@ theorem post_returnData {S : WNear.State} {h0 e : NearState} (hp : post S h0 e) 
 
 open WNear in
 /-- **`hag` for `ft_total_supply`.** For a storage that represents `st` (`Represents`) in a well
-formed context, and a host that reads `S` (`pre`), the model's step agrees with every final host
-`post` allows: the return data is the JSON of the total supply, storage, balance and usage are
+formed context, where `STATE` holds `S`, the model's step agrees with every final host `post`
+allows from the initial host `h0` (up to gas and the recorded proof): the return data is the JSON of the total supply, storage, balance and usage are
 unchanged, no logs, and the storage-stake check decides success or failure the same way. -/
 theorem hag_wnear (cfg : WNear.Config) (ctx : Context) (raw : RawStorage) (st : Option WNear.State)
     (S : WNear.State) (hrep : (wnear cfg).Represents raw st) (hwf : ctx.WF raw)
-    (hpre : pre S (erase (hostOf ctx raw))) :
-    ∀ e, post S (erase (hostOf ctx raw)) e →
+    (hval : (hostOf ctx raw).storage WNear.stateKey = some (WNear.header S))
+    (h0 : NearState) (hh0 : eraseP h0 = eraseP (hostOf ctx raw)) :
+    ∀ e, post S h0 e →
       AgreesWith (wnear cfg) ctx raw e ((wnear cfg).step ctx st .ftTotalSupply) := by
   intro e hp
-  obtain ⟨rs, hr⟩ := hpre
-  have hval : (hostOf ctx raw).storage WNear.stateKey = some (WNear.header S) := hr.value
+  have hf : ∀ {α : Type} (f : NearState → α), (∀ x, f (eraseP x) = f x) → f h0 = f (hostOf ctx raw) :=
+    fun f hfe => eraseP_field hh0 f hfe
   -- the represented state
   cases st with
   | none =>
@@ -225,19 +226,24 @@ theorem hag_wnear (cfg : WNear.Config) (ctx : Context) (raw : RawStorage) (st : 
     have hhd : WNear.header S = WNear.header S' := mem_encode_state hmem
     -- the final host's fields
     have hbal : e.context.accountBalance = ctx.balance + ctx.attached :=
-      post_field (fun x => x.context.accountBalance) (fun _ => rfl) (fun _ _ => rfl) (fun _ _ _ => rfl)
-        (fun _ _ => rfl) hp
+      (post_field (fun x => x.context.accountBalance) (fun _ => rfl) (fun _ _ => rfl) (fun _ _ _ => rfl)
+        (fun _ _ => rfl) hp).trans
+        (hf (fun x => x.context.accountBalance) fun _ => rfl)
     have hsu : e.context.storageUsage = UInt64.ofNat ctx.storageUsage :=
-      post_field (fun x => x.context.storageUsage) (fun _ => rfl) (fun _ _ => rfl) (fun _ _ _ => rfl)
-        (fun _ _ => rfl) hp
-    have hsto : e.storage = (erase (hostOf ctx raw)).storage :=
-      post_field NearState.storage (fun _ => rfl) (fun _ _ => rfl) (fun _ _ _ => rfl) (fun _ _ => rfl) hp
-    have hkeys : e.storageKeys = (erase (hostOf ctx raw)).storageKeys :=
-      post_field NearState.storageKeys (fun _ => rfl) (fun _ _ => rfl) (fun _ _ _ => rfl) (fun _ _ => rfl) hp
+      (post_field (fun x => x.context.storageUsage) (fun _ => rfl) (fun _ _ => rfl) (fun _ _ _ => rfl)
+        (fun _ _ => rfl) hp).trans
+        (hf (fun x => x.context.storageUsage) fun _ => rfl)
+    have hsto : e.storage = (hostOf ctx raw).storage :=
+      (post_field NearState.storage (fun _ => rfl) (fun _ _ => rfl) (fun _ _ _ => rfl) (fun _ _ => rfl) hp).trans
+        (hf NearState.storage fun _ => rfl)
+    have hkeys : e.storageKeys = (hostOf ctx raw).storageKeys :=
+      (post_field NearState.storageKeys (fun _ => rfl) (fun _ _ => rfl) (fun _ _ _ => rfl) (fun _ _ => rfl) hp).trans
+        (hf NearState.storageKeys fun _ => rfl)
     have hlogs : e.logs = [] :=
-      post_field NearState.logs (fun _ => rfl) (fun _ _ => rfl) (fun _ _ _ => rfl) (fun _ _ => rfl) hp
+      (post_field NearState.logs (fun _ => rfl) (fun _ _ => rfl) (fun _ _ _ => rfl) (fun _ _ => rfl) hp).trans
+        (hf NearState.logs fun _ => rfl)
     have hfin : finalStorage e = finalStorage (hostOf ctx raw) := by
-      simp only [finalStorage, hsto, hkeys]; rfl
+      simp only [finalStorage, hsto, hkeys]
     have hroom := hwf.usage_room
     have hge := hwf.usage_ge
     have hsuN : e.context.storageUsage.toNat = ctx.storageUsage := by

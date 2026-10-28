@@ -31,6 +31,18 @@ abbrev gasLoc : Loc := (10, 0, 0)
 def erase (h : NearState) : NearState :=
   { h with gas := {}, gasProfile := {}, actionProfile := [], context := { h.context with usedGas := 0 } }
 
+/-- The host up to gas and the recorded proof: what a run with the gas limits
+raised (`relax`, which records no proof) keeps of the original. -/
+def eraseP (h : NearState) : NearState := { erase h with storageProofSize := none }
+
+theorem eraseP_of_erase {h h' : NearState} (he : erase h = erase h') : eraseP h = eraseP h' := by
+  unfold eraseP
+  rw [he]
+
+theorem eraseP_field {α : Type} {h h' : NearState} (he : eraseP h = eraseP h') (f : NearState → α)
+    (hf : ∀ x, f (eraseP x) = f x) : f h = f h' := by
+  rw [← hf h, ← hf h', he]
+
 /-- The gas cell: a host state holding only a counter and the two profiles. -/
 def gasCellOf (g : Near.GasCounter) (p : Near.GasProfile) (a : List (String × Nat)) : Cell NearState :=
   .host { (default : NearState) with gas := g, gasProfile := p, actionProfile := a }

@@ -5,8 +5,8 @@ import NearLogic.Hosts.RelaxFns
 
 `prepareStorageCallAux` (nearcore's external storage phase) touches the gas
 counter only by billing charges, so under raised limits it runs the same,
-with the limits raised, unless a bill fails under the lower limits
-(`prepareStorageCallAux_relax`). The proof walks both runs in step: the
+with the limits raised, unless a bill fails under the lower limits or the lower run's recorded
+proof passes its limit (the raised run records none; `rec_case`) (`prepareStorageCallAux_relax`). The proof walks both runs in step: the
 raised host is kept folded as `relax H p m` (`relax_*`, `fold_acc`), and
 each bill of the raised run is matched with the lower run's (`bill_case`).
 -/
@@ -17,7 +17,7 @@ open Wasm Wasm.Near Lean Elab Tactic Meta
 
 theorem relax_storage (h : NearState) (p m : Nat) : (relax h p m).storage = h.storage := rfl
 theorem relax_storageAccounting (h : NearState) (p m : Nat) : (relax h p m).storageAccounting = h.storageAccounting := rfl
-theorem relax_storageProofSize (h : NearState) (p m : Nat) : (relax h p m).storageProofSize = h.storageProofSize := rfl
+theorem relax_storageProofSize (h : NearState) (p m : Nat) : (relax h p m).storageProofSize = none := rfl
 theorem relax_storageReadsFromTrie (h : NearState) (p m : Nat) : (relax h p m).storageReadsFromTrie = h.storageReadsFromTrie := rfl
 theorem relax_storageKeys (h : NearState) (p m : Nat) : (relax h p m).storageKeys = h.storageKeys := rfl
 theorem relax_iterators (h : NearState) (p m : Nat) : (relax h p m).iterators = h.iterators := rfl
@@ -49,7 +49,7 @@ theorem relax_storageLog (h : NearState) (p m : Nat) : (relax h p m).storageLog 
 theorem relax_actionProfile (h : NearState) (p m : Nat) : (relax h p m).actionProfile = h.actionProfile := rfl
 
 theorem fold_acc (h : NearState) (p m : Nat) (x : Option _root_.Near.TrieOverlay.State) :
-    ({ h with storageAccounting := x, gas := (relax h p m).gas } : NearState) =
+    ({ h with storageAccounting := x, gas := (relax h p m).gas, storageProofSize := none } : NearState) =
       relax { h with storageAccounting := x } p m := rfl
 
 theorem fold_store (s : HostStore NearState) (h : NearState) (p m : Nat) :
@@ -59,7 +59,17 @@ theorem getMemOrReg_relaxHost (mem : Memory) (h : NearState) (p m : Nat) (a b : 
     getMemOrReg { mem, host := relax h p m } a b = getMemOrReg { mem, host := h } a b := rfl
 
 theorem recordedStorageError_relax (h : NearState) (p m : Nat) (t : _root_.Near.TrieOverlay.State) :
-    recordedStorageError (relax h p m) t = recordedStorageError h t := rfl
+    recordedStorageError (relax h p m) t = none := rfl
+
+/-- A failed proof-size check reports `RecordedStorageExceeded`. -/
+theorem recordedStorageError_some {h : NearState} {t : _root_.Near.TrieOverlay.State} {e : FunctionCallError}
+    (he : recordedStorageError h t = some e) : ∃ n, e = .hostError (.recordedStorageExceeded n) := by
+  unfold recordedStorageError at he
+  split at he
+  · split at he
+    · cases he; exact ⟨_, rfl⟩
+    · cases he
+  · cases he
 
 /-- The relation between the raised and the lower run of the phase. -/
 def StorageRel (p m : Nat) (x y : HostStore NearState × Option FunctionCallError) : Prop :=
@@ -127,6 +137,24 @@ macro "bill_step" : tactic => `(tactic| (
   | (rw [applyCharges_relax_of (by dsimp only at *; omega) (by dsimp only at *; omega) hb]
      simp only [hb, Option.map_none, Option.isSome_none, Bool.false_eq_true, ite_false, fold_store] at hy ⊢)))
 
+set_option hygiene false in
+/-- Case on the lower run's proof-size check (in `hy`): the raised run records
+nothing, so a failure there is a resource trap of the lower run. -/
+elab "rec_case" : tactic => withMainContext do
+  let some ld := (← getLCtx).findFromUserName? `hy | throwError "rec_case: no hy"
+  let ty ← instantiateMVars ld.type
+  let some e := ty.find? (fun e => e.isAppOfArity ``recordedStorageError 2 && !e.hasLooseBVars)
+    | throwError "rec_case: no check"
+  let es ← Term.exprToSyntax e
+  evalTactic (← `(tactic| obtain ⟨r, hr⟩ : ∃ r, $es = r := ⟨_, rfl⟩))
+  evalTactic (← `(tactic| rw [hr] at hy))
+  evalTactic (← `(tactic| rcases r with _ | r <;> simp only at hy))
+  evalTactic (← `(tactic| on_goal 2 =>
+    (subst hy
+     left
+     obtain ⟨n, rfl⟩ := recordedStorageError_some hr
+     exact ⟨_, rfl, Or.inr (Or.inr ⟨n, rfl⟩)⟩)))
+
 set_option maxHeartbeats 8000000 in
 theorem storageAux_rel (name : String) (before : HostStore NearState) (args : List Value) (p m : Nat)
     (hp : before.host.gas.prepaid ≤ p) (hm : before.host.gas.maxBurnt ≤ m) :
@@ -138,6 +166,7 @@ theorem storageAux_rel (name : String) (before : HostStore NearState) (args : Li
   simp only [fold_store]
   repeat' (first
     | (subst hy; right; rfl)
+    | (rec_case; try relax_norm; try simp only [fold_store] at *)
     | (bill_step; try relax_norm; try simp only [fold_store] at *)
     | (csplit; try relax_norm; try simp only [fold_store] at *))
 

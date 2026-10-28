@@ -19,8 +19,10 @@ needs. Only methods that create no promises (`NoPromises`) are covered.
 
 * `method_fuel`: `run`'s default fuel is enough for any method.
 * `method_vmOutcome`: with enough gas, `run`'s outcome is read from `F`.
-* `method_vm_any`: under any gas, the same outcome or a gas failure whose
-  logs are a prefix of `F`'s.
+* `method_vm_any`: under any gas and any recorded proof, the same outcome or a
+  resource failure (gas, or the recorded proof) whose logs are a prefix of
+  `F`'s. It needs `Pre` only of the host recording no proof (`eraseP`), as
+  the run with raised limits records none.
 * `method_boundary`: both, through `Near.Boundary.execOn`, as the clauses
   of `Refines` for a model step agreeing with `F` (`AgreesWith`).
 -/
@@ -134,14 +136,14 @@ theorem gasFailureUpTo_checkReceipts {o : VMOutcome} {logs : List String} (h : G
   rw [checkReceipts_noReceipts o balance usage storage hr (by rw [hrd]; intro i; simp)]
   exact ⟨e, he, ha, hrd, hr, hl⟩
 
-/-- A run done with the host `e`, up to gas, and no promises. -/
+/-- A run done with the host `e`, up to gas and the recorded proof, and no promises. -/
 theorem outcome_done (ctx : VMContext) (storage : List (List UInt8 × List UInt8)) (s : Store NearState)
-    (e : NearState) (he : erase s.host = erase e) (hn : NoPromises e) :
+    (e : NearState) (he : eraseP s.host = eraseP e) (hn : NoPromises e) :
     let o := (outcomeOfExecution ctx storage (.done [] s) none).checkReceipts ctx.accountBalance
       ctx.storageUsage storage
     Effects o e ∧ o.usedGas = s.host.gas.used ∧ o.burntGas ≤ o.usedGas := by
-  have hf : ∀ {α : Type} (f : NearState → α), (∀ x, f (erase x) = f x) → f s.host = f e :=
-    fun f hfe => erase_field he f hfe
+  have hf : ∀ {α : Type} (f : NearState → α), (∀ x, f (eraseP x) = f x) → f s.host = f e :=
+    fun f hfe => eraseP_field he f hfe
   have hp : s.host.promises = [] := (hf NearState.promises fun _ => rfl).trans hn.promises
   have hr : s.host.returnedPromise = none := (hf NearState.returnedPromise fun _ => rfl).trans hn.returned
   have hw : s.host.gasWeights = [] := (hf NearState.gasWeights fun _ => rfl).trans hn.weights
@@ -194,7 +196,7 @@ theorem method_vmOutcome (cfg : RuntimeConfig) (size : Nat) (method : String) (c
   obtain ⟨s, hs, hhost, hused⟩ := hspec (fuelFor cfg wNearModule ctx) hl Cg (by rw [he1]; exact hpre)
     (by rw [he1, hch.used]; omega) (by rw [hch.maxBurnt]; exact hC1) (by rw [hch.prepaid]; exact hC2) hfuel
   rw [he1] at hhost
-  obtain ⟨heff, hu, hb⟩ := outcome_done ctx storage s _ hhost hnp
+  obtain ⟨heff, hu, hb⟩ := outcome_done ctx storage s _ (eraseP_of_erase hhost) hnp
   simp only [run]
   rw [hrun, hs]
   exact ⟨heff, by rw [hu]; exact hused, hb⟩
@@ -223,8 +225,10 @@ theorem outcome_gasEndL (ctx : VMContext) (storage : List (List UInt8 × List UI
     · simp [outcomeOfExecution, hs, ht]
     · simp [outcomeOfExecution, hs, ht]
 
-/-- **Any gas, at the VM.** The call fails for gas, with logs a prefix of
-`F`'s, or it has the effects it has with enough gas. -/
+/-- **Any gas, at the VM.** The call fails for gas or for the recorded
+proof, with logs a prefix of `F`'s, or it has the effects it has with enough
+gas and no proof recorded. Only the run with the limits raised, which records
+no proof, needs `Pre`. -/
 theorem method_vm_any (cfg : RuntimeConfig) (size : Nat) (method : String) (ctx : VMContext)
     (storage : List (List UInt8 × List UInt8)) {i : Nat} (Pre : NearState → Prop) (cost : NearState → Nat)
     (F : NearState → NearState)
@@ -232,11 +236,11 @@ theorem method_vm_any (cfg : RuntimeConfig) (size : Nat) (method : String) (ctx 
     (hmin : cfg.wasm.limits.initialMemoryPages = 1024) (hmax : cfg.wasm.limits.maxMemoryPages = 2048)
     (hname : method.isEmpty = false) (hexp : wNearModule.exportFunc? method = some i)
     (hft : wNearModule.funcType? i = some { params := [], results := [] }) (h1 : 48 ≤ i) (h2 : i < 955)
-    (hspec : MethodRuns cfg i Pre cost F) (hpre : Pre (erase (ctx.toNearState cfg storage)))
-    (hnp : NoPromises (F (erase (ctx.toNearState cfg storage)))) :
+    (hspec : MethodRuns cfg i Pre cost F) (hpre : Pre (eraseP (ctx.toNearState cfg storage)))
+    (hnp : NoPromises (F (eraseP (ctx.toNearState cfg storage)))) :
     let o := run cfg wNearModule size method ctx storage
-    GasFailureUpTo o (logsOf (F (erase (ctx.toNearState cfg storage)))) ∨
-      Effects o (F (erase (ctx.toNearState cfg storage))) := by
+    GasFailureUpTo o (logsOf (F (eraseP (ctx.toNearState cfg storage)))) ∨
+      Effects o (F (eraseP (ctx.toNearState cfg storage))) := by
   set h0 := ctx.toNearState cfg storage
   set hl := (applyCharges h0 (loadingCharges size)).1
   have he1 : erase hl = erase h0 := applyCharges_erase h0 _
@@ -249,7 +253,7 @@ theorem method_vm_any (cfg : RuntimeConfig) (size : Nat) (method : String) (ctx 
     exact ⟨e, NearLogic.applyCharges_error h0 _ he, rfl, rfl, rfl, List.nil_prefix⟩
   rw [hrun]
   set F0 := fuelFor cfg wNearModule ctx
-  set C := hl.gas.used + cost (erase h0) + hl.gas.prepaid + hl.gas.maxBurnt
+  set C := hl.gas.used + cost (eraseP h0) + hl.gas.prepaid + hl.gas.maxBurnt
   have hfuel0 := method_fuel cfg size ctx storage h1 h2 hpos
   have hlo : runInitialized cfg.wasm (F0 + wFuel cfg.wasm C) (.next (startW cfg hl i)) =
       runInitialized cfg.wasm F0 (.next (startW cfg hl i)) :=
@@ -263,12 +267,12 @@ theorem method_vm_any (cfg : RuntimeConfig) (size : Nat) (method : String) (ctx 
   have hfuelHi := startW_enough_fuel cfg (relax hl C C) h1 h2 hflr hpos
     (fuel := F0 + wFuel cfg.wasm C) (Nat.le_add_left _ _)
   obtain ⟨s', hs', hhost', -⟩ := hspec (F0 + wFuel cfg.wasm C) (relax hl C C) C
-    (by show Pre (erase hl); rw [he1]; exact hpre)
-    (by show hl.gas.used + cost (erase hl) ≤ C; rw [he1]; omega) (Nat.le_refl _) (Nat.le_refl _) hfuelHi
-  have hhost : erase s'.host = erase (F (erase h0)) := by
-    have : erase (relax hl C C) = erase hl := rfl
-    rw [hhost', this, he1]
-  have hlogs' : logsOf s'.host = logsOf (F (erase h0)) := erase_field hhost logsOf fun _ => rfl
+    (by show Pre (eraseP hl); rw [eraseP_of_erase he1]; exact hpre)
+    (by show hl.gas.used + cost (eraseP hl) ≤ C; rw [eraseP_of_erase he1]; omega) (Nat.le_refl _) (Nat.le_refl _) hfuelHi
+  have hhost : erase s'.host = erase (F (eraseP h0)) := by
+    have : erase (relax hl C C) = eraseP hl := rfl
+    rw [hhost', this, eraseP_of_erase he1]
+  have hlogs' : logsOf s'.host = logsOf (F (eraseP h0)) := erase_field hhost logsOf fun _ => rfl
   have hb := method_below cfg (F0 + wFuel cfg.wasm C) hl h1 h2 C (by omega) (by omega)
   simp only at hb
   rw [hlo, hs'] at hb
@@ -293,8 +297,8 @@ theorem method_vm_any (cfg : RuntimeConfig) (size : Nat) (method : String) (ctx 
     | done vs s =>
       simp only [StepResult.relax, StepResult.done.injEq] at hm
       obtain ⟨rfl, hs⟩ := hm
-      have he : erase s.host = erase (F (erase h0)) := by
-        rw [← hhost, hs]; rfl
+      have he : eraseP s.host = eraseP (F (eraseP h0)) := by
+        rw [← eraseP_of_erase hhost, hs]; rfl
       exact (outcome_done ctx storage s _ he hnp).1
 
 /-! ## The boundary -/
@@ -382,55 +386,94 @@ theorem observe_effects (M : ContractModel) (ctx : Context) (raw : RawStorage)
     refine ⟨⟨by rw [hfail], Finset.toList_toFinset raw, rfl, rfl, by rw [hl, hlogs], rfl⟩, by simp, ?_⟩
     intro msg h; cases h
 
-/-- A gas failure is observed as an out-of-gas failure that rolls back. -/
+/-- A gas or recorded-proof failure is observed as a resource failure that rolls back. -/
 theorem observe_gasFailure (ctx : Context) (raw : RawStorage) (codeOf : List UInt8 → Near.ContractCode)
     (o : VMOutcome) (logs : List String) (h : GasFailureUpTo o logs) :
     let r := observeW ctx raw codeOf o
-    r.outcome = .error .outOfGas ∧ RolledBack ctx raw r ∧ r.logs <+: logs ∧
+    ResourceFailure r ∧ RolledBack ctx raw r ∧ r.logs <+: logs ∧
       ∀ msg, r.outcome ≠ .error (.executionIssue msg) := by
   obtain ⟨e, hge, ha, -, -, hl⟩ := h
-  have hout : (observeW ctx raw codeOf o).outcome = .error .outOfGas := by
-    simp only [observeW, Near.Boundary.observe, ha]
-    rcases hge with rfl | rfl <;> rfl
-  refine ⟨hout, ?_, ?_, ?_⟩
-  · have := Near.Boundary.observe_rolledBack ctx raw.toList o _ _ hout
+  have hout : ResourceFailure (observeW ctx raw codeOf o) := by
+    unfold ResourceFailure
+    rcases hge with rfl | rfl | ⟨n, rfl⟩
+    · left; simp only [observeW, Near.Boundary.observe, ha]; rfl
+    · left; simp only [observeW, Near.Boundary.observe, ha]; rfl
+    · right; simp only [observeW, Near.Boundary.observe, ha]; rfl
+  have hrb : ∀ {f : Failure}, (observeW ctx raw codeOf o).outcome = .error f →
+      RolledBack ctx raw (observeW ctx raw codeOf o) := fun hf => by
+    have := Near.Boundary.observe_rolledBack ctx raw.toList o _ _ hf
     rw [Finset.toList_toFinset] at this
     exact this
+  refine ⟨hout, hout.elim hrb hrb, ?_, ?_⟩
   · simp only [observeW, Near.Boundary.observe, ha]
     exact hl
-  · intro msg h'; rw [hout] at h'; cases h'
+  · intro msg h'
+    rcases hout with h | h <;> rw [h] at h' <;> cases h'
+
+/-- A step agreeing with a host agrees with any host equal to it up to gas
+and the recorded proof. -/
+theorem AgreesWith.congr {M : ContractModel} {ctx : Context} {raw : RawStorage} {e e' : NearState}
+    {res : StepResult M.Panic M.State M.Ret M.Promise} (h : AgreesWith M ctx raw e res)
+    (he : eraseP e = eraseP e') : AgreesWith M ctx raw e' res := by
+  have hf : ∀ {α : Type} (f : NearState → α), (∀ x, f (eraseP x) = f x) → f e = f e' :=
+    fun f hfe => eraseP_field he f hfe
+  have u : e.context.storageUsage.toNat = e'.context.storageUsage.toNat :=
+    hf (fun x => x.context.storageUsage.toNat) fun _ => rfl
+  have b : e.context.accountBalance = e'.context.accountBalance := hf (fun x => x.context.accountBalance) fun _ => rfl
+  have r : returnOf e = returnOf e' := hf returnOf fun _ => rfl
+  have s : finalStorage e = finalStorage e' := hf finalStorage fun _ => rfl
+  have l : logsOf e = logsOf e' := hf logsOf fun _ => rfl
+  cases res with
+  | ok o =>
+    simp only [AgreesWith] at h ⊢
+    rw [← u, ← b, ← r, ← s, ← l]
+    exact h
+  | error f =>
+    simp only [AgreesWith] at h ⊢
+    rw [← u, ← b, ← l]
+    exact h
 
 /-- **The boundary.** For a call of method `i` whose run `F` describes and a
-model step `res` agreeing with `F`: no execution issue; with room for loading
+model step `res` agreeing with `F`: no execution issue; with the host's
+precondition (which may need room in the recorded proof), room for loading
 and the method within `Cg` and `Cg` attached, the model's step using at most
-`Cg`; under any gas, the model's step or an out-of-gas failure that rolls
-back with a prefix of the model's logs. -/
+`Cg`; under any gas and any recorded proof, the model's step or a resource
+failure that rolls back with a prefix of the model's logs. The latter needs
+the precondition only of the host recording no proof (`hpreP`), and `F` to
+ignore the recorded proof (`hFP`). -/
 theorem method_boundary (M : ContractModel) (size : Nat) (codeOf : List UInt8 → Near.ContractCode)
     (raw : RawStorage) (ctx : Context) {i : Nat} (Pre : NearState → Prop) (cost : NearState → Nat)
     (F : NearState → NearState) (hp : WProtocol ctx.protocol) (hwf : ctx.WF raw)
     (hname : ctx.method.isEmpty = false) (hexp : wNearModule.exportFunc? ctx.method = some i)
     (hft : wNearModule.funcType? i = some { params := [], results := [] }) (h1 : 48 ≤ i) (h2 : i < 955)
-    (hspec : MethodRuns ctx.protocol i Pre cost F) (hpre : Pre (erase (hostOf ctx raw)))
+    (hspec : MethodRuns ctx.protocol i Pre cost F) (hpreP : Pre (eraseP (hostOf ctx raw)))
     (hnp : NoPromises (F (erase (hostOf ctx raw))))
+    (hFP : eraseP (F (eraseP (hostOf ctx raw))) = eraseP (F (erase (hostOf ctx raw))))
     (res : StepResult M.Panic M.State M.Ret M.Promise)
     (hag : AgreesWith M ctx raw (F (erase (hostOf ctx raw))) res) (Cg : Nat) :
     let r := Near.Boundary.nearRuntime.exec (wCode size codeOf) raw ctx
     (∀ msg, r.outcome ≠ .error (.executionIssue msg)) ∧
-    (chargesUse (hostOf ctx raw) (loadingCharges size) + cost (erase (hostOf ctx raw)) ≤ Cg →
+    (Pre (erase (hostOf ctx raw)) →
+      chargesUse (hostOf ctx raw) (loadingCharges size) + cost (erase (hostOf ctx raw)) ≤ Cg →
       Cg ≤ ctx.gasLimit → Matches M ctx raw r res ∧ r.usedGas ≤ Cg) ∧
     (Matches M ctx raw r res ∨
-      (r.outcome = .error .outOfGas ∧ RolledBack ctx raw r ∧ r.logs <+: res.logs)) := by
+      (ResourceFailure r ∧ RolledBack ctx raw r ∧ r.logs <+: res.logs)) := by
   have hpos : 0 < minOpCost ctx.protocol.wasm := Nat.lt_min.mpr hwf.opCost_pos
   simp only [execOn_wCode]
+  have hnpP : NoPromises (F (eraseP (hostOf ctx raw))) :=
+    ⟨(eraseP_field hFP NearState.promises fun _ => rfl).trans hnp.promises,
+      (eraseP_field hFP NearState.returnedPromise fun _ => rfl).trans hnp.returned,
+      (eraseP_field hFP NearState.gasWeights fun _ => rfl).trans hnp.weights⟩
+  have hagP := hag.congr hFP.symm
   have hany := method_vm_any ctx.protocol size ctx.method (Near.Boundary.toVMContext ctx) raw.toList Pre cost F
-    hpos hp.limit hp.pagesMin hp.pagesMax hname hexp hft h1 h2 hspec hpre hnp
+    hpos hp.limit hp.pagesMin hp.pagesMax hname hexp hft h1 h2 hspec hpreP hnpP
   simp only at hany
-  have hlogs := hag.logs
+  have hlogs := hagP.logs
   refine ⟨?_, ?_, ?_⟩
   · rcases hany with hg | he
     · exact (observe_gasFailure ctx raw codeOf _ _ hg).2.2.2
-    · exact (observe_effects M ctx raw codeOf _ _ he res hag).2.2
-  · intro hgas hlim
+    · exact (observe_effects M ctx raw codeOf _ _ he res hagP).2.2
+  · intro hpre hgas hlim
     have hused0 : (hostOf ctx raw).gas.used = 0 := rfl
     have hmb : (hostOf ctx raw).gas.maxBurnt = ctx.protocol.wasm.limits.maxGasBurnt := rfl
     have hpp : (hostOf ctx raw).gas.prepaid = ctx.prepaidGas := rfl
@@ -449,29 +492,34 @@ theorem method_boundary (M : ContractModel) (size : Nat) (codeOf : List UInt8 �
       obtain ⟨ho, hrb, hl, -⟩ := observe_gasFailure ctx raw codeOf _ _ hg
       exact ⟨ho, hrb, by rw [hlogs]; exact hl⟩
     · left
-      exact (observe_effects M ctx raw codeOf _ _ he res hag).1
+      exact (observe_effects M ctx raw codeOf _ _ he res hagP).1
 
 /-- **The clauses of `Refines` for a call to the method.** For a call `c`
-whose model step agrees with `F` and whose gas bound covers loading and the
-method's cost. -/
+whose model step agrees with `F`, whose gas bound covers loading and the
+method's cost, and whose precondition on the host holds when the recorded
+proof has room for the model's bound. -/
 theorem method_refines_call (M : ContractModel) (size : Nat) (codeOf : List UInt8 → Near.ContractCode)
     (raw : RawStorage) (st : Option M.State) (ctx : Context) (c : M.Call) {i : Nat}
     (Pre : NearState → Prop) (cost : NearState → Nat) (F : NearState → NearState)
     (hp : WProtocol ctx.protocol) (hwf : ctx.WF raw)
     (hname : ctx.method.isEmpty = false) (hexp : wNearModule.exportFunc? ctx.method = some i)
     (hft : wNearModule.funcType? i = some { params := [], results := [] }) (h1 : 48 ≤ i) (h2 : i < 955)
-    (hspec : MethodRuns ctx.protocol i Pre cost F) (hpre : Pre (erase (hostOf ctx raw)))
+    (hspec : MethodRuns ctx.protocol i Pre cost F)
+    (hpre : ctx.ProofRoom (M.proofBound ctx st c) → Pre (erase (hostOf ctx raw)))
+    (hpreP : Pre (eraseP (hostOf ctx raw)))
     (hnp : NoPromises (F (erase (hostOf ctx raw))))
+    (hFP : eraseP (F (eraseP (hostOf ctx raw))) = eraseP (F (erase (hostOf ctx raw))))
     (hag : AgreesWith M ctx raw (F (erase (hostOf ctx raw))) (M.step ctx st c))
     (hbound : chargesUse (hostOf ctx raw) (loadingCharges size) + cost (erase (hostOf ctx raw)) ≤ M.gas ctx st c) :
     let r := Near.Boundary.nearRuntime.exec (wCode size codeOf) raw ctx
     let res := M.step ctx st c
     (∀ msg, r.outcome ≠ .error (.executionIssue msg)) ∧
-    (M.gas ctx st c ≤ ctx.gasLimit → Matches M ctx raw r res ∧ r.usedGas ≤ M.gas ctx st c) ∧
+    (M.gas ctx st c ≤ ctx.gasLimit → ctx.ProofRoom (M.proofBound ctx st c) →
+      Matches M ctx raw r res ∧ r.usedGas ≤ M.gas ctx st c) ∧
     (Matches M ctx raw r res ∨
-      (r.outcome = .error .outOfGas ∧ RolledBack ctx raw r ∧ r.logs <+: res.logs)) := by
+      (ResourceFailure r ∧ RolledBack ctx raw r ∧ r.logs <+: res.logs)) := by
   obtain ⟨hni, hen, hany⟩ := method_boundary M size codeOf raw ctx Pre cost F hp hwf hname hexp hft h1 h2
-    hspec hpre hnp (M.step ctx st c) hag (M.gas ctx st c)
-  exact ⟨hni, hen hbound, hany⟩
+    hspec hpreP hnp hFP (M.step ctx st c) hag (M.gas ctx st c)
+  exact ⟨hni, fun hgas hroom => hen (hpre hroom) hbound hgas, hany⟩
 
 end WNear.Binary

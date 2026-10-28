@@ -62,7 +62,7 @@ theorem quiet_chargeHost {p0 m0 : Nat} (ns : NearState) (cost : Nat) (hq : Quiet
   have hl := chargeHost_gas_limits ns cost
   exact ⟨hl.1.trans hq.1, hl.2.trans hq.2.1, hq.2.2.1, hq.2.2.2⟩
 
-theorem erase_relax (h : NearState) (p m : Nat) : erase (relax h p m) = erase h := rfl
+theorem eraseP_relax (h : NearState) (p m : Nat) : eraseP (relax h p m) = eraseP h := rfl
 
 /-- **`get` under any gas.** From a quiet host after loading, the run ends
 with a gas failure on a quiet host, or done with no values and the host,
@@ -76,7 +76,7 @@ theorem get_any (cfg : RuntimeConfig) (fuel : Nat) (h1 : NearState)
       QuietHost h1.gas.prepaid h1.gas.maxBurnt
         (runInitialized cfg.wasm fuel (.next (startSkel cfg.fees.numExtraBytesRecord h1))).1.host) ∨
     ∃ s, runInitialized cfg.wasm fuel (.next (startSkel cfg.fees.numExtraBytesRecord h1)) = (.done [] s, none) ∧
-      erase s.host = erase (h1.selectReturnValue okBytes) := by
+      eraseP s.host = eraseP (h1.selectReturnValue okBytes) := by
   set extra := cfg.fees.numExtraBytesRecord
   set c := startSkel extra h1 with hc
   set p0 := h1.gas.prepaid
@@ -120,7 +120,7 @@ theorem get_any (cfg : RuntimeConfig) (fuel : Nat) (h1 : NearState)
         rw [hB_run, hrel]; exact hfuel
       have hends := get_run cfg.wasm fuel extra hB Cg hlim
         (by
-          have hv : valueReturnUse hB 4 = valueReturnUse h1 4 := valueReturnUse_erase (erase_relax h1 Cg Cg) 4
+          have hv : valueReturnUse hB 4 = valueReturnUse h1 4 := rfl
           show h1.gas.used + (8 * cfg.wasm.regularOpCost + (3 * cfg.wasm.regularOpCost + valueReturnUse hB 4)) ≤ Cg
           have hg : getCost cfg.wasm h1 =
               8 * cfg.wasm.regularOpCost + (3 * cfg.wasm.regularOpCost + valueReturnUse h1 4) := rfl
@@ -144,8 +144,11 @@ theorem get_any (cfg : RuntimeConfig) (fuel : Nat) (h1 : NearState)
         simp only [StepResult.relax, StepResult.done.injEq] at h1'
         obtain ⟨rfl, hs⟩ := h1'
         refine ⟨s, rfl, ?_⟩
-        have : erase s.host = erase σ.store.host := by rw [← hs]; rfl
-        rw [this, hhost, erase_selectReturnValue, erase_selectReturnValue, erase_charged, erase_relax]
+        have : eraseP s.host = eraseP σ.store.host := by rw [← hs]; rfl
+        rw [this]
+        unfold eraseP
+        rw [hhost]
+        rfl
 
 /-! ## The VM outcome -/
 
@@ -215,13 +218,13 @@ theorem get_vm_any (cfg : RuntimeConfig) (size : Nat) (ctx : VMContext)
     exact outcome_gasEnd ctx storage _ hg hqA.2.2.1 hqA.2.2.2
   · right
     rw [hs]
-    have hf : ∀ {α : Type} (f : NearState → α), (∀ x, f (erase x) = f x) →
+    have hf : ∀ {α : Type} (f : NearState → α), (∀ x, f (eraseP x) = f x) →
         f s.host = f (h0.selectReturnValue okBytes) := by
       intro α f hfe
-      rw [erase_field hhost f hfe]
-      have h1e : erase (h1.selectReturnValue okBytes) = erase (h0.selectReturnValue okBytes) := by
+      have h1e : eraseP (h1.selectReturnValue okBytes) = eraseP (h0.selectReturnValue okBytes) := by
+        unfold eraseP
         rw [erase_selectReturnValue, erase_selectReturnValue, he1]
-      exact erase_field h1e f hfe
+      rw [← hfe s.host, hhost, h1e, hfe]
     have hp : s.host.promises = [] := hf NearState.promises fun _ => rfl
     have hr : s.host.returnedPromise = none := hf NearState.returnedPromise fun _ => rfl
     have hw : s.host.gasWeights = [] := hf NearState.gasWeights fun _ => rfl

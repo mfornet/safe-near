@@ -68,9 +68,10 @@ section Charges
 
 open Wasm.Near
 
-/-- The host with its gas limits raised to `p` (prepaid) and `m` (burn limit). -/
+/-- The host with its gas limits raised to `p` (prepaid) and `m` (burn limit), recording no
+storage proof: the run it starts fails for no resource the lower run does not fail for. -/
 def relax (h : NearState) (p m : Nat) : NearState :=
-  { h with gas := { h.gas with prepaid := p, maxBurnt := m } }
+  { h with gas := { h.gas with prepaid := p, maxBurnt := m }, storageProofSize := none }
 
 theorem deduct_relax (g : Near.GasCounter) (burn use p m : Nat) (hp : g.prepaid ≤ p) (hm : g.maxBurnt ≤ m)
     (h : (g.deduct burn use).2 = none) :
@@ -151,8 +152,10 @@ theorem applyCharges_erase (ns : NearState) (cs : List Charge) : erase (applyCha
       | some e => simp only [applyCharges, hc]; exact this
       | none => simp only [applyCharges, hc]; rw [ih, this]
 
-/-- A gas error: what a failed charge reports. -/
-def isGasError (e : HostError) : Prop := e = .gasExceeded ∨ e = .gasLimitExceeded
+/-- A resource error: what a failed charge reports, or the recorded storage proof over its
+limit (`RecordedStorageExceeded`), which the run with raised limits never records. -/
+def isGasError (e : HostError) : Prop :=
+  e = .gasExceeded ∨ e = .gasLimitExceeded ∨ ∃ n, e = .recordedStorageExceeded n
 
 theorem deduct_error (g : Near.GasCounter) (burn use : Nat) {e : HostError}
     (h : (g.deduct burn use).2 = some e) : isGasError e := by
