@@ -140,8 +140,14 @@ resources derive every callee domain; exact sequential memory, original payload
 bytes, full code/global frames and conditional length readback are proved.
 Independent29-byte replays in both accounting modes match whole memory,
 2,224 root ordinary units and1,705 steps, with one-less-fuel exhaustion.
-Accepted Borsh decoding161/162/425, serialization and exported refinement
-remain open. These
+The accepted Borsh scalar wrappers372/371 now compose the actual slice and
+word readers, cache their values, update the input slice, restore SP and return
+explicitly:168/151 ordinary units over134/118 typed-call steps. Original
+bounds and installed code suffice. Output semantics retain aliases; canonical
+U128 and updated-slice readback use only their precise later-write separations.
+The model's29-byte header is connected to actual548 payload reads at offsets5
+and21. Accepted decoding161/162/425, the prefix-vector path, serialization and
+exported refinement remain open. These
 contracts do not discharge the existing representation/protocol premises or
 change the model, runtime semantics, or WF definition.
 

@@ -538,6 +538,26 @@ global arrays are preserved. Independent29-byte replays in both accounting
 modes match whole memory,2224 root ordinary units and1705 steps, including
 one-less-fuel exhaustion. Accepted Borsh161/162/425 decoding, whole read219
 composition and complete900/903 decimal formatting remain open.
+The actual Borsh fixed-width leaves694/710 now have complete34/26-unit,
+27/19-step typed calls, including their unaligned, sequential packed writes
+and final status byte. Slice helpers361/362 have complete26/22-unit,
+17/13-step accepted calls; source pointers retain wrapping UInt32 arithmetic.
+The accepted scalar wrappers372/371 now compose those real children through
+cached scalar reads, sequential caller output writes, slice consumption,
+normal middle-block exit, stack restoration and explicit return. Their typed
+costs are168/151 ordinary units over134/118 steps at caller depth2. Native
+bounds and installed code refer only to original inputs; no decoded state or
+successful child execution is assumed. Exact full memory, code/global arrays,
+functional host, burn/promises/residual gas and original input-word semantics
+are proved. Canonical U128 and slice endpoints impose only the precise later
+slice/tag write separations; operational contracts preserve arbitrary aliases.
+The original model header's29 bytes now yield the actual leading word1,
+prefix byte97, total supply at payload offset5 and usage at offset21 after548.
+Independent scalar checks cover28/10 captures and144 generated cases each,
+including descriptor/source/output aliases, unaligned and cross-page spans,
+exact root gas167/150 units,133/117 steps and one-less-fuel exhaustion.
+The prefix-vector315/316 allocation/copy and whole161/162/425 composition
+remain open.
 
 Successful577 components now include requested-word scaling, all29 sizing
 guards/operations, checked page ceiling569, the real memory-growth operation,
