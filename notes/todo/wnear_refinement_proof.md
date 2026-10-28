@@ -458,9 +458,20 @@ The allocator (M4, `Bridge/Functions/Alloc*.lean`): the heap invariant `heapInv`
 
 Allocator progress: dealloc (575, 582, `__rust_dealloc` 311) proved against `heapInvFix` (`AllocDealloc.lean`); alloc proved on the paths a method takes until it frees anything: the empty list, then the single fresh cell (`f580_empty`, `f580_one`, `f581_fresh`, `f310_fresh`). The invariant fixes are folded into one `heapInv n maxP len live F` (`AllocInv.lean`): `Lives`, positive sizes, `next % 4 = 0`, `nextFree % 4 < 2`, `addr + 12 ≤ next`, disjoint cells, and an exact `len`. Dealloc is proved against it, and `__rust_alloc` on a heap with an empty free list (`f310_spec_fresh`). `p = 0` after a successful grow is possible when `align ≥ 16` and the slack is small. Left: alloc on the one-cell list a previous allocation leaves (sequences of allocations), alignment in the packed post, a limit-aware `memory.grow` rule to exclude `p = 0`, and the general walk for F ≥ 1.
 
-The remaining open point on this path is SAF-67 (`Context.WF` does not
-constrain `storageProofSize`). Until it is decided, every storage-touching
-method's `Refines` is false as stated.
+SAF-67 is fixed (#42: the recorded proof is a budget, like gas). On top of it:
+
+- **`storage_read` under the budget:** it needs room for its one lookup (`ProofBudget`), not a blanket bound.
+- **The below-the-bound case:** `relax` also turns proof recording off, and a `RecordedStorageExceeded` trap counts as a resource error.
+  - So the method chain (`method_vm_any`, `method_boundary`, their relational versions) needs `Pre` only of the host recording no proof (`eraseP`).
+  - It needs `Pre` of the actual host only under `ProofRoom`.
+- **Pending changes:** `storage_read` reads the receipt's pending changes from the overlay (`storage_lookup_view`, `viewVal`).
+- **New `Context.WF` fields:** `trie_no_zero_hash` (the zero-hash assumption above), and `prospective_unique` and `committed_unique`.
+  - The uniqueness fields are needed because `State.view` lets a later change win while a lookup takes the first.
+  - `hostOf_storage_view` links the host's storage to the overlay's view.
+
+*`ft_total_supply` on an initialized contract is done* (`ftTotalSupply_refines_init`, `Bridge/Methods/FtTotalSupplyPre.lean`, standard axioms only). Left on it:
+- the uninitialized contract: `PanicOnDefault`, with the message "The contract is not initialized" (M5, panics);
+- the code size, `CostsV86` and `LimitsV86`, all discharged at M9.
 
 ### M4. The Rust runtime layer
 
