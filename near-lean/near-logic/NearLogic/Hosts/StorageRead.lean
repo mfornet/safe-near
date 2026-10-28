@@ -14,12 +14,16 @@ trie (`storage_lookup_view`).
 
 * `prepareStorageCall_read`: the external storage phase succeeds; it only
   moves the trie's accounting (`SameData`) and burns at most
-  `storageReadPhaseUse`: the lookup's `2·|rawKey| + 1` nodes at the dearer of
-  the two node costs, and the value-byte charges when the key is present.
+  `storageReadPhaseUse`: the lookup's nodes at the dearer of the two node costs
+  (`readNodes`: `2·|rawKey| + 1` when the host reads from the trie, none otherwise, as at the
+  boundary), and the value-byte charges when the key is present.
 * `storageRead_readContract`: the whole metered call as a `ReadContractP`:
   returns `[.i64 1]` and sets the register to the value when present,
   `[.i64 0]` when absent; the resulting host is described by
-  `StorageReadPost`; the gas is at most `storageReadUse`.
+  `StorageReadPost`, which records the lookup and the dereference (`ProofReach`,
+  `readProofCost`); the gas is at most `storageReadUse`.
+* `StorageReadPost.next` (`StorageWrite.lean`): what the read leaves meets the next storage
+  call's hypotheses, with the proof budget spent by `readProofCost`.
 -/
 
 namespace NearLogic
@@ -86,10 +90,43 @@ theorem trieNodeCharges_use (h : NearState) (d m : Nat) :
   have e2 := Nat.mul_comm m (max (h.extCosts.cost "touching_trie_node") (h.extCosts.cost "read_cached_trie_node"))
   omega
 
+/-- The trie nodes `storage_read` and `storage_has_key` of the raw key `rawKey` bill: the
+`2·|rawKey| + 1` nodes of the lookup when the host reads from the trie
+(`storageReadsFromTrie`), none otherwise: the lookup then accounts no node (`getReference_cost`),
+as at the boundary (`toVMContext` leaves `storageReadsFromTrie` false). -/
+def readNodes (h : NearState) (rawKey : List UInt8) : Nat :=
+  if h.storageReadsFromTrie then 2 * rawKey.length + 1 else 0
+
+theorem readNodes_le (h : NearState) (rawKey : List UInt8) : readNodes h rawKey ≤ 2 * rawKey.length + 1 := by
+  unfold readNodes; split <;> omega
+
+theorem readNodes_mul_le (h : NearState) (rawKey : List UInt8) :
+    readNodes h rawKey * trieNodeMax h ≤ (2 * rawKey.length + 1) * trieNodeMax h :=
+  Nat.mul_le_mul_right _ (readNodes_le h rawKey)
+
+theorem readNodes_of_false {h : NearState} (hf : h.storageReadsFromTrie = false) (rawKey : List UInt8) :
+    readNodes h rawKey = 0 := by
+  simp [readNodes, hf]
+
+/-- The nodes a lookup accounts, as `readNodes` bills them. -/
+theorem lookup_readNodes {s s' : State} {k : List UInt8} {h : NearState} {p : Option ValuePointer}
+    (hget : getReference s k h.storageReadsFromTrie = .ok (s', p)) {d m : Nat}
+    (hd : s'.accounting.disk = s.accounting.disk + d) (hm : s'.accounting.mem = s.accounting.mem + m)
+    (hdm : d + m ≤ 2 * k.length + 1) : d + m ≤ readNodes h k := by
+  unfold readNodes
+  split
+  · exact hdm
+  · rename_i hf
+    rw [Bool.not_eq_true] at hf
+    rw [hf] at hget
+    have := (getReference_cost hget).2.2 rfl
+    unfold cost at this
+    omega
+
 /-- The gas the storage phase of `storage_read` may burn, for the raw trie key
-`rawKey` and the value `val` found: the lookup's nodes, then the value bytes. -/
+`rawKey` and the value `val` found: the lookup's nodes (`readNodes`), then the value bytes. -/
 def storageReadPhaseUse (h : NearState) (rawKey : List UInt8) (val : Option (List UInt8)) : Nat :=
-  (2 * rawKey.length + 1) * trieNodeMax h +
+  readNodes h rawKey * trieNodeMax h +
     ((val.map fun v => chargesUse h (storageReadValueCharges v.length)).getD 0)
 
 /-- The recorded proof has room for `b` more bytes from the overlay `s` (SAF-67):
@@ -125,6 +162,11 @@ theorem recordedStorageError_none {h : NearState} {s t : State} {a b : Nat} (hp 
   | some size =>
     simp only
     rw [if_neg (Nat.not_lt.mpr (hp size hs t (a + 0) (.step hst (.refl t)) (by omega)))]
+/-- The most a `storage_read` of `rawKey` finding `val` records: the lookup, then the
+dereference of the value. -/
+def readProofCost (rawKey : List UInt8) (val : Option (List UInt8)) : Nat :=
+  lookupProofBound rawKey + ((val.map List.length).getD 0)
+
 /-! ## The storage phase -/
 
 /-- The storage phase of `storage_read` over a canonical trie succeeds: it only moves
@@ -142,6 +184,7 @@ theorem prepareStorageCallAux_read (before : HostStore NearState) (len ptr r : U
     (h2 : C ≤ before.host.gas.maxBurnt) (h3 : C ≤ before.host.gas.prepaid) :
     ∃ after s'', prepareStorageCallAux "storage_read" before [.i64 len, .i64 ptr, .i64 r] = (after, none) ∧
       after.host.storageAccounting = some s'' ∧ SameData s s'' ∧
+      ProofReach s s'' (readProofCost rawKey (before.host.storage key)) ∧
       after.host.gas.burnt ≤
         before.host.gas.burnt + storageReadPhaseUse before.host rawKey (before.host.storage key) ∧
       after.host.gas.promises = before.host.gas.promises := by
@@ -165,7 +208,8 @@ theorem prepareStorageCallAux_read (before : HostStore NearState) (len ptr r : U
   have hext : ExtOnly (trieNodeCharges d m) := by
     intro c hc; simp only [trieNodeCharges, List.mem_cons, List.not_mem_nil, or_false] at hc
     rcases hc with rfl | rfl <;> exact ⟨_, _, rfl⟩
-  have hph : (2 * rawKey.length + 1) * trieNodeMax before.host ≤
+  have hdm' := lookup_readNodes hget hd hm hdm
+  have hph : readNodes before.host rawKey * trieNodeMax before.host ≤
       storageReadPhaseUse before.host rawKey (before.host.storage key) := by
     unfold storageReadPhaseUse; omega
   split
@@ -174,8 +218,8 @@ theorem prepareStorageCallAux_read (before : HostStore NearState) (len ptr r : U
     dsimp only
     rw [hdd, hmm]
     set ns0 : NearState := { before.host with storageAccounting := some s' } with hns0
-    have htc : chargesUse ns0 (trieNodeCharges d m) ≤ (2 * rawKey.length + 1) * trieNodeMax before.host :=
-      Nat.le_trans (trieNodeCharges_use ns0 d m) (Nat.mul_le_mul_right _ hdm)
+    have htc : chargesUse ns0 (trieNodeCharges d m) ≤ readNodes before.host rawKey * trieNodeMax before.host :=
+      Nat.le_trans (trieNodeCharges_use ns0 d m) (Nat.mul_le_mul_right _ hdm')
     obtain ⟨ok1, ch1⟩ := applyCharges_ok ns0 (trieNodeCharges d m) (C := C) (by
       show before.host.gas.used + _ ≤ C; omega) h2 h3
     have pr1 := applyCharges_ext_promises ns0 (trieNodeCharges d m) hext (C := C) (by
@@ -204,7 +248,9 @@ theorem prepareStorageCallAux_read (before : HostStore NearState) (len ptr r : U
         | some _ => rw [hv] at hpres; cases hpres
       subst hpn
       simp only [Option.isSome_none, bne_self_eq_false, Bool.false_eq_true, ite_false]
-      refine ⟨_, s', rfl, hsa1, hsd, ?_, hp1⟩
+      refine ⟨_, s', rfl, hsa1, hsd, ?_, ?_, hp1⟩
+      · show ProofReach s s' (lookupProofBound rawKey + 0)
+        exact .step (.lookup hget) (.refl _)
       rw [hv] at hph h1'
       show ns1.gas.burnt ≤ _
       simp only [Near.GasCounter.used] at hu1
@@ -225,7 +271,7 @@ theorem prepareStorageCallAux_read (before : HostStore NearState) (len ptr r : U
       have hvu : chargesUse ns1 (storageReadValueCharges v.length) =
           chargesUse before.host (storageReadValueCharges v.length) :=
         chargesUse_of ch1.fees ch1.extCosts _
-      have hph2 : (2 * rawKey.length + 1) * trieNodeMax before.host +
+      have hph2 : readNodes before.host rawKey * trieNodeMax before.host +
           chargesUse before.host (storageReadValueCharges v.length) =
           storageReadPhaseUse before.host rawKey (some v) := rfl
       rw [hv] at h1' hph
@@ -243,10 +289,12 @@ theorem prepareStorageCallAux_read (before : HostStore NearState) (len ptr r : U
       have hu2 := ch2.used
       simp only [Near.GasCounter.used] at hu2
       simp only [Option.map_none, Option.isSome_none, bne_self_eq_false, Bool.false_eq_true, ite_false]
-      refine ⟨_, s'', rfl, rfl, ?_, ?_, ?_⟩
+      refine ⟨_, s'', rfl, rfl, ?_, ?_, ?_, ?_⟩
       · obtain ⟨a1, a2, a3, a4⟩ := hsd
         obtain ⟨b1, b2, b3, b4⟩ := hsd2
         exact ⟨b1.trans a1, b2.trans a2, b3.trans a3, b4.trans a4⟩
+      · show ProofReach s s'' (lookupProofBound rawKey + (v.length + 0))
+        exact .step (.lookup hget) (.step (.dereference hd2) (.refl _))
       · show ns2.gas.burnt ≤ _
         omega
       · show ns2.gas.promises = _
@@ -319,11 +367,12 @@ theorem prepareStorageCall_read (before : HostStore NearState) (len ptr r : UInt
     (h2 : C ≤ before.host.gas.maxBurnt) (h3 : C ≤ before.host.gas.prepaid) :
     ∃ s2 b p, prepareStorageCall "storage_read" before [.i64 len, .i64 ptr, .i64 r] =
         ({ before with host := phaseHost before.host s2 b p }, none) ∧ SameData s s2 ∧
+      ProofReach s s2 (readProofCost rawKey (before.host.storage key)) ∧
       b ≤ before.host.gas.burnt + storageReadPhaseUse before.host rawKey (before.host.storage key) := by
-  obtain ⟨after, s2, haux, hsa, hsd, hb', -⟩ :=
+  obtain ⟨after, s2, haux, hsa, hsd, hre, hb', -⟩ :=
     prepareStorageCallAux_read before len ptr r key rawKey s hraw hacc hkey hlim hb hz hlink hproof hbud
       h1 h2 h3
-  refine ⟨s2, after.host.gas.burnt, after.host.gasProfile, ?_, hsd, hb'⟩
+  refine ⟨s2, after.host.gas.burnt, after.host.gasProfile, ?_, hsd, hre, hb'⟩
   simp only [prepareStorageCall, haux, hsa, Option.isNone_none, ite_true, phaseHost]
 
 /-! ## The contract -/
@@ -381,7 +430,7 @@ theorem storageReadFn_invoke (st : HostStore NearState) (len ptr r : UInt64) (ke
 accounting `s`: the register set as `storageReadRegs`, the accounting replaced by
 one with the same data (`SameData`), and nothing else changed. -/
 def StorageReadPost (h : NearState) (key : List UInt8) (r : UInt64) (s : State) (host' : NearState) : Prop :=
-  ∃ s2, SameData s s2 ∧
+  ∃ s2, SameData s s2 ∧ ProofReach s s2 (readProofCost (contractKey h.context.currentAccountId key) (h.storage key)) ∧
     erase host' = erase (storageReadRegs { h with storageAccounting := some s2 } r (h.storage key))
 
 /-- The gas `storage_read` of an `n`-byte key may use: the charges before, the
@@ -438,15 +487,17 @@ theorem storageRead_ok (extra : Nat) (st : HostStore NearState) (len ptr r : UIn
     erase_field he1 NearState.storageProofSize fun _ => rfl
   have ffee : (afterCharges ns).fees = st.host.fees := erase_field he1 NearState.fees fun _ => rfl
   have fext : (afterCharges ns).extCosts = st.host.extCosts := erase_field he1 NearState.extCosts fun _ => rfl
+  have frt : (afterCharges ns).storageReadsFromTrie = st.host.storageReadsFromTrie :=
+    erase_field he1 NearState.storageReadsFromTrie fun _ => rfl
   have hgas1 : (afterCharges ns).gas = ns.gas := rfl
   have hkey1 : getMemOrReg { mem := st.mem, host := afterCharges ns } ptr len = some key := by
     exact (getMemOrReg_mem (s := st) (s' := { mem := st.mem, host := afterCharges ns }) hlen rfl).trans hkey
   have hphase : storageReadPhaseUse (afterCharges ns) (contractKey st.host.context.currentAccountId key)
       ((afterCharges ns).storage key) =
       storageReadPhaseUse st.host (contractKey st.host.context.currentAccountId key) (st.host.storage key) := by
-    simp only [storageReadPhaseUse, trieNodeMax, fext, fsto]
+    simp only [storageReadPhaseUse, trieNodeMax, readNodes, fext, fsto, frt]
     cases st.host.storage key <;> simp [chargesUse_of ffee fext]
-  obtain ⟨s2, b, p, hpre, hsd, hbb⟩ := prepareStorageCall_read { mem := st.mem, host := afterCharges ns }
+  obtain ⟨s2, b, p, hpre, hsd, hre, hbb⟩ := prepareStorageCall_read { mem := st.mem, host := afterCharges ns }
     len ptr r key (contractKey st.host.context.currentAccountId key) s (C := C) (by rw [fid])
     (by rw [fsa]; exact hacc) hkey1 (by rw [fcfg]; exact hlim) hb hz
     (by rw [fsto]; exact hlink) (hproof.congr fpsz fcfg) hbud
@@ -480,7 +531,7 @@ theorem storageRead_ok (extra : Nat) (st : HostStore NearState) (len ptr r : UIn
     (by rw [hg3]; show C ≤ ns.gas.maxBurnt; rw [hch.maxBurnt]; exact h2)
     (by rw [hg3]; show C ≤ ns.gas.prepaid; rw [hch.prepaid]; exact h3)
   rw [finish_storageRead extra _ _ _ _ (by rw [hca]; exact ok4), hca]
-  refine ⟨(applyCharges H3 cs).1, rfl, ⟨s2, hsd, ?_⟩, ?_, ?_, ?_⟩
+  refine ⟨(applyCharges H3 cs).1, rfl, ⟨s2, hsd, by rw [fsto] at hre; exact hre, ?_⟩, ?_, ?_, ?_⟩
   · rw [ch4.erase, hH3, erase_storageReadRegs, erase_storageReadRegs]
     show storageReadRegs { erase (afterCharges ns) with storageAccounting := some s2 } r _ = _
     rw [he1]; rfl
@@ -498,8 +549,10 @@ theorem storageReadUse_erase {h h' : NearState} (he : erase h = erase h') (key :
   have hs : h.storage = h'.storage := erase_field he NearState.storage fun _ => rfl
   have hi : h.context.currentAccountId = h'.context.currentAccountId :=
     erase_field he (fun x : NearState => x.context.currentAccountId) fun _ => rfl
-  unfold storageReadUse storageReadPhaseUse trieNodeMax
-  rw [hs, hi, hx, chargesUse_of hf hx, chargesUse_of hf hx]
+  have hrt : h.storageReadsFromTrie = h'.storageReadsFromTrie :=
+    erase_field he NearState.storageReadsFromTrie fun _ => rfl
+  unfold storageReadUse storageReadPhaseUse trieNodeMax readNodes
+  rw [hs, hi, hx, hrt, chargesUse_of hf hx, chargesUse_of hf hx]
   cases h'.storage key <;> simp [chargesUse_of hf hx]
 
 theorem erase_withAcc (x : NearState) (a : Option State) :
@@ -507,9 +560,11 @@ theorem erase_withAcc (x : NearState) (a : Option State) :
 
 theorem storageReadPost_erase {h h' host' : NearState} (he : erase h = erase h') {key : List UInt8}
     {r : UInt64} {s : State} (hq : StorageReadPost h key r s host') : StorageReadPost h' key r s host' := by
-  obtain ⟨s2, hsd, hq⟩ := hq
+  obtain ⟨s2, hsd, hre, hq⟩ := hq
   have hs : h.storage = h'.storage := erase_field he NearState.storage fun _ => rfl
-  refine ⟨s2, hsd, ?_⟩
+  have hi : h.context.currentAccountId = h'.context.currentAccountId :=
+    erase_field he (fun x : NearState => x.context.currentAccountId) fun _ => rfl
+  refine ⟨s2, hsd, by rw [← hs, ← hi]; exact hre, ?_⟩
   have hw : erase { h with storageAccounting := some s2 } = erase { h' with storageAccounting := some s2 } := by
     show { erase h with storageAccounting := some s2 } = { erase h' with storageAccounting := some s2 }
     rw [he]

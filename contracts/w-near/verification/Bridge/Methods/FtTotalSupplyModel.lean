@@ -183,7 +183,7 @@ theorem post_field {α : Type} (f : NearState → α) (hf : ∀ x, f (erase x) =
     (hsel : ∀ x b, f (x.selectReturnValue b) = f x) (hreg : ∀ x i v, f (x.setRegister i v) = f x)
     (hacc : ∀ x a, f { x with storageAccounting := a } = f x)
     {S : WNear.State} {h0 e : NearState} (hp : post S h0 e) : f e = f h0 := by
-  obtain ⟨st, h1, -, ⟨s2, -, he⟩, rfl⟩ := hp
+  obtain ⟨st, h1, -, ⟨s2, -, -, he⟩, rfl⟩ := hp
   rw [hf, hsel, erase_field he f hf]
   unfold storageReadRegs
   split

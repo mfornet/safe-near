@@ -57,7 +57,7 @@ theorem storageReadPost_fields {h h1 : NearState} {key : List UInt8} {r : UInt64
     {st : Near.TrieOverlay.State} (H : StorageReadPost h key r st h1) :
     h1.config = h.config ∧ h1.logs = h.logs ∧ h1.extCosts = h.extCosts ∧
       h1.lastExecutionIssue = h.lastExecutionIssue := by
-  obtain ⟨s2, -, he⟩ := H
+  obtain ⟨s2, -, -, he⟩ := H
   have hr : ∀ (x : NearState) v, (storageReadRegs x r v).config = x.config ∧
       (storageReadRegs x r v).logs = x.logs ∧ (storageReadRegs x r v).extCosts = x.extCosts ∧
       (storageReadRegs x r v).lastExecutionIssue = x.lastExecutionIssue := by

@@ -922,7 +922,7 @@ structure ReadOk (h : NearState) (S : WNear.State) (st : Near.TrieOverlay.State)
 theorem storageReadPost_config {h h1 : NearState} {key : List UInt8} {r : UInt64} {st : Near.TrieOverlay.State}
     (H : StorageReadPost h key r st h1) :
     h1.config = h.config ∧ ∀ k, valueReturnUse h1 k = valueReturnUse h k := by
-  obtain ⟨s2, -, he⟩ := H
+  obtain ⟨s2, -, -, he⟩ := H
   have hc : (storageReadRegs { h with storageAccounting := some s2 } r (h.storage key)).config = h.config := by
     unfold storageReadRegs; split
     · split <;> rfl

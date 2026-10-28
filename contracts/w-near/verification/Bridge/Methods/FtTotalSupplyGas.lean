@@ -145,6 +145,7 @@ theorem cost_le (rc : RuntimeConfig) (h : NearState) (S : WNear.State) (x96 : Na
   have a := c96 rc.wasm (loOf S) (hiOf S)
   have b := c161 rc.wasm
   have d := c687 rc.wasm
+  have e := readNodes_mul_le h (Near.TrieOverlay.contractKey h.context.currentAccountId StateRead.stateKey)
   rw [← StateRead.stateKey_eq] at hv
   simp only [FtTotalSupplyMethod.cost, cost296, cost219, storageReadUse, StorageReadWrap.costS, ReadRegister.costRest,
     registerLenUse, readRegisterUse, valueReturnUse, hv, StateReadModel.header_length, storageReadPhaseUse,

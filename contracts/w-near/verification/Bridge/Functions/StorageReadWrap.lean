@@ -51,7 +51,7 @@ theorem chargesUse_congr' {a b : NearState} (hf : a.fees = b.fees) (hx : a.extCo
 /-- `storage_read`'s postcondition (register 0) is `QOk`. -/
 theorem storageReadPost_ok (h : NearState) (key : List UInt8) (s : Near.TrieOverlay.State) :
     QOk h key (StorageReadPost h key 0 s) := by
-  rintro h' ⟨s2, -, he⟩
+  rintro h' ⟨s2, -, -, he⟩
   have hr := erase_field he NearState.registers fun _ => rfl
   have hf := erase_field he NearState.fees fun _ => rfl
   have hx := erase_field he NearState.extCosts fun _ => rfl

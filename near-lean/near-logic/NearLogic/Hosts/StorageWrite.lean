@@ -783,4 +783,37 @@ theorem StorageWritePost.next {extra : Nat} {h host' : NearState} {key val : Lis
       · split <;> rfl
       · rfl
 
+
+/-- `storage_read`'s register update keeps every field `setRegister` keeps. -/
+theorem storageReadRegs_field {α : Type} (f : NearState → α) (hf : ∀ x i v, f (x.setRegister i v) = f x)
+    (x : NearState) (r : UInt64) (val : Option (List UInt8)) : f (storageReadRegs x r val) = f x := by
+  unfold storageReadRegs
+  split
+  · split
+    · rfl
+    · exact hf _ _ _
+  · rfl
+
+/-- What `storage_read` leaves meets the hypotheses of the next storage call: the accounting is a
+canonical trie linked to the storage, with the budget spent by the lookup and the dereference
+(`readProofCost`). -/
+theorem StorageReadPost.next {h host' : NearState} {key : List UInt8} {r : UInt64} {s : State} {b : Nat}
+    (hq : StorageReadPost h key r s host') (hc : Canon s) (hl : StorageLink h s) (hproof : ProofBudget h s b)
+    (hbud : readProofCost (contractKey h.context.currentAccountId key) (h.storage key) ≤ b) :
+    ∃ s2, host'.storageAccounting = some s2 ∧ Canon s2 ∧ StorageLink host' s2 ∧
+      ProofBudget host' s2 (b - readProofCost (contractKey h.context.currentAccountId key) (h.storage key)) ∧
+      erase host' = erase (storageReadRegs { h with storageAccounting := some s2 } r (h.storage key)) := by
+  obtain ⟨s2, hsd, hre, he⟩ := hq
+  have hfield : ∀ {α : Type} (f : NearState → α), (∀ x, f (erase x) = f x) →
+      (∀ x i v, f (x.setRegister i v) = f x) →
+      f host' = f { h with storageAccounting := some s2 } := fun f hfe hfr =>
+    (erase_field he f hfe).trans (storageReadRegs_field f hfr _ _ _)
+  refine ⟨s2, hfield NearState.storageAccounting (fun _ => rfl) (fun _ _ _ => rfl), hc.sameData hsd, ?_, ?_, he⟩
+  · intro k
+    rw [hfield NearState.storage (fun _ => rfl) (fun _ _ _ => rfl),
+      hfield (fun x => x.context.currentAccountId) (fun _ => rfl) (fun _ _ _ => rfl)]
+    exact (hl.sameData hsd) k
+  · exact (hproof.reach hre hbud).congr (hfield NearState.storageProofSize (fun _ => rfl) (fun _ _ _ => rfl))
+      (hfield NearState.config (fun _ => rfl) (fun _ _ _ => rfl))
+
 end NearLogic

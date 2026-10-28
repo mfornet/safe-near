@@ -218,7 +218,7 @@ theorem storageBalanceBounds_runs (cfg : RuntimeConfig) (S : WNear.State) :
 /-- The hosts `post` allows created no promises when the initial one did not. -/
 theorem post_noPromises {S : WNear.State} {e e' : NearState} (hp : post S e e') (h0 : NoPromises e) :
     NoPromises e' := by
-  obtain ⟨st, h1, -, ⟨s2, -, he⟩, rfl⟩ := hp
+  obtain ⟨st, h1, -, ⟨s2, -, -, he⟩, rfl⟩ := hp
   have hregs : ∀ (x : NearState) (v : Option (List UInt8)),
       (storageReadRegs x 0 v).promises = x.promises ∧ (storageReadRegs x 0 v).gasWeights = x.gasWeights := by
     intro x v; unfold storageReadRegs; split

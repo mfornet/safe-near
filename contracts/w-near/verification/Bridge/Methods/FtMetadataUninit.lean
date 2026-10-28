@@ -280,7 +280,8 @@ theorem hbound_none309 (cfg : WNear.Config) (ctx : Context) (raw : RawStorage) (
     simp [chargesUse, loadingCharges, chargeUse]; rfl
   have hlb := Nat.mul_le_mul hc.loadingBytes hsize
   rw [gas_309, hl]
-  simp only [costNone309, cost309None, costBNone, storageReadUse, storageReadPhaseUse, hv, Option.map_none,
+  have hrn := readNodes_of_false (h := erase (hostOf ctx raw)) rfl
+  simp only [costNone309, cost309None, costBNone, storageReadUse, storageReadPhaseUse, hv, hrn, Nat.zero_mul, Nat.zero_add, Option.map_none,
     Option.getD_none, panicUtf8Use, panicUtf8Charges, storageReadBeforeCharges, chargesUse, chargeUse,
     List.map, List.sum_cons, List.sum_nil, hx'] at htrie ⊢
   simp only [WNear.computeGas]
