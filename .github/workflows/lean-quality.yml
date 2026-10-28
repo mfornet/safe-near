@@ -18,7 +18,7 @@ concurrency:
 jobs:
   repository:
     name: Repository checks (no Lean or native builds)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, fv01]
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v5
@@ -37,7 +37,7 @@ jobs:
   style:
     if: github.event_name == 'workflow_dispatch'
     timeout-minutes: 15
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, fv01]
     steps:
       - uses: actions/checkout@v5
       - uses: actions/cache@v5
@@ -64,12 +64,20 @@ jobs:
   formatter:
     if: github.event_name == 'workflow_dispatch'
     timeout-minutes: 30
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, fv01]
     steps:
       - uses: actions/checkout@v5
       - uses: actions/cache@v5
         with:
           path: near-lean/.lake/lean-fmt
           key: lean-fmt-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'tools/lean_format_tool.json') }}
+      # Only installs elan: the formatter builds itself with `lake`.
+      - uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: near-lean/vm
+          build: "false"
+          test: "false"
+          lint: "false"
+          use-mathlib-cache: false
       - name: Test validated syntax formatting
         run: python3 tools/tests/check_lean_format.py

@@ -17,7 +17,7 @@ jobs:
 
   runtime-finance-conformance:
     name: Financial, nonce and receipt-result checks against pinned nearcore
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, fv01]
     timeout-minutes: 60
     env:
       CARGO_BUILD_JOBS: "2"
@@ -29,10 +29,6 @@ jobs:
           repository: near/nearcore
           ref: 44f7ae6cd7ef08bab604e20a473bf77e35d4c993
           path: reference-nearcore
-      - name: Reclaim unused SDK space before Lean and nearcore builds
-        run: |
-          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
-          df -h /
       - uses: actions/cache@v5
         with:
           path: near-lean/.lake/packages
@@ -44,9 +40,9 @@ jobs:
           use-mathlib-cache: true
       - name: Build receipt-chain replay
         run: cd near-lean/chain && lake build receipt-replay --wfail
+      # The native build dependencies (clang, cmake, protobuf, ...) are installed
+      # on the fv01 runner host; see notes/design/CI_RUNNER.md.
       - uses: dtolnay/rust-toolchain@1.93.0
-      - name: Install native build dependencies
-        run: sudo apt-get update && sudo apt-get install -y clang libclang-dev cmake protobuf-compiler libssl-dev pkg-config libzstd-dev
       - uses: actions/cache@v5
         with:
           path: |

@@ -32,7 +32,7 @@ concurrency:
 jobs:
   build:
     name: Build the chain package and everything below it
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, fv01]
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v5
