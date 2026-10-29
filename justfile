@@ -66,10 +66,13 @@ wnear-scenarios *args:
 wnear-harness *args:
     cd contracts/w-near/verification && lake build wnear-harness && ./.lake/build/bin/wnear-harness {{ args }}
 
-# Audit every wNEAR model/spec/proof declaration, including transitive axioms.
-wnear-audit:
-    cd contracts/w-near/verification && lake build Model Spec Proofs Differential runtime-adapter-tests
-    python3 tools/axiom-audit.py contracts/w-near/verification --no-build --allow-sorry-module Proofs.Refinement --report audit/wnear.json
+# Audit every wNEAR model/spec/proof declaration, including transitive axioms, and check the pinned statements.
+wnear-audit *options:
+    cd contracts/w-near/verification && lake build Model Spec Proofs Differential runtime-adapter-tests wnear-scenarios wnear-harness
+    python3 tools/axiom-audit.py contracts/w-near/verification --no-build --allow-sorry-module Proofs.Refinement --report audit/wnear.json --statements contracts/w-near/verification/statements.json {{ options }}
+
+# Rewrite contracts/w-near/verification/STATEMENTS.md after an intended change to a pinned statement.
+wnear-pin-statements: (wnear-audit "--update-statements")
 
 # Compare every normalized VM observation, including gas, against pinned nearcore.
 near-conformance:

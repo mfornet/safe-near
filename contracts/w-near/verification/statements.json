@@ -1,0 +1,22 @@
+{
+  "modules": ["Spec", "Spec.*", "NearInterface.Model", "NearInterface.Refines"],
+  "declarations": [
+    "WNear.balance_authorization",
+    "WNear.balance_of_correct",
+    "WNear.conservation",
+    "WNear.deposit_available",
+    "WNear.deposit_available_at_boundary",
+    "WNear.init_once",
+    "WNear.inv_preserved",
+    "WNear.project_encode",
+    "WNear.refines_wnear",
+    "WNear.registration_authorization",
+    "WNear.storage_coverage",
+    "WNear.total_supply_correct",
+    "WNear.views_pure",
+    "WNear.views_total",
+    "WNear.withdraw_available",
+    "WNear.withdraw_available_at_boundary",
+    "WNear.withdraw_available_binary"
+  ]
+}

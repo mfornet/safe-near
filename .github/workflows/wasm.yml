@@ -103,9 +103,9 @@ jobs:
         run: |
           lake build Spec runtime-adapter-tests --wfail
           ./.lake/build/bin/runtime-adapter-tests
-          lake build Model Proofs
+          lake build Model Proofs Differential wnear-scenarios wnear-harness
       - name: wNEAR model proof axioms
-        run: python3 tools/axiom-audit.py contracts/w-near/verification --no-build --allow-sorry-module Proofs.Refinement --report audit/wnear.json
+        run: python3 tools/axiom-audit.py contracts/w-near/verification --no-build --allow-sorry-module Proofs.Refinement --report audit/wnear.json --statements contracts/w-near/verification/statements.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -8,6 +8,11 @@ name = "NearSdk"
 version = "0.1.0"
 defaultTargets = ["NearSdk", "ft-state-check"]
 
+# Share build outputs between checkouts (worktrees, CI runs) through Lake's
+# artifact cache, and keep them in .lake/build, where our tools look for them.
+enableArtifactCache = true
+restoreAllArtifacts = true
+
 [[lean_lib]]
 name = "NearSdk"
 
