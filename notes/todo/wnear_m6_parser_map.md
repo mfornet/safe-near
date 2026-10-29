@@ -93,24 +93,24 @@ grammar function.
 
 | fn | size | role | status |
 |---|---|---|---|
-| 646 | 317 | `SliceRead::parse_str`. It scans while `ESCAPE[b] = 0` (the table at 1062392: nonzero exactly for `0x00..0x1F`, `"` and `\`). On `"` with an empty scratch, the result is the borrowed slice (583); with a non-empty scratch, the rest is appended (613). On `\`, the slice so far is appended, then `parse_escape` (649). On a control byte, `ControlCharacterWhileParsingString`. On EOF, `EofWhileParsingString` (647). The result goes through `as_str` (648). | plain case proved (`ParseStr.f646_spec_plain`, ASCII; `ParseStrUtf8.f646_spec_utf8`, any UTF-8 body; no escape, scratch empty; `plain_model`, `utf8_model`) |
+| 646 | 317 | `SliceRead::parse_str`. It scans while `ESCAPE[b] = 0` (the table at 1062392: nonzero exactly for `0x00..0x1F`, `"` and `\`). On `"` with an empty scratch, the result is the borrowed slice (583); with a non-empty scratch, the rest is appended (613). On `\`, the slice so far is appended, then `parse_escape` (649). On a control byte, `ControlCharacterWhileParsingString`. On EOF, `EofWhileParsingString` (647). The result goes through `as_str` (648). | proved on every escape-free input (`ParseStrErr.f646_spec_noesc`: EOF, control byte, `Ok(Borrowed)` on a UTF-8 body, `InvalidUnicodeCodePoint` otherwise; scratch empty; `noesc_model`); earlier the plain cases (`f646_spec_plain`, `f646_spec_utf8`). Not yet: the escape path (613, 649, 728) |
 | 648 | 39 | `as_str`: `from_utf8` (927), else `InvalidUnicodeCodePoint` (657) | proved on every input: `ParseStrUtf8.f648_spec_valid` (`utf8Ok`), `SerdeErrBox.f648_spec_bad` (not UTF-8: 657) |
 | 927 | 443 | `core::str::from_utf8`, with its word-at-a-time ASCII fast path | proved on any input (`FromUtf8Gen.f927_spec`: `Ok` exactly when `Utf8.utf8Ok`, `100 + 100·len`; the width table at 1071704 owned) |
 | 649 | 401 | `parse_escape`: the simple escapes are pushed (614); `\u` goes through `decode_hex_escape` (653, 162) and the surrogate pair logic, then `encode_utf8` (605, 109) and an append (613) |
 | 650 | 106 | `ignore_str` (ignored values): the same scan, without UTF-8 validation |
 | 652 | 267 | `ignore_escape`: validates the escape without decoding it |
-| 82, 343 | 3 | `Vec::clear` of the scratch (674 `truncate`) |
+| 82, 343 | 3 | `Vec::clear` of the scratch (674 `truncate`) | 343 and 674 proved (`SerdeDeStr.f343_s`, `f674_s`) |
 | 583 | 33 | `<Range as SliceIndex>::index` (panics 855/864 never reached) | proved (`ParseStr.f583_spec`, 20) |
 
 ### The value: `ValidAccountId`
 
-| fn | size | role |
-|---|---|---|
-| 169 | 106 | `ValidAccountId::deserialize`: `String::deserialize` (379 → 380), then `try_into` (501 → 502). An `Err` is formatted: `to_string` (130), then `Error::custom` (387), then the box is dropped (151). |
-| 380 | 177 | `deserialize_str`. Steps: whitespace; on `"`, eat it, clear the scratch (343) and `parse_str` (646), then `StringVisitor::visit_str` (633); on anything else, `peek_invalid_type` (340). |
-| 633 | 28 | `visit_str`, then `to_owned` (618): `RawVec::allocate_in` (626, through 624/625/310 to the allocator), then `memcpy` (951) |
-| 502 | 72 | `TryFrom<String>`: `is_valid_account_id` (554); on false, a `Box<dyn Error>` from `&str` (693 → 811) and the `String` dropped (479) |
-| 554 | 102 | `is_valid_account_id`: the length in 2..=64, `[a-z0-9]` runs separated by single `-`, `_` or `.`, and no separator at either end. Proved, with 673 (`AccountIdValid.f554_spec`). |
+| fn | size | role | status |
+|---|---|---|---|
+| 169 | 106 | `ValidAccountId::deserialize`: `String::deserialize` (379 → 380), then `try_into` (501 → 502). An `Err` is formatted: `to_string` (130), then `Error::custom` (387), then the box is dropped (151). | proved when 380 fails or the string is a valid account id (`SerdeAccountId.f169_s`, with 379, 617); not the formatted error |
+| 380 | 177 | `deserialize_str`. Steps: whitespace; on `"`, eat it, clear the scratch (343) and `parse_str` (646), then `StringVisitor::visit_str` (633); on anything else, `peek_invalid_type` (340). | proved on EOF and on an escape-free string (`SerdeDeStr.f380_s`); not the 340 path |
+| 633 | 28 | `visit_str`, then `to_owned` (618): `RawVec::allocate_in` (626, through 624/625/310 to the allocator), then `memcpy` (951) | proved, with 618, 626, 624/625 at alignment 1, 607/608 (`SerdeString`) |
+| 502 | 72 | `TryFrom<String>`: `is_valid_account_id` (554); on false, a `Box<dyn Error>` from `&str` (693 → 811) and the `String` dropped (479) | proved on a valid account id (`f502_valid`, `f501_valid`, 779); not the `false` branch |
+| 554 | 102 | `is_valid_account_id`: the length in 2..=64, `[a-z0-9]` runs separated by single `-`, `_` or `.`, and no separator at either end. | proved, with 673 (`AccountIdValid.f554_spec`) |
 
 ### Ignored values
 
@@ -144,8 +144,10 @@ Proved, with a loose cost as the reject paths need:
 * 645, 638, 609, the position (`SerdePosition`);
 * 639, `Error::syntax`, the 20-byte box (`SerdeErrBox`).
 
-Not proved yet: 322/325 (`peek_error` / `error`, which reach 639 through 640), 340, 642/643 and the
-drops.
+* 325 `error`, 640 `peek_position` and 322 `peek_error`, which return the box (`SerdeErrRet`): at
+  most `costErr cfg F i` (325) and `costErr cfg F (i + 1) + 20·c` (322).
+
+Not proved yet: 340, 642/643 and the drops.
 
 ### Shared infrastructure
 
@@ -158,11 +160,14 @@ Already proved:
 
 Not yet proved:
 
-* the `RawVec`/`Vec` growth used by the scratch: 588, 589, 613, 614, 620–632, 698, 712–716
-  (`VecWithCap` covers 623/630/631 on the serializer side);
-* `Layout` 607/608;
-* `exchange_malloc` 590 and 624/625 are proved at alignment 4 for the error box
-  (`SerdeErrBox.f590_spec`, through `AllocWalk.f310_spec_walk`), but not for the scratch `Vec`.
+* the `RawVec`/`Vec` growth used by the scratch: 588, 589, 613, 614, 623, 627, 628, 630, 631.
+  631 and 627 are not 716 and 714 (`VecGrow`): their code differs, and the first growth starts
+  from capacity 0, so 627 allocates instead of reallocating. 698 and 712–716 (`ignore_value`'s
+  frame stack, through 84) are proved for a nonempty buffer (`VecGrow`).
+
+Proved since: `Layout` 607/608 and `Global::allocate` 624/625 at alignment 1, any size (size 0
+gives the dangling pointer), `allocate_in` 626 (`SerdeString`); 624/625/590 at alignment 4 for the
+error box (`SerdeErrBox`).
 
 The panic paths are never reached on any input: 852, 853, 855, 857, 859, 864, 881, the
 panic machinery 816–832, and the out-of-memory handling 842–844/821. They appear only behind

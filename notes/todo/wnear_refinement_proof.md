@@ -632,6 +632,21 @@ by layer, with their sizes and roles, and which other methods' parsers share the
   * `visit_str` (633, `f633_s`): `Ok(String)`, `(0, p, c, c)`.
   * `heapS` is the heap after the allocation. The cost is a constant, the copy's and the allocator's
     `cost310W cfg F c 1`.
+* `deserialize_str` (380), `SerdeDeStr.lean`. `f380_s`, from the reader's index `i`, with
+  `j = i + wsLen (bs.drop i)`, covers two cases:
+  * the input ends at `j`: `Err(EofWhileParsingValue)` through 322 (code 5);
+  * a `"` at `j`, then an escape-free body (as for `f646_spec_noesc`): `eat_char` (333), the scratch
+    cleared (`f343_s`, `f674_s`), 646, then on `Ok` the copy (633). The result `res380` is
+    `Ok(String)` holding `body` in a fresh block when 646 accepts (`ok380`), else 646's `Err(box)`.
+  * Another byte at `j` goes to `peek_invalid_type` (340), not proved; a hypothesis excludes it.
+  * The cost `cost380` is `(350 + 96·w)·c`, plus 646's cost, plus either 633's (`60·c + cost618`)
+    or an error bound. The stack is 208 bytes.
+* `ValidAccountId::deserialize` (169), `SerdeAccountId.lean`: `f779_s` (`as_str`), `f502_valid` and
+  `f501_valid` (`try_from` on a valid account id: `Ok(s)`), `f379_s` (the wrapper of 380), `f617_s`
+  (the identity) and `f169_s`. The result is `res380` again, now for `Result<ValidAccountId>`. The
+  hypothesis `hvalid` excludes a decoded string that is not a valid account id: its path (693 and
+  479 in 502, then `to_string` 130, `Error::custom` 387 and the drop 151 in 169) is not proved. The
+  stack is 256 bytes.
 
 *Tactics notes from this round.*
 
@@ -664,6 +679,24 @@ by layer, with their sizes and roles, and which other methods' parsers share the
 * A persistent bundle of code cells in a `def` (`errCode`) is not persistent to `iintro #`.
   Destructure it with `icases … with ⟨#…⟩`. To pass it to `mcall`, `unfold` the definition in the
   specification's statement.
+* Later notes (the parser's fourth round):
+  * A bundle can also be made persistent with an instance (`SerdeDeStr` gives one for `errCode`).
+    The bundle then stays whole in the context, and `mcall` finds it there; do not `unfold` it in
+    the callee's specification.
+  * `select` with values below its three operands: `iapply` does not unify `vs ++ [a, b, c]`
+    with a literal stack. `SerdeErrRet.mwpi_select2` states it for two values below.
+  * When `mcall` fails with an `omega` counterexample that does not mention the credits, the
+    failing side condition may be the callee's address. Put `hm.funcs k (by decide)` for every
+    callee in the context.
+  * The cost side condition of `mcall` includes the activation, e.g. `(13 + cost554 m) * c` for
+    554. State `(13 + cost554 m) * c = 13 * c + K` beforehand, with the right constant; a wrong
+    constant leaves `omega` with two unrelated product atoms.
+  * A branch on a literal value: `mstep_taken with decide` or `mstep_not_taken with decide`.
+  * A callee whose postcondition is pure (617) leaves `HQ : ⌜rs = …⌝` in the Iris context, and its
+    precondition goal is closed by `ipureintro; trivial`.
+  * A loop proved once can split at its exit into several outcomes (`f646_spec_noesc`: EOF, a
+    control byte, the quote). Generalize the outcome-dependent part of the credits (`if … then 0
+    else costErr …`) into a variable, and rewrite its equation in each branch.
 
 *Plan for the rest of `FromTraitContract`, bottom-up.*
 
@@ -680,7 +713,8 @@ by layer, with their sizes and roles, and which other methods' parsers share the
      and 643 (`format!` through `core::fmt::write` 872 and the vtables of M5), and the
      drops 92/341/151.
    * Done for the syntax errors 647/657 (`SerdeErrBox.f647_spec`, with 638/645/609, 639, 590,
-     624, 625): `Err(box)`, at most `costErr cfg F i`. Still to do: 340, 642/643 and the drops.
+     624, 625): `Err(box)`, at most `costErr cfg F i`. Also done: 325, 322 and 640 (`SerdeErrRet`). Still to
+     do: 340, 642/643 and the drops.
 2. **Strings: `parse_str` (646) against `stringBody`.** Prove the spec in this order:
    * (a) the plain case: no escape, so the `Borrowed` slice, with `as_str` on bytes known to
      be UTF-8;
@@ -696,6 +730,14 @@ by layer, with their sizes and roles, and which other methods' parsers share the
    Done: the general validator (`FromUtf8Gen.f927_spec`), and `as_str` on every input
    (`f648_spec_valid`, `f648_spec_bad`).
 
+   Done: (c) except a bad escape, with `ParseStrErr.f646_spec_noesc` on every escape-free input.
+   Left: (b), the escapes. They need the scratch `Vec<u8>` to grow:
+   * the chain is 613 → 588 → 589 → 623 → 630 → 631 (`grow_amortized`) → 627 (`finish_grow`), with
+     608 and 628;
+   * it is not the chain `VecGrow` proved: 631 and 627 differ from 716 and 714;
+   * the first growth of the scratch starts from capacity 0, so 627 allocates (625 through 624, at
+     alignment 1, now proved in `SerdeString`) instead of reallocating.
+
    `ignore_str` (650) and `ignore_escape` (652) are the same scan without UTF-8. Their spec
    is acceptance and the rest, as `stringBody` gives them, ignoring its first component.
 3. **The value: `ValidAccountId`.**
@@ -705,6 +747,13 @@ by layer, with their sizes and roles, and which other methods' parsers share the
    * `is_valid_account_id` (554) is done.
    * `TryFrom` (502); and 169 with the `Err` path, which drops the `String` (479) and
      formats the error through 130/387.
+   * Done, on escape-free strings:
+     * 380 (`SerdeDeStr.f380_s`) and 633/618/626 (`SerdeString`);
+     * 502/501/169 on a valid account id or a failed string (`SerdeAccountId`).
+   * Left:
+     * a string with escapes (646's escape path);
+     * a value at the field that is not a string (340);
+     * the error for an invalid account id (693, 479, 130, 387, 151).
 4. **Ignored values: `ignore_value` (81).**
    * First a pure Lean lemma. Define the iterative machine 81 implements, with an explicit
      stack of `[`/`{` frames, and prove it accepts exactly what `NearInterface.Json.value`
