@@ -48,9 +48,12 @@ def stage(root: Path, project: Path, destination: Path) -> None:
     os.symlink(shared, destination / SHARED_PACKAGES)
 
 
-def timed_build(directory: Path, targets: list[str]) -> tuple[float, int]:
+def timed_build(directory: Path, targets: list[str], cache: Path) -> tuple[float, int]:
+    # The lakefiles enable Lake's artifact cache, which would turn the clean build
+    # into a cache restore; an empty cache directory keeps it clean.
+    environment = dict(os.environ, LAKE_CACHE_DIR=str(cache))
     started = time.monotonic()
-    process = subprocess.run(["lake", "build", *targets], cwd=directory, text=True,
+    process = subprocess.run(["lake", "build", *targets], cwd=directory, text=True, env=environment,
                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     seconds = time.monotonic() - started
     if process.returncode:
@@ -66,7 +69,7 @@ def measure(root: Path, contract: str, targets: list[str], runs: int) -> dict:
     for _ in range(runs):
         with tempfile.TemporaryDirectory(prefix="safe-near-buildtime-") as directory:
             stage(root, project, Path(directory))
-            seconds, jobs = timed_build(Path(directory) / project, targets)
+            seconds, jobs = timed_build(Path(directory) / project, targets, Path(directory) / "lake-cache")
             samples.append(round(seconds, 1))
     return {"seconds": min(samples), "samples": samples, "jobs": jobs, "targets": targets}
 

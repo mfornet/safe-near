@@ -118,13 +118,18 @@ def validation_steps(root: Path, nearcore: Path) -> list[Step]:
                             ("near-lean/runtime", "runtime"), ("near-lean/chain", "chain"),
                             ("near-lean/crypto", "crypto"), ("near-lean/sdk", "sdk")]:
         python(f"audit-{report}", "tools/axiom-audit.py", package, "--no-build", "--report", f"audit/{report}.json")
+    def pinned(project: Path) -> list:
+        """Check the project's locked statements, when it has them (STATEMENTS.md)."""
+        config = project / "statements.json"
+        return ["--statements", config] if (root / config).is_file() else []
     for contract, report in adapter_contracts:
-        python(f"audit-{report}", "tools/axiom-audit.py", f"contracts/{contract}/verification", "--no-build",
-               "--allow-sorry-module", "Proofs.Refinement", "--report", f"audit/{report}.json")
+        project = Path(f"contracts/{contract}/verification")
+        python(f"audit-{report}", "tools/axiom-audit.py", project, "--no-build",
+               "--allow-sorry-module", "Proofs.Refinement", "--report", f"audit/{report}.json", *pinned(project))
     for project in contract_projects:
         name = project.parent.name
         python(f"audit-contract-{name}", "tools/axiom-audit.py", project.relative_to(root),
-               "--no-build", "--report", f"audit/{name}.json")
+               "--no-build", "--report", f"audit/{name}.json", *pinned(project.relative_to(root)))
     generated = root / "audit/periodic-runtime-configs"
     add("runtime-config-generation", "", "cargo", "run", "--locked", "--release", "--manifest-path",
         "tools/dump-runtime-config/Cargo.toml", "--", generated)

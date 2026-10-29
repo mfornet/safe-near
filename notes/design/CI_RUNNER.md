@@ -57,8 +57,7 @@ a previous job left untracked are removed, but ignored ones stay. Jobs also
 run `git clean -ffdX -- audit/` to discard previous evidence: even when a build
 fails before producing a report, artifact uploads must not reuse an old report.
 The retained caches are the Lake builds and packages (`.lake/`, Mathlib and
-iris included), the formatter
-build (`near-lean/.lake/lean-fmt`), Rust `target/` directories and the pinned
+iris included), the formatter build (`near-lean/.lake/lean-fmt`), Rust `target/` directories and the pinned
 nearcore checkouts. All workflows of the repository share one workspace per
 runner, so whichever job built something last leaves it warm for the next.
 
@@ -75,5 +74,6 @@ seconds, and a stale `.olean` is never audited.
 ## Disk
 
 Workspaces and caches persist, so disk use grows. If it fills, stop the
-services and delete `/home/gha*/runner/_work` and `/home/gha*/.cache`; the next
+services and delete `/home/gha*/runner/_work`, `/home/gha*/.cache` and
+Lake's artifact cache `/home/gha*/.elan/toolchains/*/lake/cache`; the next
 jobs start cold.
