@@ -98,17 +98,47 @@ continuation is published to PR #40 after its validation gates pass.
   the public 66/65 pre/postconditions at a fixed cost for **every** gas ceiling. 65's bound is
   `1045 * regularOpCost + K F`. `decode_reject_cases` splits model rejection into a struct
   failure or trailing non-whitespace.
-- These are conditional building blocks, **not** a proof of the full rejecting contract:
-  228's error cases and the trailing-characters branch after a successful struct remain.
+- These are conditional building blocks, **not** a proof of the full rejecting contract.
+  The continuation below adds the trailing branch and discharges 228's EOF case.
   The wrappers use `roomS`; the full rejection contract's heap-room assumptions still need
   validation when its callees are discharged.
 - PR-wide whitespace findings are removed from `VecFromElem`, `VecWithCap`, `ParseStrEsc`
   and `StrRepeat`.
-- Validation: `just wnear-audit` passes (2746 build jobs; 412 wNEAR modules, 57373
+- Checkpoint `3bca68c` validation: `just wnear-audit` passes (2746 build jobs; 412 wNEAR modules, 57373
   declarations and 52261 theorems; only the three expected `Proofs.Refinement` sorry
   dependencies). Strict NearLogic remains at zero violations, and pinned statements match.
   The PR-wide Lean style check and `git diff --check origin/main` pass. Evidence:
   `/tmp/pr40-parser-final-audit.log` and `/tmp/pr40-parser-lean-style.log`.
+
+
+## Trailing-character and EOF rejection continuation
+
+- `AllocFinite.lean` proves `HeapModel.wf.freeList_length_le` and `heapInv_finite`:
+  distinct free-cell addresses fit in the heap's byte length, so any existential
+  free-list bound can be replaced by `2^32`. This supplies an error-only continuation
+  with a fixed finite allocation cost after `strRes` has hidden its free-list bound.
+- `SerdeRej.f66_trailing` (`SerdeTrailing.lean`) rejects non-whitespace after a parsed
+  struct, drops the parsed account string and the empty scratch, and restores the
+  complete frame. It assumes the existing struct-reading callees. Its bound is
+  `(2000 + 96*rest.length)*c + costS + costErr(2^32, input.length + 1)`.
+- `FromSliceSpec.trailing_reject_uniform` and `f65_trailing_reject_uniform`
+  (`FromSliceTrailing.lean`) connect that path to the public parser contracts, with
+  readers and costs fixed before **every** gas ceiling. 65 adds 45 regular operations.
+- **Concrete rejecting case:** `SerdeRej.f228_eof` and `rej228_eof`
+  (`SerdeStructEOF.lean`) prove that 228 rejects EOF after whitespace, by calling 322
+  with `EofWhileParsingValue`. No parser-callee specification is assumed.
+  `FromSliceSpec.f65_eof_reject_uniform` (`FromSliceEOF.lean`) carries this through
+  228 → 78 → 66 → 65 for empty and whitespace-only arguments, using the actual
+  instantiated code. `decode_eof` proves that the model rejects these inputs too.
+- The full rejecting contract remains open for the other struct error cases.
+  The accepted-prefix proof used by the trailing branch still needs the general
+  escaped/deep-reader integration; this does not expand the shallow/no-escape accepting
+  theorem's coverage by itself.
+- Current validation: `just wnear-audit` passes (2751 build jobs; 417 wNEAR modules,
+  57624 declarations and 52512 theorems; only the three expected open-refinement
+  dependencies). Strict NearLogic has zero violations, and pinned statements match.
+  PR-wide Lean style and whitespace checks pass. Evidence:
+  `/tmp/pr40-trailing-final-audit.log` and `/tmp/pr40-trailing-lean-style.log`.
 
 ## Methods
 
@@ -180,7 +210,7 @@ The texts are proved equal to the model's `Panic.message` (`PanicText`).
 ## Next steps
 
 1. **The parser, finishing `ft_balance_of`'s argument contract.**
-   1. `RejectContract`. A loose cost suffices. Use `fromSlice_eq` and the reject paths listed in M6. The conditional wrappers are proved in `SerdeRej`, `SerdeScratchDrop`, `SerdeFromReject` and `FromSliceReject`; 228 and trailing-character errors remain.
+   1. `RejectContract`. A loose cost suffices. Use `fromSlice_eq` and the reject paths listed in M6. The outer struct-error and trailing-character paths are proved; 228's EOF case is discharged through 65. Finish the other 228 error cases, and integrate the general string/ignored-value readers.
    2. Escapes in the accepting half:
       - a closed linear bound on `costRun`;
       - 380 and 169 with the copied result;

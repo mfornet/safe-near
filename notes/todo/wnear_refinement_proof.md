@@ -1190,6 +1190,15 @@ the public parser contracts uniformly in the ceiling (65: `1045*c + K F`). These
 remain conditional on the actual 228 rejection proof; trailing-character errors are separate.
 No claim that `RejectContract` is complete follows from these wrappers.
 
+**Trailing/EOF continuation:** `SerdeRej.f66_trailing` now proves the trailing-character
+branch after a successful struct, including both drops and stack restoration. The error
+allocation's cost uses `AllocInv.heapInv_finite` (`AllocFinite.lean`), derived
+from the free list's distinct addresses and the heap geometry. `FromSliceTrailing.lean`
+provides uniform public contracts for 66 and 65. `SerdeStructEOF.lean` proves 228's actual
+EOF rejection and discharges `Rej228` for whitespace-only input; `FromSliceEOF.lean`
+connects that concrete case through 65 without an assumed parser-callee contract.
+Other 228 error cases and integration of the general escaped/deep readers remain open.
+
 ### M7. State and storage
 
 Borsh encoding of the state, `LookupMap` keys, near-sdk's `env` wrappers
