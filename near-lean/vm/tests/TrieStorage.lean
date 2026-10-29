@@ -139,6 +139,11 @@ def check (cfg : RuntimeConfig) (check : String → Bool → IO Unit) : IO Unit 
           "Size of the recorded trie storage proof has exceeded the allowed limit (1.5 KB)"))
   let read := run small code 0 "read" sized storage
   check "a flat read within the proof limit succeeds" (read.succeeded && (cache read).length == 1)
+  -- nearcore observes a read's proof after it dereferences the value: the value's bytes count.
+  let base := { context trie with storageProofSize := some fun t => 1000 + 1000 * t.accounting.seen.length }
+  let o := run small code 0 "read" base storage
+  check "a read whose value takes the proof past the limit fails with RecordedStorageExceeded"
+    (o.aborted == some (.hostError (.recordedStorageExceeded 1500)) && (cache o).length == 1)
   let write := run cfg code 0 "write" sized storage
   check "the same write within the v86 limit succeeds" write.succeeded
   let unchecked := run small code 0 "write" (context trie) storage

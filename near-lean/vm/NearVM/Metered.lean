@@ -968,8 +968,6 @@ private def prepareStorageCallAux (name : String) (before : HostStore NearState)
     let (paid, error) := bill st (totals trie)
     st := paid
     if error.isSome then return (st, error)
-    -- nearcore observes the proof after the lookup, before it reads the value.
-    if let some error := recordedStorageError st.host trie then return (st, some error)
   if name != "storage_has_key" then
     if let some pointer := pointer then
       let length := pointer.reference.2.length
@@ -998,8 +996,9 @@ private def prepareStorageCallAux (name : String) (before : HostStore NearState)
       | return (st, some (.hostError (spanReadError (a 2) (a 3))))
     trie := trie.set rawKey value
     st := { st with host := { st.host with storageAccounting := some trie } }
-  if mutation then
-    if let some error := recordedStorageError st.host trie then return (st, some error)
+  -- nearcore observes the proof once the operation is done: a read's after it dereferences
+  -- the value, so the value's bytes count.
+  if let some error := recordedStorageError st.host trie then return (st, some error)
   return (st, none)
 
 /-- Burnt gas is at least `b` and within fixed limits: what a charge preserves.

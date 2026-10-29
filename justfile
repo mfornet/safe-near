@@ -68,7 +68,7 @@ wnear-harness *args:
 
 # Audit every wNEAR model/spec/proof declaration, including transitive axioms.
 wnear-audit:
-    cd contracts/w-near/verification && lake build Model Spec Proofs Differential runtime-adapter-tests
+    cd contracts/w-near/verification && lake build Model Spec Proofs Differential runtime-adapter-tests wnear-scenarios wnear-harness
     python3 tools/axiom-audit.py contracts/w-near/verification --no-build --allow-sorry-module Proofs.Refinement --report audit/wnear.json
 
 # Compare every normalized VM observation, including gas, against pinned nearcore.
