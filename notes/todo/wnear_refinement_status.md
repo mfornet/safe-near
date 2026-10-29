@@ -383,6 +383,37 @@ continuation is published to PR #40 after its validation gates pass.
   Evidence: `/tmp/pr40-trace-result-final-audit.log` and
   `/tmp/pr40-trace-result-style.log`.
 
+
+## Copied value-reader continuation
+
+- `SerdeDeStrEsc.f380_copied` proves the actual successful `deserialize_str` path
+  through the general 646 parser and `StringVisitor::visit_str`. Scratch and the
+  newly allocated owned `String` remain separate live allocations in one heap.
+  The result retains the parser's capacity/free-list endpoint and memory bounds.
+- `f380_copied_growth` exposes linear instruction work plus the closed scratch
+  growth budget and the owned-string allocation/copy cost. `strRun_size` proves
+  decoded bytes and the remaining suffix fit the encoded input, so no extra
+  decoded-size premise is required. Allocation room is required at the maximum
+  memory length charged by the trace; actual alignment and positivity come from
+  the heap invariant, and `roomFor_le` transfers that room to the actual memory.
+- `SerdeAccountIdEsc.f379_copied` and `f169_copied` carry this through the String
+  wrapper and successful `ValidAccountId::try_from`. They restore complete 240-byte
+  and 288-byte frames respectively, with depth premises `d + 32` and `d + 33`.
+  `f169_copied_model` starts directly from the JSON model's decoded string and
+  `validAccountIdBytes`; it derives the exact parser run and UTF-8 validity.
+- These prove successful copied values under explicit reader-room, allocation-room
+  and gas premises. The complete escaped accepting argument contract still needs
+  changing-state struct-reader hypotheses, escaped keys, and absorption of the
+  growth/owned-copy charges into the unchanged method allowance. Rejection and
+  deep ignored values remain open; the completed-method count stays six.
+- Validation: `just wnear-audit` passes (2780 build jobs; 446 wNEAR modules,
+  62022 declarations and 56768 theorems). Only the three existing dependencies on
+  `Proofs.Refinement` use `sorryAx`; strict NearLogic has zero violations and
+  statement pins match. Lean MCP verifies `f169_copied` and `f169_copied_model`
+  with only the standard three axioms. Changed-source Lean style and whitespace
+  checks pass. Evidence: `/tmp/pr40-copied-values-final-audit.log` and
+  `/tmp/pr40-copied-values-style.log`.
+
 ## Methods
 
 There are 15 exported methods; six now have complete per-call refinement proofs under their protocol premises.
@@ -462,7 +493,8 @@ The texts are proved equal to the model's `Panic.message` (`PanicText`).
         state instead of reusing the borrowed-key `Hyp646` unchanged;
       - keep the all-outcome `costRun` separate: it has a proved quadratic lower
         bound even on accepted newline escapes (`StrCostLower`);
-      - 380 and 169 with the copied result;
+      - integrate the proved successful copied 380/379/169 contracts into the
+        changing-state struct-value hypothesis;
       - `Hyp646` for escaped keys;
       - 652 (`ignore_escape`).
    3. Ignored values nested deeper: 84 grows the scratch from capacity 0, and `Hyp81` must allow changes to the heap and the scratch.

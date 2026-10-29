@@ -1163,9 +1163,16 @@ round).* Proved, no `sorry`, standard axioms only:
      Left: absorb this budget into the method allowance using the reachable heap
      invariant. Generalize the old heap-preserving struct-reader hypotheses for
      changing scratch state; do not assume a uniform bound for arbitrary initial
-     free lists. Then integrate
-     `deserialize_str` (380) and `ValidAccountId::deserialize` (169) on escaped input
-     (they still use `f646_spec_noesc`).
+     free lists. `SerdeDeStrEsc.f380_copied_growth` now integrates the successful
+     copied path through 646 and 633, retaining both scratch and the owned string
+     in the allocator invariant. `SerdeAccountIdEsc.f379_copied` and
+     `f169_copied_model` carry it through 379 and the valid-account-id conversion,
+     starting from the model's decoded string. They require allocation room at
+     the trace's maximum memory length and retain all growth/owned-copy charges.
+     Their complete frames/depth premises are 240 bytes / `d + 32` for 379 and
+     288 bytes / `d + 33` for 169. Integrating these changing-state contracts into
+     the struct-value hypothesis remains open; the older no-escape interfaces
+     are unchanged. General rejecting value paths remain open.
 
    `ignore_str` (650) and `ignore_escape` (652) are the same scan without UTF-8. Their spec
    is acceptance and the rest, as `stringBody` gives them, ignoring its first component.
