@@ -733,6 +733,9 @@ by layer, with their sizes and roles, and which other methods' parsers share the
   an error; stack 96. Tactic macros `end_head`, `store_code`, `err_call`, `err_end`, `eat_ok`,
   `ok_tail`; the byte tests `byte_is58`, `byte_is125`, `byte_is44`, `byte_is93`, `byte_is34`,
   `eq_is125`, `ne_is44`, `some_bit` (each `decide`d over the 256 bytes).
+* `end_seq` (91), `SerdeEndSeq.lean` (`f91_spec`): `]` eaten and 0, or the box (EOF, `TrailingComma`
+  after `,` then `]`, `TrailingCharacters`), the reader somewhere. Cost `(400 + 96·w + 96·w')·c`, `w'` the
+  whitespace after a `,`, plus `costErr cfg F (len + 1) + 20·c` on an error (`costErr_mono`); stack 112.
 * `next_value_seed`, `SerdeValueSeed.lean`: 201 (`f201_of_81`) and 205 (`f205_of_169`) from any
   specification of the value reader (81, 169) at the reader after the colon, given as a
   hypothesis in the style of `f65_of_66`. So they hold for today's escape-free 169 and for its
@@ -766,7 +769,7 @@ digit, the model one step later), changes no outcome inside a struct.
 *What is left for `FromTraitContract`.*
 
 * 193 (`next_key_seed`: the first/`,` logic, `parse_str` into the scratch, then 194), 214 (the
-  array's element), 91 (`end_seq`), 228 (the struct) and 66. The plan: prove the accepting half
+  array's element), 228 (the struct) and 66. The plan: prove the accepting half
   first, with `fromSlice … = some a` as the hypothesis; every rejecting branch of 228/193 is then
   closed by `fromSlice_eq`, and 340, 165, 166, 177, 326 and 92 are not needed for it. The
   rejecting half needs them, with a loose cost.

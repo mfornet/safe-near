@@ -83,7 +83,7 @@ grammar function.
 | 214 | 225 | `SeqAccess::next_element_seed` (the array form `["<a>"]`): 169 |
 | 89 | 61 | `parse_object_colon`. Proved (`SerdeEnds.f89_spec`) |
 | 90 | 75 | `end_map`: `}`, else `TrailingComma`, `TrailingCharacters` or EOF. Proved (`SerdeEnds.f90_spec`) |
-| 91 | 132 | `end_seq`: the same for `]` |
+| 91 | 132 | `end_seq`: the same for `]`. Proved (`SerdeEndSeq.f91_spec`) |
 | 177 | 11 | a missing `account_id`: `missing_field` (101) |
 | 166 | 47 | `duplicate_field` (a second `account_id`) |
 | 165 | 66 | `invalid_length` (`[]`) |
