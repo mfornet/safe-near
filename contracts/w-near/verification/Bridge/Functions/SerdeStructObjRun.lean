@@ -524,7 +524,7 @@ theorem f228_obj (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
       ihave HS := seen_lens $$ HS
       icases HS with ⟨%mh, %Fh, %lv, %hrh, Hh, HSw⟩
       iunfold tbl at Ht
-      icases Ht with ⟨Hsl, He, Hw8, T12, T16⟩
+      icases Ht with ⟨Hsl, He, Hw8, T12, T16, Hid⟩
       icases Hsl with ⟨%sl, Hsl⟩
       rw [show de.toNat + 20 = (de + 12).toNat + 8 by simp [UInt32.toNat_add]; omega]
       icases stk_split n ((sp - 64).toNat - 272) 256 16 $$ S272 with ⟨S256, S16⟩
@@ -605,9 +605,9 @@ theorem f228_obj (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
       icases stk_split n ((sp - 64).toNat - 272 + 16) 160 96 $$ S256 with ⟨S160, S96⟩
       rw [show (sp - 64).toNat - 272 + 16 + 160 = (sp - 64).toNat - 96 by omega,
         show (sp - 64).toNat - 272 + 16 = (sp - 64).toNat - 256 by omega]
-      ihave Ht : tbl n de $$ [Hsl He Hw8 T12 T16]
+      ihave Ht : tbl n de $$ [Hsl He Hw8 T12 T16 Hid]
       · iunfold tbl
-        iframe He Hw8 T12 T16
+        iframe He Hw8 T12 T16 Hid
         iexists 0
         rw [show de.toNat + 20 = (de + 12).toNat + 8 by simp [UInt32.toNat_add]; omega]
         iexact Hsl

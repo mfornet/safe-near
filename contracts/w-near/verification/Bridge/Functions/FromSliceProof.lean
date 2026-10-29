@@ -49,11 +49,11 @@ theorem acceptContract (K0 K1 X : Nat) : AcceptContract (GF := GF) 400 K0 K1 X :
       vt 0 1057464 idx 0 578 ∗ heapInv 0 2048 hl live F ∗ 0 ↦[wms][ out.toNat ] ob ∗
       sliceRead 0 rd ptr (UInt32.ofNat bs.length) 0 ∗ 0 ↦[wms][ ptr.toNat ] bs ∗
       0 ↦[wms][ 1062392 ] ParseStr.escTable ∗ 0 ↦[wms][ 1071704 ] FromUtf8Gen.utf8Width ∗
-      0 ↦[wms][ 1051092 ] WNear.BalanceOfArgs.keyBytes))
+      0 ↦[wms][ 1051092 ] WNear.BalanceOfArgs.keyBytes ∗ 0 ↦[wms][ 1048576 ] SerdeIdent.identBytes))
     (Q := fun _ rs => iprop(⌜rs = []⌝ ∗ 0 ↦[wg] ⟨gt, .i32 sp⟩ ∗ stk 0 (sp.toNat - 400) 400 ∗
       vt 0 1057464 idx 0 578 ∗ sliceRead 0 rd ptr (UInt32.ofNat bs.length) 0 ∗ 0 ↦[wms][ ptr.toNat ] bs ∗
       0 ↦[wms][ 1062392 ] ParseStr.escTable ∗ 0 ↦[wms][ 1071704 ] FromUtf8Gen.utf8Width ∗
-      0 ↦[wms][ 1051092 ] WNear.BalanceOfArgs.keyBytes ∗
+      0 ↦[wms][ 1051092 ] WNear.BalanceOfArgs.keyBytes ∗ 0 ↦[wms][ 1048576 ] SerdeIdent.identBytes ∗
       ∃ (p cap : UInt32), 0 ↦[i32][ out.toNat ] 0 ∗ 0 ↦[i32][ out.toNat + 4 ] p ∗
         0 ↦[i32][ out.toNat + 8 ] cap ∗ 0 ↦[i32][ out.toNat + 12 ] (UInt32.ofNat a.val.utf8ByteSize) ∗
         strRes 0 2048 live a p cap)) ?hP ?hQ)
@@ -63,12 +63,12 @@ theorem acceptContract (K0 K1 X : Nat) : AcceptContract (GF := GF) 400 K0 K1 X :
     iunfold pre66 at HP
     icases HP with ⟨%ha, Hg, Hsr, Hs, Ho, Hbs, Hro, Hvt, Hh⟩
     iunfold roData at Hro
-    icases Hro with ⟨He, Hw, Hk⟩
-    iframe Hg Hsr Hs Ho Hbs He Hw Hk Hvt Hh
+    icases Hro with ⟨He, Hw, Hk, Hid⟩
+    iframe Hg Hsr Hs Ho Hbs He Hw Hk Hid Hvt Hh
     ipureintro; exact ha
   case hQ =>
     intro args rs
-    iintro ⟨-, %hrs, Hg, Hs, Hvt, Hsr, Hbs, He, Hw, Hk, %p, %cap, W0, W4, W8, W12, Hstr⟩
+    iintro ⟨-, %hrs, Hg, Hs, Hvt, Hsr, Hbs, He, Hw, Hk, Hid, %p, %cap, W0, W4, W8, W12, Hstr⟩
     iunfold post66
     iframe Hg Hs Hbs Hvt
     isplitr
@@ -78,9 +78,9 @@ theorem acceptContract (K0 K1 X : Nat) : AcceptContract (GF := GF) 400 K0 K1 X :
       iexists UInt32.ofNat bs.length
       iexists 0
       iexact Hsr
-    isplitl [He Hw Hk]
+    isplitl [He Hw Hk Hid]
     · iunfold roData
-      iframe He Hw Hk
+      iframe He Hw Hk Hid
     iunfold strRes at Hstr
     icases Hstr with ⟨%mlen', %F', %⟨hp, hcap, -⟩, Hbytes, Hblk, Hh⟩
     iunfold okAt
