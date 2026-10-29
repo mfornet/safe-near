@@ -10,7 +10,7 @@ import Bridge.Functions.PanicFmt
 [p + 4] = 0 (string: None):
   String::new() (1, 0, 0) at sp + 24;  [sp + 36] := sp + 24
   copy the Arguments at [p] (24 bytes) to sp + 40
-  core::fmt::write(sp + 36, 1065680, sp + 40) (872)     ;; the sink 799 (table 165)
+  core::fmt::write(sp + 36, 1065680, sp + 40) (872)     ;; the sink 799 (table 166)
   move the String to p + 4  (the old one is None: no drop)
 out := (p + 4, 1066400)
 ```
@@ -22,7 +22,7 @@ The formatting is `format_args!("{}", msg)` (`expect_failed`'s), on 826's `Strin
 
 `f826_expect`: `PanicWithHook.GetSpec` for 826 on `PanicFmt.fmtPayload` with the `Arguments` of
 `expect_failed` (`argsHead`, `expectArgs`) and `getEnv` (the piece `""`, the table entries 195 and
-165, the message's bytes, the sink's vtable slot, the heap); after it, the `String` holding `msg` is at
+166, the message's bytes, the sink's vtable slot, the heap); after it, the `String` holding `msg` is at
 `p + 4` (`GetSink.gsW`, the heap allocated once if `msg ≠ []`) and the rest is given back.
 -/
 
@@ -356,13 +356,13 @@ theorem gsW_cells (n maxP hl : Nat) (live : List (Nat × Nat)) (F : Nat) (v idx 
 /-! ## 826 -/
 
 /-- What 826 reads besides the payload, the `Arguments`' header and the heap: the piece `""` at
-1070628, the table entries 195 (880) and 165 (799, the sink's `write_str`), the message's bytes, the
+1070628, the table entries 195 (880) and 166 (799, the sink's `write_str`), the message's bytes, the
 sink's vtable slot. -/
 def getData (n ta : Nat) (A : Nat → Nat) (m : UInt32) (msg : List UInt8) : IProp GF :=
   iprop((n ↦[i32][ (1070628 : UInt32).toNat + 8 * 0 ] 1067136 ∗
       n ↦[i32][ (1070628 : UInt32).toNat + 8 * 0 + 4 ] 0) ∗
     ta ↦[wt][ (195 : UInt32).toNat ] Ref.func (A 880) ∗ n ↦[wms][ m.toNat ] msg ∗
-    (n ↦[i32][ (1065680 : UInt32).toNat + 12 ] 165 ∗ ta ↦[wt][ (165 : UInt32).toNat ] Ref.func (A 799)))
+    (n ↦[i32][ (1065680 : UInt32).toNat + 12 ] 166 ∗ ta ↦[wt][ (166 : UInt32).toNat ] Ref.func (A 799)))
 
 /-- The code 826 runs (persistent). -/
 def code826 (n maxP inst : Nat) (mi : ModuleInst) (A : Nat → Nat) : IProp GF :=
@@ -434,7 +434,7 @@ theorem f826_expect (cfg : WasmConfig) (lim : ExecLimits) (d inst : Nat) (mi : M
         gsW n maxP hl live F (s - 64 + 24) idx ta (A 578) w)) B (costG cfg F B) Cg $$ [Hi H856 H880 H799 Sw]
   · iunfold CX1; iframe Hi H856 H880 H799 Sw
   have S872 := f872_gen (GF := GF) cfg lim (d + 1) types[15]! rfl inst mi A n g ta hm (by omega) Cg gt (s - 64)
-    (s - 64 + 36) 1065680 (s - 64 + 40) 1070628 (s8 + 40) 165 1 (by decide) (by omega) (by rw [har]; omega) (by simp)
+    (s - 64 + 36) 1065680 (s - 64 + 40) 1070628 (s8 + 40) 166 1 (by decide) (by omega) (by rw [har]; omega) (by simp)
     (by simp only [UInt32.reduceToNat]; rw [hap]; omega) (fun _ => 1067136) (fun _ => 0) (fun _ => s8 + 8) (fun _ => 195) (fun _ => A 880)
     (fun _ => f880) (A 799) f799
     (CX1 cfg lim D inst mi A n g gt (s - 64 + 36) (A 799) f799
@@ -444,7 +444,7 @@ theorem f826_expect (cfg : WasmConfig) (lim : ExecLimits) (d inst : Nat) (mi : M
     (StX n (s - 64) (fun w => iprop(n ↦[i32][ (s - 64 + 36).toNat ] (s - 64 + 24) ∗
         gsW n maxP hl live F (s - 64 + 24) idx ta (A 578) w)) [] (s8 + 8) m l msg)
     (costG cfg F B) (cost880 cfg f799 (costG cfg F B)) (KBX cfg f799 (costG cfg F B))
-    (hypX1 cfg lim (d + 1) inst mi A n g ta hm D (by omega) (by omega) Cg gt (s - 64) (s - 64 + 36) 1065680 165
+    (hypX1 cfg lim (d + 1) inst mi A n g ta hm D (by omega) (by omega) Cg gt (s - 64) (s - 64 + 36) 1065680 166
       (s8 + 40) (s8 + 8) m l 1067136 (A 799) f799 _ B (costG cfg F B) [] msg (by omega) (by omega) hmsg hml
       (by simpa using hmB) rfl)
   rw [show 2 * (1 : UInt32).toNat = 2 from rfl, show (1 : UInt32).toNat = 1 from rfl] at S872
