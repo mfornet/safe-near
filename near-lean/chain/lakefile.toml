@@ -9,6 +9,11 @@ version = "0.1.0"
 defaultTargets = ["NearChain"]
 packagesDir = "../.lake/packages"
 
+# Share build outputs between checkouts (worktrees, CI runs) through Lake's
+# artifact cache, and keep them in .lake/build, where our tools look for them.
+enableArtifactCache = true
+restoreAllArtifacts = true
+
 [[require]]
 name = "NearRuntime"
 path = "../runtime"

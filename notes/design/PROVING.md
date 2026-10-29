@@ -23,6 +23,17 @@ when the named declaration passes the checks below.
 `just sorries <contract>` lists what is still open. Automation and exploratory
 tools are fine during development, as long as the result passes these checks.
 
+A proof also counts only for the statement we reviewed. A contract's
+`verification/statements.json` names the modules and theorems that state what
+is proved (for wNEAR: `Spec`, the interface's `ContractModel` and `Refines`,
+and the theorem that closes each spec), and `verification/STATEMENTS.md`
+holds each of those statements as Lean prints it, with a hash of its terms.
+The audit fails when the build differs from that file, so weakening a
+statement, for example with an extra hypothesis the proof never uses, cannot
+pass as a proof fix: the pull request must regenerate the file
+(`just wnear-pin-statements`), and the change shows in its diff. The `wNEAR`
+workflow runs this audit on every pull request that can reach the proofs.
+
 ## Before proving a refinement
 
 Stress the statement before trying to prove it. Differential scenarios run

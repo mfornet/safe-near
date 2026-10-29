@@ -3,7 +3,9 @@
 The real-Lean artifact regression is check_axiom_audit.py.
 """
 
+import contextlib
 import importlib.util
+import io
 from pathlib import Path
 import subprocess
 import tempfile
@@ -49,6 +51,40 @@ class AxiomAuditPolicyTests(unittest.TestCase):
                          [complete, compiler, mixed])
         self.assertEqual(AUDIT.failing_violations(violations, False, []), violations)
         self.assertEqual(AUDIT.failing_violations(violations, True, []), [compiler, mixed])
+
+
+class StatementPinTests(unittest.TestCase):
+    def statement(self, name, text, hash=1, module="Spec"):
+        return dict(module=module, name=name, text=text, hash=hash)
+
+    def test_pin_file_lists_each_statement_once_and_rejects_missing_pins(self):
+        with tempfile.TemporaryDirectory(prefix="safe-near-pins-") as directory:
+            config = Path(directory) / "statements.json"
+            config.write_text('{"modules": ["Spec"], "declarations": ["P.closes"]}')
+            spec = self.statement("Spec.Holds", "def Spec.Holds : Prop :=\n  True", 255)
+            proof = self.statement("P.closes", "theorem P.closes : Spec.Holds", 2, "Proofs")
+            # Split audit groups both see imported statements; the file has them once.
+            rendered = AUDIT.render_statements(config, [dict(statements=[spec, proof]),
+                                                        dict(statements=[spec])])
+            self.assertEqual(rendered.count("`Spec.Holds`"), 1)
+            self.assertIn("(hash `00000000000000ff`)", rendered)
+            self.assertLess(rendered.index("## Proofs"), rendered.index("## Spec"))
+            with self.assertRaisesRegex(RuntimeError, "P.closes"):
+                AUDIT.render_statements(config, [dict(statements=[spec])])
+
+    def test_changed_statement_fails_until_the_pin_file_is_updated(self):
+        with tempfile.TemporaryDirectory(prefix="safe-near-pins-") as directory:
+            config = Path(directory) / "statements.json"
+            config.write_text('{"modules": ["Spec"]}')
+            original = [dict(statements=[self.statement("Spec.Holds", "def Spec.Holds : Prop :=\n  True")])]
+            weakened = [dict(statements=[self.statement("Spec.Holds", "def Spec.Holds : Prop :=\n  False", 2)])]
+            with contextlib.redirect_stdout(io.StringIO()) as output:
+                self.assertFalse(AUDIT.check_statements(config, original, update=False))
+                self.assertTrue(AUDIT.check_statements(config, original, update=True))
+                self.assertTrue(AUDIT.check_statements(config, original, update=False))
+                self.assertFalse(AUDIT.check_statements(config, weakened, update=False))
+            self.assertIn("-  True\n+  False", output.getvalue())
+            self.assertIn("True", (Path(directory) / "STATEMENTS.md").read_text())
 
 
 if __name__ == "__main__":

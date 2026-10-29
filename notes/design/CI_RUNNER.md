@@ -53,5 +53,6 @@ The runner updates itself when GitHub releases a new version.
 ## Disk
 
 Workspaces and caches persist, so disk use grows. If it fills, stop the
-services and delete `/home/gha*/runner/_work` and `/home/gha*/.cache`; the next
+services and delete `/home/gha*/runner/_work`, `/home/gha*/.cache` and
+Lake's artifact cache `/home/gha*/.elan/toolchains/*/lake/cache`; the next
 jobs start cold.

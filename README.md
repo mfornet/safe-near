@@ -28,7 +28,8 @@ just                      # list all recipes
 just list                 # contracts, and which have a verification project
 just build w-near         # build a contract's model, specs and proofs
 just blueprint w-near     # render the blueprint linking statements to proofs
-just wnear-audit          # check proofs have no sorry or extra axioms
+just wnear-audit          # check proofs have no sorry or extra axioms, and the pinned statements
+just wnear-pin-statements # accept a change to a pinned statement (STATEMENTS.md)
 just near-build           # build the Wasm interpreter and NEAR runtime
 just near-test            # run the runtime test suites
 just ci-check             # the fast checks CI runs on every push
@@ -37,11 +38,18 @@ just ci-check             # the fast checks CI runs on every push
 Heavy validation (conformance against a pinned nearcore checkout, full builds)
 runs locally with `just periodic-check <nearcore-checkout>`; see
 [periodic checks](notes/design/PERIODIC_CHECK.md).
-Two Lean workflows run automatically, each only when its packages change: the
+Three Lean workflows run automatically, each only when its packages change: the
 `near-lean` workflow builds the chain package and everything below it, so a
-change that breaks the build is caught on its pull request; the `wasm-logic`
+change that breaks the build is caught on its pull request; the `wNEAR`
+workflow builds the wNEAR proofs and audits their axioms and pinned statements
+([proving](notes/design/PROVING.md)); the `wasm-logic`
 workflow builds and checks the separation logic over the Wasm runtime
 (`near-lean/wasm-logic`), which takes a few minutes with iris-lean cached.
+
+Every Lake package enables Lake's artifact cache, so a module built once (in
+any worktree, by any branch) is reused from
+`~/.elan/toolchains/<toolchain>/lake/cache` instead of rebuilt. The cache is
+safe to delete; it only grows, so clear it now and then.
 
 ## Contracts dataset
 
