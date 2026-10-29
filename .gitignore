@@ -15,3 +15,6 @@ audit/
 
 # Validated syntax-formatting results (one cache per Lake package).
 .lean-fmt-cache/
+
+# The pinned nearcore checkout of runtime-reference.yml, kept between CI jobs.
+/reference-nearcore/

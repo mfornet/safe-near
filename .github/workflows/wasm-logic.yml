@@ -2,8 +2,8 @@ name: wasm-logic
 
 # The separation logic over the Wasm runtime (near-lean/wasm-logic). Unlike
 # the other Lean suites, which run in the periodic check, this runs on every
-# change to the logic or to the runtime it is about: with iris-lean cached it
-# takes a few minutes. The mutation test (scripts/mutation-test.py) is slower
+# change to the logic or to the runtime it is about: with iris-lean already
+# built in the runner's workspace it takes a few minutes. The mutation test (scripts/mutation-test.py) is slower
 # and runs in the periodic check only.
 on:
   push:
@@ -44,18 +44,16 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
-
-      # iris-lean is a git dependency compiled from source; cache it with its build.
-      - uses: actions/cache@v5
         with:
-          path: near-lean/.lake/packages/iris
-          key: lake-iris-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('near-lean/wasm-logic/lake-manifest.json', 'near-lean/wasm-logic/lean-toolchain') }}
+          clean: false
+      - run: git clean -ffd
 
       # Builds every module, which also runs the rule coverage check
       # (Coverage.lean) and the kernel checks that the examples' bytes decode,
       # validate and link to the modules the proofs are about.
       - uses: leanprover/lean-action@v1
         with:
+          use-github-cache: false
           lake-package-directory: near-lean/wasm-logic
           build-args: --wfail
           use-mathlib-cache: false
@@ -63,7 +61,7 @@ jobs:
       # Every declaration may depend only on propext, Classical.choice and
       # Quot.sound: no sorry, no native_decide.
       - name: Axiom audit
-        run: python3 tools/axiom-audit.py near-lean/wasm-logic --report audit/wasm-logic.json --no-build
+        run: python3 tools/axiom-audit.py near-lean/wasm-logic --report audit/wasm-logic.json
 
       # Must match the pin in near-lean/wasm-logic/scripts/check-wasm-bytes.sh.
       - name: Install wasm-tools

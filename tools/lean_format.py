@@ -17,15 +17,21 @@ import subprocess
 import sys
 import tempfile
 
-from check_lean_toolchains import repository_files
+from check_lean_toolchains import changed_files, repository_files
 
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def source_groups(root, requested, pin):
+def source_groups(root, requested, pin, changed=None):
+    """Package sources grouped by package. `changed` narrows the default
+    selection: what it excludes is skipped silently, as for a full run."""
     files = repository_files(root)
     owned = {p for p in files if p.suffix == ".lean" and (root / p).is_file()}
+    if changed is not None:
+        owned &= changed
+        if not owned:
+            return {}, []
     packages = {p.parent for p in files if p.name in {"lakefile.toml", "lakefile.lean"}
                 and (root / p).is_file()}
     groups = defaultdict(list)
@@ -45,7 +51,7 @@ def source_groups(root, requested, pin):
             skipped.append(path)
             continue
         groups[package].append(path.relative_to(package))
-    if not groups:
+    if not groups and changed is None:
         raise ValueError("no handwritten Lean package sources selected")
     return dict(sorted(groups.items())), skipped
 
@@ -107,13 +113,21 @@ def main():
     modes.add_argument("--fix", action="store_true", help="publish validated formatting")
     parser.add_argument("--workers", type=int, default=2)
     parser.add_argument("--build-only", action="store_true", help="prepare the pinned formatter")
+    parser.add_argument("--changed-from", metavar="REV",
+                        help="only the package sources that differ from this revision")
     parser.add_argument("files", nargs="*", type=Path, help="repository-relative files; default: all package sources")
     args = parser.parse_args()
     try:
         if args.workers < 1:
             raise ValueError("workers must be positive")
+        if args.changed_from and args.files:
+            raise ValueError("--changed-from cannot be combined with files")
         pin = json.loads((ROOT / "tools/lean_format_tool.json").read_text())
-        groups, skipped = source_groups(ROOT, args.files, pin)
+        changed = changed_files(ROOT, args.changed_from) if args.changed_from else None
+        groups, skipped = source_groups(ROOT, args.files, pin, changed)
+        if changed is not None and not groups and not args.build_only:
+            print(f"No Lean package source changed since {args.changed_from}.")
+            return 0
         binary, environment = formatter()
         if args.build_only:
             return 0
