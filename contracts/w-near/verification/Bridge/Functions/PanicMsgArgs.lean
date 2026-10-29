@@ -1,4 +1,4 @@
-import Bridge.Functions.PanicMsg
+import Bridge.Functions.PanicDisplayMsg
 
 /-!
 # The two messages of `core`'s panics, on a sink
@@ -52,7 +52,7 @@ theorem msgW_str (cfg : WasmConfig) (lim : ExecLimits) (inst : Nat) (mi : Module
     (hpa : pa.toNat + 8 ≤ 2 ^ 32) :
     inst ↪[inst] mi ∗ a ↪[wf] FuncInst.wasm types[15]! inst code ∗
       SinkW cfg lim (D + 1) inst mi n g gt data code W B Kw Cg ⊢
-      MsgW (GF := GF) cfg lim D inst mi n g ta gt data vtab idx a W B pa 1067136 1 0 (XmS n pa m l msg) msg
+      MsgW (GF := GF) cfg lim D inst mi n g ta gt data vtab idx a W B pa 1067136 1 0 (PanicDisplayMsg.XmT ta A (XmS n pa m l msg)) msg
         (costP cfg code Kw) Cg := by
   iintro ⟨#Hi, #Ha, #Sw⟩
   iunfold MsgW
@@ -75,33 +75,33 @@ theorem msgW_str (cfg : WasmConfig) (lim : ExecLimits) (inst : Nat) (mi : Module
         w (w ++ msg) msg iprop(n ↦[wms][ m.toNat ] msg) (by omega) le_rfl (by omega) hmsg hml
         (by omega) rfl (by iintro H; iframe H; iintro H; iexact H)
       iexact Sw)
-  have S' := S.trans (MFunSpec_frame (GF := GF) (Fr := iprop(emp))
+  have S' := S.trans (MFunSpec_frame (GF := GF) (Fr := iprop(ta ↦[wt][ (195 : UInt32).toNat ] Ref.func (A 880)))
     (P' := fun args => iprop(⌜args = [.i32 data, .i32 vtab, .i32 (sp + 8)]⌝ ∗ g ↦[wg] ⟨gt, .i32 sp⟩ ∗
       argsT n (sp + 8) pa 1067136 1 0 ∗ (stk n (sp.toNat - 160) 160 ∗ n ↦[i32][ vtab.toNat + 12 ] idx ∗
-        ta ↦[wt][ idx.toNat ] Ref.func a ∗ W w ∗ XmS n pa m l msg)))
+        ta ↦[wt][ idx.toNat ] Ref.func a ∗ W w ∗ PanicDisplayMsg.XmT ta A (XmS n pa m l msg))))
     (Q' := fun _ rs => iprop(⌜rs = [.i32 0]⌝ ∗ g ↦[wg] ⟨gt, .i32 sp⟩ ∗
       argsT n (sp + 8) pa 1067136 1 0 ∗ (stk n (sp.toNat - 160) 160 ∗ n ↦[i32][ vtab.toNat + 12 ] idx ∗
-        ta ↦[wt][ idx.toNat ] Ref.func a ∗ W (w ++ msg) ∗ XmS n pa m l msg)))
+        ta ↦[wt][ idx.toNat ] Ref.func a ∗ W (w ++ msg) ∗ PanicDisplayMsg.XmT ta A (XmS n pa m l msg))))
     (fun args => by
       iintro ⟨%ha, Hg, HA, Hs, V12, Ht, HW, HX⟩
-      iunfold XmS at HX
-      icases HX with ⟨X0, X4, Hm⟩
+      iunfold PanicDisplayMsg.XmT, XmS at HX
+      icases HX with ⟨T195, X0, X4, Hm⟩
       icases stkSp 112 48 (by omega) $$ Hs with ⟨Hs1, Hs2⟩
-      isplitl
+      isplitr [T195]
       · iframe Hg HA V12 Ht HW Hm X0 X4
         isplitr; · ipureintro; exact ha
         isplitl [Hs2]; · iapply stkA (by omega) $$ Hs2
         iapply stkA (by omega) $$ Hs1
-      · iempintro)
+      · iexact T195)
     (fun args rs => by
-      iintro ⟨-, %hrs, Hg, Hs2, HA, ⟨X0, X4⟩, V12, Ht, Hs1, HW, Hm⟩
+      iintro ⟨T195, %hrs, Hg, Hs2, HA, ⟨X0, X4⟩, V12, Ht, Hs1, HW, Hm⟩
       iframe Hg HA V12 Ht HW
       isplitr; · ipureintro; exact hrs
       isplitl [Hs1 Hs2]
       · iapply stkJ (a := sp.toNat - 160) (b := sp.toNat - 48) (k1 := 112) (k2 := 48) (by omega) rfl
         isplitl [Hs1]; · iapply stkA (by omega) $$ Hs1
         iexact Hs2
-      iunfold XmS; iframe X0 X4 Hm))
+      iunfold PanicDisplayMsg.XmT, XmS; iframe T195 X0 X4 Hm))
   iapply S'
   iframe Hi Ha Sw
 
@@ -114,13 +114,18 @@ def MX (n ta : Nat) (A : Nat → Nat) (e0 argp x : UInt32) : IProp GF :=
     (n ↦[i32][ argp.toNat + 8 * 0 ] x ∗ n ↦[i32][ argp.toNat + 8 * 0 + 4 ] 195 ∗
       ta ↦[wt][ (195 : UInt32).toNat ] Ref.func (A 880)))
 
+/-- `MX` without the table entry. -/
+def MX0 (n : Nat) (e0 argp x : UInt32) : IProp GF :=
+  iprop((n ↦[i32][ (1070628 : UInt32).toNat + 8 * 0 ] e0 ∗ n ↦[i32][ (1070628 : UInt32).toNat + 8 * 0 + 4 ] 0) ∗
+    (n ↦[i32][ argp.toNat + 8 * 0 ] x ∗ n ↦[i32][ argp.toNat + 8 * 0 + 4 ] 195))
+
 /-- The `&str` `(m, l)` at `x` and its bytes. -/
 def XS (n : Nat) (x m l : UInt32) (msg : List UInt8) : IProp GF :=
   iprop(n ↦[i32][ x.toNat ] m ∗ n ↦[i32][ x.toNat + 4 ] l ∗ n ↦[wms][ m.toNat ] msg)
 
 /-- What `expect_failed`'s message reads besides its header. -/
 def XmX (n ta : Nat) (A : Nat → Nat) (e0 argp x m l : UInt32) (msg : List UInt8) : IProp GF :=
-  iprop(MX n ta A e0 argp x ∗ XS n x m l msg)
+  iprop(MX0 n e0 argp x ∗ XS n x m l msg)
 
 /-- The state of `format_args!("{}", msg)`'s writes below 872's frame `s - 48`. -/
 def StX (n : Nat) (s : UInt32) (W : List UInt8 → IProp GF) (w : List UInt8) (x m l : UInt32)
@@ -242,7 +247,7 @@ theorem msgW_expect (cfg : WasmConfig) (lim : ExecLimits) (inst : Nat) (mi : Mod
     (hargp : argp.toNat + 16 ≤ 2 ^ 32) :
     CX cfg lim (D + 3) inst mi A n g gt data a code W B Kw Cg ⊢
       MsgW (GF := GF) cfg lim D inst mi n g ta gt data vtab idx a W B 1070628 argp 1 1
-        (XmX n ta A e0 argp x m l msg) msg (costN cfg code Kw (KBX cfg code Kw) 1) Cg := by
+        (PanicDisplayMsg.XmT ta A (XmX n ta A e0 argp x m l msg)) msg (costN cfg code Kw (KBX cfg code Kw) 1) Cg := by
   iintro #C
   iunfold MsgW
   imodintro
@@ -262,14 +267,16 @@ theorem msgW_expect (cfg : WasmConfig) (lim : ExecLimits) (inst : Nat) (mi : Mod
   have S' := S.trans (MFunSpec_frame (GF := GF) (Fr := iprop(emp))
     (P' := fun args => iprop(⌜args = [.i32 data, .i32 vtab, .i32 (sp + 8)]⌝ ∗ g ↦[wg] ⟨gt, .i32 sp⟩ ∗
       argsT n (sp + 8) 1070628 argp 1 1 ∗ (stk n (sp.toNat - 160) 160 ∗ n ↦[i32][ vtab.toNat + 12 ] idx ∗
-        ta ↦[wt][ idx.toNat ] Ref.func a ∗ W w ∗ XmX n ta A e0 argp x m l msg)))
+        ta ↦[wt][ idx.toNat ] Ref.func a ∗ W w ∗ PanicDisplayMsg.XmT ta A (XmX n ta A e0 argp x m l msg))))
     (Q' := fun _ rs => iprop(⌜rs = [.i32 0]⌝ ∗ g ↦[wg] ⟨gt, .i32 sp⟩ ∗
       argsT n (sp + 8) 1070628 argp 1 1 ∗ (stk n (sp.toNat - 160) 160 ∗ n ↦[i32][ vtab.toNat + 12 ] idx ∗
-        ta ↦[wt][ idx.toNat ] Ref.func a ∗ W (w ++ msg) ∗ XmX n ta A e0 argp x m l msg)))
+        ta ↦[wt][ idx.toNat ] Ref.func a ∗ W (w ++ msg) ∗ PanicDisplayMsg.XmT ta A (XmX n ta A e0 argp x m l msg))))
     (fun args => by
       iintro ⟨%ha, Hg, HA, Hs, V12, Ht, HW, HX⟩
-      iunfold XmX at HX
-      icases HX with ⟨HM, HS⟩
+      iunfold PanicDisplayMsg.XmT, XmX, MX0 at HX
+      icases HX with ⟨T195, ⟨HP0, HA0, HA4⟩, HS⟩
+      ihave HM : MX n ta A e0 argp x $$ [HP0 HA0 HA4 T195]
+      · iunfold MX; iframe HP0 HA0 HA4 T195
       icases stkSp 112 48 (by omega) $$ Hs with ⟨Hs1, Hs2⟩
       isplitl
       · iframe Hg V12 Ht HM
@@ -293,7 +300,9 @@ theorem msgW_expect (cfg : WasmConfig) (lim : ExecLimits) (inst : Nat) (mi : Mod
         isplitl [Hs1]; · iapply stkA (by omega) $$ Hs1
         iexact Hs2
       isplitl [HW]; · simp only [partX]; iexact HW
-      iunfold XmX; iframe HM HS))
+      iunfold MX at HM
+      icases HM with ⟨HP0, HA0, HA4, T195⟩
+      iunfold PanicDisplayMsg.XmT, XmX, MX0; iframe T195 HP0 HA0 HA4 HS))
   iapply S' $$ C
 
 end Spec

@@ -65,7 +65,7 @@ theorem f469_msg (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
     (hwB : w0.length + (panicText text fileB line.toNat col.toNat).length ≤ B) :
     A 885 ↪[wf] FuncInst.wasm types[13]! inst f885 ∗ code885M inst mi A a code ∗
       SinkW cfg lim D inst mi n g gt data code W B Kw Cg ∗
-      MsgW cfg lim DM inst mi n g ta gt data vtab idx a W B pp argp kp k Xm text Km Cg
+      MsgW cfg lim DM inst mi n g ta gt data vtab idx a W B pp argp kp k (XmT ta A Xm) text Km Cg
       ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f469 Cg
         (fun args => iprop(⌜args = [.i32 x, .i32 f]⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗ fmtrP n ta f data vtab idx a ∗
           (stk n (s.toNat - 304) 304 ∗ W w0 ∗ (n ↦[i32][ x.toNat ] ip ∗ infoCells n ip pp0 pv a0 loc ∗
@@ -121,7 +121,7 @@ def COutM (cfg : WasmConfig) (lim : ExecLimits) (D DM inst : Nat) (mi : ModuleIn
     (B Kw : Nat) (pp argp kp k : UInt32) (Xm : IProp GF) (text : List UInt8) (Km Cg : Nat) : IProp GF :=
   iprop(A 469 ↪[wf] FuncInst.wasm types[13]! inst f469 ∗ A 885 ↪[wf] FuncInst.wasm types[13]! inst f885 ∗
     code885M inst mi A a code ∗ SinkW cfg lim D inst mi n g gt data code W B Kw Cg ∗
-    MsgW cfg lim DM inst mi n g ta gt data vtab idx a W B pp argp kp k Xm text Km Cg)
+    MsgW cfg lim DM inst mi n g ta gt data vtab idx a W B pp argp kp k (XmT ta A Xm) text Km Cg)
 
 instance (cfg : WasmConfig) (lim : ExecLimits) (D DM inst : Nat) (mi : ModuleInst) (A : Nat → Nat)
     (n g ta : Nat) (gt : GlobalType) (data vtab idx : UInt32) (a : Nat) (code : Func) (W : List UInt8 → IProp GF)
@@ -276,7 +276,7 @@ theorem toStr_msg (cfg : WasmConfig) (lim : ExecLimits) (d inst : Nat) (mi : Mod
           (costHS cfg F J (panicText text fileB line.toNat col.toNat).length
             (panicText text fileB line.toNat col.toNat).length) Cg ⊢
         MsgW cfg lim (lim.maxCallDepth - 20) inst mi n g ta gt dd 1065404 157 (A 759) W
-          (panicText text fileB line.toNat col.toNat).length pp argp kp k Xm text Km Cg) :
+          (panicText text fileB line.toNat col.toNat).length pp argp kp k (XmT ta A Xm) text Km Cg) :
     codeTSM n maxP inst mi A ⊢
       ToStr (GF := GF) cfg lim d inst mi Cg n g gt s ip S
         iprop(infoCells n ip pp0 pv a0 loc ∗

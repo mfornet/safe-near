@@ -56,6 +56,10 @@ instance (inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (a : Nat) (code : Func
     Persistent (code885M (GF := GF) inst mi A a code) := by
   unfold code885M; infer_instance
 
+/-- The table entry 195 (880) with `Xm`: the message's `Arguments` and the location share it. -/
+def XmT (ta : Nat) (A : Nat → Nat) (Xm : IProp GF) : IProp GF :=
+  iprop(ta ↦[wt][ (195 : UInt32).toNat ] Ref.func (A 880) ∗ Xm)
+
 /-- What 885 reads on the message path besides the `PanicInfo`: the pieces and their arrays, the
 table entries, the message's header and `Xm`, the location's. -/
 def XMsg (n ta : Nat) (A : Nat → Nat) (a0 pp argp kp k loc file flen line col : UInt32) (Xm : IProp GF)
@@ -72,9 +76,9 @@ def XMsg (n ta : Nat) (A : Nat → Nat) (a0 pp argp kp k loc file flen line col 
         n ↦[i32][ (1070708 : UInt32).toNat + 8 * 1 + 4 ] plenB 1) ∗
       (n ↦[i32][ (1070708 : UInt32).toNat + 8 * 2 ] pptrB 2 ∗
         n ↦[i32][ (1070708 : UInt32).toNat + 8 * 2 + 4 ] plenB 2) ∗
-      ta ↦[wt][ (195 : UInt32).toNat ] Ref.func (A 880) ∗ ta ↦[wt][ (3 : UInt32).toNat ] Ref.func (A 870)) ∗
+      ta ↦[wt][ (3 : UInt32).toNat ] Ref.func (A 870)) ∗
     (n ↦[wms][ 1070684 ] qp ∗ n ↦[wms][ 1070685 ] qcp) ∗
-    (argsH n a0 pp argp kp k ∗ Xm) ∗
+    (argsH n a0 pp argp kp k ∗ XmT ta A Xm) ∗
     XB n loc file flen line col fileB)
 
 /-- 885's cost on the message path, the activation excluded. -/
@@ -101,7 +105,7 @@ theorem f885_msg (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
     (hline : line.toNat < 10000) (hcol : col.toNat < 10000)
     (hwB : w0.length + (panicText text fileB line.toNat col.toNat).length ≤ B) :
     code885M inst mi A a code ∗ SinkW cfg lim D inst mi n g gt data code W B Kw Cg ∗
-      MsgW cfg lim DM inst mi n g ta gt data vtab idx a W B pp argp kp k Xm text Km Cg
+      MsgW cfg lim DM inst mi n g ta gt data vtab idx a W B pp argp kp k (XmT ta A Xm) text Km Cg
       ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f885 Cg
         (fun args => iprop(⌜args = [.i32 ip, .i32 f]⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗ stk n (s.toNat - 304) 304 ∗
           fmtrP n ta f data vtab idx a ∗ infoCells n ip pp0 pv a0 loc ∗
@@ -239,17 +243,17 @@ theorem f885_msg (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
   have h40 : (s - 64 + 40).toNat = (s - 64).toNat + 40 := by simp [UInt32.toNat_add, h64]; omega
   have h48' : (s - 64 - 48).toNat = (s - 64).toNat - 48 := by
     rw [UInt32.toNat_sub_of_le] <;> simp [UInt32.le_iff_toNat_le] <;> omega
-  ihave #CMh : CM cfg lim D DM inst mi A n g ta gt data vtab idx a code W B Kw pp argp kp k Xm text Km Cg
+  ihave #CMh : CM cfg lim D DM inst mi A n g ta gt data vtab idx a code W B Kw pp argp kp k (XmT ta A Xm) text Km Cg
     $$ [Hi H887 H872 Ha Sw Mw]
   · iunfold CM; iframe Hi H887 H872 Ha Sw Mw
   have SA := f872_tr (GF := GF) cfg lim (d + 1) types[15]! rfl inst mi A n g ta hm (by omega) Cg gt (s - 64) data
     vtab (s - 64 + 40) 1070688 (s - 64 + 16) idx 2 1 (by decide) (by decide) (by omega) (by omega) (by simp)
     (by simp; omega) pptrA plenA (fun _ => s - 64 + 12) (fun _ => 202) (fun _ => A 887) (fun _ => f887) a code
-    (CM cfg lim D DM inst mi A n g ta gt data vtab idx a code W B Kw pp argp kp k Xm text Km Cg)
+    (CM cfg lim D DM inst mi A n g ta gt data vtab idx a code W B Kw pp argp kp k (XmT ta A Xm) text Km Cg)
     (MM n ta A (s - 64 + 16) (s - 64 + 12))
-    (StM n (s - 64) W (w0 ++ pk12) (s - 64 + 12) a0 pp argp kp k Xm text) Kw (cost887 cfg + Km) (KBM cfg Km)
+    (StM n (s - 64) W (w0 ++ pk12) (s - 64 + 12) a0 pp argp kp k (XmT ta A Xm) text) Kw (cost887 cfg + Km) (KBM cfg Km)
     (hypA_msg cfg lim (d + 1) inst mi A n g ta hm D DM (by omega) (by omega) (by omega) Cg gt (s - 64) data vtab idx
-      (s - 64 + 16) (s - 64 + 12) a0 pp argp kp k a code W B Kw Xm text Km (w0 ++ pk12) (by omega) (by omega)
+      (s - 64 + 16) (s - 64 + 12) a0 pp argp kp k a code W B Kw (XmT ta A Xm) text Km (w0 ++ pk12) (by omega) (by omega)
       ha0b (by simp only [List.length_append, pk12_length]; rw [hPT] at hwB; omega))
   rw [show 2 * (1 : UInt32).toNat + 1 = 3 from rfl] at SA
   ihave #SA' := SA $$ CMh
@@ -350,9 +354,13 @@ theorem f885_msg (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
   ihave #SB' := SB $$ CBh
   iunfold StM at HSt
   icases HSt with ⟨LoA, HW, HXA⟩
+  iunfold XM at HXA
+  icases HXA with ⟨PQ, Y12, HAh, HXmT⟩
+  iunfold XmT at HXmT
+  icases HXmT with ⟨T195, HXm⟩
   icases stk_split' n _ 192 32 160 rfl $$ LoA with ⟨Lo0, LoB⟩
   icases (memBytes_append (GF := GF) (H := NearState) n _ (bytes32 3) (bytes32 0)).1 $$ A48 with ⟨A4, A8⟩
-  icases PB with ⟨PB0, PB1, PB2, T195, T3⟩
+  icases PB with ⟨PB0, PB1, PB2, T3⟩
   mcall SB' using [Hg LoF A0 A4 A8 A16 A20 PB0 PB1 PB2 T195 T3 M0 M4 W24 W28 W32 W36 V12 Ht LoB HW HXB]
   · iframe Hg V12 Ht
     isplitl [LoF]
@@ -400,8 +408,6 @@ theorem f885_msg (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
   icases HA with ⟨A0, A4, A8, A16, A20⟩
   iunfold MB at HM
   icases HM with ⟨PB0, PB1, PB2, ⟨M0, M4⟩, ⟨M8, M12⟩, ⟨M16, M20⟩, T195, T3⟩
-  iunfold XM at HXA
-  icases HXA with ⟨PQ, Y12, HAh, HXm⟩
   isplitl [Lo0 LoB LoF X0 Y12 M0 M4 M8 M12 M16 M20 A0 A4 A8 X52 A16 A20]
   · ihave Fr := frame64 n (s - 64).toNat $$ [X0 Y12 M0 M4 M8 M12 M16 M20 A0 A4 A8 X52 A16 A20]
     · iframe X0
@@ -434,8 +440,9 @@ theorem f885_msg (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
   isplitl [Hpk PA0 PA1 T202 PB0 PB1 PB2 T195 T3 PQ HAh HXm HXB]
   · iunfold XMsg
     simp only [UInt32.reduceToNat]
-    iframe PQ HAh HXm HXB PB0 PB1 PB2 T195 T3 PA0 PA1 T202
-    iapply memBytes_addr _ $$ Hpk; rfl
+    iframe PQ HAh HXB PB0 PB1 PB2 T3 PA0 PA1 T202
+    isplitl [Hpk]; · iapply memBytes_addr _ $$ Hpk; rfl
+    iunfold XmT; simp only [UInt32.reduceToNat]; iframe T195 HXm
   rw [← panicText_parts]
   simp only [List.append_assoc] at *
   iexact HW
