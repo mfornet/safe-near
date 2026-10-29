@@ -607,6 +607,31 @@ by layer, with their sizes and roles, and which other methods' parsers share the
   * `f648_spec_bad` is `as_str` on bytes of the input that are not UTF-8: `from_utf8` fails, then
     `InvalidUnicodeCodePoint` (code 14) through 657. With `f648_spec_valid`, `as_str` is now
     specified on every input.
+* `parse_str` (646) on every escape-free input, `ParseStrErr.lean`.
+  * `f646_spec_noesc`. From the index `i` the input is `body ++ tail`: `body` the plain bytes the
+    scan skips, `tail` empty or starting with a byte that stops the scan and is not `\`. The
+    scratch is empty. The result `res646` has four cases:
+    * `tail = []`: `Err(EofWhileParsingString)` (code 4, through 647), the reader at the end;
+    * a control byte: the reader past it, `Err(ControlCharacterWhileParsingString)` (code 15);
+    * `"` and `utf8Ok body`: `Ok(Borrowed(ptr + i, |body|))` (`ok646`), the heap unchanged;
+    * `"` and not `utf8Ok body`: `Err(InvalidUnicodeCodePoint)` (648 → 657).
+  * The cost `cost646` is `(330 + 30·|body| + cost927 |body|)·c`, plus `costErr cfg F (i + |body| + 1)`
+    on a reject. The stack is 160 bytes.
+  * `noesc_model`: on the same input, when 646 accepts, `stringBody` decodes the string whose bytes
+    are `body`; when it rejects, `stringBody` decodes no string (`none` or `some (none, _)`).
+  * The general proof is one scan loop whose exit splits four ways. The only case left in 646 is the
+    escape (`\`), which goes through the scratch appends and 649.
+* The errors that return the box, `SerdeErrRet.lean`: `error` (325, `f325_spec`, at most
+  `costErr cfg F i`), `peek_position` (640, `f640_spec`: 645 at `min (i + 1) len`) and `peek_error`
+  (322, `f322_spec`, at most `costErr cfg F (i + 1) + 20·c`).
+* A `String` from a `&str`, `SerdeString.lean`, at alignment 1 on any free list:
+  * `alloc_impl` (625, `f625_s`): `size = 0` gives the dangling pointer 1 and no allocation;
+  * `Global::allocate` (624), the layout (607/608, the code of 684/685), `RawVec::allocate_in`
+    (626, `f626_s`);
+  * `to_owned` (618, `f618_s`): the bytes copied into the fresh block (951);
+  * `visit_str` (633, `f633_s`): `Ok(String)`, `(0, p, c, c)`.
+  * `heapS` is the heap after the allocation. The cost is a constant, the copy's and the allocator's
+    `cost310W cfg F c 1`.
 
 *Tactics notes from this round.*
 
