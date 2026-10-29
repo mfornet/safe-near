@@ -1252,6 +1252,20 @@ EOF rejection and discharges `Rej228` for whitespace-only input; `FromSliceEOF.l
 connects that concrete case through 65 without an assumed parser-callee contract.
 Other 228 error cases and integration of the general escaped/deep readers remain open.
 
+**General object-key continuation (2026-10-29):** `SerdeKeyEsc.f646_key` now
+adapts the general successful 646 reader to the existing key boundary by carrying
+its additional 32 stack bytes in the abstract state. `f193_key_model` proves the
+actual next-key call for borrowed or copied model-decoded keys, including scratch
+length clearing, all three string tables, the 208-byte frame and the explicit growth
+budget. `SerdeObjectState.keyState_reuse` exposes common returned scratch coordinates
+and bounds; `parsed_capacity` preserves the next reader's capacity premise with the
+sharper bound `max oldCapacity (max 8 (2 * finalUsed))`. `AllocLivePerm.heapInv_perm`
+and `valueStorage_reuse` preserve the owned account-id String while reordering scratch
+for subsequent keys. The next task is the actual changing-state object loop; its
+value-reader interface must also cover a borrowed/plain value with already-grown
+scratch. Deep ignored values/ignored escapes, full rejection and uniform reachable
+room/gas bounds remain open. The completed-method count stays six.
+
 ### M7. State and storage
 
 Borsh encoding of the state, `LookupMap` keys, near-sdk's `env` wrappers

@@ -494,6 +494,50 @@ continuation is published to PR #40 after its validation gates pass.
   `/tmp/pr40-copied-array-entry-final-audit.log` and
   `/tmp/pr40-copied-array-entry-style.log`.
 
+## General object-key and reusable-state continuation
+
+- `SerdeKeyEsc.f646_key` adapts the general successful string reader to the existing
+  `SerdeNextKey.Spec646` boundary. The extra 32 bytes required by the 192-byte parser
+  frame travel through its abstract pre/post resources; `Spec646` and the original
+  193 body proof remain reusable. The key's decoded bytes are lent to the field
+  matcher, whether borrowed from input or copied into scratch.
+- `SerdeKeyEsc.f193_key_model` proves the actual next-key call for any key decoded
+  by `Json.stringBody`, on the first or subsequent member. It clears the physical
+  scratch length, preserves input and all three string tables, restores the complete
+  208-byte frame, and retains the concrete growth budget and returned scratch state.
+  Both borrowed and copied paths accept arbitrary initial allocated scratch capacity.
+- `sbuf_clear` forgets logical contents while retaining every byte as spare capacity;
+  the next Wasm clear updates the descriptor length. `SerdeObjectState.keyState_reuse`
+  exposes common existential scratch coordinates, memory-growth and free-list bounds.
+  `parsed_capacity` proves the next reader's `cap < 2^25` premise. Its sharper trace
+  bound is `max oldCapacity (max 8 (2 * finalUsed))`, avoiding the old additive-eight
+  estimate at the input-size boundary.
+- `AllocLivePerm.heapInv_perm` proves enumeration order is immaterial to the allocator's
+  logical live list; it changes no physical cell. `SerdeObjectState.valueStorage_reuse`
+  reorders scratch before the owned String and keeps the String's bytes, final allocator
+  bound and parser-plus-owned-copy memory bound. This supplies reusable scratch after
+  the account field has been read, while keeping every earlier live allocation.
+- These close the concrete escaped-key reader and two resource transitions needed by
+  the changing-state object invariant. The actual object loop is not yet generalized.
+  A plain account-id value after an escaped key must also accept already-grown scratch;
+  the existing copied-value theorem alone does not cover that borrowed path. Deep
+  ignored values/ignored escapes, full rejection, reachable room and uniform gas bounds
+  remain open. Six exported methods are complete under protocol premises.
+- Next implementation route: instantiate `SerdeDeStr.f380_s` for a plain value with
+  scratch already present in `live`, framing the scratch pointer/capacity and its
+  spare bytes. Its existing no-escape parser does not touch those framed bytes.
+  Normalize that borrowed result and the copied result to one owned-value/scratch
+  boundary. The object loop then needs at least the larger value-reader stack
+  footprint and costs indexed by the evolving scratch/allocator state; do not
+  reset capacity between keys or sum growth charges as if each key started empty.
+- Validation: `just wnear-audit` passes (2794 build jobs; 460 wNEAR modules,
+  62879 declarations and 57616 theorems). Only the three existing dependencies on
+  `Proofs.Refinement` use `sorryAx`; strict NearLogic has zero violations and
+  statement pins match. Lean MCP verifies `f193_key_model`, `parsed_capacity` and
+  `valueStorage_reuse` with only the standard three axioms. Changed-source Lean
+  style and whitespace checks pass. Evidence: `/tmp/pr40-key-state-final-audit.log`
+  and `/tmp/pr40-key-state-style.log`.
+
 ## Methods
 
 There are 15 exported methods; six now have complete per-call refinement proofs under their protocol premises.
@@ -576,7 +620,7 @@ The texts are proved equal to the model's `Panic.message` (`PanicText`).
       - the copied array is integrated through 214/228/78/66/65, with scratch
         cleanup; finish the object-loop/escaped-key integration and general
         argument-contract bounds, including hex-table ownership;
-      - `Hyp646` for escaped keys;
+      - integrate `SerdeKeyEsc.f193_key_model` into the changing-state object loop;
       - 652 (`ignore_escape`).
    3. Ignored values nested deeper: 84 grows the scratch from capacity 0, and `Hyp81` must allow changes to the heap and the scratch.
 2. **`ft_balance_of`, method level.** Take the parser's contracts as parameters until they are proved. The argument layer is in `EnvInput` and `ArgsLeaves`, the balance read in `LookupMapGet`/`StorageReadWrapF`.
