@@ -53,8 +53,8 @@ def fr228 (inst : Nat) (mi : ModuleInst) (out de x2 x3 x4 x5 s : UInt32) (l7 : U
 
 /-- The field read so far, at `s + 40` (`Option<ValidAccountId>`, `None` the pointer 0), and the
 heap: before it, the heap with room for an error box; after it, the string (`strRes`). -/
-def seenRes (n maxP : Nat) (live : List (Nat × Nat)) (s : UInt32) : Option WNear.AccountId → IProp GF
-  | none => iprop(∃ (mlen F : Nat) (b8 : List UInt8), ⌜roomFor4 mlen maxP 20 ∧ b8.length = 8⌝ ∗
+def seenRes (n maxP Fb : Nat) (live : List (Nat × Nat)) (s : UInt32) : Option WNear.AccountId → IProp GF
+  | none => iprop(∃ (mlen F : Nat) (b8 : List UInt8), ⌜roomFor4 mlen maxP 20 ∧ b8.length = 8 ∧ F ≤ Fb⌝ ∗
       n ↦[i32][ s.toNat + 40 ] 0 ∗ n ↦[wms][ s.toNat + 44 ] b8 ∗ heapInv n maxP mlen live F)
   | some a => iprop(∃ (p cap : UInt32), n ↦[i32][ s.toNat + 40 ] p ∗ n ↦[i32][ s.toNat + 44 ] cap ∗
       n ↦[i32][ s.toNat + 48 ] (UInt32.ofNat a.val.utf8ByteSize) ∗ strRes n maxP live a p cap)
@@ -65,7 +65,7 @@ account `a` and leaving `rF`, and the credits for the rest (`objCost`, then `E` 
 `Fr` is the rest of the state, unchanged by the loop. -/
 def inv228 (n inst : Nat) (mi : ModuleInst) (Cg c : Nat) (K646 K169 K81 : Nat → Nat)
     (dv : List UInt8 → Option (WNear.AccountId × List UInt8)) (ign : List UInt8 → Option (Unit × List UInt8))
-    (maxP : Nat) (live : List (Nat × Nat)) (out de ptr x2 x3 x4 x5 s : UInt32) (bs : List UInt8)
+    (maxP Fb : Nat) (live : List (Nat × Nat)) (out de ptr x2 x3 x4 x5 s : UInt32) (bs : List UInt8)
     (a : WNear.AccountId) (rF : List UInt8) (E R : Nat) (Fr : IProp GF) : List Wasm.Value → Frame → IProp GF :=
   fun X f => iprop(∃ (N : Nat) (first : Bool) (i : Nat) (sA : Option WNear.AccountId) (l7 : UInt64) (l8 l10 : UInt32)
       (b16 : List UInt8),
@@ -73,7 +73,7 @@ def inv228 (n inst : Nat) (mi : ModuleInst) (Cg c : Nat) (K646 K169 K81 : Nat �
       loopRes "account_id" dv ign N first sA (bs.drop i) = some (some a, rF)⌝ ∗
     credits Cg (objCost c K646 K169 K81 dv ign bs N first i + E + R) ∗
     n ↦[wms][ s.toNat + 36 ] [if first then 1 else 0] ∗ n ↦[wms][ s.toNat + 8 ] b16 ∗
-    seenRes n maxP live s sA ∗ rd n de ptr bs i ∗ Fr)
+    seenRes n maxP Fb live s sA ∗ rd n de ptr bs i ∗ Fr)
 
 theorem costEnd_ok (cfg : WasmConfig) (F K w j : Nat) (ok : Prop) [Decidable ok] (h : ok) :
     SerdeEnds.costEnd cfg F K w j ok = (K + 96 * w) * cfg.regularOpCost := by
@@ -124,14 +124,14 @@ theorem drop_pos {bs r : List UInt8} {q : Nat} (h : bs.drop q = r) (hq : q ≤ b
   have := congrArg List.length h; simp at this; omega
 
 /-- The heap inside `seenRes`, lent and given back unchanged. -/
-theorem seen_lens (n maxP : Nat) (live : List (Nat × Nat)) (s : UInt32) (sA : Option WNear.AccountId) :
-    seenRes (GF := GF) n maxP live s sA ⊢ ∃ (mlen F : Nat) (lv : List (Nat × Nat)), ⌜roomFor4 mlen maxP 20⌝ ∗
-      heapInv n maxP mlen lv F ∗ (heapInv n maxP mlen lv F -∗ seenRes n maxP live s sA) := by
+theorem seen_lens (n maxP Fb : Nat) (live : List (Nat × Nat)) (s : UInt32) (sA : Option WNear.AccountId) :
+    seenRes (GF := GF) n maxP Fb live s sA ⊢ ∃ (mlen F : Nat) (lv : List (Nat × Nat)), ⌜roomFor4 mlen maxP 20⌝ ∗
+      heapInv n maxP mlen lv F ∗ (heapInv n maxP mlen lv F -∗ seenRes n maxP Fb live s sA) := by
   iintro H
   cases sA with
   | none =>
     iunfold seenRes at H
-    icases H with ⟨%m, %F, %b8, %⟨hr, hb8⟩, H40, H44, Hh⟩
+    icases H with ⟨%m, %F, %b8, %⟨hr, hb8, hFb⟩, H40, H44, Hh⟩
     iexists m
     iexists F
     iexists live
@@ -144,7 +144,7 @@ theorem seen_lens (n maxP : Nat) (live : List (Nat × Nat)) (s : UInt32) (sA : O
     iexists F
     iexists b8
     iframe H40 H44 Hh
-    ipureintro; exact ⟨hr, hb8⟩
+    ipureintro; exact ⟨hr, hb8, hFb⟩
   | some a =>
     iunfold seenRes at H
     icases H with ⟨%p, %cap, H40, H44, H48, Hs⟩
@@ -196,10 +196,10 @@ theorem f228_obj (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
     (hlen : bs.length + 1 < 2 ^ 28) (hptr : ptr.toNat + bs.length < 2 ^ 32) (hde : de.toNat + 25 ≤ 2 ^ 32)
     (hsp : 336 ≤ sp.toNat) (hal : sp.toNat % 8 = 0) (hi : i ≤ bs.length) (hr : roomFor4 mlen maxP 20)
     (dv : List UInt8 → Option (WNear.AccountId × List UInt8)) (ign : List UInt8 → Option (Unit × List UInt8))
-    (K646 K169 K81 : Nat → Nat) (Cd : IProp GF) [Persistent Cd]
+    (K646 K169 K81 : Nat → Nat) (Fb : Nat) (Cd : IProp GF) [Persistent Cd]
     (h646 : Hyp646 cfg lim inst mi n g ta A Cg gt de ptr idx bs maxP K646 Cd)
-    (h169 : Hyp169 cfg lim inst mi n g ta A Cg gt de ptr idx bs maxP dv K169 Cd)
-    (h81 : Hyp81 cfg lim inst mi n g ta A Cg gt de ptr idx bs maxP ign K81 Cd)
+    (h169 : Hyp169 cfg lim inst mi n g ta A Cg gt de ptr idx bs maxP dv K169 Fb Cd)
+    (h81 : Hyp81 cfg lim inst mi n g ta A Cg gt de ptr idx bs maxP ign K81 Cd) (hF : F ≤ Fb)
     (hdvs : ∀ j a r, j ≤ bs.length → dv (bs.drop j) = some (a, r) → bs.drop (bs.length - r.length) = r)
     (higns : ∀ j r, j ≤ bs.length → ign (bs.drop j) = some ((), r) → bs.drop (bs.length - r.length) = r)
     (hstrs : ∀ q k r, q ≤ bs.length → stringBody (bs.drop q) [] = some (some k, r) → bs.drop (bs.length - r.length) = r)
@@ -341,7 +341,7 @@ theorem f228_obj (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
   iapply mwpi_cons
   mcredits (cfg.regularOpCost + (OC + E + R))
   iapply MemCpy.mwpi_loop0 (Cg := Cg) (R := OC + E + R)
-    (I := inv228 n inst mi Cg cfg.regularOpCost K646 K169 K81 dv ign maxP live out de ptr x2 x3 x4 x5 (sp - 64) bs a rF E R
+    (I := inv228 n inst mi Cg cfg.regularOpCost K646 K169 K81 dv ign maxP Fb live out de ptr x2 x3 x4 x5 (sp - 64) bs a rF E R
       iprop(g ↦[wg] ⟨gt, .i32 (sp - 64)⟩ ∗ stk n ((sp - 64).toNat - 272) 272 ∗ vt n 1057464 idx ta (A 578) ∗
         tbl n de ∗ n ↦[wms][ 1051092 ] WNear.BalanceOfArgs.keyBytes ∗ n ↦[wms][ de.toNat + 24 ] [127] ∗
         stk n (sp - 64).toNat 8 ∗ stk n ((sp - 64).toNat + 24) 8 ∗ stk n ((sp - 64).toNat + 52) 12 ∗
@@ -546,7 +546,7 @@ theorem f228_obj (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
           n ↦[wms][ 1071704 ] FromUtf8Gen.utf8Width ∗ n ↦[i32][ (de + 12).toNat + 8 ] 0 ∗
           ∃ q', ⌜bs.drop q' = rest1 ∧ q' ≤ bs.length⌝ ∗ rd n de ptr bs q')
       rw [hA32, show (sp - 64).toNat + 32 + 4 = (sp - 64).toNat + 36 by omega] at s193
-      generalize hKk : (800 + 96 * keyWs first bs i' + SerdeKey.cost194) * cfg.regularOpCost + K646 q = Kk at s193
+      generalize hKk : (572 + 96 * keyWs first bs i' + SerdeKey.cost194) * cfg.regularOpCost + K646 q = Kk at s193
       ihave #S193 := s193 $$ [H193c S646]
       · iframe H193c S646
       clear s193
@@ -567,16 +567,16 @@ theorem f228_obj (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
       subst hrest2
       have hvl : q1 + w1 + 1 ≤ bs.length := by have := SerdeNextKey.getElem_lt hcol; omega
       have hcost : ∃ KV OCn, objCost cfg.regularOpCost K646 K169 K81 dv ign bs (n' + 1) first i' =
-          (1200 + 96 * (keyWs first bs i' + w1) + SerdeKey.cost194) * cfg.regularOpCost + K646 q + (KV + OCn) := by
+          (942 + 96 * (keyWs first bs i' + w1) + SerdeKey.cost194) * cfg.regularOpCost + K646 q + (KV + OCn) := by
         rcases hv with ⟨hk, a', r3, hdv, -⟩ | ⟨hk, r3, hig, -⟩
         · refine ⟨K169 (q1 + w1 + 1), objCost cfg.regularOpCost K646 K169 K81 dv ign bs n' false (bs.length - r3.length), ?_⟩
           rw [objCost_field _ _ _ _ _ _ bs hend hq hs hk (by rw [hq1, hw1]; exact hdv), hq1, hw1]
         · refine ⟨K81 (q1 + w1 + 1), objCost cfg.regularOpCost K646 K169 K81 dv ign bs n' false (bs.length - r3.length), ?_⟩
           rw [objCost_ign _ _ _ _ _ _ bs hend hq hs hk (by rw [hq1, hw1]; exact hig), hq1, hw1]
       obtain ⟨KV, OCn, hOCe⟩ := hcost
-      rw [hOCe, show (1200 + 96 * (keyWs first bs i' + w1) + SerdeKey.cost194) * cfg.regularOpCost + K646 q +
+      rw [hOCe, show (942 + 96 * (keyWs first bs i' + w1) + SerdeKey.cost194) * cfg.regularOpCost + K646 q +
           (KV + OCn) + E + R =
-        60 * cfg.regularOpCost + (Kk + (140 * cfg.regularOpCost + ((200 + 96 * w1) * cfg.regularOpCost + (KV + (OCn + E + R))))) by
+        30 * cfg.regularOpCost + (Kk + (140 * cfg.regularOpCost + ((200 + 96 * w1) * cfg.regularOpCost + (KV + (OCn + E + R))))) by
           rw [← hKk]; simp only [Nat.add_mul, Nat.mul_add]; omega]
       mstep; mstep; mstep; mstep
       mcall S193 using [M32 M36 Hg S160 S16 Hrd Hsl Hkey Hvt Hh He Hw8]
@@ -625,11 +625,11 @@ theorem f228_obj (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
         mstep
         mstep_taken with decide
         iunfold seenRes at HS
-        icases HS with ⟨%mlen0, %F0, %b8, %⟨hr0, hb8⟩, S40, S44, Hh⟩
+        icases HS with ⟨%mlen0, %F0, %b8, %⟨hr0, hb8, hF0⟩, S40, S44, Hh⟩
         mstep; mstep; mstep [S40]; mstep
         mstep_taken with decide
-        have s169 := spec169_205 (GF := GF) cfg lim inst mi n g ta A Cg gt de ptr idx bs maxP dv K169 Cd h169 (d + 2)
-          (by omega) (sp - 64) (sp - 64 + 8) b16' hb16' (by omega) (by omega) (q1 + w1 + 1) a' r3 hvl mlen0 F0 live hr0 hdv
+        have s169 := spec169_205 (GF := GF) cfg lim inst mi n g ta A Cg gt de ptr idx bs maxP dv K169 Fb Cd h169 (d + 2)
+          (by omega) (sp - 64) (sp - 64 + 8) b16' hb16' (by omega) (by omega) (q1 + w1 + 1) a' r3 hvl mlen0 F0 live hr0 hF0 hdv
         rw [hA8] at s169
         ihave #S169 := s169 $$ HCd
         clear s169
@@ -837,7 +837,7 @@ theorem f228_obj (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
   iexists F
   iexists b44
   iframe M40 M44 Hh
-  ipureintro; exact ⟨hr, hb44⟩
+  ipureintro; exact ⟨hr, hb44, hF⟩
 
 end Run
 
