@@ -289,6 +289,179 @@ theorem f879_unc (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
     hlL iprop(n ↦[i32][ (sp - 48 - 16).toNat + 8 ] (sp - 48 + 16)) Fr)
   iexact HTS
 
+
+/-! ## `core::panicking::panic` (853) -/
+
+open WNear.Binary.PanicMsg (XmS msgW_str)
+open WNear.Binary.FmtWriteP (costP)
+open WNear.Binary.PanicDisplay (SinkW)
+open WNear.Binary.PanicEntries (f853_full)
+
+/-- `SinkW` is antitone in its depth bound. -/
+theorem SinkW_mono (cfg : WasmConfig) (lim : ExecLimits) (D D' inst : Nat) (mi : ModuleInst) (n g : Nat)
+    (gt : GlobalType) (data : UInt32) (code : Func) (W : List UInt8 → IProp GF) (B Kw Cg : Nat) (h : D' ≤ D) :
+    SinkW (GF := GF) cfg lim D inst mi n g gt data code W B Kw Cg ⊢
+      SinkW cfg lim D' inst mi n g gt data code W B Kw Cg := by
+  iintro #Sw
+  iunfold SinkW at Sw
+  iunfold SinkW
+  imodintro
+  iintro %d %s %p %k %w %sb %⟨hd, hs, hsb, hp, hwB⟩
+  iapply Sw $$ %d %s %p %k %w %sb %⟨by omega, hs, hsb, hp, hwB⟩
+
+/-- The cost of `panic`'s message (one piece) on `to_string`'s sink. -/
+noncomputable def costKmS (cfg : WasmConfig) (F J B : Nat) : Nat := costP cfg f759 (costHS cfg F J B B)
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 64000000 in
+/-- **`to_string` on `core::panicking::panic`'s `PanicInfo`**: `ToStr` with the bytes
+`panicText msg file line col`, on 853's frame, `hookEnvM`, the table entry 195, the message's bytes
+and the heap. -/
+theorem toStr_str (cfg : WasmConfig) (lim : ExecLimits) (d inst : Nat) (mi : ModuleInst) (A : Nat → Nat)
+    (n g ta : Nat) (hm : IfaceMod mi A n g ta) (hd : d + 27 ≤ lim.maxCallDepth) (Cg : Nat) (gt : GlobalType)
+    (s ip pp0 a0 m l loc file flen line col idx : UInt32) (S : Nat) (hS : 432 ≤ S) (hsS : S ≤ s.toNat)
+    (hs2 : s.toNat + 28 ≤ 2 ^ 32) (hip : ip.toNat + 16 ≤ 2 ^ 32) (hloc : loc.toNat + 16 ≤ 2 ^ 32)
+    (ha0 : 1 ≤ a0.toNat) (ha0b : a0.toNat + 32 ≤ 2 ^ 32)
+    (msg fileB : List UInt8) (hmsg : msg.length = l.toNat) (hml : m.toNat + l.toNat ≤ 2 ^ 32)
+    (hfl : fileB.length = flen.toNat) (hfile : file.toNat + flen.toNat ≤ 2 ^ 32)
+    (hline : line.toNat < 10000) (hcol : col.toNat < 10000)
+    (maxP hl L0 : Nat) (live : List (Nat × Nat)) (F J : Nat)
+    (HG : HsGlobal maxP L0 F J (panicText msg fileB line.toNat col.toNat).length)
+    (hl0 : hl % 65536 = 0) (hl1 : 0 < hl) (hlL : hl ≤ L0) (I Fr : IProp GF) :
+    codeTSM n maxP inst mi A ⊢
+      ToStr (GF := GF) cfg lim d inst mi Cg n g gt s ip S
+        iprop(infoCells n ip pp0 1066416 a0 loc ∗ I ∗
+          (argsHead n a0 1 0 ∗ n ↦[i32][ a0.toNat ] (a0 + 24) ∗ n ↦[i32][ (a0 + 24).toNat ] m ∗
+            n ↦[i32][ (a0 + 24).toNat + 4 ] l ∗
+            iprop(n ↦[i32][ a0.toNat + 8 ] 0 ∗ n ↦[i32][ a0.toNat + 16 ] 1067136 ∗
+              (∃ w : UInt32, n ↦[i32][ a0.toNat + 12 ] w) ∗
+              (hookEnvM n ta A loc file flen line col fileB ∗
+                (ta ↦[wt][ (195 : UInt32).toNat ] Ref.func (A 880) ∗ n ↦[wms][ m.toNat ] msg) ∗
+                (vt n 1057464 idx ta (A 578) ∗ heapInv n maxP hl live F) ∗ Fr))))
+        (costTSM cfg F J (panicText msg fileB line.toNat col.toNat).length
+          (costKmS cfg F J (panicText msg fileB line.toNat col.toNat).length))
+        (panicText msg fileB line.toNat col.toNat) := by
+  have ha24 : (a0 + 24).toNat = a0.toNat + 24 := by simp [UInt32.toNat_add]; omega
+  have ha0' : a0 ≠ 0 := by intro e; subst e; simp at ha0
+  refine ToStr_wrap cfg lim d inst mi Cg n g gt s ip S _ _ _ (α := Unit) (fun _ => True) _
+    (fun _ => iprop(infoCells n ip pp0 1066416 a0 loc ∗
+      (toStrEnvM n ta A maxP hl live F idx a0 (a0 + 24) 1067136 1 0 loc file flen line col
+        (XmS n (a0 + 24) m l msg) fileB ∗ iprop(I ∗ Fr)))) ?_ ?_
+  · intro _ _
+    exact toStr_msg cfg lim d inst mi A n g ta hm hd Cg gt s ip pp0 1066416 a0 (a0 + 24) 1067136 1 0
+      loc file flen line col idx S hS hsS hs2 hip hloc ha0' (by omega) (XmS n (a0 + 24) m l msg)
+      (costKmS cfg F J (panicText msg fileB line.toNat col.toNat).length) msg fileB hfl hfile hline hcol
+      maxP hl L0 live F J HG hl0 hl1 hlL iprop(I ∗ Fr)
+      (fun dd W => by
+        have S := msgW_str (GF := GF) cfg lim inst mi A n g ta hm (lim.maxCallDepth - 20) (by omega) Cg gt dd
+          1065404 157 (a0 + 24) m l (A 759) f759 W
+          (panicText msg fileB line.toNat col.toNat).length
+          (costHS cfg F J (panicText msg fileB line.toNat col.toNat).length
+            (panicText msg fileB line.toNat col.toNat).length) msg hmsg hml (by rw [ha24]; omega)
+        refine (?_ : _ ⊢ _).trans S
+        iintro ⟨#Hc, #Sw⟩
+        iunfold codeTSM at Hc
+        icases Hc with ⟨-, #Hk, #H759, -⟩
+        iunfold PanicDisplayMsg.code885M at Hk
+        icases Hk with ⟨#Hi, -⟩
+        iframe Hi H759
+        iapply SinkW_mono cfg lim (lim.maxCallDepth - 17) _ inst mi n g gt dd f759 W _ _ Cg (by omega) $$ Sw)
+  · iintro ⟨HI, HI8, HA, P0, P24, P28, P8, P16, ⟨%w12, P12⟩, HEnv, ⟨T195, Hm⟩, ⟨Hvt, Hinv⟩, HFr⟩
+    iexists ()
+    isplitr; · ipureintro; trivial
+    iframe HI HI8 HFr
+    iunfold argsHead at HA
+    icases HA with ⟨A4, A20⟩
+    iunfold hookEnvM at HEnv
+    icases HEnv with ⟨Hpk, PA, PB, PQ, HXB, HV, HP⟩
+    iunfold toStrEnvM, XMsg
+    iframe Hpk PA PB PQ HXB HV HP Hvt Hinv
+    iunfold argsH, argsT, XmT, XmS
+    iframe A4 A20 P0 P8 P16 P24 P28 T195 Hm
+    iexists w12
+    iexact P12
+
+/-- 853's cost on the message `msg` at the location `(file, line, col)`. -/
+noncomputable def cost853 (cfg : WasmConfig) (F J : Nat) (bs : List UInt8) (h : NearState) : Nat :=
+  180 * cfg.regularOpCost + cost817 cfg f828 (6 * cfg.regularOpCost)
+    (costTSM cfg F J bs.length (costKmS cfg F J bs.length)) bs h
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 16000000 in
+/-- **`core::panicking::panic(m, l, loc)`** (853) down to the hook's trap, unconditionally: with
+the near-sdk hook installed, the host panicked with `panicText msg file line col`. -/
+theorem f853_unc (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
+    (inst : Nat) (mi : ModuleInst) (e : Nat) (A : Nat → Nat) (n g ta : Nat) (mx : Option Nat)
+    (hm : IfaceMod mi A n g ta) (hd : d + 35 ≤ lim.maxCallDepth) (Cg : Nat) (gt : GlobalType)
+    (sp m l loc lpc : UInt32) (hloc : loc ≠ 0) (S : Nat) (hS : 432 ≤ S) (hsp : S + 160 ≤ sp.toNat)
+    (hsp2 : sp.toNat + 8 ≤ 2 ^ 32) (hal : sp.toNat % 8 = 0)
+    (file flen line col idx : UInt32) (hlocb : loc.toNat + 16 ≤ 2 ^ 32)
+    (msg fileB : List UInt8) (hmsg : msg.length = l.toNat) (hml : m.toNat + l.toNat ≤ 2 ^ 32)
+    (hfl : fileB.length = flen.toNat) (hfile : file.toNat + flen.toNat ≤ 2 ^ 32)
+    (hline : line.toNat < 10000) (hcol : col.toNat < 10000)
+    (maxP hl L0 : Nat) (live : List (Nat × Nat)) (F J : Nat)
+    (HG : HsGlobal maxP L0 F J (panicText msg fileB line.toNat col.toNat).length)
+    (hl0 : hl % 65536 = 0) (hl1 : 0 < hl) (hlL : hl ≤ L0) (Fr : IProp GF)
+    (hlen : (panicText msg fileB line.toNat col.toNat).length < 2 ^ 32)
+    (hutf : validUtf8 (panicText msg fileB line.toNat col.toNat) = true) (h : NearState)
+    (hfit : LogFits h (panicText msg fileB line.toNat col.toNat).length)
+    (hov : h.extCosts.cost "read_memory_byte" * (panicText msg fileB line.toNat col.toNat).length < 2 ^ 64) :
+    code859 inst mi A ∗ A 859 ↪[wf] FuncInst.wasm types[14]! inst f859 ∗ code817 e inst mi A n mx ∗
+      A 828 ↪[wf] FuncInst.wasm types[14]! inst f828 ∗ codeTSM n maxP inst mi A
+      ⊢ MFunSpecT (GF := GF) cfg lim d type inst mi f853 Cg
+        (fun args => iprop(⌜args = [.i32 m, .i32 l, .i32 loc]⌝ ∗ g ↦[wg] ⟨gt, .i32 sp⟩ ∗
+          stk n (sp.toNat - 80) 80 ∗
+          (stk n ((sp - 32 - 16 - 16 - 16).toNat - 80 - S) (S + 80) ∗
+            envP n ta A lpc 1066380 181 (A 828) iprop(hookEnvM n ta A loc file flen line col fileB ∗
+              (ta ↦[wt][ (195 : UInt32).toNat ] Ref.func (A 880) ∗ n ↦[wms][ m.toNat ] msg) ∗
+              (vt n 1057464 idx ta (A 578) ∗ heapInv n maxP hl live F) ∗ Fr) h)))
+        (fun _ => cost853 cfg F J (panicText msg fileB line.toNat col.toNat) h) (fun _ _ => iprop(False))
+        (fun _ => panicked Cg h (panicText msg fileB line.toNat col.toNat)) := by
+  have hlt := sp.toNat_lt
+  have hpos : 0 < (panicText msg fileB line.toNat col.toNat).length := by
+    have : (PanicText.b "panicked at ").length = 12 := by decide +kernel
+    simp only [panicText, List.length_append]; omega
+  have h32 : (sp - 32).toNat = sp.toNat - 32 := by
+    rw [UInt32.toNat_sub_of_le] <;> simp [UInt32.le_iff_toNat_le]; omega
+  have h48 : (sp - 32 - 16).toNat = sp.toNat - 48 := by
+    rw [UInt32.toNat_sub_of_le] <;> simp [UInt32.le_iff_toNat_le, h32] <;> omega
+  have h64 : (sp - 32 - 16 - 16).toNat = sp.toNat - 64 := by
+    rw [UInt32.toNat_sub_of_le] <;> simp [UInt32.le_iff_toNat_le, h48] <;> omega
+  have h80 : (sp - 32 - 16 - 16 - 16).toNat = sp.toNat - 80 := by
+    rw [UInt32.toNat_sub_of_le] <;> simp [UInt32.le_iff_toNat_le, h64] <;> omega
+  have h96 : (sp - 32 - 16 - 16 - 16 - 16).toNat = sp.toNat - 96 := by
+    rw [UInt32.toNat_sub_of_le] <;> simp [UInt32.le_iff_toNat_le, h80] <;> omega
+  have h128 : (sp - 32 - 16 - 16 - 16 - 16 - 32).toNat = sp.toNat - 128 := by
+    rw [UInt32.toNat_sub_of_le] <;> simp [UInt32.le_iff_toNat_le, h96] <;> omega
+  have h160 : (sp - 32 - 16 - 16 - 16 - 16 - 32 - 32).toNat = sp.toNat - 160 := by
+    rw [UInt32.toNat_sub_of_le] <;> simp [UInt32.le_iff_toNat_le, h128] <;> omega
+  have hip : (sp - 32 - 16 - 16 - 16 - 16 - 32 + 16).toNat = sp.toNat - 112 := by
+    simp [UInt32.toNat_add, h128]; omega
+  iintro ⟨#H859c, #F859, #H817, #F828, #HTS⟩
+  unfold cost853
+  iapply (f853_full cfg lim d type inst mi e A n g ta mx hm (by omega) Cg gt sp m l loc lpc hloc S (by omega) hsp
+    hal iprop(hookEnvM n ta A loc file flen line col fileB ∗
+      (ta ↦[wt][ (195 : UInt32).toNat ] Ref.func (A 880) ∗ n ↦[wms][ m.toNat ] msg) ∗
+      (vt n 1057464 idx ta (A 578) ∗ heapInv n maxP hl live F) ∗ Fr)
+    (costTSM cfg F J (panicText msg fileB line.toNat col.toNat).length
+      (costKmS cfg F J (panicText msg fileB line.toNat col.toNat).length))
+    (panicText msg fileB line.toNat col.toNat) hpos hlen hutf h hfit hov)
+  iframe H859c F859 H817 F828
+  have T := toStr_str cfg lim (d + 8) inst mi A n g ta hm (by omega) Cg gt
+    (sp - 32 - 16 - 16 - 16 - 16 - 32 - 32) (sp - 32 - 16 - 16 - 16 - 16 - 32 + 16)
+    (sp - 32 - 16 - 16 - 16 - 16) (sp - 32) m l loc file flen line col idx S hS (by omega) (by omega)
+    (by omega) hlocb (by omega) (by omega) msg fileB hmsg hml hfl hfile hline hcol maxP hl L0 live F J HG hl0 hl1
+    hlL iprop((n ↦[i32][ (sp - 32 - 16 - 16 - 16 - 16).toNat ] m ∗
+      n ↦[i32][ (sp - 32 - 16 - 16 - 16 - 16).toNat + 4 ] l) ∗ n ↦[i32][ (sp - 32 - 16).toNat + 8 ] (sp - 32)) Fr
+  iapply (ToStr_wrap cfg lim (d + 8) inst mi Cg n g gt (sp - 32 - 16 - 16 - 16 - 16 - 32 - 32)
+    (sp - 32 - 16 - 16 - 16 - 16 - 32 + 16) S _ _ (codeTSM n maxP inst mi A) (α := Unit) (fun _ => True) _ (fun _ => _)
+    (fun _ _ => T) ?_)
+  · iintro ⟨HI, HP, I8, HA, P0, P24, P28, P8, P16, P12, HD1⟩
+    iexists ()
+    isplitr; · ipureintro; trivial
+    iframe HI HA P0 P24 P28 P8 P16 P12 HD1 HP I8
+  · iexact HTS
+
 end Spec
 
 end WNear.Binary.PanicFmtFull
