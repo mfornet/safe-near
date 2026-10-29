@@ -13,10 +13,11 @@ bounds on those costs, by the bytes each call reads (`Lin646`, `Lin169`, `Lin81`
   allocation of its `String`, which the allocator charges partly in other units);
 * an ignored value read from `j` to `p`, at most `(a81 + b81 · (p - j)) · c`.
 
-`objCost_le` is the object loop's bound, by induction over the members: a member reads at least four
-bytes besides its key's body and its value (the opening quote, the closing quote, the colon, and the
-comma or the struct's `{`), so its fixed cost `1200 + cost194 + a646 + b646 + a` must be at most
-`4 · K1` (`hM169`, `hM81`). `cost66_le` adds the prologue, the array form and `end`.
+`objCost_le` is the object loop's bound, by induction over the members: a member reads at least five
+bytes (the opening quote, its key's closing quote, the colon, a byte of its value, which reads at least
+one (`JsonSuffix.valueR_strict`), and the comma or the struct's `{`), so its fixed cost
+`1200 + cost194 + a646 + b646 + a + b` must be at most `5 · K1` (`hM169`,
+`hM81`). `cost66_le` adds the prologue, the array form and `end`.
 -/
 
 namespace WNear.Binary.SerdeCost
@@ -90,19 +91,21 @@ variable (c : Nat) (K646 K169 K81 : Nat → Nat) (dv : List UInt8 → Option (WN
 
 /-- One member's arithmetic: the fixed cost and the bytes it reads. -/
 theorem member_arith (K1 a646 b646 av bv kw w2 D1 D3 T s Fst C194 : Nat) (hK : 96 ≤ K1) (hb646 : b646 ≤ K1)
-    (hbv : bv ≤ K1) (hD1 : 1 ≤ D1) (hM : 1200 + C194 + a646 + b646 + av ≤ 4 * K1) (hs : Fst + K1 * s = 2 * K1) :
+    (hbv : bv ≤ K1) (hD1 : 1 ≤ D1) (hD3 : 1 ≤ D3) (hM : 1200 + C194 + a646 + b646 + av + bv ≤ 5 * K1) (hs : Fst + K1 * s = 2 * K1) :
     1200 + 96 * (kw + w2) + C194 + a646 + b646 * D1 + av + bv * D3 + (300 + K1 * T) ≤
       Fst + 300 + K1 * (kw + s + D1 + w2 + 1 + D3 + T) := by
   obtain ⟨D1', rfl⟩ : ∃ D1', D1 = D1' + 1 := ⟨D1 - 1, by omega⟩
+  obtain ⟨D3', rfl⟩ : ∃ D3', D3 = D3' + 1 := ⟨D3 - 1, by omega⟩
   have e1 : 96 * kw ≤ K1 * kw := Nat.mul_le_mul_right kw hK
   have e2 : 96 * w2 ≤ K1 * w2 := Nat.mul_le_mul_right w2 hK
   have e3 : b646 * D1' ≤ K1 * D1' := Nat.mul_le_mul_right D1' hb646
-  have e4 : bv * D3 ≤ K1 * D3 := Nat.mul_le_mul_right D3 hbv
-  have r1 : K1 * (kw + s + (D1' + 1) + w2 + 1 + D3 + T) =
-      K1 * kw + K1 * s + K1 * D1' + K1 + K1 * w2 + K1 + K1 * D3 + K1 * T := by ring
+  have e4 : bv * D3' ≤ K1 * D3' := Nat.mul_le_mul_right D3' hbv
+  have r1 : K1 * (kw + s + (D1' + 1) + w2 + 1 + (D3' + 1) + T) =
+      K1 * kw + K1 * s + K1 * D1' + K1 + K1 * w2 + K1 + K1 * D3' + K1 + K1 * T := by ring
   have r2 : 96 * (kw + w2) = 96 * kw + 96 * w2 := by ring
   have r3 : b646 * (D1' + 1) = b646 * D1' + b646 := by ring
-  rw [r1, r2, r3]
+  have r4 : bv * (D3' + 1) = bv * D3' + bv := by ring
+  rw [r1, r2, r3, r4]
   omega
 
 set_option maxHeartbeats 4000000 in
@@ -112,9 +115,11 @@ for the first member, `300` for the `}`, and `x` when the field is still to be r
 theorem objCost_le (K1 a646 b646 a169 b169 x a81 b81 : Nat)
     (h646 : Lin646 c K646 bs a646 b646) (h169 : Lin169 c K169 dv bs a169 b169 x) (h81 : Lin81 c K81 ign bs a81 b81)
     (hdvS : ∀ bs a r, dv bs = some (a, r) → r <:+ bs) (hignS : ∀ bs r, ign bs = some ((), r) → r <:+ bs)
+    (hdvL : ∀ bs a r, dv bs = some (a, r) → r.length < bs.length)
+    (hignL : ∀ bs r, ign bs = some ((), r) → r.length < bs.length)
     (hK : 96 ≤ K1) (hb646 : b646 ≤ K1) (hb169 : b169 ≤ K1) (hb81 : b81 ≤ K1)
-    (hM169 : 1200 + SerdeKey.cost194 + a646 + b646 + a169 ≤ 4 * K1)
-    (hM81 : 1200 + SerdeKey.cost194 + a646 + b646 + a81 ≤ 4 * K1) :
+    (hM169 : 1200 + SerdeKey.cost194 + a646 + b646 + a169 + b169 ≤ 5 * K1)
+    (hM81 : 1200 + SerdeKey.cost194 + a646 + b646 + a81 + b81 ≤ 5 * K1) :
     ∀ (N : Nat) (first : Bool) (i : Nat) (sA : Option WNear.AccountId) (a : WNear.AccountId) (rF : List UInt8),
       i ≤ bs.length → loopRes "account_id" dv ign N first sA (bs.drop i) = some (some a, rF) →
       objCost c K646 K169 K81 dv ign bs N first i ≤
@@ -186,8 +191,8 @@ theorem objCost_le (K1 a646 b646 a169 b169 x a81 b81 : Nat)
         subst hsA
         rw [hr2] at hd
         have h3 := drop_suf' (hdvS _ _ _ hd)
-        have hj3 : r3.length ≤ bs.length - (p1 + w2 + 1) := by
-          have := (hdvS _ _ _ hd).length_le; simp at this; omega
+        have hj3 : r3.length < bs.length - (p1 + w2 + 1) := by
+          have := hdvL _ _ _ hd; simp at this; omega
         have hK169 := h169 _ a' r3 (by omega) hd
         have hrF := loopRes_suf "account_id" dv ign hdvS hignS hl
         simp only at hrF
@@ -198,7 +203,7 @@ theorem objCost_le (K1 a646 b646 a169 b169 x a81 b81 : Nat)
         simp only [Option.isNone_none, ite_true]
         have hT := member_arith K1 a646 b646 a169 b169 (keyWs first bs i) w2 (p1 - q)
           (bs.length - r3.length - (p1 + w2 + 1)) (bs.length - rF.length - (bs.length - r3.length))
-          (if first then 1 else 2) (if first then K1 else 0) SerdeKey.cost194 hK hb646 hb169 (by omega) hM169
+          (if first then 1 else 2) (if first then K1 else 0) SerdeKey.cost194 hK hb646 hb169 (by omega) (by omega) hM169
           (by cases first <;> simp <;> omega)
         have hsum : keyWs first bs i + (if first then 1 else 2) + (p1 - q) + w2 + 1 +
             (bs.length - r3.length - (p1 + w2 + 1)) + (bs.length - rF.length - (bs.length - r3.length)) =
@@ -218,8 +223,8 @@ theorem objCost_le (K1 a646 b646 a169 b169 x a81 b81 : Nat)
       · -- another key: 81, then the loop
         rw [hr2] at hd
         have h3 := drop_suf' (hignS _ _ hd)
-        have hj3 : r3.length ≤ bs.length - (p1 + w2 + 1) := by
-          have := (hignS _ _ hd).length_le; simp at this; omega
+        have hj3 : r3.length < bs.length - (p1 + w2 + 1) := by
+          have := hignL _ _ hd; simp at this; omega
         have hK81 := h81 _ r3 (by omega) hd
         have hrF := loopRes_suf "account_id" dv ign hdvS hignS hl
         simp only at hrF
@@ -229,7 +234,7 @@ theorem objCost_le (K1 a646 b646 a169 b169 x a81 b81 : Nat)
         rw [objCost_ign c K646 K169 K81 dv ign bs hb hq hs hk (by rw [hP1, hW2]; exact hd), hP1, hW2]
         have hT := member_arith K1 a646 b646 a81 b81 (keyWs first bs i) w2 (p1 - q)
           (bs.length - r3.length - (p1 + w2 + 1)) (bs.length - rF.length - (bs.length - r3.length))
-          (if first then 1 else 2) (if first then K1 else 0) SerdeKey.cost194 hK hb646 hb81 (by omega) hM81
+          (if first then 1 else 2) (if first then K1 else 0) SerdeKey.cost194 hK hb646 hb81 (by omega) (by omega) hM81
           (by cases first <;> simp <;> omega)
         have hsum : keyWs first bs i + (if first then 1 else 2) + (p1 - q) + w2 + 1 +
             (bs.length - r3.length - (p1 + w2 + 1)) + (bs.length - rF.length - (bs.length - r3.length)) =
@@ -256,7 +261,7 @@ section Total
 /-- **66's accepting cost is linear in the input**: on an input `Call.decode` reads as `ftBalanceOf a`,
 with readers that agree with the model and callees within `Lin646`, `Lin169`, `Lin81`, `cost66` is at
 most `(1725 + a169 + K1 · len) · c + x`, where `K1` pays for every byte: `96` (whitespace), the
-callees' `b`s, and a member's fixed cost over its four bytes (`hM169`, `hM81`). -/
+callees' `b`s, and a member's fixed cost over its five bytes (`hM169`, `hM81`). -/
 theorem cost66_le (cfg : WasmConfig) (K646 K169 K81 : Nat → Nat)
     (dv : List UInt8 → Option (WNear.AccountId × List UInt8)) (ign : List UInt8 → Option (Unit × List UInt8))
     (bs : List UInt8) (hdv : Agrees dv (valueAs WNear.account)) (hign : Agrees ign valueSkip)
@@ -265,12 +270,16 @@ theorem cost66_le (cfg : WasmConfig) (K646 K169 K81 : Nat → Nat)
     (h646 : Lin646 cfg.regularOpCost K646 bs a646 b646) (h169 : Lin169 cfg.regularOpCost K169 dv bs a169 b169 x)
     (h81 : Lin81 cfg.regularOpCost K81 ign bs a81 b81)
     (hK : 96 ≤ K1) (hb646 : b646 ≤ K1) (hb169 : b169 ≤ K1) (hb81 : b81 ≤ K1)
-    (hM169 : 1200 + SerdeKey.cost194 + a646 + b646 + a169 ≤ 4 * K1)
-    (hM81 : 1200 + SerdeKey.cost194 + a646 + b646 + a81 ≤ 4 * K1) :
+    (hM169 : 1200 + SerdeKey.cost194 + a646 + b646 + a169 + b169 ≤ 5 * K1)
+    (hM81 : 1200 + SerdeKey.cost194 + a646 + b646 + a81 + b81 ≤ 5 * K1) :
     SerdeFromTrait.cost66 cfg K646 K169 K81 dv ign bs ≤
       (1725 + a169 + K1 * bs.length) * cfg.regularOpCost + x := by
   obtain ⟨r, hS, hE⟩ := SerdeFromTrait.decode_struct hdv hign hdec
   obtain ⟨hdv0, hdvs, -, -, hdvS, hignS⟩ := SerdeFromTrait.reader_facts hdv hign bs
+  have hdvL : ∀ bs a r, dv bs = some (a, r) → r.length < bs.length :=
+    JsonSuffix.agrees_strict hdv (fun _ _ _ h => JsonSuffix.valueAs_strict _ h)
+  have hignL : ∀ bs r, ign bs = some ((), r) → r.length < bs.length := fun bs r h =>
+    JsonSuffix.agrees_strict hign (fun _ x _ h => by cases x; exact JsonSuffix.valueSkip_strict h) bs () r h
   have hsuf := JsonSuffix.structDe_suf "account_id" dv ign hdvS hignS hS
   have hrl : r.length ≤ bs.length := hsuf.length_le
   have hrest : SerdeFromTrait.restLen dv ign bs = r.length := by
@@ -286,7 +295,7 @@ theorem cost66_le (cfg : WasmConfig) (K646 K169 K81 : Nat → Nat)
     rw [hc]
     have hw0 := SerdeNextKey.getElem_lt ho
     have hlb := objCost_le c K646 K169 K81 dv ign bs K1 a646 b646 a169 b169 x a81 b81 (hc ▸ h646) (hc ▸ h169)
-      (hc ▸ h81) hdvS hignS hK hb646 hb169 hb81 hM169 hM81 _ true (wsLen bs + 1) none a r (by omega)
+      (hc ▸ h81) hdvS hignS hdvL hignL hK hb646 hb169 hb81 hM169 hM81 _ true (wsLen bs + 1) none a r (by omega)
       (by simpa [loopRes] using hl)
     simp only [ite_true, Option.isNone_none] at hlb
     have hrF : r.length ≤ bs.length - (wsLen bs + 1) := by

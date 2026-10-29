@@ -315,4 +315,84 @@ theorem structDe_suf (hdv : ∀ bs a r, dv bs = some (a, r) → r <:+ bs)
 
 end Machine
 
+
+/-! ### A value reads at least one byte -/
+
+theorem number_strict {bs t r : List UInt8} (h : number bs = some (t, r)) : r.length < bs.length := by
+  unfold number at h
+  split at h
+  rename_i x sign b0 hs
+  have hs0 : b0.length ≤ bs.length := by
+    split at hs <;> simp at hs <;> (obtain ⟨_, rfl⟩ := hs) <;> simp
+  simp only [Option.bind_eq_bind, Option.bind_eq_some_iff] at h
+  obtain ⟨⟨i1, i2⟩, h1, h⟩ := h
+  have hi : i2.length < b0.length := by
+    split at h1
+    · simp at h1; obtain ⟨_, rfl⟩ := h1; simp
+    · rename_i b tl _
+      split at h1
+      · rename_i hb
+        simp at h1
+        have hd := digits_length' h1
+        have e : (digits (b :: tl)).2 = (digits tl).2 := by simp [digits, List.dropWhile_cons, hb]
+        rw [h1] at e
+        simp only at e
+        have := digits_length tl
+        rw [← e] at this
+        simp; omega
+      · simp at h1
+    · simp at h1
+  simp only at h
+  have hd := fun l => digits_length l
+  repeat (any_goals (first | (simp only [Option.bind, Option.pure_def, Option.some.injEq, Prod.mk.injEq, reduceCtorEq] at h) | split at h))
+  all_goals (obtain ⟨-, rfl⟩ := h)
+  all_goals grind
+
+theorem value_strict (f : Nat) (bs : List UInt8) (v : Value) (r : List UInt8) (h : value f bs = some (v, r)) :
+    r.length < bs.length := by
+  cases f with
+  | zero => simp [value] at h
+  | succ f =>
+    have hsb : ∀ bs acc (x : Option String × List UInt8), stringBody bs acc = some x → x.2.length < bs.length :=
+      fun bs acc x h => stringBody_len (s := x.1) (by simpa using h)
+    have hnum : ∀ bs (x : List UInt8 × List UInt8), number bs = some x → x.2.length < bs.length :=
+      fun bs x h => number_strict (t := x.1) (by simpa using h)
+    have he' : ∀ bs acc (x : List Value × List UInt8), elements f bs acc = some x → x.2.length ≤ bs.length :=
+      fun bs acc x h => (value_length f).2.1 bs acc x.1 x.2 (by simpa using h)
+    have hm' : ∀ bs acc (x : List (Option String × Value) × List UInt8), members f bs acc = some x →
+        x.2.length ≤ bs.length :=
+      fun bs acc x h => (value_length f).2.2 bs acc x.1 x.2 (by simpa using h)
+    have hsk := skip_length bs
+    have hskA := fun l => skip_length l
+    rw [value.eq_def] at h
+    repeat (any_goals (first | (simp only [Option.map, Option.bind, Option.some.injEq, Prod.mk.injEq, reduceCtorEq] at h) | split at h))
+    all_goals (obtain ⟨-, rfl⟩ := h)
+    all_goals grind
+
+theorem valueR_strict {bs r : List UInt8} {v : Value} (h : valueR bs = some (v, r)) : r.length < bs.length :=
+  value_strict _ bs v r h
+
+theorem valueAs_strict {α : Type} (dec : Value → Option α) {bs r : List UInt8} {a : α}
+    (h : valueAs dec bs = some (a, r)) : r.length < bs.length := by
+  unfold valueAs at h
+  simp only [Option.bind_eq_some_iff, Option.map_eq_some_iff, Prod.mk.injEq] at h
+  obtain ⟨⟨v, r'⟩, hv, _, _, _, e⟩ := h
+  simp only at e
+  subst e
+  exact valueR_strict hv
+
+theorem valueSkip_strict {bs r : List UInt8} (h : valueSkip bs = some ((), r)) : r.length < bs.length := by
+  unfold valueSkip at h
+  simp only [Option.map_eq_some_iff, Prod.mk.injEq] at h
+  obtain ⟨⟨v, r'⟩, hv, _, rfl⟩ := h
+  exact valueR_strict hv
+
+/-- A reader that agrees with one that reads at least a byte reads at least a byte. -/
+theorem agrees_strict {β : Type} {f g : List UInt8 → Option (β × List UInt8)} (h : Agrees f g)
+    (hg : ∀ bs x r, g bs = some (x, r) → r.length < bs.length) (bs : List UInt8) (x : β) (r : List UInt8)
+    (hf : f bs = some (x, r)) : r.length < bs.length := by
+  rcases h bs with e | ⟨e, _⟩
+  · rw [e] at hf; exact hg bs x r hf
+  · rw [e] at hf; simp at hf
+
 end WNear.JsonSuffix
