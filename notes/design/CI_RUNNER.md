@@ -53,8 +53,11 @@ The runner updates itself when GitHub releases a new version.
 ## Caching: the workspace is the cache
 
 Every job checks out with `clean: false` and then runs `git clean -ffd`: files
-a previous job left untracked are removed, but ignored ones stay. Those are the
-Lake builds and packages (`.lake/`, Mathlib and iris included), the formatter
+a previous job left untracked are removed, but ignored ones stay. Jobs also
+run `git clean -ffdX -- audit/` to discard previous evidence: even when a build
+fails before producing a report, artifact uploads must not reuse an old report.
+The retained caches are the Lake builds and packages (`.lake/`, Mathlib and
+iris included), the formatter
 build (`near-lean/.lake/lean-fmt`), Rust `target/` directories and the pinned
 nearcore checkouts. All workflows of the repository share one workspace per
 runner, so whichever job built something last leaves it warm for the next.

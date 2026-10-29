@@ -29,7 +29,10 @@ jobs:
       - uses: actions/checkout@v5
         with:
           clean: false
-      - run: git clean -ffd
+      - name: Clean sources and previous evidence; keep build caches
+        run: |
+          git clean -ffd
+          git clean -ffdX -- audit/
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
@@ -51,7 +54,10 @@ jobs:
       - uses: actions/checkout@v5
         with:
           clean: false
-      - run: git clean -ffd
+      - name: Clean sources and previous evidence; keep build caches
+        run: |
+          git clean -ffd
+          git clean -ffdX -- audit/
       - name: Select the sources to check
         id: scope
         env:
@@ -99,7 +105,10 @@ jobs:
       - uses: actions/checkout@v5
         with:
           clean: false
-      - run: git clean -ffd
+      - name: Clean sources and previous evidence; keep build caches
+        run: |
+          git clean -ffd
+          git clean -ffdX -- audit/
       - name: Did the formatter change?
         id: scope
         env:

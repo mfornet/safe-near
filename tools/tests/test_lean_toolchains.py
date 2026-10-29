@@ -59,6 +59,23 @@ class ToolchainTests(unittest.TestCase):
                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         self.assertEqual(toolchains.check(self.root), [])
 
+    def test_changed_files_include_new_sources_but_not_ignored_or_deleted_ones(self):
+        self.write(".gitignore", ".lake/\n")
+        self.write("pkg/Edited.lean", "def old := 1\n")
+        self.write("pkg/Deleted.lean", "def deleted := 1\n")
+        subprocess.run(["git", "add", "."], cwd=self.root, check=True)
+        subprocess.run(["git", "-c", "user.name=Test", "-c", "user.email=test@example.com",
+                        "commit", "-qm", "fixture"], cwd=self.root, check=True)
+        self.write("pkg/Edited.lean", "def changed := 2\n")
+        (self.root / "pkg/Deleted.lean").unlink()
+        self.write("pkg/New.lean", "def new := 3\n")
+        self.write("pkg/Staged.lean", "def staged := 4\n")
+        subprocess.run(["git", "add", "pkg/Staged.lean"], cwd=self.root, check=True)
+        self.write(".lake/Ignored.lean", "def ignored := 5\n")
+        self.assertEqual(toolchains.changed_files(self.root, "HEAD"), {
+            Path("pkg/Edited.lean"), Path("pkg/New.lean"), Path("pkg/Staged.lean"),
+        })
+
 
 if __name__ == "__main__":
     unittest.main()

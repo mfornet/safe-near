@@ -23,7 +23,11 @@ def changed_files(root: Path, revision: str) -> set[Path]:
         ["git", "diff", "--name-only", "--diff-filter=d", "-z", revision],
         cwd=root, check=True, stdout=subprocess.PIPE,
     )
-    return {Path(p.decode()) for p in result.stdout.split(b"\0") if p}
+    untracked = subprocess.run(
+        ["git", "ls-files", "--others", "--exclude-standard", "-z"],
+        cwd=root, check=True, stdout=subprocess.PIPE,
+    )
+    return {Path(p.decode()) for p in (result.stdout + untracked.stdout).split(b"\0") if p}
 
 
 def check(root: Path) -> list[str]:

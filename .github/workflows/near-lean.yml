@@ -39,7 +39,10 @@ jobs:
       - uses: actions/checkout@v5
         with:
           clean: false
-      - run: git clean -ffd
+      - name: Clean sources and previous evidence; keep build caches
+        run: |
+          git clean -ffd
+          git clean -ffdX -- audit/
 
       # The libraries, the tests and the replay executables (ChainReplay), whose missing case
       # broke `main` in the 2026-10-23 check.
