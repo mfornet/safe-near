@@ -494,11 +494,13 @@ theorem body232_unreg (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (e inst : 
     · iexact Hc
     isplitr
     · ipureintro; rw [if_pos hsm']; mstep_norm_full; omega
-    isplitl [Hg Lo HH HI HPS Hinv Hvt HDp Hh]
+    iunfold tailStat at HSt
+    icases HSt with ⟨-, -, -, HLut, -, -⟩
+    isplitl [Hg Lo HH HI HPS Hinv Hvt HDp HLut Hh]
     · isplitr
       · ipureintro; rfl
       iunfold pPre
-      iframe Hg HH HI HPS Hinv Hvt HDp Hh
+      iframe Hg HH HI HPS Hinv Hvt HDp HLut Hh
       iapply stkA2 (by omega) (by omega) $$ Lo
     inext
     isplit

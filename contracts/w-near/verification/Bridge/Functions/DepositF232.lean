@@ -78,7 +78,9 @@ theorem body232_pos (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (e inst : Na
     icases HIC with ⟨-, -, -, -, -, -, -, -, -, -, -, -, -, -, -, -, #Hi⟩
     iexact Hi
   iunfold stat232 at HT
-  icases HT with ⟨HI, H12, HDs, -, -, -, -, HPS, HH, HDp, -, -, -, -, Hvt⟩
+  icases HT with ⟨HI, H12, HDs, -, -, -, -, HPS, HH, HDp, -, -, HSt, -, Hvt⟩
+  iunfold DepositTail.tailStat at HSt
+  icases HSt with ⟨-, -, -, HLut, -, -⟩
   have hn := hm.mem
   have hg := hm.glob
   have hlt := s.toNat_lt
@@ -152,11 +154,11 @@ theorem body232_pos (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (e inst : Na
   · iexact Hc
   isplitr
   · ipureintro; mstep_norm_full; omega
-  isplitl [Hg Lo HH HI HPS Hinv Hvt HDp Hh]
+  isplitl [Hg Lo HH HI HPS Hinv Hvt HDp HLut Hh]
   · isplitr
     · ipureintro; rfl
     iunfold pPre
-    iframe Hg HH HI HPS Hinv Hvt HDp Hh
+    iframe Hg HH HI HPS Hinv Hvt HDp HLut Hh
     iapply stkA2 (by omega) (by omega) $$ Lo
   inext
   isplit

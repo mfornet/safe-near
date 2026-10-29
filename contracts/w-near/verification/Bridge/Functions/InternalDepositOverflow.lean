@@ -374,7 +374,8 @@ theorem f406_sup (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
     code406 e n maxP inst mi A mx ∗ A 879 ↪[wf] FuncInst.wasm types[31]! inst f879 ∗ C
       ⊢ MFunSpecT (GF := GF) cfg lim d type inst mi f406 Cg
         (fun args => iprop(pre406 n g ta A gt s this pp pc pl v p c L lo hi t0 t1 idx maxP len live F pre key h args ∗
-          stk n (s.toNat - 80 - SP) (SP - 400) ∗ hookRes n ta A lpc ∗ panicSlot n ta A ∗ Dp))
+          stk n (s.toNat - 80 - SP) (SP - 400) ∗ hookRes n ta A lpc ∗ panicSlot n ta A ∗ Dp ∗
+          n ↦[wms][ 1070974 ] FmtDigits.lut))
         (fun _ => cost406sup cfg F pl L h (pre ++ (bytes32 L ++ key)) (storeBytes (.i64 x0) 8 ++ storeBytes (.i64 x1) 8) K879)
         (fun _ _ => iprop(False))
         (fun _ => iprop(∃ h2, ⌜Post406 e h (pre ++ (bytes32 L ++ key))
@@ -410,7 +411,7 @@ theorem f406_sup (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
   iintro %args %R HP Hc
   unfold cost406sup
   rw [hK405, hK401, hK9]
-  icases HP with ⟨HP, Hx, HH, HPS, HD⟩
+  icases HP with ⟨HP, Hx, HH, HPS, HD, HLut⟩
   iunfold pre406 at HP
   icases HP with ⟨%hargs, Hg, Hs, HI, HW, Hvt, Hinv, Ht0, Ht8, Hm, Hp, Hv, Hkey, Hhost⟩
   subst hargs
@@ -589,11 +590,11 @@ theorem f406_sup (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
   · iexact Hc
   isplitr
   · ipureintro; rw [activation363]; mstep_norm_full; omega
-  isplitl [Hg Lo HH HI HPS Hinv Hvt HD Hhost]
+  isplitl [Hg Lo HH HI HPS Hinv Hvt HD HLut Hhost]
   · isplitr
     · ipureintro; rfl
     iunfold pPre
-    iframe Hg HH HI HPS Hinv Hvt HD Hhost
+    iframe Hg HH HI HPS Hinv Hvt HD HLut Hhost
     iexact Lo
   inext
   isplit

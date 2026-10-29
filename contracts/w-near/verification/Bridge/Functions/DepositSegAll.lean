@@ -228,8 +228,10 @@ theorem seg406_all (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (e inst : Nat
       · iexact Hc
       isplitr
       · ipureintro; rw [activation406]; mstep_norm_full; omega
-      isplitl [Hg Hlo HIR HW Hvt Hinv Ht0 Ht8 Hp Hpre HV Hab Hh Hx HH HPS HD]
-      · iframe HH HPS HD
+      iunfold tailStat at HSt
+      icases HSt with ⟨-, -, -, HLut, -, -⟩
+      isplitl [Hg Hlo HIR HW Hvt Hinv Ht0 Ht8 Hp Hpre HV Hab Hh Hx HH HPS HD HLut]
+      · iframe HH HPS HD HLut
         isplitr [Hx]
         · iunfold pre406
           iframe Hg Hlo HIR HW Hvt Hinv Ht0 Ht8 Hp Hpre HV Hab Hh

@@ -1,6 +1,7 @@
 import Bridge.Functions.PanicWithHook
 import Bridge.Functions.LookupMapOps
 import Bridge.Functions.NewHost
+import Bridge.Functions.FmtDigits
 
 /-!
 # What `near_deposit`'s panics through the Rust hook are asked (M8)
@@ -55,12 +56,14 @@ def hookRes (n ta : Nat) (A : Nat → Nat) (lpc : UInt32) : IProp GF :=
 
 /-- What a panic site owns at the call: the stack pointer `sp` and `SP` bytes below it, the hook,
 the interface and `panic_utf8`'s slot, the heap and the allocator's vtable, the static data `Dp`,
-the host. -/
+the host, and the digit table `lut` (the location's line and column are formatted with it; the
+success path's log reads it too, so it is not part of `Dp`). -/
 def pPre (n g ta : Nat) (A : Nat → Nat) (gt : GlobalType) (lpc : UInt32) (SP : Nat) (Dp : IProp GF)
     (sp : UInt32) (maxP hl : Nat) (live : List (Nat × Nat)) (F : Nat) (idx : UInt32) (h : NearState) :
     IProp GF :=
   iprop(g ↦[wg] ⟨gt, .i32 sp⟩ ∗ stk n (sp.toNat - SP) SP ∗ hookRes n ta A lpc ∗ iface n ta A ∗
-    panicSlot n ta A ∗ heapInv n maxP hl live F ∗ vt n 1057464 idx ta (A 578) ∗ Dp ∗ mhostPt h)
+    panicSlot n ta A ∗ heapInv n maxP hl live F ∗ vt n 1057464 idx ta (A 578) ∗ Dp ∗
+    n ↦[wms][ 1070974 ] FmtDigits.lut ∗ mhostPt h)
 
 /-- **What a panic entry `f(mp, ml, loc)` is asked**: from the resources `pPre` with room on the
 heap, it traps, the host panicked with `text`, at `K F (keep h)`. -/

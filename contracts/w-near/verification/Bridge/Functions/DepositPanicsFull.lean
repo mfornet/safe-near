@@ -36,6 +36,7 @@ open WNear.Binary.PanicFmt (code817 code859 envP)
 open WNear.Binary.PanicFmtFull (hookEnvM cost879)
 open WNear.Binary.DepositPanicSpec (hookRes pPre PanicSpecD MFunSpecT_persistent)
 open WNear.Binary.LookupMapOps (HeapRoomK)
+open WNear.Binary.PanicDisplay (pk12 pptrA plenA pptrB plenB qp qcp colon XB)
 
 theorem textPos_eq : panicText requiresPositive wnearRs 15 9 = NearDepositPanics.textPositive := by decide +kernel
 theorem textSmall_eq : panicText depositTooSmall wnearRs 20 13 = NearDepositPanics.textTooSmall := by
@@ -90,9 +91,87 @@ theorem MFunSpecT_pre {cfg : WasmConfig} {lim : ExecLimits} {d : Nat} {type : Fu
   iapply H $$ %args %R [HP] Hc
   iapply hP $$ HP
 
-/-- The data `begin_panic`'s `to_string` reads at a `require!` of `near_deposit`, past the heap. -/
+/-- `PanicDisplay.XB` without the digit table (`pPre` passes it separately). -/
+def XBm (n : Nat) (loc file flen line col : UInt32) (fileB : List UInt8) : IProp GF :=
+  iprop(n ↦[wms][ 1070704 ] colon ∗
+    (n ↦[i32][ loc.toNat ] file ∗ n ↦[i32][ loc.toNat + 4 ] flen ∗ n ↦[i32][ loc.toNat + 8 ] line ∗
+      n ↦[i32][ loc.toNat + 12 ] col) ∗ n ↦[wms][ file.toNat ] fileB)
+
+theorem XB_of (n : Nat) (loc file flen line col : UInt32) (fileB : List UInt8) :
+    XBm (GF := GF) n loc file flen line col fileB ∗ n ↦[wms][ 1070974 ] FmtDigits.lut ⊢
+      XB n loc file flen line col fileB := by
+  iintro ⟨H, L⟩
+  iunfold XBm at H
+  icases H with ⟨C, W, F⟩
+  iunfold XB
+  iframe C L W F
+
+/-- `ToStrPay.XP'` without the digit table. -/
+def XPm (n ta : Nat) (A : Nat → Nat) (m loc file flen line col : UInt32) (msg fileB : List UInt8) :
+    IProp GF :=
+  iprop(n ↦[wms][ 1070672 ] pk12 ∗ (n ↦[i32][ 1062988 + 12 ] 139 ∗ ta ↦[wt][ 139 ] Ref.func (A 661)) ∗
+    ((n ↦[i32][ (1070688 : UInt32).toNat + 8 * 0 ] pptrA 0 ∗
+        n ↦[i32][ (1070688 : UInt32).toNat + 8 * 0 + 4 ] plenA 0) ∗
+      (n ↦[i32][ (1070688 : UInt32).toNat + 8 * 1 ] pptrA 1 ∗
+        n ↦[i32][ (1070688 : UInt32).toNat + 8 * 1 + 4 ] plenA 1) ∗
+      ta ↦[wt][ (201 : UInt32).toNat ] Ref.func (A 886)) ∗
+    ((n ↦[i32][ (1070708 : UInt32).toNat + 8 * 0 ] pptrB 0 ∗
+        n ↦[i32][ (1070708 : UInt32).toNat + 8 * 0 + 4 ] plenB 0) ∗
+      (n ↦[i32][ (1070708 : UInt32).toNat + 8 * 1 ] pptrB 1 ∗
+        n ↦[i32][ (1070708 : UInt32).toNat + 8 * 1 + 4 ] plenB 1) ∗
+      (n ↦[i32][ (1070708 : UInt32).toNat + 8 * 2 ] pptrB 2 ∗
+        n ↦[i32][ (1070708 : UInt32).toNat + 8 * 2 + 4 ] plenB 2) ∗
+      ta ↦[wt][ (195 : UInt32).toNat ] Ref.func (A 880) ∗ ta ↦[wt][ (3 : UInt32).toNat ] Ref.func (A 870)) ∗
+    (n ↦[wms][ 1070684 ] qp ∗ n ↦[wms][ 1070685 ] qcp) ∗ n ↦[wms][ m.toNat ] msg ∗
+    XBm n loc file flen line col fileB)
+
+theorem XP_of_m (n ta : Nat) (A : Nat → Nat) (m loc file flen line col : UInt32) (msg fileB : List UInt8) :
+    XPm (GF := GF) n ta A m loc file flen line col msg fileB ∗ n ↦[wms][ 1070974 ] FmtDigits.lut ⊢
+      XP' n ta A m loc file flen line col msg fileB := by
+  iintro ⟨H, L⟩
+  iunfold XPm at H
+  icases H with ⟨H1, H2, H3, H4, H5, H6, H7⟩
+  ihave H7 := XB_of n loc file flen line col fileB $$ [H7 L]
+  · iframe H7 L
+  iunfold XP'
+  iframe H1 H2 H3 H4 H5 H6 H7
+
+/-- `PanicFmtFull.hookEnvM` without the digit table. -/
+def hookEnvMm (n ta : Nat) (A : Nat → Nat) (loc file flen line col : UInt32) (fileB : List UInt8) : IProp GF :=
+  iprop(n ↦[wms][ 1070672 ] pk12 ∗
+    ((n ↦[i32][ (1070688 : UInt32).toNat + 8 * 0 ] pptrA 0 ∗
+        n ↦[i32][ (1070688 : UInt32).toNat + 8 * 0 + 4 ] plenA 0) ∗
+      (n ↦[i32][ (1070688 : UInt32).toNat + 8 * 1 ] pptrA 1 ∗
+        n ↦[i32][ (1070688 : UInt32).toNat + 8 * 1 + 4 ] plenA 1) ∗
+      ta ↦[wt][ (202 : UInt32).toNat ] Ref.func (A 887)) ∗
+    ((n ↦[i32][ (1070708 : UInt32).toNat + 8 * 0 ] pptrB 0 ∗
+        n ↦[i32][ (1070708 : UInt32).toNat + 8 * 0 + 4 ] plenB 0) ∗
+      (n ↦[i32][ (1070708 : UInt32).toNat + 8 * 1 ] pptrB 1 ∗
+        n ↦[i32][ (1070708 : UInt32).toNat + 8 * 1 + 4 ] plenB 1) ∗
+      (n ↦[i32][ (1070708 : UInt32).toNat + 8 * 2 ] pptrB 2 ∗
+        n ↦[i32][ (1070708 : UInt32).toNat + 8 * 2 + 4 ] plenB 2) ∗
+      ta ↦[wt][ (3 : UInt32).toNat ] Ref.func (A 870)) ∗
+    (n ↦[wms][ 1070684 ] qp ∗ n ↦[wms][ 1070685 ] qcp) ∗
+    XBm n loc file flen line col fileB ∗
+    (n ↦[i32][ (1065404 : UInt32).toNat + 12 ] 157 ∗ ta ↦[wt][ (157 : UInt32).toNat ] Ref.func (A 759) ∗
+      ta ↦[wt][ (104 : UInt32).toNat ] Ref.func (A 469)) ∗
+    (n ↦[i32][ (1054332 : UInt32).toNat + 8 * 0 ] 1054332 ∗ n ↦[i32][ (1054332 : UInt32).toNat + 8 * 0 + 4 ] 0))
+
+theorem hookEnvM_of_m (n ta : Nat) (A : Nat → Nat) (loc file flen line col : UInt32) (fileB : List UInt8) :
+    hookEnvMm (GF := GF) n ta A loc file flen line col fileB ∗ n ↦[wms][ 1070974 ] FmtDigits.lut ⊢
+      hookEnvM n ta A loc file flen line col fileB := by
+  iintro ⟨H, L⟩
+  iunfold hookEnvMm at H
+  icases H with ⟨H1, H2, H3, H4, H5, H6, H7⟩
+  ihave H5 := XB_of n loc file flen line col fileB $$ [H5 L]
+  · iframe H5 L
+  iunfold hookEnvM
+  iframe H1 H2 H3 H4 H5 H6 H7
+
+/-- The data `begin_panic`'s `to_string` reads at a `require!` of `near_deposit`, past the heap and
+the digit table. -/
 def d664 (n ta : Nat) (A : Nat → Nat) (m loc line col : UInt32) (msg : List UInt8) : IProp GF :=
-  iprop(XP' n ta A m loc 1050526 13 line col msg wnearRs ∗
+  iprop(XPm n ta A m loc 1050526 13 line col msg wnearRs ∗
     (n ↦[i32][ (1065404 : UInt32).toNat + 12 ] 157 ∗ ta ↦[wt][ (157 : UInt32).toNat ] Ref.func (A 759) ∗
       ta ↦[wt][ (104 : UInt32).toNat ] Ref.func (A 469)) ∗
     (n ↦[i32][ (1054332 : UInt32).toNat + 8 * 0 ] 1054332 ∗ n ↦[i32][ (1054332 : UInt32).toNat + 8 * 0 + 4 ] 0))
@@ -102,7 +181,7 @@ def dSmall (n ta : Nat) (A : Nat → Nat) : IProp GF := d664 n ta A 1050556 1050
 
 /-- The data `expect_failed`'s payload `get` and `to_string` read for the supply overflow. -/
 def dSup (n ta : Nat) (A : Nat → Nat) : IProp GF :=
-  iprop(getData n ta A 1053016 totalSupplyOverflow ∗ hookEnvM n ta A 1053040 1052816 119 108 55 coreImplRs)
+  iprop(getData n ta A 1053016 totalSupplyOverflow ∗ hookEnvMm n ta A 1053040 1052816 119 108 55 coreImplRs)
 
 /-- All three, one of which a run uses. -/
 def dAll (n ta : Nat) (A : Nat → Nat) : IProp GF := iprop(dPos n ta A ∧ dSmall n ta A ∧ dSup n ta A)
@@ -151,12 +230,14 @@ theorem spec664pos (cfg : WasmConfig) (lim : ExecLimits) (inst : Nat) (mi : Modu
   · intro args
     iintro ⟨%ha, HP⟩
     iunfold pPre at HP
-    icases HP with ⟨Hg, Hs, HH, HI, HPS, Hinv, Hvt, HD, Hh⟩
+    icases HP with ⟨Hg, Hs, HH, HI, HPS, Hinv, Hvt, HD, HLut, Hh⟩
     icases hookRes_split n ta A lpc $$ HH with ⟨HH, H137, T137, -, -⟩
     iunfold dAll at HD
     icases HD with ⟨HD, -⟩
     iunfold dPos, d664 at HD
     icases HD with ⟨HX, H157, H1054⟩
+    ihave HX := XP_of_m n ta A 1050492 1050540 1050526 13 15 9 requiresPositive wnearRs $$ [HX HLut]
+    · iframe HX HLut
     iframe Hg
     isplitr
     · ipureintro; exact ha
@@ -193,12 +274,14 @@ theorem spec664small (cfg : WasmConfig) (lim : ExecLimits) (inst : Nat) (mi : Mo
   · intro args
     iintro ⟨%ha, HP⟩
     iunfold pPre at HP
-    icases HP with ⟨Hg, Hs, HH, HI, HPS, Hinv, Hvt, HD, Hh⟩
+    icases HP with ⟨Hg, Hs, HH, HI, HPS, Hinv, Hvt, HD, HLut, Hh⟩
     icases hookRes_split n ta A lpc $$ HH with ⟨HH, H137, T137, -, -⟩
     iunfold dAll at HD
     icases HD with ⟨-, HD, -⟩
     iunfold dSmall, d664 at HD
     icases HD with ⟨HX, H157, H1054⟩
+    ihave HX := XP_of_m n ta A 1050556 1050580 1050526 13 20 13 depositTooSmall wnearRs $$ [HX HLut]
+    · iframe HX HLut
     iframe Hg
     isplitr
     · ipureintro; exact ha
@@ -244,12 +327,14 @@ theorem spec879sup (cfg : WasmConfig) (lim : ExecLimits) (inst : Nat) (mi : Modu
   · intro args
     iintro ⟨%ha, HP⟩
     iunfold pPre at HP
-    icases HP with ⟨Hg, Hs, HH, HI, HPS, Hinv, Hvt, HD, Hh⟩
+    icases HP with ⟨Hg, Hs, HH, HI, HPS, Hinv, Hvt, HD, HLut, Hh⟩
     icases hookRes_split n ta A lpc $$ HH with ⟨HH, -, -, H179, T179⟩
     iunfold dAll at HD
     icases HD with ⟨-, -, HD⟩
     iunfold dSup at HD
     icases HD with ⟨HGD, HEM⟩
+    ihave HEM := hookEnvM_of_m n ta A 1053040 1052816 119 108 55 coreImplRs $$ [HEM HLut]
+    · iframe HEM HLut
     icases BorshFT.stkSp (SP - 96) 96 (by omega) $$ Hs with ⟨Lo, Up⟩
     iframe Hg
     isplitr
