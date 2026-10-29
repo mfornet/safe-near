@@ -93,9 +93,9 @@ grammar function.
 
 | fn | size | role | status |
 |---|---|---|---|
-| 646 | 317 | `SliceRead::parse_str`. It scans while `ESCAPE[b] = 0` (the table at 1062392: nonzero exactly for `0x00..0x1F`, `"` and `\`). On `"` with an empty scratch, the result is the borrowed slice (583); with a non-empty scratch, the rest is appended (613). On `\`, the slice so far is appended, then `parse_escape` (649). On a control byte, `ControlCharacterWhileParsingString`. On EOF, `EofWhileParsingString` (647). The result goes through `as_str` (648). | plain case proved (`ParseStr.f646_spec_plain`, ASCII, no escape, scratch empty; `plain_model`) |
-| 648 | 39 | `as_str`: `from_utf8` (927), else `InvalidUnicodeCodePoint` (657) | proved on ASCII bytes (`ParseStr.f648_spec_ascii`) |
-| 927 | 443 | `core::str::from_utf8`, with its word-at-a-time ASCII fast path | proved on ASCII bytes (`FromUtf8.f927_spec_ascii`, `100 + 100·len`); the non-ASCII branch against `Utf8.utf8Ok` left |
+| 646 | 317 | `SliceRead::parse_str`. It scans while `ESCAPE[b] = 0` (the table at 1062392: nonzero exactly for `0x00..0x1F`, `"` and `\`). On `"` with an empty scratch, the result is the borrowed slice (583); with a non-empty scratch, the rest is appended (613). On `\`, the slice so far is appended, then `parse_escape` (649). On a control byte, `ControlCharacterWhileParsingString`. On EOF, `EofWhileParsingString` (647). The result goes through `as_str` (648). | plain case proved (`ParseStr.f646_spec_plain`, ASCII; `ParseStrUtf8.f646_spec_utf8`, any UTF-8 body; no escape, scratch empty; `plain_model`, `utf8_model`) |
+| 648 | 39 | `as_str`: `from_utf8` (927), else `InvalidUnicodeCodePoint` (657) | proved on every input: `ParseStrUtf8.f648_spec_valid` (`utf8Ok`), `SerdeErrBox.f648_spec_bad` (not UTF-8: 657) |
+| 927 | 443 | `core::str::from_utf8`, with its word-at-a-time ASCII fast path | proved on any input (`FromUtf8Gen.f927_spec`: `Ok` exactly when `Utf8.utf8Ok`, `100 + 100·len`; the width table at 1071704 owned) |
 | 649 | 401 | `parse_escape`: the simple escapes are pushed (614); `\u` goes through `decode_hex_escape` (653, 162) and the surrogate pair logic, then `encode_utf8` (605, 109) and an append (613) |
 | 650 | 106 | `ignore_str` (ignored values): the same scan, without UTF-8 validation |
 | 652 | 267 | `ignore_escape`: validates the escape without decoding it |
@@ -137,6 +137,16 @@ covered for the gas bound and for termination.
 | 92, 341, 342, 143, 356, 151, 348 | | drops of `Error`, `io::Error` and `Box<dyn Error>`, some through indirect calls |
 | 101, 166, 165 | | `missing_field`, `duplicate_field`, `invalid_length` (each a `format!` with `ArgumentV1` 597/700/701) |
 
+Proved, with a loose cost as the reject paths need:
+
+* 647/657, `Deserializer::error` (`SerdeErrBox.f647_spec`, `f657_eq`): `Err(box)`, at most
+  `costErr cfg F i`;
+* 645, 638, 609, the position (`SerdePosition`);
+* 639, `Error::syntax`, the 20-byte box (`SerdeErrBox`).
+
+Not proved yet: 322/325 (`peek_error` / `error`, which reach 639 through 640), 340, 642/643 and the
+drops.
+
 ### Shared infrastructure
 
 Already proved:
@@ -151,7 +161,8 @@ Not yet proved:
 * the `RawVec`/`Vec` growth used by the scratch: 588, 589, 613, 614, 620–632, 698, 712–716
   (`VecWithCap` covers 623/630/631 on the serializer side);
 * `Layout` 607/608;
-* `exchange_malloc` 590.
+* `exchange_malloc` 590 and 624/625 are proved at alignment 4 for the error box
+  (`SerdeErrBox.f590_spec`, through `AllocWalk.f310_spec_walk`), but not for the scratch `Vec`.
 
 The panic paths are never reached on any input: 852, 853, 855, 857, 859, 864, 881, the
 panic machinery 816–832, and the out-of-memory handling 842–844/821. They appear only behind
