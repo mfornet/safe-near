@@ -216,7 +216,18 @@ continuation is published to PR #40 after its validation gates pass.
   and restore the complete stack; neither reserves whole-input error scans.
 - The Unicode success theorem passes LSP axiom verification with the standard
   three axioms; the quadratic lower bound uses only `propext` and `Quot.sound`.
-- Next: the successful surrogate-pair path, then a success-specific 646 loop,
+- `ParseEscapeSurrogateSuccess.f649_u1_success` covers successful surrogate pairs at
+  `2000*c + costExt`, preserving the same reader/scratch result and complete stack.
+  `valid_high_tail` derives the required second escape and low surrogate from
+  successful decoding. No error-allocation room premise or error reserve is used.
+- `ParseEscapeSuccessCost.f649_success` combines all three successful paths.
+  Its instruction allowance is bounded by `200*(m + 1)*regularOpCost` when the
+  decoder consumes `m` bytes after the leading backslash; scratch growth/copying
+  remains a separate `costExt` charge. This is an escape-level bound, not yet a
+  linear bound for the complete string reader.
+- LSP verifies the surrogate theorem, combined success contract and consumed-byte
+  cost bound with only `propext`, `Classical.choice` and `Quot.sound`.
+- Next: a success-specific 646 loop,
   final UTF-8 validation once, amortized scratch growth, and integration into
   380/169 and the argument contracts. Full parser rejection remains open too.
 - Validation: `just wnear-audit` passes (2763 build jobs; 429 wNEAR modules,
@@ -224,6 +235,13 @@ continuation is published to PR #40 after its validation gates pass.
   open-refinement dependencies. Strict NearLogic has zero violations; statement
   pins, PR-wide Lean style and whitespace checks pass. Evidence:
   `/tmp/pr40-escape-success-final-audit.log` and `/tmp/pr40-escape-success-style.log`.
+
+- Surrogate/combined-contract validation: `just wnear-audit` passes (2765 build
+  jobs; 431 wNEAR modules, 60291 declarations and 55137 theorems). Only the three
+  existing open-refinement dependencies remain. Strict NearLogic has zero
+  violations; statement pins, PR-wide Lean style and whitespace checks pass.
+  Evidence: `/tmp/pr40-surrogate-final-audit.log` and
+  `/tmp/pr40-surrogate-style.log`.
 
 ## Methods
 

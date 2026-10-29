@@ -1134,8 +1134,12 @@ round).* Proved, no `sorry`, standard axioms only:
      error scans give a proved quadratic lower bound on accepted newline escapes
      (`StrCostLower.costRun_newlineEscapes_quadratic`, misstatement log entry 8).
      `SerdeEscSuccess` supplies constant-cost successful byte/hex readers;
-     `ParseEscapeSuccess` uses them for simple and non-surrogate Unicode escapes.
-     Left: the successful surrogate-pair path, a success-specific outer-loop cost that
+     `ParseEscapeSuccess` uses them for simple and non-surrogate Unicode escapes;
+     `ParseEscapeSurrogateSuccess` covers valid pairs. `ParseEscapeSuccessCost.f649_success`
+     combines the three paths, with instruction cost at most 200 regular operations
+     per encoded byte consumed (including the leading backslash), plus the separate
+     scratch-growth/copy charge.
+     Left: a success-specific outer-loop cost that
      charges UTF-8 validation once, and amortized scratch growth. Then integrate
      `deserialize_str` (380) and `ValidAccountId::deserialize` (169) on escaped input
      (they still use `f646_spec_noesc`).
