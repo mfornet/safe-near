@@ -1266,6 +1266,20 @@ value-reader interface must also cover a borrowed/plain value with already-grown
 scratch. Deep ignored values/ignored escapes, full rejection and uniform reachable
 room/gas bounds remain open. The completed-method count stays six.
 
+**Unified value continuation (2026-10-29):** `SerdeValueReuse.f169_borrowed_model`
+reuses the existing plain-reader body proof with scratch already in the live list,
+framing its descriptor and spare bytes. `f169_model` now accepts every valid
+model-decoded string through the borrowed or copied path and returns `ownedValue`,
+with the String live and scratch reusable. `spec169_model`,
+`SerdeMapValueReuse.f205_model` and `SerdeSeqElemReuse.f214_model` carry this through
+both immediate value callers. `valueCost_le` places either branch under the existing
+growth-aware copied-reader charge. The next task is the actual object loop, whose
+state must unpack and update scratch coordinates after each member while retaining
+the owned account-id allocation. The exact endpoint hidden in `ownedValue` cannot
+be assumed unchanged after a later key grows scratch. The accepting method gas/room
+bounds, deep ignored values/escapes and general rejection remain open; still six
+completed exported methods under protocol premises.
+
 ### M7. State and storage
 
 Borsh encoding of the state, `LookupMap` keys, near-sdk's `env` wrappers

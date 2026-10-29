@@ -538,6 +538,52 @@ continuation is published to PR #40 after its validation gates pass.
   style and whitespace checks pass. Evidence: `/tmp/pr40-key-state-final-audit.log`
   and `/tmp/pr40-key-state-style.log`.
 
+## Unified value-reader continuation
+
+- `SerdeValueReuse.f169_borrowed_model` proves a plain account-id value with scratch
+  already allocated by an earlier escaped key. It instantiates the existing 169
+  proof with scratch in the live list, frames its pointer/capacity/spare bytes and
+  the hex table, and restores the same 288-byte frame as the copied path. The owned
+  String remains distinct from scratch. No Wasm body is duplicated for that reader.
+- `ownedValue` is the common returned resource: the String's bytes, descriptor facts,
+  reusable scratch, exact parser endpoint capacity/free-list bound, and total memory
+  growth including the owned copy. `heapS_reuse` and `valueStorage_owned` normalize
+  the borrowed and copied allocation orders. The physical scratch length may remain
+  existential; the next key or value reader clears it before reuse.
+- `SerdeValueReuse.f169_model` now handles every valid model-decoded account-id string,
+  whether borrowed/plain or copied/escaped, with arbitrary initial scratch capacity.
+  It retains explicit reader-room and allocation-room premises. `spec169_model` adapts
+  it to the existing sequence-element reader boundary.
+- `SerdeMapValueReuse.f205_model` proves the actual colon-plus-value map call, while
+  `SerdeSeqElemReuse.f214_model` proves the actual first array-element call. Both use
+  the unified reader and return `ownedValue`, the reader cursor and all three string
+  tables. The former requires a 288-byte frame; the latter restores all 304 bytes.
+- `valueCost_le` proves both branches fit the existing growth-aware copied-reader
+  charge. Borrowed strings have an empty append trace and zero scratch-growth charge;
+  their String allocation/copy is still charged. The uniform method allowance remains
+  unchanged, and its reachable heap/room/growth bounds are not yet discharged.
+- Remaining: generalize the actual object loop around the key and unified value
+  contracts, including ignored readers and the successful closing-object delimiter.
+  After each member, unpack the returned scratch/heap coordinates into the evolving
+  loop state. Do not retain `ownedValue` unchanged across later keys: its exact scratch
+  endpoint describes the value read, and a later key can grow scratch again while the
+  String remains live. Deep ignored values/ignored escapes and general rejection are
+  still open. Six exported methods are complete under protocol premises.
+- A possible control-proof interface is a member state `J i seen p cap`: keep heap,
+  scratch and owned String bytes in `J`, with the loop's descriptor words separate.
+  Abstract full 193/205/201 calls can move `J` from the entry cursor to the returned
+  cursor while preserving or setting `seen`. This avoids assuming exact scratch
+  endpoints remain fixed, and leaves uniform reachable-state cost bounds to the
+  concrete reader instantiations. The existing object control proof and pure
+  `loopRes`/`objCost` decomposition remain reusable.
+- Validation: `just wnear-audit` passes (2797 build jobs; 463 wNEAR modules,
+  62947 declarations and 57680 theorems). Only the three existing dependencies on
+  `Proofs.Refinement` use `sorryAx`; strict NearLogic has zero violations and
+  statement pins match. Lean MCP verifies `f169_model`, `f205_model`, `f214_model`
+  and `valueCost_le` with only standard axioms. Changed-source Lean style and
+  whitespace checks pass. Evidence: `/tmp/pr40-value-reuse-final-audit.log`
+  and `/tmp/pr40-value-reuse-style.log`.
+
 ## Methods
 
 There are 15 exported methods; six now have complete per-call refinement proofs under their protocol premises.
