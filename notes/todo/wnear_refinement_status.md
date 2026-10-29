@@ -4,6 +4,48 @@ Snapshot when work paused on 2026-10-29. Details are in `wnear_refinement_proof.
 
 `refines_wnear_exported` (`Proofs/Refinement.lean`) is still the only `sorry`. Every result below is proved with no `sorry`. Each depends only on `propext`, `Classical.choice` and `Quot.sound`: never use `bv_decide` or `native_decide`.
 
+## Continuation on 2026-10-29: integration with main
+
+Work continues on `codex/wnear-proof-continuation`, starting from PR head `1ea4077` and merging
+`main` at `1a615fc`. The harness and dependency-manifest merge conflicts are resolved. These
+changes have not yet been pushed to PR #40.
+
+- #44 moves the recorded-proof check after the value dereference. The repaired
+  `NearLogic.prepareStorageCallAux_read` and its callers in `StorageRead.lean` require
+  `readProofCost` (lookup plus value bytes) instead of only `lookupProofBound`.
+- `lake build NearLogic` passes. The strict axiom audit (`audit/near-logic.json`) checks 56 modules,
+  4619 declarations and 3467 theorems with zero violations. LSP also verifies
+  `StorageReadWrap.f548_spec_host` with only standard axioms.
+- The recipes, wNEAR CI workflow, runtime workflow and periodic checker now build `Bridge`;
+  they also explicitly build and strictly audit `NearLogic`. The 16 targeted audit/periodic-check
+  regression tests pass, including the new coverage test.
+- State-read wrappers, `StateRead*` and initialized `ft_total_supply` are repaired and validated.
+  `read_le_proofBound` accounts for the 29-byte state value using the existing model bound.
+  `ftTotalSupply_refines_init` passes the LSP axiom check with only the standard three axioms.
+  Absent-state reads and `storage_has_key` still need only lookup room.
+- The repaired balance lookups and all four view proof files pass LSP diagnostics. The all-state
+  theorems for `storage_minimum_balance`, `storage_balance_bounds` and `ft_metadata` pass LSP
+  axiom verification with only standard axioms. The combined view build passed (1473 jobs),
+  recorded in `/tmp/pr40-view-refinements-build.log`.
+- `InternalDeposit.lean` passes LSP diagnostics after the read-budget subproof of `f406_ok`
+  was repaired (`omega` directly uses the sum bound). **In progress, not yet all revalidated:**
+  `InternalDepositOverflow` forwards the full read budget instead of weakening it to lookup-only
+  room; then check `DepositBody234` and `NearDepositRuns`/`NearDepositUninit`. A targeted build
+  of those five modules is running with output at `/tmp/pr40-deposit-integration-build.log`.
+  Recheck its live process/session and exit status before restarting.
+- **New model agreement groundwork:** `NearDepositModel.lean` exposes every initialized deposit
+  path through `nearDeposit_zero`, `nearDeposit_too_small`, `nearDeposit_registered`, and
+  `nearDeposit_unregistered`. `nearDeposit_after_registration` separates the fee from minting;
+  `deposit_registered_cases` exposes the balance-before-supply checks. The file builds, and
+  `nearDeposit_unregistered` passes LSP axiom verification with only standard axioms.
+  Keep storageMin symbolic: unfolding its multiplication by 10^19 during broad simplification
+  caused excessive kernel work; the separate helper declarations avoid that.
+- `lake build +Bridge.Functions.StateReadModel` now passes (`/tmp/pr40-state-read-final.log`).
+  An earlier concurrent build failed writing a read-only cached BorshFT.ilean; the local link
+  was detached and the sequential build passed. Avoid overlapping builds of the same targets.
+  Continue with LSP diagnostics for the callers, then a full `Bridge` build and both audits
+  before pushing. A partial diagnostic result is not validation.
+
 ## Methods
 
 There are 15 exported methods.
