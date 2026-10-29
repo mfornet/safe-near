@@ -83,6 +83,20 @@ class PeriodicCheckTests(unittest.TestCase):
                 self.assertIn("--allow-sorry-module", audit.command)
                 self.assertLess(names.index(f"{report}-adapter-build"), names.index(f"audit-{report}"))
 
+    def test_metered_logic_and_bridge_are_built_before_their_audits(self):
+        steps = validation_steps(ROOT, ROOT / "nearcore")
+        names = [step.name for step in steps]
+        logic_build = steps[names.index("near-logic-build")]
+        logic_audit = steps[names.index("audit-near-logic")]
+        self.assertIn("NearLogic", logic_build.command)
+        self.assertLess(names.index(logic_build.name), names.index(logic_audit.name))
+        self.assertNotIn("--allow-sorry", logic_audit.command)
+        self.assertNotIn("--allow-sorry-module", logic_audit.command)
+        bridge_build = steps[names.index("wnear-proofs-build")]
+        for target in ("Bridge", "Differential", "wnear-scenarios", "wnear-harness"):
+            self.assertIn(target, bridge_build.command)
+        self.assertLess(names.index(bridge_build.name), names.index("audit-wnear"))
+
     def test_plan_needs_no_native_checkout_and_execution_requires_one(self):
         command = [sys.executable, str(ROOT / "tools/periodic_check.py")]
         plan = subprocess.run(command + ["--plan"], text=True, capture_output=True)
