@@ -16,11 +16,6 @@ packagesDir = "../../../near-lean/.lake/packages"
 enableArtifactCache = true
 restoreAllArtifacts = true
 
-[[require]]
-name = "mathlib"
-scope = "leanprover-community"
-rev = "v4.34.1"
-
 # Lean blueprint extracted from `@[blueprint]` annotations (notes/design/PROVING.md).
 # `lake build :blueprint` writes .lake/build/blueprint/, consumed by blueprint/src.
 # The NEAR runtime in Lean: `Near.Boundary.nearRuntime` is the
@@ -38,6 +33,13 @@ path = "../../../near-lean/sdk"
 name = "LeanArchitect"
 git = "https://github.com/hanwenzhu/LeanArchitect.git"
 rev = "v4.34.0"
+
+# Keep Mathlib last so its transitive dependency sources take precedence over
+# LeanArchitect's (notably the old lean4-cli URL), as required by its cache.
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
+rev = "v4.34.1"
 
 [[lean_lib]]
 name = "Model"
