@@ -128,6 +128,30 @@ tends to come back in another place.
   snippet. The strengthened wrapper is checked against the uniform contract;
   runtime scenarios cannot detect this logical quantifier error.
 
+### 8. The all-outcome string bound cannot close the accepting linear bound
+
+- **Statement:** the M6 continuation planned a closed linear bound on the existing
+  `ParseStr.costRun` to integrate escaped accepting inputs.
+- **Truth:** `costRun` is a valid but excessively loose all-outcome bound. On `n`
+  valid newline escapes followed by a quote, its value is at least
+  `(800*n*n + 3400*n) * regularOpCost`, with input length `2*n + 1`.
+  Each escape reserves eight whole-input error-position scans, even when it
+  succeeds. This quadratic expression cannot supply the intended linear bound.
+  It does not imply quadratic gas consumption by the binary.
+- **Caught by:** inspection of `StrCost` followed by the kernel-checked
+  `StrCostLower.costRun_newlineEscapes_quadratic` witness. `newlineEscapes_model`
+  and `newlineEscapes_utf8` prove the witness strings are accepted by the model.
+- **Root cause:** reusing contracts that reserve both successful and rejecting
+  paths, and charging final UTF-8 validation in every segment, loses the actual
+  accepting path's cost structure.
+- **Sweep:** successful byte and hex readers get contracts without error reserves
+  (`SerdeEscSuccess`). The successful escape paths use those contracts in
+  `ParseEscapeSuccess`; the old general contracts remain valid and unchanged.
+  The outer string loop still needs a success-specific cost and a bound on
+  amortized scratch growth, then integration into the argument contracts.
+- **Validation:** the cost lower bound and accepting witness are formal Lean
+  results. No model gas bound or semantics is changed.
+
 ## Agent results
 
 Success and failure per task type and model (section 11.2 of the plan), used

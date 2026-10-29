@@ -1130,10 +1130,15 @@ round).* Proved, no `sorry`, standard axioms only:
        a string, with the same bytes; `Err` exactly when it gives `none` or `some (none, _)`.
      * 649 is split into `f649_nu` (not `\u`), `f649_u0` (`\u` without a high surrogate) and
        `f649_u1` (a high surrogate), joined in `f649_spec`: one declaration took over an hour.
-   * Left: a closed linear bound on `costRun` (per escape a constant, the scan 30 per byte, `cost927`,
-     and the growths; these are logarithmically many, each `walkCost (F + 2·growths)`, so the sum is
-     `O(len·(1 + F))`); `deserialize_str` (380) and `ValidAccountId::deserialize` (169) on escaped
-     input, through `f646_spec` (they still use `f646_spec_noesc`).
+   * The earlier plan to bound the existing `costRun` linearly is superseded: its reserved
+     error scans give a proved quadratic lower bound on accepted newline escapes
+     (`StrCostLower.costRun_newlineEscapes_quadratic`, misstatement log entry 8).
+     `SerdeEscSuccess` supplies constant-cost successful byte/hex readers;
+     `ParseEscapeSuccess` uses them for simple and non-surrogate Unicode escapes.
+     Left: the successful surrogate-pair path, a success-specific outer-loop cost that
+     charges UTF-8 validation once, and amortized scratch growth. Then integrate
+     `deserialize_str` (380) and `ValidAccountId::deserialize` (169) on escaped input
+     (they still use `f646_spec_noesc`).
 
    `ignore_str` (650) and `ignore_escape` (652) are the same scan without UTF-8. Their spec
    is acceptance and the rest, as `stringBody` gives them, ignoring its first component.

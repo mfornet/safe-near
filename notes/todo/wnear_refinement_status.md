@@ -197,6 +197,34 @@ continuation is published to PR #40 after its validation gates pass.
   whitespace checks pass. Evidence: `/tmp/pr40-object-final-audit.log` and
   `/tmp/pr40-object-lean-style.log`.
 
+## Accepting escaped-string cost continuation
+
+- The existing all-outcome `costRun` cannot close the accepting linear gas bound.
+  `StrCostLower.costRun_newlineEscapes_quadratic` proves a lower bound of
+  `(800*n*n + 3400*n)*regularOpCost` for `n` newline escapes, with input length
+  `2*n + 1`. `newlineEscapes_model` and `newlineEscapes_utf8` prove this family
+  is accepted. The quadratic lower bound concerns the old conservative cost
+  expression, not the binary's actual gas. Misstatement log entry 8 records the
+  corrected proof plan; the general contracts and model gas bounds are unchanged.
+- `SerdeEscSuccess.f655_some` proves `next_or_eof` on a present byte in at most
+  100 regular operations, without allocator or stack-memory ownership.
+  `f653_some` proves valid four-digit hex decoding in at most 300 regular
+  operations, with no error-allocation room premise or error-cost reserve.
+- `ParseEscapeSuccess.f649_nu_success` proves all successful simple escapes at
+  `400*c + costExt`. `f649_u0_success` proves successful non-surrogate Unicode
+  escapes at `900*c + costExt`. Both preserve the general reader/scratch result
+  and restore the complete stack; neither reserves whole-input error scans.
+- The Unicode success theorem passes LSP axiom verification with the standard
+  three axioms; the quadratic lower bound uses only `propext` and `Quot.sound`.
+- Next: the successful surrogate-pair path, then a success-specific 646 loop,
+  final UTF-8 validation once, amortized scratch growth, and integration into
+  380/169 and the argument contracts. Full parser rejection remains open too.
+- Validation: `just wnear-audit` passes (2763 build jobs; 429 wNEAR modules,
+  59857 declarations and 54713 theorems), with only the three existing
+  open-refinement dependencies. Strict NearLogic has zero violations; statement
+  pins, PR-wide Lean style and whitespace checks pass. Evidence:
+  `/tmp/pr40-escape-success-final-audit.log` and `/tmp/pr40-escape-success-style.log`.
+
 ## Methods
 
 There are 15 exported methods; six now have complete per-call refinement proofs under their protocol premises.
@@ -269,7 +297,9 @@ The texts are proved equal to the model's `Panic.message` (`PanicText`).
 1. **The parser, finishing `ft_balance_of`'s argument contract.**
    1. `RejectContract`. A loose cost suffices. Use `fromSlice_eq` and the reject paths listed in M6. The outer struct-error and trailing-character paths are proved; 228's EOF case is discharged through 65. Finish the other 228 error cases, and integrate the general string/ignored-value readers.
    2. Escapes in the accepting half:
-      - a closed linear bound on `costRun`;
+      - a success-specific string cost and amortized scratch-growth bound:
+        the existing all-outcome `costRun` has a proved quadratic lower bound
+        even on accepted newline escapes (`StrCostLower`);
       - 380 and 169 with the copied result;
       - `Hyp646` for escaped keys;
       - 652 (`ignore_escape`).
