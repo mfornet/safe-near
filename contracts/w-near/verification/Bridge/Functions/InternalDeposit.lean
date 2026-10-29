@@ -601,4 +601,165 @@ theorem f406_ok (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType
 
 end S406
 
+/-! ## `internal_register_account` (409), the account new
+
+```wat
+;; 409 internal_register_account(this, acct): sp -= 32
+;;     401(sp + 8, this + 24, acct, 1052800)     ;; accounts.insert(acct, &0)
+;;     Some → panic_str("The account is already registered")   (not on this path)
+;;     sp += 32
+```
+-/
+
+section S409
+
+variable {GF : BundledGFunctors} [WasmGS NearState GF]
+
+open WNear.Binary.LookupMapOps (code401 pre401 post401 cost401)
+open WNear.Binary.StorageWrite (wslot evictedRegister)
+
+/-- The code of 409 (persistent). -/
+def code409 (e n maxP inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (mx : Option Nat) : IProp GF :=
+  iprop(code401 e n maxP inst mi A mx ∗ A 401 ↪[wf] FuncInst.wasm types[45]! inst f401)
+
+instance (e n maxP inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (mx : Option Nat) :
+    Persistent (code409 (GF := GF) e n maxP inst mi A mx) := by
+  unfold code409; infer_instance
+
+/-- The zero `u128` the binary inserts, at 1052800. -/
+def zeroAt (n : Nat) : IProp GF :=
+  iprop(n ↦[wms][ 1052800 ] List.replicate 8 (0 : UInt8) ∗ n ↦[wms][ 1052800 + 8 ] List.replicate 8 (0 : UInt8))
+
+def pre409 (n g ta : Nat) (A : Nat → Nat) (gt : GlobalType) (s this pp pc pl v p c L : UInt32)
+    (idx : UInt32) (maxP len : Nat) (live : List (Nat × Nat)) (F : Nat) (pre key : List UInt8)
+    (h : NearState) (args : List Value) : IProp GF :=
+  iprop(⌜args = [.i32 this, .i32 v]⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗ stk n (s.toNat - 304) 304 ∗
+    iface n ta A ∗ wslot n ta A ∗ vt n 1057464 idx ta (A 578) ∗ heapInv n maxP len live F ∗
+    prefixAt n (this + 24) pp pc pl ∗ n ↦[wms][ pp.toNat ] pre ∗
+    n ↦[wms][ v.toNat ] (bytes32 p ++ (bytes32 c ++ bytes32 L)) ∗ n ↦[wms][ p.toNat ] key ∗ zeroAt n ∗
+    mhostPt h)
+
+def post409 (n g ta : Nat) (A : Nat → Nat) (gt : GlobalType) (s this pp pc pl v p c L : UInt32)
+    (idx : UInt32) (maxP len : Nat) (live : List (Nat × Nat)) (F : Nat) (pre key : List UInt8)
+    (Q : NearState → Prop) (_args rs : List Value) : IProp GF :=
+  iprop(⌜rs = []⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗ stk n (s.toNat - 304) 304 ∗ iface n ta A ∗ wslot n ta A ∗
+    vt n 1057464 idx ta (A 578) ∗ (∃ len', ⌜LenIn len 3 len'⌝ ∗ heapInv n maxP len' live (F + 3)) ∗
+    prefixAt n (this + 24) pp pc pl ∗ n ↦[wms][ pp.toNat ] pre ∗
+    n ↦[wms][ v.toNat ] (bytes32 p ++ (bytes32 c ++ bytes32 L)) ∗ n ↦[wms][ p.toNat ] key ∗ zeroAt n ∗
+    (∃ h', ⌜Q h'⌝ ∗ mhostPt h'))
+
+open Near.TrieAccounting Near.TrieConstruction Near.TrieOverlay in
+set_option maxRecDepth 1000000 in
+set_option maxHeartbeats 16000000 in
+/-- **`FungibleToken::internal_register_account`** (409) of the `String` `key` at `v`, absent from
+the map: the record `pre ++ borsh(key) ↦ borsh(0u128)` written (`StorageWritePost`). -/
+theorem f409_ok (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
+    (htype : type.results = []) (inst : Nat) (mi : ModuleInst) (e : Nat) (A : Nat → Nat) (n g ta : Nat)
+    (mx : Option Nat) (hm : IfaceMod mi A n g ta) (hd : d + 18 < lim.maxCallDepth) (Cg : Nat)
+    (gt : GlobalType) (s this pp pc pl v p c L : UInt32) (idx : UInt32) (maxP len : Nat)
+    (live : List (Nat × Nat)) (F : Nat) (hF : okG F) (pre key : List UInt8)
+    (hs : 304 ≤ s.toNat) (hal : s.toNat % 8 = 0) (hthis : this.toNat + 36 ≤ 2 ^ 32)
+    (hpre : pre.length = pl.toNat) (hkey : key.length = L.toNat)
+    (hL : L.toNat + 4 ≤ 120) (hpl : pl.toNat ≤ 4) (hl0 : 0 < pl.toNat)
+    (hpp : pp.toNat + pl.toNat ≤ 2 ^ 32) (hv : v.toNat + 12 ≤ 2 ^ 32) (hp : p.toNat + L.toNat ≤ 2 ^ 32)
+    (hroom : HeapRoomK 3 len maxP)
+    (h : NearState) (st : Near.TrieOverlay.State) {bud : Nat}
+    (hview : h.context.isView = false) (hacc : h.storageAccounting = some st)
+    (hlim : withinLimit h.config.maxStorageKeyLen (pre ++ (bytes32 L ++ key)).length = true)
+    (hvlim : withinLimit h.config.maxStorageValueLen 16 = true)
+    (hb : build st.entries = .ok st.base) (hz : zeroHash ∉ st.base.witness.map Prod.fst)
+    (hlink : h.storage (pre ++ (bytes32 L ++ key)) =
+      viewVal st (contractKey h.context.currentAccountId (pre ++ (bytes32 L ++ key))))
+    (hproof : ProofBudget h st bud)
+    (hbud : writeProofCost (contractKey h.context.currentAccountId (pre ++ (bytes32 L ++ key)))
+      (h.storage (pre ++ (bytes32 L ++ key))) ≤ bud)
+    (hnone : h.storage (pre ++ (bytes32 L ++ key)) = none) :
+    code409 e n maxP inst mi A mx
+      ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f409 Cg
+        (pre409 n g ta A gt s this pp pc pl v p c L idx maxP len live F pre key h)
+        (fun _ => 100 * cfg.regularOpCost + cost401 cfg F pl L h (pre ++ (bytes32 L ++ key)))
+        (post409 n g ta A gt s this pp pc pl v p c L idx maxP len live F pre key
+          (StorageWritePost e h (pre ++ (bytes32 L ++ key)) (List.replicate 8 0 ++ List.replicate 8 0)
+            evictedRegister st)) := by
+  iintro #Hk
+  iunfold code409 at Hk
+  icases Hk with ⟨#H401c, #F401⟩
+  have hn := hm.mem
+  have hg := hm.glob
+  have ha401 := hm.funcs 401 (by decide)
+  have t45 : types[45]!.params.length = 4 := by rfl
+  have hlt := s.toNat_lt
+  have h32 : (s - 32).toNat = s.toNat - 32 := by
+    rw [UInt32.toNat_sub_of_le] <;> simp [UInt32.le_iff_toNat_le]; omega
+  ihave #Hi : inst ↪[inst] mi $$ []
+  · iunfold code401, LookupMapInsert.code391, DropVec.dropCode at H401c
+    icases H401c with ⟨⟨-, ⟨#H, -⟩, -⟩, -⟩
+    iexact H
+  generalize hK : cost401 cfg F pl L h (pre ++ (bytes32 L ++ key)) = K
+  iapply MFunSpec_intro
+  imodintro
+  iintro %args %R HP Hc
+  iunfold pre409 at HP
+  icases HP with ⟨%hargs, Hg, Hs, HI, HW, Hvt, Hinv, Hm, Hp, Hv, Hkey, Hz, Hhost⟩
+  subst hargs
+  iunfold zeroAt at Hz
+  icases Hz with ⟨Z0, Z8⟩
+  -- the callee's 272, then the frame: [0, 8) [8, 32) the Option
+  icases stk_split n (s.toNat - 304) 272 32 $$ Hs with ⟨Lo, Fr⟩
+  rw [show s.toNat - 304 + 272 = s.toNat - 32 by omega]
+  icases stk_split n (s.toNat - 32) 8 24 $$ Fr with ⟨U0, O⟩
+  iunfold stk at O
+  icases O with ⟨%obb, %hobb, O⟩
+  ihave O := memBytes_addr (show s.toNat - 32 + 8 = (s - 32 + 8).toNat by simp [UInt32.toNat_add, h32]; omega) $$ O
+  simp only [f409]
+  mstep [Hg]; mstep; mstep; mstep; mstep [Hg]
+  mstep; mstep; mstep; mstep; mstep; mstep; mstep; mstep
+  mcall (LookupMapOps.f401_none cfg lim (d + 1) types[45]! rfl inst mi e A n g ta mx hm (by omega) Cg gt (s - 32)
+      (s - 32 + 8) (this + 24) pp pc pl v p c L 1052800 idx maxP len live F hF pre key (List.replicate 8 0)
+      (List.replicate 8 0) obb (by omega) (by omega) hobb (by simp [UInt32.toNat_add, h32]; omega) hpre hkey
+      (by simp) (by simp) hL hpl hl0 hpp hv hp (by decide) hroom h st hview hacc hlim (by simpa using hvlim) hb hz
+      hlink hproof hbud hnone)
+      using [Hg Lo HI HW Hvt Hinv Hm Hp Hv Hkey Z0 Z8 O Hhost] with (rw [hK]; mstep_norm_full; omega)
+  · iunfold pre401
+    ihave Lo := stk_addr (show s.toNat - 304 = (s - 32).toNat - 272 by omega) $$ Lo
+    simp only [UInt32.reduceToNat]
+    iframe Hg Lo HI HW Hvt Hinv Hm Hp Hv Hkey Z0 Z8 O Hhost
+  rw [hK]
+  iunfold post401 at HQ
+  icases HQ with ⟨%hrs, Hg, Lo, HI, HW, Hvt, Hinv, Hm, Hp, Hv, Hkey, Z0, Z8, O, Hhost⟩
+  subst hrs
+  rw [show List.replicate 24 (0 : UInt8) = List.replicate 8 0 ++ List.replicate 16 0 from rfl]
+  ihave O := BorshFT.splitB (n := n) (a := (s - 32 + 8).toNat) (b := (s - 32 + 8).toNat + 8)
+    (List.replicate 8 0) (List.replicate 16 0) (by simp) $$ O
+  icases O with ⟨O0, O8⟩
+  ihave O0 := memBytes_addr (show (s - 32 + 8).toNat = (s - 32).toNat + 8 by simp [UInt32.toNat_add, h32]; omega) $$ O0
+  -- None: the tag 0
+  mstep; mstep; mstep [O0]
+  rw [show UInt64.ofNat (Memory.decodeLE (List.replicate 8 (0 : UInt8))) = 0 by decide]
+  mstep; mstep
+  mstep_taken
+  mstep; mstep; mstep; mstep [Hg]
+  rw [show s - 32 + 32 = s by simp]
+  mcredits R
+  iframe Hc
+  iunfold post409, zeroAt
+  isplitr
+  · ipureintro; simp [htype]
+  iframe Hg HI HW Hvt Hinv Hm Hp Hv Hkey Z0 Z8 Hhost
+  ihave O0 := BorshFT.stkB (n := n) (b := s.toNat - 24) (k := 8) _ (by omega) (by simp) $$ O0
+  ihave O8 := BorshFT.stkB (n := n) (b := s.toNat - 16) (k := 16) _ (by simp [UInt32.toNat_add, h32]; omega) (by simp) $$ O8
+  ihave U0 := BorshFT.stkA (n := n) (k := 8) (b := s.toNat - 32) (by omega) $$ U0
+  ihave Lo := BorshFT.stkA (n := n) (k := 272) (b := s.toNat - 304) (by omega) $$ Lo
+  ihave X := BorshFT.stkJ (n := n) (a := s.toNat - 24) (b := s.toNat - 16) (k1 := 8) (k2 := 16) (k := 24)
+    (by omega) rfl $$ [O0 O8]
+  · iframe O0 O8
+  ihave X := BorshFT.stkJ (n := n) (a := s.toNat - 32) (b := s.toNat - 24) (k1 := 8) (k2 := 24) (k := 32)
+    (by omega) rfl $$ [U0 X]
+  · iframe U0 X
+  iapply BorshFT.stkJ (n := n) (a := s.toNat - 304) (b := s.toNat - 32) (k1 := 272) (k2 := 32) (k := 304)
+    (by omega) rfl
+  iframe Lo X
+
+end S409
+
 end WNear.Binary.InternalDeposit
