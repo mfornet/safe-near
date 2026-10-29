@@ -160,7 +160,7 @@ theorem f406_bal (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
   mstep; mstep; mstep; mstep; mstep
   mcall (S405 bb (by omega) (by omega) hbb (by simp [UInt32.toNat_add, h80]; omega) (by omega) hpre hkey
       (by simp) (by simp) hL hpl hl0 hpp hv hp (heapRoom_mono hroom (by omega)) h st hacc hlim hcanon.1 hcanon.2 (hlink _) hproof
-      (by unfold readProofCost at hbud; omega) hreg hsome)
+      hbud hreg hsome)
       using [Hg Lo HI Hvt Hinv Hm Hp Hv Hkey B Hhost] with (rw [hK405]; mstep_norm_full; omega)
   · iunfold pre405
     ihave Lo := stk_addr (show s.toNat - 480 = (s - 80).toNat - 400 by omega) $$ Lo
@@ -433,7 +433,7 @@ theorem f406_sup (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
   mstep; mstep; mstep; mstep; mstep
   mcall (S405 bb (by omega) (by omega) hbb (by simp [UInt32.toNat_add, h80]; omega) (by omega) hpre hkey
       (by simp) (by simp) hL hpl hl0 hpp hv hp (heapRoom_mono hroom (by omega)) h st hacc hlim hcanon.1 hcanon.2 (hlink _) hproof
-      (by unfold readProofCost writeProofCost at hbud; omega) hreg hsome)
+      (by omega) hreg hsome)
       using [Hg Lo HI Hvt Hinv Hm Hp Hv Hkey B Hhost] with (rw [hK405]; mstep_norm_full; omega)
   · iunfold pre405
     ihave Lo := stk_addr (show s.toNat - 480 = (s - 80).toNat - 400 by omega) $$ Lo
