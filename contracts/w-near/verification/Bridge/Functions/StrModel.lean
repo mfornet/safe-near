@@ -151,4 +151,35 @@ theorem strRun_model (l acc : List UInt8) :
             omega
           rw [stringBody] <;> simp_all
 
+/-- **`parse_str`'s outcome against the model** (`str_model`), from the reader's index `i`, the scratch
+empty. On `.ok bytes rest` with UTF-8 `bytes`, `stringBody` decodes the string whose bytes are `bytes`
+and leaves `rest`; on `.ok` with bytes that are not UTF-8 it decodes no string (`some (none, rest)`); on
+the run's three rejections it is `none`. So 646 returns `Ok` exactly when `stringBody` decodes a string,
+with the same bytes, and `Err` exactly when it gives `none` or `some (none, _)`. -/
+theorem str_model (l : List UInt8) :
+    match strRun l [] with
+    | .ok bytes rest =>
+      if Utf8.utf8Ok bytes = true then
+        ∃ s : String, stringBody l [] = some (some s, rest) ∧ s.toByteArray = bytes.toByteArray
+      else stringBody l [] = some (none, rest)
+    | _ => stringBody l [] = none := by
+  have h := strRun_model l []
+  simp only [List.reverse_nil] at h
+  rw [h]
+  cases strRun l [] with
+  | ok bytes rest =>
+    simp only []
+    split
+    · rename_i hutf
+      have hv : ByteArray.IsValidUTF8 ⟨bytes.toArray⟩ := (Utf8.utf8Ok_iff_isValidUTF8 bytes).mp hutf
+      refine ⟨String.fromUTF8 _ hv, ?_, by rw [← mk_toArray]; rfl⟩
+      simp [String.fromUTF8?, hv]
+    · rename_i hutf
+      have hn := Utf8.fromUTF8?_isSome bytes
+      rw [show Utf8.utf8Ok bytes = false by simpa using hutf] at hn
+      rw [Option.isSome_eq_false_iff.mp hn |> Option.isNone_iff_eq_none.mp]
+  | eof => rfl
+  | ctrl => rfl
+  | badEsc => rfl
+
 end WNear.Binary.ParseStr
