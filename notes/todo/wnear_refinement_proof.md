@@ -1170,9 +1170,17 @@ round).* Proved, no `sorry`, standard axioms only:
      starting from the model's decoded string. They require allocation room at
      the trace's maximum memory length and retain all growth/owned-copy charges.
      Their complete frames/depth premises are 240 bytes / `d + 32` for 379 and
-     288 bytes / `d + 33` for 169. Integrating these changing-state contracts into
-     the struct-value hypothesis remains open; the older no-escape interfaces
-     are unchanged. General rejecting value paths remain open.
+     288 bytes / `d + 33` for 169. `SerdeValueState` now exposes that changing state
+     at the sequence-element boundary. `SerdeSeqElemEsc.f214_copied` and
+     `SerdeMapValueEsc.f205_copied` integrate the concrete reader into both value
+     callers. Successful colon and closing-bracket contracts frame their caller's
+     state through. `SerdeStructArrState.f228_arr_state` generalizes the array
+     proof; `SerdeStructArrEsc.f228_arr_copied` instantiates it from the JSON
+     model's decoded string, restoring 368 bytes and nesting depth, at `d + 35`.
+     Left: the object loop and escaped keys; then scratch cleanup and the outer
+     78/66/65 wrappers with the changed state. Preserve both live allocations when
+     repacking the heap. The older no-escape interfaces are unchanged. General
+     rejecting value paths remain open.
 
    `ignore_str` (650) and `ignore_escape` (652) are the same scan without UTF-8. Their spec
    is acceptance and the rest, as `stringBody` gives them, ignoring its first component.

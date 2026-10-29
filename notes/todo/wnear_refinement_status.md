@@ -414,6 +414,45 @@ continuation is published to PR #40 after its validation gates pass.
   checks pass. Evidence: `/tmp/pr40-copied-values-final-audit.log` and
   `/tmp/pr40-copied-values-style.log`.
 
+
+## Changing-state struct continuation
+
+- `SerdeValueState` separates scratch/heap ownership from the output descriptor
+  and reader cursor. `scratchPre` allows any allocated scratch capacity;
+  `valueStorage` retains both scratch and the owned account-id String, with exact
+  parser endpoint facts and its memory-growth bound. `spec169_copied` instantiates
+  the existing sequence-element callee boundary with this changing state.
+- `SerdeSeqElemEsc.f214_copied` proves the first array element using that concrete
+  account-id reader. `SerdeMapValueEsc.f205_copied` consumes the map colon and
+  reads the copied account id. Both retain the returned scratch/heap state.
+- `SerdeColonSuccess.f89_colon` and `f91_close` prove the actual successful
+  punctuation paths with only reader/global resources. Heap, scratch and stack
+  ownership are framed through; these paths neither allocate nor access their
+  reserved stack memory. They retain the existing 200/400-operation allowances
+  plus whitespace costs and require only `d + 2` call-depth room.
+- `SerdeStructArrState.f228_arr_state` generalizes the array struct proof to an
+  arbitrary changing-state element-reader pre/postcondition. The actual closing
+  bracket check preserves the returned state and advances the reader. The full
+  368-byte frame and nesting-depth byte are restored.
+- `SerdeStructArrEsc.f228_arr_copied` instantiates that contract with the concrete
+  JSON-model-facing escaped account-id reader, at `d + 35`. It accepts the array
+  form with a copied valid account id under explicit parser/allocation room and
+  growth/owned-copy gas charges. It does not assume the zero-capacity `tbl` or an
+  unchanged heap after 169.
+- Remaining integration: generalize the object's loop/key state, then carry the
+  array/object results through scratch cleanup and the 78/66/65 wrappers. The
+  scratch-drop contract uses membership and a remaining-live-list sublist premise,
+  so retain the owned String through that interface rather than assuming scratch
+  is the first live allocation. Absorb the explicit gas charges under reachable
+  heap bounds. Full rejection and deep ignored values remain open; still six
+  completed exported methods.
+- Validation: `just wnear-audit` passes (2786 build jobs; 452 wNEAR modules,
+  62545 declarations and 57287 theorems). Only the three existing dependencies on
+  `Proofs.Refinement` use `sorryAx`; strict NearLogic has zero violations and
+  statement pins match. Lean MCP verifies `f228_arr_copied` with only the standard
+  three axioms. Changed-source Lean style and whitespace checks pass. Evidence:
+  `/tmp/pr40-struct-values-final-audit.log` and `/tmp/pr40-struct-values-style.log`.
+
 ## Methods
 
 There are 15 exported methods; six now have complete per-call refinement proofs under their protocol premises.
@@ -493,8 +532,8 @@ The texts are proved equal to the model's `Panic.message` (`PanicText`).
         state instead of reusing the borrowed-key `Hyp646` unchanged;
       - keep the all-outcome `costRun` separate: it has a proved quadratic lower
         bound even on accepted newline escapes (`StrCostLower`);
-      - integrate the proved successful copied 380/379/169 contracts into the
-        changing-state struct-value hypothesis;
+      - the copied 169 reader is integrated through 214/205 and the array's 228;
+        finish the object-loop integration and 78/66/65 cleanup/wrappers;
       - `Hyp646` for escaped keys;
       - 652 (`ignore_escape`).
    3. Ignored values nested deeper: 84 grows the scratch from capacity 0, and `Hyp81` must allow changes to the heap and the scratch.
