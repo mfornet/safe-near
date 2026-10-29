@@ -144,6 +144,15 @@ def tail232 : List Instr :=
     .local_get 1, .i32_const 56, .i32_binop .add, .call 68,
     .local_get 1, .i32_const 144, .i32_binop .add, .global_set 0, .return]
 
+/-- `tail232` is 232's code: the end of the third nested block (the success path). -/
+theorem tail232_eq : (match f232.body.drop 21 with
+    | .block _ b :: _ => (match b with
+      | .block _ b2 :: _ => (match b2.drop 10 with
+        | .block _ b3 :: _ => b3.drop 8
+        | _ => [])
+      | _ => [])
+    | _ => []) = tail232 := rfl
+
 /-- The code of the tail (persistent). -/
 def tailCode (e n maxP inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (mx : Option Nat) : IProp GF :=
   iprop(code846 n maxP inst mi A ∗ DropVec.dropCode inst mi A ∗
