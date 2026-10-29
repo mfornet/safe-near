@@ -1,6 +1,6 @@
 # wNEAR refinement: status and how to resume
 
-Snapshot when work paused on 2026-10-29. Details are in `wnear_refinement_proof.md`: M3 for the first method, M6 for JSON arguments (the parser map is `wnear_m6_parser_map.md`), and M8 for the other methods.
+Campaign status on 2026-10-29; local continuation is active. Details are in `wnear_refinement_proof.md`: M3 for the first method, M6 for JSON arguments (the parser map is `wnear_m6_parser_map.md`), and M8 for the other methods.
 
 `refines_wnear_exported` (`Proofs/Refinement.lean`) is still the only `sorry`. Every result below is proved with no `sorry`. Each depends only on `propext`, `Classical.choice` and `Quot.sound`: never use `bv_decide` or `native_decide`.
 
@@ -49,20 +49,30 @@ changes have not yet been pushed to PR #40.
   `NearDepositMintWords`, `NearDepositMintModel`, `NearDepositStorageAgreement`, and
   `NearDepositUsageModel` connect the amount, log, header, final storage and usage to
   `mintedOutcome`. `NearDepositSuccessAgreement` includes the final storage-stake check.
-- **`NearDepositRefines.nearDeposit_refines_init_of_bound` assembles the initialized
-  method's complete per-call refinement clauses, conditional on loading plus `costDep`
-  fitting the model's gas bound.** That quantitative bound is still open; this does not
-  make `near_deposit` a sixth finished method. The targeted build passed (1603 jobs),
-  at `/tmp/pr40-deposit-refines-build.log`. LSP verifies the new top theorem, precondition,
-  storage, usage, success and panic agreement results with only the standard axioms.
+- **`near_deposit` is now the sixth completed method refinement under protocol premises.**
+  `NearDepositGas.hbound_initialized` discharges loading plus `costDep`: at most 900009
+  regular operations, 54 linear-operation charges, host fees at most 2 Tgas, and the
+  three write paths within `trieGas`. The non-trie allowance is at most 2.945 Tgas
+  against `computeGas = 4 Tgas` under the stated v86 bounds and binary size.
+  `NearDepositAll.nearDeposit_refines_all` combines initialized success/panics with the
+  uninitialized case. The targeted build passed (1630 jobs), at
+  `/tmp/pr40-deposit-all-build.log`. LSP verifies the gas-bound and all-state refinement
+  theorems with only the standard three axioms.
+- `NearDepositCostOps`, `NearDepositCostCalls`, `NearDepositCostPanics`,
+  `NearDepositCostHosts`, `NearDepositCostBody`, and `NearDepositCostFees` separate bounded
+  operation work from host fees and trie paths. `CostsDepositV86` extends `CostsNewV86`
+  with the evicted-byte cost, log base/byte costs, and permission for at least one log.
+  The added numeric bounds match `runtime_config_v86.json` (log count is 100). They are
+  explicit protocol premises for M9, not new axioms or changes to the model.
 - `lake build +Bridge.Functions.StateReadModel` passes (`/tmp/pr40-state-read-final.log`).
   An earlier concurrent build failed writing a read-only cached BorshFT.ilean; the local
   link was detached and the sequential build passed. Avoid overlapping builds of the same targets.
 - Fixed the declared `Bridge` library's missing-root problem with `globs = ["Bridge.+"]`.
   A full `lake build Bridge` is running at `/tmp/pr40-full-bridge-build.log` (exec session
   `67253`, Lake PID `22895`; the long-running `ParseEscape.lean` compiler is PID `23455`).
-  Its build graph predates the newest agreement files, which were built separately as
-  dependencies of `NearDepositRefines`. Revalidate live process and exit status, then
+  Its build graph predates the newest deposit files, which were built separately as
+  dependencies of `NearDepositAll`. `ParseEscape` completed; `ParseStrEsc` is still live
+  (PID `36052` at the last check). Revalidate live process and exit status, then
   build the current complete library and run strict NearLogic/wNEAR audits and statement
   pins before pushing. No complete integrated-build pass is claimed yet.
 
@@ -77,13 +87,14 @@ There are 15 exported methods.
 | `storage_balance_bounds` (306) | done | `StorageBalanceBoundsRefines.storageBalanceBounds_refines_all` |
 | `ft_metadata` (309) | done | `FtMetadataRefines.ftMetadata_refines_all` |
 | `new` (290) | done | `NewRefines.newRefines_all` |
-| `near_deposit` (234) | uninitialized refinement done; initialized agreement, premises and assembly done conditional on the gas bound | `NearDepositUninit.nearDeposit_refines_uninit`; `NearDepositRefines.nearDeposit_refines_init_of_bound`. Remaining: prove loading plus `NearDepositMethod.costDep` fits the model's bound, then assemble the all-state method theorem and discharge protocol premises in M9. |
+| `near_deposit` (234) | done | `NearDepositAll.nearDeposit_refines_all`, under `CostsV86`, `LimitsV86`, `CostsDepositV86`, the module protocol premises and code size. Gas, functional agreement and host preconditions are all discharged. |
 | `ft_balance_of` (297) | argument layer, and the parser's accepting half for shallow input without escapes | see "Parser" below; the method level is not started |
 | `storage_balance_of`, `storage_deposit`, `storage_withdraw`, `storage_unregister`, `near_withdraw`, `ft_transfer`, `ft_transfer_call`, `ft_resolve_transfer` | not started | they need the parser; `ft_transfer_call` and `ft_resolve_transfer` also need promises and promise results |
 
 The premises left in the method theorems are the binary's code size and protocol 86's parameters:
 - `CostsV86` and `LimitsV86` (in `FtTotalSupplyGas`/`FtTotalSupplyPre`);
-- `CostsNewV86` (in `NewPanicsRefines`).
+- `CostsNewV86` (in `NewPanicsRefines`);
+- `CostsDepositV86` (in `NearDepositCostFees`, extends `CostsNewV86`).
 
 Every value in them is checked against `near-lean/vm/configs/runtime_config_v86.json`. M9 discharges them.
 
@@ -134,7 +145,7 @@ The texts are proved equal to the model's `Panic.message` (`PanicText`).
 
 ## Next steps
 
-1. **`near_deposit`, the remaining gas bound.** Prove loading plus `costDep` is within the model's `computeGas + trieGas + returnDataGas 0` on every initialized path. Instantiate `nearDeposit_refines_init_of_bound`, then combine it with `nearDeposit_refines_uninit`. Template: `NewGas`; the functional and precondition obligations are already discharged.
+1. **Validate and integrate the six completed methods.** Finish the live full Bridge build, build every current module and run the strict audits plus statement pins. Keep the only sorry allowance at `Proofs.Refinement`. Then publish the continuation to PR #40.
 2. **The parser, finishing `ft_balance_of`'s argument contract.**
    1. `RejectContract`. A loose cost suffices. Use `fromSlice_eq` and the reject paths listed in M6. A WIP of the definitions is in `notes/wip/wnear/SerdeRejDefs.lean.txt`.
    2. Escapes in the accepting half:
@@ -148,7 +159,7 @@ The texts are proved equal to the model's `Panic.message` (`PanicText`).
    - `storage_balance_of` (its parser is the same code as `ft_balance_of`'s);
    - `storage_*`, `near_withdraw`, `ft_transfer`;
    - then `ft_transfer_call` and `ft_resolve_transfer`, which need promise and promise-result host contracts.
-5. **M9.** Assemble `refines_wnear_exported` and discharge the code size, `CostsV86`, `LimitsV86` and `CostsNewV86`.
+5. **M9.** Assemble `refines_wnear_exported` and discharge the code size, `CostsV86`, `LimitsV86`, `CostsNewV86` and `CostsDepositV86`.
 
 ## Working notes
 
