@@ -23,7 +23,7 @@ open WNear.Binary.SerdeRead (rd optByte wsLen)
 open WNear.Binary.SerdeErrBox (errCode costErr heapA roomFor4)
 open WNear.Binary.SerdeEnds (endCode some_bit)
 open WNear.Binary.SerdeNextKey (Spec646 keyQ keyWs fieldOf)
-open WNear.Binary.SerdeStructArr (strRes tbl Hyp169 stk_join' store1)
+open WNear.Binary.SerdeStructArr (strRes tbl Hyp169 roomS stk_join' store1)
 open WNear.SerdeStructLoop (loopRes)
 open NearInterface.Json
 
@@ -54,7 +54,7 @@ def fr228 (inst : Nat) (mi : ModuleInst) (out de x2 x3 x4 x5 s : UInt32) (l7 : U
 /-- The field read so far, at `s + 40` (`Option<ValidAccountId>`, `None` the pointer 0), and the
 heap: before it, the heap with room for an error box; after it, the string (`strRes`). -/
 def seenRes (n maxP Fb : Nat) (live : List (Nat × Nat)) (s : UInt32) : Option WNear.AccountId → IProp GF
-  | none => iprop(∃ (mlen F : Nat) (b8 : List UInt8), ⌜roomFor4 mlen maxP 20 ∧ b8.length = 8 ∧ F ≤ Fb⌝ ∗
+  | none => iprop(∃ (mlen F : Nat) (b8 : List UInt8), ⌜roomS mlen maxP ∧ b8.length = 8 ∧ F ≤ Fb⌝ ∗
       n ↦[i32][ s.toNat + 40 ] 0 ∗ n ↦[wms][ s.toNat + 44 ] b8 ∗ heapInv n maxP mlen live F)
   | some a => iprop(∃ (p cap : UInt32), n ↦[i32][ s.toNat + 40 ] p ∗ n ↦[i32][ s.toNat + 44 ] cap ∗
       n ↦[i32][ s.toNat + 48 ] (UInt32.ofNat a.val.utf8ByteSize) ∗ strRes n maxP live a p cap)
@@ -137,7 +137,7 @@ theorem seen_lens (n maxP Fb : Nat) (live : List (Nat × Nat)) (s : UInt32) (sA 
     iexists live
     iframe Hh
     isplitr
-    · ipureintro; exact hr
+    · ipureintro; exact SerdeStructArr.room_down hr
     iintro Hh
     iunfold seenRes
     iexists m
@@ -194,7 +194,7 @@ theorem f228_obj (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
     (gt : GlobalType) (sp out de ptr idx x2 x3 x4 x5 : UInt32) (ob bs : List UInt8) (i : Nat)
     (maxP mlen F : Nat) (live : List (Nat × Nat)) (hob : ob.length = 16) (hout : out.toNat + 16 ≤ 2 ^ 32)
     (hlen : bs.length + 1 < 2 ^ 28) (hptr : ptr.toNat + bs.length < 2 ^ 32) (hde : de.toNat + 25 ≤ 2 ^ 32)
-    (hsp : 336 ≤ sp.toNat) (hal : sp.toNat % 8 = 0) (hi : i ≤ bs.length) (hr : roomFor4 mlen maxP 20)
+    (hsp : 336 ≤ sp.toNat) (hal : sp.toNat % 8 = 0) (hi : i ≤ bs.length) (hr : roomS mlen maxP)
     (dv : List UInt8 → Option (WNear.AccountId × List UInt8)) (ign : List UInt8 → Option (Unit × List UInt8))
     (K646 K169 K81 : Nat → Nat) (Fb : Nat) (Cd : IProp GF) [Persistent Cd]
     (h646 : Hyp646 cfg lim inst mi n g ta A Cg gt de ptr idx bs maxP K646 Cd)
@@ -524,7 +524,7 @@ theorem f228_obj (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
       ihave HS := seen_lens $$ HS
       icases HS with ⟨%mh, %Fh, %lv, %hrh, Hh, HSw⟩
       iunfold tbl at Ht
-      icases Ht with ⟨Hsl, He, Hw8⟩
+      icases Ht with ⟨Hsl, He, Hw8, T12, T16⟩
       icases Hsl with ⟨%sl, Hsl⟩
       rw [show de.toNat + 20 = (de + 12).toNat + 8 by simp [UInt32.toNat_add]; omega]
       icases stk_split n ((sp - 64).toNat - 272) 256 16 $$ S272 with ⟨S256, S16⟩
@@ -605,9 +605,9 @@ theorem f228_obj (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
       icases stk_split n ((sp - 64).toNat - 272 + 16) 160 96 $$ S256 with ⟨S160, S96⟩
       rw [show (sp - 64).toNat - 272 + 16 + 160 = (sp - 64).toNat - 96 by omega,
         show (sp - 64).toNat - 272 + 16 = (sp - 64).toNat - 256 by omega]
-      ihave Ht : tbl n de $$ [Hsl He Hw8]
+      ihave Ht : tbl n de $$ [Hsl He Hw8 T12 T16]
       · iunfold tbl
-        iframe He Hw8
+        iframe He Hw8 T12 T16
         iexists 0
         rw [show de.toNat + 20 = (de + 12).toNat + 8 by simp [UInt32.toNat_add]; omega]
         iexact Hsl
@@ -635,7 +635,7 @@ theorem f228_obj (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
         clear s169
         have s205 := SerdeValueSeed.f205_of_169 (GF := GF) cfg lim (d + 1) types[14]! (by rfl) inst mi A n g ta hm
           (by omega) Cg gt (sp - 64) (sp - 64 + 8) (sp - 64 + 32) de ptr idx b16' bs q1 maxP mlen0 live F0 hb16'
-          (by omega) hlen hptr (by omega) (by omega) (by omega) hq1l hr0
+          (by omega) hlen hptr (by omega) (by omega) (by omega) hq1l (SerdeStructArr.room_down hr0)
           iprop(stk n ((sp - 64).toNat - 256) 160 ∗ tbl n de) (K169 (q1 + w1 + 1))
           iprop(g ↦[wg] ⟨gt, .i32 (sp - 64)⟩ ∗ stk n ((sp - 64).toNat - 256) 256 ∗ vt n 1057464 idx ta (A 578) ∗
             tbl n de ∗ ∃ (p cap : UInt32), n ↦[i32][ (sp - 64).toNat + 8 ] 0 ∗ n ↦[i32][ (sp - 64).toNat + 8 + 4 ] p ∗

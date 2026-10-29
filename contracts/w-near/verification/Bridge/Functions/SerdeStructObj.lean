@@ -40,7 +40,7 @@ open WNear.Binary.SerdeRead (rd optByte wsLen)
 open WNear.Binary.SerdeErrBox (errCode costErr heapA roomFor4)
 open WNear.Binary.SerdeEnds (endCode some_bit)
 open WNear.Binary.SerdeNextKey (Spec646 keyQ keyWs fieldOf)
-open WNear.Binary.SerdeStructArr (strRes tbl Hyp169)
+open WNear.Binary.SerdeStructArr (strRes tbl Hyp169 roomS)
 open NearInterface.Json
 
 /-- The field visitor's test on a decoded key is the model's. -/
@@ -172,7 +172,7 @@ theorem spec169_205 (cfg : WasmConfig) (lim : ExecLimits) (inst : Nat) (mi : Mod
     [Persistent Cd] (h : Hyp169 cfg lim inst mi n g ta A Cg gt de ptr idx bs maxP dv K169 Fb Cd)
     (d : Nat) (hd : d + 16 < lim.maxCallDepth) (sp out : UInt32) (ob : List UInt8) (hob : ob.length = 16)
     (hout : out.toNat + 16 ≤ 2 ^ 32) (hsp : 256 ≤ sp.toNat) (j : Nat) (a : WNear.AccountId) (r : List UInt8)
-    (hj : j ≤ bs.length) (mlen F : Nat) (live : List (Nat × Nat)) (hr : roomFor4 mlen maxP 20)
+    (hj : j ≤ bs.length) (mlen F : Nat) (live : List (Nat × Nat)) (hr : roomS mlen maxP)
     (hF : F ≤ Fb) (hdv : dv (bs.drop j) = some (a, r)) :
     Cd ⊢ MFunSpec cfg lim d types[14]! inst mi f169 Cg
         (fun args => iprop(⌜args = [.i32 out, .i32 de]⌝ ∗ g ↦[wg] ⟨gt, .i32 sp⟩ ∗ stk n (sp.toNat - 96) 96 ∗

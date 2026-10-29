@@ -33,7 +33,7 @@ open WNear.Binary.VecFromElem (stk stk_split stk_join stk_intro stk_word stk_add
 open WNear.Binary.SerdeRead (rd optByte wsLen)
 open WNear.Binary.SerdeErrBox (errCode costErr heapA roomFor4)
 open WNear.Binary.SerdeEnds (endCode)
-open WNear.Binary.SerdeStructArr (strRes tbl Hyp169 stk_join')
+open WNear.Binary.SerdeStructArr (strRes tbl Hyp169 roomS stk_join')
 open WNear.Binary.SerdeStructObj (Hyp646 Hyp81)
 open WNear.Binary.ArgsLeaves (sliceRead deserializer)
 open NearInterface.Json
@@ -188,7 +188,7 @@ theorem f66_acc (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType
     (gt : GlobalType) (sp out rd ptr idx : UInt32) (ob bs : List UInt8)
     (maxP mlen F : Nat) (live : List (Nat × Nat)) (hob : ob.length = 16) (hout : out.toNat + 16 ≤ 2 ^ 32)
     (hrd : rd.toNat + 12 ≤ 2 ^ 32) (hlen : bs.length + 1 < 2 ^ 28) (hptr : ptr.toNat + bs.length < 2 ^ 32)
-    (hsp : 400 ≤ sp.toNat) (hal : sp.toNat % 8 = 0) (hr : roomFor4 mlen maxP 20)
+    (hsp : 400 ≤ sp.toNat) (hal : sp.toNat % 8 = 0) (hr : roomS mlen maxP)
     (dv : List UInt8 → Option (WNear.AccountId × List UInt8)) (ign : List UInt8 → Option (Unit × List UInt8))
     (K646 K169 K81 : Nat → Nat) (Fb : Nat) (Cd : IProp GF) [Persistent Cd]
     (h646 : Hyp646 cfg lim inst mi n g ta A Cg gt (sp - 64) ptr idx bs maxP K646 Cd)
@@ -343,9 +343,13 @@ theorem f66_acc (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType
   · iunfold SerdeRead.rd
     iframe Hbs
     iexact Dsr
-  ihave Ht : tbl n (sp - 64) $$ [D20 He Hw]
+  rw [i64_one]
+  ihave D12 := KeyGet.split64 n ((sp - 64).toNat + 12) 1 0 $$ D12
+  icases D12 with ⟨D12, D16⟩
+  rw [show (sp - 64).toNat + 12 + 4 = (sp - 64).toNat + 16 by omega]
+  ihave Ht : tbl n (sp - 64) $$ [D20 He Hw D12 D16]
   · iunfold tbl
-    iframe He Hw
+    iframe He Hw D12 D16
     iexists 0
     iexact D20
   have s78 := SerdeStruct78.f78_acc (GF := GF) cfg lim (d + 1) types[14]! (by rfl) inst mi A n g ta hm (by omega) Cg
@@ -408,9 +412,9 @@ theorem f66_acc (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType
   mstep; mstep; mstep; mstep; mstep; mstep; mstep; mstep
   mstep [A40]
   mstep [Q12]
-  rw [i64_one]
-  ihave D12 := KeyGet.split64 n ((sp - 64).toNat + 12) 1 0 $$ D12
-  icases D12 with ⟨D12, D16⟩
+  iunfold tbl at Ht
+  icases Ht with ⟨Hsl, He, Hw, D12, D16⟩
+  rw [show (sp - 64).toNat + 16 = (sp - 64).toNat + 12 + 4 by omega]
   have s68 := f68_zero (GF := GF) cfg lim (d + 1) types[0]! (by rfl) inst mi A n g ta hm (by omega) Cg
     (sp - 64 + 12) (by omega)
   rw [h12] at s68
@@ -430,8 +434,7 @@ theorem f66_acc (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType
     iframe Hc
     ipureintro; omega
   iframe Hg Hvt Hkey
-  iunfold tbl at Ht
-  icases Ht with ⟨⟨%sl, D20⟩, He, Hw⟩
+  icases Hsl with ⟨%sl, D20⟩
   iframe He Hw
   iunfold SerdeRead.rd at Hrd
   icases Hrd with ⟨Dsr, Hbs⟩
@@ -550,7 +553,7 @@ theorem f66_dec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType
     (gt : GlobalType) (sp out rd ptr idx : UInt32) (ob bs : List UInt8)
     (maxP mlen F : Nat) (live : List (Nat × Nat)) (hob : ob.length = 16) (hout : out.toNat + 16 ≤ 2 ^ 32)
     (hrd : rd.toNat + 12 ≤ 2 ^ 32) (hlen : bs.length + 1 < 2 ^ 28) (hptr : ptr.toNat + bs.length < 2 ^ 32)
-    (hsp : 400 ≤ sp.toNat) (hal : sp.toNat % 8 = 0) (hr : roomFor4 mlen maxP 20)
+    (hsp : 400 ≤ sp.toNat) (hal : sp.toNat % 8 = 0) (hr : roomS mlen maxP)
     (dv : List UInt8 → Option (WNear.AccountId × List UInt8)) (ign : List UInt8 → Option (Unit × List UInt8))
     (hdv : SerdeStructModel.Agrees dv (SerdeStructModel.valueAs WNear.account))
     (hign : SerdeStructModel.Agrees ign SerdeStructModel.valueSkip)
