@@ -252,23 +252,22 @@ continuation is published to PR #40 after its validation gates pass.
   UTF-8 run, with arbitrary escapes and the original borrowed/copied `resStr`.
   It restores the complete 192-byte frame and all reader/scratch resources. It
   currently retains the existing conservative `roomRun` premise.
-- `StrSuccessCostBound.costRun_linear_work` bounds non-append work by
-  `(600 + 550*consumed + 100*initialAccLength)*regularOpCost`, plus the separate
-  recursive `appendCost`. `ParseStrSuccessBound.f646_success_linear` exposes the
+- `ParseStrSuccess.costRun_linear_work` bounds non-append work by
+  `(400 + 450*consumed + 100*initialAccLength)*regularOpCost`, plus the separate
+  recursive `appendCost`. `ParseStrSuccess.f646_success_linear` exposes the
   corresponding callable contract, including entry/exit work, at
-  `(700 + 550*consumed)*regularOpCost + appendCost` from an empty scratch.
+  `(500 + 450*consumed)*regularOpCost + appendCost` from an empty scratch.
 - `ScratchAmortized` follows the actual `capAfter` updates along arbitrary append
   lengths. `movedBytes_capacity` telescopes capacity increases; `movedBytes_linear`
   bounds all old-buffer copies by `2*finalUsed + 8` bytes. `copyOps_linear` includes
   memcpy's fixed overhead, bounding that component by `48*finalUsed + 192` regular
   operations. The trace's arithmetic premises are explicit.
-- **The accepting gas allowance is still open.** The conservative instruction
-  constants above already exceed the argument contract's 470 ops per byte, before
-  append charges. Tighten successful fitting reserve/append paths and loop
-  overhead, connect the string's append sequence to the trace bound, and bound
-  allocator/free-list work. Start with 614 when capacity is available and the
-  fitting 613 → 588 → 589 → 623 → 630 chain. Then integrate 380/169 and escaped-key readers. No
-  model gas allowance has been increased, and this is not a seventh method proof.
+- **The general accepting gas allowance is still open.** The 450-ops-per-byte
+  component excludes append charges. The fitting case below now meets 470 with
+  all append costs included; runs that grow the scratch still need a joint cost
+  bound using the append trace and allocator/free-list work. Then integrate
+  380/169 and escaped-key readers. No model gas allowance has been increased,
+  and this is not a seventh method proof.
 
 - Validation: `just wnear-audit` passes (2770 build jobs; 436 wNEAR modules,
   61095 declarations and 55896 theorems). The only tolerated dependencies on
@@ -278,6 +277,38 @@ continuation is published to PR #40 after its validation gates pass.
   three axioms and `copyOps_linear` with only `propext` and `Quot.sound`.
   Evidence: `/tmp/pr40-str-success-final-audit.log` and
   `/tmp/pr40-str-success-style.log`.
+
+## Tighter fitting paths and the 470-op accepting string contract
+
+- `ScratchFast` proves fitting 630, 623, 589, 588 and 613. The final slice-append
+  chain costs `180*c + MemCpy.cost(k)*c`, compared with `280*c + MemCpy.cost(k)*c`
+  in the general contract. Direct 614 (`push`) costs 40 regular operations,
+  compared with the general 260. `f613_fast` and `f614_fast` choose these fitting
+  bounds and retain the existing growth bounds and exact functional postconditions.
+- `ParseEscapeFast.f649_nu_fast` proves all eight successful simple escapes at
+  `240*c + pushCost`, replacing `400*c + costExt`. Its generic `f649_fast` keeps
+  the existing Unicode/surrogate proofs. Both the simple escape dispatch and
+  the fitting push are now charged at their tighter bounds.
+- The actual `ParseStrSuccess.f646_success` loop uses these contracts. Its segment
+  reserve is reduced from 500 to 300 operations, and its public non-append bound
+  is reduced from 550 to 450 operations per consumed byte, as recorded above.
+- `costRun_fit` in `StrSuccessFitBound.lean` sums all fitting append charges jointly with
+  escape dispatch and the single final UTF-8 validation. `ParseStrSuccess.f646_success_fit` in `ParseStrFit.lean`
+  exposes the full callable contract at `(500 + 470*consumed)*c`, with the same
+  borrowed/copied `resStr` and full 192-byte stack restoration. The explicit
+  capacity premise covers all unread input, so this is the no-growth case. The
+  existing conservative `roomRun` premise is retained. LSP verifies the callable
+  theorem using only `propext`, `Classical.choice` and `Quot.sound`.
+- Next: account for the initial scratch allocation and subsequent growths within
+  the same 470-op budget, combining the append trace and allocator/free-list work.
+  The argument reader still needs 380/169 integration and general rejection.
+
+- Validation: `just wnear-audit` passes (2774 build jobs; 440 wNEAR modules,
+  61364 declarations and 56157 theorems), with only the three existing
+  `Proofs.Refinement` dependencies on the open theorem. Strict NearLogic has zero
+  violations; statement pins, PR-wide Lean style and whitespace checks pass.
+  LSP verifies `ParseStrSuccess.f646_success_fit` with the standard three axioms.
+  Evidence: `/tmp/pr40-fast-fit-final-audit.log` and `/tmp/pr40-fast-fit-style.log`.
 
 ## Methods
 
@@ -351,9 +382,9 @@ The texts are proved equal to the model's `Panic.message` (`PanicText`).
 1. **The parser, finishing `ft_balance_of`'s argument contract.**
    1. `RejectContract`. A loose cost suffices. Use `fromSlice_eq` and the reject paths listed in M6. The outer struct-error and trailing-character paths are proved; 228's EOF case is discharged through 65. Finish the other 228 error cases, and integrate the general string/ignored-value readers.
    2. Escapes in the accepting half:
-      - tighten the success-only loop and fitting append/reserve constants to fit
-        the existing 470-ops-per-byte allowance; connect its append sequence to
-        `ScratchAmortized` and bound allocator/free-list work;
+      - extend the fitting 470-ops-per-byte string contract to runs that allocate
+        or grow the scratch; connect its append sequence to `ScratchAmortized`
+        and bound allocator/free-list work within the existing allowance;
       - keep the all-outcome `costRun` separate: it has a proved quadratic lower
         bound even on accepted newline escapes (`StrCostLower`);
       - 380 and 169 with the copied result;

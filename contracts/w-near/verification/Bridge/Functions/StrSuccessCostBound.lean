@@ -12,11 +12,11 @@ open WNear.Binary.FromUtf8 (cost927)
 
 /-- The exact charge for appending a segment's plain bytes. -/
 def appendBase (cfg : WasmConfig) (F : Nat) (cap : UInt32) (acc l : List UInt8) (_L : Nat) : Nat :=
-  costExt cfg F cap (UInt32.ofNat acc.length) (UInt32.ofNat (l.takeWhile plain).length)
+  ScratchFast.extCost cfg F cap (UInt32.ofNat acc.length) (UInt32.ofNat (l.takeWhile plain).length)
 
 /-- The exact charge for appending one decoded escape. -/
 def appendEsc (cfg : WasmConfig) (F : Nat) (cap : UInt32) (acc l : List UInt8) (_L : Nat) : Nat :=
-  costExt cfg F cap (UInt32.ofNat acc.length) (UInt32.ofNat (escK l))
+  ParseEscapeFast.appendCost cfg F cap acc l
 
 /-- The cost of `parse_str`'s run over `l`. -/
 def appendCost (cfg : WasmConfig) (F : Nat) (cap : UInt32) (acc l : List UInt8) (L : Nat) : Nat :=
@@ -88,7 +88,7 @@ theorem costRun_linear_work (cfg : WasmConfig) (F : Nat) (cap : UInt32)
     (acc l bytes rest : List UInt8) (L : Nat) (hok : strRun l acc = .ok bytes rest) :
     rest.length < l.length ∧
     costRun cfg F cap acc l L ≤
-      (600 + 550 * (l.length - rest.length) + 100 * acc.length) * cfg.regularOpCost +
+      (400 + 450 * (l.length - rest.length) + 100 * acc.length) * cfg.regularOpCost +
         appendCost cfg F cap acc l L := by
   induction hn : l.length using Nat.strong_induction_on generalizing F cap acc l bytes rest with
   | _ len ih =>
@@ -112,8 +112,8 @@ theorem costRun_linear_work (cfg : WasmConfig) (F : Nat) (cap : UInt32)
         rw [costRun_stop cfg F cap acc l L hnosc, costBase_close cfg F cap acc l tail L hd,
           appendCost_stop cfg F cap acc l L hnosc]
         unfold appendBase
-        have hop : 500 + 30 * (l.takeWhile plain).length + cost927 (acc.length + (l.takeWhile plain).length) ≤
-            600 + 550 * (l.length - tail.length) + 100 * acc.length := by
+        have hop : 300 + 30 * (l.takeWhile plain).length + cost927 (acc.length + (l.takeWhile plain).length) ≤
+            400 + 450 * (l.length - tail.length) + 100 * acc.length := by
           unfold cost927
           omega
         exact Nat.add_le_add_right (Nat.mul_le_mul_right cfg.regularOpCost hop) _
@@ -136,12 +136,12 @@ theorem costRun_linear_work (cfg : WasmConfig) (F : Nat) (cap : UInt32)
                 (UInt32.ofNat (acc ++ l.takeWhile plain).length) (UInt32.ofNat eo.length))
               (acc ++ l.takeWhile plain ++ eo) (tail.drop m) bytes rest hok rfl
             have hop :
-                500 + 30 * (l.takeWhile plain).length + 200 * (m + 1) +
-                  (600 + 550 * ((tail.drop m).length - rest.length) + 100 * (acc ++ l.takeWhile plain ++ eo).length) ≤
-                600 + 550 * (l.length - rest.length) + 100 * acc.length := by
+                300 + 30 * (l.takeWhile plain).length + 200 * (m + 1) +
+                  (400 + 450 * ((tail.drop m).length - rest.length) + 100 * (acc ++ l.takeWhile plain ++ eo).length) ≤
+                400 + 450 * (l.length - rest.length) + 100 * acc.length := by
               simp only [List.length_drop, List.length_append] at *
               omega
-            have hesc := ParseEscapeSuccessCost.cost649_le cfg
+            have hesc := ParseEscapeFast.cost649_le cfg
               (fAfter F cap (UInt32.ofNat acc.length) (UInt32.ofNat (l.takeWhile plain).length))
               (capAfter cap (UInt32.ofNat acc.length) (UInt32.ofNat (l.takeWhile plain).length))
               (acc ++ l.takeWhile plain) tail eo m he

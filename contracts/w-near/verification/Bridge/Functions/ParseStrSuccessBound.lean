@@ -51,7 +51,7 @@ theorem f646_success_linear (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (typ
           rd n de ptr bs i ∗ n ↦[i32][ sc.toNat ] ptrS ∗ n ↦[i32][ sc.toNat + 4 ] capS ∗
           n ↦[i32][ sc.toNat + 8 ] 0 ∗ sbuf n maxP hl live F ptrS capS [] ∗
           n ↦[wms][ 1062392 ] escTable ∗ n ↦[wms][ 1071704 ] utf8Width ∗ n ↦[wms][ 1062712 ] hexTable))
-        (fun _ => (700 + 550 * ((bs.drop i).length - finalRest.length)) * cfg.regularOpCost +
+        (fun _ => (500 + 450 * ((bs.drop i).length - finalRest.length)) * cfg.regularOpCost +
           appendCost cfg F capS [] (bs.drop i) bs.length)
         (fun _ rs => iprop(⌜rs = []⌝ ∗ g ↦[wg] ⟨gt, .i32 sp⟩ ∗ stk n (sp.toNat - 192) 192 ∗
           vt n 1057464 idx ta (A 578) ∗ n ↦[wms][ 1062392 ] escTable ∗ n ↦[wms][ 1071704 ] utf8Width ∗

@@ -1143,9 +1143,13 @@ round).* Proved, no `sorry`, standard axioms only:
      UTF-8 validation once. `StrSuccessCostBound` separates linear instruction work
      from append charges; `ParseStrSuccessBound` exposes the callable bound.
      `ScratchAmortized.copyOps_linear` bounds all old-buffer reallocation copies.
-     Left: tighten the conservative loop/append constants (the current 550 instruction
-     ops per byte already exceed the target 470), connect the append trace and bound
-     allocator/free-list work. Then integrate
+     `ScratchFast` tightens fitting pushes and the slice-append reserve chain;
+     `ParseEscapeFast` reduces simple-escape dispatch to 240 operations plus the
+     capacity-sensitive push charge. The loop uses them with a 300-op segment reserve.
+     `ParseStrSuccess.f646_success_fit` (`ParseStrFit.lean`) now meets 470 ops per consumed byte, including
+     all append and UTF-8 work, when scratch capacity covers the unread input.
+     Left: extend this bound to runs that allocate or grow the scratch, connect
+     the append trace and bound allocator/free-list work. Then integrate
      `deserialize_str` (380) and `ValidAccountId::deserialize` (169) on escaped input
      (they still use `f646_spec_noesc`).
 

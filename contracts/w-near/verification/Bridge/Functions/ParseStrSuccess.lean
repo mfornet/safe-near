@@ -17,7 +17,8 @@ open WNear.Binary.FromUtf8Gen (utf8Width)
 open WNear.Binary.ArgsLeaves (sliceRead)
 open WNear.Binary.SerdeRead (rd)
 open WNear.Binary.SerdeErrBox (errCode costErr heapA roomFor4 f647_spec f648_spec_bad f657_eq)
-open WNear.Binary.ScratchGrow (sbuf sgCode capAfter fAfter hlAfter roomRes costExt)
+open WNear.Binary.ScratchGrow (sbuf sgCode capAfter fAfter hlAfter roomRes)
+open WNear.Binary.ScratchFast (extCost)
 open WNear.Binary.ParseEscape (escDecode escK sbufE escCode res649)
 open WNear.Binary.SerdeEsc (hexTable)
 
@@ -149,12 +150,12 @@ theorem f646_success (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : Fun
       · have : Numeric.bool (Numeric.irelop32 IRelOp.gt_u (UInt32.ofNat bs.length) (UInt32.ofNat j)) ≠ 0 := by
           simp [Numeric.bool, Numeric.irelop32, UInt32.lt_iff_toNat_lt]; omega
         rw [if_neg this]
-    generalize hZ : costRun cfg F' cap acc (bs.drop j) bs.length - (500 + 30 * body.length) * cfg.regularOpCost = Z
-    have hZ' : costRun cfg F' cap acc (bs.drop j) bs.length = (500 + 30 * body.length) * cfg.regularOpCost + Z := by
-      have := Nat.le_add_right ((500 + 30 * body.length) * cfg.regularOpCost) 0
+    generalize hZ : costRun cfg F' cap acc (bs.drop j) bs.length - (300 + 30 * body.length) * cfg.regularOpCost = Z
+    have hZ' : costRun cfg F' cap acc (bs.drop j) bs.length = (300 + 30 * body.length) * cfg.regularOpCost + Z := by
+      have := Nat.le_add_right ((300 + 30 * body.length) * cfg.regularOpCost) 0
       omega
-    rw [hZ', show (500 + 30 * body.length) * cfg.regularOpCost + Z + Rl =
-      40 * cfg.regularOpCost + (30 * (j + body.length - j) * cfg.regularOpCost + 450 * cfg.regularOpCost +
+    rw [hZ', show (300 + 30 * body.length) * cfg.regularOpCost + Z + Rl =
+      40 * cfg.regularOpCost + (30 * (j + body.length - j) * cfg.regularOpCost + 250 * cfg.regularOpCost +
         (Z + Rl) + 10 * cfg.regularOpCost) by
       rw [show j + body.length - j = body.length by omega]; simp only [Nat.add_mul]; omega]
     mstep; mstep [D4]; mstep; mstep; mstep [D8]
@@ -173,8 +174,8 @@ theorem f646_success (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : Fun
     mstep; mstep; mstep [D0]; mstep; mstep; mstep
     mstep; mstep
     iapply MemCpy.mwpi_loop0 (Cg := Cg)
-      (R := 30 * (j + body.length - j) * cfg.regularOpCost + 450 * cfg.regularOpCost + (Z + Rl))
-      (I := invS n inst mi Cg cfg.regularOpCost 450 (Z + Rl) out de sc (sp - 48) (UInt32.ofNat bs.length)
+      (R := 30 * (j + body.length - j) * cfg.regularOpCost + 250 * cfg.regularOpCost + (Z + Rl))
+      (I := invS n inst mi Cg cfg.regularOpCost 250 (Z + Rl) out de sc (sp - 48) (UInt32.ofNat bs.length)
         (UInt32.ofNat j) (UInt32.ofNat bs.length) ptr j body.length
         iprop(stk n (sp.toNat - 192) 192 ∗ n ↦[wms][ out.toNat ] ob ∗ n ↦[wms][ 1062392 ] escTable ∗
           n ↦[wms][ 1071704 ] utf8Width ∗ n ↦[wms][ 1062712 ] hexTable ∗ vt n 1057464 idx ta (A 578) ∗
@@ -213,8 +214,8 @@ theorem f646_success (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : Fun
         · have hxb : plain x = true := by
             rw [List.getElem?_append_left (by omega)] at hbk
             exact hplain x (List.mem_of_getElem? hbk.symm)
-          rw [show 30 * (j + body.length - k) * cfg.regularOpCost + 450 * cfg.regularOpCost + (Z + Rl) =
-            480 * cfg.regularOpCost + (30 * (j + body.length - (k + 1)) * cfg.regularOpCost + (Z + Rl)) by
+          rw [show 30 * (j + body.length - k) * cfg.regularOpCost + 250 * cfg.regularOpCost + (Z + Rl) =
+            280 * cfg.regularOpCost + (30 * (j + body.length - (k + 1)) * cfg.regularOpCost + (Z + Rl)) by
               rw [show j + body.length - k = (j + body.length - (k + 1)) + 1 by omega]
               simp only [Nat.mul_add, Nat.add_mul]; omega]
           generalize hZ2 : 30 * (j + body.length - (k + 1)) * cfg.regularOpCost = Z2
@@ -248,7 +249,7 @@ theorem f646_success (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : Fun
           · ipureintro; exact ⟨by simp, by omega⟩
           inext
           iintro Hc
-          iapply invS_intro n inst mi Cg cfg.regularOpCost 450 (Z + Rl) out de sc (sp - 48) _ _ _ ptr j body.length _ (k + 1) _
+          iapply invS_intro n inst mi Cg cfg.regularOpCost 250 (Z + Rl) out de sc (sp - 48) _ _ _ ptr j body.length _ (k + 1) _
             (by omega) (by omega)
           iframe D8 Hs Ho He Hw Ht Hvt D0 D4 Hb Hg S0 S4 S8 Hsb
           iapply BorrowMut.credits_le
@@ -333,7 +334,7 @@ theorem f646_success (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : Fun
             · iframe T8e
             icases HQ with ⟨%hrs, P0, P4⟩
             subst hrs
-            mcredits (300 * cfg.regularOpCost + (Z + Rl))
+            mcredits (150 * cfg.regularOpCost + (Z + Rl))
             ihave P0 := AllocNewCell.memBytes_addr (show (sp - 48 + 24).toNat = (sp - 48).toNat + 24 by
               rw [UInt32.toNat_add, h48]; simp; omega) $$ P0
             ihave P4 := AllocNewCell.memBytes_addr (show (sp - 48 + 24).toNat + 4 = (sp - 48).toNat + 28 by
@@ -355,11 +356,11 @@ theorem f646_success (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : Fun
             ihave T112 := stk_addr (show sp.toNat - 192 + 32 = (sp - 48).toNat - 112 by omega) $$ T112
             have hm32 : (UInt32.ofNat body.length).toNat = body.length := by simp; omega
             have hcapl : cap.toNat < 2 ^ 27 := by omega
-            have key := ScratchGrow.f613_spec (GF := GF) cfg lim (d + 1) types[31]! rfl inst mi A n g ta hm (by omega) Cg gt
+            have key := ScratchFast.f613_fast (GF := GF) cfg lim (d + 1) types[31]! rfl inst mi A n g ta hm (by omega) Cg gt
               (sp - 48) sc (ptr + UInt32.ofNat j) (UInt32.ofNat body.length) p cap idx maxP hl' live F' acc body
               (by omega) (by omega) hcapl (by rw [hm32]; omega) hm32.symm (by simp [UInt32.toNat_add]; omega) hroom1.2.1
-            rw [show Z + Rl = costExt cfg F' cap (UInt32.ofNat acc.length) (UInt32.ofNat body.length) +
-              (Z - costExt cfg F' cap (UInt32.ofNat acc.length) (UInt32.ofNat body.length) + Rl) by omega]
+            rw [show Z + Rl = extCost cfg F' cap (UInt32.ofNat acc.length) (UInt32.ofNat body.length) +
+              (Z - extCost cfg F' cap (UInt32.ofNat acc.length) (UInt32.ofNat body.length) + Rl) by omega]
             mcall key using [Hg T112 Hvt S0 S4 S8 Hsb Bbody]
             · iframe Hg T112 Hvt S0 S4 S8 Hsb Bbody
             clear key
@@ -369,7 +370,7 @@ theorem f646_success (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : Fun
             have hl1le := hlAfter_le _ _ _ _ _ hhl1
             have hroom2 := hroom1.2.2 hl1 hhl1
             have hroom3 := hroom2.2 rest hd5c
-            mcredits (200 * cfg.regularOpCost + (Z - costExt cfg F' cap (UInt32.ofNat acc.length) (UInt32.ofNat body.length) + Rl))
+            mcredits (130 * cfg.regularOpCost + (Z - extCost cfg F' cap (UInt32.ofNat acc.length) (UInt32.ofNat body.length) + Rl))
             mstep; mstep [D8]
             mstep; mstep; mstep; mstep; mstep; mstep
             rw [SerdeRead.ofNat_succ k (by omega)]
@@ -402,22 +403,22 @@ theorem f646_success (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : Fun
               rw [hcap1] at this
               simp at this ⊢
               omega
-            have key := ParseEscapeSuccessCost.f649_success (GF := GF) cfg lim (d + 1) types[13]! rfl inst mi A n g ta hm (by omega) Cg gt
+            have key := ParseEscapeFast.f649_fast (GF := GF) cfg lim (d + 1) types[13]! rfl inst mi A n g ta hm (by omega) Cg gt
               (sp - 48) de ptr sc p1 cap1 idx bs (acc ++ body) (k + 1) maxP hl1 live F1 hde (by omega) hsc (by omega)
               hptr (by omega) (by omega) (by simp; omega) (by rw [hrest]; exact hescvalid) (by rw [hrest]; exact hroom3.1)
-            have hc649 : ParseEscapeSuccessCost.cost649 cfg F1 cap1 (acc ++ body) (bs.drop (k + 1)) = costEsc cfg F1 cap1 (acc ++ body) rest bs.length := by
+            have hc649 : ParseEscapeFast.cost649 cfg F1 cap1 (acc ++ body) (bs.drop (k + 1)) = costEsc cfg F1 cap1 (acc ++ body) rest bs.length := by
               unfold costEsc; rw [hrest]
             rw [hc649] at key
-            rw [show Z - costExt cfg F' cap (UInt32.ofNat acc.length) (UInt32.ofNat body.length) + Rl =
+            rw [show Z - extCost cfg F' cap (UInt32.ofNat acc.length) (UInt32.ofNat body.length) + Rl =
               costEsc cfg F1 cap1 (acc ++ body) rest bs.length +
-              (Z - costExt cfg F' cap (UInt32.ofNat acc.length) (UInt32.ofNat body.length) -
+              (Z - extCost cfg F' cap (UInt32.ofNat acc.length) (UInt32.ofNat body.length) -
                 costEsc cfg F1 cap1 (acc ++ body) rest bs.length + Rl) by omega]
             mstep; mstep
             mcall key using [Hg T144 Hvt Hrd S0 S4 S8 Hsb Ht]
             · iframe Hg T144 Hvt Hrd S0 S4 S8 Hsb Ht
             clear key
             icases HQ with ⟨Hg, T144, Hvt, Ht, HQ⟩
-            mcredits (150 * cfg.regularOpCost + (Z - costExt cfg F' cap (UInt32.ofNat acc.length) (UInt32.ofNat body.length) -
+            mcredits (90 * cfg.regularOpCost + (Z - extCost cfg F' cap (UInt32.ofNat acc.length) (UInt32.ofNat body.length) -
                 costEsc cfg F1 cap1 (acc ++ body) rest bs.length + Rl))
             cases he : escDecode rest with
             | none => simp [he] at hescvalid
@@ -503,7 +504,7 @@ theorem f646_success (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : Fun
             have hcb := costRun_stop cfg F' cap acc (bs.drop j) bs.length (by
               intro r; rw [htail, htx]; simp)
             rw [costBase_close cfg F' cap acc (bs.drop j) rest bs.length (by rw [htail, htx]),
-              hbody, Nat.add_mul (500 + 30 * body.length)] at hcb
+              hbody, Nat.add_mul (300 + 30 * body.length)] at hcb
             have hrl : bs.length - rest.length = k + 1 := by rw [htx] at htl; simp at htl; omega
             icases stk_split n (sp.toNat - 192) 144 48 $$ Hs with ⟨T144, T48⟩
             rw [show sp.toNat - 192 + 144 = (sp - 48).toNat by omega]
@@ -531,7 +532,7 @@ theorem f646_success (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : Fun
               · iframe T8
               icases HQ with ⟨%hrs, P0, P4⟩
               subst hrs
-              mcredits (300 * cfg.regularOpCost + (Z + Rl))
+              mcredits (150 * cfg.regularOpCost + (Z + Rl))
               mstep; mstep; mstep
               mstep [D8]
               mstep; mstep; mstep; mstep; mstep; mstep
@@ -574,7 +575,7 @@ theorem f646_success (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : Fun
                   (by omega) hutf) using [Hg T32 T12 Bbody Hw]
                 · iframe Hg T32 T12 Bbody Hw
                 rw [hK3]
-                mcredits (60 * cfg.regularOpCost + (Z - cost927 body.length * cfg.regularOpCost + Rl))
+                mcredits (Z - cost927 body.length * cfg.regularOpCost + Rl)
                 icases HQ with ⟨%hrs, Hg, T32, Q0, Q4, Q8, Bbody, Hw⟩
                 subst hrs
                 rw [h32]
@@ -676,7 +677,7 @@ theorem f646_success (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : Fun
               · iframe T8c
               icases HQ with ⟨%hrs, P0, P4⟩
               subst hrs
-              mcredits (300 * cfg.regularOpCost + (Z + Rl))
+              mcredits (150 * cfg.regularOpCost + (Z + Rl))
               ihave P0 := AllocNewCell.memBytes_addr (show (sp - 48 + 16).toNat = (sp - 48).toNat + 16 by
                 rw [UInt32.toNat_add, h48]; simp; omega) $$ P0
               ihave P4 := AllocNewCell.memBytes_addr (show (sp - 48 + 16).toNat + 4 = (sp - 48).toNat + 20 by
@@ -701,11 +702,11 @@ theorem f646_success (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : Fun
               rw [hbody] at hroom1
               have hm32 : (UInt32.ofNat body.length).toNat = body.length := by simp; omega
               have hcapl : cap.toNat < 2 ^ 27 := by omega
-              have key := ScratchGrow.f613_spec (GF := GF) cfg lim (d + 1) types[31]! rfl inst mi A n g ta hm (by omega) Cg gt
+              have key := ScratchFast.f613_fast (GF := GF) cfg lim (d + 1) types[31]! rfl inst mi A n g ta hm (by omega) Cg gt
                 (sp - 48) sc (ptr + UInt32.ofNat j) (UInt32.ofNat body.length) p cap idx maxP hl' live F' acc body
                 (by omega) (by omega) hcapl (by rw [hm32]; omega) hm32.symm (by simp [UInt32.toNat_add]; omega) hroom1.2.1
-              rw [show Z + Rl = costExt cfg F' cap (UInt32.ofNat acc.length) (UInt32.ofNat body.length) +
-                (Z - costExt cfg F' cap (UInt32.ofNat acc.length) (UInt32.ofNat body.length) + Rl) by omega]
+              rw [show Z + Rl = extCost cfg F' cap (UInt32.ofNat acc.length) (UInt32.ofNat body.length) +
+                (Z - extCost cfg F' cap (UInt32.ofNat acc.length) (UInt32.ofNat body.length) + Rl) by omega]
               mcall key using [Hg T112 Hvt S0 S4 S8 Hsb Bbody]
               · iframe Hg T112 Hvt S0 S4 S8 Hsb Bbody
               clear key
@@ -715,7 +716,7 @@ theorem f646_success (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : Fun
               generalize hcap1 : capAfter cap (UInt32.ofNat acc.length) (UInt32.ofNat body.length) = cap1
               generalize hF1 : fAfter F' cap (UInt32.ofNat acc.length) (UInt32.ofNat body.length) = F1
               have hl1le := hlAfter_le _ _ _ _ _ hhl1
-              mcredits (200 * cfg.regularOpCost + (Z - costExt cfg F' cap (UInt32.ofNat acc.length) (UInt32.ofNat body.length) + Rl))
+              mcredits (130 * cfg.regularOpCost + (Z - extCost cfg F' cap (UInt32.ofNat acc.length) (UInt32.ofNat body.length) + Rl))
               mstep; mstep
               mstep; mstep [D8]
               mstep; mstep; mstep; mstep; mstep; mstep
@@ -751,16 +752,16 @@ theorem f646_success (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : Fun
                 have hK3 : (12 + cost648 (UInt32.ofNat (acc.length + body.length)).toNat) * cfg.regularOpCost =
                     52 * cfg.regularOpCost + cost927 (acc.length + body.length) * cfg.regularOpCost := by
                   rw [hm2]; unfold cost648; simp only [Nat.add_mul, List.length_append]; omega
-                rw [show Z - costExt cfg F' cap (UInt32.ofNat acc.length) (UInt32.ofNat body.length) + Rl =
+                rw [show Z - extCost cfg F' cap (UInt32.ofNat acc.length) (UInt32.ofNat body.length) + Rl =
                   cost927 (acc.length + body.length) * cfg.regularOpCost +
-                  (Z - costExt cfg F' cap (UInt32.ofNat acc.length) (UInt32.ofNat body.length) -
+                  (Z - extCost cfg F' cap (UInt32.ofNat acc.length) (UInt32.ofNat body.length) -
                     cost927 (acc.length + body.length) * cfg.regularOpCost + Rl) by omega]
                 mcall (f648_spec_valid cfg (lim := lim) (d + 1) types[45]! (by rfl) inst mi n g hn hg (A 927) ha927 (by omega) Cg gt
                   (sp - 48) (sp - 48 + 32) de p1 (UInt32.ofNat (acc.length + body.length)) s12 (acc ++ body) hs12
                   (by rw [h32]; omega) hm2.symm (by rw [hm2]; omega) (by omega) hutf) using [Hg T32 T12 Bs Hw]
                 · iframe Hg T32 T12 Bs Hw
                 rw [hK3]
-                mcredits (60 * cfg.regularOpCost + Rl)
+                mcredits Rl
                 icases HQ with ⟨%hrs, Hg, T32, Q0, Q4, Q8, Bs, Hw⟩
                 subst hrs
                 rw [h32]
@@ -872,14 +873,14 @@ theorem f646_success (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : Fun
     isplitl [Hc]
     · iapply BorrowMut.credits_le
       iframe Hc
-      have e1 : (30 * body.length + 450) * cfg.regularOpCost = 30 * body.length * cfg.regularOpCost + 450 * cfg.regularOpCost :=
+      have e1 : (30 * body.length + 250) * cfg.regularOpCost = 30 * body.length * cfg.regularOpCost + 250 * cfg.regularOpCost :=
         Nat.add_mul _ _ _
       have e2 : 30 * (j + body.length - j) * cfg.regularOpCost = 30 * body.length * cfg.regularOpCost := by
         rw [show j + body.length - j = body.length by omega]
       ipureintro; omega
     inext
     iintro Hc
-    iapply invS_intro n inst mi Cg cfg.regularOpCost 450 (Z + Rl) out de sc (sp - 48) _ _ _ ptr j body.length _ j _
+    iapply invS_intro n inst mi Cg cfg.regularOpCost 250 (Z + Rl) out de sc (sp - 48) _ _ _ ptr j body.length _ j _
       le_rfl (by omega)
     iframe Hc D8 Hs Ho He Hw Ht Hvt D0 D4 Hb Hg S0 S4 S8 Hsb
   · isplitl [Hc]

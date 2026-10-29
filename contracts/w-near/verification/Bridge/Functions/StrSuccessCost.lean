@@ -1,4 +1,4 @@
-import Bridge.Functions.ParseEscapeSuccessCost
+import Bridge.Functions.ParseEscapeFast
 
 /-!
 # Cost of the successful string loop
@@ -18,12 +18,12 @@ open WNear.Binary.FromUtf8 (cost927)
 
 /-- Successful escape work, excluding all error-path reserves. -/
 def costEsc (cfg : WasmConfig) (F : Nat) (cap : UInt32) (acc rest : List UInt8) (_L : Nat) : Nat :=
-  ParseEscapeSuccessCost.cost649 cfg F cap acc rest
+  ParseEscapeFast.cost649 cfg F cap acc rest
 
 /-- One scan and plain-byte append, with validation only at the final segment. -/
 def costBase (cfg : WasmConfig) (F : Nat) (cap : UInt32) (acc l : List UInt8) (_L : Nat) : Nat :=
-  (500 + 30 * (l.takeWhile plain).length) * cfg.regularOpCost +
-    costExt cfg F cap (UInt32.ofNat acc.length) (UInt32.ofNat (l.takeWhile plain).length) +
+  (300 + 30 * (l.takeWhile plain).length) * cfg.regularOpCost +
+    ScratchFast.extCost cfg F cap (UInt32.ofNat acc.length) (UInt32.ofNat (l.takeWhile plain).length) +
     if (l.dropWhile plain).head? = some 0x5C then 0
     else cost927 (acc.length + (l.takeWhile plain).length) * cfg.regularOpCost
 
@@ -102,7 +102,7 @@ theorem costBase_le (cfg : WasmConfig) (F : Nat) (cap : UInt32) (acc l : List UI
 
 /-- The instruction reserve available at every loop head. -/
 theorem scan_le (cfg : WasmConfig) (F : Nat) (cap : UInt32) (acc l : List UInt8) (L : Nat) :
-    (500 + 30 * (l.takeWhile plain).length) * cfg.regularOpCost ≤ costRun cfg F cap acc l L := by
+    (300 + 30 * (l.takeWhile plain).length) * cfg.regularOpCost ≤ costRun cfg F cap acc l L := by
   apply Nat.le_trans _ (costBase_le cfg F cap acc l L)
   unfold costBase
   omega
@@ -110,16 +110,16 @@ theorem scan_le (cfg : WasmConfig) (F : Nat) (cap : UInt32) (acc l : List UInt8)
 /-- At an escape the loop does no UTF-8 validation. -/
 theorem costBase_esc (cfg : WasmConfig) (F : Nat) (cap : UInt32) (acc l rest : List UInt8) (L : Nat)
     (h : l.dropWhile plain = 0x5C :: rest) :
-    costBase cfg F cap acc l L = (500 + 30 * (l.takeWhile plain).length) * cfg.regularOpCost +
-      costExt cfg F cap (UInt32.ofNat acc.length) (UInt32.ofNat (l.takeWhile plain).length) := by
+    costBase cfg F cap acc l L = (300 + 30 * (l.takeWhile plain).length) * cfg.regularOpCost +
+      ScratchFast.extCost cfg F cap (UInt32.ofNat acc.length) (UInt32.ofNat (l.takeWhile plain).length) := by
   simp [costBase, h]
 
 /-- At a closing quote validation is charged exactly once, on the decoded bytes. -/
 theorem costBase_close (cfg : WasmConfig) (F : Nat) (cap : UInt32) (acc l rest : List UInt8) (L : Nat)
     (h : l.dropWhile plain = 0x22 :: rest) :
     costBase cfg F cap acc l L =
-      (500 + 30 * (l.takeWhile plain).length + cost927 (acc.length + (l.takeWhile plain).length)) * cfg.regularOpCost +
-      costExt cfg F cap (UInt32.ofNat acc.length) (UInt32.ofNat (l.takeWhile plain).length) := by
+      (300 + 30 * (l.takeWhile plain).length + cost927 (acc.length + (l.takeWhile plain).length)) * cfg.regularOpCost +
+      ScratchFast.extCost cfg F cap (UInt32.ofNat acc.length) (UInt32.ofNat (l.takeWhile plain).length) := by
   simp [costBase, h, Nat.add_mul]
   omega
 
