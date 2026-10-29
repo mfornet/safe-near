@@ -166,6 +166,37 @@ continuation is published to PR #40 after its validation gates pass.
   statements match. PR-wide Lean style and whitespace checks pass. Evidence:
   `/tmp/pr40-positioned-final-audit.log` and `/tmp/pr40-positioned-lean-style.log`.
 
+## Unfinished-object rejection continuation
+
+- `SerdeErrorCode` strengthens syntax-error allocation and reader error contracts
+  to retain the exact twelve input error-code bytes, with the existing cost and
+  position bounds. `copy_code` proves the two Wasm copies preserve those bytes.
+- `SerdeEndMapEOF.f90_eof` proves the closing-object check at EOF returns a
+  positioned `EofWhileParsingObject` box with its tag retained.
+- `SerdeErrorDrop.f92_syntax` proves drop glue for syntax-error tags above 1:
+  there is no owned message to free, and the twenty-byte box is returned to the
+  heap. Other live allocations are preserved.
+- `SerdeRej.f228_obj_eof` and `rej228_obj_eof` prove the actual unfinished-object
+  path. Serde creates the missing-key error, restores the nesting depth, then
+  still runs the closing-object check. That check creates a second EOF error;
+  228 frees it and returns the first through `fix_position`. The complete
+  336-byte stack and empty scratch are restored. The two allocations use the
+  existing `roomS` premise; their costs are fixed before the gas ceiling.
+- `FromSliceSpec.decode_obj_eof` proves model rejection of the same inputs.
+  `f65_obj_eof_reject_uniform` carries the concrete proof through 228 → 78 → 66 → 65,
+  without assuming any parser-callee contract. This covers an opening `{`
+  preceded and followed by arbitrary JSON whitespace.
+- The remaining rejection branches, escaped accepting inputs and deep ignored
+  values are still open. This does not complete `RejectContract` or a seventh
+  method refinement.
+- Validation: `just wnear-audit` passes (2760 build jobs; 426 wNEAR modules,
+  59129 declarations and 53999 theorems). Only the three existing open-refinement
+  dependencies remain; strict NearLogic has zero violations and statement pins
+  match. The public parser theorem and the underlying 228 theorem pass LSP
+  axiom verification with the standard three axioms. PR-wide Lean style and
+  whitespace checks pass. Evidence: `/tmp/pr40-object-final-audit.log` and
+  `/tmp/pr40-object-lean-style.log`.
+
 ## Methods
 
 There are 15 exported methods; six now have complete per-call refinement proofs under their protocol premises.
