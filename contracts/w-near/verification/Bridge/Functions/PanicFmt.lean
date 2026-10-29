@@ -330,6 +330,143 @@ theorem f817_str (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (inst : Nat) (m
     simp only [Post.mseq_trap, Post.mblock, Post.mfunc]
     iexact HT
 
+
+/-- The payload `PanicPayload { inner: a, string: None }` at `p0` (16 bytes, the `String` slot
+unset). -/
+def fmtPayload (n : Nat) (p0 a : UInt32) : IProp GF :=
+  iprop(n ↦[i32][ p0.toNat ] a ∗ n ↦[i32][ p0.toNat + 4 ] 0 ∗ stk n (p0.toNat + 8) 8)
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 16000000 in
+/-- **817 on formatted arguments** (`expect_failed`, `assert_eq!`, …: arguments, or two pieces or
+more): the payload `PanicPayload { inner: a, string: None }`; its `get` (826, which formats `a`
+into a `String`) is a premise (`GetSpec`, from `Ga` to `G'`). -/
+theorem f817_fmt (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (inst : Nat) (mi : ModuleInst) (e : Nat)
+    (A : Nat → Nat) (n g ta : Nat) (mx : Option Nat) (hm : IfaceMod mi A n g ta) (hd : d + 10 < lim.maxCallDepth)
+    (Cg : Nat) (gt : GlobalType) (sp p a info loc msg plen alen lpc : UInt32)
+    (hb : (plen = 1 ∧ alen ≠ 0) ∨ 2 ≤ plen.toNat) (S : Nat) (hS : 32 ≤ S)
+    (hsp : S + 80 ≤ sp.toNat) (hal : sp.toNat % 8 = 0) (ha : a.toNat + 24 ≤ 2 ^ 32)
+    (hp : p.toNat + 12 ≤ 2 ^ 32) (hinfo : info.toNat + 12 ≤ 2 ^ 32)
+    (Ga G' D0 : IProp GF) (Kg K : Nat) (bs : List UInt8) (hpos : 0 < bs.length)
+    (hlen : bs.length < 2 ^ 32) (hutf : validUtf8 bs = true) (h : NearState)
+    (hfit : LogFits h bs.length) (hov : h.extCosts.cost "read_memory_byte" * bs.length < 2 ^ 64) :
+    code817 e inst mi A n mx ∗ A 826 ↪[wf] FuncInst.wasm types[14]! inst f826 ∗
+      GetSpec cfg lim (d + 2) inst mi Cg n g gt (sp - 16 - 32) (sp - 16) (sp - 16 + 4) 1066400 (S + 32) f826
+        iprop(fmtPayload n (sp - 16) a ∗ Ga) G' Kg ∗
+      ToStr cfg lim (d + 4) inst mi Cg n g gt (sp - 16 - 32 - 32) (sp - 16 - 32 + 16) S
+        iprop(infoCells n (sp - 16 - 32 + 16) (sp - 16 + 4) 1066400 msg loc ∗ G' ∗
+          (n ↦[i32][ info.toNat + 8 ] msg ∗ argsHead n a plen alen ∗ D0)) K bs
+      ⊢ Spec817 cfg lim d inst mi Cg n g gt sp p a info loc
+          iprop(stk n (sp.toNat - 80 - S) (S + 80) ∗ n ↦[i32][ info.toNat + 8 ] msg ∗ argsHead n a plen alen ∗
+            Ga ∗ envP n ta A lpc 1066360 179 (A 826) D0 h)
+          (cost817 cfg f826 Kg K bs h) h bs := by
+  iintro ⟨#Hc', #F826, #Sg, #Hts⟩
+  iunfold code817 at Hc'
+  icases Hc' with ⟨#F883, #F824, #F473, #F474, #Hcode⟩
+  ihave #Hi : inst ↪[inst] mi $$ []
+  · iunfold hookCode, panicCode at Hcode
+    icases Hcode with ⟨-, -, -, -, -, -, -, -, #Hi⟩
+    iexact Hi
+  have hn := hm.mem
+  have hg := hm.glob
+  have hlt := sp.toNat_lt
+  have h16 : (sp - 16).toNat = sp.toNat - 16 := by
+    rw [UInt32.toNat_sub_of_le] <;> simp [UInt32.le_iff_toNat_le]; omega
+  have h48 : (sp - 16 - 32).toNat = sp.toNat - 48 := by
+    rw [UInt32.toNat_sub_of_le] <;> simp [UInt32.le_iff_toNat_le, h16] <;> omega
+  have ha824 := hm.funcs 824 (by decide)
+  have ha883 := hm.funcs 883 (by decide)
+  have t32 : types[32]!.params.length = 1 := by rfl
+  iunfold Spec817
+  iapply MFunSpecT_intro
+  imodintro
+  iintro %args %R HP Hc
+  icases HP with ⟨%hargs, Hg, P0, P4, P8, Hs, HM, HA, HGa, HE⟩
+  subst hargs
+  iunfold argsHead at HA
+  icases HA with ⟨A4, A20⟩
+  iunfold envP at HE
+  icases HE with ⟨HH, Vg, Tg, HD0, HI, HS, Hh⟩
+  icases stk_split' n _ (S + 80) (S + 64) 16 (by omega) $$ Hs with ⟨Hlo, Hf⟩
+  ihave Hf := stk_addr (show sp.toNat - 80 - S + (S + 64) = (sp - 16).toNat by omega) $$ Hf
+  icases stk_split n _ 8 8 $$ Hf with ⟨Hf0, Hf8⟩
+  icases stk_split n _ 4 4 $$ Hf0 with ⟨W0, W4⟩
+  icases stk4_word n _ $$ W0 with ⟨%w0, W0⟩
+  icases stk4_word n _ $$ W4 with ⟨%w4, W4⟩
+  ihave A20 := memBytes_congr (j := (a + 20).toNat) (by simp [UInt32.toNat_add]; omega) |>.1 $$ A20
+  simp only [f817, cost817, cost824]
+  generalize hAG : activationGas cfg.regularOpCost (entryLocals f826 [.i32 0, .i32 0]) = AG
+  mstep [Hg]; mstep; mstep; mstep; mstep [Hg]
+  mstep; mstep [P0]; mstep; mstep; mstep; mstep [A20]; mstep
+  mstep; mstep; mstep; mstep
+  mstep; mstep [A4]
+  rcases hb with ⟨h1, hne⟩ | h2
+  -- one piece and arguments: to `@3`, then out to `@1`
+  on_goal 1 =>
+    subst h1
+    mstep
+    try simp only [UInt32.reduceOfNat]
+    mstep
+    mstep_taken with (simp [hne])
+  -- two pieces or more: the default, `@1`
+  on_goal 2 =>
+    have hl : ([0, 1] : List Nat)[plen.toNat]?.getD 3 = 3 := by
+      rw [List.getElem?_eq_none (by simp; omega)]; rfl
+    mstep
+    rw [hl]
+    mctrl_norm
+    mpay
+  all_goals
+    mcredits (44 * cfg.regularOpCost + (92 * cfg.regularOpCost + AG + Kg + cost474 cfg K bs h) + R)
+    mstep; mstep; mstep [W4]
+    mstep; mstep; mstep [W0]
+    mstep; mstep; mstep; mstep [P4]
+    mcall (f883_spec cfg lim (d + 1) types[32]! (by rfl) inst mi n hn Cg info msg) using [HM]
+    · iframe HM
+    icases HQ with ⟨%hrs, HM⟩
+    subst hrs
+    mstep; mstep [P8]
+    iapply mwpi_cons
+    iapply mwpi_callT' (i := 824) (a := A 824) (type := types[45]!) (inst := inst) (mi := mi)
+      (code := f824) [.i32 (sp - 16), .i32 1066360, .i32 msg, .i32 loc]
+    isplitr
+    · iapply (PanicWithHook.f824_spec cfg lim (d + 1) types[45]! inst mi e A n g ta mx hm (by omega) Cg gt
+        (sp - 16) (sp - 16) 1066360 msg loc 179 (A 826) f826 (sp - 16 + 4) 1066400 lpc S hS (by omega)
+        (by omega) (by decide) iprop(fmtPayload n (sp - 16) a ∗ Ga) G'
+        iprop(n ↦[i32][ info.toNat + 8 ] msg ∗ argsHead n a _ alen ∗ D0) Kg K bs hpos hlen hutf h hfit hov)
+      iframe F826 Sg F473 F474 Hcode Hts
+    isplitr
+    · iexact F824
+    isplitr
+    · iexact Hi
+    isplitr
+    · ipureintro; exact ⟨rfl, ha824, rfl, by omega⟩
+    isplitl [Hc]
+    · iexact Hc
+    isplitr
+    · ipureintro; simp only [cost824]; rw [hAG]; mstep_norm_full; omega
+    isplitl [Hg Hlo HH Vg Tg HD0 HI HS Hh W0 W4 Hf8 HGa HM A4 A20]
+    · iunfold PanicWithHook.pre
+      simp only [UInt32.reduceToNat, Nat.reduceAdd]
+      iframe Hg HH Vg Tg HI HS Hh HGa HM HD0
+      isplitl [Hlo]
+      · iapply stk_addr _ $$ Hlo; omega
+      isplitl [W0 W4 Hf8]
+      · iunfold fmtPayload
+        iframe W0 Hf8
+        iapply memBytes_congr (by omega) |>.1 $$ W4
+      iunfold argsHead
+      iframe A4
+      iapply memBytes_congr (by simp [UInt32.toNat_add]; omega) |>.1 $$ A20
+    inext
+    isplit
+    · iintro %rs - HF
+      iexfalso
+      iexact HF
+    · iintro HT
+      simp only [Post.mseq_trap, Post.mblock, Post.mfunc]
+      iexact HT
+
 end Spec
 
 end WNear.Binary.PanicFmt
