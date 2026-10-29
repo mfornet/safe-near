@@ -343,9 +343,13 @@ theorem f66_acc (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType
   · iunfold SerdeRead.rd
     iframe Hbs
     iexact Dsr
-  ihave Ht : tbl n (sp - 64) $$ [D20 He Hw]
+  rw [i64_one]
+  ihave D12 := KeyGet.split64 n ((sp - 64).toNat + 12) 1 0 $$ D12
+  icases D12 with ⟨D12, D16⟩
+  rw [show (sp - 64).toNat + 12 + 4 = (sp - 64).toNat + 16 by omega]
+  ihave Ht : tbl n (sp - 64) $$ [D20 He Hw D12 D16]
   · iunfold tbl
-    iframe He Hw
+    iframe He Hw D12 D16
     iexists 0
     iexact D20
   have s78 := SerdeStruct78.f78_acc (GF := GF) cfg lim (d + 1) types[14]! (by rfl) inst mi A n g ta hm (by omega) Cg
@@ -408,9 +412,9 @@ theorem f66_acc (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType
   mstep; mstep; mstep; mstep; mstep; mstep; mstep; mstep
   mstep [A40]
   mstep [Q12]
-  rw [i64_one]
-  ihave D12 := KeyGet.split64 n ((sp - 64).toNat + 12) 1 0 $$ D12
-  icases D12 with ⟨D12, D16⟩
+  iunfold tbl at Ht
+  icases Ht with ⟨Hsl, He, Hw, D12, D16⟩
+  rw [show (sp - 64).toNat + 16 = (sp - 64).toNat + 12 + 4 by omega]
   have s68 := f68_zero (GF := GF) cfg lim (d + 1) types[0]! (by rfl) inst mi A n g ta hm (by omega) Cg
     (sp - 64 + 12) (by omega)
   rw [h12] at s68
@@ -430,8 +434,7 @@ theorem f66_acc (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType
     iframe Hc
     ipureintro; omega
   iframe Hg Hvt Hkey
-  iunfold tbl at Ht
-  icases Ht with ⟨⟨%sl, D20⟩, He, Hw⟩
+  icases Hsl with ⟨%sl, D20⟩
   iframe He Hw
   iunfold SerdeRead.rd at Hrd
   icases Hrd with ⟨Dsr, Hbs⟩

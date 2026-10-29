@@ -49,10 +49,12 @@ def strRes (n maxP : Nat) (live : List (Nat × Nat)) (a : WNear.AccountId) (p ca
     n ↦[wms][ p.toNat ] a.val.toUTF8.toList ∗ block n (p.toNat + a.val.utf8ByteSize) (cap.toNat - a.val.utf8ByteSize) ∗
     heapInv n maxP mlen ((p.toNat, cap.toNat) :: live) F)
 
-/-- The tables and the scratch's length the string readers use. -/
+/-- The tables and the scratch the string readers and `ignore_value` use: its length (any), its pointer 1
+and its capacity 0 (the scratch never grows on the paths proved: escape-free keys, `ignore_value` with
+no frame pushed). -/
 def tbl (n : Nat) (de : UInt32) : IProp GF :=
   iprop((∃ sl : UInt32, n ↦[i32][ de.toNat + 20 ] sl) ∗ n ↦[wms][ 1062392 ] ParseStr.escTable ∗
-    n ↦[wms][ 1071704 ] FromUtf8Gen.utf8Width)
+    n ↦[wms][ 1071704 ] FromUtf8Gen.utf8Width ∗ n ↦[i32][ de.toNat + 12 ] 1 ∗ n ↦[i32][ de.toNat + 16 ] 0)
 
 end Defs
 
