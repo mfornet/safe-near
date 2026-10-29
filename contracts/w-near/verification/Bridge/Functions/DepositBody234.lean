@@ -457,7 +457,7 @@ theorem body234 (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (e inst : Nat) (
         intro l hl
         rw [grownLen_small _ _ (by decide)] at hl
         exact roomFor_of len maxP l 1 (by decide) hR (by omega) (by omega) (by omega))
-      st hacc hlim5 hcanon.1 hcanon.2 (hlink _) (hproof.mono (by rw [← StateRead.stateKey_eq]; omega)) hreg29)
+      st hacc hlim5 hcanon.1 hcanon.2 (hlink _) (hproof.mono (by simp only [readProofCost, hv, Option.map_some, Option.getD_some, StateReadModel.header_length]; rw [← StateRead.stateKey_eq]; omega)) hreg29)
     using [Hg HI L592 Hvt Hinv F40 HSK Hh]
   · iunfold pre219
     ihave L592 := stkA (b := (s - 80).toNat - 592) (by omega) $$ L592
