@@ -10,6 +10,9 @@ import Bridge.Functions.PanicDisplayMsg
   piece and one argument (`FmtWriteN.f872_gen` on `hypX`), the text `msg`;
 * `msgW_str`: `core::panicking::panic`'s `Arguments { pieces: [(m, l)], args: [] }`: 872 with one
   piece and no argument (`FmtWriteP.f872_p1`), the text `msg`.
+
+The table entry 195 (880) is in `Xm` (`PanicDisplayMsg.XmT`): `expect_failed`'s argument and the
+location's file both use it.
 -/
 
 namespace WNear.Binary.PanicMsg

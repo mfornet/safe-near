@@ -17,6 +17,13 @@ import Bridge.Functions.GetFmt
 879's frame (96 bytes) and `S + 80` bytes below 817's stack pointer, `getEnv` (`GetFmt.getData`, the
 allocator's vtable slot and the heap) and `hookEnvM` (what the hook's formatting reads besides the
 `Arguments`) with any frame `Fr`, the hook installed (`PanicFmt.envP`).
+
+`f853_unc`: `core::panicking::panic` (853), `PanicEntries.f853_full` with `to_string` through
+`toStr_str` (`PanicMsg.msgW_str`, one piece); its payload's `get` (828) reads nothing.
+
+The sites: `f879_totalSupplyOverflow` (`internal_deposit`, `core_impl.rs:108:55`, the `Location`
+1053040) and `f879_totalSupplyUnderflow` (`internal_withdraw`, `:119:55`, 1053096), on the message
+`(1053016, 21)`; the texts are `PanicText.totalSupplyOverflow_text`/`totalSupplyUnderflow_text`.
 -/
 
 namespace WNear.Binary.PanicFmtFull

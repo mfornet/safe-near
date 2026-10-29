@@ -9,7 +9,11 @@ import Bridge.Functions.PanicFmt
 * `to_string` on the `PanicInfo` (`PanicHook.ToStr`), which fixes the bytes `bs` the host
   panics with: `<PanicInfo as Display>` (885) with the message `Some(args)`;
 * for 879, the payload's `get` (826, `GetSpec`), which formats the message into a fresh `String`
-  (the binary does it although the hook does not read it).
+  (the binary does it although the hook does not read it): it reads the `Arguments` first, so they
+  go through it (`argsHead` and `expectArgs` in `G`, given back in `G'`).
+
+The `Arguments`' word at `a + 12` (`fmt`'s length, unset) is in `strArgs`/`expectArgs`: 887 and 826
+copy it. Both premises are discharged in `PanicFmtFull` (`f879_unc`, `f853_unc`).
 
 `begin_panic` (664) needs no composition: `PanicBegin.f664_spec`.
 
