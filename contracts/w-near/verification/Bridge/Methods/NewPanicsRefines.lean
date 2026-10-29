@@ -26,10 +26,22 @@ open WNear.Binary.EnvGetters (depLo depHi depLo_or_depHi_eq_zero)
 open WNear.Binary.NewBody (costDep290 costInit290 storageHasKeyPost_fields)
 
 /-- The protocol-86 values (`runtime_config_v86.json`, `wasm_config`) of the cost parameters of
-`storage_has_key`, as upper bounds (what `new`'s panic paths pay beyond `CostsV86`). -/
+`storage_has_key`, `storage_write` and `storage_remove`, as upper bounds (what `new` pays beyond
+`CostsV86`), and of the two limits its success path needs beyond `LimitsV86`: the longest storage
+value (`max_length_storage_value`, 4194304, against the 29 bytes of `STATE`) and the per-call burn
+limit (`max_gas_burnt`, 10^15) against the bytes of the dummy record `new` writes and removes
+(`85 + num_extra_bytes_record`, 125 under v86). -/
 structure CostsNewV86 (p : RuntimeConfig) : Prop where
   storageHasKeyBase : p.wasm.extCosts.cost "storage_has_key_base" ≤ 54039896625
   storageHasKeyByte : p.wasm.extCosts.cost "storage_has_key_byte" ≤ 30790845
+  storageWriteBase : p.wasm.extCosts.cost "storage_write_base" ≤ 64196736000
+  storageWriteKeyByte : p.wasm.extCosts.cost "storage_write_key_byte" ≤ 70482867
+  storageWriteValueByte : p.wasm.extCosts.cost "storage_write_value_byte" ≤ 31018539
+  storageRemoveBase : p.wasm.extCosts.cost "storage_remove_base" ≤ 53473030500
+  storageRemoveKeyByte : p.wasm.extCosts.cost "storage_remove_key_byte" ≤ 38220384
+  storageRemoveRetValueByte : p.wasm.extCosts.cost "storage_remove_ret_value_byte" ≤ 11531556
+  storageValue : 29 ≤ p.wasm.limits.maxLengthStorageValue
+  usageRoom : 85 + p.fees.numExtraBytesRecord ≤ p.wasm.limits.maxGasBurnt
 
 /-! ## The host's premises, from the context -/
 
