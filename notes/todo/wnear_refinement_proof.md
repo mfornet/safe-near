@@ -1213,6 +1213,18 @@ The panic messages: Rust 1.51's `PanicInfo` `Display` is `panicked at '{payload}
 
 *`ft_metadata` (309) is done* (`ftMetadata_refines_all`, `Bridge/Methods/FtMetadataRefines.lean`, standard axioms only; on an uninitialized contract the `PanicOnDefault` panic). Its JSON is 138 bytes, the serializer's `Vec` 128: the write of the key `decimals` reallocates it. The grow path is generic: `__rust_realloc` (312 → 238 → 154, `VecGrow.f154_spec`) on any free list (`AllocWalk581.f581_spec_walk`), `finish_grow`/`grow_amortized` on a nonempty buffer (714, 716) and `write_all` without room (`VecGrow.f345_grow`, 80 bytes of stack). Above it, `WriteSink.WaSpec` specifies `write_all` on an abstract sink, and `WriteSink.vsink` (the `Vec` and its heap, before or after one doubling of the capacity) satisfies it (`vsink_wa`, room or grow, the grow's price charged on every write); the serde pieces are proved once over any sink (`SerdeSink`: `f346_s`, `f344_s`, `strFn_s`, `piece_s`, `keyRest_s`, the `u8` field `f105_s`). The struct (`MetadataStruct.f102_meta`) writes six fields with room (`MetadataFields`) and the `u8` field through `vsink`; the body (`FtMetadataInit`: `segM309`, `segC309`, `body309`) needs room for eight one-page grows (`HeapRoom8`) and 1024 bytes of stack. Left: the code size, `CostsV86` and `LimitsV86` (M9).
 
+**Completion update, 2026-10-29 continuation:** `near_deposit` is done on all represented
+states under the explicit protocol and code-size premises (`NearDepositMethod.nearDeposit_refines_all`,
+`Bridge/Methods/NearDepositAll.lean`). This closes the earlier deposit/log progress entries above.
+`NearDepositPre` discharges the host preconditions and proof budget; the panic and success
+agreement files connect the exact messages, state, storage, usage and storage-stake check.
+`NearDepositGas.hbound_initialized` discharges the remaining gas bound: at most 900009 regular
+operations and 54 linear charges, non-trie work below 2.945 Tgas of the 4 Tgas compute allowance,
+and two account writes plus the header write within `trieGas`. `CostsDepositV86` adds the v86
+log and evicted-byte cost bounds and log-count lower bound to `CostsNewV86`; M9 pins them.
+All six method refinements and the complete Bridge build pass the standard-axiom audit.
+The sole explicit `sorry` remains `refines_wnear_exported`.
+
 ### M9. Closing
 
 `refines_wnear_exported` assembled; `hcode` and `hprotocol` discharged;

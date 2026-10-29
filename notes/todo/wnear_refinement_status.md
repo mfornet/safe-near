@@ -7,8 +7,8 @@ Campaign status on 2026-10-29; local continuation is active. Details are in `wne
 ## Continuation on 2026-10-29: integration with main
 
 Work continues on `codex/wnear-proof-continuation`, starting from PR head `1ea4077` and merging
-`main` at `1a615fc`. The harness and dependency-manifest merge conflicts are resolved. These
-changes have not yet been pushed to PR #40.
+`main` through `0457bcd` (#46). The harness and dependency-manifest merge conflicts are resolved. The
+continuation is published to PR #40 after its validation gates pass.
 
 - #44 moves the recorded-proof check after the value dereference. The repaired
   `NearLogic.prepareStorageCallAux_read` and its callers in `StorageRead.lean` require
@@ -68,17 +68,23 @@ changes have not yet been pushed to PR #40.
   An earlier concurrent build failed writing a read-only cached BorshFT.ilean; the local
   link was detached and the sequential build passed. Avoid overlapping builds of the same targets.
 - Fixed the declared `Bridge` library's missing-root problem with `globs = ["Bridge.+"]`.
-  A full `lake build Bridge` is running at `/tmp/pr40-full-bridge-build.log` (exec session
-  `67253`, Lake PID `22895`; the long-running `ParseEscape.lean` compiler is PID `23455`).
-  Its build graph predates the newest deposit files, which were built separately as
-  dependencies of `NearDepositAll`. `ParseEscape` completed; `ParseStrEsc` is still live
-  (PID `36052` at the last check). Revalidate live process and exit status, then
-  build the current complete library and run strict NearLogic/wNEAR audits and statement
-  pins before pushing. No complete integrated-build pass is claimed yet.
+  The original full `lake build Bridge` passed (1679 jobs), including `ParseEscape` and
+  `ParseStrEsc`, at `/tmp/pr40-full-bridge-build.log`. The current complete build through
+  `just wnear-audit` also passed (2742 jobs, including all new deposit files, Model, Spec,
+  Proofs, Differential and all three test executables), at `/tmp/pr40-final-wnear-audit.log`.
+  The complete recipe exits successfully: the wNEAR audit checks 408 modules, 57240
+  declarations and 52136 theorems. Its only three `sorryAx` dependencies are the original
+  declarations in `Proofs.Refinement` (`refines_wnear_exported`, `refines_wnear`, and
+  `withdraw_available_wasm`). All pinned statements match `STATEMENTS.md`.
+- Current validation: strict NearLogic audit passes (56 modules, 4619 declarations,
+  3467 theorems, zero violations); all 294 Python tests pass (15 skipped); changed-source
+  Lean style, toolchain, node-isolation and umbrella checks pass. The freshly rebuilt
+  harness (20 contracts), adapter tests, and all 59 default scenarios pass. Evidence logs
+  are `/tmp/pr40-final-python-tests.log` and `/tmp/pr40-continuation-{harness,adapter,scenarios}.log`.
 
 ## Methods
 
-There are 15 exported methods.
+There are 15 exported methods; six now have complete per-call refinement proofs under their protocol premises.
 
 | Method | Status | Top theorem |
 |---|---|---|
@@ -145,8 +151,7 @@ The texts are proved equal to the model's `Panic.message` (`PanicText`).
 
 ## Next steps
 
-1. **Validate and integrate the six completed methods.** Finish the live full Bridge build, build every current module and run the strict audits plus statement pins. Keep the only sorry allowance at `Proofs.Refinement`. Then publish the continuation to PR #40.
-2. **The parser, finishing `ft_balance_of`'s argument contract.**
+1. **The parser, finishing `ft_balance_of`'s argument contract.**
    1. `RejectContract`. A loose cost suffices. Use `fromSlice_eq` and the reject paths listed in M6. A WIP of the definitions is in `notes/wip/wnear/SerdeRejDefs.lean.txt`.
    2. Escapes in the accepting half:
       - a closed linear bound on `costRun`;
@@ -154,12 +159,12 @@ The texts are proved equal to the model's `Panic.message` (`PanicText`).
       - `Hyp646` for escaped keys;
       - 652 (`ignore_escape`).
    3. Ignored values nested deeper: 84 grows the scratch from capacity 0, and `Hyp81` must allow changes to the heap and the scratch.
-3. **`ft_balance_of`, method level.** Take the parser's contracts as parameters until they are proved. The argument layer is in `EnvInput` and `ArgsLeaves`, the balance read in `LookupMapGet`/`StorageReadWrapF`.
-4. **The remaining methods**, in M8's order:
+2. **`ft_balance_of`, method level.** Take the parser's contracts as parameters until they are proved. The argument layer is in `EnvInput` and `ArgsLeaves`, the balance read in `LookupMapGet`/`StorageReadWrapF`.
+3. **The remaining methods**, in M8's order:
    - `storage_balance_of` (its parser is the same code as `ft_balance_of`'s);
    - `storage_*`, `near_withdraw`, `ft_transfer`;
    - then `ft_transfer_call` and `ft_resolve_transfer`, which need promise and promise-result host contracts.
-5. **M9.** Assemble `refines_wnear_exported` and discharge the code size, `CostsV86`, `LimitsV86`, `CostsNewV86` and `CostsDepositV86`.
+4. **M9.** Assemble `refines_wnear_exported` and discharge the code size, `CostsV86`, `LimitsV86`, `CostsNewV86` and `CostsDepositV86`.
 
 ## Working notes
 
