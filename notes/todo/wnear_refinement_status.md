@@ -15,7 +15,7 @@ There are 15 exported methods.
 | `storage_balance_bounds` (306) | done | `StorageBalanceBoundsRefines.storageBalanceBounds_refines_all` |
 | `ft_metadata` (309) | done | `FtMetadataRefines.ftMetadata_refines_all` |
 | `new` (290) | done | `NewRefines.newRefines_all` |
-| `near_deposit` (234) | bodies done; method level open | `DepositBody` (`body232_*`, `body234`, `body234None`), `CodeDeposit.codeDep_of`, `DepositPanicsFull`. The three Rust panics are discharged. Work in progress is saved in `notes/wip/wnear/NearDeposit{Runs,Uninit}.lean.txt` and `StaticsDeposit.lean.txt` (not compiled). Still open: the adequacy proof, `MethodRunsR`/`MethodPanicsR`, `AgreesWith`, `hbound`, `hpre`. |
+| `near_deposit` (234) | the run on every path; uninitialized contract done | `NearDepositUninit.nearDeposit_refines_uninit` (full `Refines` clauses with no state). For the initialized case: `NearDepositRuns.dep_runs` (`MethodRunsR` on success), `dep_panics` (`MethodPanicsR` for the zero deposit, the too-small deposit, the balance overflow and the supply overflow), `DepositBody.body234`, `CodeDeposit.codeDep_of`, `StaticsDeposit`. The three Rust panics are discharged. Still open for the initialized case: agreement with the model (`caseDep` against `nearDeposit`, `AgreesPanic`, `AgreesWith`), deriving `DepOk` from `Context.WF` (needs a new premise `maxNumberLogs ≥ 1` and the predecessor's validity and UTF-8), `hbound` on every path, and the assembly. |
 | `ft_balance_of` (297) | argument layer, and the parser's accepting half for shallow input without escapes | see "Parser" below; the method level is not started |
 | `storage_balance_of`, `storage_deposit`, `storage_withdraw`, `storage_unregister`, `near_withdraw`, `ft_transfer`, `ft_transfer_call`, `ft_resolve_transfer` | not started | they need the parser; `ft_transfer_call` and `ft_resolve_transfer` also need promises and promise results |
 
@@ -72,7 +72,7 @@ The texts are proved equal to the model's `Panic.message` (`PanicText`).
 
 ## Next steps
 
-1. **`near_deposit`, method level.** Resume from the WIP files and the M8 notes. Template: `NewRuns`/`NewGas`/`NewRefines`.
+1. **`near_deposit`, the initialized case.** Do the model agreement, `DepOk` from `WF`, `hbound`, then the assembly with `nearDeposit_refines_uninit`. Template: `NewRefines`/`NewGas`.
 2. **The parser, finishing `ft_balance_of`'s argument contract.**
    1. `RejectContract`. A loose cost suffices. Use `fromSlice_eq` and the reject paths listed in M6. A WIP of the definitions is in `notes/wip/wnear/SerdeRejDefs.lean.txt`.
    2. Escapes in the accepting half:
@@ -93,3 +93,6 @@ The texts are proved equal to the model's `Panic.message` (`PanicText`).
 - **Running agents.** Agents work in their own worktrees and copy `.lake` from the main worktree. They must not launch helper agents: cleaning up a worktree once removed a sub-agent's worktree while it was still working.
 - **Merging.** Always check the build's own exit status before pushing; piping it through `grep` hides failures.
 - **Tactics.** The tactic pitfalls are collected in the M6 and M8 notes: `mcredits` resets, `Hide`, `mwpi_split`, deep-recursion workarounds.
+- **Fixed by the `near_deposit` agent**:
+  - **The digit table at 1070974 was owned twice,** by the log data and by the panic hook's location formatting. It is now passed separately to the panic sites.
+  - **`GetFmt.getData` named the wrong table entry for the sink's `write_str`.** The vtable word at 1065692 is entry 166, not 165.
