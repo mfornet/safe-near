@@ -9,7 +9,11 @@ import Bridge.Functions.PanicFmt
 * `to_string` on the `PanicInfo` (`PanicHook.ToStr`), which fixes the bytes `bs` the host
   panics with: `<PanicInfo as Display>` (885) with the message `Some(args)`;
 * for 879, the payload's `get` (826, `GetSpec`), which formats the message into a fresh `String`
-  (the binary does it although the hook does not read it).
+  (the binary does it although the hook does not read it): it reads the `Arguments` first, so they
+  go through it (`argsHead` and `expectArgs` in `G`, given back in `G'`).
+
+The `Arguments`' word at `a + 12` (`fmt`'s length, unset) is in `strArgs`/`expectArgs`: 887 and 826
+copy it. Both premises are discharged in `PanicFmtFull` (`f879_unc`, `f853_unc`).
 
 `begin_panic` (664) needs no composition: `PanicBegin.f664_spec`.
 
@@ -46,13 +50,13 @@ theorem f879_full (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
       A 826 ↪[wf] FuncInst.wasm types[14]! inst f826 ∗
       GetSpec cfg lim (d + 6) inst mi Cg n g gt (sp - 48 - 16 - 16 - 16 - 16 - 32) (sp - 48 - 16 - 16 - 16 - 16)
         (sp - 48 - 16 - 16 - 16 - 16 + 4) 1066400 (S + 32) f826
-        iprop(fmtPayload n (sp - 48 - 16 - 16 - 16 - 16) (sp - 48 + 16) ∗ Ga) G' Kg ∗
+        iprop(fmtPayload n (sp - 48 - 16 - 16 - 16 - 16) (sp - 48 + 16) ∗
+          (argsHead n (sp - 48 + 16) 1 1 ∗ (expectArgs n (sp - 48) m l ∗ Ga))) G' Kg ∗
       ToStr cfg lim (d + 8) inst mi Cg n g gt (sp - 48 - 16 - 16 - 16 - 16 - 32 - 32)
         (sp - 48 - 16 - 16 - 16 - 16 - 32 + 16) S
         iprop(infoCells n (sp - 48 - 16 - 16 - 16 - 16 - 32 + 16) (sp - 48 - 16 - 16 - 16 - 16 + 4) 1066400
             (sp - 48 + 16) loc ∗ G' ∗
-          (n ↦[i32][ (sp - 48 - 16).toNat + 8 ] (sp - 48 + 16) ∗ argsHead n (sp - 48 + 16) 1 1 ∗
-            iprop(expectArgs n (sp - 48) m l ∗ D1))) K bs
+          (n ↦[i32][ (sp - 48 - 16).toNat + 8 ] (sp - 48 + 16) ∗ D1)) K bs
       ⊢ MFunSpecT (GF := GF) cfg lim d type inst mi f879 Cg
         (fun args => iprop(⌜args = [.i32 m, .i32 l, .i32 loc]⌝ ∗ g ↦[wg] ⟨gt, .i32 sp⟩ ∗
           stk n (sp.toNat - 96) 96 ∗
@@ -73,8 +77,8 @@ theorem f879_full (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
   iintro ⟨#H859, #F859, #H817, #F826, #Sg, #Hts⟩
   ihave #S817 := f817_fmt cfg lim (d + 4) inst mi e A n g ta mx hm (by omega) Cg gt
     (sp - 48 - 16 - 16 - 16) (sp - 48 - 16 - 16 - 16) (sp - 48 + 16) (sp - 48 - 16) loc (sp - 48 + 16) 1 1
-    lpc (Or.inl ⟨rfl, by decide⟩) S hS (by omega) (by omega) (by omega) (by omega) (by omega) Ga G'
-    iprop(expectArgs n (sp - 48) m l ∗ D1) Kg K bs hpos hlen hutf h hfit hov $$ [H817 F826 Sg Hts]
+    lpc (Or.inl ⟨rfl, by decide⟩) S hS (by omega) (by omega) (by omega) (by omega) (by omega)
+    iprop(expectArgs n (sp - 48) m l ∗ Ga) G' D1 Kg K bs hpos hlen hutf h hfit hov $$ [H817 F826 Sg Hts]
   · iframe H817 F826 Sg Hts
   ihave #S817' := Spec817_mono cfg lim (d + 4) inst mi Cg n g gt (sp - 48 - 16 - 16 - 16)
     (sp - 48 - 16 - 16 - 16) (sp - 48 + 16) (sp - 48 - 16) loc
@@ -84,11 +88,7 @@ theorem f879_full (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
           envP n ta A lpc 1066360 179 (A 826) D1 h)))
     _ _ h bs (by
       iintro ⟨I8, HA, EA, Hs, HGa, HE⟩
-      iunfold envP at HE
-      icases HE with ⟨HH, Vg, Tg, HD1, HI, HS, Hh⟩
-      iframe I8 HA Hs HGa
-      iunfold envP
-      iframe HH Vg Tg HD1 HI HS Hh EA) $$ S817
+      iframe I8 HA Hs HGa EA HE) $$ S817
   iapply (f879_spec cfg lim d type inst mi A n g ta hm (by omega) Cg gt sp m l loc (by omega) hloc
     iprop(stk n ((sp - 48 - 16 - 16 - 16).toNat - 80 - S) (S + 80) ∗ Ga ∗
       envP n ta A lpc 1066360 179 (A 826) D1 h) (cost817 cfg f826 Kg K bs h) h bs)
@@ -116,7 +116,8 @@ theorem f853_full (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
           (n ↦[i32][ (sp - 32 - 16).toNat + 8 ] (sp - 32) ∗ argsHead n (sp - 32) 1 0 ∗
             n ↦[i32][ (sp - 32).toNat ] (sp - 32 + 24) ∗ n ↦[i32][ (sp - 32 + 24).toNat ] m ∗
             n ↦[i32][ (sp - 32 + 24).toNat + 4 ] l ∗
-            iprop(n ↦[i32][ (sp - 32).toNat + 8 ] 0 ∗ n ↦[i32][ (sp - 32).toNat + 16 ] 1067136 ∗ D1))) K bs
+            iprop(n ↦[i32][ (sp - 32).toNat + 8 ] 0 ∗ n ↦[i32][ (sp - 32).toNat + 16 ] 1067136 ∗
+      (∃ w : UInt32, n ↦[i32][ (sp - 32).toNat + 12 ] w) ∗ D1))) K bs
       ⊢ MFunSpecT (GF := GF) cfg lim d type inst mi f853 Cg
         (fun args => iprop(⌜args = [.i32 m, .i32 l, .i32 loc]⌝ ∗ g ↦[wg] ⟨gt, .i32 sp⟩ ∗
           stk n (sp.toNat - 80) 80 ∗
@@ -138,7 +139,8 @@ theorem f853_full (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
   ihave #S817 := f817_str cfg lim (d + 4) inst mi e A n g ta mx hm (by omega) Cg gt
     (sp - 32 - 16 - 16 - 16) (sp - 32 - 16 - 16 - 16) (sp - 32) (sp - 32 - 16) loc (sp - 32) (sp - 32 + 24)
     m l lpc S hS (by omega) (by omega) (by omega) (by omega) (by omega) (by omega)
-    iprop(n ↦[i32][ (sp - 32).toNat + 8 ] 0 ∗ n ↦[i32][ (sp - 32).toNat + 16 ] 1067136 ∗ D1) K bs hpos
+    iprop(n ↦[i32][ (sp - 32).toNat + 8 ] 0 ∗ n ↦[i32][ (sp - 32).toNat + 16 ] 1067136 ∗
+      (∃ w : UInt32, n ↦[i32][ (sp - 32).toNat + 12 ] w) ∗ D1) K bs hpos
     hlen hutf h hfit hov $$ [H817 F828 Hts]
   · iframe H817 F828 Hts
   ihave #S817' := Spec817_mono cfg lim (d + 4) inst mi Cg n g gt (sp - 32 - 16 - 16 - 16)
@@ -150,14 +152,14 @@ theorem f853_full (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
     _ _ h bs (by
       iintro ⟨I8, HA, SA, Hs, HE⟩
       iunfold strArgs at SA
-      icases SA with ⟨S0, S8, S16, S24, S28⟩
+      icases SA with ⟨S0, S8, S16, S24, S28, S12⟩
       iunfold envP at HE
       icases HE with ⟨HH, Vg, Tg, HD1, HI, HS, Hh⟩
       ihave S24 := memBytes_congr (j := (sp - 32 + 24).toNat) (by omega) |>.1 $$ S24
       ihave S28 := memBytes_congr (j := (sp - 32 + 24).toNat + 4) (by omega) |>.1 $$ S28
       iframe I8 HA Hs S0 S24 S28
       iunfold envP
-      iframe HH Vg Tg HD1 HI HS Hh S8 S16) $$ S817
+      iframe HH Vg Tg HD1 HI HS Hh S8 S16 S12) $$ S817
   iapply (f853_spec cfg lim d type inst mi A n g ta hm (by omega) Cg gt sp m l loc (by omega) hloc
     iprop(stk n ((sp - 32 - 16 - 16 - 16).toNat - 80 - S) (S + 80) ∗
       envP n ta A lpc 1066380 181 (A 828) D1 h) (cost817 cfg f828 (6 * cfg.regularOpCost) K bs h) h bs)

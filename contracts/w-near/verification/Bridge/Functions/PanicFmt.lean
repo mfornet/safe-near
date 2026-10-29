@@ -352,10 +352,10 @@ theorem f817_fmt (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (inst : Nat) (m
     (hfit : LogFits h bs.length) (hov : h.extCosts.cost "read_memory_byte" * bs.length < 2 ^ 64) :
     code817 e inst mi A n mx ∗ A 826 ↪[wf] FuncInst.wasm types[14]! inst f826 ∗
       GetSpec cfg lim (d + 2) inst mi Cg n g gt (sp - 16 - 32) (sp - 16) (sp - 16 + 4) 1066400 (S + 32) f826
-        iprop(fmtPayload n (sp - 16) a ∗ Ga) G' Kg ∗
+        iprop(fmtPayload n (sp - 16) a ∗ (argsHead n a plen alen ∗ Ga)) G' Kg ∗
       ToStr cfg lim (d + 4) inst mi Cg n g gt (sp - 16 - 32 - 32) (sp - 16 - 32 + 16) S
         iprop(infoCells n (sp - 16 - 32 + 16) (sp - 16 + 4) 1066400 msg loc ∗ G' ∗
-          (n ↦[i32][ info.toNat + 8 ] msg ∗ argsHead n a plen alen ∗ D0)) K bs
+          (n ↦[i32][ info.toNat + 8 ] msg ∗ D0)) K bs
       ⊢ Spec817 cfg lim d inst mi Cg n g gt sp p a info loc
           iprop(stk n (sp.toNat - 80 - S) (S + 80) ∗ n ↦[i32][ info.toNat + 8 ] msg ∗ argsHead n a plen alen ∗
             Ga ∗ envP n ta A lpc 1066360 179 (A 826) D0 h)
@@ -432,8 +432,8 @@ theorem f817_fmt (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (inst : Nat) (m
     isplitr
     · iapply (PanicWithHook.f824_spec cfg lim (d + 1) types[45]! inst mi e A n g ta mx hm (by omega) Cg gt
         (sp - 16) (sp - 16) 1066360 msg loc 179 (A 826) f826 (sp - 16 + 4) 1066400 lpc S hS (by omega)
-        (by omega) (by decide) iprop(fmtPayload n (sp - 16) a ∗ Ga) G'
-        iprop(n ↦[i32][ info.toNat + 8 ] msg ∗ argsHead n a _ alen ∗ D0) Kg K bs hpos hlen hutf h hfit hov)
+        (by omega) (by decide) iprop(fmtPayload n (sp - 16) a ∗ (argsHead n a _ alen ∗ Ga)) G'
+        iprop(n ↦[i32][ info.toNat + 8 ] msg ∗ D0) Kg K bs hpos hlen hutf h hfit hov)
       iframe F826 Sg F473 F474 Hcode Hts
     isplitr
     · iexact F824
@@ -757,7 +757,7 @@ theorem f859_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
 argument (the empty array 1067136); its counts are `argsHead n a 1 0`. -/
 def strArgs (n : Nat) (a m l : UInt32) : IProp GF :=
   iprop(n ↦[i32][ a.toNat ] (a + 24) ∗ n ↦[i32][ a.toNat + 8 ] 0 ∗ n ↦[i32][ a.toNat + 16 ] 1067136 ∗
-    n ↦[i32][ a.toNat + 24 ] m ∗ n ↦[i32][ a.toNat + 28 ] l)
+    n ↦[i32][ a.toNat + 24 ] m ∗ n ↦[i32][ a.toNat + 28 ] l ∗ (∃ w : UInt32, n ↦[i32][ a.toNat + 12 ] w))
 
 /-- Eight bytes of `i64` 1 are the words 1 and 0. -/
 theorem i64_one : storeBytes (.i64 1) 8 = bytes32 1 ++ bytes32 0 := by decide
@@ -766,10 +766,12 @@ theorem i64_one : storeBytes (.i64 1) 8 = bytes32 1 ++ bytes32 0 := by decide
 theorem stk32_open (n a : Nat) :
     stk (GF := GF) n a 32 ⊢ ∃ w0 w16 w20 w24 w28 : UInt32, ∃ ob : List UInt8, ⌜ob.length = 8⌝ ∗
       n ↦[i32][ a ] w0 ∗ n ↦[wms][ a + 4 ] ob ∗ n ↦[i32][ a + 16 ] w16 ∗ n ↦[i32][ a + 20 ] w20 ∗
-      n ↦[i32][ a + 24 ] w24 ∗ n ↦[i32][ a + 28 ] w28 := by
+      n ↦[i32][ a + 24 ] w24 ∗ n ↦[i32][ a + 28 ] w28 ∗
+      ∃ w12 : UInt32, n ↦[i32][ a + 12 ] w12 := by
   iintro H
   icases stk_split n a 16 16 $$ H with ⟨Ha, Hb⟩
-  icases VecFromElem.stk16 n _ $$ Ha with ⟨W0, W4, W8, -⟩
+  icases VecFromElem.stk16 n _ $$ Ha with ⟨W0, W4, W8, W12⟩
+  icases stk4_word n _ $$ W12 with ⟨%w12, W12⟩
   icases VecFromElem.stk16 n _ $$ Hb with ⟨W16, W20, W24, W28⟩
   ihave W48 := stk_join n (a + 4) 4 4 $$ [W4 W8]
   · iframe W4; iexact W8
@@ -788,7 +790,10 @@ theorem stk32_open (n a : Nat) :
   · iapply memBytes_congr (by omega) |>.1 $$ W20
   isplitl [W24]
   · iapply memBytes_congr (by omega) |>.1 $$ W24
-  iapply memBytes_congr (by omega) |>.1 $$ W28
+  isplitl [W28]
+  · iapply memBytes_congr (by omega) |>.1 $$ W28
+  iexists w12
+  iapply memBytes_congr (by omega) |>.1 $$ W12
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 8000000 in
@@ -828,7 +833,7 @@ theorem f853_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
   subst hargs
   icases stk_split n _ 48 32 $$ Hs with ⟨Hlo, Hf⟩
   ihave Hf := stk_addr (show sp.toNat - 80 + 48 = (sp - 32).toNat by omega) $$ Hf
-  icases stk32_open n _ $$ Hf with ⟨%w0, %w16, %w20, %w24, %w28, %ob, %hob, W0, W48, W16, W20, W24, W28⟩
+  icases stk32_open n _ $$ Hf with ⟨%w0, %w16, %w20, %w24, %w28, %ob, %hob, W0, W48, W16, W20, W24, W28, %w12, W12⟩
   ihave W20 := memBytes_congr (j := (sp - 32 + 20).toNat) (by simp [UInt32.toNat_add]; omega) |>.1 $$ W20
   simp only [f853]
   mstep [Hg]; mstep; mstep; mstep; mstep [Hg]
@@ -858,7 +863,7 @@ theorem f853_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
   · iexact Hc
   isplitr
   · ipureintro; mstep_norm_full; omega
-  isplitl [Hg Hlo HE W0 W4 W8 W16 W20 W24 W28]
+  isplitl [Hg Hlo HE W0 W4 W8 W16 W20 W24 W28 W12]
   · iframe Hg HE
     isplitr
     · ipureintro; rfl
@@ -869,6 +874,8 @@ theorem f853_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
     ihave W20 := memBytes_congr (j := (sp - 32).toNat + 20) (by simp [UInt32.toNat_add]; omega) |>.1 $$ W20
     iunfold argsHead, strArgs
     iframe W0 W4 W8 W16 W20 W24 W28
+    iexists w12
+    iexact W12
   inext
   isplit
   · iintro %rs - HF
@@ -886,18 +893,20 @@ the argument `(s + 8, 195)` (195: `<&str as Display>`, 880); the counts are
 def expectArgs (n : Nat) (s m l : UInt32) : IProp GF :=
   iprop(n ↦[i32][ s.toNat + 8 ] m ∗ n ↦[i32][ s.toNat + 12 ] l ∗ n ↦[i32][ s.toNat + 16 ] 1070628 ∗
     n ↦[i32][ s.toNat + 24 ] 0 ∗ n ↦[i32][ s.toNat + 32 ] (s + 40) ∗ n ↦[i32][ s.toNat + 40 ] (s + 8) ∗
-    n ↦[i32][ s.toNat + 44 ] 195)
+    n ↦[i32][ s.toNat + 44 ] 195 ∗ (∃ w : UInt32, n ↦[i32][ s.toNat + 28 ] w))
 
 /-- 48 bytes of stack as the words 879 writes. -/
 theorem stk48_open (n a : Nat) :
     stk (GF := GF) n a 48 ⊢ ∃ w8 w12 w16 w32 w36 w40 w44 : UInt32, ∃ ob : List UInt8, ⌜ob.length = 8⌝ ∗
       n ↦[i32][ a + 8 ] w8 ∗ n ↦[i32][ a + 12 ] w12 ∗ n ↦[i32][ a + 16 ] w16 ∗ n ↦[wms][ a + 20 ] ob ∗
-      n ↦[i32][ a + 32 ] w32 ∗ n ↦[i32][ a + 36 ] w36 ∗ n ↦[i32][ a + 40 ] w40 ∗ n ↦[i32][ a + 44 ] w44 := by
+      n ↦[i32][ a + 32 ] w32 ∗ n ↦[i32][ a + 36 ] w36 ∗ n ↦[i32][ a + 40 ] w40 ∗ n ↦[i32][ a + 44 ] w44 ∗
+      ∃ w28 : UInt32, n ↦[i32][ a + 28 ] w28 := by
   iintro H
   icases stk_split n a 16 32 $$ H with ⟨Ha, H⟩
   icases stk_split n _ 16 16 $$ H with ⟨Hb, Hc⟩
   icases VecFromElem.stk16 n _ $$ Ha with ⟨-, -, W8, W12⟩
-  icases VecFromElem.stk16 n _ $$ Hb with ⟨W16, W20, W24, -⟩
+  icases VecFromElem.stk16 n _ $$ Hb with ⟨W16, W20, W24, W28⟩
+  icases stk4_word n _ $$ W28 with ⟨%w28, W28⟩
   icases VecFromElem.stk16 n _ $$ Hc with ⟨W32, W36, W40, W44⟩
   ihave W2 := stk_join n (a + 16 + 4) 4 4 $$ [W20 W24]
   · iframe W20; iexact W24
@@ -922,7 +931,10 @@ theorem stk48_open (n a : Nat) :
   · iapply memBytes_congr (by omega) |>.1 $$ W36
   isplitl [W40]
   · iapply memBytes_congr (by omega) |>.1 $$ W40
-  iapply memBytes_congr (by omega) |>.1 $$ W44
+  isplitl [W44]
+  · iapply memBytes_congr (by omega) |>.1 $$ W44
+  iexists w28
+  iapply memBytes_congr (by omega) |>.1 $$ W28
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 8000000 in
@@ -964,7 +976,7 @@ theorem f879_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
   icases stk_split n _ 48 48 $$ Hs with ⟨Hlo, Hf⟩
   ihave Hf := stk_addr (show sp.toNat - 96 + 48 = (sp - 48).toNat by omega) $$ Hf
   icases stk48_open n _ $$ Hf with ⟨%w8, %w12, %w16, %w32, %w36, %w40, %w44, %ob, %hob, W8, W12, W16, W20,
-    W32, W36, W40, W44⟩
+    W32, W36, W40, W44, %w28, W28⟩
   ihave W36 := memBytes_congr (j := (sp - 48 + 36).toNat) (by simp [UInt32.toNat_add]; omega) |>.1 $$ W36
   simp only [f879]
   mstep [Hg]; mstep; mstep; mstep; mstep [Hg]
@@ -997,7 +1009,7 @@ theorem f879_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
   · iexact Hc
   isplitr
   · ipureintro; mstep_norm_full; omega
-  isplitl [Hg Hlo HE W8 W12 W16 W20 W24 W32 W36 W40 W44]
+  isplitl [Hg Hlo HE W8 W12 W16 W20 W24 W32 W36 W40 W44 W28]
   · iframe Hg HE
     isplitr
     · ipureintro; rfl
@@ -1008,6 +1020,8 @@ theorem f879_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
     ihave W36 := memBytes_congr (j := (sp - 48 + 16).toNat + 20) (by simp [UInt32.toNat_add]; omega) |>.1 $$ W36
     iunfold argsHead, expectArgs
     iframe W8 W12 W16 W20 W24 W32 W36 W40 W44
+    iexists w28
+    iapply memBytes_congr (by omega) |>.1 $$ W28
   inext
   isplit
   · iintro %rs - HF
