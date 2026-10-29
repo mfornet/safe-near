@@ -574,8 +574,39 @@ by layer, with their sizes and roles, and which other methods' parsers share the
     are `body` and leaves the same rest.
   * The outer loop runs once, since its back edge follows an escape, so its invariant is just the
     state at entry.
-  * Not yet proved: escapes, non-ASCII bytes, the reject paths (647/657 build an error box through
-    the allocator), and the copied result (scratch non-empty: 613, 728).
+  * Not yet proved: escapes and the copied result (scratch non-empty: 613, 728), and the reject
+    paths of 646 itself (EOF, a control byte; their error constructor is now proved, below).
+* `from_utf8` (927) on any input, `Bridge/Functions/FromUtf8Gen.lean` (`f927_spec`): `Ok(&str)`
+  exactly when `utf8Ok bs`, else `Err` with some 8 bytes of `Utf8Error`, at the same
+  `cost927 len = 100 + 100·len`.
+  * The width table at 1071704 is a resource, `utf8Width`, read off the data segment
+    (`widthData_segment`).
+  * The non-ASCII branch, one equation of `utf8Ok` per path of the code (`ok_bad0`, `ok_two`,
+    `ok_three_*`, `ok_four_*`). The byte tests and the second `br_table`s are `decide`d over the
+    256 bytes.
+  * The main loop's invariant is `inv927` unchanged: a `w`-byte character is paid by its `w`
+    bytes, and a rejection by the byte it fails at.
+  * The proof is one declaration of about 400 steps and takes about four minutes to check.
+* `as_str` and `parse_str` on UTF-8, `ParseStrUtf8.lean`:
+  * `f648_spec_valid` is `as_str` on any `bs` with `utf8Ok bs`.
+  * `f646_spec_utf8` is the borrowed case of `parse_str` on any body of plain bytes that is valid
+    UTF-8.
+  * `utf8_model` and `utf8_model_bad` are the model side. `stringBody` decodes exactly those
+    bodies; on any other body its string is `none`.
+* The error position, `SerdePosition.lean`. Proved:
+  * `position_of_index` (645, with 609): some `(line, column)`, at most
+    `cost645 idx = 200 + 50·idx`;
+  * `position` (638): the same at the reader's index, at `cost638 i = 40 + cost645 i`.
+* The syntax error constructor, `SerdeErrBox.lean`. The spec is loose, as the reject paths need.
+  * The allocation at alignment 4, through `AllocWalk.f310_spec_walk` on a free list of any
+    length: `alloc_impl` (625), `Global::allocate` (624) and `exchange_malloc` (590).
+  * `Error::syntax` (639) fills a fresh 20-byte box.
+  * `f647_spec` (`Deserializer::error`; 657 has the same code, `f657_eq`) gives `Err(box)` at
+    `out`. The heap gains the box (`heapA`), and the cost is at most `costErr cfg F i`. That is
+    linear in the index, plus a constant and the allocator's `cost310W cfg F 20 4`.
+  * `f648_spec_bad` is `as_str` on bytes of the input that are not UTF-8: `from_utf8` fails, then
+    `InvalidUnicodeCodePoint` (code 14) through 657. With `f648_spec_valid`, `as_str` is now
+    specified on every input.
 
 *Tactics notes from this round.*
 
@@ -591,6 +622,23 @@ by layer, with their sizes and roles, and which other methods' parsers share the
   In a context with contradictory hypotheses, though, an unreachable exit branch inside a macro
   failed with "type mismatch: Type / Prop". The fix is a variant macro (`after10x`) that closes
   that branch with `exfalso; omega`.
+* Some failures show up only at the kernel, or as `whnf` timeouts, from what the step tactics'
+  side conditions (`simp_all`, `omega`) do with the context. Seen this round:
+  * A hypothesis that mentions the sign extension of a byte (`hs : sb b = s`), even wrapped in a
+    `def`, made a single `mstep` time out. Derive the byte facts before `generalize`, so they are
+    facts about `s`, and keep them packed (`FromUtf8Gen.Hide`).
+  * A fact about a `br_table` index (`[…][(b.toUInt32 + k).toNat]?.getD d = 2`) in context sent
+    `mpay` into a deep recursion. Rewriting with it inside the goal made the kernel recurse too.
+    `FromUtf8Gen.mwpi_br_table_k` takes the label computed beforehand; clear the fact right after.
+  * After an `mcall`, stepping on the subtraction the call leaves in `Hc` made the kernel recurse.
+    Normalize the credits with `mcredits (k * c + X)` before the next `mstep`.
+* `omega` fails on a subtraction whose operands contain a product such as `cost638 i * c`; it
+  treats the whole subtraction as an atom. `generalize` the product to a variable first.
+* A loop followed by more code in its block needs `iapply mwpi_cons` before
+  `MemCpy.mwpi_loop0`.
+* A persistent bundle of code cells in a `def` (`errCode`) is not persistent to `iintro #`.
+  Destructure it with `icases … with ⟨#…⟩`. To pass it to `mcall`, `unfold` the definition in the
+  specification's statement.
 
 *Plan for the rest of `FromTraitContract`, bottom-up.*
 
@@ -606,6 +654,8 @@ by layer, with their sizes and roles, and which other methods' parsers share the
      says nothing more. This applies to 322/325 (`position_of_index` is linear), 340, 642
      and 643 (`format!` through `core::fmt::write` 872 and the vtables of M5), and the
      drops 92/341/151.
+   * Done for the syntax errors 647/657 (`SerdeErrBox.f647_spec`, with 638/645/609, 639, 590,
+     624, 625): `Err(box)`, at most `costErr cfg F i`. Still to do: 340, 642/643 and the drops.
 2. **Strings: `parse_str` (646) against `stringBody`.** Prove the spec in this order:
    * (a) the plain case: no escape, so the `Borrowed` slice, with `as_str` on bytes known to
      be UTF-8;
@@ -617,6 +667,9 @@ by layer, with their sizes and roles, and which other methods' parsers share the
    which is enough for keys and account ids, then the general validator against
    `String.fromUTF8?`. The general one is needed because the model accepts any UTF-8 key
    for an unknown field.
+
+   Done: the general validator (`FromUtf8Gen.f927_spec`), and `as_str` on every input
+   (`f648_spec_valid`, `f648_spec_bad`).
 
    `ignore_str` (650) and `ignore_escape` (652) are the same scan without UTF-8. Their spec
    is acceptance and the rest, as `stringBody` gives them, ignoring its first component.
