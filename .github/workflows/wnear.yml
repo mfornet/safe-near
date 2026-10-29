@@ -1,0 +1,66 @@
+name: wNEAR
+
+# Builds the wNEAR verification project and runs its axiom audit with the
+# pinned statements (contracts/w-near/verification/STATEMENTS.md) on every
+# change that can reach them. A proof that still compiles because its statement
+# was weakened fails here, unless the pull request also updates STATEMENTS.md
+# (`just wnear-pin-statements`), where the change is reviewed.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "contracts/w-near/verification/**"
+      - "near-lean/**"
+      - "!near-lean/wasm-logic/**"
+      - "tools/axiom-audit.py"
+      - "lean-toolchain"
+      - ".github/workflows/wnear.yml"
+  pull_request:
+    paths:
+      - "contracts/w-near/verification/**"
+      - "near-lean/**"
+      - "!near-lean/wasm-logic/**"
+      - "tools/axiom-audit.py"
+      - "lean-toolchain"
+      - ".github/workflows/wnear.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wnear-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    name: Axioms and pinned statements of the wNEAR proofs
+    runs-on: [self-hosted, fv01]
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/cache@v5
+        with:
+          path: near-lean/.lake/packages
+          key: near-lean-packages-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'near-lean/*/lake-manifest.json') }}
+
+      # Every module of the package: the audit fails on a missing one. The near-lean
+      # packages below it come from Lake's artifact cache when another job built them.
+      - uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: contracts/w-near/verification
+          build-args: Model Spec Proofs Differential runtime-adapter-tests wnear-scenarios wnear-harness
+          use-mathlib-cache: true
+
+      - name: Audit axioms and check the pinned statements
+        run: >-
+          python3 tools/axiom-audit.py contracts/w-near/verification --no-build
+          --allow-sorry-module Proofs.Refinement --report audit/wnear.json
+          --statements contracts/w-near/verification/statements.json
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: wnear-audit
+          path: audit/wnear.json
