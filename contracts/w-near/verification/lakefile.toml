@@ -58,6 +58,8 @@ name = "Binary"
 # of `contract.wasm` in the metered logic.
 [[lean_lib]]
 name = "Bridge"
+# There is no umbrella module; include every proof under Bridge/.
+globs = ["Bridge.+"]
 
 [[lean_lib]]
 name = "Spec"
