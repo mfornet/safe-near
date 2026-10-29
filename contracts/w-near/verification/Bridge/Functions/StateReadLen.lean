@@ -73,7 +73,7 @@ theorem f219_spec_len (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : Fu
     (hlim : withinLimit h.config.maxStorageKeyLen StateRead.stateKey.length = true)
     (hb : build st.entries = .ok st.base) (hz : zeroHash ∉ st.base.witness.map Prod.fst)
     (hlink : h.storage StateRead.stateKey = viewVal st (contractKey h.context.currentAccountId StateRead.stateKey))
-    (hproof : ProofBudget h st (lookupProofBound (contractKey h.context.currentAccountId StateRead.stateKey)))
+    (hproof : ProofBudget h st (readProofCost (contractKey h.context.currentAccountId StateRead.stateKey) (h.storage StateRead.stateKey)))
     (hreg : withinLimit h.config.maxRegisterLen (stateBytes hd4 pre b0 b1 c0).length = true) :
     stateCode e inst mi A n maxP mx
       ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f219 Cg
@@ -337,7 +337,7 @@ theorem f219_spec_model_len (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (typ
     (hlim : withinLimit h.config.maxStorageKeyLen 5 = true)
     (hb : build st.entries = .ok st.base) (hz : zeroHash ∉ st.base.witness.map Prod.fst)
     (hlink : h.storage WNear.stateKey = viewVal st (contractKey h.context.currentAccountId WNear.stateKey))
-    (hproof : ProofBudget h st (lookupProofBound (contractKey h.context.currentAccountId WNear.stateKey)))
+    (hproof : ProofBudget h st (readProofCost (contractKey h.context.currentAccountId WNear.stateKey) (h.storage WNear.stateKey)))
     (hreg : withinLimit h.config.maxRegisterLen 29 = true) :
     stateCode e inst mi A n maxP mx
       ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f219 Cg

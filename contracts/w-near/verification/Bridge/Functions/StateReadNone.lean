@@ -103,7 +103,7 @@ theorem f219_spec_none (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : F
   simp only [f219]
   mstep [Hg]; mstep; mstep; mstep; mstep [Hg]
   mstep; mstep; mstep; mstep; mstep
-  have S := S548 f8 hf8 h st rfl (by decide) hacc hlim hb hz hlink hproof (fun v' hv' => by
+  have S := S548 f8 hf8 h st rfl (by decide) hacc hlim hb hz hlink (by simpa only [readProofCost, hv, Option.map_none, Option.getD_none, Nat.add_zero] using hproof) (fun v' hv' => by
       rw [hv] at hv'; cases hv') (by rw [hv]; trivial)
   rw [hv] at S
   mcall S using [Hg HI LoB Hvt Hinv F8 Hk Hhost]

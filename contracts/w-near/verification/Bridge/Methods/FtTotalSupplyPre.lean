@@ -61,6 +61,22 @@ theorem lookup_le_proofBound (ctx : Context) :
   simp only [WNear.storageAccesses]
   omega
 
+/-- The `STATE` lookup and its 29-byte value are within the model's proof bound. -/
+theorem read_le_proofBound (ctx : Context) :
+    Near.TrieOverlay.lookupProofBound (Near.TrieOverlay.contractKey ctx.current.bytes WNear.stateKey) + 29 ≤
+      WNear.proofBound ctx := by
+  have hl : (Near.TrieOverlay.contractKey ctx.current.bytes WNear.stateKey).length =
+      ctx.current.bytes.length + 7 := by
+    have h5 : WNear.stateKey.length = 5 := by rw [← StateRead.stateKey_eq]; rfl
+    simp only [Near.TrieOverlay.contractKey, List.length_append, h5, List.length_singleton]
+    omega
+  have hm := lookupProofBoundLen_mono (show ctx.current.bytes.length + 7 ≤
+    2 + ctx.current.bytes.length + WNear.maxStorageKeyBytes by simp [WNear.maxStorageKeyBytes]; omega)
+  unfold Near.TrieOverlay.lookupProofBound WNear.proofBound
+  rw [hl]
+  simp only [WNear.storageAccesses, WNear.maxStorageValueBytes]
+  omega
+
 /-- A host equal to the initial one up to gas and the recorded proof, with room for the
 `STATE` lookup, reads the model state `S` that `STATE` holds. -/
 theorem readOk_of (ctx : Context) (raw : RawStorage) (S : WNear.State) (hwf : ctx.WF raw)
@@ -68,7 +84,7 @@ theorem readOk_of (ctx : Context) (raw : RawStorage) (S : WNear.State) (hwf : ct
     (hval : (hostOf ctx raw).storage WNear.stateKey = some (WNear.header S)) (h : NearState)
     (he : eraseP h = eraseP (hostOf ctx raw))
     (hproof : ProofBudget h ctx.trie
-      (Near.TrieOverlay.lookupProofBound (Near.TrieOverlay.contractKey ctx.current.bytes WNear.stateKey))) :
+      (Near.TrieOverlay.lookupProofBound (Near.TrieOverlay.contractKey ctx.current.bytes WNear.stateKey) + 29)) :
     ReadOk h S ctx.trie := by
   have hsto : h.storage = (hostOf ctx raw).storage := eraseP_field he NearState.storage fun _ => rfl
   have hacc : h.storageAccounting = some ctx.trie :=
@@ -86,7 +102,7 @@ theorem readOk_of (ctx : Context) (raw : RawStorage) (S : WNear.State) (hwf : ct
   · exact hlim NearConfig.maxStorageKeyLen 5 _ rfl (by have := hl.storageKey; omega)
   · rw [hsto, hid]
     exact hostOf_storage_view ctx raw hwf WNear.stateKey
-  · rw [hid]; exact hproof
+  · simpa only [hid, hsto, hval, readProofCost, Option.map_some, Option.getD_some, StateReadModel.header_length] using hproof
   · exact hlim NearConfig.maxRegisterLen 29 _ rfl (by have := hl.register; omega)
   · exact hlim NearConfig.maxReturnLen _ _ rfl (by have := hl.returned; have := supplyJson_length S; omega)
 
@@ -100,7 +116,7 @@ theorem pre_of_ctx (cfg : WNear.Config) (ctx : Context) (raw : RawStorage) (st :
       pre S (eraseP (hostOf ctx raw)) := by
   refine ⟨fun hroom => ⟨ctx.trie, readOk_of ctx raw S hwf hl hval _ rfl ?_⟩,
     ⟨ctx.trie, readOk_of ctx raw S hwf hl hval _ rfl ?_⟩⟩
-  · exact (budget_of_room hwf hroom _ rfl rfl).mono (lookup_le_proofBound ctx)
+  · exact (budget_of_room hwf hroom _ rfl rfl).mono (read_le_proofBound ctx)
   · intro size hsz
     cases hsz
 

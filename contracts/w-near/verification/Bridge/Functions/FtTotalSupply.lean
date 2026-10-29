@@ -705,7 +705,7 @@ theorem segB (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (e inst : Nat) (mi 
     (hlim : withinLimit h.config.maxStorageKeyLen 5 = true)
     (hb : build st.entries = .ok st.base) (hz : zeroHash ∉ st.base.witness.map Prod.fst)
     (hlink : h.storage WNear.stateKey = viewVal st (contractKey h.context.currentAccountId WNear.stateKey))
-    (hproof : ProofBudget h st (lookupProofBound (contractKey h.context.currentAccountId WNear.stateKey))) (hreg : withinLimit h.config.maxRegisterLen 29 = true)
+    (hproof : ProofBudget h st (readProofCost (contractKey h.context.currentAccountId WNear.stateKey) (h.storage WNear.stateKey))) (hreg : withinLimit h.config.maxRegisterLen 29 = true)
     (rest : List Instr) (Φ : Post NearState GF) :
     codeB e inst mi A n maxP ∗
       credits Cg (864 * cfg.regularOpCost + cost219 cfg h S + (cost96 cfg (loOf S) (hiOf S) + x96) + R) ∗
@@ -914,7 +914,7 @@ structure ReadOk (h : NearState) (S : WNear.State) (st : Near.TrieOverlay.State)
   trie : build st.entries = .ok st.base
   zero : zeroHash ∉ st.base.witness.map Prod.fst
   link : h.storage WNear.stateKey = viewVal st (contractKey h.context.currentAccountId WNear.stateKey)
-  proof : ProofBudget h st (lookupProofBound (contractKey h.context.currentAccountId WNear.stateKey))
+  proof : ProofBudget h st (readProofCost (contractKey h.context.currentAccountId WNear.stateKey) (h.storage WNear.stateKey))
   regLen : withinLimit h.config.maxRegisterLen 29 = true
   retLen : withinLimit h.config.maxReturnLen (supplyJson S).length = true
 

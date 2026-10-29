@@ -217,7 +217,7 @@ theorem f219_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
     (hlim : withinLimit h.config.maxStorageKeyLen stateKey.length = true)
     (hb : build st.entries = .ok st.base) (hz : zeroHash ∉ st.base.witness.map Prod.fst)
     (hlink : h.storage stateKey = viewVal st (contractKey h.context.currentAccountId stateKey))
-    (hproof : ProofBudget h st (lookupProofBound (contractKey h.context.currentAccountId stateKey)))
+    (hproof : ProofBudget h st (readProofCost (contractKey h.context.currentAccountId stateKey) (h.storage stateKey)))
     (hreg : withinLimit h.config.maxRegisterLen (stateBytes hd4 pre b0 b1 c0).length = true) :
     stateCode e inst mi A n maxP mx
       ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f219 Cg

@@ -412,7 +412,7 @@ theorem f548_spec_host (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : F
     (hlim : withinLimit h.config.maxStorageKeyLen key.length = true)
     (hb : build st.entries = .ok st.base) (hz : zeroHash ∉ st.base.witness.map Prod.fst)
     (hlink : h.storage key = viewVal st (contractKey h.context.currentAccountId key))
-    (hproof : ProofBudget h st (lookupProofBound (contractKey h.context.currentAccountId key)))
+    (hproof : ProofBudget h st (readProofCost (contractKey h.context.currentAccountId key) (h.storage key)))
     (hreg : ∀ v, h.storage key = some v → withinLimit h.config.maxRegisterLen v.length = true)
     (hok : RegOk maxP len (h.storage key)) :
     srCode e inst mi A n maxP mx
