@@ -453,6 +453,47 @@ continuation is published to PR #40 after its validation gates pass.
   three axioms. Changed-source Lean style and whitespace checks pass. Evidence:
   `/tmp/pr40-struct-values-final-audit.log` and `/tmp/pr40-struct-values-style.log`.
 
+
+## Copied-array entry and scratch cleanup continuation
+
+- `SerdeScratchValueDrop.f68_value` proves the actual grown-scratch drop while
+  retaining the owned String and every earlier live allocation. The live-list
+  uniqueness invariant proves the two pointers differ, so erasing scratch removes
+  its second entry rather than the String. The final free-list bound is exactly
+  `max (endFreeBound F capS 0 chunks) 1 + 1`; memory growth includes the parser trace
+  and the owned-string allocation. `cleanValue` retains these bounds.
+- `SerdeEndSuccess.f320_eof` checks the final whitespace/end-of-input using only
+  reader and global resources. The changed heap, scratch and stack are framed
+  through, without requiring extra error-allocation room on this accepting path.
+- `SerdeStruct78Esc.f78_arr_copied`, `SerdeFromTraitEsc.f66_arr_copied` and
+  `FromSliceEsc.f65_arr_copied` carry the concrete array path through the actual
+  78/66/65 calls. 66 constructs its own empty scratch, runs the array reader,
+  checks the remaining whitespace, copies the result, frees grown scratch and
+  restores its frame. The complete entry restores 448 bytes, preserves input and
+  all three string tables, and returns only the owned String; its depth premise
+  is `d + 38`.
+- `FromSliceEsc.f65_arr_okAt` gives the existing public parser result shape for a
+  model account id. This is a proved copied-array family under explicit shape,
+  parser/allocation-room and growth/copy gas premises. It is not yet the uniform
+  `AcceptContract` on every accepted input. The old contract's `roData` does not
+  include the hex table; the general escaped path must carry that ownership.
+- The 66 proof simplifies credits after each large call; leaving all nested
+  subtraction expressions unnormalized caused a kernel recursion limit. The
+  checked proof uses the same 700-operation local/end/drop allowance, plus final
+  whitespace and `costArray`; 65 adds 45 operations. The uniform method allowance
+  is unchanged and still needs the growth/copy charges absorbed.
+- Remaining: object-loop/escaped-key state, deep ignored values, general parser
+  rejection, and the reachable heap/room/gas bounds for the complete accepting
+  contract. The copied-array cleanup and outer-wrapper integration are now done;
+  no seventh exported-method refinement is claimed.
+- Validation: `just wnear-audit` passes (2791 build jobs; 457 wNEAR modules,
+  62822 declarations and 57562 theorems). Only the three existing dependencies on
+  `Proofs.Refinement` use `sorryAx`; strict NearLogic has zero violations and
+  statement pins match. Lean MCP verifies `f65_arr_okAt` with only the standard
+  three axioms. Changed-source Lean style and whitespace checks pass. Evidence:
+  `/tmp/pr40-copied-array-entry-final-audit.log` and
+  `/tmp/pr40-copied-array-entry-style.log`.
+
 ## Methods
 
 There are 15 exported methods; six now have complete per-call refinement proofs under their protocol premises.
@@ -532,8 +573,9 @@ The texts are proved equal to the model's `Panic.message` (`PanicText`).
         state instead of reusing the borrowed-key `Hyp646` unchanged;
       - keep the all-outcome `costRun` separate: it has a proved quadratic lower
         bound even on accepted newline escapes (`StrCostLower`);
-      - the copied 169 reader is integrated through 214/205 and the array's 228;
-        finish the object-loop integration and 78/66/65 cleanup/wrappers;
+      - the copied array is integrated through 214/228/78/66/65, with scratch
+        cleanup; finish the object-loop/escaped-key integration and general
+        argument-contract bounds, including hex-table ownership;
       - `Hyp646` for escaped keys;
       - 652 (`ignore_escape`).
    3. Ignored values nested deeper: 84 grows the scratch from capacity 0, and `Hyp81` must allow changes to the heap and the scratch.

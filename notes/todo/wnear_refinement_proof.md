@@ -1177,10 +1177,16 @@ round).* Proved, no `sorry`, standard axioms only:
      state through. `SerdeStructArrState.f228_arr_state` generalizes the array
      proof; `SerdeStructArrEsc.f228_arr_copied` instantiates it from the JSON
      model's decoded string, restoring 368 bytes and nesting depth, at `d + 35`.
-     Left: the object loop and escaped keys; then scratch cleanup and the outer
-     78/66/65 wrappers with the changed state. Preserve both live allocations when
-     repacking the heap. The older no-escape interfaces are unchanged. General
-     rejecting value paths remain open.
+     `SerdeScratchValueDrop.f68_value` now frees scratch while retaining the owned
+     String and earlier live allocations, with the final allocator and memory
+     bounds. `SerdeStruct78Esc`, `SerdeFromTraitEsc` and `FromSliceEsc` carry the
+     copied array through the actual 78/66/65 entry and cleanup. The complete
+     448-byte frame is restored, at `d + 38`; final whitespace is checked by a
+     heap-independent successful 320 contract. `f65_arr_okAt` supplies the existing
+     result shape under explicit shape/room/growth-cost premises. Left: the object
+     loop and escaped keys; the full accepting contract needs hex-table ownership
+     added to its read-only resources and reachable heap/room/gas bounds. The older
+     no-escape interfaces are unchanged. General rejecting value paths remain open.
 
    `ignore_str` (650) and `ignore_escape` (652) are the same scan without UTF-8. Their spec
    is acceptance and the rest, as `stringBody` gives them, ignoring its first component.
