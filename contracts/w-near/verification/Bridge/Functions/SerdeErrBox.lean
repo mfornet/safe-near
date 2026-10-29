@@ -1,5 +1,6 @@
 import Bridge.Functions.SerdePosition
 import Bridge.Functions.VecWithCap
+import Bridge.Functions.FromUtf8Gen
 
 /-!
 # serde_json's error box (M6): `Box<ErrorImpl>` through the allocator
@@ -30,6 +31,9 @@ position's `cost638 i` (linear in the index `i`), a constant, and the allocator'
 * `f639_spec`: the box, filled (`block_split20`, `block_join20`).
 * `f647_spec`: `Err(box)` at `out`, the stack (80 bytes), the reader and the `ErrorCode` kept, at
   `costErr cfg F i`. The code it runs is `errCode`.
+* `f648_spec_bad`: `as_str` on bytes of the input that are not UTF-8 (`utf8Ok` false): `from_utf8`
+  (927, `FromUtf8Gen.f927_spec`) fails, and the error is `InvalidUnicodeCodePoint` (code 14) through
+  657: `Err(box)`, at `(60 + cost927 len) · c + costErr cfg F i`, a 112-byte stack.
 
 *Tactic note.* After an `mcall`, bring the credits to the `k * c + X` form (`mcredits`) before the
 next `mstep`: stepping on the subtraction the call leaves sent the kernel into a deep recursion.
@@ -646,5 +650,168 @@ theorem f647_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
 theorem f657_eq : f657 = f647 := rfl
 
 end L647
+
+section L648
+
+variable {GF : BundledGFunctors} [WasmGS NearState GF]
+open WNear.Binary.SerdeRead (rd)
+open WNear.Binary.ArgsLeaves (sliceRead)
+open WNear.Binary.FromUtf8 (res927 cost927)
+open WNear.Binary.FromUtf8Gen (utf8Width)
+open WNear.Binary.SerdePosition (cost638)
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 4000000 in
+/-- **`SliceRead::as_str(out, rd, p, len)`** (648) on bytes that are not UTF-8: the `len` bytes at
+`p = ptr + a` inside the reader's input; `from_utf8` (927) fails, and the error is
+`InvalidUnicodeCodePoint` (code 14) through 657: `Err(box)` at `out`. -/
+theorem f648_spec_bad (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
+    (htype : type.results = []) (inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (n g ta : Nat)
+    (hm : IfaceMod mi A n g ta) (hd : d + 11 < lim.maxCallDepth) (Cg : Nat)
+    (gt : GlobalType) (sp out de ptr p len idx : UInt32) (ob ibs : List UInt8) (i a : Nat) (maxP mlen : Nat)
+    (live : List (Nat × Nat)) (F : Nat) (hob : ob.length = 8) (hout : out.toNat + 8 ≤ 2 ^ 32)
+    (hde : de.toNat + 12 ≤ 2 ^ 32) (hi : i ≤ ibs.length) (hlen : ibs.length + 1 < 2 ^ 32)
+    (hptr : ptr.toNat + ibs.length ≤ 2 ^ 32) (hp : p.toNat = ptr.toNat + a) (ha : a + len.toNat ≤ ibs.length)
+    (hbad : Utf8.utf8Ok ((ibs.drop a).take len.toNat) = false) (hsp : 112 ≤ sp.toNat)
+    (hr : roomFor4 mlen maxP 20) :
+    errCode n maxP inst mi A ∗ A 927 ↪[wf] FuncInst.wasm types[31]! inst f927 ∗
+      A 657 ↪[wf] FuncInst.wasm types[31]! inst f657
+      ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f648 Cg
+        (fun args => iprop(⌜args = [.i32 out, .i32 de, .i32 p, .i32 len]⌝ ∗ g ↦[wg] ⟨gt, .i32 sp⟩ ∗
+          stk n (sp.toNat - 112) 112 ∗ vt n 1057464 idx ta (A 578) ∗ heapInv n maxP mlen live F ∗
+          n ↦[wms][ out.toNat ] ob ∗ rd n de ptr ibs i ∗ n ↦[wms][ 1071704 ] utf8Width))
+        (fun _ => (60 + cost927 len.toNat) * cfg.regularOpCost + costErr cfg F i)
+        (fun _ rs => iprop(⌜rs = []⌝ ∗ ∃ q : UInt32, ⌜q ≠ 0⌝ ∗ g ↦[wg] ⟨gt, .i32 sp⟩ ∗
+          stk n (sp.toNat - 112) 112 ∗ vt n 1057464 idx ta (A 578) ∗ heapA n maxP mlen live F 20 q ∗
+          n ↦[i32][ out.toNat ] 1 ∗ n ↦[i32][ out.toNat + 4 ] q ∗ rd n de ptr ibs i ∗
+          n ↦[wms][ 1071704 ] utf8Width)) := by
+  iintro ⟨Hcode, #H927, #H657⟩
+  iunfold errCode at Hcode
+  icases Hcode with ⟨#H310c, #H310, #H625, #H624, #H590, #H639, #H583, #H609, #H645, #H638⟩
+  ihave #Hi : inst ↪[inst] mi $$ []
+  · iunfold code310 at H310c
+    icases H310c with ⟨-, -, -, -, -, -, -, -, -, -, -, -, -, -, #Hi⟩
+    iexact Hi
+  have hn := hm.mem
+  have hg := hm.glob
+  have ha927 := hm.funcs 927 (by decide)
+  have ha657 := hm.funcs 657 (by decide)
+  have t31 : types[31]!.params.length = 3 := by rfl
+  iapply MFunSpec_intro
+  imodintro
+  iintro %args %R HP Hc
+  icases HP with ⟨%hargs, Hg, Hs, Hvt, Hinv, Ho, Hrd, Ht⟩
+  subst hargs
+  have hlt := sp.toNat_lt
+  have h32 : (sp - 32).toNat = sp.toNat - 32 := by
+    rw [UInt32.toNat_sub_of_le] <;> simp [UInt32.le_iff_toNat_le]; omega
+  iunfold rd, sliceRead at Hrd
+  icases Hrd with ⟨⟨D0, D4, D8⟩, Hb⟩
+  icases U128From.memBytes_split n ptr.toNat a ibs (by omega) $$ Hb with ⟨B0, Bx⟩
+  icases U128From.memBytes_split n (ptr.toNat + a) len.toNat (ibs.drop a) (by simp; omega) $$ Bx with ⟨Bs, B2⟩
+  ihave Bs := AllocNewCell.memBytes_addr (show ptr.toNat + a = p.toNat by omega) $$ Bs
+  icases stk_split n (sp.toNat - 112) 80 32 $$ Hs with ⟨S80, Hs⟩
+  icases stk_split n (sp.toNat - 112 + 80) 12 20 $$ Hs with ⟨SO, Hs⟩
+  icases stk_split n (sp.toNat - 112 + 80 + 12) 4 16 $$ Hs with ⟨S4, Hs⟩
+  icases stk_split n (sp.toNat - 112 + 80 + 12 + 4) 4 12 $$ Hs with ⟨SC0, Hs⟩
+  icases stk_split n (sp.toNat - 112 + 80 + 12 + 4 + 4) 8 4 $$ Hs with ⟨SC8, S4'⟩
+  iunfold stk at SO SC0 SC8
+  icases SO with ⟨%so, %hso, SO⟩
+  icases SC0 with ⟨%sc0, %hsc0, SC0⟩
+  icases SC8 with ⟨%sc8, %hsc8, SC8⟩
+  simp only [f648]
+  rw [show (60 + cost927 len.toNat) * cfg.regularOpCost + costErr cfg F i + R =
+    60 * cfg.regularOpCost + (cost927 len.toNat * cfg.regularOpCost + (costErr cfg F i + R)) by
+      rw [Nat.add_mul]; omega]
+  generalize hE : costErr cfg F i = E
+  have hK2 : (13 + cost927 len.toNat) * cfg.regularOpCost = 13 * cfg.regularOpCost + cost927 len.toNat * cfg.regularOpCost :=
+    Nat.add_mul _ _ _
+  have hK3 : (16 + cost927 len.toNat) * cfg.regularOpCost = 16 * cfg.regularOpCost + cost927 len.toNat * cfg.regularOpCost :=
+    Nat.add_mul _ _ _
+  ihave SO := AllocNewCell.memBytes_addr (show sp.toNat - 112 + 80 = (sp - 32).toNat by omega) $$ SO
+  mstep [Hg]; mstep; mstep; mstep; mstep [Hg]
+  mstep; mstep; mstep
+  mcall (FromUtf8Gen.f927_spec cfg (lim := lim) (d + 1) types[31]! (by rfl) inst mi n hn Cg (sp - 32) p len so
+    ((ibs.drop a).take len.toNat) hso (by omega) (by simp; omega) (by omega)) using [SO Bs Ht]
+  · iframe SO Bs Ht
+  rw [hK3]
+  clear hK2 hK3
+  generalize cost927 len.toNat * cfg.regularOpCost = K
+  mcredits (36 * cfg.regularOpCost + (E + R))
+  icases HQ with ⟨%hrs, Bs, Hres, Ht⟩
+  subst hrs
+  iunfold res927 at Hres
+  rw [hbad]
+  simp only [Bool.false_eq_true, ite_false]
+  icases Hres with ⟨%eb, %heb, R0, R4⟩
+  mstep; mstep
+  mstep; mstep [R0] with (simp [UInt32.toNat_add]; omega)
+  mstep; mstep
+  mstep
+  mstep; mstep
+  mstep [SC0] with (simp [UInt32.toNat_add]; omega)
+  mstep; mstep; mstep; mstep; mstep
+  ihave Bs := AllocNewCell.memBytes_addr (show p.toNat = ptr.toNat + a by omega) $$ Bs
+  ihave Bx := U128From.memBytes_join n (ptr.toNat + a) len.toNat ((ibs.drop a).take len.toNat)
+    ((ibs.drop a).drop len.toNat) (by simp; omega) $$ [Bs B2]
+  · iframe Bs B2
+  rw [List.take_append_drop]
+  ihave Hb := U128From.memBytes_join n ptr.toNat a (ibs.take a) (ibs.drop a) (by simp; omega) $$ [B0 Bx]
+  · iframe B0 Bx
+  rw [List.take_append_drop]
+  ihave C := U128From.memBytes_join n (sp.toNat - 112 + 80 + 12 + 4) 4 (bytes32 14) sc8 (by simp) $$ [SC0 SC8]
+  · iframe SC0 SC8
+  ihave C := AllocNewCell.memBytes_addr (show sp.toNat - 112 + 80 + 12 + 4 = (sp - 32 + 16).toNat by
+    rw [UInt32.toNat_add, h32]; simp; omega) $$ C
+  ihave S80 := stk_addr (show sp.toNat - 112 = (sp - 32).toNat - 80 by omega) $$ S80
+  have key := f647_spec (GF := GF) cfg lim (d + 1) types[31]! (by rfl) inst mi A n g ta hm (by omega) Cg gt
+    (sp - 32) out de (sp - 32 + 16) ptr idx ob (bytes32 14 ++ sc8) ibs i maxP mlen live F hob hout (by simp; omega)
+    (by rw [UInt32.toNat_add, h32]; simp; omega) hde hi hlen hptr (by omega) hr
+  rw [← f657_eq, hE] at key
+  unfold errCode at key
+  mcall key using [Hg S80 Hvt Hinv Ho C D0 D4 D8 Hb]
+  · iframe Hg S80 Hvt Hinv Ho C
+    iunfold rd, sliceRead
+    iframe D0 D4 D8 Hb
+  clear key
+  mcredits (11 * cfg.regularOpCost + R)
+  icases HQ with ⟨%hrs, %q, %hq, Hg, S80, Hvt, HA, O0, O4, C, Hrd⟩
+  subst hrs
+  mstep
+  mstep; mstep; mstep; mstep [Hg]
+  rw [show sp - 32 + 32 = sp by simp]
+  repeat mstep
+  isplitl [Hc]
+  · iapply BorrowMut.credits_le
+    iframe Hc
+    ipureintro; omega
+  isplitr
+  · ipureintro; trivial
+  iexists q
+  isplitr
+  · ipureintro; exact hq
+  iframe Hg Hvt HA O0 O4 Hrd Ht
+  ihave R0 := stk_word n _ _ $$ R0
+  ihave R4 := stk_intro n _ _ $$ R4
+  rw [heb]
+  ihave SO := stk_join n (sp - 32).toNat 4 8 $$ [R0 R4]
+  · iframe R0 R4
+  ihave SO := stk_addr (show (sp - 32).toNat = sp.toNat - 112 + 80 by omega) $$ SO
+  ihave J1 := stk_join n (sp.toNat - 112 + 80) 12 4 $$ [SO S4]
+  · iframe SO S4
+  ihave C := stk_intro n _ _ $$ C
+  ihave C := stk_addr (show (sp - 32 + 16).toNat = sp.toNat - 112 + 80 + 16 by
+    rw [UInt32.toNat_add, h32]; simp; omega) $$ C
+  rw [show (bytes32 14 ++ sc8).length = 12 by simp; omega]
+  ihave J2 := stk_join n (sp.toNat - 112 + 80) 16 12 $$ [J1 C]
+  · iframe J1 C
+  ihave S4' := stk_addr (show sp.toNat - 112 + 80 + 12 + 4 + 4 + 8 = sp.toNat - 112 + 80 + 28 by omega) $$ S4'
+  ihave J3 := stk_join n (sp.toNat - 112 + 80) 28 4 $$ [J2 S4']
+  · iframe J2 S4'
+  ihave S80 := stk_addr (show (sp - 32).toNat - 80 = sp.toNat - 112 by omega) $$ S80
+  iapply stk_join n (sp.toNat - 112) 80 32
+  iframe S80 J3
+
+end L648
 
 end WNear.Binary.SerdeErrBox
