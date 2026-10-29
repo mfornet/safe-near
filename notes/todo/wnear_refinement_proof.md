@@ -797,6 +797,10 @@ callees not proved yet as hypotheses:
   * Cost `costObj`: `(400 + 96·w)·c`, `objCost` (per member `(1200 + 96·(keyWs + w) + cost194)·c`
     plus `K646` and `K169`/`K81`; `(300 + 96·w)·c` at the `}`), and `300·c`. Stack 336; `sp` 8-aligned.
 * `key_iff`: the visitor's byte test is the model's key test (through `fromUTF8_toUTF8`).
+* `Input::deserialize` (78), `SerdeStruct78.lean`: `structDe_cases` splits what `structDe` accepts into
+  the two forms, and `f78_acc` is 78 on any input `structDe` accepts (`Ok(a)`, the reader past the
+  struct), at `40·c + costS` (`costObj` plus the array form's `costArr`, a bound). Extra pure
+  hypothesis: `dv [] = none`.
 
 *Restrictions and findings of this round.*
 
@@ -818,9 +822,11 @@ callees not proved yet as hypotheses:
 
 *What is left for `FromTraitContract`.*
 
-* 78 (`Input::deserialize`, a call of 228) and 66: 634, 228 (`f228_arr` or `f228_obj`, by
-  `structDe`'s first byte), 320, the drop of the scratch (68, a no-op at capacity 0), and the
-  restated contract with the parameters `Hyp646`, `Hyp169`, `Hyp81`; then `f65_contract`.
+* 66: 634, 78 (`f78_acc`), 320 (`f320_spec` at the reader past the struct: `endOk`), the drop of the
+  scratch (68 at capacity 0: `DropVec.f68_spec` covers only `c ≠ 0`, so 747/777 at capacity 0 are
+  needed), and the restated contract with the parameters `Hyp646`, `Hyp169`, `Hyp81`; then
+  `f65_contract`. The pure side is ready: `decode_balanceOf` turns `Call.decode` into `fromSlice`,
+  which is `structDe` then `endOk`.
 * The pure suffix lemmas (`stringBody`, `valueR` through `Agrees`) for `hstrs`, `hdvs`, `higns`.
 * The linear bound `costObj`, `costArr` `≤ K0 + K1·len` from linear bounds on `K646`, `K169`, `K81`.
 * The rejecting half: 340, 165, 166, 177, 326, 92 and the error paths of 193/214/228, with a loose

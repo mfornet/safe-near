@@ -53,7 +53,7 @@ grammar function.
 | 65 | 13 | `from_slice`: `SliceRead::new` (644), then 66 | proved from any spec of 66 (`ArgsLeaves.f65_of_66`) |
 | 66 | 114 | `from_trait`: 634, `deserialize_struct` (78 → 228), `end` (320), drop the scratch (68) | stated (`FromSliceSpec.FromTraitContract`); its pure side proved: `SerdeStructModel.decode_balanceOf` |
 | 634 | 23 | `Deserializer::new` | proved (`f634_spec`) |
-| 78 | 7 | `Input::deserialize`, which calls 228 | |
+| 78 | 7 | `Input::deserialize`, which calls 228 | accepting run proved from hypotheses on 646, 169, 81 (`SerdeStruct78.f78_acc`) |
 | 320 | 41 | `end`: `parse_whitespace`, then `Some(_)` gives `TrailingCharacters` (322) | proved (`SerdeEnds.f320_spec`) |
 | 68 | 4 | drop the scratch `Vec<u8>` (747/777/311) | proved (`DropVec`) |
 
