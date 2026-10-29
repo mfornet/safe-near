@@ -1148,8 +1148,15 @@ round).* Proved, no `sorry`, standard axioms only:
      capacity-sensitive push charge. The loop uses them with a 300-op segment reserve.
      `ParseStrSuccess.f646_success_fit` (`ParseStrFit.lean`) now meets 470 ops per consumed byte, including
      all append and UTF-8 work, when scratch capacity covers the unread input.
-     Left: extend this bound to runs that allocate or grow the scratch, connect
-     the append trace and bound allocator/free-list work. Then integrate
+     `StrGrowthTrace` now connects the actual append sequence to copy, capacity,
+     page and logarithmic growth-count bounds. `ParseStrSuccess.f646_success_growth` (`ParseStrGrowth.lean`)
+     exposes the full call with the remaining closed `growthBudget` (initial free-list
+     bound, growth count, copies and memory-growth fees). Borrowed strings no longer
+     reserve a nonexistent terminal scratch append.
+     Left: absorb this budget into the method allowance using the reachable heap
+     invariant. Generalize the old heap-preserving struct-reader hypotheses for
+     changing scratch state; do not assume a uniform bound for arbitrary initial
+     free lists. Then integrate
      `deserialize_str` (380) and `ValidAccountId::deserialize` (169) on escaped input
      (they still use `f646_spec_noesc`).
 

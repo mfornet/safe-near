@@ -310,6 +310,54 @@ continuation is published to PR #40 after its validation gates pass.
   LSP verifies `ParseStrSuccess.f646_success_fit` with the standard three axioms.
   Evidence: `/tmp/pr40-fast-fit-final-audit.log` and `/tmp/pr40-fast-fit-style.log`.
 
+## Concrete allocation and growth accounting
+
+- `baseAppend` in `StrSuccessCost` now charges a plain-byte append only at an
+  escape or at the end of a copied string. The borrowed terminal path does not
+  append, so its cost and trace no longer reserve an unused allocation. The
+  actual loop proof and both previous cost bounds are repaired and checked.
+- `ScratchGrowthTrace` follows `capAfter` and `fAfter` for each append. After `G`
+  growths the allocator bound is exactly `F + 2*G`; summed walk bounds satisfy
+  `walkBounds + G = F*G + G*G`. `extraCost` includes only growing reserves,
+  retaining all allocator walks and memory-growth fees.
+- `StrGrowthTrace.appendChunks` follows the actual plain/escape appends; borrowed
+  strings have none. `appendChunks_valid` proves the trace arithmetic and final
+  capacity/used-length bounds. All requested capacities total at most `4*N + 16`
+  bytes; reallocation copies cost at most `48*N + 192` regular operations, with
+  `N` the decoded byte length. Page charges are at most
+  `(4*N + 16 + 66066*G) / 65536`. The growth-count certificate is
+  `G = 0` or `8*2^(G-1) ≤ 2*N + 8`.
+- `growthBudget cfg F G N` is zero when `G = 0`. Otherwise it is
+  `(1790*G + 320*(F*G + G*G - G) + 36*N + 144)*regularOpCost`, plus
+  `G*linearOpBaseCost` and the page-bound times `linearOpUnitCost`.
+  `ParseStrSuccess.f646_success_growth` (`ParseStrGrowth.lean`) exposes the full
+  successful binary call at `(500 + 470*consumed)*regularOpCost + growthBudget`,
+  with the same borrowed/copied result, restored stack, and no capacity premise
+  requiring the input to fit. Its existing `roomRun` and binary bounds remain
+  explicit. LSP verifies this theorem and the growth-count certificate with the
+  standard three axioms.
+- **Still required:** absorb this explicit growth budget into the unchanged
+  method allowance using the reachable parser heap/scratch invariant, and
+  integrate 380/169 and the struct readers. `Hyp646` currently preserves heap
+  length/free-list bounds and its borrowed-key instance is not a state-changing
+  growth contract. Strengthen `resStr` to expose final capacity/free-list bounds
+  from the trace (it currently hides these behind existentials), then carry
+  changing scratch/heap state through the 193/228 integration. Also audit the
+  borrowed-key consumer's 160-byte callee frame and `d + 16` premise against the
+  general proof's 192-byte frame and `d + 30` premise.
+  Do not assume a cost uniform in arbitrary initial `F`, or silently frame an
+  unchanged heap through growth. Existing escape-free instances remain valid.
+  General rejection and deeper ignored values are still open. This does not
+  complete a seventh method refinement.
+
+- Validation: `just wnear-audit` passes (2777 build jobs; 443 wNEAR modules,
+  61554 declarations and 56309 theorems), with only the three existing
+  open-refinement dependencies. Strict NearLogic has zero violations; statement
+  pins, PR-wide Lean style and whitespace checks pass. The callable growth
+  theorem and power certificate pass LSP axiom verification with the standard
+  three axioms. Evidence: `/tmp/pr40-growth-accounting-final-audit.log` and
+  `/tmp/pr40-growth-accounting-style.log`.
+
 ## Methods
 
 There are 15 exported methods; six now have complete per-call refinement proofs under their protocol premises.
@@ -382,9 +430,11 @@ The texts are proved equal to the model's `Panic.message` (`PanicText`).
 1. **The parser, finishing `ft_balance_of`'s argument contract.**
    1. `RejectContract`. A loose cost suffices. Use `fromSlice_eq` and the reject paths listed in M6. The outer struct-error and trailing-character paths are proved; 228's EOF case is discharged through 65. Finish the other 228 error cases, and integrate the general string/ignored-value readers.
    2. Escapes in the accepting half:
-      - extend the fitting 470-ops-per-byte string contract to runs that allocate
-        or grow the scratch; connect its append sequence to `ScratchAmortized`
-        and bound allocator/free-list work within the existing allowance;
+      - absorb `growthBudget` into the unchanged allowance under the reachable
+        heap/scratch invariant; use the concrete append trace and its logarithmic
+        growth-count, copy and page bounds;
+      - generalize the struct-reader hypotheses to carry changing scratch/heap
+        state instead of reusing the borrowed-key `Hyp646` unchanged;
       - keep the all-outcome `costRun` separate: it has a proved quadratic lower
         bound even on accepted newline escapes (`StrCostLower`);
       - 380 and 169 with the copied result;

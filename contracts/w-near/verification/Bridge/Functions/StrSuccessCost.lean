@@ -20,10 +20,18 @@ open WNear.Binary.FromUtf8 (cost927)
 def costEsc (cfg : WasmConfig) (F : Nat) (cap : UInt32) (acc rest : List UInt8) (_L : Nat) : Nat :=
   ParseEscapeFast.cost649 cfg F cap acc rest
 
+/-- Plain bytes are appended at an escape, or at the end of a copied string.
+A borrowed string's terminal segment never calls the scratch append. -/
+def baseAppend (cfg : WasmConfig) (F : Nat) (cap : UInt32) (acc l : List UInt8) : Nat :=
+  if (l.dropWhile plain).head? = some 0x5C then
+    ScratchFast.extCost cfg F cap (UInt32.ofNat acc.length) (UInt32.ofNat (l.takeWhile plain).length)
+  else if acc = [] then 0
+  else ScratchFast.extCost cfg F cap (UInt32.ofNat acc.length) (UInt32.ofNat (l.takeWhile plain).length)
+
 /-- One scan and plain-byte append, with validation only at the final segment. -/
 def costBase (cfg : WasmConfig) (F : Nat) (cap : UInt32) (acc l : List UInt8) (_L : Nat) : Nat :=
   (300 + 30 * (l.takeWhile plain).length) * cfg.regularOpCost +
-    ScratchFast.extCost cfg F cap (UInt32.ofNat acc.length) (UInt32.ofNat (l.takeWhile plain).length) +
+    baseAppend cfg F cap acc l +
     if (l.dropWhile plain).head? = some 0x5C then 0
     else cost927 (acc.length + (l.takeWhile plain).length) * cfg.regularOpCost
 
@@ -112,15 +120,16 @@ theorem costBase_esc (cfg : WasmConfig) (F : Nat) (cap : UInt32) (acc l rest : L
     (h : l.dropWhile plain = 0x5C :: rest) :
     costBase cfg F cap acc l L = (300 + 30 * (l.takeWhile plain).length) * cfg.regularOpCost +
       ScratchFast.extCost cfg F cap (UInt32.ofNat acc.length) (UInt32.ofNat (l.takeWhile plain).length) := by
-  simp [costBase, h]
+  simp [costBase, baseAppend, h]
 
 /-- At a closing quote validation is charged exactly once, on the decoded bytes. -/
 theorem costBase_close (cfg : WasmConfig) (F : Nat) (cap : UInt32) (acc l rest : List UInt8) (L : Nat)
     (h : l.dropWhile plain = 0x22 :: rest) :
     costBase cfg F cap acc l L =
       (300 + 30 * (l.takeWhile plain).length + cost927 (acc.length + (l.takeWhile plain).length)) * cfg.regularOpCost +
-      ScratchFast.extCost cfg F cap (UInt32.ofNat acc.length) (UInt32.ofNat (l.takeWhile plain).length) := by
-  simp [costBase, h, Nat.add_mul]
+      (if acc = [] then 0 else
+        ScratchFast.extCost cfg F cap (UInt32.ofNat acc.length) (UInt32.ofNat (l.takeWhile plain).length)) := by
+  simp [costBase, baseAppend, h, Nat.add_mul]
   omega
 
 end WNear.Binary.ParseStrSuccess

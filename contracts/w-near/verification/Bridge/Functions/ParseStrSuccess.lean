@@ -523,7 +523,7 @@ theorem f646_success (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : Fun
               obtain ⟨hji, hp, hcap', hhl', hF'⟩ := hacc0 hae
               subst hp hcap' hhl' hF' hae hji
               have hbor : borrowed (bs.drop j) := by unfold borrowed; rw [htail, htx]; rfl
-              simp only [List.length_nil, List.nil_append, Nat.zero_add] at hres hcb hcr ⊢
+              simp only [List.length_nil, List.nil_append, Nat.zero_add, ite_true, Nat.add_zero] at hres hcb hcr ⊢
               brn rfl
               mstep; mstep; mstep; mstep; mstep; mstep
               mcall (f583_spec cfg (lim := lim) (d + 1) types[36]! (by rfl) inst mi n hn Cg (sp - 48) (UInt32.ofNat j)
@@ -652,6 +652,7 @@ theorem f646_success (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : Fun
                 have hgood : Utf8.utf8Ok body = true := by rw [heq.1]; exact hvalidUtf
                 exact False.elim (hutf hgood)
             · -- the scratch holds the escapes' bytes: append the rest, `Ok(Copied)`
+              simp only [if_neg hae] at hcb
               have hji : j ≠ i := fun e => hae (hj0 e)
               have hnb := hjb hji
               have hal : 0 < acc.length := List.length_pos_iff.mpr hae

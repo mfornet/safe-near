@@ -12,7 +12,7 @@ open WNear.Binary.FromUtf8 (cost927)
 
 /-- The exact charge for appending a segment's plain bytes. -/
 def appendBase (cfg : WasmConfig) (F : Nat) (cap : UInt32) (acc l : List UInt8) (_L : Nat) : Nat :=
-  ScratchFast.extCost cfg F cap (UInt32.ofNat acc.length) (UInt32.ofNat (l.takeWhile plain).length)
+  baseAppend cfg F cap acc l
 
 /-- The exact charge for appending one decoded escape. -/
 def appendEsc (cfg : WasmConfig) (F : Nat) (cap : UInt32) (acc l : List UInt8) (_L : Nat) : Nat :=
@@ -111,7 +111,7 @@ theorem costRun_linear_work (cfg : WasmConfig) (F : Nat) (cap : UInt32)
         have hnosc : ∀ r, l.dropWhile plain ≠ 0x5C :: r := by intro r; rw [hd]; simp
         rw [costRun_stop cfg F cap acc l L hnosc, costBase_close cfg F cap acc l tail L hd,
           appendCost_stop cfg F cap acc l L hnosc]
-        unfold appendBase
+        simp only [appendBase, baseAppend, hd, List.head?_cons, show (0x22 : UInt8) ≠ 0x5C by decide, ite_false]
         have hop : 300 + 30 * (l.takeWhile plain).length + cost927 (acc.length + (l.takeWhile plain).length) ≤
             400 + 450 * (l.length - tail.length) + 100 * acc.length := by
           unfold cost927
@@ -150,7 +150,7 @@ theorem costRun_linear_work (cfg : WasmConfig) (F : Nat) (cap : UInt32)
               costBase_esc cfg F cap acc l tail L hd, he,
               appendCost_esc cfg F cap acc l tail L hd, he]
             unfold costEsc appendBase appendEsc
-            simp only [escK, he]
+            simp only [baseAppend, hd, List.head?_cons, ite_true, escK, he]
             have hprod := Nat.mul_le_mul_right cfg.regularOpCost hop
             simp only [Nat.add_mul] at hprod
             have hrec' := hrec.2

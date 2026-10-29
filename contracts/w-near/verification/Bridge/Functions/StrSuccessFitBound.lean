@@ -121,7 +121,8 @@ theorem costRun_fit (cfg : WasmConfig) (F : Nat) (cap : UInt32) (acc l bytes res
           unfold cost927
           omega
         have hm := Nat.mul_le_mul_right cfg.regularOpCost hop
-        simpa only [Nat.add_mul, Nat.add_assoc] using hm
+        simp only [Nat.add_mul, Nat.add_assoc] at hm ⊢
+        split_ifs <;> omega
       · simp only [h22, ite_false] at hok
         by_cases h92 : x = 0x5C
         · subst x
