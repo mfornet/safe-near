@@ -8,6 +8,10 @@ import Bridge.Methods.NewPanicsRefines
   and the host calls: `attached_deposit`, `storage_has_key(STATE)`, `storage_usage` twice, the
   write and the removal of the dummy record (with `read_register` of the evicted value) and the
   write of `STATE` (`hostUse`).
+* `hbound_new`: loading and that cost fit the model's bound for `new` on no state: the trie nodes
+  of the three mutations (`2·|k| + 2` each at the dearer node cost; `storage_has_key` bills none at
+  the boundary) within `trieGas` (`NearDepositGas.trie_writes_le`), everything else within
+  `computeGas`. Under v86 the latter is about 0.6 Tgas of the 4 Tgas.
 -/
 
 namespace WNear.Binary.NewGas
