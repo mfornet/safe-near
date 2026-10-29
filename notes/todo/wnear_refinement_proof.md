@@ -1139,8 +1139,13 @@ round).* Proved, no `sorry`, standard axioms only:
      combines the three paths, with instruction cost at most 200 regular operations
      per encoded byte consumed (including the leading backslash), plus the separate
      scratch-growth/copy charge.
-     Left: a success-specific outer-loop cost that
-     charges UTF-8 validation once, and amortized scratch growth. Then integrate
+     `ParseStrSuccess.f646_success` now supplies the successful outer loop, charging
+     UTF-8 validation once. `StrSuccessCostBound` separates linear instruction work
+     from append charges; `ParseStrSuccessBound` exposes the callable bound.
+     `ScratchAmortized.copyOps_linear` bounds all old-buffer reallocation copies.
+     Left: tighten the conservative loop/append constants (the current 550 instruction
+     ops per byte already exceed the target 470), connect the append trace and bound
+     allocator/free-list work. Then integrate
      `deserialize_str` (380) and `ValidAccountId::deserialize` (169) on escaped input
      (they still use `f646_spec_noesc`).
 

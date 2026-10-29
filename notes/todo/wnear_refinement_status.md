@@ -227,9 +227,9 @@ continuation is published to PR #40 after its validation gates pass.
   linear bound for the complete string reader.
 - LSP verifies the surrogate theorem, combined success contract and consumed-byte
   cost bound with only `propext`, `Classical.choice` and `Quot.sound`.
-- Next: a success-specific 646 loop,
-  final UTF-8 validation once, amortized scratch growth, and integration into
-  380/169 and the argument contracts. Full parser rejection remains open too.
+- The next continuation below supplies the successful 646 loop and a copy
+  amortization lemma. The complete accepting gas bound, reader integration and
+  full parser rejection remain open.
 - Validation: `just wnear-audit` passes (2763 build jobs; 429 wNEAR modules,
   59857 declarations and 54713 theorems), with only the three existing
   open-refinement dependencies. Strict NearLogic has zero violations; statement
@@ -242,6 +242,42 @@ continuation is published to PR #40 after its validation gates pass.
   violations; statement pins, PR-wide Lean style and whitespace checks pass.
   Evidence: `/tmp/pr40-surrogate-final-audit.log` and
   `/tmp/pr40-surrogate-style.log`.
+
+## Successful string loop and amortized-copy continuation
+
+- `StrSuccessCost` defines a success-only run cost. It uses the successful escape
+  contracts, reserves no syntax errors, and charges UTF-8 validation only at the
+  closing quote. The existing all-outcome contract and cost are unchanged.
+- `ParseStrSuccess.f646_success` proves the actual 646 loop on every successful
+  UTF-8 run, with arbitrary escapes and the original borrowed/copied `resStr`.
+  It restores the complete 192-byte frame and all reader/scratch resources. It
+  currently retains the existing conservative `roomRun` premise.
+- `StrSuccessCostBound.costRun_linear_work` bounds non-append work by
+  `(600 + 550*consumed + 100*initialAccLength)*regularOpCost`, plus the separate
+  recursive `appendCost`. `ParseStrSuccessBound.f646_success_linear` exposes the
+  corresponding callable contract, including entry/exit work, at
+  `(700 + 550*consumed)*regularOpCost + appendCost` from an empty scratch.
+- `ScratchAmortized` follows the actual `capAfter` updates along arbitrary append
+  lengths. `movedBytes_capacity` telescopes capacity increases; `movedBytes_linear`
+  bounds all old-buffer copies by `2*finalUsed + 8` bytes. `copyOps_linear` includes
+  memcpy's fixed overhead, bounding that component by `48*finalUsed + 192` regular
+  operations. The trace's arithmetic premises are explicit.
+- **The accepting gas allowance is still open.** The conservative instruction
+  constants above already exceed the argument contract's 470 ops per byte, before
+  append charges. Tighten successful fitting reserve/append paths and loop
+  overhead, connect the string's append sequence to the trace bound, and bound
+  allocator/free-list work. Start with 614 when capacity is available and the
+  fitting 613 → 588 → 589 → 623 → 630 chain. Then integrate 380/169 and escaped-key readers. No
+  model gas allowance has been increased, and this is not a seventh method proof.
+
+- Validation: `just wnear-audit` passes (2770 build jobs; 436 wNEAR modules,
+  61095 declarations and 55896 theorems). The only tolerated dependencies on
+  `sorryAx` remain the three existing declarations in `Proofs.Refinement`.
+  Strict NearLogic has zero violations; statement pins, PR-wide Lean style and
+  whitespace checks pass. LSP verifies `f646_success_linear` with the standard
+  three axioms and `copyOps_linear` with only `propext` and `Quot.sound`.
+  Evidence: `/tmp/pr40-str-success-final-audit.log` and
+  `/tmp/pr40-str-success-style.log`.
 
 ## Methods
 
@@ -315,9 +351,11 @@ The texts are proved equal to the model's `Panic.message` (`PanicText`).
 1. **The parser, finishing `ft_balance_of`'s argument contract.**
    1. `RejectContract`. A loose cost suffices. Use `fromSlice_eq` and the reject paths listed in M6. The outer struct-error and trailing-character paths are proved; 228's EOF case is discharged through 65. Finish the other 228 error cases, and integrate the general string/ignored-value readers.
    2. Escapes in the accepting half:
-      - a success-specific string cost and amortized scratch-growth bound:
-        the existing all-outcome `costRun` has a proved quadratic lower bound
-        even on accepted newline escapes (`StrCostLower`);
+      - tighten the success-only loop and fitting append/reserve constants to fit
+        the existing 470-ops-per-byte allowance; connect its append sequence to
+        `ScratchAmortized` and bound allocator/free-list work;
+      - keep the all-outcome `costRun` separate: it has a proved quadratic lower
+        bound even on accepted newline escapes (`StrCostLower`);
       - 380 and 169 with the copied result;
       - `Hyp646` for escaped keys;
       - 652 (`ignore_escape`).
