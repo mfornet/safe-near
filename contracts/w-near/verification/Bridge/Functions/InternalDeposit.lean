@@ -92,7 +92,7 @@ theorem f405_some (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
     (hlink : h.storage (pre ++ (bytes32 L ++ key)) =
       viewVal st (contractKey h.context.currentAccountId (pre ++ (bytes32 L ++ key))))
     (hproof : ProofBudget h st bud)
-    (hbud : lookupProofBound (contractKey h.context.currentAccountId (pre ++ (bytes32 L ++ key))) ≤ bud)
+    (hbud : readProofCost (contractKey h.context.currentAccountId (pre ++ (bytes32 L ++ key))) (h.storage (pre ++ (bytes32 L ++ key))) ≤ bud)
     (hreg : withinLimit h.config.maxRegisterLen 16 = true)
     (hsome : h.storage (pre ++ (bytes32 L ++ key)) = some (b0 ++ b1)) :
     code405 e n maxP inst mi A mx
@@ -401,7 +401,7 @@ theorem f406_ok (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType
   have hsome' : h.storage (pre ++ (bytes32 L ++ key)) = some (storeBytes (.i64 x0) 8 ++ storeBytes (.i64 x1) 8) := hsome
   mcall (S405 bb (by omega) (by omega) hbb (by simp [UInt32.toNat_add, h80]; omega) (by omega) hpre hkey
       (by simp) (by simp) hL hpl hl0 hpp hv hp (heapRoom_mono hroom (by omega)) h st hacc hlim hcanon.1 hcanon.2 (hlink _) hproof
-      (by unfold readProofCost writeProofCost at hbud; omega) hreg hsome')
+      (by omega) hreg hsome')
       using [Hg Lo HI Hvt Hinv Hm Hp Hv Hkey B Hhost] with (rw [hK405]; mstep_norm_full; omega)
   · iunfold pre405
     ihave Lo := stk_addr (show s.toNat - 480 = (s - 80).toNat - 400 by omega) $$ Lo
