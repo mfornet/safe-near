@@ -1,0 +1,540 @@
+import Bridge.Methods.StaticsDeposit
+import Bridge.Methods.Panics
+import Bridge.Methods.FtTotalSupplyNoneRun
+
+/-!
+# `near_deposit` (234): the runs
+
+* `startResDep`: the start's resources: `code234`, the panics' code, `PanicOnDefault`'s code, 912
+  bytes of stack, `statics234` with `dAll`, `PanicOnDefault`'s message.
+* `DepOk x e S st reg`: what 234 needs of the host on an initialized contract with state `S` and
+  the predecessor's balance entry `reg` (`body234`'s premises, the proof budget `budDep`);
+  `caseDep e S reg`: the outcome 232 takes.
+* `dep_runs`: `MethodRunsR` when the outcome is `ok` (`postDepOk`: `Post234`);
+  `dep_panics`: `MethodPanicsR` for any other outcome `c` (`postDepP c`: the host panicked with
+  `c.text`, the rest kept);
+* `dep_panics_none`: `MethodPanicsR` on an uninitialized contract (`FtTotalSupplyMethod.preNone`,
+  `postNone`).
+-/
+
+namespace WNear.Binary.NearDepositMethod
+
+open Wasm Wasm.Near WasmLogic NearLogic Iris Iris.BI Iris.ProgramLogic Iris.Std
+open Iris.ProgramLogic.Language.Notation
+open WNear.Binary.InitialState WNear.Binary.DepositBody WNear.Binary.DepositBody234
+open WNear.Binary.FtTotalSupplyMethod (g0_pt mhostPt_erase runInitialized_finished runInitialized_err
+  done_of_values trap_of_ending preNone postNone endCellsNone endCellsNone_ends notInitMsg)
+open WNear.Binary.VecFromElem (stk)
+open WNear.Binary.PanicStr (panicked notInit)
+open WNear.Binary.NewBody (keep Keep)
+open WNear.Binary.DepositPanicsFull (dAll codePanics kPos kSmall kSup)
+open Near.TrieAccounting Near.TrieConstruction Near.TrieOverlay
+open WNear.Binary.FtTotalSupply (loOf hiOf)
+
+/-! ## The start's resources -/
+
+section Res
+
+variable {GF : BundledGFunctors} [WasmGS NearState GF]
+
+set_option maxRecDepth 100000 in
+theorem startResDep_gen {m : Memory} {L : Nat} (hm : MemImage m L) (hL : 1074944 ≤ L) (cfg : RuntimeConfig)
+    (h : NearState) :
+    ((Loc.inst 0 ↦ₛ (.inst wInst : Cell NearState) ∗ Loc.memLimit 0 ↦ₛ (.memLimit (some 2048) : Cell NearState) ∗
+        0 ↦[wmlength] memLen ∗ 0 ↦[wg] g0 ∗ mhostPt h ∗ gasPt h.gas h.gasProfile h.actionProfile) ∗
+      ([∗list] p ∈ tabCells, p.1 ↦ₛ p.2) ∗ ([∗list] p ∈ funcCells cfg h, p.1 ↦ₛ p.2) ∗ memR m 0 0 L : IProp GF)
+    ⊢ |==> (code234 cfg.fees.numExtraBytesRecord 0 wInst id 0 2048 (some 2048) ∗
+        codePanics cfg.fees.numExtraBytesRecord 0 wInst id 0 2048 (some 2048) ∗
+        FtTotalSupply.codeP cfg.fees.numExtraBytesRecord 0 wInst id ∗ 0 ↪[inst] wInst ∗ 0 ↦[wg] g0 ∗
+        mhostPt h ∗ gasPt h.gas h.gasProfile h.actionProfile ∗ stk 0 1047664 912 ∗
+        statics234 0 0 id 0 0 0 (dAll 0 0 id) 123 2048 memLen ∗ 0 ↦[wms][ 1050868 ] notInit) := by
+  iintro ⟨⟨Hi, Hm, HL, Hg, Hh, Hgas⟩, HT, HF, HM⟩
+  imod pointsTo_persist _ _ $$ Hi with #Hi
+  imod pointsTo_persist _ _ $$ Hm with #Hm
+  imod persistList _ $$ HF with #HF
+  ihave HT := tableOfDep $$ HT
+  ihave HS := staticsResDep hm hL 0 0 memLen (by decide) (by decide) (by decide) $$ [HM HL HT]
+  · iframe HM HL HT
+    iunfold memLimit
+    iexact Hm
+  icases HS with ⟨Stk, HS, HN⟩
+  ihave #Hk := codeDep_of cfg h $$ []
+  · iframe HF
+    isplitl []
+    · iunfold instPt; iexact Hi
+    · iunfold memLimit; iexact Hm
+  icases Hk with ⟨#K1, #K2, #K3⟩
+  imodintro
+  iframe K1 K2 K3 Hg Hh Hgas Stk HS HN
+  iunfold instPt
+  iexact Hi
+
+theorem startResDep (cfg : RuntimeConfig) (h : NearState) :
+    ownCells (GF := GF) (mheapOf ⟨wStore cfg h⟩) ⊢
+      |==> (code234 cfg.fees.numExtraBytesRecord 0 wInst id 0 2048 (some 2048) ∗
+        codePanics cfg.fees.numExtraBytesRecord 0 wInst id 0 2048 (some 2048) ∗
+        FtTotalSupply.codeP cfg.fees.numExtraBytesRecord 0 wInst id ∗ 0 ↪[inst] wInst ∗ 0 ↦[wg] g0 ∗
+        mhostPt h ∗ gasPt h.gas h.gasProfile h.actionProfile ∗ stk 0 1047664 912 ∗
+        statics234 0 0 id 0 0 0 (dAll 0 0 id) 123 2048 memLen ∗ 0 ↦[wms][ 1050868 ] notInit) :=
+  (startCells cfg h).trans ((startSplit cfg h).trans (startResDep_gen wDataMem_image (by decide) cfg h))
+
+end Res
+
+/-! ## The entry -/
+
+theorem f234_frame : funcs[234 - 48]! = f234 := by kernel_rfl
+
+theorem startW_thread (cfg : RuntimeConfig) (h : NearState) :
+    (startW cfg h 234).thread = entryThread ⟨#[.i32 0], 0, wInst⟩ 0 f234.body := by
+  simp only [startW, wFrame, f234_frame, entryThread]
+  rfl
+
+theorem entryCost_234 (cfg : RuntimeConfig) (h : NearState) :
+    entryCost cfg.wasm (.next (startW cfg h 234)) = 9 * cfg.wasm.regularOpCost := by
+  have ht := startW_thread cfg h
+  simp only [entryCost, Config.locals, ht, entryThread, activationGas]
+  simp [ValType.default]
+
+set_option maxRecDepth 100000 in
+theorem funcType_234 : wNearModule.funcType? 234 = some { params := [], results := [] } := by kernel_rfl
+
+theorem export_234 : wNearModule.exportFunc? "near_deposit" = some 234 := by decide
+
+theorem heapRoom_memLen : LookupMapOps.HeapRoomK 25 memLen 2048 := by
+  unfold LookupMapOps.HeapRoomK memLen; omega
+
+/-! ## What the initialized paths need -/
+
+/-- The recorded proof's room 234 needs: `state_read`, 232's account lookups, `state_write`. -/
+def budDep (e : NearState) : Nat :=
+  (lookupProofBound (contractKey e.context.currentAccountId StateRead.stateKey) + 29) +
+    (4 * lookupProofBound (contractKey e.context.currentAccountId (keyOf e)) + 48) +
+    (lookupProofBound (contractKey e.context.currentAccountId StateRead.stateKey) + 29)
+
+/-- **What 234 needs of the host** `e` on an initialized contract with state `S`, the trie `st` and
+the predecessor's balance entry `reg`: `body234`'s premises. -/
+structure DepOk (e : NearState) (S : WNear.State) (st : Near.TrieOverlay.State) (reg : Option (UInt64 × UInt64)) :
+    Prop where
+  value : e.storage WNear.stateKey = some (WNear.header S)
+  view : e.context.isView = false
+  acc : e.storageAccounting = some st
+  canon : Canon st
+  link : StorageLink e st
+  proof : ProofBudget e st (budDep e)
+  lim5 : withinLimit e.config.maxStorageKeyLen 5 = true
+  reg29 : withinLimit e.config.maxRegisterLen 29 = true
+  vlim29 : withinLimit e.config.maxStorageValueLen 29 = true
+  valid : e.config.validAccountId e.context.predecessorAccountId = true
+  limR : withinLimit e.config.maxRegisterLen e.context.predecessorAccountId.length = true
+  utf : Utf8.utf8Ok e.context.predecessorAccountId = true
+  ab : e.context.predecessorAccountId.length ≤ 64
+  ab0 : 0 < e.context.predecessorAccountId.length
+  lim : withinLimit e.config.maxStorageKeyLen (keyOf e).length = true
+  vlim : withinLimit e.config.maxStorageValueLen 16 = true
+  reg16 : withinLimit e.config.maxRegisterLen 16 = true
+  store : e.storage (keyOf e) = reg.map fun p => storeBytes (.i64 p.1) 8 ++ storeBytes (.i64 p.2) 8
+  log : ∀ lo hi : UInt64, LogStr.LogOk e (DepositTail.logText lo hi e.context.predecessorAccountId)
+    (DepositTail.logText lo hi e.context.predecessorAccountId).length
+  fit16 : LogFits e 16
+  ov16 : e.extCosts.cost "read_memory_byte" * 16 < 2 ^ 64
+  fitS : LogFits e InternalDepositOverflow.textSupply.length
+  ovS : e.extCosts.cost "read_memory_byte" * InternalDepositOverflow.textSupply.length < 2 ^ 64
+  fitT : LogFits e NearDepositPanics.textTooSmall.length
+  ovT : e.extCosts.cost "read_memory_byte" * NearDepositPanics.textTooSmall.length < 2 ^ 64
+  fitP : LogFits e NearDepositPanics.textPositive.length
+  ovP : e.extCosts.cost "read_memory_byte" * NearDepositPanics.textPositive.length < 2 ^ 64
+
+/-- The outcome 232 takes. -/
+def caseDep (e : NearState) (S : WNear.State) (reg : Option (UInt64 × UInt64)) : DCase :=
+  case232 e reg (WNear.Borsh.u64 S.accountStorageUsage) ((loOf S).toNat + 2 ^ 64 * (hiOf S).toNat)
+
+/-- The body's cost, the panics' costs instantiated. -/
+noncomputable def costB (cfg : WasmConfig) (e : NearState) (S : WNear.State) (reg : Option (UInt64 × UInt64)) :
+    Nat :=
+  cost234 cfg e S reg (kSup cfg) (kSmall cfg) (kPos cfg)
+
+/-- The precondition on `ok`. -/
+def preDepOk (S : WNear.State) (reg : Option (UInt64 × UInt64)) (e : NearState) : Prop :=
+  ∃ st, DepOk e S st reg ∧ caseDep e S reg = .ok
+
+/-- The precondition on the outcome `c`. -/
+def preDepP (S : WNear.State) (reg : Option (UInt64 × UInt64)) (c : DCase) (e : NearState) : Prop :=
+  ∃ st, DepOk e S st reg ∧ caseDep e S reg = c
+
+/-- The cost: the entry activation (9) and the body's. -/
+noncomputable def costDep (cfg : RuntimeConfig) (S : WNear.State) (reg : Option (UInt64 × UInt64))
+    (e : NearState) : Nat :=
+  9 * cfg.wasm.regularOpCost + costB cfg.wasm e S reg
+
+/-- What `ok` does to the host: `Post234`. -/
+def postDepOk (x : Nat) (S : WNear.State) (reg : Option (UInt64 × UInt64)) (e e' : NearState) : Prop :=
+  ∃ st h3, e.storageAccounting = some st ∧ Post234 x e st (budDep e) S reg h3 ∧ e' = erase h3
+
+/-- What the outcome `c` does to the host: the panic with `c.text`, the rest of what the costs and
+the boundary read kept. -/
+def postDepP (c : DCase) (e e' : NearState) : Prop :=
+  ∃ hX, keep hX = keep e ∧ e' = erase { hX with lastError := some (.guestPanic (utf8String c.text)) }
+
+/-! ## Adequacy on an initialized contract -/
+
+def endCellsOk (Cg x : Nat) (S : WNear.State) (reg : Option (UInt64 × UInt64)) (e : NearState)
+    (cs : List (Loc × Cell NearState)) : Prop :=
+  ∃ (h3 : NearState) (g : Near.GasCounter) (p : Near.GasProfile) (a : List (String × Nat)),
+    postDepOk x S reg e (erase h3) ∧ cs = [(Loc.host, .host (erase h3)), (gasLoc, gasCellOf g p a)] ∧ g.used ≤ Cg
+
+theorem endCellsOk_ends {Cg x : Nat} {S : WNear.State} {reg : Option (UInt64 × UInt64)} {e : NearState}
+    {σ' : MStore} {cs : List (Loc × Cell NearState)} (hc : endCellsOk Cg x S reg e cs)
+    (hl : ∀ p ∈ cs, mlookup σ' p.1 = some p.2) :
+    postDepOk x S reg e (erase σ'.store.host) ∧ σ'.store.host.gas.used ≤ Cg := by
+  obtain ⟨h3, g, p, a, hq, rfl, hg⟩ := hc
+  have hh := hl _ List.mem_cons_self
+  have hg' := hl _ (List.mem_cons_of_mem _ List.mem_cons_self)
+  simp only [mlookup, show Loc.host ≠ gasLoc by decide, ite_false, ite_true, Option.some.injEq,
+    Cell.host.injEq] at hh hg'
+  obtain ⟨hgg, -, -⟩ := gasCellOf_inj hg'
+  exact ⟨hh ▸ hq, hgg ▸ hg⟩
+
+def endCellsP (Cg : Nat) (c : DCase) (e : NearState) (cs : List (Loc × Cell NearState)) : Prop :=
+  ∃ (h' : NearState) (g : Near.GasCounter) (p : Near.GasProfile) (a : List (String × Nat)),
+    postDepP c e (erase h') ∧ cs = [(Loc.host, .host (erase h')), (gasLoc, gasCellOf g p a)] ∧ g.used ≤ Cg
+
+theorem endCellsP_ends {Cg : Nat} {c : DCase} {e : NearState} {σ' : MStore} {cs : List (Loc × Cell NearState)}
+    (hc : endCellsP Cg c e cs) (hl : ∀ p ∈ cs, mlookup σ' p.1 = some p.2) :
+    postDepP c e (erase σ'.store.host) ∧ σ'.store.host.gas.used ≤ Cg := by
+  obtain ⟨h', g, p, a, hq, rfl, hg⟩ := hc
+  have hh := hl _ List.mem_cons_self
+  have hg' := hl _ (List.mem_cons_of_mem _ List.mem_cons_self)
+  simp only [mlookup, show Loc.host ≠ gasLoc by decide, ite_false, ite_true, Option.some.injEq,
+    Cell.host.injEq] at hh hg'
+  obtain ⟨hgg, -, -⟩ := gasCellOf_inj hg'
+  exact ⟨hh ▸ hq, hgg ▸ hg⟩
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 16000000 in
+/-- **Adequacy of `near_deposit` on an initialized contract, outcome `ok`**. -/
+theorem dep_adequate_ok (cfg : RuntimeConfig) (h : NearState) (S : WNear.State) (st : Near.TrieOverlay.State)
+    (reg : Option (UInt64 × UInt64)) (hpre : DepOk (erase h) S st reg) (hok : caseDep (erase h) S reg = .ok)
+    (Cg : Nat) (hgas : h.gas.used + costB cfg.wasm (erase h) S reg ≤ Cg) (hC1 : Cg ≤ h.gas.maxBurnt)
+    (hC2 : Cg ≤ h.gas.prepaid) :
+    adequate .MaybeStuck (MCode.running cfg.wasm execLimits (entryThread ⟨#[.i32 0], 0, wInst⟩ 0 f234.body))
+      ⟨wStore cfg h⟩
+      (fun v σ' => v = .values [] ∧ ∃ cs, endCellsOk Cg cfg.fees.numExtraBytesRecord S reg (erase h) cs ∧
+        ∀ p ∈ cs, mlookup σ' p.1 = some p.2) := by
+  apply mwp_adequacy_cells (GF' := WasmLogic.GF NearState) _ _ (fun v => v = .values [])
+    (fun _ cs => endCellsOk Cg cfg.fees.numExtraBytesRecord S reg (erase h) cs)
+  intro _
+  let Ψ : Ending → IProp (WasmLogic.GF NearState) := fun v =>
+    iprop(⌜v = .values []⌝ ∗ mcellsSat (fun cs => endCellsOk Cg cfg.fees.numExtraBytesRecord S reg (erase h) cs))
+  show _ ⊢ WP _ @ _; _ {{ Ψ }}
+  refine (startResDep cfg h).trans ?_
+  iintro H
+  iapply fupd_wp
+  imod H with ⟨#Hk, #HC, -, #Hi, Hg, Hh, Hgas, Stk, HS, -⟩
+  imodintro
+  iapply mwp_entry cfg.wasm execLimits ⟨#[.i32 0], 0, wInst⟩ 0 f234.body Cg Ψ
+  isplitr
+  · iexact Hi
+  ihave Stk := BorshFT.stkA (a := 1047664) (b := (1048576 : UInt32).toNat - (304 + 608)) rfl $$ Stk
+  rw [← mhostPt_erase h]
+  iapply body234 cfg.wasm execLimits 0 cfg.fees.numExtraBytesRecord 0 wInst id 0 0 0 (some 2048)
+    Interface.wInst_ifaceMod 35 (by decide) Cg 0 { type := .num .i32, mutable := true } 1048576 608 (by decide)
+    (by decide) (by decide) (by decide) (by decide) 0 0 123 2048 memLen heapRoom_memLen S (erase h) st
+    (bud := budDep (erase h)) hpre.value hpre.view hpre.acc hpre.canon hpre.link hpre.proof hpre.lim5 hpre.reg29
+    hpre.vlim29 hpre.valid hpre.limR hpre.utf hpre.ab hpre.ab0 hpre.lim hpre.vlim hpre.reg16 le_rfl reg hpre.store
+    hpre.log hpre.fit16 hpre.ov16 hpre.fitS hpre.ovS hpre.fitT hpre.ovT hpre.fitP hpre.ovP
+    (codePanics cfg.fees.numExtraBytesRecord 0 wInst id 0 2048 (some 2048)) 0 (dAll 0 0 id)
+    (kSup cfg.wasm) (kSmall cfg.wasm) (kPos cfg.wasm)
+    (DepositPanicsFull.spec879sup cfg.wasm execLimits 0 wInst cfg.fees.numExtraBytesRecord id 0 0 0 (some 2048)
+      Interface.wInst_ifaceMod _ 0 2048 608 le_rfl)
+    (DepositPanicsFull.spec664small cfg.wasm execLimits 0 wInst cfg.fees.numExtraBytesRecord id 0 0 0 (some 2048)
+      Interface.wInst_ifaceMod _ 0 2048 608 le_rfl)
+    (DepositPanicsFull.spec664pos cfg.wasm execLimits 0 wInst cfg.fees.numExtraBytesRecord id 0 0 0 (some 2048)
+      Interface.wInst_ifaceMod _ 0 2048 608 le_rfl)
+    (entryPost Cg 0 Ψ)
+  iframe Hk HC Stk HS
+  isplitl [Hgas]
+  · iunfold credits
+    iexists h.gas, h.gasProfile, h.actionProfile
+    iframe Hgas
+    ipureintro
+    simp only [costB, Near.GasCounter.used] at hgas ⊢
+    omega
+  isplitl [Hg]
+  · iapply g0_pt $$ Hg
+  isplitl [Hh]
+  · iexact Hh
+  isplitl
+  · iintro %h3 %⟨hpost, -⟩ Hc - Hh
+    simp only [entryPost]
+    isplitr
+    · ipureintro; rfl
+    iexists 0
+    iframe Hc
+    iintro Hc
+    isplitr
+    · ipureintro; rfl
+    iunfold credits at Hc
+    icases Hc with ⟨%g, %p, %a, Hg', %hg⟩
+    iexists [(Loc.host, Cell.host (erase h3)), (gasLoc, gasCellOf g p a)]
+    isplitr
+    · ipureintro
+      exact ⟨⟨h3, g, p, a, ⟨st, h3, hpre.acc, hpost, rfl⟩, rfl, by omega⟩,
+        by simp only [List.map_cons, List.map_nil]; decide⟩
+    iapply BigSepL.bigSepL_cons.2
+    isplitl [Hh]
+    · iunfold mhostPt at Hh
+      iexact Hh
+    iapply BigSepL.bigSepL_cons.2
+    isplitl [Hg']
+    · iunfold gasPt at Hg'
+      iexact Hg'
+    iapply BigSepL.bigSepL_nil.2
+    iempintro
+  · iintro %hX %⟨-, hnok⟩ -
+    iexfalso
+    ipureintro
+    exact hnok hok
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 16000000 in
+/-- **Adequacy of `near_deposit` on an initialized contract, any other outcome `c`**: a trap, the host
+panicked with `c.text`. -/
+theorem dep_adequate_p (cfg : RuntimeConfig) (h : NearState) (S : WNear.State) (st : Near.TrieOverlay.State)
+    (reg : Option (UInt64 × UInt64)) (c : DCase) (hc : c ≠ .ok) (hpre : DepOk (erase h) S st reg)
+    (hcase : caseDep (erase h) S reg = c)
+    (Cg : Nat) (hgas : h.gas.used + costB cfg.wasm (erase h) S reg ≤ Cg) (hC1 : Cg ≤ h.gas.maxBurnt)
+    (hC2 : Cg ≤ h.gas.prepaid) :
+    adequate .MaybeStuck (MCode.running cfg.wasm execLimits (entryThread ⟨#[.i32 0], 0, wInst⟩ 0 f234.body))
+      ⟨wStore cfg h⟩
+      (fun v σ' => (∃ r, v = .trap r) ∧ ∃ cs, endCellsP Cg c (erase h) cs ∧
+        ∀ p ∈ cs, mlookup σ' p.1 = some p.2) := by
+  apply mwp_adequacy_cells (GF' := WasmLogic.GF NearState) _ _ (fun v => ∃ r, v = .trap r)
+    (fun _ cs => endCellsP Cg c (erase h) cs)
+  intro _
+  let Ψ : Ending → IProp (WasmLogic.GF NearState) := fun v =>
+    iprop(⌜∃ r, v = .trap r⌝ ∗ mcellsSat (fun cs => endCellsP Cg c (erase h) cs))
+  show _ ⊢ WP _ @ _; _ {{ Ψ }}
+  refine (startResDep cfg h).trans ?_
+  iintro H
+  iapply fupd_wp
+  imod H with ⟨#Hk, #HC, -, #Hi, Hg, Hh, Hgas, Stk, HS, -⟩
+  imodintro
+  iapply mwp_entry cfg.wasm execLimits ⟨#[.i32 0], 0, wInst⟩ 0 f234.body Cg Ψ
+  isplitr
+  · iexact Hi
+  ihave Stk := BorshFT.stkA (a := 1047664) (b := (1048576 : UInt32).toNat - (304 + 608)) rfl $$ Stk
+  rw [← mhostPt_erase h]
+  iapply body234 cfg.wasm execLimits 0 cfg.fees.numExtraBytesRecord 0 wInst id 0 0 0 (some 2048)
+    Interface.wInst_ifaceMod 35 (by decide) Cg 0 { type := .num .i32, mutable := true } 1048576 608 (by decide)
+    (by decide) (by decide) (by decide) (by decide) 0 0 123 2048 memLen heapRoom_memLen S (erase h) st
+    (bud := budDep (erase h)) hpre.value hpre.view hpre.acc hpre.canon hpre.link hpre.proof hpre.lim5 hpre.reg29
+    hpre.vlim29 hpre.valid hpre.limR hpre.utf hpre.ab hpre.ab0 hpre.lim hpre.vlim hpre.reg16 le_rfl reg hpre.store
+    hpre.log hpre.fit16 hpre.ov16 hpre.fitS hpre.ovS hpre.fitT hpre.ovT hpre.fitP hpre.ovP
+    (codePanics cfg.fees.numExtraBytesRecord 0 wInst id 0 2048 (some 2048)) 0 (dAll 0 0 id)
+    (kSup cfg.wasm) (kSmall cfg.wasm) (kPos cfg.wasm)
+    (DepositPanicsFull.spec879sup cfg.wasm execLimits 0 wInst cfg.fees.numExtraBytesRecord id 0 0 0 (some 2048)
+      Interface.wInst_ifaceMod _ 0 2048 608 le_rfl)
+    (DepositPanicsFull.spec664small cfg.wasm execLimits 0 wInst cfg.fees.numExtraBytesRecord id 0 0 0 (some 2048)
+      Interface.wInst_ifaceMod _ 0 2048 608 le_rfl)
+    (DepositPanicsFull.spec664pos cfg.wasm execLimits 0 wInst cfg.fees.numExtraBytesRecord id 0 0 0 (some 2048)
+      Interface.wInst_ifaceMod _ 0 2048 608 le_rfl)
+    (entryPost Cg 0 Ψ)
+  iframe Hk HC Stk HS
+  isplitl [Hgas]
+  · iunfold credits
+    iexists h.gas, h.gasProfile, h.actionProfile
+    iframe Hgas
+    ipureintro
+    simp only [costB, Near.GasCounter.used] at hgas ⊢
+    omega
+  isplitl [Hg]
+  · iapply g0_pt $$ Hg
+  isplitl [Hh]
+  · iexact Hh
+  isplitl []
+  · iintro %h3 %⟨-, hok⟩
+    iexfalso
+    ipureintro
+    exact hc (hcase.symm.trans hok)
+  · iintro %hX %⟨hk, -⟩ HT
+    simp only [entryPost]
+    iintro %r
+    iunfold panicked at HT
+    icases HT with ⟨%h', %he, Hh, %R, Hc⟩
+    iunfold credits at Hc
+    icases Hc with ⟨%g, %p, %a, Hg', %hg⟩
+    isplitr
+    · ipureintro; exact ⟨r, rfl⟩
+    iexists [(Loc.host, Cell.host (erase h')), (gasLoc, gasCellOf g p a)]
+    isplitr
+    · ipureintro
+      refine ⟨⟨h', g, p, a, ⟨hX, hk, ?_⟩, rfl, by omega⟩, by simp only [List.map_cons, List.map_nil]; decide⟩
+      rw [he]
+      unfold caseDep at hcase
+      rw [hcase]
+    iapply BigSepL.bigSepL_cons.2
+    isplitl [Hh]
+    · iunfold mhostPt at Hh
+      iexact Hh
+    iapply BigSepL.bigSepL_cons.2
+    isplitl [Hg']
+    · iunfold gasPt at Hg'
+      iexact Hg'
+    iapply BigSepL.bigSepL_nil.2
+    iempintro
+
+/-! ## The runs -/
+
+/-- **`near_deposit` runs on an initialized contract when 232 succeeds** (`MethodRunsR`). -/
+theorem dep_runs (cfg : RuntimeConfig) (S : WNear.State) (reg : Option (UInt64 × UInt64)) :
+    MethodRunsR cfg 234 (preDepOk S reg) (costDep cfg S reg) (postDepOk cfg.fees.numExtraBytesRecord S reg) := by
+  intro fuel h Cg hpre hcost hC1 hC2 hfuel
+  obtain ⟨st, hr, hok⟩ := hpre
+  have hw : (wStore cfg h).host = h := rfl
+  have hentry : chargeWasm (.next (startW cfg h 234)) (entryCost cfg.wasm (.next (startW cfg h 234))) =
+      (.next { startW cfg h 234 with store := wStore cfg (charged h (9 * cfg.wasm.regularOpCost)) }, none) := by
+    rw [entryCost_234, chargeWasm_ok (C := Cg)
+      (by simp only [startW, StepResult.store, hw]; simp only [costDep] at hcost; omega)
+      (by simpa [startW, StepResult.store, hw] using hC1) (by simpa [startW, StepResult.store, hw] using hC2)]
+    rfl
+  have had := dep_adequate_ok cfg (charged h (9 * cfg.wasm.regularOpCost)) S st reg
+    (by rw [erase_charged]; exact hr) (by rw [erase_charged]; exact hok) Cg
+    (by rw [charged_gas_used, erase_charged]; simp only [costDep] at hcost; omega)
+    (by simpa [charged] using hC1) (by simpa [charged] using hC2)
+  rw [← startW_thread cfg h] at had
+  have hend := runInitialized_ending_state cfg.wasm fuel _ _ _ hentry had
+  obtain ⟨e, σ, hrc⟩ := runInitialized_finished cfg.wasm fuel _ hfuel
+  rw [hrc] at hend
+  obtain ⟨rfl, cs, hcs, hlk⟩ := hend
+  have hrun := done_of_values (runInitialized_err cfg.wasm fuel _) hfuel hrc
+  obtain ⟨hq, hu⟩ := endCellsOk_ends hcs hlk
+  rw [erase_charged] at hq
+  exact ⟨σ.store, hrun, hq, hu⟩
+
+/-- **`near_deposit` panics on an initialized contract when 232 does not succeed** (`MethodPanicsR`). -/
+theorem dep_panics (cfg : RuntimeConfig) (S : WNear.State) (reg : Option (UInt64 × UInt64)) (c : DCase)
+    (hc : c ≠ .ok) :
+    MethodPanicsR cfg 234 (preDepP S reg c) (costDep cfg S reg) (postDepP c) := by
+  intro fuel h Cg hpre hcost hC1 hC2 hfuel
+  obtain ⟨st, hr, hcase⟩ := hpre
+  have hw : (wStore cfg h).host = h := rfl
+  have hentry : chargeWasm (.next (startW cfg h 234)) (entryCost cfg.wasm (.next (startW cfg h 234))) =
+      (.next { startW cfg h 234 with store := wStore cfg (charged h (9 * cfg.wasm.regularOpCost)) }, none) := by
+    rw [entryCost_234, chargeWasm_ok (C := Cg)
+      (by simp only [startW, StepResult.store, hw]; simp only [costDep] at hcost; omega)
+      (by simpa [startW, StepResult.store, hw] using hC1) (by simpa [startW, StepResult.store, hw] using hC2)]
+    rfl
+  have had := dep_adequate_p cfg (charged h (9 * cfg.wasm.regularOpCost)) S st reg c hc
+    (by rw [erase_charged]; exact hr) (by rw [erase_charged]; exact hcase) Cg
+    (by rw [charged_gas_used, erase_charged]; simp only [costDep] at hcost; omega)
+    (by simpa [charged] using hC1) (by simpa [charged] using hC2)
+  rw [← startW_thread cfg h] at had
+  have hend := runInitialized_ending_state cfg.wasm fuel _ _ _ hentry had
+  obtain ⟨e, σ, hrc⟩ := runInitialized_finished cfg.wasm fuel _ hfuel
+  rw [hrc] at hend
+  obtain ⟨⟨t, rfl⟩, cs, hcs, hlk⟩ := hend
+  have hrun := trap_of_ending (runInitialized_err cfg.wasm fuel _) hfuel hrc
+  obtain ⟨hq, hu⟩ := endCellsP_ends hcs hlk
+  rw [erase_charged] at hq
+  exact ⟨t, σ.store, hrun, hq, hu⟩
+
+/-! ## On an uninitialized contract -/
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 16000000 in
+/-- **Adequacy of `near_deposit` on an uninitialized contract**. -/
+theorem dep_adequate_none (cfg : RuntimeConfig) (h : NearState) (st : Near.TrieOverlay.State)
+    (hr : FtTotalSupply.ReadNone (erase h) st) (Cg : Nat)
+    (hgas : h.gas.used + cost234None cfg.wasm (erase h) ≤ Cg) (hC1 : Cg ≤ h.gas.maxBurnt)
+    (hC2 : Cg ≤ h.gas.prepaid) :
+    adequate .MaybeStuck (MCode.running cfg.wasm execLimits (entryThread ⟨#[.i32 0], 0, wInst⟩ 0 f234.body))
+      ⟨wStore cfg h⟩
+      (fun v σ' => (∃ r, v = .trap r) ∧ ∃ cs, endCellsNone Cg (erase h) st cs ∧
+        ∀ p ∈ cs, mlookup σ' p.1 = some p.2) := by
+  apply mwp_adequacy_cells (GF' := WasmLogic.GF NearState) _ _ (fun v => ∃ r, v = .trap r)
+    (fun _ cs => endCellsNone Cg (erase h) st cs)
+  intro _
+  let Ψ : Ending → IProp (WasmLogic.GF NearState) := fun v =>
+    iprop(⌜∃ r, v = .trap r⌝ ∗ mcellsSat (fun cs => endCellsNone Cg (erase h) st cs))
+  show _ ⊢ WP _ @ _; _ {{ Ψ }}
+  refine (startResDep cfg h).trans ?_
+  iintro H
+  iapply fupd_wp
+  imod H with ⟨#Hk, -, #HP, #Hi, Hg, Hh, Hgas, Stk, HS, HN⟩
+  imodintro
+  iapply mwp_entry cfg.wasm execLimits ⟨#[.i32 0], 0, wInst⟩ 0 f234.body Cg Ψ
+  isplitr
+  · iexact Hi
+  ihave Stk := BorshFT.stkA (a := 1047664) (b := (1048576 : UInt32).toNat - (304 + 608)) rfl $$ Stk
+  rw [← mhostPt_erase h]
+  iapply body234None cfg.wasm execLimits 0 cfg.fees.numExtraBytesRecord 0 wInst id 0 0 0 (some 2048)
+    Interface.wInst_ifaceMod (by decide) Cg 0 { type := .num .i32, mutable := true } 1048576 608 (by decide)
+    (by decide) (by decide) (by decide) (by decide) 0 0 123 2048 memLen 0 (dAll 0 0 id) (erase h) st hr
+    (entryPost Cg 0 Ψ)
+  iframe Hk HP Stk HS HN
+  isplitl [Hgas]
+  · iunfold credits
+    iexists h.gas, h.gasProfile, h.actionProfile
+    iframe Hgas
+    ipureintro
+    simp only [Near.GasCounter.used] at hgas ⊢
+    omega
+  isplitl [Hg]
+  · iapply g0_pt $$ Hg
+  isplitl [Hh]
+  · iexact Hh
+  iintro %h1 %hq HT
+  simp only [entryPost]
+  iintro %r
+  iunfold panicked at HT
+  icases HT with ⟨%h', %he, Hh, %R, Hc⟩
+  iunfold credits at Hc
+  icases Hc with ⟨%g, %p, %a, Hg', %hg⟩
+  isplitr
+  · ipureintro; exact ⟨r, rfl⟩
+  iexists [(Loc.host, Cell.host (erase h')), (gasLoc, gasCellOf g p a)]
+  isplitr
+  · ipureintro
+    refine ⟨⟨h1, h', g, p, a, hq, ?_, rfl, by omega⟩, by simp only [List.map_cons, List.map_nil]; decide⟩
+    rw [he, PanicStr.notInit_utf8String]
+    rfl
+  iapply BigSepL.bigSepL_cons.2
+  isplitl [Hh]
+  · iunfold mhostPt at Hh
+    iexact Hh
+  iapply BigSepL.bigSepL_cons.2
+  isplitl [Hg']
+  · iunfold gasPt at Hg'
+    iexact Hg'
+  iapply BigSepL.bigSepL_nil.2
+  iempintro
+
+/-- The cost on an uninitialized contract: the entry activation (9) and `cost234None`. -/
+def costNoneDep (cfg : RuntimeConfig) (e : NearState) : Nat :=
+  9 * cfg.wasm.regularOpCost + cost234None cfg.wasm e
+
+/-- **`near_deposit` panics on an uninitialized contract** (`MethodPanicsR`). -/
+theorem dep_panics_none (cfg : RuntimeConfig) :
+    MethodPanicsR cfg 234 preNone (costNoneDep cfg) postNone := by
+  intro fuel h Cg hpre hcost hC1 hC2 hfuel
+  obtain ⟨st, hr⟩ := hpre
+  have hw : (wStore cfg h).host = h := rfl
+  have hentry : chargeWasm (.next (startW cfg h 234)) (entryCost cfg.wasm (.next (startW cfg h 234))) =
+      (.next { startW cfg h 234 with store := wStore cfg (charged h (9 * cfg.wasm.regularOpCost)) }, none) := by
+    rw [entryCost_234, chargeWasm_ok (C := Cg)
+      (by simp only [startW, StepResult.store, hw]; simp only [costNoneDep] at hcost; omega)
+      (by simpa [startW, StepResult.store, hw] using hC1) (by simpa [startW, StepResult.store, hw] using hC2)]
+    rfl
+  have had := dep_adequate_none cfg (charged h (9 * cfg.wasm.regularOpCost)) st hr Cg
+    (by rw [charged_gas_used, erase_charged]; simp only [costNoneDep] at hcost; omega)
+    (by simpa [charged] using hC1) (by simpa [charged] using hC2)
+  rw [← startW_thread cfg h] at had
+  have hend := runInitialized_ending_state cfg.wasm fuel _ _ _ hentry had
+  obtain ⟨e, σ, hrc⟩ := runInitialized_finished cfg.wasm fuel _ hfuel
+  rw [hrc] at hend
+  obtain ⟨⟨t, rfl⟩, cs, hcs, hlk⟩ := hend
+  have hrun := trap_of_ending (runInitialized_err cfg.wasm fuel _) hfuel hrc
+  obtain ⟨h1, hq, he, hu⟩ := endCellsNone_ends hcs hlk
+  exact ⟨t, σ.store, hrun, ⟨st, h1, hr, hq, he⟩, hu⟩
+
+end WNear.Binary.NearDepositMethod
