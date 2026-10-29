@@ -567,16 +567,16 @@ theorem f228_obj (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
       subst hrest2
       have hvl : q1 + w1 + 1 ≤ bs.length := by have := SerdeNextKey.getElem_lt hcol; omega
       have hcost : ∃ KV OCn, objCost cfg.regularOpCost K646 K169 K81 dv ign bs (n' + 1) first i' =
-          (972 + 96 * (keyWs first bs i' + w1) + SerdeKey.cost194) * cfg.regularOpCost + K646 q + (KV + OCn) := by
+          (942 + 96 * (keyWs first bs i' + w1) + SerdeKey.cost194) * cfg.regularOpCost + K646 q + (KV + OCn) := by
         rcases hv with ⟨hk, a', r3, hdv, -⟩ | ⟨hk, r3, hig, -⟩
         · refine ⟨K169 (q1 + w1 + 1), objCost cfg.regularOpCost K646 K169 K81 dv ign bs n' false (bs.length - r3.length), ?_⟩
           rw [objCost_field _ _ _ _ _ _ bs hend hq hs hk (by rw [hq1, hw1]; exact hdv), hq1, hw1]
         · refine ⟨K81 (q1 + w1 + 1), objCost cfg.regularOpCost K646 K169 K81 dv ign bs n' false (bs.length - r3.length), ?_⟩
           rw [objCost_ign _ _ _ _ _ _ bs hend hq hs hk (by rw [hq1, hw1]; exact hig), hq1, hw1]
       obtain ⟨KV, OCn, hOCe⟩ := hcost
-      rw [hOCe, show (972 + 96 * (keyWs first bs i' + w1) + SerdeKey.cost194) * cfg.regularOpCost + K646 q +
+      rw [hOCe, show (942 + 96 * (keyWs first bs i' + w1) + SerdeKey.cost194) * cfg.regularOpCost + K646 q +
           (KV + OCn) + E + R =
-        60 * cfg.regularOpCost + (Kk + (140 * cfg.regularOpCost + ((200 + 96 * w1) * cfg.regularOpCost + (KV + (OCn + E + R))))) by
+        30 * cfg.regularOpCost + (Kk + (140 * cfg.regularOpCost + ((200 + 96 * w1) * cfg.regularOpCost + (KV + (OCn + E + R))))) by
           rw [← hKk]; simp only [Nat.add_mul, Nat.mul_add]; omega]
       mstep; mstep; mstep; mstep
       mcall S193 using [M32 M36 Hg S160 S16 Hrd Hsl Hkey Hvt Hh He Hw8]
