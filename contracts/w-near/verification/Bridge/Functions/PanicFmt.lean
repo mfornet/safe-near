@@ -467,6 +467,204 @@ theorem f817_fmt (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (inst : Nat) (m
       simp only [Post.mseq_trap, Post.mblock, Post.mfunc]
       iexact HT
 
+
+/-- `Spec817` is antitone in its resources. -/
+theorem Spec817_mono (cfg : WasmConfig) (lim : ExecLimits) (d inst : Nat) (mi : ModuleInst) (Cg n g : Nat)
+    (gt : GlobalType) (sp p msg info loc : UInt32) (E E' : IProp GF) (K : Nat) (h : NearState)
+    (bs : List UInt8) (hE : E ⊢ E') :
+    Spec817 cfg lim d inst mi Cg n g gt sp p msg info loc E' K h bs ⊢
+      Spec817 cfg lim d inst mi Cg n g gt sp p msg info loc E K h bs := by
+  iintro #H
+  iunfold Spec817, MFunSpecT at H
+  iunfold Spec817, MFunSpecT
+  imodintro
+  iintro %args %R HP Hc
+  icases HP with ⟨%hargs, Hg, P0, P4, P8, HE⟩
+  iapply H $$ %args %R [Hg P0 P4 P8 HE] Hc
+  beta_reduce
+  iframe Hg P0 P4 P8
+  isplitr
+  · ipureintro; exact hargs
+  iapply hE $$ HE
+
+/-! ## `__rust_end_short_backtrace` (816), `rust_begin_unwind` (823), `panic_fmt` (859) -/
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 8000000 in
+/-- **`__rust_end_short_backtrace`** (816) on `p` holding `(msg, info, loc)`: 817 on its copy. -/
+theorem f816_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
+    (inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (n g ta : Nat)
+    (hm : IfaceMod mi A n g ta) (hd : d + 1 < lim.maxCallDepth) (Cg : Nat) (gt : GlobalType)
+    (sp p msg info loc : UInt32) (hsp : 16 ≤ sp.toNat) (hp : p.toNat + 12 ≤ 2 ^ 32) (E : IProp GF)
+    (K : Nat) (h : NearState) (bs : List UInt8) :
+    inst ↪[inst] mi ∗ A 817 ↪[wf] FuncInst.wasm types[0]! inst f817 ∗
+      Spec817 cfg lim (d + 1) inst mi Cg n g gt (sp - 16) (sp - 16) msg info loc E K h bs
+      ⊢ MFunSpecT (GF := GF) cfg lim d type inst mi f816 Cg
+        (fun args => iprop(⌜args = [.i32 p]⌝ ∗ g ↦[wg] ⟨gt, .i32 sp⟩ ∗ n ↦[i32][ p.toNat ] msg ∗
+          n ↦[i32][ p.toNat + 4 ] info ∗ n ↦[i32][ p.toNat + 8 ] loc ∗ stk n (sp.toNat - 16) 16 ∗ E))
+        (fun _ => 29 * cfg.regularOpCost + K) (fun _ _ => iprop(False)) (fun _ => panicked Cg h bs) := by
+  iintro ⟨#Hi, #F817, #S817⟩
+  have hn := hm.mem
+  have hg := hm.glob
+  have hlt := sp.toNat_lt
+  have h16 : (sp - 16).toNat = sp.toNat - 16 := by
+    rw [UInt32.toNat_sub_of_le] <;> simp [UInt32.le_iff_toNat_le]; omega
+  have ha817 := hm.funcs 817 (by decide)
+  iapply MFunSpecT_intro
+  imodintro
+  iintro %args %R HP Hc
+  icases HP with ⟨%hargs, Hg, P0, P4, P8, Hf, HE⟩
+  subst hargs
+  ihave Hf := stk_addr (show sp.toNat - 16 = (sp - 16).toNat by omega) $$ Hf
+  icases stk_split n _ 8 8 $$ Hf with ⟨Hf0, Hf8⟩
+  icases stk_split n _ 4 4 $$ Hf8 with ⟨Hf8, -⟩
+  icases stk4_word n _ $$ Hf8 with ⟨%w8, Hf8⟩
+  ihave Hf8 := memBytes_congr (j := (sp - 16 + 8).toNat) (by simp [UInt32.toNat_add]; omega) |>.1 $$ Hf8
+  iunfold stk at Hf0
+  icases Hf0 with ⟨%ob, %hob, Hf0⟩
+  ihave PP := (memBytes_append n p.toNat (bytes32 msg) (bytes32 info)).2 $$ [P0 P4]
+  · isplitl [P0]
+    · iexact P0
+    iapply memBytes_congr (by simp) |>.1 $$ P4
+  iunfold Spec817 at S817
+  simp only [f816]
+  mstep [Hg]; mstep; mstep; mstep; mstep [Hg]
+  mstep; mstep; mstep; mstep; mstep; mstep; mstep [P8]; mstep [Hf8]
+  mstep; mstep; mstep [PP]; mstep [Hf0]
+  rw [ResultExpect.bytes64_decode _ (by simp)]
+  icases (memBytes_append n (sp - 16).toNat (bytes32 msg) (bytes32 info)).1 $$ Hf0 with ⟨Q0, Q4⟩
+  mstep
+  iapply mwpi_cons
+  iapply mwpi_callT' (i := 817) (a := A 817) (type := types[0]!) (inst := inst) (mi := mi)
+    (code := f817) [.i32 (sp - 16)]
+  isplitr
+  · iexact S817
+  isplitr
+  · iexact F817
+  isplitr
+  · iexact Hi
+  isplitr
+  · ipureintro; exact ⟨rfl, ha817, rfl, by omega⟩
+  isplitl [Hc]
+  · iexact Hc
+  isplitr
+  · ipureintro; mstep_norm_full; omega
+  isplitl [Hg Q0 Q4 Hf8 HE]
+  · iframe Hg Q0 HE
+    isplitr
+    · ipureintro; rfl
+    isplitl [Q4]
+    · iapply memBytes_congr (by simp) |>.1 $$ Q4
+    iapply memBytes_congr (by simp [UInt32.toNat_add]; omega) |>.1 $$ Hf8
+  inext
+  isplit
+  · iintro %rs - HF
+    iexfalso
+    iexact HF
+  · iintro HT
+    simp only [Post.mseq_trap, Post.mfunc]
+    iexact HT
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 8000000 in
+/-- **`rust_begin_unwind`** (823) on the `PanicInfo` `info` (its message `msg` and location
+`loc`, both `Some`): 816 on `(msg, info, loc)`. -/
+theorem f823_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
+    (inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (n g ta : Nat)
+    (hm : IfaceMod mi A n g ta) (hd : d + 2 < lim.maxCallDepth) (Cg : Nat) (gt : GlobalType)
+    (sp info msg loc : UInt32) (hsp : 32 ≤ sp.toNat) (hinfo : info.toNat + 16 ≤ 2 ^ 32)
+    (hmsg : msg ≠ 0) (hloc : loc ≠ 0) (E : IProp GF) (K : Nat) (h : NearState) (bs : List UInt8) :
+    inst ↪[inst] mi ∗ A 816 ↪[wf] FuncInst.wasm types[0]! inst f816 ∗
+      A 817 ↪[wf] FuncInst.wasm types[0]! inst f817 ∗ A 883 ↪[wf] FuncInst.wasm types[32]! inst f883 ∗
+      A 884 ↪[wf] FuncInst.wasm types[32]! inst f884 ∗ A 795 ↪[wf] FuncInst.wasm types[32]! inst f795 ∗
+      A 796 ↪[wf] FuncInst.wasm types[13]! inst f796 ∗
+      Spec817 cfg lim (d + 2) inst mi Cg n g gt (sp - 16 - 16) (sp - 16 - 16) msg info loc
+        iprop(n ↦[i32][ info.toNat + 8 ] msg ∗ E) K h bs
+      ⊢ MFunSpecT (GF := GF) cfg lim d type inst mi f823 Cg
+        (fun args => iprop(⌜args = [.i32 info]⌝ ∗ g ↦[wg] ⟨gt, .i32 sp⟩ ∗ n ↦[i32][ info.toNat + 8 ] msg ∗
+          n ↦[i32][ info.toNat + 12 ] loc ∗ stk n (sp.toNat - 32) 32 ∗ E))
+        (fun _ => 109 * cfg.regularOpCost + K) (fun _ _ => iprop(False)) (fun _ => panicked Cg h bs) := by
+  iintro ⟨#Hi, #F816, #F817, #F883, #F884, #F795, #F796, #S817⟩
+  have hn := hm.mem
+  have hg := hm.glob
+  have hlt := sp.toNat_lt
+  have h16 : (sp - 16).toNat = sp.toNat - 16 := by
+    rw [UInt32.toNat_sub_of_le] <;> simp [UInt32.le_iff_toNat_le]; omega
+  have ha816 := hm.funcs 816 (by decide)
+  have ha883 := hm.funcs 883 (by decide)
+  have ha884 := hm.funcs 884 (by decide)
+  have ha795 := hm.funcs 795 (by decide)
+  have ha796 := hm.funcs 796 (by decide)
+  have t32 : types[32]!.params.length = 1 := by rfl
+  have t13 : types[13]!.params.length = 2 := by rfl
+  iapply MFunSpecT_intro
+  imodintro
+  iintro %args %R HP Hc
+  icases HP with ⟨%hargs, Hg, M8, L12, Hs, HE⟩
+  subst hargs
+  icases stk_split n _ 16 16 $$ Hs with ⟨Hlo, Hf⟩
+  ihave Hf := stk_addr (show sp.toNat - 32 + 16 = (sp - 16).toNat by omega) $$ Hf
+  icases VecFromElem.stk16 n _ $$ Hf with ⟨W0, W4, W8, -⟩
+  icases stk4_word n _ $$ W0 with ⟨%w0, W0⟩
+  icases stk4_word n _ $$ W4 with ⟨%w4, W4⟩
+  icases stk4_word n _ $$ W8 with ⟨%w8, W8⟩
+  simp only [f823]
+  mstep [Hg]; mstep; mstep; mstep; mstep [Hg]
+  mstep
+  mcall (f884_spec cfg lim (d + 1) types[32]! (by rfl) inst mi n hn Cg info loc) using [L12]
+  · iframe L12
+  icases HQ with ⟨%hrs, L12⟩
+  subst hrs
+  mstep
+  mcall (f796_some cfg lim (d + 1) types[13]! (by rfl) inst mi Cg loc 1066328 hloc) using []
+  · ipureintro; first | trivial | rfl
+  icases HQ with %hrs
+  subst hrs
+  mstep; mstep
+  mcall (f883_spec cfg lim (d + 1) types[32]! (by rfl) inst mi n hn Cg info msg) using [M8]
+  · iframe M8
+  icases HQ with ⟨%hrs, M8⟩
+  subst hrs
+  mcall (f795_some cfg lim (d + 1) types[32]! (by rfl) inst mi Cg msg hmsg) using []
+  · ipureintro; first | trivial | rfl
+  icases HQ with %hrs
+  subst hrs
+  mstep
+  mstep; mstep; mstep [W8]
+  mstep; mstep; mstep [W4]
+  mstep; mstep; mstep [W0]
+  mstep
+  iapply mwpi_cons
+  iapply mwpi_callT' (i := 816) (a := A 816) (type := types[0]!) (inst := inst) (mi := mi)
+    (code := f816) [.i32 (sp - 16)]
+  isplitr
+  · iapply (f816_spec cfg lim (d + 1) types[0]! inst mi A n g ta hm (by omega) Cg gt (sp - 16) (sp - 16)
+      msg info loc (by omega) (by omega) iprop(n ↦[i32][ info.toNat + 8 ] msg ∗ E) K h bs)
+    iframe Hi F817 S817
+  isplitr
+  · iexact F816
+  isplitr
+  · iexact Hi
+  isplitr
+  · ipureintro; exact ⟨rfl, ha816, rfl, by omega⟩
+  isplitl [Hc]
+  · iexact Hc
+  isplitr
+  · ipureintro; mstep_norm_full; omega
+  isplitl [Hg W0 W4 W8 Hlo M8 HE]
+  · iframe Hg W0 W4 W8 M8 HE
+    isplitr
+    · ipureintro; rfl
+    iapply stk_addr _ $$ Hlo; omega
+  inext
+  isplit
+  · iintro %rs - HF
+    iexfalso
+    iexact HF
+  · iintro HT
+    simp only [Post.mseq_trap, Post.mfunc]
+    iexact HT
+
 end Spec
 
 end WNear.Binary.PanicFmt
