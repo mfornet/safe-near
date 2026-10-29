@@ -32,8 +32,9 @@ structure DepositEffects (x : Nat) (h : NearState) (s : WNear.State)
   kept : keep h' = keep (LogStr.logged h (text232 h reg (WNear.Borsh.u64 s.accountStorageUsage)))
 
 /-- The binary postcondition implies the concrete observable read/mint/write effects. -/
-theorem post234_effects {x : Nat} {h h' : NearState} {s : WNear.State} {st : Near.TrieOverlay.State}
-    {reg : Option (UInt64 × UInt64)} (hpre : DepOk h s st reg)
+theorem post234_effects_of_storage {x : Nat} {h h' : NearState} {s : WNear.State} {st : Near.TrieOverlay.State}
+    {reg : Option (UInt64 × UInt64)} (hvalue : h.storage WNear.stateKey = some (WNear.header s))
+    (hstore : h.storage (keyOf h) = reg.map (fun p => storeBytes (.i64 p.1) 8 ++ storeBytes (.i64 p.2) 8))
     (hp : Post234 x h st (budDep h) s reg h') : DepositEffects x h s reg h' := by
   obtain ⟨h1, s1, h2, s2, b0, b1, -, -, he1, hp2, -, hb, -, hp3⟩ := hp
   have fields {α : Type} (f : NearState → α) (he : ∀ a, f (erase a) = f a)
@@ -51,7 +52,7 @@ theorem post234_effects {x : Nat} {h h' : NearState} {s : WNear.State} {st : Nea
     fields (fun a => a.context.storageUsage) (fun _ => rfl) (fun _ _ _ => rfl) (fun _ _ => rfl)
   have hid : h1.context.currentAccountId = h.context.currentAccountId := congrArg Keep.id hkeep
   have hstate : h.storage StateRead.stateKey = some (WNear.header s) := by
-    rw [StateRead.stateKey_eq]; exact hpre.value
+    rw [StateRead.stateKey_eq]; exact hvalue
   have hamount : amount232 h1 reg (WNear.Borsh.u64 s.accountStorageUsage) =
       amount232 h reg (WNear.Borsh.u64 s.accountStorageUsage) := by
     cases reg <;> simp only [amount232, depOf, EnvGetters.depLo, EnvGetters.depHi, aloOf, ahiOf, hdep]
@@ -70,7 +71,7 @@ theorem post234_effects {x : Nat} {h h' : NearState} {s : WNear.State} {st : Nea
     rw [hid, hstate]
     simp only [budDep, readProofCost, Option.map_some, Option.getD_some, StateReadModel.header_length]
     omega
-  obtain ⟨o1, o2, o3, o4, -⟩ := post232_out hp2 hbud (by rw [hsto]; exact hpre.store)
+  obtain ⟨o1, o2, o3, o4, -⟩ := post232_out hp2 hbud (by rw [hsto]; exact hstore)
   obtain ⟨t, -, -, he3⟩ := hp3
   have hheader : StateWrite.stateBytes 1 WNear.accountsPrefix b0 b1 (WNear.Borsh.u64 s.accountStorageUsage) =
       mintedHeader h s reg := by
@@ -88,5 +89,20 @@ theorem post234_effects {x : Nat} {h h' : NearState} {s : WNear.State} {st : Nea
   · rw [write_usage he3, hheader, hstate2, o3, huse]
   · rw [NewBody.keep_of_erase he3, NewBody.keep_storageWriteHost, o4]
     rw [keep_logged_congr hkeep, htext]
+
+/-- The complete method precondition supplies the two storage facts needed above. -/
+theorem post234_effects {x : Nat} {h h' : NearState} {s : WNear.State} {st : Near.TrieOverlay.State}
+    {reg : Option (UInt64 × UInt64)} (hpre : DepOk h s st reg)
+    (hp : Post234 x h st (budDep h) s reg h') : DepositEffects x h s reg h' :=
+  post234_effects_of_storage hpre.value hpre.store hp
+
+/-- The run-level success relation has the same observable effects, including after gas erasure. -/
+theorem postDepOk_effects {x : Nat} {h h' : NearState} {s : WNear.State}
+    {reg : Option (UInt64 × UInt64)} (hvalue : h.storage WNear.stateKey = some (WNear.header s))
+    (hstore : h.storage (keyOf h) = reg.map (fun p => storeBytes (.i64 p.1) 8 ++ storeBytes (.i64 p.2) 8))
+    (hp : postDepOk x s reg h h') : DepositEffects x h s reg h' := by
+  obtain ⟨st, h3, -, hpost, rfl⟩ := hp
+  have hf := post234_effects_of_storage hvalue hstore hpost
+  exact ⟨hf.storage, hf.keys, hf.usage, hf.kept⟩
 
 end WNear.Binary.NearDepositMethod

@@ -27,12 +27,9 @@ changes have not yet been pushed to PR #40.
   theorems for `storage_minimum_balance`, `storage_balance_bounds` and `ft_metadata` pass LSP
   axiom verification with only standard axioms. The combined view build passed (1473 jobs),
   recorded in `/tmp/pr40-view-refinements-build.log`.
-- `InternalDeposit.lean` passes LSP diagnostics after the read-budget subproof of `f406_ok`
-  was repaired (`omega` directly uses the sum bound). **In progress, not yet all revalidated:**
-  `InternalDepositOverflow` forwards the full read budget instead of weakening it to lookup-only
-  room; then check `DepositBody234` and `NearDepositRuns`/`NearDepositUninit`. A targeted build
-  of those five modules is running with output at `/tmp/pr40-deposit-integration-build.log`.
-  Recheck its live process/session and exit status before restarting.
+- The deposit read-budget integration build passed (1558 jobs): `InternalDeposit`,
+  `InternalDepositOverflow`, `DepositBody234`, `NearDepositRuns`, and `NearDepositUninit`.
+  The log is `/tmp/pr40-deposit-integration-build.log`.
 - **New model agreement groundwork:** `NearDepositModel.lean` exposes every initialized deposit
   path through `nearDeposit_zero`, `nearDeposit_too_small`, `nearDeposit_registered`, and
   `nearDeposit_unregistered`. `nearDeposit_after_registration` separates the fee from minting;
@@ -40,11 +37,34 @@ changes have not yet been pushed to PR #40.
   `nearDeposit_unregistered` passes LSP axiom verification with only standard axioms.
   Keep storageMin symbolic: unfolding its multiplication by 10^19 during broad simplification
   caused excessive kernel work; the separate helper declarations avoid that.
-- `lake build +Bridge.Functions.StateReadModel` now passes (`/tmp/pr40-state-read-final.log`).
-  An earlier concurrent build failed writing a read-only cached BorshFT.ilean; the local link
-  was detached and the sequential build passed. Avoid overlapping builds of the same targets.
-  Continue with LSP diagnostics for the callers, then a full `Bridge` build and both audits
-  before pushing. A partial diagnostic result is not validation.
+- **Initialized deposit's functional frontier is now closed.** `NearDepositCases` connects
+  all five pure classifier outcomes to the model. `NearDepositWords` connects the actual
+  host's decoded deposit, predecessor balance, minimum and supply without truncation.
+  `NearDepositPre` derives the complete `DepOk` from represented storage and the context,
+  and proves `budDep ≤ proofBound` for both the actual and unrecorded comparison hosts.
+  The explicit protocol premises are value size ≥ 29, log count ≥ 1, and usage growth
+  `85 + numExtraBytesRecord ≤ maxGasBurnt`, alongside `CostsV86`/`LimitsV86`.
+- `NearDepositPanicAgreement` proves all panic agreement obligations. `NearDepositEffects`
+  flattens `Post234` to exact storage, key, usage and kept-field effects.
+  `NearDepositMintWords`, `NearDepositMintModel`, `NearDepositStorageAgreement`, and
+  `NearDepositUsageModel` connect the amount, log, header, final storage and usage to
+  `mintedOutcome`. `NearDepositSuccessAgreement` includes the final storage-stake check.
+- **`NearDepositRefines.nearDeposit_refines_init_of_bound` assembles the initialized
+  method's complete per-call refinement clauses, conditional on loading plus `costDep`
+  fitting the model's gas bound.** That quantitative bound is still open; this does not
+  make `near_deposit` a sixth finished method. The targeted build passed (1603 jobs),
+  at `/tmp/pr40-deposit-refines-build.log`. LSP verifies the new top theorem, precondition,
+  storage, usage, success and panic agreement results with only the standard axioms.
+- `lake build +Bridge.Functions.StateReadModel` passes (`/tmp/pr40-state-read-final.log`).
+  An earlier concurrent build failed writing a read-only cached BorshFT.ilean; the local
+  link was detached and the sequential build passed. Avoid overlapping builds of the same targets.
+- Fixed the declared `Bridge` library's missing-root problem with `globs = ["Bridge.+"]`.
+  A full `lake build Bridge` is running at `/tmp/pr40-full-bridge-build.log` (exec session
+  `67253`, Lake PID `22895`; the long-running `ParseEscape.lean` compiler is PID `23455`).
+  Its build graph predates the newest agreement files, which were built separately as
+  dependencies of `NearDepositRefines`. Revalidate live process and exit status, then
+  build the current complete library and run strict NearLogic/wNEAR audits and statement
+  pins before pushing. No complete integrated-build pass is claimed yet.
 
 ## Methods
 
@@ -57,7 +77,7 @@ There are 15 exported methods.
 | `storage_balance_bounds` (306) | done | `StorageBalanceBoundsRefines.storageBalanceBounds_refines_all` |
 | `ft_metadata` (309) | done | `FtMetadataRefines.ftMetadata_refines_all` |
 | `new` (290) | done | `NewRefines.newRefines_all` |
-| `near_deposit` (234) | the run on every path; uninitialized contract done | `NearDepositUninit.nearDeposit_refines_uninit` (full `Refines` clauses with no state). For the initialized case: `NearDepositRuns.dep_runs` (`MethodRunsR` on success), `dep_panics` (`MethodPanicsR` for the zero deposit, the too-small deposit, the balance overflow and the supply overflow), `DepositBody.body234`, `CodeDeposit.codeDep_of`, `StaticsDeposit`. The three Rust panics are discharged. Still open for the initialized case: agreement with the model (`caseDep` against `nearDeposit`, `AgreesPanic`, `AgreesWith`), deriving `DepOk` from `Context.WF` (needs a new premise `maxNumberLogs ≥ 1` and the predecessor's validity and UTF-8), `hbound` on every path, and the assembly. |
+| `near_deposit` (234) | uninitialized refinement done; initialized agreement, premises and assembly done conditional on the gas bound | `NearDepositUninit.nearDeposit_refines_uninit`; `NearDepositRefines.nearDeposit_refines_init_of_bound`. Remaining: prove loading plus `NearDepositMethod.costDep` fits the model's bound, then assemble the all-state method theorem and discharge protocol premises in M9. |
 | `ft_balance_of` (297) | argument layer, and the parser's accepting half for shallow input without escapes | see "Parser" below; the method level is not started |
 | `storage_balance_of`, `storage_deposit`, `storage_withdraw`, `storage_unregister`, `near_withdraw`, `ft_transfer`, `ft_transfer_call`, `ft_resolve_transfer` | not started | they need the parser; `ft_transfer_call` and `ft_resolve_transfer` also need promises and promise results |
 
@@ -114,7 +134,7 @@ The texts are proved equal to the model's `Panic.message` (`PanicText`).
 
 ## Next steps
 
-1. **`near_deposit`, the initialized case.** Do the model agreement, `DepOk` from `WF`, `hbound`, then the assembly with `nearDeposit_refines_uninit`. Template: `NewRefines`/`NewGas`.
+1. **`near_deposit`, the remaining gas bound.** Prove loading plus `costDep` is within the model's `computeGas + trieGas + returnDataGas 0` on every initialized path. Instantiate `nearDeposit_refines_init_of_bound`, then combine it with `nearDeposit_refines_uninit`. Template: `NewGas`; the functional and precondition obligations are already discharged.
 2. **The parser, finishing `ft_balance_of`'s argument contract.**
    1. `RejectContract`. A loose cost suffices. Use `fromSlice_eq` and the reject paths listed in M6. A WIP of the definitions is in `notes/wip/wnear/SerdeRejDefs.lean.txt`.
    2. Escapes in the accepting half:
