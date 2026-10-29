@@ -102,6 +102,50 @@ theorem predecessorHost_fields (h : NearState) :
       (predecessorHost h 0).context = h.context := by
   simp [predecessorHost, u64Max, NearState.setRegister]
 
+/-! ## The cost of 232 on hosts that differ in registers and accounting -/
+
+theorem cost526_congr (cfg : WasmConfig) (F : Nat) {x y : NearState} (hk : keep x = keep y)
+    (hc : x.context = y.context) : PredecessorId.cost526 cfg F x = PredecessorId.cost526 cfg F y := by
+  have hs := NewBody.sameCost_of_keep hk
+  have e : ∀ z : NearState, predecessorHost z 0 = z.setRegister (0 : UInt64).toNat z.context.predecessorAccountId := by
+    intro z; simp [predecessorHost, u64Max]
+  have hp := hs.setRegister (0 : UInt64).toNat y.context.predecessorAccountId
+  have hr : ∀ (z : NearState) (v : List UInt8), (z.setRegister (0 : UInt64).toNat v).registers (0 : UInt64).toNat =
+      some v := by intro z v; simp [NearState.setRegister]
+  simp only [PredecessorId.cost526, predecessorUse, NewBody.chargesUse_congr hs, ReadRegisterF.cost523F, e, hr,
+    registerLenUse, ReadRegisterF.costRestF, readRegisterUse, hc]
+  rw [NewBody.chargesUse_congr hp, NewBody.chargesUse_congr hp]
+
+theorem keep_predecessorHost_congr {x y : NearState} (hk : keep x = keep y) :
+    keep (predecessorHost x 0) = keep (predecessorHost y 0) := by
+  rw [keep_predecessorHost, keep_predecessorHost, hk]
+
+theorem cost232_congr (cfg : WasmConfig) (F : Nat) (pl : UInt32) {x y : NearState} (hk : keep x = keep y)
+    (hc : x.context = y.context) (hs : x.storage = y.storage) (key : List UInt8) (reg : Option (UInt64 × UInt64))
+    (xb : List UInt8) (t0 t1 : UInt64) (K879 K664s K664p : Nat → Keep → Nat) :
+    cost232 cfg F pl x key reg xb t0 t1 K879 K664s K664p = cost232 cfg F pl y key reg xb t0 t1 K879 K664s K664p := by
+  have hsc := NewBody.sameCost_of_keep hk
+  have hdep : x.context.attachedDeposit = y.context.attachedDeposit := by rw [hc]
+  have hpred : x.context.predecessorAccountId = y.context.predecessorAccountId := by rw [hc]
+  have h1 : attachedDepositUse x = attachedDepositUse y := NewBody.chargesUse_congr hsc _
+  have h2 := cost526_congr cfg F hk hc
+  have h3 : ∀ F' pl' L' k', LookupMapContains.cost394 cfg F' pl' L' (predecessorHost x 0) k' =
+      LookupMapContains.cost394 cfg F' pl' L' (predecessorHost y 0) k' :=
+    fun F' pl' L' k' => DepositCosts.cost394_congr cfg F' pl' L' (keep_predecessorHost_congr hk) k'
+  have h4 : ∀ F' pl' L' k' x0 x1 t0 t1 lo hi ab, DepositSegAll.costSegAll cfg F' pl' L' x k' x0 x1 t0 t1 lo hi ab K879 =
+      DepositSegAll.costSegAll cfg F' pl' L' y k' x0 x1 t0 t1 lo hi ab K879 :=
+    fun F' pl' L' k' x0 x1 t0 t1 lo hi ab => DepositCosts.costSegAll_congr cfg F' pl' L' hk (by rw [hs]) _ _ _ _ _ _ _ _
+  have h5 : ∀ F' pl' L' k' v, DepositSegAll.costSegAll cfg F' pl' L' (withVal x key v) k' 0 0 t0 t1 =
+      DepositSegAll.costSegAll cfg F' pl' L' (withVal y key v) k' 0 0 t0 t1 := by
+    intro F' pl' L' k' v; funext lo hi ab K
+    exact DepositCosts.costSegAll_congr cfg F' pl' L' (by rw [keep_withVal, keep_withVal, hk])
+      (by simp [withVal, hs]) _ _ _ _ _ _ _ _
+  have h6 : ∀ F' pl' L' k', LookupMapOps.cost401 cfg F' pl' L' x k' = LookupMapOps.cost401 cfg F' pl' L' y k' := by
+    intro F' pl' L' k'
+    simp only [LookupMapOps.cost401, NewBody.storageWriteUse_congr hsc (by rw [hs])]
+  unfold cost232 costPos costReg costUnreg aloOf ahiOf depOf depLo depHi
+  simp only [hdep, hpred, h1, h2, h3, h4, h5, h6, hk]
+
 /-! ## The whole of 232 -/
 
 /-- The account's new record. -/
