@@ -101,12 +101,12 @@ theorem structDe_cases {dv : List UInt8 → Option (WNear.AccountId × List UInt
       · intro r' e; rw [hs] at e; exact ho (SerdeStructLoop.drop_cons e).1
       · intro r' e; rw [hs] at e; exact ha (SerdeStructLoop.drop_cons e).1
 
-/-- The cost of the struct: the object form's or the array form's, whichever the input is in (both
-counted, a bound). -/
+/-- The cost of the struct: the object form's when the input starts with `{` after the whitespace, else
+the array form's. -/
 def costS (cfg : WasmConfig) (K646 K169 K81 : Nat → Nat)
     (dv : List UInt8 → Option (WNear.AccountId × List UInt8)) (ign : List UInt8 → Option (Unit × List UInt8))
     (bs : List UInt8) : Nat :=
-  costObj cfg K646 K169 K81 dv ign bs (bs.length - (wsLen bs + 1) + 1) 0 +
+  if bs[wsLen bs]? = some 0x7B then costObj cfg K646 K169 K81 dv ign bs (bs.length - (wsLen bs + 1) + 1) 0 else
   match dv (bs.drop (wsLen bs + 1 + wsLen (bs.drop (wsLen bs + 1)))) with
   | some (_, r1) => costArr cfg K169 bs 0 r1
   | none => 0
@@ -183,6 +183,7 @@ theorem f78_acc (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType
       K646 K169 K81 Cd h646 h169 h81 hdvs higns hstrs (bs.length - (wsLen bs + 1) + 1) a r (by simpa using ho)
       (by simpa using hl)
     try simp only [List.drop_zero, Nat.zero_add] at s
+    rw [if_pos ho]
     generalize hC : costObj cfg K646 K169 K81 dv ign bs (bs.length - (wsLen bs + 1) + 1) 0 = C at s ⊢
     ihave #S := s $$ [H193c F205 F201 F193 F89 F90 F81 F169 F77 HCd]
     · iframe H193c F205 F201 F193 F89 F90 F81 F169 F77 HCd
@@ -204,7 +205,9 @@ theorem f78_acc (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType
   · have s := SerdeStructArr.f228_arr (GF := GF) cfg lim (d + 1) types[36]! (by rfl) inst mi A n g ta hm (by omega) Cg
       gt sp out de ptr idx out out out out ob bs 0 maxP mlen F live hob hout hlen hptr hde hsp (by omega) hr dv
       K169 Cd h169 a r1 hok
-    obtain ⟨-, -, hdv, hb4⟩ := hok
+    obtain ⟨hb0, -, hdv, hb4⟩ := hok
+    simp only [List.drop_zero, Nat.zero_add] at hb0
+    rw [if_neg (by rw [hb0]; decide)]
     simp only [List.drop_zero, Nat.zero_add] at hdv
     have hrl : bs.length - r1.length + wsLen (bs.drop (bs.length - r1.length)) + 1 = bs.length - r.length := by
       have := SerdeNextKey.getElem_lt hb4
