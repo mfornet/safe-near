@@ -152,6 +152,71 @@ tends to come back in another place.
 - **Validation:** the cost lower bound and accepting witness are formal Lean
   results. No model gas bound or semantics is changed.
 
+### 9. One object bound predicate lost the one-time String allocation
+
+- **Statement:** the first draft of `SerdeStructObjKeyState.member` used one
+  reachable-state bound `B` both before and after saving `account_id`;
+  `ValueConditions` consequently required a pure `B → B` allocation closure.
+- **Truth:** the control proof permits one account-id allocation. The pure
+  resource bounds must distinguish the state before that allocation from the
+  state after it. Otherwise composing the pure closure can demand room for
+  hypothetical repeated String allocations, even though the loop rejects a
+  duplicate account field. The conditional Hoare theorem was true, but its
+  proposed quantitative interface was too strong for the intended use.
+- **Caught by:** interface review before publishing the changing-state loop,
+  after the first draft passed the kernel and axiom audit.
+- **Root cause:** the separation-logic member state tracked `seen`, but its pure
+  bound predicate erased that distinction and charged the one-time copy as a
+  repeatable transition.
+- **Sweep:** `member` now selects `B` or `Bsaved`; keys preserve either phase,
+  values move only from `B` to `Bsaved`, and cursor monotonicity is required for
+  each separately. The concrete key/value adapters and assembled object theorem
+  use that distinction. The generic object control proof is unchanged.
+- **Validation:** Lean MCP checks the revised assembled theorem and adapters.
+  The quantitative bounds themselves remain open; runtime scenarios cannot
+  validate this interface issue.
+
+### 10. Reachable length bounds were asked to imply alignment on an interval
+
+- **Statement:** the object adapter's first resource-closure draft required `B`
+  for every memory length in its growth interval, while `KeyConditions` and
+  `ValueConditions` demanded allocation room from `B` alone. Room includes
+  page alignment, so the combined interface could require alignment at `hl + 1`.
+- **Truth:** pure budget bounds can hold across a length interval; allocator
+  alignment and positivity belong to the actual heap. The room conditions must
+  receive those physical facts as explicit premises, derived from `heapInv`.
+- **Caught by:** interface review before publication. The kernel-checked
+  `alignment_not_interval` witness shows that an aligned length cannot have an
+  entirely aligned interval through `hl + 65536`.
+- **Root cause:** mixing physical heap well-formedness with an interval-closed
+  upper-bound predicate. A conditional theorem can pass the kernel while its
+  proposed premises are unusable at real call sites.
+- **Sweep:** both key and value conditions now take alignment and positivity
+  separately. `scratch_alignment` reads those facts from the actual allocator
+  invariant without consuming scratch; both concrete adapters supply them.
+  The growth-closure predicates no longer need to imply alignment.
+- **Validation:** Lean MCP checks the witness, allocator extraction and revised
+  adapters; the package audit checks the assembled theorem. Runtime tests do
+  not validate this quantified resource interface.
+
+### 11. The ignored reader lacked its literal data and transitive code
+
+- **Statement:** the first assembled object interface supplied only the key/value
+  reader code bundle and a member state without `SerdeIdent.identBytes`.
+- **Truth:** ignored `true`/`false`/`null` values need the literal table; the
+  ignored-value implementation also calls functions outside that code bundle.
+  Its conditional hypothesis therefore needs both resources to be usable.
+- **Caught by:** ownership and callee review before publishing the object loop.
+- **Root cause:** generalizing the loop's changing heap state while overlooking
+  read-only resources of the remaining reader. Kernel checking validates the
+  implication but does not establish its premises at a concrete call site.
+- **Sweep:** `core` retains the literal table; key/value adapters frame it through.
+  The assembled theorem accepts an additional persistent context, shared by all
+  reader hypotheses, for the ignored reader's transitive code dependencies.
+- **Validation:** Lean MCP checks the revised adapters and assembled theorem;
+  the complete audit checks their compiled declarations. Discharging the ignored
+  reader itself remains open.
+
 ## Agent results
 
 Success and failure per task type and model (section 11.2 of the plan), used

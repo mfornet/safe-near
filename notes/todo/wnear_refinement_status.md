@@ -1,6 +1,6 @@
 # wNEAR refinement: status and how to resume
 
-Campaign status on 2026-10-29; local continuation is active. Details are in `wnear_refinement_proof.md`: M3 for the first method, M6 for JSON arguments (the parser map is `wnear_m6_parser_map.md`), and M8 for the other methods.
+Campaign status on 2026-10-30; local continuation is active. Details are in `wnear_refinement_proof.md`: M3 for the first method, M6 for JSON arguments (the parser map is `wnear_m6_parser_map.md`), and M8 for the other methods.
 
 `refines_wnear_exported` (`Proofs/Refinement.lean`) is still the only `sorry`. Every result below is proved with no `sorry`. Each depends only on `propext`, `Classical.choice` and `Quot.sound`: never use `bv_decide` or `native_decide`.
 
@@ -584,6 +584,69 @@ continuation is published to PR #40 after its validation gates pass.
   whitespace checks pass. Evidence: `/tmp/pr40-value-reuse-final-audit.log`
   and `/tmp/pr40-value-reuse-style.log`.
 
+## Changing-state object-loop continuation (2026-10-30)
+
+- `SerdeStructObjState.f228_obj_state` proves the actual object path of 228 with
+  cursor-indexed member state `J`. Keys and ignored values may change heap/scratch
+  resources, and the account-id reader installs a saved String. The loop preserves
+  that String through later members, checks the closing `}`, restores depth 128 and
+  returns the complete 368-byte frame. It uses the existing `loopRes`/`objCost`
+  decomposition and the existing charge; its explicit depth premise is `d + 42`.
+- `SerdeEndMapSuccess.f90_close` proves the successful closing-object check with
+  only reader/global resources, at `(200 + 96 * whitespace) * regularOpCost` and
+  `d + 2`. The changed heap, scratch and stack remain framed through that call.
+- `SerdeStructObjKeyState.core` exposes reachable heap/scratch coordinates and
+  owns the vtable, all three string tables, static field name and literal table
+  needed by ignored values. `member` adds the
+  saved String's bytes and live allocation. It uses separate bounds before and after
+  the one account-id allocation; a single bound predicate would make the pure value
+  closure demand hypothetical repeated String allocations. `seen_core` lends that state while
+  retaining the loop's descriptor; `key_exact` preserves the exact endpoint on
+  borrowed and copied paths; `member_mono` transports pure cursor bounds.
+- `SerdeStructObjKeyState.keyHyp` discharges the loop's actual key-call hypothesis
+  with `SerdeKeyEsc.f193_key_model`. `KeyConditions` asks only for room, the fixed
+  charge bound and preservation of pure reachable-state bounds. The saved String
+  and its descriptor remain live while the scratch allocation can change.
+- `SerdeStructObjValueState.account_model` derives the quoted decoded string from
+  the model's account reader, including escaped inputs. `valueHyp` discharges the
+  loop's actual colon/value hypothesis using `SerdeMapValueReuse.f205_model`.
+  `ValueConditions` asks only for room, charge and endpoint bounds, including the
+  owned String's allocation. Both borrowed and copied values use this interface.
+- `SerdeStructObjModelState.f228_obj_model` assembles the concrete key/value
+  contracts with the actual loop and the model account reader. The remaining Wasm
+  reader hypothesis is `IgnoreHyp`. Its ignored decoder is parameterized with
+  `Agrees ign valueSkip`, rather than requiring literal model skipping on malformed
+  numeric prefixes that serde can reject. This retains the existing usable model
+  correspondence instead of assuming an unprovable ignored-reader contract.
+  An additional persistent code context supplies the ignored reader's transitive
+  callees; the successful key/value code bundle alone does not contain them.
+- The general object-control integration is now proved. The public result is still
+  conditional on `KeyConditions`, `ValueConditions`, monotone reachable bounds, an
+  initial `member` state and the ignored-reader contract. Those obligations, deeply
+  nested/escaped ignored values, object-state cleanup through 78/66/65 and general
+  rejection remain open. This does not establish full `AcceptContract` or a seventh
+  exported method refinement.
+- Room predicates receive alignment and positivity from the actual allocator,
+  via `scratch_alignment`, rather than requiring the pure interval-closed bounds
+  to imply them. `alignment_not_interval` records the counterexample; misstatement
+  entries 9–11 explain the interface corrections made before publication.
+- Quantitative follow-up: `keyHyp` currently pays the general string allowance
+  `500 + 470 * consumed` even for borrowed keys. The existing dense-member bound
+  used `300 + 130 * consumed`: for an empty key the new conservative allowance is
+  540 operations higher, so it does not fit the old 470-per-input-byte member
+  arithmetic unchanged. Reuse the old no-escape key reader with allocated scratch
+  framed through (as for the plain value), and choose that tighter charge on
+  borrowed keys. Escaped strings also retain separate growth charges; their
+  accepting instruction estimate may need tightening before the uniform method
+  allowance can absorb them. No complete uniform gas bound is claimed here.
+- Validation: `just wnear-audit` passes (2802 build jobs; 468 wNEAR modules,
+  63521 declarations and 58237 theorems). Only the three existing dependencies on
+  `Proofs.Refinement` use `sorryAx`; strict NearLogic has zero violations and
+  statement pins match. Lean MCP verifies the public object theorem, concrete
+  key/value adapters and closing check with only standard axioms. Changed-source
+  Lean style and whitespace checks pass. Evidence:
+  `/tmp/pr40-object-loop-final-audit.log` and `/tmp/pr40-object-loop-style.log`.
+
 ## Methods
 
 There are 15 exported methods; six now have complete per-call refinement proofs under their protocol premises.
@@ -659,14 +722,14 @@ The texts are proved equal to the model's `Panic.message` (`PanicText`).
       - absorb `growthBudget` into the unchanged allowance under the reachable
         heap/scratch invariant; use the concrete append trace and its logarithmic
         growth-count, copy and page bounds;
-      - generalize the struct-reader hypotheses to carry changing scratch/heap
-        state instead of reusing the borrowed-key `Hyp646` unchanged;
+      - discharge `KeyConditions`/`ValueConditions` and the reachable member-state
+        bounds of the proved changing-state object loop;
       - keep the all-outcome `costRun` separate: it has a proved quadratic lower
         bound even on accepted newline escapes (`StrCostLower`);
       - the copied array is integrated through 214/228/78/66/65, with scratch
-        cleanup; finish the object-loop/escaped-key integration and general
-        argument-contract bounds, including hex-table ownership;
-      - integrate `SerdeKeyEsc.f193_key_model` into the changing-state object loop;
+        cleanup; carry the proved changing-state object result through 78/66/65
+        and close general argument-contract bounds, including hex-table ownership;
+      - instantiate the remaining ignored-reader state transition in that loop;
       - 652 (`ignore_escape`).
    3. Ignored values nested deeper: 84 grows the scratch from capacity 0, and `Hyp81` must allow changes to the heap and the scratch.
 2. **`ft_balance_of`, method level.** Take the parser's contracts as parameters until they are proved. The argument layer is in `EnvInput` and `ArgsLeaves`, the balance read in `LookupMapGet`/`StorageReadWrapF`.

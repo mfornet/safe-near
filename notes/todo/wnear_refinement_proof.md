@@ -1280,6 +1280,36 @@ be assumed unchanged after a later key grows scratch. The accepting method gas/r
 bounds, deep ignored values/escapes and general rejection remain open; still six
 completed exported methods under protocol premises.
 
+**Changing-state object-loop continuation (2026-10-30):**
+`SerdeStructObjState.f228_obj_state` proves the full actual object path with
+cursor-indexed member state, allowing keys and ignored values to change heap and
+scratch while preserving a saved account-id String. It restores all 368 stack
+bytes and nesting depth, at the existing `objCost` and `d + 42`.
+`SerdeEndMapSuccess.f90_close` frames the changed resources through the successful
+closing `}`. `SerdeStructObjKeyState.keyHyp` and
+`SerdeStructObjValueState.valueHyp` instantiate the concrete key and account-id
+calls; their remaining `KeyConditions`/`ValueConditions` are pure room, charge and
+reachable-state closure obligations. The concrete member state uses separate
+`B`/`Bsaved` bounds before and after the one-time account-id allocation, so the
+pure value closure does not demand repeated String allocations (misstatement 9).
+Allocator alignment and positivity come from the actual scratch/heap invariant;
+they are separate premises of room conditions, since numerical bounds are closed
+over growth intervals containing unaligned integers (misstatement 10). The shared
+state retains the literal table needed by ignored values, and the assembled theorem
+accepts an additional persistent code context for that reader's callees
+(misstatement 11).
+`SerdeStructObjModelState.f228_obj_model`
+assembles those readers with the actual loop. The ignored reader stays parameterized
+by `Agrees ign valueSkip` (literal model skipping on malformed numeric prefixes
+would be too strong). Remaining: prove reachable member-state bounds and the
+ignored-reader transition, carry the object result through 78/66/65 cleanup, and
+finish general rejection. The general key allowance (`500 + 470 * consumed`)
+is 540 operations more than the old borrowed-key allowance at an empty key;
+dense short members therefore need the tighter borrowed-key contract with grown
+scratch framed through. Separate scratch-growth charges also still need absorption,
+potentially using tighter successful instruction estimates. Full accepting coverage
+and the seventh method remain open.
+
 ### M7. State and storage
 
 Borsh encoding of the state, `LookupMap` keys, near-sdk's `env` wrappers
