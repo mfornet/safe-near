@@ -229,7 +229,7 @@ theorem readOk_of (ctx : Context) (raw : RawStorage) (S : WNear.State) (hwf : ct
     (hval : (hostOf ctx raw).storage WNear.stateKey = some (WNear.header S)) (h : NearState)
     (he : eraseP h = eraseP (hostOf ctx raw))
     (hproof : ProofBudget h ctx.trie
-      (Near.TrieOverlay.lookupProofBound (Near.TrieOverlay.contractKey ctx.current.bytes WNear.stateKey))) :
+      (Near.TrieOverlay.lookupProofBound (Near.TrieOverlay.contractKey ctx.current.bytes WNear.stateKey) + 29)) :
     ReadOkV h S ctx.trie (minJson S) := by
   have hr := FtTotalSupplyMethod.readOk_of ctx raw S hwf hl hval h he hproof
   have hcfg : h.config = (hostOf ctx raw).config := eraseP_field he NearState.config fun _ => rfl
@@ -249,7 +249,7 @@ theorem pre_of_ctx (cfg : WNear.Config) (ctx : Context) (raw : RawStorage) (st :
       pre S (eraseP (hostOf ctx raw)) := by
   refine ⟨fun hroom => ⟨ctx.trie, readOk_of ctx raw S hwf hl hval _ rfl ?_⟩,
     ⟨ctx.trie, readOk_of ctx raw S hwf hl hval _ rfl ?_⟩⟩
-  · exact (budget_of_room hwf hroom _ rfl rfl).mono (lookup_le_proofBound ctx)
+  · exact (budget_of_room hwf hroom _ rfl rfl).mono (read_le_proofBound ctx)
   · intro size hsz
     cases hsz
 

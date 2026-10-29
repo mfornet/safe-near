@@ -349,7 +349,7 @@ theorem segM306 (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (e inst : Nat) (
     (hlim : withinLimit h.config.maxStorageKeyLen 5 = true)
     (hb : build st.entries = .ok st.base) (hz : zeroHash ∉ st.base.witness.map Prod.fst)
     (hlink : h.storage WNear.stateKey = viewVal st (contractKey h.context.currentAccountId WNear.stateKey))
-    (hproof : ProofBudget h st (lookupProofBound (contractKey h.context.currentAccountId WNear.stateKey)))
+    (hproof : ProofBudget h st (readProofCost (contractKey h.context.currentAccountId WNear.stateKey) (h.storage WNear.stateKey)))
     (hreg : withinLimit h.config.maxRegisterLen 29 = true)
     (rest : List Instr) (Φ : Post NearState GF) :
     codeM306 e inst mi A n maxP ∗ credits Cg (costM306 cfg h S + R) ∗

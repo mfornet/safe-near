@@ -102,7 +102,7 @@ theorem f400_some (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
     (hb : build st.entries = .ok st.base) (hz : zeroHash ∉ st.base.witness.map Prod.fst)
     (hlink : h.storage (pre ++ key) = viewVal st (contractKey h.context.currentAccountId (pre ++ key)))
     (hproof : ProofBudget h st bud)
-    (hbud : lookupProofBound (contractKey h.context.currentAccountId (pre ++ key)) ≤ bud)
+    (hbud : readProofCost (contractKey h.context.currentAccountId (pre ++ key)) (h.storage (pre ++ key)) ≤ bud)
     (hreg : withinLimit h.config.maxRegisterLen v.length = true)
     (hsome : h.storage (pre ++ key) = some v) :
     code400 e n maxP inst mi A mx
@@ -365,7 +365,7 @@ theorem f399_some (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
     (hlink : h.storage (pre ++ (bytes32 L ++ key)) =
       viewVal st (contractKey h.context.currentAccountId (pre ++ (bytes32 L ++ key))))
     (hproof : ProofBudget h st bud)
-    (hbud : lookupProofBound (contractKey h.context.currentAccountId (pre ++ (bytes32 L ++ key))) ≤ bud)
+    (hbud : readProofCost (contractKey h.context.currentAccountId (pre ++ (bytes32 L ++ key))) (h.storage (pre ++ (bytes32 L ++ key))) ≤ bud)
     (hreg : withinLimit h.config.maxRegisterLen 16 = true)
     (hsome : h.storage (pre ++ (bytes32 L ++ key)) = some (b0 ++ b1)) :
     code399 e n maxP inst mi A mx

@@ -263,7 +263,7 @@ theorem f548_someF_host (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : 
     (hb : build st.entries = .ok st.base) (hz : zeroHash ∉ st.base.witness.map Prod.fst)
     (hlink : h.storage key = viewVal st (contractKey h.context.currentAccountId key))
     {bud : Nat} (hproof : ProofBudget h st bud)
-    (hbud : lookupProofBound (contractKey h.context.currentAccountId key) ≤ bud)
+    (hbud : readProofCost (contractKey h.context.currentAccountId key) (h.storage key) ≤ bud)
     (val : List UInt8) (hsk : h.storage key = some val)
     (hreg : withinLimit h.config.maxRegisterLen val.length = true)
     (hok : RegOk maxP len (some val)) :
