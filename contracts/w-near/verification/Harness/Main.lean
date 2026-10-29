@@ -1,4 +1,5 @@
 import Harness.Builtins
+import Wasm.Binary
 
 /-!
 # `wnear-harness`: stress the function contracts
