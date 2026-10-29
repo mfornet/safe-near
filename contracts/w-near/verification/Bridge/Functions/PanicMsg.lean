@@ -258,18 +258,18 @@ def MM (n ta : Nat) (A : Nat → Nat) (argp0 y : UInt32) : IProp GF :=
       ta ↦[wt][ (202 : UInt32).toNat ] Ref.func (A 887)))
 
 /-- The code the message's writes run (persistent). -/
-def CM (cfg : WasmConfig) (lim : ExecLimits) (D inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (n g ta : Nat)
+def CM (cfg : WasmConfig) (lim : ExecLimits) (D DM inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (n g ta : Nat)
     (gt : GlobalType) (data vtab idx : UInt32) (a : Nat) (code : Func) (W : List UInt8 → IProp GF) (B Kw : Nat)
     (pp argp kp k : UInt32) (Xm : IProp GF) (text : List UInt8) (Km Cg : Nat) : IProp GF :=
   iprop(inst ↪[inst] mi ∗ A 887 ↪[wf] FuncInst.wasm types[13]! inst f887 ∗
     A 872 ↪[wf] FuncInst.wasm types[15]! inst f872 ∗ a ↪[wf] FuncInst.wasm types[15]! inst code ∗
     SinkW cfg lim D inst mi n g gt data code W B Kw Cg ∗
-    MsgW cfg lim D inst mi n g ta gt data vtab idx a W B pp argp kp k Xm text Km Cg)
+    MsgW cfg lim DM inst mi n g ta gt data vtab idx a W B pp argp kp k Xm text Km Cg)
 
-instance (cfg : WasmConfig) (lim : ExecLimits) (D inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (n g ta : Nat)
+instance (cfg : WasmConfig) (lim : ExecLimits) (D DM inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (n g ta : Nat)
     (gt : GlobalType) (data vtab idx : UInt32) (a : Nat) (code : Func) (W : List UInt8 → IProp GF) (B Kw : Nat)
     (pp argp kp k : UInt32) (Xm : IProp GF) (text : List UInt8) (Km Cg : Nat) :
-    Persistent (CM cfg lim D inst mi A n g ta gt data vtab idx a code W B Kw pp argp kp k Xm text Km Cg) := by
+    Persistent (CM cfg lim D DM inst mi A n g ta gt data vtab idx a code W B Kw pp argp kp k Xm text Km Cg) := by
   unfold CM; infer_instance
 
 /-- The cost of the message's argument (887). -/
@@ -280,14 +280,15 @@ set_option maxRecDepth 100000 in
 set_option maxHeartbeats 16000000 in
 /-- **`Hyp872T` for the panic's message**: `"'"`, the `Arguments` through 887, `"', "`. -/
 theorem hypA_msg (cfg : WasmConfig) (lim : ExecLimits) (d inst : Nat) (mi : ModuleInst) (A : Nat → Nat)
-    (n g ta : Nat) (hm : IfaceMod mi A n g ta) (D : Nat) (hdD : d + 2 ≤ D) (hd : d + 3 < lim.maxCallDepth)
+    (n g ta : Nat) (hm : IfaceMod mi A n g ta) (D DM : Nat) (hdD : d + 2 ≤ D) (hdM : d + 2 ≤ DM)
+    (hd : d + 3 < lim.maxCallDepth)
     (Cg : Nat) (gt : GlobalType) (s data vtab idx argp0 y a0 pp argp kp k : UInt32) (a : Nat) (code : Func)
     (W : List UInt8 → IProp GF) (B Kw : Nat) (Xm : IProp GF) (text : List UInt8) (Km : Nat)
     (w1 : List UInt8) (hs : 240 ≤ s.toNat) (hs2 : s.toNat ≤ 2 ^ 32 - 16) (ha0 : a0.toNat + 24 ≤ 2 ^ 32)
     (hwB : w1.length + 4 + text.length ≤ B) :
     Hyp872T (GF := GF) cfg lim d inst mi n g ta Cg gt s data vtab idx 1070688 argp0 1 pptrA plenA
       (fun _ => y) (fun _ => 202) (fun _ => A 887) (fun _ => f887) a code
-      (CM cfg lim D inst mi A n g ta gt data vtab idx a code W B Kw pp argp kp k Xm text Km Cg)
+      (CM cfg lim D DM inst mi A n g ta gt data vtab idx a code W B Kw pp argp kp k Xm text Km Cg)
       (MM n ta A argp0 y) (StM n s W w1 y a0 pp argp kp k Xm text) Kw (cost887 cfg + Km) (KBM cfg Km) := by
   have hlt := s.toNat_lt
   have hs48 : (s - 48).toNat = s.toNat - 48 := by
