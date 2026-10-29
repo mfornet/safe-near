@@ -1,5 +1,6 @@
 import Bridge.Functions.SerdeStruct78
 import Bridge.Functions.DropVec
+import Bridge.Functions.JsonSuffix
 
 /-!
 # `from_trait` (66) for `ft_balance_of`'s arguments: the accepting run (M6)
@@ -480,6 +481,110 @@ theorem f66_acc (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType
   iframe Hbytes Hblk Hh
   ipureintro; exact ⟨hp', hcap, hr'⟩
 
+
 end L66
+
+/-- The length of the rest after the struct, as serde's machine reads it. -/
+def restLen (dv : List UInt8 → Option (WNear.AccountId × List UInt8)) (ign : List UInt8 → Option (Unit × List UInt8))
+    (bs : List UInt8) : Nat :=
+  match SerdeStructModel.structDe "account_id" dv ign bs with
+  | some (_, r) => r.length
+  | none => 0
+
+/-- 66's cost on an accepted input: its own, `end`'s whitespace, and the struct's (`costS`). -/
+def cost66 (cfg : WasmConfig) (K646 K169 K81 : Nat → Nat)
+    (dv : List UInt8 → Option (WNear.AccountId × List UInt8)) (ign : List UInt8 → Option (Unit × List UInt8))
+    (bs : List UInt8) : Nat :=
+  (425 + 96 * restLen dv ign bs) * cfg.regularOpCost + SerdeStruct78.costS cfg K646 K169 K81 dv ign bs
+
+/-- The model's acceptance, read by serde's machine: `Call.decode` gives `ftBalanceOf a` exactly when
+the machine reads the struct `a` and then only whitespace, for any readers that agree with the
+model. -/
+theorem decode_struct {dv : List UInt8 → Option (WNear.AccountId × List UInt8)}
+    {ign : List UInt8 → Option (Unit × List UInt8)} (hdv : SerdeStructModel.Agrees dv (SerdeStructModel.valueAs WNear.account))
+    (hign : SerdeStructModel.Agrees ign SerdeStructModel.valueSkip) {bs : List UInt8} {a : WNear.AccountId}
+    (h : WNear.Call.decode "ft_balance_of" bs = some (.ftBalanceOf a)) :
+    ∃ r, SerdeStructModel.structDe "account_id" dv ign bs = some (a, r) ∧ skipWhitespace r = [] := by
+  rw [SerdeStructModel.decode_balanceOf dv ign hdv hign bs] at h
+  simp only [Option.map_eq_some_iff] at h
+  obtain ⟨a', h1, h2⟩ := h
+  cases h2
+  unfold SerdeStructModel.fromSlice at h1
+  simp only [Option.bind_eq_some_iff] at h1
+  obtain ⟨⟨a2, r⟩, hS, hE⟩ := h1
+  unfold SerdeStructModel.endOk at hE
+  split at hE
+  · simp only [Option.some.injEq] at hE
+    subst hE
+    exact ⟨r, hS, by assumption⟩
+  · simp at hE
+
+/-- The pure facts `f78_acc` needs, from readers that agree with the model. -/
+theorem reader_facts {dv : List UInt8 → Option (WNear.AccountId × List UInt8)}
+    {ign : List UInt8 → Option (Unit × List UInt8)} (hdv : SerdeStructModel.Agrees dv (SerdeStructModel.valueAs WNear.account))
+    (hign : SerdeStructModel.Agrees ign SerdeStructModel.valueSkip) (bs : List UInt8) :
+    dv [] = none ∧
+    (∀ j a r, j ≤ bs.length → dv (bs.drop j) = some (a, r) → bs.drop (bs.length - r.length) = r) ∧
+    (∀ j r, j ≤ bs.length → ign (bs.drop j) = some ((), r) → bs.drop (bs.length - r.length) = r) ∧
+    (∀ q k r, q ≤ bs.length → stringBody (bs.drop q) [] = some (some k, r) → bs.drop (bs.length - r.length) = r) ∧
+    (∀ bs a r, dv bs = some (a, r) → r <:+ bs) ∧ (∀ bs r, ign bs = some ((), r) → r <:+ bs) := by
+  have hdvS : ∀ bs a r, dv bs = some (a, r) → r <:+ bs :=
+    JsonSuffix.agrees_suf hdv (fun _ _ _ h => JsonSuffix.valueAs_suf _ h)
+  have hignS : ∀ bs r, ign bs = some ((), r) → r <:+ bs := fun bs r h =>
+    JsonSuffix.agrees_suf hign (fun _ x _ h => by cases x; exact JsonSuffix.valueSkip_suf h) bs () r h
+  refine ⟨JsonSuffix.agrees_nil hdv (JsonSuffix.valueAs_nil _), ?_, ?_, ?_, hdvS, hignS⟩
+  · intro j a r _ h; exact JsonSuffix.drop_suf' (hdvS _ _ _ h)
+  · intro j r _ h; exact JsonSuffix.drop_suf' (hignS _ _ h)
+  · intro q k r _ h; exact JsonSuffix.drop_suf' (JsonSuffix.stringBody_suf' h)
+
+section L66m
+
+variable {GF : BundledGFunctors} [WasmGS NearState GF]
+
+/-- **`from_trait` (66) against the model**: wherever `Call.decode` reads `ftBalanceOf a`, `out`
+gets `Ok(a)`, at `cost66`, for any readers `dv` (169) and `ign` (81) that agree with the model and
+satisfy the hypotheses `Hyp646`, `Hyp169`, `Hyp81` at 66's `Deserializer` (`sp - 64`). -/
+theorem f66_dec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
+    (htype : type.results = []) (inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (n g ta : Nat)
+    (hm : IfaceMod mi A n g ta) (hd : d + 23 < lim.maxCallDepth) (Cg : Nat)
+    (gt : GlobalType) (sp out rd ptr idx : UInt32) (ob bs : List UInt8)
+    (maxP mlen F : Nat) (live : List (Nat × Nat)) (hob : ob.length = 16) (hout : out.toNat + 16 ≤ 2 ^ 32)
+    (hrd : rd.toNat + 12 ≤ 2 ^ 32) (hlen : bs.length + 1 < 2 ^ 28) (hptr : ptr.toNat + bs.length < 2 ^ 32)
+    (hsp : 400 ≤ sp.toNat) (hal : sp.toNat % 8 = 0) (hr : roomFor4 mlen maxP 20)
+    (dv : List UInt8 → Option (WNear.AccountId × List UInt8)) (ign : List UInt8 → Option (Unit × List UInt8))
+    (hdv : SerdeStructModel.Agrees dv (SerdeStructModel.valueAs WNear.account))
+    (hign : SerdeStructModel.Agrees ign SerdeStructModel.valueSkip)
+    (K646 K169 K81 : Nat → Nat) (Cd : IProp GF) [Persistent Cd]
+    (h646 : Hyp646 cfg lim inst mi n g ta A Cg gt (sp - 64) ptr idx bs maxP K646 Cd)
+    (h169 : Hyp169 cfg lim inst mi n g ta A Cg gt (sp - 64) ptr idx bs maxP dv K169 Cd)
+    (h81 : Hyp81 cfg lim inst mi n g ta A Cg gt (sp - 64) ptr idx bs maxP ign K81 Cd)
+    (a : WNear.AccountId) (h : WNear.Call.decode "ft_balance_of" bs = some (.ftBalanceOf a)) :
+    code66 n maxP inst mi A ∗ Cd ⊢
+      MFunSpec (GF := GF) cfg lim d type inst mi f66 Cg
+        (fun args => iprop(⌜args = [.i32 out, .i32 rd]⌝ ∗
+          g ↦[wg] ⟨gt, .i32 sp⟩ ∗ stk n (sp.toNat - 400) 400 ∗ vt n 1057464 idx ta (A 578) ∗
+          heapInv n maxP mlen live F ∗ n ↦[wms][ out.toNat ] ob ∗
+          sliceRead n rd ptr (UInt32.ofNat bs.length) 0 ∗ n ↦[wms][ ptr.toNat ] bs ∗
+          n ↦[wms][ 1062392 ] ParseStr.escTable ∗ n ↦[wms][ 1071704 ] FromUtf8Gen.utf8Width ∗
+          n ↦[wms][ 1051092 ] WNear.BalanceOfArgs.keyBytes))
+        (fun _ => cost66 cfg K646 K169 K81 dv ign bs)
+        (fun _ rs => iprop(⌜rs = []⌝ ∗ g ↦[wg] ⟨gt, .i32 sp⟩ ∗ stk n (sp.toNat - 400) 400 ∗
+          vt n 1057464 idx ta (A 578) ∗ sliceRead n rd ptr (UInt32.ofNat bs.length) 0 ∗
+          n ↦[wms][ ptr.toNat ] bs ∗
+          n ↦[wms][ 1062392 ] ParseStr.escTable ∗ n ↦[wms][ 1071704 ] FromUtf8Gen.utf8Width ∗
+          n ↦[wms][ 1051092 ] WNear.BalanceOfArgs.keyBytes ∗
+          ∃ (p cap : UInt32), n ↦[i32][ out.toNat ] 0 ∗ n ↦[i32][ out.toNat + 4 ] p ∗
+            n ↦[i32][ out.toNat + 8 ] cap ∗ n ↦[i32][ out.toNat + 12 ] (UInt32.ofNat a.val.utf8ByteSize) ∗
+            strRes n maxP live a p cap)) := by
+  obtain ⟨r, hS, hE⟩ := decode_struct hdv hign h
+  obtain ⟨hdv0, hdvs, higns, hstrs, hdvS, hignS⟩ := reader_facts hdv hign bs
+  have hsuf := JsonSuffix.drop_suf (JsonSuffix.structDe_suf "account_id" dv ign hdvS hignS hS)
+  have hrest : restLen dv ign bs = r.length := by unfold restLen; rw [hS]
+  unfold cost66
+  rw [hrest]
+  exact f66_acc cfg lim d type htype inst mi A n g ta hm hd Cg gt sp out rd ptr idx ob bs maxP mlen F live hob hout
+    hrd hlen hptr hsp hal hr dv ign K646 K169 K81 Cd h646 h169 h81 hdv0 hdvs higns hstrs a r hS hE hsuf
+
+end L66m
 
 end WNear.Binary.SerdeFromTrait
