@@ -166,7 +166,7 @@ def AcceptContract (S K0 K1 X : Nat) : Prop :=
     ∀ (Cg : Nat) (gt : GlobalType) (sp out rd ptr idx : UInt32) (bs ob : List UInt8) (hl F : Nat)
       (live : List (Nat × Nat)) (a : WNear.AccountId),
     S ≤ sp.toNat → sp.toNat % 16 = 0 → ptr.toNat + bs.length < 2 ^ 32 → bs.length + 1 < 2 ^ 28 →
-    out.toNat + 16 ≤ 2 ^ 32 → ob.length = 16 → rd.toNat + 12 ≤ 2 ^ 32 → roomFor4 hl 2048 20 →
+    out.toNat + 16 ≤ 2 ^ 32 → ob.length = 16 → rd.toNat + 12 ≤ 2 ^ 32 → SerdeStructArr.roomS hl 2048 →
     WNear.Call.decode "ft_balance_of" bs = some (.ftBalanceOf a) →
     AcceptCallees (GF := GF) cfg h0 lim Cg gt (sp - 64) ptr idx bs F K0 K1 X →
     ⊢ (codeCtx (GF := GF) cfg h0 -∗

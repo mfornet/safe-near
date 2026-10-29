@@ -33,7 +33,7 @@ open WNear.Binary.VecFromElem (stk stk_split stk_join stk_intro stk_word stk_add
 open WNear.Binary.SerdeRead (rd optByte wsLen)
 open WNear.Binary.SerdeErrBox (errCode costErr heapA roomFor4)
 open WNear.Binary.SerdeEnds (endCode)
-open WNear.Binary.SerdeStructArr (strRes tbl Hyp169 stk_join')
+open WNear.Binary.SerdeStructArr (strRes tbl Hyp169 roomS stk_join')
 open WNear.Binary.SerdeStructObj (Hyp646 Hyp81)
 open WNear.Binary.ArgsLeaves (sliceRead deserializer)
 open NearInterface.Json
@@ -188,7 +188,7 @@ theorem f66_acc (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType
     (gt : GlobalType) (sp out rd ptr idx : UInt32) (ob bs : List UInt8)
     (maxP mlen F : Nat) (live : List (Nat × Nat)) (hob : ob.length = 16) (hout : out.toNat + 16 ≤ 2 ^ 32)
     (hrd : rd.toNat + 12 ≤ 2 ^ 32) (hlen : bs.length + 1 < 2 ^ 28) (hptr : ptr.toNat + bs.length < 2 ^ 32)
-    (hsp : 400 ≤ sp.toNat) (hal : sp.toNat % 8 = 0) (hr : roomFor4 mlen maxP 20)
+    (hsp : 400 ≤ sp.toNat) (hal : sp.toNat % 8 = 0) (hr : roomS mlen maxP)
     (dv : List UInt8 → Option (WNear.AccountId × List UInt8)) (ign : List UInt8 → Option (Unit × List UInt8))
     (K646 K169 K81 : Nat → Nat) (Fb : Nat) (Cd : IProp GF) [Persistent Cd]
     (h646 : Hyp646 cfg lim inst mi n g ta A Cg gt (sp - 64) ptr idx bs maxP K646 Cd)
@@ -553,7 +553,7 @@ theorem f66_dec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType
     (gt : GlobalType) (sp out rd ptr idx : UInt32) (ob bs : List UInt8)
     (maxP mlen F : Nat) (live : List (Nat × Nat)) (hob : ob.length = 16) (hout : out.toNat + 16 ≤ 2 ^ 32)
     (hrd : rd.toNat + 12 ≤ 2 ^ 32) (hlen : bs.length + 1 < 2 ^ 28) (hptr : ptr.toNat + bs.length < 2 ^ 32)
-    (hsp : 400 ≤ sp.toNat) (hal : sp.toNat % 8 = 0) (hr : roomFor4 mlen maxP 20)
+    (hsp : 400 ≤ sp.toNat) (hal : sp.toNat % 8 = 0) (hr : roomS mlen maxP)
     (dv : List UInt8 → Option (WNear.AccountId × List UInt8)) (ign : List UInt8 → Option (Unit × List UInt8))
     (hdv : SerdeStructModel.Agrees dv (SerdeStructModel.valueAs WNear.account))
     (hign : SerdeStructModel.Agrees ign SerdeStructModel.valueSkip)

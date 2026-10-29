@@ -21,7 +21,7 @@ open WNear.Binary.Interface (IfaceMod)
 open WNear.Binary.VecFromElem (stk)
 open WNear.Binary.SerdeRead (rd wsLen)
 open WNear.Binary.SerdeErrBox (roomFor4)
-open WNear.Binary.SerdeStructArr (strRes tbl Hyp169 arrOk costArr)
+open WNear.Binary.SerdeStructArr (strRes tbl Hyp169 roomS arrOk costArr)
 open WNear.Binary.SerdeStructObj (Hyp646 Hyp81 costObj)
 open NearInterface.Json
 
@@ -125,7 +125,7 @@ theorem f78_acc (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType
     (gt : GlobalType) (sp out de ptr idx : UInt32) (ob bs : List UInt8)
     (maxP mlen F : Nat) (live : List (Nat × Nat)) (hob : ob.length = 16) (hout : out.toNat + 16 ≤ 2 ^ 32)
     (hlen : bs.length + 1 < 2 ^ 28) (hptr : ptr.toNat + bs.length < 2 ^ 32) (hde : de.toNat + 25 ≤ 2 ^ 32)
-    (hsp : 336 ≤ sp.toNat) (hal : sp.toNat % 8 = 0) (hr : roomFor4 mlen maxP 20)
+    (hsp : 336 ≤ sp.toNat) (hal : sp.toNat % 8 = 0) (hr : roomS mlen maxP)
     (dv : List UInt8 → Option (WNear.AccountId × List UInt8)) (ign : List UInt8 → Option (Unit × List UInt8))
     (K646 K169 K81 : Nat → Nat) (Fb : Nat) (Cd : IProp GF) [Persistent Cd]
     (h646 : Hyp646 cfg lim inst mi n g ta A Cg gt de ptr idx bs maxP K646 Cd)

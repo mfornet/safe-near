@@ -156,7 +156,7 @@ theorem f65_accept (K0 K1 X : Nat) (hc : AcceptContract (GF := GF) 400 K0 K1 X)
     (Cg : Nat) (gt : GlobalType) (sp out ptr idx : UInt32) (bs ob : List UInt8) (hl F : Nat)
     (live : List (Nat × Nat)) (a : WNear.AccountId) (hS : 416 ≤ sp.toNat) (hal : sp.toNat % 16 = 0)
     (hptr : ptr.toNat + bs.length < 2 ^ 32) (hlen : bs.length + 1 < 2 ^ 28) (hout : out.toNat + 16 ≤ 2 ^ 32)
-    (hob : ob.length = 16) (hr : roomFor4 hl 2048 20)
+    (hob : ob.length = 16) (hr : SerdeStructArr.roomS hl 2048)
     (hdec : WNear.Call.decode "ft_balance_of" bs = some (.ftBalanceOf a))
     (hcal : AcceptCallees (GF := GF) cfg h0 lim Cg gt (sp - 16 - 64) ptr idx bs F K0 K1 X) :
     codeCtx (GF := GF) cfg h0 ⊢
