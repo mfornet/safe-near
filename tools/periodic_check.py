@@ -59,6 +59,7 @@ def validation_steps(root: Path, nearcore: Path) -> list[Step]:
     add("tooling-tests", "", sys.executable, "-m", "unittest", "discover", "-s", "tools/tests", "-v")
     add("wasm-build", "near-lean/wasm", "lake", "build", "Wasm", "testsuite", "wasm", "--wfail")
     add("wasm-logic-build", "near-lean/wasm-logic", "lake", "build", "--wfail")
+    add("near-logic-build", "near-lean/near-logic", "lake", "build", "NearLogic")
     add("interface-build", "near-lean/interface", "lake", "build", "NearInterface", "--wfail")
     add("vm-build", "near-lean/vm", "lake", "build", "NearVM", "vm-tests", "vm-replay", "--wfail")
     add("runtime-build", "near-lean/runtime", "lake", "build", "NearRuntime", "runtime-tests",
@@ -80,7 +81,8 @@ def validation_steps(root: Path, nearcore: Path) -> list[Step]:
     for contract, report in adapter_contracts:
         add(f"{report}-adapter-build", f"contracts/{contract}/verification", "lake", "build", "Spec",
             "runtime-adapter-tests", "--wfail")
-        add(f"{report}-proofs-build", f"contracts/{contract}/verification", "lake", "build", "Model", "Proofs")
+        add(f"{report}-proofs-build", f"contracts/{contract}/verification", "lake", "build", "Model", "Proofs", "Bridge",
+            "Differential", "wnear-scenarios", "wnear-harness")
     # New contract projects join the sequential build/audit gate automatically.
     contract_projects = sorted({manifest.parent for pattern in ("*/verification/lakefile.toml",
                                                                "*/verification/lakefile.lean")
@@ -114,6 +116,7 @@ def validation_steps(root: Path, nearcore: Path) -> list[Step]:
     python("verification-buildtime", "tools/verification_buildtime.py")
     python("audit-regressions", "tools/tests/check_axiom_audit.py")
     for package, report in [("near-lean/wasm", "wasm"), ("near-lean/wasm-logic", "wasm-logic"),
+                            ("near-lean/near-logic", "near-logic"),
                             ("near-lean/interface", "interface"), ("near-lean/vm", "vm"),
                             ("near-lean/runtime", "runtime"), ("near-lean/chain", "chain"),
                             ("near-lean/crypto", "crypto"), ("near-lean/sdk", "sdk")]:

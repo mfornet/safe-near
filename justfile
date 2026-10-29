@@ -68,7 +68,9 @@ wnear-harness *args:
 
 # Audit every wNEAR model/spec/proof declaration, including transitive axioms, and check the pinned statements.
 wnear-audit *options:
-    cd contracts/w-near/verification && lake build Model Spec Proofs Differential runtime-adapter-tests wnear-scenarios wnear-harness
+    cd near-lean/near-logic && lake build NearLogic
+    python3 tools/axiom-audit.py near-lean/near-logic --no-build --report audit/near-logic.json
+    cd contracts/w-near/verification && lake build Model Spec Proofs Bridge Differential runtime-adapter-tests wnear-scenarios wnear-harness
     python3 tools/axiom-audit.py contracts/w-near/verification --no-build --allow-sorry-module Proofs.Refinement --report audit/wnear.json --statements contracts/w-near/verification/statements.json {{ options }}
 
 # Rewrite contracts/w-near/verification/STATEMENTS.md after an intended change to a pinned statement.

@@ -103,7 +103,11 @@ jobs:
         run: |
           lake build Spec runtime-adapter-tests --wfail
           ./.lake/build/bin/runtime-adapter-tests
-          lake build Model Proofs Differential wnear-scenarios wnear-harness
+          lake build Model Proofs Bridge Differential wnear-scenarios wnear-harness
+      - name: Metered logic build and axiom audit
+        run: |
+          (cd near-lean/near-logic && lake build NearLogic)
+          python3 tools/axiom-audit.py near-lean/near-logic --no-build --report audit/near-logic.json
       - name: wNEAR model proof axioms
         run: python3 tools/axiom-audit.py contracts/w-near/verification --no-build --allow-sorry-module Proofs.Refinement --report audit/wnear.json --statements contracts/w-near/verification/statements.json
       - uses: actions/upload-artifact@v4

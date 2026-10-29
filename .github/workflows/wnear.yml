@@ -11,7 +11,6 @@ on:
     paths:
       - "contracts/w-near/verification/**"
       - "near-lean/**"
-      - "!near-lean/wasm-logic/**"
       - "tools/axiom-audit.py"
       - "lean-toolchain"
       - ".github/workflows/wnear.yml"
@@ -19,7 +18,6 @@ on:
     paths:
       - "contracts/w-near/verification/**"
       - "near-lean/**"
-      - "!near-lean/wasm-logic/**"
       - "tools/axiom-audit.py"
       - "lean-toolchain"
       - ".github/workflows/wnear.yml"
@@ -50,8 +48,13 @@ jobs:
       - uses: leanprover/lean-action@v1
         with:
           lake-package-directory: contracts/w-near/verification
-          build-args: Model Spec Proofs Differential runtime-adapter-tests wnear-scenarios wnear-harness
+          build-args: Model Spec Proofs Bridge Differential runtime-adapter-tests wnear-scenarios wnear-harness
           use-mathlib-cache: true
+
+      - name: Build and audit the metered logic
+        run: |
+          (cd near-lean/near-logic && lake build NearLogic)
+          python3 tools/axiom-audit.py near-lean/near-logic --no-build --report audit/near-logic.json
 
       - name: Audit axioms and check the pinned statements
         run: >-
@@ -63,4 +66,4 @@ jobs:
         if: always()
         with:
           name: wnear-audit
-          path: audit/wnear.json
+          path: audit/
