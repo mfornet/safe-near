@@ -102,7 +102,24 @@ def Spec646 (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (inst : Nat) (mi : M
         n ↦[wms][ p.toNat ] kb ∗ (n ↦[wms][ p.toNat ] kb -∗ Q646)))
 
 theorem end_bits (x : UInt32) : (((0 : UInt64) ||| 512) ||| (x.toUInt64 <<< (32 : UInt64))) &&& 65281 = 512 := by
-  bv_decide
+  apply UInt64.toBitVec_inj.mp
+  apply BitVec.eq_of_getLsbD_eq
+  intro i hi
+  have h32 : (UInt64.toBitVec 32 % 64) = 32#64 := rfl
+  simp only [UInt64.toBitVec_and, UInt64.toBitVec_or, UInt64.toBitVec_shiftLeft, BitVec.getLsbD_and,
+    BitVec.getLsbD_or, h32, BitVec.shiftLeft_eq', BitVec.getLsbD_shiftLeft]
+  by_cases h : i < 32
+  · have : (32#64).toNat = 32 := rfl
+    simp only [this, show decide (i < 32) = true from decide_eq_true h, Bool.not_true, Bool.false_and,
+      Bool.and_false, Bool.or_false]
+    revert i; decide
+  · have h2 : (UInt64.toBitVec 65281).getLsbD i = false := by
+      have : i < 64 := hi
+      revert h i; decide
+    have h3 : (UInt64.toBitVec 512).getLsbD i = false := by
+      have : i < 64 := hi
+      revert h i; decide
+    rw [h2, h3, Bool.and_false]
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 8000000 in

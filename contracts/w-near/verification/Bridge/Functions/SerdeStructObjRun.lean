@@ -387,10 +387,10 @@ theorem f228_obj (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
       icases HQ with ⟨%⟨v, hrs, hv⟩, M32, M36, Hg, S176, Hrd⟩
       subst hrs
       have hv1 : v &&& 1 = 0 := by
-        have : v &&& 1 = (v &&& 65281) &&& 1 := by bv_decide
+        have : v &&& 1 = (v &&& 65281) &&& 1 := by rw [UInt64.and_assoc]; rfl
         rw [this, hv]; decide
       have hv2 : v &&& 65280 = 512 := by
-        have : v &&& 65280 = (v &&& 65281) &&& 65280 := by bv_decide
+        have : v &&& 65280 = (v &&& 65281) &&& 65280 := by rw [UInt64.and_assoc]; rfl
         rw [this, hv]; decide
       mstep; mstep; mstep
       rw [hv1]
