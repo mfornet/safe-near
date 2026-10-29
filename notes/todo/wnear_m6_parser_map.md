@@ -75,19 +75,19 @@ grammar function.
 
 | fn | size | role |
 |---|---|---|
-| 228 | 528 | `deserialize_struct`. Steps: `parse_whitespace`; on `{`, decrement the depth (`RecursionLimitExceeded` at 0), then the inlined derived `visit_map` loop; on `[`, the same with `visit_seq`; on anything else, `peek_invalid_type` (340). After the visitor comes `end_map` (90) or `end_seq` (91), then `fix_position` (326) on errors. |
-| 193 | 265 | `MapAccess::next_key_seed`: whitespace, then `}` (end), `,` (only after the first key), or `"`. A key is `parse_str` (646) into the scratch, after `Vec::clear` (82), and goes to the field visitor 194. |
+| 228 | 528 | `deserialize_struct`. Steps: `parse_whitespace`; on `{`, decrement the depth (`RecursionLimitExceeded` at 0), then the inlined derived `visit_map` loop; on `[`, the same with `visit_seq`; on anything else, `peek_invalid_type` (340). After the visitor comes `end_map` (90) or `end_seq` (91), then `fix_position` (326) on errors. Accepting runs proved from hypotheses on 646, 169 and 81: `SerdeStructArr.f228_arr` (array form), `SerdeStructObjRun.f228_obj` (object form, loop invariant `inv228`) |
+| 193 | 265 | `MapAccess::next_key_seed`: whitespace, then `}` (end), `,` (only after the first key), or `"`. A key is `parse_str` (646) into the scratch, after `Vec::clear` (82), and goes to the field visitor 194. Accepting cases proved: `SerdeNextKey.f193_end`, `f193_key` (646 as `Spec646`; `f646_key_noesc` for escape-free keys) |
 | 194 | 8 | `__FieldVisitor::visit_str`: the key equals `account_id` (10 bytes at 1051092, compared by 754 → 755 → `bcmp` 953) to give field 0; otherwise `__ignore`. 953, 755, 754 and 194 are proved (`SerdeKey`). |
 | 205 | 19 | `next_value_seed` of the known field: `parse_object_colon` (89), then `ValidAccountId::deserialize` (169). Proved from any spec of 169 (`SerdeValueSeed.f205_of_169`) |
 | 201 | 12 | `next_value_seed` of an unknown field: 89, then `ignore_value` (81). Proved from any spec of 81 (`SerdeValueSeed.f201_of_81`) |
-| 214 | 225 | `SeqAccess::next_element_seed` (the array form `["<a>"]`): 169 |
+| 214 | 225 | `SeqAccess::next_element_seed` (the array form `["<a>"]`): 169. The struct's element proved from a spec of 169 (`SerdeSeqElem.f214_first`) |
 | 89 | 61 | `parse_object_colon`. Proved (`SerdeEnds.f89_spec`) |
 | 90 | 75 | `end_map`: `}`, else `TrailingComma`, `TrailingCharacters` or EOF. Proved (`SerdeEnds.f90_spec`) |
 | 91 | 132 | `end_seq`: the same for `]`. Proved (`SerdeEndSeq.f91_spec`) |
 | 177 | 11 | a missing `account_id`: `missing_field` (101) |
 | 166 | 47 | `duplicate_field` (a second `account_id`) |
 | 165 | 66 | `invalid_length` (`[]`) |
-| 77 | 8 | drop `Option<ValidAccountId>` (the value read before a later error) |
+| 77 | 8 | drop `Option<ValidAccountId>` (the value read before a later error). `None` proved (`SerdeStructObj.f77_none`) |
 
 ### Strings
 

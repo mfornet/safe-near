@@ -766,20 +766,69 @@ digit, the model one step later), changes no outcome inside a struct.
   `structDe_arrM`): `rfl` reduces it, `simp` and `dsimp` do not. `grind` closes the length
   side goals of `number`.
 
+*The struct's accepting run (sixth round).* Proved, no `sorry`, the accepting half of 228 with the
+callees not proved yet as hypotheses:
+
+* `next_key_seed` (193), `SerdeNextKey.lean`. `f193_end`: `}` after the whitespace gives `Ok(None)`
+  (`v &&& 0xFF01 = 512`), the reader at the `}`, cost `(200 + 96·w)·c`. `f193_key`: a key after
+  `first`, or after `,` (`keyQ first bs i = some q`): 82 clears the scratch, 646 is the hypothesis
+  `Spec646` (an `Ok` reference `(p, |kb|)` with `p ↦ kb` lent by a wand), 194 gives
+  `fieldOf kb` (0 for `account_id`, 256 otherwise), `first` cleared; cost
+  `(800 + 96·keyWs + cost194)·c + K646`; stack 176. `f646_key_noesc` proves `Spec646` from
+  `ParseStrErr.f646_spec_noesc` for an escape-free accepted key (`rd_lend` lends the key's bytes
+  out of the input).
+* `next_element_seed` (214), `SerdeSeqElem.lean`: `f214_first`, the struct's one element with
+  `first = 1` and a byte `≠ ]`, 169 as the hypothesis `Spec169`; `Ok(Some(String))` at `out`; cost
+  `(300 + 96·w)·c + K169`.
+* 228 on the array form, `SerdeStructArr.lean` (`f228_arr`): `[`, 214, `]` (91), `Ok(a)` at `out`
+  (`strRes`: the bytes, the block's rest, the heap lending `(p, cap)`); cost `costArr`
+  (`1300·c`, three runs of whitespace, `K169`); stack 336. `Hyp169` is 169's accepting spec against
+  any account-id reader `dv`; `spec169_of_hyp` gives 214's view of it.
+* 228 on the object form, `SerdeStructObjRun.lean` (`f228_obj`), with `SerdeStructLoop.lean` (pure):
+  * `loopRes` is `objLoop` seen from the binary's loop head (before the `,`); `loop_end` and
+    `loop_member` are one iteration of the binary, by indices.
+  * The loop invariant `inv228`: the members left (`loopRes … N first sA (bs.drop i)` reads `a`
+    and leaves `rF`), the field read so far (`seenRes`: `None` at `s + 40`, or the string), the
+    credits `objCost` for the rest. Each member is 193 then 205 (169) or 201 (81); `}` ends it,
+    then 90 and `Ok(a)`.
+  * Hypotheses: `Hyp646` (keys, heap unchanged), `Hyp169`, `Hyp81` (81 at 201's call, heap
+    unchanged), and three pure suffix facts (`hdvs`, `higns`, `hstrs`: the readers return a suffix
+    of the input; true of the model, not yet proved here).
+  * Cost `costObj`: `(400 + 96·w)·c`, `objCost` (per member `(1200 + 96·(keyWs + w) + cost194)·c`
+    plus `K646` and `K169`/`K81`; `(300 + 96·w)·c` at the `}`), and `300·c`. Stack 336; `sp` 8-aligned.
+* `key_iff`: the visitor's byte test is the model's key test (through `fromUTF8_toUTF8`).
+
+*Restrictions and findings of this round.*
+
+* The heap is unchanged by 646 on keys and by 81 (`Hyp646`, `Hyp81`). That holds for escape-free
+  keys (`f646_key_noesc`) and for an `ignore_value` that pushes no frame. Keys with escapes and
+  nested ignored values grow the scratch from capacity 0 (an allocation), which these hypotheses
+  exclude; generalizing means a heap that changes across the loop, in `inv228`'s `seenRes`.
+* `FromTraitContract` (disagreement with the plan): it asks the cost `K0 + K1·len` on the rejecting
+  side too, and it does not hand the parser the read-only data it reads: the `ESCAPE` table
+  (1062392), the UTF-8 width table (1071704) and the field name (1051092). Both need a restatement:
+  an accepting contract with these data resources (given back), and a rejecting one with a loose
+  cost. Smaller: the proved specs need `ptr + len < 2^32` and `len + 1 < 2^28` (the statement has
+  `≤` and `len < 2^28`), and a heap room `R` large enough for `roomFor4` (an error box's page).
+* `K1`: the accepting cost per byte is not bounded yet. `objCost` charges per member a constant
+  (about `1550·c`, with `cost194 = 342`) plus `K646` and the value's `K`; a member takes at least
+  5 bytes (`"":0,`), so the constant alone is about `310·c` per byte, plus `96` per whitespace byte
+  and the string scan (646 about `130` per byte). `K1 ≲ 480` looks reachable for the canonical
+  input but needs the bound proved against `objCost`, and short members are the worst case.
+
 *What is left for `FromTraitContract`.*
 
-* 193 (`next_key_seed`: the first/`,` logic, `parse_str` into the scratch, then 194), 214 (the
-  array's element), 228 (the struct) and 66. The plan: prove the accepting half
-  first, with `fromSlice … = some a` as the hypothesis; every rejecting branch of 228/193 is then
-  closed by `fromSlice_eq`, and 340, 165, 166, 177, 326 and 92 are not needed for it. The
-  rejecting half needs them, with a loose cost.
-* The specifications to take as parameters (hypotheses), as 201/205 do: 169 (on a string that
-  decodes to a valid account id: `Ok(String)`, the reader past it; cost `A + B·consumed`), 81 (on
-  input that `vSkip` accepts; its frame stack needs the scratch to grow, 698/712–716 from capacity
-  0, which `VecGrow` covers only for a non-empty buffer) and 646 for keys (an `Ok` reference to
-  the decoded bytes, in the input or the scratch, with the resource to read them for 194).
+* 78 (`Input::deserialize`, a call of 228) and 66: 634, 228 (`f228_arr` or `f228_obj`, by
+  `structDe`'s first byte), 320, the drop of the scratch (68, a no-op at capacity 0), and the
+  restated contract with the parameters `Hyp646`, `Hyp169`, `Hyp81`; then `f65_contract`.
+* The pure suffix lemmas (`stringBody`, `valueR` through `Agrees`) for `hstrs`, `hdvs`, `higns`.
+* The linear bound `costObj`, `costArr` `≤ K0 + K1·len` from linear bounds on `K646`, `K169`, `K81`.
+* The rejecting half: 340, 165, 166, 177, 326, 92 and the error paths of 193/214/228, with a loose
+  cost.
 * 81's Wasm proof, against `IgnoreModel`'s equations, with 83/86/87 (numbers), 323 (literals) and
-  650/652 (strings without UTF-8); and the reject paths 340, 642/643, 693/479/130/387/151.
+  650/652 (strings without UTF-8); the frame stack (84/85) needs the scratch's growth from capacity
+  0 (the escapes work) or the restriction to no pushed frame. Not started this round.
+* The reject paths 340, 642/643, 693/479/130/387/151.
 
 *Plan for the rest of `FromTraitContract`, bottom-up.*
 
