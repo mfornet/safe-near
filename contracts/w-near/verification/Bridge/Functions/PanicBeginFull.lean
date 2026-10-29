@@ -15,6 +15,14 @@ host's log limits are hypotheses. `f664_requiresPositive` and `f664_depositTooSm
 is the model's `Panic.message` (`PanicText.requiresPositiveDeposit_text`, `depositTooSmall_text`).
 
 Cost: `cost664 cfg (costTS cfg F J B) (panicText …) h`.
+
+Not done: the message path (`expect_failed` 879, `core::panicking::panic` 853). There 885 formats
+the message `Arguments` through 887, which copies its 24 bytes (`a .. a + 24`), and 879's payload
+`get` (826) copies them too, before the hook. `PanicFmt.f879_spec` and `f853_spec` drop the word
+at `a + 12` (the `fmt` slice's length, garbage: `stk48_open`/`stk32_open` discard it), and
+`PanicEntries.f879_full` hands the `Arguments`' cells (`argsHead`, `expectArgs`) to `ToStr`'s
+resources but not to `GetSpec`'s `G`: neither premise can be discharged as stated. The word at
+`a + 12` must be passed down, and for 879 the cells must go through `get` (`G` to `G'`).
 -/
 
 namespace WNear.Binary.PanicBeginFull
