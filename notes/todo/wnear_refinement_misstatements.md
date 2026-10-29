@@ -110,6 +110,24 @@ tends to come back in another place.
   Costs are now written with the parameter bytes in their comment.
 - **Test added:** the existing cost check; no new input needed.
 
+
+### 7. Parser rejection cost could exceed its own gas ceiling
+
+- **Statement:** `FromSliceSpec.RejectContract` quantified `∀ Cg, ∃ K` before
+  specifying a normal rejecting run from `credits Cg (K + R)`.
+- **Truth:** the cost must be independent of `Cg`: `∃ K, ∀ Cg`. Otherwise
+  `K = Cg + 1` makes the credits impossible and proves any postcondition.
+- **Caught by:** review, followed by a successful Lean LSP proof of the entire
+  old `RejectContract S` from that contradiction, without using parser behavior.
+- **Root cause:** “some finite cost” was chosen inside the resource ceiling's
+  quantifier, whereas the raised-limit comparison needs a fixed cost first.
+- **Sweep:** searched all Bridge `RejectContract`, `f65_reject` and existential
+  `K` declarations. The wrapper `f65_reject` had the same ordering; both are
+  strengthened. The accepting contract already fixes its cost independently.
+- **Validation:** the original exploit was kernel checked in a standalone LSP
+  snippet. The strengthened wrapper is checked against the uniform contract;
+  runtime scenarios cannot detect this logical quantifier error.
+
 ## Agent results
 
 Success and failure per task type and model (section 11.2 of the plan), used

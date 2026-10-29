@@ -326,4 +326,3 @@ theorem f847_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
 end Spec
 
 end WNear.Binary.StrRepeat
-

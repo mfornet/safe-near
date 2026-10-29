@@ -1632,4 +1632,3 @@ theorem f646_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
 end L646e
 
 end WNear.Binary.ParseStr
-

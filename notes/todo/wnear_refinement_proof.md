@@ -1180,6 +1180,16 @@ round).* Proved, no `sorry`, standard axioms only:
    221, 224, 229 etc. come from the same proof. `U128` adds `u128::from_str_radix` (871,
    with `__multi3`). `bool` adds 167, then 323. `Option` adds 168–172.
 
+**Rejection continuation (2026-10-29):** the rejecting contract's cost now precedes the gas
+ceiling (misstatement 7). The former rejection WIP is active as `SerdeRej.lean`; its `f78_rej`
+forwards a rejecting 228 specification. `SerdeRej.f68_scratch` (`SerdeScratchDrop.lean`)
+frees an empty or grown scratch in 315 regular operations. `SerdeRej.f66_struct_rej` propagates
+the struct error, frees its scratch and restores the complete frame at `1000*c + K F`.
+`FromSliceSpec.struct_reject_uniform` and `f65_struct_reject_uniform` expose that branch through
+the public parser contracts uniformly in the ceiling (65: `1045*c + K F`). These theorems
+remain conditional on the actual 228 rejection proof; trailing-character errors are separate.
+No claim that `RejectContract` is complete follows from these wrappers.
+
 ### M7. State and storage
 
 Borsh encoding of the state, `LookupMap` keys, near-sdk's `env` wrappers

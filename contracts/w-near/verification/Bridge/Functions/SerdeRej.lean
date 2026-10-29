@@ -15,7 +15,7 @@ when the struct is read but followed by more than whitespace, from `end` (320).
   (an escaped key, or `ignore_value`'s frames), which 66 then frees (`scrOk`, `scrBlk`).
 * `Rej228`: **the rejecting specification of 228**, at the cost `K F` for a free list of at most
   `F` cells: on the input `bs` (the reader at 0), 228 returns `errRes`. Stated as a hypothesis, for
-  the inputs on which serde's struct machine fails (`FromSliceReject`).
+  the inputs on which serde's struct machine fails. This file does not prove that hypothesis.
 * `f78_rej`: 78 from `Rej228`.
 -/
 

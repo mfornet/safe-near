@@ -28,7 +28,7 @@ drop the scratch Vec                      ;; 68
   allocation of the account's `String`, which the allocator charges partly in other units). The
   cost is tight: the method's gas bound pays for it.
 * **Rejecting (`RejectContract`).** When `Call.decode … = none`, 66 returns `Err(box)` (`errAt`), at
-  *some* finite cost. `Refines` needs only that a rejected input fails with no effects, and a run that
+  a finite cost independent of the gas ceiling. `Refines` needs only that a rejected input fails with no effects, and a run that
   runs out of gas fails too (`method_vm_any`), so no bound is asked. Stated, not proved.
 
 Both run on the instantiated module (`wInst`, function `k` at address `k`) from the code of the whole
@@ -177,15 +177,17 @@ def AcceptContract (S K0 K1 X : Nat) : Prop :=
         (post66 S gt sp rd ptr idx bs (okAt 0 out a live)))
 
 /-- **The rejecting contract of `from_trait` (66)**: on an input the model rejects, `Err(box)` at
-`out` (`errAt`), at some finite cost. Stated, not proved. -/
+`out` (`errAt`), at a finite cost independent of the gas ceiling. Stated, not proved.
+The cost must be chosen before `Cg`: choosing it afterwards would allow `K = Cg + 1`,
+whose gas-credit precondition is impossible. -/
 def RejectContract (S : Nat) : Prop :=
   ∀ (cfg : RuntimeConfig) (h0 : NearState) (lim : ExecLimits) (d : Nat), d + 64 < lim.maxCallDepth →
-    ∀ (Cg : Nat) (gt : GlobalType) (sp out rd ptr idx : UInt32) (bs ob : List UInt8) (hl F : Nat)
+    ∀ (gt : GlobalType) (sp out rd ptr idx : UInt32) (bs ob : List UInt8) (hl F : Nat)
       (live : List (Nat × Nat)),
     S ≤ sp.toNat → sp.toNat % 16 = 0 → ptr.toNat + bs.length < 2 ^ 32 → bs.length + 1 < 2 ^ 28 →
     out.toNat + 16 ≤ 2 ^ 32 → ob.length = 16 → rd.toNat + 12 ≤ 2 ^ 32 → roomFor4 hl 2048 20 →
     WNear.Call.decode "ft_balance_of" bs = none →
-    ∃ K : Nat, ⊢ (codeCtx (GF := GF) cfg h0 -∗
+    ∃ K : Nat, ∀ Cg : Nat, ⊢ (codeCtx (GF := GF) cfg h0 -∗
       MFunSpec (GF := GF) cfg.wasm lim d types[14]! 0 wInst f66 Cg
         (pre66 S gt sp out rd ptr idx bs ob hl F live)
         (fun _ => K)

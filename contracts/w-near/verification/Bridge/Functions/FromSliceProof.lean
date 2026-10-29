@@ -175,21 +175,22 @@ theorem f65_accept (K0 K1 X : Nat) (hc : AcceptContract (GF := GF) 400 K0 K1 X)
 stack, `Err(box)` at `out` with 416 bytes of stack, at some finite cost. -/
 theorem f65_reject (hc : RejectContract (GF := GF) 400)
     (cfg : RuntimeConfig) (h0 : NearState) (lim : ExecLimits) (d : Nat) (hd : d + 65 < lim.maxCallDepth)
-    (Cg : Nat) (gt : GlobalType) (sp out ptr idx : UInt32) (bs ob : List UInt8) (hl F : Nat)
+    (gt : GlobalType) (sp out ptr idx : UInt32) (bs ob : List UInt8) (hl F : Nat)
     (live : List (Nat × Nat)) (hS : 416 ≤ sp.toNat) (hal : sp.toNat % 16 = 0)
     (hptr : ptr.toNat + bs.length < 2 ^ 32) (hlen : bs.length + 1 < 2 ^ 28) (hout : out.toNat + 16 ≤ 2 ^ 32)
     (hob : ob.length = 16) (hr : roomFor4 hl 2048 20)
     (hdec : WNear.Call.decode "ft_balance_of" bs = none) :
-    ∃ K : Nat, codeCtx (GF := GF) cfg h0 ⊢
+    ∃ K : Nat, ∀ Cg : Nat, codeCtx (GF := GF) cfg h0 ⊢
       MFunSpec (GF := GF) cfg.wasm lim d types[31]! 0 wInst f65 Cg
         (pre65 400 gt sp out ptr idx bs ob hl F live) (fun _ => K)
         (post65 400 gt sp ptr idx bs (errAt 0 out live)) := by
   have hlt := sp.toNat_lt
   have h16 : (sp - 16).toNat = sp.toNat - 16 := by
     rw [UInt32.toNat_sub_of_le] <;> simp [UInt32.le_iff_toNat_le]; omega
-  obtain ⟨K, hK⟩ := hc cfg h0 lim (d + 1) (by omega) Cg gt (sp - 16) out (sp - 16) ptr idx bs ob hl F live
+  obtain ⟨K, hK⟩ := hc cfg h0 lim (d + 1) (by omega) gt (sp - 16) out (sp - 16) ptr idx bs ob hl F live
     (by omega) (by omega) hptr hlen hout hob (by omega) hr hdec
-  exact ⟨_, f65_of_spec 400 cfg h0 lim d hd Cg gt sp out ptr idx bs ob hl F live (by omega) _ _ hK⟩
+  refine ⟨45 * cfg.wasm.regularOpCost + K, fun Cg => ?_⟩
+  exact f65_of_spec 400 cfg h0 lim d hd Cg gt sp out ptr idx bs ob hl F live (by omega) _ _ (hK Cg)
 
 
 open WNear.Binary.InitialState in

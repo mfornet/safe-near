@@ -77,10 +77,38 @@ continuation is published to PR #40 after its validation gates pass.
   declarations in `Proofs.Refinement` (`refines_wnear_exported`, `refines_wnear`, and
   `withdraw_available_wasm`). All pinned statements match `STATEMENTS.md`.
 - Current validation: strict NearLogic audit passes (56 modules, 4619 declarations,
-  3467 theorems, zero violations); all 294 Python tests pass (15 skipped); changed-source
+  3467 theorems, zero violations); the Python suite runs 294 tests successfully (15 skipped); changed-source
   Lean style, toolchain, node-isolation and umbrella checks pass. The freshly rebuilt
   harness (20 contracts), adapter tests, and all 59 default scenarios pass. Evidence logs
   are `/tmp/pr40-final-python-tests.log` and `/tmp/pr40-continuation-{harness,adapter,scenarios}.log`.
+
+
+## Parser rejection continuation
+
+- `RejectContract` and `f65_reject` now choose their finite cost **before** the gas ceiling.
+  The former `∀ Cg, ∃ K` statement was vacuous (`K = Cg + 1`); entry 7 of the misstatement log
+  records the kernel-checked witness and the sweep.
+- The former `SerdeRejDefs.lean.txt` WIP is now `Bridge/Functions/SerdeRej.lean`.
+  Its scratch/result predicates and `f78_rej` are compiled proofs, conditional on `Rej228`.
+- `SerdeRej.f68_scratch` (`SerdeScratchDrop.lean`) frees an empty or grown scratch at
+  at most 315 regular operations, preserving all allocations live before parsing.
+- `SerdeRej.f66_struct_rej` handles 66's struct-error branch, including scratch cleanup and
+  complete stack restoration, at `1000 * regularOpCost + K F` from 228's rejecting contract.
+- `FromSliceSpec.struct_reject_uniform` and `f65_struct_reject_uniform` connect that branch to
+  the public 66/65 pre/postconditions at a fixed cost for **every** gas ceiling. 65's bound is
+  `1045 * regularOpCost + K F`. `decode_reject_cases` splits model rejection into a struct
+  failure or trailing non-whitespace.
+- These are conditional building blocks, **not** a proof of the full rejecting contract:
+  228's error cases and the trailing-characters branch after a successful struct remain.
+  The wrappers use `roomS`; the full rejection contract's heap-room assumptions still need
+  validation when its callees are discharged.
+- PR-wide whitespace findings are removed from `VecFromElem`, `VecWithCap`, `ParseStrEsc`
+  and `StrRepeat`.
+- Validation: `just wnear-audit` passes (2746 build jobs; 412 wNEAR modules, 57373
+  declarations and 52261 theorems; only the three expected `Proofs.Refinement` sorry
+  dependencies). Strict NearLogic remains at zero violations, and pinned statements match.
+  The PR-wide Lean style check and `git diff --check origin/main` pass. Evidence:
+  `/tmp/pr40-parser-final-audit.log` and `/tmp/pr40-parser-lean-style.log`.
 
 ## Methods
 
@@ -152,7 +180,7 @@ The texts are proved equal to the model's `Panic.message` (`PanicText`).
 ## Next steps
 
 1. **The parser, finishing `ft_balance_of`'s argument contract.**
-   1. `RejectContract`. A loose cost suffices. Use `fromSlice_eq` and the reject paths listed in M6. A WIP of the definitions is in `notes/wip/wnear/SerdeRejDefs.lean.txt`.
+   1. `RejectContract`. A loose cost suffices. Use `fromSlice_eq` and the reject paths listed in M6. The conditional wrappers are proved in `SerdeRej`, `SerdeScratchDrop`, `SerdeFromReject` and `FromSliceReject`; 228 and trailing-character errors remain.
    2. Escapes in the accepting half:
       - a closed linear bound on `costRun`;
       - 380 and 169 with the copied result;

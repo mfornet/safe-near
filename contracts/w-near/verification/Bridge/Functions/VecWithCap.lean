@@ -792,7 +792,7 @@ theorem f767_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
     icases HA with ⟨%hp0, HA⟩
     mcredits (22 * cfg.regularOpCost + R)
     mstep; mstep [Z4]; mstep; mstep; mstep [Z0]; mstep
-    
+
     mstep; mstep; mstep
     mstep; mstep; mstep [Ho0]
     mstep; mstep; mstep [Ho4]
