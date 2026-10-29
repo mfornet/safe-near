@@ -462,6 +462,101 @@ theorem f853_unc (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
     iframe HI HA P0 P24 P28 P8 P16 P12 HD1 HP I8
   · iexact HTS
 
+
+/-! ## `internal_deposit`'s and `internal_withdraw`'s `expect("Total supply overflow")` -/
+
+open WNear.Binary.PanicText (totalSupplyOverflow coreImplRs totalSupplyOverflow_valid decDigits_108
+  decDigits_119 decDigits_55)
+
+theorem totalSupplyOverflow_text_length :
+    (panicText totalSupplyOverflow coreImplRs (108 : UInt32).toNat (55 : UInt32).toNat).length = 163 := by
+  rw [show (108 : UInt32).toNat = 108 from rfl, show (55 : UInt32).toNat = 55 from rfl, panicText, decDigits_108,
+    decDigits_55]
+  decide +kernel
+
+theorem totalSupplyUnderflow_text_length :
+    (panicText totalSupplyOverflow coreImplRs (119 : UInt32).toNat (55 : UInt32).toNat).length = 163 := by
+  rw [show (119 : UInt32).toNat = 119 from rfl, show (55 : UInt32).toNat = 55 from rfl, panicText, decDigits_119,
+    decDigits_55]
+  decide +kernel
+
+theorem totalSupplyUnderflow_valid :
+    validUtf8 (panicText totalSupplyOverflow coreImplRs 119 55) = true := by
+  rw [panicText, decDigits_119, decDigits_55]; decide +kernel
+
+/-- The sink's bounds for a text of at most 256 bytes: at most six growths. -/
+theorem hsGlobal_256 {maxP L0 F B : Nat} (hF : 1 ≤ F) (hB : B ≤ 256) (hL1 : L0 + 7 * 65536 ≤ 2 ^ 32)
+    (hL2 : L0 + 6 * 65536 ≤ maxP * 65536) : HsGlobal maxP L0 F 6 B :=
+  ⟨hF, by decide, by simp; omega, by omega, hL1, hL2⟩
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 16000000 in
+/-- **`expect("Total supply overflow")`** in `internal_deposit` (`near_deposit`, `core_impl.rs:108:55`):
+879 on `(1053016, 21)` at the `Location` 1053040; the host panicked with the text
+`PanicText.totalSupplyOverflow_text` identifies as `Panic.message .totalSupplyOverflow`. -/
+theorem f879_totalSupplyOverflow (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
+    (inst : Nat) (mi : ModuleInst) (e : Nat) (A : Nat → Nat) (n g ta : Nat) (mx : Option Nat)
+    (hm : IfaceMod mi A n g ta) (hd : d + 35 ≤ lim.maxCallDepth) (Cg : Nat) (gt : GlobalType)
+    (sp lpc idx : UInt32) (S : Nat) (hS : 432 ≤ S) (hsp : S + 176 ≤ sp.toNat)
+    (hsp2 : sp.toNat + 8 ≤ 2 ^ 32) (hal : sp.toNat % 8 = 0)
+    (maxP hl L0 : Nat) (live : List (Nat × Nat)) (F : Nat) (hF : 1 ≤ F) (hL1 : L0 + 7 * 65536 ≤ 2 ^ 32)
+    (hL2 : L0 + 6 * 65536 ≤ maxP * 65536) (hl0 : hl % 65536 = 0) (hl1 : 0 < hl) (hlL : hl + 65536 ≤ L0)
+    (Fr : IProp GF) (h : NearState) (hfit : LogFits h 163)
+    (hov : h.extCosts.cost "read_memory_byte" * 163 < 2 ^ 64) :
+    code859 inst mi A ∗ A 859 ↪[wf] FuncInst.wasm types[14]! inst f859 ∗ code817 e inst mi A n mx ∗
+      A 826 ↪[wf] FuncInst.wasm types[14]! inst f826 ∗ code826 n maxP inst mi A ∗ codeTSM n maxP inst mi A
+      ⊢ MFunSpecT (GF := GF) cfg lim d type inst mi f879 Cg
+        (fun args => iprop(⌜args = [.i32 1053016, .i32 21, .i32 1053040]⌝ ∗ g ↦[wg] ⟨gt, .i32 sp⟩ ∗
+          stk n (sp.toNat - 96) 96 ∗
+          (stk n ((sp - 48 - 16 - 16 - 16).toNat - 80 - S) (S + 80) ∗
+            (getData n ta A 1053016 totalSupplyOverflow ∗ vt n 1057464 idx ta (A 578) ∗
+              heapInv n maxP hl live F) ∗
+            envP n ta A lpc 1066360 179 (A 826)
+              iprop(hookEnvM n ta A 1053040 1052816 119 108 55 coreImplRs ∗ Fr) h)))
+        (fun _ => cost879 cfg F 6 21 (panicText totalSupplyOverflow coreImplRs 108 55) h)
+        (fun _ _ => iprop(False)) (fun _ => panicked Cg h (panicText totalSupplyOverflow coreImplRs 108 55)) := by
+  have hT := totalSupplyOverflow_text_length
+  have S := f879_unc (GF := GF) cfg lim d type inst mi e A n g ta mx hm hd Cg gt sp 1053016 21 1053040 lpc
+    (by decide) S hS hsp hsp2 hal 1052816 119 108 55 idx (by decide) totalSupplyOverflow coreImplRs
+    (by decide +kernel) (by decide) (by decide +kernel) (by decide) (by decide) (by decide) maxP hl L0 live F 6 21
+    (hsGlobal_256 hF (by rw [hT]; decide) hL1 hL2) hl0 hl1 hlL (by decide) (by decide) (by decide +kernel) Fr
+    (by rw [hT]; decide) totalSupplyOverflow_valid h (by rw [hT]; exact hfit) (by rw [hT]; exact hov)
+  exact S
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 16000000 in
+/-- **`expect("Total supply overflow")`** in `internal_withdraw` (`near_withdraw`, `core_impl.rs:119:55`):
+879 on `(1053016, 21)` at the `Location` 1053096; the text is `Panic.message .totalSupplyUnderflow`
+(`PanicText.totalSupplyUnderflow_text`). -/
+theorem f879_totalSupplyUnderflow (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
+    (inst : Nat) (mi : ModuleInst) (e : Nat) (A : Nat → Nat) (n g ta : Nat) (mx : Option Nat)
+    (hm : IfaceMod mi A n g ta) (hd : d + 35 ≤ lim.maxCallDepth) (Cg : Nat) (gt : GlobalType)
+    (sp lpc idx : UInt32) (S : Nat) (hS : 432 ≤ S) (hsp : S + 176 ≤ sp.toNat)
+    (hsp2 : sp.toNat + 8 ≤ 2 ^ 32) (hal : sp.toNat % 8 = 0)
+    (maxP hl L0 : Nat) (live : List (Nat × Nat)) (F : Nat) (hF : 1 ≤ F) (hL1 : L0 + 7 * 65536 ≤ 2 ^ 32)
+    (hL2 : L0 + 6 * 65536 ≤ maxP * 65536) (hl0 : hl % 65536 = 0) (hl1 : 0 < hl) (hlL : hl + 65536 ≤ L0)
+    (Fr : IProp GF) (h : NearState) (hfit : LogFits h 163)
+    (hov : h.extCosts.cost "read_memory_byte" * 163 < 2 ^ 64) :
+    code859 inst mi A ∗ A 859 ↪[wf] FuncInst.wasm types[14]! inst f859 ∗ code817 e inst mi A n mx ∗
+      A 826 ↪[wf] FuncInst.wasm types[14]! inst f826 ∗ code826 n maxP inst mi A ∗ codeTSM n maxP inst mi A
+      ⊢ MFunSpecT (GF := GF) cfg lim d type inst mi f879 Cg
+        (fun args => iprop(⌜args = [.i32 1053016, .i32 21, .i32 1053096]⌝ ∗ g ↦[wg] ⟨gt, .i32 sp⟩ ∗
+          stk n (sp.toNat - 96) 96 ∗
+          (stk n ((sp - 48 - 16 - 16 - 16).toNat - 80 - S) (S + 80) ∗
+            (getData n ta A 1053016 totalSupplyOverflow ∗ vt n 1057464 idx ta (A 578) ∗
+              heapInv n maxP hl live F) ∗
+            envP n ta A lpc 1066360 179 (A 826)
+              iprop(hookEnvM n ta A 1053096 1052816 119 119 55 coreImplRs ∗ Fr) h)))
+        (fun _ => cost879 cfg F 6 21 (panicText totalSupplyOverflow coreImplRs 119 55) h)
+        (fun _ _ => iprop(False)) (fun _ => panicked Cg h (panicText totalSupplyOverflow coreImplRs 119 55)) := by
+  have hT := totalSupplyUnderflow_text_length
+  have S := f879_unc (GF := GF) cfg lim d type inst mi e A n g ta mx hm hd Cg gt sp 1053016 21 1053096 lpc
+    (by decide) S hS hsp hsp2 hal 1052816 119 119 55 idx (by decide) totalSupplyOverflow coreImplRs
+    (by decide +kernel) (by decide) (by decide +kernel) (by decide) (by decide) (by decide) maxP hl L0 live F 6 21
+    (hsGlobal_256 hF (by rw [hT]; decide) hL1 hL2) hl0 hl1 hlL (by decide) (by decide) (by decide +kernel) Fr
+    (by rw [hT]; decide) totalSupplyUnderflow_valid h (by rw [hT]; exact hfit) (by rw [hT]; exact hov)
+  exact S
+
 end Spec
 
 end WNear.Binary.PanicFmtFull
