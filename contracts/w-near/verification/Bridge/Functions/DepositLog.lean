@@ -2,6 +2,7 @@ import Bridge.Functions.StrSinkMulti
 import Bridge.Functions.FmtStrPad
 import Bridge.Functions.FmtDisplay
 import Bridge.Functions.FmtString
+import Bridge.Functions.FmtFormat
 
 /-!
 # `core::fmt::write` (872) on `near_deposit`'s log (M8)
@@ -32,7 +33,7 @@ open WNear.Binary WNear.Binary.AllocInv
 open WNear.Binary.AllocFirstFit (vt)
 open WNear.Binary.Interface (IfaceMod)
 open WNear.Binary.AllocNewCell (memBytes_addr)
-open WNear.Binary.VecFromElem (stk stk_split stk_join stk_word stk_addr)
+open WNear.Binary.VecFromElem (stk stk_split stk_join stk_word stk_addr roomFor)
 open WNear.Binary.BorshFT (splitB joinB stkJ stkSp stkA)
 open WNear.Binary.StrSinkGrow (strCode)
 open WNear.Binary.StrSinkMulti (ssink ssink_w costS memcpy_mono)
@@ -566,6 +567,168 @@ theorem f872_log (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
       alen lo hi ab hs hs2 hu hab hap hal)
   rw [show 2 * (2 : UInt32).toNat = 4 from rfl] at S
   exact S
+
+/-! ## `alloc::fmt::format` (846) on the log's `Arguments` -/
+
+theorem ssinkOk_init {hl len' : Nat} (F : Nat) {q cap : UInt32} {P : Nat} (hcap : cap.toNat = 34) (hP : P = 1)
+    (hlen' : len' = hl ∨ len' = hl + P * 65536) (hr0 : hl % 65536 = 0) (hr1 : 0 < hl) (hq : q ≠ 0)
+    (hqb : q.toNat + cap.toNat < 2 ^ 32) : StrSinkMulti.ssinkOk (hl + 65536) F 34 120 q cap len' F := by
+  subst hP
+  refine ⟨⟨0, by omega, rfl, ?_, by rw [hcap]; omega⟩, by rw [hcap]; omega, ?_, ?_, hq, hqb⟩
+  · rcases hlen' with h | h <;> omega
+  · rcases hlen' with h | h <;> omega
+  · rcases hlen' with h | h <;> omega
+
+/-- The code 846 needs for the log (persistent). -/
+def code846 (n maxP inst : Nat) (mi : ModuleInst) (A : Nat → Nat) : IProp GF :=
+  iprop(logCode n maxP inst mi A ∗ (inst ↪[inst] mi ∗ AllocZeroed.allocCode n maxP inst mi A ∗
+    A 236 ↪[wf] FuncInst.wasm types[13]! inst f236 ∗ A 581 ↪[wf] FuncInst.wasm types[15]! inst f581 ∗
+    A 575 ↪[wf] FuncInst.wasm types[0]! inst f575 ∗ A 310 ↪[wf] FuncInst.wasm types[13]! inst f310 ∗
+    A 872 ↪[wf] FuncInst.wasm types[15]! inst f872))
+
+instance (n maxP inst : Nat) (mi : ModuleInst) (A : Nat → Nat) :
+    Persistent (code846 (GF := GF) n maxP inst mi A) := by
+  unfold code846; infer_instance
+
+/-- What 846 carries for the log besides its own frame: 224 more bytes of stack, the sink's
+vtable slot, the arguments' bytes (`logX`). -/
+def logP (n ta : Nat) (A : Nat → Nat) (s u sv aptr acap alen : UInt32) (lo hi : UInt64) (ab : List UInt8) :
+    IProp GF :=
+  iprop(stk n (s.toNat - 272) 224 ∗ n ↦[i32][ (1066728 : UInt32).toNat + 12 ] 189 ∗
+    ta ↦[wt][ (189 : UInt32).toNat ] Ref.func (A 840) ∗ logX n u sv aptr acap alen lo hi ab)
+
+/-- After 846: the `String` at `out` holds the log's text. -/
+def logOut (n maxP hl : Nat) (live : List (Nat × Nat)) (F ta : Nat) (A : Nat → Nat)
+    (s out aidx argp u sv aptr acap alen : UInt32) (lo hi : UInt64) (ab : List UInt8) : IProp GF :=
+  iprop(stk n (s.toNat - 272) 224 ∗ logM n ta A argp u sv ∗ n ↦[i32][ (1066728 : UInt32).toNat + 12 ] 189 ∗
+    ta ↦[wt][ (189 : UInt32).toNat ] Ref.func (A 840) ∗
+    ssink n maxP (hl + 65536) live F 34 120 out aidx ta (A 578) (logW (decDigits (val lo hi)) ab 4) ∗
+    logX n u sv aptr acap alen lo hi ab)
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 16000000 in
+/-- **`alloc::fmt::format(out, ar)`** (846) on the log's `Arguments`: a `String` of capacity 34
+allocated, then the log's text written into it (`f872_log`). -/
+theorem f846_log (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
+    (htype : type.results = []) (inst : Nat) (mi : ModuleInst)
+    (A : Nat → Nat) (n g ta : Nat) (hm : IfaceMod mi A n g ta) (hd : d + 20 < lim.maxCallDepth) (Cg : Nat)
+    (gt : GlobalType) (maxP hl : Nat) (live : List (Nat × Nat)) (F : Nat) (aidx : UInt32)
+    (hL1 : hl + 4 * 65536 ≤ 2 ^ 32) (hL2 : hl + 3 * 65536 ≤ maxP * 65536) (hr : roomFor hl maxP (FmtFormat.capOf 17))
+    (hF : VecWithCap.okG F)
+    (s out ar argp u sv aptr acap alen : UInt32) (junk : List UInt8) (hjunk : junk.length = 4) (lo hi : UInt64)
+    (ab : List UInt8)
+    (hs : 272 ≤ s.toNat) (hs2 : s.toNat ≤ 2 ^ 32 - 16) (har : ar.toNat + 24 ≤ 2 ^ 32)
+    (hout : out.toNat + 12 ≤ 2 ^ 32) (hargp : argp.toNat + 24 ≤ 2 ^ 32)
+    (hu : u.toNat + 16 ≤ 2 ^ 32) (hab : ab.length = alen.toNat) (hap : aptr.toNat + alen.toNat ≤ 2 ^ 32)
+    (hal : alen.toNat ≤ 64) :
+    code846 n maxP inst mi A
+      ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f846 Cg
+        (fun args => iprop(⌜args = [.i32 out, .i32 ar]⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗
+          stk n (s.toNat - 48) 48 ∗ argsN n ar 1050632 argp 2 ∗ n ↦[wms][ ar.toNat + 12 ] junk ∗
+          logM n ta A argp u sv ∗ stk n out.toNat 12 ∗ vt n 1057464 aidx ta (A 578) ∗ heapInv n maxP hl live F ∗
+          logP n ta A s u sv aptr acap alen lo hi ab))
+        (fun _ => FmtFormat.cost846 cfg F (2 : UInt32).toNat 17 (cost872 cfg F lo hi alen))
+        (fun _ rs => iprop(⌜rs = []⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗ stk n (s.toNat - 48) 48 ∗
+          argsN n ar 1050632 argp 2 ∗ n ↦[wms][ ar.toNat + 12 ] junk ∗
+          ∃ _q : UInt32, logOut n maxP hl live F ta A s out aidx argp u sv aptr acap alen lo hi ab)) := by
+  have hlt := s.toNat_lt
+  have h32 : (s - 32).toNat = s.toNat - 32 := by
+    rw [UInt32.toNat_sub_of_le] <;> simp [UInt32.le_iff_toNat_le]; omega
+  have h80 : (s - 32 - 48).toNat = s.toNat - 80 := by
+    have : (48 : UInt32) ≤ s - 32 := by simp [UInt32.le_iff_toNat_le, h32]; omega
+    rw [UInt32.toNat_sub_of_le _ _ this, h32]; simp; omega
+  have h4 : (s - 32 + 4).toNat = s.toNat - 28 := by rw [UInt32.toNat_add, h32]; simp; omega
+  have h8 : (s - 32 + 8).toNat = s.toNat - 24 := by rw [UInt32.toNat_add, h32]; simp; omega
+  have hcap : (FmtFormat.capOf 17).toNat = 34 := rfl
+  have hP1 : (AllocNewCell.cellPages (AllocAlloc.wordsOf (FmtFormat.capOf 17)) 1).toNat = 1 :=
+    WriteSink.cellPages_one _ (by rw [hcap]; omega)
+  obtain ⟨hr0, hr1, -, -⟩ := id hr
+  refine FmtFormat.f846_gen (GF := GF) cfg lim d type htype inst mi A n g ta hm (by omega) Cg gt s out ar 1050632
+    argp 2 junk hjunk (by decide) (by omega) har (by decide) plen 17 rfl (by decide) (by decide)
+    (logM n ta A argp u sv) ?_ maxP hl live F aidx hr hF
+    (code846 n maxP inst mi A) (logP n ta A s u sv aptr acap alen lo hi ab)
+    (fun _ => logOut n maxP hl live F ta A s out aidx argp u sv aptr acap alen lo hi ab)
+    (cost872 cfg F lo hi alen) ?_ ?_
+  · intro j hj
+    have : (2 : UInt32).toNat = 2 := rfl
+    rcases (show j = 0 ∨ j = 1 by omega) with rfl | rfl
+    · iintro H
+      iunfold logM at H
+      icases H with ⟨⟨P0, P4⟩, Q, R, T⟩
+      iframe P4
+      iintro P4
+      iunfold logM
+      iframe P0 P4 Q R T
+    · iintro H
+      iunfold logM at H
+      icases H with ⟨P, ⟨Q0, Q4⟩, R, T⟩
+      iframe Q4
+      iintro Q4
+      iunfold logM
+      iframe P Q0 Q4 R T
+  · iintro #C
+    iunfold code846 at C
+    icases C with ⟨-, #C⟩
+    iexact C
+  · intro q hq
+    iintro #C
+    ihave #C' := C
+    iunfold code846 at C'
+    icases C' with ⟨#Hlog, -⟩
+    ihave #S := f872_log cfg lim (d + 1) types[15]! rfl inst mi A n g ta hm (by omega) Cg gt maxP (hl + 65536) live
+      F out aidx (by omega) (by omega) hout (s - 32) (s - 32 + 4) (s - 32 + 8) argp u sv aptr acap alen lo hi ab
+      (by omega) (by omega) (by omega) hargp hu hab hap hal $$ Hlog
+    iapply (MFunSpec_frame (Fr := iprop(emp)) ?_ ?_) $$ S
+    · intro args
+      iintro ⟨%ha, Hg, HA, Hdp, Hs16, HM, HN, Hvt, ⟨%len', %hlen', Hinv, Hblk⟩, HP⟩
+      iunfold logP at HP
+      icases HP with ⟨Hs224, H189, Hta, HX⟩
+      iunfold FmtFormat.strNew at HN
+      icases HN with ⟨N0, N4, N8⟩
+      iunfold block at Hblk
+      icases Hblk with ⟨%bs, %hbs, Hb⟩
+      ihave ⟨%hqb, Hinv⟩ := FmtSink.heapInv_bound (p := q.toNat) (s := (FmtFormat.capOf 17).toNat)
+        List.mem_cons_self $$ Hinv
+      ihave Hs := stkJ (a := s.toNat - 272) (b := (s - 32).toNat - 16) (k1 := 224) (k2 := 16) (k := 240)
+        (by omega) rfl $$ [Hs224 Hs16]
+      · iframe Hs224 Hs16
+      icases stkSp 192 48 rfl $$ Hs with ⟨Hs192, Hs48⟩
+      isplitl; swap; · iempintro
+      iframe Hg HA HM H189 Hta
+      isplitr; · ipureintro; exact ha
+      isplitl [Hs48]
+      · iapply stkA (by omega) $$ Hs48
+      iunfold lSt
+      iframe HX
+      isplitl [Hs192]
+      · iapply stkA (by omega) $$ Hs192
+      isplitr [Hdp]; swap; · iexact Hdp
+      iunfold ssink
+      iframe Hvt
+      iexists q, FmtFormat.capOf 17, len', F, bs
+      isplitr
+      · ipureintro
+        exact ⟨ssinkOk_init F hcap hP1 hlen' hr0 hr1 hq hqb, by rw [hbs, hcap]; rfl⟩
+      iframe N0 N4 Hinv
+      isplitl [N8]
+      · rw [show UInt32.ofNat (logW (decDigits (val lo hi)) ab 0).length = 0 from rfl]; iexact N8
+      rw [show logW (decDigits (val lo hi)) ab 0 ++ bs = bs from rfl]; iexact Hb
+    · intro args rs
+      iintro ⟨-, %hrs, Hg, Hs48, HA, HM, H189, Hta, HSt⟩
+      iunfold lSt at HSt
+      icases HSt with ⟨Hs192, Hss, Hdp, HX⟩
+      ihave Hs192 := stkA (show (s - 32 - 48).toNat - 192 = s.toNat - 272 by omega) $$ Hs192
+      ihave Hs48 := stkA (show (s - 32).toNat - 48 = s.toNat - 272 + 192 by omega) $$ Hs48
+      ihave Hs := stkJ (a := s.toNat - 272) (b := s.toNat - 272 + 192) (k1 := 192) (k2 := 48) (k := 240)
+        rfl rfl $$ [Hs192 Hs48]
+      · iframe Hs192 Hs48
+      icases stkSp 224 16 rfl $$ Hs with ⟨Hs224, Hs16⟩
+      iframe Hg HA Hdp
+      isplitr; · ipureintro; exact hrs
+      isplitl [Hs16]
+      · iapply stkA (by omega) $$ Hs16
+      iunfold logOut
+      iframe Hs224 HM H189 Hta Hss HX
 
 end Spec
 
