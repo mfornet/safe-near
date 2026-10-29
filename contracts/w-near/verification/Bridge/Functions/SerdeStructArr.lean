@@ -1,5 +1,6 @@
 import Bridge.Functions.SerdeSeqElem
 import Bridge.Functions.SerdeEndSeq
+import Bridge.Functions.SerdeIdent
 
 /-!
 # `deserialize_struct` (228) for `ft_balance_of`'s arguments: the array form (M6)
@@ -54,7 +55,8 @@ and its capacity 0 (the scratch never grows on the paths proved: escape-free key
 no frame pushed). -/
 def tbl (n : Nat) (de : UInt32) : IProp GF :=
   iprop((∃ sl : UInt32, n ↦[i32][ de.toNat + 20 ] sl) ∗ n ↦[wms][ 1062392 ] ParseStr.escTable ∗
-    n ↦[wms][ 1071704 ] FromUtf8Gen.utf8Width ∗ n ↦[i32][ de.toNat + 12 ] 1 ∗ n ↦[i32][ de.toNat + 16 ] 0)
+    n ↦[wms][ 1071704 ] FromUtf8Gen.utf8Width ∗ n ↦[i32][ de.toNat + 12 ] 1 ∗ n ↦[i32][ de.toNat + 16 ] 0 ∗
+    n ↦[wms][ 1048576 ] SerdeIdent.identBytes)
 
 end Defs
 

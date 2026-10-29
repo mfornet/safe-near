@@ -208,13 +208,13 @@ theorem f66_acc (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType
           heapInv n maxP mlen live F ∗ n ↦[wms][ out.toNat ] ob ∗
           sliceRead n rd ptr (UInt32.ofNat bs.length) 0 ∗ n ↦[wms][ ptr.toNat ] bs ∗
           n ↦[wms][ 1062392 ] ParseStr.escTable ∗ n ↦[wms][ 1071704 ] FromUtf8Gen.utf8Width ∗
-          n ↦[wms][ 1051092 ] WNear.BalanceOfArgs.keyBytes))
+          n ↦[wms][ 1051092 ] WNear.BalanceOfArgs.keyBytes ∗ n ↦[wms][ 1048576 ] SerdeIdent.identBytes))
         (fun _ => (425 + 96 * r.length) * cfg.regularOpCost + SerdeStruct78.costS cfg K646 K169 K81 dv ign bs)
         (fun _ rs => iprop(⌜rs = []⌝ ∗ g ↦[wg] ⟨gt, .i32 sp⟩ ∗ stk n (sp.toNat - 400) 400 ∗
           vt n 1057464 idx ta (A 578) ∗ sliceRead n rd ptr (UInt32.ofNat bs.length) 0 ∗
           n ↦[wms][ ptr.toNat ] bs ∗
           n ↦[wms][ 1062392 ] ParseStr.escTable ∗ n ↦[wms][ 1071704 ] FromUtf8Gen.utf8Width ∗
-          n ↦[wms][ 1051092 ] WNear.BalanceOfArgs.keyBytes ∗
+          n ↦[wms][ 1051092 ] WNear.BalanceOfArgs.keyBytes ∗ n ↦[wms][ 1048576 ] SerdeIdent.identBytes ∗
           ∃ (p cap : UInt32), n ↦[i32][ out.toNat ] 0 ∗ n ↦[i32][ out.toNat + 4 ] p ∗
             n ↦[i32][ out.toNat + 8 ] cap ∗ n ↦[i32][ out.toNat + 12 ] (UInt32.ofNat a.val.utf8ByteSize) ∗
             strRes n maxP live a p cap)) := by
@@ -260,7 +260,7 @@ theorem f66_acc (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType
   iapply MFunSpec_intro
   imodintro
   iintro %args %R HP Hc
-  icases HP with ⟨%hargs, Hg, Hs, Hvt, Hh, Ho, Hsr, Hbs, He, Hw, Hkey⟩
+  icases HP with ⟨%hargs, Hg, Hs, Hvt, Hh, Ho, Hsr, Hbs, He, Hw, Hkey, Hid⟩
   subst hargs
   -- the frame
   icases stk_split n (sp.toNat - 400) 336 64 $$ Hs with ⟨S336, F64⟩
@@ -347,9 +347,9 @@ theorem f66_acc (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType
   ihave D12 := KeyGet.split64 n ((sp - 64).toNat + 12) 1 0 $$ D12
   icases D12 with ⟨D12, D16⟩
   rw [show (sp - 64).toNat + 12 + 4 = (sp - 64).toNat + 16 by omega]
-  ihave Ht : tbl n (sp - 64) $$ [D20 He Hw D12 D16]
+  ihave Ht : tbl n (sp - 64) $$ [D20 He Hw D12 D16 Hid]
   · iunfold tbl
-    iframe He Hw D12 D16
+    iframe He Hw D12 D16 Hid
     iexists 0
     iexact D20
   have s78 := SerdeStruct78.f78_acc (GF := GF) cfg lim (d + 1) types[14]! (by rfl) inst mi A n g ta hm (by omega) Cg
@@ -413,7 +413,7 @@ theorem f66_acc (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType
   mstep [A40]
   mstep [Q12]
   iunfold tbl at Ht
-  icases Ht with ⟨Hsl, He, Hw, D12, D16⟩
+  icases Ht with ⟨Hsl, He, Hw, D12, D16, Hid⟩
   rw [show (sp - 64).toNat + 16 = (sp - 64).toNat + 12 + 4 by omega]
   have s68 := f68_zero (GF := GF) cfg lim (d + 1) types[0]! (by rfl) inst mi A n g ta hm (by omega) Cg
     (sp - 64 + 12) (by omega)
@@ -433,7 +433,7 @@ theorem f66_acc (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType
   · iapply BorrowMut.credits_le
     iframe Hc
     ipureintro; omega
-  iframe Hg Hvt Hkey
+  iframe Hg Hvt Hkey Hid
   icases Hsl with ⟨%sl, D20⟩
   iframe He Hw
   iunfold SerdeRead.rd at Hrd
@@ -569,13 +569,13 @@ theorem f66_dec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType
           heapInv n maxP mlen live F ∗ n ↦[wms][ out.toNat ] ob ∗
           sliceRead n rd ptr (UInt32.ofNat bs.length) 0 ∗ n ↦[wms][ ptr.toNat ] bs ∗
           n ↦[wms][ 1062392 ] ParseStr.escTable ∗ n ↦[wms][ 1071704 ] FromUtf8Gen.utf8Width ∗
-          n ↦[wms][ 1051092 ] WNear.BalanceOfArgs.keyBytes))
+          n ↦[wms][ 1051092 ] WNear.BalanceOfArgs.keyBytes ∗ n ↦[wms][ 1048576 ] SerdeIdent.identBytes))
         (fun _ => cost66 cfg K646 K169 K81 dv ign bs)
         (fun _ rs => iprop(⌜rs = []⌝ ∗ g ↦[wg] ⟨gt, .i32 sp⟩ ∗ stk n (sp.toNat - 400) 400 ∗
           vt n 1057464 idx ta (A 578) ∗ sliceRead n rd ptr (UInt32.ofNat bs.length) 0 ∗
           n ↦[wms][ ptr.toNat ] bs ∗
           n ↦[wms][ 1062392 ] ParseStr.escTable ∗ n ↦[wms][ 1071704 ] FromUtf8Gen.utf8Width ∗
-          n ↦[wms][ 1051092 ] WNear.BalanceOfArgs.keyBytes ∗
+          n ↦[wms][ 1051092 ] WNear.BalanceOfArgs.keyBytes ∗ n ↦[wms][ 1048576 ] SerdeIdent.identBytes ∗
           ∃ (p cap : UInt32), n ↦[i32][ out.toNat ] 0 ∗ n ↦[i32][ out.toNat + 4 ] p ∗
             n ↦[i32][ out.toNat + 8 ] cap ∗ n ↦[i32][ out.toNat + 12 ] (UInt32.ofNat a.val.utf8ByteSize) ∗
             strRes n maxP live a p cap)) := by

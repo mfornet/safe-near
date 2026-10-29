@@ -111,7 +111,7 @@ instance (cfg : RuntimeConfig) (h0 : NearState) : Persistent (codeCtx (GF := GF)
 /-- The read-only data the parser reads: the `ESCAPE` table, the UTF-8 width table, the field name. -/
 def roData (n : Nat) : IProp GF :=
   iprop(n ↦[wms][ 1062392 ] WNear.Binary.ParseStr.escTable ∗ n ↦[wms][ 1071704 ] WNear.Binary.FromUtf8Gen.utf8Width ∗
-    n ↦[wms][ 1051092 ] WNear.BalanceOfArgs.keyBytes)
+    n ↦[wms][ 1051092 ] WNear.BalanceOfArgs.keyBytes ∗ n ↦[wms][ 1048576 ] SerdeIdent.identBytes)
 
 /-- `Ok(a)` at `out`: the tag word 0 and the `String` `(p, cap, |a|)`, `p ↦ a`'s UTF-8 bytes and
 `cap - |a|` more bytes, a block the heap lends (`(p, cap) :: live`). -/

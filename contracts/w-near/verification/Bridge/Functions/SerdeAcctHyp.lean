@@ -186,7 +186,7 @@ theorem hyp169_noesc (cfg : WasmConfig) (lim : ExecLimits) (inst : Nat) (mi : Mo
       stk n (sp.toNat - 256) 256 ∗ vt n 1057464 idx ta (A 578) ∗ heapInv n maxP mlen live F ∗
       n ↦[wms][ out.toNat ] ob ∗ rd n de ptr bs j ∗ n ↦[i32][ de.toNat + 20 ] sl ∗
       n ↦[wms][ 1062392 ] ParseStr.escTable ∗ n ↦[wms][ 1071704 ] FromUtf8Gen.utf8Width ∗
-      n ↦[i32][ de.toNat + 12 ] 1 ∗ n ↦[i32][ de.toNat + 16 ] 0))
+      n ↦[i32][ de.toNat + 12 ] 1 ∗ n ↦[i32][ de.toNat + 16 ] 0 ∗ n ↦[wms][ 1048576 ] SerdeIdent.identBytes))
     (Q := fun _ rs => iprop(⌜rs = []⌝ ∗ g ↦[wg] ⟨gt, .i32 sp⟩ ∗ stk n (sp.toNat - 256) 256 ∗
       vt n 1057464 idx ta (A 578) ∗ tbl n de ∗
       ∃ (p cap : UInt32), n ↦[i32][ out.toNat ] 0 ∗ n ↦[i32][ out.toNat + 4 ] p ∗
@@ -197,10 +197,10 @@ theorem hyp169_noesc (cfg : WasmConfig) (lim : ExecLimits) (inst : Nat) (mi : Mo
     intro args
     iintro ⟨%ha, Hg, Hs, Hvt, Hh, Ho, Hrd, Ht⟩
     iunfold tbl at Ht
-    icases Ht with ⟨⟨%sl, Hsl⟩, He, Hw, T12, T16⟩
+    icases Ht with ⟨⟨%sl, Hsl⟩, He, Hw, T12, T16, Hid⟩
     isplitr []
     · iexists sl
-      iframe Hg Hs Hvt Hh Ho Hrd Hsl He Hw T12 T16
+      iframe Hg Hs Hvt Hh Ho Hrd Hsl He Hw T12 T16 Hid
       ipureintro; exact ha
     iempintro
   case hQ0 =>
@@ -215,7 +215,7 @@ theorem hyp169_noesc (cfg : WasmConfig) (lim : ExecLimits) (inst : Nat) (mi : Mo
     hstop hr.1 hrs (fun _ => hvalid)
   ihave #S := s $$ H
   clear s
-  iapply (AllocFresh.MFunSpec_frame (Fr := iprop(n ↦[i32][ de.toNat + 12 ] 1 ∗ n ↦[i32][ de.toNat + 16 ] 0))
+  iapply (AllocFresh.MFunSpec_frame (Fr := iprop(n ↦[i32][ de.toNat + 12 ] 1 ∗ n ↦[i32][ de.toNat + 16 ] 0 ∗ n ↦[wms][ 1048576 ] SerdeIdent.identBytes))
     (P := fun args => iprop(⌜args = [.i32 out, .i32 de]⌝ ∗ g ↦[wg] ⟨gt, .i32 sp⟩ ∗
       stk n (sp.toNat - 256) 256 ∗ vt n 1057464 idx ta (A 578) ∗ heapInv n maxP mlen live F ∗
       n ↦[wms][ out.toNat ] ob ∗ rd n de ptr bs j ∗ n ↦[i32][ de.toNat + 20 ] sl ∗
@@ -226,12 +226,12 @@ theorem hyp169_noesc (cfg : WasmConfig) (lim : ExecLimits) (inst : Nat) (mi : Mo
       res380 n maxP mlen live F out de ptr ob bs body tail j')) ?hP ?hQ)
   case hP =>
     intro args
-    iintro ⟨%ha, Hg, Hs, Hvt, Hh, Ho, Hrd, Hsl, He, Hw, T12, T16⟩
-    iframe T12 T16 Hg Hs Hvt Hh Ho Hrd Hsl He Hw
+    iintro ⟨%ha, Hg, Hs, Hvt, Hh, Ho, Hrd, Hsl, He, Hw, T12, T16, Hid⟩
+    iframe T12 T16 Hid Hg Hs Hvt Hh Ho Hrd Hsl He Hw
     ipureintro; exact ha
   case hQ =>
     intro args rs
-    iintro ⟨⟨T12, T16⟩, %hrs', Hg, Hs, Hvt, Hsl, He, Hw, Hres⟩
+    iintro ⟨⟨T12, T16, Hid⟩, %hrs', Hg, Hs, Hvt, Hsl, He, Hw, Hres⟩
     iunfold res380 at Hres
     rw [if_pos h380]
     icases Hres with ⟨%p, Q0, Q4, Q8, Q12, HS, Hp, Hrd⟩
@@ -241,9 +241,9 @@ theorem hyp169_noesc (cfg : WasmConfig) (lim : ExecLimits) (inst : Nat) (mi : Mo
     isplitr
     · ipureintro; exact hrs'
     iframe Hg Hs Hvt
-    isplitl [Hsl He Hw T12 T16]
+    isplitl [Hsl He Hw T12 T16 Hid]
     · iunfold tbl
-      iframe Hsl He Hw T12 T16
+      iframe Hsl He Hw T12 T16 Hid
     iexists p
     iexists UInt32.ofNat body.length
     rw [hsz, hpos]

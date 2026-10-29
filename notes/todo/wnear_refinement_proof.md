@@ -957,29 +957,80 @@ callees not proved yet as hypotheses:
 * A callee's cost that is a function application (`cost87 m * c`) must be rewritten to literal
   multiples of `c` plus atoms before `mcall`, or the call's cost goal fails.
 
+*`ignore_value` (81) on the shallow values, and the accepting contract with no hypothesis (ninth
+round).* Proved, no `sorry`, standard axioms only:
+
+* **Route (a), the shallow skip.** `Hyp81` asks the heap unchanged, which holds only when 81 pushes
+  no frame (a second bracket inside a first grows the scratch from capacity 0, through 698/712–716
+  and the allocator, and changes the heap across 228's loop). `IgnoreShallow.ign1` reads a scalar, or
+  one `[`/`{` whose elements or members' values are scalars, with `IgnoreModel.ignM`'s steps at depth
+  at most 1 (`scal`, `cont1 f n`, `open1 f n`). `ign1_sound`: `ign1` reads what `vSkip` reads;
+  `structDe_mono`, `decode_of_shallow`: where serde's struct machine with `ign1R` reads `a` and then
+  only whitespace, `Call.decode` reads `ftBalanceOf a`. Route (b) (scratch growth for any nesting) is
+  not done.
+* **323** (`SerdeIdent.f323_spec`): `parse_ident` against the literal bytes `identBytes` (`alserueull`,
+  at 1048576), at `cost323 len = 72 + 75·len`. `tbl` and `roData` now hold `identBytes`; 66, 169's
+  hypothesis and 228's loop carry it.
+* **83** (`SerdeIgnInt.f83_acc`): against `SerdeNumModel.intR`, at `cost83 bs i rest`: `197`, `127` per
+  integer digit (`intEnd`), and `tail83`: `20 + cost86 m` after a `.`, `20 + cost87 m` after `e`/`E`,
+  `0` otherwise. The path decides the cost. `cost83_le`: `cost83 + 343 ≤ 197 + 470·bytes` (the
+  one-digit number is the worst, `324`).
+* **81** (`SerdeIgnValue.f81_shallow`): where `ign1` skips from `j` to `r`, on an input without `\`,
+  `0`, the reader at `|bs| - |r|`, within `(166 + 470·(|bs| - |r| - j))·c`. The loops' invariants carry
+  `470` per byte left plus a constant by state: `109` (the first value, after the prologue's `57`),
+  `60` (a value inside the frame), `250`/`200` (just after `[`/`{`: the container's loop must break
+  to a value without reading a byte), `75` (before an element), `0` (after a value, before a member's
+  key: the key's bytes pay). The three blocks of a value, the container's loop and the break code
+  are each proved once (`mwpi_split`: run a prefix to where it falls through, state that as a
+  postcondition, then the rest), with macros for the six scalars (`vbody`), the scalar-done code
+  (`sdIn`, `sdTop`), the brackets (`brPre`, `brTail`) and the close (`closeTail`). 85's pops always
+  return `None` at depth 1, so the container's loop (`loop @6`) never repeats.
+* **The contract** (`FromSliceShallow.acceptContract_shallow`): on an input without `\` where the
+  shallow machine accepts (`structDe "account_id" (valueAs account) ign1R bs = some (a, r)`,
+  `skipWhitespace r = []`), `Call.decode` reads `ftBalanceOf a`, and 66 returns `Ok(a)` within
+  `(1725 + 470·len)·c + x169 cfg F`. No hypothesis left: `Hyp646` (escape-free keys), `Hyp169`
+  (`hyp169_noesc`), `Hyp81` (`hyp81_shallow`, `K81s`, `lin81_shallow`: `a81 = 166`, `b81 = 470`), the cost
+  (`cost66_struct`: `cost66_le` from `structDe` instead of `decode`, for readers that return
+  suffixes).
+* **`K1 = 470`**, at the bound: the member condition `942 + cost194 + 300 + 130 + a81 + b81 ≤ 5·K1`
+  holds with equality (`1714 + 166 + 470 = 2350`). The account id's member: `1714 + 208 = 1922`.
+
+*Findings and tooling notes of this round.*
+
+* The proof's per-byte accounting fits `K1 = 470` without a structural change, but only just: the
+  one-byte top-level number (`0`) costs 81 at most `166 + 470 = 636` (the prologue and 82 `57`, 339
+  `113`, the dispatch about `60`, 83 `324 + 12`, the pop and the return about `45`). Calibration:
+  lowering the first value's constant from `109` to `89` (as `a81 = 146` would) breaks both bracket
+  paths and a top-level scalar path, so the slack is under `20·c`. 83's fixed part calibrates to
+  `197` (`192` fails), 323's per byte to `75` (`70` fails).
+  The slack left in the binary is the proof's: 339's `100`, 82's `30` (343's spec; the real cost is
+  about half) and 84's `120` are loose bounds, which a tighter proof of them could recover.
+* The scalar block, the container's loop and the break are long; proving each once needs the rule
+  `mwpi_split` (`mwpi_seq` and `mwpi_wand` with a postcondition whose `normal` is the state where the
+  prefix falls through). Without it, the container's loop would be proved once per scalar kind.
+* `mstep` normalizes `k·c + X·c` into `(k + X)·c` when `X` is a product: generalize every per-byte
+  product (`470 * (q - p) * c = Wp`) before stepping.
+* Byte tests on a byte variable: rewrite the shifted byte first (`ob16`: `(optByte (some b) >>> 16)`
+  is `b`, `band255`), then give each comparison as a precomputed fact (`t93`, `t125`, `t44`, `dig_lt`,
+  `eqb_zero ∘ dig_ne`) by `decide` over the 256 bytes.
+* A frame `fr81 …` must be unfolded (`simp only [fr81]`) before an `mcall`, or the callee's activation
+  cost (from `entryLocals` of the frame's locals) does not reduce.
+* `simp only` closes `1 = 1` conjuncts to `True`; state such goals with `show` instead.
+
 *What is left for the parser's contract.*
 
-* `Hyp169`: done on an input without `\` (eighth round). Left: account ids with escapes (646's escape
-  path), and the invalid account id's error (693/479/130/387/151) for the rejecting half.
-* `Hyp81`: 81's Wasm proof against `IgnoreModel`. Done below it: 650 (escape-free), 86, 87, 88, 84
-  (flag 0), 85 (empty). Left: 83 (`ignore_integer`, against `SerdeNumModel.intR`; its cost must depend
-  on the path, `.`/`e` carrying 86's/87's fixed part, or a one-digit value exceeds `636`), 323
-  (`parse_ident`, which reads the literals `alse`, `rue`, `ull` at 1048576.., not yet in `roData` or
-  `tbl`: add them), 81 itself, and `Lin81`.
-  * The restriction: `Hyp81` asks the heap unchanged, true only when no frame is pushed (at most one
-    bracket deep). `Hyp81` quantifies over every position where the reader succeeds, and the model's
-    skip succeeds on deeper values too, so either generalize `Hyp81` (the scratch's growth from
-    capacity 0 through 716/714, not the escapes agent's 627/631 chain, and a heap that changes across
-    228's loop) or prove 81 for a shallow reader `ign1` (fails on a bracket inside a frame) and state
-    the contract for inputs where serde's machine with `ign1` accepts (`structDe … ign1 bs ≠ none`),
-    with `ign1 ⊆ vSkip` for soundness and `cost66_le` restated from `structDe` instead of `decode`
-    (it uses `Agrees ign valueSkip` only to get there).
-* Keys with escapes: `Hyp646` beyond `acceptCallees_noesc` (the escapes agent's 646).
+* Deeper ignored values (route (b)): a bracket inside a bracket. 84 pushes onto the scratch, which
+  grows from capacity 0 (698 → 716/714 → the allocator), so `Hyp81` must let the heap and the scratch's
+  `(ptr, cap)` change, 228's loop and `tbl` must carry them, and 66's drop (68) must free a nonempty
+  scratch. 81's proof would need a value loop with a stack of frames (`IgnoreModel.ignM` already
+  gives the steps).
+* Keys and account ids with escapes: `Hyp646` beyond escape-free keys, and 169's escape path (the
+  escapes agent's 646).
 * The rejecting half (`RejectContract`): 340, 165, 166, 177, 326, 92, the error paths of
   193/214/228/81/83/86/87/323/650, 642/643, 693/479/130/387/151, at some cost. Not started.
 * The method's side: `heapInv` at 297's call with `F` bounded, the memory room `roomS` (a page for
-  the account's `String`, then an error box) and the per-byte budget (`K1 ≤ 470`, `K0 + X` in
-  `computeGas`).
+  the account's `String`, then an error box), the per-byte budget (`K1 = 470` against the other
+  per-byte charges, `K0 + X` in `computeGas`), and the restriction to shallow input (or route (b)).
 
 *Plan for the rest of the parser's contract, bottom-up.*
 
