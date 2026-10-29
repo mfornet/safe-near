@@ -18,12 +18,19 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
+        with:
+          clean: false
+      - name: Clean sources and previous evidence; keep build caches
+        run: |
+          git clean -ffd
+          git clean -ffdX -- audit/
       # Only the spec testsuite is needed; the contracts/*/source submodules are large.
       - run: git submodule update --init near-lean/wasm/vendor/testsuite
 
       # The runtime depends on nothing beyond core Lean: no package cache needed.
       - uses: leanprover/lean-action@v1
         with:
+          use-github-cache: false
           lake-package-directory: near-lean/wasm
           build-args: Wasm testsuite wasm --wfail
           use-mathlib-cache: false
@@ -55,7 +62,7 @@ jobs:
       # Quot.sound: no sorry, no native_decide.
       - name: Axiom audit (no sorry, no native_decide)
         run: |
-          python3 tools/axiom-audit.py near-lean/wasm --report audit/wasm.json --no-build
+          python3 tools/axiom-audit.py near-lean/wasm --report audit/wasm.json
 
   near-runtime:
     name: VM, runtime and chain scenarios and axiom audits
@@ -63,12 +70,15 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/cache@v5
         with:
-          path: near-lean/.lake/packages
-          key: lake-runtime-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('near-lean/**/lean-toolchain', 'near-lean/**/lake-manifest.json', 'contracts/*/verification/lean-toolchain', 'contracts/*/verification/lake-manifest.json') }}
+          clean: false
+      - name: Clean sources and previous evidence; keep build caches
+        run: |
+          git clean -ffd
+          git clean -ffdX -- audit/
       - uses: leanprover/lean-action@v1
         with:
+          use-github-cache: false
           lake-package-directory: near-lean/vm
           build-args: NearVM vm-tests vm-replay
           use-mathlib-cache: true
@@ -94,10 +104,10 @@ jobs:
       - name: Runtime axiom audits
         run: |
           python3 tools/tests/check_axiom_audit.py
-          python3 tools/axiom-audit.py near-lean/interface --report audit/interface.json --no-build
-          python3 tools/axiom-audit.py near-lean/vm --report audit/vm.json --no-build
-          python3 tools/axiom-audit.py near-lean/runtime --report audit/runtime.json --no-build
-          python3 tools/axiom-audit.py near-lean/chain --report audit/chain.json --no-build
+          python3 tools/axiom-audit.py near-lean/interface --report audit/interface.json
+          python3 tools/axiom-audit.py near-lean/vm --report audit/vm.json
+          python3 tools/axiom-audit.py near-lean/runtime --report audit/runtime.json
+          python3 tools/axiom-audit.py near-lean/chain --report audit/chain.json
       - name: wNEAR runtime observation adapter
         working-directory: contracts/w-near/verification
         run: |
@@ -105,7 +115,7 @@ jobs:
           ./.lake/build/bin/runtime-adapter-tests
           lake build Model Proofs Differential wnear-scenarios wnear-harness
       - name: wNEAR model proof axioms
-        run: python3 tools/axiom-audit.py contracts/w-near/verification --no-build --allow-sorry-module Proofs.Refinement --report audit/wnear.json --statements contracts/w-near/verification/statements.json
+        run: python3 tools/axiom-audit.py contracts/w-near/verification --allow-sorry-module Proofs.Refinement --report audit/wnear.json --statements contracts/w-near/verification/statements.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -118,21 +128,19 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/cache@v5
         with:
-          path: near-lean/.lake/packages
-          key: lake-conformance-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('near-lean/**/lean-toolchain', 'near-lean/**/lake-manifest.json', 'contracts/*/verification/lean-toolchain', 'contracts/*/verification/lake-manifest.json') }}
+          clean: false
+      - name: Clean sources and previous evidence; keep build caches
+        run: |
+          git clean -ffd
+          git clean -ffdX -- audit/
       - uses: leanprover/lean-action@v1
         with:
+          use-github-cache: false
           lake-package-directory: near-lean/vm
           build-args: vm-replay
           use-mathlib-cache: true
       - uses: dtolnay/rust-toolchain@1.93.1
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: |
-            tools/runtime-conformance
-            tools/dump-runtime-config
       - uses: taiki-e/install-action@v2
         with:
           tool: wasm-tools@1.251.0

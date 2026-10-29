@@ -52,6 +52,18 @@ class FormatSelectionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "outside a Lake package"):
             lean_format.source_groups(self.root, [Path("tools/Driver.lean")], self.pin)
 
+    def test_changed_selection_skips_what_a_full_run_skips(self):
+        self.write("pkg/Other.lean", "def other := 2\n")
+        self.write("pkg/Generated/Program.lean", "def generated := 1\n")
+        self.write("tools/Driver.lean", "import Lean\n")
+        changed = {Path("pkg/Other.lean"), Path("pkg/Generated/Program.lean"),
+                   Path("tools/Driver.lean"), Path("pkg/lakefile.toml")}
+        groups, _ = lean_format.source_groups(self.root, [], self.pin, changed)
+        self.assertEqual(groups, {Path("pkg"): [Path("Other.lean")]})
+        groups, _ = lean_format.source_groups(self.root, [], self.pin, {Path("tools/Driver.lean")})
+        self.assertEqual(groups, {})
+        self.assertEqual(lean_format.source_groups(self.root, [], self.pin, set()), ({}, []))
+
     def test_ignored_dependencies_do_not_enter_selection(self):
         self.write(".gitignore", ".lake/\n")
         self.write("pkg/.lake/packages/upstream/Bad.lean", "def upstream := 1\n")

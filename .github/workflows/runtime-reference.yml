@@ -24,17 +24,21 @@ jobs:
       CARGO_PROFILE_DEV_DEBUG: "0"
     steps:
       - uses: actions/checkout@v5
+        with:
+          clean: false
+      - name: Clean sources and previous evidence; keep build caches
+        run: |
+          git clean -ffd
+          git clean -ffdX -- audit/
       - uses: actions/checkout@v5
         with:
           repository: near/nearcore
+          clean: false
           ref: 44f7ae6cd7ef08bab604e20a473bf77e35d4c993
           path: reference-nearcore
-      - uses: actions/cache@v5
-        with:
-          path: near-lean/.lake/packages
-          key: lake-finance-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('near-lean/*/lean-toolchain', 'near-lean/*/lake-manifest.json') }}
       - uses: leanprover/lean-action@v1
         with:
+          use-github-cache: false
           lake-package-directory: near-lean/runtime
           build-args: finance-replay nonce-replay allowance-replay --wfail
           use-mathlib-cache: true
@@ -43,13 +47,6 @@ jobs:
       # The native build dependencies (clang, cmake, protobuf, ...) are installed
       # on the fv01 runner host; see notes/design/CI_RUNNER.md.
       - uses: dtolnay/rust-toolchain@1.93.0
-      - uses: actions/cache@v5
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            reference-nearcore/target
-          key: finance-nearcore-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('near-lean/runtime/reference.json') }}-1.93.0-debug0-v2
       - name: Build reference adapter and compare financial observations
         run: |
           python3 tools/runtime-finance-reference/build.py reference-nearcore

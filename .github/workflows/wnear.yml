@@ -39,23 +39,25 @@ jobs:
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v5
-
-      - uses: actions/cache@v5
         with:
-          path: near-lean/.lake/packages
-          key: near-lean-packages-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'near-lean/*/lake-manifest.json') }}
+          clean: false
+      - name: Clean sources and previous evidence; keep build caches
+        run: |
+          git clean -ffd
+          git clean -ffdX -- audit/
 
       # Every module of the package: the audit fails on a missing one. The near-lean
       # packages below it come from Lake's artifact cache when another job built them.
       - uses: leanprover/lean-action@v1
         with:
+          use-github-cache: false
           lake-package-directory: contracts/w-near/verification
           build-args: Model Spec Proofs Differential runtime-adapter-tests wnear-scenarios wnear-harness
           use-mathlib-cache: true
 
       - name: Audit axioms and check the pinned statements
         run: >-
-          python3 tools/axiom-audit.py contracts/w-near/verification --no-build
+          python3 tools/axiom-audit.py contracts/w-near/verification
           --allow-sorry-module Proofs.Refinement --report audit/wnear.json
           --statements contracts/w-near/verification/statements.json
 

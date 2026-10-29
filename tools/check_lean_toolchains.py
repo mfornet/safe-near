@@ -17,6 +17,19 @@ def repository_files(root: Path) -> list[Path]:
     return sorted({Path(p.decode()) for p in result.stdout.split(b"\0") if p})
 
 
+def changed_files(root: Path, revision: str) -> set[Path]:
+    """Files that differ from `revision` in the working tree, deletions excluded."""
+    result = subprocess.run(
+        ["git", "diff", "--name-only", "--diff-filter=d", "-z", revision],
+        cwd=root, check=True, stdout=subprocess.PIPE,
+    )
+    untracked = subprocess.run(
+        ["git", "ls-files", "--others", "--exclude-standard", "-z"],
+        cwd=root, check=True, stdout=subprocess.PIPE,
+    )
+    return {Path(p.decode()) for p in (result.stdout + untracked.stdout).split(b"\0") if p}
+
+
 def check(root: Path) -> list[str]:
     canonical = root / "lean-toolchain"
     if not canonical.is_file():
