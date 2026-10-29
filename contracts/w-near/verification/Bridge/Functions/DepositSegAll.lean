@@ -119,7 +119,9 @@ theorem seg406_all (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (e inst : Nat
       (∀ (l2' : UInt64) (hl' F' : Nat) (h' : NearState),
         ⌜F' ≤ F + 11 ∧ LenUp hl 10 hl' ∧
           Post406 e h (pre ++ (bytes32 (UInt32.ofNat ab.length) ++ ab))
-            (StorageBalanceBounds.u128Of (x0.toNat + 2 ^ 64 * x1.toNat + (l3.toNat + 2 ^ 64 * l2.toNat))) st bud h'⌝ -∗
+            (StorageBalanceBounds.u128Of (x0.toNat + 2 ^ 64 * x1.toNat + (l3.toNat + 2 ^ 64 * l2.toNat))) st bud h' ∧
+          (x0.toNat + 2 ^ 64 * x1.toNat + (l3.toNat + 2 ^ 64 * l2.toNat) < 2 ^ 128 ∧
+            t0.toNat + 2 ^ 64 * t1.toNat + (l3.toNat + 2 ^ 64 * l2.toNat) < 2 ^ 128)⌝ -∗
         credits Cg R -∗ g ↦[wg] ⟨gt, .i32 (sp + 144)⟩ -∗ stk n (sp.toNat - 80 - SP) (80 + SP + 144) -∗
         tailStat n ta A -∗ vt n 1057464 aidx ta (A 578) -∗
         heapInv n maxP hl' (live.erase (ap.toNat, ab.length)) F' -∗
@@ -199,7 +201,7 @@ theorem seg406_all (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (e inst : Nat
       ihave X := stkJ (a := sp.toNat - 80 - SP) (b := sp.toNat + 128) (k1 := 80 + SP + 128) (k2 := 16)
         (k := 80 + SP + 144) (by omega) rfl $$ [X Harg]
       · iframe X Harg
-      iapply Wok $$ %l2' %hl' %F' %h' %hpost Hc Hg X HSt Hvt Hinv HI H12 HW HL HPS HH HD HM HT Hp Hpre Hh
+      iapply Wok $$ %l2' %hl' %F' %h' %⟨hpost.1, hpost.2.1, hpost.2.2, hno1, hno2⟩ Hc Hg X HSt Hvt Hinv HI H12 HW HL HPS HH HD HM HT Hp Hpre Hh
     · rw [if_neg hno2]
       have S406 := f406_sup (GF := GF) cfg lim (d + 1) types[38]! inst mi e A n g ta mx hm D (by omega) Cg gt sp self
         pp pc pl (sp + 56) ap (UInt32.ofNat ab.length) (UInt32.ofNat ab.length) l3 l2 t0 t1 x0 x1 aidx maxP hl live F

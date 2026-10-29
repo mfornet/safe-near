@@ -111,6 +111,15 @@ theorem dcase_small_text (dep m T : Nat) (hd : dep ≠ 0) (hs : dep < m) :
   unfold dcase
   rw [if_neg hd, if_pos ⟨rfl, hs⟩]; rfl
 
+theorem dcase_small_eq (dep m T : Nat) (hd : dep ≠ 0) (hs : dep < m) : dcase dep none m T = .small := by
+  unfold dcase
+  rw [if_neg hd, if_pos ⟨rfl, hs⟩]
+
+theorem dcase_new_ok (dep m T : Nat) (hd : dep ≠ 0) (hs : ¬ dep < m) (h1 : 0 + (dep - m) < 2 ^ 128)
+    (h2 : T + (dep - m) < 2 ^ 128) : dcase dep none m T = .ok := by
+  unfold dcase amountOf
+  rw [if_neg hd, if_neg (fun h => hs h.2), Option.getD_none, if_neg (Nat.not_le.mpr h1), if_neg (Nat.not_le.mpr h2)]
+
 theorem dcase_new_text (dep m T : Nat) (hd : dep ≠ 0) (hs : ¬ dep < m)
     (hno : ¬ (0 + (dep - m) < 2 ^ 128 ∧ T + (dep - m) < 2 ^ 128)) :
     (dcase dep none m T).text = if 0 + (dep - m) < 2 ^ 128 then textSupply else balMsg := by
@@ -120,6 +129,15 @@ theorem dcase_new_text (dep m T : Nat) (hd : dep ≠ 0) (hs : ¬ dep < m)
   · have h2 : ¬ (T + (dep - m) < 2 ^ 128) := fun h2 => hno ⟨h1, h2⟩
     rw [if_neg (Nat.not_le.mpr h1), if_pos (Nat.le_of_not_lt h2), if_pos h1]; rfl
   · rw [if_pos (Nat.le_of_not_lt h1), if_neg h1]; rfl
+
+theorem dcase_new_nok (dep m T : Nat) (hd : dep ≠ 0) (hs : ¬ dep < m)
+    (hno : ¬ (0 + (dep - m) < 2 ^ 128 ∧ T + (dep - m) < 2 ^ 128)) : dcase dep none m T ≠ .ok := by
+  intro hc
+  have := dcase_new_text dep m T hd hs hno
+  rw [hc] at this
+  by_cases h1 : 0 + (dep - m) < 2 ^ 128
+  · rw [if_pos h1] at this; exact absurd this (by decide +kernel)
+  · rw [if_neg h1] at this; exact absurd this (by decide +kernel)
 
 section Body
 
@@ -208,13 +226,14 @@ theorem body232_unreg (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (e inst : 
           PostNew e h (pre ++ (bytes32 (UInt32.ofNat h.context.predecessorAccountId.length) ++
               h.context.predecessorAccountId))
             (StorageBalanceBounds.u128Of (0 + 2 ^ 64 * 0 + ((aloOf h xb).toNat + 2 ^ 64 * (ahiOf h xb).toNat))) st bud
-            (logText (aloOf h xb) (ahiOf h xb) h.context.predecessorAccountId) h'⌝ -∗
+            (logText (aloOf h xb) (ahiOf h xb) h.context.predecessorAccountId) h' ∧
+          dcase (depOf h) none (minOf xb) (t0.toNat + 2 ^ 64 * t1.toNat) = .ok⌝ -∗
         credits Cg (cfg.regularOpCost + R) -∗ g ↦[wg] ⟨gt, .i32 s⟩ -∗
         stk n (s.toNat - (224 + SP)) (224 + SP) -∗
         selfCells n self (StorageBalanceBounds.u128Of (t0.toNat + 2 ^ 64 * t1.toNat +
           ((aloOf h xb).toNat + 2 ^ 64 * (ahiOf h xb).toNat))) xb pp pc pl pre -∗
         stat232 n ta A lpc Dp aidx -∗ heapInv n maxP hl' live F' -∗ mhostPt h' -∗ Φ.ret [] f') ∗
-      (∀ hX, ⌜keep hX = keep h⌝ -∗
+      (∀ hX, ⌜keep hX = keep h ∧ dcase (depOf h) none (minOf xb) (t0.toNat + 2 ^ 64 * t1.toNat) ≠ .ok⌝ -∗
         panicked Cg hX (dcase (depOf h) none (minOf xb) (t0.toNat + 2 ^ 64 * t1.toNat)).text -∗ Φ.trap)
       ⊢ mwpi cfg lim d ⟨#[.i32 self, .i32 0, .i64 0, .i64 0, .i32 0, .i64 0, .i64 0], inst, mi⟩ [] f232.body Φ := by
   iintro ⟨#Hk, #HC, Hc, Hg, Stk, HS, HT, Hinv, Hh, Wok, Wtr⟩
@@ -488,7 +507,7 @@ theorem body232_unreg (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (e inst : 
       iexact HF
     · iintro HT
       simp only [Post.mseq_trap, Post.mblock]
-      iapply Wtr $$ %h2 %hk2
+      iapply Wtr $$ %h2 %⟨hk2, by rw [dcase_small_eq _ _ _ hdep0 hsm']; exact fun h => DCase.noConfusion h⟩
       iapply panicked_conv ?_ $$ HT
       exact (dcase_small_text _ _ _ hdep0 hsm').symm
   -- the minimum is paid: `internal_register_account`
@@ -639,6 +658,15 @@ theorem body232_unreg (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (e inst : 
   ihave F112 := stkA (b := (s - 144).toNat + 112) (by omega) $$ F112
   ihave F124 := stkA (b := (s - 144).toNat + 124) (by omega) $$ F124
   ihave F128 := stkA (b := (s - 144).toNat + 128) (by omega) $$ F128
+  have hw := Cmp128.sub128_words (depLo h) (depHi h)
+    (UInt64.ofNat ((xOf xb).toNat * 10000000000000000000))
+    (UInt64.ofNat ((xOf xb).toNat * 10000000000000000000 / 18446744073709551616)) hle
+  have hw' : (depLo h - UInt64.ofNat ((xOf xb).toNat * 10000000000000000000)).toNat + 2 ^ 64 *
+      (depHi h - UInt64.ofNat ((xOf xb).toNat * 10000000000000000000 / 18446744073709551616) -
+        (Numeric.bool (Numeric.irelop64 IRelOp.lt_u (depLo h)
+          (UInt64.ofNat ((xOf xb).toNat * 10000000000000000000)))).toUInt64).toNat = depOf h - minOf xb := by
+    rw [hw]; have := hmw; simp only [mloOf, mhiOf, minOf] at this; simp only [depOf, minOf]; omega
+  have z0 : UInt64.toNat 0 = 0 := rfl
   iapply mwpi_code_eq (code' := seg406 ++ tail232) ?_
   · rfl
   iapply seg406_all cfg lim d e inst mi A n g ta mx hm D (by omega) Cg (cfg.regularOpCost + R) gt (s - 144) self
@@ -658,7 +686,7 @@ theorem body232_unreg (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (e inst : 
   isplitl [Hc]
   · iapply credits_mono (by omega) $$ Hc
   isplitl [Wok HX HDs HPs HHs HZ HU8]
-  · iintro %l2' %hl' %F' %h' %⟨hF', hup, hpost⟩ Hc Hg Lo HSt Hvt Hinv HI H12 HWs HLs HPS HH HDp HM HT HP HPre Hh
+  · iintro %l2' %hl' %F' %h' %⟨hF', hup, hpost, hok1, hok2⟩ Hc Hg Lo HSt Hvt Hinv HI H12 HWs HLs HPS HH HDp HM HT HP HPre Hh
     ihave Lo := stkA2 (b := s.toNat - (224 + SP)) (k' := 224 + SP) (by omega) (by omega) $$ Lo
     rw [show s - 144 + 144 = s by simp, List.erase_cons_head]
     ihave HS : selfCells n self (StorageBalanceBounds.u128Of (t0.toNat + 2 ^ 64 * t1.toNat +
@@ -673,22 +701,16 @@ theorem body232_unreg (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (e inst : 
       %⟨#[.i32 self, .i32 (s - 144), .i64 l2', .i64 (aloOf h xb), .i32 (s - 144 + 72 + 8),
         .i64 (UInt64.ofNat ((xOf xb).toNat * 10000000000000000000)), .i64 (depHi h)], inst, mi⟩
       %⟨by omega, (hlenU.trans hup).mono (by omega),
-        ⟨h2, s2, h3, s3, h', hq2, hacc2, hcan2, hlink2, hp2, he2, hq3, hacc3, hcan3, hlink3, hp3, he3, hpost', rfl⟩⟩
+        ⟨h2, s2, h3, s3, h', hq2, hacc2, hcan2, hlink2, hp2, he2, hq3, hacc3, hcan3, hlink3, hp3, he3, hpost', rfl⟩,
+        dcase_new_ok _ _ _ hdep0 hsm' (by omega) (by omega)⟩
       Hc Hg Lo HS HB Hinv Hh
   · iintro %hX %⟨hkX, hno⟩ HTr
     simp only [Post.mblock, Post.mseq_trap]
-    iapply Wtr $$ %hX %(hkX.trans hk3)
+    have hno' : ¬ (0 + (depOf h - minOf xb) < 2 ^ 128 ∧ t0.toNat + 2 ^ 64 * t1.toNat + (depOf h - minOf xb) < 2 ^ 128) :=
+      fun ⟨a, b⟩ => hno ⟨by omega, by omega⟩
+    iapply Wtr $$ %hX %⟨hkX.trans hk3, dcase_new_nok _ _ _ hdep0 hsm' hno'⟩
     iapply panicked_conv ?_ $$ HTr
-    have hw := Cmp128.sub128_words (depLo h) (depHi h)
-      (UInt64.ofNat ((xOf xb).toNat * 10000000000000000000))
-      (UInt64.ofNat ((xOf xb).toNat * 10000000000000000000 / 18446744073709551616)) hle
-    have hw' : (depLo h - UInt64.ofNat ((xOf xb).toNat * 10000000000000000000)).toNat + 2 ^ 64 *
-        (depHi h - UInt64.ofNat ((xOf xb).toNat * 10000000000000000000 / 18446744073709551616) -
-          (Numeric.bool (Numeric.irelop64 IRelOp.lt_u (depLo h)
-            (UInt64.ofNat ((xOf xb).toNat * 10000000000000000000)))).toUInt64).toNat = depOf h - minOf xb := by
-      rw [hw]; have := hmw; simp only [mloOf, mhiOf, minOf] at this; simp only [depOf, minOf]; omega
-    have z0 : UInt64.toNat 0 = 0 := rfl
-    rw [dcase_new_text _ _ _ hdep0 hsm' (fun ⟨a, b⟩ => hno ⟨by omega, by omega⟩)]
+    refine Eq.trans ?_ (dcase_new_text (depOf h) (minOf xb) (t0.toNat + 2 ^ 64 * t1.toNat) hdep0 hsm' hno').symm
     simp only [z0, Nat.mul_zero, Nat.zero_add, hw']
 
 end Body

@@ -98,6 +98,20 @@ theorem dcase_reg_text (dep B m T : Nat) (hd : dep ≠ 0) (hno : ¬ (B + dep < 2
     rw [if_neg (Nat.not_le.mpr h1), if_pos (Nat.le_of_not_lt h2), if_pos h1]; rfl
   · rw [if_pos (Nat.le_of_not_lt h1), if_neg h1]; rfl
 
+theorem dcase_reg_ok (dep B m T : Nat) (hd : dep ≠ 0) (h1 : B + dep < 2 ^ 128) (h2 : T + dep < 2 ^ 128) :
+    dcase dep (some B) m T = .ok := by
+  unfold dcase amountOf
+  rw [if_neg hd, if_neg (by simp), Option.getD_some, if_neg (Nat.not_le.mpr h1), if_neg (Nat.not_le.mpr h2)]
+
+theorem dcase_reg_nok (dep B m T : Nat) (hd : dep ≠ 0) (hno : ¬ (B + dep < 2 ^ 128 ∧ T + dep < 2 ^ 128)) :
+    dcase dep (some B) m T ≠ .ok := by
+  intro hc
+  have := dcase_reg_text dep B m T hd hno
+  rw [hc] at this
+  by_cases h1 : B + dep < 2 ^ 128
+  · rw [if_pos h1] at this; exact absurd this (by decide +kernel)
+  · rw [if_neg h1] at this; exact absurd this (by decide +kernel)
+
 /-- The deposit's words. -/
 abbrev depOf (h : NearState) : Nat := (depLo h).toNat + 2 ^ 64 * (depHi h).toNat
 
@@ -235,12 +249,14 @@ theorem body232_reg (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (e inst : Na
           PostReg e h (pre ++ (bytes32 (UInt32.ofNat h.context.predecessorAccountId.length) ++
               h.context.predecessorAccountId))
             (StorageBalanceBounds.u128Of (x0.toNat + 2 ^ 64 * x1.toNat + depOf h)) st bud
-            (logText (depLo h) (depHi h) h.context.predecessorAccountId) h'⌝ -∗
+            (logText (depLo h) (depHi h) h.context.predecessorAccountId) h' ∧
+          dcase (depOf h) (some (x0.toNat + 2 ^ 64 * x1.toNat)) 0 (t0.toNat + 2 ^ 64 * t1.toNat) = .ok⌝ -∗
         credits Cg (cfg.regularOpCost + R) -∗ g ↦[wg] ⟨gt, .i32 s⟩ -∗
         stk n (s.toNat - (224 + SP)) (224 + SP) -∗
         selfCells n self (StorageBalanceBounds.u128Of (t0.toNat + 2 ^ 64 * t1.toNat + depOf h)) xb pp pc pl pre -∗
         stat232 n ta A lpc Dp aidx -∗ heapInv n maxP hl' live F' -∗ mhostPt h' -∗ Φ.ret [] f') ∗
-      (∀ hX, ⌜keep hX = keep h⌝ -∗
+      (∀ hX, ⌜keep hX = keep h ∧
+          dcase (depOf h) (some (x0.toNat + 2 ^ 64 * x1.toNat)) 0 (t0.toNat + 2 ^ 64 * t1.toNat) ≠ .ok⌝ -∗
         panicked Cg hX (dcase (depOf h) (some (x0.toNat + 2 ^ 64 * x1.toNat)) 0 (t0.toNat + 2 ^ 64 * t1.toNat)).text -∗
         Φ.trap)
       ⊢ mwpi cfg lim d ⟨#[.i32 self, .i32 0, .i64 0, .i64 0, .i32 0, .i64 0, .i64 0], inst, mi⟩ [] f232.body Φ := by
@@ -457,7 +473,7 @@ theorem body232_reg (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (e inst : Na
   isplitl [Hc]
   · iapply credits_mono (by omega) $$ Hc
   isplitl [Wok HX HDs HPs HHs HZ HU8]
-  · iintro %l2' %hl' %F' %h' %⟨hF', hup, hpost⟩ Hc Hg Lo HSt Hvt Hinv HI H12 HWs HLs HPS HH HDp HM HT HP HPre Hh
+  · iintro %l2' %hl' %F' %h' %⟨hF', hup, hpost, hok1, hok2⟩ Hc Hg Lo HSt Hvt Hinv HI H12 HWs HLs HPS HH HDp HM HT HP HPre Hh
     ihave Lo := stkA2 (b := s.toNat - (224 + SP)) (k' := 224 + SP) (by omega) (by omega) $$ Lo
     rw [show s - 144 + 144 = s by simp, List.erase_cons_head]
     ihave HS : selfCells n self (StorageBalanceBounds.u128Of (t0.toNat + 2 ^ 64 * t1.toNat + depOf h)) xb pp pc pl pre
@@ -468,11 +484,12 @@ theorem body232_reg (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (e inst : Na
     simp only [Post.mblock, Post.mseq, List.nil_append]
     iapply Wok $$ %hl' %F' %(LogStr.logged h' (logText (depLo h) (depHi h) h.context.predecessorAccountId))
       %⟨#[.i32 self, .i32 (s - 144), .i64 l2', .i64 (depLo h), .i32 0, .i64 0, .i64 0], inst, mi⟩
-      %⟨by omega, (hlen12.trans hup).mono (by omega), ⟨h2, s2, h', hq2, hacc2, hcan2, hlink2, hp2, he2, hpost, rfl⟩⟩
+      %⟨by omega, (hlen12.trans hup).mono (by omega), ⟨h2, s2, h', hq2, hacc2, hcan2, hlink2, hp2, he2, hpost, rfl⟩,
+        dcase_reg_ok _ _ _ _ hdep0 hok1 hok2⟩
       Hc Hg Lo HS HB Hinv Hh
   · iintro %hX %⟨hkX, hno⟩ HTr
     simp only [Post.mblock, Post.mseq_trap]
-    iapply Wtr $$ %hX %(hkX.trans hk2)
+    iapply Wtr $$ %hX %⟨hkX.trans hk2, dcase_reg_nok _ _ _ _ hdep0 hno⟩
     iapply panicked_conv ?_ $$ HTr
     exact (dcase_reg_text _ _ 0 _ hdep0 hno).symm
 
