@@ -215,19 +215,19 @@ local macro "key_tail" : tactic => `(tactic| (
   · iframe Hrd
   icases HQ with ⟨%hrs, Hrd⟩
   subst hrs
-  mcredits (250 * cfg.regularOpCost + (K646 + (C194 + R)))
+  mcredits (150 * cfg.regularOpCost + (K646 + (C194 + R)))
   mstep; mstep; mstep; mstep
   mcall S82 using [Hsc]
   · iframe Hsc
   icases HQ with ⟨%hrs, Hsc⟩
   subst hrs
-  mcredits (190 * cfg.regularOpCost + (K646 + (C194 + R)))
+  mcredits (100 * cfg.regularOpCost + (K646 + (C194 + R)))
   mstep; mstep; mstep
   mcall S646 using [Hg H160 Hob Hrd Hsc HP]
   · iframe Hg H160 Hob Hrd Hsc HP
   icases HQ with ⟨%hrs, Hg, H160, %t, %p, %⟨hp, hkl⟩, O0, O4, O8, O12, Hk, Hw⟩
   subst hrs
-  mcredits (150 * cfg.regularOpCost + (C194 + R))
+  mcredits (60 * cfg.regularOpCost + (C194 + R))
   mstep; mstep; mstep [O0]; mstep; mstep
   mstep_taken with decide
   mstep; mstep; mstep; mstep; mstep
@@ -245,7 +245,7 @@ local macro "key_tail" : tactic => `(tactic| (
   · iframe Hk Hkey
   icases HQ with ⟨%hrs, Hk, Hkey⟩
   subst hrs
-  mcredits (100 * cfg.regularOpCost + R)
+  mcredits (30 * cfg.regularOpCost + R)
   ihave HQ := Hw $$ Hk
   have hf : (if kb = WNear.BalanceOfArgs.keyBytes then (0 : UInt64) else 256) &&& 1 = 0 := by split <;> decide
   mstep; mstep; mstep
@@ -301,7 +301,7 @@ theorem f193_key (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
           g ↦[wg] ⟨gt, .i32 sp⟩ ∗ stk n (sp.toNat - 176) 160 ∗ n ↦[wms][ (sp - 16).toNat ] ob ∗
           rd n de ptr bs i ∗ n ↦[i32][ (de + 12).toNat + 8 ] x ∗
           n ↦[wms][ 1051092 ] WNear.BalanceOfArgs.keyBytes ∗ P646))
-        (fun _ => (800 + 96 * keyWs first bs i + SerdeKey.cost194) * cfg.regularOpCost + K646)
+        (fun _ => (572 + 96 * keyWs first bs i + SerdeKey.cost194) * cfg.regularOpCost + K646)
         (fun _ rs => iprop(⌜rs = [.i64 (fieldOf kb)]⌝ ∗ n ↦[i32][ acc.toNat ] de ∗ n ↦[wms][ acc.toNat + 4 ] [0] ∗
           g ↦[wg] ⟨gt, .i32 sp⟩ ∗ stk n (sp.toNat - 176) 176 ∗
           n ↦[wms][ 1051092 ] WNear.BalanceOfArgs.keyBytes ∗ Q646)) := by
@@ -359,8 +359,8 @@ theorem f193_key (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
     · rename_i hb
       simp only [Option.some.injEq] at hq
       subst hq
-      rw [show (800 + 96 * w + SerdeKey.cost194) * cfg.regularOpCost + K646 + R =
-        120 * cfg.regularOpCost + (W + (580 * cfg.regularOpCost + (K646 + (C194 + R)))) by
+      rw [show (572 + 96 * w + SerdeKey.cost194) * cfg.regularOpCost + K646 + R =
+        120 * cfg.regularOpCost + (W + (352 * cfg.regularOpCost + (K646 + (C194 + R)))) by
           rw [← hW, ← hC194]; simp only [Nat.add_mul]; omega]
       mstep [Hg]; mstep; mstep; mstep; mstep [Hg]
       mstep; mstep; mstep; mstep; mstep
@@ -368,7 +368,7 @@ theorem f193_key (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
       mcall key using [Hrd]
       · iframe Hrd
       clear key
-      mcredits (360 * cfg.regularOpCost + (K646 + (C194 + R)))
+      mcredits (260 * cfg.regularOpCost + (K646 + (C194 + R)))
       icases HQ with ⟨%hrs, Hrd⟩
       subst hrs
       rw [hb]
@@ -407,8 +407,8 @@ theorem f193_key (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
       · rename_i hb2
         simp only [Option.some.injEq] at hq
         subst hq
-        rw [show (800 + 96 * (w + w2) + SerdeKey.cost194) * cfg.regularOpCost + K646 + R =
-          120 * cfg.regularOpCost + (W + (100 * cfg.regularOpCost + (W2 + (380 * cfg.regularOpCost +
+        rw [show (572 + 96 * (w + w2) + SerdeKey.cost194) * cfg.regularOpCost + K646 + R =
+          120 * cfg.regularOpCost + (W + (82 * cfg.regularOpCost + (W2 + (170 * cfg.regularOpCost +
             (K646 + (C194 + R)))))) by
             rw [← hW, ← hW2, ← hC194]; simp only [Nat.add_mul, Nat.mul_add]; omega]
         mstep [Hg]; mstep; mstep; mstep; mstep [Hg]
@@ -417,7 +417,7 @@ theorem f193_key (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
         mcall key using [Hrd]
         · iframe Hrd
         clear key
-        mcredits (180 * cfg.regularOpCost + (W2 + (380 * cfg.regularOpCost + (K646 + (C194 + R)))))
+        mcredits (180 * cfg.regularOpCost + (W2 + (170 * cfg.regularOpCost + (K646 + (C194 + R)))))
         icases HQ with ⟨%hrs, Hrd⟩
         subst hrs
         rw [hb]
@@ -439,12 +439,12 @@ theorem f193_key (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
         · iframe Hrd
         icases HQ with ⟨%hrs, Hrd⟩
         subst hrs
-        mcredits (100 * cfg.regularOpCost + (W2 + (380 * cfg.regularOpCost + (K646 + (C194 + R)))))
+        mcredits (100 * cfg.regularOpCost + (W2 + (170 * cfg.regularOpCost + (K646 + (C194 + R)))))
         mstep; mstep [Hacc]
         mcall key2 using [Hrd]
         · iframe Hrd
         clear key2
-        mcredits (360 * cfg.regularOpCost + (K646 + (C194 + R)))
+        mcredits (250 * cfg.regularOpCost + (K646 + (C194 + R)))
         icases HQ with ⟨%hrs, Hrd⟩
         subst hrs
         rw [hb2]

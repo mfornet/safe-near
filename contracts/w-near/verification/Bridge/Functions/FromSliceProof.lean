@@ -230,8 +230,8 @@ theorem acceptCallees_noesc (cfg : RuntimeConfig) (h0 : NearState) (lim : ExecLi
     (hL169 : SerdeCost.Lin169 cfg.wasm.regularOpCost K169 dv bs a169 b169 x)
     (hL81 : SerdeCost.Lin81 cfg.wasm.regularOpCost K81 ign bs a81 b81)
     (hK : 130 ≤ K1) (hb169 : b169 ≤ K1) (hb81 : b81 ≤ K1)
-    (hM169 : 1200 + SerdeKey.cost194 + 300 + 130 + a169 + b169 ≤ 5 * K1)
-    (hM81 : 1200 + SerdeKey.cost194 + 300 + 130 + a81 + b81 ≤ 5 * K1) :
+    (hM169 : 972 + SerdeKey.cost194 + 300 + 130 + a169 + b169 ≤ 5 * K1)
+    (hM81 : 972 + SerdeKey.cost194 + 300 + 130 + a81 + b81 ≤ 5 * K1) :
     AcceptCallees (GF := GF) cfg h0 lim Cg gt de ptr idx bs F (1725 + a169) K1 x := by
   refine ⟨dv, ign, SerdeKeyNoEsc.K646 cfg.wasm bs, K169, K81, hdv, hign, ?_, h169, h81, ?_⟩
   · exact SerdeKeyNoEsc.hyp646_noesc cfg.wasm lim 0 wInst id 0 0 0 Interface.wInst_ifaceMod Cg gt de ptr idx bs

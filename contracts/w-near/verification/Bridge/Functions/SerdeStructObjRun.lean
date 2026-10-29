@@ -546,7 +546,7 @@ theorem f228_obj (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
           n ↦[wms][ 1071704 ] FromUtf8Gen.utf8Width ∗ n ↦[i32][ (de + 12).toNat + 8 ] 0 ∗
           ∃ q', ⌜bs.drop q' = rest1 ∧ q' ≤ bs.length⌝ ∗ rd n de ptr bs q')
       rw [hA32, show (sp - 64).toNat + 32 + 4 = (sp - 64).toNat + 36 by omega] at s193
-      generalize hKk : (800 + 96 * keyWs first bs i' + SerdeKey.cost194) * cfg.regularOpCost + K646 q = Kk at s193
+      generalize hKk : (572 + 96 * keyWs first bs i' + SerdeKey.cost194) * cfg.regularOpCost + K646 q = Kk at s193
       ihave #S193 := s193 $$ [H193c S646]
       · iframe H193c S646
       clear s193
@@ -567,14 +567,14 @@ theorem f228_obj (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
       subst hrest2
       have hvl : q1 + w1 + 1 ≤ bs.length := by have := SerdeNextKey.getElem_lt hcol; omega
       have hcost : ∃ KV OCn, objCost cfg.regularOpCost K646 K169 K81 dv ign bs (n' + 1) first i' =
-          (1200 + 96 * (keyWs first bs i' + w1) + SerdeKey.cost194) * cfg.regularOpCost + K646 q + (KV + OCn) := by
+          (972 + 96 * (keyWs first bs i' + w1) + SerdeKey.cost194) * cfg.regularOpCost + K646 q + (KV + OCn) := by
         rcases hv with ⟨hk, a', r3, hdv, -⟩ | ⟨hk, r3, hig, -⟩
         · refine ⟨K169 (q1 + w1 + 1), objCost cfg.regularOpCost K646 K169 K81 dv ign bs n' false (bs.length - r3.length), ?_⟩
           rw [objCost_field _ _ _ _ _ _ bs hend hq hs hk (by rw [hq1, hw1]; exact hdv), hq1, hw1]
         · refine ⟨K81 (q1 + w1 + 1), objCost cfg.regularOpCost K646 K169 K81 dv ign bs n' false (bs.length - r3.length), ?_⟩
           rw [objCost_ign _ _ _ _ _ _ bs hend hq hs hk (by rw [hq1, hw1]; exact hig), hq1, hw1]
       obtain ⟨KV, OCn, hOCe⟩ := hcost
-      rw [hOCe, show (1200 + 96 * (keyWs first bs i' + w1) + SerdeKey.cost194) * cfg.regularOpCost + K646 q +
+      rw [hOCe, show (972 + 96 * (keyWs first bs i' + w1) + SerdeKey.cost194) * cfg.regularOpCost + K646 q +
           (KV + OCn) + E + R =
         60 * cfg.regularOpCost + (Kk + (140 * cfg.regularOpCost + ((200 + 96 * w1) * cfg.regularOpCost + (KV + (OCn + E + R))))) by
           rw [← hKk]; simp only [Nat.add_mul, Nat.mul_add]; omega]

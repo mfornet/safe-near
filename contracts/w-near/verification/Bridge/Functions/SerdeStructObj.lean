@@ -112,7 +112,7 @@ def objCost (c : Nat) (K646 K169 K81 : Nat → Nat)
       | some q =>
         match stringBody (bs.drop q) [] with
         | some (some k, rest1) =>
-          (1200 + 96 * (keyWs first bs i + wsLen (bs.drop (bs.length - rest1.length))) + SerdeKey.cost194) * c +
+          (972 + 96 * (keyWs first bs i + wsLen (bs.drop (bs.length - rest1.length))) + SerdeKey.cost194) * c +
             K646 q +
           (if k = "account_id" then
             match dv (bs.drop (bs.length - rest1.length + wsLen (bs.drop (bs.length - rest1.length)) + 1)) with
@@ -141,7 +141,7 @@ theorem objCost_field {n : Nat} {first : Bool} {i q : Nat} {k : String} {rest1 :
     (hs : stringBody (bs.drop q) [] = some (some k, rest1)) (hk : k = "account_id")
     (hd : dv (bs.drop (bs.length - rest1.length + wsLen (bs.drop (bs.length - rest1.length)) + 1)) = some (a', r3)) :
     objCost c K646 K169 K81 dv ign bs (n + 1) first i =
-      (1200 + 96 * (keyWs first bs i + wsLen (bs.drop (bs.length - rest1.length))) + SerdeKey.cost194) * c +
+      (972 + 96 * (keyWs first bs i + wsLen (bs.drop (bs.length - rest1.length))) + SerdeKey.cost194) * c +
         K646 q + (K169 (bs.length - rest1.length + wsLen (bs.drop (bs.length - rest1.length)) + 1) +
         objCost c K646 K169 K81 dv ign bs n false (bs.length - r3.length)) := by
   rw [objCost]; simp only [hb, if_false, hq, hs, hk, if_true, hd]
@@ -151,7 +151,7 @@ theorem objCost_ign {n : Nat} {first : Bool} {i q : Nat} {k : String} {rest1 : L
     (hs : stringBody (bs.drop q) [] = some (some k, rest1)) (hk : k ≠ "account_id")
     (hd : ign (bs.drop (bs.length - rest1.length + wsLen (bs.drop (bs.length - rest1.length)) + 1)) = some ((), r3)) :
     objCost c K646 K169 K81 dv ign bs (n + 1) first i =
-      (1200 + 96 * (keyWs first bs i + wsLen (bs.drop (bs.length - rest1.length))) + SerdeKey.cost194) * c +
+      (972 + 96 * (keyWs first bs i + wsLen (bs.drop (bs.length - rest1.length))) + SerdeKey.cost194) * c +
         K646 q + (K81 (bs.length - rest1.length + wsLen (bs.drop (bs.length - rest1.length)) + 1) +
         objCost c K646 K169 K81 dv ign bs n false (bs.length - r3.length)) := by
   rw [objCost]; simp only [hb, if_false, hq, hs, hk, hd]
