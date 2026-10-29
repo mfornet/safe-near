@@ -1,0 +1,153 @@
+import Bridge.Functions.SerdeFromTrait
+
+/-!
+# The rejecting half of `ft_balance_of`'s parser: the error result, and 78 from 228 (M6)
+
+On an input the model rejects, `from_trait` (66) must return `Err(box)`, at *some* finite cost
+(`FromSliceSpec.RejectContract`). The error comes from `deserialize_struct` (228, through 78) or,
+when the struct is read but followed by more than whitespace, from `end` (320).
+
+* `tabs n de`: the tables the readers use and the scratch's length word (`tbl` without the scratch's
+  pointer and capacity); `tbl_tabs`, `tabs_tbl`.
+* `errRes n maxP out de live`: what a rejecting run leaves: the tag 1 and an error box `e` at `out`,
+  the 8 bytes after it unchanged, a heap that lends at least `live` (`live'`), and the scratch
+  `Vec` `(sp, sc)` at `de + 12`: either still at capacity 0, or grown to a block the heap lends
+  (an escaped key, or `ignore_value`'s frames), which 66 then frees (`scrOk`, `scrBlk`).
+* `Rej228`: **the rejecting specification of 228**, at the cost `K F` for a free list of at most
+  `F` cells: on the input `bs` (the reader at 0), 228 returns `errRes`. Stated as a hypothesis, for
+  the inputs on which serde's struct machine fails (`FromSliceReject`).
+* `f78_rej`: 78 from `Rej228`.
+-/
+
+namespace WNear.Binary.SerdeRej
+
+open Wasm Wasm.Near WasmLogic NearLogic Iris Iris.BI Iris.ProgramLogic
+open WNear.Binary WNear.Binary.AllocInv
+open WNear.Binary.AllocFirstFit (vt)
+open WNear.Binary.Interface (IfaceMod)
+open WNear.Binary.VecFromElem (stk)
+open WNear.Binary.SerdeRead (rd)
+open WNear.Binary.SerdeStructArr (tbl roomS)
+
+/-- The scratch after a rejecting run: at capacity 0 with the heap lending at least `live`, or a
+block `(sp, sc)` the heap lends, apart from which it lends at least `live`. -/
+def scrOk (live live' : List (Nat × Nat)) (sp sc : UInt32) : Prop :=
+  (sc = 0 ∧ live.Sublist live') ∨
+    (sc ≠ 0 ∧ (sp.toNat, sc.toNat) ∈ live' ∧ live.Sublist (live'.erase (sp.toNat, sc.toNat)))
+
+section Defs
+
+variable {GF : BundledGFunctors} [WasmGS NearState GF]
+
+/-- The scratch's buffer: nothing at capacity 0, else its block. -/
+def scrBlk (n : Nat) (sp sc : UInt32) : IProp GF :=
+  if sc = 0 then iprop(emp) else block n sp.toNat sc.toNat
+
+/-- `tbl` without the scratch's pointer and capacity. -/
+def tabs (n : Nat) (de : UInt32) : IProp GF :=
+  iprop((∃ sl : UInt32, n ↦[i32][ de.toNat + 20 ] sl) ∗ n ↦[wms][ 1062392 ] ParseStr.escTable ∗
+    n ↦[wms][ 1071704 ] FromUtf8Gen.utf8Width ∗ n ↦[wms][ 1048576 ] SerdeIdent.identBytes)
+
+theorem tbl_tabs (n : Nat) (de : UInt32) :
+    tbl (GF := GF) n de ⊢ tabs n de ∗ n ↦[i32][ de.toNat + 12 ] 1 ∗ n ↦[i32][ de.toNat + 16 ] 0 := by
+  iintro H
+  iunfold tbl at H
+  icases H with ⟨Hl, He, Hw, H12, H16, Hid⟩
+  iunfold tabs
+  iframe Hl He Hw H12 H16 Hid
+
+theorem tabs_tbl (n : Nat) (de : UInt32) :
+    tabs (GF := GF) n de ∗ n ↦[i32][ de.toNat + 12 ] 1 ∗ n ↦[i32][ de.toNat + 16 ] 0 ⊢ tbl n de := by
+  iintro ⟨H, H12, H16⟩
+  iunfold tabs at H
+  icases H with ⟨Hl, He, Hw, Hid⟩
+  iunfold tbl
+  iframe Hl He Hw H12 H16 Hid
+
+/-- **What a rejecting run leaves**: `Err(e)` at `out` (the tag 1, the box, the next 8 bytes
+unchanged), the heap, and the scratch's pointer and capacity at `de + 12` with its buffer. -/
+def errRes (n maxP : Nat) (out de : UInt32) (live : List (Nat × Nat)) : IProp GF :=
+  iprop(∃ (e sp sc : UInt32) (b8 : List UInt8) (live' : List (Nat × Nat)) (mlen F : Nat),
+    ⌜b8.length = 8 ∧ scrOk live live' sp sc⌝ ∗
+    n ↦[i32][ out.toNat ] 1 ∗ n ↦[i32][ out.toNat + 4 ] e ∗ n ↦[wms][ out.toNat + 8 ] b8 ∗
+    heapInv n maxP mlen live' F ∗ n ↦[i32][ de.toNat + 12 ] sp ∗ n ↦[i32][ de.toNat + 16 ] sc ∗
+    scrBlk n sp sc)
+
+end Defs
+
+/-- **The rejecting specification of `deserialize_struct` (228)** on the input `bs` at the
+`Deserializer` `de` (the reader at 0, `remaining_depth` 128, the scratch empty at capacity 0), at the
+cost `K F` for a free list of at most `F` cells: `errRes`, the reader somewhere, the depth back at 128. -/
+def Rej228 {GF : BundledGFunctors} [WasmGS NearState GF] (cfg : WasmConfig) (lim : ExecLimits)
+    (inst : Nat) (mi : ModuleInst) (n g ta : Nat) (A : Nat → Nat) (Cg : Nat) (gt : GlobalType)
+    (de ptr idx : UInt32) (bs : List UInt8) (maxP : Nat) (K : Nat → Nat) (Cd : IProp GF) : Prop :=
+  ∀ (d : Nat) (sp out : UInt32) (ob : List UInt8) (mlen F : Nat) (live : List (Nat × Nat)),
+    d + 20 < lim.maxCallDepth → ob.length = 16 → out.toNat + 16 ≤ 2 ^ 32 → 336 ≤ sp.toNat →
+    sp.toNat % 8 = 0 → roomS mlen maxP →
+    Cd ⊢ MFunSpec (GF := GF) cfg lim d types[36]! inst mi f228 Cg
+      (fun args => iprop(⌜args = [.i32 out, .i32 de, .i32 out, .i32 out, .i32 out, .i32 out]⌝ ∗
+        g ↦[wg] ⟨gt, .i32 sp⟩ ∗ stk n (sp.toNat - 336) 336 ∗ vt n 1057464 idx ta (A 578) ∗
+        heapInv n maxP mlen live F ∗ n ↦[wms][ out.toNat ] ob ∗ rd n de ptr bs 0 ∗
+        n ↦[wms][ de.toNat + 24 ] [128] ∗ tbl n de ∗ n ↦[wms][ 1051092 ] WNear.BalanceOfArgs.keyBytes))
+      (fun _ => K F)
+      (fun _ rs => iprop(⌜rs = []⌝ ∗ g ↦[wg] ⟨gt, .i32 sp⟩ ∗ stk n (sp.toNat - 336) 336 ∗
+        vt n 1057464 idx ta (A 578) ∗ n ↦[wms][ de.toNat + 24 ] [128] ∗ tabs n de ∗
+        n ↦[wms][ 1051092 ] WNear.BalanceOfArgs.keyBytes ∗ (∃ i, rd n de ptr bs i) ∗
+        errRes n maxP out de live))
+
+section L78
+
+variable {GF : BundledGFunctors} [WasmGS NearState GF]
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 4000000 in
+/-- **`Input::deserialize` (78), rejecting**, from 228's rejecting specification. -/
+theorem f78_rej (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
+    (htype : type.results = []) (inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (n g ta : Nat)
+    (hm : IfaceMod mi A n g ta) (hd : d + 21 < lim.maxCallDepth) (Cg : Nat)
+    (gt : GlobalType) (sp out de ptr idx : UInt32) (ob bs : List UInt8)
+    (maxP mlen F : Nat) (live : List (Nat × Nat)) (hob : ob.length = 16) (hout : out.toNat + 16 ≤ 2 ^ 32)
+    (hsp : 336 ≤ sp.toNat) (hal : sp.toNat % 8 = 0) (hr : roomS mlen maxP)
+    (K : Nat → Nat) (Cd : IProp GF) [Persistent Cd]
+    (h228 : Rej228 cfg lim inst mi n g ta A Cg gt de ptr idx bs maxP K Cd) :
+    inst ↪[inst] mi ∗ A 228 ↪[wf] FuncInst.wasm types[36]! inst f228 ∗ Cd ⊢
+      MFunSpec (GF := GF) cfg lim d type inst mi f78 Cg
+        (fun args => iprop(⌜args = [.i32 out, .i32 de]⌝ ∗
+          g ↦[wg] ⟨gt, .i32 sp⟩ ∗ stk n (sp.toNat - 336) 336 ∗ vt n 1057464 idx ta (A 578) ∗
+          heapInv n maxP mlen live F ∗ n ↦[wms][ out.toNat ] ob ∗ rd n de ptr bs 0 ∗
+          n ↦[wms][ de.toNat + 24 ] [128] ∗ tbl n de ∗ n ↦[wms][ 1051092 ] WNear.BalanceOfArgs.keyBytes))
+        (fun _ => 40 * cfg.regularOpCost + K F)
+        (fun _ rs => iprop(⌜rs = []⌝ ∗ g ↦[wg] ⟨gt, .i32 sp⟩ ∗ stk n (sp.toNat - 336) 336 ∗
+          vt n 1057464 idx ta (A 578) ∗ n ↦[wms][ de.toNat + 24 ] [128] ∗ tabs n de ∗
+          n ↦[wms][ 1051092 ] WNear.BalanceOfArgs.keyBytes ∗ (∃ i, rd n de ptr bs i) ∗
+          errRes n maxP out de live)) := by
+  iintro ⟨#Hi, #F228, #HCd⟩
+  have ha228 := hm.funcs 228 (by decide)
+  have t36 : types[36]!.params.length = 6 := by rfl
+  have s := h228 (d + 1) sp out ob mlen F live (by omega) hob hout hsp hal hr
+  generalize hC : K F = C at s ⊢
+  ihave #S := s $$ HCd
+  clear s
+  iapply MFunSpec_intro
+  imodintro
+  iintro %args %R HP Hc
+  icases HP with ⟨%hargs, Hg, Hs, Hvt, Hh, Ho, Hrd, Hd, Ht, Hkey⟩
+  subst hargs
+  simp only [f78]
+  mstep; mstep; mstep; mstep; mstep; mstep
+  mcall S using [Hg Hs Hvt Hh Ho Hrd Hd Ht Hkey]
+  · iframe Hg Hs Hvt Hh Ho Hrd Hd Ht Hkey
+  icases HQ with ⟨%hrs, HQ⟩
+  subst hrs
+  repeat mstep
+  isplitl [Hc]
+  · iapply BorrowMut.credits_le
+    iframe Hc
+    ipureintro; omega
+  icases HQ with ⟨Hg, Hs, Hvt, Hd, Ht, Hkey, HR, HE⟩
+  iframe Hg Hs Hvt Hd Ht Hkey HR HE
+  ipureintro; simp [htype]
+
+end L78
+
+end WNear.Binary.SerdeRej

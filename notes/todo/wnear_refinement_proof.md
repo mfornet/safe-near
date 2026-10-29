@@ -8,6 +8,8 @@ amount of gas, with every hypothesis discharged by the kernel.
 Items marked **Decided** are not re-opened without discussing first. Items
 marked **Open** are for whoever reaches them to settle and record here.
 
+**Current status and how to resume:** `wnear_refinement_status.md`.
+
 ## Why this is doable
 
 This is the largest formalization in the project, and it is large for one
