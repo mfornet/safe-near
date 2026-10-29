@@ -5,7 +5,7 @@ import argparse
 from pathlib import Path
 import subprocess
 
-from check_lean_toolchains import repository_files
+from check_lean_toolchains import changed_files, repository_files
 
 
 def main() -> int:
@@ -13,10 +13,20 @@ def main() -> int:
     parser.add_argument("--fix", action="store_true")
     parser.add_argument("files", nargs="*", type=Path,
                         help="repository-relative files (default: every owned .lean file)")
+    parser.add_argument("--changed-from", metavar="REV",
+                        help="only the owned .lean files that differ from this revision")
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     owned = {p for p in repository_files(root) if p.suffix == ".lean" and (root / p).is_file()}
-    files = sorted(set(args.files) if args.files else owned)
+    if args.changed_from:
+        if args.files:
+            parser.error("--changed-from cannot be combined with files")
+        files = sorted(owned & changed_files(root, args.changed_from))
+        if not files:
+            print(f"No Lean source changed since {args.changed_from}.")
+            return 0
+    else:
+        files = sorted(set(args.files) if args.files else owned)
     if not files:
         parser.error("no Lean source files found")
     for file in files:

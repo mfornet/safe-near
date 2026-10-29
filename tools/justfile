@@ -186,6 +186,10 @@ node-bench *options: node-build
 lean-lint:
     python3 tools/lean_style.py
 
+# Check style only on the Lean sources changed since a revision, as CI does on a pull request.
+lean-lint-changed base="origin/main":
+    python3 tools/lean_style.py --changed-from {{quote(base)}}
+
 # Apply validated syntax formatting to package sources (optional file selection).
 [positional-arguments]
 lean-format *files:
@@ -231,8 +235,8 @@ snapshot output +accounts_and_options:
 
 # Run offline regression tests for repository tools.
 tools-test:
-    python3 -m unittest discover -s tools/tests -v
-    python3 -m unittest discover -s tools/runtime-conformance -p 'test_*.py' -v
+    python3 tools/run_unittests.py -s tools/tests
+    python3 tools/run_unittests.py -s tools/runtime-conformance -p 'test_*.py'
 
 # The inexpensive automatic CI gate: no Lean downloads or native builds.
 ci-check: check-toolchains node-isolation umbrella-imports tools-test

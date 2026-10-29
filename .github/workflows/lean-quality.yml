@@ -1,7 +1,12 @@
 name: Lean quality
 
-# Python-only repository checks. The near-lean workflow builds the Lean packages
-# on changes to them; tests, audits and native suites run in the periodic check.
+# Repository checks, and Lean style on the sources a pull request changes. The
+# near-lean workflow builds the Lean packages on changes to them; tests, audits
+# and native suites run in the periodic check.
+#
+# fv01 keeps each runner's workspace between jobs (notes/design/CI_RUNNER.md):
+# checkout leaves ignored files (.lake builds and packages, the formatter
+# build) in place, so the Lean jobs start warm.
 on:
   push:
     branches: [main]
@@ -22,6 +27,12 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v5
+        with:
+          clean: false
+      - name: Clean sources and previous evidence; keep build caches
+        run: |
+          git clean -ffd
+          git clean -ffdX -- audit/
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
@@ -31,53 +42,93 @@ jobs:
           python3 tools/check_node_isolation.py
           python3 tools/check_umbrella_imports.py
           python3 tools/check_nearcore_pin.py
-          python3 -m unittest discover -s tools/tests -v
-          python3 -m unittest discover -s tools/runtime-conformance -p 'test_*.py' -v
+          python3 tools/run_unittests.py -s tools/tests
+          python3 tools/run_unittests.py -s tools/runtime-conformance -p 'test_*.py'
 
+  # On a pull request, only the changed sources, unless the style checker or the
+  # Mathlib it runs changed. Everything on main and on a manual run.
   style:
-    if: github.event_name == 'workflow_dispatch'
     timeout-minutes: 15
     runs-on: [self-hosted, fv01]
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/cache@v5
         with:
-          path: near-lean/.lake/packages
-          key: lean-style-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'near-lean/vm/lake-manifest.json') }}
+          clean: false
+      - name: Clean sources and previous evidence; keep build caches
+        run: |
+          git clean -ffd
+          git clean -ffdX -- audit/
+      - name: Select the sources to check
+        id: scope
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ -z "$BASE" ]; then
+            echo "args=" >> "$GITHUB_OUTPUT"; echo "tooling=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          git fetch --no-tags --depth=1 origin "$BASE"
+          if git diff --name-only "$BASE" HEAD -- tools/LeanStyle.lean tools/lean_style.py \
+              tools/tests/check_lean_style.py tools/check_lean_toolchains.py lean-toolchain \
+              near-lean/vm/lake-manifest.json .github/workflows/lean-quality.yml | grep -q .; then
+            echo "args=" >> "$GITHUB_OUTPUT"; echo "tooling=true" >> "$GITHUB_OUTPUT"
+          elif git diff --name-only --diff-filter=d "$BASE" HEAD -- '*.lean' | grep -q .; then
+            echo "args=--changed-from $BASE" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
       - uses: leanprover/lean-action@v1
+        if: steps.scope.outputs.skip != 'true'
         with:
           lake-package-directory: near-lean/vm
-          build: "false"
-          test: "false"
-          lint: "false"
+          auto-config: false
+          use-github-cache: false
           use-mathlib-cache: false
       - name: Prepare only the style checker's dependencies
+        if: steps.scope.outputs.skip != 'true'
         working-directory: near-lean/vm
         run: |
           lake exe cache get Mathlib.Tactic.Linter.TextBased
           lake build +Mathlib.Tactic.Linter.TextBased
       - name: Check Lean style and formatting
-        run: python3 tools/lean_style.py
+        if: steps.scope.outputs.skip != 'true'
+        run: python3 tools/lean_style.py ${{ steps.scope.outputs.args }}
       - name: Test style checker and formatter
+        if: steps.scope.outputs.tooling == 'true'
         run: python3 tools/tests/check_lean_style.py
 
+  # The syntax formatter is not enforced: most sources predate it. This tests the
+  # pinned formatter itself, when it or its configuration changes.
   formatter:
-    if: github.event_name == 'workflow_dispatch'
     timeout-minutes: 30
     runs-on: [self-hosted, fv01]
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/cache@v5
         with:
-          path: near-lean/.lake/lean-fmt
-          key: lean-fmt-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'tools/lean_format_tool.json') }}
+          clean: false
+      - name: Clean sources and previous evidence; keep build caches
+        run: |
+          git clean -ffd
+          git clean -ffdX -- audit/
+      - name: Did the formatter change?
+        id: scope
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ -z "$BASE" ]; then echo "run=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          git fetch --no-tags --depth=1 origin "$BASE"
+          if git diff --name-only "$BASE" HEAD -- tools/lean_format.py tools/lean_format_tool.json \
+              tools/tests/check_lean_format.py tools/check_lean_toolchains.py lean-fmt.toml \
+              lean-toolchain .github/workflows/lean-quality.yml | grep -q .; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
       # Only installs elan: the formatter builds itself with `lake`.
       - uses: leanprover/lean-action@v1
+        if: steps.scope.outputs.run == 'true'
         with:
           lake-package-directory: near-lean/vm
-          build: "false"
-          test: "false"
-          lint: "false"
+          auto-config: false
+          use-github-cache: false
           use-mathlib-cache: false
       - name: Test validated syntax formatting
+        if: steps.scope.outputs.run == 'true'
         run: python3 tools/tests/check_lean_format.py
