@@ -36,7 +36,8 @@ binary, the instance and the memory limit (`codeCtx`), with a stack of `S` bytes
 input `bs` at `ptr` (`ptr + len < 2^32`, `len + 1 < 2^28`), the read-only data the parser reads
 (`roData`: the `ESCAPE` table at 1062392, the UTF-8 width table at 1071704, the field name at
 1051092, given back), and a heap `heapInv 0 2048 hl live F` with room for an error box's page
-(`roomFor4 hl 2048 20`).
+(`roomFor4 hl 2048 20`; the accepting half asks `SerdeStructArr.roomS hl 2048`, a page more for the
+account's `String`).
 
 `acceptContract` proves the accepting half from `SerdeFromTrait.f66_dec`, for any callees that satisfy
 `AcceptCallees`: readers `dv` (169) and `ign` (81) that agree with the model, the specifications of

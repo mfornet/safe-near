@@ -515,7 +515,8 @@ input `{"account_id":"<a>"}` decodes to `ftBalanceOf a` (`BalanceOfArgs.lean`). 
 proved: the rejecting half of the parser's contract, `FromSliceSpec.RejectContract`; the accepting
 half, `AcceptContract` (66 against `Call.decode`, cost `(K0 + K1·len)·c + X`), is proved
 (`acceptContract`, `f65_accept`) from the callees not proved yet (`AcceptCallees`: 169, 81, and 646
-on keys with escapes). Below 66 are 78/228 and about 200 functions (14 000 instructions), which
+on keys with escapes); on an input without `\`, only 81 is left (`FromSliceNoEsc.acceptContract_noesc81`,
+eighth round). Below 66 are 78/228 and about 200 functions (14 000 instructions), which
 allocate and free: they need the allocator on any free list (M4), as does the rest of 297
 (`LookupMap::get`, 293/415, after the parser's frees).
 
@@ -899,23 +900,86 @@ callees not proved yet as hypotheses:
     for real) within `470`: 81's Wasm proof must keep its constants within about 1.4× of the real
     cost.
 
+*`Hyp169`, and the pieces of 81 (eighth round).* Proved, no `sorry`, standard axioms only:
+
+* **`Hyp169` on an input without `\`** (`SerdeAcctHyp.hyp169_noesc`), for the model's own reader
+  `dv = valueAs account` (so `Agrees` is `rfl`), from `SerdeAccountId.f169_s`. `acct_noesc`: where the
+  model reads an account id at `j`, the input is whitespace, `"`, the plain bytes `keyBody` (the
+  account's UTF-8 bytes, valid, 2..64 of them) and `"` (`valueR_str`, `key_noesc`); so `ok380` holds
+  and `res380`/`heapS` give `strRes` (the block `(p, |a|)`, an empty `block` after it).
+  * **The heap room, restated.** After the `String`'s allocation the memory may have grown a page,
+    and `strRes` asks room for an error box after it. `roomS m maxP := roomFor4 m maxP 20 ∧
+    roomFor4 (m + 65536) maxP 20` (`SerdeStructArr`) is now `Hyp169`'s premise, carried by
+    `seenRes`'s `None` case, `f228_obj`, `f228_arr`, `f78_acc`, `f66_acc`, `f66_dec` and
+    `AcceptContract` (the rejecting contract keeps `roomFor4`). `room_down` gives back `roomFor4`.
+  * Cost `K169 cfg bs Fb j`: 169's at the free-list bound `Fb` (`cost380_mono`). `lin169_noesc`:
+    `Lin169` with `a = 0`, `b = 208` per byte read (`96` per whitespace byte; `30 + 100` for 646 and
+    `from_utf8`, `60` for `is_valid_account_id`, `18` for `memcpy`, other agents' constants) and
+    `x169 cfg Fb = (2656 + 320·Fb)·c + linearOpBaseCost + linearOpUnitCost`.
+* **The contract with only `Hyp81` left** (`FromSliceNoEsc`): `code169_of`, `acceptCallees_noesc81`
+  and `acceptContract_noesc81`: on an input without `\`, the accepting contract's conclusion at
+  `(1725 + K1·len)·c + x169 cfg F`, from `Hyp81` (for a reader that agrees with the model) and
+  `Lin81 a81 b81`, when `208 ≤ K1`, `b81 ≤ K1`, `1714 + a81 + b81 ≤ 5·K1` and `1714 + 208 ≤ 5·K1`
+  (the account id's member: `K1 ≥ 385`).
+* **The scratch in `tbl`.** 81 reads the scratch `Vec`'s pointer and capacity (84, 85), which 66 kept
+  in its own frame. `tbl n de` now also holds `de + 12 ↦ 1` and `de + 16 ↦ 0` (as 634 leaves them);
+  66 splits its `Vec` word into `tbl` before 78 and takes it back for 68.
+* **81's callees** (not 81 itself):
+  * `ignore_str` (650) on an escape-free string (`SerdeIgnStr.f650_noesc`): `0`, the reader past the
+    `"`, at `(56 + 21·m)·c` (`21` is the scan's count, `20` fails); `str_noesc_shape`: the model's
+    `stringBody` accepts exactly there.
+  * The numbers, on the model's side (`SerdeNumModel`): `intR`, `afterInt`, `fracR`, `afterExp`,
+    `expR` are the rests 83/86/87 leave; `vSkip_num`, `vSkip_neg`: wherever `IgnoreModel.vSkip`
+    reads a number (at a digit, or after `-`), `intR` reads it with the same rest. The proof walks
+    `number`'s code piece by piece (`numFE` is its tail verbatim, with its `do` join points; the first
+    digit is split over its ten values so that the literal matches reduce).
+  * `next_char_or_null` (88, `SerdeIgnNum.f88_spec`, `74·c`), `ignore_exponent` (87, `f87_acc`,
+    `(300 + 127·m)·c`, `127` per digit, `125` fails), `ignore_decimal` (86, `f86_acc`,
+    `(465 + 129·m)·c`, with 87's fixed part when there is an exponent).
+  * `spec_extend` with the flag 0 (84, `SerdeIgnFrame.f84_none`, `120·c`) and `pop` on the empty
+    scratch (85, `f85_empty`, `20·c`): what 81 does when no frame is pushed.
+
+*Findings and tooling notes of this round.*
+
+* **A call costs about 12 more** than the callee's own constant (`1` for `call`, the activation
+  `(64 + locals' bytes + 7)/8`), and `peek_or_null` (329) is `65` with its own call of 332. So a digit
+  in 83/86/87 costs `127` (329, 333, the tests and two activations). 83 peeks twice at the end of its
+  integer part (once to test for a digit, once for `.`/`e`), so a one-digit value costs 83 alone about
+  `300`. Estimated for 81 on the one-byte value `0` (prologue and 82, 339's `100`, the dispatch, 83, the
+  pop 85, the epilogue, each call's `~12`): about `600`, within `a81 + b81 ≤ 636` (`K1 = 470`) but
+  with little to spare; a value with a fraction or an exponent carries 86's or 87's fixed part (`465`,
+  `300`) over at least two more bytes. Not proved: the numbers are estimates until 83 and 81 are.
+* `mstep` treats a `br_if` and the pure instructions before it as one branch when it cannot step them
+  separately: with a symbolic byte, step to the `br_if` and give the side condition as a precomputed
+  fact (`mstep_taken with exact h`); a `rw` inside `with` fails with "internal exception #5". After an
+  `mcall`, `mcredits` to a literal multiple of `c` plus atoms; generalize the per-digit product
+  (`127 * (e - k) * c = Z0`) before stepping, or `omega` sees `(127·x + E)·c` as one atom.
+* A callee's cost that is a function application (`cost87 m * c`) must be rewritten to literal
+  multiples of `c` plus atoms before `mcall`, or the call's cost goal fails.
+
 *What is left for the parser's contract.*
 
-* `Hyp169`: from `SerdeAccountId.f169_s` on escape-free strings and valid account ids. Needs: the
-  result `res380`/`heapS` as `strRes` (a lent block, `roomFor4` after the allocation, so a heap room
-  of more than one page in the contract's premise), the `roomFor` of the allocation, `ok380` from
-  `dv`'s acceptance (as `key_noesc` does for keys), and `K169 j` with `Fb` (169's cost has
-  `cost618 cfg F`). Then `Lin169` with `a169 = 0`, `b169` its per-byte cost (554's 60, 646's 130,
-  `memcpy`).
-* `Hyp81`: 81's Wasm proof (83/86/87, 323, 650/652, 84/85), against `IgnoreModel`. `Hyp81` asks
-  the heap unchanged, true only when no frame is pushed (no nested value): nested ignored values
-  need the scratch's growth from capacity 0 (the escapes agent's 627/631 work) and a heap that
-  changes across 228's loop.
+* `Hyp169`: done on an input without `\` (eighth round). Left: account ids with escapes (646's escape
+  path), and the invalid account id's error (693/479/130/387/151) for the rejecting half.
+* `Hyp81`: 81's Wasm proof against `IgnoreModel`. Done below it: 650 (escape-free), 86, 87, 88, 84
+  (flag 0), 85 (empty). Left: 83 (`ignore_integer`, against `SerdeNumModel.intR`; its cost must depend
+  on the path, `.`/`e` carrying 86's/87's fixed part, or a one-digit value exceeds `636`), 323
+  (`parse_ident`, which reads the literals `alse`, `rue`, `ull` at 1048576.., not yet in `roData` or
+  `tbl`: add them), 81 itself, and `Lin81`.
+  * The restriction: `Hyp81` asks the heap unchanged, true only when no frame is pushed (at most one
+    bracket deep). `Hyp81` quantifies over every position where the reader succeeds, and the model's
+    skip succeeds on deeper values too, so either generalize `Hyp81` (the scratch's growth from
+    capacity 0 through 716/714, not the escapes agent's 627/631 chain, and a heap that changes across
+    228's loop) or prove 81 for a shallow reader `ign1` (fails on a bracket inside a frame) and state
+    the contract for inputs where serde's machine with `ign1` accepts (`structDe … ign1 bs ≠ none`),
+    with `ign1 ⊆ vSkip` for soundness and `cost66_le` restated from `structDe` instead of `decode`
+    (it uses `Agrees ign valueSkip` only to get there).
 * Keys with escapes: `Hyp646` beyond `acceptCallees_noesc` (the escapes agent's 646).
 * The rejecting half (`RejectContract`): 340, 165, 166, 177, 326, 92, the error paths of
-  193/214/228, 642/643, 693/479/130/387/151, at some cost.
-* The method's side: `heapInv` at 297's call with `F` bounded, the memory room for the account's
-  `String` and an error box, and the per-byte budget (`K1 ≤ 480`, `K0 + X` in `computeGas`).
+  193/214/228/81/83/86/87/323/650, 642/643, 693/479/130/387/151, at some cost. Not started.
+* The method's side: `heapInv` at 297's call with `F` bounded, the memory room `roomS` (a page for
+  the account's `String`, then an error box) and the per-byte budget (`K1 ≤ 470`, `K0 + X` in
+  `computeGas`).
 
 *Plan for the rest of the parser's contract, bottom-up.*
 
