@@ -203,4 +203,169 @@ theorem f107_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
 
 end S107
 
+section S289
+
+variable {GF : BundledGFunctors} [WasmGS NearState GF]
+
+/-- The code of 289 (persistent). -/
+def code289 (e n maxP inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (mx : Option Nat) : IProp GF :=
+  iprop(code107 e n maxP inst mi A mx ∗ A 107 ↪[wf] FuncInst.wasm types[14]! inst f107 ∗
+    A 94 ↪[wf] FuncInst.wasm types[14]! inst f94)
+
+instance (e n maxP inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (mx : Option Nat) :
+    Persistent (code289 (GF := GF) e n maxP inst mi A mx) := by
+  unfold code289; infer_instance
+
+def pre289 (n g ta : Nat) (A : Nat → Nat) (gt : GlobalType) (s out : UInt32) (idx : UInt32)
+    (maxP len : Nat) (live : List (Nat × Nat)) (F : Nat) (ob : List UInt8) (h : NearState)
+    (args : List Value) : IProp GF :=
+  iprop(⌜args = [.i32 out]⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗ stk n (s.toNat - 368) 368 ∗
+    ifaceR n ta A ∗ uslot n ta A ∗ wslot n ta A ∗ rslot n ta A ∗ vt n 1057464 idx ta (A 578) ∗
+    heapInv n maxP len live F ∗ n ↦[wms][ 1052792 ] [97] ∗ n ↦[wms][ 1052800 ] List.replicate 16 0 ∗
+    n ↦[wms][ out.toNat ] ob ∗ mhostPt h)
+
+/-- The `FungibleToken` at `out`, its prefix `"a"` in a fresh one-byte block `q`. -/
+def post289 (n g ta : Nat) (A : Nat → Nat) (gt : GlobalType) (s out : UInt32) (idx : UInt32)
+    (maxP len : Nat) (live : List (Nat × Nat)) (F : Nat) (e : Nat) (Q : NearState → Prop)
+    (_args rs : List Value) : IProp GF :=
+  iprop(⌜rs = []⌝ ∗ g ↦[wg] ⟨gt, .i32 s⟩ ∗ stk n (s.toNat - 368) 368 ∗
+    ifaceR n ta A ∗ uslot n ta A ∗ wslot n ta A ∗ rslot n ta A ∗ vt n 1057464 idx ta (A 578) ∗
+    n ↦[wms][ 1052792 ] [97] ∗ n ↦[wms][ 1052800 ] List.replicate 16 0 ∗
+    (∃ (q : UInt32) (len' : Nat), ⌜q ≠ 0 ∧ q.toNat + 1 < 2 ^ 32 ∧ LenIn len 8 len'⌝ ∗
+      heapInv n maxP len' ((q.toNat, 1) :: live) (F + 7) ∗
+      ftAt n out (List.replicate 8 0) (List.replicate 8 0) (storeBytes (.i64 (UInt64.ofNat (85 + e))) 8) q 1 ∗
+      n ↦[wms][ q.toNat ] [97]) ∗
+    (∃ h', ⌜Q h'⌝ ∗ mhostPt h'))
+
+set_option maxRecDepth 1000000 in
+set_option maxHeartbeats 16000000 in
+/-- **`Contract::new`** (289): `FungibleToken::new(b"a")` into `out`. -/
+theorem f289_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
+    (htype : type.results = []) (inst : Nat) (mi : ModuleInst) (e : Nat) (A : Nat → Nat) (n g ta : Nat)
+    (mx : Option Nat) (hm : IfaceMod mi A n g ta) (hd : d + 21 < lim.maxCallDepth) (Cg : Nat)
+    (gt : GlobalType) (s out : UInt32) (idx : UInt32) (maxP len : Nat)
+    (live : List (Nat × Nat)) (F : Nat) (hF : okG F) (ob : List UInt8)
+    (hs : 368 ≤ s.toNat) (hal : s.toNat % 8 = 0) (hob : ob.length = 36) (hout : out.toNat + 36 ≤ 2 ^ 32)
+    (hroom : HeapRoomK 8 len maxP)
+    (h : NearState) (st : Near.TrieOverlay.State) {bud : Nat}
+    (hview : h.context.isView = false) (hacc : h.storageAccounting = some st) (hcanon : Canon st)
+    (hlink : StorageLink h st) (hproof : ProofBudget h st bud)
+    (hbud : writeProofCost (contractKey h.context.currentAccountId mKey) none +
+      removeProofCost (contractKey h.context.currentAccountId mKey) (some mVal) ≤ bud)
+    (hlim : withinLimit h.config.maxStorageKeyLen 69 = true)
+    (hvlim : withinLimit h.config.maxStorageValueLen 16 = true)
+    (hreg : withinLimit h.config.maxRegisterLen 16 = true)
+    (hnone : h.storage mKey = none)
+    (hU : h.context.storageUsage.toNat + (85 + e) < 2 ^ 64)
+    (K2 : Nat) (hK2 : ∀ h1 s2, erase h1 = erase (storageWriteHost e h mKey mVal evictedRegister s2) →
+      250 * cfg.regularOpCost + storageUsageUse h1 + cost402 cfg (F + 3) 1 64 h1 mKey mVal ≤ K2) :
+    code289 e n maxP inst mi A mx
+      ⊢ MFunSpec (GF := GF) cfg lim d type inst mi f289 Cg
+        (pre289 n g ta A gt s out idx maxP len live F ob h)
+        (fun _ => 500 * cfg.regularOpCost + costAllocF cfg F 1 + cost404 cfg F h K2)
+        (post289 n g ta A gt s out idx maxP len live F e (Post404 e h st bud)) := by
+  iintro #Hk
+  iunfold code289 at Hk
+  icases Hk with ⟨#H107c, #F107, #F94⟩
+  ihave #Hvec : vecCode2 n maxP inst mi A $$ []
+  · iunfold code107, code404 at H107c; icases H107c with ⟨⟨-, -, #H, -⟩, -⟩; iexact H
+  ihave #Hi : inst ↪[inst] mi $$ []
+  · iunfold vecCode2, AllocZeroed.allocCode at Hvec
+    icases Hvec with ⟨⟨-, -, -, -, -, -, -, -, -, -, -, #H⟩, -⟩; iexact H
+  have hn := hm.mem
+  have hg := hm.glob
+  have ha94 := hm.funcs 94 (by decide)
+  have ha107 := hm.funcs 107 (by decide)
+  have t14 : types[14]!.params.length = 2 := by rfl
+  have hlt := s.toNat_lt
+  have h16 : (s - 16).toNat = s.toNat - 16 := by
+    rw [UInt32.toNat_sub_of_le] <;> simp [UInt32.le_iff_toNat_le]; omega
+  generalize hK : cost404 cfg F h K2 = K
+  generalize hKA : costAllocF cfg F 1 = KA
+  iapply MFunSpec_intro
+  imodintro
+  iintro %args %R HP Hc
+  iunfold pre289 at HP
+  icases HP with ⟨%hargs, Hg, Hs, HIR, HU, HW, HR, Hvt, Hinv, Ha, Hz, Ho, Hhost⟩
+  subst hargs
+  icases stk_split n (s.toNat - 368) 352 16 $$ Hs with ⟨Lo, Fr⟩
+  rw [show s.toNat - 368 + 352 = s.toNat - 16 by omega]
+  icases stk_split n (s.toNat - 16) 12 4 $$ Fr with ⟨V, U12⟩
+  rw [show s.toNat - 16 + 12 = s.toNat - 4 by omega]
+  iunfold stk at V
+  icases V with ⟨%vb, %hvb, V⟩
+  ihave V := memBytes_addr (show s.toNat - 16 = (s - 16).toNat by omega) $$ V
+  icases stk_split n (s.toNat - 368) 272 80 $$ Lo with ⟨Lo, L80⟩
+  rw [show s.toNat - 368 + 272 = s.toNat - 96 by omega]
+  ihave L80 := stk_addr (show s.toNat - 96 = (s - 16).toNat - 80 by omega) $$ L80
+  simp only [f289]
+  mstep [Hg]; mstep; mstep; mstep; mstep [Hg]
+  mstep; mstep
+  mcall (SerdeLeaves.f94_spec cfg lim (d + 1) types[14]! rfl inst mi A n g ta hm (by omega) Cg gt (s - 16) (s - 16) 1
+      idx maxP len live vb hvb (by omega) (by decide)
+      (fun _ => roomFor_ofK 1 (by decide) hroom (lenIn_zero len hroom.1) (by omega)) F hF)
+      using [Hg L80 Hvt Hinv V] with (rw [hKA]; mstep_norm_full; omega)
+  · iunfold pre373
+    iframe Hg L80 Hvt Hinv V
+    ipureintro; rfl
+  rw [hKA]
+  iunfold post373 at HQ
+  icases HQ with ⟨%hrs, %q, Hg, L80, Hvt, V0, V4, V8, HA⟩
+  subst hrs
+  icases FmtSink.heapAfter_grown (by decide) $$ HA with ⟨%⟨hq0, hqb⟩, Hblk, Hgr⟩
+  iunfold AllocInv.block at Hblk
+  icases Hblk with ⟨%bs, %hbs, Hblk⟩
+  simp only [UInt32.reduceToNat] at hbs hqb
+  iunfold grown at Hgr
+  icases Hgr with ⟨%l1, %hl1, Hinv⟩
+  have hL1 : LenIn len 1 l1 := lenIn_step 1 (by decide) (lenIn_zero len hroom.1) hl1
+  have hbn : bs ≠ [] := List.ne_nil_of_length_pos (by omega)
+  mstep; mstep [V0]; mstep
+  mstep [Hblk] with (first | exact hbn | (simp [storeWidth, NumType.byteWidth]; omega) | rfl)
+  rw [MemSet.storeBytes_i32_1, show MemSet.byteOf 97 = 97 from rfl]
+  mstep; mstep; mstep [V8]
+  ihave VV := KeyGet.join64 n ((s - 16).toNat + 4) 1 1 $$ [V4 V8]
+  · ihave V8 := memBytes_addr (show (s - 16).toNat + 8 = (s - 16).toNat + 4 + 4 by omega) $$ V8
+    iframe V4 V8
+  ihave VV := BorshFT.joinB (n := n) (a := (s - 16).toNat) (b := (s - 16).toNat + 4) (bytes32 q)
+    (bytes32 1 ++ bytes32 1) (by simp [bytes32]) $$ [V0 VV]
+  · iframe V0 VV
+  ihave L80 := stk_addr (show (s - 16).toNat - 80 = s.toNat - 368 + 272 by omega) $$ L80
+  ihave Lo := stk_join n (s.toNat - 368) 272 80 $$ [Lo L80]
+  · iframe Lo L80
+  ihave Lo := stk_addr (show s.toNat - 368 = (s - 16).toNat - 352 by omega) $$ Lo
+  ihave #S107 := f107_spec cfg lim (d + 1) types[14]! rfl inst mi e A n g ta mx hm (by omega) Cg gt (s - 16) out
+    (s - 16) q idx maxP l1 ((q.toNat, 1) :: live) F hF ob (by omega) (by rw [h16]; omega) hob hout
+    (by rw [h16]; omega) (by omega) (heapRoom_shift hroom hL1 (by omega)) h st hview hacc hcanon hlink hproof
+    hbud hlim hvlim hreg hnone hU K2 hK2 $$ H107c
+  mstep; mstep
+  mcall S107 using [Hg Lo HIR HU HW HR Hvt Hinv Ha Hz Hhost Ho VV Hblk] with (mstep_norm_full; omega)
+  · iunfold pre107, env404
+    iframe Hg Lo HIR HU HW HR Hvt Hinv Ha Hz Hhost Ho VV Hblk
+    ipureintro; rfl
+  iunfold post107, env404' at HQ
+  icases HQ with ⟨%hrs, ⟨Hg, Lo, HIR, HU, HW, HR, Hvt, ⟨%l2, %hl2, Hinv⟩, Ha, Hz, Hhost⟩, Hft, VV, Hq⟩
+  subst hrs
+  mstep; mstep; mstep; mstep [Hg]
+  rw [show s - 16 + 16 = s by simp]
+  mcredits R
+  iframe Hc
+  iunfold post289
+  isplitr
+  · ipureintro; simp [htype]
+  iframe Hg HIR HU HW HR Hvt Ha Hz Hhost
+  isplitl [Lo VV U12]
+  · ihave VV := BorshFT.stkB (b := s.toNat - 16) (k := 12) _ (by omega) (by simp [bytes32]) $$ VV
+    ihave X := BorshFT.stkJ (a := s.toNat - 16) (b := s.toNat - 4) (k1 := 12) (k2 := 4) (k := 16) (by omega) rfl $$ [VV U12]
+    · iframe VV U12
+    ihave Lo := BorshFT.stkA (b := s.toNat - 368) (by omega) $$ Lo
+    iapply BorshFT.stkJ (a := s.toNat - 368) (b := s.toNat - 16) (k1 := 352) (k2 := 16) (k := 368) (by omega) rfl
+    iframe Lo X
+  iexists q, l2
+  iframe Hinv Hft Hq
+  ipureintro
+  exact ⟨hq0, hqb, lenIn_trans hL1 hl2⟩
+
+end S289
+
 end WNear.Binary.ContractNew
