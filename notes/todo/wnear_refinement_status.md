@@ -140,6 +140,32 @@ continuation is published to PR #40 after its validation gates pass.
   PR-wide Lean style and whitespace checks pass. Evidence:
   `/tmp/pr40-trailing-final-audit.log` and `/tmp/pr40-trailing-lean-style.log`.
 
+## Positioned errors and object-key EOF continuation
+
+- `SerdePositionPositive.f645_pos`, `f638_pos`, and `f640_pos` strengthen the
+  position-reader contracts with a nonzero line number. The loop invariant proves
+  positivity from the actual byte scan; it is not a new parser premise.
+- `SerdeErrorPositioned.f639_positioned`, `f325_positioned`, and `f322_positioned`
+  retain the allocated error's twelve-byte code and its line/column words in
+  `positionedBox`/`heapPos`, at the existing allocation and error cost bounds.
+- `SerdeErrorPositioned.f327_positioned` and `f326_positioned`
+  (`SerdeFixPosition.lean`) prove the actual `fix_position` path for an error whose
+  line is already nonzero: the same box is returned and the stack is restored.
+- `SerdeKeyReject.f193_eof` proves `next_key_seed` rejects EOF after whitespace
+  with `EofWhileParsingObject`. It preserves the first-key flag, reader input,
+  original live allocations and positioned error, and restores the full 176-byte
+  stack footprint. Its uniform cost is
+  `(600 + 96*wsLen(rest))*c + costErr(F, input.length + 1)`.
+- The key-error, positioned peek-error, fix-position wrapper and positive position
+  theorems pass Lean LSP axiom verification with only the standard three axioms.
+  This is groundwork for 228's object-error branch; it does **not** yet discharge
+  the public rejecting contract on an unfinished object such as `{`.
+- Validation: `just wnear-audit` passes (2755 build jobs; 421 wNEAR modules,
+  58443 declarations and 53322 theorems). Only the three expected open-refinement
+  dependencies remain. The strict NearLogic audit has zero violations, and pinned
+  statements match. PR-wide Lean style and whitespace checks pass. Evidence:
+  `/tmp/pr40-positioned-final-audit.log` and `/tmp/pr40-positioned-lean-style.log`.
+
 ## Methods
 
 There are 15 exported methods; six now have complete per-call refinement proofs under their protocol premises.
