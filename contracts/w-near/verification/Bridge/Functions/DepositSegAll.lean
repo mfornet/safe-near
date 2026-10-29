@@ -129,15 +129,14 @@ theorem seg406_all (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (e inst : Nat
         prefixAt n (self + 24) pp pc pl -∗ n ↦[wms][ pp.toNat ] pre -∗
         mhostPt (LogStr.logged h' (logText l3 l2 ab)) -∗
         Φ.ret [] ⟨#[.i32 self, .i32 sp, .i64 l2', .i64 l3, .i32 l4, .i64 l5, .i64 l6], inst, mi⟩) ∗
-      (∀ h1, ⌜StorageReadPost h (pre ++ (bytes32 (UInt32.ofNat ab.length) ++ ab)) 0 st h1⌝ -∗
-        panicked Cg h1 balMsg -∗ Φ.trap) ∗
-      (∀ h2, ⌜Post406 e h (pre ++ (bytes32 (UInt32.ofNat ab.length) ++ ab))
-            (StorageBalanceBounds.u128Of (x0.toNat + 2 ^ 64 * x1.toNat + (l3.toNat + 2 ^ 64 * l2.toNat))) st bud h2⌝ -∗
-        panicked Cg h2 textSupply -∗ Φ.trap)
+      (∀ hX, ⌜keep hX = keep h ∧ ¬ (x0.toNat + 2 ^ 64 * x1.toNat + (l3.toNat + 2 ^ 64 * l2.toNat) < 2 ^ 128 ∧
+          t0.toNat + 2 ^ 64 * t1.toNat + (l3.toNat + 2 ^ 64 * l2.toNat) < 2 ^ 128)⌝ -∗
+        panicked Cg hX (if x0.toNat + 2 ^ 64 * x1.toNat + (l3.toNat + 2 ^ 64 * l2.toNat) < 2 ^ 128 then textSupply
+          else balMsg) -∗ Φ.trap)
       ⊢ mwpi cfg lim d ⟨#[.i32 self, .i32 sp, .i64 l2, .i64 l3, .i32 l4, .i64 l5, .i64 l6], inst, mi⟩ []
           (seg406 ++ tail232) Φ := by
   iintro ⟨#Hk, #HC, Hc, Hg, Hlo, Hs24, H24, Hu, HV, Hab, H68, Har, H96, Hout, H124, Harg, HSt, Hvt, Hinv, HI, H12, HW, HL,
-    HPS, HH, HD, HM, Ht0, Ht8, Hp, Hpre, Hh, Wok, Wbal, Wsup⟩
+    HPS, HH, HD, HM, Ht0, Ht8, Hp, Hpre, Hh, Wok, Wtr⟩
   iunfold codeSeg at Hk
   icases Hk with ⟨#H406c, #Htc, #F406, #F521, #F448, #HPC, #F879⟩
   ihave #Hi : inst ↪[inst] mi $$ []
@@ -242,7 +241,11 @@ theorem seg406_all (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (e inst : Nat
       · iintro HT
         simp only [Post.mseq_trap]
         icases HT with ⟨%h2, %hq2, HT⟩
-        iapply Wsup $$ %h2 %hq2 HT
+        iapply Wtr $$ %h2 %⟨DepositSeg.Post406.keep hq2, fun hh => hno2 hh.2⟩
+        have hn1 : x0.toNat + 18446744073709551616 * x1.toNat + (l3.toNat + 18446744073709551616 * l2.toNat) <
+            340282366920938463463374607431768211456 := by simpa using hno1
+        rw [if_pos hn1]
+        iexact HT
   · rw [if_neg hno1]
     have S406 := f406_bal (GF := GF) cfg lim (d + 1) types[38]! inst mi e A n g ta mx hm (by omega) Cg gt sp self
       pp pc pl (sp + 56) ap (UInt32.ofNat ab.length) (UInt32.ofNat ab.length) l3 l2 t0 t1 x0 x1 aidx maxP hl live F
@@ -283,7 +286,11 @@ theorem seg406_all (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (e inst : Nat
     · iintro HT
       simp only [Post.mseq_trap]
       icases HT with ⟨%h1, %hq1, HT⟩
-      iapply Wbal $$ %h1 %hq1 HT
+      iapply Wtr $$ %h1 %⟨InternalDepositOverflow.keep_readPost hq1, fun hh => hno1 hh.1⟩
+      have hn1 : ¬ (x0.toNat + 18446744073709551616 * x1.toNat + (l3.toNat + 18446744073709551616 * l2.toNat) <
+          340282366920938463463374607431768211456) := by simpa using hno1
+      rw [if_neg hn1]
+      iexact HT
 
 end Spec
 
