@@ -1021,6 +1021,67 @@ callees not proved yet as hypotheses:
    * the first growth of the scratch starts from capacity 0, so 627 allocates (625 through 624, at
      alignment 1, now proved in `SerdeString`) instead of reallocating.
 
+   Done since (no `sorry`), all but 646 itself:
+   * The scratch's growth, `ScratchGrow.lean`. The buffer is `sbuf n maxP hl live F ptr cap bs`: `bs`
+     then junk, no block when `cap = 0` (the dangling 1), else the lent block `(ptr, cap)`.
+     * `f627_alloc` (624 on no current memory) and `f627_realloc` (312 on `Some(ptr, cap)`);
+     * `f631_spec`: `growCap cap (len + k)`, both cases, the free list's bound `F + 2`, the memory grown
+       or not (`grownLen`);
+     * `f630_spec`, `f628_ok`, `f623_spec`, `f589_spec`: the reserve, through `capAfter`, `fAfter`,
+       `hlAfter`, `costRes` (0 when the bytes fit), with `roomRes` for the growth;
+     * `f614_spec` (push, `costApp`), `f588_spec` and `f613_spec` (append `k` bytes from memory,
+       `costExt`, the copy 951).
+   * The readers of `parse_escape`, `SerdeEscErr.lean`, `SerdeEscRead.lean`:
+     * `f651_eq` (651 is 325's code), `f656_eq` (656 = 654), `f654_spec` (325 with the box packed
+       `errPack p = (p << 32) | 1`);
+     * `f655_spec` (`next_or_eof`): `Ok(b)` packed `okPack de b`, or the box at the end;
+     * `f653_spec` (`decode_hex_escape`): `res653` on the model's `hex4`: `Ok(n)` (`hexPack n`), the
+       reader 4 further, or a box; the table `hexTable` (`hexData_segment`), `hexAcc`, `hex4_eq`.
+   * `encode_utf8` (605), `EncodeUtf8.lean`: `enc605 c` at the buffer, and `enc605_eq`: equal to
+     `String.utf8EncodeChar (Char.ofNat c)` on a valid code point.
+   * `parse_escape` (649), `ParseEscape.lean`, `f649_spec`, on every input:
+     * `escDecode` (`EscModel.lean`) is the escape as the model decodes it, through the model's own
+       `unicodeEscape`; `res649` is `0` with the escape's bytes appended to the scratch (614 or 605 +
+       613) and the reader past the escape, or a box (`sbufE`: the scratch unchanged, the box allocated);
+     * every path is covered: the 8 simple escapes, `\u` in the BMP, a lone trailing surrogate (17),
+       a high surrogate then not `\`, not `u` (20), a bad second hex, a second surrogate that is not
+       low (17), the pair; EOF at each read; an invalid escape (11);
+     * the cost `cost649`: a constant, 8 error bounds, and the append's `costExt`.
+   * The model side, `EscModel.lean` and `StrModel.lean`:
+     * `stringBody_esc`: `stringBody` after a `\` follows `escDecode`;
+     * `strRun l acc`, `parse_str`'s run (scan, append, escape) with outcomes `.ok bytes rest`, `.eof`,
+       `.ctrl`, `.badEsc`, and `strRun_model`: `stringBody l acc.reverse` is
+       `some (String.fromUTF8? bytes, rest)` on `.ok`, `none` otherwise;
+     * `StrCost.lean`: `costRun` and `roomRun`, the cost and room of a run (per segment: scan,
+       `cost927`, the appends' `costExt`, 649's bound, an error box).
+   * **No disagreement** between serde_json 1.0.60 and the model on escapes. 649 rejects lone and reversed
+     surrogates (`DC00..DFFF` first: 17; `D800..DBFF` not followed by `\u` + `DC00..DFFF`: 20 or 17),
+     as `unicodeEscape` does; the pair's code point is always valid (the code's `char::from_u32` check,
+     14, is unreachable), as the model's `isValidChar` check is.
+   * **646 on every input**, `ParseStrEsc.lean`, `f646_spec`:
+     * from the reader's index `i`, the scratch empty with any capacity (`sbuf … ptrS capS []`), the
+       tables (`escTable`, `utf8Width`, `hexTable`); the result `resStr` by the run's outcome
+       `strRun (bs.drop i) []`: `Ok(Borrowed(ptr + i, len))` when the string has no escape
+       (`borrowed`), `Ok(Copied(p, len))` with the scratch holding the bytes otherwise, both when the
+       bytes are UTF-8 (`as_str`); else `Err(box)` (`errStr`: the box after the scratch, `sbufE`);
+     * the cost `costRun cfg F capS [] (bs.drop i) bs.length + 100·c`, with room `roomRun`; the stack
+       192 bytes;
+     * the outer loop `@7` runs once per escape; its invariant holds the reader at `j`, the scratch
+       `acc` (`sbuf`), `strRun (bs.drop j) acc = strRun (bs.drop i) []`, `acc = [] ↔ j = i`, the bounds
+       `|acc| ≤ j - i`, `cap ≤ max capS (2·|acc| + 8)`, `roomRun` and `costRun` credits;
+     * at `"` with a non-empty scratch: 613 (the last plain bytes), 728, then 648 on the scratch
+       (`f648_spec_bad_mem` is `as_str` on bytes anywhere in memory);
+     * `str_model` (`StrModel`): on `.ok bytes rest`, `stringBody` decodes the string whose bytes are
+       `bytes` when they are UTF-8, and `some (none, rest)` otherwise; on `.eof`, `.ctrl`, `.badEsc` it
+       is `none`. With `resStr` this is the complete statement: `Ok` exactly when `stringBody` decodes
+       a string, with the same bytes; `Err` exactly when it gives `none` or `some (none, _)`.
+     * 649 is split into `f649_nu` (not `\u`), `f649_u0` (`\u` without a high surrogate) and
+       `f649_u1` (a high surrogate), joined in `f649_spec`: one declaration took over an hour.
+   * Left: a closed linear bound on `costRun` (per escape a constant, the scan 30 per byte, `cost927`,
+     and the growths; these are logarithmically many, each `walkCost (F + 2·growths)`, so the sum is
+     `O(len·(1 + F))`); `deserialize_str` (380) and `ValidAccountId::deserialize` (169) on escaped
+     input, through `f646_spec` (they still use `f646_spec_noesc`).
+
    `ignore_str` (650) and `ignore_escape` (652) are the same scan without UTF-8. Their spec
    is acceptance and the rest, as `stringBody` gives them, ignoring its first component.
 3. **The value: `ValidAccountId`.**
