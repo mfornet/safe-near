@@ -93,10 +93,10 @@ grammar function.
 
 | fn | size | role | status |
 |---|---|---|---|
-| 646 | 317 | `SliceRead::parse_str`. It scans while `ESCAPE[b] = 0` (the table at 1062392: nonzero exactly for `0x00..0x1F`, `"` and `\`). On `"` with an empty scratch, the result is the borrowed slice (583); with a non-empty scratch, the rest is appended (613). On `\`, the slice so far is appended, then `parse_escape` (649). On a control byte, `ControlCharacterWhileParsingString`. On EOF, `EofWhileParsingString` (647). The result goes through `as_str` (648). | proved on every escape-free input (`ParseStrErr.f646_spec_noesc`: EOF, control byte, `Ok(Borrowed)` on a UTF-8 body, `InvalidUnicodeCodePoint` otherwise; scratch empty; `noesc_model`); earlier the plain cases (`f646_spec_plain`, `f646_spec_utf8`). Not yet: the escape path (613, 649, 728) |
+| 646 | 317 | `SliceRead::parse_str`. It scans while `ESCAPE[b] = 0` (the table at 1062392: nonzero exactly for `0x00..0x1F`, `"` and `\`). On `"` with an empty scratch, the result is the borrowed slice (583); with a non-empty scratch, the rest is appended (613). On `\`, the slice so far is appended, then `parse_escape` (649). On a control byte, `ControlCharacterWhileParsingString`. On EOF, `EofWhileParsingString` (647). The result goes through `as_str` (648). | proved on every escape-free input (`ParseStrErr.f646_spec_noesc`: EOF, control byte, `Ok(Borrowed)` on a UTF-8 body, `InvalidUnicodeCodePoint` otherwise; scratch empty; `noesc_model`); earlier the plain cases (`f646_spec_plain`, `f646_spec_utf8`). **On every input**: `ParseStrEsc.f646_spec` (`resStr` by `strRun`: `Ok(Borrowed)`, `Ok(Copied)` from the scratch, or `Err`; `str_model` against `stringBody`; with 613, 649, 728) |
 | 648 | 39 | `as_str`: `from_utf8` (927), else `InvalidUnicodeCodePoint` (657) | proved on every input: `ParseStrUtf8.f648_spec_valid` (`utf8Ok`), `SerdeErrBox.f648_spec_bad` (not UTF-8: 657) |
 | 927 | 443 | `core::str::from_utf8`, with its word-at-a-time ASCII fast path | proved on any input (`FromUtf8Gen.f927_spec`: `Ok` exactly when `Utf8.utf8Ok`, `100 + 100·len`; the width table at 1071704 owned) |
-| 649 | 401 | `parse_escape`: the simple escapes are pushed (614); `\u` goes through `decode_hex_escape` (653, 162) and the surrogate pair logic, then `encode_utf8` (605, 109) and an append (613) |
+| 649 | 401 | `parse_escape`: the simple escapes are pushed (614); `\u` goes through `decode_hex_escape` (653, 162) and the surrogate pair logic, then `encode_utf8` (605, 109) and an append (613) | proved on every input (`ParseEscape.f649_spec`: `res649` against the model's `escDecode`; with 653 `SerdeEscRead.f653_spec`, 655 `f655_spec`, 654/656/651 `SerdeEscErr`, 605 `EncodeUtf8.f605_spec`) |
 | 650 | 106 | `ignore_str` (ignored values): the same scan, without UTF-8 validation |
 | 652 | 267 | `ignore_escape`: validates the escape without decoding it |
 | 82, 343 | 3 | `Vec::clear` of the scratch (674 `truncate`) | 343 and 674 proved (`SerdeDeStr.f343_s`, `f674_s`) |
@@ -158,12 +158,11 @@ Already proved:
 * `memcpy` 951 and `memset` 952;
 * the `Vec<u8>` drops 68/747/777.
 
-Not yet proved:
-
-* the `RawVec`/`Vec` growth used by the scratch: 588, 589, 613, 614, 623, 627, 628, 630, 631.
-  631 and 627 are not 716 and 714 (`VecGrow`): their code differs, and the first growth starts
-  from capacity 0, so 627 allocates instead of reallocating. 698 and 712–716 (`ignore_value`'s
-  frame stack, through 84) are proved for a nonempty buffer (`VecGrow`).
+Proved since: the `RawVec`/`Vec` growth used by the scratch, 588, 589, 613, 614, 623, 627, 628, 630, 631
+(`ScratchGrow`, on `sbuf`: capacity 0 or a lent block). 631 and 627 are not 716 and 714 (`VecGrow`):
+their code differs, and the first growth starts from capacity 0, so 627 allocates (`f627_alloc`) instead
+of reallocating (`f627_realloc`). 698 and 712–716 (`ignore_value`'s frame stack, through 84) are proved
+for a nonempty buffer (`VecGrow`).
 
 Proved since: `Layout` 607/608 and `Global::allocate` 624/625 at alignment 1, any size (size 0
 gives the dangling pointer), `allocate_in` 626 (`SerdeString`); 624/625/590 at alignment 4 for the
