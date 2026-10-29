@@ -516,4 +516,69 @@ theorem f83_acc (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType
 
 end L83
 
+/-! ## 83's cost, by the bytes it reads -/
+
+theorem fracR_strict {x r : List UInt8} (h : fracR x = some r) : r.length < x.length := by
+  unfold fracR at h
+  split at h
+  · rename_i d t
+    split at h
+    · rename_i hd
+      rw [dw_cons t hd] at h
+      have := SerdeIgnNum.afterExp_len h
+      have := (List.dropWhile_suffix (p := isDigit) (l := t)).length_le
+      simp; omega
+    · simp at h
+  · simp at h
+
+theorem expR_strict {x r : List UInt8} (h : expR x = some r) : r.length < x.length := by
+  unfold expR at h
+  dsimp only at h
+  split at h
+  · simp at h
+  · rename_i hne
+    simp only [Option.some.injEq] at h
+    subst h
+    obtain ⟨d, t, hu, hd⟩ := tw_ne hne
+    rw [hu, dw_cons t hd]
+    have h1 := (List.dropWhile_suffix (p := isDigit) (l := t)).length_le
+    have h2 := SerdeIgnNum.signPart_len x
+    rw [hu] at h2
+    simp at h2; omega
+
+/-- **83's cost is at most `470` per byte read, less `343`**: the one-digit number is the worst case
+(`197 + 127 = 324`). -/
+theorem cost83_le {bs rest : List UInt8} {i : Nat} (hi : i < bs.length) (hx : intR (bs.drop i) = some rest) :
+    cost83 bs i rest + 343 ≤ 197 + 470 * (bs.length - rest.length - i) := by
+  obtain ⟨d0, hd0⟩ : ∃ d0, bs[i]? = some d0 := ⟨_, List.getElem?_eq_getElem hi⟩
+  obtain ⟨-, hai, -⟩ := intR_split hi hd0 hx
+  have hji : i + 1 ≤ intEnd bs i := by unfold intEnd; omega
+  have hjl : intEnd bs i ≤ bs.length := by
+    obtain ⟨hjn, -⟩ := digits_at bs (i + 1) (by omega)
+    unfold intEnd; omega
+  unfold cost83
+  generalize intEnd bs i = j at hai hji hjl ⊢
+  rcases afterInt_cases hai with ⟨hjl', hbj, hfr⟩ | ⟨hjl', hbj, hex⟩ | ⟨hb1, hb2, hb3, hrest⟩
+  · have := fracR_strict hfr
+    simp only [List.length_drop] at this
+    unfold tail83 cost86
+    rw [if_pos hbj]
+    have e : bs.length - rest.length - i = (j - i) + (bs.length - rest.length - j) := by omega
+    rw [e]
+    omega
+  · have := expR_strict hex
+    simp only [List.length_drop] at this
+    have hnd : bs[j]? ≠ some 0x2E := by rcases hbj with h | h <;> rw [h] <;> decide
+    unfold tail83 cost87
+    rw [if_neg hnd, if_pos hbj]
+    have e : bs.length - rest.length - i = (j - i) + (bs.length - rest.length - j) := by omega
+    rw [e]
+    omega
+  · have hT : tail83 bs j rest = 0 := by
+      unfold tail83
+      rw [if_neg hb1, if_neg (by rintro (h | h) <;> contradiction)]
+    rw [hT]
+    have : bs.length - rest.length = j := by rw [hrest]; simp; omega
+    omega
+
 end WNear.Binary.SerdeIgnInt
