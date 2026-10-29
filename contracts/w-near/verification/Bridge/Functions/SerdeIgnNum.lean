@@ -201,7 +201,7 @@ theorem inv87_intro (n inst : Nat) (mi : ModuleInst) (Cg c₀ D E R : Nat) (de l
   iframe Hc Hrd HP
   ipureintro; exact ⟨rfl, rfl, h1, h2⟩
 
-/-- 87's cost: `150` and `127` per byte read (the `e`, the sign, the digits). -/
+/-- 87's cost: `300` and `127` per byte read (the `e`, the sign, the digits). -/
 def cost87 (m : Nat) : Nat := 300 + 127 * m
 
 set_option hygiene false in
@@ -444,5 +444,317 @@ theorem f87_acc (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType
     tail87
 
 end L87
+
+theorem signPart_len (x : List UInt8) : (signPart x).2.length ≤ x.length := by
+  unfold signPart; split <;> simp
+
+theorem expR_len {x r : List UInt8} (h : expR x = some r) : r.length ≤ x.length := by
+  unfold expR at h
+  dsimp only at h
+  split at h
+  · simp at h
+  · simp only [Option.some.injEq] at h
+    subst h
+    exact le_trans (List.dropWhile_suffix _).length_le (signPart_len x)
+
+theorem afterExp_len {v r : List UInt8} (h : afterExp v = some r) : r.length ≤ v.length := by
+  unfold afterExp at h
+  split at h
+  · split at h
+    · have := expR_len h; simp; omega
+    · simp only [Option.some.injEq] at h; rw [← h]
+  · simp only [Option.some.injEq] at h; rw [← h]
+
+/-- The digit test `(b - 48) & 255 < 10` of a peeked byte (0 at the end). -/
+theorem bon_lt10 (o : Option UInt8) :
+    Numeric.bool (Numeric.irelop32 IRelOp.lt_u (((byteOrNull o).toUInt32 >>> (8 % 32) + 4294967248) &&& 255) 10) =
+      if isDigit (o.getD 0) then 1 else 0 := by
+  cases o with
+  | none => decide
+  | some b => revert b; exact SerdeRead.uint8_forall (by decide +kernel)
+
+/-- 86's exponent test `(b | 32) & 255 = 'e'`. -/
+theorem bon_e (o : Option UInt8) :
+    Numeric.bool (Numeric.irelop32 IRelOp.eq (((byteOrNull o).toUInt32 >>> (8 % 32) ||| 32) &&& 255) 101) =
+      if o = some 0x65 ∨ o = some 0x45 then 1 else 0 := by
+  cases o with
+  | none => decide
+  | some b => revert b; exact SerdeRead.uint8_forall (by decide +kernel)
+
+section L86
+
+variable {GF : BundledGFunctors} [WasmGS NearState GF]
+
+/-- 86's frame. -/
+def fr86 (inst : Nat) (mi : ModuleInst) (de l1 l2 l3 : UInt32) (l4 : UInt64) : Frame :=
+  ⟨#[.i32 de, .i32 l1, .i32 l2, .i32 l3, .i64 l4], inst, mi⟩
+
+/-- 86's loop: the reader at `q` (the `.` at `i`, then the digits up to `e`), the flag `l2` set only
+at the `.`, `D` per digit left. -/
+def inv86 (n inst : Nat) (mi : ModuleInst) (Cg c₀ D E R : Nat) (de l1 ptr : UInt32) (bs : List UInt8) (i e : Nat)
+    (P : IProp GF) : List Value → Frame → IProp GF := fun X g =>
+  iprop(∃ (q : Nat) (l3 : UInt32) (l4 : UInt64),
+    ⌜X = [] ∧ g = fr86 inst mi de l1 (if q = i then 1 else 0) l3 l4 ∧ i ≤ q ∧ q ≤ e⌝ ∗
+    credits Cg (D * (e - q) * c₀ + E * c₀ + R) ∗ rd n de ptr bs q ∗ P)
+
+theorem inv86_intro (n inst : Nat) (mi : ModuleInst) (Cg c₀ D E R : Nat) (de l1 ptr : UInt32) (bs : List UInt8)
+    (i e : Nat) (P : IProp GF) (q : Nat) (l2 l3 : UInt32) (l4 : UInt64) (h1 : i ≤ q) (h2 : q ≤ e)
+    (hl2 : l2 = if q = i then 1 else 0) :
+    credits Cg (D * (e - q) * c₀ + E * c₀ + R) ∗ rd n de ptr bs q ∗ P ⊢
+      inv86 n inst mi Cg c₀ D E R de l1 ptr bs i e P [] ⟨#[.i32 de, .i32 l1, .i32 l2, .i32 l3, .i64 l4], inst, mi⟩ := by
+  iintro ⟨Hc, Hrd, HP⟩
+  iunfold inv86
+  iexists q
+  iexists l3
+  iexists l4
+  iframe Hc Hrd HP
+  ipureintro; exact ⟨rfl, by rw [hl2]; rfl, h1, h2⟩
+
+/-- 86's cost: `465` (with 87's fixed part) and `129` per byte read. -/
+def cost86 (m : Nat) : Nat := 465 + 129 * m
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 16000000 in
+/-- **`ignore_decimal(rd)`** (86) at `.`: a fraction `fracR` reads after it, `0`, the reader at its end. -/
+theorem f86_acc (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
+    (htype : type.results.length = 1) (inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (n g ta : Nat)
+    (hm : Interface.IfaceMod mi A n g ta) (hd : d + 4 < lim.maxCallDepth) (Cg : Nat)
+    (gt : GlobalType) (sp de ptr : UInt32) (bs rest : List UInt8) (i : Nat)
+    (hlen : bs.length < 2 ^ 32) (hptr : ptr.toNat + bs.length ≤ 2 ^ 32) (hde : de.toNat + 12 ≤ 2 ^ 32)
+    (hi : i < bs.length) (hx : fracR (bs.drop (i + 1)) = some rest) :
+    numCode inst mi A ⊢
+      MFunSpec (GF := GF) cfg lim d type inst mi f86 Cg
+        (fun args => iprop(⌜args = [.i32 de]⌝ ∗ g ↦[wg] ⟨gt, .i32 sp⟩ ∗ rd n de ptr bs i))
+        (fun _ => cost86 (bs.length - rest.length - i) * cfg.regularOpCost)
+        (fun _ rs => iprop(⌜rs = [.i32 0]⌝ ∗ g ↦[wg] ⟨gt, .i32 sp⟩ ∗ rd n de ptr bs (bs.length - rest.length))) := by
+  iintro #Hk
+  ihave #Hk' := Hk
+  iunfold numCode at Hk'
+  icases Hk' with ⟨#F324, #F332, #F333, #F329, #F88, #F87, -, #Hi⟩
+  have hn := hm.mem
+  have hg := hm.glob
+  have ha333 := hm.funcs 333 (by decide)
+  have ha329 := hm.funcs 329 (by decide)
+  have ha87 := hm.funcs 87 (by decide)
+  have t11 : types[11]!.params.length = 1 := by rfl
+  have t0 : types[0]!.params.length = 1 := by rfl
+  have t32 : types[32]!.params.length = 1 := by rfl
+  -- the digits after the `.`
+  obtain ⟨hjn, hdig, hstop, hdrop⟩ := digits_at bs (i + 1) (by omega)
+  generalize hnd : ((bs.drop (i + 1)).takeWhile isDigit).length = nd at hjn hdig hstop hdrop
+  have hnd1 : 1 ≤ nd := by
+    unfold fracR at hx
+    split at hx
+    · rename_i d0 t0 heq
+      rw [← hnd, heq]
+      split at hx
+      · simp [List.takeWhile_cons, *]
+      · simp at hx
+    · simp at hx
+  have hx' : afterExp (bs.drop (i + 1 + nd)) = some rest := by
+    unfold fracR at hx
+    split at hx
+    · rename_i d0 t0 heq
+      split at hx
+      · rw [hdrop]; exact hx
+      · simp at hx
+    · simp at hx
+  have hrl : rest.length ≤ bs.length - (i + 1 + nd) := by
+    have := afterExp_len hx'; simp at this; omega
+  iapply MFunSpec_intro
+  imodintro
+  iintro %args %R HP Hc
+  icases HP with ⟨%hargs, Hg, Hrd⟩
+  subst hargs
+  simp only [f86, cost86]
+  generalize hLx : bs.length - rest.length - (i + 1 + nd) = Lx
+  have hL : bs.length - rest.length - i = 1 + nd + Lx := by omega
+  rw [hL, show (465 + 129 * (1 + nd + Lx)) * cfg.regularOpCost + R =
+    594 * cfg.regularOpCost + (129 * (i + nd - i) * cfg.regularOpCost + (127 * Lx * cfg.regularOpCost + (2 * Lx * cfg.regularOpCost + R))) by
+      rw [show i + nd - i = nd by omega, show 129 * (1 + nd + Lx) = 129 + 129 * nd + 127 * Lx + 2 * Lx by omega]
+      simp only [Nat.add_mul]; omega]
+  generalize hR2 : 2 * Lx * cfg.regularOpCost + R = R2
+  generalize hXE : 127 * Lx * cfg.regularOpCost = XE
+  generalize hW : 129 * (i + nd - i) * cfg.regularOpCost = W
+  mstep [Hg]; mstep; mstep; mstep; mstep [Hg]
+  mstep; mstep; mstep
+  mcredits (cfg.regularOpCost + (W + 575 * cfg.regularOpCost + (XE + R2)))
+  iapply mwpi_cons
+  iapply MemCpy.mwpi_loop0 (Cg := Cg) (R := W + 575 * cfg.regularOpCost + (XE + R2))
+    (I := inv86 n inst mi Cg cfg.regularOpCost 129 575 (XE + R2) de (sp - 16) ptr bs i (i + nd)
+      iprop(g ↦[wg] ⟨gt, .i32 (sp - 16)⟩)) _ _ rfl
+  isplitr
+  · imodintro
+    iintro %X %l HI
+    iunfold inv86 at HI
+    icases HI with ⟨%q, %l3, %l4, %⟨hX, hfr, hq1, hq2⟩, Hc, Hrd, Hg⟩
+    subst hX
+    rw [hfr]
+    simp only [fr86]
+    clear hfr
+    generalize hZ0 : 129 * (i + nd - q) * cfg.regularOpCost = Z0
+    mstep; mstep; mstep
+    mcall (SerdeRead.f333_spec cfg lim (d + 1) types[0]! (by rfl) inst mi n hn Cg de ptr bs q (by omega) hlen hde)
+      using [Hrd]
+    · iframe Hrd
+    icases HQ with ⟨%hrs, Hrd⟩
+    subst hrs
+    mcredits (547 * cfg.regularOpCost + (Z0 + (XE + R2)))
+    mstep; mstep
+    mcall (SerdeRead.f329_spec cfg (lim := lim) (d + 1) types[11]! (by rfl) inst mi n hn (A 332) (hm.funcs 332 (by decide))
+      (by omega) Cg de ptr bs (q + 1) (by omega) hlen hptr hde) using [Hrd]
+    · iframe Hrd
+    icases HQ with ⟨%hrs, Hrd⟩
+    subst hrs
+    mcredits (465 * cfg.regularOpCost + (Z0 + (XE + R2)))
+    rw [← hZ0]
+    generalize hobk : byteOrNull bs[q + 1]? = obk
+    have hokk : Numeric.bool (obk &&& 1 == 0) = 1 := by rw [← hobk]; exact bon_ok _
+    mstep; mstep; mstep; mstep
+    mstep_taken with exact hokk
+    mstep; mstep
+    by_cases hke : q < i + nd
+    · obtain ⟨xk, hxk, hdk⟩ := hdig (q + 1) (by omega) (by omega)
+      rw [hxk] at hobk
+      have hlk : Numeric.bool (Numeric.irelop32 IRelOp.lt_u ((obk.toUInt32 >>> (8 % 32) + 4294967248) &&& 255) 10) = 1 := by
+        rw [← hobk, bon_lt10]; simp [hdk]
+      rw [show 129 * (i + nd - q) * cfg.regularOpCost =
+        129 * cfg.regularOpCost + 129 * (i + nd - (q + 1)) * cfg.regularOpCost by
+          rw [show i + nd - q = (i + nd - (q + 1)) + 1 by omega]; simp only [Nat.mul_add, Nat.add_mul]; omega]
+      generalize hZ : 129 * (i + nd - (q + 1)) * cfg.regularOpCost = Z
+      clear hobk
+      mstep; mstep; mstep; mstep; mstep; mstep; mstep; mstep; mstep; mstep
+      mstep_taken with exact hlk
+      simp only [Post.mloop, List.length_nil, Nat.sub_zero, List.drop_nil]
+      iapply pure_pay_intro'
+      isplitl [Hc]
+      · iexact Hc
+      isplitr
+      · ipureintro; exact ⟨by simp, by omega⟩
+      inext
+      iintro Hc
+      iapply inv86_intro n inst mi Cg cfg.regularOpCost 129 575 (XE + R2) de (sp - 16) ptr bs i (i + nd) _ (q + 1) 0 _ _
+        (by omega) (by omega) (by rw [if_neg (by omega)])
+      iframe Hrd Hg
+      iapply BorrowMut.credits_le
+      iframe Hc
+      ipureintro; omega
+    · have hq : q = i + nd := by omega
+      subst hq
+      have hlk : Numeric.bool (Numeric.irelop32 IRelOp.lt_u ((obk.toUInt32 >>> (8 % 32) + 4294967248) &&& 255) 10) = 0 := by
+        rw [← hobk, bon_lt10, show i + nd + 1 = i + 1 + nd by omega]; simp [hstop]
+      rw [show 129 * (i + nd - (i + nd)) * cfg.regularOpCost = 0 by simp, Nat.zero_add]
+      mstep; mstep; mstep; mstep; mstep; mstep; mstep; mstep; mstep; mstep
+      mstep_not_taken with exact hlk
+      (try simp only [Post.mloop]); (try mctrl_norm); (repeat mpay)
+      rw [if_neg (by omega)]
+      mstep; mstep; mstep; mstep; mstep
+      mstep_taken with decide
+      mstep; mstep
+      mcall (SerdeRead.f329_spec cfg (lim := lim) (d + 1) types[11]! (by rfl) inst mi n hn (A 332) (hm.funcs 332 (by decide))
+        (by omega) Cg de ptr bs (i + nd + 1) (by omega) hlen hptr hde) using [Hrd]
+      · iframe Hrd
+      icases HQ with ⟨%hrs, Hrd⟩
+      subst hrs
+      mcredits (355 * cfg.regularOpCost + (XE + R2))
+      generalize hobe : byteOrNull bs[i + nd + 1]? = obe
+      have hoke : Numeric.bool (obe &&& 1 == 0) = 1 := by rw [← hobe]; exact bon_ok _
+      mstep; mstep; mstep; mstep
+      mstep_taken with exact hoke
+      mstep
+      have hdi : bs.drop (i + 1 + nd) = bs.drop (i + nd + 1) := by rw [show i + 1 + nd = i + nd + 1 by omega]
+      rw [hdi] at hx'
+      rw [show i + 1 + nd = i + nd + 1 by omega] at hLx
+      by_cases he : bs[i + nd + 1]? = some 0x65 ∨ bs[i + nd + 1]? = some 0x45
+      · -- an exponent: 87
+        have hle : Numeric.bool (Numeric.irelop32 IRelOp.eq ((obe.toUInt32 >>> (8 % 32) ||| 32) &&& 255) 101) = 1 := by
+          rw [← hobe, bon_e, if_pos he]
+        have hlt : i + nd + 1 < bs.length := by
+          by_contra hc; rw [List.getElem?_eq_none (by omega)] at he; simp at he
+        obtain ⟨e0, he0⟩ : ∃ e0, bs[i + nd + 1]? = some e0 := ⟨_, List.getElem?_eq_getElem hlt⟩
+        have hd1 : bs.drop (i + nd + 1) = e0 :: bs.drop (i + nd + 1 + 1) := by
+          rw [List.drop_eq_getElem_cons hlt]
+          rw [List.getElem?_eq_getElem hlt] at he0
+          rw [Option.some.inj he0]
+        have he0' : e0 = 0x65 ∨ e0 = 0x45 := by rw [he0] at he; simpa using he
+        rw [hd1] at hx'
+        rw [show afterExp (e0 :: bs.drop (i + nd + 1 + 1)) = if e0 = 0x65 ∨ e0 = 0x45 then expR (bs.drop (i + nd + 1 + 1))
+          else some (e0 :: bs.drop (i + nd + 1 + 1)) from rfl] at hx'
+        rw [if_pos he0'] at hx'
+        clear hobe
+        mstep; mstep; mstep; mstep; mstep; mstep; mstep; mstep; mstep; mstep
+        mstep_taken with exact hle
+        mstep
+        have hLx' : bs.length - rest.length - (i + nd + 1) = Lx := hLx
+        have s87 := f87_acc (GF := GF) cfg lim (d + 1) types[32]! (by rfl) inst mi A n g ta hm (by omega) Cg gt
+          (sp - 16) de ptr bs rest (i + nd + 1) hlen hptr hde hlt hx'
+        rw [hLx', show cost87 Lx * cfg.regularOpCost = 300 * cfg.regularOpCost + XE by
+          unfold cost87; rw [← hXE]; simp only [Nat.add_mul]] at s87
+        ihave #S87 := s87 $$ Hk
+        clear s87
+        mcall S87 using [Hg Hrd]
+        · iframe Hg Hrd
+        icases HQ with ⟨%hrs, Hg, Hrd⟩
+        subst hrs
+        mstep
+        (try simp only [Post.mloop]); (try mctrl_norm); (repeat mpay)
+        mstep; mstep; mstep; mstep [Hg]
+        rw [show sp - 16 + 16 = sp by simp]
+        repeat mstep
+        isplitl [Hc]
+        · iapply BorrowMut.credits_le
+          iframe Hc
+          ipureintro; omega
+        iframe Hg Hrd
+        ipureintro; simp [htype]
+      · -- no exponent: 0
+        have hle : Numeric.bool (Numeric.irelop32 IRelOp.eq ((obe.toUInt32 >>> (8 % 32) ||| 32) &&& 255) 101) = 0 := by
+          rw [← hobe, bon_e, if_neg he]
+        have hrest : bs.drop (i + nd + 1) = rest := by
+          unfold afterExp at hx'
+          split at hx'
+          · rename_i e0 x heq
+            have he0 : ¬ (e0 = 0x65 ∨ e0 = 0x45) := by
+              intro hh; apply he
+              have hlt : i + nd + 1 < bs.length := by
+                by_contra hc; rw [List.drop_eq_nil_of_le (by omega)] at heq; simp at heq
+              rw [List.drop_eq_getElem_cons hlt] at heq
+              simp only [List.cons.injEq] at heq
+              rw [List.getElem?_eq_getElem hlt, heq.1]; simpa using hh
+            rw [if_neg he0] at hx'
+            simp only [Option.some.injEq] at hx'
+            rw [heq, hx']
+          · simp only [Option.some.injEq] at hx'
+            rename_i heq
+            rw [heq, ← hx']
+        have hpos : bs.length - rest.length = i + nd + 1 := by
+          rw [← hrest]; simp; omega
+        clear hobe
+        mstep; mstep; mstep; mstep; mstep; mstep; mstep; mstep; mstep; mstep
+        mstep_not_taken with exact hle
+        mstep; mstep; mstep
+        (try simp only [Post.mloop]); (try mctrl_norm); (repeat mpay)
+        mstep; mstep; mstep; mstep [Hg]
+        rw [show sp - 16 + 16 = sp by simp]
+        repeat mstep
+        isplitl [Hc]
+        · iapply BorrowMut.credits_le
+          iframe Hc
+          ipureintro; omega
+        iframe Hg
+        isplitr
+        · ipureintro; simp [htype]
+        rw [hpos]
+        iexact Hrd
+  · iframe Hc
+    inext
+    iintro Hc
+    rw [← hW]
+    iapply inv86_intro n inst mi Cg cfg.regularOpCost 129 575 (XE + R2) de (sp - 16) ptr bs i (i + nd) _ i 1 _ _
+      (by omega) (by omega) (by rw [if_pos rfl])
+    iframe Hrd Hg
+    iexact Hc
+
+end L86
 
 end WNear.Binary.SerdeIgnNum
