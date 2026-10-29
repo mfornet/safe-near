@@ -190,10 +190,10 @@ theorem f66_acc (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType
     (hrd : rd.toNat + 12 ≤ 2 ^ 32) (hlen : bs.length + 1 < 2 ^ 28) (hptr : ptr.toNat + bs.length < 2 ^ 32)
     (hsp : 400 ≤ sp.toNat) (hal : sp.toNat % 8 = 0) (hr : roomFor4 mlen maxP 20)
     (dv : List UInt8 → Option (WNear.AccountId × List UInt8)) (ign : List UInt8 → Option (Unit × List UInt8))
-    (K646 K169 K81 : Nat → Nat) (Cd : IProp GF) [Persistent Cd]
+    (K646 K169 K81 : Nat → Nat) (Fb : Nat) (Cd : IProp GF) [Persistent Cd]
     (h646 : Hyp646 cfg lim inst mi n g ta A Cg gt (sp - 64) ptr idx bs maxP K646 Cd)
-    (h169 : Hyp169 cfg lim inst mi n g ta A Cg gt (sp - 64) ptr idx bs maxP dv K169 Cd)
-    (h81 : Hyp81 cfg lim inst mi n g ta A Cg gt (sp - 64) ptr idx bs maxP ign K81 Cd)
+    (h169 : Hyp169 cfg lim inst mi n g ta A Cg gt (sp - 64) ptr idx bs maxP dv K169 Fb Cd)
+    (h81 : Hyp81 cfg lim inst mi n g ta A Cg gt (sp - 64) ptr idx bs maxP ign K81 Cd) (hF : F ≤ Fb)
     (hdv0 : dv [] = none)
     (hdvs : ∀ j a r, j ≤ bs.length → dv (bs.drop j) = some (a, r) → bs.drop (bs.length - r.length) = r)
     (higns : ∀ j r, j ≤ bs.length → ign (bs.drop j) = some ((), r) → bs.drop (bs.length - r.length) = r)
@@ -350,7 +350,7 @@ theorem f66_acc (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType
     iexact D20
   have s78 := SerdeStruct78.f78_acc (GF := GF) cfg lim (d + 1) types[14]! (by rfl) inst mi A n g ta hm (by omega) Cg
     gt (sp - 64) (sp - 64 + 48) (sp - 64) ptr idx ob2 bs maxP mlen F live hob2 (by omega) hlen hptr (by omega)
-    (by omega) (by omega) hr dv ign K646 K169 K81 Cd h646 h169 h81 hdv0 hdvs higns hstrs a r hS
+    (by omega) (by omega) hr dv ign K646 K169 K81 Fb Cd h646 h169 h81 hF hdv0 hdvs higns hstrs a r hS
   rw [h48, hCS] at s78
   ihave #S78 := s78 $$ [H193c F205 F201 F193 F89 F90 F81 F169 F77 F214 F91 F228 HCd]
   · iframe H193c F205 F201 F193 F89 F90 F81 F169 F77 F214 F91 F228 HCd
@@ -554,10 +554,10 @@ theorem f66_dec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType
     (dv : List UInt8 → Option (WNear.AccountId × List UInt8)) (ign : List UInt8 → Option (Unit × List UInt8))
     (hdv : SerdeStructModel.Agrees dv (SerdeStructModel.valueAs WNear.account))
     (hign : SerdeStructModel.Agrees ign SerdeStructModel.valueSkip)
-    (K646 K169 K81 : Nat → Nat) (Cd : IProp GF) [Persistent Cd]
+    (K646 K169 K81 : Nat → Nat) (Fb : Nat) (Cd : IProp GF) [Persistent Cd]
     (h646 : Hyp646 cfg lim inst mi n g ta A Cg gt (sp - 64) ptr idx bs maxP K646 Cd)
-    (h169 : Hyp169 cfg lim inst mi n g ta A Cg gt (sp - 64) ptr idx bs maxP dv K169 Cd)
-    (h81 : Hyp81 cfg lim inst mi n g ta A Cg gt (sp - 64) ptr idx bs maxP ign K81 Cd)
+    (h169 : Hyp169 cfg lim inst mi n g ta A Cg gt (sp - 64) ptr idx bs maxP dv K169 Fb Cd)
+    (h81 : Hyp81 cfg lim inst mi n g ta A Cg gt (sp - 64) ptr idx bs maxP ign K81 Cd) (hF : F ≤ Fb)
     (a : WNear.AccountId) (h : WNear.Call.decode "ft_balance_of" bs = some (.ftBalanceOf a)) :
     code66 n maxP inst mi A ∗ Cd ⊢
       MFunSpec (GF := GF) cfg lim d type inst mi f66 Cg
@@ -583,7 +583,7 @@ theorem f66_dec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType
   unfold cost66
   rw [hrest]
   exact f66_acc cfg lim d type htype inst mi A n g ta hm hd Cg gt sp out rd ptr idx ob bs maxP mlen F live hob hout
-    hrd hlen hptr hsp hal hr dv ign K646 K169 K81 Cd h646 h169 h81 hdv0 hdvs higns hstrs a r hS hE hsuf
+    hrd hlen hptr hsp hal hr dv ign K646 K169 K81 Fb Cd h646 h169 h81 hF hdv0 hdvs higns hstrs a r hS hE hsuf
 
 end L66m
 

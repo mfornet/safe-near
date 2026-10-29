@@ -127,10 +127,10 @@ theorem f78_acc (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType
     (hlen : bs.length + 1 < 2 ^ 28) (hptr : ptr.toNat + bs.length < 2 ^ 32) (hde : de.toNat + 25 ≤ 2 ^ 32)
     (hsp : 336 ≤ sp.toNat) (hal : sp.toNat % 8 = 0) (hr : roomFor4 mlen maxP 20)
     (dv : List UInt8 → Option (WNear.AccountId × List UInt8)) (ign : List UInt8 → Option (Unit × List UInt8))
-    (K646 K169 K81 : Nat → Nat) (Cd : IProp GF) [Persistent Cd]
+    (K646 K169 K81 : Nat → Nat) (Fb : Nat) (Cd : IProp GF) [Persistent Cd]
     (h646 : Hyp646 cfg lim inst mi n g ta A Cg gt de ptr idx bs maxP K646 Cd)
-    (h169 : Hyp169 cfg lim inst mi n g ta A Cg gt de ptr idx bs maxP dv K169 Cd)
-    (h81 : Hyp81 cfg lim inst mi n g ta A Cg gt de ptr idx bs maxP ign K81 Cd)
+    (h169 : Hyp169 cfg lim inst mi n g ta A Cg gt de ptr idx bs maxP dv K169 Fb Cd)
+    (h81 : Hyp81 cfg lim inst mi n g ta A Cg gt de ptr idx bs maxP ign K81 Cd) (hF : F ≤ Fb)
     (hdv0 : dv [] = none)
     (hdvs : ∀ j a r, j ≤ bs.length → dv (bs.drop j) = some (a, r) → bs.drop (bs.length - r.length) = r)
     (higns : ∀ j r, j ≤ bs.length → ign (bs.drop j) = some ((), r) → bs.drop (bs.length - r.length) = r)
@@ -180,7 +180,7 @@ theorem f78_acc (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType
   rcases structDe_cases h hdv0 hdvs with ⟨ho, hl⟩ | ⟨r1, hok, hrr⟩
   · have s := SerdeStructObj.f228_obj (GF := GF) cfg lim (d + 1) types[36]! (by rfl) inst mi A n g ta hm (by omega) Cg
       gt sp out de ptr idx out out out out ob bs 0 maxP mlen F live hob hout hlen hptr hde hsp hal (by omega) hr dv ign
-      K646 K169 K81 Cd h646 h169 h81 hdvs higns hstrs (bs.length - (wsLen bs + 1) + 1) a r (by simpa using ho)
+      K646 K169 K81 Fb Cd h646 h169 h81 hF hdvs higns hstrs (bs.length - (wsLen bs + 1) + 1) a r (by simpa using ho)
       (by simpa using hl)
     try simp only [List.drop_zero, Nat.zero_add] at s
     rw [if_pos ho]
@@ -204,7 +204,7 @@ theorem f78_acc (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType
     ipureintro; simp [htype]
   · have s := SerdeStructArr.f228_arr (GF := GF) cfg lim (d + 1) types[36]! (by rfl) inst mi A n g ta hm (by omega) Cg
       gt sp out de ptr idx out out out out ob bs 0 maxP mlen F live hob hout hlen hptr hde hsp (by omega) hr dv
-      K169 Cd h169 a r1 hok
+      K169 Fb Cd h169 hF a r1 hok
     obtain ⟨hb0, -, hdv, hb4⟩ := hok
     simp only [List.drop_zero, Nat.zero_add] at hb0
     rw [if_neg (by rw [hb0]; decide)]

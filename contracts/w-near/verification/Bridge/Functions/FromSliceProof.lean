@@ -36,7 +36,7 @@ theorem acceptContract (K0 K1 X : Nat) : AcceptContract (GF := GF) 400 K0 K1 X :
   obtain ⟨dv, ign, K646, K169, K81, hdv, hign, h646, h169, h81, hK⟩ := hcal
   have s := f66_dec (GF := GF) cfg.wasm lim d types[14]! (by rfl) 0 wInst id 0 0 0 Interface.wInst_ifaceMod
     (by omega) Cg gt sp out rd ptr idx ob bs 2048 hl F live hob hout hrd hlen hptr hS (by omega) hr dv ign hdv hign
-    K646 K169 K81 (codeCtx cfg h0) h646 h169 h81 a hdec
+    K646 K169 K81 F (codeCtx cfg h0) h646 h169 h81 (Nat.le_refl F) a hdec
   simp only [id] at s
   iintro #Hctx
   ihave #C66 := code66_of cfg h0 $$ Hctx
@@ -158,7 +158,7 @@ theorem f65_accept (K0 K1 X : Nat) (hc : AcceptContract (GF := GF) 400 K0 K1 X)
     (hptr : ptr.toNat + bs.length < 2 ^ 32) (hlen : bs.length + 1 < 2 ^ 28) (hout : out.toNat + 16 ≤ 2 ^ 32)
     (hob : ob.length = 16) (hr : roomFor4 hl 2048 20)
     (hdec : WNear.Call.decode "ft_balance_of" bs = some (.ftBalanceOf a))
-    (hcal : AcceptCallees (GF := GF) cfg h0 lim Cg gt (sp - 16 - 64) ptr idx bs K0 K1 X) :
+    (hcal : AcceptCallees (GF := GF) cfg h0 lim Cg gt (sp - 16 - 64) ptr idx bs F K0 K1 X) :
     codeCtx (GF := GF) cfg h0 ⊢
       MFunSpec (GF := GF) cfg.wasm lim d types[31]! 0 wInst f65 Cg
         (pre65 400 gt sp out ptr idx bs ob hl F live)
@@ -216,13 +216,13 @@ holds with `K0 = 1725 + a169`, `X = x`, from the two hypotheses left (`Hyp169`, 
 linear bounds, and the per-member condition of `SerdeCost.cost66_le` with `a646 = 300`,
 `b646 = 130`. -/
 theorem acceptCallees_noesc (cfg : RuntimeConfig) (h0 : NearState) (lim : ExecLimits) (Cg : Nat)
-    (gt : GlobalType) (de ptr idx : UInt32) (bs : List UInt8) (hlen : bs.length + 1 < 2 ^ 28)
+    (gt : GlobalType) (de ptr idx : UInt32) (bs : List UInt8) (F : Nat) (hlen : bs.length + 1 < 2 ^ 28)
     (hptr : ptr.toNat + bs.length < 2 ^ 32) (hde : de.toNat + 24 ≤ 2 ^ 32) (hnb : (0x5C : UInt8) ∉ bs)
     (a : WNear.AccountId) (hdec : WNear.Call.decode "ft_balance_of" bs = some (.ftBalanceOf a))
     (dv : List UInt8 → Option (WNear.AccountId × List UInt8)) (ign : List UInt8 → Option (Unit × List UInt8))
     (hdv : SerdeStructModel.Agrees dv (SerdeStructModel.valueAs WNear.account))
     (hign : SerdeStructModel.Agrees ign SerdeStructModel.valueSkip) (K169 K81 : Nat → Nat)
-    (h169 : SerdeStructArr.Hyp169 cfg.wasm lim 0 wInst 0 0 0 id Cg gt de ptr idx bs 2048 dv K169
+    (h169 : SerdeStructArr.Hyp169 cfg.wasm lim 0 wInst 0 0 0 id Cg gt de ptr idx bs 2048 dv K169 F
       (codeCtx (GF := GF) cfg h0))
     (h81 : SerdeStructObj.Hyp81 cfg.wasm lim 0 wInst 0 0 0 id Cg gt de ptr idx bs 2048 ign K81
       (codeCtx (GF := GF) cfg h0))
@@ -232,7 +232,7 @@ theorem acceptCallees_noesc (cfg : RuntimeConfig) (h0 : NearState) (lim : ExecLi
     (hK : 130 ≤ K1) (hb169 : b169 ≤ K1) (hb81 : b81 ≤ K1)
     (hM169 : 1200 + SerdeKey.cost194 + 300 + 130 + a169 + b169 ≤ 5 * K1)
     (hM81 : 1200 + SerdeKey.cost194 + 300 + 130 + a81 + b81 ≤ 5 * K1) :
-    AcceptCallees (GF := GF) cfg h0 lim Cg gt de ptr idx bs (1725 + a169) K1 x := by
+    AcceptCallees (GF := GF) cfg h0 lim Cg gt de ptr idx bs F (1725 + a169) K1 x := by
   refine ⟨dv, ign, SerdeKeyNoEsc.K646 cfg.wasm bs, K169, K81, hdv, hign, ?_, h169, h81, ?_⟩
   · exact SerdeKeyNoEsc.hyp646_noesc cfg.wasm lim 0 wInst id 0 0 0 Interface.wInst_ifaceMod Cg gt de ptr idx bs
       2048 hlen hptr hde hnb (codeCtx cfg h0) (code646_of cfg h0)

@@ -147,14 +147,14 @@ def post66 (S : Nat) (gt : GlobalType) (sp rd ptr idx : UInt32) (bs : List UInt8
 /-- **The callees of the accepting path that are not proved yet**, at 66's `Deserializer` `de`
 over `bs`: readers `dv` (169) and `ign` (81) that agree with the model; the specifications `Hyp646`
 (keys), `Hyp169` (the account id) and `Hyp81` (ignored values), with the costs `K646`, `K169`,
-`K81`; and 66's cost under them within `(K0 + K1 · len) · c + X`. -/
+`K81` (169's for a free list of at most `F` cells, the heap's at the entry); and 66's cost under them within `(K0 + K1 · len) · c + X`. -/
 def AcceptCallees (cfg : RuntimeConfig) (h0 : NearState) (lim : ExecLimits) (Cg : Nat) (gt : GlobalType)
-    (de ptr idx : UInt32) (bs : List UInt8) (K0 K1 X : Nat) : Prop :=
+    (de ptr idx : UInt32) (bs : List UInt8) (F K0 K1 X : Nat) : Prop :=
   ∃ (dv : List UInt8 → Option (WNear.AccountId × List UInt8)) (ign : List UInt8 → Option (Unit × List UInt8))
     (K646 K169 K81 : Nat → Nat),
     Agrees dv (valueAs WNear.account) ∧ Agrees ign valueSkip ∧
     Hyp646 cfg.wasm lim 0 wInst 0 0 0 id Cg gt de ptr idx bs 2048 K646 (codeCtx (GF := GF) cfg h0) ∧
-    Hyp169 cfg.wasm lim 0 wInst 0 0 0 id Cg gt de ptr idx bs 2048 dv K169 (codeCtx (GF := GF) cfg h0) ∧
+    Hyp169 cfg.wasm lim 0 wInst 0 0 0 id Cg gt de ptr idx bs 2048 dv K169 F (codeCtx (GF := GF) cfg h0) ∧
     Hyp81 cfg.wasm lim 0 wInst 0 0 0 id Cg gt de ptr idx bs 2048 ign K81 (codeCtx (GF := GF) cfg h0) ∧
     cost66 cfg.wasm K646 K169 K81 dv ign bs ≤ (K0 + K1 * bs.length) * cfg.wasm.regularOpCost + X
 
@@ -168,7 +168,7 @@ def AcceptContract (S K0 K1 X : Nat) : Prop :=
     S ≤ sp.toNat → sp.toNat % 16 = 0 → ptr.toNat + bs.length < 2 ^ 32 → bs.length + 1 < 2 ^ 28 →
     out.toNat + 16 ≤ 2 ^ 32 → ob.length = 16 → rd.toNat + 12 ≤ 2 ^ 32 → roomFor4 hl 2048 20 →
     WNear.Call.decode "ft_balance_of" bs = some (.ftBalanceOf a) →
-    AcceptCallees (GF := GF) cfg h0 lim Cg gt (sp - 64) ptr idx bs K0 K1 X →
+    AcceptCallees (GF := GF) cfg h0 lim Cg gt (sp - 64) ptr idx bs F K0 K1 X →
     ⊢ (codeCtx (GF := GF) cfg h0 -∗
       MFunSpec (GF := GF) cfg.wasm lim d types[14]! 0 wInst f66 Cg
         (pre66 S gt sp out rd ptr idx bs ob hl F live)

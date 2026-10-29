@@ -168,12 +168,12 @@ set_option maxHeartbeats 8000000 in
 `sp` (no frame of its own), `out` 228's buffer. -/
 theorem spec169_205 (cfg : WasmConfig) (lim : ExecLimits) (inst : Nat) (mi : ModuleInst) (n g ta : Nat)
     (A : Nat → Nat) (Cg : Nat) (gt : GlobalType) (de ptr idx : UInt32) (bs : List UInt8) (maxP : Nat)
-    (dv : List UInt8 → Option (WNear.AccountId × List UInt8)) (K169 : Nat → Nat) (Cd : IProp GF)
-    [Persistent Cd] (h : Hyp169 cfg lim inst mi n g ta A Cg gt de ptr idx bs maxP dv K169 Cd)
+    (dv : List UInt8 → Option (WNear.AccountId × List UInt8)) (K169 : Nat → Nat) (Fb : Nat) (Cd : IProp GF)
+    [Persistent Cd] (h : Hyp169 cfg lim inst mi n g ta A Cg gt de ptr idx bs maxP dv K169 Fb Cd)
     (d : Nat) (hd : d + 16 < lim.maxCallDepth) (sp out : UInt32) (ob : List UInt8) (hob : ob.length = 16)
     (hout : out.toNat + 16 ≤ 2 ^ 32) (hsp : 256 ≤ sp.toNat) (j : Nat) (a : WNear.AccountId) (r : List UInt8)
     (hj : j ≤ bs.length) (mlen F : Nat) (live : List (Nat × Nat)) (hr : roomFor4 mlen maxP 20)
-    (hdv : dv (bs.drop j) = some (a, r)) :
+    (hF : F ≤ Fb) (hdv : dv (bs.drop j) = some (a, r)) :
     Cd ⊢ MFunSpec cfg lim d types[14]! inst mi f169 Cg
         (fun args => iprop(⌜args = [.i32 out, .i32 de]⌝ ∗ g ↦[wg] ⟨gt, .i32 sp⟩ ∗ stk n (sp.toNat - 96) 96 ∗
           vt n 1057464 idx ta (A 578) ∗ heapInv n maxP mlen live F ∗ n ↦[wms][ out.toNat ] ob ∗
@@ -184,7 +184,7 @@ theorem spec169_205 (cfg : WasmConfig) (lim : ExecLimits) (inst : Nat) (mi : Mod
           ∃ (p cap : UInt32), n ↦[i32][ out.toNat ] 0 ∗ n ↦[i32][ out.toNat + 4 ] p ∗
             n ↦[i32][ out.toNat + 8 ] cap ∗ n ↦[i32][ out.toNat + 12 ] (UInt32.ofNat a.val.utf8ByteSize) ∗
             strRes n maxP live a p cap ∗ rd n de ptr bs (bs.length - r.length)))) := by
-  have s := h d sp out ob j a r mlen F live hd hob hout hsp hj hr hdv
+  have s := h d sp out ob j a r mlen F live hd hob hout hsp hj hr hF hdv
   iintro #HC
   ihave #S := s $$ HC
   clear s
