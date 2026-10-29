@@ -105,7 +105,8 @@ theorem predecessorHost_fields (h : NearState) :
 /-! ## The cost of 232 on hosts that differ in registers and accounting -/
 
 theorem cost526_congr (cfg : WasmConfig) (F : Nat) {x y : NearState} (hk : keep x = keep y)
-    (hc : x.context = y.context) : PredecessorId.cost526 cfg F x = PredecessorId.cost526 cfg F y := by
+    (hc : x.context.predecessorAccountId = y.context.predecessorAccountId) :
+    PredecessorId.cost526 cfg F x = PredecessorId.cost526 cfg F y := by
   have hs := NewBody.sameCost_of_keep hk
   have e : ∀ z : NearState, predecessorHost z 0 = z.setRegister (0 : UInt64).toNat z.context.predecessorAccountId := by
     intro z; simp [predecessorHost, u64Max]
@@ -121,14 +122,13 @@ theorem keep_predecessorHost_congr {x y : NearState} (hk : keep x = keep y) :
   rw [keep_predecessorHost, keep_predecessorHost, hk]
 
 theorem cost232_congr (cfg : WasmConfig) (F : Nat) (pl : UInt32) {x y : NearState} (hk : keep x = keep y)
-    (hc : x.context = y.context) (hs : x.storage = y.storage) (key : List UInt8) (reg : Option (UInt64 × UInt64))
+    (hpred : x.context.predecessorAccountId = y.context.predecessorAccountId)
+    (hdep : x.context.attachedDeposit = y.context.attachedDeposit) (hs : x.storage = y.storage) (key : List UInt8) (reg : Option (UInt64 × UInt64))
     (xb : List UInt8) (t0 t1 : UInt64) (K879 K664s K664p : Nat → Keep → Nat) :
     cost232 cfg F pl x key reg xb t0 t1 K879 K664s K664p = cost232 cfg F pl y key reg xb t0 t1 K879 K664s K664p := by
   have hsc := NewBody.sameCost_of_keep hk
-  have hdep : x.context.attachedDeposit = y.context.attachedDeposit := by rw [hc]
-  have hpred : x.context.predecessorAccountId = y.context.predecessorAccountId := by rw [hc]
   have h1 : attachedDepositUse x = attachedDepositUse y := NewBody.chargesUse_congr hsc _
-  have h2 := cost526_congr cfg F hk hc
+  have h2 := cost526_congr cfg F hk hpred
   have h3 : ∀ F' pl' L' k', LookupMapContains.cost394 cfg F' pl' L' (predecessorHost x 0) k' =
       LookupMapContains.cost394 cfg F' pl' L' (predecessorHost y 0) k' :=
     fun F' pl' L' k' => DepositCosts.cost394_congr cfg F' pl' L' (keep_predecessorHost_congr hk) k'
