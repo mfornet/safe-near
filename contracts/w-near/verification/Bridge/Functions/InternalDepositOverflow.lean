@@ -354,7 +354,7 @@ theorem f406_sup (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
     (hpre : pre.length = pl.toNat) (hkey : key.length = L.toNat)
     (hL : L.toNat + 4 ≤ 120) (hpl : pl.toNat ≤ 4) (hl0 : 0 < pl.toNat)
     (hpp : pp.toNat + pl.toNat ≤ 2 ^ 32) (hv : v.toNat + 12 ≤ 2 ^ 32) (hp : p.toNat + L.toNat ≤ 2 ^ 32)
-    (hroom : HeapRoomK 11 len maxP)
+    (hroom : HeapRoomK 15 len maxP)
     (hno1 : x0.toNat + 2 ^ 64 * x1.toNat + (lo.toNat + 2 ^ 64 * hi.toNat) < 2 ^ 128)
     (hov2 : ¬ (t0.toNat + 2 ^ 64 * t1.toNat + (lo.toNat + 2 ^ 64 * hi.toNat) < 2 ^ 128))
     (h : NearState) (st : Near.TrieOverlay.State) {bud : Nat}
@@ -370,7 +370,7 @@ theorem f406_sup (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
     (hsome : h.storage (pre ++ (bytes32 L ++ key)) = some (storeBytes (.i64 x0) 8 ++ storeBytes (.i64 x1) 8))
     (hfit : LogFits h textSupply.length) (hov : h.extCosts.cost "read_memory_byte" * textSupply.length < 2 ^ 64)
     (C : IProp GF) [Persistent C] (lpc : UInt32) (Dp : IProp GF) (K879 : Nat → NewBody.Keep → Nat)
-    (H879 : PanicSpecD cfg lim inst mi C n g ta A gt lpc f879 SP Dp D 1053016 21 1053040 K879 textSupply) :
+    (H879 : PanicSpecD cfg lim inst mi C n g ta A gt lpc maxP f879 SP Dp D 1053016 21 1053040 K879 textSupply) :
     code406 e n maxP inst mi A mx ∗ A 879 ↪[wf] FuncInst.wasm types[31]! inst f879 ∗ C
       ⊢ MFunSpecT (GF := GF) cfg lim d type inst mi f406 Cg
         (fun args => iprop(pre406 n g ta A gt s this pp pc pl v p c L lo hi t0 t1 idx maxP len live F pre key h args ∗
@@ -548,9 +548,9 @@ theorem f406_sup (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
   mstep; mstep; mstep
   mstep; mstep; mstep
   -- 363 on `None`, then 879
-  have hroom2 : HeapRoomK 4 l2 maxP :=
+  have hroom2 : HeapRoomK 8 l2 maxP :=
     MeasureUsage.heapRoom_shift hroom (MeasureUsage.lenIn_trans hl1' hl2) (by omega)
-  have S879 := H879 (d + 2) Cg (s - 80) h2 maxP l2 live (F + 7) idx (by omega) (by omega) (by omega) hroom2
+  have S879 := H879 (d + 2) Cg (s - 80) h2 l2 live (F + 7) idx (by omega) (by omega) (by omega) (by omega) hroom2
     (by unfold okG at hF ⊢; omega) (LogFits.of_keep hkp2 hfit)
     (by rw [show h2.extCosts = h.extCosts from congrArg NewBody.Keep.extCosts hkp2]; exact hov)
   rw [hkp2, hK9] at S879

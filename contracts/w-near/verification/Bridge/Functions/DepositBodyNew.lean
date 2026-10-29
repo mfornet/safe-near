@@ -186,7 +186,7 @@ theorem body232_unreg (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (e inst : 
     (hthis : self.toNat + 40 ≤ 2 ^ 32) (pp pc pl : UInt32) (pre : List UInt8)
     (hpre : pre.length = pl.toNat) (hpl : pl.toNat ≤ 4) (hl0 : 0 < pl.toNat) (hpp : pp.toNat + pl.toNat ≤ 2 ^ 32)
     (t0 t1 : UInt64) (xb : List UInt8) (hxb : xb.length = 8) (aidx : UInt32)
-    (maxP hl : Nat) (live : List (Nat × Nat)) (F : Nat) (hF : okG F) (hroom : HeapRoomK 17 hl maxP)
+    (maxP hl : Nat) (live : List (Nat × Nat)) (F : Nat) (hF : okG F) (hroom : HeapRoomK 21 hl maxP)
     (h : NearState) (st : Near.TrieOverlay.State) {bud : Nat}
     (hview : h.context.isView = false) (hacc : h.storageAccounting = some st) (hcanon : Canon st)
     (hlink : StorageLink h st) (hproof : ProofBudget h st bud)
@@ -210,8 +210,8 @@ theorem body232_unreg (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (e inst : 
     (hfitT : LogFits h NearDepositPanics.textTooSmall.length)
     (hovT : h.extCosts.cost "read_memory_byte" * NearDepositPanics.textTooSmall.length < 2 ^ 64)
     (C : IProp GF) [Persistent C] (lpc : UInt32) (Dp : IProp GF) (K879 K664 : Nat → NewBody.Keep → Nat)
-    (H879 : PanicSpecD cfg lim inst mi C n g ta A gt lpc f879 SP Dp D 1053016 21 1053040 K879 textSupply)
-    (H664 : PanicSpecD cfg lim inst mi C n g ta A gt lpc f664 SP Dp D 1050556 21 1050580 K664
+    (H879 : PanicSpecD cfg lim inst mi C n g ta A gt lpc maxP f879 SP Dp D 1053016 21 1053040 K879 textSupply)
+    (H664 : PanicSpecD cfg lim inst mi C n g ta A gt lpc maxP f664 SP Dp D 1050556 21 1050580 K664
       NearDepositPanics.textTooSmall)
     (Φ : Post NearState GF) :
     code232 e n maxP inst mi A mx ∗ C ∗
@@ -334,7 +334,7 @@ theorem body232_unreg (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (e inst : 
   ihave HIR : ifaceR n ta A $$ [HI H12]
   · iunfold ifaceR; iframe HI H12
   have hroomR : roomFor hl maxP (UInt32.ofNat h.context.predecessorAccountId.length) :=
-    LookupMapOps.roomFor_ofK (k := 17) (UInt32.ofNat h.context.predecessorAccountId.length) (by omega) hroom
+    LookupMapOps.roomFor_ofK (k := 21) (UInt32.ofNat h.context.predecessorAccountId.length) (by omega) hroom
       (LookupMapOps.lenIn_zero hl hroom.1) (by omega)
   mstep; mstep; mstep
   mcall (PredecessorId.f526_spec cfg lim (d + 1) types[0]! rfl inst mi e A n g ta mx hm (by omega) Cg gt (s - 144)
@@ -473,8 +473,8 @@ theorem body232_unreg (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (e inst : 
     mstep_taken with (first | decide | simp [Numeric.bool])
     mstep; mstep; mstep
     have hsm' : depOf h < minOf xb := by simp only [depOf]; omega
-    have S664 := H664 (d + 1) Cg (s - 144) h2 maxP hl2 ((p.toNat, h.context.predecessorAccountId.length) :: live)
-      (F + 2) aidx (by omega) (by omega) (by omega) (MeasureUsage.heapRoom_shift hroom hlen12 (by omega))
+    have S664 := H664 (d + 1) Cg (s - 144) h2 hl2 ((p.toNat, h.context.predecessorAccountId.length) :: live)
+      (F + 2) aidx (by omega) (by omega) (by omega) (by omega) (MeasureUsage.heapRoom_shift hroom hlen12 (by omega))
       (by unfold okG at hF ⊢; omega) (InternalDepositOverflow.LogFits.of_keep hk2 hfitT) (by rw [hx2']; exact hovT)
     rw [hk2, hK664] at S664
     ihave #S664' := S664 $$ HC

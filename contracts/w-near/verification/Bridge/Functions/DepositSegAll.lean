@@ -82,7 +82,7 @@ theorem seg406_all (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (e inst : Nat
     (hpre : pre.length = pl.toNat) (hab : ab.length ≤ 64) (hab0 : 0 < ab.length)
     (hpl : pl.toNat ≤ 4) (hl0 : 0 < pl.toNat) (hpp : pp.toNat + pl.toNat ≤ 2 ^ 32)
     (hap : ap.toNat + ab.length ≤ 2 ^ 32) (hlive : (ap.toNat, ab.length) ∈ live)
-    (hroom : HeapRoomK 11 hl maxP)
+    (hroom : HeapRoomK 15 hl maxP)
     (h : NearState) (st : Near.TrieOverlay.State) {bud : Nat}
     (hview : h.context.isView = false) (hacc : h.storageAccounting = some st) (hcanon : Canon st)
     (hlink : StorageLink h st) (hproof : ProofBudget h st bud)
@@ -101,7 +101,7 @@ theorem seg406_all (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (e inst : Nat
     (hfit16 : LogFits h 16) (hov16 : h.extCosts.cost "read_memory_byte" * 16 < 2 ^ 64)
     (hfitS : LogFits h textSupply.length) (hovS : h.extCosts.cost "read_memory_byte" * textSupply.length < 2 ^ 64)
     (C : IProp GF) [Persistent C] (lpc : UInt32) (Dp : IProp GF) (K879 : Nat → NewBody.Keep → Nat)
-    (H879 : PanicSpecD cfg lim inst mi C n g ta A gt lpc f879 SP Dp D 1053016 21 1053040 K879 textSupply)
+    (H879 : PanicSpecD cfg lim inst mi C n g ta A gt lpc maxP f879 SP Dp D 1053016 21 1053040 K879 textSupply)
     (Φ : Post NearState GF) :
     codeSeg e n maxP inst mi A mx ∗ C ∗
       credits Cg (costSegAll cfg F pl (UInt32.ofNat ab.length) h (pre ++ (bytes32 (UInt32.ofNat ab.length) ++ ab))

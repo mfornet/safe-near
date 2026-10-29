@@ -18,7 +18,7 @@ concrete (`pPre`):
 * the host.
 
 `PanicSpecD … f SP Dp D mp ml loc K text`: from any such resources with room on the heap
-(`HeapRoomK 4`), `f(mp, ml, loc)` traps with the host panicked with `text`, at the cost
+(`HeapRoomK 8`), `f(mp, ml, loc)` traps with the host panicked with `text`, at the cost
 `K F (keep h)` (the free cells `F`, what the costs read of the host). `PanicSpecs.lean` (Methods)
 proves them from `PanicBegin.f664_spec` and `PanicEntries.f879_full` given `to_string`'s
 specification (`ToStr`) and the payload's `get` (`GetSpec`).
@@ -65,10 +65,10 @@ def pPre (n g ta : Nat) (A : Nat → Nat) (gt : GlobalType) (lpc : UInt32) (SP :
 /-- **What a panic entry `f(mp, ml, loc)` is asked**: from the resources `pPre` with room on the
 heap, it traps, the host panicked with `text`, at `K F (keep h)`. -/
 def PanicSpecD (cfg : WasmConfig) (lim : ExecLimits) (inst : Nat) (mi : ModuleInst) (C : IProp GF)
-    (n g ta : Nat) (A : Nat → Nat) (gt : GlobalType) (lpc : UInt32) (f : Func) (SP : Nat) (Dp : IProp GF)
+    (n g ta : Nat) (A : Nat → Nat) (gt : GlobalType) (lpc : UInt32) (maxP : Nat) (f : Func) (SP : Nat) (Dp : IProp GF)
     (D : Nat) (mp ml loc : UInt32) (K : Nat → NewBody.Keep → Nat) (text : List UInt8) : Prop :=
-  ∀ (d Cg : Nat) (sp : UInt32) (h : NearState) (maxP hl : Nat) (live : List (Nat × Nat)) (F : Nat)
-    (idx : UInt32), d + D < lim.maxCallDepth → SP ≤ sp.toNat → sp.toNat % 8 = 0 → HeapRoomK 4 hl maxP →
+  ∀ (d Cg : Nat) (sp : UInt32) (h : NearState) (hl : Nat) (live : List (Nat × Nat)) (F : Nat)
+    (idx : UInt32), d + D < lim.maxCallDepth → SP ≤ sp.toNat → sp.toNat % 8 = 0 → sp.toNat + 16 ≤ 2 ^ 32 → HeapRoomK 8 hl maxP →
     okG F → LogFits h text.length → h.extCosts.cost "read_memory_byte" * text.length < 2 ^ 64 →
     C ⊢ MFunSpecT cfg lim d types[31]! inst mi f Cg
       (fun args => iprop(⌜args = [.i32 mp, .i32 ml, .i32 loc]⌝ ∗

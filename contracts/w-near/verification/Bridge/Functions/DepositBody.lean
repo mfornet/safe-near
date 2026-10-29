@@ -213,7 +213,7 @@ theorem body232_reg (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (e inst : Na
     (hthis : self.toNat + 40 ≤ 2 ^ 32) (pp pc pl : UInt32) (pre : List UInt8)
     (hpre : pre.length = pl.toNat) (hpl : pl.toNat ≤ 4) (hl0 : 0 < pl.toNat) (hpp : pp.toNat + pl.toNat ≤ 2 ^ 32)
     (t0 t1 x0 x1 : UInt64) (xb : List UInt8) (aidx : UInt32)
-    (maxP hl : Nat) (live : List (Nat × Nat)) (F : Nat) (hF : okG F) (hroom : HeapRoomK 14 hl maxP)
+    (maxP hl : Nat) (live : List (Nat × Nat)) (F : Nat) (hF : okG F) (hroom : HeapRoomK 18 hl maxP)
     (h : NearState) (st : Near.TrieOverlay.State) {bud : Nat}
     (hview : h.context.isView = false) (hacc : h.storageAccounting = some st) (hcanon : Canon st)
     (hlink : StorageLink h st) (hproof : ProofBudget h st bud)
@@ -235,7 +235,7 @@ theorem body232_reg (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (e inst : Na
     (hfit16 : LogFits h 16) (hov16 : h.extCosts.cost "read_memory_byte" * 16 < 2 ^ 64)
     (hfitS : LogFits h textSupply.length) (hovS : h.extCosts.cost "read_memory_byte" * textSupply.length < 2 ^ 64)
     (C : IProp GF) [Persistent C] (lpc : UInt32) (Dp : IProp GF) (K879 : Nat → NewBody.Keep → Nat)
-    (H879 : PanicSpecD cfg lim inst mi C n g ta A gt lpc f879 SP Dp D 1053016 21 1053040 K879 textSupply)
+    (H879 : PanicSpecD cfg lim inst mi C n g ta A gt lpc maxP f879 SP Dp D 1053016 21 1053040 K879 textSupply)
     (Φ : Post NearState GF) :
     code232 e n maxP inst mi A mx ∗ C ∗
       credits Cg (costReg cfg F pl h
@@ -352,7 +352,7 @@ theorem body232_reg (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (e inst : Na
   ihave HIR : ifaceR n ta A $$ [HI H12]
   · iunfold ifaceR; iframe HI H12
   have hroomR : roomFor hl maxP (UInt32.ofNat h.context.predecessorAccountId.length) :=
-    LookupMapOps.roomFor_ofK (k := 14) (UInt32.ofNat h.context.predecessorAccountId.length) (by omega) hroom (LookupMapOps.lenIn_zero hl hroom.1) (by omega)
+    LookupMapOps.roomFor_ofK (k := 18) (UInt32.ofNat h.context.predecessorAccountId.length) (by omega) hroom (LookupMapOps.lenIn_zero hl hroom.1) (by omega)
   mstep; mstep; mstep
   mcall (PredecessorId.f526_spec cfg lim (d + 1) types[0]! rfl inst mi e A n g ta mx hm (by omega) Cg gt (s - 144)
       (s - 144 + 56) (by omega) (by omega) (by omega) aidx maxP hl live F hF vb hvb h hview hvalid hlimR
