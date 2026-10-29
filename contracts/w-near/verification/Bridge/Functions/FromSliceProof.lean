@@ -1,4 +1,5 @@
 import Bridge.Functions.FromSliceSpec
+import Bridge.Functions.SerdeKeyNoEsc
 
 /-!
 # `ft_balance_of`'s argument parser: the accepting contract, and both halves at 65 (M6)
@@ -189,6 +190,54 @@ theorem f65_reject (hc : RejectContract (GF := GF) 400)
   obtain ⟨K, hK⟩ := hc cfg h0 lim (d + 1) (by omega) Cg gt (sp - 16) out (sp - 16) ptr idx bs ob hl F live
     (by omega) (by omega) hptr hlen hout hob (by omega) hr hdec
   exact ⟨_, f65_of_spec 400 cfg h0 lim d hd Cg gt sp out ptr idx bs ob hl F live (by omega) _ _ hK⟩
+
+
+open WNear.Binary.InitialState in
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 16000000 in
+/-- The code `parse_str` (646) runs on a key without escapes, from the store's function cells. -/
+theorem code646_of (cfg : RuntimeConfig) (h : NearState) :
+    codeCtx (GF := GF) cfg h ⊢ SerdeErrBox.errCode 0 2048 0 wInst id ∗
+      id 927 ↪[wf] FuncInst.wasm types[31]! 0 f927 ∗ id 657 ↪[wf] FuncInst.wasm types[31]! 0 f657 ∗
+      id 647 ↪[wf] FuncInst.wasm types[31]! 0 f647 ∗ id 648 ↪[wf] FuncInst.wasm types[45]! 0 f648 := by
+  iintro #Hctx
+  iunfold codeCtx at Hctx
+  icases Hctx with ⟨#HF, #Hi, #Hm⟩
+  simp only [SerdeErrBox.errCode, AllocTwo.code310, id]
+  repeat' (first
+    | iexact Hi
+    | iexact Hm
+    | (iapply wasmLeaf cfg h _ _ _ ?_ ?_ ?_ ?_ <;> first | iexact HF | decide | kernel_rfl | rfl)
+    | isplitl [])
+
+/-- **The callees of the accepting path on an input without `\`**: `Hyp646` is proved
+(`SerdeKeyNoEsc.hyp646_noesc`, at `SerdeKeyNoEsc.K646`: `300 + 130` per byte), so `AcceptCallees`
+holds with `K0 = 1725 + a169`, `X = x`, from the two hypotheses left (`Hyp169`, `Hyp81`), their
+linear bounds, and the per-member condition of `SerdeCost.cost66_le` with `a646 = 300`,
+`b646 = 130`. -/
+theorem acceptCallees_noesc (cfg : RuntimeConfig) (h0 : NearState) (lim : ExecLimits) (Cg : Nat)
+    (gt : GlobalType) (de ptr idx : UInt32) (bs : List UInt8) (hlen : bs.length + 1 < 2 ^ 28)
+    (hptr : ptr.toNat + bs.length < 2 ^ 32) (hde : de.toNat + 24 ≤ 2 ^ 32) (hnb : (0x5C : UInt8) ∉ bs)
+    (a : WNear.AccountId) (hdec : WNear.Call.decode "ft_balance_of" bs = some (.ftBalanceOf a))
+    (dv : List UInt8 → Option (WNear.AccountId × List UInt8)) (ign : List UInt8 → Option (Unit × List UInt8))
+    (hdv : SerdeStructModel.Agrees dv (SerdeStructModel.valueAs WNear.account))
+    (hign : SerdeStructModel.Agrees ign SerdeStructModel.valueSkip) (K169 K81 : Nat → Nat)
+    (h169 : SerdeStructArr.Hyp169 cfg.wasm lim 0 wInst 0 0 0 id Cg gt de ptr idx bs 2048 dv K169
+      (codeCtx (GF := GF) cfg h0))
+    (h81 : SerdeStructObj.Hyp81 cfg.wasm lim 0 wInst 0 0 0 id Cg gt de ptr idx bs 2048 ign K81
+      (codeCtx (GF := GF) cfg h0))
+    (K1 a169 b169 x a81 b81 : Nat)
+    (hL169 : SerdeCost.Lin169 cfg.wasm.regularOpCost K169 dv bs a169 b169 x)
+    (hL81 : SerdeCost.Lin81 cfg.wasm.regularOpCost K81 ign bs a81 b81)
+    (hK : 130 ≤ K1) (hb169 : b169 ≤ K1) (hb81 : b81 ≤ K1)
+    (hM169 : 1200 + SerdeKey.cost194 + 300 + 130 + a169 + b169 ≤ 5 * K1)
+    (hM81 : 1200 + SerdeKey.cost194 + 300 + 130 + a81 + b81 ≤ 5 * K1) :
+    AcceptCallees (GF := GF) cfg h0 lim Cg gt de ptr idx bs (1725 + a169) K1 x := by
+  refine ⟨dv, ign, SerdeKeyNoEsc.K646 cfg.wasm bs, K169, K81, hdv, hign, ?_, h169, h81, ?_⟩
+  · exact SerdeKeyNoEsc.hyp646_noesc cfg.wasm lim 0 wInst id 0 0 0 Interface.wInst_ifaceMod Cg gt de ptr idx bs
+      2048 hlen hptr hde hnb (codeCtx cfg h0) (code646_of cfg h0)
+  · exact SerdeCost.cost66_le cfg.wasm _ K169 K81 dv ign bs hdv hign a hdec K1 300 130 a169 b169 x a81 b81
+      (SerdeKeyNoEsc.lin646_noesc cfg.wasm bs hnb) hL169 hL81 (by omega) hK hb169 hb81 hM169 hM81
 
 end Proof
 
