@@ -49,25 +49,35 @@ def strRes (n maxP : Nat) (live : List (Nat × Nat)) (a : WNear.AccountId) (p ca
     n ↦[wms][ p.toNat ] a.val.toUTF8.toList ∗ block n (p.toNat + a.val.utf8ByteSize) (cap.toNat - a.val.utf8ByteSize) ∗
     heapInv n maxP mlen ((p.toNat, cap.toNat) :: live) F)
 
-/-- The tables and the scratch's length the string readers use. -/
+/-- The tables and the scratch the string readers and `ignore_value` use: its length (any), its pointer 1
+and its capacity 0 (the scratch never grows on the paths proved: escape-free keys, `ignore_value` with
+no frame pushed). -/
 def tbl (n : Nat) (de : UInt32) : IProp GF :=
   iprop((∃ sl : UInt32, n ↦[i32][ de.toNat + 20 ] sl) ∗ n ↦[wms][ 1062392 ] ParseStr.escTable ∗
-    n ↦[wms][ 1071704 ] FromUtf8Gen.utf8Width)
+    n ↦[wms][ 1071704 ] FromUtf8Gen.utf8Width ∗ n ↦[i32][ de.toNat + 12 ] 1 ∗ n ↦[i32][ de.toNat + 16 ] 0)
 
 end Defs
+
+/-- Room for an error box, and for one more page before it (the account id's `String`). -/
+def roomS (m maxP : Nat) : Prop := roomFor4 m maxP 20 ∧ roomFor4 (m + 65536) maxP 20
+
+theorem room_down {m maxP : Nat} (h : roomS m maxP) : roomFor4 m maxP 20 := h.1
 
 /-- **The hypothesis on 169** (`ValidAccountId::deserialize`), for the reader `dv`, the cost
 `K169 j` at the index `j`: wherever `dv` reads an account id `a` from `j`, leaving `r`, 169 called
 at `j` returns `Ok(String)` holding `a` (`strRes`), the reader at `|bs| - |r|`. Its stack is 256
-bytes. -/
+bytes. The heap's free list has at most `Fb` cells: 169 allocates the `String`, and the allocator's walk
+is linear in the free list (`AllocWalk.walkCost`), so no cost independent of it can bound 169. The heap
+has room for a page more than an error box needs (`roomS mlen maxP`): the `String`
+may take a page, and an error box still fits after it. -/
 def Hyp169 {GF : BundledGFunctors} [WasmGS NearState GF] (cfg : WasmConfig) (lim : ExecLimits)
     (inst : Nat) (mi : ModuleInst) (n g ta : Nat) (A : Nat → Nat) (Cg : Nat) (gt : GlobalType)
     (de ptr idx : UInt32) (bs : List UInt8) (maxP : Nat)
-    (dv : List UInt8 → Option (WNear.AccountId × List UInt8)) (K169 : Nat → Nat) (Cd : IProp GF) : Prop :=
+    (dv : List UInt8 → Option (WNear.AccountId × List UInt8)) (K169 : Nat → Nat) (Fb : Nat) (Cd : IProp GF) : Prop :=
   ∀ (d : Nat) (sp out : UInt32) (ob : List UInt8) (j : Nat) (a : WNear.AccountId) (r : List UInt8)
     (mlen F : Nat) (live : List (Nat × Nat)),
     d + 16 < lim.maxCallDepth → ob.length = 16 → out.toNat + 16 ≤ 2 ^ 32 → 256 ≤ sp.toNat →
-    j ≤ bs.length → roomFor4 mlen maxP 20 → dv (bs.drop j) = some (a, r) →
+    j ≤ bs.length → roomS mlen maxP → F ≤ Fb → dv (bs.drop j) = some (a, r) →
     Cd ⊢ MFunSpec (GF := GF) cfg lim d types[14]! inst mi f169 Cg
         (fun args => iprop(⌜args = [.i32 out, .i32 de]⌝ ∗ g ↦[wg] ⟨gt, .i32 sp⟩ ∗
           stk n (sp.toNat - 256) 256 ∗ vt n 1057464 idx ta (A 578) ∗ heapInv n maxP mlen live F ∗
@@ -101,11 +111,12 @@ set_option maxHeartbeats 8000000 in
 /-- `SerdeSeqElem.Spec169` (214's view of 169, its frame at `sp - 16`) from `Hyp169`. -/
 theorem spec169_of_hyp (cfg : WasmConfig) (lim : ExecLimits) (inst : Nat) (mi : ModuleInst) (n g ta : Nat)
     (A : Nat → Nat) (Cg : Nat) (gt : GlobalType) (de ptr idx : UInt32) (bs : List UInt8) (maxP : Nat)
-    (dv : List UInt8 → Option (WNear.AccountId × List UInt8)) (K169 : Nat → Nat) (Cd : IProp GF)
-    [Persistent Cd] (h : Hyp169 cfg lim inst mi n g ta A Cg gt de ptr idx bs maxP dv K169 Cd)
+    (dv : List UInt8 → Option (WNear.AccountId × List UInt8)) (K169 : Nat → Nat) (Fb : Nat) (Cd : IProp GF)
+    [Persistent Cd] (h : Hyp169 cfg lim inst mi n g ta A Cg gt de ptr idx bs maxP dv K169 Fb Cd)
     (d : Nat) (hd : d + 16 < lim.maxCallDepth) (sp : UInt32) (ob : List UInt8) (hob : ob.length = 16)
     (hsp : 272 ≤ sp.toNat) (j : Nat) (a : WNear.AccountId) (r : List UInt8) (hj : j ≤ bs.length)
-    (mlen F : Nat) (live : List (Nat × Nat)) (hr : roomFor4 mlen maxP 20) (hdv : dv (bs.drop j) = some (a, r)) :
+    (mlen F : Nat) (live : List (Nat × Nat)) (hr : roomS mlen maxP) (hF : F ≤ Fb)
+    (hdv : dv (bs.drop j) = some (a, r)) :
     Cd ⊢ Spec169 cfg lim d inst mi n g Cg gt sp de ptr ob bs j
       iprop(stk n (sp.toNat - 272) 256 ∗ vt n 1057464 idx ta (A 578) ∗ heapInv n maxP mlen live F ∗ tbl n de)
       (K169 j)
@@ -115,7 +126,7 @@ theorem spec169_of_hyp (cfg : WasmConfig) (lim : ExecLimits) (inst : Nat) (mi : 
   have hlt := sp.toNat_lt
   have h16 : (sp - 16).toNat = sp.toNat - 16 := by
     rw [UInt32.toNat_sub_of_le] <;> simp [UInt32.le_iff_toNat_le]; omega
-  have s := h d (sp - 16) (sp - 16) ob j a r mlen F live hd hob (by omega) (by omega) hj hr hdv
+  have s := h d (sp - 16) (sp - 16) ob j a r mlen F live hd hob (by omega) (by omega) hj hr hF hdv
   rw [show (sp - 16).toNat - 256 = sp.toNat - 272 by omega] at s
   iintro #HC
   ihave #S := s $$ HC
@@ -231,9 +242,9 @@ theorem f228_arr (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
     (gt : GlobalType) (sp out de ptr idx x2 x3 x4 x5 : UInt32) (ob bs : List UInt8) (i : Nat)
     (maxP mlen F : Nat) (live : List (Nat × Nat)) (hob : ob.length = 16) (hout : out.toNat + 16 ≤ 2 ^ 32)
     (hlen : bs.length + 1 < 2 ^ 28) (hptr : ptr.toNat + bs.length < 2 ^ 32) (hde : de.toNat + 25 ≤ 2 ^ 32)
-    (hsp : 336 ≤ sp.toNat) (hi : i ≤ bs.length) (hr : roomFor4 mlen maxP 20)
-    (dv : List UInt8 → Option (WNear.AccountId × List UInt8)) (K169 : Nat → Nat) (Cd : IProp GF)
-    [Persistent Cd] (h169 : Hyp169 cfg lim inst mi n g ta A Cg gt de ptr idx bs maxP dv K169 Cd)
+    (hsp : 336 ≤ sp.toNat) (hi : i ≤ bs.length) (hr : roomS mlen maxP)
+    (dv : List UInt8 → Option (WNear.AccountId × List UInt8)) (K169 : Nat → Nat) (Fb : Nat) (Cd : IProp GF)
+    [Persistent Cd] (h169 : Hyp169 cfg lim inst mi n g ta A Cg gt de ptr idx bs maxP dv K169 Fb Cd) (hF : F ≤ Fb)
     (a : WNear.AccountId) (r : List UInt8) (hok : arrOk dv bs i a r) :
     endCode n maxP inst mi A ∗ A 214 ↪[wf] FuncInst.wasm types[14]! inst f214 ∗
       A 169 ↪[wf] FuncInst.wasm types[14]! inst f169 ∗ A 91 ↪[wf] FuncInst.wasm types[32]! inst f91 ∗ Cd ⊢
@@ -330,8 +341,8 @@ theorem f228_arr (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTyp
         vt n 1057464 idx ta (A 578) ∗ tbl n de ∗ strRes n maxP live a p c ∗ rd n de ptr bs (bs.length - r.length)))
   rw [hO8, hA40, hw2, hj2, hj3, h80,
     show (sp - 64).toNat + 40 + 4 = (sp - 64).toNat + 44 by omega] at s214
-  have sp169 := spec169_of_hyp (GF := GF) cfg lim inst mi n g ta A Cg gt de ptr idx bs maxP dv K169 Cd h169 (d + 2)
-    (by omega) (sp - 64) ob1 hob1 (by omega) j2 a r (by omega) mlen F live hr hdv
+  have sp169 := spec169_of_hyp (GF := GF) cfg lim inst mi n g ta A Cg gt de ptr idx bs maxP dv K169 Fb Cd h169 (d + 2)
+    (by omega) (sp - 64) ob1 hob1 (by omega) j2 a r (by omega) mlen F live hr hF hdv
   rw [hK, hj3] at sp169
   ihave #Sp169 := sp169 $$ HCd
   clear sp169

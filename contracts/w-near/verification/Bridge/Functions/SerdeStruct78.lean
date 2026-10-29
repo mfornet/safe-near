@@ -21,7 +21,7 @@ open WNear.Binary.Interface (IfaceMod)
 open WNear.Binary.VecFromElem (stk)
 open WNear.Binary.SerdeRead (rd wsLen)
 open WNear.Binary.SerdeErrBox (roomFor4)
-open WNear.Binary.SerdeStructArr (strRes tbl Hyp169 arrOk costArr)
+open WNear.Binary.SerdeStructArr (strRes tbl Hyp169 roomS arrOk costArr)
 open WNear.Binary.SerdeStructObj (Hyp646 Hyp81 costObj)
 open NearInterface.Json
 
@@ -101,12 +101,12 @@ theorem structDe_cases {dv : List UInt8 → Option (WNear.AccountId × List UInt
       · intro r' e; rw [hs] at e; exact ho (SerdeStructLoop.drop_cons e).1
       · intro r' e; rw [hs] at e; exact ha (SerdeStructLoop.drop_cons e).1
 
-/-- The cost of the struct: the object form's or the array form's, whichever the input is in (both
-counted, a bound). -/
+/-- The cost of the struct: the object form's when the input starts with `{` after the whitespace, else
+the array form's. -/
 def costS (cfg : WasmConfig) (K646 K169 K81 : Nat → Nat)
     (dv : List UInt8 → Option (WNear.AccountId × List UInt8)) (ign : List UInt8 → Option (Unit × List UInt8))
     (bs : List UInt8) : Nat :=
-  costObj cfg K646 K169 K81 dv ign bs (bs.length - (wsLen bs + 1) + 1) 0 +
+  if bs[wsLen bs]? = some 0x7B then costObj cfg K646 K169 K81 dv ign bs (bs.length - (wsLen bs + 1) + 1) 0 else
   match dv (bs.drop (wsLen bs + 1 + wsLen (bs.drop (wsLen bs + 1)))) with
   | some (_, r1) => costArr cfg K169 bs 0 r1
   | none => 0
@@ -125,12 +125,12 @@ theorem f78_acc (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType
     (gt : GlobalType) (sp out de ptr idx : UInt32) (ob bs : List UInt8)
     (maxP mlen F : Nat) (live : List (Nat × Nat)) (hob : ob.length = 16) (hout : out.toNat + 16 ≤ 2 ^ 32)
     (hlen : bs.length + 1 < 2 ^ 28) (hptr : ptr.toNat + bs.length < 2 ^ 32) (hde : de.toNat + 25 ≤ 2 ^ 32)
-    (hsp : 336 ≤ sp.toNat) (hal : sp.toNat % 8 = 0) (hr : roomFor4 mlen maxP 20)
+    (hsp : 336 ≤ sp.toNat) (hal : sp.toNat % 8 = 0) (hr : roomS mlen maxP)
     (dv : List UInt8 → Option (WNear.AccountId × List UInt8)) (ign : List UInt8 → Option (Unit × List UInt8))
-    (K646 K169 K81 : Nat → Nat) (Cd : IProp GF) [Persistent Cd]
+    (K646 K169 K81 : Nat → Nat) (Fb : Nat) (Cd : IProp GF) [Persistent Cd]
     (h646 : Hyp646 cfg lim inst mi n g ta A Cg gt de ptr idx bs maxP K646 Cd)
-    (h169 : Hyp169 cfg lim inst mi n g ta A Cg gt de ptr idx bs maxP dv K169 Cd)
-    (h81 : Hyp81 cfg lim inst mi n g ta A Cg gt de ptr idx bs maxP ign K81 Cd)
+    (h169 : Hyp169 cfg lim inst mi n g ta A Cg gt de ptr idx bs maxP dv K169 Fb Cd)
+    (h81 : Hyp81 cfg lim inst mi n g ta A Cg gt de ptr idx bs maxP ign K81 Cd) (hF : F ≤ Fb)
     (hdv0 : dv [] = none)
     (hdvs : ∀ j a r, j ≤ bs.length → dv (bs.drop j) = some (a, r) → bs.drop (bs.length - r.length) = r)
     (higns : ∀ j r, j ≤ bs.length → ign (bs.drop j) = some ((), r) → bs.drop (bs.length - r.length) = r)
@@ -180,9 +180,10 @@ theorem f78_acc (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType
   rcases structDe_cases h hdv0 hdvs with ⟨ho, hl⟩ | ⟨r1, hok, hrr⟩
   · have s := SerdeStructObj.f228_obj (GF := GF) cfg lim (d + 1) types[36]! (by rfl) inst mi A n g ta hm (by omega) Cg
       gt sp out de ptr idx out out out out ob bs 0 maxP mlen F live hob hout hlen hptr hde hsp hal (by omega) hr dv ign
-      K646 K169 K81 Cd h646 h169 h81 hdvs higns hstrs (bs.length - (wsLen bs + 1) + 1) a r (by simpa using ho)
+      K646 K169 K81 Fb Cd h646 h169 h81 hF hdvs higns hstrs (bs.length - (wsLen bs + 1) + 1) a r (by simpa using ho)
       (by simpa using hl)
     try simp only [List.drop_zero, Nat.zero_add] at s
+    rw [if_pos ho]
     generalize hC : costObj cfg K646 K169 K81 dv ign bs (bs.length - (wsLen bs + 1) + 1) 0 = C at s ⊢
     ihave #S := s $$ [H193c F205 F201 F193 F89 F90 F81 F169 F77 HCd]
     · iframe H193c F205 F201 F193 F89 F90 F81 F169 F77 HCd
@@ -203,8 +204,10 @@ theorem f78_acc (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType
     ipureintro; simp [htype]
   · have s := SerdeStructArr.f228_arr (GF := GF) cfg lim (d + 1) types[36]! (by rfl) inst mi A n g ta hm (by omega) Cg
       gt sp out de ptr idx out out out out ob bs 0 maxP mlen F live hob hout hlen hptr hde hsp (by omega) hr dv
-      K169 Cd h169 a r1 hok
-    obtain ⟨-, -, hdv, hb4⟩ := hok
+      K169 Fb Cd h169 hF a r1 hok
+    obtain ⟨hb0, -, hdv, hb4⟩ := hok
+    simp only [List.drop_zero, Nat.zero_add] at hb0
+    rw [if_neg (by rw [hb0]; decide)]
     simp only [List.drop_zero, Nat.zero_add] at hdv
     have hrl : bs.length - r1.length + wsLen (bs.drop (bs.length - r1.length)) + 1 = bs.length - r.length := by
       have := SerdeNextKey.getElem_lt hb4

@@ -1,9 +1,10 @@
 import Bridge.Functions.ArgsLeaves
+import Bridge.Functions.SerdeFromTrait
 import Bridge.Methods.Code296
 import Bridge.Methods.BalanceOfArgs
 
 /-!
-# The contract of `ft_balance_of`'s argument parser (M6): the statement
+# The contracts of `ft_balance_of`'s argument parser (M6)
 
 `ft_balance_of` (297) reads its arguments with
 `serde_json::from_slice::<{ account_id: ValidAccountId }>` (65), which builds a
@@ -20,46 +21,42 @@ Ok(v)  → end(sp + 48)                     ;; 320: only whitespace left, else E
 drop the scratch Vec                      ;; 68
 ```
 
-The functions below 78 are serde_json 1.0.60's reader and serde's derived visitor for the
-struct (keys, unknown fields skipped by `ignore_value`, duplicates rejected), near-sdk's
-`ValidAccountId` (a `String`, then `is_valid_account_id`), and the error paths (`Error`
-boxes formatted with `core::fmt`): about 14 000 instructions. They allocate and free through
-wee_alloc, whose specifications so far cover free lists of at most two cells
-(`AllocTwoHeap`).
+`Refines` asks two different things of the parser, so its contract has two halves.
 
-This file states, without proving it, what 66 does, as one Lean proposition
-`FromTraitContract`; and proves what it gives at 65's call site (`f65_contract`).
+* **Accepting (`AcceptContract`).** When `Call.decode "ft_balance_of" bs = some (.ftBalanceOf a)`,
+  66 returns `Ok(a)` (`okAt`) within `K0 + K1 · len` `regular_op_cost`s plus a constant `X` (the
+  allocation of the account's `String`, which the allocator charges partly in other units). The
+  cost is tight: the method's gas bound pays for it.
+* **Rejecting (`RejectContract`).** When `Call.decode … = none`, 66 returns `Err(box)` (`errAt`), at
+  *some* finite cost. `Refines` needs only that a rejected input fails with no effects, and a run that
+  runs out of gas fails too (`method_vm_any`), so no bound is asked. Stated, not proved.
 
-## `FromTraitContract`
+Both run on the instantiated module (`wInst`, function `k` at address `k`) from the code of the whole
+binary, the instance and the memory limit (`codeCtx`), with a stack of `S` bytes below `sp`, the
+input `bs` at `ptr` (`ptr + len < 2^32`, `len + 1 < 2^28`), the read-only data the parser reads
+(`roData`: the `ESCAPE` table at 1062392, the UTF-8 width table at 1071704, the field name at
+1051092, given back), and a heap `heapInv 0 2048 hl live F` with room for an error box's page
+(`roomFor4 hl 2048 20`; the accepting half asks `SerdeStructArr.roomS hl 2048`, a page more for the
+account's `String`).
 
-On the instantiated module (`wInst`, function `k` at address `k`), from the code of the whole
-binary (`funcCells`), for every input `bs` (the slice at `ptr`, `len = bs.length`), a stack
-of `S` bytes below `sp`, and a heap `heapInv 0 2048 hl live F` with room for `R · (len + 1)`
-more bytes:
+`acceptContract` proves the accepting half from `SerdeFromTrait.f66_dec`, for any callees that satisfy
+`AcceptCallees`: readers `dv` (169) and `ign` (81) that agree with the model, the specifications of
+the functions not proved yet (`Hyp646` on keys, `Hyp169`, `Hyp81`, at 66's `Deserializer`,
+`sp - 64`), and the cost bound `cost66 ≤ (K0 + K1 · len) · c + X`. `SerdeCost` derives that bound
+from linear bounds on the callees' costs. `f65_accept` and `f65_reject` carry both halves to 65's call
+site.
 
-* **Accepting:** `Call.decode "ft_balance_of" bs = some (.ftBalanceOf a)` ⇒ `out` holds
-  `Ok`: the tag word 0 and the `String` `(p, cap, a.len)`, `p ↦ a`'s UTF-8 bytes (and
-  `cap - a.len` more bytes), a block the heap lends (`(p, cap) :: live`).
-* **Rejecting:** `Call.decode "ft_balance_of" bs = none` ⇒ `out` holds `Err`: the tag word
-  1 and the error box.
-* Either way it returns normally (no trap), leaves the input, the stack and the host as they
-  were, and costs at most `K0 + K1 · len` `regular_op_cost`s.
-
-Every `Call.decode "ft_balance_of"` result is `none` or some `ftBalanceOf a`
-(`decode_shape`), so the two cases are exhaustive. That is the binary's side of `Parses` for
-this method in both directions: the binary accepts exactly what the model accepts, with the
-model's account, and rejects the rest before any effect (the method has none before the
-parse: `env::input` only sets a register).
+Every `Call.decode "ft_balance_of"` result is `none` or some `ftBalanceOf a` (`decode_shape`), so the
+two halves are exhaustive.
 
 What `ftBalanceOf_refines_all` needs from it (`notes/todo/wnear_refinement_proof.md`, M6):
 
 * `S` within the 1 MiB shadow stack below 297's frame (297 itself takes 160 bytes);
 * `K1 · regular_op_cost ≤ argumentByteGas` less the other per-byte costs of the input (the
-  `read_register` byte charges and 523's `vec![0; len]`), i.e. `K1 ≤ 480` under `CostsV86`,
-  and `K0` within the method's share of `computeGas`;
+  `read_register` byte charges and 523's `vec![0; len]`), i.e. `K1 ≲ 480` under `CostsV86`, and `K0`
+  and `X` within the method's share of `computeGas`;
 * the heap room, from the memory limit and the input's register limit (`LimitsV86`);
-* the allocator on any free list, for the code after the parse (`LookupMap::get`, the
-  drops), since the parser leaves `F'` free cells.
+* the allocator on any free list, for the code after the parse (`LookupMap::get`, the drops).
 
 `balanceOf_accepting_input` (`BalanceOfArgs.decode_balanceOfArgs`) gives the accepting case's
 premise on the canonical input `{"account_id":"<a>"}`.
@@ -73,6 +70,11 @@ open WNear.Binary.AllocFirstFit (vt)
 open WNear.Binary.AllocInv (heapInv block)
 open WNear.Binary.ArgsLeaves (sliceRead f65_of_66)
 open WNear.Binary.InitialState (funcCells)
+open WNear.Binary.SerdeErrBox (roomFor4)
+open WNear.Binary.SerdeStructArr (strRes Hyp169)
+open WNear.Binary.SerdeStructObj (Hyp646 Hyp81)
+open WNear.Binary.SerdeFromTrait (code66 cost66 f66_dec)
+open WNear.SerdeStructModel (Agrees valueAs valueSkip)
 
 /-- `Call.decode` of `ft_balance_of`'s arguments is a balance query or nothing. -/
 theorem decode_shape (bs : List UInt8) (c : WNear.Call) (h : WNear.Call.decode "ft_balance_of" bs = some c) :
@@ -99,97 +101,112 @@ section Statement
 
 variable {GF : BundledGFunctors} [WasmGS NearState GF]
 
-/-- `Result<Args, serde_json::Error>` at `out` for the input `bs`, the heap after: `Ok` with
-the account's bytes in a lent block, or `Err` with the error box; the heap `heapInv` of
-the blocks lent before (`live`) and these. -/
-def resultAt (n : Nat) (out : UInt32) (bs : List UInt8) (live : List (Nat × Nat)) : IProp GF :=
-  match WNear.Call.decode "ft_balance_of" bs with
-  | some (.ftBalanceOf a) =>
-    iprop(∃ (p cap : UInt32) (hl' F' : Nat), ⌜p ≠ 0 ∧ a.val.utf8ByteSize ≤ cap.toNat⌝ ∗
-      n ↦[i32][ out.toNat ] 0 ∗ n ↦[i32][ out.toNat + 4 ] p ∗ n ↦[i32][ out.toNat + 8 ] cap ∗
-      n ↦[i32][ out.toNat + 12 ] UInt32.ofNat a.val.utf8ByteSize ∗
-      n ↦[wms][ p.toNat ] a.val.toUTF8.toList ∗
-      block n (p.toNat + a.val.utf8ByteSize) (cap.toNat - a.val.utf8ByteSize) ∗
-      heapInv n 2048 hl' ((p.toNat, cap.toNat) :: live) F')
-  | _ =>
-    iprop(∃ (e : UInt32) (bs8 : List UInt8) (live' : List (Nat × Nat)) (hl' F' : Nat),
-      ⌜bs8.length = 8 ∧ live.Sublist live'⌝ ∗
-      n ↦[i32][ out.toNat ] 1 ∗ n ↦[i32][ out.toNat + 4 ] e ∗ n ↦[wms][ out.toNat + 8 ] bs8 ∗
-      heapInv n 2048 hl' live' F')
+/-- The persistent context of the parser: the binary's code, the instance and the memory limit. -/
+noncomputable def codeCtx (cfg : RuntimeConfig) (h0 : NearState) : IProp GF :=
+  iprop(([∗list] p ∈ funcCells cfg h0, p.1 ↦ₛ□ p.2) ∗ (0 ↪[inst] wInst) ∗ 0 ↪[wmlimit] some 2048)
 
-/-- **The contract of `from_trait` (66) for `ft_balance_of`'s arguments**, with the stack
-bound `S`, the cost `K0 + K1 · len` and the heap room `R · (len + 1)`. Stated, not proved:
-see the module docstring. -/
-def FromTraitContract (S K0 K1 R : Nat) : Prop :=
+instance (cfg : RuntimeConfig) (h0 : NearState) : Persistent (codeCtx (GF := GF) cfg h0) := by
+  unfold codeCtx; infer_instance
+
+/-- The read-only data the parser reads: the `ESCAPE` table, the UTF-8 width table, the field name. -/
+def roData (n : Nat) : IProp GF :=
+  iprop(n ↦[wms][ 1062392 ] WNear.Binary.ParseStr.escTable ∗ n ↦[wms][ 1071704 ] WNear.Binary.FromUtf8Gen.utf8Width ∗
+    n ↦[wms][ 1051092 ] WNear.BalanceOfArgs.keyBytes)
+
+/-- `Ok(a)` at `out`: the tag word 0 and the `String` `(p, cap, |a|)`, `p ↦ a`'s UTF-8 bytes and
+`cap - |a|` more bytes, a block the heap lends (`(p, cap) :: live`). -/
+def okAt (n : Nat) (out : UInt32) (a : WNear.AccountId) (live : List (Nat × Nat)) : IProp GF :=
+  iprop(∃ (p cap : UInt32) (hl' F' : Nat), ⌜p ≠ 0 ∧ a.val.utf8ByteSize ≤ cap.toNat⌝ ∗
+    n ↦[i32][ out.toNat ] 0 ∗ n ↦[i32][ out.toNat + 4 ] p ∗ n ↦[i32][ out.toNat + 8 ] cap ∗
+    n ↦[i32][ out.toNat + 12 ] UInt32.ofNat a.val.utf8ByteSize ∗
+    n ↦[wms][ p.toNat ] a.val.toUTF8.toList ∗
+    block n (p.toNat + a.val.utf8ByteSize) (cap.toNat - a.val.utf8ByteSize) ∗
+    heapInv n 2048 hl' ((p.toNat, cap.toNat) :: live) F')
+
+/-- `Err(e)` at `out`: the tag word 1 and the error box `e`, the heap lending at least `live`. -/
+def errAt (n : Nat) (out : UInt32) (live : List (Nat × Nat)) : IProp GF :=
+  iprop(∃ (e : UInt32) (bs8 : List UInt8) (live' : List (Nat × Nat)) (hl' F' : Nat),
+    ⌜bs8.length = 8 ∧ live.Sublist live'⌝ ∗
+    n ↦[i32][ out.toNat ] 1 ∗ n ↦[i32][ out.toNat + 4 ] e ∗ n ↦[wms][ out.toNat + 8 ] bs8 ∗
+    heapInv n 2048 hl' live' F')
+
+/-- 66's precondition: `sp`, `out`, the `SliceRead` at `rd` over `bs` at `ptr`, a stack of `S` bytes. -/
+def pre66 (S : Nat) (gt : GlobalType) (sp out rd ptr idx : UInt32) (bs ob : List UInt8) (hl F : Nat)
+    (live : List (Nat × Nat)) (args : List Value) : IProp GF :=
+  iprop(⌜args = [.i32 out, .i32 rd]⌝ ∗ 0 ↦[wg] ⟨gt, .i32 sp⟩ ∗
+    sliceRead 0 rd ptr (UInt32.ofNat bs.length) 0 ∗ (stk 0 (sp.toNat - S) S ∗
+    0 ↦[wms][ out.toNat ] ob ∗ 0 ↦[wms][ ptr.toNat ] bs ∗ roData 0 ∗
+    vt 0 1057464 idx 0 578 ∗ heapInv 0 2048 hl live F))
+
+/-- 66's postcondition, with the result `res` at `out`. -/
+def post66 (S : Nat) (gt : GlobalType) (sp rd ptr idx : UInt32) (bs : List UInt8) (res : IProp GF)
+    (_args rs : List Value) : IProp GF :=
+  iprop(⌜rs = []⌝ ∗ 0 ↦[wg] ⟨gt, .i32 sp⟩ ∗
+    (∃ a b c : UInt32, sliceRead 0 rd a b c) ∗ (stk 0 (sp.toNat - S) S ∗
+    0 ↦[wms][ ptr.toNat ] bs ∗ roData 0 ∗ vt 0 1057464 idx 0 578 ∗ res))
+
+/-- **The callees of the accepting path that are not proved yet**, at 66's `Deserializer` `de`
+over `bs`: readers `dv` (169) and `ign` (81) that agree with the model; the specifications `Hyp646`
+(keys), `Hyp169` (the account id) and `Hyp81` (ignored values), with the costs `K646`, `K169`,
+`K81` (169's for a free list of at most `F` cells, the heap's at the entry); and 66's cost under them within `(K0 + K1 · len) · c + X`. -/
+def AcceptCallees (cfg : RuntimeConfig) (h0 : NearState) (lim : ExecLimits) (Cg : Nat) (gt : GlobalType)
+    (de ptr idx : UInt32) (bs : List UInt8) (F K0 K1 X : Nat) : Prop :=
+  ∃ (dv : List UInt8 → Option (WNear.AccountId × List UInt8)) (ign : List UInt8 → Option (Unit × List UInt8))
+    (K646 K169 K81 : Nat → Nat),
+    Agrees dv (valueAs WNear.account) ∧ Agrees ign valueSkip ∧
+    Hyp646 cfg.wasm lim 0 wInst 0 0 0 id Cg gt de ptr idx bs 2048 K646 (codeCtx (GF := GF) cfg h0) ∧
+    Hyp169 cfg.wasm lim 0 wInst 0 0 0 id Cg gt de ptr idx bs 2048 dv K169 F (codeCtx (GF := GF) cfg h0) ∧
+    Hyp81 cfg.wasm lim 0 wInst 0 0 0 id Cg gt de ptr idx bs 2048 ign K81 (codeCtx (GF := GF) cfg h0) ∧
+    cost66 cfg.wasm K646 K169 K81 dv ign bs ≤ (K0 + K1 * bs.length) * cfg.wasm.regularOpCost + X
+
+/-- **The accepting contract of `from_trait` (66)** for `ft_balance_of`'s arguments: on an input the
+model reads as `ftBalanceOf a`, `Ok(a)` at `out` (`okAt`), within `(K0 + K1 · len) · c + X`, given the
+callees (`AcceptCallees`). -/
+def AcceptContract (S K0 K1 X : Nat) : Prop :=
+  ∀ (cfg : RuntimeConfig) (h0 : NearState) (lim : ExecLimits) (d : Nat), d + 64 < lim.maxCallDepth →
+    ∀ (Cg : Nat) (gt : GlobalType) (sp out rd ptr idx : UInt32) (bs ob : List UInt8) (hl F : Nat)
+      (live : List (Nat × Nat)) (a : WNear.AccountId),
+    S ≤ sp.toNat → sp.toNat % 16 = 0 → ptr.toNat + bs.length < 2 ^ 32 → bs.length + 1 < 2 ^ 28 →
+    out.toNat + 16 ≤ 2 ^ 32 → ob.length = 16 → rd.toNat + 12 ≤ 2 ^ 32 → SerdeStructArr.roomS hl 2048 →
+    WNear.Call.decode "ft_balance_of" bs = some (.ftBalanceOf a) →
+    AcceptCallees (GF := GF) cfg h0 lim Cg gt (sp - 64) ptr idx bs F K0 K1 X →
+    ⊢ (codeCtx (GF := GF) cfg h0 -∗
+      MFunSpec (GF := GF) cfg.wasm lim d types[14]! 0 wInst f66 Cg
+        (pre66 S gt sp out rd ptr idx bs ob hl F live)
+        (fun _ => (K0 + K1 * bs.length) * cfg.wasm.regularOpCost + X)
+        (post66 S gt sp rd ptr idx bs (okAt 0 out a live)))
+
+/-- **The rejecting contract of `from_trait` (66)**: on an input the model rejects, `Err(box)` at
+`out` (`errAt`), at some finite cost. Stated, not proved. -/
+def RejectContract (S : Nat) : Prop :=
   ∀ (cfg : RuntimeConfig) (h0 : NearState) (lim : ExecLimits) (d : Nat), d + 64 < lim.maxCallDepth →
     ∀ (Cg : Nat) (gt : GlobalType) (sp out rd ptr idx : UInt32) (bs ob : List UInt8) (hl F : Nat)
       (live : List (Nat × Nat)),
-    S ≤ sp.toNat → sp.toNat % 16 = 0 → ptr.toNat + bs.length ≤ 2 ^ 32 → bs.length < 2 ^ 28 →
-    out.toNat + 16 ≤ 2 ^ 32 → ob.length = 16 → rd.toNat + 12 ≤ 2 ^ 32 →
-    hl % 65536 = 0 → 0 < hl → hl + R * (bs.length + 1) ≤ 2048 * 65536 →
-    ⊢ ((([∗list] p ∈ funcCells cfg h0, p.1 ↦ₛ□ p.2 : IProp GF)) ∗ (0 ↪[inst] wInst : IProp GF) -∗
+    S ≤ sp.toNat → sp.toNat % 16 = 0 → ptr.toNat + bs.length < 2 ^ 32 → bs.length + 1 < 2 ^ 28 →
+    out.toNat + 16 ≤ 2 ^ 32 → ob.length = 16 → rd.toNat + 12 ≤ 2 ^ 32 → roomFor4 hl 2048 20 →
+    WNear.Call.decode "ft_balance_of" bs = none →
+    ∃ K : Nat, ⊢ (codeCtx (GF := GF) cfg h0 -∗
       MFunSpec (GF := GF) cfg.wasm lim d types[14]! 0 wInst f66 Cg
-        (fun args => iprop(⌜args = [.i32 out, .i32 rd]⌝ ∗ 0 ↦[wg] ⟨gt, .i32 sp⟩ ∗
-          sliceRead 0 rd ptr (UInt32.ofNat bs.length) 0 ∗ stk 0 (sp.toNat - S) S ∗
-          0 ↦[wms][ out.toNat ] ob ∗ 0 ↦[wms][ ptr.toNat ] bs ∗
-          vt 0 1057464 idx 0 578 ∗ heapInv 0 2048 hl live F))
-        (fun _ => K0 * cfg.wasm.regularOpCost + K1 * cfg.wasm.regularOpCost * bs.length)
-        (fun _ rs => iprop(⌜rs = []⌝ ∗ 0 ↦[wg] ⟨gt, .i32 sp⟩ ∗
-          (∃ a b c : UInt32, sliceRead 0 rd a b c) ∗ stk 0 (sp.toNat - S) S ∗
-          0 ↦[wms][ ptr.toNat ] bs ∗ vt 0 1057464 idx 0 578 ∗ resultAt 0 out bs live)))
+        (pre66 S gt sp out rd ptr idx bs ob hl F live)
+        (fun _ => K)
+        (post66 S gt sp rd ptr idx bs (errAt 0 out live)))
 
-/-- **`serde_json::from_slice` (65) for `ft_balance_of`, from `FromTraitContract`**: the
-same result at `out`, with 16 more bytes of stack (its `SliceRead`) and 45 more
-`regular_op_cost`s. -/
-theorem f65_contract (S K0 K1 R : Nat) (hc : FromTraitContract (GF := GF) S K0 K1 R)
-    (cfg : RuntimeConfig) (h0 : NearState) (lim : ExecLimits) (d : Nat) (hd : d + 65 < lim.maxCallDepth)
-    (Cg : Nat) (gt : GlobalType) (sp out ptr idx : UInt32) (bs ob : List UInt8) (hl F : Nat)
-    (live : List (Nat × Nat)) (hS : S + 16 ≤ sp.toNat) (hal : sp.toNat % 16 = 0)
-    (hptr : ptr.toNat + bs.length ≤ 2 ^ 32) (hlen : bs.length < 2 ^ 28) (hout : out.toNat + 16 ≤ 2 ^ 32)
-    (hob : ob.length = 16) (hl0 : hl % 65536 = 0) (hlpos : 0 < hl)
-    (hroom : hl + R * (bs.length + 1) ≤ 2048 * 65536) :
-    ([∗list] p ∈ funcCells cfg h0, p.1 ↦ₛ□ p.2) ∗ (0 ↪[inst] wInst : IProp GF) ⊢
-      MFunSpec (GF := GF) cfg.wasm lim d types[31]! 0 wInst f65 Cg
-        (fun args => iprop(⌜args = [.i32 out, .i32 ptr, .i32 (UInt32.ofNat bs.length)]⌝ ∗
-          0 ↦[wg] ⟨gt, .i32 sp⟩ ∗ stk 0 (sp.toNat - 16) 16 ∗
-          (stk 0 (sp.toNat - 16 - S) S ∗ 0 ↦[wms][ out.toNat ] ob ∗ 0 ↦[wms][ ptr.toNat ] bs ∗
-            vt 0 1057464 idx 0 578 ∗ heapInv 0 2048 hl live F)))
-        (fun _ => 45 * cfg.wasm.regularOpCost +
-          (K0 * cfg.wasm.regularOpCost + K1 * cfg.wasm.regularOpCost * bs.length))
-        (fun _ rs => iprop(⌜rs = []⌝ ∗ 0 ↦[wg] ⟨gt, .i32 sp⟩ ∗ stk 0 (sp.toNat - 16) 16 ∗
-          (stk 0 (sp.toNat - 16 - S) S ∗ 0 ↦[wms][ ptr.toNat ] bs ∗ vt 0 1057464 idx 0 578 ∗
-            resultAt 0 out bs live))) := by
-  iintro #HF
-  icases HF with ⟨#HF, #Hi⟩
-  have hlt := sp.toNat_lt
-  have h16 : (sp - 16).toNat = sp.toNat - 16 := by
-    rw [UInt32.toNat_sub_of_le] <;> simp [UInt32.le_iff_toNat_le]; omega
-  have hS' : S ≤ (sp - 16).toNat := by omega
-  have hal' : (sp - 16).toNat % 16 = 0 := by omega
-  have s66 := hc cfg h0 lim (d + 1) (by omega) Cg gt (sp - 16) out (sp - 16) ptr idx bs ob hl F live hS' hal'
-    hptr hlen hout hob (by omega) hl0 hlpos hroom
-  rw [h16] at s66
-  ihave #S66 := s66 $$ [HF Hi]
-  · iframe HF Hi
-  ihave #F66 : (66 ↪[wf] FuncInst.wasm types[14]! 0 f66 : IProp GF) $$ []
-  · iapply InitialState.wasmLeaf cfg h0 66 _ _ (by decide) (by decide) (by kernel_rfl) (by rfl)
-    iexact HF
-  ihave #F644 : (644 ↪[wf] FuncInst.wasm types[31]! 0 f644 : IProp GF) $$ []
-  · iapply InitialState.wasmLeaf cfg h0 644 _ _ (by decide) (by decide) (by kernel_rfl) (by rfl)
-    iexact HF
-  have r := f65_of_66 (GF := GF) cfg.wasm lim d types[31]! (by rfl) 0 wInst 0 0
-    (Interface.wInst_ifaceMod.mem) (Interface.wInst_ifaceMod.glob) 66 644
-    (Interface.wInst_ifaceMod.funcs 66 (by decide)) (Interface.wInst_ifaceMod.funcs 644 (by decide))
-    (by omega) Cg gt sp out ptr (UInt32.ofNat bs.length) (by omega)
-    iprop(stk 0 ((sp - 16).toNat - S) S ∗ 0 ↦[wms][ out.toNat ] ob ∗ 0 ↦[wms][ ptr.toNat ] bs ∗
-      vt 0 1057464 idx 0 578 ∗ heapInv 0 2048 hl live F)
-    (K0 * cfg.wasm.regularOpCost + K1 * cfg.wasm.regularOpCost * bs.length)
-    (fun _ => iprop(stk 0 ((sp - 16).toNat - S) S ∗ 0 ↦[wms][ ptr.toNat ] bs ∗ vt 0 1057464 idx 0 578 ∗
-      resultAt 0 out bs live))
-  rw [h16] at r
-  iapply r
-  iframe F644 F66 Hi
-  iexact S66
+open WNear.Binary.InitialState in
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 16000000 in
+/-- The code 66 runs on its accepting path, from the store's function cells. -/
+theorem code66_of (cfg : RuntimeConfig) (h : NearState) :
+    codeCtx (GF := GF) cfg h ⊢ code66 0 2048 0 wInst id := by
+  iintro #Hctx
+  iunfold codeCtx at Hctx
+  icases Hctx with ⟨#HF, #Hi, #Hm⟩
+  simp only [code66, SerdeNextKey.code193, SerdeEnds.endCode, SerdeErrBox.errCode, AllocTwo.code310, id]
+  repeat' (first
+    | iexact Hi
+    | iexact Hm
+    | (iapply wasmLeaf cfg h _ _ _ ?_ ?_ ?_ ?_ <;> first | iexact HF | decide | kernel_rfl | rfl)
+    | isplitl [])
+
 
 end Statement
 

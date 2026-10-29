@@ -512,9 +512,11 @@ the trampoline 246; `EnvInput.lean`), the prologue's leaves `Option::expect` (15
 `SliceRead::new` (644), `Deserializer::new` (634), and `from_slice` (65) from any
 specification of `from_trait` (66) (`ArgsLeaves.lean`); on the model's side, the canonical
 input `{"account_id":"<a>"}` decodes to `ftBalanceOf a` (`BalanceOfArgs.lean`). Stated, not
-proved: the parser's contract in both directions, `FromSliceSpec.FromTraitContract` (66
-against `Call.decode`, stack `S`, cost `K0 + K1·len`, heap room), with `f65_contract` at
-297's call site. Below 66 are 78/228 and about 200 functions (14 000 instructions), which
+proved: the rejecting half of the parser's contract, `FromSliceSpec.RejectContract`; the accepting
+half, `AcceptContract` (66 against `Call.decode`, cost `(K0 + K1·len)·c + X`), is proved
+(`acceptContract`, `f65_accept`) from the callees not proved yet (`AcceptCallees`: 169, 81, and 646
+on keys with escapes); on an input without `\`, only 81 is left (`FromSliceNoEsc.acceptContract_noesc81`,
+eighth round). Below 66 are 78/228 and about 200 functions (14 000 instructions), which
 allocate and free: they need the allocator on any free list (M4), as does the rest of 297
 (`LookupMap::get`, 293/415, after the parser's frees).
 
@@ -774,9 +776,9 @@ callees not proved yet as hypotheses:
   `first`, or after `,` (`keyQ first bs i = some q`): 82 clears the scratch, 646 is the hypothesis
   `Spec646` (an `Ok` reference `(p, |kb|)` with `p ↦ kb` lent by a wand), 194 gives
   `fieldOf kb` (0 for `account_id`, 256 otherwise), `first` cleared; cost
-  `(800 + 96·keyWs + cost194)·c + K646`; stack 176. `f646_key_noesc` proves `Spec646` from
-  `ParseStrErr.f646_spec_noesc` for an escape-free accepted key (`rd_lend` lends the key's bytes
-  out of the input).
+  `(572 + 96·keyWs + cost194)·c + K646` (800 before the seventh round); stack 176.
+  `f646_key_noesc` proves `Spec646` from `ParseStrErr.f646_spec_noesc` for an escape-free accepted
+  key (`rd_lend` lends the key's bytes out of the input).
 * `next_element_seed` (214), `SerdeSeqElem.lean`: `f214_first`, the struct's one element with
   `first = 1` and a byte `≠ ]`, 169 as the hypothesis `Spec169`; `Ok(Some(String))` at `out`; cost
   `(300 + 96·w)·c + K169`.
@@ -793,9 +795,10 @@ callees not proved yet as hypotheses:
     then 90 and `Ok(a)`.
   * Hypotheses: `Hyp646` (keys, heap unchanged), `Hyp169`, `Hyp81` (81 at 201's call, heap
     unchanged), and three pure suffix facts (`hdvs`, `higns`, `hstrs`: the readers return a suffix
-    of the input; true of the model, not yet proved here).
-  * Cost `costObj`: `(400 + 96·w)·c`, `objCost` (per member `(1200 + 96·(keyWs + w) + cost194)·c`
-    plus `K646` and `K169`/`K81`; `(300 + 96·w)·c` at the `}`), and `300·c`. Stack 336; `sp` 8-aligned.
+    of the input; proved in the seventh round, `JsonSuffix`, `SerdeFromTrait.reader_facts`).
+  * Cost `costObj`: `(400 + 96·w)·c`, `objCost` (per member `(942 + 96·(keyWs + w) + cost194)·c`,
+    1200 before the seventh round, plus `K646` and `K169`/`K81`; `(300 + 96·w)·c` at the `}`), and
+    `300·c`. Stack 336; `sp` 8-aligned.
 * `key_iff`: the visitor's byte test is the model's key test (through `fromUTF8_toUTF8`).
 * `Input::deserialize` (78), `SerdeStruct78.lean`: `structDe_cases` splits what `structDe` accepts into
   the two forms, and `f78_acc` is 78 on any input `structDe` accepts (`Ok(a)`, the reader past the
@@ -814,37 +817,179 @@ callees not proved yet as hypotheses:
   an accepting contract with these data resources (given back), and a rejecting one with a loose
   cost. Smaller: the proved specs need `ptr + len < 2^32` and `len + 1 < 2^28` (the statement has
   `≤` and `len < 2^28`), and a heap room `R` large enough for `roomFor4` (an error box's page).
+  Restated in the seventh round (`AcceptContract`, `RejectContract`).
 * `K1`: the accepting cost per byte is not bounded yet. `objCost` charges per member a constant
   (about `1550·c`, with `cost194 = 342`) plus `K646` and the value's `K`; a member takes at least
   5 bytes (`"":0,`), so the constant alone is about `310·c` per byte, plus `96` per whitespace byte
   and the string scan (646 about `130` per byte). `K1 ≲ 480` looks reachable for the canonical
-  input but needs the bound proved against `objCost`, and short members are the worst case.
+  input but needs the bound proved against `objCost`, and short members are the worst case. Proved
+  in the seventh round (`SerdeCost`), with a tighter member constant.
 
-*What is left for `FromTraitContract`.*
+*The contract restated, 66, and the cost bound (seventh round).* Proved, no `sorry`:
 
-* 66: 634, 78 (`f78_acc`), 320 (`f320_spec` at the reader past the struct: `endOk`), the drop of the
-  scratch (68 at capacity 0: `DropVec.f68_spec` covers only `c ≠ 0`, so 747/777 at capacity 0 are
-  needed), and the restated contract with the parameters `Hyp646`, `Hyp169`, `Hyp81`; then
-  `f65_contract`. The pure side is ready: `decode_balanceOf` turns `Call.decode` into `fromSlice`,
-  which is `structDe` then `endOk`.
-* The pure suffix lemmas (`stringBody`, `valueR` through `Agrees`) for `hstrs`, `hdvs`, `higns`.
-* The linear bound `costObj`, `costArr` `≤ K0 + K1·len` from linear bounds on `K646`, `K169`, `K81`.
-* The rejecting half: 340, 165, 166, 177, 326, 92 and the error paths of 193/214/228, with a loose
-  cost.
-* 81's Wasm proof, against `IgnoreModel`'s equations, with 83/86/87 (numbers), 323 (literals) and
-  650/652 (strings without UTF-8); the frame stack (84/85) needs the scratch's growth from capacity
-  0 (the escapes work) or the restriction to no pushed frame. Not started this round.
-* The reject paths 340, 642/643, 693/479/130/387/151.
+* **The contract, split** (`FromSliceSpec.lean`, `FromSliceProof.lean`). `FromTraitContract` is gone.
+  * `AcceptContract S K0 K1 X`: when `Call.decode "ft_balance_of" bs = some (.ftBalanceOf a)`, 66
+    returns `Ok(a)` (`okAt`) within `(K0 + K1 · len) · c + X`. Its premise `AcceptCallees` holds
+    what is not proved yet: readers `dv`, `ign` that agree with the model, `Hyp646`, `Hyp169`,
+    `Hyp81` at 66's `Deserializer` (`sp - 64`), and the bound `cost66 ≤ (K0 + K1·len)·c + X`.
+    `X` is for the account's `String` allocation, which the allocator charges partly in other units
+    (`linearOpBaseCost`, `linearOpUnitCost`) and in the free list's length.
+  * `RejectContract S`: when `Call.decode … = none`, `Err(box)` (`errAt`) at some finite cost
+    (`∃ K`). Stated, not proved. `Refines` needs only that a rejected input fails with no effects,
+    and running out of gas is a failure (`method_vm_any`).
+  * Both premises: the code, the instance and the memory limit (`codeCtx`, persistent); the
+    read-only data (`roData`: `ESCAPE` at 1062392, the UTF-8 width table at 1071704, the field name at
+    1051092), given back; `ptr + len < 2^32`, `len + 1 < 2^28`, `roomFor4 hl 2048 20`; the stack
+    `S = 400` for 66 (416 at 65).
+  * `acceptContract K0 K1 X : AcceptContract 400 K0 K1 X`, from `f66_dec`, with the code from the
+    store (`code66_of`). `f65_accept`, `f65_reject`: either half at 65's call site (`f65_of_spec`,
+    `45·c` more). `acceptCallees_noesc`: on an input with no `\` byte, `Hyp646` is proved
+    (`SerdeKeyNoEsc.hyp646_noesc`, from `f646_key_noesc` at every key; `key_noesc` matches the
+    model's key to the body 646 returns) and the cost bound follows from `SerdeCost`, so
+    `AcceptCallees` needs only `Hyp169`, `Hyp81` and their linear bounds.
+* **66** (`SerdeFromTrait.lean`). `f66_acc`: on `structDe … = some (a, r)` with
+  `skipWhitespace r = []`, 66 (634, 78, 320, 68) returns `Ok(a)` at `(425 + 96·|r|)·c + costS`.
+  `f747_zero`, `f68_zero`: the drop of a `Vec` of capacity 0 frees nothing (the scratch never grows on
+  this path). `f66_dec` takes `Call.decode`'s acceptance instead (`decode_struct`) and discharges the
+  pure facts from `Agrees` (`reader_facts`).
+* **The pure facts** (`JsonSuffix.lean`): `skipWhitespace`, `stringBody` (with `hex4`,
+  `unicodeEscape`), `number`, `value`/`elements`/`members`, `valueR`, `keyAt`, `colonAt`, `objLoop`
+  and `structDe` return a suffix of their input (`drop_suf`: so `bs.drop (|bs| - |r|) = r`); a reader
+  that agrees with the model returns a suffix (`agrees_suf`), reads nothing from `[]` (`agrees_nil`)
+  and at least one byte (`agrees_strict`, from `value_strict`, `number_strict`).
+* **The linear bound** (`SerdeCost.lean`). `Lin646 a b`, `Lin169 a b x`, `Lin81 a b`: a callee's cost
+  is at most `a + b` per byte it reads (`+ x` for 169). `objCost_le`, by induction over the members:
+  a member reads at least five bytes (the opening quote, its key's closing quote, the colon, a byte of
+  its value, the comma or the `{`), so the loop costs at most `K1` per byte when `96, b646, b169, b81
+  ≤ K1` and `942 + cost194 + a646 + b646 + a + b ≤ 5·K1` for `a, b` of 169 and of 81 (`hM169`,
+  `hM81`). `cost66_le`: then `cost66 ≤ (1725 + a169 + K1·len)·c + x`. 169's fixed cost can go into
+  `x` (`a169 = 0`): the field occurs once.
+* **`costS`** charges only the form the input is in (it charged both the object and the array form,
+  which doubled `K1`: after `{`, a key such as `"account_id"` is itself a valid account id, so `dv`
+  succeeds there).
+* **Tightened**: 193 at a key `800 → 572`, 228's per-member overhead `60 → 30`; the per-member
+  constant of `objCost` is `942` (was `1200`). Lowered until the proof failed (193's checkpoints
+  `mcredits` moved with it). Not tightened: 89/90/320's `200` (shared macros), 646's `330 + 30/byte`
+  and 927's `100 + 100/byte` (another agent's files), `cost194 = 342` (the length-10 compare is
+  charged for every key).
 
-*Plan for the rest of `FromTraitContract`, bottom-up.*
+*Findings of this round.*
+
+* **`Hyp169` could not hold** (statement). It asked one cost `K169 j` for every free-list bound `F`,
+  but 169 allocates the account's `String`, and the allocator's walk is linear in the free list
+  (`AllocWalk.walkCost cfg F = F·320·c + …`). So no `K169` existed, and `AcceptCallees` was
+  unsatisfiable. Fixed: `Hyp169 … Fb` assumes `F ≤ Fb`; 228's loop keeps `F ≤ Fb` in `seenRes`
+  while the field is not read (646 and 81 leave the heap unchanged); 78, 66 and `AcceptCallees` pass
+  the heap's `F` at the entry.
+* **The cost per argument byte.** `argumentByteGas` (400 Mgas) is 486 `regular_op_cost`s (822 756
+  gas) per byte. The input's other per-byte charges take about 13 Mgas of it (whitespace measures
+  92.5 Mgas per byte, of which 339 is at most `96` operations, 79 Mgas), so `K1 ≲ 470`.
+  * Proved side (escape-free keys, `a646 = 300`, `b646 = 130`): `K1 ≥ 130`, `K1 ≥ b81`, `K1 ≥ b169`,
+    and `1714 + a81 + b81 ≤ 5·K1` (`942 + 342 + 300 + 130 = 1714`). At `K1 = 470`: `a81 + b81 ≤ 636`
+    and `b81 ≤ 470`. Before this round's tightening the member constant was `1972` (room `378`), and
+    with a four-byte member (without `valueR_strict`) there was no room at all.
+  * Measured side (`scenarios/27_arguments_cost.json`, `ft_balance_of` at `bound`, ~100 KB of
+    arguments; Mgas per argument byte after the call's fixed 0.37 Tgas): `1,` in an ignored array
+    275.5, `0,` 272, `[`…`]` 50 000 deep 263, `[0],` 262, top-level `"":0,` 248, `0.0,` 220,
+    `"a":0,` 220, `0e0,` 211, `"":[],` 196, `{},` 186, `-0,` 185, `[],` 180, `"":"",` 172, `"":0,`
+    inside an ignored object 169, `"",` 112, `null,` 112, whitespace 92.5. All pass at the model's
+    bound: the worst is 275.5 Mgas (335 operations) per byte against 400. **No discrepancy**: the
+    binary's true cost per byte stays within the model's bound, with a margin of 1.45×.
+  * The proof has little room, though. 81 on a short scalar must be proved within about `636` for
+    `a81 + b81`, and per byte of a long ignored array (the worst case, about 320 operations per byte
+    for real) within `470`: 81's Wasm proof must keep its constants within about 1.4× of the real
+    cost.
+
+*`Hyp169`, and the pieces of 81 (eighth round).* Proved, no `sorry`, standard axioms only:
+
+* **`Hyp169` on an input without `\`** (`SerdeAcctHyp.hyp169_noesc`), for the model's own reader
+  `dv = valueAs account` (so `Agrees` is `rfl`), from `SerdeAccountId.f169_s`. `acct_noesc`: where the
+  model reads an account id at `j`, the input is whitespace, `"`, the plain bytes `keyBody` (the
+  account's UTF-8 bytes, valid, 2..64 of them) and `"` (`valueR_str`, `key_noesc`); so `ok380` holds
+  and `res380`/`heapS` give `strRes` (the block `(p, |a|)`, an empty `block` after it).
+  * **The heap room, restated.** After the `String`'s allocation the memory may have grown a page,
+    and `strRes` asks room for an error box after it. `roomS m maxP := roomFor4 m maxP 20 ∧
+    roomFor4 (m + 65536) maxP 20` (`SerdeStructArr`) is now `Hyp169`'s premise, carried by
+    `seenRes`'s `None` case, `f228_obj`, `f228_arr`, `f78_acc`, `f66_acc`, `f66_dec` and
+    `AcceptContract` (the rejecting contract keeps `roomFor4`). `room_down` gives back `roomFor4`.
+  * Cost `K169 cfg bs Fb j`: 169's at the free-list bound `Fb` (`cost380_mono`). `lin169_noesc`:
+    `Lin169` with `a = 0`, `b = 208` per byte read (`96` per whitespace byte; `30 + 100` for 646 and
+    `from_utf8`, `60` for `is_valid_account_id`, `18` for `memcpy`, other agents' constants) and
+    `x169 cfg Fb = (2656 + 320·Fb)·c + linearOpBaseCost + linearOpUnitCost`.
+* **The contract with only `Hyp81` left** (`FromSliceNoEsc`): `code169_of`, `acceptCallees_noesc81`
+  and `acceptContract_noesc81`: on an input without `\`, the accepting contract's conclusion at
+  `(1725 + K1·len)·c + x169 cfg F`, from `Hyp81` (for a reader that agrees with the model) and
+  `Lin81 a81 b81`, when `208 ≤ K1`, `b81 ≤ K1`, `1714 + a81 + b81 ≤ 5·K1` and `1714 + 208 ≤ 5·K1`
+  (the account id's member: `K1 ≥ 385`).
+* **The scratch in `tbl`.** 81 reads the scratch `Vec`'s pointer and capacity (84, 85), which 66 kept
+  in its own frame. `tbl n de` now also holds `de + 12 ↦ 1` and `de + 16 ↦ 0` (as 634 leaves them);
+  66 splits its `Vec` word into `tbl` before 78 and takes it back for 68.
+* **81's callees** (not 81 itself):
+  * `ignore_str` (650) on an escape-free string (`SerdeIgnStr.f650_noesc`): `0`, the reader past the
+    `"`, at `(56 + 21·m)·c` (`21` is the scan's count, `20` fails); `str_noesc_shape`: the model's
+    `stringBody` accepts exactly there.
+  * The numbers, on the model's side (`SerdeNumModel`): `intR`, `afterInt`, `fracR`, `afterExp`,
+    `expR` are the rests 83/86/87 leave; `vSkip_num`, `vSkip_neg`: wherever `IgnoreModel.vSkip`
+    reads a number (at a digit, or after `-`), `intR` reads it with the same rest. The proof walks
+    `number`'s code piece by piece (`numFE` is its tail verbatim, with its `do` join points; the first
+    digit is split over its ten values so that the literal matches reduce).
+  * `next_char_or_null` (88, `SerdeIgnNum.f88_spec`, `74·c`), `ignore_exponent` (87, `f87_acc`,
+    `(300 + 127·m)·c`, `127` per digit, `125` fails), `ignore_decimal` (86, `f86_acc`,
+    `(465 + 129·m)·c`, with 87's fixed part when there is an exponent).
+  * `spec_extend` with the flag 0 (84, `SerdeIgnFrame.f84_none`, `120·c`) and `pop` on the empty
+    scratch (85, `f85_empty`, `20·c`): what 81 does when no frame is pushed.
+
+*Findings and tooling notes of this round.*
+
+* **A call costs about 12 more** than the callee's own constant (`1` for `call`, the activation
+  `(64 + locals' bytes + 7)/8`), and `peek_or_null` (329) is `65` with its own call of 332. So a digit
+  in 83/86/87 costs `127` (329, 333, the tests and two activations). 83 peeks twice at the end of its
+  integer part (once to test for a digit, once for `.`/`e`), so a one-digit value costs 83 alone about
+  `300`. Estimated for 81 on the one-byte value `0` (prologue and 82, 339's `100`, the dispatch, 83, the
+  pop 85, the epilogue, each call's `~12`): about `600`, within `a81 + b81 ≤ 636` (`K1 = 470`) but
+  with little to spare; a value with a fraction or an exponent carries 86's or 87's fixed part (`465`,
+  `300`) over at least two more bytes. Not proved: the numbers are estimates until 83 and 81 are.
+* `mstep` treats a `br_if` and the pure instructions before it as one branch when it cannot step them
+  separately: with a symbolic byte, step to the `br_if` and give the side condition as a precomputed
+  fact (`mstep_taken with exact h`); a `rw` inside `with` fails with "internal exception #5". After an
+  `mcall`, `mcredits` to a literal multiple of `c` plus atoms; generalize the per-digit product
+  (`127 * (e - k) * c = Z0`) before stepping, or `omega` sees `(127·x + E)·c` as one atom.
+* A callee's cost that is a function application (`cost87 m * c`) must be rewritten to literal
+  multiples of `c` plus atoms before `mcall`, or the call's cost goal fails.
+
+*What is left for the parser's contract.*
+
+* `Hyp169`: done on an input without `\` (eighth round). Left: account ids with escapes (646's escape
+  path), and the invalid account id's error (693/479/130/387/151) for the rejecting half.
+* `Hyp81`: 81's Wasm proof against `IgnoreModel`. Done below it: 650 (escape-free), 86, 87, 88, 84
+  (flag 0), 85 (empty). Left: 83 (`ignore_integer`, against `SerdeNumModel.intR`; its cost must depend
+  on the path, `.`/`e` carrying 86's/87's fixed part, or a one-digit value exceeds `636`), 323
+  (`parse_ident`, which reads the literals `alse`, `rue`, `ull` at 1048576.., not yet in `roData` or
+  `tbl`: add them), 81 itself, and `Lin81`.
+  * The restriction: `Hyp81` asks the heap unchanged, true only when no frame is pushed (at most one
+    bracket deep). `Hyp81` quantifies over every position where the reader succeeds, and the model's
+    skip succeeds on deeper values too, so either generalize `Hyp81` (the scratch's growth from
+    capacity 0 through 716/714, not the escapes agent's 627/631 chain, and a heap that changes across
+    228's loop) or prove 81 for a shallow reader `ign1` (fails on a bracket inside a frame) and state
+    the contract for inputs where serde's machine with `ign1` accepts (`structDe … ign1 bs ≠ none`),
+    with `ign1 ⊆ vSkip` for soundness and `cost66_le` restated from `structDe` instead of `decode`
+    (it uses `Agrees ign valueSkip` only to get there).
+* Keys with escapes: `Hyp646` beyond `acceptCallees_noesc` (the escapes agent's 646).
+* The rejecting half (`RejectContract`): 340, 165, 166, 177, 326, 92, the error paths of
+  193/214/228/81/83/86/87/323/650, 642/643, 693/479/130/387/151, at some cost. Not started.
+* The method's side: `heapInv` at 297's call with `F` bounded, the memory room `roomS` (a page for
+  the account's `String`, then an error box) and the per-byte budget (`K1 ≤ 470`, `K0 + X` in
+  `computeGas`).
+
+*Plan for the rest of the parser's contract, bottom-up.*
 
 1. **The rejection side needs no tight cost.** `Refines` asks only `RolledBack` for input
    that is not a call, and `method_vm_any` turns a run that runs out of gas into a gas
    failure. A reject path therefore needs a spec that ends in `Err` (then 881's panic) with
    *some* finite cost, say polynomial in `len`. The tight `K0 + K1·len` is needed only on
    the accepting path.
-   * Plan to split `FromTraitContract` into an accepting contract with the tight cost and a
-     rejecting contract with a loose one.
+   * Done (seventh round): `AcceptContract` with the tight cost, `RejectContract` at some finite
+     cost.
    * Error constructors can then be specified once, generically: they return a boxed
      `Error`, the heap invariant is kept, the cost is at most `E0 + E1·len`, and the output
      says nothing more. This applies to 322/325 (`position_of_index` is linear), 340, 642
@@ -912,11 +1057,10 @@ callees not proved yet as hypotheses:
      loop invariant holds the `Option<ValidAccountId>` read so far: a lent heap block, or
      none.
    * The depth byte goes 128 → 127, and `RecursionLimitExceeded` is unreachable.
-6. **66 itself:** 634, then 228, then 320, then the drop of the scratch (68, a no-op when
-   its capacity is 0, else `dealloc`). This proves `FromTraitContract`'s accepting half with
-   `K1` read off the per-byte costs. Those are 96 per whitespace byte so far, and the string
-   scan is about 30 per byte, so `K1 ≤ 480` looks comfortable. The rejecting half comes from
-   step 1.
+6. **66 itself:** done (seventh round): `f66_acc`, `acceptContract`, and the linear bound
+   `SerdeCost.cost66_le`. `K1` is limited by the member constant over five bytes and by 81's cost per
+   byte (see the findings of the seventh round): the room is about 1.4× the real cost. The rejecting
+   half comes from step 1.
 7. **The other methods.** Steps 1–4 are shared by every parser. Step 5 is one instance per
    struct; state it generically over the field list and the field visitor, so that 222,
    221, 224, 229 etc. come from the same proof. `U128` adds `u128::from_str_radix` (871,

@@ -50,12 +50,12 @@ grammar function.
 
 | fn | size | role | status |
 |---|---|---|---|
-| 65 | 13 | `from_slice`: `SliceRead::new` (644), then 66 | proved from any spec of 66 (`ArgsLeaves.f65_of_66`) |
-| 66 | 114 | `from_trait`: 634, `deserialize_struct` (78 → 228), `end` (320), drop the scratch (68) | stated (`FromSliceSpec.FromTraitContract`); its pure side proved: `SerdeStructModel.decode_balanceOf` |
+| 65 | 13 | `from_slice`: `SliceRead::new` (644), then 66 | proved from any spec of 66 (`ArgsLeaves.f65_of_66`), and from either half of 66's contract (`FromSliceProof.f65_accept`, `f65_reject`) |
+| 66 | 114 | `from_trait`: 634, `deserialize_struct` (78 → 228), `end` (320), drop the scratch (68) | accepting run proved from hypotheses on 646, 169, 81 (`SerdeFromTrait.f66_acc`, `f66_dec` against `Call.decode`), at `cost66`, linear in the input (`SerdeCost.cost66_le`). Contracts: `FromSliceSpec.AcceptContract` (proved: `FromSliceProof.acceptContract`, from `AcceptCallees`; on an input without a backslash, from `Hyp81` alone: `FromSliceNoEsc.acceptContract_noesc81`), `RejectContract` (stated) |
 | 634 | 23 | `Deserializer::new` | proved (`f634_spec`) |
 | 78 | 7 | `Input::deserialize`, which calls 228 | accepting run proved from hypotheses on 646, 169, 81 (`SerdeStruct78.f78_acc`) |
 | 320 | 41 | `end`: `parse_whitespace`, then `Some(_)` gives `TrailingCharacters` (322) | proved (`SerdeEnds.f320_spec`) |
-| 68 | 4 | drop the scratch `Vec<u8>` (747/777/311) | proved (`DropVec`) |
+| 68 | 4 | drop the scratch `Vec<u8>` (747/777/311) | proved (`DropVec`), and at capacity 0, which frees nothing (`SerdeFromTrait.f68_zero`, `f747_zero`) |
 
 ### Reader primitives (`SliceRead`)
 
@@ -67,8 +67,8 @@ grammar function.
 | 637 | 33 | `SliceRead::next`, the same body as 324 | proved (`f637_spec`) |
 | 329 | 37 | `peek_or_null` | proved (`f329_spec`, 65) |
 | 339 | 61 | `parse_whitespace`, a loop over `" \t\n\r"` (mask `0x800013`) | proved (`f339_spec`, `100 + 96·w`) |
-| 88 | 37 | `next_char_or_null` (324) | |
-| 323 | 92 | `parse_ident`: the rest of `null`, `true` or `false` | |
+| 88 | 37 | `next_char_or_null` (324) | proved (`SerdeIgnNum.f88_spec`, 74) |
+| 323 | 92 | `parse_ident`: the rest of `null`, `true` or `false` | not proved; it compares with the bytes `alse`, `rue`, `ull` at 1048576, 1048580, 1048583 (the data segment `alserueull`), which are not yet in `roData` or `tbl` |
 | 655 | 86 | `next_or_eof` (637, else an `EofWhileParsingString` error) | |
 
 ### The struct visitor (`ft_balance_of`)
@@ -76,7 +76,7 @@ grammar function.
 | fn | size | role |
 |---|---|---|
 | 228 | 528 | `deserialize_struct`. Steps: `parse_whitespace`; on `{`, decrement the depth (`RecursionLimitExceeded` at 0), then the inlined derived `visit_map` loop; on `[`, the same with `visit_seq`; on anything else, `peek_invalid_type` (340). After the visitor comes `end_map` (90) or `end_seq` (91), then `fix_position` (326) on errors. Accepting runs proved from hypotheses on 646, 169 and 81: `SerdeStructArr.f228_arr` (array form), `SerdeStructObjRun.f228_obj` (object form, loop invariant `inv228`) |
-| 193 | 265 | `MapAccess::next_key_seed`: whitespace, then `}` (end), `,` (only after the first key), or `"`. A key is `parse_str` (646) into the scratch, after `Vec::clear` (82), and goes to the field visitor 194. Accepting cases proved: `SerdeNextKey.f193_end`, `f193_key` (646 as `Spec646`; `f646_key_noesc` for escape-free keys) |
+| 193 | 265 | `MapAccess::next_key_seed`: whitespace, then `}` (end), `,` (only after the first key), or `"`. A key is `parse_str` (646) into the scratch, after `Vec::clear` (82), and goes to the field visitor 194. Accepting cases proved: `SerdeNextKey.f193_end`, `f193_key` (646 as `Spec646`; `f646_key_noesc` for escape-free keys), at `(572 + 96·keyWs + cost194)·c + K646` |
 | 194 | 8 | `__FieldVisitor::visit_str`: the key equals `account_id` (10 bytes at 1051092, compared by 754 → 755 → `bcmp` 953) to give field 0; otherwise `__ignore`. 953, 755, 754 and 194 are proved (`SerdeKey`). |
 | 205 | 19 | `next_value_seed` of the known field: `parse_object_colon` (89), then `ValidAccountId::deserialize` (169). Proved from any spec of 169 (`SerdeValueSeed.f205_of_169`) |
 | 201 | 12 | `next_value_seed` of an unknown field: 89, then `ignore_value` (81). Proved from any spec of 81 (`SerdeValueSeed.f201_of_81`) |
@@ -93,11 +93,11 @@ grammar function.
 
 | fn | size | role | status |
 |---|---|---|---|
-| 646 | 317 | `SliceRead::parse_str`. It scans while `ESCAPE[b] = 0` (the table at 1062392: nonzero exactly for `0x00..0x1F`, `"` and `\`). On `"` with an empty scratch, the result is the borrowed slice (583); with a non-empty scratch, the rest is appended (613). On `\`, the slice so far is appended, then `parse_escape` (649). On a control byte, `ControlCharacterWhileParsingString`. On EOF, `EofWhileParsingString` (647). The result goes through `as_str` (648). | proved on every escape-free input (`ParseStrErr.f646_spec_noesc`: EOF, control byte, `Ok(Borrowed)` on a UTF-8 body, `InvalidUnicodeCodePoint` otherwise; scratch empty; `noesc_model`); earlier the plain cases (`f646_spec_plain`, `f646_spec_utf8`). Not yet: the escape path (613, 649, 728) |
+| 646 | 317 | `SliceRead::parse_str`. It scans while `ESCAPE[b] = 0` (the table at 1062392: nonzero exactly for `0x00..0x1F`, `"` and `\`). On `"` with an empty scratch, the result is the borrowed slice (583); with a non-empty scratch, the rest is appended (613). On `\`, the slice so far is appended, then `parse_escape` (649). On a control byte, `ControlCharacterWhileParsingString`. On EOF, `EofWhileParsingString` (647). The result goes through `as_str` (648). | proved on every escape-free input (`ParseStrErr.f646_spec_noesc`: EOF, control byte, `Ok(Borrowed)` on a UTF-8 body, `InvalidUnicodeCodePoint` otherwise; scratch empty; `noesc_model`); earlier the plain cases (`f646_spec_plain`, `f646_spec_utf8`). 228's `Hyp646` on an input without `\` (`SerdeKeyNoEsc.hyp646_noesc`, `300 + 130` per byte read). Not yet: the escape path (613, 649, 728) |
 | 648 | 39 | `as_str`: `from_utf8` (927), else `InvalidUnicodeCodePoint` (657) | proved on every input: `ParseStrUtf8.f648_spec_valid` (`utf8Ok`), `SerdeErrBox.f648_spec_bad` (not UTF-8: 657) |
 | 927 | 443 | `core::str::from_utf8`, with its word-at-a-time ASCII fast path | proved on any input (`FromUtf8Gen.f927_spec`: `Ok` exactly when `Utf8.utf8Ok`, `100 + 100·len`; the width table at 1071704 owned) |
 | 649 | 401 | `parse_escape`: the simple escapes are pushed (614); `\u` goes through `decode_hex_escape` (653, 162) and the surrogate pair logic, then `encode_utf8` (605, 109) and an append (613) |
-| 650 | 106 | `ignore_str` (ignored values): the same scan, without UTF-8 validation |
+| 650 | 106 | `ignore_str` (ignored values): the same scan, without UTF-8 validation; proved escape-free (`SerdeIgnStr.f650_noesc`, `56 + 21` per byte) |
 | 652 | 267 | `ignore_escape`: validates the escape without decoding it |
 | 82, 343 | 3 | `Vec::clear` of the scratch (674 `truncate`) | 343 and 674 proved (`SerdeDeStr.f343_s`, `f674_s`) |
 | 583 | 33 | `<Range as SliceIndex>::index` (panics 855/864 never reached) | proved (`ParseStr.f583_spec`, 20) |
@@ -106,7 +106,7 @@ grammar function.
 
 | fn | size | role | status |
 |---|---|---|---|
-| 169 | 106 | `ValidAccountId::deserialize`: `String::deserialize` (379 → 380), then `try_into` (501 → 502). An `Err` is formatted: `to_string` (130), then `Error::custom` (387), then the box is dropped (151). | proved when 380 fails or the string is a valid account id (`SerdeAccountId.f169_s`, with 379, 617); not the formatted error |
+| 169 | 106 | `ValidAccountId::deserialize`: `String::deserialize` (379 → 380), then `try_into` (501 → 502). An `Err` is formatted: `to_string` (130), then `Error::custom` (387), then the box is dropped (151). | proved when 380 fails or the string is a valid account id (`SerdeAccountId.f169_s`, with 379, 617); not the formatted error; `Hyp169` on an input without a backslash (`SerdeAcctHyp.hyp169_noesc`, `Lin169` with `b = 208`) |
 | 380 | 177 | `deserialize_str`. Steps: whitespace; on `"`, eat it, clear the scratch (343) and `parse_str` (646), then `StringVisitor::visit_str` (633); on anything else, `peek_invalid_type` (340). | proved on EOF and on an escape-free string (`SerdeDeStr.f380_s`); not the 340 path |
 | 633 | 28 | `visit_str`, then `to_owned` (618): `RawVec::allocate_in` (626, through 624/625/310 to the allocator), then `memcpy` (951) | proved, with 618, 626, 624/625 at alignment 1, 607/608 (`SerdeString`) |
 | 502 | 72 | `TryFrom<String>`: `is_valid_account_id` (554); on false, a `Box<dyn Error>` from `&str` (693 → 811) and the `String` dropped (479) | proved on a valid account id (`f502_valid`, `f501_valid`, 779); not the `false` branch |
@@ -116,10 +116,10 @@ grammar function.
 
 | fn | size | role |
 |---|---|---|
-| 81 | 498 | `ignore_value`. It is iterative: the open `[` and `{` frames are pushed onto the scratch `Vec` (84 `spec_extend`, which grows through 698/712–716) and popped (85), so the depth is unbounded. It handles the literals (323), numbers (83/86/87), strings (650) and keys (650 + 89).  The machine and its step equations are proved against the model (`IgnoreModel`: `ignM_eq`, `vSkip_agrees`); the Wasm proof is not done. |
-| 83 | 168 | `ignore_integer`: one leading `0`, or `[1-9][0-9]*`, then `.` or `e`/`E` |
-| 86 | 97 | `ignore_decimal` (at least one digit) |
-| 87 | 115 | `ignore_exponent` (an optional sign, at least one digit) |
+| 81 | 498 | `ignore_value`. It is iterative: the open `[` and `{` frames are pushed onto the scratch `Vec` (84 `spec_extend`, which grows through 698/712–716) and popped (85), so the depth is unbounded. It handles the literals (323), numbers (83/86/87), strings (650) and keys (650 + 89).  The machine and its step equations are proved against the model (`IgnoreModel`: `ignM_eq`, `vSkip_agrees`); the Wasm proof is not done. Proved below it: 650, 86, 87, 88, 84 with the flag 0 and 85 on the empty scratch (`SerdeIgnFrame`). |
+| 83 | 168 | `ignore_integer`: one leading `0`, or `[1-9][0-9]*`, then `.` or `e`/`E`; the model's side done (`SerdeNumModel.intR`, `vSkip_num`, `vSkip_neg`), the Wasm proof not |
+| 86 | 97 | `ignore_decimal` (at least one digit); proved (`SerdeIgnNum.f86_acc`, `465 + 129` per byte) |
+| 87 | 115 | `ignore_exponent` (an optional sign, at least one digit); proved (`SerdeIgnNum.f87_acc`, `300 + 127` per byte) |
 
 ### Errors
 
@@ -156,7 +156,7 @@ Already proved:
 * the allocator: wee_alloc 568–582 and 236–239, 310–314 (`AllocWalkHeap.f310_spec_walk`,
   `AllocDealloc`);
 * `memcpy` 951 and `memset` 952;
-* the `Vec<u8>` drops 68/747/777.
+* the `Vec<u8>` drops 68/747/777, and at capacity 0 (`SerdeFromTrait.f68_zero`).
 
 Not yet proved:
 
@@ -240,3 +240,8 @@ Two points need care in the proof, though neither is a disagreement:
 * the gas of the reject paths: `position_of_index` and `make_error` are linear in the
   input, and `peek_invalid_type` parses a whole number;
 * the heap the iterative `ignore_value` consumes.
+
+The accepting paths' cost per argument byte was measured on `ft_balance_of` at the model's bound
+(`scenarios/27_arguments_cost.json`): at most 275.5 Mgas per byte (`1,` in an ignored array) against
+the 400 of `argumentByteGas`, so no discrepancy; the proof's room over the real cost is about 1.4×
+(`notes/todo/wnear_refinement_proof.md`, M6, seventh round).
