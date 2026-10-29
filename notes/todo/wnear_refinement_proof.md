@@ -1153,6 +1153,13 @@ round).* Proved, no `sorry`, standard axioms only:
      exposes the full call with the remaining closed `growthBudget` (initial free-list
      bound, growth count, copies and memory-growth fees). Borrowed strings no longer
      reserve a nonexistent terminal scratch append.
+     `f646_success_traced` and `f646_success_growth_traced` retain the concrete
+     trace endpoint in `resStrTraced`: copied results expose exact scratch
+     capacity and allocator free-list bound, and memory length lies between the
+     initial length and that length plus the trace's charged pages. The suffix
+     invariant in `StrTraceResult` composes both appends at every escape and the
+     final plain append. The old success interfaces follow by forgetting these
+     additional facts; their preconditions and gas budgets are unchanged.
      Left: absorb this budget into the method allowance using the reachable heap
      invariant. Generalize the old heap-preserving struct-reader hypotheses for
      changing scratch state; do not assume a uniform bound for arbitrary initial

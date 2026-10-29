@@ -358,6 +358,31 @@ continuation is published to PR #40 after its validation gates pass.
   three axioms. Evidence: `/tmp/pr40-growth-accounting-final-audit.log` and
   `/tmp/pr40-growth-accounting-style.log`.
 
+
+## Parser result continuation
+
+- `StrTraceResult.resStrTraced` preserves the successful parser's concrete scratch
+  trace endpoint. A copied result exposes exact final capacity and allocator
+  free-list bound, plus lower/upper memory-length bounds. A borrowed result keeps
+  the original scratch resources unchanged.
+- `traceInv_escape` composes both appends at an escape; `traceInv_close` extracts
+  the endpoint after the final plain append. These pure facts are threaded through
+  the actual `f646_success_traced` Wasm loop. `f646_success_growth_traced` exposes
+  the same result at the existing closed growth budget. The original two success
+  interfaces follow by forgetting the additional information.
+- The old key-reader `Hyp646` assumes an unchanged heap, a 160-byte callee frame,
+  and a `d + 16` depth premise. The general escaped parser has changing scratch
+  state, a 192-byte frame, and a `d + 30` depth premise. Generalize the reader and
+  enclosing struct contracts before integrating it; the stronger result is the
+  state information needed for that work. No seventh method is complete.
+- Validation: `just wnear-audit` passes (2778 build jobs; 444 wNEAR modules,
+  61570 declarations and 56321 theorems). Only the three existing dependencies on
+  `Proofs.Refinement` use `sorryAx`; strict NearLogic has zero violations and
+  statement pins match. Lean MCP verifies `f646_success_growth_traced` with only
+  the standard three axioms. Changed-source Lean style and whitespace checks pass.
+  Evidence: `/tmp/pr40-trace-result-final-audit.log` and
+  `/tmp/pr40-trace-result-style.log`.
+
 ## Methods
 
 There are 15 exported methods; six now have complete per-call refinement proofs under their protocol premises.

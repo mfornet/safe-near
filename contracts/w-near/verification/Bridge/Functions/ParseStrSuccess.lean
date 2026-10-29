@@ -1,5 +1,6 @@
 import Bridge.Functions.ParseStrEsc
 import Bridge.Functions.StrSuccessCost
+import Bridge.Functions.StrTraceResult
 
 /-! # The successful string loop, with one final UTF-8 validation -/
 
@@ -37,7 +38,7 @@ set_option Elab.async false in
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 400000000 in
 /-- Successful `parse_str`, with no error-cost reserves and one final UTF-8 check. -/
-theorem f646_success (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
+theorem f646_success_traced (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
     (htype : type.results = []) (inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (n g ta : Nat)
     (hm : IfaceMod mi A n g ta) (hd : d + 30 < lim.maxCallDepth) (Cg : Nat)
     (gt : GlobalType) (sp out de sc ptr idx ptrS capS : UInt32) (ob bs : List UInt8) (i : Nat)
@@ -58,7 +59,7 @@ theorem f646_success (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : Fun
         (fun _ => costRun cfg F capS [] (bs.drop i) bs.length + 100 * cfg.regularOpCost)
         (fun _ rs => iprop(⌜rs = []⌝ ∗ g ↦[wg] ⟨gt, .i32 sp⟩ ∗ stk n (sp.toNat - 192) 192 ∗
           vt n 1057464 idx ta (A 578) ∗ n ↦[wms][ 1062392 ] escTable ∗ n ↦[wms][ 1071704 ] utf8Width ∗
-          n ↦[wms][ 1062712 ] hexTable ∗ resStr n maxP hl live F out de ptr sc ptrS capS ob bs i)) := by
+          n ↦[wms][ 1062712 ] hexTable ∗ resStrTraced n maxP hl live F out de ptr sc ptrS capS ob bs i)) := by
   iintro #Hk
   ihave #Hk' := Hk
   iunfold code646 at Hk'
@@ -114,7 +115,8 @@ theorem f646_success (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : Fun
         strRun (bs.drop j) acc = strRun (bs.drop i) [] ∧
         (acc = [] → j = i ∧ p = ptrS ∧ cap = capS ∧ hl' = hl ∧ F' = F) ∧ (j = i → acc = []) ∧ (j ≠ i → ¬ borrowed (bs.drop i)) ∧
         acc.length ≤ j - i ∧ cap.toNat ≤ max capS.toNat (2 * acc.length + 8) ∧ hl ≤ hl' ∧
-        roomRun maxP hl' cap acc (bs.drop j)⌝ ∗
+        roomRun maxP hl' cap acc (bs.drop j) ∧
+        traceInv F hl capS (bs.drop i) F' hl' cap acc (bs.drop j)⌝ ∗
       credits Cg (costRun cfg F' cap acc (bs.drop j) bs.length + Rl) ∗ stk n (sp.toNat - 192) 192 ∗
       n ↦[wms][ out.toNat ] ob ∗ n ↦[wms][ 1062392 ] escTable ∗ n ↦[wms][ 1071704 ] utf8Width ∗
       n ↦[wms][ 1062712 ] hexTable ∗ vt n 1057464 idx ta (A 578) ∗ g ↦[wg] ⟨gt, .i32 (sp - 48)⟩ ∗
@@ -126,7 +128,7 @@ theorem f646_success (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : Fun
   · imodintro
     iintro %X %l HI
     icases HI with ⟨%j, %acc, %p, %cap, %hl', %F', %a4, %a5, %a6, %a7, %a8, %a9,
-      %⟨hX, hfr, hij, hjl, hrun, hacc0, hj0, hjb, haccl, hcapb, hhl, hroomj⟩,
+      %⟨hX, hfr, hij, hjl, hrun, hacc0, hj0, hjb, haccl, hcapb, hhl, hroomj, htrace⟩,
       Hc, Hs, Ho, He, Hw, Ht, Hvt, Hg, D0, D4, D8, Hb, S0, S4, S8, Hsb⟩
     subst hX
     rw [hfr]
@@ -442,6 +444,13 @@ theorem f646_success (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : Fun
                 by_cases hji : j = i
                 · subst hji; unfold borrowed; rw [htail, htx]; simp
                 · exact hjb hji
+              have hhl2' : hlAfter hl1 hl2 (capAfter cap (UInt32.ofNat acc.length) (UInt32.ofNat body.length))
+                  (UInt32.ofNat (acc ++ body).length) (UInt32.ofNat eo.length) := by
+                rw [hcap1]
+                exact hhl2
+              have htrace' := traceInv_escape F hl capS (bs.drop i) F' hl' hl1 hl2 cap acc (bs.drop j)
+                body rest eo m htrace hbody (by rw [htail, htx]) he hhl1 hhl2'
+              rw [hcap1, hF1] at htrace'
               mstep; mstep
               iapply mwpi_cons
               iapply mwpi_br_if_taken'
@@ -468,7 +477,7 @@ theorem f646_success (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : Fun
                 refine ⟨by first | rfl | trivial, by first | rfl | trivial, by omega, by omega, hrun',
                   fun h => absurd (congrArg List.length h) (by simp only [List.length_append, List.length_nil]; omega),
                   fun h => absurd h (by omega),
-                  fun _ => hnb, by simp; omega, ?_, by omega, by rw [hdr]; exact hroom4⟩
+                  fun _ => hnb, by simp; omega, ?_, by omega, by rw [hdr]; exact hroom4, by rw [hdr]; exact htrace'⟩
                 simp at hcap2 ⊢; omega
               iframe Ho He Hw Ht Hvt Hg D0 D4 D8 Hb S0 S4 Hsb
               isplitl [Hc]
@@ -630,7 +639,7 @@ theorem f646_success (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : Fun
                   ihave S80' := stk_addr (show (sp - 48).toNat - 32 = sp.toNat - 192 + 112 by omega) $$ S80'
                   iapply stk_join n (sp.toNat - 192) 112 80
                   iframe T112 S80'
-                iunfold resStr
+                iunfold resStrTraced
                 rw [hres]
                 simp only [if_pos hutf, if_pos hbor]
                 rw [hrl]
@@ -716,6 +725,9 @@ theorem f646_success (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : Fun
               rw [hm32]
               generalize hcap1 : capAfter cap (UInt32.ofNat acc.length) (UInt32.ofNat body.length) = cap1
               generalize hF1 : fAfter F' cap (UInt32.ofNat acc.length) (UInt32.ofNat body.length) = F1
+              have htraceEnd := traceInv_close F hl capS (bs.drop i) F' hl' hl1 cap acc (bs.drop j)
+                body rest htrace hbody (by rw [htail, htx]) hae hhl1
+              rw [hcap1, hF1] at htraceEnd
               have hl1le := hlAfter_le _ _ _ _ _ hhl1
               mcredits (130 * cfg.regularOpCost + (Z - extCost cfg F' cap (UInt32.ofNat acc.length) (UInt32.ofNat body.length) + Rl))
               mstep; mstep
@@ -831,7 +843,7 @@ theorem f646_success (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : Fun
                   ihave S48 := stk_addr (show (sp - 48).toNat = sp.toNat - 192 + 144 by omega) $$ S48
                   iapply stk_join n (sp.toNat - 192) 144 48
                   iframe T144 S48
-                iunfold resStr
+                iunfold resStrTraced
                 rw [hres']
                 simp only [if_pos hutf, if_neg hnb]
                 rw [hrl]
@@ -852,7 +864,7 @@ theorem f646_success (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : Fun
                   iexact Bb
                 iexists p1, cap1, hl1, F1
                 isplitr
-                · ipureintro; omega
+                · ipureintro; exact ⟨by omega, htraceEnd⟩
                 iframe O4 O8 S0 S4 S8
                 iapply Hsw $$ Bs
               · have heq := StrOut.ok.inj (hres'.symm.trans hok)
@@ -894,8 +906,42 @@ theorem f646_success (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : Fun
     iframe Hc Hs Ho He Hw Ht Hvt Hg D0 D4 D8 Hb S0 S4 Hsb
     isplitr
     · ipureintro
-      refine ⟨rfl, rfl, le_rfl, hi, rfl, fun _ => ⟨rfl, rfl, rfl, rfl, rfl⟩, fun _ => rfl, fun h => absurd rfl h, by simp, by simp, le_rfl, hroom⟩
+      refine ⟨rfl, rfl, le_rfl, hi, rfl, fun _ => ⟨rfl, rfl, rfl, rfl, rfl⟩, fun _ => rfl, fun h => absurd rfl h, by simp, by simp, le_rfl, hroom, traceInv_refl F hl capS (bs.drop i)⟩
     iexact S8
+
+
+/-- The original successful-parser interface follows by forgetting the growth endpoint. -/
+theorem f646_success (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
+    (htype : type.results = []) (inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (n g ta : Nat)
+    (hm : IfaceMod mi A n g ta) (hd : d + 30 < lim.maxCallDepth) (Cg : Nat)
+    (gt : GlobalType) (sp out de sc ptr idx ptrS capS : UInt32) (ob bs : List UInt8) (i : Nat)
+    (maxP hl : Nat) (live : List (Nat × Nat)) (F : Nat)
+    (hob : ob.length = 16) (hout : out.toNat + 16 ≤ 2 ^ 32) (hlen : bs.length < 2 ^ 24)
+    (hptr : ptr.toNat + bs.length ≤ 2 ^ 32) (hde : de.toNat + 12 ≤ 2 ^ 32) (hsc : sc.toNat + 12 ≤ 2 ^ 32)
+    (hsp : 192 ≤ sp.toNat) (hi : i ≤ bs.length) (hcapS : capS.toNat < 2 ^ 25)
+    (hroom : roomRun maxP hl capS [] (bs.drop i))
+    (finalBytes finalRest : List UInt8) (hok : strRun (bs.drop i) [] = .ok finalBytes finalRest)
+    (hvalidUtf : Utf8.utf8Ok finalBytes = true) :
+    code646 n maxP inst mi A ⊢
+      MFunSpec (GF := GF) cfg lim d type inst mi f646 Cg
+        (fun args => iprop(⌜args = [.i32 out, .i32 de, .i32 sc]⌝ ∗ g ↦[wg] ⟨gt, .i32 sp⟩ ∗
+          stk n (sp.toNat - 192) 192 ∗ vt n 1057464 idx ta (A 578) ∗ n ↦[wms][ out.toNat ] ob ∗
+          rd n de ptr bs i ∗ n ↦[i32][ sc.toNat ] ptrS ∗ n ↦[i32][ sc.toNat + 4 ] capS ∗
+          n ↦[i32][ sc.toNat + 8 ] 0 ∗ sbuf n maxP hl live F ptrS capS [] ∗
+          n ↦[wms][ 1062392 ] escTable ∗ n ↦[wms][ 1071704 ] utf8Width ∗ n ↦[wms][ 1062712 ] hexTable))
+        (fun _ => costRun cfg F capS [] (bs.drop i) bs.length + 100 * cfg.regularOpCost)
+        (fun _ rs => iprop(⌜rs = []⌝ ∗ g ↦[wg] ⟨gt, .i32 sp⟩ ∗ stk n (sp.toNat - 192) 192 ∗
+          vt n 1057464 idx ta (A 578) ∗ n ↦[wms][ 1062392 ] escTable ∗ n ↦[wms][ 1071704 ] utf8Width ∗
+          n ↦[wms][ 1062712 ] hexTable ∗ resStr n maxP hl live F out de ptr sc ptrS capS ob bs i)) := by
+  apply (f646_success_traced cfg lim d type htype inst mi A n g ta hm hd Cg gt sp out de sc ptr idx ptrS capS ob bs i maxP hl live F hob hout hlen hptr hde hsc hsp hi hcapS hroom finalBytes finalRest hok hvalidUtf).trans
+  apply spec_post
+  intro args rs
+  iintro ⟨%hrs, Hg, Hs, Hvt, He, Hw, Ht, Hres⟩
+  iframe Hg Hs Hvt He Hw Ht
+  isplitr
+  · ipureintro; exact hrs
+  iapply resStrTraced_forget
+  iexact Hres
 
 end L646e
 
