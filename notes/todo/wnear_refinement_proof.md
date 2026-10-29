@@ -698,6 +698,89 @@ by layer, with their sizes and roles, and which other methods' parsers share the
     control byte, the quote). Generalize the outcome-dependent part of the credits (`if … then 0
     else costErr …`) into a variable, and rewrite its equation in each branch.
 
+*The struct layer (fifth round).* Proved, no `sorry`:
+
+* The model without its fuel, `JsonFuel.lean`. `value`, `elements` and `members` give the same
+  result for any fuel from `2·len + 1` (`+ 2` for the last two): `fuel_stable`, `value_fuel`. The
+  fuel-free `valueR`, `elementsR`, `membersR` unfold like the grammar (`valueR_eq`, `elementsR_eq`,
+  `membersR_eq`, with the helpers `keyAt`, `colonAt`, `memberEnd`, `elemEnd`), and
+  `parse_eq` restates `parse` with `valueR`.
+* serde's struct machine, `SerdeStructModel.lean`. `fromSlice key dv ign` is the streaming
+  deserializer of a one-field struct as 228/193/205/201/214/90/91/320 run it: the object form
+  (`objLoop`: key, duplicate check, colon, `dv` or `ign`, then `,` or `}`; `{}` is a missing
+  field) and the array form (one element, then `]`; `[]` is `invalid_length`), then only
+  whitespace. The value readers are parameters:
+  * `dv` must agree with `valueAs dec`, the model's `valueR` then the field decoder;
+  * `ign` must agree with `valueSkip`, the model's `valueR`;
+  * "agree" (`Agrees`) allows the reader to fail where the model succeeds with a rest that
+    starts with a digit, which is how serde's early rejection of `01` differs from the model.
+  `fromSlice_eq`: for every input, `fromSlice` is `(parse bs).bind (structFields [key])` then
+  `required dec`. `decode_balanceOf`: so `Call.decode "ft_balance_of" bs` is
+  `(fromSlice "account_id" dv ign bs).map ftBalanceOf`, for any such readers.
+* `ignore_value` as an iterative machine, `IgnoreModel.lean`. `vSkip` is serde's skip of one
+  value (the model's `valueR`, failing on `0` or `-0` followed by a digit). `closeAll stk` closes
+  a stack of frames on the model's side (`contM`: `,` and more, or the closing bracket). The step
+  equations are 81's loop body: `vSkip_arrE/M`, `vSkip_objE/M` (a value that opens a frame,
+  then the closing bracket or the first element or member), `close_arr_comma`,
+  `close_obj_comma`, `close_*_end`, `close_*_none`. `ignM` is the machine with fuel, its scalars
+  (`sv`) and keys (`sk`) parameters; `ignM_spec`/`ignM_eq`: it reads exactly `vSkip`, and
+  `ignM_agrees`: it agrees with `valueSkip`, as `fromSlice_eq` needs. The Wasm proof of 81 can
+  take the equations as its loop invariant: at the value phase with frames `stk`, the result is
+  `(vSkip rest).bind (closeAll stk)`; after a value in the frame `f`, `closeAll (f :: stk) rest`.
+* The punctuation checks, `SerdeEnds.lean`: `end` (320, `f320_spec`), `parse_object_colon` (89,
+  `f89_spec`), `end_map` (90, `f90_spec`). Whitespace (339), then the byte: 0 and the reader past
+  it, or `peek_error`'s box (322). Cost `(200 + 96·w)·c`, plus `costErr cfg F (j + 1) + 20·c` on
+  an error; stack 96. Tactic macros `end_head`, `store_code`, `err_call`, `err_end`, `eat_ok`,
+  `ok_tail`; the byte tests `byte_is58`, `byte_is125`, `byte_is44`, `byte_is93`, `byte_is34`,
+  `eq_is125`, `ne_is44`, `some_bit` (each `decide`d over the 256 bytes).
+* `end_seq` (91), `SerdeEndSeq.lean` (`f91_spec`): `]` eaten and 0, or the box (EOF, `TrailingComma`
+  after `,` then `]`, `TrailingCharacters`), the reader somewhere. Cost `(400 + 96·w + 96·w')·c`, `w'` the
+  whitespace after a `,`, plus `costErr cfg F (len + 1) + 20·c` on an error (`costErr_mono`); stack 112.
+* `next_value_seed`, `SerdeValueSeed.lean`: 201 (`f201_of_81`) and 205 (`f205_of_169`) from any
+  specification of the value reader (81, 169) at the reader after the colon, given as a
+  hypothesis in the style of `f65_of_66`. So they hold for today's escape-free 169 and for its
+  generalization.
+
+*Findings.* No disagreement between serde_json and the model on the struct layer:
+`fromSlice_eq` is the "no discrepancy" check of the map, as a theorem, for any value readers that
+agree with the model. The one difference, `01` in an ignored value (serde fails at the second
+digit, the model one step later), changes no outcome inside a struct.
+
+*Tooling notes from this round.*
+
+* `mstep` counts `block` as a step: count the `block`s before a `br_if`, or `mstep_taken` lands on
+  the wrong instruction ("could not step i64.const 0").
+* A `br_if` side condition on a symbolic byte (`optByte (some b)`) failed with "internal exception
+  #5" when stated through `optByte_some`. Generalize `optByte (some b) = ob` first; the side
+  condition is then `Numeric.bool (Numeric.irelop64 IRelOp.ne (ob &&& k) c) ≠ 0`, closed by
+  `rw [← hob]` and a `decide`d byte lemma.
+* Keep the error's cost `X` generalized until the `mcall` of 322, then
+  `generalize costErr cfg F (j + 1) = E at key hX; subst hX`: stepping with `costErr` itself in
+  the credits made a later `mstep` fail.
+* An `if` in the postcondition cannot be rewritten while it is under the `Post` binders; rewrite it
+  at the end, when the goal is the bare postcondition. To open an `if` in an Iris hypothesis, apply a
+  lemma (`resEnd_pos`, `resEnd_neg`) with `ihave`.
+* Pure proofs over `NearInterface.Json`: `split` on a goal whose two sides match on the same
+  discriminant splits both; for a `match` the equation lemmas cannot reduce (literal `UInt8`
+  patterns), state a small lemma `… := by unfold f; rw [h]; rfl` (`keyAt_quote`, `valueR_objE`,
+  `structDe_arrM`): `rfl` reduces it, `simp` and `dsimp` do not. `grind` closes the length
+  side goals of `number`.
+
+*What is left for `FromTraitContract`.*
+
+* 193 (`next_key_seed`: the first/`,` logic, `parse_str` into the scratch, then 194), 214 (the
+  array's element), 228 (the struct) and 66. The plan: prove the accepting half
+  first, with `fromSlice … = some a` as the hypothesis; every rejecting branch of 228/193 is then
+  closed by `fromSlice_eq`, and 340, 165, 166, 177, 326 and 92 are not needed for it. The
+  rejecting half needs them, with a loose cost.
+* The specifications to take as parameters (hypotheses), as 201/205 do: 169 (on a string that
+  decodes to a valid account id: `Ok(String)`, the reader past it; cost `A + B·consumed`), 81 (on
+  input that `vSkip` accepts; its frame stack needs the scratch to grow, 698/712–716 from capacity
+  0, which `VecGrow` covers only for a non-empty buffer) and 646 for keys (an `Ok` reference to
+  the decoded bytes, in the input or the scratch, with the resource to read them for 194).
+* 81's Wasm proof, against `IgnoreModel`'s equations, with 83/86/87 (numbers), 323 (literals) and
+  650/652 (strings without UTF-8); and the reject paths 340, 642/643, 693/479/130/387/151.
+
 *Plan for the rest of `FromTraitContract`, bottom-up.*
 
 1. **The rejection side needs no tight cost.** `Refines` asks only `RolledBack` for input

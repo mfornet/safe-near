@@ -51,10 +51,10 @@ grammar function.
 | fn | size | role | status |
 |---|---|---|---|
 | 65 | 13 | `from_slice`: `SliceRead::new` (644), then 66 | proved from any spec of 66 (`ArgsLeaves.f65_of_66`) |
-| 66 | 114 | `from_trait`: 634, `deserialize_struct` (78 → 228), `end` (320), drop the scratch (68) | stated (`FromSliceSpec.FromTraitContract`) |
+| 66 | 114 | `from_trait`: 634, `deserialize_struct` (78 → 228), `end` (320), drop the scratch (68) | stated (`FromSliceSpec.FromTraitContract`); its pure side proved: `SerdeStructModel.decode_balanceOf` |
 | 634 | 23 | `Deserializer::new` | proved (`f634_spec`) |
 | 78 | 7 | `Input::deserialize`, which calls 228 | |
-| 320 | 41 | `end`: `parse_whitespace`, then `Some(_)` gives `TrailingCharacters` (322) | |
+| 320 | 41 | `end`: `parse_whitespace`, then `Some(_)` gives `TrailingCharacters` (322) | proved (`SerdeEnds.f320_spec`) |
 | 68 | 4 | drop the scratch `Vec<u8>` (747/777/311) | proved (`DropVec`) |
 
 ### Reader primitives (`SliceRead`)
@@ -78,12 +78,12 @@ grammar function.
 | 228 | 528 | `deserialize_struct`. Steps: `parse_whitespace`; on `{`, decrement the depth (`RecursionLimitExceeded` at 0), then the inlined derived `visit_map` loop; on `[`, the same with `visit_seq`; on anything else, `peek_invalid_type` (340). After the visitor comes `end_map` (90) or `end_seq` (91), then `fix_position` (326) on errors. |
 | 193 | 265 | `MapAccess::next_key_seed`: whitespace, then `}` (end), `,` (only after the first key), or `"`. A key is `parse_str` (646) into the scratch, after `Vec::clear` (82), and goes to the field visitor 194. |
 | 194 | 8 | `__FieldVisitor::visit_str`: the key equals `account_id` (10 bytes at 1051092, compared by 754 → 755 → `bcmp` 953) to give field 0; otherwise `__ignore`. 953, 755, 754 and 194 are proved (`SerdeKey`). |
-| 205 | 19 | `next_value_seed` of the known field: `parse_object_colon` (89), then `ValidAccountId::deserialize` (169) |
-| 201 | 12 | `next_value_seed` of an unknown field: 89, then `ignore_value` (81) |
+| 205 | 19 | `next_value_seed` of the known field: `parse_object_colon` (89), then `ValidAccountId::deserialize` (169). Proved from any spec of 169 (`SerdeValueSeed.f205_of_169`) |
+| 201 | 12 | `next_value_seed` of an unknown field: 89, then `ignore_value` (81). Proved from any spec of 81 (`SerdeValueSeed.f201_of_81`) |
 | 214 | 225 | `SeqAccess::next_element_seed` (the array form `["<a>"]`): 169 |
-| 89 | 61 | `parse_object_colon` |
-| 90 | 75 | `end_map`: `}`, else `TrailingComma`, `TrailingCharacters` or EOF |
-| 91 | 132 | `end_seq`: the same for `]` |
+| 89 | 61 | `parse_object_colon`. Proved (`SerdeEnds.f89_spec`) |
+| 90 | 75 | `end_map`: `}`, else `TrailingComma`, `TrailingCharacters` or EOF. Proved (`SerdeEnds.f90_spec`) |
+| 91 | 132 | `end_seq`: the same for `]`. Proved (`SerdeEndSeq.f91_spec`) |
 | 177 | 11 | a missing `account_id`: `missing_field` (101) |
 | 166 | 47 | `duplicate_field` (a second `account_id`) |
 | 165 | 66 | `invalid_length` (`[]`) |
@@ -116,7 +116,7 @@ grammar function.
 
 | fn | size | role |
 |---|---|---|
-| 81 | 498 | `ignore_value`. It is iterative: the open `[` and `{` frames are pushed onto the scratch `Vec` (84 `spec_extend`, which grows through 698/712–716) and popped (85), so the depth is unbounded. It handles the literals (323), numbers (83/86/87), strings (650) and keys (650 + 89). |
+| 81 | 498 | `ignore_value`. It is iterative: the open `[` and `{` frames are pushed onto the scratch `Vec` (84 `spec_extend`, which grows through 698/712–716) and popped (85), so the depth is unbounded. It handles the literals (323), numbers (83/86/87), strings (650) and keys (650 + 89).  The machine and its step equations are proved against the model (`IgnoreModel`: `ignM_eq`, `vSkip_agrees`); the Wasm proof is not done. |
 | 83 | 168 | `ignore_integer`: one leading `0`, or `[1-9][0-9]*`, then `.` or `e`/`E` |
 | 86 | 97 | `ignore_decimal` (at least one digit) |
 | 87 | 115 | `ignore_exponent` (an optional sign, at least one digit) |
@@ -186,6 +186,11 @@ arithmetic and bounds checks.
 | `deserialize_struct` / `next_key_seed` / the field visitor / `next_element_seed` | one copy per struct (221–229, 183–199, 209–215). Each is the same generic code instantiated with the struct's field names, and 222/191 equal 228/193. |
 
 ## Model against serde_json 1.0.60: checked, no disagreement found
+
+The struct layer of this check is now a theorem: `SerdeStructModel.fromSlice_eq` proves serde's
+streaming struct machine equal to `parse`, `structFields` and `required`, for any value readers that
+agree with the model, and `IgnoreModel.ignM_eq` proves the iterative `ignore_value` reads what
+`value` reads (both up to serde's early rejection of `01`, below).
 
 We read the binary's control flow, checked it against serde_json 1.0.60's source, and
 compared both with `NearInterface.Json.parse` and `structFields` / `required account`. The
