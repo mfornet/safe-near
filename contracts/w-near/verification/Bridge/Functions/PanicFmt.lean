@@ -750,6 +750,134 @@ theorem f859_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncTy
     simp only [Post.mseq_trap, Post.mfunc]
     iexact HT
 
+
+/-! ## The entries: `core::panicking::panic` (853) and `expect_failed` (879) -/
+
+/-- 853's `Arguments` at `a` (its frame): the piece array `[(m, l)]` at `a + 24`, `fmt: None`, no
+argument (the empty array 1067136); its counts are `argsHead n a 1 0`. -/
+def strArgs (n : Nat) (a m l : UInt32) : IProp GF :=
+  iprop(n ↦[i32][ a.toNat ] (a + 24) ∗ n ↦[i32][ a.toNat + 8 ] 0 ∗ n ↦[i32][ a.toNat + 16 ] 1067136 ∗
+    n ↦[i32][ a.toNat + 24 ] m ∗ n ↦[i32][ a.toNat + 28 ] l)
+
+/-- Eight bytes of `i64` 1 are the words 1 and 0. -/
+theorem i64_one : storeBytes (.i64 1) 8 = bytes32 1 ++ bytes32 0 := by decide
+
+/-- 32 bytes of stack as the words a frame of 32 writes. -/
+theorem stk32_open (n a : Nat) :
+    stk (GF := GF) n a 32 ⊢ ∃ w0 w16 w20 w24 w28 : UInt32, ∃ ob : List UInt8, ⌜ob.length = 8⌝ ∗
+      n ↦[i32][ a ] w0 ∗ n ↦[wms][ a + 4 ] ob ∗ n ↦[i32][ a + 16 ] w16 ∗ n ↦[i32][ a + 20 ] w20 ∗
+      n ↦[i32][ a + 24 ] w24 ∗ n ↦[i32][ a + 28 ] w28 := by
+  iintro H
+  icases stk_split n a 16 16 $$ H with ⟨Ha, Hb⟩
+  icases VecFromElem.stk16 n _ $$ Ha with ⟨W0, W4, W8, -⟩
+  icases VecFromElem.stk16 n _ $$ Hb with ⟨W16, W20, W24, W28⟩
+  ihave W48 := stk_join n (a + 4) 4 4 $$ [W4 W8]
+  · iframe W4; iexact W8
+  icases stk4_word n _ $$ W0 with ⟨%w0, W0⟩
+  icases stk4_word n _ $$ W16 with ⟨%w16, W16⟩
+  icases stk4_word n _ $$ W20 with ⟨%w20, W20⟩
+  icases stk4_word n _ $$ W24 with ⟨%w24, W24⟩
+  icases stk4_word n _ $$ W28 with ⟨%w28, W28⟩
+  iunfold stk at W48
+  icases W48 with ⟨%ob, %hob, W48⟩
+  iexists w0, w16, w20, w24, w28, ob
+  iframe W0 W48 W16
+  isplitr
+  · ipureintro; exact hob
+  isplitl [W20]
+  · iapply memBytes_congr (by omega) |>.1 $$ W20
+  isplitl [W24]
+  · iapply memBytes_congr (by omega) |>.1 $$ W24
+  iapply memBytes_congr (by omega) |>.1 $$ W28
+
+set_option maxRecDepth 100000 in
+set_option maxHeartbeats 8000000 in
+/-- **`core::panicking::panic(m, l, loc)`** (853): `panic_fmt(Arguments { pieces: [(m, l)], fmt:
+None, args: [] }, loc)`; 817 takes the `StrPanicPayload` branch (`f817_str`). -/
+theorem f853_spec (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
+    (inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (n g ta : Nat)
+    (hm : IfaceMod mi A n g ta) (hd : d + 4 < lim.maxCallDepth) (Cg : Nat) (gt : GlobalType)
+    (sp m l loc : UInt32) (hsp : 80 ≤ sp.toNat) (hloc : loc ≠ 0) (E : IProp GF) (K : Nat)
+    (h : NearState) (bs : List UInt8) :
+    code859 inst mi A ∗ A 859 ↪[wf] FuncInst.wasm types[14]! inst f859 ∗
+      Spec817 cfg lim (d + 4) inst mi Cg n g gt (sp - 32 - 16 - 16 - 16) (sp - 32 - 16 - 16 - 16) (sp - 32)
+        (sp - 32 - 16) loc
+        iprop(n ↦[i32][ (sp - 32 - 16).toNat + 8 ] (sp - 32) ∗
+          (argsHead n (sp - 32) 1 0 ∗ strArgs n (sp - 32) m l ∗ E)) K h bs
+      ⊢ MFunSpecT (GF := GF) cfg lim d type inst mi f853 Cg
+        (fun args => iprop(⌜args = [.i32 m, .i32 l, .i32 loc]⌝ ∗ g ↦[wg] ⟨gt, .i32 sp⟩ ∗
+          stk n (sp.toNat - 80) 80 ∗ E))
+        (fun _ => 180 * cfg.regularOpCost + K) (fun _ _ => iprop(False)) (fun _ => panicked Cg h bs) := by
+  iintro ⟨#Hc', #F859, #S817⟩
+  ihave #Hi : inst ↪[inst] mi $$ []
+  · iunfold code859 at Hc'
+    icases Hc' with ⟨#Hi, -⟩
+    iexact Hi
+  have hn := hm.mem
+  have hg := hm.glob
+  have hlt := sp.toNat_lt
+  have h32 : (sp - 32).toNat = sp.toNat - 32 := by
+    rw [UInt32.toNat_sub_of_le] <;> simp [UInt32.le_iff_toNat_le]; omega
+  have hne : sp - 32 ≠ 0 := by
+    intro e; have := congrArg UInt32.toNat e; simp only [h32, UInt32.reduceToNat] at this; omega
+  have ha859 := hm.funcs 859 (by decide)
+  iapply MFunSpecT_intro
+  imodintro
+  iintro %args %R HP Hc
+  icases HP with ⟨%hargs, Hg, Hs, HE⟩
+  subst hargs
+  icases stk_split n _ 48 32 $$ Hs with ⟨Hlo, Hf⟩
+  ihave Hf := stk_addr (show sp.toNat - 80 + 48 = (sp - 32).toNat by omega) $$ Hf
+  icases stk32_open n _ $$ Hf with ⟨%w0, %w16, %w20, %w24, %w28, %ob, %hob, W0, W48, W16, W20, W24, W28⟩
+  ihave W20 := memBytes_congr (j := (sp - 32 + 20).toNat) (by simp [UInt32.toNat_add]; omega) |>.1 $$ W20
+  simp only [f853]
+  mstep [Hg]; mstep; mstep; mstep; mstep [Hg]
+  mstep; mstep; mstep; mstep; mstep [W20]
+  mstep; mstep; mstep [W16]
+  mstep; mstep; mstep [W48]
+  mstep; mstep; mstep [W28]
+  mstep; mstep; mstep [W24]
+  mstep; mstep; mstep; mstep; mstep [W0]
+  mstep; mstep
+  rw [i64_one]
+  icases (memBytes_append n ((sp - 32).toNat + 4) (bytes32 1) (bytes32 0)).1 $$ W48 with ⟨W4, W8⟩
+  iapply mwpi_cons
+  iapply mwpi_callT' (i := 859) (a := A 859) (type := types[14]!) (inst := inst) (mi := mi)
+    (code := f859) [.i32 (sp - 32), .i32 loc]
+  isplitr
+  · iapply (f859_spec cfg lim (d + 1) types[14]! inst mi A n g ta hm (by omega) Cg gt (sp - 32) (sp - 32)
+      loc (by omega) hne hloc iprop(argsHead n (sp - 32) 1 0 ∗ strArgs n (sp - 32) m l ∗ E) K h bs)
+    iframe Hc' S817
+  isplitr
+  · iexact F859
+  isplitr
+  · iexact Hi
+  isplitr
+  · ipureintro; exact ⟨rfl, ha859, rfl, by omega⟩
+  isplitl [Hc]
+  · iexact Hc
+  isplitr
+  · ipureintro; mstep_norm_full; omega
+  isplitl [Hg Hlo HE W0 W4 W8 W16 W20 W24 W28]
+  · iframe Hg HE
+    isplitr
+    · ipureintro; rfl
+    isplitl [Hlo]
+    · iapply stk_addr _ $$ Hlo; omega
+    ihave W4 := memBytes_congr (j := (sp - 32).toNat + 4) (by simp) |>.1 $$ W4
+    ihave W8 := memBytes_congr (j := (sp - 32).toNat + 8) (by simp) |>.1 $$ W8
+    ihave W20 := memBytes_congr (j := (sp - 32).toNat + 20) (by simp [UInt32.toNat_add]; omega) |>.1 $$ W20
+    iunfold argsHead, strArgs
+    iframe W0 W4 W8 W16 W20 W24 W28
+  inext
+  isplit
+  · iintro %rs - HF
+    iexfalso
+    iexact HF
+  · iintro HT
+    simp only [Post.mseq_trap, Post.mfunc]
+    iexact HT
+
 end Spec
 
 end WNear.Binary.PanicFmt
