@@ -973,6 +973,56 @@ continuation is published to PR #40 after its validation gates pass.
   remain open, as do object cleanup wrappers, full rejection, the seventh
   method and M9. No additional `sorry` is introduced.
 
+## Concrete changing-state segments of Wasm 81 (2026-10-30)
+
+- `SerdeIgnSegments.startCode_eq`, `openingBlock_tail` and `closingBlock_tail`
+  pin the new segments to the actual decoded 81 body. The structured-control
+  paths include the following real branches: opening goes out through `br 2`,
+  and a restored close returns to the container loop through `br 1`.
+- `start_prefix` proves the actual prologue, including global stack adjustment,
+  clear through 82 and initialization of the value-loop flags. It starts with
+  arbitrary represented reusable scratch contents, preserves its allocation
+  and all earlier live blocks, and exposes the 160-byte frame as a 128-byte
+  callee region plus 32 owned bytes. Its body-prefix allowance is 60 regular
+  operations, with all remaining credits preserved.
+- `open_prefix` proves the actual nested-opening tail: pass the optional
+  pending local frame to 84, consume the opening byte through 333, clear the
+  comma flag, and install the new current bracket. Its returned pointer,
+  capacity, heap-length alternative and free-list bound are exactly the
+  `SerdeIgnMachineStack.f84_save` coordinates. The allowance is 60 regular
+  operations plus `saveCost`, and all 80 borrowed callee-stack bytes return.
+- `close_nonempty` proves the real delimiter-consume/pop/flag-test/restore
+  sequence for any nonempty saved stack. It installs the saved head in local 8,
+  sets the comma flag, retains scratch capacity/heap/free-list bounds, advances
+  the reader once and restores all 32 owned frame bytes. `close_empty` proves
+  that the same code on an empty stack takes the actual `br_if 5` success
+  branch, with the empty scratch allocation retained. Each fits 110 regular
+  operations; the full function's success epilogue is still outside this segment.
+- `open_traced` carries the complete successful pure continuation through the
+  actual opening segment. It consumes only the recorded save growth charge
+  from `extraCost`, returns the successful opened-mode trace, and leaves its
+  remaining growth credits at the returned capacity/free-list coordinates.
+  Its fixed allowance is 200 regular operations. `close_traced` restores the
+  complete continuation through a real nonempty close, removing exactly the
+  recorded pop and preserving the remaining growth budget and heap state.
+- Lean MCP checks all six contracts and all three code-location equations;
+  only standard axioms are used. The targeted build passes. `just wnear-audit`
+  passes (2818 build jobs; 484 wNEAR modules, 65834 declarations and
+  60380 theorems), with only the three existing open-refinement dependencies.
+  Strict NearLogic has zero violations, pinned statements match, and PR-wide
+  changed-source Lean style and whitespace checks pass. Evidence:
+  `/tmp/pr40-ignore-segments-final-audit.log` and
+  `/tmp/pr40-ignore-segments-final-style.log`.
+- Next: assemble the complete 81 invariant around these concrete segments,
+  including whitespace/byte dispatch, scalar completion, member-key/colon
+  handling, control-label translation and the final success epilogue. The
+  current bracket-opening and restoration segments preserve local 4 rather
+  than assuming it is always 1: after a nested opening it can still be 0.
+  The container-loop invariant must allow that until the next value entry
+  resets it. Full reader/model refinement, reachable allocation room, uniform
+  parser bounds, object wrappers, rejection, the seventh method and M9 remain
+  open. No additional `sorry` is introduced.
+
 ## Methods
 
 There are 15 exported methods; six now have complete per-call refinement proofs under their protocol premises.
@@ -1062,7 +1112,9 @@ The texts are proved equal to the model's `Panic.message` (`PanicText`).
       contracts and `SerdeIgnTrace`'s pop-aware growth budget while tracking the
       full scratch frame stack in 81. The complete pure trace and its consumed-byte
       peak bound are proved in `SerdeIgnMachineTrace`; match the actual 81 body
-      to that trace. `Hyp81` must allow heap and scratch changes.
+      to that trace. `SerdeIgnSegments` supplies the concrete entry, save and
+      restore transitions with traced credits. `Hyp81` must allow heap and scratch
+      changes.
 2. **`ft_balance_of`, method level.** Take the parser's contracts as parameters until they are proved. The argument layer is in `EnvInput` and `ArgsLeaves`, the balance read in `LookupMapGet`/`StorageReadWrapF`.
 3. **The remaining methods**, in M8's order:
    - `storage_balance_of` (its parser is the same code as `ft_balance_of`'s);

@@ -1439,6 +1439,24 @@ to be matched to the traced pure continuation, with saved String ownership
 and reachable allocation room. The uniform accepting parser, general rejection,
 seventh method and final exported refinement theorem remain open.
 
+`SerdeIgnSegments` now pins concrete body fragments by kernel-checked
+`startCode_eq`, `openingBlock_tail` and `closingBlock_tail`. `start_prefix`
+proves the actual prologue and scratch clear from arbitrary reusable contents,
+exposing the 128+32 split of the complete 160-byte frame at 60 regular
+operations. `open_prefix` proves the actual optional save, opening-byte consume
+and current-bracket installation, returning the changed scratch/heap
+coordinates at `60*c + saveCost`. `close_nonempty` restores the saved head
+through the actual pop and flag test; `close_empty` takes the real success
+branch with scratch retained. Both closing segments fit 110 regular operations.
+
+`open_traced` and `close_traced` carry the successful complete pure continuation
+and remaining growth credits through those Wasm segments; opening fits
+`200*c` plus its recorded growth reserve. The next work is the surrounding
+whitespace/scalar dispatch, member-key handling and complete loop/control
+invariant. Local 4 is preserved by opening and restoration and may be 0 after
+a nested opening; it must not be fixed to 1 in the container invariant. No
+complete deep 81 contract, uniform accepting parser or seventh method is claimed.
+
 ### M7. State and storage
 
 Borsh encoding of the state, `LookupMap` keys, near-sdk's `env` wrappers
