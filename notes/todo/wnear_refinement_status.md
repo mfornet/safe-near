@@ -33,6 +33,31 @@ it is false for the reviewed domain; its historical statement is recorded in
 the misstatement log. The historical generic host trap and contradiction lemmas
 remain checked, but witness existence is no longer a frontier obligation.
 
+## Validated global-composition checkpoint
+
+The proof changes in `39b25d76` passed the complete merged checkpoint on
+2026-10-30 at 22:55:48 UTC, for proof source digest
+`e75b58b3528d193af0fb4c1019981b37a581e60fe1155c07af31f142d4f6c02d`.
+The complete build, strict NearLogic audit, exact named wNEAR admission audit,
+unchanged statement pins, fresh LeanArchitect dependency export, seven frontier
+policy tests, Lean style and toolchain/isolation checks passed. The audit module
+allowance and exact incomplete frontier were not expanded.
+
+Integrated: `refines_wnear_of_clauses` into the existing global theorem;
+`all_clauses` and `refines_wnear_with_obligations` connect the reviewed environment
+and named remaining methods to that global composition. The new composition
+proofs use only the standard three axioms. No remaining method, protocol premise,
+uniform parser contract or deployment parse witness was instantiated or discharged.
+The new interface stays Open and its assembly and global consumers stay Conditional.
+
+The continuous publisher now runs from the active `8197` worktree through the
+existing HTTP/Tailscale endpoint. The verified release for the proof commit was
+built at 22:57:24 UTC; the served page displays the current revision and build time
+when later notes or metadata updates are published. Served JSON was compared with
+the actual Lean export and audit digest, including all fifteen methods, the global
+composition's caller edges, and Open `IgnoreHyp`, `KeyConditions` and
+`ValueConditions`. Publication health reported no failure.
+
 ## Prior receipt-domain wind-down checkpoint
 
 - Full strict validation passed on 2026-10-30 at 22:43 UTC for proof source
