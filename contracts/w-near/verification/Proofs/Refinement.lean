@@ -286,6 +286,46 @@ theorem refines_wnear_exported (cfg : Config) (code : Wasm.Module) (codeOf : Lis
   exact Binary.Exported.all_methods cfg wNearBytes.size codeOf protocol he deployed_code_size hr
     ctx.method hmethod hcfg raw st ctx hrep hwf hprot rfl
 
+/-- Admission-free global composition. The exported interface is an unresolved
+verification dependency until its exact method clauses are instantiated. The
+non-exported branch is discharged by binary export facts and boundary rollback. -/
+theorem refines_wnear_of_clauses (cfg : Config) (code : Wasm.Module)
+    (codeOf : List UInt8 → Near.ContractCode) (protocol : Wasm.Near.RuntimeConfig)
+    (hcfg : cfg.WF) (hcode : Wasm.Binary.decode wNearBytes = .ok code)
+    (hc : Binary.Exported.Clauses cfg wNearBytes.size codeOf protocol) :
+    Refines Near.Boundary.nearRuntime protocol
+      { code := { module := code, size := wNearBytes.size, hash := "" }, codeOf } (wnear cfg) := by
+  intro raw st ctx hrep hwf hprot
+  have hstart : code.start = none := code_eq hcode ▸ start_wNearModule
+  have hexports : funcExportNames code = exportedMethods := code_eq hcode ▸ exports_wNearModule
+  by_cases hmethod : ctx.method ∈ exportedMethods
+  · have hsame := code_eq hcode
+    subst code
+    exact hc ctx.method hmethod hcfg raw st ctx hrep hwf hprot rfl
+  · have hexport : code.exportFunc? ctx.method = none := exportFunc_none (by rw [hexports]; exact hmethod)
+    obtain ⟨hrb, hni⟩ := Near.Boundary.nearRuntime_not_exported
+      { code := { module := code, size := wNearBytes.size, hash := "" }, codeOf } raw ctx rfl
+      hstart hexport
+    have hnone : ∀ c, ¬ (wnear cfg).Parses ctx.method ctx.args c := by
+      intro c hc
+      change Call.decode ctx.method ctx.args = some c at hc
+      rw [decode_not_exported hmethod] at hc
+      cases hc
+    exact ⟨hni, fun c hc => absurd hc (hnone c), fun _ => hrb⟩
+
+/-- Admission-free route from the reviewed environment and nine named remaining
+method obligations to the unchanged deployed-binary refinement. No protocol parse
+witness or method proof is supplied by this theorem. -/
+theorem refines_wnear_with_obligations (cfg : Config) (code : Wasm.Module)
+    (codeOf : List UInt8 → Near.ContractCode) (protocol : Wasm.Near.RuntimeConfig)
+    (hcfg : cfg.WF) (hcode : Wasm.Binary.decode wNearBytes = .ok code)
+    (he : Binary.Exported.Environment protocol)
+    (hr : Binary.Exported.Remaining cfg wNearBytes.size codeOf protocol) :
+    Refines Near.Boundary.nearRuntime protocol
+      { code := { module := code, size := wNearBytes.size, hash := "" }, codeOf } (wnear cfg) :=
+  refines_wnear_of_clauses cfg code codeOf protocol hcfg hcode
+    (Binary.Exported.all_clauses cfg wNearBytes.size codeOf protocol he deployed_code_size hr)
+
 /-- The deployed wNEAR binary refines the model: for every configuration whose
 measured account entry fits a `u64`, every context under the pinned protocol
 configuration (version 86) and every resource state, near-lean's execution of
@@ -301,22 +341,13 @@ theorem refines_wnear (cfg : Config) (code : Wasm.Module) (codeOf : List UInt8 �
     (hprotocol : Wasm.Near.RuntimeConfig.parse wNearProtocolJson = .ok protocol) :
     Refines Near.Boundary.nearRuntime protocol
       { code := { module := code, size := wNearBytes.size, hash := "" }, codeOf } (wnear cfg) := by
-  intro raw st ctx hrep hwf hprot
-  have hstart : code.start = none := code_eq hcode ▸ start_wNearModule
-  have hexports : funcExportNames code = exportedMethods := code_eq hcode ▸ exports_wNearModule
-  by_cases hmethod : ctx.method ∈ exportedMethods
-  · exact refines_wnear_exported cfg code codeOf protocol hcfg hcode hprotocol raw st ctx hrep hwf
-      hprot hmethod
-  · have hexport : code.exportFunc? ctx.method = none := exportFunc_none (by rw [hexports]; exact hmethod)
-    obtain ⟨hrb, hni⟩ := Near.Boundary.nearRuntime_not_exported
-      { code := { module := code, size := wNearBytes.size, hash := "" }, codeOf } raw ctx rfl
-      hstart hexport
-    have hnone : ∀ c, ¬ (wnear cfg).Parses ctx.method ctx.args c := by
-      intro c hc
-      change Call.decode ctx.method ctx.args = some c at hc
-      rw [decode_not_exported hmethod] at hc
-      cases hc
-    exact ⟨hni, fun c hc => absurd hc (hnone c), fun _ => hrb⟩
+  apply refines_wnear_of_clauses cfg code codeOf protocol hcfg hcode
+  intro method hmethod hcfg' raw st ctx hrep hwf hprot hm
+  have hcall := refines_wnear_exported cfg code codeOf protocol hcfg' hcode hprotocol
+    raw st ctx hrep hwf hprot (hm ▸ hmethod)
+  have hsame := code_eq hcode
+  subst code
+  exact hcall
 
 /-- `withdraw_available_binary` for `contract.wasm` on near-lean under the
 pinned protocol configuration: a withdrawal attached with at least the model's gas bound succeeds on the deployed binary.

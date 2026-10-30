@@ -31,6 +31,12 @@ def MethodClause (cfg : WNear.Config) (size : Nat) (codeOf : List UInt8 → Near
     (wnear cfg).Represents raw st → ctx.WF raw → ctx.protocol = protocol → ctx.method = method →
     At cfg size codeOf raw st ctx
 
+/-- Exact interface consumed by the global refinement composition.
+A witness must cover every exported method, including rejected input and all resources. -/
+def Clauses (cfg : WNear.Config) (size : Nat) (codeOf : List UInt8 → Near.ContractCode)
+    (protocol : RuntimeConfig) : Prop :=
+  ∀ method, method ∈ exportedMethods → MethodClause cfg size codeOf protocol method
+
 /-- Reviewed environmental premises; their instantiation from the pinned JSON remains an obligation. -/
 structure Environment (protocol : RuntimeConfig) : Prop where
   runtime : WProtocol protocol
@@ -156,5 +162,11 @@ theorem all_methods (cfg : WNear.Config) (size : Nat) (codeOf : List UInt8 → N
   · exact storageBalanceBounds_complete cfg size codeOf protocol he hsize
   · exact hr.storageBalanceOf
   · exact ftMetadata_complete cfg size codeOf protocol he hsize
+
+/-- Admission-free assembly of the exported interface from completed methods and named obligations. -/
+theorem all_clauses (cfg : WNear.Config) (size : Nat) (codeOf : List UInt8 → Near.ContractCode)
+    (protocol : RuntimeConfig) (he : Environment protocol) (hsize : size ≤ 185625)
+    (hr : Remaining cfg size codeOf protocol) : Clauses cfg size codeOf protocol :=
+  all_methods cfg size codeOf protocol he hsize hr
 
 end WNear.Binary.Exported

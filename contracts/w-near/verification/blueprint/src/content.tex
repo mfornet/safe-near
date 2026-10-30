@@ -160,6 +160,16 @@ every failure rolling back storage, balance, usage and receipts. The theorem
 below, with the binary embedded, is the formal deployed refinement
 obligation. It is not proved.
 
+The global assembly is checked separately from its unresolved obligations.
+\texttt{refines\_wnear\_of\_clauses} consumes the exact all-exported interface
+\texttt{Exported.Clauses} and proves the non-exported branch using the decoded
+module and runtime rollback facts. The original refinement theorem uses that
+composition. \texttt{refines\_wnear\_with\_obligations} connects the reviewed
+environment and the nine named remaining method contracts through the checked
+fifteen-method dispatch to the full refinement. These composition theorems use
+no admissions, but are Conditional until their verification contracts are
+instantiated. They do not discharge the pinned protocol parse witness.
+
 \inputleanmodule{Proofs.Refinement}
 
 \section{What the statement buys}

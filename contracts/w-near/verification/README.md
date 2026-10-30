@@ -26,6 +26,16 @@ toolchain `v4.34.1`, Mathlib `v4.34.1`, LeanArchitect `v4.34.0`); the project
 depends on `near-lean/runtime` (and through it `near-lean/interface`) for the
 refinement statement and its runtime instance.
 
+The continuously maintained dependency site is published through the existing
+Tailscale Serve endpoint. Its landing page links the LeanArchitect/leanblueprint
+book, all fifteen methods, named shared contracts and the checked proof frontier.
+The site displays its source revision, digest, last successful build and strict
+audit freshness; a failed refresh retains the previous successful release and
+shows the failure. See `notes/todo/wnear_refinement_status.md` for the current
+proof obligations. From the repository root, `python3 tools/wnear_blueprint.py
+--watch --publish --reuse --destination <served-directory> --url <stable-url>`
+keeps a configured endpoint current. Reuse the existing publisher when active.
+
 ## The model
 
 `Model/State.lean` keeps the three pieces of on-chain state of the
@@ -75,7 +85,7 @@ requires the open runtime refinement proof and explicit gas/storage assumptions.
 | `InitOnce` | `new` cannot run twice; nothing runs before `new` | proved |
 | `ProjectEncode` | The view recovers every well-formed state from its storage | proved |
 | `StorageCoverage` | Occupied storage is at most the `STATE` record plus `account_storage_usage` per registered account | proved |
-| `refines_wnear` | `NearInterface.Refines` for `contract.wasm` on near-lean's function-call boundary and the `wnear` contract model, under the pinned protocol configuration (version 86): every input, every amount of gas, every resource state | proved for methods the binary does not export; open for the 15 exported ones (`refines_wnear_exported`) |
+| `refines_wnear` | `NearInterface.Refines` for `contract.wasm` on near-lean's function-call boundary and the `wnear` contract model, under the pinned protocol configuration (version 86): every input, every amount of gas, every resource state | Conditional: checked global composition and all-15 dispatch; six complete method clauses under reviewed environment premises, nine remaining method contracts and pinned protocol instantiation open |
 
 ## Proof approach and lessons
 
@@ -187,8 +197,12 @@ exported methods that can reach it (`tools/wasm_names.py`).
 
 All model/spec/proof declarations are subject to a strict transitive axiom
 audit (`just wnear-audit`). It rejects `sorryAx`, `native_decide` and every
-axiom outside `propext`, `Classical.choice` and `Quot.sound`, except the one
-open obligation `refines_wnear`. The storage projection still uses classical
+axiom outside `propext`, `Classical.choice` and `Quot.sound`, except the exact
+named frontier in `Proofs.Refinement`. The blueprint checker verifies the precise
+admitted leaves and all declarations that transitively depend on them; the rest
+of the package and NearLogic remain strict. `refines_wnear_of_clauses` and
+`refines_wnear_with_obligations` have no `sorryAx`, but remain Conditional on
+explicit verification contracts. The storage projection still uses classical
 choice, not an executable Borsh decoder.
 
 Solvency, storage-lock coverage and end-to-end transfer-call behaviour remain

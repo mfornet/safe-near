@@ -1,6 +1,6 @@
 # wNEAR refinement: status and how to resume
 
-Checkpoint status on 2026-10-30; this worktree’s proof exploration is wound down at the user’s request. Details are in `wnear_refinement_proof.md`: M3 for the first method, M6 for JSON arguments (the parser map is `wnear_m6_parser_map.md`), and M8 for the other methods.
+Campaign status on 2026-10-30; proof continuation is active in `codex/wnear-blueprint-refinement`. The prior receipt-domain checkpoint was wound down and pushed as `9988a700`. Details are in `wnear_refinement_proof.md`: M3 for the first method, M6 for JSON arguments (the parser map is `wnear_m6_parser_map.md`), and M8 for the other methods.
 
 The exported refinement is now a checked dispatch over six completed method clauses and eight open full-method obligations and a checked `ft_balance_of` assembly over three named open clauses, with five separately named protocol-instantiation obligations. The global refinement and its withdrawal corollary remain conditional on those leaves. Completed results use only `propext`, `Classical.choice` and `Quot.sound`; never use `bv_decide` or `native_decide`.
 
@@ -33,7 +33,7 @@ it is false for the reviewed domain; its historical statement is recorded in
 the misstatement log. The historical generic host trap and contradiction lemmas
 remain checked, but witness existence is no longer a frontier obligation.
 
-## Wind-down checkpoint
+## Prior receipt-domain wind-down checkpoint
 
 - Full strict validation passed on 2026-10-30 at 22:43 UTC for proof source
   digest `32909647a605d71443b933733287d2dad49bcec02cf45a6244c2e9998098fb74`.
@@ -46,18 +46,16 @@ remain checked, but witness existence is no longer a frontier obligation.
 - Warm checkpoint timings: wNEAR compilation 97.2 s, strict wNEAR audit 376.3 s,
   frontier check 95.0 s (export 79.2 s: traversal 72.6 s, estimated imports/startup
   6.6 s). Full audits still run without an audit cache.
-- No proof agents are assigned and no further proof exploration is scheduled in
-  this worktree. Its blueprint watcher was stopped for wind-down; static serving
-  remains available. The served frontier records the final revision/build time.
-  Restart watching with `tools/wnear_blueprint.py --install-watch` and the local
-  publication settings when work resumes.
+- The prior `5885` worktree was wound down and its watcher stopped. The current
+  continuation reuses the static HTTP/Tailscale endpoint and transfers continuous
+  publishing to the active `8197` worktree; the prior worktree remains preserved.
 
 ## Continuation checkpoint
 
 - Latest full-audit baseline before this domain correction: `efd5c8a`; the
   live frontier states the current revision and whether its exact source digest
-  has a full audit. The integration owner for this checkpoint is this worktree; no proof
-  agents are assigned. No further proof exploration is scheduled.
+  has a full audit. The active integration owner is `codex/wnear-blueprint-refinement` in the
+  `8197` worktree; no proof agents are assigned.
 - Checked end-to-end *decoded body* path: `ft_balance_of`, copied-string array,
   absent account, zero return. It is paired with the model zero-balance result
   in `copied_array_absent_body_model_agreement`. This is not yet an external
@@ -1742,7 +1740,7 @@ The texts are proved equal to the model's `Panic.message` (`PanicText`).
    - `storage_balance_of` (its parser is the same code as `ft_balance_of`'s);
    - `storage_*`, `near_withdraw`, `ft_transfer`;
    - then `ft_transfer_call` and `ft_resolve_transfer`, which need promise and promise-result host contracts.
-4. **M9.** Assemble `refines_wnear_exported` and discharge the code size, `CostsV86`, `LimitsV86`, `CostsNewV86` and `CostsDepositV86`.
+4. **M9.** Instantiate the checked global/exported composition: discharge the remaining method contracts, pinned-JSON parse witness, `WProtocol`, `CostsV86`, `LimitsV86`, `CostsNewV86` and `CostsDepositV86`. The deployed code size is already kernel-checked.
 
 The complete decoded `ft_balance_of` body is checked for a copied-string array
 and an absent account. `copied_array_absent_body_initial_room` derives both input
@@ -1758,6 +1756,36 @@ decoded-body execution with the model's zero result for the same absent key.
 It explicitly requires a well-formed represented state, erased-host agreement and
 zero storage deficit in addition to the execution assumptions; it does not yet
 derive the complete boundary refinement or cover other inputs and outcomes.
+
+## Continuation: explicit global composition
+
+`Binary.Exported.Clauses` names the exact exported-method interface, including
+execution safety, sufficient-resource agreement, arbitrary-resource rollback and
+rejected arguments. It is an **Open verification contract**, not a proof.
+`all_clauses` assembles it from the checked fifteen-method dispatch, reviewed
+`Environment` premises, code size and the nine named `Remaining` contracts.
+
+`refines_wnear_of_clauses` now closes the entire deployed-binary refinement from
+that interface: the exported branch consumes it, and the non-exported branch uses
+the kernel-checked module export facts and runtime rollback result. The original
+`refines_wnear` calls this composition with `refines_wnear_exported`; its statement
+and admitted leaves are unchanged. `refines_wnear_with_obligations` additionally
+exposes an admission-free route from `Environment` and `Remaining` to the full
+refinement. These assembly theorems contain no `sorryAx`, but remain
+**Conditional** because their exact verification contracts are unresolved. The
+blueprint checks both the explicit hypotheses and their actual caller edges.
+
+The next parser-room obligation must cover the actual `roomRun` definition:
+error-box space before and after each scratch append, each reserve's `roomRes`,
+and every intermediate heap length permitted by `hlAfter`. A bound only on the
+successful append trace and downstream six allocations does not by itself
+establish this all-outcome contract. Keep that distinction explicit when deriving
+room from initial method resources.
+
+This checkpoint integrates the global composition; it does not discharge a method,
+protocol premise, parser hypothesis or deployment parse witness. In particular,
+`IgnoreHyp`, `KeyConditions`, `ValueConditions`, parser room and reachable resource
+bounds remain open, and all downstream method obligations remain visible.
 
 ## Working notes
 

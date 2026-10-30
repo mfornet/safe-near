@@ -27,6 +27,15 @@ def WNear.Binary.Exported.At (cfg : WNear.Config) (size : ℕ) (codeOf : List UI
         NearInterface.RolledBack ctx raw r)
 ```
 
+`WNear.Binary.Exported.Clauses` (hash `a8eb8e27197807bc`)
+
+```lean
+def WNear.Binary.Exported.Clauses (cfg : WNear.Config) (size : ℕ) (codeOf : List UInt8 → Near.ContractCode)
+  (protocol : Wasm.Near.RuntimeConfig) : Prop :=
+  ∀ method ∈ WNear.exportedMethods,
+    WNear.Binary.Exported.MethodClause cfg size codeOf protocol method
+```
+
 `WNear.Binary.Exported.Environment` (hash `c6566a7375002a94`)
 
 ```lean
@@ -68,6 +77,15 @@ inductive WNear.Binary.Exported.Remaining (cfg : WNear.Config) (size : ℕ) (cod
   (storageUnregister : WNear.Binary.Exported.MethodClause cfg size codeOf protocol "storage_unregister")
   (storageBalanceOf : WNear.Binary.Exported.MethodClause cfg size codeOf protocol "storage_balance_of") :
   WNear.Binary.Exported.Remaining cfg size codeOf protocol
+```
+
+`WNear.Binary.Exported.all_clauses` (hash `0000000038e9b91c`)
+
+```lean
+theorem WNear.Binary.Exported.all_clauses (cfg : WNear.Config) (size : ℕ) (codeOf : List UInt8 → Near.ContractCode)
+  (protocol : Wasm.Near.RuntimeConfig) (he : WNear.Binary.Exported.Environment protocol) (hsize : size ≤ 185625)
+  (hr : WNear.Binary.Exported.Remaining cfg size codeOf protocol) :
+  WNear.Binary.Exported.Clauses cfg size codeOf protocol
 ```
 
 `WNear.Binary.Exported.all_methods` (hash `000000002f5f4612`)
@@ -5810,6 +5828,29 @@ theorem WNear.refines_wnear_exported (cfg : WNear.Config) (code : Wasm.Module) (
             (NearInterface.Matches (WNear.wnear cfg) ctx raw r res ∨
               NearInterface.ResourceFailure r ∧ NearInterface.RolledBack ctx raw r ∧ r.logs <+: res.logs)) ∧
       ((¬∃ c, (WNear.wnear cfg).Parses ctx.method ctx.args c) → NearInterface.RolledBack ctx raw r)
+```
+
+`WNear.refines_wnear_of_clauses` (hash `00000000059f2cae`)
+
+```lean
+theorem WNear.refines_wnear_of_clauses (cfg : WNear.Config) (code : Wasm.Module) (codeOf : List UInt8 → Near.ContractCode)
+  (protocol : Wasm.Near.RuntimeConfig) (hcfg : cfg.WF)
+  (hcode : Wasm.Binary.decode WNear.Binary.wNearBytes = Except.ok code)
+  (hc : WNear.Binary.Exported.Clauses cfg WNear.Binary.wNearBytes.size codeOf protocol) :
+  NearInterface.Refines Near.Boundary.nearRuntime protocol
+    { code := { module := code, size := WNear.Binary.wNearBytes.size, hash := "" }, codeOf := codeOf } (WNear.wnear cfg)
+```
+
+`WNear.refines_wnear_with_obligations` (hash `00000000678046d0`)
+
+```lean
+theorem WNear.refines_wnear_with_obligations (cfg : WNear.Config) (code : Wasm.Module) (codeOf : List UInt8 → Near.ContractCode)
+  (protocol : Wasm.Near.RuntimeConfig) (hcfg : cfg.WF)
+  (hcode : Wasm.Binary.decode WNear.Binary.wNearBytes = Except.ok code)
+  (he : WNear.Binary.Exported.Environment protocol)
+  (hr : WNear.Binary.Exported.Remaining cfg WNear.Binary.wNearBytes.size codeOf protocol) :
+  NearInterface.Refines Near.Boundary.nearRuntime protocol
+    { code := { module := code, size := WNear.Binary.wNearBytes.size, hash := "" }, codeOf := codeOf } (WNear.wnear cfg)
 ```
 
 `WNear.storageBalanceOf_obligation` (hash `00000000e4a9ffa1`)

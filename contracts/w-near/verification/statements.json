@@ -151,6 +151,8 @@
     "WNear.Binary.InputDomain.no_mismatch_witness",
     "WNear.Binary.InputDomain.wf_input_register_returns",
     "WNear.Binary.InputDomain.InputLimitsOrdered",
-    "Near.validateAction_functionCall_ok_iff"
+    "Near.validateAction_functionCall_ok_iff",
+    "WNear.refines_wnear_of_clauses",
+    "WNear.refines_wnear_with_obligations"
   ]
 }

@@ -17,7 +17,63 @@
         "protocol-available",
         "protocol-input-limit-order"
       ],
-      "notes": "User-reviewed incoming receipt argument bound now included in Context.WF. Runtime action-list validation supplies this bound. Oversized historical reproducer is outside this domain; pinned limit-relation instantiation and general arbitrary-resource refinement remain open."
+      "notes": "User-reviewed incoming receipt argument bound now included in Context.WF. Runtime action-list validation supplies this bound. Oversized historical reproducer is outside this domain; pinned limit-relation instantiation and general arbitrary-resource refinement remain open.",
+      "required_proof_dependencies": [
+        "global-composition"
+      ]
+    },
+    {
+      "id": "exported-clauses",
+      "declaration": "WNear.Binary.Exported.Clauses",
+      "title": "Full exported-method interface",
+      "kind": "verification_contract",
+      "label": "frontier:exported-clauses",
+      "notes": "Exact all-exported contract consumed by global composition. This is an interface, not an additional admission.",
+      "reviewed_shape_hash": 12171978716481062844
+    },
+    {
+      "id": "exported-clauses-assembly",
+      "declaration": "WNear.Binary.Exported.all_clauses",
+      "title": "Assemble exported-method interface",
+      "kind": "theorem",
+      "label": "frontier:exported-clauses-assembly",
+      "required_type_dependencies": [
+        "remaining",
+        "exported-clauses"
+      ],
+      "required_proof_dependencies": [
+        "dispatch"
+      ],
+      "reviewed_shape_hash": 954841372
+    },
+    {
+      "id": "global-composition",
+      "declaration": "WNear.refines_wnear_of_clauses",
+      "title": "Global refinement from exported clauses",
+      "kind": "theorem",
+      "label": "frontier:global-composition",
+      "required_type_dependencies": [
+        "exported-clauses"
+      ],
+      "notes": "No sorryAx. Conditional on the exact exported interface; the non-exported branch is proved by export and boundary rollback facts.",
+      "reviewed_shape_hash": 94317742
+    },
+    {
+      "id": "global-with-obligations",
+      "declaration": "WNear.refines_wnear_with_obligations",
+      "title": "Global refinement with named remaining obligations",
+      "kind": "theorem",
+      "label": "frontier:global-with-obligations",
+      "required_type_dependencies": [
+        "remaining"
+      ],
+      "required_proof_dependencies": [
+        "global-composition",
+        "exported-clauses-assembly",
+        "binary-size"
+      ],
+      "notes": "No sorryAx. Reviewed environmental premises and all nine remaining method contracts are explicit hypotheses. Does not instantiate them or the pinned protocol parse witness.",
+      "reviewed_shape_hash": 1736459984
     },
     {
       "id": "exported",

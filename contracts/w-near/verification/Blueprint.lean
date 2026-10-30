@@ -43,6 +43,30 @@ import Bridge.Methods.ContextInputDomain
 
 /-! The browsable proof frontier. Definitions marked Open state contracts, not proofs. -/
 
+attribute [blueprint "frontier:exported-clauses"
+  (title := /-- Full exported-method interface -/)
+  (statement := /-- Exact all-exported contract consumed by global composition. This is an interface, not an additional admission. -/)
+  (notReady := true)]
+  WNear.Binary.Exported.Clauses
+
+attribute [blueprint "frontier:exported-clauses-assembly"
+  (title := /-- Assemble exported-method interface -/)
+  (statement := /-- Assemble exported-method interface. Exact unresolved interfaces remain dependencies. -/)
+  (notReady := true)]
+  WNear.Binary.Exported.all_clauses
+
+attribute [blueprint "frontier:global-composition"
+  (title := /-- Global refinement from exported clauses -/)
+  (statement := /-- No sorryAx. Conditional on the exact exported interface; the non-exported branch is proved by export and boundary rollback facts. -/)
+  (notReady := true)]
+  WNear.refines_wnear_of_clauses
+
+attribute [blueprint "frontier:global-with-obligations"
+  (title := /-- Global refinement with named remaining obligations -/)
+  (statement := /-- No sorryAx. Reviewed environmental premises and all nine remaining method contracts are explicit hypotheses. Does not instantiate them or the pinned protocol parse witness. -/)
+  (notReady := true)]
+  WNear.refines_wnear_with_obligations
+
 attribute [blueprint "frontier:exported"
   (title := /-- All exported runtime clauses -/)
   (statement := /-- All exported runtime clauses. Kernel status, reviewed premises, unresolved dependencies and caller integration are checked by the frontier exporter. -/)
