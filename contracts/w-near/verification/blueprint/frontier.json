@@ -828,9 +828,12 @@
       "declaration": "WNear.Binary.StateRead.pre219",
       "title": "State-read entry resources and one-cell free-list bound",
       "kind": "verification_contract",
-      "notes": "State-read entry resources include a heap free-list bound of one; establishing them from the preceding balance parser remains open.",
+      "notes": "State-read entry resources include a heap free-list bound of one; establishing them from the preceding balance parser remains open. The generalized deserializer chain is checked separately, but state_read has not yet been generalized or connected to it.",
       "label": "frontier:balance-state-entry",
-      "reviewed_shape_hash": 14030933622959962654
+      "reviewed_shape_hash": 14030933622959962654,
+      "planned_dependencies": [
+        "borsh-contract-free-bound"
+      ]
     },
     {
       "id": "balance-second-read",
@@ -980,6 +983,93 @@
       "required_proof_dependencies": [
         "balance-export-state-exact-gas",
         "balance-room-after-state"
+      ]
+    },
+    {
+      "id": "borsh-vec-free-bound",
+      "declaration": "WNear.Binary.BorshVecF.f374_spec",
+      "title": "Vector copy with a general free-list bound",
+      "kind": "theorem",
+      "environment": "Arbitrary supported free-list bound, allocation room, valid input bytes, and explicit Wasm frame, depth and gas premises; not yet connected to state_read.",
+      "label": "frontier:borsh-vec-free-bound",
+      "reviewed_shape_hash": 3528513997,
+      "required_type_dependencies": [
+        "owned-room"
+      ]
+    },
+    {
+      "id": "borsh-bytes-reader-free-bound",
+      "declaration": "WNear.Binary.BorshBytesF.f316_spec",
+      "title": "Byte reader with a general free-list bound",
+      "kind": "theorem",
+      "environment": "Arbitrary supported free-list bound, allocation room, valid input bytes, and explicit Wasm frame, depth and gas premises; not yet connected to state_read.",
+      "label": "frontier:borsh-bytes-reader-free-bound",
+      "reviewed_shape_hash": 1010317074,
+      "required_type_dependencies": [
+        "owned-room"
+      ],
+      "required_proof_dependencies": [
+        "borsh-vec-free-bound"
+      ]
+    },
+    {
+      "id": "borsh-bytes-free-bound",
+      "declaration": "WNear.Binary.BorshBytesF.f315_spec",
+      "title": "Byte deserializer with a general free-list bound",
+      "kind": "theorem",
+      "environment": "Arbitrary supported free-list bound, allocation room, valid input bytes, and explicit Wasm frame, depth and gas premises; not yet connected to state_read.",
+      "label": "frontier:borsh-bytes-free-bound",
+      "reviewed_shape_hash": 2640870261,
+      "required_type_dependencies": [
+        "owned-room"
+      ],
+      "required_proof_dependencies": [
+        "borsh-bytes-reader-free-bound"
+      ]
+    },
+    {
+      "id": "borsh-ft-free-bound",
+      "declaration": "WNear.Binary.BorshFTF.f425_spec",
+      "title": "Fungible-token deserializer with a general free-list bound",
+      "kind": "theorem",
+      "environment": "Arbitrary supported free-list bound, allocation room, valid input bytes, and explicit Wasm frame, depth and gas premises; not yet connected to state_read.",
+      "label": "frontier:borsh-ft-free-bound",
+      "reviewed_shape_hash": 1874100063,
+      "required_type_dependencies": [
+        "owned-room"
+      ],
+      "required_proof_dependencies": [
+        "borsh-bytes-free-bound"
+      ]
+    },
+    {
+      "id": "borsh-contract-reader-free-bound",
+      "declaration": "WNear.Binary.BorshContractF.f162_spec",
+      "title": "Contract reader with a general free-list bound",
+      "kind": "theorem",
+      "environment": "Arbitrary supported free-list bound, allocation room, valid input bytes, and explicit Wasm frame, depth and gas premises; not yet connected to state_read.",
+      "label": "frontier:borsh-contract-reader-free-bound",
+      "reviewed_shape_hash": 1845147241,
+      "required_type_dependencies": [
+        "owned-room"
+      ],
+      "required_proof_dependencies": [
+        "borsh-ft-free-bound"
+      ]
+    },
+    {
+      "id": "borsh-contract-free-bound",
+      "declaration": "WNear.Binary.BorshContractF.f161_spec",
+      "title": "Contract slice deserializer with a general free-list bound",
+      "kind": "theorem",
+      "environment": "Arbitrary supported free-list bound, allocation room, valid input bytes, and explicit Wasm frame, depth and gas premises; not yet connected to state_read.",
+      "label": "frontier:borsh-contract-free-bound",
+      "reviewed_shape_hash": 2198598637,
+      "required_type_dependencies": [
+        "owned-room"
+      ],
+      "required_proof_dependencies": [
+        "borsh-contract-reader-free-bound"
       ]
     }
   ],

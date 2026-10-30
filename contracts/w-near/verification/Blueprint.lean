@@ -29,6 +29,7 @@ import Bridge.Functions.BalanceOf297StateBridge
 import Bridge.Functions.BalanceOf297ReadBudget
 import Bridge.Functions.BalanceOf297ReadGas
 import Bridge.Functions.BalanceOf297Room
+import Bridge.Functions.BorshContractF
 
 /-! The browsable proof frontier. Definitions marked Open state contracts, not proofs. -/
 
@@ -497,3 +498,39 @@ attribute [blueprint "frontier:balance-export-state-six-grows"
   (statement := /-- The checked absent-account suffix derives every allocation-room requirement from a single six-growth entry bound; parser-entry resources and reachability of that bound remain open. -/)
   (notReady := true)]
   WNear.Binary.BalanceOf297AbsentCall.state_through_cleanup_six_grows
+
+attribute [blueprint "frontier:borsh-vec-free-bound"
+  (title := /-- Vector copy with a general free-list bound -/)
+  (statement := /-- The decoded deserializer preserves an explicitly bounded free list, under the stated allocation-room and execution-resource premises. The state-read caller is not yet generalized. -/)
+  (notReady := true)]
+  WNear.Binary.BorshVecF.f374_spec
+
+attribute [blueprint "frontier:borsh-bytes-reader-free-bound"
+  (title := /-- Byte reader with a general free-list bound -/)
+  (statement := /-- The decoded deserializer preserves an explicitly bounded free list, under the stated allocation-room and execution-resource premises. The state-read caller is not yet generalized. -/)
+  (notReady := true)]
+  WNear.Binary.BorshBytesF.f316_spec
+
+attribute [blueprint "frontier:borsh-bytes-free-bound"
+  (title := /-- Byte deserializer with a general free-list bound -/)
+  (statement := /-- The decoded deserializer preserves an explicitly bounded free list, under the stated allocation-room and execution-resource premises. The state-read caller is not yet generalized. -/)
+  (notReady := true)]
+  WNear.Binary.BorshBytesF.f315_spec
+
+attribute [blueprint "frontier:borsh-ft-free-bound"
+  (title := /-- Fungible-token deserializer with a general free-list bound -/)
+  (statement := /-- The decoded deserializer preserves an explicitly bounded free list, under the stated allocation-room and execution-resource premises. The state-read caller is not yet generalized. -/)
+  (notReady := true)]
+  WNear.Binary.BorshFTF.f425_spec
+
+attribute [blueprint "frontier:borsh-contract-reader-free-bound"
+  (title := /-- Contract reader with a general free-list bound -/)
+  (statement := /-- The decoded deserializer preserves an explicitly bounded free list, under the stated allocation-room and execution-resource premises. The state-read caller is not yet generalized. -/)
+  (notReady := true)]
+  WNear.Binary.BorshContractF.f162_spec
+
+attribute [blueprint "frontier:borsh-contract-free-bound"
+  (title := /-- Contract slice deserializer with a general free-list bound -/)
+  (statement := /-- The decoded deserializer preserves an explicitly bounded free list, under the stated allocation-room and execution-resource premises. The state-read caller is not yet generalized. -/)
+  (notReady := true)]
+  WNear.Binary.BorshContractF.f161_spec

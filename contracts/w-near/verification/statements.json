@@ -85,6 +85,12 @@
     "WNear.Binary.BalanceOf297AbsentCall.balanceReadGasAfterState_exact",
     "WNear.Binary.BalanceOf297AbsentCall.state_through_cleanup_exact_gas",
     "WNear.Binary.BalanceOf297AbsentCall.room_after_state",
-    "WNear.Binary.BalanceOf297AbsentCall.state_through_cleanup_six_grows"
+    "WNear.Binary.BalanceOf297AbsentCall.state_through_cleanup_six_grows",
+    "WNear.Binary.BorshVecF.f374_spec",
+    "WNear.Binary.BorshBytesF.f316_spec",
+    "WNear.Binary.BorshBytesF.f315_spec",
+    "WNear.Binary.BorshFTF.f425_spec",
+    "WNear.Binary.BorshContractF.f162_spec",
+    "WNear.Binary.BorshContractF.f161_spec"
   ]
 }

@@ -21,6 +21,10 @@ contracts remain unresolved; the recent parser loop and scalar results prove
 individual transitions, not the whole ignored-value reader. The strict audit and
 frontier manifest track the exact admitted leaves and protect statement shapes.
 
+## General free-list bound in state deserialization
+
+The decoded Borsh chain for functions 374, 316, 315, 425, 162 and 161 now has checked variants that preserve an arbitrary supported free-list bound and charge the corresponding allocator cost. These are conditional on allocation room and the stated execution resources. The current state-read wrapper still requires its original one-cell entry bound; generalizing it and connecting the parser remain open.
+
 ## Continuation on 2026-10-29: integration with main
 
 Work continues on `codex/wnear-proof-continuation`, starting from PR head `1ea4077` and merging

@@ -1582,6 +1582,135 @@ theorem WNear.Binary.BalanceOfAbsent.f293_none {GF : Iris.BundledGFunctors} [Was
         (NearLogic.StorageReadPost h (pre ++ (WasmLogic.bytes32 L ++ key)) 0 st))
 ```
 
+## Bridge.Functions.BorshBytesF
+
+`WNear.Binary.BorshBytesF.f315_spec` (hash `000000009d687b75`)
+
+```lean
+theorem WNear.Binary.BorshBytesF.f315_spec {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (htype : type.results = [])
+  (inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 13 < lim.maxCallDepth) (Cg : ℕ) (gt : Wasm.GlobalType) (s out r q m idx : UInt32) (maxP len : ℕ)
+  (live : List (ℕ × ℕ)) (F : ℕ) (hF : WNear.Binary.VecWithCap.okG F) (ob hd4 data : List UInt8) (hob : ob.length = 16)
+  (hhd : hd4.length = 4) (hL : Wasm.Memory.decodeLE hd4 = data.length) (hL0 : 0 < data.length)
+  (hL28 : data.length < 2 ^ 28) (hroom : WNear.Binary.VecFromElem.roomFor len maxP (UInt32.ofNat data.length))
+  (hs : 160 ≤ s.toNat) (hmL : 4 + data.length ≤ m.toNat) (hq : q.toNat + 4 + data.length ≤ 2 ^ 32)
+  (hout : out.toNat + 16 ≤ 2 ^ 32) (hr : r.toNat + 8 ≤ 2 ^ 32) :
+  WNear.Binary.BorshBytesF.bytesCode n maxP inst mi A ⊢
+    NearLogic.MFunSpec cfg lim d type inst mi WNear.Binary.f315 Cg
+      (WNear.Binary.BorshBytesF.pre315 n g gt s out r q m idx ta (A 578) maxP len live F ob hd4 data)
+      (fun x =>
+        53 * cfg.regularOpCost +
+          (260 * cfg.regularOpCost + WNear.Binary.BorshVecF.cost374 cfg F (UInt32.ofNat data.length)))
+      (WNear.Binary.BorshBytesF.post315 n g gt s out r q m idx ta (A 578) maxP len live F hd4 data)
+```
+
+`WNear.Binary.BorshBytesF.f316_spec` (hash `000000003c383712`)
+
+```lean
+theorem WNear.Binary.BorshBytesF.f316_spec {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (htype : type.results = [])
+  (inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 12 < lim.maxCallDepth) (Cg : ℕ) (gt : Wasm.GlobalType) (s out r q m idx : UInt32) (maxP len : ℕ)
+  (live : List (ℕ × ℕ)) (F : ℕ) (hF : WNear.Binary.VecWithCap.okG F) (ob hd4 data : List UInt8) (hob : ob.length = 16)
+  (hhd : hd4.length = 4) (hL : Wasm.Memory.decodeLE hd4 = data.length) (hL0 : 0 < data.length)
+  (hL28 : data.length < 2 ^ 28) (hroom : WNear.Binary.VecFromElem.roomFor len maxP (UInt32.ofNat data.length))
+  (hs : 144 ≤ s.toNat) (hmL : 4 + data.length ≤ m.toNat) (hq : q.toNat + 4 + data.length ≤ 2 ^ 32)
+  (hout : out.toNat + 16 ≤ 2 ^ 32) (hr : r.toNat + 8 ≤ 2 ^ 32) :
+  WNear.Binary.BorshBytesF.bytesCode n maxP inst mi A ⊢
+    NearLogic.MFunSpec cfg lim d type inst mi WNear.Binary.f316 Cg
+      (WNear.Binary.BorshBytesF.pre316 n g gt s out r q m idx ta (A 578) maxP len live F ob hd4 data)
+      (fun x => 260 * cfg.regularOpCost + WNear.Binary.BorshVecF.cost374 cfg F (UInt32.ofNat data.length))
+      (WNear.Binary.BorshBytesF.post316 n g gt s out r q m idx ta (A 578) maxP len live F hd4 data)
+```
+
+## Bridge.Functions.BorshContractF
+
+`WNear.Binary.BorshContractF.f161_spec` (hash `00000000830bf3ed`)
+
+```lean
+theorem WNear.Binary.BorshContractF.f161_spec {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (htype : type.results = [])
+  (inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 16 < lim.maxCallDepth) (Cg : ℕ) (gt : Wasm.GlobalType) (s out q m idx : UInt32) (maxP len : ℕ)
+  (live : List (ℕ × ℕ)) (F : ℕ) (hF : WNear.Binary.VecWithCap.okG F) (o0 o8 hd4 pre b0 b1 c0 : List UInt8)
+  (ho0 : o0.length = 4) (ho8 : o8.length = 40) (hhd : hd4.length = 4) (hb0 : b0.length = 8) (hb1 : b1.length = 8)
+  (hc0 : c0.length = 8) (hL : Wasm.Memory.decodeLE hd4 = pre.length) (hL0 : 0 < pre.length) (hL28 : pre.length < 2 ^ 28)
+  (hroom : WNear.Binary.VecFromElem.roomFor len maxP (UInt32.ofNat pre.length)) (hs : 496 ≤ s.toNat)
+  (hal : s.toNat % 8 = 0) (hmL : m.toNat = 4 + pre.length + 24) (hq : q.toNat + 4 + pre.length + 24 ≤ 2 ^ 32)
+  (hout : out.toNat + 48 ≤ 2 ^ 32) :
+  WNear.Binary.BorshContractF.sliceCode n maxP inst mi A ⊢
+    NearLogic.MFunSpec cfg lim d type inst mi WNear.Binary.f161 Cg
+      (WNear.Binary.BorshContractF.pre161 n g gt s out q m idx ta (A 578) maxP len live F o0 o8 hd4 pre b0 b1 c0)
+      (fun x => WNear.Binary.BorshContractF.cost161 cfg F (UInt32.ofNat pre.length))
+      (WNear.Binary.BorshContractF.post161 n g gt s out q idx ta (A 578) maxP len live F hd4 pre b0 b1 c0)
+```
+
+`WNear.Binary.BorshContractF.f162_spec` (hash `000000006dfab669`)
+
+```lean
+theorem WNear.Binary.BorshContractF.f162_spec {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (htype : type.results = [])
+  (inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 15 < lim.maxCallDepth) (Cg : ℕ) (gt : Wasm.GlobalType) (s out r q m idx : UInt32) (maxP len : ℕ)
+  (live : List (ℕ × ℕ)) (F : ℕ) (hF : WNear.Binary.VecWithCap.okG F) (o0 o8 hd4 pre b0 b1 c0 : List UInt8)
+  (ho0 : o0.length = 4) (ho8 : o8.length = 40) (hhd : hd4.length = 4) (hb0 : b0.length = 8) (hb1 : b1.length = 8)
+  (hc0 : c0.length = 8) (hL : Wasm.Memory.decodeLE hd4 = pre.length) (hL0 : 0 < pre.length) (hL28 : pre.length < 2 ^ 28)
+  (hroom : WNear.Binary.VecFromElem.roomFor len maxP (UInt32.ofNat pre.length)) (hs : 352 ≤ s.toNat)
+  (hmL : 4 + pre.length + 24 ≤ m.toNat) (hq : q.toNat + 4 + pre.length + 24 ≤ 2 ^ 32) (hout : out.toNat + 48 ≤ 2 ^ 32)
+  (hr : r.toNat + 8 ≤ 2 ^ 32) :
+  WNear.Binary.BorshContractF.contractCode n maxP inst mi A ⊢
+    NearLogic.MFunSpec cfg lim d type inst mi WNear.Binary.f162 Cg
+      (WNear.Binary.BorshContractF.pre162 n g gt s out r q m idx ta (A 578) maxP len live F o0 o8 hd4 pre b0 b1 c0)
+      (fun x =>
+        93 * cfg.regularOpCost + WNear.Binary.BorshFTF.cost425 cfg F (UInt32.ofNat pre.length) +
+            654 * cfg.regularOpCost +
+          654 * cfg.regularOpCost)
+      (WNear.Binary.BorshContractF.post162 n g gt s out r q m idx ta (A 578) maxP len live F hd4 pre b0 b1 c0)
+```
+
+## Bridge.Functions.BorshFTF
+
+`WNear.Binary.BorshFTF.f425_spec` (hash `000000006fb47f5f`)
+
+```lean
+theorem WNear.Binary.BorshFTF.f425_spec {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (htype : type.results = [])
+  (inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 14 < lim.maxCallDepth) (Cg : ℕ) (gt : Wasm.GlobalType) (s out r q m idx : UInt32) (maxP len : ℕ)
+  (live : List (ℕ × ℕ)) (F : ℕ) (hF : WNear.Binary.VecWithCap.okG F) (o0 o8 hd4 pre b0 b1 c0 : List UInt8)
+  (ho0 : o0.length = 4) (ho8 : o8.length = 36) (hhd : hd4.length = 4) (hb0 : b0.length = 8) (hb1 : b1.length = 8)
+  (hc0 : c0.length = 8) (hL : Wasm.Memory.decodeLE hd4 = pre.length) (hL0 : 0 < pre.length) (hL28 : pre.length < 2 ^ 28)
+  (hroom : WNear.Binary.VecFromElem.roomFor len maxP (UInt32.ofNat pre.length)) (hs : 256 ≤ s.toNat)
+  (hmL : 4 + pre.length + 24 ≤ m.toNat) (hq : q.toNat + 4 + pre.length + 24 ≤ 2 ^ 32) (hout : out.toNat + 44 ≤ 2 ^ 32)
+  (hr : r.toNat + 8 ≤ 2 ^ 32) :
+  WNear.Binary.BorshFTF.ftCode n maxP inst mi A ⊢
+    NearLogic.MFunSpec cfg lim d type inst mi WNear.Binary.f425 Cg
+      (WNear.Binary.BorshFTF.pre425 n g gt s out r q m idx ta (A 578) maxP len live F o0 o8 hd4 pre b0 b1 c0)
+      (fun x => WNear.Binary.BorshFTF.cost425 cfg F (UInt32.ofNat pre.length))
+      (WNear.Binary.BorshFTF.post425 n g gt s out r q m idx ta (A 578) maxP len live F hd4 pre b0 b1 c0)
+```
+
+## Bridge.Functions.BorshVecF
+
+`WNear.Binary.BorshVecF.f374_spec` (hash `00000000d250d9cd`)
+
+```lean
+theorem WNear.Binary.BorshVecF.f374_spec {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (htype : type.results = [])
+  (inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 11 < lim.maxCallDepth) (Cg : ℕ) (gt : Wasm.GlobalType) (s out src c idx : UInt32) (maxP len : ℕ)
+  (live : List (ℕ × ℕ)) (F : ℕ) (hF : WNear.Binary.VecWithCap.okG F) (ob sb : List UInt8) (hob : ob.length = 12)
+  (hsb : sb.length = c.toNat) (hs : 80 ≤ s.toNat) (hc0 : 0 < c.toNat) (hc28 : c.toNat < 2 ^ 28)
+  (hr : WNear.Binary.VecFromElem.roomFor len maxP c) (hsrc : src.toNat + c.toNat ≤ 2 ^ 32)
+  (hout : out.toNat + 12 ≤ 2 ^ 32) :
+  WNear.Binary.VecWithCap.vecCode2 n maxP inst mi A ⊢
+    NearLogic.MFunSpec cfg lim d type inst mi WNear.Binary.f374 Cg
+      (WNear.Binary.BorshVecF.pre374 n g gt s out src c idx ta (A 578) maxP len live F ob sb)
+      (fun x => WNear.Binary.BorshVecF.cost374 cfg F c)
+      (WNear.Binary.BorshVecF.post374 n g gt s out src idx ta (A 578) maxP len live F sb)
+```
+
 ## Bridge.Functions.FromSliceSpec
 
 `WNear.Binary.FromSliceSpec.AcceptContract` (hash `37a2beaca78490cb`)
