@@ -67,6 +67,8 @@
     "WNear.Binary.BalanceOf297AbsentCall.format_zero",
     "WNear.Binary.BalanceOf297AbsentCall.call_copy_and_format_absent",
     "WNear.Binary.BalanceOf297AbsentCall.expect_ok",
-    "WNear.Binary.BalanceOf297AbsentCall.call_copy_format_and_expect_absent"
+    "WNear.Binary.BalanceOf297AbsentCall.call_copy_format_and_expect_absent",
+    "WNear.Binary.BalanceOf297AbsentCall.return_vec",
+    "WNear.Binary.BalanceOf297AbsentCall.call_through_value_return_absent"
   ]
 }

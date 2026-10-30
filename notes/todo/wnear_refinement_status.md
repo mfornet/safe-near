@@ -1310,6 +1310,16 @@ continuation is published to PR #40 after its validation gates pass.
   bounds, outer wrappers, rejection, the seventh method and M9 remain open.
   No additional `sorry` is introduced.
 
+## Continuation: function 297 absent balance through value return
+
+`BalanceOf297AbsentCall.return_vec` checks the actual dereference and
+`value_return` instructions. `call_through_value_return_absent` composes this
+with the absent-account path across 47 exact instructions, proving the host
+selects JSON bytes `[34, 48, 34]` for zero. It retains the storage-read state
+relation and requires an explicit three-byte return limit, four-growth heap
+room, and frame resources. Both proofs use standard axioms. Reachability of the
+heap room, subsequent cleanup and the enclosing accepted-call method remain open.
+
 ## Continuation: function 297 successful result extraction
 
 `BalanceOf297AbsentCall.expect_ok` checks the exact eight instructions calling
@@ -1317,7 +1327,7 @@ continuation is published to PR #40 after its validation gates pass.
 `call_copy_format_and_expect_absent` composes it with the absent-account path
 across the exact 37-instruction slice, preserving the returned vector and host
 resources. Both proofs use standard axioms. Reachable four-growth heap room,
-argument setup, return handling and the full accepted-call method remain open.
+argument setup, post-return cleanup and the full accepted-call method remain open.
 
 ## Continuation: function 297 absent call through serialization
 

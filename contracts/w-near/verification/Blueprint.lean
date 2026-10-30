@@ -18,6 +18,8 @@ import Bridge.Functions.BalanceOf297Format
 import Bridge.Functions.BalanceOf297Compose
 import Bridge.Functions.BalanceOf297Expect
 import Bridge.Functions.BalanceOf297ComposeExpect
+import Bridge.Functions.BalanceOf297Return
+import Bridge.Functions.BalanceOf297ComposeReturn
 
 /-! The browsable proof frontier. Definitions marked Open state contracts, not proofs. -/
 
@@ -383,3 +385,14 @@ attribute [blueprint "frontier:balance-export-through-expect"
   (statement := /-- The actual 37-instruction slice composes the absent balance lookup, zero copy, serialization, and successful result extraction; reachable room and the complete method remain open. -/)
   (notReady := true)]
   WNear.Binary.BalanceOf297AbsentCall.call_copy_format_and_expect_absent
+
+attribute [blueprint "frontier:balance-export-return-vec"
+  (title := /-- Exported balance function: return serialized vector -/)
+  (statement := /-- The exact decoded instructions dereference a serialized vector and call value_return under explicit host, memory and return-length premises. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.return_vec
+
+attribute [blueprint "frontier:balance-export-through-return"
+  (title := /-- Exported balance function: absent balance through value return -/)
+  (statement := /-- The exact 47-instruction slice composes the absent lookup through value_return of the JSON bytes for zero; reachable heap room, cleanup and the full method remain open. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.call_through_value_return_absent

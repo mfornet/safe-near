@@ -639,7 +639,7 @@
         "storage",
         "runtime-boundary",
         "ft-balance-model",
-        "balance-export-through-expect"
+        "balance-export-through-return"
       ]
     },
     {
@@ -746,6 +746,31 @@
       "required_proof_dependencies": [
         "balance-export-call-copy-format",
         "balance-export-expect-ok"
+      ]
+    },
+    {
+      "id": "balance-export-return-vec",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.return_vec",
+      "title": "Function 297: return serialized vector",
+      "kind": "theorem",
+      "environment": "Metered host, return-length limit and explicit Wasm frame/resource premises.",
+      "label": "frontier:balance-export-return-vec",
+      "reviewed_shape_hash": 188057756
+    },
+    {
+      "id": "balance-export-through-return",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.call_through_value_return_absent",
+      "title": "Function 297: absent balance through value return",
+      "kind": "theorem",
+      "environment": "Metered host, trie proof budget, return-length limit, four-growth heap room and explicit Wasm frame/resource premises.",
+      "label": "frontier:balance-export-through-return",
+      "reviewed_shape_hash": 2472105786,
+      "required_type_dependencies": [
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "balance-export-through-expect",
+        "balance-export-return-vec"
       ]
     }
   ],
