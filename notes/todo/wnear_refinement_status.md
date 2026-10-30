@@ -1310,6 +1310,15 @@ continuation is published to PR #40 after its validation gates pass.
   bounds, outer wrappers, rejection, the seventh method and M9 remain open.
   No additional `sorry` is introduced.
 
+## Continuation: function 297 successful result extraction
+
+`BalanceOf297AbsentCall.expect_ok` checks the exact eight instructions calling
+`Result::expect` on the successful serialized vector.
+`call_copy_format_and_expect_absent` composes it with the absent-account path
+across the exact 37-instruction slice, preserving the returned vector and host
+resources. Both proofs use standard axioms. Reachable four-growth heap room,
+argument setup, return handling and the full accepted-call method remain open.
+
 ## Continuation: function 297 absent call through serialization
 
 `BalanceOf297AbsentCall.call_copy_and_format_absent` composes the checked

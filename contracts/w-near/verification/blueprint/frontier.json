@@ -639,7 +639,7 @@
         "storage",
         "runtime-boundary",
         "ft-balance-model",
-        "balance-export-call-copy-format"
+        "balance-export-through-expect"
       ]
     },
     {
@@ -721,6 +721,31 @@
       "required_proof_dependencies": [
         "balance-export-call-and-copy",
         "balance-export-format-zero"
+      ]
+    },
+    {
+      "id": "balance-export-expect-ok",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.expect_ok",
+      "title": "Function 297: extract successful serialized vector",
+      "kind": "theorem",
+      "environment": "Explicit Wasm frame, function linkage and memory ownership premises.",
+      "label": "frontier:balance-export-expect-ok",
+      "reviewed_shape_hash": 1326515613
+    },
+    {
+      "id": "balance-export-through-expect",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.call_copy_format_and_expect_absent",
+      "title": "Function 297: absent balance through result extraction",
+      "kind": "theorem",
+      "environment": "Metered host, trie proof budget, four-growth heap room and explicit Wasm frame/resource premises.",
+      "label": "frontier:balance-export-through-expect",
+      "reviewed_shape_hash": 3623699236,
+      "required_type_dependencies": [
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "balance-export-call-copy-format",
+        "balance-export-expect-ok"
       ]
     }
   ],
