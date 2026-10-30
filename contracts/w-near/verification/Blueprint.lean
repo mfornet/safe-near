@@ -12,6 +12,7 @@ import Bridge.Functions.LookupMapGetNone
 import Bridge.Functions.LookupMapGet399None
 import Bridge.Functions.BalanceOfAbsent
 import Bridge.Functions.BalanceOfCallerAbsent
+import Bridge.Functions.BalanceOf297AbsentCall
 
 /-! The browsable proof frontier. Definitions marked Open state contracts, not proofs. -/
 
@@ -337,3 +338,9 @@ attribute [blueprint "frontier:balance-rejected"
   (statement := /-- Open obligation: prove rollback for rejected balance-method arguments. -/)
   (notReady := true)]
   WNear.ftBalanceOf_rejected_obligation
+
+attribute [blueprint "frontier:balance-export-call-absent"
+  (title := /-- Exported balance function: absent-account call segment -/)
+  (statement := /-- The exact decoded instruction slice in function 297 composes the absent-account token balance caller; the complete method and reachable allocation room remain open. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.call_absent

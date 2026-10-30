@@ -1310,6 +1310,16 @@ continuation is published to PR #40 after its validation gates pass.
   bounds, outer wrappers, rejection, the seventh method and M9 remain open.
   No additional `sorry` is introduced.
 
+## Continuation: function 297 absent-call segment
+
+`BalanceOf297AbsentCall.call_absent` proves the actual ten-instruction slice
+of exported function 297 that prepares its frame pointers and calls function
+293, composing the checked absent-account caller and preserving its postcondition.
+The kernel proof uses only standard axioms and is conditional on reachable
+`HeapRoomK 2` and the explicit host and resource premises. This is one segment:
+the preceding parser/state setup, the later formatting/return code and the full
+accepted-call and method obligations remain open.
+
 ## Continuation: balance method top-level composition
 
 The full `ft_balance_of` method clause is now checked composition from three
@@ -1317,7 +1327,7 @@ separately named open obligations: no execution issue for any represented
 context, full accepted-call refinement including arbitrary resource failures,
 and rollback on rejected arguments. Its original statement is unchanged.
 The accepted-call obligation has a planned dependency on the checked absent
-caller path; neither that edge nor the full method is claimed complete. All
+function-297 call segment; neither that edge nor the full method is claimed complete. All
 three open leaves and their conditional dependents remain in the strict audit.
 
 ## Continuation: absent-account token balance caller

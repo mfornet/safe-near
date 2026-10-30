@@ -639,7 +639,7 @@
         "storage",
         "runtime-boundary",
         "ft-balance-model",
-        "balance-caller-absent"
+        "balance-export-call-absent"
       ]
     },
     {
@@ -653,6 +653,21 @@
       "planned_dependencies": [
         "reject-parser",
         "runtime-boundary"
+      ]
+    },
+    {
+      "id": "balance-export-call-absent",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.call_absent",
+      "title": "Function 297: absent-account balance call segment",
+      "kind": "theorem",
+      "environment": "Metered host, trie proof budget, allocator room and explicit Wasm frame/resource premises.",
+      "label": "frontier:balance-export-call-absent",
+      "reviewed_shape_hash": 1007612218,
+      "required_type_dependencies": [
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "balance-caller-absent"
       ]
     }
   ],
