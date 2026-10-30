@@ -1608,6 +1608,35 @@
         "balance-copied-absent-body",
         "initial-input-copy-room"
       ]
+    },
+    {
+      "id": "ft-balance-absent-model",
+      "declaration": "WNear.Binary.FtBalanceOfMethod.absent_step_zero",
+      "title": "Absent account gives zero in the boundary model",
+      "kind": "theorem",
+      "environment": "A well-formed represented state, absent account record, and zero storage deficit imply the model returns zero.",
+      "label": "frontier:ft-balance-absent-model",
+      "reviewed_shape_hash": 1400203122,
+      "required_proof_dependencies": [
+        "ft-balance-model"
+      ]
+    },
+    {
+      "id": "balance-copied-absent-model-composition",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body_model_agreement",
+      "title": "Copied-array absent execution and model agreement",
+      "kind": "theorem",
+      "environment": "Checked conjunction of the absent-account model result and complete decoded body execution, sharing the absent storage key. Parser room, input shape, represented state, zero deficit, trie, host, gas and frame premises remain explicit; this is not the complete method refinement.",
+      "label": "frontier:balance-copied-absent-model-composition",
+      "reviewed_shape_hash": 2834875852,
+      "required_type_dependencies": [
+        "string-room",
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "ft-balance-absent-model",
+        "balance-copied-body-initial-room"
+      ]
     }
   ],
   "reviewed_environment": [

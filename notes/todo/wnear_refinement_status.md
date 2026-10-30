@@ -1656,6 +1656,12 @@ accepted/rejected method refinement. The frontier's type-dependency graph lists
 `RegOk` and `roomFor` on the helper because they occur as derived conclusions,
 not because the helper assumes them.
 
+The checked conjunction `copied_array_absent_body_model_agreement` now pairs that
+decoded-body execution with the model's zero result for the same absent key.
+It explicitly requires a well-formed represented state, erased-host agreement and
+zero storage deficit in addition to the execution assumptions; it does not yet
+derive the complete boundary refinement or cover other inputs and outcomes.
+
 ## Working notes
 
 - **Running agents.** Agents work in their own worktrees and copy `.lake` from the main worktree. They must not launch helper agents: cleaning up a worktree once removed a sub-agent's worktree while it was still working.

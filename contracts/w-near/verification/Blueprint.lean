@@ -37,6 +37,7 @@ import Bridge.Functions.BalanceOf297ParserPublicCompose
 import Bridge.Functions.BalanceOf297CopiedCall
 import Bridge.Functions.BalanceOf297CopiedBody
 import Bridge.Functions.BalanceOf297InitialRoomCompose
+import Bridge.Methods.FtBalanceOfAbsentCompose
 
 /-! The browsable proof frontier. Definitions marked Open state contracts, not proofs. -/
 
@@ -764,3 +765,14 @@ attribute [blueprint "frontier:balance-copied-body-initial-room"
   (statement := /-- Entire decoded body for a copied-string array and absent account, deriving input and account-copy room from the initial combined budget. Parser room, input shape, trie, host, gas and frame conditions remain premises; the full method remains open. -/)
   (notReady := true)]
   WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body_initial_room
+
+attribute [blueprint "frontier:ft-balance-absent-model"
+  (title := /-- Absent account gives zero in the boundary model -/)
+  (statement := /-- A well-formed represented state, absent account record, and zero storage deficit imply the model returns zero. -/)]
+  WNear.Binary.FtBalanceOfMethod.absent_step_zero
+
+attribute [blueprint "frontier:balance-copied-absent-model-composition"
+  (title := /-- Copied-array absent execution and model agreement -/)
+  (statement := /-- Checked conjunction of the absent-account model result and complete decoded body execution, sharing the absent storage key. Parser room, input shape, represented state, zero deficit, trie, host, gas and frame premises remain explicit; this is not the complete method refinement. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body_model_agreement

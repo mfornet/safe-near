@@ -129,6 +129,8 @@
     "WNear.Binary.ReadRegister.RegOk",
     "WNear.Binary.EnvInput.f527_spec",
     "WNear.Binary.BalanceOf297AbsentCall.initial_input_and_copy_room",
-    "WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body_initial_room"
+    "WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body_initial_room",
+    "WNear.Binary.FtBalanceOfMethod.absent_step_zero",
+    "WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body_model_agreement"
   ]
 }
