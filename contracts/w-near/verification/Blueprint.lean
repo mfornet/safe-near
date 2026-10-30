@@ -24,6 +24,8 @@ import Bridge.Functions.BalanceOf297Cleanup
 import Bridge.Functions.BalanceOf297ComposeCleanup
 import Bridge.Functions.BalanceOf297ArgumentCopy
 import Bridge.Functions.BalanceOf297ParsedSuffix
+import Bridge.Functions.BalanceOf297StateRead
+import Bridge.Functions.BalanceOf297StateBridge
 
 /-! The browsable proof frontier. Definitions marked Open state contracts, not proofs. -/
 
@@ -422,3 +424,27 @@ attribute [blueprint "frontier:balance-export-parsed-suffix"
   (statement := /-- The exact 71-instruction suffix composes the parsed account descriptor handoff through absent-account return and cleanup; parsing, state setup, reachable room and the full method remain open. -/)
   (notReady := true)]
   WNear.Binary.BalanceOf297AbsentCall.parsed_account_through_cleanup_absent
+
+attribute [blueprint "frontier:balance-state-entry"
+  (title := /-- State-read entry resources -/)
+  (statement := /-- State-read entry resources include a heap free-list bound of one; their reachability from the preceding balance parser remains open. -/)
+  (notReady := true)]
+  WNear.Binary.StateRead.pre219
+
+attribute [blueprint "frontier:balance-second-read"
+  (title := /-- Absent balance read after state read -/)
+  (statement := /-- Open second-read conditions following the state read: trie accounting, proof budget, absent key and gas bound. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.BalanceReadAfterState
+
+attribute [blueprint "frontier:balance-export-state-read"
+  (title := /-- Exported balance function: state read and unwrap -/)
+  (statement := /-- The exact decoded state-read and successful unwrap instructions compose under the stated entry and room conditions. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.state_read_and_unwrap
+
+attribute [blueprint "frontier:balance-export-state-through-cleanup"
+  (title := /-- Exported balance function: state read through absent balance cleanup -/)
+  (statement := /-- The exact 82-instruction suffix composes model-state reading through absent balance return and cleanup, assuming state-entry resources, allocation room and the named second-read conditions; parsing and the complete method remain open. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.state_through_cleanup_absent

@@ -1310,6 +1310,24 @@ continuation is published to PR #40 after its validation gates pass.
   bounds, outer wrappers, rejection, the seventh method and M9 remain open.
   No additional `sorry` is introduced.
 
+## Continuation: state read through absent balance cleanup
+
+`BalanceOf297AbsentCall.state_read_and_unwrap` checks the exact state-read and
+successful unwrap instructions for a present model state. The checked
+`state_through_cleanup_absent` composition covers the 82 instructions from
+state reading through absent-account return and cleanup, starting with an
+already parsed owned account. Both proofs use standard axioms.
+
+This is conditional on `BalanceReadAfterState`, the explicit second-read
+accounting, trie, proof-budget, absent-key and gas contract, and on reachable
+allocation room. The state-read entry requires `pre219`, including a one-cell
+free-list bound; it has not been shown to follow from the preceding parser,
+which may leave a larger bound. Both the entry-resource predicate and second-read contract are shown Open in
+the frontier for this handoff; other methods may already establish the generic
+state-read entry resources in their own proofs.
+Parsing, resource reachability, all other branches and full method refinement
+remain open.
+
 ## Continuation: parsed account descriptor through cleanup
 
 `BalanceOf297AbsentCall.argument_copy` checks the exact twelve instructions

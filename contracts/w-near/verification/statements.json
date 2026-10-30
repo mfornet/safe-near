@@ -73,6 +73,10 @@
     "WNear.Binary.BalanceOf297AbsentCall.cleanup",
     "WNear.Binary.BalanceOf297AbsentCall.call_through_cleanup_absent",
     "WNear.Binary.BalanceOf297AbsentCall.argument_copy",
-    "WNear.Binary.BalanceOf297AbsentCall.parsed_account_through_cleanup_absent"
+    "WNear.Binary.BalanceOf297AbsentCall.parsed_account_through_cleanup_absent",
+    "WNear.Binary.StateRead.pre219",
+    "WNear.Binary.BalanceOf297AbsentCall.BalanceReadAfterState",
+    "WNear.Binary.BalanceOf297AbsentCall.state_read_and_unwrap",
+    "WNear.Binary.BalanceOf297AbsentCall.state_through_cleanup_absent"
   ]
 }

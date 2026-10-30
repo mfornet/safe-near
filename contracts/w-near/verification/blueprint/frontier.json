@@ -639,7 +639,7 @@
         "storage",
         "runtime-boundary",
         "ft-balance-model",
-        "balance-export-parsed-suffix"
+        "balance-export-state-through-cleanup"
       ]
     },
     {
@@ -821,6 +821,56 @@
       "required_proof_dependencies": [
         "balance-export-through-cleanup",
         "balance-export-argument-copy"
+      ]
+    },
+    {
+      "id": "balance-state-entry",
+      "declaration": "WNear.Binary.StateRead.pre219",
+      "title": "State-read entry resources and one-cell free-list bound",
+      "kind": "verification_contract",
+      "notes": "State-read entry resources include a heap free-list bound of one; establishing them from the preceding balance parser remains open.",
+      "label": "frontier:balance-state-entry",
+      "reviewed_shape_hash": 14030933622959962654
+    },
+    {
+      "id": "balance-second-read",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.BalanceReadAfterState",
+      "title": "Absent balance read after state read",
+      "kind": "verification_contract",
+      "notes": "Open second-read conditions after state_read: trie accounting and witness, proof budget, key absence and an explicit gas bound.",
+      "label": "frontier:balance-second-read",
+      "reviewed_shape_hash": 1853011331046003394
+    },
+    {
+      "id": "balance-export-state-read",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.state_read_and_unwrap",
+      "title": "Function 297: read and unwrap model state",
+      "kind": "theorem",
+      "environment": "Present model state, one-cell free-list entry, metered host, trie proof budget, allocation room and explicit Wasm frame/resources.",
+      "label": "frontier:balance-export-state-read",
+      "reviewed_shape_hash": 2715248443,
+      "required_type_dependencies": [
+        "owned-room",
+        "balance-state-entry"
+      ]
+    },
+    {
+      "id": "balance-export-state-through-cleanup",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.state_through_cleanup_absent",
+      "title": "Function 297: state read through absent balance cleanup",
+      "kind": "theorem",
+      "environment": "Parsed owned account, state-read entry resources, metered host, proof budgets, allocation room, return limit and explicit frame premises.",
+      "label": "frontier:balance-export-state-through-cleanup",
+      "reviewed_shape_hash": 11769903,
+      "required_type_dependencies": [
+        "owned-room",
+        "lookup-heap-room",
+        "balance-state-entry",
+        "balance-second-read"
+      ],
+      "required_proof_dependencies": [
+        "balance-export-state-read",
+        "balance-export-parsed-suffix"
       ]
     }
   ],
