@@ -4705,6 +4705,13 @@ def WNear.Binary.VecFromElem.roomFor (len maxP : ℕ) (size : UInt32) : Prop :=
 
 ## Bridge.Methods.ContextInputDomain
 
+`WNear.Binary.InputDomain.InputLimitsOrdered` (hash `5706b9b03d9418f9`)
+
+```lean
+def WNear.Binary.InputDomain.InputLimitsOrdered (protocol : Wasm.Near.RuntimeConfig) : Prop :=
+  protocol.wasm.limits.maxArgumentsLength ≤ protocol.wasm.limits.maxRegisterSize
+```
+
 `WNear.Binary.InputDomain.InputRegisterMismatchWitness` (hash `658bf35157d8158e`)
 
 ```lean
@@ -4740,6 +4747,14 @@ theorem WNear.Binary.InputDomain.mismatch_refutes_refinement (cfg : WNear.Config
   ¬NearInterface.Refines Near.Boundary.nearRuntime protocol (WNear.Binary.wCode size codeOf) (WNear.wnear cfg)
 ```
 
+`WNear.Binary.InputDomain.no_mismatch_witness` (hash `00000000454b62e7`)
+
+```lean
+theorem WNear.Binary.InputDomain.no_mismatch_witness (cfg : WNear.Config) (size : ℕ) (codeOf : List UInt8 → Near.ContractCode)
+  (protocol : Wasm.Near.RuntimeConfig) (hlimits : WNear.Binary.InputDomain.InputLimitsOrdered protocol) :
+  ¬WNear.Binary.InputDomain.InputRegisterMismatchWitness cfg size codeOf protocol
+```
+
 `WNear.Binary.InputDomain.not_at_of_input_panic` (hash `00000000aaeacaf0`)
 
 ```lean
@@ -4753,22 +4768,45 @@ theorem WNear.Binary.InputDomain.not_at_of_input_panic (cfg : WNear.Config) (siz
   ¬WNear.Binary.Exported.At cfg size codeOf raw st ctx
 ```
 
-`WNear.Binary.InputDomain.wf_arguments_unbounded` (hash `000000008d835a8c`)
+`WNear.Binary.InputDomain.validated_actions_arguments` (hash `000000000340e965`)
 
 ```lean
-theorem WNear.Binary.InputDomain.wf_arguments_unbounded (ctx : NearInterface.Context) (raw : WNear.RawStorage)
-  (hwf : ctx.WF raw) (bound : ℕ) :
-  ∃ ctx',
-    ctx'.WF raw ∧
-      ctx'.protocol = ctx.protocol ∧
-        ctx'.method = ctx.method ∧ ctx'.prepaidGas = ctx.prepaidGas ∧ bound < List.length ctx'.args
+theorem WNear.Binary.InputDomain.validated_actions_arguments (ctx : NearInterface.Context) (actions : List Near.Action)
+  (method : String) (gas deposit : ℕ) (hvalid : Near.validateActions ctx.protocol.wasm.limits actions = Except.ok ())
+  (hmem : Near.Action.functionCall method ctx.args gas deposit ∈ actions) :
+  List.length ctx.args ≤ ctx.protocol.wasm.limits.maxArgumentsLength
 ```
 
-`WNear.Binary.InputDomain.wf_with_args` (hash `000000001237ae1e`)
+`WNear.Binary.InputDomain.wf_arguments_bounded` (hash `00000000ce61ab3f`)
+
+```lean
+theorem WNear.Binary.InputDomain.wf_arguments_bounded (ctx : NearInterface.Context) (raw : WNear.RawStorage)
+  (hwf : ctx.WF raw) : List.length ctx.args ≤ ctx.protocol.wasm.limits.maxArgumentsLength
+```
+
+`WNear.Binary.InputDomain.wf_input_fits_register` (hash `00000000f171e75e`)
+
+```lean
+theorem WNear.Binary.InputDomain.wf_input_fits_register (ctx : NearInterface.Context) (raw : WNear.RawStorage)
+  (hwf : ctx.WF raw) (hlimits : WNear.Binary.InputDomain.InputLimitsOrdered ctx.protocol) :
+  List.length ctx.args ≤ ctx.protocol.wasm.limits.maxRegisterSize
+```
+
+`WNear.Binary.InputDomain.wf_input_register_returns` (hash `000000006d5082c0`)
+
+```lean
+theorem WNear.Binary.InputDomain.wf_input_register_returns (ctx : NearInterface.Context) (raw : WNear.RawStorage)
+  (hwf : ctx.WF raw) (hlimits : WNear.Binary.InputDomain.InputLimitsOrdered ctx.protocol)
+  (st : Wasm.HostStore Wasm.NearState) (hinput : st.host.context.input = ctx.args)
+  (hconfig : st.host.config.maxRegisterLen = some ctx.protocol.wasm.limits.maxRegisterSize) :
+  ∃ st', Wasm.Near.inputFn.invoke st [Wasm.Value.i64 0] = Wasm.HostResult.Return [] st'
+```
+
+`WNear.Binary.InputDomain.wf_with_args` (hash `00000000c541198a`)
 
 ```lean
 theorem WNear.Binary.InputDomain.wf_with_args (ctx : NearInterface.Context) (raw : WNear.RawStorage) (hwf : ctx.WF raw)
-  (args : List UInt8) :
+  (args : List UInt8) (hargs : args.length ≤ ctx.protocol.wasm.limits.maxArgumentsLength) :
   { method := ctx.method, args := args, current := ctx.current, predecessor := ctx.predecessor, signer := ctx.signer,
         signerPk := ctx.signerPk, attached := ctx.attached, prepaidGas := ctx.prepaidGas,
         promiseResults := ctx.promiseResults, outputDataReceivers := ctx.outputDataReceivers, balance := ctx.balance,
@@ -5188,6 +5226,33 @@ theorem WNear.Binary.FtBalanceOfMethod.account_lookup_and_step (cfg : WNear.Conf
               logs := [], promises := [] }
 ```
 
+## NearInterface.Boundary
+
+`NearInterface.Context.WF` (hash `3c54348dc29aaf11`)
+
+```lean
+inductive NearInterface.Context.WF (ctx : NearInterface.Context) (raw : NearInterface.RawStorage) : Prop
+| NearInterface.Context.WF.mk {ctx : NearInterface.Context} {raw : NearInterface.RawStorage}
+  (balance_lt : ctx.balance + ctx.attached < 2 ^ 128) (locked_lt : ctx.locked < 2 ^ 128)
+  (arguments_length : List.length ctx.args ≤ ctx.protocol.wasm.limits.maxArgumentsLength)
+  (prepaidGas_lt : ctx.prepaidGas < 2 ^ 64) (blockHeight_lt : ctx.blockHeight < 2 ^ 64)
+  (timestamp_lt : ctx.timestamp < 2 ^ 64) (epochHeight_lt : ctx.epochHeight < 2 ^ 64)
+  (usage_ge : NearInterface.storageUsageOf ctx.protocol raw ≤ ctx.storageUsage)
+  (usage_room : ctx.storageUsage + ctx.protocol.wasm.limits.maxGasBurnt < 2 ^ 64)
+  (opCost_pos : 0 < ctx.protocol.wasm.regularOpCost ∧ 0 < ctx.protocol.wasm.linearOpBaseCost)
+  (trie_canonical : Near.TrieConstruction.build ctx.trie.entries = Except.ok ctx.trie.base)
+  (trie_storage : NearInterface.contractData ctx.trie ctx.current.bytes = raw)
+  (trie_no_zero_hash : List.replicate 32 0 ∉ List.map Prod.fst ctx.trie.base.witness)
+  (prospective_unique : (List.map Prod.fst ctx.trie.prospective).Nodup)
+  (committed_unique : (List.map Prod.fst ctx.trie.committed).Nodup)
+  (raw_keys_unique : ∀ (k v v' : Wasm.Near.Bytes), (k, v) ∈ raw → (k, v') ∈ raw → v = v')
+  (proof_growth :
+    ∀ (size : Near.TrieOverlay.State → ℕ),
+      ctx.storageProofSize = some size →
+        ∀ (t : Near.TrieOverlay.State) (c : ℕ), Near.TrieOverlay.ProofReach ctx.trie t c → size t ≤ size ctx.trie + c) :
+  ctx.WF raw
+```
+
 ## NearInterface.Model
 
 `NearInterface.ContractModel` (hash `349cee7a0e610b6d`)
@@ -5427,6 +5492,41 @@ def NearInterface.RolledBack (ctx : NearInterface.Context) (raw : NearInterface.
   (∃ f, r.outcome = Except.error f) ∧
     r.storage = raw ∧
       r.balance = ctx.balance ∧ r.storageUsage = ctx.storageUsage ∧ r.receipts = []
+```
+
+## NearRuntime.ActionValidation
+
+`Near.validateActionOrder_member` (hash `0000000061746082`)
+
+```lean
+theorem Near.validateActionOrder_member (limits : Wasm.Near.LimitConfig) (actions : List Near.Action) (found : Bool)
+  (h : Near.validateActionOrder limits found actions = Except.ok ()) (action : Near.Action) (hmem : action ∈ actions) :
+  Near.validateAction limits action = Except.ok ()
+```
+
+`Near.validateAction_functionCall_arguments` (hash `000000005b2a33be`)
+
+```lean
+theorem Near.validateAction_functionCall_arguments (limits : Wasm.Near.LimitConfig) (method : String) (args : List UInt8)
+  (gas deposit : ℕ) (h : Near.validateAction limits (Near.Action.functionCall method args gas deposit) = Except.ok ()) :
+  args.length ≤ limits.maxArgumentsLength
+```
+
+`Near.validateAction_functionCall_ok_iff` (hash `000000002c8f68f7`)
+
+```lean
+theorem Near.validateAction_functionCall_ok_iff (limits : Wasm.Near.LimitConfig) (method : String) (args : List UInt8)
+  (gas deposit : ℕ) :
+  Near.validateAction limits (Near.Action.functionCall method args gas deposit) = Except.ok () ↔
+    gas ≠ 0 ∧ method.utf8ByteSize ≤ limits.maxLengthMethodName ∧ args.length ≤ limits.maxArgumentsLength
+```
+
+`Near.validateActions_functionCall_arguments` (hash `0000000065ac4ce6`)
+
+```lean
+theorem Near.validateActions_functionCall_arguments (limits : Wasm.Near.LimitConfig) (actions : List Near.Action)
+  (method : String) (args : List UInt8) (gas deposit : ℕ) (h : Near.validateActions limits actions = Except.ok ())
+  (hmem : Near.Action.functionCall method args gas deposit ∈ actions) : args.length ≤ limits.maxArgumentsLength
 ```
 
 ## Proofs.Authorization

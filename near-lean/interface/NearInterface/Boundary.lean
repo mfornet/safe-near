@@ -119,12 +119,14 @@ def contractData (trie : Near.TrieOverlay.State) (account : Bytes) : RawStorage 
     if pre.isPrefixOf key then some (key.drop pre.length, value) else none).toFinset
 
 /-- What the runtime guarantees about every context it builds: nearcore's
-integer widths, storage usage that counts the contract records and leaves
+integer widths, the incoming receipt argument limit, storage usage that counts the contract records and leaves
 room for one call's growth, and a canonical trie holding the same records.
 None of it depends on the call or on the contract. -/
 structure Context.WF (ctx : Context) (raw : RawStorage) : Prop where
   balance_lt : ctx.balance + ctx.attached < 2 ^ 128
   locked_lt : ctx.locked < 2 ^ 128
+  /-- Incoming receipt action validation bounds arguments before VM execution. -/
+  arguments_length : ctx.args.length ≤ ctx.protocol.wasm.limits.maxArgumentsLength
   prepaidGas_lt : ctx.prepaidGas < 2 ^ 64
   blockHeight_lt : ctx.blockHeight < 2 ^ 64
   timestamp_lt : ctx.timestamp < 2 ^ 64

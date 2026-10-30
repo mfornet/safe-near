@@ -385,6 +385,8 @@ def checkHypotheses (M : ExecModel) (ctx : Context) (raw : RawStorage) (st : Opt
       ((M.invViolation s).map (s!"model state breaks the invariant: {·}")).toList) ++
   (if ctx.balance + ctx.attached < 2 ^ 128 then [] else ["balance + attached ≥ 2^128"]) ++
   (if ctx.locked < 2 ^ 128 then [] else ["locked ≥ 2^128"]) ++
+  (if ctx.args.length ≤ ctx.protocol.wasm.limits.maxArgumentsLength then []
+    else ["argument length exceeds incoming receipt limit"]) ++
   (if ctx.prepaidGas < 2 ^ 64 then [] else ["prepaid gas ≥ 2^64"]) ++
   (if storageUsageOf ctx.protocol raw ≤ ctx.storageUsage then []
     else ["storage usage does not count the contract records"]) ++

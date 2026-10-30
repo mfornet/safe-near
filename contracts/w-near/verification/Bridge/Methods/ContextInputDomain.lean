@@ -6,20 +6,48 @@ import Bridge.Exported
 namespace WNear.Binary.InputDomain
 open NearInterface Wasm Wasm.Near
 
-/-- The current boundary's well-formedness conditions do not inspect argument bytes. -/
-theorem wf_with_args (ctx : Context) (raw : RawStorage) (hwf : ctx.WF raw) (args : List UInt8) :
+/-- Protocol input limits needed to rule out the register-size host failure.
+The pinned JSON instantiation is a named open verification obligation. -/
+def InputLimitsOrdered (protocol : RuntimeConfig) : Prop :=
+  protocol.wasm.limits.maxArgumentsLength ≤ protocol.wasm.limits.maxRegisterSize
+
+/-- Replacing arguments preserves well-formedness when the replacement is receipt-valid. -/
+theorem wf_with_args (ctx : Context) (raw : RawStorage) (hwf : ctx.WF raw) (args : List UInt8)
+    (hargs : args.length ≤ ctx.protocol.wasm.limits.maxArgumentsLength) :
     ({ ctx with args := args } : Context).WF raw := by
   cases hwf
   constructor <;> assumption
 
-/-- Any well-formed context admits arguments exceeding any given byte bound.
-This is a domain fact, not a proof about the execution of those arguments. -/
-theorem wf_arguments_unbounded (ctx : Context) (raw : RawStorage) (hwf : ctx.WF raw) (bound : Nat) :
-    ∃ ctx' : Context, ctx'.WF raw ∧ ctx'.protocol = ctx.protocol ∧
-      ctx'.method = ctx.method ∧ ctx'.prepaidGas = ctx.prepaidGas ∧ bound < ctx'.args.length := by
-  refine ⟨{ ctx with args := List.replicate (bound + 1) 32 }, ?_, rfl, rfl, rfl, ?_⟩
-  · exact wf_with_args ctx raw hwf _
-  · simp
+/-- The reviewed incoming receipt domain bounds every admitted argument list. -/
+theorem wf_arguments_bounded (ctx : Context) (raw : RawStorage) (hwf : ctx.WF raw) :
+    ctx.args.length ≤ ctx.protocol.wasm.limits.maxArgumentsLength :=
+  hwf.arguments_length
+
+/-- The runtime action-list validator supplies exactly the new context premise.
+This does not derive the other Context.WF fields or prove incoming receipt processing. -/
+theorem validated_actions_arguments (ctx : Context) (actions : List Near.Action)
+    (method : String) (gas deposit : Nat)
+    (hvalid : Near.validateActions ctx.protocol.wasm.limits actions = .ok ())
+    (hmem : Near.Action.functionCall method ctx.args gas deposit ∈ actions) :
+    ctx.args.length ≤ ctx.protocol.wasm.limits.maxArgumentsLength :=
+  Near.validateActions_functionCall_arguments _ _ _ _ _ _ hvalid hmem
+
+/-- The receipt limit suffices for the input register whenever the protocol orders the limits.
+The pinned JSON instantiation of this numerical relation remains a separate obligation. -/
+theorem wf_input_fits_register (ctx : Context) (raw : RawStorage) (hwf : ctx.WF raw)
+    (hlimits : InputLimitsOrdered ctx.protocol) :
+    ctx.args.length ≤ ctx.protocol.wasm.limits.maxRegisterSize :=
+  Nat.le_trans hwf.arguments_length hlimits
+
+/-- At the actual input host call, receipt-valid input fits register 0.
+Gas charging around this host operation is separate. -/
+theorem wf_input_register_returns (ctx : Context) (raw : RawStorage) (hwf : ctx.WF raw)
+    (hlimits : InputLimitsOrdered ctx.protocol)
+    (st : HostStore NearState) (hinput : st.host.context.input = ctx.args)
+    (hconfig : st.host.config.maxRegisterLen = some ctx.protocol.wasm.limits.maxRegisterSize) :
+    ∃ st', inputFn.invoke st [.i64 0] = .Return [] st' := by
+  have hfits := wf_input_fits_register ctx raw hwf hlimits
+  simp [inputFn, writeRegisterResult, checkedSetRegister?, withinLimit, u64Max, hconfig, hinput, hfits]
 
 /-- Register 0 rejects an oversized input before the contract can parse it.
 This is the host operation only, not the complete deployed-method execution. -/
@@ -54,7 +82,8 @@ theorem not_at_of_input_panic (cfg : WNear.Config) (size : Nat)
     · rw [hobs] at hproof
       cases hproof
 
-/-- The precise still-open formal witness corresponding to the executable finding. -/
+/-- Historical mismatch shape. Receipt-valid contexts cannot instantiate this when
+the protocol argument limit is at most its register limit. -/
 def InputRegisterMismatchWitness (cfg : WNear.Config) (size : Nat)
     (codeOf : List UInt8 → Near.ContractCode) (protocol : RuntimeConfig) : Prop :=
   ∃ (raw : RawStorage) (st : Option WNear.State) (ctx : Context) (a : WNear.AccountId),
@@ -65,7 +94,19 @@ def InputRegisterMismatchWitness (cfg : WNear.Config) (size : Nat)
     (Near.Boundary.nearRuntime.exec (WNear.Binary.wCode size codeOf) raw ctx).outcome =
       .error (.panic "input: register size exceeded")
 
-/-- An instantiated witness contradicts the unchanged full refinement statement. -/
+/-- The reviewed domain excludes the historical oversized-input witness under the
+explicit protocol limit relation; no execution or successful-parse premise is needed. -/
+theorem no_mismatch_witness (cfg : WNear.Config) (size : Nat)
+    (codeOf : List UInt8 → Near.ContractCode) (protocol : RuntimeConfig)
+    (hlimits : InputLimitsOrdered protocol) :
+    ¬ InputRegisterMismatchWitness cfg size codeOf protocol := by
+  rintro ⟨raw, st, ctx, a, _, hwf, hprotocol, hlarge, _⟩
+  have hfits := wf_input_fits_register ctx raw hwf
+  rw [hprotocol] at hfits hlarge
+  exact Nat.not_lt_of_ge (hfits hlimits) hlarge
+
+/-- A witness would contradict refinement even in the reviewed domain. The
+ordered-limit theorem above excludes it for protocols satisfying that relation. -/
 theorem mismatch_refutes_refinement (cfg : WNear.Config) (size : Nat)
     (codeOf : List UInt8 → Near.ContractCode) (protocol : RuntimeConfig)
     (hwitness : InputRegisterMismatchWitness cfg size codeOf protocol) :

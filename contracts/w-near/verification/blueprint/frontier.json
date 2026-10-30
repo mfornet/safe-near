@@ -10,12 +10,14 @@
       "annotated": true,
       "reviewed_shape_hash": 407420551,
       "planned_dependencies": [
-        "protocol-available"
+        "protocol-available",
+        "protocol-input-limit-order"
       ],
       "required_instantiations": [
-        "protocol-available"
+        "protocol-available",
+        "protocol-input-limit-order"
       ],
-      "notes": "Executable protocol-86 discrepancy: scenarios/open/01_oversized_input.json accepts 104858651 argument bytes in the model but the binary panics with input: register size exceeded. Context.WF imposes no argument bound; a formal baseline context and execution witness remain to be proved. The target has not been changed."
+      "notes": "User-reviewed incoming receipt argument bound now included in Context.WF. Runtime action-list validation supplies this bound. Oversized historical reproducer is outside this domain; pinned limit-relation instantiation and general arbitrary-resource refinement remain open."
     },
     {
       "id": "exported",
@@ -647,7 +649,7 @@
         "balance-copied-parser-through-cleanup",
         "balance-copied-absent-body"
       ],
-      "notes": "Executable protocol-86 discrepancy: scenarios/open/01_oversized_input.json accepts 104858651 argument bytes in the model but the binary panics with input: register size exceeded. Context.WF imposes no argument bound; a formal baseline context and execution witness remain to be proved. The target has not been changed."
+      "notes": "User-reviewed incoming receipt argument bound now included in Context.WF. Runtime action-list validation supplies this bound. Oversized historical reproducer is outside this domain; pinned limit-relation instantiation and general arbitrary-resource refinement remain open."
     },
     {
       "id": "balance-rejected",
@@ -1694,23 +1696,11 @@
     {
       "id": "context-wf-with-args",
       "declaration": "WNear.Binary.InputDomain.wf_with_args",
-      "title": "Context well-formedness ignores argument bytes",
+      "title": "Receipt-valid argument replacement",
       "kind": "theorem",
-      "environment": "An existing Context.WF proof is preserved by replacing argument bytes. This establishes the quantified input domain, not runtime reachability or execution.",
+      "environment": "Replacement arguments must satisfy the incoming receipt argument limit; explicitly reviewed theorem domain restriction.",
       "label": "frontier:context-wf-with-args",
-      "reviewed_shape_hash": 305638942
-    },
-    {
-      "id": "context-wf-unbounded-args",
-      "declaration": "WNear.Binary.InputDomain.wf_arguments_unbounded",
-      "title": "Context.WF admits arbitrarily long arguments",
-      "kind": "theorem",
-      "environment": "Given a well-formed baseline, any argument byte bound can be exceeded without changing protocol, method or prepaid gas. The baseline and binary mismatch are not established by this theorem.",
-      "label": "frontier:context-wf-unbounded-args",
-      "reviewed_shape_hash": 2374195852,
-      "required_proof_dependencies": [
-        "context-wf-with-args"
-      ]
+      "reviewed_shape_hash": 3309377930
     },
     {
       "id": "input-register-trap",
@@ -1731,32 +1721,71 @@
       "environment": "Given accepted parsing, model success and this binary panic, the unchanged Exported.At clause is false. The execution premise remains to be instantiated."
     },
     {
-      "id": "input-register-mismatch-witness",
-      "declaration": "WNear.Binary.InputDomain.InputRegisterMismatchWitness",
-      "title": "Formal oversized-input counterexample witness",
-      "kind": "verification_contract",
-      "label": "frontier:input-register-mismatch-witness",
-      "reviewed_shape_hash": 7317209550285182350,
-      "notes": "Exact represented and Context.WF witness with oversized accepted arguments, model success and binary input-limit panic. A pinned-v86 executable discrepancy is reproduced; this formal existential witness is still open.",
-      "planned_dependencies": [
-        "context-wf-unbounded-args",
-        "input-register-trap"
+      "id": "context-wf-bounded-args",
+      "declaration": "WNear.Binary.InputDomain.wf_arguments_bounded",
+      "title": "Context.WF bounds incoming arguments",
+      "kind": "theorem",
+      "label": "frontier:context-wf-bounded-args",
+      "reviewed_shape_hash": 3462507327
+    },
+    {
+      "id": "validated-actions-arguments",
+      "declaration": "WNear.Binary.InputDomain.validated_actions_arguments",
+      "title": "Runtime validation supplies argument bound",
+      "kind": "theorem",
+      "label": "frontier:validated-actions-arguments",
+      "reviewed_shape_hash": 54585701
+    },
+    {
+      "id": "receipt-input-register-bound",
+      "declaration": "WNear.Binary.InputDomain.wf_input_fits_register",
+      "title": "Receipt-valid inputs fit the register",
+      "kind": "theorem",
+      "label": "frontier:receipt-input-register-bound",
+      "reviewed_shape_hash": 4050773854,
+      "environment": "Explicit protocol maxArgumentsLength \u2264 maxRegisterSize premise; pinned JSON instantiation remains open.",
+      "required_type_dependencies": [
+        "protocol-input-limit-order"
       ]
     },
     {
-      "id": "input-mismatch-refutes-refinement",
-      "declaration": "WNear.Binary.InputDomain.mismatch_refutes_refinement",
-      "title": "A mismatch witness refutes full refinement",
+      "id": "no-input-mismatch-witness",
+      "declaration": "WNear.Binary.InputDomain.no_mismatch_witness",
+      "title": "Receipt domain excludes oversized witness",
       "kind": "theorem",
-      "label": "frontier:input-mismatch-refutes-refinement",
-      "reviewed_shape_hash": 1802576567,
-      "environment": "An instantiated formal mismatch witness negates the unchanged full Refines statement. The witness remains open; this is not an unconditional kernel refutation.",
-      "required_type_dependencies": [
-        "input-register-mismatch-witness"
-      ],
+      "label": "frontier:no-input-mismatch-witness",
+      "reviewed_shape_hash": 1162568423,
       "required_proof_dependencies": [
-        "input-panic-obstruction"
+        "receipt-input-register-bound"
+      ],
+      "environment": "Explicit protocol maxArgumentsLength \u2264 maxRegisterSize premise; pinned JSON instantiation remains open.",
+      "required_type_dependencies": [
+        "protocol-input-limit-order"
       ]
+    },
+    {
+      "id": "receipt-input-register-returns",
+      "declaration": "WNear.Binary.InputDomain.wf_input_register_returns",
+      "title": "Receipt-valid input host call returns",
+      "kind": "theorem",
+      "label": "frontier:receipt-input-register-returns",
+      "reviewed_shape_hash": 1833992896,
+      "required_proof_dependencies": [
+        "receipt-input-register-bound"
+      ],
+      "environment": "Host input/configuration equal the boundary context; explicit argument/register limit relation, pinned JSON instantiation open. Surrounding gas metering is separate.",
+      "required_type_dependencies": [
+        "protocol-input-limit-order"
+      ]
+    },
+    {
+      "id": "protocol-input-limit-order",
+      "declaration": "WNear.Binary.InputDomain.InputLimitsOrdered",
+      "title": "Protocol argument limit fits register limit",
+      "kind": "verification_contract",
+      "label": "frontier:protocol-input-limit-order",
+      "reviewed_shape_hash": 6270903697758492921,
+      "notes": "Pinned JSON instantiation remains open; runtime tests observe 4194304 \u2264 104857600."
     }
   ],
   "reviewed_environment": [

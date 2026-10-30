@@ -201,6 +201,21 @@ def main : IO Unit := do
       ("log count", 1, limits.maxNumberLogs),
       ("usage room", 85 + protocol.fees.numExtraBytesRecord, limits.maxGasBurnt)] do
     check s!"protocol limit {name}: {required} ≤ {actual}" (required ≤ actual)
+  check "incoming argument limit fits input register"
+    (limits.maxArgumentsLength ≤ limits.maxRegisterSize)
+  for length in [limits.maxArgumentsLength - 1, limits.maxArgumentsLength,
+      limits.maxArgumentsLength + 1] do
+    let args := List.replicate length (32 : UInt8)
+    let result := Near.validateActions limits [.functionCall "ft_balance_of" args (300 * 10 ^ 12) 0]
+    if length ≤ limits.maxArgumentsLength then
+      check s!"incoming validation accepts {length} argument bytes"
+        (match result with | .ok () => true | _ => false)
+    else
+      check s!"incoming validation rejects {length} argument bytes"
+        (match result with
+        | .error (.functionCallArgumentsLengthExceeded actual bound) =>
+          actual == length && bound == limits.maxArgumentsLength
+        | _ => false)
   check "protocol initial memory pages" (limits.initialMemoryPages == 1024)
   check "protocol maximum memory pages" (limits.maxMemoryPages == 2048)
   for version in [29, 48, 49, 84, RuntimeConfig.latestVersion] do
@@ -308,8 +323,8 @@ def main : IO Unit := do
     let (_, _) ← cmp "ft_balance_of malformed ignored value" s { method := "ft_balance_of", args }
 
   -- Adversarial configuration experiment, not a claim about protocol 86:
-  -- Context.WF has no argument-size premise. A small register limit makes the
-  -- input-host boundary reachable without allocating a 100 MiB Lean list.
+  -- Receipt-valid arguments still require the protocol argument/register limit
+  -- relation. This deliberately violates that relation to reach the host trap.
   let smallProtocol := { protocol with wasm := { protocol.wasm with limits :=
     { protocol.wasm.limits with maxRegisterSize := 16 } } }
   let smallArgs := "{\"account_id\":\"alice.near\"}"

@@ -156,20 +156,25 @@ A file holds one scenario object or an array of them.
 | `slow/40_gas_large.json` (generated) | Arguments of 1 to 4 MB, promise results of 100 KB to 4 MB |
 | `45_storage_proof.json` | The recorded storage proof as a budget (finding 8, SAF-67): within the model's `proofBound` the call is the model's; past the limit, a rolled-back `storageProofExceeded` |
 
-## Open finding: oversized accepted input at protocol 86
+## Reviewed domain regression: oversized incoming input
 
 Run `just wnear-scenarios -v scenarios/open/01_oversized_input.json` explicitly;
-it exits 1 with a discrepancy. The default suite skips `open/`.
-The input is `{"account_id":"alice.near"}` followed by 102401 blocks of
-1024 spaces: 104,858,651 bytes, beyond the 104,857,600-byte register limit.
-With 300 Tgas prepaid (below the configured 1000 Tgas total-prepaid limit), the binary reports `panic "input: register size exceeded"`
-and the model returns `"1000"`. This is neither model agreement nor one of the
-allowed resource failures. The runner validates executable hypotheses but does
-not prove the complete `Context.WF` predicate. Lean's `InputDomain` theorems
-establish that changing arguments alone preserves any baseline WF proof.
-A formal baseline and execution witness remain open. Receipt validation's 4 MiB
-argument limit is absent from that predicate. The target statement is unchanged;
-a domain restriction or model change must be reviewed explicitly.
+it must exit 1 with **BROKEN / argument length exceeds incoming receipt limit**,
+before binary execution. This is an invalid-context regression, not a passing
+accepted-call scenario. The default suite skips `open/`.
+
+Historically, before the reviewed domain correction, the input
+`{"account_id":"alice.near"}` followed by 102401 blocks of 1024 spaces
+(104,858,651 bytes) produced a binary `input: register size exceeded` panic while
+the model returned `"1000"`, at 300 Tgas under pinned protocol 86. No complete
+formal context/execution witness was established. The user explicitly approved
+restricting arguments to the incoming receipt limit on 2026-10-30.
+`Context.WF.arguments_length` now requires that 4 MiB bound. Runtime
+`validateActions` supplies the bound for each function-call member; the runtime
+adapter tests check the real pinned limit at minus one, exactly, and plus one.
+The runtime model still leaves incoming-receipt processing unmodeled, and the
+pinned JSON bounds remain to be proved in the kernel. Gas and rollback clauses
+are unchanged. The previous unbounded-argument domain theorem was removed.
 
 ## Findings
 

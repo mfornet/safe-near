@@ -1,26 +1,63 @@
 # wNEAR refinement: status and how to resume
 
-Campaign status on 2026-10-30; local continuation is active. Details are in `wnear_refinement_proof.md`: M3 for the first method, M6 for JSON arguments (the parser map is `wnear_m6_parser_map.md`), and M8 for the other methods.
+Checkpoint status on 2026-10-30; this worktree’s proof exploration is wound down at the user’s request. Details are in `wnear_refinement_proof.md`: M3 for the first method, M6 for JSON arguments (the parser map is `wnear_m6_parser_map.md`), and M8 for the other methods.
 
 The exported refinement is now a checked dispatch over six completed method clauses and eight open full-method obligations and a checked `ft_balance_of` assembly over three named open clauses, with five separately named protocol-instantiation obligations. The global refinement and its withdrawal corollary remain conditional on those leaves. Completed results use only `propext`, `Classical.choice` and `Quot.sound`; never use `bv_decide` or `native_decide`.
 
 The three feasibility gates and their evidence, next checks and failure consequences are tracked in [wnear_feasibility_risks.md](wnear_feasibility_risks.md). The asynchronous gate has passing concrete created-receipt/callback traces, including zero-gas rollback probes; the full asynchronous method proofs remain open.
 
-A concrete executable discrepancy now exists under pinned protocol 86:
-`scenarios/open/01_oversized_input.json` has 104,858,651 accepted argument bytes,
-and the binary panics at the input register limit while the model returns a
-balance. It fails the arbitrary-resource disjunction. Lean proves argument-byte
-replacement preserves any baseline `Context.WF`, including unbounded lengths;
-the formal baseline and execution witness remain open. `InputRegisterMismatchWitness` states the exact missing witness, and `mismatch_refutes_refinement` checks its contradiction with the unchanged top-level statement. This domain issue takes
-priority over further accepted-call composition. The theorem is unchanged;
-restricting its domain or changing model failure behavior needs explicit review.
+The user explicitly approved restricting incoming arguments to the receipt-valid
+argument-length domain on 2026-10-30. `Context.WF.arguments_length` now requires
+`args.length ≤ protocol.wasm.limits.maxArgumentsLength`. No gas, proof-budget,
+rollback or accepted-call observation clause changed. This narrows the quantified
+domain: the historical 104,858,651-byte input is excluded by the 4 MiB pinned
+receipt limit and is now reported as an invalid context before execution.
+
+`Near.validateActions_functionCall_arguments` proves that runtime action-list
+validation supplies this exact premise for each member function call. This is
+not a proof that receipt delivery establishes every WF field: `applyAttempt`
+explicitly leaves incoming-receipt validation unmodeled. Closing that seam
+remains a foundation obligation. The pinned nearcore source confirms existing
+incoming and delayed receipts call `validate_receipt(...ExistingReceipt)`
+before execution (`runtime/runtime/src/lib.rs`, lines 2499–2505, 2565–2574 at
+`44f7ae6cd7ef08bab604e20a473bf77e35d4c993`). Both modes reach the same
+function-call argument check (`action_validation.rs`, lines 131–141, 255–279).
+That source review supports the environment restriction; it is not a formal
+cross-language correctness proof. `wf_input_fits_register` and
+`no_mismatch_witness` exclude the oversized-register witness under the explicit
+`InputLimitsOrdered` relation (`maxArgumentsLength ≤ maxRegisterSize`), now
+a named open frontier obligation. Executable pinned checks cover
+that relation and the argument boundary; kernel instantiation from the pinned
+JSON remains open. The old `wf_arguments_unbounded` theorem was removed because
+it is false for the reviewed domain; its historical statement is recorded in
+the misstatement log. The historical generic host trap and contradiction lemmas
+remain checked, but witness existence is no longer a frontier obligation.
+
+## Wind-down checkpoint
+
+- Full strict validation passed on 2026-10-30 at 22:43 UTC for proof source
+  digest `32909647a605d71443b933733287d2dad49bcec02cf45a6244c2e9998098fb74`.
+  `tools/wnear_validate.py --update-statements` completed; the generated statement
+  changes and frontier hashes were reviewed. Existing admissions remain tracked;
+  the deployed refinement is still Conditional.
+- Native runtime adapter tests, all 61 default scenarios, and all six frontier
+  policy tests passed. The saved oversized-input fixture deliberately exits 1
+  with the precise incoming-argument-limit hypothesis violation before execution.
+- Warm checkpoint timings: wNEAR compilation 97.2 s, strict wNEAR audit 376.3 s,
+  frontier check 95.0 s (export 79.2 s: traversal 72.6 s, estimated imports/startup
+  6.6 s). Full audits still run without an audit cache.
+- No proof agents are assigned and no further proof exploration is scheduled in
+  this worktree. Its blueprint watcher was stopped for wind-down; static serving
+  remains available. The served frontier records the final revision/build time.
+  Restart watching with `tools/wnear_blueprint.py --install-watch` and the local
+  publication settings when work resumes.
 
 ## Continuation checkpoint
 
-- Latest validated proof commit before the workflow update: `8412a11`; the
+- Latest full-audit baseline before this domain correction: `efd5c8a`; the
   live frontier states the current revision and whether its exact source digest
-  has a full audit. The current integration owner is this worktree; no proof
-  agents are assigned.
+  has a full audit. The integration owner for this checkpoint is this worktree; no proof
+  agents are assigned. No further proof exploration is scheduled.
 - Checked end-to-end *decoded body* path: `ft_balance_of`, copied-string array,
   absent account, zero return. It is paired with the model zero-balance result
   in `copied_array_absent_body_model_agreement`. This is not yet an external
@@ -33,15 +70,25 @@ restricting its domain or changing model failure behavior needs explicit review.
   input and the named `BurnLimitV86` holds. The burn-limit upper bound is
   observed in the runtime test but remains unproved for the pinned protocol;
   low-gas calls do not obtain this input bound from the gas premise.
-- Next blocking obligation: derive parser `roomRun` and connect the resulting
+- Next foundation obligation: instantiate pinned argument/register bounds and
+  link delivered action validation to the boundary (incoming receipt processing
+  is currently unmodeled). Then derive parser `roomRun` and connect the resulting
   resources and return bytes to the accepted-call method contract. Extend to
   other inputs and failure outcomes; preserve the named open contracts.
 - Development: use the warm Lean LSP and targeted checks. At integration, run
   `just wnear-audit` for the full strict audit; it coordinates with the watcher.
-  Build and audit evidence applies only to its exact source digest. The watcher
+  Build dependencies under the shared lock before opening a proof file whose
+  imports became stale: LSP `lake setup-file` can otherwise launch an automatic
+  build outside the watcher lock. Build and audit evidence applies only to its exact source digest. The watcher
   coalesces edits, reuses matching frontier exports and refreshes Git metadata
   without rebuilding the book. Timing records are in ignored build output at
   `.lake/build/blueprint/timings.jsonl`; strict audits never use an audit cache.
+- Shared-boundary domain correction triggered a broad dependency rebuild:
+  unchanged `ParseEscape.lean` alone exceeded 13 minutes of compilation.
+  A one-second process sample saw `Lean.Meta` unfolding/weak-head reduction;
+  this is a compilation observation, not an axiom-audit timing or proof failure.
+  Keep these costs distinct and profile the touched proof before considering
+  any incremental refactor. Do not lower proof checks to shorten the rebuild.
 - First measured workflow run on 2026-10-30: wNEAR audit 335 s; strict
   frontier export 74 s (68 s traversal, 6 s estimated startup/import); import
   artifact fingerprint about 5–6 s. Split audit groups each spent roughly

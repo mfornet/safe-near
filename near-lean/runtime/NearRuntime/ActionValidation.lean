@@ -107,6 +107,56 @@ def validateActionOrder (limits : LimitConfig) (foundDelegate : Bool) (actions :
 termination_by (sizeOf actions, 0)
 end
 
+/-- The function-call validator accepts exactly these bounds; the argument
+premise is attainable, not merely a consequence of an impossible success. -/
+theorem validateAction_functionCall_ok_iff (limits : LimitConfig) (method : String)
+    (args : List UInt8) (gas deposit : Nat) :
+    validateAction limits (.functionCall method args gas deposit) = .ok () ↔
+      gas ≠ 0 ∧ method.utf8ByteSize ≤ limits.maxLengthMethodName ∧
+        args.length ≤ limits.maxArgumentsLength := by
+  simp only [validateAction]
+  repeat' first | split | simp_all [Except.bind, Except.pure, Bind.bind, Pure.pure,
+    throw, MonadExceptOf.throw]
+
+/-- A validated incoming function-call action fits the protocol argument limit. -/
+theorem validateAction_functionCall_arguments (limits : LimitConfig) (method : String)
+    (args : List UInt8) (gas deposit : Nat)
+    (h : validateAction limits (.functionCall method args gas deposit) = .ok ()) :
+    args.length ≤ limits.maxArgumentsLength :=
+  ((validateAction_functionCall_ok_iff limits method args gas deposit).mp h).2.2
+
+/-- Successful ordered validation validates every action in the receipt. -/
+theorem validateActionOrder_member (limits : LimitConfig) (actions : List Action)
+    (found : Bool) (h : validateActionOrder limits found actions = .ok ())
+    (action : Action) (hmem : action ∈ actions) : validateAction limits action = .ok () := by
+  induction actions generalizing found with
+  | nil => simp at hmem
+  | cons head rest ih =>
+    have hpair : validateAction limits head = .ok () ∧
+        ∃ next, validateActionOrder limits next rest = .ok () := by
+      cases head <;> simp only [validateActionOrder] at h
+      all_goals
+        repeat' first | split at h | simp_all [Except.bind, Except.pure, Bind.bind,
+          Pure.pure, throw, MonadExceptOf.throw]
+      all_goals cases found <;> simp_all
+    rcases List.mem_cons.mp hmem with heq | hrest
+    · subst action; exact hpair.1
+    · obtain ⟨next, hnext⟩ := hpair.2
+      exact ih next hnext hrest
+
+/-- Receipt validation supplies the incoming function-call argument bound. -/
+theorem validateActions_functionCall_arguments (limits : LimitConfig) (actions : List Action)
+    (method : String) (args : List UInt8) (gas deposit : Nat)
+    (h : validateActions limits actions = .ok ())
+    (hmem : Action.functionCall method args gas deposit ∈ actions) :
+    args.length ≤ limits.maxArgumentsLength := by
+  have horder : validateActionOrder limits false actions = .ok () := by
+    simp only [validateActions] at h
+    repeat' first | split at h | simp_all [Except.bind, Except.pure, Bind.bind,
+      Pure.pure, throw, MonadExceptOf.throw]
+  exact validateAction_functionCall_arguments limits method args gas deposit
+    (validateActionOrder_member limits actions false horder _ hmem)
+
 /-- Native `validate_actions` for a transaction's actions. -/
 def validateTransactionActions (cfg : RuntimeConfig) (actions : List Action) :
     Except ActionsValidationError Unit :=

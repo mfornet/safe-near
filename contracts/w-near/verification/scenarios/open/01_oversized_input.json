@@ -1,6 +1,6 @@
 {
-  "name": "open: pinned v86 oversized accepted balance input",
-  "description": "Expected discrepancy: Context.WF has no receipt argument-length premise; v86 input host rejects a valid argument larger than the 100 MiB register limit. The model accepts it and ResourceFailure excludes the resulting panic. The runner checks executable hypotheses but does not prove Context.WF.",
+  "name": "historical: oversized input excluded by reviewed receipt domain",
+  "description": "Expected invalid-context rejection: argument length exceeds incoming receipt limit. Before the user-reviewed 2026-10-30 domain correction, this pinned-v86 input made the binary panic at the 100 MiB register limit while the model succeeded. The historical panic expectation is preserved below; execution must now stop at the Context.WF argument-limit check. This is not a passing accepted-call scenario.",
   "state": {
     "accounts": {
       "alice.near": "1000"

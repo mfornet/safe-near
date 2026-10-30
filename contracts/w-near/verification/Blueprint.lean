@@ -803,14 +803,43 @@ attribute [blueprint "frontier:balance-copied-body-gas-bound"
   WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body_gas_bound
 
 attribute [blueprint "frontier:context-wf-with-args"
-  (title := /-- Context well-formedness ignores argument bytes -/)
-  (statement := /-- From an existing well-formed context, replacing only args preserves Context.WF. This checks the current theorem domain, not runtime reachability or execution. -/)]
+  (title := /-- Receipt-valid argument replacement -/)
+  (statement := /-- Replacing arguments preserves Context.WF provided the replacement satisfies the incoming receipt argument limit. This is the explicitly reviewed domain restriction. -/)]
   WNear.Binary.InputDomain.wf_with_args
 
-attribute [blueprint "frontier:context-wf-unbounded-args"
-  (title := /-- Context.WF admits arbitrarily long arguments -/)
-  (statement := /-- Given one well-formed context, for every byte bound another well-formed context exceeds it with the same protocol, method and prepaid gas. This does not establish a baseline witness or the execution discrepancy in Lean. -/)]
-  WNear.Binary.InputDomain.wf_arguments_unbounded
+attribute [blueprint "frontier:context-wf-bounded-args"
+  (title := /-- Context.WF bounds incoming arguments -/)
+  (statement := /-- Every well-formed context satisfies the protocol argument-length limit, as required by incoming receipt action validation. -/)]
+  WNear.Binary.InputDomain.wf_arguments_bounded
+
+attribute [blueprint "frontier:validated-actions-arguments"
+  (title := /-- Runtime validation supplies argument bound -/)
+  (statement := /-- Successful runtime validateActions bounds the arguments of every function-call action in that list. This supplies the new WF premise, not the other WF fields or a proof of incoming receipt processing. -/)]
+  WNear.Binary.InputDomain.validated_actions_arguments
+
+attribute [blueprint "frontier:protocol-input-limit-order"
+  (title := /-- Protocol argument limit fits register limit -/)
+  (statement := /-- The protocol maxArgumentsLength is at most maxRegisterSize. Instantiating this relation from the pinned JSON remains open. -/)
+  (notReady := true)]
+  WNear.Binary.InputDomain.InputLimitsOrdered
+
+attribute [blueprint "frontier:receipt-input-register-bound"
+  (title := /-- Receipt-valid inputs fit the register -/)
+  (statement := /-- Context.WF and the explicit maxArgumentsLength ≤ maxRegisterSize protocol relation bound input by the register limit. Instantiating the relation from pinned JSON remains open. -/)
+  (notReady := true)]
+  WNear.Binary.InputDomain.wf_input_fits_register
+
+attribute [blueprint "frontier:no-input-mismatch-witness"
+  (title := /-- Receipt domain excludes oversized witness -/)
+  (statement := /-- No historical oversized-input mismatch witness satisfies Context.WF when the protocol argument limit is at most its register limit. This does not prove general parsing, arbitrary-resource behavior or the pinned protocol relation. -/)
+  (notReady := true)]
+  WNear.Binary.InputDomain.no_mismatch_witness
+
+attribute [blueprint "frontier:receipt-input-register-returns"
+  (title := /-- Receipt-valid input host call returns -/)
+  (statement := /-- The actual input host operation returns after writing register 0 when its input and configuration match the receipt-valid boundary context and the explicit protocol limit relation holds. Surrounding gas charging is separate. -/)
+  (notReady := true)]
+  WNear.Binary.InputDomain.wf_input_register_returns
 
 attribute [blueprint "frontier:input-register-trap"
   (title := /-- Oversized input traps at register 0 -/)
@@ -821,15 +850,3 @@ attribute [blueprint "frontier:input-panic-obstruction"
   (title := /-- Input panic contradicts accepted-call observations -/)
   (statement := /-- Given accepted parsing, model success and the binary input-limit panic, the unchanged Exported.At clause is false. These observation premises still require instantiation. -/)]
   WNear.Binary.InputDomain.not_at_of_input_panic
-
-attribute [blueprint "frontier:input-register-mismatch-witness"
-  (title := /-- Formal oversized-input counterexample witness -/)
-  (statement := /-- An exact represented Context.WF witness with oversized accepted arguments, model success and binary input-limit panic. The pinned-v86 executable reproducer supplies evidence, but this existential witness remains unproved. -/)
-  (notReady := true)]
-  WNear.Binary.InputDomain.InputRegisterMismatchWitness
-
-attribute [blueprint "frontier:input-mismatch-refutes-refinement"
-  (title := /-- A mismatch witness refutes full refinement -/)
-  (statement := /-- An instantiated input-register mismatch witness negates the unchanged full Refines statement. The formal witness remains open; the executable discrepancy is not presented as a kernel refutation. -/)
-  (notReady := true)]
-  WNear.Binary.InputDomain.mismatch_refutes_refinement

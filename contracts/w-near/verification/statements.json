@@ -137,10 +137,20 @@
     "WNear.Binary.FtBalanceOfMethod.argument_length_lt_2_24",
     "WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body_gas_bound",
     "WNear.Binary.InputDomain.wf_with_args",
-    "WNear.Binary.InputDomain.wf_arguments_unbounded",
     "WNear.Binary.InputDomain.input_register_limit_trap",
     "WNear.Binary.InputDomain.not_at_of_input_panic",
     "WNear.Binary.InputDomain.InputRegisterMismatchWitness",
-    "WNear.Binary.InputDomain.mismatch_refutes_refinement"
+    "WNear.Binary.InputDomain.mismatch_refutes_refinement",
+    "NearInterface.Context.WF",
+    "Near.validateAction_functionCall_arguments",
+    "Near.validateActionOrder_member",
+    "Near.validateActions_functionCall_arguments",
+    "WNear.Binary.InputDomain.wf_arguments_bounded",
+    "WNear.Binary.InputDomain.validated_actions_arguments",
+    "WNear.Binary.InputDomain.wf_input_fits_register",
+    "WNear.Binary.InputDomain.no_mismatch_witness",
+    "WNear.Binary.InputDomain.wf_input_register_returns",
+    "WNear.Binary.InputDomain.InputLimitsOrdered",
+    "Near.validateAction_functionCall_ok_iff"
   ]
 }

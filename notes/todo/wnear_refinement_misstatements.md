@@ -225,3 +225,23 @@ to move task types to a cheaper or stronger model.
 | Task type | Model | Succeeded | Failed | Notes |
 |---|---|---|---|---|
 | Harness design and first checkers (M1) | Opus | 1 | 0 | Two cost miscounts, caught by the harness itself |
+
+### 12. Incoming receipt argument limit omitted from the theorem domain
+
+- **Statement:** `Context.WF` admitted arbitrary argument lengths; the former
+  `InputDomain.wf_arguments_unbounded` proved this omission, not reachability.
+- **Truth:** Receipt action validation bounds arguments. A 104,858,651-byte
+  protocol-86 balance input made the binary panic at the register limit while
+  the model succeeded. No complete formal context/execution witness was proved.
+- **Caught by:** `scenarios/open/01_oversized_input.json` and quantified-domain review.
+- **Root cause:** The function-call boundary omitted an upstream validation guarantee.
+- **Reviewed correction:** The user explicitly selected receipt-valid incoming inputs
+  on 2026-10-30. Add only the argument-length consequence to `Context.WF`; leave
+  accepted/rejected observations, arbitrary gas and rollback clauses unchanged.
+  The old unbounded theorem is false under this new domain and was removed.
+- **Sweep:** Prove successful runtime action-list validation supplies the bound;
+  prove no oversized-register witness when argument limit ≤ register limit.
+  Do not claim incoming receipt processing is proved: `applyAttempt` explicitly
+  omits that validation stage. Pinned JSON instantiation remains open.
+- **Test added:** Runtime validation at the actual argument limit minus one, at
+  the limit, and plus one; historical reproducer now fails as invalid context.
