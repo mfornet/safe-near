@@ -25,6 +25,11 @@ name = "NearRuntime"
 path = "../../../near-lean/runtime"
 
 # Borsh and near-sdk collection layouts shared with the other contract projects.
+# The metered separation logic (layer L1) and the generic bridge to `Refines`.
+[[require]]
+name = "NearLogic"
+path = "../../../near-lean/near-logic"
+
 [[require]]
 name = "NearSdk"
 path = "../../../near-lean/sdk"
@@ -48,6 +53,13 @@ name = "Model"
 # and the module (milestone M0 of notes/todo/wnear_refinement_proof.md).
 [[lean_lib]]
 name = "Binary"
+
+# The bridge from the binary to `Refines` (layer L2, wNEAR part): facts about runs
+# of `contract.wasm` in the metered logic.
+[[lean_lib]]
+name = "Bridge"
+# There is no umbrella module; include every proof under Bridge/.
+globs = ["Bridge.+"]
 
 [[lean_lib]]
 name = "Spec"
@@ -76,3 +88,7 @@ name = "Harness"
 [[lean_exe]]
 name = "wnear-harness"
 root = "Harness.Main"
+
+# Curated LeanArchitect frontier and checked global composition.
+[[lean_lib]]
+name = "Blueprint"

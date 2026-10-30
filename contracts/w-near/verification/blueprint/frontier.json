@@ -1,0 +1,1690 @@
+{
+  "schema": 1,
+  "nodes": [
+    {
+      "id": "global",
+      "declaration": "WNear.refines_wnear",
+      "title": "Deployed binary refinement",
+      "kind": "theorem",
+      "label": "spec:refinement",
+      "annotated": true,
+      "reviewed_shape_hash": 407420551,
+      "planned_dependencies": [
+        "protocol-available"
+      ],
+      "required_instantiations": [
+        "protocol-available"
+      ]
+    },
+    {
+      "id": "exported",
+      "declaration": "WNear.refines_wnear_exported",
+      "title": "All exported runtime clauses",
+      "kind": "theorem",
+      "label": "frontier:exported",
+      "reviewed_shape_hash": 3221175398
+    },
+    {
+      "id": "dispatch",
+      "declaration": "WNear.Binary.Exported.all_methods",
+      "title": "Checked dispatch over all 15 methods",
+      "kind": "theorem",
+      "label": "frontier:dispatch",
+      "reviewed_shape_hash": 794773010
+    },
+    {
+      "id": "remaining",
+      "declaration": "WNear.Binary.Exported.Remaining",
+      "title": "Nine remaining full method contracts",
+      "kind": "verification_contract",
+      "label": "frontier:remaining",
+      "reviewed_shape_hash": 11887525737325216845
+    },
+    {
+      "id": "binary-size",
+      "declaration": "WNear.deployed_code_size",
+      "title": "Embedded deployed code size",
+      "kind": "theorem",
+      "label": "frontier:binary-size",
+      "reviewed_shape_hash": 2934629974
+    },
+    {
+      "id": "protocol-runtime",
+      "declaration": "WNear.pinned_runtime_obligation",
+      "title": "Pinned protocol: runtime",
+      "kind": "admission",
+      "label": "frontier:protocol-runtime",
+      "reviewed_shape_hash": 3470692719
+    },
+    {
+      "id": "protocol-costs",
+      "declaration": "WNear.pinned_costs_obligation",
+      "title": "Pinned protocol: costs",
+      "kind": "admission",
+      "label": "frontier:protocol-costs",
+      "reviewed_shape_hash": 188185962
+    },
+    {
+      "id": "protocol-limits",
+      "declaration": "WNear.pinned_limits_obligation",
+      "title": "Pinned protocol: limits",
+      "kind": "admission",
+      "label": "frontier:protocol-limits",
+      "reviewed_shape_hash": 3429799462
+    },
+    {
+      "id": "protocol-new_costs",
+      "declaration": "WNear.pinned_new_costs_obligation",
+      "title": "Pinned protocol: new costs",
+      "kind": "admission",
+      "label": "frontier:protocol-new_costs",
+      "reviewed_shape_hash": 2138127204
+    },
+    {
+      "id": "protocol-deposit_costs",
+      "declaration": "WNear.pinned_deposit_costs_obligation",
+      "title": "Pinned protocol: deposit costs",
+      "kind": "admission",
+      "label": "frontier:protocol-deposit_costs",
+      "reviewed_shape_hash": 3446914636
+    },
+    {
+      "id": "method-ft_total_supply",
+      "declaration": "WNear.Binary.Exported.ftTotalSupply_complete",
+      "title": "ft_total_supply",
+      "kind": "theorem",
+      "method": "ft_total_supply",
+      "environment": "Reviewed Environment predicate; pinned instantiation remains open.",
+      "planned_dependencies": [],
+      "label": "frontier:method-ft_total_supply",
+      "reviewed_shape_hash": 3495502223
+    },
+    {
+      "id": "method-storage_minimum_balance",
+      "declaration": "WNear.Binary.Exported.storageMinimumBalance_complete",
+      "title": "storage_minimum_balance",
+      "kind": "theorem",
+      "method": "storage_minimum_balance",
+      "environment": "Reviewed Environment predicate; pinned instantiation remains open.",
+      "planned_dependencies": [],
+      "label": "frontier:method-storage_minimum_balance",
+      "reviewed_shape_hash": 2743892628
+    },
+    {
+      "id": "method-storage_balance_bounds",
+      "declaration": "WNear.Binary.Exported.storageBalanceBounds_complete",
+      "title": "storage_balance_bounds",
+      "kind": "theorem",
+      "method": "storage_balance_bounds",
+      "environment": "Reviewed Environment predicate; pinned instantiation remains open.",
+      "planned_dependencies": [],
+      "label": "frontier:method-storage_balance_bounds",
+      "reviewed_shape_hash": 2939384948
+    },
+    {
+      "id": "method-ft_metadata",
+      "declaration": "WNear.Binary.Exported.ftMetadata_complete",
+      "title": "ft_metadata",
+      "kind": "theorem",
+      "method": "ft_metadata",
+      "environment": "Reviewed Environment predicate; pinned instantiation remains open.",
+      "planned_dependencies": [],
+      "label": "frontier:method-ft_metadata",
+      "reviewed_shape_hash": 574261695
+    },
+    {
+      "id": "method-new",
+      "declaration": "WNear.Binary.Exported.new_complete",
+      "title": "new",
+      "kind": "theorem",
+      "method": "new",
+      "environment": "Reviewed Environment predicate; pinned instantiation remains open.",
+      "planned_dependencies": [],
+      "label": "frontier:method-new",
+      "reviewed_shape_hash": 3504047329
+    },
+    {
+      "id": "method-near_deposit",
+      "declaration": "WNear.Binary.Exported.nearDeposit_complete",
+      "title": "near_deposit",
+      "kind": "theorem",
+      "method": "near_deposit",
+      "environment": "Reviewed Environment predicate; pinned instantiation remains open.",
+      "planned_dependencies": [],
+      "label": "frontier:method-near_deposit",
+      "reviewed_shape_hash": 3251291794
+    },
+    {
+      "id": "method-near_withdraw",
+      "declaration": "WNear.nearWithdraw_obligation",
+      "title": "near_withdraw",
+      "kind": "admission",
+      "method": "near_withdraw",
+      "environment": "Pinned protocol JSON and reviewed Environment predicate.",
+      "planned_dependencies": [
+        "accept-parser",
+        "reject-parser",
+        "storage",
+        "runtime-boundary"
+      ],
+      "label": "frontier:method-near_withdraw",
+      "reviewed_shape_hash": 1974200465
+    },
+    {
+      "id": "method-ft_transfer",
+      "declaration": "WNear.ftTransfer_obligation",
+      "title": "ft_transfer",
+      "kind": "admission",
+      "method": "ft_transfer",
+      "environment": "Pinned protocol JSON and reviewed Environment predicate.",
+      "planned_dependencies": [
+        "accept-parser",
+        "reject-parser",
+        "storage",
+        "runtime-boundary"
+      ],
+      "label": "frontier:method-ft_transfer",
+      "reviewed_shape_hash": 2152580315
+    },
+    {
+      "id": "method-ft_transfer_call",
+      "declaration": "WNear.ftTransferCall_obligation",
+      "title": "ft_transfer_call",
+      "kind": "admission",
+      "method": "ft_transfer_call",
+      "environment": "Pinned protocol JSON and reviewed Environment predicate.",
+      "planned_dependencies": [
+        "accept-parser",
+        "reject-parser",
+        "storage",
+        "runtime-boundary"
+      ],
+      "label": "frontier:method-ft_transfer_call",
+      "reviewed_shape_hash": 3656150618
+    },
+    {
+      "id": "method-ft_balance_of",
+      "declaration": "WNear.ftBalanceOf_obligation",
+      "title": "ft_balance_of",
+      "kind": "theorem",
+      "method": "ft_balance_of",
+      "environment": "Pinned protocol JSON and reviewed Environment predicate.",
+      "planned_dependencies": [],
+      "label": "frontier:method-ft_balance_of",
+      "reviewed_shape_hash": 925099951,
+      "exported_direct": true,
+      "required_proof_dependencies": [
+        "balance-no-issue",
+        "balance-accepted",
+        "balance-rejected"
+      ]
+    },
+    {
+      "id": "method-ft_resolve_transfer",
+      "declaration": "WNear.ftResolveTransfer_obligation",
+      "title": "ft_resolve_transfer",
+      "kind": "admission",
+      "method": "ft_resolve_transfer",
+      "environment": "Pinned protocol JSON and reviewed Environment predicate.",
+      "planned_dependencies": [
+        "accept-parser",
+        "reject-parser",
+        "storage",
+        "runtime-boundary"
+      ],
+      "label": "frontier:method-ft_resolve_transfer",
+      "reviewed_shape_hash": 2608134460
+    },
+    {
+      "id": "method-storage_deposit",
+      "declaration": "WNear.storageDeposit_obligation",
+      "title": "storage_deposit",
+      "kind": "admission",
+      "method": "storage_deposit",
+      "environment": "Pinned protocol JSON and reviewed Environment predicate.",
+      "planned_dependencies": [
+        "accept-parser",
+        "reject-parser",
+        "storage",
+        "runtime-boundary"
+      ],
+      "label": "frontier:method-storage_deposit",
+      "reviewed_shape_hash": 1653313540
+    },
+    {
+      "id": "method-storage_withdraw",
+      "declaration": "WNear.storageWithdraw_obligation",
+      "title": "storage_withdraw",
+      "kind": "admission",
+      "method": "storage_withdraw",
+      "environment": "Pinned protocol JSON and reviewed Environment predicate.",
+      "planned_dependencies": [
+        "accept-parser",
+        "reject-parser",
+        "storage",
+        "runtime-boundary"
+      ],
+      "label": "frontier:method-storage_withdraw",
+      "reviewed_shape_hash": 1012046304
+    },
+    {
+      "id": "method-storage_unregister",
+      "declaration": "WNear.storageUnregister_obligation",
+      "title": "storage_unregister",
+      "kind": "admission",
+      "method": "storage_unregister",
+      "environment": "Pinned protocol JSON and reviewed Environment predicate.",
+      "planned_dependencies": [
+        "accept-parser",
+        "reject-parser",
+        "storage",
+        "runtime-boundary"
+      ],
+      "label": "frontier:method-storage_unregister",
+      "reviewed_shape_hash": 2215542695
+    },
+    {
+      "id": "method-storage_balance_of",
+      "declaration": "WNear.storageBalanceOf_obligation",
+      "title": "storage_balance_of",
+      "kind": "admission",
+      "method": "storage_balance_of",
+      "environment": "Pinned protocol JSON and reviewed Environment predicate.",
+      "planned_dependencies": [
+        "accept-parser",
+        "reject-parser",
+        "storage",
+        "runtime-boundary"
+      ],
+      "label": "frontier:method-storage_balance_of",
+      "reviewed_shape_hash": 3836346273
+    },
+    {
+      "id": "ignore-hyp",
+      "declaration": "WNear.Binary.SerdeStructObjState.IgnoreHyp",
+      "title": "Full ignored-reader interface",
+      "kind": "verification_contract",
+      "planned_dependencies": [
+        "ignored-opening",
+        "ignored-closing",
+        "ignored-last-close",
+        "ignored-first",
+        "ignored-comma",
+        "ignored-member",
+        "ignored-scalar",
+        "ignored-depth",
+        "ignored-reserve",
+        "scratch-room"
+      ],
+      "label": "frontier:ignore-hyp",
+      "reviewed_shape_hash": 14658794859049893487
+    },
+    {
+      "id": "key-conditions",
+      "declaration": "WNear.Binary.SerdeStructObjKeyState.KeyConditions",
+      "title": "Uniform reachable key bounds",
+      "kind": "verification_contract",
+      "label": "frontier:key-conditions",
+      "reviewed_shape_hash": 14634685420054898645
+    },
+    {
+      "id": "value-conditions",
+      "declaration": "WNear.Binary.SerdeStructObjValueState.ValueConditions",
+      "title": "Uniform reachable value bounds",
+      "kind": "verification_contract",
+      "label": "frontier:value-conditions",
+      "reviewed_shape_hash": 7014099597825291335
+    },
+    {
+      "id": "accept-parser",
+      "declaration": "WNear.Binary.FromSliceSpec.AcceptContract",
+      "title": "Uniform accepting argument contract",
+      "kind": "verification_contract",
+      "planned_dependencies": [
+        "object-parser",
+        "ignore-hyp",
+        "key-conditions",
+        "value-conditions",
+        "string-room",
+        "owned-room"
+      ],
+      "label": "frontier:accept-parser",
+      "reviewed_shape_hash": 4008976267067297995
+    },
+    {
+      "id": "reject-parser",
+      "declaration": "WNear.Binary.FromSliceSpec.RejectContract",
+      "title": "Uniform rejecting argument contract",
+      "kind": "verification_contract",
+      "planned_dependencies": [
+        "object-parser",
+        "ignore-hyp",
+        "key-conditions",
+        "value-conditions"
+      ],
+      "label": "frontier:reject-parser",
+      "reviewed_shape_hash": 5907064027448999036
+    },
+    {
+      "id": "object-parser",
+      "declaration": "WNear.Binary.SerdeStructObjModelState.f228_obj_model",
+      "title": "Changing-state object parser",
+      "kind": "theorem",
+      "notes": "IgnoreHyp, KeyConditions and ValueConditions remain explicit unresolved verification dependencies.",
+      "label": "frontier:object-parser",
+      "required_type_dependencies": [
+        "ignore-hyp",
+        "key-conditions",
+        "value-conditions"
+      ],
+      "reviewed_shape_hash": 115430703
+    },
+    {
+      "id": "array-parser",
+      "declaration": "WNear.Binary.FromSliceEsc.f65_arr_okAt",
+      "title": "Copied/escaped array parser wrapper",
+      "kind": "theorem",
+      "notes": "Concrete copied-array path under explicit reader/heap/room premises; not the uniform AcceptContract.",
+      "label": "frontier:array-parser",
+      "required_type_dependencies": [
+        "string-room",
+        "owned-room"
+      ],
+      "reviewed_shape_hash": 2397495654
+    },
+    {
+      "id": "ignored-opening",
+      "declaration": "WNear.Binary.SerdeIgnOpening.entry_funded",
+      "title": "Complete funded ignored-container opening",
+      "kind": "theorem",
+      "label": "frontier:ignored-opening",
+      "required_type_dependencies": [
+        "scratch-room"
+      ],
+      "reviewed_shape_hash": 1856645026
+    },
+    {
+      "id": "ignored-closing",
+      "declaration": "WNear.Binary.SerdeIgnClosing.funded_nonempty",
+      "title": "Complete funded nested close",
+      "kind": "theorem",
+      "label": "frontier:ignored-closing",
+      "reviewed_shape_hash": 3291265390
+    },
+    {
+      "id": "ignored-last-close",
+      "declaration": "WNear.Binary.SerdeIgnClosing.funded_empty",
+      "title": "Complete funded final close",
+      "kind": "theorem",
+      "label": "frontier:ignored-last-close",
+      "reviewed_shape_hash": 1372473394
+    },
+    {
+      "id": "ignored-first",
+      "declaration": "WNear.Binary.SerdeIgnMemberBudget.first_funded",
+      "title": "Complete funded first-member iteration",
+      "kind": "theorem",
+      "label": "frontier:ignored-first",
+      "reviewed_shape_hash": 1479903732
+    },
+    {
+      "id": "ignored-comma",
+      "declaration": "WNear.Binary.SerdeIgnMemberBudget.comma_funded",
+      "title": "Complete funded comma iteration",
+      "kind": "theorem",
+      "label": "frontier:ignored-comma",
+      "reviewed_shape_hash": 2762488383
+    },
+    {
+      "id": "ignored-member",
+      "declaration": "WNear.Binary.SerdeIgnMemberBudget.next_funded",
+      "title": "Funded array/key/colon tail",
+      "kind": "theorem",
+      "label": "frontier:ignored-member",
+      "reviewed_shape_hash": 2165378940
+    },
+    {
+      "id": "ignored-scalar",
+      "declaration": "WNear.Binary.SerdeIgnScalar.scalar",
+      "title": "Complete scalar dispatch",
+      "kind": "theorem",
+      "label": "frontier:ignored-scalar",
+      "reviewed_shape_hash": 1942071516
+    },
+    {
+      "id": "ignored-depth",
+      "declaration": "WNear.Binary.SerdeIgnProgress.run_consumed",
+      "title": "Logical depth bounded by consumed bytes",
+      "kind": "theorem",
+      "label": "frontier:ignored-depth",
+      "reviewed_shape_hash": 3628815476
+    },
+    {
+      "id": "ignored-reserve",
+      "declaration": "WNear.Binary.SerdeIgnBudget.regular_reserve",
+      "title": "Closing-byte reserve accounting",
+      "kind": "theorem",
+      "label": "frontier:ignored-reserve",
+      "reviewed_shape_hash": 2801252914
+    },
+    {
+      "id": "storage",
+      "declaration": "WNear.Binary.StorageReadWrap.f548_spec_host",
+      "title": "Actual storage-read host contract",
+      "kind": "theorem",
+      "label": "frontier:storage",
+      "reviewed_shape_hash": 380040593
+    },
+    {
+      "id": "runtime-boundary",
+      "declaration": "WNear.Binary.method_boundary",
+      "title": "Runtime and rollback composition",
+      "kind": "theorem",
+      "label": "frontier:runtime-boundary",
+      "reviewed_shape_hash": 3582860242
+    },
+    {
+      "id": "runtime-call",
+      "declaration": "WNear.Binary.method_refines_call",
+      "title": "Per-call runtime refinement",
+      "kind": "theorem",
+      "label": "frontier:runtime-call",
+      "reviewed_shape_hash": 2266961742
+    },
+    {
+      "id": "scratch-room",
+      "declaration": "WNear.Binary.ScratchGrow.roomRes",
+      "title": "Reachable scratch growth room",
+      "kind": "verification_contract",
+      "label": "frontier:scratch-room",
+      "notes": "Explicit allocation-room premise; deriving it uniformly for reachable states remains open.",
+      "reviewed_shape_hash": 4007296066163589377
+    },
+    {
+      "id": "string-room",
+      "declaration": "WNear.Binary.ParseStr.roomRun",
+      "title": "Reachable escaped-string growth room",
+      "kind": "verification_contract",
+      "label": "frontier:string-room",
+      "notes": "Explicit allocation-room premise; deriving it uniformly for reachable states remains open.",
+      "reviewed_shape_hash": 13860941147584342435
+    },
+    {
+      "id": "owned-room",
+      "declaration": "WNear.Binary.VecFromElem.roomFor",
+      "title": "Reachable owned-string allocation room",
+      "kind": "verification_contract",
+      "label": "frontier:owned-room",
+      "notes": "Explicit allocation-room premise; deriving it uniformly for reachable states remains open.",
+      "reviewed_shape_hash": 234172028324874937
+    },
+    {
+      "id": "protocol-available",
+      "declaration": "WNear.PinnedProtocolAvailable",
+      "title": "Pinned protocol parses successfully",
+      "kind": "verification_contract",
+      "label": "frontier:protocol-available",
+      "notes": "The global theorem assumes a successful parse; actual existence remains to be proved before deployment-level instantiation.",
+      "reviewed_shape_hash": 17169688403301902398
+    },
+    {
+      "id": "ft-balance-model",
+      "declaration": "WNear.Binary.FtBalanceOfMethod.account_lookup_and_step",
+      "title": "ft_balance_of: account lookup and model result",
+      "kind": "theorem",
+      "environment": "Well-formed context and model state; exact represented storage and erased-host agreement.",
+      "label": "frontier:ft-balance-model",
+      "reviewed_shape_hash": 295271282
+    },
+    {
+      "id": "storage-read-absent",
+      "declaration": "WNear.Binary.StorageReadWrapF.f548_noneF_host",
+      "title": "Absent storage read with allocator and trie accounting",
+      "kind": "theorem",
+      "environment": "Metered host and explicit trie proof-budget, code, heap and interface premises.",
+      "label": "frontier:storage-read-absent",
+      "reviewed_shape_hash": 2271677168
+    },
+    {
+      "id": "lookup-raw-absent",
+      "declaration": "WNear.Binary.LookupMapGet.f400_none",
+      "title": "LookupMap get_raw: absent key",
+      "kind": "theorem",
+      "environment": "Metered host, trie proof budget, allocator room and explicit Wasm resource premises.",
+      "label": "frontier:lookup-raw-absent",
+      "reviewed_shape_hash": 582177625,
+      "required_proof_dependencies": [
+        "storage-read-absent"
+      ],
+      "required_type_dependencies": [
+        "owned-room"
+      ]
+    },
+    {
+      "id": "lookup-heap-room",
+      "declaration": "WNear.Binary.LookupMapOps.HeapRoomK",
+      "title": "Reachable LookupMap allocation room",
+      "kind": "verification_contract",
+      "label": "frontier:lookup-heap-room",
+      "notes": "Derive the multi-allocation room predicate from reachable method states.",
+      "reviewed_shape_hash": 16916469071509409475
+    },
+    {
+      "id": "lookup-absent",
+      "declaration": "WNear.Binary.LookupMapGet.f399_none",
+      "title": "LookupMap get: absent account",
+      "kind": "theorem",
+      "environment": "Metered host, trie proof budget, allocator room and explicit Wasm resource premises.",
+      "label": "frontier:lookup-absent",
+      "reviewed_shape_hash": 4235757258,
+      "required_type_dependencies": [
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "lookup-raw-absent"
+      ]
+    },
+    {
+      "id": "balance-lookup-absent",
+      "declaration": "WNear.Binary.BalanceOfAbsent.f415_none",
+      "title": "Balance lookup: absent account returns zero",
+      "kind": "theorem",
+      "environment": "Metered host, trie proof budget, allocator room and explicit Wasm resource premises.",
+      "label": "frontier:balance-lookup-absent",
+      "reviewed_shape_hash": 2300762005,
+      "required_type_dependencies": [
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "lookup-absent"
+      ]
+    },
+    {
+      "id": "balance-caller-absent",
+      "declaration": "WNear.Binary.BalanceOfAbsent.f293_none",
+      "title": "Token balance caller: absent account returns zero",
+      "kind": "theorem",
+      "environment": "Metered host, trie proof budget, allocator room and explicit Wasm resource premises.",
+      "label": "frontier:balance-caller-absent",
+      "reviewed_shape_hash": 3189644620,
+      "required_type_dependencies": [
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "balance-lookup-absent"
+      ]
+    },
+    {
+      "id": "balance-no-issue",
+      "declaration": "WNear.ftBalanceOf_no_issue_obligation",
+      "title": "ft_balance_of: execution safety",
+      "kind": "admission",
+      "indirect_admission": true,
+      "label": "frontier:balance-no-issue",
+      "reviewed_shape_hash": 676681641,
+      "planned_dependencies": [
+        "runtime-boundary"
+      ]
+    },
+    {
+      "id": "balance-accepted",
+      "declaration": "WNear.ftBalanceOf_accepted_obligation",
+      "title": "ft_balance_of: accepted-call refinement",
+      "kind": "admission",
+      "indirect_admission": true,
+      "label": "frontier:balance-accepted",
+      "reviewed_shape_hash": 1764992096,
+      "planned_dependencies": [
+        "accept-parser",
+        "storage",
+        "runtime-boundary",
+        "ft-balance-model",
+        "balance-export-state-six-grows",
+        "balance-state-six-grows-free-bound",
+        "balance-parser-through-cleanup",
+        "parser-public-through-cleanup",
+        "balance-copied-parser-through-cleanup",
+        "balance-copied-absent-body"
+      ]
+    },
+    {
+      "id": "balance-rejected",
+      "declaration": "WNear.ftBalanceOf_rejected_obligation",
+      "title": "ft_balance_of: rejected-input rollback",
+      "kind": "admission",
+      "indirect_admission": true,
+      "label": "frontier:balance-rejected",
+      "reviewed_shape_hash": 3056120183,
+      "planned_dependencies": [
+        "reject-parser",
+        "runtime-boundary"
+      ]
+    },
+    {
+      "id": "balance-export-call-absent",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.call_absent",
+      "title": "Function 297: absent-account balance call segment",
+      "kind": "theorem",
+      "environment": "Metered host, trie proof budget, allocator room and explicit Wasm frame/resource premises.",
+      "label": "frontier:balance-export-call-absent",
+      "reviewed_shape_hash": 1007612218,
+      "required_type_dependencies": [
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "balance-caller-absent"
+      ]
+    },
+    {
+      "id": "balance-export-copy-zero",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.copy_zero",
+      "title": "Function 297: copy absent-account result",
+      "kind": "theorem",
+      "environment": "Explicit Wasm frame and memory ownership premises.",
+      "label": "frontier:balance-export-copy-zero",
+      "reviewed_shape_hash": 2476748861
+    },
+    {
+      "id": "balance-export-call-and-copy",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.call_and_copy_absent",
+      "title": "Function 297: absent call and result copy",
+      "kind": "theorem",
+      "environment": "Metered host, trie proof budget, allocator room and explicit Wasm frame/resource premises.",
+      "label": "frontier:balance-export-call-and-copy",
+      "reviewed_shape_hash": 3599098301,
+      "required_type_dependencies": [
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "balance-export-call-absent",
+        "balance-export-copy-zero"
+      ]
+    },
+    {
+      "id": "balance-export-format-zero",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.format_zero",
+      "title": "Function 297: serialize zero balance",
+      "kind": "theorem",
+      "environment": "Explicit Wasm frame, serializer data, and allocation-room premises; the preceding segment is not yet composed.",
+      "label": "frontier:balance-export-format-zero",
+      "reviewed_shape_hash": 1454110285,
+      "required_type_dependencies": [
+        "owned-room"
+      ]
+    },
+    {
+      "id": "balance-export-call-copy-format",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.call_copy_and_format_absent",
+      "title": "Function 297: absent call, copy and serialization",
+      "kind": "theorem",
+      "environment": "Metered host, trie proof budget, four-growth heap room and explicit Wasm frame/resource premises.",
+      "label": "frontier:balance-export-call-copy-format",
+      "reviewed_shape_hash": 2047302754,
+      "required_type_dependencies": [
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "balance-export-call-and-copy",
+        "balance-export-format-zero"
+      ]
+    },
+    {
+      "id": "balance-export-expect-ok",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.expect_ok",
+      "title": "Function 297: extract successful serialized vector",
+      "kind": "theorem",
+      "environment": "Explicit Wasm frame, function linkage and memory ownership premises.",
+      "label": "frontier:balance-export-expect-ok",
+      "reviewed_shape_hash": 1326515613
+    },
+    {
+      "id": "balance-export-through-expect",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.call_copy_format_and_expect_absent",
+      "title": "Function 297: absent balance through result extraction",
+      "kind": "theorem",
+      "environment": "Metered host, trie proof budget, four-growth heap room and explicit Wasm frame/resource premises.",
+      "label": "frontier:balance-export-through-expect",
+      "reviewed_shape_hash": 3623699236,
+      "required_type_dependencies": [
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "balance-export-call-copy-format",
+        "balance-export-expect-ok"
+      ]
+    },
+    {
+      "id": "balance-export-return-vec",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.return_vec",
+      "title": "Function 297: return serialized vector",
+      "kind": "theorem",
+      "environment": "Metered host, return-length limit and explicit Wasm frame/resource premises.",
+      "label": "frontier:balance-export-return-vec",
+      "reviewed_shape_hash": 188057756
+    },
+    {
+      "id": "balance-export-through-return",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.call_through_value_return_absent",
+      "title": "Function 297: absent balance through value return",
+      "kind": "theorem",
+      "environment": "Metered host, trie proof budget, return-length limit, four-growth heap room and explicit Wasm frame/resource premises.",
+      "label": "frontier:balance-export-through-return",
+      "reviewed_shape_hash": 2472105786,
+      "required_type_dependencies": [
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "balance-export-through-expect",
+        "balance-export-return-vec"
+      ]
+    },
+    {
+      "id": "balance-export-cleanup",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.cleanup",
+      "title": "Function 297: free vectors and restore stack",
+      "kind": "theorem",
+      "environment": "Explicit Wasm frame, live heap allocations and memory ownership premises.",
+      "label": "frontier:balance-export-cleanup",
+      "reviewed_shape_hash": 3122558003
+    },
+    {
+      "id": "balance-export-through-cleanup",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.call_through_cleanup_absent",
+      "title": "Function 297: absent balance through cleanup",
+      "kind": "theorem",
+      "environment": "Metered host, trie proof budget, return-length limit, four-growth heap room, full prefix allocation and explicit Wasm frame/resource premises.",
+      "label": "frontier:balance-export-through-cleanup",
+      "reviewed_shape_hash": 4173074890,
+      "required_type_dependencies": [
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "balance-export-through-return",
+        "balance-export-cleanup"
+      ]
+    },
+    {
+      "id": "balance-export-argument-copy",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.argument_copy",
+      "title": "Function 297: copy parsed account descriptor",
+      "kind": "theorem",
+      "environment": "Explicit Wasm frame and memory ownership premises.",
+      "label": "frontier:balance-export-argument-copy",
+      "reviewed_shape_hash": 184260445
+    },
+    {
+      "id": "balance-export-parsed-suffix",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.parsed_account_through_cleanup_absent",
+      "title": "Function 297: parsed absent balance through cleanup",
+      "kind": "theorem",
+      "environment": "Parsed account descriptor and ownership, metered host, trie proof budget, return-length limit, four-growth heap room, full prefix allocation and explicit Wasm frame/resource premises.",
+      "label": "frontier:balance-export-parsed-suffix",
+      "reviewed_shape_hash": 2063795662,
+      "required_type_dependencies": [
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "balance-export-through-cleanup",
+        "balance-export-argument-copy"
+      ]
+    },
+    {
+      "id": "balance-state-entry",
+      "declaration": "WNear.Binary.StateRead.pre219",
+      "title": "State-read entry resources and one-cell free-list bound",
+      "kind": "verification_contract",
+      "notes": "The existing balance state-read caller still uses a one-cell free-list bound. A general-bound state-read theorem is now proved separately; the caller and parser handoff remain open.",
+      "label": "frontier:balance-state-entry",
+      "reviewed_shape_hash": 14030933622959962654
+    },
+    {
+      "id": "balance-second-read",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.BalanceReadAfterState",
+      "title": "Absent balance read after state read",
+      "kind": "verification_contract",
+      "notes": "Open second-read conditions after state_read: trie accounting and witness, proof budget, key absence and an explicit gas bound.",
+      "label": "frontier:balance-second-read",
+      "reviewed_shape_hash": 1853011331046003394
+    },
+    {
+      "id": "balance-export-state-read",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.state_read_and_unwrap",
+      "title": "Function 297: read and unwrap model state",
+      "kind": "theorem",
+      "environment": "Present model state, one-cell free-list entry, metered host, trie proof budget, allocation room and explicit Wasm frame/resources.",
+      "label": "frontier:balance-export-state-read",
+      "reviewed_shape_hash": 2715248443,
+      "required_type_dependencies": [
+        "owned-room",
+        "balance-state-entry"
+      ]
+    },
+    {
+      "id": "balance-export-state-through-cleanup",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.state_through_cleanup_absent",
+      "title": "Function 297: state read through absent balance cleanup",
+      "kind": "theorem",
+      "environment": "Parsed owned account, state-read entry resources, metered host, proof budgets, allocation room, return limit and explicit frame premises.",
+      "label": "frontier:balance-export-state-through-cleanup",
+      "reviewed_shape_hash": 11769903,
+      "required_type_dependencies": [
+        "owned-room",
+        "lookup-heap-room",
+        "balance-state-entry",
+        "balance-second-read"
+      ],
+      "required_proof_dependencies": [
+        "balance-export-state-read",
+        "balance-export-parsed-suffix"
+      ]
+    },
+    {
+      "id": "balance-second-read-gas",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.BalanceReadGasAfterState",
+      "title": "Balance-read gas bound after state read",
+      "kind": "verification_contract",
+      "notes": "Open for an arbitrary proposed bound K; an exact initial-state bound is proved and integrated into the absent-account branch.",
+      "label": "frontier:balance-second-read-gas",
+      "reviewed_shape_hash": 10982792330483191918
+    },
+    {
+      "id": "balance-second-read-from-budget",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.balanceReadAfterState_of_budget",
+      "title": "Derive second-read conditions from shared proof budget",
+      "kind": "theorem",
+      "environment": "Canonical trie, global storage link, sufficient two-read proof budget, absent account, key limit and post-state-read gas bound.",
+      "label": "frontier:balance-second-read-from-budget",
+      "reviewed_shape_hash": 370085047,
+      "required_type_dependencies": [
+        "balance-second-read-gas"
+      ]
+    },
+    {
+      "id": "balance-export-state-budget",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.state_through_cleanup_of_budget",
+      "title": "Function 297: state read through cleanup with shared proof budget",
+      "kind": "theorem",
+      "environment": "Parsed owned account, one-cell state-read entry, canonical trie and storage link, shared two-read proof budget, absent account, allocation room, return limit and post-read gas bound.",
+      "label": "frontier:balance-export-state-budget",
+      "reviewed_shape_hash": 331348160,
+      "required_type_dependencies": [
+        "balance-state-entry",
+        "balance-second-read-gas",
+        "owned-room",
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "balance-export-state-through-cleanup",
+        "balance-second-read-from-budget"
+      ]
+    },
+    {
+      "id": "balance-next-read-cost-preserved",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.storageReadUse_after_read",
+      "title": "Storage-read cost preserved after a read",
+      "kind": "theorem",
+      "environment": "StorageReadPost relation for the preceding read.",
+      "label": "frontier:balance-next-read-cost-preserved",
+      "reviewed_shape_hash": 1938900493
+    },
+    {
+      "id": "balance-second-read-exact-gas",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.balanceReadGasAfterState_exact",
+      "title": "Exact balance-read gas bound after state read",
+      "kind": "theorem",
+      "environment": "The preceding read satisfies StorageReadPost.",
+      "label": "frontier:balance-second-read-exact-gas",
+      "reviewed_shape_hash": 2452948315,
+      "required_proof_dependencies": [
+        "balance-next-read-cost-preserved"
+      ]
+    },
+    {
+      "id": "balance-export-state-exact-gas",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.state_through_cleanup_exact_gas",
+      "title": "Function 297: state read through cleanup with exact gas",
+      "kind": "theorem",
+      "environment": "Parsed owned account, one-cell state-read entry, canonical trie and storage link, shared two-read proof budget, absent account, allocation room and return limit.",
+      "label": "frontier:balance-export-state-exact-gas",
+      "reviewed_shape_hash": 4060965416,
+      "required_type_dependencies": [
+        "balance-state-entry",
+        "owned-room",
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "balance-export-state-budget",
+        "balance-second-read-exact-gas"
+      ]
+    },
+    {
+      "id": "balance-room-after-state",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.room_after_state",
+      "title": "Derive allocation room after state read",
+      "kind": "theorem",
+      "notes": "Conditional on HeapRoomK 6 at entry; the roomFor and HeapRoomK 4 occurrences in the conclusion are derived, not extra assumptions.",
+      "label": "frontier:balance-room-after-state",
+      "reviewed_shape_hash": 2843256077,
+      "required_type_dependencies": [
+        "owned-room",
+        "lookup-heap-room"
+      ]
+    },
+    {
+      "id": "balance-export-state-six-grows",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.state_through_cleanup_six_grows",
+      "title": "Function 297: state read through cleanup under six-growth budget",
+      "kind": "theorem",
+      "environment": "Parsed owned account, one-cell state-read entry, six-growth initial heap room, canonical trie and storage link, shared proof budget, absent account and return limit.",
+      "label": "frontier:balance-export-state-six-grows",
+      "reviewed_shape_hash": 1048715668,
+      "required_type_dependencies": [
+        "balance-state-entry",
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "balance-export-state-exact-gas",
+        "balance-room-after-state"
+      ]
+    },
+    {
+      "id": "borsh-vec-free-bound",
+      "declaration": "WNear.Binary.BorshVecF.f374_spec",
+      "title": "Vector copy with a general free-list bound",
+      "kind": "theorem",
+      "environment": "Arbitrary supported free-list bound, allocation room, valid input bytes, and explicit Wasm frame, depth and gas premises; connected to the general-bound state-read theorem.",
+      "label": "frontier:borsh-vec-free-bound",
+      "reviewed_shape_hash": 3528513997,
+      "required_type_dependencies": [
+        "owned-room"
+      ]
+    },
+    {
+      "id": "borsh-bytes-reader-free-bound",
+      "declaration": "WNear.Binary.BorshBytesF.f316_spec",
+      "title": "Byte reader with a general free-list bound",
+      "kind": "theorem",
+      "environment": "Arbitrary supported free-list bound, allocation room, valid input bytes, and explicit Wasm frame, depth and gas premises; connected to the general-bound state-read theorem.",
+      "label": "frontier:borsh-bytes-reader-free-bound",
+      "reviewed_shape_hash": 1010317074,
+      "required_type_dependencies": [
+        "owned-room"
+      ],
+      "required_proof_dependencies": [
+        "borsh-vec-free-bound"
+      ]
+    },
+    {
+      "id": "borsh-bytes-free-bound",
+      "declaration": "WNear.Binary.BorshBytesF.f315_spec",
+      "title": "Byte deserializer with a general free-list bound",
+      "kind": "theorem",
+      "environment": "Arbitrary supported free-list bound, allocation room, valid input bytes, and explicit Wasm frame, depth and gas premises; connected to the general-bound state-read theorem.",
+      "label": "frontier:borsh-bytes-free-bound",
+      "reviewed_shape_hash": 2640870261,
+      "required_type_dependencies": [
+        "owned-room"
+      ],
+      "required_proof_dependencies": [
+        "borsh-bytes-reader-free-bound"
+      ]
+    },
+    {
+      "id": "borsh-ft-free-bound",
+      "declaration": "WNear.Binary.BorshFTF.f425_spec",
+      "title": "Fungible-token deserializer with a general free-list bound",
+      "kind": "theorem",
+      "environment": "Arbitrary supported free-list bound, allocation room, valid input bytes, and explicit Wasm frame, depth and gas premises; connected to the general-bound state-read theorem.",
+      "label": "frontier:borsh-ft-free-bound",
+      "reviewed_shape_hash": 1874100063,
+      "required_type_dependencies": [
+        "owned-room"
+      ],
+      "required_proof_dependencies": [
+        "borsh-bytes-free-bound"
+      ]
+    },
+    {
+      "id": "borsh-contract-reader-free-bound",
+      "declaration": "WNear.Binary.BorshContractF.f162_spec",
+      "title": "Contract reader with a general free-list bound",
+      "kind": "theorem",
+      "environment": "Arbitrary supported free-list bound, allocation room, valid input bytes, and explicit Wasm frame, depth and gas premises; connected to the general-bound state-read theorem.",
+      "label": "frontier:borsh-contract-reader-free-bound",
+      "reviewed_shape_hash": 1845147241,
+      "required_type_dependencies": [
+        "owned-room"
+      ],
+      "required_proof_dependencies": [
+        "borsh-ft-free-bound"
+      ]
+    },
+    {
+      "id": "borsh-contract-free-bound",
+      "declaration": "WNear.Binary.BorshContractF.f161_spec",
+      "title": "Contract slice deserializer with a general free-list bound",
+      "kind": "theorem",
+      "environment": "Arbitrary supported free-list bound, allocation room, valid input bytes, and explicit Wasm frame, depth and gas premises; connected to the general-bound state-read theorem.",
+      "label": "frontier:borsh-contract-free-bound",
+      "reviewed_shape_hash": 2198598637,
+      "required_type_dependencies": [
+        "owned-room"
+      ],
+      "required_proof_dependencies": [
+        "borsh-contract-reader-free-bound"
+      ]
+    },
+    {
+      "id": "state-entry-free-bound",
+      "declaration": "WNear.Binary.StateReadLenF.pre219F",
+      "title": "State-read entry resources with a general free-list bound",
+      "kind": "verification_contract",
+      "notes": "The general state-read entry requires owned heap resources with a supported bound. Establishing these resources from the parser remains open.",
+      "label": "frontier:state-entry-free-bound",
+      "reviewed_shape_hash": 1469416046525480654
+    },
+    {
+      "id": "state-read-free-bound",
+      "declaration": "WNear.Binary.StateReadLenF.f219_spec_lenF",
+      "title": "State read with a general free-list bound",
+      "kind": "theorem",
+      "environment": "The decoded state reader composes the general-bound storage reader and deserializer, and frees the temporary buffer, under explicit resource and host premises.",
+      "label": "frontier:state-read-free-bound",
+      "reviewed_shape_hash": 4170766041,
+      "required_type_dependencies": [
+        "owned-room",
+        "state-entry-free-bound"
+      ],
+      "required_proof_dependencies": [
+        "borsh-contract-free-bound"
+      ]
+    },
+    {
+      "id": "state-read-model-free-bound",
+      "declaration": "WNear.Binary.StateReadLenF.f219_spec_model_lenF",
+      "title": "Model-state read with a general free-list bound",
+      "kind": "theorem",
+      "environment": "General-bound encoded model state, allocation room, trie and explicit Wasm resources; connected to the general-bound balance state-read and cleanup path, with parser entry still open.",
+      "label": "frontier:state-read-model-free-bound",
+      "reviewed_shape_hash": 3792722449,
+      "required_type_dependencies": [
+        "owned-room",
+        "state-entry-free-bound"
+      ],
+      "required_proof_dependencies": [
+        "state-read-free-bound"
+      ]
+    },
+    {
+      "id": "balance-state-read-free-bound",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.state_read_and_unwrapF",
+      "title": "Function 297: state read and unwrap with general bound",
+      "kind": "theorem",
+      "environment": "Arbitrary supported incoming free-list bound; parsed account, host, trie, proof budget, allocation room, gas and execution premises as stated. Parser-to-caller reachability and full accepted-call refinement remain open.",
+      "label": "frontier:balance-state-read-free-bound",
+      "reviewed_shape_hash": 2027513081,
+      "required_type_dependencies": [
+        "state-entry-free-bound",
+        "owned-room"
+      ],
+      "required_proof_dependencies": [
+        "state-read-model-free-bound"
+      ]
+    },
+    {
+      "id": "balance-next-read-free-bound",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.BalanceReadAfterStateF",
+      "title": "Second-read conditions with general bound",
+      "kind": "verification_contract",
+      "notes": "Arbitrary supported incoming free-list bound; parsed account, host, trie, proof budget, allocation room, gas and execution premises as stated. Parser-to-caller reachability and full accepted-call refinement remain open.",
+      "label": "frontier:balance-next-read-free-bound",
+      "reviewed_shape_hash": 14859194515470443808
+    },
+    {
+      "id": "balance-state-cleanup-free-bound",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.state_through_cleanup_absentF",
+      "title": "Function 297: state read through cleanup with general bound",
+      "kind": "theorem",
+      "environment": "Arbitrary supported incoming free-list bound; parsed account, host, trie, proof budget, allocation room, gas and execution premises as stated. Parser-to-caller reachability and full accepted-call refinement remain open.",
+      "label": "frontier:balance-state-cleanup-free-bound",
+      "reviewed_shape_hash": 631380443,
+      "required_type_dependencies": [
+        "state-entry-free-bound",
+        "owned-room",
+        "lookup-heap-room",
+        "balance-next-read-free-bound"
+      ],
+      "required_proof_dependencies": [
+        "balance-state-read-free-bound",
+        "balance-export-parsed-suffix"
+      ]
+    },
+    {
+      "id": "balance-next-gas-free-bound",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.BalanceReadGasAfterStateF",
+      "title": "Second-read gas condition with general bound",
+      "kind": "verification_contract",
+      "notes": "Arbitrary supported incoming free-list bound; parsed account, host, trie, proof budget, allocation room, gas and execution premises as stated. Parser-to-caller reachability and full accepted-call refinement remain open.",
+      "label": "frontier:balance-next-gas-free-bound",
+      "reviewed_shape_hash": 7948847994416192159
+    },
+    {
+      "id": "balance-next-budget-free-bound",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.balanceReadAfterState_of_budgetF",
+      "title": "Derive general-bound second-read conditions from budget",
+      "kind": "theorem",
+      "environment": "Arbitrary supported incoming free-list bound; parsed account, host, trie, proof budget, allocation room, gas and execution premises as stated. Parser-to-caller reachability and full accepted-call refinement remain open.",
+      "label": "frontier:balance-next-budget-free-bound",
+      "reviewed_shape_hash": 2744183776,
+      "required_type_dependencies": [
+        "balance-next-gas-free-bound"
+      ]
+    },
+    {
+      "id": "balance-state-budget-free-bound",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.state_through_cleanup_of_budgetF",
+      "title": "Function 297: general-bound state path with shared budget",
+      "kind": "theorem",
+      "environment": "Arbitrary supported incoming free-list bound; parsed account, host, trie, proof budget, allocation room, gas and execution premises as stated. Parser-to-caller reachability and full accepted-call refinement remain open.",
+      "label": "frontier:balance-state-budget-free-bound",
+      "reviewed_shape_hash": 2017951074,
+      "required_type_dependencies": [
+        "state-entry-free-bound",
+        "balance-next-gas-free-bound",
+        "owned-room",
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "balance-state-cleanup-free-bound",
+        "balance-next-budget-free-bound"
+      ]
+    },
+    {
+      "id": "balance-next-exact-gas-free-bound",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.balanceReadGasAfterState_exactF",
+      "title": "Exact second-read gas with general bound",
+      "kind": "theorem",
+      "environment": "Arbitrary supported incoming free-list bound; parsed account, host, trie, proof budget, allocation room, gas and execution premises as stated. Parser-to-caller reachability and full accepted-call refinement remain open.",
+      "label": "frontier:balance-next-exact-gas-free-bound",
+      "reviewed_shape_hash": 3961467513,
+      "required_proof_dependencies": [
+        "balance-next-read-cost-preserved"
+      ]
+    },
+    {
+      "id": "balance-state-exact-gas-free-bound",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.state_through_cleanup_exact_gasF",
+      "title": "Function 297: general-bound state path with exact gas",
+      "kind": "theorem",
+      "environment": "Arbitrary supported incoming free-list bound; parsed account, host, trie, proof budget, allocation room, gas and execution premises as stated. Parser-to-caller reachability and full accepted-call refinement remain open.",
+      "label": "frontier:balance-state-exact-gas-free-bound",
+      "reviewed_shape_hash": 24761725,
+      "required_type_dependencies": [
+        "state-entry-free-bound",
+        "owned-room",
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "balance-state-budget-free-bound",
+        "balance-next-exact-gas-free-bound"
+      ]
+    },
+    {
+      "id": "balance-state-six-grows-free-bound",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.state_through_cleanup_six_growsF",
+      "title": "Function 297: general-bound state path with six-growth room",
+      "kind": "theorem",
+      "environment": "Arbitrary supported incoming free-list bound; parsed account, host, trie, proof budget, allocation room, gas and execution premises as stated. Parser-to-caller reachability and full accepted-call refinement remain open.",
+      "label": "frontier:balance-state-six-grows-free-bound",
+      "reviewed_shape_hash": 3218371544,
+      "required_type_dependencies": [
+        "state-entry-free-bound",
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "balance-state-exact-gas-free-bound",
+        "balance-room-after-state"
+      ]
+    },
+    {
+      "id": "parser-owned-result",
+      "declaration": "WNear.Binary.FromSliceSpec.okAt",
+      "title": "Successful parser owned result",
+      "kind": "verification_contract",
+      "notes": "Owned decoded account and allocator state; obtaining this result for all accepted inputs remains conditional on the parser obligations.",
+      "label": "frontier:parser-owned-result",
+      "reviewed_shape_hash": 5900190859266988676,
+      "planned_dependencies": [
+        "accept-parser"
+      ]
+    },
+    {
+      "id": "parser-owned-resources",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.parser_result_resources",
+      "title": "Extract balance resources from parser result",
+      "kind": "theorem",
+      "environment": "Public parser result supplies account bounds and input-first allocation order; the public result now also composes through a separate fixed-witness lemma and explicit room-and-gas obligation.",
+      "label": "frontier:parser-owned-resources",
+      "reviewed_shape_hash": 4252910098,
+      "required_type_dependencies": [
+        "parser-owned-result"
+      ]
+    },
+    {
+      "id": "balance-parser-handoff",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.parser_handoff",
+      "title": "Function 297: success branch and input-vector drop",
+      "kind": "theorem",
+      "environment": "Decoded success tag and descriptors, owned input buffer, heap invariant and explicit Wasm execution resources.",
+      "label": "frontier:balance-parser-handoff",
+      "reviewed_shape_hash": 3265421669
+    },
+    {
+      "id": "balance-parser-through-cleanup",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.parser_through_cleanup",
+      "title": "Function 297: parser success through absent balance cleanup",
+      "kind": "theorem",
+      "environment": "Decoded successful parser descriptor and input vector, owned account, six-growth room, canonical trie, shared proof budget, exact lookup gas and execution resources; deriving all entry resources and gas from the parser remains open.",
+      "label": "frontier:balance-parser-through-cleanup",
+      "reviewed_shape_hash": 547737154,
+      "required_type_dependencies": [
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "balance-parser-handoff",
+        "balance-state-six-grows-free-bound"
+      ]
+    },
+    {
+      "id": "parser-fixed-result",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.okAtFixed",
+      "title": "Successful parser result with explicit heap witnesses",
+      "kind": "verification_contract",
+      "notes": "The same owned parser result with its actual heap length and free-list bound exposed; the parser must produce such a result.",
+      "label": "frontier:parser-fixed-result",
+      "reviewed_shape_hash": 7600635571072950955
+    },
+    {
+      "id": "parser-expose-heap",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.okAt_expose",
+      "title": "Expose the successful parser heap witnesses",
+      "kind": "theorem",
+      "environment": "The public parser result entails its fixed-witness representation.",
+      "label": "frontier:parser-expose-heap",
+      "reviewed_shape_hash": 2099674525,
+      "required_type_dependencies": [
+        "parser-owned-result",
+        "parser-fixed-result"
+      ]
+    },
+    {
+      "id": "parser-fixed-resources",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.parser_fixed_resources",
+      "title": "Extract account resources at fixed parser heap",
+      "kind": "theorem",
+      "environment": "The fixed-witness parser result supplies account bounds, owned bytes and input-first allocation order.",
+      "label": "frontier:parser-fixed-resources",
+      "reviewed_shape_hash": 3374729530,
+      "required_type_dependencies": [
+        "parser-fixed-result"
+      ]
+    },
+    {
+      "id": "parser-fixed-through-cleanup",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.parser_fixed_through_cleanup",
+      "title": "Function 297: fixed parser result through absent cleanup",
+      "kind": "theorem",
+      "environment": "A successful parser result at a known heap, six-growth room, gas, input ownership, trie and frame premises.",
+      "label": "frontier:parser-fixed-through-cleanup",
+      "reviewed_shape_hash": 2046500426,
+      "required_type_dependencies": [
+        "parser-fixed-result",
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "parser-fixed-resources",
+        "balance-parser-through-cleanup"
+      ]
+    },
+    {
+      "id": "parser-post-budget",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.ParserPostBudget",
+      "title": "Post-parser room and gas at the actual heap",
+      "kind": "verification_contract",
+      "notes": "Open general resource condition at the actual parser heap; a concrete copied-array path now derives its own room and exact bound without assuming this condition.",
+      "label": "frontier:parser-post-budget",
+      "reviewed_shape_hash": 16115052327671783247,
+      "planned_dependencies": [
+        "lookup-heap-room"
+      ]
+    },
+    {
+      "id": "parser-public-through-cleanup",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.parser_result_through_cleanup",
+      "title": "Function 297: public parser result through absent cleanup",
+      "kind": "theorem",
+      "environment": "Public successful parser result, explicit post-parser room and gas obligation, owned input vector, trie, and frame and host premises. The full parser and accepted-call refinement remain open.",
+      "label": "frontier:parser-public-through-cleanup",
+      "reviewed_shape_hash": 2255320546,
+      "required_type_dependencies": [
+        "parser-owned-result",
+        "parser-post-budget"
+      ],
+      "required_proof_dependencies": [
+        "parser-expose-heap",
+        "parser-fixed-through-cleanup"
+      ]
+    },
+    {
+      "id": "array-parser-copied-core",
+      "declaration": "WNear.Binary.FromSliceEsc.f65_arr_copied",
+      "title": "Function 65: copied-array parser with allocator bounds",
+      "kind": "theorem",
+      "environment": "Concrete escaped copied-array path, explicit parser growth, valid account, reader, heap and room premises.",
+      "label": "frontier:array-parser-copied-core",
+      "reviewed_shape_hash": 4254361796,
+      "required_type_dependencies": [
+        "string-room",
+        "owned-room"
+      ]
+    },
+    {
+      "id": "copied-parser-room",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.copied_result_room",
+      "title": "Derive balance room from copied parser growth",
+      "kind": "theorem",
+      "environment": "Copied parser cleanup resources and an initial parser-growth-plus-six room allowance; returns the actual heap witnesses and six-growth room.",
+      "label": "frontier:copied-parser-room",
+      "reviewed_shape_hash": 1438717554,
+      "required_type_dependencies": [
+        "lookup-heap-room",
+        "parser-fixed-result"
+      ]
+    },
+    {
+      "id": "copied-parser-with-room",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.f65_arr_copied_room",
+      "title": "Function 65: copied-array parser preserving balance room",
+      "kind": "theorem",
+      "environment": "Concrete copied-array parser, parser room and allocation assumptions, and initial parser-growth-plus-six allowance.",
+      "label": "frontier:copied-parser-with-room",
+      "reviewed_shape_hash": 3564839619,
+      "required_type_dependencies": [
+        "string-room",
+        "owned-room",
+        "lookup-heap-room",
+        "parser-fixed-result"
+      ],
+      "required_proof_dependencies": [
+        "array-parser-copied-core",
+        "copied-parser-room"
+      ]
+    },
+    {
+      "id": "balance-copied-parser-through-cleanup",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.copied_parser_call_through_cleanup",
+      "title": "Function 297: copied-array parser call through absent cleanup",
+      "kind": "theorem",
+      "environment": "Specific copied/escaped array input and actual function 65 call, initial parser-growth-plus-six room, parser allocation bounds, trie, shared proof budget, host and frame resources; other input cases and full method remain open.",
+      "label": "frontier:balance-copied-parser-through-cleanup",
+      "reviewed_shape_hash": 653603051,
+      "required_type_dependencies": [
+        "string-room",
+        "owned-room",
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "copied-parser-with-room",
+        "parser-fixed-through-cleanup"
+      ]
+    },
+    {
+      "id": "balance-input-deref-setup",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.deref_and_parser_setup",
+      "title": "Function 297: dereference input and prepare parser arguments",
+      "kind": "theorem",
+      "environment": "Decoded input vector descriptor, frame, installed code and execution resources.",
+      "label": "frontier:balance-input-deref-setup",
+      "reviewed_shape_hash": 2846147756
+    },
+    {
+      "id": "balance-input-deref-through-cleanup",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.deref_copied_parser_through_cleanup",
+      "title": "Function 297: dereference through copied-array balance cleanup",
+      "kind": "theorem",
+      "environment": "Concrete copied-array input, parser and heap room, trie, input ownership and host/frame premises.",
+      "label": "frontier:balance-input-deref-through-cleanup",
+      "reviewed_shape_hash": 4277412009,
+      "required_type_dependencies": [
+        "string-room",
+        "owned-room",
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "balance-input-deref-setup",
+        "balance-copied-parser-through-cleanup"
+      ]
+    },
+    {
+      "id": "balance-input-expect",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.input_expect",
+      "title": "Function 297: unwrap present input vector",
+      "kind": "theorem",
+      "environment": "Present input option, non-null pointer, installed code and execution resources.",
+      "label": "frontier:balance-input-expect",
+      "reviewed_shape_hash": 3636033434
+    },
+    {
+      "id": "balance-input-expect-through-cleanup",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.expect_deref_parser_through_cleanup",
+      "title": "Function 297: input unwrap through copied-array cleanup",
+      "kind": "theorem",
+      "environment": "Concrete copied-array input, present input vector, parser and heap room, trie and host/frame premises.",
+      "label": "frontier:balance-input-expect-through-cleanup",
+      "reviewed_shape_hash": 788569678,
+      "required_type_dependencies": [
+        "string-room",
+        "owned-room",
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "balance-input-expect",
+        "balance-input-deref-through-cleanup"
+      ]
+    },
+    {
+      "id": "balance-input-through-cleanup",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.input_copied_parser_through_cleanup",
+      "title": "Function 297: input call through copied-array cleanup",
+      "kind": "theorem",
+      "environment": "Input call arguments prepared, input register limit and allocation room, copied-array parser room, initial input-plus-parser-plus-six growth budget, trie, host and frame premises.",
+      "label": "frontier:balance-input-through-cleanup",
+      "reviewed_shape_hash": 1781588792,
+      "required_type_dependencies": [
+        "string-room",
+        "owned-room",
+        "lookup-heap-room",
+        "input-register-room"
+      ],
+      "required_proof_dependencies": [
+        "balance-input-expect-through-cleanup",
+        "input-read"
+      ]
+    },
+    {
+      "id": "balance-input-setup-through-cleanup",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.input_setup_through_cleanup",
+      "title": "Function 297: input setup through copied-array cleanup",
+      "kind": "theorem",
+      "environment": "Installed interface, concrete copied-array input, input and parser room, initial growth budget, trie, host and frame premises.",
+      "label": "frontier:balance-input-setup-through-cleanup",
+      "reviewed_shape_hash": 1975133193,
+      "required_type_dependencies": [
+        "string-room",
+        "owned-room",
+        "lookup-heap-room",
+        "input-register-room"
+      ],
+      "required_proof_dependencies": [
+        "balance-input-through-cleanup"
+      ]
+    },
+    {
+      "id": "balance-method-prologue",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.prologue297",
+      "title": "Function 297: frame and interface prologue",
+      "kind": "theorem",
+      "environment": "Decoded frame, panic hook and blockchain interface setup under installed code and initial memory resources.",
+      "label": "frontier:balance-method-prologue",
+      "reviewed_shape_hash": 4266550772
+    },
+    {
+      "id": "balance-copied-absent-body",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body",
+      "title": "Function 297: complete body for copied-array absent account",
+      "kind": "theorem",
+      "environment": "Entire decoded function body for the copied-string array and absent-account path, conditional on input shape, parser and heap room, trie, host, gas and initial frame/static resources. The full accepted/rejected method contract remains open.",
+      "label": "frontier:balance-copied-absent-body",
+      "reviewed_shape_hash": 3932258835,
+      "required_type_dependencies": [
+        "string-room",
+        "owned-room",
+        "lookup-heap-room",
+        "input-register-room"
+      ],
+      "required_proof_dependencies": [
+        "balance-method-prologue",
+        "balance-input-setup-through-cleanup"
+      ]
+    },
+    {
+      "id": "input-register-room",
+      "declaration": "WNear.Binary.ReadRegister.RegOk",
+      "title": "Input register and allocation room",
+      "kind": "verification_contract",
+      "notes": "The input must be nonempty, within bounds and have allocation room; deriving this from the external environment remains open.",
+      "label": "frontier:input-register-room",
+      "reviewed_shape_hash": 3932043105830060447
+    },
+    {
+      "id": "input-read",
+      "declaration": "WNear.Binary.EnvInput.f527_spec",
+      "title": "Environment input and register read",
+      "kind": "theorem",
+      "environment": "Input register-room condition, register limit, installed interface, heap and frame resources.",
+      "label": "frontier:input-read",
+      "reviewed_shape_hash": 2173767728,
+      "required_type_dependencies": [
+        "input-register-room"
+      ]
+    },
+    {
+      "id": "initial-input-copy-room",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.initial_input_and_copy_room",
+      "title": "Initial budget supplies input and account-copy room",
+      "kind": "theorem",
+      "environment": "A nonempty bounded input and initial combined growth budget imply input register room and account-copy room at either possible post-input heap. These are conclusions, while the initial budget remains a premise.",
+      "label": "frontier:initial-input-copy-room",
+      "reviewed_shape_hash": 2408406119,
+      "required_type_dependencies": [
+        "lookup-heap-room",
+        "input-register-room",
+        "owned-room"
+      ]
+    },
+    {
+      "id": "balance-copied-body-initial-room",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body_initial_room",
+      "title": "Function 297: copied-array absent account from initial room",
+      "kind": "theorem",
+      "environment": "Entire decoded body for a copied-string array and absent account, deriving input and account-copy room from the initial combined budget. Parser room, input shape, trie, host, gas and frame conditions remain premises; the full method remains open.",
+      "label": "frontier:balance-copied-body-initial-room",
+      "reviewed_shape_hash": 240968273,
+      "required_type_dependencies": [
+        "string-room",
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "balance-copied-absent-body",
+        "initial-input-copy-room"
+      ]
+    },
+    {
+      "id": "ft-balance-absent-model",
+      "declaration": "WNear.Binary.FtBalanceOfMethod.absent_step_zero",
+      "title": "Absent account gives zero in the boundary model",
+      "kind": "theorem",
+      "environment": "A well-formed represented state, absent account record, and zero storage deficit imply the model returns zero.",
+      "label": "frontier:ft-balance-absent-model",
+      "reviewed_shape_hash": 1400203122,
+      "required_proof_dependencies": [
+        "ft-balance-model"
+      ]
+    },
+    {
+      "id": "balance-copied-absent-model-composition",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body_model_agreement",
+      "title": "Copied-array absent execution and model agreement",
+      "kind": "theorem",
+      "environment": "Checked conjunction of the absent-account model result and complete decoded body execution, sharing the absent storage key. Parser room, input shape, represented state, zero deficit, trie, host, gas and frame premises remain explicit; this is not the complete method refinement.",
+      "label": "frontier:balance-copied-absent-model-composition",
+      "reviewed_shape_hash": 2834875852,
+      "required_type_dependencies": [
+        "string-room",
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "ft-balance-absent-model",
+        "balance-copied-body-initial-room"
+      ]
+    }
+  ],
+  "reviewed_environment": [
+    "WNear.Binary.Exported.Environment",
+    "WNear.Binary.WProtocol",
+    "WNear.Binary.FtTotalSupplyMethod.CostsV86",
+    "WNear.Binary.FtTotalSupplyMethod.LimitsV86",
+    "WNear.Binary.NewMethod.CostsNewV86",
+    "WNear.Binary.NearDepositGas.CostsDepositV86"
+  ],
+  "expected_admissions": [
+    "WNear.pinned_runtime_obligation",
+    "WNear.pinned_costs_obligation",
+    "WNear.pinned_limits_obligation",
+    "WNear.pinned_new_costs_obligation",
+    "WNear.pinned_deposit_costs_obligation",
+    "WNear.nearWithdraw_obligation",
+    "WNear.ftTransfer_obligation",
+    "WNear.ftTransferCall_obligation",
+    "WNear.ftResolveTransfer_obligation",
+    "WNear.storageDeposit_obligation",
+    "WNear.storageWithdraw_obligation",
+    "WNear.storageUnregister_obligation",
+    "WNear.storageBalanceOf_obligation",
+    "WNear.ftBalanceOf_no_issue_obligation",
+    "WNear.ftBalanceOf_accepted_obligation",
+    "WNear.ftBalanceOf_rejected_obligation"
+  ],
+  "expected_incomplete": [
+    "WNear.refines_wnear",
+    "WNear.refines_wnear_exported",
+    "WNear.withdraw_available_wasm",
+    "WNear.pinned_runtime_obligation",
+    "WNear.pinned_costs_obligation",
+    "WNear.pinned_limits_obligation",
+    "WNear.pinned_new_costs_obligation",
+    "WNear.pinned_deposit_costs_obligation",
+    "WNear.nearWithdraw_obligation",
+    "WNear.ftTransfer_obligation",
+    "WNear.ftTransferCall_obligation",
+    "WNear.ftBalanceOf_obligation",
+    "WNear.ftResolveTransfer_obligation",
+    "WNear.storageDeposit_obligation",
+    "WNear.storageWithdraw_obligation",
+    "WNear.storageUnregister_obligation",
+    "WNear.storageBalanceOf_obligation",
+    "WNear.ftBalanceOf_no_issue_obligation",
+    "WNear.ftBalanceOf_accepted_obligation",
+    "WNear.ftBalanceOf_rejected_obligation"
+  ]
+}

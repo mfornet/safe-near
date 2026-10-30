@@ -1,4 +1,5 @@
 import Spec.Contract
+import Bridge.Exported
 import Spec.Exports
 import Binary.Module
 import Proofs.Availability
@@ -28,9 +29,10 @@ are protocol parameters: `gasBound` is a sum of constants measured under this
 configuration, and the binary's logs and register reads succeed only under
 its limits, so the statement does not hold for every configuration.
 
-`refines_wnear_exported` (the 15 exported methods) is the only open proof in
-this project; `refines_wnear` and its corollaries depend on it. `just wnear-audit`
-tolerates `sorryAx` in this module alone.
+`refines_wnear_exported` composes six completed method clauses with nine named
+remaining method obligations and five pinned-protocol obligations. The global
+results remain incomplete through these explicit leaves. The audit remains
+strict outside this frontier and checks its exact admitted declarations.
 -/
 
 namespace WNear
@@ -86,7 +88,164 @@ theorem decode_not_exported {method : String} (h : method ∉ exportedMethods) (
   unfold Call.decode
   split <;> simp_all
 
-/-- **Open.** The exported methods: on a call to one of them under the pinned
+/-- The pinned configuration must actually parse before the conditional refinement can be instantiated. -/
+def PinnedProtocolAvailable : Prop :=
+  ∃ protocol, Wasm.Near.RuntimeConfig.parse wNearProtocolJson = .ok protocol
+
+/-- Kernel-checked size of the exact embedded deployed binary. -/
+theorem deployed_code_size : wNearBytes.size ≤ 185625 := by
+  rw [Binary.wNearBytes, Wasm.ByteSource.size_toBytes]
+  decide +kernel
+
+/-- Open protocol-86 verification obligation; not an established environmental fact. -/
+theorem pinned_runtime_obligation (protocol : Wasm.Near.RuntimeConfig)
+    (hprotocol : Wasm.Near.RuntimeConfig.parse wNearProtocolJson = .ok protocol) :
+    Binary.WProtocol protocol := by
+  sorry
+
+/-- Open protocol-86 verification obligation; not an established environmental fact. -/
+theorem pinned_costs_obligation (protocol : Wasm.Near.RuntimeConfig)
+    (hprotocol : Wasm.Near.RuntimeConfig.parse wNearProtocolJson = .ok protocol) :
+    Binary.FtTotalSupplyMethod.CostsV86 protocol := by
+  sorry
+
+/-- Open protocol-86 verification obligation; not an established environmental fact. -/
+theorem pinned_limits_obligation (protocol : Wasm.Near.RuntimeConfig)
+    (hprotocol : Wasm.Near.RuntimeConfig.parse wNearProtocolJson = .ok protocol) :
+    Binary.FtTotalSupplyMethod.LimitsV86 protocol := by
+  sorry
+
+/-- Open protocol-86 verification obligation; not an established environmental fact. -/
+theorem pinned_new_costs_obligation (protocol : Wasm.Near.RuntimeConfig)
+    (hprotocol : Wasm.Near.RuntimeConfig.parse wNearProtocolJson = .ok protocol) :
+    Binary.NewMethod.CostsNewV86 protocol := by
+  sorry
+
+/-- Open protocol-86 verification obligation; not an established environmental fact. -/
+theorem pinned_deposit_costs_obligation (protocol : Wasm.Near.RuntimeConfig)
+    (hprotocol : Wasm.Near.RuntimeConfig.parse wNearProtocolJson = .ok protocol) :
+    Binary.NearDepositGas.CostsDepositV86 protocol := by
+  sorry
+
+/-- Open full method obligation, including rejected arguments and arbitrary represented resource states. -/
+theorem nearWithdraw_obligation (cfg : Config) (codeOf : List UInt8 → Near.ContractCode)
+    (protocol : Wasm.Near.RuntimeConfig)
+    (hprotocol : Wasm.Near.RuntimeConfig.parse wNearProtocolJson = .ok protocol)
+    (he : Binary.Exported.Environment protocol) :
+    Binary.Exported.MethodClause cfg wNearBytes.size codeOf protocol "near_withdraw" := by
+  sorry
+
+/-- Open full method obligation, including rejected arguments and arbitrary represented resource states. -/
+theorem ftTransfer_obligation (cfg : Config) (codeOf : List UInt8 → Near.ContractCode)
+    (protocol : Wasm.Near.RuntimeConfig)
+    (hprotocol : Wasm.Near.RuntimeConfig.parse wNearProtocolJson = .ok protocol)
+    (he : Binary.Exported.Environment protocol) :
+    Binary.Exported.MethodClause cfg wNearBytes.size codeOf protocol "ft_transfer" := by
+  sorry
+
+/-- Open full method obligation, including rejected arguments and arbitrary represented resource states. -/
+theorem ftTransferCall_obligation (cfg : Config) (codeOf : List UInt8 → Near.ContractCode)
+    (protocol : Wasm.Near.RuntimeConfig)
+    (hprotocol : Wasm.Near.RuntimeConfig.parse wNearProtocolJson = .ok protocol)
+    (he : Binary.Exported.Environment protocol) :
+    Binary.Exported.MethodClause cfg wNearBytes.size codeOf protocol "ft_transfer_call" := by
+  sorry
+
+/-- Execution safety for every represented `ft_balance_of` context, including rejected input. -/
+theorem ftBalanceOf_no_issue_obligation (cfg : Config) (codeOf : List UInt8 → Near.ContractCode)
+    (protocol : Wasm.Near.RuntimeConfig)
+    (hprotocol : Wasm.Near.RuntimeConfig.parse wNearProtocolJson = .ok protocol)
+    (he : Binary.Exported.Environment protocol) (hcfg : cfg.WF)
+    (raw : RawStorage) (st : Option State) (ctx : Context)
+    (hrep : (wnear cfg).Represents raw st) (hwf : ctx.WF raw)
+    (hctx : ctx.protocol = protocol) (hm : ctx.method = "ft_balance_of") :
+    ∀ msg, (Near.Boundary.nearRuntime.exec (Binary.wCode wNearBytes.size codeOf) raw ctx).outcome ≠
+      .error (.executionIssue msg) := by
+  sorry
+
+/-- Accepted calls satisfy both resource-sufficient refinement and arbitrary-resource rollback clauses. -/
+theorem ftBalanceOf_accepted_obligation (cfg : Config) (codeOf : List UInt8 → Near.ContractCode)
+    (protocol : Wasm.Near.RuntimeConfig)
+    (hprotocol : Wasm.Near.RuntimeConfig.parse wNearProtocolJson = .ok protocol)
+    (he : Binary.Exported.Environment protocol) (hcfg : cfg.WF)
+    (raw : RawStorage) (st : Option State) (ctx : Context)
+    (hrep : (wnear cfg).Represents raw st) (hwf : ctx.WF raw)
+    (hctx : ctx.protocol = protocol) (hm : ctx.method = "ft_balance_of")
+    (c : Call) (hparse : (wnear cfg).Parses ctx.method ctx.args c) :
+    let r := Near.Boundary.nearRuntime.exec (Binary.wCode wNearBytes.size codeOf) raw ctx
+    let res := (wnear cfg).step ctx st c
+    ((wnear cfg).gas ctx st c ≤ ctx.gasLimit → ctx.ProofRoom ((wnear cfg).proofBound ctx st c) →
+      Matches (wnear cfg) ctx raw r res ∧ r.usedGas ≤ (wnear cfg).gas ctx st c) ∧
+    (Matches (wnear cfg) ctx raw r res ∨
+      (ResourceFailure r ∧ RolledBack ctx raw r ∧ r.logs <+: res.logs)) := by
+  sorry
+
+/-- Rejected arguments must leave the represented state rolled back. -/
+theorem ftBalanceOf_rejected_obligation (cfg : Config) (codeOf : List UInt8 → Near.ContractCode)
+    (protocol : Wasm.Near.RuntimeConfig)
+    (hprotocol : Wasm.Near.RuntimeConfig.parse wNearProtocolJson = .ok protocol)
+    (he : Binary.Exported.Environment protocol) (hcfg : cfg.WF)
+    (raw : RawStorage) (st : Option State) (ctx : Context)
+    (hrep : (wnear cfg).Represents raw st) (hwf : ctx.WF raw)
+    (hctx : ctx.protocol = protocol) (hm : ctx.method = "ft_balance_of")
+    (hreject : ¬ ∃ c, (wnear cfg).Parses ctx.method ctx.args c) :
+    RolledBack ctx raw (Near.Boundary.nearRuntime.exec (Binary.wCode wNearBytes.size codeOf) raw ctx) := by
+  sorry
+
+/-- Checked assembly of the unchanged full method clause from its three exact open branches. -/
+theorem ftBalanceOf_obligation (cfg : Config) (codeOf : List UInt8 → Near.ContractCode)
+    (protocol : Wasm.Near.RuntimeConfig)
+    (hprotocol : Wasm.Near.RuntimeConfig.parse wNearProtocolJson = .ok protocol)
+    (he : Binary.Exported.Environment protocol) :
+    Binary.Exported.MethodClause cfg wNearBytes.size codeOf protocol "ft_balance_of" := by
+  intro hcfg raw st ctx hrep hwf hctx hm
+  refine ⟨ftBalanceOf_no_issue_obligation cfg codeOf protocol hprotocol he hcfg raw st ctx hrep hwf hctx hm, ?_, ?_⟩
+  · intro c hparse
+    exact ftBalanceOf_accepted_obligation cfg codeOf protocol hprotocol he hcfg raw st ctx hrep hwf hctx hm c hparse
+  · intro hreject
+    exact ftBalanceOf_rejected_obligation cfg codeOf protocol hprotocol he hcfg raw st ctx hrep hwf hctx hm hreject
+
+/-- Open full method obligation, including rejected arguments and arbitrary represented resource states. -/
+theorem ftResolveTransfer_obligation (cfg : Config) (codeOf : List UInt8 → Near.ContractCode)
+    (protocol : Wasm.Near.RuntimeConfig)
+    (hprotocol : Wasm.Near.RuntimeConfig.parse wNearProtocolJson = .ok protocol)
+    (he : Binary.Exported.Environment protocol) :
+    Binary.Exported.MethodClause cfg wNearBytes.size codeOf protocol "ft_resolve_transfer" := by
+  sorry
+
+/-- Open full method obligation, including rejected arguments and arbitrary represented resource states. -/
+theorem storageDeposit_obligation (cfg : Config) (codeOf : List UInt8 → Near.ContractCode)
+    (protocol : Wasm.Near.RuntimeConfig)
+    (hprotocol : Wasm.Near.RuntimeConfig.parse wNearProtocolJson = .ok protocol)
+    (he : Binary.Exported.Environment protocol) :
+    Binary.Exported.MethodClause cfg wNearBytes.size codeOf protocol "storage_deposit" := by
+  sorry
+
+/-- Open full method obligation, including rejected arguments and arbitrary represented resource states. -/
+theorem storageWithdraw_obligation (cfg : Config) (codeOf : List UInt8 → Near.ContractCode)
+    (protocol : Wasm.Near.RuntimeConfig)
+    (hprotocol : Wasm.Near.RuntimeConfig.parse wNearProtocolJson = .ok protocol)
+    (he : Binary.Exported.Environment protocol) :
+    Binary.Exported.MethodClause cfg wNearBytes.size codeOf protocol "storage_withdraw" := by
+  sorry
+
+/-- Open full method obligation, including rejected arguments and arbitrary represented resource states. -/
+theorem storageUnregister_obligation (cfg : Config) (codeOf : List UInt8 → Near.ContractCode)
+    (protocol : Wasm.Near.RuntimeConfig)
+    (hprotocol : Wasm.Near.RuntimeConfig.parse wNearProtocolJson = .ok protocol)
+    (he : Binary.Exported.Environment protocol) :
+    Binary.Exported.MethodClause cfg wNearBytes.size codeOf protocol "storage_unregister" := by
+  sorry
+
+/-- Open full method obligation, including rejected arguments and arbitrary represented resource states. -/
+theorem storageBalanceOf_obligation (cfg : Config) (codeOf : List UInt8 → Near.ContractCode)
+    (protocol : Wasm.Near.RuntimeConfig)
+    (hprotocol : Wasm.Near.RuntimeConfig.parse wNearProtocolJson = .ok protocol)
+    (he : Binary.Exported.Environment protocol) :
+    Binary.Exported.MethodClause cfg wNearBytes.size codeOf protocol "storage_balance_of" := by
+  sorry
+
+/-- **Conditional composition.** The exported methods: on a call to one of them under the pinned
 protocol configuration, near-lean's execution of `contract.wasm` is the
 model's as `Refines` states it. -/
 theorem refines_wnear_exported (cfg : Config) (code : Wasm.Module) (codeOf : List UInt8 → Near.ContractCode)
@@ -105,16 +264,37 @@ theorem refines_wnear_exported (cfg : Config) (code : Wasm.Module) (codeOf : Lis
       (Matches (wnear cfg) ctx raw r res ∨
         (ResourceFailure r ∧ RolledBack ctx raw r ∧ r.logs <+: res.logs))) ∧
     ((¬ ∃ c, (wnear cfg).Parses ctx.method ctx.args c) → RolledBack ctx raw r) := by
-  sorry
+  have hsame := code_eq hcode
+  subst code
+  have he : Binary.Exported.Environment protocol :=
+    ⟨pinned_runtime_obligation protocol hprotocol,
+      pinned_costs_obligation protocol hprotocol,
+      pinned_limits_obligation protocol hprotocol,
+      pinned_new_costs_obligation protocol hprotocol,
+      pinned_deposit_costs_obligation protocol hprotocol⟩
+  have hr : Binary.Exported.Remaining cfg wNearBytes.size codeOf protocol :=
+    {
+      nearWithdraw := nearWithdraw_obligation cfg codeOf protocol hprotocol he,
+      ftTransfer := ftTransfer_obligation cfg codeOf protocol hprotocol he,
+      ftTransferCall := ftTransferCall_obligation cfg codeOf protocol hprotocol he,
+      ftBalanceOf := ftBalanceOf_obligation cfg codeOf protocol hprotocol he,
+      ftResolveTransfer := ftResolveTransfer_obligation cfg codeOf protocol hprotocol he,
+      storageDeposit := storageDeposit_obligation cfg codeOf protocol hprotocol he,
+      storageWithdraw := storageWithdraw_obligation cfg codeOf protocol hprotocol he,
+      storageUnregister := storageUnregister_obligation cfg codeOf protocol hprotocol he,
+      storageBalanceOf := storageBalanceOf_obligation cfg codeOf protocol hprotocol he }
+  exact Binary.Exported.all_methods cfg wNearBytes.size codeOf protocol he deployed_code_size hr
+    ctx.method hmethod hcfg raw st ctx hrep hwf hprot rfl
 
 /-- The deployed wNEAR binary refines the model: for every configuration whose
 measured account entry fits a `u64`, every context under the pinned protocol
 configuration (version 86) and every resource state, near-lean's execution of
 `contract.wasm` is the model's as `Refines` states it. `codeOf` decodes code that the call's promises deploy; wNEAR deploys none.
-Proved for every method the binary does not export; open for the exported
-ones (`refines_wnear_exported`). -/
+Proved for every method the binary does not export; conditional for the exported
+ones on the named method and protocol obligations. -/
 @[blueprint "spec:refinement"
-  (statement := /-- The deployed binary refines \cref{def:contract-model} under the pinned protocol configuration (version 86): for every storage representing a model state and every context the runtime can build with that configuration, the execution reports no interpreter limitation; with at least the model's gas bound attached, it agrees with the model on return value, storage, balance, storage usage, logs, receipts and failure, and uses at most that much gas; with less, it agrees or fails for gas with no effects; and input that is no call fails with no effects. -/)]
+  (statement := /-- The deployed binary refines \cref{def:contract-model} under the pinned protocol configuration (version 86): for every storage representing a model state and every context the runtime can build with that configuration, the execution reports no interpreter limitation; with at least the model's gas bound attached, it agrees with the model on return value, storage, balance, storage usage, logs, receipts and failure, and uses at most that much gas; with less, it agrees or fails for gas with no effects; and input that is no call fails with no effects. -/)
+  (notReady := true)]
 theorem refines_wnear (cfg : Config) (code : Wasm.Module) (codeOf : List UInt8 → Near.ContractCode)
     (protocol : Wasm.Near.RuntimeConfig)
     (hcfg : cfg.WF) (hcode : Wasm.Binary.decode wNearBytes = .ok code)
@@ -140,8 +320,8 @@ theorem refines_wnear (cfg : Config) (code : Wasm.Module) (codeOf : List UInt8 �
 
 /-- `withdraw_available_binary` for `contract.wasm` on near-lean under the
 pinned protocol configuration: a withdrawal attached with at least the model's gas bound succeeds on the deployed binary.
-It depends on `refines_wnear`, which a withdrawal reaches through the open
-`refines_wnear_exported`, so the audit lists it as open too. -/
+It depends on `refines_wnear`, which a withdrawal reaches through the conditional
+`refines_wnear_exported`, so the audit lists its unresolved dependencies too. -/
 theorem withdraw_available_wasm (cfg : Config) (code : Wasm.Module)
     (codeOf : List UInt8 → Near.ContractCode) (protocol : Wasm.Near.RuntimeConfig)
     (hcfg : cfg.WF) (hcode : Wasm.Binary.decode wNearBytes = .ok code)

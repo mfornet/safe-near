@@ -3,18 +3,6 @@
  "packagesDir": "../../../near-lean/.lake/packages",
  "packages": [
   {
-   "url": "https://github.com/leanprover-community/mathlib4",
-   "type": "git",
-   "subDir": null,
-   "scope": "leanprover-community",
-   "rev": "d13f23b723b8a846827a245b89c10fc7d3f11612",
-   "name": "mathlib",
-   "manifestFile": "lake-manifest.json",
-   "inputRev": "v4.34.1",
-   "inherited": false,
-   "configFile": "lakefile.lean"
-  },
-  {
    "url": "https://github.com/hanwenzhu/LeanArchitect.git",
    "type": "git",
    "subDir": null,
@@ -38,10 +26,73 @@
   {
    "type": "path",
    "scope": "",
+   "name": "NearLogic",
+   "manifestFile": "lake-manifest.json",
+   "inherited": false,
+   "dir": "../../../near-lean/near-logic",
+   "configFile": "lakefile.toml"
+  },
+  {
+   "type": "path",
+   "scope": "",
    "name": "NearRuntime",
    "manifestFile": "lake-manifest.json",
    "inherited": false,
    "dir": "../../../near-lean/runtime",
+   "configFile": "lakefile.toml"
+  },
+  {
+   "url": "https://github.com/leanprover-community/mathlib4",
+   "type": "git",
+   "subDir": null,
+   "scope": "leanprover-community",
+   "rev": "d13f23b723b8a846827a245b89c10fc7d3f11612",
+   "name": "mathlib",
+   "manifestFile": "lake-manifest.json",
+   "inputRev": "v4.34.1",
+   "inherited": false,
+   "configFile": "lakefile.lean"
+  },
+  {
+   "url": "https://github.com/leanprover/lean4-cli",
+   "type": "git",
+   "subDir": null,
+   "scope": "leanprover",
+   "rev": "e92c9f15fdfacc8536f31cfb3b7ad26c3c8cd204",
+   "name": "Cli",
+   "manifestFile": "lake-manifest.json",
+   "inputRev": "v4.34.0",
+   "inherited": true,
+   "configFile": "lakefile.toml"
+  },
+  {
+   "url": "https://github.com/leanprover-community/batteries",
+   "type": "git",
+   "subDir": null,
+   "scope": "leanprover-community",
+   "rev": "f2effa3d803fda822b1f97b806c47cf2adfbcbc2",
+   "name": "batteries",
+   "manifestFile": "lake-manifest.json",
+   "inputRev": "main",
+   "inherited": true,
+   "configFile": "lakefile.toml"
+  },
+  {
+   "type": "path",
+   "scope": "",
+   "name": "NearVM",
+   "manifestFile": "lake-manifest.json",
+   "inherited": true,
+   "dir": "../../../near-lean/near-logic/../vm",
+   "configFile": "lakefile.toml"
+  },
+  {
+   "type": "path",
+   "scope": "",
+   "name": "WasmLogic",
+   "manifestFile": "lake-manifest.json",
+   "inherited": true,
+   "dir": "../../../near-lean/near-logic/../wasm-logic",
    "configFile": "lakefile.toml"
   },
   {
@@ -117,45 +168,12 @@
    "configFile": "lakefile.toml"
   },
   {
-   "url": "https://github.com/leanprover-community/batteries",
-   "type": "git",
-   "subDir": null,
-   "scope": "leanprover-community",
-   "rev": "f2effa3d803fda822b1f97b806c47cf2adfbcbc2",
-   "name": "batteries",
-   "manifestFile": "lake-manifest.json",
-   "inputRev": "main",
-   "inherited": true,
-   "configFile": "lakefile.toml"
-  },
-  {
-   "url": "https://github.com/leanprover/lean4-cli",
-   "type": "git",
-   "subDir": null,
-   "scope": "leanprover",
-   "rev": "e92c9f15fdfacc8536f31cfb3b7ad26c3c8cd204",
-   "name": "Cli",
-   "manifestFile": "lake-manifest.json",
-   "inputRev": "v4.34.0",
-   "inherited": true,
-   "configFile": "lakefile.toml"
-  },
-  {
-   "type": "path",
-   "scope": "",
-   "name": "NearVM",
-   "manifestFile": "lake-manifest.json",
-   "inherited": true,
-   "dir": "../../../near-lean/runtime/../vm",
-   "configFile": "lakefile.toml"
-  },
-  {
    "type": "path",
    "scope": "",
    "name": "NearInterface",
    "manifestFile": "lake-manifest.json",
    "inherited": true,
-   "dir": "../../../near-lean/runtime/../vm/../interface",
+   "dir": "../../../near-lean/near-logic/../runtime/../vm/../interface",
    "configFile": "lakefile.toml"
   },
   {
@@ -164,7 +182,19 @@
    "name": "Wasm",
    "manifestFile": "lake-manifest.json",
    "inherited": true,
-   "dir": "../../../near-lean/runtime/../wasm",
+   "dir": "../../../near-lean/near-logic/../runtime/../wasm",
+   "configFile": "lakefile.toml"
+  },
+  {
+   "url": "https://github.com/leanprover-community/iris-lean.git",
+   "type": "git",
+   "subDir": "Iris",
+   "scope": "",
+   "rev": "04b7689c294bb1dd6401e2dd53b337871934ea47",
+   "name": "iris",
+   "manifestFile": "lake-manifest.json",
+   "inputRev": "04b7689c294bb1dd6401e2dd53b337871934ea47",
+   "inherited": true,
    "configFile": "lakefile.toml"
   }
  ],

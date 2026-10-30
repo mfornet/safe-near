@@ -11,16 +11,20 @@ on:
     paths:
       - "contracts/w-near/verification/**"
       - "near-lean/**"
-      - "!near-lean/wasm-logic/**"
       - "tools/axiom-audit.py"
+      - "tools/proof_sources.py"
+      - "tools/wnear_blueprint.py"
+      - "tools/tests/test_wnear_blueprint.py"
       - "lean-toolchain"
       - ".github/workflows/wnear.yml"
   pull_request:
     paths:
       - "contracts/w-near/verification/**"
       - "near-lean/**"
-      - "!near-lean/wasm-logic/**"
       - "tools/axiom-audit.py"
+      - "tools/proof_sources.py"
+      - "tools/wnear_blueprint.py"
+      - "tools/tests/test_wnear_blueprint.py"
       - "lean-toolchain"
       - ".github/workflows/wnear.yml"
   workflow_dispatch:
@@ -52,8 +56,13 @@ jobs:
         with:
           use-github-cache: false
           lake-package-directory: contracts/w-near/verification
-          build-args: Model Spec Proofs Differential runtime-adapter-tests wnear-scenarios wnear-harness
+          build-args: Model Spec Proofs Bridge Blueprint Differential runtime-adapter-tests wnear-scenarios wnear-harness
           use-mathlib-cache: true
+
+      - name: Build and audit the metered logic
+        run: |
+          (cd near-lean/near-logic && lake build NearLogic)
+          python3 tools/axiom-audit.py near-lean/near-logic --no-build --report audit/near-logic.json
 
       - name: Audit axioms and check the pinned statements
         run: >-
@@ -61,8 +70,13 @@ jobs:
           --allow-sorry-module Proofs.Refinement --report audit/wnear.json
           --statements contracts/w-near/verification/statements.json
 
+      - name: Check the exact named proof frontier
+        run: |
+          python3 tools/wnear_blueprint.py --check --audit-report audit/wnear.json
+          python3 -m unittest discover -s tools/tests -p 'test_wnear_blueprint.py'
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: wnear-audit
-          path: audit/wnear.json
+          path: audit/

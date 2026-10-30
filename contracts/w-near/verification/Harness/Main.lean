@@ -1,4 +1,4 @@
-import Harness.Builtins
+import Harness.BalanceOf
 import Wasm.Binary
 
 /-!
@@ -216,6 +216,264 @@ def allocInputs (h : Harness) (r : Rng) : Except String (List (Input (List (Nat 
     [{ label := "zero-sized", store := h.store, args := [i32 0, i32 8], ghost := [] }]
   pure (out, probes)
 
+def vecDerefInputs (h : Harness) (r : Rng) : Except String (List (Input Unit) × List (Input Unit)) := do
+  let top := h.memSize h.store
+  let mut r := r
+  let mut out := []
+  for k in [0:100] do
+    let (vec, r1) := r.nat 0 (top - 12)
+    let (dst, r2) := r1.nat 0 (top - 8)
+    let (bs, r3) := r2.bytes 12
+    r := r3
+    if overlap (dst + 4) 4 vec 4 then continue
+    let s ← put h h.store [(vec, bs)]
+    out := out ++ [{ label := s!"random {k}", store := s, args := [i32 dst, i32 vec], ghost := () }]
+  let (bs, _) := r.bytes 12
+  let s ← put h h.store [(100, bs.set 8 77)]
+  let s' ← put h h.store [(100, bs)]
+  let harmless : Input Unit :=
+    { label := "out over the capacity and length", store := s', args := [i32 104, i32 100], ghost := () }
+  let probe : Input Unit :=
+    { label := "the length's slot over the pointer", store := s, args := [i32 96, i32 100], ghost := () }
+  pure (out ++ [harmless], [probe])
+
+/-- Every method's prologue: `setup_panic_hook` (522), then
+`set_blockchain_interface` (520) with near-sdk's zero-sized interface and
+its vtable. Its postcondition is the ghost "environment set up". -/
+def prologue (h : Harness) (s : Store NearState) : Except String (Store NearState) := do
+  let r1 := h.call s 522 []
+  if let some e := ended r1 then throw s!"setup_panic_hook: {e}"
+  let r2 := h.call r1.after 520 [i32 1, i32 1050188]
+  if let some e := ended r2 then throw s!"set_blockchain_interface: {e}"
+  pure r2.after
+
+/-- `base` is a store from inside a method, where the environment is set up. -/
+def stateInputs (h : Harness) (base : Store NearState) (r : Rng) :
+    Except String (List (Input Bool) × List (Input Bool)) := do
+  let top := h.memSize base
+  let mut r := r
+  let mut out := []
+  -- An absent state: tag word zero.
+  let (bs0, r0) := r.bytes 40
+  r := r0
+  let none0 := bs0.set 24 0 |>.set 25 0 |>.set 26 0 |>.set 27 0
+  let s0 ← put h base [(200, none0)]
+  out := out ++ [{ label := "not initialized", store := s0, args := [i32 1000, i32 200], ghost := true }]
+  -- The same from a fresh store after the method's prologue: the ghost is
+  -- the prologue's postcondition.
+  let fresh ← prologue h h.store
+  let s1 ← put h fresh [(200, none0)]
+  let afterPrologue : Input Bool :=
+    { label := "not initialized, after the prologue", store := s1, args := [i32 1000, i32 200], ghost := true }
+  out := out ++ [afterPrologue]
+  for k in [0:50] do
+    let (opt, r1) := r.nat 0 (top - 40)
+    let (dst, r2) := r1.nat 0 (top - 40)
+    let (bs, r3) := r2.bytes 40
+    r := r3
+    if overlap dst 40 opt 40 then continue
+    let bs := bs.set 24 1
+    let s ← put h base [(opt, bs)]
+    out := out ++ [{ label := s!"random {k}", store := s, args := [i32 dst, i32 opt], ghost := true }]
+  let p0 ← put h h.store [(200, none0)]
+  let probe : Input Bool :=
+    { label := "not initialized, environment not set up", store := p0, args := [i32 1000, i32 200], ghost := false }
+  pure (out, [probe])
+
+def u128FromInputs (h : Harness) (r : Rng) : Except String (List (Input Unit) × List (Input Unit)) := do
+  let top := h.memSize h.store
+  let mut r := r
+  let mut out := []
+  for k in [0:50] do
+    let (dst, r1) := r.nat 0 (top - 16)
+    let (lo, r2) := r1.nat 0 (2 ^ 64 - 1)
+    let (hi, r3) := r2.nat 0 (2 ^ 64 - 1)
+    r := r3
+    out := out ++ [{ label := s!"random {k}", store := h.store, args := [i32 dst, i64 lo, i64 hi], ghost := () }]
+  let pargs := [i32 (top - 8), i64 1, i64 1]
+  let probe : Input Unit := { label := "beyond memory", store := h.store, args := pargs, ghost := () }
+  pure (out, [probe])
+
+def ftTotalSupplyInputs (h : Harness) (r : Rng) : Except String (List (Input Unit) × List (Input Unit)) := do
+  let top := h.memSize h.store
+  let mut r := r
+  let mut out := []
+  for k in [0:50] do
+    let (ft, r1) := r.nat 0 (top - 16)
+    let (dst, r2) := r1.nat 0 (top - 16)
+    let (bs, r3) := r2.bytes 16
+    r := r3
+    let s ← put h h.store [(ft, bs)]
+    out := out ++ [{ label := s!"random {k}", store := s, args := [i32 dst, i32 ft], ghost := () }]
+  pure (out, [])
+
+def expectInputs (h : Harness) (base : Store NearState) (r : Rng) :
+    Except String (List (Input Bool) × List (Input Bool)) := do
+  let top := h.memSize base
+  let mut r := r
+  let mut out : List (Input Bool) := []
+  let mut probes : List (Input Bool) := []
+  for k in [0:50] do
+    let (res, r1) := r.nat 0 (top - 16)
+    let (dst, r2) := r1.nat 0 (top - 12)
+    let (bs, r3) := r2.bytes 16
+    let (err, r4) := r3.nat 0 3
+    r := r4
+    if overlap dst 8 (res + 12) 4 then continue
+    let bs := if err == 0 then bs.set 0 1 |>.set 1 0 |>.set 2 0 |>.set 3 0 else bs.set 0 0
+    let s ← put h base [(res, bs)]
+    let i : Input Bool := { label := s!"random {k}", store := s, args := [i32 dst, i32 res, i32 1049036], ghost := true }
+    -- One garbage error is enough to show the clause is needed.
+    if err == 0 then
+      if probes.isEmpty then probes := [{ i with label := s!"Err with a garbage error {k}" }]
+    else out := out ++ [i]
+  pure (out, probes)
+
+/-- `base` with `v` (or nothing) stored at `key`. -/
+def withStorage (base : Store NearState) (key : List UInt8) (v : Option (List UInt8)) : Store NearState :=
+  { base with host := { base.host with storage := fun k => if k == key then v else base.host.storage k } }
+
+def leBytes (n len : Nat) : List UInt8 := (List.range len).map fun i => UInt8.ofNat (n / 256 ^ i)
+
+def stateReadInputs (h : Harness) (base : Store NearState) (r : Rng) :
+    Except String (List (Input Bool) × List (Input Bool)) := do
+  let mut r := r
+  let absent : Input Bool := { label := "absent", store := withStorage base stateKey none, args := [i32 1000], ghost := true }
+  let mut out : List (Input Bool) := [absent]
+  for k in [0:30] do
+    let (n, r1) := r.nat 0 10
+    let (pre, r2) := r1.bytes n
+    let (supply, r3) := r2.nat 0 (2 ^ 128 - 1)
+    let (usage, r4) := r3.nat 0 (2 ^ 64 - 1)
+    r := r4
+    let v := leBytes n 4 ++ pre ++ leBytes supply 16 ++ leBytes usage 8
+    out := out ++ [{ label := s!"random {k}", store := withStorage base stateKey (some v), args := [i32 1000], ghost := true }]
+  let bad : Input Bool := { label := "a state that does not decode", store := withStorage base stateKey (some [1, 2, 3]), args := [i32 1000], ghost := true }
+  pure (out, [bad])
+
+def toVecInputs (h : Harness) (base : Store NearState) (r : Rng) :
+    Except String (List (Input Bool) × List (Input Bool)) := do
+  let mut r := r
+  let mut out : List (Input Bool) := []
+  let border := [0, 1, 9, 10, 10 ^ 24, 2 ^ 64 - 1, 2 ^ 64, 2 ^ 128 - 1]
+  let mut randoms := []
+  for _ in [0:30] do
+    let (bits, r1) := r.nat 0 128
+    let (n, r2) := r1.nat 0 (2 ^ bits - 1)
+    r := r2
+    randoms := randoms ++ [n]
+  for (n, k) in (border ++ randoms).zipIdx do
+    let s ← put h base [(2000, leBytes n 16)]
+    out := out ++ [{ label := s!"{n} ({k})", store := s, args := [i32 1000, i32 2000], ghost := true }]
+  pure (out, [])
+
+def valueReturnInputs (h : Harness) (base : Store NearState) (r : Rng) :
+    Except String (List (Input Bool) × List (Input Bool)) := do
+  let mut r := r
+  let mut out : List (Input Bool) := []
+  for k in [0:30] do
+    let (n, r1) := r.nat 0 200
+    let (bs, r2) := r1.bytes n
+    r := r2
+    let s ← put h base [(3000, bs)]
+    out := out ++ [{ label := s!"{n} bytes ({k})", store := s, args := [i32 3000, i32 n], ghost := true }]
+  pure (out, [])
+
+def envInputInputs (h : Harness) (base : Store NearState) (r : Rng) :
+    Except String (List (Input Bool) × List (Input Bool)) := do
+  let mut r := r
+  let mut out : List (Input Bool) := []
+  for k in [0:30] do
+    let (n, r1) := r.nat 0 300
+    let (bs, r2) := r1.bytes n
+    r := r2
+    let s : Store NearState :=
+      { base with host := { base.host with context := { base.host.context with input := bs } } }
+    out := out ++ [{ label := s!"{n} bytes ({k})", store := s, args := [i32 1000], ghost := true }]
+  pure (out, [])
+
+def optionExpectInputs (h : Harness) (base : Store NearState) (r : Rng) :
+    Except String (List (Input Bool) × List (Input Bool)) := do
+  let mut r := r
+  let mut out : List (Input Bool) := []
+  for k in [0:30] do
+    let (bs, r1) := r.bytes 12
+    let (none?, r2) := r1.nat 0 3
+    r := r2
+    let bs := if none? == 0 then bs.set 0 0 |>.set 1 0 |>.set 2 0 |>.set 3 0 else bs.set 0 1
+    let s ← put h base [(4000, bs)]
+    out := out ++ [{ label := s!"random {k}", store := s, args := [i32 1000, i32 4000, i32 1049036], ghost := true }]
+  pure (out, [])
+
+/-- A contract struct at 6000 with the prefix `"a"` (at 6100), and an
+account id `String` whose buffer is a real heap allocation, at 6200. -/
+def balanceInputs (h : Harness) (base : Store NearState) (r : Rng) :
+    Except String (List (Input Bool) × List (Input Bool)) := do
+  let mut r := r
+  let mut out : List (Input Bool) := []
+  for k in [0:30] do
+    let (n, r1) := r.nat 2 20
+    let (name, r2) := r1.bytes n
+    let (present, r3) := r2.nat 0 2
+    let (bal, r4) := r3.nat 0 (2 ^ 128 - 1)
+    r := r4
+    let alloc := h.call base 310 [i32 n, i32 1]
+    let some buf := returnsU32 alloc | throw "alloc failed"
+    let s ← put h alloc.after [(6100, [97]), (6000 + 24, leBytes 6100 4 ++ leBytes 1 4 ++ leBytes 1 4),
+      (buf, name), (6200, leBytes buf 4 ++ leBytes n 4 ++ leBytes n 4)]
+    let key := [97] ++ leBytes n 4 ++ name
+    let s := if present == 0 then s else withStorage s key (some (leBytes bal 16))
+    out := out ++ [{ label := s!"random {k}", store := s, args := [i32 1000, i32 6000, i32 6200], ghost := true }]
+  pure (out, [])
+
+/-- Border-case arguments of `ft_balance_of`, as JSON. -/
+def balanceOfArgs : List String := [
+  "{\"account_id\":\"bob.near\"}", " { \"account_id\" : \"bob.near\" } ", "{\"\\u0061ccount_id\":\"bob.near\"}",
+  "{\"account_id\":\"b\\u006fb.near\"}", "[\"bob.near\"]", "{\"account_id\":\"bob.near\",\"x\":1}",
+  "{\"account_id\":\"bob.near\",\"account_id\":\"bob.near\"}", "{\"account_id\":\"A\"}",
+  "{\"account_id\":\"a\"}", "{\"account_id\":1}", "{}", "", "garbage", "{\"account_id\":\"bob.near\"",
+  "{\"account_id\":\"bob.near\"} x", "{\"account_id\":\"\"}", "{\"account_id\":null}",
+  "{\"account_id\":\"alice.near\\u0000\"}", "{\"x\":{\"y\":[1,2,{\"z\":\"w\"}]},\"account_id\":\"carol.near\"}",
+  "[\"bob.near\",1]", "{\"account_id\":\"" ++ String.ofList (List.replicate 64 'a') ++ "\"}",
+  "{\"account_id\":\"" ++ String.ofList (List.replicate 65 'a') ++ "\"}"]
+
+def fromSliceInputs (h : Harness) (base : Store NearState) (_ : Rng) :
+    Except String (List (Input Bool) × List (Input Bool)) := do
+  let mut out : List (Input Bool) := []
+  let cases : List (List UInt8) := balanceOfArgs.map (fun s : String => s.toUTF8.toList) ++ [[255, 254]]
+  for (j, k) in cases.zipIdx do
+    let s ← put h base [(7000, j)]
+    out := out ++ [{ label := s!"case {k}", store := s, args := [i32 1000, i32 7000, i32 j.length], ghost := true }]
+  pure (out, [])
+
+def storageMinimumInputs (h : Harness) (base : Store NearState) (r : Rng) :
+    Except String (List (Input Bool) × List (Input Bool)) := do
+  let mut r := r
+  let mut out : List (Input Bool) := []
+  let border := [0, 1, 125, 2 ^ 32, 2 ^ 64 - 1]
+  let mut randoms := []
+  for _ in [0:20] do
+    let (n, r1) := r.nat 0 (2 ^ 64 - 1)
+    r := r1
+    randoms := randoms ++ [n]
+  for (n, k) in (border ++ randoms).zipIdx do
+    let s ← put h base [(6000 + 16, leBytes n 8)]
+    out := out ++ [{ label := s!"usage {n} ({k})", store := s, args := [i32 1000, i32 6000], ghost := true }]
+  pure (out, [])
+
+def ftMetadataInputs (h : Harness) (base : Store NearState) (_ : Rng) :
+    Except String (List (Input Bool) × List (Input Bool)) :=
+  pure ([{ label := "the contract", store := base, args := [i32 1000, i32 6000], ghost := true }], [])
+
+def storageBoundsInputs (h : Harness) (base : Store NearState) (r : Rng) :
+    Except String (List (Input Bool) × List (Input Bool)) := do
+  let mut r := r
+  let mut out : List (Input Bool) := []
+  for (n, k) in ([0, 1, 125, 2 ^ 64 - 1] ++ (List.range 10).map (· * 1234567)).zipIdx do
+    let s ← put h base [(6000 + 16, leBytes n 8)]
+    out := out ++ [{ label := s!"usage {n} ({k})", store := s, args := [i32 1000, i32 6000], ghost := true }]
+  pure (out, [])
+
 /-! ## Call sites -/
 
 def account (s : String) : List UInt8 := s.toUTF8.toList
@@ -230,6 +488,8 @@ def calls : List (String × String × String × Nat) := [
   ("alice.near", "ft_balance_of", "{\"account_id\":\"alice.near\"}", 0),
   ("alice.near", "ft_total_supply", "{}", 0),
   ("alice.near", "ft_metadata", "{}", 0),
+  ("alice.near", "storage_minimum_balance", "{}", 0),
+  ("alice.near", "storage_balance_bounds", "{}", 0),
   ("alice.near", "storage_balance_of", "{\"account_id\":\"bob.near\"}", 0),
   ("alice.near", "near_withdraw", "{\"amount\":\"1000\"}", 1),
   ("bob.near", "ft_transfer", "{\"receiver_id\":\"alice.near\",\"amount\":\"1\"}", 1),
@@ -286,12 +546,41 @@ def main (args : List String) : IO UInt32 := do
     | .ok m => pure m
     | .error e => throw (IO.userError e.message)
   let h ← orThrow (Harness.load protocol module internalContext [])
-  let captured ← captureAll protocol module bytes.size [memcpy.func, memset.func, bcmp.func, multi3.func, alloc.func]
+  let captured ← captureAll protocol module bytes.size
+    [memcpy.func, memset.func, bcmp.func, multi3.func, alloc.func, vecDeref.func, stateOrPanic.func,
+      u128From.func, ftTotalSupply.func, resultExpect.func, stateRead.func, toVecU128.func,
+      valueReturn.func, envInput.func, optionExpect.func, balanceOf.func, fromSliceBalanceOf.func,
+      storageMinimum.func, ftMetadata.func, storageBounds.func]
   let sites (f : Nat) := captured.getD f #[]
+  -- A fresh store after the method prologue: the environment is set up.
+  let envBase ← orThrow (prologue h h.store)
   let results := [
     ← stress h memcpy (memcpyInputs h) (sites memcpy.func) verbose,
     ← stress h memset (memsetInputs h) (sites memset.func) verbose,
     ← stress h bcmp (bcmpInputs h) (sites bcmp.func) verbose,
     ← stress h multi3 (multi3Inputs h) (sites multi3.func) verbose,
-    ← stress h alloc (allocInputs h) (sites alloc.func) verbose]
+    ← stress h alloc (allocInputs h) (sites alloc.func) verbose,
+    ← stress h vecDeref (vecDerefInputs h) (sites vecDeref.func) verbose,
+    ← stress h stateOrPanic
+        (stateInputs h (((sites stateOrPanic.func)[0]?.map (·.2.store)).getD h.store))
+        (sites stateOrPanic.func) verbose,
+    ← stress h u128From (u128FromInputs h) (sites u128From.func) verbose,
+    ← stress h ftTotalSupply (ftTotalSupplyInputs h) (sites ftTotalSupply.func) verbose,
+    ← stress h resultExpect
+        (expectInputs h (((sites stateOrPanic.func)[0]?.map (·.2.store)).getD h.store))
+        (sites resultExpect.func) verbose,
+    ← stress h stateRead
+        (stateReadInputs h (((sites stateRead.func)[0]?.map (·.2.store)).getD h.store))
+        (sites stateRead.func) verbose,
+    ← stress h toVecU128
+        (toVecInputs h (((sites stateRead.func)[0]?.map (·.2.store)).getD h.store))
+        (sites toVecU128.func) verbose,
+    ← stress h valueReturn (valueReturnInputs h envBase) (sites valueReturn.func) verbose,
+    ← stress h envInput (envInputInputs h envBase) (sites envInput.func) verbose,
+    ← stress h optionExpect (optionExpectInputs h envBase) (sites optionExpect.func) verbose,
+    ← stress h balanceOf (balanceInputs h envBase) (sites balanceOf.func) verbose,
+    ← stress h fromSliceBalanceOf (fromSliceInputs h envBase) (sites fromSliceBalanceOf.func) verbose,
+    ← stress h storageMinimum (storageMinimumInputs h envBase) (sites storageMinimum.func) verbose,
+    ← stress h ftMetadata (ftMetadataInputs h envBase) (sites ftMetadata.func) verbose,
+    ← stress h storageBounds (storageBoundsInputs h envBase) (sites storageBounds.func) verbose]
   pure (if results.all id then 0 else 1)

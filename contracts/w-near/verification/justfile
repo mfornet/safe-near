@@ -15,7 +15,7 @@ sorries:
 
 # Extract the blueprint from the @[blueprint] annotations into .lake/build/blueprint.
 blueprint-extract:
-    lake build :blueprint
+    lake build Model:blueprint Spec:blueprint Proofs:blueprint Blueprint:blueprint
 
 # (`leanblueprint web` expects the Lake project at the git root, so plasTeX is called directly.)
 # Build the web blueprint (blueprint/web/index.html) with the dependency graph.

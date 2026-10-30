@@ -4,6 +4,7 @@
 \input{../../.lake/build/blueprint/library/Model}
 \input{../../.lake/build/blueprint/library/Spec}
 \input{../../.lake/build/blueprint/library/Proofs}
+\input{../../.lake/build/blueprint/library/Blueprint}
 
 \chapter{Introduction}
 
@@ -166,3 +167,19 @@ obligation. It is not proved.
 \cref{thm:withdraw-available-binary} shows the use: under the refinement,
 \cref{spec:withdraw-available-boundary} becomes a statement about the
 execution of the binary itself.
+
+
+\chapter{Current dependency frontier}
+\label{ch:frontier}
+
+The generated \href{frontier.html}{live dependency frontier} distinguishes
+Proven (kernel checked under reviewed environmental premises), Conditional
+(proved composition with unresolved verification obligations), Open (a precise
+contract or admitted leaf without its proof), and Integrated (used by a checked
+caller composition). Integration does not make a conditional caller complete.
+Definitions state contracts; their formalization check marks do not discharge them.
+Solid graph edges come from LeanArchitect's Lean dependency traversal. Planned
+edges are separately labeled and are not evidence of integration. The frontier
+records the source revision, source digest, last successful build, and failures.
+
+\inputleanmodule{Blueprint}

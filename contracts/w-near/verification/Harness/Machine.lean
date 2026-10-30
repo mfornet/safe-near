@@ -1,4 +1,5 @@
 import NearRuntime.Boundary
+import Wasm.Binary
 
 /-!
 # Running one function of the binary

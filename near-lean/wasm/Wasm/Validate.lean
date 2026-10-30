@@ -539,8 +539,9 @@ def declaredRefs (m : Module) (funcCount : Nat) : Array Bool := Id.run do
       if f < refs.size then refs := refs.set! f true
   return refs
 
-/-- Validate a module. -/
-def module (features : Features) (m : Module) : Except ValidationError Unit := do
+/-- Validate everything in a module but its function bodies, and give the
+context the bodies are checked in. -/
+def moduleContext (features : Features) (m : Module) : Except ValidationError Context := do
   -- Types.
   for ft in m.types do
     if !features.multiValue && ft.results.length > 1 then throw (.unsupported "multi-value")
@@ -620,13 +621,21 @@ def module (features : Features) (m : Module) : Except ValidationError Unit := d
       | .mem i => i < mems.size
       | .global i => i < globals.size
     if !ok then throw (.invalid s!"unknown export index: {e.name}")
+  return ctx
+
+/-- Validate one function body in the module context. -/
+def funcOk (ctx : Context) (f : Func) : Except ValidationError Unit := do
+  let ft := ctx.types[f.type]!
+  for t in f.locals do
+    if let .ref _ := t then if !ctx.features.referenceTypes then throw (.unsupported "reference-types")
+  body { ctx with locals := (ft.params ++ f.locals).toArray, «return» := some ft.results }
+    ft.results f.body
+
+/-- Validate a module. -/
+def module (features : Features) (m : Module) : Except ValidationError Unit := do
+  let ctx ← moduleContext features m
   -- Function bodies.
-  for f in m.funcs do
-    let ft := m.types[f.type]!
-    for t in f.locals do
-      if let .ref _ := t then if !features.referenceTypes then throw (.unsupported "reference-types")
-    body { ctx with locals := (ft.params ++ f.locals).toArray, «return» := some ft.results }
-      ft.results f.body
+  for f in m.funcs do funcOk ctx f
 
 end Validate
 
@@ -639,5 +648,35 @@ structure ValidModule where
 def Module.validate (features : Features) (m : Module) : Except ValidationError ValidModule := do
   Validate.module features m
   return ⟨m, features⟩
+
+namespace Validate
+
+theorem forIn_ok {α ε : Type} (l : List α) (g : α → Except ε Unit) (h : ∀ x ∈ l, g x = .ok ()) :
+    (forIn l PUnit.unit fun x _ => do g x; pure (ForInStep.yield PUnit.unit) : Except ε PUnit) =
+      .ok PUnit.unit := by
+  induction l with
+  | nil => rfl
+  | cons x l ih =>
+    simp only [List.forIn_cons, h x List.mem_cons_self]
+    exact ih fun y hy => h y (List.mem_cons_of_mem x hy)
+
+/-- A module validates when everything but its bodies does, and each body
+does in the context that gives. -/
+theorem module_ok {features : Features} {m : Module} {ctx : Context}
+    (hc : moduleContext features m = .ok ctx) (hf : ∀ f ∈ m.funcs.toList, funcOk ctx f = .ok ()) :
+    module features m = .ok () := by
+  unfold module
+  rw [hc]
+  simp only [bind, Except.bind, ← Array.forIn_toList]
+  have := forIn_ok _ _ hf
+  simp only [bind, Except.bind] at this
+  rw [this]
+  rfl
+
+end Validate
+
+theorem Module.validate_ok {features : Features} {m : Module} (h : Validate.module features m = .ok ()) :
+    ∃ vm, m.validate features = .ok vm ∧ vm.module = m :=
+  ⟨⟨m, features⟩, by simp [Module.validate, h, bind, Except.bind, pure, Except.pure], rfl⟩
 
 end Wasm

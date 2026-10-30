@@ -201,7 +201,7 @@ theorem initDatas_same (store : Store H) (inst : ModuleInst) (segs : List (Nat Ã
 theorem instantiateModule_same (store : Store H) (vm : ValidModule) (imports : List ExternVal)
     {store' : Store H} {inst : ModuleInst}
     (h : instantiateModule store vm imports = .ok (store', inst)) : SameHosts store store' := by
-  unfold instantiateModule at h
+  unfold instantiateModule instantiateModuleOf at h
   dsimp only at h
   split at h
   Â· cases h

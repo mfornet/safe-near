@@ -48,6 +48,9 @@ structure Contract (α : Type) where
   stack : Nat := 0
   /-- Whether the function may grow memory. -/
   grows : Bool := false
+  /-- Whether the function changes the host state on purpose (return data,
+  logs, storage): the postcondition checks those effects instead. -/
+  hostEffects : Bool := false
   /-- The ghost data of a captured call-site input, if it can be recovered. -/
   ghostOf : Harness → Entry → Option α
 
@@ -81,6 +84,9 @@ variable {α : Type} (c : Contract α) (h : Harness)
 
 /-- The checks that do not depend on the postcondition. -/
 def frame (i : Input α) (r : Run) : List String := Id.run do
+  -- A trap aborts the call and the receipt rolls back: only the postcondition
+  -- says which traps are allowed.
+  if let .trapped _ := r.ending then return []
   let mut out := []
   let sp := h.stackPointer i.store
   let allowed := (sp - c.stack, c.stack) :: c.footprint h i
@@ -96,9 +102,9 @@ def frame (i : Input α) (r : Run) : List String := Id.run do
       out := out ++ [s!"global {g} not restored: {repr (h.global r.before g)} to {repr (h.global r.after g)}"]
   let hb := r.before.host
   let ha := r.after.host
-  if ha.logs != hb.logs || ha.storageKeys != hb.storageKeys ||
+  if !c.hostEffects && (ha.logs != hb.logs || ha.storageKeys != hb.storageKeys ||
       ha.storageLog.length != hb.storageLog.length || ha.promises.length != hb.promises.length ||
-      ha.returnData != hb.returnData || ha.lastError.isSome then
+      ha.returnData != hb.returnData || ha.lastError.isSome) then
     out := out ++ ["host state changed beyond gas"]
   pure out
 
