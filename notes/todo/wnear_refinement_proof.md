@@ -1602,7 +1602,7 @@ operations and 54 linear charges, non-trie work below 2.945 Tgas of the 4 Tgas c
 and two account writes plus the header write within `trieGas`. `CostsDepositV86` adds the v86
 log and evicted-byte cost bounds and log-count lower bound to `CostsNewV86`; M9 pins them.
 All six method refinements and the complete Bridge build pass the standard-axiom audit.
-The exported refinement is a checked composition of six completed clauses and nine named open method obligations, plus five named pinned-protocol obligations. The global theorem remains conditional on those leaves.
+The exported refinement is a checked composition of six completed clauses, eight open full-method obligations and a conditional `ft_balance_of` assembly from three named open clauses, plus five named pinned-protocol obligations. The global theorem remains conditional on those leaves.
 
 ### M9. Closing
 

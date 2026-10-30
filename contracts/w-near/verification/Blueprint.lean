@@ -118,7 +118,7 @@ attribute [blueprint "frontier:method-ft_transfer_call"
 
 attribute [blueprint "frontier:method-ft_balance_of"
   (title := /-- ft\_balance\_of -/)
-  (statement := /-- ft\_balance\_of. Open verification obligation; its statement exists but is not discharged. -/)
+  (statement := /-- ft\_balance\_of. Checked assembly remains conditional on the three named open execution, accepted-input and rejected-input obligations. -/)
   (notReady := true)]
   WNear.ftBalanceOf_obligation
 
@@ -319,3 +319,21 @@ attribute [blueprint "frontier:balance-caller-absent"
   (statement := /-- The actual token balance caller composes the absent balance lookup and returns zero. Reachable allocation room remains open. -/)
   (notReady := true)]
   WNear.Binary.BalanceOfAbsent.f293_none
+
+attribute [blueprint "frontier:balance-no-issue"
+  (title := /-- Balance method execution safety -/)
+  (statement := /-- Open obligation: exclude execution issues for every represented balance-method context, including rejected input. -/)
+  (notReady := true)]
+  WNear.ftBalanceOf_no_issue_obligation
+
+attribute [blueprint "frontier:balance-accepted"
+  (title := /-- Balance method accepted-input refinement -/)
+  (statement := /-- Open obligation: prove the full refinement and arbitrary-resource clauses for accepted balance calls. -/)
+  (notReady := true)]
+  WNear.ftBalanceOf_accepted_obligation
+
+attribute [blueprint "frontier:balance-rejected"
+  (title := /-- Balance method rejected-input rollback -/)
+  (statement := /-- Open obligation: prove rollback for rejected balance-method arguments. -/)
+  (notReady := true)]
+  WNear.ftBalanceOf_rejected_obligation

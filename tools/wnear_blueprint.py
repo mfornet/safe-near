@@ -174,8 +174,8 @@ def classify(manifest, rows, audit=None):
             for dep in caller['proof_edges']:
                 by_id[dep]['integrated_into'].append({'id': caller['id'], 'status': caller['status']})
     required = {'global': ['exported'], 'exported': ['dispatch', 'binary-size'] +
-                [n['id'] for n in result if n['kind'] == 'admission'],
-                'dispatch': [n['id'] for n in result if n.get('method') and n['kind'] != 'admission']}
+                [n['id'] for n in result if (n['kind'] == 'admission' and not n.get('indirect_admission')) or n.get('exported_direct')],
+                'dispatch': [n['id'] for n in result if n.get('method') and n['kind'] != 'admission' and not n.get('exported_direct')]}
     for caller, deps in required.items():
         absent = set(deps) - set(by_id[caller]['proof_edges'])
         if absent:
@@ -226,7 +226,7 @@ def render_frontier(data):
 Proof source digest <code>{data['proof_source_digest']}</code><br>Full audit: {html.escape(data['audit_status'])}'''
     global_node = next(n for n in data['nodes'] if n['id'] == 'global')
     global_summary = 'complete' if global_node['status'] == 'Proven' else 'incomplete (' + global_node['status'] + ')'
-    open_methods = ', '.join(n['title'] for n in data['nodes'] if n.get('method') and n['status'] == 'Open') or 'none'
+    open_methods = ', '.join(n['title'] for n in data['nodes'] if n.get('method') and n['status'] != 'Proven') or 'none'
     open_protocol = ', '.join(n['title'] for n in data['nodes'] if n['id'].startswith('protocol-') and n['status'] == 'Open') or 'none'
     page = '''<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>wNEAR dependency frontier</title><style>
@@ -236,7 +236,7 @@ body{font:16px/1.55 system-ui,sans-serif;background:#f8fafc;color:#172033;max-wi
 <section class="legend"><b>Proven</b>: kernel checked under stated, reviewed environmental premises. <b>Conditional</b>: checked composition still assumes named verification obligations or depends on admitted leaves. <b>Open</b>: an exact contract exists but its proof is missing. <b>Integrated</b>: used in a tracked checked caller; a conditional caller remains incomplete. Definition check marks only establish a statement exists. Solid edges are actual LeanArchitect type/proof dependencies; dashed edges are planned and do not establish integration.
 <p>The reviewed <code>Context.WF</code> premise includes uniqueness of staged/committed trie changes and assumes no witness hash is all zeros; it is not a cryptographic proof of SHA-256.</p>
 <br><label>Filter <input id="search" placeholder="method, declaration or obligation"></label><select id="status"><option>All</option><option>Proven</option><option>Conditional</option><option>Open</option></select></section>
-<div><button onclick="zoom(1.4)">Zoom in</button><button onclick="zoom(1/1.4)">Zoom out</button><button onclick="resetZoom()">Reset graph</button></div><div class="graph"><object id="graph" data="frontier.svg" type="image/svg+xml" aria-label="Proof dependency graph"></object></div><p>Open methods: OPEN_METHODS. Open protocol obligations: OPEN_PROTOCOL. See the cards for remaining verification contracts and checked integration.</p><main class="grid">CARDS</main>
+<div><button onclick="zoom(1.4)">Zoom in</button><button onclick="zoom(1/1.4)">Zoom out</button><button onclick="resetZoom()">Reset graph</button></div><div class="graph"><object id="graph" data="frontier.svg" type="image/svg+xml" aria-label="Proof dependency graph"></object></div><p>Incomplete methods: OPEN_METHODS. Open protocol obligations: OPEN_PROTOCOL. See the cards for remaining verification contracts and checked integration.</p><main class="grid">CARDS</main>
 <script>let graphScale=1;function zoom(f){graphScale=Math.max(1,Math.min(8,graphScale*f));let g=document.querySelector("#graph");g.style.width=(graphScale*100)+"%";g.style.height=(graphScale*75)+"vh";}function resetZoom(){graphScale=1;zoom(1)}function filter(){const s=document.querySelector('#status').value,q=document.querySelector('#search').value.toLowerCase();document.querySelectorAll('article').forEach(n=>n.hidden=(s!=='All'&&n.dataset.status!==s)||!n.textContent.toLowerCase().includes(q));}document.querySelector('#search').oninput=filter;document.querySelector('#status').onchange=filter;
 async function health(){try{const r=await fetch('../w-near-status.json',{cache:'no-store'});if(r.ok){const s=await r.json();document.querySelector('#failure').textContent=s.failure?'Build/serving failure: '+s.failure+' — displaying the last successful build.':'';}}catch(e){document.querySelector('#failure').textContent='Live build health unavailable; verify the build time above.';}}health();setInterval(health,15000);</script></html>'''
     (WEB / 'frontier.html').write_text(page.replace('FRESHNESS', freshness).replace('GLOBAL_STATUS', global_summary).replace('OPEN_METHODS', html.escape(open_methods)).replace('OPEN_PROTOCOL', html.escape(open_protocol)).replace('CARDS', ''.join(cards)))

@@ -151,13 +151,59 @@ theorem ftTransferCall_obligation (cfg : Config) (codeOf : List UInt8 → Near.C
     Binary.Exported.MethodClause cfg wNearBytes.size codeOf protocol "ft_transfer_call" := by
   sorry
 
-/-- Open full method obligation, including rejected arguments and arbitrary represented resource states. -/
+/-- Execution safety for every represented `ft_balance_of` context, including rejected input. -/
+theorem ftBalanceOf_no_issue_obligation (cfg : Config) (codeOf : List UInt8 → Near.ContractCode)
+    (protocol : Wasm.Near.RuntimeConfig)
+    (hprotocol : Wasm.Near.RuntimeConfig.parse wNearProtocolJson = .ok protocol)
+    (he : Binary.Exported.Environment protocol) (hcfg : cfg.WF)
+    (raw : RawStorage) (st : Option State) (ctx : Context)
+    (hrep : (wnear cfg).Represents raw st) (hwf : ctx.WF raw)
+    (hctx : ctx.protocol = protocol) (hm : ctx.method = "ft_balance_of") :
+    ∀ msg, (Near.Boundary.nearRuntime.exec (Binary.wCode wNearBytes.size codeOf) raw ctx).outcome ≠
+      .error (.executionIssue msg) := by
+  sorry
+
+/-- Accepted calls satisfy both resource-sufficient refinement and arbitrary-resource rollback clauses. -/
+theorem ftBalanceOf_accepted_obligation (cfg : Config) (codeOf : List UInt8 → Near.ContractCode)
+    (protocol : Wasm.Near.RuntimeConfig)
+    (hprotocol : Wasm.Near.RuntimeConfig.parse wNearProtocolJson = .ok protocol)
+    (he : Binary.Exported.Environment protocol) (hcfg : cfg.WF)
+    (raw : RawStorage) (st : Option State) (ctx : Context)
+    (hrep : (wnear cfg).Represents raw st) (hwf : ctx.WF raw)
+    (hctx : ctx.protocol = protocol) (hm : ctx.method = "ft_balance_of")
+    (c : Call) (hparse : (wnear cfg).Parses ctx.method ctx.args c) :
+    let r := Near.Boundary.nearRuntime.exec (Binary.wCode wNearBytes.size codeOf) raw ctx
+    let res := (wnear cfg).step ctx st c
+    ((wnear cfg).gas ctx st c ≤ ctx.gasLimit → ctx.ProofRoom ((wnear cfg).proofBound ctx st c) →
+      Matches (wnear cfg) ctx raw r res ∧ r.usedGas ≤ (wnear cfg).gas ctx st c) ∧
+    (Matches (wnear cfg) ctx raw r res ∨
+      (ResourceFailure r ∧ RolledBack ctx raw r ∧ r.logs <+: res.logs)) := by
+  sorry
+
+/-- Rejected arguments must leave the represented state rolled back. -/
+theorem ftBalanceOf_rejected_obligation (cfg : Config) (codeOf : List UInt8 → Near.ContractCode)
+    (protocol : Wasm.Near.RuntimeConfig)
+    (hprotocol : Wasm.Near.RuntimeConfig.parse wNearProtocolJson = .ok protocol)
+    (he : Binary.Exported.Environment protocol) (hcfg : cfg.WF)
+    (raw : RawStorage) (st : Option State) (ctx : Context)
+    (hrep : (wnear cfg).Represents raw st) (hwf : ctx.WF raw)
+    (hctx : ctx.protocol = protocol) (hm : ctx.method = "ft_balance_of")
+    (hreject : ¬ ∃ c, (wnear cfg).Parses ctx.method ctx.args c) :
+    RolledBack ctx raw (Near.Boundary.nearRuntime.exec (Binary.wCode wNearBytes.size codeOf) raw ctx) := by
+  sorry
+
+/-- Checked assembly of the unchanged full method clause from its three exact open branches. -/
 theorem ftBalanceOf_obligation (cfg : Config) (codeOf : List UInt8 → Near.ContractCode)
     (protocol : Wasm.Near.RuntimeConfig)
     (hprotocol : Wasm.Near.RuntimeConfig.parse wNearProtocolJson = .ok protocol)
     (he : Binary.Exported.Environment protocol) :
     Binary.Exported.MethodClause cfg wNearBytes.size codeOf protocol "ft_balance_of" := by
-  sorry
+  intro hcfg raw st ctx hrep hwf hctx hm
+  refine ⟨ftBalanceOf_no_issue_obligation cfg codeOf protocol hprotocol he hcfg raw st ctx hrep hwf hctx hm, ?_, ?_⟩
+  · intro c hparse
+    exact ftBalanceOf_accepted_obligation cfg codeOf protocol hprotocol he hcfg raw st ctx hrep hwf hctx hm c hparse
+  · intro hreject
+    exact ftBalanceOf_rejected_obligation cfg codeOf protocol hprotocol he hcfg raw st ctx hrep hwf hctx hm hreject
 
 /-- Open full method obligation, including rejected arguments and arbitrary represented resource states. -/
 theorem ftResolveTransfer_obligation (cfg : Config) (codeOf : List UInt8 → Near.ContractCode)

@@ -958,6 +958,38 @@ def WNear.PinnedProtocolAvailable : Prop :=
 theorem WNear.deployed_code_size : WNear.Binary.wNearBytes.size ≤ 185625
 ```
 
+`WNear.ftBalanceOf_accepted_obligation` (hash `000000006933a460`)
+
+```lean
+theorem WNear.ftBalanceOf_accepted_obligation (cfg : WNear.Config) (codeOf : List UInt8 → Near.ContractCode)
+  (protocol : Wasm.Near.RuntimeConfig)
+  (hprotocol : Wasm.Near.RuntimeConfig.parse WNear.wNearProtocolJson = Except.ok protocol)
+  (he : WNear.Binary.Exported.Environment protocol) (hcfg : cfg.WF) (raw : WNear.RawStorage) (st : Option WNear.State)
+  (ctx : NearInterface.Context) (hrep : (WNear.wnear cfg).Represents raw st) (hwf : ctx.WF raw)
+  (hctx : ctx.protocol = protocol) (hm : ctx.method = "ft_balance_of") (c : WNear.Call)
+  (hparse : (WNear.wnear cfg).Parses ctx.method ctx.args c) :
+  have r := Near.Boundary.nearRuntime.exec (WNear.Binary.wCode WNear.Binary.wNearBytes.size codeOf) raw ctx;
+  have res := (WNear.wnear cfg).step ctx st c;
+  ((WNear.wnear cfg).gas ctx st c ≤ ctx.gasLimit →
+      ctx.ProofRoom ((WNear.wnear cfg).proofBound ctx st c) →
+        NearInterface.Matches (WNear.wnear cfg) ctx raw r res ∧ r.usedGas ≤ (WNear.wnear cfg).gas ctx st c) ∧
+    (NearInterface.Matches (WNear.wnear cfg) ctx raw r res ∨
+      NearInterface.ResourceFailure r ∧ NearInterface.RolledBack ctx raw r ∧ r.logs <+: res.logs)
+```
+
+`WNear.ftBalanceOf_no_issue_obligation` (hash `00000000285557a9`)
+
+```lean
+theorem WNear.ftBalanceOf_no_issue_obligation (cfg : WNear.Config) (codeOf : List UInt8 → Near.ContractCode)
+  (protocol : Wasm.Near.RuntimeConfig)
+  (hprotocol : Wasm.Near.RuntimeConfig.parse WNear.wNearProtocolJson = Except.ok protocol)
+  (he : WNear.Binary.Exported.Environment protocol) (hcfg : cfg.WF) (raw : WNear.RawStorage) (st : Option WNear.State)
+  (ctx : NearInterface.Context) (hrep : (WNear.wnear cfg).Represents raw st) (hwf : ctx.WF raw)
+  (hctx : ctx.protocol = protocol) (hm : ctx.method = "ft_balance_of") (msg : String) :
+  (Near.Boundary.nearRuntime.exec (WNear.Binary.wCode WNear.Binary.wNearBytes.size codeOf) raw ctx).outcome ≠
+    Except.error (NearInterface.Failure.executionIssue msg)
+```
+
 `WNear.ftBalanceOf_obligation` (hash `000000003723e7af`)
 
 ```lean
@@ -966,6 +998,20 @@ theorem WNear.ftBalanceOf_obligation (cfg : WNear.Config) (codeOf : List UInt8 �
   (hprotocol : Wasm.Near.RuntimeConfig.parse WNear.wNearProtocolJson = Except.ok protocol)
   (he : WNear.Binary.Exported.Environment protocol) :
   WNear.Binary.Exported.MethodClause cfg WNear.Binary.wNearBytes.size codeOf protocol "ft_balance_of"
+```
+
+`WNear.ftBalanceOf_rejected_obligation` (hash `00000000b628b177`)
+
+```lean
+theorem WNear.ftBalanceOf_rejected_obligation (cfg : WNear.Config) (codeOf : List UInt8 → Near.ContractCode)
+  (protocol : Wasm.Near.RuntimeConfig)
+  (hprotocol : Wasm.Near.RuntimeConfig.parse WNear.wNearProtocolJson = Except.ok protocol)
+  (he : WNear.Binary.Exported.Environment protocol) (hcfg : cfg.WF) (raw : WNear.RawStorage) (st : Option WNear.State)
+  (ctx : NearInterface.Context) (hrep : (WNear.wnear cfg).Represents raw st) (hwf : ctx.WF raw)
+  (hctx : ctx.protocol = protocol) (hm : ctx.method = "ft_balance_of")
+  (hreject : ¬∃ c, (WNear.wnear cfg).Parses ctx.method ctx.args c) :
+  NearInterface.RolledBack ctx raw
+    (Near.Boundary.nearRuntime.exec (WNear.Binary.wCode WNear.Binary.wNearBytes.size codeOf) raw ctx)
 ```
 
 `WNear.ftResolveTransfer_obligation` (hash `000000009b74f93c`)

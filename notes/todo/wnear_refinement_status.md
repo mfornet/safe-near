@@ -2,13 +2,13 @@
 
 Campaign status on 2026-10-30; local continuation is active. Details are in `wnear_refinement_proof.md`: M3 for the first method, M6 for JSON arguments (the parser map is `wnear_m6_parser_map.md`), and M8 for the other methods.
 
-The exported refinement is now a checked dispatch over six completed method clauses and nine named open method obligations, with five separately named protocol-instantiation obligations. The global refinement and its withdrawal corollary remain conditional on those leaves. Completed results use only `propext`, `Classical.choice` and `Quot.sound`; never use `bv_decide` or `native_decide`.
+The exported refinement is now a checked dispatch over six completed method clauses and eight open full-method obligations and a checked `ft_balance_of` assembly over three named open clauses, with five separately named protocol-instantiation obligations. The global refinement and its withdrawal corollary remain conditional on those leaves. Completed results use only `propext`, `Classical.choice` and `Quot.sound`; never use `bv_decide` or `native_decide`.
 
 ## Checked composition and live frontier
 
 `WNear.Binary.Exported.all_methods` composes all 15 exported method clauses. Six
 method proofs are complete under the named reviewed environment and size premises;
-the other nine full method clauses remain separate admissions. The exported
+eight other full method clauses remain admitted; `ft_balance_of` is assembled from three separately admitted execution-safety, accepted-call and rejected-input clauses. The exported
 refinement also names five protocol premise admissions. The global statement is
 unchanged and remains conditional on these leaves. `PinnedProtocolAvailable` is
 a separate open contract: deployment still needs a witness that the pinned JSON
@@ -1309,6 +1309,16 @@ continuation is published to PR #40 after its validation gates pass.
   prove the complete deep reader. Reachable allocation room, uniform parser
   bounds, outer wrappers, rejection, the seventh method and M9 remain open.
   No additional `sorry` is introduced.
+
+## Continuation: balance method top-level composition
+
+The full `ft_balance_of` method clause is now checked composition from three
+separately named open obligations: no execution issue for any represented
+context, full accepted-call refinement including arbitrary resource failures,
+and rollback on rejected arguments. Its original statement is unchanged.
+The accepted-call obligation has a planned dependency on the checked absent
+caller path; neither that edge nor the full method is claimed complete. All
+three open leaves and their conditional dependents remain in the strict audit.
 
 ## Continuation: absent-account token balance caller
 

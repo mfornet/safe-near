@@ -206,19 +206,18 @@
       "id": "method-ft_balance_of",
       "declaration": "WNear.ftBalanceOf_obligation",
       "title": "ft_balance_of",
-      "kind": "admission",
+      "kind": "theorem",
       "method": "ft_balance_of",
       "environment": "Pinned protocol JSON and reviewed Environment predicate.",
-      "planned_dependencies": [
-        "accept-parser",
-        "reject-parser",
-        "storage",
-        "runtime-boundary",
-        "ft-balance-model",
-        "balance-caller-absent"
-      ],
+      "planned_dependencies": [],
       "label": "frontier:method-ft_balance_of",
-      "reviewed_shape_hash": 925099951
+      "reviewed_shape_hash": 925099951,
+      "exported_direct": true,
+      "required_proof_dependencies": [
+        "balance-no-issue",
+        "balance-accepted",
+        "balance-rejected"
+      ]
     },
     {
       "id": "method-ft_resolve_transfer",
@@ -614,6 +613,47 @@
       "required_proof_dependencies": [
         "balance-lookup-absent"
       ]
+    },
+    {
+      "id": "balance-no-issue",
+      "declaration": "WNear.ftBalanceOf_no_issue_obligation",
+      "title": "ft_balance_of: execution safety",
+      "kind": "admission",
+      "indirect_admission": true,
+      "label": "frontier:balance-no-issue",
+      "reviewed_shape_hash": 676681641,
+      "planned_dependencies": [
+        "runtime-boundary"
+      ]
+    },
+    {
+      "id": "balance-accepted",
+      "declaration": "WNear.ftBalanceOf_accepted_obligation",
+      "title": "ft_balance_of: accepted-call refinement",
+      "kind": "admission",
+      "indirect_admission": true,
+      "label": "frontier:balance-accepted",
+      "reviewed_shape_hash": 1764992096,
+      "planned_dependencies": [
+        "accept-parser",
+        "storage",
+        "runtime-boundary",
+        "ft-balance-model",
+        "balance-caller-absent"
+      ]
+    },
+    {
+      "id": "balance-rejected",
+      "declaration": "WNear.ftBalanceOf_rejected_obligation",
+      "title": "ft_balance_of: rejected-input rollback",
+      "kind": "admission",
+      "indirect_admission": true,
+      "label": "frontier:balance-rejected",
+      "reviewed_shape_hash": 3056120183,
+      "planned_dependencies": [
+        "reject-parser",
+        "runtime-boundary"
+      ]
     }
   ],
   "reviewed_environment": [
@@ -633,12 +673,14 @@
     "WNear.nearWithdraw_obligation",
     "WNear.ftTransfer_obligation",
     "WNear.ftTransferCall_obligation",
-    "WNear.ftBalanceOf_obligation",
     "WNear.ftResolveTransfer_obligation",
     "WNear.storageDeposit_obligation",
     "WNear.storageWithdraw_obligation",
     "WNear.storageUnregister_obligation",
-    "WNear.storageBalanceOf_obligation"
+    "WNear.storageBalanceOf_obligation",
+    "WNear.ftBalanceOf_no_issue_obligation",
+    "WNear.ftBalanceOf_accepted_obligation",
+    "WNear.ftBalanceOf_rejected_obligation"
   ],
   "expected_incomplete": [
     "WNear.refines_wnear",
@@ -657,6 +699,9 @@
     "WNear.storageDeposit_obligation",
     "WNear.storageWithdraw_obligation",
     "WNear.storageUnregister_obligation",
-    "WNear.storageBalanceOf_obligation"
+    "WNear.storageBalanceOf_obligation",
+    "WNear.ftBalanceOf_no_issue_obligation",
+    "WNear.ftBalanceOf_accepted_obligation",
+    "WNear.ftBalanceOf_rejected_obligation"
   ]
 }
