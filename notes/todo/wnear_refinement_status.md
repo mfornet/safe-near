@@ -54,7 +54,7 @@ continuation is published to PR #40 after its validation gates pass.
   regular operations, 54 linear-operation charges, host fees at most 2 Tgas, and the
   three write paths within `trieGas`. The non-trie allowance is at most 2.945 Tgas
   against `computeGas = 4 Tgas` under the stated v86 bounds and binary size.
-  `NearDepositAll.nearDeposit_refines_all` combines initialized success/panics with the
+  `NearDepositMethod.nearDeposit_refines_all` combines initialized success/panics with the
   uninitialized case. The targeted build passed (1630 jobs), at
   `/tmp/pr40-deposit-all-build.log`. LSP verifies the gas-bound and all-state refinement
   theorems with only the standard three axioms.
@@ -760,6 +760,37 @@ continuation is published to PR #40 after its validation gates pass.
   `/tmp/pr40-ignored-escapes-final-audit.log` and
   `/tmp/pr40-ignored-escapes-style.log`.
 
+## Successful ignored strings (2026-10-30)
+
+- `SerdeIgnoreString.f650_success` proves the actual 650 loop for every successful
+  `strRun`, including arbitrary simple/Unicode escapes. The outer invariant tracks
+  the remaining modeled run and accumulated decoded bytes; the inner loop reuses
+  the existing plain-byte scan. The call returns zero at the exact model endpoint,
+  preserves the ESCAPE/hex tables and reader input, and restores all 128 stack bytes.
+- Its fixed charge is `(120 + 300 * consumedBytes) * regularOpCost`, independent
+  of the gas ceiling. The escape branch pays for 652's successful linear contract,
+  call activation and the next loop iteration. No allocator ownership, allocation
+  room, error reserve or UTF-8 validation is required. The depth premise is `d + 14`.
+- `strRun_of_stringBody` derives existential decoded bytes when the model returns
+  `some (s, rest)` for any `s : Option String`. `f650_model` exposes the same
+  contract directly at that model boundary. Thus skipped strings with invalid raw
+  UTF-8 remain covered; the kernel also checks the witness `[255, 34]`, whose
+  string body succeeds with `s = none` and an empty remainder.
+- Next: integrate this boundary at 81's string-value and object-key branches,
+  carry hex-table ownership through its invariant, and remove its global no-escape
+  premise. 650 needs 128 bytes below 81's own 32-byte frame, so that integration
+  must provide 160 bytes rather than the old 96-byte shallow footprint. The object
+  adapter currently lends 304 bytes, but the complete frame must still be returned.
+  Deep frame pushes, uniform heap/room/gas bounds, object wrappers and general
+  rejection remain open. This does not complete `AcceptContract` or a seventh method.
+- Validation: `just wnear-audit` passes (2807 build jobs; 473 wNEAR modules,
+  64671 declarations and 59360 theorems). Only the three existing dependencies
+  on `Proofs.Refinement` use `sorryAx`; strict NearLogic has zero violations and
+  statement pins match. Lean MCP verifies both public contracts and the model
+  helper with only the three standard axioms. Changed-source Lean style and
+  whitespace checks pass. Evidence: `/tmp/pr40-ignore-string-final-audit.log`
+  and `/tmp/pr40-ignore-string-style.log`.
+
 ## Methods
 
 There are 15 exported methods; six now have complete per-call refinement proofs under their protocol premises.
@@ -771,7 +802,7 @@ There are 15 exported methods; six now have complete per-call refinement proofs 
 | `storage_balance_bounds` (306) | done | `StorageBalanceBoundsRefines.storageBalanceBounds_refines_all` |
 | `ft_metadata` (309) | done | `FtMetadataRefines.ftMetadata_refines_all` |
 | `new` (290) | done | `NewRefines.newRefines_all` |
-| `near_deposit` (234) | done | `NearDepositAll.nearDeposit_refines_all`, under `CostsV86`, `LimitsV86`, `CostsDepositV86`, the module protocol premises and code size. Gas, functional agreement and host preconditions are all discharged. |
+| `near_deposit` (234) | done | `NearDepositMethod.nearDeposit_refines_all`, under `CostsV86`, `LimitsV86`, `CostsDepositV86`, the module protocol premises and code size. Gas, functional agreement and host preconditions are all discharged. |
 | `ft_balance_of` (297) | argument layer, and the parser's accepting half for shallow input without escapes | see "Parser" below; the method level is not started |
 | `storage_balance_of`, `storage_deposit`, `storage_withdraw`, `storage_unregister`, `near_withdraw`, `ft_transfer`, `ft_transfer_call`, `ft_resolve_transfer` | not started | they need the parser; `ft_transfer_call` and `ft_resolve_transfer` also need promises and promise results |
 
@@ -843,7 +874,8 @@ The texts are proved equal to the model's `Panic.message` (`PanicText`).
         cleanup; carry the proved changing-state object result through 78/66/65
         and close general argument-contract bounds, including hex-table ownership;
       - instantiate the remaining ignored-reader state transition in that loop;
-      - 652 (`ignore_escape`).
+      - integrate the proved 652/650 successful ignored-string boundary into 81,
+        including hex ownership and the complete stack footprint.
    3. Ignored values nested deeper: 84 grows the scratch from capacity 0, and `Hyp81` must allow changes to the heap and the scratch.
 2. **`ft_balance_of`, method level.** Take the parser's contracts as parameters until they are proved. The argument layer is in `EnvInput` and `ArgsLeaves`, the balance read in `LookupMapGet`/`StorageReadWrapF`.
 3. **The remaining methods**, in M8's order:

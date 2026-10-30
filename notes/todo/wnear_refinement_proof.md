@@ -1346,6 +1346,20 @@ strings are not materialized as decoded Strings. The 81 proof must then carry he
 ownership and use the general string boundary; nested frame pushes, uniform
 room/gas bounds, object wrappers and rejection remain open.
 
+**Successful ignored strings (2026-10-30):**
+`SerdeIgnoreString.f650_success` proves the actual 650 loop on every successful
+`strRun`, with arbitrary escapes, no allocator ownership and no UTF-8 premise.
+It preserves the input and both tables, restores all 128 stack bytes and returns
+zero at the exact endpoint under `(120 + 300 * consumedBytes) * regularOpCost`.
+The depth premise is `d + 14`; the escape branch pays for 652's activation and
+continuation as well as its successful body. `strRun_of_stringBody` and
+`f650_model` retain the model's `Option String`, including syntactically valid
+strings whose raw UTF-8 is invalid. The kernel checks `[255, 34]` as such a model
+witness. Next: replace 81's two no-escape string boundaries, carry the hex table,
+and supply 128 bytes below its own 32-byte frame (160 total). The old shallow
+footprint is 96. Deep ignored frames, reachable heap/room/gas bounds, object
+wrappers and general rejection remain open; the seventh method is not complete.
+
 ### M7. State and storage
 
 Borsh encoding of the state, `LookupMap` keys, near-sdk's `env` wrappers
