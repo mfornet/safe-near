@@ -27,6 +27,7 @@ import Bridge.Functions.BalanceOf297ParsedSuffix
 import Bridge.Functions.BalanceOf297StateRead
 import Bridge.Functions.BalanceOf297StateBridge
 import Bridge.Functions.BalanceOf297ReadBudget
+import Bridge.Functions.BalanceOf297ReadGas
 
 /-! The browsable proof frontier. Definitions marked Open state contracts, not proofs. -/
 
@@ -467,3 +468,19 @@ attribute [blueprint "frontier:balance-export-state-budget"
   (statement := /-- The checked 82-instruction absent-account suffix now derives the second-read trie and proof-budget conditions from the initial state; parsed-entry resources, allocation room and post-read gas remain open. -/)
   (notReady := true)]
   WNear.Binary.BalanceOf297AbsentCall.state_through_cleanup_of_budget
+
+attribute [blueprint "frontier:balance-next-read-cost-preserved"
+  (title := /-- Storage-read cost preserved after a read -/)
+  (statement := /-- A storage read preserves the modeled cost of a subsequent read for any key. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.storageReadUse_after_read
+
+attribute [blueprint "frontier:balance-second-read-exact-gas"
+  (title := /-- Exact balance-read gas after state read -/)
+  (statement := /-- The initial-state balance lookup cost is an exact bound after state_read, discharging the gas condition at that bound. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.balanceReadGasAfterState_exact
+
+attribute [blueprint "frontier:balance-export-state-exact-gas"
+  (title := /-- Exported balance: state read through cleanup with exact gas -/)
+  (statement := /-- The checked 82-instruction absent-account suffix instantiates the post-read gas bound exactly; parser-entry resources, allocation room and the full method remain open. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.state_through_cleanup_exact_gas

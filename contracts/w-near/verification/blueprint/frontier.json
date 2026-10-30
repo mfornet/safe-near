@@ -639,7 +639,7 @@
         "storage",
         "runtime-boundary",
         "ft-balance-model",
-        "balance-export-state-budget"
+        "balance-export-state-exact-gas"
       ]
     },
     {
@@ -878,7 +878,7 @@
       "declaration": "WNear.Binary.BalanceOf297AbsentCall.BalanceReadGasAfterState",
       "title": "Balance-read gas bound after state read",
       "kind": "verification_contract",
-      "notes": "Open uniform bound on the absent-account lookup gas after the state read.",
+      "notes": "Open for an arbitrary proposed bound K; an exact initial-state bound is proved and integrated into the absent-account branch.",
       "label": "frontier:balance-second-read-gas",
       "reviewed_shape_hash": 10982792330483191918
     },
@@ -911,6 +911,45 @@
       "required_proof_dependencies": [
         "balance-export-state-through-cleanup",
         "balance-second-read-from-budget"
+      ]
+    },
+    {
+      "id": "balance-next-read-cost-preserved",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.storageReadUse_after_read",
+      "title": "Storage-read cost preserved after a read",
+      "kind": "theorem",
+      "environment": "StorageReadPost relation for the preceding read.",
+      "label": "frontier:balance-next-read-cost-preserved",
+      "reviewed_shape_hash": 1938900493
+    },
+    {
+      "id": "balance-second-read-exact-gas",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.balanceReadGasAfterState_exact",
+      "title": "Exact balance-read gas bound after state read",
+      "kind": "theorem",
+      "environment": "The preceding read satisfies StorageReadPost.",
+      "label": "frontier:balance-second-read-exact-gas",
+      "reviewed_shape_hash": 2452948315,
+      "required_proof_dependencies": [
+        "balance-next-read-cost-preserved"
+      ]
+    },
+    {
+      "id": "balance-export-state-exact-gas",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.state_through_cleanup_exact_gas",
+      "title": "Function 297: state read through cleanup with exact gas",
+      "kind": "theorem",
+      "environment": "Parsed owned account, one-cell state-read entry, canonical trie and storage link, shared two-read proof budget, absent account, allocation room and return limit.",
+      "label": "frontier:balance-export-state-exact-gas",
+      "reviewed_shape_hash": 4060965416,
+      "required_type_dependencies": [
+        "balance-state-entry",
+        "owned-room",
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "balance-export-state-budget",
+        "balance-second-read-exact-gas"
       ]
     }
   ],

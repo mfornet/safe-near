@@ -1310,6 +1310,19 @@ continuation is published to PR #40 after its validation gates pass.
   bounds, outer wrappers, rejection, the seventh method and M9 remain open.
   No additional `sorry` is introduced.
 
+## Continuation: discharge the post-state-read gas bound
+
+`BalanceOf297AbsentCall.storageReadUse_after_read` proves a storage read
+preserves the modeled cost of a later read of any key.
+`balanceReadGasAfterState_exact` instantiates the second-read gas condition with
+the exact initial-state lookup cost, and `state_through_cleanup_exact_gas`
+integrates that instantiation into the checked 82-instruction suffix. All three
+proofs use standard axioms. The generic gas-bound predicate remains Open for an
+arbitrary proposed bound, but the composed branch no longer assumes it. The
+initial shared proof budget, parser-to-state-read entry resources (including the
+one-cell free-list bound), allocation room, other branches and the complete
+method remain open.
+
 ## Continuation: propagate a shared storage proof budget
 
 `BalanceOf297AbsentCall.balanceReadAfterState_of_budget` derives the second

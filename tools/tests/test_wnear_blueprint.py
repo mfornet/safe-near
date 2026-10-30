@@ -19,7 +19,7 @@ class FrontierPolicyTests(unittest.TestCase):
             admission = n['kind'] == 'admission'
             self.rows.append({'declaration': n['declaration'], 'is_theorem': n['kind'] != 'verification_contract',
                               'direct_sorry': admission, 'shape_hash': n['reviewed_shape_hash'], 'blueprint_label': n['label'],
-                              'not_ready': n['kind'] in ['verification_contract', 'admission'] or n['id'] in ['global', 'exported', 'dispatch', 'object-parser', 'array-parser', 'ignored-opening', 'storage', 'lookup-raw-absent', 'lookup-absent', 'balance-lookup-absent', 'balance-caller-absent', 'balance-export-call-absent', 'balance-export-call-and-copy', 'balance-export-format-zero', 'balance-export-call-copy-format', 'balance-export-through-expect', 'balance-export-through-return', 'balance-export-through-cleanup', 'balance-export-parsed-suffix', 'balance-export-state-read', 'balance-export-state-through-cleanup', 'balance-second-read-from-budget', 'balance-export-state-budget', 'method-ft_balance_of'], 'axioms': ['sorryAx'] if admission else ['propext'],
+                              'not_ready': n['kind'] in ['verification_contract', 'admission'] or n['id'] in ['global', 'exported', 'dispatch', 'object-parser', 'array-parser', 'ignored-opening', 'storage', 'lookup-raw-absent', 'lookup-absent', 'balance-lookup-absent', 'balance-caller-absent', 'balance-export-call-absent', 'balance-export-call-and-copy', 'balance-export-format-zero', 'balance-export-call-copy-format', 'balance-export-through-expect', 'balance-export-through-return', 'balance-export-through-cleanup', 'balance-export-parsed-suffix', 'balance-export-state-read', 'balance-export-state-through-cleanup', 'balance-second-read-from-budget', 'balance-export-state-budget', 'balance-export-state-exact-gas', 'method-ft_balance_of'], 'axioms': ['sorryAx'] if admission else ['propext'],
                               'type_dependencies': [], 'proof_dependencies': [], 'statement': 'test', 'type_hash': 1})
         self.by_id = {n['id']: row for n, row in zip(self.manifest['nodes'], self.rows)}
         self.by_id['storage']['type_dependencies'] = [self.nodes['owned-room']['declaration']]
@@ -36,6 +36,8 @@ class FrontierPolicyTests(unittest.TestCase):
         self.by_id['balance-export-parsed-suffix']['proof_dependencies'] = [self.nodes[x]['declaration'] for x in ['balance-export-through-cleanup', 'balance-export-argument-copy']]
         self.by_id['balance-export-state-through-cleanup']['proof_dependencies'] = [self.nodes[x]['declaration'] for x in ['balance-export-state-read', 'balance-export-parsed-suffix']]
         self.by_id['balance-export-state-budget']['proof_dependencies'] = [self.nodes[x]['declaration'] for x in ['balance-export-state-through-cleanup', 'balance-second-read-from-budget']]
+        self.by_id['balance-second-read-exact-gas']['proof_dependencies'] = [self.nodes['balance-next-read-cost-preserved']['declaration']]
+        self.by_id['balance-export-state-exact-gas']['proof_dependencies'] = [self.nodes[x]['declaration'] for x in ['balance-export-state-budget', 'balance-second-read-exact-gas']]
         self.by_id['method-ft_balance_of']['axioms'].append('sorryAx')
         self.by_id['method-ft_balance_of']['proof_dependencies'] = [self.nodes[x]['declaration'] for x in ['balance-no-issue', 'balance-accepted', 'balance-rejected']]
         self.by_id['global']['axioms'].append('sorryAx')
@@ -64,6 +66,9 @@ class FrontierPolicyTests(unittest.TestCase):
         self.assertEqual(result['balance-second-read-gas']['status'], 'Open')
         self.assertEqual(result['balance-second-read-from-budget']['status'], 'Conditional')
         self.assertEqual(result['balance-export-state-budget']['status'], 'Conditional')
+        self.assertEqual(result['balance-second-read-exact-gas']['status'], 'Proven')
+        self.assertEqual(result['balance-export-state-exact-gas']['status'], 'Conditional')
+        self.assertNotIn('balance-second-read-gas', result['balance-export-state-exact-gas']['type_edges'])
         self.assertEqual(result['balance-export-state-read']['status'], 'Conditional')
         self.assertEqual(result['balance-export-state-through-cleanup']['status'], 'Conditional')
         self.assertIn({'id': 'balance-export-state-through-cleanup', 'status': 'Conditional'}, result['balance-export-parsed-suffix']['integrated_into'])
@@ -92,6 +97,10 @@ class FrontierPolicyTests(unittest.TestCase):
             blueprint.classify(self.manifest, self.rows, self.audit)
 
     def test_lost_composition_and_admission_changes_require_manifest_update(self):
+        self.by_id['balance-export-state-exact-gas']['proof_dependencies'].clear()
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+        self.setUp()
         self.by_id['balance-export-state-budget']['proof_dependencies'].clear()
         with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
             blueprint.classify(self.manifest, self.rows, self.audit)
