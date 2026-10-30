@@ -1310,6 +1310,17 @@ continuation is published to PR #40 after its validation gates pass.
   bounds, outer wrappers, rejection, the seventh method and M9 remain open.
   No additional `sorry` is introduced.
 
+## Continuation: parsed account descriptor through cleanup
+
+`BalanceOf297AbsentCall.argument_copy` checks the exact twelve instructions
+copying the already parsed string descriptor into the balance-call argument.
+`parsed_account_through_cleanup_absent` composes that handoff with the checked
+absent-account suffix over 71 instructions through the function's end. Both use
+standard axioms. The result still assumes a parsed owned account descriptor,
+initialized state and explicit frame, host, return-limit, prefix-allocation and
+heap-room resources. Connecting the parser and state setup, proving reachability
+of these resources, and the full accepted-call method remain open.
+
 ## Continuation: function 297 absent balance through cleanup
 
 `BalanceOf297AbsentCall.cleanup` checks the final two vector drops and stack

@@ -639,7 +639,7 @@
         "storage",
         "runtime-boundary",
         "ft-balance-model",
-        "balance-export-through-cleanup"
+        "balance-export-parsed-suffix"
       ]
     },
     {
@@ -796,6 +796,31 @@
       "required_proof_dependencies": [
         "balance-export-through-return",
         "balance-export-cleanup"
+      ]
+    },
+    {
+      "id": "balance-export-argument-copy",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.argument_copy",
+      "title": "Function 297: copy parsed account descriptor",
+      "kind": "theorem",
+      "environment": "Explicit Wasm frame and memory ownership premises.",
+      "label": "frontier:balance-export-argument-copy",
+      "reviewed_shape_hash": 184260445
+    },
+    {
+      "id": "balance-export-parsed-suffix",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.parsed_account_through_cleanup_absent",
+      "title": "Function 297: parsed absent balance through cleanup",
+      "kind": "theorem",
+      "environment": "Parsed account descriptor and ownership, metered host, trie proof budget, return-length limit, four-growth heap room, full prefix allocation and explicit Wasm frame/resource premises.",
+      "label": "frontier:balance-export-parsed-suffix",
+      "reviewed_shape_hash": 2063795662,
+      "required_type_dependencies": [
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "balance-export-through-cleanup",
+        "balance-export-argument-copy"
       ]
     }
   ],

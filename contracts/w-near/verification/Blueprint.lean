@@ -22,6 +22,8 @@ import Bridge.Functions.BalanceOf297Return
 import Bridge.Functions.BalanceOf297ComposeReturn
 import Bridge.Functions.BalanceOf297Cleanup
 import Bridge.Functions.BalanceOf297ComposeCleanup
+import Bridge.Functions.BalanceOf297ArgumentCopy
+import Bridge.Functions.BalanceOf297ParsedSuffix
 
 /-! The browsable proof frontier. Definitions marked Open state contracts, not proofs. -/
 
@@ -409,3 +411,14 @@ attribute [blueprint "frontier:balance-export-through-cleanup"
   (statement := /-- The exact 59-instruction suffix composes absent-account lookup through return of zero, both vector drops and stack restoration; reachable room, preceding argument and state setup and the full method remain open. -/)
   (notReady := true)]
   WNear.Binary.BalanceOf297AbsentCall.call_through_cleanup_absent
+
+attribute [blueprint "frontier:balance-export-argument-copy"
+  (title := /-- Exported balance function: copy parsed account descriptor -/)
+  (statement := /-- The exact decoded instructions copy the already parsed account string descriptor to the balance-call argument. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.argument_copy
+
+attribute [blueprint "frontier:balance-export-parsed-suffix"
+  (title := /-- Exported balance function: parsed absent account through cleanup -/)
+  (statement := /-- The exact 71-instruction suffix composes the parsed account descriptor handoff through absent-account return and cleanup; parsing, state setup, reachable room and the full method remain open. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.parsed_account_through_cleanup_absent

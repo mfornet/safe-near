@@ -71,6 +71,8 @@
     "WNear.Binary.BalanceOf297AbsentCall.return_vec",
     "WNear.Binary.BalanceOf297AbsentCall.call_through_value_return_absent",
     "WNear.Binary.BalanceOf297AbsentCall.cleanup",
-    "WNear.Binary.BalanceOf297AbsentCall.call_through_cleanup_absent"
+    "WNear.Binary.BalanceOf297AbsentCall.call_through_cleanup_absent",
+    "WNear.Binary.BalanceOf297AbsentCall.argument_copy",
+    "WNear.Binary.BalanceOf297AbsentCall.parsed_account_through_cleanup_absent"
   ]
 }
