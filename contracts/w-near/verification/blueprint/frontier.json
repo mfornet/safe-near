@@ -639,7 +639,7 @@
         "storage",
         "runtime-boundary",
         "ft-balance-model",
-        "balance-export-call-absent"
+        "balance-export-call-and-copy"
       ]
     },
     {
@@ -668,6 +668,31 @@
       ],
       "required_proof_dependencies": [
         "balance-caller-absent"
+      ]
+    },
+    {
+      "id": "balance-export-copy-zero",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.copy_zero",
+      "title": "Function 297: copy absent-account result",
+      "kind": "theorem",
+      "environment": "Explicit Wasm frame and memory ownership premises.",
+      "label": "frontier:balance-export-copy-zero",
+      "reviewed_shape_hash": 2476748861
+    },
+    {
+      "id": "balance-export-call-and-copy",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.call_and_copy_absent",
+      "title": "Function 297: absent call and result copy",
+      "kind": "theorem",
+      "environment": "Metered host, trie proof budget, allocator room and explicit Wasm frame/resource premises.",
+      "label": "frontier:balance-export-call-and-copy",
+      "reviewed_shape_hash": 3599098301,
+      "required_type_dependencies": [
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "balance-export-call-absent",
+        "balance-export-copy-zero"
       ]
     }
   ],

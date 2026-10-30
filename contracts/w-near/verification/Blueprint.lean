@@ -13,6 +13,7 @@ import Bridge.Functions.LookupMapGet399None
 import Bridge.Functions.BalanceOfAbsent
 import Bridge.Functions.BalanceOfCallerAbsent
 import Bridge.Functions.BalanceOf297AbsentCall
+import Bridge.Functions.BalanceOf297AbsentCopy
 
 /-! The browsable proof frontier. Definitions marked Open state contracts, not proofs. -/
 
@@ -344,3 +345,14 @@ attribute [blueprint "frontier:balance-export-call-absent"
   (statement := /-- The exact decoded instruction slice in function 297 composes the absent-account token balance caller; the complete method and reachable allocation room remain open. -/)
   (notReady := true)]
   WNear.Binary.BalanceOf297AbsentCall.call_absent
+
+attribute [blueprint "frontier:balance-export-copy-zero"
+  (title := /-- Exported balance function: copy zero result -/)
+  (statement := /-- The exact decoded instructions copy the absent-account zero balance into the formatting input. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.copy_zero
+
+attribute [blueprint "frontier:balance-export-call-and-copy"
+  (title := /-- Exported balance function: absent call and result copy -/)
+  (statement := /-- The actual decoded function-297 slice composes the absent-account call with its following zero-result copy; reachable allocation room and the rest of the method remain open. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.call_and_copy_absent

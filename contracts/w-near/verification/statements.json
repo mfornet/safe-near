@@ -61,6 +61,8 @@
     "WNear.ftBalanceOf_no_issue_obligation",
     "WNear.ftBalanceOf_accepted_obligation",
     "WNear.ftBalanceOf_rejected_obligation",
-    "WNear.Binary.BalanceOf297AbsentCall.call_absent"
+    "WNear.Binary.BalanceOf297AbsentCall.call_absent",
+    "WNear.Binary.BalanceOf297AbsentCall.copy_zero",
+    "WNear.Binary.BalanceOf297AbsentCall.call_and_copy_absent"
   ]
 }

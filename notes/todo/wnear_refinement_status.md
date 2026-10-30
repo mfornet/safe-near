@@ -1310,6 +1310,16 @@ continuation is published to PR #40 after its validation gates pass.
   bounds, outer wrappers, rejection, the seventh method and M9 remain open.
   No additional `sorry` is introduced.
 
+## Continuation: function 297 absent-call result copy
+
+`BalanceOf297AbsentCall.copy_zero` proves the actual twelve instructions after
+the call copy the absent account's zero balance into the formatting input.
+`call_and_copy_absent` composes that proof with `call_absent` over the exact
+22-instruction slice of function 297. Both use only standard axioms; the
+combined theorem remains conditional on reachable `HeapRoomK 2` and its
+explicit host/resource premises. Parser and state setup, formatting and the
+full accepted-call refinement remain open.
+
 ## Continuation: function 297 absent-call segment
 
 `BalanceOf297AbsentCall.call_absent` proves the actual ten-instruction slice
@@ -1327,7 +1337,7 @@ separately named open obligations: no execution issue for any represented
 context, full accepted-call refinement including arbitrary resource failures,
 and rollback on rejected arguments. Its original statement is unchanged.
 The accepted-call obligation has a planned dependency on the checked absent
-function-297 call segment; neither that edge nor the full method is claimed complete. All
+function-297 call-and-copy segment; neither that edge nor the full method is claimed complete. All
 three open leaves and their conditional dependents remain in the strict audit.
 
 ## Continuation: absent-account token balance caller
