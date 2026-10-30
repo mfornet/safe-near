@@ -4,7 +4,7 @@ Campaign status on 2026-10-30; local continuation is active. Details are in `wne
 
 The exported refinement is now a checked dispatch over six completed method clauses and eight open full-method obligations and a checked `ft_balance_of` assembly over three named open clauses, with five separately named protocol-instantiation obligations. The global refinement and its withdrawal corollary remain conditional on those leaves. Completed results use only `propext`, `Classical.choice` and `Quot.sound`; never use `bv_decide` or `native_decide`.
 
-The three feasibility gates and their evidence, next checks and failure consequences are tracked in [wnear_feasibility_risks.md](wnear_feasibility_risks.md).
+The three feasibility gates and their evidence, next checks and failure consequences are tracked in [wnear_feasibility_risks.md](wnear_feasibility_risks.md). The asynchronous gate has passing concrete created-receipt/callback traces, including zero-gas rollback probes; the full asynchronous method proofs remain open.
 
 ## Continuation checkpoint
 

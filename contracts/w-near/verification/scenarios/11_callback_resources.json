@@ -1,0 +1,26 @@
+[
+  {
+    "name": "callbacks: low-gas callback rolls back after a successful transfer-call",
+    "description": "Deliver an actual created callback with zero gas and compare later balances with the post-transfer model state.",
+    "state": {"accounts": {"alice.near": "1000", "bob.near": "0"}},
+    "blocks": [
+      {"receipts": [
+        {"label": "transfer", "call": {"from": "alice.near", "method": "ft_transfer_call", "args": {"receiver_id": "bob.near", "amount": "100", "msg": "resource-check"}, "deposit": "1"}, "expect": "ok"}
+      ]},
+      {"receipts": [
+        {"label": "callback-no-gas", "deliver": "transfer#1", "results": ["failed"], "gas": "0", "expect": "outOfGas"},
+        {"label": "sender-after-failure", "call": {"method": "ft_balance_of", "args": {"account_id": "alice.near"}}, "expect": "ok"},
+        {"label": "receiver-after-failure", "call": {"method": "ft_balance_of", "args": {"account_id": "bob.near"}}, "expect": "ok"}
+      ]}
+    ]
+  },
+  {
+    "name": "callbacks: low-gas transfer-call rolls back before promise creation",
+    "state": {"accounts": {"alice.near": "1000", "bob.near": "0"}},
+    "blocks": [{"receipts": [
+      {"label": "transfer-no-gas", "call": {"from": "alice.near", "method": "ft_transfer_call", "args": {"receiver_id": "bob.near", "amount": "100", "msg": "resource-check"}, "deposit": "1", "gas": "0"}, "expect": "outOfGas"},
+      {"label": "sender-after-failure", "call": {"method": "ft_balance_of", "args": {"account_id": "alice.near"}}, "expect": "ok"},
+      {"label": "receiver-after-failure", "call": {"method": "ft_balance_of", "args": {"account_id": "bob.near"}}, "expect": "ok"}
+    ]}]
+  }
+]
