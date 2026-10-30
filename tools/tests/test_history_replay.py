@@ -62,6 +62,21 @@ class HistoricalBundleTests(unittest.TestCase):
         with patch.object(history, 'replay', return_value=self.evidence):
             return history.package(*self.paths, self.destination, self.binary)
 
+    def test_packaged_provenance_omits_local_paths_and_keeps_binary_hashes(self):
+        build = history.read(self.paths[2])
+        local_paths = dict(checkout='/workspace/source', replay='/workspace/replay',
+                           neard='/workspace/neard', smoke='/workspace/smoke')
+        build.update(local_paths, replayBinarySha256='binary-digest')
+        self.paths[2].write_text(json.dumps(build))
+        manifest = self.package()
+        published = history.read(self.destination / 'capture-build.json')
+        for field in local_paths:
+            self.assertNotIn(field, published)
+            self.assertIn(field, history.read(self.paths[2]))
+        self.assertEqual(published['replayBinarySha256'], 'binary-digest')
+        self.assertEqual(manifest['files']['capture-build.json'],
+                         history.sha(self.destination / 'capture-build.json'))
+
     def test_portable_assets_and_candidate_does_not_receive_expected_output(self):
         self.package()
         moved = self.root / 'relocated'

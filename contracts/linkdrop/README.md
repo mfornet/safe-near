@@ -19,3 +19,9 @@ Deploy block heights and the block at which `contract.wasm` was fetched are in `
 ```
 tools/verify_build.sh contracts/linkdrop
 ```
+
+## Binary availability
+
+The binary is omitted pending redistribution permission. Metadata, hashes and
+source references remain available for local reproduction. A locally obtained
+`contract.wasm` is ignored by Git and must not be committed.

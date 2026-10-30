@@ -103,6 +103,10 @@ def package(request_path, archive_path, build_path, destination, binary):
         read(source)
         assets[name] = source.read_bytes()
     request, archive, build = (loads(assets[name]) for name in FILES)
+    # Publish portable provenance; executable locations remain in local build metadata.
+    for field in ('checkout', 'replay', 'neard', 'smoke'):
+        build.pop(field, None)
+    assets['capture-build.json'] = (json.dumps(build, indent=2) + '\n').encode()
     validate_capture(request, archive)
     if build.get('sourceRevision') != REVISION or build.get('checkOnly') is not False:
         raise ValueError('capture build is missing or unbuilt')
