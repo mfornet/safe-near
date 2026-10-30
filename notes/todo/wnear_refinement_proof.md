@@ -1487,6 +1487,17 @@ charges or amortization across nested openings and later closes still need
 validation; these component bounds alone do not
 establish the uniform per-byte allowance or a seventh method refinement.
 
+`SerdeIgnScalarDone` now pins and proves the actual common scalar completion
+and success/return code. `scalar_pending` sets the pending-frame flag and
+branches to the container phase at seven regular operations without touching
+the saved vector. `scalar_top` uses the concrete empty pop and reaches the
+success label at 50 operations, preserving scratch and restoring the 32-byte
+frame. `success_return` restores the stack global and all 160 bytes and returns
+zero at seven operations. These retain arbitrary caller resources, including
+heap ownership and a saved String. Scalar-reader dispatch, structural label
+unwinding and full-loop composition remain open, as does aggregate per-byte
+instruction accounting. This adds no method refinement or parser-wide result.
+
 ### M7. State and storage
 
 Borsh encoding of the state, `LookupMap` keys, near-sdk's `env` wrappers

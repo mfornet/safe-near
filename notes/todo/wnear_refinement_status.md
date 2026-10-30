@@ -1117,6 +1117,33 @@ continuation is published to PR #40 after its validation gates pass.
   outer object wrappers, rejection, the seventh method and M9 remain open.
   No additional `sorry` is introduced.
 
+## Actual scalar completion and successful return (2026-10-30)
+
+- `SerdeIgnScalarDone` pins the common scalar-completion tail, success label
+  and function epilogue to decoded 81 by three kernel-checked equalities.
+- `scalar_pending` proves the actual seven-operation path for a scalar inside
+  a container: set local 3 to one, retain local 4 at zero and branch to the
+  container phase without touching the saved vector or arbitrary caller resources.
+- `scalar_top` proves the actual empty-pop success path at 50 regular operations.
+  It uses the tight concrete empty-pop contract, retains the reusable scratch
+  allocation and prior live blocks, and restores the 32-byte caller frame.
+  Its relative label 3 is distinct from the pending scalar's label 0.
+- `success_return` proves the actual seven-operation success/return epilogue:
+  result zero, restored stack global and all 160 stack bytes, with the cleared
+  saved-vector allocation and arbitrary caller resources preserved.
+- Validation: Lean MCP reports no errors and the targeted module build passes
+  (1373 jobs). PR-wide changed-source Lean style and whitespace checks pass.
+  `just wnear-audit` passes (2821 build jobs; 487 wNEAR modules, 66285
+  declarations and 60797 theorems), with only the three existing dependencies
+  on the open refinement. Strict NearLogic has zero violations and pinned
+  statements match. Evidence: `/tmp/pr40-ignore-scalar-done-final-audit.log`
+  and `/tmp/pr40-ignore-scalar-done-style.log`.
+- Next: prove the remaining scalar dispatch, compose its cost with the value
+  peek and completion tails, and assemble the full traced loop. Structural label
+  unwinding and aggregate costs still need proof; the individual segments do
+  not establish the complete deep reader. Reachable allocation room, uniform
+  parser bounds, outer wrappers, rejection, the seventh method and M9 remain open.
+
 ## Methods
 
 There are 15 exported methods; six now have complete per-call refinement proofs under their protocol premises.
