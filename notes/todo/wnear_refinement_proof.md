@@ -1333,6 +1333,19 @@ this is not the complete ignored reader. Successful ignored escapes (652/650)
 and allocating nested-frame pushes are the next reader steps, followed by the
 remaining accepting room/gas bounds and object wrappers.
 
+**Successful ignored escapes (2026-10-30):** `SerdeHexSuccess.f653_some`
+removes allocator/vtable ownership from successful hex decoding at the same
+300-operation allowance. `SerdeIgnoreEscape` proves the actual 652 on simple,
+BMP and surrogate-pair escapes, preserving the complete 112-byte frame and hex
+table without allocator resources. `consumed_eq` connects its branch lengths to
+`escDecode`; `f652_success` has the exact model endpoint, and
+`f652_success_linear` bounds work by 200 regular operations per encoded byte
+including the backslash. The successful 650 loop is next. Its model contract must
+allow `stringBody` to return either `some s` or `none` for raw UTF-8, since ignored
+strings are not materialized as decoded Strings. The 81 proof must then carry hex
+ownership and use the general string boundary; nested frame pushes, uniform
+room/gas bounds, object wrappers and rejection remain open.
+
 ### M7. State and storage
 
 Borsh encoding of the state, `LookupMap` keys, near-sdk's `env` wrappers

@@ -720,6 +720,46 @@ continuation is published to PR #40 after its validation gates pass.
   and whitespace checks pass. Evidence: `/tmp/pr40-ignored-reuse-final-audit.log`
   and `/tmp/pr40-ignored-reuse-style.log`.
 
+## Successful ignored escapes (2026-10-30)
+
+- `SerdeHexSuccess.f653_some` proves successful four-digit hex decoding without
+  owning a heap or allocator vtable. The actual 653 fast path needs only the
+  instance, reader, global, 96-byte frame and hex table. It keeps the existing
+  300-operation allowance and returns the packed value with the cursor advanced
+  exactly four bytes. Error construction and allocation room are absent.
+- `SerdeIgnoreEscape.f652_nu_success`, `f652_u0_success` and `f652_u1_success`
+  prove the actual ignored-escape function for simple escapes, BMP Unicode and
+  surrogate pairs. They preserve all 112 stack bytes and the hex table, need no
+  allocator ownership, and return zero at cursor offsets 1, 5 and 11 after the
+  leading backslash. Their instruction allowances are 400, 900 and 2000.
+- `consumed_eq` proves those branch lengths equal the model's `escDecode`
+  consumption. `f652_success` covers every model-accepted escape with that exact
+  endpoint. `f652_success_linear` places its charge under
+  `200 * (consumedBytes + 1) * regularOpCost`, including the leading backslash.
+  The code predicate contains only the instance and successful callees 637/655/653.
+- The pair proof establishes scalar range and surrogate-mask tests before the
+  corresponding branches. Its large-mask step uses the explicit numeric rule
+  with an abstract result, avoiding expensive generic simplification. No native
+  decision procedure or additional axiom is used.
+- Next is the full successful `ignore_str` loop (650), then removal of 81's
+  no-escape premise. Preserve the model's `Option String`: ignored strings may
+  have valid syntax but invalid raw UTF-8, and must not be restricted to `some s`.
+  `strRun_model` can supply existential decoded bytes without a UTF-8 premise.
+  The planned outer invariant tracks `strRun (bs.drop j) acc = .ok bytes rest`;
+  the inner scan can reuse `SerdeIgnStr.inv650`. The complete stack includes
+  650's 16 bytes plus 652's 112. Carry the hex table through the 81 invariant or
+  an abstract successful string-reader frame. Deep frame pushes and their changing
+  allocator state, uniform room/gas bounds, object wrappers and general rejection
+  remain open. This does not complete `AcceptContract` or a seventh method.
+- Validation: `just wnear-audit` passes (2806 build jobs; 472 wNEAR modules,
+  64455 declarations and 59153 theorems). Only the three existing dependencies
+  on `Proofs.Refinement` use `sorryAx`; strict NearLogic has zero violations and
+  statement pins match. Lean MCP's compiled-module axiom queries verify the hex
+  theorem and both combined escape theorems with only standard axioms.
+  Changed-source Lean style and whitespace checks pass. Evidence:
+  `/tmp/pr40-ignored-escapes-final-audit.log` and
+  `/tmp/pr40-ignored-escapes-style.log`.
+
 ## Methods
 
 There are 15 exported methods; six now have complete per-call refinement proofs under their protocol premises.
