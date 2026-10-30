@@ -14,7 +14,6 @@ from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
-import platform
 import re
 import shutil
 import subprocess
@@ -27,7 +26,7 @@ from check_lean_toolchains import repository_files  # noqa: E402
 from check_node_isolation import closure, packages  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
-BASELINE = ROOT / "tools/verification-buildtime/baseline.json"
+BASELINE = ROOT / ".local/verification-buildtime.json"
 SHARED_PACKAGES = Path("near-lean/.lake/packages")
 
 
@@ -81,9 +80,8 @@ def main() -> int:
     parser.add_argument("--record", action="store_true", help="store this machine's baseline instead of comparing")
     parser.add_argument("--baseline", type=Path, default=BASELINE)
     args = parser.parse_args()
-    host = platform.node()
     baselines = json.loads(args.baseline.read_text()) if args.baseline.is_file() else {}
-    key = f"{args.contract}@{host}"
+    key = args.contract
     targets = args.targets if args.targets is not None else baselines.get(key, {}).get("targets", [])
     try:
         result = measure(ROOT, args.contract, targets, args.runs)
@@ -93,7 +91,6 @@ def main() -> int:
     print(f"{args.contract}: clean verification build {result['seconds']}s ({result['jobs']} jobs)")
     if args.record:
         result["recorded"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
-        result["machine"] = platform.platform()
         baselines[key] = result
         args.baseline.parent.mkdir(parents=True, exist_ok=True)
         args.baseline.write_text(json.dumps(baselines, indent=2, sort_keys=True) + "\n")
