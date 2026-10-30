@@ -29,6 +29,10 @@ The decoded Borsh chain for functions 374, 316, 315, 425, 162 and 161 now has ch
 
 The actual function 297 success branch, descriptor copies and input-vector drop are checked and composed with the generalized state-read-through-cleanup path: the resulting 114-instruction slice uses a supported arbitrary heap bound after the drop. Separately, the public `okAt` parser result implies the owned account bytes, capacity bounds, address bounds and live-list order needed for that handoff. The public `okAt` parser result is now composed with the 114-instruction theorem by exposing its actual heap witnesses. This composition assumes the named `ParserPostBudget` resource condition, which must establish six-growth room and sufficient gas for those witnesses while preserving the parser result; input-vector ownership, frame resources and the full accepted-call refinement also remain open.
 
+## Copied-array parser call through cleanup
+
+For the specific copied-string array path, the actual function 65 parser call is now composed with the 114-instruction balance suffix, giving a 115-instruction decoded path from the prepared parser-call arguments through absent-account return and cleanup. The parser's recorded growth and free-list bound yield downstream six-growth room from a single initial parser-growth-plus-six allowance; gas uses the actual recorded bound. Parser room and allocation premises, input ownership, host and frame resources, other input forms, and integration into the full accepted-call refinement remain open. The general `ParserPostBudget` obligation remains open for the public parser result.
+
 ## Continuation on 2026-10-29: integration with main
 
 Work continues on `codex/wnear-proof-continuation`, starting from PR head `1ea4077` and merging

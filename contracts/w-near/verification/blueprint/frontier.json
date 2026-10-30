@@ -642,7 +642,8 @@
         "balance-export-state-six-grows",
         "balance-state-six-grows-free-bound",
         "balance-parser-through-cleanup",
-        "parser-public-through-cleanup"
+        "parser-public-through-cleanup",
+        "balance-copied-parser-through-cleanup"
       ]
     },
     {
@@ -1349,7 +1350,7 @@
       "declaration": "WNear.Binary.BalanceOf297AbsentCall.ParserPostBudget",
       "title": "Post-parser room and gas at the actual heap",
       "kind": "verification_contract",
-      "notes": "Open resource condition: at each actual exposed parser heap, preserve the owned parser result and establish six-growth room and a sufficient gas bound.",
+      "notes": "Open general resource condition at the actual parser heap; a concrete copied-array path now derives its own room and exact bound without assuming this condition.",
       "label": "frontier:parser-post-budget",
       "reviewed_shape_hash": 16115052327671783247,
       "planned_dependencies": [
@@ -1370,6 +1371,69 @@
       ],
       "required_proof_dependencies": [
         "parser-expose-heap",
+        "parser-fixed-through-cleanup"
+      ]
+    },
+    {
+      "id": "array-parser-copied-core",
+      "declaration": "WNear.Binary.FromSliceEsc.f65_arr_copied",
+      "title": "Function 65: copied-array parser with allocator bounds",
+      "kind": "theorem",
+      "environment": "Concrete escaped copied-array path, explicit parser growth, valid account, reader, heap and room premises.",
+      "label": "frontier:array-parser-copied-core",
+      "reviewed_shape_hash": 4254361796,
+      "required_type_dependencies": [
+        "string-room",
+        "owned-room"
+      ]
+    },
+    {
+      "id": "copied-parser-room",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.copied_result_room",
+      "title": "Derive balance room from copied parser growth",
+      "kind": "theorem",
+      "environment": "Copied parser cleanup resources and an initial parser-growth-plus-six room allowance; returns the actual heap witnesses and six-growth room.",
+      "label": "frontier:copied-parser-room",
+      "reviewed_shape_hash": 1438717554,
+      "required_type_dependencies": [
+        "lookup-heap-room",
+        "parser-fixed-result"
+      ]
+    },
+    {
+      "id": "copied-parser-with-room",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.f65_arr_copied_room",
+      "title": "Function 65: copied-array parser preserving balance room",
+      "kind": "theorem",
+      "environment": "Concrete copied-array parser, parser room and allocation assumptions, and initial parser-growth-plus-six allowance.",
+      "label": "frontier:copied-parser-with-room",
+      "reviewed_shape_hash": 3564839619,
+      "required_type_dependencies": [
+        "string-room",
+        "owned-room",
+        "lookup-heap-room",
+        "parser-fixed-result"
+      ],
+      "required_proof_dependencies": [
+        "array-parser-copied-core",
+        "copied-parser-room"
+      ]
+    },
+    {
+      "id": "balance-copied-parser-through-cleanup",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.copied_parser_call_through_cleanup",
+      "title": "Function 297: copied-array parser call through absent cleanup",
+      "kind": "theorem",
+      "environment": "Specific copied/escaped array input and actual function 65 call, initial parser-growth-plus-six room, parser allocation bounds, trie, shared proof budget, host and frame resources; other input cases and full method remain open.",
+      "label": "frontier:balance-copied-parser-through-cleanup",
+      "reviewed_shape_hash": 653603051,
+      "required_type_dependencies": [
+        "string-room",
+        "owned-room",
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "copied-parser-with-room",
         "parser-fixed-through-cleanup"
       ]
     }

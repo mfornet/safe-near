@@ -34,6 +34,7 @@ import Bridge.Functions.StateReadLenF
 import Bridge.Functions.BalanceOf297RoomF
 import Bridge.Functions.BalanceOf297ParserResult
 import Bridge.Functions.BalanceOf297ParserPublicCompose
+import Bridge.Functions.BalanceOf297CopiedCall
 
 /-! The browsable proof frontier. Definitions marked Open state contracts, not proofs. -/
 
@@ -668,3 +669,27 @@ attribute [blueprint "frontier:parser-public-through-cleanup"
   (statement := /-- Public successful parser result, explicit post-parser room and gas obligation, owned input vector, trie, and frame and host premises. The full parser and accepted-call refinement remain open. -/)
   (notReady := true)]
   WNear.Binary.BalanceOf297AbsentCall.parser_result_through_cleanup
+
+attribute [blueprint "frontier:array-parser-copied-core"
+  (title := /-- Function 65: copied-array parser with allocator bounds -/)
+  (statement := /-- Concrete escaped copied-array path, explicit parser growth, valid account, reader, heap and room premises. -/)
+  (notReady := true)]
+  WNear.Binary.FromSliceEsc.f65_arr_copied
+
+attribute [blueprint "frontier:copied-parser-room"
+  (title := /-- Derive balance room from copied parser growth -/)
+  (statement := /-- Copied parser cleanup resources and an initial parser-growth-plus-six room allowance; returns the actual heap witnesses and six-growth room. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.copied_result_room
+
+attribute [blueprint "frontier:copied-parser-with-room"
+  (title := /-- Function 65: copied-array parser preserving balance room -/)
+  (statement := /-- Concrete copied-array parser, parser room and allocation assumptions, and initial parser-growth-plus-six allowance. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.f65_arr_copied_room
+
+attribute [blueprint "frontier:balance-copied-parser-through-cleanup"
+  (title := /-- Function 297: copied-array parser call through absent cleanup -/)
+  (statement := /-- Specific copied/escaped array input and actual function 65 call, initial parser-growth-plus-six room, parser allocation bounds, trie, shared proof budget, host and frame resources; other input cases and full method remain open. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.copied_parser_call_through_cleanup
