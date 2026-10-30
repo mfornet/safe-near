@@ -6,6 +6,8 @@ core axiom audits, formatter integration checks and contract builds.
 
 | Command | Purpose |
 | --- | --- |
+| `just ci-approval-check` | Verify GitHub requires workflow approval for all external contributors |
+| `just ci-approval-apply` | Apply the committed workflow approval policy through the GitHub API (repo admin) |
 | `just test-all` | Run NEAR scenarios, official Wasm tests and exact VM conformance |
 | `just chain-replay-test` | Exercise trusted JSON block replay and complete-state continuation |
 | `just audit-all` | Audit all core packages |

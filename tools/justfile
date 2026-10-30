@@ -1,3 +1,10 @@
+# Check/apply the public repository's approval gate (requires authenticated gh).
+ci-approval-check:
+    python3 tools/actions_approval.py
+
+ci-approval-apply:
+    python3 tools/actions_approval.py --apply
+
 # Check every repository-owned Lake package against the root Lean version.
 check-toolchains:
     python3 tools/check_lean_toolchains.py
