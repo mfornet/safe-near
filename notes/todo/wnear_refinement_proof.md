@@ -1380,6 +1380,24 @@ frame pushes/pops, the full model-agreeing ignored reader, uniform heap/room/gas
 bounds, object wrappers and rejection remain open. The shallow `ign1R` still
 does not globally agree with `valueSkip`; no seventh method is claimed.
 
+**First nested frame allocation and nonempty pop (2026-10-30):**
+`VecGrowZero` proves the distinct reserve chain used by 84 from capacity zero:
+713's positive byte allocation, 714's `None` current-memory case, 716's first
+`max(8,k)` capacity, then 715/712/698. The final 698 contract restores 80 bytes,
+leaves length zero and preserves earlier live allocations under a fixed
+`480*c + costA` charge and explicit allocation room. `SerdeIgnFrameStack.f84_initial`
+proves the actual first frame push from `(1,0,0)`: one allocation of capacity 8,
+one byte stored, length 1, complete stack restoration, `600*c + costA` and
+`d + 13`. Its allocator result retains the exact growth alternative and free-list
+bound `max F 1`. `f85_nonempty` pops the last byte from any represented nonempty
+scratch stack, returning `Some b` while retaining capacity and allocator state,
+in at most 50 regular operations. Lean MCP checks all eight contracts with
+standard axioms only. Next: a common `sbuf` reserve/push contract for fitting,
+first-allocation and nonempty-growing cases, followed by the full 81 machine
+invariant and quantitative growth bounds. The escaped shallow reader is still
+the only integrated ignored reader; no complete accepting contract or seventh
+method is claimed.
+
 ### M7. State and storage
 
 Borsh encoding of the state, `LookupMap` keys, near-sdk's `env` wrappers

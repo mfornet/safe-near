@@ -830,6 +830,48 @@ continuation is published to PR #40 after its validation gates pass.
   shallow decoder; it must not be treated as globally agreeing with `valueSkip`.
   This does not establish the full `AcceptContract` or a seventh method.
 
+## First nested frame allocation and nonempty pop (2026-10-30)
+
+- The frame push (84) reserves through 698/712/715/716/714/713, rather than the
+  string reader's 589/623/630/631/627/624 chain. The existing `VecGrow` proofs
+  covered nonempty buffers; `VecGrowZero` closes this chain's capacity-zero case.
+  `f713_alloc` allocates positive byte capacity, `f714_alloc` proves the
+  `None` current-memory path, and `f716_alloc` installs `growCap 0 k = max(8,k)`
+  from zero capacity and length. Their stack footprints are 16, 32 and 64 bytes.
+- `f715_alloc`, `f712_alloc` and `f698_alloc` carry that first allocation through
+  the actual reserve wrappers for a positive request. 698 restores all 80 bytes,
+  preserves the length at zero, installs the fresh pointer/capacity, and keeps
+  every earlier live block. Its fixed charge is
+  `480 * regularOpCost + SerdeString.costA cfg F (growCap 0 k)`, with `d + 12`.
+  `costA` retains the allocator walk and page fees; no charge is selected from
+  the gas ceiling. The explicit room premise is `roomFor` for the new capacity.
+- `SerdeIgnFrameStack.f84_initial` proves the actual first frame push, with the
+  flag 1 on `(ptr, cap, len) = (1,0,0)`. It allocates capacity 8, stores the frame
+  byte, sets length to 1 and restores all 80 bytes. Its two-phase loop invariant
+  proves that the byte is written once before the iterator exits. The result is
+  `sbuf ... (max F 1) p 8 [byteOf b]`, with the exact allocator memory-growth
+  alternative and all earlier live allocations retained. The charge is
+  `600 * regularOpCost + costA cfg F 8`, and the depth premise is `d + 13`.
+- `f85_nonempty` proves the actual nonempty pop: a buffer holding `bs ++ [b]`
+  returns `Some b`, updates the length to `bs.length`, and retains the same
+  capacity, memory length, free-list bound and live blocks in `sbuf ... bs`.
+  The removed byte becomes the first spare byte. The leaf needs no stack/global
+  ownership or allocation room and uses at most 50 regular operations.
+- Lean MCP verifies all eight public contracts with only the three standard
+  axioms. `just wnear-audit` passes (2811 build jobs; 477 wNEAR modules,
+  65208 declarations and 59890 theorems), with only the three existing
+  `Proofs.Refinement` dependencies on `sorryAx`. Strict NearLogic has zero
+  violations; statement pins, changed-source Lean style and whitespace checks
+  pass. Evidence: `/tmp/pr40-frame-stack-final-audit.log`,
+  `/tmp/pr40-frame-stack-style.log` and `/tmp/pr40-frame-stack-final-style.log`.
+- Next: combine fitting, capacity-zero and nonempty-growing reserves under a
+  common `sbuf` contract, prove the general frame push, then extend 81's invariant
+  to the complete `IgnoreModel.ignM` machine with a changing heap/frame stack.
+  Its existing 160-byte footprint can cover the 80-byte reserve beneath its
+  32-byte frame, as well as the larger 650 path. Bound actual frame growth/copies,
+  retaining the saved account-id String. Full ignored-reader integration,
+  uniform bounds, object wrappers, rejection and the seventh method remain open.
+
 ## Methods
 
 There are 15 exported methods; six now have complete per-call refinement proofs under their protocol premises.
@@ -915,7 +957,9 @@ The texts are proved equal to the model's `Panic.message` (`PanicText`).
       - instantiate the remaining ignored-reader state transition in that loop;
       - extend the escaped shallow 81 reader to deep frames, preserving its
         changing scratch/heap state and the complete stack footprint.
-   3. Ignored values nested deeper: 84 grows the scratch from capacity 0, and `Hyp81` must allow changes to the heap and the scratch.
+   3. Ignored values nested deeper: combine the proved first allocation and nonempty
+      pop with fitting/reallocating pushes, then track the full scratch frame stack
+      in 81. `Hyp81` must allow the resulting heap and scratch changes.
 2. **`ft_balance_of`, method level.** Take the parser's contracts as parameters until they are proved. The argument layer is in `EnvInput` and `ArgsLeaves`, the balance read in `LookupMapGet`/`StorageReadWrapF`.
 3. **The remaining methods**, in M8's order:
    - `storage_balance_of` (its parser is the same code as `ft_balance_of`'s);
