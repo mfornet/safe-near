@@ -640,7 +640,8 @@
         "runtime-boundary",
         "ft-balance-model",
         "balance-export-state-six-grows",
-        "balance-state-six-grows-free-bound"
+        "balance-state-six-grows-free-bound",
+        "balance-parser-through-cleanup"
       ]
     },
     {
@@ -1240,6 +1241,58 @@
       "required_proof_dependencies": [
         "balance-state-exact-gas-free-bound",
         "balance-room-after-state"
+      ]
+    },
+    {
+      "id": "parser-owned-result",
+      "declaration": "WNear.Binary.FromSliceSpec.okAt",
+      "title": "Successful parser owned result",
+      "kind": "verification_contract",
+      "notes": "Owned decoded account and allocator state; obtaining this result for all accepted inputs remains conditional on the parser obligations.",
+      "label": "frontier:parser-owned-result",
+      "reviewed_shape_hash": 5900190859266988676,
+      "planned_dependencies": [
+        "accept-parser"
+      ]
+    },
+    {
+      "id": "parser-owned-resources",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.parser_result_resources",
+      "title": "Extract balance resources from parser result",
+      "kind": "theorem",
+      "environment": "Successful parser result and owned input allocation; proves account bounds, capacity and live-list order, but does not establish heap room or gas.",
+      "label": "frontier:parser-owned-resources",
+      "reviewed_shape_hash": 4252910098,
+      "required_type_dependencies": [
+        "parser-owned-result"
+      ]
+    },
+    {
+      "id": "balance-parser-handoff",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.parser_handoff",
+      "title": "Function 297: success branch and input-vector drop",
+      "kind": "theorem",
+      "environment": "Decoded success tag and descriptors, owned input buffer, heap invariant and explicit Wasm execution resources.",
+      "label": "frontier:balance-parser-handoff",
+      "reviewed_shape_hash": 3265421669
+    },
+    {
+      "id": "balance-parser-through-cleanup",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.parser_through_cleanup",
+      "title": "Function 297: parser success through absent balance cleanup",
+      "kind": "theorem",
+      "environment": "Decoded successful parser descriptor and input vector, owned account, six-growth room, canonical trie, shared proof budget, exact lookup gas and execution resources; deriving all entry resources and gas from the parser remains open.",
+      "label": "frontier:balance-parser-through-cleanup",
+      "reviewed_shape_hash": 547737154,
+      "required_type_dependencies": [
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "balance-parser-handoff",
+        "balance-state-six-grows-free-bound"
+      ],
+      "planned_dependencies": [
+        "parser-owned-resources"
       ]
     }
   ],

@@ -32,6 +32,7 @@ import Bridge.Functions.BalanceOf297Room
 import Bridge.Functions.BorshContractF
 import Bridge.Functions.StateReadLenF
 import Bridge.Functions.BalanceOf297RoomF
+import Bridge.Functions.BalanceOf297ParserResult
 
 /-! The browsable proof frontier. Definitions marked Open state contracts, not proofs. -/
 
@@ -607,3 +608,26 @@ attribute [blueprint "frontier:balance-state-six-grows-free-bound"
   (statement := /-- Function 297: general-bound state path with six-growth room. The parser handoff and full accepted-call refinement remain open. -/)
   (notReady := true)]
   WNear.Binary.BalanceOf297AbsentCall.state_through_cleanup_six_growsF
+
+attribute [blueprint "frontier:parser-owned-result"
+  (title := /-- Successful parser owned result -/)
+  (statement := /-- Owned decoded account and allocator state; obtaining this result for all accepted inputs remains conditional on the parser obligations. -/)
+  (notReady := true)]
+  WNear.Binary.FromSliceSpec.okAt
+
+attribute [blueprint "frontier:parser-owned-resources"
+  (title := /-- Extract balance resources from parser result -/)
+  (statement := /-- Successful parser result and owned input allocation; proves account bounds, capacity and live-list order, but does not establish heap room or gas. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.parser_result_resources
+
+attribute [blueprint "frontier:balance-parser-handoff"
+  (title := /-- Function 297: success branch and input-vector drop -/)
+  (statement := /-- Decoded success tag and descriptors, owned input buffer, heap invariant and explicit Wasm execution resources. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.parser_handoff
+
+attribute [blueprint "frontier:balance-parser-through-cleanup"
+  (title := /-- Function 297: parser success through absent balance cleanup -/)
+  (statement := /-- Decoded successful parser descriptor and input vector, owned account, six-growth room, canonical trie, shared proof budget, exact lookup gas and execution resources; deriving all entry resources and gas from the parser remains open. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.parser_through_cleanup

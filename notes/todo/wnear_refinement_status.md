@@ -25,6 +25,10 @@ frontier manifest track the exact admitted leaves and protect statement shapes.
 
 The decoded Borsh chain for functions 374, 316, 315, 425, 162 and 161 now has checked variants that preserve an arbitrary supported free-list bound and charge the corresponding allocator cost. These are conditional on allocation room and the stated execution resources. The decoded state reader and its model-state specialization now also accept an arbitrary supported bound F, returning F + 1 after releasing the temporary state buffer. The general-bound state reader is now composed with the actual 82-instruction absent-account path through return and cleanup, with a shared two-read proof budget, exact post-read lookup gas, and a single six-growth room condition. The final heap bound tracks the incoming F. Deriving the entry resources and supported bound from the parser, and integrating this path into the full accepted-call refinement, remain open.
 
+## Parser success handoff to balance cleanup
+
+The actual function 297 success branch, descriptor copies and input-vector drop are checked and composed with the generalized state-read-through-cleanup path: the resulting 114-instruction slice uses a supported arbitrary heap bound after the drop. Separately, the public `okAt` parser result implies the owned account bytes, capacity bounds, address bounds and live-list order needed for that handoff. This does not yet compose the parser result with the 114-instruction theorem: post-parser heap room, gas credits, the input-vector ownership, frame resources and the full accepted-call refinement remain open.
+
 ## Continuation on 2026-10-29: integration with main
 
 Work continues on `codex/wnear-proof-continuation`, starting from PR head `1ea4077` and merging

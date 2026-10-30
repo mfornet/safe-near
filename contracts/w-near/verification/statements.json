@@ -103,6 +103,10 @@
     "WNear.Binary.BalanceOf297AbsentCall.state_through_cleanup_of_budgetF",
     "WNear.Binary.BalanceOf297AbsentCall.balanceReadGasAfterState_exactF",
     "WNear.Binary.BalanceOf297AbsentCall.state_through_cleanup_exact_gasF",
-    "WNear.Binary.BalanceOf297AbsentCall.state_through_cleanup_six_growsF"
+    "WNear.Binary.BalanceOf297AbsentCall.state_through_cleanup_six_growsF",
+    "WNear.Binary.FromSliceSpec.okAt",
+    "WNear.Binary.BalanceOf297AbsentCall.parser_result_resources",
+    "WNear.Binary.BalanceOf297AbsentCall.parser_handoff",
+    "WNear.Binary.BalanceOf297AbsentCall.parser_through_cleanup"
   ]
 }
