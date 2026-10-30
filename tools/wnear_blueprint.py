@@ -2,7 +2,6 @@
 """Build, verify and continuously publish the existing LeanArchitect/leanblueprint frontier."""
 import argparse
 from datetime import datetime, timezone
-import fcntl
 import hashlib
 import html
 import json
@@ -18,6 +17,7 @@ import time
 import urllib.request
 
 from proof_sources import source_digest
+from wnear_pipeline import pipeline_lock, record_phase
 
 ROOT = Path(__file__).resolve().parents[1]
 PROJECT = ROOT / 'contracts/w-near/verification'
@@ -42,8 +42,10 @@ def atomic_json(path, data):
 
 def run(args, cwd=PROJECT):
     print(f'{utc()}  {" ".join(map(str, args))}', flush=True)
+    start = time.monotonic()
     with (WORK / 'build.log').open('a') as log:
         result = subprocess.run(list(map(str, args)), cwd=cwd, stdout=log, stderr=subprocess.STDOUT)
+    record_phase('blueprint-command', time.monotonic() - start, command=list(map(str, args)), exit_code=result.returncode)
     if result.returncode:
         tail = '\n'.join((WORK / 'build.log').read_text(errors='replace').splitlines()[-20:])
         raise RuntimeError(f'Command failed ({result.returncode}): {args}\n{tail}')
@@ -62,7 +64,35 @@ def snapshot():
     return {'revision': revision, 'dirty': dirty, 'proof_source_digest': digest, 'content_digest': content.hexdigest()}
 
 
-def export_lean(manifest):
+def artifact_fingerprint(proof_digest):
+    """Conservative fingerprint for compiled imports and the active toolchain.
+
+    Any artifact inode, size, mtime or ctime change invalidates the local cache.
+    Strict checkpoint checks always rerun the exporter regardless of this key.
+    """
+    start = time.monotonic()
+    lean_path = subprocess.check_output(['lake', 'env', 'printenv', 'LEAN_PATH'], cwd=PROJECT, text=True).strip()
+    lean = Path(subprocess.check_output(['lake', 'env', 'which', 'lean'], cwd=PROJECT, text=True).strip()).resolve()
+    h = hashlib.sha256(proof_digest.encode())
+    for root in [lean, *(Path(p) for p in lean_path.split(os.pathsep) if p)]:
+        if not root.exists():
+            raise FileNotFoundError(f'Missing Lean import path: {root}')
+        paths = [root] if root.is_file() else sorted(root.rglob('*.olean'))
+        h.update(str(root).encode() + b'\0')
+        for path in paths:
+            st = path.stat()
+            h.update(f'{path}\0{st.st_dev}:{st.st_ino}:{st.st_size}:{st.st_mtime_ns}:{st.st_ctime_ns}\0'.encode())
+    record_phase('frontier-cache-fingerprint', time.monotonic() - start)
+    return h.hexdigest()
+
+
+def export_lean(manifest, cache_key=None, reuse=False):
+    cache = WORK / 'frontier-export-cache.json'
+    if reuse and cache_key and cache.exists():
+        cached = json.loads(cache.read_text())
+        if cached.get('key') == cache_key:
+            print('Reusing frontier export for identical sources and compiled imports', flush=True)
+            return cached['rows']
     names = ', '.join(json.dumps(n['declaration']) for n in manifest['nodes'])
     output = WORK / 'frontier-lean.json'
     source = '''import Blueprint
@@ -71,6 +101,7 @@ import Lean.Elab.Command
 open Lean Elab Command Meta
 set_option maxHeartbeats 0 in
 run_cmd do
+  let start ← liftIO IO.monoNanosNow
   let env ← getEnv
   let names : Array String := #[NAMES]
   let mut rows : Array Json := #[]
@@ -108,7 +139,8 @@ run_cmd do
       ("proof_dependencies", toJson (proofUsed.toArray.map Name.toString)),
       ("statement", toJson statement), ("type_hash", toJson info.type.hash.toNat),
       ("shape_hash", toJson shapeHash.toNat)]
-  let report := Json.mkObj [("nodes", Json.arr rows), ("exported_methods", toJson WNear.exportedMethods)]
+  let finish ← liftIO IO.monoNanosNow
+  let report := Json.mkObj [("traversal_ns", toJson (finish - start)), ("nodes", Json.arr rows), ("exported_methods", toJson WNear.exportedMethods)]
   liftIO <| IO.FS.writeFile OUTPUT report.pretty
 #eval do
   let wasm ← IO.FS.readBinFile "../contract.wasm"
@@ -120,12 +152,19 @@ run_cmd do
 '''.replace('NAMES', names).replace('OUTPUT', json.dumps(str(output)))
     source_path = WORK / 'FrontierExport.lean'
     source_path.write_text(source)
+    started = time.monotonic()
     run(['lake', 'env', 'lean', source_path])
+    elapsed = time.monotonic() - started
     payload = json.loads(output.read_text())
+    traversal = payload['traversal_ns'] / 1e9
+    record_phase('frontier-traversal', traversal)
+    record_phase('frontier-import-and-startup-estimate', max(0, elapsed - traversal))
     actual = payload['exported_methods']
     declared = [n['method'] for n in manifest['nodes'] if 'method' in n]
     if len(actual) != len(set(actual)) or len(declared) != len(set(declared)) or set(actual) != set(declared):
         raise ValueError('Frontier methods do not exactly match the binary model exports')
+    if cache_key:
+        atomic_json(cache, {'key': cache_key, 'rows': payload['nodes']})
     return payload['nodes']
 
 
@@ -197,7 +236,7 @@ def classify(manifest, rows, audit=None):
     return result
 
 
-def render_frontier(data):
+def render_frontier(data, graph=True):
     colors = {'Proven': '#047857', 'Conditional': '#a16207', 'Open': '#be123c'}
     q = json.dumps
     dot = ['digraph frontier { graph [rankdir=LR,bgcolor="transparent"]; node [shape=box,style="rounded,filled",fontname="Helvetica",fontcolor=white];']
@@ -209,7 +248,8 @@ def render_frontier(data):
             dot.append(f'{q(dep)} -> {q(n["id"])} [style=dashed,color="#94a3b8",label="planned"];')
     dot.append('}')
     (WORK / 'frontier.dot').write_text('\n'.join(dot))
-    run(['dot', '-Tsvg', WORK / 'frontier.dot', '-o', WEB / 'frontier.svg'])
+    if graph:
+        run(['dot', '-Tsvg', WORK / 'frontier.dot', '-o', WEB / 'frontier.svg'])
     cards = []
     for n in data['nodes']:
         callers = ', '.join(f'<a href="#{html.escape(c["id"])}">{html.escape(c["id"])} ({c["status"]})</a>' for c in n['integrated_into']) or 'No tracked caller composition yet'
@@ -244,6 +284,7 @@ async function health(){try{const r=await fetch('../w-near-status.json',{cache:'
     banner = f'<aside style="padding:18px;background:#fff7ed;border:2px solid #a16207"><b>Global refinement: {html.escape(global_node["status"])}.</b> <a href="frontier.html">Browse all methods, unresolved obligations and checked dependencies</a>. {freshness}</aside>'
     index = WEB / 'index.html'
     body = index.read_text()
+    body = re.sub(r'<aside style="padding:18px;background:#fff7ed;border:2px solid #a16207">.*?</aside>', '', body, count=1, flags=re.DOTALL)
     body, count = re.subn(r'(<body[^>]*>)', lambda m:m[1]+banner, body, count=1)
     if count != 1:
         raise ValueError('Rendered leanblueprint has no index body')
@@ -297,8 +338,7 @@ def publish(data, destination, url):
 
 def build(args):
     WORK.mkdir(parents=True, exist_ok=True)
-    with (WORK / 'pipeline.lock').open('w') as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
+    with pipeline_lock():
         before = snapshot()
         evidence_path = WORK / 'audit-evidence.json'
         evidence = json.loads(evidence_path.read_text()) if evidence_path.exists() else {}
@@ -306,7 +346,17 @@ def build(args):
         cached = WORK / 'last-success.json'
         if args.reuse and not args.audit_report and cached.exists() and (WEB / 'frontier.json').exists():
             data = json.loads(cached.read_text())
-            if all(data.get(k) == v for k, v in before.items()) and data.get('audit_status') == audit_status:
+            if (data.get('content_digest') == before['content_digest'] and
+                    data.get('proof_source_digest') == before['proof_source_digest']):
+                if any(data.get(k) != v for k, v in before.items()) or data.get('audit_status') != audit_status:
+                    data.update(before)
+                    data['audit_status'] = audit_status
+                    render_frontier(data, graph=False)
+                    if snapshot() != before:
+                        raise RuntimeError('Sources changed while refreshing blueprint metadata')
+                    atomic_json(cached, data)
+                if snapshot() != before:
+                    raise RuntimeError('Sources changed before reusing blueprint')
                 if args.publish:
                     publish(data, args.destination, args.url)
                 print(json.dumps({'reused': True, 'built_at': data['built_at'], 'revision': data['revision'], 'url': args.url}), flush=True)
@@ -314,7 +364,10 @@ def build(args):
         (WORK / 'build.log').write_text('')
         manifest = json.loads(MANIFEST.read_text())
         run(['lake', 'build', 'Blueprint'])
-        rows = export_lean(manifest)
+        cache_key = artifact_fingerprint(before['proof_source_digest'])
+        rows = export_lean(manifest, cache_key=cache_key, reuse=not args.check)
+        if artifact_fingerprint(before['proof_source_digest']) != cache_key:
+            raise RuntimeError('Compiled imports changed during frontier export')
         audit = json.loads(args.audit_report.read_text()) if args.audit_report else None
         nodes = classify(manifest, rows, audit)
         if audit and audit.get('source_digest') != before['proof_source_digest']:
@@ -401,6 +454,11 @@ def main():
         evidence = WORK / 'audit-evidence.json'
         marker = (current, evidence.stat().st_mtime_ns if evidence.exists() else 0)
         if marker != previous and (marker != failed_marker or time.monotonic() >= retry_at):
+            if args.watch:
+                time.sleep(3)
+                settled = snapshot()
+                if settled != current:
+                    continue
             try:
                 build(args)
                 previous = marker

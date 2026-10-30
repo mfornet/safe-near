@@ -4,6 +4,40 @@ Campaign status on 2026-10-30; local continuation is active. Details are in `wne
 
 The exported refinement is now a checked dispatch over six completed method clauses and eight open full-method obligations and a checked `ft_balance_of` assembly over three named open clauses, with five separately named protocol-instantiation obligations. The global refinement and its withdrawal corollary remain conditional on those leaves. Completed results use only `propext`, `Classical.choice` and `Quot.sound`; never use `bv_decide` or `native_decide`.
 
+## Continuation checkpoint
+
+- Latest validated proof commit before the workflow update: `8412a11`; the
+  live frontier states the current revision and whether its exact source digest
+  has a full audit. The current integration owner is this worktree; no proof
+  agents are assigned.
+- Checked end-to-end *decoded body* path: `ft_balance_of`, copied-string array,
+  absent account, zero return. It is paired with the model zero-balance result
+  in `copied_array_absent_body_model_agreement`. This is not yet an external
+  method refinement. It requires the specific JSON shape, `roomRun` parser room,
+  initial combined heap budget, well-formed represented state and no storage
+  deficit, canonical trie and shared read-proof budget, host and frame ownership,
+  and sufficient gas.
+- Next blocking obligation: derive parser `roomRun` and connect the resulting
+  resources and return bytes to the accepted-call method contract. Extend to
+  other inputs and failure outcomes; preserve the named open contracts.
+- Development: use the warm Lean LSP and targeted checks. At integration, run
+  `just wnear-audit` for the full strict audit; it coordinates with the watcher.
+  Build and audit evidence applies only to its exact source digest. The watcher
+  coalesces edits, reuses matching frontier exports and refreshes Git metadata
+  without rebuilding the book. Timing records are in ignored build output at
+  `.lake/build/blueprint/timings.jsonl`; strict audits never use an audit cache.
+- First measured workflow run on 2026-10-30: wNEAR audit 335 s; strict
+  frontier export 74 s (68 s traversal, 6 s estimated startup/import); import
+  artifact fingerprint about 5–6 s. Split audit groups each spent roughly
+  22–25 s rendering pinned statements. These timings motivate investigating
+  group-aware pin rendering and dependency-aware caches, but checkpoint and CI
+  audits must remain full and strict. No audit results are cached today. Any
+  future audit cache must bind exact imported artifacts, toolchain and audit
+  configuration, preserve complete coverage and invalidate on changes.
+- Before delegation agree on theorem interfaces, ownership, allocator/growth,
+  framing, gas and output guarantees. Use separate worktrees/build artifacts;
+  hand off commit, declarations, checks and limitations to one integration owner.
+
 ## Checked composition and live frontier
 
 `WNear.Binary.Exported.all_methods` composes all 15 exported method clauses. Six

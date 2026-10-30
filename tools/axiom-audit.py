@@ -42,9 +42,11 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from proof_sources import source_digest
+from wnear_pipeline import record_phase
 
 STANDARD_AXIOMS = ("propext", "Classical.choice", "Quot.sound")
 MANIFESTS = ("lakefile.toml", "lakefile.lean")
@@ -130,6 +132,7 @@ def isStated (env : Environment) (name : Name) (info : ConstantInfo) : Bool :=
     | _ => false
 set_option maxHeartbeats 0 in
 run_cmd do
+  let start ← liftIO IO.monoNanosNow
   let env ← getEnv
   let audited : Array String := #[{names}]
   for module in audited do
@@ -150,6 +153,7 @@ run_cmd do
       violations := violations.push <| Json.mkObj [
         ("module", toJson module), ("declaration", toJson name.toString),
         ("axioms", toJson (offending.map Name.toString))]
+  let afterAxioms ← liftIO IO.monoNanosNow
   let pinExact : Array String := #[{exact}]
   let pinPrefixes : Array String := #[{prefixes}]
   let pinNames : Array String := #[{lean_strings(pins.get("declarations", []))}]
@@ -163,7 +167,9 @@ run_cmd do
     statements := statements.push <| Json.mkObj [
       ("module", toJson module), ("name", toJson name.toString), ("text", toJson text),
       ("hash", toJson hash.toNat)]
+  let afterStatements ← liftIO IO.monoNanosNow
   let report := Json.mkObj [
+    ("axiom_ns", toJson (afterAxioms - start)), ("statement_ns", toJson (afterStatements - afterAxioms)),
     ("modules", toJson audited), ("declarations", toJson rows),
     ("violations", toJson violations), ("statements", toJson statements)]
   liftIO <| IO.FS.writeFile {json.dumps(str(report))} report.pretty
@@ -187,10 +193,18 @@ def audit_groups(package: Path, modules: list[str], pins: dict | None = None) ->
         env = subprocess.run(["lake", "env", "printenv", "LEAN_PATH"], cwd=package,
                              text=True, capture_output=True, check=True)
         lean_path = str(artifacts) + os.pathsep + env.stdout.strip()
+        started = time.monotonic()
         run = subprocess.run(["lake", "env", "env", f"LEAN_PATH={lean_path}", "lean", str(script)],
                              cwd=package, text=True, capture_output=True)
+        elapsed = time.monotonic() - started
         if run.returncode == 0:
-            return [json.loads(report.read_text())]
+            result = json.loads(report.read_text())
+            axiom_seconds = result['axiom_ns'] / 1e9
+            statement_seconds = result['statement_ns'] / 1e9
+            record_phase('audit-import-and-startup-estimate', max(0, elapsed - axiom_seconds - statement_seconds), package=str(package))
+            record_phase('audit-axiom-traversal', axiom_seconds, package=str(package))
+            record_phase('audit-statement-rendering', statement_seconds, package=str(package))
+            return [result]
         if "environment already contains" in run.stdout and len(modules) > 1:
             half = len(modules) // 2
             return (audit_groups(package, modules[:half], pins)
