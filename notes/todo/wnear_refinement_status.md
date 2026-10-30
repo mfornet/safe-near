@@ -1144,6 +1144,55 @@ continuation is published to PR #40 after its validation gates pass.
   not establish the complete deep reader. Reachable allocation room, uniform
   parser bounds, outer wrappers, rejection, the seventh method and M9 remain open.
 
+## Complete-machine scalar dispatch and block exits (2026-10-30)
+
+- `SerdeIgnScalar` pins the actual scalar dispatch, value-presence guard,
+  complete dispatch body and enclosing block to decoded 81 by four
+  kernel-checked equalities. The concrete error and container branches remain
+  in that code; successful scalar premises select the proved paths.
+- `scalar` proves every successful non-container value: both numeric paths,
+  all three literals, and the full ignored-string reader with arbitrary escapes
+  and syntactically valid invalid raw UTF-8. It preserves the reader input,
+  literal/escape/hex tables, stack global, all 128 borrowed stack bytes and an
+  arbitrary caller resource frame. It returns at the exact model cursor with
+  local 6 zero and local 7 the initial value byte. Its charge is
+  `(470*consumedBytes - 81)*regularOpCost`.
+- `scalar_step` and `scalar_indices` extract that scalar endpoint and the
+  complete pending-frame continuation from the full traced machine, with
+  strict cursor progress and a monotone final endpoint. `scalar_traced`
+  preserves that continuation and the unchanged physical frame-growth credits,
+  reserving 470 operations per remaining byte. These use the complete machine,
+  not the shallow decoder's restricted correspondence.
+- `present` proves the real seven-operation presence guard without consuming
+  the byte. `pending` and `top` compose the dispatch with the actual scalar
+  completion tail at `(470*consumedBytes - 74)` and
+  `(470*consumedBytes - 31)` regular operations, respectively.
+- `pending_block` and `top_block` include the actual enclosing block and
+  translate its control labels. Pending completion becomes normal container-phase
+  entry at `(470*consumedBytes - 72)` operations; top-level completion takes
+  relative success exit 2 at `(470*consumedBytes - 30)` operations. The pending
+  path pays the additional operation for branching to the block's own label.
+- `pending_cost` and `top_cost` prove these charges, the existing whitespace
+  peek, presence guard and top-level success epilogue fit the existing value
+  allowances: `60 + 470*consumedBytes` inside a container and
+  `109 + 470*consumedBytes` at top level, including leading whitespace.
+  This closes the scalar arithmetic; it does not establish full-loop execution
+  or the aggregate container-phase bound.
+- Validation: all declarations pass Lean MCP diagnostics; `scalar` passes the
+  MCP axiom/source check, and compiled axiom checks for the scalar, trace,
+  completion, block and cost contracts use only standard axioms. The targeted
+  module build passes (1374 jobs). `just wnear-audit` passes (2822 build jobs;
+  488 wNEAR modules, 66514 declarations and 61017 theorems), with only the
+  three existing open-refinement dependencies. Strict NearLogic has zero
+  violations and pinned statements match. PR-wide changed-source Lean style
+  and whitespace checks pass. Evidence: `/tmp/pr40-ignore-scalar-final-audit.log`,
+  `/tmp/pr40-ignore-scalar-final-style.log` and `/tmp/pr40-ignore-scalar-axioms.log`.
+- Next: connect container-opening dispatch to the existing traced open segment,
+  then assemble the complete loop invariant, including its changed heap and
+  saved-String ownership. Aggregate nested-container instruction accounting,
+  reachable allocation room, uniform parser bounds, outer wrappers, rejection,
+  the seventh method and M9 remain open. No additional `sorry` is introduced.
+
 ## Methods
 
 There are 15 exported methods; six now have complete per-call refinement proofs under their protocol premises.

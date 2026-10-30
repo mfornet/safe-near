@@ -1498,6 +1498,26 @@ heap ownership and a saved String. Scalar-reader dispatch, structural label
 unwinding and full-loop composition remain open, as does aggregate per-byte
 instruction accounting. This adds no method refinement or parser-wide result.
 
+`SerdeIgnScalar` now proves the actual complete scalar dispatch, retaining
+its unselected container and error branches. Numbers, all literals and full
+escaped ignored strings reach the exact model endpoint with a charge of
+`(470*consumedBytes - 81)*regularOpCost`, preserving the 128-byte borrowed
+frame, all tables and arbitrary caller resources. `scalar_indices` derives
+its cursor and complete pending-frame continuation from the full traced
+machine; `scalar_traced` retains unchanged growth credits and the remaining
+per-byte reserve. `present` checks the actual seven-operation presence guard.
+`pending` and `top` compose the dispatch with scalar completion. Their enclosing
+block contracts, `pending_block` and `top_block`, translate branch zero to
+normal container-phase entry and branch three to outer success exit two.
+The charges are respectively `470*consumedBytes - 72` and
+`470*consumedBytes - 30` operations, including the pending path's extra block
+exit operation. `pending_cost` and `top_cost` absorb these, the existing
+whitespace peek/guard and success epilogue into the unchanged 60/109 value
+allowances and 470 per consumed byte. Container-opening dispatch, complete-loop
+composition, changed heap/saved-String ownership and aggregate container-phase
+accounting remain open. These scalar bounds do not prove the full deep reader
+or an additional method refinement.
+
 ### M7. State and storage
 
 Borsh encoding of the state, `LookupMap` keys, near-sdk's `env` wrappers
