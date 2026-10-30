@@ -50,7 +50,7 @@ unchanged and remains conditional on these leaves. `PinnedProtocolAvailable` is
 a separate open contract: deployment still needs a witness that the pinned JSON
 actually parses. The embedded binary size is kernel-checked.
 
-The [live proof frontier](https://obiteum-mac-studio.tail9c65ff.ts.net:8444/w-near/)
+The live proof frontier (endpoint configured locally)
 shows the source revision, build time, actual checked dependencies and audit
 freshness. `IgnoreHyp`, `KeyConditions`, `ValueConditions` and the named heap-room
 contracts remain unresolved; the recent parser loop and scalar results prove

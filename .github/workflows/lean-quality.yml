@@ -4,7 +4,7 @@ name: Lean quality
 # near-lean workflow builds the Lean packages on changes to them; tests, audits
 # and native suites run in the periodic check.
 #
-# fv01 keeps each runner's workspace between jobs (notes/design/CI_RUNNER.md):
+# The runner keeps each runner's workspace between jobs (notes/design/CI_RUNNER.md):
 # checkout leaves ignored files (.lake builds and packages, the formatter
 # build) in place, so the Lean jobs start warm.
 on:
@@ -23,7 +23,7 @@ concurrency:
 jobs:
   repository:
     name: Repository checks (no Lean or native builds)
-    runs-on: [self-hosted, fv01]
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v5
@@ -49,7 +49,7 @@ jobs:
   # Mathlib it runs changed. Everything on main and on a manual run.
   style:
     timeout-minutes: 15
-    runs-on: [self-hosted, fv01]
+    runs-on: [self-hosted, Linux, X64]
     steps:
       - uses: actions/checkout@v5
         with:
@@ -100,7 +100,7 @@ jobs:
   # pinned formatter itself, when it or its configuration changes.
   formatter:
     timeout-minutes: 30
-    runs-on: [self-hosted, fv01]
+    runs-on: [self-hosted, Linux, X64]
     steps:
       - uses: actions/checkout@v5
         with:

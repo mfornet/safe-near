@@ -39,7 +39,7 @@ concurrency:
 jobs:
   audit:
     name: Axioms and pinned statements of the wNEAR proofs
-    runs-on: [self-hosted, fv01]
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v5

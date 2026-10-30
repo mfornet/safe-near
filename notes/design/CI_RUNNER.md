@@ -1,79 +1,26 @@
 # CI runner
 
-The GitHub Actions workflows in `.github/workflows` run on our own server,
-`fv01` (Hetzner, Ubuntu 24.04, 16 cores, 64 GB), registered as self-hosted
-runners of `mfornet/safe-near`. Every job uses `runs-on: [self-hosted, fv01]`;
-no job runs on GitHub-hosted machines.
+Workflows use self-hosted Linux x64 runners. Host-specific administration
+instructions belong in private operator configuration. All external contributors
+require approval in the repository's GitHub Actions settings before fork PR
+workflows can run. Review code, dependencies and workflow changes before
+approval: approved code can access persistent runner files and caches.
 
-## Layout
+## Workspace and tool requirements
 
-- Three runners, `fv01-1`, `fv01-2`, `fv01-3`, so the workflows a pull request
-  triggers run at the same time.
-- Each runner has its own unprivileged user (`gha1`, `gha2`, `gha3`, no sudo)
-  with the runner in `~/runner`. Separate homes matter: `lean-action`
-  reinstalls elan into `$HOME` on every job, and runners sharing a home would
-  race on it. Each user keeps its own elan toolchains, Mathlib cache, cargo
-  registry and job workspaces (`~/runner/_work`) between jobs.
-- Each runner is a systemd service,
-  `actions.runner.mfornet-safe-near.fv01-<i>.service`.
-- Jobs write scratch files to `$RUNNER_TEMP`, not fixed `/tmp` paths: the
-  runner users cannot overwrite each other's files.
+Runner workspaces retain ignored build outputs between jobs. Checkouts use
+`clean: false`, followed by `git clean -ffd` to remove untracked sources and
+`git clean -ffdX -- audit/` to discard evidence from earlier runs. Lake and
+Cargo caches remain available for subsequent builds.
 
-## System packages
+This persistence is part of the trust boundary: approved code can affect files
+that a later job reuses. Use disposable isolated runners for untrusted code.
+A build must refresh the outputs an audit reads; never audit stale artifacts.
 
-Jobs cannot `sudo`, so what they need from apt is installed on the host:
+The workflows expect native build dependencies, Python, Rust and Lean tooling.
+Install required system packages through private runner administration. Each
+runner needs its own toolchain and workspace directories to avoid concurrent
+jobs modifying the same files. Scratch files belong in `$RUNNER_TEMP`.
 
-```bash
-sudo apt-get install -y build-essential clang libclang-dev cmake protobuf-compiler \
-  libssl-dev pkg-config libzstd-dev zstd python3 python3-venv curl git jq unzip libicu74
-```
-
-A workflow that needs another system package needs it installed here first.
-
-## Adding or replacing a runner
-
-As an admin of the repository, with `gh` logged in, for runner `<i>`:
-
-```bash
-TOKEN=$(gh api -X POST repos/mfornet/safe-near/actions/runners/registration-token --jq .token)
-```
-
-then on `fv01`, with the runner tarball from
-<https://github.com/actions/runner/releases> unpacked into `/home/gha<i>/runner`:
-
-```bash
-sudo useradd -m -s /bin/bash gha<i>
-sudo -u gha<i> bash -c 'cd ~/runner && ./config.sh --unattended --replace \
-  --url https://github.com/mfornet/safe-near --token <TOKEN> --name fv01-<i> --labels fv01 --work _work'
-sudo bash -c 'cd /home/gha<i>/runner && ./svc.sh install gha<i> && ./svc.sh start'
-```
-
-The runner updates itself when GitHub releases a new version.
-
-## Caching: the workspace is the cache
-
-Every job checks out with `clean: false` and then runs `git clean -ffd`: files
-a previous job left untracked are removed, but ignored ones stay. Jobs also
-run `git clean -ffdX -- audit/` to discard previous evidence: even when a build
-fails before producing a report, artifact uploads must not reuse an old report.
-The retained caches are the Lake builds and packages (`.lake/`, Mathlib and
-iris included), the formatter build (`near-lean/.lake/lean-fmt`), Rust `target/` directories and the pinned
-nearcore checkouts. All workflows of the repository share one workspace per
-runner, so whichever job built something last leaves it warm for the next.
-
-Nothing goes through GitHub's cache service (`actions/cache`, lean-action's
-`use-github-cache`): it holds at most 10 GB per repository, evicted older
-entries before they were reused, did not share pull request caches with
-`main`, and moved gigabytes per job that were already on this disk. Do not add
-it back.
-
-Since a module's build output can outlive the commit that built it, the axiom
-audits build what they read (no `--no-build`): with a warm workspace that costs
-seconds, and a stale `.olean` is never audited.
-
-## Disk
-
-Workspaces and caches persist, so disk use grows. If it fills, stop the
-services and delete `/home/gha*/runner/_work`, `/home/gha*/.cache` and
-Lake's artifact cache `/home/gha*/.elan/toolchains/*/lake/cache`; the next
-jobs start cold.
+GitHub's cache service is not used; the retained workspace is the build cache.
+Cache cleanup and runner registration are private operational procedures.

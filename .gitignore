@@ -18,3 +18,11 @@ audit/
 
 # The pinned nearcore checkout of runtime-reference.yml, kept between CI jobs.
 /reference-nearcore/
+
+# Local machine configuration and non-redistributed artifacts.
+/.local/
+/tools/verification-buildtime/baseline.json
+.env
+.env.*
+!.env.example
+/contracts/linkdrop/contract.wasm
