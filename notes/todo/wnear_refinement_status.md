@@ -2,7 +2,24 @@
 
 Campaign status on 2026-10-30; local continuation is active. Details are in `wnear_refinement_proof.md`: M3 for the first method, M6 for JSON arguments (the parser map is `wnear_m6_parser_map.md`), and M8 for the other methods.
 
-`refines_wnear_exported` (`Proofs/Refinement.lean`) is still the only `sorry`. Every result below is proved with no `sorry`. Each depends only on `propext`, `Classical.choice` and `Quot.sound`: never use `bv_decide` or `native_decide`.
+The exported refinement is now a checked dispatch over six completed method clauses and nine named open method obligations, with five separately named protocol-instantiation obligations. The global refinement and its withdrawal corollary remain conditional on those leaves. Completed results use only `propext`, `Classical.choice` and `Quot.sound`; never use `bv_decide` or `native_decide`.
+
+## Checked composition and live frontier
+
+`WNear.Binary.Exported.all_methods` composes all 15 exported method clauses. Six
+method proofs are complete under the named reviewed environment and size premises;
+the other nine full method clauses remain separate admissions. The exported
+refinement also names five protocol premise admissions. The global statement is
+unchanged and remains conditional on these leaves. `PinnedProtocolAvailable` is
+a separate open contract: deployment still needs a witness that the pinned JSON
+actually parses. The embedded binary size is kernel-checked.
+
+The [live proof frontier](https://obiteum-mac-studio.tail9c65ff.ts.net:8444/w-near/)
+shows the source revision, build time, actual checked dependencies and audit
+freshness. `IgnoreHyp`, `KeyConditions`, `ValueConditions` and the named heap-room
+contracts remain unresolved; the recent parser loop and scalar results prove
+individual transitions, not the whole ignored-value reader. The strict audit and
+frontier manifest track the exact admitted leaves and protect statement shapes.
 
 ## Continuation on 2026-10-29: integration with main
 
@@ -1245,6 +1262,54 @@ continuation is published to PR #40 after its validation gates pass.
   outer wrappers, rejection, the seventh method and M9 remain open.
   No additional `sorry` is introduced.
 
+## Complete closing/member iterations with the depth reserve (2026-10-30)
+
+- `SerdeIgnClosing` pins the actual closing/member block and the whole
+  container-loop body by two kernel-checked code equations. `block_nonempty`
+  restores the saved head and branches back to the loop; `block_empty` takes
+  success exit four. Their charges are 212 and 211 regular operations. The
+  complete whitespace-peeking closing iterations cost `337 + 96*wsLen` and
+  `336 + 96*wsLen`, respectively. They preserve arbitrary caller resources,
+  scratch capacity/heap bounds and the 32-byte caller frame.
+- `close_indices` derives the close cursor and complete pop continuation from
+  either full-machine container phase. `funded_nonempty` executes the whole
+  actual closing iteration, releases the closed frame's reserve, preserves the
+  outer continuation and unchanged growth credits, and retains 18 operations
+  for surrounding control. `funded_empty` proves the exact final endpoint and
+  empty remaining trace, retains the allocated empty vector and leaves 19
+  operations for success-label/epilogue cleanup.
+- The same actual iteration now has checked first-member and comma paths:
+  `iteration_first` costs `162 + 96*wsLen` and becomes normal loop-body exit;
+  `iteration_comma` costs `191 + 96*wsLen` and takes relative exit one.
+  Only the comma consumes its selected byte. The previously proved dispatch
+  guards and the enclosing block's charged exit are included.
+- `SerdeIgnMemberBudget.first_funded` and `comma_funded` connect those complete
+  iterations to full-machine member continuations and retain the depth reserve.
+  They leave 13 and 9 operations, respectively, for the surrounding loop/block
+  control, in addition to the actual next-member allowance. `next_depth`
+  derives the needed remaining-byte bound through either member kind.
+- `object_funded` and `next_funded` execute the complete actual array/key/colon
+  tail while retaining the same reserve and growth credits. They fund 64
+  operations for the next value entry and a separate operation for its loop
+  branch. The key reader remains the concrete full escaped-string reader,
+  including syntactically valid invalid raw UTF-8, with all 128 borrowed bytes,
+  tables, global and arbitrary heap/saved-String resources preserved.
+- `SerdeIgnSegments.start_prefix_tight` proves the actual entry at 53 regular
+  operations; the original 60-operation interface is retained as a weakening.
+  The scalar dispatch is tightened from `470*consumedBytes - 81` to
+  `470*consumedBytes - 82`. Its composed pending/top bodies now cost
+  `470*consumedBytes - 75`/`-32`, and their enclosing blocks cost `-73`/`-31`.
+  `top_cost` explicitly includes both the outer success-label payment and the
+  seven-operation success epilogue within the unchanged 109 value allowance.
+  The new 64-operation member value allowance leaves space for loop setup.
+- Validation is recorded after the complete build and audit finish.
+- Next: assemble the two loop invariants from these funded transitions,
+  translate the remaining outer labels and retain the changed heap/scratch
+  coordinates and saved String throughout. These contracts do not themselves
+  prove the complete deep reader. Reachable allocation room, uniform parser
+  bounds, outer wrappers, rejection, the seventh method and M9 remain open.
+  No additional `sorry` is introduced.
+
 ## Methods
 
 There are 15 exported methods; six now have complete per-call refinement proofs under their protocol premises.
@@ -1341,9 +1406,12 @@ The texts are proved equal to the model's `Panic.message` (`PanicText`).
       `SerdeIgnScalar` supplies complete scalar dispatch/completion and block exits.
       `SerdeIgnOpening.entry_funded` connects the actual full opening prefix to
       `SerdeIgnBudget`'s closing-byte reserve; `SerdeIgnProgress` supplies the
-      needed logical-depth/remaining-byte bound. Connect close/member execution
-      to that reserve, account for loop-label setup, then assemble both loops and
-      their aggregate instruction bound. `Hyp81` must allow heap and scratch changes.
+      needed logical-depth/remaining-byte bound. `SerdeIgnClosing` now funds
+      both complete closing iterations, while `SerdeIgnMemberBudget` funds the
+      complete first/comma iterations and next-member tails with explicit control
+      credits and a 64-operation value entry. Assemble both loops, finish their
+      outer-label translations and retain the changed heap/scratch coordinates.
+      `Hyp81` must allow heap and scratch changes.
 2. **`ft_balance_of`, method level.** Take the parser's contracts as parameters until they are proved. The argument layer is in `EnvInput` and `ArgsLeaves`, the balance read in `LookupMapGet`/`StorageReadWrapF`.
 3. **The remaining methods**, in M8's order:
    - `storage_balance_of` (its parser is the same code as `ft_balance_of`'s);

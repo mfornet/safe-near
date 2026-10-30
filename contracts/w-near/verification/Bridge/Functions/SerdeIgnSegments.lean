@@ -68,12 +68,12 @@ instance (n maxP inst : Nat) (mi : ModuleInst) (A : Nat → Nat) : Persistent (c
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 8000000 in
 /-- The actual reader entry clears arbitrary scratch contents while preserving its allocation and live blocks. -/
-theorem start_prefix (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (inst : Nat) (mi : ModuleInst)
+theorem start_prefix_tight (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (inst : Nat) (mi : ModuleInst)
     (A : Nat → Nat) (n g ta : Nat) (hm : IfaceMod mi A n g ta) (hd : d + 2 < lim.maxCallDepth)
     (Cg R : Nat) (gt : GlobalType) (sp de p cap : UInt32) (maxP hl F : Nat)
     (live : List (Nat × Nat)) (old : List UInt8) (hsp : 160 ≤ sp.toNat)
     (hde : de.toNat + 24 ≤ 2 ^ 32) :
-    code (GF := GF) n maxP inst mi A ∗ credits Cg (60 * cfg.regularOpCost + R) ∗
+    code (GF := GF) n maxP inst mi A ∗ credits Cg (53 * cfg.regularOpCost + R) ∗
       g ↦[wg] ⟨gt, .i32 sp⟩ ∗ stk n (sp.toNat - 160) 160 ∗
       SerdeIgnStack.state n maxP hl live F (de + 12) p cap old ⊢
     mwpi cfg lim d ⟨entryLocals f81 [.i32 de], inst, mi⟩ [] startCode
@@ -114,6 +114,28 @@ theorem start_prefix (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (inst : Nat
   icases VecFromElem.stk_split n (sp.toNat - 160) 128 32 $$ H160 with ⟨H128, H32⟩
   rw [show sp.toNat - 160 + 128 = sp.toNat - 32 by omega]
   iframe H128 H32
+
+set_option maxRecDepth 100000 in
+/-- The original entry allowance follows from the tight 53-operation prologue. -/
+theorem start_prefix (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (inst : Nat) (mi : ModuleInst)
+    (A : Nat → Nat) (n g ta : Nat) (hm : IfaceMod mi A n g ta) (hd : d + 2 < lim.maxCallDepth)
+    (Cg R : Nat) (gt : GlobalType) (sp de p cap : UInt32) (maxP hl F : Nat)
+    (live : List (Nat × Nat)) (old : List UInt8) (hsp : 160 ≤ sp.toNat)
+    (hde : de.toNat + 24 ≤ 2 ^ 32) :
+    code (GF := GF) n maxP inst mi A ∗ credits Cg (60 * cfg.regularOpCost + R) ∗
+      g ↦[wg] ⟨gt, .i32 sp⟩ ∗ stk n (sp.toNat - 160) 160 ∗
+      SerdeIgnStack.state n maxP hl live F (de + 12) p cap old ⊢
+    mwpi cfg lim d ⟨entryLocals f81 [.i32 de], inst, mi⟩ [] startCode
+      { normal := fun vs fr => iprop(credits Cg R ∗
+          ⌜vs = [] ∧ fr = fr81 inst mi de (sp - 32) 0 1 0 0 0 0⌝ ∗
+          g ↦[wg] ⟨gt, .i32 (sp - 32)⟩ ∗ stk n (sp.toNat - 160) 128 ∗ stk n (sp.toNat - 32) 32 ∗
+          SerdeIgnStack.state n maxP hl live F (de + 12) p cap []) } := by
+  iintro ⟨#HC, Hc, Hg, H160, Hst⟩
+  iapply start_prefix_tight cfg lim d inst mi A n g ta hm hd Cg R gt sp de p cap maxP hl F live old hsp hde
+  iframe HC Hg H160 Hst
+  iapply BorrowMut.credits_le
+  iframe Hc
+  ipureintro; omega
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 8000000 in

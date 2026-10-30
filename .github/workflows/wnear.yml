@@ -12,6 +12,9 @@ on:
       - "contracts/w-near/verification/**"
       - "near-lean/**"
       - "tools/axiom-audit.py"
+      - "tools/proof_sources.py"
+      - "tools/wnear_blueprint.py"
+      - "tools/tests/test_wnear_blueprint.py"
       - "lean-toolchain"
       - ".github/workflows/wnear.yml"
   pull_request:
@@ -19,6 +22,9 @@ on:
       - "contracts/w-near/verification/**"
       - "near-lean/**"
       - "tools/axiom-audit.py"
+      - "tools/proof_sources.py"
+      - "tools/wnear_blueprint.py"
+      - "tools/tests/test_wnear_blueprint.py"
       - "lean-toolchain"
       - ".github/workflows/wnear.yml"
   workflow_dispatch:
@@ -50,7 +56,7 @@ jobs:
         with:
           use-github-cache: false
           lake-package-directory: contracts/w-near/verification
-          build-args: Model Spec Proofs Bridge Differential runtime-adapter-tests wnear-scenarios wnear-harness
+          build-args: Model Spec Proofs Bridge Blueprint Differential runtime-adapter-tests wnear-scenarios wnear-harness
           use-mathlib-cache: true
 
       - name: Build and audit the metered logic
@@ -63,6 +69,11 @@ jobs:
           python3 tools/axiom-audit.py contracts/w-near/verification
           --allow-sorry-module Proofs.Refinement --report audit/wnear.json
           --statements contracts/w-near/verification/statements.json
+
+      - name: Check the exact named proof frontier
+        run: |
+          python3 tools/wnear_blueprint.py --check --audit-report audit/wnear.json
+          python3 -m unittest discover -s tools/tests -p 'test_wnear_blueprint.py'
 
       - uses: actions/upload-artifact@v4
         if: always()

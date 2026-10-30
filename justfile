@@ -33,13 +33,21 @@ sorries contract: (_check contract)
 blueprint contract: (_check contract)
     @test -d contracts/{{ contract }}/verification/blueprint/src || \
         { echo "contracts/{{ contract }} has no leanblueprint (see its blueprint/README.md)"; exit 1; }
-    cd contracts/{{ contract }}/verification && just blueprint-web
+    if [ "{{ contract }}" = w-near ]; then \
+        python3 tools/wnear_blueprint.py; \
+    else \
+        cd contracts/{{ contract }}/verification && just blueprint-web; \
+    fi
 
 # (Served by the launchd agent com.safe-near.blueprint from ~/Library/Application Support/safe-near/blueprint.)
 # Build one contract's web blueprint and publish it at https://obiteum-mac-studio.tail9c65ff.ts.net:8444/<contract>/.
 publish-blueprint contract: (blueprint contract)
-    rsync -a --delete contracts/{{ contract }}/verification/blueprint/web/ \
-        "$HOME/Library/Application Support/safe-near/blueprint/{{ contract }}/"
+    if [ "{{ contract }}" = w-near ]; then \
+        python3 tools/wnear_blueprint.py --publish --reuse; \
+    else \
+        rsync -a --delete contracts/{{ contract }}/verification/blueprint/web/ \
+          "$HOME/Library/Application Support/safe-near/blueprint/{{ contract }}/"; \
+    fi
     @echo "https://obiteum-mac-studio.tail9c65ff.ts.net:8444/{{ contract }}/"
 
 # Build near-lean: the Wasm interpreter, the boundary interface, the VM, the runtime, the chain layer, the crypto package and the node.
@@ -70,8 +78,9 @@ wnear-harness *args:
 wnear-audit *options:
     cd near-lean/near-logic && lake build NearLogic
     python3 tools/axiom-audit.py near-lean/near-logic --no-build --report audit/near-logic.json
-    cd contracts/w-near/verification && lake build Model Spec Proofs Bridge Differential runtime-adapter-tests wnear-scenarios wnear-harness
+    cd contracts/w-near/verification && lake build Model Spec Proofs Bridge Blueprint Differential runtime-adapter-tests wnear-scenarios wnear-harness
     python3 tools/axiom-audit.py contracts/w-near/verification --no-build --allow-sorry-module Proofs.Refinement --report audit/wnear.json --statements contracts/w-near/verification/statements.json {{ options }}
+    python3 tools/wnear_blueprint.py --check --audit-report audit/wnear.json
 
 # Rewrite contracts/w-near/verification/STATEMENTS.md after an intended change to a pinned statement.
 wnear-pin-statements: (wnear-audit "--update-statements")

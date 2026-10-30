@@ -43,6 +43,9 @@ import subprocess
 import sys
 import tempfile
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from proof_sources import source_digest
+
 STANDARD_AXIOMS = ("propext", "Classical.choice", "Quot.sound")
 MANIFESTS = ("lakefile.toml", "lakefile.lean")
 
@@ -294,6 +297,7 @@ def parse_arguments() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_arguments()
+    digest_before = source_digest(args.root)
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.unlink(missing_ok=True)
     if not args.no_build:
@@ -306,6 +310,7 @@ def main() -> int:
                                  args.allow_sorry_module)
     tolerated = [row for row in violations if row not in failing]
     result = {
+        "source_digest": digest_before,
         "modules": args.modules,
         "declarations_checked": len(declarations),
         "theorems_checked": sum(row["theorem"] for row in declarations),
@@ -314,6 +319,8 @@ def main() -> int:
         "require_clean_modules": args.require_clean_module,
         "violations": violations,
     }
+    if source_digest(args.root) != digest_before:
+        raise RuntimeError("Lean sources changed during the audit; evidence was not published")
     args.report.write_text(json.dumps(result, indent=2) + "\n")
     lenient = args.allow_sorry or args.allow_sorry_module
     print(f"{args.package.relative_to(args.root)}: {len(args.modules)} modules, "

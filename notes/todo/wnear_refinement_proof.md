@@ -1537,6 +1537,28 @@ control-flow/ownership invariant remain open. This proves neither the full
 deep reader nor another method refinement; reachable room and uniform parser
 integration also remain open.
 
+`SerdeIgnClosing` now pins the complete actual container-loop iteration
+and proves all four successful paths. Matching closes cost `337 + 96*wsLen`
+operations with a saved head or `336 + 96*wsLen` for the final empty pop.
+`funded_nonempty` releases the closed frame reserve and retains the complete
+outer continuation and 18 control operations; `funded_empty` proves the final
+endpoint and empty trace and retains 19 operations for success cleanup.
+First-member and accepted-comma iterations cost `162 + 96*wsLen` and
+`191 + 96*wsLen`, with their actual normal/branch-one exits.
+`SerdeIgnMemberBudget.first_funded` and `comma_funded` retain the member
+reserve and 13/9 control operations. `object_funded` and `next_funded` then
+execute the real array/key/colon tail with the unchanged depth and growth
+reserves, a 64-operation value-entry allowance and a separate loop-branch
+payment. Caller resources, all 128 borrowed stack bytes and full escaped-key
+semantics are retained. `start_prefix_tight` lowers the concrete prologue
+charge to 53 operations while preserving the old 60-operation wrapper.
+The scalar charge is tightened to `470*consumedBytes - 82`, its pending/top
+blocks to `-73`/`-31`, and `top_cost` now includes the success-label payment
+and epilogue under the existing 109 allowance. Both full-loop invariants and
+remaining outer-label translations still need assembly with changing heap,
+scratch and saved-String ownership. This does not prove the deep reader or
+another method refinement; reachable room and parser-wide bounds remain open.
+
 ### M7. State and storage
 
 Borsh encoding of the state, `LookupMap` keys, near-sdk's `env` wrappers
@@ -1580,7 +1602,7 @@ operations and 54 linear charges, non-trie work below 2.945 Tgas of the 4 Tgas c
 and two account writes plus the header write within `trieGas`. `CostsDepositV86` adds the v86
 log and evicted-byte cost bounds and log-count lower bound to `CostsNewV86`; M9 pins them.
 All six method refinements and the complete Bridge build pass the standard-axiom audit.
-The sole explicit `sorry` remains `refines_wnear_exported`.
+The exported refinement is a checked composition of six completed clauses and nine named open method obligations, plus five named pinned-protocol obligations. The global theorem remains conditional on those leaves.
 
 ### M9. Closing
 

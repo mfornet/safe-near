@@ -1,0 +1,573 @@
+{
+  "schema": 1,
+  "nodes": [
+    {
+      "id": "global",
+      "declaration": "WNear.refines_wnear",
+      "title": "Deployed binary refinement",
+      "kind": "theorem",
+      "label": "spec:refinement",
+      "annotated": true,
+      "reviewed_shape_hash": 407420551,
+      "planned_dependencies": [
+        "protocol-available"
+      ],
+      "required_instantiations": [
+        "protocol-available"
+      ]
+    },
+    {
+      "id": "exported",
+      "declaration": "WNear.refines_wnear_exported",
+      "title": "All exported runtime clauses",
+      "kind": "theorem",
+      "label": "frontier:exported",
+      "reviewed_shape_hash": 3221175398
+    },
+    {
+      "id": "dispatch",
+      "declaration": "WNear.Binary.Exported.all_methods",
+      "title": "Checked dispatch over all 15 methods",
+      "kind": "theorem",
+      "label": "frontier:dispatch",
+      "reviewed_shape_hash": 794773010
+    },
+    {
+      "id": "remaining",
+      "declaration": "WNear.Binary.Exported.Remaining",
+      "title": "Nine remaining full method contracts",
+      "kind": "verification_contract",
+      "label": "frontier:remaining",
+      "reviewed_shape_hash": 11887525737325216845
+    },
+    {
+      "id": "binary-size",
+      "declaration": "WNear.deployed_code_size",
+      "title": "Embedded deployed code size",
+      "kind": "theorem",
+      "label": "frontier:binary-size",
+      "reviewed_shape_hash": 2934629974
+    },
+    {
+      "id": "protocol-runtime",
+      "declaration": "WNear.pinned_runtime_obligation",
+      "title": "Pinned protocol: runtime",
+      "kind": "admission",
+      "label": "frontier:protocol-runtime",
+      "reviewed_shape_hash": 3470692719
+    },
+    {
+      "id": "protocol-costs",
+      "declaration": "WNear.pinned_costs_obligation",
+      "title": "Pinned protocol: costs",
+      "kind": "admission",
+      "label": "frontier:protocol-costs",
+      "reviewed_shape_hash": 188185962
+    },
+    {
+      "id": "protocol-limits",
+      "declaration": "WNear.pinned_limits_obligation",
+      "title": "Pinned protocol: limits",
+      "kind": "admission",
+      "label": "frontier:protocol-limits",
+      "reviewed_shape_hash": 3429799462
+    },
+    {
+      "id": "protocol-new_costs",
+      "declaration": "WNear.pinned_new_costs_obligation",
+      "title": "Pinned protocol: new costs",
+      "kind": "admission",
+      "label": "frontier:protocol-new_costs",
+      "reviewed_shape_hash": 2138127204
+    },
+    {
+      "id": "protocol-deposit_costs",
+      "declaration": "WNear.pinned_deposit_costs_obligation",
+      "title": "Pinned protocol: deposit costs",
+      "kind": "admission",
+      "label": "frontier:protocol-deposit_costs",
+      "reviewed_shape_hash": 3446914636
+    },
+    {
+      "id": "method-ft_total_supply",
+      "declaration": "WNear.Binary.Exported.ftTotalSupply_complete",
+      "title": "ft_total_supply",
+      "kind": "theorem",
+      "method": "ft_total_supply",
+      "environment": "Reviewed Environment predicate; pinned instantiation remains open.",
+      "planned_dependencies": [],
+      "label": "frontier:method-ft_total_supply",
+      "reviewed_shape_hash": 3495502223
+    },
+    {
+      "id": "method-storage_minimum_balance",
+      "declaration": "WNear.Binary.Exported.storageMinimumBalance_complete",
+      "title": "storage_minimum_balance",
+      "kind": "theorem",
+      "method": "storage_minimum_balance",
+      "environment": "Reviewed Environment predicate; pinned instantiation remains open.",
+      "planned_dependencies": [],
+      "label": "frontier:method-storage_minimum_balance",
+      "reviewed_shape_hash": 2743892628
+    },
+    {
+      "id": "method-storage_balance_bounds",
+      "declaration": "WNear.Binary.Exported.storageBalanceBounds_complete",
+      "title": "storage_balance_bounds",
+      "kind": "theorem",
+      "method": "storage_balance_bounds",
+      "environment": "Reviewed Environment predicate; pinned instantiation remains open.",
+      "planned_dependencies": [],
+      "label": "frontier:method-storage_balance_bounds",
+      "reviewed_shape_hash": 2939384948
+    },
+    {
+      "id": "method-ft_metadata",
+      "declaration": "WNear.Binary.Exported.ftMetadata_complete",
+      "title": "ft_metadata",
+      "kind": "theorem",
+      "method": "ft_metadata",
+      "environment": "Reviewed Environment predicate; pinned instantiation remains open.",
+      "planned_dependencies": [],
+      "label": "frontier:method-ft_metadata",
+      "reviewed_shape_hash": 574261695
+    },
+    {
+      "id": "method-new",
+      "declaration": "WNear.Binary.Exported.new_complete",
+      "title": "new",
+      "kind": "theorem",
+      "method": "new",
+      "environment": "Reviewed Environment predicate; pinned instantiation remains open.",
+      "planned_dependencies": [],
+      "label": "frontier:method-new",
+      "reviewed_shape_hash": 3504047329
+    },
+    {
+      "id": "method-near_deposit",
+      "declaration": "WNear.Binary.Exported.nearDeposit_complete",
+      "title": "near_deposit",
+      "kind": "theorem",
+      "method": "near_deposit",
+      "environment": "Reviewed Environment predicate; pinned instantiation remains open.",
+      "planned_dependencies": [],
+      "label": "frontier:method-near_deposit",
+      "reviewed_shape_hash": 3251291794
+    },
+    {
+      "id": "method-near_withdraw",
+      "declaration": "WNear.nearWithdraw_obligation",
+      "title": "near_withdraw",
+      "kind": "admission",
+      "method": "near_withdraw",
+      "environment": "Pinned protocol JSON and reviewed Environment predicate.",
+      "planned_dependencies": [
+        "accept-parser",
+        "reject-parser",
+        "storage",
+        "runtime-boundary"
+      ],
+      "label": "frontier:method-near_withdraw",
+      "reviewed_shape_hash": 1974200465
+    },
+    {
+      "id": "method-ft_transfer",
+      "declaration": "WNear.ftTransfer_obligation",
+      "title": "ft_transfer",
+      "kind": "admission",
+      "method": "ft_transfer",
+      "environment": "Pinned protocol JSON and reviewed Environment predicate.",
+      "planned_dependencies": [
+        "accept-parser",
+        "reject-parser",
+        "storage",
+        "runtime-boundary"
+      ],
+      "label": "frontier:method-ft_transfer",
+      "reviewed_shape_hash": 2152580315
+    },
+    {
+      "id": "method-ft_transfer_call",
+      "declaration": "WNear.ftTransferCall_obligation",
+      "title": "ft_transfer_call",
+      "kind": "admission",
+      "method": "ft_transfer_call",
+      "environment": "Pinned protocol JSON and reviewed Environment predicate.",
+      "planned_dependencies": [
+        "accept-parser",
+        "reject-parser",
+        "storage",
+        "runtime-boundary"
+      ],
+      "label": "frontier:method-ft_transfer_call",
+      "reviewed_shape_hash": 3656150618
+    },
+    {
+      "id": "method-ft_balance_of",
+      "declaration": "WNear.ftBalanceOf_obligation",
+      "title": "ft_balance_of",
+      "kind": "admission",
+      "method": "ft_balance_of",
+      "environment": "Pinned protocol JSON and reviewed Environment predicate.",
+      "planned_dependencies": [
+        "accept-parser",
+        "reject-parser",
+        "storage",
+        "runtime-boundary"
+      ],
+      "label": "frontier:method-ft_balance_of",
+      "reviewed_shape_hash": 925099951
+    },
+    {
+      "id": "method-ft_resolve_transfer",
+      "declaration": "WNear.ftResolveTransfer_obligation",
+      "title": "ft_resolve_transfer",
+      "kind": "admission",
+      "method": "ft_resolve_transfer",
+      "environment": "Pinned protocol JSON and reviewed Environment predicate.",
+      "planned_dependencies": [
+        "accept-parser",
+        "reject-parser",
+        "storage",
+        "runtime-boundary"
+      ],
+      "label": "frontier:method-ft_resolve_transfer",
+      "reviewed_shape_hash": 2608134460
+    },
+    {
+      "id": "method-storage_deposit",
+      "declaration": "WNear.storageDeposit_obligation",
+      "title": "storage_deposit",
+      "kind": "admission",
+      "method": "storage_deposit",
+      "environment": "Pinned protocol JSON and reviewed Environment predicate.",
+      "planned_dependencies": [
+        "accept-parser",
+        "reject-parser",
+        "storage",
+        "runtime-boundary"
+      ],
+      "label": "frontier:method-storage_deposit",
+      "reviewed_shape_hash": 1653313540
+    },
+    {
+      "id": "method-storage_withdraw",
+      "declaration": "WNear.storageWithdraw_obligation",
+      "title": "storage_withdraw",
+      "kind": "admission",
+      "method": "storage_withdraw",
+      "environment": "Pinned protocol JSON and reviewed Environment predicate.",
+      "planned_dependencies": [
+        "accept-parser",
+        "reject-parser",
+        "storage",
+        "runtime-boundary"
+      ],
+      "label": "frontier:method-storage_withdraw",
+      "reviewed_shape_hash": 1012046304
+    },
+    {
+      "id": "method-storage_unregister",
+      "declaration": "WNear.storageUnregister_obligation",
+      "title": "storage_unregister",
+      "kind": "admission",
+      "method": "storage_unregister",
+      "environment": "Pinned protocol JSON and reviewed Environment predicate.",
+      "planned_dependencies": [
+        "accept-parser",
+        "reject-parser",
+        "storage",
+        "runtime-boundary"
+      ],
+      "label": "frontier:method-storage_unregister",
+      "reviewed_shape_hash": 2215542695
+    },
+    {
+      "id": "method-storage_balance_of",
+      "declaration": "WNear.storageBalanceOf_obligation",
+      "title": "storage_balance_of",
+      "kind": "admission",
+      "method": "storage_balance_of",
+      "environment": "Pinned protocol JSON and reviewed Environment predicate.",
+      "planned_dependencies": [
+        "accept-parser",
+        "reject-parser",
+        "storage",
+        "runtime-boundary"
+      ],
+      "label": "frontier:method-storage_balance_of",
+      "reviewed_shape_hash": 3836346273
+    },
+    {
+      "id": "ignore-hyp",
+      "declaration": "WNear.Binary.SerdeStructObjState.IgnoreHyp",
+      "title": "Full ignored-reader interface",
+      "kind": "verification_contract",
+      "planned_dependencies": [
+        "ignored-opening",
+        "ignored-closing",
+        "ignored-last-close",
+        "ignored-first",
+        "ignored-comma",
+        "ignored-member",
+        "ignored-scalar",
+        "ignored-depth",
+        "ignored-reserve",
+        "scratch-room"
+      ],
+      "label": "frontier:ignore-hyp",
+      "reviewed_shape_hash": 14658794859049893487
+    },
+    {
+      "id": "key-conditions",
+      "declaration": "WNear.Binary.SerdeStructObjKeyState.KeyConditions",
+      "title": "Uniform reachable key bounds",
+      "kind": "verification_contract",
+      "label": "frontier:key-conditions",
+      "reviewed_shape_hash": 14634685420054898645
+    },
+    {
+      "id": "value-conditions",
+      "declaration": "WNear.Binary.SerdeStructObjValueState.ValueConditions",
+      "title": "Uniform reachable value bounds",
+      "kind": "verification_contract",
+      "label": "frontier:value-conditions",
+      "reviewed_shape_hash": 7014099597825291335
+    },
+    {
+      "id": "accept-parser",
+      "declaration": "WNear.Binary.FromSliceSpec.AcceptContract",
+      "title": "Uniform accepting argument contract",
+      "kind": "verification_contract",
+      "planned_dependencies": [
+        "object-parser",
+        "ignore-hyp",
+        "key-conditions",
+        "value-conditions",
+        "string-room",
+        "owned-room"
+      ],
+      "label": "frontier:accept-parser",
+      "reviewed_shape_hash": 4008976267067297995
+    },
+    {
+      "id": "reject-parser",
+      "declaration": "WNear.Binary.FromSliceSpec.RejectContract",
+      "title": "Uniform rejecting argument contract",
+      "kind": "verification_contract",
+      "planned_dependencies": [
+        "object-parser",
+        "ignore-hyp",
+        "key-conditions",
+        "value-conditions"
+      ],
+      "label": "frontier:reject-parser",
+      "reviewed_shape_hash": 5907064027448999036
+    },
+    {
+      "id": "object-parser",
+      "declaration": "WNear.Binary.SerdeStructObjModelState.f228_obj_model",
+      "title": "Changing-state object parser",
+      "kind": "theorem",
+      "notes": "IgnoreHyp, KeyConditions and ValueConditions remain explicit unresolved verification dependencies.",
+      "label": "frontier:object-parser",
+      "required_type_dependencies": [
+        "ignore-hyp",
+        "key-conditions",
+        "value-conditions"
+      ],
+      "reviewed_shape_hash": 115430703
+    },
+    {
+      "id": "array-parser",
+      "declaration": "WNear.Binary.FromSliceEsc.f65_arr_okAt",
+      "title": "Copied/escaped array parser wrapper",
+      "kind": "theorem",
+      "notes": "Concrete copied-array path under explicit reader/heap/room premises; not the uniform AcceptContract.",
+      "label": "frontier:array-parser",
+      "required_type_dependencies": [
+        "string-room",
+        "owned-room"
+      ],
+      "reviewed_shape_hash": 2397495654
+    },
+    {
+      "id": "ignored-opening",
+      "declaration": "WNear.Binary.SerdeIgnOpening.entry_funded",
+      "title": "Complete funded ignored-container opening",
+      "kind": "theorem",
+      "label": "frontier:ignored-opening",
+      "required_type_dependencies": [
+        "scratch-room"
+      ],
+      "reviewed_shape_hash": 1856645026
+    },
+    {
+      "id": "ignored-closing",
+      "declaration": "WNear.Binary.SerdeIgnClosing.funded_nonempty",
+      "title": "Complete funded nested close",
+      "kind": "theorem",
+      "label": "frontier:ignored-closing",
+      "reviewed_shape_hash": 3291265390
+    },
+    {
+      "id": "ignored-last-close",
+      "declaration": "WNear.Binary.SerdeIgnClosing.funded_empty",
+      "title": "Complete funded final close",
+      "kind": "theorem",
+      "label": "frontier:ignored-last-close",
+      "reviewed_shape_hash": 1372473394
+    },
+    {
+      "id": "ignored-first",
+      "declaration": "WNear.Binary.SerdeIgnMemberBudget.first_funded",
+      "title": "Complete funded first-member iteration",
+      "kind": "theorem",
+      "label": "frontier:ignored-first",
+      "reviewed_shape_hash": 1479903732
+    },
+    {
+      "id": "ignored-comma",
+      "declaration": "WNear.Binary.SerdeIgnMemberBudget.comma_funded",
+      "title": "Complete funded comma iteration",
+      "kind": "theorem",
+      "label": "frontier:ignored-comma",
+      "reviewed_shape_hash": 2762488383
+    },
+    {
+      "id": "ignored-member",
+      "declaration": "WNear.Binary.SerdeIgnMemberBudget.next_funded",
+      "title": "Funded array/key/colon tail",
+      "kind": "theorem",
+      "label": "frontier:ignored-member",
+      "reviewed_shape_hash": 2165378940
+    },
+    {
+      "id": "ignored-scalar",
+      "declaration": "WNear.Binary.SerdeIgnScalar.scalar",
+      "title": "Complete scalar dispatch",
+      "kind": "theorem",
+      "label": "frontier:ignored-scalar",
+      "reviewed_shape_hash": 1942071516
+    },
+    {
+      "id": "ignored-depth",
+      "declaration": "WNear.Binary.SerdeIgnProgress.run_consumed",
+      "title": "Logical depth bounded by consumed bytes",
+      "kind": "theorem",
+      "label": "frontier:ignored-depth",
+      "reviewed_shape_hash": 3628815476
+    },
+    {
+      "id": "ignored-reserve",
+      "declaration": "WNear.Binary.SerdeIgnBudget.regular_reserve",
+      "title": "Closing-byte reserve accounting",
+      "kind": "theorem",
+      "label": "frontier:ignored-reserve",
+      "reviewed_shape_hash": 2801252914
+    },
+    {
+      "id": "storage",
+      "declaration": "WNear.Binary.StorageReadWrap.f548_spec_host",
+      "title": "Actual storage-read host contract",
+      "kind": "theorem",
+      "label": "frontier:storage",
+      "reviewed_shape_hash": 380040593
+    },
+    {
+      "id": "runtime-boundary",
+      "declaration": "WNear.Binary.method_boundary",
+      "title": "Runtime and rollback composition",
+      "kind": "theorem",
+      "label": "frontier:runtime-boundary",
+      "reviewed_shape_hash": 3582860242
+    },
+    {
+      "id": "runtime-call",
+      "declaration": "WNear.Binary.method_refines_call",
+      "title": "Per-call runtime refinement",
+      "kind": "theorem",
+      "label": "frontier:runtime-call",
+      "reviewed_shape_hash": 2266961742
+    },
+    {
+      "id": "scratch-room",
+      "declaration": "WNear.Binary.ScratchGrow.roomRes",
+      "title": "Reachable scratch growth room",
+      "kind": "verification_contract",
+      "label": "frontier:scratch-room",
+      "notes": "Explicit allocation-room premise; deriving it uniformly for reachable states remains open.",
+      "reviewed_shape_hash": 4007296066163589377
+    },
+    {
+      "id": "string-room",
+      "declaration": "WNear.Binary.ParseStr.roomRun",
+      "title": "Reachable escaped-string growth room",
+      "kind": "verification_contract",
+      "label": "frontier:string-room",
+      "notes": "Explicit allocation-room premise; deriving it uniformly for reachable states remains open.",
+      "reviewed_shape_hash": 13860941147584342435
+    },
+    {
+      "id": "owned-room",
+      "declaration": "WNear.Binary.VecFromElem.roomFor",
+      "title": "Reachable owned-string allocation room",
+      "kind": "verification_contract",
+      "label": "frontier:owned-room",
+      "notes": "Explicit allocation-room premise; deriving it uniformly for reachable states remains open.",
+      "reviewed_shape_hash": 234172028324874937
+    },
+    {
+      "id": "protocol-available",
+      "declaration": "WNear.PinnedProtocolAvailable",
+      "title": "Pinned protocol parses successfully",
+      "kind": "verification_contract",
+      "label": "frontier:protocol-available",
+      "notes": "The global theorem assumes a successful parse; actual existence remains to be proved before deployment-level instantiation.",
+      "reviewed_shape_hash": 17169688403301902398
+    }
+  ],
+  "reviewed_environment": [
+    "WNear.Binary.Exported.Environment",
+    "WNear.Binary.WProtocol",
+    "WNear.Binary.FtTotalSupplyMethod.CostsV86",
+    "WNear.Binary.FtTotalSupplyMethod.LimitsV86",
+    "WNear.Binary.NewMethod.CostsNewV86",
+    "WNear.Binary.NearDepositGas.CostsDepositV86"
+  ],
+  "expected_admissions": [
+    "WNear.pinned_runtime_obligation",
+    "WNear.pinned_costs_obligation",
+    "WNear.pinned_limits_obligation",
+    "WNear.pinned_new_costs_obligation",
+    "WNear.pinned_deposit_costs_obligation",
+    "WNear.nearWithdraw_obligation",
+    "WNear.ftTransfer_obligation",
+    "WNear.ftTransferCall_obligation",
+    "WNear.ftBalanceOf_obligation",
+    "WNear.ftResolveTransfer_obligation",
+    "WNear.storageDeposit_obligation",
+    "WNear.storageWithdraw_obligation",
+    "WNear.storageUnregister_obligation",
+    "WNear.storageBalanceOf_obligation"
+  ],
+  "expected_incomplete": [
+    "WNear.refines_wnear",
+    "WNear.refines_wnear_exported",
+    "WNear.withdraw_available_wasm",
+    "WNear.pinned_runtime_obligation",
+    "WNear.pinned_costs_obligation",
+    "WNear.pinned_limits_obligation",
+    "WNear.pinned_new_costs_obligation",
+    "WNear.pinned_deposit_costs_obligation",
+    "WNear.nearWithdraw_obligation",
+    "WNear.ftTransfer_obligation",
+    "WNear.ftTransferCall_obligation",
+    "WNear.ftBalanceOf_obligation",
+    "WNear.ftResolveTransfer_obligation",
+    "WNear.storageDeposit_obligation",
+    "WNear.storageWithdraw_obligation",
+    "WNear.storageUnregister_obligation",
+    "WNear.storageBalanceOf_obligation"
+  ]
+}

@@ -1,5 +1,11 @@
 {
-  "modules": ["Spec", "Spec.*", "NearInterface.Model", "NearInterface.Refines"],
+  "modules": [
+    "Spec",
+    "Spec.*",
+    "NearInterface.Model",
+    "NearInterface.Refines",
+    "Bridge.Exported"
+  ],
   "declarations": [
     "WNear.balance_authorization",
     "WNear.balance_of_correct",
@@ -17,6 +23,33 @@
     "WNear.views_total",
     "WNear.withdraw_available",
     "WNear.withdraw_available_at_boundary",
-    "WNear.withdraw_available_binary"
+    "WNear.withdraw_available_binary",
+    "WNear.pinned_runtime_obligation",
+    "WNear.pinned_costs_obligation",
+    "WNear.pinned_limits_obligation",
+    "WNear.pinned_new_costs_obligation",
+    "WNear.pinned_deposit_costs_obligation",
+    "WNear.nearWithdraw_obligation",
+    "WNear.ftTransfer_obligation",
+    "WNear.ftTransferCall_obligation",
+    "WNear.ftBalanceOf_obligation",
+    "WNear.ftResolveTransfer_obligation",
+    "WNear.storageDeposit_obligation",
+    "WNear.storageWithdraw_obligation",
+    "WNear.storageUnregister_obligation",
+    "WNear.storageBalanceOf_obligation",
+    "WNear.deployed_code_size",
+    "WNear.refines_wnear_exported",
+    "WNear.withdraw_available_wasm",
+    "WNear.Binary.Exported.Remaining",
+    "WNear.Binary.SerdeStructObjState.IgnoreHyp",
+    "WNear.Binary.SerdeStructObjKeyState.KeyConditions",
+    "WNear.Binary.SerdeStructObjValueState.ValueConditions",
+    "WNear.Binary.FromSliceSpec.AcceptContract",
+    "WNear.Binary.FromSliceSpec.RejectContract",
+    "WNear.Binary.ScratchGrow.roomRes",
+    "WNear.Binary.ParseStr.roomRun",
+    "WNear.Binary.VecFromElem.roomFor",
+    "WNear.PinnedProtocolAvailable"
   ]
 }

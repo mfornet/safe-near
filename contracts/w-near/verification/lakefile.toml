@@ -88,3 +88,7 @@ name = "Harness"
 [[lean_exe]]
 name = "wnear-harness"
 root = "Harness.Main"
+
+# Curated LeanArchitect frontier and checked global composition.
+[[lean_lib]]
+name = "Blueprint"

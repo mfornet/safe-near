@@ -121,17 +121,17 @@ theorem scalar_indices (N : Nat) (frames bs r : List UInt8) (ops : List SerdeIgn
 /-- Scalar entry, including whitespace, fits the existing inside-container value allowance. -/
 theorem pending_cost (cfg : WasmConfig) (w consumed : Nat) (hconsumed : 0 < consumed) :
     (125 + 96 * w) * cfg.regularOpCost + 7 * cfg.regularOpCost +
-      (470 * consumed - 72) * cfg.regularOpCost ≤
+      (470 * consumed - 73) * cfg.regularOpCost ≤
         (60 + 470 * (w + consumed)) * cfg.regularOpCost := by
-  have h : 125 + 96 * w + 7 + (470 * consumed - 72) ≤ 60 + 470 * (w + consumed) := by omega
+  have h : 125 + 96 * w + 7 + (470 * consumed - 73) ≤ 60 + 470 * (w + consumed) := by omega
   simpa only [Nat.add_mul] using Nat.mul_le_mul_right cfg.regularOpCost h
 
-/-- Scalar entry plus the actual success epilogue fits the existing top-level value allowance. -/
+/-- Scalar entry, the success-label payment and the actual epilogue fit the existing top-level allowance. -/
 theorem top_cost (cfg : WasmConfig) (w consumed : Nat) (hconsumed : 0 < consumed) :
     (125 + 96 * w) * cfg.regularOpCost + 7 * cfg.regularOpCost +
-      (470 * consumed - 30) * cfg.regularOpCost + 7 * cfg.regularOpCost ≤
+      (470 * consumed - 31) * cfg.regularOpCost + 8 * cfg.regularOpCost ≤
         (109 + 470 * (w + consumed)) * cfg.regularOpCost := by
-  have h : 125 + 96 * w + 7 + (470 * consumed - 30) + 7 ≤ 109 + 470 * (w + consumed) := by omega
+  have h : 125 + 96 * w + 7 + (470 * consumed - 31) + 8 ≤ 109 + 470 * (w + consumed) := by omega
   simpa only [Nat.add_mul] using Nat.mul_le_mul_right cfg.regularOpCost h
 
 section Proof
@@ -140,7 +140,7 @@ variable {GF : BundledGFunctors} [WasmGS NearState GF]
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 32000000 in
 /-- Every successful scalar follows the actual dispatch to its exact model endpoint.
-The allowance leaves 81 operations per scalar for surrounding loop/control costs. -/
+The allowance leaves 82 operations per scalar for surrounding loop/control costs. -/
 theorem scalar (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (inst : Nat) (mi : ModuleInst)
     (A : Nat → Nat) (n g ta : Nat) (hm : IfaceMod mi A n g ta) (hd : d + 15 < lim.maxCallDepth)
     (Cg R : Nat) (gt : GlobalType) (de s ptr l3 l4 l6 l7 l8 : UInt32)
@@ -152,7 +152,7 @@ theorem scalar (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (inst : Nat) (mi 
     (hv : vSkip (bs.drop i) = some rest) :
     SerdeIgnValue.code81 (GF := GF) inst mi A ∗ SerdeIgnoreEscape.code inst mi A ∗
       A 652 ↪[wf] FuncInst.wasm types[32]! inst f652 ∗
-      credits Cg ((470 * (e - i) - 81) * cfg.regularOpCost + R) ∗
+      credits Cg ((470 * (e - i) - 82) * cfg.regularOpCost + R) ∗
       g ↦[wg] ⟨gt, .i32 s⟩ ∗ stk n (s.toNat - 128) 128 ∗ rd n de ptr bs i ∗
       n ↦[wms][ 1062392 ] ParseStr.escTable ∗ n ↦[wms][ 1062712 ] SerdeEsc.hexTable ∗
       n ↦[wms][ 1048576 ] SerdeIdent.identBytes ∗ Fr ⊢
@@ -467,7 +467,7 @@ theorem scalar_traced (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (inst : Na
       (bs.drop i) = some (r, ops)) :
     SerdeIgnValue.code81 (GF := GF) inst mi A ∗ SerdeIgnoreEscape.code inst mi A ∗
       A 652 ↪[wf] FuncInst.wasm types[32]! inst f652 ∗
-      credits Cg ((470 * (bs.length - r.length - i) - 81) * cfg.regularOpCost +
+      credits Cg ((470 * (bs.length - r.length - i) - 82) * cfg.regularOpCost +
         SerdeIgnTrace.extraCost cfg F cap (SerdeIgnMachineTrace.depth .val frames) ops + R) ∗
       g ↦[wg] ⟨gt, .i32 s⟩ ∗ stk n (s.toNat - 128) 128 ∗ rd n de ptr bs i ∗
       n ↦[wms][ 1062392 ] ParseStr.escTable ∗ n ↦[wms][ 1062712 ] SerdeEsc.hexTable ∗
@@ -486,16 +486,16 @@ theorem scalar_traced (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (inst : Na
           n ↦[wms][ 1048576 ] SerdeIdent.identBytes ∗ Fr) } := by
   obtain ⟨rest, e, hv, he, hie, heQ, hnext⟩ := scalar_indices N frames bs r ops i b hb hws hb5B hb7B hmodel
   have hsplit : bs.length - r.length - i = (e - i) + (bs.length - r.length - e) := by omega
-  have hcost : (470 * (e - i) - 81) * cfg.regularOpCost +
+  have hcost : (470 * (e - i) - 82) * cfg.regularOpCost +
       (470 * (bs.length - r.length - e) * cfg.regularOpCost +
         SerdeIgnTrace.extraCost cfg F cap (SerdeIgnMachineTrace.depth .val frames) ops + R) =
-      (470 * (bs.length - r.length - i) - 81) * cfg.regularOpCost +
+      (470 * (bs.length - r.length - i) - 82) * cfg.regularOpCost +
         SerdeIgnTrace.extraCost cfg F cap (SerdeIgnMachineTrace.depth .val frames) ops + R := by
     rw [hsplit]
-    have he81 : 81 ≤ 470 * (e - i) := by omega
+    have he82 : 82 ≤ 470 * (e - i) := by omega
     rw [Nat.mul_add]
-    rw [show 470 * (e - i) + 470 * (bs.length - r.length - e) - 81 =
-      (470 * (e - i) - 81) + 470 * (bs.length - r.length - e) by omega, Nat.add_mul]
+    rw [show 470 * (e - i) + 470 * (bs.length - r.length - e) - 82 =
+      (470 * (e - i) - 82) + 470 * (bs.length - r.length - e) by omega, Nat.add_mul]
     omega
   iintro ⟨#HC, #CE, #F652, Hc, Hg, H128, Hrd, He, Hhex, Hid, HF⟩
   iapply mwpi_wand
@@ -551,7 +551,7 @@ theorem pending (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (inst : Nat) (mi
     (hv : vSkip (bs.drop i) = some rest) :
     SerdeIgnValue.code81 (GF := GF) inst mi A ∗ SerdeIgnoreEscape.code inst mi A ∗
       A 652 ↪[wf] FuncInst.wasm types[32]! inst f652 ∗
-      credits Cg ((470 * (e - i) - 74) * cfg.regularOpCost + R) ∗
+      credits Cg ((470 * (e - i) - 75) * cfg.regularOpCost + R) ∗
       g ↦[wg] ⟨gt, .i32 s⟩ ∗ stk n (s.toNat - 128) 128 ∗ rd n de ptr bs i ∗
       n ↦[wms][ 1062392 ] ParseStr.escTable ∗ n ↦[wms][ 1062712 ] SerdeEsc.hexTable ∗
       n ↦[wms][ 1048576 ] SerdeIdent.identBytes ∗ Fr ⊢
@@ -566,9 +566,9 @@ theorem pending (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (inst : Nat) (mi
   have hstrict := IgnoreShallow.vSkip_strict hv
   simp only [List.length_drop] at hstrict
   have hie : i < e := by omega
-  have hc : (470 * (e - i) - 74) * cfg.regularOpCost + R =
-      (470 * (e - i) - 81) * cfg.regularOpCost + (7 * cfg.regularOpCost + R) := by
-    have heq : 470 * (e - i) - 74 = (470 * (e - i) - 81) + 7 := by omega
+  have hc : (470 * (e - i) - 75) * cfg.regularOpCost + R =
+      (470 * (e - i) - 82) * cfg.regularOpCost + (7 * cfg.regularOpCost + R) := by
+    have heq : 470 * (e - i) - 75 = (470 * (e - i) - 82) + 7 := by omega
     rw [heq, Nat.add_mul]; omega
   iintro ⟨#HC, #CE, #F652, Hc, Hg, H128, Hrd, He, Hhex, Hid, HF⟩
   iapply mwpi_seq
@@ -609,7 +609,7 @@ theorem top (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (inst : Nat) (mi : M
     (hv : vSkip (bs.drop i) = some rest) :
     SerdeIgnValue.code81 (GF := GF) inst mi A ∗ SerdeIgnoreEscape.code inst mi A ∗
       A 652 ↪[wf] FuncInst.wasm types[32]! inst f652 ∗
-      credits Cg ((470 * (e - i) - 31) * cfg.regularOpCost + R) ∗
+      credits Cg ((470 * (e - i) - 32) * cfg.regularOpCost + R) ∗
       stk n s.toNat 32 ∗ SerdeIgnStack.state n maxP hl live F (de + 12) p cap [] ∗
       g ↦[wg] ⟨gt, .i32 s⟩ ∗ stk n (s.toNat - 128) 128 ∗ rd n de ptr bs i ∗
       n ↦[wms][ 1062392 ] ParseStr.escTable ∗ n ↦[wms][ 1062712 ] SerdeEsc.hexTable ∗
@@ -626,9 +626,9 @@ theorem top (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (inst : Nat) (mi : M
   have hstrict := IgnoreShallow.vSkip_strict hv
   simp only [List.length_drop] at hstrict
   have hie : i < e := by omega
-  have hc : (470 * (e - i) - 31) * cfg.regularOpCost + R =
-      (470 * (e - i) - 81) * cfg.regularOpCost + (50 * cfg.regularOpCost + R) := by
-    have heq : 470 * (e - i) - 31 = (470 * (e - i) - 81) + 50 := by omega
+  have hc : (470 * (e - i) - 32) * cfg.regularOpCost + R =
+      (470 * (e - i) - 82) * cfg.regularOpCost + (50 * cfg.regularOpCost + R) := by
+    have heq : 470 * (e - i) - 32 = (470 * (e - i) - 82) + 50 := by omega
     rw [heq, Nat.add_mul]; omega
   iintro ⟨#HC, #CE, #F652, Hc, H32, Hst, Hg, H128, Hrd, He, Hhex, Hid, HF⟩
   iapply mwpi_seq
@@ -671,7 +671,7 @@ theorem pending_block (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (inst : Na
     (hv : vSkip (bs.drop i) = some rest) :
     SerdeIgnValue.code81 (GF := GF) inst mi A ∗ SerdeIgnoreEscape.code inst mi A ∗
       A 652 ↪[wf] FuncInst.wasm types[32]! inst f652 ∗
-      credits Cg ((470 * (e - i) - 72) * cfg.regularOpCost + R) ∗
+      credits Cg ((470 * (e - i) - 73) * cfg.regularOpCost + R) ∗
       g ↦[wg] ⟨gt, .i32 s⟩ ∗ stk n (s.toNat - 128) 128 ∗ rd n de ptr bs i ∗
       n ↦[wms][ 1062392 ] ParseStr.escTable ∗ n ↦[wms][ 1062712 ] SerdeEsc.hexTable ∗
       n ↦[wms][ 1048576 ] SerdeIdent.identBytes ∗ Fr ⊢
@@ -730,7 +730,7 @@ theorem top_block (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (inst : Nat) (
     (hv : vSkip (bs.drop i) = some rest) :
     SerdeIgnValue.code81 (GF := GF) inst mi A ∗ SerdeIgnoreEscape.code inst mi A ∗
       A 652 ↪[wf] FuncInst.wasm types[32]! inst f652 ∗
-      credits Cg ((470 * (e - i) - 30) * cfg.regularOpCost + R) ∗
+      credits Cg ((470 * (e - i) - 31) * cfg.regularOpCost + R) ∗
       stk n s.toNat 32 ∗ SerdeIgnStack.state n maxP hl live F (de + 12) p cap [] ∗
       g ↦[wg] ⟨gt, .i32 s⟩ ∗ stk n (s.toNat - 128) 128 ∗ rd n de ptr bs i ∗
       n ↦[wms][ 1062392 ] ParseStr.escTable ∗ n ↦[wms][ 1062712 ] SerdeEsc.hexTable ∗
