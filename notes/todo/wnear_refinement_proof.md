@@ -1457,6 +1457,21 @@ invariant. Local 4 is preserved by opening and restoration and may be 0 after
 a nested opening; it must not be fixed to 1 in the container invariant. No
 complete deep 81 contract, uniform accepting parser or seventh method is claimed.
 
+`SerdeIgnMember.memberCode_eq` now pins the actual complete member tail of
+81, including the array fast path, ignored-object key and colon guards and
+branch back to the outer value loop. `object_next` uses the concrete full 650
+reader for arbitrary escapes and syntactically valid invalid-UTF-8 ignored
+keys, retaining the 128-byte callee frame and arbitrary caller resources.
+`cost_le_value` absorbs its two whitespace scans and key work into 470 regular
+operations per consumed byte, including 60 operations reserved for value entry.
+`key_indices` derives its cursor premises from complete pure-machine success.
+`object_traced` and `next_traced` then return the full pending-value continuation
+with unchanged growth credits and preserved heap/saved String resources. The
+common member-entry allowance is 75 operations for arrays and zero for objects.
+The remaining full-81 work is value/container dispatch, scalar completion,
+control-label translation and the success epilogue; this does not complete
+the deep reader or the uniform accepting argument contract.
+
 ### M7. State and storage
 
 Borsh encoding of the state, `LookupMap` keys, near-sdk's `env` wrappers

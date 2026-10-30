@@ -1023,6 +1023,53 @@ continuation is published to PR #40 after its validation gates pass.
   parser bounds, object wrappers, rejection, the seventh method and M9 remain
   open. No additional `sorry` is introduced.
 
+## Complete ignored-container member tail (2026-10-30)
+
+- `SerdeIgnMember.memberCode_eq` pins the entire member tail to the rest of
+  81's decoded value-loop body after its four initial blocks. The code includes
+  the real array fast path, both whitespace/peek guards with their rejecting
+  branches, the key quote test, 650, the colon check, and the branch back to
+  the outer value loop.
+- `array_next` proves the actual array branch returns to control label 0 with
+  value-entry flags `(l3,l4) = (1,0)`, preserving arbitrary caller resources,
+  at ten regular operations. `object_next` proves the complete actual ignored
+  object key and colon path with the concrete escaped string reader. It accepts
+  `Option String`, including syntactically valid ignored keys with invalid raw
+  UTF-8, and preserves both tables, all 128 borrowed callee-stack bytes, the
+  global stack pointer and an arbitrary `Fr` (scratch/heap/saved String state).
+- Its explicit cost is
+  `(600 + 96*(q-i) + 300*(e-(q+1)) + 96*(j-e))*regularOpCost`, for quote `q`,
+  string endpoint `e` and colon `j`. `cost_le_value` proves this charge plus
+  the 60-operation value-entry allowance fits `470*(j+1-i)*regularOpCost`.
+  No extra whole-input error reserve or UTF-8-validity assumption is introduced.
+- `key_parts` and `key_indices` derive every concrete cursor premise from the
+  complete pure machine's successful key/colon continuation. `object_traced`
+  therefore needs no separate key-reader or index hypotheses: it executes the
+  real member tail, returns the successful pending-value continuation, and
+  preserves the remaining 470-per-byte and scratch-growth credits unchanged.
+- `next_traced` unifies both branches into the common value-loop entry shape,
+  with its logical pending bracket and restored 60-operation allowance. The
+  incoming member-state fixed allowance is 75 operations for arrays and zero
+  for objects, matching the existing shallow proof's phase accounting. The
+  arbitrary caller frame can retain allocator, scratch and saved account-id
+  String ownership. These are the keys inside ignored nested containers;
+  outer `deserialize_struct` key/value resource-closure conditions remain open.
+- Lean MCP verifies the code-location equation, actual execution contracts,
+  cursor derivation and quantitative interfaces using only standard axioms.
+  The targeted build passes. `just wnear-audit` passes (2819 build jobs; 485
+  wNEAR modules, 65963 declarations and 60500 theorems), with only the
+  three existing open-refinement dependencies. Strict NearLogic has zero
+  violations, pinned statements match, and PR-wide changed-source Lean style
+  and whitespace checks pass. Evidence: `/tmp/pr40-ignore-member-final-audit.log`
+  and `/tmp/pr40-ignore-member-final-style.log`.
+- Next: assemble the complete 81 invariant using `SerdeIgnSegments` and
+  `SerdeIgnMember.next_traced`, closing the remaining value/container byte
+  dispatch, scalar-completion and control-label transitions and the final
+  success epilogue. Then carry full ignored-reader state through the object
+  adapter and close reachable room and uniform parser bounds. General
+  rejection, the seventh method and M9 remain open. No additional `sorry`
+  is introduced.
+
 ## Methods
 
 There are 15 exported methods; six now have complete per-call refinement proofs under their protocol premises.
@@ -1113,8 +1160,9 @@ The texts are proved equal to the model's `Panic.message` (`PanicText`).
       full scratch frame stack in 81. The complete pure trace and its consumed-byte
       peak bound are proved in `SerdeIgnMachineTrace`; match the actual 81 body
       to that trace. `SerdeIgnSegments` supplies the concrete entry, save and
-      restore transitions with traced credits. `Hyp81` must allow heap and scratch
-      changes.
+      restore transitions; `SerdeIgnMember.next_traced` supplies the complete
+      member tail and value-loop reentry with traced credits. `Hyp81` must allow
+      heap and scratch changes.
 2. **`ft_balance_of`, method level.** Take the parser's contracts as parameters until they are proved. The argument layer is in `EnvInput` and `ArgsLeaves`, the balance read in `LookupMapGet`/`StorageReadWrapF`.
 3. **The remaining methods**, in M8's order:
    - `storage_balance_of` (its parser is the same code as `ft_balance_of`'s);
