@@ -683,6 +683,43 @@ continuation is published to PR #40 after its validation gates pass.
   style and whitespace checks pass. Evidence: `/tmp/pr40-key-reuse-final-audit.log`
   and `/tmp/pr40-key-reuse-style.log`.
 
+## Reusable scratch in shallow ignored values (2026-10-30)
+
+- `SerdeIgnValue.scratchTables` parameterizes the scratch descriptor's pointer and
+  capacity. `P81`, `inv4`, `contSt` and `brkSt` carry those coordinates through the
+  existing shallow body proof. `f81_shallow_reuse` clears only the length, keeps
+  pointer/capacity unchanged, and returns the complete 96-byte frame at the
+  original `(166 + 470 * consumedBytes) * regularOpCost` allowance. The old
+  `f81_shallow` follows as the `(1, 0)` specialization, preserving its callers.
+- `SerdeIgnReuse.f201_shallow` proves the actual colon-plus-ignore call using the
+  successful colon contract and generalized 81. It needs no allocator ownership
+  or error allocation room on this accepted path. Scratch bytes, allocator cells,
+  the hex table and a saved account-id String can remain framed through.
+- `SerdeIgnReuse.ignoreHyp` supplies the changing-state loop's full ignored-call
+  interface for `IgnoreShallow.ign1R`, with `cost81` fixed independently of the
+  gas ceiling. It lends the descriptor and read-only tables from `core`, frames
+  its allocator/buffer and the saved String, and reconstructs the same allocation
+  state under the cursor-monotone `B` or `Bsaved` bound. All 304 caller stack
+  bytes are returned. The shared literal table and additional persistent code
+  context introduced with the object loop supply the reader's actual resources.
+- Coverage remains shallow ignored values on inputs without escapes. This
+  generalizes scratch ownership and discharges that family's state transition;
+  it does not prove the full model-agreeing ignored reader, escaped/deep ignored
+  values, the uniform accepting contract, general rejection or a seventh method.
+  Next: prove successful 652/650 on escaped ignored strings, replace the global
+  no-escape requirement at the two string branches, and generalize frame pushes
+  for deeper nesting while retaining the changing allocator state. The escaped
+  string reader must receive the hex table currently framed by `ignoreHyp`;
+  carry it through 81’s invariant or a parameterized string-reader frame.
+- Validation: `just wnear-audit` passes (2804 build jobs; 470 wNEAR modules,
+  63588 declarations and 58299 theorems). Only the three existing dependencies
+  on `Proofs.Refinement` use `sorryAx`; strict NearLogic has zero violations and
+  statement pins match. Lean MCP's compiled-module axiom query verifies the
+  generalized 81 theorem and retained specialization with only standard axioms;
+  `ignoreHyp` also passes its individual axiom check. Changed-source Lean style
+  and whitespace checks pass. Evidence: `/tmp/pr40-ignored-reuse-final-audit.log`
+  and `/tmp/pr40-ignored-reuse-style.log`.
+
 ## Methods
 
 There are 15 exported methods; six now have complete per-call refinement proofs under their protocol premises.

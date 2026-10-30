@@ -1322,6 +1322,17 @@ interfaces. This closes the borrowed-key obstruction described above; copied-key
 charges, reachable bounds, ignored values, object wrappers and general rejection
 remain open. No uniform accepting result or seventh method is claimed.
 
+**Reusable shallow ignored-state continuation (2026-10-30):**
+`SerdeIgnValue.f81_shallow_reuse` keeps arbitrary scratch pointer/capacity through
+81's existing shallow proof; the original `f81_shallow` is its empty-scratch
+specialization. `SerdeIgnReuse.f201_shallow` and `ignoreHyp` carry it through the
+actual colon/value call and the changing-state object's member invariant,
+framing heap/buffer bytes and any saved account-id String. The existing shallow
+charge is unchanged. The global no-escape premise and shallow decoder remain;
+this is not the complete ignored reader. Successful ignored escapes (652/650)
+and allocating nested-frame pushes are the next reader steps, followed by the
+remaining accepting room/gas bounds and object wrappers.
+
 ### M7. State and storage
 
 Borsh encoding of the state, `LookupMap` keys, near-sdk's `env` wrappers

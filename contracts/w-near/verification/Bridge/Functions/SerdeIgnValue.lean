@@ -107,43 +107,48 @@ instance (inst : Nat) (mi : ModuleInst) (A : Nat → Nat) : Persistent (code81 (
 def fr81 (inst : Nat) (mi : ModuleInst) (de s l3 l4 : UInt32) (l5 : UInt64) (l6 l7 l8 : UInt32) : Frame :=
   ⟨#[.i32 de, .i32 s, .i32 (de + 12), .i32 l3, .i32 l4, .i64 l5, .i32 l6, .i32 l7, .i32 l8], inst, mi⟩
 
-/-- What 81 keeps through its loops: the global at its frame, its frame, the stack below it, and
-the scratch (empty, capacity 0) with the tables. -/
-def P81 (n g : Nat) (gt : GlobalType) (sp de : UInt32) : IProp GF :=
+/-- The shallow ignored reader's scratch descriptor and read-only tables. -/
+def scratchTables (n : Nat) (de ptrS capS : UInt32) : IProp GF :=
+  iprop((∃ sl : UInt32, n ↦[i32][ de.toNat + 20 ] sl) ∗ n ↦[wms][ 1062392 ] ParseStr.escTable ∗
+    n ↦[wms][ 1071704 ] FromUtf8Gen.utf8Width ∗ n ↦[i32][ de.toNat + 12 ] ptrS ∗
+    n ↦[i32][ de.toNat + 16 ] capS ∗ n ↦[wms][ 1048576 ] SerdeIdent.identBytes)
+
+/-- What 81 keeps through its loops: globals, stack, empty scratch of any capacity, and tables. -/
+def P81 (n g : Nat) (gt : GlobalType) (sp de ptrS capS : UInt32) : IProp GF :=
   iprop(g ↦[wg] ⟨gt, .i32 (sp - 32)⟩ ∗ stk n (sp.toNat - 32) 32 ∗ stk n (sp.toNat - 96) 64 ∗
     n ↦[i32][ de.toNat + 20 ] 0 ∗ n ↦[wms][ 1062392 ] ParseStr.escTable ∗
-    n ↦[wms][ 1071704 ] FromUtf8Gen.utf8Width ∗ n ↦[i32][ de.toNat + 12 ] 1 ∗ n ↦[i32][ de.toNat + 16 ] 0 ∗
+    n ↦[wms][ 1071704 ] FromUtf8Gen.utf8Width ∗ n ↦[i32][ de.toNat + 12 ] ptrS ∗ n ↦[i32][ de.toNat + 16 ] capS ∗
     n ↦[wms][ 1048576 ] SerdeIdent.identBytes)
 
 /-- The value loop's invariant: the first value (`top`, at `j`), or a value inside the frame `f`. -/
-def inv4 (n g inst : Nat) (mi : ModuleInst) (Cg c₀ : Nat) (gt : GlobalType) (sp de ptr : UInt32)
+def inv4 (n g inst : Nat) (mi : ModuleInst) (Cg c₀ : Nat) (gt : GlobalType) (sp de ptr ptrS capS : UInt32)
     (bs : List UInt8) (j : Nat) (r : List UInt8) (T0 Ein R : Nat) : List Value → Frame → IProp GF := fun X fr =>
   iprop(⌜X = []⌝ ∗
     ((∃ (l5 : UInt64) (l6 l7 l8 : UInt32), ⌜fr = fr81 inst mi de (sp - 32) 0 1 l5 l6 l7 l8⌝ ∗
-      credits Cg (T0 * c₀ + 470 * (bs.length - r.length - j) * c₀ + R) ∗ rd n de ptr bs j ∗ P81 n g gt sp de) ∨
+      credits Cg (T0 * c₀ + 470 * (bs.length - r.length - j) * c₀ + R) ∗ rd n de ptr bs j ∗ P81 n g gt sp de ptrS capS) ∨
     (∃ (p : Nat) (l5 : UInt64) (l6 l7 : UInt32) (fb : UInt8) (N : Nat),
       ⌜fr = fr81 inst mi de (sp - 32) 1 0 l5 l6 l7 fb.toUInt32 ∧ Br fb ∧ p ≤ bs.length ∧
         (scal (bs.drop p)).bind (cont1 fb N) = some r⌝ ∗
-      credits Cg (Ein * c₀ + 470 * (bs.length - r.length - p) * c₀ + R) ∗ rd n de ptr bs p ∗ P81 n g gt sp de)))
+      credits Cg (Ein * c₀ + 470 * (bs.length - r.length - p) * c₀ + R) ∗ rd n de ptr bs p ∗ P81 n g gt sp de ptrS capS)))
 
 /-- After a value or a bracket: the container's loop (`op`: just opened). -/
-def contSt (n g inst : Nat) (mi : ModuleInst) (Cg c₀ : Nat) (gt : GlobalType) (sp de ptr : UInt32)
+def contSt (n g inst : Nat) (mi : ModuleInst) (Cg c₀ : Nat) (gt : GlobalType) (sp de ptr ptrS capS : UInt32)
     (bs : List UInt8) (r : List UInt8) (Eo Ec R : Nat) : Frame → IProp GF := fun fr =>
   iprop(∃ (p : Nat) (l3 l4 : UInt32) (l5 : UInt64) (l6 l7 : UInt32) (fb : UInt8) (N : Nat) (op : Bool),
     ⌜fr = fr81 inst mi de (sp - 32) l3 l4 l5 l6 l7 fb.toUInt32 ∧ Br fb ∧ p ≤ bs.length ∧
       (if op then l3 = 0 ∧ l4 = 1 ∧ open1 fb N (bs.drop p) = some r
        else l3 = 1 ∧ l4 = 0 ∧ cont1 fb N (bs.drop p) = some r)⌝ ∗
     credits Cg ((if op = true then (if fb = 0x5B then Eo else 200) else Ec) * c₀ + 470 * (bs.length - r.length - p) * c₀ + R) ∗
-    rd n de ptr bs p ∗ P81 n g gt sp de)
+    rd n de ptr bs p ∗ P81 n g gt sp de ptrS capS)
 
 /-- After a break out of the container's loop: the next element (`[`), or the next member's key (`{`). -/
-def brkSt (n g inst : Nat) (mi : ModuleInst) (Cg c₀ : Nat) (gt : GlobalType) (sp de ptr : UInt32)
+def brkSt (n g inst : Nat) (mi : ModuleInst) (Cg c₀ : Nat) (gt : GlobalType) (sp de ptr ptrS capS : UInt32)
     (bs : List UInt8) (r : List UInt8) (Eb R : Nat) : Frame → IProp GF := fun fr =>
   iprop(∃ (p : Nat) (l3 l4 : UInt32) (l5 : UInt64) (l6 l7 : UInt32) (fb : UInt8) (N : Nat),
     ⌜fr = fr81 inst mi de (sp - 32) l3 l4 l5 l6 l7 fb.toUInt32 ∧ Br fb ∧ p ≤ bs.length ∧
       (fb = 0x5B → (scal (bs.drop p)).bind (cont1 fb N) = some r) ∧
       (fb = 0x7B → keyThen sk (bs.drop p) (fun r3 => (scal r3).bind (cont1 fb N)) = some r)⌝ ∗
-    credits Cg ((if fb = 0x5B then Eb else 0) * c₀ + 470 * (bs.length - r.length - p) * c₀ + R) ∗ rd n de ptr bs p ∗ P81 n g gt sp de)
+    credits Cg ((if fb = 0x5B then Eb else 0) * c₀ + 470 * (bs.length - r.length - p) * c₀ + R) ∗ rd n de ptr bs p ∗ P81 n g gt sp de ptrS capS)
 
 end Defs
 
@@ -264,7 +269,7 @@ local macro "sdTop" : tactic => `(tactic| (
     iframe SB S81
   isplitl [Hrd]
   · rw [← hp1q]; iexact Hrd
-  iunfold tbl
+  iunfold scratchTables
   iframe He Hw D12 D16 Hid
   iexists 0
   iexact D20))
@@ -306,7 +311,7 @@ local macro "brTail" : tactic => `(tactic| (
   icases stk_split n (sp.toNat - 96) 48 16 $$ SB with ⟨SB1, SB2⟩
   ihave SB2 := stk_addr (show sp.toNat - 96 + 48 = (sp - 32).toNat - 16 by omega) $$ SB2
   have s84 := SerdeIgnFrame.f84_none (GF := GF) cfg lim (d + 1) types[31]! (by rfl) inst mi A n g ta hm (by omega) Cg gt
-    (sp - 32) (de + 12) 1 0 0 l8 (by omega) (by omega) (by simp)
+    (sp - 32) (de + 12) ptrS 0 capS l8 (by omega) (by omega) (by simp)
   rw [hd12, show de.toNat + 12 + 4 = de.toNat + 16 by omega, show de.toNat + 12 + 8 = de.toNat + 20 by omega] at s84
   ihave #S84 := s84 $$ HA
   clear s84
@@ -408,7 +413,7 @@ local macro "closeTail" : tactic => `(tactic| (
     iframe SB S81
   isplitl [Hrd]
   · rw [show bs.length - r.length = p + w + 1 by rw [hr]; simp; omega]; iexact Hrd
-  iunfold tbl
+  iunfold scratchTables
   iframe He Hw D12 D16 Hid
   iexists 0
   iexact D20))
@@ -717,19 +722,19 @@ set_option maxRecDepth 100000 in
 set_option maxHeartbeats 64000000 in
 /-- **`ignore_value(de)`** (81) on a shallow value: where `ign1` skips from `j` to `r`, `0`, the reader at
 `|bs| - |r|`. -/
-theorem f81_shallow (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
+theorem f81_shallow_reuse (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
     (htype : type.results.length = 1) (inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (n g ta : Nat)
     (hm : IfaceMod mi A n g ta) (hd : d + 8 < lim.maxCallDepth) (Cg : Nat)
-    (gt : GlobalType) (sp de ptr : UInt32) (bs : List UInt8) (j : Nat) (r : List UInt8)
+    (gt : GlobalType) (sp de ptr ptrS capS : UInt32) (bs : List UInt8) (j : Nat) (r : List UInt8)
     (hlen : bs.length < 2 ^ 32) (hptr : ptr.toNat + bs.length ≤ 2 ^ 32) (hde : de.toNat + 24 ≤ 2 ^ 32)
     (hsp : 96 ≤ sp.toNat) (hj : j ≤ bs.length) (hnb : (0x5C : UInt8) ∉ bs) (hx : ign1 (bs.drop j) = some r) :
     code81 inst mi A ⊢
       MFunSpec (GF := GF) cfg lim d type inst mi f81 Cg
         (fun args => iprop(⌜args = [.i32 de]⌝ ∗ g ↦[wg] ⟨gt, .i32 sp⟩ ∗ stk n (sp.toNat - 96) 96 ∗
-          rd n de ptr bs j ∗ tbl n de))
+          rd n de ptr bs j ∗ scratchTables n de ptrS capS))
         (fun _ => (166 + 470 * (bs.length - r.length - j)) * cfg.regularOpCost)
         (fun _ rs => iprop(⌜rs = [.i32 0]⌝ ∗ g ↦[wg] ⟨gt, .i32 sp⟩ ∗ stk n (sp.toNat - 96) 96 ∗
-          rd n de ptr bs (bs.length - r.length) ∗ tbl n de)) := by
+          rd n de ptr bs (bs.length - r.length) ∗ scratchTables n de ptrS capS)) := by
   iintro #Hk
   ihave #Hk' := Hk
   iunfold code81 at Hk'
@@ -763,7 +768,7 @@ theorem f81_shallow (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : Func
   iintro %args %R HP Hc
   icases HP with ⟨%hargs, Hg, Hs, Hrd, Ht⟩
   subst hargs
-  iunfold tbl at Ht
+  iunfold scratchTables at Ht
   icases Ht with ⟨⟨%sl, D20⟩, He, Hw, D12, D16, Hid⟩
   icases stk_split n (sp.toNat - 96) 64 32 $$ Hs with ⟨SB, S81⟩
   rw [show sp.toNat - 96 + 64 = sp.toNat - 32 by omega]
@@ -785,7 +790,7 @@ theorem f81_shallow (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : Func
   mcredits (cfg.regularOpCost + (109 * cfg.regularOpCost + W + R))
   iapply mwpi_cons
   iapply MemCpy.mwpi_loop0 (Cg := Cg) (R := 109 * cfg.regularOpCost + W + R)
-    (I := inv4 n g inst mi Cg cfg.regularOpCost gt sp de ptr bs j r 109 60 R) _ _ rfl
+    (I := inv4 n g inst mi Cg cfg.regularOpCost gt sp de ptr ptrS capS bs j r 109 60 R) _ _ rfl
   isplitr
   · imodintro
     iintro %X %l HI
@@ -793,7 +798,7 @@ theorem f81_shallow (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : Func
     icases HI with ⟨%hX, HI⟩
     subst hX
     iapply mwpi_split3 (N := fun vs fr => iprop(⌜vs = []⌝ ∗
-      contSt n g inst mi Cg cfg.regularOpCost gt sp de ptr bs r 250 0 R fr))
+      contSt n g inst mi Cg cfg.regularOpCost gt sp de ptr ptrS capS bs r 250 0 R fr))
     isplitl [HI]
     · icases HI with (⟨%l5, %l6, %l7, %l8, %hfr, Hc, Hrd, HP⟩ | ⟨%p, %l5, %l6, %l7, %fb, %N, %⟨hfr, hfb, hp, hmod⟩, Hc, Hrd, HP⟩)
       · rw [hfr]; simp only [fr81]
@@ -943,7 +948,7 @@ theorem f81_shallow (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : Func
       generalize hWq : 470 * (bs.length - r.length - (p + w + 1)) * cfg.regularOpCost = Wq
       generalize hEC : (if op = true then (if fb = 0x5B then 250 else 200) else 0) * cfg.regularOpCost = EC
       iapply mwpi_split1 (N := fun vs fr => iprop(⌜vs = []⌝ ∗
-        brkSt n g inst mi Cg cfg.regularOpCost gt sp de ptr bs r 75 R fr))
+        brkSt n g inst mi Cg cfg.regularOpCost gt sp de ptr ptrS capS bs r 75 R fr))
       isplitl [Hc Hrd HP]
       · simp only [fr81]
         mstep
@@ -951,7 +956,7 @@ theorem f81_shallow (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : Func
         iapply mwpi_cons
         iapply MemCpy.mwpi_loop0 (Cg := Cg) (R := EC + 468 * cfg.regularOpCost + WS + X1 + Wq + R)
           (I := fun X fr' => iprop(⌜X = [] ∧ fr' = fr81 inst mi de (sp - 32) l3 l4 l5 l6 l7 fb.toUInt32⌝ ∗
-            credits Cg (EC + 468 * cfg.regularOpCost + WS + X1 + Wq + R) ∗ rd n de ptr bs p ∗ P81 n g gt sp de))
+            credits Cg (EC + 468 * cfg.regularOpCost + WS + X1 + Wq + R) ∗ rd n de ptr bs p ∗ P81 n g gt sp de ptrS capS))
           _ _ rfl
         isplitr
         · imodintro
@@ -1265,6 +1270,22 @@ theorem f81_shallow (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : Func
     iframe Hc Hrd
     iunfold P81
     iframe Hg S81 SB D20 He Hw D12 D16 Hid
+
+theorem f81_shallow (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
+    (htype : type.results.length = 1) (inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (n g ta : Nat)
+    (hm : IfaceMod mi A n g ta) (hd : d + 8 < lim.maxCallDepth) (Cg : Nat)
+    (gt : GlobalType) (sp de ptr : UInt32) (bs : List UInt8) (j : Nat) (r : List UInt8)
+    (hlen : bs.length < 2 ^ 32) (hptr : ptr.toNat + bs.length ≤ 2 ^ 32) (hde : de.toNat + 24 ≤ 2 ^ 32)
+    (hsp : 96 ≤ sp.toNat) (hj : j ≤ bs.length) (hnb : (0x5C : UInt8) ∉ bs) (hx : ign1 (bs.drop j) = some r) :
+    code81 inst mi A ⊢
+      MFunSpec (GF := GF) cfg lim d type inst mi f81 Cg
+        (fun args => iprop(⌜args = [.i32 de]⌝ ∗ g ↦[wg] ⟨gt, .i32 sp⟩ ∗ stk n (sp.toNat - 96) 96 ∗
+          rd n de ptr bs j ∗ tbl n de))
+        (fun _ => (166 + 470 * (bs.length - r.length - j)) * cfg.regularOpCost)
+        (fun _ rs => iprop(⌜rs = [.i32 0]⌝ ∗ g ↦[wg] ⟨gt, .i32 sp⟩ ∗ stk n (sp.toNat - 96) 96 ∗
+          rd n de ptr bs (bs.length - r.length) ∗ tbl n de)) := by
+  exact f81_shallow_reuse cfg lim d type htype inst mi A n g ta hm hd Cg gt sp de ptr 1 0 bs j r
+    hlen hptr hde hsp hj hnb hx
 
 end L81
 
