@@ -33,7 +33,7 @@ concurrency:
 jobs:
   build:
     name: Build the chain package and everything below it
-    runs-on: [self-hosted, fv01]
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v5

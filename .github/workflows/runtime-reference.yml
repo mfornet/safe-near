@@ -17,7 +17,7 @@ jobs:
 
   runtime-finance-conformance:
     name: Financial, nonce and receipt-result checks against pinned nearcore
-    runs-on: [self-hosted, fv01]
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 60
     env:
       CARGO_BUILD_JOBS: "2"
@@ -45,7 +45,7 @@ jobs:
       - name: Build receipt-chain replay
         run: cd near-lean/chain && lake build receipt-replay --wfail
       # The native build dependencies (clang, cmake, protobuf, ...) are installed
-      # on the fv01 runner host; see notes/design/CI_RUNNER.md.
+      # on the runner host; see notes/design/CI_RUNNER.md.
       - uses: dtolnay/rust-toolchain@1.93.0
       - name: Build reference adapter and compare financial observations
         run: |

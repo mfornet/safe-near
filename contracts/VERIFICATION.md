@@ -12,7 +12,7 @@ Model proof completion and deployed refinement must remain separate statuses.
 | Entry | State |
 |---|---|
 | w-near | Existing completed model proofs; concrete runtime refinement stated and open |
-| linkdrop | Queued again (verification removed). near-lean runs its binary: weighted callbacks and global-contract use are modelled |
+| linkdrop | Queued again (verification removed). Binary omitted pending redistribution permission; runtime support is available for local testing |
 | [sputnik-dao-factory](sputnik-dao-factory/verification/README.md) | In progress: all 18 methods modeled on one raw trie; namespace alias witness, conditional DAO/metadata layouts, raw-key uniqueness, owner gate, receipt, store/delete rollback paths proved in the model; source and deployed refinement open |
 | [sputnikdao2-v3.2](sputnikdao2-v3.2/verification/README.md) | In progress: all 34 named exports have checked projections; policy/status/authorization, proposal/bounty/delegation/blob storage effects, views, upgrade and migration are modeled, with selected governance vote/finalize traces and raw-key refinements. Several action branches, a whole-contract dispatcher, and concrete Wasm/runtime refinement remain open. |
 | ref-farming | Queued: reward-per-share arithmetic/rounding, seed custody, claim/withdraw callbacks and storage liabilities |
@@ -30,7 +30,8 @@ besides w-near; pending catalog entries are outside the current pass.
 
 The earlier linkdrop package was removed; the shared runtime now supports the
 imports its binary uses, so a new package can start from a `ContractModel`
-instance checked against the binary.
+instance checked against a locally obtained binary. The binary is not bundled
+pending redistribution permission.
 
 ## Checks
 

@@ -28,6 +28,9 @@ independent, as described in `notes/design/SMART_CONTRACTS.md`.
 
 `contract.wasm` is redistributed under the upstream project's licence, not this
 repository's; [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md) lists them.
+Entries without established redistribution permission, currently `linkdrop`,
+retain metadata and build instructions but omit the binary. Locally obtained
+binaries for those entries are ignored by Git.
 
 ## contract.toml
 

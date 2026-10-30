@@ -38,6 +38,12 @@ core axiom audits, formatter integration checks and contract builds.
 
 ## Tool tests
 
+Machine-specific settings stay outside tracked files. `just publish-blueprint`
+reads `BLUEPRINT_DEST` and `BLUEPRINT_BASE_URL` from the local environment.
+`just verification-buildtime --record --targets Model Spec` creates a baseline
+in the ignored `.local/verification-buildtime.json`; each machine records its
+own measurements. Baselines contain no hostname or OS fingerprint.
+
 `tools/tests/test_*.py` are offline: `just tools-test` and CI's repository job
 run them with `unittest discover`, which only picks up `test_*` files.
 `tools/tests/check_*.py` build Lean fixtures or need the Mathlib cache, so CI

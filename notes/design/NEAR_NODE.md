@@ -84,9 +84,10 @@ The detailed acceptance criteria live in each Linear issue.
   below is settled) `NearCrypto` module.
 - `just verification-buildtime`: copies `contracts/w-near/verification` and its
   local packages to a fresh directory (sharing built mathlib), builds it, and
-  fails if it is more than 5% slower than this machine's entry in
-  `tools/verification-buildtime/baseline.json`. Record an entry with
-  `--record`. The baseline builds `Model Spec`; recording one for the default
+  fails if it is more than 5% slower than the contract's entry in the ignored
+  `.local/verification-buildtime.json`. Record a local entry with
+  `--record --targets Model Spec`. Hostnames and OS fingerprints are not recorded.
+  The baseline builds `Model Spec`; recording one for the default
   targets, which include `Proofs.Refinement`, is open.
 
 `just node-bench [--filter S] [--out FILE]` runs the benchmarks and prints a

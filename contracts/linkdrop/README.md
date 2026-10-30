@@ -12,7 +12,12 @@ Contract deployed on the `near` top-level account: creates `*.near` accounts and
 
 - `near`
 
-Deploy block heights and the block at which `contract.wasm` was fetched are in `contract.toml`.
+Deploy block heights and the block at which the binary was verified are in `contract.toml`.
+
+The upstream project has no stated license at the pinned revision. The binary
+is omitted from this repository pending redistribution permission. Metadata,
+hashes and source references are retained. A locally obtained binary belongs in
+the ignored `contract.wasm` path; do not commit it.
 
 ## Rebuild
 
@@ -22,5 +27,6 @@ tools/verify_build.sh contracts/linkdrop
 
 ## Formalization
 
-No verification project yet. near-lean runs this binary (weighted callbacks,
-global-contract use), so a `ContractModel` instance can be built on it.
+No verification project yet. The runtime supports the imports this binary uses
+(weighted callbacks and global-contract use), so a locally obtained binary can
+be used to build a `ContractModel` instance.
