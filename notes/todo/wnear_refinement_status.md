@@ -1310,6 +1310,17 @@ continuation is published to PR #40 after its validation gates pass.
   bounds, outer wrappers, rejection, the seventh method and M9 remain open.
   No additional `sorry` is introduced.
 
+## Continuation: function 297 zero serialization
+
+`BalanceOf297AbsentCall.format_zero` proves the next seven decoded instructions
+call the existing `to_vec::<U128>` proof on a zero value and return its JSON
+string bytes. The theorem has explicit stack, memory, gas and two allocation-room
+premises, and uses only standard axioms. It is a separate segment: composition
+with `call_and_copy_absent`, reachable allocation room, the accepted method and
+full deployed refinement remain open. In particular, the preceding call returns
+a 12-byte descriptor and 384 bytes of stack while this call needs a 16-byte
+output area and 416 bytes of stack; those resources must be framed and joined.
+
 ## Continuation: function 297 absent-call result copy
 
 `BalanceOf297AbsentCall.copy_zero` proves the actual twelve instructions after

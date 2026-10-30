@@ -271,6 +271,72 @@ theorem WNear.Binary.BalanceOf297AbsentCall.copy_zero {GF : Iris.BundledGFunctor
       (List.take 12 (List.drop 101 WNear.Binary.f297.body)) Φ
 ```
 
+## Bridge.Functions.BalanceOf297Format
+
+`WNear.Binary.BalanceOf297AbsentCall.format_zero` (hash `0000000056abf64d`)
+
+```lean
+theorem WNear.Binary.BalanceOf297AbsentCall.format_zero {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ)
+  (hm : WNear.Binary.Interface.IfaceMod mi A n g ta) (hd : d + 28 < lim.maxCallDepth) (Cg R : ℕ) (gt : Wasm.GlobalType)
+  (s x1 : UInt32) (x2 : UInt64) (x3 ptr0 aidx : UInt32) (ob : List UInt8) (maxP hl : ℕ) (live : List (ℕ × ℕ))
+  (hs : 416 ≤ s.toNat) (hframe : s.toNat + 160 ≤ 2 ^ 32) (hob : ob.length = 16)
+  (hr1 : WNear.Binary.VecFromElem.roomFor hl maxP 128)
+  (hr2 :
+    ∀ (hl1 : ℕ),
+      hl1 = hl ∨ hl1 = WNear.Binary.VecFromElem.grownLen hl 128 →
+        WNear.Binary.VecFromElem.roomFor hl1 maxP
+          (WNear.Binary.FmtGrow.newCap 0 (WNear.Binary.FmtString.kOf (WNear.Binary.FmtU128.val 0 0))))
+  (F : ℕ) (hF : WNear.Binary.VecWithCap.okG F) (Φ : WasmLogic.Post Wasm.NearState GF) :
+  (WNear.Binary.ToVec.tvCode n maxP inst mi A ∗
+      A 96 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f96 ∗
+        inst ↪[inst] mi ∗
+          NearLogic.credits Cg (17 * cfg.regularOpCost + WNear.Binary.ToVec.cost96F cfg F 0 0 + R) ∗
+            g ↦[wg] { type := gt, value := Wasm.Value.i32 s } ∗
+              WNear.Binary.VecFromElem.stk n (s.toNat - 416) 416 ∗
+                n ↦[wms][ (s + 88).toNat ] ob ∗
+                  n ↦[wms][ (s + 128).toNat ] WNear.Binary.U128From.u128Bytes 0 0 ∗
+                    WNear.Binary.ToVec.tvData n ta ptr0 (A 759) (A 353) ∗
+                      WNear.Binary.AllocFirstFit.vt n 1057464 aidx ta (A 578) ∗
+                        WNear.Binary.AllocInv.heapInv n maxP hl live F ∗
+                          ▷
+                            ∀ rs,
+                              (NearLogic.credits Cg R ∗
+                                  ⌜rs = []⌝ ∗
+                                    g ↦[wg] { type := gt, value := Wasm.Value.i32 s } ∗
+                                      WNear.Binary.VecFromElem.stk n (s.toNat - 416) 416 ∗
+                                        n ↦[wms][ (s + 128).toNat ] WNear.Binary.U128From.u128Bytes 0 0 ∗
+                                          WNear.Binary.ToVec.tvData n ta ptr0 (A 759) (A 353) ∗
+                                            WNear.Binary.AllocFirstFit.vt n 1057464 aidx ta (A 578) ∗
+                                              ∃ q rest,
+                                                ⌜rest.length =
+                                                      128 -
+                                                        ((WNear.Binary.FmtString.kOf
+                                                              (WNear.Binary.FmtU128.val 0 0)).toNat +
+                                                          2)⌝ ∗
+                                                  n ↦[wms][ (s + 88).toNat ] WasmLogic.bytes32 0 ∗
+                                                    n ↦[wms][ (s + 88).toNat + 4 ] WasmLogic.bytes32 q ∗
+                                                      n ↦[wms][ (s + 88).toNat + 8 ] WasmLogic.bytes32 128 ∗
+                                                        n ↦[wms][ (s + 88).toNat + 12 ]
+                                                            WasmLogic.bytes32
+                                                              (0 +
+                                                                  WNear.Binary.FmtString.kOf
+                                                                    (WNear.Binary.FmtU128.val 0 0) +
+                                                                2) ∗
+                                                          n ↦[wms][ q.toNat ]
+                                                              [34] ++
+                                                                    WNear.Binary.FmtDigits.decDigits
+                                                                      (WNear.Binary.FmtU128.val 0 0) ++
+                                                                  [34] ++
+                                                                rest ∗
+                                                            ∃ hl',
+                                                              WNear.Binary.AllocInv.heapInv n maxP hl'
+                                                                ((q.toNat, 128) :: live) (F + 1)) -∗
+                                Φ.normal rs (WNear.Binary.BalanceOf297AbsentCall.frame inst mi s x1 x2 x3)) ⊢
+    NearLogic.mwpi cfg lim d (WNear.Binary.BalanceOf297AbsentCall.frame inst mi s x1 x2 x3) []
+      (List.take 7 (List.drop 113 WNear.Binary.f297.body)) Φ
+```
+
 ## Bridge.Functions.BalanceOfAbsent
 
 `WNear.Binary.BalanceOfAbsent.f415_none` (hash `000000008922d795`)

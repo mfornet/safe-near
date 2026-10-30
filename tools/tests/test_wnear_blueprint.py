@@ -19,7 +19,7 @@ class FrontierPolicyTests(unittest.TestCase):
             admission = n['kind'] == 'admission'
             self.rows.append({'declaration': n['declaration'], 'is_theorem': n['kind'] != 'verification_contract',
                               'direct_sorry': admission, 'shape_hash': n['reviewed_shape_hash'], 'blueprint_label': n['label'],
-                              'not_ready': n['kind'] in ['verification_contract', 'admission'] or n['id'] in ['global', 'exported', 'dispatch', 'object-parser', 'array-parser', 'ignored-opening', 'storage', 'lookup-raw-absent', 'lookup-absent', 'balance-lookup-absent', 'balance-caller-absent', 'balance-export-call-absent', 'balance-export-call-and-copy', 'method-ft_balance_of'], 'axioms': ['sorryAx'] if admission else ['propext'],
+                              'not_ready': n['kind'] in ['verification_contract', 'admission'] or n['id'] in ['global', 'exported', 'dispatch', 'object-parser', 'array-parser', 'ignored-opening', 'storage', 'lookup-raw-absent', 'lookup-absent', 'balance-lookup-absent', 'balance-caller-absent', 'balance-export-call-absent', 'balance-export-call-and-copy', 'balance-export-format-zero', 'method-ft_balance_of'], 'axioms': ['sorryAx'] if admission else ['propext'],
                               'type_dependencies': [], 'proof_dependencies': [], 'statement': 'test', 'type_hash': 1})
         self.by_id = {n['id']: row for n, row in zip(self.manifest['nodes'], self.rows)}
         self.by_id['storage']['type_dependencies'] = [self.nodes['owned-room']['declaration']]

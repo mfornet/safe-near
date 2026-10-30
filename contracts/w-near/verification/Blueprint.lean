@@ -14,6 +14,7 @@ import Bridge.Functions.BalanceOfAbsent
 import Bridge.Functions.BalanceOfCallerAbsent
 import Bridge.Functions.BalanceOf297AbsentCall
 import Bridge.Functions.BalanceOf297AbsentCopy
+import Bridge.Functions.BalanceOf297Format
 
 /-! The browsable proof frontier. Definitions marked Open state contracts, not proofs. -/
 
@@ -356,3 +357,9 @@ attribute [blueprint "frontier:balance-export-call-and-copy"
   (statement := /-- The actual decoded function-297 slice composes the absent-account call with its following zero-result copy; reachable allocation room and the rest of the method remain open. -/)
   (notReady := true)]
   WNear.Binary.BalanceOf297AbsentCall.call_and_copy_absent
+
+attribute [blueprint "frontier:balance-export-format-zero"
+  (title := /-- Exported balance function: serialize zero -/)
+  (statement := /-- The exact decoded call serializes zero under explicit heap-room and frame premises; composition with the preceding slice remains open. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.format_zero

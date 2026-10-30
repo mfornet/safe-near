@@ -639,7 +639,8 @@
         "storage",
         "runtime-boundary",
         "ft-balance-model",
-        "balance-export-call-and-copy"
+        "balance-export-call-and-copy",
+        "balance-export-format-zero"
       ]
     },
     {
@@ -693,6 +694,18 @@
       "required_proof_dependencies": [
         "balance-export-call-absent",
         "balance-export-copy-zero"
+      ]
+    },
+    {
+      "id": "balance-export-format-zero",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.format_zero",
+      "title": "Function 297: serialize zero balance",
+      "kind": "theorem",
+      "environment": "Explicit Wasm frame, serializer data, and allocation-room premises; the preceding segment is not yet composed.",
+      "label": "frontier:balance-export-format-zero",
+      "reviewed_shape_hash": 1454110285,
+      "required_type_dependencies": [
+        "owned-room"
       ]
     }
   ],
