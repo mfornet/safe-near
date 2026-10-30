@@ -13,7 +13,7 @@ just wnear-scenarios                       # every file here except slow/
 just wnear-scenarios -v scenarios/10_callbacks.json
 just wnear-scenarios --only "reverse order"
 just wnear-scenarios scenarios/slow        # megabyte inputs: minutes each
-just wnear-scenarios scenarios/open        # open findings (none at the moment): they fail by design
+just wnear-scenarios scenarios/open        # open findings: they fail by design
 python3 scenarios/generate.py              # regenerate the generated files (see the table below)
 python3 scenarios/generate.py fuzz 1 500 DIR   # fresh argument-fuzz seeds, for a scratch run
 ```
@@ -155,6 +155,21 @@ A file holds one scenario object or an array of them.
 | `70_accounts.json` | Payouts, refunds and transfer-calls for ETH-implicit, deterministic and NEAR-implicit accounts at the bound; contracts named with 64 characters, `0x` + 40 hex, and as a sub-account |
 | `slow/40_gas_large.json` (generated) | Arguments of 1 to 4 MB, promise results of 100 KB to 4 MB |
 | `45_storage_proof.json` | The recorded storage proof as a budget (finding 8, SAF-67): within the model's `proofBound` the call is the model's; past the limit, a rolled-back `storageProofExceeded` |
+
+## Open finding: oversized accepted input at protocol 86
+
+Run `just wnear-scenarios -v scenarios/open/01_oversized_input.json` explicitly;
+it exits 1 with a discrepancy. The default suite skips `open/`.
+The input is `{"account_id":"alice.near"}` followed by 102401 blocks of
+1024 spaces: 104,858,651 bytes, beyond the 104,857,600-byte register limit.
+With 300 Tgas prepaid (below the configured 1000 Tgas total-prepaid limit), the binary reports `panic "input: register size exceeded"`
+and the model returns `"1000"`. This is neither model agreement nor one of the
+allowed resource failures. The runner validates executable hypotheses but does
+not prove the complete `Context.WF` predicate. Lean's `InputDomain` theorems
+establish that changing arguments alone preserves any baseline WF proof.
+A formal baseline and execution witness remain open. Receipt validation's 4 MiB
+argument limit is absent from that predicate. The target statement is unchanged;
+a domain restriction or model change must be reviewed explicitly.
 
 ## Findings
 

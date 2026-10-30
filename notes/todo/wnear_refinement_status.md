@@ -6,10 +6,14 @@ The exported refinement is now a checked dispatch over six completed method clau
 
 The three feasibility gates and their evidence, next checks and failure consequences are tracked in [wnear_feasibility_risks.md](wnear_feasibility_risks.md). The asynchronous gate has passing concrete created-receipt/callback traces, including zero-gas rollback probes; the full asynchronous method proofs remain open.
 
-A reduced-register-limit counterexample experiment exposes a possible mismatch in
-arbitrary-resource behavior for oversized valid inputs; it is not yet a
-counterexample under the pinned protocol. See the risk register before extending
-the accepted-call proof or changing context assumptions.
+A concrete executable discrepancy now exists under pinned protocol 86:
+`scenarios/open/01_oversized_input.json` has 104,858,651 accepted argument bytes,
+and the binary panics at the input register limit while the model returns a
+balance. It fails the arbitrary-resource disjunction. Lean proves argument-byte
+replacement preserves any baseline `Context.WF`, including unbounded lengths;
+the formal baseline and execution witness remain open. `InputRegisterMismatchWitness` states the exact missing witness, and `mismatch_refutes_refinement` checks its contradiction with the unchanged top-level statement. This domain issue takes
+priority over further accepted-call composition. The theorem is unchanged;
+restricting its domain or changing model failure behavior needs explicit review.
 
 ## Continuation checkpoint
 

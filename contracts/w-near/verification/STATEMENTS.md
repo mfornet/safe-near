@@ -4703,6 +4703,83 @@ def WNear.Binary.VecFromElem.roomFor (len maxP : ℕ) (size : UInt32) : Prop :=
           maxP
 ```
 
+## Bridge.Methods.ContextInputDomain
+
+`WNear.Binary.InputDomain.InputRegisterMismatchWitness` (hash `658bf35157d8158e`)
+
+```lean
+def WNear.Binary.InputDomain.InputRegisterMismatchWitness (cfg : WNear.Config) (size : ℕ)
+  (codeOf : List UInt8 → Near.ContractCode) (protocol : Wasm.Near.RuntimeConfig) : Prop :=
+  ∃ raw st ctx a,
+    (WNear.wnear cfg).Represents raw st ∧
+      ctx.WF raw ∧
+        ctx.protocol = protocol ∧
+          ctx.protocol.wasm.limits.maxRegisterSize < List.length ctx.args ∧
+            (WNear.wnear cfg).Parses ctx.method ctx.args (WNear.Call.ftBalanceOf a) ∧
+              (∃ output,
+                  (WNear.wnear cfg).step ctx st (WNear.Call.ftBalanceOf a) = Except.ok output) ∧
+                (Near.Boundary.nearRuntime.exec (WNear.Binary.wCode size codeOf) raw
+                      ctx).outcome =
+                  Except.error (NearInterface.Failure.panic "input: register size exceeded")
+```
+
+`WNear.Binary.InputDomain.input_register_limit_trap` (hash `00000000eb594e0e`)
+
+```lean
+theorem WNear.Binary.InputDomain.input_register_limit_trap (st : Wasm.HostStore Wasm.NearState) (bound : ℕ)
+  (hconfig : st.host.config.maxRegisterLen = some bound) (hlen : bound < st.host.context.input.length) :
+  Wasm.Near.inputFn.invoke st [Wasm.Value.i64 0] = Wasm.HostResult.Trap st "input: register size exceeded"
+```
+
+`WNear.Binary.InputDomain.mismatch_refutes_refinement` (hash `000000006b7122b7`)
+
+```lean
+theorem WNear.Binary.InputDomain.mismatch_refutes_refinement (cfg : WNear.Config) (size : ℕ)
+  (codeOf : List UInt8 → Near.ContractCode) (protocol : Wasm.Near.RuntimeConfig)
+  (hwitness : WNear.Binary.InputDomain.InputRegisterMismatchWitness cfg size codeOf protocol) :
+  ¬NearInterface.Refines Near.Boundary.nearRuntime protocol (WNear.Binary.wCode size codeOf) (WNear.wnear cfg)
+```
+
+`WNear.Binary.InputDomain.not_at_of_input_panic` (hash `00000000aaeacaf0`)
+
+```lean
+theorem WNear.Binary.InputDomain.not_at_of_input_panic (cfg : WNear.Config) (size : ℕ) (codeOf : List UInt8 → Near.ContractCode)
+  (raw : WNear.RawStorage) (st : Option WNear.State) (ctx : NearInterface.Context) (a : WNear.AccountId)
+  (hparse : (WNear.wnear cfg).Parses ctx.method ctx.args (WNear.Call.ftBalanceOf a))
+  (hstep : ∃ output, (WNear.wnear cfg).step ctx st (WNear.Call.ftBalanceOf a) = Except.ok output)
+  (hobs :
+    (Near.Boundary.nearRuntime.exec (WNear.Binary.wCode size codeOf) raw ctx).outcome =
+      Except.error (NearInterface.Failure.panic "input: register size exceeded")) :
+  ¬WNear.Binary.Exported.At cfg size codeOf raw st ctx
+```
+
+`WNear.Binary.InputDomain.wf_arguments_unbounded` (hash `000000008d835a8c`)
+
+```lean
+theorem WNear.Binary.InputDomain.wf_arguments_unbounded (ctx : NearInterface.Context) (raw : WNear.RawStorage)
+  (hwf : ctx.WF raw) (bound : ℕ) :
+  ∃ ctx',
+    ctx'.WF raw ∧
+      ctx'.protocol = ctx.protocol ∧
+        ctx'.method = ctx.method ∧ ctx'.prepaidGas = ctx.prepaidGas ∧ bound < List.length ctx'.args
+```
+
+`WNear.Binary.InputDomain.wf_with_args` (hash `000000001237ae1e`)
+
+```lean
+theorem WNear.Binary.InputDomain.wf_with_args (ctx : NearInterface.Context) (raw : WNear.RawStorage) (hwf : ctx.WF raw)
+  (args : List UInt8) :
+  { method := ctx.method, args := args, current := ctx.current, predecessor := ctx.predecessor, signer := ctx.signer,
+        signerPk := ctx.signerPk, attached := ctx.attached, prepaidGas := ctx.prepaidGas,
+        promiseResults := ctx.promiseResults, outputDataReceivers := ctx.outputDataReceivers, balance := ctx.balance,
+        locked := ctx.locked, storageUsage := ctx.storageUsage, blockHeight := ctx.blockHeight,
+        timestamp := ctx.timestamp, epochHeight := ctx.epochHeight, randomSeed := ctx.randomSeed, trie := ctx.trie,
+        protocol := ctx.protocol, actionHash := ctx.actionHash, existingYields := ctx.existingYields,
+        chainId := ctx.chainId, validatorStake := ctx.validatorStake, validatorTotalStake := ctx.validatorTotalStake,
+        storageProofSize := ctx.storageProofSize }.WF
+    raw
+```
+
 ## Bridge.Methods.FtBalanceOfAbsentCompose
 
 `WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body_model_agreement` (hash `00000000a8f8c5cc`)

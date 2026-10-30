@@ -135,6 +135,12 @@
     "WNear.Binary.FtBalanceOfMethod.BurnLimitV86",
     "WNear.Binary.FtBalanceOfMethod.argument_charge_le_limit",
     "WNear.Binary.FtBalanceOfMethod.argument_length_lt_2_24",
-    "WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body_gas_bound"
+    "WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body_gas_bound",
+    "WNear.Binary.InputDomain.wf_with_args",
+    "WNear.Binary.InputDomain.wf_arguments_unbounded",
+    "WNear.Binary.InputDomain.input_register_limit_trap",
+    "WNear.Binary.InputDomain.not_at_of_input_panic",
+    "WNear.Binary.InputDomain.InputRegisterMismatchWitness",
+    "WNear.Binary.InputDomain.mismatch_refutes_refinement"
   ]
 }

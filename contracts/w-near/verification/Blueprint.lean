@@ -39,6 +39,7 @@ import Bridge.Functions.BalanceOf297CopiedBody
 import Bridge.Functions.BalanceOf297InitialRoomCompose
 import Bridge.Methods.FtBalanceOfAbsentCompose
 import Bridge.Methods.FtBalanceOfInputBound
+import Bridge.Methods.ContextInputDomain
 
 /-! The browsable proof frontier. Definitions marked Open state contracts, not proofs. -/
 
@@ -800,3 +801,35 @@ attribute [blueprint "frontier:balance-copied-body-gas-bound"
   (statement := /-- The full decoded copied-array absent-account path derives its input length from the accepted-call gas condition, matching model and binary inputs, and the named protocol burn limit. Parser room, heap budget, gas, host, trie and frame conditions remain explicit; arbitrary-resource and full method refinement remain open. -/)
   (notReady := true)]
   WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body_gas_bound
+
+attribute [blueprint "frontier:context-wf-with-args"
+  (title := /-- Context well-formedness ignores argument bytes -/)
+  (statement := /-- From an existing well-formed context, replacing only args preserves Context.WF. This checks the current theorem domain, not runtime reachability or execution. -/)]
+  WNear.Binary.InputDomain.wf_with_args
+
+attribute [blueprint "frontier:context-wf-unbounded-args"
+  (title := /-- Context.WF admits arbitrarily long arguments -/)
+  (statement := /-- Given one well-formed context, for every byte bound another well-formed context exceeds it with the same protocol, method and prepaid gas. This does not establish a baseline witness or the execution discrepancy in Lean. -/)]
+  WNear.Binary.InputDomain.wf_arguments_unbounded
+
+attribute [blueprint "frontier:input-register-trap"
+  (title := /-- Oversized input traps at register 0 -/)
+  (statement := /-- The exact input host operation traps when the input exceeds the configured register limit. The complete binary execution is not proved here. -/)]
+  WNear.Binary.InputDomain.input_register_limit_trap
+
+attribute [blueprint "frontier:input-panic-obstruction"
+  (title := /-- Input panic contradicts accepted-call observations -/)
+  (statement := /-- Given accepted parsing, model success and the binary input-limit panic, the unchanged Exported.At clause is false. These observation premises still require instantiation. -/)]
+  WNear.Binary.InputDomain.not_at_of_input_panic
+
+attribute [blueprint "frontier:input-register-mismatch-witness"
+  (title := /-- Formal oversized-input counterexample witness -/)
+  (statement := /-- An exact represented Context.WF witness with oversized accepted arguments, model success and binary input-limit panic. The pinned-v86 executable reproducer supplies evidence, but this existential witness remains unproved. -/)
+  (notReady := true)]
+  WNear.Binary.InputDomain.InputRegisterMismatchWitness
+
+attribute [blueprint "frontier:input-mismatch-refutes-refinement"
+  (title := /-- A mismatch witness refutes full refinement -/)
+  (statement := /-- An instantiated input-register mismatch witness negates the unchanged full Refines statement. The formal witness remains open; the executable discrepancy is not presented as a kernel refutation. -/)
+  (notReady := true)]
+  WNear.Binary.InputDomain.mismatch_refutes_refinement

@@ -14,7 +14,8 @@
       ],
       "required_instantiations": [
         "protocol-available"
-      ]
+      ],
+      "notes": "Executable protocol-86 discrepancy: scenarios/open/01_oversized_input.json accepts 104858651 argument bytes in the model but the binary panics with input: register size exceeded. Context.WF imposes no argument bound; a formal baseline context and execution witness remain to be proved. The target has not been changed."
     },
     {
       "id": "exported",
@@ -645,7 +646,8 @@
         "parser-public-through-cleanup",
         "balance-copied-parser-through-cleanup",
         "balance-copied-absent-body"
-      ]
+      ],
+      "notes": "Executable protocol-86 discrepancy: scenarios/open/01_oversized_input.json accepts 104858651 argument bytes in the model but the binary panics with input: register size exceeded. Context.WF imposes no argument bound; a formal baseline context and execution witness remain to be proved. The target has not been changed."
     },
     {
       "id": "balance-rejected",
@@ -1687,6 +1689,73 @@
       "required_proof_dependencies": [
         "balance-argument-length",
         "balance-copied-body-initial-room"
+      ]
+    },
+    {
+      "id": "context-wf-with-args",
+      "declaration": "WNear.Binary.InputDomain.wf_with_args",
+      "title": "Context well-formedness ignores argument bytes",
+      "kind": "theorem",
+      "environment": "An existing Context.WF proof is preserved by replacing argument bytes. This establishes the quantified input domain, not runtime reachability or execution.",
+      "label": "frontier:context-wf-with-args",
+      "reviewed_shape_hash": 305638942
+    },
+    {
+      "id": "context-wf-unbounded-args",
+      "declaration": "WNear.Binary.InputDomain.wf_arguments_unbounded",
+      "title": "Context.WF admits arbitrarily long arguments",
+      "kind": "theorem",
+      "environment": "Given a well-formed baseline, any argument byte bound can be exceeded without changing protocol, method or prepaid gas. The baseline and binary mismatch are not established by this theorem.",
+      "label": "frontier:context-wf-unbounded-args",
+      "reviewed_shape_hash": 2374195852,
+      "required_proof_dependencies": [
+        "context-wf-with-args"
+      ]
+    },
+    {
+      "id": "input-register-trap",
+      "declaration": "WNear.Binary.InputDomain.input_register_limit_trap",
+      "title": "Oversized input traps at register 0",
+      "kind": "theorem",
+      "label": "frontier:input-register-trap",
+      "reviewed_shape_hash": 3948498446,
+      "environment": "The exact input host traps above its register limit. This does not prove the complete deployed-method execution."
+    },
+    {
+      "id": "input-panic-obstruction",
+      "declaration": "WNear.Binary.InputDomain.not_at_of_input_panic",
+      "title": "Input panic contradicts accepted-call observations",
+      "kind": "theorem",
+      "label": "frontier:input-panic-obstruction",
+      "reviewed_shape_hash": 2867514096,
+      "environment": "Given accepted parsing, model success and this binary panic, the unchanged Exported.At clause is false. The execution premise remains to be instantiated."
+    },
+    {
+      "id": "input-register-mismatch-witness",
+      "declaration": "WNear.Binary.InputDomain.InputRegisterMismatchWitness",
+      "title": "Formal oversized-input counterexample witness",
+      "kind": "verification_contract",
+      "label": "frontier:input-register-mismatch-witness",
+      "reviewed_shape_hash": 7317209550285182350,
+      "notes": "Exact represented and Context.WF witness with oversized accepted arguments, model success and binary input-limit panic. A pinned-v86 executable discrepancy is reproduced; this formal existential witness is still open.",
+      "planned_dependencies": [
+        "context-wf-unbounded-args",
+        "input-register-trap"
+      ]
+    },
+    {
+      "id": "input-mismatch-refutes-refinement",
+      "declaration": "WNear.Binary.InputDomain.mismatch_refutes_refinement",
+      "title": "A mismatch witness refutes full refinement",
+      "kind": "theorem",
+      "label": "frontier:input-mismatch-refutes-refinement",
+      "reviewed_shape_hash": 1802576567,
+      "environment": "An instantiated formal mismatch witness negates the unchanged full Refines statement. The witness remains open; this is not an unconditional kernel refutation.",
+      "required_type_dependencies": [
+        "input-register-mismatch-witness"
+      ],
+      "required_proof_dependencies": [
+        "input-panic-obstruction"
       ]
     }
   ],

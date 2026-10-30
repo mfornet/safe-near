@@ -1,0 +1,31 @@
+{
+  "name": "open: pinned v86 oversized accepted balance input",
+  "description": "Expected discrepancy: Context.WF has no receipt argument-length premise; v86 input host rejects a valid argument larger than the 100 MiB register limit. The model accepts it and ResourceFailure excludes the resulting panic. The runner checks executable hypotheses but does not prove Context.WF.",
+  "state": {
+    "accounts": {
+      "alice.near": "1000"
+    }
+  },
+  "blocks": [
+    {
+      "receipts": [
+        {
+          "label": "oversized",
+          "call": {
+            "method": "ft_balance_of",
+            "gas": "300000000000000",
+            "argsText": [
+              "{\"account_id\":\"alice.near\"}",
+              {
+                "repeat": "                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                ",
+                "times": 102401
+              }
+            ]
+          },
+          "expect": "panic:input: register size exceeded"
+        }
+      ]
+    }
+  ],
+  "protocolVersion": 86
+}
