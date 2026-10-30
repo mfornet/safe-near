@@ -117,6 +117,16 @@
     "WNear.Binary.FromSliceEsc.f65_arr_copied",
     "WNear.Binary.BalanceOf297AbsentCall.copied_result_room",
     "WNear.Binary.BalanceOf297AbsentCall.f65_arr_copied_room",
-    "WNear.Binary.BalanceOf297AbsentCall.copied_parser_call_through_cleanup"
+    "WNear.Binary.BalanceOf297AbsentCall.copied_parser_call_through_cleanup",
+    "WNear.Binary.BalanceOf297AbsentCall.deref_and_parser_setup",
+    "WNear.Binary.BalanceOf297AbsentCall.deref_copied_parser_through_cleanup",
+    "WNear.Binary.BalanceOf297AbsentCall.input_expect",
+    "WNear.Binary.BalanceOf297AbsentCall.expect_deref_parser_through_cleanup",
+    "WNear.Binary.BalanceOf297AbsentCall.input_copied_parser_through_cleanup",
+    "WNear.Binary.BalanceOf297AbsentCall.input_setup_through_cleanup",
+    "WNear.Binary.BalanceOf297AbsentCall.prologue297",
+    "WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body",
+    "WNear.Binary.ReadRegister.RegOk",
+    "WNear.Binary.EnvInput.f527_spec"
   ]
 }

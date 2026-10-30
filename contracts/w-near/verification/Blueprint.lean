@@ -35,6 +35,7 @@ import Bridge.Functions.BalanceOf297RoomF
 import Bridge.Functions.BalanceOf297ParserResult
 import Bridge.Functions.BalanceOf297ParserPublicCompose
 import Bridge.Functions.BalanceOf297CopiedCall
+import Bridge.Functions.BalanceOf297CopiedBody
 
 /-! The browsable proof frontier. Definitions marked Open state contracts, not proofs. -/
 
@@ -693,3 +694,60 @@ attribute [blueprint "frontier:balance-copied-parser-through-cleanup"
   (statement := /-- Specific copied/escaped array input and actual function 65 call, initial parser-growth-plus-six room, parser allocation bounds, trie, shared proof budget, host and frame resources; other input cases and full method remain open. -/)
   (notReady := true)]
   WNear.Binary.BalanceOf297AbsentCall.copied_parser_call_through_cleanup
+
+attribute [blueprint "frontier:balance-input-deref-setup"
+  (title := /-- Function 297: dereference input and prepare parser arguments -/)
+  (statement := /-- Decoded input vector descriptor, frame, installed code and execution resources. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.deref_and_parser_setup
+
+attribute [blueprint "frontier:balance-input-deref-through-cleanup"
+  (title := /-- Function 297: dereference through copied-array balance cleanup -/)
+  (statement := /-- Concrete copied-array input, parser and heap room, trie, input ownership and host/frame premises. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.deref_copied_parser_through_cleanup
+
+attribute [blueprint "frontier:balance-input-expect"
+  (title := /-- Function 297: unwrap present input vector -/)
+  (statement := /-- Present input option, non-null pointer, installed code and execution resources. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.input_expect
+
+attribute [blueprint "frontier:balance-input-expect-through-cleanup"
+  (title := /-- Function 297: input unwrap through copied-array cleanup -/)
+  (statement := /-- Concrete copied-array input, present input vector, parser and heap room, trie and host/frame premises. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.expect_deref_parser_through_cleanup
+
+attribute [blueprint "frontier:balance-input-through-cleanup"
+  (title := /-- Function 297: input call through copied-array cleanup -/)
+  (statement := /-- Input call arguments prepared, input register limit and allocation room, copied-array parser room, initial input-plus-parser-plus-six growth budget, trie, host and frame premises. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.input_copied_parser_through_cleanup
+
+attribute [blueprint "frontier:balance-input-setup-through-cleanup"
+  (title := /-- Function 297: input setup through copied-array cleanup -/)
+  (statement := /-- Installed interface, concrete copied-array input, input and parser room, initial growth budget, trie, host and frame premises. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.input_setup_through_cleanup
+
+attribute [blueprint "frontier:balance-method-prologue"
+  (title := /-- Function 297: frame and interface prologue -/)
+  (statement := /-- Decoded frame, panic hook and blockchain interface setup under installed code and initial memory resources. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.prologue297
+
+attribute [blueprint "frontier:balance-copied-absent-body"
+  (title := /-- Function 297: complete body for copied-array absent account -/)
+  (statement := /-- Entire decoded function body for the copied-string array and absent-account path, conditional on input shape, parser and heap room, trie, host, gas and initial frame/static resources. The full accepted/rejected method contract remains open. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body
+
+attribute [blueprint "frontier:input-register-room"
+  (title := /-- Input register and allocation room -/)
+  (statement := /-- The input register is nonempty, bounded and has room for its allocation; its establishment from the external environment remains open. -/)
+  (notReady := true)]
+  WNear.Binary.ReadRegister.RegOk
+
+attribute [blueprint "frontier:input-read"
+  (title := /-- Environment input and register read -/)
+  (statement := /-- The decoded input reader calls the host and returns the input in an owned vector, under the explicit register-room and interface premises. -/)
+  (notReady := true)]
+  WNear.Binary.EnvInput.f527_spec

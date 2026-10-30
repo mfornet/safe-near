@@ -643,7 +643,8 @@
         "balance-state-six-grows-free-bound",
         "balance-parser-through-cleanup",
         "parser-public-through-cleanup",
-        "balance-copied-parser-through-cleanup"
+        "balance-copied-parser-through-cleanup",
+        "balance-copied-absent-body"
       ]
     },
     {
@@ -1435,6 +1436,146 @@
       "required_proof_dependencies": [
         "copied-parser-with-room",
         "parser-fixed-through-cleanup"
+      ]
+    },
+    {
+      "id": "balance-input-deref-setup",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.deref_and_parser_setup",
+      "title": "Function 297: dereference input and prepare parser arguments",
+      "kind": "theorem",
+      "environment": "Decoded input vector descriptor, frame, installed code and execution resources.",
+      "label": "frontier:balance-input-deref-setup",
+      "reviewed_shape_hash": 2846147756
+    },
+    {
+      "id": "balance-input-deref-through-cleanup",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.deref_copied_parser_through_cleanup",
+      "title": "Function 297: dereference through copied-array balance cleanup",
+      "kind": "theorem",
+      "environment": "Concrete copied-array input, parser and heap room, trie, input ownership and host/frame premises.",
+      "label": "frontier:balance-input-deref-through-cleanup",
+      "reviewed_shape_hash": 4277412009,
+      "required_type_dependencies": [
+        "string-room",
+        "owned-room",
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "balance-input-deref-setup",
+        "balance-copied-parser-through-cleanup"
+      ]
+    },
+    {
+      "id": "balance-input-expect",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.input_expect",
+      "title": "Function 297: unwrap present input vector",
+      "kind": "theorem",
+      "environment": "Present input option, non-null pointer, installed code and execution resources.",
+      "label": "frontier:balance-input-expect",
+      "reviewed_shape_hash": 3636033434
+    },
+    {
+      "id": "balance-input-expect-through-cleanup",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.expect_deref_parser_through_cleanup",
+      "title": "Function 297: input unwrap through copied-array cleanup",
+      "kind": "theorem",
+      "environment": "Concrete copied-array input, present input vector, parser and heap room, trie and host/frame premises.",
+      "label": "frontier:balance-input-expect-through-cleanup",
+      "reviewed_shape_hash": 788569678,
+      "required_type_dependencies": [
+        "string-room",
+        "owned-room",
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "balance-input-expect",
+        "balance-input-deref-through-cleanup"
+      ]
+    },
+    {
+      "id": "balance-input-through-cleanup",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.input_copied_parser_through_cleanup",
+      "title": "Function 297: input call through copied-array cleanup",
+      "kind": "theorem",
+      "environment": "Input call arguments prepared, input register limit and allocation room, copied-array parser room, initial input-plus-parser-plus-six growth budget, trie, host and frame premises.",
+      "label": "frontier:balance-input-through-cleanup",
+      "reviewed_shape_hash": 1781588792,
+      "required_type_dependencies": [
+        "string-room",
+        "owned-room",
+        "lookup-heap-room",
+        "input-register-room"
+      ],
+      "required_proof_dependencies": [
+        "balance-input-expect-through-cleanup",
+        "input-read"
+      ]
+    },
+    {
+      "id": "balance-input-setup-through-cleanup",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.input_setup_through_cleanup",
+      "title": "Function 297: input setup through copied-array cleanup",
+      "kind": "theorem",
+      "environment": "Installed interface, concrete copied-array input, input and parser room, initial growth budget, trie, host and frame premises.",
+      "label": "frontier:balance-input-setup-through-cleanup",
+      "reviewed_shape_hash": 1975133193,
+      "required_type_dependencies": [
+        "string-room",
+        "owned-room",
+        "lookup-heap-room",
+        "input-register-room"
+      ],
+      "required_proof_dependencies": [
+        "balance-input-through-cleanup"
+      ]
+    },
+    {
+      "id": "balance-method-prologue",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.prologue297",
+      "title": "Function 297: frame and interface prologue",
+      "kind": "theorem",
+      "environment": "Decoded frame, panic hook and blockchain interface setup under installed code and initial memory resources.",
+      "label": "frontier:balance-method-prologue",
+      "reviewed_shape_hash": 4266550772
+    },
+    {
+      "id": "balance-copied-absent-body",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body",
+      "title": "Function 297: complete body for copied-array absent account",
+      "kind": "theorem",
+      "environment": "Entire decoded function body for the copied-string array and absent-account path, conditional on input shape, parser and heap room, trie, host, gas and initial frame/static resources. The full accepted/rejected method contract remains open.",
+      "label": "frontier:balance-copied-absent-body",
+      "reviewed_shape_hash": 3932258835,
+      "required_type_dependencies": [
+        "string-room",
+        "owned-room",
+        "lookup-heap-room",
+        "input-register-room"
+      ],
+      "required_proof_dependencies": [
+        "balance-method-prologue",
+        "balance-input-setup-through-cleanup"
+      ]
+    },
+    {
+      "id": "input-register-room",
+      "declaration": "WNear.Binary.ReadRegister.RegOk",
+      "title": "Input register and allocation room",
+      "kind": "verification_contract",
+      "notes": "The input must be nonempty, within bounds and have allocation room; deriving this from the external environment remains open.",
+      "label": "frontier:input-register-room",
+      "reviewed_shape_hash": 3932043105830060447
+    },
+    {
+      "id": "input-read",
+      "declaration": "WNear.Binary.EnvInput.f527_spec",
+      "title": "Environment input and register read",
+      "kind": "theorem",
+      "environment": "Input register-room condition, register limit, installed interface, heap and frame resources.",
+      "label": "frontier:input-read",
+      "reviewed_shape_hash": 2173767728,
+      "required_type_dependencies": [
+        "input-register-room"
       ]
     }
   ],

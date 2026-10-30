@@ -33,6 +33,10 @@ The actual function 297 success branch, descriptor copies and input-vector drop 
 
 For the specific copied-string array path, the actual function 65 parser call is now composed with the 114-instruction balance suffix, giving a 115-instruction decoded path from the prepared parser-call arguments through absent-account return and cleanup. The parser's recorded growth and free-list bound yield downstream six-growth room from a single initial parser-growth-plus-six allowance; gas uses the actual recorded bound. Parser room and allocation premises, input ownership, host and frame resources, other input forms, and integration into the full accepted-call refinement remain open. The general `ParserPostBudget` obligation remains open for the public parser result.
 
+## Complete decoded body for copied-array absent-account path
+
+The actual function 297 body is now composed for the copied-string array and absent-account case, from its 160-byte frame and interface setup through input, parser, state and balance reads, return and cleanup. The checked path assumes initial input/parser growth room, parser-specific room and allocation conditions, exact input shape, canonical trie, shared proof budget, host/gas and initial frame/static resources. It is a specific conditional path, not the full accepted-call or rejected-input refinement; relating these resources and host conditions to the external method environment remains open.
+
 ## Continuation on 2026-10-29: integration with main
 
 Work continues on `codex/wnear-proof-continuation`, starting from PR head `1ea4077` and merging
