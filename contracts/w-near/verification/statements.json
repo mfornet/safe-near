@@ -56,6 +56,7 @@
     "WNear.Binary.LookupMapGet.f400_none",
     "WNear.Binary.LookupMapGet.f399_none",
     "WNear.Binary.LookupMapOps.HeapRoomK",
-    "WNear.Binary.BalanceOfAbsent.f415_none"
+    "WNear.Binary.BalanceOfAbsent.f415_none",
+    "WNear.Binary.BalanceOfAbsent.f293_none"
   ]
 }

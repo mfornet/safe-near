@@ -215,7 +215,7 @@
         "storage",
         "runtime-boundary",
         "ft-balance-model",
-        "balance-lookup-absent"
+        "balance-caller-absent"
       ],
       "label": "frontier:method-ft_balance_of",
       "reviewed_shape_hash": 925099951
@@ -598,6 +598,21 @@
       ],
       "required_proof_dependencies": [
         "lookup-absent"
+      ]
+    },
+    {
+      "id": "balance-caller-absent",
+      "declaration": "WNear.Binary.BalanceOfAbsent.f293_none",
+      "title": "Token balance caller: absent account returns zero",
+      "kind": "theorem",
+      "environment": "Metered host, trie proof budget, allocator room and explicit Wasm resource premises.",
+      "label": "frontier:balance-caller-absent",
+      "reviewed_shape_hash": 3189644620,
+      "required_type_dependencies": [
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "balance-lookup-absent"
       ]
     }
   ],
