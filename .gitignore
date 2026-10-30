@@ -16,3 +16,11 @@ audit/
 
 # Validated syntax-formatting results (one cache per Lake package).
 .lean-fmt-cache/
+
+# Local machine configuration and non-redistributed artifacts.
+/.local/
+/tools/verification-buildtime/baseline.json
+.env
+.env.*
+!.env.example
+/contracts/linkdrop/contract.wasm
