@@ -26,6 +26,7 @@ import Bridge.Functions.BalanceOf297ArgumentCopy
 import Bridge.Functions.BalanceOf297ParsedSuffix
 import Bridge.Functions.BalanceOf297StateRead
 import Bridge.Functions.BalanceOf297StateBridge
+import Bridge.Functions.BalanceOf297ReadBudget
 
 /-! The browsable proof frontier. Definitions marked Open state contracts, not proofs. -/
 
@@ -448,3 +449,21 @@ attribute [blueprint "frontier:balance-export-state-through-cleanup"
   (statement := /-- The exact 82-instruction suffix composes model-state reading through absent balance return and cleanup, assuming state-entry resources, allocation room and the named second-read conditions; parsing and the complete method remain open. -/)
   (notReady := true)]
   WNear.Binary.BalanceOf297AbsentCall.state_through_cleanup_absent
+
+attribute [blueprint "frontier:balance-second-read-gas"
+  (title := /-- Balance-read gas bound after state read -/)
+  (statement := /-- Open uniform gas bound for the absent-account lookup after state_read. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.BalanceReadGasAfterState
+
+attribute [blueprint "frontier:balance-second-read-from-budget"
+  (title := /-- Derive second-read conditions from shared budget -/)
+  (statement := /-- Canonical trie, storage link and a shared proof budget propagate across state_read; the separately named gas bound remains open. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.balanceReadAfterState_of_budget
+
+attribute [blueprint "frontier:balance-export-state-budget"
+  (title := /-- Exported balance: state read through cleanup with shared budget -/)
+  (statement := /-- The checked 82-instruction absent-account suffix now derives the second-read trie and proof-budget conditions from the initial state; parsed-entry resources, allocation room and post-read gas remain open. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.state_through_cleanup_of_budget

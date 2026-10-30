@@ -639,7 +639,7 @@
         "storage",
         "runtime-boundary",
         "ft-balance-model",
-        "balance-export-state-through-cleanup"
+        "balance-export-state-budget"
       ]
     },
     {
@@ -871,6 +871,46 @@
       "required_proof_dependencies": [
         "balance-export-state-read",
         "balance-export-parsed-suffix"
+      ]
+    },
+    {
+      "id": "balance-second-read-gas",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.BalanceReadGasAfterState",
+      "title": "Balance-read gas bound after state read",
+      "kind": "verification_contract",
+      "notes": "Open uniform bound on the absent-account lookup gas after the state read.",
+      "label": "frontier:balance-second-read-gas",
+      "reviewed_shape_hash": 10982792330483191918
+    },
+    {
+      "id": "balance-second-read-from-budget",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.balanceReadAfterState_of_budget",
+      "title": "Derive second-read conditions from shared proof budget",
+      "kind": "theorem",
+      "environment": "Canonical trie, global storage link, sufficient two-read proof budget, absent account, key limit and post-state-read gas bound.",
+      "label": "frontier:balance-second-read-from-budget",
+      "reviewed_shape_hash": 370085047,
+      "required_type_dependencies": [
+        "balance-second-read-gas"
+      ]
+    },
+    {
+      "id": "balance-export-state-budget",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.state_through_cleanup_of_budget",
+      "title": "Function 297: state read through cleanup with shared proof budget",
+      "kind": "theorem",
+      "environment": "Parsed owned account, one-cell state-read entry, canonical trie and storage link, shared two-read proof budget, absent account, allocation room, return limit and post-read gas bound.",
+      "label": "frontier:balance-export-state-budget",
+      "reviewed_shape_hash": 331348160,
+      "required_type_dependencies": [
+        "balance-state-entry",
+        "balance-second-read-gas",
+        "owned-room",
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "balance-export-state-through-cleanup",
+        "balance-second-read-from-budget"
       ]
     }
   ],

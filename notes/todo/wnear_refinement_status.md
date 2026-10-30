@@ -1310,6 +1310,17 @@ continuation is published to PR #40 after its validation gates pass.
   bounds, outer wrappers, rejection, the seventh method and M9 remain open.
   No additional `sorry` is introduced.
 
+## Continuation: propagate a shared storage proof budget
+
+`BalanceOf297AbsentCall.balanceReadAfterState_of_budget` derives the second
+lookup's canonical trie, storage link, proof budget, absent value and key limit
+from the initial state and a budget sufficient for both reads. It uses the
+existing `StorageReadPost.next` transition. The remaining uniform post-read gas
+bound is stated as `BalanceReadGasAfterState` and shown Open in the frontier.
+`state_through_cleanup_of_budget` integrates this derivation into the checked
+82-instruction suffix; both new proofs use standard axioms. Parser-to-state-read
+entry resources, allocation room, post-read gas and the full method remain open.
+
 ## Continuation: state read through absent balance cleanup
 
 `BalanceOf297AbsentCall.state_read_and_unwrap` checks the exact state-read and
