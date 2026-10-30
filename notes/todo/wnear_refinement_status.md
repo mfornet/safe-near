@@ -1310,16 +1310,24 @@ continuation is published to PR #40 after its validation gates pass.
   bounds, outer wrappers, rejection, the seventh method and M9 remain open.
   No additional `sorry` is introduced.
 
+## Continuation: function 297 absent call through serialization
+
+`BalanceOf297AbsentCall.call_copy_and_format_absent` composes the checked
+absent-account call and zero-copy slice with the zero serializer over the exact
+29 instructions of function 297. It preserves the host, lookup and frame
+resources for its caller and proves the serializer's allocation bounds from
+`HeapRoomK 4`. The theorem uses only standard axioms. Reachability of that
+four-growth room, argument parsing and the enclosing accepted-call method remain
+open; the new proof is not claimed to complete the exported method.
+
 ## Continuation: function 297 zero serialization
 
 `BalanceOf297AbsentCall.format_zero` proves the next seven decoded instructions
 call the existing `to_vec::<U128>` proof on a zero value and return its JSON
 string bytes. The theorem has explicit stack, memory, gas and two allocation-room
-premises, and uses only standard axioms. It is a separate segment: composition
-with `call_and_copy_absent`, reachable allocation room, the accepted method and
-full deployed refinement remain open. In particular, the preceding call returns
-a 12-byte descriptor and 384 bytes of stack while this call needs a 16-byte
-output area and 416 bytes of stack; those resources must be framed and joined.
+premises, and uses only standard axioms. The subsequent composition above supplies the extra four output bytes and 32
+stack bytes explicitly; reachable allocation room, the accepted method and full
+deployed refinement remain open.
 
 ## Continuation: function 297 absent-call result copy
 

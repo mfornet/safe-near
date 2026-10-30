@@ -639,8 +639,7 @@
         "storage",
         "runtime-boundary",
         "ft-balance-model",
-        "balance-export-call-and-copy",
-        "balance-export-format-zero"
+        "balance-export-call-copy-format"
       ]
     },
     {
@@ -706,6 +705,22 @@
       "reviewed_shape_hash": 1454110285,
       "required_type_dependencies": [
         "owned-room"
+      ]
+    },
+    {
+      "id": "balance-export-call-copy-format",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.call_copy_and_format_absent",
+      "title": "Function 297: absent call, copy and serialization",
+      "kind": "theorem",
+      "environment": "Metered host, trie proof budget, four-growth heap room and explicit Wasm frame/resource premises.",
+      "label": "frontier:balance-export-call-copy-format",
+      "reviewed_shape_hash": 2047302754,
+      "required_type_dependencies": [
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "balance-export-call-and-copy",
+        "balance-export-format-zero"
       ]
     }
   ],
