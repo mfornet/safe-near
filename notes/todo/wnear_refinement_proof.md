@@ -1472,6 +1472,21 @@ The remaining full-81 work is value/container dispatch, scalar completion,
 control-label translation and the success epilogue; this does not complete
 the deep reader or the uniform accepting argument contract.
 
+`SerdeIgnContainer` now proves the actual whitespace/peek blocks used by
+both loops, matching-close dispatch, first-element/member dispatch, accepted
+comma dispatch and post-loop guard. Four code-location equations tie these
+pieces to decoded 81. The peeks use `125 + 96*wsLen` regular operations;
+close, first-byte and comma dispatch use 100, 35 and 65 respectively, and
+the post-loop guard uses five. The first-byte and comma paths leave through
+different relative labels (0 and 2), with the reader advanced only for the
+comma. `phase_cases` and `phase_nonempty` derive exactly those successful
+choices from the full traced machine, replacing shallow-only case analysis.
+The complete loop still needs assembly, including value/scalar completion
+and success cleanup. Aggregate phase accounting, tighter repeated-peek/frame
+charges or amortization across nested openings and later closes still need
+validation; these component bounds alone do not
+establish the uniform per-byte allowance or a seventh method refinement.
+
 ### M7. State and storage
 
 Borsh encoding of the state, `LookupMap` keys, near-sdk's `env` wrappers

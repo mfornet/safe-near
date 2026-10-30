@@ -1070,6 +1070,53 @@ continuation is published to PR #40 after its validation gates pass.
   rejection, the seventh method and M9 remain open. No additional `sorry`
   is introduced.
 
+## Complete-machine container peek and delimiter dispatch (2026-10-30)
+
+- `SerdeIgnContainer` pins four concrete code locations in decoded 81:
+  the container peek, the value-loop peek, the nested delimiter dispatch and
+  the post-container-loop first-element guard. The rejecting and panic branches
+  remain in the checked code, although the contracts below select successful
+  paths using their explicit model/byte premises.
+- `peek_success` proves both actual whitespace/peek blocks with arbitrary
+  escape-label index. It preserves the caller frame and input bytes, updates
+  local 5 to the actual optional byte, and advances only over leading JSON
+  whitespace, including the EOF case. Its allowance is
+  `(125 + 96*wsLen)*regularOpCost`.
+- `dispatch_close` reaches the existing actual closing segment on either
+  matching delimiter while preserving arbitrary caller resources, at 100
+  regular operations. `dispatch_first` takes relative label 0 without eating
+  the first member/value byte, at 35 operations, provided it is not a closing
+  delimiter or comma. `dispatch_comma` consumes an accepted comma and takes
+  relative label 2 toward the member path, at 65 operations. `first_exit`
+  proves the actual five-operation post-loop guard for the no-comma first
+  element/member case. The two exit labels are deliberately distinct.
+- `phase_cases` derives exactly the corresponding three alternatives from
+  successful execution of the complete traced pure machine, for either an
+  opened container or a continuation after a value. Its close branch retains
+  the full saved-frame-pop continuation; its first/comma branches give the
+  successful `SerdeIgnMember.nextModel` continuation. `phase_nonempty` excludes
+  EOF from either successful container phase. These lemmas replace the old
+  shallow-only dispatch classification without assuming a general ignored
+  reader contract.
+- Lean MCP checks all five execution contracts, four code-location equations
+  and the complete-machine classification/non-EOF lemmas with only standard
+  axioms. The targeted build passes. `just wnear-audit` passes (2820 build jobs;
+  486 wNEAR modules, 66207 declarations and 60722 theorems), with only the
+  three existing open-refinement dependencies. Strict NearLogic has zero
+  violations, pinned statements match, and PR-wide changed-source Lean style
+  and whitespace checks pass. Evidence: `/tmp/pr40-ignore-container-final-audit.log`
+  and `/tmp/pr40-ignore-container-final-style.log`.
+- Next: assemble the container-loop invariant from these peeks/dispatches,
+  `SerdeIgnSegments`' traced open/close operations and `SerdeIgnMember`'s
+  value reentry. The remaining value dispatch, scalar-completion and success
+  epilogue also need integration. Aggregate instruction accounting remains open:
+  compose the phase allowances and tighten repeated-peek/frame charges or
+  amortize them across nested opens and later closes as needed. The isolated
+  component allowances do not themselves prove the full 470-per-byte bound.
+  Full deep 81 refinement, reachable allocation room, uniform parser bounds,
+  outer object wrappers, rejection, the seventh method and M9 remain open.
+  No additional `sorry` is introduced.
+
 ## Methods
 
 There are 15 exported methods; six now have complete per-call refinement proofs under their protocol premises.
@@ -1161,8 +1208,10 @@ The texts are proved equal to the model's `Panic.message` (`PanicText`).
       peak bound are proved in `SerdeIgnMachineTrace`; match the actual 81 body
       to that trace. `SerdeIgnSegments` supplies the concrete entry, save and
       restore transitions; `SerdeIgnMember.next_traced` supplies the complete
-      member tail and value-loop reentry with traced credits. `Hyp81` must allow
-      heap and scratch changes.
+      member tail and value-loop reentry with traced credits. `SerdeIgnContainer`
+      supplies actual peeks/dispatches and their full-machine case classification.
+      Assemble the loops and discharge their aggregate instruction bound. `Hyp81` must
+      allow heap and scratch changes.
 2. **`ft_balance_of`, method level.** Take the parser's contracts as parameters until they are proved. The argument layer is in `EnvInput` and `ArgsLeaves`, the balance read in `LookupMapGet`/`StorageReadWrapF`.
 3. **The remaining methods**, in M8's order:
    - `storage_balance_of` (its parser is the same code as `ft_balance_of`'s);
