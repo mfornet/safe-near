@@ -37,6 +37,7 @@ import Bridge.Functions.BalanceOf297ParserPublicCompose
 import Bridge.Functions.BalanceOf297CopiedCall
 import Bridge.Functions.BalanceOf297CopiedBody
 import Bridge.Functions.BalanceOf297InitialRoomCompose
+import Bridge.Functions.BalanceOf297ParserRoom
 import Bridge.Methods.FtBalanceOfAbsentCompose
 import Bridge.Methods.FtBalanceOfInputBound
 import Bridge.Methods.ContextInputDomain
@@ -874,3 +875,42 @@ attribute [blueprint "frontier:input-panic-obstruction"
   (title := /-- Input panic contradicts accepted-call observations -/)
   (statement := /-- Given accepted parsing, model success and the binary input-limit panic, the unchanged Exported.At clause is false. These observation premises still require instantiation. -/)]
   WNear.Binary.InputDomain.not_at_of_input_panic
+
+attribute [blueprint "frontier:short-string-room"
+  (title := /-- All reserve room for successful short strings -/)
+  (statement := /-- A successful run with at most 64 decoded bytes, bounded initial capacity and a numerical page allowance supplies all roomRun reserves, including error boxes. These are derived conclusions; the numerical allowance is explicit. -/)
+  (notReady := true)]
+  WNear.Binary.ParseStrRoom.roomRun_short
+
+attribute [blueprint "frontier:model-short-string-room"
+  (title := /-- Model-accepted short string supplies parser room -/)
+  (statement := /-- The exact JSON stringBody acceptance and decoded-byte bound instantiate the complete roomRun contract under a 131-page initial allowance, including arbitrary valid escapes. -/)
+  (notReady := true)]
+  WNear.Binary.ParseStrRoom.roomRun_of_short_stringBody
+
+attribute [blueprint "frontier:copied-account-parser-pages"
+  (title := /-- Copied account parser uses at most six growth pages -/)
+  (statement := /-- The account-id validity bound and existing concrete append trace prove at most five scratch growth pages and one owned-string page. The bounded input and exact model decode are explicit. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.copied_parser_pages_le
+
+attribute [blueprint "frontier:input-allocation-pages"
+  (title := /-- Bounded input allocation uses at most 257 pages -/)
+  (statement := /-- The actual wee_alloc cell-page calculation, under the existing input bound below 2^24 bytes. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.input_pages_le
+
+attribute [blueprint "frontier:initial-memory-parser-room"
+  (title := /-- Instantiated memory supplies input and parser allowance -/)
+  (statement := /-- Derives the input-plus-131 page allowance at InitialState.memLen = 1024 pages under maxP = 2048. HeapRoomK occurs as the derived conclusion, not an assumed room contract. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.initial_memory_room
+
+attribute [blueprint "frontier:initial-combined-parser-room"
+  (title := /-- Initial budget supplies parser and downstream room -/)
+  (statement := /-- The initial input-plus-131 allowance implies the old body budget and roomRun at both possible post-input memory sizes. General roomRun remains Open outside this specific short-account instance. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.initial_parser_and_body_room
+
+attribute [blueprint "frontier:balance-copied-body-initial-memory"
+  (title := /-- Function 297: copied-array absent body at initial memory -/)
+  (statement := /-- Complete decoded body at the instantiated 1024-page initial memory, with input, parser and subsequent allocation room derived rather than assumed. Exact copied-array input, absent account, trie/proof budget, host/register/return limits, code/frame ownership and gas credits remain stated environmental premises. This specific body proof does not establish full external accepted/rejected refinement. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body_initial_memory

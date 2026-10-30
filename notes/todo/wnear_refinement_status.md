@@ -1,6 +1,6 @@
 # wNEAR refinement: status and how to resume
 
-Campaign status on 2026-10-30; proof continuation is active in `codex/wnear-blueprint-refinement`. The prior receipt-domain checkpoint was wound down and pushed as `9988a700`. Details are in `wnear_refinement_proof.md`: M3 for the first method, M6 for JSON arguments (the parser map is `wnear_m6_parser_map.md`), and M8 for the other methods.
+Campaign status on 2026-10-31; proof continuation is active in `codex/wnear-blueprint-refinement`. The prior receipt-domain checkpoint was wound down and pushed as `9988a700`. Details are in `wnear_refinement_proof.md`: M3 for the first method, M6 for JSON arguments (the parser map is `wnear_m6_parser_map.md`), and M8 for the other methods.
 
 The exported refinement is now a checked dispatch over six completed method clauses and eight open full-method obligations and a checked `ft_balance_of` assembly over three named open clauses, with five separately named protocol-instantiation obligations. The global refinement and its withdrawal corollary remain conditional on those leaves. Completed results use only `propext`, `Classical.choice` and `Quot.sound`; never use `bv_decide` or `native_decide`.
 
@@ -32,6 +32,40 @@ JSON remains open. The old `wf_arguments_unbounded` theorem was removed because
 it is false for the reviewed domain; its historical statement is recorded in
 the misstatement log. The historical generic host trap and contradiction lemmas
 remain checked, but witness existence is no longer a frontier obligation.
+
+## Continuation on 2026-10-31: parser room at the instantiated memory
+
+`ParseStrRoom.roomRun_short` proves every reserve required by the all-outcome
+`roomRun` contract of a successful string with at most 64 decoded bytes. It covers
+scratch growth, error-box room before and after each append, and every memory
+length allowed by `hlAfter`; valid escapes are unrestricted. The model-accepted
+string adapter instantiates it with 131 pages of initial allowance.
+
+`copied_parser_pages_le` additionally applies the existing concrete append trace:
+a valid account uses at most five scratch growth pages and one owned String page.
+`input_pages_le` checks the actual allocator formula and bounds input growth by
+257 pages under the existing `< 2^24` input premise. `initial_memory_room` derives
+the input-plus-131 allowance at the shared instantiated `InitialState.memLen`
+(1024 pages, with a 2048-page limit). `initial_parser_and_body_room` supplies the
+parser contract at either post-input memory size and the downstream body budget.
+
+`copied_array_absent_body_initial_memory` composes those facts with the complete
+decoded function-297 proof. It has no `roomRun`, `RegOk`, `roomFor` or `HeapRoomK`
+hypothesis. Its exact copied-array input, absent account, code/frame ownership,
+trie link and proof budget, host/register/return limits and gas credits remain
+explicit. It proves that particular decoded body path; constructing its initial
+resources from the runtime entry and establishing the full external method
+clauses remain open. The older generalized body/model-agreement theorems retain
+their original interfaces and room hypotheses.
+
+This instantiates the room obligations for the short-account path, not the
+uniform accepting/rejecting parser contract. General `roomRun`, `IgnoreHyp`,
+`KeyConditions`, `ValueConditions`, protocol instantiation and the named method
+leaves remain unresolved. The exact admission frontier and module allowance are
+unchanged. Targeted LSP diagnostics, axiom checks and the full strict axiom
+audit passed for proof source digest `008feff4ebf70e1b24cf51f503d868a52e42cb331c1dda50b90fe5c209502cf7`.
+The generated statement pins contain additions only. The live frontier records
+the final dependency-check and publication freshness for this exact proof source.
 
 ## Validated global-composition checkpoint
 
@@ -95,8 +129,9 @@ composition's caller edges, and Open `IgnoreHyp`, `KeyConditions` and
   low-gas calls do not obtain this input bound from the gas premise.
 - Next foundation obligation: instantiate pinned argument/register bounds and
   link delivered action validation to the boundary (incoming receipt processing
-  is currently unmodeled). Then derive parser `roomRun` and connect the resulting
-  resources and return bytes to the accepted-call method contract. Extend to
+  is currently unmodeled). The copied-array short-account path now derives parser `roomRun` from the
+  instantiated memory; connect its initial resources and return bytes to the
+  accepted-call method contract, and discharge room for other parser paths. Extend to
   other inputs and failure outcomes; preserve the named open contracts.
 - Development: use the warm Lean LSP and targeted checks. At integration, run
   `just wnear-audit` for the full strict audit; it coordinates with the watcher.

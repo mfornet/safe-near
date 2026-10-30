@@ -153,6 +153,13 @@
     "WNear.Binary.InputDomain.InputLimitsOrdered",
     "Near.validateAction_functionCall_ok_iff",
     "WNear.refines_wnear_of_clauses",
-    "WNear.refines_wnear_with_obligations"
+    "WNear.refines_wnear_with_obligations",
+    "WNear.Binary.ParseStrRoom.roomRun_short",
+    "WNear.Binary.ParseStrRoom.roomRun_of_short_stringBody",
+    "WNear.Binary.BalanceOf297AbsentCall.copied_parser_pages_le",
+    "WNear.Binary.BalanceOf297AbsentCall.input_pages_le",
+    "WNear.Binary.BalanceOf297AbsentCall.initial_memory_room",
+    "WNear.Binary.BalanceOf297AbsentCall.initial_parser_and_body_room",
+    "WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body_initial_memory"
   ]
 }

@@ -19,7 +19,7 @@ class FrontierPolicyTests(unittest.TestCase):
             admission = n['kind'] == 'admission'
             self.rows.append({'declaration': n['declaration'], 'is_theorem': n['kind'] != 'verification_contract',
                               'direct_sorry': admission, 'shape_hash': n['reviewed_shape_hash'], 'blueprint_label': n['label'],
-                              'not_ready': n['kind'] in ['verification_contract', 'admission'] or n['id'] in ['global', 'exported', 'dispatch', 'exported-clauses-assembly', 'global-composition', 'global-with-obligations', 'object-parser', 'array-parser', 'ignored-opening', 'storage', 'lookup-raw-absent', 'lookup-absent', 'balance-lookup-absent', 'balance-caller-absent', 'balance-export-call-absent', 'balance-export-call-and-copy', 'balance-export-format-zero', 'balance-export-call-copy-format', 'balance-export-through-expect', 'balance-export-through-return', 'balance-export-through-cleanup', 'balance-export-parsed-suffix', 'balance-export-state-read', 'balance-export-state-through-cleanup', 'balance-second-read-from-budget', 'balance-export-state-budget', 'balance-export-state-exact-gas', 'balance-room-after-state', 'balance-export-state-six-grows', 'borsh-vec-free-bound', 'borsh-bytes-reader-free-bound', 'borsh-bytes-free-bound', 'borsh-ft-free-bound', 'borsh-contract-reader-free-bound', 'borsh-contract-free-bound', 'state-read-free-bound', 'state-read-model-free-bound', 'balance-state-read-free-bound', 'balance-state-cleanup-free-bound', 'balance-next-budget-free-bound', 'balance-state-budget-free-bound', 'balance-state-exact-gas-free-bound', 'balance-state-six-grows-free-bound', 'parser-owned-resources', 'balance-parser-through-cleanup', 'parser-expose-heap', 'parser-fixed-resources', 'parser-fixed-through-cleanup', 'parser-public-through-cleanup', 'array-parser-copied-core', 'copied-parser-room', 'copied-parser-with-room', 'balance-copied-parser-through-cleanup', 'balance-input-deref-through-cleanup', 'balance-input-expect-through-cleanup', 'balance-input-through-cleanup', 'balance-input-setup-through-cleanup', 'balance-copied-absent-body', 'initial-input-copy-room', 'balance-copied-body-initial-room', 'balance-copied-absent-model-composition', 'balance-argument-length', 'balance-copied-body-gas-bound', 'receipt-input-register-bound', 'receipt-input-register-returns', 'no-input-mismatch-witness', 'input-read', 'method-ft_balance_of'], 'axioms': ['sorryAx'] if admission else ['propext'],
+                              'not_ready': n['kind'] in ['verification_contract', 'admission'] or n['id'] in ['global', 'exported', 'dispatch', 'exported-clauses-assembly', 'global-composition', 'global-with-obligations', 'short-string-room', 'model-short-string-room', 'initial-memory-parser-room', 'initial-combined-parser-room', 'object-parser', 'array-parser', 'ignored-opening', 'storage', 'lookup-raw-absent', 'lookup-absent', 'balance-lookup-absent', 'balance-caller-absent', 'balance-export-call-absent', 'balance-export-call-and-copy', 'balance-export-format-zero', 'balance-export-call-copy-format', 'balance-export-through-expect', 'balance-export-through-return', 'balance-export-through-cleanup', 'balance-export-parsed-suffix', 'balance-export-state-read', 'balance-export-state-through-cleanup', 'balance-second-read-from-budget', 'balance-export-state-budget', 'balance-export-state-exact-gas', 'balance-room-after-state', 'balance-export-state-six-grows', 'borsh-vec-free-bound', 'borsh-bytes-reader-free-bound', 'borsh-bytes-free-bound', 'borsh-ft-free-bound', 'borsh-contract-reader-free-bound', 'borsh-contract-free-bound', 'state-read-free-bound', 'state-read-model-free-bound', 'balance-state-read-free-bound', 'balance-state-cleanup-free-bound', 'balance-next-budget-free-bound', 'balance-state-budget-free-bound', 'balance-state-exact-gas-free-bound', 'balance-state-six-grows-free-bound', 'parser-owned-resources', 'balance-parser-through-cleanup', 'parser-expose-heap', 'parser-fixed-resources', 'parser-fixed-through-cleanup', 'parser-public-through-cleanup', 'array-parser-copied-core', 'copied-parser-room', 'copied-parser-with-room', 'balance-copied-parser-through-cleanup', 'balance-input-deref-through-cleanup', 'balance-input-expect-through-cleanup', 'balance-input-through-cleanup', 'balance-input-setup-through-cleanup', 'balance-copied-absent-body', 'initial-input-copy-room', 'balance-copied-body-initial-room', 'balance-copied-absent-model-composition', 'balance-argument-length', 'balance-copied-body-gas-bound', 'receipt-input-register-bound', 'receipt-input-register-returns', 'no-input-mismatch-witness', 'input-read', 'method-ft_balance_of'], 'axioms': ['sorryAx'] if admission else ['propext'],
                               'type_dependencies': [], 'proof_dependencies': [], 'statement': 'test', 'type_hash': 1})
         self.by_id = {n['id']: row for n, row in zip(self.manifest['nodes'], self.rows)}
         for n in self.manifest['nodes']:
@@ -55,6 +55,29 @@ class FrontierPolicyTests(unittest.TestCase):
             self.by_id[n['id']]['type_dependencies'] += [self.nodes[x]['declaration'] for x in n.get('required_type_dependencies', [])]
         self.audit = {'violations': [{'declaration': n, 'axioms': ['sorryAx']}
                                      for n in self.manifest['expected_incomplete']]}
+
+    def test_initial_memory_discharges_this_parser_room_instance(self):
+        result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
+        self.assertEqual(result['balance-copied-body-initial-memory']['status'], 'Proven')
+        self.assertNotIn('string-room', result['balance-copied-body-initial-memory']['type_edges'])
+        self.assertNotIn('lookup-heap-room', result['balance-copied-body-initial-memory']['type_edges'])
+        self.assertIn({'id': 'balance-copied-body-initial-memory', 'status': 'Proven'},
+                      result['initial-memory-parser-room']['integrated_into'])
+        self.assertEqual(result['string-room']['status'], 'Open')
+        self.assertEqual(result['accept-parser']['status'], 'Open')
+        self.assertEqual(result['method-ft_balance_of']['status'], 'Conditional')
+        self.assertEqual(result['global']['status'], 'Conditional')
+
+    def test_initial_memory_cannot_hide_a_remaining_room_hypothesis(self):
+        self.by_id['balance-copied-body-initial-memory']['type_dependencies'].append(
+            self.nodes['string-room']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'readiness does not match'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+        self.setUp()
+        self.by_id['balance-copied-body-initial-memory']['proof_dependencies'].remove(
+            self.nodes['initial-memory-parser-room']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
 
     def test_admission_free_global_composition_keeps_contracts_open(self):
         result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}

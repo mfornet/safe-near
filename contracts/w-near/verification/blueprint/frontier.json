@@ -565,7 +565,7 @@
       "title": "Reachable escaped-string growth room",
       "kind": "verification_contract",
       "label": "frontier:string-room",
-      "notes": "Explicit allocation-room premise; deriving it uniformly for reachable states remains open.",
+      "notes": "Uniform reachable-state room remains open. The successful short-account instance is proved from the instantiated memory and integrated into the copied-array absent-account body; this does not establish room for other parser paths.",
       "reviewed_shape_hash": 13860941147584342435
     },
     {
@@ -703,7 +703,8 @@
         "balance-parser-through-cleanup",
         "parser-public-through-cleanup",
         "balance-copied-parser-through-cleanup",
-        "balance-copied-absent-body"
+        "balance-copied-absent-body",
+        "balance-copied-body-initial-memory"
       ],
       "notes": "User-reviewed incoming receipt argument bound now included in Context.WF. Runtime action-list validation supplies this bound. Oversized historical reproducer is outside this domain; pinned limit-relation instantiation and general arbitrary-resource refinement remain open."
     },
@@ -1842,6 +1843,99 @@
       "label": "frontier:protocol-input-limit-order",
       "reviewed_shape_hash": 6270903697758492921,
       "notes": "Pinned JSON instantiation remains open; runtime tests observe 4194304 \u2264 104857600."
+    },
+    {
+      "id": "short-string-room",
+      "declaration": "WNear.Binary.ParseStrRoom.roomRun_short",
+      "title": "All reserve room for successful short strings",
+      "kind": "theorem",
+      "required_type_dependencies": [
+        "string-room",
+        "lookup-heap-room"
+      ],
+      "notes": "A successful run with at most 64 decoded bytes, bounded initial capacity and a numerical page allowance supplies all roomRun reserves, including error boxes. These are derived conclusions; the numerical allowance is explicit.",
+      "label": "frontier:short-string-room",
+      "reviewed_shape_hash": 185165556
+    },
+    {
+      "id": "model-short-string-room",
+      "declaration": "WNear.Binary.ParseStrRoom.roomRun_of_short_stringBody",
+      "title": "Model-accepted short string supplies parser room",
+      "kind": "theorem",
+      "required_type_dependencies": [
+        "string-room",
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "short-string-room"
+      ],
+      "notes": "The exact JSON stringBody acceptance and decoded-byte bound instantiate the complete roomRun contract under a 131-page initial allowance, including arbitrary valid escapes.",
+      "label": "frontier:model-short-string-room",
+      "reviewed_shape_hash": 2150116609
+    },
+    {
+      "id": "copied-account-parser-pages",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.copied_parser_pages_le",
+      "title": "Copied account parser uses at most six growth pages",
+      "kind": "theorem",
+      "notes": "The account-id validity bound and existing concrete append trace prove at most five scratch growth pages and one owned-string page. The bounded input and exact model decode are explicit.",
+      "label": "frontier:copied-account-parser-pages",
+      "reviewed_shape_hash": 1066455986
+    },
+    {
+      "id": "input-allocation-pages",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.input_pages_le",
+      "title": "Bounded input allocation uses at most 257 pages",
+      "kind": "theorem",
+      "notes": "The actual wee_alloc cell-page calculation, under the existing input bound below 2^24 bytes.",
+      "label": "frontier:input-allocation-pages",
+      "reviewed_shape_hash": 1178210872
+    },
+    {
+      "id": "initial-memory-parser-room",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.initial_memory_room",
+      "title": "Instantiated memory supplies input and parser allowance",
+      "kind": "theorem",
+      "required_type_dependencies": [
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "input-allocation-pages"
+      ],
+      "notes": "Derives the input-plus-131 page allowance at InitialState.memLen = 1024 pages under maxP = 2048. HeapRoomK occurs as the derived conclusion, not an assumed room contract.",
+      "label": "frontier:initial-memory-parser-room",
+      "reviewed_shape_hash": 2752569820
+    },
+    {
+      "id": "initial-combined-parser-room",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.initial_parser_and_body_room",
+      "title": "Initial budget supplies parser and downstream room",
+      "kind": "theorem",
+      "required_type_dependencies": [
+        "string-room",
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "model-short-string-room",
+        "copied-account-parser-pages"
+      ],
+      "notes": "The initial input-plus-131 allowance implies the old body budget and roomRun at both possible post-input memory sizes. General roomRun remains Open outside this specific short-account instance.",
+      "label": "frontier:initial-combined-parser-room",
+      "reviewed_shape_hash": 1108646060
+    },
+    {
+      "id": "balance-copied-body-initial-memory",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body_initial_memory",
+      "title": "Function 297: copied-array absent body at initial memory",
+      "kind": "theorem",
+      "required_proof_dependencies": [
+        "initial-memory-parser-room",
+        "initial-combined-parser-room",
+        "balance-copied-body-initial-room"
+      ],
+      "notes": "Complete decoded body at the instantiated 1024-page initial memory, with input, parser and subsequent allocation room derived rather than assumed. Exact copied-array input, absent account, trie/proof budget, host/register/return limits, code/frame ownership and gas credits remain stated environmental premises. This specific body proof does not establish full external accepted/rejected refinement.",
+      "label": "frontier:balance-copied-body-initial-memory",
+      "reviewed_shape_hash": 437130165
     }
   ],
   "reviewed_environment": [
