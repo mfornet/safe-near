@@ -1310,6 +1310,17 @@ continuation is published to PR #40 after its validation gates pass.
   bounds, outer wrappers, rejection, the seventh method and M9 remain open.
   No additional `sorry` is introduced.
 
+## Continuation: a single allocation-room budget for state and balance
+
+`BalanceOf297AbsentCall.room_after_state` proves that `HeapRoomK 6` at state
+entry supplies the two state-read allocations and leaves `HeapRoomK 4` after
+any state-read growth. `state_through_cleanup_six_grows` integrates this into
+the checked absent-account suffix: the separate state-read and later room
+conditions follow from a single initial six-growth premise. Both proofs use
+standard axioms. Reachability of that initial heap-room bound and of the
+one-cell free-list entry after parsing remains open, as do the initial shared
+proof budget, other branches and the complete method.
+
 ## Continuation: discharge the post-state-read gas bound
 
 `BalanceOf297AbsentCall.storageReadUse_after_read` proves a storage read

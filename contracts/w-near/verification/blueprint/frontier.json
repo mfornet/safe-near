@@ -639,7 +639,7 @@
         "storage",
         "runtime-boundary",
         "ft-balance-model",
-        "balance-export-state-exact-gas"
+        "balance-export-state-six-grows"
       ]
     },
     {
@@ -950,6 +950,36 @@
       "required_proof_dependencies": [
         "balance-export-state-budget",
         "balance-second-read-exact-gas"
+      ]
+    },
+    {
+      "id": "balance-room-after-state",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.room_after_state",
+      "title": "Derive allocation room after state read",
+      "kind": "theorem",
+      "notes": "Conditional on HeapRoomK 6 at entry; the roomFor and HeapRoomK 4 occurrences in the conclusion are derived, not extra assumptions.",
+      "label": "frontier:balance-room-after-state",
+      "reviewed_shape_hash": 2843256077,
+      "required_type_dependencies": [
+        "owned-room",
+        "lookup-heap-room"
+      ]
+    },
+    {
+      "id": "balance-export-state-six-grows",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.state_through_cleanup_six_grows",
+      "title": "Function 297: state read through cleanup under six-growth budget",
+      "kind": "theorem",
+      "environment": "Parsed owned account, one-cell state-read entry, six-growth initial heap room, canonical trie and storage link, shared proof budget, absent account and return limit.",
+      "label": "frontier:balance-export-state-six-grows",
+      "reviewed_shape_hash": 1048715668,
+      "required_type_dependencies": [
+        "balance-state-entry",
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "balance-export-state-exact-gas",
+        "balance-room-after-state"
       ]
     }
   ],

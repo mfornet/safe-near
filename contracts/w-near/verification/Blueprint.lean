@@ -28,6 +28,7 @@ import Bridge.Functions.BalanceOf297StateRead
 import Bridge.Functions.BalanceOf297StateBridge
 import Bridge.Functions.BalanceOf297ReadBudget
 import Bridge.Functions.BalanceOf297ReadGas
+import Bridge.Functions.BalanceOf297Room
 
 /-! The browsable proof frontier. Definitions marked Open state contracts, not proofs. -/
 
@@ -484,3 +485,15 @@ attribute [blueprint "frontier:balance-export-state-exact-gas"
   (statement := /-- The checked 82-instruction absent-account suffix instantiates the post-read gas bound exactly; parser-entry resources, allocation room and the full method remain open. -/)
   (notReady := true)]
   WNear.Binary.BalanceOf297AbsentCall.state_through_cleanup_exact_gas
+
+attribute [blueprint "frontier:balance-room-after-state"
+  (title := /-- Derive allocation room after state read -/)
+  (statement := /-- Six initial one-page growth slots imply the state-read allocation room and four slots after state_read; reachability of the initial bound remains open. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.room_after_state
+
+attribute [blueprint "frontier:balance-export-state-six-grows"
+  (title := /-- Exported balance: state read through cleanup with six-growth budget -/)
+  (statement := /-- The checked absent-account suffix derives every allocation-room requirement from a single six-growth entry bound; parser-entry resources and reachability of that bound remain open. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.state_through_cleanup_six_grows

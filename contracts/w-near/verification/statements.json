@@ -83,6 +83,8 @@
     "WNear.Binary.BalanceOf297AbsentCall.state_through_cleanup_of_budget",
     "WNear.Binary.BalanceOf297AbsentCall.storageReadUse_after_read",
     "WNear.Binary.BalanceOf297AbsentCall.balanceReadGasAfterState_exact",
-    "WNear.Binary.BalanceOf297AbsentCall.state_through_cleanup_exact_gas"
+    "WNear.Binary.BalanceOf297AbsentCall.state_through_cleanup_exact_gas",
+    "WNear.Binary.BalanceOf297AbsentCall.room_after_state",
+    "WNear.Binary.BalanceOf297AbsentCall.state_through_cleanup_six_grows"
   ]
 }
