@@ -293,12 +293,12 @@ def main : IO Unit := do
       balanceBound - 1, balanceBound, balanceBound + 1] do
     let (_, _) ← cmp s!"ft_balance_of gas boundary {gas}" s
       { method := "ft_balance_of", args := balanceArgs, gas }
-  for depth in [1, 32, 126, 127, 128, 129, 256, 512, 1024] do
+  for depth in [1, 32, 126, 127, 128, 129, 256, 512, 1024, 2048, 4096] do
     let nested := String.join (List.replicate depth "[") ++ "0" ++ String.join (List.replicate depth "]")
     let args := "{\"account_id\":\"alice.near\",\"ignored\":" ++ nested ++ "}"
     let (_, _) ← cmp s!"ft_balance_of ignored nesting {depth}" s { method := "ft_balance_of", args }
 
-  for count in [64, 1024, 4096] do
+  for count in [64, 1024, 4096, 16384] do
     let escaped := String.join (List.replicate count "\\n")
     let args := "{\"account_id\":\"alice.near\",\"ignored\":\"" ++ escaped ++ "\"}"
     let (_, _) ← cmp s!"ft_balance_of ignored escapes {count}" s { method := "ft_balance_of", args }
