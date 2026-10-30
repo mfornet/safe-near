@@ -307,6 +307,23 @@ def main : IO Unit := do
       "{\"account_id\":\"alice.near\",\"ignored\":[1,]}"] do
     let (_, _) ← cmp "ft_balance_of malformed ignored value" s { method := "ft_balance_of", args }
 
+  -- Adversarial configuration experiment, not a claim about protocol 86:
+  -- Context.WF has no argument-size premise. A small register limit makes the
+  -- input-host boundary reachable without allocating a 100 MiB Lean list.
+  let smallProtocol := { protocol with wasm := { protocol.wasm with limits :=
+    { protocol.wasm.limits with maxRegisterSize := 16 } } }
+  let smallArgs := "{\"account_id\":\"alice.near\"}"
+  let smallCtx ← contextOf smallProtocol s { method := "ft_balance_of", args := smallArgs }
+  let smallRaw := s.storage.toFinset
+  let smallResult := Near.Boundary.execOn code s.storage smallCtx
+  IO.println s!"reduced register-limit experiment: {repr smallResult.outcome}"
+  check "reduced register-limit input parses" (Call.decode "ft_balance_of" (bytes smallArgs) == some (.ftBalanceOf alice))
+  check "reduced register-limit is a non-resource rollback"
+    (rolledBack smallCtx smallRaw smallResult && !outOfGas smallResult &&
+      match smallResult.outcome with | .error .storageProofExceeded => false | _ => true)
+  check "reduced register-limit result differs from the model"
+    (!matchesCheck cfg smallCtx smallRaw smallResult (contractStep smallCtx s.state (.ftBalanceOf alice)))
+
   -- Inputs that are no call.
   for (method, args) in [("near_withdraw", "{\"amount\":1}"), ("near_withdraw", "{}"),
       ("ft_balance_of", "{\"account_id\":\"A\"}"), ("ft_transfer", "[\"bob.near\",\"1\"]"),

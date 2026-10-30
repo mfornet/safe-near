@@ -6,6 +6,11 @@ The exported refinement is now a checked dispatch over six completed method clau
 
 The three feasibility gates and their evidence, next checks and failure consequences are tracked in [wnear_feasibility_risks.md](wnear_feasibility_risks.md). The asynchronous gate has passing concrete created-receipt/callback traces, including zero-gas rollback probes; the full asynchronous method proofs remain open.
 
+A reduced-register-limit counterexample experiment exposes a possible mismatch in
+arbitrary-resource behavior for oversized valid inputs; it is not yet a
+counterexample under the pinned protocol. See the risk register before extending
+the accepted-call proof or changing context assumptions.
+
 ## Continuation checkpoint
 
 - Latest validated proof commit before the workflow update: `8412a11`; the
