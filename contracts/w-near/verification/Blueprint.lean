@@ -9,6 +9,7 @@ import Bridge.Functions.FromSliceSpec
 import Bridge.Methods.FtBalanceOfModel
 import Bridge.Functions.StorageReadNoneF
 import Bridge.Functions.LookupMapGetNone
+import Bridge.Functions.LookupMapGet399None
 
 /-! The browsable proof frontier. Definitions marked Open state contracts, not proofs. -/
 
@@ -292,3 +293,15 @@ attribute [blueprint "frontier:lookup-raw-absent"
   (statement := /-- The actual get_raw function constructs the storage key, executes the absent read and frees its temporary key; the reachable allocator-room obligation remains open. -/)
   (notReady := true)]
   WNear.Binary.LookupMapGet.f400_none
+
+attribute [blueprint "frontier:lookup-heap-room"
+  (title := /-- Reachable LookupMap allocation room -/)
+  (statement := /-- Open obligation: derive the multi-allocation room predicate at reachable LookupMap calls. -/)
+  (notReady := true)]
+  WNear.Binary.LookupMapOps.HeapRoomK
+
+attribute [blueprint "frontier:lookup-absent"
+  (title := /-- Absent LookupMap get -/)
+  (statement := /-- The actual get function composes the absent raw read, frees the Borsh key and returns None. Reachable multi-allocation room remains open. -/)
+  (notReady := true)]
+  WNear.Binary.LookupMapGet.f399_none

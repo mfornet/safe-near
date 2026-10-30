@@ -1310,6 +1310,15 @@ continuation is published to PR #40 after its validation gates pass.
   bounds, outer wrappers, rejection, the seventh method and M9 remain open.
   No additional `sorry` is introduced.
 
+## Continuation: absent LookupMap get
+
+`LookupMapGet.f399_none` proves the actual absent-key `get` path. It constructs
+the Borsh key, calls the checked absent `get_raw` proof, frees the key, returns
+`None` with zeroed payload and restores the stack. The proof uses only standard
+axioms and is conditional on `HeapRoomK 2`: deriving that multi-allocation room
+from reachable method states remains open. The method argument reader and the
+call from `ft_balance_of` remain open.
+
 ## Continuation: absent raw lookup
 
 `LookupMapGet.f400_none` proves the real `get_raw` path for an absent key:
@@ -1317,7 +1326,8 @@ it constructs the combined key, calls `f548_noneF_host`, frees the temporary
 key and returns `None`, preserving the host postcondition and the stated heap
 bound, conditional on the explicit reachable allocation-room obligation. The checked
 caller integrates the absent storage-read theorem. The
-`LookupMap` 399 absent branch, parser integration and method proof remain open.
+`LookupMap` 399 absent branch now composes this result; parser integration and
+the method proof remain open.
 
 ## Continuation: absent storage read
 
@@ -1325,8 +1335,8 @@ caller integrates the absent storage-read theorem. The
 returns `None` for an absent key, preserving an arbitrary allocator bound and
 the host postcondition without allocating a value. `f548_noneF_host` instantiates
 that contract with the metered host, trie overlay and explicit proof budget.
-The wrapper is integrated into the absent `LookupMap` 400 proof; the 399
-absent branch and the method caller still need checked composition.
+The wrapper is integrated through the absent `LookupMap` 400 and 399 proofs;
+the method caller still needs checked composition.
 The present-key path and full method remain separate obligations.
 
 ## Continuation: `ft_balance_of` model agreement

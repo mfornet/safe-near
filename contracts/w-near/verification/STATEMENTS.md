@@ -213,6 +213,44 @@ def WNear.Binary.FromSliceSpec.RejectContract {GF : Iris.BundledGFunctors} [Wasm
                                         (WNear.Binary.FromSliceSpec.errAt 0 out live))
 ```
 
+## Bridge.Functions.LookupMapGet399None
+
+`WNear.Binary.LookupMapGet.f399_none` (hash `00000000fc7886ca`)
+
+```lean
+theorem WNear.Binary.LookupMapGet.f399_none {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (htype : type.results = [])
+  (inst : ℕ) (mi : Wasm.ModuleInst) (e : ℕ) (A : ℕ → ℕ) (n g ta : ℕ) (mx : Option ℕ)
+  (hm : WNear.Binary.Interface.IfaceMod mi A n g ta) (hd : d + 17 < lim.maxCallDepth) (Cg : ℕ) (gt : Wasm.GlobalType)
+  (s out m pp pc pl v p c L idx : UInt32) (maxP len : ℕ) (live : List (ℕ × ℕ)) (F : ℕ)
+  (hF : WNear.Binary.VecWithCap.okG F) (pre key ob : List UInt8) (hs : 304 ≤ s.toNat) (hal : s.toNat % 8 = 0)
+  (hob : ob.length = 24) (hout : out.toNat + 24 ≤ 2 ^ 32) (hpre : pre.length = pl.toNat) (hkey : key.length = L.toNat)
+  (hL : L.toNat + 4 ≤ 120) (hpl : pl.toNat ≤ 4) (hl0 : 0 < pl.toNat) (hpp : pp.toNat + pl.toNat ≤ 2 ^ 32)
+  (hv : v.toNat + 12 ≤ 2 ^ 32) (hp : p.toNat + L.toNat ≤ 2 ^ 32)
+  (hroom : WNear.Binary.LookupMapOps.HeapRoomK 2 len maxP) (h : Wasm.NearState) (st : Near.TrieOverlay.State) {bud : ℕ}
+  (hacc : h.storageAccounting = some st)
+  (hlim : Wasm.Near.withinLimit h.config.maxStorageKeyLen (pre ++ (WasmLogic.bytes32 L ++ key)).length = true)
+  (hb : Near.TrieConstruction.build st.entries = Except.ok st.base)
+  (hz : NearLogic.zeroHash ∉ List.map Prod.fst st.base.witness)
+  (hlink :
+    h.storage (pre ++ (WasmLogic.bytes32 L ++ key)) =
+      NearLogic.viewVal st
+        (Near.TrieOverlay.contractKey h.context.currentAccountId (pre ++ (WasmLogic.bytes32 L ++ key))))
+  (hproof : NearLogic.ProofBudget h st bud)
+  (hbud :
+    NearLogic.readProofCost
+        (Near.TrieOverlay.contractKey h.context.currentAccountId (pre ++ (WasmLogic.bytes32 L ++ key)))
+        (h.storage (pre ++ (WasmLogic.bytes32 L ++ key))) ≤
+      bud)
+  (hnone : h.storage (pre ++ (WasmLogic.bytes32 L ++ key)) = none) :
+  WNear.Binary.LookupMapGet.code399 e n maxP inst mi A mx ⊢
+    NearLogic.MFunSpec cfg lim d type inst mi WNear.Binary.f399 Cg
+      (WNear.Binary.LookupMapGet.pre399 n g ta A gt s out m pp pc pl v p c L idx maxP len live F pre key ob h)
+      (fun x => WNear.Binary.LookupMapGet.cost399None cfg F pl L h (pre ++ (WasmLogic.bytes32 L ++ key)))
+      (WNear.Binary.LookupMapGet.post399None n g ta A gt s out m pp pc pl v p c L idx maxP len live F pre key
+        (NearLogic.StorageReadPost h (pre ++ (WasmLogic.bytes32 L ++ key)) 0 st))
+```
+
 ## Bridge.Functions.LookupMapGetNone
 
 `WNear.Binary.LookupMapGet.f400_none` (hash `0000000022b35359`)
@@ -246,6 +284,15 @@ theorem WNear.Binary.LookupMapGet.f400_none {GF : Iris.BundledGFunctors} [WasmLo
       (fun x => WNear.Binary.LookupMapGet.cost400None cfg F pl kl h (pre ++ key))
       (WNear.Binary.LookupMapGet.post400None n g ta A gt s out m pp pc pl kp kl idx maxP len live F pre key
         (NearLogic.StorageReadPost h (pre ++ key) 0 st))
+```
+
+## Bridge.Functions.LookupMapOps
+
+`WNear.Binary.LookupMapOps.HeapRoomK` (hash `eac35efe45334ec3`)
+
+```lean
+def WNear.Binary.LookupMapOps.HeapRoomK (k len maxP : ℕ) : Prop :=
+  len % 65536 = 0 ∧ 0 < len ∧ len + k * 65536 ≤ maxP * 65536 ∧ len + (k + 1) * 65536 ≤ 2 ^ 32
 ```
 
 ## Bridge.Functions.ScratchGrow

@@ -215,7 +215,7 @@
         "storage",
         "runtime-boundary",
         "ft-balance-model",
-        "lookup-raw-absent"
+        "lookup-absent"
       ],
       "label": "frontier:method-ft_balance_of",
       "reviewed_shape_hash": 925099951
@@ -559,6 +559,30 @@
       ],
       "required_type_dependencies": [
         "owned-room"
+      ]
+    },
+    {
+      "id": "lookup-heap-room",
+      "declaration": "WNear.Binary.LookupMapOps.HeapRoomK",
+      "title": "Reachable LookupMap allocation room",
+      "kind": "verification_contract",
+      "label": "frontier:lookup-heap-room",
+      "notes": "Derive the multi-allocation room predicate from reachable method states.",
+      "reviewed_shape_hash": 16916469071509409475
+    },
+    {
+      "id": "lookup-absent",
+      "declaration": "WNear.Binary.LookupMapGet.f399_none",
+      "title": "LookupMap get: absent account",
+      "kind": "theorem",
+      "environment": "Metered host, trie proof budget, allocator room and explicit Wasm resource premises.",
+      "label": "frontier:lookup-absent",
+      "reviewed_shape_hash": 4235757258,
+      "required_type_dependencies": [
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "lookup-raw-absent"
       ]
     }
   ],
