@@ -39,16 +39,15 @@ blueprint contract: (_check contract)
         cd contracts/{{ contract }}/verification && just blueprint-web; \
     fi
 
-# (Served by the launchd agent com.safe-near.blueprint from ~/Library/Application Support/safe-near/blueprint.)
-# Build one contract's web blueprint and publish it at https://obiteum-mac-studio.tail9c65ff.ts.net:8444/<contract>/.
+# Publish using BLUEPRINT_DEST and BLUEPRINT_BASE_URL from the local environment.
 publish-blueprint contract: (blueprint contract)
-    if [ "{{ contract }}" = w-near ]; then \
-        python3 tools/wnear_blueprint.py --publish --reuse; \
-    else \
-        rsync -a --delete contracts/{{ contract }}/verification/blueprint/web/ \
-          "$HOME/Library/Application Support/safe-near/blueprint/{{ contract }}/"; \
-    fi
-    @echo "https://obiteum-mac-studio.tail9c65ff.ts.net:8444/{{ contract }}/"
+    #!/usr/bin/env bash
+    set -euo pipefail
+    : "${BLUEPRINT_DEST:?Set BLUEPRINT_DEST to the publish directory}"
+    : "${BLUEPRINT_BASE_URL:?Set BLUEPRINT_BASE_URL to its base URL}"
+    rsync -a --delete "contracts/{{ contract }}/verification/blueprint/web/" \
+        "${BLUEPRINT_DEST%/}/{{ contract }}/"
+    echo "${BLUEPRINT_BASE_URL%/}/{{ contract }}/"
 
 # Build near-lean: the Wasm interpreter, the boundary interface, the VM, the runtime, the chain layer, the crypto package and the node.
 near-build:

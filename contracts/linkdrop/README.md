@@ -24,3 +24,9 @@ tools/verify_build.sh contracts/linkdrop
 
 No verification project yet. near-lean runs this binary (weighted callbacks,
 global-contract use), so a `ContractModel` instance can be built on it.
+
+## Binary availability
+
+The binary is omitted pending redistribution permission. Metadata, hashes and
+source references remain available for local reproduction. A locally obtained
+`contract.wasm` is ignored by Git and must not be committed.

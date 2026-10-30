@@ -85,7 +85,7 @@ The detailed acceptance criteria live in each Linear issue.
 - `just verification-buildtime`: copies `contracts/w-near/verification` and its
   local packages to a fresh directory (sharing built mathlib), builds it, and
   fails if it is more than 5% slower than this machine's entry in
-  `tools/verification-buildtime/baseline.json`. Record an entry with
+  the ignored `.local/verification-buildtime.json`. Record an entry with
   `--record`. The baseline builds `Model Spec`; recording one for the default
   targets, which include `Proofs.Refinement`, is open.
 

@@ -17,7 +17,6 @@ and proofs about them are this project's own work.
 | `aurora-engine` | [aurora-is-near/aurora-engine](https://github.com/aurora-is-near/aurora-engine) | CC0-1.0 |
 | `eth2-client` | [Near-One/rainbow-bridge](https://github.com/Near-One/rainbow-bridge) | GPL-3.0, see [contracts/eth2-client/LICENSE](contracts/eth2-client/LICENSE) |
 | `intents-defuse` | [near/intents](https://github.com/near/intents) | MIT, Copyright (c) 2025 NEAR Foundation |
-| `linkdrop` | [near/near-linkdrop](https://github.com/near/near-linkdrop) | none stated upstream |
 | `mpc-contract` | [near/mpc](https://github.com/near/mpc) | MIT, Copyright (c) 2025 NEAR One Limited |
 | `omni-bridge` | [Near-One/omni-bridge](https://github.com/Near-One/omni-bridge) | MIT, Copyright (c) 2025 Near One |
 | `ref-farming` | [DevOfCredit/ref-contracts](https://github.com/DevOfCredit/ref-contracts) | MIT or Apache-2.0, Copyright 2019 Ref Finance |
@@ -27,9 +26,12 @@ and proofs about them are this project's own work.
 | `w-near` | [near/core-contracts](https://github.com/near/core-contracts) | MIT or Apache-2.0 (the repository's current licence; the pinned commit has no licence file) |
 
 `eth2-client` is GPL-3.0: its complete corresponding source is the pinned
-rainbow-bridge commit, and the GPL text sits next to the binary. `linkdrop`
-carries no licence upstream; it is included as the public on-chain code of the
-`near` account, and will be removed on request of its authors.
+rainbow-bridge commit, and the GPL text sits next to the binary.
+
+The `linkdrop` binary is not redistributed: the pinned upstream revision has
+no stated licence and redistribution permission has not been established.
+Its dataset entry retains metadata, hashes and a source reference for local
+reproduction.
 
 ## nearcore
 

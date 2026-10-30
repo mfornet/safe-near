@@ -24,8 +24,8 @@ PROJECT = ROOT / 'contracts/w-near/verification'
 WORK = PROJECT / '.lake/build/blueprint'
 WEB = PROJECT / 'blueprint/web'
 MANIFEST = PROJECT / 'blueprint/frontier.json'
-DEFAULT_DEST = Path.home() / 'Library/Application Support/safe-near/blueprint'
-DEFAULT_URL = 'https://obiteum-mac-studio.tail9c65ff.ts.net:8444/w-near/'
+DEFAULT_DEST = Path(os.environ.get('BLUEPRINT_DEST', ROOT / '.local/blueprint'))
+DEFAULT_URL = (os.environ['BLUEPRINT_BASE_URL'].rstrip('/') + '/w-near/') if os.environ.get('BLUEPRINT_BASE_URL') else None
 STANDARD = {'propext', 'Classical.choice', 'Quot.sound'}
 
 
@@ -306,7 +306,7 @@ def publish(data, destination, url):
     temporary.symlink_to(release.name, target_is_directory=True)
     temporary.replace(live)
     try:
-        # Verify the real stable tailnet URL and all rendered statuses/dependencies.
+        # Verify the configured stable URL and all rendered statuses/dependencies.
         with urllib.request.urlopen(url + 'frontier.json', timeout=30) as response:
             served = json.load(response)
         if served != data:
@@ -402,12 +402,12 @@ def build(args):
         print(json.dumps({'built_at': data['built_at'], 'revision':data['revision'], 'url':args.url if args.publish else str(WEB)}), flush=True)
 
 
-def install_watch():
+def install_watch(destination, url):
     """Install the persistent macOS watcher without replacing another checkout's service."""
     label = 'com.safe-near.wnear-blueprint-watch'
     path = Path.home() / 'Library/LaunchAgents' / (label + '.plist')
     log = Path.home() / 'Library/Logs/safe-near-wnear-blueprint-watch.log'
-    config = {'Label': label, 'ProgramArguments': [sys.executable, '-u', str(Path(__file__).resolve()), '--watch', '--publish', '--reuse'],
+    config = {'Label': label, 'ProgramArguments': [sys.executable, '-u', str(Path(__file__).resolve()), '--watch', '--publish', '--reuse', '--destination', str(destination), '--url', url],
               'WorkingDirectory': str(ROOT), 'RunAtLoad': True, 'KeepAlive': True,
               'EnvironmentVariables': {'PATH': os.environ.get('PATH', '/usr/bin:/bin:/usr/sbin:/sbin')},
               'StandardOutPath': str(log), 'StandardErrorPath': str(log)}
@@ -440,8 +440,10 @@ def main():
     parser.add_argument('--destination', type=Path, default=DEFAULT_DEST)
     parser.add_argument('--url', default=DEFAULT_URL)
     args = parser.parse_args()
+    if (args.publish or args.install_watch) and not args.url:
+        parser.error("Set BLUEPRINT_BASE_URL or pass --url when publishing")
     if args.install_watch:
-        install_watch()
+        install_watch(args.destination, args.url)
         return 0
     if args.check and (args.publish or args.watch):
         parser.error('--check cannot be combined with --publish or --watch')

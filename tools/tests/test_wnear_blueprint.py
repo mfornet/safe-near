@@ -200,5 +200,38 @@ class FrontierPolicyTests(unittest.TestCase):
             blueprint.classify(self.manifest, self.rows, self.audit)
 
 
+
+
+class PublishConfigurationTests(unittest.TestCase):
+    def test_publishing_requires_an_explicit_endpoint(self):
+        import contextlib
+        import io
+        from unittest.mock import patch
+        with patch.object(blueprint, 'DEFAULT_URL', None), \
+                patch.object(sys, 'argv', ['wnear_blueprint', '--publish']), \
+                contextlib.redirect_stderr(io.StringIO()) as error:
+            with self.assertRaises(SystemExit) as exit:
+                blueprint.main()
+        self.assertEqual(exit.exception.code, 2)
+        self.assertIn('BLUEPRINT_BASE_URL', error.getvalue())
+
+    def test_watcher_persists_the_configured_endpoint_and_destination(self):
+        import plistlib
+        import subprocess
+        import tempfile
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            destination = home / 'publish'
+            url = 'https://example.com/w-near/'
+            with patch.object(Path, 'home', return_value=home), \
+                    patch.object(blueprint.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0)):
+                blueprint.install_watch(destination, url)
+            config = plistlib.loads((home / 'Library/LaunchAgents/com.safe-near.wnear-blueprint-watch.plist').read_bytes())
+            arguments = config['ProgramArguments']
+            self.assertEqual(arguments[arguments.index('--url') + 1], url)
+            self.assertEqual(arguments[arguments.index('--destination') + 1], str(destination))
+
+
 if __name__ == '__main__':
     unittest.main()
