@@ -36,6 +36,7 @@ import Bridge.Functions.BalanceOf297ParserResult
 import Bridge.Functions.BalanceOf297ParserPublicCompose
 import Bridge.Functions.BalanceOf297CopiedCall
 import Bridge.Functions.BalanceOf297CopiedBody
+import Bridge.Functions.BalanceOf297InitialRoomCompose
 
 /-! The browsable proof frontier. Definitions marked Open state contracts, not proofs. -/
 
@@ -751,3 +752,15 @@ attribute [blueprint "frontier:input-read"
   (statement := /-- The decoded input reader calls the host and returns the input in an owned vector, under the explicit register-room and interface premises. -/)
   (notReady := true)]
   WNear.Binary.EnvInput.f527_spec
+
+attribute [blueprint "frontier:initial-input-copy-room"
+  (title := /-- Initial budget supplies input and account-copy room -/)
+  (statement := /-- A nonempty bounded input and initial combined growth budget imply input register room and account-copy room at either possible post-input heap. These are conclusions, while the initial budget remains a premise. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.initial_input_and_copy_room
+
+attribute [blueprint "frontier:balance-copied-body-initial-room"
+  (title := /-- Function 297: copied-array absent account from initial room -/)
+  (statement := /-- Entire decoded body for a copied-string array and absent account, deriving input and account-copy room from the initial combined budget. Parser room, input shape, trie, host, gas and frame conditions remain premises; the full method remains open. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body_initial_room

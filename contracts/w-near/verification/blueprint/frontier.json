@@ -1577,6 +1577,37 @@
       "required_type_dependencies": [
         "input-register-room"
       ]
+    },
+    {
+      "id": "initial-input-copy-room",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.initial_input_and_copy_room",
+      "title": "Initial budget supplies input and account-copy room",
+      "kind": "theorem",
+      "environment": "A nonempty bounded input and initial combined growth budget imply input register room and account-copy room at either possible post-input heap. These are conclusions, while the initial budget remains a premise.",
+      "label": "frontier:initial-input-copy-room",
+      "reviewed_shape_hash": 2408406119,
+      "required_type_dependencies": [
+        "lookup-heap-room",
+        "input-register-room",
+        "owned-room"
+      ]
+    },
+    {
+      "id": "balance-copied-body-initial-room",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body_initial_room",
+      "title": "Function 297: copied-array absent account from initial room",
+      "kind": "theorem",
+      "environment": "Entire decoded body for a copied-string array and absent account, deriving input and account-copy room from the initial combined budget. Parser room, input shape, trie, host, gas and frame conditions remain premises; the full method remains open.",
+      "label": "frontier:balance-copied-body-initial-room",
+      "reviewed_shape_hash": 240968273,
+      "required_type_dependencies": [
+        "string-room",
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "balance-copied-absent-body",
+        "initial-input-copy-room"
+      ]
     }
   ],
   "reviewed_environment": [

@@ -1647,6 +1647,15 @@ The texts are proved equal to the model's `Panic.message` (`PanicText`).
    - then `ft_transfer_call` and `ft_resolve_transfer`, which need promise and promise-result host contracts.
 4. **M9.** Assemble `refines_wnear_exported` and discharge the code size, `CostsV86`, `LimitsV86`, `CostsNewV86` and `CostsDepositV86`.
 
+The complete decoded `ft_balance_of` body is checked for a copied-string array
+and an absent account. `copied_array_absent_body_initial_room` derives both input
+register room and account-copy allocation room from the initial combined growth
+budget. It still assumes the parser's `roomRun`, the concrete input shape, trie
+and absent-account facts, host and frame resources, and gas; it is not the full
+accepted/rejected method refinement. The frontier's type-dependency graph lists
+`RegOk` and `roomFor` on the helper because they occur as derived conclusions,
+not because the helper assumes them.
+
 ## Working notes
 
 - **Running agents.** Agents work in their own worktrees and copy `.lake` from the main worktree. They must not launch helper agents: cleaning up a worktree once removed a sub-agent's worktree while it was still working.
