@@ -18,3 +18,13 @@ audit/
 
 # The pinned nearcore checkout of runtime-reference.yml, kept between CI jobs.
 /reference-nearcore/
+
+# Machine-specific configuration and benchmark measurements stay local.
+/.local/
+/tools/verification-buildtime/baseline.json
+.env
+.env.*
+!.env.example
+
+# Redistribution permission for this upstream binary has not been established.
+/contracts/linkdrop/contract.wasm

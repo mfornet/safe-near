@@ -15,7 +15,7 @@ Legend for *pinned by*: see `contracts/README.md`.
 | [aurora-engine](aurora-engine/) | `aurora` | 218961590 | docker-script | 1.99.0 | **exact** |
 | [eth2-client](eth2-client/) | `client-eth2.bridge.near` | 193402297 | cargo-near-reproducible | 1.86.0 | **exact** |
 | [intents-defuse](intents-defuse/) | `intents.near` | 218982375 | cargo-near-reproducible | 1.97.1 | **exact** |
-| [linkdrop](linkdrop/) | `near` | 163297127 | cargo-near-reproducible | 1.86.0 | **exact** |
+| [linkdrop](linkdrop/) | `near` | 163297127 | cargo-near-reproducible | 1.86.0 | **exact** (binary omitted pending permission) |
 | [mpc-contract](mpc-contract/) | `v1.signer` | 217179197 | cargo-near-reproducible | 1.97.1 | **exact** |
 | [omni-bridge](omni-bridge/) | `omni.bridge.near` | 216369342 | cargo-near-reproducible | 1.96.0 | **exact** |
 | [ref-farming](ref-farming/) | `v2.ref-farming.near` | 81183973 | docker-script | 1.56.1 | **exact** |

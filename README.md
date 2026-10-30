@@ -68,7 +68,8 @@ Verification projects exist for `w-near` (model proofs complete, deployed
 refinement open), `sputnik-dao-factory` and `sputnikdao2-v3.2` (both in
 progress). The sequential expansion is tracked in
 [contracts/VERIFICATION.md](contracts/VERIFICATION.md); `linkdrop` is queued
-again, and near-lean already runs its binary.
+again. Its binary is omitted pending redistribution permission; the runtime
+supports its imports for local testing.
 
 ## License
 
