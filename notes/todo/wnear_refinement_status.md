@@ -791,6 +791,45 @@ continuation is published to PR #40 after its validation gates pass.
   whitespace checks pass. Evidence: `/tmp/pr40-ignore-string-final-audit.log`
   and `/tmp/pr40-ignore-string-style.log`.
 
+## Escaped shallow ignored values (2026-10-30)
+
+- `SerdeIgnValue.f81_shallow_core` refactors the existing body proof around a
+  successful `StringHyp` and an explicit preserved resource frame. Both the
+  scalar-string branch and ignored-object-key branch now use the model's
+  `stringBody` endpoint rather than a no-escape split. The existing
+  `f81_shallow_reuse` is recovered with the plain reader and an empty extra
+  frame; its public 96-byte footprint, depth premise and charge are unchanged.
+- `SerdeIgnValueEsc.stringHyp` discharges that boundary with the proved full
+  successful 650. Its extra frame owns the hex table, successful callee code and
+  64 additional stack bytes. `f81_shallow_escaped` therefore covers every
+  successful `ign1` skip with arbitrary string escapes, including strings whose
+  raw UTF-8 is invalid, without a global no-backslash premise. It preserves
+  reusable scratch pointer/capacity and all three string tables, returns the exact
+  reader endpoint and restores all 160 bytes. The depth premise is `d + 15`;
+  the charge remains `(166 + 470 * consumedBytes) * regularOpCost`.
+- `SerdeIgnReuseEsc.f201_shallow` carries the result through the actual colon
+  and ignored-value call with a 160-byte frame and `d + 16`. `ignoreHyp` supplies
+  the changing-state object loop's ignored-call interface for `ign1R`, now with
+  arbitrary escaped strings. It lends the hex table, frames the scratch buffer,
+  allocator and saved account-id String, and rejoins all 304 caller stack bytes.
+  The existing `cost81` and cursor-monotone bound predicates are reused. There
+  is no allocator-room or ignored-reader behavioral hypothesis in these two
+  concrete adapter results.
+- Lean MCP checks the public contracts, generic core and retained specialization
+  with only the three standard axioms. The kernel also checks `ign1` witnesses
+  for a newline escape, invalid raw UTF-8, and an object with a Unicode-escaped
+  key and escaped string value. `just wnear-audit` passes (2809 build jobs;
+  475 wNEAR modules, 64712 declarations and 59399 theorems), with only the three
+  existing `Proofs.Refinement` dependencies on `sorryAx`. The strict NearLogic
+  audit has zero violations; pinned statements, changed-source Lean style and
+  whitespace checks pass. Evidence: `/tmp/pr40-escaped-ignore-final-audit.log`
+  and `/tmp/pr40-escaped-ignore-style.log`.
+- Remaining: scratch frame pushes/pops for deep ignored containers, the full
+  model-agreeing ignored reader, reachable heap/room and uniform gas bounds,
+  object wrappers through 78/66/65 and general rejection. `ign1R` is still the
+  shallow decoder; it must not be treated as globally agreeing with `valueSkip`.
+  This does not establish the full `AcceptContract` or a seventh method.
+
 ## Methods
 
 There are 15 exported methods; six now have complete per-call refinement proofs under their protocol premises.
@@ -874,8 +913,8 @@ The texts are proved equal to the model's `Panic.message` (`PanicText`).
         cleanup; carry the proved changing-state object result through 78/66/65
         and close general argument-contract bounds, including hex-table ownership;
       - instantiate the remaining ignored-reader state transition in that loop;
-      - integrate the proved 652/650 successful ignored-string boundary into 81,
-        including hex ownership and the complete stack footprint.
+      - extend the escaped shallow 81 reader to deep frames, preserving its
+        changing scratch/heap state and the complete stack footprint.
    3. Ignored values nested deeper: 84 grows the scratch from capacity 0, and `Hyp81` must allow changes to the heap and the scratch.
 2. **`ft_balance_of`, method level.** Take the parser's contracts as parameters until they are proved. The argument layer is in `EnvInput` and `ArgsLeaves`, the balance read in `LookupMapGet`/`StorageReadWrapF`.
 3. **The remaining methods**, in M8's order:

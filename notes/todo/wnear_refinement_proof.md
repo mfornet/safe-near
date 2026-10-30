@@ -1360,6 +1360,26 @@ and supply 128 bytes below its own 32-byte frame (160 total). The old shallow
 footprint is 96. Deep ignored frames, reachable heap/room/gas bounds, object
 wrappers and general rejection remain open; the seventh method is not complete.
 
+**Escaped shallow ignored values (2026-10-30):**
+`SerdeIgnValue.f81_shallow_core` shares the existing actual body proof between
+string readers through `StringHyp` and a preserved extra resource frame. Both
+string branches now use the model's exact endpoint. The old escape-free theorem
+is recovered with its original 96-byte frame and charge. `SerdeIgnValueEsc`
+discharges the string boundary with the full successful 650, carrying the hex
+table and an additional 64 bytes below the old frame. `f81_shallow_escaped`
+covers all successful shallow `ign1` values with arbitrary string escapes,
+including invalid raw UTF-8, at the same `(166 + 470 * consumedBytes)` regular
+operations, with all 160 bytes restored and depth premise `d + 15`.
+`SerdeIgnReuseEsc.f201_shallow` proves the actual colon/ignore call;
+`ignoreHyp` lends the hex table from the object member state, frames heap/scratch
+and a saved String, and restores all 304 caller bytes. The old `cost81` is reused.
+The generic core, retained old theorem, concrete escaped reader and both adapters
+pass Lean MCP axiom checks with only the standard three axioms. Kernel-checked
+model witnesses cover simple/Unicode escapes and invalid raw UTF-8. Deep scratch
+frame pushes/pops, the full model-agreeing ignored reader, uniform heap/room/gas
+bounds, object wrappers and rejection remain open. The shallow `ign1R` still
+does not globally agree with `valueSkip`; no seventh method is claimed.
+
 ### M7. State and storage
 
 Borsh encoding of the state, `LookupMap` keys, near-sdk's `env` wrappers

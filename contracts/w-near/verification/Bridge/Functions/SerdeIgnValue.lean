@@ -114,41 +114,54 @@ def scratchTables (n : Nat) (de ptrS capS : UInt32) : IProp GF :=
     n ↦[i32][ de.toNat + 16 ] capS ∗ n ↦[wms][ 1048576 ] SerdeIdent.identBytes)
 
 /-- What 81 keeps through its loops: globals, stack, empty scratch of any capacity, and tables. -/
-def P81 (n g : Nat) (gt : GlobalType) (sp de ptrS capS : UInt32) : IProp GF :=
+def P81 (n g : Nat) (gt : GlobalType) (sp de ptrS capS : UInt32) (extra : IProp GF) : IProp GF :=
   iprop(g ↦[wg] ⟨gt, .i32 (sp - 32)⟩ ∗ stk n (sp.toNat - 32) 32 ∗ stk n (sp.toNat - 96) 64 ∗
     n ↦[i32][ de.toNat + 20 ] 0 ∗ n ↦[wms][ 1062392 ] ParseStr.escTable ∗
     n ↦[wms][ 1071704 ] FromUtf8Gen.utf8Width ∗ n ↦[i32][ de.toNat + 12 ] ptrS ∗ n ↦[i32][ de.toNat + 16 ] capS ∗
-    n ↦[wms][ 1048576 ] SerdeIdent.identBytes)
+    n ↦[wms][ 1048576 ] SerdeIdent.identBytes ∗ extra)
 
 /-- The value loop's invariant: the first value (`top`, at `j`), or a value inside the frame `f`. -/
-def inv4 (n g inst : Nat) (mi : ModuleInst) (Cg c₀ : Nat) (gt : GlobalType) (sp de ptr ptrS capS : UInt32)
+def inv4 (n g inst : Nat) (mi : ModuleInst) (Cg c₀ : Nat) (gt : GlobalType) (sp de ptr ptrS capS : UInt32) (extra : IProp GF)
     (bs : List UInt8) (j : Nat) (r : List UInt8) (T0 Ein R : Nat) : List Value → Frame → IProp GF := fun X fr =>
   iprop(⌜X = []⌝ ∗
     ((∃ (l5 : UInt64) (l6 l7 l8 : UInt32), ⌜fr = fr81 inst mi de (sp - 32) 0 1 l5 l6 l7 l8⌝ ∗
-      credits Cg (T0 * c₀ + 470 * (bs.length - r.length - j) * c₀ + R) ∗ rd n de ptr bs j ∗ P81 n g gt sp de ptrS capS) ∨
+      credits Cg (T0 * c₀ + 470 * (bs.length - r.length - j) * c₀ + R) ∗ rd n de ptr bs j ∗ P81 n g gt sp de ptrS capS extra) ∨
     (∃ (p : Nat) (l5 : UInt64) (l6 l7 : UInt32) (fb : UInt8) (N : Nat),
       ⌜fr = fr81 inst mi de (sp - 32) 1 0 l5 l6 l7 fb.toUInt32 ∧ Br fb ∧ p ≤ bs.length ∧
         (scal (bs.drop p)).bind (cont1 fb N) = some r⌝ ∗
-      credits Cg (Ein * c₀ + 470 * (bs.length - r.length - p) * c₀ + R) ∗ rd n de ptr bs p ∗ P81 n g gt sp de ptrS capS)))
+      credits Cg (Ein * c₀ + 470 * (bs.length - r.length - p) * c₀ + R) ∗ rd n de ptr bs p ∗ P81 n g gt sp de ptrS capS extra)))
 
 /-- After a value or a bracket: the container's loop (`op`: just opened). -/
-def contSt (n g inst : Nat) (mi : ModuleInst) (Cg c₀ : Nat) (gt : GlobalType) (sp de ptr ptrS capS : UInt32)
+def contSt (n g inst : Nat) (mi : ModuleInst) (Cg c₀ : Nat) (gt : GlobalType) (sp de ptr ptrS capS : UInt32) (extra : IProp GF)
     (bs : List UInt8) (r : List UInt8) (Eo Ec R : Nat) : Frame → IProp GF := fun fr =>
   iprop(∃ (p : Nat) (l3 l4 : UInt32) (l5 : UInt64) (l6 l7 : UInt32) (fb : UInt8) (N : Nat) (op : Bool),
     ⌜fr = fr81 inst mi de (sp - 32) l3 l4 l5 l6 l7 fb.toUInt32 ∧ Br fb ∧ p ≤ bs.length ∧
       (if op then l3 = 0 ∧ l4 = 1 ∧ open1 fb N (bs.drop p) = some r
        else l3 = 1 ∧ l4 = 0 ∧ cont1 fb N (bs.drop p) = some r)⌝ ∗
     credits Cg ((if op = true then (if fb = 0x5B then Eo else 200) else Ec) * c₀ + 470 * (bs.length - r.length - p) * c₀ + R) ∗
-    rd n de ptr bs p ∗ P81 n g gt sp de ptrS capS)
+    rd n de ptr bs p ∗ P81 n g gt sp de ptrS capS extra)
 
 /-- After a break out of the container's loop: the next element (`[`), or the next member's key (`{`). -/
-def brkSt (n g inst : Nat) (mi : ModuleInst) (Cg c₀ : Nat) (gt : GlobalType) (sp de ptr ptrS capS : UInt32)
+def brkSt (n g inst : Nat) (mi : ModuleInst) (Cg c₀ : Nat) (gt : GlobalType) (sp de ptr ptrS capS : UInt32) (extra : IProp GF)
     (bs : List UInt8) (r : List UInt8) (Eb R : Nat) : Frame → IProp GF := fun fr =>
   iprop(∃ (p : Nat) (l3 l4 : UInt32) (l5 : UInt64) (l6 l7 : UInt32) (fb : UInt8) (N : Nat),
     ⌜fr = fr81 inst mi de (sp - 32) l3 l4 l5 l6 l7 fb.toUInt32 ∧ Br fb ∧ p ≤ bs.length ∧
       (fb = 0x5B → (scal (bs.drop p)).bind (cont1 fb N) = some r) ∧
       (fb = 0x7B → keyThen sk (bs.drop p) (fun r3 => (scal r3).bind (cont1 fb N)) = some r)⌝ ∗
-    credits Cg ((if fb = 0x5B then Eb else 0) * c₀ + 470 * (bs.length - r.length - p) * c₀ + R) ∗ rd n de ptr bs p ∗ P81 n g gt sp de ptrS capS)
+    credits Cg ((if fb = 0x5B then Eb else 0) * c₀ + 470 * (bs.length - r.length - p) * c₀ + R) ∗ rd n de ptr bs p ∗ P81 n g gt sp de ptrS capS extra)
+
+/-- The successful string reader, preserving caller-supplied resources and the existing 64-byte callee frame. -/
+def StringHyp (cfg : WasmConfig) (lim : ExecLimits) (d inst : Nat) (mi : ModuleInst)
+    (n g Cg : Nat) (gt : GlobalType) (sp de ptr : UInt32) (bs : List UInt8) (extra : IProp GF) : Prop :=
+  ∀ (q : Nat) (s : Option String) (rest : List UInt8), q ≤ bs.length →
+    stringBody (bs.drop q) [] = some (s, rest) →
+    ⊢ MFunSpec (GF := GF) cfg lim (d + 1) types[32]! inst mi f650 Cg
+      (fun args => iprop(⌜args = [.i32 de]⌝ ∗ g ↦[wg] ⟨gt, .i32 (sp - 32)⟩ ∗
+        stk n (sp.toNat - 96) 64 ∗ rd n de ptr bs q ∗ n ↦[wms][ 1062392 ] ParseStr.escTable ∗ extra))
+      (fun _ => (120 + 300 * (bs.length - rest.length - q)) * cfg.regularOpCost)
+      (fun _ rs => iprop(⌜rs = [.i32 0]⌝ ∗ g ↦[wg] ⟨gt, .i32 (sp - 32)⟩ ∗
+        stk n (sp.toNat - 96) 64 ∗ rd n de ptr bs (bs.length - rest.length) ∗
+        n ↦[wms][ 1062392 ] ParseStr.escTable ∗ extra))
 
 end Defs
 
@@ -204,7 +217,7 @@ local macro "n3close" : tactic => `(tactic| (
     ipureintro; omega
   iframe Hrd
   iunfold P81
-  iframe Hg S81 SB D20 He Hw D12 D16 Hid))
+  iframe Hg S81 SB D20 He Hw D12 D16 Hid Hextra))
 
 set_option hygiene false in
 /-- A scalar inside a frame is done: `l3 := 1`, `l4 = 0`, out of the value block. -/
@@ -270,7 +283,7 @@ local macro "sdTop" : tactic => `(tactic| (
   isplitl [Hrd]
   · rw [← hp1q]; iexact Hrd
   iunfold scratchTables
-  iframe He Hw D12 D16 Hid
+  iframe He Hw D12 D16 Hid Hextra
   iexists 0
   iexact D20))
 
@@ -356,7 +369,7 @@ local macro "brTail" : tactic => `(tactic| (
     ipureintro; (try split) <;> (try split) <;> omega
   iframe Hrd
   iunfold P81
-  iframe Hg S81 SB D20 He Hw D12 D16 Hid))
+  iframe Hg S81 SB D20 He Hw D12 D16 Hid Hextra))
 
 set_option hygiene false in
 /-- The container closes at `p + w` (the reader there): eat, pop the empty scratch (85), return 0. -/
@@ -414,7 +427,7 @@ local macro "closeTail" : tactic => `(tactic| (
   isplitl [Hrd]
   · rw [show bs.length - r.length = p + w + 1 by rw [hr]; simp; omega]; iexact Hrd
   iunfold scratchTables
-  iframe He Hw D12 D16 Hid
+  iframe He Hw D12 D16 Hid Hextra
   iexists 0
   iexact D20))
 
@@ -441,7 +454,7 @@ local macro "n4close " p':term:max N':term:max f:term:max : tactic => `(tactic| 
     ipureintro; (try split) <;> (first | omega | (rename_i hh; exact absurd hh (by decide)))
   iframe Hrd
   iunfold P81
-  iframe Hg S81 SB D20 He Hw D12 D16 Hid))
+  iframe Hg S81 SB D20 He Hw D12 D16 Hid Hextra))
 
 set_option hygiene false in
 /-- 81 at a scalar from `p` (the reader there, the whitespace `w`, the byte `b`, the value's end `p1`):
@@ -468,18 +481,16 @@ local macro "vbody " sd:tactic : tactic => `(tactic| (
   · -- a string: 333, 650
     rw [hdr] at hr1s
     have hsb' : stringBody (bs.drop (p + w + 1)) [] = some (s0, r1) := hsb
-    obtain ⟨hsplit, hplain⟩ := SerdeIgnPure.str_split hnb hsb'
-    generalize hbody : SerdeKeyNoEsc.keyBody bs (p + w + 1) = body at hsplit hplain
-    have hpos : p1 = p + w + 1 + body.length + 1 := by
-      have := congrArg List.length hsplit; simp at this; omega
-    have hS : 21 * body.length * cfg.regularOpCost + 940 * cfg.regularOpCost ≤
+    have hrestLen := WNear.JsonFuel.stringBody_len hsb'
+    simp only [List.length_drop] at hrestLen
+    have hpos : p + w + 1 < p1 := by omega
+    have hS : (120 + 300 * (p1 - (p + w + 1))) * cfg.regularOpCost + 300 * cfg.regularOpCost ≤
         470 * (p1 - (p + w)) * cfg.regularOpCost := by
-      have e : 470 * (p1 - (p + w)) * cfg.regularOpCost = 470 * body.length * cfg.regularOpCost +
-          940 * cfg.regularOpCost := by rw [show p1 - (p + w) = body.length + 2 by omega]; ring
-      have := Nat.mul_le_mul_right cfg.regularOpCost (Nat.mul_le_mul_right body.length (show 21 ≤ 470 by omega))
-      omega
+      have he : p1 - (p + w) = (p1 - (p + w + 1)) + 1 := by omega
+      have hc : 120 + 300 * (p1 - (p + w + 1)) + 300 ≤ 470 * (p1 - (p + w)) := by omega
+      simpa only [Nat.add_mul] using Nat.mul_le_mul_right cfg.regularOpCost hc
     generalize hS' : 470 * (p1 - (p + w)) * cfg.regularOpCost = S at hS hS1
-    generalize hM : 21 * body.length * cfg.regularOpCost = M at hS
+    generalize hM : (120 + 300 * (p1 - (p + w + 1))) * cfg.regularOpCost = M at hS
     mstep_taken with decide
     mstep
     mcall (SerdeRead.f333_spec cfg lim (d + 1) types[0]! (by rfl) inst mi n hn Cg de ptr bs (p + w) hlt hlen
@@ -487,18 +498,15 @@ local macro "vbody " sd:tactic : tactic => `(tactic| (
     · iframe Hrd
     icases HQ with ⟨%hrs, Hrd⟩
     subst hrs
-    have s650 := SerdeIgnStr.f650_noesc (GF := GF) cfg lim (d + 1) types[32]! (by rfl) inst mi n g hn hg Cg gt (sp - 32)
-      de ptr bs body r1 (p + w + 1) hlen hptr hsplit hplain
-    rw [show SerdeIgnStr.cost650 body.length * cfg.regularOpCost = 56 * cfg.regularOpCost + M by
-      unfold SerdeIgnStr.cost650; rw [← hM]; simp only [Nat.add_mul]] at s650
+    have s650 := hstr (p + w + 1) s0 r1 (by omega) hsb'
+    rw [hP1, hM] at s650
     mstep
-    mcall s650 using [Hg Hrd He]
-    · iframe Hg Hrd He
-    icases HQ with ⟨%hrs, Hg, Hrd, He⟩
+    mcall s650 using [Hg SB Hrd He Hextra]
+    · iframe Hg SB Hrd He Hextra
+    icases HQ with ⟨%hrs, Hg, SB, Hrd, He, Hextra⟩
     subst hrs
     mstep; mstep
     mstep_taken with decide
-    rw [show p + w + 1 + body.length + 1 = p1 by omega]
     ($sd:tactic)
   · -- `-`: 333, then 83
     have hlt1 : p + w + 1 < bs.length := by
@@ -722,19 +730,20 @@ set_option maxRecDepth 100000 in
 set_option maxHeartbeats 64000000 in
 /-- **`ignore_value(de)`** (81) on a shallow value: where `ign1` skips from `j` to `r`, `0`, the reader at
 `|bs| - |r|`. -/
-theorem f81_shallow_reuse (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
+theorem f81_shallow_core (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
     (htype : type.results.length = 1) (inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (n g ta : Nat)
     (hm : IfaceMod mi A n g ta) (hd : d + 8 < lim.maxCallDepth) (Cg : Nat)
     (gt : GlobalType) (sp de ptr ptrS capS : UInt32) (bs : List UInt8) (j : Nat) (r : List UInt8)
     (hlen : bs.length < 2 ^ 32) (hptr : ptr.toNat + bs.length ≤ 2 ^ 32) (hde : de.toNat + 24 ≤ 2 ^ 32)
-    (hsp : 96 ≤ sp.toNat) (hj : j ≤ bs.length) (hnb : (0x5C : UInt8) ∉ bs) (hx : ign1 (bs.drop j) = some r) :
+    (hsp : 96 ≤ sp.toNat) (hj : j ≤ bs.length) (extra : IProp GF)
+    (hstr : StringHyp cfg lim d inst mi n g Cg gt sp de ptr bs extra) (hx : ign1 (bs.drop j) = some r) :
     code81 inst mi A ⊢
       MFunSpec (GF := GF) cfg lim d type inst mi f81 Cg
         (fun args => iprop(⌜args = [.i32 de]⌝ ∗ g ↦[wg] ⟨gt, .i32 sp⟩ ∗ stk n (sp.toNat - 96) 96 ∗
-          rd n de ptr bs j ∗ scratchTables n de ptrS capS))
+          rd n de ptr bs j ∗ scratchTables n de ptrS capS ∗ extra))
         (fun _ => (166 + 470 * (bs.length - r.length - j)) * cfg.regularOpCost)
         (fun _ rs => iprop(⌜rs = [.i32 0]⌝ ∗ g ↦[wg] ⟨gt, .i32 sp⟩ ∗ stk n (sp.toNat - 96) 96 ∗
-          rd n de ptr bs (bs.length - r.length) ∗ scratchTables n de ptrS capS)) := by
+          rd n de ptr bs (bs.length - r.length) ∗ scratchTables n de ptrS capS ∗ extra)) := by
   iintro #Hk
   ihave #Hk' := Hk
   iunfold code81 at Hk'
@@ -766,7 +775,7 @@ theorem f81_shallow_reuse (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type 
   iapply MFunSpec_intro
   imodintro
   iintro %args %R HP Hc
-  icases HP with ⟨%hargs, Hg, Hs, Hrd, Ht⟩
+  icases HP with ⟨%hargs, Hg, Hs, Hrd, Ht, Hextra⟩
   subst hargs
   iunfold scratchTables at Ht
   icases Ht with ⟨⟨%sl, D20⟩, He, Hw, D12, D16, Hid⟩
@@ -790,7 +799,7 @@ theorem f81_shallow_reuse (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type 
   mcredits (cfg.regularOpCost + (109 * cfg.regularOpCost + W + R))
   iapply mwpi_cons
   iapply MemCpy.mwpi_loop0 (Cg := Cg) (R := 109 * cfg.regularOpCost + W + R)
-    (I := inv4 n g inst mi Cg cfg.regularOpCost gt sp de ptr ptrS capS bs j r 109 60 R) _ _ rfl
+    (I := inv4 n g inst mi Cg cfg.regularOpCost gt sp de ptr ptrS capS extra bs j r 109 60 R) _ _ rfl
   isplitr
   · imodintro
     iintro %X %l HI
@@ -798,12 +807,12 @@ theorem f81_shallow_reuse (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type 
     icases HI with ⟨%hX, HI⟩
     subst hX
     iapply mwpi_split3 (N := fun vs fr => iprop(⌜vs = []⌝ ∗
-      contSt n g inst mi Cg cfg.regularOpCost gt sp de ptr ptrS capS bs r 250 0 R fr))
+      contSt n g inst mi Cg cfg.regularOpCost gt sp de ptr ptrS capS extra bs r 250 0 R fr))
     isplitl [HI]
     · icases HI with (⟨%l5, %l6, %l7, %l8, %hfr, Hc, Hrd, HP⟩ | ⟨%p, %l5, %l6, %l7, %fb, %N, %⟨hfr, hfb, hp, hmod⟩, Hc, Hrd, HP⟩)
       · rw [hfr]; simp only [fr81]
         iunfold P81 at HP
-        icases HP with ⟨Hg, S81, SB, D20, He, Hw, D12, D16, Hid⟩
+        icases HP with ⟨Hg, S81, SB, D20, He, Hw, D12, D16, Hid, Hextra⟩
         have hsk : skipWhitespace (bs.drop j) = bs.drop (j + wsLen (bs.drop j)) := by
           rw [SerdeRead.skipWhitespace_eq, List.drop_drop]
         have hwle := SerdeRead.wsLen_le (bs.drop j)
@@ -876,7 +885,7 @@ theorem f81_shallow_reuse (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type 
           vbody sdTop
       · rw [hfr]; simp only [fr81]
         iunfold P81 at HP
-        icases HP with ⟨Hg, S81, SB, D20, He, Hw, D12, D16, Hid⟩
+        icases HP with ⟨Hg, S81, SB, D20, He, Hw, D12, D16, Hid, Hextra⟩
         obtain ⟨r1, hs1, hc1⟩ : ∃ r1, scal (bs.drop p) = some r1 ∧ cont1 fb N r1 = some r := by
           simp only [Option.bind_eq_some_iff] at hmod; exact hmod
         have hsk : skipWhitespace (bs.drop p) = bs.drop (p + wsLen (bs.drop p)) := by
@@ -948,7 +957,7 @@ theorem f81_shallow_reuse (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type 
       generalize hWq : 470 * (bs.length - r.length - (p + w + 1)) * cfg.regularOpCost = Wq
       generalize hEC : (if op = true then (if fb = 0x5B then 250 else 200) else 0) * cfg.regularOpCost = EC
       iapply mwpi_split1 (N := fun vs fr => iprop(⌜vs = []⌝ ∗
-        brkSt n g inst mi Cg cfg.regularOpCost gt sp de ptr ptrS capS bs r 75 R fr))
+        brkSt n g inst mi Cg cfg.regularOpCost gt sp de ptr ptrS capS extra bs r 75 R fr))
       isplitl [Hc Hrd HP]
       · simp only [fr81]
         mstep
@@ -956,7 +965,7 @@ theorem f81_shallow_reuse (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type 
         iapply mwpi_cons
         iapply MemCpy.mwpi_loop0 (Cg := Cg) (R := EC + 468 * cfg.regularOpCost + WS + X1 + Wq + R)
           (I := fun X fr' => iprop(⌜X = [] ∧ fr' = fr81 inst mi de (sp - 32) l3 l4 l5 l6 l7 fb.toUInt32⌝ ∗
-            credits Cg (EC + 468 * cfg.regularOpCost + WS + X1 + Wq + R) ∗ rd n de ptr bs p ∗ P81 n g gt sp de ptrS capS))
+            credits Cg (EC + 468 * cfg.regularOpCost + WS + X1 + Wq + R) ∗ rd n de ptr bs p ∗ P81 n g gt sp de ptrS capS extra))
           _ _ rfl
         isplitr
         · imodintro
@@ -965,7 +974,7 @@ theorem f81_shallow_reuse (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type 
           subst hX
           rw [hfr']; simp only [fr81]
           iunfold P81 at HP
-          icases HP with ⟨Hg, S81, SB, D20, He, Hw, D12, D16, Hid⟩
+          icases HP with ⟨Hg, S81, SB, D20, He, Hw, D12, D16, Hid, Hextra⟩
           have s339 := SerdeRead.f339_spec (GF := GF) cfg (lim := lim) (d + 1) types[11]! (by rfl) inst mi n hn
             (A 332) (A 333) (hm.funcs 332 (by decide)) ha333 (by omega) Cg de ptr bs p (by omega) hlen hptr (by omega)
           rw [hw, Nat.add_mul, hWS] at s339
@@ -1116,7 +1125,7 @@ theorem f81_shallow_reuse (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type 
         · -- `{`: the next member's key, `:`, then the value
           rw [show (if (0x7B : UInt8) = 0x5B then 75 else 0) = 0 from rfl]
           iunfold P81 at HP
-          icases HP with ⟨Hg, S81, SB, D20, He, Hw, D12, D16, Hid⟩
+          icases HP with ⟨Hg, S81, SB, D20, He, Hw, D12, D16, Hid, Hextra⟩
           obtain ⟨r1, s1, r2, r3, hk1, hk2, hk3, hk4⟩ := SerdeIgnPure.keyThen_some (hk7 rfl)
           have hsk : skipWhitespace (bs.drop p) = bs.drop (p + wsLen (bs.drop p)) := by
             rw [SerdeRead.skipWhitespace_eq, List.drop_drop]
@@ -1131,15 +1140,11 @@ theorem f81_shallow_reuse (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type 
           have hr1 : r1 = bs.drop (p + w3 + 1) := by
             rw [SerdeIgnInt.drop_cons hlt3 hb3] at hk1; simp only [List.cons.injEq] at hk1; exact hk1.2.symm
           rw [hr1] at hk2
-          obtain ⟨hsplit, hplain⟩ := SerdeIgnPure.str_split hnb hk2
-          generalize hbody : SerdeKeyNoEsc.keyBody bs (p + w3 + 1) = body at hsplit hplain
-          have hl2 : bs.length - (p + w3 + 1) = body.length + 1 + r2.length := by
-            have := congrArg List.length hsplit; simp at this; omega
-          have hr2 : r2 = bs.drop (p + w3 + 1 + body.length + 1) := by
-            have hs2 : r2 <:+ bs.drop (p + w3 + 1) := by
-              rw [hsplit]; exact (List.suffix_cons _ _).trans (List.suffix_append _ _)
-            rw [← JsonSuffix.drop_suf' hs2]; congr 1; omega
-          generalize hp2 : p + w3 + 1 + body.length + 1 = p2 at hr2
+          have hl2 := WNear.JsonFuel.stringBody_len hk2
+          simp only [List.length_drop] at hl2
+          have hr2 : r2 = bs.drop (bs.length - r2.length) := (JsonSuffix.drop_suf' (JsonSuffix.stringBody_suf' hk2)).symm
+          generalize hp2 : bs.length - r2.length = p2 at hr2
+          have hp2gt : p + w3 + 1 < p2 := by omega
           have hsk2 : skipWhitespace (bs.drop p2) = bs.drop (p2 + wsLen (bs.drop p2)) := by
             rw [SerdeRead.skipWhitespace_eq, List.drop_drop]
           generalize hw4 : wsLen (bs.drop p2) = w4 at hsk2
@@ -1156,16 +1161,16 @@ theorem f81_shallow_reuse (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type 
           have hq3 : p2 + w4 + 1 ≤ bs.length - r.length := by
             have := (SerdeIgnPure.kont_suf _ N _ _ hk4).length_le; simp at this; omega
           rw [show 470 * (bs.length - r.length - p) * cfg.regularOpCost =
-            96 * w3 * cfg.regularOpCost + (374 * w3 * cfg.regularOpCost + (21 * body.length * cfg.regularOpCost +
-              (449 * body.length * cfg.regularOpCost + (96 * w4 * cfg.regularOpCost +
-                (374 * w4 * cfg.regularOpCost + (1410 * cfg.regularOpCost +
+            96 * w3 * cfg.regularOpCost + (374 * w3 * cfg.regularOpCost + (300 * (p2 - (p + w3 + 1)) * cfg.regularOpCost +
+              (170 * (p2 - (p + w3 + 1)) * cfg.regularOpCost + (96 * w4 * cfg.regularOpCost +
+                (374 * w4 * cfg.regularOpCost + (940 * cfg.regularOpCost +
                   470 * (bs.length - r.length - (p2 + w4 + 1)) * cfg.regularOpCost)))))) by
-            rw [show bs.length - r.length - p = w3 + body.length + w4 + 3 + (bs.length - r.length - (p2 + w4 + 1)) by
+            rw [show bs.length - r.length - p = w3 + (p2 - (p + w3 + 1)) + w4 + 2 + (bs.length - r.length - (p2 + w4 + 1)) by
               omega]; ring]
           generalize hWS3 : 96 * w3 * cfg.regularOpCost = WS3
           generalize hX3 : 374 * w3 * cfg.regularOpCost = X3
-          generalize hM : 21 * body.length * cfg.regularOpCost = M
-          generalize hXM : 449 * body.length * cfg.regularOpCost = XM
+          generalize hM : 300 * (p2 - (p + w3 + 1)) * cfg.regularOpCost = M
+          generalize hXM : 170 * (p2 - (p + w3 + 1)) * cfg.regularOpCost = XM
           generalize hWS4 : 96 * w4 * cfg.regularOpCost = WS4
           generalize hX4 : 374 * w4 * cfg.regularOpCost = X4
           generalize hWq3 : 470 * (bs.length - r.length - (p2 + w4 + 1)) * cfg.regularOpCost = Wq3
@@ -1192,14 +1197,12 @@ theorem f81_shallow_reuse (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type 
           · iframe Hrd
           icases HQ with ⟨%hrs, Hrd⟩
           subst hrs
-          have s650 := SerdeIgnStr.f650_noesc (GF := GF) cfg lim (d + 1) types[32]! (by rfl) inst mi n g hn hg Cg gt
-            (sp - 32) de ptr bs body r2 (p + w3 + 1) hlen hptr hsplit hplain
-          rw [show SerdeIgnStr.cost650 body.length * cfg.regularOpCost = 56 * cfg.regularOpCost + M by
-            unfold SerdeIgnStr.cost650; rw [← hM]; simp only [Nat.add_mul], hp2] at s650
+          have s650 := hstr (p + w3 + 1) s1 r2 (by omega) hk2
+          rw [hp2, Nat.add_mul, hM] at s650
           mstep
-          mcall s650 using [Hg Hrd He]
-          · iframe Hg Hrd He
-          icases HQ with ⟨%hrs, Hg, Hrd, He⟩
+          mcall s650 using [Hg SB Hrd He Hextra]
+          · iframe Hg SB Hrd He Hextra
+          icases HQ with ⟨%hrs, Hg, SB, Hrd, He, Hextra⟩
           subst hrs
           mstep
           mstep_not_taken with decide
@@ -1252,7 +1255,7 @@ theorem f81_shallow_reuse (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type 
             ipureintro; omega
           iframe Hrd
           iunfold P81
-          iframe Hg S81 SB D20 He Hw D12 D16 Hid
+          iframe Hg S81 SB D20 He Hw D12 D16 Hid Hextra
   · iframe Hc
     inext
     iintro Hc
@@ -1269,7 +1272,78 @@ theorem f81_shallow_reuse (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type 
     rw [← hW]
     iframe Hc Hrd
     iunfold P81
-    iframe Hg S81 SB D20 He Hw D12 D16 Hid
+    iframe Hg S81 SB D20 He Hw D12 D16 Hid Hextra
+
+/-- The existing plain-byte reader supplies the general string interface on escape-free input. -/
+theorem stringHyp_noesc (cfg : WasmConfig) (lim : ExecLimits) (d inst : Nat) (mi : ModuleInst)
+    (n g Cg : Nat) (hn : mi.memAddrs[0]? = some n) (hg : mi.globalAddrs[0]? = some g)
+    (gt : GlobalType) (sp de ptr : UInt32) (bs : List UInt8)
+    (hlen : bs.length < 2 ^ 32) (hptr : ptr.toNat + bs.length ≤ 2 ^ 32)
+    (hnb : (0x5C : UInt8) ∉ bs) :
+    StringHyp (GF := GF) cfg lim d inst mi n g Cg gt sp de ptr bs emp := by
+  intro q s rest hq hmodel
+  obtain ⟨hsplit, hplain⟩ := SerdeIgnPure.str_split hnb hmodel
+  have hlength := congrArg List.length hsplit
+  simp only [List.length_drop, List.length_append, List.length_cons] at hlength
+  have hend : q + (SerdeKeyNoEsc.keyBody bs q).length + 1 = bs.length - rest.length := by omega
+  have base := SerdeIgnStr.f650_noesc (GF := GF) cfg lim (d + 1) types[32]! rfl inst mi n g hn hg Cg gt
+    (sp - 32) de ptr bs (SerdeKeyNoEsc.keyBody bs q) rest q hlen hptr hsplit hplain
+  rw [hend] at base
+  iapply (AllocFresh.MFunSpec_frame
+    (Fr := stk n (sp.toNat - 96) 64)
+    (P := fun args => iprop(⌜args = [.i32 de]⌝ ∗ g ↦[wg] ⟨gt, .i32 (sp - 32)⟩ ∗
+      rd n de ptr bs q ∗ n ↦[wms][ 1062392 ] ParseStr.escTable))
+    (Q := fun _ rs => iprop(⌜rs = [.i32 0]⌝ ∗ g ↦[wg] ⟨gt, .i32 (sp - 32)⟩ ∗
+      rd n de ptr bs (bs.length - rest.length) ∗ n ↦[wms][ 1062392 ] ParseStr.escTable)) ?_ ?_)
+  · intro args
+    iintro ⟨%ha, Hg, Hs, Hrd, He, _⟩
+    iframe Hg Hs Hrd He
+    ipureintro; exact ha
+  · intro args rs
+    iintro ⟨Hs, %hrs, Hg, Hrd, He⟩
+    iframe Hg Hs Hrd He
+    ipureintro; exact hrs
+  iapply AllocGen.MFunSpec_cost (K := fun _ => SerdeIgnStr.cost650 (SerdeKeyNoEsc.keyBody bs q).length * cfg.regularOpCost)
+    (hK := fun _ => Nat.mul_le_mul_right cfg.regularOpCost (show
+      SerdeIgnStr.cost650 (SerdeKeyNoEsc.keyBody bs q).length ≤ 120 + 300 * (bs.length - rest.length - q) by
+        unfold SerdeIgnStr.cost650; omega))
+  iapply base
+
+theorem f81_shallow_reuse (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
+    (htype : type.results.length = 1) (inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (n g ta : Nat)
+    (hm : IfaceMod mi A n g ta) (hd : d + 8 < lim.maxCallDepth) (Cg : Nat)
+    (gt : GlobalType) (sp de ptr ptrS capS : UInt32) (bs : List UInt8) (j : Nat) (r : List UInt8)
+    (hlen : bs.length < 2 ^ 32) (hptr : ptr.toNat + bs.length ≤ 2 ^ 32) (hde : de.toNat + 24 ≤ 2 ^ 32)
+    (hsp : 96 ≤ sp.toNat) (hj : j ≤ bs.length) (hnb : (0x5C : UInt8) ∉ bs) (hx : ign1 (bs.drop j) = some r) :
+    code81 inst mi A ⊢
+      MFunSpec (GF := GF) cfg lim d type inst mi f81 Cg
+        (fun args => iprop(⌜args = [.i32 de]⌝ ∗ g ↦[wg] ⟨gt, .i32 sp⟩ ∗ stk n (sp.toNat - 96) 96 ∗
+          rd n de ptr bs j ∗ scratchTables n de ptrS capS))
+        (fun _ => (166 + 470 * (bs.length - r.length - j)) * cfg.regularOpCost)
+        (fun _ rs => iprop(⌜rs = [.i32 0]⌝ ∗ g ↦[wg] ⟨gt, .i32 sp⟩ ∗ stk n (sp.toNat - 96) 96 ∗
+          rd n de ptr bs (bs.length - r.length) ∗ scratchTables n de ptrS capS)) := by
+  have reader := stringHyp_noesc (GF := GF) cfg lim d inst mi n g Cg hm.mem hm.glob gt sp de ptr bs hlen hptr hnb
+  have core := f81_shallow_core (GF := GF) cfg lim d type htype inst mi A n g ta hm hd Cg gt
+    sp de ptr ptrS capS bs j r hlen hptr hde hsp hj emp reader hx
+  iintro #HC
+  ihave #S := core $$ HC
+  iunfold MFunSpec at S
+  iunfold MFunSpec
+  imodintro
+  iintro %args %R HP Hc
+  iapply mwpInvoke_wand
+  isplitl [HP Hc]
+  · iapply S $$ %args %R [HP] Hc
+    dsimp only
+    icases HP with ⟨%ha, Hg, Hs, Hrd, Htables⟩
+    iframe Hg Hs Hrd Htables
+    ipureintro; exact ha
+  isplit
+  · iintro %rs ⟨Hc, %hrs, Hg, Hs, Hrd, Htables, _⟩
+    dsimp only
+    iframe Hc Hg Hs Hrd Htables
+    ipureintro; exact hrs
+  · iintro Htrap; iexact Htrap
 
 theorem f81_shallow (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
     (htype : type.results.length = 1) (inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (n g ta : Nat)
