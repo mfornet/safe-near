@@ -1398,6 +1398,27 @@ invariant and quantitative growth bounds. The escaped shallow reader is still
 the only integrated ignored reader; no complete accepting contract or seventh
 method is claimed.
 
+The general frame-stack continuation now proves `SerdeIgnReserve.f698_sbuf`
+across fitting, capacity-zero and nonempty-reallocation cases, preserving the
+used prefix and exposing `capAfter`, `fAfter` and `hlAfter`. Fitting reserves
+keep their 59-operation charge; growth retains its allocator/copy/page charges.
+`SerdeIgnPush.f84_some` appends one present byte through the actual 84 at
+`140*c + growthCost`, with the complete 80-byte frame restored. `SerdeIgnStack`
+packages the descriptor and `sbuf` in the pure machine's innermost-first order
+by reversing the physical vector bytes. Its actual clear, optional-none push,
+present push and pop contracts preserve all earlier live allocations.
+
+`SerdeIgnTrace` supplies the quantitative interface for arbitrary pushes and
+pops, whose final used length need not bound earlier copying. Under its
+per-state reserve arithmetic premises, total old bytes copied are at most
+`2*peak + 8`, total requested capacity at most `4*peak + 16`, and a positive
+actual growth count satisfies `8*2^(G-1) <= finalCapacity`. Its free-list bound
+is `F + 2*G`; allocator walks and requested pages, including rounding overhead,
+remain in `extraCost_budget`. The next obligation is to extract this trace
+from the complete 81 invariant, retaining saved String ownership and connecting
+peak length to consumed input. This is not yet the full ignored-value reader,
+a uniform accepting parser, or a seventh method refinement.
+
 ### M7. State and storage
 
 Borsh encoding of the state, `LookupMap` keys, near-sdk's `env` wrappers

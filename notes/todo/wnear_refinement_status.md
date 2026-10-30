@@ -872,6 +872,58 @@ continuation is published to PR #40 after its validation gates pass.
   retaining the saved account-id String. Full ignored-reader integration,
   uniform bounds, object wrappers, rejection and the seventh method remain open.
 
+## General frame reserves, stack operations and pop-aware growth (2026-10-30)
+
+- `SerdeIgnReserve.f698_sbuf` unifies the actual fitting, capacity-zero and
+  nonempty-reallocation paths of 698. It preserves the used prefix and earlier
+  live allocations, restores all 80 stack bytes, and exposes the returned
+  pointer, `capAfter`, `fAfter` and exact `hlAfter` alternative. Its cost is
+  `59*c + growthCost`: fitting requests pay 59 regular operations, while growth
+  retains the allocator walk, copying and requested-page fees. Its arithmetic
+  and allocation-room premises remain explicit.
+- `SerdeIgnPush.f84_some` proves the actual present-byte push for any represented
+  scratch buffer, including fitting, first-allocation and reallocating cases.
+  It appends exactly `byteOf b`, increments length once, and restores all 80
+  bytes, at `140*c + growthCost` and call-depth premise `d + 13`.
+- `SerdeIgnStack.state` stores `frames.reverse`, connecting the vector's
+  append/pop-at-end representation to `IgnoreModel`'s innermost-first saved
+  frames. `f84_cons` pushes a pure head; `f84_none` preserves the complete state
+  at 120 regular operations; `f85_pop` implements the head/tail split, including
+  the empty case, at a common 50-operation upper bound. `sbuf_clear` returns
+  all formerly used bytes to the spare region without freeing the allocation;
+  `f343_clear` carries that through the real clear call at 30 operations.
+  The state retains the scratch pointer/capacity and all earlier live blocks.
+- `SerdeIgnTrace` accounts for arbitrary interleaved pushes and nonempty pops.
+  `Valid` requires the actual reserve arithmetic bounds at every state. Its
+  transitions use the concrete `capAfter`/`fits` definitions, retain capacity
+  on pops and evolve the free-list bound only on growth. The high-water used
+  length `N = peak len ops` replaces the append-only trace's final used length:
+  `movedBytes_peak` bounds total old bytes copied by `2*N + 8`, and
+  `allocatedBytes_peak` bounds requested capacity by `4*N + 16`.
+- `growthCount_power` proves `8 * 2^(G-1) <= finalCapacity` for a positive
+  actual growth count `G`, even across pops. `endFreeBound_eq` gives `F + 2*G`,
+  and `walks_eq` retains the summed allocator walks via
+  `walks + G = F*G + G*G`. `pages_scaled` includes allocator headers and page
+  rounding. `extraCost_budget` bounds all remaining real reserve charges by
+  the closed `budget cfg F G N`, retaining regular-operation, allocator-walk,
+  old-copy and requested-page contributions. The budget is independent of the
+  gas ceiling; it is not yet absorbed into the parser's model gas allowance.
+- Lean MCP diagnostics and standard-axiom checks pass for the public stack
+  contracts and quantitative bounds. The targeted stack/trace build passes.
+  `just wnear-audit` passes (2815 build jobs; 481 wNEAR modules, 65476
+  declarations and 60097 theorems), with only the three existing open-refinement
+  dependencies on `sorryAx`. Strict NearLogic has zero violations and all
+  statement pins match. PR-wide changed-source Lean style and whitespace
+  checks pass. Evidence: `/tmp/pr40-general-stack-final-audit.log` and
+  `/tmp/pr40-general-stack-final-style.log`.
+- Next: extract such a trace while extending 81's invariant to the complete
+  `IgnoreModel.ignM` machine with a changing heap/frame stack. Preserve the
+  saved account-id allocation in `live`, couple peak length to consumed input,
+  and discharge reachable room/capacity bounds. Then integrate that reader
+  into the changing-state object loop and its 78/66/65 cleanup wrappers.
+  Full ignored-reader integration, uniform accepting bounds, general rejection,
+  the seventh method and M9 remain open. No additional `sorry` is introduced.
+
 ## Methods
 
 There are 15 exported methods; six now have complete per-call refinement proofs under their protocol premises.
@@ -957,9 +1009,10 @@ The texts are proved equal to the model's `Panic.message` (`PanicText`).
       - instantiate the remaining ignored-reader state transition in that loop;
       - extend the escaped shallow 81 reader to deep frames, preserving its
         changing scratch/heap state and the complete stack footprint.
-   3. Ignored values nested deeper: combine the proved first allocation and nonempty
-      pop with fitting/reallocating pushes, then track the full scratch frame stack
-      in 81. `Hyp81` must allow the resulting heap and scratch changes.
+   3. Ignored values nested deeper: use `SerdeIgnStack`'s proved clear/push/pop
+      contracts and `SerdeIgnTrace`'s pop-aware growth budget while tracking the
+      full scratch frame stack in 81. Extract the actual trace and couple its peak
+      length to consumed input. `Hyp81` must allow heap and scratch changes.
 2. **`ft_balance_of`, method level.** Take the parser's contracts as parameters until they are proved. The argument layer is in `EnvInput` and `ArgsLeaves`, the balance read in `LookupMapGet`/`StorageReadWrapF`.
 3. **The remaining methods**, in M8's order:
    - `storage_balance_of` (its parser is the same code as `ft_balance_of`'s);
