@@ -30,6 +30,7 @@ import Bridge.Functions.BalanceOf297ReadBudget
 import Bridge.Functions.BalanceOf297ReadGas
 import Bridge.Functions.BalanceOf297Room
 import Bridge.Functions.BorshContractF
+import Bridge.Functions.StateReadLenF
 
 /-! The browsable proof frontier. Definitions marked Open state contracts, not proofs. -/
 
@@ -534,3 +535,21 @@ attribute [blueprint "frontier:borsh-contract-free-bound"
   (statement := /-- The decoded deserializer preserves an explicitly bounded free list, under the stated allocation-room and execution-resource premises. The state-read caller is not yet generalized. -/)
   (notReady := true)]
   WNear.Binary.BorshContractF.f161_spec
+
+attribute [blueprint "frontier:state-entry-free-bound"
+  (title := /-- State-read entry resources with a general free-list bound -/)
+  (statement := /-- The general state-read entry requires owned heap resources with a supported bound. Establishing these resources from the parser remains open. -/)
+  (notReady := true)]
+  WNear.Binary.StateReadLenF.pre219F
+
+attribute [blueprint "frontier:state-read-free-bound"
+  (title := /-- State read with a general free-list bound -/)
+  (statement := /-- The decoded state reader composes the general-bound storage reader and deserializer, and frees the temporary buffer, under explicit resource and host premises. -/)
+  (notReady := true)]
+  WNear.Binary.StateReadLenF.f219_spec_lenF
+
+attribute [blueprint "frontier:state-read-model-free-bound"
+  (title := /-- Model-state read with a general free-list bound -/)
+  (statement := /-- The general-bound state-read theorem instantiated for the encoded model state; the balance caller and parser handoff remain open. -/)
+  (notReady := true)]
+  WNear.Binary.StateReadLenF.f219_spec_model_lenF

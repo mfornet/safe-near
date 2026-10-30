@@ -2019,6 +2019,119 @@ def WNear.Binary.StateRead.pre219 {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS
                     n ↦[wms][ 1049788 ] WNear.Binary.StateRead.stateKey ∗ NearLogic.mhostPt h)
 ```
 
+## Bridge.Functions.StateReadLenF
+
+`WNear.Binary.StateReadLenF.f219_spec_lenF` (hash `00000000f898d6d9`)
+
+```lean
+theorem WNear.Binary.StateReadLenF.f219_spec_lenF {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (htype : type.results = [])
+  (inst : ℕ) (mi : Wasm.ModuleInst) (e : ℕ) (A : ℕ → ℕ) (n g ta : ℕ) (mx : Option ℕ)
+  (hm : WNear.Binary.Interface.IfaceMod mi A n g ta) (hd : d + 17 < lim.maxCallDepth) (Cg : ℕ) (gt : Wasm.GlobalType)
+  (s out : UInt32) (hs : 592 ≤ s.toNat) (hal : s.toNat % 8 = 0) (hout : out.toNat + 40 ≤ 2 ^ 32) (idx : UInt32)
+  (maxP len : ℕ) (live : List (ℕ × ℕ)) (F : ℕ) (hF : WNear.Binary.VecWithCap.okG F) (ob : List UInt8)
+  (hob : ob.length = 40) (h : Wasm.NearState) (hd4 pre b0 b1 c0 : List UInt8) (hhd : hd4.length = 4)
+  (hb0 : b0.length = 8) (hb1 : b1.length = 8) (hc0 : c0.length = 8) (hL : Wasm.Memory.decodeLE hd4 = pre.length)
+  (hL0 : 0 < pre.length)
+  (hv : h.storage WNear.Binary.StateRead.stateKey = some (WNear.Binary.StateRead.stateBytes hd4 pre b0 b1 c0))
+  (hv28 : (WNear.Binary.StateRead.stateBytes hd4 pre b0 b1 c0).length < 2 ^ 28)
+  (hroom1 :
+    WNear.Binary.VecFromElem.roomFor len maxP
+      (UInt32.ofNat (WNear.Binary.StateRead.stateBytes hd4 pre b0 b1 c0).length))
+  (hroom2 :
+    ∀ (len' : ℕ),
+      len' = len ∨
+          len' =
+            WNear.Binary.VecFromElem.grownLen len
+              (UInt32.ofNat (WNear.Binary.StateRead.stateBytes hd4 pre b0 b1 c0).length) →
+        WNear.Binary.VecFromElem.roomFor len' maxP (UInt32.ofNat pre.length))
+  (st : Near.TrieOverlay.State) (hacc : h.storageAccounting = some st)
+  (hlim : Wasm.Near.withinLimit h.config.maxStorageKeyLen WNear.Binary.StateRead.stateKey.length = true)
+  (hb : Near.TrieConstruction.build st.entries = Except.ok st.base)
+  (hz : NearLogic.zeroHash ∉ List.map Prod.fst st.base.witness)
+  (hlink :
+    h.storage WNear.Binary.StateRead.stateKey =
+      NearLogic.viewVal st (Near.TrieOverlay.contractKey h.context.currentAccountId WNear.Binary.StateRead.stateKey))
+  (hproof :
+    NearLogic.ProofBudget h st
+      (NearLogic.readProofCost (Near.TrieOverlay.contractKey h.context.currentAccountId WNear.Binary.StateRead.stateKey)
+        (h.storage WNear.Binary.StateRead.stateKey)))
+  (hreg :
+    Wasm.Near.withinLimit h.config.maxRegisterLen (WNear.Binary.StateRead.stateBytes hd4 pre b0 b1 c0).length = true) :
+  WNear.Binary.StateReadLenF.stateCodeF e inst mi A n maxP mx ⊢
+    NearLogic.MFunSpec cfg lim d type inst mi WNear.Binary.f219 Cg
+      (WNear.Binary.StateReadLenF.pre219F n g ta A gt s out idx maxP len live F ob h)
+      (fun x =>
+        105 * cfg.regularOpCost +
+                (40 * cfg.regularOpCost +
+                    (249 * cfg.regularOpCost + NearLogic.storageReadUse h WNear.Binary.StateRead.stateKey 5) +
+                  WNear.Binary.StorageReadWrapF.costSF cfg F h (WNear.Binary.StateRead.stateBytes hd4 pre b0 b1 c0)) +
+              WNear.Binary.BorshContractF.cost161 cfg F (UInt32.ofNat pre.length) +
+            726 * cfg.regularOpCost +
+          334 * cfg.regularOpCost)
+      (WNear.Binary.StateReadLenF.post219LF n g ta A gt s out idx maxP len live F pre b0 b1 c0
+        (WNear.Binary.StateRead.stateBytes hd4 pre b0 b1 c0).length h
+        (NearLogic.StorageReadPost h WNear.Binary.StateRead.stateKey 0 st))
+```
+
+`WNear.Binary.StateReadLenF.f219_spec_model_lenF` (hash `00000000e2105a11`)
+
+```lean
+theorem WNear.Binary.StateReadLenF.f219_spec_model_lenF {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (htype : type.results = [])
+  (inst : ℕ) (mi : Wasm.ModuleInst) (e : ℕ) (A : ℕ → ℕ) (n g ta : ℕ) (mx : Option ℕ)
+  (hm : WNear.Binary.Interface.IfaceMod mi A n g ta) (hd : d + 17 < lim.maxCallDepth) (Cg : ℕ) (gt : Wasm.GlobalType)
+  (sp out : UInt32) (hs : 592 ≤ sp.toNat) (hal : sp.toNat % 8 = 0) (hout : out.toNat + 40 ≤ 2 ^ 32) (idx : UInt32)
+  (maxP len : ℕ) (live : List (ℕ × ℕ)) (F : ℕ) (hF : WNear.Binary.VecWithCap.okG F) (ob : List UInt8)
+  (hob : ob.length = 40) (h : Wasm.NearState) (s : WNear.State) (hv : h.storage WNear.stateKey = some (WNear.header s))
+  (hroom1 : WNear.Binary.VecFromElem.roomFor len maxP 29)
+  (hroom2 :
+    ∀ (len' : ℕ),
+      len' = len ∨ len' = WNear.Binary.VecFromElem.grownLen len 29 → WNear.Binary.VecFromElem.roomFor len' maxP 1)
+  (st : Near.TrieOverlay.State) (hacc : h.storageAccounting = some st)
+  (hlim : Wasm.Near.withinLimit h.config.maxStorageKeyLen 5 = true)
+  (hb : Near.TrieConstruction.build st.entries = Except.ok st.base)
+  (hz : NearLogic.zeroHash ∉ List.map Prod.fst st.base.witness)
+  (hlink :
+    h.storage WNear.stateKey =
+      NearLogic.viewVal st (Near.TrieOverlay.contractKey h.context.currentAccountId WNear.stateKey))
+  (hproof :
+    NearLogic.ProofBudget h st
+      (NearLogic.readProofCost (Near.TrieOverlay.contractKey h.context.currentAccountId WNear.stateKey)
+        (h.storage WNear.stateKey)))
+  (hreg : Wasm.Near.withinLimit h.config.maxRegisterLen 29 = true) :
+  WNear.Binary.StateReadLenF.stateCodeF e inst mi A n maxP mx ⊢
+    NearLogic.MFunSpec cfg lim d type inst mi WNear.Binary.f219 Cg
+      (WNear.Binary.StateReadLenF.pre219F n g ta A gt sp out idx maxP len live F ob h)
+      (fun x =>
+        105 * cfg.regularOpCost +
+                (40 * cfg.regularOpCost +
+                    (249 * cfg.regularOpCost + NearLogic.storageReadUse h WNear.Binary.StateRead.stateKey 5) +
+                  WNear.Binary.StorageReadWrapF.costSF cfg F h (WNear.header s)) +
+              WNear.Binary.BorshContractF.cost161 cfg F 1 +
+            726 * cfg.regularOpCost +
+          334 * cfg.regularOpCost)
+      (WNear.Binary.StateReadLenF.postModelLF n g ta A gt sp out idx maxP len live F s h
+        (NearLogic.StorageReadPost h WNear.Binary.StateRead.stateKey 0 st))
+```
+
+`WNear.Binary.StateReadLenF.pre219F` (hash `14646a1be868fece`)
+
+```lean
+def WNear.Binary.StateReadLenF.pre219F {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF] (n g ta : ℕ)
+  (A : ℕ → ℕ) (gt : Wasm.GlobalType) (s out idx : UInt32) (maxP len : ℕ) (live : List (ℕ × ℕ)) (F : ℕ) (ob : List UInt8)
+  (h : Wasm.NearState) (args : List Wasm.Value) : Iris.IProp GF :=
+  fun args =>
+    iprop(⌜args = [Wasm.Value.i32 out]⌝ ∗
+        g ↦[wg] { type := gt, value := Wasm.Value.i32 s } ∗
+          WNear.Binary.ReadRegister.ifaceR n ta A ∗
+            WNear.Binary.VecFromElem.stk n (s.toNat - 592) 592 ∗
+              WNear.Binary.AllocFirstFit.vt n 1057464 idx ta (A 578) ∗
+                WNear.Binary.AllocInv.heapInv n maxP len live F ∗
+                  n ↦[wms][ out.toNat ] ob ∗
+                    n ↦[wms][ 1049788 ] WNear.Binary.StateRead.stateKey ∗ NearLogic.mhostPt h)
+```
+
 ## Bridge.Functions.StorageReadNoneF
 
 `WNear.Binary.StorageReadWrapF.f548_noneF_host` (hash `0000000087670af0`)

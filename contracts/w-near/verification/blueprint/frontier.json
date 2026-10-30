@@ -828,12 +828,9 @@
       "declaration": "WNear.Binary.StateRead.pre219",
       "title": "State-read entry resources and one-cell free-list bound",
       "kind": "verification_contract",
-      "notes": "State-read entry resources include a heap free-list bound of one; establishing them from the preceding balance parser remains open. The generalized deserializer chain is checked separately, but state_read has not yet been generalized or connected to it.",
+      "notes": "The existing balance state-read caller still uses a one-cell free-list bound. A general-bound state-read theorem is now proved separately; the caller and parser handoff remain open.",
       "label": "frontier:balance-state-entry",
-      "reviewed_shape_hash": 14030933622959962654,
-      "planned_dependencies": [
-        "borsh-contract-free-bound"
-      ]
+      "reviewed_shape_hash": 14030933622959962654
     },
     {
       "id": "balance-second-read",
@@ -855,6 +852,9 @@
       "required_type_dependencies": [
         "owned-room",
         "balance-state-entry"
+      ],
+      "planned_dependencies": [
+        "state-read-model-free-bound"
       ]
     },
     {
@@ -1070,6 +1070,47 @@
       ],
       "required_proof_dependencies": [
         "borsh-contract-reader-free-bound"
+      ]
+    },
+    {
+      "id": "state-entry-free-bound",
+      "declaration": "WNear.Binary.StateReadLenF.pre219F",
+      "title": "State-read entry resources with a general free-list bound",
+      "kind": "verification_contract",
+      "notes": "The general state-read entry requires owned heap resources with a supported bound. Establishing these resources from the parser remains open.",
+      "label": "frontier:state-entry-free-bound",
+      "reviewed_shape_hash": 1469416046525480654
+    },
+    {
+      "id": "state-read-free-bound",
+      "declaration": "WNear.Binary.StateReadLenF.f219_spec_lenF",
+      "title": "State read with a general free-list bound",
+      "kind": "theorem",
+      "environment": "The decoded state reader composes the general-bound storage reader and deserializer, and frees the temporary buffer, under explicit resource and host premises.",
+      "label": "frontier:state-read-free-bound",
+      "reviewed_shape_hash": 4170766041,
+      "required_type_dependencies": [
+        "owned-room",
+        "state-entry-free-bound"
+      ],
+      "required_proof_dependencies": [
+        "borsh-contract-free-bound"
+      ]
+    },
+    {
+      "id": "state-read-model-free-bound",
+      "declaration": "WNear.Binary.StateReadLenF.f219_spec_model_lenF",
+      "title": "Model-state read with a general free-list bound",
+      "kind": "theorem",
+      "environment": "The general-bound state-read theorem instantiated for the encoded model state; the balance caller and parser handoff remain open.",
+      "label": "frontier:state-read-model-free-bound",
+      "reviewed_shape_hash": 3792722449,
+      "required_type_dependencies": [
+        "owned-room",
+        "state-entry-free-bound"
+      ],
+      "required_proof_dependencies": [
+        "state-read-free-bound"
       ]
     }
   ],

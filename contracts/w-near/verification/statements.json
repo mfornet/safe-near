@@ -91,6 +91,9 @@
     "WNear.Binary.BorshBytesF.f315_spec",
     "WNear.Binary.BorshFTF.f425_spec",
     "WNear.Binary.BorshContractF.f162_spec",
-    "WNear.Binary.BorshContractF.f161_spec"
+    "WNear.Binary.BorshContractF.f161_spec",
+    "WNear.Binary.StateReadLenF.pre219F",
+    "WNear.Binary.StateReadLenF.f219_spec_lenF",
+    "WNear.Binary.StateReadLenF.f219_spec_model_lenF"
   ]
 }
