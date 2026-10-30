@@ -107,6 +107,12 @@
     "WNear.Binary.FromSliceSpec.okAt",
     "WNear.Binary.BalanceOf297AbsentCall.parser_result_resources",
     "WNear.Binary.BalanceOf297AbsentCall.parser_handoff",
-    "WNear.Binary.BalanceOf297AbsentCall.parser_through_cleanup"
+    "WNear.Binary.BalanceOf297AbsentCall.parser_through_cleanup",
+    "WNear.Binary.BalanceOf297AbsentCall.okAtFixed",
+    "WNear.Binary.BalanceOf297AbsentCall.okAt_expose",
+    "WNear.Binary.BalanceOf297AbsentCall.parser_fixed_resources",
+    "WNear.Binary.BalanceOf297AbsentCall.parser_fixed_through_cleanup",
+    "WNear.Binary.BalanceOf297AbsentCall.ParserPostBudget",
+    "WNear.Binary.BalanceOf297AbsentCall.parser_result_through_cleanup"
   ]
 }

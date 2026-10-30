@@ -27,7 +27,7 @@ The decoded Borsh chain for functions 374, 316, 315, 425, 162 and 161 now has ch
 
 ## Parser success handoff to balance cleanup
 
-The actual function 297 success branch, descriptor copies and input-vector drop are checked and composed with the generalized state-read-through-cleanup path: the resulting 114-instruction slice uses a supported arbitrary heap bound after the drop. Separately, the public `okAt` parser result implies the owned account bytes, capacity bounds, address bounds and live-list order needed for that handoff. This does not yet compose the parser result with the 114-instruction theorem: post-parser heap room, gas credits, the input-vector ownership, frame resources and the full accepted-call refinement remain open.
+The actual function 297 success branch, descriptor copies and input-vector drop are checked and composed with the generalized state-read-through-cleanup path: the resulting 114-instruction slice uses a supported arbitrary heap bound after the drop. Separately, the public `okAt` parser result implies the owned account bytes, capacity bounds, address bounds and live-list order needed for that handoff. The public `okAt` parser result is now composed with the 114-instruction theorem by exposing its actual heap witnesses. This composition assumes the named `ParserPostBudget` resource condition, which must establish six-growth room and sufficient gas for those witnesses while preserving the parser result; input-vector ownership, frame resources and the full accepted-call refinement also remain open.
 
 ## Continuation on 2026-10-29: integration with main
 

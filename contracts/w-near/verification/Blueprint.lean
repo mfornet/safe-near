@@ -33,6 +33,7 @@ import Bridge.Functions.BorshContractF
 import Bridge.Functions.StateReadLenF
 import Bridge.Functions.BalanceOf297RoomF
 import Bridge.Functions.BalanceOf297ParserResult
+import Bridge.Functions.BalanceOf297ParserPublicCompose
 
 /-! The browsable proof frontier. Definitions marked Open state contracts, not proofs. -/
 
@@ -631,3 +632,39 @@ attribute [blueprint "frontier:balance-parser-through-cleanup"
   (statement := /-- Decoded successful parser descriptor and input vector, owned account, six-growth room, canonical trie, shared proof budget, exact lookup gas and execution resources; deriving all entry resources and gas from the parser remains open. -/)
   (notReady := true)]
   WNear.Binary.BalanceOf297AbsentCall.parser_through_cleanup
+
+attribute [blueprint "frontier:parser-fixed-result"
+  (title := /-- Successful parser result with explicit heap witnesses -/)
+  (statement := /-- The same owned parser result with its actual heap length and free-list bound exposed; the parser must produce such a result. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.okAtFixed
+
+attribute [blueprint "frontier:parser-expose-heap"
+  (title := /-- Expose the successful parser heap witnesses -/)
+  (statement := /-- The public parser result entails its fixed-witness representation. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.okAt_expose
+
+attribute [blueprint "frontier:parser-fixed-resources"
+  (title := /-- Extract account resources at fixed parser heap -/)
+  (statement := /-- The fixed-witness parser result supplies account bounds, owned bytes and input-first allocation order. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.parser_fixed_resources
+
+attribute [blueprint "frontier:parser-fixed-through-cleanup"
+  (title := /-- Function 297: fixed parser result through absent cleanup -/)
+  (statement := /-- A successful parser result at a known heap, six-growth room, gas, input ownership, trie and frame premises. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.parser_fixed_through_cleanup
+
+attribute [blueprint "frontier:parser-post-budget"
+  (title := /-- Post-parser room and gas at the actual heap -/)
+  (statement := /-- Open resource condition: at each actual exposed parser heap, preserve the owned parser result and establish six-growth room and a sufficient gas bound. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.ParserPostBudget
+
+attribute [blueprint "frontier:parser-public-through-cleanup"
+  (title := /-- Function 297: public parser result through absent cleanup -/)
+  (statement := /-- Public successful parser result, explicit post-parser room and gas obligation, owned input vector, trie, and frame and host premises. The full parser and accepted-call refinement remain open. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.parser_result_through_cleanup

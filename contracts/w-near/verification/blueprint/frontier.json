@@ -641,7 +641,8 @@
         "ft-balance-model",
         "balance-export-state-six-grows",
         "balance-state-six-grows-free-bound",
-        "balance-parser-through-cleanup"
+        "balance-parser-through-cleanup",
+        "parser-public-through-cleanup"
       ]
     },
     {
@@ -1260,7 +1261,7 @@
       "declaration": "WNear.Binary.BalanceOf297AbsentCall.parser_result_resources",
       "title": "Extract balance resources from parser result",
       "kind": "theorem",
-      "environment": "Successful parser result and owned input allocation; proves account bounds, capacity and live-list order, but does not establish heap room or gas.",
+      "environment": "Public parser result supplies account bounds and input-first allocation order; the public result now also composes through a separate fixed-witness lemma and explicit room-and-gas obligation.",
       "label": "frontier:parser-owned-resources",
       "reviewed_shape_hash": 4252910098,
       "required_type_dependencies": [
@@ -1290,9 +1291,86 @@
       "required_proof_dependencies": [
         "balance-parser-handoff",
         "balance-state-six-grows-free-bound"
+      ]
+    },
+    {
+      "id": "parser-fixed-result",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.okAtFixed",
+      "title": "Successful parser result with explicit heap witnesses",
+      "kind": "verification_contract",
+      "notes": "The same owned parser result with its actual heap length and free-list bound exposed; the parser must produce such a result.",
+      "label": "frontier:parser-fixed-result",
+      "reviewed_shape_hash": 7600635571072950955
+    },
+    {
+      "id": "parser-expose-heap",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.okAt_expose",
+      "title": "Expose the successful parser heap witnesses",
+      "kind": "theorem",
+      "environment": "The public parser result entails its fixed-witness representation.",
+      "label": "frontier:parser-expose-heap",
+      "reviewed_shape_hash": 2099674525,
+      "required_type_dependencies": [
+        "parser-owned-result",
+        "parser-fixed-result"
+      ]
+    },
+    {
+      "id": "parser-fixed-resources",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.parser_fixed_resources",
+      "title": "Extract account resources at fixed parser heap",
+      "kind": "theorem",
+      "environment": "The fixed-witness parser result supplies account bounds, owned bytes and input-first allocation order.",
+      "label": "frontier:parser-fixed-resources",
+      "reviewed_shape_hash": 3374729530,
+      "required_type_dependencies": [
+        "parser-fixed-result"
+      ]
+    },
+    {
+      "id": "parser-fixed-through-cleanup",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.parser_fixed_through_cleanup",
+      "title": "Function 297: fixed parser result through absent cleanup",
+      "kind": "theorem",
+      "environment": "A successful parser result at a known heap, six-growth room, gas, input ownership, trie and frame premises.",
+      "label": "frontier:parser-fixed-through-cleanup",
+      "reviewed_shape_hash": 2046500426,
+      "required_type_dependencies": [
+        "parser-fixed-result",
+        "lookup-heap-room"
       ],
+      "required_proof_dependencies": [
+        "parser-fixed-resources",
+        "balance-parser-through-cleanup"
+      ]
+    },
+    {
+      "id": "parser-post-budget",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.ParserPostBudget",
+      "title": "Post-parser room and gas at the actual heap",
+      "kind": "verification_contract",
+      "notes": "Open resource condition: at each actual exposed parser heap, preserve the owned parser result and establish six-growth room and a sufficient gas bound.",
+      "label": "frontier:parser-post-budget",
+      "reviewed_shape_hash": 16115052327671783247,
       "planned_dependencies": [
-        "parser-owned-resources"
+        "lookup-heap-room"
+      ]
+    },
+    {
+      "id": "parser-public-through-cleanup",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.parser_result_through_cleanup",
+      "title": "Function 297: public parser result through absent cleanup",
+      "kind": "theorem",
+      "environment": "Public successful parser result, explicit post-parser room and gas obligation, owned input vector, trie, and frame and host premises. The full parser and accepted-call refinement remain open.",
+      "label": "frontier:parser-public-through-cleanup",
+      "reviewed_shape_hash": 2255320546,
+      "required_type_dependencies": [
+        "parser-owned-result",
+        "parser-post-budget"
+      ],
+      "required_proof_dependencies": [
+        "parser-expose-heap",
+        "parser-fixed-through-cleanup"
       ]
     }
   ],
