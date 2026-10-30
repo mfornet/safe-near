@@ -1310,6 +1310,23 @@ continuation is published to PR #40 after its validation gates pass.
   bounds, outer wrappers, rejection, the seventh method and M9 remain open.
   No additional `sorry` is introduced.
 
+## Continuation: `ft_balance_of` model agreement
+
+`FtBalanceOfMethod.account_lookup_and_step` proves that the exact encoded key
+for an arbitrary requested account retrieves the optional pair of binary words
+corresponding to the represented model balance. Decoding the words without
+truncation, or defaulting an absent record to zero, gives the initialized
+`ft_balance_of` model boundary result, including its storage-stake failure.
+This is kernel-checked under the stated context, state, representation and
+erased-host premises; it is a planned dependency of the method proof, not yet
+a checked call from it. The argument reader, actual Wasm method execution,
+resource bounds and uninitialized branch remain open.
+
+The pinned protocol parse witness also remains open: `Lean.Json.Parser.anyCore`
+is opaque, so compiled evaluation of the JSON does not establish its result in
+the kernel. A verified parsing route or another sound proof of that exact parse
+statement is still required.
+
 ## Methods
 
 There are 15 exported methods; six now have complete per-call refinement proofs under their protocol premises.
@@ -1322,7 +1339,7 @@ There are 15 exported methods; six now have complete per-call refinement proofs 
 | `ft_metadata` (309) | done | `FtMetadataRefines.ftMetadata_refines_all` |
 | `new` (290) | done | `NewRefines.newRefines_all` |
 | `near_deposit` (234) | done | `NearDepositMethod.nearDeposit_refines_all`, under `CostsV86`, `LimitsV86`, `CostsDepositV86`, the module protocol premises and code size. Gas, functional agreement and host preconditions are all discharged. |
-| `ft_balance_of` (297) | argument layer, and the parser's accepting half for shallow input without escapes | see "Parser" below; the method level is not started |
+| `ft_balance_of` (297) | argument layer, partial parser acceptance, and account lookup/model-boundary agreement | `FtBalanceOfMethod.account_lookup_and_step`; Wasm method and full parser remain open |
 | `storage_balance_of`, `storage_deposit`, `storage_withdraw`, `storage_unregister`, `near_withdraw`, `ft_transfer`, `ft_transfer_call`, `ft_resolve_transfer` | not started | they need the parser; `ft_transfer_call` and `ft_resolve_transfer` also need promises and promise results |
 
 The premises left in the method theorems are the binary's code size and protocol 86's parameters:

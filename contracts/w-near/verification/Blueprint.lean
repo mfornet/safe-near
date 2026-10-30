@@ -6,6 +6,7 @@ import Bridge.Functions.SerdeIgnMemberBudget
 import Bridge.Functions.SerdeStructObjModelState
 import Bridge.Functions.FromSliceEsc
 import Bridge.Functions.FromSliceSpec
+import Bridge.Methods.FtBalanceOfModel
 
 /-! The browsable proof frontier. Definitions marked Open state contracts, not proofs. -/
 
@@ -273,3 +274,8 @@ attribute [blueprint "frontier:protocol-available"
   (statement := /-- Open obligation: prove that the pinned protocol JSON actually parses before instantiating the deployed theorem. -/)
   (notReady := true)]
   WNear.PinnedProtocolAvailable
+
+attribute [blueprint "frontier:ft-balance-model"
+  (title := /-- Balance lookup and model boundary agreement -/)
+  (statement := /-- For an arbitrary requested account, represented storage and decoded balance agree with the initialized model boundary result, including missing accounts and the storage-stake failure. Wasm execution and parsing remain open. -/)]
+  WNear.Binary.FtBalanceOfMethod.account_lookup_and_step

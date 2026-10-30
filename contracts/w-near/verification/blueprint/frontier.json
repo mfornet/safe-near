@@ -213,7 +213,8 @@
         "accept-parser",
         "reject-parser",
         "storage",
-        "runtime-boundary"
+        "runtime-boundary",
+        "ft-balance-model"
       ],
       "label": "frontier:method-ft_balance_of",
       "reviewed_shape_hash": 925099951
@@ -525,6 +526,15 @@
       "label": "frontier:protocol-available",
       "notes": "The global theorem assumes a successful parse; actual existence remains to be proved before deployment-level instantiation.",
       "reviewed_shape_hash": 17169688403301902398
+    },
+    {
+      "id": "ft-balance-model",
+      "declaration": "WNear.Binary.FtBalanceOfMethod.account_lookup_and_step",
+      "title": "ft_balance_of: account lookup and model result",
+      "kind": "theorem",
+      "environment": "Well-formed context and model state; exact represented storage and erased-host agreement.",
+      "label": "frontier:ft-balance-model",
+      "reviewed_shape_hash": 295271282
     }
   ],
   "reviewed_environment": [

@@ -50,6 +50,7 @@
     "WNear.Binary.ScratchGrow.roomRes",
     "WNear.Binary.ParseStr.roomRun",
     "WNear.Binary.VecFromElem.roomFor",
-    "WNear.PinnedProtocolAvailable"
+    "WNear.PinnedProtocolAvailable",
+    "WNear.Binary.FtBalanceOfMethod.account_lookup_and_step"
   ]
 }

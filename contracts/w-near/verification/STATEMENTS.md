@@ -385,6 +385,32 @@ def WNear.Binary.VecFromElem.roomFor (len maxP : ℕ) (size : UInt32) : Prop :=
           maxP
 ```
 
+## Bridge.Methods.FtBalanceOfModel
+
+`WNear.Binary.FtBalanceOfMethod.account_lookup_and_step` (hash `0000000011997b72`)
+
+```lean
+theorem WNear.Binary.FtBalanceOfMethod.account_lookup_and_step (cfg : WNear.Config) (ctx : NearInterface.Context)
+  (raw : WNear.RawStorage) (s : WNear.State) (hwf : ctx.WF raw) (hraw : raw = WNear.encode s) (hs : s.WF)
+  (h : Wasm.NearState) (he : NearLogic.eraseP h = NearLogic.eraseP (WNear.Binary.hostOf ctx raw))
+  (a : NearInterface.AccountId) :
+  ∃ reg,
+    h.storage (WNear.accountsPrefix ++ (WasmLogic.bytes32 (UInt32.ofNat (List.length a.bytes)) ++ a.bytes)) =
+        Option.map (fun p => WasmLogic.storeBytes (Wasm.Value.i64 p.1) 8 ++ WasmLogic.storeBytes (Wasm.Value.i64 p.2) 8)
+          reg ∧
+      (WNear.wnear cfg).step ctx (some s) (WNear.Call.ftBalanceOf (WNear.AccountId.ofNear a)) =
+        if 0 < WNear.Binary.FtTotalSupplyMethod.deficit ctx s then
+          Except.error
+            {
+              failure :=
+                NearInterface.ModelFailure.lackBalanceForState (WNear.Binary.FtTotalSupplyMethod.deficit ctx s),
+              logs := [] }
+        else
+          Except.ok
+            { state := s, ret := WNear.Ret.u128 ((Option.map (fun p => p.1.toNat + 2 ^ 64 * p.2.toNat) reg).getD 0),
+              logs := [], promises := [] }
+```
+
 ## NearInterface.Model
 
 `NearInterface.ContractModel` (hash `349cee7a0e610b6d`)
