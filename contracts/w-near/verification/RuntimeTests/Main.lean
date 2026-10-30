@@ -156,6 +156,53 @@ def main : IO Unit := do
 
   let protocol ← RuntimeConfig.load "../../../near-lean/vm/configs" RuntimeConfig.latestVersion
   let cfg := WNear.Config.ofRuntime protocol
+  -- Feasibility evidence for the concrete pinned configuration. These executable
+  -- checks do not replace the five kernel-checked protocol obligations.
+  let costs := protocol.wasm.extCosts.cost
+  for (name, actual, bound) in [
+      ("regular_op", protocol.wasm.regularOpCost, 822756),
+      ("linear_base", protocol.wasm.linearOpBaseCost, 26328192),
+      ("linear_unit", protocol.wasm.linearOpUnitCost, 822756),
+      ("base", costs "base", 264768111),
+      ("loading_base", costs "contract_loading_base", 35445963),
+      ("loading_bytes", costs "contract_loading_bytes", 1089295),
+      ("read_memory_base", costs "read_memory_base", 2609863200),
+      ("read_memory_byte", costs "read_memory_byte", 3801333),
+      ("write_memory_base", costs "write_memory_base", 2803794861),
+      ("write_memory_byte", costs "write_memory_byte", 2723772),
+      ("read_register_base", costs "read_register_base", 2517165186),
+      ("read_register_byte", costs "read_register_byte", 98562),
+      ("write_register_base", costs "write_register_base", 2865522486),
+      ("write_register_byte", costs "write_register_byte", 3801564),
+      ("storage_read_base", costs "storage_read_base", 56356845749),
+      ("storage_read_key_byte", costs "storage_read_key_byte", 30952533),
+      ("storage_read_value_byte", costs "storage_read_value_byte", 5611004),
+      ("utf8_decoding_base", costs "utf8_decoding_base", 3111779061),
+      ("utf8_decoding_byte", costs "utf8_decoding_byte", 291580479),
+      ("storage_has_key_base", costs "storage_has_key_base", 54039896625),
+      ("storage_has_key_byte", costs "storage_has_key_byte", 30790845),
+      ("storage_write_base", costs "storage_write_base", 64196736000),
+      ("storage_write_key_byte", costs "storage_write_key_byte", 70482867),
+      ("storage_write_value_byte", costs "storage_write_value_byte", 31018539),
+      ("storage_remove_base", costs "storage_remove_base", 53473030500),
+      ("storage_remove_key_byte", costs "storage_remove_key_byte", 38220384),
+      ("storage_remove_ret_value_byte", costs "storage_remove_ret_value_byte", 11531556),
+      ("storage_write_evicted_byte", costs "storage_write_evicted_byte", 32117307),
+      ("log_base", costs "log_base", 3543313050),
+      ("log_byte", costs "log_byte", 13198791)] do
+    check s!"protocol cost {name}: {actual} ≤ {bound}" (actual ≤ bound)
+  let limits := protocol.wasm.limits
+  for (name, required, actual) in [
+      ("storage key", 2048, limits.maxLengthStorageKey),
+      ("register", 104857600, limits.maxRegisterSize),
+      ("returned data", 4194304, limits.maxLengthReturnedData),
+      ("total log", 16384, limits.maxTotalLogLength),
+      ("storage value", 29, limits.maxLengthStorageValue),
+      ("log count", 1, limits.maxNumberLogs),
+      ("usage room", 85 + protocol.fees.numExtraBytesRecord, limits.maxGasBurnt)] do
+    check s!"protocol limit {name}: {required} ≤ {actual}" (required ≤ actual)
+  check "protocol initial memory pages" (limits.initialMemoryPages == 1024)
+  check "protocol maximum memory pages" (limits.maxMemoryPages == 2048)
   for version in [29, 48, 49, 84, RuntimeConfig.latestVersion] do
     let pinned ← RuntimeConfig.load "../../../near-lean/vm/configs" version
     check s!"protocol {version}: every instruction costs gas (fuel sufficiency premise)"
@@ -164,6 +211,7 @@ def main : IO Unit := do
   let module ← match Wasm.Binary.decode contractBytes with
     | .ok m => pure m
     | .error error => throw (IO.userError error.message)
+  check "protocol prepares deployed module" (prepareLimitError limits module).isNone
   -- `refines_wnear` is about `Binary.wNearBytes`, which `Binary/Bytes.lean` reads from the
   -- file when it is elaborated: check that it holds the file's bytes.
   check "the embedded binary is contract.wasm" (WNear.Binary.wNearBytes == contractBytes)
@@ -233,6 +281,31 @@ def main : IO Unit := do
     { method := "storage_withdraw", deposit := 1, args := "{\"amount\":\"1\"}" }
   let (_, _) ← cmp "storage_unregister with a balance" s
     { method := "storage_unregister", deposit := 1, args := "{}" }
+
+  -- Probe the exact model allowance and the JSON nesting boundary. Comparisons
+  -- use the same deployed binary, rollback checks and output observations as above.
+  let balanceArgs := "{\"account_id\":\"alice.near\"}"
+  let balanceCtx ← contextOf protocol s { method := "ft_balance_of", args := balanceArgs }
+  let balanceBound := gasBound balanceCtx (.ftBalanceOf alice)
+  let (_, measured) ← cmp "ft_balance_of gas measurement" s
+    { method := "ft_balance_of", args := balanceArgs }
+  for gas in [0, measured.usedGas - 1, measured.usedGas, measured.usedGas + 1,
+      balanceBound - 1, balanceBound, balanceBound + 1] do
+    let (_, _) ← cmp s!"ft_balance_of gas boundary {gas}" s
+      { method := "ft_balance_of", args := balanceArgs, gas }
+  for depth in [1, 32, 126, 127, 128, 129, 256, 512, 1024] do
+    let nested := String.join (List.replicate depth "[") ++ "0" ++ String.join (List.replicate depth "]")
+    let args := "{\"account_id\":\"alice.near\",\"ignored\":" ++ nested ++ "}"
+    let (_, _) ← cmp s!"ft_balance_of ignored nesting {depth}" s { method := "ft_balance_of", args }
+
+  for count in [64, 1024, 4096] do
+    let escaped := String.join (List.replicate count "\\n")
+    let args := "{\"account_id\":\"alice.near\",\"ignored\":\"" ++ escaped ++ "\"}"
+    let (_, _) ← cmp s!"ft_balance_of ignored escapes {count}" s { method := "ft_balance_of", args }
+  for args in ["{\"account_id\":\"alice.near\",\"ignored\":[[0]}",
+      "{\"account_id\":\"alice.near\",\"ignored\":\"\\ud800\"}",
+      "{\"account_id\":\"alice.near\",\"ignored\":[1,]}"] do
+    let (_, _) ← cmp "ft_balance_of malformed ignored value" s { method := "ft_balance_of", args }
 
   -- Inputs that are no call.
   for (method, args) in [("near_withdraw", "{\"amount\":1}"), ("near_withdraw", "{}"),
