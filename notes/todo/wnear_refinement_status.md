@@ -1310,14 +1310,24 @@ continuation is published to PR #40 after its validation gates pass.
   bounds, outer wrappers, rejection, the seventh method and M9 remain open.
   No additional `sorry` is introduced.
 
+## Continuation: absent-account balance lookup
+
+`BalanceOfAbsent.f415_none` proves the actual fungible-token balance lookup
+returns zero for an absent account. It calls the checked absent `LookupMap`
+contract, converts `None` to zero, frees the owned account string, restores the
+stack and preserves the metered host postcondition. The kernel proof has only
+standard axioms and remains conditional on reachable `HeapRoomK 2` and the
+explicit host, storage and representation premises. The enclosing function 293,
+argument reader and exported method refinement remain open.
+
 ## Continuation: absent LookupMap get
 
 `LookupMapGet.f399_none` proves the actual absent-key `get` path. It constructs
 the Borsh key, calls the checked absent `get_raw` proof, frees the key, returns
 `None` with zeroed payload and restores the stack. The proof uses only standard
 axioms and is conditional on `HeapRoomK 2`: deriving that multi-allocation room
-from reachable method states remains open. The method argument reader and the
-call from `ft_balance_of` remain open.
+from reachable method states remains open. It is now integrated into function
+415; the enclosing method and argument reader remain open.
 
 ## Continuation: absent raw lookup
 

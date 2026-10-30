@@ -215,7 +215,7 @@
         "storage",
         "runtime-boundary",
         "ft-balance-model",
-        "lookup-absent"
+        "balance-lookup-absent"
       ],
       "label": "frontier:method-ft_balance_of",
       "reviewed_shape_hash": 925099951
@@ -583,6 +583,21 @@
       ],
       "required_proof_dependencies": [
         "lookup-raw-absent"
+      ]
+    },
+    {
+      "id": "balance-lookup-absent",
+      "declaration": "WNear.Binary.BalanceOfAbsent.f415_none",
+      "title": "Balance lookup: absent account returns zero",
+      "kind": "theorem",
+      "environment": "Metered host, trie proof budget, allocator room and explicit Wasm resource premises.",
+      "label": "frontier:balance-lookup-absent",
+      "reviewed_shape_hash": 2300762005,
+      "required_type_dependencies": [
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "lookup-absent"
       ]
     }
   ],

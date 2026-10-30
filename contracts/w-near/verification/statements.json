@@ -55,6 +55,7 @@
     "WNear.Binary.StorageReadWrapF.f548_noneF_host",
     "WNear.Binary.LookupMapGet.f400_none",
     "WNear.Binary.LookupMapGet.f399_none",
-    "WNear.Binary.LookupMapOps.HeapRoomK"
+    "WNear.Binary.LookupMapOps.HeapRoomK",
+    "WNear.Binary.BalanceOfAbsent.f415_none"
   ]
 }

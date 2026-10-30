@@ -10,6 +10,7 @@ import Bridge.Methods.FtBalanceOfModel
 import Bridge.Functions.StorageReadNoneF
 import Bridge.Functions.LookupMapGetNone
 import Bridge.Functions.LookupMapGet399None
+import Bridge.Functions.BalanceOfAbsent
 
 /-! The browsable proof frontier. Definitions marked Open state contracts, not proofs. -/
 
@@ -305,3 +306,9 @@ attribute [blueprint "frontier:lookup-absent"
   (statement := /-- The actual get function composes the absent raw read, frees the Borsh key and returns None. Reachable multi-allocation room remains open. -/)
   (notReady := true)]
   WNear.Binary.LookupMapGet.f399_none
+
+attribute [blueprint "frontier:balance-lookup-absent"
+  (title := /-- Balance lookup for an absent account -/)
+  (statement := /-- The actual balance lookup composes the absent LookupMap read, returns zero, frees the account string and preserves the host. Reachable allocation room remains open. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOfAbsent.f415_none
