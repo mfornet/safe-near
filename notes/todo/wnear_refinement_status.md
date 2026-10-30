@@ -1310,6 +1310,16 @@ continuation is published to PR #40 after its validation gates pass.
   bounds, outer wrappers, rejection, the seventh method and M9 remain open.
   No additional `sorry` is introduced.
 
+## Continuation: absent storage read
+
+`StorageReadWrapF.f548_noneF` proves the actual Wasm `storage_read` wrapper
+returns `None` for an absent key, preserving an arbitrary allocator bound and
+the host postcondition without allocating a value. `f548_noneF_host` instantiates
+that contract with the metered host, trie overlay and explicit proof budget.
+The wrapper is a planned dependency of `ft_balance_of`: the `LookupMap` 400
+and 399 absent branches and the method caller still need checked composition.
+The present-key path and full method remain separate obligations.
+
 ## Continuation: `ft_balance_of` model agreement
 
 `FtBalanceOfMethod.account_lookup_and_step` proves that the exact encoded key

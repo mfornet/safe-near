@@ -354,6 +354,36 @@ def WNear.Binary.SerdeStructObjValueState.ValueConditions (cfg : Wasm.Near.WasmC
                                             (List.drop (j + 1) bs) [])).1
 ```
 
+## Bridge.Functions.StorageReadNoneF
+
+`WNear.Binary.StorageReadWrapF.f548_noneF_host` (hash `0000000087670af0`)
+
+```lean
+theorem WNear.Binary.StorageReadWrapF.f548_noneF_host {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (htype : type.results = [])
+  (inst : ℕ) (mi : Wasm.ModuleInst) (e : ℕ) (A : ℕ → ℕ) (n g ta : ℕ) (mx : Option ℕ)
+  (hm : WNear.Binary.Interface.IfaceMod mi A n g ta) (hd : d + 14 < lim.maxCallDepth) (Cg : ℕ) (gt : Wasm.GlobalType)
+  (s out kp kl : UInt32) (hs : 192 ≤ s.toNat) (hal : s.toNat % 8 = 0) (hout : out.toNat + 12 ≤ 2 ^ 32)
+  (key : List UInt8) (idx : UInt32) (maxP len : ℕ) (live : List (ℕ × ℕ)) (F : ℕ) (ob : List UInt8)
+  (hob : ob.length = 12) (h : Wasm.NearState) (st : Near.TrieOverlay.State) (hkl : key.length = kl.toNat)
+  (hpos : 0 < kl.toNat) (hacc : h.storageAccounting = some st)
+  (hlim : Wasm.Near.withinLimit h.config.maxStorageKeyLen key.length = true)
+  (hb : Near.TrieConstruction.build st.entries = Except.ok st.base)
+  (hz : NearLogic.zeroHash ∉ List.map Prod.fst st.base.witness)
+  (hlink : h.storage key = NearLogic.viewVal st (Near.TrieOverlay.contractKey h.context.currentAccountId key)) {bud : ℕ}
+  (hproof : NearLogic.ProofBudget h st bud)
+  (hbud : NearLogic.readProofCost (Near.TrieOverlay.contractKey h.context.currentAccountId key) (h.storage key) ≤ bud)
+  (hsk : h.storage key = none) :
+  WNear.Binary.StorageReadWrapF.srCodeF e inst mi A n maxP mx ⊢
+    NearLogic.MFunSpec cfg lim d type inst mi WNear.Binary.f548 Cg
+      (WNear.Binary.StorageReadWrapF.pre548F n g ta A gt s out kp kl key idx maxP len live F ob h)
+      (fun x =>
+        40 * cfg.regularOpCost + (249 * cfg.regularOpCost + NearLogic.storageReadUse h key kl.toNat) +
+          20 * cfg.regularOpCost)
+      (WNear.Binary.StorageReadWrapF.post548NoneF n g ta A gt s out kp key idx maxP len live F
+        (NearLogic.StorageReadPost h key 0 st))
+```
+
 ## Bridge.Functions.StrCost
 
 `WNear.Binary.ParseStr.roomRun` (hash `c05bf4890a5c29a3`)

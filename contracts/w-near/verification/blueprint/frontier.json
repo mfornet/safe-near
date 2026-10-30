@@ -214,7 +214,8 @@
         "reject-parser",
         "storage",
         "runtime-boundary",
-        "ft-balance-model"
+        "ft-balance-model",
+        "storage-read-absent"
       ],
       "label": "frontier:method-ft_balance_of",
       "reviewed_shape_hash": 925099951
@@ -535,6 +536,15 @@
       "environment": "Well-formed context and model state; exact represented storage and erased-host agreement.",
       "label": "frontier:ft-balance-model",
       "reviewed_shape_hash": 295271282
+    },
+    {
+      "id": "storage-read-absent",
+      "declaration": "WNear.Binary.StorageReadWrapF.f548_noneF_host",
+      "title": "Absent storage read with allocator and trie accounting",
+      "kind": "theorem",
+      "environment": "Metered host and explicit trie proof-budget, code, heap and interface premises.",
+      "label": "frontier:storage-read-absent",
+      "reviewed_shape_hash": 2271677168
     }
   ],
   "reviewed_environment": [

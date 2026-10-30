@@ -51,6 +51,7 @@
     "WNear.Binary.ParseStr.roomRun",
     "WNear.Binary.VecFromElem.roomFor",
     "WNear.PinnedProtocolAvailable",
-    "WNear.Binary.FtBalanceOfMethod.account_lookup_and_step"
+    "WNear.Binary.FtBalanceOfMethod.account_lookup_and_step",
+    "WNear.Binary.StorageReadWrapF.f548_noneF_host"
   ]
 }
