@@ -131,6 +131,10 @@
     "WNear.Binary.BalanceOf297AbsentCall.initial_input_and_copy_room",
     "WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body_initial_room",
     "WNear.Binary.FtBalanceOfMethod.absent_step_zero",
-    "WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body_model_agreement"
+    "WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body_model_agreement",
+    "WNear.Binary.FtBalanceOfMethod.BurnLimitV86",
+    "WNear.Binary.FtBalanceOfMethod.argument_charge_le_limit",
+    "WNear.Binary.FtBalanceOfMethod.argument_length_lt_2_24",
+    "WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body_gas_bound"
   ]
 }

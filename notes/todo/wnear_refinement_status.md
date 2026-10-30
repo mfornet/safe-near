@@ -19,6 +19,11 @@ The three feasibility gates and their evidence, next checks and failure conseque
   initial combined heap budget, well-formed represented state and no storage
   deficit, canonical trie and shared read-proof budget, host and frame ownership,
   and sufficient gas.
+- The resource-sufficient accepted-call gas premise now supplies the copied
+  body's `< 2^24` input-length premise when the model input equals the binary
+  input and the named `BurnLimitV86` holds. The burn-limit upper bound is
+  observed in the runtime test but remains unproved for the pinned protocol;
+  low-gas calls do not obtain this input bound from the gas premise.
 - Next blocking obligation: derive parser `roomRun` and connect the resulting
   resources and return bytes to the accepted-call method contract. Extend to
   other inputs and failure outcomes; preserve the named open contracts.

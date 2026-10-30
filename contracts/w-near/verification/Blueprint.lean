@@ -38,6 +38,7 @@ import Bridge.Functions.BalanceOf297CopiedCall
 import Bridge.Functions.BalanceOf297CopiedBody
 import Bridge.Functions.BalanceOf297InitialRoomCompose
 import Bridge.Methods.FtBalanceOfAbsentCompose
+import Bridge.Methods.FtBalanceOfInputBound
 
 /-! The browsable proof frontier. Definitions marked Open state contracts, not proofs. -/
 
@@ -776,3 +777,26 @@ attribute [blueprint "frontier:balance-copied-absent-model-composition"
   (statement := /-- Checked conjunction of the absent-account model result and complete decoded body execution, sharing the absent storage key. Parser room, input shape, represented state, zero deficit, trie, host, gas and frame premises remain explicit; this is not the complete method refinement. -/)
   (notReady := true)]
   WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body_model_agreement
+
+attribute [blueprint "frontier:protocol-burn-limit"
+  (title := /-- Protocol burn-limit upper bound -/)
+  (statement := /-- The protocol max gas burnt is at most 10^15. Instantiation from the pinned protocol remains open. -/)
+  (notReady := true)]
+  WNear.Binary.FtBalanceOfMethod.BurnLimitV86
+
+attribute [blueprint "frontier:balance-argument-charge"
+  (title := /-- Accepted-call gas pays the argument byte charge -/)
+  (statement := /-- The actual resource-sufficient ft_balance_of gas premise bounds the model charge for all argument bytes. -/)]
+  WNear.Binary.FtBalanceOfMethod.argument_charge_le_limit
+
+attribute [blueprint "frontier:balance-argument-length"
+  (title := /-- Resource-sufficient balance input size -/)
+  (statement := /-- The accepted-call gas premise and named protocol burn-limit bound imply the input is shorter than 2^24 bytes; the pinned burn limit remains open. -/)
+  (notReady := true)]
+  WNear.Binary.FtBalanceOfMethod.argument_length_lt_2_24
+
+attribute [blueprint "frontier:balance-copied-body-gas-bound"
+  (title := /-- Copied-array absent body from caller gas bound -/)
+  (statement := /-- The full decoded copied-array absent-account path derives its input length from the accepted-call gas condition, matching model and binary inputs, and the named protocol burn limit. Parser room, heap budget, gas, host, trie and frame conditions remain explicit; arbitrary-resource and full method refinement remain open. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body_gas_bound

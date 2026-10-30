@@ -1637,6 +1637,57 @@
         "ft-balance-absent-model",
         "balance-copied-body-initial-room"
       ]
+    },
+    {
+      "id": "protocol-burn-limit",
+      "declaration": "WNear.Binary.FtBalanceOfMethod.BurnLimitV86",
+      "title": "Protocol burn-limit upper bound",
+      "kind": "verification_contract",
+      "label": "frontier:protocol-burn-limit",
+      "notes": "The protocol max gas burnt is at most 10^15; the pinned configuration has not been kernel-instantiated.",
+      "reviewed_shape_hash": 7771547286619928265
+    },
+    {
+      "id": "balance-argument-charge",
+      "declaration": "WNear.Binary.FtBalanceOfMethod.argument_charge_le_limit",
+      "title": "Accepted-call gas pays the argument byte charge",
+      "kind": "theorem",
+      "environment": "The actual resource-sufficient ft_balance_of gas premise bounds the model charge for all argument bytes.",
+      "label": "frontier:balance-argument-charge",
+      "reviewed_shape_hash": 2052305000
+    },
+    {
+      "id": "balance-argument-length",
+      "declaration": "WNear.Binary.FtBalanceOfMethod.argument_length_lt_2_24",
+      "title": "Resource-sufficient balance input size",
+      "kind": "theorem",
+      "environment": "The accepted-call gas premise and named protocol burn-limit bound imply the input is shorter than 2^24 bytes; the pinned burn limit remains open.",
+      "label": "frontier:balance-argument-length",
+      "reviewed_shape_hash": 620605175,
+      "required_type_dependencies": [
+        "protocol-burn-limit"
+      ],
+      "required_proof_dependencies": [
+        "balance-argument-charge"
+      ]
+    },
+    {
+      "id": "balance-copied-body-gas-bound",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body_gas_bound",
+      "title": "Copied-array absent body from caller gas bound",
+      "kind": "theorem",
+      "environment": "The full decoded copied-array absent-account path derives its input length from the accepted-call gas condition, matching model and binary inputs, and the named protocol burn limit. Parser room, heap budget, gas, host, trie and frame conditions remain explicit; arbitrary-resource and full method refinement remain open.",
+      "label": "frontier:balance-copied-body-gas-bound",
+      "reviewed_shape_hash": 3837784372,
+      "required_type_dependencies": [
+        "protocol-burn-limit",
+        "string-room",
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "balance-argument-length",
+        "balance-copied-body-initial-room"
+      ]
     }
   ],
   "reviewed_environment": [
