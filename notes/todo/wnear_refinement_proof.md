@@ -1518,6 +1518,25 @@ composition, changed heap/saved-String ownership and aggregate container-phase
 accounting remain open. These scalar bounds do not prove the full deep reader
 or an additional method refinement.
 
+`SerdeIgnOpening` now proves both actual container-dispatch paths through
+save/eat and the enclosing block exit. `entryCode_at` pins the complete first
+three value-loop blocks. `entry` composes the whitespace peek, presence guard
+and opening dispatch at `384 + 96*wsLen` regular operations plus the actual
+traced growth charge, preserving caller resources and returning the exact
+changed scratch/heap coordinates. `SerdeIgnProgress.run_consumed` proves that
+full-machine success consumes at least one byte for each pending outer frame
+plus one for the current work, including the final unrecorded close.
+`SerdeIgnBudget` uses that bound to reserve 110 operations per active container
+from the unchanged 470-per-byte allowance. Its reserve-recovery and phase
+inequalities are checked arithmetic. `entry_funded` connects them to execution:
+the complete actual opening prefix establishes the opened-phase allowance and
+new depth reserve, retains six control operations, and preserves growth
+credits at the returned capacity and allocator bound. Close/member execution
+still needs adapters for the reserve, and loop-label setup and the full
+control-flow/ownership invariant remain open. This proves neither the full
+deep reader nor another method refinement; reachable room and uniform parser
+integration also remain open.
+
 ### M7. State and storage
 
 Borsh encoding of the state, `LookupMap` keys, near-sdk's `env` wrappers

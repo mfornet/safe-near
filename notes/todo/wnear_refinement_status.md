@@ -1193,6 +1193,58 @@ continuation is published to PR #40 after its validation gates pass.
   reachable allocation room, uniform parser bounds, outer wrappers, rejection,
   the seventh method and M9 remain open. No additional `sorry` is introduced.
 
+## Complete opening prefix and closing-byte reserve (2026-10-30)
+
+- `SerdeIgnOpening.opening` proves both actual container-dispatch paths in
+  decoded 81, including the optional pending-frame save, opening-byte consume
+  and relative exit zero. `opening_block` includes the real enclosing block
+  and its charged exit into the opened-container phase. The fixed charges are
+  110 and 112 regular operations, plus the existing concrete `saveCost`.
+  `opening_traced` splits the actual save prefix and preserves the complete
+  successful continuation at 252 regular operations plus the changing trace's
+  growth charge. Arbitrary caller resources and prior live allocations survive.
+- `entryCode_at` pins the first three actual value-loop blocks: whitespace
+  peek, presence guard and dispatch. `entry` composes their execution at
+  `(384 + 96*wsLen)*regularOpCost` plus the traced growth charge. It updates
+  locals and cursor to the opened phase, retains the 80 borrowed stack bytes
+  and returns exact scratch/heap/capacity/free-list coordinates. `opening_step`
+  and `opening_indices` derive the transition and cursor bounds from the full
+  traced machine; no general ignored-reader hypothesis is assumed.
+- `SerdeIgnProgress.run_bound` proves a stronger fact than physical-vector
+  legality: successful execution in every mode consumes at least one byte for
+  each pending outer frame, plus one for its current work. `run_consumed`
+  instantiates the full scalar/key readers. The final unrecorded close is
+  included, so this also bounds the logical active depth rather than only
+  vector pops.
+- `SerdeIgnBudget` retains 110 operations per active container from the existing
+  470-per-byte allowance. Full-machine progress proves the reserve cannot
+  truncate. `regular_reserve` recovers the original allowance exactly when
+  that reserve is added back. Its opening, closing, first-member, comma and
+  scalar inequalities preserve this reserve across the corresponding phase
+  charges. These are arithmetic lemmas, not complete-loop execution proofs.
+- `entry_funded` connects that reserve to the complete actual opening prefix.
+  It starts from full-machine success and the unchanged 60/109 value-entry
+  allowances, establishes the 250/200 opened-phase allowance minus its new
+  depth reserve, and leaves six operations for surrounding loop control.
+  Remaining growth credits use the returned capacity and allocator bound;
+  changing heap ownership and the arbitrary caller frame remain explicit.
+- Validation: all three modules pass Lean MCP diagnostics. `entry_funded`
+  passes the MCP axiom/source check, and compiled checks of the execution,
+  progress and reserve theorems use only standard axioms. Targeted builds pass
+  (1377 jobs for the opening module, including all three modules).
+  `just wnear-audit` passes (2825 build jobs; 491 wNEAR modules, 66692
+  declarations and 61173 theorems), with only the three existing dependencies
+  on the open refinement. Strict NearLogic has zero violations and pinned
+  statements match. PR-wide changed-source Lean style and whitespace checks
+  pass. Evidence: `/tmp/pr40-ignore-opening-final-audit.log`,
+  `/tmp/pr40-ignore-opening-final-style.log` and `/tmp/pr40-ignore-opening-axioms.log`.
+- Next: connect the close and member execution contracts to the reserve,
+  account for loop-label setup, and assemble the full control-flow/ownership
+  invariant. The new opening result and phase arithmetic do not yet prove the
+  complete deep reader. Reachable allocation room, uniform parser bounds,
+  outer wrappers, rejection, the seventh method and M9 remain open.
+  No additional `sorry` is introduced.
+
 ## Methods
 
 There are 15 exported methods; six now have complete per-call refinement proofs under their protocol premises.
@@ -1286,8 +1338,12 @@ The texts are proved equal to the model's `Panic.message` (`PanicText`).
       restore transitions; `SerdeIgnMember.next_traced` supplies the complete
       member tail and value-loop reentry with traced credits. `SerdeIgnContainer`
       supplies actual peeks/dispatches and their full-machine case classification.
-      Assemble the loops and discharge their aggregate instruction bound. `Hyp81` must
-      allow heap and scratch changes.
+      `SerdeIgnScalar` supplies complete scalar dispatch/completion and block exits.
+      `SerdeIgnOpening.entry_funded` connects the actual full opening prefix to
+      `SerdeIgnBudget`'s closing-byte reserve; `SerdeIgnProgress` supplies the
+      needed logical-depth/remaining-byte bound. Connect close/member execution
+      to that reserve, account for loop-label setup, then assemble both loops and
+      their aggregate instruction bound. `Hyp81` must allow heap and scratch changes.
 2. **`ft_balance_of`, method level.** Take the parser's contracts as parameters until they are proved. The argument layer is in `EnvInput` and `ArgsLeaves`, the balance read in `LookupMapGet`/`StorageReadWrapF`.
 3. **The remaining methods**, in M8's order:
    - `storage_balance_of` (its parser is the same code as `ft_balance_of`'s);
