@@ -26,3 +26,9 @@ tools/verify_build.sh contracts/linkdrop
 completed safety/liability proofs, callback interleaving witnesses, and explicit
 open storage/runtime refinement obligations. Run `just build linkdrop` and
 `just audit contracts/linkdrop/verification` from the repository root.
+
+## Binary availability
+
+The binary is omitted pending redistribution permission. Metadata, hashes and
+source references remain available for local reproduction. A locally obtained
+`contract.wasm` is ignored by Git and must not be committed.

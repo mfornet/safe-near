@@ -1,6 +1,6 @@
 We have much of the differential-testing infrastructure, but **exact historical replay is not implemented yet**.
 
-I saved a detailed [design and gap analysis](/Users/marcelo/.codex/worktrees/8766/safe-near/notes/design/HISTORICAL_RUNTIME_REPLAY.md) and linked it from the project notes/TODO.
+I saved a detailed [design and gap analysis](../design/HISTORICAL_RUNTIME_REPLAY.md) and linked it from the project notes/TODO.
 
 What already exists:
 
