@@ -639,7 +639,8 @@
         "storage",
         "runtime-boundary",
         "ft-balance-model",
-        "balance-export-state-six-grows"
+        "balance-export-state-six-grows",
+        "balance-state-six-grows-free-bound"
       ]
     },
     {
@@ -852,9 +853,6 @@
       "required_type_dependencies": [
         "owned-room",
         "balance-state-entry"
-      ],
-      "planned_dependencies": [
-        "state-read-model-free-bound"
       ]
     },
     {
@@ -990,7 +988,7 @@
       "declaration": "WNear.Binary.BorshVecF.f374_spec",
       "title": "Vector copy with a general free-list bound",
       "kind": "theorem",
-      "environment": "Arbitrary supported free-list bound, allocation room, valid input bytes, and explicit Wasm frame, depth and gas premises; not yet connected to state_read.",
+      "environment": "Arbitrary supported free-list bound, allocation room, valid input bytes, and explicit Wasm frame, depth and gas premises; connected to the general-bound state-read theorem.",
       "label": "frontier:borsh-vec-free-bound",
       "reviewed_shape_hash": 3528513997,
       "required_type_dependencies": [
@@ -1002,7 +1000,7 @@
       "declaration": "WNear.Binary.BorshBytesF.f316_spec",
       "title": "Byte reader with a general free-list bound",
       "kind": "theorem",
-      "environment": "Arbitrary supported free-list bound, allocation room, valid input bytes, and explicit Wasm frame, depth and gas premises; not yet connected to state_read.",
+      "environment": "Arbitrary supported free-list bound, allocation room, valid input bytes, and explicit Wasm frame, depth and gas premises; connected to the general-bound state-read theorem.",
       "label": "frontier:borsh-bytes-reader-free-bound",
       "reviewed_shape_hash": 1010317074,
       "required_type_dependencies": [
@@ -1017,7 +1015,7 @@
       "declaration": "WNear.Binary.BorshBytesF.f315_spec",
       "title": "Byte deserializer with a general free-list bound",
       "kind": "theorem",
-      "environment": "Arbitrary supported free-list bound, allocation room, valid input bytes, and explicit Wasm frame, depth and gas premises; not yet connected to state_read.",
+      "environment": "Arbitrary supported free-list bound, allocation room, valid input bytes, and explicit Wasm frame, depth and gas premises; connected to the general-bound state-read theorem.",
       "label": "frontier:borsh-bytes-free-bound",
       "reviewed_shape_hash": 2640870261,
       "required_type_dependencies": [
@@ -1032,7 +1030,7 @@
       "declaration": "WNear.Binary.BorshFTF.f425_spec",
       "title": "Fungible-token deserializer with a general free-list bound",
       "kind": "theorem",
-      "environment": "Arbitrary supported free-list bound, allocation room, valid input bytes, and explicit Wasm frame, depth and gas premises; not yet connected to state_read.",
+      "environment": "Arbitrary supported free-list bound, allocation room, valid input bytes, and explicit Wasm frame, depth and gas premises; connected to the general-bound state-read theorem.",
       "label": "frontier:borsh-ft-free-bound",
       "reviewed_shape_hash": 1874100063,
       "required_type_dependencies": [
@@ -1047,7 +1045,7 @@
       "declaration": "WNear.Binary.BorshContractF.f162_spec",
       "title": "Contract reader with a general free-list bound",
       "kind": "theorem",
-      "environment": "Arbitrary supported free-list bound, allocation room, valid input bytes, and explicit Wasm frame, depth and gas premises; not yet connected to state_read.",
+      "environment": "Arbitrary supported free-list bound, allocation room, valid input bytes, and explicit Wasm frame, depth and gas premises; connected to the general-bound state-read theorem.",
       "label": "frontier:borsh-contract-reader-free-bound",
       "reviewed_shape_hash": 1845147241,
       "required_type_dependencies": [
@@ -1062,7 +1060,7 @@
       "declaration": "WNear.Binary.BorshContractF.f161_spec",
       "title": "Contract slice deserializer with a general free-list bound",
       "kind": "theorem",
-      "environment": "Arbitrary supported free-list bound, allocation room, valid input bytes, and explicit Wasm frame, depth and gas premises; not yet connected to state_read.",
+      "environment": "Arbitrary supported free-list bound, allocation room, valid input bytes, and explicit Wasm frame, depth and gas premises; connected to the general-bound state-read theorem.",
       "label": "frontier:borsh-contract-free-bound",
       "reviewed_shape_hash": 2198598637,
       "required_type_dependencies": [
@@ -1102,7 +1100,7 @@
       "declaration": "WNear.Binary.StateReadLenF.f219_spec_model_lenF",
       "title": "Model-state read with a general free-list bound",
       "kind": "theorem",
-      "environment": "The general-bound state-read theorem instantiated for the encoded model state; the balance caller and parser handoff remain open.",
+      "environment": "General-bound encoded model state, allocation room, trie and explicit Wasm resources; connected to the general-bound balance state-read and cleanup path, with parser entry still open.",
       "label": "frontier:state-read-model-free-bound",
       "reviewed_shape_hash": 3792722449,
       "required_type_dependencies": [
@@ -1111,6 +1109,137 @@
       ],
       "required_proof_dependencies": [
         "state-read-free-bound"
+      ]
+    },
+    {
+      "id": "balance-state-read-free-bound",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.state_read_and_unwrapF",
+      "title": "Function 297: state read and unwrap with general bound",
+      "kind": "theorem",
+      "environment": "Arbitrary supported incoming free-list bound; parsed account, host, trie, proof budget, allocation room, gas and execution premises as stated. Parser-to-caller reachability and full accepted-call refinement remain open.",
+      "label": "frontier:balance-state-read-free-bound",
+      "reviewed_shape_hash": 2027513081,
+      "required_type_dependencies": [
+        "state-entry-free-bound",
+        "owned-room"
+      ],
+      "required_proof_dependencies": [
+        "state-read-model-free-bound"
+      ]
+    },
+    {
+      "id": "balance-next-read-free-bound",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.BalanceReadAfterStateF",
+      "title": "Second-read conditions with general bound",
+      "kind": "verification_contract",
+      "notes": "Arbitrary supported incoming free-list bound; parsed account, host, trie, proof budget, allocation room, gas and execution premises as stated. Parser-to-caller reachability and full accepted-call refinement remain open.",
+      "label": "frontier:balance-next-read-free-bound",
+      "reviewed_shape_hash": 14859194515470443808
+    },
+    {
+      "id": "balance-state-cleanup-free-bound",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.state_through_cleanup_absentF",
+      "title": "Function 297: state read through cleanup with general bound",
+      "kind": "theorem",
+      "environment": "Arbitrary supported incoming free-list bound; parsed account, host, trie, proof budget, allocation room, gas and execution premises as stated. Parser-to-caller reachability and full accepted-call refinement remain open.",
+      "label": "frontier:balance-state-cleanup-free-bound",
+      "reviewed_shape_hash": 631380443,
+      "required_type_dependencies": [
+        "state-entry-free-bound",
+        "owned-room",
+        "lookup-heap-room",
+        "balance-next-read-free-bound"
+      ],
+      "required_proof_dependencies": [
+        "balance-state-read-free-bound",
+        "balance-export-parsed-suffix"
+      ]
+    },
+    {
+      "id": "balance-next-gas-free-bound",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.BalanceReadGasAfterStateF",
+      "title": "Second-read gas condition with general bound",
+      "kind": "verification_contract",
+      "notes": "Arbitrary supported incoming free-list bound; parsed account, host, trie, proof budget, allocation room, gas and execution premises as stated. Parser-to-caller reachability and full accepted-call refinement remain open.",
+      "label": "frontier:balance-next-gas-free-bound",
+      "reviewed_shape_hash": 7948847994416192159
+    },
+    {
+      "id": "balance-next-budget-free-bound",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.balanceReadAfterState_of_budgetF",
+      "title": "Derive general-bound second-read conditions from budget",
+      "kind": "theorem",
+      "environment": "Arbitrary supported incoming free-list bound; parsed account, host, trie, proof budget, allocation room, gas and execution premises as stated. Parser-to-caller reachability and full accepted-call refinement remain open.",
+      "label": "frontier:balance-next-budget-free-bound",
+      "reviewed_shape_hash": 2744183776,
+      "required_type_dependencies": [
+        "balance-next-gas-free-bound"
+      ]
+    },
+    {
+      "id": "balance-state-budget-free-bound",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.state_through_cleanup_of_budgetF",
+      "title": "Function 297: general-bound state path with shared budget",
+      "kind": "theorem",
+      "environment": "Arbitrary supported incoming free-list bound; parsed account, host, trie, proof budget, allocation room, gas and execution premises as stated. Parser-to-caller reachability and full accepted-call refinement remain open.",
+      "label": "frontier:balance-state-budget-free-bound",
+      "reviewed_shape_hash": 2017951074,
+      "required_type_dependencies": [
+        "state-entry-free-bound",
+        "balance-next-gas-free-bound",
+        "owned-room",
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "balance-state-cleanup-free-bound",
+        "balance-next-budget-free-bound"
+      ]
+    },
+    {
+      "id": "balance-next-exact-gas-free-bound",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.balanceReadGasAfterState_exactF",
+      "title": "Exact second-read gas with general bound",
+      "kind": "theorem",
+      "environment": "Arbitrary supported incoming free-list bound; parsed account, host, trie, proof budget, allocation room, gas and execution premises as stated. Parser-to-caller reachability and full accepted-call refinement remain open.",
+      "label": "frontier:balance-next-exact-gas-free-bound",
+      "reviewed_shape_hash": 3961467513,
+      "required_proof_dependencies": [
+        "balance-next-read-cost-preserved"
+      ]
+    },
+    {
+      "id": "balance-state-exact-gas-free-bound",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.state_through_cleanup_exact_gasF",
+      "title": "Function 297: general-bound state path with exact gas",
+      "kind": "theorem",
+      "environment": "Arbitrary supported incoming free-list bound; parsed account, host, trie, proof budget, allocation room, gas and execution premises as stated. Parser-to-caller reachability and full accepted-call refinement remain open.",
+      "label": "frontier:balance-state-exact-gas-free-bound",
+      "reviewed_shape_hash": 24761725,
+      "required_type_dependencies": [
+        "state-entry-free-bound",
+        "owned-room",
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "balance-state-budget-free-bound",
+        "balance-next-exact-gas-free-bound"
+      ]
+    },
+    {
+      "id": "balance-state-six-grows-free-bound",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.state_through_cleanup_six_growsF",
+      "title": "Function 297: general-bound state path with six-growth room",
+      "kind": "theorem",
+      "environment": "Arbitrary supported incoming free-list bound; parsed account, host, trie, proof budget, allocation room, gas and execution premises as stated. Parser-to-caller reachability and full accepted-call refinement remain open.",
+      "label": "frontier:balance-state-six-grows-free-bound",
+      "reviewed_shape_hash": 3218371544,
+      "required_type_dependencies": [
+        "state-entry-free-bound",
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "balance-state-exact-gas-free-bound",
+        "balance-room-after-state"
       ]
     }
   ],

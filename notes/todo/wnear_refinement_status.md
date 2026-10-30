@@ -23,7 +23,7 @@ frontier manifest track the exact admitted leaves and protect statement shapes.
 
 ## General free-list bound in state deserialization
 
-The decoded Borsh chain for functions 374, 316, 315, 425, 162 and 161 now has checked variants that preserve an arbitrary supported free-list bound and charge the corresponding allocator cost. These are conditional on allocation room and the stated execution resources. The decoded state reader and its model-state specialization now also accept an arbitrary supported bound F, returning F + 1 after releasing the temporary state buffer. The existing balance caller still uses the original one-cell entry condition; connecting the generalized reader and deriving its entry resources from the parser remain open.
+The decoded Borsh chain for functions 374, 316, 315, 425, 162 and 161 now has checked variants that preserve an arbitrary supported free-list bound and charge the corresponding allocator cost. These are conditional on allocation room and the stated execution resources. The decoded state reader and its model-state specialization now also accept an arbitrary supported bound F, returning F + 1 after releasing the temporary state buffer. The general-bound state reader is now composed with the actual 82-instruction absent-account path through return and cleanup, with a shared two-read proof budget, exact post-read lookup gas, and a single six-growth room condition. The final heap bound tracks the incoming F. Deriving the entry resources and supported bound from the parser, and integrating this path into the full accepted-call refinement, remain open.
 
 ## Continuation on 2026-10-29: integration with main
 

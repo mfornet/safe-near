@@ -94,6 +94,15 @@
     "WNear.Binary.BorshContractF.f161_spec",
     "WNear.Binary.StateReadLenF.pre219F",
     "WNear.Binary.StateReadLenF.f219_spec_lenF",
-    "WNear.Binary.StateReadLenF.f219_spec_model_lenF"
+    "WNear.Binary.StateReadLenF.f219_spec_model_lenF",
+    "WNear.Binary.BalanceOf297AbsentCall.state_read_and_unwrapF",
+    "WNear.Binary.BalanceOf297AbsentCall.BalanceReadAfterStateF",
+    "WNear.Binary.BalanceOf297AbsentCall.state_through_cleanup_absentF",
+    "WNear.Binary.BalanceOf297AbsentCall.BalanceReadGasAfterStateF",
+    "WNear.Binary.BalanceOf297AbsentCall.balanceReadAfterState_of_budgetF",
+    "WNear.Binary.BalanceOf297AbsentCall.state_through_cleanup_of_budgetF",
+    "WNear.Binary.BalanceOf297AbsentCall.balanceReadGasAfterState_exactF",
+    "WNear.Binary.BalanceOf297AbsentCall.state_through_cleanup_exact_gasF",
+    "WNear.Binary.BalanceOf297AbsentCall.state_through_cleanup_six_growsF"
   ]
 }

@@ -31,6 +31,7 @@ import Bridge.Functions.BalanceOf297ReadGas
 import Bridge.Functions.BalanceOf297Room
 import Bridge.Functions.BorshContractF
 import Bridge.Functions.StateReadLenF
+import Bridge.Functions.BalanceOf297RoomF
 
 /-! The browsable proof frontier. Definitions marked Open state contracts, not proofs. -/
 
@@ -502,37 +503,37 @@ attribute [blueprint "frontier:balance-export-state-six-grows"
 
 attribute [blueprint "frontier:borsh-vec-free-bound"
   (title := /-- Vector copy with a general free-list bound -/)
-  (statement := /-- The decoded deserializer preserves an explicitly bounded free list, under the stated allocation-room and execution-resource premises. The state-read caller is not yet generalized. -/)
+  (statement := /-- The decoded deserializer preserves an explicitly bounded free list, under the stated allocation-room and execution-resource premises. The general-bound state reader now composes this deserialization chain. -/)
   (notReady := true)]
   WNear.Binary.BorshVecF.f374_spec
 
 attribute [blueprint "frontier:borsh-bytes-reader-free-bound"
   (title := /-- Byte reader with a general free-list bound -/)
-  (statement := /-- The decoded deserializer preserves an explicitly bounded free list, under the stated allocation-room and execution-resource premises. The state-read caller is not yet generalized. -/)
+  (statement := /-- The decoded deserializer preserves an explicitly bounded free list, under the stated allocation-room and execution-resource premises. The general-bound state reader now composes this deserialization chain. -/)
   (notReady := true)]
   WNear.Binary.BorshBytesF.f316_spec
 
 attribute [blueprint "frontier:borsh-bytes-free-bound"
   (title := /-- Byte deserializer with a general free-list bound -/)
-  (statement := /-- The decoded deserializer preserves an explicitly bounded free list, under the stated allocation-room and execution-resource premises. The state-read caller is not yet generalized. -/)
+  (statement := /-- The decoded deserializer preserves an explicitly bounded free list, under the stated allocation-room and execution-resource premises. The general-bound state reader now composes this deserialization chain. -/)
   (notReady := true)]
   WNear.Binary.BorshBytesF.f315_spec
 
 attribute [blueprint "frontier:borsh-ft-free-bound"
   (title := /-- Fungible-token deserializer with a general free-list bound -/)
-  (statement := /-- The decoded deserializer preserves an explicitly bounded free list, under the stated allocation-room and execution-resource premises. The state-read caller is not yet generalized. -/)
+  (statement := /-- The decoded deserializer preserves an explicitly bounded free list, under the stated allocation-room and execution-resource premises. The general-bound state reader now composes this deserialization chain. -/)
   (notReady := true)]
   WNear.Binary.BorshFTF.f425_spec
 
 attribute [blueprint "frontier:borsh-contract-reader-free-bound"
   (title := /-- Contract reader with a general free-list bound -/)
-  (statement := /-- The decoded deserializer preserves an explicitly bounded free list, under the stated allocation-room and execution-resource premises. The state-read caller is not yet generalized. -/)
+  (statement := /-- The decoded deserializer preserves an explicitly bounded free list, under the stated allocation-room and execution-resource premises. The general-bound state reader now composes this deserialization chain. -/)
   (notReady := true)]
   WNear.Binary.BorshContractF.f162_spec
 
 attribute [blueprint "frontier:borsh-contract-free-bound"
   (title := /-- Contract slice deserializer with a general free-list bound -/)
-  (statement := /-- The decoded deserializer preserves an explicitly bounded free list, under the stated allocation-room and execution-resource premises. The state-read caller is not yet generalized. -/)
+  (statement := /-- The decoded deserializer preserves an explicitly bounded free list, under the stated allocation-room and execution-resource premises. The general-bound state reader now composes this deserialization chain. -/)
   (notReady := true)]
   WNear.Binary.BorshContractF.f161_spec
 
@@ -550,6 +551,59 @@ attribute [blueprint "frontier:state-read-free-bound"
 
 attribute [blueprint "frontier:state-read-model-free-bound"
   (title := /-- Model-state read with a general free-list bound -/)
-  (statement := /-- The general-bound state-read theorem instantiated for the encoded model state; the balance caller and parser handoff remain open. -/)
+  (statement := /-- The general-bound state-read theorem instantiated for the encoded model state and composed into the balance path; the parser handoff remains open. -/)
   (notReady := true)]
   WNear.Binary.StateReadLenF.f219_spec_model_lenF
+
+attribute [blueprint "frontier:balance-state-read-free-bound"
+  (title := /-- Function 297: state read and unwrap with general bound -/)
+  (statement := /-- Function 297: state read and unwrap with general bound. The parser handoff and full accepted-call refinement remain open. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.state_read_and_unwrapF
+
+attribute [blueprint "frontier:balance-next-read-free-bound"
+  (title := /-- Second-read conditions with general bound -/)
+  (statement := /-- Second-read conditions with general bound. The parser handoff and full accepted-call refinement remain open. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.BalanceReadAfterStateF
+
+attribute [blueprint "frontier:balance-state-cleanup-free-bound"
+  (title := /-- Function 297: state read through cleanup with general bound -/)
+  (statement := /-- Function 297: state read through cleanup with general bound. The parser handoff and full accepted-call refinement remain open. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.state_through_cleanup_absentF
+
+attribute [blueprint "frontier:balance-next-gas-free-bound"
+  (title := /-- Second-read gas condition with general bound -/)
+  (statement := /-- Second-read gas condition with general bound. The parser handoff and full accepted-call refinement remain open. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.BalanceReadGasAfterStateF
+
+attribute [blueprint "frontier:balance-next-budget-free-bound"
+  (title := /-- Derive general-bound second-read conditions from budget -/)
+  (statement := /-- Derive general-bound second-read conditions from budget. The parser handoff and full accepted-call refinement remain open. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.balanceReadAfterState_of_budgetF
+
+attribute [blueprint "frontier:balance-state-budget-free-bound"
+  (title := /-- Function 297: general-bound state path with shared budget -/)
+  (statement := /-- Function 297: general-bound state path with shared budget. The parser handoff and full accepted-call refinement remain open. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.state_through_cleanup_of_budgetF
+
+attribute [blueprint "frontier:balance-next-exact-gas-free-bound"
+  (title := /-- Exact second-read gas with general bound -/)
+  (statement := /-- Exact second-read gas with general bound. The parser handoff and full accepted-call refinement remain open. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.balanceReadGasAfterState_exactF
+
+attribute [blueprint "frontier:balance-state-exact-gas-free-bound"
+  (title := /-- Function 297: general-bound state path with exact gas -/)
+  (statement := /-- Function 297: general-bound state path with exact gas. The parser handoff and full accepted-call refinement remain open. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.state_through_cleanup_exact_gasF
+
+attribute [blueprint "frontier:balance-state-six-grows-free-bound"
+  (title := /-- Function 297: general-bound state path with six-growth room -/)
+  (statement := /-- Function 297: general-bound state path with six-growth room. The parser handoff and full accepted-call refinement remain open. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.state_through_cleanup_six_growsF
