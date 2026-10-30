@@ -1,5 +1,5 @@
 import Bridge.Functions.SerdeStructObjState
-import Bridge.Functions.SerdeValueReuse
+import Bridge.Functions.SerdeKeyReuse
 
 /-! # Concrete key reading inside the changing-state object loop -/
 
@@ -168,7 +168,7 @@ def KeyConditions (cfg : WasmConfig) (maxP : Nat) (bs : List UInt8) (B : Bounds)
   ∀ (first : Bool) (i q : Nat) (key : String) (rest : List UInt8) (hl F : Nat) (cap : UInt32),
     i ≤ bs.length → SerdeNextKey.keyQ first bs i = some q →
     NearInterface.Json.stringBody (bs.drop q) [] = some (some key, rest) → B i hl F cap → cap.toNat < 2 ^ 25 → hl % 65536 = 0 → 0 < hl →
-    roomRun maxP hl cap [] (bs.drop q) ∧ SerdeKeyEsc.keyCost cfg F cap bs key.toUTF8.toList rest q ≤ K q ∧
+    SerdeKeyReuse.keyRoom maxP hl cap (bs.drop q) ∧ SerdeKeyReuse.keyCost cfg F cap bs key.toUTF8.toList rest q ≤ K q ∧
     (∀ hl', hl ≤ hl' → hl' ≤ hl + growthPages cap 0 (appendChunks (bs.drop q) []) * 65536 →
       B (bs.length - rest.length) hl' (endFreeBound F cap 0 (appendChunks (bs.drop q) []))
         (endState cap 0 (appendChunks (bs.drop q) [])).1)
@@ -203,7 +203,7 @@ theorem keyHyp (cfg : WasmConfig) (lim : ExecLimits) (inst : Nat) (mi : ModuleIn
     · exact hcSaved
   icases scratch_alignment n maxP hl lv F de ptrS capS sl $$ Hscratch with ⟨%⟨halign, hpositive⟩, Hscratch⟩
   obtain ⟨hr, hcost, hstep⟩ := hc' first i q key rest hl F capS hi hq hmodel hb hcap halign hpositive
-  have callKey := SerdeKeyEsc.f193_key_model (GF := GF) cfg lim d inst mi A n g ta hm (by omega) Cg gt
+  have callKey := SerdeKeyReuse.f193_key_model (GF := GF) cfg lim d inst mi A n g ta hm (by omega) Cg gt
     s (s + 32) de ptr idx ptrS capS sl bs first i q maxP hl F lv key rest hlen hptr hde
     (by rw [hs32]; omega) (by omega) hi hql hq hcap hr hmodel
   rw [hs32, show s.toNat + 32 + 4 = s.toNat + 36 by omega] at callKey
@@ -213,7 +213,7 @@ theorem keyHyp (cfg : WasmConfig) (lim : ExecLimits) (inst : Nat) (mi : ModuleIn
   iunfold MFunSpec at S
   ihave Hc := credits_mono (C := Cg)
     (show (572 + 96 * SerdeNextKey.keyWs first bs i + SerdeKey.cost194) * cfg.regularOpCost +
-      SerdeKeyEsc.keyCost cfg F capS bs key.toUTF8.toList rest q + R ≤
+      SerdeKeyReuse.keyCost cfg F capS bs key.toUTF8.toList rest q + R ≤
       (572 + 96 * SerdeNextKey.keyWs first bs i + SerdeKey.cost194) * cfg.regularOpCost + K q + R by omega) $$ Hc
   icases VecFromElem.stk_split n (s.toNat - 304) 96 208 $$ Hstack with ⟨H96, H208⟩
   rw [show s.toNat - 304 + 96 = s.toNat - 208 by omega]

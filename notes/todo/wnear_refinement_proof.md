@@ -1310,6 +1310,18 @@ scratch framed through. Separate scratch-growth charges also still need absorpti
 potentially using tighter successful instruction estimates. Full accepting coverage
 and the seventh method remain open.
 
+**Borrowed-key charge continuation (2026-10-30):** `SerdeKeyReuse` reuses
+`f646_key_noesc` with allocated scratch framed through, selects that proof or
+`SerdeKeyEsc.f646_key`, and carries the selected charge through the actual 193
+call. The borrowed charge is exactly `300 + 130 * consumedBytes`; an empty key
+therefore recovers the old 430-operation allowance even after an escaped member
+has grown scratch. `keyCost_le` bounds the selected charge by the previous
+allowance. `keyRoom` also removes hypothetical borrowed scratch appends from the
+room obligations. The changing-state `KeyConditions`/`keyHyp` now use those
+interfaces. This closes the borrowed-key obstruction described above; copied-key
+charges, reachable bounds, ignored values, object wrappers and general rejection
+remain open. No uniform accepting result or seventh method is claimed.
+
 ### M7. State and storage
 
 Borsh encoding of the state, `LookupMap` keys, near-sdk's `env` wrappers

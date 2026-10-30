@@ -630,7 +630,8 @@ continuation is published to PR #40 after its validation gates pass.
   via `scratch_alignment`, rather than requiring the pure interval-closed bounds
   to imply them. `alignment_not_interval` records the counterexample; misstatement
   entries 9–11 explain the interface corrections made before publication.
-- Quantitative follow-up: `keyHyp` currently pays the general string allowance
+- Quantitative follow-up at this checkpoint (borrowed-key part closed below):
+  `keyHyp` paid the general string allowance
   `500 + 470 * consumed` even for borrowed keys. The existing dense-member bound
   used `300 + 130 * consumed`: for an empty key the new conservative allowance is
   540 operations higher, so it does not fit the old 470-per-input-byte member
@@ -646,6 +647,41 @@ continuation is published to PR #40 after its validation gates pass.
   key/value adapters and closing check with only standard axioms. Changed-source
   Lean style and whitespace checks pass. Evidence:
   `/tmp/pr40-object-loop-final-audit.log` and `/tmp/pr40-object-loop-style.log`.
+
+## Borrowed-key charge continuation (2026-10-30)
+
+- `SerdeKeyReuse.f646_key_borrowed` reuses `SerdeNextKey.f646_key_noesc`
+  with any existing scratch allocation in the allocator's live list. It frames
+  scratch's pointer/capacity/spare bytes, the hex table and the extra 32 stack
+  bytes through the old reader, then rejoins the unchanged scratch. The key's
+  input-backed bytes are lent only until the field matcher returns them.
+- `f646_key` selects that borrowed proof or the existing general copied-key
+  proof. `f193_key_model` carries the selected charge through the actual next-key
+  call with the complete 208-byte frame and the existing reusable `keyState`.
+  No Wasm body proof is duplicated and no scratch capacity is reset.
+- `keyCost_borrowed` proves the borrowed charge is exactly
+  `(300 + 130 * consumedBytes) * regularOpCost`. Thus an empty key has a
+  430-operation allowance at this reader boundary, rather than the general 970.
+  This restores the old borrowed-key contribution to dense-member arithmetic
+  even when an earlier key or value allocated scratch. `keyCost_le` proves the
+  selected charge never exceeds the previous growth-aware allowance.
+- `keyRoom` asks only for the old reader's error-box room on a borrowed key;
+  copied keys retain the general `roomRun` premise. `keyRoom_of_roomRun` proves
+  the old general premise still suffices. Borrowed keys no longer need room for
+  a hypothetical scratch append. The changing-state `KeyConditions` and
+  `keyHyp` now use this room predicate and selected charge, so the assembled
+  object theorem inherits them.
+- Remaining: absorb copied-key growth/instruction charges, prove reachable
+  heap/scratch bounds and the ignored-reader transition, carry object results
+  through 78/66/65 cleanup, and complete general rejection. The unchanged
+  uniform accepting contract and seventh method are still open.
+- Validation: `just wnear-audit` passes (2803 build jobs; 469 wNEAR modules,
+  63551 declarations and 58265 theorems). Only the three existing dependencies
+  on `Proofs.Refinement` use `sorryAx`; strict NearLogic has zero violations and
+  statement pins match. Lean MCP verifies `SerdeKeyReuse.f193_key_model` and
+  the assembled object theorem with only standard axioms. Changed-source Lean
+  style and whitespace checks pass. Evidence: `/tmp/pr40-key-reuse-final-audit.log`
+  and `/tmp/pr40-key-reuse-style.log`.
 
 ## Methods
 
