@@ -8,6 +8,7 @@ import Bridge.Functions.FromSliceEsc
 import Bridge.Functions.FromSliceSpec
 import Bridge.Methods.FtBalanceOfModel
 import Bridge.Functions.StorageReadNoneF
+import Bridge.Functions.LookupMapGetNone
 
 /-! The browsable proof frontier. Definitions marked Open state contracts, not proofs. -/
 
@@ -285,3 +286,9 @@ attribute [blueprint "frontier:storage-read-absent"
   (title := /-- Absent storage read with allocator and trie accounting -/)
   (statement := /-- The actual storage-read wrapper returns None for an absent key and preserves the allocator bound under the metered host and trie-proof premises. Its LookupMap callers remain to be integrated. -/)]
   WNear.Binary.StorageReadWrapF.f548_noneF_host
+
+attribute [blueprint "frontier:lookup-raw-absent"
+  (title := /-- Absent LookupMap raw read -/)
+  (statement := /-- The actual get_raw function constructs the storage key, executes the absent read and frees its temporary key; the reachable allocator-room obligation remains open. -/)
+  (notReady := true)]
+  WNear.Binary.LookupMapGet.f400_none

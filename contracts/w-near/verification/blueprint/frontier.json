@@ -215,7 +215,7 @@
         "storage",
         "runtime-boundary",
         "ft-balance-model",
-        "storage-read-absent"
+        "lookup-raw-absent"
       ],
       "label": "frontier:method-ft_balance_of",
       "reviewed_shape_hash": 925099951
@@ -545,6 +545,21 @@
       "environment": "Metered host and explicit trie proof-budget, code, heap and interface premises.",
       "label": "frontier:storage-read-absent",
       "reviewed_shape_hash": 2271677168
+    },
+    {
+      "id": "lookup-raw-absent",
+      "declaration": "WNear.Binary.LookupMapGet.f400_none",
+      "title": "LookupMap get_raw: absent key",
+      "kind": "theorem",
+      "environment": "Metered host, trie proof budget, allocator room and explicit Wasm resource premises.",
+      "label": "frontier:lookup-raw-absent",
+      "reviewed_shape_hash": 582177625,
+      "required_proof_dependencies": [
+        "storage-read-absent"
+      ],
+      "required_type_dependencies": [
+        "owned-room"
+      ]
     }
   ],
   "reviewed_environment": [

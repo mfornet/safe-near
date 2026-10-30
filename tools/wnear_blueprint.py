@@ -181,6 +181,9 @@ def classify(manifest, rows, audit=None):
         if absent:
             raise ValueError(f'Checked composition lost dependencies in {caller}: {sorted(absent)}')
     for node in result:
+        missing_proof = set(node.get('required_proof_dependencies', [])) - set(node['proof_edges'])
+        if missing_proof:
+            raise ValueError(f'Checked composition lost dependencies in {node["id"]}: {sorted(missing_proof)}')
         absent = set(node.get('required_type_dependencies', [])) - set(node['type_edges'])
         if absent:
             raise ValueError(f'Expected verification hypotheses missing from {node["id"]}: {sorted(absent)}')
@@ -362,7 +365,14 @@ def install_watch():
         subprocess.run(['launchctl', 'bootout', f'gui/{os.getuid()}/{label}'], capture_output=True)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(plistlib.dumps(config))
-    subprocess.run(['launchctl', 'bootstrap', f'gui/{os.getuid()}', str(path)], check=True)
+    # launchd may briefly retain the old service after bootout succeeds.
+    for attempt in range(10):
+        result = subprocess.run(['launchctl', 'bootstrap', f'gui/{os.getuid()}', str(path)], capture_output=True, text=True)
+        if result.returncode == 0:
+            break
+        if attempt == 9:
+            raise RuntimeError(f'Unable to start {label}: {result.stderr.strip()}')
+        time.sleep(0.5)
     print(f'Installed {label}; log: {log}', flush=True)
 
 
