@@ -924,6 +924,55 @@ continuation is published to PR #40 after its validation gates pass.
   Full ignored-reader integration, uniform accepting bounds, general rejection,
   the seventh method and M9 remain open. No additional `sorry` is introduced.
 
+## Full ignored-machine trace and local-frame save boundary (2026-10-30)
+
+- `SerdeIgnMachineTrace.run` instruments the complete `IgnoreModel.ignM`,
+  rather than the shallow decoder. `erase_run` proves that forgetting its
+  trace gives exactly `ignM` for every mode, input and fuel. `erase_trace`
+  specializes the already sufficient fuel to `vSkip`, and `trace_agrees`
+  retains its complete `valueSkip` agreement, including serde's documented
+  early-number exception. Ignored key strings retain their syntactic endpoint
+  without requiring valid raw UTF-8.
+- The trace accounts for 81's local-frame optimization. In value mode the pure
+  stack's head is the pending local frame, so the physical height is one less
+  than its logical length. Opening another container records a vector push
+  only when that pending frame exists. Scalar completion uses the local head
+  without a vector operation; closing a container records only a nonempty
+  saved-frame pop. Entering an element or member records no vector push.
+- `run_good` proves successful traces legal in every mode: no empty vector
+  pop, final saved height zero, a nonincreasing reader endpoint, and push count
+  at most consumed bytes. `trace_some` yields an actual trace for every
+  successful complete `vSkip`, with peak height also at most consumed bytes.
+- `valid_of_legal` turns legality and a peak bound into every per-state reserve
+  arithmetic premise. `trace_valid` discharges those premises on the existing
+  `bs.length < 2^24` parser domain, with any initial scratch capacity below
+  `2^27`. `trace_budget` consequently bounds the produced complete-machine
+  trace by `SerdeIgnTrace.budget` at consumed length and its actual growth
+  count, retaining allocator-walk and page fees. Its final used length is zero;
+  no append-only final-length assumption is used.
+- `SerdeIgnMachineStack.physical` relates each pure mode to the represented
+  vector. `f84_save` proves the actual optional 84 call from value mode to an
+  opened container: it saves the pending local head, or preserves the complete
+  state at the top level, retaining all earlier live allocations. `saveF_trace`
+  matches the returned allocator bound to the trace, and `save_extraCost`
+  splits the growth credits using exactly the returned capacity/free-list
+  coordinates. `pop_extraCost` preserves those coordinates when a saved frame
+  is restored. The fixed save allowance is at most 140 regular operations.
+- Both modules pass Lean MCP diagnostics and standard-axiom checks; the
+  targeted build passes. `just wnear-audit` passes (2817 build jobs; 483
+  wNEAR modules, 65689 declarations and 60249 theorems), with only
+  the three existing open-refinement dependencies. Strict NearLogic has zero
+  violations, pinned statements match, and PR-wide changed-source Lean style
+  and whitespace checks pass. Evidence: `/tmp/pr40-machine-trace-final-audit.log`
+  and `/tmp/pr40-machine-trace-final-style.log`.
+- Next: extend the actual 81 value/container-loop invariant with these mode
+  views, the complete successful traced continuation, changing scratch/heap
+  coordinates, and preserved saved-String ownership. The trace is now derived
+  from the full pure machine; matching the whole Wasm 81 body to it is still
+  open. Reachable allocation room and absorption of the complete parser charge
+  remain open, as do object cleanup wrappers, full rejection, the seventh
+  method and M9. No additional `sorry` is introduced.
+
 ## Methods
 
 There are 15 exported methods; six now have complete per-call refinement proofs under their protocol premises.
@@ -1011,8 +1060,9 @@ The texts are proved equal to the model's `Panic.message` (`PanicText`).
         changing scratch/heap state and the complete stack footprint.
    3. Ignored values nested deeper: use `SerdeIgnStack`'s proved clear/push/pop
       contracts and `SerdeIgnTrace`'s pop-aware growth budget while tracking the
-      full scratch frame stack in 81. Extract the actual trace and couple its peak
-      length to consumed input. `Hyp81` must allow heap and scratch changes.
+      full scratch frame stack in 81. The complete pure trace and its consumed-byte
+      peak bound are proved in `SerdeIgnMachineTrace`; match the actual 81 body
+      to that trace. `Hyp81` must allow heap and scratch changes.
 2. **`ft_balance_of`, method level.** Take the parser's contracts as parameters until they are proved. The argument layer is in `EnvInput` and `ArgsLeaves`, the balance read in `LookupMapGet`/`StorageReadWrapF`.
 3. **The remaining methods**, in M8's order:
    - `storage_balance_of` (its parser is the same code as `ft_balance_of`'s);

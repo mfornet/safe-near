@@ -1419,6 +1419,26 @@ from the complete 81 invariant, retaining saved String ownership and connecting
 peak length to consumed input. This is not yet the full ignored-value reader,
 a uniform accepting parser, or a seventh method refinement.
 
+The full pure machine now has a concrete physical-vector trace in
+`SerdeIgnMachineTrace`. `erase_run` gives the original `ignM` for every mode
+and fuel; `trace_agrees` retains the complete skipped-value model agreement.
+The pending current frame in value mode is represented in 81's local, not in
+the vector: only opening another container saves it. Scalar completion uses
+that local head without a vector pop, and closing a container records a pop
+only for a nonempty saved stack. `run_good` proves legality and push accounting;
+`trace_some` bounds peak vector height by consumed bytes. `trace_valid` derives
+the reserve arithmetic premises on the existing input-size domain, and
+`trace_budget` applies the closed growth budget at consumed length and the
+actual growth count. No raw-UTF-8 validity premise is added for ignored keys.
+
+`SerdeIgnMachineStack.f84_save` supplies the actual 84 call in these mode views,
+preserving earlier live allocations and returning the corresponding capacity,
+heap-length alternative and allocator bound. `save_extraCost` splits trace
+credits using those returned coordinates. The full Wasm 81 loop still needs
+to be matched to the traced pure continuation, with saved String ownership
+and reachable allocation room. The uniform accepting parser, general rejection,
+seventh method and final exported refinement theorem remain open.
+
 ### M7. State and storage
 
 Borsh encoding of the state, `LookupMap` keys, near-sdk's `env` wrappers
