@@ -1310,6 +1310,18 @@ continuation is published to PR #40 after its validation gates pass.
   bounds, outer wrappers, rejection, the seventh method and M9 remain open.
   No additional `sorry` is introduced.
 
+## Continuation: function 297 absent balance through cleanup
+
+`BalanceOf297AbsentCall.cleanup` checks the final two vector drops and stack
+restoration. `call_through_cleanup_absent` composes it with the absent-account
+path across the exact 59 instructions from the balance call to the function's
+end: the host selects `[34, 48, 34]`, both allocated buffers are freed, and the
+stack global is restored. Both proofs use standard axioms. The composition
+requires the complete prefix allocation and its unused capacity, four-growth
+heap room, the return limit and the existing host/trie and frame premises.
+Reachability of those resources, earlier argument/state setup and the complete
+accepted-call method remain open.
+
 ## Continuation: function 297 absent balance through value return
 
 `BalanceOf297AbsentCall.return_vec` checks the actual dereference and
@@ -1318,7 +1330,8 @@ with the absent-account path across 47 exact instructions, proving the host
 selects JSON bytes `[34, 48, 34]` for zero. It retains the storage-read state
 relation and requires an explicit three-byte return limit, four-growth heap
 room, and frame resources. Both proofs use standard axioms. Reachability of the
-heap room, subsequent cleanup and the enclosing accepted-call method remain open.
+heap room and the enclosing accepted-call method remain open; the subsequent
+cleanup is composed in the continuation above.
 
 ## Continuation: function 297 successful result extraction
 
@@ -1327,7 +1340,8 @@ heap room, subsequent cleanup and the enclosing accepted-call method remain open
 `call_copy_format_and_expect_absent` composes it with the absent-account path
 across the exact 37-instruction slice, preserving the returned vector and host
 resources. Both proofs use standard axioms. Reachable four-growth heap room,
-argument setup, post-return cleanup and the full accepted-call method remain open.
+argument setup and the full accepted-call method remain open; cleanup is
+composed in the later continuation above.
 
 ## Continuation: function 297 absent call through serialization
 

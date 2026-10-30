@@ -20,6 +20,8 @@ import Bridge.Functions.BalanceOf297Expect
 import Bridge.Functions.BalanceOf297ComposeExpect
 import Bridge.Functions.BalanceOf297Return
 import Bridge.Functions.BalanceOf297ComposeReturn
+import Bridge.Functions.BalanceOf297Cleanup
+import Bridge.Functions.BalanceOf297ComposeCleanup
 
 /-! The browsable proof frontier. Definitions marked Open state contracts, not proofs. -/
 
@@ -396,3 +398,14 @@ attribute [blueprint "frontier:balance-export-through-return"
   (statement := /-- The exact 47-instruction slice composes the absent lookup through value_return of the JSON bytes for zero; reachable heap room, cleanup and the full method remain open. -/)
   (notReady := true)]
   WNear.Binary.BalanceOf297AbsentCall.call_through_value_return_absent
+
+attribute [blueprint "frontier:balance-export-cleanup"
+  (title := /-- Exported balance function: vector cleanup and epilogue -/)
+  (statement := /-- The exact decoded final instructions free the two owned vectors and restore the stack global. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.cleanup
+
+attribute [blueprint "frontier:balance-export-through-cleanup"
+  (title := /-- Exported balance function: absent balance through cleanup -/)
+  (statement := /-- The exact 59-instruction suffix composes absent-account lookup through return of zero, both vector drops and stack restoration; reachable room, preceding argument and state setup and the full method remain open. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.call_through_cleanup_absent

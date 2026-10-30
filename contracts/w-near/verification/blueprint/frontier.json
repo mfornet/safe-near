@@ -639,7 +639,7 @@
         "storage",
         "runtime-boundary",
         "ft-balance-model",
-        "balance-export-through-return"
+        "balance-export-through-cleanup"
       ]
     },
     {
@@ -771,6 +771,31 @@
       "required_proof_dependencies": [
         "balance-export-through-expect",
         "balance-export-return-vec"
+      ]
+    },
+    {
+      "id": "balance-export-cleanup",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.cleanup",
+      "title": "Function 297: free vectors and restore stack",
+      "kind": "theorem",
+      "environment": "Explicit Wasm frame, live heap allocations and memory ownership premises.",
+      "label": "frontier:balance-export-cleanup",
+      "reviewed_shape_hash": 3122558003
+    },
+    {
+      "id": "balance-export-through-cleanup",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.call_through_cleanup_absent",
+      "title": "Function 297: absent balance through cleanup",
+      "kind": "theorem",
+      "environment": "Metered host, trie proof budget, return-length limit, four-growth heap room, full prefix allocation and explicit Wasm frame/resource premises.",
+      "label": "frontier:balance-export-through-cleanup",
+      "reviewed_shape_hash": 4173074890,
+      "required_type_dependencies": [
+        "lookup-heap-room"
+      ],
+      "required_proof_dependencies": [
+        "balance-export-through-return",
+        "balance-export-cleanup"
       ]
     }
   ],
