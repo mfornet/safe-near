@@ -5,6 +5,43 @@ The GitHub Actions workflows in `.github/workflows` run on our own server,
 runners of `mfornet/safe-near`. Every job uses `runs-on: [self-hosted, fv01]`;
 no job runs on GitHub-hosted machines.
 
+## Public pull request approval
+
+All external contributors must receive workflow approval before their fork PR
+workflows can run, including contributors whose earlier PRs were merged. The
+desired GitHub setting is committed in `.github/actions-approval-policy.json`.
+With an authenticated GitHub CLI, run:
+
+```sh
+just ci-approval-check  # read the live setting and fail if it differs
+just ci-approval-apply  # apply the committed policy and verify it (repo admin)
+```
+
+These commands deliberately target `mfornet/safe-near`, even in a fork. The
+policy file only takes effect when applied through GitHub's API; merging it
+alone does not configure GitHub. No admin credential belongs in CI.
+
+GitHub enforces this gate before it schedules a runner. An allowlist or `if:`
+condition in a `pull_request` workflow cannot enforce it: a contributor can
+modify that workflow in their PR. Keep PR workflows on `pull_request`; do not
+switch to `pull_request_target` to check out and execute PR code, since that
+event bypasses this approval policy.
+
+Review the proposed code, workflow changes, dependencies and build hooks before
+using **Approve and run**. Approval allows arbitrary PR code to execute on
+`fv01`, with access to the runner user's persistent files and build caches.
+Read-only `GITHUB_TOKEN` permissions do not isolate the host. Only approve code
+you trust on this server; use an isolated disposable runner for untrusted code.
+
+This is approval to run workflows, separate from approving a PR review or
+merging it. Any repository user with write access can approve runs; repository
+collaborators are exempt from the external-contributor gate. Keep repository
+access restricted to people trusted to run code here. This setting does not
+cancel runs already queued or executing.
+
+References: [GitHub approval settings](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository#controlling-changes-from-forks-to-workflows-in-public-repositories),
+[approval API](https://docs.github.com/en/rest/actions/permissions#set-fork-pr-contributor-approval-permissions-for-a-repository).
+
 ## Layout
 
 - Three runners, `fv01-1`, `fv01-2`, `fv01-3`, so the workflows a pull request
