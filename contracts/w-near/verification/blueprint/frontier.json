@@ -7039,6 +7039,674 @@
         "prefix-selected-key-instance"
       ],
       "reviewed_shape_hash": 1668226916
+    },
+    {
+      "id": "field-length-755",
+      "declaration": "WNear.Binary.SerdeKeyTight.f755_length_ne",
+      "title": "Actual slice length mismatch costs 30 operations",
+      "kind": "theorem",
+      "label": "frontier:field-length-755",
+      "notes": "The actual f755 mismatch branch returns false without calling the byte comparator, preserving both owned slices.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3890083476
+    },
+    {
+      "id": "field-length-754",
+      "declaration": "WNear.Binary.SerdeKeyTight.f754_length_ne",
+      "title": "Actual equality wrapper mismatch costs 50 operations",
+      "kind": "theorem",
+      "label": "frontier:field-length-754",
+      "notes": "The actual f754 wrapper composes the 30-operation slice mismatch result.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "field-length-755"
+      ],
+      "reviewed_shape_hash": 2726281031
+    },
+    {
+      "id": "field-length-194",
+      "declaration": "WNear.Binary.SerdeKeyTight.f194_length_ne",
+      "title": "Actual field length mismatch costs 80 operations",
+      "kind": "theorem",
+      "label": "frontier:field-length-194",
+      "notes": "The actual f194 visitor returns ignore on every decoded length other than ten; it retains both key buffers.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "field-length-754"
+      ],
+      "reviewed_shape_hash": 3578441148
+    },
+    {
+      "id": "field-visitor",
+      "declaration": "WNear.Binary.SerdeKeyTight.f194_precise",
+      "title": "Field visitor uses its actual length path",
+      "kind": "theorem",
+      "label": "frontier:field-visitor",
+      "notes": "The same original field result is proved at 80 operations for non-ten-byte keys and the preserved 342 allowance otherwise.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "field-length-194"
+      ],
+      "reviewed_shape_hash": 1877030339
+    },
+    {
+      "id": "field-cost-compat",
+      "declaration": "WNear.Binary.SerdeKeyTight.fieldCost_le_legacy",
+      "title": "Field-specific charge preserves the legacy allowance",
+      "kind": "theorem",
+      "label": "frontier:field-cost-compat",
+      "notes": "Every fieldCost is at most the original pinned cost194; no previous public contract changes.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 689019101
+    },
+    {
+      "id": "field-next-key",
+      "declaration": "WNear.Binary.SerdeNextKeyTight.f193_key_precise_field",
+      "title": "Actual next-key loop uses precise field classification",
+      "kind": "theorem",
+      "label": "frontier:field-next-key",
+      "notes": "The actual f193 key path composes its Spec646 resource premise and the field-specific visitor without changing state or field result.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "field-visitor"
+      ],
+      "reviewed_shape_hash": 3558277445
+    },
+    {
+      "id": "field-key-model",
+      "declaration": "WNear.Binary.SerdeKeyReuse.f193_key_model_precise_field",
+      "title": "Precise string and field reading compose at f193",
+      "kind": "theorem",
+      "label": "frontier:field-key-model",
+      "notes": "Actual precise f646 reading supplies the next-key contract; physical reader room remains explicit.",
+      "required_type_dependencies": [
+        "string-room"
+      ],
+      "required_proof_dependencies": [
+        "field-next-key",
+        "precise-key-reader"
+      ],
+      "reviewed_shape_hash": 177574316
+    },
+    {
+      "id": "bundled-key-conditions",
+      "declaration": "WNear.Binary.SerdeStructObjPhaseReaders.BundledKeyConditions",
+      "title": "Bundled key gas, room and state conditions",
+      "kind": "verification_contract",
+      "label": "frontier:bundled-key-conditions",
+      "notes": "Requires actual string plus field work to fit the unchanged classification base plus K, with exact physical room and endpoint closure. This generic interface stays Open.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1462066151100676980
+    },
+    {
+      "id": "bundled-key-hyp",
+      "declaration": "WNear.Binary.SerdeStructObjPhaseReaders.keyHyp_bundled",
+      "title": "Actual field-aware keys feed the unchanged loop hypothesis",
+      "kind": "theorem",
+      "label": "frontier:bundled-key-hyp",
+      "notes": "A single credit cell funds the actual key/field sum from the existing classification base plus selected K; no credit is added to member state.",
+      "required_type_dependencies": [
+        "bundled-key-conditions",
+        "phase-key-hyp"
+      ],
+      "required_proof_dependencies": [
+        "field-key-model",
+        "prefix-reader-lens"
+      ],
+      "reviewed_shape_hash": 4080472024
+    },
+    {
+      "id": "bundled-key-funding",
+      "declaration": "WNear.Binary.SerdeKeyReuse.bundledCost_funds_reader_and_field",
+      "title": "Classification base plus remainder funds actual key work",
+      "kind": "theorem",
+      "label": "frontier:bundled-key-funding",
+      "notes": "Natural subtraction defines a nonnegative key remainder. The unchanged cost194 base plus it funds the actual reader and field charge.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2571265039
+    },
+    {
+      "id": "bundled-key-compat",
+      "declaration": "WNear.Binary.SerdeKeyReuse.bundledCost_le_preciseCost",
+      "title": "Bundled remainder is no larger than the old key charge",
+      "kind": "theorem",
+      "label": "frontier:bundled-key-compat",
+      "notes": "The actual field-specific allowance is bounded by the original cost194, so the remaining charge preserves the earlier preciseCost upper bound.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "field-cost-compat"
+      ],
+      "reviewed_shape_hash": 3898350588
+    },
+    {
+      "id": "bundled-key-gas",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.BundledKeyGasCharges",
+      "title": "Remaining bundled prefix key allowance",
+      "kind": "verification_contract",
+      "label": "frontier:bundled-key-gas",
+      "notes": "Only actual string plus field work versus the unchanged base plus K is required. The exact selected-cost instance is checked below; the general interface stays Open.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 12510454146518769698
+    },
+    {
+      "id": "bundled-bound-key",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.Bound.bundled_key_conditions",
+      "title": "Exact prefix constructs bundled key physical conditions",
+      "kind": "theorem",
+      "label": "frontier:bundled-bound-key",
+      "notes": "Physical room and state transport are constructed from the actual prefix; only the named bundled gas allowance is assumed.",
+      "required_type_dependencies": [
+        "bundled-key-gas",
+        "bundled-key-conditions"
+      ],
+      "required_proof_dependencies": [
+        "prefix-bound-segment",
+        "prefix-bound-forget",
+        "ledger-key-room"
+      ],
+      "reviewed_shape_hash": 2517762468
+    },
+    {
+      "id": "bundled-selected-key-cost",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.selectedBundledKeyCost_of_witness",
+      "title": "Selected bundled key charge agrees with every witness",
+      "kind": "theorem",
+      "label": "frontier:bundled-selected-key-cost",
+      "notes": "Unique actual key history fixes capacity, free state and decoded field, yielding the exact nonnegative bundled charge.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "prefix-key-history"
+      ],
+      "reviewed_shape_hash": 1935273299
+    },
+    {
+      "id": "bundled-selected-key-instance",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.Bound.selected_bundled_key_charges",
+      "title": "Selected bundled key charge instantiates both saved states",
+      "kind": "theorem",
+      "label": "frontier:bundled-selected-key-instance",
+      "notes": "The exact selected remainder and unchanged classification base fund every actual prefix key call. The generic interface remains Open.",
+      "required_type_dependencies": [
+        "bundled-key-gas"
+      ],
+      "required_proof_dependencies": [
+        "bundled-selected-key-cost",
+        "bundled-key-funding"
+      ],
+      "reviewed_shape_hash": 4156464458
+    },
+    {
+      "id": "value-charge-no-later",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.Prefix.value_no_later_start",
+      "title": "Value charge index cannot recur at a later prefix",
+      "kind": "theorem",
+      "label": "frontier:value-charge-no-later",
+      "notes": "An actual successful value reaches or passes its charge index, while any caller of that index must precede it.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "prefix-canonical",
+        "prefix-before-index"
+      ],
+      "reviewed_shape_hash": 2416405218
+    },
+    {
+      "id": "value-charge-unique",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.Prefix.value_start_unique",
+      "title": "Value-start index uniquely determines actual caller state",
+      "kind": "theorem",
+      "label": "frontier:value-charge-unique",
+      "notes": "Functional trace ordering fixes the pending key, cursor, retained history and saved flag for successful calls at the same value start.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "value-charge-no-later",
+        "prefix-canonical"
+      ],
+      "reviewed_shape_hash": 189041781
+    },
+    {
+      "id": "value-witness-next",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.ValueWitness.next",
+      "title": "Actual account witness extends the prefix",
+      "kind": "theorem",
+      "label": "frontier:value-witness-next",
+      "notes": "The accepted account model supplies its exact string segment and saved-account transition.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2000815491
+    },
+    {
+      "id": "value-witness-history",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.ValueWitness.history_unique",
+      "title": "Account charge witnesses retain one exact history",
+      "kind": "theorem",
+      "label": "frontier:value-witness-history",
+      "notes": "Actual account models and prefix ordering fix the scratch coordinates at a value charge index.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "value-witness-next",
+        "value-charge-unique"
+      ],
+      "reviewed_shape_hash": 112978201
+    },
+    {
+      "id": "selected-value-cost",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.selectedValueCost_of_witness",
+      "title": "Selected account charge agrees with actual accepted calls",
+      "kind": "theorem",
+      "label": "frontier:selected-value-cost",
+      "notes": "The selected exact account allowance uses the unique retained history and actual account/rest result. This does not fund the whole model budget.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "value-witness-history"
+      ],
+      "reviewed_shape_hash": 2501967165
+    },
+    {
+      "id": "selected-value-instance",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.Bound.selected_value_charges",
+      "title": "Selected account charge instantiates prefix value gas",
+      "kind": "theorem",
+      "label": "frontier:selected-value-instance",
+      "notes": "Constructs the generic prefix value-gas interface for the selected exact function. The general interface remains Open.",
+      "required_type_dependencies": [
+        "prefix-value-gas"
+      ],
+      "required_proof_dependencies": [
+        "selected-value-cost"
+      ],
+      "reviewed_shape_hash": 388978661
+    },
+    {
+      "id": "ignore-witness-next",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.IgnoreWitness.next",
+      "title": "Actual ignored witness extends its unknown-key prefix",
+      "kind": "theorem",
+      "label": "frontier:ignore-witness-next",
+      "notes": "The actual successful ignored trace supplies its frame segment and preserves the saved account.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2772581193
+    },
+    {
+      "id": "ignore-witness-history",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.IgnoreWitness.history_unique",
+      "title": "Ignored charge witnesses retain one exact history",
+      "kind": "theorem",
+      "label": "frontier:ignore-witness-history",
+      "notes": "Unknown-field trace models and prefix ordering fix the scratch coordinates at the ignored value start.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "ignore-witness-next",
+        "value-charge-unique"
+      ],
+      "reviewed_shape_hash": 344008780
+    },
+    {
+      "id": "selected-ignore-cost",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.selectedIgnoreCost_of_witness",
+      "title": "Selected ignored charge agrees with actual successful traces",
+      "kind": "theorem",
+      "label": "frontier:selected-ignore-cost",
+      "notes": "The unique prefix and deterministic ignored trace fix the exact frame/growth allowance. Total original-model funding remains missing.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "ignore-witness-history"
+      ],
+      "reviewed_shape_hash": 2260262437
+    },
+    {
+      "id": "selected-ignore-instance",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.Bound.selected_ignore_charges",
+      "title": "Selected ignored charge instantiates both saved states",
+      "kind": "theorem",
+      "label": "frontier:selected-ignore-instance",
+      "notes": "Constructs the generic ignored-gas interface from actual retained history and trace, with no new behavioral or room premise.",
+      "required_type_dependencies": [
+        "prefix-ignore-gas"
+      ],
+      "required_proof_dependencies": [
+        "selected-ignore-cost"
+      ],
+      "reviewed_shape_hash": 128637243
+    },
+    {
+      "id": "fully-selected-receipt",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.fully_selected_refines_init",
+      "title": "Exact reader charges reach full receipt refinement",
+      "kind": "theorem",
+      "label": "frontier:fully-selected-receipt",
+      "notes": "All three generic reader-gas premises are instantiated. The full receipt result remains Conditional on the unchanged ProviderModelBudget and protocol/domain premises.",
+      "required_type_dependencies": [
+        "provider-model-budget"
+      ],
+      "required_proof_dependencies": [
+        "prefix-selected-key-receipt",
+        "selected-value-instance",
+        "selected-ignore-instance"
+      ],
+      "reviewed_shape_hash": 3860968470
+    },
+    {
+      "id": "string-work-tight",
+      "declaration": "WNear.Binary.ParseStrSuccess.costRun_growth_tight",
+      "title": "Successful string work has a 200-operation base",
+      "kind": "theorem",
+      "label": "frontier:string-work-tight",
+      "notes": "The same raw successful costRun is bounded by 200+433 consumed-byte work plus 100 per initial accumulator byte and actual retained growth. Old 400-base statements are unchanged.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "string-escape-work-sharp"
+      ],
+      "reviewed_shape_hash": 2008481966
+    },
+    {
+      "id": "bundled-model-loop",
+      "declaration": "WNear.Binary.SerdeStructObjPhaseReaders.f228_obj_model_closing_bundled",
+      "title": "Phase loop uses the actual bundled key reader",
+      "kind": "theorem",
+      "label": "frontier:bundled-model-loop",
+      "notes": "Concrete field-aware keys and existing actual account/ignored interfaces feed the unchanged loop and costObj. Named pure conditions remain visible.",
+      "required_type_dependencies": [
+        "bundled-key-conditions",
+        "prefix-reader-value-conditions",
+        "prefix-reader-close-conditions",
+        "phase-ignore-hyp"
+      ],
+      "required_proof_dependencies": [
+        "bundled-key-hyp",
+        "phase-object-loop",
+        "prefix-reader-value",
+        "prefix-reader-closing"
+      ],
+      "reviewed_shape_hash": 321308097
+    },
+    {
+      "id": "bundled-full-loop",
+      "declaration": "WNear.Binary.SerdeStructObjPhaseReaders.object_loop_v86_closing_bundled",
+      "title": "Full ignored reader composes with bundled keys",
+      "kind": "theorem",
+      "label": "frontier:bundled-full-loop",
+      "notes": "Actual key/value/ignored behavior composes at the unchanged recurrence and one gas cell.",
+      "required_type_dependencies": [
+        "bundled-key-conditions",
+        "prefix-reader-value-conditions",
+        "prefix-reader-ignore-conditions",
+        "prefix-reader-close-conditions"
+      ],
+      "required_proof_dependencies": [
+        "bundled-model-loop",
+        "prefix-reader-ignore"
+      ],
+      "reviewed_shape_hash": 3595524465
+    },
+    {
+      "id": "bundled-actual-loop",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.object_loop_bundled",
+      "title": "Exact prefix builds the actual bundled object loop",
+      "kind": "theorem",
+      "label": "frontier:bundled-actual-loop",
+      "notes": "Prefix room, state and brace instances feed the full actual reader. Only selected gas and existing physical setup remain.",
+      "required_type_dependencies": [
+        "bundled-key-gas",
+        "prefix-value-gas",
+        "prefix-ignore-gas",
+        "object-ledger-setup"
+      ],
+      "required_proof_dependencies": [
+        "bundled-full-loop",
+        "bundled-bound-key",
+        "prefix-bound-value",
+        "prefix-bound-ignore",
+        "prefix-bound-close"
+      ],
+      "reviewed_shape_hash": 534336813
+    },
+    {
+      "id": "bundled-wrapper",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.f78_bundled_cost",
+      "title": "Actual bundled object reaches f78 ownership",
+      "kind": "theorem",
+      "label": "frontier:bundled-wrapper",
+      "notes": "Raw scratch initialization and original resource handoff connect bundled parsing to the unchanged wrapper.",
+      "required_type_dependencies": [
+        "bundled-key-gas",
+        "prefix-value-gas",
+        "prefix-ignore-gas",
+        "object-ledger-setup"
+      ],
+      "required_proof_dependencies": [
+        "bundled-actual-loop",
+        "prefix-member-initial",
+        "prefix-member-forget",
+        "ledger-wrapper-generic"
+      ],
+      "reviewed_shape_hash": 1379709756
+    },
+    {
+      "id": "bundled-from-trait",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.f66_bundled",
+      "title": "Bundled charges survive f66 and scratch cleanup",
+      "kind": "theorem",
+      "label": "frontier:bundled-from-trait",
+      "notes": "Checks EOF/whitespace, result moves and actual retained scratch drop with unchanged output ownership.",
+      "required_type_dependencies": [
+        "bundled-key-gas",
+        "prefix-value-gas",
+        "prefix-ignore-gas",
+        "object-ledger-setup"
+      ],
+      "required_proof_dependencies": [
+        "bundled-wrapper",
+        "ledger-scratch-cleanup",
+        "ledger-final-bounds"
+      ],
+      "reviewed_shape_hash": 3183143221
+    },
+    {
+      "id": "bundled-from-slice",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.f65_bundled",
+      "title": "Bundled parser restores the slice caller",
+      "kind": "theorem",
+      "label": "frontier:bundled-from-slice",
+      "notes": "The actual f65 entry composes bundled f66 and restores original frames, static/input resources and observations.",
+      "required_type_dependencies": [
+        "bundled-key-gas",
+        "prefix-value-gas",
+        "prefix-ignore-gas",
+        "object-ledger-setup"
+      ],
+      "required_proof_dependencies": [
+        "bundled-from-trait"
+      ],
+      "reviewed_shape_hash": 1722776885
+    },
+    {
+      "id": "bundled-from-slice-room",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.f65_bundled_room",
+      "title": "Bundled parser supplies balance room",
+      "kind": "theorem",
+      "label": "frontier:bundled-from-slice-room",
+      "notes": "The unchanged owned-account handoff supplies balance execution room and final free bound.",
+      "required_type_dependencies": [
+        "bundled-key-gas",
+        "prefix-value-gas",
+        "prefix-ignore-gas",
+        "object-ledger-setup"
+      ],
+      "required_proof_dependencies": [
+        "bundled-from-slice",
+        "ledger-result-room"
+      ],
+      "reviewed_shape_hash": 1832408692
+    },
+    {
+      "id": "bundled-parser-call",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.bundled_parser_contract",
+      "title": "Bundled parsing supplies the shared parser contract",
+      "kind": "theorem",
+      "label": "frontier:bundled-parser-call",
+      "notes": "Packages the actual parser for the existing balance execution pipeline.",
+      "required_type_dependencies": [
+        "bundled-key-gas",
+        "prefix-value-gas",
+        "prefix-ignore-gas",
+        "object-ledger-setup",
+        "parser-call-contract"
+      ],
+      "required_proof_dependencies": [
+        "bundled-from-slice-room"
+      ],
+      "reviewed_shape_hash": 306381771
+    },
+    {
+      "id": "bundled-parser-family",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.bundled_parser_family",
+      "title": "Actual input memory instantiates bundled setup",
+      "kind": "theorem",
+      "label": "frontier:bundled-parser-family",
+      "notes": "Permitted input allocation outcomes construct physical setup; reader allowances remain explicit.",
+      "required_type_dependencies": [
+        "bundled-key-gas",
+        "prefix-value-gas",
+        "prefix-ignore-gas",
+        "parser-family"
+      ],
+      "required_proof_dependencies": [
+        "bundled-parser-call",
+        "ledger-input-bounds"
+      ],
+      "reviewed_shape_hash": 672395617
+    },
+    {
+      "id": "bundled-deployed-provider",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.bundled_deployed_parser_provider",
+      "title": "Actual code supplies the bundled provider",
+      "kind": "theorem",
+      "label": "frontier:bundled-deployed-provider",
+      "notes": "Persistent function cells connect the actual parser family to the shared entry pipeline with output F=44.",
+      "required_type_dependencies": [
+        "bundled-key-gas",
+        "prefix-value-gas",
+        "prefix-ignore-gas",
+        "deployed-parser-provider"
+      ],
+      "required_proof_dependencies": [
+        "bundled-parser-family",
+        "ledger-parser-code",
+        "parser-family-code-transport"
+      ],
+      "reviewed_shape_hash": 1918192043
+    },
+    {
+      "id": "bundled-provider-plan",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.bundled_provider_plan",
+      "title": "Bundled provider retains the original whole-model budget",
+      "kind": "theorem",
+      "label": "frontier:bundled-provider-plan",
+      "notes": "The actual provider and same costObj recurrence are coupled to unchanged ProviderModelBudget.",
+      "required_type_dependencies": [
+        "bundled-key-gas",
+        "prefix-value-gas",
+        "prefix-ignore-gas",
+        "provider-model-budget",
+        "absent-parser-plan"
+      ],
+      "required_proof_dependencies": [
+        "bundled-deployed-provider"
+      ],
+      "reviewed_shape_hash": 1728797737
+    },
+    {
+      "id": "bundled-receipt",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.bundled_refines_init",
+      "title": "Bundled actual parsing reaches full receipt refinement",
+      "kind": "theorem",
+      "label": "frontier:bundled-receipt",
+      "notes": "Retains safety, sufficient-resource Matches/used gas and arbitrary-resource Matches-or-failure rollback/log-prefix. Named gas/model-budget premises remain explicit.",
+      "required_type_dependencies": [
+        "bundled-key-gas",
+        "prefix-value-gas",
+        "prefix-ignore-gas",
+        "provider-model-budget"
+      ],
+      "required_proof_dependencies": [
+        "bundled-provider-plan",
+        "provider-plan-receipt-initial"
+      ],
+      "reviewed_shape_hash": 3340887131
+    },
+    {
+      "id": "fully-bundled-receipt",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.fully_bundled_refines_init",
+      "title": "All exact reader charges reach the original-budget receipt",
+      "kind": "theorem",
+      "label": "frontier:fully-bundled-receipt",
+      "notes": "Instantiates both bundled key states, account gas and both ignored states from their actual unique histories. Only unchanged whole-model funding and protocol/domain premises remain. Total gas is not claimed proved.",
+      "required_type_dependencies": [
+        "provider-model-budget"
+      ],
+      "required_proof_dependencies": [
+        "bundled-receipt",
+        "bundled-selected-key-instance",
+        "selected-value-instance",
+        "selected-ignore-instance"
+      ],
+      "reviewed_shape_hash": 1167320353
+    },
+    {
+      "id": "key-work-tight",
+      "declaration": "WNear.Binary.SerdeKeyReuse.preciseCost_growth_tight",
+      "title": "Same actual key charge has a 300-operation base",
+      "kind": "theorem",
+      "label": "frontier:key-work-tight",
+      "notes": "The successful borrowed/copied preciseCost is bounded by 300+433 operations per consumed byte plus actual growth. This improves a bound without altering raw charge or existing statements.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "string-work-tight"
+      ],
+      "reviewed_shape_hash": 3850694764
+    },
+    {
+      "id": "bundled-key-work",
+      "declaration": "WNear.Binary.SerdeKeyReuse.bundledCost_growth_tight",
+      "title": "Bundled key/classification work keeps actual length cost",
+      "kind": "theorem",
+      "label": "frontier:bundled-key-work",
+      "notes": "The unchanged classification base plus net key charge fits 642+433n work for ten-byte keys or 380+433n otherwise, plus actual retained growth.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "key-work-tight"
+      ],
+      "reviewed_shape_hash": 1682951497
+    },
+    {
+      "id": "ignored-member-work",
+      "declaration": "WNear.Binary.SerdeKeyReuse.ignored_member_regular_budget",
+      "title": "Unknown-member regular work fits 486 operations per byte",
+      "kind": "theorem",
+      "label": "frontier:ignored-member-work",
+      "notes": "Key, actual field classification, object control and ignored regular work fit 486 times key/value consumed bytes plus three structural bytes. Actual scratch growth remains separate; global disjoint coverage and total model funding are not claimed.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "bundled-key-work"
+      ],
+      "reviewed_shape_hash": 2192102469
+    },
+    {
+      "id": "regular-byte-rate",
+      "declaration": "WNear.Binary.SerdeKeyReuse.regular_byte_rate",
+      "title": "Reviewed operation bound funds the byte rate",
+      "kind": "theorem",
+      "label": "frontier:regular-byte-rate",
+      "notes": "486 regular operations fit the unchanged 400-million-gas argument-byte coefficient under the explicit reviewed op bound 822756. This does not instantiate pinned protocol costs or fund actual growth.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1414201458
     }
   ],
   "reviewed_environment": [

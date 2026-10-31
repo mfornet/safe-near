@@ -1,3 +1,5 @@
+import Bridge.Functions.SerdeBundledSelected
+import Bridge.Functions.SerdeBundledWork
 import Bridge.Functions.SerdePrefixSelectedKey
 import Bridge.Functions.SerdeObjectPrefix
 import Bridge.Functions.SerdeObjectProviderPrecise
@@ -2953,3 +2955,245 @@ attribute [blueprint "frontier:prefix-selected-key-receipt"
   (statement := /-- Instantiates both actual key hypotheses at selectedKeyCost. Full receipt observations remain Conditional on value/ignored gas and the unchanged whole-model budget; no generic key gas witness is assumed. -/)
   (notReady := true)]
   WNear.Binary.SerdeObjectPrefix.selected_key_refines_init
+
+attribute [blueprint "frontier:field-length-755"
+  (title := /-- Actual slice length mismatch costs 30 operations -/)
+  (statement := /-- The actual f755 mismatch branch returns false without calling the byte comparator, preserving both owned slices. -/)]
+  WNear.Binary.SerdeKeyTight.f755_length_ne
+
+attribute [blueprint "frontier:field-length-754"
+  (title := /-- Actual equality wrapper mismatch costs 50 operations -/)
+  (statement := /-- The actual f754 wrapper composes the 30-operation slice mismatch result. -/)]
+  WNear.Binary.SerdeKeyTight.f754_length_ne
+
+attribute [blueprint "frontier:field-length-194"
+  (title := /-- Actual field length mismatch costs 80 operations -/)
+  (statement := /-- The actual f194 visitor returns ignore on every decoded length other than ten; it retains both key buffers. -/)]
+  WNear.Binary.SerdeKeyTight.f194_length_ne
+
+attribute [blueprint "frontier:field-visitor"
+  (title := /-- Field visitor uses its actual length path -/)
+  (statement := /-- The same original field result is proved at 80 operations for non-ten-byte keys and the preserved 342 allowance otherwise. -/)]
+  WNear.Binary.SerdeKeyTight.f194_precise
+
+attribute [blueprint "frontier:field-cost-compat"
+  (title := /-- Field-specific charge preserves the legacy allowance -/)
+  (statement := /-- Every fieldCost is at most the original pinned cost194; no previous public contract changes. -/)]
+  WNear.Binary.SerdeKeyTight.fieldCost_le_legacy
+
+attribute [blueprint "frontier:field-next-key"
+  (title := /-- Actual next-key loop uses precise field classification -/)
+  (statement := /-- The actual f193 key path composes its Spec646 resource premise and the field-specific visitor without changing state or field result. -/)]
+  WNear.Binary.SerdeNextKeyTight.f193_key_precise_field
+
+attribute [blueprint "frontier:field-key-model"
+  (title := /-- Precise string and field reading compose at f193 -/)
+  (statement := /-- Actual precise f646 reading supplies the next-key contract; physical reader room remains explicit. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeKeyReuse.f193_key_model_precise_field
+
+attribute [blueprint "frontier:bundled-key-conditions"
+  (title := /-- Bundled key gas, room and state conditions -/)
+  (statement := /-- Requires actual string plus field work to fit the unchanged classification base plus K, with exact physical room and endpoint closure. This generic interface stays Open. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeStructObjPhaseReaders.BundledKeyConditions
+
+attribute [blueprint "frontier:bundled-key-hyp"
+  (title := /-- Actual field-aware keys feed the unchanged loop hypothesis -/)
+  (statement := /-- A single credit cell funds the actual key/field sum from the existing classification base plus selected K; no credit is added to member state. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeStructObjPhaseReaders.keyHyp_bundled
+
+attribute [blueprint "frontier:bundled-key-funding"
+  (title := /-- Classification base plus remainder funds actual key work -/)
+  (statement := /-- Natural subtraction defines a nonnegative key remainder. The unchanged cost194 base plus it funds the actual reader and field charge. -/)]
+  WNear.Binary.SerdeKeyReuse.bundledCost_funds_reader_and_field
+
+attribute [blueprint "frontier:bundled-key-compat"
+  (title := /-- Bundled remainder is no larger than the old key charge -/)
+  (statement := /-- The actual field-specific allowance is bounded by the original cost194, so the remaining charge preserves the earlier preciseCost upper bound. -/)]
+  WNear.Binary.SerdeKeyReuse.bundledCost_le_preciseCost
+
+attribute [blueprint "frontier:bundled-key-gas"
+  (title := /-- Remaining bundled prefix key allowance -/)
+  (statement := /-- Only actual string plus field work versus the unchanged base plus K is required. The exact selected-cost instance is checked below; the general interface stays Open. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.BundledKeyGasCharges
+
+attribute [blueprint "frontier:bundled-bound-key"
+  (title := /-- Exact prefix constructs bundled key physical conditions -/)
+  (statement := /-- Physical room and state transport are constructed from the actual prefix; only the named bundled gas allowance is assumed. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.Bound.bundled_key_conditions
+
+attribute [blueprint "frontier:bundled-selected-key-cost"
+  (title := /-- Selected bundled key charge agrees with every witness -/)
+  (statement := /-- Unique actual key history fixes capacity, free state and decoded field, yielding the exact nonnegative bundled charge. -/)]
+  WNear.Binary.SerdeObjectPrefix.selectedBundledKeyCost_of_witness
+
+attribute [blueprint "frontier:bundled-selected-key-instance"
+  (title := /-- Selected bundled key charge instantiates both saved states -/)
+  (statement := /-- The exact selected remainder and unchanged classification base fund every actual prefix key call. The generic interface remains Open. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.Bound.selected_bundled_key_charges
+
+attribute [blueprint "frontier:value-charge-no-later"
+  (title := /-- Value charge index cannot recur at a later prefix -/)
+  (statement := /-- An actual successful value reaches or passes its charge index, while any caller of that index must precede it. -/)]
+  WNear.Binary.SerdeObjectPrefix.Prefix.value_no_later_start
+
+attribute [blueprint "frontier:value-charge-unique"
+  (title := /-- Value-start index uniquely determines actual caller state -/)
+  (statement := /-- Functional trace ordering fixes the pending key, cursor, retained history and saved flag for successful calls at the same value start. -/)]
+  WNear.Binary.SerdeObjectPrefix.Prefix.value_start_unique
+
+attribute [blueprint "frontier:value-witness-next"
+  (title := /-- Actual account witness extends the prefix -/)
+  (statement := /-- The accepted account model supplies its exact string segment and saved-account transition. -/)]
+  WNear.Binary.SerdeObjectPrefix.ValueWitness.next
+
+attribute [blueprint "frontier:value-witness-history"
+  (title := /-- Account charge witnesses retain one exact history -/)
+  (statement := /-- Actual account models and prefix ordering fix the scratch coordinates at a value charge index. -/)]
+  WNear.Binary.SerdeObjectPrefix.ValueWitness.history_unique
+
+attribute [blueprint "frontier:selected-value-cost"
+  (title := /-- Selected account charge agrees with actual accepted calls -/)
+  (statement := /-- The selected exact account allowance uses the unique retained history and actual account/rest result. This does not fund the whole model budget. -/)]
+  WNear.Binary.SerdeObjectPrefix.selectedValueCost_of_witness
+
+attribute [blueprint "frontier:selected-value-instance"
+  (title := /-- Selected account charge instantiates prefix value gas -/)
+  (statement := /-- Constructs the generic prefix value-gas interface for the selected exact function. The general interface remains Open. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.Bound.selected_value_charges
+
+attribute [blueprint "frontier:ignore-witness-next"
+  (title := /-- Actual ignored witness extends its unknown-key prefix -/)
+  (statement := /-- The actual successful ignored trace supplies its frame segment and preserves the saved account. -/)]
+  WNear.Binary.SerdeObjectPrefix.IgnoreWitness.next
+
+attribute [blueprint "frontier:ignore-witness-history"
+  (title := /-- Ignored charge witnesses retain one exact history -/)
+  (statement := /-- Unknown-field trace models and prefix ordering fix the scratch coordinates at the ignored value start. -/)]
+  WNear.Binary.SerdeObjectPrefix.IgnoreWitness.history_unique
+
+attribute [blueprint "frontier:selected-ignore-cost"
+  (title := /-- Selected ignored charge agrees with actual successful traces -/)
+  (statement := /-- The unique prefix and deterministic ignored trace fix the exact frame/growth allowance. Total original-model funding remains missing. -/)]
+  WNear.Binary.SerdeObjectPrefix.selectedIgnoreCost_of_witness
+
+attribute [blueprint "frontier:selected-ignore-instance"
+  (title := /-- Selected ignored charge instantiates both saved states -/)
+  (statement := /-- Constructs the generic ignored-gas interface from actual retained history and trace, with no new behavioral or room premise. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.Bound.selected_ignore_charges
+
+attribute [blueprint "frontier:fully-selected-receipt"
+  (title := /-- Exact reader charges reach full receipt refinement -/)
+  (statement := /-- All three generic reader-gas premises are instantiated. The full receipt result remains Conditional on the unchanged ProviderModelBudget and protocol/domain premises. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.fully_selected_refines_init
+
+attribute [blueprint "frontier:string-work-tight"
+  (title := /-- Successful string work has a 200-operation base -/)
+  (statement := /-- The same raw successful costRun is bounded by 200+433 consumed-byte work plus 100 per initial accumulator byte and actual retained growth. Old 400-base statements are unchanged. -/)]
+  WNear.Binary.ParseStrSuccess.costRun_growth_tight
+
+attribute [blueprint "frontier:bundled-model-loop"
+  (title := /-- Phase loop uses the actual bundled key reader -/)
+  (statement := /-- Concrete field-aware keys and existing actual account/ignored interfaces feed the unchanged loop and costObj. Named pure conditions remain visible. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeStructObjPhaseReaders.f228_obj_model_closing_bundled
+
+attribute [blueprint "frontier:bundled-full-loop"
+  (title := /-- Full ignored reader composes with bundled keys -/)
+  (statement := /-- Actual key/value/ignored behavior composes at the unchanged recurrence and one gas cell. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeStructObjPhaseReaders.object_loop_v86_closing_bundled
+
+attribute [blueprint "frontier:bundled-actual-loop"
+  (title := /-- Exact prefix builds the actual bundled object loop -/)
+  (statement := /-- Prefix room, state and brace instances feed the full actual reader. Only selected gas and existing physical setup remain. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.object_loop_bundled
+
+attribute [blueprint "frontier:bundled-wrapper"
+  (title := /-- Actual bundled object reaches f78 ownership -/)
+  (statement := /-- Raw scratch initialization and original resource handoff connect bundled parsing to the unchanged wrapper. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.f78_bundled_cost
+
+attribute [blueprint "frontier:bundled-from-trait"
+  (title := /-- Bundled charges survive f66 and scratch cleanup -/)
+  (statement := /-- Checks EOF/whitespace, result moves and actual retained scratch drop with unchanged output ownership. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.f66_bundled
+
+attribute [blueprint "frontier:bundled-from-slice"
+  (title := /-- Bundled parser restores the slice caller -/)
+  (statement := /-- The actual f65 entry composes bundled f66 and restores original frames, static/input resources and observations. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.f65_bundled
+
+attribute [blueprint "frontier:bundled-from-slice-room"
+  (title := /-- Bundled parser supplies balance room -/)
+  (statement := /-- The unchanged owned-account handoff supplies balance execution room and final free bound. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.f65_bundled_room
+
+attribute [blueprint "frontier:bundled-parser-call"
+  (title := /-- Bundled parsing supplies the shared parser contract -/)
+  (statement := /-- Packages the actual parser for the existing balance execution pipeline. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.bundled_parser_contract
+
+attribute [blueprint "frontier:bundled-parser-family"
+  (title := /-- Actual input memory instantiates bundled setup -/)
+  (statement := /-- Permitted input allocation outcomes construct physical setup; reader allowances remain explicit. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.bundled_parser_family
+
+attribute [blueprint "frontier:bundled-deployed-provider"
+  (title := /-- Actual code supplies the bundled provider -/)
+  (statement := /-- Persistent function cells connect the actual parser family to the shared entry pipeline with output F=44. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.bundled_deployed_parser_provider
+
+attribute [blueprint "frontier:bundled-provider-plan"
+  (title := /-- Bundled provider retains the original whole-model budget -/)
+  (statement := /-- The actual provider and same costObj recurrence are coupled to unchanged ProviderModelBudget. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.bundled_provider_plan
+
+attribute [blueprint "frontier:bundled-receipt"
+  (title := /-- Bundled actual parsing reaches full receipt refinement -/)
+  (statement := /-- Retains safety, sufficient-resource Matches/used gas and arbitrary-resource Matches-or-failure rollback/log-prefix. Named gas/model-budget premises remain explicit. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.bundled_refines_init
+
+attribute [blueprint "frontier:fully-bundled-receipt"
+  (title := /-- All exact reader charges reach the original-budget receipt -/)
+  (statement := /-- Instantiates both bundled key states, account gas and both ignored states from their actual unique histories. Only unchanged whole-model funding and protocol/domain premises remain. Total gas is not claimed proved. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.fully_bundled_refines_init
+
+attribute [blueprint "frontier:key-work-tight"
+  (title := /-- Same actual key charge has a 300-operation base -/)
+  (statement := /-- The successful borrowed/copied preciseCost is bounded by 300+433 operations per consumed byte plus actual growth. This improves a bound without altering raw charge or existing statements. -/)]
+  WNear.Binary.SerdeKeyReuse.preciseCost_growth_tight
+
+attribute [blueprint "frontier:bundled-key-work"
+  (title := /-- Bundled key/classification work keeps actual length cost -/)
+  (statement := /-- The unchanged classification base plus net key charge fits 642+433n work for ten-byte keys or 380+433n otherwise, plus actual retained growth. -/)]
+  WNear.Binary.SerdeKeyReuse.bundledCost_growth_tight
+
+attribute [blueprint "frontier:ignored-member-work"
+  (title := /-- Unknown-member regular work fits 486 operations per byte -/)
+  (statement := /-- Key, actual field classification, object control and ignored regular work fit 486 times key/value consumed bytes plus three structural bytes. Actual scratch growth remains separate; global disjoint coverage and total model funding are not claimed. -/)]
+  WNear.Binary.SerdeKeyReuse.ignored_member_regular_budget
+
+attribute [blueprint "frontier:regular-byte-rate"
+  (title := /-- Reviewed operation bound funds the byte rate -/)
+  (statement := /-- 486 regular operations fit the unchanged 400-million-gas argument-byte coefficient under the explicit reviewed op bound 822756. This does not instantiate pinned protocol costs or fund actual growth. -/)]
+  WNear.Binary.SerdeKeyReuse.regular_byte_rate

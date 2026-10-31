@@ -33,6 +33,67 @@ it is false for the reviewed domain; its historical statement is recorded in
 the misstatement log. The historical generic host trap and contradiction lemmas
 remain checked, but witness existence is no longer a frontier obligation.
 
+## Continuation on 2026-10-31: selected readers and actual field costs reach the receipt
+
+The actual f755/f754/f194 key-length mismatch path is now checked at 30/50/80
+regular operations; the preserved legacy f194 allowance is 342. fieldCost uses
+80 when decoded key length differs from ten and the original 342 otherwise,
+with unchanged field result and owned key bytes. Actual f193 and its precise
+string model compose this path. All prior public statements remain unchanged.
+
+bundledCost is the nonnegative remainder of actual precise string work plus
+fieldCost after the unchanged cost194 base. A kernel proof establishes that the
+original base plus this remainder funds both calls; another bounds it by the
+earlier preciseCost. The phase key constructor uses exactly that credit
+comparison, without adding credit to the owned member invariant. The original
+costObj recurrence, gas allowance, environment and observations are preserved.
+
+Actual prefix room, state and closing instances feed this field-aware object
+loop and its f78/f66/f65 wrapper/EOF/whitespace/account-move/scratch-cleanup chain.
+The same actual-code provider and output free bound 44 reach full initialized
+absent-account receipt refinement. BundledKeyConditions and BundledKeyGasCharges
+remain Open generic interfaces with checked concrete prefix constructors.
+
+Value-start uniqueness now fixes the actual pending key, cursor and retained
+history for successful account/ignored calls at a charge index. ValueWitness
+and IgnoreWitness extend their actual Prefix transitions. selectedValueCost
+and selectedIgnoreCost agree with every actual witness and construct the named
+prefix gas interfaces, including both saved-account states for ignored values.
+selectedBundledKeyCost similarly instantiates both actual key states.
+
+The fully selected and fully bundled receipt theorems instantiate all generic
+reader-gas premises. Their exact remaining funding hypothesis is the original
+ProviderModelBudget for those concrete charge functions; pinned protocol and
+reviewed domain/representation premises are unchanged. The receipt results
+remain Conditional. Choosing exact allowances does not prove their total fits
+the model. Generic KeyConditions, ValueConditions, IgnoreHyp and reader-gas
+contracts remain Open even where these scoped instances are connected.
+
+The same successful string costRun has a new 200+433n+100acc bound, replacing
+no old theorem; actual precise keys therefore have a 300+433n bound plus actual
+growth. The fixed classification base plus bundled work fits 642+433n for
+ten-byte decoded keys, or 380+433n otherwise, plus actual retained growth.
+Complete unknown-member regular work (key, field classification, object loop,
+ignored regular work) fits 486 operations per key/value consumed byte plus
+three structural bytes. 486 operations fit the unchanged 400-million-gas byte
+coefficient under the explicit reviewed operation bound 822756.
+
+These are Proven local arithmetic/model bounds. Complete disjoint input
+coverage, retained mixed-growth funding, the one account allocation, fixed
+wrapper/host costs and the full ProviderModelBudget still need composition.
+Growth remains separate; it is not reset or charged as fresh scratch at every
+member. A loose earlier allowance for repeated small escaped unknown keys is
+not an actual Wasm counterexample. No budget, observation, environmental premise
+or admission rule is weakened. Remaining methods/states/inputs and pinned
+protocol obligations remain unresolved.
+
+Strict full audit and fresh dependency/readiness gate passed at
+2026-10-31T13:14:28+00:00 for proof source `12efac417f694e9ee3e134cc4435f769037977655ee289156955568af1a8a13d`. All 98 frontier
+policy tests, Lean style and toolchain checks passed. Every old statement pin
+remains byte-identical, including original parser and loop contracts. The
+exact admission frontier and original gas/observation/domain statements are
+unchanged. Publication requires matching served evidence.
+
 ## Continuation on 2026-10-31: exact prefix reader pipeline and selected key charge
 
 Actual phase-aware f193 keys, f205 account values and f201/full f81 ignored
