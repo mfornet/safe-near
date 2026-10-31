@@ -1,3 +1,4 @@
+import Bridge.Methods.FtBalanceOfUninitialized
 import Bridge.Methods.FtBalanceOfInitialized
 import Bridge.Functions.BalanceOf297PresentFamily
 import Bridge.Functions.SerdeObjectPresentProvider
@@ -1639,14 +1640,14 @@ attribute [blueprint "frontier:balance-absent-parser-plan"
   WNear.ftBalanceOf_absent_parser_plan_obligation
 
 attribute [blueprint "frontier:balance-other-state-accepted"
-  (title := /-- Original complementary accepted-call statement composes all initialized receipts -/)
-  (statement := /-- Exact original statement and environmental/domain/observation premises remain unchanged. Checked state/parse splits directly compose the complete initialized-call receipt through the explicit pinned argument ceiling. Its direct admission is removed; only the precisely named uninitialized accepted-call leaf remains Open. -/)
+  (title := /-- Original complementary accepted-call statement composes both states -/)
+  (statement := /-- Exact original statement and environmental/domain/observation premises are unchanged. Checked state splits compose complete initialized and uninitialized accepted receipts through the explicit pinned argument ceiling. No direct admission remains; this assembly is Conditional through the protocol ceiling. -/)
   (notReady := true)]
   WNear.ftBalanceOf_other_state_accepted_obligation
 
 attribute [blueprint "frontier:balance-other-input-state-safety"
-  (title := /-- Original complementary safety statement composes accepted initialized receipts -/)
-  (statement := /-- Exact original statement remains unchanged. Checked state/accepted-input splits compose complete initialized safety through the explicit pinned argument ceiling. Its direct admission is removed; uninitialized safety and initialized rejected-input safety remain separate precise Open leaves. This assembly remains Conditional. -/)
+  (title := /-- Original complementary safety statement composes accepted behavior in both states -/)
+  (statement := /-- Exact original statement is unchanged. Checked state/accepted-input splits compose complete accepted safety in both states through the pinned argument ceiling. Initialized and uninitialized rejected-input safety remain precise Open leaves; all dependent assemblies stay Conditional. -/)
   (notReady := true)]
   WNear.ftBalanceOf_other_input_state_no_issue_obligation
 
@@ -4189,14 +4190,14 @@ attribute [blueprint "frontier:initialized-accepted-under-limit"
   WNear.Binary.BalanceOf297PresentCall.initialized_accepted_refines_under_limit
 
 attribute [blueprint "frontier:balance-uninitialized-accepted"
-  (title := /-- Uninitialized balance calls: accepted-call receipt frontier -/)
-  (statement := /-- Exact remaining accepted-call obligation restricted to represented uninitialized state, preserving the original runtime/environment, accepted input, model gas, Matches and resource-failure/rollback/log-prefix claims. No initialized state remains in this admission. -/)
+  (title := /-- Original uninitialized accepted receipt composes actual full-domain proof -/)
+  (statement := /-- Exact original statement is unchanged. Actual accepted object/array binary receipts compose through the explicit pinned argument ceiling; no direct admission remains. This wrapper stays Conditional through that protocol obligation. -/)
   (notReady := true)]
   WNear.ftBalanceOf_uninitialized_accepted_obligation
 
 attribute [blueprint "frontier:balance-uninitialized-safety"
-  (title := /-- Uninitialized balance calls: execution-safety frontier -/)
-  (statement := /-- Exact remaining execution-safety obligation restricted to represented uninitialized state. Actual method/runtime/environment premises remain unchanged; accepted initialized safety is constructed separately. -/)
+  (title := /-- Original uninitialized safety composes accepted proof and rejected frontier -/)
+  (statement := /-- Exact original statement is unchanged. Checked accepted/rejected split uses completed actual accepted-call safety through the pinned argument ceiling and a precise uninitialized rejected-input leaf. This assembly stays Conditional. -/)
   (notReady := true)]
   WNear.ftBalanceOf_uninitialized_no_issue_obligation
 
@@ -4205,3 +4206,183 @@ attribute [blueprint "frontier:balance-initialized-rejected-safety"
   (statement := /-- Exact remaining execution-safety obligation for initialized state with no accepted balance-query parse. Original runtime, represented storage, well-formed context and method premises are retained. Accepted initialized calls are excluded precisely. -/)
   (notReady := true)]
   WNear.ftBalanceOf_initialized_rejected_no_issue_obligation
+
+attribute [blueprint "frontier:none-state-read"
+  (title := /-- Absent STATE read preserves arbitrary allocator state -/)
+  (statement := /-- Actual function 219 and storage_read None execute with the current allocator F and live blocks unchanged, zeroing exactly the Option niche. No artificial F=1 or growth-room premise is imposed. -/)
+  (notReady := true)]
+  WNear.Binary.StateReadNoneFree.f219_spec_noneF
+
+attribute [blueprint "frontier:none-state-panic"
+  (title := /-- Actual missing-state read and unwrap compose into a trap -/)
+  (statement := /-- The actual function-297 state segment calls the completed arbitrary-F absent reader and unwrap/default panic, retaining exact host/trie effects and one gas credit. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297NoneCall.state_none_panics
+
+attribute [blueprint "frontier:none-parsed-panic"
+  (title := /-- Parsed account handoff reaches the missing-state panic -/)
+  (statement := /-- The actual successful descriptor handoff frees the input vector, preserves the surviving allocator/account resources and composes the missing-state trap through the remaining binary instructions. -/)]
+  WNear.Binary.BalanceOf297NoneCall.parsed_none_panics
+
+attribute [blueprint "frontier:none-parser-panic"
+  (title := /-- Actual successful parser call reaches the panic suffix -/)
+  (statement := /-- The existing exact ParserCallContract is consumed with its original ownership and gas postcondition. The named generic parser contract remains unresolved until a concrete provider is supplied. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297NoneCall.provider_none_panics
+
+attribute [blueprint "frontier:none-deref-panic"
+  (title := /-- Actual vector dereference supplies parser arguments -/)
+  (statement := /-- The actual dereference and setup feed the uniform parser family before the missing-state trap. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297NoneCall.deref_provider_none_panics
+
+attribute [blueprint "frontier:none-expect-panic"
+  (title := /-- Actual input expect feeds dereference and panic -/)
+  (statement := /-- The nonzero allocated input vector is unpacked by the original expect segment and handed to parser/dereference composition. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297NoneCall.expect_provider_none_panics
+
+attribute [blueprint "frontier:none-input-panic"
+  (title := /-- Actual input read and allocation feed the panic path -/)
+  (statement := /-- The actual input host call, register copy/allocation and heap outcome feed the uniform parser family and unchanged missing-state panic. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297NoneCall.input_provider_none_panics
+
+attribute [blueprint "frontier:none-input-setup"
+  (title := /-- Actual input argument setup composes -/)
+  (statement := /-- Original setup instructions pass the actual option address into the metered input path. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297NoneCall.input_setup_provider_none_panics
+
+attribute [blueprint "frontier:none-body"
+  (title := /-- Whole actual function-297 body reaches the panic -/)
+  (statement := /-- Actual prologue, input, parser, handoff, STATE read and unwrap/default panic compose with one credit cell. Generic deployed parser family remains explicit. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297NoneCall.provider_none_body
+
+attribute [blueprint "frontier:none-body-initial"
+  (title := /-- Initial balance frame and statics construct the actual body -/)
+  (statement := /-- Actual frame297, unchanged heap and statics construct the whole-body panic path. Code resources remain persistent; no linear memory or credits are duplicated. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297NoneCall.provider_none_body_initial_resources
+
+attribute [blueprint "frontier:none-start-resources"
+  (title := /-- Actual instantiated store supplies parser and panic resources -/)
+  (statement := /-- The real initial memory/table/function cells supply parser code context, balance frame/statics and distinct panic statics plus code. Existing strict infrastructure stays checked. -/)]
+  WNear.Binary.InitialState.startRes297NoneProvider
+
+attribute [blueprint "frontier:none-body-adequacy"
+  (title := /-- Whole uninitialized body has checked adequacy -/)
+  (statement := /-- Actual initial store and body composition prove that each finished run traps with exact storage-read/panic host and metered gas cells. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297NoneCall.provider_none_adequate
+
+attribute [blueprint "frontier:none-entry-contract"
+  (title := /-- Uninitialized receipt requires precise initial host premises -/)
+  (statement := /-- Exact input/register bound and absent-state storage/trie/panic premises after input. This generic interface is Open; its well-formed-context constructor is separate. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297NoneCall.NonePre
+
+attribute [blueprint "frontier:none-deployed-provider"
+  (title := /-- Uninitialized receipt requires an actual parser family -/)
+  (statement := /-- Exact existing uniform successful parser family over the deployed code context for every entry host. Generic witness stays Open; concrete full object/array instances discharge it locally. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297NoneCall.NoneDeployedParserProvider
+
+attribute [blueprint "frontier:none-method-run"
+  (title := /-- Entry activation and body compose into MethodPanicsR -/)
+  (statement := /-- The actual eleven-operation activation and whole-body adequacy establish exact method panic, final host and gas postconditions. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297NoneCall.provider_none_runs
+
+attribute [blueprint "frontier:none-body-linear-gas"
+  (title := /-- Missing-state body has a parser-dependent linear bound -/)
+  (statement := /-- Original parser inequality and actual input allocation/operations fund the exact missing-state and UTF-8 panic charges without changing model gas. -/)]
+  WNear.Binary.BalanceOf297NoneCall.none_provider_body_linear_cost
+
+attribute [blueprint "frontier:none-host-gas"
+  (title := /-- Actual missing-state host charges retain trie work -/)
+  (statement := /-- Input/register charges, STATE lookup and the 31-byte UTF-8 panic fit the numeric allowance plus actual read-node work. -/)]
+  WNear.Binary.BalanceOf297NoneCall.none_host_cost_le
+
+attribute [blueprint "frontier:none-model-budget"
+  (title := /-- Missing-state body fits the original model gas -/)
+  (statement := /-- Original domain, cost ceilings and weighted parser inequality cover actual loading, activation and body within unchanged ft_balance_of gas. -/)]
+  WNear.Binary.BalanceOf297NoneCall.none_model_budget_of_parser_linear
+
+attribute [blueprint "frontier:none-entry-instance"
+  (title := /-- Well-formed context constructs missing-state entry premises -/)
+  (statement := /-- Original register limits, canonical/link/storage and recorded/unrecorded proof budgets construct exact entry conditions, preserved by inputHost. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297NoneCall.none_pre_of_ctx
+
+attribute [blueprint "frontier:none-model-agreement"
+  (title := /-- Missing-state panic agrees with the original model -/)
+  (statement := /-- Exact not-initialized panic and empty logs agree with the original model step for the balance query. -/)]
+  WNear.Binary.BalanceOf297NoneCall.none_model_agreement
+
+attribute [blueprint "frontier:none-receipt-provider"
+  (title := /-- Actual missing-state execution composes into the full receipt -/)
+  (statement := /-- The existing panic boundary theorem combines method execution, concrete entry/model agreement and original budget. Only the named deployed parser and exact linear parser inequality remain formal hypotheses. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297NoneCall.provider_none_refines
+
+attribute [blueprint "frontier:none-full-object-receipt"
+  (title := /-- Accepted full-domain uninitialized objects have complete receipts -/)
+  (statement := /-- Actual selected bundled-key/account/weighted-ignored readers construct the deployed provider and full retained-growth funding supplies the parser inequality. Original safety/Matches/gas/rollback/log-prefix clauses hold over 4 MiB including escapes and complete nested ignored values. -/)]
+  WNear.Binary.BalanceOf297NoneCall.full_object_none_refines
+
+attribute [blueprint "frontier:none-receipt-budget"
+  (title := /-- Missing-state receipt consumes its exact model budget -/)
+  (statement := /-- Same complete panic receipt composition with an explicit loading/activation/body inequality for alternate concrete parser routes. No admission or larger replacement budget is introduced. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297NoneCall.provider_none_refines_with_budget
+
+attribute [blueprint "frontier:none-present-family"
+  (title := /-- Stronger registered parser post supplies the existing family -/)
+  (statement := /-- Checked postcondition implication retains exact owned parsed result and weakens seven available growth pages to six. This changes no completed theorem or domain; the stronger actual array provider can be reused. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297NoneCall.present_family_for_none
+
+attribute [blueprint "frontier:none-array-body-gas"
+  (title := /-- Actual array parser funds the missing-state body -/)
+  (statement := /-- Original array parser model/charge bound and input allocation cover the missing-state trap with exact host charges retained. -/)]
+  WNear.Binary.BalanceOf297NoneCall.none_array_body_cost_le
+
+attribute [blueprint "frontier:none-array-model-budget"
+  (title := /-- Actual array panic fits the original model allowance -/)
+  (statement := /-- Original loading/activation/body and panic charges are covered by unchanged ft_balance_of gas for actual borrowed/escaped array models. -/)]
+  WNear.Binary.BalanceOf297NoneCall.none_array_model_budget
+
+attribute [blueprint "frontier:none-full-array-receipt"
+  (title := /-- Accepted full-domain uninitialized arrays have complete receipts -/)
+  (statement := /-- Actual stronger array provider supplies the original exact family; actual array budget funds the original receipt theorem. Borrowed and escaped account strings retain complete safety/gas/Matches/resource-failure clauses. -/)]
+  WNear.Binary.BalanceOf297NoneCall.full_array_none_refines
+
+attribute [blueprint "frontier:none-accepted-array-model"
+  (title := /-- Accepted array decoder supplies exact string and EOF positions -/)
+  (statement := /-- Decoder agreement constructs the raw account string model, closing bracket, suffix and final whitespace/EOF endpoints independently of contract state. -/)]
+  WNear.Binary.BalanceOf297NoneCall.accepted_none_array_model
+
+attribute [blueprint "frontier:none-accepted-receipt"
+  (title := /-- Every accepted uninitialized balance call has full refinement -/)
+  (statement := /-- Exact accepted decoder shape and object/array classification compose completed missing-state receipts across the original 4 MiB domain. No abstract parser, reader, model or gas hypothesis remains. -/)]
+  WNear.Binary.BalanceOf297NoneCall.uninitialized_accepted_refines
+
+attribute [blueprint "frontier:none-accepted-under-limit"
+  (title := /-- Uninitialized accepted receipt keeps explicit protocol ceiling -/)
+  (statement := /-- Context well-formedness and named ArgumentLimitV86 supply the original domain bound. Pinned protocol ceiling remains unresolved until concretely discharged. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297NoneCall.uninitialized_accepted_refines_under_limit
+
+attribute [blueprint "frontier:balance-uninitialized-rejected-safety"
+  (title := /-- Rejected uninitialized balance input: execution-safety frontier -/)
+  (statement := /-- Exact remaining no-execution-issue obligation for represented uninitialized state with no accepted balance parse. Original binary/runtime/context premises are retained; completed accepted receipts are excluded precisely. -/)
+  (notReady := true)]
+  WNear.ftBalanceOf_uninitialized_rejected_no_issue_obligation
+
+attribute [blueprint "frontier:none-model-budget-contract"
+  (title := /-- Generic missing-state provider must fit original model gas -/)
+  (statement := /-- Exact original loading, entry activation and body inequality. This generic interface remains Open; checked weighted-object and array constructors discharge each concrete instance. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297NoneCall.NoneProviderModelBudget

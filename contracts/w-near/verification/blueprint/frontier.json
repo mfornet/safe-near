@@ -3646,10 +3646,10 @@
     {
       "id": "balance-other-state-accepted",
       "declaration": "WNear.ftBalanceOf_other_state_accepted_obligation",
-      "title": "Original complementary accepted-call statement composes all initialized receipts",
+      "title": "Original complementary accepted-call statement composes both states",
       "kind": "theorem",
       "label": "frontier:balance-other-state-accepted",
-      "notes": "Exact original statement and environmental/domain/observation premises remain unchanged. Checked state/parse splits directly compose the complete initialized-call receipt through the explicit pinned argument ceiling. Its direct admission is removed; only the precisely named uninitialized accepted-call leaf remains Open.",
+      "notes": "Exact original statement and environmental/domain/observation premises are unchanged. Checked state splits compose complete initialized and uninitialized accepted receipts through the explicit pinned argument ceiling. No direct admission remains; this assembly is Conditional through the protocol ceiling.",
       "required_proof_dependencies": [
         "initialized-accepted-under-limit",
         "pinned-arguments-limit",
@@ -3660,10 +3660,10 @@
     {
       "id": "balance-other-input-state-safety",
       "declaration": "WNear.ftBalanceOf_other_input_state_no_issue_obligation",
-      "title": "Original complementary safety statement composes accepted initialized receipts",
+      "title": "Original complementary safety statement composes accepted behavior in both states",
       "kind": "theorem",
       "label": "frontier:balance-other-input-state-safety",
-      "notes": "Exact original statement remains unchanged. Checked state/accepted-input splits compose complete initialized safety through the explicit pinned argument ceiling. Its direct admission is removed; uninitialized safety and initialized rejected-input safety remain separate precise Open leaves. This assembly remains Conditional.",
+      "notes": "Exact original statement is unchanged. Checked state/accepted-input splits compose complete accepted safety in both states through the pinned argument ceiling. Initialized and uninitialized rejected-input safety remain precise Open leaves; all dependent assemblies stay Conditional.",
       "required_proof_dependencies": [
         "initialized-accepted-under-limit",
         "pinned-arguments-limit",
@@ -10275,26 +10275,31 @@
     {
       "id": "balance-uninitialized-accepted",
       "declaration": "WNear.ftBalanceOf_uninitialized_accepted_obligation",
-      "title": "Uninitialized balance calls: accepted-call receipt frontier",
-      "kind": "admission",
+      "title": "Original uninitialized accepted receipt composes actual full-domain proof",
+      "kind": "theorem",
       "label": "frontier:balance-uninitialized-accepted",
-      "notes": "Exact remaining accepted-call obligation restricted to represented uninitialized state, preserving the original runtime/environment, accepted input, model gas, Matches and resource-failure/rollback/log-prefix claims. No initialized state remains in this admission.",
+      "notes": "Exact original statement is unchanged. Actual accepted object/array binary receipts compose through the explicit pinned argument ceiling; no direct admission remains. This wrapper stays Conditional through that protocol obligation.",
       "required_type_dependencies": [],
-      "required_proof_dependencies": [],
-      "reviewed_shape_hash": 2583259499,
-      "indirect_admission": true
+      "required_proof_dependencies": [
+        "none-accepted-under-limit",
+        "pinned-arguments-limit"
+      ],
+      "reviewed_shape_hash": 2583259499
     },
     {
       "id": "balance-uninitialized-safety",
       "declaration": "WNear.ftBalanceOf_uninitialized_no_issue_obligation",
-      "title": "Uninitialized balance calls: execution-safety frontier",
-      "kind": "admission",
+      "title": "Original uninitialized safety composes accepted proof and rejected frontier",
+      "kind": "theorem",
       "label": "frontier:balance-uninitialized-safety",
-      "notes": "Exact remaining execution-safety obligation restricted to represented uninitialized state. Actual method/runtime/environment premises remain unchanged; accepted initialized safety is constructed separately.",
+      "notes": "Exact original statement is unchanged. Checked accepted/rejected split uses completed actual accepted-call safety through the pinned argument ceiling and a precise uninitialized rejected-input leaf. This assembly stays Conditional.",
       "required_type_dependencies": [],
-      "required_proof_dependencies": [],
-      "reviewed_shape_hash": 4150731908,
-      "indirect_admission": true
+      "required_proof_dependencies": [
+        "none-accepted-under-limit",
+        "pinned-arguments-limit",
+        "balance-uninitialized-rejected-safety"
+      ],
+      "reviewed_shape_hash": 4150731908
     },
     {
       "id": "balance-initialized-rejected-safety",
@@ -10307,6 +10312,454 @@
       "required_proof_dependencies": [],
       "reviewed_shape_hash": 2954860839,
       "indirect_admission": true
+    },
+    {
+      "id": "none-state-read",
+      "declaration": "WNear.Binary.StateReadNoneFree.f219_spec_noneF",
+      "title": "Absent STATE read preserves arbitrary allocator state",
+      "kind": "theorem",
+      "label": "frontier:none-state-read",
+      "notes": "Actual function 219 and storage_read None execute with the current allocator F and live blocks unchanged, zeroing exactly the Option niche. No artificial F=1 or growth-room premise is imposed.",
+      "required_type_dependencies": [
+        "state-entry-free-bound"
+      ],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 64836654
+    },
+    {
+      "id": "none-state-panic",
+      "declaration": "WNear.Binary.BalanceOf297NoneCall.state_none_panics",
+      "title": "Actual missing-state read and unwrap compose into a trap",
+      "kind": "theorem",
+      "label": "frontier:none-state-panic",
+      "notes": "The actual function-297 state segment calls the completed arbitrary-F absent reader and unwrap/default panic, retaining exact host/trie effects and one gas credit.",
+      "required_type_dependencies": [
+        "state-entry-free-bound"
+      ],
+      "required_proof_dependencies": [
+        "none-state-read"
+      ],
+      "reviewed_shape_hash": 1679299094
+    },
+    {
+      "id": "none-parsed-panic",
+      "declaration": "WNear.Binary.BalanceOf297NoneCall.parsed_none_panics",
+      "title": "Parsed account handoff reaches the missing-state panic",
+      "kind": "theorem",
+      "label": "frontier:none-parsed-panic",
+      "notes": "The actual successful descriptor handoff frees the input vector, preserves the surviving allocator/account resources and composes the missing-state trap through the remaining binary instructions.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "none-state-panic"
+      ],
+      "reviewed_shape_hash": 3635826349
+    },
+    {
+      "id": "none-parser-panic",
+      "declaration": "WNear.Binary.BalanceOf297NoneCall.provider_none_panics",
+      "title": "Actual successful parser call reaches the panic suffix",
+      "kind": "theorem",
+      "label": "frontier:none-parser-panic",
+      "notes": "The existing exact ParserCallContract is consumed with its original ownership and gas postcondition. The named generic parser contract remains unresolved until a concrete provider is supplied.",
+      "required_type_dependencies": [
+        "parser-call-contract"
+      ],
+      "required_proof_dependencies": [
+        "none-parsed-panic"
+      ],
+      "reviewed_shape_hash": 2663690432
+    },
+    {
+      "id": "none-deref-panic",
+      "declaration": "WNear.Binary.BalanceOf297NoneCall.deref_provider_none_panics",
+      "title": "Actual vector dereference supplies parser arguments",
+      "kind": "theorem",
+      "label": "frontier:none-deref-panic",
+      "notes": "The actual dereference and setup feed the uniform parser family before the missing-state trap.",
+      "required_type_dependencies": [
+        "parser-family"
+      ],
+      "required_proof_dependencies": [
+        "none-parser-panic"
+      ],
+      "reviewed_shape_hash": 2551685041
+    },
+    {
+      "id": "none-expect-panic",
+      "declaration": "WNear.Binary.BalanceOf297NoneCall.expect_provider_none_panics",
+      "title": "Actual input expect feeds dereference and panic",
+      "kind": "theorem",
+      "label": "frontier:none-expect-panic",
+      "notes": "The nonzero allocated input vector is unpacked by the original expect segment and handed to parser/dereference composition.",
+      "required_type_dependencies": [
+        "parser-family"
+      ],
+      "required_proof_dependencies": [
+        "none-deref-panic"
+      ],
+      "reviewed_shape_hash": 3309197312
+    },
+    {
+      "id": "none-input-panic",
+      "declaration": "WNear.Binary.BalanceOf297NoneCall.input_provider_none_panics",
+      "title": "Actual input read and allocation feed the panic path",
+      "kind": "theorem",
+      "label": "frontier:none-input-panic",
+      "notes": "The actual input host call, register copy/allocation and heap outcome feed the uniform parser family and unchanged missing-state panic.",
+      "required_type_dependencies": [
+        "input-register-room",
+        "parser-family"
+      ],
+      "required_proof_dependencies": [
+        "none-expect-panic"
+      ],
+      "reviewed_shape_hash": 2865076862
+    },
+    {
+      "id": "none-input-setup",
+      "declaration": "WNear.Binary.BalanceOf297NoneCall.input_setup_provider_none_panics",
+      "title": "Actual input argument setup composes",
+      "kind": "theorem",
+      "label": "frontier:none-input-setup",
+      "notes": "Original setup instructions pass the actual option address into the metered input path.",
+      "required_type_dependencies": [
+        "input-register-room",
+        "parser-family"
+      ],
+      "required_proof_dependencies": [
+        "none-input-panic"
+      ],
+      "reviewed_shape_hash": 3392143943
+    },
+    {
+      "id": "none-body",
+      "declaration": "WNear.Binary.BalanceOf297NoneCall.provider_none_body",
+      "title": "Whole actual function-297 body reaches the panic",
+      "kind": "theorem",
+      "label": "frontier:none-body",
+      "notes": "Actual prologue, input, parser, handoff, STATE read and unwrap/default panic compose with one credit cell. Generic deployed parser family remains explicit.",
+      "required_type_dependencies": [
+        "input-register-room",
+        "parser-family"
+      ],
+      "required_proof_dependencies": [
+        "none-input-setup"
+      ],
+      "reviewed_shape_hash": 708161865
+    },
+    {
+      "id": "none-body-initial",
+      "declaration": "WNear.Binary.BalanceOf297NoneCall.provider_none_body_initial_resources",
+      "title": "Initial balance frame and statics construct the actual body",
+      "kind": "theorem",
+      "label": "frontier:none-body-initial",
+      "notes": "Actual frame297, unchanged heap and statics construct the whole-body panic path. Code resources remain persistent; no linear memory or credits are duplicated.",
+      "required_type_dependencies": [
+        "parser-family"
+      ],
+      "required_proof_dependencies": [
+        "none-body"
+      ],
+      "reviewed_shape_hash": 4216095483
+    },
+    {
+      "id": "none-start-resources",
+      "declaration": "WNear.Binary.InitialState.startRes297NoneProvider",
+      "title": "Actual instantiated store supplies parser and panic resources",
+      "kind": "theorem",
+      "label": "frontier:none-start-resources",
+      "notes": "The real initial memory/table/function cells supply parser code context, balance frame/statics and distinct panic statics plus code. Existing strict infrastructure stays checked.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2995523490
+    },
+    {
+      "id": "none-body-adequacy",
+      "declaration": "WNear.Binary.BalanceOf297NoneCall.provider_none_adequate",
+      "title": "Whole uninitialized body has checked adequacy",
+      "kind": "theorem",
+      "label": "frontier:none-body-adequacy",
+      "notes": "Actual initial store and body composition prove that each finished run traps with exact storage-read/panic host and metered gas cells.",
+      "required_type_dependencies": [
+        "parser-family"
+      ],
+      "required_proof_dependencies": [
+        "none-body-initial",
+        "none-start-resources"
+      ],
+      "reviewed_shape_hash": 583327586
+    },
+    {
+      "id": "none-entry-contract",
+      "declaration": "WNear.Binary.BalanceOf297NoneCall.NonePre",
+      "title": "Uninitialized receipt requires precise initial host premises",
+      "kind": "verification_contract",
+      "label": "frontier:none-entry-contract",
+      "notes": "Exact input/register bound and absent-state storage/trie/panic premises after input. This generic interface is Open; its well-formed-context constructor is separate.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 6276534545190314630
+    },
+    {
+      "id": "none-deployed-provider",
+      "declaration": "WNear.Binary.BalanceOf297NoneCall.NoneDeployedParserProvider",
+      "title": "Uninitialized receipt requires an actual parser family",
+      "kind": "verification_contract",
+      "label": "frontier:none-deployed-provider",
+      "notes": "Exact existing uniform successful parser family over the deployed code context for every entry host. Generic witness stays Open; concrete full object/array instances discharge it locally.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 8288688471183121810
+    },
+    {
+      "id": "none-method-run",
+      "declaration": "WNear.Binary.BalanceOf297NoneCall.provider_none_runs",
+      "title": "Entry activation and body compose into MethodPanicsR",
+      "kind": "theorem",
+      "label": "frontier:none-method-run",
+      "notes": "The actual eleven-operation activation and whole-body adequacy establish exact method panic, final host and gas postconditions.",
+      "required_type_dependencies": [
+        "none-deployed-provider",
+        "none-entry-contract"
+      ],
+      "required_proof_dependencies": [
+        "none-body-adequacy"
+      ],
+      "reviewed_shape_hash": 3344589255
+    },
+    {
+      "id": "none-body-linear-gas",
+      "declaration": "WNear.Binary.BalanceOf297NoneCall.none_provider_body_linear_cost",
+      "title": "Missing-state body has a parser-dependent linear bound",
+      "kind": "theorem",
+      "label": "frontier:none-body-linear-gas",
+      "notes": "Original parser inequality and actual input allocation/operations fund the exact missing-state and UTF-8 panic charges without changing model gas.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2566073487
+    },
+    {
+      "id": "none-host-gas",
+      "declaration": "WNear.Binary.BalanceOf297NoneCall.none_host_cost_le",
+      "title": "Actual missing-state host charges retain trie work",
+      "kind": "theorem",
+      "label": "frontier:none-host-gas",
+      "notes": "Input/register charges, STATE lookup and the 31-byte UTF-8 panic fit the numeric allowance plus actual read-node work.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2116480346
+    },
+    {
+      "id": "none-model-budget",
+      "declaration": "WNear.Binary.BalanceOf297NoneCall.none_model_budget_of_parser_linear",
+      "title": "Missing-state body fits the original model gas",
+      "kind": "theorem",
+      "label": "frontier:none-model-budget",
+      "notes": "Original domain, cost ceilings and weighted parser inequality cover actual loading, activation and body within unchanged ft_balance_of gas.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "none-body-linear-gas",
+        "none-host-gas"
+      ],
+      "reviewed_shape_hash": 1360792254
+    },
+    {
+      "id": "none-entry-instance",
+      "declaration": "WNear.Binary.BalanceOf297NoneCall.none_pre_of_ctx",
+      "title": "Well-formed context constructs missing-state entry premises",
+      "kind": "theorem",
+      "label": "frontier:none-entry-instance",
+      "notes": "Original register limits, canonical/link/storage and recorded/unrecorded proof budgets construct exact entry conditions, preserved by inputHost.",
+      "required_type_dependencies": [
+        "none-entry-contract"
+      ],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 380686960
+    },
+    {
+      "id": "none-model-agreement",
+      "declaration": "WNear.Binary.BalanceOf297NoneCall.none_model_agreement",
+      "title": "Missing-state panic agrees with the original model",
+      "kind": "theorem",
+      "label": "frontier:none-model-agreement",
+      "notes": "Exact not-initialized panic and empty logs agree with the original model step for the balance query.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2905492915
+    },
+    {
+      "id": "none-receipt-provider",
+      "declaration": "WNear.Binary.BalanceOf297NoneCall.provider_none_refines",
+      "title": "Actual missing-state execution composes into the full receipt",
+      "kind": "theorem",
+      "label": "frontier:none-receipt-provider",
+      "notes": "The existing panic boundary theorem combines method execution, concrete entry/model agreement and original budget. Only the named deployed parser and exact linear parser inequality remain formal hypotheses.",
+      "required_type_dependencies": [
+        "none-deployed-provider"
+      ],
+      "required_proof_dependencies": [
+        "none-method-run",
+        "none-entry-instance",
+        "none-model-agreement",
+        "none-model-budget"
+      ],
+      "reviewed_shape_hash": 3873375089
+    },
+    {
+      "id": "none-full-object-receipt",
+      "declaration": "WNear.Binary.BalanceOf297NoneCall.full_object_none_refines",
+      "title": "Accepted full-domain uninitialized objects have complete receipts",
+      "kind": "theorem",
+      "label": "frontier:none-full-object-receipt",
+      "notes": "Actual selected bundled-key/account/weighted-ignored readers construct the deployed provider and full retained-growth funding supplies the parser inequality. Original safety/Matches/gas/rollback/log-prefix clauses hold over 4 MiB including escapes and complete nested ignored values.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "none-receipt-provider",
+        "full-weighted-parser-budget",
+        "bundled-selected-key-instance",
+        "weighted-selected-instance",
+        "selected-value-instance"
+      ],
+      "reviewed_shape_hash": 449095469
+    },
+    {
+      "id": "none-receipt-budget",
+      "declaration": "WNear.Binary.BalanceOf297NoneCall.provider_none_refines_with_budget",
+      "title": "Missing-state receipt consumes its exact model budget",
+      "kind": "theorem",
+      "label": "frontier:none-receipt-budget",
+      "notes": "Same complete panic receipt composition with an explicit loading/activation/body inequality for alternate concrete parser routes. No admission or larger replacement budget is introduced.",
+      "required_type_dependencies": [
+        "none-deployed-provider",
+        "none-model-budget-contract"
+      ],
+      "required_proof_dependencies": [
+        "none-method-run",
+        "none-entry-instance",
+        "none-model-agreement"
+      ],
+      "reviewed_shape_hash": 1048750497
+    },
+    {
+      "id": "none-present-family",
+      "declaration": "WNear.Binary.BalanceOf297NoneCall.present_family_for_none",
+      "title": "Stronger registered parser post supplies the existing family",
+      "kind": "theorem",
+      "label": "frontier:none-present-family",
+      "notes": "Checked postcondition implication retains exact owned parsed result and weakens seven available growth pages to six. This changes no completed theorem or domain; the stronger actual array provider can be reused.",
+      "required_type_dependencies": [
+        "parser-family",
+        "present-parser-family"
+      ],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2170805012
+    },
+    {
+      "id": "none-array-body-gas",
+      "declaration": "WNear.Binary.BalanceOf297NoneCall.none_array_body_cost_le",
+      "title": "Actual array parser funds the missing-state body",
+      "kind": "theorem",
+      "label": "frontier:none-array-body-gas",
+      "notes": "Original array parser model/charge bound and input allocation cover the missing-state trap with exact host charges retained.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1566037183
+    },
+    {
+      "id": "none-array-model-budget",
+      "declaration": "WNear.Binary.BalanceOf297NoneCall.none_array_model_budget",
+      "title": "Actual array panic fits the original model allowance",
+      "kind": "theorem",
+      "label": "frontier:none-array-model-budget",
+      "notes": "Original loading/activation/body and panic charges are covered by unchanged ft_balance_of gas for actual borrowed/escaped array models.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "none-array-body-gas",
+        "none-host-gas"
+      ],
+      "reviewed_shape_hash": 268801121
+    },
+    {
+      "id": "none-full-array-receipt",
+      "declaration": "WNear.Binary.BalanceOf297NoneCall.full_array_none_refines",
+      "title": "Accepted full-domain uninitialized arrays have complete receipts",
+      "kind": "theorem",
+      "label": "frontier:none-full-array-receipt",
+      "notes": "Actual stronger array provider supplies the original exact family; actual array budget funds the original receipt theorem. Borrowed and escaped account strings retain complete safety/gas/Matches/resource-failure clauses.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "none-receipt-budget",
+        "none-present-family",
+        "none-array-model-budget",
+        "present-array-deployed-provider"
+      ],
+      "reviewed_shape_hash": 3827129879
+    },
+    {
+      "id": "none-accepted-array-model",
+      "declaration": "WNear.Binary.BalanceOf297NoneCall.accepted_none_array_model",
+      "title": "Accepted array decoder supplies exact string and EOF positions",
+      "kind": "theorem",
+      "label": "frontier:none-accepted-array-model",
+      "notes": "Decoder agreement constructs the raw account string model, closing bracket, suffix and final whitespace/EOF endpoints independently of contract state.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3795957746
+    },
+    {
+      "id": "none-accepted-receipt",
+      "declaration": "WNear.Binary.BalanceOf297NoneCall.uninitialized_accepted_refines",
+      "title": "Every accepted uninitialized balance call has full refinement",
+      "kind": "theorem",
+      "label": "frontier:none-accepted-receipt",
+      "notes": "Exact accepted decoder shape and object/array classification compose completed missing-state receipts across the original 4 MiB domain. No abstract parser, reader, model or gas hypothesis remains.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "none-full-object-receipt",
+        "none-full-array-receipt",
+        "none-accepted-array-model",
+        "accepted-object-model"
+      ],
+      "reviewed_shape_hash": 784738906
+    },
+    {
+      "id": "none-accepted-under-limit",
+      "declaration": "WNear.Binary.BalanceOf297NoneCall.uninitialized_accepted_refines_under_limit",
+      "title": "Uninitialized accepted receipt keeps explicit protocol ceiling",
+      "kind": "theorem",
+      "label": "frontier:none-accepted-under-limit",
+      "notes": "Context well-formedness and named ArgumentLimitV86 supply the original domain bound. Pinned protocol ceiling remains unresolved until concretely discharged.",
+      "required_type_dependencies": [
+        "argument-limit-v86"
+      ],
+      "required_proof_dependencies": [
+        "none-accepted-receipt",
+        "receipt-small-arguments"
+      ],
+      "reviewed_shape_hash": 179433977
+    },
+    {
+      "id": "balance-uninitialized-rejected-safety",
+      "declaration": "WNear.ftBalanceOf_uninitialized_rejected_no_issue_obligation",
+      "title": "Rejected uninitialized balance input: execution-safety frontier",
+      "kind": "admission",
+      "label": "frontier:balance-uninitialized-rejected-safety",
+      "notes": "Exact remaining no-execution-issue obligation for represented uninitialized state with no accepted balance parse. Original binary/runtime/context premises are retained; completed accepted receipts are excluded precisely.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2663222250,
+      "indirect_admission": true
+    },
+    {
+      "id": "none-model-budget-contract",
+      "declaration": "WNear.Binary.BalanceOf297NoneCall.NoneProviderModelBudget",
+      "title": "Generic missing-state provider must fit original model gas",
+      "kind": "verification_contract",
+      "label": "frontier:none-model-budget-contract",
+      "notes": "Exact original loading, entry activation and body inequality. This generic interface remains Open; checked weighted-object and array constructors discharge each concrete instance.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 16093302341597834088
     }
   ],
   "reviewed_environment": [
@@ -10333,9 +10786,8 @@
     "WNear.storageBalanceOf_obligation",
     "WNear.ftBalanceOf_rejected_obligation",
     "WNear.pinned_arguments_obligation",
-    "WNear.ftBalanceOf_uninitialized_accepted_obligation",
-    "WNear.ftBalanceOf_uninitialized_no_issue_obligation",
-    "WNear.ftBalanceOf_initialized_rejected_no_issue_obligation"
+    "WNear.ftBalanceOf_initialized_rejected_no_issue_obligation",
+    "WNear.ftBalanceOf_uninitialized_rejected_no_issue_obligation"
   ],
   "expected_incomplete": [
     "WNear.refines_wnear",
@@ -10372,6 +10824,7 @@
     "WNear.ftBalanceOf_absent_parser_complement_obligation",
     "WNear.ftBalanceOf_uninitialized_accepted_obligation",
     "WNear.ftBalanceOf_uninitialized_no_issue_obligation",
-    "WNear.ftBalanceOf_initialized_rejected_no_issue_obligation"
+    "WNear.ftBalanceOf_initialized_rejected_no_issue_obligation",
+    "WNear.ftBalanceOf_uninitialized_rejected_no_issue_obligation"
   ]
 }

@@ -19,7 +19,7 @@ class FrontierPolicyTests(unittest.TestCase):
             admission = n['kind'] == 'admission'
             self.rows.append({'declaration': n['declaration'], 'is_theorem': n['kind'] != 'verification_contract',
                               'direct_sorry': admission, 'shape_hash': n['reviewed_shape_hash'], 'blueprint_label': n['label'],
-                              'not_ready': n['kind'] in ['verification_contract', 'admission'] or any(self.nodes[d]['kind'] == 'verification_contract' for d in n.get('required_type_dependencies', [])) or n['id'] in ['balance-other-state-accepted', 'balance-other-input-state-safety', 'balance-absent-parser-complement', 'global', 'balance-outside-array-object-accepted', 'balance-outside-array-object-no-issue', 'balance-outside-array-accepted', 'balance-outside-array-no-issue', 'balance-other-accepted', 'balance-other-no-issue', 'balance-no-issue', 'balance-accepted', 'exported', 'dispatch', 'exported-clauses-assembly', 'global-composition', 'global-with-obligations', 'short-string-room', 'model-short-string-room', 'initial-memory-parser-room', 'initial-combined-parser-room', 'object-parser', 'array-parser', 'ignored-opening', 'storage', 'lookup-raw-absent', 'lookup-absent', 'balance-lookup-absent', 'balance-caller-absent', 'balance-export-call-absent', 'balance-export-call-and-copy', 'balance-export-format-zero', 'balance-export-call-copy-format', 'balance-export-through-expect', 'balance-export-through-return', 'balance-export-through-cleanup', 'balance-export-parsed-suffix', 'balance-export-state-read', 'balance-export-state-through-cleanup', 'balance-second-read-from-budget', 'balance-export-state-budget', 'balance-export-state-exact-gas', 'balance-room-after-state', 'balance-export-state-six-grows', 'borsh-vec-free-bound', 'borsh-bytes-reader-free-bound', 'borsh-bytes-free-bound', 'borsh-ft-free-bound', 'borsh-contract-reader-free-bound', 'borsh-contract-free-bound', 'state-read-free-bound', 'state-read-model-free-bound', 'balance-state-read-free-bound', 'balance-state-cleanup-free-bound', 'balance-next-budget-free-bound', 'balance-state-budget-free-bound', 'balance-state-exact-gas-free-bound', 'balance-state-six-grows-free-bound', 'parser-owned-resources', 'balance-parser-through-cleanup', 'parser-expose-heap', 'parser-fixed-resources', 'parser-fixed-through-cleanup', 'parser-public-through-cleanup', 'array-parser-copied-core', 'copied-parser-room', 'copied-parser-with-room', 'balance-copied-parser-through-cleanup', 'balance-input-deref-through-cleanup', 'balance-input-expect-through-cleanup', 'balance-input-through-cleanup', 'balance-input-setup-through-cleanup', 'balance-copied-absent-body', 'initial-input-copy-room', 'balance-copied-body-initial-room', 'balance-copied-absent-model-composition', 'balance-argument-length', 'balance-copied-body-gas-bound', 'receipt-input-register-bound', 'receipt-input-register-returns', 'no-input-mismatch-witness', 'input-read', 'method-ft_balance_of'], 'axioms': ['sorryAx'] if admission else ['propext'],
+                              'not_ready': n['kind'] in ['verification_contract', 'admission'] or any(self.nodes[d]['kind'] == 'verification_contract' for d in n.get('required_type_dependencies', [])) or n['id'] in ['balance-uninitialized-accepted', 'balance-uninitialized-safety', 'balance-other-state-accepted', 'balance-other-input-state-safety', 'balance-absent-parser-complement', 'global', 'balance-outside-array-object-accepted', 'balance-outside-array-object-no-issue', 'balance-outside-array-accepted', 'balance-outside-array-no-issue', 'balance-other-accepted', 'balance-other-no-issue', 'balance-no-issue', 'balance-accepted', 'exported', 'dispatch', 'exported-clauses-assembly', 'global-composition', 'global-with-obligations', 'short-string-room', 'model-short-string-room', 'initial-memory-parser-room', 'initial-combined-parser-room', 'object-parser', 'array-parser', 'ignored-opening', 'storage', 'lookup-raw-absent', 'lookup-absent', 'balance-lookup-absent', 'balance-caller-absent', 'balance-export-call-absent', 'balance-export-call-and-copy', 'balance-export-format-zero', 'balance-export-call-copy-format', 'balance-export-through-expect', 'balance-export-through-return', 'balance-export-through-cleanup', 'balance-export-parsed-suffix', 'balance-export-state-read', 'balance-export-state-through-cleanup', 'balance-second-read-from-budget', 'balance-export-state-budget', 'balance-export-state-exact-gas', 'balance-room-after-state', 'balance-export-state-six-grows', 'borsh-vec-free-bound', 'borsh-bytes-reader-free-bound', 'borsh-bytes-free-bound', 'borsh-ft-free-bound', 'borsh-contract-reader-free-bound', 'borsh-contract-free-bound', 'state-read-free-bound', 'state-read-model-free-bound', 'balance-state-read-free-bound', 'balance-state-cleanup-free-bound', 'balance-next-budget-free-bound', 'balance-state-budget-free-bound', 'balance-state-exact-gas-free-bound', 'balance-state-six-grows-free-bound', 'parser-owned-resources', 'balance-parser-through-cleanup', 'parser-expose-heap', 'parser-fixed-resources', 'parser-fixed-through-cleanup', 'parser-public-through-cleanup', 'array-parser-copied-core', 'copied-parser-room', 'copied-parser-with-room', 'balance-copied-parser-through-cleanup', 'balance-input-deref-through-cleanup', 'balance-input-expect-through-cleanup', 'balance-input-through-cleanup', 'balance-input-setup-through-cleanup', 'balance-copied-absent-body', 'initial-input-copy-room', 'balance-copied-body-initial-room', 'balance-copied-absent-model-composition', 'balance-argument-length', 'balance-copied-body-gas-bound', 'receipt-input-register-bound', 'receipt-input-register-returns', 'no-input-mismatch-witness', 'input-read', 'method-ft_balance_of'], 'axioms': ['sorryAx'] if admission else ['propext'],
                               'type_dependencies': [], 'proof_dependencies': [], 'statement': 'test', 'type_hash': 1})
         self.by_id = {n['id']: row for n, row in zip(self.manifest['nodes'], self.rows)}
         for n in self.manifest['nodes']:
@@ -41,6 +41,8 @@ class FrontierPolicyTests(unittest.TestCase):
         self.by_id['balance-second-read-exact-gas']['proof_dependencies'] = [self.nodes['balance-next-read-cost-preserved']['declaration']]
         self.by_id['balance-export-state-exact-gas']['proof_dependencies'] = [self.nodes[x]['declaration'] for x in ['balance-export-state-budget', 'balance-second-read-exact-gas']]
         self.by_id['balance-export-state-six-grows']['proof_dependencies'] = [self.nodes[x]['declaration'] for x in ['balance-export-state-exact-gas', 'balance-room-after-state']]
+        self.by_id['balance-uninitialized-accepted']['axioms'].append('sorryAx')
+        self.by_id['balance-uninitialized-safety']['axioms'].append('sorryAx')
         self.by_id['balance-other-state-accepted']['axioms'].append('sorryAx')
         self.by_id['balance-other-input-state-safety']['axioms'].append('sorryAx')
         self.by_id['balance-absent-parser-complement']['axioms'].append('sorryAx')
@@ -804,8 +806,7 @@ class FrontierPolicyTests(unittest.TestCase):
                      'balance-other-input-state-safety', 'present-budget-from-linear', 'present-concrete-object-provider', 'global']:
             self.assertEqual(result[node]['status'], 'Conditional')
             self.assertFalse(result[node]['direct_sorry'])
-        for node in ['balance-uninitialized-accepted', 'balance-uninitialized-safety',
-                     'balance-initialized-rejected-safety', 'pinned-arguments-limit', 'balance-rejected',
+        for node in ['balance-uninitialized-rejected-safety', 'balance-initialized-rejected-safety', 'pinned-arguments-limit', 'balance-rejected',
                      'ignore-hyp', 'key-conditions', 'value-conditions', 'present-model-budget', 'present-deployed-provider']:
             self.assertEqual(result[node]['status'], 'Open')
         for source, caller in [('initialized-accepted-under-limit', 'balance-other-state-accepted'),
@@ -847,13 +848,65 @@ class FrontierPolicyTests(unittest.TestCase):
             blueprint.classify(self.manifest, self.rows, self.audit)
 
     def test_precise_uninitialized_admission_cannot_be_presented_as_complete(self):
-        self.nodes['balance-uninitialized-accepted']['kind'] = 'theorem'
-        self.by_id['balance-uninitialized-accepted']['direct_sorry'] = False
+        self.nodes['balance-uninitialized-rejected-safety']['kind'] = 'theorem'
+        self.by_id['balance-uninitialized-rejected-safety']['direct_sorry'] = False
         with self.assertRaisesRegex(ValueError, 'Admission frontier changed'):
             blueprint.classify(self.manifest, self.rows, self.audit)
 
     def test_actual_registered_provider_keeps_selected_weighted_reader_instance(self):
         self.by_id['present-concrete-object-provider']['proof_dependencies'].remove(self.nodes['weighted-selected-instance']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_uninitialized_accepted_receipts_keep_rejected_and_protocol_frontier(self):
+        result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
+        for node in ['none-full-object-receipt', 'none-full-array-receipt', 'none-accepted-receipt', 'none-accepted-array-model']:
+            self.assertEqual(result[node]['status'], 'Proven')
+            self.assertFalse(result[node]['direct_sorry'])
+        for node in ['none-accepted-under-limit', 'balance-uninitialized-accepted', 'balance-uninitialized-safety', 'global']:
+            self.assertEqual(result[node]['status'], 'Conditional')
+            self.assertFalse(result[node]['direct_sorry'])
+        for node in ['balance-uninitialized-rejected-safety', 'balance-initialized-rejected-safety', 'pinned-arguments-limit',
+                     'none-deployed-provider', 'none-entry-contract', 'none-model-budget-contract', 'ignore-hyp', 'key-conditions', 'value-conditions']:
+            self.assertEqual(result[node]['status'], 'Open')
+        for source, caller in [('none-accepted-under-limit', 'balance-uninitialized-accepted'),
+                               ('none-accepted-under-limit', 'balance-uninitialized-safety'),
+                               ('pinned-arguments-limit', 'balance-uninitialized-accepted'),
+                               ('balance-uninitialized-rejected-safety', 'balance-uninitialized-safety')]:
+            self.assertIn({'id': caller, 'status': 'Conditional'}, result[source]['integrated_into'])
+
+    def test_uninitialized_original_receipt_cannot_skip_complete_binary_receipt(self):
+        self.by_id['balance-uninitialized-accepted']['proof_dependencies'].remove(self.nodes['none-accepted-under-limit']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_uninitialized_original_safety_cannot_skip_rejected_input_frontier(self):
+        self.by_id['balance-uninitialized-safety']['proof_dependencies'].remove(self.nodes['balance-uninitialized-rejected-safety']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_uninitialized_original_receipt_keeps_protocol_ceiling(self):
+        self.by_id['balance-uninitialized-accepted']['proof_dependencies'].remove(self.nodes['pinned-arguments-limit']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_uninitialized_object_receipt_keeps_actual_selected_readers(self):
+        self.by_id['none-full-object-receipt']['proof_dependencies'].remove(self.nodes['weighted-selected-instance']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_uninitialized_array_receipt_keeps_original_model_budget(self):
+        self.by_id['none-full-array-receipt']['proof_dependencies'].remove(self.nodes['none-array-model-budget']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_uninitialized_array_receipt_keeps_checked_owned_post_implication(self):
+        self.by_id['none-full-array-receipt']['proof_dependencies'].remove(self.nodes['none-present-family']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_uninitialized_classification_keeps_both_complete_receipts(self):
+        self.by_id['none-accepted-receipt']['proof_dependencies'].remove(self.nodes['none-full-array-receipt']['declaration'])
         with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
             blueprint.classify(self.manifest, self.rows, self.audit)
 

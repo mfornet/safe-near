@@ -33,6 +33,35 @@ it is false for the reviewed domain; its historical statement is recorded in
 the misstatement log. The historical generic host trap and contradiction lemmas
 remain checked, but witness existence is no longer a frontier obligation.
 
+## Continuation on 2026-10-31: all uninitialized accepted balance calls compose
+
+Every accepted uninitialized ft_balance_of call now has complete checked deployed
+receipt refinement across the original 4 MiB domain. Actual input allocation,
+parser execution, input freeing and arbitrary-F STATE read lead to the exact
+not-initialized panic. Whole-body adequacy and the actual entry activation give
+MethodPanicsR, exact final host cells and gas. Actual weighted object readers and
+both borrowed/escaped array models instantiate the parser family, and loading,
+activation, input allocation and UTF-8 panic fit the unchanged original model gas.
+Decoder agreement supplies all exact parser models and EOF endpoints.
+
+The original uninitialized accepted receipt is now checked composition through
+the still-unresolved pinned argument ceiling. Original uninitialized safety splits
+accepted calls from a precise rejected-input safety leaf. Two direct admissions
+are replaced by one precise rejected-input admission, while every old transitive
+incomplete result remains visibly Conditional. Generic parser and entry contracts
+remain Open; concrete full receipts have no abstract parser/reader/gas/model
+premise. Original statements, domain, binary, observations and strict audit policy
+are unchanged. All initialized and uninitialized accepted behavior is now composed;
+rejected input, other methods and pinned protocol premises remain unfinished.
+
+Strict full audit and fresh dependency/readiness gate passed at
+2026-10-31T18:09:17+00:00 for proof source `4b413ee1932fc5131bf0d1c280931857ceb1e72c78cbabb20dc0a7f5c0ae545a`. All 144 frontier
+policy tests, Lean style and toolchain checks passed. Every old statement pin
+remains byte-identical. Two uninitialized direct admissions are replaced by the precisely named uninitialized
+rejected-input safety leaf. Every old transitive incomplete result remains visibly Conditional;
+new leaves are added exactly, and the strict module allowance stays unchanged. Live publication must match
+this source and evidence.
+
 ## Continuation on 2026-10-31: all initialized accepted balance calls compose globally
 
 Every accepted initialized ft_balance_of call now has complete checked deployed
