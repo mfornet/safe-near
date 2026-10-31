@@ -1,3 +1,4 @@
+import Bridge.Functions.SerdeObjectLedgerProvider
 import Bridge.Functions.SerdeObjectLedgerComposition
 import Bridge.Functions.SerdeObjectCostComposition
 import Bridge.Functions.SerdeObjectKeyCoverage
@@ -2287,3 +2288,99 @@ attribute [blueprint "frontier:object-ledger-initial-reader"
   (statement := /-- Composes raw member initialization with the actual object reader, retaining its equal key/residual budget and postcondition. Initial pipeline setup, remaining room/gas and the complete parser budget remain unresolved. -/)
   (notReady := true)]
   WNear.Binary.SerdeObjectMixedTrace.object_loop_ledger_initial
+
+attribute [blueprint "frontier:ledger-wrapper-generic"
+  (title := /-- Actual object wrapper preserves any checked callee -/)
+  (statement := /-- Proves the decoded f78 wrapper with one gas-credit cell and an explicit call-depth bound. The generic callee is an owned checked specification, not an admission. -/)]
+  WNear.Binary.SerdeObjectMixedTrace.f78_of_object_spec
+
+attribute [blueprint "frontier:ledger-key-wrapper"
+  (title := /-- Ledger key/residual reader reaches f78 -/)
+  (statement := /-- Composes the published raw-resource f228 contract through the actual f78 call, preserving the exact key/residual allowance and all named unresolved setup/room/gas contracts. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.f78_ledger_initial
+
+attribute [blueprint "frontier:ledger-cost-wrapper"
+  (title := /-- Ledger object reader with original cost recurrence -/)
+  (statement := /-- Builds the same concrete ledger reader and raw initializer through f78 at the unchanged object-cost recurrence. Uses checked closing/key/value/ignore instances; all setup/room/gas obligations remain explicit. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.f78_ledger_initial_cost
+
+attribute [blueprint "frontier:ledger-scratch-cleanup"
+  (title := /-- Actual cleanup frees empty or retained scratch -/)
+  (statement := /-- The actual f68 drop handles capacity zero and nonzero uniformly within 315 regular-operation gas, preserves the exact original live list and returns a free-list bound F+1. No assumption that successful scratch capacity is zero. -/)]
+  WNear.Binary.SerdeObjectMixedTrace.f68_retained_scratch
+
+attribute [blueprint "frontier:ledger-final-bounds"
+  (title := /-- Ledger bounds survive the complete object -/)
+  (statement := /-- Successful retained segments bound total heap growth by 18,230,154 bytes and the free-list bound by baseF+42, independently of a per-member scratch reset. -/)]
+  WNear.Binary.SerdeObjectMixedTrace.Ledger.final_bounds
+
+attribute [blueprint "frontier:ledger-from-trait"
+  (title := /-- General object parser reaches actual f66 cleanup -/)
+  (statement := /-- Checked f66 execution includes initial deserializer resources, f78, trailing EOF/whitespace, output moves and actual retained scratch cleanup. It returns only the account allocation; room/gas and setup instances remain explicit. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.f66_ledger_object
+
+attribute [blueprint "frontier:ledger-from-slice"
+  (title := /-- General object slice entry reaches cleanup -/)
+  (statement := /-- Actual f65 composes f66, restores the 448-byte caller stack, and preserves input/static resources. It does not discharge reader charges or original model gas. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.f65_ledger_object
+
+attribute [blueprint "frontier:ledger-result-room"
+  (title := /-- Ledger account result supplies balance execution room -/)
+  (statement := /-- Actual owned heap alignment/positivity and the ledger ceiling yield six pages of balance execution room. The generic LedgerSetup and fixed-result interface remain explicit in this constructor. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.ledger_result_room
+
+attribute [blueprint "frontier:ledger-from-slice-room"
+  (title := /-- Slice parser returns the exact balance handoff -/)
+  (statement := /-- Composes f65 with six-page result room and a uniform baseF+43 free-list bound after the actual scratch drop. All original reader/setup contracts remain visible. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.f65_ledger_room
+
+attribute [blueprint "frontier:ledger-parser-call"
+  (title := /-- General object supplies the shared parser-call contract -/)
+  (statement := /-- Packages the actual slice parser and retained resources into the existing ParserCallContract used by the full balance pipeline. Its named verification contracts are not discharged by this packaging. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.ledger_parser_contract
+
+attribute [blueprint "frontier:ledger-container-code"
+  (title := /-- Full container code comes from the instantiated store -/)
+  (statement := /-- Constructs all ignored-container, reserve, reallocation and escape function-cell resources directly from actual codeCtx. The projection uses kernel checked binary function cells. -/)]
+  WNear.Binary.SerdeObjectMixedTrace.ignored_member_code_of_context
+
+attribute [blueprint "frontier:ledger-parser-code"
+  (title := /-- General parser code comes from the instantiated store -/)
+  (statement := /-- Combines the reviewed existing parser code projection with the full container code projection; no function-code premise is assumed externally. -/)]
+  WNear.Binary.SerdeObjectMixedTrace.ledger_parser_code_of_context
+
+attribute [blueprint "frontier:ledger-input-bounds"
+  (title := /-- Actual input allocation establishes ledger setup bounds -/)
+  (statement := /-- For inputs at most 4 MiB, initial memory or the real input allocation requests at most 65 pages and establishes the ledger heap ceiling. A positive initial free bound supplies the remaining setup conjunct; the deployed provider instantiates F=1. No environment/model premise is strengthened. -/)]
+  WNear.Binary.SerdeObjectMixedTrace.input_ledger_bounds
+
+attribute [blueprint "frontier:ledger-parser-family"
+  (title := /-- General parser family instantiates initial ledger setup -/)
+  (statement := /-- All real input allocation outcomes instantiate LedgerSetup numerically from the input bound. The returned shared family remains Conditional on named key/value room/gas and ignored gas contracts for those heap instances. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.ledger_parser_family
+
+attribute [blueprint "frontier:ledger-deployed-provider"
+  (title := /-- General parser supplies the actual-code deployed provider -/)
+  (statement := /-- Transports the full object family from actual codeCtx for every entry host state. Instantiates initial F=1 and output F=44; reader room/gas remains Open. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.ledger_deployed_parser_provider
+
+attribute [blueprint "frontier:ledger-provider-plan"
+  (title := /-- General object couples execution and original model budget -/)
+  (statement := /-- The selected K functions determine both actual parser execution and the same ProviderModelBudget witness. No new budget or weaker observation is substituted. All charge contracts and whole-method budget remain explicit. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.ledger_provider_plan
+
+attribute [blueprint "frontier:ledger-receipt"
+  (title := /-- General object reaches checked full receipt refinement -/)
+  (statement := /-- Composes the concrete object provider plan through the existing initialized absent-account receipt theorem: safety, sufficient-resource Matches/used gas, arbitrary-resource Matches or rollback/log-prefix resource failure. It remains Conditional on named reader charges, unchanged ProviderModelBudget and reviewed protocol/environment premises. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.ledger_refines_init

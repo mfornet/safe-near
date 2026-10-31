@@ -611,6 +611,27 @@
     "WNear.Binary.SerdeObjectMixedTrace.ValueSegment.account",
     "WNear.Binary.SerdeObjectMixedTrace.ValueSegment.ignored",
     "WNear.Binary.SerdeObjectMixedTrace.CallTrace.done",
-    "WNear.Binary.SerdeObjectMixedTrace.CallTrace.member"
+    "WNear.Binary.SerdeObjectMixedTrace.CallTrace.member",
+    "WNear.Binary.SerdeObjectMixedTrace.f78_of_object_spec",
+    "WNear.Binary.SerdeObjectMixedTrace.f78_ledger_initial",
+    "WNear.Binary.SerdeObjectMixedTrace.f78_ledger_initial_cost",
+    "WNear.Binary.SerdeObjectMixedTrace.f68_retained_scratch",
+    "WNear.Binary.SerdeObjectMixedTrace.Ledger.final_bounds",
+    "WNear.Binary.SerdeObjectMixedTrace.cleanLedgerObject",
+    "WNear.Binary.SerdeObjectMixedTrace.f66_ledger_object",
+    "WNear.Binary.SerdeObjectMixedTrace.f65_ledger_object",
+    "WNear.Binary.SerdeObjectMixedTrace.ledger_result_room",
+    "WNear.Binary.SerdeObjectMixedTrace.f65_ledger_room",
+    "WNear.Binary.SerdeObjectMixedTrace.ledgerParserCode",
+    "WNear.Binary.SerdeObjectMixedTrace.ledgerParserStatics",
+    "WNear.Binary.SerdeObjectMixedTrace.ledgerParserCost",
+    "WNear.Binary.SerdeObjectMixedTrace.ledger_parser_contract",
+    "WNear.Binary.SerdeObjectMixedTrace.ignored_member_code_of_context",
+    "WNear.Binary.SerdeObjectMixedTrace.ledger_parser_code_of_context",
+    "WNear.Binary.SerdeObjectMixedTrace.input_ledger_bounds",
+    "WNear.Binary.SerdeObjectMixedTrace.ledger_parser_family",
+    "WNear.Binary.SerdeObjectMixedTrace.ledger_deployed_parser_provider",
+    "WNear.Binary.SerdeObjectMixedTrace.ledger_provider_plan",
+    "WNear.Binary.SerdeObjectMixedTrace.ledger_refines_init"
   ]
 }

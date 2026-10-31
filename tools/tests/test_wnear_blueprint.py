@@ -317,6 +317,43 @@ class FrontierPolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Expected verification hypotheses missing'):
             blueprint.classify(self.manifest, self.rows, self.audit)
 
+    def test_general_ledger_reaches_actual_receipt_but_keeps_budget_open(self):
+        result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
+        for node in ['ledger-wrapper-generic', 'ledger-scratch-cleanup', 'ledger-final-bounds',
+                     'ledger-container-code', 'ledger-parser-code', 'ledger-input-bounds']:
+            self.assertEqual(result[node]['status'], 'Proven')
+        for node in ['ledger-key-wrapper', 'ledger-cost-wrapper', 'ledger-from-trait',
+                     'ledger-from-slice', 'ledger-result-room', 'ledger-from-slice-room',
+                     'ledger-parser-call', 'ledger-parser-family', 'ledger-deployed-provider',
+                     'ledger-provider-plan', 'ledger-receipt']:
+            self.assertEqual(result[node]['status'], 'Conditional')
+            self.assertFalse(result[node]['direct_sorry'])
+        for node in ['object-key-room-charges', 'object-value-room-charges', 'object-ignore-charges',
+                     'provider-model-budget', 'ignore-hyp', 'key-conditions', 'value-conditions']:
+            self.assertEqual(result[node]['status'], 'Open')
+        for source in ['ledger-provider-plan', 'provider-plan-receipt-initial']:
+            self.assertIn({'id': 'ledger-receipt', 'status': 'Conditional'}, result[source]['integrated_into'])
+
+    def test_general_ledger_receipt_cannot_hide_original_model_budget(self):
+        self.by_id['ledger-receipt']['type_dependencies'].remove(self.nodes['provider-model-budget']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Expected verification hypotheses missing'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_general_ledger_caller_cannot_skip_actual_scratch_cleanup(self):
+        self.by_id['ledger-from-trait']['proof_dependencies'].remove(self.nodes['ledger-scratch-cleanup']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_general_ledger_family_cannot_assume_initial_setup(self):
+        self.by_id['ledger-parser-family']['proof_dependencies'].remove(self.nodes['ledger-input-bounds']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_general_ledger_provider_cannot_assume_function_code(self):
+        self.by_id['ledger-deployed-provider']['proof_dependencies'].remove(self.nodes['ledger-parser-code']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
     def test_actual_code_provider_reaches_global_assemblies_without_closing_the_plan(self):
         result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
         for node in ['deployed-parser-provider', 'provider-model-budget', 'absent-parser-plan',

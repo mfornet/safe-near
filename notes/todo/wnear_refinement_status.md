@@ -33,6 +33,59 @@ it is false for the reviewed domain; its historical statement is recorded in
 the misstatement log. The historical generic host trap and contradiction lemmas
 remain checked, but witness existence is no longer a frontier obligation.
 
+## Continuation on 2026-10-31: general object ledger reaches the actual receipt pipeline
+
+The ledger object contract now composes through actual f78, f66 and f65.
+The f78 key/residual interface preserves the published exact split. A second
+f78 interface retains the original object cost recurrence for the full caller.
+f66 initializes the deserializer, executes the concrete ledger reader, checks
+trailing whitespace/EOF, moves the account result and executes the actual f68
+scratch drop. f65 restores the complete 448-byte caller frame. These are checked
+Conditional compositions, not discharged reader-charge or gas-budget instances.
+
+The new uniform scratch-drop theorem handles both capacity zero and retained
+allocated capacity without resetting it or requiring it to be zero. It preserves
+the exact original live list at cost 315 regular operations and free bound F+1.
+The full object ledger bounds its final free parameter by baseF+42. After the
+real drop only the account allocation remains live, at uniform baseF+43. Its
+heap is between the initial heap and initial heap+18,230,154 bytes. Physical
+alignment/positivity from owned heap resources and the ledger ceiling supply six
+pages of room for balance execution. These numeric/resource facts use no new
+verification admission.
+
+The actual initial 1024-page (64 MiB) memory and input-allocation outcomes now
+instantiate the ledger setup bound for every input of at most 4 MiB: the input
+requests at most 65 pages. The deployed provider sets baseF=1 and output F=44.
+This setup instance is checked; generic LedgerSetup remains a visible interface.
+The reviewed incoming argument premise and the still-Open pinned protocol
+ceiling are unchanged.
+
+Full container/reserve/reallocation/escape code is projected from the actual
+instantiated store's persistent function cells. The general object reader now
+supplies the same ParserCallContract and ParserFamily used by the existing full
+balance pipeline, then transports that family over actual codeCtx for every
+entry host state. One selected set of K functions fixes its parser cost before
+the gas ceiling is chosen. A checked plan constructor couples that actual cost
+and output free bound to the unchanged ProviderModelBudget witness. The new
+full initialized/unregistered-account receipt theorem composes that plan through
+the existing safety, sufficient-resource Matches/used-gas and arbitrary-resource
+Matches-or-resource-failure rollback/log-prefix proof.
+
+This receipt theorem remains Conditional on named KeyRoomCharges,
+ValueRoomCharges and IgnoreCharges for the real input heaps, and on the exact
+ProviderModelBudget for those same costs. No model budget, environmental domain,
+observation or admission policy is weakened. It does not establish all general
+objects within the original gas allowance, other balance input/state cases,
+remaining methods or pinned protocol obligations. The next frontier is concrete
+successful string/allocation room and the shared original-allowance gas witness.
+
+Strict full audit and fresh dependency/readiness gate passed at
+2026-10-31T10:32:33+00:00 for proof source `dfc222aca8157ed6f5dd2e12bafd257dfd50f11ab735127cb74b4b531423ac3d`. All 70 frontier
+policy tests, Lean style and toolchain checks passed. Every old statement pin
+remains byte-identical; new caller/cleanup/provider interfaces are pinned
+additively. The exact admission frontier and original gas/observation/domain
+statements are unchanged. Publication requires matching served evidence.
+
 ## Continuation on 2026-10-31: one retained mixed ledger instantiates object state closure
 
 Successful object models now produce an ordered CallTrace of every key and

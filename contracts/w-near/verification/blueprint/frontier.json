@@ -5190,7 +5190,10 @@
       "notes": "The actual input pipeline still must establish baseHL+18,230,154 <= 96 MiB and a positive initial free bound. No Environment or method domain is strengthened.",
       "required_type_dependencies": [],
       "required_proof_dependencies": [],
-      "reviewed_shape_hash": 15195616410908528446
+      "reviewed_shape_hash": 15195616410908528446,
+      "planned_dependencies": [
+        "ledger-input-bounds"
+      ]
     },
     {
       "id": "object-ledger-reader",
@@ -5245,6 +5248,289 @@
         "object-ledger-member"
       ],
       "reviewed_shape_hash": 4073226010
+    },
+    {
+      "id": "ledger-wrapper-generic",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.f78_of_object_spec",
+      "title": "Actual object wrapper preserves any checked callee",
+      "kind": "theorem",
+      "label": "frontier:ledger-wrapper-generic",
+      "notes": "Proves the decoded f78 wrapper with one gas-credit cell and an explicit call-depth bound. The generic callee is an owned checked specification, not an admission.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2921457655
+    },
+    {
+      "id": "ledger-key-wrapper",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.f78_ledger_initial",
+      "title": "Ledger key/residual reader reaches f78",
+      "kind": "theorem",
+      "label": "frontier:ledger-key-wrapper",
+      "notes": "Composes the published raw-resource f228 contract through the actual f78 call, preserving the exact key/residual allowance and all named unresolved setup/room/gas contracts.",
+      "required_type_dependencies": [
+        "object-ledger-setup",
+        "object-key-room-charges",
+        "object-value-room-charges",
+        "object-ignore-charges"
+      ],
+      "required_proof_dependencies": [
+        "object-ledger-initial-reader",
+        "ledger-wrapper-generic"
+      ],
+      "reviewed_shape_hash": 4213237096
+    },
+    {
+      "id": "ledger-cost-wrapper",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.f78_ledger_initial_cost",
+      "title": "Ledger object reader with original cost recurrence",
+      "kind": "theorem",
+      "label": "frontier:ledger-cost-wrapper",
+      "notes": "Builds the same concrete ledger reader and raw initializer through f78 at the unchanged object-cost recurrence. Uses checked closing/key/value/ignore instances; all setup/room/gas obligations remain explicit.",
+      "required_type_dependencies": [
+        "object-ledger-setup",
+        "object-key-room-charges",
+        "object-value-room-charges",
+        "object-ignore-charges"
+      ],
+      "required_proof_dependencies": [
+        "ledger-wrapper-generic",
+        "object-ledger-member",
+        "object-ledger-key",
+        "object-ledger-value",
+        "object-ledger-ignore",
+        "object-ledger-closing",
+        "ignored-object-closing"
+      ],
+      "reviewed_shape_hash": 3383251852
+    },
+    {
+      "id": "ledger-scratch-cleanup",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.f68_retained_scratch",
+      "title": "Actual cleanup frees empty or retained scratch",
+      "kind": "theorem",
+      "label": "frontier:ledger-scratch-cleanup",
+      "notes": "The actual f68 drop handles capacity zero and nonzero uniformly within 315 regular-operation gas, preserves the exact original live list and returns a free-list bound F+1. No assumption that successful scratch capacity is zero.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1667604643
+    },
+    {
+      "id": "ledger-final-bounds",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.Ledger.final_bounds",
+      "title": "Ledger bounds survive the complete object",
+      "kind": "theorem",
+      "label": "frontier:ledger-final-bounds",
+      "notes": "Successful retained segments bound total heap growth by 18,230,154 bytes and the free-list bound by baseF+42, independently of a per-member scratch reset.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "mixed-growth-v86",
+        "mixed-model-pages"
+      ],
+      "reviewed_shape_hash": 1300113882
+    },
+    {
+      "id": "ledger-from-trait",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.f66_ledger_object",
+      "title": "General object parser reaches actual f66 cleanup",
+      "kind": "theorem",
+      "label": "frontier:ledger-from-trait",
+      "notes": "Checked f66 execution includes initial deserializer resources, f78, trailing EOF/whitespace, output moves and actual retained scratch cleanup. It returns only the account allocation; room/gas and setup instances remain explicit.",
+      "required_type_dependencies": [
+        "object-ledger-setup",
+        "object-key-room-charges",
+        "object-value-room-charges",
+        "object-ignore-charges"
+      ],
+      "required_proof_dependencies": [
+        "ledger-cost-wrapper",
+        "ledger-scratch-cleanup",
+        "ledger-final-bounds"
+      ],
+      "reviewed_shape_hash": 3378748278
+    },
+    {
+      "id": "ledger-from-slice",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.f65_ledger_object",
+      "title": "General object slice entry reaches cleanup",
+      "kind": "theorem",
+      "label": "frontier:ledger-from-slice",
+      "notes": "Actual f65 composes f66, restores the 448-byte caller stack, and preserves input/static resources. It does not discharge reader charges or original model gas.",
+      "required_type_dependencies": [
+        "object-ledger-setup",
+        "object-key-room-charges",
+        "object-value-room-charges",
+        "object-ignore-charges"
+      ],
+      "required_proof_dependencies": [
+        "ledger-from-trait"
+      ],
+      "reviewed_shape_hash": 2795272048
+    },
+    {
+      "id": "ledger-result-room",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.ledger_result_room",
+      "title": "Ledger account result supplies balance execution room",
+      "kind": "theorem",
+      "label": "frontier:ledger-result-room",
+      "notes": "Actual owned heap alignment/positivity and the ledger ceiling yield six pages of balance execution room. The generic LedgerSetup and fixed-result interface remain explicit in this constructor.",
+      "required_type_dependencies": [
+        "object-ledger-setup",
+        "lookup-heap-room",
+        "parser-fixed-result"
+      ],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1296602481
+    },
+    {
+      "id": "ledger-from-slice-room",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.f65_ledger_room",
+      "title": "Slice parser returns the exact balance handoff",
+      "kind": "theorem",
+      "label": "frontier:ledger-from-slice-room",
+      "notes": "Composes f65 with six-page result room and a uniform baseF+43 free-list bound after the actual scratch drop. All original reader/setup contracts remain visible.",
+      "required_type_dependencies": [
+        "object-ledger-setup",
+        "object-key-room-charges",
+        "object-value-room-charges",
+        "object-ignore-charges"
+      ],
+      "required_proof_dependencies": [
+        "ledger-from-slice",
+        "ledger-result-room"
+      ],
+      "reviewed_shape_hash": 3921816951
+    },
+    {
+      "id": "ledger-parser-call",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.ledger_parser_contract",
+      "title": "General object supplies the shared parser-call contract",
+      "kind": "theorem",
+      "label": "frontier:ledger-parser-call",
+      "notes": "Packages the actual slice parser and retained resources into the existing ParserCallContract used by the full balance pipeline. Its named verification contracts are not discharged by this packaging.",
+      "required_type_dependencies": [
+        "parser-call-contract",
+        "object-ledger-setup",
+        "object-key-room-charges",
+        "object-value-room-charges",
+        "object-ignore-charges"
+      ],
+      "required_proof_dependencies": [
+        "ledger-from-slice-room"
+      ],
+      "reviewed_shape_hash": 1827295429
+    },
+    {
+      "id": "ledger-container-code",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.ignored_member_code_of_context",
+      "title": "Full container code comes from the instantiated store",
+      "kind": "theorem",
+      "label": "frontier:ledger-container-code",
+      "notes": "Constructs all ignored-container, reserve, reallocation and escape function-cell resources directly from actual codeCtx. The projection uses kernel checked binary function cells.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 361983982
+    },
+    {
+      "id": "ledger-parser-code",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.ledger_parser_code_of_context",
+      "title": "General parser code comes from the instantiated store",
+      "kind": "theorem",
+      "label": "frontier:ledger-parser-code",
+      "notes": "Combines the reviewed existing parser code projection with the full container code projection; no function-code premise is assumed externally.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "ledger-container-code",
+        "object-parser-code-context"
+      ],
+      "reviewed_shape_hash": 4288253421
+    },
+    {
+      "id": "ledger-input-bounds",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.input_ledger_bounds",
+      "title": "Actual input allocation establishes ledger setup bounds",
+      "kind": "theorem",
+      "label": "frontier:ledger-input-bounds",
+      "notes": "For inputs at most 4 MiB, initial memory or the real input allocation requests at most 65 pages and establishes the ledger heap ceiling. A positive initial free bound supplies the remaining setup conjunct; the deployed provider instantiates F=1. No environment/model premise is strengthened.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3705038534
+    },
+    {
+      "id": "ledger-parser-family",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.ledger_parser_family",
+      "title": "General parser family instantiates initial ledger setup",
+      "kind": "theorem",
+      "label": "frontier:ledger-parser-family",
+      "notes": "All real input allocation outcomes instantiate LedgerSetup numerically from the input bound. The returned shared family remains Conditional on named key/value room/gas and ignored gas contracts for those heap instances.",
+      "required_type_dependencies": [
+        "parser-family",
+        "object-key-room-charges",
+        "object-value-room-charges",
+        "object-ignore-charges"
+      ],
+      "required_proof_dependencies": [
+        "ledger-parser-call",
+        "ledger-input-bounds"
+      ],
+      "reviewed_shape_hash": 3047986522
+    },
+    {
+      "id": "ledger-deployed-provider",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.ledger_deployed_parser_provider",
+      "title": "General parser supplies the actual-code deployed provider",
+      "kind": "theorem",
+      "label": "frontier:ledger-deployed-provider",
+      "notes": "Transports the full object family from actual codeCtx for every entry host state. Instantiates initial F=1 and output F=44; reader room/gas remains Open.",
+      "required_type_dependencies": [
+        "deployed-parser-provider",
+        "object-key-room-charges",
+        "object-value-room-charges",
+        "object-ignore-charges"
+      ],
+      "required_proof_dependencies": [
+        "ledger-parser-family",
+        "ledger-parser-code",
+        "parser-family-code-transport"
+      ],
+      "reviewed_shape_hash": 590734586
+    },
+    {
+      "id": "ledger-provider-plan",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.ledger_provider_plan",
+      "title": "General object couples execution and original model budget",
+      "kind": "theorem",
+      "label": "frontier:ledger-provider-plan",
+      "notes": "The selected K functions determine both actual parser execution and the same ProviderModelBudget witness. No new budget or weaker observation is substituted. All charge contracts and whole-method budget remain explicit.",
+      "required_type_dependencies": [
+        "absent-parser-plan",
+        "provider-model-budget",
+        "object-key-room-charges",
+        "object-value-room-charges",
+        "object-ignore-charges"
+      ],
+      "required_proof_dependencies": [
+        "ledger-deployed-provider"
+      ],
+      "reviewed_shape_hash": 4190941479
+    },
+    {
+      "id": "ledger-receipt",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.ledger_refines_init",
+      "title": "General object reaches checked full receipt refinement",
+      "kind": "theorem",
+      "label": "frontier:ledger-receipt",
+      "notes": "Composes the concrete object provider plan through the existing initialized absent-account receipt theorem: safety, sufficient-resource Matches/used gas, arbitrary-resource Matches or rollback/log-prefix resource failure. It remains Conditional on named reader charges, unchanged ProviderModelBudget and reviewed protocol/environment premises.",
+      "required_type_dependencies": [
+        "provider-model-budget",
+        "object-key-room-charges",
+        "object-value-room-charges",
+        "object-ignore-charges"
+      ],
+      "required_proof_dependencies": [
+        "ledger-provider-plan",
+        "provider-plan-receipt-initial"
+      ],
+      "reviewed_shape_hash": 2380770011
     }
   ],
   "reviewed_environment": [
