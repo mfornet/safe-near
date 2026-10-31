@@ -1,3 +1,4 @@
+import Bridge.Methods.FtBalanceOfInitialized
 import Bridge.Functions.BalanceOf297PresentFamily
 import Bridge.Functions.SerdeObjectPresentProvider
 import Bridge.Methods.FtBalanceOfFullWeightedObject
@@ -1638,14 +1639,14 @@ attribute [blueprint "frontier:balance-absent-parser-plan"
   WNear.ftBalanceOf_absent_parser_plan_obligation
 
 attribute [blueprint "frontier:balance-other-state-accepted"
-  (title := /-- Accepted calls outside initialized absent-account state -/)
-  (statement := /-- Exact complementary accepted-input/state obligation after excluding every initialized/unregistered-account call as well as both completed cases. Registered/uninitialized behavior remains Open. -/)
+  (title := /-- Original complementary accepted-call statement composes all initialized receipts -/)
+  (statement := /-- Exact original statement and environmental/domain/observation premises remain unchanged. Checked state/parse splits directly compose the complete initialized-call receipt through the explicit pinned argument ceiling. Its direct admission is removed; only the precisely named uninitialized accepted-call leaf remains Open. -/)
   (notReady := true)]
   WNear.ftBalanceOf_other_state_accepted_obligation
 
 attribute [blueprint "frontier:balance-other-input-state-safety"
-  (title := /-- Safety outside accepted initialized absent-account calls -/)
-  (statement := /-- Exact safety complement: excludes every accepted initialized/unregistered-account context and both completed cases. Rejected input, registered/uninitialized states and remaining safety behavior stay Open. -/)
+  (title := /-- Original complementary safety statement composes accepted initialized receipts -/)
+  (statement := /-- Exact original statement remains unchanged. Checked state/accepted-input splits compose complete initialized safety through the explicit pinned argument ceiling. Its direct admission is removed; uninitialized safety and initialized rejected-input safety remain separate precise Open leaves. This assembly remains Conditional. -/)
   (notReady := true)]
   WNear.ftBalanceOf_other_input_state_no_issue_obligation
 
@@ -3964,3 +3965,243 @@ attribute [blueprint "frontier:present-provider-initial"
   (statement := /-- The actual initial frame, instantiated function cells, statics and initial memory supply the entire registered-account body. Initial input-register room is constructed from the unchanged input bound; exact successful parser family and method gas remain explicit. -/)
   (notReady := true)]
   WNear.Binary.BalanceOf297PresentCall.provider_present_body_initial_resources
+
+attribute [blueprint "frontier:present-register-copy-gas"
+  (title := /-- Actual stored balance register copy has a bounded charge -/)
+  (statement := /-- The exact 16-byte stored-value register copy and allocation fit the stated operation/linear allowance and actual host register charges. -/)]
+  WNear.Binary.BalanceOf297PresentCall.present_storage_register64_cost_le
+
+attribute [blueprint "frontier:present-lookup-gas"
+  (title := /-- Present lookup retains actual read and register charges -/)
+  (statement := /-- The actual some-value lookup is bounded with allocator walks and real key/value host charges retained. -/)]
+  WNear.Binary.BalanceOf297PresentCall.present_lookup64_cost_le
+
+attribute [blueprint "frontier:present-suffix-gas"
+  (title := /-- Present success suffix has an exact host-charge allowance -/)
+  (statement := /-- The complete stored-u128 suffix fits its operation and linear allowance, retaining both reads, both register lengths, register payloads and the exact result-length return. -/)]
+  WNear.Binary.BalanceOf297PresentCall.present_suffix64_cost_le
+
+attribute [blueprint "frontier:present-body-linear-gas"
+  (title := /-- Actual registered body has a linear parser-dependent bound -/)
+  (statement := /-- The exact body cost fits 1300 billion plus 397500000 per input byte and real host charges under the unchanged weighted parser inequality. No original model allowance is changed. -/)]
+  WNear.Binary.BalanceOf297PresentCall.present_provider_body_linear_cost
+
+attribute [blueprint "frontier:present-body-adequacy"
+  (title := /-- Registered body has checked initial-store adequacy -/)
+  (statement := /-- Actual initial resources, one credit cell, the composed body and final host/gas cells give MaybeStuck adequacy with exact arbitrary-u128 return. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297PresentCall.provider_present_adequate
+
+attribute [blueprint "frontier:present-deployed-provider"
+  (title := /-- Registered receipt requires an actual deployed parser family -/)
+  (statement := /-- Exact parser family over the real instantiated code context at every entry host. Generic interface remains Open; concrete object and array providers are separate instances. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297PresentCall.PresentDeployedParserProvider
+
+attribute [blueprint "frontier:present-method-run"
+  (title := /-- Actual activation and body compose into method execution -/)
+  (statement := /-- The exact eleven-operation activation charge and body adequacy construct MethodRunsR, retaining the actual two-read/u128-return postcondition. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297PresentCall.provider_present_runs
+
+attribute [blueprint "frontier:present-entry-contract"
+  (title := /-- Registered receipt entry requires exact host and trie premises -/)
+  (statement := /-- Precise initial precondition with and without recorded proof, including actual stored words and shared two-read proof room. Generic interface stays Open; the well-formed-context constructor is checked separately. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297PresentCall.PresentEntryAt
+
+attribute [blueprint "frontier:present-agreement-contract"
+  (title := /-- Registered receipt requires agreement of actual observations -/)
+  (statement := /-- The exact two-read/arbitrary-u128 return postcondition must agree with the original model, including storage-stake failure. Generic interface stays Open; represented-state agreement is constructed separately. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297PresentCall.PresentAgreement
+
+attribute [blueprint "frontier:present-model-budget"
+  (title := /-- Registered receipt must fit the original model gas allowance -/)
+  (statement := /-- Exact loading plus actual activation/body cost must fit the unchanged WNear model gas. This is an unresolved generic interface, not a larger replacement budget. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297PresentCall.PresentProviderModelBudget
+
+attribute [blueprint "frontier:present-receipt-obligations"
+  (title := /-- Registered method execution composes into the full receipt -/)
+  (statement := /-- The existing boundary composition uses actual MethodRunsR and explicit provider, original gas budget, entry and observation-agreement obligations. It retains safety, gas/ProofRoom, Matches and resource-failure rollback/log-prefix clauses. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297PresentCall.provider_present_refines_with_obligations
+
+attribute [blueprint "frontier:present-entry-instance"
+  (title := /-- Well-formed context constructs registered entry premises -/)
+  (statement := /-- Original limits and context well-formedness construct exact register/key/return limits, canonical storage link and shared two-read proof budget. The stored-value premise remains exact. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297PresentCall.present_entry_at_of_ctx
+
+attribute [blueprint "frontier:present-model-agreement"
+  (title := /-- Exact stored word bytes agree with the model balance -/)
+  (statement := /-- The represented arbitrary-account lookup and decoded machine words give the original model balance without truncation. Read-only fields, exact JSON bytes and storage-stake failure agree with boundary observations. -/)]
+  WNear.Binary.BalanceOf297PresentCall.present_agreement_of_represents
+
+attribute [blueprint "frontier:present-receipt-initial"
+  (title := /-- Registered receipt constructs entry and model agreement -/)
+  (statement := /-- Exact initial entry and represented-state observation agreement are constructed. Only the actual deployed parser, original model budget and exact stored-value witness remain explicit. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297PresentCall.provider_present_refines_init
+
+attribute [blueprint "frontier:present-host-gas"
+  (title := /-- Present host charges retain actual trie and return data gas -/)
+  (statement := /-- The real input, state/account storage, stored-value register and exact-length return charges fit a numeric allowance plus actual trie-node and return-data charges. -/)]
+  WNear.Binary.BalanceOf297PresentCall.present_host_cost_le
+
+attribute [blueprint "frontier:present-budget-from-linear"
+  (title := /-- Actual present body fits the unchanged model budget -/)
+  (statement := /-- Original reviewed cost ceilings, binary-size/domain bounds and the original weighted parser inequality construct the precise model budget. Extra value-copy and variable-return costs are included. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297PresentCall.present_model_budget_of_parser_linear
+
+attribute [blueprint "frontier:present-weighted-parser-room"
+  (title := /-- Actual weighted object parser supplies seven-growth room -/)
+  (statement := /-- The completed actual weighted parser and the same retained ledger construct the stronger owned parser postcondition. Raw key/value/ignored charge and setup contracts remain explicit. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.f65_bundled_room_weighted_present
+
+attribute [blueprint "frontier:present-weighted-parser-call"
+  (title := /-- Weighted object parser constructs the present call contract -/)
+  (statement := /-- Exact actual weighted f65 code, selected charge and seven-growth owned postcondition package the present parser-call contract. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.bundled_parser_contract_weighted_present
+
+attribute [blueprint "frontier:present-weighted-parser-family"
+  (title := /-- Weighted parser family covers each actual input heap -/)
+  (statement := /-- Each real input allocation outcome instantiates the unchanged ledger setup; raw reader charge hypotheses remain visible. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.bundled_parser_family_weighted_present
+
+attribute [blueprint "frontier:present-weighted-deployed"
+  (title := /-- Weighted parser family uses real deployed function cells -/)
+  (statement := /-- The exact instantiated code context supplies the weighted present family. Its raw reader charge hypotheses remain explicit. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.bundled_deployed_parser_provider_weighted_present
+
+attribute [blueprint "frontier:present-concrete-object-provider"
+  (title := /-- Actual selected readers construct the registered object provider -/)
+  (statement := /-- Actual selected key, account and weighted ignored readers construct every raw reader allowance and the real deployed present provider. Generic reader contracts remain Open in general; no abstract reader hypothesis remains in this constructor. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.present_concrete_weighted_provider
+
+attribute [blueprint "frontier:present-full-object-receipt"
+  (title := /-- Registered full-domain objects have complete receipt refinement -/)
+  (statement := /-- For actual successful object models up to the original 4 MiB domain, representation constructs stored words and actual selected readers plus full retained-growth funding construct provider and original model budget. No abstract parser/reader/gas obligation remains; original safety/Matches/gas/rollback/log-prefix clauses are preserved. -/)]
+  WNear.Binary.SerdeObjectPrefix.full_weighted_present_refines_init
+
+attribute [blueprint "frontier:present-array-result-room"
+  (title := /-- Exact array result retains room for present execution -/)
+  (statement := /-- Original cleanValue ownership and actual growth bounds construct seven-growth room with the same parser free-list and owned-account result. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297PresentCall.copied_result_room_present
+
+attribute [blueprint "frontier:present-array-model-room"
+  (title := /-- Actual borrowed or escaped array parser returns seven-growth room -/)
+  (statement := /-- The original actual f65 array model proof reaches the stronger owned result for both borrowed and copied/escaped account strings. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297PresentCall.f65_arr_model_room_present
+
+attribute [blueprint "frontier:present-array-parser-call"
+  (title := /-- Actual array parser constructs the present call contract -/)
+  (statement := /-- Actual parser function cells construct the exact present call; original key/identifier statics are framed without duplication. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297PresentCall.array_present_parser_contract
+
+attribute [blueprint "frontier:present-array-parser-family"
+  (title := /-- Actual array parser family constructs every heap/room instance -/)
+  (statement := /-- The original input allocation allowance and valid-account scratch-page bound construct room, owned-copy room and seven-growth post room at every reachable heap. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297PresentCall.array_present_parser_family
+
+attribute [blueprint "frontier:present-array-deployed-provider"
+  (title := /-- Actual deployed code constructs the present array provider -/)
+  (statement := /-- Real instantiated code supplies the uniform parser family for every accepted array model, including escapes. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297PresentCall.array_present_deployed_provider
+
+attribute [blueprint "frontier:present-array-body-gas"
+  (title := /-- Actual registered array body has a bounded charge -/)
+  (statement := /-- Original array parser gas, exact parser free-list bound and actual stored-value suffix fit the stated body allowance plus retained host charges. -/)]
+  WNear.Binary.BalanceOf297PresentCall.present_array_body_cost_le
+
+attribute [blueprint "frontier:present-array-model-budget"
+  (title := /-- Actual array body fits the original model budget -/)
+  (statement := /-- The actual array parser and full present body charges construct the unchanged receipt gas allowance, including stored-value register copying and exact-length return. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297PresentCall.present_array_model_budget
+
+attribute [blueprint "frontier:present-full-array-receipt"
+  (title := /-- Registered full-domain arrays have complete receipt refinement -/)
+  (statement := /-- Successful actual array models up to the original 4 MiB bound construct stored words, real parser, exact room and the original model gas budget. Both borrowed and escaped strings retain full safety/Matches/gas/rollback/log-prefix clauses. -/)]
+  WNear.Binary.SerdeObjectPrefix.full_array_present_refines_init
+
+attribute [blueprint "frontier:present-object-case-accepted"
+  (title := /-- Registered object receipt supplies accepted-call clauses -/)
+  (statement := /-- Actual full object case directly instantiates complete receipt refinement under the reviewed exported environment. -/)]
+  WNear.Binary.BalanceOf297PresentCall.full_general_present_case_accepted
+
+attribute [blueprint "frontier:present-object-case-safety"
+  (title := /-- Registered object receipt supplies execution safety -/)
+  (statement := /-- Actual full object case directly instantiates execution safety under the same reviewed premises. -/)]
+  WNear.Binary.BalanceOf297PresentCall.full_general_present_case_no_issue
+
+attribute [blueprint "frontier:present-array-accepted-model"
+  (title := /-- Accepted registered array supplies the exact machine model -/)
+  (statement := /-- Existing decoder agreement supplies raw account-string model, exact bracket and whitespace/EOF positions and the original input bound. -/)]
+  WNear.Binary.BalanceOf297PresentCall.accepted_array_present_case
+
+attribute [blueprint "frontier:present-accepted-models"
+  (title := /-- Every accepted registered input belongs to a completed case -/)
+  (statement := /-- Every accepted registered call in the original domain supplies either the actual array model or full successful object model. No abstract accepted-input/model hypothesis remains. -/)]
+  WNear.Binary.BalanceOf297PresentCall.accepted_present_cases
+
+attribute [blueprint "frontier:present-array-case-accepted"
+  (title := /-- Registered array receipt supplies accepted-call clauses -/)
+  (statement := /-- The exact actual array case supplies complete accepted-call refinement under the reviewed exported environment. -/)]
+  WNear.Binary.BalanceOf297PresentCall.array_present_case_accepted
+
+attribute [blueprint "frontier:present-array-case-safety"
+  (title := /-- Registered array receipt supplies execution safety -/)
+  (statement := /-- The exact actual array case supplies execution safety under the same reviewed premises. -/)]
+  WNear.Binary.BalanceOf297PresentCall.array_present_case_no_issue
+
+attribute [blueprint "frontier:present-initialized-receipt"
+  (title := /-- All accepted registered calls have complete receipt refinement -/)
+  (statement := /-- Accepted-input classification composes exact array/object receipts across the original 4 MiB domain with no abstract parser, reader, gas or model witness. -/)]
+  WNear.Binary.BalanceOf297PresentCall.initialized_present_refines
+
+attribute [blueprint "frontier:initialized-balance-receipt"
+  (title := /-- All accepted initialized balance calls have complete refinement -/)
+  (statement := /-- Registered and unregistered account cases compose completed array and full object receipts across the original domain. Original observations and gas are unchanged; uninitialized/rejected contexts and protocol deployment remain outside this theorem. -/)]
+  WNear.Binary.BalanceOf297PresentCall.initialized_balance_refines
+
+attribute [blueprint "frontier:initialized-accepted-receipt"
+  (title := /-- Every accepted initialized balance call reaches the full receipt -/)
+  (statement := /-- Actual decoder shape reduces any accepted ft_balance_of call to its exact balance query and composes the full initialized receipt. -/)]
+  WNear.Binary.BalanceOf297PresentCall.initialized_accepted_refines
+
+attribute [blueprint "frontier:initialized-accepted-under-limit"
+  (title := /-- Initialized receipt composes under the explicit protocol ceiling -/)
+  (statement := /-- Context well-formedness and the named ArgumentLimitV86 supply the original domain bound. The generic protocol ceiling remains an unresolved dependency until the pinned protocol field is proved. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297PresentCall.initialized_accepted_refines_under_limit
+
+attribute [blueprint "frontier:balance-uninitialized-accepted"
+  (title := /-- Uninitialized balance calls: accepted-call receipt frontier -/)
+  (statement := /-- Exact remaining accepted-call obligation restricted to represented uninitialized state, preserving the original runtime/environment, accepted input, model gas, Matches and resource-failure/rollback/log-prefix claims. No initialized state remains in this admission. -/)
+  (notReady := true)]
+  WNear.ftBalanceOf_uninitialized_accepted_obligation
+
+attribute [blueprint "frontier:balance-uninitialized-safety"
+  (title := /-- Uninitialized balance calls: execution-safety frontier -/)
+  (statement := /-- Exact remaining execution-safety obligation restricted to represented uninitialized state. Actual method/runtime/environment premises remain unchanged; accepted initialized safety is constructed separately. -/)
+  (notReady := true)]
+  WNear.ftBalanceOf_uninitialized_no_issue_obligation
+
+attribute [blueprint "frontier:balance-initialized-rejected-safety"
+  (title := /-- Rejected initialized balance input: execution-safety frontier -/)
+  (statement := /-- Exact remaining execution-safety obligation for initialized state with no accepted balance-query parse. Original runtime, represented storage, well-formed context and method premises are retained. Accepted initialized calls are excluded precisely. -/)
+  (notReady := true)]
+  WNear.ftBalanceOf_initialized_rejected_no_issue_obligation

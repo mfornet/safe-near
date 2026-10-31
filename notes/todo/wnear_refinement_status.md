@@ -33,6 +33,54 @@ it is false for the reviewed domain; its historical statement is recorded in
 the misstatement log. The historical generic host trap and contradiction lemmas
 remain checked, but witness existence is no longer a frontier obligation.
 
+## Continuation on 2026-10-31: all initialized accepted balance calls compose globally
+
+Every accepted initialized ft_balance_of call now has complete checked deployed
+receipt refinement across the original 4 MiB domain: registered and unregistered
+accounts, arrays and full general objects, escaped strings and nested ignored
+values. Representation constructs exact stored machine words; real parser code,
+stronger retained room, actual reader instances and original weighted parser
+funding construct the provider and the unchanged model gas budget. Exact
+serialized bytes and length, shared trie proof accounting, activation/body gas,
+storage-stake failure, Matches, rollback and log-prefix claims are preserved.
+No abstract parser, reader, heap, model or numerical gas obligation remains in
+the complete initialized receipt under the reviewed environmental premises.
+
+The original complementary accepted and safety statements remain byte-identical.
+Their broad direct admissions are replaced with checked state/parse composition
+through this initialized receipt. The remaining frontier is split precisely into
+uninitialized accepted-call receipt, uninitialized execution safety and initialized
+rejected-input execution safety. No initialized accepted call remains in a
+method-behavior admission. The named pinned argument ceiling is still used to
+derive the domain and remains unresolved. Both original callers and all dependent
+global assemblies remain Conditional. The separate rejected receipt, other
+methods and concrete protocol/runtime premises remain Open.
+
+Generic IgnoreHyp, KeyConditions, ValueConditions, parser/deployed-provider,
+entry/agreement, heap and model-budget interfaces remain visibly Open where their
+universal contracts are unproved. Concrete constructors and actual checked caller
+edges show which instances are supplied. Raw interface-dependent results remain
+Conditional; actual complete initialized receipts have no such abstract premise.
+
+All old statement pins, original gas budgets, binary/domain/observations, one
+credit-cell ownership, strict module/axiom allowances and overall end-to-end goal
+are unchanged. Two broad direct admissions are replaced by three narrowly audited
+state/input leaves; this deliberately does not optimize admission counts. Every
+dependent result remains visibly incomplete until all leaves and protocol
+instantiations are discharged.
+
+Next: prove uninitialized state panic/receipt behavior, rejected-input safety and
+receipt, then remaining methods and pinned protocol premises. Completion still
+requires full deployed-binary refinement and an audit without sorryAx.
+
+Strict full audit and fresh dependency/readiness gate passed at
+2026-10-31T17:27:57+00:00 for proof source `b075b01942a65d536594f5bc80d54743e86b433cdc900506d8efede0ea757168`. All 136 frontier
+policy tests, Lean style and toolchain checks passed. Every old statement pin
+remains byte-identical. Two broad direct admissions are replaced by three precisely named uninitialized/
+rejected-input leaves. Every old transitive incomplete result remains visibly Conditional;
+new leaves are added exactly, and the strict module allowance stays unchanged. Live publication must match
+this source and evidence.
+
 ## Continuation on 2026-10-31: registered-account whole binary body composition
 
 The actual present-account path now composes stored 16-byte balance lookup,

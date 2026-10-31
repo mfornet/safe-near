@@ -3646,24 +3646,31 @@
     {
       "id": "balance-other-state-accepted",
       "declaration": "WNear.ftBalanceOf_other_state_accepted_obligation",
-      "title": "Accepted calls outside initialized absent-account state",
-      "kind": "admission",
+      "title": "Original complementary accepted-call statement composes all initialized receipts",
+      "kind": "theorem",
       "label": "frontier:balance-other-state-accepted",
-      "notes": "Exact complementary accepted-input/state obligation after excluding every initialized/unregistered-account call as well as both completed cases. Registered/uninitialized behavior remains Open.",
-      "required_proof_dependencies": [],
-      "reviewed_shape_hash": 4082237725,
-      "indirect_admission": true
+      "notes": "Exact original statement and environmental/domain/observation premises remain unchanged. Checked state/parse splits directly compose the complete initialized-call receipt through the explicit pinned argument ceiling. Its direct admission is removed; only the precisely named uninitialized accepted-call leaf remains Open.",
+      "required_proof_dependencies": [
+        "initialized-accepted-under-limit",
+        "pinned-arguments-limit",
+        "balance-uninitialized-accepted"
+      ],
+      "reviewed_shape_hash": 4082237725
     },
     {
       "id": "balance-other-input-state-safety",
       "declaration": "WNear.ftBalanceOf_other_input_state_no_issue_obligation",
-      "title": "Safety outside accepted initialized absent-account calls",
-      "kind": "admission",
+      "title": "Original complementary safety statement composes accepted initialized receipts",
+      "kind": "theorem",
       "label": "frontier:balance-other-input-state-safety",
-      "notes": "Exact safety complement: excludes every accepted initialized/unregistered-account context and both completed cases. Rejected input, registered/uninitialized states and remaining safety behavior stay Open.",
-      "required_proof_dependencies": [],
-      "reviewed_shape_hash": 592551965,
-      "indirect_admission": true
+      "notes": "Exact original statement remains unchanged. Checked state/accepted-input splits compose complete initialized safety through the explicit pinned argument ceiling. Its direct admission is removed; uninitialized safety and initialized rejected-input safety remain separate precise Open leaves. This assembly remains Conditional.",
+      "required_proof_dependencies": [
+        "initialized-accepted-under-limit",
+        "pinned-arguments-limit",
+        "balance-uninitialized-safety",
+        "balance-initialized-rejected-safety"
+      ],
+      "reviewed_shape_hash": 592551965
     },
     {
       "id": "key-traced-reader",
@@ -9679,6 +9686,627 @@
         "initial-memory-parser-room"
       ],
       "reviewed_shape_hash": 3165475249
+    },
+    {
+      "id": "present-register-copy-gas",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.present_storage_register64_cost_le",
+      "title": "Actual stored balance register copy has a bounded charge",
+      "kind": "theorem",
+      "label": "frontier:present-register-copy-gas",
+      "notes": "The exact 16-byte stored-value register copy and allocation fit the stated operation/linear allowance and actual host register charges.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2908023980
+    },
+    {
+      "id": "present-lookup-gas",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.present_lookup64_cost_le",
+      "title": "Present lookup retains actual read and register charges",
+      "kind": "theorem",
+      "label": "frontier:present-lookup-gas",
+      "notes": "The actual some-value lookup is bounded with allocator walks and real key/value host charges retained.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "present-register-copy-gas"
+      ],
+      "reviewed_shape_hash": 785143218
+    },
+    {
+      "id": "present-suffix-gas",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.present_suffix64_cost_le",
+      "title": "Present success suffix has an exact host-charge allowance",
+      "kind": "theorem",
+      "label": "frontier:present-suffix-gas",
+      "notes": "The complete stored-u128 suffix fits its operation and linear allowance, retaining both reads, both register lengths, register payloads and the exact result-length return.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "present-lookup-gas"
+      ],
+      "reviewed_shape_hash": 491215121
+    },
+    {
+      "id": "present-body-linear-gas",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.present_provider_body_linear_cost",
+      "title": "Actual registered body has a linear parser-dependent bound",
+      "kind": "theorem",
+      "label": "frontier:present-body-linear-gas",
+      "notes": "The exact body cost fits 1300 billion plus 397500000 per input byte and real host charges under the unchanged weighted parser inequality. No original model allowance is changed.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "present-suffix-gas"
+      ],
+      "reviewed_shape_hash": 985125691
+    },
+    {
+      "id": "present-body-adequacy",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.provider_present_adequate",
+      "title": "Registered body has checked initial-store adequacy",
+      "kind": "theorem",
+      "label": "frontier:present-body-adequacy",
+      "notes": "Actual initial resources, one credit cell, the composed body and final host/gas cells give MaybeStuck adequacy with exact arbitrary-u128 return.",
+      "required_type_dependencies": [
+        "present-parser-family"
+      ],
+      "required_proof_dependencies": [
+        "present-provider-initial"
+      ],
+      "reviewed_shape_hash": 4188910887
+    },
+    {
+      "id": "present-deployed-provider",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.PresentDeployedParserProvider",
+      "title": "Registered receipt requires an actual deployed parser family",
+      "kind": "verification_contract",
+      "label": "frontier:present-deployed-provider",
+      "notes": "Exact parser family over the real instantiated code context at every entry host. Generic interface remains Open; concrete object and array providers are separate instances.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 6366194163597870251
+    },
+    {
+      "id": "present-method-run",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.provider_present_runs",
+      "title": "Actual activation and body compose into method execution",
+      "kind": "theorem",
+      "label": "frontier:present-method-run",
+      "notes": "The exact eleven-operation activation charge and body adequacy construct MethodRunsR, retaining the actual two-read/u128-return postcondition.",
+      "required_type_dependencies": [
+        "present-deployed-provider"
+      ],
+      "required_proof_dependencies": [
+        "present-body-adequacy"
+      ],
+      "reviewed_shape_hash": 893562816
+    },
+    {
+      "id": "present-entry-contract",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.PresentEntryAt",
+      "title": "Registered receipt entry requires exact host and trie premises",
+      "kind": "verification_contract",
+      "label": "frontier:present-entry-contract",
+      "notes": "Precise initial precondition with and without recorded proof, including actual stored words and shared two-read proof room. Generic interface stays Open; the well-formed-context constructor is checked separately.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 16157208172435960608
+    },
+    {
+      "id": "present-agreement-contract",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.PresentAgreement",
+      "title": "Registered receipt requires agreement of actual observations",
+      "kind": "verification_contract",
+      "label": "frontier:present-agreement-contract",
+      "notes": "The exact two-read/arbitrary-u128 return postcondition must agree with the original model, including storage-stake failure. Generic interface stays Open; represented-state agreement is constructed separately.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 4132501379824740136
+    },
+    {
+      "id": "present-model-budget",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.PresentProviderModelBudget",
+      "title": "Registered receipt must fit the original model gas allowance",
+      "kind": "verification_contract",
+      "label": "frontier:present-model-budget",
+      "notes": "Exact loading plus actual activation/body cost must fit the unchanged WNear model gas. This is an unresolved generic interface, not a larger replacement budget.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 14112540172326257758
+    },
+    {
+      "id": "present-receipt-obligations",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.provider_present_refines_with_obligations",
+      "title": "Registered method execution composes into the full receipt",
+      "kind": "theorem",
+      "label": "frontier:present-receipt-obligations",
+      "notes": "The existing boundary composition uses actual MethodRunsR and explicit provider, original gas budget, entry and observation-agreement obligations. It retains safety, gas/ProofRoom, Matches and resource-failure rollback/log-prefix clauses.",
+      "required_type_dependencies": [
+        "present-agreement-contract",
+        "present-deployed-provider",
+        "present-entry-contract",
+        "present-model-budget"
+      ],
+      "required_proof_dependencies": [
+        "present-method-run"
+      ],
+      "reviewed_shape_hash": 1303316965
+    },
+    {
+      "id": "present-entry-instance",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.present_entry_at_of_ctx",
+      "title": "Well-formed context constructs registered entry premises",
+      "kind": "theorem",
+      "label": "frontier:present-entry-instance",
+      "notes": "Original limits and context well-formedness construct exact register/key/return limits, canonical storage link and shared two-read proof budget. The stored-value premise remains exact.",
+      "required_type_dependencies": [
+        "present-entry-contract"
+      ],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2830238437
+    },
+    {
+      "id": "present-model-agreement",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.present_agreement_of_represents",
+      "title": "Exact stored word bytes agree with the model balance",
+      "kind": "theorem",
+      "label": "frontier:present-model-agreement",
+      "notes": "The represented arbitrary-account lookup and decoded machine words give the original model balance without truncation. Read-only fields, exact JSON bytes and storage-stake failure agree with boundary observations.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "ft-balance-model"
+      ],
+      "reviewed_shape_hash": 1771385419
+    },
+    {
+      "id": "present-receipt-initial",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.provider_present_refines_init",
+      "title": "Registered receipt constructs entry and model agreement",
+      "kind": "theorem",
+      "label": "frontier:present-receipt-initial",
+      "notes": "Exact initial entry and represented-state observation agreement are constructed. Only the actual deployed parser, original model budget and exact stored-value witness remain explicit.",
+      "required_type_dependencies": [
+        "present-deployed-provider",
+        "present-model-budget"
+      ],
+      "required_proof_dependencies": [
+        "present-receipt-obligations",
+        "present-entry-instance",
+        "present-model-agreement"
+      ],
+      "reviewed_shape_hash": 27802009
+    },
+    {
+      "id": "present-host-gas",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.present_host_cost_le",
+      "title": "Present host charges retain actual trie and return data gas",
+      "kind": "theorem",
+      "label": "frontier:present-host-gas",
+      "notes": "The real input, state/account storage, stored-value register and exact-length return charges fit a numeric allowance plus actual trie-node and return-data charges.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1566459230
+    },
+    {
+      "id": "present-budget-from-linear",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.present_model_budget_of_parser_linear",
+      "title": "Actual present body fits the unchanged model budget",
+      "kind": "theorem",
+      "label": "frontier:present-budget-from-linear",
+      "notes": "Original reviewed cost ceilings, binary-size/domain bounds and the original weighted parser inequality construct the precise model budget. Extra value-copy and variable-return costs are included.",
+      "required_type_dependencies": [
+        "present-model-budget"
+      ],
+      "required_proof_dependencies": [
+        "present-body-linear-gas",
+        "present-host-gas"
+      ],
+      "reviewed_shape_hash": 1234808509
+    },
+    {
+      "id": "present-weighted-parser-room",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.f65_bundled_room_weighted_present",
+      "title": "Actual weighted object parser supplies seven-growth room",
+      "kind": "theorem",
+      "label": "frontier:present-weighted-parser-room",
+      "notes": "The completed actual weighted parser and the same retained ledger construct the stronger owned parser postcondition. Raw key/value/ignored charge and setup contracts remain explicit.",
+      "required_type_dependencies": [
+        "bundled-key-gas",
+        "lookup-heap-room",
+        "object-ledger-setup",
+        "parser-fixed-result",
+        "prefix-value-gas",
+        "weighted-prefix-gas"
+      ],
+      "required_proof_dependencies": [
+        "present-ledger-room"
+      ],
+      "reviewed_shape_hash": 4013124123
+    },
+    {
+      "id": "present-weighted-parser-call",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.bundled_parser_contract_weighted_present",
+      "title": "Weighted object parser constructs the present call contract",
+      "kind": "theorem",
+      "label": "frontier:present-weighted-parser-call",
+      "notes": "Exact actual weighted f65 code, selected charge and seven-growth owned postcondition package the present parser-call contract.",
+      "required_type_dependencies": [
+        "bundled-key-gas",
+        "object-ledger-setup",
+        "prefix-value-gas",
+        "present-parser-contract",
+        "weighted-prefix-gas"
+      ],
+      "required_proof_dependencies": [
+        "present-weighted-parser-room"
+      ],
+      "reviewed_shape_hash": 2856084364
+    },
+    {
+      "id": "present-weighted-parser-family",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.bundled_parser_family_weighted_present",
+      "title": "Weighted parser family covers each actual input heap",
+      "kind": "theorem",
+      "label": "frontier:present-weighted-parser-family",
+      "notes": "Each real input allocation outcome instantiates the unchanged ledger setup; raw reader charge hypotheses remain visible.",
+      "required_type_dependencies": [
+        "bundled-key-gas",
+        "prefix-value-gas",
+        "present-parser-family",
+        "weighted-prefix-gas"
+      ],
+      "required_proof_dependencies": [
+        "present-weighted-parser-call"
+      ],
+      "reviewed_shape_hash": 1635565769
+    },
+    {
+      "id": "present-weighted-deployed",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.bundled_deployed_parser_provider_weighted_present",
+      "title": "Weighted parser family uses real deployed function cells",
+      "kind": "theorem",
+      "label": "frontier:present-weighted-deployed",
+      "notes": "The exact instantiated code context supplies the weighted present family. Its raw reader charge hypotheses remain explicit.",
+      "required_type_dependencies": [
+        "bundled-key-gas",
+        "prefix-value-gas",
+        "present-deployed-provider",
+        "weighted-prefix-gas"
+      ],
+      "required_proof_dependencies": [
+        "present-weighted-parser-family"
+      ],
+      "reviewed_shape_hash": 3115752340
+    },
+    {
+      "id": "present-concrete-object-provider",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.present_concrete_weighted_provider",
+      "title": "Actual selected readers construct the registered object provider",
+      "kind": "theorem",
+      "label": "frontier:present-concrete-object-provider",
+      "notes": "Actual selected key, account and weighted ignored readers construct every raw reader allowance and the real deployed present provider. Generic reader contracts remain Open in general; no abstract reader hypothesis remains in this constructor.",
+      "required_type_dependencies": [
+        "present-deployed-provider"
+      ],
+      "required_proof_dependencies": [
+        "present-weighted-deployed",
+        "bundled-selected-key-instance",
+        "selected-value-instance",
+        "weighted-selected-instance"
+      ],
+      "reviewed_shape_hash": 1713248301
+    },
+    {
+      "id": "present-full-object-receipt",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.full_weighted_present_refines_init",
+      "title": "Registered full-domain objects have complete receipt refinement",
+      "kind": "theorem",
+      "label": "frontier:present-full-object-receipt",
+      "notes": "For actual successful object models up to the original 4 MiB domain, representation constructs stored words and actual selected readers plus full retained-growth funding construct provider and original model budget. No abstract parser/reader/gas obligation remains; original safety/Matches/gas/rollback/log-prefix clauses are preserved.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "present-receipt-initial",
+        "present-concrete-object-provider",
+        "present-budget-from-linear",
+        "full-weighted-parser-budget"
+      ],
+      "reviewed_shape_hash": 4253884367
+    },
+    {
+      "id": "present-array-result-room",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.copied_result_room_present",
+      "title": "Exact array result retains room for present execution",
+      "kind": "theorem",
+      "label": "frontier:present-array-result-room",
+      "notes": "Original cleanValue ownership and actual growth bounds construct seven-growth room with the same parser free-list and owned-account result.",
+      "required_type_dependencies": [
+        "lookup-heap-room",
+        "parser-fixed-result"
+      ],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 4029386687
+    },
+    {
+      "id": "present-array-model-room",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.f65_arr_model_room_present",
+      "title": "Actual borrowed or escaped array parser returns seven-growth room",
+      "kind": "theorem",
+      "label": "frontier:present-array-model-room",
+      "notes": "The original actual f65 array model proof reaches the stronger owned result for both borrowed and copied/escaped account strings.",
+      "required_type_dependencies": [
+        "lookup-heap-room",
+        "owned-room",
+        "parser-fixed-result",
+        "string-room"
+      ],
+      "required_proof_dependencies": [
+        "present-array-result-room"
+      ],
+      "reviewed_shape_hash": 1994074553
+    },
+    {
+      "id": "present-array-parser-call",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.array_present_parser_contract",
+      "title": "Actual array parser constructs the present call contract",
+      "kind": "theorem",
+      "label": "frontier:present-array-parser-call",
+      "notes": "Actual parser function cells construct the exact present call; original key/identifier statics are framed without duplication.",
+      "required_type_dependencies": [
+        "lookup-heap-room",
+        "owned-room",
+        "present-parser-contract",
+        "string-room"
+      ],
+      "required_proof_dependencies": [
+        "present-array-model-room"
+      ],
+      "reviewed_shape_hash": 3271820671
+    },
+    {
+      "id": "present-array-parser-family",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.array_present_parser_family",
+      "title": "Actual array parser family constructs every heap/room instance",
+      "kind": "theorem",
+      "label": "frontier:present-array-parser-family",
+      "notes": "The original input allocation allowance and valid-account scratch-page bound construct room, owned-copy room and seven-growth post room at every reachable heap.",
+      "required_type_dependencies": [
+        "present-parser-family"
+      ],
+      "required_proof_dependencies": [
+        "present-array-parser-call"
+      ],
+      "reviewed_shape_hash": 341199387
+    },
+    {
+      "id": "present-array-deployed-provider",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.array_present_deployed_provider",
+      "title": "Actual deployed code constructs the present array provider",
+      "kind": "theorem",
+      "label": "frontier:present-array-deployed-provider",
+      "notes": "Real instantiated code supplies the uniform parser family for every accepted array model, including escapes.",
+      "required_type_dependencies": [
+        "present-deployed-provider"
+      ],
+      "required_proof_dependencies": [
+        "present-array-parser-family"
+      ],
+      "reviewed_shape_hash": 2062316897
+    },
+    {
+      "id": "present-array-body-gas",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.present_array_body_cost_le",
+      "title": "Actual registered array body has a bounded charge",
+      "kind": "theorem",
+      "label": "frontier:present-array-body-gas",
+      "notes": "Original array parser gas, exact parser free-list bound and actual stored-value suffix fit the stated body allowance plus retained host charges.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "present-suffix-gas"
+      ],
+      "reviewed_shape_hash": 870070951
+    },
+    {
+      "id": "present-array-model-budget",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.present_array_model_budget",
+      "title": "Actual array body fits the original model budget",
+      "kind": "theorem",
+      "label": "frontier:present-array-model-budget",
+      "notes": "The actual array parser and full present body charges construct the unchanged receipt gas allowance, including stored-value register copying and exact-length return.",
+      "required_type_dependencies": [
+        "present-model-budget"
+      ],
+      "required_proof_dependencies": [
+        "present-array-body-gas",
+        "present-host-gas"
+      ],
+      "reviewed_shape_hash": 1888440865
+    },
+    {
+      "id": "present-full-array-receipt",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.full_array_present_refines_init",
+      "title": "Registered full-domain arrays have complete receipt refinement",
+      "kind": "theorem",
+      "label": "frontier:present-full-array-receipt",
+      "notes": "Successful actual array models up to the original 4 MiB bound construct stored words, real parser, exact room and the original model gas budget. Both borrowed and escaped strings retain full safety/Matches/gas/rollback/log-prefix clauses.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "present-receipt-initial",
+        "present-array-deployed-provider",
+        "present-array-model-budget"
+      ],
+      "reviewed_shape_hash": 2888377551
+    },
+    {
+      "id": "present-object-case-accepted",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.full_general_present_case_accepted",
+      "title": "Registered object receipt supplies accepted-call clauses",
+      "kind": "theorem",
+      "label": "frontier:present-object-case-accepted",
+      "notes": "Actual full object case directly instantiates complete receipt refinement under the reviewed exported environment.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "present-full-object-receipt"
+      ],
+      "reviewed_shape_hash": 378265583
+    },
+    {
+      "id": "present-object-case-safety",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.full_general_present_case_no_issue",
+      "title": "Registered object receipt supplies execution safety",
+      "kind": "theorem",
+      "label": "frontier:present-object-case-safety",
+      "notes": "Actual full object case directly instantiates execution safety under the same reviewed premises.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "present-full-object-receipt"
+      ],
+      "reviewed_shape_hash": 4095751686
+    },
+    {
+      "id": "present-array-accepted-model",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.accepted_array_present_case",
+      "title": "Accepted registered array supplies the exact machine model",
+      "kind": "theorem",
+      "label": "frontier:present-array-accepted-model",
+      "notes": "Existing decoder agreement supplies raw account-string model, exact bracket and whitespace/EOF positions and the original input bound.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3553065738
+    },
+    {
+      "id": "present-accepted-models",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.accepted_present_cases",
+      "title": "Every accepted registered input belongs to a completed case",
+      "kind": "theorem",
+      "label": "frontier:present-accepted-models",
+      "notes": "Every accepted registered call in the original domain supplies either the actual array model or full successful object model. No abstract accepted-input/model hypothesis remains.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "accepted-object-model",
+        "present-array-accepted-model"
+      ],
+      "reviewed_shape_hash": 657828117
+    },
+    {
+      "id": "present-array-case-accepted",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.array_present_case_accepted",
+      "title": "Registered array receipt supplies accepted-call clauses",
+      "kind": "theorem",
+      "label": "frontier:present-array-case-accepted",
+      "notes": "The exact actual array case supplies complete accepted-call refinement under the reviewed exported environment.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "present-full-array-receipt"
+      ],
+      "reviewed_shape_hash": 2669629654
+    },
+    {
+      "id": "present-array-case-safety",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.array_present_case_no_issue",
+      "title": "Registered array receipt supplies execution safety",
+      "kind": "theorem",
+      "label": "frontier:present-array-case-safety",
+      "notes": "The exact actual array case supplies execution safety under the same reviewed premises.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "present-full-array-receipt"
+      ],
+      "reviewed_shape_hash": 1012602106
+    },
+    {
+      "id": "present-initialized-receipt",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.initialized_present_refines",
+      "title": "All accepted registered calls have complete receipt refinement",
+      "kind": "theorem",
+      "label": "frontier:present-initialized-receipt",
+      "notes": "Accepted-input classification composes exact array/object receipts across the original 4 MiB domain with no abstract parser, reader, gas or model witness.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "present-accepted-models",
+        "present-object-case-accepted",
+        "present-object-case-safety",
+        "present-array-case-accepted",
+        "present-array-case-safety"
+      ],
+      "reviewed_shape_hash": 1107165846
+    },
+    {
+      "id": "initialized-balance-receipt",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.initialized_balance_refines",
+      "title": "All accepted initialized balance calls have complete refinement",
+      "kind": "theorem",
+      "label": "frontier:initialized-balance-receipt",
+      "notes": "Registered and unregistered account cases compose completed array and full object receipts across the original domain. Original observations and gas are unchanged; uninitialized/rejected contexts and protocol deployment remain outside this theorem.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "present-initialized-receipt",
+        "accepted-absent-cases",
+        "full-general-accepted",
+        "full-general-safety"
+      ],
+      "reviewed_shape_hash": 1614082314
+    },
+    {
+      "id": "initialized-accepted-receipt",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.initialized_accepted_refines",
+      "title": "Every accepted initialized balance call reaches the full receipt",
+      "kind": "theorem",
+      "label": "frontier:initialized-accepted-receipt",
+      "notes": "Actual decoder shape reduces any accepted ft_balance_of call to its exact balance query and composes the full initialized receipt.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "initialized-balance-receipt"
+      ],
+      "reviewed_shape_hash": 2948785815
+    },
+    {
+      "id": "initialized-accepted-under-limit",
+      "declaration": "WNear.Binary.BalanceOf297PresentCall.initialized_accepted_refines_under_limit",
+      "title": "Initialized receipt composes under the explicit protocol ceiling",
+      "kind": "theorem",
+      "label": "frontier:initialized-accepted-under-limit",
+      "notes": "Context well-formedness and the named ArgumentLimitV86 supply the original domain bound. The generic protocol ceiling remains an unresolved dependency until the pinned protocol field is proved.",
+      "required_type_dependencies": [
+        "argument-limit-v86"
+      ],
+      "required_proof_dependencies": [
+        "initialized-accepted-receipt",
+        "receipt-small-arguments"
+      ],
+      "reviewed_shape_hash": 4272987749
+    },
+    {
+      "id": "balance-uninitialized-accepted",
+      "declaration": "WNear.ftBalanceOf_uninitialized_accepted_obligation",
+      "title": "Uninitialized balance calls: accepted-call receipt frontier",
+      "kind": "admission",
+      "label": "frontier:balance-uninitialized-accepted",
+      "notes": "Exact remaining accepted-call obligation restricted to represented uninitialized state, preserving the original runtime/environment, accepted input, model gas, Matches and resource-failure/rollback/log-prefix claims. No initialized state remains in this admission.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2583259499,
+      "indirect_admission": true
+    },
+    {
+      "id": "balance-uninitialized-safety",
+      "declaration": "WNear.ftBalanceOf_uninitialized_no_issue_obligation",
+      "title": "Uninitialized balance calls: execution-safety frontier",
+      "kind": "admission",
+      "label": "frontier:balance-uninitialized-safety",
+      "notes": "Exact remaining execution-safety obligation restricted to represented uninitialized state. Actual method/runtime/environment premises remain unchanged; accepted initialized safety is constructed separately.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 4150731908,
+      "indirect_admission": true
+    },
+    {
+      "id": "balance-initialized-rejected-safety",
+      "declaration": "WNear.ftBalanceOf_initialized_rejected_no_issue_obligation",
+      "title": "Rejected initialized balance input: execution-safety frontier",
+      "kind": "admission",
+      "label": "frontier:balance-initialized-rejected-safety",
+      "notes": "Exact remaining execution-safety obligation for initialized state with no accepted balance-query parse. Original runtime, represented storage, well-formed context and method premises are retained. Accepted initialized calls are excluded precisely.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2954860839,
+      "indirect_admission": true
     }
   ],
   "reviewed_environment": [
@@ -9704,9 +10332,10 @@
     "WNear.storageUnregister_obligation",
     "WNear.storageBalanceOf_obligation",
     "WNear.ftBalanceOf_rejected_obligation",
-    "WNear.ftBalanceOf_other_input_state_no_issue_obligation",
-    "WNear.ftBalanceOf_other_state_accepted_obligation",
-    "WNear.pinned_arguments_obligation"
+    "WNear.pinned_arguments_obligation",
+    "WNear.ftBalanceOf_uninitialized_accepted_obligation",
+    "WNear.ftBalanceOf_uninitialized_no_issue_obligation",
+    "WNear.ftBalanceOf_initialized_rejected_no_issue_obligation"
   ],
   "expected_incomplete": [
     "WNear.refines_wnear",
@@ -9740,6 +10369,9 @@
     "WNear.ftBalanceOf_other_state_accepted_obligation",
     "WNear.pinned_arguments_obligation",
     "WNear.ftBalanceOf_absent_parser_cost_obligation",
-    "WNear.ftBalanceOf_absent_parser_complement_obligation"
+    "WNear.ftBalanceOf_absent_parser_complement_obligation",
+    "WNear.ftBalanceOf_uninitialized_accepted_obligation",
+    "WNear.ftBalanceOf_uninitialized_no_issue_obligation",
+    "WNear.ftBalanceOf_initialized_rejected_no_issue_obligation"
   ]
 }

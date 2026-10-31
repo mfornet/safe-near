@@ -1,3 +1,4 @@
+import Bridge.Methods.FtBalanceOfInitialized
 import Bridge.Methods.FtBalanceOfFullWeightedObject
 import Bridge.Methods.FtBalanceOfSmallGeneralObject
 import Bridge.Methods.AcceptedInputBounds
@@ -226,7 +227,53 @@ theorem ftBalanceOf_absent_parser_plan_obligation (cfg : Config)
     hwf hm hparse hlimit
     (ftBalanceOf_absent_parser_cost_obligation cfg protocol hprotocol he hcfg raw ctx S a hrep hwf hctx hm hparse ha hother hobject)
 
-/-- Remaining safety contexts outside the completed array and escape-free object cases. -/
+/-- Precise remaining accepted receipt for represented uninitialized state. -/
+theorem ftBalanceOf_uninitialized_accepted_obligation (cfg : Config) (codeOf : List UInt8 → Near.ContractCode)
+    (protocol : Wasm.Near.RuntimeConfig)
+    (hprotocol : Wasm.Near.RuntimeConfig.parse wNearProtocolJson = .ok protocol)
+    (he : Binary.Exported.Environment protocol) (hcfg : cfg.WF)
+    (raw : RawStorage) (ctx : Context)
+    (hrep : (wnear cfg).Represents raw none) (hwf : ctx.WF raw)
+    (hctx : ctx.protocol = protocol) (hm : ctx.method = "ft_balance_of")
+    (c : Call) (hparse : (wnear cfg).Parses ctx.method ctx.args c)
+ :
+    let r := Near.Boundary.nearRuntime.exec (Binary.wCode wNearBytes.size codeOf) raw ctx
+    let res := (wnear cfg).step ctx none c
+    ((wnear cfg).gas ctx none c ≤ ctx.gasLimit → ctx.ProofRoom ((wnear cfg).proofBound ctx none c) →
+      Matches (wnear cfg) ctx raw r res ∧ r.usedGas ≤ (wnear cfg).gas ctx none c) ∧
+    (Matches (wnear cfg) ctx raw r res ∨
+      (ResourceFailure r ∧ RolledBack ctx raw r ∧ r.logs <+: res.logs)) := by
+  sorry
+
+/-- Precise remaining execution safety for represented uninitialized state. -/
+theorem ftBalanceOf_uninitialized_no_issue_obligation (cfg : Config) (codeOf : List UInt8 → Near.ContractCode)
+    (protocol : Wasm.Near.RuntimeConfig)
+    (hprotocol : Wasm.Near.RuntimeConfig.parse wNearProtocolJson = .ok protocol)
+    (he : Binary.Exported.Environment protocol) (hcfg : cfg.WF)
+    (raw : RawStorage) (ctx : Context)
+    (hrep : (wnear cfg).Represents raw none) (hwf : ctx.WF raw)
+    (hctx : ctx.protocol = protocol) (hm : ctx.method = "ft_balance_of")
+ :
+    ∀ msg, (Near.Boundary.nearRuntime.exec (Binary.wCode wNearBytes.size codeOf) raw ctx).outcome ≠
+      .error (.executionIssue msg) := by
+  sorry
+
+/-- Precise remaining execution safety for initialized state with rejected input. -/
+theorem ftBalanceOf_initialized_rejected_no_issue_obligation (cfg : Config) (codeOf : List UInt8 → Near.ContractCode)
+    (protocol : Wasm.Near.RuntimeConfig)
+    (hprotocol : Wasm.Near.RuntimeConfig.parse wNearProtocolJson = .ok protocol)
+    (he : Binary.Exported.Environment protocol) (hcfg : cfg.WF)
+    (raw : RawStorage) (S : State) (ctx : Context)
+    (hrep : (wnear cfg).Represents raw (some S)) (hwf : ctx.WF raw)
+    (hctx : ctx.protocol = protocol) (hm : ctx.method = "ft_balance_of")
+
+    (hreject : ¬ ∃ a, (wnear cfg).Parses ctx.method ctx.args (.ftBalanceOf a)) :
+    ∀ msg, (Near.Boundary.nearRuntime.exec (Binary.wCode wNearBytes.size codeOf) raw ctx).outcome ≠
+      .error (.executionIssue msg) := by
+  sorry
+
+set_option maxRecDepth 20000 in
+/-- Checked original safety complement: accepted initialized receipts and precise uninitialized/rejected leaves. -/
 theorem ftBalanceOf_other_input_state_no_issue_obligation (cfg : Config) (codeOf : List UInt8 → Near.ContractCode)
     (protocol : Wasm.Near.RuntimeConfig)
     (hprotocol : Wasm.Near.RuntimeConfig.parse wNearProtocolJson = .ok protocol)
@@ -239,7 +286,20 @@ theorem ftBalanceOf_other_input_state_no_issue_obligation (cfg : Config) (codeOf
     (hstate : ¬ ∃ (S : State) (a : AccountId), st = some S ∧ (wnear cfg).Parses ctx.method ctx.args (.ftBalanceOf a) ∧ a ∉ S.registered) :
     ∀ msg, (Near.Boundary.nearRuntime.exec (Binary.wCode wNearBytes.size codeOf) raw ctx).outcome ≠
       .error (.executionIssue msg) := by
-  sorry
+  classical
+  cases st with
+  | none =>
+    exact ftBalanceOf_uninitialized_no_issue_obligation cfg codeOf protocol hprotocol he hcfg raw ctx
+      hrep hwf hctx hm
+  | some S =>
+    by_cases hp : ∃ a, (wnear cfg).Parses ctx.method ctx.args (.ftBalanceOf a)
+    · obtain ⟨a, hparse⟩ := hp
+      have hlimit : Binary.InputDomain.ArgumentLimitV86 ctx.protocol :=
+        hctx ▸ pinned_arguments_obligation protocol hprotocol
+      exact (Binary.BalanceOf297PresentCall.initialized_accepted_refines_under_limit cfg wNearBytes.size codeOf
+        protocol he deployed_code_size raw ctx S (.ftBalanceOf a) hrep hwf hctx hm hparse hlimit).1
+    · exact ftBalanceOf_initialized_rejected_no_issue_obligation cfg codeOf protocol hprotocol he hcfg raw S ctx
+        hrep hwf hctx hm hp
 
 /-- Checked split through actual-code parser/resource/gas composition; precise complementary states remain Open. -/
 theorem ftBalanceOf_outside_array_object_absent_no_issue_obligation (cfg : Config) (codeOf : List UInt8 → Near.ContractCode)
@@ -326,7 +386,8 @@ theorem ftBalanceOf_no_issue_obligation (cfg : Config) (codeOf : List UInt8 → 
   · exact ftBalanceOf_other_no_issue_obligation cfg codeOf protocol hprotocol he hcfg raw st ctx
       hrep hwf hctx hm hcase
 
-/-- Remaining accepted inputs and states outside the completed array and escape-free object cases. -/
+set_option maxRecDepth 20000 in
+/-- Checked original accepted-call complement: initialized receipts and the precise uninitialized leaf. -/
 theorem ftBalanceOf_other_state_accepted_obligation (cfg : Config) (codeOf : List UInt8 → Near.ContractCode)
     (protocol : Wasm.Near.RuntimeConfig)
     (hprotocol : Wasm.Near.RuntimeConfig.parse wNearProtocolJson = .ok protocol)
@@ -344,7 +405,15 @@ theorem ftBalanceOf_other_state_accepted_obligation (cfg : Config) (codeOf : Lis
       Matches (wnear cfg) ctx raw r res ∧ r.usedGas ≤ (wnear cfg).gas ctx st c) ∧
     (Matches (wnear cfg) ctx raw r res ∨
       (ResourceFailure r ∧ RolledBack ctx raw r ∧ r.logs <+: res.logs)) := by
-  sorry
+  cases st with
+  | none =>
+    exact ftBalanceOf_uninitialized_accepted_obligation cfg codeOf protocol hprotocol he hcfg raw ctx
+      hrep hwf hctx hm c hparse
+  | some S =>
+    have hlimit : Binary.InputDomain.ArgumentLimitV86 ctx.protocol :=
+      hctx ▸ pinned_arguments_obligation protocol hprotocol
+    exact (Binary.BalanceOf297PresentCall.initialized_accepted_refines_under_limit cfg wNearBytes.size codeOf
+      protocol he deployed_code_size raw ctx S c hrep hwf hctx hm hparse hlimit).2
 
 /-- Checked split through actual-code parser/resource/gas composition; precise complementary states remain Open. -/
 theorem ftBalanceOf_outside_array_object_absent_accepted_obligation (cfg : Config) (codeOf : List UInt8 → Near.ContractCode)
