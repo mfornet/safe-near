@@ -961,6 +961,64 @@ class FrontierPolicyTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 blueprint.classify(self.manifest, rows)
 
+    def test_whole_serde_debug_body_keeps_both_actual_writer_contracts(self):
+        nodes = {n['id']: n for n in blueprint.classify(self.manifest, self.rows)}
+        for id in ['serde-debug-body', 'serde-debug-owned-instance', 'serde-debug-composed-dispatch']:
+            self.assertEqual(nodes[id]['status'], 'Conditional')
+            self.assertTrue({'serde-code-string-writer', 'serde-error-envelope-writer'} <= set(nodes[id]['type_edges']))
+        for id in ['serde-code-string-writer', 'serde-error-envelope-writer']:
+            self.assertEqual(nodes[id]['status'], 'Open')
+        self.assertNotIn('serde-error-debug-spec', nodes['serde-debug-composed-dispatch']['type_edges'])
+
+    def test_whole_serde_debug_cannot_drop_one_writer_premise(self):
+        for id in ['serde-debug-body', 'serde-debug-owned-instance', 'serde-debug-composed-dispatch']:
+            for dependency in ['serde-code-string-writer', 'serde-error-envelope-writer']:
+                rows = copy.deepcopy(self.rows)
+                row = next(r for r in rows if r['declaration'] == self.nodes[id]['declaration'])
+                row['type_dependencies'].remove(self.nodes[dependency]['declaration'])
+                with self.assertRaises(ValueError):
+                    blueprint.classify(self.manifest, rows)
+
+    def test_debug_dispatch_constructs_body_instance_through_checked_edges(self):
+        nodes = {n['id']: n for n in blueprint.classify(self.manifest, self.rows)}
+        for source, caller in [('serde-debug-first-format', 'serde-debug-body'),
+                               ('serde-debug-second-format', 'serde-debug-body'),
+                               ('serde-debug-cleanup', 'serde-debug-body'),
+                               ('serde-debug-body', 'serde-debug-owned-instance'),
+                               ('serde-debug-owned-instance', 'serde-debug-composed-dispatch'),
+                               ('serde-error-debug-dispatch', 'serde-debug-composed-dispatch')]:
+            self.assertIn({'id': caller, 'status': 'Conditional'}, nodes[source]['integrated_into'])
+        self.by_id['serde-debug-body']['proof_dependencies'].remove(self.nodes['serde-debug-cleanup']['declaration'])
+        with self.assertRaises(ValueError):
+            blueprint.classify(self.manifest, self.rows)
+
+    def test_debug_cleanup_and_frame_ownership_are_proven_separately(self):
+        nodes = {n['id']: n for n in blueprint.classify(self.manifest, self.rows)}
+        for id in ['serde-string-deallocator-code', 'serde-string-drop', 'serde-args-reclaim',
+                   'serde-string-record-reclaim', 'serde-debug-cleanup']:
+            self.assertEqual(nodes[id]['status'], 'Proven')
+            self.assertFalse(nodes[id]['direct_sorry'])
+            self.assertFalse(nodes[id]['type_edges'])
+        self.assertIn({'id': 'serde-debug-cleanup', 'status': 'Proven'},
+                      nodes['serde-string-drop']['integrated_into'])
+
+    def test_debug_uniform_cost_is_open_and_its_exact_shape_is_pinned(self):
+        nodes = {n['id']: n for n in blueprint.classify(self.manifest, self.rows)}
+        self.assertEqual(nodes['serde-debug-uniform-cost']['status'], 'Open')
+        self.assertFalse(nodes['serde-debug-uniform-cost']['is_theorem'])
+        self.by_id['serde-debug-uniform-cost']['shape_hash'] += 1
+        with self.assertRaises(ValueError):
+            blueprint.classify(self.manifest, self.rows)
+
+    def test_debug_adapters_do_not_prove_selected_engines_or_rejected_receipts(self):
+        nodes = {n['id']: n for n in blueprint.classify(self.manifest, self.rows)}
+        for id in ['serde-string-adapter', 'serde-formatter-adapter']:
+            self.assertEqual(nodes[id]['status'], 'Conditional')
+        for id in ['serde-string-engine', 'serde-formatter-engine', 'balance-rejected',
+                   'balance-initialized-rejected-safety', 'balance-uninitialized-rejected-safety', 'reject-parser']:
+            self.assertEqual(nodes[id]['status'], 'Open')
+        self.assertEqual(nodes['global']['status'], 'Conditional')
+
     def test_actual_code_provider_reaches_global_assemblies_without_closing_the_plan(self):
         result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
         for node in ['deployed-parser-provider', 'provider-model-budget', 'absent-parser-plan', 'pinned-arguments-limit', 'ignore-hyp', 'key-conditions', 'value-conditions']:

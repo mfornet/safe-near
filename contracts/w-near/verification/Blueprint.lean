@@ -1,3 +1,4 @@
+import Bridge.Functions.SerdeDebugBody
 import Bridge.Functions.BalanceOf297RejectPanic
 import Bridge.Functions.PanicDebug
 import Bridge.Functions.FormatResult
@@ -4416,7 +4417,7 @@ attribute [blueprint "frontier:reject-debug-callee-spec"
 
 attribute [blueprint "frontier:serde-error-debug-spec"
   (title := /-- Actual serde error Debug function-641 frontier -/)
-  (statement := /-- Exact selected deployed function-641 formatter contract. It remains Open; line/column, ErrorCode formatting, heap behavior and full message bounds are not inferred from the proven vtable dispatch. -/)
+  (statement := /-- Exact generic function-641 formatter contract remains Open. A checked whole-body constructor now supplies a concrete owned instance conditionally on the precise ErrorCode and outer-message writer families; their actual formatting, uniform cost and payload ownership instances are not yet discharged. -/)
   (notReady := true)]
   WNear.Binary.PanicDebug.SerdeErrorDebugSpec
 
@@ -4479,3 +4480,100 @@ attribute [blueprint "frontier:balance-reject-panic-block"
   (statement := /-- Given the actual rejected result tag and owned error box pointer, function 297 stores its descriptor and calls function 881. The exact block, stack, activation and one-credit composition are checked. Conditional on the common panic-formatting contract; parser rejection production, whole-body adequacy, resource cases and rejected receipt safety/rollback remain Open. -/)
   (notReady := true)]
   WNear.Binary.BalanceOf297RejectPanic.parser_handoff_reject
+
+attribute [blueprint "frontier:serde-string-engine"
+  (title := /-- Actual String adapter needs its selected formatting engine -/)
+  (statement := /-- Exact function-872 call with owned String pointer, Arguments copy, stack and selected payload/sink resources. Adapter correctness does not prove this interface. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeDebug.StringFmtEngineSpec
+
+attribute [blueprint "frontier:serde-formatter-engine"
+  (title := /-- Actual Formatter adapter needs its selected formatting engine -/)
+  (statement := /-- Exact function-872 call through the loaded sink data and vtable, preserving the Arguments copy and chosen payload/sink resources. This generic interface remains Open. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeDebug.FormatterFmtEngineSpec
+
+attribute [blueprint "frontier:serde-code-string-writer"
+  (title := /-- Serde ErrorCode-to-String writer frontier -/)
+  (statement := /-- Exact function-598 family over every unused padding word. It must produce owned existential String pointer/capacity/length and payload resources. Concrete ErrorCode formatting, sink/heap bounds and finite cost are not supplied by the body composition. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeDebug.ErrorCodeStringWriteSpec
+
+attribute [blueprint "frontier:serde-error-envelope-writer"
+  (title := /-- Serde outer error-message writer frontier -/)
+  (statement := /-- Exact function-913 family for the actual String, line and column descriptors and four static pieces. Actual String and full u32 formatting, owned payload/sink cells and post-heap resources remain unresolved. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeDebug.ErrorEnvelopeWriteSpec
+
+attribute [blueprint "frontier:serde-debug-uniform-cost"
+  (title := /-- Rejected Debug execution needs a cost before every gas ceiling -/)
+  (statement := /-- Exact uniform family: one finite K is chosen before every Cg, with explicit code context and actual owned pre/post resources. Local per-ceiling compositions do not instantiate this obligation; selecting K after Cg would not suffice. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeDebug.UniformSerdeDebugSpec
+
+attribute [blueprint "frontier:serde-string-adapter"
+  (title := /-- Actual String write_fmt retains and copies Arguments -/)
+  (statement := /-- Actual function 598 preserves the original 24-byte Arguments, lends its own stack copy and String descriptor to function 872, then restores the frame and credits. Conditional on the named selected formatting engine. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeDebug.f598_delegate
+
+attribute [blueprint "frontier:serde-formatter-adapter"
+  (title := /-- Actual Formatter write_fmt preserves its loaded sink -/)
+  (statement := /-- Actual function 913 reads the retained Formatter data/vtable cells, supplies an owned Arguments stack copy to the real writer and restores its frame. Conditional on the precise formatting engine. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeDebug.f913_delegate
+
+attribute [blueprint "frontier:serde-string-deallocator-code"
+  (title := /-- String deallocator equals the existing checked Global deallocator -/)
+  (statement := /-- Kernel checked equality of actual functions 601 and 777, including their complete function records. No new deallocation algorithm or axiom is introduced. -/)]
+  WNear.Binary.SerdeDebug.string_deallocator_eq
+
+attribute [blueprint "frontier:serde-string-drop"
+  (title := /-- Actual String cleanup frees its temporary allocation once -/)
+  (statement := /-- Both zero-capacity and allocated-buffer paths are checked. Record cells are retained; zero capacity preserves the heap, while a live allocation is erased once and increments the free-list allowance. No formatter verification premise remains. -/)]
+  WNear.Binary.SerdeDebug.f599_drop
+
+attribute [blueprint "frontier:serde-args-reclaim"
+  (title := /-- Copied Arguments ownership reclaims its full stack region -/)
+  (statement := /-- Checked ownership-preserving join of all three eight-byte words into the original 24-byte stack region. No bytes or resources are invented. -/)]
+  WNear.Binary.SerdeDebug.args24_stack
+
+attribute [blueprint "frontier:serde-string-record-reclaim"
+  (title := /-- String record ownership reclaims its full stack region -/)
+  (statement := /-- Checked join of the owned pointer, capacity and length words into their original 12-byte region. -/)]
+  WNear.Binary.SerdeDebug.stringCells_stack
+
+attribute [blueprint "frontier:serde-debug-first-format"
+  (title := /-- Actual serde Debug prefix constructs its first formatting call -/)
+  (statement := /-- Actual first 49 instructions read the error-box descriptor and construct the exact String, ErrorCode argument and first Arguments record. Arbitrary padding is retained, allocation outputs are existential, activation and one credit cell are checked. Conditional on the ErrorCode-to-String writer. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeDebug.f641_first_format_exists
+
+attribute [blueprint "frontier:serde-debug-second-format"
+  (title := /-- Actual serde Debug builds the outer three-argument call -/)
+  (statement := /-- Checked successful format-result unwrap, both real pointer/tag constructors, line-pair load and exact second Arguments/descriptors lead to function 913. No small-line restriction is assumed; full String and u32 formatting remain in the named writer contract. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeDebug.f641_second_format
+
+attribute [blueprint "frontier:serde-debug-cleanup"
+  (title := /-- Actual serde Debug cleanup restores the complete frame -/)
+  (statement := /-- Actual String drop frees its live temporary buffer, preserves zero-capacity behavior, reconstructs all 80 bytes, restores the global stack pointer and returns the chosen formatter result. No formatter contract remains in this local cleanup proof. -/)]
+  WNear.Binary.SerdeDebug.f641_cleanup
+
+attribute [blueprint "frontier:serde-debug-body"
+  (title := /-- Whole deployed serde Debug body composes checked stages -/)
+  (statement := /-- Actual function 641 composes both formatting stages and concrete cleanup, preserving original descriptor ownership, existential allocation/heap outcomes and one credit resource. Conditional on both exact named writer families. This does not discharge their implementations or a uniform-before-Cg cost witness. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeDebug.f641_composed
+
+attribute [blueprint "frontier:serde-debug-owned-instance"
+  (title := /-- Checked body constructs an owned deployed Debug instance -/)
+  (statement := /-- Specializes the actual body to zero formatter result and constructs the precise existing SerdeErrorDebugSpec with explicit global/stack/descriptor and final heap ownership. Both writer contracts remain Open; the generic Debug interface is not claimed universally proved. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeDebug.f641_debug_instance
+
+attribute [blueprint "frontier:serde-debug-composed-dispatch"
+  (title := /-- Dynamic serde dispatch uses the checked whole Debug body -/)
+  (statement := /-- Actual function-882 dispatch instantiates function 641 from its checked body, instead of assuming the whole generic formatter contract. Exact vtable/table descriptor ownership, activation and final heap/frame resources are retained. Only the precise writer families remain direct formatter premises; rejected receipt/parser production and uniform finite cost remain unfinished. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeDebug.f882_serde_composed

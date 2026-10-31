@@ -33,6 +33,47 @@ it is false for the reviewed domain; its historical statement is recorded in
 the misstatement log. The historical generic host trap and contradiction lemmas
 remain checked, but witness existence is no longer a frontier obligation.
 
+## Continuation on 2026-10-31: whole serde Debug body and owned dispatch compose
+
+The actual function-641 body now composes its first ErrorCode-to-String call,
+successful unwrap, real line/column argument constructors, three-argument outer
+formatting call and concrete String cleanup. The original error descriptor is
+retained. Both arbitrary padding words, existential String allocation outcomes,
+post-writer heap choices, exact frame restoration and one owned gas credit cell
+are preserved. Actual function-882 dispatch now constructs this owned Debug
+instance from the checked body rather than assuming the entire generic formatter.
+
+These compositions remain Conditional on exact named ErrorCodeStringWriteSpec
+and ErrorEnvelopeWriteSpec contracts. Generic String and Formatter adapters are
+also checked against separately named Open function-872 engine contracts.
+Deallocation uses the same decoded function as the already checked allocator;
+the standalone equality fact does not create an extra proof edge.
+zero capacity preserves the heap and an allocated String is freed exactly once.
+These local cleanup and frame-reclamation results are independently Proven.
+
+UniformSerdeDebugSpec is separately Open: a full rejection family needs one
+finite cost chosen before every gas ceiling. Local per-Cg specifications do not
+supply this witness. Full ErrorCode/String rendering, numeric formatting for
+line/column values above 9999, heap/sink bounds and owned payload results remain
+unfinished. No small-line restriction or narrower input domain is assumed.
+The old RejectContract/errAt interface still discards the error-box ownership
+needed by Debug; a stronger producer must retain valid ErrorCode/message cells.
+
+No rejected receipt or method safety obligation is claimed discharged. The full
+accepted balance receipts, original root compositions, all other method and
+protocol premises, old statements, proof statuses and exact admission frontiers
+are unchanged. Every remaining formatter premise is visible and no audit
+allowance expands. Next instantiate actual writers and uniform costs while
+strengthening error ownership through parser rejection, then compose the full
+rejected-body/runtime result.
+
+Strict full audit and fresh dependency/readiness gate passed at
+2026-10-31T19:37:50+00:00 for proof source `212066e24004c39c6e18ab2ca5b1ad42e0909865de3950eee4e03598670af265`. All 156 frontier
+policy tests, Lean style and toolchain checks passed. Every old statement pin,
+shape and proof status is unchanged; the exact direct and transitive admission
+frontiers and strict module allowance are unchanged. New conditional callers keep
+each named formatter dependency explicit. Live publication must match this evidence.
+
 ## Continuation on 2026-10-31: rejected parser-result branch reaches checked panic entry
 
 The actual rejected-result block at function-297 offset 36 now composes the
