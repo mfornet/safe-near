@@ -86,7 +86,7 @@ theorem copied_entry_at_of_ctx (cfg : WNear.Config) (ctx : Context) (raw : RawSt
 open NearInterface ContractModel in
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 8000000 in
-theorem copied_array_absent_refines_init (cfg : WNear.Config) (size : Nat)
+theorem array_absent_refines_init (cfg : WNear.Config) (size : Nat)
     (codeOf : List UInt8 → Near.ContractCode) (raw : RawStorage) (ctx : Context) (S : WNear.State) (a : WNear.AccountId) (bs rest : List UInt8) (j k : Nat)
     (hp : WProtocol ctx.protocol) (hwf : ctx.WF raw)
     (hm : ctx.method = "ft_balance_of") (hc : FtTotalSupplyMethod.CostsV86 ctx.protocol) (hl : FtTotalSupplyMethod.LimitsV86 ctx.protocol) (hsize : size ≤ 185625)
@@ -96,7 +96,7 @@ theorem copied_array_absent_refines_init (cfg : WNear.Config) (size : Nat)
     (hk : k = bs.length - rest.length + wsLen (bs.drop (bs.length - rest.length)) + 1)
     (hend : k + wsLen (bs.drop k) = bs.length)
     (hmodel : NearInterface.Json.stringBody (bs.drop (j + 1)) [] = some (some a.val, rest))
-    (hcopied : ¬ borrowed (bs.drop (j + 1)))
+
     (hargs : ctx.args = bs) (hrep : (WNear.wnear cfg).Represents raw (some S))
     (ha : a ∉ S.registered) :
     let r := Near.Boundary.nearRuntime.exec (wCode size codeOf) raw ctx
@@ -120,7 +120,33 @@ theorem copied_array_absent_refines_init (cfg : WNear.Config) (size : Nat)
     rw [hkey] at hr
     simpa only [NearDepositMethod.regOf, if_neg ha, Option.map_none] using hr
   have hentry := copied_entry_at_of_ctx cfg ctx raw (some S) S a bs hwf hl hargs hlen hval hnone
-  exact copied_array_absent_refines_v86 cfg size codeOf raw (some S) ctx S a bs rest j k ctx.trie
-    (WNear.proofBound ctx) hp hwf hm hc hsize hlen ho hj hq he hk hend hmodel hcopied hentry hrep
+  exact array_absent_refines_v86 cfg size codeOf raw (some S) ctx S a bs rest j k ctx.trie
+    (WNear.proofBound ctx) hp hwf hm hc hsize hlen ho hj hq he hk hend hmodel  hentry hrep
 
+open NearInterface ContractModel in
+set_option maxRecDepth 1000000 in
+set_option maxHeartbeats 32000000 in
+/-- The existing copied-only contract, preserved as a checked specialization. -/
+theorem copied_array_absent_refines_init (cfg : WNear.Config) (size : Nat)
+    (codeOf : List UInt8 → Near.ContractCode) (raw : RawStorage) (ctx : Context) (S : WNear.State) (a : WNear.AccountId) (bs rest : List UInt8) (j k : Nat)
+    (hp : WProtocol ctx.protocol) (hwf : ctx.WF raw)
+    (hm : ctx.method = "ft_balance_of") (hc : FtTotalSupplyMethod.CostsV86 ctx.protocol) (hl : FtTotalSupplyMethod.LimitsV86 ctx.protocol) (hsize : size ≤ 185625)
+    (hlen : bs.length < 2 ^ 24) (ho : bs[wsLen bs]? = some 0x5B)
+    (hj : j = wsLen bs + 1 + wsLen (bs.drop (wsLen bs + 1))) (hq : bs[j]? = some 0x22)
+    (he : bs[bs.length - rest.length + wsLen (bs.drop (bs.length - rest.length))]? = some 0x5D)
+    (hk : k = bs.length - rest.length + wsLen (bs.drop (bs.length - rest.length)) + 1)
+    (hend : k + wsLen (bs.drop k) = bs.length)
+    (hmodel : NearInterface.Json.stringBody (bs.drop (j + 1)) [] = some (some a.val, rest))
+    (hcopied : ¬ borrowed (bs.drop (j + 1)))
+    (hargs : ctx.args = bs) (hrep : (WNear.wnear cfg).Represents raw (some S))
+    (ha : a ∉ S.registered) :
+    let r := Near.Boundary.nearRuntime.exec (wCode size codeOf) raw ctx
+    let res := (WNear.wnear cfg).step ctx (some S) (.ftBalanceOf a)
+    (∀ msg, r.outcome ≠ .error (.executionIssue msg)) ∧
+    ((WNear.wnear cfg).gas ctx (some S) (.ftBalanceOf a) ≤ ctx.gasLimit →
+      ctx.ProofRoom ((WNear.wnear cfg).proofBound ctx (some S) (.ftBalanceOf a)) →
+      Matches (WNear.wnear cfg) ctx raw r res ∧ r.usedGas ≤ (WNear.wnear cfg).gas ctx (some S) (.ftBalanceOf a)) ∧
+    (Matches (WNear.wnear cfg) ctx raw r res ∨
+      (ResourceFailure r ∧ RolledBack ctx raw r ∧ r.logs <+: res.logs)) := by
+  exact array_absent_refines_init cfg size codeOf raw ctx S a bs rest j k hp hwf hm hc hl hsize hlen ho hj hq he hk hend hmodel hargs hrep ha
 end WNear.Binary.BalanceOf297AbsentCall

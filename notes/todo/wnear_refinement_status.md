@@ -33,6 +33,46 @@ it is false for the reviewed domain; its historical statement is recorded in
 the misstatement log. The historical generic host trap and contradiction lemmas
 remain checked, but witness existence is no longer a frontier obligation.
 
+## Continuation on 2026-10-31: both valid array string paths reach receipt refinement
+
+`array_absent_refines_init` proves the full receipt result for initialized
+represented state, an unregistered account and the exact valid account-id array
+grammar with input length below 2^24. This now covers **borrowed and copied**
+strings. Execution safety, sufficient-resource Matches and the original model
+gas bound, and arbitrary-resource Matches or rollback are proved under the
+reviewed runtime/cost/limit premises. Registered accounts, uninitialized state,
+object arguments, rejected arguments and other contexts remain unresolved.
+
+The existing `SerdeValueReuse.spec169_model` supplies both string-reader paths.
+New scratch cleanup retains the concrete free-list and parser/copy growth
+bounds, including empty scratch. The actual 228/78/66/65 wrappers restore their
+frames and pass that owned account result into balance execution. The shared
+reader charge is bounded by the existing copied-reader charge, so loading,
+activation, body, host and trie charges still fit the **unchanged model gas
+allowance**. Error-box room comes from the existing growth-plus-six allowance;
+no additional unresolved entry-room contract is assumed by the completed case.
+Context.WF and represented storage concretely instantiate the same host/trie,
+proof-budget and model-agreement interfaces as before.
+
+The shared Wasm proofs now establish the broader statements once. Every existing
+copied-only interface is retained as a checked specialization with its original
+statement pin unchanged. `copied_case_is_array_case` checks coverage of the old
+case by the broader predicate. `array_case_accepted` and `array_case_no_issue`
+are **Proven and Integrated** into the existing remaining-case assemblies.
+Their original statements are preserved, and their new admitted leaves are the
+precise complements of the entire initialized valid-array/absent-account case.
+Both old remaining-case results, the full method and global refinement remain
+**Conditional**. Rejected-input rollback and the general parser/resource
+contracts, including `IgnoreHyp`, `KeyConditions` and `ValueConditions`, remain
+Open. No allowlist scope or model observation statement is relaxed.
+
+Next extend the remaining parser/state cases while keeping the full receipt
+composition connected. The full strict audit and fresh actual-dependency and
+readiness gate passed at 2026-10-31T02:29:19+00:00 for proof source `48b871c4542d61f2f34a41fe3d4a4ba6fdde8e8f71a6269bd19b22582bdf1af3`.
+All earlier statement pins are unchanged; new pins are additive. Publication
+requires the served revision, statuses and dependencies to match this evidence.
+
+
 ## Continuation on 2026-10-31: copied absent case reaches receipt refinement
 
 The initialized copied-string array branch for an unregistered account now has

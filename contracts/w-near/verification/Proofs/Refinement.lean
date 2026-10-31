@@ -1,6 +1,7 @@
 import Spec.Contract
 import Bridge.Exported
 import Bridge.Methods.FtBalanceOfCopiedCase
+import Bridge.Methods.FtBalanceOfArrayCase
 import Spec.Exports
 import Binary.Module
 import Proofs.Availability
@@ -153,6 +154,19 @@ theorem ftTransferCall_obligation (cfg : Config) (codeOf : List UInt8 → Near.C
   sorry
 
 /-- Remaining execution-safety contexts, excluding the completed copied-array absent-account branch. -/
+theorem ftBalanceOf_outside_array_absent_no_issue_obligation (cfg : Config) (codeOf : List UInt8 → Near.ContractCode)
+    (protocol : Wasm.Near.RuntimeConfig)
+    (hprotocol : Wasm.Near.RuntimeConfig.parse wNearProtocolJson = .ok protocol)
+    (he : Binary.Exported.Environment protocol) (hcfg : cfg.WF)
+    (raw : RawStorage) (st : Option State) (ctx : Context)
+    (hrep : (wnear cfg).Represents raw st) (hwf : ctx.WF raw)
+    (hctx : ctx.protocol = protocol) (hm : ctx.method = "ft_balance_of")
+    (hother : ¬ ∃ c, Binary.BalanceOf297AbsentCall.ArrayAbsentCase st ctx c) :
+    ∀ msg, (Near.Boundary.nearRuntime.exec (Binary.wCode wNearBytes.size codeOf) raw ctx).outcome ≠
+      .error (.executionIssue msg) := by
+  sorry
+
+/-- Checked extension of the remaining copied-only case to all valid strings in this array branch. -/
 theorem ftBalanceOf_other_no_issue_obligation (cfg : Config) (codeOf : List UInt8 → Near.ContractCode)
     (protocol : Wasm.Near.RuntimeConfig)
     (hprotocol : Wasm.Near.RuntimeConfig.parse wNearProtocolJson = .ok protocol)
@@ -163,7 +177,12 @@ theorem ftBalanceOf_other_no_issue_obligation (cfg : Config) (codeOf : List UInt
     (hother : ¬ ∃ c, Binary.BalanceOf297AbsentCall.CopiedAbsentCase st ctx c) :
     ∀ msg, (Near.Boundary.nearRuntime.exec (Binary.wCode wNearBytes.size codeOf) raw ctx).outcome ≠
       .error (.executionIssue msg) := by
-  sorry
+  classical
+  by_cases hcase : ∃ c, Binary.BalanceOf297AbsentCall.ArrayAbsentCase st ctx c
+  · obtain ⟨c, hcase⟩ := hcase
+    exact Binary.BalanceOf297AbsentCall.array_case_no_issue cfg wNearBytes.size codeOf protocol he
+      deployed_code_size raw st ctx c hrep hwf hctx hm hcase
+  · exact ftBalanceOf_outside_array_absent_no_issue_obligation cfg codeOf protocol hprotocol he hcfg raw st ctx hrep hwf hctx hm hcase
 
 /-- Execution safety for every represented `ft_balance_of` context, including rejected input. -/
 theorem ftBalanceOf_no_issue_obligation (cfg : Config) (codeOf : List UInt8 → Near.ContractCode)
@@ -184,6 +203,24 @@ theorem ftBalanceOf_no_issue_obligation (cfg : Config) (codeOf : List UInt8 → 
       hrep hwf hctx hm hcase
 
 /-- Remaining accepted inputs and states, excluding the proved copied-array absent-account branch. -/
+theorem ftBalanceOf_outside_array_absent_accepted_obligation (cfg : Config) (codeOf : List UInt8 → Near.ContractCode)
+    (protocol : Wasm.Near.RuntimeConfig)
+    (hprotocol : Wasm.Near.RuntimeConfig.parse wNearProtocolJson = .ok protocol)
+    (he : Binary.Exported.Environment protocol) (hcfg : cfg.WF)
+    (raw : RawStorage) (st : Option State) (ctx : Context)
+    (hrep : (wnear cfg).Represents raw st) (hwf : ctx.WF raw)
+    (hctx : ctx.protocol = protocol) (hm : ctx.method = "ft_balance_of")
+    (c : Call) (hparse : (wnear cfg).Parses ctx.method ctx.args c)
+    (hother : ¬ Binary.BalanceOf297AbsentCall.ArrayAbsentCase st ctx c) :
+    let r := Near.Boundary.nearRuntime.exec (Binary.wCode wNearBytes.size codeOf) raw ctx
+    let res := (wnear cfg).step ctx st c
+    ((wnear cfg).gas ctx st c ≤ ctx.gasLimit → ctx.ProofRoom ((wnear cfg).proofBound ctx st c) →
+      Matches (wnear cfg) ctx raw r res ∧ r.usedGas ≤ (wnear cfg).gas ctx st c) ∧
+    (Matches (wnear cfg) ctx raw r res ∨
+      (ResourceFailure r ∧ RolledBack ctx raw r ∧ r.logs <+: res.logs)) := by
+  sorry
+
+/-- Checked extension of the remaining copied-only case to all valid strings in this array branch. -/
 theorem ftBalanceOf_other_accepted_obligation (cfg : Config) (codeOf : List UInt8 → Near.ContractCode)
     (protocol : Wasm.Near.RuntimeConfig)
     (hprotocol : Wasm.Near.RuntimeConfig.parse wNearProtocolJson = .ok protocol)
@@ -199,7 +236,11 @@ theorem ftBalanceOf_other_accepted_obligation (cfg : Config) (codeOf : List UInt
       Matches (wnear cfg) ctx raw r res ∧ r.usedGas ≤ (wnear cfg).gas ctx st c) ∧
     (Matches (wnear cfg) ctx raw r res ∨
       (ResourceFailure r ∧ RolledBack ctx raw r ∧ r.logs <+: res.logs)) := by
-  sorry
+  classical
+  by_cases hcase : Binary.BalanceOf297AbsentCall.ArrayAbsentCase st ctx c
+  · exact Binary.BalanceOf297AbsentCall.array_case_accepted cfg wNearBytes.size codeOf protocol he
+      deployed_code_size raw st ctx c hrep hwf hctx hm hcase
+  · exact ftBalanceOf_outside_array_absent_accepted_obligation cfg codeOf protocol hprotocol he hcfg raw st ctx hrep hwf hctx hm c hparse hcase
 
 /-- Accepted calls satisfy both resource-sufficient refinement and arbitrary-resource rollback clauses. -/
 theorem ftBalanceOf_accepted_obligation (cfg : Config) (codeOf : List UInt8 → Near.ContractCode)

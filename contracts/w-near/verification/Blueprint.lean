@@ -44,6 +44,7 @@ import Bridge.Methods.ContextInputDomain
 import Bridge.Methods.FtBalanceOfCodeCompose
 import Bridge.Methods.FtBalanceOfInitialAdequacy
 import Bridge.Methods.FtBalanceOfCopiedCase
+import Bridge.Methods.FtBalanceOfArrayCase
 
 /-! The browsable proof frontier. Definitions marked Open state contracts, not proofs. -/
 
@@ -174,7 +175,7 @@ attribute [blueprint "frontier:method-ft_transfer_call"
 
 attribute [blueprint "frontier:method-ft_balance_of"
   (title := /-- ft\_balance\_of -/)
-  (statement := /-- ft\_balance\_of. Checked assembly is Conditional on general execution safety, rejected-input rollback and the accepted-call composition. That composition integrates the proved copied-array absent-account case and leaves its precise complement Open. -/)
+  (statement := /-- Conditional checked assembly with the initialized absent-account array branch proved for both borrowed and copied valid strings. The exact complementary safety/accepted-case obligations, rejected-input rollback and other method/protocol obligations remain unresolved. -/)
   (notReady := true)]
   WNear.ftBalanceOf_obligation
 
@@ -378,13 +379,13 @@ attribute [blueprint "frontier:balance-caller-absent"
 
 attribute [blueprint "frontier:balance-no-issue"
   (title := /-- Balance method execution safety -/)
-  (statement := /-- Open obligation: exclude execution issues for every represented balance-method context, including rejected input. -/)
+  (statement := /-- Conditional checked assembly with the initialized absent-account array branch proved for both borrowed and copied valid strings. The exact complementary safety/accepted-case obligations, rejected-input rollback and other method/protocol obligations remain unresolved. -/)
   (notReady := true)]
   WNear.ftBalanceOf_no_issue_obligation
 
 attribute [blueprint "frontier:balance-accepted"
   (title := /-- ft_balance_of: accepted-call refinement -/)
-  (statement := /-- Checked case composition preserves the original accepted-call statement. The copied-array absent-account case is proved and integrated; its complement remains Open. This assembly remains Conditional. -/)
+  (statement := /-- Conditional checked assembly with the initialized absent-account array branch proved for both borrowed and copied valid strings. The exact complementary safety/accepted-case obligations, rejected-input rollback and other method/protocol obligations remain unresolved. -/)
   (notReady := true)]
   WNear.ftBalanceOf_accepted_obligation
 
@@ -723,7 +724,7 @@ attribute [blueprint "frontier:copied-parser-with-room"
 
 attribute [blueprint "frontier:balance-copied-parser-through-cleanup"
   (title := /-- Function 297: copied-array parser call through absent cleanup -/)
-  (statement := /-- Specific copied/escaped array input and actual function 65 call, initial parser-growth-plus-six room, parser allocation bounds, trie, shared proof budget, host and frame resources; other input cases and full method remain open. -/)
+  (statement := /-- The original copied-only statement is preserved exactly and proved by checked specialization of balance-array-parser-through-cleanup. Its displayed type premises and readiness remain unchanged. -/)
   (notReady := true)]
   WNear.Binary.BalanceOf297AbsentCall.copied_parser_call_through_cleanup
 
@@ -734,7 +735,7 @@ attribute [blueprint "frontier:balance-input-deref-setup"
 
 attribute [blueprint "frontier:balance-input-deref-through-cleanup"
   (title := /-- Function 297: dereference through copied-array balance cleanup -/)
-  (statement := /-- Concrete copied-array input, parser and heap room, trie, input ownership and host/frame premises. -/)
+  (statement := /-- The original copied-only statement is preserved exactly and proved by checked specialization of balance-array-deref-through-cleanup. Its displayed type premises and readiness remain unchanged. -/)
   (notReady := true)]
   WNear.Binary.BalanceOf297AbsentCall.deref_copied_parser_through_cleanup
 
@@ -745,19 +746,19 @@ attribute [blueprint "frontier:balance-input-expect"
 
 attribute [blueprint "frontier:balance-input-expect-through-cleanup"
   (title := /-- Function 297: input unwrap through copied-array cleanup -/)
-  (statement := /-- Concrete copied-array input, present input vector, parser and heap room, trie and host/frame premises. -/)
+  (statement := /-- The original copied-only statement is preserved exactly and proved by checked specialization of balance-array-expect-through-cleanup. Its displayed type premises and readiness remain unchanged. -/)
   (notReady := true)]
   WNear.Binary.BalanceOf297AbsentCall.expect_deref_parser_through_cleanup
 
 attribute [blueprint "frontier:balance-input-through-cleanup"
   (title := /-- Function 297: input call through copied-array cleanup -/)
-  (statement := /-- Input call arguments prepared, input register limit and allocation room, copied-array parser room, initial input-plus-parser-plus-six growth budget, trie, host and frame premises. -/)
+  (statement := /-- The original copied-only statement is preserved exactly and proved by checked specialization of balance-array-input-through-cleanup. Its displayed type premises and readiness remain unchanged. -/)
   (notReady := true)]
   WNear.Binary.BalanceOf297AbsentCall.input_copied_parser_through_cleanup
 
 attribute [blueprint "frontier:balance-input-setup-through-cleanup"
   (title := /-- Function 297: input setup through copied-array cleanup -/)
-  (statement := /-- Installed interface, concrete copied-array input, input and parser room, initial growth budget, trie, host and frame premises. -/)
+  (statement := /-- The original copied-only statement is preserved exactly and proved by checked specialization of balance-array-input-setup-through-cleanup. Its displayed type premises and readiness remain unchanged. -/)
   (notReady := true)]
   WNear.Binary.BalanceOf297AbsentCall.input_setup_through_cleanup
 
@@ -768,7 +769,7 @@ attribute [blueprint "frontier:balance-method-prologue"
 
 attribute [blueprint "frontier:balance-copied-absent-body"
   (title := /-- Function 297: complete body for copied-array absent account -/)
-  (statement := /-- Entire decoded function body for the copied-string array and absent-account path, conditional on input shape, parser and heap room, trie, host, gas and initial frame/static resources. The full accepted/rejected method contract remains open. -/)
+  (statement := /-- The original copied-only statement is preserved exactly and proved by checked specialization of balance-array-absent-body. Its displayed type premises and readiness remain unchanged. -/)
   (notReady := true)]
   WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body
 
@@ -792,7 +793,7 @@ attribute [blueprint "frontier:initial-input-copy-room"
 
 attribute [blueprint "frontier:balance-copied-body-initial-room"
   (title := /-- Function 297: copied-array absent account from initial room -/)
-  (statement := /-- Entire decoded body for a copied-string array and absent account, deriving input and account-copy room from the initial combined budget. Parser room, input shape, trie, host, gas and frame conditions remain premises; the full method remains open. -/)
+  (statement := /-- The original copied-only statement is preserved exactly and proved by checked specialization of balance-array-body-initial-room. Its displayed type premises and readiness remain unchanged. -/)
   (notReady := true)]
   WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body_initial_room
 
@@ -915,7 +916,7 @@ attribute [blueprint "frontier:initial-combined-parser-room"
 
 attribute [blueprint "frontier:balance-copied-body-initial-memory"
   (title := /-- Function 297: copied-array absent body at initial memory -/)
-  (statement := /-- Complete decoded body at the instantiated 1024-page initial memory, with input, parser and subsequent allocation room derived rather than assumed. Exact copied-array input, absent account, trie/proof budget, host/register/return limits, code/frame ownership and gas credits remain stated environmental premises. This specific body proof does not establish full external accepted/rejected refinement. -/)]
+  (statement := /-- The original copied-only statement is preserved exactly and proved by checked specialization of balance-array-body-initial-memory. Its displayed type premises and readiness remain unchanged. -/)]
   WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body_initial_memory
 
 attribute [blueprint "frontier:balance-code-input"
@@ -1000,7 +1001,7 @@ attribute [blueprint "frontier:balance-initial-start"
 
 attribute [blueprint "frontier:balance-initial-body"
   (title := /-- Copied body with initialized resources -/)
-  (statement := /-- Instantiates the complete copied-array absent body with the actual initial frame, static words, table indices and empty heap. Exact input, absent key, host/trie/proof budget, runtime limits and credits remain explicit. -/)]
+  (statement := /-- The original copied-only statement is preserved exactly and proved by checked specialization of balance-array-initial-body. Its displayed type premises and readiness remain unchanged. -/)]
   WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body_initial_resources
 
 attribute [blueprint "frontier:balance-initial-store-body"
@@ -1030,7 +1031,7 @@ attribute [blueprint "frontier:balance-entry-activation"
 
 attribute [blueprint "frontier:balance-entry-adequacy"
   (title := /-- Balance entry: ending-run adequacy -/)
-  (statement := /-- MaybeStuck adequacy from the actual initial store for the exact copied-array absent-account path. Any ending run returns no values with the proved host/gas cells. Does not prove termination, fuel sufficiency, general execution safety, arbitrary-gas rollback or full accepted-call refinement. Body gas is explicit; activation is separate. -/)]
+  (statement := /-- The original copied-only statement is preserved exactly and proved by checked specialization of balance-array-entry-adequacy. Its displayed type premises and readiness remain unchanged. -/)]
   WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_adequate
 
 attribute [blueprint "frontier:balance-entry-host"
@@ -1075,7 +1076,7 @@ attribute [blueprint "frontier:balance-total-model-gas"
 
 attribute [blueprint "frontier:balance-copied-runs"
   (title := /-- Actual copied balance MethodRunsR -/)
-  (statement := /-- Connects the initialized store and ending-run adequacy to the standard resource-aware method-run contract, including activation and bounded host/gas effects. -/)]
+  (statement := /-- The original copied-only statement is preserved exactly and proved by checked specialization of balance-array-runs. Its displayed type premises and readiness remain unchanged. -/)]
   WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_runs
 
 attribute [blueprint "frontier:balance-copied-model-agreement"
@@ -1095,7 +1096,7 @@ attribute [blueprint "frontier:balance-copied-entry-at"
 
 attribute [blueprint "frontier:balance-copied-case-refinement"
   (title := /-- Copied array, absent account: full receipt refinement -/)
-  (statement := /-- Proven for initialized represented state, an unregistered account and the exact copied-string array grammar with input length below 2^24. Proves execution safety, sufficient-resource Matches with model gas bound, and arbitrary-resource Matches or rollback. Entry/trie/proof-budget and model-agreement interfaces are concretely instantiated. Other input/state cases remain open. -/)]
+  (statement := /-- The original copied-only statement is preserved exactly and proved by checked specialization of balance-array-case-refinement. Its displayed type premises and readiness remain unchanged. -/)]
   WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_refines_init
 
 attribute [blueprint "frontier:balance-copied-case-accepted"
@@ -1105,7 +1106,7 @@ attribute [blueprint "frontier:balance-copied-case-accepted"
 
 attribute [blueprint "frontier:balance-other-accepted"
   (title := /-- ft_balance_of: remaining accepted cases -/)
-  (statement := /-- Precise complementary case of the original accepted-call contract. Excludes the proved initialized copied-array, absent-account branch. Borrowed strings, objects, registered accounts, uninitialized state and other accepted cases remain to be proved. -/)
+  (statement := /-- Preserves the previous remaining-case statement and performs a checked split on the broader completed array case. Borrowed and copied strings in that case are proved; its precise complement is still Open. This assembly remains Conditional. -/)
   (notReady := true)]
   WNear.ftBalanceOf_other_accepted_obligation
 
@@ -1116,6 +1117,162 @@ attribute [blueprint "frontier:balance-copied-case-safety"
 
 attribute [blueprint "frontier:balance-other-no-issue"
   (title := /-- ft_balance_of: remaining execution-safety contexts -/)
-  (statement := /-- General execution safety outside the proved initialized copied-array absent-account case, including rejected input. The precise complement remains Open. -/)
+  (statement := /-- Preserves the previous remaining-case statement and performs a checked split on the broader completed array case. Borrowed and copied strings in that case are proved; its precise complement is still Open. This assembly remains Conditional. -/)
   (notReady := true)]
   WNear.ftBalanceOf_other_no_issue_obligation
+
+attribute [blueprint "frontier:array-value-reader"
+  (title := /-- Shared account-id reader: borrowed or copied -/)
+  (statement := /-- Reuses the existing model-decoded account-id reader with arbitrary reusable scratch. Its explicit parser and allocation-room premises remain named dependencies until the initialized instance supplies them. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeValueReuse.spec169_model
+
+attribute [blueprint "frontier:array-value-cost-bound"
+  (title := /-- Both string paths fit the existing value gas charge -/)
+  (statement := /-- The shared borrowed/copied reader charge is bounded by the existing copied-reader charge. No gas allowance or old cost definition changes. -/)]
+  WNear.Binary.SerdeValueReuse.valueCost_le
+
+attribute [blueprint "frontier:array-scratch-drop"
+  (title := /-- Scratch cleanup preserves the free-list bound -/)
+  (statement := /-- The actual vector drop preserves every earlier live allocation and returns a checked free-list bound F+1 for either empty or allocated scratch. Empty scratch uses the permitted monotonic bound. -/)]
+  WNear.Binary.SerdeValueReuse.f68_scratch_exact
+
+attribute [blueprint "frontier:array-owned-drop"
+  (title := /-- Owned value survives either scratch cleanup path -/)
+  (statement := /-- Carries the common reader result through the actual scratch drop, retaining the exact parser/copy growth allowance and the owned account string. -/)]
+  WNear.Binary.SerdeValueReuse.f68_owned_value
+
+attribute [blueprint "frontier:array-struct-reader"
+  (title := /-- Array struct reads either valid string path -/)
+  (statement := /-- Instantiates the changing-state array-struct contract with the existing shared account-id reader and its owned value. General parser/allocation room remains explicit. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeStructArrModel.f228_arr_model
+
+attribute [blueprint "frontier:array-wrapper-reader"
+  (title := /-- Deserialize wrapper for both string paths -/)
+  (statement := /-- Checked function-78 wrapper for the common valid-array result and reusable scratch state. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeStruct78Model.f78_arr_model
+
+attribute [blueprint "frontier:array-parser-cost-domination"
+  (title := /-- Common array charge fits the previous bound -/)
+  (statement := /-- Lifts the shared value-reader cost inequality to the full array-struct cost, under the exact successful model decode. -/)]
+  WNear.Binary.SerdeStruct78Model.costArray_le
+
+attribute [blueprint "frontier:array-from-trait-reader"
+  (title := /-- from_trait restores either successful array path -/)
+  (statement := /-- Executes the real deserializer construction, array reader, trailing-input check and scratch cleanup; restores the full frame and retains the owned String and concrete heap bounds. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeFromTraitModel.f66_arr_model
+
+attribute [blueprint "frontier:array-from-slice-reader"
+  (title := /-- from_slice accepts both valid string paths -/)
+  (statement := /-- Connects the actual function-65 entry to the common array result and exact cleanup bounds. -/)
+  (notReady := true)]
+  WNear.Binary.FromSliceModel.f65_arr_model
+
+attribute [blueprint "frontier:array-parser-model-core"
+  (title := /-- Both array paths use the unchanged parser budget -/)
+  (statement := /-- Funds the common function-65 proof from the original parser gas allowance using the proved cost domination. No gas statement is weakened. -/)
+  (notReady := true)]
+  WNear.Binary.FromSliceModel.f65_arr_model_bound
+
+attribute [blueprint "frontier:array-parser-with-room"
+  (title := /-- Both array paths supply balance-entry resources -/)
+  (statement := /-- Derives error-box room from the existing growth-plus-six allowance, invokes the common parser with the unchanged budget, and retains the exact owned account and downstream heap room. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.f65_arr_model_room
+
+attribute [blueprint "frontier:balance-array-parser-through-cleanup"
+  (title := /-- Balance parser call through cleanup for both array paths -/)
+  (statement := /-- Checked generalization to borrowed and copied valid strings in the exact array/absent-account branch. The existing copied-only statement is retained as a checked specialization. All displayed resource and environmental premises remain explicit. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.array_parser_call_through_cleanup
+
+attribute [blueprint "frontier:balance-array-deref-through-cleanup"
+  (title := /-- Balance input dereference through common array cleanup -/)
+  (statement := /-- Checked generalization to borrowed and copied valid strings in the exact array/absent-account branch. The existing copied-only statement is retained as a checked specialization. All displayed resource and environmental premises remain explicit. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.array_deref_parser_through_cleanup
+
+attribute [blueprint "frontier:balance-array-expect-through-cleanup"
+  (title := /-- Balance input unwrap through common array cleanup -/)
+  (statement := /-- Checked generalization to borrowed and copied valid strings in the exact array/absent-account branch. The existing copied-only statement is retained as a checked specialization. All displayed resource and environmental premises remain explicit. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.array_expect_deref_parser_through_cleanup
+
+attribute [blueprint "frontier:balance-array-input-through-cleanup"
+  (title := /-- Balance input read through common array cleanup -/)
+  (statement := /-- Checked generalization to borrowed and copied valid strings in the exact array/absent-account branch. The existing copied-only statement is retained as a checked specialization. All displayed resource and environmental premises remain explicit. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.array_input_parser_through_cleanup
+
+attribute [blueprint "frontier:balance-array-input-setup-through-cleanup"
+  (title := /-- Balance input setup through common array cleanup -/)
+  (statement := /-- Checked generalization to borrowed and copied valid strings in the exact array/absent-account branch. The existing copied-only statement is retained as a checked specialization. All displayed resource and environmental premises remain explicit. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.array_input_setup_through_cleanup
+
+attribute [blueprint "frontier:balance-array-absent-body"
+  (title := /-- Whole balance body for either valid array string path -/)
+  (statement := /-- Checked generalization to borrowed and copied valid strings in the exact array/absent-account branch. The existing copied-only statement is retained as a checked specialization. All displayed resource and environmental premises remain explicit. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.array_absent_body
+
+attribute [blueprint "frontier:balance-array-body-initial-room"
+  (title := /-- Both array paths from the combined initial allowance -/)
+  (statement := /-- Checked generalization to borrowed and copied valid strings in the exact array/absent-account branch. The existing copied-only statement is retained as a checked specialization. All displayed resource and environmental premises remain explicit. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.array_absent_body_initial_room
+
+attribute [blueprint "frontier:balance-array-body-initial-memory"
+  (title := /-- Initial memory supplies both array paths -/)
+  (statement := /-- Checked generalization to borrowed and copied valid strings in the exact array/absent-account branch. The existing copied-only statement is retained as a checked specialization. All displayed resource and environmental premises remain explicit. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.array_absent_body_initial_memory
+
+attribute [blueprint "frontier:balance-array-initial-body"
+  (title := /-- Initial code, frame and statics supply both array paths -/)
+  (statement := /-- Checked generalization to borrowed and copied valid strings in the exact array/absent-account branch. The existing copied-only statement is retained as a checked specialization. All displayed resource and environmental premises remain explicit. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.array_absent_body_initial_resources
+
+attribute [blueprint "frontier:balance-array-entry-adequacy"
+  (title := /-- Ending-run adequacy for either array string path -/)
+  (statement := /-- Checked generalization to borrowed and copied valid strings in the exact array/absent-account branch. The existing copied-only statement is retained as a checked specialization. All displayed resource and environmental premises remain explicit. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.array_absent_adequate
+
+attribute [blueprint "frontier:balance-array-runs"
+  (title := /-- Metered MethodRunsR for either array string path -/)
+  (statement := /-- Checked generalization to borrowed and copied valid strings in the exact array/absent-account branch. The existing copied-only statement is retained as a checked specialization. All displayed resource and environmental premises remain explicit. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.array_absent_runs
+
+attribute [blueprint "frontier:balance-array-case-refinement"
+  (title := /-- Valid array, absent account: full receipt refinement -/)
+  (statement := /-- Proven full receipt result for initialized represented state, an unregistered account and any valid model-decoded string in the exact array grammar, with input length below 2^24. Covers borrowed and copied strings, execution safety, sufficient-resource Matches with the unchanged model gas bound, and arbitrary-resource Matches or rollback. Context and represented storage instantiate the entry/trie/proof-budget and model-agreement contracts. Other input/state cases remain unresolved. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.array_absent_refines_init
+
+attribute [blueprint "frontier:balance-array-case-accepted"
+  (title := /-- All valid array strings supply accepted-call assembly -/)
+  (statement := /-- Projects the proved receipt case into the original accepted-call result shape. Both string paths are connected through checked composition to the Conditional accepted-call callers. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.array_case_accepted
+
+attribute [blueprint "frontier:balance-array-case-safety"
+  (title := /-- All valid array strings supply execution-safety assembly -/)
+  (statement := /-- Projects execution safety from the proved full receipt case and connects it to the Conditional general safety callers. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.array_case_no_issue
+
+attribute [blueprint "frontier:balance-copied-case-in-array"
+  (title := /-- Previous copied case lies inside the completed array case -/)
+  (statement := /-- Kernel-checked containment of the old case predicate in the new broader case. Both predicate bodies are pinned; the remaining leaves exclude this entire broader case. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.copied_case_is_array_case
+
+attribute [blueprint "frontier:balance-outside-array-accepted"
+  (title := /-- ft_balance_of: accepted outside the completed array case -/)
+  (statement := /-- Precise complement of the initialized valid-array, absent-account case. Registered accounts, uninitialized state, object inputs and other contexts remain Open. The full callers remain Conditional through this leaf. -/)
+  (notReady := true)]
+  WNear.ftBalanceOf_outside_array_absent_accepted_obligation
+
+attribute [blueprint "frontier:balance-outside-array-no-issue"
+  (title := /-- ft_balance_of: safety outside the completed array case -/)
+  (statement := /-- Precise complement of the initialized valid-array, absent-account case. Registered accounts, uninitialized state, object inputs and other contexts remain Open. The full callers remain Conditional through this leaf. -/)
+  (notReady := true)]
+  WNear.ftBalanceOf_outside_array_absent_no_issue_obligation

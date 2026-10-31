@@ -76,7 +76,7 @@ theorem entryCost_297 (cfg : RuntimeConfig) (h : NearState) :
 
 set_option maxRecDepth 1000000 in
 set_option maxHeartbeats 32000000 in
-theorem copied_array_absent_adequate (runtime : RuntimeConfig) (Cg : Nat) (a : WNear.AccountId) (bs jsonRest : List UInt8) (j k : Nat)
+theorem array_absent_adequate (runtime : RuntimeConfig) (Cg : Nat) (a : WNear.AccountId) (bs jsonRest : List UInt8) (j k : Nat)
     (hlen : bs.length < 2 ^ 24)
     (ho : bs[wsLen bs]? = some 0x5B)
     (hj : j = wsLen bs + 1 + wsLen (bs.drop (wsLen bs + 1))) (hq : bs[j]? = some 0x22)
@@ -84,7 +84,7 @@ theorem copied_array_absent_adequate (runtime : RuntimeConfig) (Cg : Nat) (a : W
     (hk : k = bs.length - jsonRest.length + wsLen (bs.drop (bs.length - jsonRest.length)) + 1)
     (hend : k + wsLen (bs.drop k) = bs.length)
     (hmodel : NearInterface.Json.stringBody (bs.drop (j + 1)) [] = some (some a.val, jsonRest))
-    (hcopied : ¬ borrowed (bs.drop (j + 1)))
+
     (h0 h : NearState) (hinput : h0.context.input = bs) (hafter : inputHost h0 0 = h)
     (hinputLimit : withinLimit h0.config.maxRegisterLen bs.length = true)
     (S : WNear.State) (st : Near.TrieOverlay.State)
@@ -122,8 +122,8 @@ theorem copied_array_absent_adequate (runtime : RuntimeConfig) (Cg : Nat) (a : W
   iapply mwp_entry runtime.wasm execLimits ⟨#[.i32 0, .i32 0, .i64 0, .i32 0], 0, wInst⟩ 0 f297.body Cg Ψ
   isplitr
   · iexact Hinst
-  iapply copied_array_absent_body_initial_resources runtime runtime.wasm execLimits 0 (by decide) Cg 0 a bs jsonRest j k
-    hlen ho hj hq he hk hend hmodel hcopied h0 h hinput hafter hinputLimit S st hv hacc hlim
+  iapply array_absent_body_initial_resources runtime runtime.wasm execLimits 0 (by decide) Cg 0 a bs jsonRest j k
+    hlen ho hj hq he hk hend hmodel  h0 h hinput hafter hinputLimit S st hv hacc hlim
     hcanon hlink bud hproof hbudget hlimAccount hnone hreg hret (entryPost Cg 0 Ψ)
   iframe HC Hg HF HS V36 T44 ESC UTF HEX HH
   isplitl [Hgas]
@@ -162,6 +162,42 @@ theorem copied_array_absent_adequate (runtime : RuntimeConfig) (Cg : Nat) (a : W
   iapply BigSepL.bigSepL_nil.2
   iempintro
 
+set_option maxRecDepth 1000000 in
+set_option maxHeartbeats 32000000 in
+/-- The existing copied-only contract, preserved as a checked specialization. -/
+theorem copied_array_absent_adequate (runtime : RuntimeConfig) (Cg : Nat) (a : WNear.AccountId) (bs jsonRest : List UInt8) (j k : Nat)
+    (hlen : bs.length < 2 ^ 24)
+    (ho : bs[wsLen bs]? = some 0x5B)
+    (hj : j = wsLen bs + 1 + wsLen (bs.drop (wsLen bs + 1))) (hq : bs[j]? = some 0x22)
+    (he : bs[bs.length - jsonRest.length + wsLen (bs.drop (bs.length - jsonRest.length))]? = some 0x5D)
+    (hk : k = bs.length - jsonRest.length + wsLen (bs.drop (bs.length - jsonRest.length)) + 1)
+    (hend : k + wsLen (bs.drop k) = bs.length)
+    (hmodel : NearInterface.Json.stringBody (bs.drop (j + 1)) [] = some (some a.val, jsonRest))
+    (hcopied : ¬ borrowed (bs.drop (j + 1)))
+    (h0 h : NearState) (hinput : h0.context.input = bs) (hafter : inputHost h0 0 = h)
+    (hinputLimit : withinLimit h0.config.maxRegisterLen bs.length = true)
+    (S : WNear.State) (st : Near.TrieOverlay.State)
+    (hv : h.storage WNear.stateKey = some (WNear.header S))
+    (hacc : h.storageAccounting = some st) (hlim : withinLimit h.config.maxStorageKeyLen 5 = true)
+    (hcanon : Canon st) (hlink : StorageLink h st) (bud : Nat) (hproof : ProofBudget h st bud)
+    (hbudget : readProofCost (contractKey h.context.currentAccountId WNear.stateKey) (h.storage WNear.stateKey) +
+      readProofCost (contractKey h.context.currentAccountId (WNear.accountsPrefix ++ (bytes32 (UInt32.ofNat a.val.utf8ByteSize) ++ a.val.toUTF8.toList)))
+        (h.storage (WNear.accountsPrefix ++ (bytes32 (UInt32.ofNat a.val.utf8ByteSize) ++ a.val.toUTF8.toList))) ≤ bud)
+    (hlimAccount : withinLimit h.config.maxStorageKeyLen (WNear.accountsPrefix ++ (bytes32 (UInt32.ofNat a.val.utf8ByteSize) ++ a.val.toUTF8.toList)).length = true)
+    (hnone : h.storage (WNear.accountsPrefix ++ (bytes32 (UInt32.ofNat a.val.utf8ByteSize) ++ a.val.toUTF8.toList)) = none)
+    (hreg : withinLimit h.config.maxRegisterLen 29 = true)
+    (hret : withinLimit h.config.maxReturnLen 3 = true)
+    (hgas : h0.gas.used + (475 * runtime.wasm.regularOpCost + (3 * runtime.wasm.regularOpCost + (100 * runtime.wasm.regularOpCost + cost527 runtime.wasm h0 + (100 * runtime.wasm.regularOpCost + (100 * runtime.wasm.regularOpCost + (1000 * runtime.wasm.regularOpCost +
+        (45 * runtime.wasm.regularOpCost + ((700 + 96 * wsLen (bs.drop k)) * runtime.wasm.regularOpCost +
+          costArray runtime.wasm 1 0 bs a.val.toUTF8.toList jsonRest j)) +
+        parserSuccessCost runtime.wasm (copiedParserFree bs (j + 1) 1) h S a 0)))))) ≤ Cg) (hC1 : Cg ≤ h0.gas.maxBurnt) (hC2 : Cg ≤ h0.gas.prepaid)
+    : adequate .MaybeStuck
+      (MCode.running runtime.wasm execLimits
+        (entryThread ⟨#[.i32 0, .i32 0, .i64 0, .i32 0], 0, wInst⟩ 0 f297.body))
+      ⟨wStore runtime h0⟩
+      (fun v σ' => v = .values [] ∧ ∃ cs, endCells297 Cg h a st cs ∧
+        ∀ p ∈ cs, mlookup σ' p.1 = some p.2) := by
+  exact array_absent_adequate runtime Cg a bs jsonRest j k hlen ho hj hq he hk hend hmodel h0 h hinput hafter hinputLimit S st hv hacc hlim hcanon hlink bud hproof hbudget hlimAccount hnone hreg hret hgas hC1 hC2
 set_option maxRecDepth 1000000 in
 set_option maxHeartbeats 32000000 in
 /-- The actual initial entry thread, with observable host and gas consequences. Activation is charged separately. -/

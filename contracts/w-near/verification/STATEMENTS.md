@@ -310,6 +310,74 @@ theorem WNear.Binary.BalanceOf297AbsentCall.argument_copy {GF : Iris.BundledGFun
       (List.take 12 (List.drop 79 WNear.Binary.f297.body)) Φ
 ```
 
+## Bridge.Functions.BalanceOf297ArrayParser
+
+`WNear.Binary.BalanceOf297AbsentCall.f65_arr_model_room` (hash `000000004d522f6e`)
+
+```lean
+theorem WNear.Binary.BalanceOf297AbsentCall.f65_arr_model_room {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (htype : type.results = [])
+  (inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 38 < lim.maxCallDepth) (Cg : ℕ) (gt : Wasm.GlobalType) (sp out ptr idx : UInt32) (ob bs : List UInt8)
+  (a : WNear.AccountId) (rest : List UInt8) (j k mlen F : ℕ) (live : List (ℕ × ℕ)) (hob : ob.length = 16)
+  (hout : out.toNat + 16 ≤ 2 ^ 32) (hlen : bs.length < 2 ^ 24) (hptr : ptr.toNat + bs.length < 2 ^ 32)
+  (hsp : 448 ≤ sp.toNat) (ho : bs[WNear.Binary.SerdeRead.wsLen bs]? = some 91)
+  (hj :
+    j =
+      WNear.Binary.SerdeRead.wsLen bs + 1 +
+        WNear.Binary.SerdeRead.wsLen (List.drop (WNear.Binary.SerdeRead.wsLen bs + 1) bs))
+  (hq : bs[j]? = some 34)
+  (he : bs[bs.length - rest.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - rest.length) bs)]? = some 93)
+  (hk : k = bs.length - rest.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - rest.length) bs) + 1)
+  (hend : k + WNear.Binary.SerdeRead.wsLen (List.drop k bs) = bs.length)
+  (hmodel : NearInterface.Json.stringBody (List.drop (j + 1) bs) [] = some (some ↑a, rest))
+  (hroom : WNear.Binary.ParseStr.roomRun 2048 mlen 0 [] (List.drop (j + 1) bs))
+  (halloc :
+    WNear.Binary.VecFromElem.roomFor
+      (mlen +
+        WNear.Binary.ScratchGrow.growthPages 0 0 (WNear.Binary.ParseStrSuccess.appendChunks (List.drop (j + 1) bs) []) *
+          65536)
+      2048 (UInt32.ofNat (↑a).toUTF8.toList.length))
+  (hroom6 :
+    WNear.Binary.LookupMapOps.HeapRoomK (WNear.Binary.BalanceOf297AbsentCall.copiedParserPages bs (j + 1) a + 6) mlen
+      2048) :
+  WNear.Binary.SerdeFromTrait.code66 n 2048 inst mi A ∗
+      WNear.Binary.SerdeAccountId.code169 n 2048 inst mi A ∗
+        WNear.Binary.ParseStr.code646 n 2048 inst mi A ∗
+          WNear.Binary.DropVec.dropCode inst mi A ∗
+            A 644 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[31]! inst WNear.Binary.f644 ∗
+              A 66 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f66 ∗ inst ↪[inst] mi ⊢
+    NearLogic.MFunSpec cfg lim d type inst mi WNear.Binary.f65 Cg
+      (fun args =>
+        iprop(⌜args = [Wasm.Value.i32 out, Wasm.Value.i32 ptr, Wasm.Value.i32 (UInt32.ofNat bs.length)]⌝ ∗
+            g ↦[wg] { type := gt, value := Wasm.Value.i32 sp } ∗
+              WNear.Binary.VecFromElem.stk n (sp.toNat - 448) 448 ∗
+                WNear.Binary.AllocFirstFit.vt n 1057464 idx ta (A 578) ∗
+                  WNear.Binary.AllocInv.heapInv n 2048 mlen live F ∗
+                    n ↦[wms][ out.toNat ] ob ∗
+                      n ↦[wms][ ptr.toNat ] bs ∗
+                        n ↦[wms][ 1062392 ] WNear.Binary.ParseStr.escTable ∗
+                          n ↦[wms][ 1071704 ] WNear.Binary.FromUtf8Gen.utf8Width ∗
+                            n ↦[wms][ 1062712 ] WNear.Binary.SerdeEsc.hexTable))
+      (fun x =>
+        45 * cfg.regularOpCost +
+          ((700 + 96 * WNear.Binary.SerdeRead.wsLen (List.drop k bs)) * cfg.regularOpCost +
+            WNear.Binary.SerdeStruct78Esc.costArray cfg F 0 bs (↑a).toUTF8.toList rest j))
+      fun x rs =>
+      iprop(⌜rs = []⌝ ∗
+          g ↦[wg] { type := gt, value := Wasm.Value.i32 sp } ∗
+            WNear.Binary.VecFromElem.stk n (sp.toNat - 448) 448 ∗
+              WNear.Binary.AllocFirstFit.vt n 1057464 idx ta (A 578) ∗
+                n ↦[wms][ ptr.toNat ] bs ∗
+                  n ↦[wms][ 1062392 ] WNear.Binary.ParseStr.escTable ∗
+                    n ↦[wms][ 1071704 ] WNear.Binary.FromUtf8Gen.utf8Width ∗
+                      n ↦[wms][ 1062712 ] WNear.Binary.SerdeEsc.hexTable ∗
+                        ∃ hl',
+                          ⌜WNear.Binary.LookupMapOps.HeapRoomK 6 hl' 2048⌝ ∗
+                            WNear.Binary.BalanceOf297AbsentCall.okAtFixed n out a live hl'
+                              (WNear.Binary.BalanceOf297AbsentCall.copiedParserFree bs (j + 1) F))
+```
+
 ## Bridge.Functions.BalanceOf297Cleanup
 
 `WNear.Binary.BalanceOf297AbsentCall.cleanup` (hash `00000000ba1e7433`)
@@ -739,6 +807,180 @@ theorem WNear.Binary.BalanceOf297AbsentCall.call_through_value_return_absent {GF
 
 ## Bridge.Functions.BalanceOf297CopiedBody
 
+`WNear.Binary.BalanceOf297AbsentCall.array_absent_body` (hash `00000000236dae53`)
+
+```lean
+theorem WNear.Binary.BalanceOf297AbsentCall.array_absent_body {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d inst e : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ)
+  (mx : Option ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta) (hd : d + 39 < lim.maxCallDepth) (Cg R : ℕ)
+  (gt : Wasm.GlobalType) (s x1 : UInt32) (x2 : UInt64) (x3 idx : UInt32) (len : ℕ) (a : WNear.AccountId)
+  (live : List (ℕ × ℕ)) (bs oldOpt optTail oldVec jsonRest derefOut : List UInt8) (j k : ℕ)
+  (ob stateTail contractTail destTail out head oldA oldB : List UInt8) (oldC oldD hookOld k3 : UInt32)
+  (hs : 592 ≤ s.toNat) (hal : s.toNat % 8 = 0) (hframe : s.toNat + 160 < 2 ^ 32) (hopt : oldOpt.length = 12)
+  (hoptTail : optTail.length = 4) (holdVec : oldVec.length = 12) (hderef : derefOut.length = 8)
+  (hlen : bs.length < 2 ^ 24) (ho : bs[WNear.Binary.SerdeRead.wsLen bs]? = some 91)
+  (hj :
+    j =
+      WNear.Binary.SerdeRead.wsLen bs + 1 +
+        WNear.Binary.SerdeRead.wsLen (List.drop (WNear.Binary.SerdeRead.wsLen bs + 1) bs))
+  (hq : bs[j]? = some 34)
+  (he :
+    bs[bs.length - jsonRest.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - jsonRest.length) bs)]? =
+      some 93)
+  (hk : k = bs.length - jsonRest.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - jsonRest.length) bs) + 1)
+  (hend : k + WNear.Binary.SerdeRead.wsLen (List.drop k bs) = bs.length)
+  (hmodel : NearInterface.Json.stringBody (List.drop (j + 1) bs) [] = some (some ↑a, jsonRest))
+  (hparserRoom :
+    ∀ (len' : ℕ),
+      len' = len ∨ len' = WNear.Binary.VecFromElem.grownLen len (UInt32.ofNat bs.length) →
+        WNear.Binary.ParseStr.roomRun 2048 len' 0 [] (List.drop (j + 1) bs))
+  (halloc :
+    ∀ (len' : ℕ),
+      len' = len ∨ len' = WNear.Binary.VecFromElem.grownLen len (UInt32.ofNat bs.length) →
+        WNear.Binary.VecFromElem.roomFor
+          (len' +
+            WNear.Binary.ScratchGrow.growthPages 0 0
+                (WNear.Binary.ParseStrSuccess.appendChunks (List.drop (j + 1) bs) []) *
+              65536)
+          2048 (UInt32.ofNat (↑a).toUTF8.toList.length))
+  (hob : ob.length = 16) (hstateTail : stateTail.length = 24) (hcontractTail : contractTail.length = 28)
+  (hdestTail : destTail.length = 4) (hA : oldA.length = 8) (hB : oldB.length = 8) (hout : out.length = 12)
+  (hhead : head.length = 8) (h0 h : Wasm.NearState) (hinput : h0.context.input = bs)
+  (hafter : NearLogic.inputHost h0 0 = h)
+  (hinputLimit : Wasm.Near.withinLimit h0.config.maxRegisterLen bs.length = true)
+  (hok : WNear.Binary.ReadRegister.RegOk 2048 len (some bs)) (S : WNear.State) (st : Near.TrieOverlay.State)
+  (hv : h.storage WNear.stateKey = some (WNear.header S))
+  (hroom :
+    WNear.Binary.LookupMapOps.HeapRoomK
+      ((WNear.Binary.AllocNewCell.cellPages (WNear.Binary.AllocAlloc.wordsOf (UInt32.ofNat bs.length)) 1).toNat +
+          WNear.Binary.BalanceOf297AbsentCall.copiedParserPages bs (j + 1) a +
+        6)
+      len 2048)
+  (hacc : h.storageAccounting = some st) (hlim : Wasm.Near.withinLimit h.config.maxStorageKeyLen 5 = true)
+  (hcanon : NearLogic.Canon st) (hlink : NearLogic.StorageLink h st) (bud : ℕ) (hproof : NearLogic.ProofBudget h st bud)
+  (hbudget :
+    NearLogic.readProofCost (Near.TrieOverlay.contractKey h.context.currentAccountId WNear.stateKey)
+          (h.storage WNear.stateKey) +
+        NearLogic.readProofCost
+          (Near.TrieOverlay.contractKey h.context.currentAccountId
+            (WNear.accountsPrefix ++ (WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ++ (↑a).toUTF8.toList)))
+          (h.storage
+            (WNear.accountsPrefix ++ (WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ++ (↑a).toUTF8.toList))) ≤
+      bud)
+  (hlimAccount :
+    Wasm.Near.withinLimit h.config.maxStorageKeyLen
+        (List.length
+          (WNear.accountsPrefix ++ (WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ++ (↑a).toUTF8.toList))) =
+      true)
+  (hnone :
+    h.storage (WNear.accountsPrefix ++ (WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ++ (↑a).toUTF8.toList)) =
+      none)
+  (hreg : Wasm.Near.withinLimit h.config.maxRegisterLen 29 = true) (ptr0 : UInt32)
+  (hret : Wasm.Near.withinLimit h.config.maxReturnLen 3 = true) (Φ : WasmLogic.Post Wasm.NearState GF) :
+  WNear.Binary.FtTotalSupply.codeA inst mi A ∗
+      WNear.Binary.EnvInput.inCode e inst mi A n 2048 mx ∗
+        A 527 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[0]! inst WNear.Binary.f527 ∗
+          WNear.Binary.SerdeFromTrait.code66 n 2048 inst mi A ∗
+            WNear.Binary.SerdeAccountId.code169 n 2048 inst mi A ∗
+              WNear.Binary.ParseStr.code646 n 2048 inst mi A ∗
+                A 644 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[31]! inst WNear.Binary.f644 ∗
+                  A 66 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f66 ∗
+                    A 65 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[31]! inst WNear.Binary.f65 ∗
+                      A 157 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[31]! inst WNear.Binary.f157 ∗
+                        WNear.Binary.StateReadLenF.stateCodeF e inst mi A n 2048 mx ∗
+                          A 219 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[0]! inst WNear.Binary.f219 ∗
+                            A 155 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f155 ∗
+                              A 951 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[15]! inst WNear.Binary.f951 ∗
+                                WNear.Binary.BalanceOfAbsent.code293 e n 2048 inst mi A mx ∗
+                                  A 293 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[31]! inst WNear.Binary.f293 ∗
+                                    WNear.Binary.ToVec.tvCode n 2048 inst mi A ∗
+                                      A 96 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f96 ∗
+                                        A 158 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[31]! inst WNear.Binary.f158 ∗
+                                          A 779 ↪[wf]
+                                              Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f779 ∗
+                                            A 545 ↪[wf]
+                                                Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f545 ∗
+                                              A 456 ↪[wf]
+                                                  Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f456 ∗
+                                                WNear.Binary.DropVec.dropCode inst mi A ∗
+                                                  A 68 ↪[wf]
+                                                      Wasm.FuncInst.wasm WNear.Binary.types[0]! inst WNear.Binary.f68 ∗
+                                                    WNear.Binary.Interface.ifaceCode e inst mi A n mx ∗
+                                                      inst ↪[inst] mi ∗
+                                                        NearLogic.credits Cg
+                                                            (475 * cfg.regularOpCost +
+                                                              (3 * cfg.regularOpCost +
+                                                                (100 * cfg.regularOpCost +
+                                                                    WNear.Binary.EnvInput.cost527 cfg h0 +
+                                                                  (100 * cfg.regularOpCost +
+                                                                    (100 * cfg.regularOpCost +
+                                                                      (1000 * cfg.regularOpCost +
+                                                                          (45 * cfg.regularOpCost +
+                                                                            ((700 +
+                                                                                  96 *
+                                                                                    WNear.Binary.SerdeRead.wsLen
+                                                                                      (List.drop k bs)) *
+                                                                                cfg.regularOpCost +
+                                                                              WNear.Binary.SerdeStruct78Esc.costArray
+                                                                                cfg 1 0 bs (↑a).toUTF8.toList jsonRest
+                                                                                j)) +
+                                                                        WNear.Binary.BalanceOf297AbsentCall.parserSuccessCost
+                                                                          cfg
+                                                                          (WNear.Binary.BalanceOf297AbsentCall.copiedParserFree
+                                                                            bs (j + 1) 1)
+                                                                          h S a R)))))) ∗
+                                                          g ↦[wg] { type := gt, value := Wasm.Value.i32 (s + 160) } ∗
+                                                            WNear.Binary.VecFromElem.stk n (s.toNat - 592) 592 ∗
+                                                              WNear.Binary.SetupPanicHook.hookCells n 0 hookOld 0 ∗
+                                                                n ↦[wms][ 1055020 ] WasmLogic.bytes32 116 ∗
+                                                                  ta ↦[wt][ 116 ] Wasm.Ref.func (A 565) ∗
+                                                                    ta ↦[wt][ 106 ] Wasm.Ref.func (A 564) ∗
+                                                                      WNear.Binary.SetBlockchainInterface.blockchainInterfaceCells
+                                                                          n 0 0 0 k3 ∗
+                                                                        WNear.Binary.FtTotalSupply.vtab n ta A ∗
+                                                                          n ↦[wms][ 1050188 + 36 ]
+                                                                              WNear.Binary.Interface.dataWord
+                                                                                (1050188 + 36) ∗
+                                                                            ta ↦[wt][ 44 ] Wasm.Ref.func (A 246) ∗
+                                                                              WNear.Binary.AllocFirstFit.vt n 1057464
+                                                                                  idx ta (A 578) ∗
+                                                                                n ↦[wms][ 1049788 ]
+                                                                                    WNear.Binary.StateRead.stateKey ∗
+                                                                                  NearLogic.mhostPt h0 ∗
+                                                                                    WNear.Binary.AllocInv.heapInv n 2048
+                                                                                        len live 1 ∗
+                                                                                      n ↦[wms][ (s + 88).toNat ]
+                                                                                          oldOpt ∗
+                                                                                        n ↦[wms][ (s + 100).toNat ]
+                                                                                            optTail ∗
+                                                                                          n ↦[wms][ 1062392 ]
+                                                                                              WNear.Binary.ParseStr.escTable ∗
+                                                                                            n ↦[wms][ 1071704 ]
+                                                                                                WNear.Binary.FromUtf8Gen.utf8Width ∗
+                                                                                              n ↦[wms][ 1062712 ]
+                                                                                                  WNear.Binary.SerdeEsc.hexTable ∗
+                                                                                                n ↦[wms][
+                                                                                                    (s + 104).toNat ]
+                                                                                                    stateTail ∗
+                                                                                                  n ↦[wms][
+                                                                                                      (s + 128).toNat ]
+                                                                                                      oldA ∗
+                                                                                                    n ↦[wms][
+                                                                                                        (s +
+                                                                                                              128).toNat +
+                                                                                                          8 ]
+                                                                                                        WasmLogic.bytes32
+                                                                                                          oldC ∗
+                                                                                                      n ↦[wms][
+                                                                                                          (s +
+                                                                                                              140).toNat ]
+                                                                                                          destTail ∗
+                                                                                                        ⋯ ⊢
+    NearLogic.mwpi cfg lim d
+      { locals := #[Wasm.Value.i32 0, Wasm.Value.i32 x1, Wasm.Value.i64 x2, Wasm.Value.i32 x3], inst := inst, mi := mi }
+      [] WNear.Binary.f297.body Φ
+```
+
 `WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body` (hash `00000000ea618213`)
 
 ```lean
@@ -915,6 +1157,152 @@ theorem WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body {GF : Iris.
 ```
 
 ## Bridge.Functions.BalanceOf297CopiedCall
+
+`WNear.Binary.BalanceOf297AbsentCall.array_parser_call_through_cleanup` (hash `00000000f700e87e`)
+
+```lean
+theorem WNear.Binary.BalanceOf297AbsentCall.array_parser_call_through_cleanup {GF : Iris.BundledGFunctors}
+  [WasmLogic.WasmGS Wasm.NearState GF] (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d inst e : ℕ)
+  (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ) (mx : Option ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 39 < lim.maxCallDepth) (Cg R : ℕ) (gt : Wasm.GlobalType) (s x1 : UInt32) (x2 : UInt64)
+  (x3 ip ic idx : UInt32) (len : ℕ) (a : WNear.AccountId) (live : List (ℕ × ℕ)) (F : ℕ)
+  (bs tail parserOut jsonRest : List UInt8) (j k : ℕ)
+  (ob stateTail contractTail destTail out head oldA oldB : List UInt8) (oldC oldD : UInt32) (hs : 592 ≤ s.toNat)
+  (hal : s.toNat % 8 = 0) (hframe : s.toNat + 160 ≤ 2 ^ 32) (hic : ic ≠ 0) (hinput : bs.length + tail.length = ic.toNat)
+  (hparserOut : parserOut.length = 16) (hlen : bs.length < 2 ^ 24) (hptr : ip.toNat + bs.length < 2 ^ 32)
+  (ho : bs[WNear.Binary.SerdeRead.wsLen bs]? = some 91)
+  (hj :
+    j =
+      WNear.Binary.SerdeRead.wsLen bs + 1 +
+        WNear.Binary.SerdeRead.wsLen (List.drop (WNear.Binary.SerdeRead.wsLen bs + 1) bs))
+  (hq : bs[j]? = some 34)
+  (he :
+    bs[bs.length - jsonRest.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - jsonRest.length) bs)]? =
+      some 93)
+  (hk : k = bs.length - jsonRest.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - jsonRest.length) bs) + 1)
+  (hend : k + WNear.Binary.SerdeRead.wsLen (List.drop k bs) = bs.length)
+  (hmodel : NearInterface.Json.stringBody (List.drop (j + 1) bs) [] = some (some ↑a, jsonRest))
+  (hparserRoom : WNear.Binary.ParseStr.roomRun 2048 len 0 [] (List.drop (j + 1) bs))
+  (halloc :
+    WNear.Binary.VecFromElem.roomFor
+      (len +
+        WNear.Binary.ScratchGrow.growthPages 0 0 (WNear.Binary.ParseStrSuccess.appendChunks (List.drop (j + 1) bs) []) *
+          65536)
+      2048 (UInt32.ofNat (↑a).toUTF8.toList.length))
+  (hob : ob.length = 16) (hstateTail : stateTail.length = 24) (hcontractTail : contractTail.length = 28)
+  (hdestTail : destTail.length = 4) (hA : oldA.length = 8) (hB : oldB.length = 8) (hout : out.length = 12)
+  (hhead : head.length = 8) (h : Wasm.NearState) (S : WNear.State) (st : Near.TrieOverlay.State)
+  (hv : h.storage WNear.stateKey = some (WNear.header S))
+  (hroom :
+    WNear.Binary.LookupMapOps.HeapRoomK (WNear.Binary.BalanceOf297AbsentCall.copiedParserPages bs (j + 1) a + 6) len
+      2048)
+  (hacc : h.storageAccounting = some st) (hlim : Wasm.Near.withinLimit h.config.maxStorageKeyLen 5 = true)
+  (hcanon : NearLogic.Canon st) (hlink : NearLogic.StorageLink h st) (bud : ℕ) (hproof : NearLogic.ProofBudget h st bud)
+  (hbudget :
+    NearLogic.readProofCost (Near.TrieOverlay.contractKey h.context.currentAccountId WNear.stateKey)
+          (h.storage WNear.stateKey) +
+        NearLogic.readProofCost
+          (Near.TrieOverlay.contractKey h.context.currentAccountId
+            (WNear.accountsPrefix ++ (WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ++ (↑a).toUTF8.toList)))
+          (h.storage
+            (WNear.accountsPrefix ++ (WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ++ (↑a).toUTF8.toList))) ≤
+      bud)
+  (hlimAccount :
+    Wasm.Near.withinLimit h.config.maxStorageKeyLen
+        (List.length
+          (WNear.accountsPrefix ++ (WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ++ (↑a).toUTF8.toList))) =
+      true)
+  (hnone :
+    h.storage (WNear.accountsPrefix ++ (WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ++ (↑a).toUTF8.toList)) =
+      none)
+  (hreg : Wasm.Near.withinLimit h.config.maxRegisterLen 29 = true) (ptr0 : UInt32)
+  (hret : Wasm.Near.withinLimit h.config.maxReturnLen 3 = true) (Φ : WasmLogic.Post Wasm.NearState GF) :
+  WNear.Binary.SerdeFromTrait.code66 n 2048 inst mi A ∗
+      WNear.Binary.SerdeAccountId.code169 n 2048 inst mi A ∗
+        WNear.Binary.ParseStr.code646 n 2048 inst mi A ∗
+          A 644 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[31]! inst WNear.Binary.f644 ∗
+            A 66 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f66 ∗
+              A 65 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[31]! inst WNear.Binary.f65 ∗
+                WNear.Binary.StateReadLenF.stateCodeF e inst mi A n 2048 mx ∗
+                  A 219 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[0]! inst WNear.Binary.f219 ∗
+                    A 155 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f155 ∗
+                      A 951 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[15]! inst WNear.Binary.f951 ∗
+                        WNear.Binary.BalanceOfAbsent.code293 e n 2048 inst mi A mx ∗
+                          A 293 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[31]! inst WNear.Binary.f293 ∗
+                            WNear.Binary.ToVec.tvCode n 2048 inst mi A ∗
+                              A 96 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f96 ∗
+                                A 158 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[31]! inst WNear.Binary.f158 ∗
+                                  A 779 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f779 ∗
+                                    A 545 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f545 ∗
+                                      A 456 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f456 ∗
+                                        WNear.Binary.DropVec.dropCode inst mi A ∗
+                                          A 68 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[0]! inst WNear.Binary.f68 ∗
+                                            WNear.Binary.Interface.ifaceCode e inst mi A n mx ∗
+                                              inst ↪[inst] mi ∗
+                                                NearLogic.credits Cg
+                                                    (1000 * cfg.regularOpCost +
+                                                        (45 * cfg.regularOpCost +
+                                                          ((700 + 96 * WNear.Binary.SerdeRead.wsLen (List.drop k bs)) *
+                                                              cfg.regularOpCost +
+                                                            WNear.Binary.SerdeStruct78Esc.costArray cfg F 0 bs
+                                                              (↑a).toUTF8.toList jsonRest j)) +
+                                                      WNear.Binary.BalanceOf297AbsentCall.parserSuccessCost cfg
+                                                        (WNear.Binary.BalanceOf297AbsentCall.copiedParserFree bs (j + 1)
+                                                          F)
+                                                        h S a R) ∗
+                                                  g ↦[wg] { type := gt, value := Wasm.Value.i32 s } ∗
+                                                    WNear.Binary.ReadRegister.ifaceR n ta A ∗
+                                                      WNear.Binary.VecFromElem.stk n (s.toNat - 592) 592 ∗
+                                                        WNear.Binary.AllocFirstFit.vt n 1057464 idx ta (A 578) ∗
+                                                          n ↦[wms][ 1049788 ] WNear.Binary.StateRead.stateKey ∗
+                                                            NearLogic.mhostPt h ∗
+                                                              WNear.Binary.AllocInv.heapInv n 2048 len
+                                                                  ((ip.toNat, ic.toNat) :: live) F ∗
+                                                                n ↦[wms][ (s + 88).toNat ] parserOut ∗
+                                                                  n ↦[wms][ ip.toNat ] bs ∗
+                                                                    n ↦[wms][ ip.toNat + bs.length ] tail ∗
+                                                                      n ↦[wms][ 1062392 ]
+                                                                          WNear.Binary.ParseStr.escTable ∗
+                                                                        n ↦[wms][ 1071704 ]
+                                                                            WNear.Binary.FromUtf8Gen.utf8Width ∗
+                                                                          n ↦[wms][ 1062712 ]
+                                                                              WNear.Binary.SerdeEsc.hexTable ∗
+                                                                            n ↦[wms][ (s + 104).toNat ] stateTail ∗
+                                                                              n ↦[wms][ (s + 128).toNat ] oldA ∗
+                                                                                n ↦[wms][ (s + 128).toNat + 8 ]
+                                                                                    WasmLogic.bytes32 oldC ∗
+                                                                                  n ↦[wms][ (s + 140).toNat ] destTail ∗
+                                                                                    n ↦[wms][ (s + 32).toNat ] oldB ∗
+                                                                                      n ↦[wms][ (s + 32).toNat + 8 ]
+                                                                                          WasmLogic.bytes32 oldD ∗
+                                                                                        n ↦[wms][ (s + 48).toNat ]
+                                                                                            WasmLogic.bytes32 ip ∗
+                                                                                          n ↦[wms][ (s + 48).toNat + 4 ]
+                                                                                              WasmLogic.bytes32 ic ∗
+                                                                                            n ↦[wms][
+                                                                                                (s + 48).toNat + 8 ]
+                                                                                                WasmLogic.bytes32
+                                                                                                  (UInt32.ofNat
+                                                                                                    bs.length) ∗
+                                                                                              n ↦[wms][ (s + 60).toNat ]
+                                                                                                  contractTail ∗
+                                                                                                n ↦[wms][
+                                                                                                    (s + 8).toNat ] ob ∗
+                                                                                                  WNear.Binary.ToVec.tvData
+                                                                                                      n ta ptr0 (A 759)
+                                                                                                      (A 353) ∗
+                                                                                                    n ↦[wms][
+                                                                                                        (s +
+                                                                                                            144).toNat ]
+                                                                                                        out ∗
+                                                                                                      n ↦[wms][
+                                                                                                          s.toNat ]
+                                                                                                          head ∗
+                                                                                                        ⋯ ⊢
+    NearLogic.mwpi cfg lim d (WNear.Binary.BalanceOf297AbsentCall.frame inst mi s x1 x2 x3)
+      [Wasm.Value.i32 (s + 88), Wasm.Value.i32 ip, Wasm.Value.i32 (UInt32.ofNat bs.length)]
+      (List.take 115 (List.drop 35 WNear.Binary.f297.body)) Φ
+```
 
 `WNear.Binary.BalanceOf297AbsentCall.copied_parser_call_through_cleanup` (hash `0000000026f530eb`)
 
@@ -1154,6 +1542,150 @@ theorem WNear.Binary.BalanceOf297AbsentCall.copied_result_room {GF : Iris.Bundle
 
 ## Bridge.Functions.BalanceOf297DerefCompose
 
+`WNear.Binary.BalanceOf297AbsentCall.array_deref_parser_through_cleanup` (hash `00000000287dc473`)
+
+```lean
+theorem WNear.Binary.BalanceOf297AbsentCall.array_deref_parser_through_cleanup {GF : Iris.BundledGFunctors}
+  [WasmLogic.WasmGS Wasm.NearState GF] (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d inst e : ℕ)
+  (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ) (mx : Option ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 39 < lim.maxCallDepth) (Cg R : ℕ) (gt : Wasm.GlobalType) (s x1 : UInt32) (x2 : UInt64)
+  (x3 ip ic idx : UInt32) (len : ℕ) (a : WNear.AccountId) (live : List (ℕ × ℕ)) (F : ℕ)
+  (bs tail parserOut jsonRest derefOut : List UInt8) (j k : ℕ)
+  (ob stateTail contractTail destTail out head oldA oldB : List UInt8) (oldC oldD : UInt32) (hs : 592 ≤ s.toNat)
+  (hal : s.toNat % 8 = 0) (hframe : s.toNat + 160 ≤ 2 ^ 32) (hic : ic ≠ 0) (hinput : bs.length + tail.length = ic.toNat)
+  (hparserOut : parserOut.length = 16) (hderef : derefOut.length = 8) (hlen : bs.length < 2 ^ 24)
+  (hptr : ip.toNat + bs.length < 2 ^ 32) (ho : bs[WNear.Binary.SerdeRead.wsLen bs]? = some 91)
+  (hj :
+    j =
+      WNear.Binary.SerdeRead.wsLen bs + 1 +
+        WNear.Binary.SerdeRead.wsLen (List.drop (WNear.Binary.SerdeRead.wsLen bs + 1) bs))
+  (hq : bs[j]? = some 34)
+  (he :
+    bs[bs.length - jsonRest.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - jsonRest.length) bs)]? =
+      some 93)
+  (hk : k = bs.length - jsonRest.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - jsonRest.length) bs) + 1)
+  (hend : k + WNear.Binary.SerdeRead.wsLen (List.drop k bs) = bs.length)
+  (hmodel : NearInterface.Json.stringBody (List.drop (j + 1) bs) [] = some (some ↑a, jsonRest))
+  (hparserRoom : WNear.Binary.ParseStr.roomRun 2048 len 0 [] (List.drop (j + 1) bs))
+  (halloc :
+    WNear.Binary.VecFromElem.roomFor
+      (len +
+        WNear.Binary.ScratchGrow.growthPages 0 0 (WNear.Binary.ParseStrSuccess.appendChunks (List.drop (j + 1) bs) []) *
+          65536)
+      2048 (UInt32.ofNat (↑a).toUTF8.toList.length))
+  (hob : ob.length = 16) (hstateTail : stateTail.length = 24) (hcontractTail : contractTail.length = 28)
+  (hdestTail : destTail.length = 4) (hA : oldA.length = 8) (hB : oldB.length = 8) (hout : out.length = 12)
+  (hhead : head.length = 8) (h : Wasm.NearState) (S : WNear.State) (st : Near.TrieOverlay.State)
+  (hv : h.storage WNear.stateKey = some (WNear.header S))
+  (hroom :
+    WNear.Binary.LookupMapOps.HeapRoomK (WNear.Binary.BalanceOf297AbsentCall.copiedParserPages bs (j + 1) a + 6) len
+      2048)
+  (hacc : h.storageAccounting = some st) (hlim : Wasm.Near.withinLimit h.config.maxStorageKeyLen 5 = true)
+  (hcanon : NearLogic.Canon st) (hlink : NearLogic.StorageLink h st) (bud : ℕ) (hproof : NearLogic.ProofBudget h st bud)
+  (hbudget :
+    NearLogic.readProofCost (Near.TrieOverlay.contractKey h.context.currentAccountId WNear.stateKey)
+          (h.storage WNear.stateKey) +
+        NearLogic.readProofCost
+          (Near.TrieOverlay.contractKey h.context.currentAccountId
+            (WNear.accountsPrefix ++ (WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ++ (↑a).toUTF8.toList)))
+          (h.storage
+            (WNear.accountsPrefix ++ (WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ++ (↑a).toUTF8.toList))) ≤
+      bud)
+  (hlimAccount :
+    Wasm.Near.withinLimit h.config.maxStorageKeyLen
+        (List.length
+          (WNear.accountsPrefix ++ (WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ++ (↑a).toUTF8.toList))) =
+      true)
+  (hnone :
+    h.storage (WNear.accountsPrefix ++ (WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ++ (↑a).toUTF8.toList)) =
+      none)
+  (hreg : Wasm.Near.withinLimit h.config.maxRegisterLen 29 = true) (ptr0 : UInt32)
+  (hret : Wasm.Near.withinLimit h.config.maxReturnLen 3 = true) (Φ : WasmLogic.Post Wasm.NearState GF) :
+  WNear.Binary.SerdeFromTrait.code66 n 2048 inst mi A ∗
+      WNear.Binary.SerdeAccountId.code169 n 2048 inst mi A ∗
+        WNear.Binary.ParseStr.code646 n 2048 inst mi A ∗
+          A 644 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[31]! inst WNear.Binary.f644 ∗
+            A 66 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f66 ∗
+              A 65 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[31]! inst WNear.Binary.f65 ∗
+                WNear.Binary.StateReadLenF.stateCodeF e inst mi A n 2048 mx ∗
+                  A 219 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[0]! inst WNear.Binary.f219 ∗
+                    A 155 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f155 ∗
+                      A 951 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[15]! inst WNear.Binary.f951 ∗
+                        WNear.Binary.BalanceOfAbsent.code293 e n 2048 inst mi A mx ∗
+                          A 293 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[31]! inst WNear.Binary.f293 ∗
+                            WNear.Binary.ToVec.tvCode n 2048 inst mi A ∗
+                              A 96 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f96 ∗
+                                A 158 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[31]! inst WNear.Binary.f158 ∗
+                                  A 779 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f779 ∗
+                                    A 545 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f545 ∗
+                                      A 456 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f456 ∗
+                                        WNear.Binary.DropVec.dropCode inst mi A ∗
+                                          A 68 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[0]! inst WNear.Binary.f68 ∗
+                                            WNear.Binary.Interface.ifaceCode e inst mi A n mx ∗
+                                              inst ↪[inst] mi ∗
+                                                NearLogic.credits Cg
+                                                    (100 * cfg.regularOpCost +
+                                                      (1000 * cfg.regularOpCost +
+                                                          (45 * cfg.regularOpCost +
+                                                            ((700 +
+                                                                  96 * WNear.Binary.SerdeRead.wsLen (List.drop k bs)) *
+                                                                cfg.regularOpCost +
+                                                              WNear.Binary.SerdeStruct78Esc.costArray cfg F 0 bs
+                                                                (↑a).toUTF8.toList jsonRest j)) +
+                                                        WNear.Binary.BalanceOf297AbsentCall.parserSuccessCost cfg
+                                                          (WNear.Binary.BalanceOf297AbsentCall.copiedParserFree bs
+                                                            (j + 1) F)
+                                                          h S a R)) ∗
+                                                  g ↦[wg] { type := gt, value := Wasm.Value.i32 s } ∗
+                                                    WNear.Binary.ReadRegister.ifaceR n ta A ∗
+                                                      WNear.Binary.VecFromElem.stk n (s.toNat - 592) 592 ∗
+                                                        WNear.Binary.AllocFirstFit.vt n 1057464 idx ta (A 578) ∗
+                                                          n ↦[wms][ 1049788 ] WNear.Binary.StateRead.stateKey ∗
+                                                            NearLogic.mhostPt h ∗
+                                                              WNear.Binary.AllocInv.heapInv n 2048 len
+                                                                  ((ip.toNat, ic.toNat) :: live) F ∗
+                                                                n ↦[wms][ (s + 88).toNat ] parserOut ∗
+                                                                  n ↦[wms][ ip.toNat ] bs ∗
+                                                                    n ↦[wms][ ip.toNat + bs.length ] tail ∗
+                                                                      n ↦[wms][ 1062392 ]
+                                                                          WNear.Binary.ParseStr.escTable ∗
+                                                                        n ↦[wms][ 1071704 ]
+                                                                            WNear.Binary.FromUtf8Gen.utf8Width ∗
+                                                                          n ↦[wms][ 1062712 ]
+                                                                              WNear.Binary.SerdeEsc.hexTable ∗
+                                                                            n ↦[wms][ (s + 104).toNat ] stateTail ∗
+                                                                              n ↦[wms][ (s + 128).toNat ] oldA ∗
+                                                                                n ↦[wms][ (s + 128).toNat + 8 ]
+                                                                                    WasmLogic.bytes32 oldC ∗
+                                                                                  n ↦[wms][ (s + 140).toNat ] destTail ∗
+                                                                                    n ↦[wms][ (s + 32).toNat ] oldB ∗
+                                                                                      n ↦[wms][ (s + 32).toNat + 8 ]
+                                                                                          WasmLogic.bytes32 oldD ∗
+                                                                                        n ↦[wms][ (s + 24).toNat ]
+                                                                                            derefOut ∗
+                                                                                          n ↦[wms][ (s + 48).toNat ]
+                                                                                              WasmLogic.bytes32 ip ++
+                                                                                                (WasmLogic.bytes32 ic ++
+                                                                                                  WasmLogic.bytes32
+                                                                                                    (UInt32.ofNat
+                                                                                                      bs.length)) ∗
+                                                                                            n ↦[wms][ (s + 60).toNat ]
+                                                                                                contractTail ∗
+                                                                                              n ↦[wms][ (s + 8).toNat ]
+                                                                                                  ob ∗
+                                                                                                WNear.Binary.ToVec.tvData
+                                                                                                    n ta ptr0 (A 759)
+                                                                                                    (A 353) ∗
+                                                                                                  n ↦[wms][
+                                                                                                      (s + 144).toNat ]
+                                                                                                      out ∗
+                                                                                                    n ↦[wms][ s.toNat ]
+                                                                                                        head ∗
+                                                                                                      ▷ ⋯ ⊢
+    NearLogic.mwpi cfg lim d (WNear.Binary.BalanceOf297AbsentCall.frame inst mi s x1 x2 x3) []
+      (List.take 129 (List.drop 21 WNear.Binary.f297.body)) Φ
+```
+
 `WNear.Binary.BalanceOf297AbsentCall.deref_copied_parser_through_cleanup` (hash `00000000fef420a9`)
 
 ```lean
@@ -1361,6 +1893,157 @@ theorem WNear.Binary.BalanceOf297AbsentCall.expect_ok {GF : Iris.BundledGFunctor
 ```
 
 ## Bridge.Functions.BalanceOf297ExpectCompose
+
+`WNear.Binary.BalanceOf297AbsentCall.array_expect_deref_parser_through_cleanup` (hash `00000000506e1321`)
+
+```lean
+theorem WNear.Binary.BalanceOf297AbsentCall.array_expect_deref_parser_through_cleanup {GF : Iris.BundledGFunctors}
+  [WasmLogic.WasmGS Wasm.NearState GF] (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d inst e : ℕ)
+  (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ) (mx : Option ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 39 < lim.maxCallDepth) (Cg R : ℕ) (gt : Wasm.GlobalType) (s x1 : UInt32) (x2 : UInt64)
+  (x3 ip ic idx : UInt32) (len : ℕ) (a : WNear.AccountId) (live : List (ℕ × ℕ)) (F : ℕ)
+  (bs tail optTail oldVec jsonRest derefOut : List UInt8) (j k : ℕ)
+  (ob stateTail contractTail destTail out head oldA oldB : List UInt8) (oldC oldD : UInt32) (hs : 592 ≤ s.toNat)
+  (hal : s.toNat % 8 = 0) (hframe : s.toNat + 160 ≤ 2 ^ 32) (hic : ic ≠ 0) (hip : ip ≠ 0)
+  (hinput : bs.length + tail.length = ic.toNat) (hoptTail : optTail.length = 4) (holdVec : oldVec.length = 12)
+  (hderef : derefOut.length = 8) (hlen : bs.length < 2 ^ 24) (hptr : ip.toNat + bs.length < 2 ^ 32)
+  (ho : bs[WNear.Binary.SerdeRead.wsLen bs]? = some 91)
+  (hj :
+    j =
+      WNear.Binary.SerdeRead.wsLen bs + 1 +
+        WNear.Binary.SerdeRead.wsLen (List.drop (WNear.Binary.SerdeRead.wsLen bs + 1) bs))
+  (hq : bs[j]? = some 34)
+  (he :
+    bs[bs.length - jsonRest.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - jsonRest.length) bs)]? =
+      some 93)
+  (hk : k = bs.length - jsonRest.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - jsonRest.length) bs) + 1)
+  (hend : k + WNear.Binary.SerdeRead.wsLen (List.drop k bs) = bs.length)
+  (hmodel : NearInterface.Json.stringBody (List.drop (j + 1) bs) [] = some (some ↑a, jsonRest))
+  (hparserRoom : WNear.Binary.ParseStr.roomRun 2048 len 0 [] (List.drop (j + 1) bs))
+  (halloc :
+    WNear.Binary.VecFromElem.roomFor
+      (len +
+        WNear.Binary.ScratchGrow.growthPages 0 0 (WNear.Binary.ParseStrSuccess.appendChunks (List.drop (j + 1) bs) []) *
+          65536)
+      2048 (UInt32.ofNat (↑a).toUTF8.toList.length))
+  (hob : ob.length = 16) (hstateTail : stateTail.length = 24) (hcontractTail : contractTail.length = 28)
+  (hdestTail : destTail.length = 4) (hA : oldA.length = 8) (hB : oldB.length = 8) (hout : out.length = 12)
+  (hhead : head.length = 8) (h : Wasm.NearState) (S : WNear.State) (st : Near.TrieOverlay.State)
+  (hv : h.storage WNear.stateKey = some (WNear.header S))
+  (hroom :
+    WNear.Binary.LookupMapOps.HeapRoomK (WNear.Binary.BalanceOf297AbsentCall.copiedParserPages bs (j + 1) a + 6) len
+      2048)
+  (hacc : h.storageAccounting = some st) (hlim : Wasm.Near.withinLimit h.config.maxStorageKeyLen 5 = true)
+  (hcanon : NearLogic.Canon st) (hlink : NearLogic.StorageLink h st) (bud : ℕ) (hproof : NearLogic.ProofBudget h st bud)
+  (hbudget :
+    NearLogic.readProofCost (Near.TrieOverlay.contractKey h.context.currentAccountId WNear.stateKey)
+          (h.storage WNear.stateKey) +
+        NearLogic.readProofCost
+          (Near.TrieOverlay.contractKey h.context.currentAccountId
+            (WNear.accountsPrefix ++ (WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ++ (↑a).toUTF8.toList)))
+          (h.storage
+            (WNear.accountsPrefix ++ (WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ++ (↑a).toUTF8.toList))) ≤
+      bud)
+  (hlimAccount :
+    Wasm.Near.withinLimit h.config.maxStorageKeyLen
+        (List.length
+          (WNear.accountsPrefix ++ (WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ++ (↑a).toUTF8.toList))) =
+      true)
+  (hnone :
+    h.storage (WNear.accountsPrefix ++ (WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ++ (↑a).toUTF8.toList)) =
+      none)
+  (hreg : Wasm.Near.withinLimit h.config.maxRegisterLen 29 = true) (ptr0 : UInt32)
+  (hret : Wasm.Near.withinLimit h.config.maxReturnLen 3 = true) (Φ : WasmLogic.Post Wasm.NearState GF) :
+  WNear.Binary.SerdeFromTrait.code66 n 2048 inst mi A ∗
+      WNear.Binary.SerdeAccountId.code169 n 2048 inst mi A ∗
+        WNear.Binary.ParseStr.code646 n 2048 inst mi A ∗
+          A 644 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[31]! inst WNear.Binary.f644 ∗
+            A 66 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f66 ∗
+              A 65 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[31]! inst WNear.Binary.f65 ∗
+                A 157 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[31]! inst WNear.Binary.f157 ∗
+                  WNear.Binary.StateReadLenF.stateCodeF e inst mi A n 2048 mx ∗
+                    A 219 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[0]! inst WNear.Binary.f219 ∗
+                      A 155 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f155 ∗
+                        A 951 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[15]! inst WNear.Binary.f951 ∗
+                          WNear.Binary.BalanceOfAbsent.code293 e n 2048 inst mi A mx ∗
+                            A 293 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[31]! inst WNear.Binary.f293 ∗
+                              WNear.Binary.ToVec.tvCode n 2048 inst mi A ∗
+                                A 96 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f96 ∗
+                                  A 158 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[31]! inst WNear.Binary.f158 ∗
+                                    A 779 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f779 ∗
+                                      A 545 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f545 ∗
+                                        A 456 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f456 ∗
+                                          WNear.Binary.DropVec.dropCode inst mi A ∗
+                                            A 68 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[0]! inst WNear.Binary.f68 ∗
+                                              WNear.Binary.Interface.ifaceCode e inst mi A n mx ∗
+                                                inst ↪[inst] mi ∗
+                                                  NearLogic.credits Cg
+                                                      (100 * cfg.regularOpCost +
+                                                        (100 * cfg.regularOpCost +
+                                                          (1000 * cfg.regularOpCost +
+                                                              (45 * cfg.regularOpCost +
+                                                                ((700 +
+                                                                      96 *
+                                                                        WNear.Binary.SerdeRead.wsLen (List.drop k bs)) *
+                                                                    cfg.regularOpCost +
+                                                                  WNear.Binary.SerdeStruct78Esc.costArray cfg F 0 bs
+                                                                    (↑a).toUTF8.toList jsonRest j)) +
+                                                            WNear.Binary.BalanceOf297AbsentCall.parserSuccessCost cfg
+                                                              (WNear.Binary.BalanceOf297AbsentCall.copiedParserFree bs
+                                                                (j + 1) F)
+                                                              h S a R))) ∗
+                                                    g ↦[wg] { type := gt, value := Wasm.Value.i32 s } ∗
+                                                      WNear.Binary.ReadRegister.ifaceR n ta A ∗
+                                                        WNear.Binary.VecFromElem.stk n (s.toNat - 592) 592 ∗
+                                                          WNear.Binary.AllocFirstFit.vt n 1057464 idx ta (A 578) ∗
+                                                            n ↦[wms][ 1049788 ] WNear.Binary.StateRead.stateKey ∗
+                                                              NearLogic.mhostPt h ∗
+                                                                WNear.Binary.AllocInv.heapInv n 2048 len
+                                                                    ((ip.toNat, ic.toNat) :: live) F ∗
+                                                                  n ↦[wms][ (s + 88).toNat ] WasmLogic.bytes32 ip ∗
+                                                                    n ↦[wms][ (s + 88).toNat + 4 ]
+                                                                        WasmLogic.bytes32 ic ∗
+                                                                      n ↦[wms][ (s + 88).toNat + 8 ]
+                                                                          WasmLogic.bytes32 (UInt32.ofNat bs.length) ∗
+                                                                        n ↦[wms][ (s + 100).toNat ] optTail ∗
+                                                                          n ↦[wms][ ip.toNat ] bs ∗
+                                                                            n ↦[wms][ ip.toNat + bs.length ] tail ∗
+                                                                              n ↦[wms][ 1062392 ]
+                                                                                  WNear.Binary.ParseStr.escTable ∗
+                                                                                n ↦[wms][ 1071704 ]
+                                                                                    WNear.Binary.FromUtf8Gen.utf8Width ∗
+                                                                                  n ↦[wms][ 1062712 ]
+                                                                                      WNear.Binary.SerdeEsc.hexTable ∗
+                                                                                    n ↦[wms][ (s + 104).toNat ]
+                                                                                        stateTail ∗
+                                                                                      n ↦[wms][ (s + 128).toNat ] oldA ∗
+                                                                                        n ↦[wms][ (s + 128).toNat + 8 ]
+                                                                                            WasmLogic.bytes32 oldC ∗
+                                                                                          n ↦[wms][ (s + 140).toNat ]
+                                                                                              destTail ∗
+                                                                                            n ↦[wms][ (s + 32).toNat ]
+                                                                                                oldB ∗
+                                                                                              n ↦[wms][
+                                                                                                  (s + 32).toNat + 8 ]
+                                                                                                  WasmLogic.bytes32
+                                                                                                    oldD ∗
+                                                                                                n ↦[wms][
+                                                                                                    (s + 24).toNat ]
+                                                                                                    derefOut ∗
+                                                                                                  n ↦[wms][
+                                                                                                      (s + 48).toNat ]
+                                                                                                      oldVec ∗
+                                                                                                    n ↦[wms][
+                                                                                                        (s + 60).toNat ]
+                                                                                                        contractTail ∗
+                                                                                                      n ↦[wms][
+                                                                                                          (s +
+                                                                                                              8).toNat ]
+                                                                                                          ob ∗
+                                                                                                        ⋯ ⊢
+    NearLogic.mwpi cfg lim d (WNear.Binary.BalanceOf297AbsentCall.frame inst mi s x1 x2 x3) []
+      (List.take 137 (List.drop 13 WNear.Binary.f297.body)) Φ
+```
 
 `WNear.Binary.BalanceOf297AbsentCall.expect_deref_parser_through_cleanup` (hash `000000002f009e4e`)
 
@@ -1605,6 +2288,170 @@ theorem WNear.Binary.BalanceOf297AbsentCall.initial_input_and_copy_room (bs : Li
 
 ## Bridge.Functions.BalanceOf297InitialRoomCompose
 
+`WNear.Binary.BalanceOf297AbsentCall.array_absent_body_initial_room` (hash `0000000035983043`)
+
+```lean
+theorem WNear.Binary.BalanceOf297AbsentCall.array_absent_body_initial_room {GF : Iris.BundledGFunctors}
+  [WasmLogic.WasmGS Wasm.NearState GF] (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d inst e : ℕ)
+  (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ) (mx : Option ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 39 < lim.maxCallDepth) (Cg R : ℕ) (gt : Wasm.GlobalType) (s x1 : UInt32) (x2 : UInt64) (x3 idx : UInt32)
+  (len : ℕ) (a : WNear.AccountId) (live : List (ℕ × ℕ)) (bs oldOpt optTail oldVec jsonRest derefOut : List UInt8)
+  (j k : ℕ) (ob stateTail contractTail destTail out head oldA oldB : List UInt8) (oldC oldD hookOld k3 : UInt32)
+  (hs : 592 ≤ s.toNat) (hal : s.toNat % 8 = 0) (hframe : s.toNat + 160 < 2 ^ 32) (hopt : oldOpt.length = 12)
+  (hoptTail : optTail.length = 4) (holdVec : oldVec.length = 12) (hderef : derefOut.length = 8)
+  (hlen : bs.length < 2 ^ 24) (ho : bs[WNear.Binary.SerdeRead.wsLen bs]? = some 91)
+  (hj :
+    j =
+      WNear.Binary.SerdeRead.wsLen bs + 1 +
+        WNear.Binary.SerdeRead.wsLen (List.drop (WNear.Binary.SerdeRead.wsLen bs + 1) bs))
+  (hq : bs[j]? = some 34)
+  (he :
+    bs[bs.length - jsonRest.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - jsonRest.length) bs)]? =
+      some 93)
+  (hk : k = bs.length - jsonRest.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - jsonRest.length) bs) + 1)
+  (hend : k + WNear.Binary.SerdeRead.wsLen (List.drop k bs) = bs.length)
+  (hmodel : NearInterface.Json.stringBody (List.drop (j + 1) bs) [] = some (some ↑a, jsonRest))
+  (hparserRoom :
+    ∀ (len' : ℕ),
+      len' = len ∨ len' = WNear.Binary.VecFromElem.grownLen len (UInt32.ofNat bs.length) →
+        WNear.Binary.ParseStr.roomRun 2048 len' 0 [] (List.drop (j + 1) bs))
+  (hob : ob.length = 16) (hstateTail : stateTail.length = 24) (hcontractTail : contractTail.length = 28)
+  (hdestTail : destTail.length = 4) (hA : oldA.length = 8) (hB : oldB.length = 8) (hout : out.length = 12)
+  (hhead : head.length = 8) (h0 h : Wasm.NearState) (hinput : h0.context.input = bs)
+  (hafter : NearLogic.inputHost h0 0 = h)
+  (hinputLimit : Wasm.Near.withinLimit h0.config.maxRegisterLen bs.length = true) (S : WNear.State)
+  (st : Near.TrieOverlay.State) (hv : h.storage WNear.stateKey = some (WNear.header S))
+  (hroom :
+    WNear.Binary.LookupMapOps.HeapRoomK
+      ((WNear.Binary.AllocNewCell.cellPages (WNear.Binary.AllocAlloc.wordsOf (UInt32.ofNat bs.length)) 1).toNat +
+          WNear.Binary.BalanceOf297AbsentCall.copiedParserPages bs (j + 1) a +
+        6)
+      len 2048)
+  (hacc : h.storageAccounting = some st) (hlim : Wasm.Near.withinLimit h.config.maxStorageKeyLen 5 = true)
+  (hcanon : NearLogic.Canon st) (hlink : NearLogic.StorageLink h st) (bud : ℕ) (hproof : NearLogic.ProofBudget h st bud)
+  (hbudget :
+    NearLogic.readProofCost (Near.TrieOverlay.contractKey h.context.currentAccountId WNear.stateKey)
+          (h.storage WNear.stateKey) +
+        NearLogic.readProofCost
+          (Near.TrieOverlay.contractKey h.context.currentAccountId
+            (WNear.accountsPrefix ++ (WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ++ (↑a).toUTF8.toList)))
+          (h.storage
+            (WNear.accountsPrefix ++ (WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ++ (↑a).toUTF8.toList))) ≤
+      bud)
+  (hlimAccount :
+    Wasm.Near.withinLimit h.config.maxStorageKeyLen
+        (List.length
+          (WNear.accountsPrefix ++ (WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ++ (↑a).toUTF8.toList))) =
+      true)
+  (hnone :
+    h.storage (WNear.accountsPrefix ++ (WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ++ (↑a).toUTF8.toList)) =
+      none)
+  (hreg : Wasm.Near.withinLimit h.config.maxRegisterLen 29 = true) (ptr0 : UInt32)
+  (hret : Wasm.Near.withinLimit h.config.maxReturnLen 3 = true) (Φ : WasmLogic.Post Wasm.NearState GF) :
+  WNear.Binary.FtTotalSupply.codeA inst mi A ∗
+      WNear.Binary.EnvInput.inCode e inst mi A n 2048 mx ∗
+        A 527 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[0]! inst WNear.Binary.f527 ∗
+          WNear.Binary.SerdeFromTrait.code66 n 2048 inst mi A ∗
+            WNear.Binary.SerdeAccountId.code169 n 2048 inst mi A ∗
+              WNear.Binary.ParseStr.code646 n 2048 inst mi A ∗
+                A 644 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[31]! inst WNear.Binary.f644 ∗
+                  A 66 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f66 ∗
+                    A 65 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[31]! inst WNear.Binary.f65 ∗
+                      A 157 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[31]! inst WNear.Binary.f157 ∗
+                        WNear.Binary.StateReadLenF.stateCodeF e inst mi A n 2048 mx ∗
+                          A 219 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[0]! inst WNear.Binary.f219 ∗
+                            A 155 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f155 ∗
+                              A 951 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[15]! inst WNear.Binary.f951 ∗
+                                WNear.Binary.BalanceOfAbsent.code293 e n 2048 inst mi A mx ∗
+                                  A 293 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[31]! inst WNear.Binary.f293 ∗
+                                    WNear.Binary.ToVec.tvCode n 2048 inst mi A ∗
+                                      A 96 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f96 ∗
+                                        A 158 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[31]! inst WNear.Binary.f158 ∗
+                                          A 779 ↪[wf]
+                                              Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f779 ∗
+                                            A 545 ↪[wf]
+                                                Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f545 ∗
+                                              A 456 ↪[wf]
+                                                  Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f456 ∗
+                                                WNear.Binary.DropVec.dropCode inst mi A ∗
+                                                  A 68 ↪[wf]
+                                                      Wasm.FuncInst.wasm WNear.Binary.types[0]! inst WNear.Binary.f68 ∗
+                                                    WNear.Binary.Interface.ifaceCode e inst mi A n mx ∗
+                                                      inst ↪[inst] mi ∗
+                                                        NearLogic.credits Cg
+                                                            (475 * cfg.regularOpCost +
+                                                              (3 * cfg.regularOpCost +
+                                                                (100 * cfg.regularOpCost +
+                                                                    WNear.Binary.EnvInput.cost527 cfg h0 +
+                                                                  (100 * cfg.regularOpCost +
+                                                                    (100 * cfg.regularOpCost +
+                                                                      (1000 * cfg.regularOpCost +
+                                                                          (45 * cfg.regularOpCost +
+                                                                            ((700 +
+                                                                                  96 *
+                                                                                    WNear.Binary.SerdeRead.wsLen
+                                                                                      (List.drop k bs)) *
+                                                                                cfg.regularOpCost +
+                                                                              WNear.Binary.SerdeStruct78Esc.costArray
+                                                                                cfg 1 0 bs (↑a).toUTF8.toList jsonRest
+                                                                                j)) +
+                                                                        WNear.Binary.BalanceOf297AbsentCall.parserSuccessCost
+                                                                          cfg
+                                                                          (WNear.Binary.BalanceOf297AbsentCall.copiedParserFree
+                                                                            bs (j + 1) 1)
+                                                                          h S a R)))))) ∗
+                                                          g ↦[wg] { type := gt, value := Wasm.Value.i32 (s + 160) } ∗
+                                                            WNear.Binary.VecFromElem.stk n (s.toNat - 592) 592 ∗
+                                                              WNear.Binary.SetupPanicHook.hookCells n 0 hookOld 0 ∗
+                                                                n ↦[wms][ 1055020 ] WasmLogic.bytes32 116 ∗
+                                                                  ta ↦[wt][ 116 ] Wasm.Ref.func (A 565) ∗
+                                                                    ta ↦[wt][ 106 ] Wasm.Ref.func (A 564) ∗
+                                                                      WNear.Binary.SetBlockchainInterface.blockchainInterfaceCells
+                                                                          n 0 0 0 k3 ∗
+                                                                        WNear.Binary.FtTotalSupply.vtab n ta A ∗
+                                                                          n ↦[wms][ 1050188 + 36 ]
+                                                                              WNear.Binary.Interface.dataWord
+                                                                                (1050188 + 36) ∗
+                                                                            ta ↦[wt][ 44 ] Wasm.Ref.func (A 246) ∗
+                                                                              WNear.Binary.AllocFirstFit.vt n 1057464
+                                                                                  idx ta (A 578) ∗
+                                                                                n ↦[wms][ 1049788 ]
+                                                                                    WNear.Binary.StateRead.stateKey ∗
+                                                                                  NearLogic.mhostPt h0 ∗
+                                                                                    WNear.Binary.AllocInv.heapInv n 2048
+                                                                                        len live 1 ∗
+                                                                                      n ↦[wms][ (s + 88).toNat ]
+                                                                                          oldOpt ∗
+                                                                                        n ↦[wms][ (s + 100).toNat ]
+                                                                                            optTail ∗
+                                                                                          n ↦[wms][ 1062392 ]
+                                                                                              WNear.Binary.ParseStr.escTable ∗
+                                                                                            n ↦[wms][ 1071704 ]
+                                                                                                WNear.Binary.FromUtf8Gen.utf8Width ∗
+                                                                                              n ↦[wms][ 1062712 ]
+                                                                                                  WNear.Binary.SerdeEsc.hexTable ∗
+                                                                                                n ↦[wms][
+                                                                                                    (s + 104).toNat ]
+                                                                                                    stateTail ∗
+                                                                                                  n ↦[wms][
+                                                                                                      (s + 128).toNat ]
+                                                                                                      oldA ∗
+                                                                                                    n ↦[wms][
+                                                                                                        (s +
+                                                                                                              128).toNat +
+                                                                                                          8 ]
+                                                                                                        WasmLogic.bytes32
+                                                                                                          oldC ∗
+                                                                                                      n ↦[wms][
+                                                                                                          (s +
+                                                                                                              140).toNat ]
+                                                                                                          destTail ∗
+                                                                                                        ⋯ ⊢
+    NearLogic.mwpi cfg lim d
+      { locals := #[Wasm.Value.i32 0, Wasm.Value.i32 x1, Wasm.Value.i64 x2, Wasm.Value.i32 x3], inst := inst, mi := mi }
+      [] WNear.Binary.f297.body Φ
+```
+
 `WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body_initial_room` (hash `000000000e5ce251`)
 
 ```lean
@@ -1771,6 +2618,171 @@ theorem WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body_initial_roo
 ```
 
 ## Bridge.Functions.BalanceOf297InputCompose
+
+`WNear.Binary.BalanceOf297AbsentCall.array_input_parser_through_cleanup` (hash `0000000050074eaa`)
+
+```lean
+theorem WNear.Binary.BalanceOf297AbsentCall.array_input_parser_through_cleanup {GF : Iris.BundledGFunctors}
+  [WasmLogic.WasmGS Wasm.NearState GF] (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d inst e : ℕ)
+  (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ) (mx : Option ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 39 < lim.maxCallDepth) (Cg R : ℕ) (gt : Wasm.GlobalType) (s x1 : UInt32) (x2 : UInt64) (x3 idx : UInt32)
+  (len : ℕ) (a : WNear.AccountId) (live : List (ℕ × ℕ)) (bs oldOpt optTail oldVec jsonRest derefOut : List UInt8)
+  (j k : ℕ) (ob stateTail contractTail destTail out head oldA oldB : List UInt8) (oldC oldD : UInt32)
+  (hs : 592 ≤ s.toNat) (hal : s.toNat % 8 = 0) (hframe : s.toNat + 160 ≤ 2 ^ 32) (hopt : oldOpt.length = 12)
+  (hoptTail : optTail.length = 4) (holdVec : oldVec.length = 12) (hderef : derefOut.length = 8)
+  (hlen : bs.length < 2 ^ 24) (ho : bs[WNear.Binary.SerdeRead.wsLen bs]? = some 91)
+  (hj :
+    j =
+      WNear.Binary.SerdeRead.wsLen bs + 1 +
+        WNear.Binary.SerdeRead.wsLen (List.drop (WNear.Binary.SerdeRead.wsLen bs + 1) bs))
+  (hq : bs[j]? = some 34)
+  (he :
+    bs[bs.length - jsonRest.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - jsonRest.length) bs)]? =
+      some 93)
+  (hk : k = bs.length - jsonRest.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - jsonRest.length) bs) + 1)
+  (hend : k + WNear.Binary.SerdeRead.wsLen (List.drop k bs) = bs.length)
+  (hmodel : NearInterface.Json.stringBody (List.drop (j + 1) bs) [] = some (some ↑a, jsonRest))
+  (hparserRoom :
+    ∀ (len' : ℕ),
+      len' = len ∨ len' = WNear.Binary.VecFromElem.grownLen len (UInt32.ofNat bs.length) →
+        WNear.Binary.ParseStr.roomRun 2048 len' 0 [] (List.drop (j + 1) bs))
+  (halloc :
+    ∀ (len' : ℕ),
+      len' = len ∨ len' = WNear.Binary.VecFromElem.grownLen len (UInt32.ofNat bs.length) →
+        WNear.Binary.VecFromElem.roomFor
+          (len' +
+            WNear.Binary.ScratchGrow.growthPages 0 0
+                (WNear.Binary.ParseStrSuccess.appendChunks (List.drop (j + 1) bs) []) *
+              65536)
+          2048 (UInt32.ofNat (↑a).toUTF8.toList.length))
+  (hob : ob.length = 16) (hstateTail : stateTail.length = 24) (hcontractTail : contractTail.length = 28)
+  (hdestTail : destTail.length = 4) (hA : oldA.length = 8) (hB : oldB.length = 8) (hout : out.length = 12)
+  (hhead : head.length = 8) (h0 h : Wasm.NearState) (hinput : h0.context.input = bs)
+  (hafter : NearLogic.inputHost h0 0 = h)
+  (hinputLimit : Wasm.Near.withinLimit h0.config.maxRegisterLen bs.length = true)
+  (hok : WNear.Binary.ReadRegister.RegOk 2048 len (some bs)) (S : WNear.State) (st : Near.TrieOverlay.State)
+  (hv : h.storage WNear.stateKey = some (WNear.header S))
+  (hroom :
+    WNear.Binary.LookupMapOps.HeapRoomK
+      ((WNear.Binary.AllocNewCell.cellPages (WNear.Binary.AllocAlloc.wordsOf (UInt32.ofNat bs.length)) 1).toNat +
+          WNear.Binary.BalanceOf297AbsentCall.copiedParserPages bs (j + 1) a +
+        6)
+      len 2048)
+  (hacc : h.storageAccounting = some st) (hlim : Wasm.Near.withinLimit h.config.maxStorageKeyLen 5 = true)
+  (hcanon : NearLogic.Canon st) (hlink : NearLogic.StorageLink h st) (bud : ℕ) (hproof : NearLogic.ProofBudget h st bud)
+  (hbudget :
+    NearLogic.readProofCost (Near.TrieOverlay.contractKey h.context.currentAccountId WNear.stateKey)
+          (h.storage WNear.stateKey) +
+        NearLogic.readProofCost
+          (Near.TrieOverlay.contractKey h.context.currentAccountId
+            (WNear.accountsPrefix ++ (WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ++ (↑a).toUTF8.toList)))
+          (h.storage
+            (WNear.accountsPrefix ++ (WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ++ (↑a).toUTF8.toList))) ≤
+      bud)
+  (hlimAccount :
+    Wasm.Near.withinLimit h.config.maxStorageKeyLen
+        (List.length
+          (WNear.accountsPrefix ++ (WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ++ (↑a).toUTF8.toList))) =
+      true)
+  (hnone :
+    h.storage (WNear.accountsPrefix ++ (WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ++ (↑a).toUTF8.toList)) =
+      none)
+  (hreg : Wasm.Near.withinLimit h.config.maxRegisterLen 29 = true) (ptr0 : UInt32)
+  (hret : Wasm.Near.withinLimit h.config.maxReturnLen 3 = true) (Φ : WasmLogic.Post Wasm.NearState GF) :
+  WNear.Binary.EnvInput.inCode e inst mi A n 2048 mx ∗
+      A 527 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[0]! inst WNear.Binary.f527 ∗
+        WNear.Binary.SerdeFromTrait.code66 n 2048 inst mi A ∗
+          WNear.Binary.SerdeAccountId.code169 n 2048 inst mi A ∗
+            WNear.Binary.ParseStr.code646 n 2048 inst mi A ∗
+              A 644 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[31]! inst WNear.Binary.f644 ∗
+                A 66 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f66 ∗
+                  A 65 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[31]! inst WNear.Binary.f65 ∗
+                    A 157 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[31]! inst WNear.Binary.f157 ∗
+                      WNear.Binary.StateReadLenF.stateCodeF e inst mi A n 2048 mx ∗
+                        A 219 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[0]! inst WNear.Binary.f219 ∗
+                          A 155 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f155 ∗
+                            A 951 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[15]! inst WNear.Binary.f951 ∗
+                              WNear.Binary.BalanceOfAbsent.code293 e n 2048 inst mi A mx ∗
+                                A 293 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[31]! inst WNear.Binary.f293 ∗
+                                  WNear.Binary.ToVec.tvCode n 2048 inst mi A ∗
+                                    A 96 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f96 ∗
+                                      A 158 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[31]! inst WNear.Binary.f158 ∗
+                                        A 779 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f779 ∗
+                                          A 545 ↪[wf]
+                                              Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f545 ∗
+                                            A 456 ↪[wf]
+                                                Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f456 ∗
+                                              WNear.Binary.DropVec.dropCode inst mi A ∗
+                                                A 68 ↪[wf]
+                                                    Wasm.FuncInst.wasm WNear.Binary.types[0]! inst WNear.Binary.f68 ∗
+                                                  WNear.Binary.Interface.ifaceCode e inst mi A n mx ∗
+                                                    inst ↪[inst] mi ∗
+                                                      NearLogic.credits Cg
+                                                          (100 * cfg.regularOpCost +
+                                                              WNear.Binary.EnvInput.cost527 cfg h0 +
+                                                            (100 * cfg.regularOpCost +
+                                                              (100 * cfg.regularOpCost +
+                                                                (1000 * cfg.regularOpCost +
+                                                                    (45 * cfg.regularOpCost +
+                                                                      ((700 +
+                                                                            96 *
+                                                                              WNear.Binary.SerdeRead.wsLen
+                                                                                (List.drop k bs)) *
+                                                                          cfg.regularOpCost +
+                                                                        WNear.Binary.SerdeStruct78Esc.costArray cfg 1 0
+                                                                          bs (↑a).toUTF8.toList jsonRest j)) +
+                                                                  WNear.Binary.BalanceOf297AbsentCall.parserSuccessCost
+                                                                    cfg
+                                                                    (WNear.Binary.BalanceOf297AbsentCall.copiedParserFree
+                                                                      bs (j + 1) 1)
+                                                                    h S a R)))) ∗
+                                                        g ↦[wg] { type := gt, value := Wasm.Value.i32 s } ∗
+                                                          WNear.Binary.EnvInput.ifaceI n ta A ∗
+                                                            WNear.Binary.VecFromElem.stk n (s.toNat - 592) 592 ∗
+                                                              WNear.Binary.AllocFirstFit.vt n 1057464 idx ta (A 578) ∗
+                                                                n ↦[wms][ 1049788 ] WNear.Binary.StateRead.stateKey ∗
+                                                                  NearLogic.mhostPt h0 ∗
+                                                                    WNear.Binary.AllocInv.heapInv n 2048 len live 1 ∗
+                                                                      n ↦[wms][ (s + 88).toNat ] oldOpt ∗
+                                                                        n ↦[wms][ (s + 100).toNat ] optTail ∗
+                                                                          n ↦[wms][ 1062392 ]
+                                                                              WNear.Binary.ParseStr.escTable ∗
+                                                                            n ↦[wms][ 1071704 ]
+                                                                                WNear.Binary.FromUtf8Gen.utf8Width ∗
+                                                                              n ↦[wms][ 1062712 ]
+                                                                                  WNear.Binary.SerdeEsc.hexTable ∗
+                                                                                n ↦[wms][ (s + 104).toNat ] stateTail ∗
+                                                                                  n ↦[wms][ (s + 128).toNat ] oldA ∗
+                                                                                    n ↦[wms][ (s + 128).toNat + 8 ]
+                                                                                        WasmLogic.bytes32 oldC ∗
+                                                                                      n ↦[wms][ (s + 140).toNat ]
+                                                                                          destTail ∗
+                                                                                        n ↦[wms][ (s + 32).toNat ]
+                                                                                            oldB ∗
+                                                                                          n ↦[wms][ (s + 32).toNat + 8 ]
+                                                                                              WasmLogic.bytes32 oldD ∗
+                                                                                            n ↦[wms][ (s + 24).toNat ]
+                                                                                                derefOut ∗
+                                                                                              n ↦[wms][ (s + 48).toNat ]
+                                                                                                  oldVec ∗
+                                                                                                n ↦[wms][
+                                                                                                    (s + 60).toNat ]
+                                                                                                    contractTail ∗
+                                                                                                  n ↦[wms][
+                                                                                                      (s + 8).toNat ]
+                                                                                                      ob ∗
+                                                                                                    WNear.Binary.ToVec.tvData
+                                                                                                        n ta ptr0
+                                                                                                        (A 759)
+                                                                                                        (A 353) ∗
+                                                                                                      n ↦[wms][
+                                                                                                          (s +
+                                                                                                              144).toNat ]
+                                                                                                          out ∗
+                                                                                                        ⋯ ⊢
+    NearLogic.mwpi cfg lim d (WNear.Binary.BalanceOf297AbsentCall.frame inst mi s x1 x2 x3) [Wasm.Value.i32 (s + 88)]
+      (List.take 138 (List.drop 12 WNear.Binary.f297.body)) Φ
+```
 
 `WNear.Binary.BalanceOf297AbsentCall.input_copied_parser_through_cleanup` (hash `000000006a30e338`)
 
@@ -1969,6 +2981,172 @@ theorem WNear.Binary.BalanceOf297AbsentCall.input_expect {GF : Iris.BundledGFunc
 ```
 
 ## Bridge.Functions.BalanceOf297InputSetup
+
+`WNear.Binary.BalanceOf297AbsentCall.array_input_setup_through_cleanup` (hash `0000000042f9bc38`)
+
+```lean
+theorem WNear.Binary.BalanceOf297AbsentCall.array_input_setup_through_cleanup {GF : Iris.BundledGFunctors}
+  [WasmLogic.WasmGS Wasm.NearState GF] (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d inst e : ℕ)
+  (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ) (mx : Option ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 39 < lim.maxCallDepth) (Cg R : ℕ) (gt : Wasm.GlobalType) (s x1 : UInt32) (x2 : UInt64) (x3 idx : UInt32)
+  (len : ℕ) (a : WNear.AccountId) (live : List (ℕ × ℕ)) (bs oldOpt optTail oldVec jsonRest derefOut : List UInt8)
+  (j k : ℕ) (ob stateTail contractTail destTail out head oldA oldB : List UInt8) (oldC oldD : UInt32)
+  (hs : 592 ≤ s.toNat) (hal : s.toNat % 8 = 0) (hframe : s.toNat + 160 ≤ 2 ^ 32) (hopt : oldOpt.length = 12)
+  (hoptTail : optTail.length = 4) (holdVec : oldVec.length = 12) (hderef : derefOut.length = 8)
+  (hlen : bs.length < 2 ^ 24) (ho : bs[WNear.Binary.SerdeRead.wsLen bs]? = some 91)
+  (hj :
+    j =
+      WNear.Binary.SerdeRead.wsLen bs + 1 +
+        WNear.Binary.SerdeRead.wsLen (List.drop (WNear.Binary.SerdeRead.wsLen bs + 1) bs))
+  (hq : bs[j]? = some 34)
+  (he :
+    bs[bs.length - jsonRest.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - jsonRest.length) bs)]? =
+      some 93)
+  (hk : k = bs.length - jsonRest.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - jsonRest.length) bs) + 1)
+  (hend : k + WNear.Binary.SerdeRead.wsLen (List.drop k bs) = bs.length)
+  (hmodel : NearInterface.Json.stringBody (List.drop (j + 1) bs) [] = some (some ↑a, jsonRest))
+  (hparserRoom :
+    ∀ (len' : ℕ),
+      len' = len ∨ len' = WNear.Binary.VecFromElem.grownLen len (UInt32.ofNat bs.length) →
+        WNear.Binary.ParseStr.roomRun 2048 len' 0 [] (List.drop (j + 1) bs))
+  (halloc :
+    ∀ (len' : ℕ),
+      len' = len ∨ len' = WNear.Binary.VecFromElem.grownLen len (UInt32.ofNat bs.length) →
+        WNear.Binary.VecFromElem.roomFor
+          (len' +
+            WNear.Binary.ScratchGrow.growthPages 0 0
+                (WNear.Binary.ParseStrSuccess.appendChunks (List.drop (j + 1) bs) []) *
+              65536)
+          2048 (UInt32.ofNat (↑a).toUTF8.toList.length))
+  (hob : ob.length = 16) (hstateTail : stateTail.length = 24) (hcontractTail : contractTail.length = 28)
+  (hdestTail : destTail.length = 4) (hA : oldA.length = 8) (hB : oldB.length = 8) (hout : out.length = 12)
+  (hhead : head.length = 8) (h0 h : Wasm.NearState) (hinput : h0.context.input = bs)
+  (hafter : NearLogic.inputHost h0 0 = h)
+  (hinputLimit : Wasm.Near.withinLimit h0.config.maxRegisterLen bs.length = true)
+  (hok : WNear.Binary.ReadRegister.RegOk 2048 len (some bs)) (S : WNear.State) (st : Near.TrieOverlay.State)
+  (hv : h.storage WNear.stateKey = some (WNear.header S))
+  (hroom :
+    WNear.Binary.LookupMapOps.HeapRoomK
+      ((WNear.Binary.AllocNewCell.cellPages (WNear.Binary.AllocAlloc.wordsOf (UInt32.ofNat bs.length)) 1).toNat +
+          WNear.Binary.BalanceOf297AbsentCall.copiedParserPages bs (j + 1) a +
+        6)
+      len 2048)
+  (hacc : h.storageAccounting = some st) (hlim : Wasm.Near.withinLimit h.config.maxStorageKeyLen 5 = true)
+  (hcanon : NearLogic.Canon st) (hlink : NearLogic.StorageLink h st) (bud : ℕ) (hproof : NearLogic.ProofBudget h st bud)
+  (hbudget :
+    NearLogic.readProofCost (Near.TrieOverlay.contractKey h.context.currentAccountId WNear.stateKey)
+          (h.storage WNear.stateKey) +
+        NearLogic.readProofCost
+          (Near.TrieOverlay.contractKey h.context.currentAccountId
+            (WNear.accountsPrefix ++ (WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ++ (↑a).toUTF8.toList)))
+          (h.storage
+            (WNear.accountsPrefix ++ (WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ++ (↑a).toUTF8.toList))) ≤
+      bud)
+  (hlimAccount :
+    Wasm.Near.withinLimit h.config.maxStorageKeyLen
+        (List.length
+          (WNear.accountsPrefix ++ (WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ++ (↑a).toUTF8.toList))) =
+      true)
+  (hnone :
+    h.storage (WNear.accountsPrefix ++ (WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ++ (↑a).toUTF8.toList)) =
+      none)
+  (hreg : Wasm.Near.withinLimit h.config.maxRegisterLen 29 = true) (ptr0 : UInt32)
+  (hret : Wasm.Near.withinLimit h.config.maxReturnLen 3 = true) (Φ : WasmLogic.Post Wasm.NearState GF) :
+  WNear.Binary.EnvInput.inCode e inst mi A n 2048 mx ∗
+      A 527 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[0]! inst WNear.Binary.f527 ∗
+        WNear.Binary.SerdeFromTrait.code66 n 2048 inst mi A ∗
+          WNear.Binary.SerdeAccountId.code169 n 2048 inst mi A ∗
+            WNear.Binary.ParseStr.code646 n 2048 inst mi A ∗
+              A 644 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[31]! inst WNear.Binary.f644 ∗
+                A 66 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f66 ∗
+                  A 65 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[31]! inst WNear.Binary.f65 ∗
+                    A 157 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[31]! inst WNear.Binary.f157 ∗
+                      WNear.Binary.StateReadLenF.stateCodeF e inst mi A n 2048 mx ∗
+                        A 219 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[0]! inst WNear.Binary.f219 ∗
+                          A 155 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f155 ∗
+                            A 951 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[15]! inst WNear.Binary.f951 ∗
+                              WNear.Binary.BalanceOfAbsent.code293 e n 2048 inst mi A mx ∗
+                                A 293 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[31]! inst WNear.Binary.f293 ∗
+                                  WNear.Binary.ToVec.tvCode n 2048 inst mi A ∗
+                                    A 96 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f96 ∗
+                                      A 158 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[31]! inst WNear.Binary.f158 ∗
+                                        A 779 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f779 ∗
+                                          A 545 ↪[wf]
+                                              Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f545 ∗
+                                            A 456 ↪[wf]
+                                                Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f456 ∗
+                                              WNear.Binary.DropVec.dropCode inst mi A ∗
+                                                A 68 ↪[wf]
+                                                    Wasm.FuncInst.wasm WNear.Binary.types[0]! inst WNear.Binary.f68 ∗
+                                                  WNear.Binary.Interface.ifaceCode e inst mi A n mx ∗
+                                                    inst ↪[inst] mi ∗
+                                                      NearLogic.credits Cg
+                                                          (3 * cfg.regularOpCost +
+                                                            (100 * cfg.regularOpCost +
+                                                                WNear.Binary.EnvInput.cost527 cfg h0 +
+                                                              (100 * cfg.regularOpCost +
+                                                                (100 * cfg.regularOpCost +
+                                                                  (1000 * cfg.regularOpCost +
+                                                                      (45 * cfg.regularOpCost +
+                                                                        ((700 +
+                                                                              96 *
+                                                                                WNear.Binary.SerdeRead.wsLen
+                                                                                  (List.drop k bs)) *
+                                                                            cfg.regularOpCost +
+                                                                          WNear.Binary.SerdeStruct78Esc.costArray cfg 1
+                                                                            0 bs (↑a).toUTF8.toList jsonRest j)) +
+                                                                    WNear.Binary.BalanceOf297AbsentCall.parserSuccessCost
+                                                                      cfg
+                                                                      (WNear.Binary.BalanceOf297AbsentCall.copiedParserFree
+                                                                        bs (j + 1) 1)
+                                                                      h S a R))))) ∗
+                                                        g ↦[wg] { type := gt, value := Wasm.Value.i32 s } ∗
+                                                          WNear.Binary.EnvInput.ifaceI n ta A ∗
+                                                            WNear.Binary.VecFromElem.stk n (s.toNat - 592) 592 ∗
+                                                              WNear.Binary.AllocFirstFit.vt n 1057464 idx ta (A 578) ∗
+                                                                n ↦[wms][ 1049788 ] WNear.Binary.StateRead.stateKey ∗
+                                                                  NearLogic.mhostPt h0 ∗
+                                                                    WNear.Binary.AllocInv.heapInv n 2048 len live 1 ∗
+                                                                      n ↦[wms][ (s + 88).toNat ] oldOpt ∗
+                                                                        n ↦[wms][ (s + 100).toNat ] optTail ∗
+                                                                          n ↦[wms][ 1062392 ]
+                                                                              WNear.Binary.ParseStr.escTable ∗
+                                                                            n ↦[wms][ 1071704 ]
+                                                                                WNear.Binary.FromUtf8Gen.utf8Width ∗
+                                                                              n ↦[wms][ 1062712 ]
+                                                                                  WNear.Binary.SerdeEsc.hexTable ∗
+                                                                                n ↦[wms][ (s + 104).toNat ] stateTail ∗
+                                                                                  n ↦[wms][ (s + 128).toNat ] oldA ∗
+                                                                                    n ↦[wms][ (s + 128).toNat + 8 ]
+                                                                                        WasmLogic.bytes32 oldC ∗
+                                                                                      n ↦[wms][ (s + 140).toNat ]
+                                                                                          destTail ∗
+                                                                                        n ↦[wms][ (s + 32).toNat ]
+                                                                                            oldB ∗
+                                                                                          n ↦[wms][ (s + 32).toNat + 8 ]
+                                                                                              WasmLogic.bytes32 oldD ∗
+                                                                                            n ↦[wms][ (s + 24).toNat ]
+                                                                                                derefOut ∗
+                                                                                              n ↦[wms][ (s + 48).toNat ]
+                                                                                                  oldVec ∗
+                                                                                                n ↦[wms][
+                                                                                                    (s + 60).toNat ]
+                                                                                                    contractTail ∗
+                                                                                                  n ↦[wms][
+                                                                                                      (s + 8).toNat ]
+                                                                                                      ob ∗
+                                                                                                    WNear.Binary.ToVec.tvData
+                                                                                                        n ta ptr0
+                                                                                                        (A 759)
+                                                                                                        (A 353) ∗
+                                                                                                      n ↦[wms][
+                                                                                                          (s +
+                                                                                                              144).toNat ]
+                                                                                                          out ∗
+                                                                                                        ⋯ ⊢
+    NearLogic.mwpi cfg lim d (WNear.Binary.BalanceOf297AbsentCall.frame inst mi s x1 x2 x3) []
+      (List.take 141 (List.drop 9 WNear.Binary.f297.body)) Φ
+```
 
 `WNear.Binary.BalanceOf297AbsentCall.input_setup_through_cleanup` (hash `0000000075ba2409`)
 
@@ -2712,6 +3890,160 @@ theorem WNear.Binary.BalanceOf297AbsentCall.parser_result_resources {GF : Iris.B
 ```
 
 ## Bridge.Functions.BalanceOf297ParserRoom
+
+`WNear.Binary.BalanceOf297AbsentCall.array_absent_body_initial_memory` (hash `0000000058dad58c`)
+
+```lean
+theorem WNear.Binary.BalanceOf297AbsentCall.array_absent_body_initial_memory {GF : Iris.BundledGFunctors}
+  [WasmLogic.WasmGS Wasm.NearState GF] (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d inst e : ℕ)
+  (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ) (mx : Option ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 39 < lim.maxCallDepth) (Cg R : ℕ) (gt : Wasm.GlobalType) (s x1 : UInt32) (x2 : UInt64) (x3 idx : UInt32)
+  (a : WNear.AccountId) (live : List (ℕ × ℕ)) (bs oldOpt optTail oldVec jsonRest derefOut : List UInt8) (j k : ℕ)
+  (ob stateTail contractTail destTail out head oldA oldB : List UInt8) (oldC oldD hookOld k3 : UInt32)
+  (hs : 592 ≤ s.toNat) (hal : s.toNat % 8 = 0) (hframe : s.toNat + 160 < 2 ^ 32) (hopt : oldOpt.length = 12)
+  (hoptTail : optTail.length = 4) (holdVec : oldVec.length = 12) (hderef : derefOut.length = 8)
+  (hlen : bs.length < 2 ^ 24) (ho : bs[WNear.Binary.SerdeRead.wsLen bs]? = some 91)
+  (hj :
+    j =
+      WNear.Binary.SerdeRead.wsLen bs + 1 +
+        WNear.Binary.SerdeRead.wsLen (List.drop (WNear.Binary.SerdeRead.wsLen bs + 1) bs))
+  (hq : bs[j]? = some 34)
+  (he :
+    bs[bs.length - jsonRest.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - jsonRest.length) bs)]? =
+      some 93)
+  (hk : k = bs.length - jsonRest.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - jsonRest.length) bs) + 1)
+  (hend : k + WNear.Binary.SerdeRead.wsLen (List.drop k bs) = bs.length)
+  (hmodel : NearInterface.Json.stringBody (List.drop (j + 1) bs) [] = some (some ↑a, jsonRest)) (hob : ob.length = 16)
+  (hstateTail : stateTail.length = 24) (hcontractTail : contractTail.length = 28) (hdestTail : destTail.length = 4)
+  (hA : oldA.length = 8) (hB : oldB.length = 8) (hout : out.length = 12) (hhead : head.length = 8)
+  (h0 h : Wasm.NearState) (hinput : h0.context.input = bs) (hafter : NearLogic.inputHost h0 0 = h)
+  (hinputLimit : Wasm.Near.withinLimit h0.config.maxRegisterLen bs.length = true) (S : WNear.State)
+  (st : Near.TrieOverlay.State) (hv : h.storage WNear.stateKey = some (WNear.header S))
+  (hacc : h.storageAccounting = some st) (hlim : Wasm.Near.withinLimit h.config.maxStorageKeyLen 5 = true)
+  (hcanon : NearLogic.Canon st) (hlink : NearLogic.StorageLink h st) (bud : ℕ) (hproof : NearLogic.ProofBudget h st bud)
+  (hbudget :
+    NearLogic.readProofCost (Near.TrieOverlay.contractKey h.context.currentAccountId WNear.stateKey)
+          (h.storage WNear.stateKey) +
+        NearLogic.readProofCost
+          (Near.TrieOverlay.contractKey h.context.currentAccountId
+            (WNear.accountsPrefix ++ (WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ++ (↑a).toUTF8.toList)))
+          (h.storage
+            (WNear.accountsPrefix ++ (WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ++ (↑a).toUTF8.toList))) ≤
+      bud)
+  (hlimAccount :
+    Wasm.Near.withinLimit h.config.maxStorageKeyLen
+        (List.length
+          (WNear.accountsPrefix ++ (WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ++ (↑a).toUTF8.toList))) =
+      true)
+  (hnone :
+    h.storage (WNear.accountsPrefix ++ (WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ++ (↑a).toUTF8.toList)) =
+      none)
+  (hreg : Wasm.Near.withinLimit h.config.maxRegisterLen 29 = true) (ptr0 : UInt32)
+  (hret : Wasm.Near.withinLimit h.config.maxReturnLen 3 = true) (Φ : WasmLogic.Post Wasm.NearState GF) :
+  WNear.Binary.FtTotalSupply.codeA inst mi A ∗
+      WNear.Binary.EnvInput.inCode e inst mi A n 2048 mx ∗
+        A 527 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[0]! inst WNear.Binary.f527 ∗
+          WNear.Binary.SerdeFromTrait.code66 n 2048 inst mi A ∗
+            WNear.Binary.SerdeAccountId.code169 n 2048 inst mi A ∗
+              WNear.Binary.ParseStr.code646 n 2048 inst mi A ∗
+                A 644 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[31]! inst WNear.Binary.f644 ∗
+                  A 66 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f66 ∗
+                    A 65 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[31]! inst WNear.Binary.f65 ∗
+                      A 157 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[31]! inst WNear.Binary.f157 ∗
+                        WNear.Binary.StateReadLenF.stateCodeF e inst mi A n 2048 mx ∗
+                          A 219 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[0]! inst WNear.Binary.f219 ∗
+                            A 155 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f155 ∗
+                              A 951 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[15]! inst WNear.Binary.f951 ∗
+                                WNear.Binary.BalanceOfAbsent.code293 e n 2048 inst mi A mx ∗
+                                  A 293 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[31]! inst WNear.Binary.f293 ∗
+                                    WNear.Binary.ToVec.tvCode n 2048 inst mi A ∗
+                                      A 96 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f96 ∗
+                                        A 158 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[31]! inst WNear.Binary.f158 ∗
+                                          A 779 ↪[wf]
+                                              Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f779 ∗
+                                            A 545 ↪[wf]
+                                                Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f545 ∗
+                                              A 456 ↪[wf]
+                                                  Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f456 ∗
+                                                WNear.Binary.DropVec.dropCode inst mi A ∗
+                                                  A 68 ↪[wf]
+                                                      Wasm.FuncInst.wasm WNear.Binary.types[0]! inst WNear.Binary.f68 ∗
+                                                    WNear.Binary.Interface.ifaceCode e inst mi A n mx ∗
+                                                      inst ↪[inst] mi ∗
+                                                        NearLogic.credits Cg
+                                                            (475 * cfg.regularOpCost +
+                                                              (3 * cfg.regularOpCost +
+                                                                (100 * cfg.regularOpCost +
+                                                                    WNear.Binary.EnvInput.cost527 cfg h0 +
+                                                                  (100 * cfg.regularOpCost +
+                                                                    (100 * cfg.regularOpCost +
+                                                                      (1000 * cfg.regularOpCost +
+                                                                          (45 * cfg.regularOpCost +
+                                                                            ((700 +
+                                                                                  96 *
+                                                                                    WNear.Binary.SerdeRead.wsLen
+                                                                                      (List.drop k bs)) *
+                                                                                cfg.regularOpCost +
+                                                                              WNear.Binary.SerdeStruct78Esc.costArray
+                                                                                cfg 1 0 bs (↑a).toUTF8.toList jsonRest
+                                                                                j)) +
+                                                                        WNear.Binary.BalanceOf297AbsentCall.parserSuccessCost
+                                                                          cfg
+                                                                          (WNear.Binary.BalanceOf297AbsentCall.copiedParserFree
+                                                                            bs (j + 1) 1)
+                                                                          h S a R)))))) ∗
+                                                          g ↦[wg] { type := gt, value := Wasm.Value.i32 (s + 160) } ∗
+                                                            WNear.Binary.VecFromElem.stk n (s.toNat - 592) 592 ∗
+                                                              WNear.Binary.SetupPanicHook.hookCells n 0 hookOld 0 ∗
+                                                                n ↦[wms][ 1055020 ] WasmLogic.bytes32 116 ∗
+                                                                  ta ↦[wt][ 116 ] Wasm.Ref.func (A 565) ∗
+                                                                    ta ↦[wt][ 106 ] Wasm.Ref.func (A 564) ∗
+                                                                      WNear.Binary.SetBlockchainInterface.blockchainInterfaceCells
+                                                                          n 0 0 0 k3 ∗
+                                                                        WNear.Binary.FtTotalSupply.vtab n ta A ∗
+                                                                          n ↦[wms][ 1050188 + 36 ]
+                                                                              WNear.Binary.Interface.dataWord
+                                                                                (1050188 + 36) ∗
+                                                                            ta ↦[wt][ 44 ] Wasm.Ref.func (A 246) ∗
+                                                                              WNear.Binary.AllocFirstFit.vt n 1057464
+                                                                                  idx ta (A 578) ∗
+                                                                                n ↦[wms][ 1049788 ]
+                                                                                    WNear.Binary.StateRead.stateKey ∗
+                                                                                  NearLogic.mhostPt h0 ∗
+                                                                                    WNear.Binary.AllocInv.heapInv n 2048
+                                                                                        WNear.Binary.InitialState.memLen
+                                                                                        live 1 ∗
+                                                                                      n ↦[wms][ (s + 88).toNat ]
+                                                                                          oldOpt ∗
+                                                                                        n ↦[wms][ (s + 100).toNat ]
+                                                                                            optTail ∗
+                                                                                          n ↦[wms][ 1062392 ]
+                                                                                              WNear.Binary.ParseStr.escTable ∗
+                                                                                            n ↦[wms][ 1071704 ]
+                                                                                                WNear.Binary.FromUtf8Gen.utf8Width ∗
+                                                                                              n ↦[wms][ 1062712 ]
+                                                                                                  WNear.Binary.SerdeEsc.hexTable ∗
+                                                                                                n ↦[wms][
+                                                                                                    (s + 104).toNat ]
+                                                                                                    stateTail ∗
+                                                                                                  n ↦[wms][
+                                                                                                      (s + 128).toNat ]
+                                                                                                      oldA ∗
+                                                                                                    n ↦[wms][
+                                                                                                        (s +
+                                                                                                              128).toNat +
+                                                                                                          8 ]
+                                                                                                        WasmLogic.bytes32
+                                                                                                          oldC ∗
+                                                                                                      n ↦[wms][
+                                                                                                          (s +
+                                                                                                              140).toNat ]
+                                                                                                          destTail ∗
+                                                                                                        ⋯ ⊢
+    NearLogic.mwpi cfg lim d
+      { locals := #[Wasm.Value.i32 0, Wasm.Value.i32 x1, Wasm.Value.i64 x2, Wasm.Value.i32 x3], inst := inst, mi := mi }
+      [] WNear.Binary.f297.body Φ
+```
 
 `WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body_initial_memory` (hash `000000001a0e13b5`)
 
@@ -4407,6 +5739,144 @@ theorem WNear.Binary.FromSliceEsc.f65_arr_copied {GF : Iris.BundledGFunctors} [W
                                     value.toUTF8.toList (j + 1) p c len)
 ```
 
+## Bridge.Functions.FromSliceModel
+
+`WNear.Binary.FromSliceModel.f65_arr_model` (hash `000000002ba24b14`)
+
+```lean
+theorem WNear.Binary.FromSliceModel.f65_arr_model {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (htype : type.results = [])
+  (inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 38 < lim.maxCallDepth) (Cg : ℕ) (gt : Wasm.GlobalType) (sp out ptr idx : UInt32) (ob bs : List UInt8)
+  (value : String) (rest : List UInt8) (j k maxP mlen F : ℕ) (live : List (ℕ × ℕ)) (hob : ob.length = 16)
+  (hout : out.toNat + 16 ≤ 2 ^ 32) (hlen : bs.length < 2 ^ 24) (hptr : ptr.toNat + bs.length < 2 ^ 32)
+  (hsp : 448 ≤ sp.toNat) (ho : bs[WNear.Binary.SerdeRead.wsLen bs]? = some 91)
+  (hj :
+    j =
+      WNear.Binary.SerdeRead.wsLen bs + 1 +
+        WNear.Binary.SerdeRead.wsLen (List.drop (WNear.Binary.SerdeRead.wsLen bs + 1) bs))
+  (hq : bs[j]? = some 34)
+  (he : bs[bs.length - rest.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - rest.length) bs)]? = some 93)
+  (hk : k = bs.length - rest.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - rest.length) bs) + 1)
+  (hend : k + WNear.Binary.SerdeRead.wsLen (List.drop k bs) = bs.length)
+  (hmodel : NearInterface.Json.stringBody (List.drop (j + 1) bs) [] = some (some value, rest))
+  (hr : WNear.Binary.SerdeErrBox.roomFor4 mlen maxP 20)
+  (hroom : WNear.Binary.ParseStr.roomRun maxP mlen 0 [] (List.drop (j + 1) bs))
+  (hvalid : Wasm.Near.validAccountIdBytes value.toUTF8.toList = true)
+  (halloc :
+    WNear.Binary.VecFromElem.roomFor
+      (mlen +
+        WNear.Binary.ScratchGrow.growthPages 0 0 (WNear.Binary.ParseStrSuccess.appendChunks (List.drop (j + 1) bs) []) *
+          65536)
+      maxP (UInt32.ofNat value.toUTF8.toList.length)) :
+  WNear.Binary.SerdeFromTrait.code66 n maxP inst mi A ∗
+      WNear.Binary.SerdeAccountId.code169 n maxP inst mi A ∗
+        WNear.Binary.ParseStr.code646 n maxP inst mi A ∗
+          WNear.Binary.DropVec.dropCode inst mi A ∗
+            A 644 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[31]! inst WNear.Binary.f644 ∗
+              A 66 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f66 ∗ inst ↪[inst] mi ⊢
+    NearLogic.MFunSpec cfg lim d type inst mi WNear.Binary.f65 Cg
+      (fun args =>
+        iprop(⌜args = [Wasm.Value.i32 out, Wasm.Value.i32 ptr, Wasm.Value.i32 (UInt32.ofNat bs.length)]⌝ ∗
+            g ↦[wg] { type := gt, value := Wasm.Value.i32 sp } ∗
+              WNear.Binary.VecFromElem.stk n (sp.toNat - 448) 448 ∗
+                WNear.Binary.AllocFirstFit.vt n 1057464 idx ta (A 578) ∗
+                  WNear.Binary.AllocInv.heapInv n maxP mlen live F ∗
+                    n ↦[wms][ out.toNat ] ob ∗
+                      n ↦[wms][ ptr.toNat ] bs ∗
+                        n ↦[wms][ 1062392 ] WNear.Binary.ParseStr.escTable ∗
+                          n ↦[wms][ 1071704 ] WNear.Binary.FromUtf8Gen.utf8Width ∗
+                            n ↦[wms][ 1062712 ] WNear.Binary.SerdeEsc.hexTable))
+      (fun x =>
+        45 * cfg.regularOpCost +
+          ((700 + 96 * WNear.Binary.SerdeRead.wsLen (List.drop k bs)) * cfg.regularOpCost +
+            WNear.Binary.SerdeStruct78Model.costArray cfg F 0 bs value.toUTF8.toList rest j))
+      fun x rs =>
+      iprop(⌜rs = []⌝ ∗
+          g ↦[wg] { type := gt, value := Wasm.Value.i32 sp } ∗
+            WNear.Binary.VecFromElem.stk n (sp.toNat - 448) 448 ∗
+              WNear.Binary.AllocFirstFit.vt n 1057464 idx ta (A 578) ∗
+                n ↦[wms][ ptr.toNat ] bs ∗
+                  n ↦[wms][ 1062392 ] WNear.Binary.ParseStr.escTable ∗
+                    n ↦[wms][ 1071704 ] WNear.Binary.FromUtf8Gen.utf8Width ∗
+                      n ↦[wms][ 1062712 ] WNear.Binary.SerdeEsc.hexTable ∗
+                        ∃ p c len,
+                          n ↦[wms][ out.toNat ] WasmLogic.bytes32 0 ∗
+                            n ↦[wms][ out.toNat + 4 ] WasmLogic.bytes32 p ∗
+                              n ↦[wms][ out.toNat + 8 ] WasmLogic.bytes32 c ∗
+                                n ↦[wms][ out.toNat + 12 ] WasmLogic.bytes32 len ∗
+                                  WNear.Binary.SerdeScratchValueDrop.cleanValue n maxP mlen live F 0 bs
+                                    value.toUTF8.toList (j + 1) p c len)
+```
+
+`WNear.Binary.FromSliceModel.f65_arr_model_bound` (hash `0000000078be717e`)
+
+```lean
+theorem WNear.Binary.FromSliceModel.f65_arr_model_bound {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (htype : type.results = [])
+  (inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 38 < lim.maxCallDepth) (Cg : ℕ) (gt : Wasm.GlobalType) (sp out ptr idx : UInt32) (ob bs : List UInt8)
+  (value : String) (rest : List UInt8) (j k maxP mlen F : ℕ) (live : List (ℕ × ℕ)) (hob : ob.length = 16)
+  (hout : out.toNat + 16 ≤ 2 ^ 32) (hlen : bs.length < 2 ^ 24) (hptr : ptr.toNat + bs.length < 2 ^ 32)
+  (hsp : 448 ≤ sp.toNat) (ho : bs[WNear.Binary.SerdeRead.wsLen bs]? = some 91)
+  (hj :
+    j =
+      WNear.Binary.SerdeRead.wsLen bs + 1 +
+        WNear.Binary.SerdeRead.wsLen (List.drop (WNear.Binary.SerdeRead.wsLen bs + 1) bs))
+  (hq : bs[j]? = some 34)
+  (he : bs[bs.length - rest.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - rest.length) bs)]? = some 93)
+  (hk : k = bs.length - rest.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - rest.length) bs) + 1)
+  (hend : k + WNear.Binary.SerdeRead.wsLen (List.drop k bs) = bs.length)
+  (hmodel : NearInterface.Json.stringBody (List.drop (j + 1) bs) [] = some (some value, rest))
+  (hr : WNear.Binary.SerdeErrBox.roomFor4 mlen maxP 20)
+  (hroom : WNear.Binary.ParseStr.roomRun maxP mlen 0 [] (List.drop (j + 1) bs))
+  (hvalid : Wasm.Near.validAccountIdBytes value.toUTF8.toList = true)
+  (halloc :
+    WNear.Binary.VecFromElem.roomFor
+      (mlen +
+        WNear.Binary.ScratchGrow.growthPages 0 0 (WNear.Binary.ParseStrSuccess.appendChunks (List.drop (j + 1) bs) []) *
+          65536)
+      maxP (UInt32.ofNat value.toUTF8.toList.length)) :
+  WNear.Binary.SerdeFromTrait.code66 n maxP inst mi A ∗
+      WNear.Binary.SerdeAccountId.code169 n maxP inst mi A ∗
+        WNear.Binary.ParseStr.code646 n maxP inst mi A ∗
+          WNear.Binary.DropVec.dropCode inst mi A ∗
+            A 644 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[31]! inst WNear.Binary.f644 ∗
+              A 66 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f66 ∗ inst ↪[inst] mi ⊢
+    NearLogic.MFunSpec cfg lim d type inst mi WNear.Binary.f65 Cg
+      (fun args =>
+        iprop(⌜args = [Wasm.Value.i32 out, Wasm.Value.i32 ptr, Wasm.Value.i32 (UInt32.ofNat bs.length)]⌝ ∗
+            g ↦[wg] { type := gt, value := Wasm.Value.i32 sp } ∗
+              WNear.Binary.VecFromElem.stk n (sp.toNat - 448) 448 ∗
+                WNear.Binary.AllocFirstFit.vt n 1057464 idx ta (A 578) ∗
+                  WNear.Binary.AllocInv.heapInv n maxP mlen live F ∗
+                    n ↦[wms][ out.toNat ] ob ∗
+                      n ↦[wms][ ptr.toNat ] bs ∗
+                        n ↦[wms][ 1062392 ] WNear.Binary.ParseStr.escTable ∗
+                          n ↦[wms][ 1071704 ] WNear.Binary.FromUtf8Gen.utf8Width ∗
+                            n ↦[wms][ 1062712 ] WNear.Binary.SerdeEsc.hexTable))
+      (fun x =>
+        45 * cfg.regularOpCost +
+          ((700 + 96 * WNear.Binary.SerdeRead.wsLen (List.drop k bs)) * cfg.regularOpCost +
+            WNear.Binary.SerdeStruct78Esc.costArray cfg F 0 bs value.toUTF8.toList rest j))
+      fun x rs =>
+      iprop(⌜rs = []⌝ ∗
+          g ↦[wg] { type := gt, value := Wasm.Value.i32 sp } ∗
+            WNear.Binary.VecFromElem.stk n (sp.toNat - 448) 448 ∗
+              WNear.Binary.AllocFirstFit.vt n 1057464 idx ta (A 578) ∗
+                n ↦[wms][ ptr.toNat ] bs ∗
+                  n ↦[wms][ 1062392 ] WNear.Binary.ParseStr.escTable ∗
+                    n ↦[wms][ 1071704 ] WNear.Binary.FromUtf8Gen.utf8Width ∗
+                      n ↦[wms][ 1062712 ] WNear.Binary.SerdeEsc.hexTable ∗
+                        ∃ p c len,
+                          n ↦[wms][ out.toNat ] WasmLogic.bytes32 0 ∗
+                            n ↦[wms][ out.toNat + 4 ] WasmLogic.bytes32 p ∗
+                              n ↦[wms][ out.toNat + 8 ] WasmLogic.bytes32 c ∗
+                                n ↦[wms][ out.toNat + 12 ] WasmLogic.bytes32 len ∗
+                                  WNear.Binary.SerdeScratchValueDrop.cleanValue n maxP mlen live F 0 bs
+                                    value.toUTF8.toList (j + 1) p c len)
+```
+
 ## Bridge.Functions.FromSliceSpec
 
 `WNear.Binary.FromSliceSpec.AcceptContract` (hash `37a2beaca78490cb`)
@@ -4598,6 +6068,296 @@ def WNear.Binary.ScratchGrow.roomRes (hl maxP : ℕ) (cap len k : UInt32) : Prop
     WNear.Binary.VecFromElem.roomFor hl maxP (WNear.Binary.VecGrow.growCap cap (len + k))
 ```
 
+## Bridge.Functions.SerdeFromTraitModel
+
+`WNear.Binary.SerdeFromTraitModel.f66_arr_model` (hash `000000004f15011a`)
+
+```lean
+theorem WNear.Binary.SerdeFromTraitModel.f66_arr_model {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (htype : type.results = [])
+  (inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 37 < lim.maxCallDepth) (Cg : ℕ) (gt : Wasm.GlobalType) (sp out rd ptr idx : UInt32) (ob bs : List UInt8)
+  (value : String) (rest : List UInt8) (j k maxP mlen F : ℕ) (live : List (ℕ × ℕ)) (hob : ob.length = 16)
+  (hout : out.toNat + 16 ≤ 2 ^ 32) (hrd : rd.toNat + 12 ≤ 2 ^ 32) (hlen : bs.length < 2 ^ 24)
+  (hptr : ptr.toNat + bs.length < 2 ^ 32) (hsp : 432 ≤ sp.toNat) (ho : bs[WNear.Binary.SerdeRead.wsLen bs]? = some 91)
+  (hj :
+    j =
+      WNear.Binary.SerdeRead.wsLen bs + 1 +
+        WNear.Binary.SerdeRead.wsLen (List.drop (WNear.Binary.SerdeRead.wsLen bs + 1) bs))
+  (hq : bs[j]? = some 34)
+  (he : bs[bs.length - rest.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - rest.length) bs)]? = some 93)
+  (hk : k = bs.length - rest.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - rest.length) bs) + 1)
+  (hend : k + WNear.Binary.SerdeRead.wsLen (List.drop k bs) = bs.length)
+  (hmodel : NearInterface.Json.stringBody (List.drop (j + 1) bs) [] = some (some value, rest))
+  (hr : WNear.Binary.SerdeErrBox.roomFor4 mlen maxP 20)
+  (hroom : WNear.Binary.ParseStr.roomRun maxP mlen 0 [] (List.drop (j + 1) bs))
+  (hvalid : Wasm.Near.validAccountIdBytes value.toUTF8.toList = true)
+  (halloc :
+    WNear.Binary.VecFromElem.roomFor
+      (mlen +
+        WNear.Binary.ScratchGrow.growthPages 0 0 (WNear.Binary.ParseStrSuccess.appendChunks (List.drop (j + 1) bs) []) *
+          65536)
+      maxP (UInt32.ofNat value.toUTF8.toList.length)) :
+  WNear.Binary.SerdeFromTrait.code66 n maxP inst mi A ∗
+      WNear.Binary.SerdeAccountId.code169 n maxP inst mi A ∗
+        WNear.Binary.ParseStr.code646 n maxP inst mi A ∗ WNear.Binary.DropVec.dropCode inst mi A ⊢
+    NearLogic.MFunSpec cfg lim d type inst mi WNear.Binary.f66 Cg
+      (fun args =>
+        iprop(⌜args = [Wasm.Value.i32 out, Wasm.Value.i32 rd]⌝ ∗
+            g ↦[wg] { type := gt, value := Wasm.Value.i32 sp } ∗
+              WNear.Binary.VecFromElem.stk n (sp.toNat - 432) 432 ∗
+                WNear.Binary.AllocFirstFit.vt n 1057464 idx ta (A 578) ∗
+                  WNear.Binary.AllocInv.heapInv n maxP mlen live F ∗
+                    n ↦[wms][ out.toNat ] ob ∗
+                      WNear.Binary.ArgsLeaves.sliceRead n rd ptr (UInt32.ofNat bs.length) 0 ∗
+                        n ↦[wms][ ptr.toNat ] bs ∗
+                          n ↦[wms][ 1062392 ] WNear.Binary.ParseStr.escTable ∗
+                            n ↦[wms][ 1071704 ] WNear.Binary.FromUtf8Gen.utf8Width ∗
+                              n ↦[wms][ 1062712 ] WNear.Binary.SerdeEsc.hexTable))
+      (fun x =>
+        (700 + 96 * WNear.Binary.SerdeRead.wsLen (List.drop k bs)) * cfg.regularOpCost +
+          WNear.Binary.SerdeStruct78Model.costArray cfg F 0 bs value.toUTF8.toList rest j)
+      fun x rs =>
+      iprop(⌜rs = []⌝ ∗
+          g ↦[wg] { type := gt, value := Wasm.Value.i32 sp } ∗
+            WNear.Binary.VecFromElem.stk n (sp.toNat - 432) 432 ∗
+              WNear.Binary.AllocFirstFit.vt n 1057464 idx ta (A 578) ∗
+                WNear.Binary.ArgsLeaves.sliceRead n rd ptr (UInt32.ofNat bs.length) 0 ∗
+                  n ↦[wms][ ptr.toNat ] bs ∗
+                    n ↦[wms][ 1062392 ] WNear.Binary.ParseStr.escTable ∗
+                      n ↦[wms][ 1071704 ] WNear.Binary.FromUtf8Gen.utf8Width ∗
+                        n ↦[wms][ 1062712 ] WNear.Binary.SerdeEsc.hexTable ∗
+                          ∃ p c len,
+                            n ↦[wms][ out.toNat ] WasmLogic.bytes32 0 ∗
+                              n ↦[wms][ out.toNat + 4 ] WasmLogic.bytes32 p ∗
+                                n ↦[wms][ out.toNat + 8 ] WasmLogic.bytes32 c ∗
+                                  n ↦[wms][ out.toNat + 12 ] WasmLogic.bytes32 len ∗
+                                    WNear.Binary.SerdeScratchValueDrop.cleanValue n maxP mlen live F 0 bs
+                                      value.toUTF8.toList (j + 1) p c len)
+```
+
+## Bridge.Functions.SerdeOwnedValueDrop
+
+`WNear.Binary.SerdeValueReuse.f68_owned_value` (hash `00000000120f3e9d`)
+
+```lean
+theorem WNear.Binary.SerdeValueReuse.f68_owned_value {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (htype : type.results = [])
+  (inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 7 < lim.maxCallDepth) (Cg maxP hl : ℕ) (live : List (ℕ × ℕ)) (F : ℕ) (de capS p c len : UInt32)
+  (bs bytes : List UInt8) (q : ℕ) (hde : de.toNat + 24 ≤ 2 ^ 32) :
+  WNear.Binary.DropVec.dropCode inst mi A ⊢
+    NearLogic.MFunSpec cfg lim d type inst mi WNear.Binary.f68 Cg
+      (fun args =>
+        iprop(⌜args = [Wasm.Value.i32 (de + 12)]⌝ ∗
+            WNear.Binary.SerdeValueReuse.ownedValue n maxP hl live F de capS bs bytes q p c len))
+      (fun x => 315 * cfg.regularOpCost) fun x rs =>
+      iprop(⌜rs = []⌝ ∗
+          ∃ scratch cap sl,
+            n ↦[wms][ de.toNat + 12 ] WasmLogic.bytes32 scratch ∗
+              n ↦[wms][ de.toNat + 16 ] WasmLogic.bytes32 cap ∗
+                n ↦[wms][ de.toNat + 20 ] WasmLogic.bytes32 sl ∗
+                  WNear.Binary.SerdeScratchValueDrop.cleanValue n maxP hl live F capS bs bytes q p c len)
+```
+
+`WNear.Binary.SerdeValueReuse.f68_scratch_exact` (hash `00000000f1f8a07d`)
+
+```lean
+theorem WNear.Binary.SerdeValueReuse.f68_scratch_exact {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (htype : type.results = [])
+  (inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 7 < lim.maxCallDepth) (Cg maxP hl : ℕ) (live : List (ℕ × ℕ)) (F : ℕ) (v ptr cap sl : UInt32)
+  (hv : v.toNat + 12 ≤ 2 ^ 32) :
+  WNear.Binary.DropVec.dropCode inst mi A ⊢
+    NearLogic.MFunSpec cfg lim d type inst mi WNear.Binary.f68 Cg
+      (fun args =>
+        iprop(⌜args = [Wasm.Value.i32 v]⌝ ∗
+            n ↦[wms][ v.toNat ] WasmLogic.bytes32 ptr ∗
+              n ↦[wms][ v.toNat + 4 ] WasmLogic.bytes32 cap ∗
+                n ↦[wms][ v.toNat + 8 ] WasmLogic.bytes32 sl ∗
+                  WNear.Binary.ScratchGrow.sbuf n maxP hl live F ptr cap []))
+      (fun x => 315 * cfg.regularOpCost) fun x rs =>
+      iprop(⌜rs = []⌝ ∗
+          n ↦[wms][ v.toNat ] WasmLogic.bytes32 ptr ∗
+            n ↦[wms][ v.toNat + 4 ] WasmLogic.bytes32 cap ∗
+              n ↦[wms][ v.toNat + 8 ] WasmLogic.bytes32 sl ∗ WNear.Binary.AllocInv.heapInv n maxP hl live (F + 1))
+```
+
+## Bridge.Functions.SerdeStruct78Model
+
+`WNear.Binary.SerdeStruct78Model.costArray` (hash `9ad5d577db2ccd50`)
+
+```lean
+def WNear.Binary.SerdeStruct78Model.costArray (cfg : Wasm.Near.WasmConfig) (F : ℕ) (capS : UInt32)
+  (bs bytes rest : List UInt8) (j : ℕ) : ℕ :=
+  (1300 +
+        96 *
+          (WNear.Binary.SerdeRead.wsLen bs +
+              WNear.Binary.SerdeRead.wsLen (List.drop (WNear.Binary.SerdeRead.wsLen bs + 1) bs) +
+            WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - rest.length) bs))) *
+      cfg.regularOpCost +
+    WNear.Binary.SerdeValueReuse.valueCost cfg F capS bs bytes rest j j
+```
+
+`WNear.Binary.SerdeStruct78Model.costArray_le` (hash `0000000079c760ef`)
+
+```lean
+theorem WNear.Binary.SerdeStruct78Model.costArray_le (cfg : Wasm.Near.WasmConfig) (F : ℕ) (capS : UInt32) (bs : List UInt8)
+  (value : String) (rest : List UInt8) (j : ℕ) (hq : bs[j]? = some 34)
+  (hmodel : NearInterface.Json.stringBody (List.drop (j + 1) bs) [] = some (some value, rest)) :
+  WNear.Binary.SerdeStruct78Model.costArray cfg F capS bs value.toUTF8.toList rest j ≤
+    WNear.Binary.SerdeStruct78Esc.costArray cfg F capS bs value.toUTF8.toList rest j
+```
+
+`WNear.Binary.SerdeStruct78Model.f78_arr_model` (hash `0000000068b517c1`)
+
+```lean
+theorem WNear.Binary.SerdeStruct78Model.f78_arr_model {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (htype : type.results = [])
+  (inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 36 < lim.maxCallDepth) (Cg : ℕ) (gt : Wasm.GlobalType) (sp out de ptr idx sl ptrS capS : UInt32)
+  (ob bs : List UInt8) (value : String) (rest : List UInt8) (j maxP hl : ℕ) (live : List (ℕ × ℕ)) (F : ℕ)
+  (hob : ob.length = 16) (hout : out.toNat + 16 ≤ 2 ^ 32) (hlen : bs.length < 2 ^ 24)
+  (hptr : ptr.toNat + bs.length < 2 ^ 32) (hde : de.toNat + 25 ≤ 2 ^ 32) (hsp : 368 ≤ sp.toNat)
+  (ho : bs[WNear.Binary.SerdeRead.wsLen bs]? = some 91)
+  (hj :
+    j =
+      WNear.Binary.SerdeRead.wsLen bs + 1 +
+        WNear.Binary.SerdeRead.wsLen (List.drop (WNear.Binary.SerdeRead.wsLen bs + 1) bs))
+  (hq : bs[j]? = some 34)
+  (he : bs[bs.length - rest.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - rest.length) bs)]? = some 93)
+  (hcap : capS.toNat < 2 ^ 25)
+  (hmodel : NearInterface.Json.stringBody (List.drop (j + 1) bs) [] = some (some value, rest))
+  (hr : WNear.Binary.SerdeErrBox.roomFor4 hl maxP 20)
+  (hroom : WNear.Binary.ParseStr.roomRun maxP hl capS [] (List.drop (j + 1) bs))
+  (hvalid : Wasm.Near.validAccountIdBytes value.toUTF8.toList = true)
+  (halloc :
+    WNear.Binary.VecFromElem.roomFor
+      (hl +
+        WNear.Binary.ScratchGrow.growthPages capS 0
+            (WNear.Binary.ParseStrSuccess.appendChunks (List.drop (j + 1) bs) []) *
+          65536)
+      maxP (UInt32.ofNat value.toUTF8.toList.length)) :
+  WNear.Binary.SerdeEnds.endCode n maxP inst mi A ∗
+      A 214 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f214 ∗
+        A 169 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f169 ∗
+          A 91 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[32]! inst WNear.Binary.f91 ∗
+            WNear.Binary.SerdeAccountId.code169 n maxP inst mi A ∗
+              WNear.Binary.ParseStr.code646 n maxP inst mi A ∗
+                A 228 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[36]! inst WNear.Binary.f228 ∗ inst ↪[inst] mi ⊢
+    NearLogic.MFunSpec cfg lim d type inst mi WNear.Binary.f78 Cg
+      (fun args =>
+        iprop(⌜args = [Wasm.Value.i32 out, Wasm.Value.i32 de]⌝ ∗
+            g ↦[wg] { type := gt, value := Wasm.Value.i32 sp } ∗
+              WNear.Binary.VecFromElem.stk n (sp.toNat - 368) 368 ∗
+                WNear.Binary.AllocFirstFit.vt n 1057464 idx ta (A 578) ∗
+                  n ↦[wms][ out.toNat ] ob ∗
+                    WNear.Binary.SerdeRead.rd n de ptr bs 0 ∗
+                      n ↦[wms][ de.toNat + 24 ] [128] ∗
+                        WNear.Binary.SerdeValueState.scratchPre n maxP hl live F de ptrS capS sl ∗
+                          WNear.Binary.SerdeValueState.tables n))
+      (fun x =>
+        40 * cfg.regularOpCost + WNear.Binary.SerdeStruct78Model.costArray cfg F capS bs value.toUTF8.toList rest j)
+      fun x rs =>
+      iprop(⌜rs = []⌝ ∗
+          g ↦[wg] { type := gt, value := Wasm.Value.i32 sp } ∗
+            WNear.Binary.VecFromElem.stk n (sp.toNat - 368) 368 ∗
+              WNear.Binary.AllocFirstFit.vt n 1057464 idx ta (A 578) ∗
+                n ↦[wms][ de.toNat + 24 ] [128] ∗
+                  ∃ p c len,
+                    ⌜p ≠ 0⌝ ∗
+                      n ↦[wms][ out.toNat ] WasmLogic.bytes32 0 ∗
+                        n ↦[wms][ out.toNat + 4 ] WasmLogic.bytes32 p ∗
+                          n ↦[wms][ out.toNat + 8 ] WasmLogic.bytes32 c ∗
+                            n ↦[wms][ out.toNat + 12 ] WasmLogic.bytes32 len ∗
+                              (WNear.Binary.SerdeValueState.tables n ∗
+                                  WNear.Binary.SerdeValueReuse.ownedValue n maxP hl live F de capS bs
+                                    value.toUTF8.toList (j + 1) p c len) ∗
+                                WNear.Binary.SerdeRead.rd n de ptr bs
+                                  (bs.length - rest.length +
+                                      WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - rest.length) bs) +
+                                    1))
+```
+
+## Bridge.Functions.SerdeStructArrModel
+
+`WNear.Binary.SerdeStructArrModel.f228_arr_model` (hash `000000005f002536`)
+
+```lean
+theorem WNear.Binary.SerdeStructArrModel.f228_arr_model {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (htype : type.results = [])
+  (inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 35 < lim.maxCallDepth) (Cg : ℕ) (gt : Wasm.GlobalType) (sp out de ptr idx x2 x3 x4 x5 sl ptrS capS : UInt32)
+  (ob bs : List UInt8) (value : String) (rest : List UInt8) (i j maxP hl : ℕ) (live : List (ℕ × ℕ)) (F : ℕ)
+  (hob : ob.length = 16) (hout : out.toNat + 16 ≤ 2 ^ 32) (hlen : bs.length < 2 ^ 24)
+  (hptr : ptr.toNat + bs.length < 2 ^ 32) (hde : de.toNat + 25 ≤ 2 ^ 32) (hsp : 368 ≤ sp.toNat) (hi : i ≤ bs.length)
+  (ho : bs[i + WNear.Binary.SerdeRead.wsLen (List.drop i bs)]? = some 91)
+  (hj :
+    j =
+      i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1 +
+        WNear.Binary.SerdeRead.wsLen (List.drop (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1) bs))
+  (hq : bs[j]? = some 34)
+  (he : bs[bs.length - rest.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - rest.length) bs)]? = some 93)
+  (hcap : capS.toNat < 2 ^ 25)
+  (hmodel : NearInterface.Json.stringBody (List.drop (j + 1) bs) [] = some (some value, rest))
+  (hr : WNear.Binary.SerdeErrBox.roomFor4 hl maxP 20)
+  (hroom : WNear.Binary.ParseStr.roomRun maxP hl capS [] (List.drop (j + 1) bs))
+  (hvalid : Wasm.Near.validAccountIdBytes value.toUTF8.toList = true)
+  (halloc :
+    WNear.Binary.VecFromElem.roomFor
+      (hl +
+        WNear.Binary.ScratchGrow.growthPages capS 0
+            (WNear.Binary.ParseStrSuccess.appendChunks (List.drop (j + 1) bs) []) *
+          65536)
+      maxP (UInt32.ofNat value.toUTF8.toList.length)) :
+  WNear.Binary.SerdeEnds.endCode n maxP inst mi A ∗
+      A 214 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f214 ∗
+        A 169 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f169 ∗
+          A 91 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[32]! inst WNear.Binary.f91 ∗
+            WNear.Binary.SerdeAccountId.code169 n maxP inst mi A ∗ WNear.Binary.ParseStr.code646 n maxP inst mi A ⊢
+    NearLogic.MFunSpec cfg lim d type inst mi WNear.Binary.f228 Cg
+      (fun args =>
+        iprop(⌜args =
+                [Wasm.Value.i32 out, Wasm.Value.i32 de, Wasm.Value.i32 x2, Wasm.Value.i32 x3, Wasm.Value.i32 x4,
+                  Wasm.Value.i32 x5]⌝ ∗
+            g ↦[wg] { type := gt, value := Wasm.Value.i32 sp } ∗
+              WNear.Binary.VecFromElem.stk n (sp.toNat - 368) 368 ∗
+                WNear.Binary.AllocFirstFit.vt n 1057464 idx ta (A 578) ∗
+                  n ↦[wms][ out.toNat ] ob ∗
+                    WNear.Binary.SerdeRead.rd n de ptr bs i ∗
+                      n ↦[wms][ de.toNat + 24 ] [128] ∗
+                        WNear.Binary.SerdeValueState.scratchPre n maxP hl live F de ptrS capS sl ∗
+                          WNear.Binary.SerdeValueState.tables n))
+      (fun x =>
+        (1300 +
+              96 *
+                (WNear.Binary.SerdeRead.wsLen (List.drop i bs) +
+                    WNear.Binary.SerdeRead.wsLen
+                      (List.drop (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1) bs) +
+                  WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - rest.length) bs))) *
+            cfg.regularOpCost +
+          WNear.Binary.SerdeValueReuse.valueCost cfg F capS bs value.toUTF8.toList rest j j)
+      fun x rs =>
+      iprop(⌜rs = []⌝ ∗
+          g ↦[wg] { type := gt, value := Wasm.Value.i32 sp } ∗
+            WNear.Binary.VecFromElem.stk n (sp.toNat - 368) 368 ∗
+              WNear.Binary.AllocFirstFit.vt n 1057464 idx ta (A 578) ∗
+                n ↦[wms][ de.toNat + 24 ] [128] ∗
+                  ∃ p c len,
+                    ⌜p ≠ 0⌝ ∗
+                      n ↦[wms][ out.toNat ] WasmLogic.bytes32 0 ∗
+                        n ↦[wms][ out.toNat + 4 ] WasmLogic.bytes32 p ∗
+                          n ↦[wms][ out.toNat + 8 ] WasmLogic.bytes32 c ∗
+                            n ↦[wms][ out.toNat + 12 ] WasmLogic.bytes32 len ∗
+                              (WNear.Binary.SerdeValueState.tables n ∗
+                                  WNear.Binary.SerdeValueReuse.ownedValue n maxP hl live F de capS bs
+                                    value.toUTF8.toList (j + 1) p c len) ∗
+                                WNear.Binary.SerdeRead.rd n de ptr bs
+                                  (bs.length - rest.length +
+                                      WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - rest.length) bs) +
+                                    1))
+```
+
 ## Bridge.Functions.SerdeStructObjKeyState
 
 `WNear.Binary.SerdeStructObjKeyState.KeyConditions` (hash `cb18d8da05f5e7d5`)
@@ -4727,6 +6487,55 @@ def WNear.Binary.SerdeStructObjValueState.ValueConditions (cfg : Wasm.Near.WasmC
                                       (WNear.Binary.ScratchGrow.endState cap 0
                                           (WNear.Binary.ParseStrSuccess.appendChunks
                                             (List.drop (j + 1) bs) [])).1
+```
+
+## Bridge.Functions.SerdeValueReuse
+
+`WNear.Binary.SerdeValueReuse.spec169_model` (hash `00000000e29224d0`)
+
+```lean
+theorem WNear.Binary.SerdeValueReuse.spec169_model {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ)
+  (hm : WNear.Binary.Interface.IfaceMod mi A n g ta) (hd : d + 33 < lim.maxCallDepth) (Cg : ℕ) (gt : Wasm.GlobalType)
+  (sp de ptr idx ptrS capS sl : UInt32) (ob bs : List UInt8) (value : String) (rest : List UInt8) (i j maxP hl F : ℕ)
+  (live : List (ℕ × ℕ)) (hob : ob.length = 16) (hlen : bs.length < 2 ^ 24) (hptr : ptr.toNat + bs.length < 2 ^ 32)
+  (hde : de.toNat + 24 ≤ 2 ^ 32) (hsp : 304 ≤ sp.toNat) (hi : i ≤ bs.length)
+  (hj : j = i + WNear.Binary.SerdeRead.wsLen (List.drop i bs)) (hq : bs[j]? = some 34) (hcap : capS.toNat < 2 ^ 25)
+  (hmodel : NearInterface.Json.stringBody (List.drop (j + 1) bs) [] = some (some value, rest))
+  (hvalid : Wasm.Near.validAccountIdBytes value.toUTF8.toList = true)
+  (hr : WNear.Binary.SerdeErrBox.roomFor4 hl maxP 20)
+  (hroom : WNear.Binary.ParseStr.roomRun maxP hl capS [] (List.drop (j + 1) bs))
+  (halloc :
+    WNear.Binary.VecFromElem.roomFor
+      (hl +
+        WNear.Binary.ScratchGrow.growthPages capS 0
+            (WNear.Binary.ParseStrSuccess.appendChunks (List.drop (j + 1) bs) []) *
+          65536)
+      maxP (UInt32.ofNat value.toUTF8.toList.length)) :
+  WNear.Binary.SerdeAccountId.code169 n maxP inst mi A ∗ WNear.Binary.ParseStr.code646 n maxP inst mi A ⊢
+    WNear.Binary.SerdeSeqElem.Spec169 cfg lim d inst mi n g Cg gt sp de ptr ob bs i
+      iprop(WNear.Binary.VecFromElem.stk n (sp.toNat - 304) 288 ∗
+          WNear.Binary.AllocFirstFit.vt n 1057464 idx ta (A 578) ∗
+            WNear.Binary.SerdeValueState.scratchPre n maxP hl live F de ptrS capS sl ∗
+              WNear.Binary.SerdeValueState.tables n)
+      (WNear.Binary.SerdeValueReuse.valueCost cfg F capS bs value.toUTF8.toList rest i j) fun p c len =>
+      iprop(WNear.Binary.VecFromElem.stk n (sp.toNat - 304) 288 ∗
+          WNear.Binary.AllocFirstFit.vt n 1057464 idx ta (A 578) ∗
+            WNear.Binary.SerdeValueState.tables n ∗
+              WNear.Binary.SerdeRead.rd n de ptr bs (bs.length - rest.length) ∗
+                WNear.Binary.SerdeValueReuse.ownedValue n maxP hl live F de capS bs value.toUTF8.toList (j + 1) p c len)
+```
+
+`WNear.Binary.SerdeValueReuse.valueCost_le` (hash `00000000fafb1d35`)
+
+```lean
+theorem WNear.Binary.SerdeValueReuse.valueCost_le (cfg : Wasm.Near.WasmConfig) (F : ℕ) (cap : UInt32)
+  (bs bytes rest : List UInt8) (i j : ℕ) (hq : j < bs.length)
+  (hok : WNear.Binary.ParseStr.strRun (List.drop (j + 1) bs) [] = WNear.Binary.ParseStr.StrOut.ok bytes rest)
+  (hu : WNear.Binary.Utf8.utf8Ok bytes = true) :
+  WNear.Binary.SerdeValueReuse.valueCost cfg F cap bs bytes rest i j ≤
+    (400 + WNear.Binary.AccountIdValid.cost554 bytes.length) * cfg.regularOpCost +
+      WNear.Binary.SerdeDeStrEsc.costCopied cfg F cap bs bytes rest i j
 ```
 
 ## Bridge.Functions.StateRead
@@ -5415,6 +7224,78 @@ theorem WNear.Binary.FtBalanceOfMethod.absent_step_zero (cfg : WNear.Config) (ct
     Except.ok { state := s, ret := WNear.Ret.u128 0, logs := [], promises := [] }
 ```
 
+## Bridge.Methods.FtBalanceOfArrayCase
+
+`WNear.Binary.BalanceOf297AbsentCall.ArrayAbsentCase` (hash `706ae070fa81f067`)
+
+```lean
+def WNear.Binary.BalanceOf297AbsentCall.ArrayAbsentCase (st : Option WNear.State) (ctx : NearInterface.Context)
+  (c : WNear.Call) : Prop :=
+  ∃ S a bs rest j k,
+    st = some S ∧
+      c = WNear.Call.ftBalanceOf a ∧
+        a ∉ S.registered ∧
+          ctx.args = bs ∧
+            bs.length < 2 ^ 24 ∧
+              bs[WNear.Binary.SerdeRead.wsLen bs]? = some 91 ∧
+                j =
+                    WNear.Binary.SerdeRead.wsLen bs + 1 +
+                      WNear.Binary.SerdeRead.wsLen
+                        (List.drop (WNear.Binary.SerdeRead.wsLen bs + 1) bs) ∧
+                  bs[j]? = some 34 ∧
+                    bs[bs.length - rest.length +
+                            WNear.Binary.SerdeRead.wsLen
+                              (List.drop (bs.length - rest.length) bs)]? =
+                        some 93 ∧
+                      k =
+                          bs.length - rest.length +
+                              WNear.Binary.SerdeRead.wsLen
+                                (List.drop (bs.length - rest.length) bs) +
+                            1 ∧
+                        k + WNear.Binary.SerdeRead.wsLen (List.drop k bs) = bs.length ∧
+                          NearInterface.Json.stringBody (List.drop (j + 1) bs) [] =
+                            some (some ↑a, rest)
+```
+
+`WNear.Binary.BalanceOf297AbsentCall.array_case_accepted` (hash `0000000034f51345`)
+
+```lean
+theorem WNear.Binary.BalanceOf297AbsentCall.array_case_accepted (cfg : WNear.Config) (size : ℕ)
+  (codeOf : List UInt8 → Near.ContractCode) (protocol : Wasm.Near.RuntimeConfig)
+  (he : WNear.Binary.Exported.Environment protocol) (hsize : size ≤ 185625) (raw : WNear.RawStorage)
+  (st : Option WNear.State) (ctx : NearInterface.Context) (c : WNear.Call) (hrep : (WNear.wnear cfg).Represents raw st)
+  (hwf : ctx.WF raw) (hctx : ctx.protocol = protocol) (hm : ctx.method = "ft_balance_of")
+  (hcase : WNear.Binary.BalanceOf297AbsentCall.ArrayAbsentCase st ctx c) :
+  have r := Near.Boundary.nearRuntime.exec (WNear.Binary.wCode size codeOf) raw ctx;
+  have res := (WNear.wnear cfg).step ctx st c;
+  ((WNear.wnear cfg).gas ctx st c ≤ ctx.gasLimit →
+      ctx.ProofRoom ((WNear.wnear cfg).proofBound ctx st c) →
+        NearInterface.Matches (WNear.wnear cfg) ctx raw r res ∧ r.usedGas ≤ (WNear.wnear cfg).gas ctx st c) ∧
+    (NearInterface.Matches (WNear.wnear cfg) ctx raw r res ∨
+      NearInterface.ResourceFailure r ∧ NearInterface.RolledBack ctx raw r ∧ r.logs <+: res.logs)
+```
+
+`WNear.Binary.BalanceOf297AbsentCall.array_case_no_issue` (hash `000000007cdce21f`)
+
+```lean
+theorem WNear.Binary.BalanceOf297AbsentCall.array_case_no_issue (cfg : WNear.Config) (size : ℕ)
+  (codeOf : List UInt8 → Near.ContractCode) (protocol : Wasm.Near.RuntimeConfig)
+  (he : WNear.Binary.Exported.Environment protocol) (hsize : size ≤ 185625) (raw : WNear.RawStorage)
+  (st : Option WNear.State) (ctx : NearInterface.Context) (c : WNear.Call) (hrep : (WNear.wnear cfg).Represents raw st)
+  (hwf : ctx.WF raw) (hctx : ctx.protocol = protocol) (hm : ctx.method = "ft_balance_of")
+  (hcase : WNear.Binary.BalanceOf297AbsentCall.ArrayAbsentCase st ctx c) (msg : String) :
+  (Near.Boundary.nearRuntime.exec (WNear.Binary.wCode size codeOf) raw ctx).outcome ≠
+    Except.error (NearInterface.Failure.executionIssue msg)
+```
+
+`WNear.Binary.BalanceOf297AbsentCall.copied_case_is_array_case` (hash `00000000d4ba5150`)
+
+```lean
+theorem WNear.Binary.BalanceOf297AbsentCall.copied_case_is_array_case (st : Option WNear.State) (ctx : NearInterface.Context)
+  (c : WNear.Call) (h : WNear.Binary.BalanceOf297AbsentCall.CopiedAbsentCase st ctx c) :
+  WNear.Binary.BalanceOf297AbsentCall.ArrayAbsentCase st ctx c
+```
+
 ## Bridge.Methods.FtBalanceOfBodyGas
 
 `WNear.Binary.BalanceOf297AbsentCall.alloc32_delta` (hash `0000000023d6edcb`)
@@ -5858,6 +7739,37 @@ theorem WNear.Binary.BalanceOf297AbsentCall.copied_case_no_issue (cfg : WNear.Co
 
 ## Bridge.Methods.FtBalanceOfCopiedModel
 
+`WNear.Binary.BalanceOf297AbsentCall.array_absent_refines_v86` (hash `00000000f688e7e8`)
+
+```lean
+theorem WNear.Binary.BalanceOf297AbsentCall.array_absent_refines_v86 (cfg : WNear.Config) (size : ℕ)
+  (codeOf : List UInt8 → Near.ContractCode) (raw : WNear.RawStorage) (modelSt : Option WNear.State)
+  (ctx : NearInterface.Context) (S : WNear.State) (a : WNear.AccountId) (bs rest : List UInt8) (j k : ℕ)
+  (tr : Near.TrieOverlay.State) (bud : ℕ) (hp : WNear.Binary.WProtocol ctx.protocol) (hwf : ctx.WF raw)
+  (hm : ctx.method = "ft_balance_of") (hc : WNear.Binary.FtTotalSupplyMethod.CostsV86 ctx.protocol)
+  (hsize : size ≤ 185625) (hlen : bs.length < 2 ^ 24) (ho : bs[WNear.Binary.SerdeRead.wsLen bs]? = some 91)
+  (hj :
+    j =
+      WNear.Binary.SerdeRead.wsLen bs + 1 +
+        WNear.Binary.SerdeRead.wsLen (List.drop (WNear.Binary.SerdeRead.wsLen bs + 1) bs))
+  (hq : bs[j]? = some 34)
+  (he : bs[bs.length - rest.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - rest.length) bs)]? = some 93)
+  (hk : k = bs.length - rest.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - rest.length) bs) + 1)
+  (hend : k + WNear.Binary.SerdeRead.wsLen (List.drop k bs) = bs.length)
+  (hmodel : NearInterface.Json.stringBody (List.drop (j + 1) bs) [] = some (some ↑a, rest))
+  (hentry : WNear.Binary.BalanceOf297AbsentCall.CopiedEntryAt cfg ctx raw modelSt S a bs tr bud)
+  (hrep : (WNear.wnear cfg).Represents raw modelSt) :
+  have r := Near.Boundary.nearRuntime.exec (WNear.Binary.wCode size codeOf) raw ctx;
+  have res := (WNear.wnear cfg).step ctx modelSt (WNear.Call.ftBalanceOf a);
+  (∀ (msg : String), r.outcome ≠ Except.error (NearInterface.Failure.executionIssue msg)) ∧
+    ((WNear.wnear cfg).gas ctx modelSt (WNear.Call.ftBalanceOf a) ≤ ctx.gasLimit →
+        ctx.ProofRoom ((WNear.wnear cfg).proofBound ctx modelSt (WNear.Call.ftBalanceOf a)) →
+          NearInterface.Matches (WNear.wnear cfg) ctx raw r res ∧
+            r.usedGas ≤ (WNear.wnear cfg).gas ctx modelSt (WNear.Call.ftBalanceOf a)) ∧
+      (NearInterface.Matches (WNear.wnear cfg) ctx raw r res ∨
+        NearInterface.ResourceFailure r ∧ NearInterface.RolledBack ctx raw r ∧ r.logs <+: res.logs)
+```
+
 `WNear.Binary.BalanceOf297AbsentCall.copied_agreement_of_represents` (hash `00000000805b76bd`)
 
 ```lean
@@ -5905,6 +7817,36 @@ theorem WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_refines_v86 (cfg
 ```
 
 ## Bridge.Methods.FtBalanceOfCopiedPre
+
+`WNear.Binary.BalanceOf297AbsentCall.array_absent_refines_init` (hash `00000000334c8e9d`)
+
+```lean
+theorem WNear.Binary.BalanceOf297AbsentCall.array_absent_refines_init (cfg : WNear.Config) (size : ℕ)
+  (codeOf : List UInt8 → Near.ContractCode) (raw : WNear.RawStorage) (ctx : NearInterface.Context) (S : WNear.State)
+  (a : WNear.AccountId) (bs rest : List UInt8) (j k : ℕ) (hp : WNear.Binary.WProtocol ctx.protocol) (hwf : ctx.WF raw)
+  (hm : ctx.method = "ft_balance_of") (hc : WNear.Binary.FtTotalSupplyMethod.CostsV86 ctx.protocol)
+  (hl : WNear.Binary.FtTotalSupplyMethod.LimitsV86 ctx.protocol) (hsize : size ≤ 185625) (hlen : bs.length < 2 ^ 24)
+  (ho : bs[WNear.Binary.SerdeRead.wsLen bs]? = some 91)
+  (hj :
+    j =
+      WNear.Binary.SerdeRead.wsLen bs + 1 +
+        WNear.Binary.SerdeRead.wsLen (List.drop (WNear.Binary.SerdeRead.wsLen bs + 1) bs))
+  (hq : bs[j]? = some 34)
+  (he : bs[bs.length - rest.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - rest.length) bs)]? = some 93)
+  (hk : k = bs.length - rest.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - rest.length) bs) + 1)
+  (hend : k + WNear.Binary.SerdeRead.wsLen (List.drop k bs) = bs.length)
+  (hmodel : NearInterface.Json.stringBody (List.drop (j + 1) bs) [] = some (some ↑a, rest)) (hargs : ctx.args = bs)
+  (hrep : (WNear.wnear cfg).Represents raw (some S)) (ha : a ∉ S.registered) :
+  have r := Near.Boundary.nearRuntime.exec (WNear.Binary.wCode size codeOf) raw ctx;
+  have res := (WNear.wnear cfg).step ctx (some S) (WNear.Call.ftBalanceOf a);
+  (∀ (msg : String), r.outcome ≠ Except.error (NearInterface.Failure.executionIssue msg)) ∧
+    ((WNear.wnear cfg).gas ctx (some S) (WNear.Call.ftBalanceOf a) ≤ ctx.gasLimit →
+        ctx.ProofRoom ((WNear.wnear cfg).proofBound ctx (some S) (WNear.Call.ftBalanceOf a)) →
+          NearInterface.Matches (WNear.wnear cfg) ctx raw r res ∧
+            r.usedGas ≤ (WNear.wnear cfg).gas ctx (some S) (WNear.Call.ftBalanceOf a)) ∧
+      (NearInterface.Matches (WNear.wnear cfg) ctx raw r res ∨
+        NearInterface.ResourceFailure r ∧ NearInterface.RolledBack ctx raw r ∧ r.logs <+: res.logs)
+```
 
 `WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_refines_init` (hash `0000000071282a14`)
 
@@ -6036,6 +7978,62 @@ def WNear.Binary.BalanceOf297AbsentCall.CopiedEntryAt (cfg : WNear.Config) (ctx 
         (NearLogic.erase (WNear.Binary.hostOf ctx raw))) ∧
     WNear.Binary.BalanceOf297AbsentCall.CopiedAbsentPre S a bs tr bud
       (NearLogic.eraseP (WNear.Binary.hostOf ctx raw))
+```
+
+`WNear.Binary.BalanceOf297AbsentCall.array_absent_refines_with_obligations` (hash `00000000d790c0fa`)
+
+```lean
+theorem WNear.Binary.BalanceOf297AbsentCall.array_absent_refines_with_obligations (cfg : WNear.Config) (size : ℕ)
+  (codeOf : List UInt8 → Near.ContractCode) (raw : WNear.RawStorage) (modelSt : Option WNear.State)
+  (ctx : NearInterface.Context) (S : WNear.State) (a : WNear.AccountId) (bs rest : List UInt8) (j k : ℕ)
+  (tr : Near.TrieOverlay.State) (bud : ℕ) (hp : WNear.Binary.WProtocol ctx.protocol) (hwf : ctx.WF raw)
+  (hm : ctx.method = "ft_balance_of") (hc : WNear.Binary.FtTotalSupplyMethod.CostsV86 ctx.protocol)
+  (hsize : size ≤ 185625) (hlen : bs.length < 2 ^ 24) (ho : bs[WNear.Binary.SerdeRead.wsLen bs]? = some 91)
+  (hj :
+    j =
+      WNear.Binary.SerdeRead.wsLen bs + 1 +
+        WNear.Binary.SerdeRead.wsLen (List.drop (WNear.Binary.SerdeRead.wsLen bs + 1) bs))
+  (hq : bs[j]? = some 34)
+  (he : bs[bs.length - rest.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - rest.length) bs)]? = some 93)
+  (hk : k = bs.length - rest.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - rest.length) bs) + 1)
+  (hend : k + WNear.Binary.SerdeRead.wsLen (List.drop k bs) = bs.length)
+  (hmodel : NearInterface.Json.stringBody (List.drop (j + 1) bs) [] = some (some ↑a, rest))
+  (hentry : WNear.Binary.BalanceOf297AbsentCall.CopiedEntryAt cfg ctx raw modelSt S a bs tr bud)
+  (hag :
+    WNear.Binary.BalanceOf297AbsentCall.CopiedAgreement cfg ctx raw modelSt a tr
+      (NearLogic.erase (WNear.Binary.hostOf ctx raw)))
+  (hagP :
+    WNear.Binary.BalanceOf297AbsentCall.CopiedAgreement cfg ctx raw modelSt a tr
+      (NearLogic.eraseP (WNear.Binary.hostOf ctx raw))) :
+  have r := Near.Boundary.nearRuntime.exec (WNear.Binary.wCode size codeOf) raw ctx;
+  have res := (WNear.wnear cfg).step ctx modelSt (WNear.Call.ftBalanceOf a);
+  (∀ (msg : String), r.outcome ≠ Except.error (NearInterface.Failure.executionIssue msg)) ∧
+    ((WNear.wnear cfg).gas ctx modelSt (WNear.Call.ftBalanceOf a) ≤ ctx.gasLimit →
+        ctx.ProofRoom ((WNear.wnear cfg).proofBound ctx modelSt (WNear.Call.ftBalanceOf a)) →
+          NearInterface.Matches (WNear.wnear cfg) ctx raw r res ∧
+            r.usedGas ≤ (WNear.wnear cfg).gas ctx modelSt (WNear.Call.ftBalanceOf a)) ∧
+      (NearInterface.Matches (WNear.wnear cfg) ctx raw r res ∨
+        NearInterface.ResourceFailure r ∧ NearInterface.RolledBack ctx raw r ∧ r.logs <+: res.logs)
+```
+
+`WNear.Binary.BalanceOf297AbsentCall.array_absent_runs` (hash `0000000058ef40de`)
+
+```lean
+theorem WNear.Binary.BalanceOf297AbsentCall.array_absent_runs (cfg : Wasm.Near.RuntimeConfig) (S : WNear.State)
+  (a : WNear.AccountId) (bs rest : List UInt8) (j k : ℕ) (st : Near.TrieOverlay.State) (bud : ℕ)
+  (hlen : bs.length < 2 ^ 24) (ho : bs[WNear.Binary.SerdeRead.wsLen bs]? = some 91)
+  (hj :
+    j =
+      WNear.Binary.SerdeRead.wsLen bs + 1 +
+        WNear.Binary.SerdeRead.wsLen (List.drop (WNear.Binary.SerdeRead.wsLen bs + 1) bs))
+  (hq : bs[j]? = some 34)
+  (he : bs[bs.length - rest.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - rest.length) bs)]? = some 93)
+  (hk : k = bs.length - rest.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - rest.length) bs) + 1)
+  (hend : k + WNear.Binary.SerdeRead.wsLen (List.drop k bs) = bs.length)
+  (hmodel : NearInterface.Json.stringBody (List.drop (j + 1) bs) [] = some (some ↑a, rest)) :
+  WNear.Binary.MethodRunsR cfg 297 (WNear.Binary.BalanceOf297AbsentCall.CopiedAbsentPre S a bs st bud)
+    (WNear.Binary.BalanceOf297AbsentCall.copiedMethodCost cfg S a bs rest j k)
+    (WNear.Binary.BalanceOf297AbsentCall.copiedMethodPost a st)
 ```
 
 `WNear.Binary.BalanceOf297AbsentCall.copiedKey` (hash `dc3b8033cf61cb24`)
@@ -6215,6 +8213,73 @@ theorem WNear.Binary.BalanceOf297AbsentCall.storage_read_post_field {α : Type} 
 ```
 
 ## Bridge.Methods.FtBalanceOfInitialAdequacy
+
+`WNear.Binary.BalanceOf297AbsentCall.array_absent_adequate` (hash `000000007508fc82`)
+
+```lean
+theorem WNear.Binary.BalanceOf297AbsentCall.array_absent_adequate (runtime : Wasm.Near.RuntimeConfig) (Cg : ℕ)
+  (a : WNear.AccountId) (bs jsonRest : List UInt8) (j k : ℕ) (hlen : bs.length < 2 ^ 24)
+  (ho : bs[WNear.Binary.SerdeRead.wsLen bs]? = some 91)
+  (hj :
+    j =
+      WNear.Binary.SerdeRead.wsLen bs + 1 +
+        WNear.Binary.SerdeRead.wsLen (List.drop (WNear.Binary.SerdeRead.wsLen bs + 1) bs))
+  (hq : bs[j]? = some 34)
+  (he :
+    bs[bs.length - jsonRest.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - jsonRest.length) bs)]? =
+      some 93)
+  (hk : k = bs.length - jsonRest.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - jsonRest.length) bs) + 1)
+  (hend : k + WNear.Binary.SerdeRead.wsLen (List.drop k bs) = bs.length)
+  (hmodel : NearInterface.Json.stringBody (List.drop (j + 1) bs) [] = some (some ↑a, jsonRest)) (h0 h : Wasm.NearState)
+  (hinput : h0.context.input = bs) (hafter : NearLogic.inputHost h0 0 = h)
+  (hinputLimit : Wasm.Near.withinLimit h0.config.maxRegisterLen bs.length = true) (S : WNear.State)
+  (st : Near.TrieOverlay.State) (hv : h.storage WNear.stateKey = some (WNear.header S))
+  (hacc : h.storageAccounting = some st) (hlim : Wasm.Near.withinLimit h.config.maxStorageKeyLen 5 = true)
+  (hcanon : NearLogic.Canon st) (hlink : NearLogic.StorageLink h st) (bud : ℕ) (hproof : NearLogic.ProofBudget h st bud)
+  (hbudget :
+    NearLogic.readProofCost (Near.TrieOverlay.contractKey h.context.currentAccountId WNear.stateKey)
+          (h.storage WNear.stateKey) +
+        NearLogic.readProofCost
+          (Near.TrieOverlay.contractKey h.context.currentAccountId
+            (WNear.accountsPrefix ++ (WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ++ (↑a).toUTF8.toList)))
+          (h.storage
+            (WNear.accountsPrefix ++ (WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ++ (↑a).toUTF8.toList))) ≤
+      bud)
+  (hlimAccount :
+    Wasm.Near.withinLimit h.config.maxStorageKeyLen
+        (List.length
+          (WNear.accountsPrefix ++ (WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ++ (↑a).toUTF8.toList))) =
+      true)
+  (hnone :
+    h.storage (WNear.accountsPrefix ++ (WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ++ (↑a).toUTF8.toList)) =
+      none)
+  (hreg : Wasm.Near.withinLimit h.config.maxRegisterLen 29 = true)
+  (hret : Wasm.Near.withinLimit h.config.maxReturnLen 3 = true)
+  (hgas :
+    h0.gas.used +
+        (475 * runtime.wasm.regularOpCost +
+          (3 * runtime.wasm.regularOpCost +
+            (100 * runtime.wasm.regularOpCost + WNear.Binary.EnvInput.cost527 runtime.wasm h0 +
+              (100 * runtime.wasm.regularOpCost +
+                (100 * runtime.wasm.regularOpCost +
+                  (1000 * runtime.wasm.regularOpCost +
+                      (45 * runtime.wasm.regularOpCost +
+                        ((700 + 96 * WNear.Binary.SerdeRead.wsLen (List.drop k bs)) * runtime.wasm.regularOpCost +
+                          WNear.Binary.SerdeStruct78Esc.costArray runtime.wasm 1 0 bs (↑a).toUTF8.toList jsonRest j)) +
+                    WNear.Binary.BalanceOf297AbsentCall.parserSuccessCost runtime.wasm
+                      (WNear.Binary.BalanceOf297AbsentCall.copiedParserFree bs (j + 1) 1) h S a 0)))))) ≤
+      Cg)
+  (hC1 : Cg ≤ h0.gas.maxBurnt) (hC2 : Cg ≤ h0.gas.prepaid) :
+  Iris.ProgramLogic.adequate Iris.Stuckness.MaybeStuck
+    (NearLogic.MCode.running runtime.wasm Wasm.Near.execLimits
+      (NearLogic.entryThread
+        { locals := #[Wasm.Value.i32 0, Wasm.Value.i32 0, Wasm.Value.i64 0, Wasm.Value.i32 0], inst := 0,
+          mi := WNear.Binary.wInst }
+        0 WNear.Binary.f297.body))
+    { store := WNear.Binary.wStore runtime h0 } fun v σ' =>
+    v = NearLogic.Ending.values [] ∧
+      ∃ cs, WNear.Binary.BalanceOf297AbsentCall.endCells297 Cg h a st cs ∧ ∀ p ∈ cs, NearLogic.mlookup σ' p.1 = some p.2
+```
 
 `WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_adequate` (hash `000000008cd89b9b`)
 
@@ -6413,6 +8478,107 @@ theorem WNear.Binary.BalanceOf297AbsentCall.startW_thread297 (cfg : Wasm.Near.Ru
 ```
 
 ## Bridge.Methods.FtBalanceOfInitialCompose
+
+`WNear.Binary.BalanceOf297AbsentCall.array_absent_body_initial_resources` (hash `000000006271d7f2`)
+
+```lean
+theorem WNear.Binary.BalanceOf297AbsentCall.array_absent_body_initial_resources {GF : Iris.BundledGFunctors}
+  [WasmLogic.WasmGS Wasm.NearState GF] (runtime : Wasm.Near.RuntimeConfig) (cfg : Wasm.Near.WasmConfig)
+  (lim : Wasm.ExecLimits) (d : ℕ) (hd : d + 39 < lim.maxCallDepth) (Cg R : ℕ) (a : WNear.AccountId)
+  (bs jsonRest : List UInt8) (j k : ℕ) (hlen : bs.length < 2 ^ 24) (ho : bs[WNear.Binary.SerdeRead.wsLen bs]? = some 91)
+  (hj :
+    j =
+      WNear.Binary.SerdeRead.wsLen bs + 1 +
+        WNear.Binary.SerdeRead.wsLen (List.drop (WNear.Binary.SerdeRead.wsLen bs + 1) bs))
+  (hq : bs[j]? = some 34)
+  (he :
+    bs[bs.length - jsonRest.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - jsonRest.length) bs)]? =
+      some 93)
+  (hk : k = bs.length - jsonRest.length + WNear.Binary.SerdeRead.wsLen (List.drop (bs.length - jsonRest.length) bs) + 1)
+  (hend : k + WNear.Binary.SerdeRead.wsLen (List.drop k bs) = bs.length)
+  (hmodel : NearInterface.Json.stringBody (List.drop (j + 1) bs) [] = some (some ↑a, jsonRest)) (h0 h : Wasm.NearState)
+  (hinput : h0.context.input = bs) (hafter : NearLogic.inputHost h0 0 = h)
+  (hinputLimit : Wasm.Near.withinLimit h0.config.maxRegisterLen bs.length = true) (S : WNear.State)
+  (st : Near.TrieOverlay.State) (hv : h.storage WNear.stateKey = some (WNear.header S))
+  (hacc : h.storageAccounting = some st) (hlim : Wasm.Near.withinLimit h.config.maxStorageKeyLen 5 = true)
+  (hcanon : NearLogic.Canon st) (hlink : NearLogic.StorageLink h st) (bud : ℕ) (hproof : NearLogic.ProofBudget h st bud)
+  (hbudget :
+    NearLogic.readProofCost (Near.TrieOverlay.contractKey h.context.currentAccountId WNear.stateKey)
+          (h.storage WNear.stateKey) +
+        NearLogic.readProofCost
+          (Near.TrieOverlay.contractKey h.context.currentAccountId
+            (WNear.accountsPrefix ++ (WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ++ (↑a).toUTF8.toList)))
+          (h.storage
+            (WNear.accountsPrefix ++ (WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ++ (↑a).toUTF8.toList))) ≤
+      bud)
+  (hlimAccount :
+    Wasm.Near.withinLimit h.config.maxStorageKeyLen
+        (List.length
+          (WNear.accountsPrefix ++ (WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ++ (↑a).toUTF8.toList))) =
+      true)
+  (hnone :
+    h.storage (WNear.accountsPrefix ++ (WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ++ (↑a).toUTF8.toList)) =
+      none)
+  (hreg : Wasm.Near.withinLimit h.config.maxRegisterLen 29 = true)
+  (hret : Wasm.Near.withinLimit h.config.maxReturnLen 3 = true) (Φ : WasmLogic.Post Wasm.NearState GF) :
+  (WNear.Binary.BalanceOf297AbsentCall.code297 runtime.fees.numExtraBytesRecord 0 WNear.Binary.wInst id 0 (some 2048) ∗
+      NearLogic.credits Cg
+          (475 * cfg.regularOpCost +
+            (3 * cfg.regularOpCost +
+              (100 * cfg.regularOpCost + WNear.Binary.EnvInput.cost527 cfg h0 +
+                (100 * cfg.regularOpCost +
+                  (100 * cfg.regularOpCost +
+                    (1000 * cfg.regularOpCost +
+                        (45 * cfg.regularOpCost +
+                          ((700 + 96 * WNear.Binary.SerdeRead.wsLen (List.drop k bs)) * cfg.regularOpCost +
+                            WNear.Binary.SerdeStruct78Esc.costArray cfg 1 0 bs (↑a).toUTF8.toList jsonRest j)) +
+                      WNear.Binary.BalanceOf297AbsentCall.parserSuccessCost cfg
+                        (WNear.Binary.BalanceOf297AbsentCall.copiedParserFree bs (j + 1) 1) h S a R)))))) ∗
+        0 ↦[wg] WNear.Binary.InitialState.g0 ∗
+          WNear.Binary.InitialState.frame297 0 ∗
+            WNear.Binary.FtTotalSupply.statics 0 0 id 0 0 123 1051836 2048 WNear.Binary.InitialState.memLen ∗
+              0 ↦[wms][ 1050188 + 36 ] WNear.Binary.Interface.dataWord (1050188 + 36) ∗
+                0 ↦[wt][ 44 ] Wasm.Ref.func 246 ∗
+                  0 ↦[wms][ 1062392 ] WNear.Binary.ParseStr.escTable ∗
+                    0 ↦[wms][ 1071704 ] WNear.Binary.FromUtf8Gen.utf8Width ∗
+                      0 ↦[wms][ 1062712 ] WNear.Binary.SerdeEsc.hexTable ∗
+                        NearLogic.mhostPt h0 ∗
+                          ▷
+                            ∀ p c,
+                              (NearLogic.credits Cg R ∗
+                                  (∃ ip, 0 ↦[wms][ (1048416 + 24).toNat ] WasmLogic.bytes32 ip) ∗
+                                    0 ↦[wms][ (1048416 + 24).toNat + 4 ] WasmLogic.bytes32 (UInt32.ofNat bs.length) ∗
+                                      0 ↦[wms][ 1062392 ] WNear.Binary.ParseStr.escTable ∗
+                                        0 ↦[wms][ 1071704 ] WNear.Binary.FromUtf8Gen.utf8Width ∗
+                                          0 ↦[wms][ 1062712 ] WNear.Binary.SerdeEsc.hexTable ∗
+                                            0 ↦[wg] WNear.Binary.InitialState.g0 ∗
+                                              (∃ hl,
+                                                  WNear.Binary.AllocInv.heapInv 0 2048 hl []
+                                                    (WNear.Binary.BalanceOf297AbsentCall.copiedParserFree bs (j + 1) 1 +
+                                                                1 +
+                                                              1 +
+                                                            3 +
+                                                          1 +
+                                                        1 +
+                                                      1)) ∗
+                                                ∃ h1,
+                                                  ⌜NearLogic.StorageReadPost h WNear.stateKey 0 st h1⌝ ∗
+                                                    ∃ st1 h2,
+                                                      ⌜NearLogic.StorageReadPost h1
+                                                            (WNear.accountsPrefix ++
+                                                              (WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ++
+                                                                (↑a).toUTF8.toList))
+                                                            0 st1 h2⌝ ∗
+                                                        NearLogic.mhostPt (h2.selectReturnValue [34, 48, 34])) -∗
+                                Φ.normal []
+                                  (WNear.Binary.BalanceOf297AbsentCall.frame 0 WNear.Binary.wInst 1048416
+                                    (UInt32.ofNat (↑a).utf8ByteSize) (WNear.Binary.VecFromElem.pair64 p c)
+                                    (1048416 + 40))) ⊢
+    NearLogic.mwpi cfg lim d
+      { locals := #[Wasm.Value.i32 0, Wasm.Value.i32 0, Wasm.Value.i64 0, Wasm.Value.i32 0], inst := 0,
+        mi := WNear.Binary.wInst }
+      [] WNear.Binary.f297.body Φ
+```
 
 `WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body_initial_resources` (hash `000000004d9d3600`)
 
@@ -7704,6 +9870,40 @@ theorem WNear.ftBalanceOf_other_no_issue_obligation (cfg : WNear.Config) (codeOf
   (ctx : NearInterface.Context) (hrep : (WNear.wnear cfg).Represents raw st) (hwf : ctx.WF raw)
   (hctx : ctx.protocol = protocol) (hm : ctx.method = "ft_balance_of")
   (hother : ¬∃ c, WNear.Binary.BalanceOf297AbsentCall.CopiedAbsentCase st ctx c) (msg : String) :
+  (Near.Boundary.nearRuntime.exec (WNear.Binary.wCode WNear.Binary.wNearBytes.size codeOf) raw ctx).outcome ≠
+    Except.error (NearInterface.Failure.executionIssue msg)
+```
+
+`WNear.ftBalanceOf_outside_array_absent_accepted_obligation` (hash `0000000099132b93`)
+
+```lean
+theorem WNear.ftBalanceOf_outside_array_absent_accepted_obligation (cfg : WNear.Config)
+  (codeOf : List UInt8 → Near.ContractCode) (protocol : Wasm.Near.RuntimeConfig)
+  (hprotocol : Wasm.Near.RuntimeConfig.parse WNear.wNearProtocolJson = Except.ok protocol)
+  (he : WNear.Binary.Exported.Environment protocol) (hcfg : cfg.WF) (raw : WNear.RawStorage) (st : Option WNear.State)
+  (ctx : NearInterface.Context) (hrep : (WNear.wnear cfg).Represents raw st) (hwf : ctx.WF raw)
+  (hctx : ctx.protocol = protocol) (hm : ctx.method = "ft_balance_of") (c : WNear.Call)
+  (hparse : (WNear.wnear cfg).Parses ctx.method ctx.args c)
+  (hother : ¬WNear.Binary.BalanceOf297AbsentCall.ArrayAbsentCase st ctx c) :
+  have r := Near.Boundary.nearRuntime.exec (WNear.Binary.wCode WNear.Binary.wNearBytes.size codeOf) raw ctx;
+  have res := (WNear.wnear cfg).step ctx st c;
+  ((WNear.wnear cfg).gas ctx st c ≤ ctx.gasLimit →
+      ctx.ProofRoom ((WNear.wnear cfg).proofBound ctx st c) →
+        NearInterface.Matches (WNear.wnear cfg) ctx raw r res ∧ r.usedGas ≤ (WNear.wnear cfg).gas ctx st c) ∧
+    (NearInterface.Matches (WNear.wnear cfg) ctx raw r res ∨
+      NearInterface.ResourceFailure r ∧ NearInterface.RolledBack ctx raw r ∧ r.logs <+: res.logs)
+```
+
+`WNear.ftBalanceOf_outside_array_absent_no_issue_obligation` (hash `00000000663ea2d0`)
+
+```lean
+theorem WNear.ftBalanceOf_outside_array_absent_no_issue_obligation (cfg : WNear.Config)
+  (codeOf : List UInt8 → Near.ContractCode) (protocol : Wasm.Near.RuntimeConfig)
+  (hprotocol : Wasm.Near.RuntimeConfig.parse WNear.wNearProtocolJson = Except.ok protocol)
+  (he : WNear.Binary.Exported.Environment protocol) (hcfg : cfg.WF) (raw : WNear.RawStorage) (st : Option WNear.State)
+  (ctx : NearInterface.Context) (hrep : (WNear.wnear cfg).Represents raw st) (hwf : ctx.WF raw)
+  (hctx : ctx.protocol = protocol) (hm : ctx.method = "ft_balance_of")
+  (hother : ¬∃ c, WNear.Binary.BalanceOf297AbsentCall.ArrayAbsentCase st ctx c) (msg : String) :
   (Near.Boundary.nearRuntime.exec (WNear.Binary.wCode WNear.Binary.wNearBytes.size codeOf) raw ctx).outcome ≠
     Except.error (NearInterface.Failure.executionIssue msg)
 ```

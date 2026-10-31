@@ -277,7 +277,7 @@
         "balance-accepted",
         "balance-rejected"
       ],
-      "notes": "Conditional assembly of general execution safety, rejected-input rollback and the accepted-call composition. The accepted composition integrates the proved copied-array absent-account case; its precise complement remains Open."
+      "notes": "Conditional checked assembly with the initialized absent-account array branch proved for both borrowed and copied valid strings. The exact complementary safety/accepted-case obligations, rejected-input rollback and other method/protocol obligations remain unresolved."
     },
     {
       "id": "method-ft_resolve_transfer",
@@ -685,7 +685,7 @@
         "balance-copied-case-safety",
         "balance-other-no-issue"
       ],
-      "notes": "Checked case split preserves the original general execution-safety statement. The copied absent-account case is proved and integrated; safety of the precise complement remains Open. This assembly is Conditional."
+      "notes": "Conditional checked assembly with the initialized absent-account array branch proved for both borrowed and copied valid strings. The exact complementary safety/accepted-case obligations, rejected-input rollback and other method/protocol obligations remain unresolved."
     },
     {
       "id": "balance-accepted",
@@ -694,7 +694,7 @@
       "kind": "theorem",
       "label": "frontier:balance-accepted",
       "reviewed_shape_hash": 1764992096,
-      "notes": "Checked case composition preserves the original statement. The copied-array absent-account initialized branch is proved and integrated; the exact complement remains admitted through balance-other-accepted. This result and its full-method/global callers remain visibly Conditional.",
+      "notes": "Conditional checked assembly with the initialized absent-account array branch proved for both borrowed and copied valid strings. The exact complementary safety/accepted-case obligations, rejected-input rollback and other method/protocol obligations remain unresolved.",
       "required_proof_dependencies": [
         "balance-copied-case-accepted",
         "balance-other-accepted"
@@ -1487,9 +1487,9 @@
         "lookup-heap-room"
       ],
       "required_proof_dependencies": [
-        "copied-parser-with-room",
-        "parser-fixed-through-cleanup"
-      ]
+        "balance-array-parser-through-cleanup"
+      ],
+      "notes": "The original copied-only statement is preserved exactly and proved by checked specialization of balance-array-parser-through-cleanup. Its displayed type premises and readiness remain unchanged."
     },
     {
       "id": "balance-input-deref-setup",
@@ -1514,9 +1514,9 @@
         "lookup-heap-room"
       ],
       "required_proof_dependencies": [
-        "balance-input-deref-setup",
-        "balance-copied-parser-through-cleanup"
-      ]
+        "balance-array-deref-through-cleanup"
+      ],
+      "notes": "The original copied-only statement is preserved exactly and proved by checked specialization of balance-array-deref-through-cleanup. Its displayed type premises and readiness remain unchanged."
     },
     {
       "id": "balance-input-expect",
@@ -1541,9 +1541,9 @@
         "lookup-heap-room"
       ],
       "required_proof_dependencies": [
-        "balance-input-expect",
-        "balance-input-deref-through-cleanup"
-      ]
+        "balance-array-expect-through-cleanup"
+      ],
+      "notes": "The original copied-only statement is preserved exactly and proved by checked specialization of balance-array-expect-through-cleanup. Its displayed type premises and readiness remain unchanged."
     },
     {
       "id": "balance-input-through-cleanup",
@@ -1560,9 +1560,9 @@
         "input-register-room"
       ],
       "required_proof_dependencies": [
-        "balance-input-expect-through-cleanup",
-        "input-read"
-      ]
+        "balance-array-input-through-cleanup"
+      ],
+      "notes": "The original copied-only statement is preserved exactly and proved by checked specialization of balance-array-input-through-cleanup. Its displayed type premises and readiness remain unchanged."
     },
     {
       "id": "balance-input-setup-through-cleanup",
@@ -1579,8 +1579,9 @@
         "input-register-room"
       ],
       "required_proof_dependencies": [
-        "balance-input-through-cleanup"
-      ]
+        "balance-array-input-setup-through-cleanup"
+      ],
+      "notes": "The original copied-only statement is preserved exactly and proved by checked specialization of balance-array-input-setup-through-cleanup. Its displayed type premises and readiness remain unchanged."
     },
     {
       "id": "balance-method-prologue",
@@ -1606,9 +1607,9 @@
         "input-register-room"
       ],
       "required_proof_dependencies": [
-        "balance-method-prologue",
-        "balance-input-setup-through-cleanup"
-      ]
+        "balance-array-absent-body"
+      ],
+      "notes": "The original copied-only statement is preserved exactly and proved by checked specialization of balance-array-absent-body. Its displayed type premises and readiness remain unchanged."
     },
     {
       "id": "input-register-room",
@@ -1658,9 +1659,9 @@
         "lookup-heap-room"
       ],
       "required_proof_dependencies": [
-        "balance-copied-absent-body",
-        "initial-input-copy-room"
-      ]
+        "balance-array-body-initial-room"
+      ],
+      "notes": "The original copied-only statement is preserved exactly and proved by checked specialization of balance-array-body-initial-room. Its displayed type premises and readiness remain unchanged."
     },
     {
       "id": "ft-balance-absent-model",
@@ -1921,11 +1922,9 @@
       "title": "Function 297: copied-array absent body at initial memory",
       "kind": "theorem",
       "required_proof_dependencies": [
-        "initial-memory-parser-room",
-        "initial-combined-parser-room",
-        "balance-copied-body-initial-room"
+        "balance-array-body-initial-memory"
       ],
-      "notes": "Complete decoded body at the instantiated 1024-page initial memory, with input, parser and subsequent allocation room derived rather than assumed. Exact copied-array input, absent account, trie/proof budget, host/register/return limits, code/frame ownership and gas credits remain stated environmental premises. This specific body proof does not establish full external accepted/rejected refinement.",
+      "notes": "The original copied-only statement is preserved exactly and proved by checked specialization of balance-array-body-initial-memory. Its displayed type premises and readiness remain unchanged.",
       "label": "frontier:balance-copied-body-initial-memory",
       "reviewed_shape_hash": 437130165
     },
@@ -2119,9 +2118,9 @@
       "title": "Copied body with initialized resources",
       "kind": "theorem",
       "label": "frontier:balance-initial-body",
-      "notes": "Instantiates the complete copied-array absent body with the actual initial frame, static words, table indices and empty heap. Exact input, absent key, host/trie/proof budget, runtime limits and credits remain explicit.",
+      "notes": "The original copied-only statement is preserved exactly and proved by checked specialization of balance-array-initial-body. Its displayed type premises and readiness remain unchanged.",
       "required_proof_dependencies": [
-        "balance-copied-body-initial-memory"
+        "balance-array-initial-body"
       ],
       "reviewed_shape_hash": 1302148608
     },
@@ -2188,10 +2187,9 @@
       "title": "Balance entry: ending-run adequacy",
       "kind": "theorem",
       "label": "frontier:balance-entry-adequacy",
-      "notes": "MaybeStuck adequacy from the actual initial store for the exact copied-array absent-account path. Any ending run returns no values with the proved host/gas cells. Does not prove termination, fuel sufficiency, general execution safety, arbitrary-gas rollback or full accepted-call refinement. Body gas is explicit; activation is separate.",
+      "notes": "The original copied-only statement is preserved exactly and proved by checked specialization of balance-array-entry-adequacy. Its displayed type premises and readiness remain unchanged.",
       "required_proof_dependencies": [
-        "balance-initial-start",
-        "balance-initial-body"
+        "balance-array-entry-adequacy"
       ],
       "reviewed_shape_hash": 2363005851
     },
@@ -2294,12 +2292,9 @@
       "title": "Actual copied balance MethodRunsR",
       "kind": "theorem",
       "label": "frontier:balance-copied-runs",
-      "notes": "Connects the initialized store and ending-run adequacy to the standard resource-aware method-run contract, including activation and bounded host/gas effects.",
+      "notes": "The original copied-only statement is preserved exactly and proved by checked specialization of balance-array-runs. Its displayed type premises and readiness remain unchanged.",
       "required_proof_dependencies": [
-        "balance-entry-activation",
-        "balance-entry-adequacy",
-        "balance-end-observations",
-        "balance-entry-thread"
+        "balance-array-runs"
       ],
       "reviewed_shape_hash": 1625094088
     },
@@ -2341,12 +2336,9 @@
       "title": "Copied array, absent account: full receipt refinement",
       "kind": "theorem",
       "label": "frontier:balance-copied-case-refinement",
-      "notes": "Proven for initialized represented state, an unregistered account and the exact copied-string array grammar with input length below 2^24. Proves execution safety, sufficient-resource Matches with model gas bound, and arbitrary-resource Matches or rollback. Entry/trie/proof-budget and model-agreement interfaces are concretely instantiated. Other input/state cases remain open.",
+      "notes": "The original copied-only statement is preserved exactly and proved by checked specialization of balance-array-case-refinement. Its displayed type premises and readiness remain unchanged.",
       "required_proof_dependencies": [
-        "balance-copied-entry-at",
-        "balance-copied-model-agreement",
-        "balance-copied-runs",
-        "balance-total-model-gas"
+        "balance-array-case-refinement"
       ],
       "reviewed_shape_hash": 1898457620
     },
@@ -2366,12 +2358,14 @@
       "id": "balance-other-accepted",
       "declaration": "WNear.ftBalanceOf_other_accepted_obligation",
       "title": "ft_balance_of: remaining accepted cases",
-      "kind": "admission",
+      "kind": "theorem",
       "label": "frontier:balance-other-accepted",
-      "notes": "Precise complementary case of the original accepted-call contract. Excludes the proved initialized copied-array, absent-account branch. Borrowed strings, objects, registered accounts, uninitialized state and other accepted cases remain to be proved.",
-      "required_proof_dependencies": [],
-      "reviewed_shape_hash": 1399244657,
-      "indirect_admission": true
+      "notes": "Preserves the previous remaining-case statement and performs a checked split on the broader completed array case. Borrowed and copied strings in that case are proved; its precise complement is still Open. This assembly remains Conditional.",
+      "required_proof_dependencies": [
+        "balance-outside-array-accepted",
+        "balance-array-case-accepted"
+      ],
+      "reviewed_shape_hash": 1399244657
     },
     {
       "id": "balance-copied-case-safety",
@@ -2389,11 +2383,425 @@
       "id": "balance-other-no-issue",
       "declaration": "WNear.ftBalanceOf_other_no_issue_obligation",
       "title": "ft_balance_of: remaining execution-safety contexts",
-      "kind": "admission",
-      "indirect_admission": true,
+      "kind": "theorem",
       "label": "frontier:balance-other-no-issue",
-      "notes": "General execution safety outside the proved initialized copied-array absent-account case, including rejected input. The precise complement remains Open.",
-      "reviewed_shape_hash": 2725785016
+      "notes": "Preserves the previous remaining-case statement and performs a checked split on the broader completed array case. Borrowed and copied strings in that case are proved; its precise complement is still Open. This assembly remains Conditional.",
+      "reviewed_shape_hash": 2725785016,
+      "required_proof_dependencies": [
+        "balance-outside-array-no-issue",
+        "balance-array-case-safety"
+      ]
+    },
+    {
+      "id": "array-value-reader",
+      "declaration": "WNear.Binary.SerdeValueReuse.spec169_model",
+      "title": "Shared account-id reader: borrowed or copied",
+      "kind": "theorem",
+      "label": "frontier:array-value-reader",
+      "notes": "Reuses the existing model-decoded account-id reader with arbitrary reusable scratch. Its explicit parser and allocation-room premises remain named dependencies until the initialized instance supplies them.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3801228496,
+      "required_type_dependencies": [
+        "string-room",
+        "owned-room"
+      ]
+    },
+    {
+      "id": "array-value-cost-bound",
+      "declaration": "WNear.Binary.SerdeValueReuse.valueCost_le",
+      "title": "Both string paths fit the existing value gas charge",
+      "kind": "theorem",
+      "label": "frontier:array-value-cost-bound",
+      "notes": "The shared borrowed/copied reader charge is bounded by the existing copied-reader charge. No gas allowance or old cost definition changes.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 4210761013
+    },
+    {
+      "id": "array-scratch-drop",
+      "declaration": "WNear.Binary.SerdeValueReuse.f68_scratch_exact",
+      "title": "Scratch cleanup preserves the free-list bound",
+      "kind": "theorem",
+      "label": "frontier:array-scratch-drop",
+      "notes": "The actual vector drop preserves every earlier live allocation and returns a checked free-list bound F+1 for either empty or allocated scratch. Empty scratch uses the permitted monotonic bound.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 4059603069
+    },
+    {
+      "id": "array-owned-drop",
+      "declaration": "WNear.Binary.SerdeValueReuse.f68_owned_value",
+      "title": "Owned value survives either scratch cleanup path",
+      "kind": "theorem",
+      "label": "frontier:array-owned-drop",
+      "notes": "Carries the common reader result through the actual scratch drop, retaining the exact parser/copy growth allowance and the owned account string.",
+      "required_proof_dependencies": [
+        "array-scratch-drop"
+      ],
+      "reviewed_shape_hash": 302988957
+    },
+    {
+      "id": "array-struct-reader",
+      "declaration": "WNear.Binary.SerdeStructArrModel.f228_arr_model",
+      "title": "Array struct reads either valid string path",
+      "kind": "theorem",
+      "label": "frontier:array-struct-reader",
+      "notes": "Instantiates the changing-state array-struct contract with the existing shared account-id reader and its owned value. General parser/allocation room remains explicit.",
+      "required_proof_dependencies": [
+        "array-value-reader"
+      ],
+      "reviewed_shape_hash": 1593845046,
+      "required_type_dependencies": [
+        "string-room",
+        "owned-room"
+      ]
+    },
+    {
+      "id": "array-wrapper-reader",
+      "declaration": "WNear.Binary.SerdeStruct78Model.f78_arr_model",
+      "title": "Deserialize wrapper for both string paths",
+      "kind": "theorem",
+      "label": "frontier:array-wrapper-reader",
+      "notes": "Checked function-78 wrapper for the common valid-array result and reusable scratch state.",
+      "required_proof_dependencies": [
+        "array-struct-reader"
+      ],
+      "reviewed_shape_hash": 1756698561,
+      "required_type_dependencies": [
+        "string-room",
+        "owned-room"
+      ]
+    },
+    {
+      "id": "array-parser-cost-domination",
+      "declaration": "WNear.Binary.SerdeStruct78Model.costArray_le",
+      "title": "Common array charge fits the previous bound",
+      "kind": "theorem",
+      "label": "frontier:array-parser-cost-domination",
+      "notes": "Lifts the shared value-reader cost inequality to the full array-struct cost, under the exact successful model decode.",
+      "required_proof_dependencies": [
+        "array-value-cost-bound"
+      ],
+      "reviewed_shape_hash": 2043109615
+    },
+    {
+      "id": "array-from-trait-reader",
+      "declaration": "WNear.Binary.SerdeFromTraitModel.f66_arr_model",
+      "title": "from_trait restores either successful array path",
+      "kind": "theorem",
+      "label": "frontier:array-from-trait-reader",
+      "notes": "Executes the real deserializer construction, array reader, trailing-input check and scratch cleanup; restores the full frame and retains the owned String and concrete heap bounds.",
+      "required_proof_dependencies": [
+        "array-wrapper-reader",
+        "array-owned-drop"
+      ],
+      "reviewed_shape_hash": 1326776602,
+      "required_type_dependencies": [
+        "string-room",
+        "owned-room"
+      ]
+    },
+    {
+      "id": "array-from-slice-reader",
+      "declaration": "WNear.Binary.FromSliceModel.f65_arr_model",
+      "title": "from_slice accepts both valid string paths",
+      "kind": "theorem",
+      "label": "frontier:array-from-slice-reader",
+      "notes": "Connects the actual function-65 entry to the common array result and exact cleanup bounds.",
+      "required_proof_dependencies": [
+        "array-from-trait-reader"
+      ],
+      "reviewed_shape_hash": 732056340,
+      "required_type_dependencies": [
+        "string-room",
+        "owned-room"
+      ]
+    },
+    {
+      "id": "array-parser-model-core",
+      "declaration": "WNear.Binary.FromSliceModel.f65_arr_model_bound",
+      "title": "Both array paths use the unchanged parser budget",
+      "kind": "theorem",
+      "label": "frontier:array-parser-model-core",
+      "notes": "Funds the common function-65 proof from the original parser gas allowance using the proved cost domination. No gas statement is weakened.",
+      "required_proof_dependencies": [
+        "array-from-slice-reader",
+        "array-parser-cost-domination"
+      ],
+      "reviewed_shape_hash": 2025746814,
+      "required_type_dependencies": [
+        "string-room",
+        "owned-room"
+      ]
+    },
+    {
+      "id": "array-parser-with-room",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.f65_arr_model_room",
+      "title": "Both array paths supply balance-entry resources",
+      "kind": "theorem",
+      "label": "frontier:array-parser-with-room",
+      "notes": "Derives error-box room from the existing growth-plus-six allowance, invokes the common parser with the unchanged budget, and retains the exact owned account and downstream heap room.",
+      "required_proof_dependencies": [
+        "array-parser-model-core",
+        "copied-parser-room"
+      ],
+      "reviewed_shape_hash": 1297231726,
+      "required_type_dependencies": [
+        "string-room",
+        "owned-room",
+        "lookup-heap-room",
+        "parser-fixed-result"
+      ]
+    },
+    {
+      "id": "balance-array-parser-through-cleanup",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.array_parser_call_through_cleanup",
+      "title": "Balance parser call through cleanup for both array paths",
+      "kind": "theorem",
+      "label": "frontier:balance-array-parser-through-cleanup",
+      "notes": "Checked generalization to borrowed and copied valid strings in the exact array/absent-account branch. The existing copied-only statement is retained as a checked specialization. All displayed resource and environmental premises remain explicit.",
+      "required_proof_dependencies": [
+        "array-parser-with-room",
+        "parser-fixed-through-cleanup"
+      ],
+      "reviewed_shape_hash": 4144031870,
+      "required_type_dependencies": [
+        "string-room",
+        "owned-room",
+        "lookup-heap-room"
+      ]
+    },
+    {
+      "id": "balance-array-deref-through-cleanup",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.array_deref_parser_through_cleanup",
+      "title": "Balance input dereference through common array cleanup",
+      "kind": "theorem",
+      "label": "frontier:balance-array-deref-through-cleanup",
+      "notes": "Checked generalization to borrowed and copied valid strings in the exact array/absent-account branch. The existing copied-only statement is retained as a checked specialization. All displayed resource and environmental premises remain explicit.",
+      "required_proof_dependencies": [
+        "balance-input-deref-setup",
+        "balance-array-parser-through-cleanup"
+      ],
+      "reviewed_shape_hash": 679330931,
+      "required_type_dependencies": [
+        "string-room",
+        "owned-room",
+        "lookup-heap-room"
+      ]
+    },
+    {
+      "id": "balance-array-expect-through-cleanup",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.array_expect_deref_parser_through_cleanup",
+      "title": "Balance input unwrap through common array cleanup",
+      "kind": "theorem",
+      "label": "frontier:balance-array-expect-through-cleanup",
+      "notes": "Checked generalization to borrowed and copied valid strings in the exact array/absent-account branch. The existing copied-only statement is retained as a checked specialization. All displayed resource and environmental premises remain explicit.",
+      "required_proof_dependencies": [
+        "balance-input-expect",
+        "balance-array-deref-through-cleanup"
+      ],
+      "reviewed_shape_hash": 1349391137,
+      "required_type_dependencies": [
+        "string-room",
+        "owned-room",
+        "lookup-heap-room"
+      ]
+    },
+    {
+      "id": "balance-array-input-through-cleanup",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.array_input_parser_through_cleanup",
+      "title": "Balance input read through common array cleanup",
+      "kind": "theorem",
+      "label": "frontier:balance-array-input-through-cleanup",
+      "notes": "Checked generalization to borrowed and copied valid strings in the exact array/absent-account branch. The existing copied-only statement is retained as a checked specialization. All displayed resource and environmental premises remain explicit.",
+      "required_proof_dependencies": [
+        "balance-array-expect-through-cleanup",
+        "input-read"
+      ],
+      "reviewed_shape_hash": 1342656170,
+      "required_type_dependencies": [
+        "string-room",
+        "owned-room",
+        "lookup-heap-room",
+        "input-register-room"
+      ]
+    },
+    {
+      "id": "balance-array-input-setup-through-cleanup",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.array_input_setup_through_cleanup",
+      "title": "Balance input setup through common array cleanup",
+      "kind": "theorem",
+      "label": "frontier:balance-array-input-setup-through-cleanup",
+      "notes": "Checked generalization to borrowed and copied valid strings in the exact array/absent-account branch. The existing copied-only statement is retained as a checked specialization. All displayed resource and environmental premises remain explicit.",
+      "required_proof_dependencies": [
+        "balance-array-input-through-cleanup"
+      ],
+      "reviewed_shape_hash": 1123662904,
+      "required_type_dependencies": [
+        "string-room",
+        "owned-room",
+        "lookup-heap-room",
+        "input-register-room"
+      ]
+    },
+    {
+      "id": "balance-array-absent-body",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.array_absent_body",
+      "title": "Whole balance body for either valid array string path",
+      "kind": "theorem",
+      "label": "frontier:balance-array-absent-body",
+      "notes": "Checked generalization to borrowed and copied valid strings in the exact array/absent-account branch. The existing copied-only statement is retained as a checked specialization. All displayed resource and environmental premises remain explicit.",
+      "required_proof_dependencies": [
+        "balance-method-prologue",
+        "balance-array-input-setup-through-cleanup"
+      ],
+      "reviewed_shape_hash": 594390611,
+      "required_type_dependencies": [
+        "string-room",
+        "owned-room",
+        "lookup-heap-room",
+        "input-register-room"
+      ]
+    },
+    {
+      "id": "balance-array-body-initial-room",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.array_absent_body_initial_room",
+      "title": "Both array paths from the combined initial allowance",
+      "kind": "theorem",
+      "label": "frontier:balance-array-body-initial-room",
+      "notes": "Checked generalization to borrowed and copied valid strings in the exact array/absent-account branch. The existing copied-only statement is retained as a checked specialization. All displayed resource and environmental premises remain explicit.",
+      "required_proof_dependencies": [
+        "balance-array-absent-body",
+        "initial-input-copy-room"
+      ],
+      "reviewed_shape_hash": 899166275,
+      "required_type_dependencies": [
+        "string-room",
+        "lookup-heap-room"
+      ]
+    },
+    {
+      "id": "balance-array-body-initial-memory",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.array_absent_body_initial_memory",
+      "title": "Initial memory supplies both array paths",
+      "kind": "theorem",
+      "label": "frontier:balance-array-body-initial-memory",
+      "notes": "Checked generalization to borrowed and copied valid strings in the exact array/absent-account branch. The existing copied-only statement is retained as a checked specialization. All displayed resource and environmental premises remain explicit.",
+      "required_proof_dependencies": [
+        "initial-memory-parser-room",
+        "initial-combined-parser-room",
+        "balance-array-body-initial-room"
+      ],
+      "reviewed_shape_hash": 1490736524
+    },
+    {
+      "id": "balance-array-initial-body",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.array_absent_body_initial_resources",
+      "title": "Initial code, frame and statics supply both array paths",
+      "kind": "theorem",
+      "label": "frontier:balance-array-initial-body",
+      "notes": "Checked generalization to borrowed and copied valid strings in the exact array/absent-account branch. The existing copied-only statement is retained as a checked specialization. All displayed resource and environmental premises remain explicit.",
+      "required_proof_dependencies": [
+        "balance-array-body-initial-memory"
+      ],
+      "reviewed_shape_hash": 1651628018
+    },
+    {
+      "id": "balance-array-entry-adequacy",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.array_absent_adequate",
+      "title": "Ending-run adequacy for either array string path",
+      "kind": "theorem",
+      "label": "frontier:balance-array-entry-adequacy",
+      "notes": "Checked generalization to borrowed and copied valid strings in the exact array/absent-account branch. The existing copied-only statement is retained as a checked specialization. All displayed resource and environmental premises remain explicit.",
+      "required_proof_dependencies": [
+        "balance-initial-start",
+        "balance-array-initial-body"
+      ],
+      "reviewed_shape_hash": 1963523202
+    },
+    {
+      "id": "balance-array-runs",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.array_absent_runs",
+      "title": "Metered MethodRunsR for either array string path",
+      "kind": "theorem",
+      "label": "frontier:balance-array-runs",
+      "notes": "Checked generalization to borrowed and copied valid strings in the exact array/absent-account branch. The existing copied-only statement is retained as a checked specialization. All displayed resource and environmental premises remain explicit.",
+      "required_proof_dependencies": [
+        "balance-entry-activation",
+        "balance-array-entry-adequacy",
+        "balance-end-observations",
+        "balance-entry-thread"
+      ],
+      "reviewed_shape_hash": 1492074718
+    },
+    {
+      "id": "balance-array-case-refinement",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.array_absent_refines_init",
+      "title": "Valid array, absent account: full receipt refinement",
+      "kind": "theorem",
+      "label": "frontier:balance-array-case-refinement",
+      "notes": "Proven full receipt result for initialized represented state, an unregistered account and any valid model-decoded string in the exact array grammar, with input length below 2^24. Covers borrowed and copied strings, execution safety, sufficient-resource Matches with the unchanged model gas bound, and arbitrary-resource Matches or rollback. Context and represented storage instantiate the entry/trie/proof-budget and model-agreement contracts. Other input/state cases remain unresolved.",
+      "required_proof_dependencies": [
+        "balance-copied-entry-at",
+        "balance-copied-model-agreement",
+        "balance-array-runs",
+        "balance-total-model-gas"
+      ],
+      "reviewed_shape_hash": 860655261
+    },
+    {
+      "id": "balance-array-case-accepted",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.array_case_accepted",
+      "title": "All valid array strings supply accepted-call assembly",
+      "kind": "theorem",
+      "label": "frontier:balance-array-case-accepted",
+      "notes": "Projects the proved receipt case into the original accepted-call result shape. Both string paths are connected through checked composition to the Conditional accepted-call callers.",
+      "required_proof_dependencies": [
+        "balance-array-case-refinement"
+      ],
+      "reviewed_shape_hash": 888476485
+    },
+    {
+      "id": "balance-array-case-safety",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.array_case_no_issue",
+      "title": "All valid array strings supply execution-safety assembly",
+      "kind": "theorem",
+      "label": "frontier:balance-array-case-safety",
+      "notes": "Projects execution safety from the proved full receipt case and connects it to the Conditional general safety callers.",
+      "required_proof_dependencies": [
+        "balance-array-case-refinement"
+      ],
+      "reviewed_shape_hash": 2094850591
+    },
+    {
+      "id": "balance-copied-case-in-array",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.copied_case_is_array_case",
+      "title": "Previous copied case lies inside the completed array case",
+      "kind": "theorem",
+      "label": "frontier:balance-copied-case-in-array",
+      "notes": "Kernel-checked containment of the old case predicate in the new broader case. Both predicate bodies are pinned; the remaining leaves exclude this entire broader case.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3568980304
+    },
+    {
+      "id": "balance-outside-array-accepted",
+      "declaration": "WNear.ftBalanceOf_outside_array_absent_accepted_obligation",
+      "title": "ft_balance_of: accepted outside the completed array case",
+      "kind": "admission",
+      "label": "frontier:balance-outside-array-accepted",
+      "notes": "Precise complement of the initialized valid-array, absent-account case. Registered accounts, uninitialized state, object inputs and other contexts remain Open. The full callers remain Conditional through this leaf.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2568170387,
+      "indirect_admission": true
+    },
+    {
+      "id": "balance-outside-array-no-issue",
+      "declaration": "WNear.ftBalanceOf_outside_array_absent_no_issue_obligation",
+      "title": "ft_balance_of: safety outside the completed array case",
+      "kind": "admission",
+      "label": "frontier:balance-outside-array-no-issue",
+      "notes": "Precise complement of the initialized valid-array, absent-account case. Registered accounts, uninitialized state, object inputs and other contexts remain Open. The full callers remain Conditional through this leaf.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1715380944,
+      "indirect_admission": true
     }
   ],
   "reviewed_environment": [
@@ -2418,8 +2826,8 @@
     "WNear.storageWithdraw_obligation",
     "WNear.storageUnregister_obligation",
     "WNear.storageBalanceOf_obligation",
-    "WNear.ftBalanceOf_other_no_issue_obligation",
-    "WNear.ftBalanceOf_other_accepted_obligation",
+    "WNear.ftBalanceOf_outside_array_absent_no_issue_obligation",
+    "WNear.ftBalanceOf_outside_array_absent_accepted_obligation",
     "WNear.ftBalanceOf_rejected_obligation"
   ],
   "expected_incomplete": [
@@ -2444,6 +2852,8 @@
     "WNear.ftBalanceOf_accepted_obligation",
     "WNear.ftBalanceOf_rejected_obligation",
     "WNear.ftBalanceOf_other_accepted_obligation",
-    "WNear.ftBalanceOf_other_no_issue_obligation"
+    "WNear.ftBalanceOf_other_no_issue_obligation",
+    "WNear.ftBalanceOf_outside_array_absent_accepted_obligation",
+    "WNear.ftBalanceOf_outside_array_absent_no_issue_obligation"
   ]
 }

@@ -52,7 +52,7 @@ theorem storage_read_post_erase_source (h : NearState) (key : List UInt8) (r : U
 
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 8000000 in
-theorem copied_array_absent_runs (cfg : RuntimeConfig) (S : WNear.State) (a : WNear.AccountId)
+theorem array_absent_runs (cfg : RuntimeConfig) (S : WNear.State) (a : WNear.AccountId)
     (bs rest : List UInt8) (j k : Nat) (st : Near.TrieOverlay.State) (bud : Nat)
     (hlen : bs.length < 2 ^ 24) (ho : bs[wsLen bs]? = some 0x5B)
     (hj : j = wsLen bs + 1 + wsLen (bs.drop (wsLen bs + 1))) (hq : bs[j]? = some 0x22)
@@ -60,7 +60,7 @@ theorem copied_array_absent_runs (cfg : RuntimeConfig) (S : WNear.State) (a : WN
     (hk : k = bs.length - rest.length + wsLen (bs.drop (bs.length - rest.length)) + 1)
     (hend : k + wsLen (bs.drop k) = bs.length)
     (hmodel : NearInterface.Json.stringBody (bs.drop (j + 1)) [] = some (some a.val, rest))
-    (hcopied : ¬ borrowed (bs.drop (j + 1))) :
+     :
     MethodRunsR cfg 297 (CopiedAbsentPre S a bs st bud) (copiedMethodCost cfg S a bs rest j k) (copiedMethodPost a st) := by
   intro fuel h Cg hpre hcost hC1 hC2 hfuel
   have hw : (wStore cfg h).host = h := rfl
@@ -80,7 +80,7 @@ theorem copied_array_absent_runs (cfg : RuntimeConfig) (S : WNear.State) (a : WN
     rw [charged_gas_used, ← initial_body_cost_erase, erase_charged]
     simp only [copiedMethodCost] at hcost
     omega
-  have had := copied_array_absent_adequate cfg Cg a bs rest j k hlen ho hj hq he hk hend hmodel hcopied
+  have had := array_absent_adequate cfg Cg a bs rest j k hlen ho hj hq he hk hend hmodel
     (charged h (11 * cfg.wasm.regularOpCost)) (inputHost (charged h (11 * cfg.wasm.regularOpCost)) 0)
     hp.input rfl hp.inputLimit S st hp.value hp.accounting hp.keyLimit hp.canonical hp.link bud hp.proof
     hp.budget hp.accountLimit hp.absent hp.registerLimit hp.returnLimit hbody
@@ -100,6 +100,20 @@ theorem copied_array_absent_runs (cfg : RuntimeConfig) (S : WNear.State) (a : WN
     rwa [heinput] at hr
   exact ⟨σ.store, hrun, ⟨h1, st1, h2, hs1', hs2, heq⟩, hu⟩
 
+set_option maxRecDepth 1000000 in
+set_option maxHeartbeats 32000000 in
+/-- The existing copied-only contract, preserved as a checked specialization. -/
+theorem copied_array_absent_runs (cfg : RuntimeConfig) (S : WNear.State) (a : WNear.AccountId)
+    (bs rest : List UInt8) (j k : Nat) (st : Near.TrieOverlay.State) (bud : Nat)
+    (hlen : bs.length < 2 ^ 24) (ho : bs[wsLen bs]? = some 0x5B)
+    (hj : j = wsLen bs + 1 + wsLen (bs.drop (wsLen bs + 1))) (hq : bs[j]? = some 0x22)
+    (he : bs[bs.length - rest.length + wsLen (bs.drop (bs.length - rest.length))]? = some 0x5D)
+    (hk : k = bs.length - rest.length + wsLen (bs.drop (bs.length - rest.length)) + 1)
+    (hend : k + wsLen (bs.drop k) = bs.length)
+    (hmodel : NearInterface.Json.stringBody (bs.drop (j + 1)) [] = some (some a.val, rest))
+    (hcopied : ¬ borrowed (bs.drop (j + 1))) :
+    MethodRunsR cfg 297 (CopiedAbsentPre S a bs st bud) (copiedMethodCost cfg S a bs rest j k) (copiedMethodPost a st) := by
+  exact array_absent_runs cfg S a bs rest j k st bud hlen ho hj hq he hk hend hmodel
 theorem storage_read_post_field {α : Type} (f : NearState → α) (hf : ∀ x, f (erase x) = f x)
     (hreg : ∀ x i v, f (x.setRegister i v) = f x) (hacc : ∀ x a, f { x with storageAccounting := a } = f x)
     {h h' : NearState} {key : List UInt8} {r : UInt64} {tr : Near.TrieOverlay.State}
@@ -156,6 +170,44 @@ theorem export_297 : wNearModule.exportFunc? "ft_balance_of" = some 297 := by de
 open NearInterface ContractModel in
 set_option maxRecDepth 100000 in
 set_option maxHeartbeats 8000000 in
+theorem array_absent_refines_with_obligations (cfg : WNear.Config) (size : Nat)
+    (codeOf : List UInt8 → Near.ContractCode) (raw : RawStorage) (modelSt : Option WNear.State)
+    (ctx : Context) (S : WNear.State) (a : WNear.AccountId) (bs rest : List UInt8) (j k : Nat)
+    (tr : Near.TrieOverlay.State) (bud : Nat) (hp : WProtocol ctx.protocol) (hwf : ctx.WF raw)
+    (hm : ctx.method = "ft_balance_of") (hc : FtTotalSupplyMethod.CostsV86 ctx.protocol) (hsize : size ≤ 185625)
+    (hlen : bs.length < 2 ^ 24) (ho : bs[wsLen bs]? = some 0x5B)
+    (hj : j = wsLen bs + 1 + wsLen (bs.drop (wsLen bs + 1))) (hq : bs[j]? = some 0x22)
+    (he : bs[bs.length - rest.length + wsLen (bs.drop (bs.length - rest.length))]? = some 0x5D)
+    (hk : k = bs.length - rest.length + wsLen (bs.drop (bs.length - rest.length)) + 1)
+    (hend : k + wsLen (bs.drop k) = bs.length)
+    (hmodel : NearInterface.Json.stringBody (bs.drop (j + 1)) [] = some (some a.val, rest))
+
+    (hentry : CopiedEntryAt cfg ctx raw modelSt S a bs tr bud)
+    (hag : CopiedAgreement cfg ctx raw modelSt a tr (erase (hostOf ctx raw)))
+    (hagP : CopiedAgreement cfg ctx raw modelSt a tr (eraseP (hostOf ctx raw))) :
+    let r := Near.Boundary.nearRuntime.exec (wCode size codeOf) raw ctx
+    let res := (WNear.wnear cfg).step ctx modelSt (.ftBalanceOf a)
+    (∀ msg, r.outcome ≠ .error (.executionIssue msg)) ∧
+    ((WNear.wnear cfg).gas ctx modelSt (.ftBalanceOf a) ≤ ctx.gasLimit →
+      ctx.ProofRoom ((WNear.wnear cfg).proofBound ctx modelSt (.ftBalanceOf a)) →
+      Matches (WNear.wnear cfg) ctx raw r res ∧ r.usedGas ≤ (WNear.wnear cfg).gas ctx modelSt (.ftBalanceOf a)) ∧
+    (Matches (WNear.wnear cfg) ctx raw r res ∨
+      (ResourceFailure r ∧ RolledBack ctx raw r ∧ r.logs <+: res.logs)) := by
+  have hbound := initial_total_cost_le_model cfg ctx raw modelSt S a bs rest j k size hc hsize hentry.2.input
+    hlen hj hq hk hend hmodel hentry.2.value hentry.2.absent
+  exact method_refines_callR (WNear.wnear cfg) size codeOf raw modelSt ctx (.ftBalanceOf a)
+    (CopiedAbsentPre S a bs tr bud) (copiedMethodCost ctx.protocol S a bs rest j k) (copiedMethodPost a tr)
+    hp hwf (by rw [hm]; decide) (by rw [hm]; exact export_297) funcType_297 (by decide) (by decide)
+    (array_absent_runs ctx.protocol S a bs rest j k tr bud hlen ho hj hq he hk hend hmodel )
+    hentry.1 hentry.2
+    (fun e he => copied_post_noPromises (e := erase (hostOf ctx raw)) he ⟨rfl, rfl, rfl⟩)
+    (fun e he => copied_post_noPromises (e := eraseP (hostOf ctx raw)) he ⟨rfl, rfl, rfl⟩)
+    hag hagP (by simpa only [copiedMethodCost, Nat.add_assoc] using hbound)
+
+open NearInterface ContractModel in
+set_option maxRecDepth 1000000 in
+set_option maxHeartbeats 32000000 in
+/-- The existing copied-only contract, preserved as a checked specialization. -/
 theorem copied_array_absent_refines_with_obligations (cfg : WNear.Config) (size : Nat)
     (codeOf : List UInt8 → Near.ContractCode) (raw : RawStorage) (modelSt : Option WNear.State)
     (ctx : Context) (S : WNear.State) (a : WNear.AccountId) (bs rest : List UInt8) (j k : Nat)
@@ -179,14 +231,5 @@ theorem copied_array_absent_refines_with_obligations (cfg : WNear.Config) (size 
       Matches (WNear.wnear cfg) ctx raw r res ∧ r.usedGas ≤ (WNear.wnear cfg).gas ctx modelSt (.ftBalanceOf a)) ∧
     (Matches (WNear.wnear cfg) ctx raw r res ∨
       (ResourceFailure r ∧ RolledBack ctx raw r ∧ r.logs <+: res.logs)) := by
-  have hbound := initial_total_cost_le_model cfg ctx raw modelSt S a bs rest j k size hc hsize hentry.2.input
-    hlen hj hq hk hend hmodel hentry.2.value hentry.2.absent
-  exact method_refines_callR (WNear.wnear cfg) size codeOf raw modelSt ctx (.ftBalanceOf a)
-    (CopiedAbsentPre S a bs tr bud) (copiedMethodCost ctx.protocol S a bs rest j k) (copiedMethodPost a tr)
-    hp hwf (by rw [hm]; decide) (by rw [hm]; exact export_297) funcType_297 (by decide) (by decide)
-    (copied_array_absent_runs ctx.protocol S a bs rest j k tr bud hlen ho hj hq he hk hend hmodel hcopied)
-    hentry.1 hentry.2
-    (fun e he => copied_post_noPromises (e := erase (hostOf ctx raw)) he ⟨rfl, rfl, rfl⟩)
-    (fun e he => copied_post_noPromises (e := eraseP (hostOf ctx raw)) he ⟨rfl, rfl, rfl⟩)
-    hag hagP (by simpa only [copiedMethodCost, Nat.add_assoc] using hbound)
+  exact array_absent_refines_with_obligations cfg size codeOf raw modelSt ctx S a bs rest j k tr bud hp hwf hm hc hsize hlen ho hj hq he hk hend hmodel hentry hag hagP
 end WNear.Binary.BalanceOf297AbsentCall
