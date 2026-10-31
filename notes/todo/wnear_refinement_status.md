@@ -33,6 +33,54 @@ it is false for the reviewed domain; its historical statement is recorded in
 the misstatement log. The historical generic host trap and contradiction lemmas
 remain checked, but witness existence is no longer a frontier obligation.
 
+## Continuation on 2026-10-31: full 4 MiB funding and accepted models compose globally
+
+Actual mixed growth is bounded by 36*peak*op+200 billion gas across the full
+4 MiB domain. The checked key/member work retains nonnegative structural savings;
+actual ignored readers retain 74 operations per real frame push. Summed structural
+work credits cover 36*the one retained mixed peak with one 2304-operation slack.
+Thus actual mixed extraCost is funded by those credits plus 202 billion gas.
+The full selected trace sum, unchanged one-account reserve and original parser
+recurrence instantiate SelectedWeightedParserLinearBudget for every successful
+full object model. No abstract parser gas premise remains in its full receipt.
+
+The same original ProviderModelBudget and full initialized absent-account receipt
+are now constructed for full object models up to 4194304 bytes, including escaped
+keys/account values and complete nested ignored values. Existing decode_balanceOf
+agreement proves accepted objects supply those exact models and EOF endpoints.
+Accepted arrays supply the earlier completed ArrayAbsentCase using their actual
+raw account model and exact suffix/whitespace positions. Every accepted
+initialized absent-account input in the original domain belongs to one of these
+completed cases. No abstract accepted-input/model premise remains.
+
+The original ftBalanceOf_absent_parser_complement_obligation statement remains
+byte-identical, but its proof now composes the accepted-case classification and
+full provider/cost construction. Its direct admission is removed, with no new
+parser admission. It stays Conditional through the original named pinned protocol
+argument-ceiling obligation. Original parser-cost/plan, accepted-call and global
+statements remain unchanged; full general-object accepted and safety clauses are
+also connected directly to their original global callers. Full method/global
+results remain Conditional through other states, rejected-input safety, other
+methods and concrete protocol premises. Generic IgnoreHyp, KeyConditions,
+ValueConditions, room/gas/linear interface contracts remain visibly Open while
+the actual accepted absent-account route concretely instantiates them.
+
+No old statement, resource invariant, one-credit ownership rule, gas budget,
+observation, module allowlist or full end-to-end goal is weakened. Exact direct
+admission frontier removes only the completed parser complement; transitive
+incompleteness remains wherever pinned protocol or other obligations are used.
+
+Next: address initialized registered-account and uninitialized/rejected contexts,
+then remaining method and pinned protocol leaves. Full completion still requires
+deployed-binary refinement and a clean audit without sorryAx.
+
+Strict full audit and fresh dependency/readiness gate passed at
+2026-10-31T15:41:12+00:00 for proof source `a2133f6df72ff60253da2e1012d4e48f6922e2398cc40553c4ea1eb99d31a313`. All 119 frontier
+policy tests, Lean style and toolchain checks passed. Every old statement pin
+remains byte-identical. The exact direct admission frontier removes only the completed parser
+complement; transitive incompleteness and the module allowance stay unchanged. Live publication must match
+this source and evidence.
+
 ## Continuation on 2026-10-31: weighted actual reader reaches the full receipt
 
 The unchanged binary closing dispatch costs 30 regular operations. Checked actual

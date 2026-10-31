@@ -3282,12 +3282,13 @@
       "title": "ft_balance_of: safety outside completed array/object cases",
       "kind": "theorem",
       "label": "frontier:balance-outside-array-object-no-issue",
-      "notes": "Preserves the exact original full-domain statement. A checked split now directly integrates the completed <=10000-byte full general-object case, then the existing actual-code parser-plan composition. Exact complementary parser/input/state and protocol obligations remain Open; this assembly stays Conditional.",
+      "notes": "Exact original full-domain statement is preserved. Checked splits directly integrate both the earlier small-object case and the full 4 MiB general-object case. Accepted absent-account parser funding/model cases are now constructed; precise other states/rejected-input safety and pinned protocol obligations remain Open. This full assembly stays Conditional.",
       "required_proof_dependencies": [
         "balance-absent-parser-plan",
         "provider-plan-receipt-initial",
         "balance-other-input-state-safety",
-        "small-general-safety"
+        "small-general-safety",
+        "full-general-safety"
       ],
       "reviewed_shape_hash": 690425189
     },
@@ -3297,12 +3298,13 @@
       "title": "ft_balance_of: accepted outside completed array/object cases",
       "kind": "theorem",
       "label": "frontier:balance-outside-array-object-accepted",
-      "notes": "Preserves the exact original full-domain statement. A checked split now directly integrates the completed <=10000-byte full general-object case, then the existing actual-code parser-plan composition. Exact complementary parser/input/state and protocol obligations remain Open; this assembly stays Conditional.",
+      "notes": "Exact original full-domain statement is preserved. Checked splits directly integrate both the earlier small-object case and the full 4 MiB general-object case. Accepted absent-account parser funding/model cases are now constructed; precise other states/rejected-input safety and pinned protocol obligations remain Open. This full assembly stays Conditional.",
       "required_proof_dependencies": [
         "balance-absent-parser-plan",
         "provider-plan-receipt-initial",
         "balance-other-state-accepted",
-        "small-general-accepted"
+        "small-general-accepted",
+        "full-general-accepted"
       ],
       "reviewed_shape_hash": 3187448350
     },
@@ -8177,15 +8179,16 @@
     {
       "id": "balance-absent-parser-complement",
       "declaration": "WNear.ftBalanceOf_absent_parser_complement_obligation",
-      "title": "Exact remaining absent-parser inputs outside the checked small object case",
-      "kind": "admission",
+      "title": "Original parser complement is composed from completed accepted cases",
+      "kind": "theorem",
       "label": "frontier:balance-absent-parser-complement",
-      "notes": "Same actual-code provider and unchanged whole-model budget must be supplied for accepted initialized/unregistered inputs outside all three completed array, escape-free object and <=10000-byte full general-object cases. The explicit negated SmallGeneralObjectAbsentCase premise is part of this audited statement. This obligation is Open; no full-domain funding is claimed.",
-      "required_type_dependencies": [
-        "deployed-parser-provider",
-        "provider-model-budget"
+      "notes": "Exact original statement and all premises remain unchanged. Accepted-input classification constructs either the completed array case (contradicting its explicit exclusion) or the full 4 MiB general-object model, which now constructs actual provider and original budget. No parser admission remains here; this theorem is Conditional only through named pinned protocol obligations, including the argument ceiling.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "pinned-arguments-limit",
+        "accepted-absent-cases",
+        "full-general-parser-cost"
       ],
-      "required_proof_dependencies": [],
       "reviewed_shape_hash": 2779398864,
       "indirect_admission": true
     },
@@ -8942,6 +8945,286 @@
         "weighted-selected-receipt"
       ],
       "reviewed_shape_hash": 3692446522
+    },
+    {
+      "id": "mixed-structural-growth-budget",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.mixed_growth_structural_budget",
+      "title": "Full-domain mixed growth retains a structural allowance",
+      "kind": "theorem",
+      "label": "frontier:mixed-structural-growth-budget",
+      "notes": "Actual valid retained mixed histories with peak<=4 MiB have extraCost<=36*peak*op+200 billion gas under the reviewed operation ceilings. Global growth, allocator walks, copied bytes and requested pages are all retained.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3319586298
+    },
+    {
+      "id": "key-work-growth-credit",
+      "declaration": "WNear.Binary.SerdeKeyReuse.ignored_member_regular_budget_credit",
+      "title": "Actual key work preserves growth credit",
+      "kind": "theorem",
+      "label": "frontier:key-work-growth-credit",
+      "notes": "The same actual bundled key and field/member work fits the original 470-byte allowance while retaining a nonnegative 36*consumed-340 operation credit. Scalar and model gas bounds are unchanged.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 591293651
+    },
+    {
+      "id": "segment-peak-work-credit",
+      "declaration": "WNear.Binary.ScratchMixedTrace.Segment.peak_credit",
+      "title": "Each exact segment funds its physical peak",
+      "kind": "theorem",
+      "label": "frontier:segment-peak-work-credit",
+      "notes": "Append segments reserve 36*actual peak minus a fixed 2304-operation slack; frame segments retain 74 per actual push. Actual frame peak is bounded by those pushes.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3911245103
+    },
+    {
+      "id": "mixed-peak-work-credit",
+      "declaration": "WNear.Binary.ScratchMixedTrace.peak_credit",
+      "title": "One retained mixed peak is funded by summed work credits",
+      "kind": "theorem",
+      "label": "frontier:mixed-peak-work-credit",
+      "notes": "The actual evolving-capacity mixed history satisfies 36*peak<=sum work credits+2304. The fixed slack is charged once globally.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "segment-peak-work-credit"
+      ],
+      "reviewed_shape_hash": 1040698276
+    },
+    {
+      "id": "mixed-growth-work-budget",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.mixed_growth_credit_budget",
+      "title": "Exact retained growth is funded by structural savings",
+      "kind": "theorem",
+      "label": "frontier:mixed-growth-work-budget",
+      "notes": "The same actual mixed extraCost fits summed work credits plus 202 billion gas for the full 4 MiB domain under reviewed operation ceilings.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "mixed-structural-growth-budget",
+        "mixed-peak-work-credit"
+      ],
+      "reviewed_shape_hash": 4035550660
+    },
+    {
+      "id": "account-work-credit-zero",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.account_workCredit_zero",
+      "title": "The actual valid account consumes no growth work credit",
+      "kind": "theorem",
+      "label": "frontier:account-work-credit-zero",
+      "notes": "Successful account syntax bounds actual scratch-used bytes by the decoded valid account length<=64, hence its structural work credit is zero.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2201873309
+    },
+    {
+      "id": "weighted-selected-value-credit",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.ValueSegment.selected_weighted_charge",
+      "title": "Selected actual value charge retains its growth credit",
+      "kind": "theorem",
+      "label": "frontier:weighted-selected-value-credit",
+      "notes": "The concrete weighted ignored reader returns its 74-per-actual-push savings; the account branch has zero work credit and the existing one-account reserve. Exact witness and resource endpoints agree.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "weighted-selected-cost",
+        "account-work-credit-zero",
+        "selected-account-value-bound"
+      ],
+      "reviewed_shape_hash": 2478498753
+    },
+    {
+      "id": "weighted-selected-member-credit",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.member_selected_weighted_charge",
+      "title": "Actual complete member charge preserves structural savings",
+      "kind": "theorem",
+      "label": "frontier:weighted-selected-member-credit",
+      "notes": "Exact key, colon, value and whitespace input partition composes the actual key work credit and weighted value allowance with the same evolving mixed history.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "key-work-growth-credit",
+        "weighted-selected-value-credit",
+        "member-input-partition"
+      ],
+      "reviewed_shape_hash": 2754859692
+    },
+    {
+      "id": "weighted-selected-trace-credit",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.CallTrace.selected_weighted_cost_le",
+      "title": "Complete selected trace funds one retained growth history",
+      "kind": "theorem",
+      "label": "frontier:weighted-selected-trace-credit",
+      "notes": "Exact successful trace cost plus summed structural work credits fits disjoint consumed bytes, one account reserve and actual retained growth. Credits are neither reset nor duplicated.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "weighted-selected-member-credit"
+      ],
+      "reviewed_shape_hash": 2806725571
+    },
+    {
+      "id": "weighted-model-loop-credit",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.loop_selected_weighted_cost_le",
+      "title": "Actual object recurrence receives the weighted trace bound",
+      "kind": "theorem",
+      "label": "frontier:weighted-model-loop-credit",
+      "notes": "Existing model fuel/account slots and exact original costObj equality compose the full selected weighted trace.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "weighted-selected-trace-credit",
+        "trace-original-cost",
+        "trace-fuel-account"
+      ],
+      "reviewed_shape_hash": 356844752
+    },
+    {
+      "id": "weighted-parser-credit-bound",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.selected_weighted_parser_cost_le",
+      "title": "Actual complete parser charge preserves growth credits",
+      "kind": "theorem",
+      "label": "frontier:weighted-parser-credit-bound",
+      "notes": "Original ledgerParserCost plus summed work credits fits (2215+470*inputbytes)*op, the one-account reserve and actual mixed extraCost.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "weighted-model-loop-credit"
+      ],
+      "reviewed_shape_hash": 580647759
+    },
+    {
+      "id": "full-weighted-parser-budget",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.selected_weighted_parser_linear_full",
+      "title": "Successful models instantiate weighted funding over all 4 MiB",
+      "kind": "theorem",
+      "label": "frontier:full-weighted-parser-budget",
+      "notes": "Actual weighted trace sum and the same retained growth credit fund SelectedWeightedParserLinearBudget for every successful full object model within the original domain. Generic interface remains Open; this constructor is Conditional by its tracked contract conclusion.",
+      "required_type_dependencies": [
+        "weighted-parser-linear-budget"
+      ],
+      "required_proof_dependencies": [
+        "weighted-parser-credit-bound",
+        "mixed-growth-work-budget"
+      ],
+      "reviewed_shape_hash": 2901890402
+    },
+    {
+      "id": "full-weighted-provider-plan",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.full_weighted_bundled_plan",
+      "title": "Full-domain successful objects construct the deployed parser plan",
+      "kind": "theorem",
+      "label": "frontier:full-weighted-provider-plan",
+      "notes": "Concrete key/account/weighted ignore instances and full-domain funding construct the original actual provider and unchanged ProviderModelBudget under explicit storage/domain premises.",
+      "required_type_dependencies": [
+        "absent-parser-plan"
+      ],
+      "required_proof_dependencies": [
+        "full-weighted-parser-budget",
+        "provider-budget-from-linear",
+        "weighted-provider-plan"
+      ],
+      "reviewed_shape_hash": 261749348
+    },
+    {
+      "id": "full-weighted-receipt",
+      "declaration": "WNear.Binary.SerdeObjectPrefix.full_weighted_bundled_refines_init",
+      "title": "Full 4 MiB successful objects have complete receipt refinement",
+      "kind": "theorem",
+      "label": "frontier:full-weighted-receipt",
+      "notes": "No abstract parser/gas/reader obligation remains for initialized absent-account successful full object models. Same execution safety, Matches, used gas, resource failure, rollback and log-prefix claims under reviewed environment/domain/representation premises.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "full-weighted-parser-budget",
+        "weighted-linear-receipt"
+      ],
+      "reviewed_shape_hash": 2552148004
+    },
+    {
+      "id": "full-general-accepted",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.full_general_object_case_accepted",
+      "title": "Full general-object case supplies accepted-call clauses",
+      "kind": "theorem",
+      "label": "frontier:full-general-accepted",
+      "notes": "Full-domain actual object models instantiate complete receipt refinement under the reviewed exported environment.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "full-weighted-receipt"
+      ],
+      "reviewed_shape_hash": 3056331666
+    },
+    {
+      "id": "full-general-safety",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.full_general_object_case_no_issue",
+      "title": "Full general-object case supplies execution safety",
+      "kind": "theorem",
+      "label": "frontier:full-general-safety",
+      "notes": "Full-domain actual object models instantiate no execution issue under the same reviewed premises.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "full-weighted-receipt"
+      ],
+      "reviewed_shape_hash": 3205713479
+    },
+    {
+      "id": "full-general-parser-cost",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.full_general_parser_cost",
+      "title": "Full general-object case fills the original parser-cost interface",
+      "kind": "theorem",
+      "label": "frontier:full-general-parser-cost",
+      "notes": "Exact initialized absent-account representation constructs actual DeployedParserProvider and original whole-model funding for every successful object model in the full input domain.",
+      "required_type_dependencies": [
+        "deployed-parser-provider",
+        "provider-model-budget"
+      ],
+      "required_proof_dependencies": [
+        "full-weighted-provider-plan"
+      ],
+      "reviewed_shape_hash": 2857333673
+    },
+    {
+      "id": "accepted-object-model",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.accepted_object_model",
+      "title": "Accepted JSON object supplies the exact successful machine model",
+      "kind": "theorem",
+      "label": "frontier:accepted-object-model",
+      "notes": "Existing decode_balanceOf agreement and suffix/whitespace theorems derive the full actual objLoop model and exact EOF endpoint from accepted object input.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2320421048
+    },
+    {
+      "id": "accepted-account-model",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.account_value_model",
+      "title": "Accepted account value supplies its raw string model",
+      "kind": "theorem",
+      "label": "frontier:accepted-account-model",
+      "notes": "Pure accepted account deserialization yields the exact quote index and complete raw stringBody model, including escapes.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 4175212981
+    },
+    {
+      "id": "accepted-array-case",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.accepted_array_case",
+      "title": "Accepted array supplies the completed actual array case",
+      "kind": "theorem",
+      "label": "frontier:accepted-array-case",
+      "notes": "Decoder agreement, raw account model and exact suffix/whitespace endpoints construct the existing ArrayAbsentCase throughout the original domain.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "accepted-account-model"
+      ],
+      "reviewed_shape_hash": 2596428904
+    },
+    {
+      "id": "accepted-absent-cases",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.accepted_absent_cases",
+      "title": "Every accepted absent-account input belongs to a completed case",
+      "kind": "theorem",
+      "label": "frontier:accepted-absent-cases",
+      "notes": "Within the explicit original argument bound, every accepted ft_balance_of input is either the completed array case or the full successful general-object case. No abstract parser/model premise is required.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "accepted-object-model",
+        "accepted-array-case"
+      ],
+      "reviewed_shape_hash": 2604605510
     }
   ],
   "reviewed_environment": [
@@ -8969,8 +9252,7 @@
     "WNear.ftBalanceOf_rejected_obligation",
     "WNear.ftBalanceOf_other_input_state_no_issue_obligation",
     "WNear.ftBalanceOf_other_state_accepted_obligation",
-    "WNear.pinned_arguments_obligation",
-    "WNear.ftBalanceOf_absent_parser_complement_obligation"
+    "WNear.pinned_arguments_obligation"
   ],
   "expected_incomplete": [
     "WNear.refines_wnear",

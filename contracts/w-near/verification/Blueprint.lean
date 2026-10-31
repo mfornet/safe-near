@@ -1,3 +1,4 @@
+import Bridge.Methods.FtBalanceOfFullWeightedObject
 import Bridge.Methods.FtBalanceOfWeightedLinearGas
 import Bridge.Methods.FtBalanceOfSmallGeneralObject
 import Bridge.Methods.FtBalanceOfProviderLinearGas
@@ -1488,13 +1489,13 @@ attribute [blueprint "frontier:balance-object-case-safety"
 
 attribute [blueprint "frontier:balance-outside-array-object-no-issue"
   (title := /-- ft_balance_of: safety outside completed array/object cases -/)
-  (statement := /-- Preserves the exact original full-domain statement. A checked split now directly integrates the completed <=10000-byte full general-object case, then the existing actual-code parser-plan composition. Exact complementary parser/input/state and protocol obligations remain Open; this assembly stays Conditional. -/)
+  (statement := /-- Exact original full-domain statement is preserved. Checked splits directly integrate both the earlier small-object case and the full 4 MiB general-object case. Accepted absent-account parser funding/model cases are now constructed; precise other states/rejected-input safety and pinned protocol obligations remain Open. This full assembly stays Conditional. -/)
   (notReady := true)]
   WNear.ftBalanceOf_outside_array_object_absent_no_issue_obligation
 
 attribute [blueprint "frontier:balance-outside-array-object-accepted"
   (title := /-- ft_balance_of: accepted outside completed array/object cases -/)
-  (statement := /-- Preserves the exact original full-domain statement. A checked split now directly integrates the completed <=10000-byte full general-object case, then the existing actual-code parser-plan composition. Exact complementary parser/input/state and protocol obligations remain Open; this assembly stays Conditional. -/)
+  (statement := /-- Exact original full-domain statement is preserved. Checked splits directly integrate both the earlier small-object case and the full 4 MiB general-object case. Accepted absent-account parser funding/model cases are now constructed; precise other states/rejected-input safety and pinned protocol obligations remain Open. This full assembly stays Conditional. -/)
   (notReady := true)]
   WNear.ftBalanceOf_outside_array_object_absent_accepted_obligation
 
@@ -3381,8 +3382,8 @@ attribute [blueprint "frontier:small-general-parser-cost"
   WNear.Binary.BalanceOf297AbsentCall.small_general_parser_cost
 
 attribute [blueprint "frontier:balance-absent-parser-complement"
-  (title := /-- Exact remaining absent-parser inputs outside the checked small object case -/)
-  (statement := /-- Same actual-code provider and unchanged whole-model budget must be supplied for accepted initialized/unregistered inputs outside all three completed array, escape-free object and <=10000-byte full general-object cases. The explicit negated SmallGeneralObjectAbsentCase premise is part of this audited statement. This obligation is Open; no full-domain funding is claimed. -/)
+  (title := /-- Original parser complement is composed from completed accepted cases -/)
+  (statement := /-- Exact original statement and all premises remain unchanged. Accepted-input classification constructs either the completed array case (contradicting its explicit exclusion) or the full 4 MiB general-object model, which now constructs actual provider and original budget. No parser admission remains here; this theorem is Conditional only through named pinned protocol obligations, including the argument ceiling. -/)
   (notReady := true)]
   WNear.ftBalanceOf_absent_parser_complement_obligation
 
@@ -3674,3 +3675,111 @@ attribute [blueprint "frontier:weighted-linear-receipt"
   (statement := /-- Original loading/input/storage/host/suffix composition builds ProviderModelBudget from the exact named weighted parser inequality, then checked concrete readers reach full initialized absent-account refinement. This remains Conditional. -/)
   (notReady := true)]
   WNear.Binary.SerdeObjectPrefix.weighted_linear_bundled_refines_init
+
+attribute [blueprint "frontier:mixed-structural-growth-budget"
+  (title := /-- Full-domain mixed growth retains a structural allowance -/)
+  (statement := /-- Actual valid retained mixed histories with peak<=4 MiB have extraCost<=36*peak*op+200 billion gas under the reviewed operation ceilings. Global growth, allocator walks, copied bytes and requested pages are all retained. -/)]
+  WNear.Binary.SerdeObjectMixedTrace.mixed_growth_structural_budget
+
+attribute [blueprint "frontier:key-work-growth-credit"
+  (title := /-- Actual key work preserves growth credit -/)
+  (statement := /-- The same actual bundled key and field/member work fits the original 470-byte allowance while retaining a nonnegative 36*consumed-340 operation credit. Scalar and model gas bounds are unchanged. -/)]
+  WNear.Binary.SerdeKeyReuse.ignored_member_regular_budget_credit
+
+attribute [blueprint "frontier:segment-peak-work-credit"
+  (title := /-- Each exact segment funds its physical peak -/)
+  (statement := /-- Append segments reserve 36*actual peak minus a fixed 2304-operation slack; frame segments retain 74 per actual push. Actual frame peak is bounded by those pushes. -/)]
+  WNear.Binary.ScratchMixedTrace.Segment.peak_credit
+
+attribute [blueprint "frontier:mixed-peak-work-credit"
+  (title := /-- One retained mixed peak is funded by summed work credits -/)
+  (statement := /-- The actual evolving-capacity mixed history satisfies 36*peak<=sum work credits+2304. The fixed slack is charged once globally. -/)]
+  WNear.Binary.ScratchMixedTrace.peak_credit
+
+attribute [blueprint "frontier:mixed-growth-work-budget"
+  (title := /-- Exact retained growth is funded by structural savings -/)
+  (statement := /-- The same actual mixed extraCost fits summed work credits plus 202 billion gas for the full 4 MiB domain under reviewed operation ceilings. -/)]
+  WNear.Binary.SerdeObjectMixedTrace.mixed_growth_credit_budget
+
+attribute [blueprint "frontier:account-work-credit-zero"
+  (title := /-- The actual valid account consumes no growth work credit -/)
+  (statement := /-- Successful account syntax bounds actual scratch-used bytes by the decoded valid account length<=64, hence its structural work credit is zero. -/)]
+  WNear.Binary.SerdeObjectMixedTrace.account_workCredit_zero
+
+attribute [blueprint "frontier:weighted-selected-value-credit"
+  (title := /-- Selected actual value charge retains its growth credit -/)
+  (statement := /-- The concrete weighted ignored reader returns its 74-per-actual-push savings; the account branch has zero work credit and the existing one-account reserve. Exact witness and resource endpoints agree. -/)]
+  WNear.Binary.SerdeObjectMixedTrace.ValueSegment.selected_weighted_charge
+
+attribute [blueprint "frontier:weighted-selected-member-credit"
+  (title := /-- Actual complete member charge preserves structural savings -/)
+  (statement := /-- Exact key, colon, value and whitespace input partition composes the actual key work credit and weighted value allowance with the same evolving mixed history. -/)]
+  WNear.Binary.SerdeObjectMixedTrace.member_selected_weighted_charge
+
+attribute [blueprint "frontier:weighted-selected-trace-credit"
+  (title := /-- Complete selected trace funds one retained growth history -/)
+  (statement := /-- Exact successful trace cost plus summed structural work credits fits disjoint consumed bytes, one account reserve and actual retained growth. Credits are neither reset nor duplicated. -/)]
+  WNear.Binary.SerdeObjectMixedTrace.CallTrace.selected_weighted_cost_le
+
+attribute [blueprint "frontier:weighted-model-loop-credit"
+  (title := /-- Actual object recurrence receives the weighted trace bound -/)
+  (statement := /-- Existing model fuel/account slots and exact original costObj equality compose the full selected weighted trace. -/)]
+  WNear.Binary.SerdeObjectMixedTrace.loop_selected_weighted_cost_le
+
+attribute [blueprint "frontier:weighted-parser-credit-bound"
+  (title := /-- Actual complete parser charge preserves growth credits -/)
+  (statement := /-- Original ledgerParserCost plus summed work credits fits (2215+470*inputbytes)*op, the one-account reserve and actual mixed extraCost. -/)]
+  WNear.Binary.SerdeObjectMixedTrace.selected_weighted_parser_cost_le
+
+attribute [blueprint "frontier:full-weighted-parser-budget"
+  (title := /-- Successful models instantiate weighted funding over all 4 MiB -/)
+  (statement := /-- Actual weighted trace sum and the same retained growth credit fund SelectedWeightedParserLinearBudget for every successful full object model within the original domain. Generic interface remains Open; this constructor is Conditional by its tracked contract conclusion. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.selected_weighted_parser_linear_full
+
+attribute [blueprint "frontier:full-weighted-provider-plan"
+  (title := /-- Full-domain successful objects construct the deployed parser plan -/)
+  (statement := /-- Concrete key/account/weighted ignore instances and full-domain funding construct the original actual provider and unchanged ProviderModelBudget under explicit storage/domain premises. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectPrefix.full_weighted_bundled_plan
+
+attribute [blueprint "frontier:full-weighted-receipt"
+  (title := /-- Full 4 MiB successful objects have complete receipt refinement -/)
+  (statement := /-- No abstract parser/gas/reader obligation remains for initialized absent-account successful full object models. Same execution safety, Matches, used gas, resource failure, rollback and log-prefix claims under reviewed environment/domain/representation premises. -/)]
+  WNear.Binary.SerdeObjectPrefix.full_weighted_bundled_refines_init
+
+attribute [blueprint "frontier:full-general-accepted"
+  (title := /-- Full general-object case supplies accepted-call clauses -/)
+  (statement := /-- Full-domain actual object models instantiate complete receipt refinement under the reviewed exported environment. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.full_general_object_case_accepted
+
+attribute [blueprint "frontier:full-general-safety"
+  (title := /-- Full general-object case supplies execution safety -/)
+  (statement := /-- Full-domain actual object models instantiate no execution issue under the same reviewed premises. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.full_general_object_case_no_issue
+
+attribute [blueprint "frontier:full-general-parser-cost"
+  (title := /-- Full general-object case fills the original parser-cost interface -/)
+  (statement := /-- Exact initialized absent-account representation constructs actual DeployedParserProvider and original whole-model funding for every successful object model in the full input domain. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.full_general_parser_cost
+
+attribute [blueprint "frontier:accepted-object-model"
+  (title := /-- Accepted JSON object supplies the exact successful machine model -/)
+  (statement := /-- Existing decode_balanceOf agreement and suffix/whitespace theorems derive the full actual objLoop model and exact EOF endpoint from accepted object input. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.accepted_object_model
+
+attribute [blueprint "frontier:accepted-account-model"
+  (title := /-- Accepted account value supplies its raw string model -/)
+  (statement := /-- Pure accepted account deserialization yields the exact quote index and complete raw stringBody model, including escapes. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.account_value_model
+
+attribute [blueprint "frontier:accepted-array-case"
+  (title := /-- Accepted array supplies the completed actual array case -/)
+  (statement := /-- Decoder agreement, raw account model and exact suffix/whitespace endpoints construct the existing ArrayAbsentCase throughout the original domain. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.accepted_array_case
+
+attribute [blueprint "frontier:accepted-absent-cases"
+  (title := /-- Every accepted absent-account input belongs to a completed case -/)
+  (statement := /-- Within the explicit original argument bound, every accepted ft_balance_of input is either the completed array case or the full successful general-object case. No abstract parser/model premise is required. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.accepted_absent_cases
