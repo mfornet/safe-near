@@ -33,6 +33,48 @@ it is false for the reviewed domain; its historical statement is recorded in
 the misstatement log. The historical generic host trap and contradiction lemmas
 remain checked, but witness existence is no longer a frontier obligation.
 
+## Continuation on 2026-10-31: precise closing handoff and exact object-key cost composition
+
+The complete actual object-loop proof now needs state transport only across its
+physical final closing brace. `SerdeStructObjState.CloseHyp` records that exact
+handoff; the original state theorem is a compatibility result with its type
+unchanged. `ClosingConditions` supplies the corresponding pure bound transport
+for current/saved member states. The concrete key/value assembly constructs the
+owned closing handoff and uses the new raw loop. Its previous public theorem
+also keeps its exact old statement, deriving the narrower condition from its
+original cursor-monotonicity premise. This permits future prefix-exact scratch
+states without requiring them to hold at every later input position.
+
+The generic key, value, ignore and closing call interfaces remain Open. The
+concrete-room f81/f201 constructor now feeds a closing-only object assembly,
+which stays Conditional on KeyConditions, ValueConditions, the reachable heap,
+reader allowance/state closure and ClosingConditions. The latter is a named
+Open dependency until the actual prefix states instantiate it. No generic
+interface is labeled discharged merely because a conditional constructor exists.
+
+The value-linked KeyWalk now also has enough fuel for every recorded member.
+For that path, the actual object cost equals the sum of its key allowances plus
+the same cost recurrence with key allowances zero. The equation retains every
+other charge, including the object prologue/exit, structural and value charges.
+It is derived from successful model execution, key models and disjoint byte
+coverage. A new actual object Wasm contract composes the concrete reader with
+this exact key/residual split. Its budget is equal to the old budget, and the
+existing single gas-cell ownership is preserved.
+
+These pure cost equations are Proven and Integrated into the Conditional Wasm
+object contract. They do not identify the isolated key-only scratch budget
+with all interleaved frame/account allocation. The remaining frontier is the
+actual prefix allocation/heap invariant and domination of the full mixed parser
+cost by the original model allowance. Full ft_balance_of and global refinement
+remain Conditional; other methods and pinned protocol instances remain Open.
+
+Strict full audit and fresh dependency/readiness gate passed at
+2026-10-31T09:14:44+00:00 for proof source `c769d670bb62bb0cf46e19f233a67b3c6c953f00b0d226eb737af33b3f4da9ce`. All 60 frontier
+policy tests, Lean style and toolchain checks passed. Every old statement pin
+remains byte-identical; the closing and exact-cost interfaces are pinned
+additively. The admission allowance, model gas/observations and reviewed
+environmental premises are unchanged. Publication requires matching served evidence.
+
 ## Continuation on 2026-10-31: concrete ignored-reader room and physical caller composition
 
 `SerdeIgnRoom` constructs trace Room from a total requested-page budget. The

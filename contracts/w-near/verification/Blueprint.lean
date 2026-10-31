@@ -1,3 +1,4 @@
+import Bridge.Functions.SerdeObjectCostComposition
 import Bridge.Functions.SerdeObjectKeyCoverage
 import Bridge.Functions.SerdeIgnObjectV86
 import Bridge.Functions.SerdeIgnObject
@@ -2059,3 +2060,89 @@ attribute [blueprint "frontier:object-key-opening"
   (title := /-- Full object opening supplies the checked key path -/)
   (statement := /-- Instantiates key-path extraction at the same actual opening cursor and objLoop premise used by the composed object-parser contract. -/)]
   WNear.Binary.SerdeObjectCoverage.object_keys
+
+attribute [blueprint "frontier:object-key-hyp"
+  (title := /-- Generic changing-state key call interface -/)
+  (statement := /-- The generic key-call premise remains Open; the concrete key constructor supplies it assuming named KeyConditions. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeStructObjState.KeyHyp
+
+attribute [blueprint "frontier:object-value-hyp"
+  (title := /-- Generic changing-state account-value call interface -/)
+  (statement := /-- The generic account-value premise remains Open; the concrete value constructor supplies it assuming named ValueConditions. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeStructObjState.ValueHyp
+
+attribute [blueprint "frontier:object-close-hyp"
+  (title := /-- Physical final-brace state handoff -/)
+  (statement := /-- State transport only from the pre-close cursor through whitespace and the actual final closing brace. The concrete prefix-state instance remains unresolved. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeStructObjState.CloseHyp
+
+attribute [blueprint "frontier:object-loop-closing"
+  (title := /-- Actual object loop needs only the final-brace handoff -/)
+  (statement := /-- The complete actual Wasm proof uses CloseHyp at its single final cursor handoff. General key/value/ignore call interfaces remain explicit unresolved dependencies. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeStructObjState.f228_obj_state_closing
+
+attribute [blueprint "frontier:object-loop-monotone"
+  (title := /-- Original object loop is a checked compatibility result -/)
+  (statement := /-- The original public statement is unchanged and now composes from the closing-only loop by deriving its final-brace premise from the old general cursor-monotonicity hypothesis. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeStructObjState.f228_obj_state
+
+attribute [blueprint "frontier:object-closing-conditions"
+  (title := /-- Pure bounds close only at the actual final brace -/)
+  (statement := /-- The precise remaining pure bound transport for current and saved member states. It does not require those states to be monotone across every input position. Concrete prefix-state instances remain Open. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeStructObjModelState.ClosingConditions
+
+attribute [blueprint "frontier:object-closing-adapter"
+  (title := /-- Legacy monotonicity instantiates the narrower closing premise -/)
+  (statement := /-- A checked adapter preserves old public APIs. The generic ClosingConditions family remains Open for the actual prefix states needed by the full parser proof. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeStructObjModelState.closing_of_mono
+
+attribute [blueprint "frontier:object-member-closing"
+  (title := /-- Owned member state crosses the physical final brace -/)
+  (statement := /-- Transports the actual scratch, heap, tables and retained account allocation using the named current/saved closing conditions. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeStructObjModelState.member_closing
+
+attribute [blueprint "frontier:object-model-closing"
+  (title := /-- Concrete key/value readers feed the closing-only object loop -/)
+  (statement := /-- Constructs key and value call contracts and the final-brace handoff, then applies the actual loop. IgnoreHyp, KeyConditions, ValueConditions and ClosingConditions remain unresolved in this generic interface. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeStructObjModelState.f228_obj_model_closing
+
+attribute [blueprint "frontier:object-key-fuel"
+  (title := /-- Actual key path fits the successful model fuel -/)
+  (statement := /-- Strengthens key-path extraction with an exact fuel bound, allowing its cost recurrence to follow every actual key/value call. -/)]
+  WNear.Binary.SerdeObjectCoverage.loop_keys_fuel
+
+attribute [blueprint "frontier:object-key-component"
+  (title := /-- Exact key component of the object-loop cost -/)
+  (statement := /-- For the value-linked ordered key path, objCost equals the sum of its key allowances plus objCost with key allowances set to zero. All residual charges are retained. -/)]
+  WNear.Binary.SerdeObjectCoverage.objCost_key_component
+
+attribute [blueprint "frontier:object-key-cost-path"
+  (title := /-- Successful model supplies exact key charges and coverage -/)
+  (statement := /-- Combines fuel-bounded extraction, successful key models, disjoint raw-byte coverage and the exact key/residual cost equation. -/)]
+  WNear.Binary.SerdeObjectCoverage.loop_keys_cost
+
+attribute [blueprint "frontier:object-cost-key-component"
+  (title := /-- Complete object cost splits at the actual opening cursor -/)
+  (statement := /-- Extends the exact key-charge equation through the real object prologue/exit cost interface, retaining all other charges. -/)]
+  WNear.Binary.SerdeObjectCoverage.object_key_cost
+
+attribute [blueprint "frontier:ignored-object-closing"
+  (title := /-- Concrete-room reader feeds the precise closing assembly -/)
+  (statement := /-- Uses the actual f81/f201 reader and constructs IgnoreHyp, with only the precise final-brace transport required of B/Bsaved. Key/value, reachable heap/gas/state and closing conditions remain Open. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeIgnObject.object_loop_v86_closing
+
+attribute [blueprint "frontier:ignored-object-key-cost"
+  (title := /-- Actual object Wasm contract exposes exact key/residual cost -/)
+  (statement := /-- Composes the concrete-room object reader with the proved model key path and exact cost equality. The Wasm budget is equal to its previous cost, now visibly key charges plus residual charges. Total mixed allocation/parser gas domination remains unresolved. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeIgnObject.object_loop_v86_key_cost

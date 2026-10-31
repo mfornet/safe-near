@@ -20,6 +20,11 @@ open WNear.Binary.SerdeStructObjKeyState (Bounds member KeyConditions)
 open WNear.Binary.SerdeStructObjValueState (ValueConditions)
 open WNear.SerdeStructModel
 
+def ClosingConditions (bs : List UInt8) (B : Bounds) : Prop :=
+  ∀ i j hl F cap, j = i + wsLen (bs.drop i) → bs[j]? = some 0x7D →
+    B i hl F cap → B (j + 1) hl F cap
+
+
 section Proof
 variable {GF : BundledGFunctors} [WasmGS NearState GF]
 
@@ -55,9 +60,43 @@ theorem code_values (n maxP inst : Nat) (mi : ModuleInst) (A : Nat → Nat) :
   icases C193 with ⟨#Cend, -⟩
   iframe Cend F89 F169 C169 C646
 
+theorem closing_of_mono (bs : List UInt8) (B : Bounds)
+    (hmono : ∀ i j hl F cap, i ≤ j → B i hl F cap → B j hl F cap) : ClosingConditions bs B := by
+  intro i j hl F cap hj _ hB
+  exact hmono i (j + 1) hl F cap (by omega) hB
+
+theorem member_closing (n maxP ta alloc : Nat) (idx de : UInt32) (live : List (Nat × Nat))
+    (bs : List UInt8) (B Bsaved : Bounds) (hB : ClosingConditions bs B)
+    (hSaved : ClosingConditions bs Bsaved)
+    (i j : Nat) (seen : Option (WNear.AccountId × UInt32 × UInt32)) (hj : j = i + wsLen (bs.drop i)) (hb : bs[j]? = some 0x7D) :
+    member (GF := GF) n maxP ta alloc idx de live B Bsaved i seen ⊢ member n maxP ta alloc idx de live B Bsaved (j + 1) seen := by
+  have hc (C : Bounds) (hC : ClosingConditions bs C)
+      (lv : List (Nat × Nat)) : SerdeStructObjKeyState.core (GF := GF) n maxP ta alloc idx de lv C i ⊢ SerdeStructObjKeyState.core n maxP ta alloc idx de lv C (j + 1) := by
+    iintro H
+    iunfold SerdeStructObjKeyState.core at H
+    icases H with ⟨%hl, %F, %p, %cap, %sl, %⟨hbound, hcap⟩, Hvt, Htables, Hkey, Hident, Hs⟩
+    iunfold SerdeStructObjKeyState.core
+    iexists hl, F, p, cap, sl
+    iframe Hvt Htables Hkey Hident Hs
+    ipureintro; exact ⟨hC i j hl F cap hj hb hbound, hcap⟩
+  cases seen with
+  | none => exact hc B hB live
+  | some v =>
+    obtain ⟨a, p, cap⟩ := v
+    iintro H
+    iunfold member at H
+    icases H with ⟨%hv, Hb, Hcore⟩
+    iunfold member
+    dsimp only
+    iframe Hb
+    isplitr
+    · ipureintro; exact hv
+    iapply hc Bsaved hSaved
+    iexact Hcore
+
+
 set_option maxRecDepth 100000 in
-/-- Model-accepted object prefixes through the real 228 loop, with only ignored-reader and pure-bound obligations left. -/
-theorem f228_obj_model (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
+theorem f228_obj_model_closing (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
     (htype : type.results = []) (inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (n g ta : Nat)
     (hm : IfaceMod mi A n g ta) (hd : d + 42 < lim.maxCallDepth) (Cg : Nat)
     (gt : GlobalType) (sp out de ptr idx x2 x3 x4 x5 : UInt32) (ob bs : List UInt8) (i maxP : Nat)
@@ -68,8 +107,8 @@ theorem f228_obj_model (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : F
     (hsp : 368 ≤ sp.toNat) (hal : sp.toNat % 8 = 0) (hi : i ≤ bs.length)
     (hkeys : KeyConditions cfg maxP bs B K646) (hkeysSaved : KeyConditions cfg maxP bs Bsaved K646)
     (hvalues : ValueConditions cfg maxP bs B Bsaved K169)
-    (hmono : ∀ i j hl F cap, i ≤ j → B i hl F cap → B j hl F cap)
-    (hmonoSaved : ∀ i j hl F cap, i ≤ j → Bsaved i hl F cap → Bsaved j hl F cap)
+    (hclose : ClosingConditions bs B)
+    (hcloseSaved : ClosingConditions bs Bsaved)
     (hignore : SerdeStructObjState.IgnoreHyp (GF := GF) cfg lim inst mi n g Cg gt de ptr bs ign K81
       (member n maxP ta (A 578) idx de live B Bsaved) iprop(code n maxP inst mi A ∗ Cd))
     (N : Nat) (a : WNear.AccountId) (rF : List UInt8)
@@ -107,11 +146,11 @@ theorem f228_obj_model (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : F
     bs live B Bsaved K169 hlen hptr (by omega) hvalues iprop(code n maxP inst mi A ∗ Cd) hcv
   obtain ⟨_, hdvs, higns, hstrs, _, _⟩ := SerdeFromTrait.reader_facts
     (dv := valueAs WNear.account) (ign := ign) (fun _ => Or.inl rfl) hign bs
-  have result := SerdeStructObjState.f228_obj_state (GF := GF) cfg lim d type htype inst mi A n g ta hm hd Cg gt
+  have result := SerdeStructObjState.f228_obj_state_closing (GF := GF) cfg lim d type htype inst mi A n g ta hm hd Cg gt
     sp out de ptr idx x2 x3 x4 x5 ob bs i maxP hob hout (by omega) hptr hde hsp hal hi
     (valueAs WNear.account) ign K646 K169 K81 (member n maxP ta (A 578) idx de live B Bsaved)
     iprop(code n maxP inst mi A ∗ Cd) hk hv hignore
-    (fun i j seen hij => SerdeStructObjKeyState.member_mono n maxP ta (A 578) idx de live B Bsaved hmono hmonoSaved i j seen hij)
+    (fun i j seen hj hb => member_closing n maxP ta (A 578) idx de live bs B Bsaved hclose hcloseSaved i j seen hj hb)
     hdvs higns hstrs N a rF hb0 hloop
   iintro ⟨#Hcode, #HCd⟩
   iapply result
@@ -119,6 +158,45 @@ theorem f228_obj_model (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : F
   iunfold code at Hcode
   icases Hcode with ⟨#C193, -, -, #F205, #F201, #F193, #F89, #F90, #F81, #F169, #F77⟩
   iframe C193 F205 F201 F193 F89 F90 F81 F169 F77
+
+
+theorem f228_obj_model (cfg : WasmConfig) (lim : ExecLimits) (d : Nat) (type : FuncType)
+    (htype : type.results = []) (inst : Nat) (mi : ModuleInst) (A : Nat → Nat) (n g ta : Nat)
+    (hm : IfaceMod mi A n g ta) (hd : d + 42 < lim.maxCallDepth) (Cg : Nat)
+    (gt : GlobalType) (sp out de ptr idx x2 x3 x4 x5 : UInt32) (ob bs : List UInt8) (i maxP : Nat)
+    (live : List (Nat × Nat)) (Cd : IProp GF) [Persistent Cd] (B Bsaved : Bounds) (K646 K169 K81 : Nat → Nat)
+    (ign : List UInt8 → Option (Unit × List UInt8)) (hign : Agrees ign valueSkip)
+    (hob : ob.length = 16) (hout : out.toNat + 16 ≤ 2 ^ 32) (hlen : bs.length < 2 ^ 24)
+    (hptr : ptr.toNat + bs.length < 2 ^ 32) (hde : de.toNat + 25 ≤ 2 ^ 32)
+    (hsp : 368 ≤ sp.toNat) (hal : sp.toNat % 8 = 0) (hi : i ≤ bs.length)
+    (hkeys : KeyConditions cfg maxP bs B K646) (hkeysSaved : KeyConditions cfg maxP bs Bsaved K646)
+    (hvalues : ValueConditions cfg maxP bs B Bsaved K169)
+    (hmono : ∀ i j hl F cap, i ≤ j → B i hl F cap → B j hl F cap)
+    (hmonoSaved : ∀ i j hl F cap, i ≤ j → Bsaved i hl F cap → Bsaved j hl F cap)
+    (hignore : SerdeStructObjState.IgnoreHyp (GF := GF) cfg lim inst mi n g Cg gt de ptr bs ign K81
+      (member n maxP ta (A 578) idx de live B Bsaved) iprop(code n maxP inst mi A ∗ Cd))
+    (N : Nat) (a : WNear.AccountId) (rF : List UInt8)
+    (hb0 : bs[i + wsLen (bs.drop i)]? = some 0x7B)
+    (hloop : objLoop "account_id" (valueAs WNear.account) ign N none
+      (bs.drop (i + wsLen (bs.drop i) + 1)) = some (some a, rF)) :
+    code n maxP inst mi A ∗ Cd ⊢
+      MFunSpec (GF := GF) cfg lim d type inst mi f228 Cg
+        (fun args => iprop(⌜args = [.i32 out, .i32 de, .i32 x2, .i32 x3, .i32 x4, .i32 x5]⌝ ∗
+          g ↦[wg] ⟨gt, .i32 sp⟩ ∗ stk n (sp.toNat - 368) 368 ∗ n ↦[wms][ out.toNat ] ob ∗
+          rd n de ptr bs i ∗ n ↦[wms][ de.toNat + 24 ] [128] ∗
+          member n maxP ta (A 578) idx de live B Bsaved (i + wsLen (bs.drop i) + 1) none))
+        (fun _ => SerdeStructObj.costObj cfg K646 K169 K81 (valueAs WNear.account) ign bs N i)
+        (fun _ rs => iprop(⌜rs = []⌝ ∗ g ↦[wg] ⟨gt, .i32 sp⟩ ∗ stk n (sp.toNat - 368) 368 ∗
+          n ↦[wms][ de.toNat + 24 ] [128] ∗ ∃ (p cap : UInt32),
+          n ↦[i32][ out.toNat ] 0 ∗ n ↦[i32][ out.toNat + 4 ] p ∗ n ↦[i32][ out.toNat + 8 ] cap ∗
+          n ↦[i32][ out.toNat + 12 ] UInt32.ofNat a.val.utf8ByteSize ∗ ⌜p ≠ 0⌝ ∗
+          member n maxP ta (A 578) idx de live B Bsaved (bs.length - rF.length) (some (a, p, cap)) ∗
+          rd n de ptr bs (bs.length - rF.length))) := by
+  exact f228_obj_model_closing cfg lim d type htype inst mi A n g ta hm hd Cg gt sp out de ptr idx x2 x3 x4 x5
+    ob bs i maxP live Cd B Bsaved K646 K169 K81 ign hign hob hout hlen hptr hde hsp hal hi
+    hkeys hkeysSaved hvalues (closing_of_mono bs B hmono) (closing_of_mono bs Bsaved hmonoSaved)
+    hignore N a rF hb0 hloop
+
 
 end Proof
 end WNear.Binary.SerdeStructObjModelState

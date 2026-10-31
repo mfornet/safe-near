@@ -242,6 +242,40 @@ class FrontierPolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
             blueprint.classify(self.manifest, self.rows, self.audit)
 
+    def test_precise_closing_and_exact_cost_keep_reader_obligations_visible(self):
+        result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
+        for node in ['object-key-hyp', 'object-value-hyp', 'object-close-hyp', 'object-closing-conditions',
+                     'ignore-hyp', 'key-conditions', 'value-conditions', 'ignored-reachable-conditions']:
+            self.assertEqual(result[node]['status'], 'Open')
+        for node in ['object-loop-closing', 'object-loop-monotone', 'object-model-closing',
+                     'ignored-object-closing', 'ignored-object-key-cost', 'object-parser', 'global']:
+            self.assertEqual(result[node]['status'], 'Conditional')
+            self.assertFalse(result[node]['direct_sorry'])
+        for node in ['object-key-fuel', 'object-key-component', 'object-key-cost-path', 'object-cost-key-component']:
+            self.assertEqual(result[node]['status'], 'Proven')
+        self.assertIn({'id': 'ignored-object-key-cost', 'status': 'Conditional'},
+                      result['object-cost-key-component']['integrated_into'])
+        self.assertIn({'id': 'object-parser', 'status': 'Conditional'},
+                      result['object-model-closing']['integrated_into'])
+
+    def test_legacy_model_api_cannot_drop_closing_composition(self):
+        self.by_id['object-parser']['proof_dependencies'].remove(
+            self.nodes['object-model-closing']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_physical_object_cannot_hide_precise_closing_condition(self):
+        self.by_id['ignored-object-closing']['type_dependencies'].remove(
+            self.nodes['object-closing-conditions']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Expected verification hypotheses missing'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_wasm_key_split_cannot_drop_exact_cost_equation(self):
+        self.by_id['ignored-object-key-cost']['proof_dependencies'].remove(
+            self.nodes['object-cost-key-component']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
     def test_actual_code_provider_reaches_global_assemblies_without_closing_the_plan(self):
         result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
         for node in ['deployed-parser-provider', 'provider-model-budget', 'absent-parser-plan',

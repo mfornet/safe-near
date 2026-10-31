@@ -544,6 +544,25 @@
     "WNear.Binary.SerdeObjectCoverage.object_keys",
     "WNear.Binary.SerdeObjectCoverage.KeyWalk",
     "WNear.Binary.SerdeObjectCoverage.KeyWalk.done",
-    "WNear.Binary.SerdeObjectCoverage.KeyWalk.member"
+    "WNear.Binary.SerdeObjectCoverage.KeyWalk.member",
+    "WNear.Binary.SerdeStructObjState.KeyHyp",
+    "WNear.Binary.SerdeStructObjState.ValueHyp",
+    "WNear.Binary.SerdeStructObjState.CloseHyp",
+    "WNear.Binary.SerdeStructObjState.f228_obj_state_closing",
+    "WNear.Binary.SerdeStructObjState.f228_obj_state",
+    "WNear.Binary.SerdeStructObjModelState.ClosingConditions",
+    "WNear.Binary.SerdeStructObjModelState.closing_of_mono",
+    "WNear.Binary.SerdeStructObjModelState.member_closing",
+    "WNear.Binary.SerdeStructObjModelState.f228_obj_model_closing",
+    "WNear.Binary.SerdeObjectCoverage.loop_keys_fuel",
+    "WNear.Binary.SerdeObjectCoverage.objCost_key_component",
+    "WNear.Binary.SerdeObjectCoverage.loop_keys_cost",
+    "WNear.Binary.SerdeObjectCoverage.object_key_cost",
+    "WNear.Binary.SerdeIgnObject.object_loop_v86_closing",
+    "WNear.Binary.SerdeIgnObject.object_loop_v86_key_cost",
+    "WNear.Binary.SerdeStructObjModelState.f228_obj_model",
+    "WNear.Binary.SerdeObjectCoverage.keyCharge",
+    "WNear.Binary.SerdeObjectCoverage.keyQ_not_end",
+    "WNear.Binary.SerdeObjectCoverage.colon_result"
   ]
 }
