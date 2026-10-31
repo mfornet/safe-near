@@ -252,10 +252,22 @@ def cmd_run(args, root: Path) -> int:
                 print(f"--- {message['role']}\n{message['content']}")
         return 0
     print(f"profile {profile}: {len(tasks)} task(s), {args.parallel} in parallel")
+
+    def guarded(task: dict) -> dict | None:
+        """A driver error on one task is recorded and does not stop the others."""
+        try:
+            return run_task(root, task, config, profile, pool, args.keep, warm_from=args.warm_from)
+        except Exception as error:  # noqa: BLE001 - whatever it is, the run continues
+            record(root, {"task": task["id"], "kind": task["kind"], "role": task["role"], "profile": profile,
+                          "backend": None, "model": None, "attempt": 0, "accepted": False, "exhausted": False,
+                          "seconds": 0, "time": datetime.now(timezone.utc).isoformat(),
+                          "detail": f"driver error: {type(error).__name__}: {error}"[-2000:]})
+            print(f"{task['id']}: driver error: {type(error).__name__}: {error}")
+            return None
+
     accepted = 0
     with ThreadPoolExecutor(max_workers=args.parallel) as executor:
-        for result in executor.map(lambda t: run_task(root, t, config, profile, pool, args.keep,
-                                                      warm_from=args.warm_from), tasks):
+        for result in executor.map(guarded, tasks):
             accepted += result is not None
     print(f"{accepted}/{len(tasks)} accepted")
     return 0 if accepted == len(tasks) else 1

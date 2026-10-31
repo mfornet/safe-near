@@ -29,9 +29,9 @@ FILE_BLOCK = re.compile(r"<<<FILE (?P<path>[^\n>]+)>>>\n(?P<body>.*?)\n?<<<END>>
 API_KEY_VARS = ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_AUTH_TOKEN")
 # What a proof task needs: reading and editing the tree, Lake, the repository's Python
 # tools, and read-only git. No network, no package installs, no git writes.
-DEFAULT_CLAUDE_TOOLS = ["Read", "Edit", "Write", "Glob", "Grep", "Bash(lake *)", "Bash(python3 *)",
-                        "Bash(just *)", "Bash(git status*)", "Bash(git diff*)", "Bash(git log*)",
-                        "Bash(ls *)", "Bash(cat *)", "Bash(grep *)", "Bash(wc *)", "Bash(head *)", "Bash(tail *)"]
+DEFAULT_CLAUDE_TOOLS = ["Read", "Edit", "Write", "Glob", "Grep", "Bash(lake:*)", "Bash(python3:*)",
+                        "Bash(just:*)", "Bash(git status:*)", "Bash(git diff:*)", "Bash(git log:*)",
+                        "Bash(ls:*)", "Bash(cat:*)", "Bash(grep:*)", "Bash(wc:*)", "Bash(head:*)", "Bash(tail:*)"]
 
 
 @dataclass

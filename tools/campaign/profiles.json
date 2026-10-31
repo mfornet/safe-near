@@ -6,9 +6,9 @@
       "kind": "claude-cli",
       "billing": "subscription",
       "permission_mode": "acceptEdits",
-      "allowed_tools": ["Read", "Edit", "Write", "Glob", "Grep", "Bash(lake *)", "Bash(python3 *)",
-        "Bash(just *)", "Bash(git status*)", "Bash(git diff*)", "Bash(git log*)",
-        "Bash(ls *)", "Bash(cat *)", "Bash(grep *)", "Bash(wc *)", "Bash(head *)", "Bash(tail *)"],
+      "allowed_tools": ["Read", "Edit", "Write", "Glob", "Grep", "Bash(lake:*)", "Bash(python3:*)",
+        "Bash(just:*)", "Bash(git status:*)", "Bash(git diff:*)", "Bash(git log:*)",
+        "Bash(ls:*)", "Bash(cat:*)", "Bash(grep:*)", "Bash(wc:*)", "Bash(head:*)", "Bash(tail:*)"],
       "exhausted_patterns": [
         "usage limit", "hit your limit", "reached your limit", "out of credits",
         "credit balance", "rate limit", "limit resets"

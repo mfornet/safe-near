@@ -159,6 +159,16 @@ class DriverTests(unittest.TestCase):
         self.assertEqual(again["backend"], "b")
         self.assertEqual(backends.Fake.responses["a"], [])
 
+    def test_report_task_changes_nothing_and_is_still_accepted(self):
+        backends.Fake.responses["c"] = ["Built. 748 jobs replayed, 0 built."]
+        task = dict(self.task, role="runner", kind="report", check=["test -f Other.lean"])
+        del task["files"]
+        accepted = driver.run_task(self.root, task, self.config, "default", self.pool, log=self.logs.append)
+        self.assertEqual(accepted["backend"], "c")
+        self.assertEqual(accepted["report"], "Built. 748 jobs replayed, 0 built.")
+        self.assertEqual(self.git("rev-list", "--count", "main..campaign/t1").stdout.strip(), "1")
+        self.assertEqual(self.git("diff", "--stat", "main", "campaign/t1").stdout, "")
+
     def test_agentic_backend_edits_itself_and_every_tier_can_fail(self):
         backends.Fake.responses["c"] = ["<<<FILE pkg/Target.lean>>>\ndone\n<<<END>>>"]
         task = dict(self.task, role="runner")

@@ -115,6 +115,9 @@ the shared `.git` serializes commits.
   `permission_mode` `acceptEdits` and the backend's `allowed_tools` (editing,
   Lake, the repository's Python tools, read-only git; a tool outside the list
   is denied, since `-p` cannot ask), Codex in its `workspace-write` sandbox.
+  The allowlist uses Claude Code's rule syntax, `Bash(lake:*)` for a command
+  prefix; a compound command (`cd x && git status`) matches no prefix rule
+  and is denied, which the agent sees as a refusal and works around.
   Both are settings of the backend in `profiles.json`. Edits are still
   confined only by the file guard, which rejects the result rather than
   preventing the edit, so run the driver on a machine whose checkouts you can

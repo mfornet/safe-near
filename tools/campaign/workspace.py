@@ -85,8 +85,11 @@ def changed_files(path: Path) -> list[str]:
 
 
 def commit_all(path: Path, message: str) -> str:
+    """Commit everything; a task that changes nothing (a report) gets an empty commit,
+    so every accepted task has one."""
     git(path, "add", "-A")
-    git(path, "-c", "user.name=campaign", "-c", "user.email=campaign@local", "commit", "-q", "-m", message)
+    git(path, "-c", "user.name=campaign", "-c", "user.email=campaign@local",
+        "commit", "-q", "--allow-empty", "-m", message)
     return git(path, "rev-parse", "HEAD").stdout.strip()
 
 
