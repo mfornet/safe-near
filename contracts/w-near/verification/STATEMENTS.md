@@ -7885,6 +7885,69 @@ def WNear.Binary.ScratchGrow.roomRes (hl maxP : ℕ) (cap len k : UInt32) : Prop
     WNear.Binary.VecFromElem.roomFor hl maxP (WNear.Binary.VecGrow.growCap cap (len + k))
 ```
 
+## Bridge.Functions.ScratchMixedGrowth
+
+`WNear.Binary.ScratchMixedTrace.Segment.growth_doubles` (hash `000000005e080c14`)
+
+```lean
+theorem WNear.Binary.ScratchMixedTrace.Segment.growth_doubles (cap : UInt32) (seg : WNear.Binary.ScratchMixedTrace.Segment)
+  (hv : WNear.Binary.ScratchMixedTrace.Segment.Valid cap seg) :
+  cap.toNat * 2 ^ WNear.Binary.ScratchMixedTrace.Segment.growthCount cap seg ≤
+    (WNear.Binary.ScratchMixedTrace.Segment.next cap seg).toNat
+```
+
+`WNear.Binary.ScratchMixedTrace.Segment.growth_power` (hash `00000000d8a0570c`)
+
+```lean
+theorem WNear.Binary.ScratchMixedTrace.Segment.growth_power (cap : UInt32) (seg : WNear.Binary.ScratchMixedTrace.Segment)
+  (hv : WNear.Binary.ScratchMixedTrace.Segment.Valid cap seg)
+  (hg : 0 < WNear.Binary.ScratchMixedTrace.Segment.growthCount cap seg) :
+  8 * 2 ^ (WNear.Binary.ScratchMixedTrace.Segment.growthCount cap seg - 1) ≤
+    (WNear.Binary.ScratchMixedTrace.Segment.next cap seg).toNat
+```
+
+`WNear.Binary.ScratchMixedTrace.account_page` (hash `0000000079540de7`)
+
+```lean
+theorem WNear.Binary.ScratchMixedTrace.account_page (size : UInt32) (hs : size.toNat ≤ 64) :
+  (WNear.Binary.AllocNewCell.cellPages (WNear.Binary.AllocAlloc.wordsOf size) 1).toNat ≤ 1
+```
+
+`WNear.Binary.ScratchMixedTrace.growth_doubles` (hash `000000000a425168`)
+
+```lean
+theorem WNear.Binary.ScratchMixedTrace.growth_doubles (cap : UInt32) (batches : WNear.Binary.ScratchMixedTrace.Batches)
+  (hv : WNear.Binary.ScratchMixedTrace.Valid cap batches) :
+  cap.toNat * 2 ^ WNear.Binary.ScratchMixedTrace.growthCount cap batches ≤
+    (WNear.Binary.ScratchMixedTrace.endCap cap batches).toNat
+```
+
+`WNear.Binary.ScratchMixedTrace.growth_power` (hash `00000000566ace65`)
+
+```lean
+theorem WNear.Binary.ScratchMixedTrace.growth_power (cap : UInt32) (batches : WNear.Binary.ScratchMixedTrace.Batches)
+  (hv : WNear.Binary.ScratchMixedTrace.Valid cap batches)
+  (hg : 0 < WNear.Binary.ScratchMixedTrace.growthCount cap batches) :
+  8 * 2 ^ (WNear.Binary.ScratchMixedTrace.growthCount cap batches - 1) ≤
+    (WNear.Binary.ScratchMixedTrace.endCap cap batches).toNat
+```
+
+`WNear.Binary.ScratchMixedTrace.growth_v86` (hash `00000000bf5b0681`)
+
+```lean
+theorem WNear.Binary.ScratchMixedTrace.growth_v86 (batches : WNear.Binary.ScratchMixedTrace.Batches)
+  (hv : WNear.Binary.ScratchMixedTrace.Valid 0 batches) (hp : WNear.Binary.ScratchMixedTrace.peak 0 batches ≤ 4194304) :
+  WNear.Binary.ScratchMixedTrace.growthCount 0 batches ≤ 21
+```
+
+`WNear.Binary.ScratchMixedTrace.pages_v86` (hash `00000000133ae7fe`)
+
+```lean
+theorem WNear.Binary.ScratchMixedTrace.pages_v86 (batches : WNear.Binary.ScratchMixedTrace.Batches)
+  (hv : WNear.Binary.ScratchMixedTrace.Valid 0 batches) (hp : WNear.Binary.ScratchMixedTrace.peak 0 batches ≤ 4194304) :
+  65536 * WNear.Binary.ScratchMixedTrace.pages 0 batches ≤ 18164618
+```
+
 ## Bridge.Functions.ScratchMixedTrace
 
 `WNear.Binary.ScratchMixedTrace.allocatedBytes_capacity` (hash `00000000353afd6d`)
@@ -10716,6 +10779,651 @@ theorem WNear.Binary.SerdeObjectCoverage.object_keys (bs : List UInt8) (i N : �
   ∃ keys,
     WNear.Binary.SerdeObjectCoverage.KeyWalk bs (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1) true keys
       (bs.length - rest.length)
+```
+
+## Bridge.Functions.SerdeObjectLedger
+
+`WNear.Binary.SerdeObjectMixedTrace.IgnoreCharges` (hash `0406dece164f44b0`)
+
+```lean
+def WNear.Binary.SerdeObjectMixedTrace.IgnoreCharges (cfg : Wasm.Near.WasmConfig) (bs : List UInt8) (K : ℕ → ℕ)
+  (B : WNear.Binary.SerdeStructObjKeyState.Bounds) : Prop :=
+  ∀ (i hl F : ℕ) (cap : UInt32) (rest : List UInt8) (ops : List WNear.Binary.SerdeIgnTrace.Op),
+    B i hl F cap →
+      cap.toNat < 2 ^ 25 →
+        i ≤ bs.length →
+          bs[i + WNear.Binary.SerdeRead.wsLen (List.drop i bs)]? = some 58 →
+            WNear.Binary.SerdeIgnMachineTrace.trace
+                  (List.drop (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1) bs) =
+                some (rest, ops) →
+              hl % 65536 = 0 →
+                0 < hl →
+                  (166 +
+                          470 *
+                            (bs.length - rest.length -
+                              (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1))) *
+                        cfg.regularOpCost +
+                      WNear.Binary.SerdeIgnTrace.extraCost cfg F cap 0 ops ≤
+                    K (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1)
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.KeyRoomCharges` (hash `0e35365cd151e6b8`)
+
+```lean
+def WNear.Binary.SerdeObjectMixedTrace.KeyRoomCharges (cfg : Wasm.Near.WasmConfig) (maxP : ℕ) (bs : List UInt8)
+  (B : WNear.Binary.SerdeStructObjKeyState.Bounds) (K : ℕ → ℕ) : Prop :=
+  ∀ (first : Bool) (i q : ℕ) (key : String) (rest : List UInt8) (hl F : ℕ) (cap : UInt32),
+    i ≤ bs.length →
+      WNear.Binary.SerdeNextKey.keyQ first bs i = some q →
+        NearInterface.Json.stringBody (List.drop q bs) [] = some (some key, rest) →
+          B i hl F cap →
+            cap.toNat < 2 ^ 25 →
+              hl % 65536 = 0 →
+                0 < hl →
+                  WNear.Binary.SerdeKeyReuse.keyRoom maxP hl cap (List.drop q bs) ∧
+                    WNear.Binary.SerdeKeyReuse.keyCost cfg F cap bs key.toUTF8.toList rest q ≤ K q
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.Ledger` (hash `29a9445912eaae44`)
+
+```lean
+def WNear.Binary.SerdeObjectMixedTrace.Ledger (bs : List UInt8) (baseHL baseF : ℕ) (saved : Bool) :
+  WNear.Binary.SerdeStructObjKeyState.Bounds :=
+  fun x hl F cap =>
+    ∃ batches,
+      (∀ seg ∈ batches, WNear.Binary.SerdeObjectMixedTrace.SegmentModel bs seg) ∧
+        cap = WNear.Binary.ScratchMixedTrace.endCap 0 batches ∧
+          F = WNear.Binary.ScratchMixedTrace.endFreeBound baseF 0 batches ∧
+            baseHL ≤ hl ∧
+              hl ≤
+                baseHL +
+                  65536 *
+                    (WNear.Binary.ScratchMixedTrace.pages 0 batches +
+                      if saved = true then 1 else 0)
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.Ledger.closing` (hash `0000000088fab957`)
+
+```lean
+theorem WNear.Binary.SerdeObjectMixedTrace.Ledger.closing (bs : List UInt8) (baseHL baseF : ℕ) (saved : Bool) :
+  WNear.Binary.SerdeStructObjModelState.ClosingConditions bs
+    (WNear.Binary.SerdeObjectMixedTrace.Ledger bs baseHL baseF saved)
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.Ledger.endCap_append` (hash `0000000055fd8853`)
+
+```lean
+theorem WNear.Binary.SerdeObjectMixedTrace.Ledger.endCap_append (cap : UInt32)
+  (pre post : WNear.Binary.ScratchMixedTrace.Batches) :
+  WNear.Binary.ScratchMixedTrace.endCap cap (pre ++ post) =
+    WNear.Binary.ScratchMixedTrace.endCap (WNear.Binary.ScratchMixedTrace.endCap cap pre) post
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.Ledger.free_append` (hash `0000000025b75948`)
+
+```lean
+theorem WNear.Binary.SerdeObjectMixedTrace.Ledger.free_append (F : ℕ) (cap : UInt32)
+  (pre post : WNear.Binary.ScratchMixedTrace.Batches) :
+  WNear.Binary.ScratchMixedTrace.endFreeBound F cap (pre ++ post) =
+    WNear.Binary.ScratchMixedTrace.endFreeBound (WNear.Binary.ScratchMixedTrace.endFreeBound F cap pre)
+      (WNear.Binary.ScratchMixedTrace.endCap cap pre) post
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.Ledger.free_positive` (hash `00000000b9aab67d`)
+
+```lean
+theorem WNear.Binary.SerdeObjectMixedTrace.Ledger.free_positive (bs : List UInt8) (baseHL baseF i hl F : ℕ) (saved : Bool)
+  (cap : UInt32) (hbase : 1 ≤ baseF) (h : WNear.Binary.SerdeObjectMixedTrace.Ledger bs baseHL baseF saved i hl F cap) :
+  1 ≤ F
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.Ledger.heap_ceiling` (hash `00000000e0204b7c`)
+
+```lean
+theorem WNear.Binary.SerdeObjectMixedTrace.Ledger.heap_ceiling (bs : List UInt8) (baseHL baseF i hl F : ℕ) (saved : Bool)
+  (cap : UInt32) (hlen : bs.length ≤ 4194304) (hbase : baseHL + 18230154 ≤ 100663296)
+  (h : WNear.Binary.SerdeObjectMixedTrace.Ledger bs baseHL baseF saved i hl F cap) : hl ≤ 100663296
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.Ledger.ignore_conditions` (hash `00000000496bafc6`)
+
+```lean
+theorem WNear.Binary.SerdeObjectMixedTrace.Ledger.ignore_conditions (cfg : Wasm.Near.WasmConfig) (bs : List UInt8)
+  (baseHL baseF : ℕ) (saved : Bool) (K : ℕ → ℕ) (hlen : bs.length ≤ 4194304) (hbase : baseHL + 18230154 ≤ 100663296)
+  (hcharges :
+    WNear.Binary.SerdeObjectMixedTrace.IgnoreCharges cfg bs K
+      (WNear.Binary.SerdeObjectMixedTrace.Ledger bs baseHL baseF saved)) :
+  WNear.Binary.SerdeIgnObject.ReachableIgnoreConditions cfg bs K
+    (WNear.Binary.SerdeObjectMixedTrace.Ledger bs baseHL baseF saved)
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.Ledger.ignored` (hash `00000000d62623f0`)
+
+```lean
+theorem WNear.Binary.SerdeObjectMixedTrace.Ledger.ignored (bs : List UInt8) (baseHL baseF i q hl F hl' : ℕ) (saved : Bool)
+  (cap : UInt32) (rest : List UInt8) (ops : List Bool)
+  (ht : WNear.Binary.SerdeIgnMachineTrace.trace (List.drop q bs) = some (rest, ops))
+  (h : WNear.Binary.SerdeObjectMixedTrace.Ledger bs baseHL baseF saved i hl F cap)
+  (hh : WNear.Binary.SerdeIgnExecution.HeapTrace hl cap 0 ops hl') :
+  WNear.Binary.SerdeObjectMixedTrace.Ledger bs baseHL baseF saved (bs.length - rest.length) hl'
+    (WNear.Binary.SerdeIgnTrace.endFreeBound F cap 0 ops) (WNear.Binary.SerdeIgnTrace.endState cap 0 ops).1
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.Ledger.initial` (hash `00000000c20e61bf`)
+
+```lean
+theorem WNear.Binary.SerdeObjectMixedTrace.Ledger.initial (bs : List UInt8) (baseHL baseF i : ℕ) :
+  WNear.Binary.SerdeObjectMixedTrace.Ledger bs baseHL baseF false i baseHL baseF 0
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.Ledger.key_conditions` (hash `000000004c8b616e`)
+
+```lean
+theorem WNear.Binary.SerdeObjectMixedTrace.Ledger.key_conditions (cfg : Wasm.Near.WasmConfig) (bs : List UInt8)
+  (baseHL baseF : ℕ) (saved : Bool) (K : ℕ → ℕ)
+  (hcharges :
+    WNear.Binary.SerdeObjectMixedTrace.KeyRoomCharges cfg 2048 bs
+      (WNear.Binary.SerdeObjectMixedTrace.Ledger bs baseHL baseF saved) K) :
+  WNear.Binary.SerdeStructObjKeyState.KeyConditions cfg 2048 bs
+    (WNear.Binary.SerdeObjectMixedTrace.Ledger bs baseHL baseF saved) K
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.Ledger.pages_append` (hash `00000000f04b0282`)
+
+```lean
+theorem WNear.Binary.SerdeObjectMixedTrace.Ledger.pages_append (cap : UInt32)
+  (pre post : WNear.Binary.ScratchMixedTrace.Batches) :
+  WNear.Binary.ScratchMixedTrace.pages cap (pre ++ post) =
+    WNear.Binary.ScratchMixedTrace.pages cap pre +
+      WNear.Binary.ScratchMixedTrace.pages (WNear.Binary.ScratchMixedTrace.endCap cap pre) post
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.Ledger.segment` (hash `0000000062acbb2f`)
+
+```lean
+theorem WNear.Binary.SerdeObjectMixedTrace.Ledger.segment (bs : List UInt8) (baseHL baseF i j hl F hl' : ℕ)
+  (saved saved' : Bool) (cap : UInt32) (seg : WNear.Binary.ScratchMixedTrace.Segment) (extra : ℕ)
+  (hslot : (if saved = true then 1 else 0) + extra = if saved' = true then 1 else 0)
+  (hm : WNear.Binary.SerdeObjectMixedTrace.SegmentModel bs seg)
+  (h : WNear.Binary.SerdeObjectMixedTrace.Ledger bs baseHL baseF saved i hl F cap) (hlo : hl ≤ hl')
+  (hhi : hl' ≤ hl + 65536 * (WNear.Binary.ScratchMixedTrace.Segment.pages cap seg + extra)) :
+  WNear.Binary.SerdeObjectMixedTrace.Ledger bs baseHL baseF saved' j hl'
+    (WNear.Binary.ScratchMixedTrace.Segment.endFreeBound F cap seg)
+    (WNear.Binary.ScratchMixedTrace.Segment.next cap seg)
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.Ledger.value_conditions` (hash `00000000d71a87bb`)
+
+```lean
+theorem WNear.Binary.SerdeObjectMixedTrace.Ledger.value_conditions (cfg : Wasm.Near.WasmConfig) (bs : List UInt8)
+  (baseHL baseF : ℕ) (K : ℕ → ℕ) (hbaseF : 1 ≤ baseF)
+  (hcharges :
+    WNear.Binary.SerdeObjectMixedTrace.ValueRoomCharges cfg 2048 bs
+      (WNear.Binary.SerdeObjectMixedTrace.Ledger bs baseHL baseF false) K) :
+  WNear.Binary.SerdeStructObjValueState.ValueConditions cfg 2048 bs
+    (WNear.Binary.SerdeObjectMixedTrace.Ledger bs baseHL baseF false)
+    (WNear.Binary.SerdeObjectMixedTrace.Ledger bs baseHL baseF true) K
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.ValueRoomCharges` (hash `675fbd8e9a303654`)
+
+```lean
+def WNear.Binary.SerdeObjectMixedTrace.ValueRoomCharges (cfg : Wasm.Near.WasmConfig) (maxP : ℕ) (bs : List UInt8)
+  (B : WNear.Binary.SerdeStructObjKeyState.Bounds) (K : ℕ → ℕ) : Prop :=
+  ∀ (i j : ℕ) (a : WNear.AccountId) (rest : List UInt8) (hl F : ℕ) (cap : UInt32),
+    i ≤ bs.length →
+      bs[i + WNear.Binary.SerdeRead.wsLen (List.drop i bs)]? = some 58 →
+        j =
+            i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1 +
+              WNear.Binary.SerdeRead.wsLen
+                (List.drop (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1) bs) →
+          bs[j]? = some 34 →
+            NearInterface.Json.stringBody (List.drop (j + 1) bs) [] = some (some ↑a, rest) →
+              B i hl F cap →
+                cap.toNat < 2 ^ 25 →
+                  hl % 65536 = 0 →
+                    0 < hl →
+                      WNear.Binary.SerdeErrBox.roomFor4 hl maxP 20 ∧
+                        WNear.Binary.ParseStr.roomRun maxP hl cap [] (List.drop (j + 1) bs) ∧
+                          WNear.Binary.VecFromElem.roomFor
+                              (hl +
+                                WNear.Binary.ScratchGrow.growthPages cap 0
+                                    (WNear.Binary.ParseStrSuccess.appendChunks
+                                      (List.drop (j + 1) bs) []) *
+                                  65536)
+                              maxP (UInt32.ofNat (↑a).toUTF8.toList.length) ∧
+                            WNear.Binary.SerdeValueReuse.valueCost cfg F cap bs (↑a).toUTF8.toList
+                                rest (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1) j ≤
+                              K (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1)
+```
+
+## Bridge.Functions.SerdeObjectLedgerComposition
+
+`WNear.Binary.SerdeObjectMixedTrace.LedgerSetup` (hash `d2e1ac9dab4c8f3e`)
+
+```lean
+def WNear.Binary.SerdeObjectMixedTrace.LedgerSetup (baseHL baseF : ℕ) : Prop :=
+  baseHL + 18230154 ≤ 100663296 ∧ 1 ≤ baseF
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.member_initial` (hash `000000001e7d2931`)
+
+```lean
+theorem WNear.Binary.SerdeObjectMixedTrace.member_initial {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (n maxP ta alloc : ℕ) (idx de ptrS sl : UInt32) (live : List (ℕ × ℕ)) (bs : List UInt8) (baseHL baseF i : ℕ) :
+  WNear.Binary.AllocFirstFit.vt n 1057464 idx ta alloc ∗
+      WNear.Binary.SerdeValueState.tables n ∗
+        n ↦[wms][ 1051092 ] WNear.BalanceOfArgs.keyBytes ∗
+          n ↦[wms][ 1048576 ] WNear.Binary.SerdeIdent.identBytes ∗
+            WNear.Binary.SerdeValueState.scratchPre n maxP baseHL live baseF de ptrS 0 sl ⊢
+    WNear.Binary.SerdeStructObjKeyState.member n maxP ta alloc idx de live
+      (WNear.Binary.SerdeObjectMixedTrace.Ledger bs baseHL baseF false)
+      (WNear.Binary.SerdeObjectMixedTrace.Ledger bs baseHL baseF true) i none
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.object_loop_ledger` (hash `00000000b6dd4aea`)
+
+```lean
+theorem WNear.Binary.SerdeObjectMixedTrace.object_loop_ledger {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (htype : type.results = [])
+  (inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 42 < lim.maxCallDepth) (Cg : ℕ) (gt : Wasm.GlobalType) (sp out de ptr idx x2 x3 x4 x5 : UInt32)
+  (ob bs : List UInt8) (i : ℕ) (live : List (ℕ × ℕ)) (Cd : Iris.IProp GF) [Iris.BI.Persistent Cd] (baseHL baseF : ℕ)
+  (K646 K169 K81 : ℕ → ℕ) (hob : ob.length = 16) (hout : out.toNat + 16 ≤ 2 ^ 32) (hlen : bs.length ≤ 4194304)
+  (hptr : ptr.toNat + bs.length < 2 ^ 32) (hde : de.toNat + 25 ≤ 2 ^ 32) (hsp : 368 ≤ sp.toNat) (hal : sp.toNat % 8 = 0)
+  (hi : i ≤ bs.length) (hsetup : WNear.Binary.SerdeObjectMixedTrace.LedgerSetup baseHL baseF)
+  (hkeys :
+    WNear.Binary.SerdeObjectMixedTrace.KeyRoomCharges cfg 2048 bs
+      (WNear.Binary.SerdeObjectMixedTrace.Ledger bs baseHL baseF false) K646)
+  (hkeysSaved :
+    WNear.Binary.SerdeObjectMixedTrace.KeyRoomCharges cfg 2048 bs
+      (WNear.Binary.SerdeObjectMixedTrace.Ledger bs baseHL baseF true) K646)
+  (hvalues :
+    WNear.Binary.SerdeObjectMixedTrace.ValueRoomCharges cfg 2048 bs
+      (WNear.Binary.SerdeObjectMixedTrace.Ledger bs baseHL baseF false) K169)
+  (hignored :
+    WNear.Binary.SerdeObjectMixedTrace.IgnoreCharges cfg bs K81
+      (WNear.Binary.SerdeObjectMixedTrace.Ledger bs baseHL baseF false))
+  (hignoredSaved :
+    WNear.Binary.SerdeObjectMixedTrace.IgnoreCharges cfg bs K81
+      (WNear.Binary.SerdeObjectMixedTrace.Ledger bs baseHL baseF true))
+  (N : ℕ) (a : WNear.AccountId) (rF : List UInt8)
+  (hb0 : bs[i + WNear.Binary.SerdeRead.wsLen (List.drop i bs)]? = some 123)
+  (hloop :
+    WNear.SerdeStructModel.objLoop "account_id" (WNear.SerdeStructModel.valueAs WNear.account)
+        WNear.Binary.SerdeIgnObject.ignored N none
+        (List.drop (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1) bs) =
+      some (some a, rF)) :
+  ∃ keys,
+    WNear.Binary.SerdeObjectCoverage.KeyWalk bs (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1) true keys
+        (bs.length - rF.length) ∧
+      (∀ sample ∈ keys, NearInterface.Json.stringBody (List.drop sample.1 bs) [] = some (some sample.2.1, sample.2.2)) ∧
+        WNear.Binary.SerdeKeyEsc.consumed bs keys + 2 * keys.length ≤
+            bs.length - rF.length - (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1) ∧
+          (WNear.Binary.SerdeStructObjModelState.code n 2048 inst mi A ∗
+              WNear.Binary.SerdeIgnMember.code n 2048 inst mi A ∗ Cd ⊢
+            NearLogic.MFunSpec cfg lim d type inst mi WNear.Binary.f228 Cg
+              (fun args =>
+                iprop(⌜args =
+                        [Wasm.Value.i32 out, Wasm.Value.i32 de, Wasm.Value.i32 x2, Wasm.Value.i32 x3, Wasm.Value.i32 x4,
+                          Wasm.Value.i32 x5]⌝ ∗
+                    g ↦[wg] { type := gt, value := Wasm.Value.i32 sp } ∗
+                      WNear.Binary.VecFromElem.stk n (sp.toNat - 368) 368 ∗
+                        n ↦[wms][ out.toNat ] ob ∗
+                          WNear.Binary.SerdeRead.rd n de ptr bs i ∗
+                            n ↦[wms][ de.toNat + 24 ] [128] ∗
+                              WNear.Binary.SerdeStructObjKeyState.member n 2048 ta (A 578) idx de live
+                                (WNear.Binary.SerdeObjectMixedTrace.Ledger bs baseHL baseF false)
+                                (WNear.Binary.SerdeObjectMixedTrace.Ledger bs baseHL baseF true)
+                                (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1) none))
+              (fun x =>
+                WNear.Binary.SerdeObjectCoverage.keyCharge K646 keys +
+                  WNear.Binary.SerdeStructObj.costObj cfg (fun x => 0) K169 K81
+                    (WNear.SerdeStructModel.valueAs WNear.account) WNear.Binary.SerdeIgnObject.ignored bs N i)
+              fun x rs =>
+              iprop(⌜rs = []⌝ ∗
+                  g ↦[wg] { type := gt, value := Wasm.Value.i32 sp } ∗
+                    WNear.Binary.VecFromElem.stk n (sp.toNat - 368) 368 ∗
+                      n ↦[wms][ de.toNat + 24 ] [128] ∗
+                        ∃ p cap,
+                          n ↦[wms][ out.toNat ] WasmLogic.bytes32 0 ∗
+                            n ↦[wms][ out.toNat + 4 ] WasmLogic.bytes32 p ∗
+                              n ↦[wms][ out.toNat + 8 ] WasmLogic.bytes32 cap ∗
+                                n ↦[wms][ out.toNat + 12 ] WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ∗
+                                  ⌜p ≠ 0⌝ ∗
+                                    WNear.Binary.SerdeStructObjKeyState.member n 2048 ta (A 578) idx de live
+                                        (WNear.Binary.SerdeObjectMixedTrace.Ledger bs baseHL baseF false)
+                                        (WNear.Binary.SerdeObjectMixedTrace.Ledger bs baseHL baseF true)
+                                        (bs.length - rF.length) (some (a, p, cap)) ∗
+                                      WNear.Binary.SerdeRead.rd n de ptr bs (bs.length - rF.length)))
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.object_loop_ledger_initial` (hash `00000000f2c87f1a`)
+
+```lean
+theorem WNear.Binary.SerdeObjectMixedTrace.object_loop_ledger_initial {GF : Iris.BundledGFunctors}
+  [WasmLogic.WasmGS Wasm.NearState GF] (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ)
+  (type : Wasm.FuncType) (htype : type.results = []) (inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ)
+  (hm : WNear.Binary.Interface.IfaceMod mi A n g ta) (hd : d + 42 < lim.maxCallDepth) (Cg : ℕ) (gt : Wasm.GlobalType)
+  (sp out de ptr idx x2 x3 x4 x5 : UInt32) (ob bs : List UInt8) (i : ℕ) (live : List (ℕ × ℕ)) (Cd : Iris.IProp GF)
+  [Iris.BI.Persistent Cd] (baseHL baseF : ℕ) (ptrS sl : UInt32) (K646 K169 K81 : ℕ → ℕ) (hob : ob.length = 16)
+  (hout : out.toNat + 16 ≤ 2 ^ 32) (hlen : bs.length ≤ 4194304) (hptr : ptr.toNat + bs.length < 2 ^ 32)
+  (hde : de.toNat + 25 ≤ 2 ^ 32) (hsp : 368 ≤ sp.toNat) (hal : sp.toNat % 8 = 0) (hi : i ≤ bs.length)
+  (hsetup : WNear.Binary.SerdeObjectMixedTrace.LedgerSetup baseHL baseF)
+  (hkeys :
+    WNear.Binary.SerdeObjectMixedTrace.KeyRoomCharges cfg 2048 bs
+      (WNear.Binary.SerdeObjectMixedTrace.Ledger bs baseHL baseF false) K646)
+  (hkeysSaved :
+    WNear.Binary.SerdeObjectMixedTrace.KeyRoomCharges cfg 2048 bs
+      (WNear.Binary.SerdeObjectMixedTrace.Ledger bs baseHL baseF true) K646)
+  (hvalues :
+    WNear.Binary.SerdeObjectMixedTrace.ValueRoomCharges cfg 2048 bs
+      (WNear.Binary.SerdeObjectMixedTrace.Ledger bs baseHL baseF false) K169)
+  (hignored :
+    WNear.Binary.SerdeObjectMixedTrace.IgnoreCharges cfg bs K81
+      (WNear.Binary.SerdeObjectMixedTrace.Ledger bs baseHL baseF false))
+  (hignoredSaved :
+    WNear.Binary.SerdeObjectMixedTrace.IgnoreCharges cfg bs K81
+      (WNear.Binary.SerdeObjectMixedTrace.Ledger bs baseHL baseF true))
+  (N : ℕ) (a : WNear.AccountId) (rF : List UInt8)
+  (hb0 : bs[i + WNear.Binary.SerdeRead.wsLen (List.drop i bs)]? = some 123)
+  (hloop :
+    WNear.SerdeStructModel.objLoop "account_id" (WNear.SerdeStructModel.valueAs WNear.account)
+        WNear.Binary.SerdeIgnObject.ignored N none
+        (List.drop (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1) bs) =
+      some (some a, rF)) :
+  ∃ keys,
+    WNear.Binary.SerdeObjectCoverage.KeyWalk bs (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1) true keys
+        (bs.length - rF.length) ∧
+      (∀ sample ∈ keys, NearInterface.Json.stringBody (List.drop sample.1 bs) [] = some (some sample.2.1, sample.2.2)) ∧
+        WNear.Binary.SerdeKeyEsc.consumed bs keys + 2 * keys.length ≤
+            bs.length - rF.length - (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1) ∧
+          (WNear.Binary.SerdeStructObjModelState.code n 2048 inst mi A ∗
+              WNear.Binary.SerdeIgnMember.code n 2048 inst mi A ∗ Cd ⊢
+            NearLogic.MFunSpec cfg lim d type inst mi WNear.Binary.f228 Cg
+              (fun args =>
+                iprop(⌜args =
+                        [Wasm.Value.i32 out, Wasm.Value.i32 de, Wasm.Value.i32 x2, Wasm.Value.i32 x3, Wasm.Value.i32 x4,
+                          Wasm.Value.i32 x5]⌝ ∗
+                    g ↦[wg] { type := gt, value := Wasm.Value.i32 sp } ∗
+                      WNear.Binary.VecFromElem.stk n (sp.toNat - 368) 368 ∗
+                        n ↦[wms][ out.toNat ] ob ∗
+                          WNear.Binary.SerdeRead.rd n de ptr bs i ∗
+                            n ↦[wms][ de.toNat + 24 ] [128] ∗
+                              WNear.Binary.AllocFirstFit.vt n 1057464 idx ta (A 578) ∗
+                                WNear.Binary.SerdeValueState.tables n ∗
+                                  n ↦[wms][ 1051092 ] WNear.BalanceOfArgs.keyBytes ∗
+                                    n ↦[wms][ 1048576 ] WNear.Binary.SerdeIdent.identBytes ∗
+                                      WNear.Binary.SerdeValueState.scratchPre n 2048 baseHL live baseF de ptrS 0 sl))
+              (fun x =>
+                WNear.Binary.SerdeObjectCoverage.keyCharge K646 keys +
+                  WNear.Binary.SerdeStructObj.costObj cfg (fun x => 0) K169 K81
+                    (WNear.SerdeStructModel.valueAs WNear.account) WNear.Binary.SerdeIgnObject.ignored bs N i)
+              fun x rs =>
+              iprop(⌜rs = []⌝ ∗
+                  g ↦[wg] { type := gt, value := Wasm.Value.i32 sp } ∗
+                    WNear.Binary.VecFromElem.stk n (sp.toNat - 368) 368 ∗
+                      n ↦[wms][ de.toNat + 24 ] [128] ∗
+                        ∃ p cap,
+                          n ↦[wms][ out.toNat ] WasmLogic.bytes32 0 ∗
+                            n ↦[wms][ out.toNat + 4 ] WasmLogic.bytes32 p ∗
+                              n ↦[wms][ out.toNat + 8 ] WasmLogic.bytes32 cap ∗
+                                n ↦[wms][ out.toNat + 12 ] WasmLogic.bytes32 (UInt32.ofNat (↑a).utf8ByteSize) ∗
+                                  ⌜p ≠ 0⌝ ∗
+                                    WNear.Binary.SerdeStructObjKeyState.member n 2048 ta (A 578) idx de live
+                                        (WNear.Binary.SerdeObjectMixedTrace.Ledger bs baseHL baseF false)
+                                        (WNear.Binary.SerdeObjectMixedTrace.Ledger bs baseHL baseF true)
+                                        (bs.length - rF.length) (some (a, p, cap)) ∗
+                                      WNear.Binary.SerdeRead.rd n de ptr bs (bs.length - rF.length)))
+```
+
+## Bridge.Functions.SerdeObjectMixedTrace
+
+`WNear.Binary.SerdeObjectMixedTrace.CallTrace` (hash `6b90aead9cce613f`)
+
+```lean
+inductive WNear.Binary.SerdeObjectMixedTrace.CallTrace (bs : List UInt8) :
+  ℕ → Bool → List WNear.Binary.SerdeKeyEsc.KeySample → WNear.Binary.ScratchMixedTrace.Batches → ℕ → ℕ → Prop
+| WNear.Binary.SerdeObjectMixedTrace.CallTrace.done {bs : List UInt8} (i : ℕ)
+  (hb : bs[i + WNear.Binary.SerdeRead.wsLen (List.drop i bs)]? = some 125) :
+  WNear.Binary.SerdeObjectMixedTrace.CallTrace bs i false [] [] (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1)
+    0
+| WNear.Binary.SerdeObjectMixedTrace.CallTrace.member {bs : List UInt8} (i q e stop : ℕ) (first : Bool) (key : String)
+  (r1 r2 : List UInt8) (keys : List WNear.Binary.SerdeKeyEsc.KeySample) (value : WNear.Binary.ScratchMixedTrace.Segment)
+  (batches : WNear.Binary.ScratchMixedTrace.Batches) (accounts : ℕ)
+  (hq : WNear.Binary.SerdeNextKey.keyQ first bs i = some q)
+  (hs : NearInterface.Json.stringBody (List.drop q bs) [] = some (some key, r1))
+  (hc : WNear.JsonFuel.colonAt r1 = some r2) (he : bs.length - r2.length ≤ e) (heb : e ≤ bs.length)
+  (hv : WNear.Binary.SerdeObjectMixedTrace.ValueSegment bs key r2 e value)
+  (tail : WNear.Binary.SerdeObjectMixedTrace.CallTrace bs e false keys batches stop accounts) :
+  WNear.Binary.SerdeObjectMixedTrace.CallTrace bs i first ((q, key, r1) :: keys)
+    (WNear.Binary.ScratchMixedTrace.Segment.append (WNear.Binary.ParseStrSuccess.appendChunks (List.drop q bs) []) ::
+      value :: batches)
+    stop ((if key = "account_id" then 1 else 0) + accounts)
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.CallTrace.done` (hash `00000000cccbdfcc`)
+
+```lean
+constant WNear.Binary.SerdeObjectMixedTrace.CallTrace.done {bs : List UInt8} (i : ℕ)
+  (hb : bs[i + WNear.Binary.SerdeRead.wsLen (List.drop i bs)]? = some 125) :
+  WNear.Binary.SerdeObjectMixedTrace.CallTrace bs i false [] [] (i + WNear.Binary.SerdeRead.wsLen (List.drop i bs) + 1)
+    0
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.CallTrace.member` (hash `00000000be900b6e`)
+
+```lean
+constant WNear.Binary.SerdeObjectMixedTrace.CallTrace.member {bs : List UInt8} (i q e stop : ℕ) (first : Bool) (key : String)
+  (r1 r2 : List UInt8) (keys : List WNear.Binary.SerdeKeyEsc.KeySample) (value : WNear.Binary.ScratchMixedTrace.Segment)
+  (batches : WNear.Binary.ScratchMixedTrace.Batches) (accounts : ℕ)
+  (hq : WNear.Binary.SerdeNextKey.keyQ first bs i = some q)
+  (hs : NearInterface.Json.stringBody (List.drop q bs) [] = some (some key, r1))
+  (hc : WNear.JsonFuel.colonAt r1 = some r2) (he : bs.length - r2.length ≤ e) (heb : e ≤ bs.length)
+  (hv : WNear.Binary.SerdeObjectMixedTrace.ValueSegment bs key r2 e value)
+  (tail : WNear.Binary.SerdeObjectMixedTrace.CallTrace bs e false keys batches stop accounts) :
+  WNear.Binary.SerdeObjectMixedTrace.CallTrace bs i first ((q, key, r1) :: keys)
+    (WNear.Binary.ScratchMixedTrace.Segment.append (WNear.Binary.ParseStrSuccess.appendChunks (List.drop q bs) []) ::
+      value :: batches)
+    stop ((if key = "account_id" then 1 else 0) + accounts)
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.SegmentModel` (hash `fbf0beb0eca99e76`)
+
+```lean
+inductive WNear.Binary.SerdeObjectMixedTrace.SegmentModel (bs : List UInt8) : WNear.Binary.ScratchMixedTrace.Segment → Prop
+| WNear.Binary.SerdeObjectMixedTrace.SegmentModel.string {bs : List UInt8} (q : ℕ) (key : String) (rest : List UInt8)
+  (h : NearInterface.Json.stringBody (List.drop q bs) [] = some (some key, rest)) :
+  WNear.Binary.SerdeObjectMixedTrace.SegmentModel bs
+    (WNear.Binary.ScratchMixedTrace.Segment.append (WNear.Binary.ParseStrSuccess.appendChunks (List.drop q bs) []))
+| WNear.Binary.SerdeObjectMixedTrace.SegmentModel.ignored {bs : List UInt8} (q : ℕ) (rest : List UInt8) (ops : List Bool)
+  (h : WNear.Binary.SerdeIgnMachineTrace.trace (List.drop q bs) = some (rest, ops)) :
+  WNear.Binary.SerdeObjectMixedTrace.SegmentModel bs (WNear.Binary.ScratchMixedTrace.Segment.frames ops)
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.SegmentModel.ignored` (hash `00000000ce8da207`)
+
+```lean
+constant WNear.Binary.SerdeObjectMixedTrace.SegmentModel.ignored {bs : List UInt8} (q : ℕ) (rest : List UInt8) (ops : List Bool)
+  (h : WNear.Binary.SerdeIgnMachineTrace.trace (List.drop q bs) = some (rest, ops)) :
+  WNear.Binary.SerdeObjectMixedTrace.SegmentModel bs (WNear.Binary.ScratchMixedTrace.Segment.frames ops)
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.SegmentModel.string` (hash `00000000e9729bfe`)
+
+```lean
+constant WNear.Binary.SerdeObjectMixedTrace.SegmentModel.string {bs : List UInt8} (q : ℕ) (key : String) (rest : List UInt8)
+  (h : NearInterface.Json.stringBody (List.drop q bs) [] = some (some key, rest)) :
+  WNear.Binary.SerdeObjectMixedTrace.SegmentModel bs
+    (WNear.Binary.ScratchMixedTrace.Segment.append (WNear.Binary.ParseStrSuccess.appendChunks (List.drop q bs) []))
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.ValueSegment` (hash `4f0ceb1f96855b57`)
+
+```lean
+inductive WNear.Binary.SerdeObjectMixedTrace.ValueSegment (bs : List UInt8) (key : String) (input : List UInt8) (e : ℕ) :
+  WNear.Binary.ScratchMixedTrace.Segment → Prop
+| WNear.Binary.SerdeObjectMixedTrace.ValueSegment.account {bs : List UInt8} {key : String} {input : List UInt8} {e : ℕ}
+  (v j : ℕ) (a : WNear.AccountId) (hk : key = "account_id") (hin : input = List.drop v bs)
+  (hj : j = v + WNear.Binary.SerdeRead.wsLen (List.drop v bs)) (hq : bs[j]? = some 34)
+  (hv : WNear.SerdeStructModel.valueAs WNear.account (List.drop v bs) = some (a, List.drop e bs))
+  (hs : NearInterface.Json.stringBody (List.drop (j + 1) bs) [] = some (some ↑a, List.drop e bs)) :
+  WNear.Binary.SerdeObjectMixedTrace.ValueSegment bs key input e
+    (WNear.Binary.ScratchMixedTrace.Segment.append
+      (WNear.Binary.ParseStrSuccess.appendChunks (List.drop (j + 1) bs) []))
+| WNear.Binary.SerdeObjectMixedTrace.ValueSegment.ignored {bs : List UInt8} {key : String} {input : List UInt8} {e : ℕ}
+  (v : ℕ) (ops : List Bool) (hk : key ≠ "account_id") (hin : input = List.drop v bs)
+  (ht : WNear.Binary.SerdeIgnMachineTrace.trace (List.drop v bs) = some (List.drop e bs, ops)) :
+  WNear.Binary.SerdeObjectMixedTrace.ValueSegment bs key input e (WNear.Binary.ScratchMixedTrace.Segment.frames ops)
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.ValueSegment.account` (hash `000000009f28ce3b`)
+
+```lean
+constant WNear.Binary.SerdeObjectMixedTrace.ValueSegment.account {bs : List UInt8} {key : String} {input : List UInt8} {e : ℕ}
+  (v j : ℕ) (a : WNear.AccountId) (hk : key = "account_id") (hin : input = List.drop v bs)
+  (hj : j = v + WNear.Binary.SerdeRead.wsLen (List.drop v bs)) (hq : bs[j]? = some 34)
+  (hv : WNear.SerdeStructModel.valueAs WNear.account (List.drop v bs) = some (a, List.drop e bs))
+  (hs : NearInterface.Json.stringBody (List.drop (j + 1) bs) [] = some (some ↑a, List.drop e bs)) :
+  WNear.Binary.SerdeObjectMixedTrace.ValueSegment bs key input e
+    (WNear.Binary.ScratchMixedTrace.Segment.append
+      (WNear.Binary.ParseStrSuccess.appendChunks (List.drop (j + 1) bs) []))
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.ValueSegment.ignored` (hash `0000000032e286d9`)
+
+```lean
+constant WNear.Binary.SerdeObjectMixedTrace.ValueSegment.ignored {bs : List UInt8} {key : String} {input : List UInt8} {e : ℕ}
+  (v : ℕ) (ops : List Bool) (hk : key ≠ "account_id") (hin : input = List.drop v bs)
+  (ht : WNear.Binary.SerdeIgnMachineTrace.trace (List.drop v bs) = some (List.drop e bs, ops)) :
+  WNear.Binary.SerdeObjectMixedTrace.ValueSegment bs key input e (WNear.Binary.ScratchMixedTrace.Segment.frames ops)
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.accountCount` (hash `8e6b15e324c429a2`)
+
+```lean
+def WNear.Binary.SerdeObjectMixedTrace.accountCount : List WNear.Binary.SerdeKeyEsc.KeySample → ℕ :=
+  fun x => List.brecOn x WNear.Binary.SerdeObjectMixedTrace.accountCount._f
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.account_id_page` (hash `00000000b40f816f`)
+
+```lean
+theorem WNear.Binary.SerdeObjectMixedTrace.account_id_page (a : WNear.AccountId) :
+  (WNear.Binary.AllocNewCell.cellPages (WNear.Binary.AllocAlloc.wordsOf (UInt32.ofNat (↑a).toUTF8.toList.length))
+        1).toNat ≤
+    1
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.batches_bounds` (hash `000000004f827a1f`)
+
+```lean
+theorem WNear.Binary.SerdeObjectMixedTrace.batches_bounds (bs : List UInt8) (batches : WNear.Binary.ScratchMixedTrace.Batches)
+  (cap : UInt32) (hlen : bs.length ≤ 4194304) (hcap : cap.toNat < 2 ^ 25)
+  (hm : ∀ seg ∈ batches, WNear.Binary.SerdeObjectMixedTrace.SegmentModel bs seg) :
+  WNear.Binary.ScratchMixedTrace.Valid cap batches ∧
+    (WNear.Binary.ScratchMixedTrace.endCap cap batches).toNat < 2 ^ 25 ∧
+      WNear.Binary.ScratchMixedTrace.peak cap batches ≤ bs.length
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.call_trace_accounts` (hash `000000009f3df221`)
+
+```lean
+theorem WNear.Binary.SerdeObjectMixedTrace.call_trace_accounts {bs : List UInt8} {i stop accounts : ℕ} {first : Bool}
+  {keys : List WNear.Binary.SerdeKeyEsc.KeySample} {batches : WNear.Binary.ScratchMixedTrace.Batches}
+  (ht : WNear.Binary.SerdeObjectMixedTrace.CallTrace bs i first keys batches stop accounts) :
+  accounts = WNear.Binary.SerdeObjectMixedTrace.accountCount keys
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.call_trace_models` (hash `00000000c19238a1`)
+
+```lean
+theorem WNear.Binary.SerdeObjectMixedTrace.call_trace_models {bs : List UInt8} {i stop accounts : ℕ} {first : Bool}
+  {keys : List WNear.Binary.SerdeKeyEsc.KeySample} {batches : WNear.Binary.ScratchMixedTrace.Batches}
+  (ht : WNear.Binary.SerdeObjectMixedTrace.CallTrace bs i first keys batches stop accounts)
+  (seg : WNear.Binary.ScratchMixedTrace.Segment) :
+  seg ∈ batches → WNear.Binary.SerdeObjectMixedTrace.SegmentModel bs seg
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.expand_key_walk` (hash `0000000029e2e4a7`)
+
+```lean
+theorem WNear.Binary.SerdeObjectMixedTrace.expand_key_walk {bs : List UInt8} {i stop : ℕ} {first : Bool}
+  {keys : List WNear.Binary.SerdeKeyEsc.KeySample}
+  (hw : WNear.Binary.SerdeObjectCoverage.KeyWalk bs i first keys stop) :
+  ∃ batches accounts, WNear.Binary.SerdeObjectMixedTrace.CallTrace bs i first keys batches stop accounts
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.loop_keys_account` (hash `00000000b074dccc`)
+
+```lean
+theorem WNear.Binary.SerdeObjectMixedTrace.loop_keys_account (bs : List UInt8) (N : ℕ) (first : Bool) (i : ℕ)
+  (seen : Option WNear.AccountId) (a : WNear.AccountId) (rest : List UInt8) (hi : i ≤ bs.length)
+  (hloop :
+    WNear.SerdeStructLoop.loopRes "account_id" (WNear.SerdeStructModel.valueAs WNear.account)
+        WNear.Binary.SerdeIgnObject.ignored N first seen (List.drop i bs) =
+      some (some a, rest)) :
+  ∃ keys,
+    WNear.Binary.SerdeObjectCoverage.KeyWalk bs i first keys (bs.length - rest.length) ∧
+      (WNear.Binary.SerdeObjectMixedTrace.accountCount keys + if seen.isSome = true then 1 else 0) ≤ 1
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.loop_scratch_pages` (hash `00000000fceea498`)
+
+```lean
+theorem WNear.Binary.SerdeObjectMixedTrace.loop_scratch_pages (bs : List UInt8) (N : ℕ) (first : Bool) (i : ℕ)
+  (seen : Option WNear.AccountId) (a : WNear.AccountId) (rest : List UInt8) (hlen : bs.length ≤ 4194304)
+  (hi : i ≤ bs.length)
+  (hloop :
+    WNear.SerdeStructLoop.loopRes "account_id" (WNear.SerdeStructModel.valueAs WNear.account)
+        WNear.Binary.SerdeIgnObject.ignored N first seen (List.drop i bs) =
+      some (some a, rest)) :
+  ∃ keys batches accounts,
+    WNear.Binary.SerdeObjectMixedTrace.CallTrace bs i first keys batches (bs.length - rest.length) accounts ∧
+      65536 * WNear.Binary.ScratchMixedTrace.pages 0 batches ≤ 18164618
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.loop_total_pages` (hash `0000000008aa300a`)
+
+```lean
+theorem WNear.Binary.SerdeObjectMixedTrace.loop_total_pages (bs : List UInt8) (N : ℕ) (first : Bool) (i : ℕ)
+  (seen : Option WNear.AccountId) (a : WNear.AccountId) (rest : List UInt8) (hlen : bs.length ≤ 4194304)
+  (hi : i ≤ bs.length)
+  (hloop :
+    WNear.SerdeStructLoop.loopRes "account_id" (WNear.SerdeStructModel.valueAs WNear.account)
+        WNear.Binary.SerdeIgnObject.ignored N first seen (List.drop i bs) =
+      some (some a, rest)) :
+  ∃ keys batches accounts,
+    WNear.Binary.SerdeObjectMixedTrace.CallTrace bs i first keys batches (bs.length - rest.length) accounts ∧
+      accounts ≤ 1 ∧ 65536 * WNear.Binary.ScratchMixedTrace.pages 0 batches + 65536 * accounts ≤ 18230154
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.scratch_pages` (hash `00000000189cdb1b`)
+
+```lean
+theorem WNear.Binary.SerdeObjectMixedTrace.scratch_pages (bs : List UInt8) (batches : WNear.Binary.ScratchMixedTrace.Batches)
+  (hlen : bs.length ≤ 4194304) (hm : ∀ seg ∈ batches, WNear.Binary.SerdeObjectMixedTrace.SegmentModel bs seg) :
+  65536 * WNear.Binary.ScratchMixedTrace.pages 0 batches ≤ 18164618
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.segment_bounds` (hash `00000000c5965bec`)
+
+```lean
+theorem WNear.Binary.SerdeObjectMixedTrace.segment_bounds (bs : List UInt8) (seg : WNear.Binary.ScratchMixedTrace.Segment)
+  (cap : UInt32) (hlen : bs.length ≤ 4194304) (hcap : cap.toNat < 2 ^ 25)
+  (hm : WNear.Binary.SerdeObjectMixedTrace.SegmentModel bs seg) :
+  WNear.Binary.ScratchMixedTrace.Segment.Valid cap seg ∧
+    (WNear.Binary.ScratchMixedTrace.Segment.next cap seg).toNat < 2 ^ 25 ∧
+      WNear.Binary.ScratchMixedTrace.Segment.peak cap seg ≤ bs.length
+```
+
+`WNear.Binary.SerdeObjectMixedTrace.value_segment_model` (hash `000000007fe7e364`)
+
+```lean
+theorem WNear.Binary.SerdeObjectMixedTrace.value_segment_model {bs : List UInt8} {key : String} {input : List UInt8} {e : ℕ}
+  {seg : WNear.Binary.ScratchMixedTrace.Segment}
+  (hv : WNear.Binary.SerdeObjectMixedTrace.ValueSegment bs key input e seg) :
+  WNear.Binary.SerdeObjectMixedTrace.SegmentModel bs seg
 ```
 
 ## Bridge.Functions.SerdeObjectNoEsc

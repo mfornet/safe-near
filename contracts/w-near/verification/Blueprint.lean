@@ -1,3 +1,4 @@
+import Bridge.Functions.SerdeObjectLedgerComposition
 import Bridge.Functions.SerdeObjectCostComposition
 import Bridge.Functions.SerdeObjectKeyCoverage
 import Bridge.Functions.SerdeIgnObjectV86
@@ -2146,3 +2147,143 @@ attribute [blueprint "frontier:ignored-object-key-cost"
   (statement := /-- Composes the concrete-room object reader with the proved model key path and exact cost equality. The Wasm budget is equal to its previous cost, now visibly key charges plus residual charges. Total mixed allocation/parser gas domination remains unresolved. -/)
   (notReady := true)]
   WNear.Binary.SerdeIgnObject.object_loop_v86_key_cost
+
+attribute [blueprint "frontier:mixed-growth-power"
+  (title := /-- Mixed retained capacity pays every growth -/)
+  (statement := /-- The first allocation is at least eight bytes and every later growth doubles across string/frame segments. -/)]
+  WNear.Binary.ScratchMixedTrace.growth_power
+
+attribute [blueprint "frontier:mixed-growth-v86"
+  (title := /-- One global growth bound across mixed scratch use -/)
+  (statement := /-- At most 21 scratch growths from empty capacity when the mixed high-water length is at most 4 MiB. No per-member reset. -/)]
+  WNear.Binary.ScratchMixedTrace.growth_v86
+
+attribute [blueprint "frontier:mixed-pages-v86"
+  (title := /-- One global requested-page bound for mixed scratch -/)
+  (statement := /-- Bounds scratch page bytes by 18,164,618 under the 4 MiB high-water premise. -/)]
+  WNear.Binary.ScratchMixedTrace.pages_v86
+
+attribute [blueprint "frontier:mixed-account-page"
+  (title := /-- A valid account allocation requests at most one page -/)
+  (statement := /-- Instantiates the allocator page bound from the actual model AccountId UTF-8 length ceiling. -/)]
+  WNear.Binary.SerdeObjectMixedTrace.account_id_page
+
+attribute [blueprint "frontier:mixed-segment-model-bounds"
+  (title := /-- Successful reader models bound each scratch segment -/)
+  (statement := /-- Successful string/frame models establish actual trace validity, retained capacity below 2^25 and peak below the bounded input length. -/)]
+  WNear.Binary.SerdeObjectMixedTrace.segment_bounds
+
+attribute [blueprint "frontier:mixed-batches-model-bounds"
+  (title := /-- Successful mixed segments preserve one retained scratch -/)
+  (statement := /-- Carries validity/capacity across the complete model segment sequence with one global peak, including the account string. -/)]
+  WNear.Binary.SerdeObjectMixedTrace.batches_bounds
+
+attribute [blueprint "frontier:mixed-model-pages"
+  (title := /-- Successful mixed models instantiate the page bound -/)
+  (statement := /-- Any retained sequence of successful segments from a 4 MiB input satisfies the global scratch page bound. -/)]
+  WNear.Binary.SerdeObjectMixedTrace.scratch_pages
+
+attribute [blueprint "frontier:mixed-call-path"
+  (title := /-- Every actual key/value step supplies its scratch segments -/)
+  (statement := /-- Expands the value-linked key path into ordered key appends, account-string appends or ignored-frame traces, preserving exact endpoints and counting account calls. -/)]
+  WNear.Binary.SerdeObjectMixedTrace.expand_key_walk
+
+attribute [blueprint "frontier:mixed-call-models"
+  (title := /-- Every ordered call segment has a successful model -/)
+  (statement := /-- Projects actual string/ignored models from the ordered call trace; arbitrary invented scratch segments are not admitted. -/)]
+  WNear.Binary.SerdeObjectMixedTrace.call_trace_models
+
+attribute [blueprint "frontier:mixed-account-calls"
+  (title := /-- Successful object loops allocate at most one account -/)
+  (statement := /-- The successful model duplicate check bounds account-field calls, including the already-seen case. -/)]
+  WNear.Binary.SerdeObjectMixedTrace.loop_keys_account
+
+attribute [blueprint "frontier:mixed-loop-pages"
+  (title := /-- Complete successful object model has one allocation-page budget -/)
+  (statement := /-- Extracts the ordered complete scratch trace and at most one account call. Scratch page bytes plus one page per account call are bounded by 18,230,154. This remains a model trace until its reader resource contracts are instantiated. -/)]
+  WNear.Binary.SerdeObjectMixedTrace.loop_total_pages
+
+attribute [blueprint "frontier:object-ledger-initial"
+  (title := /-- Empty scratch establishes the concrete ledger -/)
+  (statement := /-- Initializes one retained scratch history and no saved-account allocation. -/)]
+  WNear.Binary.SerdeObjectMixedTrace.Ledger.initial
+
+attribute [blueprint "frontier:object-ledger-ceiling"
+  (title := /-- The mixed ledger bounds every reachable heap -/)
+  (statement := /-- From the explicit initial heap budget, all ledger states remain at most 96 MiB, including the saved account slot. B does not assume alignment of hypothetical interval lengths. -/)]
+  WNear.Binary.SerdeObjectMixedTrace.Ledger.heap_ceiling
+
+attribute [blueprint "frontier:object-ledger-segment"
+  (title := /-- Actual segment effects preserve the heap/capacity ledger -/)
+  (statement := /-- Appends a successful segment, retaining exact capacity/free-bound transitions and accumulating actual requested pages plus the account slot. -/)]
+  WNear.Binary.SerdeObjectMixedTrace.Ledger.segment
+
+attribute [blueprint "frontier:object-ledger-ignored-state"
+  (title := /-- The actual ignored heap history closes the ledger -/)
+  (statement := /-- Uses the exact returned HeapTrace to instantiate the segment ledger and preserve all endpoint resource bounds. -/)]
+  WNear.Binary.SerdeObjectMixedTrace.Ledger.ignored
+
+attribute [blueprint "frontier:object-ledger-closing"
+  (title := /-- The ledger constructs final-brace closing transport -/)
+  (statement := /-- Constructs ClosingConditions for this concrete invariant. The generic closing interface remains Open for other states. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.Ledger.closing
+
+attribute [blueprint "frontier:object-ignore-charges"
+  (title := /-- Remaining ignored-reader gas allowance -/)
+  (statement := /-- Only the actual ignored-reader cost versus chosen K remains in this contract; ledger room/heap/state transport is constructed separately. It remains Open until the original parser budget supplies K. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.IgnoreCharges
+
+attribute [blueprint "frontier:object-key-room-charges"
+  (title := /-- Remaining key-reader room and gas allowance -/)
+  (statement := /-- Exact reachable key room and charge obligations after ledger state closure has been proved. The original model allowance is unchanged. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.KeyRoomCharges
+
+attribute [blueprint "frontier:object-value-room-charges"
+  (title := /-- Remaining account-reader room and gas allowance -/)
+  (statement := /-- Exact error/string/account-allocation room and charge obligations; final state transport is supplied by the ledger. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.ValueRoomCharges
+
+attribute [blueprint "frontier:object-ledger-ignore"
+  (title := /-- Ledger constructs reachable ignored-reader conditions -/)
+  (statement := /-- Instantiates the reachable heap ceiling and exact ignored state closure. Conditional on the explicitly named ignored gas allowance and initial numeric heap bound. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.Ledger.ignore_conditions
+
+attribute [blueprint "frontier:object-ledger-key"
+  (title := /-- Ledger constructs the key closure contract -/)
+  (statement := /-- Proves the actual retained key capacity/free-bound and heap endpoint closure, leaving only named key room/charge obligations. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.Ledger.key_conditions
+
+attribute [blueprint "frontier:object-ledger-value"
+  (title := /-- Ledger constructs account-value state closure -/)
+  (statement := /-- Preserves retained scratch and adds the one owned account slot; max free-bound is stable from a positive initial bound. Room and cost remain explicit named obligations. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.Ledger.value_conditions
+
+attribute [blueprint "frontier:object-ledger-setup"
+  (title := /-- Initial heap/free-bound ledger instance -/)
+  (statement := /-- The actual input pipeline still must establish baseHL+18,230,154 <= 96 MiB and a positive initial free bound. No Environment or method domain is strengthened. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.LedgerSetup
+
+attribute [blueprint "frontier:object-ledger-reader"
+  (title := /-- Concrete ledger instantiates the actual object reader -/)
+  (statement := /-- Constructs key/value/ignore/closing contracts and composes the existing actual Wasm key/residual contract. The named initial ledger setup and room/gas obligations remain Open, so this result is Conditional. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.object_loop_ledger
+
+attribute [blueprint "frontier:object-ledger-member"
+  (title := /-- Actual raw scratch resources initialize the ledger member -/)
+  (statement := /-- Constructs the initial member invariant from owned empty scratch, allocator tables and actual byte tables. No ledger witness is assumed. -/)]
+  WNear.Binary.SerdeObjectMixedTrace.member_initial
+
+attribute [blueprint "frontier:object-ledger-initial-reader"
+  (title := /-- Raw initial resources feed the ledger object Wasm contract -/)
+  (statement := /-- Composes raw member initialization with the actual object reader, retaining its equal key/residual budget and postcondition. Initial pipeline setup, remaining room/gas and the complete parser budget remain unresolved. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectMixedTrace.object_loop_ledger_initial

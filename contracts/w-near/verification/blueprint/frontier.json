@@ -379,7 +379,8 @@
         "ignored-hyp-instance",
         "ignored-member-conditions",
         "ignored-reachable-hyp",
-        "ignored-reachable-conditions"
+        "ignored-reachable-conditions",
+        "object-ledger-ignore"
       ],
       "label": "frontier:ignore-hyp",
       "reviewed_shape_hash": 14658794859049893487,
@@ -391,7 +392,10 @@
       "title": "Uniform reachable key bounds",
       "kind": "verification_contract",
       "label": "frontier:key-conditions",
-      "reviewed_shape_hash": 14634685420054898645
+      "reviewed_shape_hash": 14634685420054898645,
+      "planned_dependencies": [
+        "object-ledger-key"
+      ]
     },
     {
       "id": "value-conditions",
@@ -399,7 +403,10 @@
       "title": "Uniform reachable value bounds",
       "kind": "verification_contract",
       "label": "frontier:value-conditions",
-      "reviewed_shape_hash": 7014099597825291335
+      "reviewed_shape_hash": 7014099597825291335,
+      "planned_dependencies": [
+        "object-ledger-value"
+      ]
     },
     {
       "id": "accept-parser",
@@ -4750,7 +4757,10 @@
       "notes": "The precise remaining pure bound transport for current and saved member states. It does not require those states to be monotone across every input position. Concrete prefix-state instances remain Open.",
       "reviewed_shape_hash": 8474885217529521803,
       "required_type_dependencies": [],
-      "required_proof_dependencies": []
+      "required_proof_dependencies": [],
+      "planned_dependencies": [
+        "object-ledger-closing"
+      ]
     },
     {
       "id": "object-closing-adapter",
@@ -4885,6 +4895,356 @@
         "ignored-object-closing",
         "object-cost-key-component"
       ]
+    },
+    {
+      "id": "mixed-growth-power",
+      "declaration": "WNear.Binary.ScratchMixedTrace.growth_power",
+      "title": "Mixed retained capacity pays every growth",
+      "kind": "theorem",
+      "label": "frontier:mixed-growth-power",
+      "notes": "The first allocation is at least eight bytes and every later growth doubles across string/frame segments.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1449840229
+    },
+    {
+      "id": "mixed-growth-v86",
+      "declaration": "WNear.Binary.ScratchMixedTrace.growth_v86",
+      "title": "One global growth bound across mixed scratch use",
+      "kind": "theorem",
+      "label": "frontier:mixed-growth-v86",
+      "notes": "At most 21 scratch growths from empty capacity when the mixed high-water length is at most 4 MiB. No per-member reset.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "mixed-growth-power",
+        "scratch-mixed-capacity"
+      ],
+      "reviewed_shape_hash": 3210413697
+    },
+    {
+      "id": "mixed-pages-v86",
+      "declaration": "WNear.Binary.ScratchMixedTrace.pages_v86",
+      "title": "One global requested-page bound for mixed scratch",
+      "kind": "theorem",
+      "label": "frontier:mixed-pages-v86",
+      "notes": "Bounds scratch page bytes by 18,164,618 under the 4 MiB high-water premise.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "mixed-growth-v86",
+        "scratch-mixed-allocation",
+        "scratch-mixed-pages"
+      ],
+      "reviewed_shape_hash": 322627582
+    },
+    {
+      "id": "mixed-account-page",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.account_id_page",
+      "title": "A valid account allocation requests at most one page",
+      "kind": "theorem",
+      "label": "frontier:mixed-account-page",
+      "notes": "Instantiates the allocator page bound from the actual model AccountId UTF-8 length ceiling.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3020915055
+    },
+    {
+      "id": "mixed-segment-model-bounds",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.segment_bounds",
+      "title": "Successful reader models bound each scratch segment",
+      "kind": "theorem",
+      "label": "frontier:mixed-segment-model-bounds",
+      "notes": "Successful string/frame models establish actual trace validity, retained capacity below 2^25 and peak below the bounded input length.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "ignored-capacity-v86"
+      ],
+      "reviewed_shape_hash": 3314965484
+    },
+    {
+      "id": "mixed-batches-model-bounds",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.batches_bounds",
+      "title": "Successful mixed segments preserve one retained scratch",
+      "kind": "theorem",
+      "label": "frontier:mixed-batches-model-bounds",
+      "notes": "Carries validity/capacity across the complete model segment sequence with one global peak, including the account string.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "mixed-segment-model-bounds"
+      ],
+      "reviewed_shape_hash": 1333951007
+    },
+    {
+      "id": "mixed-model-pages",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.scratch_pages",
+      "title": "Successful mixed models instantiate the page bound",
+      "kind": "theorem",
+      "label": "frontier:mixed-model-pages",
+      "notes": "Any retained sequence of successful segments from a 4 MiB input satisfies the global scratch page bound.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "mixed-batches-model-bounds",
+        "mixed-pages-v86"
+      ],
+      "reviewed_shape_hash": 412932891
+    },
+    {
+      "id": "mixed-call-path",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.expand_key_walk",
+      "title": "Every actual key/value step supplies its scratch segments",
+      "kind": "theorem",
+      "label": "frontier:mixed-call-path",
+      "notes": "Expands the value-linked key path into ordered key appends, account-string appends or ignored-frame traces, preserving exact endpoints and counting account calls.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 702735527
+    },
+    {
+      "id": "mixed-call-models",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.call_trace_models",
+      "title": "Every ordered call segment has a successful model",
+      "kind": "theorem",
+      "label": "frontier:mixed-call-models",
+      "notes": "Projects actual string/ignored models from the ordered call trace; arbitrary invented scratch segments are not admitted.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3247585441
+    },
+    {
+      "id": "mixed-account-calls",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.loop_keys_account",
+      "title": "Successful object loops allocate at most one account",
+      "kind": "theorem",
+      "label": "frontier:mixed-account-calls",
+      "notes": "The successful model duplicate check bounds account-field calls, including the already-seen case.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2960448716
+    },
+    {
+      "id": "mixed-loop-pages",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.loop_total_pages",
+      "title": "Complete successful object model has one allocation-page budget",
+      "kind": "theorem",
+      "label": "frontier:mixed-loop-pages",
+      "notes": "Extracts the ordered complete scratch trace and at most one account call. Scratch page bytes plus one page per account call are bounded by 18,230,154. This remains a model trace until its reader resource contracts are instantiated.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "mixed-account-calls",
+        "mixed-call-path",
+        "mixed-call-models",
+        "mixed-model-pages"
+      ],
+      "reviewed_shape_hash": 145371146
+    },
+    {
+      "id": "object-ledger-initial",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.Ledger.initial",
+      "title": "Empty scratch establishes the concrete ledger",
+      "kind": "theorem",
+      "label": "frontier:object-ledger-initial",
+      "notes": "Initializes one retained scratch history and no saved-account allocation.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3255722431
+    },
+    {
+      "id": "object-ledger-ceiling",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.Ledger.heap_ceiling",
+      "title": "The mixed ledger bounds every reachable heap",
+      "kind": "theorem",
+      "label": "frontier:object-ledger-ceiling",
+      "notes": "From the explicit initial heap budget, all ledger states remain at most 96 MiB, including the saved account slot. B does not assume alignment of hypothetical interval lengths.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "mixed-model-pages"
+      ],
+      "reviewed_shape_hash": 3760212860
+    },
+    {
+      "id": "object-ledger-segment",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.Ledger.segment",
+      "title": "Actual segment effects preserve the heap/capacity ledger",
+      "kind": "theorem",
+      "label": "frontier:object-ledger-segment",
+      "notes": "Appends a successful segment, retaining exact capacity/free-bound transitions and accumulating actual requested pages plus the account slot.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1655487279
+    },
+    {
+      "id": "object-ledger-ignored-state",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.Ledger.ignored",
+      "title": "The actual ignored heap history closes the ledger",
+      "kind": "theorem",
+      "label": "frontier:object-ledger-ignored-state",
+      "notes": "Uses the exact returned HeapTrace to instantiate the segment ledger and preserve all endpoint resource bounds.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "object-ledger-segment",
+        "ignored-heap-pages"
+      ],
+      "reviewed_shape_hash": 3592823792
+    },
+    {
+      "id": "object-ledger-closing",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.Ledger.closing",
+      "title": "The ledger constructs final-brace closing transport",
+      "kind": "theorem",
+      "label": "frontier:object-ledger-closing",
+      "notes": "Constructs ClosingConditions for this concrete invariant. The generic closing interface remains Open for other states.",
+      "required_type_dependencies": [
+        "object-closing-conditions"
+      ],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2298132823
+    },
+    {
+      "id": "object-ignore-charges",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.IgnoreCharges",
+      "title": "Remaining ignored-reader gas allowance",
+      "kind": "verification_contract",
+      "label": "frontier:object-ignore-charges",
+      "notes": "Only the actual ignored-reader cost versus chosen K remains in this contract; ledger room/heap/state transport is constructed separately. It remains Open until the original parser budget supplies K.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 290164202730898608
+    },
+    {
+      "id": "object-key-room-charges",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.KeyRoomCharges",
+      "title": "Remaining key-reader room and gas allowance",
+      "kind": "verification_contract",
+      "label": "frontier:object-key-room-charges",
+      "notes": "Exact reachable key room and charge obligations after ledger state closure has been proved. The original model allowance is unchanged.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1023784262573352632
+    },
+    {
+      "id": "object-value-room-charges",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.ValueRoomCharges",
+      "title": "Remaining account-reader room and gas allowance",
+      "kind": "verification_contract",
+      "label": "frontier:object-value-room-charges",
+      "notes": "Exact error/string/account-allocation room and charge obligations; final state transport is supplied by the ledger.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 7448880728863946324
+    },
+    {
+      "id": "object-ledger-ignore",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.Ledger.ignore_conditions",
+      "title": "Ledger constructs reachable ignored-reader conditions",
+      "kind": "theorem",
+      "label": "frontier:object-ledger-ignore",
+      "notes": "Instantiates the reachable heap ceiling and exact ignored state closure. Conditional on the explicitly named ignored gas allowance and initial numeric heap bound.",
+      "required_type_dependencies": [
+        "object-ignore-charges",
+        "ignored-reachable-conditions"
+      ],
+      "required_proof_dependencies": [
+        "object-ledger-ceiling",
+        "object-ledger-ignored-state"
+      ],
+      "reviewed_shape_hash": 1231794118
+    },
+    {
+      "id": "object-ledger-key",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.Ledger.key_conditions",
+      "title": "Ledger constructs the key closure contract",
+      "kind": "theorem",
+      "label": "frontier:object-ledger-key",
+      "notes": "Proves the actual retained key capacity/free-bound and heap endpoint closure, leaving only named key room/charge obligations.",
+      "required_type_dependencies": [
+        "object-key-room-charges",
+        "key-conditions"
+      ],
+      "required_proof_dependencies": [
+        "object-ledger-segment"
+      ],
+      "reviewed_shape_hash": 1284202862
+    },
+    {
+      "id": "object-ledger-value",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.Ledger.value_conditions",
+      "title": "Ledger constructs account-value state closure",
+      "kind": "theorem",
+      "label": "frontier:object-ledger-value",
+      "notes": "Preserves retained scratch and adds the one owned account slot; max free-bound is stable from a positive initial bound. Room and cost remain explicit named obligations.",
+      "required_type_dependencies": [
+        "object-value-room-charges",
+        "value-conditions"
+      ],
+      "required_proof_dependencies": [
+        "object-ledger-segment",
+        "mixed-account-page"
+      ],
+      "reviewed_shape_hash": 3608840123
+    },
+    {
+      "id": "object-ledger-setup",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.LedgerSetup",
+      "title": "Initial heap/free-bound ledger instance",
+      "kind": "verification_contract",
+      "label": "frontier:object-ledger-setup",
+      "notes": "The actual input pipeline still must establish baseHL+18,230,154 <= 96 MiB and a positive initial free bound. No Environment or method domain is strengthened.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 15195616410908528446
+    },
+    {
+      "id": "object-ledger-reader",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.object_loop_ledger",
+      "title": "Concrete ledger instantiates the actual object reader",
+      "kind": "theorem",
+      "label": "frontier:object-ledger-reader",
+      "notes": "Constructs key/value/ignore/closing contracts and composes the existing actual Wasm key/residual contract. The named initial ledger setup and room/gas obligations remain Open, so this result is Conditional.",
+      "required_type_dependencies": [
+        "object-ledger-setup",
+        "object-key-room-charges",
+        "object-value-room-charges",
+        "object-ignore-charges"
+      ],
+      "required_proof_dependencies": [
+        "ignored-object-key-cost",
+        "object-ledger-key",
+        "object-ledger-value",
+        "object-ledger-closing",
+        "object-ledger-ignore"
+      ],
+      "reviewed_shape_hash": 3067955946
+    },
+    {
+      "id": "object-ledger-member",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.member_initial",
+      "title": "Actual raw scratch resources initialize the ledger member",
+      "kind": "theorem",
+      "label": "frontier:object-ledger-member",
+      "notes": "Constructs the initial member invariant from owned empty scratch, allocator tables and actual byte tables. No ledger witness is assumed.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "object-ledger-initial"
+      ],
+      "reviewed_shape_hash": 511519025
+    },
+    {
+      "id": "object-ledger-initial-reader",
+      "declaration": "WNear.Binary.SerdeObjectMixedTrace.object_loop_ledger_initial",
+      "title": "Raw initial resources feed the ledger object Wasm contract",
+      "kind": "theorem",
+      "label": "frontier:object-ledger-initial-reader",
+      "notes": "Composes raw member initialization with the actual object reader, retaining its equal key/residual budget and postcondition. Initial pipeline setup, remaining room/gas and the complete parser budget remain unresolved.",
+      "required_type_dependencies": [
+        "object-ledger-setup",
+        "object-key-room-charges",
+        "object-value-room-charges",
+        "object-ignore-charges"
+      ],
+      "required_proof_dependencies": [
+        "object-ledger-reader",
+        "object-ledger-member"
+      ],
+      "reviewed_shape_hash": 4073226010
     }
   ],
   "reviewed_environment": [

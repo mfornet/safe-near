@@ -33,6 +33,55 @@ it is false for the reviewed domain; its historical statement is recorded in
 the misstatement log. The historical generic host trap and contradiction lemmas
 remain checked, but witness existence is no longer a frontier obligation.
 
+## Continuation on 2026-10-31: one retained mixed ledger instantiates object state closure
+
+Successful object models now produce an ordered CallTrace of every key and
+value reader, with exact endpoints and the account duplicate check. String
+segments, ignored-frame segments and the account string all retain one scratch
+capacity. Mixed capacity doubling bounds the complete sequence by 21 growths
+when its peak is at most 4 MiB. Successful raw models establish segment validity,
+capacity below 2^25 and that peak bound. Scratch requests total at most
+18,164,618 page bytes; the at-most-one account field adds at most one page, for
+18,230,154 bytes. These model/trace facts are Proven. They do not alone assert
+that the complete deployed method has executed.
+
+The concrete Ledger records retained scratch segments, exact cap/free-bound
+endpoints, actual heap-growth bounds and a zero/one account-allocation slot.
+Its segment append theorem preserves these bounds for actual reader outcomes.
+The account path retains scratch rather than transferring/resetting it; the
+separate owned account allocation fits one page. A positive initial free bound
+also makes the account reader's max-with-one bound stable. The ledger handles
+hypothetical heap interval lengths without assuming they are aligned; actual
+scratch ownership supplies alignment/positivity before reader calls.
+
+The ledger now constructs the key, account-value, ignored-value and final-brace
+state transport. The ignored heap ceiling follows from its global page bound
+and the returned exact HeapTrace. KeyConditions, ValueConditions and reachable
+ignored conditions are instantiated by checked constructors, conditional on the
+remaining room/gas contracts. The new object reader composes these instances
+into the existing actual Wasm key/residual contract. Raw empty-scratch resources
+also initialize its member state through a checked precondition composition,
+so an abstract ledger witness is not assumed at that boundary.
+
+This object contract remains Conditional on LedgerSetup and the named
+KeyRoomCharges, ValueRoomCharges and IgnoreCharges. LedgerSetup requires the
+actual input pipeline to establish its initial heap/free-bound instance;
+room/gas contracts require the real successful reader charges/room and the
+chosen original-allowance K values. Generic IgnoreHyp, KeyConditions,
+ValueConditions and closing interfaces remain Open until their full deployment
+instances are discharged. The next frontier is general string/allocation room,
+the complete original parser gas allowance and the actual input/provider
+instantiation. Full ft_balance_of and global refinement, remaining methods and
+protocol instances are still incomplete. No model gas, Environment or public
+observation statement is weakened.
+
+Strict full audit and fresh dependency/readiness gate passed at
+2026-10-31T09:54:46+00:00 for proof source `8265e43e62ac305c38c525c8f8f158f588cd86eb2fcdd315f03c291320a0339f`. All 65 frontier
+policy tests, Lean style and toolchain checks passed. Every old statement pin
+remains byte-identical; mixed-trace and ledger interfaces are pinned additively.
+The admission allowance, original model gas/observations and reviewed
+environmental premises are unchanged. Publication requires matching served evidence.
+
 ## Continuation on 2026-10-31: precise closing handoff and exact object-key cost composition
 
 The complete actual object-loop proof now needs state transport only across its

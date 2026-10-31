@@ -276,6 +276,47 @@ class FrontierPolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
             blueprint.classify(self.manifest, self.rows, self.audit)
 
+    def test_concrete_ledger_closes_state_but_keeps_room_gas_setup_open(self):
+        result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
+        for node in ['mixed-growth-v86', 'mixed-pages-v86', 'mixed-loop-pages', 'mixed-account-page',
+                     'object-ledger-ceiling', 'object-ledger-segment', 'object-ledger-ignored-state', 'object-ledger-member']:
+            self.assertEqual(result[node]['status'], 'Proven')
+        for node in ['object-ledger-key', 'object-ledger-value', 'object-ledger-ignore',
+                     'object-ledger-reader', 'object-ledger-initial-reader', 'global']:
+            self.assertEqual(result[node]['status'], 'Conditional')
+            self.assertFalse(result[node]['direct_sorry'])
+        for node in ['object-ledger-setup', 'object-key-room-charges', 'object-value-room-charges',
+                     'object-ignore-charges', 'key-conditions', 'value-conditions', 'ignore-hyp']:
+            self.assertEqual(result[node]['status'], 'Open')
+        for source in ['object-ledger-key', 'object-ledger-value', 'object-ledger-ignore', 'object-ledger-closing']:
+            self.assertIn({'id': 'object-ledger-reader', 'status': 'Conditional'}, result[source]['integrated_into'])
+        self.assertIn({'id': 'object-ledger-initial-reader', 'status': 'Conditional'},
+                      result['object-ledger-member']['integrated_into'])
+
+    def test_ignored_ledger_cannot_drop_actual_heap_ceiling(self):
+        self.by_id['object-ledger-ignore']['proof_dependencies'].remove(
+            self.nodes['object-ledger-ceiling']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_initial_ledger_reader_cannot_assume_member_initialization(self):
+        self.by_id['object-ledger-initial-reader']['proof_dependencies'].remove(
+            self.nodes['object-ledger-member']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_object_ledger_cannot_drop_value_state_composition(self):
+        self.by_id['object-ledger-reader']['proof_dependencies'].remove(
+            self.nodes['object-ledger-value']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_ledger_cannot_hide_remaining_ignored_gas_obligation(self):
+        self.by_id['object-ledger-reader']['type_dependencies'].remove(
+            self.nodes['object-ignore-charges']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Expected verification hypotheses missing'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
     def test_actual_code_provider_reaches_global_assemblies_without_closing_the_plan(self):
         result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
         for node in ['deployed-parser-provider', 'provider-model-budget', 'absent-parser-plan',
