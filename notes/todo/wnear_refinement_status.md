@@ -33,6 +33,46 @@ it is false for the reviewed domain; its historical statement is recorded in
 the misstatement log. The historical generic host trap and contradiction lemmas
 remain checked, but witness existence is no longer a frontier obligation.
 
+## Continuation on 2026-10-31: first writer is constructed through the whole Debug path
+
+Actual function 872 now composes its deployed empty first piece with the static
+ErrorCode formatter and real function-616 String sink. The empty piece concretely
+discharges its zero-growth room case and preserves dangling pointer one, zero
+capacity/length and the heap. Copied Arguments expose all five engine fields while
+retaining the arbitrary padding word. Both original/copy records, descriptor and
+table cells, full stack, owned String bytes, post-growth heap choices and the one
+global/credit resources are preserved. Empty-byte and record conversions are
+independently Proven; no nonempty ownership is invented.
+
+The real function-598 adapter constructs its engine from those checked stages.
+An exact ErrorCodeStringWriteSpec instance is supplied for every padding word,
+including a frame for the remaining owned error-box, line/column and caller cells.
+Whole function 641 and actual dynamic function 882 consume that constructed first
+writer. Their only direct verification-contract premises on this static route are
+scratch-room and ErrorEnvelopeWriteSpec. No whole first-writer or generic Debug
+contract is assumed as an input by these new composed callers.
+
+These whole-body/dispatch results remain Conditional. Allocation room must still
+be derived for reachable states. Outer quoted/escaped String and full UInt32
+formatting, dynamic message/I/O behavior, parser-produced owned error payloads,
+uniform-before-Cg cost, rejected receipt/runtime safety, other methods and protocol
+premises remain unresolved. Static tags 2 through 21 delimit this local lemma;
+there is no narrower deployed input domain or assumption that all errors are static.
+IgnoreHyp, KeyConditions and ValueConditions remain Open until their actual
+reachable instances are discharged. Generic contract templates stay Open even
+where a concrete local instance has now been constructed.
+
+Every old statement pin, shape, status, admission frontier and strict allowance is
+preserved. The original binary, receipt-domain, gas, observations and rollback
+clauses are unchanged. The global end-to-end goal remains incomplete.
+
+Strict full audit and fresh dependency/readiness gate passed at
+2026-10-31T21:10:09+00:00 for proof source `b74d59c56bee5d89ef8e32d3596f1ec94109a210885461141674e5488c7b93f6`. All 171 frontier
+policy tests, Lean style and toolchain checks passed. Every old statement pin,
+shape and proof status is unchanged; the exact direct and transitive admission
+frontiers and strict module allowance are unchanged. New conditional callers keep
+the named outer-writer and allocation-room dependencies explicit. Live publication must match this evidence.
+
 ## Continuation on 2026-10-31: actual serde String sink is instantiated
 
 The deployed first String adapter uses vtable 1057784, whose write_str slot is

@@ -1,3 +1,4 @@
+import Bridge.Functions.SerdeSyntaxBody
 import Bridge.Functions.SerdeActualSink
 import Bridge.Functions.SerdeErrorPayload
 import Bridge.Functions.SerdeErrorWriters
@@ -4689,3 +4690,77 @@ attribute [blueprint "frontier:serde-io-branch"
   (statement := /-- Tag 1 calls actual function 804 at error plus four and retains owned tag and caller resources. Conditional on the precise I/O payload formatter; no static message is substituted and parser impossibility of this variant is not assumed. -/)
   (notReady := true)]
   WNear.Binary.SerdeErrorPayload.f592_io
+
+attribute [blueprint "frontier:serde-empty-piece"
+  (title := /-- Actual empty first piece preserves String and heap -/)
+  (statement := /-- Instantiates the real function-616 append at zero bytes. Its zero-growth room condition is concretely discharged, and dangling pointer one, zero capacity/length and heap are retained. No named formatting or allocation-room obligation remains in this local result. -/)]
+  WNear.Binary.SerdeSyntax.f616_empty
+
+attribute [blueprint "frontier:serde-empty-piece-framed"
+  (title := /-- Empty piece retains the ErrorCode caller resources -/)
+  (statement := /-- Frames actual error descriptor, tag and source bytes around the checked empty-piece writer. One global stack-pointer cell is lent and returned; no owned resource is duplicated. -/)]
+  WNear.Binary.SerdeSyntax.f616_empty_framed
+
+attribute [blueprint "frontier:serde-static-argument"
+  (title := /-- Static ErrorCode satisfies the real engine argument interface -/)
+  (statement := /-- Instantiates the actual static ErrorCode-to-function-616 path under the real Formatter resource and owned String state. Retains flags/width, descriptor, tag and source bytes and exact post-growth allocation state. Conditional on named scratch-room. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeSyntax.f591_argument
+
+attribute [blueprint "frontier:serde-static-engine"
+  (title := /-- Actual first formatting engine composes empty piece and static argument -/)
+  (statement := /-- Actual function 872 uses the deployed piece pointer 1057628 and ErrorCode table slot 126, writes its empty piece and invokes the concrete static formatter through function 616. It preserves Arguments, descriptor/table cells, full frame and the single global/credit resources. Only scratch-room remains a direct verification premise. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeSyntax.f872_syntax
+
+attribute [blueprint "frontier:serde-args-fields"
+  (title := /-- Copied Arguments preserve arbitrary padding through field conversion -/)
+  (statement := /-- Checked ownership equivalence between all three eight-byte pairs and the five fields read by function 872 plus the retained arbitrary padding word. Both directions preserve the full record. -/)]
+  WNear.Binary.SerdeSyntax.args24_argsAt
+
+attribute [blueprint "frontier:serde-static-engine-copy"
+  (title := /-- Actual engine accepts the copied Arguments record -/)
+  (statement := /-- Reuses the checked engine after exposing its five fields and retaining arbitrary padding. Restores the full 160-byte caller allowance, original data word and complete copied Arguments; no whole-engine contract is assumed. Allocation room remains Conditional. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeSyntax.f872_copied
+
+attribute [blueprint "frontier:serde-static-string-format"
+  (title := /-- Actual String write_fmt constructs its first engine instance -/)
+  (statement := /-- The real function-598 adapter instantiates its exact function-872 engine from concrete static ErrorCode and function-616 String sink behavior. Original Arguments and padding, copied frame, String bytes, heap choices and one credit resource are preserved. Conditional only on scratch-room. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeSyntax.f598_syntax
+
+attribute [blueprint "frontier:serde-empty-string-resources"
+  (title := /-- Empty dangling String consumes no byte ownership -/)
+  (statement := /-- Constructs the empty buffer and zero spare capacity from the existing heap invariant. All zero-byte cells are derived from empty ownership; no nonempty bytes or heap resources are introduced. -/)]
+  WNear.Binary.SerdeSyntax.empty_sbuf
+
+attribute [blueprint "frontier:serde-static-writer-frame"
+  (title := /-- Static first writer returns the exact Debug frame and owned String -/)
+  (statement := /-- Repackages the real String writer into the actual serde Debug frame. All 192 bytes below the frame, original descriptors, every padding word and existential pointer/capacity/length are retained. Result includes source/shared cells and the actual post-growth String bytes and heap. Conditional on scratch-room. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeSyntax.f598_frame_syntax
+
+attribute [blueprint "frontier:serde-static-code-writer-instance"
+  (title := /-- Checked static first writer constructs its exact family -/)
+  (statement := /-- Constructs ErrorCodeStringWriteSpec for every padding word from actual binary calls and ownership results. This is a concrete static instance, not universal discharge of the generic interface. scratch-room remains unresolved. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeSyntax.code_writer_instance
+
+attribute [blueprint "frontier:serde-static-code-writer-framed"
+  (title := /-- First writer retains additional owned error and caller cells -/)
+  (statement := /-- Frames arbitrary additional owned resources, including remaining error-box, line/column and sink cells, through every padding choice of the concrete static writer. Constructs the exact writer family; does not invent missing parser ownership. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeSyntax.code_writer_instance_framed
+
+attribute [blueprint "frontier:serde-static-debug-body"
+  (title := /-- Whole Debug constructs its static ErrorCode first writer -/)
+  (statement := /-- Actual function 641 composes the concretely constructed static first-writer family with the checked outer setup and String cleanup. ErrorCodeStringWriteSpec is no longer an input premise on this route. scratch-room and exact outer ErrorEnvelopeWriteSpec remain Conditional. Dynamic message/I/O semantics, full UInt32/String escaping, uniform cost and rejected receipt premises remain unfinished. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeSyntax.f641_static_composed
+
+attribute [blueprint "frontier:serde-static-debug-dispatch"
+  (title := /-- Dynamic Debug dispatch constructs its static first writer -/)
+  (statement := /-- Actual function 882 reaches the whole checked Debug body with its static first writer constructed from the real engine and String sink. Vtable/table ownership, complete frame, returned heap and gas are retained. No assumed generic first-writer or generic Debug interface remains as an input; outer formatting and scratch-room remain explicit. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeSyntax.f882_static_composed

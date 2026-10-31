@@ -11416,6 +11416,199 @@
       ],
       "required_proof_dependencies": [],
       "reviewed_shape_hash": 4140860763
+    },
+    {
+      "id": "serde-empty-piece",
+      "declaration": "WNear.Binary.SerdeSyntax.f616_empty",
+      "title": "Actual empty first piece preserves String and heap",
+      "kind": "theorem",
+      "label": "frontier:serde-empty-piece",
+      "notes": "Instantiates the real function-616 append at zero bytes. Its zero-growth room condition is concretely discharged, and dangling pointer one, zero capacity/length and heap are retained. No named formatting or allocation-room obligation remains in this local result.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "serde-actual-string-append"
+      ],
+      "reviewed_shape_hash": 2100354196
+    },
+    {
+      "id": "serde-empty-piece-framed",
+      "declaration": "WNear.Binary.SerdeSyntax.f616_empty_framed",
+      "title": "Empty piece retains the ErrorCode caller resources",
+      "kind": "theorem",
+      "label": "frontier:serde-empty-piece-framed",
+      "notes": "Frames actual error descriptor, tag and source bytes around the checked empty-piece writer. One global stack-pointer cell is lent and returned; no owned resource is duplicated.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "serde-empty-piece"
+      ],
+      "reviewed_shape_hash": 1870174320
+    },
+    {
+      "id": "serde-static-argument",
+      "declaration": "WNear.Binary.SerdeSyntax.f591_argument",
+      "title": "Static ErrorCode satisfies the real engine argument interface",
+      "kind": "theorem",
+      "label": "frontier:serde-static-argument",
+      "notes": "Instantiates the actual static ErrorCode-to-function-616 path under the real Formatter resource and owned String state. Retains flags/width, descriptor, tag and source bytes and exact post-growth allocation state. Conditional on named scratch-room.",
+      "required_type_dependencies": [
+        "scratch-room"
+      ],
+      "required_proof_dependencies": [
+        "serde-code-syntax-append"
+      ],
+      "reviewed_shape_hash": 499869894
+    },
+    {
+      "id": "serde-static-engine",
+      "declaration": "WNear.Binary.SerdeSyntax.f872_syntax",
+      "title": "Actual first formatting engine composes empty piece and static argument",
+      "kind": "theorem",
+      "label": "frontier:serde-static-engine",
+      "notes": "Actual function 872 uses the deployed piece pointer 1057628 and ErrorCode table slot 126, writes its empty piece and invokes the concrete static formatter through function 616. It preserves Arguments, descriptor/table cells, full frame and the single global/credit resources. Only scratch-room remains a direct verification premise.",
+      "required_type_dependencies": [
+        "scratch-room"
+      ],
+      "required_proof_dependencies": [
+        "serde-empty-piece-framed",
+        "serde-static-argument"
+      ],
+      "reviewed_shape_hash": 3408784015
+    },
+    {
+      "id": "serde-args-fields",
+      "declaration": "WNear.Binary.SerdeSyntax.args24_argsAt",
+      "title": "Copied Arguments preserve arbitrary padding through field conversion",
+      "kind": "theorem",
+      "label": "frontier:serde-args-fields",
+      "notes": "Checked ownership equivalence between all three eight-byte pairs and the five fields read by function 872 plus the retained arbitrary padding word. Both directions preserve the full record.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1006969631
+    },
+    {
+      "id": "serde-static-engine-copy",
+      "declaration": "WNear.Binary.SerdeSyntax.f872_copied",
+      "title": "Actual engine accepts the copied Arguments record",
+      "kind": "theorem",
+      "label": "frontier:serde-static-engine-copy",
+      "notes": "Reuses the checked engine after exposing its five fields and retaining arbitrary padding. Restores the full 160-byte caller allowance, original data word and complete copied Arguments; no whole-engine contract is assumed. Allocation room remains Conditional.",
+      "required_type_dependencies": [
+        "scratch-room"
+      ],
+      "required_proof_dependencies": [
+        "serde-static-engine",
+        "serde-args-fields"
+      ],
+      "reviewed_shape_hash": 722296446
+    },
+    {
+      "id": "serde-static-string-format",
+      "declaration": "WNear.Binary.SerdeSyntax.f598_syntax",
+      "title": "Actual String write_fmt constructs its first engine instance",
+      "kind": "theorem",
+      "label": "frontier:serde-static-string-format",
+      "notes": "The real function-598 adapter instantiates its exact function-872 engine from concrete static ErrorCode and function-616 String sink behavior. Original Arguments and padding, copied frame, String bytes, heap choices and one credit resource are preserved. Conditional only on scratch-room.",
+      "required_type_dependencies": [
+        "scratch-room"
+      ],
+      "required_proof_dependencies": [
+        "serde-static-engine-copy",
+        "serde-string-adapter"
+      ],
+      "reviewed_shape_hash": 3145389734
+    },
+    {
+      "id": "serde-empty-string-resources",
+      "declaration": "WNear.Binary.SerdeSyntax.empty_sbuf",
+      "title": "Empty dangling String consumes no byte ownership",
+      "kind": "theorem",
+      "label": "frontier:serde-empty-string-resources",
+      "notes": "Constructs the empty buffer and zero spare capacity from the existing heap invariant. All zero-byte cells are derived from empty ownership; no nonempty bytes or heap resources are introduced.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2269360525
+    },
+    {
+      "id": "serde-static-writer-frame",
+      "declaration": "WNear.Binary.SerdeSyntax.f598_frame_syntax",
+      "title": "Static first writer returns the exact Debug frame and owned String",
+      "kind": "theorem",
+      "label": "frontier:serde-static-writer-frame",
+      "notes": "Repackages the real String writer into the actual serde Debug frame. All 192 bytes below the frame, original descriptors, every padding word and existential pointer/capacity/length are retained. Result includes source/shared cells and the actual post-growth String bytes and heap. Conditional on scratch-room.",
+      "required_type_dependencies": [
+        "scratch-room"
+      ],
+      "required_proof_dependencies": [
+        "serde-static-string-format",
+        "serde-empty-string-resources"
+      ],
+      "reviewed_shape_hash": 210694932
+    },
+    {
+      "id": "serde-static-code-writer-instance",
+      "declaration": "WNear.Binary.SerdeSyntax.code_writer_instance",
+      "title": "Checked static first writer constructs its exact family",
+      "kind": "theorem",
+      "label": "frontier:serde-static-code-writer-instance",
+      "notes": "Constructs ErrorCodeStringWriteSpec for every padding word from actual binary calls and ownership results. This is a concrete static instance, not universal discharge of the generic interface. scratch-room remains unresolved.",
+      "required_type_dependencies": [
+        "scratch-room",
+        "serde-code-string-writer"
+      ],
+      "required_proof_dependencies": [
+        "serde-static-writer-frame"
+      ],
+      "reviewed_shape_hash": 1497473528
+    },
+    {
+      "id": "serde-static-code-writer-framed",
+      "declaration": "WNear.Binary.SerdeSyntax.code_writer_instance_framed",
+      "title": "First writer retains additional owned error and caller cells",
+      "kind": "theorem",
+      "label": "frontier:serde-static-code-writer-framed",
+      "notes": "Frames arbitrary additional owned resources, including remaining error-box, line/column and sink cells, through every padding choice of the concrete static writer. Constructs the exact writer family; does not invent missing parser ownership.",
+      "required_type_dependencies": [
+        "scratch-room",
+        "serde-code-string-writer"
+      ],
+      "required_proof_dependencies": [
+        "serde-static-code-writer-instance"
+      ],
+      "reviewed_shape_hash": 3231774755
+    },
+    {
+      "id": "serde-static-debug-body",
+      "declaration": "WNear.Binary.SerdeSyntax.f641_static_composed",
+      "title": "Whole Debug constructs its static ErrorCode first writer",
+      "kind": "theorem",
+      "label": "frontier:serde-static-debug-body",
+      "notes": "Actual function 641 composes the concretely constructed static first-writer family with the checked outer setup and String cleanup. ErrorCodeStringWriteSpec is no longer an input premise on this route. scratch-room and exact outer ErrorEnvelopeWriteSpec remain Conditional. Dynamic message/I/O semantics, full UInt32/String escaping, uniform cost and rejected receipt premises remain unfinished.",
+      "required_type_dependencies": [
+        "scratch-room",
+        "serde-error-envelope-writer"
+      ],
+      "required_proof_dependencies": [
+        "serde-static-code-writer-framed",
+        "serde-debug-body"
+      ],
+      "reviewed_shape_hash": 2773663400
+    },
+    {
+      "id": "serde-static-debug-dispatch",
+      "declaration": "WNear.Binary.SerdeSyntax.f882_static_composed",
+      "title": "Dynamic Debug dispatch constructs its static first writer",
+      "kind": "theorem",
+      "label": "frontier:serde-static-debug-dispatch",
+      "notes": "Actual function 882 reaches the whole checked Debug body with its static first writer constructed from the real engine and String sink. Vtable/table ownership, complete frame, returned heap and gas are retained. No assumed generic first-writer or generic Debug interface remains as an input; outer formatting and scratch-room remain explicit.",
+      "required_type_dependencies": [
+        "scratch-room",
+        "serde-error-envelope-writer"
+      ],
+      "required_proof_dependencies": [
+        "serde-static-debug-body",
+        "serde-error-debug-dispatch"
+      ],
+      "reviewed_shape_hash": 247278797
     }
   ],
   "reviewed_environment": [

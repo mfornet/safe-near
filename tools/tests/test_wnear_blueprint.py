@@ -1118,6 +1118,88 @@ class FrontierPolicyTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 blueprint.classify(self.manifest, rows)
 
+    def test_static_debug_constructs_first_writer_and_keeps_outer_room_open(self):
+        nodes = {n['id']: n for n in blueprint.classify(self.manifest, self.rows)}
+        for id in ['serde-static-debug-body', 'serde-static-debug-dispatch']:
+            self.assertEqual(nodes[id]['status'], 'Conditional')
+            self.assertEqual(set(nodes[id]['type_edges']), {'scratch-room', 'serde-error-envelope-writer'})
+            self.assertFalse(nodes[id]['direct_sorry'])
+            self.assertNotIn('serde-code-string-writer', nodes[id]['type_edges'])
+            self.assertNotIn('serde-error-debug-spec', nodes[id]['type_edges'])
+        for id in ['scratch-room', 'serde-error-envelope-writer', 'serde-code-string-writer',
+                   'serde-debug-uniform-cost', 'ignore-hyp', 'key-conditions', 'value-conditions']:
+            self.assertEqual(nodes[id]['status'], 'Open')
+
+    def test_static_engine_and_adapter_have_concrete_behavior_instances(self):
+        nodes = {n['id']: n for n in blueprint.classify(self.manifest, self.rows)}
+        for id in ['serde-static-argument', 'serde-static-engine', 'serde-static-engine-copy',
+                   'serde-static-string-format', 'serde-static-writer-frame']:
+            self.assertEqual(nodes[id]['status'], 'Conditional')
+            self.assertEqual(nodes[id]['type_edges'], ['scratch-room'])
+            self.assertFalse(nodes[id]['direct_sorry'])
+        for id in ['serde-string-engine', 'serde-static-slice-writer', 'serde-selected-slice-sink']:
+            self.assertEqual(nodes[id]['status'], 'Open')
+
+    def test_zero_piece_and_argument_record_reclaim_are_independently_proven(self):
+        nodes = {n['id']: n for n in blueprint.classify(self.manifest, self.rows)}
+        for id in ['serde-empty-piece', 'serde-empty-piece-framed', 'serde-args-fields', 'serde-empty-string-resources']:
+            self.assertEqual(nodes[id]['status'], 'Proven')
+            self.assertFalse(nodes[id]['type_edges'])
+            self.assertFalse(nodes[id]['direct_sorry'])
+        self.assertIn({'id': 'serde-empty-piece', 'status': 'Proven'},
+                      nodes['serde-actual-string-append']['integrated_into'])
+
+    def test_static_writer_family_is_constructed_not_universally_closed(self):
+        nodes = {n['id']: n for n in blueprint.classify(self.manifest, self.rows)}
+        for id in ['serde-static-code-writer-instance', 'serde-static-code-writer-framed']:
+            self.assertEqual(nodes[id]['status'], 'Conditional')
+            self.assertEqual(set(nodes[id]['type_edges']), {'scratch-room', 'serde-code-string-writer'})
+            self.assertFalse(nodes[id]['direct_sorry'])
+        self.assertEqual(nodes['serde-code-string-writer']['status'], 'Open')
+        self.assertEqual(nodes['balance-rejected']['status'], 'Open')
+
+    def test_static_room_and_outer_writer_premises_cannot_disappear(self):
+        for id, dependency in [('serde-static-debug-body', 'scratch-room'),
+                               ('serde-static-debug-body', 'serde-error-envelope-writer'),
+                               ('serde-static-debug-dispatch', 'scratch-room'),
+                               ('serde-static-debug-dispatch', 'serde-error-envelope-writer'),
+                               ('serde-static-string-format', 'scratch-room')]:
+            rows = copy.deepcopy(self.rows)
+            row = next(r for r in rows if r['declaration'] == self.nodes[id]['declaration'])
+            row['type_dependencies'].remove(self.nodes[dependency]['declaration'])
+            with self.assertRaises(ValueError):
+                blueprint.classify(self.manifest, rows)
+
+    def test_static_debug_route_keeps_actual_checked_composition_edges(self):
+        nodes = {n['id']: n for n in blueprint.classify(self.manifest, self.rows)}
+        edges = [('serde-empty-piece-framed', 'serde-static-engine'),
+                 ('serde-static-argument', 'serde-static-engine'),
+                 ('serde-static-engine', 'serde-static-engine-copy'),
+                 ('serde-args-fields', 'serde-static-engine-copy'),
+                 ('serde-static-engine-copy', 'serde-static-string-format'),
+                 ('serde-static-string-format', 'serde-static-writer-frame'),
+                 ('serde-static-writer-frame', 'serde-static-code-writer-instance'),
+                 ('serde-static-code-writer-instance', 'serde-static-code-writer-framed'),
+                 ('serde-static-code-writer-framed', 'serde-static-debug-body'),
+                 ('serde-debug-body', 'serde-static-debug-body'),
+                 ('serde-static-debug-body', 'serde-static-debug-dispatch')]
+        for source, caller in edges:
+            self.assertIn({'id': caller, 'status': 'Conditional'}, nodes[source]['integrated_into'])
+            rows = copy.deepcopy(self.rows)
+            row = next(r for r in rows if r['declaration'] == self.nodes[caller]['declaration'])
+            row['proof_dependencies'].remove(self.nodes[source]['declaration'])
+            with self.assertRaises(ValueError):
+                blueprint.classify(self.manifest, rows)
+
+    def test_static_debug_and_owned_writer_shapes_remain_reviewed(self):
+        for id in ['serde-static-debug-body', 'serde-static-debug-dispatch', 'serde-static-code-writer-instance',
+                   'serde-static-writer-frame', 'serde-args-fields']:
+            rows = copy.deepcopy(self.rows)
+            row = next(r for r in rows if r['declaration'] == self.nodes[id]['declaration'])
+            row['shape_hash'] += 1
+            with self.assertRaises(ValueError):
+                blueprint.classify(self.manifest, rows)
+
     def test_actual_code_provider_reaches_global_assemblies_without_closing_the_plan(self):
         result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
         for node in ['deployed-parser-provider', 'provider-model-budget', 'absent-parser-plan', 'pinned-arguments-limit', 'ignore-hyp', 'key-conditions', 'value-conditions']:
