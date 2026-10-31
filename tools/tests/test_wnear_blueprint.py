@@ -199,6 +199,49 @@ class FrontierPolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Expected verification hypotheses missing'):
             blueprint.classify(self.manifest, self.rows, self.audit)
 
+    def test_concrete_reader_room_keeps_whole_object_obligations_open(self):
+        result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
+        for node in ['ignored-reader-pages', 'ignored-reader-v86', 'ignored-colon-v86',
+                     'ignored-capacity-v86', 'ignored-pages-v86', 'ignored-heap-pages']:
+            self.assertEqual(result[node]['status'], 'Proven')
+            self.assertFalse(result[node]['direct_sorry'])
+        for node in ['ignored-reachable-hyp', 'ignored-reachable-object', 'global', 'method-ft_balance_of']:
+            self.assertEqual(result[node]['status'], 'Conditional')
+        for node in ['ignored-reachable-conditions', 'ignore-hyp', 'key-conditions', 'value-conditions']:
+            self.assertEqual(result[node]['status'], 'Open')
+        for source, caller, status in [('ignored-reader-pages', 'ignored-reader-v86', 'Proven'),
+                                       ('ignored-reader-v86', 'ignored-colon-v86', 'Proven'),
+                                       ('ignored-colon-v86', 'ignored-reachable-hyp', 'Conditional'),
+                                       ('ignored-reachable-hyp', 'ignored-reachable-object', 'Conditional')]:
+            self.assertIn({'id': caller, 'status': status}, result[source]['integrated_into'])
+
+    def test_page_budget_reader_cannot_drop_its_room_constructor(self):
+        self.by_id['ignored-reader-pages']['proof_dependencies'].remove(
+            self.nodes['ignored-room-pages']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_physical_object_caller_cannot_hide_reachable_conditions(self):
+        self.by_id['ignored-reachable-object']['type_dependencies'].remove(
+            self.nodes['ignored-reachable-conditions']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Expected verification hypotheses missing'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_actual_object_key_coverage_keeps_full_parser_open(self):
+        result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
+        for node in ['object-key-path', 'object-key-cover', 'object-key-models', 'object-key-gas', 'object-key-opening']:
+            self.assertEqual(result[node]['status'], 'Proven')
+        for node in ['object-key-path', 'object-key-cover', 'object-key-models', 'key-argument-slice-gas']:
+            self.assertIn({'id': 'object-key-gas', 'status': 'Proven'}, result[node]['integrated_into'])
+        self.assertEqual(result['ignored-reachable-conditions']['status'], 'Open')
+        self.assertEqual(result['global']['status'], 'Conditional')
+
+    def test_key_gas_cannot_drop_actual_input_coverage(self):
+        self.by_id['object-key-gas']['proof_dependencies'].remove(
+            self.nodes['object-key-cover']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
     def test_actual_code_provider_reaches_global_assemblies_without_closing_the_plan(self):
         result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
         for node in ['deployed-parser-provider', 'provider-model-budget', 'absent-parser-plan',

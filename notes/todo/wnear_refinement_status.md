@@ -33,6 +33,61 @@ it is false for the reviewed domain; its historical statement is recorded in
 the misstatement log. The historical generic host trap and contradiction lemmas
 remain checked, but witness existence is no longer a frontier obligation.
 
+## Continuation on 2026-10-31: concrete ignored-reader room and physical caller composition
+
+`SerdeIgnRoom` constructs trace Room from a total requested-page budget. The
+proof handles every actual reserve outcome, including allocation reuse and
+memory growth, and preserves positive aligned heap lengths. `heap_pages_bound`
+also bounds the returned exact HeapTrace and preserves page residue.
+
+For a successful value of at most 4 MiB, the existing capacity/peak and doubling
+bounds imply at most 24 frame growths and at most 18,362,816 requested page bytes.
+Under the explicit 2,048-page ceiling, a positive aligned starting heap no larger
+than 96 MiB therefore has room for the entire value trace. The full deployed
+f81 contract is instantiated from this page bound and feeds a checked real f201
+colon caller. These scoped operational contracts have no Room hypothesis and
+are Proven under their explicit input/resource bounds. They do not establish
+that every whole-object call meets the starting-heap ceiling, nor instantiate
+the pinned protocol JSON or change Environment/Context.WF.
+
+Successful 4 MiB value traces also preserve the object caller's capacity bound
+below 2^25. `SerdeIgnObjectV86.ignoreHyp_v86` reads alignment and positivity from
+actual owned scratch, constructs the reader room, proves final capacity and
+preserves the caller's account/stack resources. The new `object_loop_v86` feeds
+this constructor into the general object loop. Actual reader room and final
+capacity are now instantiated and Integrated at that call boundary.
+
+This physical-state interface matters because KeyConditions quantifies its
+closure over a heap-length interval, including unaligned hypothetical integers.
+Requiring B itself to imply alignment would make growing-key instances fail.
+The new ReachableIgnoreConditions is restricted by alignment/positivity proved
+from actual memory; the old IgnoreConditions and all old theorem statements
+remain unchanged. ReachableIgnoreConditions still requires the starting-heap
+ceiling, original reader cost allowance and exact caller-state closure for B
+and Bsaved. It is Open, and the new IgnoreHyp/object compositions are Conditional.
+KeyConditions, ValueConditions, the generic IgnoreHyp interface, whole-object
+trace/gas coverage, general parser provider and protocol instances remain Open.
+Full ft_balance_of and global refinement remain Conditional. Next work is the
+whole-object retained-scratch/heap invariant and original total parser allowance.
+
+The same checkpoint closes the key-only input-coverage step. A successful
+full object-loop model now yields an ordered KeyWalk with the exact absolute
+key cursors, successful string models, colons and subsequent value endpoints.
+Its raw key-body bytes plus two structural bytes per key are disjoint and fit
+the consumed object input. This instantiates the existing key-sequence gas bound
+with actual loop keys and the unchanged argumentByteGas coefficient. The key
+path also instantiates at the actual opening cursor used by the object caller.
+These pure coverage/composition results are Proven. They do not identify the
+key-only retained-scratch sequence with the whole mixed Wasm allocation trace:
+interleaved frame/account allocations and the total parser allowance remain Open.
+
+Strict full audit and fresh actual-dependency/readiness gate passed at
+2026-10-31T08:32:24+00:00 for proof source `75ba6272f77335a301b310ae74774b960ac6438c76610505fe0cf3899b81c385`. All 56 frontier
+policy tests, Lean style and toolchain checks passed. All old statement pins
+remain byte-identical; the concrete room/reachable-caller interfaces are pinned additively.
+No axiom/admission allowance, model observation or reviewed environmental
+premise was expanded. Publication also requires matching served evidence.
+
 ## Continuation on 2026-10-31: full ignored reader integrated into object parsing
 
 The complete actual deployed function 81 now composes from its real prologue,

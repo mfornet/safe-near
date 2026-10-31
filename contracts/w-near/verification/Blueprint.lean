@@ -1,3 +1,5 @@
+import Bridge.Functions.SerdeObjectKeyCoverage
+import Bridge.Functions.SerdeIgnObjectV86
 import Bridge.Functions.SerdeIgnObject
 import Bridge.Functions.SerdeIgnLoop
 import Bridge.Functions.ScratchMixedTrace
@@ -1972,3 +1974,88 @@ attribute [blueprint "frontier:ignored-object-composition"
   (statement := /-- Constructs IgnoreHyp and composes it into the existing general object-loop proof. KeyConditions, ValueConditions and ignored-member room/gas/state closure remain explicit unresolved dependencies. -/)
   (notReady := true)]
   WNear.Binary.SerdeIgnObject.object_loop
+
+attribute [blueprint "frontier:ignored-room-pages"
+  (title := /-- Requested-page budget constructs trace room -/)
+  (statement := /-- Constructs Room by induction over actual reserve transitions from a total requested-page budget, positive aligned heap and address/page ceiling. Conditional classification reflects Room in its conclusion; the constructor has no admission. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeIgnExecution.room_of_pages
+
+attribute [blueprint "frontier:ignored-heap-pages"
+  (title := /-- Actual heap trace preserves alignment and obeys page budget -/)
+  (statement := /-- Bounds every permitted actual final heap between its initial length and initial length plus requested pages, and preserves its page residue. No arbitrary final-heap assumption. -/)]
+  WNear.Binary.SerdeIgnExecution.heap_pages_bound
+
+attribute [blueprint "frontier:ignored-capacity-v86"
+  (title := /-- Successful 4 MiB values preserve the object capacity ceiling -/)
+  (statement := /-- A successful full syntax trace with initial capacity below 2^25 has final capacity below 2^25. Uses the actual retained-capacity/peak bound; no caller closure assumption. -/)]
+  WNear.Binary.SerdeIgnExecution.trace_end_cap_v86
+
+attribute [blueprint "frontier:ignored-pages-v86"
+  (title := /-- Successful 4 MiB values request at most 18,362,816 bytes of pages -/)
+  (statement := /-- Derives at most 24 growths from valid capacity doubling, then bounds exact page requests using the successful trace peak. This is a pure bound under explicit input/capacity premises, not protocol instantiation. -/)]
+  WNear.Binary.SerdeIgnExecution.trace_pages_v86
+
+attribute [blueprint "frontier:ignored-room-v86"
+  (title := /-- Concrete trace-room instance for an aligned 96 MiB heap -/)
+  (statement := /-- Constructs Room under the 2,048-page ceiling for a successful value up to 4 MiB starting at a positive aligned heap no larger than 96 MiB. Whole-object establishment of the starting heap bound is not claimed. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeIgnExecution.room_v86
+
+attribute [blueprint "frontier:ignored-reader-pages"
+  (title := /-- Full deployed reader instantiated from a physical page budget -/)
+  (statement := /-- Instantiates the full actual reader by constructing its Room argument from explicit page, positivity and alignment bounds. The scoped operational contract has no remaining Room hypothesis. -/)]
+  WNear.Binary.SerdeIgnExecution.f81_traced_of_pages
+
+attribute [blueprint "frontier:ignored-reader-v86"
+  (title := /-- Full reader with concrete input and starting-heap bounds -/)
+  (statement := /-- Full deployed f81 contract for successful values up to 4 MiB and a positive aligned starting heap at most 96 MiB under 2,048 pages. Room is constructed, not assumed. Whole-method reachable-heap and protocol instantiation remain separate Open obligations. -/)]
+  WNear.Binary.SerdeIgnExecution.f81_traced_v86
+
+attribute [blueprint "frontier:ignored-colon-v86"
+  (title := /-- Real colon caller uses the concrete-room full reader -/)
+  (statement := /-- Composes the actual colon function directly with the concrete-room f81 contract. Retains exact cost, cursor, heap trace and owned allocation endpoints under the explicit input/starting-heap bounds. -/)]
+  WNear.Binary.SerdeIgnExecution.f201_traced_v86
+
+attribute [blueprint "frontier:ignored-reachable-conditions"
+  (title := /-- Remaining physically reachable ignored-member conditions -/)
+  (statement := /-- For actual positive aligned scratch heaps: establishes the 96 MiB starting-heap ceiling, reader cost allowance and exact HeapTrace closure of B/Bsaved. These three whole-object obligations remain Open. Room and final capacity are derived by the new constructor. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeIgnObject.ReachableIgnoreConditions
+
+attribute [blueprint "frontier:ignored-reachable-hyp"
+  (title := /-- IgnoreHyp uses actual memory alignment and constructed room -/)
+  (statement := /-- Reads alignment/positivity from owned scratch, constructs reader room, and proves final capacity. Conditional on ReachableIgnoreConditions for current and saved bounds. Preserves the original IgnoreHyp interface. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeIgnObject.ignoreHyp_v86
+
+attribute [blueprint "frontier:ignored-reachable-object"
+  (title := /-- General object caller integrates concrete ignored-reader room -/)
+  (statement := /-- Constructs IgnoreHyp with actual scratch alignment and concrete reader room, then applies the general object loop. Remains Conditional on reachable heap/gas/state closure, KeyConditions and ValueConditions. No global or full-method obligation is declared closed. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeIgnObject.object_loop_v86
+
+attribute [blueprint "frontier:object-key-cover"
+  (title := /-- Object key charges occupy disjoint input bytes -/)
+  (statement := /-- For the exact key/cursor path, raw key-body bytes plus two structural bytes per key fit the consumed object-loop input. Includes escapes and UTF-8; no theorem about all parser costs is asserted. -/)]
+  WNear.Binary.SerdeObjectCoverage.key_walk_coverage
+
+attribute [blueprint "frontier:object-key-models"
+  (title := /-- Every extracted object key satisfies the string model -/)
+  (statement := /-- The ordered path supplies the exact successful stringBody model at every recorded absolute key cursor. -/)]
+  WNear.Binary.SerdeObjectCoverage.key_walk_models
+
+attribute [blueprint "frontier:object-key-path"
+  (title := /-- Successful general object loop yields the actual key path -/)
+  (statement := /-- Extracts an ordered KeyWalk from every successful model object loop, including account fields, escaped keys and arbitrary successful ignored values. Value suffixes and actual colon consumption ensure nonoverlap. -/)]
+  WNear.Binary.SerdeObjectCoverage.loop_keys
+
+attribute [blueprint "frontier:object-key-gas"
+  (title := /-- Actual object keys instantiate the key argument-gas slice -/)
+  (statement := /-- Combines the actual successful loop path, key model witnesses, disjoint coverage and the existing key-sequence bound using the unchanged argumentByteGas coefficient. This key-only scratch sequence still does not include interleaved frame/account allocation or all parser operations. -/)]
+  WNear.Binary.SerdeObjectCoverage.loop_key_argument_budget
+
+attribute [blueprint "frontier:object-key-opening"
+  (title := /-- Full object opening supplies the checked key path -/)
+  (statement := /-- Instantiates key-path extraction at the same actual opening cursor and objLoop premise used by the composed object-parser contract. -/)]
+  WNear.Binary.SerdeObjectCoverage.object_keys

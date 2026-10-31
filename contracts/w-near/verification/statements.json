@@ -523,6 +523,27 @@
     "WNear.Binary.SerdeIgnObject.ignored_agrees",
     "WNear.Binary.SerdeIgnObject.IgnoreConditions",
     "WNear.Binary.SerdeIgnObject.ignoreHyp",
-    "WNear.Binary.SerdeIgnObject.object_loop"
+    "WNear.Binary.SerdeIgnObject.object_loop",
+    "WNear.Binary.SerdeIgnExecution.room_of_pages",
+    "WNear.Binary.SerdeIgnExecution.heap_pages_bound",
+    "WNear.Binary.SerdeIgnExecution.trace_end_cap_v86",
+    "WNear.Binary.SerdeIgnExecution.trace_pages_v86",
+    "WNear.Binary.SerdeIgnExecution.room_v86",
+    "WNear.Binary.SerdeIgnExecution.f81_traced_of_pages",
+    "WNear.Binary.SerdeIgnExecution.f81_traced_v86",
+    "WNear.Binary.SerdeIgnExecution.f201_traced_v86",
+    "WNear.Binary.SerdeIgnObject.ReachableIgnoreConditions",
+    "WNear.Binary.SerdeIgnObject.ignoreHyp_v86",
+    "WNear.Binary.SerdeIgnObject.object_loop_v86",
+    "WNear.Binary.SerdeObjectCoverage.keyQ_strict",
+    "WNear.Binary.SerdeObjectCoverage.key_charge",
+    "WNear.Binary.SerdeObjectCoverage.key_walk_coverage",
+    "WNear.Binary.SerdeObjectCoverage.key_walk_models",
+    "WNear.Binary.SerdeObjectCoverage.loop_keys",
+    "WNear.Binary.SerdeObjectCoverage.loop_key_argument_budget",
+    "WNear.Binary.SerdeObjectCoverage.object_keys",
+    "WNear.Binary.SerdeObjectCoverage.KeyWalk",
+    "WNear.Binary.SerdeObjectCoverage.KeyWalk.done",
+    "WNear.Binary.SerdeObjectCoverage.KeyWalk.member"
   ]
 }

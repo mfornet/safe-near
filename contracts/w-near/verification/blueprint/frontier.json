@@ -377,11 +377,13 @@
         "scratch-room",
         "ignored-decoded-suffix",
         "ignored-hyp-instance",
-        "ignored-member-conditions"
+        "ignored-member-conditions",
+        "ignored-reachable-hyp",
+        "ignored-reachable-conditions"
       ],
       "label": "frontier:ignore-hyp",
       "reviewed_shape_hash": 14658794859049893487,
-      "notes": "The complete deployed f81/f201 reader now constructs this interface conditionally and is integrated into a general object-loop proof. Concrete reachable growth-room, original gas and state-closure instances are still missing; the general interface remains Open."
+      "notes": "Full f81/f201 execution is checked and a reachable-state constructor now derives actual growth room and final capacity using owned memory facts and explicit physical bounds. Whole-object heap ceiling, original gas and state-closure instances remain missing, so this general interface stays Open."
     },
     {
       "id": "key-conditions",
@@ -4458,6 +4460,216 @@
         "ignored-hyp-instance",
         "object-parser"
       ]
+    },
+    {
+      "id": "ignored-room-pages",
+      "declaration": "WNear.Binary.SerdeIgnExecution.room_of_pages",
+      "title": "Requested-page budget constructs trace room",
+      "kind": "theorem",
+      "label": "frontier:ignored-room-pages",
+      "notes": "Constructs Room by induction over actual reserve transitions from a total requested-page budget, positive aligned heap and address/page ceiling. Conditional classification reflects Room in its conclusion; the constructor has no admission.",
+      "reviewed_shape_hash": 2296185954,
+      "required_type_dependencies": [
+        "ignored-trace-room"
+      ],
+      "required_proof_dependencies": []
+    },
+    {
+      "id": "ignored-heap-pages",
+      "declaration": "WNear.Binary.SerdeIgnExecution.heap_pages_bound",
+      "title": "Actual heap trace preserves alignment and obeys page budget",
+      "kind": "theorem",
+      "label": "frontier:ignored-heap-pages",
+      "notes": "Bounds every permitted actual final heap between its initial length and initial length plus requested pages, and preserves its page residue. No arbitrary final-heap assumption.",
+      "reviewed_shape_hash": 4176810134,
+      "required_type_dependencies": [],
+      "required_proof_dependencies": []
+    },
+    {
+      "id": "ignored-capacity-v86",
+      "declaration": "WNear.Binary.SerdeIgnExecution.trace_end_cap_v86",
+      "title": "Successful 4 MiB values preserve the object capacity ceiling",
+      "kind": "theorem",
+      "label": "frontier:ignored-capacity-v86",
+      "notes": "A successful full syntax trace with initial capacity below 2^25 has final capacity below 2^25. Uses the actual retained-capacity/peak bound; no caller closure assumption.",
+      "reviewed_shape_hash": 376150413,
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "ignore-machine-trace-valid"
+      ]
+    },
+    {
+      "id": "ignored-pages-v86",
+      "declaration": "WNear.Binary.SerdeIgnExecution.trace_pages_v86",
+      "title": "Successful 4 MiB values request at most 18,362,816 bytes of pages",
+      "kind": "theorem",
+      "label": "frontier:ignored-pages-v86",
+      "notes": "Derives at most 24 growths from valid capacity doubling, then bounds exact page requests using the successful trace peak. This is a pure bound under explicit input/capacity premises, not protocol instantiation.",
+      "reviewed_shape_hash": 3671056821,
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "ignore-machine-trace-valid"
+      ]
+    },
+    {
+      "id": "ignored-room-v86",
+      "declaration": "WNear.Binary.SerdeIgnExecution.room_v86",
+      "title": "Concrete trace-room instance for an aligned 96 MiB heap",
+      "kind": "theorem",
+      "label": "frontier:ignored-room-v86",
+      "notes": "Constructs Room under the 2,048-page ceiling for a successful value up to 4 MiB starting at a positive aligned heap no larger than 96 MiB. Whole-object establishment of the starting heap bound is not claimed.",
+      "reviewed_shape_hash": 3914399227,
+      "required_type_dependencies": [
+        "ignored-trace-room"
+      ],
+      "required_proof_dependencies": [
+        "ignored-room-pages",
+        "ignored-pages-v86"
+      ]
+    },
+    {
+      "id": "ignored-reader-pages",
+      "declaration": "WNear.Binary.SerdeIgnExecution.f81_traced_of_pages",
+      "title": "Full deployed reader instantiated from a physical page budget",
+      "kind": "theorem",
+      "label": "frontier:ignored-reader-pages",
+      "notes": "Instantiates the full actual reader by constructing its Room argument from explicit page, positivity and alignment bounds. The scoped operational contract has no remaining Room hypothesis.",
+      "reviewed_shape_hash": 2759324486,
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "ignored-traced-reader",
+        "ignored-room-pages"
+      ]
+    },
+    {
+      "id": "ignored-reader-v86",
+      "declaration": "WNear.Binary.SerdeIgnExecution.f81_traced_v86",
+      "title": "Full reader with concrete input and starting-heap bounds",
+      "kind": "theorem",
+      "label": "frontier:ignored-reader-v86",
+      "notes": "Full deployed f81 contract for successful values up to 4 MiB and a positive aligned starting heap at most 96 MiB under 2,048 pages. Room is constructed, not assumed. Whole-method reachable-heap and protocol instantiation remain separate Open obligations.",
+      "reviewed_shape_hash": 638032531,
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "ignored-reader-pages",
+        "ignored-pages-v86"
+      ]
+    },
+    {
+      "id": "ignored-colon-v86",
+      "declaration": "WNear.Binary.SerdeIgnExecution.f201_traced_v86",
+      "title": "Real colon caller uses the concrete-room full reader",
+      "kind": "theorem",
+      "label": "frontier:ignored-colon-v86",
+      "notes": "Composes the actual colon function directly with the concrete-room f81 contract. Retains exact cost, cursor, heap trace and owned allocation endpoints under the explicit input/starting-heap bounds.",
+      "reviewed_shape_hash": 3282747484,
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "ignored-reader-v86"
+      ]
+    },
+    {
+      "id": "ignored-reachable-conditions",
+      "declaration": "WNear.Binary.SerdeIgnObject.ReachableIgnoreConditions",
+      "title": "Remaining physically reachable ignored-member conditions",
+      "kind": "verification_contract",
+      "label": "frontier:ignored-reachable-conditions",
+      "notes": "For actual positive aligned scratch heaps: establishes the 96 MiB starting-heap ceiling, reader cost allowance and exact HeapTrace closure of B/Bsaved. These three whole-object obligations remain Open. Room and final capacity are derived by the new constructor.",
+      "reviewed_shape_hash": 1082396082192438916,
+      "required_type_dependencies": [],
+      "required_proof_dependencies": []
+    },
+    {
+      "id": "ignored-reachable-hyp",
+      "declaration": "WNear.Binary.SerdeIgnObject.ignoreHyp_v86",
+      "title": "IgnoreHyp uses actual memory alignment and constructed room",
+      "kind": "theorem",
+      "label": "frontier:ignored-reachable-hyp",
+      "notes": "Reads alignment/positivity from owned scratch, constructs reader room, and proves final capacity. Conditional on ReachableIgnoreConditions for current and saved bounds. Preserves the original IgnoreHyp interface.",
+      "reviewed_shape_hash": 1211153071,
+      "required_type_dependencies": [
+        "ignore-hyp",
+        "ignored-reachable-conditions"
+      ],
+      "required_proof_dependencies": [
+        "ignored-colon-v86",
+        "ignored-capacity-v86"
+      ]
+    },
+    {
+      "id": "ignored-reachable-object",
+      "declaration": "WNear.Binary.SerdeIgnObject.object_loop_v86",
+      "title": "General object caller integrates concrete ignored-reader room",
+      "kind": "theorem",
+      "label": "frontier:ignored-reachable-object",
+      "notes": "Constructs IgnoreHyp with actual scratch alignment and concrete reader room, then applies the general object loop. Remains Conditional on reachable heap/gas/state closure, KeyConditions and ValueConditions. No global or full-method obligation is declared closed.",
+      "reviewed_shape_hash": 3057930815,
+      "required_type_dependencies": [
+        "ignored-reachable-conditions",
+        "key-conditions",
+        "value-conditions"
+      ],
+      "required_proof_dependencies": [
+        "ignored-reachable-hyp",
+        "object-parser"
+      ]
+    },
+    {
+      "id": "object-key-cover",
+      "declaration": "WNear.Binary.SerdeObjectCoverage.key_walk_coverage",
+      "title": "Object key charges occupy disjoint input bytes",
+      "kind": "theorem",
+      "label": "frontier:object-key-cover",
+      "notes": "For the exact key/cursor path, raw key-body bytes plus two structural bytes per key fit the consumed object-loop input. Includes escapes and UTF-8; no theorem about all parser costs is asserted.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 582826153
+    },
+    {
+      "id": "object-key-models",
+      "declaration": "WNear.Binary.SerdeObjectCoverage.key_walk_models",
+      "title": "Every extracted object key satisfies the string model",
+      "kind": "theorem",
+      "label": "frontier:object-key-models",
+      "notes": "The ordered path supplies the exact successful stringBody model at every recorded absolute key cursor.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3800612662
+    },
+    {
+      "id": "object-key-path",
+      "declaration": "WNear.Binary.SerdeObjectCoverage.loop_keys",
+      "title": "Successful general object loop yields the actual key path",
+      "kind": "theorem",
+      "label": "frontier:object-key-path",
+      "notes": "Extracts an ordered KeyWalk from every successful model object loop, including account fields, escaped keys and arbitrary successful ignored values. Value suffixes and actual colon consumption ensure nonoverlap.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 473643439
+    },
+    {
+      "id": "object-key-gas",
+      "declaration": "WNear.Binary.SerdeObjectCoverage.loop_key_argument_budget",
+      "title": "Actual object keys instantiate the key argument-gas slice",
+      "kind": "theorem",
+      "label": "frontier:object-key-gas",
+      "notes": "Combines the actual successful loop path, key model witnesses, disjoint coverage and the existing key-sequence bound using the unchanged argumentByteGas coefficient. This key-only scratch sequence still does not include interleaved frame/account allocation or all parser operations.",
+      "required_proof_dependencies": [
+        "object-key-path",
+        "object-key-models",
+        "object-key-cover",
+        "key-argument-slice-gas"
+      ],
+      "reviewed_shape_hash": 1705694558
+    },
+    {
+      "id": "object-key-opening",
+      "declaration": "WNear.Binary.SerdeObjectCoverage.object_keys",
+      "title": "Full object opening supplies the checked key path",
+      "kind": "theorem",
+      "label": "frontier:object-key-opening",
+      "notes": "Instantiates key-path extraction at the same actual opening cursor and objLoop premise used by the composed object-parser contract.",
+      "required_proof_dependencies": [
+        "object-key-path"
+      ],
+      "reviewed_shape_hash": 248716444
     }
   ],
   "reviewed_environment": [
