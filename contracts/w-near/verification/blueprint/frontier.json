@@ -375,11 +375,13 @@
         "ignored-depth",
         "ignored-reserve",
         "scratch-room",
-        "ignored-decoded-suffix"
+        "ignored-decoded-suffix",
+        "ignored-hyp-instance",
+        "ignored-member-conditions"
       ],
       "label": "frontier:ignore-hyp",
       "reviewed_shape_hash": 14658794859049893487,
-      "notes": "The complete actual container/member suffix is checked. The outer value loop, value-entry composition, cleanup and concrete growth-room instances remain unresolved; this interface stays Open."
+      "notes": "The complete deployed f81/f201 reader now constructs this interface conditionally and is integrated into a general object-loop proof. Concrete reachable growth-room, original gas and state-closure instances are still missing; the general interface remains Open."
     },
     {
       "id": "key-conditions",
@@ -4240,6 +4242,222 @@
         "ignored-suffix-code"
       ],
       "reviewed_shape_hash": 1848788969
+    },
+    {
+      "id": "ignored-pending-entry",
+      "declaration": "WNear.Binary.SerdeIgnValueEntry.pending_entry",
+      "title": "Pending scalar entry of the actual value loop",
+      "kind": "theorem",
+      "label": "frontier:ignored-pending-entry",
+      "notes": "Pays the actual peek, presence and pending-scalar instructions and preserves the remaining trace, frame stack and resource budget.",
+      "reviewed_shape_hash": 4258036134,
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "ignored-scalar",
+        "ignored-depth"
+      ]
+    },
+    {
+      "id": "ignored-top-entry",
+      "declaration": "WNear.Binary.SerdeIgnValueEntry.top_entry",
+      "title": "Top scalar takes the actual success branch",
+      "kind": "theorem",
+      "label": "frontier:ignored-top-entry",
+      "notes": "Checks the complete scalar entry prefix and real success branch with an empty pending stack.",
+      "reviewed_shape_hash": 2636688039,
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [
+        "ignored-scalar"
+      ]
+    },
+    {
+      "id": "ignored-opening-entry",
+      "declaration": "WNear.Binary.SerdeIgnValueEntry.opening_entry128",
+      "title": "Container opening enters the shared value invariant",
+      "kind": "theorem",
+      "label": "frontier:ignored-opening-entry",
+      "notes": "Reuses the checked opening proof with the full 128-byte value-loop frame and exact allocation transition. Growth room remains an explicit premise.",
+      "reviewed_shape_hash": 2671096347,
+      "required_type_dependencies": [
+        "scratch-room"
+      ],
+      "required_proof_dependencies": [
+        "ignored-opening"
+      ]
+    },
+    {
+      "id": "ignored-trace-room",
+      "declaration": "WNear.Binary.SerdeIgnExecution.Room",
+      "title": "Room for every actual growth in an ignored-value trace",
+      "kind": "verification_contract",
+      "label": "frontier:ignored-trace-room",
+      "notes": "Exact remaining room obligation along the successful trace, quantified over each permitted actual heap transition. No concrete reachable-state instance is claimed.",
+      "reviewed_shape_hash": 15190354722883835725,
+      "required_type_dependencies": [],
+      "required_proof_dependencies": []
+    },
+    {
+      "id": "ignored-heap-trace",
+      "declaration": "WNear.Binary.SerdeIgnExecution.heap_save",
+      "title": "Heap trace follows actual saved-frame growth",
+      "kind": "theorem",
+      "label": "frontier:ignored-heap-trace",
+      "notes": "Constructs the precise allocation-history relation through a saved frame, including the actual heap transition and retained capacity.",
+      "reviewed_shape_hash": 3622729491,
+      "required_type_dependencies": [],
+      "required_proof_dependencies": []
+    },
+    {
+      "id": "ignored-value-iteration",
+      "declaration": "WNear.Binary.SerdeIgnExecution.value_iteration",
+      "title": "Complete deployed ignored-value iteration",
+      "kind": "theorem",
+      "label": "frontier:ignored-value-iteration",
+      "notes": "Composes scalar/opening entries with the actual container/member suffix. Room for the whole remaining trace is an unresolved explicit dependency.",
+      "reviewed_shape_hash": 2030980743,
+      "required_type_dependencies": [
+        "ignored-trace-room"
+      ],
+      "required_proof_dependencies": [
+        "ignored-pending-entry",
+        "ignored-top-entry",
+        "ignored-opening-entry",
+        "ignored-heap-trace",
+        "ignored-container-suffix"
+      ]
+    },
+    {
+      "id": "ignored-value-loop",
+      "declaration": "WNear.Binary.SerdeIgnExecution.value_loop",
+      "title": "Complete deployed outer ignored-value loop",
+      "kind": "theorem",
+      "label": "frontier:ignored-value-loop",
+      "notes": "Establishes and preserves one gas-credit invariant with exact cursor, pending frames, remaining trace, allocation endpoints and heap history.",
+      "reviewed_shape_hash": 1860831168,
+      "required_type_dependencies": [
+        "ignored-trace-room"
+      ],
+      "required_proof_dependencies": [
+        "ignored-value-iteration"
+      ]
+    },
+    {
+      "id": "ignored-main",
+      "declaration": "WNear.Binary.SerdeIgnExecution.main",
+      "title": "Ignored-value loop reaches actual cleanup and return",
+      "kind": "theorem",
+      "label": "frontier:ignored-main",
+      "notes": "Retains both rejecting tails and checks the real enclosing branches, success and cleanup. Conditional on trace growth room.",
+      "reviewed_shape_hash": 3356355655,
+      "required_type_dependencies": [
+        "ignored-trace-room"
+      ],
+      "required_proof_dependencies": [
+        "ignored-value-loop"
+      ]
+    },
+    {
+      "id": "ignored-raw-prologue",
+      "declaration": "WNear.Binary.SerdeIgnExecution.start_raw",
+      "title": "Actual ignored-reader prologue clears scratch length",
+      "kind": "theorem",
+      "label": "frontier:ignored-raw-prologue",
+      "notes": "Checks the actual prologue from raw scratch ownership with arbitrary old length. It clears that word before interpreting the empty pending stack.",
+      "reviewed_shape_hash": 949503576,
+      "required_type_dependencies": [],
+      "required_proof_dependencies": []
+    },
+    {
+      "id": "ignored-full-reader",
+      "declaration": "WNear.Binary.SerdeIgnExecution.f81_core",
+      "title": "Full actual ignored-reader execution",
+      "kind": "theorem",
+      "label": "frontier:ignored-full-reader",
+      "notes": "Complete deployed function 81, including prologue, loops, retained rejecting tails and cleanup. Returns the precise successful endpoint and heap history, with explicit remaining growth-room obligation.",
+      "reviewed_shape_hash": 2035462284,
+      "required_type_dependencies": [
+        "ignored-trace-room"
+      ],
+      "required_proof_dependencies": [
+        "ignored-raw-prologue",
+        "ignored-main"
+      ]
+    },
+    {
+      "id": "ignored-traced-reader",
+      "declaration": "WNear.Binary.SerdeIgnExecution.f81_traced",
+      "title": "Successful syntax trace instantiates full function 81",
+      "kind": "theorem",
+      "label": "frontier:ignored-traced-reader",
+      "notes": "Instantiates the complete reader using the successful pure syntax trace and derived frame validity. Growth room remains unresolved.",
+      "reviewed_shape_hash": 9280848,
+      "required_type_dependencies": [
+        "ignored-trace-room"
+      ],
+      "required_proof_dependencies": [
+        "ignored-full-reader",
+        "ignore-machine-trace-valid"
+      ]
+    },
+    {
+      "id": "ignored-colon-reader",
+      "declaration": "WNear.Binary.SerdeIgnExecution.f201_traced",
+      "title": "Actual colon caller composes with full ignored reader",
+      "kind": "theorem",
+      "label": "frontier:ignored-colon-reader",
+      "notes": "Checks function 201 against the real colon and full function-81 contracts, retaining actual heap history, allocation endpoints and cost.",
+      "reviewed_shape_hash": 14019772,
+      "required_type_dependencies": [
+        "ignored-trace-room"
+      ],
+      "required_proof_dependencies": [
+        "ignored-traced-reader"
+      ]
+    },
+    {
+      "id": "ignored-member-conditions",
+      "declaration": "WNear.Binary.SerdeIgnObject.IgnoreConditions",
+      "title": "Reachable ignored-member room, gas and state closure",
+      "kind": "verification_contract",
+      "label": "frontier:ignored-member-conditions",
+      "notes": "For each successful reachable member trace: supplies Room, fits the actual reader cost into the chosen allowance, and closes the caller bounds along its exact HeapTrace. Still Open for concrete B, Bsaved and K.",
+      "reviewed_shape_hash": 7585328845492622072,
+      "required_type_dependencies": [],
+      "required_proof_dependencies": []
+    },
+    {
+      "id": "ignored-hyp-instance",
+      "declaration": "WNear.Binary.SerdeIgnObject.ignoreHyp",
+      "title": "IgnoreHyp constructed from actual reader and named closure",
+      "kind": "theorem",
+      "label": "frontier:ignored-hyp-instance",
+      "notes": "Instantiates the existing IgnoreHyp interface with the checked deployed reader. Conditional on IgnoreConditions for current and saved bounds; does not discharge the general IgnoreHyp interface.",
+      "reviewed_shape_hash": 3759468315,
+      "required_type_dependencies": [
+        "ignored-member-conditions",
+        "ignore-hyp"
+      ],
+      "required_proof_dependencies": [
+        "ignored-colon-reader"
+      ]
+    },
+    {
+      "id": "ignored-object-composition",
+      "declaration": "WNear.Binary.SerdeIgnObject.object_loop",
+      "title": "General object loop uses the actual ignored reader",
+      "kind": "theorem",
+      "label": "frontier:ignored-object-composition",
+      "notes": "Constructs IgnoreHyp and composes it into the existing general object-loop proof. KeyConditions, ValueConditions and ignored-member room/gas/state closure remain explicit unresolved dependencies.",
+      "reviewed_shape_hash": 3344455589,
+      "required_type_dependencies": [
+        "ignored-member-conditions",
+        "key-conditions",
+        "value-conditions"
+      ],
+      "required_proof_dependencies": [
+        "ignored-hyp-instance",
+        "object-parser"
+      ]
     }
   ],
   "reviewed_environment": [

@@ -171,6 +171,34 @@ class FrontierPolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
             blueprint.classify(self.manifest, self.rows, self.audit)
 
+    def test_full_ignored_reader_stays_conditional_on_trace_room(self):
+        result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
+        for node in ['ignored-full-reader', 'ignored-traced-reader', 'ignored-colon-reader',
+                     'ignored-value-loop', 'ignored-hyp-instance', 'ignored-object-composition']:
+            self.assertEqual(result[node]['status'], 'Conditional')
+            self.assertFalse(result[node]['direct_sorry'])
+        for node in ['ignored-trace-room', 'ignored-member-conditions', 'ignore-hyp',
+                     'key-conditions', 'value-conditions']:
+            self.assertEqual(result[node]['status'], 'Open')
+        for source, caller in [('ignored-full-reader', 'ignored-traced-reader'),
+                               ('ignored-colon-reader', 'ignored-hyp-instance'),
+                               ('ignored-hyp-instance', 'ignored-object-composition'),
+                               ('object-parser', 'ignored-object-composition')]:
+            self.assertIn({'id': caller, 'status': 'Conditional'}, result[source]['integrated_into'])
+        self.assertEqual(result['global']['status'], 'Conditional')
+
+    def test_full_reader_cannot_drop_actual_main_composition(self):
+        self.by_id['ignored-full-reader']['proof_dependencies'].remove(
+            self.nodes['ignored-main']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_object_reader_cannot_hide_reachable_member_conditions(self):
+        self.by_id['ignored-object-composition']['type_dependencies'].remove(
+            self.nodes['ignored-member-conditions']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Expected verification hypotheses missing'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
     def test_actual_code_provider_reaches_global_assemblies_without_closing_the_plan(self):
         result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
         for node in ['deployed-parser-provider', 'provider-model-budget', 'absent-parser-plan',

@@ -33,6 +33,47 @@ it is false for the reviewed domain; its historical statement is recorded in
 the misstatement log. The historical generic host trap and contradiction lemmas
 remain checked, but witness existence is no longer a frontier obligation.
 
+## Continuation on 2026-10-31: full ignored reader integrated into object parsing
+
+The complete actual deployed function 81 now composes from its real prologue,
+scalar and opening entries, outer value loop, container/member suffix, success
+branches and cleanup. Both rejecting tails remain in the checked bytecode.
+The prologue accepts the raw scratch length word and clears it before use.
+A single gas-credit invariant carries the exact cursor, pending-frame bytes,
+remaining successful trace, retained allocation and allocator bound. The full
+contract charges `(166 + 470 * consumed) * regularOpCost` plus the exact
+trace-dependent growth reserve. No original method gas statement is weakened.
+
+`HeapTrace` records actual heap transitions through each frame save. The reader
+returns that history and the exact final capacity/free bound, rather than an
+unconstrained existential final heap. Function 201 composes the real colon
+reader with the complete function-81 contract. These execution proofs have no
+admissions and use only the standard kernel axioms, but remain Conditional on
+`SerdeIgnExecution.Room`: room for every growth in the exact remaining trace.
+
+`SerdeIgnObject.ignoreHyp` now constructs the existing ignored-reader Wasm
+interface, preserving caller/account resources and stack ownership. Its precise
+`IgnoreConditions` obligation supplies room, fits the actual reader cost into
+the chosen allowance, and closes reachable bounds along the exact HeapTrace.
+The new `object_loop` theorem feeds this constructor into the general object
+parser. The previous object theorem and all its statement pins stay unchanged.
+Thus the complete ignored reader is Integrated into an actual object caller.
+
+The general IgnoreHyp interface remains Open: its concrete room, original gas
+and state-closure instances have not been discharged. IgnoreConditions and Room
+are separately visible Open contracts. KeyConditions, ValueConditions, escaped
+string room, the general deployed parser/gas witness, pinned protocol premises
+and remaining methods are unresolved. Full ft_balance_of and global deployed
+refinement remain Conditional. The next frontier is concrete reachable Room,
+reader gas and member-bound closure, followed by the full parser provider.
+
+Strict full audit and fresh actual-dependency/readiness gate passed at
+2026-10-31T07:57:24+00:00 for proof source `45cf39ec5c35d8eb453970a3650d8b83728c330eee90010c38d38cc24d5c8f70`. All 51 frontier
+policy tests, Lean style and toolchain checks passed. All old statement pins
+remain byte-identical; the full reader/object interfaces are pinned additively.
+No axiom/admission allowance, model observation or reviewed environmental
+premise was expanded. Publication also requires matching served evidence.
+
 ## Continuation on 2026-10-31: complete ignored-container Wasm loop
 
 `SerdeIgnLoop` composes the already checked nested/final closing and first/comma

@@ -1,3 +1,4 @@
+import Bridge.Functions.SerdeIgnObject
 import Bridge.Functions.SerdeIgnLoop
 import Bridge.Functions.ScratchMixedTrace
 import Bridge.Functions.SerdeIgnMachineTrace
@@ -1885,3 +1886,89 @@ attribute [blueprint "frontier:ignored-decoded-suffix"
   (title := /-- Suffix contract is connected to deployed function 81 -/)
   (statement := /-- Uses checked equality to apply the container/member suffix contract directly to the actual decoded function body. Full value-entry/outer-loop/cleanup composition, growth room, original full-method gas and IgnoreHyp remain unresolved. -/)]
   WNear.Binary.SerdeIgnLoop.decoded_suffix
+
+attribute [blueprint "frontier:ignored-pending-entry"
+  (title := /-- Pending scalar entry of the actual value loop -/)
+  (statement := /-- Pays the actual peek, presence and pending-scalar instructions and preserves the remaining trace, frame stack and resource budget. -/)]
+  WNear.Binary.SerdeIgnValueEntry.pending_entry
+
+attribute [blueprint "frontier:ignored-top-entry"
+  (title := /-- Top scalar takes the actual success branch -/)
+  (statement := /-- Checks the complete scalar entry prefix and real success branch with an empty pending stack. -/)]
+  WNear.Binary.SerdeIgnValueEntry.top_entry
+
+attribute [blueprint "frontier:ignored-opening-entry"
+  (title := /-- Container opening enters the shared value invariant -/)
+  (statement := /-- Reuses the checked opening proof with the full 128-byte value-loop frame and exact allocation transition. Growth room remains an explicit premise. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeIgnValueEntry.opening_entry128
+
+attribute [blueprint "frontier:ignored-trace-room"
+  (title := /-- Room for every actual growth in an ignored-value trace -/)
+  (statement := /-- Exact remaining room obligation along the successful trace, quantified over each permitted actual heap transition. No concrete reachable-state instance is claimed. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeIgnExecution.Room
+
+attribute [blueprint "frontier:ignored-heap-trace"
+  (title := /-- Heap trace follows actual saved-frame growth -/)
+  (statement := /-- Constructs the precise allocation-history relation through a saved frame, including the actual heap transition and retained capacity. -/)]
+  WNear.Binary.SerdeIgnExecution.heap_save
+
+attribute [blueprint "frontier:ignored-value-iteration"
+  (title := /-- Complete deployed ignored-value iteration -/)
+  (statement := /-- Composes scalar/opening entries with the actual container/member suffix. Room for the whole remaining trace is an unresolved explicit dependency. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeIgnExecution.value_iteration
+
+attribute [blueprint "frontier:ignored-value-loop"
+  (title := /-- Complete deployed outer ignored-value loop -/)
+  (statement := /-- Establishes and preserves one gas-credit invariant with exact cursor, pending frames, remaining trace, allocation endpoints and heap history. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeIgnExecution.value_loop
+
+attribute [blueprint "frontier:ignored-main"
+  (title := /-- Ignored-value loop reaches actual cleanup and return -/)
+  (statement := /-- Retains both rejecting tails and checks the real enclosing branches, success and cleanup. Conditional on trace growth room. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeIgnExecution.main
+
+attribute [blueprint "frontier:ignored-raw-prologue"
+  (title := /-- Actual ignored-reader prologue clears scratch length -/)
+  (statement := /-- Checks the actual prologue from raw scratch ownership with arbitrary old length. It clears that word before interpreting the empty pending stack. -/)]
+  WNear.Binary.SerdeIgnExecution.start_raw
+
+attribute [blueprint "frontier:ignored-full-reader"
+  (title := /-- Full actual ignored-reader execution -/)
+  (statement := /-- Complete deployed function 81, including prologue, loops, retained rejecting tails and cleanup. Returns the precise successful endpoint and heap history, with explicit remaining growth-room obligation. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeIgnExecution.f81_core
+
+attribute [blueprint "frontier:ignored-traced-reader"
+  (title := /-- Successful syntax trace instantiates full function 81 -/)
+  (statement := /-- Instantiates the complete reader using the successful pure syntax trace and derived frame validity. Growth room remains unresolved. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeIgnExecution.f81_traced
+
+attribute [blueprint "frontier:ignored-colon-reader"
+  (title := /-- Actual colon caller composes with full ignored reader -/)
+  (statement := /-- Checks function 201 against the real colon and full function-81 contracts, retaining actual heap history, allocation endpoints and cost. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeIgnExecution.f201_traced
+
+attribute [blueprint "frontier:ignored-member-conditions"
+  (title := /-- Reachable ignored-member room, gas and state closure -/)
+  (statement := /-- For each successful reachable member trace: supplies Room, fits the actual reader cost into the chosen allowance, and closes the caller bounds along its exact HeapTrace. Still Open for concrete B, Bsaved and K. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeIgnObject.IgnoreConditions
+
+attribute [blueprint "frontier:ignored-hyp-instance"
+  (title := /-- IgnoreHyp constructed from actual reader and named closure -/)
+  (statement := /-- Instantiates the existing IgnoreHyp interface with the checked deployed reader. Conditional on IgnoreConditions for current and saved bounds; does not discharge the general IgnoreHyp interface. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeIgnObject.ignoreHyp
+
+attribute [blueprint "frontier:ignored-object-composition"
+  (title := /-- General object loop uses the actual ignored reader -/)
+  (statement := /-- Constructs IgnoreHyp and composes it into the existing general object-loop proof. KeyConditions, ValueConditions and ignored-member room/gas/state closure remain explicit unresolved dependencies. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeIgnObject.object_loop
