@@ -33,6 +33,36 @@ it is false for the reviewed domain; its historical statement is recorded in
 the misstatement log. The historical generic host trap and contradiction lemmas
 remain checked, but witness existence is no longer a frontier obligation.
 
+## Continuation on 2026-10-31: code from the instantiated store
+
+`Code297` extracts all input, parser, lookup, return and interface code resources
+from `InitialState.funcCells` and assembles `code297_of`. `startCode297` composes
+this with the actual instantiated-store ownership split, retaining the raw table,
+memory, host, gas and global resources for entry setup. These results are Proven;
+component extraction is Integrated into `code297_of`, and that assembly is
+Integrated into the checked body proof and initial-store extraction.
+
+`copied_array_absent_body_store_code` consumes the actual persistent function
+cells, module instance and memory limit, derives the code, and instantiates
+`wInst_ifaceMod` in the complete copied-array absent-account body. The previous
+room instantiation is retained. No code availability or module-interface
+verification obligation remains in this body instance. Table/static/frame/heap
+ownership, host/trie correspondence and proof budget, exact input and absent key,
+limits and gas remain explicit. The whole-store extraction is not yet composed
+with the body's linear entry resources; its edge to the external accepted clause
+is planned, not Integrated. All other input shapes and outcome clauses remain open.
+
+The next entry obligation is to carve the required table entries (including input
+entry 44), static data and the 752-byte initial stack without duplicating linear
+ownership, then connect initial host/trie and credit resources to this body. The
+full method and global refinement remain Conditional. `IgnoreHyp`,
+`KeyConditions`, `ValueConditions`, general parser room, protocol premises and
+all named admitted leaves remain unresolved. Existing statements and the strict
+admission allowance are unchanged. LSP diagnostics and axiom checks passed for
+the new body and whole-store extraction. The live frontier records the full
+strict audit and dependency-check evidence for proof source digest
+`0ae2355f3e37bdd878101d577465b8676d10c397e8c964afe180fc74e97dde72`; publication requires both gates to pass.
+
 ## Continuation on 2026-10-31: parser room at the instantiated memory
 
 `ParseStrRoom.roomRun_short` proves every reserve required by the all-outcome

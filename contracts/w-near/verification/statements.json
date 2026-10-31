@@ -160,6 +160,20 @@
     "WNear.Binary.BalanceOf297AbsentCall.input_pages_le",
     "WNear.Binary.BalanceOf297AbsentCall.initial_memory_room",
     "WNear.Binary.BalanceOf297AbsentCall.initial_parser_and_body_room",
-    "WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body_initial_memory"
+    "WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body_initial_memory",
+    "WNear.Binary.BalanceOf297AbsentCall.code297Input",
+    "WNear.Binary.BalanceOf297AbsentCall.code297Parser",
+    "WNear.Binary.BalanceOf297AbsentCall.code297Lookup",
+    "WNear.Binary.BalanceOf297AbsentCall.code297Return",
+    "WNear.Binary.BalanceOf297AbsentCall.code297",
+    "WNear.Binary.InitialState.code297_input_of",
+    "WNear.Binary.InitialState.code297_parser_of",
+    "WNear.Binary.InitialState.code297_lookup_of",
+    "WNear.Binary.InitialState.code297_return_of",
+    "WNear.Binary.InitialState.code297_interface_of",
+    "WNear.Binary.InitialState.code297_of",
+    "WNear.Binary.InitialState.startCode297_gen",
+    "WNear.Binary.InitialState.startCode297",
+    "WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body_store_code"
   ]
 }

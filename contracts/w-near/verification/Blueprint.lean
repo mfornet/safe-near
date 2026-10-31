@@ -41,6 +41,7 @@ import Bridge.Functions.BalanceOf297ParserRoom
 import Bridge.Methods.FtBalanceOfAbsentCompose
 import Bridge.Methods.FtBalanceOfInputBound
 import Bridge.Methods.ContextInputDomain
+import Bridge.Methods.FtBalanceOfCodeCompose
 
 /-! The browsable proof frontier. Definitions marked Open state contracts, not proofs. -/
 
@@ -914,3 +915,48 @@ attribute [blueprint "frontier:balance-copied-body-initial-memory"
   (title := /-- Function 297: copied-array absent body at initial memory -/)
   (statement := /-- Complete decoded body at the instantiated 1024-page initial memory, with input, parser and subsequent allocation room derived rather than assumed. Exact copied-array input, absent account, trie/proof budget, host/register/return limits, code/frame ownership and gas credits remain stated environmental premises. This specific body proof does not establish full external accepted/rejected refinement. -/)]
   WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body_initial_memory
+
+attribute [blueprint "frontier:balance-code-input"
+  (title := /-- Initial store: balance input code -/)
+  (statement := /-- Extracts the exact input code resources from the instantiated persistent function cells, module instance and memory limit. No code-availability verification hypothesis remains for this component. -/)]
+  WNear.Binary.InitialState.code297_input_of
+
+attribute [blueprint "frontier:balance-code-parser"
+  (title := /-- Initial store: balance parser code -/)
+  (statement := /-- Extracts the exact parser code resources from the instantiated persistent function cells, module instance and memory limit. No code-availability verification hypothesis remains for this component. -/)]
+  WNear.Binary.InitialState.code297_parser_of
+
+attribute [blueprint "frontier:balance-code-lookup"
+  (title := /-- Initial store: balance lookup code -/)
+  (statement := /-- Extracts the exact lookup code resources from the instantiated persistent function cells, module instance and memory limit. No code-availability verification hypothesis remains for this component. -/)]
+  WNear.Binary.InitialState.code297_lookup_of
+
+attribute [blueprint "frontier:balance-code-return"
+  (title := /-- Initial store: balance return code -/)
+  (statement := /-- Extracts the exact return code resources from the instantiated persistent function cells, module instance and memory limit. No code-availability verification hypothesis remains for this component. -/)]
+  WNear.Binary.InitialState.code297_return_of
+
+attribute [blueprint "frontier:balance-code-interface"
+  (title := /-- Initial store: balance interface code -/)
+  (statement := /-- Extracts the exact interface code resources from the instantiated persistent function cells, module instance and memory limit. No code-availability verification hypothesis remains for this component. -/)]
+  WNear.Binary.InitialState.code297_interface_of
+
+attribute [blueprint "frontier:balance-code-assembled"
+  (title := /-- Initial store: complete copied-balance code -/)
+  (statement := /-- Checked assembly of every code component required by the copied-array absent-account body. -/)]
+  WNear.Binary.InitialState.code297_of
+
+attribute [blueprint "frontier:balance-code-start-split"
+  (title := /-- Split initial store: extract balance code -/)
+  (statement := /-- Persists the initial function cells and derives the code while preserving table, memory, host, gas and global ownership. -/)]
+  WNear.Binary.InitialState.startCode297_gen
+
+attribute [blueprint "frontier:balance-code-start"
+  (title := /-- Whole initial store: extract balance code -/)
+  (statement := /-- Starts from ownership of the actual instantiated store and derives the code, retaining raw table and memory resources. Static/frame carving and the full method boundary remain to be composed. -/)]
+  WNear.Binary.InitialState.startCode297
+
+attribute [blueprint "frontier:balance-copied-body-store-code"
+  (title := /-- Function 297: copied body with actual store code -/)
+  (statement := /-- Instantiates the code and module interface in the complete copied-array absent-account body. Table/static/frame/heap/host ownership, exact input and absent key, trie/proof budget, runtime limits and gas remain explicit. Does not yet consume whole-store entry ownership or prove an external MethodClause. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body_store_code

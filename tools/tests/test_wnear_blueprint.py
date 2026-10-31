@@ -56,6 +56,24 @@ class FrontierPolicyTests(unittest.TestCase):
         self.audit = {'violations': [{'declaration': n, 'axioms': ['sorryAx']}
                                      for n in self.manifest['expected_incomplete']]}
 
+    def test_store_code_composition_preserves_external_frontier(self):
+        result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
+        self.assertEqual(result['balance-copied-body-store-code']['status'], 'Proven')
+        self.assertIn({'id': 'balance-copied-body-store-code', 'status': 'Proven'},
+                      result['balance-code-assembled']['integrated_into'])
+        self.assertEqual(result['balance-code-start']['status'], 'Proven')
+        self.assertNotIn('balance-accepted',
+                         [n['id'] for n in result['balance-code-start']['integrated_into']])
+        self.assertEqual(result['balance-accepted']['status'], 'Open')
+        self.assertEqual(result['method-ft_balance_of']['status'], 'Conditional')
+        self.assertEqual(result['global']['status'], 'Conditional')
+
+    def test_store_code_cannot_claim_integration_without_checked_composition(self):
+        self.by_id['balance-copied-body-store-code']['proof_dependencies'].remove(
+            self.nodes['balance-code-assembled']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
     def test_initial_memory_discharges_this_parser_room_instance(self):
         result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
         self.assertEqual(result['balance-copied-body-initial-memory']['status'], 'Proven')

@@ -704,7 +704,9 @@
         "parser-public-through-cleanup",
         "balance-copied-parser-through-cleanup",
         "balance-copied-absent-body",
-        "balance-copied-body-initial-memory"
+        "balance-copied-body-initial-memory",
+        "balance-code-start",
+        "balance-copied-body-store-code"
       ],
       "notes": "User-reviewed incoming receipt argument bound now included in Context.WF. Runtime action-list validation supplies this bound. Oversized historical reproducer is outside this domain; pinned limit-relation instantiation and general arbitrary-resource refinement remain open."
     },
@@ -1936,6 +1938,109 @@
       "notes": "Complete decoded body at the instantiated 1024-page initial memory, with input, parser and subsequent allocation room derived rather than assumed. Exact copied-array input, absent account, trie/proof budget, host/register/return limits, code/frame ownership and gas credits remain stated environmental premises. This specific body proof does not establish full external accepted/rejected refinement.",
       "label": "frontier:balance-copied-body-initial-memory",
       "reviewed_shape_hash": 437130165
+    },
+    {
+      "id": "balance-code-input",
+      "declaration": "WNear.Binary.InitialState.code297_input_of",
+      "title": "Initial store: balance input code",
+      "kind": "theorem",
+      "label": "frontier:balance-code-input",
+      "notes": "Extracts the exact input code resources from the instantiated persistent function cells, module instance and memory limit. No code-availability verification hypothesis remains for this component.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 778426801
+    },
+    {
+      "id": "balance-code-parser",
+      "declaration": "WNear.Binary.InitialState.code297_parser_of",
+      "title": "Initial store: balance parser code",
+      "kind": "theorem",
+      "label": "frontier:balance-code-parser",
+      "notes": "Extracts the exact parser code resources from the instantiated persistent function cells, module instance and memory limit. No code-availability verification hypothesis remains for this component.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 4022472996
+    },
+    {
+      "id": "balance-code-lookup",
+      "declaration": "WNear.Binary.InitialState.code297_lookup_of",
+      "title": "Initial store: balance lookup code",
+      "kind": "theorem",
+      "label": "frontier:balance-code-lookup",
+      "notes": "Extracts the exact lookup code resources from the instantiated persistent function cells, module instance and memory limit. No code-availability verification hypothesis remains for this component.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 4256442986
+    },
+    {
+      "id": "balance-code-return",
+      "declaration": "WNear.Binary.InitialState.code297_return_of",
+      "title": "Initial store: balance return code",
+      "kind": "theorem",
+      "label": "frontier:balance-code-return",
+      "notes": "Extracts the exact return code resources from the instantiated persistent function cells, module instance and memory limit. No code-availability verification hypothesis remains for this component.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1191342978
+    },
+    {
+      "id": "balance-code-interface",
+      "declaration": "WNear.Binary.InitialState.code297_interface_of",
+      "title": "Initial store: balance interface code",
+      "kind": "theorem",
+      "label": "frontier:balance-code-interface",
+      "notes": "Extracts the exact interface code resources from the instantiated persistent function cells, module instance and memory limit. No code-availability verification hypothesis remains for this component.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3317969868
+    },
+    {
+      "id": "balance-code-assembled",
+      "declaration": "WNear.Binary.InitialState.code297_of",
+      "title": "Initial store: complete copied-balance code",
+      "kind": "theorem",
+      "label": "frontier:balance-code-assembled",
+      "notes": "Checked assembly of every code component required by the copied-array absent-account body.",
+      "required_proof_dependencies": [
+        "balance-code-input",
+        "balance-code-parser",
+        "balance-code-lookup",
+        "balance-code-return",
+        "balance-code-interface"
+      ],
+      "reviewed_shape_hash": 1325345841
+    },
+    {
+      "id": "balance-code-start-split",
+      "declaration": "WNear.Binary.InitialState.startCode297_gen",
+      "title": "Split initial store: extract balance code",
+      "kind": "theorem",
+      "label": "frontier:balance-code-start-split",
+      "notes": "Persists the initial function cells and derives the code while preserving table, memory, host, gas and global ownership.",
+      "required_proof_dependencies": [
+        "balance-code-assembled"
+      ],
+      "reviewed_shape_hash": 1069248798
+    },
+    {
+      "id": "balance-code-start",
+      "declaration": "WNear.Binary.InitialState.startCode297",
+      "title": "Whole initial store: extract balance code",
+      "kind": "theorem",
+      "label": "frontier:balance-code-start",
+      "notes": "Starts from ownership of the actual instantiated store and derives the code, retaining raw table and memory resources. Static/frame carving and the full method boundary remain to be composed.",
+      "required_proof_dependencies": [
+        "balance-code-start-split"
+      ],
+      "reviewed_shape_hash": 4033991307
+    },
+    {
+      "id": "balance-copied-body-store-code",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body_store_code",
+      "title": "Function 297: copied body with actual store code",
+      "kind": "theorem",
+      "label": "frontier:balance-copied-body-store-code",
+      "notes": "Instantiates the code and module interface in the complete copied-array absent-account body. Table/static/frame/heap/host ownership, exact input and absent key, trie/proof budget, runtime limits and gas remain explicit. Does not yet consume whole-store entry ownership or prove an external MethodClause.",
+      "required_proof_dependencies": [
+        "balance-code-assembled",
+        "balance-copied-body-initial-memory"
+      ],
+      "reviewed_shape_hash": 410606491
     }
   ],
   "reviewed_environment": [
