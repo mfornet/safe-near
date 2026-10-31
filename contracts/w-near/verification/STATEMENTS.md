@@ -11882,6 +11882,131 @@ theorem WNear.Binary.SerdeObjectPrefix.selectedValueCost_account_bound (cfg : Wa
     (166 + 470 * (bs.length - w.rest.length - v)) * cfg.regularOpCost + 500000000000
 ```
 
+## Bridge.Functions.SerdeActualSink
+
+`WNear.Binary.SerdeActualSink.f591_syntax_append` (hash `00000000a7708c70`)
+
+```lean
+theorem WNear.Binary.SerdeActualSink.f591_syntax_append {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (htype : type.results.length = 1)
+  (inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 19 < lim.maxCallDepth) (Cg : ℕ) (gt : Wasm.GlobalType) (desc e fmt tag s dd vec ptr cap idx : UInt32)
+  (maxP hl F : ℕ) (live : List (ℕ × ℕ)) (bs sb : List UInt8) (hdesc : desc.toNat + 4 ≤ 2 ^ 32)
+  (he : e.toNat + 4 ≤ 2 ^ 32) (hlow : 2 ≤ tag.toNat) (hhigh : tag.toNat ≤ 21) (hf : fmt.toNat + 32 ≤ 2 ^ 32)
+  (hs : 112 ≤ s.toNat) (hsb : sb.length = (WNear.Binary.SerdeErrorWriters.syntaxSlice tag).2.toNat)
+  (hdd : dd.toNat + 4 ≤ 2 ^ 32) (hvec : vec.toNat + 12 ≤ 2 ^ 32) (hcap : cap.toNat < 2 ^ 27)
+  (hlk : bs.length + (WNear.Binary.SerdeErrorWriters.syntaxSlice tag).2.toNat < 2 ^ 27)
+  (hsrc :
+    (WNear.Binary.SerdeErrorWriters.syntaxSlice tag).1.toNat +
+        (WNear.Binary.SerdeErrorWriters.syntaxSlice tag).2.toNat ≤
+      2 ^ 32)
+  (hr :
+    WNear.Binary.ScratchGrow.roomRes hl maxP cap (UInt32.ofNat bs.length)
+      (WNear.Binary.SerdeErrorWriters.syntaxSlice tag).2) :
+  inst ↪[inst] mi ∗
+      A 592 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[13]! inst WNear.Binary.f592 ∗
+        A 912 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[15]! inst WNear.Binary.f912 ∗
+          A 616 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[15]! inst WNear.Binary.f616 ∗
+            WNear.Binary.ScratchGrow.sgCode n maxP inst mi A ⊢
+    NearLogic.MFunSpec cfg lim d type inst mi WNear.Binary.f591 Cg
+      (fun args =>
+        iprop(⌜args = [Wasm.Value.i32 desc, Wasm.Value.i32 fmt]⌝ ∗
+            n ↦[wms][ desc.toNat ] WasmLogic.bytes32 e ∗
+              n ↦[wms][ e.toNat ] WasmLogic.bytes32 tag ∗
+                n ↦[wms][ fmt.toNat + 24 ] WasmLogic.bytes32 dd ∗
+                  n ↦[wms][ fmt.toNat + 28 ] WasmLogic.bytes32 1057784 ∗
+                    n ↦[wms][ 1057796 ] WasmLogic.bytes32 130 ∗
+                      ta ↦[wt][ 130 ] Wasm.Ref.func (A 616) ∗
+                        WNear.Binary.SerdeActualSink.stringState n g ta gt s dd vec ptr cap idx (A 578) maxP hl F live
+                            bs ∗
+                          n ↦[wms][ (WNear.Binary.SerdeErrorWriters.syntaxSlice tag).1.toNat ] sb))
+      (fun x =>
+        133 * cfg.regularOpCost +
+            Wasm.Near.activationGas cfg.regularOpCost
+              (WasmLogic.entryLocals WNear.Binary.f616
+                [Wasm.Value.i32 dd, Wasm.Value.i32 (WNear.Binary.SerdeErrorWriters.syntaxSlice tag).1,
+                  Wasm.Value.i32 (WNear.Binary.SerdeErrorWriters.syntaxSlice tag).2]) +
+          (36 * cfg.regularOpCost +
+            WNear.Binary.ScratchGrow.costExt cfg F cap (UInt32.ofNat bs.length)
+              (WNear.Binary.SerdeErrorWriters.syntaxSlice tag).2))
+      fun x rs =>
+      iprop(⌜rs = [Wasm.Value.i32 0]⌝ ∗
+          n ↦[wms][ desc.toNat ] WasmLogic.bytes32 e ∗
+            n ↦[wms][ e.toNat ] WasmLogic.bytes32 tag ∗
+              n ↦[wms][ fmt.toNat + 24 ] WasmLogic.bytes32 dd ∗
+                n ↦[wms][ fmt.toNat + 28 ] WasmLogic.bytes32 1057784 ∗
+                  n ↦[wms][ 1057796 ] WasmLogic.bytes32 130 ∗
+                    ta ↦[wt][ 130 ] Wasm.Ref.func (A 616) ∗
+                      ∃ p hl',
+                        ⌜WNear.Binary.ScratchGrow.hlAfter hl hl' cap (UInt32.ofNat bs.length)
+                              (WNear.Binary.SerdeErrorWriters.syntaxSlice tag).2⌝ ∗
+                          WNear.Binary.SerdeActualSink.stringState n g ta gt s dd vec p
+                              (WNear.Binary.ScratchGrow.capAfter cap (UInt32.ofNat bs.length)
+                                (WNear.Binary.SerdeErrorWriters.syntaxSlice tag).2)
+                              idx (A 578) maxP hl'
+                              (WNear.Binary.ScratchGrow.fAfter F cap (UInt32.ofNat bs.length)
+                                (WNear.Binary.SerdeErrorWriters.syntaxSlice tag).2)
+                              live (bs ++ sb) ∗
+                            n ↦[wms][ (WNear.Binary.SerdeErrorWriters.syntaxSlice tag).1.toNat ] sb)
+```
+
+`WNear.Binary.SerdeActualSink.f616_append` (hash `00000000d57b926f`)
+
+```lean
+theorem WNear.Binary.SerdeActualSink.f616_append {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ)
+  (hm : WNear.Binary.Interface.IfaceMod mi A n g ta) (hd : d + 16 < lim.maxCallDepth) (Cg : ℕ) (gt : Wasm.GlobalType)
+  (s dd vec ptr cap src k idx : UInt32) (maxP hl F : ℕ) (live : List (ℕ × ℕ)) (bs sb : List UInt8) (hs : 112 ≤ s.toNat)
+  (hdd : dd.toNat + 4 ≤ 2 ^ 32) (hvec : vec.toNat + 12 ≤ 2 ^ 32) (hcap : cap.toNat < 2 ^ 27)
+  (hlk : bs.length + k.toNat < 2 ^ 27) (hsb : sb.length = k.toNat) (hsrc : src.toNat + k.toNat ≤ 2 ^ 32)
+  (hr : WNear.Binary.ScratchGrow.roomRes hl maxP cap (UInt32.ofNat bs.length) k) :
+  inst ↪[inst] mi ∗ WNear.Binary.ScratchGrow.sgCode n maxP inst mi A ⊢
+    NearLogic.MFunSpec cfg lim d WNear.Binary.types[15]! inst mi WNear.Binary.f616 Cg
+      (fun args =>
+        iprop(⌜args = [Wasm.Value.i32 dd, Wasm.Value.i32 src, Wasm.Value.i32 k]⌝ ∗
+            WNear.Binary.SerdeActualSink.stringState n g ta gt s dd vec ptr cap idx (A 578) maxP hl F live bs ∗
+              n ↦[wms][ src.toNat ] sb))
+      (fun x => 36 * cfg.regularOpCost + WNear.Binary.ScratchGrow.costExt cfg F cap (UInt32.ofNat bs.length) k)
+      fun x rs =>
+      iprop(⌜rs = [Wasm.Value.i32 0]⌝ ∗
+          ∃ p hl',
+            ⌜WNear.Binary.ScratchGrow.hlAfter hl hl' cap (UInt32.ofNat bs.length) k⌝ ∗
+              WNear.Binary.SerdeActualSink.stringState n g ta gt s dd vec p
+                  (WNear.Binary.ScratchGrow.capAfter cap (UInt32.ofNat bs.length) k) idx (A 578) maxP hl'
+                  (WNear.Binary.ScratchGrow.fAfter F cap (UInt32.ofNat bs.length) k) live (bs ++ sb) ∗
+                n ↦[wms][ src.toNat ] sb)
+```
+
+`WNear.Binary.SerdeActualSink.serde_string_sink_table` (hash `00000000280e84d4`)
+
+```lean
+theorem WNear.Binary.SerdeActualSink.serde_string_sink_table : WNear.Binary.wTable.elems[130]? = some (Wasm.Ref.func 616)
+```
+
+`WNear.Binary.SerdeActualSink.serde_string_sink_vtable` (hash `00000000bdc4db7a`)
+
+```lean
+theorem WNear.Binary.SerdeActualSink.serde_string_sink_vtable :
+  WNear.Binary.Interface.dataWord (1057784 + 12) = WasmLogic.bytes32 130
+```
+
+`WNear.Binary.SerdeActualSink.stringState` (hash `ab22da301ae8f032`)
+
+```lean
+def WNear.Binary.SerdeActualSink.stringState {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF] (n g ta : ℕ)
+  (gt : Wasm.GlobalType) (s dd vec ptr cap idx : UInt32) (a578 maxP hl F : ℕ) (live : List (ℕ × ℕ)) (bs : List UInt8) :
+  Iris.IProp GF :=
+  fun bs =>
+    iprop(n ↦[wms][ dd.toNat ] WasmLogic.bytes32 vec ∗
+        g ↦[wg] { type := gt, value := Wasm.Value.i32 s } ∗
+          WNear.Binary.VecFromElem.stk n (s.toNat - 112) 112 ∗
+            WNear.Binary.AllocFirstFit.vt n 1057464 idx ta a578 ∗
+              n ↦[wms][ vec.toNat ] WasmLogic.bytes32 ptr ∗
+                n ↦[wms][ vec.toNat + 4 ] WasmLogic.bytes32 cap ∗
+                  n ↦[wms][ vec.toNat + 8 ] WasmLogic.bytes32 (UInt32.ofNat bs.length) ∗
+                    WNear.Binary.ScratchGrow.sbuf n maxP hl live F ptr cap bs)
+```
+
 ## Bridge.Functions.SerdeBundledKeyState
 
 `WNear.Binary.SerdeObjectPrefix.Bound.bundled_key_conditions` (hash `00000000961201a4`)
@@ -13432,6 +13557,326 @@ theorem WNear.Binary.SerdeDebug.f641_second_format {GF : Iris.BundledGFunctors} 
                                         (WNear.Binary.VecFromElem.pair64 (e + 12) 3))) ⊢
     NearLogic.mwpi cfg lim d (WNear.Binary.SerdeDebug.debugFrame inst mi e fmt s x3) [Wasm.Value.i32 0]
       (List.take 56 (List.drop 49 WNear.Binary.f641.body)) Φ
+```
+
+## Bridge.Functions.SerdeErrorPayload
+
+`WNear.Binary.SerdeErrorPayload.IOErrorDebugSpec` (hash `da463ee4287baa93`)
+
+```lean
+def WNear.Binary.SerdeErrorPayload.IOErrorDebugSpec {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d inst : ℕ) (mi : Wasm.ModuleInst) (payload fmt : UInt32)
+  (K Cg : ℕ) (P Q : Iris.IProp GF) : Iris.IProp GF :=
+  fun Q =>
+    WNear.Binary.PanicDebug.DebugCalleeSpec cfg lim d inst mi WNear.Binary.f804 payload fmt K Cg P
+      Q
+```
+
+`WNear.Binary.SerdeErrorPayload.f592_io` (hash `00000000f6d0855b`)
+
+```lean
+theorem WNear.Binary.SerdeErrorPayload.f592_io {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (htype : type.results.length = 1)
+  (inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 1 < lim.maxCallDepth) (Cg : ℕ) (e fmt : UInt32) (Kw : ℕ) (P Q : Iris.IProp GF) (he : e.toNat + 4 < 2 ^ 32) :
+  inst ↪[inst] mi ∗
+      A 804 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[13]! inst WNear.Binary.f804 ∗
+        WNear.Binary.SerdeErrorPayload.IOErrorDebugSpec cfg lim (d + 1) inst mi (e + 4) fmt Kw Cg P Q ⊢
+    NearLogic.MFunSpec cfg lim d type inst mi WNear.Binary.f592 Cg
+      (fun args => iprop(⌜args = [Wasm.Value.i32 e, Wasm.Value.i32 fmt]⌝ ∗ n ↦[wms][ e.toNat ] WasmLogic.bytes32 1 ∗ P))
+      (fun x =>
+        100 * cfg.regularOpCost +
+            Wasm.Near.activationGas cfg.regularOpCost
+              (WasmLogic.entryLocals WNear.Binary.f804 [Wasm.Value.i32 (e + 4), Wasm.Value.i32 fmt]) +
+          Kw)
+      fun x rs => iprop(⌜rs = [Wasm.Value.i32 0]⌝ ∗ n ↦[wms][ e.toNat ] WasmLogic.bytes32 1 ∗ Q)
+```
+
+`WNear.Binary.SerdeErrorPayload.f592_message` (hash `0000000057767d76`)
+
+```lean
+theorem WNear.Binary.SerdeErrorPayload.f592_message {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (htype : type.results.length = 1)
+  (inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 1 < lim.maxCallDepth) (Cg : ℕ) (e fmt ptr len : UInt32) (Kw : ℕ) (P Q : Iris.IProp GF)
+  (he : e.toNat + 12 ≤ 2 ^ 32) :
+  inst ↪[inst] mi ∗
+      A 912 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[15]! inst WNear.Binary.f912 ∗
+        WNear.Binary.SerdeErrorWriters.StaticWriteSpec cfg lim (d + 1) inst mi fmt ptr len Kw Cg P Q ⊢
+    NearLogic.MFunSpec cfg lim d type inst mi WNear.Binary.f592 Cg
+      (fun args =>
+        iprop(⌜args = [Wasm.Value.i32 e, Wasm.Value.i32 fmt]⌝ ∗
+            n ↦[wms][ e.toNat ] WasmLogic.bytes32 0 ∗
+              n ↦[wms][ e.toNat + 4 ] WasmLogic.bytes32 ptr ∗ n ↦[wms][ e.toNat + 8 ] WasmLogic.bytes32 len ∗ P))
+      (fun x =>
+        100 * cfg.regularOpCost +
+            Wasm.Near.activationGas cfg.regularOpCost
+              (WasmLogic.entryLocals WNear.Binary.f912 [Wasm.Value.i32 fmt, Wasm.Value.i32 ptr, Wasm.Value.i32 len]) +
+          Kw)
+      fun x rs =>
+      iprop(⌜rs = [Wasm.Value.i32 0]⌝ ∗
+          n ↦[wms][ e.toNat ] WasmLogic.bytes32 0 ∗
+            n ↦[wms][ e.toNat + 4 ] WasmLogic.bytes32 ptr ∗ n ↦[wms][ e.toNat + 8 ] WasmLogic.bytes32 len ∗ Q)
+```
+
+## Bridge.Functions.SerdeErrorWriters
+
+`WNear.Binary.SerdeErrorWriters.StaticWriteSpec` (hash `1462b0cbbfe0f84c`)
+
+```lean
+def WNear.Binary.SerdeErrorWriters.StaticWriteSpec {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d inst : ℕ) (mi : Wasm.ModuleInst) (fmt ptr len : UInt32)
+  (K Cg : ℕ) (P Q : Iris.IProp GF) : Iris.IProp GF :=
+  fun Q =>
+    NearLogic.MFunSpec cfg lim d WNear.Binary.types[15]! inst mi WNear.Binary.f912 Cg
+      (fun args =>
+        iprop(⌜args = [Wasm.Value.i32 fmt, Wasm.Value.i32 ptr, Wasm.Value.i32 len]⌝ ∗ P))
+      (fun x => K) fun x rs => iprop(⌜rs = [Wasm.Value.i32 0]⌝ ∗ Q)
+```
+
+`WNear.Binary.SerdeErrorWriters.StringDebugSliceSpec` (hash `e048793db34c93b5`)
+
+```lean
+def WNear.Binary.SerdeErrorWriters.StringDebugSliceSpec {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d inst : ℕ) (mi : Wasm.ModuleInst) (g : ℕ)
+  (gt : Wasm.GlobalType) (sp p len fmt : UInt32) (K Cg : ℕ) (P Q : Iris.IProp GF) : Iris.IProp GF :=
+  fun Q =>
+    NearLogic.MFunSpec cfg lim d WNear.Binary.types[15]! inst mi WNear.Binary.f920 Cg
+      (fun args =>
+        iprop(⌜args = [Wasm.Value.i32 p, Wasm.Value.i32 len, Wasm.Value.i32 fmt]⌝ ∗
+            g ↦[wg] { type := gt, value := Wasm.Value.i32 sp } ∗ P))
+      (fun x => K) fun x rs =>
+      iprop(⌜rs = [Wasm.Value.i32 0]⌝ ∗ g ↦[wg] { type := gt, value := Wasm.Value.i32 sp } ∗ Q)
+```
+
+`WNear.Binary.SerdeErrorWriters.WriteSliceCalleeSpec` (hash `658cbf68017845f3`)
+
+```lean
+def WNear.Binary.SerdeErrorWriters.WriteSliceCalleeSpec {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d inst : ℕ) (mi : Wasm.ModuleInst) (code : Wasm.Func)
+  (data ptr len : UInt32) (K Cg : ℕ) (P Q : Iris.IProp GF) : Iris.IProp GF :=
+  fun Q =>
+    NearLogic.MFunSpec cfg lim d WNear.Binary.types[15]! inst mi code Cg
+      (fun args =>
+        iprop(⌜args = [Wasm.Value.i32 data, Wasm.Value.i32 ptr, Wasm.Value.i32 len]⌝ ∗ P))
+      (fun x => K) fun x rs => iprop(⌜rs = [Wasm.Value.i32 0]⌝ ∗ Q)
+```
+
+`WNear.Binary.SerdeErrorWriters.error_code_debug_table` (hash `00000000abb7dcf1`)
+
+```lean
+theorem WNear.Binary.SerdeErrorWriters.error_code_debug_table : WNear.Binary.wTable.elems[126]? = some (Wasm.Ref.func 591)
+```
+
+`WNear.Binary.SerdeErrorWriters.f591_delegate` (hash `00000000dc96af30`)
+
+```lean
+theorem WNear.Binary.SerdeErrorWriters.f591_delegate {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (htype : type.results.length = 1)
+  (inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 1 < lim.maxCallDepth) (Cg : ℕ) (desc e fmt : UInt32) (Kw : ℕ) (P Q : Iris.IProp GF)
+  (hdesc : desc.toNat + 4 ≤ 2 ^ 32) :
+  inst ↪[inst] mi ∗
+      A 592 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[13]! inst WNear.Binary.f592 ∗
+        WNear.Binary.PanicDebug.DebugCalleeSpec cfg lim (d + 1) inst mi WNear.Binary.f592 e fmt Kw Cg P Q ⊢
+    NearLogic.MFunSpec cfg lim d type inst mi WNear.Binary.f591 Cg
+      (fun args =>
+        iprop(⌜args = [Wasm.Value.i32 desc, Wasm.Value.i32 fmt]⌝ ∗ n ↦[wms][ desc.toNat ] WasmLogic.bytes32 e ∗ P))
+      (fun x =>
+        4 * cfg.regularOpCost +
+            Wasm.Near.activationGas cfg.regularOpCost
+              (WasmLogic.entryLocals WNear.Binary.f592 [Wasm.Value.i32 e, Wasm.Value.i32 fmt]) +
+          Kw)
+      fun x rs => iprop(⌜rs = [Wasm.Value.i32 0]⌝ ∗ n ↦[wms][ desc.toNat ] WasmLogic.bytes32 e ∗ Q)
+```
+
+`WNear.Binary.SerdeErrorWriters.f591_syntax` (hash `000000008191fb60`)
+
+```lean
+theorem WNear.Binary.SerdeErrorWriters.f591_syntax {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (htype : type.results.length = 1)
+  (inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 2 < lim.maxCallDepth) (Cg : ℕ) (desc e fmt tag : UInt32) (Kw : ℕ) (P Q : Iris.IProp GF)
+  (hdesc : desc.toNat + 4 ≤ 2 ^ 32) (he : e.toNat + 4 ≤ 2 ^ 32) (hlow : 2 ≤ tag.toNat) (hhigh : tag.toNat ≤ 21) :
+  inst ↪[inst] mi ∗
+      A 592 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[13]! inst WNear.Binary.f592 ∗
+        A 912 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[15]! inst WNear.Binary.f912 ∗
+          WNear.Binary.SerdeErrorWriters.StaticWriteSpec cfg lim (d + 2) inst mi fmt
+            (WNear.Binary.SerdeErrorWriters.syntaxSlice tag).1 (WNear.Binary.SerdeErrorWriters.syntaxSlice tag).2 Kw Cg
+            P Q ⊢
+    NearLogic.MFunSpec cfg lim d type inst mi WNear.Binary.f591 Cg
+      (fun args =>
+        iprop(⌜args = [Wasm.Value.i32 desc, Wasm.Value.i32 fmt]⌝ ∗
+            n ↦[wms][ desc.toNat ] WasmLogic.bytes32 e ∗ n ↦[wms][ e.toNat ] WasmLogic.bytes32 tag ∗ P))
+      (fun x => 123 * cfg.regularOpCost + Kw) fun x rs =>
+      iprop(⌜rs = [Wasm.Value.i32 0]⌝ ∗
+          n ↦[wms][ desc.toNat ] WasmLogic.bytes32 e ∗ n ↦[wms][ e.toNat ] WasmLogic.bytes32 tag ∗ Q)
+```
+
+`WNear.Binary.SerdeErrorWriters.f591_syntax_sink` (hash `0000000026c55025`)
+
+```lean
+theorem WNear.Binary.SerdeErrorWriters.f591_syntax_sink {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (htype : type.results.length = 1)
+  (inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 3 < lim.maxCallDepth) (Cg : ℕ) (desc e fmt tag data vt idx : UInt32) (af : ℕ) (code : Wasm.Func) (Kw : ℕ)
+  (P Q : Iris.IProp GF) (hdesc : desc.toNat + 4 ≤ 2 ^ 32) (he : e.toNat + 4 ≤ 2 ^ 32) (hlow : 2 ≤ tag.toNat)
+  (hhigh : tag.toNat ≤ 21) (hf : fmt.toNat + 32 ≤ 2 ^ 32) (hvt : vt.toNat + 16 ≤ 2 ^ 32) :
+  inst ↪[inst] mi ∗
+      A 592 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[13]! inst WNear.Binary.f592 ∗
+        A 912 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[15]! inst WNear.Binary.f912 ∗
+          af ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[15]! inst code ∗
+            WNear.Binary.SerdeErrorWriters.WriteSliceCalleeSpec cfg lim (d + 3) inst mi code data
+              (WNear.Binary.SerdeErrorWriters.syntaxSlice tag).1 (WNear.Binary.SerdeErrorWriters.syntaxSlice tag).2 Kw
+              Cg P Q ⊢
+    NearLogic.MFunSpec cfg lim d type inst mi WNear.Binary.f591 Cg
+      (fun args =>
+        iprop(⌜args = [Wasm.Value.i32 desc, Wasm.Value.i32 fmt]⌝ ∗
+            n ↦[wms][ desc.toNat ] WasmLogic.bytes32 e ∗
+              n ↦[wms][ e.toNat ] WasmLogic.bytes32 tag ∗
+                n ↦[wms][ fmt.toNat + 24 ] WasmLogic.bytes32 data ∗
+                  n ↦[wms][ fmt.toNat + 28 ] WasmLogic.bytes32 vt ∗
+                    n ↦[wms][ vt.toNat + 12 ] WasmLogic.bytes32 idx ∗ ta ↦[wt][ idx.toNat ] Wasm.Ref.func af ∗ P))
+      (fun x =>
+        133 * cfg.regularOpCost +
+            Wasm.Near.activationGas cfg.regularOpCost
+              (WasmLogic.entryLocals code
+                [Wasm.Value.i32 data, Wasm.Value.i32 (WNear.Binary.SerdeErrorWriters.syntaxSlice tag).1,
+                  Wasm.Value.i32 (WNear.Binary.SerdeErrorWriters.syntaxSlice tag).2]) +
+          Kw)
+      fun x rs =>
+      iprop(⌜rs = [Wasm.Value.i32 0]⌝ ∗
+          n ↦[wms][ desc.toNat ] WasmLogic.bytes32 e ∗
+            n ↦[wms][ e.toNat ] WasmLogic.bytes32 tag ∗
+              n ↦[wms][ fmt.toNat + 24 ] WasmLogic.bytes32 data ∗
+                n ↦[wms][ fmt.toNat + 28 ] WasmLogic.bytes32 vt ∗
+                  n ↦[wms][ vt.toNat + 12 ] WasmLogic.bytes32 idx ∗ ta ↦[wt][ idx.toNat ] Wasm.Ref.func af ∗ Q)
+```
+
+`WNear.Binary.SerdeErrorWriters.f592_syntax` (hash `0000000034a4cbd3`)
+
+```lean
+theorem WNear.Binary.SerdeErrorWriters.f592_syntax {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (htype : type.results.length = 1)
+  (inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 1 < lim.maxCallDepth) (Cg : ℕ) (e fmt tag : UInt32) (Kw : ℕ) (P Q : Iris.IProp GF)
+  (he : e.toNat + 4 ≤ 2 ^ 32) (hlow : 2 ≤ tag.toNat) (hhigh : tag.toNat ≤ 21) :
+  inst ↪[inst] mi ∗
+      A 912 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[15]! inst WNear.Binary.f912 ∗
+        WNear.Binary.SerdeErrorWriters.StaticWriteSpec cfg lim (d + 1) inst mi fmt
+          (WNear.Binary.SerdeErrorWriters.syntaxSlice tag).1 (WNear.Binary.SerdeErrorWriters.syntaxSlice tag).2 Kw Cg P
+          Q ⊢
+    NearLogic.MFunSpec cfg lim d type inst mi WNear.Binary.f592 Cg
+      (fun args =>
+        iprop(⌜args = [Wasm.Value.i32 e, Wasm.Value.i32 fmt]⌝ ∗ n ↦[wms][ e.toNat ] WasmLogic.bytes32 tag ∗ P))
+      (fun x =>
+        100 * cfg.regularOpCost +
+            Wasm.Near.activationGas cfg.regularOpCost
+              (WasmLogic.entryLocals WNear.Binary.f912
+                [Wasm.Value.i32 fmt, Wasm.Value.i32 (WNear.Binary.SerdeErrorWriters.syntaxSlice tag).1,
+                  Wasm.Value.i32 (WNear.Binary.SerdeErrorWriters.syntaxSlice tag).2]) +
+          Kw)
+      fun x rs => iprop(⌜rs = [Wasm.Value.i32 0]⌝ ∗ n ↦[wms][ e.toNat ] WasmLogic.bytes32 tag ∗ Q)
+```
+
+`WNear.Binary.SerdeErrorWriters.f619_delegate` (hash `000000002e8018ec`)
+
+```lean
+theorem WNear.Binary.SerdeErrorWriters.f619_delegate {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (htype : type.results.length = 1)
+  (inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 1 < lim.maxCallDepth) (Cg : ℕ) (gt : Wasm.GlobalType) (sp vec p len fmt : UInt32) (Kw : ℕ)
+  (P Q : Iris.IProp GF) (hsp : 16 ≤ sp.toNat) (hv : vec.toNat + 12 ≤ 2 ^ 32) :
+  inst ↪[inst] mi ∗
+      A 728 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[14]! inst WNear.Binary.f728 ∗
+        A 920 ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[15]! inst WNear.Binary.f920 ∗
+          WNear.Binary.SerdeErrorWriters.StringDebugSliceSpec cfg lim (d + 1) inst mi g gt (sp - 16) p len fmt Kw Cg P
+            Q ⊢
+    NearLogic.MFunSpec cfg lim d type inst mi WNear.Binary.f619 Cg
+      (fun args =>
+        iprop(⌜args = [Wasm.Value.i32 vec, Wasm.Value.i32 fmt]⌝ ∗
+            g ↦[wg] { type := gt, value := Wasm.Value.i32 sp } ∗
+              WNear.Binary.VecFromElem.stk n (sp.toNat - 16) 16 ∗
+                n ↦[wms][ vec.toNat ] WasmLogic.bytes32 p ∗ n ↦[wms][ vec.toNat + 8 ] WasmLogic.bytes32 len ∗ P))
+      (fun x =>
+        50 * cfg.regularOpCost +
+            Wasm.Near.activationGas cfg.regularOpCost
+              (WasmLogic.entryLocals WNear.Binary.f920 [Wasm.Value.i32 p, Wasm.Value.i32 len, Wasm.Value.i32 fmt]) +
+          Kw)
+      fun x rs =>
+      iprop(⌜rs = [Wasm.Value.i32 0]⌝ ∗
+          g ↦[wg] { type := gt, value := Wasm.Value.i32 sp } ∗
+            WNear.Binary.VecFromElem.stk n (sp.toNat - 16) 16 ∗
+              n ↦[wms][ vec.toNat ] WasmLogic.bytes32 p ∗ n ↦[wms][ vec.toNat + 8 ] WasmLogic.bytes32 len ∗ Q)
+```
+
+`WNear.Binary.SerdeErrorWriters.f912_delegate` (hash `0000000065f70bd8`)
+
+```lean
+theorem WNear.Binary.SerdeErrorWriters.f912_delegate {GF : Iris.BundledGFunctors} [WasmLogic.WasmGS Wasm.NearState GF]
+  (cfg : Wasm.Near.WasmConfig) (lim : Wasm.ExecLimits) (d : ℕ) (type : Wasm.FuncType) (htype : type.results.length = 1)
+  (inst : ℕ) (mi : Wasm.ModuleInst) (A : ℕ → ℕ) (n g ta : ℕ) (hm : WNear.Binary.Interface.IfaceMod mi A n g ta)
+  (hd : d + 1 < lim.maxCallDepth) (Cg : ℕ) (fmt data vt idx ptr len : UInt32) (af : ℕ) (code : Wasm.Func) (Kw : ℕ)
+  (P Q : Iris.IProp GF) (hf : fmt.toNat + 32 ≤ 2 ^ 32) (hvt : vt.toNat + 16 ≤ 2 ^ 32) :
+  inst ↪[inst] mi ∗
+      af ↪[wf] Wasm.FuncInst.wasm WNear.Binary.types[15]! inst code ∗
+        WNear.Binary.SerdeErrorWriters.WriteSliceCalleeSpec cfg lim (d + 1) inst mi code data ptr len Kw Cg P Q ⊢
+    NearLogic.MFunSpec cfg lim d type inst mi WNear.Binary.f912 Cg
+      (fun args =>
+        iprop(⌜args = [Wasm.Value.i32 fmt, Wasm.Value.i32 ptr, Wasm.Value.i32 len]⌝ ∗
+            n ↦[wms][ fmt.toNat + 24 ] WasmLogic.bytes32 data ∗
+              n ↦[wms][ fmt.toNat + 28 ] WasmLogic.bytes32 vt ∗
+                n ↦[wms][ vt.toNat + 12 ] WasmLogic.bytes32 idx ∗ ta ↦[wt][ idx.toNat ] Wasm.Ref.func af ∗ P))
+      (fun x =>
+        10 * cfg.regularOpCost +
+            Wasm.Near.activationGas cfg.regularOpCost
+              (WasmLogic.entryLocals code [Wasm.Value.i32 data, Wasm.Value.i32 ptr, Wasm.Value.i32 len]) +
+          Kw)
+      fun x rs =>
+      iprop(⌜rs = [Wasm.Value.i32 0]⌝ ∗
+          n ↦[wms][ fmt.toNat + 24 ] WasmLogic.bytes32 data ∗
+            n ↦[wms][ fmt.toNat + 28 ] WasmLogic.bytes32 vt ∗
+              n ↦[wms][ vt.toNat + 12 ] WasmLogic.bytes32 idx ∗ ta ↦[wt][ idx.toNat ] Wasm.Ref.func af ∗ Q)
+```
+
+`WNear.Binary.SerdeErrorWriters.string_debug_table` (hash `00000000c39f2565`)
+
+```lean
+theorem WNear.Binary.SerdeErrorWriters.string_debug_table : WNear.Binary.wTable.elems[127]? = some (Wasm.Ref.func 619)
+```
+
+`WNear.Binary.SerdeErrorWriters.syntaxSlice` (hash `218a7159fed9c73c`)
+
+```lean
+def WNear.Binary.SerdeErrorWriters.syntaxSlice (tag : UInt32) : UInt32 × UInt32 :=
+  match tag.toNat with
+  | 2 => (1061464, 24)
+  | 3 => (1061437, 27)
+  | 4 => (1061411, 26)
+  | 5 => (1061386, 25)
+  | 6 => (1061374, 12)
+  | 7 => (1061355, 19)
+  | 8 => (1061336, 19)
+  | 9 => (1061322, 14)
+  | 10 => (1061308, 14)
+  | 11 => (1061294, 14)
+  | 12 => (1061280, 14)
+  | 13 => (1061261, 19)
+  | 14 => (1061235, 26)
+  | 15 => (1061173, 62)
+  | 16 => (1061153, 20)
+  | 17 => (1061117, 36)
+  | 18 => (1061103, 14)
+  | 19 => (1061084, 19)
+  | 20 => (1061056, 28)
+  | 21 => (1061032, 24)
+  | x => (0, 0)
+```
+
+`WNear.Binary.SerdeErrorWriters.u32_display_table` (hash `0000000025c99fa3`)
+
+```lean
+theorem WNear.Binary.SerdeErrorWriters.u32_display_table : WNear.Binary.wTable.elems[3]? = some (Wasm.Ref.func 870)
 ```
 
 ## Bridge.Functions.SerdeFieldPrecise

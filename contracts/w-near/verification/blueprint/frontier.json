@@ -11178,6 +11178,244 @@
         "serde-error-debug-dispatch"
       ],
       "reviewed_shape_hash": 1607682212
+    },
+    {
+      "id": "serde-code-format-table",
+      "declaration": "WNear.Binary.SerdeErrorWriters.error_code_debug_table",
+      "title": "Actual ErrorCode formatter table entry",
+      "kind": "theorem",
+      "label": "frontier:serde-code-format-table",
+      "notes": "Kernel-checked deployed table entry 126 selects function 591. This fact alone does not prove its formatting behavior.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2880953585
+    },
+    {
+      "id": "serde-string-format-table",
+      "declaration": "WNear.Binary.SerdeErrorWriters.string_debug_table",
+      "title": "Actual String Debug table entry",
+      "kind": "theorem",
+      "label": "frontier:serde-string-format-table",
+      "notes": "Kernel-checked deployed table entry 127 selects function 619, whose borrowed slice uses quoted and escaped Debug formatting.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3281986917
+    },
+    {
+      "id": "serde-u32-format-table",
+      "declaration": "WNear.Binary.SerdeErrorWriters.u32_display_table",
+      "title": "Actual line and column formatter table entry",
+      "kind": "theorem",
+      "label": "frontier:serde-u32-format-table",
+      "notes": "Kernel-checked deployed table entry 3 selects function 870. Full UInt32 behavior and its concrete caller instance remain unfinished.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 633970595
+    },
+    {
+      "id": "serde-code-format-wrapper",
+      "declaration": "WNear.Binary.SerdeErrorWriters.f591_delegate",
+      "title": "Actual ErrorCode Debug wrapper preserves its descriptor",
+      "kind": "theorem",
+      "label": "frontier:serde-code-format-wrapper",
+      "notes": "The actual wrapper dereferences the owned ErrorCode descriptor and calls function 592, with exact activation and credits. Its enum-formatter premise remains Open.",
+      "required_type_dependencies": [
+        "reject-debug-callee-spec"
+      ],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3700862768
+    },
+    {
+      "id": "serde-string-debug-slice",
+      "declaration": "WNear.Binary.SerdeErrorWriters.StringDebugSliceSpec",
+      "title": "Quoted and escaped string-slice Debug frontier",
+      "kind": "verification_contract",
+      "label": "frontier:serde-string-debug-slice",
+      "notes": "Exact deployed function-920 contract, with global stack and chosen owned payload/sink resources. Valid UTF8 processing, escaping, sink bounds and finite costs still require implementation proofs.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 16161300568727131061
+    },
+    {
+      "id": "serde-string-debug-wrapper",
+      "declaration": "WNear.Binary.SerdeErrorWriters.f619_delegate",
+      "title": "Actual String Debug borrows its slice and restores its frame",
+      "kind": "theorem",
+      "label": "frontier:serde-string-debug-wrapper",
+      "notes": "Actual function 619 invokes checked Vec dereference, calls the real function-920 quoted/escaped formatter, retains String pointer and length and reclaims all 16 stack bytes. Conditional on the named String Debug slice contract.",
+      "required_type_dependencies": [
+        "serde-string-debug-slice"
+      ],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 780146924
+    },
+    {
+      "id": "serde-static-slice-writer",
+      "declaration": "WNear.Binary.SerdeErrorWriters.StaticWriteSpec",
+      "title": "Exact borrowed-slice Formatter write frontier",
+      "kind": "verification_contract",
+      "label": "frontier:serde-static-slice-writer",
+      "notes": "Exact function-912 contract for selected payload bytes, Formatter and owned sink resources. Its checked descriptor-dispatch constructor does not establish the selected sink implementation.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1468930817620244556
+    },
+    {
+      "id": "serde-code-syntax-branches",
+      "declaration": "WNear.Binary.SerdeErrorWriters.f592_syntax",
+      "title": "All twenty deployed static ErrorCode branches",
+      "kind": "theorem",
+      "label": "frontier:serde-code-syntax-branches",
+      "notes": "Checks the actual nested blocks and branch table for tags 2 through 21, selects each exact deployed static pointer/length, preserves tag ownership and calls the named slice writer. Dynamic message tag 0 and I/O tag 1 are explicitly outside this local result; no input restriction is imposed on the contract goal.",
+      "required_type_dependencies": [
+        "serde-static-slice-writer"
+      ],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 883215315
+    },
+    {
+      "id": "serde-code-syntax-wrapper",
+      "declaration": "WNear.Binary.SerdeErrorWriters.f591_syntax",
+      "title": "ErrorCode wrapper composes all static syntax branches",
+      "kind": "theorem",
+      "label": "frontier:serde-code-syntax-wrapper",
+      "notes": "Constructs the precise enum-formatter instance from all twenty checked static branches and composes the real descriptor wrapper. Retains tag and descriptor ownership with 123 regular-operation units plus the selected write cost.",
+      "required_type_dependencies": [
+        "serde-static-slice-writer"
+      ],
+      "required_proof_dependencies": [
+        "serde-code-format-wrapper",
+        "serde-code-syntax-branches"
+      ],
+      "reviewed_shape_hash": 2173827936
+    },
+    {
+      "id": "serde-selected-slice-sink",
+      "declaration": "WNear.Binary.SerdeErrorWriters.WriteSliceCalleeSpec",
+      "title": "Selected write_str sink frontier",
+      "kind": "verification_contract",
+      "label": "frontier:serde-selected-slice-sink",
+      "notes": "Exact actual selected function, three arguments, owned input/output resources and return zero. Descriptor dispatch is checked separately; concrete sink bytes, heap growth and uniform cost remain unresolved.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 7317433947992376819
+    },
+    {
+      "id": "serde-slice-dispatch",
+      "declaration": "WNear.Binary.SerdeErrorWriters.f912_delegate",
+      "title": "Actual borrowed-slice write dispatch preserves descriptors",
+      "kind": "theorem",
+      "label": "frontier:serde-slice-dispatch",
+      "notes": "Actual function 912 reads Formatter data and vtable, the method slot and owned table cell, then calls the selected type-15 function with exact bytes. Preserves descriptor/table ownership and one gas credit resource. Conditional on that selected sink contract.",
+      "required_type_dependencies": [
+        "serde-selected-slice-sink"
+      ],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1710689240
+    },
+    {
+      "id": "serde-code-syntax-sink",
+      "declaration": "WNear.Binary.SerdeErrorWriters.f591_syntax_sink",
+      "title": "Static ErrorCode formatting reaches selected sink through checked calls",
+      "kind": "theorem",
+      "label": "frontier:serde-code-syntax-sink",
+      "notes": "Composes all twenty static branches, the ErrorCode descriptor wrapper and actual borrowed-slice dynamic sink dispatch. The whole-format assumption is replaced by the exact selected write_str contract. Dynamic payload variants, concrete sink behavior, String escaping, numeric formatting, uniform cost and rejected parser ownership remain unfinished.",
+      "required_type_dependencies": [
+        "serde-selected-slice-sink"
+      ],
+      "required_proof_dependencies": [
+        "serde-code-syntax-wrapper",
+        "serde-slice-dispatch"
+      ],
+      "reviewed_shape_hash": 650465317
+    },
+    {
+      "id": "serde-actual-string-vtable",
+      "declaration": "WNear.Binary.SerdeActualSink.serde_string_sink_vtable",
+      "title": "Actual serde String sink vtable",
+      "kind": "theorem",
+      "label": "frontier:serde-actual-string-vtable",
+      "notes": "Kernel-checked data segment word at 1057784 plus 12 selects table slot 130. This is distinct from the other reusable String sink vtable.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3183795066
+    },
+    {
+      "id": "serde-actual-string-table",
+      "declaration": "WNear.Binary.SerdeActualSink.serde_string_sink_table",
+      "title": "Actual serde String sink table",
+      "kind": "theorem",
+      "label": "frontier:serde-actual-string-table",
+      "notes": "Kernel-checked deployed table slot 130 selects actual function 616.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 672040148
+    },
+    {
+      "id": "serde-actual-string-append",
+      "declaration": "WNear.Binary.SerdeActualSink.f616_append",
+      "title": "Actual serde String sink appends owned bytes",
+      "kind": "theorem",
+      "label": "frontier:serde-actual-string-append",
+      "notes": "Actual function 616 invokes the existing checked 613/588 reserve-and-copy chain, including allocation and reallocation. Exact source bytes, String record, stack, allocator and resulting heap are retained. The selected writer behavior is instantiated; this result remains Conditional on the named scratch-room obligation, which must be discharged for reachable callers.",
+      "required_type_dependencies": [
+        "scratch-room"
+      ],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3581645423
+    },
+    {
+      "id": "serde-code-syntax-append",
+      "declaration": "WNear.Binary.SerdeActualSink.f591_syntax_append",
+      "title": "Static ErrorCode path uses actual serde String allocation and copy",
+      "kind": "theorem",
+      "label": "frontier:serde-code-syntax-append",
+      "notes": "All twenty static variants compose their actual ErrorCode wrapper, branch table, Formatter dispatch and real function-616 sink. The selected write_str behavior is concretely instantiated by checked allocation/copy results. The result remains Conditional on scratch-room; complete formatting-engine construction, dynamic variants, parser ownership and rejected receipts remain unfinished.",
+      "required_type_dependencies": [
+        "scratch-room"
+      ],
+      "required_proof_dependencies": [
+        "serde-code-syntax-sink",
+        "serde-actual-string-append"
+      ],
+      "reviewed_shape_hash": 2809171056
+    },
+    {
+      "id": "serde-message-branch",
+      "declaration": "WNear.Binary.SerdeErrorPayload.f592_message",
+      "title": "Actual dynamic message branch retains its payload pair",
+      "kind": "theorem",
+      "label": "frontier:serde-message-branch",
+      "notes": "Tag 0 reads the owned error payload pointer and length and invokes the actual borrowed-slice Formatter writer. These cells and the tag are retained. Selected writer behavior and byte validity are still obligations through the explicit slice contract; weak parser rejection ownership does not establish them.",
+      "required_type_dependencies": [
+        "serde-static-slice-writer"
+      ],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1467383158
+    },
+    {
+      "id": "serde-io-debug-writer",
+      "declaration": "WNear.Binary.SerdeErrorPayload.IOErrorDebugSpec",
+      "title": "Actual I/O payload Debug frontier",
+      "kind": "verification_contract",
+      "label": "frontier:serde-io-debug-writer",
+      "notes": "Exact actual function-804 formatter at the owned payload address and Formatter, with specified pre/post resources, result and cost. Dispatch correctness does not establish this I/O formatting interface.",
+      "required_type_dependencies": [],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 15728327898290694803
+    },
+    {
+      "id": "serde-io-branch",
+      "declaration": "WNear.Binary.SerdeErrorPayload.f592_io",
+      "title": "Actual I/O branch invokes its payload formatter",
+      "kind": "theorem",
+      "label": "frontier:serde-io-branch",
+      "notes": "Tag 1 calls actual function 804 at error plus four and retains owned tag and caller resources. Conditional on the precise I/O payload formatter; no static message is substituted and parser impossibility of this variant is not assumed.",
+      "required_type_dependencies": [
+        "serde-io-debug-writer"
+      ],
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 4140860763
     }
   ],
   "reviewed_environment": [

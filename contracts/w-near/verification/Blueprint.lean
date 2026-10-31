@@ -1,3 +1,6 @@
+import Bridge.Functions.SerdeActualSink
+import Bridge.Functions.SerdeErrorPayload
+import Bridge.Functions.SerdeErrorWriters
 import Bridge.Functions.SerdeDebugBody
 import Bridge.Functions.BalanceOf297RejectPanic
 import Bridge.Functions.PanicDebug
@@ -4577,3 +4580,112 @@ attribute [blueprint "frontier:serde-debug-composed-dispatch"
   (statement := /-- Actual function-882 dispatch instantiates function 641 from its checked body, instead of assuming the whole generic formatter contract. Exact vtable/table descriptor ownership, activation and final heap/frame resources are retained. Only the precise writer families remain direct formatter premises; rejected receipt/parser production and uniform finite cost remain unfinished. -/)
   (notReady := true)]
   WNear.Binary.SerdeDebug.f882_serde_composed
+
+attribute [blueprint "frontier:serde-code-format-table"
+  (title := /-- Actual ErrorCode formatter table entry -/)
+  (statement := /-- Kernel-checked deployed table entry 126 selects function 591. This fact alone does not prove its formatting behavior. -/)]
+  WNear.Binary.SerdeErrorWriters.error_code_debug_table
+
+attribute [blueprint "frontier:serde-string-format-table"
+  (title := /-- Actual String Debug table entry -/)
+  (statement := /-- Kernel-checked deployed table entry 127 selects function 619, whose borrowed slice uses quoted and escaped Debug formatting. -/)]
+  WNear.Binary.SerdeErrorWriters.string_debug_table
+
+attribute [blueprint "frontier:serde-u32-format-table"
+  (title := /-- Actual line and column formatter table entry -/)
+  (statement := /-- Kernel-checked deployed table entry 3 selects function 870. Full UInt32 behavior and its concrete caller instance remain unfinished. -/)]
+  WNear.Binary.SerdeErrorWriters.u32_display_table
+
+attribute [blueprint "frontier:serde-code-format-wrapper"
+  (title := /-- Actual ErrorCode Debug wrapper preserves its descriptor -/)
+  (statement := /-- The actual wrapper dereferences the owned ErrorCode descriptor and calls function 592, with exact activation and credits. Its enum-formatter premise remains Open. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeErrorWriters.f591_delegate
+
+attribute [blueprint "frontier:serde-string-debug-slice"
+  (title := /-- Quoted and escaped string-slice Debug frontier -/)
+  (statement := /-- Exact deployed function-920 contract, with global stack and chosen owned payload/sink resources. Valid UTF8 processing, escaping, sink bounds and finite costs still require implementation proofs. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeErrorWriters.StringDebugSliceSpec
+
+attribute [blueprint "frontier:serde-string-debug-wrapper"
+  (title := /-- Actual String Debug borrows its slice and restores its frame -/)
+  (statement := /-- Actual function 619 invokes checked Vec dereference, calls the real function-920 quoted/escaped formatter, retains String pointer and length and reclaims all 16 stack bytes. Conditional on the named String Debug slice contract. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeErrorWriters.f619_delegate
+
+attribute [blueprint "frontier:serde-static-slice-writer"
+  (title := /-- Exact borrowed-slice Formatter write frontier -/)
+  (statement := /-- Exact function-912 contract for selected payload bytes, Formatter and owned sink resources. Its checked descriptor-dispatch constructor does not establish the selected sink implementation. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeErrorWriters.StaticWriteSpec
+
+attribute [blueprint "frontier:serde-code-syntax-branches"
+  (title := /-- All twenty deployed static ErrorCode branches -/)
+  (statement := /-- Checks the actual nested blocks and branch table for tags 2 through 21, selects each exact deployed static pointer/length, preserves tag ownership and calls the named slice writer. Dynamic message tag 0 and I/O tag 1 are explicitly outside this local result; no input restriction is imposed on the contract goal. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeErrorWriters.f592_syntax
+
+attribute [blueprint "frontier:serde-code-syntax-wrapper"
+  (title := /-- ErrorCode wrapper composes all static syntax branches -/)
+  (statement := /-- Constructs the precise enum-formatter instance from all twenty checked static branches and composes the real descriptor wrapper. Retains tag and descriptor ownership with 123 regular-operation units plus the selected write cost. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeErrorWriters.f591_syntax
+
+attribute [blueprint "frontier:serde-selected-slice-sink"
+  (title := /-- Selected write_str sink frontier -/)
+  (statement := /-- Exact actual selected function, three arguments, owned input/output resources and return zero. Descriptor dispatch is checked separately; concrete sink bytes, heap growth and uniform cost remain unresolved. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeErrorWriters.WriteSliceCalleeSpec
+
+attribute [blueprint "frontier:serde-slice-dispatch"
+  (title := /-- Actual borrowed-slice write dispatch preserves descriptors -/)
+  (statement := /-- Actual function 912 reads Formatter data and vtable, the method slot and owned table cell, then calls the selected type-15 function with exact bytes. Preserves descriptor/table ownership and one gas credit resource. Conditional on that selected sink contract. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeErrorWriters.f912_delegate
+
+attribute [blueprint "frontier:serde-code-syntax-sink"
+  (title := /-- Static ErrorCode formatting reaches selected sink through checked calls -/)
+  (statement := /-- Composes all twenty static branches, the ErrorCode descriptor wrapper and actual borrowed-slice dynamic sink dispatch. The whole-format assumption is replaced by the exact selected write_str contract. Dynamic payload variants, concrete sink behavior, String escaping, numeric formatting, uniform cost and rejected parser ownership remain unfinished. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeErrorWriters.f591_syntax_sink
+
+attribute [blueprint "frontier:serde-actual-string-vtable"
+  (title := /-- Actual serde String sink vtable -/)
+  (statement := /-- Kernel-checked data segment word at 1057784 plus 12 selects table slot 130. This is distinct from the other reusable String sink vtable. -/)]
+  WNear.Binary.SerdeActualSink.serde_string_sink_vtable
+
+attribute [blueprint "frontier:serde-actual-string-table"
+  (title := /-- Actual serde String sink table -/)
+  (statement := /-- Kernel-checked deployed table slot 130 selects actual function 616. -/)]
+  WNear.Binary.SerdeActualSink.serde_string_sink_table
+
+attribute [blueprint "frontier:serde-actual-string-append"
+  (title := /-- Actual serde String sink appends owned bytes -/)
+  (statement := /-- Actual function 616 invokes the existing checked 613/588 reserve-and-copy chain, including allocation and reallocation. Exact source bytes, String record, stack, allocator and resulting heap are retained. The selected writer behavior is instantiated; this result remains Conditional on the named scratch-room obligation, which must be discharged for reachable callers. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeActualSink.f616_append
+
+attribute [blueprint "frontier:serde-code-syntax-append"
+  (title := /-- Static ErrorCode path uses actual serde String allocation and copy -/)
+  (statement := /-- All twenty static variants compose their actual ErrorCode wrapper, branch table, Formatter dispatch and real function-616 sink. The selected write_str behavior is concretely instantiated by checked allocation/copy results. The result remains Conditional on scratch-room; complete formatting-engine construction, dynamic variants, parser ownership and rejected receipts remain unfinished. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeActualSink.f591_syntax_append
+
+attribute [blueprint "frontier:serde-message-branch"
+  (title := /-- Actual dynamic message branch retains its payload pair -/)
+  (statement := /-- Tag 0 reads the owned error payload pointer and length and invokes the actual borrowed-slice Formatter writer. These cells and the tag are retained. Selected writer behavior and byte validity are still obligations through the explicit slice contract; weak parser rejection ownership does not establish them. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeErrorPayload.f592_message
+
+attribute [blueprint "frontier:serde-io-debug-writer"
+  (title := /-- Actual I/O payload Debug frontier -/)
+  (statement := /-- Exact actual function-804 formatter at the owned payload address and Formatter, with specified pre/post resources, result and cost. Dispatch correctness does not establish this I/O formatting interface. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeErrorPayload.IOErrorDebugSpec
+
+attribute [blueprint "frontier:serde-io-branch"
+  (title := /-- Actual I/O branch invokes its payload formatter -/)
+  (statement := /-- Tag 1 calls actual function 804 at error plus four and retains owned tag and caller resources. Conditional on the precise I/O payload formatter; no static message is substituted and parser impossibility of this variant is not assumed. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeErrorPayload.f592_io

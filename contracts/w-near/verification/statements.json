@@ -1193,6 +1193,27 @@
     "WNear.Binary.SerdeDebug.f641_cleanup",
     "WNear.Binary.SerdeDebug.f641_composed",
     "WNear.Binary.SerdeDebug.f641_debug_instance",
-    "WNear.Binary.SerdeDebug.f882_serde_composed"
+    "WNear.Binary.SerdeDebug.f882_serde_composed",
+    "WNear.Binary.SerdeErrorWriters.error_code_debug_table",
+    "WNear.Binary.SerdeErrorWriters.string_debug_table",
+    "WNear.Binary.SerdeErrorWriters.u32_display_table",
+    "WNear.Binary.SerdeErrorWriters.f591_delegate",
+    "WNear.Binary.SerdeErrorWriters.StringDebugSliceSpec",
+    "WNear.Binary.SerdeErrorWriters.f619_delegate",
+    "WNear.Binary.SerdeErrorWriters.syntaxSlice",
+    "WNear.Binary.SerdeErrorWriters.StaticWriteSpec",
+    "WNear.Binary.SerdeErrorWriters.f592_syntax",
+    "WNear.Binary.SerdeErrorWriters.f591_syntax",
+    "WNear.Binary.SerdeErrorWriters.WriteSliceCalleeSpec",
+    "WNear.Binary.SerdeErrorWriters.f912_delegate",
+    "WNear.Binary.SerdeErrorWriters.f591_syntax_sink",
+    "WNear.Binary.SerdeActualSink.serde_string_sink_vtable",
+    "WNear.Binary.SerdeActualSink.serde_string_sink_table",
+    "WNear.Binary.SerdeActualSink.stringState",
+    "WNear.Binary.SerdeActualSink.f616_append",
+    "WNear.Binary.SerdeActualSink.f591_syntax_append",
+    "WNear.Binary.SerdeErrorPayload.f592_message",
+    "WNear.Binary.SerdeErrorPayload.IOErrorDebugSpec",
+    "WNear.Binary.SerdeErrorPayload.f592_io"
   ]
 }

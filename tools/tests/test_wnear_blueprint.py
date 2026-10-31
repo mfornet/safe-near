@@ -1019,6 +1019,105 @@ class FrontierPolicyTests(unittest.TestCase):
             self.assertEqual(nodes[id]['status'], 'Open')
         self.assertEqual(nodes['global']['status'], 'Conditional')
 
+    def test_static_error_writers_keep_selected_sink_open(self):
+        nodes = {n['id']: n for n in blueprint.classify(self.manifest, self.rows)}
+        for id in ['serde-code-format-wrapper', 'serde-string-debug-wrapper',
+                   'serde-code-syntax-branches', 'serde-code-syntax-wrapper',
+                   'serde-slice-dispatch', 'serde-code-syntax-sink']:
+            self.assertEqual(nodes[id]['status'], 'Conditional')
+            self.assertFalse(nodes[id]['direct_sorry'])
+        for id in ['serde-string-debug-slice', 'serde-static-slice-writer', 'serde-selected-slice-sink']:
+            self.assertEqual(nodes[id]['status'], 'Open')
+        self.assertIn('serde-selected-slice-sink', nodes['serde-code-syntax-sink']['type_edges'])
+        self.assertNotIn('serde-static-slice-writer', nodes['serde-code-syntax-sink']['type_edges'])
+        self.assertNotIn('reject-debug-callee-spec', nodes['serde-code-syntax-sink']['type_edges'])
+
+    def test_static_sink_caller_must_keep_both_checked_compositions(self):
+        nodes = {n['id']: n for n in blueprint.classify(self.manifest, self.rows)}
+        for source, caller in [('serde-code-format-wrapper', 'serde-code-syntax-wrapper'),
+                               ('serde-code-syntax-branches', 'serde-code-syntax-wrapper'),
+                               ('serde-code-syntax-wrapper', 'serde-code-syntax-sink'),
+                               ('serde-slice-dispatch', 'serde-code-syntax-sink')]:
+            self.assertIn({'id': caller, 'status': 'Conditional'}, nodes[source]['integrated_into'])
+            rows = copy.deepcopy(self.rows)
+            row = next(r for r in rows if r['declaration'] == self.nodes[caller]['declaration'])
+            row['proof_dependencies'].remove(self.nodes[source]['declaration'])
+            with self.assertRaises(ValueError):
+                blueprint.classify(self.manifest, rows)
+
+    def test_static_sink_cannot_hide_exact_selected_callee_premise(self):
+        for id, dependency in [('serde-code-syntax-sink', 'serde-selected-slice-sink'),
+                               ('serde-slice-dispatch', 'serde-selected-slice-sink'),
+                               ('serde-code-syntax-branches', 'serde-static-slice-writer'),
+                               ('serde-string-debug-wrapper', 'serde-string-debug-slice')]:
+            rows = copy.deepcopy(self.rows)
+            row = next(r for r in rows if r['declaration'] == self.nodes[id]['declaration'])
+            row['type_dependencies'].remove(self.nodes[dependency]['declaration'])
+            with self.assertRaises(ValueError):
+                blueprint.classify(self.manifest, rows)
+
+    def test_formatter_table_facts_do_not_discharge_behavior(self):
+        nodes = {n['id']: n for n in blueprint.classify(self.manifest, self.rows)}
+        for id in ['serde-code-format-table', 'serde-string-format-table', 'serde-u32-format-table']:
+            self.assertEqual(nodes[id]['status'], 'Proven')
+            self.assertFalse(nodes[id]['type_edges'])
+            self.assertFalse(nodes[id]['direct_sorry'])
+        for id in ['serde-code-string-writer', 'serde-error-envelope-writer',
+                   'serde-debug-uniform-cost', 'balance-rejected',
+                   'balance-initialized-rejected-safety', 'balance-uninitialized-rejected-safety']:
+            self.assertEqual(nodes[id]['status'], 'Open')
+        self.assertEqual(nodes['global']['status'], 'Conditional')
+
+    def test_static_error_writer_shapes_and_readiness_are_pinned(self):
+        for id in ['serde-code-syntax-branches', 'serde-code-syntax-sink',
+                   'serde-string-debug-slice', 'serde-static-slice-writer', 'serde-selected-slice-sink']:
+            rows = copy.deepcopy(self.rows)
+            row = next(r for r in rows if r['declaration'] == self.nodes[id]['declaration'])
+            row['shape_hash'] += 1
+            with self.assertRaises(ValueError):
+                blueprint.classify(self.manifest, rows)
+        self.by_id['serde-code-syntax-sink']['not_ready'] = False
+        with self.assertRaises(ValueError):
+            blueprint.classify(self.manifest, self.rows)
+
+    def test_actual_serde_sink_discharges_selected_instance_without_writer_premises(self):
+        nodes = {n['id']: n for n in blueprint.classify(self.manifest, self.rows)}
+        for id in ['serde-actual-string-vtable', 'serde-actual-string-table']:
+            self.assertEqual(nodes[id]['status'], 'Proven')
+            self.assertFalse(nodes[id]['direct_sorry'])
+            self.assertFalse(nodes[id]['type_edges'])
+        self.assertIn({'id': 'serde-code-syntax-append', 'status': 'Conditional'},
+                      nodes['serde-code-syntax-sink']['integrated_into'])
+        self.assertIn({'id': 'serde-code-syntax-append', 'status': 'Conditional'},
+                      nodes['serde-actual-string-append']['integrated_into'])
+        for id in ['serde-actual-string-append', 'serde-code-syntax-append']:
+            self.assertEqual(nodes[id]['status'], 'Conditional')
+            self.assertEqual(nodes[id]['type_edges'], ['scratch-room'])
+            self.assertFalse(nodes[id]['direct_sorry'])
+        self.assertEqual(nodes['scratch-room']['status'], 'Open')
+        self.assertEqual(nodes['serde-selected-slice-sink']['status'], 'Open')
+
+    def test_actual_serde_sink_must_use_checked_dispatch_and_append(self):
+        for dependency in ['serde-code-syntax-sink', 'serde-actual-string-append']:
+            rows = copy.deepcopy(self.rows)
+            row = next(r for r in rows if r['declaration'] == self.nodes['serde-code-syntax-append']['declaration'])
+            row['proof_dependencies'].remove(self.nodes[dependency]['declaration'])
+            with self.assertRaises(ValueError):
+                blueprint.classify(self.manifest, rows)
+
+    def test_dynamic_error_payload_branches_retain_named_behavior_frontiers(self):
+        nodes = {n['id']: n for n in blueprint.classify(self.manifest, self.rows)}
+        for id, dependency in [('serde-message-branch', 'serde-static-slice-writer'),
+                               ('serde-io-branch', 'serde-io-debug-writer')]:
+            self.assertEqual(nodes[id]['status'], 'Conditional')
+            self.assertEqual(nodes[dependency]['status'], 'Open')
+            self.assertIn(dependency, nodes[id]['type_edges'])
+            rows = copy.deepcopy(self.rows)
+            row = next(r for r in rows if r['declaration'] == self.nodes[id]['declaration'])
+            row['type_dependencies'].remove(self.nodes[dependency]['declaration'])
+            with self.assertRaises(ValueError):
+                blueprint.classify(self.manifest, rows)
+
     def test_actual_code_provider_reaches_global_assemblies_without_closing_the_plan(self):
         result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
         for node in ['deployed-parser-provider', 'provider-model-budget', 'absent-parser-plan', 'pinned-arguments-limit', 'ignore-hyp', 'key-conditions', 'value-conditions']:

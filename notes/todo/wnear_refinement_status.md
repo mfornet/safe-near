@@ -33,6 +33,72 @@ it is false for the reviewed domain; its historical statement is recorded in
 the misstatement log. The historical generic host trap and contradiction lemmas
 remain checked, but witness existence is no longer a frontier obligation.
 
+## Continuation on 2026-10-31: actual serde String sink is instantiated
+
+The deployed first String adapter uses vtable 1057784, whose write_str slot is
+130 and selects function 616. Both data/table facts are kernel checked. The
+actual function 616 now composes the existing checked 613/588 reserve-and-copy
+chain, retaining arbitrary source bytes, String record, stack, allocator and
+post-growth heap across allocation, room and reallocation cases. The selected
+writer behavior is concretely instantiated, but both the local sink and composed
+static path remain Conditional on the named scratch-room allocation obligation.
+This premise must be discharged uniformly for reachable callers; explicit
+capacity bounds are not yet an established environment fact at this call site.
+
+The static path instantiates WriteSliceCalleeSpec from actual function 616 and
+feeds that instance through the checked f591/f592/f912 composition. Explicit
+memory bounds, source-byte ownership and allocator-room premises remain; they
+must be supplied by the complete formatting engine and parser/runtime callers.
+The generic selected-sink contract is still Open because other instances have
+not all been constructed. No table fact is labelled integrated through a proof
+edge unless the actual exported term uses it.
+
+Dynamic ErrorCode message tag 0 now has checked pointer/length transport into
+function 912, conditional on the slice writer. I/O tag 1 has checked dispatch to
+the exact named Open function-804 payload contract. These cover branch transport,
+not full behavioral instances or parser-produced owned payloads. Whole Debug
+composition, outer String quoting/escaping, full UInt32 numeric formatting,
+uniform costs, rejected receipt/runtime safety and protocol premises remain
+unfinished. IgnoreHyp, KeyConditions and ValueConditions remain Open.
+
+Every old statement and status, binary/input domain/gas/observation clause and
+exact admission frontier is preserved. No module allowance expands.
+
+Strict full audit and fresh dependency/readiness gate passed at
+2026-10-31T20:35:24+00:00 for proof source `f985ec6066b623706d5e4ca91078eabe6d1cf9210370c463db9ec04e069e332e`. All 164 frontier
+policy tests, Lean style and toolchain checks passed. Every old statement pin,
+shape and proof status is unchanged; the exact direct and transitive admission
+frontiers and strict module allowance are unchanged. New conditional callers keep
+each named selected-sink dependency explicit. Live publication must match this evidence.
+
+## Continuation on 2026-10-31: static ErrorCode writers reach the selected sink
+
+All twenty deployed static syntax variants (tags 2 through 21) now follow the
+actual nested branch table, ErrorCode descriptor wrapper, Formatter data/vtable
+loads and selected write_str indirect call. Owned tags, descriptor and table
+cells are retained. The assembled static path has 133 regular-operation units
+plus the selected sink activation and cost. Each stage uses one credit resource.
+The String Debug wrapper separately borrows its actual Vec slice, invokes the
+quoted/escaped function 920 and restores its complete frame.
+
+These results are Conditional. StaticWriteSpec is now constructed for retained
+Formatter descriptor resources from the checked dispatch; f591_syntax_sink
+requires only the precise selected WriteSliceCalleeSpec. This is integration of
+contracts through actual caller proofs, not discharge of a concrete sink. The
+StringDebugSliceSpec remains Open, including escaping and sink behavior.
+Deployed ErrorCode, String Debug and numeric table entries are independently
+Proven; no concrete complete formatting instance is inferred from table facts.
+
+Dynamic message tag 0 and I/O tag 1 remain outside the static-variant lemma and
+must be covered for full refinement. The parser producer still needs stronger
+owned-error results; full UInt32 line/column formatting, String/heap limits,
+uniform-before-Cg cost and rejected receipt/runtime composition remain Open.
+No narrower deployed input domain, old statement, proof status, admission or
+module allowance changes. The top-level refinement remains incomplete.
+
+Publication requires strict full audit, unchanged old statement pins, exact fresh
+dependencies, frontier policy tests and matching live served evidence.
+
 ## Continuation on 2026-10-31: whole serde Debug body and owned dispatch compose
 
 The actual function-641 body now composes its first ErrorCode-to-String call,
