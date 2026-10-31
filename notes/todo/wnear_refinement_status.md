@@ -33,6 +33,53 @@ it is false for the reviewed domain; its historical statement is recorded in
 the misstatement log. The historical generic host trap and contradiction lemmas
 remain checked, but witness existence is no longer a frontier obligation.
 
+## Continuation on 2026-10-31: object case reaches full receipt refinement
+
+`object_absent_refines_init` proves the full receipt result for initialized
+represented state, an unregistered account, escape-free object input up to
+**4 MiB**, shallow ignored values and trailing whitespace only. It proves
+execution safety, sufficient-resource Matches with the **unchanged model gas
+allowance**, and arbitrary-resource Matches or resource failure with rollback
+and a log prefix. This is additional to the completed valid-array case.
+
+The actual 78/66/65 wrappers restore their frames, retain the owned account and
+carry the empty scratch through the real drop. A named `ParserCallContract`
+connects this concrete provider to the existing balance execution/cleanup
+suffix; the general contract stays Open, and its generic consumer and concrete
+contract-instance result remain visibly Conditional where their types contain
+a named interface. The closed method case supplies those interfaces concretely.
+
+The initial memory is carved once to retain key/identifier bytes together with
+the existing frame and statics; every ignored-reader function address/body is
+checked against instantiated code. Input/setup, full body, entry-thread adequacy
+and metered activation are composed from these actual resources. No ownership
+is recovered from a discarded slice. Context.WF and represented storage supply
+the existing host/trie/proof-budget and model-agreement instances.
+
+Gas uses the existing 470-operations-per-byte object-loop bound, a sharper proved
+host byte bound and the explicit 4 MiB case limit. Loading, activation, input,
+parser, allocator, trie and return charges all fit the original model budget.
+The size bound is an explicit case premise, consistent with the pinned deployed
+input domain; it is not inferred silently from the weaker `WProtocol` interface.
+Escapes, non-shallow ignored values, larger-object contexts, registered accounts,
+uninitialized state, general rejected-input rollback and protocol instantiation
+remain unresolved.
+
+`object_case_accepted` and `object_case_no_issue` are Proven and Integrated into
+the old outside-array assemblies, whose original statement pins are preserved.
+Their new admitted leaves exclude both completed array and object cases. The
+full balance method and global refinement remain Conditional. General
+`IgnoreHyp`, `KeyConditions` and `ValueConditions` remain Open. No allowlist or
+model observation/gas statement is relaxed.
+
+The complete strict audit and fresh actual-dependency/readiness gate passed at
+2026-10-31T03:53:30+00:00 for proof source `532cf8cf79a681d9fc6ea1e5906f5ffa6ff72ec2cb8ae3c1138e498936160291`. Every prior statement
+pin is byte-identical; new interfaces and resource/cost/case definitions are
+pinned additively. Frontier policy regressions, Lean style and toolchain checks
+passed. Publication requires a matching served revision, statuses, dependencies
+and audit evidence.
+
+
 ## Continuation on 2026-10-31: concrete escape-free object-loop instances
 
 `SerdeObjectNoEsc.f228_obj_initial_room` proves the actual function-228 loop

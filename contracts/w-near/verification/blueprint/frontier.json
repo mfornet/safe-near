@@ -2785,23 +2785,27 @@
       "id": "balance-outside-array-accepted",
       "declaration": "WNear.ftBalanceOf_outside_array_absent_accepted_obligation",
       "title": "ft_balance_of: accepted outside the completed array case",
-      "kind": "admission",
+      "kind": "theorem",
       "label": "frontier:balance-outside-array-accepted",
-      "notes": "Precise complement of the initialized valid-array, absent-account case. Registered accounts, uninitialized state, object inputs and other contexts remain Open. The full callers remain Conditional through this leaf.",
-      "required_proof_dependencies": [],
-      "reviewed_shape_hash": 2568170387,
-      "indirect_admission": true
+      "notes": "Preserves the exact previous outside-array statement and performs a checked split on the new complete object case. The new exact complementary obligation remains Open, so this assembly remains Conditional.",
+      "required_proof_dependencies": [
+        "balance-outside-array-object-accepted",
+        "balance-object-case-accepted"
+      ],
+      "reviewed_shape_hash": 2568170387
     },
     {
       "id": "balance-outside-array-no-issue",
       "declaration": "WNear.ftBalanceOf_outside_array_absent_no_issue_obligation",
       "title": "ft_balance_of: safety outside the completed array case",
-      "kind": "admission",
+      "kind": "theorem",
       "label": "frontier:balance-outside-array-no-issue",
-      "notes": "Precise complement of the initialized valid-array, absent-account case. Registered accounts, uninitialized state, object inputs and other contexts remain Open. The full callers remain Conditional through this leaf.",
-      "required_proof_dependencies": [],
-      "reviewed_shape_hash": 1715380944,
-      "indirect_admission": true
+      "notes": "Preserves the exact previous outside-array statement and performs a checked split on the new complete object case. The new exact complementary obligation remains Open, so this assembly remains Conditional.",
+      "required_proof_dependencies": [
+        "balance-outside-array-object-no-issue",
+        "balance-object-case-safety"
+      ],
+      "reviewed_shape_hash": 1715380944
     },
     {
       "id": "object-noesc-keys-before",
@@ -2903,6 +2907,373 @@
         "object-noesc-initial-room"
       ],
       "reviewed_shape_hash": 713291232
+    },
+    {
+      "id": "object-wrapper-reader",
+      "declaration": "WNear.Binary.SerdeObjectNoEsc.f78_obj_initial_room",
+      "title": "Object loop through the actual 78 wrapper",
+      "kind": "theorem",
+      "label": "frontier:object-wrapper-reader",
+      "notes": "Consumes the proved initial-memory object loop with no reader verification hypothesis. Retains the exact saved account and empty scratch.",
+      "required_proof_dependencies": [
+        "object-noesc-loop-initial"
+      ],
+      "reviewed_shape_hash": 3318560062
+    },
+    {
+      "id": "object-from-trait-reader",
+      "declaration": "WNear.Binary.SerdeObjectNoEsc.f66_obj_model",
+      "title": "Object from_trait restores its full frame",
+      "kind": "theorem",
+      "label": "frontier:object-from-trait-reader",
+      "notes": "Actual deserializer construction, object read, trailing-input check and empty scratch drop. Retains owned bytes, at most one allocation page and free-list bound max F 1 + 1.",
+      "required_proof_dependencies": [
+        "object-wrapper-reader"
+      ],
+      "reviewed_shape_hash": 55787495
+    },
+    {
+      "id": "object-from-slice-reader",
+      "declaration": "WNear.Binary.SerdeObjectNoEsc.f65_obj_model",
+      "title": "Object from_slice restores all 448 bytes",
+      "kind": "theorem",
+      "label": "frontier:object-from-slice-reader",
+      "notes": "The actual function-65 entry composes the object reader and restores its frame. Extra object static resources are retained explicitly.",
+      "required_proof_dependencies": [
+        "object-from-trait-reader"
+      ],
+      "reviewed_shape_hash": 1266825844
+    },
+    {
+      "id": "object-result-room",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.object_result_room",
+      "title": "Object result supplies fixed owned account resources",
+      "kind": "theorem",
+      "label": "frontier:object-result-room",
+      "notes": "Converts the concrete owned String and one-page growth into the exact balance handoff; its general seven-page room premise remains explicit.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3517010949,
+      "required_type_dependencies": [
+        "lookup-heap-room",
+        "parser-fixed-result"
+      ]
+    },
+    {
+      "id": "object-parser-with-room",
+      "declaration": "WNear.Binary.SerdeObjectNoEsc.f65_obj_room",
+      "title": "Object parser instantiates the balance handoff",
+      "kind": "theorem",
+      "label": "frontier:object-parser-with-room",
+      "notes": "Derives every parser/result reserve from actual initial/input memory sizes. Its conclusion is an instance of the named fixed-result and room interfaces, not a proof of those general interfaces.",
+      "required_proof_dependencies": [
+        "object-from-slice-reader",
+        "object-result-room",
+        "object-noesc-initial-room"
+      ],
+      "reviewed_shape_hash": 2659848964,
+      "required_type_dependencies": [
+        "lookup-heap-room",
+        "parser-fixed-result"
+      ]
+    },
+    {
+      "id": "parser-call-contract",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.ParserCallContract",
+      "title": "Exact parser-call composition interface",
+      "kind": "verification_contract",
+      "label": "frontier:parser-call-contract",
+      "notes": "Successful function-65 specification consumed at the balance parser call: parser cost, owned account, six-growth result room and retained linear resources. The concrete object provider supplies this interface for its stated domain; the general contract remains Open.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 17794384621731785672
+    },
+    {
+      "id": "parser-provider-through-cleanup",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.parser_provider_through_cleanup",
+      "title": "Parser provider through checked balance cleanup",
+      "kind": "theorem",
+      "label": "frontier:parser-provider-through-cleanup",
+      "notes": "Shared actual parser-call-to-cleanup composition. Conditional on the exact named parser-call interface, with explicit gas, returned free-list bound and retained linear resources.",
+      "required_proof_dependencies": [
+        "parser-fixed-through-cleanup"
+      ],
+      "reviewed_shape_hash": 464342836,
+      "required_type_dependencies": [
+        "parser-call-contract"
+      ]
+    },
+    {
+      "id": "object-parser-instance",
+      "declaration": "WNear.Binary.SerdeObjectNoEsc.parser_contract",
+      "title": "Concrete object parser-call instance",
+      "kind": "theorem",
+      "label": "frontier:object-parser-instance",
+      "notes": "Instantiates the named parser-call interface from the actual object parser and initial-memory reserve. No admitted parser behavior; the conclusion remains marked Conditional as an input-restricted contract instance.",
+      "required_proof_dependencies": [
+        "object-parser-with-room"
+      ],
+      "reviewed_shape_hash": 694240019,
+      "required_type_dependencies": [
+        "parser-call-contract"
+      ]
+    },
+    {
+      "id": "object-parser-through-cleanup",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.object_parser_through_cleanup",
+      "title": "Object parser through balance cleanup",
+      "kind": "theorem",
+      "label": "frontier:object-parser-through-cleanup",
+      "notes": "Checked composition through the actual function-297 instructions. Object parser code and static bytes are retained linearly; input/state, resource and environmental premises remain explicit.",
+      "required_proof_dependencies": [
+        "parser-provider-through-cleanup",
+        "object-parser-instance"
+      ],
+      "reviewed_shape_hash": 366916669
+    },
+    {
+      "id": "object-deref-through-cleanup",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.object_deref_parser_through_cleanup",
+      "title": "Object input dereference through cleanup",
+      "kind": "theorem",
+      "label": "frontier:object-deref-through-cleanup",
+      "notes": "Checked composition through the actual function-297 instructions. Object parser code and static bytes are retained linearly; input/state, resource and environmental premises remain explicit.",
+      "required_proof_dependencies": [
+        "object-parser-through-cleanup"
+      ],
+      "reviewed_shape_hash": 3159291551
+    },
+    {
+      "id": "object-expect-through-cleanup",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.object_expect_deref_parser_through_cleanup",
+      "title": "Object input unwrap through cleanup",
+      "kind": "theorem",
+      "label": "frontier:object-expect-through-cleanup",
+      "notes": "Checked composition through the actual function-297 instructions. Object parser code and static bytes are retained linearly; input/state, resource and environmental premises remain explicit.",
+      "required_proof_dependencies": [
+        "object-deref-through-cleanup"
+      ],
+      "reviewed_shape_hash": 3106288325
+    },
+    {
+      "id": "object-input-through-cleanup",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.object_input_parser_through_cleanup",
+      "title": "Object input host through cleanup",
+      "kind": "theorem",
+      "label": "frontier:object-input-through-cleanup",
+      "notes": "Checked composition through the actual function-297 instructions. Object parser code and static bytes are retained linearly; input/state, resource and environmental premises remain explicit.",
+      "required_proof_dependencies": [
+        "object-expect-through-cleanup"
+      ],
+      "reviewed_shape_hash": 2086825215,
+      "required_type_dependencies": [
+        "input-register-room"
+      ]
+    },
+    {
+      "id": "object-input-setup-through-cleanup",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.object_input_setup_through_cleanup",
+      "title": "Object input setup through cleanup",
+      "kind": "theorem",
+      "label": "frontier:object-input-setup-through-cleanup",
+      "notes": "Checked composition through the actual function-297 instructions. Object parser code and static bytes are retained linearly; input/state, resource and environmental premises remain explicit.",
+      "required_proof_dependencies": [
+        "object-input-through-cleanup"
+      ],
+      "reviewed_shape_hash": 1903884162,
+      "required_type_dependencies": [
+        "input-register-room"
+      ]
+    },
+    {
+      "id": "object-absent-body",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.object_absent_body",
+      "title": "Whole object absent-account method body",
+      "kind": "theorem",
+      "label": "frontier:object-absent-body",
+      "notes": "Checked composition through the actual function-297 instructions. Object parser code and static bytes are retained linearly; input/state, resource and environmental premises remain explicit.",
+      "required_proof_dependencies": [
+        "object-input-setup-through-cleanup"
+      ],
+      "reviewed_shape_hash": 1844833367,
+      "required_type_dependencies": [
+        "input-register-room"
+      ]
+    },
+    {
+      "id": "object-initial-memory",
+      "declaration": "WNear.Binary.InitialState.memRes297Obj",
+      "title": "Initial memory retains both object static slices",
+      "kind": "theorem",
+      "label": "frontier:object-initial-memory",
+      "notes": "Carves key-name and identifier bytes together with the existing frame and statics from the whole initialized memory once. No recovery or duplication of discarded linear memory.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2479749451
+    },
+    {
+      "id": "object-initial-ignore-code",
+      "declaration": "WNear.Binary.InitialState.ignored_code_of",
+      "title": "Instantiated functions supply ignored-reader code",
+      "kind": "theorem",
+      "label": "frontier:object-initial-ignore-code",
+      "notes": "Kernel-checks every actual function address/body needed by the shallow ignore reader against the instantiated function cells.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3140427801
+    },
+    {
+      "id": "object-initial-store",
+      "declaration": "WNear.Binary.InitialState.startRes297Obj",
+      "title": "Whole initial store supplies object resources",
+      "kind": "theorem",
+      "label": "frontier:object-initial-store",
+      "notes": "Extracts the full method code, ignored-reader code, frame, table entries and both object static byte slices from the owned initial store.",
+      "required_proof_dependencies": [
+        "object-initial-memory",
+        "object-initial-ignore-code"
+      ],
+      "reviewed_shape_hash": 4200044071
+    },
+    {
+      "id": "object-initial-body",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.object_absent_body_initial_resources",
+      "title": "Whole object body from actual initial resources",
+      "kind": "theorem",
+      "label": "frontier:object-initial-body",
+      "notes": "Instantiates the actual frame and input register room from initial memory. No unresolved parser/allocator hypothesis remains in this closed body instance.",
+      "required_proof_dependencies": [
+        "object-absent-body",
+        "initial-memory-parser-room"
+      ],
+      "reviewed_shape_hash": 1653873358
+    },
+    {
+      "id": "object-entry-adequacy",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.object_absent_adequate",
+      "title": "Object entry-thread execution adequacy",
+      "kind": "theorem",
+      "label": "frontier:object-entry-adequacy",
+      "notes": "Ending-run adequacy of the complete object/absent-account body from the whole actual initialized store, with explicit metered budget.",
+      "required_proof_dependencies": [
+        "object-initial-body",
+        "object-initial-store"
+      ],
+      "reviewed_shape_hash": 1957646130
+    },
+    {
+      "id": "object-runs",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.object_absent_runs",
+      "title": "Metered object MethodRunsR",
+      "kind": "theorem",
+      "label": "frontier:object-runs",
+      "notes": "Connects the 11-operation activation charge and actual method body to the existing two-storage-read/zero-return postcondition, for the exact code and initialized resources.",
+      "required_proof_dependencies": [
+        "object-entry-adequacy"
+      ],
+      "reviewed_shape_hash": 1370195125
+    },
+    {
+      "id": "object-parser-linear-gas",
+      "declaration": "WNear.Binary.SerdeObjectNoEsc.parser_cost_linear",
+      "title": "Object parser linear operation bound",
+      "kind": "theorem",
+      "label": "frontier:object-parser-linear-gas",
+      "notes": "Proves the existing object parser charge is bounded by (2215 + 470 * input bytes) regular operations plus the single account allocation charge, using the existing key/value/ignore cost bounds.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2606710535
+    },
+    {
+      "id": "object-body-gas",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.object_body_cost_le",
+      "title": "Complete object body gas bound",
+      "kind": "theorem",
+      "label": "frontier:object-body-gas",
+      "notes": "The actual object body fits 100 billion gas plus 397500000 per input byte and explicit host charges. Retains all input, parser, allocator, storage and return charges.",
+      "required_proof_dependencies": [
+        "object-parser-linear-gas"
+      ],
+      "reviewed_shape_hash": 3457021551
+    },
+    {
+      "id": "object-host-gas",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.object_host_cost_le",
+      "title": "Sharper object host byte bound",
+      "kind": "theorem",
+      "label": "frontier:object-host-gas",
+      "notes": "Proves the shared input/read/return host charges fit 200 billion gas plus 3 million per input byte and explicit trie/return-data charges, under the existing reviewed CostsV86 premises.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1577368806
+    },
+    {
+      "id": "object-total-model-gas",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.object_total_cost_le_model",
+      "title": "Object loading, activation and body fit model gas",
+      "kind": "theorem",
+      "label": "frontier:object-total-model-gas",
+      "notes": "For inputs up to 4 MiB, the complete deployed charge fits the unchanged model allowance. The input-size bound is explicit; no stronger protocol bound is silently inferred from WProtocol.",
+      "required_proof_dependencies": [
+        "object-body-gas",
+        "object-host-gas"
+      ],
+      "reviewed_shape_hash": 535981139
+    },
+    {
+      "id": "balance-object-case-refinement",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.object_absent_refines_init",
+      "title": "Escape-free object, absent account: receipt refinement",
+      "kind": "theorem",
+      "label": "frontier:balance-object-case-refinement",
+      "notes": "Proven full receipt result for initialized represented state, an unregistered account, escape-free object input up to 4 MiB, shallow ignored values and trailing whitespace only. Proves no executionIssue, sufficient-resource Matches and original gas bound, and arbitrary-resource Matches or resource failure with rollback and log prefix. Context/storage instantiate the entry, trie/proof budget and model agreement. Other input/state cases remain unresolved.",
+      "required_proof_dependencies": [
+        "object-runs",
+        "object-total-model-gas",
+        "balance-copied-entry-at",
+        "balance-copied-model-agreement"
+      ],
+      "reviewed_shape_hash": 1509414829
+    },
+    {
+      "id": "balance-object-case-accepted",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.object_case_accepted",
+      "title": "Object case supplies accepted-call assembly",
+      "kind": "theorem",
+      "label": "frontier:balance-object-case-accepted",
+      "notes": "Projects the complete receipt theorem into the accepted-call assembly. The exact case predicate is pinned and its callers remain Conditional.",
+      "required_proof_dependencies": [
+        "balance-object-case-refinement"
+      ],
+      "reviewed_shape_hash": 2696026901
+    },
+    {
+      "id": "balance-object-case-safety",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.object_case_no_issue",
+      "title": "Object case supplies execution-safety assembly",
+      "kind": "theorem",
+      "label": "frontier:balance-object-case-safety",
+      "notes": "Projects execution safety for the exact object/absent-account case into checked callers. This does not establish general rejection or other state cases.",
+      "required_proof_dependencies": [
+        "balance-object-case-refinement"
+      ],
+      "reviewed_shape_hash": 724366713
+    },
+    {
+      "id": "balance-outside-array-object-no-issue",
+      "declaration": "WNear.ftBalanceOf_outside_array_object_absent_no_issue_obligation",
+      "title": "ft_balance_of: safety outside completed array/object cases",
+      "kind": "admission",
+      "label": "frontier:balance-outside-array-object-no-issue",
+      "notes": "Precise complement of the completed initialized absent-account cases. Escaped objects, ignored values outside the shallow domain, objects above 4 MiB under other protocol contexts, registered/uninitialized states and other inputs remain Open.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 690425189,
+      "indirect_admission": true
+    },
+    {
+      "id": "balance-outside-array-object-accepted",
+      "declaration": "WNear.ftBalanceOf_outside_array_object_absent_accepted_obligation",
+      "title": "ft_balance_of: accepted outside completed array/object cases",
+      "kind": "admission",
+      "label": "frontier:balance-outside-array-object-accepted",
+      "notes": "Precise complement of the completed initialized absent-account cases. Escaped objects, ignored values outside the shallow domain, objects above 4 MiB under other protocol contexts, registered/uninitialized states and other inputs remain Open.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3187448350,
+      "indirect_admission": true
     }
   ],
   "reviewed_environment": [
@@ -2927,8 +3298,8 @@
     "WNear.storageWithdraw_obligation",
     "WNear.storageUnregister_obligation",
     "WNear.storageBalanceOf_obligation",
-    "WNear.ftBalanceOf_outside_array_absent_no_issue_obligation",
-    "WNear.ftBalanceOf_outside_array_absent_accepted_obligation",
+    "WNear.ftBalanceOf_outside_array_object_absent_no_issue_obligation",
+    "WNear.ftBalanceOf_outside_array_object_absent_accepted_obligation",
     "WNear.ftBalanceOf_rejected_obligation"
   ],
   "expected_incomplete": [
@@ -2955,6 +3326,8 @@
     "WNear.ftBalanceOf_other_accepted_obligation",
     "WNear.ftBalanceOf_other_no_issue_obligation",
     "WNear.ftBalanceOf_outside_array_absent_accepted_obligation",
-    "WNear.ftBalanceOf_outside_array_absent_no_issue_obligation"
+    "WNear.ftBalanceOf_outside_array_absent_no_issue_obligation",
+    "WNear.ftBalanceOf_outside_array_object_absent_no_issue_obligation",
+    "WNear.ftBalanceOf_outside_array_object_absent_accepted_obligation"
   ]
 }

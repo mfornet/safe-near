@@ -1,4 +1,5 @@
 import Architect
+import Bridge.Methods.FtBalanceOfObjectCase
 import Bridge.Functions.SerdeObjectNoEsc
 import Architect.CollectUsed
 import Proofs.Refinement
@@ -1268,13 +1269,13 @@ attribute [blueprint "frontier:balance-copied-case-in-array"
 
 attribute [blueprint "frontier:balance-outside-array-accepted"
   (title := /-- ft_balance_of: accepted outside the completed array case -/)
-  (statement := /-- Precise complement of the initialized valid-array, absent-account case. Registered accounts, uninitialized state, object inputs and other contexts remain Open. The full callers remain Conditional through this leaf. -/)
+  (statement := /-- Preserves the exact previous outside-array statement and performs a checked split on the new complete object case. The new exact complementary obligation remains Open, so this assembly remains Conditional. -/)
   (notReady := true)]
   WNear.ftBalanceOf_outside_array_absent_accepted_obligation
 
 attribute [blueprint "frontier:balance-outside-array-no-issue"
   (title := /-- ft_balance_of: safety outside the completed array case -/)
-  (statement := /-- Precise complement of the initialized valid-array, absent-account case. Registered accounts, uninitialized state, object inputs and other contexts remain Open. The full callers remain Conditional through this leaf. -/)
+  (statement := /-- Preserves the exact previous outside-array statement and performs a checked split on the new complete object case. The new exact complementary obligation remains Open, so this assembly remains Conditional. -/)
   (notReady := true)]
   WNear.ftBalanceOf_outside_array_absent_no_issue_obligation
 
@@ -1318,3 +1319,158 @@ attribute [blueprint "frontier:object-noesc-loop-initial"
   (title := /-- Escape-free object loop at instantiated memory -/)
   (statement := /-- Kernel-checked actual function-228 loop with numerical room discharged from initial/input memory sizes, concrete key/value/ignore instances, exact owned String and restored frame. Requires the stated linear code, tables and parser resources. Integrated reader instances reach this loop; ownership construction and functions 78/66/65 into the method remain open. -/)]
   WNear.Binary.SerdeObjectNoEsc.f228_obj_initial_room
+
+attribute [blueprint "frontier:object-wrapper-reader"
+  (title := /-- Object loop through the actual 78 wrapper -/)
+  (statement := /-- Consumes the proved initial-memory object loop with no reader verification hypothesis. Retains the exact saved account and empty scratch. -/)]
+  WNear.Binary.SerdeObjectNoEsc.f78_obj_initial_room
+
+attribute [blueprint "frontier:object-from-trait-reader"
+  (title := /-- Object from_trait restores its full frame -/)
+  (statement := /-- Actual deserializer construction, object read, trailing-input check and empty scratch drop. Retains owned bytes, at most one allocation page and free-list bound max F 1 + 1. -/)]
+  WNear.Binary.SerdeObjectNoEsc.f66_obj_model
+
+attribute [blueprint "frontier:object-from-slice-reader"
+  (title := /-- Object from_slice restores all 448 bytes -/)
+  (statement := /-- The actual function-65 entry composes the object reader and restores its frame. Extra object static resources are retained explicitly. -/)]
+  WNear.Binary.SerdeObjectNoEsc.f65_obj_model
+
+attribute [blueprint "frontier:object-result-room"
+  (title := /-- Object result supplies fixed owned account resources -/)
+  (statement := /-- Converts the concrete owned String and one-page growth into the exact balance handoff; its general seven-page room premise remains explicit. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.object_result_room
+
+attribute [blueprint "frontier:object-parser-with-room"
+  (title := /-- Object parser instantiates the balance handoff -/)
+  (statement := /-- Derives every parser/result reserve from actual initial/input memory sizes. Its conclusion is an instance of the named fixed-result and room interfaces, not a proof of those general interfaces. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectNoEsc.f65_obj_room
+
+attribute [blueprint "frontier:parser-call-contract"
+  (title := /-- Exact parser-call composition interface -/)
+  (statement := /-- Successful function-65 specification consumed at the balance parser call: parser cost, owned account, six-growth result room and retained linear resources. The concrete object provider supplies this interface for its stated domain; the general contract remains Open. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.ParserCallContract
+
+attribute [blueprint "frontier:parser-provider-through-cleanup"
+  (title := /-- Parser provider through checked balance cleanup -/)
+  (statement := /-- Shared actual parser-call-to-cleanup composition. Conditional on the exact named parser-call interface, with explicit gas, returned free-list bound and retained linear resources. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.parser_provider_through_cleanup
+
+attribute [blueprint "frontier:object-parser-instance"
+  (title := /-- Concrete object parser-call instance -/)
+  (statement := /-- Instantiates the named parser-call interface from the actual object parser and initial-memory reserve. No admitted parser behavior; the conclusion remains marked Conditional as an input-restricted contract instance. -/)
+  (notReady := true)]
+  WNear.Binary.SerdeObjectNoEsc.parser_contract
+
+attribute [blueprint "frontier:object-parser-through-cleanup"
+  (title := /-- Object parser through balance cleanup -/)
+  (statement := /-- Checked composition through the actual function-297 instructions. Object parser code and static bytes are retained linearly; input/state, resource and environmental premises remain explicit. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.object_parser_through_cleanup
+
+attribute [blueprint "frontier:object-deref-through-cleanup"
+  (title := /-- Object input dereference through cleanup -/)
+  (statement := /-- Checked composition through the actual function-297 instructions. Object parser code and static bytes are retained linearly; input/state, resource and environmental premises remain explicit. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.object_deref_parser_through_cleanup
+
+attribute [blueprint "frontier:object-expect-through-cleanup"
+  (title := /-- Object input unwrap through cleanup -/)
+  (statement := /-- Checked composition through the actual function-297 instructions. Object parser code and static bytes are retained linearly; input/state, resource and environmental premises remain explicit. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.object_expect_deref_parser_through_cleanup
+
+attribute [blueprint "frontier:object-input-through-cleanup"
+  (title := /-- Object input host through cleanup -/)
+  (statement := /-- Checked composition through the actual function-297 instructions. Object parser code and static bytes are retained linearly; input/state, resource and environmental premises remain explicit. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.object_input_parser_through_cleanup
+
+attribute [blueprint "frontier:object-input-setup-through-cleanup"
+  (title := /-- Object input setup through cleanup -/)
+  (statement := /-- Checked composition through the actual function-297 instructions. Object parser code and static bytes are retained linearly; input/state, resource and environmental premises remain explicit. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.object_input_setup_through_cleanup
+
+attribute [blueprint "frontier:object-absent-body"
+  (title := /-- Whole object absent-account method body -/)
+  (statement := /-- Checked composition through the actual function-297 instructions. Object parser code and static bytes are retained linearly; input/state, resource and environmental premises remain explicit. -/)
+  (notReady := true)]
+  WNear.Binary.BalanceOf297AbsentCall.object_absent_body
+
+attribute [blueprint "frontier:object-initial-memory"
+  (title := /-- Initial memory retains both object static slices -/)
+  (statement := /-- Carves key-name and identifier bytes together with the existing frame and statics from the whole initialized memory once. No recovery or duplication of discarded linear memory. -/)]
+  WNear.Binary.InitialState.memRes297Obj
+
+attribute [blueprint "frontier:object-initial-ignore-code"
+  (title := /-- Instantiated functions supply ignored-reader code -/)
+  (statement := /-- Kernel-checks every actual function address/body needed by the shallow ignore reader against the instantiated function cells. -/)]
+  WNear.Binary.InitialState.ignored_code_of
+
+attribute [blueprint "frontier:object-initial-store"
+  (title := /-- Whole initial store supplies object resources -/)
+  (statement := /-- Extracts the full method code, ignored-reader code, frame, table entries and both object static byte slices from the owned initial store. -/)]
+  WNear.Binary.InitialState.startRes297Obj
+
+attribute [blueprint "frontier:object-initial-body"
+  (title := /-- Whole object body from actual initial resources -/)
+  (statement := /-- Instantiates the actual frame and input register room from initial memory. No unresolved parser/allocator hypothesis remains in this closed body instance. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.object_absent_body_initial_resources
+
+attribute [blueprint "frontier:object-entry-adequacy"
+  (title := /-- Object entry-thread execution adequacy -/)
+  (statement := /-- Ending-run adequacy of the complete object/absent-account body from the whole actual initialized store, with explicit metered budget. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.object_absent_adequate
+
+attribute [blueprint "frontier:object-runs"
+  (title := /-- Metered object MethodRunsR -/)
+  (statement := /-- Connects the 11-operation activation charge and actual method body to the existing two-storage-read/zero-return postcondition, for the exact code and initialized resources. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.object_absent_runs
+
+attribute [blueprint "frontier:object-parser-linear-gas"
+  (title := /-- Object parser linear operation bound -/)
+  (statement := /-- Proves the existing object parser charge is bounded by (2215 + 470 * input bytes) regular operations plus the single account allocation charge, using the existing key/value/ignore cost bounds. -/)]
+  WNear.Binary.SerdeObjectNoEsc.parser_cost_linear
+
+attribute [blueprint "frontier:object-body-gas"
+  (title := /-- Complete object body gas bound -/)
+  (statement := /-- The actual object body fits 100 billion gas plus 397500000 per input byte and explicit host charges. Retains all input, parser, allocator, storage and return charges. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.object_body_cost_le
+
+attribute [blueprint "frontier:object-host-gas"
+  (title := /-- Sharper object host byte bound -/)
+  (statement := /-- Proves the shared input/read/return host charges fit 200 billion gas plus 3 million per input byte and explicit trie/return-data charges, under the existing reviewed CostsV86 premises. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.object_host_cost_le
+
+attribute [blueprint "frontier:object-total-model-gas"
+  (title := /-- Object loading, activation and body fit model gas -/)
+  (statement := /-- For inputs up to 4 MiB, the complete deployed charge fits the unchanged model allowance. The input-size bound is explicit; no stronger protocol bound is silently inferred from WProtocol. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.object_total_cost_le_model
+
+attribute [blueprint "frontier:balance-object-case-refinement"
+  (title := /-- Escape-free object, absent account: receipt refinement -/)
+  (statement := /-- Proven full receipt result for initialized represented state, an unregistered account, escape-free object input up to 4 MiB, shallow ignored values and trailing whitespace only. Proves no executionIssue, sufficient-resource Matches and original gas bound, and arbitrary-resource Matches or resource failure with rollback and log prefix. Context/storage instantiate the entry, trie/proof budget and model agreement. Other input/state cases remain unresolved. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.object_absent_refines_init
+
+attribute [blueprint "frontier:balance-object-case-accepted"
+  (title := /-- Object case supplies accepted-call assembly -/)
+  (statement := /-- Projects the complete receipt theorem into the accepted-call assembly. The exact case predicate is pinned and its callers remain Conditional. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.object_case_accepted
+
+attribute [blueprint "frontier:balance-object-case-safety"
+  (title := /-- Object case supplies execution-safety assembly -/)
+  (statement := /-- Projects execution safety for the exact object/absent-account case into checked callers. This does not establish general rejection or other state cases. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.object_case_no_issue
+
+attribute [blueprint "frontier:balance-outside-array-object-no-issue"
+  (title := /-- ft_balance_of: safety outside completed array/object cases -/)
+  (statement := /-- Precise complement of the completed initialized absent-account cases. Escaped objects, ignored values outside the shallow domain, objects above 4 MiB under other protocol contexts, registered/uninitialized states and other inputs remain Open. -/)
+  (notReady := true)]
+  WNear.ftBalanceOf_outside_array_object_absent_no_issue_obligation
+
+attribute [blueprint "frontier:balance-outside-array-object-accepted"
+  (title := /-- ft_balance_of: accepted outside completed array/object cases -/)
+  (statement := /-- Precise complement of the completed initialized absent-account cases. Escaped objects, ignored values outside the shallow domain, objects above 4 MiB under other protocol contexts, registered/uninitialized states and other inputs remain Open. -/)
+  (notReady := true)]
+  WNear.ftBalanceOf_outside_array_object_absent_accepted_obligation
