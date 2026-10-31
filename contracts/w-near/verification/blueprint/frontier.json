@@ -3727,11 +3727,13 @@
       "title": "Global scratch reserve budget across keys",
       "kind": "theorem",
       "label": "frontier:scratch-reuse-budget",
-      "notes": "The complete sum of reserve charges retains changing allocator walks, copied bytes, requested pages and base/unit memory fees. The budget uses one global growth count and peak use rather than a fresh buffer at every key.",
+      "notes": "The complete sum of reserve charges retains changing allocator walks, copied bytes, requested pages and base/unit memory fees. The budget uses one global growth count and peak use rather than a fresh buffer at every key. Its unchanged statement is now a checked specialization of the mixed string/frame reserve.",
       "required_proof_dependencies": [
-        "scratch-reuse-walks",
-        "scratch-reuse-copying",
-        "scratch-reuse-pages"
+        "scratch-mixed-budget",
+        "scratch-append-mixed-valid",
+        "scratch-append-mixed-growth",
+        "scratch-append-mixed-peak",
+        "scratch-append-mixed-cost"
       ],
       "reviewed_shape_hash": 1564998696
     },
@@ -3962,6 +3964,194 @@
         "scratch-reuse-budget"
       ],
       "reviewed_shape_hash": 3251577540
+    },
+    {
+      "id": "scratch-mixed-free-bound",
+      "declaration": "WNear.Binary.ScratchMixedTrace.endFreeBound_eq",
+      "title": "One allocator bound across mixed scratch segments",
+      "kind": "theorem",
+      "label": "frontier:scratch-mixed-free-bound",
+      "notes": "Every segment carries the actual ending allocator bound into the next; clears retain allocation. The final bound is F plus twice the global growth count.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 4172070296
+    },
+    {
+      "id": "scratch-mixed-walks",
+      "declaration": "WNear.Binary.ScratchMixedTrace.walks_eq",
+      "title": "Exact allocator walks across strings and frame stacks",
+      "kind": "theorem",
+      "label": "frontier:scratch-mixed-walks",
+      "notes": "The exact F*G + G*G - G walk sum composes string appends and frame pushes/pops. Capacity and F never restart at a clear.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 4034047655
+    },
+    {
+      "id": "scratch-mixed-capacity",
+      "declaration": "WNear.Binary.ScratchMixedTrace.endCap_capacity",
+      "title": "Mixed scratch capacity follows peak use",
+      "kind": "theorem",
+      "label": "frontier:scratch-mixed-capacity",
+      "notes": "The final capacity is bounded by the initial capacity or twice the global high-water use plus eight. Each append/frame segment has its existing exact transition and validity conditions.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3593524839
+    },
+    {
+      "id": "scratch-mixed-copying",
+      "declaration": "WNear.Binary.ScratchMixedTrace.movedBytes_peak",
+      "title": "Mixed scratch copying telescopes across clears",
+      "kind": "theorem",
+      "label": "frontier:scratch-mixed-copying",
+      "notes": "Old bytes copied across all string and frame growths are at most twice the global peak plus eight. Pops and clears retain capacity.",
+      "required_proof_dependencies": [
+        "scratch-mixed-capacity"
+      ],
+      "reviewed_shape_hash": 2941865507
+    },
+    {
+      "id": "scratch-mixed-allocation",
+      "declaration": "WNear.Binary.ScratchMixedTrace.allocatedBytes_peak",
+      "title": "Mixed requested allocations telescope",
+      "kind": "theorem",
+      "label": "frontier:scratch-mixed-allocation",
+      "notes": "All requested allocation capacities sum to at most four times the global peak plus sixteen, with initial capacity cancelling out. This is not yet a full HeapRoomK6 instance.",
+      "required_proof_dependencies": [
+        "scratch-mixed-capacity"
+      ],
+      "reviewed_shape_hash": 52522393
+    },
+    {
+      "id": "scratch-mixed-pages",
+      "declaration": "WNear.Binary.ScratchMixedTrace.pages_scaled",
+      "title": "Mixed growth retains page rounding and headers",
+      "kind": "theorem",
+      "label": "frontier:scratch-mixed-pages",
+      "notes": "Requested pages retain every growth header and rounding charge, including growths after pops and clears.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1164920706
+    },
+    {
+      "id": "scratch-mixed-cost",
+      "declaration": "WNear.Binary.ScratchMixedTrace.extraCost_le",
+      "title": "Actual mixed reserve costs are retained",
+      "kind": "theorem",
+      "label": "frontier:scratch-mixed-cost",
+      "notes": "The combined reserve charge includes changing allocator walks, old-byte copying, requested pages, and base/unit memory fees for both actual segment models.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3457504260
+    },
+    {
+      "id": "scratch-mixed-budget",
+      "declaration": "WNear.Binary.ScratchMixedTrace.extraCost_budget",
+      "title": "One global reserve budget for strings and frame stacks",
+      "kind": "theorem",
+      "label": "frontier:scratch-mixed-budget",
+      "notes": "Composes append and frame-stack accounting into one global reserve bound. Valid requires the existing arithmetic bounds of each actual segment; it supplies no full parser or ignored-value Wasm implementation.",
+      "required_proof_dependencies": [
+        "scratch-mixed-walks",
+        "scratch-mixed-copying",
+        "scratch-mixed-allocation",
+        "scratch-mixed-pages",
+        "scratch-mixed-cost"
+      ],
+      "reviewed_shape_hash": 2150294021
+    },
+    {
+      "id": "scratch-mixed-frame-budget",
+      "declaration": "WNear.Binary.ScratchMixedTrace.frames_budget",
+      "title": "Frame-only reserve is a mixed-trace instance",
+      "kind": "theorem",
+      "label": "frontier:scratch-mixed-frame-budget",
+      "notes": "Instantiates mixed validity from the existing frame trace validity and explicit initial/final capacity bounds.",
+      "required_proof_dependencies": [
+        "scratch-mixed-budget"
+      ],
+      "reviewed_shape_hash": 1626656064
+    },
+    {
+      "id": "scratch-mixed-frame-domination",
+      "declaration": "WNear.Binary.ScratchMixedTrace.budget_le_frame_budget",
+      "title": "Mixed reserve preserves the old frame allowance",
+      "kind": "theorem",
+      "label": "frontier:scratch-mixed-frame-domination",
+      "notes": "The tighter exact walk sum is bounded by the existing frame budget; its public allowance is unchanged.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1311889297
+    },
+    {
+      "id": "scratch-append-mixed-valid",
+      "declaration": "WNear.Binary.ScratchReuseTrace.mixed_valid",
+      "title": "String batches instantiate mixed validity",
+      "kind": "theorem",
+      "label": "frontier:scratch-append-mixed-valid",
+      "notes": "Checked embedding of existing string-only batches as append segments. Original capacity and allocator transitions are preserved exactly.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 643342398
+    },
+    {
+      "id": "scratch-append-mixed-growth",
+      "declaration": "WNear.Binary.ScratchReuseTrace.mixed_growthCount",
+      "title": "String embedding preserves global growth count",
+      "kind": "theorem",
+      "label": "frontier:scratch-append-mixed-growth",
+      "notes": "Checked embedding of existing string-only batches as append segments. Original capacity and allocator transitions are preserved exactly.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 3245503221
+    },
+    {
+      "id": "scratch-append-mixed-peak",
+      "declaration": "WNear.Binary.ScratchReuseTrace.mixed_peak",
+      "title": "String embedding preserves high-water use",
+      "kind": "theorem",
+      "label": "frontier:scratch-append-mixed-peak",
+      "notes": "Checked embedding of existing string-only batches as append segments. Original capacity and allocator transitions are preserved exactly.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 2479912265
+    },
+    {
+      "id": "scratch-append-mixed-cost",
+      "declaration": "WNear.Binary.ScratchReuseTrace.mixed_extraCost",
+      "title": "String embedding preserves actual reserve charge",
+      "kind": "theorem",
+      "label": "frontier:scratch-append-mixed-cost",
+      "notes": "Checked embedding of existing string-only batches as append segments. Original capacity and allocator transitions are preserved exactly.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 4163651774
+    },
+    {
+      "id": "ignore-machine-trace-valid",
+      "declaration": "WNear.Binary.SerdeIgnMachineTrace.trace_valid",
+      "title": "Successful ignored values produce valid physical stack traces",
+      "kind": "theorem",
+      "label": "frontier:ignore-machine-trace-valid",
+      "notes": "The existing pure ignored-value machine yields the actual physical push/pop trace, an empty final frame vector, and peak/push bounds in consumed input. This is a model trace theorem; the complete function-81 Wasm proof remains Open.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 625008551
+    },
+    {
+      "id": "ignore-machine-mixed-budget",
+      "declaration": "WNear.Binary.SerdeIgnMachineTrace.trace_mixed_budget",
+      "title": "Successful ignored values instantiate the mixed reserve",
+      "kind": "theorem",
+      "label": "frontier:ignore-machine-mixed-budget",
+      "notes": "Instantiates the stronger mixed reserve for the actual pure-machine frame trace and bounds its high-water use by consumed input. Full ignored-value execution and whole-object trace assembly remain unresolved.",
+      "required_proof_dependencies": [
+        "ignore-machine-trace-valid",
+        "scratch-mixed-frame-budget"
+      ],
+      "reviewed_shape_hash": 942117552
+    },
+    {
+      "id": "ignore-machine-trace-budget",
+      "declaration": "WNear.Binary.SerdeIgnMachineTrace.trace_budget",
+      "title": "Existing ignored-value budget composes from mixed reserve",
+      "kind": "theorem",
+      "label": "frontier:ignore-machine-trace-budget",
+      "notes": "The old successful ignored-value trace budget is now a checked specialization of the mixed reserve, preserving its original statement and allowance.",
+      "required_proof_dependencies": [
+        "ignore-machine-mixed-budget",
+        "scratch-mixed-frame-domination"
+      ],
+      "reviewed_shape_hash": 3102320834
     }
   ],
   "reviewed_environment": [

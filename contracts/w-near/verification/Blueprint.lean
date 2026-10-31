@@ -1,3 +1,5 @@
+import Bridge.Functions.ScratchMixedTrace
+import Bridge.Functions.SerdeIgnMachineTrace
 import Bridge.Functions.SerdeKeyArgumentGas
 import Bridge.Functions.SerdeKeyTraceCost
 import Architect
@@ -1762,3 +1764,88 @@ attribute [blueprint "frontier:key-argument-slice-gas"
   (title := /-- Key-only cost fits the original argument-byte allowance -/)
   (statement := /-- Proves the key-only sequence is bounded by a fixed 200-billion-gas reserve plus the unchanged model argumentByteGas for consumed key bytes and two structural bytes per key. Uses actual reused capacity/free-list accounting and reviewed CostsV86. Full input coverage of this slice, account/ignored-container operations and other runtime charges remain Open. -/)]
   WNear.Binary.SerdeKeyEsc.seriesCost_argument_gas
+
+attribute [blueprint "frontier:scratch-mixed-free-bound"
+  (title := /-- One allocator bound across mixed scratch segments -/)
+  (statement := /-- Every segment carries the actual ending allocator bound into the next; clears retain allocation. The final bound is F plus twice the global growth count. -/)]
+  WNear.Binary.ScratchMixedTrace.endFreeBound_eq
+
+attribute [blueprint "frontier:scratch-mixed-walks"
+  (title := /-- Exact allocator walks across strings and frame stacks -/)
+  (statement := /-- The exact F*G + G*G - G walk sum composes string appends and frame pushes/pops. Capacity and F never restart at a clear. -/)]
+  WNear.Binary.ScratchMixedTrace.walks_eq
+
+attribute [blueprint "frontier:scratch-mixed-capacity"
+  (title := /-- Mixed scratch capacity follows peak use -/)
+  (statement := /-- The final capacity is bounded by the initial capacity or twice the global high-water use plus eight. Each append/frame segment has its existing exact transition and validity conditions. -/)]
+  WNear.Binary.ScratchMixedTrace.endCap_capacity
+
+attribute [blueprint "frontier:scratch-mixed-copying"
+  (title := /-- Mixed scratch copying telescopes across clears -/)
+  (statement := /-- Old bytes copied across all string and frame growths are at most twice the global peak plus eight. Pops and clears retain capacity. -/)]
+  WNear.Binary.ScratchMixedTrace.movedBytes_peak
+
+attribute [blueprint "frontier:scratch-mixed-allocation"
+  (title := /-- Mixed requested allocations telescope -/)
+  (statement := /-- All requested allocation capacities sum to at most four times the global peak plus sixteen, with initial capacity cancelling out. This is not yet a full HeapRoomK6 instance. -/)]
+  WNear.Binary.ScratchMixedTrace.allocatedBytes_peak
+
+attribute [blueprint "frontier:scratch-mixed-pages"
+  (title := /-- Mixed growth retains page rounding and headers -/)
+  (statement := /-- Requested pages retain every growth header and rounding charge, including growths after pops and clears. -/)]
+  WNear.Binary.ScratchMixedTrace.pages_scaled
+
+attribute [blueprint "frontier:scratch-mixed-cost"
+  (title := /-- Actual mixed reserve costs are retained -/)
+  (statement := /-- The combined reserve charge includes changing allocator walks, old-byte copying, requested pages, and base/unit memory fees for both actual segment models. -/)]
+  WNear.Binary.ScratchMixedTrace.extraCost_le
+
+attribute [blueprint "frontier:scratch-mixed-budget"
+  (title := /-- One global reserve budget for strings and frame stacks -/)
+  (statement := /-- Composes append and frame-stack accounting into one global reserve bound. Valid requires the existing arithmetic bounds of each actual segment; it supplies no full parser or ignored-value Wasm implementation. -/)]
+  WNear.Binary.ScratchMixedTrace.extraCost_budget
+
+attribute [blueprint "frontier:scratch-mixed-frame-budget"
+  (title := /-- Frame-only reserve is a mixed-trace instance -/)
+  (statement := /-- Instantiates mixed validity from the existing frame trace validity and explicit initial/final capacity bounds. -/)]
+  WNear.Binary.ScratchMixedTrace.frames_budget
+
+attribute [blueprint "frontier:scratch-mixed-frame-domination"
+  (title := /-- Mixed reserve preserves the old frame allowance -/)
+  (statement := /-- The tighter exact walk sum is bounded by the existing frame budget; its public allowance is unchanged. -/)]
+  WNear.Binary.ScratchMixedTrace.budget_le_frame_budget
+
+attribute [blueprint "frontier:scratch-append-mixed-valid"
+  (title := /-- String batches instantiate mixed validity -/)
+  (statement := /-- Checked embedding of existing string-only batches as append segments. Original capacity and allocator transitions are preserved exactly. -/)]
+  WNear.Binary.ScratchReuseTrace.mixed_valid
+
+attribute [blueprint "frontier:scratch-append-mixed-growth"
+  (title := /-- String embedding preserves global growth count -/)
+  (statement := /-- Checked embedding of existing string-only batches as append segments. Original capacity and allocator transitions are preserved exactly. -/)]
+  WNear.Binary.ScratchReuseTrace.mixed_growthCount
+
+attribute [blueprint "frontier:scratch-append-mixed-peak"
+  (title := /-- String embedding preserves high-water use -/)
+  (statement := /-- Checked embedding of existing string-only batches as append segments. Original capacity and allocator transitions are preserved exactly. -/)]
+  WNear.Binary.ScratchReuseTrace.mixed_peak
+
+attribute [blueprint "frontier:scratch-append-mixed-cost"
+  (title := /-- String embedding preserves actual reserve charge -/)
+  (statement := /-- Checked embedding of existing string-only batches as append segments. Original capacity and allocator transitions are preserved exactly. -/)]
+  WNear.Binary.ScratchReuseTrace.mixed_extraCost
+
+attribute [blueprint "frontier:ignore-machine-trace-valid"
+  (title := /-- Successful ignored values produce valid physical stack traces -/)
+  (statement := /-- The existing pure ignored-value machine yields the actual physical push/pop trace, an empty final frame vector, and peak/push bounds in consumed input. This is a model trace theorem; the complete function-81 Wasm proof remains Open. -/)]
+  WNear.Binary.SerdeIgnMachineTrace.trace_valid
+
+attribute [blueprint "frontier:ignore-machine-mixed-budget"
+  (title := /-- Successful ignored values instantiate the mixed reserve -/)
+  (statement := /-- Instantiates the stronger mixed reserve for the actual pure-machine frame trace and bounds its high-water use by consumed input. Full ignored-value execution and whole-object trace assembly remain unresolved. -/)]
+  WNear.Binary.SerdeIgnMachineTrace.trace_mixed_budget
+
+attribute [blueprint "frontier:ignore-machine-trace-budget"
+  (title := /-- Existing ignored-value budget composes from mixed reserve -/)
+  (statement := /-- The old successful ignored-value trace budget is now a checked specialization of the mixed reserve, preserving its original statement and allowance. -/)]
+  WNear.Binary.SerdeIgnMachineTrace.trace_budget

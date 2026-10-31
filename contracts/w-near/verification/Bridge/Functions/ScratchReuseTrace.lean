@@ -1,3 +1,4 @@
+import Bridge.Functions.ScratchMixedTrace
 import Bridge.Functions.ScratchGrowthTrace
 
 /-! Reusable parser growth charges and checked accepted-input domain bounds.
@@ -149,21 +150,48 @@ def budget (cfg : WasmConfig) (F G P : Nat) : Nat :=
   (1790 * G + (F * G + G * G - G) * 320 + 18 * (2 * P + 8)) * cfg.regularOpCost +
     G * cfg.linearOpBaseCost + cfg.linearOpUnitCost * ((4 * P + 16 + 66066 * G) / 65536)
 
+def mixed (batches : Batches) : ScratchMixedTrace.Batches := batches.map .append
+
+theorem mixed_valid (cap : UInt32) (batches : Batches) (hv : Valid cap batches) :
+    ScratchMixedTrace.Valid cap (mixed batches) := by
+  induction batches generalizing cap with
+  | nil => exact hv
+  | cons ks batches ih => exact ⟨hv.1, hv.2.1, ih (next cap ks) hv.2.2⟩
+
+theorem mixed_growthCount (cap : UInt32) (batches : Batches) :
+    ScratchMixedTrace.growthCount cap (mixed batches) = growthCount cap batches := by
+  induction batches generalizing cap with
+  | nil => rfl
+  | cons ks batches ih =>
+    simpa only [mixed, List.map_cons, ScratchMixedTrace.growthCount,
+      ScratchMixedTrace.Segment.growthCount, ScratchMixedTrace.Segment.next, growthCount, next] using
+      congrArg (ScratchGrow.growthCount cap 0 ks + ·) (ih (next cap ks))
+
+theorem mixed_peak (cap : UInt32) (batches : Batches) :
+    ScratchMixedTrace.peak cap (mixed batches) = peak cap batches := by
+  induction batches generalizing cap with
+  | nil => rfl
+  | cons ks batches ih =>
+    simpa only [mixed, List.map_cons, ScratchMixedTrace.peak,
+      ScratchMixedTrace.Segment.peak, ScratchMixedTrace.Segment.next, peak, next] using
+      congrArg (max (ScratchGrow.endState cap 0 ks).2.toNat) (ih (next cap ks))
+
+theorem mixed_extraCost (cfg : WasmConfig) (F : Nat) (cap : UInt32) (batches : Batches) :
+    ScratchMixedTrace.extraCost cfg F cap (mixed batches) = extraCost cfg F cap batches := by
+  induction batches generalizing F cap with
+  | nil => rfl
+  | cons ks batches ih =>
+    simpa only [mixed, List.map_cons, ScratchMixedTrace.extraCost,
+      ScratchMixedTrace.Segment.extraCost, ScratchMixedTrace.Segment.endFreeBound,
+      ScratchMixedTrace.Segment.next, extraCost, next] using
+      congrArg (ScratchGrow.extraCost cfg F cap 0 ks + ·)
+        (ih (ScratchGrow.endFreeBound F cap 0 ks) (next cap ks))
+
 theorem extraCost_budget (cfg : WasmConfig) (F : Nat) (cap : UInt32) (batches : Batches) (hv : Valid cap batches) :
     extraCost cfg F cap batches ≤ budget cfg F (growthCount cap batches) (peak cap batches) := by
-  have hwalk := walks_eq F cap batches
-  have hmove := movedBytes_peak cap batches hv
-  have hp := pages_scaled cap batches hv
-  have ha := allocatedBytes_peak cap batches hv
-  have hpage : pages cap batches ≤ (4 * peak cap batches + 16 + 66066 * growthCount cap batches) / 65536 := by omega
-  have hw : walks F cap batches = F * growthCount cap batches + growthCount cap batches * growthCount cap batches - growthCount cap batches := by omega
-  have hm := Nat.mul_le_mul_right cfg.regularOpCost (Nat.mul_le_mul_left 18 hmove)
-  have hpg := Nat.mul_le_mul_left cfg.linearOpUnitCost hpage
-  have he := extraCost_le cfg F cap batches
-  unfold budget
-  rw [hw] at he
-  simp only [Nat.add_mul] at he ⊢
-  omega
+  have h := ScratchMixedTrace.extraCost_budget cfg F cap (mixed batches) (mixed_valid cap batches hv)
+  rw [mixed_extraCost, mixed_growthCount, mixed_peak] at h
+  exact h
 
 end WNear.Binary.ScratchReuseTrace
 

@@ -7885,6 +7885,135 @@ def WNear.Binary.ScratchGrow.roomRes (hl maxP : ℕ) (cap len k : UInt32) : Prop
     WNear.Binary.VecFromElem.roomFor hl maxP (WNear.Binary.VecGrow.growCap cap (len + k))
 ```
 
+## Bridge.Functions.ScratchMixedTrace
+
+`WNear.Binary.ScratchMixedTrace.allocatedBytes_capacity` (hash `00000000353afd6d`)
+
+```lean
+theorem WNear.Binary.ScratchMixedTrace.allocatedBytes_capacity (cap : UInt32) (batches : WNear.Binary.ScratchMixedTrace.Batches)
+  (hv : WNear.Binary.ScratchMixedTrace.Valid cap batches) :
+  WNear.Binary.ScratchMixedTrace.allocatedBytes cap batches + 2 * cap.toNat ≤
+    2 * (WNear.Binary.ScratchMixedTrace.endCap cap batches).toNat
+```
+
+`WNear.Binary.ScratchMixedTrace.allocatedBytes_peak` (hash `0000000003216d99`)
+
+```lean
+theorem WNear.Binary.ScratchMixedTrace.allocatedBytes_peak (cap : UInt32) (batches : WNear.Binary.ScratchMixedTrace.Batches)
+  (hv : WNear.Binary.ScratchMixedTrace.Valid cap batches) :
+  WNear.Binary.ScratchMixedTrace.allocatedBytes cap batches ≤ 4 * WNear.Binary.ScratchMixedTrace.peak cap batches + 16
+```
+
+`WNear.Binary.ScratchMixedTrace.budget_le_frame_budget` (hash `000000004e31d791`)
+
+```lean
+theorem WNear.Binary.ScratchMixedTrace.budget_le_frame_budget (cfg : Wasm.Near.WasmConfig) (F G P : ℕ) :
+  WNear.Binary.ScratchMixedTrace.budget cfg F G P ≤ WNear.Binary.SerdeIgnTrace.budget cfg F G P
+```
+
+`WNear.Binary.ScratchMixedTrace.budget_mono_peak` (hash `000000002fb872df`)
+
+```lean
+theorem WNear.Binary.ScratchMixedTrace.budget_mono_peak (cfg : Wasm.Near.WasmConfig) (F G P Q : ℕ) (hp : P ≤ Q) :
+  WNear.Binary.ScratchMixedTrace.budget cfg F G P ≤ WNear.Binary.ScratchMixedTrace.budget cfg F G Q
+```
+
+`WNear.Binary.ScratchMixedTrace.endCap_capacity` (hash `00000000d630d667`)
+
+```lean
+theorem WNear.Binary.ScratchMixedTrace.endCap_capacity (cap : UInt32) (batches : WNear.Binary.ScratchMixedTrace.Batches)
+  (hv : WNear.Binary.ScratchMixedTrace.Valid cap batches) :
+  (WNear.Binary.ScratchMixedTrace.endCap cap batches).toNat ≤
+    max cap.toNat (2 * WNear.Binary.ScratchMixedTrace.peak cap batches + 8)
+```
+
+`WNear.Binary.ScratchMixedTrace.endFreeBound_eq` (hash `00000000f8acbd98`)
+
+```lean
+theorem WNear.Binary.ScratchMixedTrace.endFreeBound_eq (F : ℕ) (cap : UInt32)
+  (batches : WNear.Binary.ScratchMixedTrace.Batches) :
+  WNear.Binary.ScratchMixedTrace.endFreeBound F cap batches =
+    F + 2 * WNear.Binary.ScratchMixedTrace.growthCount cap batches
+```
+
+`WNear.Binary.ScratchMixedTrace.extraCost_budget` (hash `00000000802ae205`)
+
+```lean
+theorem WNear.Binary.ScratchMixedTrace.extraCost_budget (cfg : Wasm.Near.WasmConfig) (F : ℕ) (cap : UInt32)
+  (batches : WNear.Binary.ScratchMixedTrace.Batches) (hv : WNear.Binary.ScratchMixedTrace.Valid cap batches) :
+  WNear.Binary.ScratchMixedTrace.extraCost cfg F cap batches ≤
+    WNear.Binary.ScratchMixedTrace.budget cfg F (WNear.Binary.ScratchMixedTrace.growthCount cap batches)
+      (WNear.Binary.ScratchMixedTrace.peak cap batches)
+```
+
+`WNear.Binary.ScratchMixedTrace.extraCost_le` (hash `00000000ce155404`)
+
+```lean
+theorem WNear.Binary.ScratchMixedTrace.extraCost_le (cfg : Wasm.Near.WasmConfig) (F : ℕ) (cap : UInt32)
+  (batches : WNear.Binary.ScratchMixedTrace.Batches) :
+  WNear.Binary.ScratchMixedTrace.extraCost cfg F cap batches ≤
+    (1790 * WNear.Binary.ScratchMixedTrace.growthCount cap batches +
+              WNear.Binary.ScratchMixedTrace.walks F cap batches * 320 +
+            18 * WNear.Binary.ScratchMixedTrace.movedBytes cap batches) *
+          cfg.regularOpCost +
+        WNear.Binary.ScratchMixedTrace.growthCount cap batches * cfg.linearOpBaseCost +
+      cfg.linearOpUnitCost * WNear.Binary.ScratchMixedTrace.pages cap batches
+```
+
+`WNear.Binary.ScratchMixedTrace.frames_budget` (hash `0000000060f4cd40`)
+
+```lean
+theorem WNear.Binary.ScratchMixedTrace.frames_budget (cfg : Wasm.Near.WasmConfig) (F : ℕ) (cap : UInt32) (ops : List Bool)
+  (hv : WNear.Binary.SerdeIgnTrace.Valid cap 0 ops) (hc : cap.toNat < 2 ^ 28)
+  (he : (WNear.Binary.SerdeIgnTrace.endState cap 0 ops).1.toNat < 2 ^ 28) :
+  WNear.Binary.SerdeIgnTrace.extraCost cfg F cap 0 ops ≤
+    WNear.Binary.ScratchMixedTrace.budget cfg F (WNear.Binary.SerdeIgnTrace.growthCount cap 0 ops)
+      (WNear.Binary.SerdeIgnTrace.peak 0 ops)
+```
+
+`WNear.Binary.ScratchMixedTrace.movedBytes_capacity` (hash `00000000b400b188`)
+
+```lean
+theorem WNear.Binary.ScratchMixedTrace.movedBytes_capacity (cap : UInt32) (batches : WNear.Binary.ScratchMixedTrace.Batches)
+  (hv : WNear.Binary.ScratchMixedTrace.Valid cap batches) :
+  WNear.Binary.ScratchMixedTrace.movedBytes cap batches + cap.toNat ≤
+    (WNear.Binary.ScratchMixedTrace.endCap cap batches).toNat
+```
+
+`WNear.Binary.ScratchMixedTrace.movedBytes_peak` (hash `00000000af594e23`)
+
+```lean
+theorem WNear.Binary.ScratchMixedTrace.movedBytes_peak (cap : UInt32) (batches : WNear.Binary.ScratchMixedTrace.Batches)
+  (hv : WNear.Binary.ScratchMixedTrace.Valid cap batches) :
+  WNear.Binary.ScratchMixedTrace.movedBytes cap batches ≤ 2 * WNear.Binary.ScratchMixedTrace.peak cap batches + 8
+```
+
+`WNear.Binary.ScratchMixedTrace.pages_scaled` (hash `00000000456f4782`)
+
+```lean
+theorem WNear.Binary.ScratchMixedTrace.pages_scaled (cap : UInt32) (batches : WNear.Binary.ScratchMixedTrace.Batches)
+  (hv : WNear.Binary.ScratchMixedTrace.Valid cap batches) :
+  65536 * WNear.Binary.ScratchMixedTrace.pages cap batches ≤
+    WNear.Binary.ScratchMixedTrace.allocatedBytes cap batches +
+      66066 * WNear.Binary.ScratchMixedTrace.growthCount cap batches
+```
+
+`WNear.Binary.ScratchMixedTrace.valid_cap` (hash `000000003b9f2bef`)
+
+```lean
+theorem WNear.Binary.ScratchMixedTrace.valid_cap (cap : UInt32) (batches : WNear.Binary.ScratchMixedTrace.Batches)
+  (hv : WNear.Binary.ScratchMixedTrace.Valid cap batches) : cap.toNat < 2 ^ 28
+```
+
+`WNear.Binary.ScratchMixedTrace.walks_eq` (hash `00000000f072aea7`)
+
+```lean
+theorem WNear.Binary.ScratchMixedTrace.walks_eq (F : ℕ) (cap : UInt32) (batches : WNear.Binary.ScratchMixedTrace.Batches) :
+  WNear.Binary.ScratchMixedTrace.walks F cap batches + WNear.Binary.ScratchMixedTrace.growthCount cap batches =
+    F * WNear.Binary.ScratchMixedTrace.growthCount cap batches +
+      WNear.Binary.ScratchMixedTrace.growthCount cap batches * WNear.Binary.ScratchMixedTrace.growthCount cap batches
+```
+
 ## Bridge.Functions.ScratchReuseTrace
 
 `WNear.Binary.ScratchReuseTrace.Batches` (hash `429821ae470c3c9b`)
@@ -8061,6 +8190,39 @@ theorem WNear.Binary.ScratchReuseTrace.growthCount_power (cap : UInt32) (batches
     (WNear.Binary.ScratchReuseTrace.endCap cap batches).toNat
 ```
 
+`WNear.Binary.ScratchReuseTrace.mixed_extraCost` (hash `00000000f82c48be`)
+
+```lean
+theorem WNear.Binary.ScratchReuseTrace.mixed_extraCost (cfg : Wasm.Near.WasmConfig) (F : ℕ) (cap : UInt32)
+  (batches : WNear.Binary.ScratchReuseTrace.Batches) :
+  WNear.Binary.ScratchMixedTrace.extraCost cfg F cap (WNear.Binary.ScratchReuseTrace.mixed batches) =
+    WNear.Binary.ScratchReuseTrace.extraCost cfg F cap batches
+```
+
+`WNear.Binary.ScratchReuseTrace.mixed_growthCount` (hash `00000000c17272f5`)
+
+```lean
+theorem WNear.Binary.ScratchReuseTrace.mixed_growthCount (cap : UInt32) (batches : WNear.Binary.ScratchReuseTrace.Batches) :
+  WNear.Binary.ScratchMixedTrace.growthCount cap (WNear.Binary.ScratchReuseTrace.mixed batches) =
+    WNear.Binary.ScratchReuseTrace.growthCount cap batches
+```
+
+`WNear.Binary.ScratchReuseTrace.mixed_peak` (hash `0000000093d07549`)
+
+```lean
+theorem WNear.Binary.ScratchReuseTrace.mixed_peak (cap : UInt32) (batches : WNear.Binary.ScratchReuseTrace.Batches) :
+  WNear.Binary.ScratchMixedTrace.peak cap (WNear.Binary.ScratchReuseTrace.mixed batches) =
+    WNear.Binary.ScratchReuseTrace.peak cap batches
+```
+
+`WNear.Binary.ScratchReuseTrace.mixed_valid` (hash `000000002658a03e`)
+
+```lean
+theorem WNear.Binary.ScratchReuseTrace.mixed_valid (cap : UInt32) (batches : WNear.Binary.ScratchReuseTrace.Batches)
+  (hv : WNear.Binary.ScratchReuseTrace.Valid cap batches) :
+  WNear.Binary.ScratchMixedTrace.Valid cap (WNear.Binary.ScratchReuseTrace.mixed batches)
+```
+
 `WNear.Binary.ScratchReuseTrace.movedBytes` (hash `c9bc945a1ac6f9db`)
 
 ```lean
@@ -8208,6 +8370,51 @@ theorem WNear.Binary.SerdeFromTraitModel.f66_arr_model {GF : Iris.BundledGFuncto
                                   n ↦[wms][ out.toNat + 12 ] WasmLogic.bytes32 len ∗
                                     WNear.Binary.SerdeScratchValueDrop.cleanValue n maxP mlen live F 0 bs
                                       value.toUTF8.toList (j + 1) p c len)
+```
+
+## Bridge.Functions.SerdeIgnMachineTrace
+
+`WNear.Binary.SerdeIgnMachineTrace.trace_budget` (hash `00000000b8e9a8c2`)
+
+```lean
+theorem WNear.Binary.SerdeIgnMachineTrace.trace_budget (cfg : Wasm.Near.WasmConfig) (F : ℕ) {bs r : List UInt8} (cap : UInt32)
+  (hcap : cap.toNat < 2 ^ 27) (hlen : bs.length < 2 ^ 24) (h : WNear.IgnoreModel.vSkip bs = some r) :
+  ∃ ops,
+    WNear.Binary.SerdeIgnMachineTrace.trace bs = some (r, ops) ∧
+      WNear.Binary.SerdeIgnTrace.Valid cap 0 ops ∧
+        (WNear.Binary.SerdeIgnTrace.endState cap 0 ops).2 = 0 ∧
+          WNear.Binary.SerdeIgnTrace.peak 0 ops ≤ bs.length - r.length ∧
+            WNear.Binary.SerdeIgnTrace.extraCost cfg F cap 0 ops ≤
+              WNear.Binary.SerdeIgnTrace.budget cfg F (WNear.Binary.SerdeIgnTrace.growthCount cap 0 ops)
+                (bs.length - r.length)
+```
+
+`WNear.Binary.SerdeIgnMachineTrace.trace_mixed_budget` (hash `00000000382792b0`)
+
+```lean
+theorem WNear.Binary.SerdeIgnMachineTrace.trace_mixed_budget (cfg : Wasm.Near.WasmConfig) (F : ℕ) {bs r : List UInt8}
+  (cap : UInt32) (hcap : cap.toNat < 2 ^ 27) (hlen : bs.length < 2 ^ 24) (h : WNear.IgnoreModel.vSkip bs = some r) :
+  ∃ ops,
+    WNear.Binary.SerdeIgnMachineTrace.trace bs = some (r, ops) ∧
+      WNear.Binary.SerdeIgnTrace.Valid cap 0 ops ∧
+        (WNear.Binary.SerdeIgnTrace.endState cap 0 ops).2 = 0 ∧
+          WNear.Binary.SerdeIgnTrace.peak 0 ops ≤ bs.length - r.length ∧
+            WNear.Binary.SerdeIgnTrace.extraCost cfg F cap 0 ops ≤
+              WNear.Binary.ScratchMixedTrace.budget cfg F (WNear.Binary.SerdeIgnTrace.growthCount cap 0 ops)
+                (bs.length - r.length)
+```
+
+`WNear.Binary.SerdeIgnMachineTrace.trace_valid` (hash `000000002540dfa7`)
+
+```lean
+theorem WNear.Binary.SerdeIgnMachineTrace.trace_valid {bs r : List UInt8} (cap : UInt32) (hcap : cap.toNat < 2 ^ 27)
+  (hlen : bs.length < 2 ^ 24) (h : WNear.IgnoreModel.vSkip bs = some r) :
+  ∃ ops,
+    WNear.Binary.SerdeIgnMachineTrace.trace bs = some (r, ops) ∧
+      WNear.Binary.SerdeIgnTrace.Valid cap 0 ops ∧
+        (WNear.Binary.SerdeIgnTrace.endState cap 0 ops).2 = 0 ∧
+          WNear.Binary.SerdeIgnTrace.pushCount ops ≤ bs.length - r.length ∧
+            WNear.Binary.SerdeIgnTrace.peak 0 ops ≤ bs.length - r.length
 ```
 
 ## Bridge.Functions.SerdeIgnReuse

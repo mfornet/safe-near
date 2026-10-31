@@ -429,6 +429,27 @@
     "WNear.Binary.SerdeKeyEsc.reserve_budget_v86",
     "WNear.Binary.SerdeKeyEsc.seriesCost_argument_slice",
     "WNear.Binary.SerdeKeyEsc.seriesCost_argument_gas",
-    "WNear.argumentByteGas"
+    "WNear.argumentByteGas",
+    "WNear.Binary.ScratchMixedTrace.valid_cap",
+    "WNear.Binary.ScratchMixedTrace.endFreeBound_eq",
+    "WNear.Binary.ScratchMixedTrace.walks_eq",
+    "WNear.Binary.ScratchMixedTrace.movedBytes_capacity",
+    "WNear.Binary.ScratchMixedTrace.allocatedBytes_capacity",
+    "WNear.Binary.ScratchMixedTrace.endCap_capacity",
+    "WNear.Binary.ScratchMixedTrace.movedBytes_peak",
+    "WNear.Binary.ScratchMixedTrace.allocatedBytes_peak",
+    "WNear.Binary.ScratchMixedTrace.pages_scaled",
+    "WNear.Binary.ScratchMixedTrace.extraCost_le",
+    "WNear.Binary.ScratchMixedTrace.extraCost_budget",
+    "WNear.Binary.ScratchMixedTrace.budget_mono_peak",
+    "WNear.Binary.ScratchMixedTrace.frames_budget",
+    "WNear.Binary.ScratchMixedTrace.budget_le_frame_budget",
+    "WNear.Binary.ScratchReuseTrace.mixed_valid",
+    "WNear.Binary.ScratchReuseTrace.mixed_growthCount",
+    "WNear.Binary.ScratchReuseTrace.mixed_peak",
+    "WNear.Binary.ScratchReuseTrace.mixed_extraCost",
+    "WNear.Binary.SerdeIgnMachineTrace.trace_valid",
+    "WNear.Binary.SerdeIgnMachineTrace.trace_mixed_budget",
+    "WNear.Binary.SerdeIgnMachineTrace.trace_budget"
   ]
 }

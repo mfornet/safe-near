@@ -33,6 +33,40 @@ it is false for the reviewed domain; its historical statement is recorded in
 the misstatement log. The historical generic host trap and contradiction lemmas
 remain checked, but witness existence is no longer a frontier obligation.
 
+## Continuation on 2026-10-31: mixed string/frame scratch composition
+
+`ScratchMixedTrace` composes string-append batches with ignored-container
+frame pushes and pops. Each completed segment starts at used length zero;
+capacity and the ending allocator bound carry across the intervening clear.
+Existing append validity (capacity below 2^28) and frame validity (below 2^27)
+remain explicit. The exact free-list and walk identities, telescoping copying
+and allocation bounds, page rounding and reserve costs now compose across
+both segment kinds. There is one global growth count and peak use.
+
+The original `ScratchReuseTrace.extraCost_budget` statement is unchanged and
+now follows through a checked embedding into the mixed trace. Thus the mixed
+reserve is integrated into the existing key-series and argument-gas slice.
+The actual successful pure ignored-value machine also supplies a valid frame
+trace with peak use bounded by consumed input; its stronger mixed-budget
+instance composes into the unchanged previous ignored-value trace budget.
+These are model/resource accounting results, not a complete function-81 Wasm
+proof or a whole-object parser instance.
+
+The next frontier is to extract and realize one mixed trace for the actual
+object loop, including its ignored-value Wasm implementation and the account
+allocation. Whole-input source coverage, HeapRoomK6, original method gas and
+the deployed parser provider remain unresolved. IgnoreHyp, KeyConditions,
+ValueConditions, escaped-string room and pinned protocol fields remain Open.
+The global theorem and full ft_balance_of result remain Conditional; no new
+full-method obligation or environmental premise is discharged here.
+
+Strict full audit and fresh actual-dependency/readiness gate passed at
+2026-10-31T06:32:17+00:00 for proof source `b34a4ea8597f5fa9bd1225434cfda3243db1fb2a20db07b38719139c3be68a69`. All 45 frontier
+policy tests, Lean style and toolchain checks passed. All old statement pins
+remain byte-identical; new mixed-trace declarations are pinned additively.
+No axiom/admission allowance or reviewed environmental premise was expanded.
+Publication also requires matching served revision/build/audit evidence.
+
 ## Continuation on 2026-10-31: input-domain proof and retained key-growth charges
 
 The exact accepted/absent parser-plan obligation now has checked construction.

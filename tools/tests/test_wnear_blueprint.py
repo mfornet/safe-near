@@ -110,8 +110,35 @@ class FrontierPolicyTests(unittest.TestCase):
             blueprint.classify(self.manifest, self.rows, self.audit)
 
     def test_scratch_budget_cannot_drop_evolving_allocator_walks(self):
+        self.by_id['scratch-mixed-budget']['proof_dependencies'].remove(
+            self.nodes['scratch-mixed-walks']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_mixed_scratch_composition_keeps_both_specializations_and_open_parser(self):
+        result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
+        for node in ['scratch-mixed-budget', 'scratch-append-mixed-valid',
+                     'ignore-machine-trace-valid', 'ignore-machine-mixed-budget',
+                     'ignore-machine-trace-budget']:
+            self.assertEqual(result[node]['status'], 'Proven')
+        for source, caller in [('scratch-mixed-budget', 'scratch-reuse-budget'),
+                               ('scratch-mixed-budget', 'scratch-mixed-frame-budget'),
+                               ('ignore-machine-trace-valid', 'ignore-machine-mixed-budget'),
+                               ('ignore-machine-mixed-budget', 'ignore-machine-trace-budget')]:
+            self.assertIn({'id': caller, 'status': 'Proven'}, result[source]['integrated_into'])
+        for node in ['ignore-hyp', 'key-conditions', 'value-conditions', 'balance-absent-parser-cost']:
+            self.assertEqual(result[node]['status'], 'Open')
+        self.assertEqual(result['global']['status'], 'Conditional')
+
+    def test_string_specialization_cannot_drop_mixed_validity(self):
         self.by_id['scratch-reuse-budget']['proof_dependencies'].remove(
-            self.nodes['scratch-reuse-walks']['declaration'])
+            self.nodes['scratch-append-mixed-valid']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_mixed_value_budget_cannot_drop_actual_model_trace_validity(self):
+        self.by_id['ignore-machine-mixed-budget']['proof_dependencies'].remove(
+            self.nodes['ignore-machine-trace-valid']['declaration'])
         with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
             blueprint.classify(self.manifest, self.rows, self.audit)
 

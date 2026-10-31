@@ -1,3 +1,4 @@
+import Bridge.Functions.ScratchMixedTrace
 import Bridge.Functions.IgnoreModel
 import Bridge.Functions.SerdeIgnTrace
 
@@ -395,6 +396,19 @@ theorem budget_mono (cfg : Wasm.Near.WasmConfig) (F G N M : Nat) (h : N ≤ M) :
   have hb := Nat.mul_le_mul_left cfg.linearOpUnitCost hd
   exact Nat.add_le_add (Nat.add_le_add_right ha _) hb
 
+theorem trace_mixed_budget (cfg : Wasm.Near.WasmConfig) (F : Nat) {bs r : List UInt8} (cap : UInt32)
+    (hcap : cap.toNat < 2 ^ 27) (hlen : bs.length < 2 ^ 24) (h : vSkip bs = some r) :
+    ∃ ops, trace bs = some (r, ops) ∧ SerdeIgnTrace.Valid cap 0 ops ∧
+      (SerdeIgnTrace.endState cap 0 ops).2 = 0 ∧
+      SerdeIgnTrace.peak 0 ops ≤ bs.length - r.length ∧
+      SerdeIgnTrace.extraCost cfg F cap 0 ops ≤
+        ScratchMixedTrace.budget cfg F (SerdeIgnTrace.growthCount cap 0 ops) (bs.length - r.length) := by
+  obtain ⟨ops, ht, hv, he, _, hp⟩ := trace_valid cap hcap hlen h
+  have hc := SerdeIgnTrace.endState_capacity cap 0 ops hv
+  have hecap : (SerdeIgnTrace.endState cap 0 ops).1.toNat < 2 ^ 28 := by omega
+  have hb := ScratchMixedTrace.frames_budget cfg F cap ops hv (by omega) hecap
+  exact ⟨ops, ht, hv, he, hp, hb.trans (ScratchMixedTrace.budget_mono_peak cfg F _ _ _ hp)⟩
+
 /-- Full successful values have a growth reserve bounded by consumed input and their actual growth count. -/
 theorem trace_budget (cfg : Wasm.Near.WasmConfig) (F : Nat) {bs r : List UInt8} (cap : UInt32)
     (hcap : cap.toNat < 2 ^ 27) (hlen : bs.length < 2 ^ 24) (h : vSkip bs = some r) :
@@ -403,8 +417,7 @@ theorem trace_budget (cfg : Wasm.Near.WasmConfig) (F : Nat) {bs r : List UInt8} 
       SerdeIgnTrace.peak 0 ops ≤ bs.length - r.length ∧
       SerdeIgnTrace.extraCost cfg F cap 0 ops ≤
         SerdeIgnTrace.budget cfg F (SerdeIgnTrace.growthCount cap 0 ops) (bs.length - r.length) := by
-  obtain ⟨ops, ht, hv, he, _, hp⟩ := trace_valid cap hcap hlen h
-  exact ⟨ops, ht, hv, he, hp, (SerdeIgnTrace.extraCost_budget cfg F cap 0 ops hv).trans
-    (budget_mono cfg F _ _ _ hp)⟩
+  obtain ⟨ops, ht, hv, he, hp, hb⟩ := trace_mixed_budget cfg F cap hcap hlen h
+  exact ⟨ops, ht, hv, he, hp, hb.trans (ScratchMixedTrace.budget_le_frame_budget cfg F _ _)⟩
 
 end WNear.Binary.SerdeIgnMachineTrace
