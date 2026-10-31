@@ -33,6 +33,44 @@ it is false for the reviewed domain; its historical statement is recorded in
 the misstatement log. The historical generic host trap and contradiction lemmas
 remain checked, but witness existence is no longer a frontier obligation.
 
+## Continuation on 2026-10-31: initial-store resources and ending-run adequacy
+
+`Statics297` selects the initial table entries once, including input entry 44,
+and carves the actual memory image into the parser/UTF-8 tables, static words,
+formatter data, empty allocator state and the exact 752-byte frame region.
+`startRes297` assembles all of these with code, instance, global, host and gas
+ownership from the whole instantiated store. No additional linear entry-resource
+availability hypothesis is assumed by this extraction.
+
+`copied_array_absent_body_initial_resources` instantiates the decoded body with
+those concrete frame and static resources. `copied_array_absent_body_initial_store`
+composes their extraction and funds credits from the store's own gas cell under
+an explicit numerical budget and gas-limit premises. It does not assume an
+additional, overlapping gas cell alongside whole-store ownership.
+
+`copied_array_absent_adequate` connects the resource construction to the entry
+thread through the checked adequacy rule. `copied_array_absent_adequate_host`
+uses the actual `startW` thread and extracts both storage-read postconditions,
+the final host returning quoted zero and the used-gas bound. These are
+**MaybeStuck adequacy** results: they constrain runs that end. They do not prove
+termination, fuel sufficiency, general execution safety or arbitrary-resource
+rollback. The exact copied-array input, absent key, host/trie correspondence,
+proof budget, runtime register/key/return limits and body gas bound remain explicit.
+
+The actual entry frame and its separate activation charge of **11 regular
+operations** are checked. Activation and the body budget still need to be
+connected to the model's sufficient-gas premise and receipt-boundary run. The
+resource and ending-observation results are Proven and Integrated through the
+checked entry composition. The full accepted-call edge is still planned; the
+accepted, rejected and execution-safety clauses remain Open and the full method
+and global refinement remain Conditional. `IgnoreHyp`, `KeyConditions`,
+`ValueConditions`, the uniform parser/resource contracts and protocol premises
+remain unresolved. No admitted leaf, allowlist entry or old statement is changed.
+
+LSP diagnostics and the host-observation axiom check passed. The live frontier
+records the strict audit and fresh dependency-check evidence for proof source
+`fe8f3e016693e567eb6638b6affe93b92fbece00f085dd08a000179e0048da6d`; publication requires both gates to pass.
+
 ## Continuation on 2026-10-31: code from the instantiated store
 
 `Code297` extracts all input, parser, lookup, return and interface code resources

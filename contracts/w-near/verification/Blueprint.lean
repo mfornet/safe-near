@@ -42,6 +42,7 @@ import Bridge.Methods.FtBalanceOfAbsentCompose
 import Bridge.Methods.FtBalanceOfInputBound
 import Bridge.Methods.ContextInputDomain
 import Bridge.Methods.FtBalanceOfCodeCompose
+import Bridge.Methods.FtBalanceOfInitialAdequacy
 
 /-! The browsable proof frontier. Definitions marked Open state contracts, not proofs. -/
 
@@ -960,3 +961,78 @@ attribute [blueprint "frontier:balance-copied-body-store-code"
   (title := /-- Function 297: copied body with actual store code -/)
   (statement := /-- Instantiates the code and module interface in the complete copied-array absent-account body. Table/static/frame/heap/host ownership, exact input and absent key, trie/proof budget, runtime limits and gas remain explicit. Does not yet consume whole-store entry ownership or prove an external MethodClause. -/)]
   WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body_store_code
+
+attribute [blueprint "frontier:balance-initial-table"
+  (title := /-- Initial balance table entries -/)
+  (statement := /-- Selects the exact table cells once, including input entry 44, alongside the interface, allocator and formatting entries. No duplicated linear ownership. -/)]
+  WNear.Binary.InitialState.table297Of
+
+attribute [blueprint "frontier:balance-initial-input-slot"
+  (title := /-- Input vtable word from binary data -/)
+  (statement := /-- The input vtable word is the actual data-segment word at 1050224. -/)]
+  WNear.Binary.InitialState.seg_v36
+
+attribute [blueprint "frontier:balance-initial-frame"
+  (title := /-- Initial balance frame cells -/)
+  (statement := /-- Carves the 752-byte initial stack region into the 592-byte lower stack and exact zeroed body buffers and words. Unused gaps are discarded. -/)]
+  WNear.Binary.InitialState.frame297_of
+
+attribute [blueprint "frontier:balance-initial-memory"
+  (title := /-- Balance memory resources from initial image -/)
+  (statement := /-- Carves the frame, interface and allocator words, state key, parser tables, UTF-8 table, formatter tables and zeroed statics from one owned memory image. -/)]
+  WNear.Binary.InitialState.memRes297
+
+attribute [blueprint "frontier:balance-initial-statics"
+  (title := /-- Assemble initialized balance statics -/)
+  (statement := /-- Combines the carved memory with table ownership and memory length/limit, deriving the empty initial heap invariant and retaining the input/parser resources. -/)]
+  WNear.Binary.InitialState.statics297P
+
+attribute [blueprint "frontier:balance-initial-start-split"
+  (title := /-- Split initial store to all balance resources -/)
+  (statement := /-- Derives code, frame, static, heap, table, host and gas resources from the separated initial store. All linear cells are extracted once. -/)]
+  WNear.Binary.InitialState.startRes297_gen
+
+attribute [blueprint "frontier:balance-initial-start"
+  (title := /-- Whole initial store to balance resources -/)
+  (statement := /-- Checked composition from ownership of the actual instantiated store to every resource used by the copied-array absent-account body. -/)]
+  WNear.Binary.InitialState.startRes297
+
+attribute [blueprint "frontier:balance-initial-body"
+  (title := /-- Copied body with initialized resources -/)
+  (statement := /-- Instantiates the complete copied-array absent body with the actual initial frame, static words, table indices and empty heap. Exact input, absent key, host/trie/proof budget, runtime limits and credits remain explicit. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body_initial_resources
+
+attribute [blueprint "frontier:balance-initial-store-body"
+  (title := /-- Initial store supplies the copied body -/)
+  (statement := /-- Derives all body resources from the whole instantiated store, funding credits from that store gas cell under an explicit budget and gas-limit premises. This is an update to the decoded-body Hoare contract, not a full external method clause. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body_initial_store
+
+attribute [blueprint "frontier:balance-end-observations"
+  (title := /-- Ending balance cells imply host and gas observations -/)
+  (statement := /-- Extracts both storage-read effects, final host return of quoted zero and the gas bound from the owned ending host/gas cells. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.endCells297_ends
+
+attribute [blueprint "frontier:balance-decoded-entry"
+  (title := /-- Actual decoded function 297 -/)
+  (statement := /-- Kernel-checked function index and decoded body correspondence. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.f297_frame
+
+attribute [blueprint "frontier:balance-entry-thread"
+  (title := /-- Actual balance entry thread -/)
+  (statement := /-- The actual initialized entry thread has the four proved local defaults and the decoded function-297 body. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.startW_thread297
+
+attribute [blueprint "frontier:balance-entry-activation"
+  (title := /-- Balance activation costs eleven regular operations -/)
+  (statement := /-- Checks the separate activation charge of the actual entry frame. It has not yet been integrated with the model gas allowance. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.entryCost_297
+
+attribute [blueprint "frontier:balance-entry-adequacy"
+  (title := /-- Balance entry: ending-run adequacy -/)
+  (statement := /-- MaybeStuck adequacy from the actual initial store for the exact copied-array absent-account path. Any ending run returns no values with the proved host/gas cells. Does not prove termination, fuel sufficiency, general execution safety, arbitrary-gas rollback or full accepted-call refinement. Body gas is explicit; activation is separate. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_adequate
+
+attribute [blueprint "frontier:balance-entry-host"
+  (title := /-- Balance entry: ending-run host and gas -/)
+  (statement := /-- Connects the actual initialized entry thread to both storage-read effects, final host return of quoted zero and bounded used gas for runs that end. Exact input, absent key, host/trie/proof budget, runtime limits and body gas premises remain. No full external method clause is discharged. -/)]
+  WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_adequate_host

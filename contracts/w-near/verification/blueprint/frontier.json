@@ -698,17 +698,11 @@
         "storage",
         "runtime-boundary",
         "ft-balance-model",
-        "balance-export-state-six-grows",
-        "balance-state-six-grows-free-bound",
-        "balance-parser-through-cleanup",
-        "parser-public-through-cleanup",
-        "balance-copied-parser-through-cleanup",
-        "balance-copied-absent-body",
-        "balance-copied-body-initial-memory",
-        "balance-code-start",
-        "balance-copied-body-store-code"
+        "balance-copied-body-gas-bound",
+        "balance-entry-host",
+        "balance-entry-activation"
       ],
-      "notes": "User-reviewed incoming receipt argument bound now included in Context.WF. Runtime action-list validation supplies this bound. Oversized historical reproducer is outside this domain; pinned limit-relation instantiation and general arbitrary-resource refinement remain open."
+      "notes": "The copied-array absent-account path now has initialized-store resource composition and ending-run entry adequacy. Remaining work includes deriving the body budget from the model allowance with activation, supplying boundary host/trie premises, termination/fuel and arbitrary-resource behavior, other accepted inputs and the general parser contract. The edge from this path to the full accepted clause remains planned."
     },
     {
       "id": "balance-rejected",
@@ -2041,6 +2035,183 @@
         "balance-copied-body-initial-memory"
       ],
       "reviewed_shape_hash": 410606491
+    },
+    {
+      "id": "balance-initial-table",
+      "declaration": "WNear.Binary.InitialState.table297Of",
+      "title": "Initial balance table entries",
+      "kind": "theorem",
+      "label": "frontier:balance-initial-table",
+      "notes": "Selects the exact table cells once, including input entry 44, alongside the interface, allocator and formatting entries. No duplicated linear ownership.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1522700128
+    },
+    {
+      "id": "balance-initial-input-slot",
+      "declaration": "WNear.Binary.InitialState.seg_v36",
+      "title": "Input vtable word from binary data",
+      "kind": "theorem",
+      "label": "frontier:balance-initial-input-slot",
+      "notes": "The input vtable word is the actual data-segment word at 1050224.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 103223093
+    },
+    {
+      "id": "balance-initial-frame",
+      "declaration": "WNear.Binary.InitialState.frame297_of",
+      "title": "Initial balance frame cells",
+      "kind": "theorem",
+      "label": "frontier:balance-initial-frame",
+      "notes": "Carves the 752-byte initial stack region into the 592-byte lower stack and exact zeroed body buffers and words. Unused gaps are discarded.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 407749716
+    },
+    {
+      "id": "balance-initial-memory",
+      "declaration": "WNear.Binary.InitialState.memRes297",
+      "title": "Balance memory resources from initial image",
+      "kind": "theorem",
+      "label": "frontier:balance-initial-memory",
+      "notes": "Carves the frame, interface and allocator words, state key, parser tables, UTF-8 table, formatter tables and zeroed statics from one owned memory image.",
+      "required_proof_dependencies": [
+        "balance-initial-frame",
+        "balance-initial-input-slot"
+      ],
+      "reviewed_shape_hash": 2708985982
+    },
+    {
+      "id": "balance-initial-statics",
+      "declaration": "WNear.Binary.InitialState.statics297P",
+      "title": "Assemble initialized balance statics",
+      "kind": "theorem",
+      "label": "frontier:balance-initial-statics",
+      "notes": "Combines the carved memory with table ownership and memory length/limit, deriving the empty initial heap invariant and retaining the input/parser resources.",
+      "required_proof_dependencies": [
+        "balance-initial-memory"
+      ],
+      "reviewed_shape_hash": 1389735065
+    },
+    {
+      "id": "balance-initial-start-split",
+      "declaration": "WNear.Binary.InitialState.startRes297_gen",
+      "title": "Split initial store to all balance resources",
+      "kind": "theorem",
+      "label": "frontier:balance-initial-start-split",
+      "notes": "Derives code, frame, static, heap, table, host and gas resources from the separated initial store. All linear cells are extracted once.",
+      "required_proof_dependencies": [
+        "balance-initial-table",
+        "balance-initial-statics",
+        "balance-code-assembled"
+      ],
+      "reviewed_shape_hash": 1760511357
+    },
+    {
+      "id": "balance-initial-start",
+      "declaration": "WNear.Binary.InitialState.startRes297",
+      "title": "Whole initial store to balance resources",
+      "kind": "theorem",
+      "label": "frontier:balance-initial-start",
+      "notes": "Checked composition from ownership of the actual instantiated store to every resource used by the copied-array absent-account body.",
+      "required_proof_dependencies": [
+        "balance-initial-start-split"
+      ],
+      "reviewed_shape_hash": 3328929050
+    },
+    {
+      "id": "balance-initial-body",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body_initial_resources",
+      "title": "Copied body with initialized resources",
+      "kind": "theorem",
+      "label": "frontier:balance-initial-body",
+      "notes": "Instantiates the complete copied-array absent body with the actual initial frame, static words, table indices and empty heap. Exact input, absent key, host/trie/proof budget, runtime limits and credits remain explicit.",
+      "required_proof_dependencies": [
+        "balance-copied-body-initial-memory"
+      ],
+      "reviewed_shape_hash": 1302148608
+    },
+    {
+      "id": "balance-initial-store-body",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_body_initial_store",
+      "title": "Initial store supplies the copied body",
+      "kind": "theorem",
+      "label": "frontier:balance-initial-store-body",
+      "notes": "Derives all body resources from the whole instantiated store, funding credits from that store gas cell under an explicit budget and gas-limit premises. This is an update to the decoded-body Hoare contract, not a full external method clause.",
+      "required_proof_dependencies": [
+        "balance-initial-start",
+        "balance-initial-body"
+      ],
+      "reviewed_shape_hash": 685304844
+    },
+    {
+      "id": "balance-end-observations",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.endCells297_ends",
+      "title": "Ending balance cells imply host and gas observations",
+      "kind": "theorem",
+      "label": "frontier:balance-end-observations",
+      "notes": "Extracts both storage-read effects, final host return of quoted zero and the gas bound from the owned ending host/gas cells.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 1998841989
+    },
+    {
+      "id": "balance-decoded-entry",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.f297_frame",
+      "title": "Actual decoded function 297",
+      "kind": "theorem",
+      "label": "frontier:balance-decoded-entry",
+      "notes": "Kernel-checked function index and decoded body correspondence.",
+      "required_proof_dependencies": [],
+      "reviewed_shape_hash": 267003140
+    },
+    {
+      "id": "balance-entry-thread",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.startW_thread297",
+      "title": "Actual balance entry thread",
+      "kind": "theorem",
+      "label": "frontier:balance-entry-thread",
+      "notes": "The actual initialized entry thread has the four proved local defaults and the decoded function-297 body.",
+      "required_proof_dependencies": [
+        "balance-decoded-entry"
+      ],
+      "reviewed_shape_hash": 2504623438
+    },
+    {
+      "id": "balance-entry-activation",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.entryCost_297",
+      "title": "Balance activation costs eleven regular operations",
+      "kind": "theorem",
+      "label": "frontier:balance-entry-activation",
+      "notes": "Checks the separate activation charge of the actual entry frame. It has not yet been integrated with the model gas allowance.",
+      "required_proof_dependencies": [
+        "balance-entry-thread"
+      ],
+      "reviewed_shape_hash": 3296244403
+    },
+    {
+      "id": "balance-entry-adequacy",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_adequate",
+      "title": "Balance entry: ending-run adequacy",
+      "kind": "theorem",
+      "label": "frontier:balance-entry-adequacy",
+      "notes": "MaybeStuck adequacy from the actual initial store for the exact copied-array absent-account path. Any ending run returns no values with the proved host/gas cells. Does not prove termination, fuel sufficiency, general execution safety, arbitrary-gas rollback or full accepted-call refinement. Body gas is explicit; activation is separate.",
+      "required_proof_dependencies": [
+        "balance-initial-start",
+        "balance-initial-body"
+      ],
+      "reviewed_shape_hash": 2363005851
+    },
+    {
+      "id": "balance-entry-host",
+      "declaration": "WNear.Binary.BalanceOf297AbsentCall.copied_array_absent_adequate_host",
+      "title": "Balance entry: ending-run host and gas",
+      "kind": "theorem",
+      "label": "frontier:balance-entry-host",
+      "notes": "Connects the actual initialized entry thread to both storage-read effects, final host return of quoted zero and bounded used gas for runs that end. Exact input, absent key, host/trie/proof budget, runtime limits and body gas premises remain. No full external method clause is discharged.",
+      "required_proof_dependencies": [
+        "balance-entry-adequacy",
+        "balance-end-observations",
+        "balance-entry-thread"
+      ],
+      "reviewed_shape_hash": 2770906355
     }
   ],
   "reviewed_environment": [

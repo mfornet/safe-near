@@ -56,6 +56,32 @@ class FrontierPolicyTests(unittest.TestCase):
         self.audit = {'violations': [{'declaration': n, 'axioms': ['sorryAx']}
                                      for n in self.manifest['expected_incomplete']]}
 
+    def test_initial_entry_composition_keeps_ending_run_scope(self):
+        result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
+        self.assertEqual(result['balance-entry-host']['status'], 'Proven')
+        self.assertIn({'id': 'balance-entry-adequacy', 'status': 'Proven'},
+                      result['balance-initial-start']['integrated_into'])
+        self.assertIn({'id': 'balance-entry-host', 'status': 'Proven'},
+                      result['balance-end-observations']['integrated_into'])
+        self.assertNotIn('balance-accepted',
+                         [n['id'] for n in result['balance-entry-host']['integrated_into']])
+        for node in ['balance-accepted', 'balance-no-issue', 'balance-rejected']:
+            self.assertEqual(result[node]['status'], 'Open')
+        self.assertEqual(result['method-ft_balance_of']['status'], 'Conditional')
+        self.assertEqual(result['global']['status'], 'Conditional')
+
+    def test_initial_entry_cannot_lose_linear_resource_composition(self):
+        self.by_id['balance-initial-start-split']['proof_dependencies'].remove(
+            self.nodes['balance-initial-table']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'Checked composition lost dependencies'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
+    def test_initial_entry_cannot_hide_parser_verification_hypotheses(self):
+        self.by_id['balance-entry-host']['type_dependencies'].append(
+            self.nodes['ignore-hyp']['declaration'])
+        with self.assertRaisesRegex(ValueError, 'readiness does not match'):
+            blueprint.classify(self.manifest, self.rows, self.audit)
+
     def test_store_code_composition_preserves_external_frontier(self):
         result = {n['id']: n for n in blueprint.classify(self.manifest, self.rows, self.audit)}
         self.assertEqual(result['balance-copied-body-store-code']['status'], 'Proven')
