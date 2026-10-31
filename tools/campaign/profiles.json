@@ -1,0 +1,85 @@
+{
+  "default_profile": "default",
+  "exhaustion_reset_hours": 5,
+  "backends": {
+    "claude": {
+      "kind": "claude-cli",
+      "billing": "subscription",
+      "exhausted_patterns": [
+        "usage limit", "hit your limit", "reached your limit", "out of credits",
+        "credit balance", "rate limit", "limit resets"
+      ]
+    },
+    "codex": {
+      "kind": "codex-cli",
+      "billing": "subscription",
+      "exhausted_patterns": [
+        "usage limit", "hit your usage", "hit your limit", "quota", "insufficient_quota",
+        "limit resets", "plan limit"
+      ]
+    },
+    "deepseek": {
+      "kind": "openai-api",
+      "base_url": "https://api.deepseek.com",
+      "api_key_env": "DEEPSEEK_API_KEY",
+      "exhausted_patterns": ["insufficient balance", "Insufficient Balance", "\"code\": 402"]
+    }
+  },
+  "profiles": {
+    "default": {
+      "fallbacks": ["claude-exhausted", "codex-exhausted", "api-only"],
+      "roles": {
+        "architect": [{"backend": "claude", "model": "opus", "attempts": 1}],
+        "auditor": [{"backend": "codex", "model": null, "attempts": 1}, {"backend": "claude", "model": "opus", "attempts": 1}],
+        "prover": [{"backend": "claude", "model": "sonnet"}, {"backend": "codex", "model": null}, {"backend": "claude", "model": "opus", "attempts": 1}],
+        "grinder": [{"backend": "deepseek", "model": "deepseek-reasoner", "attempts": 3}, {"backend": "claude", "model": "haiku"}, {"backend": "claude", "model": "sonnet", "attempts": 1}],
+        "runner": [{"backend": "claude", "model": "haiku"}, {"backend": "codex", "model": null, "attempts": 1}],
+        "integrator": [{"backend": "claude", "model": "sonnet"}, {"backend": "codex", "model": null, "attempts": 1}]
+      }
+    },
+    "claude-exhausted": {
+      "fallbacks": ["api-only"],
+      "roles": {
+        "architect": [{"backend": "codex", "model": null, "attempts": 1}],
+        "auditor": [{"backend": "codex", "model": null, "attempts": 1}],
+        "prover": [{"backend": "codex", "model": null}, {"backend": "deepseek", "model": "deepseek-reasoner", "attempts": 3}],
+        "grinder": [{"backend": "deepseek", "model": "deepseek-reasoner", "attempts": 3}, {"backend": "codex", "model": null, "attempts": 1}],
+        "runner": [{"backend": "codex", "model": null}],
+        "integrator": [{"backend": "codex", "model": null}]
+      }
+    },
+    "codex-exhausted": {
+      "fallbacks": ["api-only"],
+      "roles": {
+        "architect": [{"backend": "claude", "model": "opus", "attempts": 1}],
+        "auditor": [{"backend": "claude", "model": "opus", "attempts": 1}],
+        "prover": [{"backend": "claude", "model": "sonnet"}, {"backend": "claude", "model": "opus", "attempts": 1}],
+        "grinder": [{"backend": "deepseek", "model": "deepseek-reasoner", "attempts": 3}, {"backend": "claude", "model": "haiku"}],
+        "runner": [{"backend": "claude", "model": "haiku"}],
+        "integrator": [{"backend": "claude", "model": "sonnet"}]
+      }
+    },
+    "api-only": {
+      "fallbacks": [],
+      "roles": {
+        "architect": [{"backend": "deepseek", "model": "deepseek-reasoner", "attempts": 1}],
+        "auditor": [{"backend": "deepseek", "model": "deepseek-reasoner", "attempts": 1}],
+        "prover": [{"backend": "deepseek", "model": "deepseek-reasoner", "attempts": 3}],
+        "grinder": [{"backend": "deepseek", "model": "deepseek-reasoner", "attempts": 3}, {"backend": "deepseek", "model": "deepseek-chat", "attempts": 3}],
+        "runner": [{"backend": "deepseek", "model": "deepseek-chat"}],
+        "integrator": [{"backend": "deepseek", "model": "deepseek-chat"}]
+      }
+    },
+    "cheap": {
+      "fallbacks": ["default"],
+      "roles": {
+        "architect": [{"backend": "claude", "model": "sonnet", "attempts": 1}],
+        "auditor": [{"backend": "claude", "model": "sonnet", "attempts": 1}],
+        "prover": [{"backend": "deepseek", "model": "deepseek-reasoner", "attempts": 3}, {"backend": "claude", "model": "haiku"}, {"backend": "claude", "model": "sonnet", "attempts": 1}],
+        "grinder": [{"backend": "deepseek", "model": "deepseek-chat", "attempts": 3}, {"backend": "deepseek", "model": "deepseek-reasoner", "attempts": 2}],
+        "runner": [{"backend": "claude", "model": "haiku"}],
+        "integrator": [{"backend": "claude", "model": "haiku"}]
+      }
+    }
+  }
+}

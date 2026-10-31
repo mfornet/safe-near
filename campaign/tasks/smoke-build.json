@@ -1,0 +1,11 @@
+{
+  "id": "smoke-build",
+  "role": "runner",
+  "kind": "report",
+  "title": "Build the wNEAR Spec library and report",
+  "brief": "campaign/briefs/smoke-build.md",
+  "package": "contracts/w-near/verification",
+  "check": ["lake build Spec"],
+  "base": "origin/main",
+  "timeout_minutes": 30
+}
